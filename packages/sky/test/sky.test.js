@@ -395,6 +395,20 @@ test('stars keep a 0.7 px minimum radius and their energy on square stereographi
   assert.match(night, /smoothstep\(0\.0,2\.0\*size,length\(cell-id-0\.5\)\)/);
 });
 
+test('the moon disc goes down before its glow, so the dark side reads as a dim moon inside the halo', () => {
+  const { night } = nightShaders(),
+    disc = night.indexOf('color=mix(color,frame.nightMoonColor.rgb'),
+    glow = night.indexOf('pow(max(cosine,0.0),32.0)');
+  assert.ok(disc > 0 && glow > disc, 'The glow is added after the disc');
+  assert.match(night, /\(smoothstep\(0\.0,0\.02,lit\)\+0\.04\)/, 'Earthshine on the unlit part');
+  assert.match(night, /0\.35\*\(1\.0-0\.6\*cover\)/, 'The glow is thinned, not removed, over the disc');
+  assert.match(
+    night,
+    /let edge=max\(0\.01,0\.5\*footprint\/frame\.nightMoonColor\.w\)/,
+    'The rim follows the footprint',
+  );
+});
+
 test('opt-in sunlight synchronizes before rendering and reverse clocks wrap at midnight', () => {
   const h = optionalGPU(),
     direction = new Float32Array([3, 5, 4, 3]),

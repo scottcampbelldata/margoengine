@@ -91,7 +91,8 @@ Set `night` to replace the default night gradient with a moonlit sky: a zenith-t
 stars above 15° and a moon disc with phase, glow and size. The object is read every frame, so mutate it for
 live controls. Each star is drawn at least 0.7 px in radius and dimmed by the area it covers, so it keeps its
 energy and holds steady while the camera moves; stars too small for the target (the 64 × 32 reflection) fade out.
-Stars twinkle on independent phases.
+Stars twinkle on independent phases. The moon disc is drawn before its glow: the unlit part keeps a faint
+earthshine and reads as a darker disc inside the halo, and the rim is filtered by the pixel or texel footprint.
 
 ```ts
 import {Engine} from '@margoengine/core';

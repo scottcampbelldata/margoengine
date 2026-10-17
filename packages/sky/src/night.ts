@@ -25,14 +25,20 @@ fn stylizedNight(r:vec3f,footprint:f32)->vec3f {
   }
   color+=vec3f(0.8,0.9,1.0)*stars*energy*params.z*smoothstep(0.258819,0.5,r.y)*(1.0-smoothstep(0.96,1.0,cosine));
  }
- color+=frame.nightMoonColor.rgb*pow(max(cosine,0.0),32.0)*params.y*0.35;
- if(cosine>moon.w){
+ // The disc goes down first, lit and dark parts alike; earthshine keeps the dark part a dim moon rather than a hole.
+ var cover=0.0;
+ if(cosine>0.0){
   let right=normalize(cross(moon.xyz,select(vec3f(0,1,0),vec3f(0,0,1),abs(moon.y)>0.99)));
-  let disc=vec2f(dot(r,right),dot(r,cross(right,moon.xyz)))/frame.nightMoonColor.w;let radius=dot(disc,disc);let limb=sqrt(max(0.0,1.0-radius));
-  let lit=disc.x*sqrt(max(0.0,1.0-params.x*params.x))+limb*params.x;
-  color=mix(color,frame.nightMoonColor.rgb*(0.8+0.2*limb)*smoothstep(0.0,0.02,lit),1.0-smoothstep(0.96,1.0,radius));
+  let disc=vec2f(dot(r,right),dot(r,cross(right,moon.xyz)))/frame.nightMoonColor.w;let radius=dot(disc,disc);
+  // A 0.02 floor on the limb term lets the filtered rim just outside the disc take the lighting just inside it.
+  let limb=sqrt(max(0.0004,1.0-radius));let lit=disc.x*sqrt(max(0.0,1.0-params.x*params.x))+limb*params.x;
+  // The rim is filtered over half a footprint each side; a sample wider than the disc spreads its energy (celestialProfile).
+  let edge=max(0.01,0.5*footprint/frame.nightMoonColor.w);
+  cover=(1.0-smoothstep(1.0-edge,1.0+edge,sqrt(radius)))*min(1.0,1.0/(edge*edge));
+  color=mix(color,frame.nightMoonColor.rgb*(0.8+0.2*limb)*(smoothstep(0.0,0.02,lit)+0.04),cover);
  }
- return color;
+ // The glow is atmosphere in front of the moon: added last, thinned to 40% over the disc so its dark side reads against it.
+ return color+frame.nightMoonColor.rgb*pow(max(cosine,0.0),32.0)*params.y*0.35*(1.0-0.6*cover);
 }
 `,
   validate(n) {
