@@ -7,15 +7,18 @@ import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
 import { parseGLTFAsync } from '../packages/gltf-pro/dist/index.js';
 import { animatedTriangle } from './support/gltf-pro-fixture.js';
+import { mockGPU } from '../examples/package-benchmarks/proofs/gpu-recorder.js';
 
+// PBRModel needs a WebGPU device: a recording mock (no drawing happens here).
 async function headless() {
-  return new Engine(
-    { width: 8, height: 8, clientWidth: 8, clientHeight: 8 },
-    await TransformStore.create(16),
-    { backend: 'webgl2', add() {}, remove() {}, render() {}, dispose() {} },
-    undefined,
-    null,
-  );
+  return new Engine({ width: 8, height: 8, clientWidth: 8, clientHeight: 8 }, await TransformStore.create(16), {
+    backend: 'webgpu',
+    gpu: mockGPU().device,
+    add() {},
+    remove() {},
+    render() {},
+    dispose() {},
+  });
 }
 function coated() {
   const fixture = animatedTriangle();

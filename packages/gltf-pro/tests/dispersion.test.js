@@ -59,7 +59,7 @@ test('dispersion validates factors even when transmission is zero', async (t) =>
   }
 });
 
-test('required dispersion loads without an extension hook and accepts factors above one', async (t) => {
+test('required dispersion loads with the physical shader opted out and accepts factors above one', async (t) => {
   const engine = await scene();
   t.after(() => engine.dispose());
   const input = fixture({ dispersion: 2.5 });
@@ -82,7 +82,10 @@ test('required dispersion loads without an extension hook and accepts factors ab
         server.closeAllConnections();
       }),
   );
-  const model = await loadGLTF(engine, `http://127.0.0.1:${server.address().port}/model.gltf`);
+  // Physical extensions load the physical shader by default (a389bc5); materials: false keeps the base shader.
+  const model = await loadGLTF(engine, `http://127.0.0.1:${server.address().port}/model.gltf`, {
+    decoders: { materials: false },
+  });
   assert.equal(model.primitives[0].material.dispersion, 2.5);
   assert.equal(model.primitives[0].material.physical, undefined);
 });
