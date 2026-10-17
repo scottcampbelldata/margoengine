@@ -136,13 +136,35 @@ test('shadows casts from the meshes present when it is called', async () => {
 
 test('environment hands the stage engine, source and options to EnvironmentLighting.load and returns its lighting', async () => {
   const { app, engine } = await scene(),
-    options = { intensity: 2 };
+    caller = AbortSignal.abort(),
+    options = { intensity: 2, signal: caller };
   try {
     const lighting = await app.environment('/studio.hdr', options);
-    assert.deepEqual(loads.at(-1), [engine, '/studio.hdr', options]);
+    const forwarded = loads.at(-1);
+    assert.equal(forwarded[0], engine);
+    assert.equal(forwarded[1], '/studio.hdr');
+    assert.equal(forwarded[2].intensity, 2);
+    assert.notEqual(forwarded[2].signal, caller);
+    assert.equal(forwarded[2].signal.aborted, true);
     assert.equal(lighting.name, 'environment:lighting');
   } finally {
     app.dispose();
+  }
+});
+
+test('environment does not call EnvironmentLighting.load when disposal wins the import race', async () => {
+  for (const disposeEngine of [false, true]) {
+    const { app, engine } = await scene(),
+      before = loads.length;
+    const pending = app.environment('/studio.hdr', { intensity: 1 });
+    const rejected = assert.rejects(pending, (error) => error.name === 'AbortError');
+    if (disposeEngine) engine.dispose();
+    else app.dispose();
+    await rejected;
+    assert.equal(loads.length, before);
+    assert.equal(engine.disposed, true);
+    await assert.rejects(app.environment('/studio.hdr'), (error) => error.name === 'AbortError');
+    assert.equal(loads.length, before);
   }
 });
 

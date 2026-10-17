@@ -1,6 +1,6 @@
 # margoengine
 
-High-level setup for Margo Engine. Mount a canvas, enable orbit/pan/zoom, start rendering and create a spinning orb in five lines. Core selects WebGPU with WebGL2 fallback, handles resize and automatically recovers WebGPU device loss. WebGL2 context loss reports through `onError` and stops rendering; dispose and recreate the stage to resume.
+High-level setup for Margo Engine. Mount a canvas, enable orbit/pan/zoom, start rendering and create a spinning orb in five lines. The stage creates a WebGPU engine. Pass `fallback` from the optional `@margoengine/webgl` when a browser has no WebGPU; without it, creation rejects with `WebGPU unavailable`. Core handles resize and automatically recovers a lost WebGPU device. A lost WebGL2 context reports through `onError` and stops rendering; dispose and recreate the stage to resume.
 
 This package is built from source alongside the engine. See the [package catalog](../../docs/README.md) for npm availability. Run `npm run build:packages` in the repository, or install its local tarball and `@margoengine/core`. The only dependency is `@margoengine/core`. `@margoengine/gltf`, `@margoengine/machinery`, `@margoengine/creative`, `@margoengine/scenery`, `@margoengine/environment`, and `@margoengine/shadows` are optional peers. `load`, `sky`, `particles`, `effects`, `environment`, and `shadows` import them on use and reject with `Install <package>` when they are absent. Dynamic imports keep that runtime code out of the initial scene.
 
@@ -27,7 +27,7 @@ Use a selector, an HTMLElement container or an existing canvas. The wrapper appe
 | `app.sphere({radius, segments, ...options})` | Creates an orb with the same material/transform options as boxes |
 | `app.box({size, color, roughness, metalness, position, rotation, scale, parent, name})` | Creates a box and returns the existing mutable mesh handle |
 | `app.mesh(geometry, options)` | Attaches existing or custom geometry with the same options |
-| `await app.load(url, options)` | Loads glTF/GLB/STL/OBJ/STEP/IGES, exposes root transforms and fits the imported meshes |
+| `await app.load(url, options)` | Imports `@margoengine/gltf` for glTF/GLB or `@margoengine/machinery/cad` for STL/OBJ/STEP/IGES, then exposes root transforms and fits the imported meshes. A missing pack rejects with `Install @margoengine/<name>` |
 | `app.onTick(delta => { ... })` | Runs once per frame with delta in seconds; returns an unsubscribe function |
 | `app.fit()` / `app.fit(model.meshes)` | Fits visible geometry, including world transforms and hierarchy |
 | `await app.sky(options)` | Loads the scenery `/sky` entry and attaches SkyMoon |

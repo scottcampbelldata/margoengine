@@ -2,11 +2,11 @@
 
 The product is six packages: the [`margoengine`](packages/margoengine/README.md) stage, [`@margoengine/core`](packages/core/README.md), [`@margoengine/react`](packages/react/README.md), [`@margoengine/gltf`](packages/gltf/README.md), [`@margoengine/gltf-pro`](packages/gltf-pro/README.md), and [`@margoengine/machinery`](packages/machinery/README.md). The demo is [Night Citadel](apps/showcase-night-citadel/README.md): `npm run dev`.
 
-The current consolidated build measures **18,626 bytes gzip** (42,922 raw) for core and **20,827 bytes gzip** (49,361 raw) for core plus the stage facade, including embedded Wasm and both backends. Those bytes are a mesh, one directional light, orbit controls, and the loader shell. That is below the gate. CI rejects a combined size of **25,000 bytes gzip or above**.
+The current consolidated build measures **18,626 bytes gzip** (42,922 raw) for core and **20,850 bytes gzip** (49,482 raw) for core plus the stage facade, including the embedded Wasm kernel and the WebGPU backend. Those bytes are a mesh, one directional light, orbit controls, and the loader shell. WebGL2 is the optional `@margoengine/webgl` package, passed as `fallback`. That is below the gate. CI rejects a combined size of **25,000 bytes gzip or above**.
 
 The optional React entry measures **20,966 bytes gzip** on its own, with React and optional package peers external. It is additional to the base; an application bundle also includes the peers it uses. Measurements are recorded in [entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json).
 
-A small Rust/Wasm engine for web apps, with WebGPU rendering, WebGL2 fallback, ordinary React components and optional domain packs.
+A small Rust/Wasm engine for web apps, with WebGPU rendering, an optional WebGL2 fallback, ordinary React components and optional domain packs.
 
 Official website: [margoengine.com](https://margoengine.com). Built with precision, named with love. For Margie.
 
@@ -200,7 +200,7 @@ Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. T
 
 <!-- /package-list -->
 
-The current consolidated build measures **18,626 bytes gzip** for core and **20,827 bytes gzip** for core plus the stage facade, including embedded Wasm and both backends. Those bytes are a mesh, one directional light, orbit controls, and the loader shell. The base is feature-frozen for v1.0.0; every push and pull request runs a CI build that rejects a combined size of **25,000 bytes gzip or above** and checks package isolation. Optional PBR, animation and SSAO packages use the existing extension hooks and do not enter the base bundle. The build also retains the 30 KiB combined core/static-glTF budget and 30 KiB raw Wasm budget. React/framework/application code is additional; domain packages have no separate 25 KiB ceiling.
+The current consolidated build measures **18,626 bytes gzip** for core and **20,850 bytes gzip** for core plus the stage facade, including the embedded Wasm kernel and the WebGPU backend. Those bytes are a mesh, one directional light, orbit controls, and the loader shell. WebGL2 is the optional `@margoengine/webgl` package, passed as `fallback`. The base is feature-frozen for v1.0.0; every push and pull request runs a CI build that rejects a combined size of **25,000 bytes gzip or above** and checks package isolation. Optional PBR, animation and SSAO packages use the existing extension hooks and do not enter the base bundle. The build also retains the 30 KiB combined core/static-glTF budget and 30 KiB raw Wasm budget. React/framework/application code is additional; domain packages have no separate 25 KiB ceiling.
 
 The six requested game modules (shadows, clustered, animator, TAA, VFX and splats), plus terrain, use those hooks. Build with `npm run build:packages`; run `npm run modern:test:game` for their combined WebGPU rendering/culling/cache/IK/particle checks, temporal reprojection/clamping, skinned motion, stable radix sorting and ellipse blending. `npm run modern:test:game:packages` checks ten packed packages and seven standalone README TypeScript examples. The normal sort test covers 66,049 splats across hierarchical scan blocks; set `SPLAT_STRESS=1` for the additional three-million-splat capacity/sort check. Million-particle, three-million-splat and 1,024-light execution tests validate correctness separately from FPS claims. These source packages have not been published by this change.
 
@@ -280,7 +280,7 @@ captures, complete Khronos material/KTX2/UV1 assets, and eight-influence charact
 GPU readback, plus 45 local-shadow and 46 deformed-picking captures.
 These results describe that earlier checkout, not a rerun of its browser captures
 on the consolidated tree. The current `npm run measure:size` result is
-**49,361 bytes raw / 20,827 bytes gzip** for core + stage.
+**49,482 bytes raw / 20,850 bytes gzip** for core + stage.
 The [release notes](CHANGELOG.md#unreleased) record the parser,
 normalization, index-boundary and lifecycle checks.
 

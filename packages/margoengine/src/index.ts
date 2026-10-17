@@ -228,12 +228,16 @@ export class Stage {
   }
   /**
    * Loads `@margoengine/environment` and lights every mesh with image-based lighting from an `.hdr`, `.exr` or
-   * UltraHDR `.jpg` URL (or a decoded source). Rejects with `AbortError`, attaching nothing, if the stage is disposed first.
+   * UltraHDR `.jpg` URL (or a decoded source). The stage disposal signal is combined with `options.signal` and
+   * forwarded. Rejects with `AbortError`, attaching nothing, if the stage is disposed first.
    * A missing package rejects with `Install @margoengine/environment`.
    */
   async environment(source: string | URL | object, options?: object): Promise<object> {
     const { EnvironmentLighting } = await loadPackage('@margoengine/environment', () => import('@margoengine/environment'));
-    return EnvironmentLighting.load(this.engine, source as never, options as never);
+    this.imports.signal.throwIfAborted();
+    const caller = options as { signal?: AbortSignal } | undefined;
+    const signal = caller?.signal ? AbortSignal.any([caller.signal, this.imports.signal]) : this.imports.signal;
+    return EnvironmentLighting.load(this.engine, source as never, { ...caller, signal } as never);
   }
   /**
    * Loads `@margoengine/shadows` and attaches cascaded shadows for the stage's directional light. Meshes present now
