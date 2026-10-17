@@ -100,6 +100,72 @@ test('edgeShrink scales instances to zero over the last stretch before the cull 
   effect.dispose();
 });
 
+test('blades shade grass from root to tip and bend lit normals toward the ground only when asked', () => {
+  const blade = new Geometry(
+      [-0.04, 0, 0, 0.04, 0, 0, 0, 0.5, 0],
+      [0, 0.24, 0.97, 0, 0.24, 0.97, 0, 0.24, 0.97],
+      [0, 1, 2],
+    ),
+    plain = new Scatter(blade),
+    grass = new Scatter(blade, { lod: [10, 20, 40], blades: {} });
+  assert.deepEqual(Array.from(plain.values.slice(76, 80)), [0, 0, 0, 0], 'off by default');
+  assert.deepEqual(
+    Array.from(grass.values.slice(76, 80)),
+    [0.5, 1 / 40, 2, 1 / 40].map(Math.fround),
+    'rootShade, widen per unit of distance, 1 / tip height, 1 / last distance',
+  );
+  assert.equal(grass.values[35], Math.fround(plain.values[35] * 2), 'cull bounds cover blades twice as wide');
+  const tuned = new Scatter(blade, { lod: [10, 20, 40], blades: { rootShade: 0.7, widen: 0.5 } });
+  assert.deepEqual(Array.from(tuned.values.slice(76, 78)), [0.7, 0.5 / 40].map(Math.fround));
+  for (const blades of [{ rootShade: 1.2 }, { rootShade: -0.1 }, { widen: -1 }, { widen: 11 }, { widen: NaN }])
+    assert.throws(() => new Scatter(blade, { blades }), { name: 'RangeError', message: /rootShade 0-1 and widen/ });
+  assert.throws(() => new Scatter(blade, { blades: 1 }), { name: 'TypeError', message: /options object/ });
+  const flat = new Geometry([0, 0, 0, 1, 0, 0, 0, 0, 1], [0, 1, 0, 0, 1, 0, 0, 1, 0], [0, 1, 2]);
+  assert.throws(() => new Scatter(flat, { blades: {} }), { name: 'RangeError', message: /rise above/ });
+  const build = (options) => {
+    const h = optionalGPU();
+    h.engine.lighting = {
+      direction: new Float32Array([-1, 0.13, 0, 1]),
+      radiance: new Float32Array([1, 0.8, 0.54, 0.18]),
+    };
+    h.context.shader = wgsl;
+    h.context.bindings = [];
+    const effect = new Scatter(
+      [blade, blade, new Geometry([0, 0, 0, 0.1, 0, 0, 0, 0.5, 0], [0, 0, 1, 0, 0, 1, 0, 0, 1], [0, 1, 2])],
+      {
+        count: 4,
+        ...options,
+      },
+    );
+    h.engine.use(effect);
+    h.engine.frameGraph.execute(h.context);
+    const code = h.pipelines.find((p) => p.fragment).vertex.module.code,
+      material = effect.materialUniform && Array.from(new Float32Array(effect.materialUniform.data));
+    effect.dispose();
+    return { code, material };
+  };
+  const bent = 'let n=normalize(mix(normalize(i.normal)*select(-1.0,1.0,facing),i.ground.xyz,i.ground.w));';
+  for (const lodFade of [2, 0]) {
+    const lit = build({ lodFade, blades: {}, material: new PbrMaterial({ doubleSided: true }) });
+    assert.ok(lit.code.includes(bent), `lodFade ${lodFade}: the shading normal bends after the back-face flip`);
+    assert.match(lit.code, /@location\(5\) ground:vec4f/);
+    assert.match(lit.code, /o\.color=material\[0\]\.rgb\*pose\.shade;/);
+    assert.match(lit.code, /o\.ground=pose\.ground;/);
+    assert.match(lit.code, /var<uniform> material:array<vec4f,5>/);
+    assert.equal(lit.code.includes('lodVisible'), lodFade > 0);
+    assert.deepEqual(lit.material.slice(16, 20), [0.5, 1 / 120, 2, 1 / 120].map(Math.fround));
+    const off = build({ lodFade, material: new PbrMaterial({ doubleSided: true }) });
+    assert.ok(off.code.includes('let n=normalize(i.normal)*select(-1.0,1.0,facing);'), 'core normal untouched');
+    assert.doesNotMatch(off.code, /i\.ground|pose\.shade/);
+    const unlit = build({ lodFade, blades: {} });
+    assert.match(
+      unlit.code,
+      /let n=normalize\(mix\(normalize\(i\.normal\)\*select\(-1\.0,1\.0,front\),i\.ground\.xyz,i\.ground\.w\)\);/,
+    );
+    assert.match(unlit.code, /frame\.color\.rgb\*i\.shade\*/);
+  }
+});
+
 test('scatter frustum bounds include geometry displaced from its local origin', () => {
   const h = optionalGPU(),
     geometry = new Geometry([10, 0, 0, 11, 0, 0, 10, 1, 0], [0, 0, 1, 0, 0, 1, 0, 0, 1], [0, 1, 2]),

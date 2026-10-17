@@ -175,6 +175,23 @@ try {
         check(Math.abs(scale - expected) < 1e-3, `Edge shrink ${scale} at ${distance}, expected ${expected}`);
       }
       shrinking.dispose();
+      // Every blades variant (lit and unlit, with and without the LOD fade) must compile; validate() checks below.
+      for (const material of [undefined, new PbrMaterial({ color: [0.2, 0.3, 0.1], doubleSided: true })])
+        for (const lodFade of [2, 0]) {
+          const blades = Scatter.attach(
+            engine,
+            [2, 1, 0].map((detail) => toGeometry(icosahedronGeometry(1, detail, true))),
+            {
+              count: 16,
+              area: [4, 4],
+              lodFade,
+              material,
+              blades: { rootShade: 0.6, widen: 1 },
+            },
+          );
+          await frame();
+          blades.dispose();
+        }
       engine.camera.position = [0, 0, 3];
       engine.camera.target = [0, 0, 0];
       // Bilinear ground: a 4x4 r32float ramp rising 0.5 per texel along X, one texel per world unit, so texel centres sit

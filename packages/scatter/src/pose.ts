@@ -1,7 +1,8 @@
 /**
  * WGSL that places one GPU scatter vertex. Instances store `position = (x, y, z, scale)` and
  * `rotation = (yaw, packed ground normal, LOD fade, fade mode)`; the ground normal's X and Z take 12 bits each in one
- * float (integers below 2^24 are exact). `ground.x` is the `alignToGround` amount. Needs `windShader`.
+ * float (integers below 2^24 are exact). `ground.x` is the `alignToGround` amount; `blade` is
+ * `(rootShade, widen / far, 1 / mesh top, 1 / far)`, all 0 without `blades`. Needs `windShader`.
  */
 export const poseShader = /* wgsl */ `
 fn scatterGround(packed:f32)->vec3f {
@@ -13,11 +14,16 @@ fn scatterTurn(v:vec3f,c:f32,s:f32,up:vec3f)->vec3f {
  let r=vec3f(c*v.x+s*v.z,v.y,-s*v.x+c*v.z);let k=vec3f(up.z,0,-up.x);
  return r*up.y+cross(k,r)+k*dot(k,r)/(1.0+up.y);
 }
-struct ScatterPose {world:vec3f,normal:vec3f}
-fn scatterPose(p:vec3f,n:vec3f,position:vec4f,rotation:vec4f,ground:vec4f,wind:vec4f)->ScatterPose {
- let c=cos(rotation.x);let s=sin(rotation.x);let up=normalize(mix(vec3f(0,1,0),scatterGround(rotation.y),ground.x));
- var world=scatterTurn(p,c,s,up)*position.w+position.xyz;
+// ground.xyz is the terrain normal and ground.w how far the shading normal blends toward it; shade scales the albedo.
+struct ScatterPose {world:vec3f,normal:vec3f,ground:vec4f,shade:f32}
+fn scatterPose(p:vec3f,n:vec3f,position:vec4f,rotation:vec4f,ground:vec4f,blade:vec4f,eye:vec3f,wind:vec4f)->ScatterPose {
+ let c=cos(rotation.x);let s=sin(rotation.x);let g=scatterGround(rotation.y);let up=normalize(mix(vec3f(0,1,0),g,ground.x));
+ // Blades: t is 0 at the root and 1 at the tip; distant blades widen so they do not thin below a pixel and alias.
+ let d=distance(position.xyz,eye);let t=clamp(p.y*blade.z,0.0,1.0);let wide=1.0+d*blade.y;
+ var world=scatterTurn(vec3f(p.x*wide,p.y,p.z*wide),c,s,up)*position.w+position.xyz;
  let bend=windBend(world.y-position.y,position.xz,wind);world+=vec3f(bend.x,0,bend.y);
- return ScatterPose(world,windNormal(scatterTurn(n,c,s,up),bend,wind));
+ // Ground normal at the root, the blade's own normal at the tip, and all ground by the last LOD distance.
+ let weight=select(0.0,1.0-t*(1.0-min(d*blade.w,1.0)),blade.w>0.0);
+ return ScatterPose(world,windNormal(scatterTurn(n,c,s,up),bend,wind),vec4f(g,weight),1.0-blade.x*(1.0-t));
 }
 `;

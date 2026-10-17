@@ -48,6 +48,8 @@ export function createLandscapeDetails(
       lod: [18, 42, 105],
       // Blades shrink to nothing over the last 25 m instead of vanishing at 105 m.
       edgeShrink: 25,
+      // Roots darken and shade like the ground under them; distant blades widen instead of shimmering.
+      blades: { rootShade: 0.5, widen: 1 },
       material: new PbrMaterial({ color: [0.19, 0.28, 0.09], roughness: 0.95, doubleSided: true }),
       wind: [1, 0.35, 0.2],
       // Blades stay upright; a 2 cm sink hides roots on small bumps between heightmap texels.

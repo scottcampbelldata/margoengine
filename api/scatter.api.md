@@ -44,6 +44,11 @@ export interface ScatterBatch {
     windDetail?: number;
 }
 
+export interface ScatterBlades {
+    rootShade?: number;
+    widen?: number;
+}
+
 export class ScatterInstances implements EnginePlugin {
     readonly name: string;
     readonly batches: {
@@ -90,6 +95,7 @@ export interface ScatterOptions {
     alignToGround?: number;
     sink?: number;
     edgeShrink?: number;
+    blades?: ScatterBlades;
 }
 
 export type ScatterWind = readonly [number, number, number];

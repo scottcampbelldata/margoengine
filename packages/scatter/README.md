@@ -52,6 +52,19 @@ buried on the downhill side of steep ground. Both read the same bilinear patch
 of the heightmap as placement. Each instance keeps 32 bytes: position and scale,
 then yaw, the ground normal's X and Z packed into one float, and the LOD fade.
 
+`blades: { rootShade, widen }` shades instances as grass blades: upright meshes
+whose local origin is the root and whose tallest vertex is the tip. Albedo darkens
+linearly toward the root (`rootShade`, default 0.5, is the fraction lost there).
+The shading normal blends from the ground normal at the root to the blade's own
+normal at the tip, after the back-face flip so both sides agree, and fully to the
+ground normal by the last LOD distance: a distant field shades like the terrain
+under it instead of speckling, after Wohllaib's Ghost of Tsushima grass (GDC 2021).
+Blades also widen with distance, by `widen` (default 1, twice as wide) at the last
+LOD distance, so thin far blades stay about a pixel wide instead of shimmering.
+Lit and unlit scatter both support it; without `blades` the lit shader keeps
+core's shading normal untouched. Cost: one distance per vertex, one extra varying,
+and one mix and normalize per fragment.
+
 LOD meshes must use matching origins, scale and shading. For procedural rocks,
 pass `true` as the third argument to `icosahedronGeometry(radius, detail, true)`
 from `@margoengine/geometry`, including at detail 0, and keep the same radius in

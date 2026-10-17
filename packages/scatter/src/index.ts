@@ -39,6 +39,16 @@ declare const GPUBufferUsage: {
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 const heightFormats = ['r32float', 'r16float', 'rgba32float', 'rgba16float', 'r8unorm'];
+/** Grass-blade shading for GPU `Scatter` (see `ScatterOptions.blades`). */
+export interface ScatterBlades {
+  /** Albedo lost at the root, 0-1 (default 0.5): blades darken linearly from the tip (1) to the root (1 - rootShade). */
+  rootShade?: number;
+  /**
+   * Extra blade width at the last LOD distance as a fraction, 0-10 (default 1: twice as wide), growing linearly with
+   * distance from 0 at the camera. Thin distant blades otherwise fall below a pixel and shimmer.
+   */
+  widen?: number;
+}
 export interface ScatterOptions {
   count?: number;
   area?: readonly [number, number];
@@ -77,9 +87,16 @@ export interface ScatterOptions {
    * `discard`; widths past the last distance are clamped to it.
    */
   edgeShrink?: number;
+  /**
+   * Shades instances as grass blades: upright geometry whose local origin is the root and whose tallest vertex is the
+   * tip (default off). Albedo darkens toward the root; the shading normal blends from the ground normal at the root to
+   * the blade's own normal at the tip, and fully to the ground normal by the last LOD distance, so a field shades like
+   * the terrain under it instead of speckling (after Wohllaib, GDC 2021); distant blades widen. `{}` uses the defaults.
+   */
+  blades?: ScatterBlades;
 }
 const frame = `
-struct Frame {camera:mat4x4f,eye:vec4f,area:vec4f,rules:vec4f,scale:vec4f,lod:vec4f,ids:vec4u,color:vec4f,planes:array<vec4f,6>,wind:vec4f,ground:vec4f}
+struct Frame {camera:mat4x4f,eye:vec4f,area:vec4f,rules:vec4f,scale:vec4f,lod:vec4f,ids:vec4u,color:vec4f,planes:array<vec4f,6>,wind:vec4f,ground:vec4f,blade:vec4f}
 struct Instance {position:vec4f,rotation:vec4f}
 @group(0) @binding(0) var<uniform> frame:Frame;
 `;
@@ -146,33 +163,35 @@ const renderCode =
   poseShader +
   `
 @group(0) @binding(1) var<storage,read> instances:array<Instance>;
-struct Output {@builtin(position) clip:vec4f,@location(0) normal:vec3f,@location(1) @interpolate(flat) lodFade:vec2f}
+struct Output {@builtin(position) clip:vec4f,@location(0) normal:vec3f,@location(1) @interpolate(flat) lodFade:vec2f,@location(2) ground:vec4f,@location(3) shade:f32}
 @vertex fn vertex(@location(0) p:vec3f,@location(1) n:vec3f,@builtin(instance_index) index:u32)->Output{
- let data=instances[index];let pose=scatterPose(p,n,data.position,data.rotation,frame.ground,frame.wind);
- return Output(frame.camera*vec4f(pose.world,1),pose.normal,data.rotation.zw);
+ let data=instances[index];let pose=scatterPose(p,n,data.position,data.rotation,frame.ground,frame.blade,frame.eye.xyz,frame.wind);
+ return Output(frame.camera*vec4f(pose.world,1),pose.normal,data.rotation.zw,pose.ground,pose.shade);
 }
-@fragment fn fragment(i:Output,@builtin(front_facing) front:bool)->@location(0) vec4f {if(!lodVisible(i.clip.xy,i.lodFade)){discard;}var color=frame.color.rgb*(0.25+max(0.0,dot(normalize(i.normal)*select(-1.0,1.0,front),normalize(vec3f(1,2,1))))*0.75);if(frame.color.w<0.5){color=pow(color/(1.0+color),vec3f(1.0/2.2));}return vec4f(color,1);}
+@fragment fn fragment(i:Output,@builtin(front_facing) front:bool)->@location(0) vec4f {if(!lodVisible(i.clip.xy,i.lodFade)){discard;}let n=normalize(mix(normalize(i.normal)*select(-1.0,1.0,front),i.ground.xyz,i.ground.w));var color=frame.color.rgb*i.shade*(0.25+max(0.0,dot(n,normalize(vec3f(1,2,1))))*0.75);if(frame.color.w<0.5){color=pow(color/(1.0+color),vec3f(1.0/2.2));}return vec4f(color,1);}
 `;
 // Without a LOD fade no instance is ever dithered out, yet any `discard` in a fragment shader stops tile-based (phone)
 // GPUs from rejecting hidden fragments before shading. This variant has no fade varying, no mask and no discard.
 const solidCode = renderCode
   .replace(fadeCode, '')
   .replace(',@location(1) @interpolate(flat) lodFade:vec2f', '')
-  .replace(',data.rotation.zw);', ');')
+  .replace(',data.rotation.zw,', ',')
   .replace('if(!lodVisible(i.clip.xy,i.lodFade)){discard;}', '');
-const pbrVertex =
+/** Lit vertex stage: `fade` writes the LOD fade varying, `blades` the root shade and the ground-normal varying. */
+const pbrVertex = (fade: boolean, blades: boolean) =>
   windShader +
   poseShader +
   `
 struct ScatterInstance {position:vec4f,rotation:vec4f}
 @group(1) @binding(0) var<storage,read> instances:array<ScatterInstance>;
-@group(1) @binding(1) var<uniform> material:array<vec4f,4>;
+@group(1) @binding(1) var<uniform> material:array<vec4f,5>;
 @vertex fn vertex(@location(0) p:vec3f,@location(1) n:vec3f,@builtin(instance_index) index:u32)->Output {
- let data=instances[index];let pose=scatterPose(p,n,data.position,data.rotation,material[3],material[2]);
+ let data=instances[index];let pose=scatterPose(p,n,data.position,data.rotation,material[3],material[4],frame.eye.xyz,material[2]);
  var o:Output;o.position=pose.world;o.clip=frame.camera*vec4f(o.position,1);o.normal=pose.normal;
- o.color=material[0].rgb;o.material=vec4f(material[1].xyz,1);o.lodFade=data.rotation.zw;return o;
+ o.color=material[0].rgb${blades ? '*pose.shade' : ''};o.material=vec4f(material[1].xyz,1);${fade ? 'o.lodFade=data.rotation.zw;' : ''}${blades ? 'o.ground=pose.ground;' : ''}return o;
 }
 `;
+const coreNormal = 'let n=normalize(i.normal)*select(-1.0,1.0,facing);';
 let serial = 0;
 export class Scatter implements EnginePlugin {
   readonly name = 'scatter:' + ++serial;
@@ -185,12 +204,12 @@ export class Scatter implements EnginePlugin {
   private fallback?: GPUTexture;
   private compute?: GPUComputePipeline;
   private pipelines = new Map<string, GPURenderPipeline>();
-  private readonly values = new Float32Array(76);
+  private readonly values = new Float32Array(80);
   private readonly meta = new Uint32Array(this.values.buffer);
   private readonly geometries: readonly Geometry[];
   private disposed = false;
   readonly count: number;
-  private readonly materialValues = new Float32Array(16);
+  private readonly materialValues = new Float32Array(20);
   private time = 0;
   private terrain?: GPUTexture;
   private computeGroup?: GPUBindGroup;
@@ -321,6 +340,20 @@ export class Scatter implements EnginePlugin {
     this.values[72] = alignToGround;
     this.values[73] = sink;
     this.values[74] = Math.min(edgeShrink, lod[2]);
+    const { blades } = options;
+    if (blades !== undefined) {
+      if (typeof blades !== 'object' || blades === null)
+        throw new TypeError('Scatter blades must be an options object');
+      const { rootShade = 0.5, widen = 1 } = blades;
+      if (![rootShade, widen].every(Number.isFinite) || rootShade < 0 || rootShade > 1 || widen < 0 || widen > 10)
+        throw new RangeError('Scatter blades need rootShade 0-1 and widen 0-10');
+      let top = 0;
+      for (const g of this.geometries)
+        for (let i = 1; i < g.vertices.length; i += 6) top = Math.max(top, g.vertices[i]);
+      if (!(top > 0)) throw new RangeError('Scatter blades need meshes that rise above their local origin (the root)');
+      this.values.set([rootShade, widen / lod[2], 1 / top, 1 / lod[2]], 76);
+      this.values[35] *= 1 + widen; // cull bounds include the widest blades
+    }
     // Compute emits fading instances only for a nonzero width between rings that use different meshes.
     this.fade = this.values[31] > 0 && this.meta[39] !== 0;
   }
@@ -354,7 +387,7 @@ export class Scatter implements EnginePlugin {
     d.queue.writeBuffer(this.exclusionBuffer, 0, this.exclusionValues as Float32Array<ArrayBuffer>);
     if (this.options.material) {
       this.pbrUniform = d.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-      this.materialUniform = d.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      this.materialUniform = d.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
       this.materialValues.set(this.options.material.data);
     }
     this.commands = d.createBuffer({
@@ -438,7 +471,7 @@ export class Scatter implements EnginePlugin {
     const lit = !!this.options.material;
     if (lit) {
       this.materialValues.set(this.options.material!.data);
-      this.materialValues.set(this.values.subarray(68, 76), 8); // wind, then ground fit
+      this.materialValues.set(this.values.subarray(68, 80), 8); // wind, ground fit, blades
       c.device.queue.writeBuffer(this.materialUniform!, 0, this.materialValues as Float32Array<ArrayBuffer>);
       if (this.pbrShader !== c.shader) {
         this.pipelines.clear();
@@ -472,26 +505,34 @@ export class Scatter implements EnginePlugin {
       (culled ? ':culled' : '');
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
-      const vertex = c.shader.includes('var<uniform> taaCamera:')
-        ? pbrVertex.replace('o.clip=frame.camera*', 'o.clip=taaCamera*')
-        : pbrVertex;
-      const code = !lit
-        ? this.fade
-          ? renderCode
-          : solidCode
-        : this.fade
-          ? c.shader
-              .replace(/struct Input \{[^}]+\}/, '')
-              .replace(
-                '@location(3) material:vec4f',
-                '@location(3) material:vec4f,@location(4) @interpolate(flat) lodFade:vec2f',
-              )
-              .replace(/@vertex fn vertex\([\s\S]*?(?=@fragment)/, vertex)
-              .replace(/(@fragment fn fragment[^{]+\{)/, '$1\n if(!lodVisible(i.clip.xy,i.lodFade)){discard;}') +
-            fadeCode
-          : c.shader
-              .replace(/struct Input \{[^}]+\}/, '')
-              .replace(/@vertex fn vertex\([\s\S]*?(?=@fragment)/, vertex.replace('o.lodFade=data.rotation.zw;', ''));
+      const blades = this.values[78] > 0,
+        vertex = pbrVertex(this.fade, blades);
+      let code = !lit ? (this.fade ? renderCode : solidCode) : c.shader.replace(/struct Input \{[^}]+\}/, '');
+      if (lit) {
+        code = code
+          .replace(
+            '@location(3) material:vec4f',
+            '@location(3) material:vec4f' +
+              (this.fade ? ',@location(4) @interpolate(flat) lodFade:vec2f' : '') +
+              (blades ? ',@location(5) ground:vec4f' : ''),
+          )
+          .replace(
+            /@vertex fn vertex\([\s\S]*?(?=@fragment)/,
+            c.shader.includes('var<uniform> taaCamera:')
+              ? vertex.replace('o.clip=frame.camera*', 'o.clip=taaCamera*')
+              : vertex,
+          );
+        if (this.fade)
+          code =
+            code.replace(/(@fragment fn fragment[^{]+\{)/, '$1\n if(!lodVisible(i.clip.xy,i.lodFade)){discard;}') +
+            fadeCode;
+        // Blades bend core's shading normal after its back-face flip, so both sides of a blade share the ground term.
+        if (blades)
+          code = code.replace(
+            coreNormal,
+            'let n=normalize(mix(normalize(i.normal)*select(-1.0,1.0,facing),i.ground.xyz,i.ground.w));',
+          );
+      }
       const module = c.device.createShaderModule({ code });
       pipeline = c.device.createRenderPipeline({
         layout: 'auto',
