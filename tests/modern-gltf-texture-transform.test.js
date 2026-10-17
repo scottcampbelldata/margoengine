@@ -8,7 +8,8 @@ import { textureQuad } from './support/texture-fixture.js';
 import { optionalGPU } from './support/optional-gpu.js';
 
 const digest = (value) => createHash('sha256').update(value).digest('hex');
-const baselineShader = '45df766b2c73181edc3cbd8109a848f17851f03b7cc947dec8d987ff60c2dee5';
+// GPU-verified derivative frame correction changes shader text while retaining the frame and group ABI.
+const baselineShader = '0b7dcd50cea837c6c983f1487b23b0a7991a11e8a56d441c6a936b867169bb5d';
 async function scene(fixture = materialQuad(), image = true) {
   const harness = optionalGPU(),
     store = await TransformStore.create(16),

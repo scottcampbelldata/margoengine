@@ -75,6 +75,10 @@ interface PixelTexture {
   };
 }
 type TextureOwner = Partial<Record<(typeof slots)[number], PixelTexture>> & { shading?: string };
+function textureOwner(model: PBRModel, index?: number): TextureOwner | undefined {
+  const owner = (model as { material?: TextureOwner | readonly TextureOwner[] }).material;
+  return Array.isArray(owner) ? owner[index ?? 0] : (owner as TextureOwner | undefined);
+}
 const wraps: Record<string, number> = { repeat: 10497, clamp: 33071, mirror: 33648 };
 
 class Writer extends Bin {
@@ -128,8 +132,11 @@ class Writer extends Bin {
     if (def.attributes)
       for (const name in def.attributes) attributes[name] = this.data(model, def.attributes[name], name);
     else {
-      // Packed 80-byte vertices (materials meshes): position, normal, tangent, uv0, uv1 (= uv0), color.
+      // Packed 80-byte vertices (materials meshes): position, normal, tangent, uv0, uv1, color.
       const v = p.vertices,
+        owner = textureOwner(model, def.material),
+        usesUV = (set: number) =>
+          p.material.maps.some((map, i) => (map || (i < 5 && owner?.[slots[i]])) && p.material.uvt![i * 8 + 3] === set),
         column = (at: number, width: number) => {
           const o = new Float32Array(count * width);
           for (let i = 0; i < count; i++) for (let k = 0; k < width; k++) o[i * width + k] = v[i * 20 + at + k];
@@ -137,12 +144,17 @@ class Writer extends Bin {
         };
       const tangents = column(8, 4),
         uvs = column(12, 2),
-        colors = column(16, 4);
+        uvs1 = column(14, 2),
+        colors = column(16, 4),
+        hasUV1 = usesUV(1) || uvs1.some((x, i) => x !== uvs[i]);
       attributes.POSITION = this.accessor(column(0, 3), 'VEC3', FLOAT, ARRAY_BUFFER, true);
       attributes.NORMAL = this.accessor(column(4, 3), 'VEC3', FLOAT, ARRAY_BUFFER);
       if (tangents.some((x, i) => i % 4 === 3 && x))
         attributes.TANGENT = this.accessor(tangents, 'VEC4', FLOAT, ARRAY_BUFFER);
-      if (uvs.some((x) => x)) attributes.TEXCOORD_0 = this.accessor(uvs, 'VEC2', FLOAT, ARRAY_BUFFER);
+      // glTF indexed semantics must start at 0, even when only UV1 is sampled.
+      if (hasUV1 || usesUV(0) || uvs.some((x) => x))
+        attributes.TEXCOORD_0 = this.accessor(uvs, 'VEC2', FLOAT, ARRAY_BUFFER);
+      if (hasUV1) attributes.TEXCOORD_1 = this.accessor(uvs1, 'VEC2', FLOAT, ARRAY_BUFFER);
       if (colors.some((x) => x !== 1)) attributes.COLOR_0 = this.accessor(colors, 'VEC4', FLOAT, ARRAY_BUFFER);
     }
     // 65535 is the primitive restart value for 16-bit indices.
@@ -150,7 +162,7 @@ class Writer extends Bin {
       out.indices = this.memo(def.attributes ? model.asset.accessor(def.indices) : p.indices, () =>
         this.accessor(p.indices, 'SCALAR', count <= 65535 ? 5123 : 5125, ELEMENT_ARRAY_BUFFER),
       );
-    if (def.material !== undefined) out.material = this.material(model, p.material);
+    if (def.material !== undefined) out.material = this.material(model, p.material, def.material);
     if (def.targets?.length)
       out.targets = def.targets.map((t: Record<string, number>) =>
         Object.fromEntries(Object.entries(t).map(([k, id]) => [k, this.data(model, id, k)])),
@@ -172,9 +184,9 @@ class Writer extends Bin {
   }
 
   /** Live values from gltf-pro's material record (shared with an @margoengine/materials Material). */
-  private material(model: PBRModel, m: PBRMaterial): number {
+  private material(model: PBRModel, m: PBRMaterial, index: number): number {
     return this.memo(m, () => {
-      const owner = (model as { material?: TextureOwner }).material,
+      const owner = textureOwner(model, index),
         e = m.extensions ?? {},
         t = (i: number) => this.textureInfo(model, m, i, owner),
         P = m.physical,
@@ -249,9 +261,9 @@ class Writer extends Bin {
       texture = i < 5 ? owner?.[slots[i]] : undefined;
     if (!map && !texture) return undefined;
     const info: Json = { index: map ? this.docTexture(model, map.index) : this.pixelTexture(texture!) };
-    if (map?.texCoord) info.texCoord = map.texCoord;
     // Rows: [cos*sx, sin*sy, offset x, uv set], [-sin*sx, cos*sy, offset y, 0].
-    const [a0, a1, x, , b0, b1, y] = m.uvt!.slice(i * 8, i * 8 + 8);
+    const [a0, a1, x, texCoord, b0, b1, y] = m.uvt!.slice(i * 8, i * 8 + 8);
+    if (texCoord) info.texCoord = texCoord;
     if (a0 !== 1 || a1 || x || b0 || b1 !== 1 || y) {
       const r = Math.atan2(-b0, a0),
         c = Math.cos(r),

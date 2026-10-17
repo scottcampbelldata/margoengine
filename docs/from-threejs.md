@@ -295,6 +295,10 @@ glass.opacity = 0.6; // colours, scalars and maps are live
   `texture.update()` after drawing to a canvas (CanvasTexture `needsUpdate`); videos re-upload by themselves.
 - UV transforms follow glTF `KHR_texture_transform` (rotation about the UV origin, no `center`). One slot:
   `material.setUVTransform({offset: [0.5, 0], scale: [0.5, 0.5], rotation: 0}, 'normalMap')`.
+- Supply a real second UV set as `geometry.uvs1`; omitted UV1 copies UV0. Select it per map with
+  `material.setUVTransform({texCoord: 1}, 'aoMap')`. Pass `geometry.groups` (`start`, `count`, `materialIndex`) and a
+  material array to `createMesh` or `createInstancedMesh` for multiple materials under one model/root. Ranges count
+  indices (vertices for nonindexed geometry), contain complete triangles and cannot overlap; gaps are not drawn.
 - Atlases: `packAtlas(images)` returns one image and a `uvTransform` per input, so many textured meshes can share one
   texture or be merged into one draw.
 - Transparent meshes sort per mesh like three.js, so overlapping ones can pop as the camera moves. Order-independent
@@ -315,8 +319,7 @@ oit.add(pane);  // and oit.add(model) for a loaded glTF's BLEND primitives
   `specularIntensity`, `specularColor`, `ior`, `transmission`, `thickness`, `attenuationColor`, `attenuationDistance`;
   factors only). Glass refracts with `Transmission.attach(engine).add(mesh)` from `@margoengine/materials/transmission`
   (needs an HDR post capture such as `PostStack` with `Tonemap`); without it the background shows through tinted.
-- Not available: Lambert, Phong, physical maps, iridescence, anisotropy and dispersion on your own meshes, a second UV
-  set, geometry groups (one material per mesh).
+- Not available: Lambert, Phong, physical maps, dispersion and arbitrary named vertex attributes on your own meshes.
 
 ## Lights and shadows
 
@@ -1121,7 +1124,7 @@ From [`docs/threejs-parity.md`](threejs-parity.md). Each would be an optional pa
 | `ShadowMaterial` on any mesh | Missing (`@margoengine/staging` ContactShadows is a ground shadow catcher for product shots) |
 | Lambert, Phong, depth materials, physical maps, iridescence, anisotropy, dispersion on your own meshes | Missing (physical factors and refracting transmission exist: materials physical options, `@margoengine/materials/transmission`) |
 | glTF `KHR_animation_pointer`, dispersion | Missing (files that require them are rejected); iridescence, anisotropy and diffuse transmission (`@margoengine/gltf-pro/extended`), material variants (`selectVariant`) and glTF cameras (`viewGLTFCamera`) are supported |
-| Second UV set, geometry groups and custom attributes on your own meshes | Missing |
+| Custom attributes on your own meshes | Arbitrary named attributes remain missing; independent `uvs1` and geometry groups with material arrays are supported by materials, including instancing and glTF export |
 | Standalone KTX2 or float/3D/array data textures on your own meshes | Missing (KTX2 works inside glTF; materials takes RGBA8 data) |
 | SMAA, GTAO, SSGI, motion blur, lens flare, glitch, afterimage | Missing (FXAA, TAA, SSAO, SSR, bloom, DOF are there) |
 | Built-in screen effects (vignette, RGB shift, pixelation, halftone, Sobel) | Not built in; a few nodes in a shader `NodePass` |

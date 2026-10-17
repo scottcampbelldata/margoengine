@@ -1,3 +1,4 @@
+// Compact PBR fingerprint includes the GPU-verified WebGPU derivative tangent correction.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -8,7 +9,7 @@ import { optionalGPU } from './support/optional-gpu.js';
 
 const digest = (value) => createHash('sha256').update(value).digest('hex');
 // Degenerate tangent frames use a finite orthogonal basis; ordinary UV paths retain this shared shader.
-const baselineShader = '45df766b2c73181edc3cbd8109a848f17851f03b7cc947dec8d987ff60c2dee5';
+const baselineShader = '0b7dcd50cea837c6c983f1487b23b0a7991a11e8a56d441c6a936b867169bb5d';
 // The missing normal-map factor is zero; Camera.up-aware view math also preserves its signed-zero lanes.
 const baselineFrame = '0abd32314fbc275319398c26b44726992318ed9a3dce2870d43ae10efa40bf01';
 
