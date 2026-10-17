@@ -85,6 +85,7 @@ interface StaticBatchDeferral {
   commit?: () => void;
 }
 import { occlusionShader } from './occlusion.js';
+import { sectionState, sectionShader } from '../../shared/section.js';
 export { GLTFAsset } from './asset.js';
 export type { GLTFDocument } from './asset.js';
 export type { GLTFImage, KTX2Image } from './asset.js';
@@ -359,6 +360,7 @@ interface DrawResource {
   volumeWritten?: GPUBuffer;
   values: Float32Array;
   groups: Map<GPURenderPipeline, GPUBindGroup[]>;
+  sectionBuffer?: GPUBuffer;
   views: GPUTextureView[];
   samplers: GPUSampler[];
   replacesTextures?: boolean;
@@ -495,6 +497,7 @@ function createDrawGroups(
   m: PBRMaterial,
   transmission: boolean,
   hooks: GLTFExtendedMaterials | undefined,
+  section?: GPUBuffer,
 ): GPUBindGroup[] {
   return [
     device.createBindGroup({
@@ -514,6 +517,7 @@ function createDrawGroups(
               },
             ]
           : []),
+        ...(section ? [{ binding: 2, resource: { buffer: section } }] : []),
       ],
     }),
     device.createBindGroup({
@@ -1691,7 +1695,8 @@ export class PBRModel implements EnginePlugin {
       oit = transmission ? this.transmission : this.transparency,
       through = mode === 'transparent' || transmission,
       hook = this.capture,
-      capture = mode === 'capture';
+      capture = mode === 'capture',
+      section = sectionState(c)?.buffer;
     if (this.disposed || (through && !oit) || (capture && !hook)) return;
     const pending = mode === 'beauty' ? opaquePasses.get(c) : undefined;
     if (pending) {
@@ -1935,6 +1940,7 @@ export class PBRModel implements EnginePlugin {
           code = rewritten.code;
           entry = rewritten.entry;
         }
+        if (section) code = sectionShader(code, 0, 2);
         // Keep the shader's original front-facing convention, including mirrored transforms.
         // Mirrored instances flip winding per instance: no culling, the shader's face test discards back faces instead.
         const face = +(!topology && !!inst?.mirrored && flag !== 1),
@@ -2143,9 +2149,13 @@ export class PBRModel implements EnginePlugin {
             pipeline,
           };
         }
+        if (r.sectionBuffer !== section) {
+          r.groups.clear();
+          r.sectionBuffer = section;
+        }
         let groups = r.groups.get(pipeline);
         if (!groups) {
-          groups = createDrawGroups(c.device, pipeline, r, m, transmission, x);
+          groups = createDrawGroups(c.device, pipeline, r, m, transmission, x, section);
           r.groups.set(pipeline, groups);
         }
         let target: GPURenderPassEncoder;
@@ -2237,11 +2247,14 @@ export class PBRModel implements EnginePlugin {
           let tintGroups = r.groups.get(tint);
           if (!tintGroups) {
             tintGroups = mappedTint
-              ? createDrawGroups(c.device, tint, r, m, false, x)
+              ? createDrawGroups(c.device, tint, r, m, false, x, section)
               : [
                   c.device.createBindGroup({
                     layout: tint.getBindGroupLayout(0),
-                    entries: [{ binding: 0, resource: { buffer: r.uniform } }],
+                    entries: [
+                      { binding: 0, resource: { buffer: r.uniform } },
+                      ...(section ? [{ binding: 2, resource: { buffer: section } }] : []),
+                    ],
                   }),
                 ];
             r.groups.set(tint, tintGroups);

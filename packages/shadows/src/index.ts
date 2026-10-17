@@ -16,6 +16,7 @@ import { instanceLayout, instancedDepth } from '../../shared/instances.js';
 import { shadowPrimitivesInto } from '../../shared/shadow-source.js';
 import { viewMatrix } from '../../shared/view.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
+import { sectionState, sectionShader } from '../../shared/section.js';
 import { cascadeSplits, fitCascades } from './cascades.js';
 import { shadowSampling, shadowDepth } from './shader.js';
 export { cascadeSplits, fitCascades } from './cascades.js';
@@ -87,6 +88,7 @@ interface Draw {
   pipeline: GPURenderPipeline;
   alpha?: GPUTextureView;
   sampler?: GPUSampler;
+  section?: GPUBuffer;
 }
 const emptyPrimitives: readonly ShadowPrimitive[] = [];
 export class Shadows implements EnginePlugin {
@@ -129,6 +131,7 @@ export class Shadows implements EnginePlugin {
   private readonly previous = new Float32Array(64);
   private readonly view = this.values.subarray(64, 80);
   private dirty = true;
+  private clipped = false;
   private stillHash = 0;
   private readonly hashWord = new Uint32Array(1);
   private readonly hashFloat = new Float32Array(this.hashWord.buffer);
@@ -365,8 +368,19 @@ export class Shadows implements EnginePlugin {
       execute: (c) => {
         if (c.backend !== 'webgpu') return;
         this.render(c);
-        c.shader = this.shader(c.shader);
-        c.bindings.push(...this.bindings());
+        if (sectionState(c)) {
+          // SectionPlanes owns its existing binding. Move only the shadow
+          // sampling declarations and resources past the occupied slots.
+          const base = Math.max(0, ...c.bindings.map((entry) => entry.binding)) + 1;
+          c.shader = this.shader(c.shader)
+            .replace('@binding(1) var<uniform> shadowFrame', `@binding(${base}) var<uniform> shadowFrame`)
+            .replace('@binding(2) var shadowMap', `@binding(${base + 1}) var shadowMap`)
+            .replace('@binding(3) var shadowSampler', `@binding(${base + 2}) var shadowSampler`);
+          c.bindings.push(...this.bindings().map((entry) => ({ ...entry, binding: entry.binding + base - 1 })));
+        } else {
+          c.shader = this.shader(c.shader);
+          c.bindings.push(...this.bindings());
+        }
       },
     });
   }
@@ -432,6 +446,12 @@ export class Shadows implements EnginePlugin {
   }
   private render(c: Context): void {
     this.validate();
+    const clipped = !!sectionState(c);
+    // Plane coefficients and enabled are live uniforms. Redraw while a
+    // section is attached, and once after removal, rather than caching an
+    // atlas made with obsolete plane values.
+    if (clipped || this.clipped) this.dirty = true;
+    this.clipped = clipped;
     for (let i = 0; i < 3; i++) this.light[i] = this.engine!.lighting.direction[i];
     if (this.options.bounds) {
       this.fitBounds();
@@ -731,7 +751,7 @@ export class Shadows implements EnginePlugin {
             submitted.set(node, indices);
           }
           indices.add(key);
-          this.draw(pass, primitive, matrix, cascade);
+          this.draw(pass, primitive, matrix, cascade, sectionState(c));
           if (cached) this.stats.staticDraws++;
           else this.stats.dynamicDraws++;
         }
@@ -746,7 +766,13 @@ export class Shadows implements EnginePlugin {
     }
     pass.end();
   }
-  private draw(pass: GPURenderPassEncoder, p: ShadowPrimitive, matrix: Float32Array, cascade: number): void {
+  private draw(
+    pass: GPURenderPassEncoder,
+    p: ShadowPrimitive,
+    matrix: Float32Array,
+    cascade: number,
+    section?: GPUBufferBinding,
+  ): void {
     if (p.stride !== 24 && p.stride !== 80) throw new RangeError('Unsupported shadow vertex stride');
     const inst = p.instances;
     if (inst && !inst.count) return;
@@ -761,11 +787,18 @@ export class Shadows implements EnginePlugin {
     )
       throw new TypeError('Shadow alpha transform requires finite affine rows and PBR vertices');
     const lines = p.topology === 'line-list',
-      key = p.stride + (transform ? 1 : 0) + (inst ? 2 : 0) + (lines ? 4 : 0);
+      key = p.stride + (transform ? 1 : 0) + (inst ? 2 : 0) + (lines ? 4 : 0) + (section ? 8 : 0);
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
-      const code = shadowDepth(p.stride === 80, !!transform);
-      const module = this.device!.createShaderModule({ code: inst ? instancedDepth(code) : code });
+      let code = shadowDepth(p.stride === 80, !!transform);
+      if (inst) code = instancedDepth(code);
+      if (section) {
+        code = code
+          .replace('struct Out {', 'struct Out {@location(2) position:vec3f,')
+          .replace(/o.clip=f.camera\*([^;]+);/, 'let world=$1;o.clip=f.camera*world;o.position=world.xyz;');
+        code = sectionShader(code, 0, 3);
+      }
+      const module = this.device!.createShaderModule({ code });
       pipeline = this.device!.createRenderPipeline({
         layout: 'auto',
         vertex: {
@@ -805,7 +838,8 @@ export class Shadows implements EnginePlugin {
       record.vertex !== p.vertex ||
       record.pipeline !== pipeline ||
       record.alpha !== p.alphaTexture ||
-      record.sampler !== p.alphaSampler
+      record.sampler !== p.alphaSampler ||
+      record.section !== section?.buffer
     ) {
       if (record) for (const b of record.uniforms) b.destroy();
       records.delete(identity);
@@ -825,6 +859,7 @@ export class Shadows implements EnginePlugin {
                 { binding: 0, resource: { buffer } },
                 { binding: 1, resource: p.alphaTexture ?? this.whiteView! },
                 { binding: 2, resource: p.alphaSampler ?? this.alphaSampler! },
+                ...(section ? [{ binding: 3, resource: section }] : []),
               ],
             }),
           );
@@ -842,6 +877,7 @@ export class Shadows implements EnginePlugin {
         pipeline,
         alpha: p.alphaTexture,
         sampler: p.alphaSampler,
+        section: section?.buffer,
       };
       records.set(identity, record);
     }
