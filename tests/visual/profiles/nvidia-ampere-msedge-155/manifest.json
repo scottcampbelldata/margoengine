@@ -523,9 +523,11 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-17T06:05:33.873Z",
-    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
-    "packagesDirty": false
+    "date": "2026-10-17T06:41:53.501Z",
+    "commit": "6be169bec988c460a75b381bf8774db7d7ebbbf1",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "tonemap-phone": {
@@ -547,9 +549,11 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-17T06:05:33.873Z",
-    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
-    "packagesDirty": false
+    "date": "2026-10-17T06:41:53.501Z",
+    "commit": "6be169bec988c460a75b381bf8774db7d7ebbbf1",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-MetalRoughSpheres-model": {
@@ -1327,9 +1331,11 @@
   "gpu": "nvidia ampere",
   "acPowerBefore": true,
   "acPowerAfter": true,
-  "date": "2026-10-17T06:05:33.873Z",
-  "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
-  "packagesDirty": false
+  "date": "2026-10-17T06:41:53.501Z",
+  "commit": "6be169bec988c460a75b381bf8774db7d7ebbbf1",
+  "packagesDirty": false,
+  "renderedInputsDirty": false,
+  "renderedInputChanges": []
  },
  "method": {
   "hot": 24,

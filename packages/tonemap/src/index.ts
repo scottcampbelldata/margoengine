@@ -9,7 +9,7 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { parseCube, validateLUT, type CubeLUT } from './cube.js';
-import { outputShader, tonemapShader } from './shaders.js';
+import { outputShader, tonemapShader, sizedLUTShader } from './shaders.js';
 import type { StackHost, StackStage } from '../../shared/stack.js';
 export { parseCube };
 export type { CubeLUT };
@@ -107,41 +107,65 @@ export class Tonemap implements EnginePlugin {
         engine.hasPlugin('bloom'))
     )
       throw new Error('Tonemap needs an explicit HDR source when another effect owns scene capture');
+    this.checkLUTSize(engine.gpu, this.lut);
+    const previousEngine = this.engine;
     this.engine = engine;
-    this.uniform = engine.gpu.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    this.uploadLUT();
+    try {
+      this.uniform = engine.gpu.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      this.uploadLUT(this.lut);
+    } catch (error) {
+      this.uniform?.destroy();
+      this.uniform = undefined;
+      this.engine = previousEngine;
+      throw error;
+    }
   }
   /** Replace or clear the grading LUT; upload happens only here and on device restoration. */
   setLUT(lut: CubeLUT | string | null): void {
     if (this.disposed) throw new Error('Tonemap is disposed');
     const parsed = typeof lut === 'string' ? parseCube(lut) : lut;
-    if (parsed) validateLUT(parsed);
-    this.lut = parsed
-      ? { data: parsed.data.slice(), domainMin: parsed.domainMin.slice(), domainMax: parsed.domainMax.slice() }
+    if (parsed !== null) validateLUT(parsed);
+    const next = parsed
+      ? {
+          size: parsed.size ?? 33,
+          data: parsed.data.slice(),
+          domainMin: parsed.domainMin.slice(),
+          domainMax: parsed.domainMax.slice(),
+        }
       : undefined;
-    if (this.engine) this.uploadLUT();
+    if (this.engine) this.uploadLUT(next);
+    else this.lut = next;
   }
-  private uploadLUT(): void {
+  private checkLUTSize(device: GPUDevice, lut: CubeLUT | undefined): void {
+    const size = lut?.size ?? 33,
+      limit = device.limits?.maxTextureDimension3D;
+    if (limit !== undefined && size > limit)
+      throw new RangeError('Tonemap LUT size exceeds the device 3D texture limit; use a smaller LUT');
+  }
+  private uploadLUT(lut: CubeLUT | undefined): void {
     const device = this.engine!.gpu!,
-      previous = this.lutTexture;
+      previous = this.lutTexture,
+      size = lut?.size ?? 33;
+    this.checkLUTSize(device, lut);
     const texture = device.createTexture({
       dimension: '3d',
-      size: [33, 33, 33],
+      size: [size, size, size],
       format: 'rgba32float',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
     try {
-      if (this.lut)
+      if (lut)
         device.queue.writeTexture(
           { texture },
-          this.lut.data as Float32Array<ArrayBuffer>,
-          { bytesPerRow: 33 * 16, rowsPerImage: 33 },
-          [33, 33, 33],
+          lut.data as Float32Array<ArrayBuffer>,
+          { bytesPerRow: size * 16, rowsPerImage: size },
+          [size, size, size],
         );
     } catch (error) {
       texture.destroy();
       throw error;
     }
+    this.lut = lut;
     this.lutTexture = texture;
     this.group = undefined;
     previous?.destroy();
@@ -237,9 +261,11 @@ export class Tonemap implements EnginePlugin {
   ): void {
     const out = (c as { [OUTPUT]?: Output })[OUTPUT],
       excess = out?.excess,
-      key = format + ':' + multisample?.count + (excess ? ':output' : '');
+      variableLUT = (this.lut?.size ?? 33) !== 33,
+      key = format + ':' + multisample?.count + (excess ? ':output' : '') + (variableLUT ? ':lut-size' : '');
     if (!this.pipeline || this.pipelineFormat !== key) {
-      const module = c.device.createShaderModule({ code: excess ? outputShader : tonemapShader });
+      const code = excess ? outputShader : tonemapShader,
+        module = c.device.createShaderModule({ code: variableLUT ? sizedLUTShader(code) : code });
       this.pipeline = c.device.createRenderPipeline({
         layout: 'auto',
         vertex: { module, entryPoint: 'vertex' },

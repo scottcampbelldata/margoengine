@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
-  "description": "Optional AgX, ACES fitted and Khronos PBR Neutral color grading with 33-cube LUTs.",
+  "description": "Optional AgX, ACES fitted and Khronos PBR Neutral color grading with 2-65 cube LUTs.",
   "sideEffects": false,
   "exports": {
     ".": {

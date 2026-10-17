@@ -19,7 +19,18 @@ stage.dispose();
 
 Order: input color conversion → exposure in stops (−16 to 16) → selected curve → contrast around linear 18% gray (0 to 4) → optional LUT → clamp and exact sRGB transfer. The LUT operates on display-linear RGB after the curve; provide a LUT authored for that domain. It is not an automatic OCIO transform or a log/sRGB-encoded LUT decoder.
 
-`parseCube(text)` accepts exactly `LUT_3D_SIZE 33`, optional `TITLE`, `DOMAIN_MIN` and `DOMAIN_MAX`, comments, and 35,937 finite RGB rows with red varying fastest. Unsupported/1D headers, wrong counts, duplicate size/domain headers, non-finite values and invalid domains are rejected. It returns Float32Array RGBA data and Float32Array domains. `setLUT` accepts this object, raw .cube text or null and retains a private copy for device restoration. A `rgba32float` 3D GPU texture is sampled with eight explicit texture loads and trilinear interpolation, requiring no optional float32 filtering feature.
+`parseCube(text)` accepts `LUT_3D_SIZE` integers from 2 through 65, including common 16³, 17³, 32³, 33³, 64³ and
+65³ files. Supply exactly `size³` finite RGB rows with red varying fastest. Optional quoted `TITLE`, `DOMAIN_MIN`,
+`DOMAIN_MAX`, comments and scientific notation are supported. Unsupported/1D headers, duplicate or late headers,
+wrong counts, non-finite values and invalid domains reject. Input text is capped at 32 × 1024² JavaScript characters.
+The result contains explicit `size`, Float32Array RGBA data and Float32Array domains. Manually constructed legacy
+objects that omit `size` still mean 33³; other sizes require it.
+
+`setLUT` accepts that object, raw `.cube` text or `null` and snapshots the size, samples and domains for restoration.
+Replacement checks the device's 3D texture limit; failed validation or upload preserves the previous LUT. A
+`rgba32float` 3D GPU texture uses eight explicit texture loads and trilinear interpolation, requiring no optional
+float32 filtering feature. Non-33 sizes share a dimension-aware shader; 33³ and no-LUT inputs retain their existing
+shader and rendering behavior. `setLUT(null)` clears grading by the LUT while retaining the selected tone curve.
 
 Standalone capture at order −50 replaces the standard core shader's display mapping with linear HDR; grading presents at 31. To combine with DOF, attach DOF first and pass `source:()=>dof.outputTexture`. External sources must be sampleable viewport-sized single-sample 2D `rgba16float` or `rgba32float` textures containing linear HDR. The source callback is fixed at attachment and follows resize/restoration. TAA can resolve afterward at order 40; with DOF, give it `depth:()=>dof.depthTexture`. Alone, Tonemap cannot share capture with SSAO or Creative PostProcessing. In a `PostStack` from `@margoengine/post/stack` it is the display effect: it grades the stack's HDR result after SSAO, DOF and Bloom and before FXAA, e.g. `PostStack.attach(stage.engine, [new SSAO(), new Bloom(), new Tonemap({curve:'neutral'})])`. A stacked Tonemap takes no `source`.
 

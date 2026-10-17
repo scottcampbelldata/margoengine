@@ -7,6 +7,7 @@ import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 
 export interface CubeLUT {
+    size?: number;
     data: Float32Array;
     domainMin: Float32Array;
     domainMax: Float32Array;

@@ -8,8 +8,8 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| COVERED | 100 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
-| PARTIAL | 34 | Some of it exists, but a common use case is missing. The notes say what. |
+| COVERED | 101 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
+| PARTIAL | 33 | Some of it exists, but a common use case is missing. The notes say what. |
 | MISSING | 25 | No implementation was found in any package's `src/`. |
 
 Overall: Margo is strong where three.js relies on third-party libraries or examples. That includes cascaded PCSS shadows, clustered lighting, TAA, Gaussian splats, BVH queries, physics, navigation, terrain, water and sky. The day-one basics the first version of this matrix found missing (textures and materials on meshes you build, glTF extensions and compression, an orthographic camera, picking loaded models, image-based lighting outside React, combinable effects, FXAA, a math library) now exist as optional packages. What remains:
@@ -173,7 +173,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | SVGLoader | MISSING | — | geometry has `Shape` and `extrudeGeometry`, but nothing parses SVG paths. |
 | Long-tail model loaders (LDraw, VRML, 3DS, LWO, AMF, MD2, VOX, PDB, GCode, BVH motion capture, 3DM, KMZ, TDS) | MISSING | — | |
 | Texture loaders (UltraHDR, TGA, DDS, KTX v1, TIFF, IES, LUT3dl, LUTImage) | PARTIAL | environment `decodeUltraHDR` | UltraHDR only, as an environment source. The rest are missing. |
-| LUTCubeLoader | PARTIAL | tonemap `parseCube` (`packages/tonemap/src/cube.ts`) | 33³ LUTs only. |
+| LUTCubeLoader | COVERED † | tonemap `parseCube`, `Tonemap.setLUT` (`packages/tonemap/src/cube.ts`, `index.ts`) | 3D RGB cubes with integer axis sizes 2–65, including common 16³/17³/32³/33³/64³/65³ files, domains and red-fastest order. Text cap: 32 Mi JavaScript characters. Legacy objects without `size` mean 33³. No 1D/shaper LUTs. [Verification](tonemap-lut-sizes-verification.md). |
 | LoadingManager, Cache, progress events | PARTIAL | per-loader `AbortSignal` and byte caps (`packages/shared/loading.js`); cache `AssetCache` (`packages/cache/src/index.ts`) | Cache: persistent IndexedDB with ETag/Last-Modified revalidation, offline fallback, range requests and LRU eviction, passed to every loader as its `fetch` option (goes beyond three's in-memory `THREE.Cache`). No shared loading manager. Progress is reported only by machinery's CAD worker. |
 
 ### 11. Exporters
@@ -215,7 +215,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | FilmPass (grain) | COVERED † | creative `PostProcessing({grain})` | |
 | GlitchPass | MISSING | — | |
 | AfterimagePass | MISSING | — | |
-| LUTPass | COVERED † | tonemap `setLUT` | 33³ `.cube` files only. |
+| LUTPass | COVERED † | tonemap `setLUT` | 2³–65³ `.cube` files; eight-load trilinear interpolation, domains, SDR and HDR/P3 excess paths, private snapshots and device restoration. |
 | OutputPass, tone mapping | COVERED † | tonemap `Tonemap` | |
 | God rays | COVERED | environment `VolumetricFog` with `shadows` (`packages/environment/src/volumetric.ts`); creative `atmosphere.godRays` (`packages/creative/src/post.ts`) | World-space shafts through real occluders from the sun's cascades (and from clustered spot and point lights). creative's screen-space version stays inside its `PostProcessing`. WebGPU only. |
 | Motion blur | MISSING | — | taa already produces a velocity buffer. |
@@ -281,7 +281,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 
 ## What is missing or partial, and what to do
 
-Recounted from the rows: 34 PARTIAL, 25 MISSING. COVERED rows stay in the matrix above. At the approved core-hook commit (`6a57389`), core + stage measured **20,641 bytes gzip**, against a clean 20,282-byte baseline: +359 bytes, with 4,358 usable bytes below the exclusive 25,000-byte ceiling. `npm run measure:size` prints the current size; build and GPU evidence for those hooks is recorded in [the verification note](core-parity-hooks-verification.md).
+Recounted from the rows: 33 PARTIAL, 25 MISSING. COVERED rows stay in the matrix above. At the approved core-hook commit (`6a57389`), core + stage measured **20,641 bytes gzip**, against a clean 20,282-byte baseline: +359 bytes, with 4,358 usable bytes below the exclusive 25,000-byte ceiling. `npm run measure:size` prints the current size; build and GPU evidence for those hooks is recorded in [the verification note](core-parity-hooks-verification.md).
 
 The user approved these three hooks as a specific exception to the core freeze. Their larger features stay in optional packages.
 
@@ -301,9 +301,11 @@ Independent UV1 and geometry groups have since been implemented in materials and
 because arbitrary named vertex attributes remain absent. Physical maps and dispersion, depth/distance material modes,
 front/back/double-side rendering, and material blend/depth/polygon-offset/stencil controls are implemented in optional
 packages. Wireframe now covers constructed materials and live native materials across render and shadow paths,
-with [Node and GPU evidence](materials-wireframe-verification.md). The current totals are 100 / 34 / 25.
+with [Node and GPU evidence](materials-wireframe-verification.md). Variable-size `.cube` LUTs are also implemented
+in tonemap, with [parser, runtime and physical-GPU evidence](tonemap-lut-sizes-verification.md). The current totals
+are 101 / 33 / 25.
 
-Complete actionable PARTIAL rows before starting MISSING rows. Variable-size LUTs are next; the table lists the partial
+Complete actionable PARTIAL rows before starting MISSING rows. The table lists the remaining partial
 work before the missing features. Closed core and v1 limits remain in the following section rather than becoming
 implementation tasks.
 
@@ -328,7 +330,6 @@ implementation tasks.
 | glTF extensions | PARTIAL. `KHR_animation_pointer` is rejected when required. Export writes no cameras or lights. | Pointer in `@margoengine/animation`. Cameras and lights in `@margoengine/exporters`. |
 | OBJLoader, MTLLoader | PARTIAL geometry, MISSING materials. `vt`, `usemtl` and `mtllib` are skipped. | Parse those in `@margoengine/loaders` and build a `Material`. |
 | Other texture loaders | PARTIAL. UltraHDR only. TGA, DDS, KTX v1, TIFF and IES are absent. | Add a format in `@margoengine/decoders` when a file needs it. |
-| LUTCubeLoader | PARTIAL. 33³ cubes only. | Other sizes in `@margoengine/tonemap` when a file needs them. |
 | LoadingManager, progress | PARTIAL. `AbortSignal`, byte caps, and `AssetCache`. CAD reports progress. | A progress callback on `packages/shared/loading.js` for the other loaders. |
 | USDZExporter | PARTIAL. No textures, vertex colors or alpha masks. | Those channels in `@margoengine/usdz`. |
 | KeyframeTrack, PropertyBinding | PARTIAL. Clips come from glTF. `sampleTrack` exists. | An authoring helper in `@margoengine/animation` for node TRS and weights. |
