@@ -30,6 +30,8 @@ export interface STEPBody {
   readonly edges: number;
   /** Metres per unit of the body's coordinates (0.001 for a body modelled in millimetres). */
   readonly unit: number;
+  /** Radians per plane-angle unit of the body's context (a cone's half angle is written in it). */
+  readonly angleUnit: number;
   /** The body's style colour, when the file gives one. */
   readonly color?: STEPColor;
 }
@@ -379,7 +381,7 @@ export function readStructure(file: STEPFile, { maxInstances = 1_000_000 }: STEP
       const [, , item1, item2] = file.args(p.operator, 'ITEM_DEFINED_TRANSFORMATION');
       // item 1 lives in relationship representation 1, item 2 in representation 2; the transformation maps the child's
       // placement onto the parent's.
-      const [childItem, parentItem] = childFirst ? [item1, item2] : [item2, item1];
+      const [childItem, parentItem]: Value[] = childFirst ? [item1, item2] : [item2, item1];
       return multiply(
         placement(ref(parentItem), repUnit(parentRep)),
         invert(placement(ref(childItem), repUnit(childRep))),
@@ -475,7 +477,7 @@ export function readStructure(file: STEPFile, { maxInstances = 1_000_000 }: STEP
       return shellFaces(ref(file.get(shell).args[2]) ?? -1);
     return refs(file.get(shell).args[1]);
   };
-  const body = (id: number, unit: number): number => {
+  const body = (id: number, unit: number, angleUnit: number): number => {
     const known = bodyIndex.get(id);
     if (known !== undefined) return known;
     const entity = file.get(id),
@@ -522,7 +524,16 @@ export function readStructure(file: STEPFile, { maxInstances = 1_000_000 }: STEP
       }
     const color = colors.get(id) ?? (shells.length ? colors.get(shells[0]) : undefined);
     bodyIndex.set(id, bodies.length);
-    bodies.push({ id, kind, name: str(args[0]), faces, edges: edges.size, unit, ...(color ? { color } : {}) });
+    bodies.push({
+      id,
+      kind,
+      name: str(args[0]),
+      faces,
+      edges: edges.size,
+      unit,
+      angleUnit,
+      ...(color ? { color } : {}),
+    });
     return bodies.length - 1;
   };
 
@@ -530,10 +541,16 @@ export function readStructure(file: STEPFile, { maxInstances = 1_000_000 }: STEP
   const instances: STEPInstance[] = [];
   const children = new Map<number, Link[]>();
   for (const link of links) children.set(link.parent, [...(children.get(link.parent) ?? []), link]);
-  const emit = (bodyId: number, unit: number, product: number, matrix: Float64Array, path: readonly number[]) => {
+  const emit = (
+    bodyId: number,
+    units: { length: number; angle: number },
+    product: number,
+    matrix: Float64Array,
+    path: readonly number[],
+  ) => {
     if (instances.length >= maxInstances)
       throw new RangeError(`STEP assembly places more than ${maxInstances} bodies; raise the maxInstances option`);
-    instances.push({ body: body(bodyId, unit), product, matrix, path });
+    instances.push({ body: body(bodyId, units.length, units.angle), product, matrix, path });
   };
   /**
    * Bodies of representation `rep` (and its mapped items) placed by `matrix`. Mapped items of a representation in
@@ -549,11 +566,12 @@ export function readStructure(file: STEPFile, { maxInstances = 1_000_000 }: STEP
   ) => {
     const args = representation(rep);
     if (!args || depth > 32) return;
-    const unit = repUnit(rep);
+    const units = context(ref(args[2])),
+      unit = units.length;
     for (const item of refs(args[1])) {
       if (!file.has(item)) continue;
       const type = file.get(item).type;
-      if (BODIES[type]) emit(item, unit, product, matrix, path);
+      if (BODIES[type]) emit(item, units, product, matrix, path);
       else if (type === 'MAPPED_ITEM') {
         const [, source, target] = file.args(item),
           map = ref(source);

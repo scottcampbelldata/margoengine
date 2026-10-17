@@ -1,9 +1,10 @@
 // @margoengine/brep: Margo's own CAD kernel, written from the published standards (ISO 10303-21 for the file,
 // ISO 10303-41/42/43 and the AP203/AP214/AP242 schemas for the data), with no third-party CAD code. Stage 1 reads a
-// STEP file's structure: products, the assembly tree with placements, B-rep bodies, units and colours. Exact geometry
-// and tessellation follow (docs/brep-kernel.md).
+// STEP file's structure: products, the assembly tree with placements, B-rep bodies, units and colours. Stages 2 to 4
+// evaluate the exact geometry (analytic surfaces and NURBS) and tessellate it (docs/brep-kernel.md).
 import { STEPFile, stepText, type STEPHeader } from './step/file.js';
 import { readStructure, type STEPStructure, type STEPStructureOptions } from './step/structure.js';
+import { Tessellator, type BodyMesh, type TessellationOptions } from './mesh/tessellate.js';
 
 export { STEPFile, Ref, Enum, Typed, DERIVED, stepText } from './step/file.js';
 export type { Entity, STEPHeader, Value } from './step/file.js';
@@ -16,6 +17,8 @@ export type {
   STEPStructure,
   STEPStructureOptions,
 } from './step/structure.js';
+export { Tessellator } from './mesh/tessellate.js';
+export type { BodyMesh, BodyMeshFace, TessellationOptions } from './mesh/tessellate.js';
 
 /** Options of {@link parseSTEP}. */
 export type STEPOptions = STEPStructureOptions;
@@ -38,4 +41,18 @@ export interface STEPModel extends STEPStructure {
 export function parseSTEP(input: string | ArrayBuffer | ArrayBufferView, options: STEPOptions = {}): STEPModel {
   const file = new STEPFile(stepText(input));
   return { header: file.header, file, ...readStructure(file, options) };
+}
+
+/**
+ * Tessellates every body of a parsed STEP file from its exact geometry: one mesh per body (place it with each of the
+ * body's `instances`), with exact surface normals, hard B-rep edges and a run of triangles per face. Faces the kernel
+ * cannot evaluate are listed in each mesh's `failures`. Throws a RangeError for an option out of range.
+ * @example
+ * const model = parseSTEP(bytes);
+ * const meshes = tessellateSTEP(model, { relativeDeflection: 0.001, angle: 0.5 });
+ * for (const instance of model.instances) draw(meshes[instance.body], instance.matrix);
+ */
+export function tessellateSTEP(model: STEPModel, options: TessellationOptions = {}): BodyMesh[] {
+  const tessellator = new Tessellator(model.file, model.faceColors, options);
+  return model.bodies.map((body) => tessellator.body(body));
 }

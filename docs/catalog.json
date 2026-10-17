@@ -1662,9 +1662,9 @@
     "package": "@margoengine/brep",
     "version": "1.0.0",
     "published": false,
-    "description": "Margo's own CAD kernel: STEP (ISO 10303-21) reading, product structure, units and colours; exact B-rep geometry and tessellation follow.",
+    "description": "Margo's own CAD kernel: STEP (ISO 10303-21) reading, product structure, units and colours, exact B-rep geometry (analytic surfaces and NURBS) and crack-free tessellation.",
     "requirements": "See the package guide for requirements",
-    "keywords": "brep b-rep cad kernel step stp ap203 ap214 ap242 iso 10303 assembly product structure units colours",
+    "keywords": "brep b-rep cad kernel step stp ap203 ap214 ap242 iso 10303 assembly product structure units colours nurbs tessellation mesh deflection",
     "install": "npm install @margoengine/brep@1.0.0",
     "imports": "import { parseSTEP } from '@margoengine/brep';",
     "exports": [
@@ -1672,10 +1672,12 @@
       "Enum",
       "Ref",
       "STEPFile",
+      "Tessellator",
       "Typed",
       "parseSTEP",
       "readStructure",
-      "stepText"
+      "stepText",
+      "tessellateSTEP"
     ]
   },
   {

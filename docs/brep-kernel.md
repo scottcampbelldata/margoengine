@@ -1,6 +1,6 @@
 # Margo B-rep kernel: our own STEP reader (design)
 
-Status: design, 2026-10-17. Replaces OpenCascade (`occt-import-js`) for STEP, then IGES. Clean room: written only from
+Status, 2026-10-17: stages 1 to 4 written (`packages/brep`), waiting for Codex's tests; stage 5 next. Replaces OpenCascade (`occt-import-js`) for STEP, then IGES. Clean room: written only from
 the published standards (ISO 10303-21 file syntax, ISO 10303-42 geometry and topology, the AP203/AP214/AP242 schemas)
 and textbook geometry (NURBS evaluation, constrained Delaunay triangulation). No OpenCascade, three.js or Babylon.js
 source is read. OpenCascade stays only as a test oracle (dev dependency) until our reader passes the corpus, then it is
@@ -51,6 +51,32 @@ Some files also carry AP242 tessellated geometry (2,296 `COMPLEX_TRIANGULATED_SU
 6. **Switch and remove.** Default to our reader once every corpus file matches; then an IGES reader on the same
    geometry and tessellator (entities 100-144, 186, 502-514); then OpenCascade is removed from the dependencies and
    the LGPL notices go.
+
+## Feature parity with OpenCascade
+
+Scott's rule (2026-10-17): match what OpenCascade can do, learned from its public documentation and feature lists, never
+from its source. The list below is the target, and the status of each item.
+
+| OpenCascade capability (documented) | Margo |
+| --- | --- |
+| STEP AP203, AP214, AP242 reading | written (stage 1) |
+| Assembly structure, instance placements, names, part numbers | written (stage 1) |
+| Length and plane-angle units, SI prefixes, conversion-based units | written (stage 1) |
+| Colours on solids and faces, overriding styles, transparency | written (stage 1) |
+| Analytic and NURBS curves and surfaces, offset, revolution, extrusion | written (stage 2) |
+| Mesher: linear deflection, absolute or relative to the part size | written (stage 4) |
+| Mesher: angular deflection; separate interior deflection and angle | written (stage 4) |
+| Mesher: minimum size; checking deflection inside triangles, not only on edges | written (stage 4) |
+| Mesher: shared edge discretization (no cracks between faces) | written (stage 3) |
+| Mesher: faces in parallel | stage 5 (workers) |
+| AP242 tessellated geometry read as is | listed in stage 1; meshing it is stage 5 |
+| Layers, validation properties (volume, area, centroid), saved views | to do |
+| AP242 PMI (dimensions and tolerances), materials and density | to do |
+| Per-instance style overrides (SHUO) | to do |
+| Shape healing on read (small edges, wire order, tolerances) | to do; failures are listed per face today |
+| IGES reading | stage 6 |
+| STEP writing | to do |
+| Boolean operations, fillets, offsets (modelling) | not planned for the viewer |
 
 Package: `@margoengine/brep` (optional; never core or the stage). Not in scope for the first version: repairing
 broken files, offset and swept surfaces beyond revolution and extrusion, Boolean operations, PMI display.
