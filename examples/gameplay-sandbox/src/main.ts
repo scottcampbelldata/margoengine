@@ -19,18 +19,12 @@ import { Clustered } from '@margoengine/clustered';
 import { createCharacter, createLandscape, terrainHeight } from './scene.js';
 import { stepLocomotion, type LocomotionOptions } from '@margoengine/controls';
 import { createProceduralSettlement } from './procedural/index.js';
-import {
-  applyQualityTier,
-  paceEngine,
-  qualityPreset,
-  redrawAfterRestore,
-  sceneSamples,
-  watchQuality,
-} from '@margoengine/quality';
+import { applyQualityTier, paceEngine, qualityPreset, redrawAfterRestore, watchQuality } from '@margoengine/quality';
 import './style.css';
 
-// Before any engine exists: core reads the tier when it builds pipelines and sizes the canvas.
-applyQualityTier();
+// Before any engine exists: core reads the tier when it builds pipelines and sizes the canvas. Scene detail follows the
+// tier by name: the desktop light tier is single-sampled like a phone but is not a phone.
+const tier = applyQualityTier();
 
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = element<HTMLCanvasElement>('scene'),
@@ -75,7 +69,6 @@ async function boot(): Promise<void> {
   };
   if (import.meta.hot) import.meta.hot.dispose(dispose);
   try {
-    const mobile = sceneSamples() === 1;
     engine.onError = (error) => {
       engine.stop();
       fail(error);
@@ -110,7 +103,7 @@ async function boot(): Promise<void> {
     // Compile the sky and its LUT while the CPU builds the island.
     engine.render({ delta: 0 });
     const shadows = (shadow = new Shadows({
-      resolution: mobile ? 512 : 1024,
+      resolution: tier === 'phone' ? 512 : 1024,
       distance: 115,
       lambda: 0.7,
       lightSize: 0.018,
@@ -393,7 +386,7 @@ async function boot(): Promise<void> {
     try {
       const { createLandscapeDetails } = await import('./landscape-details.js');
       if (disposed) return;
-      details = createLandscapeDetails(engine, settlement.exclusions, landscape.heightmap);
+      details = createLandscapeDetails(engine, settlement.exclusions, landscape.heightmap, tier);
       details.wireframe.visible = element<HTMLInputElement>('wireframe').checked;
       engine.use(shadows);
       lights = Clustered.attach(engine, { grid: [8, 4, 16] });

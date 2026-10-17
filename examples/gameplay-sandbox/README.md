@@ -20,8 +20,9 @@ procedural explorer, damped third-person camera, HDR bloom and AgX presentation.
 The character, landscape, coastal cabin, ten trees, spaced shrubs and fern crowns are generated
 locally; first launch fetches no assets. The scene starts at 17:34 golden hour.
 Phones start with 100k particles, 25k grass instances, a 96-cell terrain mesh,
-a 128-cell heightmap, 64 water segments and 512-pixel shadows. Desktop defaults
-retain the full scene. The particle control still offers every tier up to one million.
+a 128-cell heightmap and 512-pixel shadows; water keeps 256 segments everywhere. The desktop
+light tier (where every desktop starts) keeps 1024-pixel shadows and draws 60k grass instances; the
+high tier 110k. The particle control still offers every tier up to one million.
 The sky's first GPU submission overlaps procedural scene construction.
 Shared `Sky` warms low sunlight from a neutral daytime tint to amber at dusk,
 with cool ambient fill, lighter procedural cloud coverage and restrained bloom.
@@ -134,7 +135,7 @@ Vite and TypeScript resolve the packages through their public distribution expor
 without source aliases. Run `npm run build:packages` before standalone workspace
 builds/tests; `npm run dev:sandbox` builds the packages automatically. The example
 adds no features to core or stage. CI builds/tests this workspace and retains the
-core + stage gzip gate of 20,000 bytes. The 20,480-byte ceiling named in earlier notes is retired.
+core + stage gzip gate of 25,000 bytes (AGENTS.md).
 
 Before the shrub-spacing adjustment, the physical NVIDIA Ampere production run at 1440 × 900
 measured 60.03 / 60.07 / 60.00 FPS at 100k / 500k / 1M particles. The 600-frame

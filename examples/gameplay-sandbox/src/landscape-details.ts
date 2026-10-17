@@ -5,7 +5,7 @@ import { heightfieldGeometry } from '@margoengine/terrain';
 import { Scatter, type GroundBounds } from '@margoengine/scatter';
 import { Line, Lines } from '@margoengine/lines';
 import { terrainHeight, ISLAND_SIZE } from './scene.js';
-import { sceneSamples } from '@margoengine/quality';
+import type { QualityTier } from '@margoengine/quality';
 import { MATERIALS } from './procedural/meshes.ts';
 import { CABIN_EXCLUSIONS } from './procedural/placement.ts';
 
@@ -14,8 +14,8 @@ export function createLandscapeDetails(
   engine: EngineKernel,
   exclusions: readonly GroundBounds[],
   heightmap: () => GPUTexture | undefined,
+  tier: QualityTier,
 ) {
-  const mobile = sceneSamples() === 1;
   const linePositions = wireframePositions(
     heightfieldGeometry(terrainHeight, { size: [ISLAND_SIZE, ISLAND_SIZE], resolution: 64 }),
     0.035,
@@ -37,7 +37,8 @@ export function createLandscapeDetails(
     engine,
     [toGeometry(generateGrassMesh(3)), toGeometry(generateGrassMesh(2)), toGeometry(generateGrassMesh(1))],
     {
-      count: mobile ? 25_000 : 110_000,
+      // Phones 25k blades; the desktop light tier (slower PCs) 60k; the high tier 110k.
+      count: tier === 'phone' ? 25_000 : tier === 'light' ? 60_000 : 110_000,
       area: [ISLAND_SIZE, ISLAND_SIZE],
       minHeight: 0.9,
       maxHeight: 13,
