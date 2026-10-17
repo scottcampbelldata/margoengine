@@ -362,7 +362,7 @@ test('NodePass joins PostStack in HDR and LDR positions, binds input, depth and 
       PostStack.attach(g.engine, [alone]);
       g.frame();
     });
-  assert.ok(log.some(([name, , d]) => name === 'module' && d.code.includes('aces(')));
+  assert.ok(log.some(([name, , d]) => name === 'module' && d.code.includes('pbrNeutral(')));
   assert.throws(() => g.engine.use(new NodePass(vec3(1))), /runs inside a PostStack/);
   assert.throws(() => PostStack.attach(stackHarness().engine, [alone]), /already attached/);
 });
