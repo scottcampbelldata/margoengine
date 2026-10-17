@@ -10,3 +10,11 @@ Color transform references
 - ACES RRT/ODT fitted curve: [Stephen Hill](https://github.com/selfshadow/ltc_code/blob/master/webgl/shaders/ltc/ltc_blit.fs), with no extra exposure scale.
 - Khronos PBR Neutral: [reference implementation](https://github.com/KhronosGroup/ToneMapping/blob/main/PBR_Neutral/pbrNeutral.glsl).
 - ACEScg is AP1 with a D60 white point: [ACES specification](https://docs.acescentral.com/encodings/acescg/). The AP1 to linear-sRGB matrix includes D60 to D65 adaptation.
+
+Bloom references (our own code, written from the published talks)
+
+- Downsample/upsample chain (13-tap downsample of five overlapping boxes, Karis-weighted first level, 3x3 tent
+  upsample): Jorge Jimenez, "Next Generation Post Processing in Call of Duty: Advanced Warfare", SIGGRAPH 2014
+  Advances in Real-Time Rendering.
+- Triangular dither of up to one step before 8-bit output: Mikkel Gjøl and Mikkel Svendsen, "Low Complexity, High
+  Fidelity: INSIDE Rendering", GDC 2016.

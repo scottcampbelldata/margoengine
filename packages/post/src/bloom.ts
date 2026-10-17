@@ -10,7 +10,7 @@ import {
   type DrawOptions,
 } from '@margoengine/core/extension';
 import { agxShader } from '../../shared/agx.js';
-import { render, group } from '../../shared/gpu.js';
+import { render } from '../../shared/gpu.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: {
@@ -21,55 +21,116 @@ declare const GPUTextureUsage: {
 };
 
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+/** Glow settings. They are read every frame, so they may be changed while the effect runs. */
 export interface BloomOptions {
+  /** Share of the light above `threshold` that is spread back as glow, 0 to 4 (default 0.8). */
   strength?: number;
+  /** Linear brightness (brightest channel) above which a pixel glows, 0 to 100 (default 1). */
   threshold?: number;
+  /** Exposure in stops, applied before the AgX display transform, -10 to 10 (default 0). */
   exposure?: number;
 }
-const filter = `
-@group(0) @binding(0) var source:texture_2d<f32>;
-@group(0) @binding(1) var output:texture_storage_2d<rgba16float,write>;
-@group(0) @binding(2) var<uniform> settings:vec4f;
-@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){
- let size=textureDimensions(output);if(any(id.xy>=size)){return;}
- let p=vec2i(id.xy*textureDimensions(source)/size);let limit=vec2i(textureDimensions(source))-1;
- var color=vec3f(0);var weights=0.0;
- for(var i=-4;i<=4;i++){
-  let w=exp(-f32(i*i)*0.125);let q=clamp(p+vec2i(settings.xy)*i,vec2i(0),limit);
-  var c=textureLoad(source,q,0).rgb;
-  if(settings.z>0){c*=max(0.0,max(c.r,max(c.g,c.b))-settings.w)/max(0.0001,max(c.r,max(c.g,c.b)));}
-  color+=c*w;weights+=w;
- }textureStore(output,vec2i(id.xy),vec4f(color/weights,1));
+/** 3x3 tent (1 2 1 by 1 2 1, over 16) of bilinear taps one texel of `t` apart: every upsample of the chain. */
+const tent = `
+fn tent(t:texture_2d<f32>,s:sampler,uv:vec2f)->vec3f{
+ let d=1.0/vec2f(textureDimensions(t));var c=vec3f(0);
+ for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){c+=textureSampleLevel(t,s,uv+vec2f(f32(x),f32(y))*d,0.0).rgb*f32((2-abs(x))*(2-abs(y)));}}
+ return c/16.0;
 }`;
+/**
+ * The glow chain, after Jimenez, "Next Generation Post Processing in Call of Duty: Advanced Warfare" (SIGGRAPH 2014).
+ * Going down, each level is half the size of the one above, filtered by 13 bilinear taps that form five overlapping
+ * 2x2-texel boxes: the centre box weighs 0.5, the four corner boxes 0.125 each. The top level reads the full-resolution
+ * scene, keeps only the light above the threshold in every tap and weights each box by 1/(1+luma) (Karis average), so
+ * one very bright pixel (a water glint, an ember) cannot switch the glow on and off as it crosses pixels. Coming back
+ * up, each level adds a tent upsample of the summed levels below it.
+ */
+const chain =
+  tent +
+  `
+@group(0) @binding(0) var source:texture_2d<f32>;
+@group(0) @binding(1) var bilinear:sampler;
+@group(0) @binding(2) var output:texture_storage_2d<rgba16float,write>;
+@group(0) @binding(3) var detail:texture_2d<f32>;
+@group(0) @binding(4) var<uniform> settings:vec4f;
+fn downsample(id:vec2u,top:bool){
+ let size=textureDimensions(output);if(any(id>=size)){return;}
+ let uv=(vec2f(id)+0.5)/vec2f(size);let t=1.0/vec2f(textureDimensions(source));
+ let o=array<vec2f,13>(vec2f(-2,-2),vec2f(0,-2),vec2f(2,-2),vec2f(-1,-1),vec2f(1,-1),vec2f(-2,0),vec2f(0,0),vec2f(2,0),vec2f(-1,1),vec2f(1,1),vec2f(-2,2),vec2f(0,2),vec2f(2,2));
+ var s:array<vec3f,13>;
+ for(var i=0;i<13;i++){
+  var c=textureSampleLevel(source,bilinear,uv+o[i]*t,0.0).rgb;let m=max(c.r,max(c.g,c.b));
+  if(top){c*=max(0.0,m-settings.w)/max(0.0001,m);}s[i]=c;
+ }
+ let b=array<vec3f,5>(s[3]+s[4]+s[8]+s[9],s[0]+s[1]+s[5]+s[6],s[1]+s[2]+s[6]+s[7],s[5]+s[6]+s[10]+s[11],s[6]+s[7]+s[11]+s[12]);
+ var color=vec3f(0);var total=0.0;
+ for(var i=0;i<5;i++){
+  let box=b[i]*0.25;var w=select(0.125,0.5,i==0);
+  if(top){w/=1+dot(box,vec3f(0.2126,0.7152,0.0722));}color+=box*w;total+=w;
+ }
+ textureStore(output,vec2i(id),vec4f(color/total,1));
+}
+@compute @workgroup_size(8,8) fn prefilter(@builtin(global_invocation_id) id:vec3u){downsample(id.xy,true);}
+@compute @workgroup_size(8,8) fn down(@builtin(global_invocation_id) id:vec3u){downsample(id.xy,false);}
+@compute @workgroup_size(8,8) fn up(@builtin(global_invocation_id) id:vec3u){
+ let size=textureDimensions(output);if(any(id.xy>=size)){return;}
+ let uv=(vec2f(id.xy)+0.5)/vec2f(size);
+ textureStore(output,vec2i(id.xy),vec4f(textureLoad(detail,vec2i(id.xy),0).rgb+tent(source,bilinear,uv),1));
+}`;
+// The 8-bit output is dithered (Gjøl, "Low Complexity, High Fidelity: INSIDE", GDC 2016): triangular noise of up to one
+// 8-bit step (settings.z; 0 for float targets), hashed from the pixel position so a frame repeats exactly. The noise
+// also stays within each channel's distance to 0 and 1, so black stays black, nothing clips (no bias) and a
+// transparent pixel stays transparent.
 const composite =
   agxShader +
+  tent +
   `
 @group(0) @binding(0) var scene:texture_2d<f32>;
 @group(0) @binding(1) var bloom:texture_2d<f32>;
 @group(0) @binding(2) var<uniform> settings:vec4f;
+@group(0) @binding(3) var bilinear:sampler;
 @vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f{
  let p=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));return vec4f(p[i],0,1);
 }
+fn dither(p:vec2f)->f32{
+ var x=(u32(p.x)*0x9e3779b9u)^(u32(p.y)*0x85ebca6bu);x=(x^(x>>16u))*0x7feb352du;x=(x^(x>>15u))*0x846ca68bu;x^=x>>16u;
+ return f32(x&0xffffu)/65536.0+f32(x>>16u)/65536.0-1.0;
+}
 @fragment fn fragment(@builtin(position) p:vec4f)->@location(0) vec4f{
- let uv=p.xy/vec2f(textureDimensions(scene));
- let q=clamp(vec2i(uv*vec2f(textureDimensions(bloom))),vec2i(0),vec2i(textureDimensions(bloom))-1);
- let s=textureLoad(scene,vec2i(p.xy),0);let hdr=s.rgb+textureLoad(bloom,q,0).rgb*settings.x;
+ let s=textureLoad(scene,vec2i(p.xy),0);let hdr=s.rgb+tent(bloom,bilinear,p.xy/vec2f(textureDimensions(scene)))*settings.x;
  let c=agx(max(hdr,vec3f(0))*exp2(settings.y));
- let o=select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.055,c>=vec3f(0.0031308));return vec4f(o,max(s.a,max(o.r,max(o.g,o.b))));
+ let o=select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.055,c>=vec3f(0.0031308));let a=max(s.a,max(o.r,max(o.g,o.b)));return vec4f(min(o+dither(p.xy)*min(vec3f(settings.z),min(o,1-o)),vec3f(a)),a);
 }`;
 // Alpha: scene coverage (premultiplied), raised to the glow's brightest channel so glow over a transparent canvas stays valid.
 // In a PostStack, a non-final Bloom hands linear light (with its exposure) to the next effect.
 const linear = composite.replace(/let c=agx[^\n]+\n[^\n]+/, 'return vec4f(max(hdr,vec3f(0))*exp2(settings.y),s.a);');
+/** One dispatch of the chain: pipeline, bind group, workgroups across and down. */
+type Step = [GPUComputePipeline, GPUBindGroup, number, number];
+/** Bind group whose entry i is resource i; holes are bindings the entry point does not use. */
+function bind(
+  device: GPUDevice,
+  pipeline: GPUComputePipeline | GPURenderPipeline,
+  resources: (GPUBindingResource | undefined)[],
+): GPUBindGroup {
+  return device.createBindGroup({
+    layout: pipeline.getBindGroupLayout(0),
+    entries: resources.flatMap((resource, binding) => (resource ? [{ binding, resource }] : [])),
+  });
+}
 
-/** Owns linear HDR scene capture, half-resolution bloom and a single AgX presentation. */
+/** Owns linear HDR scene capture, a glow chain from half resolution down to 1/64 and a single dithered AgX presentation. */
 export class Bloom implements EnginePlugin {
   readonly name = 'bloom';
   private engine?: Engine;
   private uniform?: GPUBuffer;
-  private kernels: GPUBuffer[] = [];
+  private sampler?: GPUSampler;
+  /** The chain's prefilter, down and up entry points. */
+  private passes: GPUComputePipeline[] = [];
+  /** Built with the textures and replayed every frame, so a steady frame creates no GPU objects. */
+  private steps: Step[] = [];
+  private levels = 1;
   private textures: GPUTexture[] = [];
-  private groups: GPUBindGroup[] = [];
-  private blur?: GPUComputePipeline;
+  private group?: GPUBindGroup;
   private present?: GPURenderPipeline;
   private capture?: SceneTarget;
   private scene?: GPUTextureView;
@@ -84,7 +145,6 @@ export class Bloom implements EnginePlugin {
   private readonly sceneOptions: DrawOptions = {};
   private readonly drawScene = (options?: DrawOptions): void => this.originalDraw!(options ?? this.sceneOptions);
   private readonly values = new Float32Array(4);
-  private readonly horizontal = new Float32Array([1, 0, 1, 1]);
   private readonly attachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'clear', storeOp: 'store' };
   private readonly presentation: GPURenderPassDescriptor = { colorAttachments: [this.attachment] };
   private disposed = false;
@@ -141,15 +201,11 @@ export class Bloom implements EnginePlugin {
     this.engine = engine;
     const device = engine.gpu;
     this.uniform = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    for (const data of [this.horizontal, new Float32Array([0, 1, 0, 0])]) {
-      const buffer = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-      this.kernels.push(buffer);
-      device.queue.writeBuffer(buffer, 0, data);
-    }
-    this.blur = device.createComputePipeline({
-      layout: 'auto',
-      compute: { module: device.createShaderModule({ code: filter }), entryPoint: 'main' },
-    });
+    this.sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
+    const module = device.createShaderModule({ code: chain });
+    this.passes = ['prefilter', 'down', 'up'].map((entryPoint) =>
+      device.createComputePipeline({ layout: 'auto', compute: { module, entryPoint } }),
+    );
   }
   registerPasses(graph: FrameGraph): void {
     if (this.host) return;
@@ -231,9 +287,7 @@ export class Bloom implements EnginePlugin {
     this.capture = undefined;
     for (const texture of this.textures) texture.destroy();
     this.textures = [];
-    const device = c.device,
-      width = Math.max(1, Math.ceil(c.width / 2)),
-      height = Math.max(1, Math.ceil(c.height / 2));
+    const device = c.device;
     this.textures.push(
       device.createTexture({
         size: [c.width, c.height],
@@ -248,60 +302,83 @@ export class Bloom implements EnginePlugin {
         usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
       }),
     );
-    for (let i = 0; i < 2; i++)
+    this.allocate(device, Math.max(1, Math.ceil(c.width / 2)), Math.max(1, Math.ceil(c.height / 2)));
+    this.scene = this.textures[0].createView();
+    this.depth = this.textures[1].createView();
+    this.present = render(device, composite, c.format, { multisample: c.descriptor.multisample });
+    this.group = bind(device, this.present, [
+      this.scene,
+      this.chain(device, this.scene),
+      { buffer: this.uniform! },
+      this.sampler,
+    ]);
+    // Last, so a frame that failed part-way rebuilds everything above on the next one.
+    this.capture = new SceneTarget(device, this.textures[0], this.textures[1], c.descriptor.multisample?.count ?? 4);
+  }
+  /**
+   * The chain's two textures, each pushed as soon as it exists so a failed allocation is still released. Mip i of the
+   * first is level i going down; mip i of the second is level i plus every level below it.
+   */
+  private allocate(device: GPUDevice, width: number, height: number): void {
+    // Six levels (1/2 to 1/64 of the viewport) where the viewport allows, none smaller than a pixel.
+    this.levels = Math.min(6, 32 - Math.clz32(Math.min(width, height)));
+    for (const mipLevelCount of [this.levels, Math.max(1, this.levels - 1)])
       this.textures.push(
         device.createTexture({
           size: [width, height],
+          mipLevelCount,
           format: 'rgba16float',
           usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
         }),
       );
-    this.capture = new SceneTarget(device, this.textures[0], this.textures[1], c.descriptor.multisample?.count ?? 4);
-    this.scene = this.textures[0].createView();
-    this.depth = this.textures[1].createView();
-    const a = this.textures[2].createView(),
-      b = this.textures[3].createView(),
-      module = device.createShaderModule({ code: composite });
-    this.present = device.createRenderPipeline({
-      layout: 'auto',
-      vertex: { module, entryPoint: 'vertex' },
-      fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format }] },
-      multisample: c.descriptor.multisample,
-    });
-    const group = (pipeline: GPUComputePipeline | GPURenderPipeline, resources: GPUBindingResource[]) =>
-      device.createBindGroup({
-        layout: pipeline.getBindGroupLayout(0),
-        entries: resources.map((resource, binding) => ({ binding, resource })),
-      });
-    this.groups = [
-      group(this.blur!, [this.scene, a, { buffer: this.kernels[0] }]),
-      group(this.blur!, [a, b, { buffer: this.kernels[1] }]),
-      group(this.present, [this.scene, b, { buffer: this.uniform! }]),
-    ];
+  }
+  /** Views, bind groups and dispatch sizes of the chain over `source`; returns the view the presentation reads. */
+  private chain(device: GPUDevice, source: GPUTextureView): GPUTextureView {
+    const [down, up] = this.textures.slice(-2),
+      [prefilter, reduce, expand] = this.passes,
+      levels = this.levels,
+      mip = (texture: GPUTexture, baseMipLevel: number) => texture.createView({ baseMipLevel, mipLevelCount: 1 }),
+      downs = Array.from({ length: levels }, (_, i) => mip(down, i)),
+      ups = Array.from({ length: levels - 1 }, (_, i) => mip(up, i)),
+      steps: Step[] = [],
+      step = (pipeline: GPUComputePipeline, level: number, resources: (GPUBindingResource | undefined)[]) =>
+        steps.push([
+          pipeline,
+          bind(device, pipeline, resources),
+          Math.ceil(Math.max(1, down.width >> level) / 8),
+          Math.ceil(Math.max(1, down.height >> level) / 8),
+        ]);
+    for (let i = 0; i < levels; i++)
+      step(i ? reduce : prefilter, i, [
+        i ? downs[i - 1] : source,
+        this.sampler,
+        downs[i],
+        undefined,
+        { buffer: this.uniform! },
+      ]);
+    // The smallest level stands for itself; each level above adds the tent of the sum below it.
+    for (let i = levels - 2; i >= 0; i--) step(expand, i, [ups[i + 1] ?? downs[i + 1], this.sampler, ups[i], downs[i]]);
+    this.steps = steps;
+    return ups[0] ?? downs[0];
   }
   private draw(c: Context): void {
     this.capture!.resolve(c.encoder, true);
-    this.apply(c, this.original!);
+    this.apply(c, this.original!, this.originalFormat!);
     this.capture!.restore(c);
     c.draw = this.originalDraw!;
   }
-  /** Stacked: blur `input` at half resolution and composite into `output`, AgX-encoded only as the display output. */
+  /** Stacked: run the chain on `input` and composite into `output`, AgX-encoded only as the display output. */
   private stage(c: Context, input: GPUTextureView, output: StageOutput): void {
     this.validate();
     const device = c.device,
       width = Math.max(1, Math.ceil(c.width / 2)),
       height = Math.max(1, Math.ceil(c.height / 2)),
       key = output.format + output.multisample.count + output.hdr;
-    if (this.textures[0]?.width !== width || this.textures[0].height !== height) {
+    if (this.textures[1]?.width !== width || this.textures[1].height !== height) {
       for (const texture of this.textures) texture.destroy();
+      this.textures = [];
       this.input = undefined;
-      this.textures = [0, 1].map(() =>
-        device.createTexture({
-          size: [width, height],
-          format: 'rgba16float',
-          usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
-        }),
-      );
+      this.allocate(device, width, height);
     }
     if (this.key !== key) {
       this.key = key;
@@ -311,37 +388,34 @@ export class Bloom implements EnginePlugin {
       });
     }
     if (this.input !== input) {
-      const a = this.textures[0].createView(),
-        b = this.textures[1].createView();
+      this.group = bind(device, this.present!, [
+        input,
+        this.chain(device, input),
+        { buffer: this.uniform! },
+        this.sampler,
+      ]);
       this.input = input;
-      this.groups = [
-        group(device, this.blur!, [input, a, { buffer: this.kernels[0] }]),
-        group(device, this.blur!, [a, b, { buffer: this.kernels[1] }]),
-        group(device, this.present!, [input, b, { buffer: this.uniform! }]),
-      ];
     }
-    this.apply(c, output.view);
+    this.apply(c, output.view, output.format);
   }
-  private apply(c: Context, view: GPUTextureView): void {
-    this.values[0] = this.options.strength ?? 0.8;
+  private apply(c: Context, view: GPUTextureView, format: GPUTextureFormat): void {
+    // Every level carries all of the thresholded light, so the summed chain is averaged over its levels.
+    this.values[0] = (this.options.strength ?? 0.8) / this.levels;
     this.values[1] = this.options.exposure ?? 0;
-    this.horizontal[3] = this.options.threshold ?? 1;
+    this.values[2] = format.includes('8unorm') ? 1 / 255 : 0;
+    this.values[3] = this.options.threshold ?? 1;
     c.device.queue.writeBuffer(this.uniform!, 0, this.values);
-    c.device.queue.writeBuffer(this.kernels[0], 0, this.horizontal);
     const compute = c.encoder.beginComputePass();
-    compute.setPipeline(this.blur!);
-    for (let i = 0; i < 2; i++) {
-      compute.setBindGroup(0, this.groups[i]);
-      compute.dispatchWorkgroups(
-        Math.ceil(this.textures.at(-1)!.width / 8),
-        Math.ceil(this.textures.at(-1)!.height / 8),
-      );
+    for (const [pipeline, group, x, y] of this.steps) {
+      compute.setPipeline(pipeline);
+      compute.setBindGroup(0, group);
+      compute.dispatchWorkgroups(x, y);
     }
     compute.end();
     this.attachment.view = view;
     const pass = c.encoder.beginRenderPass(this.presentation);
     pass.setPipeline(this.present!);
-    pass.setBindGroup(0, this.groups[2]);
+    pass.setBindGroup(0, this.group!);
     pass.draw(3);
     pass.end();
   }
@@ -349,13 +423,11 @@ export class Bloom implements EnginePlugin {
     this.capture?.dispose();
     this.capture = undefined;
     this.uniform?.destroy();
-    for (const buffer of this.kernels) buffer.destroy();
     for (const texture of this.textures) texture.destroy();
-    this.uniform = undefined;
-    this.kernels = [];
+    this.uniform = this.sampler = this.group = this.present = undefined;
+    this.passes = [];
+    this.steps = [];
     this.textures = [];
-    this.groups = [];
-    this.blur = this.present = undefined;
     this.scene = this.depth = this.original = this.originalDepth = undefined;
     this.originalFormat = undefined;
     this.sourceShader = this.linearShader = this.key = '';

@@ -205,8 +205,11 @@ temporary texture and uniform are released on disposal or device restoration.
 
 `Bloom` is Margo's one bloom (creative `PostProcessing` has none; put Bloom before it in a `PostStack`).
 `Bloom.attach(engine, {strength: 0.8, threshold: 1, exposure: 0})` captures linear HDR,
-filters bright pixels at half resolution and presents with the analytic AgX transform
-shared with `@margoengine/tonemap`. Exposure is in stops. `depthTexture` exposes its
+spreads the light above `threshold` through a chain of up to six levels (1/2 to 1/64 of the viewport: 13-tap bilinear
+downsamples, the first one Karis-weighted so single bright pixels do not flicker, then tent upsamples added back level
+by level) and presents with the analytic AgX transform shared with `@margoengine/tonemap`, dithered by up to one step
+before 8-bit output so dark gradients do not band. `strength` is the share of that light spread back as glow (the
+levels are averaged). Exposure is in stops. `depthTexture` exposes its
 viewport-sized scene depth for water. `sceneTexture` exposes the borrowed linear
 HDR scene color, with `COPY_SRC` usage for water refraction. Both change on
 resize/restoration and remain owned by Bloom. Alone it owns scene capture and cannot share it with
