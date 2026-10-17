@@ -52,7 +52,6 @@ const add = (a: Vec3, b: Vec3): Point => [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
 
 // Playback control belongs to this demo; Animator remains the single owner of the base pose.
 class WorkshopAnimator extends Animator {
-  playing = true;
   probeReuse?: ProbePoseReuse;
   probeCompatible = true;
   override onPreUpdate(dt: number) {

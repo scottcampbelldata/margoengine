@@ -21,6 +21,7 @@ export class Animator implements EnginePlugin {
     readonly parameters: Record<string, number>;
     state: string;
     time: number;
+    playing: boolean;
     constructor(animation: Animation, options: AnimatorOptions);
     static attach(animation: Animation, options: AnimatorOptions): Animator;
     transition(state: string, duration?: number): this;

@@ -97,11 +97,17 @@ export class Animator implements EnginePlugin {
   readonly parameters: Record<string, number>;
   state: string;
   time = 0;
+  /**
+   * Advances state time and crossfades while true; false holds the current pose in place. Time also scales by the
+   * Animation's `options.speed`, as it does for Animation's own playback, so one pause and speed control serves both.
+   */
+  playing = true;
   private engine?: Engine;
   private readonly rest: Pose;
   private current: Pose;
   private readonly singlePose: Pose;
   private readonly weightNodes: number[];
+  private readonly morphed: Set<number>;
   private readonly applied: Float64Array[];
   private fade?: { pose: Pose; elapsed: number; duration: number };
   private layers = new Set<AdditiveLayer>();
@@ -170,6 +176,13 @@ export class Animator implements EnginePlugin {
     this.current = clone(this.rest);
     this.singlePose = clone(this.rest);
     this.weightNodes = [...this.rest.weights.keys()];
+    // Only morph weights a clip animates are written; every other node's weights stay the application's (expression
+    // sliders, lip sync) instead of being reset to their rest values every frame.
+    this.morphed = new Set(
+      animation.clips.flatMap((clip) =>
+        clip.tracks.filter((track) => track.path === 'weights').map((track) => track.node),
+      ),
+    );
     this.applied = nodes.map(() => new Float64Array(26).fill(NaN));
     this.previousPlaying = animation.playing;
   }
@@ -259,7 +272,10 @@ export class Animator implements EnginePlugin {
           this.transition(t.to, t.duration);
           break;
         }
-    this.time += delta;
+    const speed = this.animation.options.speed ?? 1;
+    if (!Number.isFinite(speed) || speed < 0) throw new RangeError('Animation speed must be a finite number >= 0');
+    const step = this.playing ? delta * speed : 0;
+    this.time += step;
     const tree = this.options.states[this.state];
     let pose: Pose | undefined;
     // One unlayered clip needs one owned pose, not a deep clone of every node
@@ -296,7 +312,7 @@ export class Animator implements EnginePlugin {
     if (!pose) pose = clone(this.rest);
     if (this.fade) {
       const f = this.fade;
-      f.elapsed += delta;
+      f.elapsed += step;
       pose = this.mix(clone(f.pose), pose, Math.min(1, f.elapsed / f.duration));
       if (f.elapsed >= f.duration) this.fade = undefined;
     }
@@ -338,7 +354,7 @@ export class Animator implements EnginePlugin {
     for (let i = 0; i < primitives.length; i++) {
       const p = primitives[i];
       const weights = pose.weights.get(p.nodeIndex);
-      if (weights) p.weights.set(weights);
+      if (weights && this.morphed.has(p.nodeIndex)) p.weights.set(weights);
     }
     if (this.feet.size) for (const foot of this.feet) this.foot(foot);
   }

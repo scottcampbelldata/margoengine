@@ -40,3 +40,39 @@ test('nonlooping animator holds the final pose and crossfades from that pose aft
     engine.dispose();
   }
 });
+
+test('animator pauses with playing, scales time by the animation speed, and leaves unanimated morphs alone', async () => {
+  const store = await TransformStore.create(32),
+    engine = new Engine({ width: 256, height: 256, clientWidth: 256, clientHeight: 256 }, store, {
+      backend: 'webgl2',
+      add() {},
+      remove() {},
+      render() {},
+      dispose() {},
+    });
+  const fixture = animatedTriangle(),
+    model = new PBRModel(engine, new GLTFAsset(fixture.doc, fixture.buffers)),
+    animation = new Animation(model, { loop: false }),
+    animator = new Animator(animation, { states: { moving: 'Move' }, initial: 'moving' });
+  try {
+    // An expression slider: no clip animates node 0's morph weights, so the animator must not reset them.
+    animation.setMorph(0, 0, 0.75);
+    animator.onPreUpdate(0.5);
+    const held = model.nodes[1].position.x;
+    animator.playing = false;
+    animator.onPreUpdate(1);
+    assert.equal(animator.time, 0.5, 'paused: state time holds');
+    assert.equal(model.nodes[1].position.x, held, 'paused: pose holds');
+    animator.playing = true;
+    animation.options.speed = 0.5;
+    animator.onPreUpdate(0.5);
+    assert.equal(animator.time, 0.75, 'time advances at the animation speed');
+    assert.equal(model.primitives[0].weights[0], 0.75, "unanimated morph weights stay the application's");
+    animation.options.speed = -1;
+    assert.throws(() => animator.onPreUpdate(0.1), /^RangeError: Animation speed must be a finite number >= 0$/);
+  } finally {
+    animator.dispose();
+    model.dispose();
+    engine.dispose();
+  }
+});

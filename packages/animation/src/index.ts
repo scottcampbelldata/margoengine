@@ -128,7 +128,6 @@ export class Animation implements EnginePlugin {
   private readonly joint = new Float32Array(16);
   private readonly product = new Float32Array(16);
   private readonly workspace = new Float64Array(52);
-  private readonly samples: Float32Array[][];
   private readonly quaternion: number[] = [0, 0, 0, 1];
   private disposed = false;
   private unsubscribe?: () => void;
@@ -212,7 +211,6 @@ export class Animation implements EnginePlugin {
         tracks,
       };
     });
-    this.samples = this.clips.map((clip) => clip.tracks.map((track) => new Float32Array(track.width)));
   }
   static attach(model: PBRModel, options: AnimationOptions = {}): Animation {
     const animation = new Animation(model, options);
@@ -278,7 +276,8 @@ export class Animation implements EnginePlugin {
           t,
           track.interpolation,
           track.path === 'rotation',
-          this.samples[this.clip]?.[i],
+          // Each track carries its own scratch, so filtering or reordering a clip's tracks keeps it allocation-free.
+          track.sample,
         ),
         node = this.model.nodes[track.node];
       node.check();
