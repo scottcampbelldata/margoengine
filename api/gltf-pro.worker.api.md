@@ -573,6 +573,7 @@ class PBRModel implements EnginePlugin {
         alphaTransform?: Float32Array<ArrayBufferLike> | undefined;
     }[];
     setup(engine: Engine, device?: GPUDevice | null): void;
+    shareBuffers(target: PBRPrimitive, source: PBRPrimitive): boolean;
     registerPasses(graph: FrameGraph): void;
     image(index: number): Exclude<GLTFImage, undefined>;
     uploadImage(index: number, device: GPUDevice, srgb?: boolean): GPUTexture;

@@ -14,6 +14,7 @@ export interface Batch {
         instances: GPUBuffer;
         args: GPUBuffer;
     };
+    claimed?: boolean;
 }
 
 export class Camera {
@@ -54,6 +55,7 @@ export interface DrawOptions {
     stencilClear?: number;
     indirect?: boolean;
     colorAttachments?: GPURenderPassColorAttachment[];
+    partIds?: boolean;
 }
 
 export class Engine {

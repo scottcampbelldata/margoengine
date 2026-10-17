@@ -20,6 +20,8 @@ export interface DrawOptions {
   indirect?: boolean;
   /** Extra color attachments after the main color target. */
   colorAttachments?: GPURenderPassColorAttachment[];
+  /** Marks a draw that writes per-mesh ids (factors.w) into an extra attachment. Core ignores it; a package drawing claimed batches' meshes from its own buffers draws them one mesh at a time so each writes its own id. Default false. */
+  partIds?: boolean;
 }
 /**
  * What a {@link FramePass} receives each frame: `delta` in seconds, the drawing-buffer `width`/`height` in pixels,

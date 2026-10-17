@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import { engineRuntime, meshRuntime } from '@margoengine/core/extension';
 import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
 import {
@@ -11,8 +12,11 @@ import {
 import { readResponse } from '../../shared/loading.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import type { PBRSourcePrimitive } from '../../shared/pbr-source.js';
+import type { MeshSourceOwner } from '../../shared/mesh-source.js';
 import { maxBytes, maxIndices, parseCADGeometry, fingerprint, hash } from './cad-parser.js';
 import { parseCADAsync, type CADFormat, type CADImportOptions } from './cad-async.js';
+import { PartPacks, type PackShadowPrimitive } from './pack.js';
+export type { PackShadowPrimitive } from './pack.js';
 export interface CADModel {
   root: MeshHandle;
   meshes: readonly MeshHandle[];
@@ -22,6 +26,7 @@ export function deduplicateParts(meshes: Iterable<MeshHandle>): { parts: number;
   const seen = new Map<string, Array<{ data: Float32Array; geometry: Geometry }>>(),
     known = new Map<Geometry, Geometry>(),
     pbrSeen = new Map<string, Float32Array[]>(),
+    pairs = new Map<object, Map<string, PBRSourcePrimitive[]>>(),
     deformableSeen = new Set<Mesh>();
   let parts = 0,
     unique = 0;
@@ -45,6 +50,7 @@ export function deduplicateParts(meshes: Iterable<MeshHandle>): { parts: number;
         }
         continue;
       }
+      shareBuffers(source.model, primitives, pairs);
       const key = `${data.length}:${hash(data)}`,
         bucket = pbrSeen.get(key) ?? [];
       if (!bucket.some((entry) => entry.length === data.length && entry.every((value, i) => value === data[i]))) {
@@ -76,6 +82,34 @@ export function deduplicateParts(meshes: Iterable<MeshHandle>): { parts: number;
   return { parts, unique };
 }
 
+/**
+ * Points every static triangle primitive at the GPU buffer pair of the first primitive of the same glTF-pro model with
+ * equal vertices and indices (the model's `shareBuffers`). Skinned and morphed primitives keep their own pair.
+ */
+function shareBuffers(
+  model: MeshSourceOwner,
+  primitives: readonly PBRSourcePrimitive[],
+  pairs: Map<object, Map<string, PBRSourcePrimitive[]>>,
+): void {
+  if (typeof model.shareBuffers !== 'function') return;
+  let byKey = pairs.get(model);
+  if (!byKey) pairs.set(model, (byKey = new Map()));
+  for (const p of primitives) {
+    if (p.deformed || p.definition.targets?.length || p.definition.attributes?.JOINTS_0 !== undefined) continue;
+    const v = p.vertices,
+      i = p.indices,
+      key = `${v.length}:${i.length}:${hash(v)}:${hash(new Float32Array(i.buffer, i.byteOffset, i.length))}`,
+      bucket = byKey.get(key) ?? [],
+      match = bucket.find(
+        (q) => q.vertices.every((value, k) => value === v[k]) && q.indices.every((value, k) => value === i[k]),
+      );
+    if (match) model.shareBuffers(p, match);
+    else {
+      bucket.push(p);
+      byKey.set(key, bucket);
+    }
+  }
+}
 /** Compare all bind-pose triangles and normals without modifying PBR attributes or GPU buffers. */
 function primitiveFingerprint(primitives: readonly PBRSourcePrimitive[]): Float32Array {
   let vertexCount = 0,
@@ -164,16 +198,64 @@ export async function loadCAD(
       : data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
   return parseCADAsync(engine, buffer as ArrayBuffer, kind, { signal, ...options });
 }
+/** Options for {@link PartInstancer}. */
+export interface PartInstancerOptions {
+  /** Draw small static closed parts that share a material and root from shared GPU buffers (WebGPU). Default true. */
+  pack?: boolean;
+  /** Parts with more vertices than this keep their own draw. Default 4,096. */
+  partVertices?: number;
+  /** Most vertices in one pack buffer. Default 262,144 (at least `partVertices`). */
+  packVertices?: number;
+}
+/**
+ * Deduplicates identical parts on attach, then packs small static parts into shared buffers. Packed parts stay
+ * ordinary visible meshes (names, picks, sections and exports address them); core skips their claimed batches and the
+ * plugin draws each pack once inside every core draw, with that draw's pipeline and bindings. A part returns to its own
+ * draw when it moves, hides, changes material or geometry, or another visible mesh shares its geometry. Parts loaded
+ * after attaching are packed by {@link PartInstancer.refresh}. For directional shadows, pass the plugin to
+ * `shadows.add` (it is a ShadowSource for its packs) instead of each packed part.
+ */
 export class PartInstancer implements EnginePlugin {
-  static attach(instance: EngineKernel): PartInstancer {
-    const plugin = new PartInstancer();
+  /** Same as `engine.use(new PartInstancer(options))`; returns the plugin. */
+  static attach(instance: EngineKernel, options: PartInstancerOptions = {}): PartInstancer {
+    const plugin = new PartInstancer(options);
     engineRuntime(instance).use(plugin);
     return plugin;
   }
   readonly name = 'part-instancer';
-  readonly stats = { parts: 0, unique: 0 };
+  /** `parts`/`unique` from deduplication on attach; `packs` buffers and `packed` parts drawn from them now. */
+  readonly stats: { parts: number; unique: number; packs: number; packed: number };
+  /** Pack while true; false hands every part back to its own draw on the next frame. */
+  pack: boolean;
+  private readonly packs: PartPacks;
+  private removed = false;
+  constructor(options: PartInstancerOptions = {}) {
+    const partVertices = options.partVertices ?? 4096,
+      packVertices = options.packVertices ?? Math.max(262_144, partVertices);
+    if (!Number.isSafeInteger(partVertices) || partVertices < 3)
+      throw new RangeError('partVertices must be an integer of at least 3');
+    if (!Number.isSafeInteger(packVertices) || packVertices < partVertices)
+      throw new RangeError('packVertices must be an integer no smaller than partVertices');
+    if (options.pack !== undefined && typeof options.pack !== 'boolean') throw new TypeError('pack must be a boolean');
+    this.pack = options.pack ?? true;
+    this.packs = new PartPacks(partVertices, packVertices);
+    this.stats = Object.assign(this.packs.stats, { parts: 0, unique: 0 });
+  }
+  /** Pack buffers as directional shadow casters, clipped by sections like core casters. */
+  get shadowPrimitives(): readonly PackShadowPrimitive[] {
+    return this.packs.shadowPrimitives;
+  }
+  /** True once the plugin is removed or disposed. */
+  get disposed(): boolean {
+    return this.removed;
+  }
   setup(engine: Engine): void {
     Object.assign(this.stats, deduplicateParts(engine.meshes.values()));
+    this.packs.setup(engine);
+  }
+  /** Unpacks every part and packs the engine's current meshes again on the next frame. */
+  refresh(): void {
+    this.packs.refresh();
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
@@ -183,5 +265,24 @@ export class PartInstancer implements EnginePlugin {
         if (context.backend === 'webgpu') context.indirect = true;
       },
     });
+    // Lowest order, so the pack draw wraps core's draw directly and sees every caller's final options.
+    graph.add({
+      name: 'parts:pack',
+      order: -1000,
+      execute: (context) => {
+        if (context.backend === 'webgpu') this.packs.execute(context, this.pack);
+      },
+    });
+  }
+  onDeviceRestored(): void {
+    this.packs.onDeviceRestored();
+  }
+  dispose(): void {
+    this.removed = true;
+    this.packs.dispose();
+  }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
   }
 }

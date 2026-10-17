@@ -36,6 +36,8 @@ export interface MeshSourceOwner extends PBRSource {
   })[];
   prepareDeformation?: (context: MeshDeformationContext) => void;
   readPickingGeometry(): Promise<readonly MeshPose[]>;
+  /** Draws `target` from `source`'s GPU buffer pair (gltf-pro `PBRModel.shareBuffers`); false when they do not qualify. */
+  shareBuffers?(target: PBRSourcePrimitive, source: PBRSourcePrimitive): boolean;
   createRenderer(device: GPUDevice): {
     prepare(context: MeshDeformationContext): void;
     draw(context: Context, pass: GPURenderPassEncoder, view: ArrayLike<number>): void;

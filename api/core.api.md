@@ -163,6 +163,7 @@ interface Batch {
         instances: GPUBuffer;
         args: GPUBuffer;
     };
+    claimed?: boolean;
 }
 
 interface DrawOptions {
@@ -174,6 +175,7 @@ interface DrawOptions {
     stencilClear?: number;
     indirect?: boolean;
     colorAttachments?: GPURenderPassColorAttachment[];
+    partIds?: boolean;
 }
 
 class FrameGraph {

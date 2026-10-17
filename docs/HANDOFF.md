@@ -2,6 +2,15 @@
 
 Last updated 2026-10-17. Read this first when starting a new session. Update it whenever work lands.
 
+Large-assembly drawing (2026-10-17): core gains one hook, `Batch.claimed` (core neither binds nor encodes a claimed
+batch and `engine.stats.drawCalls` leaves it out; picks still draw it), plus the type-only `DrawOptions.partIds`, set on
+selection's existing id draw. `@margoengine/machinery` `PartInstancer` packs small closed static parts into root-space
+buffers drawn inside every core draw; `deduplicateParts` shares glTF-pro GPU buffer pairs through gltf-pro's new
+`PBRModel.shareBuffers` (same model, not skinned or morphed); `parseCADAsync` takes an optional `linearDeflection`.
+Measured on this PC (NVIDIA Ampere): 1,000 distinct small boxes from a loaded OBJ draw as 1 pack draw (1,002 parts:
+3 draws instead of 1,002); 39/39 real-GPU checks (`node scripts/machinery-pack-tests.js`). Core + stage measures
+21,107 bytes gzip (+13), core 18,876. No stage, wireframe, exporters or SectionPlanes change.
+
 Current parity work (2026-10-17): dispersion, depth/distance materials and back-side-only rendering are on main
 (`aa2150c`, `e8befe7`, `95b4eae`). Polygon offset, stencil and color-write controls are on main (`156c4b8`).
 Material wireframe is on main (`80de63c`) in optional materials/gltf-pro and directional/local/contact shadows.

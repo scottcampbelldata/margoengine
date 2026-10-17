@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel, Mesh } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, Mesh } from "@margoengine/core/extension";
 
 export interface CADModel {
     root: MeshHandle;
@@ -12,15 +12,39 @@ export interface CADModel {
     dispose(): void;
 }
 
+export interface PackShadowPrimitive {
+    node: Mesh;
+    vertex: GPUBuffer;
+    index: GPUBuffer;
+    count: number;
+    stride: 24;
+}
+
 export class PartInstancer implements EnginePlugin {
-    static attach(instance: EngineKernel): PartInstancer;
+    static attach(instance: EngineKernel, options?: PartInstancerOptions): PartInstancer;
     readonly name = "part-instancer";
     readonly stats: {
         parts: number;
         unique: number;
+        packs: number;
+        packed: number;
     };
+    pack: boolean;
+    constructor(options?: PartInstancerOptions);
+    get shadowPrimitives(): readonly PackShadowPrimitive[];
+    get disposed(): boolean;
     setup(engine: Engine): void;
+    refresh(): void;
     registerPasses(graph: FrameGraph): void;
+    onDeviceRestored(): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface PartInstancerOptions {
+    pack?: boolean;
+    partVertices?: number;
+    packVertices?: number;
 }
 
 export function deduplicateParts(meshes: Iterable<MeshHandle>): {
@@ -45,5 +69,6 @@ interface CADImportOptions {
     smoothing?: boolean;
     maxParts?: number;
     timeoutMs?: number;
+    linearDeflection?: number;
 }
 ```

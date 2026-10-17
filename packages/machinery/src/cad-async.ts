@@ -15,6 +15,12 @@ export interface CADImportOptions {
    * spend minutes tessellating a malformed STEP or IGES file; a worker that never answers is never waited on.
    */
   timeoutMs?: number;
+  /**
+   * STEP and IGES only: the largest distance, in meters, that OpenCascade's tessellation may stray from the true surface
+   * (its absolute linear deflection). Smaller values give finer triangles. Omitted, OpenCascade keeps its default
+   * tessellation. STL and OBJ are already triangles and ignore it.
+   */
+  linearDeflection?: number;
 }
 export function parseCADAsync(
   instance: EngineKernel,
@@ -32,6 +38,12 @@ export function parseCADAsync(
     throw new TypeError('Invalid CAD input');
   const timeoutMs = options.timeoutMs ?? 120_000;
   if (!(timeoutMs > 0 && timeoutMs <= 2 ** 31 - 1)) throw new RangeError('timeoutMs must be a positive number');
+  const { linearDeflection } = options;
+  if (
+    linearDeflection !== undefined &&
+    !(typeof linearDeflection === 'number' && linearDeflection > 0 && linearDeflection < Infinity)
+  )
+    throw new RangeError('linearDeflection must be a positive finite number of meters');
   const engine = engineRuntime(instance);
   if (engine.disposed) throw new Error('Engine is disposed');
   const workerURL = new URL(/* @vite-ignore */ './workers/cad-runtime.js?no-inline', import.meta.url),
@@ -134,6 +146,7 @@ export function parseCADAsync(
           format,
           smoothing: options.smoothing ?? true,
           maxParts: options.maxParts,
+          linearDeflection,
           occtURL: occtURL.href,
           wasmURL: wasmURL.href,
         },

@@ -1,6 +1,6 @@
 # What goes in core and the stage
 
-Date: 2026-10-16. Combined core plus stage gzip fails at 25,000 bytes. The current measurement is **18,863 bytes gzip** (43,585 raw) for core and **21,094 bytes gzip** (50,155 raw) for core plus stage. Those bytes are a mesh, one directional light, orbit controls, and the loader shell. The new bytes belong in the stage file, `packages/margoengine`. `@margoengine/core` stays the draw path it already is.
+Date: 2026-10-16. Combined core plus stage gzip fails at 25,000 bytes. The current measurement is **18,876 bytes gzip** (43,637 raw) for core and **21,107 bytes gzip** (50,207 raw) for core plus stage. Those bytes are a mesh, one directional light, orbit controls, and the loader shell. The new bytes belong in the stage file, `packages/margoengine`. `@margoengine/core` stays the draw path it already is.
 
 `gltf-pro` alone measured 19,256 bytes gzip. Animation, post, and the Draco decoder do not fit beside core. They stay optional packages. The stage does not import them.
 

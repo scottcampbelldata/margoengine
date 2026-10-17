@@ -600,7 +600,6 @@ export class Engine {
     if (full) {
       for (const batch of this.batches.values()) batch.count = batch.mask = 0;
       this.stats.visible = 0;
-      this.stats.drawCalls = 0;
       this.materialFrame++;
       this.materials.clear();
       this.slots.fill(-1);
@@ -609,7 +608,6 @@ export class Engine {
       seen.set(visible);
       changed.fill(0);
       for (const batch of this.batches.values()) {
-        if (batch.count) this.stats.drawCalls++;
         batch.start = 0;
         batch.end = batch.count * 24;
       }
@@ -626,6 +624,9 @@ export class Engine {
           batch.end = Math.max(batch.end!, offset + 16);
         }
       }
+    // Every frame, with the renderer's own test: a package can claim or release a batch without a new collection.
+    this.stats.drawCalls = 0;
+    for (const batch of this.batches.values()) if (batch.count && !batch.claimed) this.stats.drawCalls++;
   }
   async pick(x: number, y: number): Promise<Mesh | null> {
     if (![x, y].every(Number.isFinite)) throw new RangeError('Invalid pick');
