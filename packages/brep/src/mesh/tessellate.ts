@@ -11,7 +11,7 @@ import type { STEPBody, STEPColor } from '../step/structure.js';
 import { curveOf, type Curve } from '../geometry/curves.js';
 import { surfaceOf, type Surface } from '../geometry/surfaces.js';
 import { list, point, ref } from '../geometry/read.js';
-import { add, angle as between, cross, distance, nearest, scale, sub, unit, type V3 } from '../geometry/vec.js';
+import { add, angle as between, cross, distance, dot, nearest, scale, sub, unit, type V3 } from '../geometry/vec.js';
 import { interiorEdges, triangulate } from './cdt.js';
 
 /**
@@ -263,8 +263,28 @@ export class Tessellator {
       for (let k = 0; k < n; ) {
         const r = raw[(start + k) % n];
         if (!r.singular) {
-          u = nearest(r.u, u, s.uPeriod);
-          v = nearest(r.v, v, s.vPeriod);
+          let nextU = nearest(r.u, u, s.uPeriod);
+          const nextV = nearest(r.v, v, s.vPeriod),
+            previous = out[out.length - 1];
+          // A bound that passes over a pole between two samples (a great circle through the poles) jumps about half a
+          // turn in u: walk it along the pole line, the way that keeps the face on its side, like a pole vertex.
+          if (previous && s.uPeriod && Math.abs(nextU - u) > 1) {
+            const side = (nextV + v > 0 ? 1 : -1) as 1 | -1,
+              poleV = s.pole(side);
+            if (poleV !== undefined) {
+              const pole = spot(u, poleV),
+                chord = sub(r.p, previous.p),
+                along = Math.max(0, Math.min(1, dot(sub(pole, previous.p), chord) / (dot(chord, chord) || 1)));
+              if (distance(pole, add(previous.p, scale(chord, along))) <= 0.5 * Math.hypot(...chord)) {
+                const walk = -side * left;
+                if (walk > 0 && nextU <= u) nextU += s.uPeriod;
+                else if (walk < 0 && nextU >= u) nextU -= s.uPeriod;
+                out.push({ p: pole, u, v: poleV, line: true }, { p: pole, u: nextU, v: poleV });
+              }
+            }
+          }
+          u = nextU;
+          v = nextV;
           out.push({ p: r.p, u, v });
           k++;
           continue;
@@ -336,8 +356,11 @@ export class Tessellator {
           a0 = A(q0),
           a1 = A(q1) + (i + 1 === n ? shift : 0),
           target = nearest(cut, (a0 + a1) / 2, period);
-        if (a0 === a1 || (target - a0) * (target - a1) > 0 || target === a1) continue;
-        const t = (target - a0) / (a1 - a0),
+        // A cut at a sample point belongs to the segment it starts (a rounding error either side still counts).
+        const near = period * 1e-9;
+        if (a0 === a1 || Math.min(target - Math.min(a0, a1), Math.max(a0, a1) - target) < -near) continue;
+        if (i + 1 < n && Math.abs(target - a1) <= near) continue;
+        const t = Math.max(0, Math.min(1, (target - a0) / (a1 - a0))),
           crossing = make(add(q0.p, scale(sub(q1.p, q0.p), t)), target, B(q0) + (B(q1) - B(q0)) * t, q0.line);
         const run: LoopPoint[] = [crossing];
         for (let j = 1; j <= n; j++) {
@@ -362,7 +385,18 @@ export class Tessellator {
       const second = open(wraps[1], A(first.run[0])),
         end = first.run[first.run.length - 1],
         shift = A(end) - A(second.run[0]),
-        moved = second.run.map((q) => make(q.p, A(q) + shift, B(q), q.line));
+        across = transposed ? s.uPeriod : s.vPeriod;
+      let moved = second.run.map((q) => make(q.p, A(q) + shift, B(q), q.line));
+      // Across a closed direction (a torus) two bands share these bounds: the one wound the way the face's orientation
+      // says (counter-clockwise in (u, v) when its normal is the surface's) is the face; the other is reached by moving
+      // the second bound one period over.
+      if (across) {
+        const wound = Math.sign(signedArea([...first.run, ...moved])) * (transposed ? -1 : 1);
+        if (wound && wound !== left) {
+          const step = B(moved[0]) < B(first.run[0]) ? across : -across;
+          moved = moved.map((q) => make(q.p, A(q), B(q) + step, q.line));
+        }
+      }
       end.line = true;
       moved[moved.length - 1].line = true;
       domain.push([...first.run, ...moved]);
@@ -678,6 +712,16 @@ function bounds2(points: readonly LoopPoint[]): [number, number, number, number]
     out[3] = Math.max(out[3], q.v);
   }
   return out;
+}
+/** Signed area of a closed (u, v) polygon: positive when it winds counter-clockwise. */
+function signedArea(loop: readonly LoopPoint[]): number {
+  let sum = 0;
+  for (let i = 0; i < loop.length; i++) {
+    const a = loop[i],
+      b = loop[(i + 1) % loop.length];
+    sum += a.u * b.v - b.u * a.v;
+  }
+  return sum / 2;
 }
 function boxArea(loop: readonly LoopPoint[]): number {
   const b = bounds2(loop);

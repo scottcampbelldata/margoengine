@@ -141,7 +141,8 @@ class Cone implements Surface {
     return side * this.tan * Math.sign(this.radius || 1) < 0 ? apex : undefined;
   }
   singular(_u: number, v: number) {
-    return Math.abs(this.rho(v)) <= 1e-12 * Math.max(1, Math.abs(this.radius));
+    // Exported apex vertices sit within a rounding error of the true apex, not on it: 1e-7 of the cone's size there.
+    return Math.abs(this.rho(v)) <= 1e-7 * Math.max(Math.abs(this.radius), Math.abs(v * this.tan)) + 1e-12;
   }
 }
 
@@ -185,7 +186,8 @@ class Sphere implements Surface {
     return (side * Math.PI) / 2;
   }
   singular(_u: number, v: number) {
-    return Math.abs(Math.cos(v)) < 1e-9;
+    // Within 1e-7 of the radius of a pole (exported pole vertices carry rounding error).
+    return Math.abs(Math.cos(v)) < 1e-7;
   }
 }
 
