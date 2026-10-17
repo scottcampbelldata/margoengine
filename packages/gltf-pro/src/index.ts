@@ -1914,8 +1914,10 @@ export class PBRModel implements EnginePlugin {
                     ? 'capture'
                     : 'ambientFragment',
           lit = mode === 'beauty' || through || capture;
-        const specialized = !compact || !!inst || m.settings[0] === 1;
-        if (compact && specialized)
+        // Every pipeline sets the face and alpha tests as constants (face, mask below), so plain opaque and blended
+        // materials compile without a discard and keep early depth testing (HANDOFF 1e.f). The compact path had lost
+        // this outside instancing and MASK in the consolidation (8f710eb3).
+        if (compact)
           code =
             'override margoFaceTest:bool=true;\noverride margoAlphaTest:bool=true;\n' +
             code
@@ -2095,7 +2097,7 @@ export class PBRModel implements EnginePlugin {
             fragment: {
               module,
               entryPoint: entry,
-              constants: specialized ? { margoFaceTest: face, margoAlphaTest: mask } : undefined,
+              constants: { margoFaceTest: face, margoAlphaTest: mask },
               targets:
                 through || capture
                   ? ((through ? oit! : hook!).targets as GPUColorTargetState[])
@@ -2165,8 +2167,7 @@ export class PBRModel implements EnginePlugin {
                 fragment: {
                   module,
                   entryPoint: 'margoTint',
-                  constants:
-                    specialized && m.shading?.texturedTint ? { margoFaceTest: face, margoAlphaTest: mask } : undefined,
+                  constants: m.shading?.texturedTint ? { margoFaceTest: face, margoAlphaTest: mask } : undefined,
                   targets: [
                     {
                       format,
