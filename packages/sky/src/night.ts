@@ -10,9 +10,20 @@ fn stylizedNight(r:vec3f,footprint:f32)->vec3f {
  if(footprint<=0.0){return color;}
  let cosine=clamp(dot(r,moon.xyz),-1.0,1.0);
  if(r.y>0.258819){
-  let cell=r.xz/(r.y+0.15)*250.0;let random=hash21(floor(cell));
-  if(random>0.985){let twinkle=max(0.0,sin(params.w*2.0+random*6.28)*0.5*frame.nightZenith.w+0.5);
-   color+=vec3f(0.8,0.9,1.0)*(1.0-smoothstep(0.01,0.12,length(fract(cell)-0.5)))*random*twinkle*params.z*smoothstep(0.258819,0.5,r.y)*(1.0-smoothstep(0.96,1.0,cosine));}
+  // Stereographic cells are square in angle, 434/(1+y) per radian: 3-5 px wide at 1080p down to the 15 degree cutoff.
+  let scale=434.0/(1.0+r.y);let cell=r.xz*scale;
+  // A star is drawn at least 0.7 px in radius (0.0003 rad when the view resolves it) and dimmed by the area it covers,
+  // so its energy holds and a moving camera cannot make it pop between pixels. Stars outgrowing their cell fade out.
+  let radius=max(0.0003,footprint*0.7);let size=radius*scale;
+  let energy=0.0003*0.0003/(radius*radius)*(1.0-smoothstep(0.35,0.5,size));
+  // The four cells around the sample hold every star whose disc reaches it; phases are decorrelated per star.
+  let corner=floor(cell-0.5);var stars=0.0;
+  for(var i=0u;i<4u;i++){
+   let id=corner+vec2f(f32(i&1u),f32(i>>1u));let random=hash21(id);
+   if(random>0.975){let twinkle=max(0.0,sin(params.w*2.0+fract(random*613.7)*6.2831853)*0.5*frame.nightZenith.w+0.5);
+    stars+=(1.0-smoothstep(0.0,2.0*size,length(cell-id-0.5)))*random*twinkle;}
+  }
+  color+=vec3f(0.8,0.9,1.0)*stars*energy*params.z*smoothstep(0.258819,0.5,r.y)*(1.0-smoothstep(0.96,1.0,cosine));
  }
  color+=frame.nightMoonColor.rgb*pow(max(cosine,0.0),32.0)*params.y*0.35;
  if(cosine>moon.w){

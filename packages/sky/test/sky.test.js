@@ -342,7 +342,8 @@ test('moonlight, ambient color and the reflected night sky share a continuous cl
     assert.throws(() => new Sky({ lighting }), /Sky|sky/);
 });
 
-test('fog takes the night gradient alone; the sky and its reflection pass their sample footprints', () => {
+/** The WGSL a stylized night compiles into: the sky pass, its fog and its reflection, plus the night function itself. */
+function nightShaders() {
   const h = optionalGPU(),
     depth = Object.assign(
       h.engine.gpu.createTexture({ size: [128, 96], format: 'depth32float', usage: GPUTextureUsage.TEXTURE_BINDING }),
@@ -358,19 +359,40 @@ test('fog takes the night gradient alone; the sky and its reflection pass their 
     return (pipeline.fragment ?? pipeline.compute).module.code;
   };
   const fog = code('fogFragment'),
-    night = fog.slice(fog.indexOf('fn stylizedNight('));
+    shaders = { sky: code('fragment'), fog, reflection: code('reflectSky') };
+  shaders.night = fog.slice(fog.indexOf('fn stylizedNight('));
+  sky.dispose();
+  depth.destroy();
+  assert.ok(h.resources.every((r) => r.destroyed));
+  return shaders;
+}
+
+test('fog takes the night gradient alone; the sky and its reflection pass their sample footprints', () => {
+  const { sky, fog, reflection, night } = nightShaders();
   assert.match(fog, /skyRadiance\(normalize\([^;]*\),0\.0\)/, 'Fog asks for the sky with a zero footprint');
   assert.match(night, /^fn stylizedNight\(r:vec3f,footprint:f32\)/);
   const early = night.indexOf('if(footprint<=0.0){return color;}');
   assert.ok(early > 0 && early < night.indexOf('let cosine='), 'A zero footprint returns before stars and moon');
   assert.match(
-    code('fragment'),
+    sky,
     /let footprint=max\(length\(dpdx\(w\)\),length\(dpdy\(w\)\)\);var color=skyRadiance\(w,footprint\);/,
   );
-  assert.match(code('reflectSky'), /nightSky\(w,0\.1\)/, 'The 64 x 32 reflection passes its texel size');
-  sky.dispose();
-  depth.destroy();
-  assert.ok(h.resources.every((r) => r.destroyed));
+  assert.match(reflection, /nightSky\(w,0\.1\)/, 'The 64 x 32 reflection passes its texel size');
+});
+
+test('stars keep a 0.7 px minimum radius and their energy on square stereographic cells', () => {
+  const { night } = nightShaders();
+  assert.match(night, /let scale=434\.0\/\(1\.0\+r\.y\);let cell=r\.xz\*scale;/);
+  assert.doesNotMatch(
+    night,
+    /\/\(r\.y\+0\.15\)\*250\.0/,
+    'The former cells were thinner than a pixel near the horizon',
+  );
+  assert.match(night, /let radius=max\(0\.0003,footprint\*0\.7\);/, 'At least 0.7 px in radius');
+  assert.match(night, /let energy=0\.0003\*0\.0003\/\(radius\*radius\)/, 'Dimmed by the area it covers');
+  // A star's disc (support twice its radius) stays inside the four cells searched until it fades out at half a cell.
+  assert.match(night, /\(1\.0-smoothstep\(0\.35,0\.5,size\)\)/);
+  assert.match(night, /smoothstep\(0\.0,2\.0\*size,length\(cell-id-0\.5\)\)/);
 });
 
 test('opt-in sunlight synchronizes before rendering and reverse clocks wrap at midnight', () => {

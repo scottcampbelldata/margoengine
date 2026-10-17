@@ -89,7 +89,9 @@ Omitting `sunset` keeps the configured colour constant.
 
 Set `night` to replace the default night gradient with a moonlit sky: a zenith-to-horizon gradient, twinkling
 stars above 15° and a moon disc with phase, glow and size. The object is read every frame, so mutate it for
-live controls.
+live controls. Each star is drawn at least 0.7 px in radius and dimmed by the area it covers, so it keeps its
+energy and holds steady while the camera moves; stars too small for the target (the 64 × 32 reflection) fade out.
+Stars twinkle on independent phases.
 
 ```ts
 import {Engine} from '@margoengine/core';
