@@ -211,6 +211,55 @@ test('ripple normals use gradient noise on four separately turned lattices', () 
     }
   water.dispose();
 });
+test('foam takes N.L lighting, and a shadow source shades glints and foam from bind group 1', () => {
+  const h = optionalGPU(),
+    entries = [
+      { binding: 1, resource: { buffer: {} } },
+      { binding: 2, resource: {} },
+      { binding: 3, resource: {} },
+    ];
+  let current = entries;
+  const shadows = {
+    pbr: (group) => ({
+      declarations: `@group(${group}) @binding(1) var<uniform> shadowFrame:vec4f;
+fn shadowVisibility(position:vec3f,normal:vec3f)->f32 {return shadowFrame.x;}`,
+    }),
+    bindings: () => current,
+  };
+  const water = new Water({ segments: 4, shadows });
+  h.engine.use(water);
+  h.frame();
+  const code = h.pipelines.findLast((p) => p.fragment?.targets.length === 2).fragment.module.code;
+  assert.match(code, /@group\(1\) @binding\(1\) var<uniform> shadowFrame/);
+  assert.match(code, /fn waterShadow\(p:vec3f\)->f32 \{return shadowVisibility\(p,vec3f\(0,1,0\)\);\}/);
+  assert.ok(code.indexOf('@group(1)') > code.indexOf('struct Output'), 'Shadow sampling stays out of surface probes');
+  assert.match(code, /\+glint\*shade;/);
+  assert.match(
+    code,
+    /vec3f\(0\.72,0\.77,0\.74\)\*\(frame\.eye\.w\+frame\.radiance\.rgb\*nl\*frame\.sun\.w\*shade\/3\.14159265\)/,
+    'Foam: ambient plus Lambert N.L, shadowed',
+  );
+  const shadowGroups = () => h.groups.filter((g) => g.entries === current).length;
+  assert.equal(shadowGroups(), 1);
+  for (let i = 0; i < 20; i++) h.frame();
+  assert.equal(shadowGroups(), 1, 'Steady frames reuse the shadow group');
+  current = entries.slice();
+  h.frame();
+  h.frame();
+  assert.equal(shadowGroups(), 1, 'New shadow entries rebuild the group once');
+  water.dispose();
+  assert.ok(h.resources.every((r) => r.destroyed));
+  const plain = optionalGPU(),
+    unshadowed = new Water({ segments: 4 });
+  plain.engine.use(unshadowed);
+  plain.frame();
+  const source = plain.pipelines.findLast((p) => p.fragment?.targets.length === 2).fragment.module.code;
+  assert.match(source, /fn waterShadow\(p:vec3f\)->f32 \{return 1\.0;\}/);
+  assert.doesNotMatch(source, /@group\(1\)/);
+  unshadowed.dispose();
+  for (const invalid of [null, {}, { pbr() {} }, { pbr() {}, bindings: [] }])
+    assert.throws(() => new Water({ shadows: invalid }), /Water shadows need pbr\(\) and bindings\(\)/);
+});
 test('default swells share a wind cone and keep distinct wavelengths', () => {
   const h = optionalGPU(),
     effect = new Water({ segments: 4 });

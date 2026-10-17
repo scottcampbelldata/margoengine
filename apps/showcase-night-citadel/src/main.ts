@@ -165,6 +165,8 @@ export class NightCitadel {
       depth: () => this.post.depthTexture,
       sceneColor: () => this.post.sceneTexture,
       reflection: () => this.atmosphere.reflectionTexture,
+      // The cascades darken moon glints and foam on the citadel's shadowed side.
+      shadows: this.shadows,
       lights: [{ direction: runtime.lighting.direction, radiance: runtime.lighting.radiance.subarray(0, 3) }],
       color: [0.004, 0.009, 0.022],
       foamDistance: 1.2,

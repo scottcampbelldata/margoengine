@@ -43,6 +43,14 @@ and `radiance` (three nonnegative RGB numbers), updated before each render. An e
 array disables direct glints. Omitting `lights` retains engine lighting behavior;
 the application must synchronize that direction with its sun clock.
 
+Foam is lit like the scene's diffuse surfaces: the engine light's N·L over π plus
+the ambient level, so it dims with the light angle instead of glowing at full light
+strength. Pass `shadows: shadows` (a `Shadows` from `@margoengine/shadows` attached
+to the same engine) to darken glints and foam where the engine light is blocked.
+Water binds the cascades at group 1 and samples them with the same PCSS filter as
+the scene, only where a glint or foam shows. All glint lights take that one shadow
+map, as the scene's single blended light does.
+
 For beaches and inland dips, supply `terrain: {heightmap: () => texture,
 origin: [-80,-80], size: [160,160]}`. The borrowed heightmap must contain world-space
 Y heights in a sampleable `r32float` texture, 2..512 cells per side. Each cell holds

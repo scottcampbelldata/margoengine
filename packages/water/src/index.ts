@@ -35,6 +35,11 @@ export interface WaterLight {
   direction: ArrayLike<number>;
   radiance: ArrayLike<number>;
 }
+/** What Water reads from `Shadows` (@margoengine/shadows): its sampling WGSL for a bind group, and that group's entries. */
+export interface WaterShadowSource {
+  pbr(group: number): { readonly declarations: string };
+  bindings(): GPUBindGroupEntry[];
+}
 export interface WaterOptions {
   size?: readonly [number, number];
   segments?: number;
@@ -49,6 +54,11 @@ export interface WaterOptions {
   lights?: readonly WaterLight[];
   spray?: boolean;
   horizon?: boolean;
+  /**
+   * The engine light's shadow map: `Shadows` from @margoengine/shadows, attached to the same engine. Glints and foam
+   * lose that light where it is blocked; without it they are lit everywhere.
+   */
+  shadows?: WaterShadowSource;
 }
 const shader =
   waterFrame +
@@ -185,12 +195,19 @@ struct Result {@location(0) color:vec4f,@location(1) foam:vec4f}
  if(frame.radiance.w>0.5){let limit=vec2i(textureDimensions(opaque))-1;var q=clamp(pixel+vec2i(n.xz*min(6.0,gap*2.0)),vec2i(0),limit);let d=textureLoad(depth,q,0);if(d<=0||d>i.clip.z){q=pixel;}if(textureLoad(depth,q,0)>0){bottom=mix(bottom,textureLoad(opaque,q,0).rgb,refraction);}}
  let nl=clamp(dot(n,normalize(frame.sun.xyz)),0.0,1.0);let rough=clamp(0.12+normalWidth*0.6+footprint*0.025,0.12,0.4);
  let glint=directionalGlint(frame.lights[0],n,v,rough)+directionalGlint(frame.lights[1],n,v,rough);
+ // Glints and foam lose the direct light in its shadow; the map is read only where either shows.
+ var shade=1.0;if(foam>0.002||max(glint.x,max(glint.y,glint.z))>0.002){shade=waterShadow(i.world);}
  let body=bottom*transmission+frame.color.rgb*(vec3f(1)-transmission)*(frame.eye.w+frame.radiance.rgb*nl*frame.sun.w*0.12);
- var color=mix(body,skyColor(reflect(-v,n),rough),reflection)+glint;
- color=mix(color,vec3f(0.72,0.77,0.74)*(vec3f(0.05)+frame.radiance.rgb*min(1.0,frame.sun.w)),foam*0.95);
+ var color=mix(body,skyColor(reflect(-v,n),rough),reflection)+glint*shade;
+ // Foam is a rough white scatterer: N.L direct light over the water's ambient, Lambert-normalized (albedo/pi) like the
+ // scene's diffuse surfaces, so it no longer glows at full light strength on the side away from the moon.
+ color=mix(color,vec3f(0.72,0.77,0.74)*(frame.eye.w+frame.radiance.rgb*nl*frame.sun.w*shade/3.14159265),foam*0.95);
  if(frame.cameraData.w<0.5){color=pow(color/(vec3f(1)+color),vec3f(1.0/2.2));}
  return Result(vec4f(color,1),vec4f(foam,0,0,1));
 }`;
+// With a shadow source its own filtered visibility (bind group 1) shades the surface; without one the light is unblocked.
+const unshadowed = '\nfn waterShadow(p:vec3f)->f32 {return 1.0;}';
+const shadowed = '\nfn waterShadow(p:vec3f)->f32 {return shadowVisibility(p,vec3f(0,1,0));}';
 const depthCopy = `
 @group(0) @binding(0) var sceneDepth:texture_depth_2d;
 @vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {
@@ -244,6 +261,8 @@ export class Water implements EnginePlugin {
   private readonly colorSize: GPUExtent3DDict = { width: 1, height: 1, depthOrArrayLayers: 1 };
   private foamViews: GPUTextureView[] = [];
   private groups: GPUBindGroup[] = [];
+  private shadowGroup?: GPUBindGroup;
+  private shadowEntries?: GPUBindGroupEntry[];
   private sampledDepth?: GPUTexture;
   private coastal?: CoastalFlow;
   readonly name = 'water:' + ++instances;
@@ -306,6 +325,11 @@ export class Water implements EnginePlugin {
       (options.horizon !== undefined && typeof options.horizon !== 'boolean')
     )
       throw new TypeError('Invalid water optics or spray options');
+    if (
+      options.shadows !== undefined &&
+      (typeof options.shadows?.pbr !== 'function' || typeof options.shadows?.bindings !== 'function')
+    )
+      throw new TypeError('Water shadows need pbr() and bindings(); pass a Shadows from @margoengine/shadows');
     this.validateLights();
     this.horizon = options.horizon ?? false;
     this.values[98] = this.values[99] = 1;
@@ -615,10 +639,14 @@ export class Water implements EnginePlugin {
       this.groups = [];
       this.current = 0;
     }
-    const format = c.format + ':' + samples + ':' + depth.format;
+    const shadows = this.options.shadows;
+    const format = c.format + ':' + samples + ':' + depth.format + ':' + !!shadows;
     if (this.format !== format) {
+      // Shadow sampling goes after the surface functions, which GPU probes compile on their own.
       const module = c.device.createShaderModule({
-        code: shader.replace('const HORIZON=false;', `const HORIZON=${this.horizon};`),
+        code:
+          shader.replace('const HORIZON=false;', `const HORIZON=${this.horizon};`) +
+          (shadows ? '\n' + shadows.pbr(1).declarations + shadowed : unshadowed),
       });
       this.pipeline = c.device.createRenderPipeline({
         layout: 'auto',
@@ -642,6 +670,7 @@ export class Water implements EnginePlugin {
       });
       this.format = format;
       this.groups = [];
+      this.shadowEntries = undefined;
     }
     this.time += c.delta;
     this.values.set(c.camera.matrix);
@@ -723,6 +752,15 @@ export class Water implements EnginePlugin {
           );
       this.sampledDepth = depth;
     }
+    // The shadow source owns its entries; a new array (resize, restoration) rebuilds group 1.
+    const shadowEntries = shadows?.bindings();
+    if (shadowEntries && this.shadowEntries !== shadowEntries) {
+      this.shadowEntries = shadowEntries;
+      this.shadowGroup = c.device.createBindGroup({
+        layout: this.pipeline!.getBindGroupLayout(1),
+        entries: shadowEntries,
+      });
+    }
     const target = sceneTarget(c);
     if (target && samples === 4) target.copyDepth(c.encoder, this.surfaceView!, 4);
     else {
@@ -742,6 +780,7 @@ export class Water implements EnginePlugin {
     const pass = c.encoder.beginRenderPass(this.presentation);
     pass.setPipeline(this.pipeline!);
     pass.setBindGroup(0, bind);
+    if (shadowEntries) pass.setBindGroup(1, this.shadowGroup!);
     pass.setVertexBuffer(0, this.vertices!);
     pass.setIndexBuffer(this.indices!, 'uint32');
     pass.drawIndexed(this.count);
@@ -775,6 +814,7 @@ export class Water implements EnginePlugin {
     this.foam = [];
     this.foamViews = [];
     this.groups = [];
+    this.shadowGroup = this.shadowEntries = undefined;
     this.sampledDepth = undefined;
     this.uniform = this.vertices = this.indices = undefined;
     this.pipeline = undefined;
