@@ -36,6 +36,12 @@ stage.engine.camera.fitToBoundingBox([b[0],b[1],b[2]], [b[3],b[4],b[5]]);
 
 Supports base color/alpha, metallic-roughness (G/B), normal maps, occlusion (R), emissive, vertex colors, UV sets 0/1, tangents or derivative tangent frames, alpha masking/blending, double-sided materials, GLB/external buffers/images, normalized and sparse accessors. GGX, Smith, and Schlick implement analytical direct lighting with hemispherical ambient fill. Canvas output uses Three.js-compatible ACES Filmic tone mapping and sRGB encoding; HDR captures remain linear. Color/emissive textures decode sRGB; other maps remain linear. Images have generated mip chains and honor glTF filtering and wrapping.
 
+Loaded triangle materials expose live `side: 'front' | 'back' | 'double'`, initialized from glTF's `doubleSided`.
+For example, `model.primitives[0].material.side = 'back'` switches to back-only rendering next frame. Mirrored
+nodes and mixed mirrored instances retain local winding. Picking and beauty/auxiliary passes agree on sides;
+points and lines ignore triangle sides. Shadow casters retain their existing two-sided policy. `exportModel`
+in `@margoengine/exporters` bakes back-only winding and normals into glTF-compatible geometry.
+
 `loadGLTF` automatically decodes `KHR_draco_mesh_compression` primitives and
 `EXT_meshopt_compression` buffer views and `KHR_texture_basisu` textures using `@margoengine/decoders`, installed as
 a dependency. Draco workers and Wasm start only when compressed primitives are

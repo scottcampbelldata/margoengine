@@ -121,6 +121,7 @@ export interface ModelPrimitiveLike {
     readonly indices: Uint32Array;
     readonly material: {
         readonly settings: ArrayLike<number>;
+        readonly side?: Side;
     };
     readonly nodeIndex?: number;
     readonly instances?: {
@@ -142,6 +143,7 @@ export interface PickingGeometry {
     readonly vertices: Float32Array;
     readonly indices: Uint32Array;
     readonly doubleSided: boolean;
+    readonly side?: Side;
     readonly matrix: Float32Array;
 }
 

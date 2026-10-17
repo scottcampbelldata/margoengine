@@ -547,7 +547,8 @@ export function collect(source: ExportSource, options: SceneOptions = {}): Node[
     if (!primitives.length) return;
     node.primitives = primitives.map((primitive) => {
       const { vertices, indices, definition, material: mat } = primitive,
-        count = vertices.length / 20;
+        count = vertices.length / 20,
+        side = mat.side ?? (mat.settings[2] === 2 ? 'back' : mat.settings[2] ? 'double' : 'front');
       if (!Number.isInteger(count) || !count) fail('Invalid PBR primitive vertices');
       if (
         mat.maps.some((map: unknown) => map) ||
@@ -583,13 +584,23 @@ export function collect(source: ExportSource, options: SceneOptions = {}): Node[
           tangents: target.TANGENT === undefined ? undefined : source.asset.accessor(target.TANGENT, 'VEC3'),
         }));
       const geometry = normalizeGeometry(data);
+      if (side === 'back') {
+        // normalizeGeometry owns these arrays, so the source's shared front-side geometry remains untouched.
+        for (let i = 0; i < geometry.indices.length; i += 3)
+          [geometry.indices[i + 1], geometry.indices[i + 2]] = [geometry.indices[i + 2], geometry.indices[i + 1]];
+        for (let i = 0; i < geometry.normals.length; i++)
+          geometry.normals[i] = geometry.normals[i] ? -geometry.normals[i] : 0;
+        for (const morph of geometry.morphs ?? [])
+          if (morph.normals)
+            for (let i = 0; i < morph.normals.length; i++) morph.normals[i] = morph.normals[i] ? -morph.normals[i] : 0;
+      }
       const material = normalizeMaterial({
         name: mat.name,
         color: mat.base,
         roughness: mat.factors[0],
         metalness: mat.factors[1],
         emissive: mat.emission,
-        doubleSided: !!mat.settings[2],
+        doubleSided: side === 'double',
         alphaMode: (mat.alphaMode as MaterialData['alphaMode']) ?? 'OPAQUE',
         alphaCutoff: mat.alphaMode === 'MASK' ? mat.settings[1] : undefined,
       });

@@ -441,7 +441,15 @@ export function loadGLTFProgressive(
     real = model.primitives.map((p, i) => {
       const m = p.material;
       if (!m.maps.some(Boolean)) return m;
-      if (!stripped.has(m)) stripped.set(m, { ...m, maps: m.maps.map(() => undefined) });
+      if (!stripped.has(m))
+        stripped.set(
+          m,
+          Object.defineProperty(
+            { ...m, maps: m.maps.map(() => undefined) },
+            'side',
+            Object.getOwnPropertyDescriptor(m, 'side')!,
+          ),
+        );
       p.material = stripped.get(m)!;
       bare.add(i);
       return m;

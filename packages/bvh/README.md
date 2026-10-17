@@ -37,6 +37,11 @@ const bytes = tree.toArrayBuffer();            // one buffer, 16-byte header
 const again = MeshBVH.fromArrayBuffer(bytes, {positions});
 ```
 
+PBR models and materials meshes honor live `side: 'front' | 'back' | 'double'` in ordinary engine raycasts and
+deformed snapshot queries, including mirrored nodes. Ordinary engine raycasts also test each instance;
+the asynchronous pose snapshot retains its existing non-instanced primitive transform. `raycaster.side`
+can still override material sides.
+
 ## How it works
 
 - **Binned SAH build.** Triangles are binned on all three axes (32 bins, fewer for small ranges) and split at the lowest surface area cost, stopping at `maxLeafTriangles` or `maxDepth`. Triangle boxes move with the triangle ids during partitioning and the child bounds are measured in the same pass, so every pass streams memory.

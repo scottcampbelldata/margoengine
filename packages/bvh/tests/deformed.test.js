@@ -62,6 +62,36 @@ function fixture() {
   return { engine, store, root, node, snapshot, source, make };
 }
 
+test('material back side rejects front rays for live primitives and deformed snapshots, including mirrors', async () => {
+  const f = fixture(),
+    material = { settings: new Float32Array([0, 0, 2]) },
+    primitive = { node: f.node, vertices: f.snapshot.vertices, indices: f.snapshot.indices, material },
+    model = { root: f.root, primitives: [primitive] },
+    ray = new Raycaster();
+  f.engine.plugins = new Map([['model', model]]);
+  f.snapshot.side = 'back';
+  for (const mirror of [1, -1]) {
+    f.snapshot.matrix[0] = mirror;
+    f.store.matrices[f.node.id * 16] = mirror;
+    ray.set([0, 0, 2], [0, 0, -1]);
+    assert.equal(ray.intersectEngine(f.engine).length, 0, 'front rejected by live material flag');
+    assert.equal((await ray.intersectModel(f.source)).length, 0, 'front rejected by snapshot side');
+    ray.set([0, 0, -2], [0, 0, 1]);
+    assert.equal(ray.intersectEngine(f.engine)[0].frontFace, false);
+    assert.equal((await ray.intersectModel(f.source))[0].frontFace, false);
+    material.side = 'front';
+    assert.equal(ray.intersectEngine(f.engine).length, 0, 'explicit side takes precedence');
+    delete material.side;
+    ray.side = 'double';
+    ray.set([0, 0, 2], [0, 0, -1]);
+    assert.equal(ray.intersectEngine(f.engine).length, 1, 'raycaster override still applies');
+    assert.equal((await ray.intersectModel(f.source)).length, 1);
+    ray.side = 'material';
+  }
+  f.snapshot.side = 'invalid';
+  await assert.rejects(ray.intersectModel(f.source), /Invalid picking material/);
+});
+
 test('intersectModel picks morph and bounded eight-weight skin poses outside bind bounds without assigning core geometry', async () => {
   const f = fixture(),
     bind = f.snapshot.vertices.slice(),

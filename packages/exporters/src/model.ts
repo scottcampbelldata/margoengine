@@ -109,6 +109,7 @@ function textureOwner(model: PBRModel, index?: number): TextureOwner | undefined
   return Array.isArray(owner) ? owner[index ?? 0] : (owner as TextureOwner | undefined);
 }
 const wraps: Record<string, number> = { repeat: 10497, clamp: 33071, mirror: 33648 };
+const side = (m: PBRMaterial) => m.side ?? (m.settings[2] === 2 ? 'back' : m.settings[2] ? 'double' : 'front');
 
 class Writer extends Bin {
   readonly used = new Set<string>();
@@ -116,6 +117,10 @@ class Writer extends Bin {
   /** Images (and their source and flipY) whose PNG bytes are encoded after the synchronous walk. */
   readonly pending: [GLTFImageDefinition, PNGSource, boolean][] = [];
   private readonly cache = new Map<unknown, number>();
+  // Separate array identities keep a shared source accessor's front and back variants distinct in memo().
+  private readonly negated = new Map<ArrayLike<number>, Float32Array>();
+  private readonly reversed = new Map<Uint32Array, Uint32Array>();
+  private readonly backMeshes = new Map<GLTFMesh, PBRMaterial[][]>();
   constructor(
     private readonly embedImages: boolean,
     private readonly maxSize: number,
@@ -130,8 +135,9 @@ class Writer extends Bin {
   }
 
   /** A source accessor as gltf-pro decodes it: floats, JOINTS as unsigned ints, WEIGHTS normalized per vertex. */
-  private data(model: PBRModel, id: number, name: string): number {
-    const values = model.asset.accessor(id),
+  private data(model: PBRModel, id: number, name: string, back = false): number {
+    const source = model.asset.accessor(id),
+      values = back && name === 'NORMAL' ? this.negate(source) : source,
       type = model.asset.doc.accessors![id].type;
     return this.memo(values, () => {
       if (name.startsWith('JOINTS_')) {
@@ -152,34 +158,47 @@ class Writer extends Bin {
     });
   }
 
+  private negate(source: ArrayLike<number>): Float32Array {
+    let values = this.negated.get(source);
+    if (!values) {
+      values = Float32Array.from(source, (v) => (v ? -v : 0));
+      this.negated.set(source, values);
+    }
+    return values;
+  }
+
   private primitive(model: PBRModel, p: PBRPrimitive): Json {
     const def = p.definition,
       // Attribute names come from the source file: a null prototype keeps `__proto__` an ordinary key.
       attributes: Record<string, number> = Object.create(null),
       out: Json = { attributes },
-      count = p.vertices.length / 20;
-    if (def.attributes)
-      for (const name in def.attributes) attributes[name] = this.data(model, def.attributes[name], name);
-    else {
+      count = p.vertices.length / 20,
+      back = !p.topology && side(p.material) === 'back',
+      column = (at: number, width: number) => {
+        const o = new Float32Array(count * width);
+        for (let i = 0; i < count; i++) for (let k = 0; k < width; k++) o[i * width + k] = p.vertices[i * 20 + at + k];
+        return o;
+      };
+    if (def.attributes) {
+      for (const name in def.attributes) attributes[name] = this.data(model, def.attributes[name], name, back);
+      // The packed normal is also the renderer's fallback when a loaded primitive omits NORMAL.
+      if (back && def.attributes.NORMAL === undefined)
+        attributes.NORMAL = this.accessor(this.negate(column(4, 3)), 'VEC3', FLOAT, ARRAY_BUFFER);
+    } else {
       // Packed 80-byte vertices (materials meshes): position, normal, tangent, uv0, uv1, color.
-      const v = p.vertices,
-        owner = textureOwner(model, def.material),
+      const owner = textureOwner(model, def.material),
         usesUV = (set: number) =>
           p.material.maps.some(
             (map, i) => map && !(owner && i < slots.length && slots[i] in owner) && p.material.uvt![i * 8 + 3] === set,
-          ) || slots.some((name, i) => owner?.[name] && (owner.uvt ?? p.material.uvt)![i * 8 + 3] === set),
-        column = (at: number, width: number) => {
-          const o = new Float32Array(count * width);
-          for (let i = 0; i < count; i++) for (let k = 0; k < width; k++) o[i * width + k] = v[i * 20 + at + k];
-          return o;
-        };
+          ) || slots.some((name, i) => owner?.[name] && (owner.uvt ?? p.material.uvt)![i * 8 + 3] === set);
       const tangents = column(8, 4),
         uvs = column(12, 2),
         uvs1 = column(14, 2),
         colors = column(16, 4),
         hasUV1 = usesUV(1) || uvs1.some((x, i) => x !== uvs[i]);
       attributes.POSITION = this.accessor(column(0, 3), 'VEC3', FLOAT, ARRAY_BUFFER, true);
-      attributes.NORMAL = this.accessor(column(4, 3), 'VEC3', FLOAT, ARRAY_BUFFER);
+      const normals = column(4, 3);
+      attributes.NORMAL = this.accessor(back ? this.negate(normals) : normals, 'VEC3', FLOAT, ARRAY_BUFFER);
       if (tangents.some((x, i) => i % 4 === 3 && x))
         attributes.TANGENT = this.accessor(tangents, 'VEC4', FLOAT, ARRAY_BUFFER);
       // glTF indexed semantics must start at 0, even when only UV1 is sampled.
@@ -189,20 +208,43 @@ class Writer extends Bin {
       if (colors.some((x) => x !== 1)) attributes.COLOR_0 = this.accessor(colors, 'VEC4', FLOAT, ARRAY_BUFFER);
     }
     // 65535 is the primitive restart value for 16-bit indices.
-    if (def.indices !== undefined || !def.attributes)
+    if (back) {
+      let indices = this.reversed.get(p.indices);
+      if (!indices) {
+        indices = p.indices.slice();
+        for (let i = 0; i < indices.length; i += 3) [indices[i + 1], indices[i + 2]] = [indices[i + 2], indices[i + 1]];
+        this.reversed.set(p.indices, indices);
+      }
+      out.indices = this.memo(indices, () =>
+        this.accessor(indices, 'SCALAR', count <= 65535 ? 5123 : 5125, ELEMENT_ARRAY_BUFFER),
+      );
+    } else if (def.indices !== undefined || !def.attributes)
       out.indices = this.memo(def.attributes ? model.asset.accessor(def.indices) : p.indices, () =>
         this.accessor(p.indices, 'SCALAR', count <= 65535 ? 5123 : 5125, ELEMENT_ARRAY_BUFFER),
       );
     if (def.material !== undefined) out.material = this.material(model, p.material, def.material);
     if (def.targets?.length)
       out.targets = def.targets.map((t: Record<string, number>) =>
-        Object.fromEntries(Object.entries(t).map(([k, id]) => [k, this.data(model, id, k)])),
+        Object.fromEntries(Object.entries(t).map(([k, id]) => [k, this.data(model, id, k, back)])),
       );
     return out;
   }
 
   mesh(model: PBRModel, docMesh: GLTFMesh, primitives: PBRPrimitive[]): number {
-    return this.memo(docMesh, () =>
+    let key: object = docMesh;
+    if (primitives.some((p) => !p.topology && side(p.material) === 'back')) {
+      const variants = this.backMeshes.get(docMesh) ?? [];
+      let materials = variants.find(
+        (a) => a.length === primitives.length && a.every((m, i) => m === primitives[i].material),
+      );
+      if (!materials) {
+        materials = primitives.map((p) => p.material);
+        variants.push(materials);
+        this.backMeshes.set(docMesh, variants);
+      }
+      key = materials;
+    }
+    return this.memo(key, () =>
       this.list(
         'meshes',
         clean({
@@ -318,7 +360,7 @@ class Writer extends Bin {
           emissiveFactor: m.emission.some((x: number) => x) ? m.emission.map((x: number) => x / strength) : undefined,
           alphaMode: mode === 'OPAQUE' ? undefined : mode,
           alphaCutoff: mode === 'MASK' && m.settings[1] !== 0.5 ? m.settings[1] : undefined,
-          doubleSided: m.settings[2] ? true : undefined,
+          doubleSided: side(m) === 'double' ? true : undefined,
           extensions: Object.keys(ext).length ? ext : undefined,
           extras: m.extras,
         }),

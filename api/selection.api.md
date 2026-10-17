@@ -18,6 +18,7 @@ export interface ModelPrimitive {
     readonly indices: Uint32Array;
     readonly material: {
         readonly settings: ArrayLike<number>;
+        readonly side?: 'front' | 'back' | 'double';
     };
     readonly buffers?: {
         vertex: GPUBuffer;
@@ -80,6 +81,7 @@ export interface PickingPrimitive {
     texCoord?: 0 | 1;
     alphaTransform?: Float32Array;
     doubleSided?: boolean;
+    side?: 'front' | 'back' | 'double';
 }
 
 export interface PickingSource {

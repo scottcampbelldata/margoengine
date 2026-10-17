@@ -195,6 +195,8 @@ export class Material {
     set alphaTest(v: number);
     get transparent(): boolean;
     set transparent(v: boolean);
+    get side(): MaterialSide;
+    set side(v: MaterialSide);
     get doubleSided(): boolean;
     set doubleSided(v: boolean);
     setUVTransform(t: TextureTransform | null, slot?: MapSlot): this;
@@ -255,12 +257,15 @@ export interface MaterialOptions extends PhysicalOptions {
     matcap?: Texture | null;
     transparent?: boolean;
     alphaTest?: number;
+    side?: MaterialSide;
     doubleSided?: boolean;
     blending?: Blending;
     depthWrite?: boolean;
     depthTest?: boolean;
     uvTransform?: TextureTransform;
 }
+
+export { MaterialSide } from "@margoengine/gltf-pro";
 
 export interface MeshGeometry {
     positions: ArrayLike<number>;

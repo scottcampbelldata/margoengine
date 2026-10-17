@@ -66,6 +66,7 @@ import {
   type CoordinateExtension,
 } from './texture-coordinates.js';
 import { deviceRenderer, type PBRDeviceRenderer, type PBRDeformationRenderer } from './replica.js';
+import { backSideShader } from './side-shader.js';
 export type { PBRDeviceRenderer, PBRDeformationRenderer } from './replica.js';
 // Type only: PBRInstances and the EXT_mesh_gpu_instancing reader load with @margoengine/gltf-pro/instancing.
 import type { PBRInstances } from './instancing.js';
@@ -186,17 +187,24 @@ export interface PBRPickingGeometry {
   vertices: Float32Array;
   indices: Uint32Array;
   doubleSided: boolean;
+  side?: MaterialSide;
   matrix: Float32Array;
 }
 const opaquePasses = new WeakMap<Context, Set<PBRModel>>();
 // A symbol keeps separately bundled optional consumers interoperable without
 // importing the loader or attaching a second drawable core Geometry.
 const cpuSource = Symbol.for('margoengine.pbr-source.v1');
+export type MaterialSide = 'front' | 'back' | 'double';
+const sideOf = (m: PBRMaterial): MaterialSide =>
+  m.side ?? (m.settings[2] === 2 ? 'back' : m.settings[2] >= 0.5 ? 'double' : 'front');
+const sideFlag = (side: MaterialSide): number => (side === 'double' ? 1 : side === 'back' ? 2 : 0);
 export interface PBRMaterial extends GLTFMaterial {
   base: number[];
   factors: number[];
   emission: number[];
   settings: number[];
+  /** Live triangle face selection. Legacy structural materials may supply only settings[2]. */
+  side?: MaterialSide;
   maps: (GLTFTextureInfo | undefined)[];
   uvt?: number[];
   ext?: number[];
@@ -655,6 +663,13 @@ function material(def: GLTFMaterial = {}, extended?: GLTFExtendedMaterials): PBR
       +(def.doubleSided ?? false),
       0,
     ],
+    get side(): MaterialSide {
+      return this.settings[2] === 2 ? 'back' : this.settings[2] >= 0.5 ? 'double' : 'front';
+    },
+    set side(value: MaterialSide) {
+      if (!['front', 'back', 'double'].includes(value)) throw new TypeError('Invalid material side');
+      this.settings[2] = sideFlag(value);
+    },
     maps,
     // KHR_texture_transform per map as two rows of offset*rotation*scale; the first row's w holds the UV set.
     uvt: maps.flatMap((t) =>
@@ -736,7 +751,9 @@ function fit(asset: GLTFAsset, p: GLTFPrimitive, m: PBRMaterial, pointsOrLines: 
         throw new Error('Material requires available TEXCOORD_0 or TEXCOORD_1');
       entry(asset.doc.textures, map.index, 'texture');
     }
-  return pointsOrLines && a.NORMAL === undefined ? { ...m, ext: [1, ...m.ext!.slice(1)] } : m;
+  return pointsOrLines && a.NORMAL === undefined
+    ? Object.defineProperty({ ...m, ext: [1, ...m.ext!.slice(1)] }, 'side', Object.getOwnPropertyDescriptor(m, 'side')!)
+    : m;
 }
 function transform(node: Mesh, def: GLTFNode): void {
   if (def.matrix !== undefined) {
@@ -1480,7 +1497,8 @@ export class PBRModel implements EnginePlugin {
           : r.primitive.material.settings[0] === 2
             ? 0.001
             : 0,
-      doubleSided: r.primitive.material.settings[2] >= 0.5,
+      side: sideOf(r.primitive.material),
+      doubleSided: sideOf(r.primitive.material) === 'double',
       texCoord: (r.primitive.material.maps[0] ? textureCoordinates(r.primitive.material.maps[0]).texCoord : 0) as 0 | 1,
       ...(r.primitive.material.maps[0]?.extensions?.KHR_texture_transform
         ? { alphaTransform: textureCoordinates(r.primitive.material.maps[0]).transform }
@@ -1500,7 +1518,8 @@ export class PBRModel implements EnginePlugin {
       matrix: resource.primitive.node.matrix.slice(),
       vertices: resource.primitive.deformed ? undefined : resource.primitive.vertices.slice(),
       indices: resource.primitive.indices.slice(),
-      doubleSided: resource.primitive.material.settings[2] >= 0.5,
+      side: sideOf(resource.primitive.material),
+      doubleSided: sideOf(resource.primitive.material) === 'double',
       read: undefined as GPUBuffer | undefined,
     }));
     try {
@@ -1542,6 +1561,7 @@ export class PBRModel implements EnginePlugin {
           vertices: record.read ? new Float32Array(record.read.getMappedRange()).slice() : record.vertices!,
           indices: record.indices,
           doubleSided: record.doubleSided,
+          side: record.side,
         }));
     } catch (error) {
       if (
@@ -1696,6 +1716,9 @@ export class PBRModel implements EnginePlugin {
         if (!m.maps[2] && !m.extendedFrame) v[82] = 0;
         v.set(m.emission, 84);
         v.set(m.settings, 88);
+        const side = sideOf(m),
+          flag = sideFlag(side);
+        v[90] = p.topology ? 1 : flag;
         v[91] = +(c.format === 'rgba16float');
         // coordsA/coordsB.x name each base map's slot; uv() reads that slot's KHR_texture_transform row, which carries its UV set.
         for (let i = 0; i < 5; i++) v[92 + i] = compact ? (m.maps[i] ? textureCoordinates(m.maps[i]!).texCoord : 0) : i;
@@ -1825,6 +1848,7 @@ export class PBRModel implements EnginePlugin {
         else if (capture) code = capturePBR(code, hook!.declarations(code));
         // Instancing patches the vertex stage last, so text-patching effects (shader NodeMaterial vertex nodes) keep their anchors.
         if (inst) code = inst.shader(code);
+        if (side === 'back' && !p.topology) code = backSideShader(code);
         if (m.shading?.texturedTint) code = texturedTintPBR(code);
         if (mode === 'occlusion') {
           const rewritten = occlusionShader(code);
@@ -1833,8 +1857,8 @@ export class PBRModel implements EnginePlugin {
         }
         // Keep the shader's original front-facing convention, including mirrored transforms.
         // Mirrored instances flip winding per instance: no culling, the shader's face test discards back faces instead.
-        const face = +(!!inst?.mirrored && m.settings[2] < 0.5),
-          cull: GPUCullMode = m.settings[2] < 0.5 && !face ? (v[97] > 0 ? 'back' : 'front') : 'none';
+        const face = +(!p.topology && !!inst?.mirrored && flag !== 1),
+          cull: GPUCullMode = flag !== 1 && !face ? (v[97] > 0 === (side === 'front') ? 'back' : 'front') : 'none';
         const state: PBRRenderState | undefined = mode === 'beauty' ? m.renderState : undefined;
         // Shader text enters the key as a small id: the code strings are cached objects, so the lookup hashes them once.
         // Discard only where it can happen: back faces are culled by the pipeline and only MASK materials alpha-test.
