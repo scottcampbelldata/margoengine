@@ -3,7 +3,7 @@ const app = await createStage('#scene', {
   onError: (error) => {
     document.querySelector('#error')!.textContent = String(error);
   },
-});
+}).catch((error) => import('./webgpu-failure').then((m) => m.explainWebGPUFailure(error, '#error', '#scene')));
 const orb = app.sphere({ color: '#84d6bd', roughness: 0.25, scale: [1, 0.85, 1] });
 app.onTick((delta) => {
   orb.rotation.z += delta;
