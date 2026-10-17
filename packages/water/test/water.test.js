@@ -186,6 +186,31 @@ test('default reflection lights copy exact uniform bits without creating tempora
   water.dispose();
   assert.ok(h.resources.every((r) => r.destroyed));
 });
+test('ripple normals use gradient noise on four separately turned lattices', () => {
+  const h = optionalGPU(),
+    water = new Water({ segments: 4 });
+  h.engine.use(water);
+  h.frame();
+  const code = h.pipelines.find((p) => p.fragment?.targets.length === 2).fragment.module.code;
+  // Perlin's quintic fade over corner gradients, not value noise's cubic fade whose slope vanishes on every cell edge.
+  assert.match(code, /fn cornerGradient\(cell:vec2i\)->vec2f/);
+  assert.match(code, /f\*f\*f\*\(f\*\(f\*6\.0-15\.0\)\+10\.0\)/);
+  assert.doesNotMatch(code, /6\.0\*f\*\(1\.0-f\)/);
+  const turns = [...code.matchAll(/rippleSlope\(p,vec2f\(([-\d.]+),([-\d.]+)\)/g)].map((m) => [+m[1], +m[2]]);
+  assert.equal(turns.length, 4);
+  const angles = turns.map(([c, s]) => {
+    assert.ok(Math.abs(Math.hypot(c, s) - 1) < 1e-4, 'Turns rotate without scaling');
+    return Math.atan2(s, c);
+  });
+  // Square lattices repeat every 90 degrees; every pair of layers stays more than 10 degrees apart.
+  const quarter = Math.PI / 2;
+  for (let i = 0; i < angles.length; i++)
+    for (let j = 0; j < i; j++) {
+      const d = (((angles[i] - angles[j]) % quarter) + quarter) % quarter;
+      assert.ok(Math.min(d, quarter - d) > (10 * Math.PI) / 180, `layers ${j} and ${i} align`);
+    }
+  water.dispose();
+});
 test('default swells share a wind cone and keep distinct wavelengths', () => {
   const h = optionalGPU(),
     effect = new Water({ segments: 4 });

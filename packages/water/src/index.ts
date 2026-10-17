@@ -115,10 +115,21 @@ struct Output {@builtin(position) clip:vec4f,@location(0) normal:vec3f,@location
 }
 fn linear(d:f32)->f32 {return frame.cameraData.x*frame.cameraData.y/(frame.cameraData.x+d*(frame.cameraData.y-frame.cameraData.x));}
 fn hash(p:vec2i)->f32 {var x=bitcast<u32>(p.x)*1664525u+bitcast<u32>(p.y)*1013904223u;x=(x^(x>>16u))*2246822519u;return f32(x^(x>>13u))/4294967295.0;}
+fn cornerGradient(cell:vec2i)->vec2f {let angle=hash(cell)*6.2831853;return vec2f(cos(angle),sin(angle));}
+// Gradient noise (Perlin 2002: random unit corner gradients, quintic fade) with analytic derivatives: value, d/dx, d/dy.
+// Value noise has zero slope along every cell edge, which lit ripples as flat strips; here each edge keeps its gradients.
 fn noise(p:vec2f)->vec3f {
- let cell=vec2i(floor(p));let f=fract(p);let t=f*f*(3.0-2.0*f);let slope=6.0*f*(1.0-f);
- let a=hash(cell);let b=hash(cell+vec2i(1,0));let c=hash(cell+vec2i(0,1));let d=hash(cell+vec2i(1));
- return vec3f(mix(mix(a,b,t.x),mix(c,d,t.x),t.y),mix(b-a,d-c,t.y)*slope.x,mix(c-a,d-b,t.x)*slope.y);
+ let cell=vec2i(floor(p));let f=fract(p);let u=f*f*f*(f*(f*6.0-15.0)+10.0);let du=30.0*f*f*(f*(f-2.0)+1.0);
+ let a=cornerGradient(cell);let b=cornerGradient(cell+vec2i(1,0));let c=cornerGradient(cell+vec2i(0,1));let d=cornerGradient(cell+vec2i(1));
+ let va=dot(a,f);let vb=dot(b,f-vec2f(1,0));let vc=dot(c,f-vec2f(0,1));let vd=dot(d,f-vec2f(1));let k=va-vb-vc+vd;
+ return vec3f(va+u.x*(vb-va)+u.y*(vc-va)+u.x*u.y*k,a+u.x*(b-a)+u.y*(c-a)+u.x*u.y*(a-b-c+d)+du*vec2f(vb-va+u.y*k,vc-va+u.x*k));
+}
+// One ripple layer's world-space slope. Each layer turns the wind frame by its own angle (cos, sin) and scales it by
+// non-integer ratios, so no two layers share a lattice axis or spacing.
+fn rippleSlope(xz:vec2f,turn:vec2f,scale:vec2f,drift:vec2f,offset:vec2f)->vec2f {
+ let w=frame.waves[0].wave.xy;let along=vec2f(w.x*turn.x-w.y*turn.y,w.x*turn.y+w.y*turn.x);let across=vec2f(-along.y,along.x);
+ let n=noise(vec2f(dot(xz,along),dot(xz,across))*scale+frame.settings.x*drift+offset).yz*scale;
+ return along*n.x+across*n.y;
 }
 fn fresnel(cosine:f32)->f32 {return 0.02+0.98*pow(1.0-clamp(cosine,0.0,1.0),5.0);}
 fn directionalGlint(light:Light,n:vec3f,v:vec3f,rough:f32)->vec3f {
@@ -153,19 +164,19 @@ struct Result {@location(0) color:vec4f,@location(1) foam:vec4f}
  // Shoreline quads need their helper lanes until all screen derivatives have been evaluated.
  if(dry){discard;}
  let grainDetail=1.0-smoothstep(0.25,1.0,footprint*2.4);var grain=0.5;
- if(grainDetail>0){grain=mix(0.5,noise(i.world.xz*2.4+vec2f(frame.settings.x*0.22,0)).x,grainDetail);}
+ // Gradient noise is centred on zero with the same 0.21 spread as the former 0..1 value noise.
+ if(grainDetail>0){grain=0.5+noise(i.world.xz*2.4+vec2f(frame.settings.x*0.22,0)).x*grainDetail;}
  let shore=1.0-smoothstep(0.0,max(frame.settings.z*0.5,edge*2.0),max(0.0,gap+(grain-0.5)*0.08));
  let pattern=mix(0.45,1.0,grain);let fresh=clamp((shore*0.08+movement*0.9)*pattern,0.0,1.0);
  var foam=fresh;if(frame.flow.w<0.5){foam=max(fresh,textureLoad(history,pixel,0).r*exp(-frame.cameraData.z*3.0)*shore);}
  var ripple=vec3f(0);
  if(footprint<6.0){
- let wind=frame.waves[0].wave.xy;let across=vec2f(-wind.y,wind.x);let uv=vec2f(dot(i.world.xz,wind),dot(i.world.xz,across));
- let agitation=noise(uv*vec2f(0.22,0.16)+frame.settings.x*vec2f(-0.09,0.03));
- let chop=noise(uv*vec2f(0.57,0.42)+frame.settings.x*vec2f(-0.17,-0.06)+vec2f(3.17,9.23));
- let a=noise(uv*vec2f(1.8,0.65)+frame.settings.x*vec2f(-0.5,0.12));
- let b=noise(uv*vec2f(3.4,1.9)+frame.settings.x*vec2f(-0.7,0.2)+vec2f(7.13,3.71));
- let gradient=agitation.yz*vec2f(0.22,0.16)*0.30*(1.0-smoothstep(0.25,1.0,footprint*0.22))+chop.yz*vec2f(0.57,0.42)*0.10*(1.0-smoothstep(0.25,1.0,footprint*0.57))+(a.yz*vec2f(1.8,0.65)*0.018+b.yz*vec2f(3.4,1.9)*0.006*(1.0-smoothstep(0.12,0.5,footprint)))*(1.0-smoothstep(0.2,1.0,footprint));
- let slope=wind*gradient.x+across*gradient.y;
+ // Agitation, chop and two micro layers turned 11, -21, 30 and -41 degrees from the wind. Weights keep the former
+ // value-noise slope (RMS 0.39 per axis against gradient noise's 0.62).
+ let p=i.world.xz;
+ let slope=rippleSlope(p,vec2f(0.98200,0.18886),vec2f(0.22,0.16),vec2f(-0.09,0.03),vec2f(0))*0.186*(1.0-smoothstep(0.25,1.0,footprint*0.22))
+  +rippleSlope(p,vec2f(0.93233,-0.36162),vec2f(0.57,0.42),vec2f(-0.17,-0.06),vec2f(3.17,9.23))*0.062*(1.0-smoothstep(0.25,1.0,footprint*0.57))
+  +(rippleSlope(p,vec2f(0.86281,0.50553),vec2f(1.8,0.65),vec2f(-0.5,0.12),vec2f(0))*0.0112+rippleSlope(p,vec2f(0.75836,-0.65183),vec2f(3.4,1.9),vec2f(-0.7,0.2),vec2f(7.13,3.71))*0.0037*(1.0-smoothstep(0.12,0.5,footprint)))*(1.0-smoothstep(0.2,1.0,footprint));
  ripple=vec3f(-slope.x,0,-slope.y)*(1.0-foam);
  }
  let n=normalize(i.normal+ripple);let v=normalize(frame.eye.xyz-i.world);let nv=clamp(dot(n,v),0.001,1.0);let reflection=fresnel(nv);
