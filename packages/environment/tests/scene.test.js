@@ -29,7 +29,7 @@ const coreShader = source('../../core/src/shaders.ts'),
 const variants = {
   core: coreShader,
   shadows: coreShader.replace('let linear=direct*', 'let linear=shadowLit(direct,i.position,i.normal)*'),
-  sky: coreShader.replace('frame.radiance.w', 'skyAmbient.rgb'),
+  sky: coreShader.replace('frame.radiance.w*frame.ambient.rgb', 'skyAmbient.rgb'),
   clustered: coreShader.replace(
     /let linear=([^;]+);/,
     'let linear=$1+clusterLighting(i.clip.xy,i.position,n,frame.eye.xyz,i.color,i.material.x,i.material.y);',
@@ -88,7 +88,7 @@ test('EnvironmentLighting patches core meshes only while the environment is live
   // The IBL term is named margoAmbient (the convention post's SSAO occludes) and added where the constant ambient was.
   assert.match(
     fragment(patched),
-    /let margoAmbient=iblShade\(iblSpecular,iblSampler,iblSh,iblParams,n,v,i\.color,i\.material\.y,i\.material\.x\);let linear=direct\*frame\.radiance\.xyz\*frame\.light\.w\+i\.color\*\(1\.0-i\.material\.y\)\*0\.0\+margoAmbient;/,
+    /let margoAmbient=iblShade\(iblSpecular,iblSampler,iblSh,iblParams,n,v,i\.color,i\.material\.y,i\.material\.x\);let linear=direct\*frame\.radiance\.xyz\*frame\.light\.w\+i\.color\*\(1\.0-i\.material\.y\)\*0\.0\*frame\.ambient\.rgb\+margoAmbient;/,
   );
   assert.doesNotMatch(fragment(patched), /frame\.radiance\.w/, 'IBL replaces the constant ambient term');
   assert.deepEqual(

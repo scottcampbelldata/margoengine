@@ -61,7 +61,7 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
       },
       pass(c) {
         if (source !== c.shader) {
-          const patched = c.shader.replace('frame.radiance.w', 'skyAmbient.rgb');
+          const patched = c.shader.replace('frame.radiance.w*frame.ambient.rgb', 'skyAmbient.rgb');
           if (patched === c.shader) throw new Error('Sky ambient requires the standard PBR shader');
           source = c.shader;
           shader = '@group(0) @binding(8) var<uniform> skyAmbient:vec4f;\n' + patched;

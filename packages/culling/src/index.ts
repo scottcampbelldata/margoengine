@@ -73,7 +73,7 @@ export class CulledInstances implements EnginePlugin {
   private readonly uniform = new ArrayBuffer(448);
   private readonly floats = new Float32Array(this.uniform);
   private readonly words = new Uint32Array(this.uniform);
-  private readonly frame = new Float32Array(28);
+  private readonly frame = new Float32Array(32);
   private buffers: Record<string, GPUBuffer> = {};
   private geometryBuffers = new Map<Geometry, { vertex: GPUBuffer; index: GPUBuffer }>();
   private compute?: {
@@ -224,7 +224,7 @@ export class CulledInstances implements EnginePlugin {
     const S = GPUBufferUsage.STORAGE;
     try {
       buffer('uniform', 448, GPUBufferUsage.UNIFORM);
-      buffer('frame', 112, GPUBufferUsage.UNIFORM);
+      buffer('frame', 128, GPUBufferUsage.UNIFORM);
       buffer(
         'levels',
         16 * 256,
@@ -477,6 +477,8 @@ export class CulledInstances implements EnginePlugin {
     this.frame.set(c.camera.position, 16);
     this.frame.set(lighting.direction, 20);
     this.frame.set(lighting.radiance, 24);
+    this.frame.fill(1, 28, 31);
+    if (lighting.ambient) this.frame.set(lighting.ambient, 28);
     d.queue.writeBuffer(b.frame, 0, this.frame as Float32Array<ArrayBuffer>);
     const p = this.compute!,
       groups = Math.ceil(this.count / 256);

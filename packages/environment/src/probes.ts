@@ -531,11 +531,12 @@ export class LightProbes extends ShaderEffect {
         `${this.name} replaces EnvironmentLighting: pass {environment} to LightProbes instead of attaching both`,
       );
     const base = source.includes('let base=terrainColor') ? 'base' : 'i.color',
-      env = !!this.environment;
+      env = !!this.environment,
+      color = source.includes('frame.ambient.rgb') ? '*frame.ambient.rgb' : '';
     const code = source.replace(
       /let linear=([^;]+);/,
       (_, terms: string) =>
-        `let margoAmbient=probeShade(i.position,n,v,${base},i.material.y,i.material.x,${env ? 'vec3f(0)' : `${base}*(1.0-i.material.y)*frame.radiance.w`});let linear=${terms.replace('frame.radiance.w', '0.0')}+margoAmbient;`,
+        `let margoAmbient=probeShade(i.position,n,v,${base},i.material.y,i.material.x,${env ? 'vec3f(0)' : `${base}*(1.0-i.material.y)*frame.radiance.w${color}`});let linear=${terms.replace('frame.radiance.w', '0.0')}+margoAmbient;`,
     );
     return code === source ? source : shadingWgsl(group, env) + code;
   }
@@ -754,7 +755,7 @@ export class LightProbes extends ShaderEffect {
       return resource;
     };
     try {
-      const frame = track(device.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })),
+      const frame = track(device.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })),
         params = track(device.createBuffer({ size: 256 * 8, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })),
         sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' }),
         targets = new Map<number, CaptureTarget>();
@@ -828,7 +829,7 @@ export class LightProbes extends ShaderEffect {
           aims,
           bindings,
           frameBinding: { binding: CAPTURE_BINDING, resource: { buffer: frame } },
-          values: new Float32Array(28),
+          values: new Float32Array(32),
           slots,
           floats: new Float32Array(slots.buffer),
           commands: [],
@@ -949,6 +950,8 @@ export class LightProbes extends ShaderEffect {
       values[19] = 0;
       values.set(lighting.direction, 20);
       values.set(lighting.radiance, 24);
+      values.fill(1, 28, 31);
+      if (lighting.ambient) values.set(lighting.ambient, 28);
       device.queue.writeBuffer(resources.frame, 0, values);
       const encoder = device.createCommandEncoder(),
         color = target.colors[face],

@@ -243,7 +243,11 @@ export class Engine {
   readonly frameGraph = new FrameGraph();
   readonly meshes = new Map<number, Mesh>();
   readonly camera: Camera;
-  readonly lighting = { direction: new Float32Array([3, 5, 4, 3]), radiance: new Float32Array([1, 1, 1, 0.15]) };
+  readonly lighting = {
+    direction: new Float32Array([3, 5, 4, 3]),
+    radiance: new Float32Array([1, 1, 1, 0.15]),
+    ambient: new Float32Array([1, 1, 1]),
+  };
   readonly stats = { visible: 0, drawCalls: 0 };
   disposed = false;
   onError: (error: unknown) => void = (error) => {
@@ -265,6 +269,8 @@ export class Engine {
   private raf: number | null = null;
   private last = 0;
   private running = false;
+  private rendering = false;
+  private primaryCulling = true;
   private readonly frameOptions: { culling?: boolean; delta: number } = { delta: 0 };
   private disposing = false;
   /** Attached plugins by name (read-only). */
@@ -478,11 +484,42 @@ export class Engine {
       this.stats.visible++;
     }
   };
-  render({ culling = true, delta = 0 }: { culling?: boolean; delta?: number } = {}): void {
-    this.update(culling, delta);
-    if (!this.recovery) this.renderer.render(this.camera, this.lighting, this.batches.values(), this.frameGraph, delta);
+  /** Draw through `camera` for this call, restoring the primary view before returning. Alternate views are sequential. */
+  render({
+    camera = this.camera,
+    culling = true,
+    delta = 0,
+  }: {
+    camera?: Camera;
+    culling?: boolean;
+    delta?: number;
+  } = {}): void {
+    if (this.rendering) throw new Error('Render recursion');
+    if (!(camera instanceof Camera)) throw new TypeError('Invalid camera');
+    this.rendering = true;
+    let failed = false;
+    try {
+      this.update(culling, delta, camera);
+      if (!this.recovery) this.renderer.render(camera, this.lighting, this.batches.values(), this.frameGraph, delta);
+    } catch (error) {
+      failed = true;
+      throw error;
+    } finally {
+      try {
+        if (camera !== this.camera && !this.disposed && !this.disposing) {
+          this.camera.update(this.canvas.width / this.canvas.height, this.backend === 'webgpu');
+          this.store.planes.set(this.camera.planes);
+          this.store.tick(this.primaryCulling);
+          this.collectInstances();
+        }
+      } catch (error) {
+        if (!failed) throw error;
+      } finally {
+        this.rendering = false;
+      }
+    }
   }
-  private update(culling: boolean, delta: number): void {
+  private update(culling: boolean, delta: number, camera = this.camera): void {
     if (this.disposed || this.disposing) throw new Error('Engine disposed');
     if (!Number.isFinite(delta) || delta < 0 || delta > 1) throw new RangeError('Invalid delta');
     for (const plugin of this.plugins.values()) plugin.onPreUpdate?.(delta);
@@ -492,18 +529,24 @@ export class Engine {
       height = Math.max(1, Math.min(4096, Math.round(this.canvas.clientHeight * dpr) || this.canvas.height));
     if (this.canvas.width !== width) this.canvas.width = width;
     if (this.canvas.height !== height) this.canvas.height = height;
-    this.camera.advance(delta);
-    this.camera.update(this.canvas.width / this.canvas.height, this.backend === 'webgpu');
-    this.store.planes.set(this.camera.planes);
+    camera.advance(delta);
+    camera.update(this.canvas.width / this.canvas.height, this.backend === 'webgpu');
+    this.store.planes.set(camera.planes);
     this.store.tick(culling);
     finite(this.lighting.direction, 4, 'Light');
     finite(this.lighting.radiance, 4, 'Radiance');
+    if (this.lighting.ambient !== undefined) finite(this.lighting.ambient, 3, 'Ambient');
     if (
       !Math.hypot(this.lighting.direction[0], this.lighting.direction[1], this.lighting.direction[2]) ||
       this.lighting.direction[3] < 0 ||
-      this.lighting.radiance.some((v) => v < 0)
+      this.lighting.radiance.some((v) => v < 0) ||
+      this.lighting.ambient?.some((v) => v < 0)
     )
       throw new RangeError('Invalid lighting');
+    this.collectInstances();
+    if (camera === this.camera) this.primaryCulling = culling;
+  }
+  private collectInstances(): void {
     // Reuse last frame's instances unless the mesh set, visibility or a material changed; then patch moved matrices only.
     const { visible, changed } = this.store,
       seen = this.seen;

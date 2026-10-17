@@ -19,6 +19,16 @@ declare const GPUMapMode: { READ: number };
 
 const defaultDraw: DrawOptions = {};
 
+function validateRectangle(rectangle: DrawOptions['viewport'], width: number, height: number): void {
+  if (rectangle === undefined) return;
+  if (!Array.isArray(rectangle) || rectangle.length !== 4) throw new RangeError('Invalid draw rectangle');
+  for (let i = 0; i < 4; i++)
+    if (!Number.isSafeInteger(rectangle[i]) || rectangle[i] < (i < 2 ? 0 : 1))
+      throw new RangeError('Invalid draw rectangle');
+  if (rectangle[0] + rectangle[2] > width || rectangle[1] + rectangle[3] > height)
+    throw new RangeError('Draw rectangle exceeds target');
+}
+
 /** `start`/`end`: float range of `instances` changed since the WebGPU renderer last uploaded it (absent: upload all).
  * `mask`: nonzero when a drawn instance needs back faces (double-sided material or mirrored transform); 0 lets core's
  * own pass draw the batch with its back-culled pipeline (absent counts as 0).
@@ -38,10 +48,12 @@ export interface Batch {
  * The single directional light. `direction`: xyz toward the light (non-zero), w intensity (>= 0); default [3, 5, 4, 3].
  * `radiance`: linear rgb light color, w ambient strength, all >= 0; default [1, 1, 1, 0.15]. Invalid values throw
  * RangeError on the next frame.
+ * `ambient`: three nonnegative finite linear RGB multipliers for core-mesh ambient; omitted means white.
  */
 export interface Lighting {
   direction: Float32Array;
   radiance: Float32Array;
+  ambient?: Float32Array;
 }
 /** WebGPU buffers core keeps for one geometry: vertices (position + normal), uint32 indices, and per-instance data. */
 export interface GeometryBuffers {
@@ -71,7 +83,7 @@ export class GPURenderer implements Renderer {
     return this.device;
   }
   readonly backend = 'webgpu';
-  private readonly frame = new Float32Array(28);
+  private readonly frame = new Float32Array(32);
   private targets: GPUTexture[] = [];
   private views: GPUTextureView[] = [];
   private resolveTarget?: GPUTextureView;
@@ -173,7 +185,7 @@ export class GPURenderer implements Renderer {
     private readonly descriptor: GPURenderPipelineDescriptor,
     private readonly culled: GPURenderPipeline,
   ) {
-    this.uniform = device.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.uniform = device.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.bindGroup = device.createBindGroup({
       layout: pipeline.getBindGroupLayout(0),
       entries: [{ binding: 0, resource: { buffer: this.uniform } }],
@@ -280,6 +292,8 @@ export class GPURenderer implements Renderer {
     this.frame.set(camera.position, 16);
     this.frame.set(lighting.direction, 20);
     this.frame.set(lighting.radiance, 24);
+    this.frame.fill(1, 28, 31);
+    if (lighting.ambient) this.frame.set(lighting.ambient, 28);
     this.device.queue.writeBuffer(this.uniform, 0, this.frame);
     const encoder = this.device.createCommandEncoder();
     this.frameId++;
@@ -295,6 +309,8 @@ export class GPURenderer implements Renderer {
       backend: 'webgpu',
       draw: (options: DrawOptions = defaultDraw) => {
         const context = this.passContext!;
+        validateRectangle(options.viewport, context.width, context.height);
+        validateRectangle(options.scissor, context.width, context.height);
         let pipeline = options.pipeline ?? this.pipeline;
         const bindings = options.bindings ?? context.bindings;
         if (
@@ -381,6 +397,8 @@ export class GPURenderer implements Renderer {
         depth.stencilLoadOp = stencil ? (clear || options.stencilClear !== undefined ? 'clear' : 'load') : undefined;
         depth.stencilStoreOp = stencil ? depth.depthStoreOp : undefined;
         const pass = context.encoder.beginRenderPass(descriptor);
+        if (options.viewport) pass.setViewport(...options.viewport, 0, 1);
+        if (options.scissor) pass.setScissorRect(...options.scissor);
         let current: GPURenderPipeline | undefined;
         for (const batch of drawBatches)
           if (batch.count) {
@@ -495,12 +513,14 @@ export class GPURenderer implements Renderer {
         matrix[c * 4] = (camera.matrix[c * 4] - nx * camera.matrix[c * 4 + 3]) * this.canvas.width;
         matrix[c * 4 + 1] = (camera.matrix[c * 4 + 1] - ny * camera.matrix[c * 4 + 3]) * this.canvas.height;
       }
-      const frame = new Float32Array(28);
+      const frame = new Float32Array(32);
       frame.set(matrix);
       frame.set(camera.position, 16);
       frame.set(lighting.direction, 20);
       frame.set(lighting.radiance, 24);
-      uniform = device.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      frame.fill(1, 28, 31);
+      if (lighting.ambient) frame.set(lighting.ambient, 28);
+      uniform = device.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
       device.queue.writeBuffer(uniform, 0, frame);
       // Reuse shader pass hooks for fragment clipping; caps and FX draws are suppressed.
       const encoder = device.createCommandEncoder(),

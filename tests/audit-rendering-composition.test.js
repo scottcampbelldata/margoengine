@@ -46,10 +46,13 @@ test('PBR Scatter retains TAA jitter in the replacement vertex shader', () => {
     scatter = new Scatter(box(), { count: 1, material: new PbrMaterial() });
   h.engine.use(taa);
   h.engine.use(scatter);
+  h.engine.lighting.ambient = new Float32Array([2, 0.5, 0]);
   try {
     h.engine.frameGraph.execute(h.context);
     const pipeline = h.pipelines.find((p) => p.vertex?.module.code.includes('lodVisible'));
     assert.match(pipeline.vertex.module.code, /o.clip=taaCamera\*vec4f\(o.position,1\)/);
+    const frame = h.resources.find((r) => r.size === 128 && r.usage === 72);
+    assert.deepEqual([...new Float32Array(frame.data).subarray(28, 32)], [2, 0.5, 0, 0]);
     assert.ok(
       h.groups.some((g) =>
         g.entries.some((e) => e.binding === taa.cameraBinding.binding && e.resource === taa.cameraBinding.resource),

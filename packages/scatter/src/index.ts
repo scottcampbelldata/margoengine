@@ -162,7 +162,7 @@ export class Scatter implements EnginePlugin {
   private readonly exclusionValues: Float32Array;
   private pbrUniform?: GPUBuffer;
   private materialUniform?: GPUBuffer;
-  private readonly pbrValues = new Float32Array(28);
+  private readonly pbrValues = new Float32Array(32);
   private pbrShader = '';
   private pbrBindings: GPUBindGroupEntry[] = [];
   private readonly pbrGroups = new Map<GPURenderPipeline, GPUBindGroup>();
@@ -296,7 +296,7 @@ export class Scatter implements EnginePlugin {
     });
     d.queue.writeBuffer(this.exclusionBuffer, 0, this.exclusionValues as Float32Array<ArrayBuffer>);
     if (this.options.material) {
-      this.pbrUniform = d.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      this.pbrUniform = d.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
       this.materialUniform = d.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
       this.materialValues.set(this.options.material.data);
     }
@@ -397,6 +397,8 @@ export class Scatter implements EnginePlugin {
       this.pbrValues.set(c.camera.position, 16);
       this.pbrValues.set(this.engine!.lighting.direction, 20);
       this.pbrValues.set(this.engine!.lighting.radiance, 24);
+      this.pbrValues.fill(1, 28, 31);
+      if (this.engine!.lighting.ambient) this.pbrValues.set(this.engine!.lighting.ambient, 28);
       c.device.queue.writeBuffer(this.pbrUniform!, 0, this.pbrValues as Float32Array<ArrayBuffer>);
     }
     const key = c.format + ':' + c.descriptor.multisample?.count + ':' + c.descriptor.depthStencil!.format;

@@ -49,6 +49,8 @@ export interface DrawOptions {
     pipeline?: GPURenderPipeline;
     bindings?: GPUBindGroupEntry[];
     clear?: boolean;
+    viewport?: readonly [number, number, number, number];
+    scissor?: readonly [number, number, number, number];
     stencilClear?: number;
     indirect?: boolean;
     colorAttachments?: GPURenderPassColorAttachment[];
@@ -64,6 +66,7 @@ export class Engine {
     readonly lighting: {
         direction: Float32Array<ArrayBuffer>;
         radiance: Float32Array<ArrayBuffer>;
+        ambient: Float32Array<ArrayBuffer>;
     };
     readonly stats: {
         visible: number;
@@ -88,7 +91,8 @@ export class Engine {
     remove(mesh: Mesh): void;
     retain(geometry: Geometry): void;
     release(geometry: Geometry): void;
-    render({ culling, delta }?: {
+    render({ camera, culling, delta }?: {
+        camera?: Camera;
         culling?: boolean;
         delta?: number;
     }): void;
@@ -153,6 +157,7 @@ export interface GeometryBuffers {
 export interface Lighting {
     direction: Float32Array;
     radiance: Float32Array;
+    ambient?: Float32Array;
 }
 
 export class Mesh {
@@ -279,6 +284,7 @@ interface EngineKernel {
     createMesh(parent?: Mesh | null): Mesh;
     pick(x: number, y: number): Promise<Mesh | null>;
     render(options?: {
+        camera?: Camera;
         culling?: boolean;
         delta?: number;
     }): void;

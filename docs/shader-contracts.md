@@ -37,6 +37,8 @@ Text anchors in core's shader (the full list, with the package file using each, 
 `packages/shared/gpu.js` `meshVertex` is a copy of core's vertex inputs for packages that draw core meshes with their own
 fragment (selection, toon outline); the test checks it still matches core's `Frame`/`Input` layout and transform.
 
+The approved camera/ambient/rectangle core exception adds `ambient:vec4f` at the end of the canonical `Frame`. Its original 112-byte prefix remains in place; the complete uniform is 128 bytes, with linear RGB multipliers at floats 28–30. The default is white and `radiance.w` remains ambient intensity. Core-shader consumers, including private pick, culling, XR, scatter and probe buffers, must allocate/write this tail. Scatter's own wind row follows it at float 32. Independent glTF-pro, terrain, VAT and other material layouts are unchanged. SSAO replays the same RGB ambient; Sky's absolute color replaces the complete multiplier and IBL replaces the ambient term.
+
 Every hook or patch adds its bindings to one fragment stage, which WebGPU limits to 16 sampled textures and 16 samplers
 by default. The per-combination counts are in the gltf-pro README ("Texture bindings"); physical materials with
 shadows, IBL and LocalShadows use all 16, and gltf-pro throws naming the combination when a shader exceeds the device.

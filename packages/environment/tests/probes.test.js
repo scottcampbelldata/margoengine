@@ -125,7 +125,7 @@ test('LightProbes replaces the ambient term on every core shader variant, with o
   // Named margoAmbient (SSAO occludes it); without an environment the fallback is core's own ambient term, so unbaked probes change nothing.
   assert.match(
     fragment(patched),
-    /let margoAmbient=probeShade\(i\.position,n,v,i\.color,i\.material\.y,i\.material\.x,i\.color\*\(1\.0-i\.material\.y\)\*frame\.radiance\.w\);let linear=direct\*frame\.radiance\.xyz\*frame\.light\.w\+i\.color\*\(1\.0-i\.material\.y\)\*0\.0\+clusterLighting\([^;]+\)\+margoAmbient;/,
+    /let margoAmbient=probeShade\(i\.position,n,v,i\.color,i\.material\.y,i\.material\.x,i\.color\*\(1\.0-i\.material\.y\)\*frame\.radiance\.w\*frame\.ambient\.rgb\);let linear=direct\*frame\.radiance\.xyz\*frame\.light\.w\+i\.color\*\(1\.0-i\.material\.y\)\*0\.0\*frame\.ambient\.rgb\+clusterLighting\([^;]+\)\+margoAmbient;/,
   );
   assert.doesNotMatch(patched, /iblSpecular/, 'no texture bindings without an environment');
   assert.deepEqual(
@@ -134,7 +134,7 @@ test('LightProbes replaces the ambient term on every core shader variant, with o
   );
   const terrain =
     'let base=terrainColor(i.position,n);\n' +
-    coreShader.replace('+i.color*(1.0-i.material.y)*frame.radiance.w', '+base*frame.radiance.w');
+    coreShader.replace('+i.color*(1.0-i.material.y)*frame.radiance.w*frame.ambient.rgb', '+base*frame.radiance.w');
   assert.match(
     probes.shader(terrain, 0),
     /probeShade\(i\.position,n,v,base,i\.material\.y,i\.material\.x,base\*\(1\.0-i\.material\.y\)\*frame\.radiance\.w\)/,
@@ -245,6 +245,7 @@ test('LightProbes reach gltf-pro models through the ambient hook and the bake ca
     reflections: [{ position: [0, 1, 0], ...room }],
     resolution: 16,
   });
+  engine.lighting.ambient = new Float32Array([2, 0.5, 0]);
   probes.setup(engine);
   probes.setReflectionPosition(0, [1, 2, -1]);
   const remove = probes.add(model);
@@ -346,9 +347,15 @@ test('LightProbes reach gltf-pro models through the ambient hook and the bake ca
   assert.equal(probes.baked, true);
   assert.equal(probes.texels.length, (16 + 336) * 2);
   const captures = log
-    .filter((e) => e[0] === 'writeBuffer' && e[2] === 0 && e[3].length === 112 * 2)
+    .filter((e) => e[0] === 'writeBuffer' && e[2] === 0 && e[3].length === 128 * 2)
     .map((e) => Buffer.from(e[3], 'hex'));
   assert.equal(captures.length, 2 * probeCount * 6);
+  for (const values of captures)
+    assert.deepEqual(
+      [112, 116, 120].map((o) => values.readFloatLE(o)),
+      [2, 0.5, 0],
+      'probe captures retain ambient RGB',
+    );
   for (const values of [...captures.slice(12, 18), ...captures.slice(30, 36)])
     assert.deepEqual(
       [64, 68, 72].map((o) => values.readFloatLE(o)),

@@ -475,7 +475,9 @@ export class SSAO implements EnginePlugin {
         ? c.shader.replace(/(let direct=[\s\S]*)return (vec4f\([^\n]+\));/, '$1_=$2;return vec4f(margoAmbient,1);')
         : c.shader.replace(
             /let direct=[\s\S]*return vec4f\([^\n]+\);/,
-            'return vec4f(i.color*(1.0-i.material.y)*frame.radiance.w,1);',
+            c.shader.includes('skyAmbient.rgb')
+              ? 'return vec4f(i.color*(1.0-i.material.y)*skyAmbient.rgb,1);'
+              : 'return vec4f(i.color*(1.0-i.material.y)*frame.radiance.w*frame.ambient.rgb,1);',
           );
     }
     const code = this.ambientCode;
@@ -493,12 +495,16 @@ export class SSAO implements EnginePlugin {
     }
     const color = c.color;
     c.color = ambient;
-    // Ambient replay still needs TAA's vertex camera override, while its fragment lighting bindings are unused.
+    // Retain TAA's vertex camera and Sky's absolute ambient color when either is used by the replay.
     try {
       c.draw({
         pipeline: this.ambientPipeline,
         clear: false,
-        bindings: this.ambientAll ? c.bindings : c.bindings.filter((entry) => entry.binding === 18),
+        bindings: this.ambientAll
+          ? c.bindings
+          : c.bindings.filter(
+              (entry) => entry.binding === 18 || (entry.binding === 8 && c.shader.includes('skyAmbient.rgb')),
+            ),
       });
     } finally {
       c.color = color;

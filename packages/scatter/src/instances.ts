@@ -71,7 +71,7 @@ export class ScatterInstances implements EnginePlugin {
   private engine?: Engine;
   private resources: Batch[] = [];
   private uniform?: GPUBuffer;
-  private readonly values = new Float32Array(32);
+  private readonly values = new Float32Array(36);
   private readonly shadowValues = new Float32Array(20);
   private time = 0;
   private shadowPipeline?: GPURenderPipeline;
@@ -118,7 +118,7 @@ export class ScatterInstances implements EnginePlugin {
       return buffer;
     };
     try {
-      this.uniform = d.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      this.uniform = d.createBuffer({ size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
       for (const b of this.generate()) {
         const count = b.vertices.length / 20,
           instances = b.transforms.length / 16;
@@ -269,8 +269,10 @@ export class ScatterInstances implements EnginePlugin {
     this.values.set(c.camera.position, 16);
     this.values.set(this.engine!.lighting.direction, 20);
     this.values.set(this.engine!.lighting.radiance, 24);
-    this.values[28] = this.time;
-    this.values[29] = intensity;
+    this.values.fill(1, 28, 31);
+    if (this.engine!.lighting.ambient) this.values.set(this.engine!.lighting.ambient, 28);
+    this.values[32] = this.time;
+    this.values[33] = intensity;
     c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
     this.color.view = c.color;
     this.depth.view = c.depth;

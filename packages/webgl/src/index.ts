@@ -1,11 +1,32 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type { Renderer, Batch, Lighting, Geometry, Camera, FrameGraph } from '@margoengine/core/extension';
+import type {
+  Renderer,
+  Batch,
+  Lighting,
+  Geometry,
+  Camera,
+  FrameGraph,
+  PassContext,
+  DrawOptions,
+} from '@margoengine/core/extension';
 import { sceneSamples } from '../../shared/quality.js';
+
+const defaultDraw: DrawOptions = {};
+
+function validateRectangle(rectangle: DrawOptions['viewport'], width: number, height: number): void {
+  if (rectangle === undefined) return;
+  if (!Array.isArray(rectangle) || rectangle.length !== 4) throw new RangeError('Invalid draw rectangle');
+  for (let i = 0; i < 4; i++)
+    if (!Number.isSafeInteger(rectangle[i]) || rectangle[i] < (i < 2 ? 0 : 1))
+      throw new RangeError('Invalid draw rectangle');
+  if (rectangle[0] + rectangle[2] > width || rectangle[1] + rectangle[3] > height)
+    throw new RangeError('Draw rectangle exceeds target');
+}
 
 const glVertex = `#version 300 es
 precision highp float;layout(location=0) in vec3 p;layout(location=1) in vec3 n;layout(location=2) in vec4 m0;layout(location=3) in vec4 m1;layout(location=4) in vec4 m2;layout(location=5) in vec4 m3;layout(location=6) in vec4 color;layout(location=7) in vec4 factors;uniform mat4 camera;out vec3 w;out vec3 wn;out vec3 b;out vec4 m;void main(){mat4 M=mat4(m0,m1,m2,m3);vec4 q=M*vec4(p,1);vec3 a=m0.xyz,y=m1.xyz,c=m2.xyz;wn=mat3(cross(y,c),cross(c,a),cross(a,y))*n*sign(dot(a,cross(y,c)));w=q.xyz;b=color.rgb;m=vec4(factors.xyz,sign(dot(a,cross(y,c))));gl_Position=camera*q;}`;
 const glFragment = `#version 300 es
-precision highp float;in vec3 w;in vec3 wn;in vec3 b;in vec4 m;uniform vec3 eye;uniform vec4 light;uniform vec4 radiance;out vec4 o;void main(){bool front=gl_FrontFacing==(m.w>0.0);if(!front&&m.z<0.5)discard;vec3 n=normalize(wn);if(!front)n=-n;vec3 v=normalize(eye-w),l=normalize(light.xyz),h=(v+l)/max(length(v+l),0.0001);float nl=clamp(dot(n,l),0.0,1.0),nv=clamp(dot(n,v),0.0001,1.0),nh=clamp(dot(n,h),0.0,1.0),vh=clamp(dot(v,h),0.0,1.0);float a=m.x*m.x,a2=a*a,d=a2/(3.14159265*pow(nh*nh*(a2-1.0)+1.0,2.0));float g=2.0*nv/(nv+sqrt(a2+(1.0-a2)*nv*nv))*2.0*nl/max(nl+sqrt(a2+(1.0-a2)*nl*nl),0.0001);vec3 f0=mix(vec3(0.04),b,m.y),f=f0+(1.0-f0)*pow(1.0-vh,5.0);vec3 direct=((1.0-f)*(1.0-m.y)*b/3.14159265+d*g*f/max(4.0*nl*nv,0.0001))*nl;vec3 linear=direct*radiance.rgb*light.w+b*(1.0-m.y)*radiance.w;vec3 mapped=linear/(1.0+linear);o=vec4(mix(mapped*12.92,1.055*pow(mapped,vec3(1.0/2.4))-0.055,step(vec3(0.0031308),mapped)),1);}`;
+precision highp float;in vec3 w;in vec3 wn;in vec3 b;in vec4 m;uniform vec3 eye;uniform vec4 light;uniform vec4 radiance;uniform vec3 ambient;out vec4 o;void main(){bool front=gl_FrontFacing==(m.w>0.0);if(!front&&m.z<0.5)discard;vec3 n=normalize(wn);if(!front)n=-n;vec3 v=normalize(eye-w),l=normalize(light.xyz),h=(v+l)/max(length(v+l),0.0001);float nl=clamp(dot(n,l),0.0,1.0),nv=clamp(dot(n,v),0.0001,1.0),nh=clamp(dot(n,h),0.0,1.0),vh=clamp(dot(v,h),0.0,1.0);float a=m.x*m.x,a2=a*a,d=a2/(3.14159265*pow(nh*nh*(a2-1.0)+1.0,2.0));float g=2.0*nv/(nv+sqrt(a2+(1.0-a2)*nv*nv))*2.0*nl/max(nl+sqrt(a2+(1.0-a2)*nl*nl),0.0001);vec3 f0=mix(vec3(0.04),b,m.y),f=f0+(1.0-f0)*pow(1.0-vh,5.0);vec3 direct=((1.0-f)*(1.0-m.y)*b/3.14159265+d*g*f/max(4.0*nl*nv,0.0001))*nl;vec3 linear=direct*radiance.rgb*light.w+b*(1.0-m.y)*radiance.w*ambient;vec3 mapped=linear/(1.0+linear);o=vec4(mix(mapped*12.92,1.055*pow(mapped,vec3(1.0/2.4))-0.055,step(vec3(0.0031308),mapped)),1);}`;
 
 export class GLRenderer implements Renderer {
   readonly backend = 'webgl2';
@@ -15,6 +36,7 @@ export class GLRenderer implements Renderer {
   private readonly eye: WebGLUniformLocation | null;
   private readonly light: WebGLUniformLocation | null;
   private readonly radiance: WebGLUniformLocation | null;
+  private readonly ambient: WebGLUniformLocation | null;
   private readonly resources = new Map<
     Geometry,
     { vao: WebGLVertexArrayObject; buffers: WebGLBuffer[]; instance: WebGLBuffer }
@@ -64,6 +86,7 @@ export class GLRenderer implements Renderer {
     this.eye = gl.getUniformLocation(program, 'eye');
     this.light = gl.getUniformLocation(program, 'light');
     this.radiance = gl.getUniformLocation(program, 'radiance');
+    this.ambient = gl.getUniformLocation(program, 'ambient');
   }
   add(geometry: Geometry, capacity: number): void {
     const gl = this.gl,
@@ -115,24 +138,38 @@ export class GLRenderer implements Renderer {
   render(camera: Camera, lighting: Lighting, batches: Iterable<Batch>, graph: FrameGraph, delta: number): void {
     const gl = this.gl;
     if (gl.isContextLost()) throw new Error('WebGL context lost');
-    graph.execute({
+    const context: PassContext = {
       backend: 'webgl2',
       gl,
       camera,
       width: this.canvas.width,
       height: this.canvas.height,
       delta,
-      draw: () => {
-        gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+      draw: (options: DrawOptions = defaultDraw) => {
+        const { width, height } = context,
+          viewport = options.viewport,
+          scissor = options.scissor;
+        validateRectangle(viewport, width, height);
+        validateRectangle(scissor, width, height);
+        if (viewport) gl.viewport(viewport[0], height - viewport[1] - viewport[3], viewport[2], viewport[3]);
+        else gl.viewport(0, 0, width, height);
+        gl.disable(gl.SCISSOR_TEST);
         gl.enable(gl.DEPTH_TEST);
         gl.disable(gl.CULL_FACE);
-        gl.clearColor(...this.clear);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        if (options.clear ?? true) {
+          gl.clearColor(...this.clear);
+          gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        }
+        if (scissor) {
+          gl.scissor(scissor[0], height - scissor[1] - scissor[3], scissor[2], scissor[3]);
+          gl.enable(gl.SCISSOR_TEST);
+        }
         gl.useProgram(this.program);
         gl.uniformMatrix4fv(this.camera, false, camera.matrix);
         gl.uniform3f(this.eye, ...camera.position);
         gl.uniform4fv(this.light, lighting.direction);
         gl.uniform4fv(this.radiance, lighting.radiance);
+        gl.uniform3f(this.ambient, lighting.ambient?.[0] ?? 1, lighting.ambient?.[1] ?? 1, lighting.ambient?.[2] ?? 1);
         for (const batch of batches)
           if (batch.count) {
             const r = this.resources.get(batch.geometry)!;
@@ -143,7 +180,8 @@ export class GLRenderer implements Renderer {
           }
         gl.bindVertexArray(null);
       },
-    });
+    };
+    graph.execute(context);
   }
   dispose(): void {
     for (const geometry of this.resources.keys()) this.remove(geometry);

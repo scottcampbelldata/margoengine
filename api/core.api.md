@@ -62,6 +62,7 @@ export interface EngineKernel {
     createMesh(parent?: Mesh | null): Mesh;
     pick(x: number, y: number): Promise<Mesh | null>;
     render(options?: {
+        camera?: Camera;
         culling?: boolean;
         delta?: number;
     }): void;
@@ -168,6 +169,8 @@ interface DrawOptions {
     pipeline?: GPURenderPipeline;
     bindings?: GPUBindGroupEntry[];
     clear?: boolean;
+    viewport?: readonly [number, number, number, number];
+    scissor?: readonly [number, number, number, number];
     stencilClear?: number;
     indirect?: boolean;
     colorAttachments?: GPURenderPassColorAttachment[];
@@ -198,6 +201,7 @@ interface GeometryBuffers {
 interface Lighting {
     direction: Float32Array;
     radiance: Float32Array;
+    ambient?: Float32Array;
 }
 
 type PassContext = {

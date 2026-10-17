@@ -141,7 +141,7 @@ export class StereoRenderer {
         descriptor = image.getViewDescriptor();
       let frame = this.eyes[eye];
       if (!frame) {
-        const uniform = device.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+        const uniform = device.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
         try {
           frame = {
             uniform,
@@ -149,7 +149,7 @@ export class StereoRenderer {
               layout: pipeline.getBindGroupLayout(0),
               entries: [{ binding: 0, resource: { buffer: uniform } }],
             }),
-            data: new Float32Array(28),
+            data: new Float32Array(32),
           };
           this.eyes.push(frame);
         } catch (error) {
@@ -171,6 +171,8 @@ export class StereoRenderer {
       data[19] = 1;
       data.set(engine.lighting.direction, 20);
       data.set(engine.lighting.radiance, 24);
+      data.fill(1, 28, 31);
+      if (engine.lighting.ambient) data.set(engine.lighting.ambient, 28);
       device.queue.writeBuffer(frame.uniform, 0, data as Float32Array<ArrayBuffer>);
       if (!image.depthStencilTexture) throw new Error('XR projection layer has no depth texture');
       if (

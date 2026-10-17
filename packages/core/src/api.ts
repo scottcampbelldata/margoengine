@@ -50,7 +50,8 @@ export interface EngineKernel {
   onError: (error: unknown) => void;
   createMesh(parent?: Mesh | null): Mesh;
   pick(x: number, y: number): Promise<Mesh | null>;
-  render(options?: { culling?: boolean; delta?: number }): void;
+  /** Draw through an optional camera for this call; the primary camera and culling state are restored on return. */
+  render(options?: { camera?: Camera; culling?: boolean; delta?: number }): void;
   start(options?: { culling?: boolean }): void;
   stop(): void;
   dispose(): void;

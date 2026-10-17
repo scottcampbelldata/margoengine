@@ -8,8 +8,12 @@ export interface DrawOptions {
   pipeline?: GPURenderPipeline;
   /** Extra bind group 0 entries after core's uniform at binding 0. Default the context's `bindings`. */
   bindings?: GPUBindGroupEntry[];
-  /** Clear color and depth before drawing instead of loading them. Default true. */
+  /** Clear the whole color/depth attachments before drawing instead of loading them, regardless of rectangles. Default true. */
   clear?: boolean;
+  /** Viewport [x, y, width, height] in top-left drawing-buffer pixels. Integer origin >= 0 and size > 0, within context dimensions. Does not change camera aspect. */
+  viewport?: readonly [number, number, number, number];
+  /** Independent clipping rectangle, in the same pixels/bounds as viewport. Omitted means the full target. Custom target owners must report their dimensions. */
+  scissor?: readonly [number, number, number, number];
   /** Stencil clear value when the depth format has stencil; setting it clears stencil even with `clear: false`. Default 0. */
   stencilClear?: number;
   /** Draw with drawIndexedIndirect. Default the context's `indirect`. */
