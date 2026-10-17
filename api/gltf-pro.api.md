@@ -214,6 +214,7 @@ export interface PBRMaterial extends GLTFMaterial {
     emission: number[];
     settings: number[];
     side?: MaterialSide;
+    wireframe?: boolean;
     maps: (GLTFTextureInfo | undefined)[];
     uvt?: number[];
     ext?: number[];
@@ -700,6 +701,7 @@ interface ShadowCasterRecord {
     vertex: GPUBuffer;
     index: GPUBuffer;
     count: number;
+    topology?: 'line-list';
     stride: number;
     alphaTexture: GPUTextureView;
     alphaSampler: GPUSampler;

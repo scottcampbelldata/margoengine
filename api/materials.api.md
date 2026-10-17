@@ -92,6 +92,7 @@ export type MapSlot = (typeof mapSlots)[number];
 
 export class Material {
     readonly shading: Shading;
+    readonly wireframe: boolean;
     readonly color: number[];
     readonly emissive: number[];
     readonly blending: Blending;
@@ -272,6 +273,7 @@ export interface MaterialOptions extends PhysicalOptions {
     alphaTest?: number;
     side?: MaterialSide;
     doubleSided?: boolean;
+    wireframe?: boolean;
     blending?: Blending;
     depthWrite?: boolean;
     depthTest?: boolean;

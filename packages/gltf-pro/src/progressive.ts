@@ -3,6 +3,7 @@ import type { GLTFPrimitive } from '../../shared/gltf.js';
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { canUseWorker } from '../../shared/worker.js';
+import { Cleanup } from '../../shared/cleanup.js';
 import {
   GLTFAsset,
   assetLimit,
@@ -237,11 +238,14 @@ export function loadGLTFProgressive(
   };
   const rebuild = (list: number[]) => {
     const out = setup(list.map((i) => model!.primitives[i])),
-      resources = model!['resources'];
+      resources = model!['resources'],
+      cleanup = new Cleanup();
     list.forEach((i, j) => {
-      resources[i].uniform.destroy();
+      const previous = resources[i];
+      cleanup.run(() => previous.uniform.destroy()).run(() => previous.wireframe?.index.destroy());
       resources[i] = out[j];
     });
+    cleanup.finish();
   };
   // One texture (upload + mips) per step: a throwaway setup with only map k fills the cache; the last step swaps the material.
   const texture = (i: number) => {
@@ -444,10 +448,18 @@ export function loadGLTFProgressive(
       if (!stripped.has(m))
         stripped.set(
           m,
-          Object.defineProperty(
+          Object.defineProperties(
             { ...m, maps: m.maps.map(() => undefined) },
-            'side',
-            Object.getOwnPropertyDescriptor(m, 'side')!,
+            {
+              side: Object.getOwnPropertyDescriptor(m, 'side')!,
+              wireframe: {
+                enumerable: true,
+                get: () => m.wireframe,
+                set: (value: boolean | undefined) => {
+                  m.wireframe = value;
+                },
+              },
+            },
           ),
         );
       p.material = stripped.get(m)!;

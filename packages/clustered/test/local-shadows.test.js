@@ -668,3 +668,68 @@ test('integrated local shadow casters retain PBR instance matrices and affine al
     assertDisposed(h);
   }
 });
+
+test('integrated local shadows draw wireframe indices with reusable line and triangle pipelines', () => {
+  const h = harness(),
+    effect = new Clustered({ grid: [1, 1, 1], shadows: { resolution: 16, maxLights: 1 } }),
+    primitive = caster(h, 80),
+    draws = [],
+    begin = h.context.encoder.beginRenderPass;
+  primitive.topology = 'line-list';
+  primitive.index = h.engine.gpu.createBuffer({ size: 24, usage: GPUBufferUsage.INDEX });
+  h.borrowed.add(primitive.index);
+  primitive.count = 6;
+  primitive.cutoff = 0.4;
+  primitive.alphaTransform = new Float32Array([1, 0, 0.25, 0, 0, 1, 0.5, 0]);
+  effect.setLights([spot()]);
+  h.engine.use(effect);
+  effect.addShadowCaster({ shadowPrimitives: [primitive] });
+  h.context.encoder.beginRenderPass = (descriptor) => {
+    const pass = begin(descriptor);
+    let pipeline, index;
+    return {
+      ...pass,
+      setPipeline(value) {
+        pipeline = value;
+      },
+      setIndexBuffer(value) {
+        index = value;
+      },
+      drawIndexed(...args) {
+        draws.push({ pipeline, index, args });
+      },
+    };
+  };
+  const frame = () => {
+    draws.length = 0;
+    h.frame();
+  };
+  try {
+    frame();
+    const lines = draws[0].pipeline;
+    assert.equal(lines.primitive?.topology, 'line-list');
+    assert.ok(!Object.keys(lines.depthStencil).some((key) => key.startsWith('depthBias')));
+    assert.match(lines.vertex.module.code, /sourceUV=o.uv/);
+    assert.equal(draws[0].index, primitive.index);
+    assert.deepEqual(draws[0].args, [6]);
+    delete primitive.topology;
+    frame();
+    const triangles = draws[0].pipeline;
+    assert.equal(Object.hasOwn(triangles, 'primitive'), false);
+    primitive.topology = 'line-list';
+    frame();
+    assert.equal(draws[0].pipeline, lines);
+    delete primitive.topology;
+    frame();
+    assert.equal(draws[0].pipeline, triangles);
+    primitive.topology = 'line-list';
+    primitive.instances = { count: 2, upload: () => primitive.vertex };
+    frame();
+    assert.deepEqual(draws[0].args, [6, 2]);
+    assert.equal(draws[0].pipeline.primitive.topology, 'line-list');
+    assert.equal(draws[0].pipeline.vertex.buffers[1].stepMode, 'instance');
+  } finally {
+    effect.dispose();
+    assertDisposed(h);
+  }
+});

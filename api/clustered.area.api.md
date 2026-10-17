@@ -110,6 +110,7 @@ interface LocalShadowPrimitive {
     index: GPUBuffer;
     count: number;
     stride: number;
+    topology?: 'triangle-list' | 'line-list';
     alphaTexture?: GPUTextureView;
     alphaSampler?: GPUSampler;
     alpha?: number;

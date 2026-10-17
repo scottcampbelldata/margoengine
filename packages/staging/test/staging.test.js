@@ -157,6 +157,90 @@ test('static re-renders only on transform, source, visibility or option changes'
   }
 });
 
+test('wireframe contact casters invalidate static maps on topology changes and reuse pipelines', () => {
+  const s = scene(),
+    contact = ContactShadows.attach(s.engine, { static: true, resolution: 32 }),
+    primitive = s.model.shadowPrimitives[0],
+    draws = [],
+    begin = s.h.context.encoder.beginRenderPass;
+  primitive.topology = 'line-list';
+  primitive.index = s.engine.gpu.createBuffer({ size: 24, usage: GPUBufferUsage.INDEX });
+  primitive.count = 6;
+  s.h.context.encoder.beginRenderPass = (descriptor) => {
+    const pass = begin(descriptor);
+    let pipeline, index;
+    return {
+      ...pass,
+      setPipeline(value) {
+        pipeline = value;
+      },
+      setIndexBuffer(value) {
+        index = value;
+      },
+      drawIndexed(...args) {
+        draws.push({ pipeline, index, args });
+      },
+    };
+  };
+  const frame = () => {
+    draws.length = 0;
+    s.frame();
+  };
+  try {
+    contact.add(s.model);
+    frame();
+    const lines = draws[0].pipeline;
+    assert.equal(lines.primitive?.topology, 'line-list');
+    assert.equal(draws[0].index, primitive.index);
+    assert.deepEqual(draws[0].args, [6]);
+    frame();
+    assert.equal(draws.length, 0);
+    delete primitive.topology;
+    frame();
+    assert.equal(draws.length, 1, 'topology alone invalidates the static contact texture');
+    const triangles = draws[0].pipeline;
+    assert.equal(Object.hasOwn(triangles, 'primitive'), false);
+    primitive.topology = 'line-list';
+    frame();
+    assert.equal(draws[0].pipeline, lines);
+    delete primitive.topology;
+    frame();
+    assert.equal(draws[0].pipeline, triangles);
+    primitive.topology = 'line-list';
+    primitive.instances = { count: 2, upload: () => primitive.vertex };
+    frame();
+    assert.deepEqual(draws[0].args, [6, 2]);
+    assert.equal(draws[0].pipeline.primitive.topology, 'line-list');
+    assert.equal(draws[0].pipeline.vertex.buffers[1].stepMode, 'instance');
+  } finally {
+    contact.dispose();
+    s.h.cleanup();
+  }
+});
+
+test('static contact maps refresh when returning to a cached index buffer or changing its count', () => {
+  const s = scene(),
+    contact = ContactShadows.attach(s.engine, { static: true, resolution: 32 }),
+    primitive = s.model.shadowPrimitives[0],
+    original = primitive.index,
+    replacement = s.engine.gpu.createBuffer({ size: 24, usage: GPUBufferUsage.INDEX });
+  try {
+    contact.add(s.model);
+    assert.equal(s.frame().length, 6);
+    primitive.index = replacement;
+    assert.equal(s.frame().length, 6);
+    assert.deepEqual(s.frame(), ['plane']);
+    primitive.index = original;
+    assert.equal(s.frame().length, 6, 'the currently cached texture came from the other index buffer');
+    primitive.count = 0;
+    assert.equal(s.frame().length, 6, 'count-only changes refresh the cached texture');
+    assert.deepEqual(s.frame(), ['plane']);
+  } finally {
+    contact.dispose();
+    s.h.cleanup();
+  }
+});
+
 test('core meshes use the engine geometry buffers; disposed or foreign sources are rejected or dropped', () => {
   const s = scene(),
     contact = new ContactShadows(),

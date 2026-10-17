@@ -3,20 +3,25 @@
 Last updated 2026-10-17. Read this first when starting a new session. Update it whenever work lands.
 
 Current parity work (2026-10-17): dispersion, depth/distance materials and back-side-only rendering are on main
-(`aa2150c`, `e8befe7`, `95b4eae`). Polygon offset, stencil and color-write controls are implemented and verified in
-optional materials/gltf-pro; no core or stage feature is added. The matrix now counts 99 covered / 35 partial /
-25 missing of 159 rows. Core + stage measures 20,935 bytes gzip after upstream kernel maintenance, below the strict 25,000-byte ceiling in AGENTS.md.
+(`aa2150c`, `e8befe7`, `95b4eae`). Polygon offset, stencil and color-write controls are on main (`156c4b8`).
+Material wireframe is implemented in optional materials/gltf-pro and directional/local/contact shadow consumers;
+no core or stage feature is added. The matrix now counts 100 covered / 34 partial /
+25 missing of 159 rows. Core + stage measures 21,094 bytes gzip after upstream kernel and Euler lane-view
+maintenance, below the strict 25,000-byte ceiling in AGENTS.md. Wireframe adds no core or stage source changes.
 Nine stale current-proof references were reconciled against clean upstream `b3ed8ac`; all 15 current proofs and all
 nine affected historical proofs pass. The exact comparisons remain in place; evidence and intentional prior changes
 are recorded in `docs/whitepaper/claims.md`. Earlier dated measurements below remain historical.
 
 Current launch-gate verification: `npm run check:merge` passes, including the site build and all 55 NVIDIA/Ampere
-visual comparisons. A fresh full Node suite after the final harness guards passes 2,466 tests; the material render-state
-fixture passes 648 real-GPU checks at actual 1x/4x MSAA. All seven additional package/interop checks pass, including
-strict consumers of all 74 packaged modules. Touched materials/gltf-pro hygiene gates have no new violations.
+visual comparisons. The rebased full Node suite passes 2,487 tests; wireframe passes 249 real-GPU checks at actual
+1x/4x MSAA, including 24 directional/local/contact shadow cases. Progressive replacement, live flag retention and
+exception-safe cleanup have three new regressions. The prior material render-state fixture passed 648 GPU checks.
+All seven additional package/interop checks pass, including strict consumers of all 74 packaged modules.
+Touched materials/gltf-pro/shadows/clustered/staging hygiene gates have no new violations.
 The Windows desktop power probe records actual AC power, and hardware-specific visual profiles preserve the original
 Intel references. The NVIDIA reference uses clean `b3ed8ac` rendered sources with four captures per view; its source
-and adapter audit is retained beside the profile. Finish actionable PARTIAL rows before MISSING rows; wireframe is next.
+and adapter audit is retained beside the profile. Finish actionable PARTIAL rows before MISSING rows; variable-size
+`.cube` LUTs are next. Wireframe details and evidence: `docs/materials-wireframe-verification.md`.
 
 ## Goal
 
@@ -2516,7 +2521,7 @@ particles, post, `app.environment()`, `app.shadows()`), so a spinning model cost
 
 ## Feature gaps versus three.js (after optimization; each as an optional package)
 
-Verified matrix: `docs/threejs-parity.md`, recounted 2026-10-17 after the approved core hooks and optional material parity work: 159 rows, 99 covered / 35 partial / 25 missing.
+Verified matrix: `docs/threejs-parity.md`, recounted 2026-10-17 after the approved core hooks and optional material parity work: 159 rows, 100 covered / 34 partial / 25 missing.
 Earlier: re-tallied 2026-10-14 against 2c53227 (156 three.js features: 85 covered,
 39 partial, 32 missing after textured instancing (InstancedMesh PARTIAL -> COVERED) and glTF export (GLTFExporter PARTIAL -> COVERED); ShadowMaterial became partial with staging's ContactShadows; was 65 / 43 / 45 in its stale summary; read from source, not run). The first audit's top gaps
 (materials, glTF extensions/decoders, picking models, IBL, background colour, post stack, ortho camera, math, FXAA) are

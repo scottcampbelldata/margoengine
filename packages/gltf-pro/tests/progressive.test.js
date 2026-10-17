@@ -119,7 +119,7 @@ async function gpuEngine() {
     const context = { ...h.context, camera: engine.camera, encoder };
     model.draw(context, 'beauty', context.color, context.depth);
   };
-  return { engine, device, draw };
+  return { engine, device, draw, resources: h.resources };
 }
 const texture = (t) => ({
   size: t.size,
@@ -201,6 +201,72 @@ async function withGlobals(worker, run) {
       else globalThis[k] = v;
   }
 }
+
+test('progressive geometry replaces and releases wireframe edge buffers created before completion', (t) =>
+  withGlobals(false, async () => {
+    const { engine, draw } = await gpuEngine(),
+      load = loadGLTFProgressive(engine, base + '/grids.glb', { frameBudget: 0 }),
+      model = await load.ready;
+    t.after(() => engine.dispose());
+    for (const primitive of model.primitives) primitive.material.wireframe = true;
+    draw(model);
+    const placeholders = model['resources'].map((resource) => resource.wireframe.index);
+    assert.ok(placeholders.length > 0);
+    assert.ok(placeholders.every((buffer) => !buffer.destroyed));
+    await load.complete;
+    assert.ok(
+      placeholders.every((buffer) => buffer.destroyed),
+      'replacing placeholder resources must release their edge buffers',
+    );
+    draw(model);
+    const final = model['resources'].flatMap((resource) => (resource.wireframe ? [resource.wireframe.index] : []));
+    assert.ok(final.length > 0);
+    assert.ok(final.every((buffer) => !buffer.destroyed && !placeholders.includes(buffer)));
+    model.dispose();
+    assert.ok(final.every((buffer) => buffer.destroyed));
+  }));
+
+test('progressive textured materials retain live wireframe through the internal texture swap', (t) =>
+  withGlobals(false, async () => {
+    const { engine } = await gpuEngine(),
+      load = loadGLTFProgressive(engine, base + '/helmet.glb'),
+      model = await load.ready;
+    t.after(() => engine.dispose());
+    assert.ok(model.primitives.some((primitive) => primitive.material.maps.every((map) => !map)));
+    for (const primitive of model.primitives) primitive.material.wireframe = true;
+    await load.complete;
+    assert.ok(model.primitives.some((primitive) => primitive.material.maps.some(Boolean)));
+    assert.ok(
+      model.primitives.every((primitive) => primitive.material.wireframe === true),
+      'a streamed texture must preserve the live wireframe choice',
+    );
+  }));
+
+test('progressive wireframe replacement releases both edge and replacement resources after a disposal error', (t) =>
+  withGlobals(false, async () => {
+    const { engine, draw, resources } = await gpuEngine(),
+      load = loadGLTFProgressive(engine, base + '/grids.glb', { frameBudget: 0 }),
+      model = await load.ready;
+    t.after(() => engine.dispose());
+    for (const primitive of model.primitives) primitive.material.wireframe = true;
+    draw(model);
+    const placeholders = model['resources'].map((resource) => resource.wireframe.index),
+      uniform = model['resources'][0].uniform,
+      destroy = uniform.destroy.bind(uniform),
+      failure = new Error('uniform disposal failed');
+    let calls = 0;
+    uniform.destroy = () => {
+      destroy();
+      if (!calls++) throw failure;
+    };
+    await assert.rejects(load.complete, (error) => error === failure);
+    assert.equal(model.disposed, true);
+    assert.ok(placeholders.every((buffer) => buffer.destroyed));
+    assert.ok(
+      resources.filter((resource) => resource.usage & GPUBufferUsage.UNIFORM).every((buffer) => buffer.destroyed),
+      'failed replacement must release the newly allocated uniforms too',
+    );
+  }));
 
 for (const [name, path, decoders] of [
   ['DamagedHelmet (textured, tangents)', '/helmet.glb'],

@@ -51,6 +51,8 @@ export interface ShadowPrimitive {
   index: GPUBuffer;
   count: number;
   stride: number;
+  /** Index topology; omitted for triangle casters. Wireframe casters supply triangle-edge line indices. */
+  topology?: 'triangle-list' | 'line-list';
   alphaTexture?: GPUTextureView;
   alphaSampler?: GPUSampler;
   alpha?: number;
@@ -615,6 +617,7 @@ export class Shadows implements EnginePlugin {
     hash = Math.imul(hash, 16777619) ^ this.identity(primitive.index);
     hash = Math.imul(hash, 16777619) ^ primitive.count;
     hash = Math.imul(hash, 16777619) ^ primitive.stride;
+    hash = Math.imul(hash, 16777619) ^ (primitive.topology === 'line-list' ? 1 : 0);
     hash = Math.imul(hash, 16777619) ^ (primitive.node.id + 1);
     hash = Math.imul(hash, 16777619) ^ (primitive.alphaTexture ? this.identity(primitive.alphaTexture) : 0);
     hash = Math.imul(hash, 16777619) ^ (primitive.alphaSampler ? this.identity(primitive.alphaSampler) : 0);
@@ -757,7 +760,8 @@ export class Shadows implements EnginePlugin {
         p.stride !== 80)
     )
       throw new TypeError('Shadow alpha transform requires finite affine rows and PBR vertices');
-    const key = p.stride + (transform ? 1 : 0) + (inst ? 2 : 0);
+    const lines = p.topology === 'line-list',
+      key = p.stride + (transform ? 1 : 0) + (inst ? 2 : 0) + (lines ? 4 : 0);
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const code = shadowDepth(p.stride === 80, !!transform);
@@ -783,6 +787,7 @@ export class Shadows implements EnginePlugin {
           ],
         },
         fragment: { module, entryPoint: 'fragment', targets: [] },
+        ...(lines ? { primitive: { topology: 'line-list' as const } } : {}),
         depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less-equal' },
       });
       this.pipelines.set(key, pipeline);
