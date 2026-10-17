@@ -8,8 +8,8 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| COVERED | 99 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
-| PARTIAL | 35 | Some of it exists, but a common use case is missing. The notes say what. |
+| COVERED | 100 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
+| PARTIAL | 34 | Some of it exists, but a common use case is missing. The notes say what. |
 | MISSING | 25 | No implementation was found in any package's `src/`. |
 
 Overall: Margo is strong where three.js relies on third-party libraries or examples. That includes cascaded PCSS shadows, clustered lighting, TAA, Gaussian splats, BVH queries, physics, navigation, terrain, water and sky. The day-one basics the first version of this matrix found missing (textures and materials on meshes you build, glTF extensions and compression, an orthographic camera, picking loaded models, image-based lighting outside React, combinable effects, FXAA, a math library) now exist as optional packages. What remains:
@@ -97,7 +97,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | Order-independent transparency (three.js has none built in; its examples sort per object) | COVERED † | oit `OIT` (`packages/oit/src/index.ts`) through gltf-pro's transparency hook | Weighted blended OIT for gltf-pro BLEND primitives and materials transparent meshes (`oit.add(model)`): no popping between overlapping transparent parts; MSAA 1x/4x, PostStack, TransparentCanvas, orthographic. An approximation, exact for one layer (errors per layer count in `packages/oit/README.md`). Transmission and custom blending stay sorted. WebGPU only. |
 | Vertex colors | COVERED | materials geometry `colors` (RGB or RGBA, floats or bytes); gltf-pro `COLOR_0` | Always multiply the base colour (no `vertexColors` switch). Not available on core meshes. |
 | `side` (Front, Back, Double) | COVERED | materials `Material.side`, gltf-pro `PBRMaterial.side` (`packages/materials/src/built-material.ts`, `packages/gltf-pro/src/index.ts`, `side-shader.ts`; `scripts/material-back-side-gpu-check.js`) | Live front/back/double selection, including mirrored nodes, mixed mirrored instances, groups, alpha masks, material shading, auxiliary/capture/transmission paths and GPU/CPU picking. `doubleSided` remains an alias on constructed materials. Core materials retain front/double only. Shadow casting keeps its existing two-sided policy. glTF export bakes back-only winding and normals. |
-| Wireframe | PARTIAL | inspector overlay; geometry `wireframe` drawn with lines | No material flag. |
+| Wireframe | COVERED | materials `Material({wireframe: true})` (`packages/materials/src/built-material.ts`); gltf-pro live `PBRMaterial.wireframe` (`packages/gltf-pro/src/index.ts`) | Native one-pixel triangle edges across beauty, auxiliary and shadow passes, groups, instances and deformation. Shared triangle edges are retained; face culling and polygon bias are ignored for lines. Picking and glTF export retain triangles. [Verification](materials-wireframe-verification.md). |
 | Per-material blending modes, depthTest, depthWrite, polygonOffset, renderOrder, stencil | COVERED | materials `Material`, `StencilBuffer`, `createMesh(…, {renderOrder})` (`packages/materials/src/built-material.ts`, `stencil-buffer.ts`); gltf-pro `PBRRenderState` (`packages/gltf-pro/src/render-state.ts`; `scripts/material-render-state-gpu-check.js`) | Material presets and native custom WebGPU blend equations; depth test/write, polygon units/slope/clamp, color-write suppression and stencil comparisons/ops/masks/reference. Material controls are fixed at construction; native references stay live. Positive Material offsets recede in reverse-Z and forward-Z views. Optional StencilBuffer supplies a portable scene stencil attachment; stencil does not cross capture/resolve target boundaries. Controls affect beauty; auxiliary replays, picking and shadows keep their existing behavior. Custom state uses sorted beauty/transmission tint fallback. Core material APIs are unchanged. |
 
 ### 6. Textures
@@ -281,7 +281,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 
 ## What is missing or partial, and what to do
 
-Recounted from the rows: 35 PARTIAL, 25 MISSING. COVERED rows stay in the matrix above. At the approved core-hook commit (`6a57389`), core + stage measured **20,641 bytes gzip**, against a clean 20,282-byte baseline: +359 bytes, with 4,358 usable bytes below the exclusive 25,000-byte ceiling. `npm run measure:size` prints the current size; build and GPU evidence for those hooks is recorded in [the verification note](core-parity-hooks-verification.md).
+Recounted from the rows: 34 PARTIAL, 25 MISSING. COVERED rows stay in the matrix above. At the approved core-hook commit (`6a57389`), core + stage measured **20,641 bytes gzip**, against a clean 20,282-byte baseline: +359 bytes, with 4,358 usable bytes below the exclusive 25,000-byte ceiling. `npm run measure:size` prints the current size; build and GPU evidence for those hooks is recorded in [the verification note](core-parity-hooks-verification.md).
 
 The user approved these three hooks as a specific exception to the core freeze. Their larger features stay in optional packages.
 
@@ -300,15 +300,15 @@ Independent UV1 and geometry groups have since been implemented in materials and
 [build, test and GPU evidence](materials-uv-groups-verification.md). The combined attributes row stays PARTIAL
 because arbitrary named vertex attributes remain absent. Physical maps and dispersion, depth/distance material modes,
 front/back/double-side rendering, and material blend/depth/polygon-offset/stencil controls are implemented in optional
-packages. Their four material rows are COVERED, giving the current totals: 99 / 35 / 25. Wireframe remains outstanding.
+packages. Wireframe now covers constructed materials and live native materials across render and shadow paths,
+with [Node and GPU evidence](materials-wireframe-verification.md). The current totals are 100 / 34 / 25.
 
-Complete actionable PARTIAL rows before starting MISSING rows. Wireframe is next; the table lists the other partial
+Complete actionable PARTIAL rows before starting MISSING rows. Variable-size LUTs are next; the table lists the partial
 work before the missing features. Closed core and v1 limits remain in the following section rather than becoming
 implementation tasks.
 
 | Row | What is missing | What to do |
 | --- | --- | --- |
-| Wireframe | PARTIAL. Inspector overlay, or `wireframe` drawn with lines. | A materials flag that uses that line path. |
 | ShaderMaterial, RawShaderMaterial | PARTIAL. WGSL per pass and `Material.shader()`, no raw material with its own vertex layout. | Add that material in `@margoengine/shader`. |
 | Node materials / TSL | PARTIAL. Typed WGSL nodes. No statement-level `If`, workgroup memory, or light nodes. | Extend `@margoengine/shader`. Shadows and SSAO reading `positionNode` is part of that package. |
 | Render targets | PARTIAL. Sequential camera captures are possible; one implicit scene. | Add a dedicated multi-view capture helper in `@margoengine/creative` or `@margoengine/environment` if needed. |

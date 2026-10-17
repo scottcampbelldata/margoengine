@@ -28,6 +28,8 @@ export interface LocalShadowPrimitive {
   index: GPUBuffer;
   count: number;
   stride: number;
+  /** Index topology; omitted for triangle casters. Wireframe casters supply triangle-edge line indices. */
+  topology?: 'triangle-list' | 'line-list';
   alphaTexture?: GPUTextureView;
   alphaSampler?: GPUSampler;
   alpha?: number;
@@ -425,7 +427,8 @@ export class LocalShadowMaps {
       !Number.isFinite(Math.fround(p.cutoff ?? 0))
     )
       throw new RangeError('Invalid local shadow primitive');
-    const key = p.stride + (transform ? 1 : 0) + (inst ? 2 : 0);
+    const lines = p.topology === 'line-list',
+      key = p.stride + (transform ? 1 : 0) + (inst ? 2 : 0) + (lines ? 4 : 0);
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const code = depthShader(p.stride === 80, !!transform),
@@ -458,6 +461,7 @@ export class LocalShadowMaps {
           ],
         },
         fragment: { module, entryPoint: 'fragment', targets: [] },
+        ...(lines ? { primitive: { topology: 'line-list' as const } } : {}),
         depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less-equal' },
       });
       this.pipelines.set(key, pipeline);

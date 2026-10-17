@@ -28,7 +28,12 @@ export interface MeshPose {
 export interface MeshSourceOwner extends PBRSource {
   readonly disposed: boolean;
   readonly pickingPrimitives: readonly MeshDraw[];
-  readonly shadowPrimitives: readonly (Omit<MeshDraw, 'stride' | 'texCoord'> & { stride: number; texCoord?: number })[];
+  readonly shadowPrimitives: readonly (Omit<MeshDraw, 'stride' | 'texCoord'> & {
+    stride: number;
+    texCoord?: number;
+    /** Absent for triangle casters; wireframe supplies triangle-edge line indices. */
+    topology?: 'triangle-list' | 'line-list';
+  })[];
   prepareDeformation?: (context: MeshDeformationContext) => void;
   readPickingGeometry(): Promise<readonly MeshPose[]>;
   createRenderer(device: GPUDevice): {

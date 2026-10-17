@@ -341,3 +341,99 @@ test('external shadow casters retain affine alpha UVs, instance transforms and p
     assert.ok(h.resources.every((resource) => resource.destroyed));
   }
 });
+
+test('local shadows: wireframe topology invalidates cached maps and reuses depth pipelines', () => {
+  const h = harness(),
+    lights = Clustered.attach(h.engine, { grid: [1, 1, 1] }),
+    shadows = LocalShadows.attach(h.engine, { lights, resolution: 16 }),
+    source = caster(h.engine, { primitive: {}, topology: 'line-list', count: 6, cutoff: 0.4 }),
+    primitive = source.shadowPrimitives[0],
+    draws = [],
+    begin = h.context.encoder.beginRenderPass;
+  h.context.encoder.beginRenderPass = (descriptor) => {
+    const pass = begin(descriptor);
+    let pipeline, index;
+    return {
+      ...pass,
+      setPipeline(value) {
+        pipeline = value;
+      },
+      setIndexBuffer(value) {
+        index = value;
+      },
+      drawIndexed(...args) {
+        draws.push({ pipeline, index, args });
+        pass.drawIndexed(...args);
+      },
+    };
+  };
+  const frame = () => {
+    draws.length = 0;
+    h.frame();
+  };
+  try {
+    lights.setLights([{ position: [0, 2, 0], range: 6, direction: [0, -1, 0], outerAngle: 0.7, castShadow: true }]);
+    shadows.add(source);
+    frame();
+    const lines = draws[0].pipeline;
+    assert.equal(lines.primitive?.topology, 'line-list');
+    assert.ok(!Object.keys(lines.depthStencil).some((key) => key.startsWith('depthBias')));
+    assert.equal(lines.fragment.entryPoint, 'fragment', 'masked lines retain alpha testing');
+    assert.equal(draws[0].index, primitive.index);
+    assert.deepEqual(draws[0].args, [6]);
+    frame();
+    assert.equal(draws.length, 0);
+    delete primitive.topology;
+    frame();
+    assert.equal(draws.length, 1, 'topology alone invalidates the cached spot map');
+    const triangles = draws[0].pipeline;
+    assert.equal(Object.hasOwn(triangles, 'primitive'), false);
+    primitive.topology = 'line-list';
+    frame();
+    assert.equal(draws[0].pipeline, lines);
+    delete primitive.topology;
+    frame();
+    assert.equal(draws[0].pipeline, triangles);
+    primitive.topology = 'line-list';
+    primitive.instances = { count: 2, upload: () => ({}) };
+    frame();
+    assert.deepEqual(draws[0].args, [6, 2]);
+    assert.equal(draws[0].pipeline.primitive.topology, 'line-list');
+    assert.equal(draws[0].pipeline.vertex.buffers[1].stepMode, 'instance');
+  } finally {
+    shadows.dispose();
+    lights.dispose();
+    h.cleanup();
+  }
+});
+
+test('local shadows: replacing indices behind stable primitive identity refreshes the cached map', () => {
+  const h = harness(),
+    lights = Clustered.attach(h.engine, { grid: [1, 1, 1] }),
+    shadows = LocalShadows.attach(h.engine, { lights, resolution: 16 }),
+    source = caster(h.engine, { primitive: {} }),
+    primitive = source.shadowPrimitives[0],
+    original = primitive.index;
+  try {
+    lights.setLights([{ position: [0, 2, 0], range: 6, direction: [0, -1, 0], outerAngle: 0.7, castShadow: true }]);
+    shadows.add(source);
+    h.frame();
+    h.frame();
+    assert.equal(h.drawn.length, 0);
+    primitive.index = {};
+    h.frame();
+    assert.equal(h.drawn.length, 1, 'index replacement refreshes a stable primitive without a version bump');
+    h.frame();
+    assert.equal(h.drawn.length, 0);
+    primitive.index = original;
+    h.frame();
+    assert.equal(h.drawn.length, 1);
+    primitive.count = 6;
+    h.frame();
+    assert.deepEqual(h.drawn[0].slice(1), [6, 1]);
+  } finally {
+    shadows.dispose();
+    lights.dispose();
+    h.cleanup();
+  }
+});

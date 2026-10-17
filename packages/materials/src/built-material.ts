@@ -386,6 +386,8 @@ export interface MaterialOptions extends PhysicalOptions {
   /** Faces drawn by triangle meshes. Explicit side takes precedence over doubleSided. */
   side?: MaterialSide;
   doubleSided?: boolean;
+  /** Draws triangle edges instead of filled surfaces. Fixed at construction; defaults to false. */
+  wireframe?: boolean;
   blending?: Blending;
   depthWrite?: boolean;
   depthTest?: boolean;
@@ -646,6 +648,8 @@ export function materialShader(source: string, group: number, shading: Shading):
 /** Live values: color/emissive arrays, scalar setters and map assignments apply on the next frame to every mesh using the material. Shading and render state are fixed. */
 export class Material {
   readonly shading: Shading;
+  /** Draws triangle edges instead of filled surfaces. Fixed at construction; defaults to false. */
+  readonly wireframe: boolean;
   private packing: DepthPacking = 'basic';
   private reference: readonly [number, number, number] = [0, 0, 0];
   private near = 1;
@@ -782,7 +786,7 @@ export class Material {
   constructor(o: MaterialOptions = {}) {
     const shading = o.shading ?? 'standard',
       blending = o.blending ?? 'normal';
-    for (const key of ['colorWrite', 'polygonOffset', 'stencilWrite'] as const)
+    for (const key of ['colorWrite', 'polygonOffset', 'stencilWrite', 'wireframe'] as const)
       if (o[key] !== undefined && typeof o[key] !== 'boolean')
         throw new TypeError('Material ' + key + ' must be a boolean; set true or false');
     if (
@@ -799,6 +803,7 @@ export class Material {
       if (o[slot] != null && !(o[slot] instanceof Texture))
         throw new TypeError('Material ' + slot + ' must be a Texture');
     this.shading = shading;
+    this.wireframe = o.wireframe ?? false;
     this.depthPacking = o.depthPacking === undefined ? (shading === 'distance' ? 'rgba' : 'basic') : o.depthPacking;
     if (o.referencePosition !== undefined) this.referencePosition = o.referencePosition;
     const near = o.nearDistance === undefined ? 1 : o.nearDistance,
@@ -1481,6 +1486,7 @@ export function createMesh<M extends Material | readonly Material[]>(
       g = primitive.material;
     Object.assign(g, {
       extendedFrame: true,
+      wireframe: m.wireframe,
       base: m.color,
       emission: m.emissive,
       factors: m.factors,

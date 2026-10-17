@@ -37,6 +37,8 @@ export interface LocalShadowPrimitive {
   index: GPUBuffer;
   count: number;
   stride: number;
+  /** Index topology; omitted for triangle casters. Wireframe casters supply triangle-edge line indices. */
+  topology?: 'triangle-list' | 'line-list';
   alphaTexture?: GPUTextureView;
   alphaSampler?: GPUSampler;
   alpha?: number;
@@ -545,18 +547,18 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
         p.stride !== 80)
     )
       throw new TypeError('Local shadow alpha transform requires finite affine rows and PBR vertices');
-    const identity = p.primitive ?? p.index;
+    const identity = p.primitive ?? p.index,
+      key = `${p.stride}${p.instances ? 'i' : ''}${(p.cutoff ?? 0) > 0 ? 'm' : ''}${transform ? 't' : ''}${p.topology === 'line-list' ? 'l' : ''}`;
     let records = this.draws.get(p.node);
     if (!records) this.draws.set(p.node, (records = new Map()));
     let d = records.get(identity);
     if (
       !d ||
       d.vertex !== p.vertex ||
+      d.index !== p.index ||
       d.alpha !== p.alphaTexture ||
       d.sampler !== p.alphaSampler ||
-      d.key.includes('i') !== !!p.instances ||
-      d.key.includes('m') !== (p.cutoff ?? 0) > 0 ||
-      d.key.includes('t') !== !!transform
+      d.key !== key
     ) {
       d?.uniform.destroy();
       const uniform = this.device!.createBuffer({
@@ -585,7 +587,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
           count: -1,
           instances: -1,
           seen: true,
-          key: `${p.stride}${p.instances ? 'i' : ''}${(p.cutoff ?? 0) > 0 ? 'm' : ''}${transform ? 't' : ''}`,
+          key,
         };
         records.set(identity, d);
         this.changed = true;
@@ -623,6 +625,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       },
       // Opaque casters need no fragment stage, which keeps early depth testing.
       ...(key.includes('m') ? { fragment: { module, entryPoint: 'fragment', targets: [] } } : {}),
+      ...(key.includes('l') ? { primitive: { topology: 'line-list' as const } } : {}),
       depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater' },
     });
     this.pipelines.set(key, pipeline);

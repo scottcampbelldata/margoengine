@@ -335,3 +335,85 @@ test('unmarked casters stay cached until their matrix or dynamic flag changes', 
     assert.ok(h.resources.every((r) => r.destroyed));
   }
 });
+
+test('wireframe directional casters select line depth pipelines and invalidate still maps on topology changes', () => {
+  const h = optionalGPU(),
+    engine = h.engine;
+  engine.gpu.limits.maxTextureDimension2D = 8192;
+  engine.gpu.limits.maxTextureArrayLayers = 256;
+  engine.lighting = { direction: new Float32Array([1, 2, 3, 3]) };
+  const vertex = engine.gpu.createBuffer({ size: 240, usage: GPUBufferUsage.VERTEX }),
+    index = engine.gpu.createBuffer({ size: 24, usage: GPUBufferUsage.INDEX }),
+    node = { id: 0, engine, matrix: new Float32Array(h.context.camera.matrix), check() {} },
+    primitive = {
+      primitive: {},
+      node,
+      vertex,
+      index,
+      count: 6,
+      stride: 80,
+      topology: 'line-list',
+      cutoff: 0.4,
+      alphaTransform: new Float32Array([1, 0, 0.25, 0, 0, 1, 0.5, 0]),
+    },
+    shadows = new Shadows({ resolution: 64 }),
+    draws = [],
+    begin = h.context.encoder.beginRenderPass;
+  h.context.encoder.beginRenderPass = (descriptor) => {
+    const pass = begin(descriptor);
+    let pipeline, boundIndex;
+    return {
+      ...pass,
+      setPipeline(value) {
+        pipeline = value;
+      },
+      setIndexBuffer(value) {
+        boundIndex = value;
+      },
+      drawIndexed(...args) {
+        draws.push({ pipeline, index: boundIndex, args });
+      },
+    };
+  };
+  const frame = () => {
+    draws.length = 0;
+    h.context.shader = 'let linear=direct*vec3f(1);';
+    h.context.bindings = [];
+    engine.frameGraph.execute(h.context);
+  };
+  try {
+    engine.use(shadows);
+    shadows.add({ shadowPrimitives: [primitive] });
+    frame();
+    const lines = draws[0].pipeline;
+    assert.equal(lines.primitive?.topology, 'line-list');
+    assert.ok(!Object.keys(lines.depthStencil).some((key) => key.startsWith('depthBias')));
+    assert.match(lines.vertex.module.code, /sourceUV=o.uv/);
+    assert.ok(draws.every((draw) => draw.index === index && draw.args[0] === 6));
+    frame();
+    assert.equal(draws.length, 0, 'unchanged lines reuse the cached maps');
+    delete primitive.topology;
+    frame();
+    assert.equal(draws.length, 4, 'topology alone invalidates every cached cascade');
+    const triangles = draws[0].pipeline;
+    assert.equal(Object.hasOwn(triangles, 'primitive'), false, 'default pipeline descriptor stays unchanged');
+    primitive.topology = 'line-list';
+    frame();
+    assert.equal(draws.length, 4);
+    assert.equal(draws[0].pipeline, lines);
+    delete primitive.topology;
+    frame();
+    assert.equal(draws[0].pipeline, triangles, 'returning to triangles reuses the default pipeline');
+    primitive.topology = 'line-list';
+    primitive.instances = { count: 2, upload: () => vertex };
+    frame();
+    assert.equal(draws[0].pipeline.primitive.topology, 'line-list');
+    assert.equal(draws[0].pipeline.vertex.buffers[1].stepMode, 'instance');
+    assert.deepEqual(draws[0].args, [6, 2]);
+  } finally {
+    shadows.dispose();
+    vertex.destroy();
+    index.destroy();
+    h.cleanup();
+  }
+});

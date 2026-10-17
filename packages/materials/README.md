@@ -259,6 +259,20 @@ GPU picking and CPU BVH queries follow the same side. Shadow casting retains the
 policy. Export bakes back-only triangles by reversing their winding and normals because glTF has no back-side
 material flag. Core materials keep their existing API.
 
+## Wireframe
+
+`new Material({wireframe: true})` draws triangle edges with native WebGPU lines. `wireframe` defaults to `false`
+and is fixed at construction. Geometry groups and instanced meshes use each group's material setting.
+Edges include triangulation diagonals; shared triangle edges can be drawn more than once. Wide-line thickness
+controls are not provided.
+
+Wireframe alone keeps the existing render-state and transparency paths. The original triangle geometry remains
+available to picking and glTF export. Native `primitive.material.wireframe` accepts a live boolean, so assigning
+`true` or `false` changes subsequent draws without replacing the source triangle data.
+Beauty, auxiliary and shadow passes use the same edges, including deformed vertices. Lines ignore triangle
+face culling and polygon offset. Directional casters explicitly registered with `{static: true}` keep their
+manual update policy: call `Shadows.invalidate()` after changing the native flag.
+
 ## Polygon offset and stencil
 
 `polygonOffset`, `polygonOffsetFactor`, `polygonOffsetUnits` and `polygonOffsetClamp` are fixed at construction.

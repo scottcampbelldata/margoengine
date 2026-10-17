@@ -42,6 +42,8 @@ export interface ContactPrimitive {
   index: GPUBuffer;
   count: number;
   stride: number;
+  /** Index topology; omitted for triangle casters. Wireframe casters supply triangle-edge line indices. */
+  topology?: 'triangle-list' | 'line-list';
   alphaTexture?: GPUTextureView;
   alphaSampler?: GPUSampler;
   alpha?: number;
@@ -129,6 +131,7 @@ export class ContactShadows implements EnginePlugin {
   private occluders = new Map<number, GPURenderPipeline>();
   private planes = new Map<string, GPURenderPipeline>();
   private draws = new Map<Mesh, Map<GPUBuffer, Draw>>();
+  private readonly previousCasters: { draw: Draw; count: number; instances: number }[] = [];
   private sources: Source[] = [];
   private readonly matrix = new Float32Array(16);
   private readonly previous = new Float64Array(20);
@@ -348,11 +351,21 @@ export class ContactShadows implements EnginePlugin {
         v[33] = p.cutoff ?? 0;
         v[34] = p.texCoord ?? 0;
         for (let i = 0; i < 35 && !changed; i++) if (v[i] !== before[i]) changed = true;
+        const instances = p.instances?.count ?? 1,
+          previous = this.previousCasters[list.length];
+        if (!previous) this.previousCasters[list.length] = { draw, count: p.count, instances };
+        else {
+          if (previous.draw !== draw || previous.count !== p.count || previous.instances !== instances) changed = true;
+          previous.draw = draw;
+          previous.count = p.count;
+          previous.instances = instances;
+        }
         list.push([draw, p]);
       }
     }
     changed ||= this.dirty || list.length !== this.count;
     this.count = list.length;
+    this.previousCasters.length = list.length;
     if (changed) {
       this.stats.updates++;
       this.dirty = false;
@@ -459,7 +472,8 @@ export class ContactShadows implements EnginePlugin {
   }
   private record(p: ContactPrimitive): Draw {
     const inst = !!p.instances,
-      key = p.stride + (inst ? 1 : 0);
+      lines = p.topology === 'line-list',
+      key = p.stride + (inst ? 1 : 0) + (lines ? 2 : 0);
     let pipeline = this.occluders.get(key);
     const device = this.device!;
     if (!pipeline) {
@@ -500,6 +514,7 @@ export class ContactShadows implements EnginePlugin {
             },
           ],
         },
+        ...(lines ? { primitive: { topology: 'line-list' as const } } : {}),
       });
       this.occluders.set(key, pipeline);
     }
@@ -548,6 +563,7 @@ export class ContactShadows implements EnginePlugin {
   private clearDraws(): void {
     for (const records of this.draws.values()) for (const r of records.values()) r.uniform.destroy();
     this.draws.clear();
+    this.previousCasters.length = 0;
   }
   private release(): void {
     this.clearDraws();

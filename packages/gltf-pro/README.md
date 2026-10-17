@@ -42,6 +42,15 @@ nodes and mixed mirrored instances retain local winding. Picking and beauty/auxi
 points and lines ignore triangle sides. Shadow casters retain their existing two-sided policy. `exportModel`
 in `@margoengine/exporters` bakes back-only winding and normals into glTF-compatible geometry.
 
+Set `primitive.material.wireframe = true` to draw triangle edges as one-pixel WebGPU lines. The flag is live,
+defaults to false, and applies to beauty, auxiliary, transparency, capture and shadow passes, including groups,
+instances and deformed vertices. Each triangle contributes all three edges, so shared edges blend twice on
+transparent surfaces. Points and existing lines keep their topology. Lines ignore triangle face culling and
+polygon bias. Edge index buffers are allocated on first use, reused across toggles, and released on restoration
+or disposal. Picking, CPU snapshots and glTF export retain the original filled triangle geometry; glTF has no
+wireframe material flag. Directional sources registered with `Shadows.add(source, {static: true})` require the
+existing `Shadows.invalidate()` call after a live toggle; automatically cached casters update themselves.
+
 `primitive.material.renderState` supplies beauty-only blend/depth overrides, polygon bias, stencil face states,
 masks/reference, and `colorWrite`. Bias defaults to literal WebGPU values; `depthBiasMode: 'away'` keeps positive
 offsets away from the camera across main reverse-Z and forward-Z device views. `stencilReference` is live per draw

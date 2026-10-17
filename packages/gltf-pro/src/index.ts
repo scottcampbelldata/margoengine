@@ -212,6 +212,8 @@ export interface PBRMaterial extends GLTFMaterial {
   settings: number[];
   /** Live triangle face selection. Legacy structural materials may supply only settings[2]. */
   side?: MaterialSide;
+  /** Draw each triangle's three edges as one-pixel lines (default false), read live. Picking retains triangles. */
+  wireframe?: boolean;
   maps: (GLTFTextureInfo | undefined)[];
   uvt?: number[];
   ext?: number[];
@@ -345,8 +347,10 @@ function preparedPrimitive(
 }
 interface DrawResource {
   primitive: PBRPrimitive;
+  device: GPUDevice;
   vertex: GPUBuffer;
   index: GPUBuffer;
+  wireframe?: { index: GPUBuffer; count: number };
   uniform: GPUBuffer;
   volume?: GPUBuffer;
   /** Float32 copy of `material.volume`, reused so a transmission draw does not allocate. */
@@ -372,6 +376,8 @@ interface ShadowCasterRecord {
   vertex: GPUBuffer;
   index: GPUBuffer;
   count: number;
+  /** Absent for triangles; line-list when the material draws triangle edges. */
+  topology?: 'line-list';
   stride: number;
   alphaTexture: GPUTextureView;
   alphaSampler: GPUSampler;
@@ -382,15 +388,51 @@ interface ShadowCasterRecord {
   instances?: PBRInstances;
   dynamic: boolean;
 }
+// Keep the original triangle buffer for queries and exports. Duplicate shared
+// edges deliberately: transparent triangle wireframes blend each edge twice.
+function wireframeIndices(r: DrawResource): DrawResource['wireframe'] {
+  const p = r.primitive,
+    flag = p.material.wireframe;
+  if (flag !== undefined && typeof flag !== 'boolean')
+    throw new TypeError('PBR material wireframe must be a boolean; set wireframe to true or false');
+  if (!flag || p.topology) return;
+  if (r.wireframe) return r.wireframe;
+  const size = p.indices.byteLength * 2;
+  if (size > r.device.limits.maxBufferSize)
+    throw new RangeError('PBR wireframe buffer exceeds the device limit; split the geometry into smaller meshes');
+  const indices = new Uint32Array(p.indices.length * 2);
+  for (let i = 0, j = 0; i < p.indices.length; i += 3) {
+    const a = p.indices[i],
+      b = p.indices[i + 1],
+      c = p.indices[i + 2];
+    indices[j++] = a;
+    indices[j++] = b;
+    indices[j++] = b;
+    indices[j++] = c;
+    indices[j++] = c;
+    indices[j++] = a;
+  }
+  const index = r.device.createBuffer({ size, usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST });
+  try {
+    r.device.queue.writeBuffer(index, 0, indices);
+  } catch (error) {
+    index.destroy();
+    throw error;
+  }
+  return (r.wireframe = { index, count: indices.length });
+}
 function fillShadow(r: DrawResource, value: ShadowCasterRecord): void {
   const p = r.primitive,
     m = p.material,
+    wireframe = wireframeIndices(r),
     coordinates = m.maps[0] ? textureCoordinates(m.maps[0]) : undefined;
   value.primitive = p;
   value.node = p.node;
   value.vertex = p.deformed ?? r.vertex;
-  value.index = r.index;
-  value.count = p.indices.length;
+  value.index = wireframe?.index ?? r.index;
+  value.count = wireframe?.count ?? p.indices.length;
+  if (wireframe) value.topology = 'line-list';
+  else delete value.topology;
   value.stride = 80;
   value.alphaTexture = r.views[0];
   value.alphaSampler = r.samplers[0];
@@ -1110,6 +1152,7 @@ export class PBRModel implements EnginePlugin {
     for (const p of this.pointsAndLines.length ? [...this.primitives, ...this.pointsAndLines] : this.primitives) {
       const r: DrawResource = {
         primitive: p,
+        device,
         vertex: undefined!,
         index: undefined!,
         uniform: undefined!,
@@ -1163,6 +1206,7 @@ export class PBRModel implements EnginePlugin {
       const p = batch.primitive,
         r: DrawResource = {
           primitive: p,
+          device,
           vertex: undefined!,
           index: undefined!,
           uniform: undefined!,
@@ -1728,6 +1772,10 @@ export class PBRModel implements EnginePlugin {
         for (let id = node.id; id !== -1; id = this.engine.store.parents[id])
           if (this.engine.store.hidden[id]) visible = false;
         if (!visible || (inst && !inst.count)) continue;
+        const wireframe = wireframeIndices(r),
+          topology = p.topology ?? (wireframe ? 'line-list' : undefined),
+          index = wireframe?.index ?? r.index,
+          count = wireframe?.count ?? p.indices.length;
         const instances = inst?.upload(c.device);
         const compact =
           !!(p.extension ?? m.extension)?.replacesPhysical || (!m.extendedFrame && !m.physical && !m.ext?.[0]);
@@ -1750,7 +1798,7 @@ export class PBRModel implements EnginePlugin {
         v.set(m.settings, 88);
         const side = sideOf(m),
           flag = sideFlag(side);
-        v[90] = p.topology ? 1 : flag;
+        v[90] = topology ? 1 : flag;
         v[91] = +(c.format === 'rgba16float');
         // coordsA/coordsB.x name each base map's slot; uv() reads that slot's KHR_texture_transform row, which carries its UV set.
         for (let i = 0; i < 5; i++) v[92 + i] = compact ? (m.maps[i] ? textureCoordinates(m.maps[i]!).texCoord : 0) : i;
@@ -1880,7 +1928,7 @@ export class PBRModel implements EnginePlugin {
         else if (capture) code = capturePBR(code, hook!.declarations(code));
         // Instancing patches the vertex stage last, so text-patching effects (shader NodeMaterial vertex nodes) keep their anchors.
         if (inst) code = inst.shader(code);
-        if (side === 'back' && !p.topology) code = backSideShader(code);
+        if (side === 'back' && !topology) code = backSideShader(code);
         if (m.shading?.texturedTint) code = texturedTintPBR(code);
         if (mode === 'occlusion') {
           const rewritten = occlusionShader(code);
@@ -1889,8 +1937,9 @@ export class PBRModel implements EnginePlugin {
         }
         // Keep the shader's original front-facing convention, including mirrored transforms.
         // Mirrored instances flip winding per instance: no culling, the shader's face test discards back faces instead.
-        const face = +(!p.topology && !!inst?.mirrored && flag !== 1),
-          cull: GPUCullMode = flag !== 1 && !face ? (v[97] > 0 === (side === 'front') ? 'back' : 'front') : 'none';
+        const face = +(!topology && !!inst?.mirrored && flag !== 1),
+          cull: GPUCullMode =
+            !wireframe && flag !== 1 && !face ? (v[97] > 0 === (side === 'front') ? 'back' : 'front') : 'none';
         const state: PBRRenderState | undefined = mode === 'beauty' ? m.renderState : undefined;
         if (state) validateRenderState(state, c.descriptor.depthStencil!.format);
         // Shader text enters the key as a small id: the code strings are cached objects, so the lookup hashes them once.
@@ -1925,7 +1974,7 @@ export class PBRModel implements EnginePlugin {
               value.state === stateKey &&
               value.instanced === !!inst &&
               value.face === face &&
-              value.topology === p.topology
+              value.topology === topology
             ) {
               previous = value;
               // A main view and a probe can alternate the same mode every frame.
@@ -1958,7 +2007,7 @@ export class PBRModel implements EnginePlugin {
             mask +
             stateKey +
             (inst ? ':i' + face : '') +
-            (p.topology ? ':' + p.topology : '');
+            (topology ? ':' + topology : '');
         let pipeline = samePipeline ? previous!.pipeline : this.pipelines.get(key);
         if (!pipeline) {
           checkDrawLimits(c.device, code, m, transmission, this.lighting);
@@ -2022,11 +2071,11 @@ export class PBRModel implements EnginePlugin {
                       ],
             },
             multisample: c.descriptor.multisample,
-            primitive: p.topology ? { topology: p.topology } : { topology: 'triangle-list', cullMode: cull },
+            primitive: topology ? { topology } : { topology: 'triangle-list', cullMode: cull },
             depthStencil: {
               ...pipelineDepthState(
                 state,
-                !p.topology,
+                !topology,
                 external?.depthCompare === 'less' || external?.depthCompare === 'less-equal',
               ),
               format: c.descriptor.depthStencil!.format,
@@ -2089,7 +2138,7 @@ export class PBRModel implements EnginePlugin {
             state: stateKey,
             instanced: !!inst,
             face,
-            topology: p.topology,
+            topology,
             key,
             pipeline,
           };
@@ -2217,10 +2266,10 @@ export class PBRModel implements EnginePlugin {
           }
           target.setVertexBuffer(0, p.deformed ?? r.vertex);
           if (instances) target.setVertexBuffer(1, instances);
-          target.setIndexBuffer(r.index, 'uint32');
+          target.setIndexBuffer(index, 'uint32');
           applyStencilReference(target, state);
-          if (inst) target.drawIndexed(p.indices.length, inst.count);
-          else target.drawIndexed(p.indices.length);
+          if (inst) target.drawIndexed(count, inst.count);
+          else target.drawIndexed(count);
         }
         target.setPipeline(pipeline);
         target.setBindGroup(0, groups[0]);
@@ -2229,11 +2278,11 @@ export class PBRModel implements EnginePlugin {
         if (extension) bindMaterialExtension(c.device, target, pipeline, r.extension!, effectBindings);
         target.setVertexBuffer(0, p.deformed ?? r.vertex);
         if (instances) target.setVertexBuffer(1, instances);
-        target.setIndexBuffer(r.index, 'uint32');
+        target.setIndexBuffer(index, 'uint32');
         // A preceding material may have changed the reference on this shared pass.
         applyStencilReference(target, state);
-        if (inst) target.drawIndexed(p.indices.length, inst.count);
-        else target.drawIndexed(p.indices.length);
+        if (inst) target.drawIndexed(count, inst.count);
+        else target.drawIndexed(count);
         if (!external && blend && mode !== 'gbuffer' && !through && !capture) {
           pass!.end();
           pass = undefined;
@@ -2463,7 +2512,8 @@ export class PBRModel implements EnginePlugin {
     const cleanup = new Cleanup(),
       buffers = new Set<GPUBuffer>();
     for (const r of this.resources)
-      for (const b of [r.vertex, r.index, r.uniform, r.extension?.uniform, r.volume]) if (b) buffers.add(b);
+      for (const b of [r.vertex, r.index, r.wireframe?.index, r.uniform, r.extension?.uniform, r.volume])
+        if (b) buffers.add(b);
     for (const b of buffers) cleanup.run(() => b.destroy());
     for (const t of this.textures) cleanup.run(() => t.destroy());
     for (const p of [...this.primitives, ...this.pointsAndLines]) {
