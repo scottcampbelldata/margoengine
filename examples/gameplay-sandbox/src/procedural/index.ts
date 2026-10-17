@@ -47,6 +47,8 @@ export function createProceduralSettlement(engine: EngineKernel, shadows: Shadow
         name,
         wind: vegetation ? [1, 0.35, 0.045] : undefined,
         windDetail: vegetation ? 1 : undefined,
+        // Broad leaves pass more back-light than dense pine needles; bark passes none.
+        translucency: material === 'foliage' ? 0.8 : material === 'pine' ? 0.5 : undefined,
         vertices: pbrVertexStream(data, occlusion),
         indices: data.indices,
         transforms,

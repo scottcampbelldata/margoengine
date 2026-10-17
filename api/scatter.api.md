@@ -42,6 +42,7 @@ export interface ScatterBatch {
     emissive?: readonly [number, number, number];
     wind?: ScatterWind;
     windDetail?: number;
+    translucency?: number;
 }
 
 export interface ScatterBlades {

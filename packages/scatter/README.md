@@ -163,6 +163,18 @@ MIT. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/scatter
 
+`ScatterBatch.translucency` (0-1, default 0) lets sunlight through thin foliage,
+after Barre-Brisebois and Bouchard's wrapped back-light translucency (GDC 2011):
+a lobe around the direction away from the sun, bent by the normal so curved
+canopies light unevenly, plus wrapped diffuse on the side facing away from it.
+It scales with the vertex occlusion (alpha), so outer leaves glow and a canopy's
+core does not, and with the albedo and sun colour; 1 matches the front-lit
+diffuse. It is not shadowed, because a canopy's own shadow map would hide its
+back-lit side, so a tree in a hill's shadow keeps a faint glow. It rides in the
+unused fourth float of the instance emission; without any translucent batch the
+shader and vertex layout are unchanged. Cost when on: about 15 ALU per fragment
+of that ScatterInstances draw.
+
 Fixed `ScatterInstances` batches accept `emissive: [r, g, b]` in linear HDR.
 Emission defaults to zero and is added after PBR lighting, shadows and baked
 occlusion; for example `[3, 2.16, 0.9]` makes a warm window bloom with optional

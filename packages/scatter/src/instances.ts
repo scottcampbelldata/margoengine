@@ -25,6 +25,12 @@ export interface ScatterBatch {
   wind?: ScatterWind;
   /** Branch/foliage ripple, 0–1, layered over rooted wind. Defaults to 0. */
   windDetail?: number;
+  /**
+   * Sunlight seen through thin foliage, 0-1 (default 0): wrapped back-light translucency after Barre-Brisebois and
+   * Bouchard (GDC 2011). Leaves facing away from the sun glow when the camera looks toward it, scaled by the vertex
+   * occlusion (alpha) so outer leaves glow and a canopy's core does not. 1 matches the albedo's front-lit diffuse.
+   */
+  translucency?: number;
 }
 interface Batch {
   vertex: GPUBuffer;
@@ -51,6 +57,25 @@ const vertexLayouts: GPUVertexBufferLayout[] = [
     ],
   },
 ];
+// Location 9 also carries translucency in .w when any batch sets it.
+const translucentLayouts: GPUVertexBufferLayout[] = [
+  vertexLayouts[0],
+  {
+    ...vertexLayouts[1],
+    attributes: [...vertexLayouts[1].attributes].map((a) =>
+      a.shaderLocation === 9 ? { ...a, format: 'float32x4' as const } : a,
+    ),
+  },
+];
+// Light through thin leaves (Barre-Brisebois and Bouchard 2011): a lobe around the direction away from the sun, bent by
+// the normal so curved canopies light unevenly, plus wrapped diffuse on the shadow side. Unshadowed (a canopy's own
+// shadow map would hide its back-lit side); baked occlusion stands in for thickness.
+const translucencyShader = /* wgsl */ `
+fn foliageTranslucency(n:vec3f,v:vec3f,l:vec3f,occlusion:f32,strength:f32)->f32 {
+ let back=pow(clamp(dot(v,-normalize(l+n*0.4)),0.0,1.0),4.0);let wrap=clamp((0.5-dot(n,l))/1.5,0.0,1.0);
+ return strength*occlusion*(back+0.3*wrap)/3.14159265;
+}
+`;
 const shadowShader =
   windShader +
   `
@@ -82,6 +107,8 @@ export class ScatterInstances implements EnginePlugin {
   private shader = '';
   private format = '';
   private bindings: GPUBindGroupEntry[] = [];
+  /** Whether any batch sets `translucency`; otherwise the shader and layout stay as they were without it. */
+  private translucent = false;
   private readonly color: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' };
   private readonly depth: GPURenderPassDepthStencilAttachment = {
     view: undefined!,
@@ -146,6 +173,12 @@ export class ScatterInstances implements EnginePlugin {
             [0, 1, 2].some((i) => !Number.isFinite(Math.fround(b.emissive![i])) || b.emissive![i] < 0))
         )
           throw new RangeError('Invalid scatter emission');
+        if (
+          b.translucency !== undefined &&
+          (!Number.isFinite(b.translucency) || b.translucency < 0 || b.translucency > 1)
+        )
+          throw new RangeError('Scatter batch translucency must be from 0 to 1');
+        this.translucent ||= (b.translucency ?? 0) > 0;
         const windLength = b.wind ? validateWind(b.wind) : 1;
         if (
           b.windDetail !== undefined &&
@@ -166,6 +199,7 @@ export class ScatterInstances implements EnginePlugin {
           packed.set(b.material.data, i * 32 + 16);
           packed[i * 32 + 23] = -1; // Fixed batches have no core mesh ID.
           if (b.emissive) packed.set(b.emissive, i * 32 + 24);
+          packed[i * 32 + 27] = b.translucency ?? 0;
           if (wind) packed.set(wind, i * 32 + 28);
           packed[i * 32 + 31] = b.windDetail ?? 0;
         }
@@ -223,18 +257,23 @@ export class ScatterInstances implements EnginePlugin {
     const changed = !sameBindings(this.bindings, c.bindings);
     const format = c.format + ':' + c.descriptor.multisample?.count + ':' + c.descriptor.depthStencil!.format;
     if (this.shader !== c.shader || this.format !== format) {
+      const lucent = this.translucent;
       const code =
         windShader +
+        (lucent ? translucencyShader : '') +
         c.shader
           .replace(/struct Frame \{[^}]+\}/, (frame) => frame.replace('}', ',windTime:vec4f }'))
           .replace(/struct Input \{[^}]+\}/, (input) =>
             input.replace(
               '}',
-              ',@location(8) vertexColor:vec4f,@location(9) emissive:vec3f,@location(10) wind:vec4f }',
+              `,@location(8) vertexColor:vec4f,@location(9) emissive:${lucent ? 'vec4f' : 'vec3f'},@location(10) wind:vec4f }`,
             ),
           )
           .replace(/struct Output \{[^}]+\}/, (output) =>
-            output.replace('}', ',@location(4) emissive:vec3f,@location(5) occlusion:f32 }'),
+            output.replace(
+              '}',
+              `,@location(4) emissive:vec3f,@location(5) occlusion:f32${lucent ? ',@location(6) @interpolate(flat) translucency:f32' : ''} }`,
+            ),
           )
           .replace(
             'let p=model*vec4f(i.position,1);',
@@ -242,14 +281,23 @@ export class ScatterInstances implements EnginePlugin {
           )
           .replace(
             'o.color=i.color.rgb;',
-            'o.normal=windDetailNormal(o.normal,bend,wind);o.color=i.color.rgb*i.vertexColor.rgb;o.emissive=i.emissive*frame.windTime.y;o.occlusion=clamp(i.vertexColor.a,0.0,1.0);',
+            'o.normal=windDetailNormal(o.normal,bend,wind);o.color=i.color.rgb*i.vertexColor.rgb;' +
+              (lucent
+                ? 'o.emissive=i.emissive.rgb*frame.windTime.y;o.translucency=i.emissive.w;'
+                : 'o.emissive=i.emissive*frame.windTime.y;') +
+              'o.occlusion=clamp(i.vertexColor.a,0.0,1.0);',
           )
           .replace('i.color*(1.0-i.material.y)*', 'i.color*(1.0-i.material.y)*i.occlusion*')
-          .replace(/let linear=([^;]+);/, 'let linear=$1+i.emissive;');
+          .replace(
+            /let linear=([^;]+);/,
+            lucent
+              ? 'let linear=$1+foliageTranslucency(n,v,l,i.occlusion,i.translucency)*i.color*frame.radiance.xyz*frame.light.w+i.emissive;'
+              : 'let linear=$1+i.emissive;',
+          );
       const module = c.device.createShaderModule({ code });
       this.pipeline = c.device.createRenderPipeline({
         layout: 'auto',
-        vertex: { module, entryPoint: 'vertex', buffers: vertexLayouts },
+        vertex: { module, entryPoint: 'vertex', buffers: lucent ? translucentLayouts : vertexLayouts },
         fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format }] },
         multisample: c.descriptor.multisample,
         depthStencil: { ...c.descriptor.depthStencil!, depthWriteEnabled: true, depthCompare: 'greater-equal' },
@@ -324,6 +372,7 @@ export class ScatterInstances implements EnginePlugin {
     this.pipeline = this.shadowPipeline = undefined;
     this.group = undefined;
     this.shader = this.format = '';
+    this.translucent = false;
     this.bindings.length = 0;
   }
   onDeviceRestored(engine: Engine): void {

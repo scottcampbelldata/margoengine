@@ -100,6 +100,60 @@ test('fixed PBR scatter applies alpha occlusion only to ambient lighting and pre
   scatter.dispose();
 });
 
+test('foliage translucency adds wrapped back-light only when a batch asks for it', () => {
+  const build = (batches) => {
+    const h = optionalGPU();
+    h.engine.lighting = {
+      direction: new Float32Array([-1, 0.13, 0, 1]),
+      radiance: new Float32Array([1, 0.8, 0.54, 0.18]),
+    };
+    h.context.shader = wgsl.replace('let linear=direct*', 'let linear=direct*0.5*');
+    const scatter = new ScatterInstances(() => batches);
+    h.engine.use(scatter);
+    h.engine.frameGraph.execute(h.context);
+    const render = h.pipelines.find((p) => p.fragment),
+      uploads = h.resources.filter((r) => !r.destroyed && r.size === 128 && r.usage === 40);
+    return { h, scatter, render, code: render.vertex.module.code, uploads };
+  };
+  const plain = build([batch()]);
+  assert.match(plain.code, /@location\(9\) emissive:vec3f/);
+  assert.doesNotMatch(plain.code, /foliageTranslucency|translucency/, 'no translucent batch: shader as before');
+  assert.equal(plain.render.vertex.buffers[1].attributes.find((a) => a.shaderLocation === 9).format, 'float32x3');
+  assert.equal(new Float32Array(plain.uploads[0].data)[27], 0);
+  plain.scatter.dispose();
+  const leaves = batch();
+  leaves.translucency = 0.8;
+  const lit = build([batch(), leaves]);
+  assert.match(lit.code, /@location\(9\) emissive:vec4f/);
+  assert.match(lit.code, /@location\(6\) @interpolate\(flat\) translucency:f32/);
+  assert.match(lit.code, /o\.emissive=i\.emissive\.rgb\*frame\.windTime\.y;o\.translucency=i\.emissive\.w;/);
+  assert.match(
+    lit.code,
+    /let linear=direct\*0\.5\*[^;]+\+foliageTranslucency\(n,v,l,i\.occlusion,i\.translucency\)\*i\.color\*frame\.radiance\.xyz\*frame\.light\.w\+i\.emissive;/,
+    'added outside the shadowed direct term, before emission',
+  );
+  assert.equal(lit.render.vertex.buffers[1].attributes.find((a) => a.shaderLocation === 9).format, 'float32x4');
+  assert.equal(lit.render.vertex.buffers[1].arrayStride, 128, 'packed into the unused emissive.w slot');
+  assert.deepEqual(
+    lit.uploads.map((u) => new Float32Array(u.data)[27]),
+    [0, Math.fround(0.8)],
+  );
+  lit.scatter.onDeviceRestored(lit.h.engine);
+  lit.h.engine.frameGraph.execute(lit.h.context);
+  assert.match(lit.h.pipelines.at(-1).vertex.module.code, /foliageTranslucency/, 'restored with the same shader');
+  lit.scatter.dispose();
+  for (const translucency of [-0.1, 1.5, NaN]) {
+    const h = optionalGPU(),
+      bad = batch();
+    bad.translucency = translucency;
+    assert.throws(() => h.engine.use(new ScatterInstances(() => [bad])), {
+      name: 'RangeError',
+      message: /translucency must be from 0 to 1/,
+    });
+    assert.ok(h.resources.every((r) => r.destroyed));
+  }
+});
+
 test('fixed scatter rejects malformed geometry/transforms and rolls back partial GPU uploads', () => {
   for (const mutate of [
     (b) => (b.vertices[0] = NaN),
