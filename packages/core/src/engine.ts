@@ -36,7 +36,7 @@ export class VectorRef {
   private get(axis: number): number {
     this.mesh.check();
     return this.kind === 'rotation'
-      ? this.mesh.euler[axis]
+      ? this.mesh.engine.store.rotations[this.mesh.id * 3 + axis]
       : this.mesh.engine.store.transforms[(this.kind === 'scale' ? scaleFields : positionFields)[axis]][this.mesh.id];
   }
   private validate(value: number): void {
@@ -51,7 +51,7 @@ export class VectorRef {
     this.mesh.check();
     this.validate(value);
     if (this.kind === 'rotation') {
-      this.mesh.euler[axis] = value;
+      this.mesh.engine.store.rotations[this.mesh.id * 3 + axis] = value;
       this.mesh.syncRotation();
     } else
       this.mesh.engine.store.transforms[(this.kind === 'scale' ? scaleFields : positionFields)[axis]][this.mesh.id] =
@@ -67,7 +67,7 @@ export class VectorRef {
       id = this.mesh.id;
     for (let axis = 0; axis < 3; axis++) {
       const value = axis === 0 ? x : axis === 1 ? y : z;
-      if (this.kind === 'rotation') this.mesh.euler[axis] = value;
+      if (this.kind === 'rotation') this.mesh.engine.store.rotations[id * 3 + axis] = value;
       else t[fields[axis]][id] = value;
     }
     if (this.kind === 'rotation') this.mesh.syncRotation();
@@ -102,10 +102,50 @@ const keep = ({ matrix: m, material }: Mesh) =>
     material.data[6] > 0 ||
     m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]) < 0
   );
+class EulerView {
+  constructor(private readonly mesh: Mesh) {}
+  private write(axis: number, value: number): void {
+    this.mesh.engine.store.rotations[this.mesh.id * 3 + axis] = value;
+    syncStoredRotation(this.mesh.engine.store, this.mesh.id);
+  }
+  private lane(axis: number): number {
+    return this.mesh.engine.store.rotations[this.mesh.id * 3 + axis];
+  }
+  get 0(): number {
+    return this.lane(0);
+  }
+  set 0(value: number) {
+    this.write(0, value);
+  }
+  get 1(): number {
+    return this.lane(1);
+  }
+  set 1(value: number) {
+    this.write(1, value);
+  }
+  get 2(): number {
+    return this.lane(2);
+  }
+  set 2(value: number) {
+    this.write(2, value);
+  }
+  get length(): 3 {
+    return 3;
+  }
+  get buffer(): ArrayBufferLike {
+    return this.mesh.engine.store.rotations.buffer;
+  }
+  *[Symbol.iterator](): IterableIterator<number> {
+    yield this[0];
+    yield this[1];
+    yield this[2];
+  }
+}
+const eulerView = (mesh: Mesh) => new EulerView(mesh);
 const views = (mesh: Mesh) =>
   Object.assign(mesh, {
     matrix: mesh.engine.store.matrices.subarray(mesh.id * 16, mesh.id * 16 + 16),
-    euler: mesh.engine.store.rotations.subarray(mesh.id * 3, mesh.id * 3 + 3),
+    euler: eulerView(mesh),
   });
 /**
  * Runtime mesh: a slot `id` in its engine's transform store plus geometry and material. Create it with
@@ -117,10 +157,18 @@ export class Mesh {
   readonly rotation = new VectorRef(this, 'rotation');
   readonly scale = new VectorRef(this, 'scale');
   /**
-   * Store view of Euler XYZ radians. Index writes do not update the quaternion; use `rotation` or `setRotation`.
-   * `createMesh` replaces this view when the store grows, so read it, never keep it.
+   * Euler XYZ radians for this mesh. An index write updates the quaternion. `setQuaternion` writes the lanes after
+   * the quaternion and leaves that quaternion in place. `createMesh` replaces this object when the store grows; a
+   * kept view still reads the current lanes.
    */
-  declare readonly euler: Float32Array;
+  declare readonly euler: {
+    0: number;
+    1: number;
+    2: number;
+    readonly length: 3;
+    readonly buffer: ArrayBufferLike;
+    [Symbol.iterator](): IterableIterator<number>;
+  };
   /** World matrix view into the store. `createMesh` replaces it when the store grows, so read it, never keep it. */
   declare readonly matrix: Float32Array;
   geometry: Geometry | null = null;
@@ -185,9 +233,11 @@ export class Mesh {
     t.qy[id] = y;
     t.qz[id] = z;
     t.qw[id] = w;
-    this.euler[1] = Math.asin(Math.max(-1, Math.min(1, 2 * (x * z + w * y))));
-    this.euler[0] = Math.atan2(2 * (w * x - y * z), 1 - 2 * (x * x + y * y));
-    this.euler[2] = Math.atan2(2 * (w * z - x * y), 1 - 2 * (y * y + z * z));
+    const lanes = this.engine.store.rotations,
+      at = id * 3;
+    lanes[at + 1] = Math.asin(Math.max(-1, Math.min(1, 2 * (x * z + w * y))));
+    lanes[at] = Math.atan2(2 * (w * x - y * z), 1 - 2 * (x * x + y * y));
+    lanes[at + 2] = Math.atan2(2 * (w * z - x * y), 1 - 2 * (y * y + z * z));
     return this;
   }
   setParent(parent: Mesh | null): this {

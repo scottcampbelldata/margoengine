@@ -181,13 +181,15 @@ export class Stage {
               loadGLTF(engine: EngineKernel, url: URL, options: { signal?: AbortSignal }): Promise<StageModel>;
             }
           ).loadGLTF(this.engine, target, { signal: abort })
-        : await (
-            await loadPackage('@margoengine/machinery', () => import('@margoengine/machinery/cad'))
-          ).loadCAD(this.engine, target, {
-            ...options,
-            format: kind as 'stl' | 'obj' | 'step' | 'iges',
-            signal: abort,
-          });
+        : await (await loadPackage('@margoengine/machinery', () => import('@margoengine/machinery/cad'))).loadCAD(
+            this.engine,
+            target,
+            {
+              ...options,
+              format: kind as 'stl' | 'obj' | 'step' | 'iges',
+              signal: abort,
+            },
+          );
     try {
       abort.throwIfAborted();
       if (fit) this.fit(model.meshes);
@@ -214,17 +216,20 @@ export class Stage {
   async sky(options: object = {}): Promise<object> {
     const { SkyMoon } = await loadPackage('@margoengine/scenery', () => import('@margoengine/scenery/sky'));
     this.imports.signal.throwIfAborted();
-    return this.use(new SkyMoon(options as never));
+    return this.use(new SkyMoon(options as ConstructorParameters<typeof SkyMoon>[0]));
   }
   async particles(options: object = {}): Promise<object> {
-    const { GPUParticles } = await loadPackage('@margoengine/creative', () => import('@margoengine/creative/particles'));
+    const { GPUParticles } = await loadPackage(
+      '@margoengine/creative',
+      () => import('@margoengine/creative/particles'),
+    );
     this.imports.signal.throwIfAborted();
-    return this.use(new GPUParticles(options as never));
+    return this.use(new GPUParticles(options as ConstructorParameters<typeof GPUParticles>[0]));
   }
   async effects(options: object = {}): Promise<object> {
     const { PostProcessing } = await loadPackage('@margoengine/creative', () => import('@margoengine/creative/post'));
     this.imports.signal.throwIfAborted();
-    return this.use(new PostProcessing(options as never));
+    return this.use(new PostProcessing(options as ConstructorParameters<typeof PostProcessing>[0]));
   }
   /**
    * Loads `@margoengine/environment` and lights every mesh with image-based lighting from an `.hdr`, `.exr` or
@@ -233,11 +238,18 @@ export class Stage {
    * A missing package rejects with `Install @margoengine/environment`.
    */
   async environment(source: string | URL | object, options?: object): Promise<object> {
-    const { EnvironmentLighting } = await loadPackage('@margoengine/environment', () => import('@margoengine/environment'));
+    const { EnvironmentLighting } = await loadPackage(
+      '@margoengine/environment',
+      () => import('@margoengine/environment'),
+    );
     this.imports.signal.throwIfAborted();
     const caller = options as { signal?: AbortSignal } | undefined;
     const signal = caller?.signal ? AbortSignal.any([caller.signal, this.imports.signal]) : this.imports.signal;
-    return EnvironmentLighting.load(this.engine, source as never, { ...caller, signal } as never);
+    return EnvironmentLighting.load(
+      this.engine,
+      source as Parameters<typeof EnvironmentLighting.load>[1],
+      { ...caller, signal } as Parameters<typeof EnvironmentLighting.load>[2],
+    );
   }
   /**
    * Loads `@margoengine/shadows` and attaches cascaded shadows for the stage's directional light. Meshes present now
@@ -247,7 +259,7 @@ export class Stage {
   async shadows(options: object = {}): Promise<object> {
     const { Shadows } = await loadPackage('@margoengine/shadows', () => import('@margoengine/shadows'));
     this.imports.signal.throwIfAborted();
-    const shadows = this.use(new Shadows(options as never));
+    const shadows = this.use(new Shadows(options as ConstructorParameters<typeof Shadows>[0]));
     for (const mesh of (this.engine as unknown as RuntimeEngine).meshes.values()) shadows.add(mesh);
     return shadows;
   }

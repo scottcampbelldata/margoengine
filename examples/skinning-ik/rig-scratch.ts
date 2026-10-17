@@ -100,9 +100,11 @@ export class RigScratch {
     t.qy[id] = y;
     t.qz[id] = z;
     t.qw[id] = w;
-    mesh.euler[1] = Math.asin(Math.max(-1, Math.min(1, 2 * (x * z + w * y))));
-    mesh.euler[0] = Math.atan2(2 * (w * x - y * z), 1 - 2 * (x * x + y * y));
-    mesh.euler[2] = Math.atan2(2 * (w * z - x * y), 1 - 2 * (y * y + z * z));
+    const lanes = mesh.engine.store.rotations,
+      at = id * 3;
+    lanes[at + 1] = Math.asin(Math.max(-1, Math.min(1, 2 * (x * z + w * y))));
+    lanes[at] = Math.atan2(2 * (w * x - y * z), 1 - 2 * (x * x + y * y));
+    lanes[at + 2] = Math.atan2(2 * (w * z - x * y), 1 - 2 * (y * y + z * z));
   }
   rotateWorld(mesh: Mesh, delta: readonly number[]): void {
     if (delta.length !== 4) throw new RangeError('Invalid arm IK rotation');
