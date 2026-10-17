@@ -38,6 +38,9 @@ export class ArmControlRoute {
   private readonly scratch: Point = [0, 0, 0];
   private count = 0;
   private cursor = 0;
+  // Closest the accepted orb has come to the current waypoint, and seconds without getting 0.5 mm closer.
+  private closest = Infinity;
+  private stalled = 0;
 
   request(control: ArmControl, parameter: number, accepted: ArrayLike<number>): this {
     routeKnots(control);
@@ -75,7 +78,10 @@ export class ArmControlRoute {
     return this;
   }
 
-  /** Advance only on a real solve, after the accepted orb reaches the waypoint. */
+  /**
+   * Advance only on a real solve, after the accepted orb reaches the waypoint, or after it has stopped getting closer
+   * for 0.75 s (body contact or the arm's reach holds it short), so a slider route never stalls for good.
+   */
   update(accepted: ArrayLike<number>, dt: number, reachedTarget: ArrayLike<number> = this.position): Point {
     scenePoint(accepted);
     scenePoint(reachedTarget);
@@ -87,7 +93,12 @@ export class ArmControlRoute {
       dy = accepted[1] - reachedTarget[1],
       dz = accepted[2] - reachedTarget[2];
     this.settled = false;
-    if (dx * dx + dy * dy + dz * dz <= 0.002 * 0.002) {
+    const distance = Math.hypot(dx, dy, dz);
+    if (distance < this.closest - 0.0005) {
+      this.closest = distance;
+      this.stalled = 0;
+    } else this.stalled += dt;
+    if (distance <= 0.002 || this.stalled >= 0.75) {
       if (this.cursor < this.count - 1) {
         this.cursor++;
         this.currentControl = this.controls[this.cursor];
@@ -120,6 +131,8 @@ export class ArmControlRoute {
   }
 
   private copyWaypoint(): void {
+    this.closest = Infinity;
+    this.stalled = 0;
     const offset = this.cursor * 3;
     for (let i = 0; i < 3; i++) this.position[i] = this.waypoints[offset + i];
   }

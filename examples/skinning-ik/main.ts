@@ -223,7 +223,9 @@ try {
   orbit.enableDamping = true;
   orbit.dampingFactor = 0.12;
   orbit.minDistance = 0.75;
-  orbit.maxDistance = 7;
+  // Portrait screens frame every view from farther away (frameScale), so the zoom-out limit scales with it. A fixed 7 m
+  // clamped the framed Home distance on phones, and rotating to landscape then rescaled the clamped distance.
+  orbit.maxDistance = 7 * frameScale();
   orbit.minPolarAngle = 0.08;
   orbit.maxPolarAngle = Math.PI * 0.49;
   orbit.saveState();
@@ -249,6 +251,7 @@ try {
   const resize = new ResizeObserver(() => {
     const scale = frameScale(),
       ratio = scale / previousFrameScale;
+    orbit.maxDistance = 7 * scale;
     if (document.body.dataset.view !== 'close') {
       const look = stage.engine.camera.target;
       stage.engine.camera.position = add(
@@ -714,9 +717,12 @@ try {
               ? 'At body surface'
               : gazeConditioned
                 ? 'Keeping light in view'
-                : residual > 0.012
+                : // Limited: the solved orb missed the filtered command. Otherwise a gap to the raw target is travel.
+                  solved.limited
                   ? 'At arm’s reach'
-                  : 'Held in hand';
+                  : residual > 0.012
+                    ? 'Moving to target'
+                    : 'Held in hand';
         if (state.textContent !== stateText) state.textContent = stateText;
         const distanceText = residual > 0.012 ? (residual * 100).toFixed(1) + ' cm to target' : 'Grip secure';
         if (distance.value !== distanceText) distance.value = distanceText;
@@ -952,11 +958,14 @@ try {
         .querySelectorAll('.views button')
         .forEach((button) => button.classList.toggle('active', button.id === id));
     });
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const reset = () => {
     probePoseReuse.invalidate();
     releaseInteractions();
     for (const id of ['ik-enabled', 'auto-ik', 'look', 'idle', 'moving-light', 'reflections'])
       checkbox(id).checked = true;
+    // Reduced motion keeps idle motion and the moving light off after a reset too, as at load.
+    if (reduced.matches) for (const id of ['idle', 'moving-light']) checkbox(id).checked = false;
     for (const id of ['follow', 'autopilot', 'show-rig']) checkbox(id).checked = false;
     animator.time = 0;
     animator.playing = true;
@@ -1018,11 +1027,6 @@ try {
       }
     }
   });
-  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  if (reduced.matches) {
-    checkbox('idle').checked = false;
-    checkbox('moving-light').checked = false;
-  }
   let reflectionCadenceMs = 50,
     reflectionFinalRequested = false,
     reflectionFrame = 0;
@@ -1136,10 +1140,6 @@ try {
     $('orb-keyboard').removeEventListener('keyup', queueFinalReflection);
   });
   reset();
-  if (reduced.matches) {
-    checkbox('idle').checked = false;
-    checkbox('moving-light').checked = false;
-  }
   stage.engine.render();
   if (new URLSearchParams(location.search).get('shadowDebug') === '1') {
     const proof = await showShadowDebug(stage.engine, shadows, $('viewport'));

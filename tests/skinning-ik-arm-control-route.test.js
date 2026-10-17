@@ -125,3 +125,15 @@ test('release removes the old path, reacquisition starts from the actual accepte
   assert.equal(route.active, true);
   assert.equal(route.settled, false);
 });
+
+test('a route held short of a waypoint moves on after 0.75 s without progress instead of stalling for good', () => {
+  const route = new ArmControlRoute();
+  route.request('side', 1, home);
+  const first = copied(route),
+    held = [first[0], first[1] - 0.05, first[2]]; // body contact or reach keeps the orb 5 cm short
+  for (let i = 0; i < 40; i++) route.update(held, 1 / 60);
+  assert.deepEqual(route.position, first, 'still heading for the first waypoint after 0.65 s');
+  for (let i = 0; i < 20; i++) route.update(held, 1 / 60);
+  assert.deepEqual(route.position, mapArmControl('side', 0.88), 'moved on to the next waypoint');
+  assert.equal(route.settled, false);
+});

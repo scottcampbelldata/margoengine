@@ -757,21 +757,27 @@ export class BodyIK {
         this.cached = undefined;
       }
       this.restore(this.lastSafe);
+      // Contact recovery limits are rates, so the arm slides along the body at the same speed at any frame rate: the
+      // orb chases at 1.08 m/s, bones turn at 7.2 rad/s, and a request moving under 4.8 m/s continues one contact
+      // (18 mm, 0.12 rad and 80 mm per frame at 60 frames per second).
+      const chaseStep = 1.08 * dt,
+        turnStep = 7.2 * dt,
+        contactStep = 4.8 * dt;
       const previousPose = this.lastSafe,
         previousCenter = this.orb(),
         previousLocal = this.local(frame, previousCenter),
         rawStep = this.lastDesired
           ? this.length3(this.sub(this.local(frame, desired), this.local(frame, this.lastDesired)))[0]
           : Infinity,
-        continuousContact = rawStep < 0.08 && (this.cached?.blocked || this.recovering);
+        continuousContact = rawStep < contactStep && (this.cached?.blocked || this.recovering);
       const requestedDistance = this.length3(this.sub(this.local(frame, desired), previousLocal))[0],
-        chase = continuousContact && requestedDistance > 0.018,
+        chase = continuousContact && requestedDistance > chaseStep,
         solveDesired = chase
           ? this.gripPoint(
               frame,
               this.add(
                 previousLocal,
-                this.mul(this.sub(this.local(frame, desired), previousLocal), 0.018 / requestedDistance),
+                this.mul(this.sub(this.local(frame, desired), previousLocal), chaseStep / requestedDistance),
               ),
             )
           : desired;
@@ -867,7 +873,7 @@ export class BodyIK {
         let angle = -Infinity;
         for (let i = 0; i < 3; i++)
           angle = Math.max(angle, 2 * Math.acos(Math.min(1, Math.abs(dot4(pose[i], previousPose[i])))));
-        let alpha = Math.min(1, 0.018 / Math.max(distance, 1e-8), 0.12 / Math.max(angle, 1e-8));
+        let alpha = Math.min(1, chaseStep / Math.max(distance, 1e-8), turnStep / Math.max(angle, 1e-8));
         if (alpha < 1) {
           const destination = pose;
           recovering = true;
