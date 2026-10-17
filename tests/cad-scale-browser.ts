@@ -16,10 +16,20 @@ import { getSceneBounds } from '../packages/gltf-pro/dist/scene.js';
 import { Picking } from '../packages/selection/dist/index.js';
 
 type Roots = Parameters<typeof getSceneBounds>[1];
+/** A view for scripts/cad-inspect.mjs: angles in degrees, `zoom` scales the framing distance, `focus` is a point inside
+ * the model's bounds (0 to 1 per axis), `cut` adds the section ('upper' keeps the upper half, 'lower' the lower). */
+type CloseView = {
+  azimuth?: number;
+  elevation?: number;
+  zoom?: number;
+  focus?: number[];
+  cut?: 'upper' | 'lower';
+};
 declare global {
   interface Window {
     cadScale?: unknown;
-    cadScaleShot?: (cut: boolean) => Promise<void>;
+    cadScaleShot?: (shot: 'whole' | 'section' | 'cap') => Promise<void>;
+    cadScaleView?: (view: CloseView) => Promise<void>;
   }
 }
 
@@ -258,7 +268,8 @@ async function run() {
   engine.removePlugin(picking.name);
 
   stage = 'section';
-  const sections = SectionPlanes.attach(engine, { planes: [[0, 1, 0, -center[1]]], cap: true, hatch: 0 });
+  const plane = [0, 1, 0, -center[1]],
+    sections = SectionPlanes.attach(engine, { planes: [plane], cap: true, hatch: 0 });
   const section: number[] = [],
     sectionEncode: number[] = [];
   for (let i = 0; i < 30; i++) {
@@ -267,10 +278,33 @@ async function run() {
     sectionEncode.push(encodeMs);
   }
 
-  // The screenshots: the whole model (shading), then cut at its middle height (caps).
-  window.cadScaleShot = async (cut) => {
-    sections.enabled = cut;
+  // The screenshots: the whole model (shading); cut at its middle height keeping the upper half (the timed section
+  // view, whose caps face away from this camera); then keeping the lower half, so the cut and its caps face the camera.
+  window.cadScaleShot = async (shot) => {
+    sections.enabled = shot !== 'whole';
+    plane[1] = shot === 'cap' ? -1 : 1;
+    plane[3] = shot === 'cap' ? center[1] : -center[1];
     view(35);
+    await frame();
+  };
+  window.cadScaleView = async ({ azimuth = 35, elevation = 30, zoom = 1, focus = [0.5, 0.5, 0.5], cut }) => {
+    const a = (azimuth * Math.PI) / 180,
+      e = (elevation * Math.PI) / 180,
+      d = distance * zoom,
+      target = [0, 1, 2].map((k) => b[k] + (b[k + 3] - b[k]) * focus[k]);
+    sections.enabled = !!cut;
+    plane[1] = cut === 'lower' ? -1 : 1;
+    plane[3] = cut === 'lower' ? center[1] : -center[1];
+    Object.assign(engine.camera, {
+      position: [
+        target[0] + d * Math.cos(e) * Math.cos(a),
+        target[1] + d * Math.sin(e),
+        target[2] + d * Math.cos(e) * Math.sin(a),
+      ],
+      target,
+      near: Math.max(d * 1e-4, d - 1.5 * radius),
+      far: d + 1.5 * radius,
+    });
     await frame();
   };
   const memory = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory;

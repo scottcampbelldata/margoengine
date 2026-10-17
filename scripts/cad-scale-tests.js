@@ -2,7 +2,7 @@
 //
 //   node scripts/cad-scale-tests.js --class=workstation|laptop|entry [--ladder] [--corpus] [--quiet]
 //        [--sizes=1000,2500,5000,10000,25000,50000,100000] [--detail=low|normal|high] [--paths=obj,glb]
-//        [--frames=120] [--all] [--kernel=occt|margo]
+//        [--frames=120] [--all] [--kernel=occt|margo] [--only=<part of a corpus file name>]
 //
 // --ladder (default with no mode flag): generated machinery assemblies (scripts/cad-scale/assembly.mjs) of growing
 //   size through two paths: `obj` (world-space parts through parseCADAsync, with PartInstancer: a file a user drops
@@ -13,8 +13,10 @@
 // --kernel=margo: STEP files read and tessellated by our own kernel (@margoengine/brep) instead of OpenCascade; with
 //   --corpus only the STEP files run, and results and screenshots are kept apart (results-<class>-margo.json).
 // A run passes when it loads without error, keeps every part and triangle (generated assemblies), and meets the
-// class's limits below. Each run opens a fresh browser (Edge, physical WebGPU) under the shared GPU lock and saves two
-// screenshots: the whole model, then cut at its middle height. --quiet waits for scripts/quiet-gate.mjs before every run; without it, times are labelled diagnostic.
+// class's limits below. Each run opens a fresh browser (Edge, physical WebGPU) under the shared GPU lock and saves three
+// screenshots: the whole model; cut at its middle height keeping the upper half (the timed section view); and keeping
+// the lower half, so the cut surface and its caps face the camera. --only=<text> runs only the corpus files whose
+// name contains it. --quiet waits for scripts/quiet-gate.mjs before every run; without it, times are labelled diagnostic.
 // Results: test-results/cad-scale/results-<class>.json; screenshots in test-results/cad-scale/shots/<class>/.
 // Run after `npm run build:packages`.
 import assert from 'node:assert/strict';
@@ -58,6 +60,7 @@ const ladder = arg('ladder', false) || !arg('corpus', false),
   detail = arg('detail', 'normal'),
   paths = String(arg('paths', 'obj,glb')).split(','),
   kernel = String(arg('kernel', 'occt')),
+  only = arg('only', null),
   sizes = String(arg('sizes', '1000,2500,5000,10000,25000,50000,100000')).split(',').map(Number);
 assert.ok(
   sizes.every((n) => Number.isInteger(n) && n > 0),
@@ -132,9 +135,9 @@ async function measure({ file, format, label, bounds, smoothing = true }) {
       shots = [];
     if (result.ok) {
       await mkdir(`${OUT}/shots/${machine}`, { recursive: true });
-      for (const cut of [false, true]) {
-        const shot = `${OUT}/shots/${machine}/${label.replace(/[^\w.-]+/g, '_')}-${cut ? 'section' : 'whole'}.png`;
-        await page.evaluate((c) => window.cadScaleShot(c), cut);
+      for (const view of ['whole', 'section', 'cap']) {
+        const shot = `${OUT}/shots/${machine}/${label.replace(/[^\w.-]+/g, '_')}-${view}.png`;
+        await page.evaluate((v) => window.cadScaleShot(v), view);
         await page.locator('canvas').screenshot({ path: shot });
         shots.push(shot);
       }
@@ -230,6 +233,7 @@ try {
     const manifest = JSON.parse(await readFile('test-results/cad-corpus/manifest.json', 'utf8'));
     for (const entry of manifest) {
       if (kernel === 'margo' && entry.format !== 'step') continue;
+      if (only && !entry.file.includes(only)) continue;
       const file = `test-results/cad-corpus/${entry.file}`,
         result = await measure({ file, format: entry.format, label: `corpus${tag}-${entry.file}` });
       report.hardware ??= result.hardware;
