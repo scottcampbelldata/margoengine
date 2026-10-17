@@ -86,8 +86,12 @@ fn emit(ring:u32,instance:Instance){
  let i=id.x;if(i>=frame.ids.x||hash(i*7u+1u)>frame.rules.w){return;}
  let columns=frame.ids.z;let rows=(frame.ids.x+columns-1u)/columns;
  let uv=vec2f((f32(i%columns)+hash(i*7u+2u))/f32(columns),(f32(i/columns)+hash(i*7u+3u))/f32(rows));
- let size=vec2i(textureDimensions(terrain));let pixel=clamp(vec2i(uv*vec2f(size)),vec2i(0),size-1);let h=height(pixel)+frame.scale.z;
- let normal=normalize(vec3f(-(height(pixel+vec2i(1,0))-height(pixel-vec2i(1,0)))*f32(size.x)/(2.0*frame.area.x),1.0,-(height(pixel+vec2i(0,1))-height(pixel-vec2i(0,1)))*f32(size.y)/(2.0*frame.area.y)));
+ // Texels hold cell-centre heights: interpolate the four centres around the instance (a nearest read is off by half a
+ // cell times the slope), and take the normal from the same bilinear patch's gradient.
+ let size=vec2i(textureDimensions(terrain));let texel=uv*vec2f(size)-0.5;let cell=vec2i(floor(texel));let f=texel-floor(texel);
+ let h00=height(cell);let h10=height(cell+vec2i(1,0));let h01=height(cell+vec2i(0,1));let h11=height(cell+vec2i(1,1));
+ let h=mix(mix(h00,h10,f.x),mix(h01,h11,f.x),f.y)+frame.scale.z;
+ let normal=normalize(vec3f(-mix(h10-h00,h11-h01,f.y)*f32(size.x)/frame.area.x,1.0,-mix(h01-h00,h11-h10,f.x)*f32(size.y)/frame.area.y));
  if(h<frame.rules.x||h>frame.rules.y||normal.y<frame.rules.z){return;}
  let p=vec3f((uv.x-0.5)*frame.area.x+frame.area.z,h,(uv.y-0.5)*frame.area.y+frame.area.w);
  let scale=mix(frame.scale.x,frame.scale.y,hash(i*7u+4u));let radius=frame.lod.w*scale;

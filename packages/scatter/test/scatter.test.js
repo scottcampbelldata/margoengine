@@ -18,6 +18,20 @@ test('scatter distributes on GPU and issues three bounded indirect LOD draws', (
   assert.throws(() => new Scatter(box(), { lod: [20, 10, 30] }), /rules/);
   assert.throws(() => new Scatter(box(), { maxSlope: 91 }), /rules/);
 });
+test('scatter interpolates the four cell-centre heights around each instance and takes the normal from that patch', () => {
+  const h = optionalGPU(),
+    effect = new Scatter(box(), { count: 1 });
+  h.engine.use(effect);
+  h.frame();
+  const code = h.pipelines.find((p) => p.compute).compute.module.code;
+  assert.match(code, /let texel=uv\*vec2f\(size\)-0\.5;let cell=vec2i\(floor\(texel\)\);/);
+  for (const corner of ['cell)', 'cell+vec2i(1,0))', 'cell+vec2i(0,1))', 'cell+vec2i(1,1))'])
+    assert.ok(code.includes('=height(' + corner), corner);
+  assert.match(code, /let h=mix\(mix\(h00,h10,f\.x\),mix\(h01,h11,f\.x\),f\.y\)\+frame\.scale\.z;/);
+  assert.doesNotMatch(code, /vec2i\(uv\*vec2f\(size\)\)/, 'no nearest-texel read');
+  effect.dispose();
+});
+
 test('scatter frustum bounds include geometry displaced from its local origin', () => {
   const h = optionalGPU(),
     geometry = new Geometry([10, 0, 0, 11, 0, 0, 10, 1, 0], [0, 0, 1, 0, 0, 1, 0, 0, 1], [0, 1, 2]),

@@ -150,6 +150,42 @@ try {
     const commands = new Uint32Array(await read(same.commands));
     check(commands[1] + commands[6] + commands[11] === 1, 'Identical geometries were duplicated');
     same.dispose();
+    // Bilinear ground: a 4x4 r32float ramp rising 0.5 per texel along X, one texel per world unit, so texel centres sit
+    // at world x = -1.5..1.5 and the interpolated height at x is 0.5 * clamp(x + 1.5, 0, 3). A nearest read is off by
+    // up to 0.25.
+    const ramp = engine.gpu.createTexture({
+      size: [4, 4],
+      format: 'r32float',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    engine.gpu.queue.writeTexture(
+      { texture: ramp },
+      Float32Array.from({ length: 16 }, (_, i) => 0.5 * (i % 4)),
+      { bytesPerRow: 16 },
+      [4, 4],
+    );
+    engine.camera.position = [0, 8, 8];
+    engine.camera.target = [0, 0, 0];
+    const groundSteps = [];
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const ground = Scatter.attach(engine, toGeometry(icosahedronGeometry(0.1, 0, true)), {
+        count: 1,
+        area: [4, 4],
+        scale: [1, 1],
+        seed,
+        heightmap: () => ramp,
+      });
+      await frame();
+      const [x, y] = new Float32Array(await read(ground.instances[0])),
+        expected = 0.5 * Math.min(3, Math.max(0, x + 1.5));
+      check(Math.abs(y - expected) < 1e-4, `Ground height ${y} at x ${x}, expected ${expected}`);
+      groundSteps.push({ x, y });
+      ground.dispose();
+    }
+    ramp.destroy();
+    summaries.push({ groundSteps });
+    engine.camera.position = [0, 0, 3];
+    engine.camera.target = [0, 0, 0];
     const validate = async () => {
       const compilation = (await Promise.all(modules.map((module) => module.getCompilationInfo()))).flatMap((info) =>
         info.messages.filter((message) => message.type === 'error'),
