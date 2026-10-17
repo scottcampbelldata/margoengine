@@ -3,17 +3,17 @@ import { execFileSync } from 'node:child_process';
 export function acPower() {
   if (process.platform !== 'win32') return null;
   try {
-    return (
-      execFileSync(
-        'powershell',
-        [
-          '-NoProfile',
-          '-Command',
-          '(Get-CimInstance -Namespace root/wmi -ClassName BatteryStatus | Select-Object -First 1).PowerOnline',
-        ],
-        { encoding: 'utf8' },
-      ).trim() === 'True'
-    );
+    const status = execFileSync(
+      'powershell',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        'Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop; ([System.Windows.Forms.SystemInformation]::PowerStatus).PowerLineStatus',
+      ],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+    ).trim();
+    return status === 'Online' ? true : status === 'Offline' ? false : null;
   } catch {
     return null;
   }

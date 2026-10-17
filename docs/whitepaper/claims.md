@@ -106,21 +106,21 @@ before the core speed-ups (`0ed56b9`) re-run faster than recorded.
 | animation-vat (measurement, no baseline) | H-16, PKG-002 | gltf-pro + animation at `700838e` | – |
 | materials-atlas (measurement, no baseline) | PKG-055 | geometry + materials at `700838e` | – |
 | binding-limit | H-27, DOC-062, PKG-102 | `e017d50` -> `f8a36ca`: 3,812 calls without IBL, 4,556 with (384 mapped) | – |
-| gltf-pro-lighting-hooks | PKG-035, PKG-037 | `15c87f1` -> `cf2953e`: 4,556 calls; PKG-037: `114130c` -> `7072190` | `f8a36ca` |
-| materials-uv-transform | PKG-054, PKG-037 | `1970fda` -> `700838e`: 1,277 calls; PKG-037: `114130c` -> `7072190` | `7f1c9c6` |
+| gltf-pro-lighting-hooks | PKG-035, PKG-037 | `15c87f1` -> `cf2953e`: 4,556 calls; PKG-037: `114130c` -> `7072190` | `b3ed8ac`: 4,476 calls |
+| materials-uv-transform | PKG-054, PKG-037 | `1970fda` -> `700838e`: 1,277 calls; PKG-037: `114130c` -> `7072190` | `b3ed8ac`: 1,321 calls |
 | lines-perspective | PKG-041 | `96edc75` -> `6da7f7e`: 946 calls | `96edc75` |
 | math-consolidation | PKG-059 | `2484971` -> `4eed254` (math built at the pin) | `2484971` |
-| post-stack | PKG-065 | `5b1fe66^` -> `5b1fe66`: 12,378 calls (creative `5b1fe66^` -> `3319317`) | `e2cc4c5`: 13,056 calls |
-| selection-xray-off | PKG-068 | `46f9484` -> `80d4cfb`: 10,586 calls | `46f9484` |
+| post-stack | PKG-065 | `5b1fe66^` -> `5b1fe66`: 12,378 calls (creative `5b1fe66^` -> `3319317`) | `b3ed8ac`: 13,056 calls |
+| selection-xray-off | PKG-068 | `46f9484` -> `80d4cfb`: 10,586 calls | `b3ed8ac` |
 | clustered-local-shadows | PKG-096, PKG-097 | `0ed56b9` -> `590278e`: 482 calls, 8 params.z writes | `0ed56b9` |
 | clustered-area-lights | – | `67e0172` -> `dab9633`: 482 calls | `67e0172` |
 | color-output | – | `7dcc958` -> `225b1d6`: 6,174 calls | `7dcc958` |
-| deformed-shadows | – | `38d448e` -> `282e751` | `38d448e` |
+| deformed-shadows | – | `38d448e` -> `282e751` | `b3ed8ac` |
 | environment-volumetric | – | `7c47a09` -> `366ebff` | `7c47a09` |
-| oit-detached | – | `b803d56` -> `0e02ead`: 2,864 calls (2,964 until 5w.f replaced the story's transmission material with a plain BLEND one: transmission now draws twice by design) | `b803d56` |
-| post-ssr | – | `7c47a09` -> `3cf1453`: 9,269 calls | `7c47a09` (AgX normalised, see below) |
-| post-ssr-models | LIM-016 | `3cf1453` -> `838ae6e`: 30,858 calls | `3cf1453` |
-| quality-presets | – | `96daac7` -> `01e5e35` | `96daac7` |
+| oit-detached | – | `b803d56` -> `0e02ead`: 2,864 calls (2,964 until 5w.f replaced the story's transmission material with a plain BLEND one: transmission now draws twice by design) | `b3ed8ac` |
+| post-ssr | – | `7c47a09` -> `3cf1453`: 9,269 calls | `b3ed8ac` (AgX normalised for older refs, see below) |
+| post-ssr-models | LIM-016 | `3cf1453` -> `838ae6e`: 30,858 calls | `b3ed8ac` |
+| quality-presets | – | `96daac7` -> `01e5e35` | `b3ed8ac` |
 | post-ssao-perspective | – | `9c761d5` -> `9702e57`: 3,282 calls | – |
 | probes-decals | – | `ecdcb31` -> `7d144fb`: 15 identical entry bundles, 135 + 12,320 calls | – |
 | procedural-deps | – | HISTORICAL: `ed53ec5` -> `fff47af`; the baseline imports simplex-noise and isosurface, removed from the lockfile in 5l.v, so the runner reports it instead of failing | – |
@@ -130,6 +130,35 @@ The only normalisation is `ignoreAgx(calls, ref)`: it blanks the `agx()` body on
 `loopSubdivide` threw a bare TypeError on an index past the vertices (geometry.proof.js's degenerate case; now a named
 RangeError). Every other difference was an intended later change (exporters' lazy chunks, SSAO's `a281ad2`/`9702e57`/
 `e2cc4c5`, splats' orthographic shader `5cf148e`, later edits to the probes' sources).
+
+The nine current references above were advanced to `b3ed8ac` on 2026-10-17 to reconcile already committed, intentional
+changes. Each previous current reference was first compared with a candidate pinned to clean `b3ed8ac`, which reproduced
+its failure before the render-state work. The prior approved core-freeze exception `6a57389` added ambient RGB to the
+frame uniform and made SSAO preserve it; that changes the SSAO shader in the post-stack, post-ssr, post-ssr-models and
+quality-presets stories, and the uniform declaration in selection. `2091f12` deliberately coalesced glTF draws, reused
+shadow scratch data and changed upload ordering; later PBR uniform specialization and initialization also change the
+lighting, transparency and texture-transform stories. `b326518` changed the texture-transform story's normal-frame
+orientation and topology descriptors, and `95b4eae` added back-side-only model culling and its selection data. The
+texture-transform harness now inlines lazy decoder imports into its single comparison module so modern lazy loading
+does not prevent that proof from running.
+
+These current checks still compare every recorded call, descriptor, shader and buffer write exactly against the
+committed reference, without normalizing away render-state changes. Pinned baseline/claim pairs are unchanged.
+Assertions that the baseline predates fitted shadows, SSR, model capture or x-ray apply to pinned runs; current runs
+retain the positive feature assertions, including fitted shadow ranges, SSR/model-capture APIs and x-ray-on differing
+from x-ray-off within the candidate. No reference includes the new render-state feature.
+
+Visual references now preserve hardware provenance. The original Intel/Edge files in `tests/visual` are unchanged;
+NVIDIA/Ampere with Edge 155 selects `tests/visual/profiles/nvidia-ampere-msedge-155`. Its 55 views were captured four
+times from the committed package, demo and asset sources at `b3ed8ac`, using only the updated capture harness and
+desktop power probe. All 220 captures succeeded on AC power; 47 views were byte-identical across all four runs.
+The [source audit](../../tests/visual/profiles/nvidia-ampere-msedge-155/source-audit.json) records the full commit/tree,
+607 verified Git LFS asset hashes and matching default/high-performance adapters during and after capture.
+The noise formula remains three times measured noise plus the existing fixed allowances. Profiles require matching
+GPU/browser identities; new profiles require a complete repeated capture with clean rendered inputs. Individual
+views retain their own source and environment provenance when a profile is partially refreshed.
+The render-state candidate, including upstream kernel-column maintenance `ac2fdfa`, passes all 55 comparisons against
+that NVIDIA reference with the new controls disabled. `npm run check:merge` reproduces the full build, proof and visual gate.
 
 ### Worst items for a Hacker News reader
 

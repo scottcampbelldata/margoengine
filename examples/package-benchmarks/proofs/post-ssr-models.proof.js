@@ -5,13 +5,14 @@
 // gltf-pro's side (no capture hook set: identical calls) is oit-detached.proof.js and gltf-pro-lighting-hooks.proof.js
 // run with the commit before the capture as ref.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/post-ssr-models.proof.js [ref] [pin] [--current]
-// Pinned: 3cf1453 against 838ae6e, the commit that made this claim. --current: 3cf1453 against the working tree.
+// Pinned: 3cf1453 against 838ae6e, the commit that made this claim. --current: b3ed8ac against the working tree;
+// 6a57389 intentionally made SSAO preserve the approved core ambient RGB hook (claims.md).
 import assert from 'node:assert/strict';
-import { refs, versions, ignoreAgx } from './compare.js';
+import { refs, versions, ignoreAgx, current } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 
-const { ref, pin } = refs('3cf1453', '838ae6e', '3cf1453'),
+const { ref, pin } = refs('3cf1453', '838ae6e', 'b3ed8ac'),
   post = await versions('post', ref, undefined, pin);
 const ibl =
   wgsl.replace(/let linear=([^;]+);/, 'let margoAmbient=vec3f(0.5);let linear=$1+margoAmbient;') +
@@ -102,10 +103,8 @@ for (const [label, make] of Object.entries(lists))
       calls += expected.length;
       stories++;
     }
-assert.ok(
-  typeof post.candidate.SSR.prototype.add === 'function' && !post.baseline.SSR.prototype.add,
-  'candidate has ssr.add, baseline does not',
-);
+assert.ok(typeof post.candidate.SSR.prototype.add === 'function', 'candidate has ssr.add');
+if (!current) assert.ok(!post.baseline.SSR.prototype.add, 'baseline does not have ssr.add');
 console.log(
   `SSR without added models and stacks without SSR: GPU call sequences identical to ${ref}: ${calls} recorded calls across ${stories} stories.`,
 );
