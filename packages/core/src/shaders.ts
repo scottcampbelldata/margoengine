@@ -14,7 +14,7 @@ var o:Output;o.clip=frame.camera*p;o.position=p.xyz;
 o.normal=mat3x3f(cross(i.m1.xyz,i.m2.xyz),cross(i.m2.xyz,i.m0.xyz),cross(i.m0.xyz,i.m1.xyz))*i.normal*sign(dot(i.m0.xyz,cross(i.m1.xyz,i.m2.xyz)));
 o.color=i.color.rgb;o.material=vec4f(i.factors.xyz,sign(dot(i.m0.xyz,cross(i.m1.xyz,i.m2.xyz))));return o;
 }
-fn pbrNeutral(input:vec3f)->vec3f {let x=min(input.r,min(input.g,input.b));let offset=select(0.04,x-6.25*x*x,x<0.08);var color=input-offset;let peak=max(color.r,max(color.g,color.b));if(peak<0.76){return color;}let newPeak=1.0-0.24*0.24/(peak+0.24-0.76);color*=newPeak/peak;return mix(color,vec3f(newPeak),1.0-1.0/(0.15*(peak-newPeak)+1.0));}
+fn pbrNeutral(input:vec3f)->vec3f {let x=min(input.r,min(input.g,input.b));let offset=select(0.04,x-6.25*x*x,x<0.08);var v=input-offset;let peak=max(v.r,max(v.g,v.b));if(peak<0.76){return v;}let newPeak=1.0-0.24*0.24/(peak+0.24-0.76);v*=newPeak/peak;return mix(v,vec3f(newPeak),1.0-1.0/(0.15*(peak-newPeak)+1.0));}
 @fragment fn fragment(i:Output,@builtin(front_facing) front:bool)->@location(0) vec4f {
 let facing=front==(i.material.w>0.0);if(!C&&!facing&&i.material.z<0.5){discard;}
 let n=normalize(i.normal)*select(-1.0,1.0,facing);let v=normalize(frame.eye.xyz-i.position);let l=normalize(frame.light.xyz);let h=(v+l)/max(length(v+l),0.0001);
