@@ -70,6 +70,9 @@ fn terrainBlend(t:f32,ha:f32,hb:f32)->f32 {
  let a=ha+1.0-t;let b=hb+t;let m=max(a,b)-0.2;let x=max(a-m,0.0);let y=max(b-m,0.0);return y/(x+y);
 }
 `;
+/** The first @location a struct does not use: patches that add varyings to a shared struct must not collide. */
+const freeLocation = (struct: string): number =>
+  Math.max(-1, ...[...struct.matchAll(/@location\((\d+)\)/g)].map((m) => Number(m[1]))) + 1;
 const num = (value: number) => String(Math.round(value * 1e6) / 1e6);
 
 /** Height/slope colors on one ordinary mesh, shaded per pixel inside the scene's PBR and shadow shader. */
@@ -225,7 +228,7 @@ fn terrainWet(position:vec3f)->f32 {
     if (!code.includes('terrainId:f32'))
       code = code
         .replace(/struct Output \{[^}]+\}/, (output) =>
-          output.replace('}', ',@location(6) @interpolate(flat) terrainId:f32 }'),
+          output.replace('}', `,@location(${freeLocation(output)}) @interpolate(flat) terrainId:f32 }`),
         )
         .replace('o.color=i.color.rgb;', 'o.terrainId=i.factors.w+1.0;o.color=i.color.rgb;');
     // Silent like the other optional core patches: without the standard shader the mesh keeps its material color.

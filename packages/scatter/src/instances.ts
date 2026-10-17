@@ -70,6 +70,9 @@ const translucentLayouts: GPUVertexBufferLayout[] = [
 // Light through thin leaves (Barre-Brisebois and Bouchard 2011): a lobe around the direction away from the sun, bent by
 // the normal so curved canopies light unevenly, plus wrapped diffuse on the shadow side. Unshadowed (a canopy's own
 // shadow map would hide its back-lit side); baked occlusion stands in for thickness.
+/** The first @location a struct does not use: patches that add varyings to a shared struct must not collide. */
+const freeLocation = (struct: string): number =>
+  Math.max(-1, ...[...struct.matchAll(/@location\((\d+)\)/g)].map((m) => Number(m[1]))) + 1;
 const translucencyShader = /* wgsl */ `
 fn foliageTranslucency(n:vec3f,v:vec3f,l:vec3f,occlusion:f32,strength:f32)->f32 {
  let back=pow(clamp(dot(v,-normalize(l+n*0.4)),0.0,1.0),4.0);let wrap=clamp((0.5-dot(n,l))/1.5,0.0,1.0);
@@ -269,12 +272,14 @@ export class ScatterInstances implements EnginePlugin {
               `,@location(8) vertexColor:vec4f,@location(9) emissive:${lucent ? 'vec4f' : 'vec3f'},@location(10) wind:vec4f }`,
             ),
           )
-          .replace(/struct Output \{[^}]+\}/, (output) =>
-            output.replace(
+          .replace(/struct Output \{[^}]+\}/, (output) => {
+            // After core's own varyings and any another patch added (terrain's mesh id).
+            const at = freeLocation(output);
+            return output.replace(
               '}',
-              `,@location(4) emissive:vec3f,@location(5) occlusion:f32${lucent ? ',@location(6) @interpolate(flat) translucency:f32' : ''} }`,
-            ),
-          )
+              `,@location(${at}) emissive:vec3f,@location(${at + 1}) occlusion:f32${lucent ? `,@location(${at + 2}) @interpolate(flat) translucency:f32` : ''} }`,
+            );
+          })
           .replace(
             'let p=model*vec4f(i.position,1);',
             'var p=model*vec4f(i.position,1);let wind=vec4f(i.wind.xyz,frame.windTime.x);let bend=windDeformation(p.xyz,i.m3.xyz,wind,i.wind.w);p=vec4f(p.x+bend.offset.x,p.y,p.z+bend.offset.y,1);',
