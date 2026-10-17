@@ -2222,12 +2222,14 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    and their results, measurement notes in package READMEs/docs/whitepaper (labelled as such), this file's history.
    Not re-measured: the demo-load and frame-rate tables in `docs/demo-loading.md` / `docs/desktop-frame-rate.md`
    (rows labelled "former demo").
-   OPEN (found by the swap, not fixed - gltf-pro): `scripts/test-helmet-streaming.js` passes its streaming cases but
-   fails its full-detail parity step: loading the full FlightHelmet directly (phone URL fulfilled with the desktop GLB)
-   draws the `KHR_materials_transmission` goggle lenses black (~320 px, max diff 165-171), while the streamed upgrade
-   shows the stand through them. DamagedHelmet has no transmission, so this never showed. Likely the sorted
-   transmission draw depends on load/dispose history. csp-check was not re-run (laptop went on battery); run
-   `node scripts/gpu-lock.mjs run --owner=<id> -- node scripts/csp-check.mjs` on AC.
+   RECHECKED 2026-10-16 at `05d9cf1`: `scripts/test-helmet-streaming.js` exits 0 under the GPU lock on Edge
+   155.0.4283.60 / physical NVIDIA RTX A6000 (WebGPU, no software fallback). Direct desktop and streamed full-detail
+   loads match exactly with SSAO off and on (`changedChannels: 0`); upgrade, failed-detail fallback, Android layout and
+   pagehide cleanup pass. No renderer/core/stage change was needed. The original report had black direct-load goggle
+   lenses (~320 px, max diff 165-171); its Arc 140V/D3D12 configuration has not been rechecked, and load/dispose sorting
+   was never established as the cause. Results: `test-results/helmet-streaming.json`. csp-check was not re-run; run
+   `node scripts/gpu-lock.mjs run --owner=<id> -- node scripts/csp-check.mjs` on AC. How to read this note, including
+   what 5w.f already fixed in the gallery: `docs/flight-helmet-transmission.md`.
 6. **Code hygiene >= 9** (5k), including zero `any` in public APIs and TSDoc on every export (autocomplete with docs).
 7. **Docs + playground** (item 8): quickstart, three.js migration, two flagship tutorials, cookbook, generated API
    reference, live-editable examples.
