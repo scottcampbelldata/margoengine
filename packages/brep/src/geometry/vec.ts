@@ -18,12 +18,6 @@ export const unit = (a: readonly number[]): V3 | undefined => {
   const l = length(a);
   return l > 0 && Number.isFinite(l) ? [a[0] / l, a[1] / l, a[2] / l] : undefined;
 };
-/** a + b * s. */
-export const addScaled = (a: readonly number[], b: readonly number[], s: number): V3 => [
-  a[0] + b[0] * s,
-  a[1] + b[1] * s,
-  a[2] + b[2] * s,
-];
 /** Angle between two vectors in radians (0 when either is zero). */
 export const angle = (a: readonly number[], b: readonly number[]): number => {
   const l = length(a) * length(b);

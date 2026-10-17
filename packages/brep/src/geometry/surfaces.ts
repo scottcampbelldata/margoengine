@@ -2,7 +2,7 @@
 // surface of linear extrusion, B-spline (rational or not) and offset surface. Each evaluates point and first
 // derivatives, inverts a point to its (u, v), and tells the tessellator its periods, its poles and how finely to sample.
 import { Enum, type STEPFile, type Value } from '../step/file.js';
-import { angleStep, curveOf, type Curve } from './curves.js';
+import { angleStep, type Curve } from './curves.js';
 import { clamped, knotVector, spanBreaks, surfaceAt, type SplineSurface } from './nurbs.js';
 import { direction, frame, list, num, point, ref, unsupported, vector, type Frame } from './read.js';
 import { add, cross, distance, dot, length, scale, sub, unit, type V3 } from './vec.js';
@@ -607,5 +607,3 @@ export function surfaceOf(file: STEPFile, id: number, angleUnit: number, curves:
       throw unsupported(file, id, 'surface');
   }
 }
-
-export { curveOf };
