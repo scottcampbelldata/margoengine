@@ -37,12 +37,19 @@ function selectModel(engine:EngineKernel, model:PBRModel) {
   const picking=Picking.attach(engine,{capture:false});
   const outline=Selection.attach(engine);
   const removePick=picking.add(model),removeOutline=outline.add(model);
-  outline.set(model.primitives.map(primitive=>primitive.node));
-  return {pick:(x:number,y:number)=>engine.pick(x,y),dispose(){
+  return {async pick(x:number,y:number){
+    const hit=await picking.pick(x,y);
+    outline.set(hit ? [hit.mesh] : []);
+    return hit?.mesh ?? null;
+  },dispose(){
     removePick();removeOutline();picking.dispose();outline.dispose();
   }};
 }
 ```
+
+Use `hit.mesh` to outline the picked child. Selecting `hit.model` selects the whole model instead. A miss clears the outline with `set([])`. A selected node includes its descendants, so picking a drawable assembly root outlines its subtree.
+
+The loaded-assembly regression is `node scripts/selection-loaded-child-tests.js` from the repository root after building packages. It loads the checked-in Khronos `CommercialRefrigerator.glb` (six named nodes, eight native PBR primitives). Real pixel hits on `FridgeDoor` and the drawable scene root `FridgeCase` verify child-only and whole-assembly outlines; a background miss restores the unselected frame exactly. It checks actual 1x and 4x MSAA without constructing geometry.
 
 With registered sources, picking uses a combined 3×3 depth pass for core and PBR
 geometry. It reads the current vertex buffer produced by animation, including

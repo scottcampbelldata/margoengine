@@ -27,15 +27,26 @@ and adapter audit is retained beside the profile. Evidence: `docs/materials-wire
 `docs/tonemap-lut-sizes-verification.md`.
 
 The standalone shared depth proposal was canceled before any commit: its API, loose tests and docs were removed.
-PostStack's existing depthTexture and its consumers are unchanged. Current requested work is ordered:
-loaded glTF-pro section beauty plus its cut shadow, then picked assembly-child outlines, then scene camera/light export.
-No MISSING-row implementation is authorized by that sequence. Section clipping now reuses the existing machinery
+PostStack's existing depthTexture and its consumers are unchanged. The current request is limited to the selection
+README example and its loaded-assembly pixel proof. Export is explicitly deferred; do not start it or any MISSING row.
+Section clipping now reuses the existing machinery
 uniform in optional glTF-pro and directional shadow shaders; core, stage and the machinery core-shader patch are unchanged.
 Physical GPU Box.glb tests pass 15 checks at actual 1x/4x, including removal/retention of beauty and cast shadow.
 Stencil caps for loaded models remain a gap. Core + stage remains exactly 21,094 bytes gzip.
 Section verification passes `npm run check:merge`: 2,518 Node tests, 15 current proofs and all 55 visual views,
 with no reference-image changes. All seven additional package/interop checks pass. Touched glTF-pro/shadows
 hygiene gates have no new violations. Reproduce the loaded-asset pixels with `node scripts/section-loaded-asset-tests.js`.
+
+Selection's README example now updates the outline from `hit.mesh` on each pick and clears it on a miss;
+the existing picking and outline runtime is unchanged. `node scripts/selection-loaded-child-tests.js` executes
+the actual README snippet on CommercialRefrigerator.glb (six named nodes/eight native primitives). Pixel (115,226)
+picks FridgeDoor and outlines only its subtree, (207,144) picks the drawable FridgeCase root and outlines the assembly,
+and (2,2) misses and restores the exact unselected frame. Root-to-child also restores the exact child-only frame.
+All eight physical GPU checks pass at actual 1x/4x; the old README fails those checks. Five loaded-asset Node checks
+and all 31 selection Node tests pass. The corrected README example compiles under strict TypeScript.
+Core + stage remains exactly 21,094 bytes gzip. Core, stage, wireframe and exporters are unchanged; export is deferred.
+Selection verification passes `npm run verify`: 2,523 Node tests and all 15 current proofs. Selection hygiene gates
+have no new violations. This change updates documentation and tests only; no picking or outline shader is changed.
 
 ## Goal
 
