@@ -122,6 +122,24 @@ messages, 5 self-merges).
 | Branch | What | State / what to do |
 | --- | --- | --- |
 | `claude/proof-triage` | Triage of the 9 failing proofs and the visual diffs: first bad commit, intended vs regression, evidence. Proof refs re-pinned for intended changes; findings written into HANDOFF gates 1/10/5. Report-only for package code | Was running on the old PC when this file was written; it pushes this branch when done. **If the branch does not exist or is a WIP, redo the triage** (prompt idea in section 7, step 1) |
+
+**Triage results (branch `claude/proof-triage`, commit 13204982, findings in its docs/HANDOFF.md gates 1/5/10 - merge
+that doc change into main):**
+- Codex's d3629be re-pinned all 9 proofs' `--current` ref to b3ed8ac, so `--current` passes on main, BUT three of those
+  refs already contain a real regression (below). Proof re-pins for the intended changes are therefore already on main.
+- **Regression 1 (B), gltf-pro compact path, from consolidation 8f710eb3:** plain opaque/BLEND glTF materials compile
+  with runtime `discard` again, losing the 1e.f early-Z win (0.852 -> 0.524 ms on DamagedHelmet). Cause
+  `packages/gltf-pro/src/index.ts:1776` (`specialized = !compact || ...`) and `:1955`; fix: always add the
+  `margoFaceTest:0, margoAlphaTest:0` overrides on the compact path. Then re-pin oit-detached,
+  gltf-pro-lighting-hooks, materials-uv-transform to the fix commit. Claims PKG-035 / PKG-054 do not hold until fixed.
+- **Regression 2 (B), derivative tangent frame, from b326518e "Add UV1 and geometry groups":** ToyCar, SheenChair,
+  MaterialsVariantsShoe, DiffuseTransmissionTeacup (normal-mapped, no tangent data) render wrong (ToyCar's sheen cloth
+  gets dark blotches). `packages/gltf-pro/src/shader.ts:49-56` and `:150-157`. Likely the bitangent is inverted
+  (hypothesis, verify on GPU by comparing BoomBox/Corset/Lantern with tangents stripped vs with tangents).
+- Intended (A), baselines may be updated together: the 10 Khronos models off by 1 level (8f710eb3 sets normal scale 0
+  without a normal map). Not yet updated.
+- Ask Scott: selecting a plain core mesh now also outlines its children (8f710eb3 side effect).
+- Not done: pinned `npm run proofs` (all 46), the flight-helmet lens comparison, Night Citadel.
 | `claude/wip-gate9-deterministic-visual` | Gate 9: make sandbox capture deterministic, find the Night Citadel stall | WIP from 08f7eb5 base, merges cleanly onto main. Finish it: root-cause the Night Citadel load stall, then prove visual:check and verify 5x in a row under bounded load |
 | `claude/wip-fuzz-gltf-textures` | Gate 11a part 1: fuzz gltf/gltf-pro/decoders (KTX2/Basis/Draco/meshopt)/environment images (EXR/HDR/UltraHDR)/.margo | WIP, conflicts with main (12 files). Redo on main, reusing its harness ideas; the shared harness is `scripts/fuzz/` (from 849ff51). ALSO fuzz Codex's new KTX2 path in `gltf` and the new native FBX importer (6bd2042 replaced the importer that 849ff51 fuzzed) |
 | `claude/old-base-hygiene-group-c` | Hygiene group C (lighting/post) on the OLD base | Conflicts in 18 files with main. Do not merge; redo group C on main and use it only as reference |
