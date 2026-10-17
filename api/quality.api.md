@@ -27,6 +27,7 @@ export interface QualityPreset {
         resolution?: number;
     };
     ssao?: {
+        enabled?: boolean;
         samples?: number;
     };
     ssr?: {
@@ -34,6 +35,7 @@ export interface QualityPreset {
         steps?: number;
     };
     volumetric?: {
+        enabled?: boolean;
         grid?: readonly [number, number, number];
     };
     localShadows?: {

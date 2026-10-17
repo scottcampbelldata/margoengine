@@ -16,9 +16,9 @@ paceEngine(engine);                       // light tier: about 60 FPS
 watchQuality();
 ```
 
-- `applyQualityTier()` returns `'light'`, `'high'` or `'phone'`. Phones keep core's own path (single-sampled, pixel
-  ratio up to 2). It sets core's `globalThis.margoLow`, which core reads when it builds pipelines and sizes the canvas,
-  so it must run before the engine is created.
+- `applyQualityTier()` returns `'light'`, `'high'` or `'phone'`. Phones are single-sampled with the pixel ratio capped
+  at 1 (`globalThis.margoLow = 1`), even with `?quality=high` or `?scale=2`. It sets core's `globalThis.margoLow`, which
+  core reads when it builds pipelines and sizes the canvas, so it must run before the engine is created.
 - `watchQuality()` measures on the light tier and remembers `'high'` or `'low'` in `localStorage.margoQuality`. On the
   full tier, five consecutive seconds under 55 FPS remember `'low'` and reload once (a machine that slowed down, for
   example on battery).
@@ -39,14 +39,17 @@ The tier also scales optional features. `applyQualityTier()` publishes the tier'
 packages never import this package: the global is the whole contract, so an app that does not use
 `@margoengine/quality` gets every package's own defaults, unchanged.
 
-| Key | Package, class | Option | Full tier (package default) | Light and phone tiers |
-| --- | --- | --- | --- | --- |
-| `shadows` | `@margoengine/shadows` `Shadows` | `resolution` | 2048 (two 4-layer maps, 128 MiB) | 1024 (32 MiB) |
-| `ssao` | `@margoengine/post/ssao` `SSAO` | `samples` | 32 | 16 |
-| `ssr` | `@margoengine/post/ssr` `SSR` | `enabled`, `steps` | on, 64 | off (pass `enabled: true` to keep it), 32 |
-| `volumetric` | `@margoengine/environment/volumetric` `VolumetricFog` | `grid` | [160, 90, 64] | [80, 45, 32] |
-| `localShadows` | `@margoengine/clustered/shadows` `LocalShadows` | `resolution` | 512 | 256 |
-| `vfx` | `@margoengine/vfx` `VFX` | `capacity` | 1,000,000 | 100,000 |
+| Key | Package, class | Option | Full tier (package default) | Light tier | Phone tier |
+| --- | --- | --- | --- | --- | --- |
+| `shadows` | `@margoengine/shadows` `Shadows` | `resolution` | 2048 (two 4-layer maps, 128 MiB) | 1024 (32 MiB) | 1024 (32 MiB) |
+| `ssao` | `@margoengine/post/ssao` `SSAO` | `enabled`, `samples` | on, 32 | on, 16 | off |
+| `ssr` | `@margoengine/post/ssr` `SSR` | `enabled`, `steps` | on, 64 | off, 32 | off, 32 |
+| `volumetric` | `@margoengine/environment/volumetric` `VolumetricFog` | `enabled`, `grid` | on, [160, 90, 64] | on, [80, 45, 32] | off |
+| `localShadows` | `@margoengine/clustered/shadows` `LocalShadows` | `resolution` | 512 | 256 | 256 |
+| `vfx` | `@margoengine/vfx` `VFX` | `capacity` | 1,000,000 | 100,000 | 100,000 |
+
+The phone preset publishes `ssao: { enabled: false }` and `volumetric: { enabled: false }`. Disabled `VolumetricFog`
+registers no passes; omitting `enabled` keeps it on. Explicit feature options still win over preset defaults.
 
 ```ts
 import {applyQualityTier, qualityPreset} from '@margoengine/quality';

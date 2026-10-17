@@ -53,23 +53,25 @@
    "size": "195x422",
    "runs": 4,
    "noise": {
-    "changed": 0.0044,
-    "hot": 0.0000729,
-    "mean": 0.019,
-    "max": 35
+    "changed": 0.00361,
+    "hot": 0.000182,
+    "mean": 0.0175,
+    "max": 74
    },
    "tolerance": {
-    "changed": 0.0137,
-    "hot": 0.000419
+    "changed": 0.0113,
+    "hot": 0.000746
    },
    "environment": {
     "browser": "msedge 155.0.4283.60",
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-17T06:05:33.873Z",
-    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
-    "packagesDirty": false
+    "date": "2026-10-17T08:04:14.158Z",
+    "commit": "c5ba426105253a553e9b9408ad5fc47385c59b72",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "gameplay-sandbox-high": {
@@ -125,23 +127,25 @@
    "size": "195x422",
    "runs": 4,
    "noise": {
-    "changed": 0.0129,
-    "hot": 0.000328,
-    "mean": 0.0618,
-    "max": 130
+    "changed": 0.0148,
+    "hot": 0.000595,
+    "mean": 0.0723,
+    "max": 138
    },
    "tolerance": {
-    "changed": 0.0392,
-    "hot": 0.00118
+    "changed": 0.0449,
+    "hot": 0.00199
    },
    "environment": {
     "browser": "msedge 155.0.4283.60",
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-17T06:05:33.873Z",
-    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
-    "packagesDirty": false
+    "date": "2026-10-17T08:04:14.158Z",
+    "commit": "c5ba426105253a553e9b9408ad5fc47385c59b72",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "character-animation-high": {
@@ -211,9 +215,11 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-17T06:05:33.873Z",
-    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
-    "packagesDirty": false
+    "date": "2026-10-17T08:04:14.158Z",
+    "commit": "c5ba426105253a553e9b9408ad5fc47385c59b72",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "flight-helmet-high": {
@@ -283,9 +289,11 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-17T06:05:33.873Z",
-    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
-    "packagesDirty": false
+    "date": "2026-10-17T08:04:14.158Z",
+    "commit": "c5ba426105253a553e9b9408ad5fc47385c59b72",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "windy-meadow-high": {
@@ -355,9 +363,11 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-17T06:05:33.873Z",
-    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
-    "packagesDirty": false
+    "date": "2026-10-17T08:04:14.158Z",
+    "commit": "c5ba426105253a553e9b9408ad5fc47385c59b72",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "earth-high": {
@@ -427,9 +437,11 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-17T06:05:33.873Z",
-    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
-    "packagesDirty": false
+    "date": "2026-10-17T08:04:14.158Z",
+    "commit": "c5ba426105253a553e9b9408ad5fc47385c59b72",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "dof-high": {
@@ -499,9 +511,11 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-17T06:05:33.873Z",
-    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
-    "packagesDirty": false
+    "date": "2026-10-17T08:04:14.158Z",
+    "commit": "c5ba426105253a553e9b9408ad5fc47385c59b72",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "tonemap-high": {
@@ -1331,8 +1345,8 @@
   "gpu": "nvidia ampere",
   "acPowerBefore": true,
   "acPowerAfter": true,
-  "date": "2026-10-17T06:41:53.501Z",
-  "commit": "6be169bec988c460a75b381bf8774db7d7ebbbf1",
+  "date": "2026-10-17T08:04:14.158Z",
+  "commit": "c5ba426105253a553e9b9408ad5fc47385c59b72",
   "packagesDirty": false,
   "renderedInputsDirty": false,
   "renderedInputChanges": []
