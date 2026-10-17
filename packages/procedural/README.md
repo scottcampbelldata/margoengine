@@ -56,7 +56,11 @@ const bush = generateShrubMesh();
 
 Trees return separate `trunk` and `canopy` GeometryData plus canopy `center` and
 `radius`. Six-tier pines keep their timber supports enclosed inside the foliage;
-broadleaf lobes share smooth normals radiating from their collective centroid.
+broadleaf canopies are fifteen lumpy lobes plus 24 opaque, double-sided leaf
+clumps per lobe (diamond cards rooted inside the lobe and reaching up to about
+0.5 m past it) that break the smooth outline; all their normals radiate from the
+collective centroid. The clumps add 1,440 triangles to the 4,800 of the lobes
+and need no alpha test, so they keep early depth rejection on phone GPUs.
 Shrubs use three compact, asymmetric hemispherical lobes with smooth normals.
 All meshes have contiguous Float32 positions, normals, UVs and tangents, and
 Uint32 indices. Generation is deterministic, initialization-only CPU work, with

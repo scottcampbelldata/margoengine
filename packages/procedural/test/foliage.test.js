@@ -86,6 +86,32 @@ test('broadleaf lobes share one canopy normal volume and trunks flare at the gro
   assert.ok(Math.abs(base - 0.32 * 1.8) < 1e-5);
 });
 
+test('broadleaf leaf clumps break the lobe outline with double-sided cards that stay rooted in the canopy', () => {
+  const tree = generateTreeMesh('broadleaf'),
+    lobeIndices = icosahedronGeometry(1, 3).indices.length,
+    lobeVertices = icosahedronGeometry(1, 3).positions.length / 3,
+    p = tree.canopy.positions,
+    cards = (tree.canopy.indices.length - 15 * lobeIndices) / 12;
+  assert.equal(cards, 15 * 24, '24 clumps per lobe, four triangles each');
+  assert.equal(p.length / 3, 15 * lobeVertices + cards * 8, 'front and back keep their own vertices');
+  let lobeRadius = 0,
+    clumpRadius = 0;
+  const distance = (v) =>
+    Math.hypot(p[v * 3] - tree.center[0], p[v * 3 + 1] - tree.center[1], p[v * 3 + 2] - tree.center[2]);
+  for (let v = 0; v < 15 * lobeVertices; v++) lobeRadius = Math.max(lobeRadius, distance(v));
+  for (let v = 15 * lobeVertices; v < p.length / 3; v++) clumpRadius = Math.max(clumpRadius, distance(v));
+  assert.ok(clumpRadius > lobeRadius + 0.1, 'clump tips reach past the smooth lobes');
+  assert.ok(clumpRadius < lobeRadius + 0.8, 'and stay leaf-sized');
+  assert.ok(Math.abs(tree.radius - Math.max(lobeRadius, clumpRadius)) < 1e-5, 'radius covers the clumps');
+  const first = 15 * lobeIndices;
+  for (let i = first; i < tree.canopy.indices.length; i += 12) {
+    const front = tree.canopy.indices.subarray(i, i + 6),
+      back = tree.canopy.indices.subarray(i + 6, i + 12);
+    for (let k = 0; k < 6; k++)
+      for (let a = 0; a < 3; a++) assert.equal(p[front[k] * 3 + a], p[back[[0, 2, 1, 3, 5, 4][k]] * 3 + a]);
+  }
+});
+
 test('pine support branches stay enclosed by their foliage instead of protruding from the silhouette', () => {
   const tree = generateTreeMesh('conifer'),
     p = tree.trunk.positions,
@@ -147,8 +173,8 @@ test('broadleaf trunk top is enclosed by at least one foliage lobe', () => {
   const vertices = cylinderGeometry(0.11, 0.32, 1, 8, 6).indices.length;
   const lobeIndices = icosahedronGeometry(1, 3).indices.length,
     lobes = [];
-  for (let i = 0; i < tree.canopy.indices.length; i += lobeIndices)
-    lobes.push(tree.canopy.indices.subarray(i, i + lobeIndices));
+  // Fifteen closed lobes come first; the open leaf clumps after them are not volumes.
+  for (let i = 0; i < 15 * lobeIndices; i += lobeIndices) lobes.push(tree.canopy.indices.subarray(i, i + lobeIndices));
   let top = -Infinity,
     checked = 0;
   for (let v = 0; v < vertices; v++) top = Math.max(top, p[v * 3 + 1]);

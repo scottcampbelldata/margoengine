@@ -61,16 +61,19 @@ function radialNormals(data: GeometryData, cx = 0, cy = 0, cz = 0): GeometryData
   return data;
 }
 
+/** Radius factor of a lumpy lobe at unit direction (x, y, z): three octaves of smooth bumps. */
+function lump(x: number, y: number, z: number): number {
+  let radius = 1;
+  for (let octave = 0; octave < 3; octave++) {
+    const frequency = 3 * 2 ** octave;
+    radius += (0.2 / 2 ** octave) * Math.sin(x * frequency) * Math.cos(y * frequency) * Math.sin(z * frequency);
+  }
+  return radius;
+}
+
 function perturb(data: GeometryData): GeometryData {
   for (let i = 0; i < data.positions.length; i += 3) {
-    const x = data.positions[i],
-      y = data.positions[i + 1],
-      z = data.positions[i + 2];
-    let radius = 1;
-    for (let octave = 0; octave < 3; octave++) {
-      const frequency = 3 * 2 ** octave;
-      radius += (0.2 / 2 ** octave) * Math.sin(x * frequency) * Math.cos(y * frequency) * Math.sin(z * frequency);
-    }
+    const radius = lump(data.positions[i], data.positions[i + 1], data.positions[i + 2]);
     data.positions[i] *= radius;
     data.positions[i + 1] *= radius;
     data.positions[i + 2] *= radius;
@@ -78,7 +81,68 @@ function perturb(data: GeometryData): GeometryData {
   return data;
 }
 
-/** Initialization-only tree geometry with smooth foliage and enclosed pine supports. */
+/**
+ * Leaf clumps around one lumpy lobe centred at (x, y, z) with radii (size, 0.87 size, size): opaque double-sided
+ * diamonds that start inside the surface and reach past it, so the canopy outline breaks into leafy points instead of
+ * a smooth blob. Opaque on purpose: an alpha-tested card needs a fragment discard, which costs tile-based phone GPUs
+ * their early depth rejection.
+ */
+function leafClumps(x: number, y: number, z: number, size: number, phase: number, count = 24): GeometryData {
+  const positions: number[] = [],
+    uvs: number[] = [],
+    indices: number[] = [];
+  for (let k = 0; k < count; k++) {
+    // Fibonacci directions, turned per lobe so neighbouring lobes do not line their clumps up.
+    const dy = 1 - (2 * (k + 0.5)) / count,
+      ring = Math.sqrt(1 - dy * dy),
+      angle = k * 2.399963 + phase,
+      dx = Math.cos(angle) * ring,
+      dz = Math.sin(angle) * ring,
+      r = lump(dx, dy, dz) * size,
+      vary = 0.75 + 0.5 * ((k * 0.618034 + phase * 0.31) % 1);
+    // Outward direction on the scaled lobe, leaning up toward the light; side axis rolled per clump.
+    let ox = dx,
+      oy = dy * 0.87 + 0.35,
+      oz = dz;
+    const ol = Math.hypot(ox, oy, oz);
+    ox /= ol;
+    oy /= ol;
+    oz /= ol;
+    const al = Math.hypot(ox, oz),
+      ax = al > 1e-3 ? -oz / al : 1,
+      az = al > 1e-3 ? ox / al : 0,
+      bx = oy * az,
+      by = oz * ax - ox * az,
+      bz = -oy * ax,
+      roll = k * 1.3 + phase,
+      w = 0.2 * size * vary,
+      sx = (ax * Math.cos(roll) + bx * Math.sin(roll)) * w,
+      sy = by * Math.sin(roll) * w,
+      sz = (az * Math.cos(roll) + bz * Math.sin(roll)) * w;
+    const px = x + dx * r,
+      py = y + dy * r * 0.87,
+      pz = z + dz * r,
+      inner = 0.2 * size,
+      outer = 0.3 * size * vary,
+      base = [px - ox * inner, py - oy * inner, pz - oz * inner],
+      tip = [px + ox * outer, py + oy * outer, pz + oz * outer],
+      mid = [(base[0] + tip[0]) / 2, (base[1] + tip[1]) / 2, (base[2] + tip[2]) / 2],
+      corners = [...base, mid[0] + sx, mid[1] + sy, mid[2] + sz, ...tip, mid[0] - sx, mid[1] - sy, mid[2] - sz],
+      start = positions.length / 3;
+    // Front and back get their own vertices so each side keeps a consistent tangent frame.
+    positions.push(...corners, ...corners);
+    uvs.push(0.5, 0, 1, 0.5, 0.5, 1, 0, 0.5, 0.5, 0, 1, 0.5, 0.5, 1, 0, 0.5);
+    indices.push(start, start + 1, start + 2, start, start + 2, start + 3);
+    indices.push(start + 4, start + 6, start + 5, start + 4, start + 7, start + 6);
+  }
+  return geometryData(positions, new Float32Array(positions.length), uvs, indices);
+}
+
+/**
+ * Initialization-only tree geometry with smooth foliage and enclosed pine supports. Broadleaf canopies are fifteen
+ * lumpy lobes plus 24 opaque leaf clumps per lobe that break the outline; every canopy vertex's normal radiates from
+ * the canopy centre.
+ */
 export function generateTreeMesh(kind: 'conifer' | 'broadleaf') {
   if (kind !== 'conifer' && kind !== 'broadleaf') throw new RangeError('Invalid tree kind');
   const trunkHeight = kind === 'conifer' ? 6.2 : 5.3,
@@ -94,7 +158,8 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf') {
     trunk.positions[i + 2] = -x * Math.sin(angle) + z * Math.cos(angle) + Math.sin(y * 0.7) * 0.1;
   }
   const wood = [computeVertexNormals(toNonIndexed(trunk))],
-    leaves: GeometryData[] = [];
+    leaves: GeometryData[] = [],
+    clumps: GeometryData[] = [];
   if (kind === 'conifer') {
     for (let tier = 0; tier < 6; tier++) {
       const r = 2.05 * (1 - tier * 0.115),
@@ -161,22 +226,17 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf') {
       for (let lobe = 0; lobe < 5; lobe++) {
         const t = 0.35 + lobe * 0.17,
           phase = angle + lobe * 2.399963,
-          size = 1.1 + (lobe % 3) * 0.13;
-        leaves.push(
-          placed(
-            perturb(icosahedronGeometry(1, 3)),
-            0.13 + c * (0.4 + t * 1.9) + Math.cos(phase) * 0.4,
-            4.05 + t * 1.9 + (lobe % 2) * 0.35,
-            0.03 + s * (0.4 + t * 1.9) + Math.sin(phase) * 0.4,
-            size,
-            size * 0.87,
-            size,
-          ),
-        );
+          size = 1.1 + (lobe % 3) * 0.13,
+          x = 0.13 + c * (0.4 + t * 1.9) + Math.cos(phase) * 0.4,
+          y = 4.05 + t * 1.9 + (lobe % 2) * 0.35,
+          z = 0.03 + s * (0.4 + t * 1.9) + Math.sin(phase) * 0.4;
+        leaves.push(placed(perturb(icosahedronGeometry(1, 3)), x, y, z, size, size * 0.87, size));
+        clumps.push(leafClumps(x, y, z, size, phase));
       }
     }
   }
-  const canopy = mergeGeometries(leaves),
+  // Lobes first, then their leaf clumps (broadleaf only), so lobe i keeps its index range.
+  const canopy = mergeGeometries([...leaves, ...clumps]),
     center = new Float32Array(3),
     count = canopy.positions.length / 3;
   for (let i = 0; i < canopy.positions.length; i++) center[i % 3] += canopy.positions[i] / count;

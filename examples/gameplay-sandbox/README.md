@@ -59,7 +59,9 @@ and shrub generators from `@margoengine/procedural` and footprint spacing from
 `@margoengine/scatter`, so these fixes are shared with other scenes.
 Six-segment, eight-sided
 trunks lean, twist and flare at the base. Pines use six jagged, drooping skirts;
-broadleaf trees combine fifteen noise-deformed geodesic lobes on three limbs.
+broadleaf trees combine fifteen noise-deformed geodesic lobes on three limbs, with
+opaque leaf clumps breaking each lobe's outline. Canopies, shrubs and ferns pass
+back-light (`ScatterBatch.translucency`) when the camera looks toward the sun.
 Pine support branches stay enclosed by their foliage. Pine normals radiate from each tier; all broadleaf normals radiate from one
 collective canopy centroid. Architectural corners retain split face normals.
 The existing geometry tangent helper computes UV-derived MikkTSpace-compatible
