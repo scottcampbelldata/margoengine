@@ -60,7 +60,6 @@ try {
       lighting: {
         intensity: 3,
         color: [1, 0.97, 0.9],
-        sunset: [1, 0.68, 0.35],
         moon: { intensity: 0.4, color: [0.25, 0.45, 0.75] },
         ambient: { day: [0.14, 0.19, 0.24], night: [0.02, 0.04, 0.09] },
       },

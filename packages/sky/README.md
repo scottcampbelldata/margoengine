@@ -76,14 +76,15 @@ on device restoration and must not be destroyed by its consumer.
 `sky.lights` exposes two retained sun/moon records updated before rendering. Each
 holds `direction` (XYZ plus intensity) and RGB `radiance`. Pass these to
 `Water.attach(engine, {lights: sky.lights})` for separate reflection paths during
-dusk. The engine's single blended light still drives scene lighting and shadows.
+dusk. The engine's single light (sun or moon) still drives scene lighting and shadows.
 With no `lighting` options, both direct reflection intensities are zero.
 
-Set `lighting.sunset: [1, 0.69, 0.36]` alongside a daylight `color` such as
-`[1, 0.97, 0.92]` to warm sunlight continuously near dawn and dusk. The blend uses
-sun elevation, reaching the sunset tint below roughly 5° and the daylight tint
-above 30°. Scene lighting and the separate water light record share that tint.
-Omitting `sunset` keeps the configured colour constant.
+The sun's colour and strength come from the atmosphere's own transmittance: `color`
+and `intensity` hold for the sun overhead, and lower down the light passes through
+more air, warming and dimming it (at 17:34 with turbidity 3.2 the sun is at about
+69% strength, with green at 64% and blue at 21% of red). Surfaces add their own N·L,
+so there is no further elevation factor. `sunlight(mu, altitude, turbidity)` returns
+that colour for any sun elevation. `sunset` is deprecated and ignored.
 
 ## Stylized night
 
@@ -150,9 +151,9 @@ camera far plane.
 
 The clock and sun update before rendering, so shadows and scene lighting can use
 the same frame's direction. Set `lighting: {intensity: 6, minimum: 0.15}` to copy
-the sun direction into engine lighting and scale direct intensity by sun elevation.
-Intensity defaults to 1 and minimum to 0. Radiance color and ambient settings stay
-under the caller's control. Omit `lighting` to keep independent scene lighting.
+the sun direction, strength and transmittance colour into engine lighting.
+Intensity defaults to 1 and minimum to 0; the radiance colour is always written.
+Omit `lighting` to keep independent scene lighting.
 
 For a day/night scene, enable the optional moon and RGB ambient floor:
 
@@ -169,7 +170,9 @@ sits about 12° above the horizon. Its disc, borrowed environment and separate w
 glint use one fade, starting when the sun drops below the horizon and reaching full
 strength with the sun about 7° below the horizon (about 18:28 on this clock). They fade
 out together before sunrise; there is no daytime moon glint. Scene lighting and
-existing PCSS shadows retain a single smoothly blended twilight light. The
+PCSS shadows use one light, the stronger of sun and moon: the sun fades out through
+its transmittance as its disc sets before the moon fades in, so the light changes
+direction once, below 1% of noon strength, instead of sweeping across the sky. The
 atmospheric background has its own earlier twilight fade. This is a visual preset, with no lunar orbit
 or phase calculation. RGB ambient patches the standard scene shader (including
 scatter and mesh terrain) at group 0, binding 8, and composes with shadows and

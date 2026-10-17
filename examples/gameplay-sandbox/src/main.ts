@@ -93,7 +93,6 @@ async function boot(): Promise<void> {
         lighting: {
           intensity: 6,
           color: [1, 0.97, 0.92],
-          sunset: [1, 0.69, 0.36],
           moon: { intensity: 0.6, color: [0.25, 0.45, 0.75] },
           ambient: { day: [0.14, 0.19, 0.24], night: [0.02, 0.04, 0.09] },
         },

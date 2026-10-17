@@ -1,8 +1,6 @@
 import { finiteVector } from '@margoengine/math/validate';
 import type { SkyFeatures } from './base.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
-// Same default as the sky's moon colour.
-const moonColor = [0.25, 0.45, 0.75] as const;
 /** Drives the engine's directional light (sun and moon) and, with `ambient`, the PBR ambient colour (`lighting` option). */
 export const lighting: NonNullable<SkyFeatures['lighting']> = {
   validate(l) {
@@ -39,21 +37,19 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
     let source = '',
       shader = '';
     return {
-      update({ direction, radiance }, sky, l, moonIntensity, night) {
-        const solar = Math.max(0, sky.sun[1]) * (l.intensity ?? 1),
-          lunar = moonIntensity * night,
-          weight = solar + lunar > 0 ? solar / (solar + lunar) : 1;
-        // shortcut: one blended directional source shares PCSS, use separate shadow maps for simultaneous sun/moon shadows.
-        direction.set(sky.sun);
-        if (l.moon) {
-          for (let i = 0; i < 3; i++) direction[i] = sky.sun[i] * weight + sky.moon[i] * (1 - weight);
-          const norm = Math.hypot(direction[0], direction[1], direction[2]);
-          for (let i = 0; i < 3; i++) direction[i] /= norm;
+      update({ direction, radiance }, sky, l, night) {
+        // shortcut: one directional source shares PCSS, use separate shadow maps for simultaneous sun/moon shadows.
+        // The engine light is whichever of sun and moon is stronger. The sun fades out through its own transmittance
+        // as its disc sets before the moon fades in, so at dusk the light switches direction while both are near zero
+        // (a cross-fade) instead of sweeping through blended directions across the sky.
+        const sun = sky.lights[0],
+          moon = sky.lights[1],
+          source = l.moon && moon.direction[3] > sun.direction[3] ? moon : sun;
+        for (let i = 0; i < 3; i++) {
+          direction[i] = source.direction[i];
+          radiance[i] = source.radiance[i];
         }
-        direction[3] = Math.max(l.minimum ?? 0, solar + lunar);
-        if (l.color || l.sunset || l.moon)
-          for (let i = 0; i < 3; i++)
-            radiance[i] = sky.lights[0].radiance[i] * weight + (l.moon?.color?.[i] ?? moonColor[i]) * (1 - weight);
+        direction[3] = Math.max(l.minimum ?? 0, source.direction[3]);
         if (l.ambient) {
           for (let i = 0; i < 3; i++) ambient[i] = l.ambient.day[i] * (1 - night) + l.ambient.night[i] * night;
           radiance[3] = Math.max(...ambient);

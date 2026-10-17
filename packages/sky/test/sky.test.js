@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Sky, sunDirection } from '../dist/index.js';
+import { Sky, sunDirection, sunlight } from '../dist/index.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 import { wgsl } from '../../core/src/shaders.ts';
 test('retained reflection lights track actual sun and moon directions through dusk', () => {
@@ -14,17 +14,16 @@ test('retained reflection lights track actual sun and moon directions through du
   h.engine.use(sky);
   const lights = sky.lights;
   h.frame();
-  assert.ok(
-    Math.hypot(...sky.sun.map((v, i) => v - h.engine.lighting.direction[i])) > 0.1,
-    'Dusk exercises the former blended-direction drift',
-  );
+  assert.deepEqual(h.engine.lighting.direction.slice(0, 3), sky.sun, 'At dusk the light keeps the sun until it sets');
   for (const hours of [12, 17 + 49 / 60, 17.7, 17.9, 18, 18.1, 18.3, 21, 0, 5.9, 6.1]) {
     sky.options.hours = hours;
     h.frame();
     assert.equal(sky.lights, lights);
     assert.deepEqual(lights[0].direction.slice(0, 3), sky.sun);
     assert.deepEqual(lights[1].direction.slice(0, 3), sky.moon);
-    assert.equal(lights[0].direction[3], Math.fround(Math.max(0, sky.sun[1]) * 6));
+    // The camera sits 1 m up; the default turbidity is 2.
+    assert.equal(lights[0].direction[3], Math.fround(6 * Math.max(...sunlight(sky.sun[1], 0.001, 2))));
+    if (sky.sun[1] < -0.02) assert.equal(lights[0].direction[3], 0, 'No sun once its disc has set');
     const values = new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 256).data);
     assert.equal(lights[1].direction[3], values[31], 'Moon disc, environment and direct glints share one strength');
     if (sky.sun[1] >= 0) assert.equal(lights[1].direction[3], 0, 'No moon reflection before sunset');
@@ -151,7 +150,33 @@ test('interrupted Bruneton precomputation retains the original error and retries
   assert.ok(h.resources.every((resource) => resource.destroyed));
 });
 
-test('optional sunset tint follows elevation in both scene lighting and water light records', () => {
+test('sunlight is the transmittance relative to noon: plane-parallel high up, warm low down, zero once set', () => {
+  assert.deepEqual([...sunlight(1, 0.001, 2)], [1, 1, 1]);
+  // Turbidity 2 gives the Mie coefficient 0.003996 * 0.5; scale heights are 8 and 1.2 km.
+  const mie = (0.003996 * 0.5) / 0.9;
+  for (const mu of [0.9, 0.6, 0.4]) {
+    const s = sunlight(mu, 0.001, 2);
+    [0.005802, 0.013558, 0.0331].forEach((beta, i) => {
+      const flat = Math.exp(-(beta * 8 + mie * 1.2) * (1 / mu - 1));
+      assert.ok(Math.abs(s[i] - flat) < 0.01 * flat, `mu ${mu}, channel ${i}: ${s[i]} against ${flat}`);
+    });
+  }
+  // 17:34 on the island clock: about 6 degrees up, turbidity 3.2.
+  const golden = sunlight(sunDirection(17 + 34 / 60)[1], 0.001, 3.2);
+  assert.ok(golden[0] > golden[1] && golden[1] > golden[2] && golden[2] < 0.35 && golden[0] > 0.5, `${golden}`);
+  assert.ok(sunlight(0, 0.001, 2)[0] > 0, 'The disc still shows on the horizon');
+  assert.deepEqual([...sunlight(-0.02, 0.001, 2)], [0, 0, 0]);
+  let previous = 0;
+  for (let mu = -0.03; mu <= 0.3; mu += 0.001) {
+    const red = sunlight(mu, 0.001, 2)[0];
+    assert.ok(red >= previous - 1e-6, 'Rises steadily through sunrise');
+    previous = red;
+  }
+  assert.throws(() => sunlight(NaN, 0, 2), /Invalid sunlight/);
+  assert.throws(() => sunlight(0, 0, 2, new Float32Array(4)), /Invalid sunlight/);
+});
+
+test('the engine sun takes colour and strength from the transmittance; sunset is ignored', () => {
   const h = optionalGPU();
   h.engine.lighting = { direction: new Float32Array(4), radiance: new Float32Array(4) };
   const sky = new Sky({
@@ -161,15 +186,19 @@ test('optional sunset tint follows elevation in both scene lighting and water li
   });
   h.engine.use(sky);
   h.frame();
-  assert.deepEqual([...sky.lights[0].radiance], [1, 0.97, 0.92].map(Math.fround));
+  assert.deepEqual([...sky.lights[0].radiance], [1, 0.97, 0.92].map(Math.fround), 'Noon keeps the configured colour');
   assert.deepEqual(h.engine.lighting.radiance.slice(0, 3), sky.lights[0].radiance);
-  sky.options.hours = 17.9;
+  assert.equal(h.engine.lighting.direction[3], 6);
+  sky.options.hours = 17 + 34 / 60;
   h.frame();
-  assert.deepEqual([...sky.lights[0].radiance], [1, 0.69, 0.36].map(Math.fround));
+  const [r, g, b] = sky.lights[0].radiance,
+    strength = h.engine.lighting.direction[3];
+  assert.ok(r === 1 && g < 0.8 && b < g, `Golden hour is warm: ${[r, g, b]}`);
+  assert.ok(strength > 6 * 0.5 && strength < 6, `and dimmed once, by the air (${strength}), not by elevation too`);
   assert.deepEqual(h.engine.lighting.radiance.slice(0, 3), sky.lights[0].radiance);
-  sky.options.hours = 6.1;
+  delete sky.options.lighting.sunset;
   h.frame();
-  assert.deepEqual([...sky.lights[0].radiance], [1, 0.69, 0.36].map(Math.fround));
+  assert.deepEqual([...sky.lights[0].radiance], [r, g, b], 'sunset no longer changes the colour');
   sky.dispose();
   for (const sunset of [
     [-1, 0, 0],
@@ -314,15 +343,24 @@ test('moonlight, ambient color and the reflected night sky share a continuous cl
   h.frame();
   assert.ok(sky.nightFactor > 0 && sky.nightFactor < 1);
   const created = { ...h.counts };
-  let previous;
+  let previous,
+    previousStrength = 0,
+    switches = 0;
   for (let i = 0; i <= 200; i++) {
     options.hours = 17.5 + i / 200;
     h.frame();
-    const direction = h.engine.lighting.direction.slice(0, 3);
-    if (previous) assert.ok(direction.reduce((sum, v, j) => sum + v * previous[j], 0) > 0.995);
+    const direction = h.engine.lighting.direction.slice(0, 3),
+      strength = h.engine.lighting.direction[3];
+    // Sun and moon cross-fade: the light only changes body while both are nearly off, never sweeping between them.
+    if (previous && direction.reduce((sum, v, j) => sum + v * previous[j], 0) < 0.995) {
+      switches++;
+      assert.ok(Math.max(strength, previousStrength) < 0.05, `switched at strength ${strength}`);
+    }
     previous = direction;
+    previousStrength = strength;
     assert.ok(direction.every(Number.isFinite));
   }
+  assert.equal(switches, 1, 'One switch from sun to moon');
   assert.equal(h.counts.groups, created.groups);
   assert.equal(h.counts.buffers, created.buffers);
   options.hours = 0;
@@ -444,7 +482,7 @@ test('opt-in sunlight synchronizes before rendering and reverse clocks wrap at m
 test('sky clock wraps midnight and synchronizes sun and lighting once before rendering', () => {
   const h = optionalGPU(),
     effect = new Sky({ hours: 23.95, timeScale: 1, lighting: { intensity: 2, minimum: 0.25 } });
-  h.engine.lighting = { direction: new Float32Array(4) };
+  h.engine.lighting = { direction: new Float32Array(4), radiance: new Float32Array(4) };
   h.engine.use(effect);
   try {
     h.frame();

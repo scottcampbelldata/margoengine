@@ -10,6 +10,7 @@ import { reflection } from './reflection.js';
 import { lighting } from './lighting.js';
 export {
   sunDirection,
+  sunlight,
   type SkyOptions,
   type SkyLightingOptions,
   type SkyCloudOptions,

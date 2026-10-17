@@ -400,7 +400,8 @@ try {
       assert.deepEqual(x.light.slice(0, 3), x.sun);
       assert.equal(x.light[3], 6);
     } else {
-      assert.ok(x.light[1] > (x.hours < 18 ? 0 : 0.15));
+      // At 06:00 the sun sits on the horizon (y = 0) and still holds the light: sun and moon cross-fade.
+      assert.ok(x.light[1] >= (x.hours < 18 ? 0 : 0.15));
       assert.ok(x.light[3] > 0);
     }
     for (let i = 0; i < 3; i++) {
@@ -418,7 +419,7 @@ try {
   }
   report.lighting = lighting;
   report.checks.push(
-    'Separate sun/moon glints share disc strength and stay off before sunset while PCSS retains its twilight blend',
+    'Separate sun/moon glints share disc strength and stay off before sunset while PCSS cross-fades sun and moon',
   );
   const moonCascades = await page.evaluate(async () => {
     const app = window.sandbox,

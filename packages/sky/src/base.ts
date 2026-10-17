@@ -10,18 +10,24 @@ import {
 import { fullscreen, group, compute, dispatch } from '../../shared/gpu.js';
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { celestialShader } from './celestial.js';
-import { head, mid, transmittance } from './atmosphere.js';
+import { head, mid, transmittance, sunlight } from './atmosphere.js';
+export { sunlight } from './atmosphere.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { STORAGE_BINDING: number; TEXTURE_BINDING: number };
 type Color = readonly [number, number, number];
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 const moonColor: Color = [0.25, 0.45, 0.75];
 export interface SkyLightingOptions {
+  /** Direct sun strength with the sun overhead (default 1); the atmosphere's transmittance dims and warms it lower down. */
   intensity?: number;
+  /** Floor for the engine light's strength (default 0). */
   minimum?: number;
+  /** Sun colour with the sun overhead, linear RGB (default white); the transmittance tints it toward the horizon. */
   color?: Color;
+  /** @deprecated Ignored: the atmosphere's transmittance now colours the low sun. Still validated. */
   sunset?: Color;
   moon?: { intensity?: number; color?: Color };
+  /** RGB ambient by day and by night, blended by `nightFactor`. */
   ambient?: { day: Color; night: Color };
 }
 export interface SkyCloudOptions {
@@ -119,7 +125,7 @@ export interface SkyFeatures {
       device: GPUDevice,
       owned: Owned,
     ): {
-      update(target: Lights, sky: Sky, lighting: SkyLightingOptions, moonIntensity: number, night: number): void;
+      update(target: Lights, sky: Sky, lighting: SkyLightingOptions, night: number): void;
       pass(c: Context): void;
     };
   };
@@ -208,6 +214,7 @@ export class Sky implements EnginePlugin {
   private time = 0;
   private readonly inverse = this.values.subarray(0, 16);
   private readonly scratch = new Float64Array(52);
+  private readonly sunColor = new Float32Array(3);
   readonly sun = new Float32Array(3);
   readonly moon = Float32Array.from([-0.3, 0.22, -1], (v) => v / Math.hypot(0.3, 0.22, 1));
   private disposed = false;
@@ -336,16 +343,17 @@ export class Sky implements EnginePlugin {
     this.values.set(this.moon, 28);
     this.values[31] = moonIntensity * moonVisibility;
     this.values.set(l?.moon?.color ?? moonColor, 32);
+    // The sun's strength and colour come from the atmosphere's transmittance (the sky's own model), relative to noon.
+    // Surfaces add their own N.L, so no further elevation factor: the low sun is dimmed and warmed once, by the air.
+    const s = sunlight(this.sun[1], this.values[19] || 0.001, this.options.turbidity ?? 2, this.sunColor),
+      peak = Math.max(s[0], s[1], s[2]);
     this.lights[0].direction.set(this.sun);
-    this.lights[0].direction[3] = Math.max(0, this.sun[1]) * (l?.intensity ?? 0);
-    const elevation = Math.max(0, Math.min(1, (this.sun[1] - 0.08) / 0.42)),
-      day = elevation * elevation * (3 - 2 * elevation);
-    for (let i = 0; i < 3; i++)
-      this.lights[0].radiance[i] = (l?.color?.[i] ?? 1) * day + (l?.sunset?.[i] ?? l?.color?.[i] ?? 1) * (1 - day);
+    this.lights[0].direction[3] = l ? (l.intensity ?? 1) * peak : 0;
+    for (let i = 0; i < 3; i++) this.lights[0].radiance[i] = (l?.color?.[i] ?? 1) * (peak > 0 ? s[i] / peak : 1);
     this.lights[1].direction.set(this.moon);
     this.lights[1].direction[3] = this.values[31];
     this.lights[1].radiance.set(l?.moon?.color ?? moonColor);
-    if (l && this.lit) this.lit.update(this.engine!.lighting, this, l, moonIntensity, night);
+    if (l && this.lit) this.lit.update(this.engine!.lighting, this, l, night);
   }
   private draw(c: Context): void {
     this.validate();

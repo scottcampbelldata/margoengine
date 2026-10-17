@@ -24,3 +24,40 @@ export const transmittance = `
  var result=vec3f(0);if(!ground(r,mu)){let step=boundary(r,mu)/64.0;var optical=vec3f(0);for(var i=0u;i<64u;i++){let d=(f32(i)+0.5)*step;optical+=extinction(sqrt(r*r+d*d+2.0*r*mu*d))*step;}result=exp(-optical);}
  textureStore(output,vec2i(id.xy),vec4f(result,1));
 }`;
+// CPU twin of the transmittance table above: same radii, densities, coefficients and 64-step integration.
+const RAYLEIGH = [0.005802, 0.013558, 0.0331];
+const optical = new Float64Array(4);
+/** Rayleigh and Mie optical lengths (km of sea-level air) from radius `r` along cosine `mu` to the top, at `at`. */
+function opticalLengths(r: number, mu: number, at: number): void {
+  const step = (-r * mu + Math.sqrt(Math.max(0, r * r * (mu * mu - 1) + 6460 * 6460))) / 64;
+  let rayleigh = 0,
+    mie = 0;
+  for (let i = 0; i < 64; i++) {
+    const d = (i + 0.5) * step,
+      h = Math.max(0, Math.sqrt(r * r + d * d + 2 * r * mu * d) - 6360);
+    rayleigh += Math.exp(-h / 8) * step;
+    mie += Math.exp(-h / 1.2) * step;
+  }
+  optical[at] = rayleigh;
+  optical[at + 1] = mie;
+}
+/**
+ * The sun's linear RGB colour through the atmosphere, relative to the sun at the zenith: the transmittance
+ * (Bruneton and Neyret 2008, the sky's own table) from an eye `altitude` km up toward a sun of elevation cosine `mu`,
+ * divided by the zenith transmittance, so it is 1 at noon overhead. It fades over the sun's disc (0.014 rad) as the
+ * disc crosses the horizon and is 0 once it has set. Writes the three channels into `out` and returns it.
+ */
+export function sunlight(mu: number, altitude: number, turbidity: number, out = new Float32Array(3)): Float32Array {
+  if (!Number.isFinite(mu) || !Number.isFinite(altitude) || !Number.isFinite(turbidity) || out.length !== 3)
+    throw new RangeError('Invalid sunlight: pass finite mu, altitude and turbidity and a 3-element output');
+  const r = 6360 + Math.min(99.9, Math.max(0.001, altitude)),
+    horizon = -Math.sqrt(Math.max(0, 1 - (6360 / r) ** 2)),
+    x = Math.max(0, Math.min(1, (mu - horizon + 0.014) / 0.028)),
+    disc = x * x * (3 - 2 * x),
+    mie = (0.003996 * Math.max(0.25, (turbidity - 1) * 0.5)) / 0.9;
+  opticalLengths(r, Math.min(1, Math.max(mu, horizon + 1e-4)), 0);
+  opticalLengths(r, 1, 2);
+  for (let i = 0; i < 3; i++)
+    out[i] = disc ? disc * Math.exp(-(RAYLEIGH[i] * (optical[0] - optical[2]) + mie * (optical[1] - optical[3]))) : 0;
+  return out;
+}
