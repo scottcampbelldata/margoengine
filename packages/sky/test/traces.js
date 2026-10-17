@@ -1,5 +1,6 @@
 // Recorded GPU work for the demo sky configurations. `node packages/sky/test/traces.js <dist>` rewrites
-// fixtures/traces.json from a build; it was recorded from the build before the entry split (1970fda).
+// fixtures/traces.json from a build. First recorded before the entry split (1970fda); re-record it whenever the WGSL
+// changes on purpose, as the night footprint (stars, moon) and fog changes did.
 import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';

@@ -16,7 +16,7 @@ const entries = Object.fromEntries(
 const fixtures = JSON.parse(await readFile(new URL('./fixtures/traces.json', import.meta.url), 'utf8'));
 const pick = (names) => Object.fromEntries(names.map((name) => [name, entries[name]]));
 
-test('the full Sky records exactly the GPU work, WGSL and uploads of the pre-split build', () => {
+test('the full Sky records exactly the GPU work, WGSL and uploads of the recorded traces', () => {
   for (const name of Object.keys(configs)) {
     const h = trace(Sky, name);
     assert.equal(h.digest(), fixtures[name].digest, name);
