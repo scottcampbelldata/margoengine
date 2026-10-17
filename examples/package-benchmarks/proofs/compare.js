@@ -65,7 +65,9 @@ export async function bundle(name, entry, ref, minify = false) {
       minify,
       target: 'es2022',
       lib: { entry: resolve(root, 'packages', name, entry), formats: ['es'] },
-      rollupOptions: { external: bare },
+      // A lazily imported module (gltf-pro imports its physical shader on first need) is inlined, so the entry still
+      // builds to the one module the comparison loads; the code that runs is the same.
+      rollupOptions: { external: bare, output: { inlineDynamicImports: true } },
     },
   });
   return result[0].output.filter((item) => item.type === 'chunk');
