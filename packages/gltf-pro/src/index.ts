@@ -1346,7 +1346,7 @@ export class PBRModel implements EnginePlugin {
     r.replacesTextures = !!m.shading?.replacesTextures;
     if (r.replacesTextures) return;
     for (let i = 0; i < m.maps.length; i++) {
-      if (!ownSlot(m, i, this.asset.hooks.materials)) {
+      if (!ownSlot(m, i, this.asset.hooks.materials || undefined)) {
         r.views.push(undefined!);
         r.samplers.push(undefined!);
         continue;
@@ -1889,7 +1889,7 @@ export class PBRModel implements EnginePlugin {
         c.device.queue.writeBuffer(r.uniform, 0, v as Float32Array<ArrayBuffer>);
         // Physical materials listing only the five core maps (materials built in code) draw the factor-only variant;
         // transmission draws its transmissive form, extended materials the shader of decoders.materials.
-        const x = this.asset.hooks.materials,
+        const x = this.asset.hooks.materials || undefined,
           physical = compact
             ? pbrShader
             : m.physical
