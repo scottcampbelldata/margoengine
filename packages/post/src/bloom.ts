@@ -102,7 +102,12 @@ fn dither(p:vec2f)->f32{
 }`;
 // Alpha: scene coverage (premultiplied), raised to the glow's brightest channel so glow over a transparent canvas stays valid.
 // In a PostStack, a non-final Bloom hands linear light (with its exposure) to the next effect.
-const linear = composite.replace(/let c=agx[^\n]+\n[^\n]+/, 'return vec4f(max(hdr,vec3f(0))*exp2(settings.y),s.a);');
+const linear = composite.replace(
+  /let o=toDisplay\(hdr\*exp2\(settings\.y\)\);[^\n]+/,
+  'return vec4f(max(hdr,vec3f(0))*exp2(settings.y),s.a);',
+);
+// The display transform must be gone, or an HDR stage would hand the next effect display-encoded colour.
+if (linear.includes('toDisplay(hdr')) throw new Error('Bloom: the HDR composite still encodes for display');
 /** One dispatch of the chain: pipeline, bind group, workgroups across and down. */
 type Step = [GPUComputePipeline, GPUBindGroup, number, number];
 /** Bind group whose entry i is resource i; holes are bindings the entry point does not use. */

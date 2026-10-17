@@ -151,7 +151,9 @@ c=max(vec3f(0),c+f*(m.rgb*reflected-e.rgb));
 }}}}
 return vec4f(toDisplay(c),s.a);
 }`;
-const linearComposite = compositeShader.replace(/c=c\/\(1\+c\);[^\n]+/, 'return vec4f(c,s.a);');
+const linearComposite = compositeShader.replace('return vec4f(toDisplay(c),s.a);', 'return vec4f(c,s.a);');
+// The display transform must be gone, or an HDR stage would hand the next effect display-encoded colour.
+if (linearComposite.includes('vec4f(toDisplay(c)')) throw new Error('SSR: the HDR composite still encodes for display');
 // With models added, never remove more IBL specular than the pixel holds: at 4x a silhouette pixel is the resolve of both
 // sides while its material is the centre sample's, so removal and replacement are scaled by the share the pixel can hold
 // (1 wherever scene and material agree, so exact there). Without models the composite is unchanged.

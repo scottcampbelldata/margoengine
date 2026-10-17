@@ -15,7 +15,10 @@ import { orthographic } from '../../shared/projection.js';
 import { fullscreen, render, group as bind } from '../../shared/gpu.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { extractShader, ssaoShader, blurShader, compositeShader } from './shaders.js';
-const linearComposite = compositeShader.replace(/c=c\/\(1\+c\);[^\n]+/, 'return vec4f(c,s.a);');
+const linearComposite = compositeShader.replace('return vec4f(toDisplay(c),s.a);', 'return vec4f(c,s.a);');
+// The display transform must be gone, or an HDR stage would hand the next effect display-encoded colour.
+if (linearComposite.includes('vec4f(toDisplay(c)'))
+  throw new Error('SSAO: the HDR composite still encodes for display');
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number };
 declare const GPUTextureUsage: {
   RENDER_ATTACHMENT: number;
