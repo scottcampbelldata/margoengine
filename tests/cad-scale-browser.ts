@@ -1,0 +1,225 @@
+// One CAD load measured in a real browser; scripts/cad-scale-tests.js drives it. It reports load to first frame, orbit
+// frame times, pick latency, frame times with a capped section plane, draws, JS heap, and exact part and triangle
+// counts. Every time is this page's own clock around a frame that ends at GPU completion (queue.onSubmittedWorkDone).
+// Query: url (file under the dev server), format (obj, stl, step, iges, glb, gltf), frames (orbit frames, default 120),
+// smoothing ('false' for flat CAD normals) and, for generated assemblies, the known bounds (minx..maxz).
+import { Engine } from '../packages/core/dist/extension.js';
+import { parseCADAsync, PartInstancer, SectionPlanes } from '../packages/machinery/dist/index.js';
+import { loadGLTF } from '../packages/gltf-pro/dist/index.js';
+import { instancing } from '../packages/gltf-pro/dist/instancing.js';
+import { getSceneBounds } from '../packages/gltf-pro/dist/scene.js';
+import { Picking } from '../packages/selection/dist/index.js';
+
+type Roots = Parameters<typeof getSceneBounds>[1];
+declare global {
+  interface Window {
+    cadScale?: unknown;
+    cadScaleShot?: (cut: boolean) => Promise<void>;
+  }
+}
+
+const query = new URLSearchParams(location.search),
+  url = query.get('url') ?? '',
+  format = (query.get('format') ?? '').toLowerCase(),
+  frames = Math.max(10, Number(query.get('frames') ?? 120)),
+  smoothing = query.get('smoothing') !== 'false',
+  known = ['minx', 'miny', 'minz', 'maxx', 'maxy', 'maxz'].map((k) =>
+    query.has(k) ? Number(query.get(k)) : Number.NaN,
+  ),
+  errors: string[] = [];
+let stage = 'start';
+addEventListener('error', (event) => errors.push(String(event.message)));
+addEventListener('unhandledrejection', (event) => errors.push(String(event.reason)));
+
+function stats(samples: number[]) {
+  const sorted = [...samples].sort((a, b) => a - b),
+    at = (q: number) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))];
+  return {
+    count: sorted.length,
+    median: at(0.5),
+    p95: at(0.95),
+    max: sorted[sorted.length - 1],
+    mean: sorted.reduce((s, v) => s + v, 0) / sorted.length,
+  };
+}
+
+async function run() {
+  const canvas = document.querySelector('canvas')!;
+  stage = 'engine';
+  const engine = await Engine.create(canvas, {
+      backend: 'webgpu',
+      camera: { position: [0, 0, 10], target: [0, 0, 0], near: 0.1, far: 1000 },
+    }),
+    device = engine.gpu!;
+  engine.stop();
+  engine.onError = (error) => errors.push(String(error));
+  device.addEventListener('uncapturederror', (event) => errors.push((event as GPUUncapturedErrorEvent).error.message));
+  const frame = async () => {
+    const start = performance.now();
+    engine.render();
+    await device.queue.onSubmittedWorkDone();
+    return performance.now() - start;
+  };
+
+  const start = performance.now();
+  let parts = 0,
+    triangles = 0,
+    roots: Roots = [],
+    fetchMs = 0,
+    instancer: PartInstancer | undefined,
+    widen = (_bounds: number[]) => {};
+  stage = 'load';
+  if (format === 'glb' || format === 'gltf') {
+    const model = await loadGLTF(engine, url, {
+      decoders: { instancing },
+      maxDownloadBytes: 2 ** 30,
+      maxNodes: 1_000_000,
+    });
+    // A part is a node that draws; an EXT_mesh_gpu_instancing node is one part per instance.
+    const copiesByNode = new Map<number, number>();
+    for (const p of model.primitives) {
+      const copies = p.instances?.capacity ?? 1;
+      copiesByNode.set(p.nodeIndex, copies);
+      triangles += (p.indices.length / 3) * copies;
+    }
+    parts = [...copiesByNode.values()].reduce((s, n) => s + n, 0);
+    roots = model.nodes;
+    // getSceneBounds counts an instanced primitive once, without its instance matrices: add every instance's box.
+    widen = (b) => {
+      for (const p of model.primitives) {
+        if (!p.instances) continue;
+        const lo = [Infinity, Infinity, Infinity],
+          hi = [-Infinity, -Infinity, -Infinity],
+          v = p.vertices,
+          n = p.node.matrix,
+          d = p.instances.data;
+        for (let o = 0; o < v.length; o += 20)
+          for (let a = 0; a < 3; a++) {
+            lo[a] = Math.min(lo[a], v[o + a]);
+            hi[a] = Math.max(hi[a], v[o + a]);
+          }
+        for (let i = 0, m = 0; i < p.instances.count; i++, m += 24)
+          for (let c = 0; c < 8; c++) {
+            const x = c & 1 ? hi[0] : lo[0],
+              y = c & 2 ? hi[1] : lo[1],
+              z = c & 4 ? hi[2] : lo[2],
+              ix = d[m] * x + d[m + 4] * y + d[m + 8] * z + d[m + 12],
+              iy = d[m + 1] * x + d[m + 5] * y + d[m + 9] * z + d[m + 13],
+              iz = d[m + 2] * x + d[m + 6] * y + d[m + 10] * z + d[m + 14];
+            for (let a = 0; a < 3; a++) {
+              const w = n[a] * ix + n[a + 4] * iy + n[a + 8] * iz + n[a + 12];
+              b[a] = Math.min(b[a], w);
+              b[a + 3] = Math.max(b[a + 3], w);
+            }
+          }
+      }
+    };
+  } else if (['obj', 'stl', 'step', 'iges'].includes(format)) {
+    const buffer = await (await fetch(url)).arrayBuffer();
+    fetchMs = performance.now() - start;
+    const model = await parseCADAsync(engine, buffer, format as 'obj' | 'stl' | 'step' | 'iges', {
+      smoothing,
+      maxParts: 1_000_000,
+    });
+    parts = model.meshes.length;
+    for (const mesh of model.meshes) triangles += (mesh.geometry?.indices.length ?? 0) / 3;
+    roots = model.meshes;
+    instancer = PartInstancer.attach(engine);
+  } else throw new TypeError(`Unknown format ${format}`);
+  const parseMs = performance.now() - start - fetchMs;
+
+  // Frame the whole model: the known bounds of a generated assembly, else the loaded geometry's world bounds.
+  stage = 'frame';
+  let b = known;
+  if (!known.every(Number.isFinite)) {
+    b = [...getSceneBounds(engine, roots)];
+    widen(b);
+  }
+  const center = [(b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2],
+    radius = Math.max(1e-6, Math.hypot(b[3] - b[0], b[4] - b[1], b[5] - b[2]) / 2),
+    distance = 2.2 * radius,
+    view = (degrees: number) => {
+      const a = (degrees * Math.PI) / 180,
+        up = Math.PI / 6;
+      Object.assign(engine.camera, {
+        position: [
+          center[0] + distance * Math.cos(up) * Math.cos(a),
+          center[1] + distance * Math.sin(up),
+          center[2] + distance * Math.cos(up) * Math.sin(a),
+        ],
+        target: center,
+        near: Math.max(distance * 1e-4, distance - 1.5 * radius),
+        far: distance + 1.5 * radius,
+      });
+    };
+  view(35);
+  const firstFrameMs = await frame(),
+    loadMs = performance.now() - start,
+    draws = engine.stats.drawCalls,
+    packs = instancer ? { ...instancer.stats } : null;
+
+  stage = 'orbit';
+  const orbit: number[] = [];
+  for (let i = 0; i < frames; i++) {
+    view(35 + (360 * i) / frames);
+    orbit.push(await frame());
+  }
+
+  stage = 'pick';
+  view(35);
+  await frame();
+  const picking = Picking.attach(engine),
+    pickTimes: number[] = [];
+  let hits = 0;
+  for (let i = 0; i < 9; i++) {
+    const x = canvas.clientWidth * (0.35 + 0.15 * (i % 3)),
+      y = canvas.clientHeight * (0.35 + 0.15 * Math.floor(i / 3)),
+      t = performance.now();
+    if (await picking.pick(x, y)) hits++;
+    pickTimes.push(performance.now() - t);
+  }
+  engine.removePlugin(picking.name);
+
+  stage = 'section';
+  const sections = SectionPlanes.attach(engine, { planes: [[0, 1, 0, -center[1]]], cap: true, hatch: 0 });
+  const section: number[] = [];
+  for (let i = 0; i < 30; i++) {
+    view(35 + 12 * i);
+    section.push(await frame());
+  }
+
+  // The screenshots: the whole model (shading), then cut at its middle height (caps).
+  window.cadScaleShot = async (cut) => {
+    sections.enabled = cut;
+    view(35);
+    await frame();
+  };
+  const memory = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory;
+  return {
+    ok: true,
+    format,
+    smoothing,
+    parts,
+    triangles,
+    fetchMs,
+    parseMs,
+    firstFrameMs,
+    loadMs,
+    draws,
+    packs,
+    orbit: stats(orbit),
+    pick: { ...stats(pickTimes), hits },
+    section: stats(section),
+    heapBytes: memory?.usedJSHeapSize ?? null,
+    errors,
+  };
+}
+
+run().then(
+  (result) => {
+    window.cadScale = errors.length ? { ...result, ok: false, stage: 'errors' } : result;
+  },
+  (error) => {
+    window.cadScale = { ok: false, stage, error: `${error?.name ?? 'Error'}: ${error?.message ?? error}`, errors };
+  },
+);
