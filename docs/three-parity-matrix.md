@@ -70,7 +70,7 @@ These limits remain after the three hooks:
 These partials are narrower APIs that already have a Margo path. They are limits to state, not missing packages:
 
 - Node materials compile typed WGSL. They are not three.js TSL, and there is no raw shader material with its own vertex layout.
-- MeshPhysicalMaterial has the lobes above as factors. Dispersion is absent. Clearcoat and sheen use the key light and the hemisphere fill.
+- MeshPhysicalMaterial supports factors and all 12 physical maps on constructed meshes, with UV0/UV1 transforms, live assignments, glTF export and restoration. Dispersion is absent. Clearcoat and sheen use the key light and the hemisphere fill; device texture/sampler limits apply to map combinations.
 - glTF reads the extensions listed on that row. A file that requires `KHR_animation_pointer` or dispersion throws and names the extension. Export writes no cameras or lights.
 - KTX2 works for `KHR_texture_basisu` on a glTF. A standalone `.ktx2` is a raw `GPUTexture` that materials cannot take. Cube maps, arrays, and UASTC HDR are rejected.
 - Materials meshes accept independent `uvs1` coordinates and geometry groups with material arrays, including instancing and glTF export. UV1 falls back to UV0 when omitted. Arbitrary named vertex attributes remain absent, so the combined geometry-attributes row stays PARTIAL and the counts remain 95 / 39 / 25.
@@ -85,7 +85,7 @@ The remaining partials are the same kind of limit, spelled out on each row: core
 
 ## Sentence that was behind the table
 
-The summary used to say physical materials had no iridescence or anisotropy. The MeshPhysicalMaterial row already said glTF loads both through `@margoengine/gltf-pro/extended`, and `@margoengine/materials` now takes those factors on meshes you build. The summary bullet matches that. Dispersion is still absent, so the row stays PARTIAL.
+The summary used to say physical materials had no iridescence or anisotropy. The MeshPhysicalMaterial row already said glTF loads both through `@margoengine/gltf-pro/extended`, and `@margoengine/materials` now takes those factors and their maps on meshes you build. The 12 physical map properties cover clearcoat, sheen, specular, transmission, volume, anisotropy and iridescence. Dispersion is still absent, so the row stays PARTIAL and the counts remain 95 / 39 / 25. This change adds no core or stage features.
 
 ## What to say when someone cites 95 / 38 / 26
 

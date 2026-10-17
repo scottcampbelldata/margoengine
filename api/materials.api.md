@@ -86,7 +86,7 @@ export interface IridescenceOptions {
     iridescenceThicknessTexture?: ClearcoatTexture;
 }
 
-export type MapSlot = 'map' | 'metalRoughnessMap' | 'normalMap' | 'aoMap' | 'emissiveMap';
+export type MapSlot = (typeof mapSlots)[number];
 
 export class Material {
     readonly shading: Shading;
@@ -104,6 +104,30 @@ export class Material {
     aoMap: Texture | null;
     emissiveMap: Texture | null;
     matcap: Texture | null;
+    get clearcoatMap(): Texture | null;
+    set clearcoatMap(v: Texture | null);
+    get clearcoatRoughnessMap(): Texture | null;
+    set clearcoatRoughnessMap(v: Texture | null);
+    get clearcoatNormalMap(): Texture | null;
+    set clearcoatNormalMap(v: Texture | null);
+    get transmissionMap(): Texture | null;
+    set transmissionMap(v: Texture | null);
+    get sheenColorMap(): Texture | null;
+    set sheenColorMap(v: Texture | null);
+    get sheenRoughnessMap(): Texture | null;
+    set sheenRoughnessMap(v: Texture | null);
+    get specularIntensityMap(): Texture | null;
+    set specularIntensityMap(v: Texture | null);
+    get specularColorMap(): Texture | null;
+    set specularColorMap(v: Texture | null);
+    get iridescenceMap(): Texture | null;
+    set iridescenceMap(v: Texture | null);
+    get iridescenceThicknessMap(): Texture | null;
+    set iridescenceThicknessMap(v: Texture | null);
+    get anisotropyMap(): Texture | null;
+    set anisotropyMap(v: Texture | null);
+    get thicknessMap(): Texture | null;
+    set thicknessMap(v: Texture | null);
     readonly physical?: number[];
     readonly ext?: number[];
     readonly volume?: number[];
@@ -113,6 +137,18 @@ export class Material {
     set clearcoat(v: number);
     get clearcoatRoughness(): number;
     set clearcoatRoughness(v: number);
+    get clearcoatNormalScale(): number;
+    set clearcoatNormalScale(v: number);
+    get anisotropy(): number;
+    set anisotropy(v: number);
+    get anisotropyRotation(): number;
+    set anisotropyRotation(v: number);
+    get iridescence(): number;
+    set iridescence(v: number);
+    get iridescenceIOR(): number;
+    set iridescenceIOR(v: number);
+    get iridescenceThicknessRange(): readonly [number, number];
+    set iridescenceThicknessRange(v: readonly [number, number]);
     get transmission(): number;
     set transmission(v: number);
     get specularColor(): number[];
@@ -152,7 +188,7 @@ export class Material {
     setUVTransform(t: TextureTransform | null, slot?: MapSlot): this;
     get customState(): boolean;
     shader(source: string, group: number): string;
-    bindings(device: GPUDevice, _engine?: Engine): GPUBindGroupEntry[];
+    bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[];
 }
 
 export interface MaterialGraph {
@@ -279,12 +315,30 @@ export interface NormalMapNode {
 export interface PhysicalOptions {
     clearcoat?: number;
     clearcoatRoughness?: number;
+    clearcoatMap?: Texture | null;
+    clearcoatRoughnessMap?: Texture | null;
+    clearcoatNormalMap?: Texture | null;
+    clearcoatNormalScale?: number;
     sheenColor?: Color;
     sheenRoughness?: number;
+    sheenColorMap?: Texture | null;
+    sheenRoughnessMap?: Texture | null;
     specularIntensity?: number;
     specularColor?: Color;
+    specularIntensityMap?: Texture | null;
+    specularColorMap?: Texture | null;
+    anisotropy?: number;
+    anisotropyRotation?: number;
+    anisotropyMap?: Texture | null;
+    iridescence?: number;
+    iridescenceIOR?: number;
+    iridescenceThicknessRange?: readonly [number, number];
+    iridescenceMap?: Texture | null;
+    iridescenceThicknessMap?: Texture | null;
     ior?: number;
     transmission?: number;
+    transmissionMap?: Texture | null;
+    thicknessMap?: Texture | null;
     thickness?: number;
     attenuationColor?: Color;
     attenuationDistance?: number;
@@ -430,4 +484,6 @@ type Pixels = {
 interface TransmissionPassOptions {
     order?: number;
 }
+
+const mapSlots: readonly ['map', 'metalRoughnessMap', 'normalMap', 'aoMap', 'emissiveMap', 'clearcoatMap', 'clearcoatRoughnessMap', 'clearcoatNormalMap', 'transmissionMap', 'sheenColorMap', 'sheenRoughnessMap', 'specularIntensityMap', 'specularColorMap', 'iridescenceMap', 'iridescenceThicknessMap', 'anisotropyMap', 'thicknessMap'];
 ```

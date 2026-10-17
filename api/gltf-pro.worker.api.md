@@ -523,8 +523,13 @@ interface PBRMaterial extends GLTFMaterial {
     volume?: number[];
     renderState?: PBRRenderState;
     extension?: MaterialExtension;
-    shading?: LightingEffect;
+    shading?: PBRMaterialShading;
     extendedFrame?: boolean;
+}
+
+interface PBRMaterialShading extends LightingEffect {
+    readonly replacesTextures?: boolean;
+    readonly texturedTint?: boolean;
 }
 
 class PBRModel implements EnginePlugin {

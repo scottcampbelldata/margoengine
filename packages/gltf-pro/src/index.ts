@@ -39,6 +39,7 @@ import {
   transparentPBR,
   capturePBR,
   transmissionPBR,
+  texturedTintPBR,
   type ExtendedPlan,
   type PBRLighting,
   type PBRTransparency,
@@ -199,7 +200,7 @@ export interface PBRMaterial extends GLTFMaterial {
   renderState?: PBRRenderState;
   extension?: MaterialExtension;
   /** Per-material surface shader and bindings, composed before model-wide lighting effects. */
-  shading?: LightingEffect;
+  shading?: PBRMaterialShading;
   /** Use the retained UV-transform frame layout for constructed optional materials. */
   extendedFrame?: boolean;
 }
@@ -313,6 +314,7 @@ interface DrawResource {
   groups: Map<GPURenderPipeline, GPUBindGroup[]>;
   views: GPUTextureView[];
   samplers: GPUSampler[];
+  replacesTextures?: boolean;
   extension?: MaterialExtensionResource;
   coordinates?: CoordinateExtension;
   pipelineHistories?: Map<string, DrawPipelineState[]>;
@@ -462,6 +464,11 @@ export interface LightingEffect {
   pbr?(group: number): PBRLighting | undefined;
   shader?(source: string, group: number): string;
   bindings(): GPUBindGroupEntry[];
+}
+/** Per-material shader that may replace native textures and supply a texture-dependent transmission tint. */
+export interface PBRMaterialShading extends LightingEffect {
+  readonly replacesTextures?: boolean;
+  readonly texturedTint?: boolean;
 }
 function uploadCompressedImage(
   device: GPUDevice,
@@ -1028,6 +1035,8 @@ export class PBRModel implements EnginePlugin {
     r.views = [];
     r.samplers = [];
     r.groups.clear();
+    r.replacesTextures = !!m.shading?.replacesTextures;
+    if (r.replacesTextures) return;
     for (let i = 0; i < m.maps.length; i++) {
       if (!ownSlot(m, i, this.asset.hooks.materials)) {
         r.views.push(undefined!);
@@ -1507,7 +1516,7 @@ export class PBRModel implements EnginePlugin {
         const compact =
           !!(p.extension ?? m.extension)?.replacesPhysical || (!m.extendedFrame && !m.physical && !m.ext?.[0]);
         const floatCount = compact ? 100 : m.extended ? 272 : 220;
-        if (r.values.length !== floatCount)
+        if (r.values.length !== floatCount || r.replacesTextures !== !!m.shading?.replacesTextures)
           this.bindMaterial(r, c.device, c.device.createSampler({ minFilter: 'linear', magFilter: 'linear' }));
         const v = r.values;
         v.set(c.camera.matrix);
@@ -1539,7 +1548,7 @@ export class PBRModel implements EnginePlugin {
         if (!compact && m.physical) {
           const offset = m.extended ? 248 : 208;
           v.set(m.physical, offset);
-          if (!m.maps[7]) v[offset + 2] = 0;
+          if (!m.maps[7] && !m.shading?.replacesTextures) v[offset + 2] = 0;
         }
         // Physical rows follow 26 UV rows (36 for extended materials); factor-only materials (five maps) use the same layout.
         // The transmission tint (margoTint) in spare Frame lanes coordsB.zw and ext.z; zero for every other material.
@@ -1651,6 +1660,7 @@ export class PBRModel implements EnginePlugin {
         else if (capture) code = capturePBR(code, hook!.declarations(code));
         // Instancing patches the vertex stage last, so text-patching effects (shader NodeMaterial vertex nodes) keep their anchors.
         if (inst) code = inst.shader(code);
+        if (m.shading?.texturedTint) code = texturedTintPBR(code);
         // Keep the shader's original front-facing convention, including mirrored transforms.
         // Mirrored instances flip winding per instance: no culling, the shader's face test discards back faces instead.
         const face = +(!!inst?.mirrored && m.settings[2] < 0.5),
@@ -1791,6 +1801,8 @@ export class PBRModel implements EnginePlugin {
                 fragment: {
                   module,
                   entryPoint: 'margoTint',
+                  constants:
+                    specialized && m.shading?.texturedTint ? { margoFaceTest: face, margoAlphaTest: mask } : undefined,
                   targets: [
                     {
                       format,
@@ -1852,32 +1864,7 @@ export class PBRModel implements EnginePlugin {
           target = pass;
         }
         if (transmission) c.device.queue.writeBuffer(r.volume!, 0, new Float32Array(m.volume!));
-        // Transmission draws twice: margoTint multiplies the background by the tint, then the lit surface adds on top. One
-        // draw with a blend constant (dst x tint) rendered black behind the glass in Edge on an Arc 140V (D3D12, 4x MSAA): the
-        // constant read as 0 for pipelines used across frames (HANDOFF 5w.f).
-        if (tinted) {
-          const tint = this.pipelines.get(key + ':tint')!;
-          let group = r.groups.get(tint);
-          if (!group) {
-            group = [
-              c.device.createBindGroup({
-                layout: tint.getBindGroupLayout(0),
-                entries: [{ binding: 0, resource: { buffer: r.uniform } }],
-              }),
-            ];
-            r.groups.set(tint, group);
-          }
-          target.setPipeline(tint);
-          target.setBindGroup(0, group[0]);
-          target.setVertexBuffer(0, p.deformed ?? r.vertex);
-          if (instances) target.setVertexBuffer(1, instances);
-          target.setIndexBuffer(r.index, 'uint32');
-          if (inst) target.drawIndexed(p.indices.length, inst.count);
-          else target.drawIndexed(p.indices.length);
-        }
-        target.setPipeline(pipeline);
-        target.setBindGroup(0, groups[0]);
-        target.setBindGroup(1, groups[1]);
+        let effectGroup: GPUBindGroup | undefined;
         const effectBindings = !!shading || (lit && ((lighting && this.lighting.size > 0) || through));
         if (effectBindings) {
           const entries = scratch.entries,
@@ -1926,8 +1913,52 @@ export class PBRModel implements EnginePlugin {
             cached = { entries: snapshot, group };
             this.lightingGroups.set(pipeline, cached);
           }
-          target.setBindGroup(2, cached!.group);
+          effectGroup = cached!.group;
         }
+        // Transmission first multiplies the background, then adds the lit surface.
+        if (tinted) {
+          const tint = this.pipelines.get(key + ':tint')!,
+            mappedTint = !!shading?.texturedTint;
+          let tintGroups = r.groups.get(tint);
+          if (!tintGroups) {
+            tintGroups = mappedTint
+              ? createDrawGroups(c.device, tint, r, m, false, x)
+              : [
+                  c.device.createBindGroup({
+                    layout: tint.getBindGroupLayout(0),
+                    entries: [{ binding: 0, resource: { buffer: r.uniform } }],
+                  }),
+                ];
+            r.groups.set(tint, tintGroups);
+          }
+          target.setPipeline(tint);
+          target.setBindGroup(0, tintGroups[0]);
+          if (mappedTint) {
+            target.setBindGroup(1, tintGroups[1]);
+            if (effectBindings) {
+              const snapshot = this.lightingGroups.get(pipeline)!.entries;
+              let cached = this.lightingGroups.get(tint);
+              if (!cached || cached.entries !== snapshot) {
+                cached = {
+                  entries: snapshot,
+                  group: c.device.createBindGroup({ layout: tint.getBindGroupLayout(2), entries: snapshot }),
+                };
+                this.lightingGroups.set(tint, cached);
+              }
+              target.setBindGroup(2, cached.group);
+            }
+            if (extension) bindMaterialExtension(c.device, target, tint, r.extension!, effectBindings);
+          }
+          target.setVertexBuffer(0, p.deformed ?? r.vertex);
+          if (instances) target.setVertexBuffer(1, instances);
+          target.setIndexBuffer(r.index, 'uint32');
+          if (inst) target.drawIndexed(p.indices.length, inst.count);
+          else target.drawIndexed(p.indices.length);
+        }
+        target.setPipeline(pipeline);
+        target.setBindGroup(0, groups[0]);
+        target.setBindGroup(1, groups[1]);
+        if (effectGroup) target.setBindGroup(2, effectGroup);
         if (extension) bindMaterialExtension(c.device, target, pipeline, r.extension!, effectBindings);
         target.setVertexBuffer(0, p.deformed ?? r.vertex);
         if (instances) target.setVertexBuffer(1, instances);

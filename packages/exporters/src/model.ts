@@ -10,6 +10,7 @@ import type {
   GLTFInstancing,
   GLTFSampler,
   GLTFImageDefinition,
+  GLTFTextureInfo,
 } from '../../shared/gltf.js';
 import type { PNGSource } from './png.js';
 type PBRPrimitive = ModelPrimitive & { instances?: { count: number; data: Float32Array } };
@@ -61,7 +62,26 @@ const clean = <T extends Json>(o: T): T => {
 };
 const scaled = (info: Json | undefined, key: string, value: number) =>
   info && value !== 1 ? { ...info, [key]: value } : info;
-const slots = ['map', 'metalRoughnessMap', 'normalMap', 'aoMap', 'emissiveMap'] as const;
+// Constructed Material order. Loaded glTF uses slots 16/17 for diffuse transmission, never thickness.
+const slots = [
+  'map',
+  'metalRoughnessMap',
+  'normalMap',
+  'aoMap',
+  'emissiveMap',
+  'clearcoatMap',
+  'clearcoatRoughnessMap',
+  'clearcoatNormalMap',
+  'transmissionMap',
+  'sheenColorMap',
+  'sheenRoughnessMap',
+  'specularIntensityMap',
+  'specularColorMap',
+  'iridescenceMap',
+  'iridescenceThicknessMap',
+  'anisotropyMap',
+  'thicknessMap',
+] as const;
 interface PixelTexture {
   source: PNGSource;
   isVideo?: boolean;
@@ -74,7 +94,15 @@ interface PixelTexture {
     flipY?: boolean;
   };
 }
-type TextureOwner = Partial<Record<(typeof slots)[number], PixelTexture>> & { shading?: string };
+type TextureOwner = Partial<Record<(typeof slots)[number], PixelTexture | null>> & {
+  shading?: string;
+  uvt?: readonly number[];
+  thickness?: number;
+  attenuationColor?: readonly number[];
+  attenuationDistance?: number;
+  anisotropyRotation?: number;
+  transmissive?: boolean;
+};
 function textureOwner(model: PBRModel, index?: number): TextureOwner | undefined {
   const owner = (model as { material?: TextureOwner | readonly TextureOwner[] }).material;
   return Array.isArray(owner) ? owner[index ?? 0] : (owner as TextureOwner | undefined);
@@ -136,7 +164,9 @@ class Writer extends Bin {
       const v = p.vertices,
         owner = textureOwner(model, def.material),
         usesUV = (set: number) =>
-          p.material.maps.some((map, i) => (map || (i < 5 && owner?.[slots[i]])) && p.material.uvt![i * 8 + 3] === set),
+          p.material.maps.some(
+            (map, i) => map && !(owner && i < slots.length && slots[i] in owner) && p.material.uvt![i * 8 + 3] === set,
+          ) || slots.some((name, i) => owner?.[name] && (owner.uvt ?? p.material.uvt)![i * 8 + 3] === set),
         column = (at: number, width: number) => {
           const o = new Float32Array(count * width);
           for (let i = 0; i < count; i++) for (let k = 0; k < width; k++) o[i * width + k] = v[i * 20 + at + k];
@@ -198,7 +228,14 @@ class Writer extends Bin {
       if (strength !== 1) ext.KHR_materials_emissive_strength = { emissiveStrength: strength };
       if (m.ext![0] || owner?.shading === 'basic') ext.KHR_materials_unlit = {};
       if (e.KHR_materials_ior || m.ext![1] !== 1.5) ext.KHR_materials_ior = { ior: m.ext![1] };
-      if (P && e.KHR_materials_clearcoat)
+      if (
+        P &&
+        (e.KHR_materials_clearcoat ||
+          owner?.clearcoatMap ||
+          owner?.clearcoatRoughnessMap ||
+          owner?.clearcoatNormalMap ||
+          (owner && (P[0] !== 0 || P[1] !== 0 || P[2] !== 1)))
+      )
         ext.KHR_materials_clearcoat = clean({
           clearcoatFactor: P[0],
           clearcoatRoughnessFactor: P[1],
@@ -206,28 +243,59 @@ class Writer extends Bin {
           clearcoatRoughnessTexture: t(6),
           clearcoatNormalTexture: scaled(t(7), 'scale', P[2]),
         });
-      if (P && e.KHR_materials_transmission)
+      if (P && (e.KHR_materials_transmission || owner?.transmissionMap || owner?.transmissive))
         ext.KHR_materials_transmission = clean({ transmissionFactor: P[3], transmissionTexture: t(8) });
-      if (P && e.KHR_materials_sheen)
+      if (
+        P &&
+        (e.KHR_materials_sheen ||
+          owner?.sheenColorMap ||
+          owner?.sheenRoughnessMap ||
+          (owner && P.slice(8, 12).some((v) => v !== 0)))
+      )
         ext.KHR_materials_sheen = clean({
           sheenColorFactor: P.slice(8, 11),
           sheenRoughnessFactor: P[11],
           sheenColorTexture: t(9),
           sheenRoughnessTexture: t(10),
         });
-      if (P && e.KHR_materials_specular)
+      if (
+        P &&
+        (e.KHR_materials_specular ||
+          owner?.specularIntensityMap ||
+          owner?.specularColorMap ||
+          (owner && P.slice(4, 8).some((v) => v !== 1)))
+      )
         ext.KHR_materials_specular = clean({
           specularFactor: P[7],
           specularColorFactor: P.slice(4, 7),
           specularTexture: t(11),
           specularColorTexture: t(12),
         });
+      if (P && (e.KHR_materials_iridescence || owner?.iridescenceMap || owner?.iridescenceThicknessMap))
+        ext.KHR_materials_iridescence = clean({
+          iridescenceFactor: P[12],
+          iridescenceIor: P[13],
+          iridescenceThicknessMinimum: P[14],
+          iridescenceThicknessMaximum: P[15],
+          iridescenceTexture: t(13),
+          iridescenceThicknessTexture: t(14),
+        });
+      if (P && (e.KHR_materials_anisotropy || owner?.anisotropyMap))
+        ext.KHR_materials_anisotropy = clean({
+          anisotropyStrength: P[16],
+          anisotropyRotation: owner?.anisotropyRotation ?? Math.atan2(P[18], P[17]),
+          anisotropyTexture: t(15),
+        });
       const v = e.KHR_materials_volume;
-      if (v)
+      if (v || owner?.thicknessMap || owner?.transmissive)
         ext.KHR_materials_volume = clean({
-          thicknessFactor: v.thicknessFactor,
-          attenuationDistance: v.attenuationDistance,
-          attenuationColor: v.attenuationColor,
+          thicknessFactor: owner?.thickness ?? v?.thicknessFactor,
+          attenuationDistance:
+            owner?.attenuationDistance === Infinity
+              ? undefined
+              : (owner?.attenuationDistance ?? v?.attenuationDistance),
+          attenuationColor: owner?.attenuationColor ?? v?.attenuationColor,
+          thicknessTexture: owner ? t(16) : this.sourceTextureInfo(model, v?.thicknessTexture),
         });
       for (const name in ext) this.used.add(name);
       return this.list(
@@ -257,12 +325,12 @@ class Writer extends Bin {
 
   /** Texture info for map slot `i` (gltf-pro order), with its KHR_texture_transform taken back out of the material's UV rows. */
   private textureInfo(model: PBRModel, m: PBRMaterial, i: number, owner: TextureOwner | undefined): Json | undefined {
-    const map = m.maps[i],
-      texture = i < 5 ? owner?.[slots[i]] : undefined;
+    const texture = owner?.[slots[i]],
+      map = owner && slots[i] in owner ? undefined : m.maps[i];
     if (!map && !texture) return undefined;
     const info: Json = { index: map ? this.docTexture(model, map.index) : this.pixelTexture(texture!) };
     // Rows: [cos*sx, sin*sy, offset x, uv set], [-sin*sx, cos*sy, offset y, 0].
-    const [a0, a1, x, texCoord, b0, b1, y] = m.uvt!.slice(i * 8, i * 8 + 8);
+    const [a0, a1, x, texCoord, b0, b1, y] = (texture ? (owner?.uvt ?? m.uvt!) : m.uvt!).slice(i * 8, i * 8 + 8);
     if (texCoord) info.texCoord = texCoord;
     if (a0 !== 1 || a1 || x || b0 || b1 !== 1 || y) {
       const r = Math.atan2(-b0, a0),
@@ -278,6 +346,13 @@ class Writer extends Bin {
       this.used.add('KHR_texture_transform');
     }
     return info;
+  }
+
+  /** Loaded volume maps have no native material slot; keep their document coordinates without interpreting slot 16. */
+  private sourceTextureInfo(model: PBRModel, info: GLTFTextureInfo | undefined): Json | undefined {
+    if (!info) return undefined;
+    if (info.extensions?.KHR_texture_transform) this.used.add('KHR_texture_transform');
+    return { ...info, index: this.docTexture(model, info.index) };
   }
 
   private sampler(def: GLTFSampler): number {

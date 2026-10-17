@@ -136,12 +136,13 @@ export class NodeMaterial extends Material {
       .join('');
   }
   override shader(source: string, group: number): string {
-    const key = group + source;
+    // Material maps can change their sparse resource layout while the native PBR source stays identical.
+    const material = super.shader(source, group),
+      key = group + material;
     let code = this.patched.get(key);
     if (code) return code;
     let count = 0;
-    code = super
-      .shader(source, group)
+    code = material
       .replace(fragmentSite, (site) => {
         count++;
         return this.fragmentCode.trimStart() + '  ' + site;

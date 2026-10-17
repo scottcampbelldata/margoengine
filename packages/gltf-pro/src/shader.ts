@@ -336,6 +336,18 @@ export const physicalShader = (): string =>
 const transmissive = new Map<string, string>();
 // Transmission's first draw (gltf-pro blends it as dst x src): the tint of what is behind, from spare Frame lanes.
 const tintEntry = '\n@fragment fn margoTint(i:Out)->@location(0) vec4f {return vec4f(f.coordsB.zw,f.ext.z,1);}\n';
+/** Retain the complete material/effect resource interface for a texture-dependent tint draw. */
+export function texturedTintPBR(code: string): string {
+  const resources = Array.from(code.matchAll(/((?:@\w+\s*\([^)]*\)\s*)+)var(?:\s*<([^>]+)>)?\s+(\w+)\s*:/g))
+    .filter(([, attributes]) => /@group\s*\(/.test(attributes) && /@binding\s*\(/.test(attributes))
+    // A runtime-sized storage array cannot be loaded as a value; retain its pointer instead.
+    .map(([, , space, name]) => `_=${space && /^(uniform|storage)\b/.test(space) ? '&' : ''}${name};`)
+    .join('');
+  return code.replace(
+    /@fragment fn margoTint\(i:Out(?:,@builtin\(front_facing\) front:bool)?\)->@location\(0\) vec4f \{/,
+    `@fragment fn margoTint(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {${resources}`,
+  );
+}
 /**
  * `code` (physicalShader, or factorPhysicalShader for materials built in code) for KHR_materials_transmission
  * materials. Ambient and local-light hooks are evaluated (by lightPBR)
@@ -361,13 +373,13 @@ fn margoAmbientLayers(i:Out,s:Surface,v:vec3f)->vec3f {return margoAmbientTerm(i
 }
 // The physical variant's edits; `sample(name)` is a map slot's vec4f and `bindings` its group-1 declarations.
 const physicalEdits = (sample: (name: string) => string, bindings: string): [string, string][] => [
-  ['emissive:vec3f}', 'emissive:vec3f, f0:vec3f, tr:f32, cn:vec3f, cc:f32, cr:f32, sh:vec4f}'],
+  ['emissive:vec3f}', 'emissive:vec3f, f0:vec3f, tr:f32, th:f32, cn:vec3f, cc:f32, cr:f32, sh:vec4f}'],
   ['var emissiveSampler:sampler;', 'var emissiveSampler:sampler;\n' + bindings],
   // Dielectric F0 from IOR and KHR_materials_specular, transmission weight, clearcoat normal and layer factors.
   [
     '  if(margoFaceTest&&!facing&&f.settings.z<0.5){discard;}',
     `  let ior=(f.ext.y-1)/(f.ext.y+1); s.f0=min(ior*ior*f.specular.rgb*${sample('specularColor')}.rgb,vec3f(1))*f.specular.w*${sample('specular')}.a;
-  s.tr=f.coat.w*${sample('transmission')}.r; let cm=${sample('clearcoatNormal')}.xyz*2-1; s.cn=normalize(t*cm.x*f.coat.z+b*cm.y*f.coat.z+n*cm.z);
+  s.tr=f.coat.w*${sample('transmission')}.r; s.th=1; let cm=${sample('clearcoatNormal')}.xyz*2-1; s.cn=normalize(t*cm.x*f.coat.z+b*cm.y*f.coat.z+n*cm.z);
   s.cc=f.coat.x*${sample('clearcoat')}.r; s.cr=clamp(f.coat.y*${sample('clearcoatRoughness')}.g,0.045,1.0);
   s.sh=vec4f(f.sheen.rgb*${sample('sheenColor')}.rgb,max(f.sheen.w*${sample('sheenRoughness')}.a,0.07));
   if(margoFaceTest&&!facing&&f.settings.z<0.5){discard;}`,

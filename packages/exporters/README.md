@@ -40,6 +40,8 @@ const {text, bin} = await exportModel(mesh, {embed: false});
 
 Geometry groups remain primitives under one mesh node, with each group's material, textures and index range. Independent UV1 coordinates are written as `TEXCOORD_1`; referenced UV sets are retained even when every coordinate is zero. Texture UV selection and affine transforms use the live material rows, including changes made with `material.setUVTransform({texCoord: 1}, 'aoMap')`. An unused UV1 copy of UV0 is omitted.
 
+Physical `Material` maps are saved to the matching glTF extensions: clearcoat factor, roughness and normal; transmission; sheen color and roughness; specular intensity and color; iridescence factor and thickness; anisotropy; and volume thickness. Each map keeps its live UV set and transform, sampler and original RGBA channels. A shared `Texture` is written once, including when several groups or physical lobes use it. Iridescence and anisotropy controls and the live volume thickness, attenuation color and attenuation distance are exported with the maps; infinite attenuation distance uses glTF's omitted default.
+
 ## How it works
 
 Engine exports recognize primitives loaded by `@margoengine/gltf-pro` and `@margoengine/fbx`, without attaching core geometry. glTF/GLB retain all primitives on each node and their bind-pose skin/morph data; other formats write base geometry. Automatic export of PBR textures, material extensions, and more than four skin influences throws explicitly. An engine forest containing no supported mesh geometry also throws; visibility filtering and intentionally empty data scenes remain supported.

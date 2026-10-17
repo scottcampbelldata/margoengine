@@ -11,10 +11,13 @@ import {
   type TextureTransform,
 } from '@margoengine/gltf-pro';
 import { PBRInstances } from '@margoengine/gltf-pro/instancing';
+import { extendedMaterials } from '@margoengine/gltf-pro/extended';
+import { physicalMapsShader } from './physical-maps.js';
 import { readResponse } from '../../shared/loading.js';
 export type { TextureTransform } from '@margoengine/gltf-pro';
 export { packAtlas, transformUVs, type Atlas, type AtlasOptions } from './atlas.js';
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
+declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 export type RawImage = { data: Uint8Array | Uint8ClampedArray; width: number; height: number };
 /** ImageData and `{data,width,height}` upload as raw RGBA8 rows (row 0 at UV v=0); other sources use copyExternalImageToTexture. */
 export type TextureSource =
@@ -53,7 +56,13 @@ const mipShader = `struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec
 @fragment fn fragment(i:Out)->@location(0) vec4f {return textureSample(image,imageSampler,i.uv);}`;
 const shared = new WeakMap<
   GPUDevice,
-  { white: GPUTextureView; normal: GPUTextureView; sampler: GPUSampler; pipelines: Map<string, GPURenderPipeline> }
+  {
+    white: GPUTextureView;
+    normal: GPUTextureView;
+    anisotropy?: GPUTextureView;
+    sampler: GPUSampler;
+    pipelines: Map<string, GPURenderPipeline>;
+  }
 >();
 function defaults(device: GPUDevice) {
   let d = shared.get(device);
@@ -77,6 +86,24 @@ function defaults(device: GPUDevice) {
   };
   shared.set(device, d);
   return d;
+}
+function fallback(device: GPUDevice, role: number): readonly [GPUTextureView, GPUSampler] {
+  const d = defaults(device);
+  if (role === 2 && !d.anisotropy) {
+    const texture = device.createTexture({
+      size: [1, 1],
+      format: 'rgba16float',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    device.queue.writeTexture(
+      { texture },
+      new Uint16Array([0x3c00, 0x3800, 0x3c00, 0x3c00]),
+      { bytesPerRow: 8 },
+      [1, 1],
+    );
+    d.anisotropy = texture.createView();
+  }
+  return [role === 2 ? d.anisotropy! : role === 1 ? d.normal : d.white, d.sampler];
 }
 interface ImageDimensions {
   videoWidth?: number;
@@ -287,16 +314,41 @@ export interface PhysicalOptions {
   /** KHR_materials_clearcoat: layer strength and roughness, 0-1. */
   clearcoat?: number;
   clearcoatRoughness?: number;
+  /** Linear R strength, G roughness, and tangent-space RGB normal, respectively. */
+  clearcoatMap?: Texture | null;
+  clearcoatRoughnessMap?: Texture | null;
+  clearcoatNormalMap?: Texture | null;
+  clearcoatNormalScale?: number;
   /** KHR_materials_sheen: sheen colour (default black: none) and roughness 0-1. */
   sheenColor?: Color;
   sheenRoughness?: number;
+  /** sRGB RGB colour and linear A roughness. */
+  sheenColorMap?: Texture | null;
+  sheenRoughnessMap?: Texture | null;
   /** KHR_materials_specular: dielectric specular strength 0-1 and F0 colour. */
   specularIntensity?: number;
   specularColor?: Color;
+  /** Linear A intensity and sRGB RGB colour. */
+  specularIntensityMap?: Texture | null;
+  specularColorMap?: Texture | null;
+  /** KHR_materials_anisotropy: strength 0-1, rotation in radians; linear RG direction and B strength. */
+  anisotropy?: number;
+  anisotropyRotation?: number;
+  anisotropyMap?: Texture | null;
+  /** KHR_materials_iridescence: strength 0-1, film IOR >= 1, thickness range in nanometres. */
+  iridescence?: number;
+  iridescenceIOR?: number;
+  iridescenceThicknessRange?: readonly [number, number];
+  /** Linear R strength and G thickness within the configured range. */
+  iridescenceMap?: Texture | null;
+  iridescenceThicknessMap?: Texture | null;
   /** KHR_materials_ior: index of refraction, >= 1 (default 1.5). */
   ior?: number;
   /** KHR_materials_transmission: share of light passing through, 0-1. Refracts the scene with `@margoengine/materials/transmission`; otherwise the background shows through tinted. */
   transmission?: number;
+  /** Linear R transmission and G volume thickness. Either reserves transmissive rendering at construction. */
+  transmissionMap?: Texture | null;
+  thicknessMap?: Texture | null;
   /** KHR_materials_volume: thickness in mesh units (0 = thin-walled, no refraction), and the colour white light reaches after `attenuationDistance` world units inside. */
   thickness?: number;
   attenuationColor?: Color;
@@ -326,7 +378,26 @@ export interface MaterialOptions extends PhysicalOptions {
   /** UV offset/scale/rotation for every map but `matcap` (KHR_texture_transform semantics), e.g. an atlas region. */
   uvTransform?: TextureTransform;
 }
-export type MapSlot = 'map' | 'metalRoughnessMap' | 'normalMap' | 'aoMap' | 'emissiveMap';
+const mapSlots = [
+  'map',
+  'metalRoughnessMap',
+  'normalMap',
+  'aoMap',
+  'emissiveMap',
+  'clearcoatMap',
+  'clearcoatRoughnessMap',
+  'clearcoatNormalMap',
+  'transmissionMap',
+  'sheenColorMap',
+  'sheenRoughnessMap',
+  'specularIntensityMap',
+  'specularColorMap',
+  'iridescenceMap',
+  'iridescenceThicknessMap',
+  'anisotropyMap',
+  'thicknessMap',
+] as const;
+export type MapSlot = (typeof mapSlots)[number];
 const slots = ['map', 'metalRoughnessMap', 'normalMap', 'aoMap', 'emissiveMap', 'matcap'] as const,
   names = ['baseMap', 'mrMap', 'normalMap', 'aoMap', 'emissiveMap', 'matcap'];
 const unit = (v: unknown, label: string) => {
@@ -337,12 +408,30 @@ const unit = (v: unknown, label: string) => {
 const extensions: Record<keyof PhysicalOptions, string> = {
   clearcoat: 'clearcoat',
   clearcoatRoughness: 'clearcoat',
+  clearcoatMap: 'clearcoat',
+  clearcoatRoughnessMap: 'clearcoat',
+  clearcoatNormalMap: 'clearcoat',
+  clearcoatNormalScale: 'clearcoat',
   sheenColor: 'sheen',
   sheenRoughness: 'sheen',
+  sheenColorMap: 'sheen',
+  sheenRoughnessMap: 'sheen',
   specularIntensity: 'specular',
   specularColor: 'specular',
+  specularIntensityMap: 'specular',
+  specularColorMap: 'specular',
+  anisotropy: 'anisotropy',
+  anisotropyRotation: 'anisotropy',
+  anisotropyMap: 'anisotropy',
+  iridescence: 'iridescence',
+  iridescenceIOR: 'iridescence',
+  iridescenceThicknessRange: 'iridescence',
+  iridescenceMap: 'iridescence',
+  iridescenceThicknessMap: 'iridescence',
   ior: 'ior',
   transmission: 'transmission',
+  transmissionMap: 'transmission',
+  thicknessMap: 'volume',
   thickness: 'volume',
   attenuationColor: 'volume',
   attenuationDistance: 'volume',
@@ -372,6 +461,53 @@ const outputs: Record<Exclude<Shading, 'standard'>, string> = {
 const encode =
   'fn mat_out(c:vec3f)->vec3f {if(f.settings.w>0.5){return c;}let x=clamp(c,vec3f(0),vec3f(1));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>=vec3f(0.0031308));}';
 const patched = new Map<string, Map<string, string>>();
+type MapState = { refs: number; device?: GPUDevice; buffer?: GPUBuffer };
+const mapStates = new WeakMap<Material, Map<object, MapState>>();
+function mapState(m: Material, owner: object): MapState {
+  let states = mapStates.get(m);
+  if (!states) mapStates.set(m, (states = new Map()));
+  let state = states.get(owner);
+  if (!state) states.set(owner, (state = { refs: 0 }));
+  return state;
+}
+function retainMaps(m: Material, engine: Engine): () => void {
+  const state = mapState(m, engine);
+  state.refs++;
+  return () => {
+    if (--state.refs) return;
+    state.buffer?.destroy();
+    mapStates.get(m)?.delete(engine);
+  };
+}
+function mapped(m: Material): boolean {
+  return !!m.physical && (m.physical.length > 12 || mapSlots.slice(5).some((k) => m[k] != null));
+}
+function mapPlan(m: Material) {
+  const textures: { texture: Texture; srgb: boolean; fallback: number }[] = [],
+    samplers: Texture[] = [];
+  const slots = mapSlots.map((k, i): readonly [number, number] | null => {
+    const texture = m[k];
+    if (!texture) return null;
+    if (!(texture instanceof Texture)) throw new TypeError('Material ' + k + ' must be a Texture');
+    const srgb = texture.options.colorSpace ? texture.options.colorSpace === 'srgb' : [0, 4, 9, 12].includes(i);
+    const fallback = i === 2 || i === 7 ? 1 : i === 15 ? 2 : 0,
+      pending = !texture.width || !texture.height || ('readyState' in texture.source && texture.source.readyState < 2);
+    let t = textures.findIndex(
+        (v) => v.texture === texture && v.srgb === srgb && (!pending || v.fallback === fallback),
+      ),
+      s = samplers.indexOf(texture);
+    if (t < 0) {
+      t = textures.length;
+      textures.push({ texture, srgb, fallback });
+    }
+    if (s < 0) {
+      s = samplers.length;
+      samplers.push(texture);
+    }
+    return [t, s];
+  });
+  return { textures, samplers, slots };
+}
 /** Rewrites gltf-pro's beauty shader to multiply in this package's maps (group 2, bindings 32-43) and, for non-standard shading, return early. */
 export function materialShader(source: string, group: number, shading: Shading): string {
   let cache = patched.get(source);
@@ -426,12 +562,102 @@ export class Material {
   private blend: boolean;
   /** gltf-pro layout: two rows per map slot (offset*rotation*scale), in `MapSlot` order. */
   readonly uvt: number[] = [];
+  private uvDefault = textureTransform({}, 0);
   map: Texture | null;
   metalRoughnessMap: Texture | null;
   normalMap: Texture | null;
   aoMap: Texture | null;
   emissiveMap: Texture | null;
   matcap: Texture | null;
+  private readonly physicalTextures: (Texture | null)[] = Array(12).fill(null);
+  private setMap(i: number, value: Texture | null): void {
+    if (value != null) {
+      if (!(value instanceof Texture)) throw new TypeError('Material ' + mapSlots[i + 5] + ' must be a Texture');
+      const capability =
+        i === 10 ? 'anisotropy' : i === 8 || i === 9 ? 'iridescence' : i === 3 || i === 11 ? 'transmission' : undefined;
+      if (
+        this.extensions &&
+        (!this.physical ||
+          (capability === 'transmission' ? !this.volume : capability && !this.extensions.includes(capability)))
+      )
+        throw new TypeError('Material ' + mapSlots[i + 5] + ' needs the corresponding option at construction');
+      while (this.uvt.length < mapSlots.length * 8) this.uvt.push(...this.uvDefault);
+    }
+    this.physicalTextures[i] = value ?? null;
+  }
+  get clearcoatMap(): Texture | null {
+    return this.physicalTextures[0];
+  }
+  set clearcoatMap(v: Texture | null) {
+    this.setMap(0, v);
+  }
+  get clearcoatRoughnessMap(): Texture | null {
+    return this.physicalTextures[1];
+  }
+  set clearcoatRoughnessMap(v: Texture | null) {
+    this.setMap(1, v);
+  }
+  get clearcoatNormalMap(): Texture | null {
+    return this.physicalTextures[2];
+  }
+  set clearcoatNormalMap(v: Texture | null) {
+    this.setMap(2, v);
+  }
+  get transmissionMap(): Texture | null {
+    return this.physicalTextures[3];
+  }
+  set transmissionMap(v: Texture | null) {
+    this.setMap(3, v);
+  }
+  get sheenColorMap(): Texture | null {
+    return this.physicalTextures[4];
+  }
+  set sheenColorMap(v: Texture | null) {
+    this.setMap(4, v);
+  }
+  get sheenRoughnessMap(): Texture | null {
+    return this.physicalTextures[5];
+  }
+  set sheenRoughnessMap(v: Texture | null) {
+    this.setMap(5, v);
+  }
+  get specularIntensityMap(): Texture | null {
+    return this.physicalTextures[6];
+  }
+  set specularIntensityMap(v: Texture | null) {
+    this.setMap(6, v);
+  }
+  get specularColorMap(): Texture | null {
+    return this.physicalTextures[7];
+  }
+  set specularColorMap(v: Texture | null) {
+    this.setMap(7, v);
+  }
+  get iridescenceMap(): Texture | null {
+    return this.physicalTextures[8];
+  }
+  set iridescenceMap(v: Texture | null) {
+    this.setMap(8, v);
+  }
+  get iridescenceThicknessMap(): Texture | null {
+    return this.physicalTextures[9];
+  }
+  set iridescenceThicknessMap(v: Texture | null) {
+    this.setMap(9, v);
+  }
+  get anisotropyMap(): Texture | null {
+    return this.physicalTextures[10];
+  }
+  set anisotropyMap(v: Texture | null) {
+    this.setMap(10, v);
+  }
+  get thicknessMap(): Texture | null {
+    return this.physicalTextures[11];
+  }
+  set thicknessMap(v: Texture | null) {
+    this.setMap(11, v);
+  }
+  private rotation = 0;
   /** Physical materials only, gltf-pro layout: [clearcoat, clearcoatRoughness, 1, transmission, specularColor rgb, specularIntensity, sheenColor rgb, sheenRoughness], and [0, ior, 0, 0]. */
   readonly physical?: number[];
   readonly ext?: number[];
@@ -453,7 +679,7 @@ export class Material {
       (o.normalScale !== undefined && !Number.isFinite(o.normalScale))
     )
       throw new TypeError('Invalid material options');
-    for (const slot of slots)
+    for (const slot of [...mapSlots, 'matcap'] as const)
       if (o[slot] != null && !(o[slot] instanceof Texture))
         throw new TypeError('Material ' + slot + ' must be a Texture');
     this.shading = shading;
@@ -479,13 +705,30 @@ export class Material {
     this.aoMap = o.aoMap ?? null;
     this.emissiveMap = o.emissiveMap ?? null;
     this.matcap = o.matcap ?? null;
-    const used = (Object.keys(extensions) as (keyof PhysicalOptions)[]).filter((k) => o[k] !== undefined);
-    this.extensions = [...new Set(used.map((k) => extensions[k]))];
+    this.clearcoatMap = o.clearcoatMap ?? null;
+    this.clearcoatRoughnessMap = o.clearcoatRoughnessMap ?? null;
+    this.clearcoatNormalMap = o.clearcoatNormalMap ?? null;
+    this.transmissionMap = o.transmissionMap ?? null;
+    this.thicknessMap = o.thicknessMap ?? null;
+    this.sheenColorMap = o.sheenColorMap ?? null;
+    this.sheenRoughnessMap = o.sheenRoughnessMap ?? null;
+    this.specularIntensityMap = o.specularIntensityMap ?? null;
+    this.specularColorMap = o.specularColorMap ?? null;
+    this.anisotropyMap = o.anisotropyMap ?? null;
+    this.iridescenceMap = o.iridescenceMap ?? null;
+    this.iridescenceThicknessMap = o.iridescenceThicknessMap ?? null;
+    const used = (Object.keys(extensions) as (keyof PhysicalOptions)[]).filter((k) => o[k] != null);
+    this.extensions = [
+      ...new Set([...used.map((k) => extensions[k]), ...(o.thicknessMap != null ? ['transmission'] : [])]),
+    ];
     if (!used.length) return;
     if (shading !== 'standard') throw new TypeError('Physical options need standard shading');
     this.physical = [0, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 0];
     this.ext = [0, 1.5, 0, 0];
-    if (o.transmission !== undefined) this.volume = [0, 1, 1, 1];
+    if (this.extensions.includes('anisotropy') || this.extensions.includes('iridescence'))
+      this.physical.push(0, 1.3, 100, 400, 0, 1, 0, 0, 0, 1, 1, 1);
+    if (o.transmission !== undefined || o.transmissionMap != null || o.thicknessMap != null) this.volume = [0, 1, 1, 1];
+    if (mapped(this)) while (this.uvt.length < mapSlots.length * 8) this.uvt.push(...this.uvDefault);
     Object.assign(this, Object.fromEntries(used.map((k) => [k, o[k]])));
   }
   private set(i: number, v: number, label: string): void {
@@ -517,6 +760,59 @@ export class Material {
   }
   set clearcoatRoughness(v: number) {
     this.set(1, v, 'clearcoatRoughness');
+  }
+  get clearcoatNormalScale(): number {
+    return this.physical?.[2] ?? 1;
+  }
+  set clearcoatNormalScale(v: number) {
+    if (!this.physical) throw new TypeError('Material clearcoatNormalScale needs a physical option at construction');
+    if (!Number.isFinite(v)) throw new RangeError('Invalid clearcoatNormalScale');
+    this.physical[2] = v;
+  }
+  private advanced(label: string): number[] {
+    if (!this.physical || !this.extensions.includes(label))
+      throw new TypeError('Material ' + label + ' needs the corresponding option at construction');
+    return this.physical;
+  }
+  get anisotropy(): number {
+    return this.physical?.[16] ?? 0;
+  }
+  set anisotropy(v: number) {
+    this.advanced('anisotropy')[16] = unit(v, 'anisotropy');
+  }
+  get anisotropyRotation(): number {
+    return this.rotation;
+  }
+  set anisotropyRotation(v: number) {
+    const p = this.advanced('anisotropy');
+    if (!Number.isFinite(v)) throw new RangeError('Invalid anisotropyRotation');
+    this.rotation = v;
+    p[17] = Math.cos(v);
+    p[18] = Math.sin(v);
+  }
+  get iridescence(): number {
+    return this.physical?.[12] ?? 0;
+  }
+  set iridescence(v: number) {
+    this.advanced('iridescence')[12] = unit(v, 'iridescence');
+  }
+  get iridescenceIOR(): number {
+    return this.physical?.[13] ?? 1.3;
+  }
+  set iridescenceIOR(v: number) {
+    const p = this.advanced('iridescence');
+    if (!(v >= 1 && v < Infinity)) throw new RangeError('Invalid iridescenceIOR');
+    p[13] = v;
+  }
+  get iridescenceThicknessRange(): readonly [number, number] {
+    return [this.physical?.[14] ?? 100, this.physical?.[15] ?? 400];
+  }
+  set iridescenceThicknessRange(v: readonly [number, number]) {
+    const p = this.advanced('iridescence');
+    if (!Array.isArray(v) || v.length !== 2 || !v.every(Number.isFinite) || v[0] < 0 || v[1] < v[0])
+      throw new RangeError('Invalid iridescenceThicknessRange');
+    p[14] = v[0];
+    p[15] = v[1];
   }
   get transmission(): number {
     return this.physical?.[3] ?? 0;
@@ -640,11 +936,13 @@ export class Material {
   }
   /** Live: sets one map slot's UV transform, or every slot's without `slot`; null restores the identity. */
   setUVTransform(t: TextureTransform | null, slot?: MapSlot): this {
-    const i = slot === undefined ? -1 : slots.indexOf(slot);
-    if (i > 4 || (slot !== undefined && i < 0)) throw new TypeError('Invalid UV transform slot');
+    const i = slot === undefined ? -1 : mapSlots.indexOf(slot);
+    if (slot !== undefined && i < 0) throw new TypeError('Invalid UV transform slot');
     const { texCoord } = textureCoordinates({ extensions: { KHR_texture_transform: t ?? {} } }),
       rows = textureTransform(t ?? {}, texCoord);
-    for (let k = 0; k < 5; k++) if (i < 0 || k === i) this.uvt.splice(k * 8, 8, ...rows);
+    if (i < 0) this.uvDefault = rows;
+    while (this.uvt.length < Math.max(40, (i + 1) * 8)) this.uvt.push(...this.uvDefault);
+    for (let k = 0; k < this.uvt.length / 8; k++) if (i < 0 || k === i) this.uvt.splice(k * 8, 8, ...rows);
     return this;
   }
   /** True when the beauty pipeline needs blending or depth overrides. */
@@ -656,10 +954,43 @@ export class Material {
   }
   /** gltf-pro beauty shader patch; subclasses (such as `@margoengine/shader`'s NodeMaterial) may extend it. */
   shader(source: string, group: number): string {
+    if (mapped(this)) return physicalMapsShader(source, group, mapPlan(this).slots);
     return materialShader(source, group, this.shading);
   }
   /** @internal gltf-pro LightingEffect bindings for one device; `engine` is the drawing engine. */
-  bindings(device: GPUDevice, _engine?: Engine): GPUBindGroupEntry[] {
+  bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[] {
+    if (mapped(this)) {
+      const plan = mapPlan(this),
+        state = mapState(this, engine ?? device);
+      if (state.device !== device || !state.buffer) {
+        state.buffer?.destroy();
+        state.device = device;
+        state.buffer = device.createBuffer({ size: 560, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+        const buffer = state.buffer;
+        device.lost?.then(() => {
+          if (state.buffer === buffer) {
+            buffer.destroy();
+            state.buffer = undefined;
+          }
+        });
+      }
+      const values = new Float32Array(140);
+      for (let k = 0; k < mapSlots.length; k++)
+        values.set(this.uvt.length > k * 8 ? this.uvt.slice(k * 8, k * 8 + 8) : this.uvDefault, k * 8);
+      values.set(this.volume ?? [0, 1, 1, 1], 136);
+      device.queue.writeBuffer(state.buffer, 0, values);
+      const entries: GPUBindGroupEntry[] = [{ binding: 200, resource: { buffer: state.buffer } }];
+      const bound = plan.textures.map(({ texture, srgb, fallback: role }) => {
+        const pair = texture.bind(device, srgb);
+        if (pair) return pair;
+        return fallback(device, role);
+      });
+      bound.forEach((pair, i) => entries.push({ binding: 201 + i, resource: pair[0] }));
+      plan.samplers.forEach((texture, i) =>
+        entries.push({ binding: 240 + i, resource: bound[plan.textures.findIndex((t) => t.texture === texture)][1] }),
+      );
+      return entries;
+    }
     const d = defaults(device),
       entries: GPUBindGroupEntry[] = [];
     for (let i = 0; i < (this.shading === 'matcap' ? 6 : 5); i++) {
@@ -866,7 +1197,14 @@ export function createMesh<M extends Material | readonly Material[]>(
       ...(m.physical && { extensions: Object.fromEntries(m.extensions.map((e) => ['KHR_materials_' + e, {}])) }),
     })),
   };
-  const model = new PBRModel(engine, new GLTFAsset(doc, []), [], [prepared]);
+  const model = new PBRModel(
+    engine,
+    new GLTFAsset(doc, [], undefined, { materials: extendedMaterials }),
+    [],
+    [prepared],
+  );
+  const releaseMaps = [...new Set(groups.map((g) => materials[g.materialIndex]))].map((m) => retainMaps(m, runtime));
+  model.onDispose(() => releaseMaps.forEach((release) => release()));
   for (const primitive of model.primitives) {
     const m = materials[primitive.definition.material!],
       g = primitive.material;
@@ -876,12 +1214,19 @@ export function createMesh<M extends Material | readonly Material[]>(
       emission: m.emissive,
       factors: m.factors,
       settings: m.settings,
-      uvt: m.uvt,
     });
+    // The native frame holds 13 slots; the sparse map uniform owns all 17 slots.
+    Object.defineProperty(g, 'uvt', { get: () => m.uvt.slice(0, g.extended ? 144 : 104) });
     // Physical: gltf-pro's factor-only variant (five maps), live arrays, and the tinted-blend constant read every frame.
     if (m.physical) {
       Object.assign(g, { physical: m.physical, ext: m.ext, volume: m.volume, maps: g.maps.slice(0, 5) });
       Object.defineProperty(g, 'tint', { get: () => m.tint });
+      if (m.physical.length > 12)
+        g.extended = {
+          iridescence: m.extensions.includes('iridescence'),
+          anisotropy: m.extensions.includes('anisotropy'),
+          diffuseTransmission: false,
+        };
     }
     if (m.customState)
       g.renderState = {
@@ -890,6 +1235,12 @@ export function createMesh<M extends Material | readonly Material[]>(
         depthCompare: m.depthTest ? undefined : 'always',
       } satisfies PBRRenderState;
     g.shading = {
+      get replacesTextures() {
+        return mapped(m);
+      },
+      get texturedTint() {
+        return mapped(m) && m.transmissive;
+      },
       shader: (code, group) => m.shader(code, group),
       bindings: () => m.bindings(runtime.gpu!, runtime),
     };
