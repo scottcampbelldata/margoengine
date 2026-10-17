@@ -358,6 +358,8 @@ type GPUContext = Extract<PassContext, {
 interface PBRHooks {
     readonly declarations: string;
     readonly ambient?: string;
+    readonly coat?: string;
+    readonly sheen?: string;
     output?(color: string): string;
 }
 

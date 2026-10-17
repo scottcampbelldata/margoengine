@@ -118,3 +118,16 @@ test('lighting cache remains bounded while preserving recent shader variants and
   assert.equal(lightPBR(variants[0], other), results[0]);
   assert.equal(calls, 67);
 });
+
+test('coat and sheen hooks light the physical layers; shaders without layers ignore them', () => {
+  const defaults = physicalShader();
+  // Without an environment the layers keep the hemisphere terms they always had.
+  assert.match(defaults, /fn margoCoatAmbient\(s:Surface,v:vec3f\)->vec3f \{return 0\.5\*margoLayerSky\(s\);\}/);
+  assert.match(defaults, /fn margoSheenAmbient\(s:Surface,v:vec3f\)->vec3f \{return 0\.157\*margoLayerSky\(s\);\}/);
+  const hooks = { declarations: '', coat: 'coatLight(s,v)', sheen: 'sheenLight(s,v)' },
+    lit = lightPBR(defaults, hooks);
+  assert.match(lit, /fn margoCoatAmbient\(s:Surface,v:vec3f\)->vec3f \{return coatLight\(s,v\);\}/);
+  assert.match(lit, /fn margoSheenAmbient\(s:Surface,v:vec3f\)->vec3f \{return sheenLight\(s,v\);\}/);
+  assert.match(lit, /margoSheenAmbient\(s,v\)\);/, 'layers() still calls the sheen hook');
+  assert.equal(lightPBR(pbrShader, hooks), pbrShader, 'the standard shader has no layers to light');
+});

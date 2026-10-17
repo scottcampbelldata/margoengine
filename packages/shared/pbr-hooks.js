@@ -46,6 +46,16 @@ function composeLightPBR(code, hooks, cache) {
         `let margoAmbient=${layered ? 'margoAmbientLayers(i,s,v)' : hooks.ambient};var color=${terms}+s.emissive+margoAmbient;`,
     );
   }
+  // Physical materials (gltf-pro's layers) light their clearcoat and sheen through these two functions.
+  for (const [name, expression] of [
+    ['margoCoatAmbient', hooks.coat],
+    ['margoSheenAmbient', hooks.sheen],
+  ])
+    if (expression && out.includes(`fn ${name}(`))
+      edit(
+        new RegExp(`fn ${name}\\(s:Surface,v:vec3f\\)->vec3f \\{return [^;]*;\\}`),
+        () => `fn ${name}(s:Surface,v:vec3f)->vec3f {return ${expression};}`,
+      );
   if (hooks.output)
     edit(
       'if(f.settings.w<0.5) {color=aces(max(color,vec3f(0))/0.6);',

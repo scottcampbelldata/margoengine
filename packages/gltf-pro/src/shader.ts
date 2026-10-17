@@ -203,6 +203,14 @@ export interface PBRLighting {
   readonly light?: string;
   /** vec3f replacing the hemisphere ambient (image-based lighting). SSAO's ambient replay returns it. At most one effect. */
   readonly ambient?: string;
+  /**
+   * vec3f ambient light of the clearcoat layer, before its Fresnel, in terms of `s` (Surface: `s.cn` coat normal, `s.cr`
+   * coat roughness) and `v` (unit vector to the eye); replaces the hemisphere in physical materials (image-based
+   * lighting: prefiltered radiance along the coat's reflection). Shaders without a coat ignore it. At most one effect.
+   */
+  readonly coat?: string;
+  /** vec3f ambient light of the sheen layer, before its colour (`s`, `v` as for `coat`); as `coat`, for sheen. */
+  readonly sheen?: string;
   /** Wraps the display colour after tone mapping, before sRGB encoding (fog). */
   output?(color: string): string;
 }
@@ -387,13 +395,17 @@ const physicalEdits = (sample: (name: string) => string, bindings: string): [str
   let a2=pow(r,4.0); let d=a2/(3.14159265*pow(nh*nh*(a2-1)+1,2.0)); let g=2*nv/(nv+sqrt(a2+(1-a2)*nv*nv))*2*nl/max(nl+sqrt(a2+(1-a2)*nl*nl),0.0001);
   return d*g/max(4*nl*nv,0.0001)*nl;
 }
+fn margoLayerSky(s:Surface)->vec3f {return mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(s.cn.y*0.5+0.5,0.0,1.0))*f.radiance.w*s.occlusion;}
+// Ambient light of the clearcoat (before its Fresnel) and of the sheen (before its colour); lighting effects with an
+// environment replace them (PBRHooks coat and sheen), the defaults are the hemisphere.
+fn margoCoatAmbient(s:Surface,v:vec3f)->vec3f {return 0.5*margoLayerSky(s);}
+fn margoSheenAmbient(s:Surface,v:vec3f)->vec3f {return 0.157*margoLayerSky(s);}
 fn layers(s:Surface,v:vec3f,l:vec3f,under:vec3f)->vec3f {
   let light=f.radiance.rgb*f.light.w; let h=normalize(v+l); let nl=clamp(dot(s.n,l),0.0,1.0); let nv=clamp(dot(s.n,v),0.0001,1.0); let nh=clamp(dot(s.n,h),0.0,1.0);
   let inv=1/(s.sh.w*s.sh.w); let sheen=(2+inv)*pow(1-nh*nh,inv*0.5)/6.2831853/(4*(nl+nv-nl*nv))*nl;
-  let sky=mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(s.cn.y*0.5+0.5,0.0,1.0))*f.radiance.w*s.occlusion;
-  let color=under*(1-0.157*max(s.sh.r,max(s.sh.g,s.sh.b)))+s.sh.rgb*(sheen*light+0.157*sky);
+  let color=under*(1-0.157*max(s.sh.r,max(s.sh.g,s.sh.b)))+s.sh.rgb*(sheen*light+margoSheenAmbient(s,v));
   let fc=0.04+0.96*pow(1-clamp(dot(s.cn,v),0.0,1.0),5.0);
-  return color*(1-s.cc*fc)+s.cc*fc*(ggx(s.cn,v,l,s.cr)*light+0.5*sky);
+  return color*(1-s.cc*fc)+s.cc*fc*(ggx(s.cn,v,l,s.cr)*light+margoCoatAmbient(s,v));
 }
 @fragment fn fragment(`,
   ],

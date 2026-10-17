@@ -18,6 +18,10 @@ declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 export interface PBRHooks {
   readonly declarations: string;
   readonly ambient?: string;
+  /** Ambient light of a physical material's clearcoat layer (gltf-pro PBRLighting `coat`). */
+  readonly coat?: string;
+  /** Ambient light of a physical material's sheen layer (gltf-pro PBRLighting `sheen`). */
+  readonly sheen?: string;
   output?(color: string): string;
 }
 /** What the effects light: core's mesh shader (patched, group 0) or anything with glTF-pro's `addLighting` (hooks, group 2). */
@@ -235,6 +239,8 @@ export class EnvironmentLighting extends ShaderEffect {
     return {
       declarations: this.declarations(group),
       ambient: iblCall('s.n', 'v', 's.base.rgb', 's.metal', 's.roughness') + '*s.occlusion',
+      coat: 'iblPrefiltered(iblSpecular,iblSampler,iblParams,reflect(-v,s.cn),s.cr)*iblParams.w*s.occlusion',
+      sheen: '0.157*iblIrradiance(iblSh,iblRotate(s.n,iblParams))*iblParams.w*s.occlusion',
     };
   }
   override setup(engine: EngineKernel): void {

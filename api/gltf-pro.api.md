@@ -205,6 +205,8 @@ export interface PBRLighting {
     direct?(direct: string): string;
     readonly light?: string;
     readonly ambient?: string;
+    readonly coat?: string;
+    readonly sheen?: string;
     output?(color: string): string;
 }
 
