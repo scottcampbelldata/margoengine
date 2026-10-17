@@ -101,6 +101,7 @@ type TextureOwner = Partial<Record<(typeof slots)[number], PixelTexture | null>>
   attenuationColor?: readonly number[];
   attenuationDistance?: number;
   anisotropyRotation?: number;
+  dispersion?: number;
   transmissive?: boolean;
 };
 function textureOwner(model: PBRModel, index?: number): TextureOwner | undefined {
@@ -245,6 +246,8 @@ class Writer extends Bin {
         });
       if (P && (e.KHR_materials_transmission || owner?.transmissionMap || owner?.transmissive))
         ext.KHR_materials_transmission = clean({ transmissionFactor: P[3], transmissionTexture: t(8) });
+      const dispersion = owner?.dispersion ?? m.dispersion ?? e.KHR_materials_dispersion?.dispersion ?? 0;
+      if (e.KHR_materials_dispersion || (P && dispersion > 0)) ext.KHR_materials_dispersion = { dispersion };
       if (
         P &&
         (e.KHR_materials_sheen ||

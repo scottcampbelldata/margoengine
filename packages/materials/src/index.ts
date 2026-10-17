@@ -93,6 +93,7 @@ type MaterialDefinition = Partial<Record<MapField, TextureInfo | ClearcoatTextur
   clearcoatFactor?: number;
   clearcoatRoughnessFactor?: number;
   transmissionFactor?: number;
+  dispersion?: number;
   volume?: MaterialDefinition;
   thicknessFactor?: number;
   attenuationColor?: readonly [number, number, number];
@@ -162,6 +163,7 @@ export class MaterialInstallation implements EnginePlugin {
         normalizedTransmission ? material.transmission : material.extensions?.KHR_materials_transmission,
         'KHR_materials_transmission',
       );
+      const dispersion = definition(material.extensions?.KHR_materials_dispersion, 'KHR_materials_dispersion');
       // The built-in physical renderer stores packed attenuation in volume; normalized extension metadata stays an object.
       const normalizedVolume = material.physical && Array.isArray(material.volume) ? undefined : material.volume;
       const volume = definition(
@@ -206,7 +208,8 @@ export class MaterialInstallation implements EnginePlugin {
         for (const field of lobeMaps[key]) if (value[field] !== undefined) lobeTextures[field] = value[field];
       }
       const hasLobes = Object.keys(lobeOptions).length > 0;
-      if (def === undefined && transmit === undefined && volume === undefined && !hasLobes) continue;
+      if (def === undefined && transmit === undefined && volume === undefined && dispersion === undefined && !hasLobes)
+        continue;
       const iorDef = definition(material.extensions?.KHR_materials_ior, 'KHR_materials_ior');
       if (hasLobes) {
         if (
@@ -220,6 +223,7 @@ export class MaterialInstallation implements EnginePlugin {
       const transmissionOptions: TransmissionOptions = {
         factor: transmit ? (normalizedTransmission ? transmit.factor : transmit.transmissionFactor) : 0,
         ior: transmit?.ior ?? (material.ior as number | undefined) ?? iorDef?.ior,
+        dispersion: dispersion !== undefined ? dispersion.dispersion : (material.dispersion as number | undefined),
         ...(volume !== undefined
           ? {
               volume: {

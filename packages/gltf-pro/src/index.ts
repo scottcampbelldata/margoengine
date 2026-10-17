@@ -193,6 +193,8 @@ export interface PBRMaterial extends GLTFMaterial {
   maps: (GLTFTextureInfo | undefined)[];
   uvt?: number[];
   ext?: number[];
+  /** KHR_materials_dispersion strength, finite and non-negative (default 0); read live each draw. */
+  dispersion?: number;
   physical?: number[];
   extended?: Omit<ExtendedPlan, 'slots'>;
   tint?: number[];
@@ -545,7 +547,8 @@ function material(def: GLTFMaterial = {}, extended?: GLTFExtendedMaterials): PBR
     tr = e.KHR_materials_transmission,
     sh = e.KHR_materials_sheen,
     sp = e.KHR_materials_specular,
-    vo = e.KHR_materials_volume;
+    vo = e.KHR_materials_volume,
+    dispersion = def.extensions?.KHR_materials_dispersion?.dispersion;
   const base = vector(p.baseColorFactor ?? [1, 1, 1, 1], 4, 'base color', 0, 1),
     transmission = scalar(tr?.transmissionFactor ?? 0, 0, 1, 'transmission'),
     strength = scalar(e.KHR_materials_emissive_strength?.emissiveStrength ?? 1, 0, Infinity, 'emissive strength');
@@ -558,7 +561,7 @@ function material(def: GLTFMaterial = {}, extended?: GLTFExtendedMaterials): PBR
     depth = thickness / distance;
   // Extended materials: thin film, anisotropy or diffuse transmission in use (factor > 0); maps 13-17 and three more uniform rows.
   const x = extended?.parse(e),
-    physical = !!(x || cc || tr || sh || sp || vo || e.KHR_materials_ior);
+    physical = !!(x || cc || tr || sh || sp || vo || e.KHR_materials_ior || e.KHR_materials_dispersion);
   const maps = [
     p.baseColorTexture,
     p.metallicRoughnessTexture,
@@ -603,6 +606,7 @@ function material(def: GLTFMaterial = {}, extended?: GLTFExtendedMaterials): PBR
       textureTransform((t?.extensions?.KHR_texture_transform ?? {}) as TextureTransform, t?.texCoord ?? 0),
     ),
     ext: [+!!e.KHR_materials_unlit, scalar(e.KHR_materials_ior?.ior ?? 1.5, 0, Infinity, 'ior'), 0, 0],
+    dispersion: scalar(dispersion === undefined ? 0 : dispersion, 0, Infinity, 'dispersion'),
     physical: physical
       ? [
           scalar(cc?.clearcoatFactor ?? 0, 0, 1, 'clearcoat'),
@@ -1543,6 +1547,7 @@ export class PBRModel implements EnginePlugin {
         );
         if (!compact) {
           v.set(m.ext!, 100);
+          v[103] = m.dispersion ?? 0;
           v.set(m.uvt!, 104);
         }
         if (!compact && m.physical) {

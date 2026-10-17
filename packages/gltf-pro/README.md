@@ -73,7 +73,18 @@ Optional material maps support the same transform through `materials.install()`.
 `textureCoordinates(info)` exposes the validated UV selection and packed affine rows;
 caller-owned clearcoat/transmission textures accept a glTF-style `transform` option.
 
-Imported clearcoat, transmission, IOR, volume, sheen and specular metadata remain available for explicit `@margoengine/materials` installation. To use the retained physical renderer directly, import `extendedMaterials` from `@margoengine/gltf-pro/extended` and pass `{decoders: {materials: extendedMaterials}}` to `loadGLTF` or `parseGLTFAsync`. For synchronous parsing, pass `{materials: extendedMaterials}` as `parseGLTF`'s fifth argument. This route also enables iridescence, anisotropy and diffuse transmission. Constructed `@margoengine/materials` meshes retain their live material and UV-transform layout automatically.
+Imported clearcoat, transmission, IOR, volume, dispersion, sheen and specular metadata remain available for explicit `@margoengine/materials` installation. To use the retained physical renderer directly, import `extendedMaterials` from `@margoengine/gltf-pro/extended` and pass `{decoders: {materials: extendedMaterials}}` to `loadGLTF` or `parseGLTFAsync`. For synchronous parsing, pass `{materials: extendedMaterials}` as `parseGLTF`'s fifth argument. This route also enables iridescence, anisotropy and diffuse transmission. Constructed `@margoengine/materials` meshes retain their live material and UV-transform layout automatically.
+
+`KHR_materials_dispersion` is accepted when required. Its factor is validated and
+retained as `primitive.material.dispersion` even without a materials decoder;
+it defaults to 0 and accepts finite non-negative values, including values above 1.
+With `extendedMaterials`, declaring the extension reserves the physical frame even
+at 0. Chromatic refraction is visible through `@margoengine/materials/transmission`
+when transmission and volume thickness are positive. Dispersion alone does not
+reserve transmission. The factor remains live, and 0 preserves the existing
+refraction output. Native transmission uses scalar volume thickness; imported
+`KHR_materials_volume.thicknessTexture` is sampled by the explicit
+`@margoengine/materials` installation route.
 
 The optional `/worker` entry exposes `loadGLTFInWorker` and `parseGLTFInWorker`. Ordinary assets parse and pack in a worker. Automatic Draco/KTX2 inputs transfer their source buffers back before codec work, then decode on the GPU-owning thread; custom decoders or `fetch` keep the entire load there. The `/progressive` loader exposes `ready` and `complete`; compressed assets use the normal async loader before publishing a model. `maxDownloadBytes`, `maxNodes`, allowed resource URLs and abort signals remain enforced.
 

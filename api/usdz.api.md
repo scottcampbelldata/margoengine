@@ -128,6 +128,7 @@ interface GLTFExtensions {
   KHR_materials_unlit?: object;
   KHR_materials_emissive_strength?: { emissiveStrength?: number };
   KHR_materials_ior?: { ior?: number };
+  KHR_materials_dispersion?: { dispersion?: number };
   KHR_materials_clearcoat?: {
     clearcoatFactor?: number;
     clearcoatRoughnessFactor?: number;
