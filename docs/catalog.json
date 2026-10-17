@@ -680,7 +680,8 @@
     "imports": "import { Sky } from '@margoengine/sky';",
     "exports": [
       "Sky",
-      "sunDirection"
+      "sunDirection",
+      "sunlight"
     ],
     "category": "Rendering and lighting"
   },

@@ -72,7 +72,7 @@ Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. T
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-74 packages in 10 layers, the same as the [catalog](https://margoengine.com/catalog/).
+75 packages in 10 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (2)
 
@@ -184,7 +184,7 @@ Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. T
 | [`@margoengine/fsm`](packages/fsm/README.md) | Hierarchical state transitions with cross-fade progress. |
 | [`@margoengine/net`](packages/net/README.md) | Hermite and quaternion snapshot interpolation with bounded prediction. |
 
-### CAD and engineering (3)
+### CAD and engineering (4)
 
 | Package | What it is |
 | --- | --- |
