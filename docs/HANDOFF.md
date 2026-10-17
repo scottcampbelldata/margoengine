@@ -23,8 +23,19 @@ All seven additional package/interop checks pass, including strict consumers of 
 Touched materials/gltf-pro/shadows/clustered/staging/tonemap hygiene gates have no new violations.
 The Windows desktop power probe records actual AC power, and hardware-specific visual profiles preserve the original
 Intel references. The NVIDIA reference uses clean `b3ed8ac` rendered sources with four captures per view; its source
-and adapter audit is retained beside the profile. Finish actionable PARTIAL rows before MISSING rows; standalone
-depth capture is next. Evidence: `docs/materials-wireframe-verification.md` and `docs/tonemap-lut-sizes-verification.md`.
+and adapter audit is retained beside the profile. Evidence: `docs/materials-wireframe-verification.md` and
+`docs/tonemap-lut-sizes-verification.md`.
+
+The standalone shared depth proposal was canceled before any commit: its API, loose tests and docs were removed.
+PostStack's existing depthTexture and its consumers are unchanged. Current requested work is ordered:
+loaded glTF-pro section beauty plus its cut shadow, then picked assembly-child outlines, then scene camera/light export.
+No MISSING-row implementation is authorized by that sequence. Section clipping now reuses the existing machinery
+uniform in optional glTF-pro and directional shadow shaders; core, stage and the machinery core-shader patch are unchanged.
+Physical GPU Box.glb tests pass 15 checks at actual 1x/4x, including removal/retention of beauty and cast shadow.
+Stencil caps for loaded models remain a gap. Core + stage remains exactly 21,094 bytes gzip.
+Section verification passes `npm run check:merge`: 2,518 Node tests, 15 current proofs and all 55 visual views,
+with no reference-image changes. All seven additional package/interop checks pass. Touched glTF-pro/shadows
+hygiene gates have no new violations. Reproduce the loaded-asset pixels with `node scripts/section-loaded-asset-tests.js`.
 
 ## Goal
 

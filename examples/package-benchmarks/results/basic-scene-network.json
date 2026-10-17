@@ -1,6 +1,6 @@
 {
-  "commit": "6be169b",
-  "dirty": false,
+  "commit": "686d8d2",
+  "dirty": true,
   "browser": "msedge 155.0.4283.60 headless",
   "adapter": "nvidia ampere",
   "method": "Vite production build of tests/fixtures/basic-scene (base ./, es2022), served by vite preview (its own on-the-fly gzip); transferred = Playwright requestfinished sizes (encoded body + response headers); raw, gzip and brotli of the same built files at zlib defaults",
@@ -11,7 +11,7 @@
       "encoding": "identity",
       "transferred": 808,
       "raw": 558,
-      "gzip": 369,
+      "gzip": 370,
       "brotli": 227
     },
     {
@@ -24,13 +24,13 @@
       "brotli": 938
     },
     {
-      "path": "assets/index-Be5G0gO8.js",
+      "path": "assets/index-cDoxHMJ6.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
       "transferred": 21965,
       "raw": 50889,
       "gzip": 21584,
-      "brotli": 19032
+      "brotli": 19027
     },
     {
       "path": "assets/extension-DuYhGmhk.js",
@@ -64,8 +64,8 @@
     "requests": 6,
     "transferred": 31407,
     "raw": 66737,
-    "gzip": 28389,
-    "brotli": 25024
+    "gzip": 28390,
+    "brotli": 25019
   },
   "notFetched": [
     {
@@ -89,16 +89,16 @@
       "raw": 40045
     },
     {
+      "path": "assets/dist-CoFMXJay.js",
+      "raw": 26731
+    },
+    {
       "path": "assets/dist-CRraD2Og.js",
       "raw": 69030
     },
     {
       "path": "assets/dist-DnGFOsSt.js",
       "raw": 63300
-    },
-    {
-      "path": "assets/dist-DPx4ESVe.js",
-      "raw": 25046
     },
     {
       "path": "assets/occt-import-js-BhHfLpto.wasm",

@@ -63,6 +63,10 @@ Assembly BVHs also discover static glTF Pro/FBX triangles, including multiple pr
 
 CPU machinery tools work with either backend. Section rendering requires WebGPU; caps require depth32float-stencil8 and closed, consistently oriented geometry. Depth-fail winding uses a dedicated plane-depth/stencil target and composites against beauty depth. For open, nonmanifold or mixed-winding surfaces, use `{ cap: false }`; no stencil algorithm can infer their missing solid interior.
 
+`SectionPlanes` also clips native primitives loaded by `@margoengine/gltf-pro` and their directional shadows from `@margoengine/shadows`. Both renderers reuse the existing section uniform and world-space plane test. Use `{ cap: false }` for loaded models: stencil caps currently draw core geometry only. Attached sections redraw the directional shadow atlas each frame so editing planes or `enabled` cannot leave stale shadows; removing sections restores normal caching.
+
+Run `node scripts/section-loaded-asset-tests.js` from the repository root after building packages. The real checked-in `Box.glb` is loaded through `loadGLTF`; at actual 1x and 4x MSAA, the removed beauty matches the empty scene, its removed shadow matches the lit receiver, and the retained half keeps both its beauty and shadow. Core + stage remains 21,094 bytes gzip.
+
 This ESM package includes TypeScript declarations and requires `@margoengine/core` 0.1.0. See the [API and supported geometry guide](https://github.com/scottcampbelldata/margoengine/blob/main/MODERN-ENGINE.md).
 
 Margo Engine code is MIT licensed. The separately loaded OCCT assets are LGPL-2.1; notices and the license ship in `dist/workers`. These assets add about 7.7 MB to the package, separate from the machinery runtime JavaScript.
