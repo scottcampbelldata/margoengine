@@ -31,7 +31,7 @@ const server = await createServer({
   configFile: false,
   logLevel: 'error',
   optimizeDeps: { noDiscovery: true, include: [] },
-  server: { host: '127.0.0.1', port: 0, hmr: false },
+  server: { host: '127.0.0.1', port: 0, hmr: false, watch: null },
 });
 await server.listen();
 const url = new URL('examples/package-benchmarks/warm-up.html', server.resolvedUrls.local[0]).href;

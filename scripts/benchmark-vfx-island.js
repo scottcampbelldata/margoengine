@@ -529,7 +529,7 @@ try {
   server = await createServer({
     root: resolve('examples/gameplay-sandbox'),
     configFile: resolve('examples/gameplay-sandbox/vite.config.ts'),
-    server: { host: '127.0.0.1', port: 5199, strictPort: true, fs: { allow: [resolve('.')] } },
+    server: { host: '127.0.0.1', port: 5199, strictPort: true, watch: null, fs: { allow: [resolve('.')] } },
     optimizeDeps: { entries: ['index.html'] },
     logLevel: 'error',
   });

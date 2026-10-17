@@ -18,7 +18,9 @@ export async function openBrowser({
   const server = await createServer({
     resolve: { alias: aliases },
     optimizeDeps: { entries: [startPath.replace(/^\//, '')] },
-    server: { host: '127.0.0.1', port, strictPort: true },
+    // No file watcher: its first crawl of the repository (and every worktree under it) blocked this process for
+    // 30-140 s on a busy machine, so the first page load timed out ("Preparing the citadel...", gate 9).
+    server: { host: '127.0.0.1', port, strictPort: true, watch: null },
     logLevel: 'error',
   });
   await server.listen();

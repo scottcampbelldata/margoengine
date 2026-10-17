@@ -50,7 +50,7 @@ export async function runBenchmark() {
     appType: 'custom',
     optimizeDeps: { noDiscovery: true, entries: [] },
     logLevel: 'error',
-    server: { host: '127.0.0.1', port: 0 },
+    server: { host: '127.0.0.1', port: 0, watch: null },
     plugins: [
       {
         name: 'benchmark-gzip',

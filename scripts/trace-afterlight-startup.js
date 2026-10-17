@@ -109,7 +109,7 @@ try {
     root,
     configFile: resolve(root, 'vite.config.ts'),
     logLevel: 'error',
-    server: { host: '127.0.0.1', port: 5231, strictPort: true },
+    server: { host: '127.0.0.1', port: 5231, strictPort: true, watch: null },
   });
   await server.listen();
   browser = await chromium.launch({ channel: 'msedge', headless: true });

@@ -340,7 +340,9 @@ try {
         root,
         logLevel: 'error',
         optimizeDeps: { noDiscovery: true, include: [] },
-        server: { port: 0, hmr: false },
+        // No file watcher: its first crawl of the repository (and every worktree under it) blocked this process for
+        // 30-140 s on a busy machine, so the first page load timed out ("Preparing the citadel...", gate 9).
+        server: { port: 0, hmr: false, watch: null },
       })
     ).listen();
   const devOrigin = devServer && new URL(devServer.resolvedUrls.local[0]).origin;
@@ -381,19 +383,24 @@ try {
           };
           assertCaptureEnvironment(environment.gpu ? environment : currentEnvironment, currentEnvironment);
           if (!environment.gpu) environment = currentEnvironment;
-          return downsample(
-            await decodePNG(
-              await page.screenshot({ animations: 'disabled', mask: (demo.mask ?? []).map((s) => page.locator(s)) }),
-            ),
-            factor,
-          );
+          // Under load a screenshot can catch the browser mid-raster (a band of CSS gradient or blur 1-4 levels off,
+          // gone half a second later; gate 9), so shoot until two in a row match, as Playwright's toHaveScreenshot does.
+          const shot = () =>
+            page.screenshot({ animations: 'disabled', mask: (demo.mask ?? []).map((s) => page.locator(s)) });
+          let last = Buffer.alloc(0),
+            next = await shot();
+          for (let i = 0; i < 6 && !next.equals(last); i++) {
+            await page.waitForTimeout(500);
+            [last, next] = [next, await shot()];
+          }
+          return downsample(await decodePNG(next), factor);
         };
         page.on('pageerror', (e) => result.errors.push(`pageerror: ${e.message}`));
         page.on('console', (m) => {
           if (m.type() === 'error') result.errors.push(`console: ${m.text()}`);
         });
         try {
-          // 90 s: Night Citadel's first load took over 30 s while other agents built packages (gate 9: no load-flaky checks).
+          // 90 s: generous for a busy laptop (a 30-140 s first load was the dev server's file watcher, now off).
           await page.goto((demo.dev ? devOrigin : origin) + '/' + demo.path + query, { timeout: 90_000 });
           await page.waitForFunction(demo.ready, null, { timeout: 120_000 });
           if (loss) {

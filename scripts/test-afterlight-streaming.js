@@ -12,7 +12,7 @@ const server = await createServer({
   root,
   configFile: resolve(root, 'vite.config.ts'),
   logLevel: 'error',
-  server: { host: '127.0.0.1', port: 5198, strictPort: true },
+  server: { host: '127.0.0.1', port: 5198, strictPort: true, watch: null },
 });
 await server.listen();
 let browser, hardware;

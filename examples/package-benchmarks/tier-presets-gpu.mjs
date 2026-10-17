@@ -131,7 +131,7 @@ try {
       server = await createServer({
         root: resolve(root, page.root),
         configFile: page.configFile ? resolve(root, page.configFile) : false,
-        server: { host: '127.0.0.1', port: page.port, strictPort: true, fs: { allow: [root] } },
+        server: { host: '127.0.0.1', port: page.port, strictPort: true, watch: null, fs: { allow: [root] } },
         optimizeDeps: { entries: ['index.html'] },
         logLevel: 'error',
       });
