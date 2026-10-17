@@ -3,14 +3,14 @@
 
 Margo Engine's own code is MIT licensed (`LICENSE`; every tarball ships a copy). This file lists everything else that
 reaches users: npm packages our published packages depend on, third-party code shipped inside our tarballs, and the
-assets the site and examples use. It covers all 76 published packages (74 in `packages/`
+assets the site and examples use. It covers all 77 published packages (75 in `packages/`
 plus `create-margo` and `margo-convert`). `node scripts/supply-chain.mjs --check` (in `npm run verify`, through
 `tests/supply-chain.test.js`) fails when this file is stale, a dependency has no stated reason, a licence is outside
 the allowed list, or a runtime dependency has an install script, a deprecation or a non-registry source.
 
 ## Runtime npm dependencies of published packages (direct and transitive)
 
-65 of 76 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
+66 of 77 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
 Versions are the ones in `package-lock.json`; users get whatever their own lockfile resolves inside our ranges.
 
 | Package | Version (lock) | Licence | Kind | Used by | Why |
@@ -80,6 +80,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/animator` | none | none | LICENSE |
 | `@margoengine/audio` | none | none | LICENSE |
 | `@margoengine/blender` | none | none | LICENSE |
+| `@margoengine/brep` | none | none | LICENSE |
 | `@margoengine/bvh` | none | none | LICENSE |
 | `@margoengine/cache` | none | none | LICENSE |
 | `@margoengine/cameras` | none | none | LICENSE |
@@ -170,7 +171,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 
 ## Development and workspace tooling (never shipped)
 
-`package-lock.json` holds 199 third-party entries (build tools, test tools, the examples' and apps' own
-dependencies, platform-optional binaries). Licences: MIT 105, Apache-2.0 46, MPL-2.0 13, LGPL-3.0-or-later 10, MIT OR Apache-2.0 9, ISC 4, Apache-2.0 AND LGPL-3.0-or-later 3, BSD-2-Clause 2, BSD-3-Clause 2, 0BSD 1, Apache-2.0 AND LGPL-3.0-or-later AND MIT 1, CC-BY-4.0 1, LGPL-2.1 1, MIT-0 1.
+`package-lock.json` holds 202 third-party entries (build tools, test tools, the examples' and apps' own
+dependencies, platform-optional binaries). Licences: MIT 105, Apache-2.0 49, MPL-2.0 13, LGPL-3.0-or-later 10, MIT OR Apache-2.0 9, ISC 4, Apache-2.0 AND LGPL-3.0-or-later 3, BSD-2-Clause 2, BSD-3-Clause 2, 0BSD 1, Apache-2.0 AND LGPL-3.0-or-later AND MIT 1, CC-BY-4.0 1, LGPL-2.1 1, MIT-0 1.
 Install scripts anywhere in the lock: fsevents@2.3.3. Deprecated: whatwg-encoding@3.1.1. CI and releases install with `npm ci`, which refuses a lockfile that does not match `package.json` and checks
 every tarball against its integrity hash.
