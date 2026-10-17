@@ -32,7 +32,7 @@ const declarations = (group: number) => /* wgsl */ `
 @group(${group}) @binding(${BINDING + 1}) var margoSceneSampler:sampler;
 fn margoTransmission(s:Surface,v:vec3f,i:Out)->vec3f {
   let ior=max(f.ext.y,1.0); let r=refract(-v,s.n,1/ior);
-  let path=margoVolume.x*(length(f.model[0].xyz)+length(f.model[1].xyz)+length(f.model[2].xyz))/3;
+  let path=margoVolume.x*s.th*(length(f.model[0].xyz)+length(f.model[1].xyz)+length(f.model[2].xyz))/3;
   let clip=f.camera*vec4f(i.position+r*(path/max(length(r),1e-4)),1); let uv=clip.xy/clip.w*vec2f(0.5,-0.5)+0.5;
   let lod=log2(f32(textureDimensions(margoScene).x))*s.roughness*clamp(ior*2-2,0.0,1.0);
   let behind=textureSampleLevel(margoScene,margoSceneSampler,uv,lod).rgb;

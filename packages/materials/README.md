@@ -227,7 +227,7 @@ mesh.root.setPosition([0, 1, 0]);
 ```
 
 `setUVTransform(transform, slot?)` selects UV0 or UV1 with `texCoord` as well as offset, scale and rotation. Without a
-slot it updates every standard map; `null` restores UV0 and the identity transform. Updates take effect next frame.
+slot it updates every map except `matcap`, including maps assigned later; `null` restores UV0 and the identity transform. Updates take effect next frame.
 Normal maps selected from UV1 or transformed UVs derive their tangent frame from those coordinates.
 
 A material array requires at least one group. Each group has a nonnegative integer `materialIndex` into that array,
@@ -246,3 +246,46 @@ Packing is cached by geometry identity: finish editing attributes before the fir
 creation, and use a new geometry object for changed attributes. `mesh.dispose()` releases model resources; textures
 remain caller-owned. Device restoration rebuilds the model and texture bindings. Constructed material shading cannot
 be copied to another GPU device without rebuilding its material resources. Core and the stage facade are unchanged.
+
+## Physical maps on constructed materials
+
+`Material` accepts these optional `Texture | null` properties alongside its physical factors:
+
+| Properties | Channels and default colour space |
+| --- | --- |
+| `clearcoatMap`, `clearcoatRoughnessMap`, `clearcoatNormalMap` | R strength, G roughness, RGB tangent normal; linear |
+| `sheenColorMap`, `sheenRoughnessMap` | sRGB RGB colour, linear A roughness |
+| `specularIntensityMap`, `specularColorMap` | Linear A intensity, sRGB RGB colour |
+| `transmissionMap`, `thicknessMap` | R transmission, G volume thickness; linear |
+| `anisotropyMap` | RG direction remapped to -1…1, B strength; linear |
+| `iridescenceMap`, `iridescenceThicknessMap` | R strength, G thickness within the film range; linear |
+
+```ts
+const glass = new Material({
+  transmission: 1, thickness: 0.8,
+  clearcoat: 1, clearcoatNormalMap: await loadTexture('/coat-normal.png'),
+  thicknessMap: await loadTexture('/thickness.png'),
+  attenuationColor: '#88bbff', attenuationDistance: 2,
+});
+glass.setUVTransform({texCoord: 1}, 'thicknessMap');
+```
+
+Maps multiply their corresponding factors; existing factor defaults remain unchanged. Clearcoat normals use
+`clearcoatNormalScale` (default 1). Anisotropy uses `anisotropy` (default 0) and `anisotropyRotation` (radians,
+default 0). Iridescence uses `iridescence` (default 0), `iridescenceIOR` (default 1.3) and
+`iridescenceThicknessRange` (nanometres, default `[100, 400]`). Dispersion remains unsupported.
+
+Physical and transmissive capabilities are fixed at construction. A non-null map reserves its lobe, and a
+transmission or thickness map also reserves transmissive rendering even when its factor is zero. To add
+anisotropy, iridescence or transmission maps later, reserve that capability with its factor set to zero first.
+Factors, map assignments (including `null`), texture `update()` calls and per-slot UV transforms stay live.
+Clearcoat normals and anisotropy derive independent tangent frames from their own transformed UV set.
+
+Mapped materials bind only assigned textures, share views by texture identity and colour space, and share samplers.
+The renderer checks the complete shader against device texture and sampler limits, including lighting and
+transmission resources. Combinations exceeding those limits throw a descriptive error; reduce simultaneous maps
+or share packed textures. `Texture.options.colorSpace` overrides the defaults in the table.
+
+These maps work with geometry groups, instancing, glTF export and device restoration. Glass uses the maps in both
+the tinted-background path and the optional `Transmission` refraction pass. Disposing the last mesh using a
+material releases its map uniform buffers; textures remain caller-owned.
