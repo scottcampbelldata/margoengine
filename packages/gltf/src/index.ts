@@ -13,11 +13,27 @@ const integer = (value: unknown, label: string, min = 0): number => {
     throw new TypeError(`Invalid glTF ${label}`);
   return value;
 };
+const isObject = (value: unknown): boolean => !!value && typeof value === 'object' && !Array.isArray(value);
 const entry = <T>(array: readonly T[] | undefined, id: unknown, label: string): T => {
   const value = array?.[integer(id, label)];
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError(`Missing glTF ${label}`);
   return value;
 };
+// Malformed UTF-8 or JSON is a named error, not the TextDecoder's TypeError or JSON.parse's SyntaxError.
+function text(data: Uint8Array): string {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(data);
+  } catch {
+    throw new TypeError('Invalid glTF JSON: not UTF-8');
+  }
+}
+function json(source: string): Document {
+  try {
+    return parseJSON<Document>(source);
+  } catch (error) {
+    throw new TypeError(`Invalid glTF JSON: ${(error as Error).message}`);
+  }
+}
 function bytes(input: ArrayBuffer | ArrayBufferView): Uint8Array {
   return input instanceof ArrayBuffer
     ? new Uint8Array(input)
@@ -27,7 +43,7 @@ function container(input: string | object | ArrayBuffer | ArrayBufferView): { do
   if (typeof input === 'string') {
     if (input.length > limit || new TextEncoder().encode(input).length > limit)
       throw new RangeError('glTF JSON exceeds 64 MiB');
-    return { doc: parseJSON<Document>(input) };
+    return { doc: json(input) };
   }
   if (!(input instanceof ArrayBuffer) && !ArrayBuffer.isView(input)) return { doc: input as Document };
   const data = bytes(input),
@@ -53,7 +69,7 @@ function container(input: string | object | ArrayBuffer | ArrayBufferView): { do
     if (offset === 20 && type !== 0x4e4f534a) throw new TypeError('GLB JSON must be first');
     if (type === 0x4e4f534a) {
       if (doc) throw new TypeError('Duplicate GLB JSON');
-      doc = parseJSON<Document>(new TextDecoder('utf-8', { fatal: true }).decode(chunk));
+      doc = json(text(chunk));
     } else if (type === 0x004e4942) {
       if (binary) throw new TypeError('Duplicate GLB binary');
       binary = chunk;
@@ -66,7 +82,13 @@ function container(input: string | object | ArrayBuffer | ArrayBufferView): { do
 function embedded(uri: string): Uint8Array {
   const match = /^data:application\/(?:octet-stream|gltf-buffer);base64,([A-Za-z0-9+/]*={0,2})$/.exec(uri);
   if (!match || match[1].length > (limit * 4) / 3 + 4) throw new TypeError('Invalid glTF data URI');
-  return Uint8Array.from(atob(match[1]), (c) => c.charCodeAt(0));
+  let decoded: string;
+  try {
+    decoded = atob(match[1]); // throws on a bad length or misplaced padding the pattern lets through
+  } catch {
+    throw new TypeError('Invalid glTF data URI');
+  }
+  return Uint8Array.from(decoded, (c) => c.charCodeAt(0));
 }
 function validate(doc: Document, maxNodes?: number): void {
   const nodeLimit = countLimit('maxNodes', maxNodes);
@@ -84,6 +106,11 @@ function validate(doc: Document, maxNodes?: number): void {
     'extensionsRequired',
   ])
     if (doc[field] !== undefined && !Array.isArray(doc[field])) throw new TypeError(`glTF ${field} must be an array`);
+  // Every definition is an object, so later reads of its members never meet null or a number.
+  for (const field of ['buffers', 'bufferViews', 'accessors', 'meshes', 'nodes', 'scenes', 'materials']) {
+    const list: unknown = doc[field];
+    if (Array.isArray(list) && !list.every(isObject)) throw new TypeError(`Invalid glTF ${field} entry`);
+  }
   if (doc.extensionsRequired?.length || doc.skins?.length || doc.animations?.length)
     throw new Error(
       'Minimal glTF supports static uncompressed models; required extensions, skins and animations are unsupported',
@@ -236,7 +263,8 @@ export function parseGLTF(
       !Array.isArray(color) ||
       color.length !== 4 ||
       color[3] !== 1 ||
-      m.emissiveFactor?.some((v: number) => v !== 0) ||
+      (m.emissiveFactor !== undefined &&
+        (!Array.isArray(m.emissiveFactor) || m.emissiveFactor.some((v: number) => v !== 0))) ||
       m.extensions ||
       [p.baseColorTexture, p.metallicRoughnessTexture, m.normalTexture, m.occlusionTexture, m.emissiveTexture].some(
         Boolean,
@@ -253,7 +281,8 @@ export function parseGLTF(
     });
   });
   const definitions = (doc.meshes ?? []).map((mesh) => {
-    if (!Array.isArray(mesh.primitives) || !mesh.primitives.length) throw new TypeError('Missing glTF primitives');
+    if (!Array.isArray(mesh.primitives) || !mesh.primitives.length || !mesh.primitives.every(isObject))
+      throw new TypeError('Missing glTF primitives');
     return mesh.primitives.map((p) => {
       if (
         (p.mode ?? 4) !== 4 ||
@@ -393,7 +422,7 @@ export async function loadGLTF(
   const data = await fetchBytes(base, true),
     glb =
       data.length >= 4 && new DataView(data.buffer, data.byteOffset, data.byteLength).getUint32(0, true) === 0x46546c67,
-    { doc, binary } = container(glb ? data : new TextDecoder('utf-8', { fatal: true }).decode(data));
+    { doc, binary } = container(glb ? data : text(data));
   validate(doc, maxNodes);
   const buffers = [];
   for (const def of doc.buffers ?? []) {

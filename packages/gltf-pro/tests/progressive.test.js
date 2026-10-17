@@ -32,7 +32,44 @@ const helmet = new Uint8Array(await asset('damaged-helmet.glb')),
 const grids = bigGLB({ segments: 256, meshes: 3 }),
   parts = bigGLB({ segments: 6, meshes: 3, instances: 12 }),
   external = split(bigGLB({ segments: 40, meshes: 2 }), 'external.bin');
+// A small grid GLB with its document changed by `edit` (the fuzz findings of launch gate 11a below).
+function editedGLB(edit) {
+  const glb = bigGLB({ segments: 6, meshes: 1 }),
+    v = new DataView(glb.buffer, glb.byteOffset),
+    length = v.getUint32(12, true),
+    doc = JSON.parse(new TextDecoder().decode(glb.subarray(20, 20 + length))),
+    bin = glb.subarray(28 + length);
+  edit(doc);
+  const json = new TextEncoder().encode(JSON.stringify(doc).padEnd(Math.ceil(JSON.stringify(doc).length / 4) * 4)),
+    out = new Uint8Array(28 + json.length + bin.length),
+    o = new DataView(out.buffer);
+  o.setUint32(0, 0x46546c67, true);
+  o.setUint32(4, 2, true);
+  o.setUint32(8, out.length, true);
+  o.setUint32(12, json.length, true);
+  o.setUint32(16, 0x4e4f534a, true);
+  out.set(json, 20);
+  o.setUint32(20 + json.length, bin.length, true);
+  o.setUint32(24 + json.length, 0x004e4942, true);
+  out.set(bin, 28 + json.length);
+  return out;
+}
 const files = {
+  // A POSITION accessor and its bufferView reaching past the end of the glTF buffer.
+  '/past-end.glb': editedGLB((doc) => {
+    const position = doc.accessors[doc.meshes[0].primitives[0].attributes.POSITION];
+    doc.bufferViews[position.bufferView].byteLength += 12 << 16;
+    position.count += 1 << 16;
+  }),
+  // An image whose bufferView starts before its buffer.
+  '/negative-image.glb': editedGLB((doc) => {
+    doc.bufferViews.push({ buffer: 0, byteOffset: -(1 << 20), byteLength: 64 }); // before the GLB's first byte
+    doc.images = [{ bufferView: doc.bufferViews.length - 1, mimeType: 'image/png' }];
+  }),
+  // A buffer that declares 4 GiB.
+  '/huge-buffer.glb': editedGLB((doc) => {
+    doc.buffers[0].byteLength = 2 ** 32;
+  }),
   '/helmet.glb': helmet,
   '/robot.glb': robot,
   '/grids.glb': grids,
@@ -45,7 +82,9 @@ const files = {
 const log = [];
 const server = createServer((request, response) => {
   const plain = request.url.startsWith('/plain/'),
-    path = request.url.replace('/plain/', '/'),
+    // /short/: range replies claim the requested range but send half of it (a broken server or proxy).
+    short = request.url.startsWith('/short/'),
+    path = request.url.replace(/^\/(plain|short)\//, '/'),
     body = files[path];
   if (!body) {
     response.writeHead(404);
@@ -61,8 +100,9 @@ const server = createServer((request, response) => {
   }
   const lo = +range[1],
     hi = Math.min(range[2] ? +range[2] : body.length - 1, body.length - 1);
-  response.writeHead(206, { 'content-range': `bytes ${lo}-${hi}/${body.length}`, 'content-length': hi - lo + 1 });
-  response.end(body.subarray(lo, hi + 1));
+  const sent = short ? Math.max(1, (hi - lo + 1) >> 1) : hi - lo + 1;
+  response.writeHead(206, { 'content-range': `bytes ${lo}-${hi}/${body.length}`, 'content-length': sent });
+  response.end(body.subarray(lo, lo + sent));
 });
 // Client closes idle sockets: a server keep-alive close can race a reused socket under load (ECONNRESET).
 server.keepAliveTimeout = 0;
@@ -450,3 +490,60 @@ for (const useWorker of [false, true])
         delete files['/compressed.gltf'];
       }
     }));
+
+/** `complete` must reject with `pattern` within 10 s; the load is aborted either way, so a regression fails, not hangs. */
+async function rejectsInTime(engine, url, pattern) {
+  const load = loadGLTFProgressive(engine, url);
+  let timer;
+  try {
+    const hang = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error('still waiting after 10 s')), 10_000);
+    });
+    await assert.rejects(Promise.race([load.complete, hang]), pattern, url);
+  } finally {
+    clearTimeout(timer);
+    load.abort();
+  }
+}
+
+// Fuzz finding (gate 11a): the stream waited forever for bytes past the end of the buffer (they never arrive); now the
+// range is clipped to the buffer, the primitive decodes and reports the bounds error.
+test('progressive: an accessor past the end of its buffer rejects instead of waiting forever', () =>
+  withGlobals(false, async () => {
+    for (const path of ['/past-end.glb', '/plain/past-end.glb'])
+      await rejectsInTime(
+        (await gpuEngine()).engine,
+        base + path,
+        /^RangeError: glTF mesh 0 primitive 0: POSITION \(accessor \d+\): Invalid glTF bufferView bounds$/,
+      );
+  }));
+
+// Fuzz finding (gate 11a): an image view starting before its buffer was waited for forever (a server without ranges).
+test('progressive: an image view outside its buffer rejects instead of waiting forever', () =>
+  withGlobals(false, async () => {
+    for (const path of ['/negative-image.glb', '/plain/negative-image.glb'])
+      await rejectsInTime((await gpuEngine()).engine, base + path, /^TypeError: Invalid glTF view offset$/);
+  }));
+
+// Fuzz finding (gate 11a): the main thread allocated placeholder buffers at their declared sizes (here 4 GiB) before
+// the byte budget was checked.
+test('progressive: declared buffer sizes are checked against the budget before placeholders are allocated', () =>
+  withGlobals(false, async () => {
+    const before = process.memoryUsage().arrayBuffers;
+    await rejectsInTime(
+      (await gpuEngine()).engine,
+      base + '/huge-buffer.glb',
+      /^RangeError: glTF buffers exceed byte budget \(\d+ bytes; raise the maxDownloadBytes option\)$/,
+    );
+    assert.ok(process.memoryUsage().arrayBuffers - before < 64 << 20, 'no 4 GiB placeholder');
+  }));
+
+// Review finding (gate 11a): a range reply shorter than requested left its gap unfilled and every waiter on it waiting.
+test('progressive: a server that sends short range replies rejects instead of waiting forever', () =>
+  withGlobals(false, async () =>
+    rejectsInTime(
+      (await gpuEngine()).engine,
+      base + '/short/past-end.glb',
+      /^RangeError: Truncated glTF range response$/,
+    ),
+  ));

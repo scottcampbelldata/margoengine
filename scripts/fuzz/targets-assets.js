@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { deflateRawSync } from 'node:zlib';
+import { checkModel, headless } from './formats.js';
 import { bytesOf, concat, isNamed, random } from './harness.js';
 
 const root = resolve(import.meta.dirname, '../..'),
@@ -638,13 +639,16 @@ export default [
     async setup() {
       this.F = await import('@margoengine/fbx');
       this.W = await import(`file://${join(root, 'packages/fbx/test/fixtures.js').replaceAll('\\', '/')}`);
+      this.engine = await headless();
     },
-    named: (e) => /\bFBX\b/.test(e.message),
+    // The native converter's own errors, or gltf-pro's when the GLB it wrote is refused.
+    named: (e) => /\bFBX\b|glTF|PBR/.test(e.message),
     async seeds() {
       const W = await import(`file://${join(root, 'packages/fbx/test/fixtures.js').replaceAll('\\', '/')}`),
         trees = [W.rich(), W.grid(3)];
       return [
         file('examples/package-benchmarks/fixtures/triangle.fbx'),
+        file('packages/fbx/test/fixtures/blender-rig.fbx'),
         ...trees.flatMap((t) => [
           new Uint8Array(W.binary(t)),
           new Uint8Array(W.binary(t, { compress: true, version: 7500 })),
@@ -674,7 +678,13 @@ export default [
     ],
     generatorRate: 0.5,
     async run(bytes) {
-      await this.F.convertFBX(bytes);
+      // parseFBX: the native converter, then gltf-pro on the GLB it wrote (as in a browser).
+      const model = await this.F.parseFBX(this.engine, bytes);
+      try {
+        await checkModel(model);
+      } finally {
+        model.dispose();
+      }
     },
   },
   ...['usda', 'usdc', 'usdz'].map((kind) => ({

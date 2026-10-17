@@ -64,13 +64,19 @@ function meshoptDecodeVertexV1(target: Uint8Array, count: number, size: number, 
     channels = src.subarray(src.length - size / 4);
   for (const c of channels) if ((c & 3) === 3) throw new Error('EXT_meshopt_compression: invalid vertex channel mode');
   const blockMax = Math.min((8192 / size) & ~15, 256),
-    deltas = new Uint8Array(blockMax * size);
+    deltas = new Uint8Array(blockMax * size),
+    // Every read below stays inside src: a group reads at most 24 bytes (8 code bytes + 16 escapes), the
+    // reference decoder's per-group limit, and the tail (at least 24 bytes) follows valid data.
+    need = (n: number) => {
+      if (src.length - pos < n) throw new RangeError('EXT_meshopt_compression: truncated vertex stream');
+    };
   let pos = 1;
   for (let vo = 0; vo < count; vo += blockMax) {
     const bc = Math.min(blockMax, count - vo),
       groups = (bc + 15) >> 4,
       headerSize = (groups + 3) >> 2,
       control = pos;
+    need(size / 4);
     pos += size / 4;
     deltas.fill(0);
     for (let k = 0; k < size; k++) {
@@ -78,13 +84,16 @@ function meshoptDecodeVertexV1(target: Uint8Array, count: number, size: number, 
         base = k * bc;
       if (mode === 2) continue;
       if (mode === 3) {
+        need(bc);
         deltas.set(src.subarray(pos, pos + bc), base);
         pos += bc;
         continue;
       }
       const header = pos;
+      need(headerSize);
       pos += headerSize;
       for (let g = 0; g < groups; g++) {
+        need(24);
         const bits = V1_BITS[mode][(src[header + (g >> 2)] >> ((g & 3) << 1)) & 3],
           o = base + (g << 4),
           n = Math.min(16, bc - (g << 4));
@@ -144,10 +153,17 @@ function meshoptDecodeVertexV1(target: Uint8Array, count: number, size: number, 
   if (pos !== end) throw new Error('EXT_meshopt_compression: vertex stream has trailing or missing data');
 }
 
+// Counts and output sizes are checked before anything is decoded, so no write lands outside the output.
+function checkOutput(count: number, output: { length: number }, length: number): void {
+  if (!Number.isSafeInteger(count) || count < 0 || output.length < length)
+    throw new RangeError('EXT_meshopt_compression: invalid count or output size');
+}
+
 /** meshopt vertex codec, versions 0 (EXT_meshopt_compression) and 1 (KHR_meshopt_compression). */
 export function meshoptDecodeVertexBuffer(target: Uint8Array, count: number, size: number, src: Uint8Array): void {
-  if (size <= 0 || size > 256 || size % 4 !== 0)
+  if (!Number.isInteger(size) || size <= 0 || size > 256 || size % 4 !== 0)
     throw new Error(`EXT_meshopt_compression: invalid ATTRIBUTES byteStride ${size}`);
+  checkOutput(count, target, count * size);
   if (src.length < 1 + size) throw new Error('EXT_meshopt_compression: truncated vertex stream');
   const header = src[0];
   if ((header & 0xf0) !== 0xa0) throw new Error('EXT_meshopt_compression: bad vertex stream header');
@@ -198,6 +214,7 @@ function meshoptVByte(src: Uint8Array, st: { p: number }): number {
 
 /** meshopt triangle index codec (versions 0 and 1). */
 export function meshoptDecodeIndexBuffer(out: Uint32Array | Uint16Array, count: number, src: Uint8Array): void {
+  checkOutput(count, out, count);
   if (count % 3 !== 0) throw new Error('EXT_meshopt_compression: TRIANGLES count must be a multiple of 3');
   if (src.length < 1 + count / 3 + 16) throw new Error('EXT_meshopt_compression: truncated index stream');
   if ((src[0] & 0xf0) !== 0xe0) throw new Error('EXT_meshopt_compression: bad index stream header');
@@ -318,6 +335,7 @@ export function meshoptDecodeIndexBuffer(out: Uint32Array | Uint16Array, count: 
 
 /** meshopt index sequence codec. */
 export function meshoptDecodeIndexSequence(out: Uint32Array | Uint16Array, count: number, src: Uint8Array): void {
+  checkOutput(count, out, count);
   if (src.length < 1 + count + 4) throw new Error('EXT_meshopt_compression: truncated index sequence');
   if ((src[0] & 0xf0) !== 0xd0) throw new Error('EXT_meshopt_compression: bad index sequence header');
   const version = src[0] & 0x0f;
@@ -437,6 +455,27 @@ export function meshoptDecodeGltfBuffer(
   mode: string,
   filter = 'NONE',
 ): Uint8Array {
+  if (
+    !Number.isSafeInteger(count) ||
+    count < 0 ||
+    !Number.isSafeInteger(stride) ||
+    stride <= 0 ||
+    count * stride > 2 ** 31
+  )
+    throw new RangeError('EXT_meshopt_compression: invalid count or byteStride');
+  // A stream cannot describe more elements than its bytes allow, checked before the output is allocated: each block of
+  // up to 256 vertices costs at least one control byte per 4 vertex bytes, a triangle at least one code byte and an
+  // index sequence element at least one byte.
+  const most =
+    mode === 'ATTRIBUTES'
+      ? 256 * (Math.floor((src.length * 4) / stride) + 1)
+      : mode === 'TRIANGLES'
+        ? 3 * src.length
+        : src.length;
+  if (count > most)
+    throw new RangeError(
+      `EXT_meshopt_compression: truncated stream (${count} elements cannot fit in ${src.length} bytes)`,
+    );
   const out = new Uint8Array(count * stride);
   if (mode === 'ATTRIBUTES') {
     meshoptDecodeVertexBuffer(out, count, stride, src);

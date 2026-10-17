@@ -41,11 +41,11 @@ merged at `0ed56b9`:
 ## Summary
 
 Recounted 2026-10-15 (HANDOFF 5j; again with 5l.o, which made DOC-074/LIM-024 PROVEN, and with the pinned proofs,
-which made H-04 PROVEN), 267 rows: the 233 after 5d
+which made H-04 PROVEN), 268 rows: the 233 after 5d
 (the original 201, 27 from the post-`590278e` audit and 5
 for the material setters and transparent canvas merged during 5d), DOC-072 to DOC-075 (CSP, deploying.md) and PKG-109
-(core back-face culling) added since without updating this table, and LIM-001 to LIM-029 for `docs/limits.md` (LIM-028 and
-LIM-029 with light probes and decals, HANDOFF 5l.e/5l.h):
+(core back-face culling) added since without updating this table, and LIM-001 to LIM-030 for `docs/limits.md` (LIM-028 and
+LIM-029 with light probes and decals, HANDOFF 5l.e/5l.h; LIM-030 with the parser fuzzers, launch gate 11a):
 
 | Source | PROVEN | STALE | UNPROVEN | OVERCLAIM | REMOVED | HISTORICAL | Total |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -54,8 +54,8 @@ LIM-029 with light probes and decals, HANDOFF 5l.e/5l.h):
 | HANDOFF (H) | 19 | 5 | 8 | 0 | 0 | 0 | 32 |
 | Engine docs (DOC) | 53 | 0 | 2 | 0 | 10 | 10 | 75 |
 | Package READMEs (PKG) | 90 | 1 | 6 | 0 | 7 | 5 | 109 |
-| Design envelope (LIM) | 29 | 0 | 0 | 0 | 0 | 0 | 29 |
-| **All** | **212** | **6** | **16** | **0** | **18** | **15** | **267** |
+| Design envelope (LIM) | 30 | 0 | 0 | 0 | 0 | 0 | 30 |
+| **All** | **213** | **6** | **16** | **0** | **18** | **15** | **268** |
 
 The original 201 rows went from 77 PROVEN / 43 STALE / 58 UNPROVEN / 23 OVERCLAIM to 155 PROVEN / 4 STALE /
 9 UNPROVEN / 0 OVERCLAIM / 18 REMOVED / 15 HISTORICAL. Before 5d:
@@ -549,6 +549,7 @@ constant (and the test that asserts it, where one exists); the page says "not me
 | LIM-027 | Entities escape hatch: "with `minRadius: 1.5` a 100,008-part orbit draws 11 % of the parts at 138 FPS (core: 29)" | docs/limits.md (Scale) | `examples/package-benchmarks/cad/results-5l-after-culled1.5.json` (fps 137.8, gpuDrawn 11,363) and `results-5l-before-orbit.json` (fps 29.3); Arc 140V, Edge, AC, quiet-gated, GPU lock (HANDOFF 5l.a) | `node examples/package-benchmarks/cad/run.mjs --sizes=100000 --culled=1.5 --no-bvh --no-explode` | PROVEN | One session; a second session measured 28-30 FPS for core and 61-88 FPS with edges, see cad-performance.md. |
 | LIM-028 | Light probes: one volume of at most 4,096 L1/L2 probes (64 per axis), at most 16 reflection probes; bake "114-121 ms" for 8 volume probes + one 128 px reflection probe (diagnostic); volume SH "within 1.7% of DC"; the four quoted errors; "10,845 B gzip" | docs/limits.md (Rendering) | `packages/environment/src/probes.ts` (`MAX_VOLUME_PROBES`, `MAX_REFLECTION_PROBES`, messages); `packages/environment/tests/probes.test.js` (in verify); `results/probes-gpu.json` (`volume[].maxCoefficientErrorOfDC` <= 0.0171, `bakeTimings` 114.7 / 121.3 / 113.6; quiet gate passed, other agents open); `entry-sizes.json` (`environment/./probes` 10845) | `node scripts/gpu-lock.mjs run --owner=<id> -- node examples/package-benchmarks/probes-gpu.mjs --bench` | PROVEN | Timings labelled diagnostic on the page (busy machine). |
 | LIM-029 | Decals: 4,096 per `setDecals`, colour only; "1.64 ms without, 1.64 / 1.97 / 6.36 ms with 1 / 16 / 256" decals at 1280 × 720 4x (diagnostic); the quoted error; "4,118 B gzip" | docs/limits.md (Rendering) | `packages/post/src/decals.ts` (`MAX_DECALS`); `packages/post/test/decals.test.js` (in verify; asserts the error); `results/decals-gpu.json` (`timings`; quiet gate passed, other agents open); `entry-sizes.json` (`post/./decals` 4118) | `node scripts/gpu-lock.mjs run --owner=<id> -- node examples/package-benchmarks/decals-gpu.mjs --bench` | PROVEN | Timings labelled diagnostic on the page. |
+| LIM-030 | Malformed and hostile files: every parser ends in a result or its own error; gltf-pro nesting 256 levels; EXR chunk 256 MiB and chunk capacity; Draco/KTX2 decode limit 10 s + 4 s per MiB; the four quoted errors | docs/limits.md (Assets) | `packages/gltf-pro/src/asset.ts` (`parseJSON`, `checkDocument`), `packages/environment/src/exr.ts`, `packages/decoders/src/pool.ts` (`jobTimeout`, `WorkerPool.watch`); `tests/fuzz-formats-regressions.test.js`, `packages/decoders/tests/decoders.test.js`, `packages/gltf-pro/tests/progressive.test.js` (in verify; assert the errors); fuzz campaign in HANDOFF gate 11 | `npm run fuzz -- --target=gltf,gltf-pro,gltf-pro/worker,gltf-pro/ktx2,gltf-pro/progressive,margo,decoders/meshopt,decoders/draco,decoders/ktx2,environment/hdr,environment/exr,environment/ultrahdr,fbx`; `node --test tests/fuzz-formats-regressions.test.js` | PROVEN | Decode times are not claimed. |
 
 ## vs-three.js results
 

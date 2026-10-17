@@ -1,12 +1,32 @@
+import { decodeFailed } from './errors.js';
 import type { WorkerResponse } from './protocol.js';
 
 interface Job {
   resolve(value: unknown): void;
   reject(reason: unknown): void;
+  /** Most milliseconds the worker may spend on this job once it reaches the front of the worker's queue. */
+  timeout: number;
+  /** What timed out, for the error ('Draco decode', 'KTX2 transcode'). */
+  label: string;
 }
 interface Slot {
   worker: Worker;
+  /** In posting order: a worker runs its jobs one after another, so the first is the one running. */
   jobs: Map<number, Job>;
+  timer?: ReturnType<typeof setTimeout>;
+}
+
+/**
+ * Default time limit for one decode: 10 s plus 4 s per MiB of input. Corrupt Draco data can keep the decoder busy for
+ * many seconds on a few kilobytes; past the limit the worker is restarted and the decode rejects.
+ */
+export const jobTimeout = (bytes: number): number => 10_000 + Math.ceil(bytes / 256);
+
+/** Validates a `timeout` option: undefined (the default limit), a positive number of milliseconds or Infinity. */
+export function timeLimit(value: number | undefined): number | undefined {
+  if (value !== undefined && !(typeof value === 'number' && value > 0))
+    throw new RangeError('timeout must be a positive number of milliseconds or Infinity');
+  return value;
 }
 
 /** Default worker count: hardware threads capped at 4. Read lazily so SSR never touches navigator. */
@@ -45,7 +65,8 @@ export function payload(data: ArrayBuffer | ArrayBufferView, transfer: boolean):
 
 /**
  * Lazily grown worker pool. Jobs go to an idle worker, a new worker while under the limit, or the least loaded worker.
- * A crashed worker rejects only its own jobs and is replaced on demand.
+ * A crashed worker rejects only its own jobs and is replaced on demand; so is a worker whose running job exceeds its time
+ * limit (the jobs queued behind it on that worker reject too).
  */
 export class WorkerPool {
   private readonly slots: Slot[] = [];
@@ -64,7 +85,17 @@ export class WorkerPool {
     return this.slots.reduce((total, slot) => total + slot.jobs.size, 0);
   }
 
-  run<T>(message: Record<string, unknown>, transfer: Transferable[], signal?: AbortSignal): Promise<T> {
+  /**
+   * Post one job. `timeout`: most milliseconds the worker may spend on it (default: no limit); past it the worker is
+   * terminated and replaced, and its jobs reject with `<label> timed out ...`.
+   */
+  run<T>(
+    message: Record<string, unknown>,
+    transfer: Transferable[],
+    signal?: AbortSignal,
+    timeout = Number.POSITIVE_INFINITY,
+    label = 'Decode',
+  ): Promise<T> {
     if (this.disposed) return Promise.reject(new Error('Decoder has been disposed'));
     if (signal?.aborted) return Promise.reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
     let slot: Slot;
@@ -75,15 +106,20 @@ export class WorkerPool {
     }
     const id = this.next++;
     return new Promise<T>((resolve, reject) => {
+      const job: Job = { resolve: () => {}, reject: () => {}, timeout, label };
       const abort = () => {
-        // Synchronous Wasm keeps running after cancellation. Retain its slot occupancy until the reply.
+        // Synchronous Wasm keeps running after cancellation: the entry stays until the reply (or the time limit), so the
+        // worker is not handed new jobs as if idle and the watchdog still covers it.
+        job.resolve = job.reject = () => {};
         reject(signal!.reason ?? new DOMException('Aborted', 'AbortError'));
       };
       const settle = (fn: (value: unknown) => void) => (value: unknown) => {
         signal?.removeEventListener('abort', abort);
         fn(value);
       };
-      slot.jobs.set(id, { resolve: settle((value) => resolve(value as T)), reject: settle(reject) });
+      job.resolve = settle((value) => resolve(value as T));
+      job.reject = settle(reject);
+      slot.jobs.set(id, job);
       signal?.addEventListener('abort', abort, { once: true });
       try {
         slot.worker.postMessage({ ...message, id }, transfer);
@@ -91,7 +127,9 @@ export class WorkerPool {
         slot.jobs.delete(id);
         signal?.removeEventListener('abort', abort);
         reject(error);
+        return;
       }
+      if (slot.jobs.size === 1) this.watch(slot);
     });
   }
 
@@ -99,6 +137,28 @@ export class WorkerPool {
     if (this.disposed) return;
     this.disposed = true;
     for (const slot of this.slots.splice(0)) this.retire(slot, new Error('Decoder has been disposed'));
+  }
+
+  // Arms the time limit of the job the worker is running now (the oldest).
+  private watch(slot: Slot): void {
+    clearTimeout(slot.timer);
+    slot.timer = undefined;
+    const running: Job | undefined = slot.jobs.values().next().value;
+    if (running && Number.isFinite(running.timeout))
+      slot.timer = setTimeout(
+        () =>
+          this.retire(
+            slot,
+            decodeFailed(
+              `${running.label} timed out after ${running.timeout} ms (corrupt data?); the decoder worker was restarted`,
+            ),
+          ),
+        running.timeout,
+      );
+  }
+
+  private crash(slot: Slot, message: string): void {
+    this.retire(slot, new Error(message));
   }
 
   private pick(): Slot {
@@ -111,26 +171,26 @@ export class WorkerPool {
         const job = slot.jobs.get(data?.id);
         if (!job) return;
         slot.jobs.delete(data.id);
+        this.watch(slot);
         if (typeof data.error === 'string') job.reject(new Error(data.error));
         else job.resolve(data.result);
       };
-      const crash = (message: string) => {
-        const index = this.slots.indexOf(slot);
-        if (index >= 0) this.slots.splice(index, 1);
-        this.retire(slot, new Error(message));
-      };
       worker.onerror = (event) => {
         event.preventDefault?.();
-        crash(`Decoder worker failed: ${event.message || 'unknown error'}`);
+        this.crash(slot, `Decoder worker failed: ${event.message || 'unknown error'}`);
       };
-      worker.onmessageerror = () => crash('Decoder worker message could not be deserialized');
+      worker.onmessageerror = () => this.crash(slot, 'Decoder worker message could not be deserialized');
       this.slots.push(slot);
       return slot;
     }
     return this.slots.reduce((best, slot) => (slot.jobs.size < best.jobs.size ? slot : best));
   }
 
+  // Terminates the slot's worker (a later job starts a fresh one) and rejects its jobs with `reason`.
   private retire(slot: Slot, reason: Error): void {
+    const index = this.slots.indexOf(slot);
+    if (index >= 0) this.slots.splice(index, 1);
+    clearTimeout(slot.timer);
     slot.worker.onmessage = slot.worker.onerror = slot.worker.onmessageerror = null;
     slot.worker.terminate();
     for (const job of slot.jobs.values()) job.reject(reason);

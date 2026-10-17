@@ -1,4 +1,4 @@
-import { parseJSON } from '../../shared/json.js';
+import { parseJSON as parseSafeJSON } from '../../shared/json.js';
 import { assetURL } from '../../shared/asset-url.js';
 import { readResponse } from '../../shared/loading.js';
 import { meshoptDecodeGltfBuffer } from '@margoengine/decoders/meshopt';
@@ -144,21 +144,80 @@ export function entry<T>(array: readonly T[] | undefined, id: unknown, label: st
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError('Missing glTF ' + label);
   return value;
 }
+/** UTF-8 bytes as text; malformed UTF-8 throws TypeError('Invalid glTF JSON: not UTF-8'). */
+function utf8(bytes: Uint8Array): string {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    throw new TypeError('Invalid glTF JSON: not UTF-8');
+  }
+}
+/**
+ * glTF JSON text (or UTF-8 bytes) as a document. Malformed JSON throws TypeError('Invalid glTF JSON: ...'), not
+ * SyntaxError, and nesting deeper than 256 levels is refused before parsing: structured clone (worker replies) and
+ * recursive readers would overflow the stack on a document nested thousands deep. No real glTF comes close.
+ */
+export function parseJSON(source: string | Uint8Array): GLTFDocument {
+  const text = typeof source === 'string' ? source : utf8(source);
+  for (let i = 0, depth = 0, string = false; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    if (string) {
+      if (c === 92)
+        i++; // backslash: skip the escaped character
+      else if (c === 34) string = false;
+    } else if (c === 34) string = true;
+    else if (c === 91 || c === 123) {
+      if (++depth > 256) throw new TypeError('Invalid glTF JSON: nested deeper than 256 levels');
+    } else if (c === 93 || c === 125) depth--;
+  }
+  try {
+    return parseSafeJSON<GLTFDocument>(text);
+  } catch (error) {
+    throw error instanceof SyntaxError ? new TypeError('Invalid glTF JSON: ' + error.message) : error;
+  }
+}
+const lists = ['buffers', 'bufferViews', 'accessors', 'meshes', 'nodes', 'scenes', 'materials', 'textures', 'images'];
+lists.push('samplers', 'skins', 'animations', 'cameras');
+const objects = (list: unknown): boolean =>
+  list === undefined ||
+  (Array.isArray(list) && list.every((v: unknown) => !!v && typeof v === 'object' && !Array.isArray(v)));
+/**
+ * The trust-boundary check every load runs before reading a document: glTF 2.0, every top-level list an array of
+ * objects (so later reads never meet null or a number), the nested lists loaders iterate (primitives and their morph
+ * targets, animation samplers and channels) too, and the extension name lists arrays.
+ */
+export function checkDocument(doc: GLTFDocument): void {
+  if (!doc || typeof doc !== 'object' || doc.asset?.version !== '2.0') throw new TypeError('Expected glTF 2.0');
+  const record = doc as unknown as Record<string, unknown>;
+  for (const key of lists) if (!objects(record[key])) throw new TypeError('Invalid glTF ' + key);
+  for (const mesh of doc.meshes ?? [])
+    if (!objects(mesh.primitives) || !(mesh.primitives ?? []).every((p) => objects(p.targets)))
+      throw new TypeError('Invalid glTF primitives');
+  for (const animation of doc.animations ?? [])
+    if (!objects(animation.samplers) || !objects(animation.channels)) throw new TypeError('Invalid glTF animation');
+  for (const key of ['extensionsRequired', 'extensionsUsed'])
+    if (record[key] !== undefined && !Array.isArray(record[key])) throw new TypeError('Invalid glTF ' + key);
+}
 export function container(
   input: string | object | ArrayBuffer | ArrayBufferView,
   limit = assetLimit,
 ): { doc: GLTFDocument; binary?: Uint8Array } {
   if (typeof input === 'string') {
-    if (new TextEncoder().encode(input).length > limit) throw overBudget('glTF JSON exceeds byte budget', limit);
-    return { doc: parseJSON<GLTFDocument>(input) };
+    // Every UTF-16 unit encodes to at least one byte: a long string fails before it is encoded.
+    if (input.length > limit || new TextEncoder().encode(input).length > limit)
+      throw overBudget('glTF JSON exceeds byte budget', limit);
+    return { doc: parseJSON(input) };
   }
   if (!(input instanceof ArrayBuffer) && !ArrayBuffer.isView(input)) return { doc: input as GLTFDocument };
   const data =
     input instanceof ArrayBuffer
       ? new Uint8Array(input)
       : new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
-  if (data.length >= 4 && new DataView(data.buffer, data.byteOffset).getUint32(0, true) !== 0x46546c67)
-    return container(new TextDecoder('utf-8', { fatal: true }).decode(data), limit);
+  if (data.length >= 4 && new DataView(data.buffer, data.byteOffset).getUint32(0, true) !== 0x46546c67) {
+    // JSON bytes: the budget is checked before the text is decoded, so a huge input is not copied twice first.
+    if (data.length > limit) throw overBudget('glTF JSON exceeds byte budget', limit);
+    return container(utf8(data), limit);
+  }
   if (data.length > limit) throw overBudget('glTF exceeds download budget', limit);
   if (data.length < 20) throw new RangeError('Invalid GLB size');
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
@@ -179,7 +238,7 @@ export function container(
     if (offset === 20 && type !== 0x4e4f534a) throw new TypeError('GLB JSON must be first');
     if (type === 0x4e4f534a) {
       if (doc) throw new TypeError('Duplicate GLB JSON');
-      doc = parseJSON<GLTFDocument>(new TextDecoder('utf-8', { fatal: true }).decode(chunk));
+      doc = parseJSON(chunk);
     } else if (type === 0x004e4942) {
       if (binary) throw new TypeError('Duplicate GLB binary');
       binary = chunk;
@@ -193,7 +252,13 @@ export function embedded(uri: string, limit = assetLimit): Uint8Array {
   const match = /^data:[^;,]+;base64,([A-Za-z0-9+/]*={0,2})$/.exec(uri);
   if (match && match[1].length > (limit * 4) / 3 + 4) throw overBudget('glTF exceeds download budget', limit);
   if (!match) throw new TypeError('Invalid glTF data URI');
-  return Uint8Array.from(atob(match[1]), (c) => c.charCodeAt(0));
+  let text: string;
+  try {
+    text = atob(match[1]); // throws on a bad length or misplaced padding the pattern lets through
+  } catch {
+    throw new TypeError('Invalid glTF data URI');
+  }
+  return Uint8Array.from(text, (c) => c.charCodeAt(0));
 }
 export const componentSizes: Record<number, number> = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 };
 export const components: Record<string, number> = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
@@ -267,23 +332,7 @@ export class GLTFAsset {
   ) {
     downloadLimit(maxBytes);
     countLimit('maxNodes', maxNodes);
-    if (!doc || doc.asset?.version !== '2.0') throw new TypeError('Expected glTF 2.0');
-    for (const key of [
-      'buffers',
-      'bufferViews',
-      'accessors',
-      'meshes',
-      'nodes',
-      'scenes',
-      'materials',
-      'textures',
-      'images',
-      'samplers',
-      'skins',
-      'animations',
-      'extensionsRequired',
-    ])
-      if (doc[key] !== undefined && !Array.isArray(doc[key])) throw new TypeError('Invalid glTF ' + key);
+    checkDocument(doc);
     const missing = (doc.extensionsRequired ?? []).filter(
       (name: string) =>
         !supported.has(name) &&
@@ -733,6 +782,7 @@ export async function loadAsset(
   const { doc, binary } = container(input ?? (await fetchBytes(base!, true)), limit),
     buffers: Uint8Array[] = [],
     images: GLTFImage[] = [];
+  checkDocument(doc);
   for (let i = 0; i < (doc.buffers?.length ?? 0); i++) {
     const def = entry(doc.buffers, i, 'buffer');
     if (provided[i]) {
@@ -746,7 +796,8 @@ export async function loadAsset(
     if (def.extensions?.[meshoptExtension]?.fallback === true) continue;
     if (!def.uri) {
       if (i === 0 && binary) buffers[i] = binary;
-    } else if (def.uri.startsWith('data:')) {
+    } else if (typeof def.uri !== 'string') throw new TypeError('Invalid glTF buffer uri');
+    else if (def.uri.startsWith('data:')) {
       const b = embedded(def.uri, limit);
       total += b.length;
       if (total > limit) throw new RangeError('glTF exceeds download budget');
@@ -776,12 +827,7 @@ export async function loadAsset(
         if (total > limit) throw overBudget('glTF exceeds download budget', limit);
       } else if (typeof def.uri === 'string') data = await fetchBytes(resolve(def.uri));
       else throw new TypeError('Invalid glTF image');
-      const bitmap = sources.has(index)
-        ? await decoder.decode(data)
-        : await createImageBitmap(new Blob([new Uint8Array(data)], { type: def.mimeType }), {
-            colorSpaceConversion: 'none',
-            premultiplyAlpha: 'none',
-          });
+      const bitmap = sources.has(index) ? await decoder.decode(data) : await decodeImage(data, def.mimeType, index);
       images[index] = bitmap;
       decodedImages += bitmap.width * bitmap.height * 4;
       if (bitmap.width * bitmap.height > 16_777_216 || decodedImages > limit * 4)
@@ -794,6 +840,20 @@ export async function loadAsset(
     throw error;
   } finally {
     decoder.close();
+  }
+}
+/** Image bytes as an ImageBitmap; bytes the browser cannot decode throw TypeError('glTF image N could not be decoded (...)'). */
+export async function decodeImage(data: Uint8Array, type: string | undefined, index: number): Promise<ImageBitmap> {
+  try {
+    return await createImageBitmap(new Blob([new Uint8Array(data)], { type }), {
+      colorSpaceConversion: 'none',
+      premultiplyAlpha: 'none',
+    });
+  } catch (error) {
+    // The browser rejects with a DOMException (InvalidStateError); report it as the loader's own error.
+    throw new TypeError(
+      `glTF image ${index} could not be decoded (${error instanceof Error ? error.message : error}); check the file`,
+    );
   }
 }
 export function closeImages(images: readonly GLTFImage[]): void {
