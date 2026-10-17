@@ -44,6 +44,14 @@ test('fixed PBR scatter uploads once, uses flat transforms and indirect draws in
   assert.equal(h.counts.buffers, created.buffers);
   assert.equal(h.counts.groups, created.groups);
   assert.equal(scatter.batches, array);
+  const frame = new Float32Array(h.resources.find((r) => r.size === 144 && r.usage === 72).data);
+  assert.deepEqual([...frame.subarray(28, 32)], [1, 1, 1, 0]);
+  h.engine.lighting.ambient = new Float32Array([2, 0.5, 0]);
+  h.engine.frameGraph.execute(h.context);
+  assert.deepEqual([...frame.subarray(28, 32)], [2, 0.5, 0, 0]);
+  delete h.engine.lighting.ambient;
+  h.engine.frameGraph.execute(h.context);
+  assert.deepEqual([...frame.subarray(28, 32)], [1, 1, 1, 0]);
   assert.deepEqual(scatter.batches, [{ name: 'cedar', vertices: 3, indices: 3, instances: 1 }]);
   const instance = h.resources.find((r) => r.size === 128 && r.usage === 40),
     values = new Float32Array(instance.data);
@@ -159,9 +167,9 @@ test('emission fades each render without replacing batch data and survives resto
     h.context.bindings = [];
     h.engine.frameGraph.execute(h.context);
   };
-  const uniform = () => h.resources.find((r) => !r.destroyed && r.size === 128 && r.usage === 72);
+  const uniform = () => h.resources.find((r) => !r.destroyed && r.size === 144 && r.usage === 72);
   render();
-  assert.equal(new Float32Array(uniform().data)[29], 1);
+  assert.equal(new Float32Array(uniform().data)[33], 1);
   scatter.emissiveIntensity = () => {
     sampled++;
     return scale;
@@ -169,7 +177,7 @@ test('emission fades each render without replacing batch data and survives resto
   const created = { ...h.counts };
   for (scale of [0, 0.5, 1]) {
     render();
-    assert.equal(new Float32Array(uniform().data)[29], scale);
+    assert.equal(new Float32Array(uniform().data)[33], scale);
   }
   assert.equal(sampled, 3);
   assert.equal(generated, 1);
@@ -184,7 +192,7 @@ test('emission fades each render without replacing batch data and survives resto
   scatter.onDeviceRestored(h.engine);
   render();
   assert.equal(generated, 2);
-  assert.equal(new Float32Array(uniform().data)[29], scale);
+  assert.equal(new Float32Array(uniform().data)[33], scale);
   for (const invalid of [-1, NaN, Infinity, 1e40, '1'])
     for (const value of [invalid, () => invalid]) {
       scatter.emissiveIntensity = value;
@@ -213,8 +221,8 @@ test('wind uploads a single clock to the color pass and every shadow cascade, wi
   h.engine.frameGraph.execute(h.context);
   for (const pipeline of [h.pipelines[0], h.pipelines.at(-1)])
     assert.match(pipeline.vertex.module.code, /windDeformation\(p.xyz,i.(?:d|m3).xyz/);
-  const uniform = h.resources.find((r) => r.size === 128 && r.usage === 72),
-    time = new Float32Array(uniform.data)[28];
+  const uniform = h.resources.find((r) => r.size === 144 && r.usage === 72),
+    time = new Float32Array(uniform.data)[32];
   assert.ok(time > 0);
   const pass = h.context.encoder.beginRenderPass({});
   for (let cascade = 0; cascade < 4; cascade++)

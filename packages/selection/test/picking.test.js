@@ -65,6 +65,23 @@ function harness(samples = 4) {
     },
   };
 }
+test('Picking micro frames bind complete canonical ambient data', async () => {
+  for (const ambient of [undefined, new Float32Array([2, 0.5, 0])]) {
+    const h = harness();
+    try {
+      if (ambient) h.engine.lighting.ambient = ambient;
+      h.frame();
+      await h.effect.onPick(64, 48);
+      const frame = h.resources.find((r) => r.size === 128 && r.usage === 72);
+      assert.ok(frame, 'micro picking requires a full canonical frame buffer');
+      assert.deepEqual([...new Float32Array(frame.data).subarray(28, 32)], ambient ? [2, 0.5, 0, 0] : [1, 1, 1, 0]);
+    } finally {
+      h.effect.dispose();
+      h.cleanup();
+    }
+  }
+});
+
 test('Picking reuses MRT and readback, resolves center before orthogonal and diagonal neighbors, and clips canvas edges', async () => {
   const h = harness(1);
   h.frame();

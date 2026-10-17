@@ -1,7 +1,7 @@
 // GGX/Smith/Schlick direct lighting follows the existing engine's PBR equations.
 // Optional shader hooks depend on these WGSL names and line breaks.
 export const wgsl = `
-struct Frame { camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f }
+struct Frame { camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f,ambient:vec4f }
 @group(0) @binding(0) var<uniform> frame:Frame;
 override C=false;
 struct Input { @location(0) position:vec3f,@location(1) normal:vec3f,@location(2) m0:vec4f,@location(3) m1:vec4f,@location(4) m2:vec4f,@location(5) m3:vec4f,@location(6) color:vec4f,@location(7) factors:vec4f }
@@ -20,6 +20,6 @@ let a=i.material.x*i.material.x;let a2=a*a;let d=a2/(3.14159265*pow(nh*nh*(a2-1.
 let g=2.0*nv/(nv+sqrt(a2+(1.0-a2)*nv*nv))*2.0*nl/max(nl+sqrt(a2+(1.0-a2)*nl*nl),0.0001);
 let f0=mix(vec3f(0.04),i.color,i.material.y);let f=f0+(1.0-f0)*pow(1.0-vh,5.0);
 let direct=((1.0-f)*(1.0-i.material.y)*i.color/3.14159265+d*g*f/max(4.0*nl*nv,0.0001))*nl;
-let linear=direct*frame.radiance.xyz*frame.light.w+i.color*(1.0-i.material.y)*frame.radiance.w;
+let linear=direct*frame.radiance.xyz*frame.light.w+i.color*(1.0-i.material.y)*frame.radiance.w*frame.ambient.rgb;
 let mapped=linear/(1.0+linear);return vec4f(select(mapped*12.92,1.055*pow(mapped,vec3f(1.0/2.4))-0.055,mapped>=vec3f(0.0031308)),1);
 }`;

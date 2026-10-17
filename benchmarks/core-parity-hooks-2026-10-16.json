@@ -1,0 +1,130 @@
+{
+  "date": "2026-10-16",
+  "branch": "codex/core-parity-hooks",
+  "sourceBase": "12f3b283080345b4eda4d90f62ffc45a955d0dba",
+  "workingTreeDirty": true,
+  "scope": "Three user-approved core hooks; stage facade implementation unchanged; optional package backlog not implemented",
+  "sourceSha256": {
+    "packages/core/src/api.ts": "7c557851ff73a018c69ba4652d9653fa01969daa8293703c92d1b778d633a0e1",
+    "packages/core/src/engine.ts": "9bd554b3babf109efc24d737640182518d7638b56262f0a754e84340dd80ecd7",
+    "packages/core/src/plugin.ts": "548e14db1a12fc3a42046ffa9b7a391808d07b612135045c0b088d988848a7bb",
+    "packages/core/src/renderer.ts": "1ec1ada8aa338a5a35a3f5b6a894040fa5973d3e1c3515f397c3ad4811dc39ca",
+    "packages/core/src/shaders.ts": "d575b35b63409d1ea567d4eae53b5a61255068b7a45d6fb215d8d833a9293e1f",
+    "packages/shared/gpu.js": "a6df56e439dcfd9143bf01e549f0ee286d11666629cfa32be0026b4e3519bf51"
+  },
+  "coreStage": {
+    "raw": 48783,
+    "gzip": 20641,
+    "baselineGzip": 20282,
+    "addedGzip": 359,
+    "exclusiveLimit": 25000,
+    "usableHeadroom": 4358,
+    "steps": [
+      {
+        "hook": "camera",
+        "gzip": 20407,
+        "added": 125
+      },
+      {
+        "hook": "ambient RGB",
+        "gzip": 20486,
+        "added": 79
+      },
+      {
+        "hook": "viewport/scissor",
+        "gzip": 20641,
+        "added": 155
+      }
+    ]
+  },
+  "optionalWebGLRootEntry": {
+    "raw": 6374,
+    "gzip": 2727
+  },
+  "validation": {
+    "packageBuild": true,
+    "strictTypecheckedPackages": 74,
+    "api": {
+      "entries": 173,
+      "exports": 1777,
+      "match": true
+    },
+    "node": {
+      "passed": 2266,
+      "failed": 0,
+      "skipped": 0,
+      "todo": 0,
+      "log": "test-results/core-parity-hooks/full-suite-hydrated.log"
+    },
+    "gpu": {
+      "hardware": {
+        "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webgpu": {
+          "vendor": "nvidia",
+          "architecture": "ampere",
+          "device": "",
+          "description": "",
+          "fallback": false
+        },
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "155.0.4283.60",
+        "requestedChannel": "msedge",
+        "launchArgs": [],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true
+      },
+      "hooks": {
+        "captures": 14,
+        "offscreenReadbacks": [
+          {
+            "visible": 1,
+            "primary": true,
+            "pixel": [
+              0.66748046875,
+              0.086669921875,
+              0.086669921875,
+              1
+            ]
+          },
+          {
+            "visible": 1,
+            "primary": true,
+            "pixel": [
+              0,
+              0,
+              0.396484375,
+              1
+            ]
+          }
+        ],
+        "primaryPickRestored": true,
+        "changedPrimaryChannels": 0,
+        "changedBaselineChannels": 0
+      },
+      "helmet": {
+        "mode": "full-detail-parity",
+        "aoOff": true,
+        "aoOn": true,
+        "changedChannels": 0
+      },
+      "groups": [
+        "core-parity-hooks-gpu-check",
+        "test-helmet-streaming",
+        "ssao-gpu-check",
+        "modern-xr-tests",
+        "nature.browser"
+      ],
+      "allPassed": true,
+      "sharedGpuLockReleased": true
+    },
+    "independentReview": "No actionable findings"
+  },
+  "limits": [
+    "Independent material ambient models and optional native passes keep their existing APIs.",
+    "No CubeCamera, Reflector, separate scenes, recursive rendering or isolated temporal histories.",
+    "XR sessions simulated; no headset or Intel Arc validation.",
+    "Historical SSAO screenshot baseline absent; spatial checks passed."
+  ]
+}

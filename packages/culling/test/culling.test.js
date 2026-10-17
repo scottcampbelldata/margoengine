@@ -87,6 +87,14 @@ test('uploads parts once and draws them with compute culling and indirect draws,
   assert.equal(h.counts.buffers, created.buffers);
   assert.equal(h.counts.groups, created.groups);
   assert.equal(h.counts.textures, created.textures);
+  const frame = new Float32Array(h.resources.find((r) => r.size === 128 && r.usage === 72).data);
+  assert.deepEqual([...frame.subarray(28, 32)], [1, 1, 1, 0], 'legacy lighting defaults to white');
+  h.engine.lighting.ambient = new Float32Array([2, 0.5, 0]);
+  h.run();
+  assert.deepEqual([...frame.subarray(28, 32)], [2, 0.5, 0, 0], 'culled core meshes receive RGB ambient');
+  delete h.engine.lighting.ambient;
+  h.run();
+  assert.deepEqual([...frame.subarray(28, 32)], [1, 1, 1, 0], 'omission clears a previous tint');
   parts.dispose();
   assert.ok(h.resources.every((r) => r.destroyed));
   assert.equal(h.engine.hasPlugin(parts.name), false);

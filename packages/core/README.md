@@ -34,6 +34,44 @@ Back faces of single-sided materials (`doubleSided: false`) are culled by the GP
 
 The canvas is opaque. For a transparent canvas over HTML and CSS (three.js `alpha: true`), attach `TransparentCanvas` from `@margoengine/environment`; core needs no option.
 
+## Camera for one render
+
+`engine.render({camera: anotherCamera, delta: 0})` draws the implicit scene through that camera. The camera supplied to `Engine.create` remains `engine.camera`; its fit animation does not advance during the alternate render. Before returning, core restores the primary camera's frustum, visible instances, batches and statistics, including when a pass throws. Plugins receive one pre-update callback per call. A later ordinary render or pick uses the primary camera.
+
+Alternate renders must be sequential, outside a running frame pass. This hook does not create a second scene, separate temporal histories, CubeCamera or a mirror. Camera-dependent plugins that read `engine.camera` in their update callbacks still follow the primary camera. Use `delta: 0` for additional views so simulation is not advanced again. Projection aspect follows the canvas; an offscreen capture with another aspect needs an explicit `Camera.project` override.
+
+## Ambient RGB
+
+Extension users can tint core's diffuse ambient independently of the directional light:
+
+```ts
+import { engineRuntime } from '@margoengine/core/extension';
+
+const lighting = engineRuntime(engine).lighting;
+lighting.radiance[3] = 0.2; // existing ambient intensity
+lighting.ambient.set([0.4, 0.6, 1]); // linear RGB multiplier; white by default
+```
+
+The three components must be finite and nonnegative; values above one are allowed. Core meshes and packages drawing core's shader use this color. Independent material shaders, including glTF-pro's hemisphere model, retain their existing lighting APIs. Environment IBL replaces core ambient; Sky's explicit ambient color supplies its own absolute floor. This is a flat RGB hook, not a HemisphereLight.
+
+For packages supplying `Lighting` directly to a renderer, omitted `ambient` means white. The canonical WGSL `Frame` is now 128 bytes: its original 112-byte prefix is unchanged and an `ambient:vec4f` follows it (RGB at floats 28–30). Packages allocating that uniform must supply the full layout; append their own fields after it.
+
+## Viewport and scissor per core draw
+
+Inside a frame pass, `context.draw` accepts independent rectangles:
+
+```ts
+context.draw({
+  viewport: [0, 0, 160, 240],
+  scissor: [0, 0, 160, 240],
+  clear: false,
+});
+```
+
+Both tuples use top-left drawing-buffer pixels, with nonnegative integer origins and positive integer sizes. Invalid or out-of-bounds rectangles throw before drawing. Custom target owners must set the context dimensions to match their active attachments. Omitted rectangles use the full target and do not retain the preceding draw's state.
+
+Clearing still clears the whole attachment, regardless of either rectangle. Use `clear:false` for later subviews that must retain color and depth. Rectangles do not change camera aspect or culling, the coordinates used by `engine.pick`, or optional packages that open their own native render passes. WebGL's core-mesh preview supports the same rectangles and clear/load behavior.
+
 Call `engine.dispose()` when the canvas is removed. Wasm is embedded; no Rust toolchain or Wasm bundler plugin is required. The public API is exported from `@margoengine/core`; raw GPU/Wasm access uses the explicit `@margoengine/core/extension` entry. Both entries include TypeScript declarations.
 
 TypeScript 7+ with DOM types, Wasm SIMD and DecompressionStream gzip support are required. WebGPU requires HTTPS or localhost. See the [API and lifecycle guide](https://github.com/scottcampbelldata/margoengine/blob/main/MODERN-ENGINE.md) and [committed measurements and how to reproduce them](https://github.com/scottcampbelldata/margoengine/blob/main/docs/whitepaper/claims.md).

@@ -145,10 +145,11 @@ try {
         instanceLighting +
         `@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;
    @compute @workgroup_size(64) fn probe(@builtin(global_invocation_id) id:vec3u){if(id.x>=2u){return;}var i:Output;i.position=vec3f(0);i.normal=vec3f(0,0,1);i.color=vec3f(0.5);i.material=vec4f(0.8,0,1,1);i.occlusion=f32(id.x);result[id.x]=lighting(i,true);}`;
-      const aoFrame = new Float32Array(32);
+      const aoFrame = new Float32Array(36);
       aoFrame.set([0, 0, 1, 0], 16);
       aoFrame.set([0, 0, 1, 1], 20);
       aoFrame.set([1, 1, 1, 0], 24);
+      aoFrame.set([1, 1, 1], 28);
       const directAO = await probe(aoCode, aoFrame, 2);
       aoFrame.set([0, 0, 0, 0.2], 24);
       const ambientAO = await probe(aoCode, aoFrame, 2);
@@ -200,10 +201,11 @@ try {
         )
         .replace('discard;', 'return vec4f(0);')
         .replace('dot(v,h)', '1.00000012');
-      const frame = new Float32Array(28);
+      const frame = new Float32Array(32);
       frame.set([0, 0, 1, 0], 16);
       frame.set([0, 0, -1, 1], 20);
       frame.set([1, 1, 1, 0.1], 24);
+      frame.set([1, 1, 1], 28);
       const pbr = await probe(
         lighting +
           `

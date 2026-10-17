@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EngineKernel, PbrMaterial, box } from '../packages/core/dist/index.js';
 
-// Fake WebGPU device that records buffer uploads (except the 112-byte frame uniform) and every pipeline / bind group creation.
+// Fake WebGPU device that records buffer uploads (except the canonical frame uniform) and every pipeline / bind group creation.
 function fakeGPU(t) {
   const saved = Object.fromEntries(
     ['navigator', 'GPUBufferUsage', 'GPUTextureUsage'].map((key) => [
@@ -22,7 +22,7 @@ function fakeGPU(t) {
     destroy() {},
     queue: {
       writeBuffer(buffer, offset, data, start = 0, size) {
-        if (buffer.size !== 112)
+        if (buffer.size !== 128)
           log.writes.push({ offset, values: Array.from(data.subarray(start, start + (size ?? data.length - start))) });
       },
       submit() {},

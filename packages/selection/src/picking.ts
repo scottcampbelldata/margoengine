@@ -184,7 +184,7 @@ export class Picking implements EnginePlugin {
   private instances?: GPUBuffer;
   private readonly pipelines = new Map<string, GPURenderPipeline>();
   private readonly groups = new Map<GPURenderPipeline, { entries: GPUBindGroupEntry[]; group: GPUBindGroup }>();
-  private readonly frame = new Float32Array(28);
+  private readonly frame = new Float32Array(32);
   private readonly camera = new Float32Array(16);
   private readonly clip = new Float64Array(16);
   private readonly snapshot = new Map<Mesh, Snapshot>();
@@ -214,7 +214,7 @@ export class Picking implements EnginePlugin {
     this.engine = engine;
     this.device = engine.gpu;
     this.primitives.setup(engine);
-    this.uniform = this.device.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.uniform = this.device.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     // Three 12-byte rows use WebGPU's 256-byte copy pitch; padding is never resolved as IDs.
     this.read = this.device.createBuffer({ size: 768, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     this.micro = this.device.createTexture({
@@ -505,6 +505,8 @@ export class Picking implements EnginePlugin {
     this.frame.set(e.camera.position, 16);
     this.frame.set(e.lighting.direction, 20);
     this.frame.set(e.lighting.radiance, 24);
+    this.frame.fill(1, 28, 31);
+    if (e.lighting.ambient) this.frame.set(e.lighting.ambient, 28);
     device.queue.writeBuffer(this.uniform!, 0, this.frame as Float32Array<ArrayBuffer>);
     const c: Context = {
       backend: 'webgpu',

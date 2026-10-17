@@ -111,7 +111,9 @@ test('SSAO ambient replay retains the TAA vertex camera binding without image ba
   h.context.shader = wgsl;
   h.context.draw = (options) => {
     if (
-      options?.pipeline?.fragment.module.code.includes('return vec4f(i.color*(1.0-i.material.y)*frame.radiance.w,1);')
+      options?.pipeline?.fragment.module.code.includes(
+        'return vec4f(i.color*(1.0-i.material.y)*frame.radiance.w*frame.ambient.rgb,1);',
+      )
     )
       ambient.push(options);
   };

@@ -116,7 +116,10 @@ test('SSAO occludes the ambient light a plugin names margoAmbient (environment I
   };
   // Without the marker: the constant ambient term, TAA's camera binding only (unchanged).
   const plain = replay(wgsl, [taa, ibl, fog]);
-  assert.match(plain.code, /return vec4f\(i\.color\*\(1\.0-i\.material\.y\)\*frame\.radiance\.w,1\);\s*\}$/);
+  assert.match(
+    plain.code,
+    /return vec4f\(i\.color\*\(1\.0-i\.material\.y\)\*frame\.radiance\.w\*frame\.ambient\.rgb,1\);\s*\}$/,
+  );
   assert.doesNotMatch(plain.code, /let direct=/);
   assert.deepEqual(
     plain.draws.map((d) => d.bindings.map((e) => e.binding)),
