@@ -150,6 +150,18 @@ test('an assembly places its component with the item-defined transformation, in 
   assert.deepEqual(instance.path, [1, 0]);
   // x -> +y, y -> -x, z -> z; 100 mm along x.
   close(instance.matrix, [0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1, 0, 0.1, 0, 0, 1], 'component placement');
+  // SolidWorks writes the parent's placement first: the representation that lists an item owns it, so the order of
+  // the transformation's two items does not change the placement.
+  const reversed = parseSTEP(
+    header +
+      part +
+      assembly.replace(
+        "#72=ITEM_DEFINED_TRANSFORMATION('','',#12,#67);",
+        "#72=ITEM_DEFINED_TRANSFORMATION('','',#67,#12);",
+      ) +
+      footer,
+  );
+  close(reversed.instances[0].matrix, [0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1, 0, 0.1, 0, 0, 1], 'items in either order');
 });
 
 test('inch models report 0.0254 metres per unit through the conversion-based unit', () => {

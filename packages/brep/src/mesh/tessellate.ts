@@ -6,7 +6,7 @@
 // constrained Delaunay triangulation over interior points spaced by the surface's curvature, then refined until every
 // interior triangle edge stays within the deflection of the true surface. Normals come from the exact surface, so curved
 // faces shade smoothly and every B-rep edge stays hard.
-import { Enum, type STEPFile, type Value } from '../step/file.js';
+import { Enum, type STEPFile, type STEPValue } from '../step/file.js';
 import type { STEPBody, STEPColor } from '../step/structure.js';
 import { curveOf, type Curve } from '../geometry/curves.js';
 import { surfaceOf, type Surface } from '../geometry/surfaces.js';
@@ -68,7 +68,7 @@ export interface BodyMesh {
   readonly deflection: number;
 }
 
-const isTrue = (v: Value | undefined) => !(v instanceof Enum) || v.name !== 'F';
+const isTrue = (v: STEPValue | undefined) => !(v instanceof Enum) || v.name !== 'F';
 
 /** A point of a face's domain: its exact 3D position and (u, v). `line` marks a straight (u, v) segment to the next
  * point that is not a B-rep edge (a pole, or a cut through a band), which is sampled across the surface. */
@@ -253,8 +253,10 @@ export class Tessellator {
       }
       const n = raw.length,
         start = raw.indexOf(regular[0]),
+        meanU = regular.reduce((sum, r) => sum + r.u, 0) / regular.length,
         meanV = regular.reduce((sum, r) => sum + r.v, 0) / regular.length,
-        tiny = s.uPeriod * 1e-9;
+        tiny = s.uPeriod * 1e-9,
+        tinyV = s.vPeriod * 1e-9;
       const out: LoopPoint[] = [];
       let u = regular[0].u,
         v = regular[0].v;
@@ -267,13 +269,32 @@ export class Tessellator {
           k++;
           continue;
         }
-        // A pole or apex, where u has no meaning: a line of the domain from the u the loop arrives with to the u it
-        // leaves with, walked so the face stays on its side (away from the pole). Passing back down the same seam
-        // makes that line a full period.
+        // A pole or apex, where one parameter has no meaning: a line of the domain from the value the loop arrives with
+        // to the value it leaves with, walked so the face stays on its side (away from the pole). Passing back down the
+        // same seam makes that line a full period.
         let j = k + 1;
         while (j < n && raw[(start + j) % n].singular) j++;
         const after = raw[(start + j) % n],
-          poleV = nearest(r.v, v, s.vPeriod),
+          d = at(r.u, r.v);
+        if (Math.hypot(d[6], d[7], d[8]) < Math.hypot(d[3], d[4], d[5])) {
+          // v has no meaning (a B-spline row collapsed at a u end): the line runs along v at the pole's u.
+          const poleU = nearest(r.u, u, s.uPeriod),
+            walkV = (poleU > meanU ? 1 : -1) * left;
+          let nextV = nearest(after.v, v, s.vPeriod);
+          if (s.vPeriod) {
+            if (walkV > 0 && nextV <= v + tinyV) nextV += s.vPeriod;
+            else if (walkV < 0 && nextV >= v - tinyV) nextV -= s.vPeriod;
+          }
+          if (Math.abs(nextV - v) > tinyV)
+            out.push({ p: r.p, u: poleU, v, line: true }, { p: r.p, u: poleU, v: nextV });
+          else out.push({ p: r.p, u: poleU, v });
+          u = poleU;
+          v = nextV;
+          k = j;
+          continue;
+        }
+        // u has no meaning (a sphere's pole, a cone's apex): the line runs along u at the pole's v.
+        const poleV = nearest(r.v, v, s.vPeriod),
           walk = -(poleV > meanV ? 1 : -1) * left;
         let nextU = nearest(after.u, u, s.uPeriod);
         if (s.uPeriod) {
@@ -345,9 +366,20 @@ export class Tessellator {
       end.line = true;
       moved[moved.length - 1].line = true;
       domain.push([...first.run, ...moved]);
+    } else if (wraps.length === 1 && transposed) {
+      // A cap wrapping in v, closed at a pole in u (a B-spline row collapsed at a u end).
+      const { run, k } = open(wraps[0], A(wraps[0].points[0])),
+        side = (-Math.sign(k) * left) as 1 | -1,
+        uPole = s.uPole?.(side) ?? (poles.length ? s.parameters(poles[0], [run[0].u, run[0].v])[0] : undefined);
+      if (uPole === undefined)
+        throw new TypeError(`STEP face #${id}: a bound wraps round a surface that does not close at a pole`);
+      const b0 = run[0].v,
+        b1 = run[run.length - 1].v,
+        pole = poles[0] ?? spot(uPole, b0);
+      run[run.length - 1].line = true;
+      domain.push([...run, { p: pole, u: uPole, v: b1, line: true }, { p: pole, u: uPole, v: b0, line: true }]);
     } else if (wraps.length === 1) {
       // A cap (a sphere or cone end): the bound cut at a seam and closed along the pole on the face's side.
-      if (transposed) throw new TypeError(`Unsupported STEP face #${id}: a single bound wrapping in v`);
       const { run, k } = open(wraps[0], A(wraps[0].points[0])),
         side = (Math.sign(k) * left) as 1 | -1;
       let vPole = s.pole(side);

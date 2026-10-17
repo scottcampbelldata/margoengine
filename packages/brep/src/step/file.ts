@@ -14,20 +14,20 @@ export class Enum {
 export class Typed {
   constructor(
     readonly type: string,
-    readonly value: Value,
+    readonly value: STEPValue,
   ) {}
 }
 /** `*`: an attribute whose value a supertype derives. */
 export const DERIVED: unique symbol = Symbol('derived');
 /** A parameter: number, string, `$` (null), reference, enumeration, typed value, list, or derived. */
-export type Value = number | string | null | Ref | Enum | Typed | typeof DERIVED | Value[];
+export type STEPValue = number | string | null | Ref | Enum | Typed | typeof DERIVED | STEPValue[];
 
 /** One entity instance. A complex instance (`#5=(A(..)B(..));`) has `type` 'COMPLEX' and its partial types in `parts`. */
-export interface Entity {
+export interface STEPEntity {
   readonly id: number;
   readonly type: string;
-  readonly args: readonly Value[];
-  readonly parts?: ReadonlyMap<string, readonly Value[]>;
+  readonly args: readonly STEPValue[];
+  readonly parts?: ReadonlyMap<string, readonly STEPValue[]>;
 }
 
 /** The HEADER section's file description, name and schema. */
@@ -112,7 +112,7 @@ function decodeString(raw: string): string {
 }
 
 /** Parses one parameter at `i`; returns it and the index after it. */
-function value(text: string, i: number): [Value, number] {
+function value(text: string, i: number): [STEPValue, number] {
   i = skip(text, i);
   const c = at(text, i);
   if (c === HASH) {
@@ -168,8 +168,8 @@ function value(text: string, i: number): [Value, number] {
 }
 
 /** Parses `( value, value, ... )` at `i` (which must be '('); returns the values and the index after ')'. */
-function list(text: string, i: number): [Value[], number] {
-  const out: Value[] = [];
+function list(text: string, i: number): [STEPValue[], number] {
+  const out: STEPValue[] = [];
   i = skip(text, i + 1);
   if (at(text, i) === CLOSE) return [out, i + 1];
   for (;;) {
@@ -184,8 +184,8 @@ function list(text: string, i: number): [Value[], number] {
 }
 
 /** Parses `NAME(args)` records from `i` until `stop` (')' of a complex instance, or ';' of a header record). */
-function records(text: string, i: number, stop: number): [Array<[string, Value[]]>, number] {
-  const out: Array<[string, Value[]]> = [];
+function records(text: string, i: number, stop: number): [Array<[string, STEPValue[]]>, number] {
+  const out: Array<[string, STEPValue[]]> = [];
   for (;;) {
     i = skip(text, i);
     if (at(text, i) === stop) return [out, i + 1];
@@ -228,8 +228,9 @@ function instanceEnd(text: string, i: number): number {
   throw malformed('unterminated entity instance', text, text.length);
 }
 
-const asText = (v: Value | undefined) => (typeof v === 'string' ? v : '');
-const asTexts = (v: Value | undefined) => (Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string') : []);
+const asText = (v: STEPValue | undefined) => (typeof v === 'string' ? v : '');
+const asTexts = (v: STEPValue | undefined) =>
+  Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string') : [];
 
 /**
  * A STEP file's entity table. `get(id)` parses an instance on first use and caches it; `ids(type)` lists the
@@ -242,7 +243,7 @@ export class STEPFile {
   private readonly ends: number[] = [];
   private readonly types: string[] = [];
   private readonly byType = new Map<string, number[]>();
-  private readonly cache = new Map<number, Entity>();
+  private readonly cache = new Map<number, STEPEntity>();
 
   constructor(private readonly text: string) {
     let i = skip(text, 0);
@@ -271,7 +272,7 @@ export class STEPFile {
   }
 
   private headerSection(i: number): [STEPHeader, number] {
-    const fields = new Map<string, Value[]>();
+    const fields = new Map<string, STEPValue[]>();
     for (;;) {
       i = skip(this.text, i);
       if (this.text.startsWith('ENDSEC', i)) {
@@ -359,14 +360,14 @@ export class STEPFile {
     return new Map([...this.byType].map(([type, ids]) => [type, ids.length]));
   }
   /** Instance `#id`, parsed on first use. Throws when it does not exist. */
-  get(id: number): Entity {
+  get(id: number): STEPEntity {
     const cached = this.cache.get(id);
     if (cached) return cached;
     const slot = this.slots.get(id);
     if (slot === undefined) throw new TypeError(`Invalid STEP file: #${id} is referenced but never defined`);
     const t = this.text,
       start = this.starts[slot];
-    let entity: Entity;
+    let entity: STEPEntity;
     if (at(t, start) === OPEN) {
       const [parts, after] = records(t, start + 1, CLOSE);
       if (skip(t, after) !== this.ends[slot]) throw malformed(`#${id}: text after the complex instance`, t, after);
@@ -384,7 +385,7 @@ export class STEPFile {
     return entity;
   }
   /** The parameters of `#id` as `type`: its own when it is that type, or that partial type's of a complex instance. */
-  args(id: number, type?: string): readonly Value[] {
+  args(id: number, type?: string): readonly STEPValue[] {
     const entity = this.get(id);
     if (!type || entity.type === type) return entity.args;
     const part = entity.parts?.get(type);

@@ -2,7 +2,7 @@
 // assembly tree with each component's placement, the B-rep bodies with their faces and edges, length units and
 // colours. Written from the ISO 10303-41/42/43 resource schemas and the application protocols' mapping of assemblies
 // (NEXT_ASSEMBLY_USAGE_OCCURRENCE with CONTEXT_DEPENDENT_SHAPE_REPRESENTATION, and MAPPED_ITEM).
-import { Enum, Ref, Typed, type STEPFile, type Value } from './file.js';
+import { Enum, Ref, Typed, type STEPFile, type STEPValue } from './file.js';
 
 /** RGBA in 0..1: the colour as the file writes it (display values) and 1 - transparency. */
 export type STEPColor = readonly [number, number, number, number];
@@ -75,11 +75,11 @@ export interface STEPStructureOptions {
   readonly maxInstances?: number;
 }
 
-const ref = (v: Value | undefined): number | undefined => (v instanceof Ref ? v.id : undefined);
-const refs = (v: Value | undefined): number[] =>
+const ref = (v: STEPValue | undefined): number | undefined => (v instanceof Ref ? v.id : undefined);
+const refs = (v: STEPValue | undefined): number[] =>
   Array.isArray(v) ? v.flatMap((x) => (x instanceof Ref ? [x.id] : [])) : [];
-const str = (v: Value | undefined): string => (typeof v === 'string' ? v : '');
-const num = (v: Value | undefined): number | undefined =>
+const str = (v: STEPValue | undefined): string => (typeof v === 'string' ? v : '');
+const num = (v: STEPValue | undefined): number | undefined =>
   typeof v === 'number' ? v : v instanceof Typed && typeof v.value === 'number' ? v.value : undefined;
 
 const PREFIX: Readonly<Record<string, number>> = {
@@ -163,7 +163,7 @@ function invert(m: Float64Array): Float64Array {
   return r;
 }
 /** Numbers of a list parameter (non-numbers as 0). */
-const numbers = (v: Value | undefined): number[] => (Array.isArray(v) ? v.map((x) => num(x) ?? 0) : []);
+const numbers = (v: STEPValue | undefined): number[] => (Array.isArray(v) ? v.map((x) => num(x) ?? 0) : []);
 const normalize = (v: number[]): number[] | undefined => {
   const l = Math.hypot(v[0], v[1], v[2]);
   return l > 0 && Number.isFinite(l) ? [v[0] / l, v[1] / l, v[2] / l] : undefined;
@@ -225,7 +225,7 @@ export function readStructure(file: STEPFile, { maxInstances = 1_000_000 }: STEP
 
   // --- representations ---------------------------------------------------------------------------------------------
   /** A representation's [name, items, context]: its own parameters, or the REPRESENTATION part of a complex one. */
-  const representation = (id: number): readonly Value[] | undefined => {
+  const representation = (id: number): readonly STEPValue[] | undefined => {
     if (!file.has(id)) return undefined;
     const entity = file.get(id);
     if (!entity.parts) return entity.type.endsWith('REPRESENTATION') ? entity.args : undefined;
@@ -245,7 +245,7 @@ export function readStructure(file: STEPFile, { maxInstances = 1_000_000 }: STEP
     const [, location, axis, refDirection] = file.args(id, 'AXIS2_PLACEMENT_3D');
     const at = ref(location),
       point = at !== undefined && file.has(at) ? numbers(file.args(at)[1]) : [];
-    const direction = (v: Value | undefined) => {
+    const direction = (v: STEPValue | undefined) => {
       const d = ref(v);
       return d === undefined || !file.has(d) ? undefined : normalize(numbers(file.args(d)[1]));
     };
@@ -381,7 +381,15 @@ export function readStructure(file: STEPFile, { maxInstances = 1_000_000 }: STEP
       const [, , item1, item2] = file.args(p.operator, 'ITEM_DEFINED_TRANSFORMATION');
       // item 1 lives in relationship representation 1, item 2 in representation 2; the transformation maps the child's
       // placement onto the parent's.
-      const [childItem, parentItem]: Value[] = childFirst ? [item1, item2] : [item2, item1];
+      let [childItem, parentItem]: STEPValue[] = childFirst ? [item1, item2] : [item2, item1];
+      // Exporters disagree on the item order (SolidWorks lists the parent's placement first): the representation that
+      // lists an item owns it.
+      const lists = (rep: number, item: STEPValue) => refs(file.args(rep)[1]).includes(ref(item) ?? -1);
+      if (lists(parentRep, childItem) && lists(childRep, parentItem)) {
+        const swapped = childItem;
+        childItem = parentItem;
+        parentItem = swapped;
+      }
       return multiply(
         placement(ref(parentItem), repUnit(parentRep)),
         invert(placement(ref(childItem), repUnit(childRep))),
@@ -391,7 +399,7 @@ export function readStructure(file: STEPFile, { maxInstances = 1_000_000 }: STEP
       const entity = file.get(p.operator),
         args = entity.parts ? (entity.parts.get('CARTESIAN_TRANSFORMATION_OPERATOR') ?? []) : entity.args,
         axis3 = entity.parts ? entity.parts.get('CARTESIAN_TRANSFORMATION_OPERATOR_3D')?.[0] : args[6];
-      const direction = (v: Value | undefined, fallback: number[]) => {
+      const direction = (v: STEPValue | undefined, fallback: number[]) => {
         const d = ref(v);
         return (d !== undefined && file.has(d) && normalize(numbers(file.args(d)[1]))) || fallback;
       };

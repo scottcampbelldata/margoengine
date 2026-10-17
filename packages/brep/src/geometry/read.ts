@@ -1,11 +1,11 @@
 // Reading points, directions and placements from STEP entities (ISO 10303-42), in the file's length unit.
-import { Ref, Typed, type STEPFile, type Value } from '../step/file.js';
+import { Ref, Typed, type STEPFile, type STEPValue } from '../step/file.js';
 import { cross, dot, unit, type V3 } from './vec.js';
 
-export const ref = (v: Value | undefined): number | undefined => (v instanceof Ref ? v.id : undefined);
-export const num = (v: Value | undefined, fallback = 0): number =>
+export const ref = (v: STEPValue | undefined): number | undefined => (v instanceof Ref ? v.id : undefined);
+export const num = (v: STEPValue | undefined, fallback = 0): number =>
   typeof v === 'number' ? v : v instanceof Typed && typeof v.value === 'number' ? v.value : fallback;
-export const list = (v: Value | undefined): readonly Value[] => (Array.isArray(v) ? v : []);
+export const list = (v: STEPValue | undefined): readonly STEPValue[] => (Array.isArray(v) ? v : []);
 
 /** An entity the kernel cannot evaluate yet: a TypeError naming it, so one bad face or edge can be skipped. */
 export function unsupported(file: STEPFile, id: number, what: string): TypeError {

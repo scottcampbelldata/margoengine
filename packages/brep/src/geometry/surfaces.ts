@@ -1,7 +1,7 @@
 // Face surfaces (ISO 10303-42 parameterizations): plane, cylinder, cone, sphere, torus, surface of revolution,
 // surface of linear extrusion, B-spline (rational or not) and offset surface. Each evaluates point and first
 // derivatives, inverts a point to its (u, v), and tells the tessellator its periods, its poles and how finely to sample.
-import { Enum, type STEPFile, type Value } from '../step/file.js';
+import { Enum, type STEPFile, type STEPValue } from '../step/file.js';
 import { angleStep, type Curve } from './curves.js';
 import { clamped, knotVector, spanBreaks, surfaceAt, type SplineSurface } from './nurbs.js';
 import { direction, frame, list, num, point, ref, unsupported, vector, type Frame } from './read.js';
@@ -28,6 +28,8 @@ export interface Surface {
   steps(box: readonly number[], deflection: number, turn: number): [number, number];
   /** v of the pole or apex on side +1 (high v) or -1 (low v), when the surface collapses to a point there. */
   pole(side: 1 | -1): number | undefined;
+  /** u of a pole on side +1 (high u) or -1 (low u), where v has no meaning (a B-spline row collapsed at a u end). */
+  uPole?(side: 1 | -1): number | undefined;
   /** Whether (u, v) is a pole or apex, where u has no meaning. */
   singular(u: number, v: number): boolean;
 }
@@ -463,6 +465,15 @@ class SplinePatch implements Surface {
     }
     return side > 0 ? this.vDomain[1] : this.vDomain[0];
   }
+  uPole(side: 1 | -1) {
+    // A control-point row collapsed to one point at the low or high u end.
+    const i = side > 0 ? this.s.nu - 1 : 0,
+      at = (j: number) =>
+        [0, 1, 2].map((k) => this.s.points[(i * this.s.nv + j) * 4 + k] / this.s.points[(i * this.s.nv + j) * 4 + 3]),
+      first = at(0);
+    for (let j = 1; j < this.s.nv; j++) if (distance(at(j), first) > 1e-9 * this.size) return undefined;
+    return side > 0 ? this.uDomain[1] : this.uDomain[0];
+  }
   singular(u: number, v: number) {
     const d = this.at(u, v);
     return length(d.slice(3, 6)) < 1e-9 * this.size || length(d.slice(6, 9)) < 1e-9 * this.size;
@@ -552,7 +563,7 @@ function splineSurface(file: STEPFile, id: number): Surface {
       points.set([c[0] * w, c[1] * w, c[2] * w, w], (i * nv + j) * 4);
     }
   // Closed in a direction when marked so, or when a clamped net's first and last rows meet (the flag is often false).
-  const flag = (v: Value | undefined) => v instanceof Enum && v.name === 'T';
+  const flag = (v: STEPValue | undefined) => v instanceof Enum && v.name === 'T';
   let size = 0;
   for (const row of rows) for (const c of row) size = Math.max(size, Math.abs(c[0]), Math.abs(c[1]), Math.abs(c[2]));
   const tolerance = 1e-9 * Math.max(size, 1e-30),

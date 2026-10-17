@@ -380,6 +380,35 @@ test('rational B-splines: the 9-point circle and a cylinder side, closed though 
   }
 });
 
+test('a B-spline face collapsed to a point at one u end (v meaningless there) closes a tetrahedron', () => {
+  // Faces counter-clockwise from outside; the slanted face ABC is S(u, v) = (1 - u) A + u ((1 - v) B + v C), whose
+  // control row at u = 0 is A twice: at A, v has no meaning (NIST CTC02 has such patches).
+  const O = [0, 0, 0],
+    A = [10, 0, 0],
+    B = [0, 10, 0],
+    C = [0, 0, 10];
+  const text = polyhedron(
+    [O, A, B, C],
+    [
+      [0, 2, 1],
+      [0, 1, 3],
+      [0, 3, 2],
+      [1, 2, 3],
+    ],
+    {
+      surface: {
+        3: (w) =>
+          w.add(
+            `B_SPLINE_SURFACE_WITH_KNOTS('',1,1,((${w.point(A)},${w.point(A)}),(${w.point(B)},${w.point(C)})),` +
+              '.UNSPECIFIED.,.F.,.F.,.F.,(2,2),(2,2),(0.,1.),(0.,1.),.UNSPECIFIED.)',
+          ),
+      },
+    },
+  );
+  const r = solid(mesh(text), 1000 / 6, 150 + (Math.sqrt(3) / 4) * 200);
+  assert.ok(r.triangles >= 4);
+});
+
 test('a finer deflection gives more triangles and a closer volume', () => {
   const R = 10,
     exact = (4 / 3) * Math.PI * R ** 3,

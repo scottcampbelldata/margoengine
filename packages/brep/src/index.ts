@@ -7,7 +7,7 @@ import { readStructure, type STEPStructure, type STEPStructureOptions } from './
 import { Tessellator, type BodyMesh, type TessellationOptions } from './mesh/tessellate.js';
 
 export { STEPFile, Ref, Enum, Typed, DERIVED, stepText } from './step/file.js';
-export type { Entity, STEPHeader, Value } from './step/file.js';
+export type { STEPEntity, STEPHeader, STEPValue } from './step/file.js';
 export { readStructure } from './step/structure.js';
 export type {
   STEPBody,

@@ -1,7 +1,7 @@
 // Edge curves (ISO 10303-42): line, circle, ellipse, B-spline (rational or not) and polyline, plus the wrappers that
 // name a 3D curve (surface, seam and intersection curves, trimmed curves). Each evaluates a point and tangent, finds
 // the parameter of a point on it, and samples a parameter range to a chord deflection and turning angle.
-import { Enum, type STEPFile, type Value } from '../step/file.js';
+import { Enum, type STEPFile, type STEPValue } from '../step/file.js';
 import { clamped, curveAt, knotVector, spanBreaks, type SplineCurve } from './nurbs.js';
 import { frame, list, num, point, ref, unsupported, vector } from './read.js';
 import { add, angle, distance, dot, scale, sub, type V3 } from './vec.js';
@@ -248,7 +248,7 @@ function splineCurve(file: STEPFile, id: number): Curve {
 export function curveOf(file: STEPFile, id: number): Curve {
   const entity = file.get(id),
     type = entity.parts ? (entity.parts.has('B_SPLINE_CURVE') ? 'B_SPLINE_CURVE_WITH_KNOTS' : '') : entity.type,
-    args: readonly Value[] = entity.args;
+    args: readonly STEPValue[] = entity.args;
   switch (type) {
     case 'LINE':
       return new Line(point(file, ref(args[1])), vector(file, ref(args[2])));
