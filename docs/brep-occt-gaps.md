@@ -1,4 +1,4 @@
-# Where OpenCascade still leads (roadmap, to address later)
+# Where OpenCascade still leads, and testing to commercial grade (roadmap, to address later)
 
 Noted 2026-10-17 from Scott's review. Each item is where OpenCascade (OCCT) is still ahead of `@margoengine/brep`, with
 where Margo stands today and what matching it would take. Goal (Scott): match or beat OCCT on all of it.
@@ -51,6 +51,47 @@ To match:
 - re-fitting p-curves and edges that do not lie on their surfaces; removing slivers and tiny edges;
 - making shells closed and consistently oriented, then solids; reporting what was changed;
 - defeaturing: removing holes, fillets and chamfers by face selection (the inverse of the operations above).
+
+## 4. Testing to commercial grade
+
+Noted 2026-10-18 from Scott. Buyers of a CAD kernel (CAD/CAM tools, robotics simulators, generative design, web
+configurators) judge it by how it behaves at the boundaries and whether it ever crashes, not by benchmarks. Three
+suites take Margo from measured-on-clean-files to that standard.
+
+### A. Pathological public corpora
+
+Margo today: the corpus is the 54 NIST/CAx-IF files (clean, structural): every parsed file at 0 failed faces and 0
+open edges on solids, 43 matching OpenCascade's mesh. `validateBody` checks loops, edge use and that edges and vertices
+lie on their curves and surfaces, but nothing checks topology globally and nothing stops a runaway operation.
+
+To do:
+- run a 10,000-model slice of the ABC Dataset (CAD models from Onshape, with real user defects: self-intersecting and
+  degenerate faces, non-tangent seams, micro-edges, floating-point noise);
+- gate every run on three counts: crash immunity (no unhandled exception and no hang, with a time limit on every
+  Boolean and blend search), watertightness (0 open edges on every valid solid), and the Euler-Poincare check
+  V - E + F - (L - F) - 2(S - G) = 0 (vertices, edges, faces, loops, shells, genus) on every solid read or made, so
+  each is a valid 2-manifold.
+
+### B. Perturbation and boundary fuzzing
+
+Margo today: the fillet builder was compared with the Boolean construction on 5,286 straight-edge and 168 circle cases
+(radii 0.25 to 3.5 mm on 5 to 20 mm parts, 2026-10-18): same solids, none lost. No sweeps to the limits, no jitter.
+
+To do:
+- sweep the operations benchmark's 66 cases over continuous ranges: fillet radius towards 0 (micro-radii) and towards
+  the largest that fits (exactly where a blend swallows a face); coplanar face merges; near-tangent cylinder-plane and
+  cylinder-cylinder contact;
+- jitter input coordinates by 1e-7 to 1e-5 (files from different systems carry different tolerances: about 1e-6 in
+  Parasolid, 1e-7 in ACIS); the kernel must reconcile disjoint edge tolerances without tearing shells.
+
+### C. STEP round trips
+
+Margo today: Codex checks every exported test result in OpenCascade (BRepCheck, GProp, occt-import-js). The exporter
+writes closed curved faces without seam edges, which OpenCascade's mesher misreads (below); a session is fixing that.
+
+To do, the highest validation priority: import STEP, edit in Margo (blend, Boolean), export STEP, open the result in
+Siemens NX, FreeCAD and SolidWorks, automatically (FreeCAD's command line for a start). Engineers reject a file one of
+them flags for missing seam edges, inverted faces or unstitched sheets.
 
 ## Other work parked for later (not the kernel)
 
