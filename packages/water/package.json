@@ -27,10 +27,5 @@
     "prepack": "npm run build"
   },
   "homepage": "https://margoengine.com",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/water"
-  },
   "description": "Gerstner water surfaces, terrain-coupled shallow-water flow, foam and spray."
 }
