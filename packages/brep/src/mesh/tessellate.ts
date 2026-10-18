@@ -466,7 +466,9 @@ export class Tessellator {
     const holesOnly =
       !domain.length &&
       loops.length > 0 &&
-      Math.sign(signedArea(loops[0])) === -left &&
+      // Every loop wound as a hole: a file whose loops disagree (an outer loop written the wrong way round) keeps the
+      // largest as the outer one.
+      loops.every((loop) => Math.sign(signedArea(loop)) === -left) &&
       !!s.uPeriod &&
       (!!s.vPeriod || (s.pole(-1) !== undefined && s.pole(1) !== undefined));
     if (!domain.length && (!loops.length || holesOnly)) {
