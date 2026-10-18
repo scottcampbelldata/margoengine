@@ -31,38 +31,73 @@ export function findSpan(n: number, p: number, u: number, U: readonly number[]):
   return mid;
 }
 
-/** A2.3 for orders 0 and 1: `out[0][j]` the basis functions N(span - p + j, p) at u, `out[1][j]` their derivatives. */
-export function basisDerivatives(span: number, u: number, p: number, U: readonly number[]): [number[], number[]] {
-  const ndu: number[][] = Array.from({ length: p + 1 }, () => new Array(p + 1).fill(0)),
-    left = new Array(p + 1).fill(0),
-    right = new Array(p + 1).fill(0);
-  ndu[0][0] = 1;
+// Scratch for the basis table, reused by every evaluation (they run one at a time): evaluating a surface point
+// allocates nothing, which is most of the tessellator's time on spline-heavy parts. Degrees above MAX_DEGREE take a
+// table of their own.
+const MAX_DEGREE = 31;
+const scratchTable = new Float64Array((MAX_DEGREE + 1) * (MAX_DEGREE + 1)),
+  scratchLeft = new Float64Array(MAX_DEGREE + 1),
+  scratchRight = new Float64Array(MAX_DEGREE + 1);
+
+/**
+ * A2.3 for orders 0 and 1, into `values[j]` (the basis functions N(span - p + j, p) at u) and `derivatives[j]`, each
+ * with room for p + 1 entries.
+ */
+export function basisInto(
+  span: number,
+  u: number,
+  p: number,
+  U: readonly number[],
+  values: Float64Array | number[],
+  derivatives: Float64Array | number[],
+): void {
+  const big = p > MAX_DEGREE,
+    ndu = big ? new Float64Array((p + 1) * (p + 1)) : scratchTable,
+    left = big ? new Float64Array(p + 1) : scratchLeft,
+    right = big ? new Float64Array(p + 1) : scratchRight,
+    w = p + 1;
+  ndu[0] = 1;
   for (let j = 1; j <= p; j++) {
     left[j] = u - U[span + 1 - j];
     right[j] = U[span + j] - u;
     let saved = 0;
     for (let r = 0; r < j; r++) {
-      ndu[j][r] = right[r + 1] + left[j - r];
-      const temp = ndu[j][r] ? ndu[r][j - 1] / ndu[j][r] : 0;
-      ndu[r][j] = saved + right[r + 1] * temp;
+      const lower = right[r + 1] + left[j - r];
+      ndu[j * w + r] = lower;
+      const temp = lower ? ndu[r * w + j - 1] / lower : 0;
+      ndu[r * w + j] = saved + right[r + 1] * temp;
       saved = left[j - r] * temp;
     }
-    ndu[j][j] = saved;
+    ndu[j * w + j] = saved;
   }
-  const values = new Array(p + 1),
-    derivatives = new Array(p + 1).fill(0);
-  for (let j = 0; j <= p; j++) values[j] = ndu[j][p];
-  if (p > 0)
-    for (let r = 0; r <= p; r++) {
-      // d/du N(i,p) = p (N(i,p-1) / (U[i+p] - U[i]) - N(i+1,p-1) / (U[i+p+1] - U[i+1])), from the triangular table.
-      // A zero knot difference (repeated knots) makes that term vanish, as A2.3 treats it.
-      let d = 0;
-      if (r >= 1 && ndu[p][r - 1]) d += ndu[r - 1][p - 1] / ndu[p][r - 1];
-      if (r <= p - 1 && ndu[p][r]) d -= ndu[r][p - 1] / ndu[p][r];
-      derivatives[r] = d * p;
-    }
+  for (let j = 0; j <= p; j++) values[j] = ndu[j * w + p];
+  if (!p) {
+    derivatives[0] = 0;
+    return;
+  }
+  for (let r = 0; r <= p; r++) {
+    // d/du N(i,p) = p (N(i,p-1) / (U[i+p] - U[i]) - N(i+1,p-1) / (U[i+p+1] - U[i+1])), from the triangular table.
+    // A zero knot difference (repeated knots) makes that term vanish, as A2.3 treats it.
+    let d = 0;
+    if (r >= 1 && ndu[p * w + r - 1]) d += ndu[(r - 1) * w + p - 1] / ndu[p * w + r - 1];
+    if (r <= p - 1 && ndu[p * w + r]) d -= ndu[r * w + p - 1] / ndu[p * w + r];
+    derivatives[r] = d * p;
+  }
+}
+
+/** A2.3 for orders 0 and 1: `out[0][j]` the basis functions N(span - p + j, p) at u, `out[1][j]` their derivatives. */
+export function basisDerivatives(span: number, u: number, p: number, U: readonly number[]): [number[], number[]] {
+  const values = new Array<number>(p + 1).fill(0),
+    derivatives = new Array<number>(p + 1).fill(0);
+  basisInto(span, u, p, U, values, derivatives);
   return [values, derivatives];
 }
+
+// Per-direction outputs of basisInto for curve and surface evaluation.
+const N0 = new Float64Array(MAX_DEGREE + 1),
+  D0 = new Float64Array(MAX_DEGREE + 1),
+  N1 = new Float64Array(MAX_DEGREE + 1),
+  D1 = new Float64Array(MAX_DEGREE + 1);
 
 /** A B-spline curve: degree, homogeneous control points (4 per point), knot vector. */
 export interface SplineCurve {
@@ -76,7 +111,10 @@ export function curveAt(c: SplineCurve, u: number): number[] {
   const n = c.points.length / 4 - 1,
     p = c.degree,
     span = findSpan(n, p, u, c.knots),
-    [N, dN] = basisDerivatives(span, u, p, c.knots);
+    big = p > MAX_DEGREE,
+    N = big ? new Float64Array(p + 1) : N0,
+    dN = big ? new Float64Array(p + 1) : D0;
+  basisInto(span, u, p, c.knots, N, dN);
   const a = [0, 0, 0, 0],
     d = [0, 0, 0, 0];
   for (let j = 0; j <= p; j++) {
@@ -109,31 +147,66 @@ export function surfaceAt(s: SplineSurface, u: number, v: number): number[] {
     q = s.vDegree,
     uspan = findSpan(s.nu - 1, p, u, s.uKnots),
     vspan = findSpan(s.nv - 1, q, v, s.vKnots),
-    [Nu, dNu] = basisDerivatives(uspan, u, p, s.uKnots),
-    [Nv, dNv] = basisDerivatives(vspan, v, q, s.vKnots);
-  const a = [0, 0, 0, 0],
-    au = [0, 0, 0, 0],
-    av = [0, 0, 0, 0];
-  for (let i = 0; i <= p; i++)
-    for (let j = 0; j <= q; j++) {
-      const o = ((uspan - p + i) * s.nv + (vspan - q + j)) * 4,
-        n = Nu[i] * Nv[j],
-        nu = dNu[i] * Nv[j],
-        nv = Nu[i] * dNv[j];
-      for (let k = 0; k < 4; k++) {
-        const c = s.points[o + k];
-        a[k] += n * c;
-        au[k] += nu * c;
-        av[k] += nv * c;
-      }
+    Nu = p > MAX_DEGREE ? new Float64Array(p + 1) : N0,
+    dNu = p > MAX_DEGREE ? new Float64Array(p + 1) : D0,
+    Nv = q > MAX_DEGREE ? new Float64Array(q + 1) : N1,
+    dNv = q > MAX_DEGREE ? new Float64Array(q + 1) : D1;
+  basisInto(uspan, u, p, s.uKnots, Nu, dNu);
+  basisInto(vspan, v, q, s.vKnots, Nv, dNv);
+  // Sums in plain locals: x, y, z, w of the point and of both partial derivatives.
+  let ax = 0,
+    ay = 0,
+    az = 0,
+    aw = 0,
+    ux = 0,
+    uy = 0,
+    uz = 0,
+    uw = 0,
+    vx = 0,
+    vy = 0,
+    vz = 0,
+    vw = 0;
+  const P = s.points;
+  for (let i = 0; i <= p; i++) {
+    const ni = Nu[i],
+      di = dNu[i];
+    let o = ((uspan - p + i) * s.nv + (vspan - q)) * 4;
+    for (let j = 0; j <= q; j++, o += 4) {
+      const n = ni * Nv[j],
+        nu = di * Nv[j],
+        nv = ni * dNv[j],
+        x = P[o],
+        y = P[o + 1],
+        z = P[o + 2],
+        h = P[o + 3];
+      ax += n * x;
+      ay += n * y;
+      az += n * z;
+      aw += n * h;
+      ux += nu * x;
+      uy += nu * y;
+      uz += nu * z;
+      uw += nu * h;
+      vx += nv * x;
+      vy += nv * y;
+      vz += nv * z;
+      vw += nv * h;
     }
-  const w = a[3],
-    out = [a[0] / w, a[1] / w, a[2] / w, 0, 0, 0, 0, 0, 0];
-  for (let k = 0; k < 3; k++) {
-    out[3 + k] = (au[k] - au[3] * out[k]) / w;
-    out[6 + k] = (av[k] - av[3] * out[k]) / w;
   }
-  return out;
+  const px = ax / aw,
+    py = ay / aw,
+    pz = az / aw;
+  return [
+    px,
+    py,
+    pz,
+    (ux - uw * px) / aw,
+    (uy - uw * py) / aw,
+    (uz - uw * pz) / aw,
+    (vx - vw * px) / aw,
+    (vy - vw * py) / aw,
+    (vz - vw * pz) / aw,
+  ];
 }
 
 /** Whether a knot vector is clamped (its first and last p + 1 knots repeat), so the spline starts and ends on control points. */
