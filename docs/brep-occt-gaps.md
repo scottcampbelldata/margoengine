@@ -56,12 +56,12 @@ To match:
 
 ### Night Citadel is darker on the CAD branch
 
-Found by Codex's b973204 validation (2026-10-18, `test-results/b973204-validation/browser/NIGHT-NUMBERS.md` in the
+Found by Codex's 1bf77b8 validation (2026-10-18, `test-results/1bf77b8-validation/browser/NIGHT-NUMBERS.md` in the
 split worktree). Same fixed view, branch against main 1f7d19f: mean screen brightness is about 62% of main's on desktop
 (26.7 against 43.1, 8-bit luminance) and 66% on the phone. The castle stone, island rock and sea read nearly black;
 stars now show and the moon is brighter. Likely cause: the sky-lighting and display-curve commits of 2026-10-17 on
-this branch (sky SH diffuse and split-sum reflections 731604a, sun and moon from the transmittance 9e607c8, PBR Neutral
-display curve 679f87c). Decide whether to bring the moonlit stone back to main's readability (moon light strength or
+this branch (sky SH diffuse and split-sum reflections 72323ea, sun and moon from the transmittance 321d307, PBR Neutral
+display curve ea3f0c7). Decide whether to bring the moonlit stone back to main's readability (moon light strength or
 the scene's exposure) while keeping the stars.
 
 Related: the Night Citadel browser test expects phones at 2 device pixels per CSS pixel, but fb01fb1 (on main,
@@ -69,7 +69,7 @@ Related: the Night Citadel browser test expects phones at 2 device pixels per CS
 
 ### STEP export: OpenCascade misreads some sphere faces
 
-Found by Codex's b973204 validation (step 8) and narrowed down on 2026-10-18. Our exports of the "sphere through a
+Found by Codex's 1bf77b8 validation (step 8) and narrowed down on 2026-10-18. Our exports of the "sphere through a
 cylinder wall" Booleans write each face with only its traced intersection edges: no seam edges on periodic surfaces
 and no degenerate edge at a sphere's pole, which STEP allows. OpenCascade's GProp agrees with our volumes for the union,
 intersect and cylinder-minus-sphere results, but its mesher (occt-import-js) fills the wrong side of the sphere face in

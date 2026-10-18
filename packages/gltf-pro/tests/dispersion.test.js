@@ -82,7 +82,7 @@ test('required dispersion loads with the physical shader opted out and accepts f
         server.closeAllConnections();
       }),
   );
-  // Physical extensions load the physical shader by default (a389bc5); materials: false keeps the base shader.
+  // Physical extensions load the physical shader by default (7cdde07); materials: false keeps the base shader.
   const model = await loadGLTF(engine, `http://127.0.0.1:${server.address().port}/model.gltf`, {
     decoders: { materials: false },
   });

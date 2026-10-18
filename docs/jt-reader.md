@@ -71,4 +71,4 @@ Codex's step-10 samples (NIST models, US public domain, mirrored by Innerscene; 
 - A literal JT 9.5 file and a tessellation-only file to check the JT 9 mesh decoder on (JT2Go's samples).
 - JT 10 packets and bit-length Mk. 2; polygon sets and polylines; colours and texture coordinates if wanted.
 - JT B-rep, wireframe and ULP segments, coded with Int32 Mk. 1 packets (bit-length and two-table arithmetic): that
-  decoder was written in 2c41f76 and removed unused; bring it back with the first of those segments.
+  decoder was written in 3bb8099 and removed unused; bring it back with the first of those segments.

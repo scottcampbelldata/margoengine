@@ -2,7 +2,7 @@
 // creative PostProcessing) makes exactly the GPU calls it made before, over a story of resizes, option edits, format
 // and sample-count changes, a rejected frame, device restoration and disposal at 1x and 4x.
 // Run: node examples/package-benchmarks/proofs/post-stack.proof.js [ref] [pin] [--current]
-// Pinned: 5b1fe66^ against 5b1fe66, the commit that added PostStack and made this claim. --current: 963358d against the
+// Pinned: 5b1fe66^ against 5b1fe66, the commit that added PostStack and made this claim. --current: 07c8e6d against the
 // working tree, including the approved multilevel Bloom, PBR Neutral display and Tonemap default (claims.md).
 // creative's PostProcessing is always 5b1fe66^ against 3319317: it lost bloom and the sky backdrop after 3319317.
 import assert from 'node:assert/strict';
@@ -11,7 +11,7 @@ import { mockGPU, context } from './gpu-recorder.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 
 const before = '5b1fe66^',
-  { ref, pin } = refs(before, '5b1fe66', '963358d');
+  { ref, pin } = refs(before, '5b1fe66', '07c8e6d');
 const post = await versions('post', ref, undefined, pin),
   dof = await versions('dof', ref, undefined, pin),
   tonemap = await versions('tonemap', ref, undefined, pin);
