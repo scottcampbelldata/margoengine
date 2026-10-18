@@ -183,13 +183,17 @@ export class Tessellator {
         const samples = c.sample(t1, t2, deflection, this.turn),
           lo = Math.min(t1, t2),
           hi = Math.max(t1, t2);
+        // A pole the edge passes through (a cone's apex, a sphere's pole) inside the edge: inserted in order, unless
+        // a sample already sits on it. One at an end (an edge from the apex, its parameter a rounding error inside)
+        // would be a second point a few ulps from the end vertex that the neighbouring face does not have.
+        const near = 1e-9 * (hi - lo);
         for (const pole of this.through.get(id) ?? [])
           for (let k = -1; k <= 1; k++) {
             const t = pole + k * c.period;
-            if (t <= lo || t >= hi || (k && !c.period)) continue;
-            // Inside the edge: inserted in order, unless a sample already sits on it.
+            if (t <= lo + near || t >= hi - near || (k && !c.period)) continue;
             const at = samples.findIndex((x) => (t2 > t1 ? x >= t : x <= t));
-            if (at > 0 && Math.abs(samples[at] - t) > 1e-12 * (hi - lo)) samples.splice(at, 0, t);
+            if (at > 0 && Math.abs(samples[at] - t) > near && Math.abs(samples[at - 1] - t) > near)
+              samples.splice(at, 0, t);
           }
         out = samples.map((t) => c.at(t).slice(0, 3) as XYZ);
         out[0] = p1;
