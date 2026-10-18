@@ -458,9 +458,9 @@ export class Tessellator {
         throw new TypeError(`Invalid STEP file: face #${id} has no bounds on an unbounded surface`);
       const corner = (u: number, v: number): LoopPoint => ({ p: spot(u, v), u, v, line: true }),
         corners = [corner(u0, v0), corner(u1, v0), corner(u1, v1), corner(u0, v1)];
-      // Corners on one pole are one point.
-      if (distance(corners[0].p, corners[1].p) <= gap) corners[1].p = corners[0].p;
-      if (distance(corners[2].p, corners[3].p) <= gap) corners[3].p = corners[2].p;
+      // Corners on one pole are one point. A torus's corners meet too, but its sides are seam circles, not poles.
+      if (s.pole(-1) !== undefined && distance(corners[0].p, corners[1].p) <= gap) corners[1].p = corners[0].p;
+      if (s.pole(1) !== undefined && distance(corners[2].p, corners[3].p) <= gap) corners[3].p = corners[2].p;
       domain.push(corners);
     }
     // Closed loops: the largest is the outer one unless a band or cap made it; holes move by whole periods into it.
@@ -526,13 +526,16 @@ export class Tessellator {
         if (!(steps > 1)) return;
         const qk = canon(q),
           rk = canon(r),
-          forward = qk <= rk,
+          // A line once round a period starts and ends at one canonical point: its direction decides the order.
+          forward = qk < rk || (qk === rk && r.u - q.u + (r.v - q.v) >= 0),
           key = forward ? `${qk};${rk};${steps}` : `${rk};${qk};${steps}`;
         let points = lines.get(key);
         if (!points) {
           const [lo, hi] = forward ? [q, r] : [r, q],
-            // Along a pole every point is the pole itself.
-            pole = distance(q.p, r.p) <= gap;
+            // Along a pole every point is the pole itself. A line whose ends meet only because it goes once round a
+            // closed surface (a torus's seam circle) is no pole: its middle is far from its ends.
+            pole =
+              distance(q.p, r.p) <= gap && distance(spot((q.u + r.u) / 2, (q.v + r.v) / 2), q.p) <= gap;
           points = [];
           for (let j = 1; j < steps; j++)
             points.push(pole ? q.p : spot(lo.u + ((hi.u - lo.u) * j) / steps, lo.v + ((hi.v - lo.v) * j) / steps));
