@@ -29,10 +29,5 @@
     "prepack": "npm run build"
   },
   "homepage": "https://margoengine.com",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/navmesh"
-  },
   "description": "Convex polygon navigation with A*, funnel paths and ORCA avoidance."
 }
