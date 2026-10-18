@@ -10,7 +10,7 @@
 // Siemens JT Data Format Reference Patent Clarification Notice. JT and Parasolid are trademarks of Siemens; they are
 // named here only to identify the format. This software is not endorsed by or affiliated with Siemens.
 import { inflateZlib } from './inflate.js';
-import { inflateLZMA } from './lzma.js';
+import { inflateLZMA, inflateXZ, isXZ } from './lzma.js';
 
 export const fail = (message: string): never => {
   throw new TypeError(`Invalid JT file: ${message}`);
@@ -209,7 +209,7 @@ export class JTContainer {
     if (!((flag === 2 && algorithm === 2) || (flag === 3 && algorithm === 3))) return r;
     const stream = r.sub(packed - 1),
       input = this.bytes.subarray(stream.at, stream.end),
-      inflated = algorithm === 2 ? inflateZlib(input) : inflateLZMA(input);
+      inflated = algorithm === 2 ? inflateZlib(input) : isXZ(input) ? inflateXZ(input) : inflateLZMA(input);
     return new JTReader(inflated, this.little);
   }
 }
