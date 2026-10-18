@@ -49,8 +49,24 @@ Licensing and the notice it must carry: `docs/jt-licensing.md`. Code: `packages/
   escape), one vertex record per corner and per triangle, both byte orders; checksums written by a separate byte-wise
   hash, so a wrong word-wise hash fails the read.
 
+## First real files (2026-10-18)
+
+Codex's step-10 samples (NIST models, US public domain, mirrored by Innerscene; in the ignored corpus, never committed):
+
+- NIST MTC CRADA assembly, literal JT 10.5 (DM 9.8): structure reads in about 140 ms: 179 nodes, 13 parts, 41
+  instances, millimetres, part names from the instance nodes. Its segments are XZ containers of LZMA2 (not bare LZMA),
+  now decoded. The JT 10 XT B-rep element is: U8 version, U8 subordinate flag, I32 Parasolid major/minor/build, one
+  more byte, I32 data length, the Parasolid neutral binary (V33, SCH_3300171_32001_13006), then body identifiers and
+  attributes. Seven parts read their exact B-rep and mesh with 0 failed faces and 0 open edges in about 0.6 s; volumes
+  match the same assembly's STEP file (hex nut 102.5 / 102.4 mm3, flat-head screw 141.0 / 141.0, window 17,045 /
+  17,054; cover and plate within about 1%, a revision apart). Two Parasolid reader bugs this exposed are fixed.
+- The box part's element is subordinate (23 bytes): its B-rep sits in the assembly's MultiXT segment (type 30) and
+  is not read yet. Its tessellated shapes (JT 10 packets) are not decoded yet either.
+- The two NIST parts (socket head cap screw, CTC 02) are literal JT 9.4: the reader refuses them (the patent notice
+  covers 9.5 and later; for counsel, docs/jt-licensing.md).
+
 ## Next
 
-- Read real JT files (JT2Go's samples, Codex's step 10): compare part counts, names and units with JT2Go, meshes
-  against the XT B-rep of the same part, and check the stored hashes pass.
+- MultiXT segments (type 30) and subordinate XT elements; JT 10 Int32 packets for tessellated shapes.
+- A literal JT 9.5 file and a tessellation-only file to check the JT 9 mesh decoder on (JT2Go's samples).
 - JT 10 packets and bit-length Mk. 2; polygon sets and polylines; colours and texture coordinates if wanted.
