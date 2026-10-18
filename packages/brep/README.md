@@ -48,6 +48,22 @@ for (const check of validateSTEP(model, tessellateSTEP(model)))
   if (!check.ok) console.warn(check.property.label, check.differences, check.note);
 ```
 
+## Other B-rep formats
+
+ACIS SAT and Parasolid XT are converted to STEP entities and then read and meshed by the same kernel:
+
+- **ACIS SAT** (`parseSAT`, `satToSTEP`): save versions before and after ACIS 7.0, written from Spatial's published SAT
+  format chapter and class restore descriptions. Bodies, lumps, shells, faces, loops, coedges, edges, vertices; plane,
+  cone, cylinder, sphere, torus and spline surfaces; straight, ellipse and interpolated curves (procedural splines from
+  the B-spline approximation the file stores with them); body transforms, units and rgb_color attributes.
+- **Parasolid XT** (`parseXT`, `xtToSTEP`, `readXT` for the raw nodes): text (.x_t) and neutral binary (.x_b)
+  transmit files, written from the published XT Format Reference. Node layouts come from the base schema, with each
+  file's own schema edits applied (Parasolid V14 on); assemblies become mapped items (a part placed many times is meshed
+  once); solid and sheet bodies; plane, cylinder, cone, sphere, torus, B-surface, offset, swept and spun surfaces; line,
+  circle, ellipse, B-curve, trimmed and intersection curves (through their chart points); SDL/TYSA_COLOUR attributes.
+  Lengths are metres. Rolling-ball blends, SP-curves of tolerant edges and foreign geometry are left out and listed in
+  `warnings` for now.
+
 ## What stage 1 reads
 
 - **The file:** one pass indexes every entity instance of the DATA sections; parameters are parsed only when used, so

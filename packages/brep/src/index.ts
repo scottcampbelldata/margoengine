@@ -10,6 +10,11 @@ export { validateSTEP } from './mesh/validate.js';
 export type { STEPMeasured, STEPValidationCheck, ValidationOptions } from './mesh/validate.js';
 export { satToSTEP } from './sat/read.js';
 export type { SATConversion } from './sat/read.js';
+export { readXT } from './xt/read.js';
+export type { XTFile, XTNode, XTValue } from './xt/read.js';
+export { xtToSTEP } from './xt/step.js';
+export type { XTConversion } from './xt/step.js';
+import { xtToSTEP } from './xt/step.js';
 
 export { STEPFile, Ref, Enum, Typed, DERIVED, stepText } from './step/file.js';
 export type { STEPEntity, STEPHeader, STEPValue } from './step/file.js';
@@ -72,6 +77,17 @@ export function tessellateSTEP(model: STEPModel, options: TessellationOptions = 
  */
 export function parseSAT(input: string | ArrayBuffer | ArrayBufferView, options: STEPOptions = {}): STEPModel {
   const conversion = satToSTEP(input),
+    model = parseSTEP(conversion.step, options);
+  return { ...model, warnings: [...conversion.warnings, ...model.warnings] };
+}
+
+/**
+ * Reads a Parasolid transmit file (.x_t text or .x_b neutral binary, as NX, Solid Edge, SolidWorks, Onshape and others
+ * write it) through {@link xtToSTEP}, so it meshes with {@link tessellateSTEP} like a STEP file. What the conversion
+ * left out comes first in `warnings`. Throws a TypeError for a file it cannot read.
+ */
+export function parseXT(input: string | ArrayBuffer | ArrayBufferView, options: STEPOptions = {}): STEPModel {
+  const conversion = xtToSTEP(input),
     model = parseSTEP(conversion.step, options);
   return { ...model, warnings: [...conversion.warnings, ...model.warnings] };
 }
