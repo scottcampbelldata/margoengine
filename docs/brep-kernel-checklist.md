@@ -21,11 +21,13 @@ Every item is done only when all of these hold:
 
 - [ ] 1.1 Exact mass properties: volume, area, centroid and inertia integrated over the B-rep's faces, not its mesh;
       matching closed forms and OpenCascade's GProp on the corpus and every operation result.
-- [ ] 1.2 Topology checker: Euler-Poincare (V - E + F - (L - F) - 2(S - G) = 0), every edge used twice and oppositely in
+- [ ] 1.2 Import into the modeler: STEP, SAT, Parasolid and JT B-reps read as modeler bodies, so every operation (and
+      mass properties, checking, healing, export) works on imported parts, not only on shapes built in Margo.
+- [ ] 1.3 Topology checker: Euler-Poincare (V - E + F - (L - F) - 2(S - G) = 0), every edge used twice and oppositely in
       a solid, consistent orientation, no face crossing another; run on every file read and every operation result.
-- [ ] 1.3 Crash immunity: every operation bounded (time and iteration limits on intersection, tracing and blend
+- [ ] 1.4 Crash immunity: every operation bounded (time and iteration limits on intersection, tracing and blend
       searches); every failure a typed error naming the cause; no unhandled exception on any input.
-- [ ] 1.4 Harnesses: an ABC Dataset slice runner, a sweep-and-jitter fuzzer for every operation, and a STEP round trip
+- [ ] 1.5 Harnesses: an ABC Dataset slice runner, a sweep-and-jitter fuzzer for every operation, and a STEP round trip
       runner (OpenCascade reader and mesher, then FreeCAD's command line).
 
 ## Phase 2: read everything
