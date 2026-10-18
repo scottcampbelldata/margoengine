@@ -131,8 +131,8 @@ const BASE: readonly [number, string, string][] = [
   ],
   [137, 'SP_CURVE', `${common} surface:p b_curve:p original:p tolerance_to_original:f`],
   [141, 'GEOMETRIC_OWNER', 'owner:p next:p previous:p shared_geometry:p'],
-  [163, 'HELIX_CU_FORM', 'axis_pt:v axis_dir:v point:v hand:c turns:i pitch:f tol:f'],
-  [184, 'HELIX_SU_FORM', 'axis_pt:v axis_dir:v hand:c turns:i pitch:f gap:f tol:f'],
+  [163, 'HELIX_SU_FORM', 'axis_pt:v axis_dir:v hand:c turns:i pitch:f gap:f tol:f'],
+  [184, 'HELIX_CU_FORM', 'axis_pt:v axis_dir:v point:v hand:c turns:i pitch:f tol:f'],
 ];
 
 /** A node type's name and fields. */

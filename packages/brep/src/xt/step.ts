@@ -71,8 +71,14 @@ export function xtToSTEP(input: string | ArrayBuffer | ArrayBufferView): XTConve
       dim = num(n.fields.vertex_dim, 3),
       rational = n.fields.rational === true || dim === 4,
       raw = list(node(n.fields.bspline_vertices), 'vertices').map((v) => num(v)),
-      knots = list(node(n.fields.knots), 'knots').map((v) => num(v)),
-      multiplicities = list(node(n.fields.knot_mult), 'mult').map((v) => num(v)),
+      // The knot arrays can carry spare slots past n_knots (V33 files): only the counted knots are the curve's.
+      count = num(n.fields.n_knots, Number.POSITIVE_INFINITY),
+      knots = list(node(n.fields.knots), 'knots')
+        .slice(0, count)
+        .map((v) => num(v)),
+      multiplicities = list(node(n.fields.knot_mult), 'mult')
+        .slice(0, count)
+        .map((v) => num(v)),
       points: number[][] = [],
       weights: number[] = [];
     for (let k = 0; k + dim <= raw.length; k += dim) {
@@ -250,13 +256,22 @@ export function xtToSTEP(input: string | ArrayBuffer | ArrayBufferView): XTConve
           id: w.spline({
             degrees: [ud, vd],
             counts: [nu, nv],
+            // As for curves, only the first n_u_knots / n_v_knots entries count.
             knots: [
-              list(node(s.fields.u_knots), 'knots').map((v) => num(v)),
-              list(node(s.fields.v_knots), 'knots').map((v) => num(v)),
+              list(node(s.fields.u_knots), 'knots')
+                .slice(0, num(s.fields.n_u_knots, Number.POSITIVE_INFINITY))
+                .map((v) => num(v)),
+              list(node(s.fields.v_knots), 'knots')
+                .slice(0, num(s.fields.n_v_knots, Number.POSITIVE_INFINITY))
+                .map((v) => num(v)),
             ],
             multiplicities: [
-              list(node(s.fields.u_knot_mult), 'mult').map((v) => num(v)),
-              list(node(s.fields.v_knot_mult), 'mult').map((v) => num(v)),
+              list(node(s.fields.u_knot_mult), 'mult')
+                .slice(0, num(s.fields.n_u_knots, Number.POSITIVE_INFINITY))
+                .map((v) => num(v)),
+              list(node(s.fields.v_knot_mult), 'mult')
+                .slice(0, num(s.fields.n_v_knots, Number.POSITIVE_INFINITY))
+                .map((v) => num(v)),
             ],
             points,
             ...(rational ? { weights } : {}),
