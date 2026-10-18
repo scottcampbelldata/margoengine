@@ -1,12 +1,14 @@
 // Parasolid XT nodes to STEP, from the XT Format Reference's model description: bodies (solid regions' shells, or every
 // face of a sheet or general body), faces with their loops of fins, edges between the vertices of their positive and
 // negative fins, and the geometry: plane, cylinder, cone, sphere, torus, B-surface, offset, swept and spun surfaces;
-// line, circle, ellipse, B-curve, trimmed and intersection curves (an intersection through its chart points).
-// Assemblies become mapped items, so a part placed many times is meshed once. Lengths stay in metres.
+// line, circle, ellipse, B-curve, trimmed and intersection curves (an intersection through its chart points), and the
+// SP-curves on the fins of tolerant edges. Assemblies become mapped items, so a part placed many times is meshed once.
+// Lengths stay in metres.
 import { readXT, type XTFile, type XTNode, type XTValue } from './read.js';
 import { StepWriter } from '../step/write.js';
 import { STEPFile, stepText } from '../step/file.js';
 import { curveOf } from '../geometry/curves.js';
+import { curveAt, knotVector } from '../geometry/nurbs.js';
 import { surfaceOf } from '../geometry/surfaces.js';
 
 /** What {@link xtToSTEP} produces. */
@@ -15,7 +17,7 @@ export interface XTConversion {
   readonly step: string;
   readonly modeller: string;
   readonly schema: string;
-  /** What was left out and why (faces on surfaces the converter lacks, edges with no curve). */
+  /** What was left out and why (faces on surfaces the converter lacks, edges with no curve to follow). */
   readonly warnings: readonly string[];
 }
 
@@ -414,6 +416,25 @@ export function xtToSTEP(input: string | ArrayBuffer | ArrayBufferView, options:
     if (c.name === 'INTERSECTION') return vec(list(node(f.chart), 'hvec')[0]);
     return undefined;
   };
+  /**
+   * A tolerant edge has no curve of its own: each of its fins carries a trimmed SP-curve, a 2D B-curve in the
+   * parameters of the fin's face surface. Its edge curve is reserved here and built from the fins' SP-curves once the
+   * draft file gives the surfaces' evaluators (below).
+   */
+  const tolerant: { id: string; edge: XTNode; fins: XTNode[] }[] = [];
+  /**
+   * A fin's SP-curve, the trimmed curve that bounds it (if any) and its surface, when that surface converts and is
+   * not a blend's (whose surface is built too late to evaluate).
+   */
+  const spCurve = (fin: XTNode | undefined) => {
+    const c = node(fin?.fields.curve),
+      trimmed = c?.name === 'TRIMMED_CURVE' ? c : undefined,
+      sp = trimmed ? node(trimmed.fields.basis_curve) : c,
+      surfaceNode = node(sp?.fields.surface);
+    if (sp?.name !== 'SP_CURVE' || !surfaceNode || surfaceNode.name === 'BLENDED_EDGE' || !surface(surfaceNode))
+      return undefined;
+    return { sp, trimmed, surfaceNode };
+  };
   const edges = new Map<number, string | null>();
   const edge = (e: XTNode): string | null => {
     if (edges.has(e.index)) return edges.get(e.index)!;
@@ -421,12 +442,23 @@ export function xtToSTEP(input: string | ArrayBuffer | ArrayBufferView, options:
     const positive = node(e.fields.fin),
       negative = node(positive?.fields.other),
       curveNode = node(e.fields.curve),
-      c = curve(curveNode);
-    if (!c) warn(`#${e.index}: edge with ${curveNode ? curveNode.name : 'no'} curve (a tolerant edge) is left out`);
+      fins = curveNode ? [] : [positive, negative].filter((fin): fin is XTNode => !!spCurve(fin));
+    let c = curve(curveNode);
+    if (!c && fins.length) {
+      // The built curve runs with the edge.
+      c = { id: w.reserve(), forward: true };
+      tolerant.push({ id: c.id, edge: e, fins });
+    }
+    if (!c)
+      warn(
+        curveNode
+          ? `#${e.index}: edge with ${curveNode.name} curve is left out`
+          : `#${e.index}: tolerant edge whose fins have no SP-curve to follow is left out`,
+      );
     else {
       // The positive fin's forward vertex ends the edge, the negative fin's starts it. A ring edge (no vertices)
-      // starts and ends at one vertex made on its curve.
-      const ring = () => ringPoint(curveNode),
+      // starts and ends at one vertex made on its curve (a tolerant one's: where its first fin's trimmed curve starts).
+      const ring = () => ringPoint(curveNode) ?? vec(node(fins[0]?.fields.curve)?.fields.point_1),
         endNode = node(positive?.fields.vertex),
         startNode = node(negative?.fields.vertex),
         end = endNode || startNode ? vertex(endNode ?? startNode, ring) : vertex(undefined, ring),
@@ -546,13 +578,10 @@ export function xtToSTEP(input: string | ArrayBuffer | ArrayBufferView, options:
     const shape = part(p);
     if (shape) roots.push(placed(shape, undefined));
   }
-  // --- rolling-ball blends ---------------------------------------------------------------------------------------
-  // With everything else written, the draft file gives the kernel's own evaluators for the supports and the spine.
-  // Along the spine (over the part its faces use), each ball centre is moved onto the exact offsets of both supports
-  // (the spine is often an intersection curve, kept only as its chart's chords) and projected onto them; the exact
-  // circular arc between the two contacts is a rational quadratic, and the sections join linearly along the spine,
-  // sampled finely enough to stay within a small fraction of the radius.
-  if (blends.size) {
+  // --- evaluated geometry ----------------------------------------------------------------------------------------
+  // With everything else written, the draft file gives the kernel's own evaluators for the converted curves and
+  // surfaces, over which tolerant edges' curves and rolling-ball blends are built.
+  if (tolerant.length || blends.size) {
     const draft = new STEPFile(stepText(w.draft())),
       kernelCurves = new Map<number, ReturnType<typeof curveOf>>(),
       curveFor = (id: number) => {
@@ -567,6 +596,115 @@ export function xtToSTEP(input: string | ArrayBuffer | ArrayBufferView, options:
         return Array.isArray(coords) ? coords.map((c) => (typeof c === 'number' ? c : 0)) : undefined;
       },
       refId = (v: unknown) => (v && typeof v === 'object' && 'id' in v ? (v as { id: number }).id : undefined);
+
+    // --- tolerant edges ---
+    // A fin's SP-curve maps through its surface's STEP form, which has the same (u, v) but for a spun surface (STEP
+    // takes its angle as u). The fin runs from its trimmed curve's point_1 (at parm_1 on the B-curve) to point_2 (at
+    // parm_2), along the SP-curve: its parameter falls when the trimmed curve's and SP-curve's senses differ. The first
+    // fin whose SP-curve meets both points is followed in chords, halved until they stay within a small fraction of the
+    // curve's size, and turned to run with the edge.
+    const swapped = (s: XTNode | undefined): boolean =>
+      s?.name === 'SPUN_SURF' || (s?.name === 'OFFSET_SURF' && swapped(node(s.fields.surface)));
+    const follow = (fin: XTNode, reach: number): XYZ[] => {
+      const { sp, trimmed, surfaceNode } = spCurve(fin)!,
+        s = surfaceOf(draft, idOf(surface(surfaceNode)!.id), 1, curveFor),
+        nurbsNode = node(node(sp.fields.b_curve)?.fields.nurbs),
+        b = nurbsCurve(nurbsNode);
+      if (!b || b.points.length <= b.degrees[0]) throw new TypeError('its B-curve has too few vertices');
+      const p = b.degrees[0],
+        n = b.points.length,
+        U = knotVector(b.knots[0], b.multiplicities[0]);
+      if (U.length !== n + p + 1) throw new TypeError("its B-curve's knots do not match its vertices");
+      const homogeneous = new Float64Array(n * 4);
+      b.points.forEach((q, k) => {
+        const wgt = b.weights?.[k] ?? 1;
+        homogeneous.set([q[0] * wgt, q[1] * wgt, 0, wgt], k * 4);
+      });
+      const spline = { degree: p, points: homogeneous, knots: U },
+        lo = U[p],
+        hi = U[n],
+        period = nurbsNode?.fields.periodic === true ? hi - lo : 0,
+        up = (trimmed?.fields.sense !== '-') === (sp.fields.sense !== '-'),
+        swap = swapped(surfaceNode),
+        at = (t: number): XYZ => {
+          const q = curveAt(spline, period ? lo + ((((t - lo) % period) + period) % period) : t);
+          return s.at(swap ? q[1] : q[0], swap ? q[0] : q[1]).slice(0, 3);
+        };
+      const t0 = trimmed ? num(trimmed.fields.parm_1) : up ? lo : hi;
+      let t1 = trimmed ? num(trimmed.fields.parm_2) : up ? hi : lo;
+      // On a periodic B-curve the fin may run across the seam, or all the way round.
+      if (period && (up ? t1 <= t0 : t1 >= t0)) t1 += up ? period : -period;
+      const first = at(t0),
+        last = at(t1),
+        miss = Math.max(
+          ...[
+            [first, vec(trimmed?.fields.point_1)],
+            [last, vec(trimmed?.fields.point_2)],
+          ].map(([q, end]) => (end ? Math.hypot(...sub(q!, end)) : 0)),
+        );
+      if (!(miss <= reach)) throw new TypeError(`it passes ${miss.toPrecision(3)} m from its trimmed ends`);
+      // A few chords to each B-curve span it covers, then halved wherever the curve bends away from them.
+      const spans = new Set(U.slice(p, n + 1)).size - 1,
+        count = Math.max(2, Math.ceil(2 * Math.max(p, 1) * spans * Math.min(1, Math.abs(t1 - t0) / (hi - lo)))),
+        ts = Array.from({ length: count + 1 }, (_, k) => t0 + ((t1 - t0) * k) / count),
+        coarse = ts.map((t, k) => (k === 0 ? first : k === count ? last : at(t))),
+        size = Math.hypot(
+          ...[0, 1, 2].map((i) => Math.max(...coarse.map((q) => q[i])) - Math.min(...coarse.map((q) => q[i]))),
+        ),
+        tolerance = Math.max(size * 5e-4, 1e-9),
+        out: XYZ[] = [first];
+      const between = (ta: number, a: XYZ, tb: number, c: XYZ, depth: number) => {
+        const tm = (ta + tb) / 2,
+          m = at(tm),
+          middle = [0, 1, 2].map((i) => (a[i] + c[i]) / 2);
+        if (depth >= 12 || Math.hypot(...sub(m, middle)) <= tolerance) return;
+        between(ta, a, tm, m, depth + 1);
+        out.push(m);
+        between(tm, m, tb, c, depth + 1);
+      };
+      for (let k = 1; k <= count; k++) {
+        between(ts[k - 1], coarse[k - 1], ts[k], coarse[k], 0);
+        out.push(coarse[k]);
+      }
+      const points = out.filter((q, k) => k === 0 || Math.hypot(...sub(q, out[k - 1])) > 1e-12);
+      if (points.length < 2) throw new TypeError('it has no length');
+      return points;
+    };
+    for (const t of tolerant) {
+      const reach = Math.max(num(t.edge.fields.tolerance), 1e-7),
+        problems: string[] = [];
+      let points: XYZ[] | undefined;
+      for (const fin of t.fins)
+        try {
+          points = follow(fin, reach);
+          if (fin.fields.sense === '-') points.reverse();
+          break;
+        } catch (error) {
+          problems.push(error instanceof Error ? error.message : String(error));
+        }
+      if (!points) {
+        warn(`#${t.edge.index}: tolerant edge not built: its SP-curves could not be followed (${problems.join('; ')})`);
+        continue;
+      }
+      const knots = [0];
+      for (let k = 1; k < points.length; k++) knots.push(knots[k - 1] + Math.hypot(...sub(points[k], points[k - 1])));
+      w.spline(
+        {
+          degrees: [1],
+          counts: [points.length],
+          knots: [knots],
+          multiplicities: [knots.map((_, k) => (k === 0 || k === knots.length - 1 ? 2 : 1))],
+          points,
+        },
+        t.id,
+      );
+    }
+
+    // --- rolling-ball blends ---
+    // Along the spine (over the part its faces use), each ball centre is moved onto the exact offsets of both supports
+    // (the spine is often an intersection curve, kept only as its chart's chords) and projected onto them; the exact
+    // circular arc between the two contacts is a rational quadratic, and the sections join linearly along the spine,
+    // sampled finely enough to stay within a small fraction of the radius.
     for (const blend of blends.values()) {
       try {
         const surfaces = blend.supports.map((s) => (s.curve ? undefined : surfaceOf(draft, idOf(s.id), 1, curveFor))),

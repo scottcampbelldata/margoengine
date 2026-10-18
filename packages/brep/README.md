@@ -63,8 +63,9 @@ kernel:
   once); solid and sheet bodies; plane, cylinder, cone, sphere, torus, B-surface, offset, swept and spun surfaces; line,
   circle, ellipse, B-curve, trimmed and intersection curves (through their chart points); rolling-ball and cliff-edge
   blends (each ball centre moved onto both offset supports, or onto the surface and the cliff edge, the exact arc
-  between the contacts as a rational quadratic); SDL/TYSA_COLOUR attributes. Lengths are metres. SP-curves of tolerant
-  edges and foreign geometry are left out and listed in `warnings` for now.
+  between the contacts as a rational quadratic); tolerant edges (the curve followed along a fin's trimmed SP-curve over
+  its face surface); SDL/TYSA_COLOUR attributes. Lengths are metres. Foreign geometry is left out and listed in
+  `warnings` for now.
 - **JT** (`parseJT`, `tessellateJT`): JT 9.5 and later (ISO 14306), written from the JT File Format Reference and
   the standard under Siemens' published licence terms (`NOTICE`, `docs/jt-licensing.md`). The file header and table
   of contents, zlib (JT 9) and LZMA (JT 10) segment compression, the scene graph (partitions, groups, instances,

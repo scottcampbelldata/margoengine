@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { parseXT, readXT, tessellateSTEP, xtToSTEP } from '../dist/index.js';
+import { STEPFile, parseXT, readXT, tessellateSTEP, xtToSTEP } from '../dist/index.js';
 
 /**
  * A sheet body: one planar disc of radius 10 mm bounded by a ring edge on a circle, coloured orange, as a Parasolid
@@ -167,6 +167,78 @@ const elbow = (bore) => {
 };
 
 /**
+ * A sheet body: a quarter of a can of radius and height 10 mm about the z axis (x and y from 0 up), its side on the
+ * cylinder and its lid on the plane z = 10 mm. The side and lid meet at a tolerant edge (no curve, tolerance 0.01 mm)
+ * running round the rim from (0, 10, 10) mm to (10, 0, 10) mm, each of whose fins carries a trimmed SP-curve: on the
+ * side, the line v = 10 mm in the cylinder's (angle, height), run from u = pi / 2 down to 0 (parm_1 1 and parm_2 0
+ * on a B-curve of negative sense, as Parasolid writes them); on the lid, the rational quarter circle in the plane's
+ * (x, y), run from (10, 0) to (0, 10). `positive` and `negative` say whether the side's and the lid's fins keep their
+ * curves; `off` lifts the start of the side's trimmed curve off its SP-curve.
+ */
+const quarterCan = ({ positive = true, negative = true, off = 0 } = {}) =>
+  transmit(
+    [
+      [12, '1 83 0 0 0 0 0 0 1e3 1e-8 0 0 0 1 0 3 1 2 3 50 0 4 20 30 '],
+      [13, '2 1 0 1 0 5 0 0 4 5 '],
+      [51, '3 2 0 1 6 0 0 +0 0 0 0 0 1 .01 1 0 0 '],
+      [19, '4 3 0 1 0 0 2 V'],
+      [14, '5 4 0 ?7 0 8 2 3 +0 0 7 0 2 '],
+      [50, '6 5 0 1 0 3 0 +0 0 .01 0 0 1 1 0 0 '],
+      [14, '7 6 0 ?0 5 9 2 6 +0 0 0 5 2 '],
+      [15, '8 7 0 40 5 0 '],
+      [15, '9 8 0 44 7 0 '],
+      [16, '20 20 0 ?40 0 21 50 0 0 1 '],
+      [16, '21 21 0 ?41 20 22 51 0 0 1 '],
+      [16, '22 22 0 1e-5 42 21 23 0 0 0 1 '],
+      [16, '23 23 0 ?43 22 24 52 0 0 1 '],
+      [16, '24 24 0 ?44 23 25 53 0 0 1 '],
+      [16, '25 25 0 ?46 24 0 54 0 0 1 '],
+      [18, '30 30 0 43 0 31 35 ?1 '],
+      [18, '31 31 0 40 30 32 36 ?1 '],
+      [18, '32 32 0 41 31 33 37 1e-5 1 '],
+      [18, '33 33 0 42 32 34 38 1e-5 1 '],
+      [18, '34 34 0 46 33 0 39 ?1 '],
+      [29, '35 35 0 30 36 0 .01 0 0 '],
+      [29, '36 36 0 31 37 35 0 .01 0 '],
+      [29, '37 37 0 32 38 36 0 .01 .01 '],
+      [29, '38 38 0 33 39 37 .01 0 .01 '],
+      [29, '39 39 0 34 0 38 0 0 .01 '],
+      [17, '40 0 8 41 43 31 60 20 0 0 +'],
+      [17, '41 0 8 42 40 32 61 21 0 0 +'],
+      [17, `42 0 8 43 41 33 45 22 ${positive ? 70 : 0} 0 +`],
+      [17, '43 0 8 40 42 30 62 23 0 0 +'],
+      [17, '44 0 9 45 46 33 63 24 0 0 +'],
+      [17, `45 0 9 46 44 32 42 22 ${negative ? 75 : 0} 0 -`],
+      [17, '46 0 9 44 45 34 64 25 0 0 +'],
+      [31, '50 50 0 1 51 0 0 +0 0 0 0 0 1 1 0 0 .01 '],
+      [30, '51 51 0 1 52 50 0 +0 .01 0 0 0 1 '],
+      [30, '52 52 0 1 53 51 0 +.01 0 .01 0 0 -1 '],
+      [30, '53 53 0 1 54 52 0 +0 0 .01 1 0 0 '],
+      [30, '54 54 0 1 0 53 0 +0 .01 .01 0 -1 0 '],
+      [17, '60 0 0 0 0 30 40 20 0 0 -'],
+      [17, '61 0 0 0 0 31 41 21 0 0 -'],
+      [17, '62 0 0 0 0 33 43 23 0 0 -'],
+      [17, '63 0 0 0 0 34 44 24 0 0 -'],
+      [17, '64 0 0 0 0 32 46 25 0 0 -'],
+      [133, `70 70 0 42 0 0 0 +71 0 .01 ${0.01 + off} .01 0 .01 1 0 `],
+      [137, '71 71 0 70 0 0 0 -3 72 0 ?'],
+      [134, '72 72 0 71 0 0 0 +73 0 '],
+      [136, '73 1 2 2 2 5 FFF1 74 76 77 '],
+      [45, '4 74 0 .01 1.5707963267948966 .01 '],
+      [127, '2 76 2 2 '],
+      [128, '2 77 0 1 '],
+      [133, '75 75 0 45 0 0 0 +78 .01 0 .01 0 .01 .01 0 1 '],
+      [137, '78 78 0 75 0 0 0 +6 79 0 ?'],
+      [134, '79 79 0 78 0 0 0 +80 0 '],
+      [136, '80 2 3 3 2 5 FFT1 81 82 83 '],
+      [45, '9 81 .01 0 1 .007071067811865476 .007071067811865476 .7071067811865476 0 .01 1 '],
+      [127, '2 82 3 3 '],
+      [128, '2 83 0 1 '],
+    ],
+    false,
+  );
+
+/**
  * Checks a blend face's mesh: every vertex on the ball's sweep (`off` gives a vertex's distance from the spine), the
  * area, and every triangle facing away from the spine (Parasolid's natural normal for a blend, the face being
  * positive; `centre` gives the spine point nearest a point).
@@ -280,6 +352,72 @@ test('Parasolid XT: a rolling-ball blend is built from its spine and supports as
     ([, y]) => [0.002, y, 0.002],
     (Math.PI / 2) * 0.002 * 0.01,
   );
+});
+
+test("Parasolid XT: a tolerant edge follows its fins' SP-curves round the rim the side and lid share", () => {
+  const r = 0.01,
+    exact = (Math.PI / 2) * r * r + (Math.PI / 4) * r * r;
+  // From the side's SP-curve; from the lid's alone, run back to the edge's direction; with neither, left out.
+  for (const fins of [{}, { positive: false }]) {
+    const conversion = xtToSTEP(quarterCan(fins));
+    assert.deepEqual(conversion.warnings, []);
+    // The built curve runs with the edge, from the negative fin's vertex at (0, 10, 10) mm to the positive fin's.
+    const file = new STEPFile(conversion.step),
+      coordinates = (id) => file.args(id)[1].map((v) => Math.round(v * 1e9) / 1e9),
+      [edge] = file.ids('EDGE_CURVE').filter((id) => file.is(file.args(id)[3].id, 'B_SPLINE_CURVE_WITH_KNOTS')),
+      [, start, end, curve, sense] = file.args(edge),
+      controls = file.args(curve.id)[2];
+    assert.equal(sense.name, 'T');
+    assert.deepEqual(coordinates(file.args(start.id)[1].id), [0, r, r]);
+    assert.deepEqual(coordinates(file.args(end.id)[1].id), [r, 0, r]);
+    assert.deepEqual(coordinates(controls[0].id), [0, r, r]);
+    assert.deepEqual(coordinates(controls[controls.length - 1].id), [r, 0, r]);
+    const [mesh] = tessellateSTEP(parseXT(quarterCan(fins)), { deflection: 1e-6 });
+    assert.deepEqual(mesh.failures, []);
+    assert.equal(mesh.faces.length, 2);
+    const p = mesh.positions,
+      t = mesh.indices,
+      at = (i) => [p[i * 3], p[i * 3 + 1], p[i * 3 + 2]],
+      key = (i) =>
+        at(i)
+          .map((v) => Math.round(v * 1e9))
+          .join(','),
+      edges = new Map();
+    let area = 0;
+    for (let k = 0; k < t.length; k += 3) {
+      const [a, b, c] = [t[k], t[k + 1], t[k + 2]].map(at),
+        u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
+        v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+      area += Math.hypot(u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]) / 2;
+      for (const [i, j] of [
+        [t[k], t[k + 1]],
+        [t[k + 1], t[k + 2]],
+        [t[k + 2], t[k]],
+      ]) {
+        const e = [key(i), key(j)].sort().join('|');
+        edges.set(e, [...(edges.get(e) ?? []), [i, j]]);
+      }
+    }
+    assert.ok(Math.abs(area - exact) < 1e-3 * exact, `area ${area} vs ${exact}`);
+    // No point strays outside the can, and the rim's samples lie on its circle (to the mesh's single precision),
+    // shared by side and lid: no mesh edge between them is open.
+    for (let i = 0; i < p.length / 3; i++) assert.ok(Math.hypot(...at(i).slice(0, 2)) < r * (1 + 1e-6), `${at(i)}`);
+    let rim = 0;
+    for (const uses of edges.values()) {
+      if (!uses[0].map(at).every((q) => Math.abs(q[2] - r) < 1e-8 && Math.abs(Math.hypot(q[0], q[1]) - r) < 1e-8))
+        continue;
+      rim++;
+      assert.equal(uses.length, 2, 'an open edge on the rim');
+    }
+    assert.ok(rim >= 8, `${rim} mesh edges along the rim`);
+  }
+  assert.deepEqual(xtToSTEP(quarterCan({ positive: false, negative: false })).warnings, [
+    '#22: tolerant edge whose fins have no SP-curve to follow is left out',
+  ]);
+  // A trimmed curve whose SP-curve misses its start, and no other fin to follow: not built, and said why.
+  assert.deepEqual(xtToSTEP(quarterCan({ negative: false, off: 0.001 })).warnings, [
+    '#22: tolerant edge not built: its SP-curves could not be followed (it passes 0.00100 m from its trimmed ends)',
+  ]);
 });
 
 test('Parasolid XT: blends on a coarsely charted spine, rolling-ball and cliff-edge, sweep the exact round', () => {

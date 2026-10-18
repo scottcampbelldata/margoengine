@@ -145,9 +145,9 @@ The XT data carries no per-body identifier, so a part's bodies are taken by thei
 (the ISO text calls the subordinate list a subset of it); the NIST file's MultiXT holds one body, so that mapping is
 only checked there and in the synthetic test. `xtToSTEP` gained a `parts` option to convert chosen top-level bodies.
 
-The box now reads its exact B-rep. With its blends built (below) it meshes to 328,986 mm3 and 92,808 mm2, against
-329,127 mm3 and 92,769 mm2 for its closed JT mesh (0.04% each), though four small planar faces bounded only by
-tolerant edges are still left out (below); the assembly's STEP file gives 329,944 mm3, 0.25% more than both.
+The box now reads its exact B-rep. With its blends built and its tolerant edges followed (both below) it meshes
+closed, to 329,410 mm3 and 92,760 mm2 against 329,127 mm3 and 92,769 mm2 for its closed JT mesh (+0.09%, -0.01%); the
+assembly's STEP file gives 329,944 mm3, 0.25% more than the JT mesh.
 
 ## Radial_Engine's blends (2026-10-18)
 
@@ -180,13 +180,27 @@ the long way round. Without that turn the three parts are within 0.2% of their J
 face senses for tori were right. No other Radial_Engine part and no corpus file meshes differently. Head keeps 54 such
 edges (welded at 1 um) inside three faces on trimmed rational B-spline surfaces, as before.
 
+## Tolerant edges (2026-10-18)
+
+A tolerant edge has no curve: each of its fins carries a trimmed curve whose basis is an SP-curve, a 2D B-curve in the
+parameters of the fin's face surface. The edge curve is now built from the positive fin's (the negative fin's when the
+positive one's surface is a blend's or does not convert): the B-curve from parm_1 to parm_2, mapped through the
+kernel's own evaluator of the converted surface (the same (u, v), swapped for a spun surface), in chords within 5e-4 of
+the curve's size, as a degree-1 B-spline that runs with the edge. A fin runs from its trimmed curve's point_1 to
+point_2 (the NIST box's: parm_1 1 and parm_2 0 on SP-curves of negative sense, the fins' vertices at point_2); the
+SP-curve has to meet both points within the edge's tolerance, or the other fin is tried, and an edge neither fin gives
+is reported and its faces fail.
+
+The NIST box has 32 tolerant edges, where the 0.5 mm side walls (swept surfaces) of features on its face at
+x = 144.4 mm meet that face. All follow their positive fins, whose SP-curves meet both trimmed points exactly. Before,
+the walls' loops lacked these edges and the four small planar faces bounded only by them failed: the box's mesh had 91
+open edges and 1 shared by more than two triangles, and now has none. No other JT2Go example has tolerant edges; their results are unchanged.
+
 ## Next
 
 - Polygon sets and polylines; colours, texture coordinates and CAE result fields if wanted.
 - Head's three faces on trimmed rational B-spline surfaces (#5716, #5748, #6092 of its conversion), whose own triangles
   share edges the same way round.
-- Tolerant edges: each fin's trimmed SP-curve (a 2D curve on the face's surface) as the edge curve (the NIST box's
-  four planar faces).
 - A MultiXT segment with several bodies, to confirm that bodies are taken by their place in its list.
 - JT B-rep, wireframe and ULP segments, coded with Int32 Mk. 1 packets (bit-length and two-table arithmetic): that
   decoder was written in c91ebc0 and removed unused; bring it back with the first of those segments.

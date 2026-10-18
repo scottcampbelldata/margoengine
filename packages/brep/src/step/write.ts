@@ -87,10 +87,18 @@ export class StepWriter {
           : unit([-zz[1] * zz[0], 1 - zz[1] * zz[1], -zz[1] * zz[2]]);
     return this.add(`AXIS2_PLACEMENT_3D('',${this.point(origin)},${this.direction(zz)},${this.direction(ref)})`);
   }
-  /** A B-spline curve (one degree) or surface (two degrees), rational when it has weights. */
-  spline(s: WriterSpline): string {
+  /**
+   * A B-spline curve (one degree) or surface (two degrees), rational when it has weights; written as the reserved id
+   * `into` when given.
+   */
+  spline(s: WriterSpline, into?: string): string {
     const surface = s.degrees.length === 2,
-      pts = s.points.map((p) => this.point(p));
+      pts = s.points.map((p) => this.point(p)),
+      put = (entity: string) => {
+        if (!into) return this.add(entity);
+        this.fill(into, entity);
+        return into;
+      };
     if (pts.length !== s.counts.reduce((a, b) => a * b, 1))
       fail('Invalid model: a spline has the wrong number of points');
     const grid = <T>(at: (k: number) => T) =>
@@ -101,15 +109,15 @@ export class StepWriter {
     if (surface) {
       const body = `${s.degrees[0]},${s.degrees[1]},${list},.UNSPECIFIED.,.F.,.F.,.F.`,
         withKnots = `${mults[0]},${mults[1]},${knots[0]},${knots[1]},.UNSPECIFIED.`;
-      if (!s.weights) return this.add(`B_SPLINE_SURFACE_WITH_KNOTS('',${body},${withKnots})`);
-      return this.add(
+      if (!s.weights) return put(`B_SPLINE_SURFACE_WITH_KNOTS('',${body},${withKnots})`);
+      return put(
         `(BOUNDED_SURFACE()B_SPLINE_SURFACE(${body})B_SPLINE_SURFACE_WITH_KNOTS(${withKnots})GEOMETRIC_REPRESENTATION_ITEM()RATIONAL_B_SPLINE_SURFACE(${grid((k) => this.real(s.weights![k]))})REPRESENTATION_ITEM('')SURFACE())`,
       );
     }
     const body = `${s.degrees[0]},${list},.UNSPECIFIED.,.F.,.F.`,
       withKnots = `${mults[0]},${knots[0]},.UNSPECIFIED.`;
-    if (!s.weights) return this.add(`B_SPLINE_CURVE_WITH_KNOTS('',${body},${withKnots})`);
-    return this.add(
+    if (!s.weights) return put(`B_SPLINE_CURVE_WITH_KNOTS('',${body},${withKnots})`);
+    return put(
       `(BOUNDED_CURVE()B_SPLINE_CURVE(${body})B_SPLINE_CURVE_WITH_KNOTS(${withKnots})CURVE()GEOMETRIC_REPRESENTATION_ITEM()RATIONAL_B_SPLINE_CURVE((${s.weights.map((v) => this.real(v)).join(',')}))REPRESENTATION_ITEM(''))`,
     );
   }
