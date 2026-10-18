@@ -84,20 +84,24 @@ for (const name of packedNames) {
     assert.equal(manifest.name, packageName(name), `Wrong cached package: ${filename}`);
     assert.equal(manifest.version, workspaceManifest.version, `Wrong cached version: ${filename}`);
   } else {
+    // npm pack prints the prepack scripts' output (core's build prints the catalog line) before its JSON.
+    const fromArray = (text) => text.slice(Math.max(0, text.search(/^\[/m)));
     [pack] = JSON.parse(
-      execFileSync(
-        process.execPath,
-        [
-          npm,
-          'pack',
-          '--workspace',
-          packageName(name),
-          '--pack-destination',
-          archives,
-          '--json',
-          ...(reuseBuild && name !== 'core' ? ['--ignore-scripts'] : []),
-        ],
-        { encoding: 'utf8' },
+      fromArray(
+        execFileSync(
+          process.execPath,
+          [
+            npm,
+            'pack',
+            '--workspace',
+            packageName(name),
+            '--pack-destination',
+            archives,
+            '--json',
+            ...(reuseBuild && name !== 'core' ? ['--ignore-scripts'] : []),
+          ],
+          { encoding: 'utf8' },
+        ),
       ),
     );
     manifest = JSON.parse(await readFile(`packages/${name}/package.json`, 'utf8'));

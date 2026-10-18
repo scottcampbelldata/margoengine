@@ -68,7 +68,8 @@ const place = (m, p) => [0, 1, 2].map((r) => m[r] * p[0] + m[4 + r] * p[1] + m[8
 const det3 = (m) =>
   m[0] * (m[5] * m[10] - m[9] * m[6]) - m[4] * (m[1] * m[10] - m[9] * m[2]) + m[8] * (m[1] * m[6] - m[5] * m[2]);
 const ratio = (a, b) => (b ? +(a / b).toFixed(4) : a ? Infinity : 1);
-const occt = withOCCT ? await require('occt-import-js')() : undefined;
+// The reference can abort on a file (STC07): that file records the error, and a fresh instance reads the next.
+let occt = withOCCT ? await require('occt-import-js')() : undefined;
 const rows = [],
   surfaces = {},
   curves = {};
@@ -144,12 +145,18 @@ for (const entry of manifest) {
   if (occt && entry.format === 'step') {
     start = performance.now();
     // Metres, and the same deflection settings as ours.
-    const result = occt.ReadStepFile(new Uint8Array(bytes), {
-      linearUnit: 'meter',
-      linearDeflectionType: 'bounding_box_ratio',
-      linearDeflection: 0.001,
-      angularDeflection: 0.5,
-    });
+    let result;
+    try {
+      result = occt.ReadStepFile(new Uint8Array(bytes), {
+        linearUnit: 'meter',
+        linearDeflectionType: 'bounding_box_ratio',
+        linearDeflection: 0.001,
+        angularDeflection: 0.5,
+      });
+    } catch (error) {
+      row.occtError = String(error);
+      occt = await require('occt-import-js')();
+    }
     row.occt = {
       ms: +(performance.now() - start).toFixed(1),
       success: !!result?.success,
@@ -172,6 +179,8 @@ for (const entry of manifest) {
     }
   }
   rows.push(row);
+  // Written after every file, so a run that dies part way keeps what it measured.
+  if (json) writeFileSync(json, `${JSON.stringify({ rows, surfaces, curves, complete: false }, null, 2)}\n`);
   const o = row.ours,
     r = row.occt;
   console.log(
@@ -229,4 +238,4 @@ for (const entry of manifest) {
 }
 console.log('\nSurface types:', surfaces);
 console.log('Edge-curve types:', curves);
-if (json) writeFileSync(json, `${JSON.stringify({ rows, surfaces, curves }, null, 2)}\n`);
+if (json) writeFileSync(json, `${JSON.stringify({ rows, surfaces, curves, complete: true }, null, 2)}\n`);

@@ -11,7 +11,7 @@ features. Clean room as before: published standards, textbooks and papers only; 
 | --- | --- | --- |
 | Read + mesh, 44 corpus STEP files, 0.001 of the model diagonal, 0.5 rad | 9.2 s, one JS thread (Node) | 27.0 s native C++ one thread; 24.1 s parallel mesh |
 | Files faster | 42 of 44 | 2 of 44 (FTC11: we make about 3x the triangles on a 0.1 mm torus) |
-| Browser download | 25,474 B gzip worker | 7,604,031 B Wasm (occt-import-js) |
+| Browser download | 40,030 B gzip worker (114,562 B raw; measured at cb89fd5, the modeler is not in it) | 7,604,031 B Wasm (occt-import-js) |
 | Formats without paid add-ons | STEP, SAT, Parasolid XT, DXF (loaders) | STEP, IGES |
 | Self-check | file's own volume, area, centre: 16 of 16 match | none |
 | Modeling | primitives, extrude, Booleans in general position (planes, cylinders, cones, spheres) | Booleans, fillets, offsets, healing, ... |
