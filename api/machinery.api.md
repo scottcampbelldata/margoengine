@@ -44,7 +44,7 @@ export class AssemblyIndex {
     setSubtreeVisible(handle: MeshHandle, visible: boolean): void;
 }
 
-export type CADFormat = 'stl' | 'obj' | 'step' | 'iges';
+export type CADFormat = 'stl' | 'obj' | 'step' | 'iges' | 'sat' | 'xt';
 
 export interface CADImportOptions {
     signal?: AbortSignal;
@@ -54,12 +54,19 @@ export interface CADImportOptions {
     maxParts?: number;
     timeoutMs?: number;
     linearDeflection?: number;
+    kernel?: 'occt' | 'margo';
+    workers?: number;
+    progressive?: boolean;
+    onPart?: (mesh: Mesh) => void;
+    refine?: boolean;
 }
 
 export interface CADModel {
     root: MeshHandle;
     meshes: readonly MeshHandle[];
     dispose(): void;
+    failedFaces?: number;
+    refine?: (options?: CADRefineOptions) => Promise<number>;
 }
 
 export interface Callout {
@@ -389,4 +396,11 @@ export function snapFeature(node: Mesh, worldPoint: Vec3, kind: 'vertex' | 'edge
 export function vertexAnchor(node: Mesh, index: number): Anchor;
 
 export function worldAnchor(anchor: Anchor): Vec3;
+
+// Not exported from this entry, but used by the exports above:
+
+interface CADRefineOptions {
+    pixels?: number;
+    maxTriangles?: number;
+}
 ```

@@ -231,6 +231,7 @@
       "load",
       "parse3MF",
       "parseAny",
+      "parseDXF",
       "parseOFF",
       "parsePCD",
       "parsePCDHeader",
@@ -1675,10 +1676,16 @@
       "STEPFile",
       "Tessellator",
       "Typed",
+      "parseSAT",
       "parseSTEP",
+      "parseXT",
       "readStructure",
+      "readXT",
+      "satToSTEP",
       "stepText",
-      "tessellateSTEP"
+      "tessellateSTEP",
+      "validateSTEP",
+      "xtToSTEP"
     ]
   },
   {

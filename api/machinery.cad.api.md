@@ -10,6 +10,13 @@ export interface CADModel {
     root: MeshHandle;
     meshes: readonly MeshHandle[];
     dispose(): void;
+    failedFaces?: number;
+    refine?: (options?: CADRefineOptions) => Promise<number>;
+}
+
+export interface CADRefineOptions {
+    pixels?: number;
+    maxTriangles?: number;
 }
 
 export interface PackShadowPrimitive {
@@ -61,7 +68,7 @@ export function parseCAD(instance: EngineKernel, input: string | ArrayBuffer | A
 
 // Not exported from this entry, but used by the exports above:
 
-type CADFormat = 'stl' | 'obj' | 'step' | 'iges';
+type CADFormat = 'stl' | 'obj' | 'step' | 'iges' | 'sat' | 'xt';
 
 interface CADImportOptions {
     signal?: AbortSignal;
@@ -71,5 +78,10 @@ interface CADImportOptions {
     maxParts?: number;
     timeoutMs?: number;
     linearDeflection?: number;
+    kernel?: 'occt' | 'margo';
+    workers?: number;
+    progressive?: boolean;
+    onPart?: (mesh: Mesh) => void;
+    refine?: boolean;
 }
 ```

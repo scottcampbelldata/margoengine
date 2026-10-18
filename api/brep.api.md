@@ -15,6 +15,7 @@ export interface BodyMesh {
     }[];
     readonly unit: number;
     readonly deflection: number;
+    readonly facets?: number;
 }
 
 export interface BodyMeshFace {
@@ -34,6 +35,13 @@ export class Enum {
 export class Ref {
     readonly id: number;
     constructor(id: number);
+}
+
+export interface SATConversion {
+    readonly step: string;
+    readonly version: number;
+    readonly unit: number;
+    readonly warnings: readonly string[];
 }
 
 export interface STEPBody {
@@ -85,6 +93,15 @@ export interface STEPInstance {
     readonly product: number;
     readonly matrix: Float64Array;
     readonly path: readonly number[];
+    readonly occurrence: number;
+}
+
+export interface STEPMeasured {
+    readonly volume?: number;
+    readonly area?: number;
+    readonly centroid?: STEPPoint;
+    readonly box?: readonly [STEPPoint, STEPPoint];
+    readonly facets?: number;
 }
 
 export interface STEPModel extends STEPStructure {
@@ -92,7 +109,15 @@ export interface STEPModel extends STEPStructure {
     readonly file: STEPFile;
 }
 
+export interface STEPOccurrence {
+    readonly product: number;
+    readonly parent: number;
+    readonly matrix: Float64Array;
+}
+
 export type STEPOptions = STEPStructureOptions;
+
+export type STEPPoint = readonly [number, number, number];
 
 export interface STEPProduct {
     readonly id: number;
@@ -105,6 +130,8 @@ export interface STEPStructure {
     readonly roots: readonly number[];
     readonly bodies: readonly STEPBody[];
     readonly instances: readonly STEPInstance[];
+    readonly occurrences: readonly STEPOccurrence[];
+    readonly validation: readonly STEPValidationProperty[];
     readonly faceColors: ReadonlyMap<number, STEPColor>;
     readonly census: {
         readonly surfaces: Readonly<Record<string, number>>;
@@ -115,6 +142,35 @@ export interface STEPStructure {
 
 export interface STEPStructureOptions {
     readonly maxInstances?: number;
+}
+
+export interface STEPValidationCheck {
+    readonly property: STEPValidationProperty;
+    readonly measured: STEPMeasured;
+    readonly differences: {
+        readonly volume?: number;
+        readonly area?: number;
+        readonly centroid?: number;
+        readonly box?: number;
+        readonly facets?: number;
+    };
+    readonly ok: boolean;
+    readonly note?: string;
+}
+
+export interface STEPValidationProperty {
+    readonly id: number;
+    readonly label: string;
+    readonly product: number;
+    readonly bodies?: readonly number[];
+    readonly tessellated: boolean;
+    readonly independent?: boolean;
+    readonly volume?: number;
+    readonly area?: number;
+    readonly centroid?: STEPPoint;
+    readonly surfaceCentroid?: boolean;
+    readonly box?: readonly [STEPPoint, STEPPoint];
+    readonly facets?: number;
 }
 
 export type STEPValue = number | string | null | Ref | Enum | Typed | typeof DERIVED | STEPValue[];
@@ -140,11 +196,50 @@ export class Typed {
     constructor(type: string, value: STEPValue);
 }
 
+export interface ValidationOptions {
+    readonly tolerance?: number;
+}
+
+export interface XTConversion {
+    readonly step: string;
+    readonly modeller: string;
+    readonly schema: string;
+    readonly warnings: readonly string[];
+}
+
+export interface XTFile {
+    readonly modeller: string;
+    readonly schema: string;
+    readonly nodes: ReadonlyMap<number, XTNode>;
+    readonly root: XTNode | undefined;
+}
+
+export interface XTNode {
+    readonly type: number;
+    readonly name: string;
+    readonly index: number;
+    readonly fields: Readonly<Record<string, XTValue>>;
+}
+
+export type XTValue = number | null | string | boolean | readonly number[] | readonly XTValue[];
+
+export function parseSAT(input: string | ArrayBuffer | ArrayBufferView, options?: STEPOptions): STEPModel;
+
 export function parseSTEP(input: string | ArrayBuffer | ArrayBufferView, options?: STEPOptions): STEPModel;
 
+export function parseXT(input: string | ArrayBuffer | ArrayBufferView, options?: STEPOptions): STEPModel;
+
 export function readStructure(file: STEPFile, { maxInstances }?: STEPStructureOptions): STEPStructure;
+
+export function readXT(input: string | ArrayBuffer | ArrayBufferView): XTFile;
+
+export function satToSTEP(input: string | ArrayBuffer | ArrayBufferView): SATConversion;
 
 export function stepText(input: string | ArrayBuffer | ArrayBufferView): string;
 
 export function tessellateSTEP(model: STEPModel, options?: TessellationOptions): BodyMesh[];
+
+export function validateSTEP(model: STEPStructure, meshes: readonly BodyMesh[], { tolerance }?: ValidationOptions): STEPValidationCheck[];
+
+export function xtToSTEP(input: string | ArrayBuffer | ArrayBufferView): XTConversion;
 ```

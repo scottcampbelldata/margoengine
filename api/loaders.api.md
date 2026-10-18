@@ -26,6 +26,59 @@ export interface CreateMeshesOptions extends Pick<ToGeometryOptions, 'normals'>,
 
 export const DEFAULT_MAX_BYTES: number;
 
+export type DXFColor = [number, number, number];
+
+export interface DXFLayer {
+    name: string;
+    color: DXFColor;
+    visible: boolean;
+}
+
+export interface DXFLines {
+    positions: Float32Array;
+    colors: Float32Array;
+    groups: LoadedGroup[];
+}
+
+export interface DXFOptions extends ParseLimits {
+    units?: 'meters' | 'file';
+    arcSegments?: number;
+    splineSegments?: number;
+    maxSegments?: number;
+    maxInserts?: number;
+    maxDepth?: number;
+}
+
+export interface DXFResult {
+    mesh: LoadedGeometry;
+    lines: DXFLines;
+    points: Float32Array;
+    texts: DXFText[];
+    layers: DXFLayer[];
+    solids: DXFSolid[];
+    unit: number;
+    version: string;
+    skipped: Record<string, number>;
+}
+
+export interface DXFSolid {
+    type: '3DSOLID' | 'BODY' | 'REGION';
+    sat: string;
+    transform: number[];
+    layer: string;
+    color: DXFColor;
+}
+
+export interface DXFText {
+    text: string;
+    position: [number, number, number];
+    height: number;
+    direction: [number, number, number];
+    normal: [number, number, number];
+    layer: string;
+    color: DXFColor;
+}
+
 export interface FetchOptions {
     signal?: AbortSignal;
     maxBytes?: number;
@@ -227,6 +280,8 @@ export function load<T, O extends object = object>(url: string | URL, parse: (in
 export function parse3MF(input: BinaryInput, options?: ThreeMFOptions): Promise<ThreeMFResult>;
 
 export function parseAny(input: BinaryInput, options?: AnyOptions): Promise<LoadedGeometry>;
+
+export function parseDXF(input: BinaryInput, options?: DXFOptions): DXFResult;
 
 export function parseOFF(input: BinaryInput, options?: OFFOptions): LoadedGeometry;
 
