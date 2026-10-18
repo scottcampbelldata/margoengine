@@ -3,6 +3,7 @@
 import { Geometry, PbrMaterial, type Engine, type Mesh } from '@margoengine/core/extension';
 import { checkCount, countLimit } from '../../shared/limits.js';
 import { margoError } from '../../shared/errors.js';
+import { markSolidPieces } from './closed.js';
 import type { CADModel, CADRefineOptions } from './cad.js';
 import type { CADImportOptions } from './cad-async.js';
 
@@ -19,6 +20,8 @@ interface BodyResult {
   failures: number;
   /** The chord deflection the mesh was made with, in meters. */
   deflection: number;
+  /** The body's mesh is a closed solid across all its colour parts (sections cap it). */
+  closed?: boolean;
   error?: string;
   parts: { color: string | null; vertices: Float32Array; indices: Uint32Array; bounds: Float32Array }[];
 }
@@ -236,8 +239,9 @@ export function parseSTEPWithMargo(
             if (state && !result.error && result.parts.length === state.groups.length) {
               const instances = placements.get(result.body)?.length ?? 1;
               let triangles = 0;
-              result.parts.forEach((part, g) => {
-                const geometry = adopt(part);
+              const refined = result.parts.map(adopt);
+              if (result.closed) markSolidPieces(refined);
+              refined.forEach((geometry, g) => {
                 triangles += geometry.indices.length / 3;
                 for (const mesh of state.groups[g]) mesh.setGeometry(geometry);
               });
@@ -274,6 +278,7 @@ export function parseSTEPWithMargo(
       const s = structure!,
         geometries = result.parts.map((part) => ({ color: part.color, geometry: adopt(part) })),
         groups: Mesh[][] = geometries.map(() => []);
+      if (result.closed) markSolidPieces(geometries.map(({ geometry }) => geometry));
       // The body's bounding sphere in its own frame: around the first group's centre, holding every group's sphere.
       if (geometries.length) {
         const [first] = geometries,

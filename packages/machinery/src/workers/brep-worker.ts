@@ -26,6 +26,46 @@ const hex = (c: readonly number[]) =>
     .join('')}`;
 
 /**
+ * Whether a body's mesh is a closed, consistently wound solid: every edge (positions matched exactly, as the kernel
+ * gives faces their shared edge samples bit for bit) used once each way. Degenerate triangles at poles do not count.
+ */
+function closedMesh(mesh: BodyMesh): boolean {
+  const p = mesh.positions,
+    t = mesh.indices,
+    ids = new Map<string, number>(),
+    id = new Int32Array(p.length / 3).fill(-1),
+    key = (v: number) => {
+      if (id[v] < 0) {
+        const k = `${p[v * 3]},${p[v * 3 + 1]},${p[v * 3 + 2]}`;
+        let n = ids.get(k);
+        if (n === undefined) ids.set(k, (n = ids.size));
+        id[v] = n;
+      }
+      return id[v];
+    },
+    span = p.length / 3 + 1,
+    edges = new Map<number, number>();
+  for (let i = 0; i < t.length; i += 3) {
+    const a = key(t[i]),
+      b = key(t[i + 1]),
+      c = key(t[i + 2]);
+    if (a === b || b === c || a === c) continue;
+    for (const [x, y] of [
+      [a, b],
+      [b, c],
+      [c, a],
+    ])
+      edges.set(x * span + y, (edges.get(x * span + y) ?? 0) + 1);
+  }
+  for (const [e, n] of edges) {
+    const x = Math.floor(e / span),
+      y = e - x * span;
+    if (n !== 1 || edges.get(y * span + x) !== 1) return false;
+  }
+  return edges.size > 0;
+}
+
+/**
  * A body's triangles as core geometries in metres, one per colour (a face's own colour, else the body's): vertices
  * renumbered per group, with the kernel's exact surface normals, or one flat normal per triangle without smoothing.
  */
@@ -160,6 +200,7 @@ self.onmessage = (event: MessageEvent) => {
       body = model.bodies[index];
     if (!body) throw new RangeError(`CAD worker got body ${index} of ${model.bodies.length}`);
     let parts: { color: string | null; geometry: Geometry }[] = [],
+      closed = false,
       failures = 0,
       deflection = 0,
       error: string | undefined;
@@ -173,6 +214,7 @@ self.onmessage = (event: MessageEvent) => {
       failures = mesh.failures.length;
       deflection = mesh.deflection * mesh.unit;
       parts = groups(mesh, body.color ? hex(body.color) : null);
+      closed = !mesh.failures.length && closedMesh(mesh);
     } catch (e) {
       // One body the kernel cannot mesh (a face over the vertex cap, a malformed entity) leaves the others standing.
       error = e instanceof Error ? e.message : String(e);
@@ -183,6 +225,7 @@ self.onmessage = (event: MessageEvent) => {
         body: index,
         failures,
         deflection,
+        closed,
         ...(error ? { error } : {}),
         parts: parts.map(({ color, geometry: g }) => ({
           color,

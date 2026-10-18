@@ -1,6 +1,6 @@
 import type { Batch, DrawOptions, Engine, Geometry, Mesh, PassContext } from '@margoengine/core/extension';
 import { invertMatrixStable, multiplyMatrices } from '@margoengine/math/mat4';
-import { featureEdges } from './edges.js';
+import { capsAsSolid } from './closed.js';
 
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; UNIFORM: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -194,7 +194,7 @@ export class PartPacks {
   /** Same closed-solid test SectionPlanes caps by: open shells keep their own draw. */
   private isClosed(geometry: Geometry): boolean {
     let closed = this.closed.get(geometry);
-    if (closed === undefined) this.closed.set(geometry, (closed = featureEdges(geometry, 180).length === 0));
+    if (closed === undefined) this.closed.set(geometry, (closed = capsAsSolid(geometry)));
     return closed;
   }
   private bake(device: GPUDevice, root: Mesh, meshes: Mesh[], batches: Map<Geometry, Batch>): void {

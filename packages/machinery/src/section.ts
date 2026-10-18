@@ -12,7 +12,7 @@ import {
 } from '@margoengine/core/extension';
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { declaration } from './section-uniform.js';
-import { featureEdges } from './edges.js';
+import { capsAsSolid } from './closed.js';
 import { displayShader } from '../../shared/display.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; INDIRECT: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
@@ -433,7 +433,7 @@ export class SectionPlanes implements EnginePlugin {
     for (const batch of context.batches ?? []) {
       const geometry = batch.geometry;
       let closed = this.closed.get(geometry);
-      if (closed === undefined) this.closed.set(geometry, (closed = featureEdges(geometry, 180).length === 0));
+      if (closed === undefined) this.closed.set(geometry, (closed = capsAsSolid(geometry)));
       if (closed || !batch.count) continue;
       this.empty ??= context.device.createBuffer({ size: 20, usage: GPUBufferUsage.INDIRECT });
       this.skipped.push([batch, batch.redirect]);
