@@ -369,31 +369,49 @@ class CodeText {
 const signedBits = (x) => 33 - Math.clz32(x ^ (x >> 31));
 
 /**
- * An Int32 Compressed Data Packet Mk. 2 bit-length coded as real files write it. Fixed width: tag 0, the bit counts of
- * the minimum and maximum (6 bits each), the two values, then each value less the minimum. Variable width: tag 1, the
- * mean (32 bits), the bits of a width change and of a run (3 bits each: 4 and 4), then blocks of width changes (7 or
- * -8 repeats), a run length up to 15 and the run's values less the mean.
+ * An Int32 Compressed Data Packet bit-length coded as real files write it. Fixed width: tag 0, the minimum and maximum,
+ * then each value less the minimum. Variable width: tag 1, the mean, then blocks of width changes (7 or -8 repeats), a
+ * run length up to 15 and the run's values less the mean. JT 9.5 writes the minimum and maximum as their bit counts (6
+ * bits each) and then the values, and the mean as 32 bits and then the bits of a width change and of a run (3 bits
+ * each: 4 and 4); JT 10 writes each of them in 4-bit groups, low first, each followed by a bit that says another
+ * follows.
  */
-function bitLengthPacket(d, values, variable = false) {
+function bitLengthPacket(d, values, variable = false, jt10 = false) {
   d.i32(values.length);
   if (!values.length) return;
-  const c = new CodeText();
+  const c = new CodeText(),
+    nibbles = (v) => {
+      for (let done = false; !done; v >>= 4) {
+        const nibble = v & 15;
+        done = (v >> 4 === 0 && !(nibble & 8)) || (v >> 4 === -1 && nibble & 8);
+        c.put(nibble, 4);
+        c.put(done ? 0 : 1, 1);
+      }
+    };
   if (!variable) {
     const min = Math.min(...values),
       max = Math.max(...values),
       width = 32 - Math.clz32(max - min);
     c.put(0, 1);
-    c.put(signedBits(min), 6);
-    c.put(signedBits(max), 6);
-    c.signed(min, signedBits(min));
-    c.signed(max, signedBits(max));
+    if (jt10) {
+      nibbles(min);
+      nibbles(max);
+    } else {
+      c.put(signedBits(min), 6);
+      c.put(signedBits(max), 6);
+      c.signed(min, signedBits(min));
+      c.signed(max, signedBits(max));
+    }
     for (const v of values) c.put(v - min, width);
   } else {
     const mean = Math.trunc(values.reduce((a, b) => a + b, 0) / values.length);
     c.put(1, 1);
-    c.signed(mean, 32);
-    c.put(4, 3);
-    c.put(4, 3);
+    if (jt10) nibbles(mean);
+    else {
+      c.signed(mean, 32);
+      c.put(4, 3);
+      c.put(4, 3);
+    }
     let width = 0;
     for (let i = 0; i < values.length; ) {
       const target = signedBits(values[i] - mean);
@@ -412,7 +430,7 @@ function bitLengthPacket(d, values, variable = false) {
 }
 
 /** A chopper packet: `chop` high bits of the biased values and the low bits, each bit-length coded. */
-function chopperPacket(d, values, chop, bias) {
+function chopperPacket(d, values, chop, bias, jt10 = false) {
   const biased = values.map((v) => v - bias),
     span = 32 - Math.clz32(Math.max(...biased)),
     low = span - chop;
@@ -420,11 +438,14 @@ function chopperPacket(d, values, chop, bias) {
   bitLengthPacket(
     d,
     biased.map((v) => Math.floor(v / 2 ** low)),
+    false,
+    jt10,
   );
   bitLengthPacket(
     d,
     biased.map((v) => v % 2 ** low),
     true,
+    jt10,
   );
 }
 
@@ -433,10 +454,10 @@ function chopperPacket(d, values, chop, bias) {
  * escaped (count `escape`) to the out-of-band packet. The encoder is the 16-bit range coder with underflow bits that
  * the format's decoder inverts.
  */
-function arithmeticPacket(d, values, table, escape) {
+function arithmeticPacket(d, values, table, escape, jt10 = false) {
   const entries = [
     ...table.map(([value, count], i) => ({ symbol: i, value, count })),
-    { symbol: -2, value: 0, count: escape },
+    ...(escape || !jt10 ? [{ symbol: -2, value: 0, count: escape }] : []),
   ];
   let cumulative = 0;
   for (const e of entries) {
@@ -490,19 +511,45 @@ function arithmeticPacket(d, values, table, escape) {
       for (let i = n - 1; i >= 0; i--) bits.push(Math.floor(v / 2 ** i) % 2);
     };
   put(entries.length, 16);
-  put(4, 6);
+  // JT 9: symbol, count and value bits; JT 10: count and value bits (the escape entry is flagged).
+  if (!jt10) put(4, 6);
   put(8, 6);
-  put(16, 6);
+  put(16, jt10 ? 7 : 6);
   put(min >>> 0, 32);
   for (const e of entries) {
-    put(e.symbol + 2, 4);
+    put(jt10 ? Number(e.symbol === -2) : e.symbol + 2, jt10 ? 1 : 4);
     put(e.count, 8);
     put(e.value - min, 16);
   }
   while (bits.length % 8) bits.push(0);
   for (let i = 0; i < bits.length; i += 8) d.u8(bits.slice(i, i + 8).reduce((a, b) => a * 2 + b, 0));
-  nullPacket(d, oob);
+  // JT 10 gives the out-of-band packet only when the context has an escape entry.
+  if (!jt10 || escape) nullPacket(d, oob);
 }
+
+/** A JT 10 move-to-front packet: the new values, then per value its offset in a window of 16 (-1 for a new one). */
+function moveToFrontPacket(d, values) {
+  const window = [],
+    fresh = [],
+    offsets = [];
+  for (const v of values) {
+    const o = window.indexOf(v);
+    if (o < 0) fresh.push(v);
+    else window.splice(o, 1);
+    offsets.push(o);
+    window.unshift(v);
+    if (window.length > 16) window.pop();
+  }
+  d.i32(values.length).u8(5);
+  bitLengthPacket(d, fresh, false, true);
+  bitLengthPacket(d, offsets, true, true);
+}
+
+/** The Deering code of a unit axis normal ([sextant:3][octant:3][theta:6][psi:6]): theta at its top, psi 0. */
+const axisNormal = (sextant, octant) => sextant * 2 ** 15 + octant * 2 ** 12 + 63 * 64;
+
+/** The float bits of `v` as an Int32. */
+const floatBits = (v) => new Int32Array(Float32Array.of(v).buffer)[0];
 
 /**
  * A Tri-Strip Set Shape LOD element: a closed tetrahedron on the corners (0,0,0), (1,0,0), (0,1,0), (0,0,1) (in file
@@ -510,7 +557,8 @@ function arithmeticPacket(d, values, table, escape) {
  * and four dual faces of degree 3 (the corners), the packets null-, bit-length-, chopper- and arithmetic-coded. `split`
  * attribute bits per corner give 1 vertex record per corner (smooth) or 3 (one per triangle).
  */
-export function lodElement({ little }, { split = false } = {}) {
+export function lodElement({ little, jt10 }, { split = false } = {}) {
+  if (jt10) return lodElement10(little);
   const d = new Bytes(little),
     mask = split ? 7 : 1;
   d.guid(T.triStripLOD).u8(4).i32(200);
@@ -562,6 +610,79 @@ export function lodElement({ little }, { split = false } = {}) {
   for (const list of codes) hc = hash32(list, hc);
   d.u32(hc);
   d.i16(1); // tri-strip set shape LOD version
+  return new Bytes(little).i32(d.length).raw(d.bytes).bytes;
+}
+
+/**
+ * The tetrahedron's tri-strip LOD element as real JT 10 files write it: one vertex record per corner, the TopoMesh data
+ * as an element of its own inside it, the third-generation packets (null, bit-length with 4-bit groups, arithmetic with
+ * an escape-flagged context, chopper, move-to-front), float coordinates hashed one component array at a time, and
+ * normals as packed Deering codes (corner 0 along -x, the others along their own axis).
+ */
+function lodElement10(little) {
+  const t = new Bytes(little);
+  t.guid('f830a5ad-be4c-4fbc-9b5f-b9269278d2e1').u8(9).i32(1);
+  t.u8(1).u32(201).u8(1); // TopoMesh LOD data, topologically compressed LOD data
+  const degrees = [[3, 3, 3], [3], [], [], [], [], [], []],
+    valences = [3, 3, 3, 3],
+    groups = [0, 1, 2, 3],
+    flags = [0, 0, 0, 0],
+    masks = [[], [1, 1, 1, 1], [], [], [], [], [], []];
+  bitLengthPacket(t, degrees[0], false, true);
+  bitLengthPacket(t, degrees[1], true, true);
+  for (const list of degrees.slice(2)) nullPacket(t, list);
+  moveToFrontPacket(t, valences);
+  arithmeticPacket(
+    t,
+    groups,
+    [
+      [0, 1],
+      [1, 1],
+    ],
+    2,
+    true,
+  );
+  arithmeticPacket(t, flags, [[0, 4]], 0, true);
+  nullPacket(t, masks[0]);
+  chopperPacket(t, masks[1], 1, 0, true);
+  for (const list of masks.slice(2)) nullPacket(t, list);
+  nullPacket(t, []); // context 7's high words
+  t.i32(0); // high-degree masks
+  nullPacket(t, []);
+  nullPacket(t, []);
+  let h = 0;
+  for (const list of degrees) h = hash32(list, h);
+  h = hash32(valences, h);
+  h = hash32(groups, h);
+  h = hash16(flags, h);
+  for (const list of masks) h = hash32(list, h);
+  for (let i = 0; i < 4; i++) h = hash32([], h);
+  t.u32(h);
+  // Vertex records: coordinates and normals; the 4-byte quantization field stays, as in real files.
+  t.u64(10).u8(0).u8(0).u8(0).u8(0).i32(4).i32(4);
+  t.i32(4).u8(3);
+  for (let c = 0; c < 3; c++) t.f32(0, 1).u8(0);
+  const one = floatBits(1),
+    coords = [
+      [0, one, 0, 0],
+      [0, 0, one, 0],
+      [0, 0, 0, one],
+    ];
+  arithmeticPacket(t, coords[0], [[0, 3]], 1, true);
+  bitLengthPacket(t, coords[1], true, true);
+  moveToFrontPacket(t, coords[2]);
+  let hc = 0;
+  for (const list of coords) hc = hash32(list, hc);
+  t.u32(hc);
+  const normals = [axisNormal(5, 3), axisNormal(5, 7), axisNormal(3, 7), axisNormal(1, 7)];
+  t.i32(4).u8(3).u8(6);
+  bitLengthPacket(t, normals, false, true);
+  t.u32(hash32(normals, 0));
+  const d = new Bytes(little);
+  d.guid(T.triStripLOD).u8(4).i32(200);
+  d.u8(1).u8(1).u64(10); // base shape LOD, vertex shape LOD, bindings: 3-component coordinates and normals
+  d.i32(t.length).raw(t.bytes);
+  d.u8(1); // tri-strip set shape LOD version
   return new Bytes(little).i32(d.length).raw(d.bytes).bytes;
 }
 

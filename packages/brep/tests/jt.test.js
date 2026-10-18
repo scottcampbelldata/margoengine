@@ -136,7 +136,13 @@ function check(model, version) {
   assert.equal(props.get('CAD_COUNT'), 42);
   assert.deepEqual(props.get('CREATED'), { date: '2026-10-18T07:05:03' });
   assert.equal(model.sceneGraph.properties.get(2).get('NOTE'), note());
-  if (version < 10) checkMesh(part.shapes[0].mesh, 4);
+  checkMesh(part.shapes[0].mesh, 4);
+  // JT 10 stores packed Deering normals: corner 0 along -x, corners 1 to 3 along x, y and z.
+  if (version >= 10)
+    assert.deepEqual(
+      [...part.shapes[0].mesh.normals].map((v) => Math.round(v * 1e6) / 1e6 || 0),
+      [-1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+    );
   // The draw style attribute is not read but kept by its base type.
   assert.equal(model.sceneGraph.attributes.get(13).kind, 'other');
   const [meshes] = tessellateJT(model, { deflection: 1e-7 });
@@ -163,7 +169,7 @@ const XZ_CRC64 =
 const XZ_CRC32 =
   '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';
 
-test('JT 10: LZMA- and XZ-compressed scene graphs (header forms, LZMA2 chunks, other settings) read the same', () => {
+test('JT 10: LZMA- and XZ-compressed scene graphs (header forms, LZMA2 chunks, other settings) read the same, with the shape', () => {
   const plain = lsgStream({ jt10: true, little: true }),
     alone = Buffer.from(LZMA_DEFAULT, 'base64');
   // Unknown size with an end marker; the size written into the header; no size field at all.
@@ -179,7 +185,7 @@ test('JT 10: LZMA- and XZ-compressed scene graphs (header forms, LZMA2 chunks, o
     Buffer.from(XZ_CRC64, 'base64'),
     Buffer.from(XZ_CRC32, 'base64'),
   ])
-    check(parseJT(file(10, true, lzma), { meshes: false }), 10);
+    check(parseJT(file(10, true, lzma)), 10);
 });
 
 test('JT 9.5: a tri-strip LOD decodes through the topology coder, one vertex record per corner or per triangle', () => {

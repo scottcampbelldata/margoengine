@@ -1,6 +1,8 @@
-// JT 9 tessellated shapes: the Tri-Strip Set Shape LOD element's topologically compressed mesh (JT File Format Reference
-// 9.5, 7.2.2.1.2.5-6), rebuilt by the polygon mesh topology decoder of Appendix E, with its vertex coordinates (8.1.4,
-// quantized or as float bits) and normals (8.1.5, Deering-coded or as float bits). The coder visits the mesh's dual:
+// JT 9 and 10 tessellated shapes: the Tri-Strip Set Shape LOD element's topologically compressed mesh (JT File Format
+// Reference 9.5, 7.2.2.1.2.5-6; ISO 14306 7.1.2), rebuilt by the polygon mesh topology decoder of Appendix E, with its
+// vertex coordinates (8.1.4, quantized or as float bits) and normals (8.1.5, Deering-coded or as float bits). JT 10
+// files wrap the topology in an element of their own and code it with the third-generation packets. The coder visits
+// the mesh's dual:
 // each dual vertex is a polygon (its valence the polygon's size, usually 3) and each dual face a mesh vertex (its degree
 // the number of polygons around it). Cover polygons added to close open meshes are flagged and dropped.
 //
@@ -10,7 +12,7 @@
 // License Terms. US 8,019,788, US 2011/0199382 and corresponding foreign patents are licensed royalty-free under the
 // Siemens JT Data Format Reference Patent Clarification Notice. JT and Parasolid are trademarks of Siemens; they are
 // named here only to identify the format. This software is not endorsed by or affiliated with Siemens.
-import { hash16, hash32, int32Packet2, Predictor, unpack } from './codec.js';
+import { hash16, hash32, int32Packet, Predictor, unpack } from './codec.js';
 import { type JTContainer, type JTReader, fail, readElement } from './file.js';
 
 /** A tessellated shape. */
@@ -34,24 +36,29 @@ interface Symbols {
   readonly valences: Int32Array;
   readonly groups: Int32Array;
   readonly flags: Int32Array;
-  /** Per context, the attribute mask bits 0-29; context 7 also has bits 30-59 and 60-63. */
+  /**
+   * Per context, the attribute mask bits 0-29 (JT 9) or 0-31 (JT 10); context 7 also has bits 30-59 and 60-63 (JT 9)
+   * or 32-63 (JT 10, in `masks7Mid`).
+   */
   readonly masks: Int32Array[];
   readonly masks7Mid: Int32Array;
   readonly masks7Top: Int32Array;
+  /** Mask bits per word of `masks`: 30 in JT 9, 32 in JT 10. */
+  readonly maskBits: number;
   readonly large: Uint32Array;
   readonly splitFaces: Int32Array;
   readonly splitPositions: Int32Array;
 }
 
-function readSymbols(r: JTReader): Symbols {
-  const packet = () => int32Packet2(r),
+function readSymbols(r: JTReader, jt10: boolean): Symbols {
+  const packet = () => int32Packet(r, jt10),
     degrees = Array.from({ length: 8 }, packet),
     valences = packet(),
     groups = packet(),
     flags = unpack(packet(), Predictor.Lag1),
     masks = Array.from({ length: 8 }, packet),
     masks7Mid = packet(),
-    masks7Top = packet(),
+    masks7Top = jt10 ? new Int32Array(0) : packet(),
     large = r.vecU32(),
     splitFaces = unpack(packet(), Predictor.Lag1),
     splitPositions = packet(),
@@ -62,13 +69,21 @@ function readSymbols(r: JTReader): Symbols {
   h = hash32(groups, h);
   h = hash16(flags, h);
   for (const m of masks) h = hash32(m, h);
-  h = hash32(masks7Mid, h);
-  h = hash32(masks7Top, h);
+  if (jt10) {
+    // The high words of every context-7 mask, zero where the file leaves them out.
+    const high = new Int32Array(masks[7].length);
+    high.set(masks7Mid.subarray(0, high.length));
+    h = hash32(high, h);
+  } else {
+    h = hash32(masks7Mid, h);
+    h = hash32(masks7Top, h);
+  }
   h = hash32(large, h);
   h = hash32(splitFaces, h);
   h = hash32(splitPositions, h);
   if (h !== stored) fail(`mesh topology hash ${h.toString(16)} does not match the stored ${stored.toString(16)}`);
-  return { degrees, valences, groups, flags, masks, masks7Mid, masks7Top, large, splitFaces, splitPositions };
+  const maskBits = jt10 ? 32 : 30;
+  return { degrees, valences, groups, flags, masks, masks7Mid, masks7Top, maskBits, large, splitFaces, splitPositions };
 }
 
 /** The dual mesh as the decoder builds it: dual vertices (polygons) and dual faces (mesh vertices), linked by slots. */
@@ -185,8 +200,9 @@ class DualMeshDecoder {
         lo = i < s.masks[m].length ? s.masks[m][i] : 0,
         mid = m === 7 && i < s.masks7Mid.length ? s.masks7Mid[i] : 0,
         top = m === 7 && i < s.masks7Top.length ? s.masks7Top[i] : 0;
+      const w = s.maskBits;
       for (let k = 0; k < degree; k++) {
-        const bit = k < 30 ? (lo >>> k) & 1 : k < 60 ? (mid >>> (k - 30)) & 1 : (top >>> (k - 60)) & 1;
+        const bit = k < w ? (lo >>> k) & 1 : k < 2 * w ? (mid >>> (k - w)) & 1 : (top >>> (k - 2 * w)) & 1;
         this.fVerts.push(-1);
         this.fBits.push(bit);
         count += bit;
@@ -361,8 +377,12 @@ function float(exponent: number, mantissa: number): number {
   return view.getFloat32(0);
 }
 
-/** Compressed Vertex Coordinate Array (8.1.4): xyz per topological vertex. */
-function readCoordinates(r: JTReader): Float32Array {
+/**
+ * Compressed Vertex Coordinate Array (8.1.4; ISO 14306 13.1.3): xyz per topological vertex. Unquantized coordinates are
+ * float bits, split into exponent and mantissa arrays in JT 9 and whole in JT 10; real JT 9 files hash them one value
+ * at a time, as the text says, and JT 10 files one component array at a time.
+ */
+function readCoordinates(r: JTReader, jt10: boolean): Float32Array {
   const count = r.i32(),
     components = r.u8(),
     quantizers = [0, 1, 2].map(() => ({ min: r.f32(), max: r.f32(), bits: r.u8() }));
@@ -371,9 +391,14 @@ function readCoordinates(r: JTReader): Float32Array {
     bits = quantizers[0].bits;
   let h = 0;
   for (let c = 0; c < components; c++) {
-    if (bits === 0) {
-      const exponents = unpack(int32Packet2(r), Predictor.Lag1),
-        mantissae = unpack(int32Packet2(r), Predictor.Lag1);
+    if (bits === 0 && jt10) {
+      const values = unpack(int32Packet(r, true), Predictor.Lag1),
+        v = floats(values, count);
+      if (c < 3) for (let i = 0; i < count; i++) out[i * 3 + c] = v[i];
+      h = hash32(values, h);
+    } else if (bits === 0) {
+      const exponents = unpack(int32Packet(r, false), Predictor.Lag1),
+        mantissae = unpack(int32Packet(r, false), Predictor.Lag1);
       for (let i = 0; i < count; i++) {
         const v = float(exponents[i], mantissae[i]);
         if (c < 3) out[i * 3 + c] = v;
@@ -381,7 +406,7 @@ function readCoordinates(r: JTReader): Float32Array {
         h = hash32([view.getUint32(0)], h);
       }
     } else {
-      const codes = unpack(int32Packet2(r), Predictor.Lag1),
+      const codes = unpack(int32Packet(r, jt10), Predictor.Lag1),
         q = quantizers[Math.min(c, 2)],
         step = (q.max - q.min) / (q.bits >= 32 ? 0xffffffff : 2 ** q.bits - 1);
       if (codes.length !== count) fail(`${codes.length} coordinate codes for ${count} vertices`);
@@ -392,6 +417,12 @@ function readCoordinates(r: JTReader): Float32Array {
   const stored = r.u32();
   if (h !== stored) fail(`vertex coordinate hash ${h.toString(16)} does not match the stored ${stored.toString(16)}`);
   return out;
+}
+
+/** Float bits as floats, checked to hold `count` of them. */
+function floats(bits: Int32Array, count: number): Float32Array {
+  if (bits.length !== count) fail(`${bits.length} float values for ${count}`);
+  return new Float32Array(bits.buffer, bits.byteOffset, count);
 }
 
 /** A Deering-coded normal (Appendix C 4.2): sextant and octant of the sphere, then two angles of `bits` bits. */
@@ -443,18 +474,29 @@ function deering(
   out[i * 3 + 2] = octant & 1 ? z : -z;
 }
 
-/** Compressed Vertex Normal Array (8.1.5): one normal per vertex attribute record. */
-function readNormals(r: JTReader): Float32Array {
+/**
+ * Compressed Vertex Normal Array (8.1.5; ISO 14306 13.1.4): one normal per vertex attribute record. Unquantized
+ * normals are float bits (exponent and mantissa arrays in JT 9, whole in JT 10); Deering codes come as four arrays
+ * in JT 9 and packed into one word each in JT 10 (sextant, octant, theta, psi from the top).
+ */
+function readNormals(r: JTReader, jt10: boolean): Float32Array {
   const count = r.i32(),
     components = r.u8(),
     bits = r.u8();
   if (count < 0 || components < 1 || components > 4) fail(`vertex normals ${count} x ${components}`);
   const out = new Float32Array(count * 3);
   let h = 0;
-  if (bits === 0) {
+  if (bits === 0 && jt10) {
     for (let c = 0; c < components; c++) {
-      const exponents = int32Packet2(r),
-        mantissae = int32Packet2(r);
+      const values = int32Packet(r, true),
+        v = floats(values, count);
+      if (c < 3) for (let i = 0; i < count; i++) out[i * 3 + c] = v[i];
+      h = hash32(values, h);
+    }
+  } else if (bits === 0) {
+    for (let c = 0; c < components; c++) {
+      const exponents = int32Packet(r, false),
+        mantissae = int32Packet(r, false);
       for (let i = 0; i < count; i++) {
         const v = float(exponents[i], mantissae[i]);
         if (c < 3) out[i * 3 + c] = v;
@@ -462,11 +504,28 @@ function readNormals(r: JTReader): Float32Array {
         h = hash32([view.getUint32(0)], h);
       }
     }
+  } else if (jt10) {
+    const codes = int32Packet(r, true),
+      mask = 2 ** bits - 1;
+    if (codes.length !== count) fail(`${codes.length} normal codes for ${count} vertex records`);
+    for (let i = 0; i < count; i++) {
+      const code = codes[i] >>> 0;
+      deering(
+        (code >>> (2 * bits + 3)) & 7,
+        (code >>> (2 * bits)) & 7,
+        Math.floor(code / 2 ** bits) & mask,
+        code & mask,
+        bits,
+        out,
+        i,
+      );
+    }
+    h = hash32(codes, h);
   } else {
-    const sextant = int32Packet2(r),
-      octant = int32Packet2(r),
-      theta = int32Packet2(r),
-      psi = int32Packet2(r);
+    const sextant = int32Packet(r, false),
+      octant = int32Packet(r, false),
+      theta = int32Packet(r, false),
+      psi = int32Packet(r, false);
     if (sextant.length !== count || octant.length !== count || theta.length !== count || psi.length !== count)
       fail('normal code arrays of different lengths');
     for (let i = 0; i < count; i++) deering(sextant[i], octant[i], theta[i], psi[i], bits, out, i);
@@ -482,30 +541,35 @@ function readNormals(r: JTReader): Float32Array {
  * TypeError for malformed or inconsistent data and a RangeError for a coding this reader does not support yet.
  */
 export function readTriStripLOD(container: JTContainer, segment: string, unit: number): JTMesh {
-  if (container.version >= 10)
-    throw new RangeError('JT 10 tessellated shapes are not supported yet (JT 9 shapes and JT 10 XT B-rep are)');
-  const r = container.data(segment),
+  const jt10 = container.version >= 10,
+    r = container.data(segment),
     element = readElement(r) ?? fail(`segment ${segment} holds no element`);
   if (element.type !== TRI_STRIP_LOD) fail(`segment ${segment} holds ${element.type}, not a tri-strip set LOD`);
-  const d = element.data;
-  d.i16(); // base shape LOD data version
-  d.i16(); // vertex shape LOD data version
+  let d = element.data;
+  const version = () => (jt10 ? d.u8() : d.i16());
+  version(); // base shape LOD data
+  version(); // vertex shape LOD data
   d.u32();
   d.u32(); // vertex bindings (repeated with the vertex records)
-  d.i16(); // TopoMesh LOD data version
+  if (jt10) {
+    // Real JT 10 files hold the TopoMesh data as an element of its own: length, object type ID, base type, object ID.
+    d = d.sub(d.count(1));
+    d.need(21);
+  }
+  version(); // TopoMesh LOD data
   d.i32(); // vertex records object ID
-  d.i16(); // topologically compressed LOD data version
-  const symbols = readSymbols(d);
+  version(); // topologically compressed LOD data
+  const symbols = readSymbols(d, jt10);
 
   // Topologically Compressed Vertex Records.
   const a = d.u32(),
     b = d.u32(),
     low = d.little ? a : b;
-  d.need(4); // quantization parameters (each array carries its own)
+  d.need(4); // quantization parameters (each array carries its own; JT 10 files keep the field)
   const vertices = d.i32(),
     records = vertices > 0 ? d.i32() : 0,
-    coordinates = low & 7 ? readCoordinates(d) : undefined,
-    normals = low & 8 && records > 0 ? readNormals(d) : undefined;
+    coordinates = low & 7 ? readCoordinates(d, jt10) : undefined,
+    normals = low & 8 && records > 0 ? readNormals(d, jt10) : undefined;
 
   const mesh = new DualMeshDecoder(symbols);
   mesh.run();

@@ -59,7 +59,7 @@ Codex's step-10 samples (NIST models, US public domain, mirrored by Innerscene; 
   match the same assembly's STEP file (hex nut 102.5 / 102.4 mm3, flat-head screw 141.0 / 141.0, window 17,045 /
   17,054; cover and plate within about 1%, a revision apart). Two Parasolid reader bugs this exposed are fixed.
 - The box part's element is subordinate (23 bytes): its B-rep sits in the assembly's MultiXT segment (type 30) and
-  is not read yet. Its tessellated shapes (JT 10 packets) are not decoded yet either.
+  is not read yet. (Its tessellated shapes decode since the JT 10 meshes below.)
 - The two NIST parts (socket head cap screw, CTC 02) are literal JT 9.4: the reader refuses them (the patent notice
   covers 9.5 and later; for counsel, docs/jt-licensing.md).
 
@@ -95,9 +95,46 @@ disagree; the rest have zero area). Parse times include decoding every mesh, on 
 Open surfaces stay open (conrod's rod axis is a cylinder side without caps), so edges with one triangle, counted by
 position, are not by themselves a defect.
 
+## Real JT 10 meshes (2026-10-18)
+
+All tri-strip shapes of JT2Go's JT 10.5 files (bracket, cylindrical design, piston, the NIST MTC assembly; the
+corpus copy of the NIST assembly reads the same) and its four mesh-only JT 10.0 CAE files now decode with every
+stored hash matching. Against the ISO 14306 text, real files:
+
+- hold the TopoMesh data as an element of its own inside the tri-strip LOD element (I32 length, object type ID
+  f830a5ad-be4c-4fbc-9b5f-b9269278d2e1, base type 9, object ID), followed by the LOD's U8 version;
+- use the third-generation Int32 packets: the context marks its escape entry with a U{1} flag (U{16} entries, U{6}
+  count bits, U{7} value bits, I{32} minimum), the out-of-band packet follows only when there is an escape entry,
+  and codec 5 is move-to-front (a packet of new values, then a packet of offsets into a window of the 16 latest
+  values, -1 taking the next new value);
+- write bit-length packets with the minimum, maximum and mean in 4-bit groups, low first, each followed by a bit that
+  says another follows (sign-extended), and fixed 4-bit width changes and run lengths;
+- keep context 7's mask high words as one packet (bits 32-63) and keep the vertex records' 4-byte quantization field;
+- store unquantized coordinates and normals as whole float bits (one packet per component, coordinates Lag1) and
+  hash each component's array at once, and pack each Deering normal into one word (sextant, octant, theta, psi).
+
+Checks: every mesh matches its shape node's stored bounding box (worst 0.016% of the size, Gimbal) and area (worst
+0.005%); the NIST parts' volumes match the same parts in the assembly's STEP file (hex nut 102.4 / 102.4 mm3,
+flat-head screw 140.8 / 141.0, window 17,031 / 17,054). Ring order agrees with the stored normals in every shape LOD
+that stores them (272, every LOD of the 13 JT2Go files), so the two CAE files without normals keep it.
+
+| File | Version | Tri-strip shapes decoded | Triangles | Edges with one triangle | Parse (ms) |
+| --- | --- | --- | --- | --- | --- |
+| bracket_MBD | 10.5 | 1 / 1 | 604 | 0 | 7 |
+| cylindrical_design_MBD | 10.5 | 1 / 1 | 4,220 | 0 | 12 |
+| piston_MBD | 10.5 | 1 / 1 | 5,196 | 0 | 28 |
+| NIST_mtc_crada_assembly_MBD | 10.5 | 8 / 8 | 50,286 | 0 | 158 |
+| CAE/All_Results | 10.0 | 1 / 1 | 29,952 | 64 | 21 |
+| CAE/CAEResults | 10.0 | 1 / 1 | 10,892 | 0 | 22 |
+| CAE/Gimbal | 10.0 | 1 / 1 | 109,888 | 378 | 66 |
+| CAE/testCaeID | 10.0 | 1 / 1 | 1,264 | 0 | 3 |
+
+The NIST assembly's other five shapes and one shape in each of All_Results and Gimbal are polylines (section curves,
+trace lines, element edges), which the reader lists but does not decode.
+
 ## Next
 
-- MultiXT segments (type 30) and subordinate XT elements; JT 10 Int32 packets for tessellated shapes.
-- JT 10 packets; polygon sets and polylines; colours and texture coordinates if wanted.
+- MultiXT segments (type 30) and subordinate XT elements.
+- Polygon sets and polylines; colours, texture coordinates and CAE result fields if wanted.
 - JT B-rep, wireframe and ULP segments, coded with Int32 Mk. 1 packets (bit-length and two-table arithmetic): that
   decoder was written in c91ebc0 and removed unused; bring it back with the first of those segments.
