@@ -21,6 +21,8 @@ export interface XTConversion {
 
 type XYZ = readonly number[];
 const sub = (a: XYZ, b: XYZ) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const dot = (a: XYZ, b: XYZ) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross = (a: XYZ, b: XYZ) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const scale = (a: XYZ, s: number) => [a[0] * s, a[1] * s, a[2] * s];
 
 /** Options of {@link xtToSTEP}. */
@@ -176,12 +178,20 @@ export function xtToSTEP(input: string | ArrayBuffer | ArrayBufferView, options:
 
   // --- surfaces -------------------------------------------------------------------------------------------------
   /**
-   * Rolling-ball blends, built once every other entity is written: the reserved surface id, its two supporting
-   * surfaces and spine (STEP ids), the ball radius, and the edges of the faces on it (where the spine range comes from).
+   * Rolling-ball blends, built once every other entity is written: the reserved surface id, its two supports (STEP
+   * ids of surfaces, or of a cliff edge's curve and, for an intersection curve, its two surfaces) and spine, the
+   * ball's distance from each support, and the edges of the faces on it (where the spine range comes from).
    */
   const blends = new Map<
     number,
-    { id: string; supports: [string, string]; spine: string; radius: number; edges: string[]; node: XTNode }
+    {
+      id: string;
+      supports: { id: string; curve: boolean; on?: string[] }[];
+      spine: string;
+      radii: number[];
+      edges: string[];
+      node: XTNode;
+    }
   >();
   /** A STEP surface id, and whether its natural normal is the XT surface's natural normal reversed. */
   const surfaces = new Map<number, { id: string; flip: boolean } | null>();
@@ -317,20 +327,56 @@ export function xtToSTEP(input: string | ArrayBuffer | ArrayBufferView, options:
         break;
       }
       case 'BLENDED_EDGE': {
-        // A rolling-ball blend: the ball runs along the spine touching both supporting surfaces. Its surface is built
-        // after the rest is written (see resolveBlends); Parasolid's v runs from surface 0 to 1 unless the spine's
-        // sense is negative, when the natural normal is the reverse of the one built.
-        const [a, b] = list(n, 'surface').map((v) => surface(node(v))),
+        // A rolling-ball blend: the ball runs along the spine at the distances in range from its two supports. In a
+        // cliff-edge blend (type E) one support is itself a blend with range [0,0] whose spine is the cliff edge,
+        // which the ball touches; such a carrier has no faces of its own. The surface is built after the rest is
+        // written (below), u along the spine and v from support 0 to 1. Parasolid's v runs that way unless the spine's
+        // sense is negative; its natural normal is the reverse of the built surface's when the spine's sense is
+        // positive and the same when it is negative (every blend face of JT2Go's radial engine, against the
+        // engine's own tessellation).
+        const radii = list(n, 'range').map((v) => Math.abs(num(v))),
           spineNode = node(f.spine),
-          spine = curve(spineNode),
-          radius = Math.abs(num(list(n, 'range')[0]));
-        if (f.blend_type !== 'R') warn(`#${n.index}: cliff-edge blends are not converted yet`);
-        else if (!a || !b || !spine || !(radius > 0))
+          spine = curve(spineNode);
+        if (radii.every((r) => r === 0)) break;
+        const supports = list(n, 'surface').map((v) => {
+          const s = node(v);
+          if (s?.name === 'BLENDED_EDGE' && list(s, 'range').every((r) => num(r) === 0)) {
+            // An intersection curve is kept as its chart's chords: the contacts go onto both of its surfaces.
+            const edgeNode = node(s.fields.spine),
+              cliff = curve(edgeNode),
+              on =
+                edgeNode?.name === 'INTERSECTION'
+                  ? list(edgeNode, 'surface').map((x) => {
+                      const sn = node(x);
+                      return sn && sn.name !== 'BLEND_BOUND' && sn.name !== 'BLENDED_EDGE'
+                        ? surface(sn)?.id
+                        : undefined;
+                    })
+                  : [];
+            return (
+              cliff && {
+                id: cliff.id,
+                curve: true,
+                on: on.length === 2 && on.every(Boolean) ? (on as string[]) : undefined,
+              }
+            );
+          }
+          const support = surface(s);
+          return support && { id: support.id, curve: false };
+        });
+        if (supports.length !== 2 || !supports[0] || !supports[1] || !spine || !radii.every((r) => r > 0))
           warn(`#${n.index}: rolling-ball blend whose supports or spine could not be converted`);
         else {
           const id = w.reserve();
-          blends.set(n.index, { id, supports: [a.id, b.id], spine: spine.id, radius, edges: [], node: n });
-          result = { id, flip: spineNode?.fields.sense === '-' };
+          blends.set(n.index, {
+            id,
+            supports: supports as { id: string; curve: boolean }[],
+            spine: spine.id,
+            radii,
+            edges: [],
+            node: n,
+          });
+          result = { id, flip: spineNode?.fields.sense !== '-' };
         }
         break;
       }
@@ -501,10 +547,11 @@ export function xtToSTEP(input: string | ArrayBuffer | ArrayBufferView, options:
     if (shape) roots.push(placed(shape, undefined));
   }
   // --- rolling-ball blends ---------------------------------------------------------------------------------------
-  // With everything else written, the draft file gives the kernel's own evaluators for the supporting surfaces and
-  // the spine. Along the spine (over the part its faces use), each ball centre is projected onto both supports; the
-  // exact circular arc between the two contacts is a rational quadratic, and the sections join linearly along the
-  // spine, sampled finely enough to stay within a small fraction of the radius.
+  // With everything else written, the draft file gives the kernel's own evaluators for the supports and the spine.
+  // Along the spine (over the part its faces use), each ball centre is moved onto the exact offsets of both supports
+  // (the spine is often an intersection curve, kept only as its chart's chords) and projected onto them; the exact
+  // circular arc between the two contacts is a rational quadratic, and the sections join linearly along the spine,
+  // sampled finely enough to stay within a small fraction of the radius.
   if (blends.size) {
     const draft = new STEPFile(stepText(w.draft())),
       kernelCurves = new Map<number, ReturnType<typeof curveOf>>(),
@@ -522,9 +569,12 @@ export function xtToSTEP(input: string | ArrayBuffer | ArrayBufferView, options:
       refId = (v: unknown) => (v && typeof v === 'object' && 'id' in v ? (v as { id: number }).id : undefined);
     for (const blend of blends.values()) {
       try {
-        const supports = blend.supports.map((s) => surfaceOf(draft, idOf(s), 1, curveFor)),
+        const surfaces = blend.supports.map((s) => (s.curve ? undefined : surfaceOf(draft, idOf(s.id), 1, curveFor))),
+          edgeCurves = blend.supports.map((s) => (s.curve ? curveFor(idOf(s.id)) : undefined)),
+          edgeSurfaces = blend.supports.map((s) => s.on?.map((id) => surfaceOf(draft, idOf(id), 1, curveFor))),
           spine = curveFor(idOf(blend.spine)),
-          r = blend.radius;
+          radii = blend.radii,
+          r = Math.max(...radii);
         // The spine's range: from the face corners projected onto it (a ring edge on a closed spine: all of it).
         let ring = false;
         const params: number[] = [];
@@ -563,50 +613,135 @@ export function xtToSTEP(input: string | ArrayBuffer | ArrayBufferView, options:
           t0 = Math.max(spine.domain[0], t0 - margin);
           t1 = Math.min(spine.domain[1], t1 + margin);
         }
-        const ts = spine.sample(t0, t1, Math.max(r * 5e-4, 1e-9), 0.08);
+        const tolerance = Math.max(r * 5e-4, 1e-9),
+          ts = spine.sample(t0, t1, tolerance, 0.08);
         if (ts.length < 2) throw new TypeError('its spine range is empty');
-        const rows: number[][][] = [],
-          weights: number[][] = [];
-        const hints: (readonly number[] | undefined)[] = [undefined, undefined];
-        for (const t of ts) {
-          const c = spine.at(t).slice(0, 3),
-            contacts = supports.map((s, k) => {
-              const uv = s.parameters(c, hints[k]);
-              hints[k] = uv;
-              return s.at(uv[0], uv[1]).slice(0, 3);
-            });
-          const d0 = sub(contacts[0], c),
+        const hints: (readonly number[] | undefined)[] = [undefined, undefined],
+          curveHints: (number | undefined)[] = [undefined, undefined],
+          edgeHints: (readonly number[] | undefined)[][] = [[], []];
+        /** The point of support k nearest to `c`. */
+        const contact = (k: number, c: XYZ): number[] => {
+          const s = surfaces[k],
+            e = edgeCurves[k],
+            on = edgeSurfaces[k];
+          if (e) {
+            const t = e.parameter(c, curveHints[k]);
+            curveHints[k] = t;
+            let q: XYZ = e.at(t).slice(0, 3);
+            // From the chord onto both surfaces of the intersection, sliding along it towards c: the smallest move
+            // that zeroes both distances, plus the move along the curve's tangent.
+            for (let step = 0; on && step < 16; step++) {
+              const feet = on.map((surface, j) => {
+                  const uv = surface.parameters(q, edgeHints[k][j]);
+                  edgeHints[k][j] = uv;
+                  return { p: surface.at(uv[0], uv[1]).slice(0, 3), n: surface.normal(uv[0], uv[1]) };
+                }),
+                [a, b] = feet,
+                da = dot(sub(q, a.p), a.n),
+                db = dot(sub(q, b.p), b.n),
+                g = dot(a.n, b.n),
+                det = 1 - g * g;
+              if (det < 1e-9) break;
+              const alpha = (da - g * db) / det,
+                beta = (db - g * da) / det,
+                tangent = cross(a.n, b.n),
+                length = Math.hypot(tangent[0], tangent[1], tangent[2]),
+                slide = dot(sub(c, q), tangent) / (length * length);
+              q = [0, 1, 2].map((i) => q[i] - alpha * a.n[i] - beta * b.n[i] + slide * tangent[i]);
+              if (Math.abs(alpha) + Math.abs(beta) + Math.abs(slide) * length < 1e-12) break;
+            }
+            return q as number[];
+          }
+          const uv = s!.parameters(c, hints[k]);
+          hints[k] = uv;
+          return s!.at(uv[0], uv[1]).slice(0, 3);
+        };
+        /** The ball's section at spine parameter t: the arc's three control points and their weights. */
+        const section = (t: number): { points: number[][]; weights: number[] } => {
+          let c: XYZ = spine.at(t).slice(0, 3),
+            contacts = [contact(0, c), contact(1, c)],
+            d0 = sub(contacts[0], c),
             d1 = sub(contacts[1], c),
             l0 = Math.hypot(d0[0], d0[1], d0[2]),
             l1 = Math.hypot(d1[0], d1[1], d1[2]);
-          if (Math.abs(l0 - r) > 0.05 * r + 1e-9 || Math.abs(l1 - r) > 0.05 * r + 1e-9)
+          // Newton steps onto both offsets: the smallest move along the two contact directions that corrects both
+          // distances at once.
+          for (let step = 0; step < 12; step++) {
+            const e0 = l0 - radii[0],
+              e1 = l1 - radii[1];
+            if (Math.abs(e0) <= 1e-9 * r && Math.abs(e1) <= 1e-9 * r) break;
+            const n0 = d0.map((v) => v / l0),
+              n1 = d1.map((v) => v / l1),
+              g = n0[0] * n1[0] + n0[1] * n1[1] + n0[2] * n1[2],
+              det = 1 - g * g;
+            if (det < 1e-9) break;
+            const a = (e0 - g * e1) / det,
+              b = (e1 - g * e0) / det;
+            c = [0, 1, 2].map((k) => c[k] + a * n0[k] + b * n1[k]);
+            contacts = [contact(0, c), contact(1, c)];
+            d0 = sub(contacts[0], c);
+            d1 = sub(contacts[1], c);
+            l0 = Math.hypot(d0[0], d0[1], d0[2]);
+            l1 = Math.hypot(d1[0], d1[1], d1[2]);
+          }
+          if (Math.abs(l0 - radii[0]) > 0.05 * radii[0] + 1e-9 || Math.abs(l1 - radii[1]) > 0.05 * radii[1] + 1e-9)
             throw new TypeError(
-              `the ball does not touch its supports (${l0.toPrecision(4)}, ${l1.toPrecision(4)} for radius ${r.toPrecision(4)})`,
+              `the ball does not touch its supports (${l0.toPrecision(4)}, ${l1.toPrecision(4)} for radii ${radii.map((v) => v.toPrecision(4)).join(', ')})`,
             );
           const cos = (d0[0] * d1[0] + d0[1] * d1[1] + d0[2] * d1[2]) / (l0 * l1);
           if (cos < -0.999) throw new TypeError('its arc is a half circle or more');
           // The middle control point of the arc: where the tangents at both contacts meet.
           const middle = [0, 1, 2].map((k) => c[k] + (d0[k] + d1[k]) / (1 + cos));
-          rows.push([contacts[0], middle, contacts[1]]);
-          weights.push([1, Math.sqrt((1 + cos) / 2), 1]);
+          return { points: [contacts[0], middle, contacts[1]], weights: [1, Math.sqrt((1 + cos) / 2), 1] };
+        };
+        // Sections at the spine's own samples, and between them wherever the moved centres bend away from the chord
+        // (a charted spine's chords are straight where the true path is not).
+        const us: number[] = [],
+          rows: { points: number[][]; weights: number[] }[] = [];
+        const between = (ta: number, a: (typeof rows)[0], tb: number, b: (typeof rows)[0], depth: number) => {
+          if (depth >= 10) return;
+          const tm = (ta + tb) / 2,
+            m = section(tm);
+          let off = 0;
+          for (let j = 0; j < 3; j++)
+            off = Math.max(
+              off,
+              Math.hypot(
+                ...sub(
+                  m.points[j],
+                  a.points[j].map((v, k) => (v + b.points[j][k]) / 2),
+                ),
+              ),
+            );
+          if (off <= tolerance) return;
+          between(ta, a, tm, m, depth + 1);
+          us.push(tm);
+          rows.push(m);
+          between(tm, m, tb, b, depth + 1);
+        };
+        for (const [k, t] of ts.entries()) {
+          const row = section(t);
+          if (k > 0) between(us[us.length - 1], rows[rows.length - 1], t, row, 0);
+          us.push(t);
+          rows.push(row);
         }
         const nu = rows.length,
           points: number[][] = [],
           ws: number[] = [];
         for (let j = 0; j < 3; j++)
           for (let i = 0; i < nu; i++) {
-            points.push(rows[i][j]);
-            ws.push(weights[i][j]);
+            points.push(rows[i].points[j]);
+            ws.push(rows[i].weights[j]);
           }
         const id = w.spline({
           degrees: [1, 2],
           counts: [nu, 3],
-          knots: [ts, [0, 1]],
-          multiplicities: [ts.map((_, k) => (k === 0 || k === nu - 1 ? 2 : 1)), [3, 3]],
+          knots: [us, [0, 1]],
+          multiplicities: [us.map((_, k) => (k === 0 || k === nu - 1 ? 2 : 1)), [3, 3]],
           points,
           weights: ws,
         });
-        w.fill(blend.id, `RECTANGULAR_TRIMMED_SURFACE('',${id},${w.real(ts[0])},${w.real(ts[nu - 1])},0.,1.,.T.,.T.)`);
+        w.fill(blend.id, `RECTANGULAR_TRIMMED_SURFACE('',${id},${w.real(us[0])},${w.real(us[nu - 1])},0.,1.,.T.,.T.)`);
       } catch (error) {
         warn(
           `#${blend.node.index}: rolling-ball blend not built: ${error instanceof Error ? error.message : String(error)}`,

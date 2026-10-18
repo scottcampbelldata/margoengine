@@ -80,8 +80,8 @@ coordinates, normals) matching. What real files do that the text and our test wr
 
 Checks: each decoded mesh matches the bounding box and surface area its shape node stores in the LSG (worst 0.0002%
 of the box size and 0.03% of the area, over all 237 shapes); Radial_Engine's meshes match its own XT B-reps' bounds to
-within 0.15 mm and their volumes to within 1% on 20 of its 24 parts (the other four are below, under Radial_Engine's
-blends). Triangles stored with normals agree in winding with them on 97.9 to 100% of each file's triangles (at most 1%
+within 0.25 mm on 22 of its 24 parts and their volumes to within 1% on 21 (the other three are below, under
+Radial_Engine's blends). Triangles stored with normals agree in winding with them on 97.9 to 100% of each file's triangles (at most 1%
 disagree; the rest have zero area). Parse times include decoding every mesh, on this PC.
 
 | File | Shapes decoded | Triangles | Parse (ms) |
@@ -143,11 +143,39 @@ The XT data carries no per-body identifier, so a part's bodies are taken by thei
 (the ISO text calls the subordinate list a subset of it); the NIST file's MultiXT holds one body, so that mapping is
 only checked there and in the synthetic test. `xtToSTEP` gained a `parts` option to convert chosen top-level bodies.
 
-The box now reads its exact B-rep: 329,847 mm3, against 329,944 in the assembly's STEP file (0.03% less) and 329,127
-for its JT mesh; 4 of its blend faces were still left out (below, under blends).
+The box now reads its exact B-rep. With its blends built (below) it meshes to 328,986 mm3 and 92,808 mm2, against
+329,127 mm3 and 92,769 mm2 for its closed JT mesh (0.04% each), though four small planar faces bounded only by
+tolerant edges are still left out (below); the assembly's STEP file gives 329,944 mm3, 0.25% more than both.
+
+## Radial_Engine's blends (2026-10-18)
+
+Radial_Engine (JT 9.5, 24 XT B-rep parts) lost 39 faces from Parasolid blends: 38 rolling-ball blends "not built: the
+ball does not touch its supports", and 8 cliff-edge blends with the 8 range-[0,0] blends they rest on. Now:
+
+- A blend's spine is usually an intersection curve, which the converter keeps as its chart's chords; on curved
+  spines the chords stray from the true ball centres (here by 5 to 9% of the radius). Each centre is now moved onto
+  both offset supports by Newton steps before the arc is built, and sections are added along the spine wherever the
+  moved centres bend away from the chord.
+- Cliff-edge blends (type E) are built: the ball rolls on one surface and touches the cliff edge, the spine of the
+  range-[0,0] blend that stands for it; when that edge is an intersection curve the contact goes onto both of its
+  surfaces. The range-[0,0] blends themselves have no faces and no longer warn.
+- Every blend face was turned inside out, those built before as well: against each part's own JT tessellation,
+  Parasolid's blend normal is the reverse of the built surface's when the spine's sense is positive and the same when
+  it is negative (all 96 blend faces of Radial_Engine and the 4 of the NIST box now agree with it).
+
+Radial_Engine converts with no warnings; 1 of its 1,349 faces fails to mesh (a Crank Case cylinder face, "a bound wraps
+round a surface that does not close at a pole"). Master Rod, Cam Cover and Piston, whose blends were missing or
+inside out, now mesh closed and consistently wound, within 0.25% of their JT meshes' volumes (40,305 / 40,232,
+67,336 / 67,489, 10,601 / 10,623 mm3). Left as they were: torus faces in Head, Exhaust Port and Intake Port mesh the
+wrong part of their torus or face the wrong way (areas 22,575 / 19,451, 25,909 / 9,441 and 343,951 / 310,208 mm2
+against the JT meshes); this predates the blend work and lies in the tessellation of trimmed tori.
 
 ## Next
 
 - Polygon sets and polylines; colours, texture coordinates and CAE result fields if wanted.
+- Torus faces that mesh the wrong region (Radial_Engine's Head, Exhaust Port and Intake Port).
+- Tolerant edges: each fin's trimmed SP-curve (a 2D curve on the face's surface) as the edge curve (the NIST box's
+  four planar faces).
+- A MultiXT segment with several bodies, to confirm that bodies are taken by their place in its list.
 - JT B-rep, wireframe and ULP segments, coded with Int32 Mk. 1 packets (bit-length and two-table arithmetic): that
   decoder was written in c91ebc0 and removed unused; bring it back with the first of those segments.

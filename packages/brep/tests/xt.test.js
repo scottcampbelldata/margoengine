@@ -74,6 +74,92 @@ const fillet = () =>
     false,
   );
 
+/**
+ * A sheet body: a quarter of the concave fillet of radius 2 mm round a cylindrical boss of radius 10 mm standing on the
+ * plane z = 0 (x and y from 0 up), its spine the circle of radius 12 mm at z = 2 mm, running counter-clockwise as
+ * Parasolid runs it (the plane's normal crossed with the cylinder's). The spine is an intersection curve whose chart
+ * has only five points, so its chords stray up to 0.23 mm from the ball centres. As a rolling-ball blend its supports
+ * are the plane and the cylinder; with `cliff`, it is a cliff-edge blend: the plane and a blend of range [0,0] whose
+ * spine is the boss's top edge (the circle of radius 10 mm at z = 2 mm), which the ball touches.
+ */
+const bossFillet = (cliff) =>
+  transmit(
+    [
+      [12, '1 40 0 0 0 0 0 0 1e3 1e-8 0 0 0 1 0 3 1 2 3 14 0 4 10 18 '],
+      [13, '2 1 0 1 0 5 0 0 4 5 '],
+      [56, `3 2 0 5 0 0 0 +${cliff ? 'E7 35' : 'R7 8'} 9 .002 .002 1 1 0 0 0 0 `],
+      [19, '4 3 0 1 0 0 2 V'],
+      [14, '5 4 0 ?0 0 6 2 3 +0 0 0 0 2 '],
+      [15, '6 5 0 26 5 0 '],
+      [50, '7 6 0 1 0 0 0 +0 0 0 0 0 1 1 0 0 '],
+      [51, '8 7 0 1 0 0 0 +0 0 0 0 0 1 .01 1 0 0 '],
+      [38, '9 8 0 1 0 0 0 +7 8 34 0 0 '],
+      [16, '10 9 0 ?26 0 11 14 0 0 1 '],
+      [16, '11 10 0 ?27 10 12 15 0 0 1 '],
+      [16, '12 11 0 ?32 11 13 16 0 0 1 '],
+      [16, '13 12 0 ?33 12 0 17 0 0 1 '],
+      [31, '14 13 0 10 0 0 0 +0 0 0 0 0 1 1 0 0 .012 '],
+      [31, '15 14 0 11 0 0 0 +0 .012 .002 -1 0 0 0 0 -1 .002 '],
+      [31, '16 15 0 12 0 0 0 +0 0 .002 0 0 1 1 0 0 .01 '],
+      [31, '17 16 0 13 0 0 0 +.012 0 .002 0 1 0 0 0 -1 .002 '],
+      [18, '18 17 0 26 0 19 22 ?1 '],
+      [18, '19 18 0 27 18 20 23 ?1 '],
+      [18, '20 19 0 28 19 21 24 ?1 '],
+      [18, '21 20 0 29 20 0 25 ?1 '],
+      [29, '22 21 0 18 23 0 .012 0 0 '],
+      [29, '23 22 0 19 24 22 0 .012 0 '],
+      [29, '24 23 0 20 25 23 0 .01 .002 '],
+      [29, '25 24 0 21 0 24 .01 0 .002 '],
+      [17, '26 0 6 27 29 19 30 10 0 0 +'],
+      [17, '27 0 6 28 26 20 31 11 0 0 +'],
+      [17, '28 0 6 29 27 21 32 12 0 0 -'],
+      [17, '29 0 6 26 28 18 33 13 0 0 -'],
+      [17, '30 0 0 0 0 18 26 10 0 0 -'],
+      [17, '31 0 0 0 0 19 27 11 0 0 -'],
+      [17, '32 0 0 0 0 20 28 12 0 0 +'],
+      [17, '33 0 0 0 0 21 29 13 0 0 +'],
+      [
+        40,
+        '5 34 0 1 5 1e-6 .01 0 0 .012 0 .002 .0110865543901 .00459220118838 .002 .00848528137424 .00848528137424 .002 .00459220118838 .0110865543901 .002 0 .012 .002 ',
+      ],
+      ...(cliff
+        ? [
+            [56, '35 36 0 0 0 0 0 +R7 8 36 0 0 1 1 0 0 0 0 '],
+            [31, '36 37 0 35 0 0 0 +0 0 .002 0 0 1 1 0 0 .01 '],
+          ]
+        : []),
+    ],
+    false,
+  );
+
+/**
+ * Checks a blend face's mesh: every vertex on the ball's sweep (`off` gives a vertex's distance from the spine), the
+ * area, and every triangle facing away from the spine (Parasolid's natural normal for a blend, the face being
+ * positive; `centre` gives the spine point nearest a point).
+ */
+function checkBlend(mesh, off, centre, exact) {
+  assert.deepEqual(mesh.failures, []);
+  const p = mesh.positions,
+    t = mesh.indices;
+  let area = 0,
+    worst = 0,
+    inward = 0;
+  for (let k = 0; k < t.length; k += 3) {
+    const [a, b, c] = [t[k], t[k + 1], t[k + 2]].map((i) => [p[i * 3], p[i * 3 + 1], p[i * 3 + 2]]),
+      u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
+      v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]],
+      n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]],
+      m = [0, 1, 2].map((i) => (a[i] + b[i] + c[i]) / 3),
+      s = centre(m);
+    area += Math.hypot(...n) / 2;
+    if (n[0] * (m[0] - s[0]) + n[1] * (m[1] - s[1]) + n[2] * (m[2] - s[2]) <= 0) inward++;
+  }
+  for (let i = 0; i < p.length; i += 3) worst = Math.max(worst, Math.abs(off(p[i], p[i + 1], p[i + 2]) - 0.002));
+  assert.ok(worst < 2e-6, `off the round by ${worst}`);
+  assert.equal(inward, 0, `${inward} triangles face the spine`);
+  assert.ok(Math.abs(area - exact) < 2e-3 * exact, `area ${area} vs ${exact}`);
+}
+
 /** A text transmit file of the given nodes ([type, data after the type]). */
 function transmit(nodes, embedded) {
   const seen = new Set(),
@@ -153,21 +239,29 @@ test('Parasolid XT: a rolling-ball blend is built from its spine and supports as
   const conversion = xtToSTEP(fillet());
   assert.deepEqual(conversion.warnings, []);
   const [mesh] = tessellateSTEP(parseXT(fillet()), { deflection: 1e-7 });
-  assert.deepEqual(mesh.failures, []);
-  let area = 0,
-    worst = 0;
-  const p = mesh.positions,
-    t = mesh.indices;
-  for (let k = 0; k < t.length; k += 3) {
-    const [a, b, c] = [t[k], t[k + 1], t[k + 2]].map((i) => [p[i * 3], p[i * 3 + 1], p[i * 3 + 2]]),
-      u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
-      v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-    area += Math.hypot(u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]) / 2;
-  }
   // Every vertex lies on the cylinder of radius 2 mm about the spine.
-  for (let i = 0; i < p.length; i += 3)
-    worst = Math.max(worst, Math.abs(Math.hypot(p[i] - 0.002, p[i + 2] - 0.002) - 0.002));
-  assert.ok(worst < 1e-8, `off the round by ${worst}`);
-  const exact = (Math.PI / 2) * 0.002 * 0.01;
-  assert.ok(Math.abs(area - exact) < 2e-3 * exact, `area ${area} vs ${exact}`);
+  checkBlend(
+    mesh,
+    (x, _y, z) => Math.hypot(x - 0.002, z - 0.002),
+    ([, y]) => [0.002, y, 0.002],
+    (Math.PI / 2) * 0.002 * 0.01,
+  );
+});
+
+test('Parasolid XT: blends on a coarsely charted spine, rolling-ball and cliff-edge, sweep the exact round', () => {
+  const exact = (6 * Math.PI ** 2 - 2 * Math.PI) * 1e-6;
+  for (const cliff of [false, true]) {
+    assert.deepEqual(xtToSTEP(bossFillet(cliff)).warnings, []);
+    const [mesh] = tessellateSTEP(parseXT(bossFillet(cliff)), { deflection: 1e-7 });
+    // Every vertex lies on the torus swept by the ball round the boss.
+    checkBlend(
+      mesh,
+      (x, y, z) => Math.hypot(Math.hypot(x, y) - 0.012, z - 0.002),
+      ([x, y]) => {
+        const r = Math.hypot(x, y);
+        return [(0.012 * x) / r, (0.012 * y) / r, 0.002];
+      },
+      exact,
+    );
+  }
 });
