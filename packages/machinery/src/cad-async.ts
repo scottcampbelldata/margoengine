@@ -3,6 +3,7 @@ import type { EngineKernel } from '@margoengine/core';
 import type { Mesh } from '@margoengine/core/extension';
 import type { CADModel } from './cad.js';
 import { capError, maxBytes } from './cad-parser.js';
+import { parseSTEPWithMargo } from './brep-async.js';
 export type CADFormat = 'stl' | 'obj' | 'step' | 'iges';
 export interface CADImportOptions {
   signal?: AbortSignal;
@@ -31,9 +32,22 @@ export interface CADImportOptions {
   /**
    * STEP and IGES only: the largest distance, in meters, that OpenCascade's tessellation may stray from the true surface
    * (its absolute linear deflection). Smaller values give finer triangles. Omitted, OpenCascade keeps its default
-   * tessellation. STL and OBJ are already triangles and ignore it.
+   * tessellation. STL and OBJ are already triangles and ignore it. With `kernel: 'margo'`, the kernel's chord deflection
+   * in meters (default 0.001 of each body's bounding-box diagonal).
    */
   linearDeflection?: number;
+  /**
+   * STEP only: `'occt'` (default) reads the file with OpenCascade in one worker; `'margo'` reads it with Margo's own
+   * kernel (`@margoengine/brep`) in a pool of workers, one body at a time, largest first, and keeps the file's face
+   * and body colours. IGES needs `'occt'`.
+   */
+  kernel?: 'occt' | 'margo';
+  /** `kernel: 'margo'`: most workers, 1 to 64 (default the device's logical cores less one, at most 8). */
+  workers?: number;
+  /** `kernel: 'margo'`: the model is visible from its first part, which joins it as soon as it is meshed (default true). */
+  progressive?: boolean;
+  /** `kernel: 'margo'`: called with each part as it joins the model. */
+  onPart?: (mesh: Mesh) => void;
 }
 export function parseCADAsync(
   instance: EngineKernel,
@@ -59,6 +73,17 @@ export function parseCADAsync(
     throw new RangeError('creaseAngle must be a number of degrees from 0 to 180');
   const engine = engineRuntime(instance);
   if (engine.disposed) throw new Error('Engine is disposed');
+  const kernel = options.kernel ?? 'occt';
+  if (kernel !== 'occt' && kernel !== 'margo') throw new TypeError("kernel must be 'occt' or 'margo'");
+  if (kernel === 'margo' && format === 'iges') throw new TypeError("kernel 'margo' reads STEP; use 'occt' for IGES");
+  if (kernel === 'margo' && format === 'step')
+    return parseSTEPWithMargo(
+      engine,
+      buffer,
+      new URL(/* @vite-ignore */ './workers/brep-runtime.js?no-inline', import.meta.url),
+      options,
+      timeoutMs,
+    );
   const workerURL = new URL(/* @vite-ignore */ './workers/cad-runtime.js?no-inline', import.meta.url),
     occtURL = new URL(/* @vite-ignore */ './workers/occt-import-js.js?no-inline', import.meta.url),
     wasmURL = new URL(/* @vite-ignore */ './workers/occt-import-js.wasm?no-inline', import.meta.url);

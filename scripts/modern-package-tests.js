@@ -124,6 +124,7 @@ for (const name of packedNames) {
   if (name === 'machinery')
     for (const file of [
       'cad-runtime.js',
+      'brep-runtime.js',
       'occt-import-js.js',
       'occt-import-js.wasm',
       'OCCT-LICENSE.txt',

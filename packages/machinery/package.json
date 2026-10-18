@@ -91,6 +91,7 @@
     "@margoengine/text": "^1.0.0"
   },
   "devDependencies": {
+    "@margoengine/brep": "^1.0.0",
     "@margoengine/math": "^1.0.0"
   }
 }

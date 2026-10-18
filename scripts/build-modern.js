@@ -206,6 +206,23 @@ for (const name of packageOrder(manifests)) {
         },
       },
     });
+    // STEP with Margo's own kernel (kernel: 'margo'): @margoengine/brep bundled into a pool worker, no OpenCascade.
+    await build({
+      configFile: false,
+      publicDir: false,
+      logLevel: 'warn',
+      build: {
+        outDir: resolve(output, 'workers'),
+        emptyOutDir: false,
+        target: 'es2022',
+        lib: {
+          entry: 'packages/machinery/src/workers/brep-worker.ts',
+          name: 'BREPWorker',
+          formats: ['iife'],
+          fileName: () => 'brep-runtime.js',
+        },
+      },
+    });
     // occt-import-js's embind wrappers would need 'unsafe-eval'; ship the closure form (scripts/static-embind.js). Wasm unchanged.
     await writeFile(
       resolve(output, 'workers/occt-import-js.js'),

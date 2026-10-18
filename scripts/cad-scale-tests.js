@@ -181,7 +181,7 @@ const report = {
 };
 const row = (r) =>
   r.ok
-    ? `${String(r.parts).padStart(7)} parts ${String(r.triangles).padStart(10)} tris  load ${r.loadMs.toFixed(0).padStart(6)} ms  orbit ${r.orbit.median.toFixed(1)}/${r.orbit.p95.toFixed(1)} ms (encode ${r.orbit.encode.median.toFixed(1)})  pick ${r.pick.median.toFixed(0)} ms  section ${r.section.median.toFixed(1)} ms (encode ${r.section.encode.median.toFixed(1)})  draws ${r.draws}${r.kernel === 'margo' ? `  margo kernel: ${r.failedFaces} faces failed` : ''}`
+    ? `${String(r.parts).padStart(7)} parts ${String(r.triangles).padStart(10)} tris  load ${r.loadMs.toFixed(0).padStart(6)} ms  orbit ${r.orbit.median.toFixed(1)}/${r.orbit.p95.toFixed(1)} ms (encode ${r.orbit.encode.median.toFixed(1)})  pick ${r.pick.median.toFixed(0)} ms  section ${r.section.median.toFixed(1)} ms (encode ${r.section.encode.median.toFixed(1)})  draws ${r.draws}${r.kernel === 'margo' ? `  margo kernel: ${r.failedFaces} faces failed, first part ${r.firstPartMs?.toFixed(0) ?? '-'} ms` : ''}`
     : `FAILED at ${r.stage}: ${r.error ?? r.errors?.join('; ')}`;
 
 const release = await acquire({ owner: 'cad-scale-tests' });

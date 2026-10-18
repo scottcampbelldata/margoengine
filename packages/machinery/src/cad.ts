@@ -21,6 +21,8 @@ export interface CADModel {
   root: MeshHandle;
   meshes: readonly MeshHandle[];
   dispose(): void;
+  /** STEP with `kernel: 'margo'`: faces the kernel could not mesh (left out of their parts). */
+  failedFaces?: number;
 }
 export function deduplicateParts(meshes: Iterable<MeshHandle>): { parts: number; unique: number } {
   const seen = new Map<string, Array<{ data: Float32Array; geometry: Geometry }>>(),
