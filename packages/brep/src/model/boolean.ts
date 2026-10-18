@@ -129,13 +129,27 @@ export function boolean(
     if (t < lo - 1e-12 * (hi - lo) || t > hi + 1e-12 * (hi - lo)) return undefined;
     return length(sub(c.at(t).slice(0, 3) as XYZ, p)) <= touch ? t : undefined;
   };
+  // Boxes round the faces, and round each edge the common part of its faces' boxes (it lies in both): an edge meets no
+  // face whose box is apart from its own.
+  const boxes = new Map([...faces.a, ...faces.b].map((f) => [f, faceBox(uvOf.get(f)!, merge)])),
+    edgeBox = (e: Edge): Box3 | undefined => {
+      let box: Box3 | undefined;
+      for (const co of e.coedges) {
+        const b = boxes.get(co.loop.face);
+        if (b) box = box ? overlap(box, b) : b;
+        if (!box) return undefined;
+      }
+      return box;
+    };
   const contacts = (edges: Edge[], others: Face[], otherVertices: Vertex[]) => {
     for (const e of edges) {
       const [t0, t1] = edgeParameters(e, 1),
         c = curveEvaluator(e.curve),
         start = original.get(e.start)!,
-        end = original.get(e.end)!;
+        end = original.get(e.end)!,
+        box = edgeBox(e);
       for (const g of others) {
+        if (box && !overlap(box, boxes.get(g)!)) continue;
         // An edge lying in the face's surface: it may cut the face (below), and crosses nothing there.
         const samples = edgeParameters(e, 6).slice(1, -1);
         if (samples.every((t) => Math.abs(signedDistance(g.surface, c.at(t).slice(0, 3) as XYZ)) <= touch)) {
@@ -257,7 +271,6 @@ export function boolean(
     }
 
   // --- intersection curves of each pair of faces, kept where they lie inside both -----------------------------------
-  const boxes = new Map([...faces.a, ...faces.b].map((f) => [f, faceBox(uvOf.get(f)!, merge)]));
   for (const fa of faces.a)
     for (const fb of faces.b) {
       const box = overlap(boxes.get(fa)!, boxes.get(fb)!);
