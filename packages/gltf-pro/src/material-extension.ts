@@ -108,22 +108,37 @@ export function prepareMaterialExtension(
   return resource;
 }
 
+/** The phony assignments that keep an extension's group-3 resources in an auto layout (WGSL 9.2.3). */
+function extensionAccess(extension: MaterialExtension): string {
+  let access = extension.factors ? '_ = materialFactors;\n' : '';
+  (extension.textures ?? []).forEach((texture, i) => {
+    access += `_ = materialTexture${i};\n`;
+    if (texture.sampler) access += `_ = materialSampler${i};\n`;
+  });
+  return access;
+}
+
+/**
+ * Applies the extension's surface edits (and the phony assignments that keep its bindings) wherever an entry point
+ * still builds the plain surface: after materialExtensionShader, an entry appended later (SSAO's occlusion fragment)
+ * gets them too, so its layout keeps group 3 and its surface matches the beauty pass.
+ */
+export function materialExtensionSurface(code: string, extension: MaterialExtension): string {
+  return code.replaceAll(
+    'let s=surface(i,front);',
+    () => `var s=surface(i,front);\n${extensionAccess(extension)}${extension.wgsl ?? ''}\n`,
+  );
+}
+
 export function materialExtensionShader(source: string, extension: MaterialExtension): string {
   validateDeclarations(extension.declarations);
   // Even an empty extension has a distinct pipeline signature.
-  let declarations = '// Material extension: group 3\n',
-    access = '';
-  if (extension.factors) {
+  let declarations = '// Material extension: group 3\n';
+  if (extension.factors)
     declarations += `@group(3) @binding(0) var<uniform> materialFactors:array<vec4f,${extension.factors.length / 4}>;\n`;
-    access += '_ = materialFactors;\n';
-  }
   (extension.textures ?? []).forEach((texture, i) => {
     declarations += `@group(3) @binding(${1 + i * 2}) var materialTexture${i}:texture_2d<f32>;\n`;
-    access += `_ = materialTexture${i};\n`;
-    if (texture.sampler) {
-      declarations += `@group(3) @binding(${2 + i * 2}) var materialSampler${i}:sampler;\n`;
-      access += `_ = materialSampler${i};\n`;
-    }
+    if (texture.sampler) declarations += `@group(3) @binding(${2 + i * 2}) var materialSampler${i}:sampler;\n`;
   });
   // Phony assignments retain the resource interface even for factors-only slots,
   // without texture samples or changes to the surface (WGSL 9.2.3).
@@ -135,10 +150,7 @@ export function materialExtensionShader(source: string, extension: MaterialExten
       '  return vec4f(color,select(1.0,s.base.a,f.settings.x>1.5));',
       () => `  ${extension.output}\n  return vec4f(color,select(1.0,s.base.a,f.settings.x>1.5));`,
     );
-  code = code.replaceAll(
-    'let s=surface(i,front);',
-    () => `var s=surface(i,front);\n${access}${extension.wgsl ?? ''}\n`,
-  );
+  code = materialExtensionSurface(code, extension);
   return declarations + (extension.declarations ?? '') + '\n' + code;
 }
 

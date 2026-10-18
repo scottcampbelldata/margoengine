@@ -1,6 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { Geometry, PbrMaterial, type EngineKernel } from '@margoengine/core';
 export { ScatterInstances, type ScatterBatch } from './instances.js';
+import { freeLocation } from './instances.js';
 export { randomPlacements, radialPlacements } from './candidates.js';
 export {
   PlacementLayout,
@@ -511,12 +512,14 @@ export class Scatter implements EnginePlugin {
         vertex = pbrVertex(this.fade, blades);
       let code = !lit ? (this.fade ? renderCode : solidCode) : c.shader.replace(/struct Input \{[^}]+\}/, '');
       if (lit) {
+        // After core's varyings and any a patch added to its Output (terrain's mesh id): 4 and 5 on a plain shader.
+        const at = freeLocation(/struct Output \{[^}]+\}/.exec(code)?.[0] ?? '');
         code = code
           .replace(
             '@location(3) material:vec4f',
             '@location(3) material:vec4f' +
-              (this.fade ? ',@location(4) @interpolate(flat) lodFade:vec2f' : '') +
-              (blades ? ',@location(5) ground:vec4f' : ''),
+              (this.fade ? `,@location(${at}) @interpolate(flat) lodFade:vec2f` : '') +
+              (blades ? `,@location(${at + 1}) ground:vec4f` : ''),
           )
           .replace(
             /@vertex fn vertex\([\s\S]*?(?=@fragment)/,

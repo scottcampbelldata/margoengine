@@ -56,6 +56,7 @@ import { mipShader } from './mip.js';
 import {
   prepareMaterialExtension,
   materialExtensionShader,
+  materialExtensionSurface,
   materialExtensionAmbientShader,
   bindMaterialExtension,
   type MaterialExtension,
@@ -1988,7 +1989,8 @@ export class PBRModel implements EnginePlugin {
         if (m.shading?.texturedTint) code = texturedTintPBR(code);
         if (mode === 'occlusion') {
           const rewritten = occlusionShader(code);
-          code = rewritten.code;
+          // An appended occlusion fragment builds the plain surface: give it the extension's edits and bindings too.
+          code = extension ? materialExtensionSurface(rewritten.code, extension) : rewritten.code;
           entry = rewritten.entry;
         }
         if (section) code = sectionShader(code, 0, 2);

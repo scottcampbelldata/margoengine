@@ -71,7 +71,7 @@ const translucentLayouts: GPUVertexBufferLayout[] = [
 // the normal so curved canopies light unevenly, plus wrapped diffuse on the shadow side. Unshadowed (a canopy's own
 // shadow map would hide its back-lit side); baked occlusion stands in for thickness.
 /** The first @location a struct does not use: patches that add varyings to a shared struct must not collide. */
-const freeLocation = (struct: string): number =>
+export const freeLocation = (struct: string): number =>
   Math.max(-1, ...[...struct.matchAll(/@location\((\d+)\)/g)].map((m) => Number(m[1]))) + 1;
 const translucencyShader = /* wgsl */ `
 fn foliageTranslucency(n:vec3f,v:vec3f,l:vec3f,occlusion:f32,strength:f32)->f32 {
