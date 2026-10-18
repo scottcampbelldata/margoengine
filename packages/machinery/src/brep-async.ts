@@ -2,7 +2,7 @@
 // out bodies largest first, and each body's parts join the scene the moment its mesh arrives.
 import { Geometry, PbrMaterial, type Engine, type Mesh } from '@margoengine/core/extension';
 import { checkCount, countLimit } from '../../shared/limits.js';
-import type { CADModel } from './cad.js';
+import type { CADModel, CADRefineOptions } from './cad.js';
 import type { CADImportOptions } from './cad-async.js';
 
 interface Structure {
@@ -16,6 +16,8 @@ interface Structure {
 interface BodyResult {
   body: number;
   failures: number;
+  /** The chord deflection the mesh was made with, in meters. */
+  deflection: number;
   error?: string;
   parts: { color: string | null; vertices: Float32Array; indices: Uint32Array; bounds: Float32Array }[];
 }
@@ -89,23 +91,35 @@ export function parseSTEPWithMargo(
       queue: number[] = [],
       remaining = 0,
       settled = false,
-      failedFaces = 0;
+      ended = false,
+      failedFaces = 0,
+      placedTriangles = 0;
     /** Instance indices of each body. */
     const placements = new Map<number, number[]>();
+    /**
+     * Each meshed body, for refining: its current deflection (meters), triangles, bounding sphere in its own frame, the
+     * finest deflection a refinement could not reach, and its parts by colour group (every placement's).
+     */
+    const meshed = new Map<
+      number,
+      { deflection: number; triangles: number; center: number[]; radius: number; floor: number; groups: Mesh[][] }
+    >();
     const timer = setTimeout(
       () => fail(new RangeError(`CAD import did not finish within ${timeoutMs} ms (raise the timeoutMs option)`)),
       timeoutMs,
     );
-    const cleanup = () => {
+    const cleanup = (keep?: Worker) => {
         settled = true;
         clearTimeout(timer);
         for (const worker of workers) {
           worker.onmessage = worker.onerror = worker.onmessageerror = null;
-          worker.terminate();
+          if (worker !== keep) worker.terminate();
         }
         options.signal?.removeEventListener('abort', abort);
       },
       dispose = () => {
+        ended = true;
+        for (const worker of workers) worker.terminate();
         for (let i = created.length - 1; i >= 0; i--) created[i].dispose();
       },
       fail = (error: unknown) => {
@@ -125,9 +139,116 @@ export function parseSTEPWithMargo(
       if (!root || !meshes.length) throw new Error('CAD contains no geometry');
       root.visible = true;
       options.onProgress?.(100);
-      cleanup();
-      resolve({ root, meshes, dispose, failedFaces });
+      // The primary worker read the whole file and stays for refining; the others end.
+      const kept = options.refine ? workers[0] : undefined;
+      cleanup(kept);
+      resolve({ root, meshes, dispose, failedFaces, ...(kept ? { refine: refiner(kept) } : {}) });
     };
+    /** Geometry from a worker's part: core's own constructor ran there, so the transferred buffers are adopted. */
+    const adopt = (part: BodyResult['parts'][number]) =>
+      Object.assign(Object.create(Geometry.prototype) as Geometry, {
+        vertices: part.vertices,
+        indices: part.indices,
+        bounds: part.bounds,
+      });
+    const refiner = (worker: Worker) => {
+      const initial = placedTriangles;
+      let running: Promise<number> | undefined;
+      return ({ pixels = 0.5, maxTriangles = Math.max(3 * initial, 5_000_000) }: CADRefineOptions = {}) => {
+        if (!(typeof pixels === 'number' && pixels > 0 && pixels < Infinity))
+          throw new RangeError('pixels must be a positive number of canvas pixels');
+        if (!(typeof maxTriangles === 'number' && maxTriangles > 0))
+          throw new RangeError('maxTriangles must be a positive number');
+        if (ended || engine.disposed) return Promise.reject(new Error('The CAD model or its engine is disposed'));
+        running ??= new Promise<number>((done, refused) => {
+          const s = structure!,
+            camera = engine.camera,
+            eye = camera.position,
+            ahead = [0, 1, 2].map((k) => camera.target[k] - eye[k]),
+            length = Math.hypot(ahead[0], ahead[1], ahead[2]) || 1,
+            // Meters per canvas pixel at one meter from the eye.
+            perPixel = (2 * Math.tan((camera.fov * Math.PI) / 360)) / Math.max(1, engine.canvas.height),
+            jobs: { body: number; deflection: number; gain: number; extra: number }[] = [];
+          for (const [body, state] of meshed) {
+            // The nearest placement in front of the eye decides how fine the body must be.
+            let near = Infinity;
+            for (const i of placements.get(body) ?? []) {
+              const m = s.matrices,
+                o = i * 16,
+                [x, y, z] = state.center,
+                c = [0, 1, 2].map((k) => m[o + k] * x + m[o + 4 + k] * y + m[o + 8 + k] * z + m[o + 12 + k]),
+                scale = Math.max(
+                  Math.hypot(m[o], m[o + 1], m[o + 2]),
+                  Math.hypot(m[o + 4], m[o + 5], m[o + 6]),
+                  Math.hypot(m[o + 8], m[o + 9], m[o + 10]),
+                ),
+                r = state.radius * scale,
+                d = [c[0] - eye[0], c[1] - eye[1], c[2] - eye[2]];
+              if ((d[0] * ahead[0] + d[1] * ahead[1] + d[2] * ahead[2]) / length < -r) continue;
+              near = Math.min(near, Math.max(camera.near, Math.hypot(d[0], d[1], d[2]) - r));
+            }
+            if (near === Infinity) continue;
+            const want = Math.max(pixels * near * perPixel, state.radius * 1e-5);
+            if (want < 0.7 * state.deflection && want < state.floor)
+              jobs.push({
+                body,
+                deflection: want,
+                gain: state.deflection / want,
+                // Triangles grow about as the inverse of the deflection on curved faces (fewer on flat ones).
+                extra: state.triangles * (state.deflection / want - 1) * (placements.get(body)?.length ?? 1),
+              });
+          }
+          jobs.sort((a, b) => b.gain - a.gain);
+          let total = placedTriangles,
+            count = 0;
+          const work = jobs.filter((job) => {
+            if (total + job.extra > maxTriangles) return false;
+            total += job.extra;
+            return true;
+          });
+          const step = () => {
+            const job = work.shift();
+            if (!job || ended) {
+              running = undefined;
+              done(count);
+            } else worker.postMessage({ body: job.body, deflection: job.deflection });
+          };
+          worker.onerror = (event) => {
+            event.preventDefault?.();
+            running = undefined;
+            refused(new Error(`CAD worker failed: ${event.message || 'unknown error'}`));
+          };
+          worker.onmessage = (event) => {
+            const result = event.data as BodyResult & { fatal?: string };
+            if (ended) return;
+            if (result.fatal) {
+              running = undefined;
+              refused(new Error(result.fatal));
+              return;
+            }
+            const state = meshed.get(result.body);
+            if (state && !result.error && result.parts.length === state.groups.length) {
+              const instances = placements.get(result.body)?.length ?? 1;
+              let triangles = 0;
+              result.parts.forEach((part, g) => {
+                const geometry = adopt(part);
+                triangles += geometry.indices.length / 3;
+                for (const mesh of state.groups[g]) mesh.setGeometry(geometry);
+              });
+              placedTriangles += (triangles - state.triangles) * instances;
+              Object.assign(state, { deflection: result.deflection, triangles });
+              count++;
+              // A body that failed to re-mesh, or came back in other groups (a colour group over the vertex limit),
+              // keeps the mesh it has.
+            } else if (state) state.floor = 0;
+            step();
+          };
+          step();
+        });
+        return running;
+      };
+    };
+
     const start = (s: Structure) => {
       structure = s;
       for (let i = 0; i < s.instanceBodies.length; i++) {
@@ -145,20 +266,27 @@ export function parseSTEPWithMargo(
     const add = (result: BodyResult) => {
       failedFaces += result.failures;
       const s = structure!,
-        geometries = result.parts.map((part) => ({
-          color: part.color,
-          // The owned worker builds geometry with core's own constructor; adopt the transferred buffers as they are.
-          geometry: Object.assign(Object.create(Geometry.prototype) as Geometry, {
-            vertices: part.vertices,
-            indices: part.indices,
-            bounds: part.bounds,
-          }),
-        }));
+        geometries = result.parts.map((part) => ({ color: part.color, geometry: adopt(part) })),
+        groups: Mesh[][] = geometries.map(() => []);
+      // The body's bounding sphere in its own frame: around the first group's centre, holding every group's sphere.
+      if (geometries.length) {
+        const [first] = geometries,
+          center = [...first.geometry.bounds.subarray(0, 3)],
+          radius = Math.max(
+            ...geometries.map(
+              ({ geometry: g }) =>
+                Math.hypot(g.bounds[0] - center[0], g.bounds[1] - center[1], g.bounds[2] - center[2]) + g.bounds[3],
+            ),
+          ),
+          triangles = geometries.reduce((sum, { geometry: g }) => sum + g.indices.length / 3, 0);
+        meshed.set(result.body, { deflection: result.deflection, triangles, center, radius, floor: Infinity, groups });
+        placedTriangles += triangles * (placements.get(result.body)?.length ?? 0);
+      }
       for (const instance of placements.get(result.body) ?? []) {
         const product = s.instanceProducts[instance],
           name = (product >= 0 ? s.products[product] : '') || s.bodies[result.body].name || `body ${result.body}`,
           { position, quaternion, scale } = decompose(s.matrices, instance * 16);
-        for (const { color, geometry } of geometries) {
+        for (const [g, { color, geometry }] of geometries.entries()) {
           checkCount('Too many CAD parts', meshes.length + 1, maxParts, 'maxParts');
           const mesh = engine.createMesh(root);
           created.push(mesh);
@@ -171,6 +299,7 @@ export function parseSTEPWithMargo(
               .setQuaternion(quaternion)
               .setScale(scale),
           );
+          groups[g].push(mesh);
           options.onPart?.(mesh);
         }
       }

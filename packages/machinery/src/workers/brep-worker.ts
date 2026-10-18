@@ -98,7 +98,7 @@ function groups(mesh: BodyMesh, bodyColor: string | null) {
 self.onmessage = (event: MessageEvent) => {
   const message = event.data as
     | { buffer: ArrayBuffer; primary: boolean; deflection?: number; smoothing?: boolean }
-    | { body: number };
+    | { body: number; deflection?: number };
   try {
     if ('buffer' in message) {
       if (!(message.buffer instanceof ArrayBuffer) || !message.buffer.byteLength)
@@ -149,10 +149,17 @@ self.onmessage = (event: MessageEvent) => {
     if (!body) throw new RangeError(`CAD worker got body ${index} of ${model.bodies.length}`);
     let parts: { color: string | null; geometry: Geometry }[] = [],
       failures = 0,
+      deflection = 0,
       error: string | undefined;
     try {
-      const mesh = tessellator.body(body);
+      // A refinement asks for its own deflection (meters): a fresh tessellator, so the body's edges are sampled anew.
+      const mesh = (
+        message.deflection === undefined
+          ? tessellator
+          : new Tessellator(model.file, model.faceColors, { deflection: message.deflection })
+      ).body(body);
       failures = mesh.failures.length;
+      deflection = mesh.deflection * mesh.unit;
       parts = groups(mesh, body.color ? hex(body.color) : null);
     } catch (e) {
       // One body the kernel cannot mesh (a face over the vertex cap, a malformed entity) leaves the others standing.
@@ -163,6 +170,7 @@ self.onmessage = (event: MessageEvent) => {
       {
         body: index,
         failures,
+        deflection,
         ...(error ? { error } : {}),
         parts: parts.map(({ color, geometry: g }) => ({
           color,

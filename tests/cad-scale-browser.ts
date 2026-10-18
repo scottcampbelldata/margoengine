@@ -7,7 +7,8 @@
 // Query: url (file under the dev server), format (obj, stl, step, iges, glb, gltf), frames (orbit frames, default 120),
 // smoothing ('false' for flat CAD normals), kernel ('margo' reads STEP with our own kernel, @margoengine/brep, in
 // machinery's pool of workers, instead of OpenCascade in one worker; firstPartMs then reports when the first part joined
-// the scene) and, for generated assemblies, the known bounds (minx..maxz).
+// the scene; refine=true then re-meshes parts finer for each close view before its frame) and, for generated
+// assemblies, the known bounds (minx..maxz).
 import { Engine } from '../packages/core/dist/extension.js';
 import { parseCADAsync, PartInstancer, SectionPlanes } from '../packages/machinery/dist/index.js';
 import { loadGLTF } from '../packages/gltf-pro/dist/index.js';
@@ -29,7 +30,7 @@ declare global {
   interface Window {
     cadScale?: unknown;
     cadScaleShot?: (shot: 'whole' | 'section' | 'cap') => Promise<void>;
-    cadScaleView?: (view: CloseView) => Promise<void>;
+    cadScaleView?: (view: CloseView) => Promise<number | void>;
   }
 }
 
@@ -39,6 +40,7 @@ const query = new URLSearchParams(location.search),
   frames = Math.max(10, Number(query.get('frames') ?? 120)),
   smoothing = query.get('smoothing') !== 'false',
   kernel = query.get('kernel') === 'margo' ? 'margo' : 'occt',
+  refining = kernel === 'margo' && query.get('refine') === 'true',
   known = ['minx', 'miny', 'minz', 'maxx', 'maxy', 'maxz'].map((k) =>
     query.has(k) ? Number(query.get(k)) : Number.NaN,
   ),
@@ -87,6 +89,7 @@ async function run() {
     instancer: PartInstancer | undefined,
     failedFaces = 0,
     firstPartMs: number | null = null,
+    refine: (() => Promise<number>) | undefined,
     widen = (_bounds: number[]) => {};
   stage = 'load';
   if (format === 'glb' || format === 'gltf') {
@@ -140,6 +143,7 @@ async function run() {
     fetchMs = performance.now() - start;
     const model = await parseCADAsync(engine, buffer, 'step', {
       kernel: 'margo',
+      refine: refining,
       smoothing,
       maxParts: 1_000_000,
       onPart: () => {
@@ -147,6 +151,7 @@ async function run() {
       },
     });
     failedFaces = model.failedFaces ?? 0;
+    refine = model.refine && (() => model.refine!());
     parts = model.meshes.length;
     for (const mesh of model.meshes) triangles += (mesh.geometry?.indices.length ?? 0) / 3;
     roots = model.meshes;
@@ -257,7 +262,14 @@ async function run() {
       near: Math.max(d * 1e-4, d - 1.5 * radius),
       far: d + 1.5 * radius,
     });
+    // With refine=true: one frame so the camera is current, then the bodies this view needs finer, then the shot's frame.
+    let refined: number | undefined;
+    if (refine) {
+      await frame();
+      refined = await refine();
+    }
     await frame();
+    return refined;
   };
   const memory = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory;
   return {

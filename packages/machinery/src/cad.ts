@@ -23,6 +23,20 @@ export interface CADModel {
   dispose(): void;
   /** STEP with `kernel: 'margo'`: faces the kernel could not mesh (left out of their parts). */
   failedFaces?: number;
+  /**
+   * STEP with `kernel: 'margo'` and `refine`: re-meshes, from the exact shapes, the bodies whose triangles stray from
+   * the true surface by more than `pixels` on screen from the engine's current camera, the coarsest-looking first,
+   * within `maxTriangles`; every placement of a body takes its finer geometry. Resolves with the number of bodies
+   * re-meshed. A call while one runs returns that one. Call it when the camera comes to rest after a zoom or orbit.
+   */
+  refine?: (options?: CADRefineOptions) => Promise<number>;
+}
+/** Options of {@link CADModel.refine}. */
+export interface CADRefineOptions {
+  /** Largest gap on screen, in canvas pixels, between the triangles and the exact surface (default 0.5). */
+  pixels?: number;
+  /** Most triangles the placed parts may total after refining (default three times the loaded model's, at least 5,000,000). */
+  maxTriangles?: number;
 }
 export function deduplicateParts(meshes: Iterable<MeshHandle>): { parts: number; unique: number } {
   const seen = new Map<string, Array<{ data: Float32Array; geometry: Geometry }>>(),

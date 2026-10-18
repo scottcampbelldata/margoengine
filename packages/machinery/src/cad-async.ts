@@ -48,6 +48,11 @@ export interface CADImportOptions {
   progressive?: boolean;
   /** `kernel: 'margo'`: called with each part as it joins the model. */
   onPart?: (mesh: Mesh) => void;
+  /**
+   * `kernel: 'margo'`: keeps one worker with the exact shapes after loading, so `model.refine()` can re-mesh parts
+   * finer for the current view; `model.dispose()` ends it (default false).
+   */
+  refine?: boolean;
 }
 export function parseCADAsync(
   instance: EngineKernel,
