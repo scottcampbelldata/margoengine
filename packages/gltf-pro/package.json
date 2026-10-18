@@ -4,11 +4,6 @@
   "type": "module",
   "license": "MIT",
   "description": "Opt-in glTF 2.0 metallic-roughness rendering for Margo Engine WebGPU.",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/gltf-pro"
-  },
   "publishConfig": {
     "access": "public"
   },

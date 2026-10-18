@@ -4,11 +4,6 @@
   "type": "module",
   "license": "MIT",
   "description": "Pure-CPU, tree-shakable geometry for Margo Engine: Three.js-compatible primitives, curves, shapes, extrusion, triangulation and mesh utilities.",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/geometry"
-  },
   "publishConfig": {
     "access": "public"
   },
