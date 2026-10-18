@@ -104,6 +104,12 @@ Where OpenCascade still leads (freeform NURBS intersections, advanced blends, he
   takes 0.4 ms in Node (best of 5; 4.4 to 4.6 ms for a fresh process's first call); OpenCascade's
   BRepFilletAPI_MakeFillet took 14.1 ms on it (Codex, b1f5d2e step 9), and the Booleans 2,691 ms before ca361d2.
 - `model.revolve`: lines and arcs round an axis (planes, cylinders, cones, tori, spheres).
+- `model.bodiesFromSTEP`: a parsed STEP file's solids and sheets as modeler bodies (SAT, Parasolid and JT B-reps
+  arrive as STEP), so every operation works on imported parts: planes, cylinders, cones, spheres, tori and B-splines as
+  they are; revolved and extruded lines and circles and offsets of analytic surfaces as the analytic surfaces they are;
+  seams through a pole, and loops of seams only, left out as the modeler's own closed faces have them. Round trips of a
+  box, cylinder, sphere, torus, holed block and rounded box come back valid with volume and area within 1e-9; an imported
+  plate takes a drilled hole and rounded edges.
 - `model.massProperties`: exact volume, area, centroid and inertia from the faces (divergence theorem, Green's
   theorem over each trimmed face, Gauss-Legendre), not a mesh: box, cylinder, sphere, torus, a cone ring, a
   hemisphere over its pole, a holed block and the rounded box match their closed forms to 1e-9 (1e-8 for the hemisphere).
