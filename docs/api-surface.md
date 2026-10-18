@@ -17,7 +17,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/animator | `.` 10 |  |  | 4,862 |
 | @margoengine/audio | `.` 17 | 2 |  | 6,661 |
 | @margoengine/blender | `.` 5 |  |  | 2,890 |
-| @margoengine/brep | `.` 41 |  |  | 21,866 |
+| @margoengine/brep | `.` 41 |  |  | 38,139 |
 | @margoengine/bvh | `.` 51 |  |  | 15,349 |
 | @margoengine/cache | `.` 5 |  |  | 2,421 |
 | @margoengine/cameras | `.` 3, `./origin` 3 |  |  | 1,674 |
@@ -45,9 +45,9 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/kinematics-constraints | `.` 18 |  |  | 6,544 |
 | @margoengine/labels | `.` 22 | 2 |  | 4,449 |
 | @margoengine/lines | `.` 31 | 1 |  | 12,459 |
-| @margoengine/loaders | `.` 68, `./worker` 2 | 8 |  | 22,029 |
+| @margoengine/loaders | `.` 68, `./worker` 2 | 8 |  | 27,947 |
 | @margoengine/lod | `.` 18 |  |  | 10,250 |
-| @margoengine/machinery | `.` 49, `./cad` 8, `./cad-async` 3, `./kinematics` 7, `./surface` 4, `./telemetry` 2, `./section` 3, `./assembly` 1, `./metrology` 7, `./spatial` 2, `./clearance` 2, `./materials` 2, `./overlays` 7, `./exploded` 2, `./edges` 3, `./dimensions` 7 | 14 |  | 40,493 |
+| @margoengine/machinery | `.` 49, `./cad` 8, `./cad-async` 3, `./kinematics` 7, `./surface` 4, `./telemetry` 2, `./section` 3, `./assembly` 1, `./metrology` 7, `./spatial` 2, `./clearance` 2, `./materials` 2, `./overlays` 7, `./exploded` 2, `./edges` 3, `./dimensions` 7 | 14 |  | 42,703 |
 | margoengine | `.` 22 | 1 |  | 2,790 |
 | @margoengine/materials | `.` 65, `./transmission` 8 | 5 |  | 32,119 |
 | @margoengine/math | `.` 40, `./vector2` 1, `./vector3` 1, `./vector4` 1, `./quaternion` 1, `./euler` 1, `./matrix3` 1, `./matrix4` 1, `./color` 7, `./box3` 1, `./sphere` 1, `./plane` 1, `./ray` 1, `./frustum` 1, `./spherical` 1, `./mathutils` 21, `./mat4` 4, `./validate` 1, `./quat` 2, `./vec3` 7, `./errors` 2, `./mesh` 1 | 80 |  | 10,499 |
@@ -57,12 +57,12 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/oit | `.` 2 |  |  | 2,210 |
 | @margoengine/physics | `.` 35 | 20 |  | 11,392 |
 | @margoengine/points | `.` 42 | 3 |  | 15,647 |
-| @margoengine/post | `.` 12, `./bloom` 2, `./ssao` 3, `./scene-fade` 4, `./stack` 1, `./fxaa` 1, `./decals` 4, `./ssr` 4 | 4 |  | 17,925 |
+| @margoengine/post | `.` 12, `./bloom` 2, `./ssao` 3, `./scene-fade` 4, `./stack` 1, `./fxaa` 1, `./decals` 4, `./ssr` 4 | 4 |  | 17,990 |
 | @margoengine/procedural | `.` 26, `./noise` 10, `./lsystem` 12, `./voronoi` 15 |  |  | 7,236 |
 | @margoengine/quality | `.` 17, `./warm` 3 | 1 |  | 1,623 |
 | @margoengine/react | `.` 102, `./kit` 29, `./post` 12, `./physics` 16, `./xr` 12 | 31 |  | 20,966 |
 | @margoengine/road | `.` 3 |  |  | 915 |
-| @margoengine/scatter | `.` 18 | 1 |  | 11,274 |
+| @margoengine/scatter | `.` 18 | 1 |  | 11,344 |
 | @margoengine/scenery | `.` 2, `./sky` 2 |  |  | 218 |
 | @margoengine/selection | `.` 10 |  |  | 12,400 |
 | @margoengine/shader | `.` 142, `./noise` 9 | 39 |  | 11,893 |
@@ -73,7 +73,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/staging | `.` 4 |  |  | 4,890 |
 | @margoengine/stats | `.` 3 |  |  | 4,678 |
 | @margoengine/taa | `.` 6 |  |  | 8,241 |
-| @margoengine/terrain | `.` 12 | 3 |  | 8,832 |
+| @margoengine/terrain | `.` 12 | 3 |  | 8,880 |
 | @margoengine/text | `.` 34 | 2 |  | 14,139 |
 | @margoengine/tonemap | `.` 5 |  |  | 7,009 |
 | @margoengine/toon | `.` 3 |  |  | 1,338 |

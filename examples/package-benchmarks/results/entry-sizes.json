@@ -1,5 +1,5 @@
 {
-  "commit": "4158cdd",
+  "commit": "be53918",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -38,8 +38,8 @@
     },
     "@margoengine/brep": {
       ".": {
-        "raw": 60305,
-        "gzip": 21866
+        "raw": 110326,
+        "gzip": 38139
       }
     },
     "@margoengine/bvh": {
@@ -330,8 +330,8 @@
     },
     "@margoengine/loaders": {
       ".": {
-        "raw": 62467,
-        "gzip": 22029
+        "raw": 77594,
+        "gzip": 27947
       },
       "./worker": {
         "raw": 18614,
@@ -350,16 +350,16 @@
     },
     "@margoengine/machinery": {
       ".": {
-        "raw": 92157,
-        "gzip": 40493
+        "raw": 98903,
+        "gzip": 42703
       },
       "./cad": {
-        "raw": 30627,
-        "gzip": 11654
+        "raw": 37352,
+        "gzip": 14037
       },
       "./cad-async": {
-        "raw": 3028,
-        "gzip": 1474
+        "raw": 9877,
+        "gzip": 4030
       },
       "./kinematics": {
         "raw": 8041,
@@ -412,6 +412,10 @@
       "./dimensions": {
         "raw": 9268,
         "gzip": 4051
+      },
+      "dist/workers/brep-runtime.js": {
+        "raw": 110003,
+        "gzip": 37972
       },
       "dist/workers/cad-runtime.js": {
         "raw": 17555,
@@ -562,16 +566,16 @@
     },
     "@margoengine/post": {
       ".": {
-        "raw": 63552,
-        "gzip": 17925
+        "raw": 63903,
+        "gzip": 17990
       },
       "./bloom": {
-        "raw": 15847,
-        "gzip": 5233
+        "raw": 15971,
+        "gzip": 5283
       },
       "./ssao": {
-        "raw": 25963,
-        "gzip": 8157
+        "raw": 26075,
+        "gzip": 8183
       },
       "./scene-fade": {
         "raw": 5820,
@@ -590,8 +594,8 @@
         "gzip": 4118
       },
       "./ssr": {
-        "raw": 25704,
-        "gzip": 8713
+        "raw": 25819,
+        "gzip": 8736
       }
     },
     "@margoengine/procedural": {
@@ -652,8 +656,8 @@
     },
     "@margoengine/scatter": {
       ".": {
-        "raw": 34575,
-        "gzip": 11274
+        "raw": 34691,
+        "gzip": 11344
       }
     },
     "@margoengine/scenery": {
@@ -762,8 +766,8 @@
     },
     "@margoengine/terrain": {
       ".": {
-        "raw": 25668,
-        "gzip": 8832
+        "raw": 25757,
+        "gzip": 8880
       }
     },
     "@margoengine/text": {
@@ -890,9 +894,9 @@
       "brotli": 4546
     },
     "packages/machinery/dist/cad.js": {
-      "raw": 31637,
-      "gzip": 12094,
-      "brotli": 10846
+      "raw": 38362,
+      "gzip": 14460,
+      "brotli": 12967
     },
     "packages/scenery/dist/sky.js": {
       "raw": 19166,
@@ -923,6 +927,11 @@
       "raw": 17489,
       "gzip": 7080,
       "brotli": 6390
+    },
+    "packages/machinery/dist/workers/brep-runtime.js": {
+      "raw": 109108,
+      "gzip": 37896,
+      "brotli": 32870
     },
     "packages/machinery/dist/workers/occt-import-js.js": {
       "raw": 97856,
