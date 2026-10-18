@@ -17,7 +17,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/animator | `.` 10 |  |  | 4,862 |
 | @margoengine/audio | `.` 17 | 2 |  | 6,661 |
 | @margoengine/blender | `.` 5 |  |  | 2,890 |
-| @margoengine/brep | `.` 76 | 4 |  | 38,139 |
+| @margoengine/brep | `.` 76 | 4 |  | 49,758 |
 | @margoengine/bvh | `.` 51 |  |  | 15,349 |
 | @margoengine/cache | `.` 5 |  |  | 2,421 |
 | @margoengine/cameras | `.` 3, `./origin` 3 |  |  | 1,674 |
