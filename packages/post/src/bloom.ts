@@ -10,6 +10,7 @@ import {
   type DrawOptions,
 } from '@margoengine/core/extension';
 import { displayShader } from '../../shared/display.js';
+import { margoError } from '../../shared/errors.js';
 import { render } from '../../shared/gpu.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
@@ -107,7 +108,8 @@ const linear = composite.replace(
   'return vec4f(max(hdr,vec3f(0))*exp2(settings.y),s.a);',
 );
 // The display transform must be gone, or an HDR stage would hand the next effect display-encoded colour.
-if (linear.includes('toDisplay(hdr')) throw new Error('Bloom: the HDR composite still encodes for display');
+if (linear.includes('toDisplay(hdr'))
+  throw margoError('failed', 'Bloom: the HDR composite still encodes for display; update its linear-output patch');
 /** One dispatch of the chain: pipeline, bind group, workgroups across and down. */
 type Step = [GPUComputePipeline, GPUBindGroup, number, number];
 /** Bind group whose entry i is resource i; holes are bindings the entry point does not use. */

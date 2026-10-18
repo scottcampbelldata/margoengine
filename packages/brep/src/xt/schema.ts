@@ -145,7 +145,7 @@ const parse = (spec: string): XTField[] =>
   spec.split(/\s+/).map((f) => {
     const [name, type] = f.split(':'),
       m = /^(\w)(?:\[(\d*)\])?$/.exec(type);
-    if (!m) throw new Error(`bad field ${f}`);
+    if (!m) throw new TypeError(`Parasolid schema: field ${f} is not name:type[count]; fix the schema table`);
     return { name, type: m[1], count: m[2] === undefined ? 0 : m[2] === '' ? 1 : Number(m[2]) };
   });
 

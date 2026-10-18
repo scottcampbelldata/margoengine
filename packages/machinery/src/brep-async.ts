@@ -2,6 +2,7 @@
 // out bodies largest first, and each body's parts join the scene the moment its mesh arrives.
 import { Geometry, PbrMaterial, type Engine, type Mesh } from '@margoengine/core/extension';
 import { checkCount, countLimit } from '../../shared/limits.js';
+import { margoError } from '../../shared/errors.js';
 import type { CADModel, CADRefineOptions } from './cad.js';
 import type { CADImportOptions } from './cad-async.js';
 
@@ -137,7 +138,11 @@ export function parseSTEPWithMargo(
       if (body !== undefined) worker.postMessage({ body });
     };
     const finish = () => {
-      if (!root || !meshes.length) throw new Error('CAD contains no geometry');
+      if (!root || !meshes.length)
+        throw margoError(
+          'failed',
+          'CAD contains no geometry; check the file holds solids, shells or tessellated faces',
+        );
       root.visible = true;
       options.onProgress?.(100);
       // The primary worker read the whole file and stays for refining; the others end.
@@ -325,7 +330,7 @@ export function parseSTEPWithMargo(
         const message = event.data;
         try {
           options.signal?.throwIfAborted();
-          if (engine.disposed) throw new Error('Engine is disposed');
+          if (engine.disposed) throw margoError('disposed', 'Engine is disposed; load CAD into a live engine');
           if (!message || typeof message !== 'object') throw new TypeError('Invalid CAD worker message');
           if (message.fatal)
             throw new (message.kind === 'RangeError' ? RangeError : message.kind === 'TypeError' ? TypeError : Error)(

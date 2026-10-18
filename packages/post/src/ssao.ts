@@ -11,6 +11,7 @@ import {
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { viewMatrix } from '../../shared/view.js';
 import { preset } from '../../shared/preset.js';
+import { margoError } from '../../shared/errors.js';
 import { orthographic } from '../../shared/projection.js';
 import { fullscreen, render, group as bind } from '../../shared/gpu.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
@@ -18,7 +19,7 @@ import { extractShader, ssaoShader, blurShader, compositeShader } from './shader
 const linearComposite = compositeShader.replace('return vec4f(toDisplay(c),s.a);', 'return vec4f(c,s.a);');
 // The display transform must be gone, or an HDR stage would hand the next effect display-encoded colour.
 if (linearComposite.includes('vec4f(toDisplay(c)'))
-  throw new Error('SSAO: the HDR composite still encodes for display');
+  throw margoError('failed', 'SSAO: the HDR composite still encodes for display; update its linear-output patch');
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number };
 declare const GPUTextureUsage: {
   RENDER_ATTACHMENT: number;

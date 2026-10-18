@@ -97,6 +97,7 @@ export { Body, Coedge, Edge, Face, History, Loop, Shell, Vertex } from './model/
 export type { HistoryEntry, Name } from './model/topology.js';
 export { frameOf, curveEvaluator, surfaceEvaluator } from './model/geometry.js';
 export type { CurveDef, Frame, SurfaceDef } from './model/geometry.js';
+export type { WriterSpline } from './step/write.js';
 export { box, cylinder, extrude, sphere, torus } from './model/build.js';
 export type { Profile, ProfileSegment } from './model/build.js';
 export { validateBody } from './model/validate.js';
