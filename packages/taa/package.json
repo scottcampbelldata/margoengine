@@ -4,11 +4,6 @@
   "type": "module",
   "license": "MIT",
   "description": "Optional temporal anti-aliasing with motion vectors and YCoCg history clamping.",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/taa"
-  },
   "publishConfig": {
     "access": "public"
   },
