@@ -36,9 +36,12 @@ ${records.join('\n')}
   return Uint8Array.from(text, (c) => c.charCodeAt(0));
 }
 
-/** A JT file of the test assembly; the LSG segment zlib-compressed (JT 9.5) or as `lzma` gives it (JT 10). */
-function file(version, little, lzma, split = false) {
-  const options = { version, little, jt10: version >= 10 };
+/**
+ * A JT file of the test assembly; the LSG segment zlib-compressed (JT 9.5) or as `lzma` gives it (JT 10), the shape's
+ * LOD in a segment of type `shapeType`.
+ */
+function file(version, little, lzma, split = false, shapeType = 7) {
+  const options = { version, little, jt10: version >= 10, shapeType };
   return jtFile(options, [
     {
       id: SEG.lsg,
@@ -46,7 +49,7 @@ function file(version, little, lzma, split = false) {
       data: packed(little, lsgStream(options), lzma ? { lzma } : { zlib: true }),
     },
     { id: SEG.xt, type: 17, data: packed(little, xtElement(options, disc()), { zlib: version < 10 }) },
-    { id: SEG.lod, type: 7, data: lodElement(options, { split }) },
+    { id: SEG.lod, type: shapeType, data: lodElement(options, { split }) },
   ]);
 }
 
@@ -185,9 +188,15 @@ test('JT 9.5: a tri-strip LOD decodes through the topology coder, one vertex rec
     assert.deepEqual(model.warnings, []);
     checkMesh(model.parts[0].shapes[0].mesh, 12);
   }
-  // A damaged topology stream fails its hash: the shape is left out with a warning.
+  // A plain shape segment (type 6) is not compressed: it starts with the element, as in real files.
+  const plain = parseJT(file(9.5, true, undefined, false, 6));
+  assert.deepEqual(plain.warnings, []);
+  assert.deepEqual(plain.parts[0].shapes[0].lods[0].segmentType, 6);
+  checkMesh(plain.parts[0].shapes[0].mesh, 4);
+  // Coordinates that do not match their stored hash (the file's last 6 bytes are the hash and a version): the shape is
+  // left out with a warning.
   const bytes = file(9.5, true),
-    at = bytes.length - 40;
+    at = bytes.length - 6;
   bytes[at] ^= 0x10;
   const model = parseJT(bytes);
   assert.equal(model.parts[0].shapes[0].mesh, undefined);

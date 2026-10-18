@@ -1,7 +1,8 @@
 // JT integer coding, from the JT File Format Reference 9.5: Int32 Compressed Data Packets Mk. 2 (8.1.2, used by JT 9
-// meshes) with the arithmetic codec (8.2.3, Appendix C 3.2) and the chopper, the residual predictors (Appendix C 1.3),
-// and the lookup hash the format stores to check decoded data (Appendix D). Mk. 1 packets, with the bit-length codec,
-// appear only in the JT B-rep, wireframe and ULP segments, which are not read; their decoder is in commit c91ebc0.
+// meshes) with the arithmetic codec (8.2.3, Appendix C 3.2), the bit-length codec (as real files write it; the text
+// leaves it part-defined) and the chopper, the residual predictors (Appendix C 1.3), and the lookup hash the format
+// stores to check decoded data (Appendix D). Mk. 1 packets appear only in the JT B-rep, wireframe and ULP segments,
+// which are not read; their decoder is in commit c91ebc0.
 //
 // This software reads the JT Data Format as described in the Siemens JT File Format Reference and ISO 14306. Copyright
 // in the JT data structures and operators is owned by Siemens Product Lifecycle Management Software Inc. (Siemens
@@ -176,8 +177,11 @@ export function int32Packet2(r: JTReader, depth = 0): Int32Array {
     for (let i = 0; i < count; i++) out[i] = ((lsb[i] | (shift >= 32 ? 0 : msb[i] << shift)) + bias) | 0;
     return out;
   }
-  const bits = r.i32(),
-    words = r.vecU32();
+  // The code text's length in bits, then its words: the files carry no separate word count.
+  const bits = r.i32();
+  if (bits < 0 || bits > r.left * 8) fail(`Int32 Mk. 2 code text of ${bits} bits at byte ${r.at - 4}`);
+  const words = new Uint32Array(Math.ceil(bits / 32));
+  for (let i = 0; i < words.length; i++) words[i] = r.u32();
   if (codec === NULL_CODEC) {
     if (words.length < count) fail(`null-coded packet holds ${words.length} of ${count} values`);
     return new Int32Array(words.buffer, words.byteOffset, count);
@@ -189,11 +193,54 @@ export function int32Packet2(r: JTReader, depth = 0): Int32Array {
     if (values.length !== count) fail(`Int32 Mk. 2 packet decoded ${values.length} of ${count} values`);
     return values;
   }
-  if (codec === BITLENGTH)
-    throw new RangeError(
-      'JT bit-length Mk. 2 coding is not supported yet (the published text leaves part of it undefined); the file needs another JT exporter or version',
-    );
+  if (codec === BITLENGTH) return bitLength2(words, bits, count);
   return fail(`Int32 Mk. 2 packet codec ${codec}`);
+}
+
+/** Bits needed for `x` as an unsigned number. */
+const bitsize = (x: number) => 32 - Math.clz32(x);
+
+/**
+ * Bit-length decoding of Mk. 2 packets, as real JT 9.5 and 10 files write it. A tag bit picks the scheme. Fixed width
+ * (0): the bit counts of the minimum and maximum (U{6} each), the two values (signed, that many bits), then each value
+ * less the minimum in bitsize(max - min) bits. Variable width (1, the JT 10 text's annex B): the mean (I32), the bits
+ * of a width change and of a run length (U{3} each, 4 and 4 in the files seen), then blocks of a signed width change
+ * (repeated while it is at either end of its range), a run length and the run's values less the mean, signed, in the
+ * current width.
+ */
+function bitLength2(words: Uint32Array, bits: number, count: number): Int32Array {
+  const b = new CodeBits(words),
+    out = new Int32Array(count),
+    signed = (n: number) => (n === 0 ? 0 : n >= 32 ? b.bits(32) | 0 : (b.bits(n) << (32 - n)) >> (32 - n));
+  if (b.bit() === 0) {
+    const minBits = b.bits(6),
+      maxBits = b.bits(6),
+      min = signed(minBits),
+      max = signed(maxBits),
+      width = bitsize((max - min) >>> 0);
+    for (let i = 0; i < count; i++) out[i] = (b.bits(width) + min) | 0;
+  } else {
+    const mean = signed(32),
+      deltaBits = b.bits(3),
+      runBits = b.bits(3),
+      up = 2 ** (deltaBits - 1) - 1,
+      down = -(2 ** (deltaBits - 1));
+    if (deltaBits === 0 || runBits === 0) fail(`bit-length blocks of ${deltaBits} and ${runBits} bits`);
+    let width = 0;
+    for (let i = 0; i < count; ) {
+      let delta: number;
+      do {
+        delta = signed(deltaBits);
+        width += delta;
+      } while (delta === up || delta === down);
+      if (width < 0 || width > 32) fail(`bit-length field width ${width}`);
+      if (b.at > bits) fail(`bit-length code text of ${bits} bits holds ${i} of ${count} values`);
+      const run = b.bits(runBits);
+      for (let k = 0; k < run && i < count; k++, i++) out[i] = (signed(width) + mean) | 0;
+    }
+  }
+  if (b.at > bits) fail(`bit-length code text of ${bits} bits read to bit ${b.at}`);
+  return out;
 }
 
 /** Residual predictors (Appendix C 1.3). */
@@ -266,8 +313,8 @@ function mix(s: Uint32Array) {
 }
 
 /**
- * The format's hash of 32-bit words (Appendix D `hash32`): Jenkins' hash of the words' little-endian bytes, taken three
- * words at a time, with the byte length folded in.
+ * The format's hash of 32-bit words (Appendix D `hash32`, Jenkins' `hash2`): the words taken three at a time, then
+ * the length folded in, counted in words as real files do.
  */
 export function hash32(words: ArrayLike<number>, seed: number): number {
   const s = new Uint32Array([0x9e3779b9, 0x9e3779b9, seed]),
@@ -279,7 +326,7 @@ export function hash32(words: ArrayLike<number>, seed: number): number {
     s[2] += words[k + 2];
     mix(s);
   }
-  s[2] += n * 4;
+  s[2] += n;
   if (n - k === 2) s[1] += words[k + 1];
   if (n - k >= 1) s[0] += words[k];
   mix(s);

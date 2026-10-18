@@ -37,9 +37,7 @@ Licensing and the notice it must carry: `docs/jt-licensing.md`. Code: `packages/
     the Mk. 2 contexts and the out-of-band packet.
   - Bit-length Mk. 1 (Appendix C 2.1), arithmetic (Appendix C 3.2), residual predictors (Appendix C 1.3), the lookup
     hash (Appendix D; `hash32` is the hash of the words' little-endian bytes, as the appendix says).
-  - Not yet: bit-length Mk. 2 (the JT 10 text calls `nibblerGet`, which it never defines, and gives its block width as
-    4 bits in code and 3 in a comment) and JT 10's packets (escape flag per entry, move-to-front). Both throw a
-    RangeError that names them; settle them on real files, using the stored hashes to confirm a reading.
+  - Bit-length Mk. 2 and JT 10's packets were left for real files (see "Real JT 9.5 meshes" below).
 - `src/jt/mesh.ts`: Tri-Strip Set Shape LOD elements of JT 9: the 22 topology fields with their composite hash, the
   Appendix E decoder (dual vertices are polygons, dual faces mesh vertices; split faces; per-corner attribute masks
   map vertex records to corners), coordinates (quantized codes or float bits, hash checked), normals (Deering codes
@@ -65,10 +63,41 @@ Codex's step-10 samples (NIST models, US public domain, mirrored by Innerscene; 
 - The two NIST parts (socket head cap screw, CTC 02) are literal JT 9.4: the reader refuses them (the patent notice
   covers 9.5 and later; for counsel, docs/jt-licensing.md).
 
+## Real JT 9.5 meshes (2026-10-18)
+
+JT2Go's samples (read in place, never copied): conrod, HandMixer, san2, sextant and Radial_Engine_assm, all literal
+JT 9.5. Every tri-strip shape failed before; now every one decodes with all of its stored hashes (topology, vertex
+coordinates, normals) matching. What real files do that the text and our test writer did not:
+
+- Shape segments (type 6) are not compressed: they start with the element length, with no compression header. Only
+  1-4, 17, 18, 20 and 24 take one (the extracted table's "ZLIB Applied?" column is shifted by a row).
+- Mk. 2 packets give the code text as its bit length followed by ceil(bits / 32) words, with no word count.
+- Bit-length Mk. 2 (read from the bits, no text defines it fully): a tag bit, then fixed width (0): U{6} bit counts
+  of the minimum and maximum, the two values (signed), then each value less the minimum in bitsize(max - min) bits; or
+  variable width (1): I32 mean, U{3} width-change bits and U{3} run-length bits (4 and 4), then blocks of signed width
+  changes (repeated at either end of their range), a run length and the run's values less the mean, signed.
+- `hash32` folds the length in as a word count (Jenkins' `hash2`), not bytes, in every hash the files store.
+
+Checks: each decoded mesh matches the bounding box and surface area its shape node stores in the LSG (worst 0.0002%
+of the box size and 0.03% of the area, over all 237 shapes); Radial_Engine's meshes match its own XT B-reps' bounds to
+within 0.15 mm and their volumes to within 1% on 20 of its 24 parts (the other four are below, under Radial_Engine's
+blends). Triangles stored with normals agree in winding with them on 97.9 to 100% of each file's triangles (at most 1%
+disagree; the rest have zero area). Parse times include decoding every mesh, on this PC.
+
+| File | Shapes decoded | Triangles | Parse (ms) |
+| --- | --- | --- | --- |
+| conrod | 9 / 9 | 15,586 | 37 |
+| HandMixer | 33 / 33 | 312,254 | 331 |
+| san2 | 106 / 106 | 129,067 | 161 |
+| sextant | 58 / 58 | 36,205 | 47 |
+| Radial_Engine_assm | 31 / 31 | 94,014 | 316 |
+
+Open surfaces stay open (conrod's rod axis is a cylinder side without caps), so edges with one triangle, counted by
+position, are not by themselves a defect.
+
 ## Next
 
 - MultiXT segments (type 30) and subordinate XT elements; JT 10 Int32 packets for tessellated shapes.
-- A literal JT 9.5 file and a tessellation-only file to check the JT 9 mesh decoder on (JT2Go's samples).
-- JT 10 packets and bit-length Mk. 2; polygon sets and polylines; colours and texture coordinates if wanted.
+- JT 10 packets; polygon sets and polylines; colours and texture coordinates if wanted.
 - JT B-rep, wireframe and ULP segments, coded with Int32 Mk. 1 packets (bit-length and two-table arithmetic): that
   decoder was written in c91ebc0 and removed unused; bring it back with the first of those segments.

@@ -140,8 +140,11 @@ export interface JTElement {
 /** The end-of-elements marker's object type ID. */
 const END_OF_ELEMENTS = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
 
-/** Segment types whose whole data may be compressed (zlib in JT 9, LZMA in JT 10). */
-const COMPRESSIBLE = new Set([1, 2, 3, 4, 6, 17, 18, 20, 24]);
+/**
+ * Segment types whose whole data may be compressed (zlib in JT 9, LZMA in JT 10). Shape segments (type 6) are not:
+ * real JT 9.5 files start them with the element length.
+ */
+const COMPRESSIBLE = new Set([1, 2, 3, 4, 17, 18, 20, 24]);
 
 /** The file header and table of contents of a JT file. */
 export class JTContainer {

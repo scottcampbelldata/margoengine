@@ -114,9 +114,9 @@ export function note() {
  * The LSG element stream: a root partition over an assembly group (red material) holding two instances (one moved
  * 10 units along x, one turned a quarter about z and moved 20 along y) of part "Disc", whose LOD node offers two
  * tri-strip shapes; then the property atoms and the property table (names, units, the part's XT B-rep and the first
- * shape's LOD segment).
+ * shape's LOD segment, of segment type `shapeType`: 7 for LOD 0, 6 for a plain shape segment).
  */
-export function lsgStream({ jt10, little }) {
+export function lsgStream({ jt10, little, shapeType = 7 }) {
   const b = new Bytes(little),
     ver = (d) => (jt10 ? d.u8(1) : d.i16(1));
   const element = (type, baseType, id, fill) => {
@@ -224,7 +224,7 @@ export function lsgStream({ jt10, little }) {
   str(25, 'JT_LLPROP_XTBREP');
   late(26, SEG.xt, 17);
   str(27, 'JT_LLPROP_SHAPEIMPL');
-  late(28, SEG.lod, 7);
+  late(28, SEG.lod, shapeType);
   str(29, 'CAD_COUNT');
   atom(T.integer, 30, (d) => d.i32(42));
   str(31, 'NOTE');
@@ -252,8 +252,11 @@ export function xtElement({ jt10, little }, xt) {
   return new Bytes(little).i32(d.length).raw(d.bytes).bytes;
 }
 
-/** Jenkins' 1996 hash of bytes, as the format's Appendix D gives it (a byte-wise check on the reader's word-wise one). */
-function jenkins(bytes, seed) {
+/**
+ * Jenkins' 1996 hash of bytes, as the format's Appendix D gives it (a byte-wise check on the reader's word-wise one),
+ * with `length` folded in.
+ */
+function jenkins(bytes, seed, length) {
   const s = new Uint32Array([0x9e3779b9, 0x9e3779b9, seed]);
   const mix = () => {
     let [a, b, c] = s;
@@ -276,7 +279,7 @@ function jenkins(bytes, seed) {
     s[2] += word(k + 8);
     mix();
   }
-  s[2] += bytes.length;
+  s[2] += length;
   const tail = bytes.length - k;
   for (let i = tail - 1; i >= 0; i--) {
     const v = bytes[k + i];
@@ -288,12 +291,12 @@ function jenkins(bytes, seed) {
   return s[2];
 }
 
-/** hash32 of the format: the words' little-endian bytes. */
+/** hash32 of the format: the words' little-endian bytes, the length counted in words (as real files count it). */
 export function hash32(words, seed) {
   const b = new Uint8Array(words.length * 4),
     v = new DataView(b.buffer);
   words.forEach((w, i) => v.setUint32(i * 4, w >>> 0, true));
-  return jenkins(b, seed);
+  return jenkins(b, seed, words.length);
 }
 
 /** hash16 of the format (Appendix D hash3): 16-bit values, two to a word, the length counted in values. */
@@ -331,14 +334,98 @@ export function hash16(values, seed) {
   return s[2];
 }
 
-/** An Int32 Compressed Data Packet Mk. 2 holding `values` uncoded (null codec). */
+/**
+ * An Int32 Compressed Data Packet Mk. 2 holding `values` uncoded (null codec). As in real files, the code text's bit
+ * length is followed by its words with no count of them.
+ */
 function nullPacket(d, values) {
   d.i32(values.length);
   if (!values.length) return;
-  d.u8(0)
-    .i32(values.length * 32)
-    .i32(values.length);
+  d.u8(0).i32(values.length * 32);
   for (const v of values) d.i32(v);
+}
+
+/** Code text bits, most significant bit of each word first. */
+class CodeText {
+  bits = [];
+  put(v, n) {
+    for (let i = n - 1; i >= 0; i--) this.bits.push(Math.floor((v >>> 0) / 2 ** i) % 2);
+  }
+  /** `n` low bits of signed `v`, two's complement. */
+  signed(v, n) {
+    this.put(n >= 32 ? v >>> 0 : (v + 2 ** n) % 2 ** n, n);
+  }
+  write(d) {
+    d.i32(this.bits.length);
+    for (let i = 0; i < this.bits.length; i += 32) {
+      let w = 0;
+      for (let k = 0; k < 32; k++) w = w * 2 + (this.bits[i + k] ?? 0);
+      d.u32(w);
+    }
+  }
+}
+
+/** Bits a signed value needs (two's complement, sign included). */
+const signedBits = (x) => 33 - Math.clz32(x ^ (x >> 31));
+
+/**
+ * An Int32 Compressed Data Packet Mk. 2 bit-length coded as real files write it. Fixed width: tag 0, the bit counts of
+ * the minimum and maximum (6 bits each), the two values, then each value less the minimum. Variable width: tag 1, the
+ * mean (32 bits), the bits of a width change and of a run (3 bits each: 4 and 4), then blocks of width changes (7 or
+ * -8 repeats), a run length up to 15 and the run's values less the mean.
+ */
+function bitLengthPacket(d, values, variable = false) {
+  d.i32(values.length);
+  if (!values.length) return;
+  const c = new CodeText();
+  if (!variable) {
+    const min = Math.min(...values),
+      max = Math.max(...values),
+      width = 32 - Math.clz32(max - min);
+    c.put(0, 1);
+    c.put(signedBits(min), 6);
+    c.put(signedBits(max), 6);
+    c.signed(min, signedBits(min));
+    c.signed(max, signedBits(max));
+    for (const v of values) c.put(v - min, width);
+  } else {
+    const mean = Math.trunc(values.reduce((a, b) => a + b, 0) / values.length);
+    c.put(1, 1);
+    c.signed(mean, 32);
+    c.put(4, 3);
+    c.put(4, 3);
+    let width = 0;
+    for (let i = 0; i < values.length; ) {
+      const target = signedBits(values[i] - mean);
+      let j = i + 1;
+      while (j < values.length && j - i < 15 && signedBits(values[j] - mean) === target) j++;
+      for (; target - width >= 7; width += 7) c.signed(7, 4);
+      for (; target - width <= -8; width -= 8) c.signed(-8, 4);
+      c.signed(target - width, 4);
+      width = target;
+      c.put(j - i, 4);
+      for (; i < j; i++) c.signed(values[i] - mean, width);
+    }
+  }
+  d.u8(1);
+  c.write(d);
+}
+
+/** A chopper packet: `chop` high bits of the biased values and the low bits, each bit-length coded. */
+function chopperPacket(d, values, chop, bias) {
+  const biased = values.map((v) => v - bias),
+    span = 32 - Math.clz32(Math.max(...biased)),
+    low = span - chop;
+  d.i32(values.length).u8(4).u8(chop).i32(bias).u8(span);
+  bitLengthPacket(
+    d,
+    biased.map((v) => Math.floor(v / 2 ** low)),
+  );
+  bitLengthPacket(
+    d,
+    biased.map((v) => v % 2 ** low),
+    true,
+  );
 }
 
 /**
@@ -394,7 +481,7 @@ function arithmeticPacket(d, values, table, escape) {
     for (let k = 0; k < 32; k++) w = w * 2 + (code[i + k] ?? 0);
     words.push(w);
   }
-  d.i32(values.length).u8(3).i32(code.length).i32(words.length);
+  d.i32(values.length).u8(3).i32(code.length);
   for (const w of words) d.u32(w);
   // The context table: bit fields packed most significant bit first.
   const min = Math.min(...entries.map((e) => e.value)),
@@ -420,8 +507,8 @@ function arithmeticPacket(d, values, table, escape) {
 /**
  * A Tri-Strip Set Shape LOD element: a closed tetrahedron on the corners (0,0,0), (1,0,0), (0,1,0), (0,0,1) (in file
  * units), as the JT 9 topology coder writes it: four dual vertices of valence 3 (the triangles, one face group each)
- * and four dual faces of degree 3 (the corners), every packet null-coded. `split` attribute bits per corner give 1
- * vertex record per corner (smooth) or 3 (one per triangle).
+ * and four dual faces of degree 3 (the corners), the packets null-, bit-length-, chopper- and arithmetic-coded. `split`
+ * attribute bits per corner give 1 vertex record per corner (smooth) or 3 (one per triangle).
  */
 export function lodElement({ little }, { split = false } = {}) {
   const d = new Bytes(little),
@@ -435,11 +522,15 @@ export function lodElement({ little }, { split = false } = {}) {
     groups = [0, 1, 2, 3],
     flags = [0, 0, 0, 0],
     masks = [[], [mask, mask, mask, mask], [], [], [], [], [], []];
-  for (const list of degrees) nullPacket(d, list);
-  nullPacket(d, valences);
-  nullPacket(d, groups);
+  bitLengthPacket(d, degrees[0]);
+  bitLengthPacket(d, degrees[1], true);
+  for (const list of degrees.slice(2)) nullPacket(d, list);
+  bitLengthPacket(d, valences);
+  bitLengthPacket(d, groups, true);
   nullPacket(d, flags);
-  for (const list of masks) nullPacket(d, list);
+  nullPacket(d, masks[0]);
+  chopperPacket(d, masks[1], 1, 0);
+  for (const list of masks.slice(2)) nullPacket(d, list);
   nullPacket(d, []);
   nullPacket(d, []);
   d.i32(0); // high-degree masks
@@ -464,10 +555,10 @@ export function lodElement({ little }, { split = false } = {}) {
   d.i32(4).u8(3);
   for (let c = 0; c < 3; c++) d.f32(0, 1).u8(10);
   let hc = 0;
-  // x arithmetic-coded (1023 escaped to the out-of-band values), y and z null-coded.
+  // x arithmetic-coded (1023 escaped to the out-of-band values), y null-coded, z chopped.
   arithmeticPacket(d, codes[0], [[0, 3]], 1);
   nullPacket(d, codes[1]);
-  nullPacket(d, codes[2]);
+  chopperPacket(d, codes[2], 2, 0);
   for (const list of codes) hc = hash32(list, hc);
   d.u32(hc);
   d.i16(1); // tri-strip set shape LOD version
