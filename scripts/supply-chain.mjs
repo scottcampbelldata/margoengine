@@ -4,7 +4,7 @@
 // release (docs/releasing.md):
 //   node scripts/supply-chain.mjs          rewrite THIRD-PARTY-NOTICES.md
 //   node scripts/supply-chain.mjs --check  exit 1 when the file is stale or a rule below is broken
-// Rules: every published manifest has license/repository/files/exports/sideEffects and is not private; every
+// Rules: every published manifest has license/files/exports/sideEffects and is not private; every
 // external runtime dependency or peer has a reason in WHY, a licence on ALLOWED (or a named exception), no install
 // script, no deprecation, a registry.npmjs.org URL with an integrity hash, and is imported by the package's code
 // (a build-time tool listed as a runtime dependency fails). npm audit needs the registry, so it is a release step,
@@ -16,7 +16,6 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(import.meta.dirname, '..');
 const read = (path) => readFileSync(join(root, path), 'utf8');
 const json = (path) => JSON.parse(read(path));
-const REPOSITORY = 'git+https://github.com/scottcampbelldata/margoengine.git';
 export const OUTPUT = 'THIRD-PARTY-NOTICES.md';
 
 /** Licences any runtime dependency may carry without review. */
@@ -180,15 +179,13 @@ export function collect() {
   for (const { dir, manifest } of publishedPackages()) {
     const name = manifest.name,
       bin = manifest.bin && !manifest.exports;
-    const need = ['license', 'repository', 'files', 'version', ...(bin ? [] : ['exports', 'sideEffects'])];
+    const need = ['license', 'files', 'version', ...(bin ? [] : ['exports', 'sideEffects'])];
     for (const field of need) if (manifest[field] === undefined) problems.push(`${name}: no "${field}"`);
     if (manifest.private) problems.push(`${name}: "private": true on a published package`);
     const expectedLicense = name === '@margoengine/materials' ? 'MIT AND Apache-2.0' : 'MIT';
     if (manifest.license !== expectedLicense)
       problems.push(`${name}: license ${manifest.license}, expected ${expectedLicense}`);
     if (manifest.publishConfig?.access !== 'public') problems.push(`${name}: publishConfig.access is not "public"`);
-    if (manifest.repository?.url !== REPOSITORY || manifest.repository?.directory !== dir)
-      problems.push(`${name}: repository must be ${REPOSITORY} with directory ${dir} (npm --provenance checks it)`);
     for (const f of manifest.files ?? [])
       if (/^(src|tests?|fixtures|scripts)\b/.test(f)) problems.push(`${name}: "files" ships ${f}`);
     const code = codeOf(dir, manifest)

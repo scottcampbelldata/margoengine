@@ -116,6 +116,6 @@ SSR emits an accessible canvas without accessing GPU APIs. The ESM output preser
 
 Run `npm run build:packages` followed by `npm run modern:test:react` for React Testing Library/JSDOM lifecycle tests, including the canonical target snippet, StrictMode events, Suspense, cancellation, cache reuse and demand rendering. `npm run typecheck`, `npm run test:modules:packages`, and `npm run measure:size` verify package types, imports, and the core + stage ceiling of 25,000 bytes gzip; the current measurement is 21,107 bytes gzip. Run `npm run dev --workspace @margoengine/react-viewer` for the resizable Vite example. The adapter uses standard hooks, never `react-reconciler`. Frame dispatch forwards `(engine, deltaSeconds)` without building per-frame state objects or callback arrays.
 
-See the [React API and lifecycle guide](https://github.com/scottcampbelldata/margoengine/blob/main/MODERN-ENGINE.md).
+See the React API and lifecycle guide.
 
 MIT licensed.
