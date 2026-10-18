@@ -15,7 +15,7 @@ before(async () => {
 });
 after(() => new Promise((resolve) => server.close(resolve)));
 
-test('catalog covers every public package with matching versions, imports and repository links', async () => {
+test('catalog covers every public package with matching versions and imports, and no repository links', async () => {
   for (const id of await readdir(new URL('../packages/', import.meta.url))) {
     let manifest;
     try {
@@ -33,7 +33,8 @@ test('catalog covers every public package with matching versions, imports and re
     assert.ok(entry.install.includes(`${manifest.name}@${manifest.version}`));
     const runtime = await import(new URL(`../packages/${id}/dist/index.js`, import.meta.url));
     assert.deepEqual(entry.exports, Object.keys(runtime).sort());
-    assert.ok(manifest.repository.url.endsWith('/margoengine.git'));
+    // The source repository is private: manifests link to no repository (main, 2026-10-18).
+    assert.equal(manifest.repository, undefined, `${manifest.name} names a repository`);
   }
   assert.equal(new Set(entries.map((entry) => entry.package)).size, entries.length);
 });
