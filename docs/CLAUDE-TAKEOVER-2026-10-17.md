@@ -51,7 +51,7 @@ inventory). The handoff's opening "Where things are" section is stale (it still 
 7. **Versions:** all 74 packages + `create-margo` + `margo-convert` ship in lockstep at **1.0.0**; every internal range
    is `^1.0.0`. `node scripts/set-version.mjs <x.y.z>` moves them all; `tests/versions.test.js` fails on drift.
 8. **Security contact:** `security@margoengine.com` (Scott's decision), with GitHub private vulnerability reporting as
-   the preferred channel. Never put `` in the repo.
+   the preferred channel. Never put the owner's business email address in the repo.
 9. **Licences:** OpenCascade (LGPL-2.1) source offer = Scott's fork https://github.com/scottcampbelldata/occt-import-js
    (tag 0.0.23 = c2148e5) + the pinned upstream OCCT commit d2abb6d (OCCT 7.6.1) on Open-Cascade-SAS's GitHub. Do NOT
    mirror the OCCT repo itself (Scott decided that is enough).

@@ -2406,7 +2406,7 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    Tarballs (npm pack --dry-run of all 75, after build:packages): no surprises; only package.json, README, LICENSE,
    NOTICE.md (post, tonemap, text), blender's FORMAT.md and dist/. The OCCT .wasm/.js contain the upstream
    author's build paths (`C:/Users/vkovacs/...` in assert strings), not ours. Secrets scan (tracked files, all
-   history, built dist): no tokens, keys, .npmrc/.env files or email addresses in files; 
+   history, built dist): no tokens, keys, .npmrc/.env files or email addresses in files; the owner's business email
    appears only as the git author email of 389 commits (public once pushed; set user.email to the GitHub noreply
    address for future commits if that matters). `margo-convert` gained `sideEffects: false`; create-margo is
    bin-only (no exports). Root `publish:packages` (a local live publish) became `publish:dry-run`; README points to
