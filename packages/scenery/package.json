@@ -4,11 +4,6 @@
   "type": "module",
   "license": "MIT",
   "description": "Procedural moonlit skies and scenery passes for Margo Engine.",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/scenery"
-  },
   "publishConfig": {
     "access": "public"
   },
