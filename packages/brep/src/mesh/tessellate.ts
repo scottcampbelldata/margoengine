@@ -198,6 +198,15 @@ export class Tessellator {
         out = samples.map((t) => c.at(t).slice(0, 3) as XYZ);
         out[0] = p1;
         out[out.length - 1] = p2;
+        // Samples a rounding error apart (a knot or pole a hair from an end, MTC's thread helices) would be two points
+        // where the neighbouring face has one: within the faces' collapse distance of the last kept point or of the
+        // end vertex, a sample is dropped. Every face reads these same points.
+        const tiny = deflection * 1e-4,
+          kept = [p1];
+        for (let i = 1; i < out.length - 1; i++) if (distance(out[i], kept[kept.length - 1]) > tiny) kept.push(out[i]);
+        while (kept.length > 1 && distance(kept[kept.length - 1], p2) <= tiny) kept.pop();
+        kept.push(p2);
+        out = kept;
       }
     }
     this.edges.set(id, out);
