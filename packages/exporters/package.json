@@ -4,11 +4,6 @@
   "type": "module",
   "license": "MIT",
   "description": "glTF/GLB, STL, OBJ and PLY exporters for Margo Engine scenes and geometry data.",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/exporters"
-  },
   "publishConfig": {
     "access": "public"
   },

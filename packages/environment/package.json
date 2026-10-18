@@ -4,11 +4,6 @@
   "type": "module",
   "license": "MIT",
   "description": "HDR/EXR/UltraHDR loading, image-based lighting (prefiltered specular, SH irradiance, BRDF LUT) applied to meshes and glTF models, environment and color backgrounds, and scene fog for Margo Engine on WebGPU.",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/environment"
-  },
   "publishConfig": {
     "access": "public"
   },
