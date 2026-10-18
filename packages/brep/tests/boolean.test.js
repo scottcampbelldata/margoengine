@@ -1,0 +1,198 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import {
+  boolean,
+  bodiesToSTEP,
+  box,
+  curveSurfaceCrossings,
+  cylinder,
+  frameOf,
+  History,
+  meshBodies,
+  orient3d,
+  parseSTEP,
+  sphere,
+  validateBody,
+} from '../dist/index.js';
+
+const mm = 0.001,
+  at = (x, y, z, axis = [0, 0, 1], dir = [1, 0, 0]) => frameOf([x * mm, y * mm, z * mm], axis, dir);
+
+/** Volume, area and open edges of a mesh, vertices joined where positions are equal. */
+function measure(m) {
+  const p = m.positions,
+    t = m.indices,
+    ids = new Map(),
+    weld = (i) => {
+      const key = `${p[i * 3]},${p[i * 3 + 1]},${p[i * 3 + 2]}`;
+      if (!ids.has(key)) ids.set(key, ids.size);
+      return ids.get(key);
+    },
+    directed = new Map();
+  let volume = 0,
+    area = 0;
+  for (let k = 0; k < t.length; k += 3) {
+    const [a, b, c] = [t[k], t[k + 1], t[k + 2]].map((i) => [p[i * 3], p[i * 3 + 1], p[i * 3 + 2]]);
+    volume +=
+      (a[0] * (b[1] * c[2] - b[2] * c[1]) + a[1] * (b[2] * c[0] - b[0] * c[2]) + a[2] * (b[0] * c[1] - b[1] * c[0])) /
+      6;
+    const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
+      v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    area += Math.hypot(u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]) / 2;
+    const w = [t[k], t[k + 1], t[k + 2]].map(weld);
+    for (const [x, y] of [
+      [w[0], w[1]],
+      [w[1], w[2]],
+      [w[2], w[0]],
+    ])
+      directed.set(`${x},${y}`, (directed.get(`${x},${y}`) ?? 0) + 1);
+  }
+  let open = 0;
+  for (const [key, count] of directed) {
+    const [x, y] = key.split(',');
+    if (count !== 1 || directed.get(`${y},${x}`) !== 1) open++;
+  }
+  return { volume, area, open };
+}
+
+/** Checks a Boolean result is a valid closed solid of the expected volume and area (mm^3, mm^2). */
+function solid(body, volume, area) {
+  assert.deepEqual(validateBody(body), []);
+  const [mesh] = meshBodies([body], { deflection: 1e-6, angle: 0.1 }).meshes,
+    r = measure(mesh);
+  assert.deepEqual(mesh.failures, []);
+  assert.equal(r.open, 0, 'closed');
+  assert.ok(Math.abs(r.volume / mm ** 3 - volume) <= 1e-3 * volume, `volume ${r.volume / mm ** 3} vs ${volume}`);
+  assert.ok(Math.abs(r.area / mm ** 2 - area) <= 1e-3 * area, `area ${r.area / mm ** 2} vs ${area}`);
+}
+
+test('Booleans: two overlapping boxes unite, subtract and intersect exactly', () => {
+  // 10 mm cubes, the second moved 5 mm along each axis: they share a 5 mm cube.
+  const a = () => box('a', [10 * mm, 10 * mm, 10 * mm]),
+    b = () => box('b', [10 * mm, 10 * mm, 10 * mm], at(5, 5, 5));
+  solid(boolean('u', 'union', a(), b()), 1875, 1050);
+  solid(boolean('s', 'subtract', a(), b()), 875, 600);
+  solid(boolean('i', 'intersect', a(), b()), 125, 150);
+});
+
+test('Booleans: a hole through a box, a boss on it, a spherical pocket, and two holes one after another', () => {
+  const block = () => box('a', [10 * mm, 10 * mm, 10 * mm]),
+    r = 2.5;
+  solid(
+    boolean('hole', 'subtract', block(), cylinder('c', r * mm, 20 * mm, at(5, 5, -5))),
+    1000 - Math.PI * r * r * 10,
+    600 - 2 * Math.PI * r * r + 2 * Math.PI * r * 10,
+  );
+  solid(
+    boolean('boss', 'union', block(), cylinder('c', r * mm, 10 * mm, at(5, 5, 5))),
+    1000 + Math.PI * r * r * 5,
+    600 + 2 * Math.PI * r * 5,
+  );
+  // A 4 mm ball centred on the top face leaves a hemispherical pocket.
+  solid(
+    boolean('pocket', 'subtract', block(), sphere('s', 4 * mm, at(5, 5, 10))),
+    1000 - (2 / 3) * Math.PI * 64,
+    600 - Math.PI * 16 + 2 * Math.PI * 16,
+  );
+  const once = boolean(
+      'h1',
+      'subtract',
+      box('a', [20 * mm, 10 * mm, 10 * mm]),
+      cylinder('c1', 2 * mm, 20 * mm, at(5, 5, -5)),
+    ),
+    twice = boolean('h2', 'subtract', once, cylinder('c2', 3 * mm, 20 * mm, at(14, 5, -5)));
+  solid(twice, 2000 - Math.PI * (4 + 9) * 10, 1000 - 2 * Math.PI * (4 + 9) + 2 * Math.PI * (2 + 3) * 10);
+});
+
+test('Booleans: a sphere cut by a plane keeps its cap or the rest; a cavity is a second shell, written as a void', () => {
+  // A 10 mm ball against a block from x = 3 mm: the cap is 7 mm high, its flat face of radius^2 = 100 - 9.
+  const ball = () => sphere('s', 10 * mm),
+    block = () => box('b', [30 * mm, 40 * mm, 40 * mm], at(3, -20, -20)),
+    h = 7,
+    capVolume = (Math.PI * h * h * (30 - h)) / 3,
+    disc = Math.PI * 91;
+  solid(boolean('cap', 'intersect', ball(), block()), capVolume, 2 * Math.PI * 10 * h + disc);
+  solid(
+    boolean('rest', 'subtract', ball(), block()),
+    (4 / 3) * Math.PI * 1000 - capVolume,
+    4 * Math.PI * 100 - 2 * Math.PI * 10 * h + disc,
+  );
+  const hollow = boolean(
+    'hollow',
+    'subtract',
+    box('a', [10 * mm, 10 * mm, 10 * mm]),
+    box('b', [5 * mm, 5 * mm, 5 * mm], at(2.5, 2.5, 2.5)),
+  );
+  assert.equal(hollow.shells.length, 2);
+  assert.equal(hollow.shells.filter((s) => s.outer).length, 1);
+  solid(hollow, 875, 750);
+  assert.match(bodiesToSTEP([hollow]), /BREP_WITH_VOIDS\('hollow'/);
+  assert.deepEqual(
+    parseSTEP(bodiesToSTEP([hollow])).bodies.map((x) => [x.kind, x.faces.length]),
+    [['solid', 12]],
+  );
+});
+
+test('Booleans: names survive, splits and new edges are recorded, and STEP keeps the names', () => {
+  const history = new History(),
+    result = boolean(
+      'drill',
+      'subtract',
+      box('a', [10 * mm, 10 * mm, 10 * mm]),
+      cylinder('c', 2.5 * mm, 20 * mm, at(5, 5, -5)),
+      { history },
+    );
+  assert.deepEqual(result.faces.map((f) => f.name).sort(), [
+    'a/face:+x',
+    'a/face:+y',
+    'a/face:+z',
+    'a/face:-x',
+    'a/face:-y',
+    'a/face:-z',
+    'c/face:side',
+  ]);
+  // The top face is still itself (now with a hole); the drill's end caps are gone; the hole's rims are new edges.
+  assert.deepEqual(history.resolve('a/face:+z'), ['a/face:+z']);
+  assert.deepEqual(history.resolve('c/face:+z'), []);
+  assert.deepEqual(history.generatedFrom('c/face:side').sort(), [
+    'drill/edge:a/face:+z|c/face:side#0',
+    'drill/edge:a/face:-z|c/face:side#0',
+  ]);
+  const { meshes, faceName } = meshBodies([result]);
+  assert.deepEqual(
+    [...new Set(meshes[0].faces.map((f) => faceName(f.id)))].sort(),
+    result.faces.map((f) => f.name).sort(),
+  );
+});
+
+test('Booleans: what is not supported yet throws a RangeError that says so', () => {
+  // Side faces in one plane that overlap.
+  assert.throws(
+    () =>
+      boolean('x', 'union', box('a', [10 * mm, 10 * mm, 10 * mm]), box('b', [10 * mm, 10 * mm, 10 * mm], at(5, 0, 0))),
+    { name: 'RangeError', message: /lie on one surface and overlap: not supported yet/ },
+  );
+  assert.throws(
+    () => boolean('y', 'subtract', sphere('s', 10 * mm), cylinder('c', 3 * mm, 40 * mm, at(-20, 0, 0, [1, 0, 0]))),
+    { name: 'RangeError', message: /not supported yet/ },
+  );
+});
+
+test('exact predicates and crossings: orient3d is exact; crossings closer than any sampling are both found', () => {
+  assert.equal(orient3d([0, 0, 0], [1, 0, 0], [0, 1, 0], [0.3, 0.3, 0]), 0);
+  assert.ok(orient3d([0, 0, 0], [1, 0, 0], [0, 1, 0], [0.3, 0.3, 2 ** -70]) < 0);
+  assert.ok(orient3d([0, 0, 0], [1, 0, 0], [0, 1, 0], [0.3, 0.3, -(2 ** -70)]) > 0);
+  // Large coordinates: the plane x + y + z = 3e15 through three points, a fourth an ulp off it.
+  const big = 1e15;
+  assert.equal(
+    orient3d([big, big, big], [big + 2, big - 1, big - 1], [big - 1, big + 2, big - 1], [big + 1, big + 1, big - 2]),
+    0,
+  );
+  // A line passing 1 nm inside a 10 mm ball crosses it twice, 2 * sqrt(2 * 10 mm * 1 nm) = 8.9 um apart.
+  const ball = { kind: 'sphere', frame: frameOf([0, 0, 0], [0, 0, 1]), radius: 0.01 },
+    line = { kind: 'line', origin: [-0.02, 0.01 - 1e-9, 0], direction: [1, 0, 0] },
+    ts = curveSurfaceCrossings(line, ball, 0, 0.04);
+  assert.equal(ts.length, 2);
+  const half = Math.sqrt(0.01 ** 2 - (0.01 - 1e-9) ** 2);
+  assert.ok(Math.abs(ts[0] - (0.02 - half)) < 1e-12 && Math.abs(ts[1] - (0.02 + half)) < 1e-12, `${ts}`);
+});

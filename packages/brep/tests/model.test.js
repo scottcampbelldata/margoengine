@@ -114,7 +114,8 @@ test('modeler: an extruded slot (lines and arcs) and an oblique prism', () => {
 test('modeler: persistent names reach the mesh and the history, and STEP round trips keep them', () => {
   const history = new History(),
     b = box('base', [0.01, 0.01, 0.01], frameOf([0, 0, 0], [0, 0, 1], [1, 0, 0]), history);
-  assert.deepEqual(history.resolve('base/profile/+x'), ['base/face:+x']);
+  assert.deepEqual(history.generatedFrom('base/profile/+x'), ['base/face:+x']);
+  assert.deepEqual(history.resolve('base/face:+x'), ['base/face:+x']);
   const { meshes, faceName } = meshBodies([b]),
     names = meshes[0].faces.map((f) => faceName(f.id)).sort();
   assert.deepEqual(names, [

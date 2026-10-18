@@ -1,7 +1,8 @@
 # Margo B-rep kernel: modeling (plan)
 
-Status, 2026-10-17: plan only. The kernel reads and meshes STEP, ACIS SAT and Parasolid XT (`docs/brep-kernel.md`); it
-does not edit shapes yet. Goal (Scott, 2026-10-17): beat OpenCascade on web speed, desktop speed and modeling
+Status, 2026-10-17: stages 1 and 2 done (topology, primitives, extrude, names, STEP export); stage 4 has a first cut
+(Booleans in general position, below). The kernel reads and meshes STEP, ACIS SAT and Parasolid XT
+(`docs/brep-kernel.md`). Goal (Scott, 2026-10-17): beat OpenCascade on web speed, desktop speed and modeling
 features. Clean room as before: published standards, textbooks and papers only; OpenCascade stays a measured reference.
 
 ## Where we stand (measured 2026-10-17, this PC)
@@ -13,7 +14,7 @@ features. Clean room as before: published standards, textbooks and papers only; 
 | Browser download | 25,474 B gzip worker | 7,604,031 B Wasm (occt-import-js) |
 | Formats without paid add-ons | STEP, SAT, Parasolid XT, DXF (loaders) | STEP, IGES |
 | Self-check | file's own volume, area, centre: 16 of 16 match | none |
-| Modeling | none yet | Booleans, fillets, offsets, healing, ... |
+| Modeling | primitives, extrude, Booleans in general position (planes, cylinders, cones, spheres) | Booleans, fillets, offsets, healing, ... |
 
 ## Design choices (where OpenCascade is weakest)
 
@@ -48,3 +49,31 @@ features. Clean room as before: published standards, textbooks and papers only; 
    p-curves: needed for real imported files before Booleans on them.
 7. **Benchmarks against OpenCascade** at each stage: the same operations on the same inputs, time, success rate and
    validity of results (scripts/brep-occt-native.py grows an operations mode).
+
+## Booleans: first cut (2026-10-17)
+
+`boolean(name, 'union' | 'subtract' | 'intersect', a, b, { history })` in `packages/brep/src/model/boolean.ts`:
+
+- Every edge is crossed with the other solid's faces (`curveSurfaceCrossings`: intervals split until the distance at
+  their ends proves no crossing, or narrower than 1e-9 of the curve, so close pairs of crossings are not missed); every
+  face pair is intersected exactly (`intersectSurfaces`: plane with plane, cylinder, sphere, cone at right angles;
+  parallel cylinders); the curves are kept where they lie inside both faces.
+- Faces are split by tracing regions in 3D (sharpest left turn about the face normal at each vertex), so seams and
+  periodic surfaces need no special cases; loops are grouped into faces by which side of every loop a point inside
+  each lies (signed crossings in (u, v), which also handles loops round a cylinder or a sphere's pole axis).
+- Pieces are classified by rays against the other solid's exact faces (three directions, majority); `orient3d` is
+  exact (Shewchuk). The result is checked by `validateBody`; a cavity becomes a second shell, written as
+  `BREP_WITH_VOIDS`.
+- Names: faces and edges that come through keep theirs; a split continues as `<name>#k` (history `modified`);
+  intersection edges are `generated` from their two faces; `History.resolve` follows what a name became and
+  `History.generatedFrom` what was made from it.
+- Measured (tests/boolean.test.js, volume and area against closed forms within 0.1%, 0 open edges): box with box
+  (all three operations), through hole, boss, spherical pocket, two holes in a row, sphere cap and remainder, cavity;
+  2 to 13 ms each in Node.
+- Not yet (each throws a RangeError that says so): faces on one surface that overlap (coplanar boxes), tangent
+  contact, curves through a pole, surface pairs beyond the list above (cylinder with cylinder at an angle, sphere with
+  cylinder, anything with a torus or spline). Next: the general quadric pairs and spline pairs by marching, then
+  coincident faces.
+- Mesher fixes it needed: a face that is a closed surface less its holes (a sphere less a cap), oriented shells and
+  faces (`ORIENTED_CLOSED_SHELL .F.` of a void now turns its faces), and columns of interior points on curved faces with
+  holes (a cylinder wall with a hole made up to 6x the triangles it needed).

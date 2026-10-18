@@ -6,7 +6,7 @@ import { STEPFile, stepText } from '../step/file.js';
 import { readStructure } from '../step/structure.js';
 import { StepWriter } from '../step/write.js';
 import { writeCurve, writeSurface } from './geometry.js';
-import type { Body, Edge, Name, Vertex } from './topology.js';
+import type { Body, Edge, Face, Name, Shell, Vertex } from './topology.js';
 
 const text = (name: Name) => `'${name.replace(/\\/g, '\\\\').replace(/'/g, "''")}'`;
 
@@ -32,26 +32,40 @@ export function bodiesToSTEP(bodies: readonly Body[]): string {
       );
     return id;
   };
+  // A face as written; `inverted` writes it facing the other way (a cavity's faces, which STEP turns back round).
+  const face = (f: Face, inverted: boolean) => {
+    const bounds = f.loops
+      .filter((l) => l.coedges.length)
+      .map((l) => {
+        const oriented = l.coedges.map((c) =>
+          w.add(`ORIENTED_EDGE('',*,*,${edge(c.edge)},${c.forward ? '.T.' : '.F.'})`),
+        );
+        return w.add(`FACE_BOUND('',${w.add(`EDGE_LOOP('',(${oriented.join(',')}))`)},${inverted ? '.F.' : '.T.'})`);
+      });
+    return w.add(
+      `ADVANCED_FACE(${text(f.name)},(${bounds.join(',')}),${writeSurface(w, f.surface)},${f.sense !== inverted ? '.T.' : '.F.'})`,
+    );
+  };
+  const closed = (s: Shell, inverted = false) =>
+    w.add(`CLOSED_SHELL('',(${s.faces.map((f) => face(f, inverted)).join(',')}))`);
   for (const body of bodies)
     for (const shell of body.shells) {
-      const faces = shell.faces.map((f) => {
-        const bounds = f.loops
-          .filter((l) => l.coedges.length)
-          .map((l) => {
-            const oriented = l.coedges.map((c) =>
-              w.add(`ORIENTED_EDGE('',*,*,${edge(c.edge)},${c.forward ? '.T.' : '.F.'})`),
-            );
-            return w.add(`FACE_BOUND('',${w.add(`EDGE_LOOP('',(${oriented.join(',')}))`)},.T.)`);
-          });
-        return w.add(
-          `ADVANCED_FACE(${text(f.name)},(${bounds.join(',')}),${writeSurface(w, f.surface)},${f.sense ? '.T.' : '.F.'})`,
+      if (!shell.faces.length || shell.outer) continue;
+      if (body.kind !== 'solid') {
+        const faces = shell.faces.map((f) => face(f, false));
+        items.push(
+          w.add(`SHELL_BASED_SURFACE_MODEL(${text(body.name)},(${w.add(`OPEN_SHELL('',(${faces.join(',')}))`)}))`),
         );
-      });
-      if (!faces.length) continue;
+        continue;
+      }
+      // A cavity is a closed shell facing out of the empty space, turned round by an oriented shell.
+      const voids = body.shells
+        .filter((s) => s.outer === shell && s.faces.length)
+        .map((s) => w.add(`ORIENTED_CLOSED_SHELL('',*,${closed(s, true)},.F.)`));
       items.push(
-        body.kind === 'solid'
-          ? w.add(`MANIFOLD_SOLID_BREP(${text(body.name)},${w.add(`CLOSED_SHELL('',(${faces.join(',')}))`)})`)
-          : w.add(`SHELL_BASED_SURFACE_MODEL(${text(body.name)},(${w.add(`OPEN_SHELL('',(${faces.join(',')}))`)}))`),
+        voids.length
+          ? w.add(`BREP_WITH_VOIDS(${text(body.name)},${closed(shell)},(${voids.join(',')}))`)
+          : w.add(`MANIFOLD_SOLID_BREP(${text(body.name)},${closed(shell)})`),
       );
     }
   return w.finish(items, { unit: 'm', source: 'Margo modeler' });

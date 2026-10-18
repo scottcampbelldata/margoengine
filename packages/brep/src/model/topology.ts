@@ -84,6 +84,8 @@ export class Face {
 
 export class Shell {
   readonly faces: Face[] = [];
+  /** For a cavity's shell: the shell it lies inside. Its faces face into the cavity, out of the material. */
+  outer?: Shell;
   constructor(public body?: Body) {}
   add(face: Face): Face {
     face.shell = this;
@@ -119,10 +121,15 @@ export class Body {
   }
 }
 
-/** One operation's effect on names: what it made (and from what), what it changed, what it removed. */
+/**
+ * One operation's effect on names: what it made new (and from what), what continued under other names (a face split
+ * by a cut continues as its pieces), and what it removed.
+ */
 export interface HistoryEntry {
   readonly operation: Name;
+  /** New entities and the entities they were made from (a side face from a sketch segment, an edge where two faces met). */
   readonly generated: readonly (readonly [Name, readonly Name[]])[];
+  /** Entities that continue as others: [from, to], several for one `from` when it was split. */
   readonly modified: readonly (readonly [Name, Name])[];
   readonly deleted: readonly Name[];
 }
@@ -134,19 +141,28 @@ export class History {
     this.entries.push(entry);
   }
   /**
-   * The current names of what `name` became: itself when nothing changed it, the names it was modified into or the
-   * names generated from it (a face split by a cut becomes two), or none when it was deleted.
+   * The current names of what `name` became: itself when nothing changed it, the names it continued as (a face split
+   * by a cut becomes two), or none when it was deleted.
    */
   resolve(name: Name): Name[] {
-    let current = [name];
-    for (const e of this.entries) {
+    return this.follow([name], 0);
+  }
+  /** The current names of what was made from `name` (the side face swept from a sketch segment), followed to now. */
+  generatedFrom(name: Name): Name[] {
+    const out: Name[] = [];
+    this.entries.forEach((e, i) => {
+      for (const [to, from] of e.generated) if (from.includes(name)) out.push(...this.follow([to], i + 1));
+    });
+    return [...new Set(out)];
+  }
+  private follow(names: Name[], first: number): Name[] {
+    let current = names;
+    for (const e of this.entries.slice(first)) {
       const next: Name[] = [];
       for (const n of current) {
         if (e.deleted.includes(n)) continue;
-        const modified = e.modified.filter(([from]) => from === n).map(([, to]) => to),
-          generated = e.generated.filter(([, from]) => from.includes(n)).map(([to]) => to);
-        if (modified.length || generated.length) next.push(...modified, ...generated);
-        else next.push(n);
+        const modified = e.modified.filter(([from]) => from === n).map(([, to]) => to);
+        next.push(...(modified.length ? modified : [n]));
       }
       current = [...new Set(next)];
     }
