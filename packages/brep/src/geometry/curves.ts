@@ -31,7 +31,9 @@ const uniform = (a: number, b: number, step: number): number[] => {
 
 /**
  * Adaptive sampling between the break parameters `breaks` (a, ..., b): a segment splits while its midpoint strays from
- * the chord by more than `deflection`, its quarter points do, or its end tangents turn by more than `turn`.
+ * the chord by more than `deflection`, its quarter points do, or its end tangents turn by more than `turn` while it is
+ * longer than a hundredth of the deflection. Where a curve's speed falls to zero (a fillet's B-spline end) the tangent
+ * direction is noise: splitting on it piled samples micrometres apart, which two faces then kept differently.
  */
 function adaptive(curve: Curve, breaks: readonly number[], deflection: number, turn: number): number[] {
   const out = [breaks[0]];
@@ -43,7 +45,7 @@ function adaptive(curve: Curve, breaks: readonly number[], deflection: number, t
         distance(m, chord(0.5)) > deflection ||
         distance(curve.at(t0 + (t1 - t0) / 4), chord(0.25)) > deflection ||
         distance(curve.at(t0 + ((t1 - t0) * 3) / 4), chord(0.75)) > deflection ||
-        angle(a.slice(3), b.slice(3)) > turn;
+        (distance(a, b) > deflection * 0.01 && angle(a.slice(3), b.slice(3)) > turn);
     if (far && depth < 14) {
       split(t0, a, tm, m, depth + 1);
       split(tm, m, t1, b, depth + 1);
