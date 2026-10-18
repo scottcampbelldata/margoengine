@@ -116,15 +116,15 @@ for (const entry of manifest) {
         mesh.open += b.open;
         mesh.area += b.area * b.unit ** 2 * Math.abs(d) ** (2 / 3);
         mesh.volume += b.volume * b.unit ** 3 * d;
-        for (const x of [b.min[0], b.max[0]])
-          for (const y of [b.min[1], b.max[1]])
-            for (const z of [b.min[2], b.max[2]]) {
-              const w = place(instance.matrix, [x * b.unit, y * b.unit, z * b.unit]);
-              for (let k = 0; k < 3; k++) {
-                min[k] = Math.min(min[k], w[k]);
-                max[k] = Math.max(max[k], w[k]);
-              }
-            }
+        // The placed points themselves: a rotated body's box corners would overstate its extent.
+        const p = meshes[instance.body].positions;
+        for (let i = 0; i < p.length; i += 3) {
+          const w = place(instance.matrix, [p[i] * b.unit, p[i + 1] * b.unit, p[i + 2] * b.unit]);
+          for (let k = 0; k < 3; k++) {
+            min[k] = Math.min(min[k], w[k]);
+            max[k] = Math.max(max[k], w[k]);
+          }
+        }
       }
       row.ours.mesh = { ...mesh, min, max };
       // The file's own validation properties (volume, area, centre, box, facets) against our meshes.
