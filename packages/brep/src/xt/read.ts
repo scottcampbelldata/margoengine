@@ -285,6 +285,11 @@ export function readXT(input: string | ArrayBuffer | ArrayBufferView): XTFile {
   const parts = /^SCH_(\d+)_(\d+)(?:_(\d+))?$/.exec(schema.trim()) ?? fail(`schema name "${schema}"`),
     schemaNumber = Number(parts[2]),
     embedded = parts[3] !== undefined;
+  // Before modeller version 12 the node layouts differ from the published format, and no schema describes them.
+  if (schemaNumber < 12000)
+    throw new RangeError(
+      `Parasolid ${schema.trim()} is from modeller version ${Math.floor(schemaNumber / 1000)} (before 12), which is not supported; save it again from a current Parasolid application as text or neutral binary`,
+    );
   if (embedded) src.short(); // the highest node type number
   const userFields = (src instanceof BinarySource ? src.int32() : ((src.number('int') as number) ?? 0)) || 0;
 
