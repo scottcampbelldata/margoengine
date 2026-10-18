@@ -4,11 +4,15 @@
 // - meets one more blended edge sharing a face, mirror images of each other across the mitre plane between them (the
 //   two blends meet in that plane);
 // - meets two more at right angles, all convex, rounded with one radius (a ball rounds the corner).
-// The two faces of each edge are set back to the blend's tangent (or bevel) lines, the edges beside them shortened, and
-// the new faces put in between, without the Booleans' search. Anything else, or a result whose planar faces would not
+// And full circles where a plane meets a coaxial cylinder (a boss top, a hole rim, a boss on a plate), the circle a loop
+// of its own in the plane and the cylinder's seam line the only other edge at its vertex.
+// The two faces of each edge are set back to the blend's tangent (or bevel) lines, or circles, the edges beside them
+// shortened, and the new faces (a cylinder or plane along a straight edge, a torus or cone round a circle, a sphere at
+// a ball corner) put in between, without the Booleans' search. Anything else, or a result whose planar faces would not
 // be simple loops or which is not a valid solid, gives undefined, and the Booleans build it instead.
 import { add, cross, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
 import type { Blend, Selected } from './blend.js';
+import { distanceGradient } from './distance.js';
 import { curveEvaluator, frameOf, type CurveDef, type SurfaceDef } from './geometry.js';
 import { Body, Edge, Face, type History, type Loop, type Name, type Shell, Vertex } from './topology.js';
 import { edgeParameters, validateBody } from './validate.js';
@@ -57,7 +61,9 @@ export function setBack(
   balls: ReadonlyMap<Vertex, XYZ>,
   history?: History,
 ): Body | undefined {
-  if (selected.some((s) => s.edge.curve.kind !== 'line')) return undefined;
+  const straight = selected.filter((s) => s.edge.curve.kind === 'line'),
+    circles = selected.filter((s) => s.edge.curve.kind === 'circle');
+  if (straight.length + circles.length !== selected.length) return undefined;
   const fillet = how.kind === 'fillet',
     r = fillet ? how.radius : 0,
     edgesAt = new Map<Vertex, Edge[]>(),
@@ -79,7 +85,7 @@ export function setBack(
 
   // Each blended edge: its direction, how far its faces are set back, its new face.
   const along = new Map<Selected, { d: XYZ; set: number; face: Face; axis: XYZ }>();
-  for (const s of selected) {
+  for (const s of straight) {
     const p0 = s.edge.start.point,
       d = unit(sub(s.edge.end.point, p0))!,
       b = unit(add(s.u1, s.u2))!,
@@ -238,11 +244,89 @@ export function setBack(
     };
   };
   const ends = new Map<Selected, [End, End]>();
-  for (const s of selected) {
+  for (const s of straight) {
     const e0 = endOf(s, s.edge.start),
       e1 = endOf(s, s.edge.end);
     if (!e0 || !e1) return undefined;
     ends.set(s, [e0, e1]);
+  }
+
+  // --- full circles: the plane's circle moves out (a hole's rim) or in (a boss top), the wall's along the axis ---------
+  /** The new edges of each blended edge, by the face they bound. */
+  const lines = new Map<Selected, Map<Face, Edge>>(),
+    rings: {
+      face: Face;
+      shell: Shell;
+      inPlane: Edge;
+      onWall: Edge;
+      across: Edge;
+      planeUse: boolean;
+      wallUse: boolean;
+    }[] = [];
+  for (const s of circles) {
+    const e = s.edge,
+      v = e.start,
+      around = edgesAt.get(v)!,
+      seam = around.find((x) => x !== e),
+      c1 = e.coedges.find((c) => c.loop.face === s.f1),
+      c2 = e.coedges.find((c) => c.loop.face === s.f2);
+    if (e.curve.kind !== 'circle' || !e.closed || !c1 || !c2 || c1.loop.coedges.length !== 1) return undefined;
+    if (around.length !== 2 || !seam || seam.curve.kind !== 'line' || seam.coedges.some((c) => c.loop.face !== s.f2))
+      return undefined;
+    const { frame, radius } = e.curve,
+      set = fillet ? r : how.distance,
+      out = unit(sub(v.point, frame.origin))!,
+      grow = dot(s.u1, out) > 0 ? set : -set,
+      shift = scale(s.u2, set),
+      wallCentre = add(frame.origin, shift),
+      p1 = add(v.point, scale(s.u1, set)),
+      p2 = add(v.point, shift);
+    if (!(radius + grow > tiny)) return undefined;
+    let surface: SurfaceDef, meridian: CurveDef, mid: XYZ;
+    if (fillet) {
+      // A torus about the axis through the rounding's centre circle; a spindle torus (major <= minor) is left out.
+      if (!(radius + grow > r)) return undefined;
+      const centre = add(add(v.point, scale(s.u1, r)), shift);
+      surface = { kind: 'torus', frame: frameOf(wallCentre, frame.z, out), major: radius + grow, minor: r };
+      meridian = arc(centre, p1, p2, r);
+      mid = sub(centre, scale(unit(add(s.u1, s.u2))!, r));
+    } else {
+      // A cone from the smaller circle towards the larger, so its angle is positive.
+      const [o, z, r0, r1] =
+        grow < 0 ? [frame.origin, s.u2, radius + grow, radius] : [wallCentre, scale(s.u2, -1), radius, radius + grow];
+      surface = { kind: 'cone', frame: frameOf(o, z, out), radius: r0, angle: Math.atan2(r1 - r0, set) };
+      meridian = { kind: 'line', origin: p1, direction: unit(sub(p2, p1))! };
+      mid = scale(add(p1, p2), 0.5);
+    }
+    // The face's normal points to the edge it replaces at a convex edge, away from it at a concave one.
+    const face = new Face(
+        `${name}:${s.name}/face:${fillet ? 'round' : 'bevel'}`,
+        surface,
+        dot(distanceGradient(surface, mid), sub(v.point, mid)) > 0 === s.convex,
+      ),
+      a = new Vertex(vertexName(s.f1, face), p1),
+      b = new Vertex(vertexName(s.f2, face), p2),
+      inPlane = edge(
+        s.f1,
+        face,
+        { kind: 'circle', frame: frameOf(frame.origin, frame.z, out), radius: radius + grow },
+        a,
+        a,
+      ),
+      onWall = edge(s.f2, face, { kind: 'circle', frame: frameOf(wallCentre, frame.z, out), radius }, b, b),
+      across = new Edge(`${face.name}/edge:seam`, meridian, a, b);
+    // The new circles run the way the old one did, so the plane's and the wall's loops keep their direction.
+    inPlane.sameSense = onWall.sameSense = e.sameSense;
+    generated.push([face.name, [s.name]], [across.name, [s.name]]);
+    trim(seam, v, b);
+    lines.set(
+      s,
+      new Map([
+        [s.f1, inPlane],
+        [s.f2, onWall],
+      ]),
+    );
+    rings.push({ face, shell: s.f1.shell!, inPlane, onWall, across, planeUse: c1.forward, wallUse: c2.forward });
   }
 
   // --- edges -----------------------------------------------------------------------------------------------------------
@@ -271,8 +355,7 @@ export function setBack(
     }
     edges.set(e, new Edge(e.name, e.curve, a, b, e.sameSense, e.tolerance));
   }
-  const lines = new Map<Selected, Map<Face, Edge>>();
-  for (const s of selected) {
+  for (const s of straight) {
     const [e0, e1] = ends.get(s)!,
       { d, face } = along.get(s)!,
       byFace = new Map<Face, Edge>();
@@ -305,7 +388,16 @@ export function setBack(
       }
     }
   }
-  for (const s of selected) {
+  for (const { face, shell, inPlane, onWall, across, planeUse, wallUse } of rings) {
+    // Round the band: the plane's circle, across, the wall's circle, back; each circle the other way from its face's use.
+    shells.get(shell)!.add(face);
+    const l = face.loop();
+    l.use(inPlane, !planeUse);
+    l.use(across, true);
+    l.use(onWall, !wallUse);
+    l.use(across, false);
+  }
+  for (const s of straight) {
     const { face } = along.get(s)!,
       [e0, e1] = ends.get(s)!,
       l1 = lines.get(s)!.get(s.f1)!,
