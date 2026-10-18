@@ -126,12 +126,23 @@ test('Booleans: a sphere cut by a plane keeps its cap or the rest; a cavity is a
     h = 7,
     capVolume = (Math.PI * h * h * (30 - h)) / 3,
     disc = Math.PI * 91;
-  solid(boolean('cap', 'intersect', ball(), block()), capVolume, 2 * Math.PI * 10 * h + disc);
-  solid(
-    boolean('rest', 'subtract', ball(), block()),
-    (4 / 3) * Math.PI * 1000 - capVolume,
-    4 * Math.PI * 100 - 2 * Math.PI * 10 * h + disc,
+  const cap = boolean('cap', 'intersect', ball(), block()),
+    rest = boolean('rest', 'subtract', ball(), block());
+  solid(cap, capVolume, 2 * Math.PI * 10 * h + disc);
+  solid(rest, (4 / 3) * Math.PI * 1000 - capVolume, 4 * Math.PI * 100 - 2 * Math.PI * 10 * h + disc);
+  // As other readers expect it: the rest goes round its sphere, so its face is cut open by a seam edge from pole to
+  // pole, used once each way; the cap goes round nothing and is written as it is.
+  const written = bodiesToSTEP([rest]),
+    seam = written.match(/#(\d+)=EDGE_CURVE\('s\/face:surface\/edge:seam:0',(#\d+),(#\d+),/);
+  assert.ok(seam, 'a seam edge');
+  for (const sense of ['T', 'F']) assert.ok(written.includes(`ORIENTED_EDGE('',*,*,#${seam[1]},.${sense}.)`));
+  assert.match(written, new RegExp(`${seam[2]}=VERTEX_POINT\\('s/face:surface/vertex:pole:-'`));
+  assert.match(written, new RegExp(`${seam[3]}=VERTEX_POINT\\('s/face:surface/vertex:pole:\\+'`));
+  assert.deepEqual(
+    parseSTEP(written).bodies.map((x) => [x.kind, x.faces.length]),
+    [['solid', 2]],
   );
+  assert.doesNotMatch(bodiesToSTEP([cap]), /edge:seam/);
   const hollow = boolean(
     'hollow',
     'subtract',
