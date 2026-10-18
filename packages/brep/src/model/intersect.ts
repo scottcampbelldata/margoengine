@@ -2,7 +2,6 @@
 // cylinder, parallel cylinders, and every pair of surfaces of revolution on one axis, which meet in circles), and
 // curves traced point by point inside a box for every other pair of analytic surfaces (march.ts).
 import { add, cross, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
-import { signedDistance } from './distance.js';
 import { frameOf, type CurveDef, type SurfaceDef } from './geometry.js';
 import { traceIntersections, type Box3 } from './march.js';
 

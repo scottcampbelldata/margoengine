@@ -12,7 +12,7 @@ import { boolean } from './boolean.js';
 import { box, extrude, revolve, sphere, type ProfileSegment } from './build.js';
 import { FaceUV } from './faces.js';
 import { frameOf } from './geometry.js';
-import { Body, History, type Edge, type Face, type Name, type Vertex } from './topology.js';
+import type { Body, History, Edge, Face, Name, Vertex } from './topology.js';
 
 type Blend = { kind: 'fillet'; radius: number } | { kind: 'chamfer'; distance: number };
 
