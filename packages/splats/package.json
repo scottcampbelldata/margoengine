@@ -4,11 +4,6 @@
   "type": "module",
   "license": "MIT",
   "description": "Optional Gaussian splats with GPU covariance projection and stable compute radix sorting.",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/splats"
-  },
   "publishConfig": {
     "access": "public"
   },

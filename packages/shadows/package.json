@@ -4,11 +4,6 @@
   "type": "module",
   "license": "MIT",
   "description": "Four-cascade cached directional shadows with PCSS.",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/shadows"
-  },
   "publishConfig": {
     "access": "public"
   },
