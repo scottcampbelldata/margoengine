@@ -213,7 +213,8 @@ export function parseJT(input: ArrayBuffer | ArrayBufferView, options: JTOptions
     return shapes;
   };
 
-  const partOf = (id: number, nodeUnit: number): number => {
+  // A part without a name of its own takes the nearest one above it (JT 10 writers name the instance node).
+  const partOf = (id: number, nodeUnit: number, above: string): number => {
     const known = partIndex.get(id);
     if (known !== undefined) return known;
     const shapes = shapesOf(id, nodeUnit);
@@ -228,7 +229,7 @@ export function parseJT(input: ArrayBuffer | ArrayBufferView, options: JTOptions
         }
       }
     }
-    const index = parts.push({ node: id, name: nameOf(id), brep, shapes }) - 1;
+    const index = parts.push({ node: id, name: nameOf(id) || above, brep, shapes }) - 1;
     partIndex.set(id, index);
     return index;
   };
@@ -258,7 +259,7 @@ export function parseJT(input: ArrayBuffer | ArrayBufferView, options: JTOptions
       return;
     }
     if (node.kind === 'part' || node.kind === 'shape') {
-      instances.push({ part: partOf(id, here), matrix: m, color: c, path: p });
+      instances.push({ part: partOf(id, here, p[p.length - 1] ?? ''), matrix: m, color: c, path: p });
       return;
     }
     for (const child of taken(id)) visit(child, m, c, p, here, depth + 1);
