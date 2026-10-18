@@ -103,6 +103,8 @@ export class Tessellator {
   private readonly curves = new Map<number, Curve>();
   private readonly surfaces = new Map<number, Surface>();
   private readonly edges = new Map<number, XYZ[]>();
+  /** Triangles of the body being meshed whose corners are all bound samples, by their corners' positions. */
+  private rim = new Set<string>();
   /** Curve parameters an edge must be sampled at: where it passes through a pole of a surface it bounds. */
   private readonly through = new Map<number, number[]>();
   private readonly turn: number;
@@ -656,6 +658,7 @@ export class Tessellator {
       });
       loopIndices.push(indices);
     }
+    const rimPoints = uv.length / 2;
     if (Number.isFinite(du) && Number.isFinite(dv) && du > 0 && dv > 0) {
       const w = all[1] - all[0],
         h = all[3] - all[2],
@@ -721,6 +724,41 @@ export class Tessellator {
         xyz.push(spot(added[i], added[i + 1]));
       }
       triangles = triangulate(scaled(uv, su * ku, sv * kv), loopIndices);
+    }
+
+    // --- slivers along an edge, mirrored by the face across it --------------------------------------------------------
+    // A triangle with all its corners on the bounds can lie between a curved edge and its chord. When the face across
+    // the edge made that very triangle too (all its corners on the edge), the two cover the sliver twice, mirrored, and
+    // its diagonals are used four times: not a closed manifold (rotor_all's blade roots on the hub). A point inside
+    // each such triangle breaks the repeat; only the second face of the pair changes.
+    const corner = new Map<number, string>(),
+      cornerKey = (i: number) => {
+        let k = corner.get(i);
+        if (k === undefined) corner.set(i, (k = `${xyz[i][0]},${xyz[i][1]},${xyz[i][2]}`));
+        return k;
+      },
+      rimKey = (t: number) =>
+        triangles[t] < rimPoints && triangles[t + 1] < rimPoints && triangles[t + 2] < rimPoints
+          ? [cornerKey(triangles[t]), cornerKey(triangles[t + 1]), cornerKey(triangles[t + 2])].sort().join(';')
+          : undefined;
+    for (let pass = 0; pass < 3 && this.rim.size; pass++) {
+      const added: number[] = [];
+      for (let t = 0; t < triangles.length; t += 3) {
+        const key = rimKey(t);
+        if (key === undefined || !this.rim.has(key)) continue;
+        const [a, b, c] = [triangles[t], triangles[t + 1], triangles[t + 2]];
+        added.push((uv[a * 2] + uv[b * 2] + uv[c * 2]) / 3, (uv[a * 2 + 1] + uv[b * 2 + 1] + uv[c * 2 + 1]) / 3);
+      }
+      if (!added.length) break;
+      for (let i = 0; i < added.length; i += 2) {
+        uv.push(added[i], added[i + 1]);
+        xyz.push(spot(added[i], added[i + 1]));
+      }
+      triangles = triangulate(scaled(uv, su * ku, sv * kv), loopIndices);
+    }
+    for (let t = 0; t < triangles.length; t += 3) {
+      const key = rimKey(t);
+      if (key !== undefined) this.rim.add(key);
     }
 
     // --- output: triangles wound to face outward, collapsed ones (at a pole) dropped, unused points removed -------------
@@ -956,6 +994,7 @@ export class Tessellator {
       faces: BodyMeshFace[] = [],
       failures: { id: number; reason: string }[] = [];
     this.findPoleCrossings(body, tol.edge * 1e-3);
+    this.rim = new Set();
     const reversed = new Set(body.reversed);
     for (const id of body.faces) {
       let mesh: FaceMesh;
