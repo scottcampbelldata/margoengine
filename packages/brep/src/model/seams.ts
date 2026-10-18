@@ -29,13 +29,13 @@ export interface WrittenEdge {
 }
 
 /** One use of a written edge by a face loop, along it or against it. */
-export interface WrittenUse {
+interface WrittenUse {
   readonly edge: WrittenEdge;
   readonly forward: boolean;
 }
 
 /** How faces are written: each one's surface (its frame turned to put the seam where the face is cut) and loops. */
-export interface WrittenFaces {
+interface WrittenFaces {
   surface(face: Face): SurfaceDef;
   loops(face: Face): WrittenUse[][];
 }
