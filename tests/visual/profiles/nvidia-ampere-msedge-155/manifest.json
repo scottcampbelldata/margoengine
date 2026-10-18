@@ -5,23 +5,25 @@
    "size": "640x360",
    "runs": 4,
    "noise": {
-    "changed": 0.000026,
-    "hot": 0.00000434,
-    "mean": 0.0002,
-    "max": 26
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
    },
    "tolerance": {
-    "changed": 0.000578,
-    "hot": 0.000213
+    "changed": 0.0005,
+    "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 155.0.4283.60",
+    "browser": "msedge 155.0.4283.62",
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-17T06:05:33.873Z",
-    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
-    "packagesDirty": false
+    "date": "2026-10-18T11:28:16.572Z",
+    "commit": "92ac68dbd4b643649d1f20dda249c8a98f071edc",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "night-citadel-light": {
@@ -29,23 +31,25 @@
    "size": "640x360",
    "runs": 4,
    "noise": {
-    "changed": 0.00089,
-    "hot": 0.0000521,
-    "mean": 0.00664,
-    "max": 68
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
    },
    "tolerance": {
-    "changed": 0.00317,
-    "hot": 0.000356
+    "changed": 0.0005,
+    "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 155.0.4283.60",
+    "browser": "msedge 155.0.4283.62",
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-17T06:05:33.873Z",
-    "commit": "b3ed8acaa3d7f35be5028cd35cf03abe768b5c29",
-    "packagesDirty": false
+    "date": "2026-10-18T11:28:16.572Z",
+    "commit": "92ac68dbd4b643649d1f20dda249c8a98f071edc",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "night-citadel-phone": {
@@ -53,22 +57,22 @@
    "size": "195x422",
    "runs": 4,
    "noise": {
-    "changed": 0.00361,
-    "hot": 0.000182,
-    "mean": 0.0175,
-    "max": 74
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
    },
    "tolerance": {
-    "changed": 0.0113,
-    "hot": 0.000746
+    "changed": 0.0005,
+    "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 155.0.4283.60",
+    "browser": "msedge 155.0.4283.62",
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-17T08:04:14.158Z",
-    "commit": "c5ba426105253a553e9b9408ad5fc47385c59b72",
+    "date": "2026-10-18T11:28:16.572Z",
+    "commit": "92ac68dbd4b643649d1f20dda249c8a98f071edc",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
