@@ -389,8 +389,10 @@ export class Tessellator {
       throw new TypeError(`STEP face #${id}: could not cut a wrapping bound at its seam`);
     };
     // Bands and caps are cut open where no hole lies, or a hole across the cut would cross the cut lines.
-    const cutAt = (fallback: number) =>
-      (loops.length
+    // ... and at one of the bound's own samples (the one nearest the middle of that stretch): a cut between samples
+    // would put a point on the bound its neighbouring face does not have, a T-junction and an open edge.
+    const cutAt = (wrap: Wrap) => {
+      const free = loops.length
         ? freeMiddle(
             loops.map((l) => {
               const values = l.map(A);
@@ -398,11 +400,23 @@ export class Tessellator {
             }),
             period,
           )
-        : undefined) ?? fallback;
+        : undefined;
+      if (free === undefined) return A(wrap.points[0]);
+      let best = A(wrap.points[0]),
+        gap = Infinity;
+      for (const q of wrap.points) {
+        const d = Math.abs(nearest(A(q), free, period) - free);
+        if (d < gap) {
+          gap = d;
+          best = A(q);
+        }
+      }
+      return best;
+    };
     if (wraps.length === 2) {
       // A band (the side of a cylinder or cone, a sphere between two latitudes): both bounds cut at one seam, joined
       // by the cut walked once each way.
-      const first = open(wraps[0], cutAt(A(wraps[0].points[0])));
+      const first = open(wraps[0], cutAt(wraps[0]));
       if (Math.sign(transposed ? wraps[1].kv : wraps[1].ku) === Math.sign(first.k)) {
         // Both bounds run the same way round, against the standard: reverse the second.
         const pts = wraps[1].points,
@@ -436,7 +450,7 @@ export class Tessellator {
       domain.push([...first.run, ...moved]);
     } else if (wraps.length === 1 && transposed) {
       // A cap wrapping in v, closed at a pole in u (a B-spline row collapsed at a u end).
-      const { run, k } = open(wraps[0], cutAt(A(wraps[0].points[0]))),
+      const { run, k } = open(wraps[0], cutAt(wraps[0])),
         side = (-Math.sign(k) * left) as 1 | -1,
         uPole = s.uPole?.(side) ?? (poles.length ? s.parameters(poles[0], [run[0].u, run[0].v])[0] : undefined);
       if (uPole === undefined)
@@ -448,7 +462,7 @@ export class Tessellator {
       domain.push([...run, { p: pole, u: uPole, v: b1, line: true }, { p: pole, u: uPole, v: b0, line: true }]);
     } else if (wraps.length === 1) {
       // A cap (a sphere or cone end): the bound cut at a seam and closed along the pole on the face's side.
-      const { run, k } = open(wraps[0], cutAt(A(wraps[0].points[0]))),
+      const { run, k } = open(wraps[0], cutAt(wraps[0])),
         side = (Math.sign(k) * left) as 1 | -1;
       let vPole = s.pole(side);
       if (vPole === undefined && poles.length) vPole = s.parameters(poles[0], [run[0].u, run[0].v])[1];
