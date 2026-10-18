@@ -321,7 +321,12 @@ function readXTSegment(
       }
     }
     if (!xt) {
-      warn(`part ${part}: the JT 10 XT B-rep element's data was not found`);
+      // The byte after the element's version flags a subordinate element: its B-rep is in the MultiXT segment.
+      warn(
+        d.at + 1 < d.end && d.bytes[d.at + 1] !== 0
+          ? `part ${part}: its XT B-rep is a subordinate element, held in the file's MultiXT segment (type 30), which is not read yet`
+          : `part ${part}: the JT 10 XT B-rep element's data was not found`,
+      );
       return undefined;
     }
   }
