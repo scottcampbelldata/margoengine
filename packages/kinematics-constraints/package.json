@@ -24,10 +24,5 @@
     "test:browser": "node ../../scripts/test-kinematics-constraints-browser.js",
     "prepack": "npm run build"
   },
-  "homepage": "https://margoengine.com",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/kinematics-constraints"
-  }
+  "homepage": "https://margoengine.com"
 }

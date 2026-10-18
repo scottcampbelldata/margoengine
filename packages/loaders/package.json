@@ -4,11 +4,6 @@
   "type": "module",
   "license": "MIT",
   "description": "PLY, 3MF, PCD, OFF, XYZ, legacy VTK and static USDA/USDZ loaders for Margo Engine.",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/loaders"
-  },
   "publishConfig": {
     "access": "public"
   },
