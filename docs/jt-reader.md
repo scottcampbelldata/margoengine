@@ -168,14 +168,23 @@ ball does not touch its supports", and 8 cliff-edge blends with the 8 range-[0,0
 Radial_Engine converts with no warnings; 1 of its 1,349 faces fails to mesh (a Crank Case cylinder face, "a bound wraps
 round a surface that does not close at a pole"). Master Rod, Cam Cover and Piston, whose blends were missing or
 inside out, now mesh closed and consistently wound, within 0.25% of their JT meshes' volumes (40,305 / 40,232,
-67,336 / 67,489, 10,601 / 10,623 mm3). Left as they were: torus faces in Head, Exhaust Port and Intake Port mesh the
-wrong part of their torus or face the wrong way (areas 22,575 / 19,451, 25,909 / 9,441 and 343,951 / 310,208 mm2
-against the JT meshes); this predates the blend work and lies in the tessellation of trimmed tori.
+67,336 / 67,489, 10,601 / 10,623 mm3).
+
+Torus faces in Head, Exhaust Port and Intake Port meshed the wrong part of their torus (areas 22,575 / 19,451,
+25,909 / 9,441 and 343,951 / 310,208 mm2 against the JT meshes, 163, 142 and 477 edges shared the same way round).
+They are pipe elbows: tube bands between two meridians, bounds that wrap round the tube (in v). Between two such bounds
+a torus has two bands, one each way round the axis; the tessellator picks the one wound as the face's orientation says,
+but turned the winding's sign for bounds wrapping in v although the band's points are (u, v) either way, so it took
+the long way round. Without that turn the three parts are within 0.2% of their JT meshes' areas (19,471 / 19,451,
+9,426 / 9,441, 310,805 / 310,208 mm2) with no edges shared the same way between faces; the conversion's loops and
+face senses for tori were right. No other Radial_Engine part and no corpus file meshes differently. Head keeps 54 such
+edges (welded at 1 um) inside three faces on trimmed rational B-spline surfaces, as before.
 
 ## Next
 
 - Polygon sets and polylines; colours, texture coordinates and CAE result fields if wanted.
-- Torus faces that mesh the wrong region (Radial_Engine's Head, Exhaust Port and Intake Port).
+- Head's three faces on trimmed rational B-spline surfaces (#5716, #5748, #6092 of its conversion), whose own triangles
+  share edges the same way round.
 - Tolerant edges: each fin's trimmed SP-curve (a 2D curve on the face's surface) as the edge curve (the NIST box's
   four planar faces).
 - A MultiXT segment with several bodies, to confirm that bodies are taken by their place in its list.

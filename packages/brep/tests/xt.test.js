@@ -133,6 +133,40 @@ const bossFillet = (cliff) =>
   );
 
 /**
+ * A sheet body: a quarter elbow of a pipe bent round the z axis, one face on a torus of major radius 30 mm (its sense
+ * negative, as on the elbows of Radial_Engine's exhaust and intake ports) from the plane y = 0 round to x = 0, bounded
+ * by two ring edges on the meridian circles there, each going once round the tube. The outer wall (minor radius 8 mm)
+ * faces away from the tube's centre line; with `bore`, the bore (7 mm) faces towards it.
+ */
+const elbow = (bore) => {
+  const r = bore ? '.007' : '.008',
+    // The face's fins run each meridian so the face lies on their left seen from the side its normal points to.
+    fin = bore ? '-' : '+',
+    other = bore ? '+' : '-';
+  return transmit(
+    [
+      [12, '1 20 0 0 0 0 0 0 1e3 1e-8 0 0 0 1 0 3 1 2 3 10 0 4 8 0 '],
+      [13, '2 1 0 1 0 5 0 0 4 5 '],
+      [54, `3 2 0 5 0 0 0 -0 0 0 0 0 1 .03 ${r} 1 0 0 `],
+      [19, '4 3 0 1 0 0 2 V'],
+      [14, `5 4 0 ?0 0 6 2 3 ${bore ? '+' : '-'}0 0 0 0 2 `],
+      [15, '6 5 0 12 5 7 '],
+      [15, '7 6 0 13 5 0 '],
+      [16, `8 7 0 ?${bore ? 14 : 12} 0 9 10 0 0 1 `],
+      [16, `9 8 0 ?${bore ? 15 : 13} 8 0 11 0 0 1 `],
+      // The meridian circle at y = 0 runs round the tube against the torus's v, the one at x = 0 with it.
+      [31, `10 9 0 8 11 0 0 +.03 0 0 0 1 0 1 0 0 ${r} `],
+      [31, `11 10 0 9 0 10 0 +0 .03 0 1 0 0 0 1 0 ${r} `],
+      [17, `12 0 6 12 12 0 14 8 0 0 ${fin}`],
+      [17, `13 0 7 13 13 0 15 9 0 0 ${fin}`],
+      [17, `14 0 0 0 0 0 12 8 0 0 ${other}`],
+      [17, `15 0 0 0 0 0 13 9 0 0 ${other}`],
+    ],
+    false,
+  );
+};
+
+/**
  * Checks a blend face's mesh: every vertex on the ball's sweep (`off` gives a vertex's distance from the spine), the
  * area, and every triangle facing away from the spine (Parasolid's natural normal for a blend, the face being
  * positive; `centre` gives the spine point nearest a point).
@@ -263,5 +297,42 @@ test('Parasolid XT: blends on a coarsely charted spine, rolling-ball and cliff-e
       },
       exact,
     );
+  }
+});
+
+test('Parasolid XT: a torus face between two meridians meshes the quarter elbow they bound, facing its way', () => {
+  for (const bore of [false, true]) {
+    const r = bore ? 0.007 : 0.008;
+    assert.deepEqual(xtToSTEP(elbow(bore)).warnings, []);
+    const [mesh] = tessellateSTEP(parseXT(elbow(bore)), { deflection: 1e-7 });
+    assert.deepEqual(mesh.failures, []);
+    const p = mesh.positions,
+      t = mesh.indices;
+    let area = 0,
+      wrong = 0,
+      worst = 0;
+    for (let k = 0; k < t.length; k += 3) {
+      const [a, b, c] = [t[k], t[k + 1], t[k + 2]].map((i) => [p[i * 3], p[i * 3 + 1], p[i * 3 + 2]]),
+        u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
+        v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]],
+        n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]],
+        m = [0, 1, 2].map((i) => (a[i] + b[i] + c[i]) / 3),
+        // The nearest point of the tube's centre line, the circle of radius 30 mm in z = 0.
+        q = Math.hypot(m[0], m[1]),
+        out = [m[0] - (0.03 * m[0]) / q, m[1] - (0.03 * m[1]) / q, m[2]],
+        facing = n[0] * out[0] + n[1] * out[1] + n[2] * out[2];
+      area += Math.hypot(...n) / 2;
+      if (bore ? facing >= 0 : facing <= 0) wrong++;
+    }
+    for (let i = 0; i < p.length; i += 3) {
+      const [x, y, z] = [p[i], p[i + 1], p[i + 2]];
+      assert.ok(x > -1e-9 && y > -1e-9, `vertex (${x}, ${y}, ${z}) outside the quarter`);
+      worst = Math.max(worst, Math.abs(Math.hypot(Math.hypot(x, y) - 0.03, z) - r));
+    }
+    assert.ok(worst < 1e-6, `off the torus by ${worst}`);
+    assert.equal(wrong, 0, `${wrong} triangles face the wrong way`);
+    // A quarter turn round the axis of a whole tube: (pi / 2) (2 pi r) 30 mm.
+    const exact = Math.PI ** 2 * r * 0.03;
+    assert.ok(Math.abs(area - exact) < 1e-3 * exact, `area ${area} vs ${exact}`);
   }
 });

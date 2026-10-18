@@ -473,9 +473,10 @@ export class Tessellator {
       let moved = second.run.map((q) => make(q.p, A(q) + shift, B(q), q.line));
       // Across a closed direction (a torus) two bands share these bounds: the one wound the way the face's orientation
       // says (counter-clockwise in (u, v) when its normal is the surface's) is the face; the other is reached by moving
-      // the second bound one period over.
+      // the second bound one period over. The points are (u, v) whichever coordinate the bounds wrap in, so a band
+      // round the tube between two meridians (bounds wrapping in v) is judged by the same winding.
       if (across) {
-        const wound = Math.sign(signedArea([...first.run, ...moved])) * (transposed ? -1 : 1);
+        const wound = Math.sign(signedArea([...first.run, ...moved]));
         if (wound && wound !== left) {
           const step = B(moved[0]) < B(first.run[0]) ? across : -across;
           moved = moved.map((q) => make(q.p, A(q), B(q) + step, q.line));
