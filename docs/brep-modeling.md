@@ -16,6 +16,9 @@ features. Clean room as before: published standards, textbooks and papers only; 
 | Self-check | file's own volume, area, centre: 16 of 16 match | none |
 | Modeling | primitives, extrude, Booleans in general position (planes, cylinders, cones, spheres) | Booleans, fillets, offsets, healing, ... |
 
+Where OpenCascade still leads (freeform NURBS intersections, advanced blends, healing) and what matching it takes:
+`docs/brep-occt-gaps.md`.
+
 ## Design choices (where OpenCascade is weakest)
 
 - **Tolerances:** every vertex and edge carries its own tolerance, set by the operation that made it and checked by
