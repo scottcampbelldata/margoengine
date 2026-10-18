@@ -1,5 +1,5 @@
 {
-  "commit": "6de44dc",
+  "commit": "2fb9783",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -38,8 +38,8 @@
     },
     "@margoengine/brep": {
       ".": {
-        "raw": 143911,
-        "gzip": 49758
+        "raw": 170997,
+        "gzip": 58670
       }
     },
     "@margoengine/bvh": {
@@ -234,8 +234,8 @@
     },
     "@margoengine/gltf-pro": {
       ".": {
-        "raw": 123221,
-        "gzip": 38426
+        "raw": 123354,
+        "gzip": 38480
       },
       "./asset": {
         "raw": 13866,
@@ -258,12 +258,12 @@
         "gzip": 15280
       },
       "./progressive": {
-        "raw": 140770,
-        "gzip": 44878
+        "raw": 140919,
+        "gzip": 44934
       },
       "./worker": {
-        "raw": 125456,
-        "gzip": 39089
+        "raw": 125589,
+        "gzip": 39141
       },
       "dist/workers/gltf.js": {
         "raw": 55174,
@@ -350,16 +350,16 @@
     },
     "@margoengine/machinery": {
       ".": {
-        "raw": 98903,
-        "gzip": 42703
+        "raw": 99162,
+        "gzip": 42810
       },
       "./cad": {
-        "raw": 37352,
-        "gzip": 14037
+        "raw": 37618,
+        "gzip": 14185
       },
       "./cad-async": {
-        "raw": 9877,
-        "gzip": 4030
+        "raw": 10161,
+        "gzip": 4185
       },
       "./kinematics": {
         "raw": 8041,
@@ -374,8 +374,8 @@
         "gzip": 12988
       },
       "./section": {
-        "raw": 12418,
-        "gzip": 4532
+        "raw": 12488,
+        "gzip": 4562
       },
       "./assembly": {
         "raw": 1525,
@@ -414,8 +414,8 @@
         "gzip": 4051
       },
       "dist/workers/brep-runtime.js": {
-        "raw": 115450,
-        "gzip": 40060
+        "raw": 117583,
+        "gzip": 40816
       },
       "dist/workers/cad-runtime.js": {
         "raw": 17555,
@@ -566,20 +566,20 @@
     },
     "@margoengine/post": {
       ".": {
-        "raw": 63903,
-        "gzip": 17990
+        "raw": 64074,
+        "gzip": 18055
       },
       "./bloom": {
-        "raw": 15971,
-        "gzip": 5283
+        "raw": 16072,
+        "gzip": 5334
       },
       "./ssao": {
-        "raw": 26075,
-        "gzip": 8183
+        "raw": 26172,
+        "gzip": 8239
       },
       "./scene-fade": {
-        "raw": 5820,
-        "gzip": 2563
+        "raw": 5816,
+        "gzip": 2560
       },
       "./stack": {
         "raw": 9050,
@@ -594,8 +594,8 @@
         "gzip": 4118
       },
       "./ssr": {
-        "raw": 25819,
-        "gzip": 8736
+        "raw": 25916,
+        "gzip": 8786
       }
     },
     "@margoengine/procedural": {
@@ -656,8 +656,8 @@
     },
     "@margoengine/scatter": {
       ".": {
-        "raw": 34691,
-        "gzip": 11344
+        "raw": 34752,
+        "gzip": 11366
       }
     },
     "@margoengine/scenery": {
@@ -810,8 +810,8 @@
         "gzip": 8847
       },
       "dist/workers/usdz.js": {
-        "raw": 145497,
-        "gzip": 47250
+        "raw": 145630,
+        "gzip": 47297
       }
     },
     "@margoengine/usdz-export": {
@@ -894,9 +894,9 @@
       "brotli": 4546
     },
     "packages/machinery/dist/cad.js": {
-      "raw": 38362,
-      "gzip": 14460,
-      "brotli": 12967
+      "raw": 38628,
+      "gzip": 14610,
+      "brotli": 13129
     },
     "packages/scenery/dist/sky.js": {
       "raw": 19166,
@@ -929,9 +929,9 @@
       "brotli": 6390
     },
     "packages/machinery/dist/workers/brep-runtime.js": {
-      "raw": 114395,
-      "gzip": 39984,
-      "brotli": 34699
+      "raw": 116464,
+      "gzip": 40730,
+      "brotli": 35327
     },
     "packages/machinery/dist/workers/occt-import-js.js": {
       "raw": 97856,
@@ -984,9 +984,9 @@
       "brotli": 36623
     },
     "packages/usdz/dist/workers/usdz.js": {
-      "raw": 144022,
-      "gzip": 47126,
-      "brotli": 41283
+      "raw": 144155,
+      "gzip": 47177,
+      "brotli": 41304
     },
     "packages/loaders/dist/workers/usd.js": {
       "raw": 17210,
