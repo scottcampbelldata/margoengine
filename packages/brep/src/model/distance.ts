@@ -1,11 +1,11 @@
 // Signed distances to the analytic surfaces and their gradients: the implicit form every intersection, crossing and
 // in/out decision of the Booleans works from. Each is the true Euclidean distance (or, for a cone, its exact local
 // form), so it changes no faster than the point moves.
-import { cross, dot, length, scale, sub, unit, type V3 } from '../geometry/vec.js';
+import { cross, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
 import { curveEvaluator, type CurveDef, type SurfaceDef } from './geometry.js';
 
 /** Signed distance from `p` to a surface along its natural normal (positive on the normal's side). */
-export function signedDistance(s: SurfaceDef, p: V3): number {
+export function signedDistance(s: SurfaceDef, p: XYZ): number {
   switch (s.kind) {
     case 'plane':
       return dot(sub(p, s.frame.origin), s.frame.z);
@@ -35,14 +35,14 @@ export function signedDistance(s: SurfaceDef, p: V3): number {
 }
 
 /** Unit vector from the axis towards p, perpendicular to the axis (any perpendicular on the axis itself). */
-function radial(frame: { origin: V3; x: V3; z: V3 }, p: V3): V3 {
+function radial(frame: { origin: XYZ; x: XYZ; z: XYZ }, p: XYZ): XYZ {
   const d = sub(p, frame.origin),
     off = sub(d, scale(frame.z, dot(d, frame.z)));
   return unit(off) ?? frame.x;
 }
 
 /** Gradient of the signed distance at `p`: the unit surface normal there, on the surface's natural side. */
-export function distanceGradient(s: SurfaceDef, p: V3): V3 {
+export function distanceGradient(s: SurfaceDef, p: XYZ): XYZ {
   switch (s.kind) {
     case 'plane':
       return s.frame.z;
@@ -71,7 +71,7 @@ export function distanceGradient(s: SurfaceDef, p: V3): V3 {
 }
 
 /** The unit direction of the curve two surfaces meet in at `p` (undefined where they touch tangentially). */
-export function meetDirection(a: SurfaceDef, b: SurfaceDef, p: V3): V3 | undefined {
+export function meetDirection(a: SurfaceDef, b: SurfaceDef, p: XYZ): XYZ | undefined {
   const t = cross(distanceGradient(a, p), distanceGradient(b, p));
   return length(t) > 1e-9 ? unit(t) : undefined;
 }
@@ -136,7 +136,7 @@ export function curveSurfaceCrossings(
   resolution?: number,
 ): number[] {
   const c = curveEvaluator(curve),
-    f = (t: number) => signedDistance(surface, c.at(t).slice(0, 3) as V3),
+    f = (t: number) => signedDistance(surface, c.at(t).slice(0, 3) as XYZ),
     out: number[] = [];
   if (!(t1 > t0)) return out;
   const speed = speedBound(curve);

@@ -93,20 +93,6 @@ export function parseXT(input: string | ArrayBuffer | ArrayBufferView, options: 
 }
 
 // Modeling (docs/brep-modeling.md): editable bodies with persistent names, construction, validation and export.
-export { Body, Coedge, Edge, Face, History, Loop, Shell, Vertex } from './model/topology.js';
-export type { HistoryEntry, Name } from './model/topology.js';
-export { frameOf, curveEvaluator, surfaceEvaluator } from './model/geometry.js';
-export type { CurveDef, Frame, SurfaceDef } from './model/geometry.js';
-export type { WriterSpline } from './step/write.js';
-export { box, cylinder, extrude, sphere, torus } from './model/build.js';
-export type { Profile, ProfileSegment } from './model/build.js';
-export { validateBody } from './model/validate.js';
-export type { ValidityProblem } from './model/validate.js';
-export { bodiesToSTEP, meshBodies } from './model/export.js';
-export type { BodyMeshes } from './model/export.js';
-export { boolean } from './model/boolean.js';
-export { chamfer, fillet } from './model/blend.js';
-export type { BooleanOperation } from './model/boolean.js';
-export { curveSurfaceCrossings, intersectSurfaces, signedDistance } from './model/intersect.js';
-export type { SurfaceIntersection } from './model/intersect.js';
+/** The modeler (B-rep topology, primitives, Booleans, fillets and chamfers, STEP export): see model/index.ts. */
+export * as model from './model/index.js';
 export { orient3d } from './geometry/exact.js';

@@ -4,7 +4,7 @@ import { makeCurve, type Curve } from '../geometry/curves.js';
 import { knotVector } from '../geometry/nurbs.js';
 import type { Frame } from '../geometry/read.js';
 import { makeSurface, type Surface } from '../geometry/surfaces.js';
-import { cross, dot, unit, type V3 } from '../geometry/vec.js';
+import { cross, dot, unit, type XYZ } from '../geometry/vec.js';
 import type { StepWriter, WriterSpline } from '../step/write.js';
 
 export type { Frame };
@@ -23,14 +23,14 @@ export type SurfaceDef =
 /** A curve: its kind and defining values. */
 export type CurveDef =
   /** `direction` is a unit vector; the parameter is the distance from `origin`. */
-  | { readonly kind: 'line'; readonly origin: V3; readonly direction: V3 }
+  | { readonly kind: 'line'; readonly origin: XYZ; readonly direction: XYZ }
   /** Counter-clockwise about frame z from frame x. */
   | { readonly kind: 'circle'; readonly frame: Frame; readonly radius: number }
   | { readonly kind: 'ellipse'; readonly frame: Frame; readonly a: number; readonly b: number }
   | ({ readonly kind: 'spline'; readonly closed?: boolean } & WriterSpline);
 
 /** An orthonormal frame at `origin` with axis `z` and x towards `x` (any perpendicular when omitted or parallel). */
-export function frameOf(origin: V3, z: V3, x?: V3): Frame {
+export function frameOf(origin: XYZ, z: XYZ, x?: XYZ): Frame {
   const zz = unit(z);
   if (!zz) throw new RangeError('frame axis must not be the zero vector');
   let xx = x ? unit([x[0] - dot(x, zz) * zz[0], x[1] - dot(x, zz) * zz[1], x[2] - dot(x, zz) * zz[2]]) : undefined;

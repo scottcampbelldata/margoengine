@@ -1,7 +1,7 @@
 // Checks a body's topology and geometry: loops that close, edges of a solid used twice in opposite directions,
 // vertices on their edges' curves and edges on their faces' surfaces, each within its own tolerance. Every operation
 // runs it on its result, so an invalid shape is reported where it is made, not where it is next used.
-import { distance, type V3 } from '../geometry/vec.js';
+import { distance, type XYZ } from '../geometry/vec.js';
 import { curveEvaluator, surfaceEvaluator } from './geometry.js';
 import type { Body, Edge, Name } from './topology.js';
 
@@ -55,7 +55,7 @@ export function validateBody(body: Body): ValidityProblem[] {
       tolerance = Math.max(e.tolerance, 1e-9);
     for (const v of [e.start, e.end]) {
       const t = c.parameter(v.point),
-        gap = distance(c.at(t).slice(0, 3) as V3, v.point);
+        gap = distance(c.at(t).slice(0, 3) as XYZ, v.point);
       if (gap > Math.max(v.tolerance, tolerance))
         report(v.name, `${gap.toExponential(2)} m off the curve of ${e.name}`);
     }
@@ -64,9 +64,9 @@ export function validateBody(body: Body): ValidityProblem[] {
       const s = surfaceEvaluator(use.loop.face.surface);
       let hint: [number, number] | undefined;
       for (const t of ts) {
-        const p = c.at(t).slice(0, 3) as V3,
+        const p = c.at(t).slice(0, 3) as XYZ,
           uv: [number, number] = s.parameters(p, hint),
-          gap = distance(s.at(uv[0], uv[1]).slice(0, 3) as V3, p);
+          gap = distance(s.at(uv[0], uv[1]).slice(0, 3) as XYZ, p);
         hint = uv;
         if (gap > tolerance) {
           report(e.name, `${gap.toExponential(2)} m off the surface of ${use.loop.face.name}`);

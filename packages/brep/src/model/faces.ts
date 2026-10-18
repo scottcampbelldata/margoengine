@@ -4,7 +4,7 @@
 // decided loop by loop, by signed crossings of a line up from the point, which works for loops round a cylinder or a
 // sphere's pole as well as for closed ones.
 import type { Surface } from '../geometry/surfaces.js';
-import type { V3 } from '../geometry/vec.js';
+import type { XYZ } from '../geometry/vec.js';
 import { curveEvaluator, surfaceEvaluator } from './geometry.js';
 import type { Edge, Face } from './topology.js';
 import { edgeParameters } from './validate.js';
@@ -19,7 +19,7 @@ export interface UVLoop {
 }
 
 /** Samples per edge in (u, v): a line maps to a straight line on the surfaces Booleans take; a curve takes enough points to follow its turn. */
-export const edgeSamples = (edge: Edge) => (edge.curve.kind === 'line' ? 1 : 128);
+const edgeSamples = (edge: Edge) => (edge.curve.kind === 'line' ? 1 : 128);
 
 export class FaceUV {
   readonly surface: Surface;
@@ -48,7 +48,7 @@ export class FaceUV {
         if (!c.forward) ts.reverse();
         const curve = curveEvaluator(c.edge.curve);
         for (let k = 0; k < ts.length - 1; k++) {
-          const uv = this.near(curve.at(ts[k]).slice(0, 3) as V3, hint);
+          const uv = this.near(curve.at(ts[k]).slice(0, 3) as XYZ, hint);
           points.push(uv);
           hint = uv;
         }
@@ -98,7 +98,7 @@ export class FaceUV {
   }
 
   /** (u', v) of a point on the surface, its u (and v) moved by whole periods next to `hint` when given. */
-  near(p: V3, hint?: UV): UV {
+  near(p: XYZ, hint?: UV): UV {
     const s = this.surface,
       raw = s.parameters(p, hint ? [this.flip ? -hint[0] : hint[0], hint[1]] : undefined);
     let u = this.flip ? -raw[0] : raw[0],
@@ -111,19 +111,19 @@ export class FaceUV {
   }
 
   /** The 3D point at (u', v). */
-  at(uv: UV): V3 {
-    return this.surface.at(this.flip ? -uv[0] : uv[0], uv[1]).slice(0, 3) as V3;
+  at(uv: UV): XYZ {
+    return this.surface.at(this.flip ? -uv[0] : uv[0], uv[1]).slice(0, 3) as XYZ;
   }
 
   /** The face normal (out of its solid) at a point of the face. */
-  normal(p: V3): V3 {
+  normal(p: XYZ): XYZ {
     const raw = this.surface.parameters(p),
       n = this.surface.normal(raw[0], raw[1]);
     return this.face.sense ? n : [-n[0], -n[1], -n[2]];
   }
 
   /** Whether a point of the surface lies inside the face: left of every loop (a face with no loops is the whole surface). */
-  contains(p: V3): boolean {
+  contains(p: XYZ): boolean {
     if (!this.loops.length) return true;
     const [u, v] = this.near(p);
     return this.loops.every((l) => leftOf(l, this.period, u, v));
@@ -135,7 +135,7 @@ export class FaceUV {
  * above the point running towards -u', -1 for each running towards +u'. A counter-clockwise loop round the point
  * gives 1; a loop going once round the period gives -1 below it and 0 above.
  */
-export function crossings(loop: UVLoop, period: number, u: number, v: number): number {
+function crossings(loop: UVLoop, period: number, u: number, v: number): number {
   const pts = loop.points,
     n = pts.length;
   if (n < 2 && !loop.wrap) return 0;
@@ -170,7 +170,7 @@ export function leftOf(loop: UVLoop, period: number, u: number, v: number): bool
 }
 
 /** Signed area of a closed polyline (counter-clockwise positive). */
-export function polygonArea(points: readonly UV[]): number {
+function polygonArea(points: readonly UV[]): number {
   let a = 0;
   for (let i = 0, j = points.length - 1; i < points.length; j = i++)
     a += points[j][0] * points[i][1] - points[i][0] * points[j][1];

@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import {
+import { model, orient3d, parseSTEP } from '../dist/index.js';
+
+const {
   boolean,
   bodiesToSTEP,
   box,
@@ -9,12 +11,10 @@ import {
   frameOf,
   History,
   meshBodies,
-  orient3d,
-  parseSTEP,
   sphere,
   torus,
   validateBody,
-} from '../dist/index.js';
+} = model;
 
 const mm = 0.001,
   at = (x, y, z, axis = [0, 0, 1], dir = [1, 0, 0]) => frameOf([x * mm, y * mm, z * mm], axis, dir);

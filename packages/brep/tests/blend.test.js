@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { boolean, box, chamfer, cylinder, fillet, frameOf, History, meshBodies, validateBody } from '../dist/index.js';
+import { model } from '../dist/index.js';
+
+const { boolean, box, chamfer, cylinder, fillet, frameOf, History, meshBodies, validateBody } = model;
 
 const mm = 0.001,
   at = (x, y, z) => frameOf([x * mm, y * mm, z * mm], [0, 0, 1], [1, 0, 0]),

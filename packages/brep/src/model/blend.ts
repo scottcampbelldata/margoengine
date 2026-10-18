@@ -7,7 +7,7 @@
 //   along it, as two equal cylinders do);
 // - where three convex edges meet at right angles with one radius (a box's corner), the strips stop where a ball of
 //   that radius would roll off them, and the corner is rounded by the ball (a sphere patch).
-import { add, cross, dot, length, scale, sub, unit, type V3 } from '../geometry/vec.js';
+import { add, cross, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
 import { boolean } from './boolean.js';
 import { box, extrude, sphere, type ProfileSegment } from './build.js';
 import { FaceUV } from './faces.js';
@@ -53,8 +53,8 @@ interface Selected {
   name: Name;
   edge: Edge;
   /** Into each of its two faces from the edge, across it, and those faces. */
-  u1: V3;
-  u2: V3;
+  u1: XYZ;
+  u2: XYZ;
   f1: Face;
   f2: Face;
   angle: number;
@@ -73,7 +73,7 @@ function blend(name: Name, body: Body, edgeNames: readonly Name[], how: Blend, h
   const size = how.kind === 'fillet' ? how.radius : how.distance,
     tools: { body: Body; convex: boolean }[] = [];
   // Corners rounded by a ball: three convex edges at right angles (fillets only).
-  const balls = new Map<Vertex, V3>();
+  const balls = new Map<Vertex, XYZ>();
   if (how.kind === 'fillet')
     for (const [v, list] of at) {
       if (list.length !== 3 || !list.every((s) => s.convex)) continue;
@@ -131,7 +131,7 @@ function blend(name: Name, body: Body, edgeNames: readonly Name[], how: Blend, h
 }
 
 /** The unit direction along an edge away from one of its vertices. */
-function away(edge: Edge, v: Vertex): V3 {
+function away(edge: Edge, v: Vertex): XYZ {
   const other = edge.start === v ? edge.end : edge.start;
   return unit(sub(other.point, v.point))!;
 }
@@ -149,7 +149,7 @@ function describe(body: Body, edge: Edge, name: Name): Selected {
     len = length(sub(p1, p0)),
     d = unit(sub(p1, p0))!,
     mid = scale(add(p0, p1), 0.5),
-    into = (f: Face): V3 => {
+    into = (f: Face): XYZ => {
       const u = unit(cross(d, outward(f)))!;
       return new FaceUV(f).contains(add(mid, scale(u, 1e-6 * len))) ? u : scale(u, -1);
     },
@@ -205,7 +205,7 @@ function beyondMitre(name: Name, s: Selected, other: Selected, v: Vertex, big: n
 }
 
 /** A planar face's normal out of its solid. */
-function outward(f: Face): V3 {
+function outward(f: Face): XYZ {
   if (f.surface.kind !== 'plane') throw new RangeError(`${f.name}: not planar`);
   const z = f.surface.frame.z;
   return f.sense ? z : scale(z, -1);

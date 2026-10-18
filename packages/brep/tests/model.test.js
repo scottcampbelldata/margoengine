@@ -1,18 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import {
-  bodiesToSTEP,
-  box,
-  cylinder,
-  extrude,
-  frameOf,
-  History,
-  meshBodies,
-  parseSTEP,
-  sphere,
-  torus,
-  validateBody,
-} from '../dist/index.js';
+import { model, parseSTEP } from '../dist/index.js';
+
+const { bodiesToSTEP, box, cylinder, extrude, frameOf, History, meshBodies, sphere, torus, validateBody } = model;
 
 /** Volume, area and open edges of a mesh in metres, vertices joined where positions are equal. */
 function measure(m) {

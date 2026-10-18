@@ -11,7 +11,7 @@ import type { STEPBody, STEPColor } from '../step/structure.js';
 import { curveOf, type Curve } from '../geometry/curves.js';
 import { surfaceOf, type Surface } from '../geometry/surfaces.js';
 import { list, num, point, ref } from '../geometry/read.js';
-import { add, angle as between, cross, distance, dot, nearest, scale, sub, unit, type V3 } from '../geometry/vec.js';
+import { add, angle as between, cross, distance, dot, nearest, scale, sub, unit, type XYZ } from '../geometry/vec.js';
 import { interiorEdges, triangulate } from './cdt.js';
 
 /**
@@ -75,7 +75,7 @@ const isTrue = (v: STEPValue | undefined) => !(v instanceof Enum) || v.name !== 
 /** A point of a face's domain: its exact 3D position and (u, v). `line` marks a straight (u, v) segment to the next
  * point that is not a B-rep edge (a pole, or a cut through a band), which is sampled across the surface. */
 interface LoopPoint {
-  p: V3;
+  p: XYZ;
   u: number;
   v: number;
   line?: boolean;
@@ -102,7 +102,7 @@ interface Tolerances {
 export class Tessellator {
   private readonly curves = new Map<number, Curve>();
   private readonly surfaces = new Map<number, Surface>();
-  private readonly edges = new Map<number, V3[]>();
+  private readonly edges = new Map<number, XYZ[]>();
   /** Curve parameters an edge must be sampled at: where it passes through a pole of a surface it bounds. */
   private readonly through = new Map<number, number[]>();
   private readonly turn: number;
@@ -145,14 +145,14 @@ export class Tessellator {
     if (!s) this.surfaces.set(id, (s = surfaceOf(this.file, id, angleUnit, (c) => this.curve(c))));
     return s;
   }
-  private vertex(id: number | undefined): V3 {
+  private vertex(id: number | undefined): XYZ {
     if (id === undefined || !this.file.is(id, 'VERTEX_POINT'))
       throw new TypeError(`Invalid STEP file: #${id} is not a vertex point`);
     return point(this.file, ref(this.file.args(id, 'VERTEX_POINT')[1]));
   }
 
   /** Points of edge `id` from its start vertex to its end vertex (the vertex alone for a degenerate edge). */
-  private edge(id: number, deflection: number): V3[] {
+  private edge(id: number, deflection: number): XYZ[] {
     const cached = this.edges.get(id);
     if (cached) return cached;
     const [, start, end, geometry, sameSense] = this.file.args(id, 'EDGE_CURVE'),
@@ -160,7 +160,7 @@ export class Tessellator {
       p2 = this.vertex(ref(end)),
       closed = ref(start) === ref(end) || distance(p1, p2) <= deflection * 1e-3,
       geom = ref(geometry);
-    let out: V3[] = closed ? [p1] : [p1, p2];
+    let out: XYZ[] = closed ? [p1] : [p1, p2];
     if (geom !== undefined) {
       const c = this.curve(geom),
         forward = isTrue(sameSense);
@@ -191,7 +191,7 @@ export class Tessellator {
             const at = samples.findIndex((x) => (t2 > t1 ? x >= t : x <= t));
             if (at > 0 && Math.abs(samples[at] - t) > 1e-12 * (hi - lo)) samples.splice(at, 0, t);
           }
-        out = samples.map((t) => c.at(t).slice(0, 3) as V3);
+        out = samples.map((t) => c.at(t).slice(0, 3) as XYZ);
         out[0] = p1;
         out[out.length - 1] = p2;
       }
@@ -201,13 +201,13 @@ export class Tessellator {
   }
 
   /** A face bound's points in order (the face on their left seen from the face's normal side), or its single vertex. */
-  private bound(id: number, deflection: number): { points: V3[]; pole?: V3 } {
+  private bound(id: number, deflection: number): { points: XYZ[]; pole?: XYZ } {
     const [, loopRef, orientation] = this.file.get(id).args,
       loop = ref(loopRef);
     if (loop === undefined) throw new TypeError(`Invalid STEP file: face bound #${id} has no loop`);
     const type = this.file.get(loop).type;
     if (type === 'VERTEX_LOOP') return { points: [], pole: this.vertex(ref(this.file.get(loop).args[1])) };
-    let points: V3[] = [];
+    let points: XYZ[] = [];
     if (type === 'POLY_LOOP') points = list(this.file.get(loop).args[1]).map((v) => point(this.file, ref(v)));
     else if (type === 'EDGE_LOOP')
       for (const oriented of list(this.file.args(loop, 'EDGE_LOOP')[1])) {
@@ -241,14 +241,14 @@ export class Tessellator {
       wrapV = (v: number) =>
         s.vPeriod ? s.vDomain[0] + ((((v - s.vDomain[0]) % s.vPeriod) + s.vPeriod) % s.vPeriod) : v,
       at = (u: number, v: number) => s.at(wrapU(u), wrapV(v)),
-      spot = (u: number, v: number) => at(u, v).slice(0, 3) as V3,
+      spot = (u: number, v: number) => at(u, v).slice(0, 3) as XYZ,
       normalAt = (u: number, v: number) => s.normal(wrapU(u), wrapV(v)),
       gap = tol.edge * 1e-4;
 
     // --- bounds to (u, v) -------------------------------------------------------------------------------------------
     const loops: LoopPoint[][] = [],
       wraps: Wrap[] = [],
-      poles: V3[] = [];
+      poles: XYZ[] = [];
     for (const b of bounds) {
       if (b.pole) {
         poles.push(b.pole);
@@ -358,7 +358,7 @@ export class Tessellator {
     // Work in (a, b) with a the coordinate the bounds wrap in.
     const A = (q: LoopPoint) => (transposed ? q.v : q.u),
       B = (q: LoopPoint) => (transposed ? q.u : q.v),
-      make = (p: V3, a: number, b: number, line?: boolean): LoopPoint =>
+      make = (p: XYZ, a: number, b: number, line?: boolean): LoopPoint =>
         transposed ? { p, u: b, v: a, line } : { p, u: a, v: b, line };
     /** A wrapping bound cut where it crosses a = cut (mod the period), from that crossing round to it one period on. */
     const open = (w: Wrap, cut: number): { run: LoopPoint[]; k: number } => {
@@ -543,17 +543,17 @@ export class Tessellator {
       }
     }
     const uv: number[] = [],
-      xyz: V3[] = [],
+      xyz: XYZ[] = [],
       loopIndices: number[][] = [],
       // A cut appears on both sides of its seam, walked opposite ways: both use one set of points, so they weld exactly.
-      lines = new Map<string, V3[]>(),
+      lines = new Map<string, XYZ[]>(),
       canon = (q: LoopPoint) => `${Math.round(wrapU(q.u) * 1e8)},${Math.round(wrapV(q.v) * 1e8)}`,
       // A point this face makes up (a pole, a cut end, a corner) that lands on one of its bounds' samples takes that
       // sample's exact position: the neighbouring face has the sample, and an ulp apart is an open seam.
       cell = Math.max(gap, 1e-300) * 4,
-      samples = new Map<string, V3[]>(),
+      samples = new Map<string, XYZ[]>(),
       cellOf = (p: readonly number[]) => p.map((c) => Math.floor(c / cell)),
-      snap = (p: V3): V3 => {
+      snap = (p: XYZ): XYZ => {
         const [x, y, z] = cellOf(p);
         for (let i = -1; i <= 1; i++)
           for (let j = -1; j <= 1; j++)
@@ -570,7 +570,7 @@ export class Tessellator {
       }
     for (const loop of domain) {
       const indices: number[] = [],
-        put = (p: V3, u: number, v: number) => {
+        put = (p: XYZ, u: number, v: number) => {
           indices.push(uv.length / 2);
           uv.push(u, v);
           xyz.push(snap(p));
@@ -710,7 +710,7 @@ export class Tessellator {
     else {
       const lo = [Infinity, Infinity, Infinity],
         hi = [-Infinity, -Infinity, -Infinity],
-        grow = (p: V3) => {
+        grow = (p: XYZ) => {
           for (let k = 0; k < 3; k++) {
             lo[k] = Math.min(lo[k], p[k]);
             hi[k] = Math.max(hi[k], p[k]);
@@ -777,10 +777,10 @@ export class Tessellator {
       } catch {
         continue;
       }
-      const poles: V3[] = [];
+      const poles: XYZ[] = [];
       for (const side of [1, -1] as const) {
         const v = s.pole(side);
-        if (v !== undefined) poles.push(s.at(s.uDomain[0], v).slice(0, 3) as V3);
+        if (v !== undefined) poles.push(s.at(s.uDomain[0], v).slice(0, 3) as XYZ);
       }
       if (!poles.length) continue;
       for (const b of list(this.file.get(face).args[1])) {
@@ -934,8 +934,8 @@ export class Tessellator {
 }
 
 /** The plane through a polygon (Newell's normal), for a face the file gives no surface. */
-function planeOf(points: readonly V3[]): Surface {
-  let n: V3 = [0, 0, 0];
+function planeOf(points: readonly XYZ[]): Surface {
+  let n: XYZ = [0, 0, 0];
   for (let i = 0; i < points.length; i++) {
     const a = points[i],
       b = points[(i + 1) % points.length];

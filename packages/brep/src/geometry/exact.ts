@@ -7,19 +7,6 @@ const EPSILON = 2 ** -53;
 const SPLITTER = 2 ** 27 + 1;
 const ORIENT3D_BOUND = (7 + 56 * EPSILON) * EPSILON;
 
-/** Exact a * b (Two-Product with Dekker's split). */
-function product(a: number, b: number): number[] {
-  const x = a * b;
-  let c = SPLITTER * a;
-  const ahi = c - (c - a),
-    alo = a - ahi;
-  c = SPLITTER * b;
-  const bhi = c - (c - b),
-    blo = b - bhi;
-  const y = alo * blo - (x - ahi * bhi - alo * bhi - ahi * blo);
-  return y !== 0 ? [y, x] : x !== 0 ? [x] : [];
-}
-
 /** Exact a - b (Two-Diff). */
 function difference(a: number, b: number): number[] {
   const x = a - b,

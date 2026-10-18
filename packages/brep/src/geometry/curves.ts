@@ -4,7 +4,7 @@
 import { Enum, type STEPFile, type STEPValue } from '../step/file.js';
 import { clamped, curveAt, knotVector, spanBreaks, type SplineCurve } from './nurbs.js';
 import { frame, list, num, point, ref, unsupported, vector } from './read.js';
-import { add, angle, distance, dot, scale, sub, type V3 } from './vec.js';
+import { add, angle, distance, dot, scale, sub, type XYZ } from './vec.js';
 
 /** A 3D curve. */
 export interface Curve {
@@ -60,8 +60,8 @@ class Line implements Curve {
   readonly period = 0;
   readonly domain = [-Infinity, Infinity] as const;
   constructor(
-    private readonly origin: V3,
-    private readonly dir: V3,
+    private readonly origin: XYZ,
+    private readonly dir: XYZ,
   ) {}
   at(t: number) {
     return [...add(this.origin, scale(this.dir, t)), ...this.dir];
@@ -78,7 +78,7 @@ class Ellipse implements Curve {
   readonly period = 2 * Math.PI;
   readonly domain = [0, 2 * Math.PI] as const;
   constructor(
-    private readonly f: { origin: V3; x: V3; y: V3 },
+    private readonly f: { origin: XYZ; x: XYZ; y: XYZ },
     private readonly a: number,
     private readonly b: number,
   ) {}
@@ -179,7 +179,7 @@ class Spline implements Curve {
 class Polyline implements Curve {
   readonly period = 0;
   readonly domain: readonly [number, number];
-  constructor(private readonly points: readonly V3[]) {
+  constructor(private readonly points: readonly XYZ[]) {
     this.domain = [0, Math.max(0, points.length - 1)];
   }
   at(t: number) {
@@ -277,8 +277,8 @@ export function curveOf(file: STEPFile, id: number): Curve {
 
 /** Evaluators for curves the modeler makes from parameters (no STEP entity behind them). */
 export const makeCurve = {
-  line: (origin: V3, direction: V3): Curve => new Line(origin, direction),
+  line: (origin: XYZ, direction: XYZ): Curve => new Line(origin, direction),
   /** A circle is an ellipse with equal semi-axes. */
-  ellipse: (f: { origin: V3; x: V3; y: V3 }, a: number, b: number): Curve => new Ellipse(f, a, b),
+  ellipse: (f: { origin: XYZ; x: XYZ; y: XYZ }, a: number, b: number): Curve => new Ellipse(f, a, b),
   spline: (s: SplineCurve, closed: boolean): Curve => new Spline(s, closed),
 };

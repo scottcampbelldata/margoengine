@@ -1,6 +1,6 @@
 // Reading points, directions and placements from STEP entities (ISO 10303-42), in the file's length unit.
 import { Ref, Typed, type STEPFile, type STEPValue } from '../step/file.js';
-import { cross, dot, unit, type V3 } from './vec.js';
+import { cross, dot, unit, type XYZ } from './vec.js';
 
 export const ref = (v: STEPValue | undefined): number | undefined => (v instanceof Ref ? v.id : undefined);
 export const num = (v: STEPValue | undefined, fallback = 0): number =>
@@ -15,14 +15,14 @@ export function unsupported(file: STEPFile, id: number, what: string): TypeError
 }
 
 /** CARTESIAN_POINT coordinates (missing ones 0). */
-export function point(file: STEPFile, id: number | undefined): V3 {
+export function point(file: STEPFile, id: number | undefined): XYZ {
   if (id === undefined || !file.is(id, 'CARTESIAN_POINT'))
     throw new TypeError(`Invalid STEP file: #${id} is not a point`);
   const c = list(file.args(id, 'CARTESIAN_POINT')[1]);
   return [num(c[0]), num(c[1]), num(c[2])];
 }
 /** DIRECTION as a unit vector. */
-export function direction(file: STEPFile, id: number | undefined): V3 {
+export function direction(file: STEPFile, id: number | undefined): XYZ {
   if (id === undefined || !file.is(id, 'DIRECTION'))
     throw new TypeError(`Invalid STEP file: #${id} is not a direction`);
   const r = list(file.args(id, 'DIRECTION')[1]),
@@ -31,7 +31,7 @@ export function direction(file: STEPFile, id: number | undefined): V3 {
   return d;
 }
 /** VECTOR as direction times magnitude. */
-export function vector(file: STEPFile, id: number | undefined): V3 {
+export function vector(file: STEPFile, id: number | undefined): XYZ {
   if (id === undefined || !file.is(id, 'VECTOR')) throw new TypeError(`Invalid STEP file: #${id} is not a vector`);
   const [, orientation, magnitude] = file.args(id, 'VECTOR'),
     d = direction(file, ref(orientation)),
@@ -41,25 +41,25 @@ export function vector(file: STEPFile, id: number | undefined): V3 {
 
 /** An orthonormal frame: origin and axes. */
 export interface Frame {
-  readonly origin: V3;
-  readonly x: V3;
-  readonly y: V3;
-  readonly z: V3;
+  readonly origin: XYZ;
+  readonly x: XYZ;
+  readonly y: XYZ;
+  readonly z: XYZ;
 }
 /** AXIS2_PLACEMENT_3D as a frame (ISO 10303-42 build_axes; a 2D placement lies in z = 0). */
 export function frame(file: STEPFile, id: number | undefined): Frame {
   if (id !== undefined && file.is(id, 'AXIS2_PLACEMENT_2D')) {
     const [, location, refDirection] = file.args(id, 'AXIS2_PLACEMENT_2D'),
       o = point(file, ref(location)),
-      x = ref(refDirection) !== undefined ? direction(file, ref(refDirection)) : ([1, 0, 0] as V3);
+      x = ref(refDirection) !== undefined ? direction(file, ref(refDirection)) : ([1, 0, 0] as XYZ);
     return { origin: [o[0], o[1], 0], x, y: [-x[1], x[0], 0], z: [0, 0, 1] };
   }
   if (id === undefined || !file.is(id, 'AXIS2_PLACEMENT_3D'))
     throw new TypeError(`Invalid STEP file: #${id} is not an axis placement`);
   const [, location, axis, refDirection] = file.args(id, 'AXIS2_PLACEMENT_3D'),
     origin = point(file, ref(location)),
-    z = ref(axis) !== undefined ? direction(file, ref(axis)) : ([0, 0, 1] as V3);
-  let x: V3 =
+    z = ref(axis) !== undefined ? direction(file, ref(axis)) : ([0, 0, 1] as XYZ);
+  let x: XYZ =
     ref(refDirection) !== undefined
       ? direction(file, ref(refDirection))
       : Math.abs(z[0]) > 1 - 1e-9

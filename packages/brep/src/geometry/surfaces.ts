@@ -5,7 +5,7 @@ import { Enum, type STEPFile, type STEPValue } from '../step/file.js';
 import { angleStep, type Curve } from './curves.js';
 import { clamped, knotVector, spanBreaks, surfaceAt, type SplineSurface } from './nurbs.js';
 import { direction, frame, list, num, point, ref, unsupported, vector, type Frame } from './read.js';
-import { add, cross, distance, dot, length, scale, sub, unit, type V3 } from './vec.js';
+import { add, cross, distance, dot, length, scale, sub, unit, type XYZ } from './vec.js';
 
 const TAU = 2 * Math.PI;
 const wrap = (a: number) => (a < 0 ? a + TAU : a);
@@ -21,7 +21,7 @@ export interface Surface {
   /** Point and first partial derivatives: [x, y, z, Su (3), Sv (3)]. */
   at(u: number, v: number): number[];
   /** Unit normal along Su x Sv, defined at poles and apexes too. */
-  normal(u: number, v: number): V3;
+  normal(u: number, v: number): XYZ;
   /** (u, v) of `p`, a point on or very near the surface; `hint` is a nearby (u, v). */
   parameters(p: readonly number[], hint?: readonly number[]): [number, number];
   /** Steps (du, dv) for interior points over the box [u0, u1, v0, v1]; Infinity where the surface is straight. */
@@ -35,7 +35,7 @@ export interface Surface {
 }
 
 /** Su x Sv made unit; at a degenerate point, the normal a little way into the domain. */
-function normalOf(s: Surface, u: number, v: number): V3 {
+function normalOf(s: Surface, u: number, v: number): XYZ {
   const d = s.at(u, v),
     n = unit(cross(d.slice(3, 6), d.slice(6, 9)));
   if (n) return n;
@@ -46,7 +46,7 @@ function normalOf(s: Surface, u: number, v: number): V3 {
 }
 
 /** Radial and tangential unit vectors of angle u in a frame's xy plane. */
-const radial = (f: Frame, u: number): [V3, V3] => {
+const radial = (f: Frame, u: number): [XYZ, XYZ] => {
   const c = Math.cos(u),
     s = Math.sin(u);
   return [
@@ -170,7 +170,7 @@ class Sphere implements Surface {
       ...add(scale(e, -R * sv), scale(z, R * cv)),
     ];
   }
-  normal(u: number, v: number): V3 {
+  normal(u: number, v: number): XYZ {
     const [e] = radial(this.f, u);
     return add(scale(e, Math.cos(v)), scale(this.f.z, Math.sin(v)));
   }
@@ -216,7 +216,7 @@ class Torus implements Surface {
       ...add(scale(e, -this.minor * sv), scale(z, this.minor * cv)),
     ];
   }
-  normal(u: number, v: number): V3 {
+  normal(u: number, v: number): XYZ {
     const [e] = radial(this.f, u),
       n = add(scale(e, Math.cos(v)), scale(this.f.z, Math.sin(v)));
     return this.major + this.minor * Math.cos(v) < 0 ? scale(n, -1) : n;
@@ -253,13 +253,13 @@ class Revolution implements Surface {
   readonly vDomain = [-Infinity, Infinity] as const;
   constructor(
     private readonly profile: Curve,
-    private readonly axisPoint: V3,
-    private readonly axis: V3,
+    private readonly axisPoint: XYZ,
+    private readonly axis: XYZ,
   ) {
     this.vPeriod = profile.period;
   }
   /** Rotates w about the axis direction by angle u (Rodrigues). */
-  private rotate(w: readonly number[], u: number): V3 {
+  private rotate(w: readonly number[], u: number): XYZ {
     const c = Math.cos(u),
       s = Math.sin(u),
       a = this.axis;
@@ -318,7 +318,7 @@ class Extrusion implements Surface {
   readonly vDomain = [-Infinity, Infinity] as const;
   constructor(
     private readonly profile: Curve,
-    private readonly direction: V3,
+    private readonly direction: XYZ,
   ) {
     this.uPeriod = profile.period;
   }

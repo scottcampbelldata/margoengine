@@ -1,15 +1,15 @@
 // Making solids: extrusion of a closed planar profile of lines and arcs (box and cylinder are extrusions), and the
 // cone, sphere and torus. Every face, edge and vertex is named after the operation and what made it, and each
 // operation records its names in the History it is given.
-import { add, cross, dot, length, scale, sub, unit, type V3 } from '../geometry/vec.js';
+import { add, cross, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
 import { frameOf, type CurveDef, type Frame, type SurfaceDef } from './geometry.js';
 import { Body, Edge, Face, Vertex, type History, type Name } from './topology.js';
 
 /** One piece of a profile: a line to `to`, or an arc to `to` about `center` (counter-clockwise about the profile normal unless `clockwise`). */
 export interface ProfileSegment {
   readonly kind: 'line' | 'arc';
-  readonly to: V3;
-  readonly center?: V3;
+  readonly to: XYZ;
+  readonly center?: XYZ;
   readonly clockwise?: boolean;
   /** The name the side face made from this segment takes after the operation's name. */
   readonly name?: Name;
@@ -18,16 +18,16 @@ export interface ProfileSegment {
 /** A closed planar profile: from `start`, segment by segment, back to `start`. */
 export interface Profile {
   readonly name: Name;
-  readonly start: V3;
+  readonly start: XYZ;
   /** Normal of the profile's plane. */
-  readonly normal: V3;
+  readonly normal: XYZ;
   readonly segments: readonly ProfileSegment[];
 }
 
-const same = (a: V3, b: V3, tolerance: number) => length(sub(a, b)) <= tolerance;
+const same = (a: XYZ, b: XYZ, tolerance: number) => length(sub(a, b)) <= tolerance;
 
 /** Signed area of a profile about `n` (counter-clockwise positive), arcs included. */
-function signedArea(profile: Profile, n: V3): number {
+function signedArea(profile: Profile, n: XYZ): number {
   let area = 0,
     at = profile.start;
   for (const s of profile.segments) {
@@ -70,7 +70,7 @@ function reversed(profile: Profile): Profile {
 export function extrude(
   name: Name,
   profile: Profile,
-  vector: V3,
+  vector: XYZ,
   { history, bottom = 'bottom', top = 'top' }: { history?: History; bottom?: Name; top?: Name } = {},
 ): Body {
   const along = unit(vector),
@@ -101,7 +101,7 @@ export function extrude(
     bottomV = points.map((q, k) => new Vertex(`${name}/vertex:${bottom}:${k}`, q)),
     topV = points.map((q, k) => new Vertex(`${name}/vertex:${top}:${k}`, add(q, d)));
   // Curves of the profile segments, at the bottom and moved up by the extrusion.
-  const segmentCurve = (k: number, shift: V3): { curve: CurveDef; sameSense: boolean } => {
+  const segmentCurve = (k: number, shift: XYZ): { curve: CurveDef; sameSense: boolean } => {
     const s = p.segments[k],
       from = add(points[k], shift),
       to = add(s.to, shift);
@@ -178,7 +178,7 @@ const faceOf = (name: Name, surface: SurfaceDef, sense = true) => new Face(name,
 /** A box of the given sizes from `frame`'s origin along its x, y and z axes, faces named -x, +x, -y, +y, -z, +z. */
 export function box(
   name: Name,
-  size: V3,
+  size: XYZ,
   frame: Frame = frameOf([0, 0, 0], [0, 0, 1], [1, 0, 0]),
   history?: History,
 ): Body {

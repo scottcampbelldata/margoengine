@@ -43,7 +43,7 @@ const scratchTable = new Float64Array((MAX_DEGREE + 1) * (MAX_DEGREE + 1)),
  * A2.3 for orders 0 and 1, into `values[j]` (the basis functions N(span - p + j, p) at u) and `derivatives[j]`, each
  * with room for p + 1 entries.
  */
-export function basisInto(
+function basisInto(
   span: number,
   u: number,
   p: number,

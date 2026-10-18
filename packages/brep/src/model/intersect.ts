@@ -1,7 +1,7 @@
 // Intersections for the Boolean operations: exact curves where a closed form exists (plane with plane, plane with
 // cylinder, parallel cylinders, and every pair of surfaces of revolution on one axis, which meet in circles), and
 // curves traced point by point inside a box for every other pair of analytic surfaces (march.ts).
-import { add, cross, dot, length, scale, sub, unit, type V3 } from '../geometry/vec.js';
+import { add, cross, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
 import { signedDistance } from './distance.js';
 import { frameOf, type CurveDef, type SurfaceDef } from './geometry.js';
 import { traceIntersections, type Box3 } from './march.js';
@@ -11,9 +11,9 @@ export { curveSurfaceCrossings, distanceGradient, signedDistance } from './dista
 /** What two surfaces share: curves, the same surface (coincident), or nothing. */
 export type SurfaceIntersection =
   /** `crossings`: points where two curves cross (the surfaces touch tangentially there). */
-  { kind: 'curves'; curves: CurveDef[]; crossings?: V3[] } | { kind: 'coincident' } | { kind: 'none' };
+  { kind: 'curves'; curves: CurveDef[]; crossings?: XYZ[] } | { kind: 'coincident' } | { kind: 'none' };
 
-const parallel = (a: V3, b: V3) => length(cross(a, b)) <= 1e-12;
+const parallel = (a: XYZ, b: XYZ) => length(cross(a, b)) <= 1e-12;
 
 /**
  * What two analytic surfaces share: curves, the same surface, or nothing. Exact where a closed form exists (plane with
@@ -37,12 +37,12 @@ export function intersectSurfaces(a: SurfaceDef, b: SurfaceDef, box?: Box3): Sur
   return curves.length ? { kind: 'curves', curves, crossings } : { kind: 'none' };
 }
 
-type Axis = { o: V3; z: V3 };
+type Axis = { o: XYZ; z: XYZ };
 type P2 = [number, number];
 /** A surface of revolution's profile in its half-plane: rho (distance from the axis) and h (height along it). */
 type Meridian = { kind: 'line'; p: P2; d: P2 } | { kind: 'circle'; c: P2; r: number };
 
-const fromAxis = (axis: Axis, p: V3) => {
+const fromAxis = (axis: Axis, p: XYZ) => {
   const d = sub(p, axis.o),
     h = dot(d, axis.z);
   return { h, rho: length(sub(d, scale(axis.z, h))) };
@@ -74,7 +74,7 @@ function revolutionPair(a: SurfaceDef, b: SurfaceDef): SurfaceIntersection | und
       axis = { o: a.frame.origin, z: unit(d)! };
     } else return undefined;
   }
-  const about = (s: SurfaceDef & { frame: { origin: V3; z: V3 } }) =>
+  const about = (s: SurfaceDef & { frame: { origin: XYZ; z: XYZ } }) =>
     s.kind === 'plane'
       ? parallel(s.frame.z, axis.z)
       : s.kind === 'sphere'
@@ -168,7 +168,7 @@ function meet(m: Meridian, n: Meridian, tol: number): P2[] | 'same' {
   return [];
 }
 
-function planePlane(o1: V3, n1: V3, o2: V3, n2: V3): SurfaceIntersection {
+function planePlane(o1: XYZ, n1: XYZ, o2: XYZ, n2: XYZ): SurfaceIntersection {
   const direction = cross(n1, n2),
     len = length(direction);
   if (len <= 1e-12) return Math.abs(dot(sub(o2, o1), n1)) <= 1e-12 ? { kind: 'coincident' } : { kind: 'none' };
@@ -180,7 +180,7 @@ function planePlane(o1: V3, n1: V3, o2: V3, n2: V3): SurfaceIntersection {
   return { kind: 'curves', curves: [{ kind: 'line', origin: point, direction: u }] };
 }
 
-function planeCylinder(o: V3, n: V3, c: V3, axis: V3, x: V3, r: number): SurfaceIntersection {
+function planeCylinder(o: XYZ, n: XYZ, c: XYZ, axis: XYZ, x: XYZ, r: number): SurfaceIntersection {
   const along = dot(n, axis);
   if (Math.abs(along) <= 1e-12) {
     // Plane parallel to the axis: none, one tangent line or two lines along the axis.
@@ -206,7 +206,7 @@ function planeCylinder(o: V3, n: V3, c: V3, axis: V3, x: V3, r: number): Surface
   };
 }
 
-function parallelCylinders(c1: V3, axis: V3, r1: number, c2: V3, r2: number): SurfaceIntersection {
+function parallelCylinders(c1: XYZ, axis: XYZ, r1: number, c2: XYZ, r2: number): SurfaceIntersection {
   // In the plane across the axes: two circles; their crossing points run along the axis.
   const d = sub(c2, c1),
     offset = sub(d, scale(axis, dot(d, axis))),

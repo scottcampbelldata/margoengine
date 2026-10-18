@@ -6,14 +6,14 @@
 // on both surfaces to rounding; the curve between them is a cubic Hermite spline through the points and their exact
 // tangents (deviation about 1e-11 of the step for that turn). A branch ends where it leaves the box or comes back to
 // its start. Where the surfaces touch tangentially the direction is undefined: that throws a RangeError.
-import { add, cross, dot, length, scale, sub, unit, type V3 } from '../geometry/vec.js';
+import { add, cross, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
 import { curveSurfaceCrossings, distanceGradient, meetDirection, signedDistance } from './distance.js';
 import { curveEvaluator, frameOf, type CurveDef, type SurfaceDef } from './geometry.js';
 
 /** An axis-aligned box. */
 export interface Box3 {
-  readonly min: V3;
-  readonly max: V3;
+  readonly min: XYZ;
+  readonly max: XYZ;
 }
 
 const MAX_TURN = 0.08;
@@ -23,14 +23,14 @@ const MAX_TURN = 0.08;
  * points where two of them cross: there the surfaces touch tangentially (two equal cylinders at right angles), and the
  * Booleans put a vertex.
  */
-export function traceIntersections(a: SurfaceDef, b: SurfaceDef, box: Box3): { curves: CurveDef[]; crossings: V3[] } {
+export function traceIntersections(a: SurfaceDef, b: SurfaceDef, box: Box3): { curves: CurveDef[]; crossings: XYZ[] } {
   const size = length(sub(box.max, box.min));
   if (!(size > 0)) return { curves: [], crossings: [] };
   const hmax = size / 8,
     scale0 = size + Math.max(...box.min.map(Math.abs), ...box.max.map(Math.abs)),
-    branches: { points: V3[]; tangents: V3[] }[] = [],
+    branches: { points: XYZ[]; tangents: XYZ[] }[] = [],
     curves: CurveDef[] = [];
-  const covered = (p: V3) =>
+  const covered = (p: XYZ) =>
     branches.some(({ points, tangents }) => {
       for (let i = 0; i + 1 < points.length; i++) {
         const q = points[i],
@@ -70,12 +70,12 @@ export function traceIntersections(a: SurfaceDef, b: SurfaceDef, box: Box3): { c
   // Curves that meet cross where the surfaces touch tangentially (two equal cylinders at right angles): the tracer
   // steps over such a point, so it is found here, from chords that come within their sag of each other, and moved onto
   // both curves.
-  const sag = (t: { points: V3[]; tangents: V3[] }, k: number) =>
+  const sag = (t: { points: XYZ[]; tangents: XYZ[] }, k: number) =>
       (length(sub(t.points[k + 1], t.points[k])) *
         Math.acos(Math.min(1, Math.abs(dot(t.tangents[k], t.tangents[k + 1]))))) /
       8,
     near = 1e-6 * size,
-    crossings: V3[] = [];
+    crossings: XYZ[] = [];
   for (let i = 0; i < branches.length; i++)
     for (let j = i; j < branches.length; j++) {
       const p = branches[i].points,
@@ -90,8 +90,8 @@ export function traceIntersections(a: SurfaceDef, b: SurfaceDef, box: Box3): { c
             const ci = curveEvaluator(curves[i]),
               cj = curveEvaluator(curves[j]);
             for (let k = 0; k < 60; k++) {
-              const yi = ci.at(ci.parameter(x)).slice(0, 3) as V3,
-                yj = cj.at(cj.parameter(x)).slice(0, 3) as V3;
+              const yi = ci.at(ci.parameter(x)).slice(0, 3) as XYZ,
+                yj = cj.at(cj.parameter(x)).slice(0, 3) as XYZ;
               x = scale(add(yi, yj), 0.5);
               if (length(sub(yi, yj)) <= 1e-12 * scale0) break;
             }
@@ -103,7 +103,7 @@ export function traceIntersections(a: SurfaceDef, b: SurfaceDef, box: Box3): { c
 }
 
 /** The closest points of segments pq and rs, and their distance. */
-function closest(p: V3, q: V3, r: V3, s: V3): { p: V3; q: V3; distance: number } {
+function closest(p: XYZ, q: XYZ, r: XYZ, s: XYZ): { p: XYZ; q: XYZ; distance: number } {
   const d1 = sub(q, p),
     d2 = sub(s, r),
     w = sub(p, r),
@@ -136,13 +136,13 @@ function closest(p: V3, q: V3, r: V3, s: V3): { p: V3; q: V3; distance: number }
   return { p: x, q: y, distance: length(sub(x, y)) };
 }
 
-function inside(box: Box3, p: V3, margin: number): boolean {
+function inside(box: Box3, p: XYZ, margin: number): boolean {
   for (let k = 0; k < 3; k++) if (p[k] < box.min[k] - margin || p[k] > box.max[k] + margin) return false;
   return true;
 }
 
 /** Solves [r1; r2; r3] x = rhs (Cramer's rule); undefined when singular. */
-function solve3(r1: V3, r2: V3, r3: V3, rhs: V3): V3 | undefined {
+function solve3(r1: XYZ, r2: XYZ, r3: XYZ, rhs: XYZ): XYZ | undefined {
   const c23 = cross(r2, r3),
     det = dot(r1, c23);
   if (!(Math.abs(det) > 1e-14)) return undefined;
@@ -157,7 +157,7 @@ function solve3(r1: V3, r2: V3, r3: V3, rhs: V3): V3 | undefined {
 }
 
 /** Newton's method from `p` onto both surfaces, staying in the plane through `anchor` across `along`. */
-function settle(a: SurfaceDef, b: SurfaceDef, p: V3, anchor: V3, along: V3, scale0: number): V3 | undefined {
+function settle(a: SurfaceDef, b: SurfaceDef, p: XYZ, anchor: XYZ, along: XYZ, scale0: number): XYZ | undefined {
   if (!length(along)) return undefined;
   let q = p;
   const eps = 4e-16 * scale0;
@@ -181,14 +181,14 @@ function settle(a: SurfaceDef, b: SurfaceDef, p: V3, anchor: V3, along: V3, scal
 function walk(
   a: SurfaceDef,
   b: SurfaceDef,
-  start: V3,
-  direction: V3,
+  start: XYZ,
+  direction: XYZ,
   box: Box3,
   hmax: number,
   scale0: number,
-): { points: V3[]; tangents: V3[]; closed: boolean } {
-  const points: V3[] = [start],
-    tangents: V3[] = [direction];
+): { points: XYZ[]; tangents: XYZ[]; closed: boolean } {
+  const points: XYZ[] = [start],
+    tangents: XYZ[] = [direction];
   let h = hmax / 4,
     travelled = 0;
   for (let steps = 0; steps < 200_000; steps++) {
@@ -231,8 +231,8 @@ function walk(
 }
 
 /** A C1 cubic B-spline (a chain of Bezier segments) through the points with the given unit tangents. */
-function hermite(points: V3[], tangents: V3[], closed: boolean): CurveDef {
-  const control: V3[] = [points[0]],
+function hermite(points: XYZ[], tangents: XYZ[], closed: boolean): CurveDef {
+  const control: XYZ[] = [points[0]],
     knots = [0],
     multiplicities = [4];
   let t = 0;
@@ -264,18 +264,18 @@ function hermite(points: V3[], tangents: V3[], closed: boolean): CurveDef {
 
 /** The lines and circles lying on `s` across `box`, each with its parameter range. */
 function isoCurves(s: SurfaceDef, box: Box3, n: number): { curve: CurveDef; t0: number; t1: number }[] {
-  const corners: V3[] = [];
+  const corners: XYZ[] = [];
   for (let i = 0; i < 8; i++)
     corners.push([i & 1 ? box.max[0] : box.min[0], i & 2 ? box.max[1] : box.min[1], i & 4 ? box.max[2] : box.min[2]]);
   if (s.kind === 'spline') throw new RangeError('Booleans on spline surfaces are not supported yet');
   const { origin: o, x, y, z } = s.frame,
-    range = (axis: V3) => {
+    range = (axis: XYZ) => {
       const v = corners.map((c) => dot(sub(c, o), axis));
       return [Math.min(...v), Math.max(...v)];
     },
-    at = (a: number, dx: V3, b: number, dy: V3) => add(o, add(scale(dx, a), scale(dy, b))),
+    at = (a: number, dx: XYZ, b: number, dy: XYZ) => add(o, add(scale(dx, a), scale(dy, b))),
     out: { curve: CurveDef; t0: number; t1: number }[] = [],
-    circle = (centre: V3, normal: V3, radius: number, xDir?: V3) => {
+    circle = (centre: XYZ, normal: XYZ, radius: number, xDir?: XYZ) => {
       if (radius > 0)
         out.push({ curve: { kind: 'circle', frame: frameOf(centre, normal, xDir), radius }, t0: 0, t1: 2 * Math.PI });
     },
@@ -298,7 +298,7 @@ function isoCurves(s: SurfaceDef, box: Box3, n: number): { curve: CurveDef; t0: 
         cos = Math.cos(s.kind === 'cone' ? s.angle : 0);
       for (let k = 0; k < n; k++) {
         const u = (2 * Math.PI * k) / n,
-          r: V3 = add(scale(x, Math.cos(u)), scale(y, Math.sin(u))),
+          r: XYZ = add(scale(x, Math.cos(u)), scale(y, Math.sin(u))),
           dir = unit(add(z, scale(r, tan)))!;
         out.push({
           curve: { kind: 'line', origin: add(o, scale(r, s.radius)), direction: dir },
@@ -321,8 +321,8 @@ function isoCurves(s: SurfaceDef, box: Box3, n: number): { curve: CurveDef; t0: 
     case 'torus':
       for (let k = 0; k < n; k++) {
         const u = (2 * Math.PI * k) / n,
-          r: V3 = add(scale(x, Math.cos(u)), scale(y, Math.sin(u))),
-          along: V3 = add(scale(x, -Math.sin(u)), scale(y, Math.cos(u)));
+          r: XYZ = add(scale(x, Math.cos(u)), scale(y, Math.sin(u))),
+          along: XYZ = add(scale(x, -Math.sin(u)), scale(y, Math.cos(u)));
         circle(add(o, scale(r, s.major)), along, s.minor, r);
         circle(add(o, scale(z, s.minor * Math.sin(u))), z, s.major + s.minor * Math.cos(u), x);
       }
@@ -332,9 +332,9 @@ function isoCurves(s: SurfaceDef, box: Box3, n: number): { curve: CurveDef; t0: 
 }
 
 /** Points where curves lying on `s` cross `other`, inside the box. */
-function seeds(s: SurfaceDef, other: SurfaceDef, box: Box3): V3[] {
+function seeds(s: SurfaceDef, other: SurfaceDef, box: Box3): XYZ[] {
   const margin = 1e-9 * length(sub(box.max, box.min)),
-    out: V3[] = [];
+    out: XYZ[] = [];
   for (const { curve, t0, t1 } of isoCurves(s, box, 32))
     for (const t of curveSurfaceCrossings(curve, other, t0, t1)) {
       const c = curve.kind === 'line' ? add(curve.origin, scale(curve.direction, t)) : undefined,
@@ -344,7 +344,7 @@ function seeds(s: SurfaceDef, other: SurfaceDef, box: Box3): V3[] {
   return out;
 }
 
-function circlePoint(curve: CurveDef, t: number): V3 {
+function circlePoint(curve: CurveDef, t: number): XYZ {
   if (curve.kind !== 'circle') throw new TypeError('expected a circle');
   const { origin, x, y } = curve.frame;
   return add(origin, add(scale(x, curve.radius * Math.cos(t)), scale(y, curve.radius * Math.sin(t))));

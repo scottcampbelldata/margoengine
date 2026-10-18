@@ -3,21 +3,23 @@
 // a curve. Every face, edge and vertex has a persistent name: the operation that made it and what it was made from,
 // so a reference to "the side face from sketch edge 3" survives later edits (operations record what they generate,
 // modify and delete in a History).
-import type { V3 } from '../geometry/vec.js';
+import type { XYZ } from '../geometry/vec.js';
 import type { CurveDef, SurfaceDef } from './geometry.js';
 
 /** A persistent name, such as 'box1/face:+z' or 'extrude2/side:sketch1/e3'. */
 export type Name = string;
 
+/** A point where edges meet, with its persistent name and how far it may be from its edges' curves. */
 export class Vertex {
   constructor(
     public name: Name,
-    public point: V3,
+    public point: XYZ,
     /** Largest distance the vertex may be from the curves of its edges, in metres. */
     public tolerance = 1e-7,
   ) {}
 }
 
+/** A bounded piece of a curve between two vertices (one, for a closed edge), used once each way by two face loops in a solid. */
 export class Edge {
   /** The edge's uses by face loops: two, run in opposite directions, for an edge inside a solid. */
   readonly coedges: Coedge[] = [];
@@ -37,6 +39,7 @@ export class Edge {
   }
 }
 
+/** One use of an edge by a face loop, along the edge or against it. */
 export class Coedge {
   constructor(
     public readonly edge: Edge,
@@ -54,6 +57,7 @@ export class Coedge {
   }
 }
 
+/** A closed chain of coedges bounding a face; the face lies to their left seen from its normal. */
 export class Loop {
   readonly coedges: Coedge[] = [];
   constructor(public face: Face) {}
@@ -65,6 +69,7 @@ export class Loop {
   }
 }
 
+/** A bounded piece of a surface, its normal along the surface's or against it, bounded by loops. */
 export class Face {
   readonly loops: Loop[] = [];
   constructor(
@@ -82,6 +87,7 @@ export class Face {
   }
 }
 
+/** A connected set of faces: a closed shell bounds a solid (or a cavity in one). */
 export class Shell {
   readonly faces: Face[] = [];
   /** For a cavity's shell: the shell it lies inside. Its faces face into the cavity, out of the material. */
@@ -94,6 +100,7 @@ export class Shell {
   }
 }
 
+/** A solid or a sheet: its shells, and the faces, edges and vertices they hold. */
 export class Body {
   readonly shells: Shell[] = [];
   constructor(

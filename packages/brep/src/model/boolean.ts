@@ -4,7 +4,7 @@
 // is the sharpest left turn about the face normal), so seams and periodic surfaces need no special cases; loops are
 // grouped into faces by which side of every loop a point inside each lies. Inside/outside comes from rays cast
 // against the other solid's exact faces (three directions, majority), not from a mesh.
-import { cross, dot, length, scale, sub, unit, type V3 } from '../geometry/vec.js';
+import { cross, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
 import { curveEvaluator, surfaceEvaluator, type CurveDef } from './geometry.js';
 import { FaceUV, gaps, leftOf, shiftV, vRange, type UV, type UVLoop } from './faces.js';
 import { curveSurfaceCrossings, intersectSurfaces, signedDistance } from './intersect.js';
@@ -27,7 +27,7 @@ interface Piece {
   /** Names it came from, for the history: the edge it was split from, or the two faces it was cut along. */
   from: Name[];
   edge?: Edge;
-  samples?: V3[];
+  samples?: XYZ[];
   /** A piece of the other solid lying along this one: the result keeps that one (flip: it runs the other way). */
   alias?: { piece: Piece; flip: boolean };
 }
@@ -55,7 +55,7 @@ interface Region {
   face: Face;
   from: 'a' | 'b';
   loops: Half[][];
-  point: V3;
+  point: XYZ;
 }
 
 const TWO_PI = 2 * Math.PI;
@@ -91,7 +91,7 @@ export function boolean(
   // Model size: the merge tolerance for points computed twice, and how far a ray must go to leave both solids.
   let size = 0;
   for (const f of [...faces.a, ...faces.b]) {
-    const s = f.surface as { frame?: { origin: V3 }; radius?: number; major?: number; minor?: number };
+    const s = f.surface as { frame?: { origin: XYZ }; radius?: number; major?: number; minor?: number };
     if (s.frame && (s.radius !== undefined || s.major !== undefined))
       size = Math.max(size, length(s.frame.origin) + (s.radius ?? (s.major ?? 0) + (s.minor ?? 0)));
   }
@@ -106,7 +106,7 @@ export function boolean(
   const vertices: Vertex[] = [],
     original = new Map<Vertex, Vertex>();
   let vertexCount = 0;
-  const vertexAt = (p: V3, keep?: Vertex): Vertex => {
+  const vertexAt = (p: XYZ, keep?: Vertex): Vertex => {
     for (const v of vertices) if (length(sub(v.point, p)) <= touch) return v;
     const v = new Vertex(keep?.name ?? `${name}/vertex:${vertexCount++}`, p, keep?.tolerance);
     vertices.push(v);
@@ -119,7 +119,7 @@ export function boolean(
     split = (e: Edge, t: number, vertex: Vertex) => splits.set(e, [...(splits.get(e) ?? []), { t, vertex }]),
     lying: [Edge, Face][] = [];
   /** The parameter of `p` on edge `e` when it lies on the edge (within touch, inside its range), else undefined. */
-  const onEdge = (e: Edge, p: V3): number | undefined => {
+  const onEdge = (e: Edge, p: XYZ): number | undefined => {
     const c = curveEvaluator(e.curve),
       [t0, t1] = edgeParameters(e, 1),
       lo = Math.min(t0, t1),
@@ -127,7 +127,7 @@ export function boolean(
     let t = c.parameter(p);
     if (c.period) t = lo + ((((t - lo) % c.period) + c.period) % c.period);
     if (t < lo - 1e-12 * (hi - lo) || t > hi + 1e-12 * (hi - lo)) return undefined;
-    return length(sub(c.at(t).slice(0, 3) as V3, p)) <= touch ? t : undefined;
+    return length(sub(c.at(t).slice(0, 3) as XYZ, p)) <= touch ? t : undefined;
   };
   const contacts = (edges: Edge[], others: Face[], otherVertices: Vertex[]) => {
     for (const e of edges) {
@@ -138,12 +138,12 @@ export function boolean(
       for (const g of others) {
         // An edge lying in the face's surface: it may cut the face (below), and crosses nothing there.
         const samples = edgeParameters(e, 6).slice(1, -1);
-        if (samples.every((t) => Math.abs(signedDistance(g.surface, c.at(t).slice(0, 3) as V3)) <= touch)) {
+        if (samples.every((t) => Math.abs(signedDistance(g.surface, c.at(t).slice(0, 3) as XYZ)) <= touch)) {
           lying.push([e, g]);
           continue;
         }
         for (const t of curveSurfaceCrossings(e.curve, g.surface, Math.min(t0, t1), Math.max(t0, t1))) {
-          const p = c.at(t).slice(0, 3) as V3;
+          const p = c.at(t).slice(0, 3) as XYZ;
           // On the face's boundary (tested first: the inside test is not reliable there): the edge crosses one of its
           // edges, and both are cut.
           let onBoundary = false;
@@ -206,7 +206,7 @@ export function boolean(
     middle = (p: Piece) =>
       curveEvaluator(p.curve)
         .at((p.t0 + p.t1) / 2)
-        .slice(0, 3) as V3,
+        .slice(0, 3) as XYZ,
     /** Whether piece p runs along piece q (same ends, p's middle on q within its range). */
     along = (p: Piece, q: Piece) => {
       const m = middle(p),
@@ -216,7 +216,7 @@ export function boolean(
       let t = c.parameter(m);
       if (c.period) t = lo + ((((t - lo) % c.period) + c.period) % c.period);
       return (
-        t >= lo - 1e-9 * (hi - lo) && t <= hi + 1e-9 * (hi - lo) && length(sub(c.at(t).slice(0, 3) as V3, m)) <= touch
+        t >= lo - 1e-9 * (hi - lo) && t <= hi + 1e-9 * (hi - lo) && length(sub(c.at(t).slice(0, 3) as XYZ, m)) <= touch
       );
     },
     byEnds = new Map<string, Piece[]>();
@@ -279,7 +279,7 @@ export function boolean(
               for (const s of splits.get(co.edge) ?? []) {
                 if (stops.some((x) => x.vertex === s.vertex)) continue;
                 const t = c.parameter(s.vertex.point);
-                if (length(sub(c.at(t).slice(0, 3) as V3, s.vertex.point)) <= touch)
+                if (length(sub(c.at(t).slice(0, 3) as XYZ, s.vertex.point)) <= touch)
                   stops.push({ t, vertex: s.vertex });
               }
         // Where two curves cross (the surfaces touch tangentially there): a vertex on each. At a corner the faces share
@@ -293,7 +293,7 @@ export function boolean(
               `faces ${fa.name} and ${fb.name} touch tangentially where their curves cross: Booleans there are not supported yet`,
             );
           const t = c.parameter(x);
-          if (length(sub(c.at(t).slice(0, 3) as V3, x)) > touch) continue;
+          if (length(sub(c.at(t).slice(0, 3) as XYZ, x)) > touch) continue;
           const v = vertexAt(x);
           if (!stops.some((y) => y.vertex === v)) stops.push({ t, vertex: v });
         }
@@ -304,11 +304,11 @@ export function boolean(
               const v = original.get(co.start)!;
               if (stops.some((x) => x.vertex === v)) continue;
               const t = c.parameter(v.point);
-              if (length(sub(c.at(t).slice(0, 3) as V3, v.point)) <= touch) stops.push({ t, vertex: v });
+              if (length(sub(c.at(t).slice(0, 3) as XYZ, v.point)) <= touch) stops.push({ t, vertex: v });
             }
         stops.sort((x, y) => x.t - y.t);
         /** A boundary piece of `f` between these vertices that the stretch runs along, if any. */
-        const onBoundary = (f: Face, start: Vertex, end: Vertex, m: V3) => {
+        const onBoundary = (f: Face, start: Vertex, end: Vertex, m: XYZ) => {
           for (const q of boundaryOf(f))
             if (
               ((q.start === start && q.end === end) || (q.start === end && q.end === start)) &&
@@ -318,7 +318,7 @@ export function boolean(
           return undefined;
         };
         const push = (t0: number, t1: number, start: Vertex, end: Vertex) => {
-          const m = c.at((t0 + t1) / 2).slice(0, 3) as V3,
+          const m = c.at((t0 + t1) / 2).slice(0, 3) as XYZ,
             onA = onBoundary(fa, start, end, m),
             onB = onBoundary(fb, start, end, m);
           // Along an edge of either face: that edge, cutting the other face where it lies inside it.
@@ -346,7 +346,7 @@ export function boolean(
         };
         if (closed && !stops.length) {
           const t0 = c.domain[0],
-            p0 = c.at(t0).slice(0, 3) as V3;
+            p0 = c.at(t0).slice(0, 3) as XYZ;
           if (uvOf.get(fa)!.contains(p0) && uvOf.get(fb)!.contains(p0)) {
             const v = vertexAt(p0);
             push(t0, t0 + period, v, v);
@@ -419,7 +419,7 @@ export function boolean(
   const members = new Map<number, number[]>();
   facing.forEach((_, i) => members.set(top(i), [...(members.get(top(i)) ?? []), i]));
   /** Each result face: the input face it is named from, its sense, its loops, a point inside it, and its other sources. */
-  const outputs: { face: Face; sense: boolean; loops: Half[][]; point: V3; sources: Face[] }[] = [];
+  const outputs: { face: Face; sense: boolean; loops: Half[][]; point: XYZ; sources: Face[] }[] = [];
   for (const list of members.values()) {
     const first = facing[list[0]],
       sources = [...new Set(list.map((i) => facing[i].region.face))];
@@ -465,7 +465,7 @@ export function boolean(
     generated: [Name, Name[]][] = [],
     modified: [Name, Name][] = [],
     made: Face[] = [],
-    pointOf = new Map<Face, V3>();
+    pointOf = new Map<Face, XYZ>();
   for (const { face } of outputs) counts.set(face, (counts.get(face) ?? 0) + 1);
   const edgeOf = (p: Piece) => {
     if (!p.edge) {
@@ -545,21 +545,21 @@ export function boolean(
 }
 
 /** Samples of a piece in 3D from its start to its end (ends exactly at its vertices), shared by both its uses. */
-function samplesOf(p: Piece): V3[] {
+function samplesOf(p: Piece): XYZ[] {
   if (p.samples) return p.samples;
   const c = curveEvaluator(p.curve),
     n = p.curve.kind === 'line' ? 1 : 128,
-    out: V3[] = [];
+    out: XYZ[] = [];
   for (let k = 0; k <= n; k++)
     out.push(
-      k === 0 ? p.start.point : k === n ? p.end.point : (c.at(p.t0 + ((p.t1 - p.t0) * k) / n).slice(0, 3) as V3),
+      k === 0 ? p.start.point : k === n ? p.end.point : (c.at(p.t0 + ((p.t1 - p.t0) * k) / n).slice(0, 3) as XYZ),
     );
   p.samples = out;
   return out;
 }
 
 /** The unit direction of travel of a half at its start or its end. */
-function tangent(h: Half, atEnd: boolean): V3 {
+function tangent(h: Half, atEnd: boolean): XYZ {
   const p = h.piece,
     d = curveEvaluator(p.curve).at(h.forward !== atEnd ? p.t0 : p.t1),
     sign = (p.t1 >= p.t0 ? 1 : -1) * (h.forward ? 1 : -1);
@@ -567,14 +567,14 @@ function tangent(h: Half, atEnd: boolean): V3 {
 }
 
 /** A point a little way along a half from its start (or back from its end), to tell apart halves that leave a vertex tangent to each other. */
-function nearEnd(h: Half, atEnd: boolean): V3 {
+function nearEnd(h: Half, atEnd: boolean): XYZ {
   const s = samplesOf(h.piece),
     k = Math.min(4, s.length - 1);
   return h.forward !== atEnd ? s[k] : s[s.length - 1 - k];
 }
 
 /** Clockwise angle from `from` to `to` about `normal`, in (0, 2 pi]. */
-function clockwise(from: V3, to: V3, normal: V3): number {
+function clockwise(from: XYZ, to: XYZ, normal: XYZ): number {
   const a = -Math.atan2(dot(cross(from, to), normal), dot(from, to));
   return a <= 1e-12 ? a + TWO_PI : a;
 }
@@ -722,7 +722,7 @@ function probe(fuv: FaceUV, loop: UVLoop, all: UVLoop[], vBounds: readonly [numb
  * the opposite way, or in or out of it (rays in three directions, majority of their crossing counts).
  */
 function classify(
-  p: V3,
+  p: XYZ,
   fuv: FaceUV,
   others: Face[],
   uvOf: Map<Face, FaceUV>,
@@ -742,7 +742,7 @@ function classify(
     let count = 0;
     for (const g of others)
       for (const t of curveSurfaceCrossings(line, g.surface, 0, reach))
-        if (uvOf.get(g)!.contains(c.at(t).slice(0, 3) as V3)) count++;
+        if (uvOf.get(g)!.contains(c.at(t).slice(0, 3) as XYZ)) count++;
     if (count % 2) inside++;
   }
   return inside >= 2 ? 'in' : 'out';
@@ -812,10 +812,10 @@ function join(p: Piece, q: Piece, v: Vertex, touch: number): Piece | undefined {
     // q's middle and far end must lie on p's curve, beyond v from p.
     qMid = curveEvaluator(q.curve)
       .at((q.t0 + q.t1) / 2)
-      .slice(0, 3) as V3;
+      .slice(0, 3) as XYZ;
   for (const point of [qMid, far.point]) {
     const t = c.parameter(point);
-    if (length(sub(c.at(t).slice(0, 3) as V3, point)) > touch) return undefined;
+    if (length(sub(c.at(t).slice(0, 3) as XYZ, point)) > touch) return undefined;
   }
   // Continue past v the way p runs away from its far end.
   const dir = Math.sign(tv - tp) || 1,
@@ -839,7 +839,7 @@ function sameSide(f: Face, fSense: boolean, g: Face, gSense: boolean, piece: Pie
   }
   const m = curveEvaluator(piece.curve)
       .at((piece.t0 + piece.t1) / 2)
-      .slice(0, 3) as V3,
+      .slice(0, 3) as XYZ,
     normal = (s: Face, sense: boolean) => {
       const e = surfaceEvaluator(s.surface),
         [u, v] = e.parameters(m),
@@ -855,7 +855,7 @@ function sameSide(f: Face, fSense: boolean, g: Face, gSense: boolean, piece: Pie
  */
 function faceBox(fuv: FaceUV, merge: number): Box3 {
   const s = fuv.face.surface,
-    points: V3[] = [];
+    points: XYZ[] = [];
   if (s.kind === 'sphere' || s.kind === 'torus') {
     const r = s.kind === 'sphere' ? s.radius : s.major + s.minor,
       o = s.frame.origin;
@@ -867,8 +867,8 @@ function faceBox(fuv: FaceUV, merge: number): Box3 {
     for (let i = 0; i <= 16; i++)
       for (let j = 0; j <= 16; j++) points.push(fuv.at([u0 + ((u1 - u0) * i) / 16, v0 + ((v1 - v0) * j) / 16]));
   }
-  const min: V3 = [Infinity, Infinity, Infinity],
-    max: V3 = [-Infinity, -Infinity, -Infinity];
+  const min: XYZ = [Infinity, Infinity, Infinity],
+    max: XYZ = [-Infinity, -Infinity, -Infinity];
   for (const p of points)
     for (let k = 0; k < 3; k++) {
       min[k] = Math.min(min[k], p[k]);
@@ -880,8 +880,8 @@ function faceBox(fuv: FaceUV, merge: number): Box3 {
 
 /** The common part of two boxes, or undefined when they are apart. */
 function overlap(a: Box3, b: Box3): Box3 | undefined {
-  const min: V3 = [0, 0, 0],
-    max: V3 = [0, 0, 0];
+  const min: XYZ = [0, 0, 0],
+    max: XYZ = [0, 0, 0];
   for (let k = 0; k < 3; k++) {
     min[k] = Math.max(a.min[k], b.min[k]);
     max[k] = Math.min(a.max[k], b.max[k]);

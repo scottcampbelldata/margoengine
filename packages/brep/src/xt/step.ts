@@ -19,9 +19,9 @@ export interface XTConversion {
   readonly warnings: readonly string[];
 }
 
-type V3 = readonly number[];
-const sub = (a: V3, b: V3) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const scale = (a: V3, s: number) => [a[0] * s, a[1] * s, a[2] * s];
+type XYZ = readonly number[];
+const sub = (a: XYZ, b: XYZ) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const scale = (a: XYZ, s: number) => [a[0] * s, a[1] * s, a[2] * s];
 
 /** Converts a Parasolid transmit file (text or neutral binary) to STEP for the kernel. */
 export function xtToSTEP(input: string | ArrayBuffer | ArrayBufferView): XTConversion {
@@ -33,7 +33,8 @@ export function xtToSTEP(input: string | ArrayBuffer | ArrayBufferView): XTConve
     };
   const node = (index: XTValue | undefined): XTNode | undefined =>
     typeof index === 'number' && index > 0 ? xt.nodes.get(index) : undefined;
-  const vec = (v: XTValue | undefined): V3 | undefined => (Array.isArray(v) && v.length === 3 ? (v as V3) : undefined);
+  const vec = (v: XTValue | undefined): XYZ | undefined =>
+    Array.isArray(v) && v.length === 3 ? (v as XYZ) : undefined;
   const num = (v: XTValue | undefined, fallback = 0) => (typeof v === 'number' ? v : fallback);
   const list = (n: XTNode | undefined, field: string): XTValue[] =>
     n && Array.isArray(n.fields[field]) ? (n.fields[field] as XTValue[]) : [];
@@ -318,7 +319,7 @@ export function xtToSTEP(input: string | ArrayBuffer | ArrayBufferView): XTConve
 
   // --- topology -------------------------------------------------------------------------------------------------
   const vertices = new Map<number, string>();
-  const vertex = (v: XTNode | undefined, fallback: () => V3 | undefined): string | undefined => {
+  const vertex = (v: XTNode | undefined, fallback: () => XYZ | undefined): string | undefined => {
     if (v) {
       let id = vertices.get(v.index);
       if (!id) {
@@ -333,7 +334,7 @@ export function xtToSTEP(input: string | ArrayBuffer | ArrayBufferView): XTConve
     return p ? w.add(`VERTEX_POINT('',${w.point(p)})`) : undefined;
   };
   /** A point on a ring edge's curve, where its single vertex goes. */
-  const ringPoint = (c: XTNode | undefined): V3 | undefined => {
+  const ringPoint = (c: XTNode | undefined): XYZ | undefined => {
     if (!c) return undefined;
     const f = c.fields;
     if (c.name === 'CIRCLE') return vec(f.centre)!.map((v, k) => v + num(f.radius) * vec(f.x_axis)![k]);
@@ -487,7 +488,7 @@ export function xtToSTEP(input: string | ArrayBuffer | ArrayBufferView): XTConve
         return c;
       },
       idOf = (s: string) => Number(s.slice(1)),
-      pointOf = (id: number | undefined): V3 | undefined => {
+      pointOf = (id: number | undefined): XYZ | undefined => {
         if (id === undefined) return undefined;
         const coords = draft.args(id)[1];
         return Array.isArray(coords) ? coords.map((c) => (typeof c === 'number' ? c : 0)) : undefined;
