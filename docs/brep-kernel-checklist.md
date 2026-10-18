@@ -25,6 +25,9 @@ Every item is done only when all of these hold:
       mass properties, checking, healing, export) works on imported parts, not only on shapes built in Margo.
 - [ ] 1.3 Topology checker: Euler-Poincare (V - E + F - (L - F) - 2(S - G) = 0), every edge used twice and oppositely in
       a solid, consistent orientation, no face crossing another; run on every file read and every operation result.
+      Written (claude/kernel): validateBody (Euler-Poincare, one piece per shell) on every operation and import;
+      checkBody (orientation by enclosed volume, crossing edges of a face, edges through faces); extrude and revolve
+      refuse self-touching profiles. Left: two faces crossing in a closed curve that meets no edge of either.
 - [ ] 1.4 Crash immunity: every operation bounded (time and iteration limits on intersection, tracing and blend
       searches); every failure a typed error naming the cause; no unhandled exception on any input.
 - [ ] 1.5 Harnesses: an ABC Dataset slice runner, a sweep-and-jitter fuzzer for every operation, and a STEP round trip

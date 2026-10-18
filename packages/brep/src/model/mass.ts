@@ -214,19 +214,32 @@ function uDot(s: Surface, flip: boolean, uv: UV, p: number[]): number {
   return flip ? -du : du;
 }
 
+/** A point near some faces (the middle of their vertices' box): moments about it keep large coordinates from cancelling. */
+function centreOf(faces: readonly Face[]): XYZ {
+  const pts: XYZ[] = [];
+  for (const f of faces) for (const l of f.loops) for (const co of l.coedges) pts.push(co.start.point);
+  if (!pts.length) for (const f of faces) if ('frame' in f.surface) pts.push(f.surface.frame.origin);
+  return [0, 1, 2].map((k) =>
+    pts.length ? (Math.min(...pts.map((p) => p[k])) + Math.max(...pts.map((p) => p[k]))) / 2 : 0,
+  ) as XYZ;
+}
+
+/** The volume some faces enclose, signed: positive when they face out of it (a solid's shell), negative for a cavity's. */
+export function enclosedVolume(faces: readonly Face[]): number {
+  const c = centreOf(faces);
+  let volume = 0;
+  for (const f of faces) volume += faceIntegrals(f, c)[1];
+  return volume;
+}
+
 /**
  * Exact mass properties of a body of unit density (multiply volume and inertia by a density for mass): integrated
  * over its faces' surfaces within their edges, with no mesh. Faces of cavity shells face into the cavity, so their
  * contributions subtract.
  */
 export function massProperties(body: Body): MassProperties {
-  // Moments about a point near the body keep large coordinates from cancelling.
-  const pts = body.vertices.map((v) => v.point);
-  if (!pts.length) for (const f of body.faces) if ('frame' in f.surface) pts.push(f.surface.frame.origin);
-  const c: XYZ = [0, 1, 2].map((k) =>
-    pts.length ? (Math.min(...pts.map((p) => p[k])) + Math.max(...pts.map((p) => p[k]))) / 2 : 0,
-  ) as XYZ;
-  const sum = new Float64Array(K);
+  const c = centreOf(body.faces),
+    sum = new Float64Array(K);
   for (const f of body.faces) {
     const r = faceIntegrals(f, c);
     for (let k = 0; k < K; k++) sum[k] += r[k];

@@ -110,6 +110,15 @@ Where OpenCascade still leads (freeform NURBS intersections, advanced blends, he
   seams through a pole, and loops of seams only, left out as the modeler's own closed faces have them. Round trips of a
   box, cylinder, sphere, torus, holed block and rounded box come back valid with volume and area within 1e-9; an imported
   plate takes a drilled hole and rounded edges.
+  Imported faces are grouped into one shell per connected set, a shell enclosing negative volume being a void, and
+  every body is validated, its problems listed with the reasons a body was left out.
+- `model.validateBody`, run by every operation on its result: loops that close, a solid's edges used twice in opposite
+  directions, each shell one connected piece whose counts Euler-Poincare allows (V - E + 2F - L = 2 - 2 x genus when
+  closed), vertices on their curves and edges on their faces' surfaces within tolerance. `model.checkBody` adds the
+  costlier geometric checks, for files read and for tests: each shell facing out of its material (a cavity's into it,
+  by its enclosed volume), no two edges of a face crossing, and no edge passing through or lying inside a face it does
+  not bound. Not found: two faces crossing in a closed curve that meets no edge of either. `extrude` and `revolve`
+  refuse a profile that crosses or touches itself.
 - `model.massProperties`: exact volume, area, centroid and inertia from the faces (divergence theorem, Green's
   theorem over each trimmed face, Gauss-Legendre), not a mesh: box, cylinder, sphere, torus, a cone ring, a
   hemisphere over its pole, a holed block and the rounded box match their closed forms to 1e-9 (1e-8 for the hemisphere).

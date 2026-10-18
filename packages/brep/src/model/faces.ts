@@ -19,7 +19,7 @@ export interface UVLoop {
 }
 
 /** Samples per edge in (u, v): a line maps to a straight line on the surfaces Booleans take; a curve takes enough points to follow its turn. */
-const edgeSamples = (edge: Edge) => (edge.curve.kind === 'line' ? 1 : 128);
+export const edgeSamples = (edge: Edge) => (edge.curve.kind === 'line' ? 1 : 128);
 
 export class FaceUV {
   readonly surface: Surface;

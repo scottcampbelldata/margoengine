@@ -866,7 +866,7 @@ function sameSide(f: Face, fSense: boolean, g: Face, gSense: boolean, piece: Pie
  * A box round a face, generous rather than tight: its boundary samples, and on a curved surface a grid over its
  * (u, v) bounds as well (the face can bulge past its boundary); a sphere or torus is boxed whole.
  */
-function faceBox(fuv: FaceUV, merge: number): Box3 {
+export function faceBox(fuv: FaceUV, merge: number): Box3 {
   const s = fuv.face.surface,
     points: XYZ[] = [];
   if (s.kind === 'sphere' || s.kind === 'torus') {
@@ -892,7 +892,7 @@ function faceBox(fuv: FaceUV, merge: number): Box3 {
 }
 
 /** The common part of two boxes, or undefined when they are apart. */
-function overlap(a: Box3, b: Box3): Box3 | undefined {
+export function overlap(a: Box3, b: Box3): Box3 | undefined {
   const min: XYZ = [0, 0, 0],
     max: XYZ = [0, 0, 0];
   for (let k = 0; k < 3; k++) {

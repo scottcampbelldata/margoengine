@@ -26,31 +26,124 @@ export interface Profile {
 
 const same = (a: XYZ, b: XYZ, tolerance: number) => length(sub(a, b)) <= tolerance;
 
+/** The angle an arc from `at` turns about `n`: positive counter-clockwise, a whole turn when it ends where it starts. */
+function sweepOf(at: XYZ, s: ProfileSegment, n: XYZ): number {
+  const a0 = sub(at, s.center!),
+    a1 = sub(s.to, s.center!),
+    sweep0 = Math.atan2(dot(cross(a0, a1), n), dot(a0, a1));
+  return s.clockwise
+    ? sweep0 > 0
+      ? sweep0 - 2 * Math.PI
+      : sweep0 || -2 * Math.PI
+    : sweep0 < 0
+      ? sweep0 + 2 * Math.PI
+      : sweep0 || 2 * Math.PI;
+}
+
 /** Signed area of a profile about `n` (counter-clockwise positive), arcs included. */
 function signedArea(profile: Profile, n: XYZ): number {
   let area = 0,
     at = profile.start;
   for (const s of profile.segments) {
-    if (s.kind === 'line') area += dot(cross(at, s.to), n) / 2;
-    else {
-      // The chord's share plus the circular segment the arc adds (positive when it turns counter-clockwise).
-      const c = s.center!,
-        r = length(sub(at, c)),
-        a0 = sub(at, c),
-        a1 = sub(s.to, c),
-        sweep0 = Math.atan2(dot(cross(a0, a1), n), dot(a0, a1)),
-        sweep = s.clockwise
-          ? sweep0 > 0
-            ? sweep0 - 2 * Math.PI
-            : sweep0 || -2 * Math.PI
-          : sweep0 < 0
-            ? sweep0 + 2 * Math.PI
-            : sweep0 || 2 * Math.PI;
-      area += dot(cross(at, s.to), n) / 2 + (r * r * (sweep - Math.sin(sweep))) / 2;
+    area += dot(cross(at, s.to), n) / 2;
+    if (s.kind === 'arc') {
+      // The circular segment the arc adds to its chord (positive when it turns counter-clockwise).
+      const r = length(sub(at, s.center!)),
+        sweep = sweepOf(at, s, n);
+      area += (r * r * (sweep - Math.sin(sweep))) / 2;
     }
     at = s.to;
   }
   return area;
+}
+
+/**
+ * Throws a RangeError when a profile crosses or touches itself anywhere but where one segment meets the next (arcs
+ * are followed as chords of 1/128 turn), or turns straight back on itself.
+ */
+function refuseSelfContact(profile: Profile, n: XYZ, tolerance: number) {
+  // The profile as a cycle of short straight pieces in its plane's (x, y).
+  const x = unit(sub(profile.segments[0].to, profile.start)) ?? unit(cross(n, [1, 0, 0])) ?? unit(cross(n, [0, 1, 0]))!,
+    y = cross(n, x),
+    flat = (q: XYZ): [number, number] => [dot(q, x), dot(q, y)],
+    points: [number, number][] = [];
+  let at = profile.start;
+  for (const s of profile.segments) {
+    points.push(flat(at));
+    if (s.kind === 'arc') {
+      const a0 = sub(at, s.center!),
+        b0 = cross(n, a0),
+        sweep = sweepOf(at, s, n),
+        steps = Math.ceil(Math.abs(sweep) / (Math.PI / 64));
+      for (let k = 1; k < steps; k++) {
+        const t = (sweep * k) / steps;
+        points.push(flat(add(s.center!, add(scale(a0, Math.cos(t)), scale(b0, Math.sin(t))))));
+      }
+    }
+    at = s.to;
+  }
+  const count = points.length,
+    piece = (k: number) => [points[k], points[(k + 1) % count]] as const,
+    order = [...points.keys()].sort(
+      (i, j) => Math.min(piece(i)[0][0], piece(i)[1][0]) - Math.min(piece(j)[0][0], piece(j)[1][0]),
+    ),
+    where = (k: number) => {
+      const [u, v] = piece(k)[0];
+      return add(scale(x, u), scale(y, v));
+    };
+  for (let a = 0; a < count; a++) {
+    const i = order[a],
+      [p0, p1] = piece(i),
+      right = Math.max(p0[0], p1[0]) + tolerance;
+    for (let b = a + 1; b < count; b++) {
+      const j = order[b],
+        [q0, q1] = piece(j);
+      if (Math.min(q0[0], q1[0]) > right) break;
+      const gap = (j - i + count) % count;
+      if (gap === 1 || gap === count - 1) {
+        // Neighbours meet at a point; they must not run back along each other.
+        const [first, second] = gap === 1 ? [piece(i), piece(j)] : [piece(j), piece(i)],
+          d0 = [first[1][0] - first[0][0], first[1][1] - first[0][1]],
+          d1 = [second[1][0] - second[0][0], second[1][1] - second[0][1]],
+          l0 = Math.hypot(d0[0], d0[1]),
+          l1 = Math.hypot(d1[0], d1[1]);
+        if (d0[0] * d1[0] + d0[1] * d1[1] < 0 && Math.abs(d0[0] * d1[1] - d0[1] * d1[0]) <= 1e-9 * l0 * l1)
+          throw new RangeError(
+            `profile ${profile.name} turns straight back on itself at ${fmt(where(gap === 1 ? j : i))}`,
+          );
+        continue;
+      }
+      if (gap === 0) continue;
+      if (segmentGap(p0, p1, q0, q1) <= tolerance)
+        throw new RangeError(`profile ${profile.name} crosses or touches itself near ${fmt(where(i))}`);
+    }
+  }
+}
+
+const fmt = (p: XYZ) => `(${p.map((v) => v.toPrecision(6)).join(', ')})`;
+
+/** Distance between two segments in the plane (0 when they cross). */
+function segmentGap(
+  a0: readonly number[],
+  a1: readonly number[],
+  b0: readonly number[],
+  b1: readonly number[],
+): number {
+  const orient = (p: readonly number[], q: readonly number[], r: readonly number[]) =>
+      (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]),
+    o1 = orient(a0, a1, b0),
+    o2 = orient(a0, a1, b1),
+    o3 = orient(b0, b1, a0),
+    o4 = orient(b0, b1, a1);
+  if (((o1 > 0 && o2 < 0) || (o1 < 0 && o2 > 0)) && ((o3 > 0 && o4 < 0) || (o3 < 0 && o4 > 0))) return 0;
+  const toSegment = (p: readonly number[], s0: readonly number[], s1: readonly number[]) => {
+    const dx = s1[0] - s0[0],
+      dy = s1[1] - s0[1],
+      len2 = dx * dx + dy * dy,
+      t = len2 ? Math.max(0, Math.min(1, ((p[0] - s0[0]) * dx + (p[1] - s0[1]) * dy) / len2)) : 0;
+    return Math.hypot(p[0] - s0[0] - t * dx, p[1] - s0[1] - t * dy);
+  };
+  return Math.min(toSegment(a0, b0, b1), toSegment(a1, b0, b1), toSegment(b0, a0, a1), toSegment(b1, a0, a1));
 }
 
 /** The same profile run the other way. */
@@ -86,6 +179,7 @@ export function extrude(
     throw new RangeError(`profile ${profile.name} does not end where it starts`);
   const area = signedArea(profile, n);
   if (Math.abs(area) <= tolerance * tolerance) throw new RangeError(`profile ${profile.name} encloses no area`);
+  refuseSelfContact(profile, n, tolerance);
   // Counter-clockwise about the extrusion side, so side faces face out.
   const p = area > 0 ? profile : reversed(profile),
     count = p.segments.length,
@@ -259,8 +353,8 @@ export function torus(
  * Turns a closed planar profile of lines and arcs once round an axis lying in its plane, into a solid named `name`: a
  * face per segment (a plane, cylinder or cone for a line; a torus, or a sphere for an arc centred on the axis), each
  * closed by its own seam, and a circle at every profile point. The profile must stay off the axis. Throws a
- * RangeError for an open or degenerate profile, one that leaves the axis's plane or touches the axis, and an arc
- * crossing it.
+ * RangeError for an open, degenerate or self-touching profile, one that leaves the axis's plane or touches the axis,
+ * and an arc crossing it.
  */
 export function revolve(
   name: Name,
@@ -293,6 +387,7 @@ export function revolve(
     throw new RangeError(`profile ${profile.name} does not end where it starts`);
   const area = signedArea(p, m);
   if (Math.abs(area) <= tolerance * tolerance) throw new RangeError(`profile ${profile.name} encloses no area`);
+  refuseSelfContact(p, m, tolerance);
   if (area < 0) p = reversed(p);
   const count = p.segments.length,
     points = [p.start, ...p.segments.slice(0, -1).map((s) => s.to)],

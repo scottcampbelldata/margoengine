@@ -10,16 +10,34 @@ import { direction, frame, list, num, point, ref, vector } from '../geometry/rea
 import { add, cross, distance, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
 import type { STEPModel } from '../index.js';
 import { type CurveDef, type Frame, frameOf, type SurfaceDef } from './geometry.js';
-import { Body, Edge, Face, Vertex } from './topology.js';
+import { enclosedVolume } from './mass.js';
+import { Body, Edge, Face, type Shell, Vertex } from './topology.js';
+import { validateBody } from './validate.js';
 
 /** The bodies of `step`, one per STEP body (undefined for a tessellated or faceted-only one, or a failed one). */
 export interface ImportedBodies {
   readonly bodies: readonly (Body | undefined)[];
-  /** Why a body was left out: its index in `step.bodies` and the reason. */
+  /**
+   * Why a body was left out, or what is wrong with one that was imported (validateBody's problems, as
+   * `<name>: <problem>`): its index in `step.bodies` and the reason.
+   */
   readonly problems: readonly { readonly body: number; readonly problem: string }[];
 }
 
 const isTrue = (v: STEPValue | undefined) => !(v instanceof Enum && v.name === 'F');
+
+/** A shell's box from its vertices: [min x, min y, min z, max x, max y, max z]. */
+function shellBox(shell: Shell): number[] {
+  const box = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
+  for (const f of shell.faces)
+    for (const l of f.loops)
+      for (const c of l.coedges)
+        for (let k = 0; k < 3; k++) {
+          box[k] = Math.min(box[k], c.start.point[k]);
+          box[k + 3] = Math.max(box[k + 3], c.start.point[k]);
+        }
+  return box;
+}
 
 /** Points where a surface collapses: a sphere's two poles, a cone's apex. */
 function polesOf(s: SurfaceDef): XYZ[] {
@@ -32,14 +50,22 @@ function polesOf(s: SurfaceDef): XYZ[] {
 /**
  * Modeler bodies from a parsed STEP file's solids and sheets (`parseSTEP`, or a JT part's `brep`), in metres, with
  * names from their entity ids (`<body>/face:#<id>` and so on). Each body lines up with `step.bodies`; a body using a
- * surface or curve the modeler does not have is undefined, with the reason in `problems`.
+ * surface or curve the modeler does not have is undefined, with the reason in `problems`. Every imported body is
+ * validated (validateBody), and what is wrong with it is in `problems` too; checkBody checks it fully.
  */
 export function bodiesFromSTEP(step: STEPModel): ImportedBodies {
   const problems: { body: number; problem: string }[] = [];
   const bodies = step.bodies.map((b, index) => {
     if (b.kind !== 'solid' && b.kind !== 'shell') return undefined;
     try {
-      return new Importer(step.file, b.unit, b.angleUnit).body(b.name || `#${b.id}`, b.kind, b.faces, b.reversed ?? []);
+      const body = new Importer(step.file, b.unit, b.angleUnit).body(
+        b.name || `#${b.id}`,
+        b.kind,
+        b.faces,
+        b.reversed ?? [],
+      );
+      for (const p of validateBody(body)) problems.push({ body: index, problem: `${p.name}: ${p.problem}` });
+      return body;
     } catch (e) {
       problems.push({ body: index, problem: e instanceof Error ? e.message : String(e) });
       return undefined;
@@ -64,9 +90,36 @@ class Importer {
   body(name: string, kind: 'solid' | 'shell', faceIds: readonly number[], reversed: readonly number[]): Body {
     this.name = name;
     const body = new Body(name, kind === 'solid' ? 'solid' : 'sheet'),
-      shell = body.shell(),
-      flipped = new Set(reversed);
-    for (const id of faceIds) shell.add(this.face(id, flipped.has(id)));
+      flipped = new Set(reversed),
+      faces = faceIds.map((id) => this.face(id, flipped.has(id)));
+    // One shell per connected set of faces (STEP lists a solid's outer shell and voids, and a sheet's shells, together).
+    const parent = new Map<Face, Face>(faces.map((f) => [f, f])),
+      root = (f: Face): Face => {
+        while (parent.get(f) !== f) f = parent.get(f)!;
+        return f;
+      };
+    for (const f of faces)
+      for (const l of f.loops)
+        for (const c of l.coedges)
+          for (const o of c.edge.coedges) if (parent.has(o.loop.face)) parent.set(root(o.loop.face), root(f));
+    const groups = new Map<Face, Face[]>();
+    for (const f of faces) groups.set(root(f), [...(groups.get(root(f)) ?? []), f]);
+    const shells = [...groups.values()].map((group) => {
+      const shell = body.shell();
+      for (const f of group) shell.add(f);
+      return shell;
+    });
+    // In a solid, a shell enclosing negative volume is a void, inside the smallest outer shell whose box holds it.
+    if (body.kind === 'solid' && shells.length > 1) {
+      const volumes = shells.map((sh) => enclosedVolume(sh.faces)),
+        boxes = shells.map(shellBox);
+      shells.forEach((sh, i) => {
+        if (volumes[i] >= 0) return;
+        sh.outer = shells
+          .filter((o, j) => volumes[j] > 0 && boxes[j].every((x, k) => (k < 3 ? x <= boxes[i][k] : x >= boxes[i][k])))
+          .sort((a, b) => volumes[shells.indexOf(a)] - volumes[shells.indexOf(b)])[0];
+      });
+    }
     return body;
   }
 
