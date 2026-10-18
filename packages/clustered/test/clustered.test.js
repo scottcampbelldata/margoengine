@@ -147,8 +147,11 @@ test('clustered: orthographic cameras get linear depth slices whose cells contai
       m = camera.matrix,
       { width, height } = h.context;
     let checked = 0;
+    // A fixed sequence (32-bit LCG), so the points in the frustum are the same every run (Math.random once gave 47).
+    let seed = 12345;
+    const random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32;
     for (let i = 0; i < 500; i++) {
-      const p = [Math.random() * 12 - 6, Math.random() * 10 - 5, Math.random() * 30 - 15],
+      const p = [random() * 12 - 6, random() * 10 - 5, random() * 30 - 15],
         c = [0, 1, 2, 3].map((r) => m[r] * p[0] + m[4 + r] * p[1] + m[8 + r] * p[2] + m[12 + r]);
       if (Math.abs(c[0]) > 1 || Math.abs(c[1]) > 1 || c[2] < 0 || c[2] > 1) continue;
       const e = [0, 1, 2].map((r) => view[r] * p[0] + view[4 + r] * p[1] + view[8 + r] * p[2] + view[12 + r]),
