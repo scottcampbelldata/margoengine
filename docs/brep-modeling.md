@@ -97,8 +97,10 @@ Where OpenCascade still leads (freeform NURBS intersections, advanced blends, he
   end of a blended straight edge is a corner of three planar faces (running out through a face square to it, a
   mirror-image mitre, or a ball corner), and for full circles where a plane meets a coaxial cylinder, the faces are set
   back and the blend faces put in place (`model/setback.ts`); otherwise each blend is a solid the Booleans subtract or
-  add. Against OpenCascade on the operations benchmark's 66 cases (Codex's harness and native times, a3bc823 run):
-  Margo faster in all 66 at the in-place circles commit, 50 at a3bc823. The box with all 12 edges rounded (radius 2 of 10)
+  add. Against OpenCascade on the operations benchmark (Codex's harness, best of 3 cold calls): Margo faster in 50 of
+  66 cases at a3bc823; at af41dfe in 67 of 67 against that run's paired OpenCascade times, and in 65 of 66 against the
+  a3bc823 and 1bf77b8 OpenCascade times (the boss-on-plate fillet: 0.457 ms against 0.452 and 0.446 ms). Sub-millisecond
+  cases vary by 20 to 60% from run to run. The box with all 12 edges rounded (radius 2 of 10)
   takes 0.4 ms in Node (best of 5; 4.4 to 4.6 ms for a fresh process's first call); OpenCascade's
   BRepFilletAPI_MakeFillet took 14.1 ms on it (Codex, 1bf77b8 step 9), and the Booleans 2,691 ms before 880cc30.
 - `model.revolve`: lines and arcs round an axis (planes, cylinders, cones, tori, spheres).
