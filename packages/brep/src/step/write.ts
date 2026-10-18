@@ -27,11 +27,30 @@ export class StepWriter {
   private next = 100;
   private readonly styled: string[] = [];
 
+  /** Lines of entities reserved and not yet filled, by id. */
+  private readonly reserved = new Map<string, number>();
+
   /** Adds an entity (its text without the id) and returns its id, such as '#123'. */
   add(entity: string): string {
     const id = `#${this.next++}`;
     this.lines.push(`${id}=${entity};`);
     return id;
+  }
+  /** An id for an entity written later with {@link StepWriter.fill}; one never filled is left out of the file. */
+  reserve(): string {
+    const id = `#${this.next++}`;
+    this.reserved.set(id, this.lines.push('') - 1);
+    return id;
+  }
+  fill(id: string, entity: string): void {
+    const at = this.reserved.get(id);
+    if (at === undefined) fail(`StepWriter: ${id} was not reserved`);
+    this.lines[at!] = `${id}=${entity};`;
+    this.reserved.delete(id);
+  }
+  /** The entities so far as a STEP file, for evaluating converted geometry before the conversion finishes. */
+  draft(): string {
+    return `ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION((''),'2;1');\nFILE_NAME('','',(''),(''),'','','');\nFILE_SCHEMA(('AUTOMOTIVE_DESIGN'));\nENDSEC;\nDATA;\n${this.lines.filter(Boolean).join('\n')}\nENDSEC;\nEND-ISO-10303-21;\n`;
   }
   /** A STEP real: a decimal point always, before any exponent. */
   real(v: number): string {
@@ -147,7 +166,7 @@ DATA;
 #12=AXIS2_PLACEMENT_3D('',#11,$,$);
 #13=SHAPE_REPRESENTATION('',(#12),#10);
 #14=SHAPE_DEFINITION_REPRESENTATION(#7,#13);
-${this.lines.join('\n')}
+${this.lines.filter(Boolean).join('\n')}
 ENDSEC;
 END-ISO-10303-21;
 `;

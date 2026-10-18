@@ -8,22 +8,74 @@ import { parseXT, readXT, tessellateSTEP, xtToSTEP } from '../dist/index.js';
  * files from Parasolid V14 on do.
  */
 function disc(embedded) {
-  const nodes = [
-    [12, '1 10 0 0 0 0 0 0 1e3 1e-8 0 0 0 1 0 3 1 2 3 4 0 5 6 0 '],
-    [13, '2 1 0 1 0 9 0 0 5 9 '],
-    [50, '3 2 0 9 0 0 0 +0 0 0 0 0 1 1 0 0 '],
-    [31, '4 3 0 6 0 0 0 +0 0 0 0 0 1 1 0 0 .01 '],
-    [19, '5 4 0 1 0 0 2 V'],
-    [16, '6 5 0 ?7 0 0 4 0 0 1 '],
-    [17, '7 0 8 7 7 0 10 6 0 0 +'],
-    [15, '8 6 0 7 9 0 '],
-    [14, '9 7 11 ?0 0 8 2 3 +0 0 0 0 2 '],
-    [17, '10 0 0 0 0 0 7 6 0 0 -'],
-    [81, '1 11 8 12 9 0 0 0 0 14 '],
-    [80, '1 12 0 13 8001 0 0 0 0 3 5 0 0 0 FFFFTFTFFFFFFF2 '],
-    [79, '15 13 SDL/TYSA_COLOUR'],
-    [83, '3 14 1 .5 0 '],
-  ];
+  return transmit(
+    [
+      [12, '1 10 0 0 0 0 0 0 1e3 1e-8 0 0 0 1 0 3 1 2 3 4 0 5 6 0 '],
+      [13, '2 1 0 1 0 9 0 0 5 9 '],
+      [50, '3 2 0 9 0 0 0 +0 0 0 0 0 1 1 0 0 '],
+      [31, '4 3 0 6 0 0 0 +0 0 0 0 0 1 1 0 0 .01 '],
+      [19, '5 4 0 1 0 0 2 V'],
+      [16, '6 5 0 ?7 0 0 4 0 0 1 '],
+      [17, '7 0 8 7 7 0 10 6 0 0 +'],
+      [15, '8 6 0 7 9 0 '],
+      [14, '9 7 11 ?0 0 8 2 3 +0 0 0 0 2 '],
+      [17, '10 0 0 0 0 0 7 6 0 0 -'],
+      [81, '1 11 8 12 9 0 0 0 0 14 '],
+      [80, '1 12 0 13 8001 0 0 0 0 3 5 0 0 0 FFFFTFTFFFFFFF2 '],
+      [79, '15 13 SDL/TYSA_COLOUR'],
+      [83, '3 14 1 .5 0 '],
+    ],
+    embedded,
+  );
+}
+
+/**
+ * A sheet body: one rolling-ball blend face of radius 2 mm and length 10 mm in the corner between the planes z = 0
+ * and x = 0, its spine the line x = z = 2 mm, bounded by two lines where the ball touches the planes and two
+ * quarter circles at its ends.
+ */
+const fillet = () =>
+  transmit(
+    [
+      [12, '1 40 0 0 0 0 0 0 1e3 1e-8 0 0 0 1 0 3 1 2 3 14 0 4 10 18 '],
+      [13, '2 1 0 1 0 5 0 0 4 5 '],
+      [56, '3 2 0 5 0 0 0 +R7 8 9 .002 .002 1 1 0 0 0 0 '],
+      [19, '4 3 0 1 0 0 2 V'],
+      [14, '5 4 0 ?0 0 6 2 3 +0 0 0 0 2 '],
+      [15, '6 5 0 26 5 0 '],
+      [50, '7 6 0 1 0 0 0 +0 0 0 0 0 1 1 0 0 '],
+      [50, '8 7 0 1 0 0 0 +0 0 0 1 0 0 0 1 0 '],
+      [30, '9 8 0 1 0 0 0 +.002 0 .002 0 1 0 '],
+      [16, '10 9 0 ?26 0 11 14 0 0 1 '],
+      [16, '11 10 0 ?27 10 12 15 0 0 1 '],
+      [16, '12 11 0 ?32 11 13 16 0 0 1 '],
+      [16, '13 12 0 ?33 12 0 17 0 0 1 '],
+      [30, '14 13 0 10 0 0 0 +.002 0 0 0 1 0 '],
+      [31, '15 14 0 11 0 0 0 +.002 .01 .002 0 1 0 0 0 -1 .002 '],
+      [30, '16 15 0 12 0 0 0 +0 0 .002 0 1 0 '],
+      [31, '17 16 0 13 0 0 0 +.002 0 .002 0 1 0 0 0 -1 .002 '],
+      [18, '18 17 0 26 0 19 22 ?1 '],
+      [18, '19 18 0 27 18 20 23 ?1 '],
+      [18, '20 19 0 28 19 21 24 ?1 '],
+      [18, '21 20 0 29 20 0 25 ?1 '],
+      [29, '22 21 0 18 23 0 .002 0 0 '],
+      [29, '23 22 0 19 24 22 .002 .01 0 '],
+      [29, '24 23 0 20 25 23 0 .01 .002 '],
+      [29, '25 24 0 21 0 24 0 0 .002 '],
+      [17, '26 0 6 27 29 19 30 10 0 0 +'],
+      [17, '27 0 6 28 26 20 31 11 0 0 +'],
+      [17, '28 0 6 29 27 21 32 12 0 0 -'],
+      [17, '29 0 6 26 28 18 33 13 0 0 -'],
+      [17, '30 0 0 0 0 18 26 10 0 0 -'],
+      [17, '31 0 0 0 0 19 27 11 0 0 -'],
+      [17, '32 0 0 0 0 20 28 12 0 0 +'],
+      [17, '33 0 0 0 0 21 29 13 0 0 +'],
+    ],
+    false,
+  );
+
+/** A text transmit file of the given nodes ([type, data after the type]). */
+function transmit(nodes, embedded) {
   const seen = new Set(),
     body = nodes
       .map(([type, rest]) => {
@@ -95,4 +147,27 @@ test('Parasolid XT: malformed input throws a TypeError that says where', () => {
     name: 'TypeError',
     message: /schema name/,
   });
+});
+
+test('Parasolid XT: a rolling-ball blend is built from its spine and supports as an exact quarter-round', () => {
+  const conversion = xtToSTEP(fillet());
+  assert.deepEqual(conversion.warnings, []);
+  const [mesh] = tessellateSTEP(parseXT(fillet()), { deflection: 1e-7 });
+  assert.deepEqual(mesh.failures, []);
+  let area = 0,
+    worst = 0;
+  const p = mesh.positions,
+    t = mesh.indices;
+  for (let k = 0; k < t.length; k += 3) {
+    const [a, b, c] = [t[k], t[k + 1], t[k + 2]].map((i) => [p[i * 3], p[i * 3 + 1], p[i * 3 + 2]]),
+      u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
+      v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    area += Math.hypot(u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]) / 2;
+  }
+  // Every vertex lies on the cylinder of radius 2 mm about the spine.
+  for (let i = 0; i < p.length; i += 3)
+    worst = Math.max(worst, Math.abs(Math.hypot(p[i] - 0.002, p[i + 2] - 0.002) - 0.002));
+  assert.ok(worst < 1e-8, `off the round by ${worst}`);
+  const exact = (Math.PI / 2) * 0.002 * 0.01;
+  assert.ok(Math.abs(area - exact) < 2e-3 * exact, `area ${area} vs ${exact}`);
 });
