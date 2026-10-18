@@ -5,8 +5,11 @@
 import { STEPFile, stepText, type STEPHeader } from './step/file.js';
 import { readStructure, type STEPStructure, type STEPStructureOptions } from './step/structure.js';
 import { Tessellator, type BodyMesh, type TessellationOptions } from './mesh/tessellate.js';
+import { satToSTEP } from './sat/read.js';
 export { validateSTEP } from './mesh/validate.js';
 export type { STEPMeasured, STEPValidationCheck, ValidationOptions } from './mesh/validate.js';
+export { satToSTEP } from './sat/read.js';
+export type { SATConversion } from './sat/read.js';
 
 export { STEPFile, Ref, Enum, Typed, DERIVED, stepText } from './step/file.js';
 export type { STEPEntity, STEPHeader, STEPValue } from './step/file.js';
@@ -60,4 +63,15 @@ export function parseSTEP(input: string | ArrayBuffer | ArrayBufferView, options
 export function tessellateSTEP(model: STEPModel, options: TessellationOptions = {}): BodyMesh[] {
   const tessellator = new Tessellator(model.file, model.faceColors, options);
   return model.bodies.map((body) => tessellator.body(body));
+}
+
+/**
+ * Reads an ACIS SAT file (as AutoCAD, Inventor, SpaceClaim and others write it, or a DXF 3DSOLID's SAT data) through
+ * {@link satToSTEP}, so it meshes with {@link tessellateSTEP} like a STEP file. What the conversion left out comes first
+ * in `warnings`. Throws a TypeError for a file it cannot read.
+ */
+export function parseSAT(input: string | ArrayBuffer | ArrayBufferView, options: STEPOptions = {}): STEPModel {
+  const conversion = satToSTEP(input),
+    model = parseSTEP(conversion.step, options);
+  return { ...model, warnings: [...conversion.warnings, ...model.warnings] };
 }
