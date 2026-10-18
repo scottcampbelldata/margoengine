@@ -4,11 +4,6 @@
   "type": "module",
   "license": "MIT AND Apache-2.0",
   "description": "Optional glTF PBR material lobes, transmission, volume and typed node graphs through an isolated extension slot.",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/materials"
-  },
   "publishConfig": {
     "access": "public"
   },
