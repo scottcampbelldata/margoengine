@@ -1,7 +1,8 @@
 // A JT file as parts placed in an assembly: the scene graph walked from its root (transforms multiplied down, the
 // finest LOD alternative and a switch's selected child taken, ignored nodes skipped), each part node's exact B-rep
-// read from its XT B-rep segment (Parasolid neutral binary, through the XT reader) and its shapes' LOD segments
-// listed. Coordinates come out in metres, as STEP models do.
+// read from its XT B-rep segment (Parasolid neutral binary, through the XT reader) or, for a subordinate XT element,
+// its bodies from the file's MultiXT segment, and its shapes' LOD segments listed. Coordinates come out in metres, as
+// STEP models do.
 //
 // This software reads the JT Data Format as described in the Siemens JT File Format Reference and ISO 14306. Copyright
 // in the JT data structures and operators is owned by Siemens Product Lifecycle Management Software Inc. (Siemens
@@ -13,7 +14,8 @@ import type { STEPModel, STEPOptions } from '../index.js';
 import { STEPFile, stepText } from '../step/file.js';
 import { readStructure } from '../step/structure.js';
 import { xtToSTEP } from '../xt/step.js';
-import { JTContainer, readElement } from './file.js';
+import { int32Packet } from './codec.js';
+import { fail, JTContainer, type JTElement, type JTReader, readElement } from './file.js';
 import { JT_TYPES, type JTLateLoaded, type JTSceneGraph, type JTShapeKind, readSceneGraph } from './lsg.js';
 import { type JTMesh, readTriStripLOD } from './mesh.js';
 
@@ -35,7 +37,10 @@ export interface JTPart {
   /** The part node's object ID. */
   readonly node: number;
   readonly name: string;
-  /** The exact B-rep from the part's XT B-rep segment, read like a Parasolid file; undefined without one. */
+  /**
+   * The exact B-rep from the part's XT B-rep segment (or, for a subordinate one, its bodies in the file's MultiXT
+   * segment), read like a Parasolid file; undefined without one.
+   */
   readonly brep?: STEPModel;
   readonly shapes: readonly JTShape[];
 }
@@ -181,7 +186,8 @@ export function parseJT(input: ArrayBuffer | ArrayBufferView, options: JTOptions
   const parts: JTPart[] = [],
     partIndex = new Map<number, number>(),
     instances: JTInstance[] = [],
-    external = new Set<string>();
+    external = new Set<string>(),
+    multiXT = new Map<string, MultiXT>();
 
   /** The shapes below part node `id`, placed relative to it. */
   const shapesOf = (id: number, nodeUnit: number): JTShape[] => {
@@ -220,10 +226,17 @@ export function parseJT(input: ArrayBuffer | ArrayBufferView, options: JTOptions
     const shapes = shapesOf(id, nodeUnit);
     let brep: STEPModel | undefined;
     if (options.brep !== false) {
-      const xt = [...(graph.properties.get(id)?.values() ?? [])].filter(isLate).find((v) => v.segmentType === 17);
+      const late = [...(graph.properties.get(id)?.values() ?? [])].filter(isLate),
+        xt = late.find((v) => v.segmentType === 17),
+        multi = late.find((v) => v.segmentType === 30)?.segment;
       if (xt) {
         try {
-          brep = readXTSegment(container, xt.segment, options, warn, id);
+          const source = (segment: string) => {
+            let m = multiXT.get(segment);
+            if (!m) multiXT.set(segment, (m = readMultiXT(container, segment)));
+            return m;
+          };
+          brep = readXTSegment(container, xt.segment, multi, source, options, warn, id);
         } catch (error) {
           warn(`part ${nameOf(id) || id}: its XT B-rep could not be read (${(error as Error).message})`);
         }
@@ -281,10 +294,51 @@ export function parseJT(input: ArrayBuffer | ArrayBufferView, options: JTOptions
   };
 }
 
+/** A MultiXT segment: one Parasolid file holding several parts' bodies, and each body's identifier, in order. */
+interface MultiXT {
+  readonly ids: Int32Array;
+  readonly xt: Uint8Array;
+}
+
+/**
+ * The Parasolid data after the reader's position: the I32 length followed by Parasolid's own start ("PS" and two zero
+ * bytes for neutral binary, or the "**" text header), found within the first 4 KiB.
+ */
+function findXT(d: JTReader): Uint8Array | undefined {
+  const b = d.bytes,
+    view = new DataView(b.buffer, b.byteOffset);
+  for (let k = d.at; k + 8 <= d.end && k < d.at + 4096; k++) {
+    const n = view.getInt32(k, d.little),
+      s = k + 4;
+    const ps = b[s] === 0x50 && b[s + 1] === 0x53 && b[s + 2] === 0 && b[s + 3] === 0,
+      header = b[s] === 0x2a && b[s + 1] === 0x2a;
+    if ((ps || header) && n > 4 && s + n <= d.end) return b.subarray(s, s + n);
+  }
+  return undefined;
+}
+
+/**
+ * Reads a MultiXT segment (type 30; not in the published texts). Its element, as JT 10.5 files write it: U8 version,
+ * I32 Parasolid major, minor and build, one more byte, U32 body count, the bodies' identifiers (an Int32 packet), then
+ * the I32 length and the Parasolid data, which holds the bodies in the same order.
+ */
+function readMultiXT(container: JTContainer, segment: string): MultiXT {
+  const element = readElement(container.data(segment));
+  if (!element || element.type !== JT_TYPES.multiXTBRep) fail(`segment ${segment} holds no MultiXT element`);
+  const d = (element as JTElement).data;
+  d.need(14);
+  const count = d.u32(),
+    ids = int32Packet(d, true);
+  if (ids.length !== count) fail(`MultiXT lists ${ids.length} of ${count} bodies`);
+  return { ids, xt: findXT(d) ?? fail(`segment ${segment} holds no Parasolid data`) };
+}
+
 /** Reads an XT B-rep segment's Parasolid data into a STEP model (geometry in metres, as Parasolid stores it). */
 function readXTSegment(
   container: JTContainer,
   segment: string,
+  multi: string | undefined,
+  source: (segment: string) => MultiXT,
   options: STEPOptions,
   warn: (message: string) => void,
   part: number,
@@ -296,7 +350,7 @@ function readXTSegment(
     return undefined;
   }
   const d = element.data;
-  let xt: Uint8Array | undefined;
+  let xt: Uint8Array | undefined, bodies: number[] | undefined;
   if (container.version < 10) {
     // Version, Parasolid major, minor and build, then the data's length and the data.
     d.i32();
@@ -307,30 +361,33 @@ function readXTSegment(
       at = d.need(n);
     xt = d.bytes.subarray(at, at + n);
   } else {
-    // JT 10 adds subordinate and body identifier fields ahead of the data: find the length that is followed by
-    // Parasolid's own start ("PS" and two zero bytes for neutral binary, or the "**" text header).
-    for (let k = d.at; k + 8 <= d.end && k < d.at + 4096; k++) {
-      const b = d.bytes,
-        n = new DataView(b.buffer, b.byteOffset).getInt32(k, d.little),
-        s = k + 4;
-      const ps = b[s] === 0x50 && b[s + 1] === 0x53 && b[s + 2] === 0 && b[s + 3] === 0,
-        header = b[s] === 0x2a && b[s + 1] === 0x2a;
-      if ((ps || header) && n > 4 && s + n <= d.end) {
-        xt = b.subarray(s, s + n);
-        break;
+    d.u8(); // version
+    if (d.u8() !== 0) {
+      // A subordinate element: U32 body count and the bodies' identifiers; the Parasolid data is the MultiXT
+      // segment's, whose own list of identifiers gives each body's place in it.
+      const count = d.u32(),
+        ids = int32Packet(d, true);
+      if (ids.length !== count) fail(`XT element lists ${ids.length} of ${count} bodies`);
+      if (!multi) {
+        warn(`part ${part}: its XT B-rep is a subordinate element and the part names no MultiXT segment`);
+        return undefined;
+      }
+      const m = source(multi);
+      bodies = [...ids].map((id) => m.ids.indexOf(id)).filter((i) => i >= 0);
+      if (bodies.length < ids.length)
+        warn(`part ${part}: ${ids.length - bodies.length} of its bodies are not in the MultiXT segment`);
+      if (!bodies.length) return undefined;
+      xt = m.xt;
+    } else {
+      // JT 10 adds body identifier fields ahead of the data.
+      xt = findXT(d);
+      if (!xt) {
+        warn(`part ${part}: the JT 10 XT B-rep element's data was not found`);
+        return undefined;
       }
     }
-    if (!xt) {
-      // The byte after the element's version flags a subordinate element: its B-rep is in the MultiXT segment.
-      warn(
-        d.at + 1 < d.end && d.bytes[d.at + 1] !== 0
-          ? `part ${part}: its XT B-rep is a subordinate element, held in the file's MultiXT segment (type 30), which is not read yet`
-          : `part ${part}: the JT 10 XT B-rep element's data was not found`,
-      );
-      return undefined;
-    }
   }
-  const conversion = xtToSTEP(xt),
+  const conversion = xtToSTEP(xt, { parts: bodies }),
     file = new STEPFile(stepText(conversion.step)),
     structure = readStructure(file, options);
   for (const w of conversion.warnings) warn(`part ${part}: ${w}`);

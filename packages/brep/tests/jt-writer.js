@@ -19,6 +19,7 @@ export const T = {
   date: 'ce357246-38fb-11d1-a506-006097bdc6e1',
   late: 'e0b05be5-fbbd-11d1-a3a7-00aa00d10954',
   xt: '873a70e0-2ac9-11d1-9b6b-0080c7bb5997',
+  multiXT: '49829521-1835-49c3-8bef-ddc43bfe5e88',
   triStripLOD: '10dd10ab-2ac8-11d1-9b6b-0080c7bb5997',
 };
 
@@ -27,6 +28,7 @@ export const SEG = {
   lsg: 'a0000000-0000-0000-0000-000000000001',
   xt: 'a0000000-0000-0000-0000-000000000002',
   lod: 'a0000000-0000-0000-0000-000000000003',
+  multiXT: 'a0000000-0000-0000-0000-000000000004',
 };
 
 /** Little- or big-endian byte builder. */
@@ -114,9 +116,10 @@ export function note() {
  * The LSG element stream: a root partition over an assembly group (red material) holding two instances (one moved
  * 10 units along x, one turned a quarter about z and moved 20 along y) of part "Disc", whose LOD node offers two
  * tri-strip shapes; then the property atoms and the property table (names, units, the part's XT B-rep and the first
- * shape's LOD segment, of segment type `shapeType`: 7 for LOD 0, 6 for a plain shape segment).
+ * shape's LOD segment, of segment type `shapeType`: 7 for LOD 0, 6 for a plain shape segment; with `multiXT`, the
+ * part also names the MultiXT segment).
  */
-export function lsgStream({ jt10, little, shapeType = 7 }) {
+export function lsgStream({ jt10, little, shapeType = 7, multiXT = false }) {
   const b = new Bytes(little),
     ver = (d) => (jt10 ? d.u8(1) : d.i16(1));
   const element = (type, baseType, id, fill) => {
@@ -233,11 +236,17 @@ export function lsgStream({ jt10, little, shapeType = 7 }) {
   atom(T.date, 34, (d) => {
     for (const v of [2026, 9, 18, 7, 5, 3]) d.i16(v);
   });
+  if (multiXT) {
+    str(35, 'JT_LLPROP_MULTIXTBREP');
+    late(36, SEG.multiXT, 30);
+  }
   b.i32(16).guid(T.eoe);
 
   b.i16(1).i32(3);
   b.i32(2).i32(20).i32(21).i32(23).i32(24).i32(31).i32(32).i32(0);
-  b.i32(5).i32(20).i32(22).i32(25).i32(26).i32(29).i32(30).i32(33).i32(34).i32(0);
+  b.i32(5).i32(20).i32(22).i32(25).i32(26).i32(29).i32(30).i32(33).i32(34);
+  if (multiXT) b.i32(35).i32(36);
+  b.i32(0);
   b.i32(7).i32(27).i32(28).i32(0);
   return b.bytes;
 }
@@ -248,6 +257,28 @@ export function xtElement({ jt10, little }, xt) {
   d.guid(T.xt).u8(255).i32(100);
   if (jt10) d.u8(1).u8(0).i32(26).i32(1).i32(0).u32(1);
   else d.i32(2).i32(26).i32(1).i32(0);
+  d.i32(xt.length).raw(xt);
+  return new Bytes(little).i32(d.length).raw(d.bytes).bytes;
+}
+
+/** A JT 10 subordinate XT B-rep element: its bodies' identifiers in the file's MultiXT segment, no Parasolid data. */
+export function subordinateXTElement(little, ids) {
+  const d = new Bytes(little);
+  d.guid(T.xt).u8(9).i32(100);
+  d.u8(1).u8(1).u32(ids.length);
+  bitLengthPacket(d, ids, false, true);
+  return new Bytes(little).i32(d.length).raw(d.bytes).bytes;
+}
+
+/**
+ * A MultiXT segment's element as JT 10.5 files write it: version, Parasolid major, minor and build, one more byte, the
+ * bodies' identifiers (in the Parasolid data's order), then the data's length and the data.
+ */
+export function multiXTElement(little, ids, xt) {
+  const d = new Bytes(little);
+  d.guid(T.multiXT).u8(9).i32(0);
+  d.u8(1).i32(26).i32(1).i32(0).u8(0).u32(ids.length);
+  bitLengthPacket(d, ids, false, true);
   d.i32(xt.length).raw(xt);
   return new Bytes(little).i32(d.length).raw(d.bytes).bytes;
 }

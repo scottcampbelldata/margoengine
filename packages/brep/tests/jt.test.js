@@ -1,7 +1,17 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { parseJT, tessellateJT } from '../dist/index.js';
-import { jtFile, lodElement, lsgStream, note, packed, SEG, xtElement } from './jt-writer.js';
+import {
+  jtFile,
+  lodElement,
+  lsgStream,
+  multiXTElement,
+  note,
+  packed,
+  SEG,
+  subordinateXTElement,
+  xtElement,
+} from './jt-writer.js';
 
 /** A planar disc of radius 10 mm as a Parasolid text transmit file (the XT reader's test body). */
 function disc() {
@@ -207,6 +217,25 @@ test('JT 9.5: a tri-strip LOD decodes through the topology coder, one vertex rec
   const model = parseJT(bytes);
   assert.equal(model.parts[0].shapes[0].mesh, undefined);
   assert.match(model.warnings.join('\n'), /shape 7 was not decoded \(Invalid JT file: vertex coordinate hash/);
+});
+
+test('JT 10: a subordinate XT element takes its bodies from the MultiXT segment', () => {
+  const multi = (ids) => {
+    const options = { version: 10.5, little: true, jt10: true, multiXT: true };
+    return jtFile(options, [
+      { id: SEG.lsg, type: 1, data: packed(true, lsgStream(options)) },
+      { id: SEG.xt, type: 17, data: packed(true, subordinateXTElement(true, ids)) },
+      { id: SEG.lod, type: 7, data: lodElement(options) },
+      { id: SEG.multiXT, type: 30, data: packed(true, multiXTElement(true, [25653], disc())) },
+    ]);
+  };
+  const model = parseJT(multi([25653]));
+  assert.deepEqual(model.warnings, []);
+  check(model, 10.5);
+  // A body the MultiXT segment does not list: the part has no B-rep, and the warning says why.
+  const lost = parseJT(multi([7]));
+  assert.equal(lost.parts[0].brep, undefined);
+  assert.match(lost.warnings.join('\n'), /1 of its bodies are not in the MultiXT segment/);
 });
 
 test('JT: files older than 9.5 throw a RangeError; malformed ones a TypeError that says what', () => {

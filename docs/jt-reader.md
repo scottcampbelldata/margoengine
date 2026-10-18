@@ -132,9 +132,22 @@ that stores them (272, every LOD of the 13 JT2Go files), so the two CAE files wi
 The NIST assembly's other five shapes and one shape in each of All_Results and Gimbal are polylines (section curves,
 trace lines, element edges), which the reader lists but does not decode.
 
+## MultiXT segments (2026-10-18)
+
+The NIST MTC assembly's box part has a subordinate XT B-rep element: U8 version, U8 subordinate flag (1), U32 body
+count and the bodies' identifiers (an Int32 packet; here one body, 25653). The part's `JT_LLPROP_MULTIXTBREP`
+property names the MultiXT segment (type 30, LZMA-compressible like 17), whose one element (object type ID
+49829521-1835-49c3-8bef-ddc43bfe5e88, not in the published texts) is: U8 version, I32 Parasolid major, minor and
+build, one more byte, U32 body count, the identifiers (an Int32 packet), I32 length and the Parasolid neutral binary.
+The XT data carries no per-body identifier, so a part's bodies are taken by their place in the MultiXT's own list
+(the ISO text calls the subordinate list a subset of it); the NIST file's MultiXT holds one body, so that mapping is
+only checked there and in the synthetic test. `xtToSTEP` gained a `parts` option to convert chosen top-level bodies.
+
+The box now reads its exact B-rep: 329,847 mm3, against 329,944 in the assembly's STEP file (0.03% less) and 329,127
+for its JT mesh; 4 of its blend faces were still left out (below, under blends).
+
 ## Next
 
-- MultiXT segments (type 30) and subordinate XT elements.
 - Polygon sets and polylines; colours, texture coordinates and CAE result fields if wanted.
 - JT B-rep, wireframe and ULP segments, coded with Int32 Mk. 1 packets (bit-length and two-table arithmetic): that
   decoder was written in c91ebc0 and removed unused; bring it back with the first of those segments.

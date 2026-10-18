@@ -23,8 +23,17 @@ type XYZ = readonly number[];
 const sub = (a: XYZ, b: XYZ) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const scale = (a: XYZ, s: number) => [a[0] * s, a[1] * s, a[2] * s];
 
+/** Options of {@link xtToSTEP}. */
+export interface XTOptions {
+  /**
+   * Which of the file's top-level parts (its bodies and assemblies, in the file's order, from 0) to convert; all of
+   * them when omitted.
+   */
+  readonly parts?: readonly number[];
+}
+
 /** Converts a Parasolid transmit file (text or neutral binary) to STEP for the kernel. */
-export function xtToSTEP(input: string | ArrayBuffer | ArrayBufferView): XTConversion {
+export function xtToSTEP(input: string | ArrayBuffer | ArrayBufferView, options: XTOptions = {}): XTConversion {
   const xt: XTFile = readXT(input),
     w = new StepWriter(),
     warnings: string[] = [],
@@ -485,7 +494,9 @@ export function xtToSTEP(input: string | ArrayBuffer | ArrayBufferView): XTConve
       : r.name === 'WORLD'
         ? [...chain(node(r.fields.assembly), 'next'), ...chain(node(r.fields.body), 'next')]
         : [r];
-  for (const p of partsOf(root)) {
+  const keep = options.parts && new Set(options.parts);
+  for (const [i, p] of partsOf(root).entries()) {
+    if (keep && !keep.has(i)) continue;
     const shape = part(p);
     if (shape) roots.push(placed(shape, undefined));
   }

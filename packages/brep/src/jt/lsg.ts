@@ -33,6 +33,8 @@ export const JT_TYPES = {
   lateLoadedProperty: 'e0b05be5-fbbd-11d1-a3a7-00aa00d10954',
   vector4Property: '2e7db4be-c71a-4b18-9d07-c7227e9fef76',
   xtBRep: '873a70e0-2ac9-11d1-9b6b-0080c7bb5997',
+  /** The MultiXT segment's element (not in the published texts; seen in JT 10.5 files). */
+  multiXTBRep: '49829521-1835-49c3-8bef-ddc43bfe5e88',
 } as const;
 
 /** Shape node object type IDs and the representation each holds. */

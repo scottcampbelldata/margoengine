@@ -13,7 +13,7 @@ export type { SATConversion } from './sat/read.js';
 export { readXT } from './xt/read.js';
 export type { XTFile, XTNode, XTValue } from './xt/read.js';
 export { xtToSTEP } from './xt/step.js';
-export type { XTConversion } from './xt/step.js';
+export type { XTConversion, XTOptions } from './xt/step.js';
 import { xtToSTEP } from './xt/step.js';
 import type { JTModel } from './jt/read.js';
 
