@@ -360,12 +360,19 @@ export class Tessellator {
       B = (q: LoopPoint) => (transposed ? q.u : q.v),
       make = (p: XYZ, a: number, b: number, line?: boolean): LoopPoint =>
         transposed ? { p, u: b, v: a, line } : { p, u: a, v: b, line };
-    /** A wrapping bound cut where it crosses a = cut (mod the period), from that crossing round to it one period on. */
-    const open = (w: Wrap, cut: number): { run: LoopPoint[]; k: number } => {
+    /**
+     * A wrapping bound cut where it crosses a = cut (mod the period), from that crossing round to it one period on.
+     * Where it crosses more than once (a notch), the crossing nearest b = `near` (the first when not given).
+     */
+    const open = (w: Wrap, cut: number, near?: number): { run: LoopPoint[]; k: number } => {
       const k = transposed ? w.kv : w.ku,
         pts = w.points,
         n = pts.length,
         shift = k * period;
+      let found = -1,
+        foundT = 0,
+        foundTarget = 0,
+        gap = Infinity;
       for (let i = 0; i < n; i++) {
         const q0 = pts[i],
           q1 = pts[(i + 1) % n],
@@ -373,20 +380,35 @@ export class Tessellator {
           a1 = A(q1) + (i + 1 === n ? shift : 0),
           target = nearest(cut, (a0 + a1) / 2, period);
         // A cut at a sample point belongs to the segment it starts (a rounding error either side still counts).
-        const near = period * 1e-9;
-        if (a0 === a1 || Math.min(target - Math.min(a0, a1), Math.max(a0, a1) - target) < -near) continue;
-        if (i + 1 < n && Math.abs(target - a1) <= near) continue;
+        const tolerance = period * 1e-9;
+        if (a0 === a1 || Math.min(target - Math.min(a0, a1), Math.max(a0, a1) - target) < -tolerance) continue;
+        if (i + 1 < n && Math.abs(target - a1) <= tolerance) continue;
         const t = Math.max(0, Math.min(1, (target - a0) / (a1 - a0))),
-          crossing = make(add(q0.p, scale(sub(q1.p, q0.p), t)), target, B(q0) + (B(q1) - B(q0)) * t, q0.line);
-        const run: LoopPoint[] = [crossing];
-        for (let j = 1; j <= n; j++) {
-          const q = pts[(i + j) % n];
-          run.push(make(q.p, A(q) + (i + j >= n ? shift : 0), B(q), q.line));
+          d = near === undefined ? 0 : Math.abs(B(q0) + (B(q1) - B(q0)) * t - near);
+        if (d < gap) {
+          gap = d;
+          found = i;
+          foundT = t;
+          foundTarget = target;
+          if (near === undefined) break;
         }
-        run.push(make(crossing.p, target + shift, B(crossing)));
-        return { run: dedupe(run), k };
       }
-      throw new TypeError(`STEP face #${id}: could not cut a wrapping bound at its seam`);
+      if (found < 0) throw new TypeError(`STEP face #${id}: could not cut a wrapping bound at its seam`);
+      const q0 = pts[found],
+        q1 = pts[(found + 1) % n],
+        crossing = make(
+          add(q0.p, scale(sub(q1.p, q0.p), foundT)),
+          foundTarget,
+          B(q0) + (B(q1) - B(q0)) * foundT,
+          q0.line,
+        );
+      const run: LoopPoint[] = [crossing];
+      for (let j = 1; j <= n; j++) {
+        const q = pts[(found + j) % n];
+        run.push(make(q.p, A(q) + (found + j >= n ? shift : 0), B(q), q.line));
+      }
+      run.push(make(crossing.p, foundTarget + shift, B(crossing)));
+      return { run: dedupe(run), k };
     };
     // Bands and caps are cut open where no hole lies, or a hole across the cut would cross the cut lines.
     // ... and at one of the bound's own samples (the one nearest the middle of that stretch): a cut between samples
@@ -416,20 +438,19 @@ export class Tessellator {
     if (wraps.length === 2) {
       // A band (the side of a cylinder or cone, a sphere between two latitudes): both bounds cut at one seam, joined
       // by the cut walked once each way.
-      const first = open(wraps[0], cutAt(wraps[0]));
-      if (Math.sign(transposed ? wraps[1].kv : wraps[1].ku) === Math.sign(first.k)) {
+      if (Math.sign(transposed ? wraps[1].kv : wraps[1].ku) === Math.sign(transposed ? wraps[0].kv : wraps[0].ku)) {
         // Both bounds run the same way round, against the standard: reverse the second.
         const pts = wraps[1].points,
           reversed = pts.map((_, i) => ({ ...pts[pts.length - 1 - i], line: pts[(pts.length - i) % pts.length].line }));
         wraps[1] = { points: reversed, ku: -wraps[1].ku, kv: -wraps[1].kv };
       }
-      // The second bound is cut at its own sample nearest the first cut, never between samples: an interpolated point
-      // would be a T-junction with the neighbouring face, which only has the samples. The cut lines then lean slightly.
-      const at = A(first.run[0]),
-        closest = wraps[1].points.reduce((best, q) =>
-          Math.abs(nearest(A(q), at, period) - at) < Math.abs(nearest(A(best), at, period) - at) ? q : best,
-        ),
-        second = open(wraps[1], A(closest)),
+      // Each bound is cut at one of its own samples, never between samples: an interpolated point would be a
+      // T-junction with the neighbouring face, which only has the samples. The cut line between them must cross no
+      // bound (a notch reaching in from one bound can lie on the first choice): the first bound's samples are tried
+      // nearest the preferred cut first, each with the second bound's sample nearest it. The cut lines lean slightly.
+      const [cut0, at0, cut1, at1] = bandCut(wraps[0].points, wraps[1].points, loops, cutAt(wraps[0]), A, B, period),
+        first = open(wraps[0], cut0, at0),
+        second = open(wraps[1], cut1, at1),
         end = first.run[first.run.length - 1],
         // Whole periods only, so every point keeps the (u, v) of its position.
         shift = Math.round((A(end) - A(second.run[0])) / period) * period,
@@ -1004,6 +1025,72 @@ function boxArea(loop: readonly LoopPoint[]): number {
   return (b[1] - b[0]) * (b[3] - b[2]);
 }
 /** The middle of the widest stretch of a periodic coordinate that none of the ranges [lo, hi] covers, if any. */
+/**
+ * Where to cut a band's two wrapping bounds (in the wrap coordinate `A`): a sample of each, the straight cut between them
+ * crossing, touching or running along no segment of either bound or of a hole, as [a, b] on the first bound then on
+ * the second. Samples of the first bound are tried nearest `preferred` first; without a clear one, the preferred cut.
+ */
+function bandCut(
+  w0: readonly LoopPoint[],
+  w1: readonly LoopPoint[],
+  holes: readonly (readonly LoopPoint[])[],
+  preferred: number,
+  A: (q: LoopPoint) => number,
+  B: (q: LoopPoint) => number,
+  period: number,
+): [number, number | undefined, number, number | undefined] {
+  const nearestOf = (w: readonly LoopPoint[], at: number) =>
+    w.reduce((best, q) =>
+      Math.abs(nearest(A(q), at, period) - at) < Math.abs(nearest(A(best), at, period) - at) ? q : best,
+    );
+  // Every bound segment as (a0, b0, a1, b1), a1 taken nearest a0.
+  const segments: number[][] = [];
+  for (const loop of [w0, w1, ...holes])
+    for (let i = 0; i < loop.length; i++) {
+      const p = loop[i],
+        q = loop[(i + 1) % loop.length];
+      segments.push([A(p), B(p), nearest(A(q), A(p), period), B(q)]);
+    }
+  const clear = (a0: number, b0: number, a1: number, b1: number): boolean => {
+    const dx = a1 - a0,
+      dy = b1 - b0,
+      len = Math.hypot(dx, dy);
+    if (len === 0) return false;
+    for (const [s0, t0, s1, t1] of segments)
+      for (const shift of period ? [-period, 0, period] : [0]) {
+        const ex = s1 - s0,
+          ey = t1 - t0,
+          fx = s0 + shift - a0,
+          fy = t0 - b0,
+          denom = dx * ey - dy * ex,
+          size = len * Math.hypot(ex, ey);
+        if (Math.abs(denom) <= 1e-12 * size) {
+          // Parallel: overlapping along the cut is not clear.
+          if (Math.abs(dx * fy - dy * fx) > 1e-9 * len * (len + Math.hypot(ex, ey))) continue;
+          const u0 = (fx * dx + fy * dy) / (len * len),
+            u1 = ((fx + ex) * dx + (fy + ey) * dy) / (len * len);
+          if (Math.min(1, Math.max(u0, u1)) - Math.max(0, Math.min(u0, u1)) > 1e-9) return false;
+          continue;
+        }
+        // The cut at parameter t meets the segment at u; inside the cut (not at its ends) is not clear.
+        const t = (fx * ey - fy * ex) / denom,
+          u = (fx * dy - fy * dx) / denom;
+        if (t > 1e-9 && t < 1 - 1e-9 && u >= -1e-9 && u <= 1 + 1e-9) return false;
+      }
+    return true;
+  };
+  const order = [...w0].sort(
+    (p, q) =>
+      Math.abs(nearest(A(p), preferred, period) - preferred) - Math.abs(nearest(A(q), preferred, period) - preferred),
+  );
+  for (const q0 of order) {
+    const a = A(q0),
+      q1 = nearestOf(w1, a);
+    if (clear(a, B(q0), nearest(A(q1), a, period), B(q1))) return [a, B(q0), A(q1), B(q1)];
+  }
+  return [preferred, undefined, A(nearestOf(w1, preferred)), undefined];
+}
+
 function freeMiddle(ranges: readonly (readonly number[])[], period: number): number | undefined {
   const spans = ranges
     .map(([lo, hi]) => {
