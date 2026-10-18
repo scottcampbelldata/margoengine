@@ -41,8 +41,11 @@ Alternate renders must be sequential, outside a running frame pass. This hook do
 Extension users can tint core's diffuse ambient independently of the directional light:
 
 ```ts
+import { Engine } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+const engine = await Engine.create(canvas);
 const lighting = engineRuntime(engine).lighting;
 lighting.radiance[3] = 0.2; // existing ambient intensity
 lighting.ambient.set([0.4, 0.6, 1]); // linear RGB multiplier; white by default
@@ -59,11 +62,18 @@ For packages supplying `Lighting` directly to a renderer, omitted `ambient` mean
 Inside a frame pass, `context.draw` accepts independent rectangles:
 
 ```ts
-context.draw({
-  viewport: [0, 0, 160, 240],
-  scissor: [0, 0, 160, 240],
-  clear: false,
-});
+import type { FramePass } from '@margoengine/core/extension';
+
+const leftView: FramePass = {
+  name: 'left-view',
+  order: 1,
+  execute: (context) =>
+    context.draw({
+      viewport: [0, 0, 160, 240],
+      scissor: [0, 0, 160, 240],
+      clear: false,
+    }),
+};
 ```
 
 Both tuples use top-left drawing-buffer pixels, with nonnegative integer origins and positive integer sizes. Invalid or out-of-bounds rectangles throw before drawing. Custom target owners must set the context dimensions to match their active attachments. Omitted rectangles use the full target and do not retain the preceding draw's state.

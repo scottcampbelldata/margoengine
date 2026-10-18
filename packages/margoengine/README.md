@@ -62,7 +62,7 @@ The bounds array belongs to the model; treat its contents as read-only. Bounds a
 const model = await app.load('/assembly.obj');
 model.position.set(0, 2.5, 0);
 model.scale.setAll(1.2);
-const {AssemblyIndex} = await app.machinery();
+const {AssemblyIndex} = (await app.machinery()) as typeof import('@margoengine/machinery');
 const index = new AssemblyIndex(app.engine);
 index.tag(model.root, 'assembly');
 model.destroy();
