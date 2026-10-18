@@ -10,7 +10,7 @@ import { Enum, type STEPFile, type STEPValue } from '../step/file.js';
 import type { STEPBody, STEPColor } from '../step/structure.js';
 import { curveOf, type Curve } from '../geometry/curves.js';
 import { surfaceOf, type Surface } from '../geometry/surfaces.js';
-import { list, point, ref } from '../geometry/read.js';
+import { list, num, point, ref } from '../geometry/read.js';
 import { add, angle as between, cross, distance, dot, nearest, scale, sub, unit, type V3 } from '../geometry/vec.js';
 import { interiorEdges, triangulate } from './cdt.js';
 
@@ -720,7 +720,94 @@ export class Tessellator {
     }
   }
 
+  /**
+   * A tessellated body (AP242): TESSELLATED_SOLID or TESSELLATED_SHELL of triangulated faces, or one face or surface set
+   * on its own. Triangles come from lists, strips (alternating winding) or fans; 1-based indices go through pnindex to
+   * the coordinates list. Normals are the file's (one per point, or one for the face), else area-weighted per face.
+   */
+  private tessellatedBody(body: STEPBody): BodyMesh {
+    const file = this.file,
+      positions: number[] = [],
+      normals: number[] = [],
+      indices: number[] = [],
+      faces: BodyMeshFace[] = [],
+      failures: { id: number; reason: string }[] = [],
+      type = file.get(body.id).type,
+      items =
+        type === 'TESSELLATED_SOLID' || type === 'TESSELLATED_SHELL'
+          ? list(file.get(body.id).args[1]).flatMap((v) => (ref(v) === undefined ? [] : [ref(v)!]))
+          : [body.id];
+    const ints = (v: STEPValue | undefined) => list(v).map((x) => (typeof x === 'number' ? x : Number.NaN));
+    for (const id of items) {
+      try {
+        const entity = file.get(id),
+          a = entity.args,
+          kind = entity.type,
+          complex = kind === 'COMPLEX_TRIANGULATED_FACE' || kind === 'COMPLEX_TRIANGULATED_SURFACE_SET',
+          set = kind === 'TRIANGULATED_SURFACE_SET' || kind === 'COMPLEX_TRIANGULATED_SURFACE_SET';
+        if (!complex && kind !== 'TRIANGULATED_FACE' && kind !== 'TRIANGULATED_SURFACE_SET')
+          throw new TypeError(`Unsupported STEP tessellated item: #${id} ${kind}`);
+        // Faces carry a geometric link before pnindex; surface sets do not.
+        const coordinates = list(file.args(ref(a[1]) ?? -1, 'COORDINATES_LIST')[2]).map((p) =>
+            list(p).map((c) => num(c)),
+          ),
+          normalsIn = list(a[3]).map((n) => list(n).map((c) => num(c))),
+          pnindex = ints(a[set ? 4 : 5]),
+          local = pnindex.length ? pnindex.map((i) => coordinates[i - 1]) : coordinates;
+        if (local.some((p) => !p || p.length !== 3 || !p.every(Number.isFinite)))
+          throw new TypeError(`Invalid STEP file: #${id} indexes outside its coordinates list`);
+        const triangles: number[] = [],
+          add = (i: number, j: number, k: number) => {
+            if (i !== j && j !== k && k !== i) triangles.push(i - 1, j - 1, k - 1);
+          };
+        if (complex) {
+          for (const strip of list(a[set ? 5 : 6]).map(ints))
+            for (let t = 0; t + 2 < strip.length; t++)
+              if (t % 2) add(strip[t + 1], strip[t], strip[t + 2]);
+              else add(strip[t], strip[t + 1], strip[t + 2]);
+          for (const fan of list(a[set ? 6 : 7]).map(ints))
+            for (let t = 1; t + 1 < fan.length; t++) add(fan[0], fan[t], fan[t + 1]);
+        } else for (const triangle of list(a[set ? 5 : 6]).map(ints)) add(triangle[0], triangle[1], triangle[2]);
+        if (triangles.some((i) => !(i >= 0 && i < local.length)))
+          throw new TypeError(`Invalid STEP file: #${id} has a triangle index outside its points`);
+        const base = positions.length / 3,
+          first = indices.length,
+          vertexNormals = new Float64Array(local.length * 3);
+        if (normalsIn.length === local.length) normalsIn.forEach((n, i) => vertexNormals.set(n, i * 3));
+        else if (normalsIn.length === 1) for (let i = 0; i < local.length; i++) vertexNormals.set(normalsIn[0], i * 3);
+        else
+          for (let t = 0; t < triangles.length; t += 3) {
+            const [p, q, r] = [triangles[t], triangles[t + 1], triangles[t + 2]].map((i) => local[i]),
+              n = cross(sub(q, p), sub(r, p));
+            for (const i of [triangles[t], triangles[t + 1], triangles[t + 2]])
+              for (let k = 0; k < 3; k++) vertexNormals[i * 3 + k] += n[k];
+          }
+        for (let i = 0; i < local.length; i++) {
+          const n = unit([vertexNormals[i * 3], vertexNormals[i * 3 + 1], vertexNormals[i * 3 + 2]]) ?? [0, 0, 1];
+          positions.push(local[i][0], local[i][1], local[i][2]);
+          normals.push(n[0], n[1], n[2]);
+        }
+        for (const i of triangles) indices.push(base + i);
+        const color = this.faceColors.get(id);
+        faces.push({ id, first, count: triangles.length, ...(color ? { color } : {}) });
+      } catch (error) {
+        failures.push({ id, reason: error instanceof Error ? error.message : String(error) });
+      }
+    }
+    return {
+      id: body.id,
+      positions: Float32Array.from(positions),
+      normals: Float32Array.from(normals),
+      indices: Uint32Array.from(indices),
+      faces,
+      failures,
+      unit: body.unit,
+      deflection: 0,
+    };
+  }
+
   body(body: STEPBody): BodyMesh {
+    if (body.kind === 'tessellated') return this.tessellatedBody(body);
     const tol = this.tolerances(body),
       positions: number[] = [],
       normals: number[] = [],

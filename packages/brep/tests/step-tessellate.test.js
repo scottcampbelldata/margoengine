@@ -63,9 +63,12 @@ class Writer {
   }
   /** The whole file: the faces as one closed-shell solid of a part. */
   file(faces) {
-    const shell = this.add(`CLOSED_SHELL('',(${faces.join(',')}))`),
-      solid = this.add(`MANIFOLD_SOLID_BREP('solid',${shell})`),
-      rep = this.add(`ADVANCED_BREP_SHAPE_REPRESENTATION('',(${solid},#12),#10)`);
+    const shell = this.add(`CLOSED_SHELL('',(${faces.join(',')}))`);
+    return this.part(this.add(`MANIFOLD_SOLID_BREP('solid',${shell})`), 'ADVANCED_BREP_SHAPE_REPRESENTATION');
+  }
+  /** The whole file: one body item (a solid, or a tessellated solid) in a representation of the part. */
+  part(body, representation) {
+    const rep = this.add(`${representation}('',(${body},#12),#10)`);
     this.add(`SHAPE_REPRESENTATION_RELATIONSHIP('','',#13,${rep})`);
     return `ISO-10303-21;
 HEADER;
@@ -407,6 +410,42 @@ test('a B-spline face collapsed to a point at one u end (v meaningless there) cl
   );
   const r = solid(mesh(text), 1000 / 6, 150 + (Math.sqrt(3) / 4) * 200);
   assert.ok(r.triangles >= 4);
+});
+
+test('a tessellated solid (AP242): triangles, strips and fans through pnindex, read as written', () => {
+  // A unit tetrahedron (millimetres): two TRIANGULATED_FACEs and one COMPLEX_TRIANGULATED_FACE share one point list.
+  for (const [strips, fans] of [
+    ['((1,2,3,4))', '()'],
+    ['((1,2,3))', '((4,3,2))'],
+  ]) {
+    const w = new Writer(),
+      points = w.add("COORDINATES_LIST('',4,((0.,0.,0.),(1.,0.,0.),(0.,1.,0.),(0.,0.,1.)))"),
+      faces = [
+        w.add(`TRIANGULATED_FACE('',${points},4,((0.,0.,-1.)),$,(),((1,3,2)))`),
+        w.add(`TRIANGULATED_FACE('',${points},3,(),$,(1,2,4),((1,2,3)))`),
+        w.add(`COMPLEX_TRIANGULATED_FACE('',${points},4,(),$,(1,4,3,2),${strips},${fans})`),
+      ],
+      m = mesh(
+        w.part(w.add(`TESSELLATED_SOLID('tetrahedron',(${faces.join(',')}),$)`), 'TESSELLATED_SHAPE_REPRESENTATION'),
+      );
+    const r = solid(m, 1 / 6, 1.5 + Math.sqrt(3) / 2);
+    assert.equal(r.triangles, 4);
+    assert.deepEqual(
+      m.faces.map((f) => f.count / 3),
+      [1, 1, 2],
+    );
+    assert.deepEqual([...m.normals.slice(0, 3)], [0, 0, -1], "the file's one normal for a face is every point's");
+  }
+});
+
+test('a tessellated face indexing past its points is a failure that names the face', () => {
+  const w = new Writer(),
+    points = w.add("COORDINATES_LIST('',3,((0.,0.,0.),(1.,0.,0.),(0.,1.,0.)))"),
+    face = w.add(`TRIANGULATED_FACE('',${points},3,(),$,(),((1,2,7)))`),
+    m = mesh(w.part(w.add(`TESSELLATED_SOLID('',(${face}),$)`), 'TESSELLATED_SHAPE_REPRESENTATION'));
+  assert.equal(m.failures.length, 1);
+  assert.match(m.failures[0].reason, /outside its points/);
+  assert.equal(m.indices.length, 0);
 });
 
 test('a finer deflection gives more triangles and a closer volume', () => {

@@ -530,6 +530,14 @@ export function readStructure(file: STEPFile, { maxInstances = 1_000_000 }: STEP
           }
         }
       }
+    // A tessellated body's styled items are its triangulated faces.
+    if (kind === 'tessellated')
+      for (const item of entity.type === 'TESSELLATED_SOLID' || entity.type === 'TESSELLATED_SHELL'
+        ? refs(args[1])
+        : [id]) {
+        const color = colors.get(item);
+        if (color) faceColors.set(item, color);
+      }
     const color = colors.get(id) ?? (shells.length ? colors.get(shells[0]) : undefined);
     bodyIndex.set(id, bodies.length);
     bodies.push({
