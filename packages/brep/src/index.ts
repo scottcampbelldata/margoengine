@@ -15,6 +15,7 @@ export type { XTFile, XTNode, XTValue } from './xt/read.js';
 export { xtToSTEP } from './xt/step.js';
 export type { XTConversion } from './xt/step.js';
 import { xtToSTEP } from './xt/step.js';
+import type { JTModel } from './jt/read.js';
 
 export { STEPFile, Ref, Enum, Typed, DERIVED, stepText } from './step/file.js';
 export type { STEPEntity, STEPHeader, STEPValue } from './step/file.js';
@@ -90,6 +91,34 @@ export function parseXT(input: string | ArrayBuffer | ArrayBufferView, options: 
   const conversion = xtToSTEP(input),
     model = parseSTEP(conversion.step, options);
   return { ...model, warnings: [...conversion.warnings, ...model.warnings] };
+}
+
+// JT (ISO 14306, JT 9.5 and later; licensing in docs/jt-licensing.md).
+export { parseJT } from './jt/read.js';
+export type { JTInstance, JTModel, JTOptions, JTPart, JTShape } from './jt/read.js';
+export type {
+  JTAttribute,
+  JTLateLoaded,
+  JTNode,
+  JTNodeKind,
+  JTPropertyValue,
+  JTSceneGraph,
+  JTShapeKind,
+} from './jt/lsg.js';
+/**
+ * Tessellates the exact B-rep of every part of a parsed JT file (see {@link tessellateSTEP}): per part, one mesh per
+ * body of its `brep`, or undefined for a part without one. Place each with the part's instances, then the body's own
+ * instances within its `brep`. Throws a RangeError for an option out of range.
+ * @example
+ * const model = parseJT(bytes);
+ * const meshes = tessellateJT(model);
+ * for (const instance of model.instances) {
+ *   const brep = model.parts[instance.part].brep;
+ *   for (const placed of brep?.instances ?? []) draw(meshes[instance.part]![placed.body], instance.matrix, placed.matrix);
+ * }
+ */
+export function tessellateJT(model: JTModel, options: TessellationOptions = {}): (BodyMesh[] | undefined)[] {
+  return model.parts.map((part) => (part.brep ? tessellateSTEP(part.brep, options) : undefined));
 }
 
 // Modeling (docs/brep-modeling.md): editable bodies with persistent names, construction, validation and export.

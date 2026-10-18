@@ -50,7 +50,8 @@ for (const check of validateSTEP(model, tessellateSTEP(model)))
 
 ## Other B-rep formats
 
-ACIS SAT and Parasolid XT are converted to STEP entities and then read and meshed by the same kernel:
+ACIS SAT and Parasolid XT (also inside JT files) are converted to STEP entities and then read and meshed by the same
+kernel:
 
 - **ACIS SAT** (`parseSAT`, `satToSTEP`): save versions before and after ACIS 7.0, written from Spatial's published SAT
   format chapter and class restore descriptions. Bodies, lumps, shells, faces, loops, coedges, edges, vertices; plane,
@@ -64,6 +65,13 @@ ACIS SAT and Parasolid XT are converted to STEP entities and then read and meshe
   (each ball centre along the spine projected onto both supports, the exact arc between the contacts as a rational
   quadratic); SDL/TYSA_COLOUR attributes. Lengths are metres. Cliff-edge blends, SP-curves of tolerant edges and
   foreign geometry are left out and listed in `warnings` for now.
+- **JT** (`parseJT`, `tessellateJT`): JT 9.5 and later (ISO 14306), written from the JT File Format Reference and
+  the standard under Siemens' published licence terms (`NOTICE`, `docs/jt-licensing.md`). The file header and table
+  of contents, zlib (JT 9) and LZMA (JT 10) segment compression, the scene graph (partitions, groups, instances,
+  parts, LOD and switch nodes, transforms, materials, properties with names and units) and each part's exact B-rep
+  from its XT B-rep segment, read by the Parasolid reader. Parts and placements come out in metres. Tessellated shapes
+  (shape LOD segments) are listed with their segments but not decoded yet; JT files that partition nodes refer to are
+  listed in `warnings`.
 
 ## What stage 1 reads
 
