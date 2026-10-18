@@ -6,6 +6,7 @@ const {
   boolean,
   bodiesToSTEP,
   box,
+  curveEvaluator,
   curveSurfaceCrossings,
   cylinder,
   frameOf,
@@ -17,7 +18,13 @@ const {
 } = model;
 
 const mm = 0.001,
-  at = (x, y, z, axis = [0, 0, 1], dir = [1, 0, 0]) => frameOf([x * mm, y * mm, z * mm], axis, dir);
+  at = (x, y, z, axis = [0, 0, 1], dir = [1, 0, 0]) => frameOf([x * mm, y * mm, z * mm], axis, dir),
+  // An 80 mm box's frame, tilted, with its -z face 2 mm below the origin: that face crosses a torus about z obliquely.
+  tilted = (() => {
+    const f = frameOf([0, 0, 0], [0.3, 0.1, 1], [1, 0, 0]),
+      o = [0, 1, 2].map((k) => (-40 * f.x[k] - 40 * f.y[k] - 2 * f.z[k]) * mm);
+    return frameOf(o, f.z, f.x);
+  })();
 
 /** Volume, area and open edges of every mesh of a body (a cut can leave several solids), vertices joined where equal. */
 function measureAll(body, options = { deflection: 1e-6, angle: 0.1 }) {
@@ -193,11 +200,6 @@ test('Booleans: names survive, splits and new edges are recorded, and STEP keeps
 
 test('Booleans on curved pairs (traced curves): intersect + subtract = A, and union = A + B - intersect', () => {
   // Pairs no closed form covers: their curves are traced; volumes must add up across the four operations.
-  const tilted = (() => {
-    const f = frameOf([0, 0, 0], [0.3, 0.1, 1], [1, 0, 0]),
-      o = [0, 1, 2].map((k) => (-40 * f.x[k] - 40 * f.y[k] - 2 * f.z[k]) * mm);
-    return frameOf(o, f.z, f.x);
-  })();
   // [label, A, B, exact volume of A, of B] (mm^3).
   const pairs = [
     [
@@ -271,6 +273,45 @@ test('Booleans on curved pairs (traced curves): intersect + subtract = A, and un
       `${label}: union vs A + B - intersect`,
     );
   }
+});
+
+test('STEP export: a traced loop is written in pieces that turn half a turn at most', () => {
+  // A torus less the tilted box keeps one traced loop, a closed edge. OpenCascade's default GProp integrates each edge
+  // with a fixed number of points and read it 3% too large written as one edge.
+  const cut = boolean('s', 'subtract', torus('t', 20 * mm, 5 * mm), box('b', [80 * mm, 80 * mm, 80 * mm], tilted)),
+    [loop] = cut.edges;
+  assert.equal(cut.edges.length, 1);
+  assert.ok(loop.closed && loop.curve.kind === 'spline');
+  const written = bodiesToSTEP([cut]),
+    points = new Map(
+      [...written.matchAll(/#(\d+)=CARTESIAN_POINT\('',\(([^)]*)\)\)/g)].map((m) => [
+        m[1],
+        m[2].split(',').map(Number),
+      ]),
+    ),
+    vertices = new Map(
+      [...written.matchAll(/#(\d+)=VERTEX_POINT\('[^']*',#(\d+)\)/g)].map((m) => [m[1], points.get(m[2])]),
+    ),
+    pieces = [...written.matchAll(/=EDGE_CURVE\('([^']*)',#(\d+),#(\d+),#\d+,\.([TF])\.\)/g)];
+  assert.ok(pieces.length > 1 && pieces.every((m) => m[1] === loop.name));
+  // Each piece's turn: the angles between tangents sampled along the loop's curve between its vertices.
+  const c = curveEvaluator(loop.curve),
+    angle = (a, b) =>
+      Math.acos(Math.min(1, (a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) / (Math.hypot(...a) * Math.hypot(...b))));
+  for (const [, , start, end, sense] of pieces) {
+    const [from, to] = sense === 'T' ? [start, end] : [end, start],
+      t0 = c.parameter(vertices.get(from));
+    let t1 = c.parameter(vertices.get(to)),
+      turn = 0;
+    if (t1 <= t0) t1 += c.period;
+    for (let k = 1; k <= 200; k++)
+      turn += angle(c.at(t0 + ((t1 - t0) * (k - 1)) / 200).slice(3), c.at(t0 + ((t1 - t0) * k) / 200).slice(3));
+    assert.ok(turn <= Math.PI + 0.01, `a piece turns ${turn.toFixed(3)} rad`);
+  }
+  assert.deepEqual(
+    parseSTEP(written).bodies.map((x) => [x.kind, x.faces.length]),
+    [['solid', 2]],
+  );
 });
 
 test('Booleans: coaxial surfaces meet in exact circles (a napkin ring, a torus cut across its axis)', () => {

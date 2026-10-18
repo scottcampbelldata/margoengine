@@ -110,7 +110,7 @@ Related: the Night Citadel browser test expects phones at 2 device pixels per CS
 
 ### STEP export: OpenCascade misread faces on closed surfaces (fixed 2026-10-18)
 
-Found by Codex's b1f5d2e and 7243c0e validations. Two causes in `bodiesToSTEP`, both fixed in `model/seams.ts`:
+Found by Codex's b1f5d2e and 7243c0e validations. Three causes in `bodiesToSTEP`, all fixed in `model/seams.ts`:
 
 - A face going round a cylinder, cone, sphere or torus (a sphere or torus less a hole, a cap over a pole) was bounded
   only by its own edges, and OpenCascade's mesher filled the wrong side. It is now cut open along the surface's seam by
@@ -118,10 +118,18 @@ Found by Codex's b1f5d2e and 7243c0e validations. Two causes in `bodiesToSTEP`, 
   than a hemisphere is written with the sphere's axis turned across it instead.
 - An edge on a traced intersection loop (a closed B-spline) could run across the spline's start, which a reader that
   takes the spline as written cannot follow (032's GProp was -15.65 mm3). Such edges are now split there.
+- GProp's default integration uses a fixed number of points per edge, whatever the edge's curve. 023 (torus less a
+  tilted box) keeps one traced loop, written as one closed edge: 3,807.8 mm3 against Margo's 3,698.1 (+3%), its plane
+  face 683.9 mm2 against 656.9. Not the spline's continuity or span count: the loop refitted as a C2 spline (simple
+  knots) or with 19 to 301 spans still read 3,796 to 3,808, while the same spline cut into 2, 4 or 8 edges read 3,699.0
+  each time (adaptive integration, relative error 1e-7: 3,699.0). B-spline edges are now written in pieces that turn
+  half a turn at most, split at equal turns (023: 4 edges; 42 more edges over 20 of the 74 results). Quarter turns
+  read as well but made occt-import-js 0.0.23's mesher cover part of a hole (030's sphere face +3% area) or fold
+  (022's torus face), and splitting at equal lengths did too; OCP 8.0.1's mesher meshes those files like the old ones.
 
 All 74 Boolean, blend and model test results, exported and read back: occt-import-js (1 um deflection, 0.05 rad) mesh
 volume within 0.041% of Margo's and area within 0.014% (before: 010 -61%, 022 -40%, 026 -26%, 030 -14%, 031 +7.5%,
-032 -126%, 033 -85%, 035 -76%, 036 -40%, and 024, 025, 027 off 0.5% to 2%). OpenCascade's GProp agrees within 0.04%
-except 023 (+3%, as before): its default integration is that far off on the face's long spline edge, and its adaptive
-integration (relative error 1e-7) gives 3,699.0 mm3 against Margo's 3,698.1. Our reader reads every export back to
-the same solids, volumes within 0.018% of the old exports'.
+032 -126%, 033 -85%, 035 -76%, 036 -40%, and 024, 025, 027 off 0.5% to 2%). OpenCascade's GProp (default integration)
+volume within 0.061% (078, a whole torus, where Margo's own mesh is 0.06% under) and area within 0.014%; 023 now
+3,699.0 mm3 (+0.024%). BRepCheck finds all 74 valid. Our reader reads every export back to the same solids, volumes
+within 0.018% of the old exports'.

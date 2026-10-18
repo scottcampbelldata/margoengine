@@ -8,9 +8,12 @@
 // instead with the sphere's axis turned across it, so it covers no pole and needs no seam. Faces that already have a
 // seam (a cylinder made by extrusion), patches that do not go round, planes and splines are written as they are.
 // Edges are also split where they run across the start of a closed B-spline (a traced intersection loop): STEP writes
-// the spline as an open one from that point round to it, and an edge cannot run across it.
+// the spline as an open one from that point round to it, and an edge cannot run across it. And a B-spline edge is
+// written in pieces that turn half a turn at most, split at equal turns: OpenCascade's default integration (GProp's
+// volume and area) uses a fixed number of points per edge, and was 3% out on a traced loop written as one edge (4% on
+// its plane face). Pieces of a quarter turn made occt-import-js 0.0.23's mesher cover part of a hole or fold back.
 import type { Surface } from '../geometry/surfaces.js';
-import { add, dot, scale, sub, type XYZ } from '../geometry/vec.js';
+import { add, angle as between, dot, scale, sub, type XYZ } from '../geometry/vec.js';
 import { curveEvaluator, frameOf, surfaceEvaluator, type CurveDef, type Frame, type SurfaceDef } from './geometry.js';
 import { gaps } from './faces.js';
 import { Vertex, type Edge, type Face, type Name } from './topology.js';
@@ -38,6 +41,9 @@ export interface WrittenFaces {
 }
 
 const TAU = 2 * Math.PI;
+
+/** The most a B-spline edge turns as written (see above). */
+const MAX_TURN = Math.PI;
 
 type UV = [number, number];
 
@@ -108,7 +114,10 @@ const sampleCount = (e: Edge) =>
 const turned = (f: Frame, angle: number): Frame =>
   frameOf(f.origin, f.z, add(scale(f.x, Math.cos(angle)), scale(f.y, Math.sin(angle))));
 
-/** Faces as written: those that need it cut open, and edges split where seams and spline starts cross them. */
+/**
+ * Faces as written: those that need it cut open, and edges split where seams and spline starts cross them and where
+ * a B-spline edge turns too far.
+ */
 export function writtenFaces(faces: readonly Face[]): WrittenFaces {
   const splits = new Map<Edge, { f: number; vertex: Vertex }[]>(),
     cuts = new Map<Face, { surface: SurfaceDef; loops: Step[][] }>(),
@@ -117,8 +126,9 @@ export function writtenFaces(faces: readonly Face[]): WrittenFaces {
       if (!list.some((x) => x.vertex === vertex)) list.push({ f, vertex });
       splits.set(edge, list);
     };
+  const edges = new Set(faces.flatMap((f) => f.loops.flatMap((l) => l.coedges.map((c) => c.edge))));
   // Edges running across the start of a closed B-spline, split there (see above).
-  for (const edge of new Set(faces.flatMap((f) => f.loops.flatMap((l) => l.coedges.map((c) => c.edge))))) {
+  for (const edge of edges) {
     const c = curveEvaluator(edge.curve);
     if (edge.curve.kind !== 'spline' || !c.period) continue;
     const [t0, t1] = edgeParameters(edge, 1),
@@ -135,6 +145,40 @@ export function writtenFaces(faces: readonly Face[]): WrittenFaces {
     if (!cut) continue;
     cuts.set(face, cut);
     for (const s of cut.splits) split(s.edge, s.f, s.vertex);
+  }
+  // B-spline edges, between the points already splitting them, split again where they turn more than MAX_TURN (see
+  // above), at equal turns: how far the edge has turned at each sample is the sum of its chords' turns before it.
+  for (const edge of edges) {
+    if (edge.curve.kind !== 'spline') continue;
+    const n = sampleCount(edge),
+      c = curveEvaluator(edge.curve),
+      [t0, t1] = edgeParameters(edge, 1),
+      at = edgeParameters(edge, n).map((t) => c.at(t).slice(0, 3) as XYZ),
+      turns = [0];
+    for (let k = 1; k < n; k++) turns.push(turns[k - 1] + between(sub(at[k], at[k - 1]), sub(at[k + 1], at[k])));
+    turns.push(turns[n - 1]);
+    const turnAt = (f: number) => {
+        const x = f * n,
+          k = Math.min(n - 1, Math.floor(x));
+        return turns[k] + (turns[k + 1] - turns[k]) * (x - k);
+      },
+      fractionAt = (turn: number) => {
+        let k = 0;
+        while (k < n - 1 && turns[k + 1] < turn) k++;
+        const d = turns[k + 1] - turns[k];
+        return (k + (d > 0 ? (turn - turns[k]) / d : 0)) / n;
+      },
+      ends = [0, ...(splits.get(edge) ?? []).map((x) => x.f).sort((a, b) => a - b), 1];
+    let named = 0;
+    for (let i = 0; i + 1 < ends.length; i++) {
+      const a = turnAt(ends[i]),
+        b = turnAt(ends[i + 1]),
+        count = Math.ceil((b - a) / MAX_TURN - 1e-9);
+      for (let j = 1; j < count; j++) {
+        const f = fractionAt(a + ((b - a) * j) / count);
+        split(edge, f, new Vertex(`${edge.name}/vertex:turn:${named++}`, c.at(t0 + (t1 - t0) * f).slice(0, 3) as XYZ));
+      }
+    }
   }
   // Each edge as the pieces between its split points, in order from its start.
   const pieces = new Map<Edge, { f0: number; f1: number; edge: WrittenEdge }[]>();
