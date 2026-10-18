@@ -1,5 +1,6 @@
-// Our STEP reader (@margoengine/brep) against OpenCascade on every STEP file of the CAD corpus
-// (test-results/cad-corpus/manifest.json). OpenCascade (occt-import-js, a dev dependency) is only the reference here,
+// Our kernel (@margoengine/brep) against OpenCascade on every STEP file of the CAD corpus
+// (test-results/cad-corpus/manifest.json), and on its own for the B-rep formats OpenCascade's free build cannot read
+// (ACIS SAT, format 'sat'; Parasolid XT, format 'xt': .x_t and .x_b). OpenCascade (occt-import-js, a dev dependency) is only the reference here,
 // as three.js is for rendering; it never ships in @margoengine/brep. Per file: products, placed bodies and faces from
 // both, and parse times; then, unless --no-mesh, both tessellate at the same settings (deflection 0.001 of the size,
 // 0.5 rad) and the meshes are compared: triangles, area, enclosed volume, bounds, open edges, faces that failed, time.
@@ -8,7 +9,7 @@
 //     [--no-mesh] [--only=<part of a file name>]
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { parseSTEP, tessellateSTEP, validateSTEP } from '../packages/brep/dist/index.js';
+import { parseSAT, parseSTEP, parseXT, tessellateSTEP, validateSTEP } from '../packages/brep/dist/index.js';
 
 const require = createRequire(import.meta.url),
   json = process.argv.find((a) => a.startsWith('--json='))?.slice(7),
@@ -16,7 +17,7 @@ const require = createRequire(import.meta.url),
   withOCCT = !process.argv.includes('--no-occt'),
   withMesh = !process.argv.includes('--no-mesh');
 const manifest = JSON.parse(readFileSync('test-results/cad-corpus/manifest.json', 'utf8')).filter(
-  (entry) => entry.format === 'step' && (!only || entry.file.includes(only)),
+  (entry) => ['step', 'sat', 'xt'].includes(entry.format) && (!only || entry.file.includes(only)),
 );
 
 /** Triangles, area, signed volume, open edges (after joining equal positions) and bounds of a triangle mesh. */
@@ -76,11 +77,11 @@ for (const entry of manifest) {
     row = { file: entry.file, bytes: bytes.length };
   let start = performance.now();
   try {
-    const model = parseSTEP(bytes),
+    const model = entry.format === 'sat' ? parseSAT(bytes) : entry.format === 'xt' ? parseXT(bytes) : parseSTEP(bytes),
       faces = model.instances.reduce((sum, i) => sum + model.bodies[i.body].faces.length, 0);
     row.ours = {
       ms: +(performance.now() - start).toFixed(1),
-      schema: model.header.schema[0]?.split(' ')[0] ?? '',
+      schema: entry.format === 'step' ? (model.header.schema[0]?.split(' ')[0] ?? '') : entry.format,
       products: model.products.length,
       roots: model.roots.length,
       bodies: model.bodies.length,
@@ -140,7 +141,7 @@ for (const entry of manifest) {
   } catch (error) {
     row.ours = { ms: +(performance.now() - start).toFixed(1), error: String(error) };
   }
-  if (occt) {
+  if (occt && entry.format === 'step') {
     start = performance.now();
     // Metres, and the same deflection settings as ours.
     const result = occt.ReadStepFile(new Uint8Array(bytes), {
