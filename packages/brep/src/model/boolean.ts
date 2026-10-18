@@ -6,8 +6,9 @@
 // against the other solid's exact faces (three directions, majority), not from a mesh.
 import { cross, dot, length, scale, sub, unit, type V3 } from '../geometry/vec.js';
 import { curveEvaluator, type CurveDef } from './geometry.js';
-import { FaceUV, leftOf, type UV, type UVLoop } from './faces.js';
+import { FaceUV, gaps, leftOf, shiftV, vRange, type UV, type UVLoop } from './faces.js';
 import { curveSurfaceCrossings, intersectSurfaces, signedDistance } from './intersect.js';
+import type { Box3 } from './march.js';
 import { Body, Edge, Face, Vertex, type History, type Name } from './topology.js';
 import { edgeParameters, validateBody } from './validate.js';
 
@@ -144,9 +145,12 @@ export function boolean(
   // --- intersection curves of each pair of faces, kept where they lie inside both -----------------------------------
   const inner = new Map<Face, Piece[]>();
   const addInner = (f: Face, p: Piece) => inner.set(f, [...(inner.get(f) ?? []), p]);
+  const boxes = new Map([...faces.a, ...faces.b].map((f) => [f, faceBox(uvOf.get(f)!, merge)]));
   for (const fa of faces.a)
     for (const fb of faces.b) {
-      const meet = intersectSurfaces(fa.surface, fb.surface);
+      const box = overlap(boxes.get(fa)!, boxes.get(fb)!);
+      if (!box) continue;
+      const meet = intersectSurfaces(fa.surface, fb.surface, box);
       if (meet.kind === 'none') continue;
       if (meet.kind === 'coincident') {
         if (overlaps(uvOf.get(fa)!, uvOf.get(fb)!))
@@ -156,7 +160,8 @@ export function boolean(
       let k = 0;
       for (const curve of meet.curves) {
         const c = curveEvaluator(curve),
-          closed = curve.kind === 'circle' || curve.kind === 'ellipse',
+          period = c.period,
+          closed = period > 0,
           // Where either face's edges cross the other face, on this curve: the ends of its stretches inside both.
           stops: { t: number; vertex: Vertex }[] = [];
         for (const [f, g] of [
@@ -171,6 +176,15 @@ export function boolean(
                 if (length(sub(c.at(t).slice(0, 3) as V3, s.vertex.point)) <= 1e3 * merge)
                   stops.push({ t, vertex: s.vertex });
               }
+        // Vertices of either face on the curve (a corner touching the other face) break it too.
+        for (const f of [fa, fb])
+          for (const loop of f.loops)
+            for (const co of loop.coedges) {
+              const v = original.get(co.start)!;
+              if (stops.some((x) => x.vertex === v)) continue;
+              const t = c.parameter(v.point);
+              if (length(sub(c.at(t).slice(0, 3) as V3, v.point)) <= 1e3 * merge) stops.push({ t, vertex: v });
+            }
         stops.sort((x, y) => x.t - y.t);
         const both = (t: number) => {
           const p = c.at(t).slice(0, 3) as V3;
@@ -190,15 +204,16 @@ export function boolean(
           addInner(fb, piece);
         };
         if (closed && !stops.length) {
-          if (both(0)) {
-            const v = vertexAt(c.at(0).slice(0, 3) as V3);
-            push(0, TWO_PI, v, v);
+          const t0 = c.domain[0];
+          if (both(t0)) {
+            const v = vertexAt(c.at(t0).slice(0, 3) as V3);
+            push(t0, t0 + period, v, v);
           }
           continue;
         }
         for (let i = 0; i < stops.length - (closed ? 0 : 1); i++) {
           const s = stops[i],
-            e = closed && i === stops.length - 1 ? { t: stops[0].t + TWO_PI, vertex: stops[0].vertex } : stops[i + 1];
+            e = closed && i === stops.length - 1 ? { t: stops[0].t + period, vertex: stops[0].vertex } : stops[i + 1];
           if (both((s.t + e.t) / 2)) push(s.t, e.t, s.vertex, e.vertex);
         }
       }
@@ -412,14 +427,32 @@ function splitFace(f: Face, fuv: FaceUV, halves: Half[]): Omit<Region, 'from'>[]
     }
     return fuv.close(points);
   });
+  // A torus is cut open round its tube where no cycle crosses, so v runs over one period from the cut; the region
+  // the cut runs through is then in two parts, joined below.
+  const vPeriod = fuv.surface.vPeriod,
+    cut = vPeriod ? gaps(loops.map(vRange), vPeriod)[0] : undefined;
+  if (vPeriod && cut === undefined)
+    throw new RangeError(`splitting face ${f.name}: a loop goes round a torus's tube: not supported yet`);
+  const open = cut === undefined ? loops : loops.map((l) => shiftV(l, cut, vPeriod)),
+    vBounds: readonly [number, number] = cut === undefined ? fuv.surface.vDomain : [cut, cut + vPeriod],
+    sides = ([u, v]: UV) => open.map((l) => (leftOf(l, fuv.period, u, v) ? '1' : '0')).join('');
   // Cycles bound one region when a point inside next to each lies on the same side of every cycle.
-  const points = loops.map((l) => probe(fuv, l, loops)),
+  const points = open.map((l) => probe(fuv, l, open, vBounds)),
     groups = new Map<string, number[]>();
-  points.forEach(([u, v], i) => {
-    const key = loops.map((l) => (leftOf(l, fuv.period, u, v) ? '1' : '0')).join('');
+  points.forEach((q, i) => {
+    const key = sides(q);
     if (key[i] !== '1') throw new RangeError(`splitting face ${f.name}: a loop does not bound a region on its left`);
     groups.set(key, [...(groups.get(key) ?? []), i]);
   });
+  if (cut !== undefined) {
+    const u = open[0].points[0][0],
+      low = sides([u, cut + 1e-9 * vPeriod]),
+      high = sides([u, cut + vPeriod * (1 - 1e-9)]);
+    if (low !== high && groups.has(low) && groups.has(high)) {
+      groups.set(low, [...groups.get(low)!, ...groups.get(high)!]);
+      groups.delete(high);
+    }
+  }
   return [...groups.values()].map((group) => ({
     face: f,
     loops: group.map((i) => cycles[i]),
@@ -428,7 +461,7 @@ function splitFace(f: Face, fuv: FaceUV, halves: Half[]): Omit<Region, 'from'>[]
 }
 
 /** A point inside the region left of a loop: halfway from the middle of the loop's longest segment to the next loop (or surface end) on its left. */
-function probe(fuv: FaceUV, loop: UVLoop, all: UVLoop[]): UV {
+function probe(fuv: FaceUV, loop: UVLoop, all: UVLoop[], vBounds: readonly [number, number]): UV {
   const period = fuv.period,
     segment = (l: UVLoop, i: number): [UV, UV] => [
       l.points[i],
@@ -447,7 +480,7 @@ function probe(fuv: FaceUV, loop: UVLoop, all: UVLoop[]): UV {
   const [p0, q0] = segment(loop, best),
     m: UV = [(p0[0] + q0[0]) / 2, (p0[1] + q0[1]) / 2],
     d: UV = [-(q0[1] - p0[1]) / len, (q0[0] - p0[0]) / len],
-    [v0, v1] = fuv.surface.vDomain;
+    [v0, v1] = vBounds;
   let s = Infinity;
   if (d[1] > 0 && Number.isFinite(v1)) s = (v1 - m[1]) / d[1];
   if (d[1] < 0 && Number.isFinite(v0)) s = (v0 - m[1]) / d[1];
@@ -509,4 +542,45 @@ function overlaps(x: FaceUV, y: FaceUV): boolean {
   ] as const)
     for (const loop of f.loops) for (const q of loop.points) if (g.contains(f.at(q))) return true;
   return false;
+}
+
+/**
+ * A box round a face, generous rather than tight: its boundary samples, and on a curved surface a grid over its
+ * (u, v) bounds as well (the face can bulge past its boundary); a sphere or torus is boxed whole.
+ */
+function faceBox(fuv: FaceUV, merge: number): Box3 {
+  const s = fuv.face.surface,
+    points: V3[] = [];
+  if (s.kind === 'sphere' || s.kind === 'torus') {
+    const r = s.kind === 'sphere' ? s.radius : s.major + s.minor,
+      o = s.frame.origin;
+    return { min: [o[0] - r, o[1] - r, o[2] - r], max: [o[0] + r, o[1] + r, o[2] + r] };
+  }
+  for (const l of fuv.loops) for (const q of l.points) points.push(fuv.at(q));
+  if (s.kind !== 'plane') {
+    const [u0, u1, v0, v1] = fuv.box;
+    for (let i = 0; i <= 16; i++)
+      for (let j = 0; j <= 16; j++) points.push(fuv.at([u0 + ((u1 - u0) * i) / 16, v0 + ((v1 - v0) * j) / 16]));
+  }
+  const min: V3 = [Infinity, Infinity, Infinity],
+    max: V3 = [-Infinity, -Infinity, -Infinity];
+  for (const p of points)
+    for (let k = 0; k < 3; k++) {
+      min[k] = Math.min(min[k], p[k]);
+      max[k] = Math.max(max[k], p[k]);
+    }
+  const pad = 0.02 * length(sub(max, min)) + 1e3 * merge;
+  return { min: [min[0] - pad, min[1] - pad, min[2] - pad], max: [max[0] + pad, max[1] + pad, max[2] + pad] };
+}
+
+/** The common part of two boxes, or undefined when they are apart. */
+function overlap(a: Box3, b: Box3): Box3 | undefined {
+  const min: V3 = [0, 0, 0],
+    max: V3 = [0, 0, 0];
+  for (let k = 0; k < 3; k++) {
+    min[k] = Math.max(a.min[k], b.min[k]);
+    max[k] = Math.min(a.max[k], b.max[k]);
+    if (min[k] > max[k]) return undefined;
+  }
+  return { min, max };
 }

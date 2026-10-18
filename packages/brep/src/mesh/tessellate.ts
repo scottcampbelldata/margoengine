@@ -506,13 +506,30 @@ export class Tessellator {
       su = Math.hypot(mid[3], mid[4], mid[5]) || 1,
       sv = Math.hypot(mid[6], mid[7], mid[8]) || 1;
     let [du, dv] = s.steps(all, tol.interior, tol.interiorAngle);
-    // A face straight one way (a cylinder along its axis) needs no points inside, unless it has holes: then triangles
-    // would span round them, so it takes columns across the curved way, a few points along each.
-    if (domain.length > 1) {
-      if (Number.isFinite(du) && !Number.isFinite(dv))
-        (du *= 0.7), (dv = Math.max((all[3] - all[2]) / 8, (du * su) / sv));
-      else if (Number.isFinite(dv) && !Number.isFinite(du))
-        (dv *= 0.7), (du = Math.max((all[1] - all[0]) / 8, (dv * sv) / su));
+    // A face straight one way (a cylinder along its axis) needs no points inside when it is a plain band or patch; with
+    // a hole or a notch (boundary points away from its edges in both directions) triangles would span round it as
+    // flat chords, so it takes columns across the curved way, a few points along each.
+    const inner = (q: LoopPoint) => {
+        const eu = 1e-9 * (all[1] - all[0]),
+          ev = 1e-9 * (all[3] - all[2]);
+        return q.u > all[0] + eu && q.u < all[1] - eu && q.v > all[2] + ev && q.v < all[3] - ev;
+      },
+      notched = domain.length > 1 || domain.some((loop) => loop.some(inner));
+    // The triangulation then runs with the straight direction squashed so the grid's cells are square: Delaunay
+    // triangles then join each boundary point to its own column, and the surface being straight that way, squashing
+    // it costs no accuracy.
+    let ku = 1,
+      kv = 1;
+    if (notched && Number.isFinite(du) !== Number.isFinite(dv)) {
+      if (Number.isFinite(du)) {
+        du *= 0.7;
+        dv = Math.max((all[3] - all[2]) / 8, (du * su) / sv);
+        kv = (du * su) / (dv * sv);
+      } else {
+        dv *= 0.7;
+        du = Math.max((all[1] - all[0]) / 8, (dv * sv) / su);
+        ku = (dv * sv) / (du * su);
+      }
     }
     const uv: number[] = [],
       xyz: V3[] = [],
@@ -586,7 +603,11 @@ export class Tessellator {
         du *= 1.5;
         dv *= 1.5;
       }
-      const near = boundaryFilter(scaled(uv, su, sv), loopIndices, 0.3 * Math.min(du * su, dv * sv));
+      const near = boundaryFilter(
+        scaled(uv, su * ku, sv * kv),
+        loopIndices,
+        0.3 * Math.min(du * su * ku, dv * sv * kv),
+      );
       for (let u = all[0] + du / 2; u < all[1]; u += du)
         for (let v = all[2] + dv / 2; v < all[3]; v += dv) {
           if (near(u * su, v * sv)) continue;
@@ -596,7 +617,7 @@ export class Tessellator {
     }
 
     // --- triangulation and refinement -----------------------------------------------------------------------------------
-    let triangles = triangulate(scaled(uv, su, sv), loopIndices);
+    let triangles = triangulate(scaled(uv, su * ku, sv * kv), loopIndices);
     for (let pass = 0; pass < 6 && uv.length / 2 < this.maxFaceVertices; pass++) {
       const added: number[] = [],
         seen = new Set<string>(),
@@ -638,7 +659,7 @@ export class Tessellator {
         uv.push(added[i], added[i + 1]);
         xyz.push(spot(added[i], added[i + 1]));
       }
-      triangles = triangulate(scaled(uv, su, sv), loopIndices);
+      triangles = triangulate(scaled(uv, su * ku, sv * kv), loopIndices);
     }
 
     // --- output: triangles wound to face outward, collapsed ones (at a pole) dropped, unused points removed -------------

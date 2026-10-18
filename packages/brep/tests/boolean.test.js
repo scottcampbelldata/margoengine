@@ -12,11 +12,26 @@ import {
   orient3d,
   parseSTEP,
   sphere,
+  torus,
   validateBody,
 } from '../dist/index.js';
 
 const mm = 0.001,
   at = (x, y, z, axis = [0, 0, 1], dir = [1, 0, 0]) => frameOf([x * mm, y * mm, z * mm], axis, dir);
+
+/** Volume, area and open edges of every mesh of a body (a cut can leave several solids), vertices joined where equal. */
+function measureAll(body, options = { deflection: 1e-6, angle: 0.1 }) {
+  if (!body.faces.length) return { volume: 0, area: 0, open: 0 };
+  const total = { volume: 0, area: 0, open: 0 };
+  for (const mesh of meshBodies([body], options).meshes) {
+    assert.deepEqual(mesh.failures, []);
+    const r = measure(mesh);
+    total.volume += r.volume;
+    total.area += r.area;
+    total.open += r.open;
+  }
+  return total;
+}
 
 /** Volume, area and open edges of a mesh, vertices joined where positions are equal. */
 function measure(m) {
@@ -165,6 +180,114 @@ test('Booleans: names survive, splits and new edges are recorded, and STEP keeps
   );
 });
 
+test('Booleans on curved pairs (traced curves): intersect + subtract = A, and union = A + B - intersect', () => {
+  // Pairs no closed form covers: their curves are traced; volumes must add up across the four operations.
+  const tilted = (() => {
+    const f = frameOf([0, 0, 0], [0.3, 0.1, 1], [1, 0, 0]),
+      o = [0, 1, 2].map((k) => (-40 * f.x[k] - 40 * f.y[k] - 2 * f.z[k]) * mm);
+    return frameOf(o, f.z, f.x);
+  })();
+  // [label, A, B, exact volume of A, of B] (mm^3).
+  const pairs = [
+    [
+      'skew pin through a bar',
+      () => cylinder('bar', 20 * mm, 100 * mm, at(0, 0, -50)),
+      () => cylinder('pin', 8 * mm, 120 * mm, at(-50, 3, -25, [1, 0, 0.5])),
+      Math.PI * 400 * 100,
+      Math.PI * 64 * 120,
+    ],
+    [
+      'tee',
+      () => cylinder('bar', 20 * mm, 100 * mm, at(0, 0, -50)),
+      () => cylinder('pin', 10 * mm, 60 * mm, at(0, 0, 0, [1, 0, 0])),
+      Math.PI * 400 * 100,
+      Math.PI * 100 * 60,
+    ],
+    [
+      'oblique plane through a torus',
+      () => torus('t', 20 * mm, 5 * mm),
+      () => box('b', [80 * mm, 80 * mm, 80 * mm], tilted),
+      2 * Math.PI ** 2 * 20 * 25,
+      80 ** 3,
+    ],
+    [
+      'cylinder through a torus tube',
+      () => torus('t', 20 * mm, 5 * mm),
+      () => cylinder('c', 3 * mm, 40 * mm, at(20, 1, -20)),
+      2 * Math.PI ** 2 * 20 * 25,
+      Math.PI * 9 * 40,
+    ],
+    [
+      'sphere through a cylinder wall',
+      () => cylinder('c', 10 * mm, 40 * mm, at(0, 0, -20)),
+      () => sphere('s', 6 * mm, at(9, 2, 3)),
+      Math.PI * 100 * 40,
+      (4 / 3) * Math.PI * 216,
+    ],
+    [
+      'two spheres',
+      () => sphere('a', 10 * mm),
+      () => sphere('b', 8 * mm, at(9, 3, 2)),
+      (4 / 3) * Math.PI * 1000,
+      (4 / 3) * Math.PI * 512,
+    ],
+  ];
+  for (const [label, A, B, va, vb] of pairs) {
+    const ops = Object.fromEntries(
+        [
+          ['u', 'union', A, B],
+          ['i', 'intersect', A, B],
+          ['s', 'subtract', A, B],
+          ['t', 'subtract', B, A],
+        ].map(([k, op, x, y]) => [k, boolean(k, op, x(), y())]),
+      ),
+      v = Object.fromEntries(
+        Object.entries(ops).map(([k, b]) => {
+          const r = measureAll(b, { deflection: 1e-6 });
+          return [k, { ...r, volume: r.volume / mm ** 3 }];
+        }),
+      );
+    for (const [k, b] of Object.entries(ops)) {
+      assert.deepEqual(validateBody(b), [], `${label} ${k}`);
+      assert.equal(v[k].open, 0, `${label} ${k} closed`);
+    }
+    // Within 0.1% of the exact volumes (the meshes' own chord error is up to about 0.05% here); a piece kept or
+    // dropped wrongly is far more.
+    assert.ok(Math.abs(v.i.volume + v.s.volume - va) <= 1e-3 * va, `${label}: intersect + subtract vs A`);
+    assert.ok(Math.abs(v.i.volume + v.t.volume - vb) <= 1e-3 * vb, `${label}: intersect + (B - A) vs B`);
+    assert.ok(
+      Math.abs(v.u.volume - (va + vb - v.i.volume)) <= 1e-3 * (va + vb),
+      `${label}: union vs A + B - intersect`,
+    );
+  }
+});
+
+test('Booleans: coaxial surfaces meet in exact circles (a napkin ring, a torus cut across its axis)', () => {
+  // A 10 mm ball less a 3 mm bore through its centre: the napkin ring, (4/3) pi h^3 with h the half height.
+  const h = Math.sqrt(100 - 9);
+  const ring = boolean(
+    'ring',
+    'subtract',
+    sphere('s', 10 * mm),
+    cylinder('c', 3 * mm, 40 * mm, at(-20, 0, 0, [1, 0, 0])),
+  );
+  const cut = ring.faces
+    .flatMap((f) => f.loops.flatMap((l) => l.coedges.map((c) => c.edge)))
+    .filter((e) => e.name.startsWith('ring/edge:'));
+  assert.ok(cut.length && cut.every((e) => e.curve.kind === 'circle'));
+  const r = measureAll(ring);
+  assert.equal(r.open, 0);
+  assert.ok(Math.abs(r.volume / mm ** 3 - (4 / 3) * Math.PI * h ** 3) <= 1e-3 * (4 / 3) * Math.PI * h ** 3);
+  // The half of a torus (major 20, minor 5) below its middle plane.
+  const half = measureAll(
+    boolean('half', 'intersect', torus('t', 20 * mm, 5 * mm), box('b', [60 * mm, 60 * mm, 30 * mm], at(-30, -30, -30))),
+  );
+  assert.ok(
+    Math.abs(half.volume / mm ** 3 - Math.PI ** 2 * 20 * 25) <= 1e-3 * Math.PI ** 2 * 20 * 25,
+    `${half.volume / mm ** 3}`,
+  );
+});
+
 test('Booleans: what is not supported yet throws a RangeError that says so', () => {
   // Side faces in one plane that overlap.
   assert.throws(
@@ -172,9 +295,16 @@ test('Booleans: what is not supported yet throws a RangeError that says so', () 
       boolean('x', 'union', box('a', [10 * mm, 10 * mm, 10 * mm]), box('b', [10 * mm, 10 * mm, 10 * mm], at(5, 0, 0))),
     { name: 'RangeError', message: /lie on one surface and overlap: not supported yet/ },
   );
+  // Two equal cylinders at right angles touch tangentially where their curves cross.
   assert.throws(
-    () => boolean('y', 'subtract', sphere('s', 10 * mm), cylinder('c', 3 * mm, 40 * mm, at(-20, 0, 0, [1, 0, 0]))),
-    { name: 'RangeError', message: /not supported yet/ },
+    () =>
+      boolean(
+        'y',
+        'union',
+        cylinder('a', 10 * mm, 60 * mm, at(0, 0, -30)),
+        cylinder('b', 10 * mm, 60 * mm, at(-30, 0, 0, [1, 0, 0])),
+      ),
+    { name: 'RangeError', message: /touch tangentially/ },
   );
 });
 

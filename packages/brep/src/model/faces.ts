@@ -30,6 +30,11 @@ export class FaceUV {
   readonly loops: UVLoop[] = [];
   /** The loops' (u', v) bounds: [u0, u1, v0, v1]. */
   readonly box: [number, number, number, number] = [Infinity, -Infinity, Infinity, -Infinity];
+  /**
+   * On a surface closed in v as well (a torus): where its tube is cut open, a v no loop crosses and outside the face,
+   * so v runs from here one period on and the face's loops and points lie in that range.
+   */
+  vCut = -Math.PI;
 
   constructor(readonly face: Face) {
     this.surface = surfaceEvaluator(face.surface);
@@ -49,6 +54,25 @@ export class FaceUV {
         }
       }
       this.loops.push(this.close(points));
+    }
+    const vPeriod = this.surface.vPeriod;
+    if (vPeriod && this.loops.length) {
+      // The cut is a circle round the tube that no loop crosses, so it lies wholly inside or wholly outside the face.
+      const cut = gaps(
+        this.loops.map((l) => vRange(l)),
+        vPeriod,
+      ).find((g) => {
+        const shifted = this.loops.map((l) => shiftV(l, g, vPeriod));
+        return !shifted.every((l) => leftOf(l, this.period, shifted[0].points[0][0], g + 1e-9 * vPeriod));
+      });
+      if (cut === undefined)
+        throw new RangeError(`face ${this.face.name}: it goes all the way round a torus's tube: not supported yet`);
+      this.vCut = cut;
+      this.loops.forEach((l, i) => {
+        this.loops[i] = shiftV(l, cut, vPeriod);
+      });
+      this.box[2] = Math.min(...this.loops.map((l) => vRange(l)[0]));
+      this.box[3] = Math.max(...this.loops.map((l) => vRange(l)[1]));
     }
   }
 
@@ -82,7 +106,7 @@ export class FaceUV {
     if (hint) {
       if (s.uPeriod) u += Math.round((hint[0] - u) / s.uPeriod) * s.uPeriod;
       if (s.vPeriod) v += Math.round((hint[1] - v) / s.vPeriod) * s.vPeriod;
-    }
+    } else if (s.vPeriod) v = this.vCut + ((((v - this.vCut) % s.vPeriod) + s.vPeriod) % s.vPeriod);
     return [u, v];
   }
 
@@ -151,4 +175,40 @@ export function polygonArea(points: readonly UV[]): number {
   for (let i = 0, j = points.length - 1; i < points.length; j = i++)
     a += points[j][0] * points[i][1] - points[i][0] * points[j][1];
   return a / 2;
+}
+
+/** The v extent of a loop. */
+export function vRange(loop: UVLoop): [number, number] {
+  let lo = Infinity,
+    hi = -Infinity;
+  for (const q of loop.points) {
+    lo = Math.min(lo, q[1]);
+    hi = Math.max(hi, q[1]);
+  }
+  return [lo, hi];
+}
+
+/** The loop moved by whole periods in v so it starts at or above `cut` (it lies below `cut` + period when no part crosses the cut). */
+export function shiftV(loop: UVLoop, cut: number, period: number): UVLoop {
+  const k = Math.ceil((cut - vRange(loop)[0]) / period);
+  return k ? { points: loop.points.map(([u, v]) => [u, v + k * period] as UV), wrap: loop.wrap } : loop;
+}
+
+/** Middles of the stretches of a periodic coordinate that none of the ranges covers, widest first. */
+export function gaps(ranges: readonly (readonly [number, number])[], period: number): number[] {
+  if (!ranges.length) return [0];
+  const spans = ranges
+    .map(([lo, hi]) => {
+      const start = lo - Math.floor(lo / period) * period;
+      return [start, start + hi - lo];
+    })
+    .sort((a, b) => a[0] - b[0]);
+  const out: [number, number][] = [];
+  let end = Math.max(spans[0][1], ...spans.map((r) => r[1] - period));
+  for (let i = 1; i <= spans.length; i++) {
+    const next = i < spans.length ? spans[i][0] : spans[0][0] + period;
+    if (next > end) out.push([next - end, (end + next) / 2]);
+    if (i < spans.length) end = Math.max(end, spans[i][1]);
+  }
+  return out.sort((a, b) => b[0] - a[0]).map((g) => g[1]);
 }

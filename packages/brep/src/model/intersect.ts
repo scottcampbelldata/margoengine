@@ -1,162 +1,169 @@
-// Intersections for the Boolean operations. Surface/surface: exact curves for the analytic pairs (plane with plane,
-// cylinder, cone at right angles, sphere; parallel cylinders), as the textbook cases give them. Curve/surface: the
-// roots of the surface's signed distance along the curve, bracketed by sampling and closed by bisection to the last
-// bit, so a crossing is never missed between samples finer than the curve's turn.
+// Intersections for the Boolean operations: exact curves where a closed form exists (plane with plane, plane with
+// cylinder, parallel cylinders, and every pair of surfaces of revolution on one axis, which meet in circles), and
+// curves traced point by point inside a box for every other pair of analytic surfaces (march.ts).
 import { add, cross, dot, length, scale, sub, unit, type V3 } from '../geometry/vec.js';
-import { curveEvaluator, frameOf, type CurveDef, type SurfaceDef } from './geometry.js';
+import { signedDistance } from './distance.js';
+import { frameOf, type CurveDef, type SurfaceDef } from './geometry.js';
+import { traceIntersections, type Box3 } from './march.js';
 
-/** Signed distance from `p` to a surface along its natural normal (positive on the normal's side). */
-export function signedDistance(s: SurfaceDef, p: V3): number {
-  switch (s.kind) {
-    case 'plane':
-      return dot(sub(p, s.frame.origin), s.frame.z);
-    case 'cylinder': {
-      const d = sub(p, s.frame.origin),
-        h = dot(d, s.frame.z);
-      return length(sub(d, scale(s.frame.z, h))) - s.radius;
-    }
-    case 'sphere':
-      return length(sub(p, s.frame.origin)) - s.radius;
-    case 'cone': {
-      const d = sub(p, s.frame.origin),
-        h = dot(d, s.frame.z),
-        rho = length(sub(d, scale(s.frame.z, h))),
-        r = s.radius + h * Math.tan(s.angle);
-      return (rho - r) * Math.cos(s.angle);
-    }
-    case 'torus': {
-      const d = sub(p, s.frame.origin),
-        h = dot(d, s.frame.z),
-        rho = length(sub(d, scale(s.frame.z, h)));
-      return Math.hypot(rho - s.major, h) - s.minor;
-    }
-    default:
-      throw new RangeError(`Booleans on ${s.kind} surfaces are not supported yet`);
-  }
-}
-
-/** A bound on the curve's speed |C'(t)|, so on the signed distance's rate of change along it (distances change no faster than the point moves). */
-function speedBound(curve: CurveDef): number {
-  switch (curve.kind) {
-    case 'line':
-      return length(curve.direction);
-    case 'circle':
-      return curve.radius;
-    case 'ellipse':
-      return Math.max(curve.a, curve.b);
-    default:
-      return Infinity;
-  }
-}
-
-const negative = (x: number) => x < 0;
-
-/** The root of f in [lo, hi], where f changes sign, to the last bit. */
-function bisect(f: (t: number) => number, lo: number, flo: number, hi: number): number {
-  let fhi = f(hi);
-  for (let i = 0; i < 200; i++) {
-    const mid = (lo + hi) / 2;
-    if (mid <= lo || mid >= hi) break;
-    const fm = f(mid);
-    if (negative(fm) === negative(flo)) {
-      lo = mid;
-      flo = fm;
-    } else {
-      hi = mid;
-      fhi = fm;
-    }
-  }
-  return Math.abs(flo) <= Math.abs(fhi) ? lo : hi;
-}
-
-/**
- * Parameters in [t0, t1] where the curve crosses the surface (its signed distance changes sign), each found to the
- * last bit. Intervals are split until each either provably holds no crossing (the distance at its ends is more than
- * the curve can travel between them) or is shorter than `resolution` (a distance; default 1e-9 of the curve's
- * length), so no crossing is missed however close to another; a touch counts twice and stretches lying on the
- * surface count none.
- */
-export function curveSurfaceCrossings(
-  curve: CurveDef,
-  surface: SurfaceDef,
-  t0: number,
-  t1: number,
-  resolution?: number,
-): number[] {
-  const c = curveEvaluator(curve),
-    f = (t: number) => signedDistance(surface, c.at(t).slice(0, 3) as V3),
-    out: number[] = [];
-  if (!(t1 > t0)) return out;
-  const speed = speedBound(curve);
-  if (!Number.isFinite(speed)) {
-    // Splines: sign changes between dense samples.
-    const n = 256;
-    let a = t0,
-      fa = f(a);
-    for (let k = 1; k <= n; k++) {
-      const b = t0 + ((t1 - t0) * k) / n,
-        fb = f(b);
-      if (negative(fa) !== negative(fb)) out.push(bisect(f, a, fa, b));
-      a = b;
-      fa = fb;
-    }
-    return out;
-  }
-  const tol = resolution ?? 1e-9 * speed * (t1 - t0);
-  const visit = (a: number, fa: number, b: number, fb: number, depth: number) => {
-    const change = negative(fa) !== negative(fb);
-    if (!change && Math.abs(fa) + Math.abs(fb) > speed * (b - a)) return;
-    if (speed * (b - a) <= tol || depth > 64) {
-      if (change) out.push(bisect(f, a, fa, b));
-      return;
-    }
-    const m = (a + b) / 2,
-      fm = f(m);
-    if (!change && Math.abs(fa) <= tol && Math.abs(fm) <= tol && Math.abs(fb) <= tol) return;
-    visit(a, fa, m, fm, depth + 1);
-    visit(m, fm, b, fb, depth + 1);
-  };
-  visit(t0, f(t0), t1, f(t1), 0);
-  return out;
-}
+export { curveSurfaceCrossings, distanceGradient, signedDistance } from './distance.js';
 
 /** What two surfaces share: curves, the same surface (coincident), or nothing. */
 export type SurfaceIntersection = { kind: 'curves'; curves: CurveDef[] } | { kind: 'coincident' } | { kind: 'none' };
 
 const parallel = (a: V3, b: V3) => length(cross(a, b)) <= 1e-12;
 
-/** Exact intersection curves of two analytic surfaces; throws a RangeError for a pair not supported yet. */
-export function intersectSurfaces(a: SurfaceDef, b: SurfaceDef): SurfaceIntersection {
-  if (b.kind === 'plane' && a.kind !== 'plane') return intersectSurfaces(b, a);
+/**
+ * What two analytic surfaces share: curves, the same surface, or nothing. Exact where a closed form exists (plane with
+ * plane, plane with cylinder, parallel cylinders, and surfaces of revolution on one axis: planes across it, spheres
+ * centred on it, cylinders, cones and tori about it, which meet in circles); otherwise the curves are traced inside
+ * `box` (march.ts), which those pairs need. Throws a RangeError for spline surfaces and for tangential contact.
+ */
+export function intersectSurfaces(a: SurfaceDef, b: SurfaceDef, box?: Box3): SurfaceIntersection {
+  if (b.kind === 'plane' && a.kind !== 'plane') return intersectSurfaces(b, a, box);
   if (a.kind === 'plane' && b.kind === 'plane') return planePlane(a.frame.origin, a.frame.z, b.frame.origin, b.frame.z);
-  if (a.kind === 'plane') {
-    const o = a.frame.origin,
-      n = a.frame.z;
-    if (b.kind === 'cylinder') return planeCylinder(o, n, b.frame.origin, b.frame.z, b.frame.x, b.radius);
-    if (b.kind === 'sphere') {
-      const d = dot(sub(b.frame.origin, o), n);
-      if (Math.abs(d) >= b.radius) return { kind: 'none' };
-      const centre = sub(b.frame.origin, scale(n, d));
-      return {
-        kind: 'curves',
-        curves: [{ kind: 'circle', frame: frameOf(centre, n), radius: Math.sqrt(b.radius ** 2 - d * d) }],
-      };
-    }
-    if (b.kind === 'cone' && parallel(n, b.frame.z)) {
-      const h = dot(sub(o, b.frame.origin), b.frame.z),
-        r = b.radius + h * Math.tan(b.angle);
-      if (!(r > 0)) return { kind: 'none' };
-      return {
-        kind: 'curves',
-        curves: [
-          { kind: 'circle', frame: frameOf(add(b.frame.origin, scale(b.frame.z, h)), b.frame.z, b.frame.x), radius: r },
-        ],
-      };
-    }
-  }
+  if (a.kind === 'spline' || b.kind === 'spline')
+    throw new RangeError(`Booleans between ${a.kind} and ${b.kind} faces are not supported yet`);
+  const coaxial = revolutionPair(a, b);
+  if (coaxial) return coaxial;
+  if (a.kind === 'plane' && b.kind === 'cylinder')
+    return planeCylinder(a.frame.origin, a.frame.z, b.frame.origin, b.frame.z, b.frame.x, b.radius);
   if (a.kind === 'cylinder' && b.kind === 'cylinder' && parallel(a.frame.z, b.frame.z))
     return parallelCylinders(a.frame.origin, a.frame.z, a.radius, b.frame.origin, b.radius);
-  throw new RangeError(`Booleans between ${a.kind} and ${b.kind} faces are not supported yet`);
+  if (!box) throw new RangeError(`intersecting ${a.kind} with ${b.kind} needs a box to trace the curves in`);
+  const curves = traceIntersections(a, b, box);
+  return curves.length ? { kind: 'curves', curves } : { kind: 'none' };
+}
+
+type Axis = { o: V3; z: V3 };
+type P2 = [number, number];
+/** A surface of revolution's profile in its half-plane: rho (distance from the axis) and h (height along it). */
+type Meridian = { kind: 'line'; p: P2; d: P2 } | { kind: 'circle'; c: P2; r: number };
+
+const fromAxis = (axis: Axis, p: V3) => {
+  const d = sub(p, axis.o),
+    h = dot(d, axis.z);
+  return { h, rho: length(sub(d, scale(axis.z, h))) };
+};
+
+/** The circles two surfaces of revolution on one axis meet in; undefined when they share no axis. */
+function revolutionPair(a: SurfaceDef, b: SurfaceDef): SurfaceIntersection | undefined {
+  if (a.kind === 'spline' || b.kind === 'spline') return undefined;
+  const size =
+      1 +
+      Math.max(
+        ...[a, b].flatMap((s) => [
+          ...s.frame.origin.map(Math.abs),
+          'radius' in s ? s.radius : 0,
+          'major' in s ? s.major + s.minor : 0,
+        ]),
+      ),
+    tol = 1e-12 * size,
+    fixed = (s: SurfaceDef): Axis | undefined =>
+      s.kind === 'cylinder' || s.kind === 'cone' || s.kind === 'torus'
+        ? { o: s.frame.origin, z: s.frame.z }
+        : undefined;
+  let axis = fixed(a) ?? fixed(b);
+  if (!axis) {
+    if (a.kind === 'plane' && b.kind === 'sphere') axis = { o: b.frame.origin, z: a.frame.z };
+    else if (a.kind === 'sphere' && b.kind === 'sphere') {
+      const d = sub(b.frame.origin, a.frame.origin);
+      if (length(d) <= tol) return Math.abs(a.radius - b.radius) <= tol ? { kind: 'coincident' } : { kind: 'none' };
+      axis = { o: a.frame.origin, z: unit(d)! };
+    } else return undefined;
+  }
+  const about = (s: SurfaceDef & { frame: { origin: V3; z: V3 } }) =>
+    s.kind === 'plane'
+      ? parallel(s.frame.z, axis.z)
+      : s.kind === 'sphere'
+        ? fromAxis(axis, s.frame.origin).rho <= tol
+        : parallel(s.frame.z, axis.z) && fromAxis(axis, s.frame.origin).rho <= tol;
+  if (!about(a) || !about(b)) return undefined;
+  const ma = meridians(a, axis),
+    mb = meridians(b, axis),
+    points: P2[] = [];
+  for (const m of ma)
+    for (const n of mb) {
+      const met = meet(m, n, tol);
+      if (met === 'same') return { kind: 'coincident' };
+      for (const q of met)
+        if (q[0] > tol && !points.some((r) => Math.abs(r[0] - q[0]) <= tol && Math.abs(r[1] - q[1]) <= tol))
+          points.push(q);
+    }
+  if (!points.length) return { kind: 'none' };
+  return {
+    kind: 'curves',
+    curves: points.map(([rho, h]) => ({
+      kind: 'circle',
+      frame: frameOf(add(axis.o, scale(axis.z, h)), axis.z),
+      radius: rho,
+    })),
+  };
+}
+
+function meridians(s: SurfaceDef, axis: Axis): Meridian[] {
+  if (s.kind === 'spline') return [];
+  const h0 = dot(sub(s.frame.origin, axis.o), axis.z);
+  switch (s.kind) {
+    case 'plane':
+      return [{ kind: 'line', p: [0, h0], d: [1, 0] }];
+    case 'sphere':
+      return [{ kind: 'circle', c: [0, h0], r: s.radius }];
+    case 'cylinder':
+      return [{ kind: 'line', p: [s.radius, 0], d: [0, 1] }];
+    case 'torus':
+      return [{ kind: 'circle', c: [s.major, h0], r: s.minor }];
+    case 'cone': {
+      // rho = |r0 + (h - h0) slope|: two lines in the half-plane, one per nappe.
+      const slope = Math.sign(dot(s.frame.z, axis.z)) * Math.tan(s.angle),
+        k = Math.hypot(slope, 1);
+      return [
+        { kind: 'line', p: [s.radius, h0], d: [slope / k, 1 / k] },
+        { kind: 'line', p: [-s.radius, h0], d: [-slope / k, 1 / k] },
+      ];
+    }
+  }
+}
+
+const cross2 = (a: P2, b: P2) => a[0] * b[1] - a[1] * b[0];
+
+/** Where two profile curves meet ('same' when they are one curve). A touch gives one point. */
+function meet(m: Meridian, n: Meridian, tol: number): P2[] | 'same' {
+  if (m.kind === 'circle' && n.kind === 'line') return meet(n, m, tol);
+  if (m.kind === 'line' && n.kind === 'line') {
+    const den = cross2(m.d, n.d),
+      w: P2 = [n.p[0] - m.p[0], n.p[1] - m.p[1]];
+    if (Math.abs(den) <= 1e-14) return Math.abs(cross2(w, m.d)) <= tol ? 'same' : [];
+    const s = cross2(w, n.d) / den;
+    return [[m.p[0] + m.d[0] * s, m.p[1] + m.d[1] * s]];
+  }
+  if (m.kind === 'line' && n.kind === 'circle') {
+    const w: P2 = [n.c[0] - m.p[0], n.c[1] - m.p[1]],
+      s0 = w[0] * m.d[0] + w[1] * m.d[1],
+      off = cross2(m.d, w),
+      disc = n.r * n.r - off * off;
+    if (disc < -2 * tol * n.r) return [];
+    const half = Math.sqrt(Math.max(0, disc)),
+      at = (s: number): P2 => [m.p[0] + m.d[0] * s, m.p[1] + m.d[1] * s];
+    return half <= tol ? [at(s0)] : [at(s0 - half), at(s0 + half)];
+  }
+  if (m.kind === 'circle' && n.kind === 'circle') {
+    const dx = n.c[0] - m.c[0],
+      dy = n.c[1] - m.c[1],
+      d = Math.hypot(dx, dy);
+    if (d <= tol) return Math.abs(m.r - n.r) <= tol ? 'same' : [];
+    if (d > m.r + n.r + tol || d < Math.abs(m.r - n.r) - tol) return [];
+    const a = (m.r * m.r - n.r * n.r + d * d) / (2 * d),
+      h = Math.sqrt(Math.max(0, m.r * m.r - a * a)),
+      base: P2 = [m.c[0] + (a * dx) / d, m.c[1] + (a * dy) / d];
+    return h <= tol
+      ? [base]
+      : [
+          [base[0] - (h * dy) / d, base[1] + (h * dx) / d],
+          [base[0] + (h * dy) / d, base[1] - (h * dx) / d],
+        ];
+  }
+  return [];
 }
 
 function planePlane(o1: V3, n1: V3, o2: V3, n2: V3): SurfaceIntersection {
