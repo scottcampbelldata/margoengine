@@ -64,3 +64,15 @@ the scene's exposure) while keeping the stars.
 
 Related: the Night Citadel browser test expects phones at 2 device pixels per CSS pixel, but fb01fb1 (on main,
 "cap phone pixels") made phones render at 1, so the test fails on main too. Restore 2x on phones or update the test.
+
+### STEP export: OpenCascade misreads some sphere faces
+
+Found by Codex's b973204 validation (step 8) and narrowed down on 2026-10-18. Our exports of the "sphere through a
+cylinder wall" Booleans write each face with only its traced intersection edges: no seam edges on periodic surfaces
+and no degenerate edge at a sphere's pole, which STEP allows. OpenCascade's GProp agrees with our volumes for the union,
+intersect and cylinder-minus-sphere results, but its mesher (occt-import-js) fills the wrong side of the sphere face in
+three of them (030, 031, 036: e.g. 417.2 mm3 for an intersection of 487.4), and for sphere-minus-cylinder (032) both
+GProp (-15.65 mm3) and the mesher (22 triangles) fail. Turning the sphere's seam away from the face or its pole out of
+it did not help; flipping the cylinder patch's loop did not either. What real CAD writers do and what to try next:
+split periodic faces at their seam with seam edges, give a face that contains a pole a degenerate edge there, and
+check each export with OpenCascade's mesher as well as GProp. Our own reader and meshes are right in all four cases.
