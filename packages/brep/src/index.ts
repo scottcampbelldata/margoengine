@@ -5,6 +5,8 @@
 import { STEPFile, stepText, type STEPHeader } from './step/file.js';
 import { readStructure, type STEPStructure, type STEPStructureOptions } from './step/structure.js';
 import { Tessellator, type BodyMesh, type TessellationOptions } from './mesh/tessellate.js';
+export { validateSTEP } from './mesh/validate.js';
+export type { STEPMeasured, STEPValidationCheck, ValidationOptions } from './mesh/validate.js';
 
 export { STEPFile, Ref, Enum, Typed, DERIVED, stepText } from './step/file.js';
 export type { STEPEntity, STEPHeader, STEPValue } from './step/file.js';
@@ -13,9 +15,12 @@ export type {
   STEPBody,
   STEPColor,
   STEPInstance,
+  STEPOccurrence,
+  STEPPoint,
   STEPProduct,
   STEPStructure,
   STEPStructureOptions,
+  STEPValidationProperty,
 } from './step/structure.js';
 export { Tessellator } from './mesh/tessellate.js';
 export type { BodyMesh, BodyMeshFace, TessellationOptions } from './mesh/tessellate.js';

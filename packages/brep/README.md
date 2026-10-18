@@ -37,6 +37,17 @@ for (const instance of model.instances) {
 }
 ```
 
+To check the meshes against what the file says about itself (many AP242 and AP203 files state their volume, area,
+centre, bounding box or facet count as CAx-IF validation properties):
+
+```ts
+import { parseSTEP, tessellateSTEP, validateSTEP } from '@margoengine/brep';
+
+const model = parseSTEP(bytes);
+for (const check of validateSTEP(model, tessellateSTEP(model)))
+  if (!check.ok) console.warn(check.property.label, check.differences, check.note);
+```
+
 ## What stage 1 reads
 
 - **The file:** one pass indexes every entity instance of the DATA sections; parameters are parsed only when used, so
@@ -49,9 +60,20 @@ for (const instance of model.instances) {
   the two representations, and `MAPPED_ITEM` copies. A component an assembly link already places is not placed again
   by a mapped copy of it.
 - **Bodies:** `MANIFOLD_SOLID_BREP`, `BREP_WITH_VOIDS`, `FACETED_BREP`, `SHELL_BASED_SURFACE_MODEL` and the AP242
-  tessellated bodies, with their faces and distinct edges, and a census of surface and edge-curve types.
+  tessellated bodies (`TESSELLATED_SOLID`, `TESSELLATED_SHELL`, triangulated faces and surface sets, with triangle
+  lists, strips and fans through `pnindex`, and the file's normals), with their faces and distinct edges, and a
+  census of surface and edge-curve types.
 - **Units:** each body's length unit in metres (SI prefixes and conversion-based units such as inches); placements are
   converted to metres.
+- **Occurrences:** every placed product (a root, or a component where an assembly places it), with its parent and its
+  frame in metres; each instance names its occurrence.
+- **Validation properties:** `PROPERTY_DEFINITION`s tagged geometric or tessellated validation property, of a
+  product or of a shape aspect that names bodies (`GEOMETRIC_ITEM_SPECIFIC_USAGE`, or a shape representation of the
+  aspect): volume, area, centre point, bounding box and number of facets, in metres, with the measure items' own
+  derived units. Values for independent surfaces are kept apart; independent points and curves, and the zero values
+  some exporters write as placeholders, are left out. `validateSTEP` measures the meshes in each property's frame;
+  a product's values cover its components' solids, its area may count surface bodies too (exporters differ), and a
+  tessellated property is checked against the tessellated bodies.
 - **Colours:** `STYLED_ITEM` and `OVER_RIDING_STYLED_ITEM` down to `COLOUR_RGB` or a pre-defined colour, with
   `SURFACE_STYLE_TRANSPARENT` as alpha; body colours, and face colours that differ.
 

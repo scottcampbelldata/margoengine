@@ -49,6 +49,54 @@ export interface STEPInstance {
   readonly matrix: Float64Array;
   /** Product indices from the root assembly down to `product`. */
   readonly path: readonly number[];
+  /** Index into `occurrences` of the placed product the body belongs to (-1 for geometry outside any product). */
+  readonly occurrence: number;
+}
+
+/** One placed product: a root, or a component where an assembly places it (each use is its own occurrence). */
+export interface STEPOccurrence {
+  /** Index into `products`. */
+  readonly product: number;
+  /** Index into `occurrences` of the assembly occurrence that places it (-1 for a root). */
+  readonly parent: number;
+  /** Column-major 4x4 from the product's coordinates in metres to the model's world, in metres. */
+  readonly matrix: Float64Array;
+}
+
+/** A point or direction in metres. */
+export type STEPPoint = readonly [number, number, number];
+
+/**
+ * What a file states about its own shape for readers to check against (the CAx-IF recommended practices for geometric
+ * and tessellated validation properties): the exporting system's volume, area, centre, bounding box or facet count of a
+ * product (its components included) or of particular bodies. Lengths are metres, in the coordinates of the product, or
+ * of the bodies' own representation when `bodies` is set. Properties stated separately for one shape are merged.
+ */
+export interface STEPValidationProperty {
+  /** The first PROPERTY_DEFINITION entity that states it. */
+  readonly id: number;
+  /** The described shape's name: the shape aspect's description, or the product's name. */
+  readonly label: string;
+  /** Index into `products` of the product the shape belongs to (-1 when the file does not say). */
+  readonly product: number;
+  /** Indices into `bodies` when particular bodies are described; undefined for the whole product. */
+  readonly bodies?: readonly number[];
+  /** A tessellated validation property: area, centre and facets of the triangles the file itself carries. */
+  readonly tessellated: boolean;
+  /** Of the independent surfaces (surface bodies beside the solids) rather than the solids. */
+  readonly independent?: boolean;
+  /** Volume in cubic metres. */
+  readonly volume?: number;
+  /** Surface area in square metres. */
+  readonly area?: number;
+  /** Centre of the volume, or of the surface when `surfaceCentroid` is true. */
+  readonly centroid?: STEPPoint;
+  /** Whether `centroid` is the centre of the surface (a tessellation, or a point the file names a surface centre). */
+  readonly surfaceCentroid?: boolean;
+  /** Bounding box `[min, max]`. */
+  readonly box?: readonly [STEPPoint, STEPPoint];
+  /** Number of facets as the file writes them, degenerate strip joins included. */
+  readonly facets?: number;
 }
 
 /** What `readStructure` finds. */
@@ -58,6 +106,10 @@ export interface STEPStructure {
   readonly roots: readonly number[];
   readonly bodies: readonly STEPBody[];
   readonly instances: readonly STEPInstance[];
+  /** Every placed product, an assembly before its components. */
+  readonly occurrences: readonly STEPOccurrence[];
+  /** The validation properties the file states (empty when it states none). */
+  readonly validation: readonly STEPValidationProperty[];
   /** Face colours that differ from their body's, by face entity id. */
   readonly faceColors: ReadonlyMap<number, STEPColor>;
   /** Surface and edge-curve types of the bodies' faces, with counts (complex types joined with '+'). */
@@ -125,7 +177,8 @@ const BODIES: Readonly<Record<string, STEPBody['kind']>> = {
 
 // --- 4x4 column-major affine matrices -------------------------------------------------------------------------------
 const identity = (): Float64Array => Float64Array.of(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
-function multiply(a: Float64Array, b: Float64Array): Float64Array {
+/** Product of two column-major affine matrices. */
+export function multiply(a: Float64Array, b: Float64Array): Float64Array {
   const out = new Float64Array(16);
   for (let c = 0; c < 4; c++)
     for (let r = 0; r < 4; r++)
@@ -133,7 +186,7 @@ function multiply(a: Float64Array, b: Float64Array): Float64Array {
   return out;
 }
 /** Inverse of an affine matrix (general 3x3 part, so a scaled transformation operator inverts correctly). */
-function invert(m: Float64Array): Float64Array {
+export function invert(m: Float64Array): Float64Array {
   const [a, b, c, , d, e, f, , g, h, i] = m,
     A = e * i - f * h,
     B = f * g - d * i,
@@ -554,19 +607,21 @@ export function readStructure(file: STEPFile, { maxInstances = 1_000_000 }: STEP
   };
 
   // --- flattening --------------------------------------------------------------------------------------------------------
-  const instances: STEPInstance[] = [];
+  const instances: STEPInstance[] = [],
+    occurrences: STEPOccurrence[] = [];
   const children = new Map<number, Link[]>();
   for (const link of links) children.set(link.parent, [...(children.get(link.parent) ?? []), link]);
   const emit = (
     bodyId: number,
     units: { length: number; angle: number },
     product: number,
+    occurrence: number,
     matrix: Float64Array,
     path: readonly number[],
   ) => {
     if (instances.length >= maxInstances)
       throw new RangeError(`STEP assembly places more than ${maxInstances} bodies; raise the maxInstances option`);
-    instances.push({ body: body(bodyId, units.length, units.angle), product, matrix, path });
+    instances.push({ body: body(bodyId, units.length, units.angle), product, matrix, path, occurrence });
   };
   /**
    * Bodies of representation `rep` (and its mapped items) placed by `matrix`. Mapped items of a representation in
@@ -576,6 +631,7 @@ export function readStructure(file: STEPFile, { maxInstances = 1_000_000 }: STEP
     rep: number,
     matrix: Float64Array,
     product: number,
+    occurrence: number,
     path: readonly number[],
     depth: number,
     placed: ReadonlySet<number> = new Set(),
@@ -587,7 +643,7 @@ export function readStructure(file: STEPFile, { maxInstances = 1_000_000 }: STEP
     for (const item of refs(args[1])) {
       if (!file.has(item)) continue;
       const type = file.get(item).type;
-      if (BODIES[type]) emit(item, units, product, matrix, path);
+      if (BODIES[type]) emit(item, units, product, occurrence, matrix, path);
       else if (type === 'MAPPED_ITEM') {
         const [, source, target] = file.args(item),
           map = ref(source);
@@ -596,25 +652,28 @@ export function readStructure(file: STEPFile, { maxInstances = 1_000_000 }: STEP
           mappedRep = ref(mapped);
         if (mappedRep === undefined || placed.has(mappedRep)) continue;
         const local = multiply(placement(ref(target), unit), invert(placement(ref(origin), repUnit(mappedRep))));
-        for (const r of closure([mappedRep])) placeRep(r, multiply(matrix, local), product, path, depth + 1, placed);
+        for (const r of closure([mappedRep]))
+          placeRep(r, multiply(matrix, local), product, occurrence, path, depth + 1, placed);
       }
     }
   };
-  const visit = (pd: number, matrix: Float64Array, path: readonly number[], depth: number) => {
+  const visit = (pd: number, matrix: Float64Array, path: readonly number[], depth: number, parent: number) => {
     const index = productIndex.get(pd)!;
     if (path.includes(index) || depth > 64) {
       warn(`#${pd}: assembly contains itself; stopped there`);
       return;
     }
     const here = [...path, index],
-      placed = new Set<number>();
+      placed = new Set<number>(),
+      occurrence = occurrences.push({ product: index, parent, matrix }) - 1;
     for (const link of children.get(pd) ?? []) for (const r of closure(repsOf.get(link.child) ?? [])) placed.add(r);
     for (const rep of closure(repsOf.get(pd) ?? []))
-      if (!placed.has(rep)) placeRep(rep, matrix, index, here, 0, placed);
-    for (const link of children.get(pd) ?? []) visit(link.child, multiply(matrix, linkMatrix(link)), here, depth + 1);
+      if (!placed.has(rep)) placeRep(rep, matrix, index, occurrence, here, 0, placed);
+    for (const link of children.get(pd) ?? [])
+      visit(link.child, multiply(matrix, linkMatrix(link)), here, depth + 1, occurrence);
   };
   const roots = products.map((_, i) => i).filter((i) => !used.has(products[i].id));
-  for (const root of roots) visit(products[root].id, identity(), [], 0);
+  for (const root of roots) visit(products[root].id, identity(), [], 0, -1);
   // Geometry no product owns (a file of bare bodies): every body-holding representation nothing else reached.
   if (!products.length)
     for (const type of [
@@ -622,7 +681,163 @@ export function readStructure(file: STEPFile, { maxInstances = 1_000_000 }: STEP
       'MANIFOLD_SURFACE_SHAPE_REPRESENTATION',
       'SHAPE_REPRESENTATION',
     ])
-      for (const rep of file.ids(type)) placeRep(rep, identity(), -1, [], 0);
+      for (const rep of file.ids(type)) placeRep(rep, identity(), -1, -1, [], 0);
 
-  return { products, roots, bodies, instances, faceColors, census: { surfaces, curves }, warnings };
+  // --- validation properties -----------------------------------------------------------------------------------------
+  /** Metres to the measure's power per unit `#id`: a derived unit of lengths, or a length unit to `power`. */
+  const measureScale = (id: number | undefined, power: number, length: number): number => {
+    if (id !== undefined && file.has(id)) {
+      const entity = file.get(id),
+        derived = entity.parts
+          ? entity.parts.get('DERIVED_UNIT')
+          : entity.type === 'DERIVED_UNIT'
+            ? entity.args
+            : undefined;
+      if (derived) {
+        let scale = 1;
+        for (const element of refs(derived[0])) {
+          const [unit, exponent] = file.has(element) ? file.args(element) : [],
+            base = unitScale(ref(unit), 'METRE');
+          if (base === undefined || typeof exponent !== 'number') return length ** power;
+          scale *= base ** exponent;
+        }
+        return scale;
+      }
+      const base = unitScale(id, 'METRE');
+      if (base !== undefined) return base ** power;
+    }
+    return length ** power;
+  };
+  // What a shape aspect identifies: GEOMETRIC_ITEM_SPECIFIC_USAGE items, or the representation a property of the
+  // aspect is shaped by (SHAPE_DEFINITION_REPRESENTATION).
+  const aspectItems = new Map<number, number[]>(),
+    identify = (aspect: number | undefined, items: readonly number[]) => {
+      if (aspect !== undefined) aspectItems.set(aspect, [...(aspectItems.get(aspect) ?? []), ...items]);
+    };
+  for (const id of file.ids('GEOMETRIC_ITEM_SPECIFIC_USAGE')) {
+    const args = file.args(id, 'GEOMETRIC_ITEM_SPECIFIC_USAGE'),
+      item = args[4];
+    identify(ref(args[2]), item instanceof Ref ? [item.id] : refs(item));
+  }
+  const propertyReps = new Map<number, number[]>();
+  for (const id of file.ids('PROPERTY_DEFINITION_REPRESENTATION')) {
+    const [definition, used] = file.args(id, 'PROPERTY_DEFINITION_REPRESENTATION'),
+      d = ref(definition),
+      r = ref(used);
+    if (d !== undefined && r !== undefined) propertyReps.set(d, [...(propertyReps.get(d) ?? []), r]);
+  }
+  for (const id of file.ids('SHAPE_DEFINITION_REPRESENTATION')) {
+    const [definition, used] = file.args(id),
+      d = ref(definition);
+    if (d === undefined || !file.has(d) || !file.is(d, 'PROPERTY_DEFINITION')) continue;
+    const aspect = ref(file.args(d, 'PROPERTY_DEFINITION')[2]);
+    if (aspect !== undefined && file.has(aspect) && file.is(aspect, 'SHAPE_ASPECT'))
+      identify(aspect, refs(representation(ref(used) ?? -1)?.[1]));
+  }
+  /** A measure item's name, value and unit: MEASURE_REPRESENTATION_ITEM, or a complex instance with MEASURE_WITH_UNIT. */
+  const measure = (id: number) => {
+    const entity = file.get(id);
+    if (entity.parts) {
+      const m = entity.parts.get('MEASURE_WITH_UNIT');
+      return m ? { name: str(entity.parts.get('REPRESENTATION_ITEM')?.[0]), value: m[0], unit: ref(m[1]) } : undefined;
+    }
+    return entity.type === 'MEASURE_REPRESENTATION_ITEM'
+      ? { name: str(entity.args[0]), value: entity.args[1], unit: ref(entity.args[2]) }
+      : undefined;
+  };
+  type Stated = { -readonly [K in keyof STEPValidationProperty]: STEPValidationProperty[K] };
+  const stated = new Map<string, Stated>();
+  for (const id of file.ids('PROPERTY_DEFINITION')) {
+    const [name, description, definition] = file.args(id, 'PROPERTY_DEFINITION'),
+      tag = `${str(name)} ${str(description)}`.toLowerCase(),
+      tessellated = tag.includes('tessellated validation property'),
+      target = ref(definition);
+    if ((!tessellated && !tag.includes('geometric validation property')) || target === undefined || !file.has(target))
+      continue;
+    let product: number, bodyList: number[] | undefined, label: string;
+    if (file.is(target, 'SHAPE_ASPECT')) {
+      const [aspectName, aspectDescription, ofShape] = file.args(target, 'SHAPE_ASPECT');
+      product = productIndex.get(shapeOf.get(ref(ofShape) ?? -1) ?? -1) ?? -1;
+      bodyList = [...new Set((aspectItems.get(target) ?? []).flatMap((item) => bodyIndex.get(item) ?? []))].sort(
+        (a, b) => a - b,
+      );
+      label = str(aspectDescription).trim() || str(aspectName).trim() || `#${target}`;
+      // An aspect that names no body we place (a curve, a point set, a face) is not checked here.
+      if (!bodyList.length) continue;
+    } else {
+      product = productIndex.get(shapeOf.get(target) ?? -1) ?? -1;
+      label = product >= 0 ? products[product].name : `#${target}`;
+    }
+    /** The merged record for this shape: of its solids, or of its independent surfaces. */
+    const record = (independent: boolean): Stated => {
+      const key = `${product}|${bodyList?.join(',') ?? '*'}|${tessellated}|${independent}`;
+      let into = stated.get(key);
+      if (!into) {
+        into = { id, label, product, tessellated, ...(bodyList ? { bodies: bodyList } : {}) };
+        if (independent) into.independent = true;
+        stated.set(key, into);
+      }
+      return into;
+    };
+    for (const r of propertyReps.get(id) ?? []) {
+      const args = representation(r);
+      if (!args) continue;
+      const length = context(ref(args[2])).length,
+        corners = new Map<Stated, number[][]>();
+      for (const item of refs(args[1])) {
+        if (!file.has(item)) continue;
+        const entity = file.get(item),
+          m = measure(item),
+          // Independent points and curves (outside any solid or surface) are not meshed; independent surfaces are
+          // checked against the shell bodies on their own.
+          text = `${m ? m.name : str(entity.args[0])} ${str(args[0])}`;
+        if (/independent\s+(point|curve)|curve length/i.test(text)) continue;
+        const into = record(/independent/i.test(text));
+        if (m && m.value instanceof Typed && typeof m.value.value === 'number') {
+          if (m.value.type === 'VOLUME_MEASURE') into.volume ??= m.value.value * measureScale(m.unit, 3, length);
+          else if (m.value.type === 'AREA_MEASURE') into.area ??= m.value.value * measureScale(m.unit, 2, length);
+        } else if (entity.type === 'CARTESIAN_POINT') {
+          const [pointName, coordinates] = entity.args,
+            p = numbers(coordinates).map((c) => c * length);
+          if (p.length !== 3) continue;
+          if (/bounding box/i.test(text)) corners.set(into, [...(corners.get(into) ?? []), p]);
+          else if (!into.centroid) {
+            into.centroid = [p[0], p[1], p[2]];
+            if (tessellated || /surface/i.test(str(pointName))) into.surfaceCentroid = true;
+          }
+        } else if (/facet/i.test(str(entity.args[0]))) {
+          const count = num(entity.args[1]);
+          if (count !== undefined) into.facets ??= count;
+        }
+      }
+      for (const [into, [a, b, ...rest]] of corners)
+        if (b && !rest.length && !into.box)
+          into.box = [
+            [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.min(a[2], b[2])],
+            [Math.max(a[0], b[0]), Math.max(a[1], b[1]), Math.max(a[2], b[2])],
+          ];
+    }
+  }
+  // Zero volume or area is an exporter's placeholder, not a measurement; so is the origin stated beside it.
+  for (const v of stated.values())
+    if (v.volume === 0 || v.area === 0) {
+      if (v.volume === 0) delete v.volume;
+      if (v.area === 0) delete v.area;
+      if (v.centroid && v.centroid.every((c) => c === 0)) delete v.centroid;
+    }
+  const validation = [...stated.values()].filter(
+    (v) => v.volume !== undefined || v.area !== undefined || v.centroid || v.box || v.facets !== undefined,
+  );
+
+  return {
+    products,
+    roots,
+    bodies,
+    instances,
+    occurrences,
+    validation,
+    faceColors,
+    census: { surfaces, curves },
+    warnings,
+  };
 }

@@ -3,7 +3,7 @@
 // surface as the deflection asks, and enclose the solid's volume.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { parseSTEP, tessellateSTEP } from '../dist/index.js';
+import { parseSTEP, tessellateSTEP, validateSTEP } from '../dist/index.js';
 
 const real = (x) => {
   if (Math.abs(x) < 1e-13) return '0.';
@@ -446,6 +446,58 @@ test('a tessellated face indexing past its points is a failure that names the fa
   assert.equal(m.failures.length, 1);
   assert.match(m.failures[0].reason, /outside its points/);
   assert.equal(m.indices.length, 0);
+});
+
+test("validation properties: the file's own volume, area, centre and box, checked against the mesh", () => {
+  // A 10 x 20 x 30 mm box. The part states its volume, area, centre and box (and the centre of loose points, which is
+  // not the solid's); a shape aspect naming the solid states a wrong area in a complex measure item.
+  let text = box(10, 20, 30);
+  const solid = text.match(/#(\d+)=MANIFOLD_SOLID_BREP/)[1],
+    rep = text.match(/#(\d+)=ADVANCED_BREP_SHAPE_REPRESENTATION/)[1];
+  text = text.replace(
+    'ENDSEC;\nEND-ISO',
+    `#9001=DERIVED_UNIT_ELEMENT(#8,3.);
+#9002=DERIVED_UNIT((#9001));
+#9003=DERIVED_UNIT_ELEMENT(#8,2.);
+#9004=DERIVED_UNIT((#9003));
+#9005=MEASURE_REPRESENTATION_ITEM('volume measure',VOLUME_MEASURE(6000.),#9002);
+#9006=MEASURE_REPRESENTATION_ITEM('surface area measure',AREA_MEASURE(2200.),#9004);
+#9007=CARTESIAN_POINT('centre point',(5.,10.,15.));
+#9008=CARTESIAN_POINT('bounding box corner point',(0.,0.,0.));
+#9009=CARTESIAN_POINT('bounding box corner point',(10.,20.,30.));
+#9010=CARTESIAN_POINT('independent points centre point',(99.,99.,99.));
+#9011=REPRESENTATION('',(#9005,#9006,#9007,#9008,#9009,#9010),#10);
+#9012=PROPERTY_DEFINITION('geometric validation property','of the part',#7);
+#9013=PROPERTY_DEFINITION_REPRESENTATION(#9012,#9011);
+#9020=SHAPE_ASPECT('','the solid',#7,.F.);
+#9021=GEOMETRIC_ITEM_SPECIFIC_USAGE('','',#9020,#${rep},#${solid});
+#9022=(AREA_MEASURE_WITH_UNIT()MEASURE_REPRESENTATION_ITEM()MEASURE_WITH_UNIT(AREA_MEASURE(2300.),#9004)REPRESENTATION_ITEM('surface area measure'));
+#9023=REPRESENTATION('surface area',(#9022),#10);
+#9024=PROPERTY_DEFINITION('area of the solid','geometric validation property',#9020);
+#9025=PROPERTY_DEFINITION_REPRESENTATION(#9024,#9023);
+ENDSEC;
+END-ISO`,
+  );
+  const model = parseSTEP(text),
+    [part, aspect] = model.validation;
+  assert.equal(model.validation.length, 2);
+  assert.deepEqual([part.label, part.product, part.bodies, part.tessellated], ['Solid', 0, undefined, false]);
+  assert.ok(Math.abs(part.volume - 6e-6) < 1e-15 && Math.abs(part.area - 2.2e-3) < 1e-12);
+  assert.deepEqual(
+    part.centroid.map((c) => +c.toFixed(9)),
+    [0.005, 0.01, 0.015],
+  );
+  assert.deepEqual(
+    part.box[1].map((c) => +c.toFixed(9)),
+    [0.01, 0.02, 0.03],
+  );
+  assert.deepEqual([aspect.label, aspect.bodies, +aspect.area.toFixed(9)], ['the solid', [0], 0.0023]);
+  const [good, bad] = validateSTEP(model, tessellateSTEP(model));
+  assert.equal(good.ok, true);
+  for (const d of Object.values(good.differences)) assert.ok(d < 1e-6, `difference ${d}`);
+  assert.equal(bad.ok, false);
+  assert.ok(Math.abs(bad.differences.area - (1 - 2200 / 2300)) < 1e-6);
+  assert.throws(() => validateSTEP(model, []), { name: 'RangeError', message: /one mesh per body/ });
 });
 
 test('a finer deflection gives more triangles and a closer volume', () => {

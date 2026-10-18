@@ -66,6 +66,8 @@ export interface BodyMesh {
   readonly unit: number;
   /** The edge deflection used, in body units. */
   readonly deflection: number;
+  /** Triangles as a tessellated body writes them, degenerate strip joins included (tessellated bodies only). */
+  readonly facets?: number;
 }
 
 const isTrue = (v: STEPValue | undefined) => !(v instanceof Enum) || v.name !== 'F';
@@ -737,6 +739,7 @@ export class Tessellator {
         type === 'TESSELLATED_SOLID' || type === 'TESSELLATED_SHELL'
           ? list(file.get(body.id).args[1]).flatMap((v) => (ref(v) === undefined ? [] : [ref(v)!]))
           : [body.id];
+    let written = 0;
     const ints = (v: STEPValue | undefined) => list(v).map((x) => (typeof x === 'number' ? x : Number.NaN));
     for (const id of items) {
       try {
@@ -758,6 +761,7 @@ export class Tessellator {
           throw new TypeError(`Invalid STEP file: #${id} indexes outside its coordinates list`);
         const triangles: number[] = [],
           add = (i: number, j: number, k: number) => {
+            written++;
             if (i !== j && j !== k && k !== i) triangles.push(i - 1, j - 1, k - 1);
           };
         if (complex) {
@@ -803,6 +807,7 @@ export class Tessellator {
       failures,
       unit: body.unit,
       deflection: 0,
+      facets: written,
     };
   }
 

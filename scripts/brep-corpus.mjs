@@ -8,7 +8,7 @@
 //     [--no-mesh] [--only=<part of a file name>]
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { parseSTEP, tessellateSTEP } from '../packages/brep/dist/index.js';
+import { parseSTEP, tessellateSTEP, validateSTEP } from '../packages/brep/dist/index.js';
 
 const require = createRequire(import.meta.url),
   json = process.argv.find((a) => a.startsWith('--json='))?.slice(7),
@@ -125,6 +125,15 @@ for (const entry of manifest) {
             }
       }
       row.ours.mesh = { ...mesh, min, max };
+      // The file's own validation properties (volume, area, centre, box, facets) against our meshes.
+      row.ours.validation = validateSTEP(model, meshes).map((c) => ({
+        label: c.property.label,
+        tessellated: c.property.tessellated,
+        bodies: c.property.bodies?.length ?? 'product',
+        differences: c.differences,
+        ok: c.ok,
+        ...(c.note ? { note: c.note } : {}),
+      }));
     }
     for (const [k, v] of Object.entries(model.census.surfaces)) surfaces[k] = (surfaces[k] ?? 0) + v;
     for (const [k, v] of Object.entries(model.census.curves)) curves[k] = (curves[k] ?? 0) + v;
@@ -198,6 +207,23 @@ for (const entry of manifest) {
     );
     for (const [reason, count] of Object.entries(om.reasons).slice(0, 5))
       console.log('    failed'.padEnd(48), `${count} x ${reason}`);
+    const checks = o.validation ?? [];
+    if (checks.length) {
+      const passed = checks.filter((v) => v.ok).length;
+      console.log(
+        '  file says'.padEnd(48),
+        `${checks.length} validation checks, ${passed} within 0.5% | ${passed === checks.length ? 'SELF MATCH' : 'SELF DIFFERS'}`,
+      );
+      for (const v of checks.filter((c) => !c.ok).slice(0, 8))
+        console.log(
+          '    differs'.padEnd(48),
+          `${v.label}${v.tessellated ? ' (tessellated)' : ''}, ${v.bodies === 'product' ? 'whole product' : `${v.bodies} bodies`}: ` +
+            Object.entries(v.differences)
+              .map(([k, d]) => `${k} ${k === 'facets' ? d : +d.toPrecision(3)}`)
+              .join(', ') +
+            (v.note ? ` (${v.note})` : ''),
+        );
+    }
   }
 }
 console.log('\nSurface types:', surfaces);
