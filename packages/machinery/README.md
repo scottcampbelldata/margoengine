@@ -73,6 +73,6 @@ CPU machinery tools work with either backend. Section rendering requires WebGPU;
 
 Run `node scripts/section-loaded-asset-tests.js` from the repository root after building packages. The real checked-in `Box.glb` is loaded through `loadGLTF`; at actual 1x and 4x MSAA, the removed beauty matches the empty scene, its removed shadow matches the lit receiver, and the retained half keeps both its beauty and shadow. Core + stage measures 21,107 bytes gzip.
 
-This ESM package includes TypeScript declarations and requires `@margoengine/core` 0.1.0. See the [API and supported geometry guide](https://github.com/scottcampbelldata/margoengine/blob/main/MODERN-ENGINE.md).
+This ESM package includes TypeScript declarations and requires `@margoengine/core` 0.1.0. See the API and supported geometry guide.
 
 Margo Engine code is MIT licensed. The separately loaded OCCT assets are LGPL-2.1; notices and the license ship in `dist/workers`. These assets add about 7.7 MB to the package, separate from the machinery runtime JavaScript.
