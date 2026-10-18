@@ -15,6 +15,7 @@ import { readStructure } from '../step/structure.js';
 import { xtToSTEP } from '../xt/step.js';
 import { JTContainer, readElement } from './file.js';
 import { JT_TYPES, type JTLateLoaded, type JTSceneGraph, type JTShapeKind, readSceneGraph } from './lsg.js';
+import { type JTMesh, readTriStripLOD } from './mesh.js';
 
 /** A shape of a part: a tessellated representation stored in shape LOD segments. */
 export interface JTShape {
@@ -25,6 +26,8 @@ export interface JTShape {
   readonly matrix: Float64Array;
   /** Its late-loaded shape LOD segments (segment types 6 to 16), finest first. */
   readonly lods: readonly JTLateLoaded[];
+  /** The finest LOD's triangles (tri-strip set shapes of JT 9 files), in the part's coordinates in metres. */
+  readonly mesh?: JTMesh;
 }
 
 /** A part: one part node (or a shape outside any part), however many times the assembly places it. */
@@ -53,6 +56,8 @@ export interface JTInstance {
 export interface JTOptions extends STEPOptions {
   /** Read each part's XT B-rep segment (default true). */
   readonly brep?: boolean;
+  /** Decode each shape's finest LOD into `mesh` (default true). */
+  readonly meshes?: boolean;
 }
 
 /** A parsed JT file. */
@@ -192,7 +197,14 @@ export function parseJT(input: ArrayBuffer | ArrayBufferView, options: JTOptions
           .filter(isLate)
           .filter((v) => v.segmentType >= 6 && v.segmentType <= 16)
           .sort((a, b) => a.segmentType - b.segmentType);
-        shapes.push({ node: n, kind: node.shape ?? 'shape', matrix: m, lods });
+        let mesh: JTMesh | undefined;
+        if (options.meshes !== false && node.shape === 'tri-strip' && lods.length)
+          try {
+            mesh = readTriStripLOD(container, lods[0].segment, here);
+          } catch (error) {
+            warn(`part ${nameOf(id) || id}: shape ${n} was not decoded (${(error as Error).message})`);
+          }
+        shapes.push({ node: n, kind: node.shape ?? 'shape', matrix: m, lods, mesh });
         return;
       }
       for (const child of taken(n)) walk(child, m, here, depth + 1);

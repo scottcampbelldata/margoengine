@@ -51,3 +51,6 @@ they are named here only to identify the format. This software is not endorsed b
 - The form and placement of the "appropriate copyright notice", and how the package licence sits with the
   restriction on combining JT into other formats.
 - How the royalty-free notice and the RAND statement registered with ISO interact.
+- The 9.5 specification's Appendix E (the mesh topology coder the reader implements) cites US 7,098,916 as a similar
+  method and says the JT coder differs from it (a queue of active faces, not vertices; face groups and per-vertex
+  attributes). Who owns it, whether it is in force, and whether the Siemens notice reaches it.

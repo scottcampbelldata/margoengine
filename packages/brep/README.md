@@ -69,9 +69,11 @@ kernel:
   the standard under Siemens' published licence terms (`NOTICE`, `docs/jt-licensing.md`). The file header and table
   of contents, zlib (JT 9) and LZMA (JT 10) segment compression, the scene graph (partitions, groups, instances,
   parts, LOD and switch nodes, transforms, materials, properties with names and units) and each part's exact B-rep
-  from its XT B-rep segment, read by the Parasolid reader. Parts and placements come out in metres. Tessellated shapes
-  (shape LOD segments) are listed with their segments but not decoded yet; JT files that partition nodes refer to are
-  listed in `warnings`.
+  from its XT B-rep segment, read by the Parasolid reader. Parts and placements come out in metres. JT 9 tessellated
+  shapes (tri-strip sets) are decoded into triangle meshes with normals and face groups: Int32 compressed data packets
+  (bit-length, arithmetic, chopper), the polygon mesh topology decoder, quantized coordinates and Deering normals,
+  each checked against the hashes the file stores. JT 10 shapes and JT files that partition nodes refer to are listed
+  in `warnings`.
 
 ## What stage 1 reads
 

@@ -22,11 +22,10 @@ Licensing and the notice it must carry: `docs/jt-licensing.md`. Code: `packages/
 - Tests (`tests/jt.test.js`, a small writer in `tests/jt-writer.js`): JT 9.5 little- and big-endian, JT 10 with four
   LZMA variants made by Python's lzma module, malformed files. No real JT file has been read yet.
 
-## Stage J2 (next, needs real files)
+## Stage J2 (written 2026-10-18; checked only on files our test writer makes)
 
-Decode shape LOD segments (tri-strip sets) so tessellation-only JT files draw.
-
-- Int32 Compressed Data Packets. Layouts confirmed from the 9.5 PDF's figures (the text extraction loses branches):
+- `src/jt/codec.ts`: Int32 Compressed Data Packets Mk. 1 and Mk. 2 (layouts confirmed from the 9.5 PDF's figures; the
+  text extraction loses branches):
   - Mk. 1 (Figure 218): U8 codec; arithmetic: probability contexts, I32 out-of-band count, a nested packet when it is
     above 0; codec not null: I32 code-text bits, I32 value count, I32 symbol count when there are two context tables;
     then VecU32 code text in every case.
@@ -36,11 +35,22 @@ Decode shape LOD segments (tri-strip sets) so tessellation-only JT files draw.
   - Mk. 2 (Figure 221): I32 value count; U8 codec; chopper: U8 chop bits (0 means a complete nested packet follows),
     I32 bias, U8 span bits, MSB packet, LSB packet; others: I32 code-text bits, VecU32 code text, then for arithmetic
     the Mk. 2 contexts and the out-of-band packet.
-  - Decoders: bit-length (Appendix C 2.1), arithmetic (Appendix C 3.2, a 16-bit range coder with underflow bits),
-    residual predictors (Appendix C 1.3). JT 10's packets differ again (escape flag per context entry, a move-to-front
-    codec) and its bit-length coder calls `nibblerGet`, which the text never defines; its block field width reads as
-    4 bits in the code and 3 in the comment. Settle both on real files.
-- Topologically compressed tri-strip data (9.5 section 7.2.2.1.2.4, Appendix E polygon mesh topology coder), vertex
-  coordinate, normal (Deering, Appendix C 4) and colour arrays, quantization.
-- Validate against real files: JT version string, segment types in the TOC, part and instance counts, names, and
-  meshes against the XT B-rep of the same part where both exist.
+  - Bit-length Mk. 1 (Appendix C 2.1), arithmetic (Appendix C 3.2), residual predictors (Appendix C 1.3), the lookup
+    hash (Appendix D; `hash32` is the hash of the words' little-endian bytes, as the appendix says).
+  - Not yet: bit-length Mk. 2 (the JT 10 text calls `nibblerGet`, which it never defines, and gives its block width as
+    4 bits in code and 3 in a comment) and JT 10's packets (escape flag per entry, move-to-front). Both throw a
+    RangeError that names them; settle them on real files, using the stored hashes to confirm a reading.
+- `src/jt/mesh.ts`: Tri-Strip Set Shape LOD elements of JT 9: the 22 topology fields with their composite hash, the
+  Appendix E decoder (dual vertices are polygons, dual faces mesh vertices; split faces; per-corner attribute masks
+  map vertex records to corners), coordinates (quantized codes or float bits, hash checked), normals (Deering codes
+  or float bits, hash checked), cover polygons dropped, winding made to agree with the stored normals.
+- `parseJT` decodes each tri-strip shape's finest LOD into `JTShape.mesh` (option `meshes: false` skips it).
+- Tests: a closed tetrahedron written as the coder would (null-coded packets, one arithmetic-coded array with an
+  escape), one vertex record per corner and per triangle, both byte orders; checksums written by a separate byte-wise
+  hash, so a wrong word-wise hash fails the read.
+
+## Next
+
+- Read real JT files (JT2Go's samples, Codex's step 10): compare part counts, names and units with JT2Go, meshes
+  against the XT B-rep of the same part, and check the stored hashes pass.
+- JT 10 packets and bit-length Mk. 2; polygon sets and polylines; colours and texture coordinates if wanted.

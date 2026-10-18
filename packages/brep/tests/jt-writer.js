@@ -252,10 +252,225 @@ export function xtElement({ jt10, little }, xt) {
   return new Bytes(little).i32(d.length).raw(d.bytes).bytes;
 }
 
-/** A shape LOD segment's one element (contents not read by the parser yet). */
-export function lodElement({ little }) {
-  const d = new Bytes(little);
-  d.guid(T.triStripLOD).u8(4).i32(200).i32(1).i32(2).i32(3);
+/** Jenkins' 1996 hash of bytes, as the format's Appendix D gives it (a byte-wise check on the reader's word-wise one). */
+function jenkins(bytes, seed) {
+  const s = new Uint32Array([0x9e3779b9, 0x9e3779b9, seed]);
+  const mix = () => {
+    let [a, b, c] = s;
+    a = ((a - b - c) ^ (c >>> 13)) >>> 0;
+    b = ((b - c - a) ^ (a << 8)) >>> 0;
+    c = ((c - a - b) ^ (b >>> 13)) >>> 0;
+    a = ((a - b - c) ^ (c >>> 12)) >>> 0;
+    b = ((b - c - a) ^ (a << 16)) >>> 0;
+    c = ((c - a - b) ^ (b >>> 5)) >>> 0;
+    a = ((a - b - c) ^ (c >>> 3)) >>> 0;
+    b = ((b - c - a) ^ (a << 10)) >>> 0;
+    c = ((c - a - b) ^ (b >>> 15)) >>> 0;
+    s.set([a, b, c]);
+  };
+  const word = (k) => bytes[k] + bytes[k + 1] * 256 + bytes[k + 2] * 65536 + bytes[k + 3] * 16777216;
+  let k = 0;
+  for (; bytes.length - k >= 12; k += 12) {
+    s[0] += word(k);
+    s[1] += word(k + 4);
+    s[2] += word(k + 8);
+    mix();
+  }
+  s[2] += bytes.length;
+  const tail = bytes.length - k;
+  for (let i = tail - 1; i >= 0; i--) {
+    const v = bytes[k + i];
+    if (i >= 8) s[2] += v * 2 ** (8 * (i - 8 + 1));
+    else if (i >= 4) s[1] += v * 2 ** (8 * (i - 4));
+    else s[0] += v * 2 ** (8 * i);
+  }
+  mix();
+  return s[2];
+}
+
+/** hash32 of the format: the words' little-endian bytes. */
+export function hash32(words, seed) {
+  const b = new Uint8Array(words.length * 4),
+    v = new DataView(b.buffer);
+  words.forEach((w, i) => v.setUint32(i * 4, w >>> 0, true));
+  return jenkins(b, seed);
+}
+
+/** hash16 of the format (Appendix D hash3): 16-bit values, two to a word, the length counted in values. */
+export function hash16(values, seed) {
+  const s = new Uint32Array([0x9e3779b9, 0x9e3779b9, seed]),
+    n = values.length;
+  const mix = () => {
+    let [a, b, c] = s;
+    a = ((a - b - c) ^ (c >>> 13)) >>> 0;
+    b = ((b - c - a) ^ (a << 8)) >>> 0;
+    c = ((c - a - b) ^ (b >>> 13)) >>> 0;
+    a = ((a - b - c) ^ (c >>> 12)) >>> 0;
+    b = ((b - c - a) ^ (a << 16)) >>> 0;
+    c = ((c - a - b) ^ (b >>> 5)) >>> 0;
+    a = ((a - b - c) ^ (c >>> 3)) >>> 0;
+    b = ((b - c - a) ^ (a << 10)) >>> 0;
+    c = ((c - a - b) ^ (b >>> 15)) >>> 0;
+    s.set([a, b, c]);
+  };
+  let k = 0;
+  for (; n - k >= 6; k += 6) {
+    s[0] += values[k] + values[k + 1] * 65536;
+    s[1] += values[k + 2] + values[k + 3] * 65536;
+    s[2] += values[k + 4] + values[k + 5] * 65536;
+    mix();
+  }
+  s[2] += n;
+  const left = n - k;
+  if (left >= 5) s[2] += values[k + 4] * 65536;
+  if (left >= 4) s[1] += values[k + 3] * 65536;
+  if (left >= 3) s[1] += values[k + 2];
+  if (left >= 2) s[0] += values[k + 1] * 65536;
+  if (left >= 1) s[0] += values[k];
+  mix();
+  return s[2];
+}
+
+/** An Int32 Compressed Data Packet Mk. 2 holding `values` uncoded (null codec). */
+function nullPacket(d, values) {
+  d.i32(values.length);
+  if (!values.length) return;
+  d.u8(0)
+    .i32(values.length * 32)
+    .i32(values.length);
+  for (const v of values) d.i32(v);
+}
+
+/**
+ * An Int32 Compressed Data Packet Mk. 2 arithmetic-coded: `table` lists [value, count] entries, values not in it are
+ * escaped (count `escape`) to the out-of-band packet. The encoder is the 16-bit range coder with underflow bits that
+ * the format's decoder inverts.
+ */
+function arithmeticPacket(d, values, table, escape) {
+  const entries = [
+    ...table.map(([value, count], i) => ({ symbol: i, value, count })),
+    { symbol: -2, value: 0, count: escape },
+  ];
+  let cumulative = 0;
+  for (const e of entries) {
+    e.cum = cumulative;
+    cumulative += e.count;
+  }
+  const total = cumulative,
+    oob = [],
+    code = [];
+  let low = 0,
+    high = 0xffff,
+    underflow = 0;
+  const emit = (bit) => {
+    code.push(bit);
+    for (; underflow > 0; underflow--) code.push(bit ^ 1);
+  };
+  for (const v of values) {
+    let e = entries.find((x) => x.symbol !== -2 && x.value === v);
+    if (!e) {
+      e = entries[entries.length - 1];
+      oob.push(v);
+    }
+    const range = high - low + 1;
+    high = low + Math.floor((range * (e.cum + e.count)) / total) - 1;
+    low = low + Math.floor((range * e.cum) / total);
+    for (;;) {
+      if ((high & 0x8000) === (low & 0x8000)) emit(high >> 15);
+      else if (low & 0x4000 && !(high & 0x4000)) {
+        underflow++;
+        low &= 0x3fff;
+        high |= 0x4000;
+      } else break;
+      low = (low << 1) & 0xffff;
+      high = ((high << 1) | 1) & 0xffff;
+    }
+  }
+  underflow++;
+  emit((low >> 14) & 1);
+  const words = [];
+  for (let i = 0; i < code.length; i += 32) {
+    let w = 0;
+    for (let k = 0; k < 32; k++) w = w * 2 + (code[i + k] ?? 0);
+    words.push(w);
+  }
+  d.i32(values.length).u8(3).i32(code.length).i32(words.length);
+  for (const w of words) d.u32(w);
+  // The context table: bit fields packed most significant bit first.
+  const min = Math.min(...entries.map((e) => e.value)),
+    bits = [],
+    put = (v, n) => {
+      for (let i = n - 1; i >= 0; i--) bits.push(Math.floor(v / 2 ** i) % 2);
+    };
+  put(entries.length, 16);
+  put(4, 6);
+  put(8, 6);
+  put(16, 6);
+  put(min >>> 0, 32);
+  for (const e of entries) {
+    put(e.symbol + 2, 4);
+    put(e.count, 8);
+    put(e.value - min, 16);
+  }
+  while (bits.length % 8) bits.push(0);
+  for (let i = 0; i < bits.length; i += 8) d.u8(bits.slice(i, i + 8).reduce((a, b) => a * 2 + b, 0));
+  nullPacket(d, oob);
+}
+
+/**
+ * A Tri-Strip Set Shape LOD element: a closed tetrahedron on the corners (0,0,0), (1,0,0), (0,1,0), (0,0,1) (in file
+ * units), as the JT 9 topology coder writes it: four dual vertices of valence 3 (the triangles, one face group each)
+ * and four dual faces of degree 3 (the corners), every packet null-coded. `split` attribute bits per corner give 1
+ * vertex record per corner (smooth) or 3 (one per triangle).
+ */
+export function lodElement({ little }, { split = false } = {}) {
+  const d = new Bytes(little),
+    mask = split ? 7 : 1;
+  d.guid(T.triStripLOD).u8(4).i32(200);
+  d.i16(1).i16(1).u64(2); // base shape LOD, vertex shape LOD, bindings: 3-component coordinates
+  d.i16(1).i32(201).i16(1); // TopoMesh LOD data, topologically compressed LOD data
+  // The decoder asks for the first corner's degree in context 1 (no known neighbours), the other three in context 0.
+  const degrees = [[3, 3, 3], [3], [], [], [], [], [], []],
+    valences = [3, 3, 3, 3],
+    groups = [0, 1, 2, 3],
+    flags = [0, 0, 0, 0],
+    masks = [[], [mask, mask, mask, mask], [], [], [], [], [], []];
+  for (const list of degrees) nullPacket(d, list);
+  nullPacket(d, valences);
+  nullPacket(d, groups);
+  nullPacket(d, flags);
+  for (const list of masks) nullPacket(d, list);
+  nullPacket(d, []);
+  nullPacket(d, []);
+  d.i32(0); // high-degree masks
+  nullPacket(d, []);
+  nullPacket(d, []);
+  let h = 0;
+  for (const list of degrees) h = hash32(list, h);
+  h = hash32(valences, h);
+  h = hash32(groups, h);
+  h = hash16(flags, h);
+  for (const list of masks) h = hash32(list, h);
+  for (let i = 0; i < 5; i++) h = hash32([], h);
+  d.u32(h);
+  // Vertex records: coordinates quantized to 10 bits over [0, 1].
+  const records = split ? 12 : 4,
+    codes = [
+      [0, 1023, 0, 0],
+      [0, 0, 1023, 0],
+      [0, 0, 0, 1023],
+    ];
+  d.u64(2).u8(10).u8(0).u8(0).u8(0).i32(4).i32(records);
+  d.i32(4).u8(3);
+  for (let c = 0; c < 3; c++) d.f32(0, 1).u8(10);
+  let hc = 0;
+  // x arithmetic-coded (1023 escaped to the out-of-band values), y and z null-coded.
+  arithmeticPacket(d, codes[0], [[0, 3]], 1);
+  nullPacket(d, codes[1]);
+  nullPacket(d, codes[2]);
+  for (const list of codes) hc = hash32(list, hc);
+  d.u32(hc);
+  d.i16(1); // tri-strip set shape LOD version
   return new Bytes(little).i32(d.length).raw(d.bytes).bytes;
 }
 

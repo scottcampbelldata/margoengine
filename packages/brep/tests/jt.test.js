@@ -37,7 +37,7 @@ ${records.join('\n')}
 }
 
 /** A JT file of the test assembly; the LSG segment zlib-compressed (JT 9.5) or as `lzma` gives it (JT 10). */
-function file(version, little, lzma) {
+function file(version, little, lzma, split = false) {
   const options = { version, little, jt10: version >= 10 };
   return jtFile(options, [
     {
@@ -46,7 +46,7 @@ function file(version, little, lzma) {
       data: packed(little, lsgStream(options), lzma ? { lzma } : { zlib: true }),
     },
     { id: SEG.xt, type: 17, data: packed(little, xtElement(options, disc()), { zlib: version < 10 }) },
-    { id: SEG.lod, type: 7, data: lodElement(options) },
+    { id: SEG.lod, type: 7, data: lodElement(options, { split }) },
   ]);
 }
 
@@ -62,6 +62,41 @@ const area = (mesh) => {
   }
   return sum;
 };
+
+/**
+ * The tetrahedron shape mesh: 4 triangles, one per face group, closed and consistently wound (every directed edge once,
+ * its reverse once, by position), enclosing 1/6 mm^3, with `vertices` vertex records.
+ */
+function checkMesh(mesh, vertices) {
+  assert.equal(mesh.positions.length, vertices * 3);
+  assert.equal(mesh.indices.length, 12);
+  assert.deepEqual([...mesh.groups].sort(), [0, 1, 2, 3]);
+  const key = (i) => [...mesh.positions.subarray(i * 3, i * 3 + 3)].map((v) => Math.round(v * 1e7)).join(',');
+  const edges = new Set();
+  let volume = 0;
+  for (let t = 0; t < 12; t += 3) {
+    const [a, b, c] = [0, 1, 2].map((k) => mesh.indices[t + k]);
+    for (const [p, q] of [
+      [a, b],
+      [b, c],
+      [c, a],
+    ]) {
+      const e = `${key(p)}>${key(q)}`;
+      assert.ok(!edges.has(e), `edge ${e} twice`);
+      edges.add(e);
+    }
+    const P = (i) => [...mesh.positions.subarray(i * 3, i * 3 + 3)],
+      [pa, pb, pc] = [P(a), P(b), P(c)];
+    volume +=
+      (pa[0] * (pb[1] * pc[2] - pb[2] * pc[1]) -
+        pa[1] * (pb[0] * pc[2] - pb[2] * pc[0]) +
+        pa[2] * (pb[0] * pc[1] - pb[1] * pc[0])) /
+      6;
+  }
+  for (const e of edges) assert.ok(edges.has(e.split('>').reverse().join('>')), `edge ${e} has no twin`);
+  assert.equal(new Set([...edges].map((e) => e.split('>')[0])).size, 4);
+  assert.ok(Math.abs(Math.abs(volume) - 1e-9 / 6) < 1e-15, `volume ${volume}`);
+}
 
 /** The assembly as the tests expect it, whatever the version, byte order or compression. */
 function check(model, version) {
@@ -98,6 +133,7 @@ function check(model, version) {
   assert.equal(props.get('CAD_COUNT'), 42);
   assert.deepEqual(props.get('CREATED'), { date: '2026-10-18T07:05:03' });
   assert.equal(model.sceneGraph.properties.get(2).get('NOTE'), note());
+  if (version < 10) checkMesh(part.shapes[0].mesh, 4);
   // The draw style attribute is not read but kept by its base type.
   assert.equal(model.sceneGraph.attributes.get(13).kind, 'other');
   const [meshes] = tessellateJT(model, { deflection: 1e-7 });
@@ -126,7 +162,22 @@ test('JT 10: LZMA-compressed scene graphs (both header forms, other literal and 
   new DataView(sized.buffer).setUint32(9, 0, true);
   const bare = Uint8Array.from([...alone.subarray(0, 5), ...alone.subarray(13)]);
   for (const lzma of [alone, sized, bare, Buffer.from(LZMA_LC0_LP2_PB0, 'base64')])
-    check(parseJT(file(10, true, lzma)), 10);
+    check(parseJT(file(10, true, lzma), { meshes: false }), 10);
+});
+
+test('JT 9.5: a tri-strip LOD decodes through the topology coder, one vertex record per corner or per triangle', () => {
+  for (const little of [true, false]) {
+    const model = parseJT(file(9.5, little, undefined, true));
+    assert.deepEqual(model.warnings, []);
+    checkMesh(model.parts[0].shapes[0].mesh, 12);
+  }
+  // A damaged topology stream fails its hash: the shape is left out with a warning.
+  const bytes = file(9.5, true),
+    at = bytes.length - 40;
+  bytes[at] ^= 0x10;
+  const model = parseJT(bytes);
+  assert.equal(model.parts[0].shapes[0].mesh, undefined);
+  assert.match(model.warnings.join('\n'), /shape 7 was not decoded \(Invalid JT file: vertex coordinate hash/);
 });
 
 test('JT: files older than 9.5 throw a RangeError; malformed ones a TypeError that says what', () => {
