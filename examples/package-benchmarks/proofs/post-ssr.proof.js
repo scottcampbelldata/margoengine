@@ -2,14 +2,14 @@
 // over a story of resizes, option edits, depth-format, sample-count and canvas-format changes, a rejected frame, device
 // restoration and disposal at 1x and 4x, for several effect lists. (The single-effect stories are post-stack.proof.js.)
 // Run: node examples/package-benchmarks/proofs/post-ssr.proof.js [ref] [pin] [--current]   (ref: the commit before SSR, default 7c47a09)
-// Pinned: 7c47a09 against 3cf1453, the commit that made this claim. --current: b3ed8ac against the working tree;
-// 6a57389 intentionally made SSAO preserve the approved core ambient RGB hook (claims.md).
+// Pinned: 7c47a09 against 3cf1453, the commit that made this claim. --current: e8c2aab against the working tree;
+// approved multilevel Bloom, PBR Neutral display and linear HDR handoff changed these calls (claims.md).
 import assert from 'node:assert/strict';
 import { refs, versions, ignoreAgx, current } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 
-const { ref, pin } = refs('7c47a09', '3cf1453', 'b3ed8ac'),
+const { ref, pin } = refs('7c47a09', '3cf1453', 'e8c2aab'),
   post = await versions('post', ref, undefined, pin);
 
 function story(m, make, samples) {
