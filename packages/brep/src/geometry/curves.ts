@@ -274,3 +274,11 @@ export function curveOf(file: STEPFile, id: number): Curve {
       throw unsupported(file, id, 'curve');
   }
 }
+
+/** Evaluators for curves the modeler makes from parameters (no STEP entity behind them). */
+export const makeCurve = {
+  line: (origin: V3, direction: V3): Curve => new Line(origin, direction),
+  /** A circle is an ellipse with equal semi-axes. */
+  ellipse: (f: { origin: V3; x: V3; y: V3 }, a: number, b: number): Curve => new Ellipse(f, a, b),
+  spline: (s: SplineCurve, closed: boolean): Curve => new Spline(s, closed),
+};

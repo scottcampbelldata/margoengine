@@ -91,3 +91,15 @@ export function parseXT(input: string | ArrayBuffer | ArrayBufferView, options: 
     model = parseSTEP(conversion.step, options);
   return { ...model, warnings: [...conversion.warnings, ...model.warnings] };
 }
+
+// Modeling (docs/brep-modeling.md): editable bodies with persistent names, construction, validation and export.
+export { Body, Coedge, Edge, Face, History, Loop, Shell, Vertex } from './model/topology.js';
+export type { HistoryEntry, Name } from './model/topology.js';
+export { frameOf, curveEvaluator, surfaceEvaluator } from './model/geometry.js';
+export type { CurveDef, Frame, SurfaceDef } from './model/geometry.js';
+export { box, cylinder, extrude, sphere, torus } from './model/build.js';
+export type { Profile, ProfileSegment } from './model/build.js';
+export { validateBody } from './model/validate.js';
+export type { ValidityProblem } from './model/validate.js';
+export { bodiesToSTEP, meshBodies } from './model/export.js';
+export type { BodyMeshes } from './model/export.js';

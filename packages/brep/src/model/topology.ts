@@ -1,0 +1,155 @@
+// The modeler's boundary representation: bodies of shells of faces, each face bounded by loops of coedges, each coedge
+// one use of an edge (two for an edge inside a solid, run in opposite directions), each edge between two vertices on
+// a curve. Every face, edge and vertex has a persistent name: the operation that made it and what it was made from,
+// so a reference to "the side face from sketch edge 3" survives later edits (operations record what they generate,
+// modify and delete in a History).
+import type { V3 } from '../geometry/vec.js';
+import type { CurveDef, SurfaceDef } from './geometry.js';
+
+/** A persistent name, such as 'box1/face:+z' or 'extrude2/side:sketch1/e3'. */
+export type Name = string;
+
+export class Vertex {
+  constructor(
+    public name: Name,
+    public point: V3,
+    /** Largest distance the vertex may be from the curves of its edges, in metres. */
+    public tolerance = 1e-7,
+  ) {}
+}
+
+export class Edge {
+  /** The edge's uses by face loops: two, run in opposite directions, for an edge inside a solid. */
+  readonly coedges: Coedge[] = [];
+  constructor(
+    public name: Name,
+    public curve: CurveDef,
+    public start: Vertex,
+    public end: Vertex,
+    /** Whether start to end runs in the curve's increasing parameter direction. */
+    public sameSense = true,
+    /** Largest distance from the edge to the surfaces of its faces, in metres. */
+    public tolerance = 1e-7,
+  ) {}
+  /** A closed edge (a full circle) starts and ends at one vertex. */
+  get closed(): boolean {
+    return this.start === this.end;
+  }
+}
+
+export class Coedge {
+  constructor(
+    public readonly edge: Edge,
+    /** Whether the loop runs along the edge (start to end). */
+    public readonly forward: boolean,
+    public loop: Loop,
+  ) {
+    edge.coedges.push(this);
+  }
+  get start(): Vertex {
+    return this.forward ? this.edge.start : this.edge.end;
+  }
+  get end(): Vertex {
+    return this.forward ? this.edge.end : this.edge.start;
+  }
+}
+
+export class Loop {
+  readonly coedges: Coedge[] = [];
+  constructor(public face: Face) {}
+  /** Adds the use of `edge` (forward or reversed) at the end of the loop. */
+  use(edge: Edge, forward: boolean): Coedge {
+    const c = new Coedge(edge, forward, this);
+    this.coedges.push(c);
+    return c;
+  }
+}
+
+export class Face {
+  readonly loops: Loop[] = [];
+  constructor(
+    public name: Name,
+    public surface: SurfaceDef,
+    /** Whether the face normal (out of a solid) is the surface's natural normal. */
+    public sense: boolean,
+    public shell?: Shell,
+  ) {}
+  /** A new loop on this face; the face lies to the left of its coedges, seen from the face normal. */
+  loop(): Loop {
+    const l = new Loop(this);
+    this.loops.push(l);
+    return l;
+  }
+}
+
+export class Shell {
+  readonly faces: Face[] = [];
+  constructor(public body?: Body) {}
+  add(face: Face): Face {
+    face.shell = this;
+    this.faces.push(face);
+    return face;
+  }
+}
+
+export class Body {
+  readonly shells: Shell[] = [];
+  constructor(
+    public name: Name,
+    /** 'solid': closed shells bounding material; 'sheet': open or closed surfaces with no inside. */
+    public kind: 'solid' | 'sheet',
+  ) {}
+  shell(): Shell {
+    const s = new Shell(this);
+    this.shells.push(s);
+    return s;
+  }
+  get faces(): Face[] {
+    return this.shells.flatMap((s) => s.faces);
+  }
+  get edges(): Edge[] {
+    const out = new Set<Edge>();
+    for (const f of this.faces) for (const l of f.loops) for (const c of l.coedges) out.add(c.edge);
+    return [...out];
+  }
+  get vertices(): Vertex[] {
+    const out = new Set<Vertex>();
+    for (const e of this.edges) out.add(e.start).add(e.end);
+    return [...out];
+  }
+}
+
+/** One operation's effect on names: what it made (and from what), what it changed, what it removed. */
+export interface HistoryEntry {
+  readonly operation: Name;
+  readonly generated: readonly (readonly [Name, readonly Name[]])[];
+  readonly modified: readonly (readonly [Name, Name])[];
+  readonly deleted: readonly Name[];
+}
+
+/** The record of operations that lets a name stored before an edit find what became of it. */
+export class History {
+  readonly entries: HistoryEntry[] = [];
+  record(entry: HistoryEntry): void {
+    this.entries.push(entry);
+  }
+  /**
+   * The current names of what `name` became: itself when nothing changed it, the names it was modified into or the
+   * names generated from it (a face split by a cut becomes two), or none when it was deleted.
+   */
+  resolve(name: Name): Name[] {
+    let current = [name];
+    for (const e of this.entries) {
+      const next: Name[] = [];
+      for (const n of current) {
+        if (e.deleted.includes(n)) continue;
+        const modified = e.modified.filter(([from]) => from === n).map(([, to]) => to),
+          generated = e.generated.filter(([, from]) => from.includes(n)).map(([to]) => to);
+        if (modified.length || generated.length) next.push(...modified, ...generated);
+        else next.push(n);
+      }
+      current = [...new Set(next)];
+    }
+    return current;
+  }
+}

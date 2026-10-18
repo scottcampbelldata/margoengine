@@ -620,3 +620,13 @@ export function surfaceOf(file: STEPFile, id: number, angleUnit: number, curves:
       throw unsupported(file, id, 'surface');
   }
 }
+
+/** Evaluators for surfaces the modeler makes from parameters (no STEP entity behind them). */
+export const makeSurface = {
+  plane: (f: Frame): Surface => new Plane(f),
+  /** A cylinder is a cone with zero half angle. */
+  cone: (f: Frame, radius: number, halfAngle: number): Surface => new Cone(f, radius, halfAngle),
+  sphere: (f: Frame, radius: number): Surface => new Sphere(f, radius),
+  torus: (f: Frame, major: number, minor: number): Surface => new Torus(f, major, minor),
+  spline: (s: SplineSurface, uClosed: boolean, vClosed: boolean): Surface => new SplinePatch(s, uClosed, vClosed),
+};
