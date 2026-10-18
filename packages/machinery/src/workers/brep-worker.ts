@@ -1,7 +1,7 @@
 // STEP with Margo's own kernel (@margoengine/brep), one worker of a pool: each worker reads the whole file, then meshes
 // the bodies the page hands it one at a time, so the bodies of an assembly mesh in parallel and each part can be shown
 // as soon as it is ready. The primary worker also sends the file's structure (bodies, placements, products).
-import { parseSAT, parseSTEP, Tessellator, type BodyMesh, type STEPModel } from '@margoengine/brep';
+import { parseSAT, parseSTEP, parseXT, Tessellator, type BodyMesh, type STEPModel } from '@margoengine/brep';
 import { Geometry } from '@margoengine/core';
 declare const self: {
   onmessage: ((event: MessageEvent) => void) | null;
@@ -97,15 +97,26 @@ function groups(mesh: BodyMesh, bodyColor: string | null) {
 
 self.onmessage = (event: MessageEvent) => {
   const message = event.data as
-    | { buffer: ArrayBuffer; primary: boolean; format?: 'step' | 'sat'; deflection?: number; smoothing?: boolean }
+    | {
+        buffer: ArrayBuffer;
+        primary: boolean;
+        format?: 'step' | 'sat' | 'xt';
+        deflection?: number;
+        smoothing?: boolean;
+      }
     | { body: number; deflection?: number };
   try {
     if ('buffer' in message) {
       if (!(message.buffer instanceof ArrayBuffer) || !message.buffer.byteLength)
         throw new TypeError('Invalid CAD worker input');
       smoothing = message.smoothing !== false;
-      // ACIS SAT goes through the kernel's SAT-to-STEP conversion.
-      model = message.format === 'sat' ? parseSAT(message.buffer) : parseSTEP(message.buffer);
+      // ACIS SAT and Parasolid XT go through the kernel's conversions to STEP.
+      model =
+        message.format === 'sat'
+          ? parseSAT(message.buffer)
+          : message.format === 'xt'
+            ? parseXT(message.buffer)
+            : parseSTEP(message.buffer);
       tessellator = new Tessellator(
         model.file,
         model.faceColors,

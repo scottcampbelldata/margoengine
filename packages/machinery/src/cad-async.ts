@@ -4,7 +4,7 @@ import type { Mesh } from '@margoengine/core/extension';
 import type { CADModel } from './cad.js';
 import { capError, maxBytes } from './cad-parser.js';
 import { parseSTEPWithMargo } from './brep-async.js';
-export type CADFormat = 'stl' | 'obj' | 'step' | 'iges' | 'sat';
+export type CADFormat = 'stl' | 'obj' | 'step' | 'iges' | 'sat' | 'xt';
 export interface CADImportOptions {
   signal?: AbortSignal;
   onProgress?: (percent: number) => void;
@@ -39,7 +39,7 @@ export interface CADImportOptions {
   /**
    * STEP: `'occt'` (default) reads the file with OpenCascade in one worker; `'margo'` reads it with Margo's own
    * kernel (`@margoengine/brep`) in a pool of workers, one body at a time, largest first, and keeps the file's face
-   * and body colours. IGES needs `'occt'`; ACIS SAT (format `'sat'`) always takes Margo's kernel.
+   * and body colours. IGES needs `'occt'`; ACIS SAT (format `'sat'`) and Parasolid XT (`'xt'`, .x_t and .x_b) always take Margo's kernel.
    */
   kernel?: 'occt' | 'margo';
   /** `kernel: 'margo'`: most workers, 1 to 64 (default the device's logical cores less one, at most 8). */
@@ -61,7 +61,11 @@ export function parseCADAsync(
   options: CADImportOptions = {},
 ): Promise<CADModel> {
   options.signal?.throwIfAborted();
-  if (!(buffer instanceof ArrayBuffer) || !buffer.byteLength || !['stl', 'obj', 'step', 'iges', 'sat'].includes(format))
+  if (
+    !(buffer instanceof ArrayBuffer) ||
+    !buffer.byteLength ||
+    !['stl', 'obj', 'step', 'iges', 'sat', 'xt'].includes(format)
+  )
     throw new TypeError('Invalid CAD input');
   if (buffer.byteLength > maxBytes)
     throw capError(`CAD exceeds 64 MiB (${buffer.byteLength} > ${maxBytes} bytes)`, format);
@@ -81,8 +85,8 @@ export function parseCADAsync(
   const kernel = options.kernel ?? 'occt';
   if (kernel !== 'occt' && kernel !== 'margo') throw new TypeError("kernel must be 'occt' or 'margo'");
   if (kernel === 'margo' && format === 'iges') throw new TypeError("kernel 'margo' reads STEP; use 'occt' for IGES");
-  // ACIS SAT has no OpenCascade path here: Margo's kernel reads it whatever the kernel option says.
-  if ((kernel === 'margo' && format === 'step') || format === 'sat')
+  // ACIS SAT and Parasolid XT have no OpenCascade path here: Margo's kernel reads them whatever the kernel option says.
+  if ((kernel === 'margo' && format === 'step') || format === 'sat' || format === 'xt')
     return parseSTEPWithMargo(
       engine,
       buffer,
