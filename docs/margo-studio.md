@@ -111,6 +111,35 @@ Draft inventory to verify:
 - Margo advantages: per-tile game metadata (walkable, sound, collider type, triggers) carried into the level,
   baked navmesh (`@margoengine/navigation`) and Rapier colliders (`@margoengine/physics`) on save, instanced batching.
 
+### Engine gaps for the tile editor (Scott, 2026-10-18)
+
+Margo already has textured rendering, skeletal animation playback, morphs, picking, basic gizmos, lighting, post
+effects and audio. To match Crocotile 3D it still needs the items below. They come from reviews of the materials code,
+the controls' limits, the exporters and the FBX support; check each against the code before building it.
+
+1. **Editable mesh updates.** Update textured vertex and index buffers, topology, skin weights, bind matrices and
+   morph targets in place. Today, edited geometry usually means rebuilding the render objects it touches.
+2. **Complete OBJ/MTL support.** The importer drops UVs, normals and material assignments. Export must write the
+   texture files and their `map_Kd` references.
+3. **Missing formats.** `.crocotile` projects, `.c3dp` prefabs, Collada `.dae` import and export, TMX import, and
+   Crocotile's own scene and UV-animation data.
+4. **Matching materials.** Lambert and Phong shading, matching light falloff, and Crocotile's rules for combining
+   vertex colours. Margo's PBR rendering does not by itself give the same look.
+5. **Vertex lighting and AO baking.** Work out lighting and ambient occlusion and write them into vertex colours, with
+   the same bake options Crocotile has.
+6. **Transforms on a selection.** Move, rotate and scale selected vertices or faces about a pivot set separately from
+   them, scale in a plane, snap to vertices while dragging, and scale proportionally the way Crocotile does.
+7. **Animation authoring.** Editable keys, Actions and Acts, timing curves, camera cuts, animated UVs, reverse
+   playback, and timeline audio kept in sync. Playback already exists.
+8. **Rig authoring.** Create and edit skeletons, manage rest poses, bind and rebind meshes, paint weights, select and
+   show bones, and duplicate or mirror rigs. Runtime skinning already exists.
+9. **Render jobs and media output.** Frame-by-frame stepping that gives the same result every run, screenshots, image
+   sequences, turntables, GIF and WebM encoding, output size, cancelling, and audio kept in sync.
+10. **Export options.** Export the current pose, batch objects, package texture files with the export, keep custom
+    properties, and follow Crocotile's tile-padding and animated-UV export conventions.
+11. **FBX compatibility.** Margo imports FBX, but refuses some combinations of inheritance, scaling, morphs,
+    animation layers and curves. Shared reference files must show which of those limits need fixing.
+
 ## 3. Node / skeleton modeller (Dust3D equivalent)
 
 Engine gaps still open in Margo (research 2026-10-18, largest first; editor UI is not counted): a skeleton sweep

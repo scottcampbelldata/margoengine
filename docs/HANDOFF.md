@@ -2093,6 +2093,9 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    supported for import/export). Plan, ground rules and draft feature inventories: `docs/margo-studio.md`. Each tool
    starts with a feature audit against the current release and Scott's scope sign-off. Update 2026-10-18: Scott
    started the tile editor before 1.0 (see the top of this file); the voxel and node editors remain later work.
+   The engine gaps the tile editor needs (editable meshes, OBJ/MTL, Crocotile and Collada formats, Lambert/Phong
+   materials, vertex-light baking, selection transforms, animation and rig authoring, render jobs, export options,
+   FBX limits) are listed in `docs/margo-studio.md` section 2 (Scott, 2026-10-18).
 
 Worker practice: agents run in git worktrees; they must start from the current `main` (`git reset --hard origin/main`; worktrees
 default to an old base). `node scripts/worktree-node-modules.mjs` sets up node_modules as described next. Do not junction the whole node_modules (then `@margoengine/*` resolves to the main checkout's
