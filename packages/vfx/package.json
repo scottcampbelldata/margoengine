@@ -4,11 +4,6 @@
   "type": "module",
   "license": "MIT",
   "description": "GPU particle simulation and indirect billboards.",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/vfx"
-  },
   "publishConfig": {
     "access": "public"
   },

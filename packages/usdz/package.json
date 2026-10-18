@@ -35,11 +35,6 @@
     "access": "public"
   },
   "homepage": "https://margoengine.com",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/usdz"
-  },
   "devDependencies": {
     "@margoengine/math": "^1.0.0"
   }
