@@ -30,10 +30,5 @@
     "@margoengine/loaders": "^1.0.0",
     "web-ifc": "^0.0.78"
   },
-  "homepage": "https://margoengine.com",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/ifc"
-  }
+  "homepage": "https://margoengine.com"
 }
