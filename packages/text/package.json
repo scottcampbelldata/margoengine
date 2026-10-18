@@ -4,11 +4,6 @@
   "type": "module",
   "license": "MIT",
   "description": "GPU signed distance field text for Margo Engine: runtime glyph atlases from any browser font, wrapping, alignment, outlines and shadows, WebGPU.",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/text"
-  },
   "publishConfig": {
     "access": "public"
   },

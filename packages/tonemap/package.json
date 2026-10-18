@@ -29,10 +29,5 @@
     "dev": "vite --config vite.config.js --open /examples/index.html",
     "build:demo": "vite build --config vite.config.js"
   },
-  "homepage": "https://margoengine.com",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/tonemap"
-  }
+  "homepage": "https://margoengine.com"
 }

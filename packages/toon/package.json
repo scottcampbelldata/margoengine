@@ -29,10 +29,5 @@
     "prepack": "npm run build"
   },
   "homepage": "https://margoengine.com",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/toon"
-  },
   "description": "Stepped diffuse shading and inverted-hull outlines."
 }

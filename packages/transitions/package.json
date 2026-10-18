@@ -26,10 +26,5 @@
     "prepack": "npm run build"
   },
   "homepage": "https://margoengine.com",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/transitions"
-  },
   "description": "WebGPU scene wipes, noise dissolves and chromatic displacement."
 }
