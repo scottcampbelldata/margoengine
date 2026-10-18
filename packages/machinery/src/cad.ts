@@ -201,11 +201,11 @@ export async function loadCAD(
   const data = await readResponse(await get(target, { signal }), { maxBytes, signal, label: 'CAD download' }),
     extension = target.pathname.toLowerCase().split('.').at(-1),
     kind = format ?? (extension === 'stp' ? 'step' : extension === 'igs' ? 'iges' : extension);
-  if (kind !== 'stl' && kind !== 'obj' && kind !== 'step' && kind !== 'iges')
-    throw new TypeError('Specify STL, OBJ, STEP or IGES format');
+  if (kind !== 'stl' && kind !== 'obj' && kind !== 'step' && kind !== 'iges' && kind !== 'sat')
+    throw new TypeError('Specify STL, OBJ, STEP, IGES or SAT format');
   signal?.throwIfAborted();
   if (typeof Worker === 'undefined') {
-    if (kind === 'step' || kind === 'iges') throw new Error('B-Rep import requires Web Workers');
+    if (kind === 'step' || kind === 'iges' || kind === 'sat') throw new Error('B-Rep import requires Web Workers');
     return parseCAD(engine, data, kind, options);
   }
   const buffer =

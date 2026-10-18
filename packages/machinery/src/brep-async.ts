@@ -67,6 +67,7 @@ export function parseSTEPWithMargo(
   workerURL: URL,
   options: CADImportOptions,
   timeoutMs: number,
+  format: 'step' | 'sat' = 'step',
 ): Promise<CADModel> {
   const cores = Math.max(1, Math.min(8, ((globalThis.navigator?.hardwareConcurrency as number | undefined) ?? 4) - 1)),
     requested = options.workers ?? cores;
@@ -353,7 +354,7 @@ export function parseSTEPWithMargo(
         }
       };
       worker.postMessage(
-        { buffer: data, primary, deflection: options.linearDeflection, smoothing: options.smoothing ?? true },
+        { buffer: data, primary, format, deflection: options.linearDeflection, smoothing: options.smoothing ?? true },
         [data],
       );
     };
