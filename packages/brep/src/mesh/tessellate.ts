@@ -658,7 +658,7 @@ export class Tessellator {
       );
       for (let u = all[0] + du / 2; u < all[1]; u += du)
         for (let v = all[2] + dv / 2; v < all[3]; v += dv) {
-          if (near(u * su, v * sv)) continue;
+          if (near(u * su * ku, v * sv * kv)) continue;
           uv.push(u, v);
           xyz.push(spot(u, v));
         }
