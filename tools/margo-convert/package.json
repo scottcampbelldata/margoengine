@@ -26,11 +26,6 @@
     "occt-import-js": "0.0.23"
   },
   "homepage": "https://margoengine.com",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "tools/margo-convert"
-  },
   "publishConfig": {
     "access": "public"
   }
