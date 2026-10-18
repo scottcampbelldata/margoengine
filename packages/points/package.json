@@ -4,11 +4,6 @@
   "type": "module",
   "license": "MIT",
   "description": "Large point clouds (Points, PointsMaterial) and instanced sprites (Sprite, SpriteMaterial) for Margo Engine, WebGPU.",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/points"
-  },
   "publishConfig": {
     "access": "public"
   },

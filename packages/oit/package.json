@@ -27,10 +27,5 @@
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
   },
-  "homepage": "https://margoengine.com",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/oit"
-  }
+  "homepage": "https://margoengine.com"
 }
