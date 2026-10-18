@@ -87,7 +87,7 @@ To do:
 ### C. STEP round trips
 
 Margo today: Codex checks every exported test result in OpenCascade (BRepCheck, GProp, occt-import-js). The exporter
-writes closed curved faces without seam edges, which OpenCascade's mesher misreads (below); a session is fixing that.
+wrote closed curved faces without seam edges, which OpenCascade's mesher misread; fixed 2026-10-18 (below).
 
 To do, the highest validation priority: import STEP, edit in Margo (blend, Boolean), export STEP, open the result in
 Siemens NX, FreeCAD and SolidWorks, automatically (FreeCAD's command line for a start). Engineers reject a file one of
@@ -108,14 +108,20 @@ the scene's exposure) while keeping the stars.
 Related: the Night Citadel browser test expects phones at 2 device pixels per CSS pixel, but fb01fb1 (on main,
 "cap phone pixels") made phones render at 1, so the test fails on main too. Restore 2x on phones or update the test.
 
-### STEP export: OpenCascade misreads some sphere faces
+### STEP export: OpenCascade misread faces on closed surfaces (fixed 2026-10-18)
 
-Found by Codex's b1f5d2e validation (step 8) and narrowed down on 2026-10-18. Our exports of the "sphere through a
-cylinder wall" Booleans write each face with only its traced intersection edges: no seam edges on periodic surfaces
-and no degenerate edge at a sphere's pole, which STEP allows. OpenCascade's GProp agrees with our volumes for the union,
-intersect and cylinder-minus-sphere results, but its mesher (occt-import-js) fills the wrong side of the sphere face in
-three of them (030, 031, 036: e.g. 417.2 mm3 for an intersection of 487.4), and for sphere-minus-cylinder (032) both
-GProp (-15.65 mm3) and the mesher (22 triangles) fail. Turning the sphere's seam away from the face or its pole out of
-it did not help; flipping the cylinder patch's loop did not either. What real CAD writers do and what to try next:
-split periodic faces at their seam with seam edges, give a face that contains a pole a degenerate edge there, and
-check each export with OpenCascade's mesher as well as GProp. Our own reader and meshes are right in all four cases.
+Found by Codex's b1f5d2e and 7243c0e validations. Two causes in `bodiesToSTEP`, both fixed in `model/seams.ts`:
+
+- A face going round a cylinder, cone, sphere or torus (a sphere or torus less a hole, a cap over a pole) was bounded
+  only by its own edges, and OpenCascade's mesher filled the wrong side. It is now cut open along the surface's seam by
+  seam edges used once each way, ending on a sphere at a vertex on each pole the face covers; a sphere cap smaller
+  than a hemisphere is written with the sphere's axis turned across it instead.
+- An edge on a traced intersection loop (a closed B-spline) could run across the spline's start, which a reader that
+  takes the spline as written cannot follow (032's GProp was -15.65 mm3). Such edges are now split there.
+
+All 74 Boolean, blend and model test results, exported and read back: occt-import-js (1 um deflection, 0.05 rad) mesh
+volume within 0.041% of Margo's and area within 0.014% (before: 010 -61%, 022 -40%, 026 -26%, 030 -14%, 031 +7.5%,
+032 -126%, 033 -85%, 035 -76%, 036 -40%, and 024, 025, 027 off 0.5% to 2%). OpenCascade's GProp agrees within 0.04%
+except 023 (+3%, as before): its default integration is that far off on the face's long spline edge, and its adaptive
+integration (relative error 1e-7) gives 3,699.0 mm3 against Margo's 3,698.1. Our reader reads every export back to
+the same solids, volumes within 0.018% of the old exports'.

@@ -7,6 +7,8 @@
 // vertices is written as two pieces, for both of its faces. A cap on a sphere smaller than a hemisphere is written
 // instead with the sphere's axis turned across it, so it covers no pole and needs no seam. Faces that already have a
 // seam (a cylinder made by extrusion), patches that do not go round, planes and splines are written as they are.
+// Edges are also split where they run across the start of a closed B-spline (a traced intersection loop): STEP writes
+// the spline as an open one from that point round to it, and an edge cannot run across it.
 import type { Surface } from '../geometry/surfaces.js';
 import { add, dot, scale, sub, type XYZ } from '../geometry/vec.js';
 import { curveEvaluator, frameOf, surfaceEvaluator, type CurveDef, type Frame, type SurfaceDef } from './geometry.js';
@@ -106,7 +108,7 @@ const sampleCount = (e: Edge) =>
 const turned = (f: Frame, angle: number): Frame =>
   frameOf(f.origin, f.z, add(scale(f.x, Math.cos(angle)), scale(f.y, Math.sin(angle))));
 
-/** Faces as written: those that need it cut open, and edges split where their seams cross them. */
+/** Faces as written: those that need it cut open, and edges split where seams and spline starts cross them. */
 export function writtenFaces(faces: readonly Face[]): WrittenFaces {
   const splits = new Map<Edge, { f: number; vertex: Vertex }[]>(),
     cuts = new Map<Face, { surface: SurfaceDef; loops: Step[][] }>(),
@@ -115,6 +117,19 @@ export function writtenFaces(faces: readonly Face[]): WrittenFaces {
       if (!list.some((x) => x.vertex === vertex)) list.push({ f, vertex });
       splits.set(edge, list);
     };
+  // Edges running across the start of a closed B-spline, split there (see above).
+  for (const edge of new Set(faces.flatMap((f) => f.loops.flatMap((l) => l.coedges.map((c) => c.edge))))) {
+    const c = curveEvaluator(edge.curve);
+    if (edge.curve.kind !== 'spline' || !c.period) continue;
+    const [t0, t1] = edgeParameters(edge, 1),
+      start = c.domain[0];
+    for (let k = Math.ceil((Math.min(t0, t1) - start) / c.period); start + k * c.period < Math.max(t0, t1); k++) {
+      const t = start + k * c.period,
+        f = (t - t0) / (t1 - t0);
+      if (f > 1e-9 && f < 1 - 1e-9)
+        split(edge, f, new Vertex(`${edge.name}/vertex:spline-start`, c.at(t).slice(0, 3) as XYZ));
+    }
+  }
   for (const face of faces) {
     const cut = cutOpen(face, splits);
     if (!cut) continue;
