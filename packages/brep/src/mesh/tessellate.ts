@@ -224,7 +224,7 @@ export class Tessellator {
   }
 
   /** Tessellates face `id`; throws a TypeError when its geometry or bounds cannot be resolved. */
-  private face(id: number, body: STEPBody, tol: Tolerances): FaceMesh {
+  private face(id: number, body: STEPBody, tol: Tolerances, inverted = false): FaceMesh {
     const args = this.file.get(id).args,
       bounds = list(args[1]).map((v) => this.bound(ref(v) ?? -1, tol.edge)),
       geometry = ref(args[2]),
@@ -450,10 +450,31 @@ export class Tessellator {
       domain.push([...run, { p: pole, u: a1, v: vPole, line: true }, { p: pole, u: a0, v: vPole, line: true }]);
     } else if (wraps.length > 2)
       throw new TypeError(`Unsupported STEP face #${id}: three or more bounds wrap round it`);
-    if (!domain.length && !loops.length) {
-      // No edge bounds: the whole closed surface (a full sphere or torus).
-      const [u0, u1] = s.uPeriod ? [s.uDomain[0], s.uDomain[0] + s.uPeriod] : s.uDomain,
-        [v0, v1] = s.vPeriod ? [s.vDomain[0], s.vDomain[0] + s.vPeriod] : s.vDomain;
+    loops.sort((a, b) => boxArea(b) - boxArea(a));
+    // Only holes (a sphere less a cap): the face is the whole closed surface less them, cut open where none crosses.
+    const holesOnly =
+      !domain.length &&
+      loops.length > 0 &&
+      Math.sign(signedArea(loops[0])) === -left &&
+      !!s.uPeriod &&
+      (!!s.vPeriod || (s.pole(-1) !== undefined && s.pole(1) !== undefined));
+    if (!domain.length && (!loops.length || holesOnly)) {
+      // No edge bounds, or only holes: the whole closed surface (a full sphere or torus).
+      const boxes = loops.map(bounds2),
+        cut = (period: number, base: number, lo: 0 | 2) => {
+          if (!boxes.length) return base;
+          const free = freeMiddle(
+            boxes.map((b) => [b[lo], b[lo + 1]]),
+            period,
+          );
+          if (free === undefined)
+            throw new TypeError(`STEP face #${id}: its holes cover a whole period of its surface`);
+          return free;
+        },
+        u0 = s.uPeriod ? cut(s.uPeriod, s.uDomain[0], 0) : s.uDomain[0],
+        u1 = s.uPeriod ? u0 + s.uPeriod : s.uDomain[1],
+        v0 = s.vPeriod ? cut(s.vPeriod, s.vDomain[0], 2) : s.vDomain[0],
+        v1 = s.vPeriod ? v0 + s.vPeriod : s.vDomain[1];
       if (![u0, u1, v0, v1].every(Number.isFinite))
         throw new TypeError(`Invalid STEP file: face #${id} has no bounds on an unbounded surface`);
       const corner = (u: number, v: number): LoopPoint => ({ p: spot(u, v), u, v, line: true }),
@@ -485,6 +506,14 @@ export class Tessellator {
       su = Math.hypot(mid[3], mid[4], mid[5]) || 1,
       sv = Math.hypot(mid[6], mid[7], mid[8]) || 1;
     let [du, dv] = s.steps(all, tol.interior, tol.interiorAngle);
+    // A face straight one way (a cylinder along its axis) needs no points inside, unless it has holes: then triangles
+    // would span round them, so it takes columns across the curved way, a few points along each.
+    if (domain.length > 1) {
+      if (Number.isFinite(du) && !Number.isFinite(dv))
+        (du *= 0.7), (dv = Math.max((all[3] - all[2]) / 8, (du * su) / sv));
+      else if (Number.isFinite(dv) && !Number.isFinite(du))
+        (dv *= 0.7), (du = Math.max((all[1] - all[0]) / 8, (dv * sv) / su));
+    }
     const uv: number[] = [],
       xyz: V3[] = [],
       loopIndices: number[][] = [],
@@ -534,8 +563,7 @@ export class Tessellator {
           const [lo, hi] = forward ? [q, r] : [r, q],
             // Along a pole every point is the pole itself. A line whose ends meet only because it goes once round a
             // closed surface (a torus's seam circle) is no pole: its middle is far from its ends.
-            pole =
-              distance(q.p, r.p) <= gap && distance(spot((q.u + r.u) / 2, (q.v + r.v) / 2), q.p) <= gap;
+            pole = distance(q.p, r.p) <= gap && distance(spot((q.u + r.u) / 2, (q.v + r.v) / 2), q.p) <= gap;
           points = [];
           for (let j = 1; j < steps; j++)
             points.push(pole ? q.p : spot(lo.u + ((hi.u - lo.u) * j) / steps, lo.v + ((hi.v - lo.v) * j) / steps));
@@ -614,7 +642,8 @@ export class Tessellator {
     }
 
     // --- output: triangles wound to face outward, collapsed ones (at a pole) dropped, unused points removed -------------
-    const count = uv.length / 2,
+    const outward = sameSense !== inverted,
+      count = uv.length / 2,
       kept: number[] = [];
     for (let t = 0; t < triangles.length; t += 3) {
       const a = triangles[t],
@@ -622,7 +651,7 @@ export class Tessellator {
         c = triangles[t + 2];
       if (!(distance(xyz[a], xyz[b]) > gap && distance(xyz[b], xyz[c]) > gap && distance(xyz[c], xyz[a]) > gap))
         continue;
-      if (sameSense) kept.push(a, b, c);
+      if (outward) kept.push(a, b, c);
       else kept.push(a, c, b);
     }
     const remap = new Int32Array(count).fill(-1);
@@ -635,7 +664,7 @@ export class Tessellator {
       remap[i] = next++;
       const n = normalAt(uv[i * 2], uv[i * 2 + 1]);
       positions.push(xyz[i][0], xyz[i][1], xyz[i][2]);
-      if (sameSense) normals.push(n[0], n[1], n[2]);
+      if (outward) normals.push(n[0], n[1], n[2]);
       else normals.push(-n[0], -n[1], -n[2]);
     }
     return { positions, normals, indices: kept.map((i) => remap[i]) };
@@ -823,10 +852,11 @@ export class Tessellator {
       faces: BodyMeshFace[] = [],
       failures: { id: number; reason: string }[] = [];
     this.findPoleCrossings(body, tol.edge * 1e-3);
+    const reversed = new Set(body.reversed);
     for (const id of body.faces) {
       let mesh: FaceMesh;
       try {
-        mesh = this.face(id, body, tol);
+        mesh = this.face(id, body, tol, reversed.has(id));
       } catch (error) {
         failures.push({ id, reason: error instanceof Error ? error.message : String(error) });
         continue;
@@ -905,6 +935,28 @@ function signedArea(loop: readonly LoopPoint[]): number {
 function boxArea(loop: readonly LoopPoint[]): number {
   const b = bounds2(loop);
   return (b[1] - b[0]) * (b[3] - b[2]);
+}
+/** The middle of the widest stretch of a periodic coordinate that none of the ranges [lo, hi] covers, if any. */
+function freeMiddle(ranges: readonly (readonly number[])[], period: number): number | undefined {
+  const spans = ranges
+    .map(([lo, hi]) => {
+      const start = lo - Math.floor(lo / period) * period;
+      return [start, start + hi - lo];
+    })
+    .sort((a, b) => a[0] - b[0]);
+  // Coverage carried over from a range running past the period's end.
+  let end = Math.max(spans[0][1], ...spans.map((r) => r[1] - period)),
+    best: number | undefined,
+    width = 0;
+  for (let i = 1; i <= spans.length; i++) {
+    const next = i < spans.length ? spans[i][0] : spans[0][0] + period;
+    if (next - end > width) {
+      width = next - end;
+      best = (end + next) / 2;
+    }
+    if (i < spans.length) end = Math.max(end, spans[i][1]);
+  }
+  return best;
 }
 /** Drops consecutive repeats from an open run of (u, v) points. */
 function dedupe(run: LoopPoint[]): LoopPoint[] {

@@ -26,6 +26,8 @@ export interface STEPBody {
   readonly name: string;
   /** Face entity ids (empty for tessellated bodies). */
   readonly faces: readonly number[];
+  /** Faces turned inside out by an oriented shell or face around them (a void's shell is reversed). */
+  readonly reversed?: readonly number[];
   /** Number of distinct edges. */
   readonly edges: number;
   /** Metres per unit of the body's coordinates (0.001 for a body modelled in millimetres). */
@@ -532,11 +534,19 @@ export function readStructure(file: STEPFile, { maxInstances = 1_000_000 }: STEP
     curves: Record<string, number> = {},
     faceColors = new Map<number, STEPColor>(),
     countedEdges = new Set<number>();
-  const shellFaces = (shell: number): number[] => {
+  const isFalse = (v: STEPValue | undefined) => v instanceof Enum && v.name === 'F';
+  /** A shell's faces, each with whether an oriented shell or face around it reverses it (a void's shell does). */
+  const shellFaces = (shell: number, flip = false): [number, boolean][] => {
     if (!file.has(shell)) return [];
-    if (file.is(shell, 'ORIENTED_CLOSED_SHELL') || file.is(shell, 'ORIENTED_OPEN_SHELL'))
-      return shellFaces(ref(file.get(shell).args[2]) ?? -1);
-    return refs(file.get(shell).args[1]);
+    if (file.is(shell, 'ORIENTED_CLOSED_SHELL') || file.is(shell, 'ORIENTED_OPEN_SHELL')) {
+      const args = file.get(shell).args;
+      return shellFaces(ref(args[2]) ?? -1, flip !== isFalse(args[3]));
+    }
+    return refs(file.get(shell).args[1]).map((face) => {
+      if (!file.has(face) || !file.is(face, 'ORIENTED_FACE')) return [face, flip];
+      const args = file.get(face).args;
+      return [ref(args[2]) ?? face, flip !== isFalse(args[3])];
+    });
   };
   const body = (id: number, unit: number, angleUnit: number): number => {
     const known = bodyIndex.get(id);
@@ -553,12 +563,13 @@ export function readStructure(file: STEPFile, { maxInstances = 1_000_000 }: STEP
             ? []
             : [ref(args[1]) ?? -1];
     const faces: number[] = [],
+      reversed: number[] = [],
       edges = new Set<number>();
     for (const shell of shells)
-      for (let face of shellFaces(shell)) {
+      for (const [face, flip] of shellFaces(shell)) {
         if (!file.has(face)) continue;
-        if (file.is(face, 'ORIENTED_FACE')) face = ref(file.get(face).args[2]) ?? face;
         faces.push(face);
+        if (flip) reversed.push(face);
         const [, bounds, geometry] = file.get(face).args,
           surface = ref(geometry);
         if (surface !== undefined && file.has(surface)) {
@@ -598,6 +609,7 @@ export function readStructure(file: STEPFile, { maxInstances = 1_000_000 }: STEP
       kind,
       name: str(args[0]),
       faces,
+      ...(reversed.length ? { reversed } : {}),
       edges: edges.size,
       unit,
       angleUnit,
