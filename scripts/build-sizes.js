@@ -152,7 +152,6 @@ ${table(
       <a href="./#start">Get started</a>
       <a href="./sizes.html" aria-current="page">Sizes</a>
       <a href="./catalog/">Catalog</a>
-      <a href="https://github.com/scottcampbelldata/margoengine">GitHub</a>
     </nav>
   </header>
 
@@ -182,13 +181,13 @@ ${lazyFiles(sizes)}
 ${sections.join('\n\n')}
 
     <section class="status">
-      <p>Method: ${esc(sizes.method)}. Source: <a href="https://github.com/scottcampbelldata/margoengine/blob/main/examples/package-benchmarks/results/entry-sizes.json">entry-sizes.json</a>.</p>
+      <p>Method: ${esc(sizes.method)}. Source: entry-sizes.json.</p>
     </section>
   </main>
 
   <footer>
     <p>Built with precision, named with love. For Margie.</p>
-    <p><a href="https://github.com/scottcampbelldata/margoengine">Source on GitHub</a> <a href="https://github.com/scottcampbelldata/margoengine/blob/main/LICENSE">MIT license</a> <a href="./catalog/">Catalog</a></p>
+    <p><a href="./catalog/">Catalog</a></p>
   </footer>
 </body>
 </html>

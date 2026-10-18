@@ -108,7 +108,6 @@ async function load() {
       }
       card.querySelector('.npm').href = `https://www.npmjs.com/package/${entry.package}`;
       card.querySelector('.npm').hidden = !entry.published;
-      card.querySelector('.readme').href = `https://github.com/scottcampbelldata/margoengine/blob/main/packages/${entry.id}/README.md`;
       card.querySelector('.permalink').href = `./#${entry.id}`;
       card.querySelector('.exports summary').textContent = `Browse ${entry.exports.length} public exports`;
       for (const name of entry.exports) {
