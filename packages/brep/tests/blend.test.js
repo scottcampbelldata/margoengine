@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { model } from '../dist/index.js';
 
-const { boolean, box, chamfer, cylinder, fillet, frameOf, History, meshBodies, validateBody } = model;
+const { boolean, box, chamfer, cylinder, extrude, fillet, frameOf, History, meshBodies, validateBody } = model;
 
 const mm = 0.001,
   at = (x, y, z) => frameOf([x * mm, y * mm, z * mm], [0, 0, 1], [1, 0, 0]),
@@ -106,6 +106,32 @@ test('fillets: two rounded edges meeting at a corner meet at a mitre; names and 
   assert.ok(body.faces.some((f) => f.name === 'm:a/edge:+z:+x/face:round'));
   // The top face is still the top face.
   assert.deepEqual(history.resolve('a/face:+z'), ['a/face:+z']);
+});
+
+test('fillets: an edge running out through slanted faces is rounded with the Booleans', () => {
+  // A trapezoid prism (12 and 7 across, 7 deep, 8 high). Its top front edge ends in the two slanted sides, not square
+  // to it, so the rounding strip is cut by them: its length at the strip's centroid line is 12 - 5/7 of the centroid's
+  // offset from the front face.
+  const r = 1,
+    area = r * r * (1 - Math.PI / 4),
+    offset = (r * (5 / 6 - Math.PI / 4)) / (1 - Math.PI / 4),
+    corners = [
+      [12, 0],
+      [9, 7],
+      [2, 7],
+      [0, 0],
+    ],
+    prism = extrude(
+      't',
+      {
+        name: 'p',
+        start: [0, 0, 0],
+        normal: [0, 0, 1],
+        segments: corners.map(([x, y], k) => ({ kind: 'line', to: [x * mm, y * mm, 0], name: `s${k}` })),
+      },
+      [0, 0, 8 * mm],
+    );
+  solid(fillet('ft', prism, ['t/edge:top:s0'], r * mm), ((12 + 7) / 2) * 7 * 8 - area * (12 - (5 * offset) / 7));
 });
 
 test('fillets and chamfers on full circles: a boss top, a hole rim, and a boss meeting a plate', () => {

@@ -1,7 +1,9 @@
-// Fillets and chamfers, made with the Booleans: for each edge, the strip of material between the edge and the rounding
-// (or the bevel) is built as a solid and taken away from a convex edge, or added at a concave one. The strip's flat
-// sides lie in the edge's two faces and its round side touches them along its tangent lines, cases the Booleans take
-// (faces on one surface, edges in faces). Every strip is built from the body as given, then applied in turn:
+// Fillets and chamfers. The common case (straight edges between planar faces, ending at three-face corners) is built in
+// place (setback.ts). Otherwise they are made with the Booleans: for each edge, the strip of material between the edge
+// and the rounding (or the bevel) is built as a solid and taken away from a convex edge, or added at a concave one. The
+// strip's flat sides lie in the edge's two faces and its round side touches them along its tangent lines, cases the
+// Booleans take (faces on one surface, edges in faces). Every strip is built from the body as given, then applied in
+// turn:
 // - an end no other blended edge meets runs on past the end (a convex strip) so it cuts clean through the face there;
 // - where two blended edges meet, each strip stops at the mitre plane between them (their roundings meet in a crease
 //   along it, as two equal cylinders do);
@@ -12,9 +14,11 @@ import { boolean } from './boolean.js';
 import { box, extrude, revolve, sphere, type ProfileSegment } from './build.js';
 import { FaceUV } from './faces.js';
 import { frameOf } from './geometry.js';
+import { away, outward, setBack } from './setback.js';
 import type { Body, History, Edge, Face, Name, Vertex } from './topology.js';
 
-type Blend = { kind: 'fillet'; radius: number } | { kind: 'chamfer'; distance: number };
+/** A rounding of one radius, or a bevel one distance along each face. */
+export type Blend = { kind: 'fillet'; radius: number } | { kind: 'chamfer'; distance: number };
 
 /**
  * Rounds the named edges of `body` to `radius` (metres): straight edges between two planar faces, convex or concave,
@@ -49,7 +53,7 @@ export function chamfer(
 }
 
 /** One edge to blend, as the body gives it. */
-interface Selected {
+export interface Selected {
   name: Name;
   edge: Edge;
   /** Into each of its two faces from the edge, across it, and those faces. */
@@ -80,8 +84,14 @@ function blend(name: Name, body: Body, edgeNames: readonly Name[], how: Blend, h
       const d = list.map((s) => away(s.edge, v));
       if (Math.abs(dot(d[0], d[1])) > 1e-9 || Math.abs(dot(d[1], d[2])) > 1e-9 || Math.abs(dot(d[0], d[2])) > 1e-9)
         continue;
-      const centre = add(v.point, scale(add(add(d[0], d[1]), d[2]), how.radius));
-      balls.set(v, centre);
+      balls.set(v, add(v.point, scale(add(add(d[0], d[1]), d[2]), how.radius)));
+    }
+  const direct = setBack(name, body, selected, how, balls, history);
+  if (direct) return direct;
+  if (how.kind === 'fillet')
+    for (const [v, centre] of balls) {
+      const list = at.get(v)!,
+        d = list.map((s) => away(s.edge, v));
       // The corner block between the vertex and the ball's centre, less the ball.
       // x, then the third direction as y = z x x: a right-handed frame along the three edges.
       const x = dot(cross(d[0], d[1]), d[2]) < 0 ? d[1] : d[0],
@@ -133,12 +143,6 @@ function blend(name: Name, body: Body, edgeNames: readonly Name[], how: Blend, h
     );
   });
   return current;
-}
-
-/** The unit direction along an edge away from one of its vertices. */
-function away(edge: Edge, v: Vertex): XYZ {
-  const other = edge.start === v ? edge.end : edge.start;
-  return unit(sub(other.point, v.point))!;
 }
 
 /** An edge's faces, the directions into them across it, the angle between those, and whether it is convex. */
@@ -262,11 +266,4 @@ function beyondMitre(name: Name, s: Selected, other: Selected, v: Vertex, big: n
     y = cross(m, x),
     origin = sub(v.point, scale(add(x, y), big / 2));
   return box(name, [big, big, big], frameOf(origin, m, x));
-}
-
-/** A planar face's normal out of its solid. */
-function outward(f: Face): XYZ {
-  if (f.surface.kind !== 'plane') throw new RangeError(`${f.name}: not planar`);
-  const z = f.surface.frame.z;
-  return f.sense ? z : scale(z, -1);
 }
