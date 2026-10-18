@@ -314,13 +314,15 @@ class Revolution implements Surface {
 class Extrusion implements Surface {
   readonly uPeriod: number;
   readonly vPeriod = 0;
-  readonly uDomain = [-Infinity, Infinity] as const;
+  /** The profile's parameter range: finite for a closed profile, so u can be taken back into one period from it. */
+  readonly uDomain: readonly [number, number];
   readonly vDomain = [-Infinity, Infinity] as const;
   constructor(
     private readonly profile: Curve,
     private readonly direction: XYZ,
   ) {
     this.uPeriod = profile.period;
+    this.uDomain = profile.domain;
   }
   at(u: number, v: number) {
     const c = this.profile.at(u);

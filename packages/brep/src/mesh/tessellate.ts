@@ -715,6 +715,9 @@ export class Tessellator {
     }
 
     // --- output: triangles wound to face outward, collapsed ones (at a pole) dropped, unused points removed -------------
+    // A point the surface could not evaluate would drop every triangle on it and leave the face empty without a word.
+    if (xyz.some((p) => !Number.isFinite(p[0] + p[1] + p[2])))
+      throw new TypeError(`STEP face #${id}: its surface gave no point at some (u, v) of the face`);
     const outward = sameSense !== inverted,
       count = uv.length / 2,
       kept: number[] = [];
