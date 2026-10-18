@@ -302,6 +302,10 @@ export interface XTNode {
     readonly fields: Readonly<Record<string, XTValue>>;
 }
 
+export interface XTOptions {
+    readonly parts?: readonly number[];
+}
+
 export type XTValue = number | null | string | boolean | readonly number[] | readonly XTValue[];
 
 export namespace model {
@@ -571,7 +575,7 @@ export function tessellateSTEP(model: STEPModel, options?: TessellationOptions):
 
 export function validateSTEP(model: STEPStructure, meshes: readonly BodyMesh[], { tolerance }?: ValidationOptions): STEPValidationCheck[];
 
-export function xtToSTEP(input: string | ArrayBuffer | ArrayBufferView): XTConversion;
+export function xtToSTEP(input: string | ArrayBuffer | ArrayBufferView, options?: XTOptions): XTConversion;
 
 // Not exported from this entry, but used by the exports above:
 
