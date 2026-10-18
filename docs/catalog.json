@@ -1678,6 +1678,7 @@
       "Typed",
       "model",
       "orient3d",
+      "parseJT",
       "parseSAT",
       "parseSTEP",
       "parseXT",
@@ -1685,6 +1686,7 @@
       "readXT",
       "satToSTEP",
       "stepText",
+      "tessellateJT",
       "tessellateSTEP",
       "validateSTEP",
       "xtToSTEP"

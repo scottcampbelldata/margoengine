@@ -32,6 +32,86 @@ export class Enum {
     constructor(name: string);
 }
 
+export interface JTAttribute {
+    readonly id: number;
+    readonly type: string;
+    readonly kind: 'transform' | 'material' | 'other';
+    readonly matrix?: readonly number[];
+    readonly diffuse?: readonly [number, number, number, number];
+}
+
+export interface JTInstance {
+    readonly part: number;
+    readonly matrix: Float64Array;
+    readonly color?: readonly [number, number, number, number];
+    readonly path: readonly string[];
+}
+
+export interface JTLateLoaded {
+    readonly segment: string;
+    readonly segmentType: number;
+    readonly payload: number;
+}
+
+export interface JTModel {
+    readonly version: number;
+    readonly versionText: string;
+    readonly unit: number;
+    readonly sceneGraph: JTSceneGraph;
+    readonly parts: readonly JTPart[];
+    readonly instances: readonly JTInstance[];
+    readonly warnings: readonly string[];
+}
+
+export interface JTNode {
+    readonly id: number;
+    readonly type: string;
+    readonly kind: JTNodeKind;
+    readonly shape?: JTShapeKind;
+    readonly ignore: boolean;
+    readonly attributes: readonly number[];
+    readonly children: readonly number[];
+    readonly selected?: number;
+    readonly file?: string;
+}
+
+export type JTNodeKind = 'node' | 'group' | 'partition' | 'instance' | 'part' | 'meta-data' | 'lod' | 'range-lod' | 'switch' | 'shape';
+
+export interface JTOptions extends STEPOptions {
+    readonly brep?: boolean;
+    readonly meshes?: boolean;
+}
+
+export interface JTPart {
+    readonly node: number;
+    readonly name: string;
+    readonly brep?: STEPModel;
+    readonly shapes: readonly JTShape[];
+}
+
+export type JTPropertyValue = string | number | readonly number[] | JTLateLoaded | {
+    readonly object: number;
+} | {
+    readonly date: string;
+};
+
+export interface JTSceneGraph {
+    readonly nodes: ReadonlyMap<number, JTNode>;
+    readonly attributes: ReadonlyMap<number, JTAttribute>;
+    readonly properties: ReadonlyMap<number, ReadonlyMap<string, JTPropertyValue>>;
+    readonly root: number | undefined;
+}
+
+export interface JTShape {
+    readonly node: number;
+    readonly kind: JTShapeKind;
+    readonly matrix: Float64Array;
+    readonly lods: readonly JTLateLoaded[];
+    readonly mesh?: JTMesh;
+}
+
+export type JTShapeKind = 'shape' | 'tri-strip' | 'polygon' | 'polyline' | 'point' | 'primitive' | 'vertex' | 'null';
+
 export class Ref {
     readonly id: number;
     constructor(id: number);
@@ -469,6 +549,8 @@ export namespace model {
 
 export function orient3d(a: readonly number[], b: readonly number[], c: readonly number[], d: readonly number[]): number;
 
+export function parseJT(input: ArrayBuffer | ArrayBufferView, options?: JTOptions): JTModel;
+
 export function parseSAT(input: string | ArrayBuffer | ArrayBufferView, options?: STEPOptions): STEPModel;
 
 export function parseSTEP(input: string | ArrayBuffer | ArrayBufferView, options?: STEPOptions): STEPModel;
@@ -482,6 +564,8 @@ export function readXT(input: string | ArrayBuffer | ArrayBufferView): XTFile;
 export function satToSTEP(input: string | ArrayBuffer | ArrayBufferView): SATConversion;
 
 export function stepText(input: string | ArrayBuffer | ArrayBufferView): string;
+
+export function tessellateJT(model: JTModel, options?: TessellationOptions): (BodyMesh[] | undefined)[];
 
 export function tessellateSTEP(model: STEPModel, options?: TessellationOptions): BodyMesh[];
 
@@ -502,6 +586,13 @@ interface Curve {
     at(t: number): number[];
     parameter(p: readonly number[], hint?: number): number;
     sample(a: number, b: number, deflection: number, turn: number): number[];
+}
+
+interface JTMesh {
+    readonly positions: Float32Array;
+    readonly normals?: Float32Array;
+    readonly indices: Uint32Array;
+    readonly groups: Int32Array;
 }
 
 interface Surface {
