@@ -2,7 +2,7 @@
 // cone, sphere and torus. Every face, edge and vertex is named after the operation and what made it, and each
 // operation records its names in the History it is given.
 import { add, cross, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
-import { frameOf, type CurveDef, type Frame, type SurfaceDef } from './geometry.js';
+import { frameOf, surfaceEvaluator, type CurveDef, type Frame, type SurfaceDef } from './geometry.js';
 import { Body, Edge, Face, Vertex, type History, type Name } from './topology.js';
 
 /** One piece of a profile: a line to `to`, or an arc to `to` about `center` (counter-clockwise about the profile normal unless `clockwise`). */
@@ -252,5 +252,137 @@ export function torus(
   const body = new Body(name, 'solid');
   body.shell().add(faceOf(`${name}/face:surface`, { kind: 'torus', frame, major, minor }));
   history?.record({ operation: name, generated: [[`${name}/face:surface`, []]], modified: [], deleted: [] });
+  return body;
+}
+
+/**
+ * Turns a closed planar profile of lines and arcs once round an axis lying in its plane, into a solid named `name`: a
+ * face per segment (a plane, cylinder or cone for a line; a torus, or a sphere for an arc centred on the axis), each
+ * closed by its own seam, and a circle at every profile point. The profile must stay off the axis. Throws a
+ * RangeError for an open or degenerate profile, one that leaves the axis's plane or touches the axis, and an arc
+ * crossing it.
+ */
+export function revolve(
+  name: Name,
+  profile: Profile,
+  axis: { readonly origin: XYZ; readonly direction: XYZ },
+  { history }: { history?: History } = {},
+): Body {
+  const z = unit(axis.direction),
+    o = axis.origin;
+  if (!z) throw new RangeError('revolve axis must not be the zero vector');
+  const n0 = unit(profile.normal);
+  if (!n0) throw new RangeError('profile normal must not be zero');
+  if (Math.abs(dot(n0, z)) > 1e-9) throw new RangeError(`profile ${profile.name} must lie in a plane through the axis`);
+  const rel = sub(profile.start, o),
+    x = unit(sub(rel, scale(z, dot(rel, z))));
+  if (!x) throw new RangeError(`profile ${profile.name} starts on the axis`);
+  // Counter-clockwise in (distance from the axis, height) about m = x cross z, so the faces face out.
+  const m = cross(x, z),
+    size = Math.max(...[profile.start, ...profile.segments.map((s) => s.to)].map((p) => length(sub(p, o)))),
+    tolerance = 1e-9 * Math.max(size, 1);
+  let p: Profile =
+    dot(n0, m) < 0
+      ? {
+          ...profile,
+          normal: m,
+          segments: profile.segments.map((s) => (s.kind === 'arc' ? { ...s, clockwise: !s.clockwise } : s)),
+        }
+      : { ...profile, normal: m };
+  if (!p.segments.length || !same(p.segments[p.segments.length - 1].to, p.start, tolerance))
+    throw new RangeError(`profile ${profile.name} does not end where it starts`);
+  const area = signedArea(p, m);
+  if (Math.abs(area) <= tolerance * tolerance) throw new RangeError(`profile ${profile.name} encloses no area`);
+  if (area < 0) p = reversed(p);
+  const count = p.segments.length,
+    points = [p.start, ...p.segments.slice(0, -1).map((s) => s.to)],
+    rho = (q: XYZ) => dot(sub(q, o), x),
+    h = (q: XYZ) => dot(sub(q, o), z),
+    level = (q: XYZ) => add(o, scale(z, h(q)));
+  for (const q of [...points, ...p.segments.flatMap((s) => (s.center ? [s.center] : []))])
+    if (Math.abs(dot(sub(q, o), m)) > tolerance)
+      throw new RangeError(`profile ${profile.name} must lie in a plane through the axis`);
+  for (const q of points)
+    if (rho(q) <= tolerance) throw new RangeError(`profile ${profile.name} touches the axis: not supported yet`);
+  const body = new Body(name, 'solid'),
+    shell = body.shell(),
+    segName = (k: number) => p.segments[k].name ?? `e${k}`,
+    vertices = points.map((q, k) => new Vertex(`${name}/vertex:${k}`, q)),
+    circles = points.map(
+      (q, k) =>
+        new Edge(
+          `${name}/edge:round:${k}`,
+          { kind: 'circle', frame: frameOf(level(q), z, x), radius: rho(q) },
+          vertices[k],
+          vertices[k],
+          true,
+        ),
+    ),
+    around = cross(z, x),
+    generated: [Name, Name[]][] = [];
+  for (let k = 0; k < count; k++) {
+    const s = p.segments[k],
+      from = points[k],
+      to = points[(k + 1) % count];
+    let seam: CurveDef,
+      sameSense = true,
+      surface: SurfaceDef,
+      start: XYZ,
+      mid: XYZ,
+      midTangent: XYZ;
+    if (s.kind === 'line') {
+      const d = unit(sub(to, from))!,
+        dr = rho(to) - rho(from),
+        dh = h(to) - h(from);
+      seam = { kind: 'line', origin: from, direction: d };
+      start = midTangent = d;
+      mid = scale(add(from, to), 0.5);
+      surface =
+        Math.abs(dr) <= tolerance
+          ? { kind: 'cylinder', frame: frameOf(o, z, x), radius: rho(from) }
+          : Math.abs(dh) <= tolerance
+            ? { kind: 'plane', frame: frameOf(level(from), z, x) }
+            : { kind: 'cone', frame: frameOf(level(from), z, x), radius: rho(from), angle: Math.atan(dr / dh) };
+    } else {
+      const c = s.center!,
+        r = length(sub(from, c)),
+        a0 = sub(from, c),
+        a1 = sub(to, c),
+        turn = Math.atan2(dot(cross(a0, a1), m), dot(a0, a1)),
+        sweep = s.clockwise
+          ? turn > 0
+            ? turn - 2 * Math.PI
+            : turn || -2 * Math.PI
+          : turn < 0
+            ? turn + 2 * Math.PI
+            : turn || 2 * Math.PI,
+        spin = (v: XYZ, t: number) => add(scale(v, Math.cos(t)), scale(cross(m, v), Math.sin(t))),
+        sign = Math.sign(sweep);
+      seam = { kind: 'circle', frame: frameOf(c, m, a0), radius: r };
+      sameSense = !s.clockwise;
+      start = unit(scale(cross(m, a0), sign))!;
+      mid = add(c, spin(a0, sweep / 2));
+      midTangent = unit(scale(cross(m, sub(mid, c)), sign))!;
+      if (rho(c) <= tolerance) surface = { kind: 'sphere', frame: frameOf(level(c), z, x), radius: r };
+      else if (rho(c) > r) surface = { kind: 'torus', frame: frameOf(level(c), z, x), major: rho(c), minor: r };
+      else throw new RangeError(`profile ${profile.name}: an arc reaches the axis: not supported yet`);
+    }
+    // Out of the solid: right of the way round a counter-clockwise profile. The face's sense compares it with the
+    // surface's own normal there; its loop runs so the face lies left of it seen from outside.
+    const outward = cross(midTangent, m),
+      e = surfaceEvaluator(surface),
+      [u, v] = e.parameters(mid),
+      sense = dot(e.normal(u, v), outward) > 0,
+      face = shell.add(new Face(`${name}/face:${segName(k)}`, surface, sense)),
+      edge = new Edge(`${name}/edge:${segName(k)}`, seam, vertices[k], vertices[(k + 1) % count], sameSense),
+      loop = face.loop(),
+      forward = dot(cross(cross(start, m), around), start) > 0;
+    loop.use(circles[k], forward);
+    loop.use(edge, true);
+    loop.use(circles[(k + 1) % count], !forward);
+    loop.use(edge, false);
+    generated.push([face.name, [`${profile.name}/${segName(k)}`]]);
+  }
+  history?.record({ operation: name, generated, modified: [], deleted: [] });
   return body;
 }

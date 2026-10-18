@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { model, parseSTEP } from '../dist/index.js';
 
-const { bodiesToSTEP, box, cylinder, extrude, frameOf, History, meshBodies, sphere, torus, validateBody } = model;
+const { revolve, bodiesToSTEP, box, cylinder, extrude, frameOf, History, meshBodies, sphere, torus, validateBody } =
+  model;
 
 /** Volume, area and open edges of a mesh in metres, vertices joined where positions are equal. */
 function measure(m) {
@@ -140,4 +141,46 @@ test('modeler: invalid input throws a RangeError that names the problem; validat
   const problems = validateBody(b);
   assert.equal(problems.length, 4);
   assert.match(problems[0].problem, /used by 1 face loops/);
+});
+
+test('modeler: revolve turns a profile of lines and arcs round an axis (ring, frustum, torus), either way round', () => {
+  const axis = { origin: [0, 0, 0], direction: [0, 0, 1] },
+    n = [0, 1, 0],
+    line = (x, z) => ({ kind: 'line', to: [x * 0.001, 0, z * 0.001] }),
+    p = (start, segments, normal = n) => ({
+      name: 'p',
+      start: [start[0] * 0.001, 0, start[1] * 0.001],
+      normal,
+      segments,
+    });
+  solid(
+    revolve('ring', p([2, 0], [line(5, 0), line(5, 3), line(2, 3), line(2, 0)]), axis),
+    Math.PI * 21 * 3e-9,
+    Math.PI * (2 * 21 + 2 * 5 * 3 + 2 * 2 * 3) * 1e-6,
+  );
+  solid(
+    revolve('cw', p([2, 0], [line(2, 3), line(5, 3), line(5, 0), line(2, 0)], [0, -1, 0]), axis),
+    Math.PI * 21 * 3e-9,
+    Math.PI * (2 * 21 + 2 * 5 * 3 + 2 * 2 * 3) * 1e-6,
+  );
+  const frustum = revolve('fr', p([2, 0], [line(5, 0), line(3, 3), line(2, 3), line(2, 0)]), axis);
+  assert.deepEqual(
+    frustum.faces.map((f) => f.surface.kind),
+    ['plane', 'cone', 'plane', 'cylinder'],
+  );
+  solid(
+    frustum,
+    ((Math.PI * 3 * (25 + 15 + 9)) / 3 - Math.PI * 12) * 1e-9,
+    (Math.PI * (25 - 4) + Math.PI * (9 - 4) + Math.PI * (5 + 3) * Math.hypot(2, 3) + 2 * Math.PI * 2 * 3) * 1e-6,
+  );
+  const arc = (x, z, cx, cz) => ({ kind: 'arc', to: [x * 0.001, 0, z * 0.001], center: [cx * 0.001, 0, cz * 0.001] });
+  solid(
+    revolve('t', p([6, 0], [arc(4, 0, 5, 0), arc(6, 0, 5, 0)]), axis),
+    2 * Math.PI ** 2 * 5 * 1e-9,
+    4 * Math.PI ** 2 * 5 * 1e-6,
+  );
+  assert.throws(() => revolve('x', p([5, 0], [line(5, 3), line(0, 3), line(0, 0), line(5, 0)]), axis), {
+    name: 'RangeError',
+    message: /touches the axis/,
+  });
 });

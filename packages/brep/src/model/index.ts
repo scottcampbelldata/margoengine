@@ -6,7 +6,7 @@ export type { HistoryEntry, Name } from './topology.js';
 export { frameOf, curveEvaluator, surfaceEvaluator } from './geometry.js';
 export type { CurveDef, Frame, SurfaceDef } from './geometry.js';
 export type { WriterSpline } from '../step/write.js';
-export { box, cylinder, extrude, sphere, torus } from './build.js';
+export { box, cylinder, extrude, revolve, sphere, torus } from './build.js';
 export type { Profile, ProfileSegment } from './build.js';
 export { validateBody } from './validate.js';
 export type { ValidityProblem } from './validate.js';

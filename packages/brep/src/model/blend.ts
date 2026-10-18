@@ -9,7 +9,7 @@
 //   that radius would roll off them, and the corner is rounded by the ball (a sphere patch).
 import { add, cross, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
 import { boolean } from './boolean.js';
-import { box, extrude, sphere, type ProfileSegment } from './build.js';
+import { box, extrude, revolve, sphere, type ProfileSegment } from './build.js';
 import { FaceUV } from './faces.js';
 import { frameOf } from './geometry.js';
 import { Body, History, type Edge, type Face, type Name, type Vertex } from './topology.js';
@@ -91,6 +91,11 @@ function blend(name: Name, body: Body, edgeNames: readonly Name[], how: Blend, h
       tools.push({ body: boolean(`${name}:corner:${v.name}`, 'subtract', block, ball), convex: true });
     }
   for (const s of selected) {
+    // A full circle: its ring, which has no ends.
+    if (s.edge.curve.kind === 'circle') {
+      tools.push({ body: ring(`${name}:${s.name}`, s, how), convex: s.convex });
+      continue;
+    }
     const ends: [number, number] = [0, 0],
       mitres: { at: Vertex; other: Selected }[] = [],
       len = length(sub(s.edge.end.point, s.edge.start.point)),
@@ -138,9 +143,11 @@ function away(edge: Edge, v: Vertex): XYZ {
 
 /** An edge's faces, the directions into them across it, the angle between those, and whether it is convex. */
 function describe(body: Body, edge: Edge, name: Name): Selected {
-  if (edge.curve.kind !== 'line') throw new RangeError(`${name}: only straight edges can be blended so far`);
   const faces = [...new Set(edge.coedges.map((c) => c.loop.face).filter((f) => body.faces.includes(f)))];
   if (faces.length !== 2) throw new RangeError(`${name}: an edge between two faces is needed`);
+  if (edge.curve.kind === 'circle') return describeRound(edge, name, faces);
+  if (edge.curve.kind !== 'line')
+    throw new RangeError(`${name}: only straight edges and full circles can be blended so far`);
   for (const f of faces)
     if (f.surface.kind !== 'plane')
       throw new RangeError(`${name}: only edges between planar faces can be blended so far`);
@@ -161,6 +168,59 @@ function describe(body: Body, edge: Edge, name: Name): Selected {
     throw new RangeError(`${name}: its faces meet flat or fold back; nothing to blend`);
   // Convex: face 2 runs away from face 1's outside (the strip between them is material); concave: towards it.
   return { name, edge, u1, u2, f1, f2, angle, convex: dot(outward(f1), u2) < 0 };
+}
+
+/**
+ * A full circle where a plane meets a cylinder on the circle's axis (a hole's or a boss's rim): the directions into the
+ * two faces from the circle's vertex, in the plane through the axis, at right angles.
+ */
+function describeRound(edge: Edge, name: Name, faces: Face[]): Selected {
+  if (edge.curve.kind !== 'circle' || !edge.closed)
+    throw new RangeError(`${name}: only full circles can be blended so far`);
+  const { frame } = edge.curve,
+    plane = faces.find((f) => f.surface.kind === 'plane'),
+    wall = faces.find((f) => f.surface.kind === 'cylinder');
+  if (!plane || !wall || wall.surface.kind !== 'cylinder')
+    throw new RangeError(`${name}: only circles between a plane and a cylinder can be blended so far`);
+  const axis = wall.surface.frame.z,
+    off = sub(frame.origin, wall.surface.frame.origin);
+  if (length(cross(axis, frame.z)) > 1e-9 || length(cross(off, axis)) > 1e-9 * (1 + length(off)))
+    throw new RangeError(`${name}: the circle is not on its cylinder's axis`);
+  const e = edge.start.point,
+    radial = unit(sub(e, frame.origin))!,
+    step = 1e-6 * edge.curve.radius,
+    into = (f: Face, u: XYZ): XYZ => (new FaceUV(f).contains(add(e, scale(u, step))) ? u : scale(u, -1)),
+    u1 = into(plane, radial),
+    u2 = into(wall, frame.z);
+  return { name, edge, u1, u2, f1: plane, f2: wall, angle: Math.PI / 2, convex: dot(outward(plane), u2) < 0 };
+}
+
+/** The ring between a circular edge and its rounding or bevel: the corner's cross-section turned round the axis. */
+function ring(name: Name, s: Selected, how: Blend): Body {
+  if (s.edge.curve.kind !== 'circle') throw new RangeError(`${s.name}: not a circle`);
+  const { frame } = s.edge.curve,
+    e = s.edge.start.point,
+    reach = how.kind === 'fillet' ? how.radius : how.distance,
+    t1 = add(e, scale(s.u1, reach)),
+    t2 = add(e, scale(s.u2, reach)),
+    normal = cross(s.u1, s.u2),
+    segments: ProfileSegment[] = [{ kind: 'line', to: t1, name: 'side1' }];
+  if (how.kind === 'fillet')
+    segments.push({
+      kind: 'arc',
+      to: t2,
+      center: add(e, scale(add(s.u1, s.u2), how.radius)),
+      // The short way round, on the edge's side of the centre.
+      clockwise: true,
+      name: 'round',
+    });
+  else segments.push({ kind: 'line', to: t2, name: 'bevel' });
+  segments.push({ kind: 'line', to: e, name: 'side2' });
+  return revolve(
+    name,
+    { name: `${name}/profile`, start: e, normal, segments },
+    { origin: frame.origin, direction: frame.z },
+  );
 }
 
 /** The solid between an edge and its rounding or bevel, from `ends[0]` past its start to `ends[1]` past its end. */
