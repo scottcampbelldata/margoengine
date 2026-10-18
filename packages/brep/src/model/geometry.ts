@@ -4,7 +4,7 @@ import { makeCurve, type Curve } from '../geometry/curves.js';
 import { knotVector } from '../geometry/nurbs.js';
 import type { Frame } from '../geometry/read.js';
 import { makeSurface, type Surface } from '../geometry/surfaces.js';
-import { cross, dot, unit, type XYZ } from '../geometry/vec.js';
+import { cross, dot, scale, unit, type XYZ } from '../geometry/vec.js';
 import type { StepWriter, WriterSpline } from '../step/write.js';
 
 export type { Frame };
@@ -135,7 +135,13 @@ export function writeSurface(w: StepWriter, def: SurfaceDef): string {
     case 'cylinder':
       return w.add(`CYLINDRICAL_SURFACE('',${place(def.frame)},${w.real(def.radius)})`);
     case 'cone':
-      return w.add(`CONICAL_SURFACE('',${place(def.frame)},${w.real(def.radius)},${w.real(def.angle)})`);
+      // STEP's semi-angle is positive (ISO 10303-42): a cone narrowing along +z is written with its axis reversed,
+      // which keeps its points and its outward normal.
+      return def.angle >= 0
+        ? w.add(`CONICAL_SURFACE('',${place(def.frame)},${w.real(def.radius)},${w.real(def.angle)})`)
+        : w.add(
+            `CONICAL_SURFACE('',${w.axis(def.frame.origin, scale(def.frame.z, -1), def.frame.x)},${w.real(def.radius)},${w.real(-def.angle)})`,
+          );
     case 'sphere':
       return w.add(`SPHERICAL_SURFACE('',${place(def.frame)},${w.real(def.radius)})`);
     case 'torus':
