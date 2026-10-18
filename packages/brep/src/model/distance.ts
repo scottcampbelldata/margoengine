@@ -101,32 +101,98 @@ function speedBound(curve: CurveDef): number {
   }
 }
 
+/** A bound on |C''(t)|, Infinity for splines (whose knots may be corners). */
+function accelerationBound(curve: CurveDef): number {
+  switch (curve.kind) {
+    case 'line':
+      return 0;
+    case 'circle':
+      return curve.radius;
+    case 'ellipse':
+      return Math.max(curve.a, curve.b);
+    case 'spline':
+      return Infinity;
+  }
+}
+
+/**
+ * A bound on the signed distance's second derivative in any direction within `reach` of `p`: none for a plane, one
+ * over the clearance from the axis or centre (or a torus's core circle) for the others, unbounded where the reach comes
+ * near them.
+ */
+function bendBound(s: SurfaceDef, p: XYZ, reach: number): number {
+  let clear: number;
+  switch (s.kind) {
+    case 'plane':
+      return 0;
+    case 'sphere':
+      clear = length(sub(p, s.frame.origin));
+      break;
+    case 'cylinder':
+    case 'cone':
+    case 'torus': {
+      const d = sub(p, s.frame.origin),
+        h = dot(d, s.frame.z),
+        rho = length(sub(d, scale(s.frame.z, h)));
+      clear = s.kind === 'torus' ? Math.min(rho, Math.hypot(rho - s.major, h)) : rho;
+      break;
+    }
+    default:
+      return Infinity;
+  }
+  clear -= reach;
+  return clear > 0 ? 1 / clear : Infinity;
+}
+
 const negative = (x: number) => x < 0;
 
-/** The root of f in [lo, hi], where f changes sign, to the last bit. */
-function bisect(f: (t: number) => number, lo: number, flo: number, hi: number): number {
-  let fhi = f(hi);
-  for (let i = 0; i < 200; i++) {
-    const mid = (lo + hi) / 2;
-    if (mid <= lo || mid >= hi) break;
-    const fm = f(mid);
-    if (negative(fm) === negative(flo)) {
-      lo = mid;
-      flo = fm;
+/**
+ * The root of f in [lo, hi], where f changes sign, to the last bit (or to 2^-64 of the bracket, for a root at 0 where
+ * floats run finer than that): false position with the Illinois correction (the end that stays put has its value
+ * halved), every fourth step a halving. A parameter where f is exactly 0 is returned as it is.
+ */
+function bisect(f: (t: number) => number, lo: number, flo: number, hi: number, fhi: number): number {
+  const floor = (hi - lo) * 2 ** -64;
+  // The end values false position works from (halved by the Illinois correction).
+  let glo = flo,
+    ghi = fhi,
+    side = 0;
+  const move = (t: number, ft: number) => {
+    if (negative(ft) === negative(flo)) {
+      lo = t;
+      flo = glo = ft;
+      if (side === 1) ghi /= 2;
+      side = 1;
     } else {
-      hi = mid;
-      fhi = fm;
+      hi = t;
+      fhi = ghi = ft;
+      if (side === -1) glo /= 2;
+      side = -1;
     }
+  };
+  for (let i = 0; i < 400; i++) {
+    const width = hi - lo,
+      mid = (lo + hi) / 2;
+    if (mid <= lo || mid >= hi || width <= floor) break;
+    // Every fourth step halves, so a creeping false position still closes the bracket. Otherwise the step lands at
+    // least 2^-26 of the bracket inside it, so a root a rounding error from one end is closed in on in a few steps.
+    const nudge = width * 2 ** -26;
+    let t = i % 4 === 3 ? mid : Math.min(hi - nudge, Math.max(lo + nudge, lo - (glo * width) / (ghi - glo)));
+    if (!(t > lo && t < hi)) t = mid;
+    const ft = f(t);
+    if (ft === 0) return t;
+    move(t, ft);
   }
   return Math.abs(flo) <= Math.abs(fhi) ? lo : hi;
 }
 
 /**
  * Parameters in [t0, t1] where the curve crosses the surface (its signed distance changes sign), each found to the
- * last bit. Intervals are split until each either provably holds no crossing (the distance at its ends is more than
- * the curve can travel between them) or is shorter than `resolution` (a distance; default 1e-9 of the curve's
- * length), so no crossing is missed however close to another; a touch counts twice and stretches lying on the
- * surface count none.
+ * last bit. Intervals are split until each either provably holds no crossing or is shorter than `resolution` (a
+ * distance; default 1e-9 of the curve's length), so no crossing is missed however close to another; a touch counts
+ * twice and stretches lying on the surface count none. An interval holds no crossing when the distance at its ends is
+ * more than the curve can travel between them, or, near a touch (where the distance grows with the square of the
+ * parameter and that test fails down to `resolution`), more than the distance's second derivative can bend it back by.
  */
 export function curveSurfaceCrossings(
   curve: CurveDef,
@@ -148,23 +214,41 @@ export function curveSurfaceCrossings(
     for (let k = 1; k <= n; k++) {
       const b = t0 + ((t1 - t0) * k) / n,
         fb = f(b);
-      if (negative(fa) !== negative(fb)) out.push(bisect(f, a, fa, b));
+      if (negative(fa) !== negative(fb)) out.push(bisect(f, a, fa, b, fb));
       a = b;
       fa = fb;
     }
     return out;
   }
-  const tol = resolution ?? 1e-9 * speed * (t1 - t0);
+  const tol = resolution ?? 1e-9 * speed * (t1 - t0),
+    acceleration = accelerationBound(curve);
   const visit = (a: number, fa: number, b: number, fb: number, depth: number) => {
-    const change = negative(fa) !== negative(fb);
-    if (!change && Math.abs(fa) + Math.abs(fb) > speed * (b - a)) return;
-    if (speed * (b - a) <= tol || depth > 64) {
-      if (change) out.push(bisect(f, a, fa, b));
+    const change = negative(fa) !== negative(fb),
+      w = b - a;
+    if (!change && Math.abs(fa) + Math.abs(fb) > speed * w) return;
+    if (speed * w <= tol || depth > 64) {
+      if (change) out.push(bisect(f, a, fa, b, fb));
       return;
     }
     const m = (a + b) / 2,
-      fm = f(m);
-    if (!change && Math.abs(fa) <= tol && Math.abs(fm) <= tol && Math.abs(fb) <= tol) return;
+      cm = c.at(m),
+      pm = cm.slice(0, 3) as XYZ,
+      fm = signedDistance(surface, pm),
+      // |f''| <= k on the interval.
+      k = bendBound(surface, pm, (speed * w) / 2) * speed * speed + acceleration,
+      // f' stays this far from zero across it (f'(m) less what f'' can change it by over half the interval).
+      slope = Math.abs(dot(distanceGradient(surface, pm), [cm[3], cm[4], cm[5]])) - (k * w) / 2;
+    // Monotonic, by more than the resolution across the interval: one crossing at most.
+    if (slope * w > tol) {
+      if (change) out.push(bisect(f, a, fa, b, fb));
+      return;
+    }
+    if (!change) {
+      if (Math.abs(fa) <= tol && Math.abs(fm) <= tol && Math.abs(fb) <= tol) return;
+      // f stays within k w^2 / 8 of the chord between its ends; ends further than that (and than the resolution) from
+      // the surface, on one side, leave no crossing between them.
+      if (Math.min(Math.abs(fa), Math.abs(fb)) > (k * w * w) / 8 + tol) return;
+    }
     visit(a, fa, m, fm, depth + 1);
     visit(m, fm, b, fb, depth + 1);
   };
