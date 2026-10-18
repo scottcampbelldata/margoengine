@@ -4,11 +4,6 @@
   "type": "module",
   "license": "MIT",
   "description": "Orbit, map, trackball, fly, first-person, pointer-lock and collision-aware walkthrough (/walk) camera controls, a transform gizmo and drag controls for Margo Engine.",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/controls"
-  },
   "publishConfig": {
     "access": "public"
   },

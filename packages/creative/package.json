@@ -4,11 +4,6 @@
   "type": "module",
   "license": "MIT",
   "description": "WebGPU particles, atmosphere, toon shading and post-processing for Margo Engine.",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/creative"
-  },
   "publishConfig": {
     "access": "public"
   },

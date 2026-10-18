@@ -4,11 +4,6 @@
   "type": "module",
   "license": "MIT",
   "description": "WebGPU clustered forward point and spot lighting with optional local shadows.",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/clustered"
-  },
   "publishConfig": {
     "access": "public"
   },

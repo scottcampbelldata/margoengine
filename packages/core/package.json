@@ -4,11 +4,6 @@
   "description": "WebGPU rendering and a Wasm transform kernel. WebGL2 is the optional @margoengine/webgl package.",
   "type": "module",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/core"
-  },
   "publishConfig": {
     "access": "public"
   },
