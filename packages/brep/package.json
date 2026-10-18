@@ -24,10 +24,5 @@
     "test": "npm run build && node --test tests/*.test.js",
     "prepack": "npm run build"
   },
-  "homepage": "https://margoengine.com",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/brep"
-  }
+  "homepage": "https://margoengine.com"
 }
