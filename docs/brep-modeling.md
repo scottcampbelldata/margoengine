@@ -14,7 +14,7 @@ features. Clean room as before: published standards, textbooks and papers only; 
 | Browser download | 40,030 B gzip worker (114,562 B raw; measured at cb89fd5, the modeler is not in it) | 7,604,031 B Wasm (occt-import-js) |
 | Formats without paid add-ons | STEP, SAT, Parasolid XT, DXF (loaders) | STEP, IGES |
 | Self-check | file's own volume, area, centre: 16 of 16 match | none |
-| Modeling | primitives, extrude, Booleans in general position (planes, cylinders, cones, spheres) | Booleans, fillets, offsets, healing, ... |
+| Modeling | primitives, extrude, revolve; Booleans on planes, cylinders, cones, spheres and tori (any position, faces on one plane, edges along edges); fillets and chamfers on straight edges and full circles | Booleans on any surface, variable fillets, offsets, healing, ... (docs/brep-occt-gaps.md) |
 
 Where OpenCascade still leads (freeform NURBS intersections, advanced blends, healing) and what matching it takes:
 `docs/brep-occt-gaps.md`.
@@ -80,3 +80,20 @@ Where OpenCascade still leads (freeform NURBS intersections, advanced blends, he
 - Mesher fixes it needed: a face that is a closed surface less its holes (a sphere less a cap), oriented shells and
   faces (`ORIENTED_CLOSED_SHELL .F.` of a void now turns its faces), and columns of interior points on curved faces with
   holes (a cylinder wall with a hole made up to 6x the triangles it needed).
+
+## Booleans, fillets and chamfers: second cut (2026-10-17, 6c9f678)
+
+- Any pair of analytic surfaces: coaxial pairs meet in exact circles; every other pair (cylinders at an angle, a
+  sphere off a cylinder's axis, planes across cones and tori) is traced in the face pair's box (`model/march.ts`) and
+  stored as a cubic spline. Tori are cut open round the tube for face splitting. Curves crossing at a shared corner
+  get a vertex there; tangential contact inside both faces still throws.
+- Contacts within 1e-6 of the model: faces on one surface, edges along edges, vertices on edges and faces. The
+  result's faces left on one surface and edges split along one curve are joined (two boxes side by side: 8 V, 12 E,
+  6 F). Tested: nine flush/stacked/coplanar cases, six curved pairs (union = A + B - intersect, intersect + subtract
+  = A within 0.1% of exact volumes).
+- `model.fillet` / `model.chamfer`: straight edges between planes (convex, concave, any angle; mitred where two meet,
+  a sphere where three meet at right angles: a rounded box matches its closed form to 0.002%) and full circles
+  between a plane and a coaxial cylinder (hole rims, boss tops, boss junctions; Pappus volumes to 0.001%).
+- `model.revolve`: lines and arcs round an axis (planes, cylinders, cones, tori, spheres).
+- Next: blends on curved faces and along traced edges, setbacks and variable radius, freeform (spline) Booleans,
+  healing (docs/brep-occt-gaps.md); the operations benchmark against OpenCascade (Codex prompt 6c9f678, step 9).
