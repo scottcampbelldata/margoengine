@@ -412,7 +412,8 @@ export function satToSTEP(input: string | ArrayBuffer | ArrayBufferView): SATCon
         let sin = r.number(),
           cos = r.number();
         if (isNumber(r.peek())) r.number(); // u parameter scale
-        const reversed = r.word() === 'reversed',
+        // A negative cosine puts the surface normal towards the axis (a hole's wall), as 'reversed' does.
+        const reversed = (r.word() === 'reversed') !== cos < 0,
           c = position(center),
           z = unit(normal),
           majorWorld = vector(major),
@@ -593,8 +594,13 @@ export function satToSTEP(input: string | ArrayBuffer | ArrayBufferView): SATCon
       _coedge = r.pointer(),
       geometry = r.pointer();
     void _coedge;
-    while (r.at < r.items.length && r.peek() !== 'forward' && r.peek() !== 'reversed') r.next();
-    const sense = r.word() !== 'reversed';
+    // The sense follows the curve: a word from ACIS 7.0 (version 700), 0 (forward) or 1 (reversed) before it.
+    let sense: boolean;
+    if (r.peek() === '0' || r.peek() === '1') sense = r.next() === '0';
+    else {
+      while (r.at < r.items.length && r.peek() !== 'forward' && r.peek() !== 'reversed') r.next();
+      sense = r.word() !== 'reversed';
+    }
     let result: { id: string } | null = null;
     if (geometry >= 0) {
       const c = curve(geometry);

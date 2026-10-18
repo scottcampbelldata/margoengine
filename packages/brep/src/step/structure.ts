@@ -669,6 +669,26 @@ export function readStructure(file: STEPFile, { maxInstances = 1_000_000 }: STEP
       }
     }
   };
+  /** Placements (component metres to parent metres) of the mapped items in `reps` that map one of `targets`. */
+  const mappedPlacements = (reps: ReadonlySet<number>, targets: ReadonlySet<number>): Float64Array[] => {
+    const out: Float64Array[] = [];
+    for (const rep of reps) {
+      const args = representation(rep);
+      if (!args) continue;
+      const unit = context(ref(args[2])).length;
+      for (const item of refs(args[1])) {
+        if (!file.has(item) || file.get(item).type !== 'MAPPED_ITEM') continue;
+        const [, source, target] = file.args(item),
+          map = ref(source);
+        if (map === undefined || !file.has(map)) continue;
+        const [origin, mappedRep] = file.args(map),
+          to = ref(mappedRep);
+        if (to === undefined || !targets.has(to)) continue;
+        out.push(multiply(placement(ref(target), unit), invert(placement(ref(origin), repUnit(to)))));
+      }
+    }
+    return out;
+  };
   const visit = (pd: number, matrix: Float64Array, path: readonly number[], depth: number, parent: number) => {
     const index = productIndex.get(pd)!;
     if (path.includes(index) || depth > 64) {
@@ -677,12 +697,29 @@ export function readStructure(file: STEPFile, { maxInstances = 1_000_000 }: STEP
     }
     const here = [...path, index],
       placed = new Set<number>(),
-      occurrence = occurrences.push({ product: index, parent, matrix }) - 1;
-    for (const link of children.get(pd) ?? []) for (const r of closure(repsOf.get(link.child) ?? [])) placed.add(r);
-    for (const rep of closure(repsOf.get(pd) ?? []))
-      if (!placed.has(rep)) placeRep(rep, matrix, index, occurrence, here, 0, placed);
-    for (const link of children.get(pd) ?? [])
-      visit(link.child, multiply(matrix, linkMatrix(link)), here, depth + 1, occurrence);
+      occurrence = occurrences.push({ product: index, parent, matrix }) - 1,
+      own = closure(repsOf.get(pd) ?? []);
+    // A link with no placement of its own (older files, ST-Developer 1995) is placed by the parent's mapped items of
+    // the component's shape: one instance per mapped item, in place of the link.
+    const mapped = new Map<number, Float64Array[]>();
+    for (const link of children.get(pd) ?? []) {
+      const childReps = closure(repsOf.get(link.child) ?? []);
+      if (!placements.has(link.id) && !mapped.has(link.child)) {
+        const found = mappedPlacements(own, childReps);
+        if (found.length) mapped.set(link.child, found);
+      }
+      for (const r of childReps) placed.add(r);
+    }
+    for (const rep of own) if (!placed.has(rep)) placeRep(rep, matrix, index, occurrence, here, 0, placed);
+    const visited = new Set<number>();
+    for (const link of children.get(pd) ?? []) {
+      const maps = mapped.get(link.child);
+      if (!maps) visit(link.child, multiply(matrix, linkMatrix(link)), here, depth + 1, occurrence);
+      else if (!visited.has(link.child)) {
+        visited.add(link.child);
+        for (const local of maps) visit(link.child, multiply(matrix, local), here, depth + 1, occurrence);
+      }
+    }
   };
   const roots = products.map((_, i) => i).filter((i) => !used.has(products[i].id));
   for (const root of roots) visit(products[root].id, identity(), [], 0, -1);

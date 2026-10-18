@@ -705,7 +705,25 @@ export class Tessellator {
             hi[k] = Math.max(hi[k], p[k]);
           }
         };
-      for (const face of body.faces)
+      for (const face of body.faces) {
+        // A sphere or torus face can have no vertices at all (a whole ball, a wheel's tyre), or a dome far beyond its
+        // boundary: its surface's extent counts too, or the deflection would fall back to 0.001 of one file unit.
+        const surface = ref(this.file.get(face).args[2]);
+        if (surface !== undefined && this.file.has(surface)) {
+          const s = this.file.get(surface),
+            r =
+              s.type === 'SPHERICAL_SURFACE'
+                ? Number(s.args[2])
+                : s.type === 'TOROIDAL_SURFACE'
+                  ? Number(s.args[2]) + Number(s.args[3])
+                  : NaN,
+            position = ref(s.args[1]);
+          if (r > 0 && position !== undefined && this.file.has(position)) {
+            const c = point(this.file, ref(this.file.get(position).args[1]));
+            grow([c[0] - r, c[1] - r, c[2] - r]);
+            grow([c[0] + r, c[1] + r, c[2] + r]);
+          }
+        }
         for (const b of list(this.file.get(face).args[1])) {
           const loop = ref(this.file.get(ref(b) ?? -1).args[1]);
           if (loop === undefined) continue;
@@ -720,6 +738,7 @@ export class Tessellator {
                 for (const v of this.file.args(edge, 'EDGE_CURVE').slice(1, 3)) grow(this.vertex(ref(v)));
             }
         }
+      }
       const diagonal = distance(lo, hi);
       edge = (Number.isFinite(diagonal) && diagonal > 0 ? diagonal : 1) * (o.relativeDeflection ?? 0.001);
     }
