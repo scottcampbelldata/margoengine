@@ -31,6 +31,8 @@ const packedNames = JSON.parse(await readFile('package.json', 'utf8'))
   .workspaces.filter((path) => path.startsWith('packages/'))
   .map((path) => path.slice('packages/'.length));
 const noticeFiles = new Map([
+  // The Siemens JT Data Format notice the JT reader must ship (docs/jt-licensing.md).
+  ['brep', 'NOTICE'],
   ['post', 'NOTICE.md'],
   ['tonemap', 'NOTICE.md'],
   ['materials', 'THIRD_PARTY_NOTICES.md'],

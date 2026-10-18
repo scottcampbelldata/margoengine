@@ -68,7 +68,7 @@ export function inflateZlib(input: Uint8Array, limit = 1 << 30): Uint8Array {
 }
 
 /** Inflates raw DEFLATE data (RFC 1951) into a buffer that grows as needed, up to `limit` bytes. */
-export function inflateRaw(input: Uint8Array, limit = 1 << 30): Uint8Array {
+function inflateRaw(input: Uint8Array, limit = 1 << 30): Uint8Array {
   let out = new Uint8Array(Math.max(1024, input.length * 4)),
     position = 0,
     bitBuffer = 0,

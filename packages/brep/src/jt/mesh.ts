@@ -25,7 +25,8 @@ export interface JTMesh {
   readonly groups: Int32Array;
 }
 
-export const TRI_STRIP_LOD = '10dd10ab-2ac8-11d1-9b6b-0080c7bb5997';
+/** The tri-strip set shape LOD element's object type ID. */
+const TRI_STRIP_LOD = '10dd10ab-2ac8-11d1-9b6b-0080c7bb5997';
 
 /** The topology coder's symbol streams (Topologically Compressed Rep Data). */
 interface Symbols {

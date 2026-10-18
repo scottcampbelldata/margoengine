@@ -121,7 +121,7 @@ export class JTReader {
 }
 
 /** One TOC entry: a data segment's ID, place in the file and type. */
-export interface JTSegment {
+interface JTSegment {
   readonly id: string;
   readonly offset: number;
   readonly length: number;
@@ -138,7 +138,7 @@ export interface JTElement {
 }
 
 /** The end-of-elements marker's object type ID. */
-export const END_OF_ELEMENTS = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
+const END_OF_ELEMENTS = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
 
 /** Segment types whose whole data may be compressed (zlib in JT 9, LZMA in JT 10). */
 const COMPRESSIBLE = new Set([1, 2, 3, 4, 6, 17, 18, 20, 24]);

@@ -5,7 +5,7 @@ import { add, cross, dot, length, scale, sub, unit, type XYZ } from '../geometry
 import { frameOf, type CurveDef, type SurfaceDef } from './geometry.js';
 import { traceIntersections, type Box3 } from './march.js';
 
-export { curveSurfaceCrossings, distanceGradient, signedDistance } from './distance.js';
+export { curveSurfaceCrossings, signedDistance } from './distance.js';
 
 /** What two surfaces share: curves, the same surface (coincident), or nothing. */
 export type SurfaceIntersection =

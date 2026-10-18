@@ -1,7 +1,7 @@
-// JT integer coding, from the JT File Format Reference 9.5: Int32 Compressed Data Packets (8.1.1) and their Mk. 2 form
-// (8.1.2, used by JT 9 meshes) with the bit-length (8.2.2, Appendix C 2.1) and arithmetic (8.2.3, Appendix C 3.2)
-// codecs and the chopper, the residual predictors (Appendix C 1.3), and the lookup hash the format stores to check
-// decoded data (Appendix D).
+// JT integer coding, from the JT File Format Reference 9.5: Int32 Compressed Data Packets Mk. 2 (8.1.2, used by JT 9
+// meshes) with the arithmetic codec (8.2.3, Appendix C 3.2) and the chopper, the residual predictors (Appendix C 1.3),
+// and the lookup hash the format stores to check decoded data (Appendix D). Mk. 1 packets, with the bit-length codec,
+// appear only in the JT B-rep, wireframe and ULP segments, which are not read; their decoder is in commit 2c41f76.
 //
 // This software reads the JT Data Format as described in the Siemens JT File Format Reference and ISO 14306. Copyright
 // in the JT data structures and operators is owned by Siemens Product Lifecycle Management Software Inc. (Siemens
@@ -58,30 +58,6 @@ class ByteBits {
   }
 }
 
-const signed = (v: number, width: number) => (width >= 32 ? v | 0 : (v << (32 - width)) >> (32 - width));
-
-/** Bit-length coding (Mk. 1): per value a width-change prefix (0, or 1 then ±2-bit steps and a terminator), then the value. */
-function bitLength(words: Uint32Array, count: number, total: number): Int32Array {
-  const b = new CodeBits(words),
-    out = new Int32Array(count);
-  let width = 0;
-  for (let i = 0; i < count; i++) {
-    if (b.bit()) {
-      for (let last = -1; ; ) {
-        const step = b.bit();
-        if (last >= 0 && step !== last) break;
-        width += step ? 2 : -2;
-        last = step;
-        if (b.at > total) fail('bit-length code runs past its code text');
-      }
-      if (width < 0 || width > 32) fail(`bit-length field width ${width}`);
-    }
-    out[i] = width ? signed(b.bits(width), width) : 0;
-  }
-  if (b.at > total) fail(`bit-length code read ${b.at} of ${total} bits`);
-  return out;
-}
-
 /** One probability context table: entries in order with running counts. */
 interface Context {
   readonly symbol: Int32Array;
@@ -110,35 +86,6 @@ function context(n: number, read: (i: number) => [number, number, number, number
   }
   if (total === 0 || total > 0xffff) fail(`probability context total ${total}`);
   return { symbol, count, cumulative, value, next, total };
-}
-
-/** Int32 Probability Contexts (Mk. 1): one or two tables, the first carrying the value width and minimum. */
-function contexts1(r: JTReader): Context[] {
-  const tables = r.u8();
-  if (tables < 1 || tables > 2) fail(`${tables} probability context tables`);
-  const b = new ByteBits(r),
-    out: Context[] = [];
-  let valueBits = 0,
-    min = 0;
-  for (let t = 0; t < tables; t++) {
-    const entries = b.bits(32),
-      symbolBits = b.bits(6),
-      countBits = b.bits(6);
-    if (t === 0) valueBits = b.bits(6);
-    const nextBits = b.bits(6);
-    if (t === 0) min = b.bits(32) | 0;
-    if (entries > 1 << 16) fail(`probability context of ${entries} entries`);
-    out.push(
-      context(entries, () => [
-        b.bits(symbolBits) - 2,
-        b.bits(countBits),
-        (b.bits(valueBits) + min) | 0,
-        b.bits(nextBits),
-      ]),
-    );
-  }
-  b.align();
-  return out;
 }
 
 /** Int32 Probability Contexts Mk. 2: one table. */
@@ -202,36 +149,6 @@ function arithmetic(words: Uint32Array, tables: Context[], symbols: number, oob:
     table = c.next[lo];
   }
   return Int32Array.from(out);
-}
-
-/** Reads an Int32 Compressed Data Packet (JT 9.5 8.1.1). */
-export function int32Packet(r: JTReader, depth = 0): Int32Array {
-  if (depth > 8) fail('Int32 packets nested too deep');
-  const codec = r.u8();
-  let tables: Context[] = [],
-    oob: Int32Array = new Int32Array(0);
-  if (codec === ARITHMETIC) {
-    tables = contexts1(r);
-    if (r.i32() > 0) oob = int32Packet(r, depth + 1);
-  }
-  let bits = 0,
-    count = 0,
-    symbols = 0;
-  if (codec !== NULL_CODEC) {
-    bits = r.i32();
-    count = r.i32();
-    symbols = codec === ARITHMETIC && tables.length > 1 ? r.i32() : count;
-    if (count < 0 || symbols < 0 || bits < 0) fail(`Int32 packet counts ${count}/${symbols}/${bits}`);
-  }
-  const words = r.vecU32();
-  if (codec === NULL_CODEC) return new Int32Array(words.buffer, words.byteOffset, words.length);
-  if (codec === BITLENGTH) return bitLength(words, count, bits);
-  if (codec === ARITHMETIC) {
-    const values = bits === 0 && oob.length === count ? oob : arithmetic(words, tables, symbols, oob);
-    if (values.length !== count) fail(`Int32 packet decoded ${values.length} of ${count} values`);
-    return values;
-  }
-  return fail(`Int32 packet codec ${codec}`);
 }
 
 /** Reads an Int32 Compressed Data Packet Mk. 2 (JT 9.5 8.1.2). */
