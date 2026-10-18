@@ -11,7 +11,7 @@ features. Clean room as before: published standards, textbooks and papers only; 
 | --- | --- | --- |
 | Read + mesh, 44 corpus STEP files, 0.001 of the model diagonal, 0.5 rad | 9.2 s, one JS thread (Node) | 27.0 s native C++ one thread; 24.1 s parallel mesh |
 | Files faster | 42 of 44 | 2 of 44 (FTC11: we make about 3x the triangles on a 0.1 mm torus) |
-| Browser download | 40,030 B gzip worker (114,562 B raw; measured at b76389d, the modeler is not in it) | 7,604,031 B Wasm (occt-import-js) |
+| Browser download | 40,030 B gzip worker (114,562 B raw; measured at 2469a93, the modeler is not in it) | 7,604,031 B Wasm (occt-import-js) |
 | Formats without paid add-ons | STEP, SAT, Parasolid XT, JT 9.5+ (structure and XT B-rep), DXF (loaders) | STEP, IGES |
 | Self-check | file's own volume, area, centre: 16 of 16 match | none |
 | Modeling | primitives, extrude, revolve; Booleans on planes, cylinders, cones, spheres and tori (any position, faces on one plane, edges along edges); fillets and chamfers on straight edges and full circles | Booleans on any surface, variable fillets, offsets, healing, ... (docs/brep-occt-gaps.md) |
@@ -81,7 +81,7 @@ Where OpenCascade still leads (freeform NURBS intersections, advanced blends, he
   faces (`ORIENTED_CLOSED_SHELL .F.` of a void now turns its faces), and columns of interior points on curved faces with
   holes (a cylinder wall with a hole made up to 6x the triangles it needed).
 
-## Booleans, fillets and chamfers: second cut (2026-10-17, 66ac1d8)
+## Booleans, fillets and chamfers: second cut (2026-10-17, 511d19d)
 
 - Any pair of analytic surfaces: coaxial pairs meet in exact circles; every other pair (cylinders at an angle, a
   sphere off a cylinder's axis, planes across cones and tori) is traced in the face pair's box (`model/march.ts`) and
@@ -98,11 +98,11 @@ Where OpenCascade still leads (freeform NURBS intersections, advanced blends, he
   mirror-image mitre, or a ball corner), and for full circles where a plane meets a coaxial cylinder, the faces are set
   back and the blend faces put in place (`model/setback.ts`); otherwise each blend is a solid the Booleans subtract or
   add. Against OpenCascade on the operations benchmark (Codex's harness, best of 3 cold calls): Margo faster in 50 of
-  66 cases at a3bc823; at af41dfe in 67 of 67 against that run's paired OpenCascade times, and in 65 of 66 against the
-  a3bc823 and 1bf77b8 OpenCascade times (the boss-on-plate fillet: 0.457 ms against 0.452 and 0.446 ms). Sub-millisecond
+  66 cases at 7243c0e; at 0b17142 in 67 of 67 against that run's paired OpenCascade times, and in 65 of 66 against the
+  7243c0e and b1f5d2e OpenCascade times (the boss-on-plate fillet: 0.457 ms against 0.452 and 0.446 ms). Sub-millisecond
   cases vary by 20 to 60% from run to run. The box with all 12 edges rounded (radius 2 of 10)
   takes 0.4 ms in Node (best of 5; 4.4 to 4.6 ms for a fresh process's first call); OpenCascade's
-  BRepFilletAPI_MakeFillet took 14.1 ms on it (Codex, 1bf77b8 step 9), and the Booleans 2,691 ms before 880cc30.
+  BRepFilletAPI_MakeFillet took 14.1 ms on it (Codex, b1f5d2e step 9), and the Booleans 2,691 ms before ca361d2.
 - `model.revolve`: lines and arcs round an axis (planes, cylinders, cones, tori, spheres).
 - Next: blends on curved faces and along traced edges, setbacks and variable radius, freeform (spline) Booleans,
-  healing (docs/brep-occt-gaps.md); the operations benchmark against OpenCascade (Codex prompt 66ac1d8, step 9).
+  healing (docs/brep-occt-gaps.md); the operations benchmark against OpenCascade (Codex prompt 511d19d, step 9).

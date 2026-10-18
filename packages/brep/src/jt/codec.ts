@@ -1,7 +1,7 @@
 // JT integer coding, from the JT File Format Reference 9.5: Int32 Compressed Data Packets Mk. 2 (8.1.2, used by JT 9
 // meshes) with the arithmetic codec (8.2.3, Appendix C 3.2) and the chopper, the residual predictors (Appendix C 1.3),
 // and the lookup hash the format stores to check decoded data (Appendix D). Mk. 1 packets, with the bit-length codec,
-// appear only in the JT B-rep, wireframe and ULP segments, which are not read; their decoder is in commit 3bb8099.
+// appear only in the JT B-rep, wireframe and ULP segments, which are not read; their decoder is in commit c91ebc0.
 //
 // This software reads the JT Data Format as described in the Siemens JT File Format Reference and ISO 14306. Copyright
 // in the JT data structures and operators is owned by Siemens Product Lifecycle Management Software Inc. (Siemens

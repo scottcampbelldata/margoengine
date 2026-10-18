@@ -2,14 +2,14 @@
 // over a story of resizes, option edits, depth-format, sample-count and canvas-format changes, a rejected frame, device
 // restoration and disposal at 1x and 4x, for several effect lists. (The single-effect stories are post-stack.proof.js.)
 // Run: node examples/package-benchmarks/proofs/post-ssr.proof.js [ref] [pin] [--current]   (ref: the commit before SSR, default 7c47a09)
-// Pinned: 7c47a09 against 3cf1453, the commit that made this claim. --current: d484c4e against the working tree;
+// Pinned: 7c47a09 against 3cf1453, the commit that made this claim. --current: de93aa5 against the working tree;
 // approved multilevel Bloom, PBR Neutral display and linear HDR handoff changed these calls (claims.md).
 import assert from 'node:assert/strict';
 import { refs, versions, ignoreAgx, current } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 
-const { ref, pin } = refs('7c47a09', '3cf1453', 'd484c4e'),
+const { ref, pin } = refs('7c47a09', '3cf1453', 'de93aa5'),
   post = await versions('post', ref, undefined, pin);
 
 function story(m, make, samples) {

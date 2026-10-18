@@ -5,14 +5,14 @@
 // gltf-pro's side (no capture hook set: identical calls) is oit-detached.proof.js and gltf-pro-lighting-hooks.proof.js
 // run with the commit before the capture as ref.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/post-ssr-models.proof.js [ref] [pin] [--current]
-// Pinned: 3cf1453 against 838ae6e, the commit that made this claim. --current: d484c4e against the working tree;
+// Pinned: 3cf1453 against 838ae6e, the commit that made this claim. --current: de93aa5 against the working tree;
 // approved multilevel Bloom, PBR Neutral display and linear HDR handoff changed these calls (claims.md).
 import assert from 'node:assert/strict';
 import { refs, versions, ignoreAgx, current } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 
-const { ref, pin } = refs('3cf1453', '838ae6e', 'd484c4e'),
+const { ref, pin } = refs('3cf1453', '838ae6e', 'de93aa5'),
   post = await versions('post', ref, undefined, pin);
 const ibl =
   wgsl.replace(/let linear=([^;]+);/, 'let margoAmbient=vec3f(0.5);let linear=$1+margoAmbient;') +
