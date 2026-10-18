@@ -4,11 +4,6 @@
   "type": "module",
   "license": "MIT",
   "description": "Storage-buffer skinning and compute morph targets for Margo Engine.",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/animation"
-  },
   "publishConfig": {
     "access": "public"
   },

@@ -4,11 +4,6 @@
   "type": "module",
   "license": "MIT",
   "description": "Web Audio listener, global and positional sounds and an analyser for Margo Engine (THREE.AudioListener, Audio, PositionalAudio and AudioAnalyser counterparts).",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
-    "directory": "packages/audio"
-  },
   "publishConfig": {
     "access": "public"
   },
