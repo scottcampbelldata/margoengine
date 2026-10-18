@@ -49,3 +49,18 @@ To match:
 - re-fitting p-curves and edges that do not lie on their surfaces; removing slivers and tiny edges;
 - making shells closed and consistently oriented, then solids; reporting what was changed;
 - defeaturing: removing holes, fillets and chamfers by face selection (the inverse of the operations above).
+
+## Other work parked for later (not the kernel)
+
+### Night Citadel is darker on the CAD branch
+
+Found by Codex's b973204 validation (2026-10-18, `test-results/b973204-validation/browser/NIGHT-NUMBERS.md` in the
+split worktree). Same fixed view, branch against main 1f7d19f: mean screen brightness is about 62% of main's on desktop
+(26.7 against 43.1, 8-bit luminance) and 66% on the phone. The castle stone, island rock and sea read nearly black;
+stars now show and the moon is brighter. Likely cause: the sky-lighting and display-curve commits of 2026-10-17 on
+this branch (sky SH diffuse and split-sum reflections 731604a, sun and moon from the transmittance 9e607c8, PBR Neutral
+display curve 679f87c). Decide whether to bring the moonlit stone back to main's readability (moon light strength or
+the scene's exposure) while keeping the stars.
+
+Related: the Night Citadel browser test expects phones at 2 device pixels per CSS pixel, but fb01fb1 (on main,
+"cap phone pixels") made phones render at 1, so the test fails on main too. Restore 2x on phones or update the test.
