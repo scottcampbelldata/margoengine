@@ -4,6 +4,7 @@
 // as three.js is for rendering; it never ships in @margoengine/brep. Per file: products, placed bodies and faces from
 // both, and parse times; then, unless --no-mesh, both tessellate at the same settings (deflection 0.001 of the size,
 // 0.5 rad) and the meshes are compared: triangles, area, enclosed volume, bounds, open edges, faces that failed, time.
+// Our open edges are those of solids and tessellated bodies; sheet bodies' borders are counted apart (sheetEdges).
 // Last, the surface and edge-curve types the geometry stages must cover.
 //   npm run build:packages && node scripts/brep-corpus.mjs [--json=test-results/brep-corpus.json] [--no-occt]
 //     [--no-mesh] [--only=<part of a file name>]
@@ -98,7 +99,7 @@ for (const entry of manifest) {
       const meshes = tessellateSTEP(model, { relativeDeflection: 0.001, angle: 0.5 }),
         ms = performance.now() - start,
         bodies = meshes.map((m) => ({ ...meshStats(m.positions, m.indices), unit: m.unit })),
-        mesh = { ms: +ms.toFixed(1), triangles: 0, area: 0, volume: 0, open: 0, failed: 0, reasons: {} },
+        mesh = { ms: +ms.toFixed(1), triangles: 0, area: 0, volume: 0, open: 0, sheetEdges: 0, failed: 0, reasons: {} },
         min = [Infinity, Infinity, Infinity],
         max = [-Infinity, -Infinity, -Infinity];
       for (const m of meshes) {
@@ -113,7 +114,9 @@ for (const entry of manifest) {
           d = det3(instance.matrix);
         if (!b.triangles) continue;
         mesh.triangles += b.triangles;
-        mesh.open += b.open;
+        // A sheet body (SHELL_BASED_SURFACE_MODEL) is open by nature: its border is counted apart from solids' gaps.
+        if (model.bodies[instance.body].kind === 'shell') mesh.sheetEdges += b.open;
+        else mesh.open += b.open;
         mesh.area += b.area * b.unit ** 2 * Math.abs(d) ** (2 / 3);
         mesh.volume += b.volume * b.unit ** 3 * d;
         // The placed points themselves: a rotated body's box corners would overstate its extent.
@@ -210,7 +213,7 @@ for (const entry of manifest) {
       same = c && Math.abs(c.area - 1) <= 0.01 && Math.abs(c.volume - 1) <= 0.01 && c.bounds <= 0.005;
     console.log(
       '  mesh'.padEnd(48),
-      `ours ${om.triangles} triangles, area ${om.area.toPrecision(6)} m2, volume ${om.volume.toPrecision(6)} m3, ${om.open} open edges, ${om.failed} faces failed, ${om.ms} ms`,
+      `ours ${om.triangles} triangles, area ${om.area.toPrecision(6)} m2, volume ${om.volume.toPrecision(6)} m3, ${om.open} open edges${om.sheetEdges ? ` (+${om.sheetEdges} sheet border)` : ''}, ${om.failed} faces failed, ${om.ms} ms`,
       rm
         ? `| occt ${rm.triangles} triangles, area ${rm.area.toPrecision(6)}, volume ${rm.volume.toPrecision(6)}, ${rm.open} open edges | ratio tri ${c.triangles} area ${c.area} vol ${c.volume} bounds ${c.bounds} time ${c.time} | ${same ? 'MESH MATCH' : 'MESH DIFFERS'}`
         : '',
