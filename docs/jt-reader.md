@@ -9,7 +9,8 @@ Licensing and the notice it must carry: `docs/jt-licensing.md`. Code: `packages/
   lays elements out differently).
 - Container: header (version string, byte order, TOC offset: I32 in 9.x, U64 in 10), TOC (28-byte entries in 9.x,
   32 in 10), segment headers checked against the TOC, whole-segment zlib (JT 9, flag 2) and LZMA (JT 10, flag 3; the
-  "alone" header or the 5-byte one) for segment types 1, 2, 3, 4, 6, 17, 18, 20, 24.
+  "alone" header or the 5-byte one) for segment types 1, 2, 3, 4, 17, 18, 20, 24 and 30 (real files took 6 out and
+  put 30 in; see below).
 - LSG: version fields I16 in 9.x and U8 in 10; base attribute data has an extra U32 (field final flags) in 10.
   Partitions, groups, instances, parts, meta-data, LOD (finest alternative taken), range LOD, switch (selected child),
   all shape node types, transforms (row-major for row vectors, which is column-major for column vectors), materials
@@ -36,7 +37,8 @@ Licensing and the notice it must carry: `docs/jt-licensing.md`. Code: `packages/
     I32 bias, U8 span bits, MSB packet, LSB packet; others: I32 code-text bits, VecU32 code text, then for arithmetic
     the Mk. 2 contexts and the out-of-band packet.
   - Bit-length Mk. 1 (Appendix C 2.1), arithmetic (Appendix C 3.2), residual predictors (Appendix C 1.3), the lookup
-    hash (Appendix D; `hash32` is the hash of the words' little-endian bytes, as the appendix says).
+    hash (Appendix D; `hash32` is the hash of the words' little-endian bytes; real files fold the length in as a word
+    count, see below).
   - Bit-length Mk. 2 and JT 10's packets were left for real files (see "Real JT 9.5 meshes" below).
 - `src/jt/mesh.ts`: Tri-Strip Set Shape LOD elements of JT 9: the 22 topology fields with their composite hash, the
   Appendix E decoder (dual vertices are polygons, dual faces mesh vertices; split faces; per-corner attribute masks
@@ -81,8 +83,8 @@ coordinates, normals) matching. What real files do that the text and our test wr
 Checks: each decoded mesh matches the bounding box and surface area its shape node stores in the LSG (worst 0.0002%
 of the box size and 0.03% of the area, over all 237 shapes); Radial_Engine's meshes match its own XT B-reps' bounds to
 within 0.25 mm on 22 of its 24 parts and their volumes to within 1% on 21 (the other three are below, under
-Radial_Engine's blends). Triangles stored with normals agree in winding with them on 97.9 to 100% of each file's triangles (at most 1%
-disagree; the rest have zero area). Parse times include decoding every mesh, on this PC.
+Radial_Engine's blends). Triangles stored with normals agree in winding with them on 97.9 to 100% of each file's
+triangles (at most 1% disagree; the rest have zero area). Parse times include decoding every mesh, on this PC.
 
 | File | Shapes decoded | Triangles | Parse (ms) |
 | --- | --- | --- | --- |

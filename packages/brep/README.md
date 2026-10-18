@@ -61,19 +61,20 @@ kernel:
   transmit files, written from the published XT Format Reference. Node layouts come from the base schema, with each
   file's own schema edits applied (Parasolid V14 on); assemblies become mapped items (a part placed many times is meshed
   once); solid and sheet bodies; plane, cylinder, cone, sphere, torus, B-surface, offset, swept and spun surfaces; line,
-  circle, ellipse, B-curve, trimmed and intersection curves (through their chart points); rolling-ball blends
-  (each ball centre along the spine projected onto both supports, the exact arc between the contacts as a rational
-  quadratic); SDL/TYSA_COLOUR attributes. Lengths are metres. Cliff-edge blends, SP-curves of tolerant edges and
-  foreign geometry are left out and listed in `warnings` for now.
+  circle, ellipse, B-curve, trimmed and intersection curves (through their chart points); rolling-ball and cliff-edge
+  blends (each ball centre moved onto both offset supports, or onto the surface and the cliff edge, the exact arc
+  between the contacts as a rational quadratic); SDL/TYSA_COLOUR attributes. Lengths are metres. SP-curves of tolerant
+  edges and foreign geometry are left out and listed in `warnings` for now.
 - **JT** (`parseJT`, `tessellateJT`): JT 9.5 and later (ISO 14306), written from the JT File Format Reference and
   the standard under Siemens' published licence terms (`NOTICE`, `docs/jt-licensing.md`). The file header and table
   of contents, zlib (JT 9) and LZMA (JT 10) segment compression, the scene graph (partitions, groups, instances,
   parts, LOD and switch nodes, transforms, materials, properties with names and units) and each part's exact B-rep
-  from its XT B-rep segment, read by the Parasolid reader. Parts and placements come out in metres. JT 9 tessellated
-  shapes (tri-strip sets) are decoded into triangle meshes with normals and face groups: Int32 compressed data packets
-  (bit-length, arithmetic, chopper), the polygon mesh topology decoder, quantized coordinates and Deering normals,
-  each checked against the hashes the file stores. JT 10 shapes and JT files that partition nodes refer to are listed
-  in `warnings`.
+  from its XT B-rep segment (or the file's MultiXT segment), read by the Parasolid reader. Parts and placements come
+  out in metres. JT 9 and JT 10 tessellated shapes (tri-strip sets) are decoded into triangle meshes with normals and
+  face groups: Int32 compressed data packets (bit-length, arithmetic, chopper, move-to-front), the polygon mesh
+  topology decoder, coordinates and Deering normals, each checked against the hashes the file stores; real files'
+  departures from the published texts are in `docs/jt-reader.md`. Polylines and JT files that partition nodes refer
+  to are listed in `warnings`.
 
 ## What stage 1 reads
 
