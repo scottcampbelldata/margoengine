@@ -288,13 +288,108 @@ test('Booleans: coaxial surfaces meet in exact circles (a napkin ring, a torus c
   );
 });
 
+test('Booleans: faces on one plane, edges along edges and vertices on faces (the usual CAD cases)', () => {
+  const cube = (n, x, y, z, sx, sy, sz) => box(n, [sx * mm, sy * mm, sz * mm], at(x, y, z));
+  // [label, result, volume mm^3, vertices, edges, faces]
+  const cases = [
+    [
+      'side by side, overlapping',
+      () => boolean('u', 'union', cube('a', 0, 0, 0, 10, 10, 10), cube('b', 5, 0, 0, 10, 10, 10)),
+      1500,
+      8,
+      12,
+      6,
+    ],
+    [
+      'face to face',
+      () => boolean('f', 'union', cube('a', 0, 0, 0, 10, 10, 10), cube('b', 10, 0, 0, 10, 10, 10)),
+      2000,
+      8,
+      12,
+      6,
+    ],
+    [
+      'the shared part',
+      () => boolean('i', 'intersect', cube('a', 0, 0, 0, 10, 10, 10), cube('b', 5, 0, 0, 10, 10, 10)),
+      500,
+      8,
+      12,
+      6,
+    ],
+    [
+      'the rest',
+      () => boolean('s', 'subtract', cube('a', 0, 0, 0, 10, 10, 10), cube('b', 5, 0, 0, 10, 10, 10)),
+      500,
+      8,
+      12,
+      6,
+    ],
+    [
+      'a box on a box',
+      () => boolean('st', 'union', cube('a', 0, 0, 0, 10, 10, 10), cube('b', 2, 2, 10, 6, 6, 5)),
+      1180,
+      16,
+      24,
+      11,
+    ],
+    [
+      'a pocket flush with the top',
+      () => boolean('p', 'subtract', cube('a', 0, 0, 0, 10, 10, 10), cube('b', 2, 2, 5, 6, 6, 5)),
+      820,
+      16,
+      24,
+      11,
+    ],
+    [
+      'a slot through, flush on three sides',
+      () => boolean('sl', 'subtract', cube('a', 0, 0, 0, 10, 10, 10), cube('b', 2, 0, 5, 6, 10, 5)),
+      700,
+      16,
+      24,
+      10,
+    ],
+    [
+      'the same box twice',
+      () => boolean('same', 'union', cube('a', 0, 0, 0, 10, 10, 10), cube('b', 0, 0, 0, 10, 10, 10)),
+      1000,
+      8,
+      12,
+      6,
+    ],
+    [
+      'a pipe: a bore as long as the bar',
+      () => boolean('pipe', 'subtract', cylinder('c', 5 * mm, 10 * mm), cylinder('h', 3 * mm, 10 * mm)),
+      Math.PI * 16 * 10,
+      4,
+      6,
+      4,
+    ],
+  ];
+  for (const [label, make, volume, v, e, f] of cases) {
+    const body = make(),
+      r = measureAll(body);
+    assert.deepEqual(validateBody(body), [], label);
+    assert.equal(r.open, 0, `${label}: closed`);
+    assert.ok(
+      Math.abs(r.volume / mm ** 3 - volume) <= 1e-3 * volume,
+      `${label}: volume ${r.volume / mm ** 3} vs ${volume}`,
+    );
+    // Faces on one surface are one face again, and edges split along their length are one edge.
+    assert.deepEqual([body.vertices.length, body.edges.length, body.faces.length], [v, e, f], label);
+  }
+  // The united boxes keep the names of the faces they came from.
+  const united = boolean('u', 'union', cube('a', 0, 0, 0, 10, 10, 10), cube('b', 5, 0, 0, 10, 10, 10));
+  assert.deepEqual(united.faces.map((x) => x.name).sort(), [
+    'a/face:+y',
+    'a/face:+z',
+    'a/face:-x',
+    'a/face:-y',
+    'a/face:-z',
+    'b/face:+x',
+  ]);
+});
+
 test('Booleans: what is not supported yet throws a RangeError that says so', () => {
-  // Side faces in one plane that overlap.
-  assert.throws(
-    () =>
-      boolean('x', 'union', box('a', [10 * mm, 10 * mm, 10 * mm]), box('b', [10 * mm, 10 * mm, 10 * mm], at(5, 0, 0))),
-    { name: 'RangeError', message: /lie on one surface and overlap: not supported yet/ },
-  );
   // Two equal cylinders at right angles touch tangentially where their curves cross.
   assert.throws(
     () =>
