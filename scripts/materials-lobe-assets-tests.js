@@ -117,7 +117,9 @@ try {
           });
           const device = engine.gpu;
           device.pushErrorScope('validation');
-          model = await loadGLTF(engine, fixture.url);
+          // The lobes under test come from @margoengine/materials alone: load with the base shader, as gltf-pro did
+          // by default before it brought in its own physical shader for files that use these extensions.
+          model = await loadGLTF(engine, fixture.url, { decoders: { materials: false } });
           const originalDocument = JSON.stringify(model.asset.doc),
             doc = model.asset.doc;
           assert(
@@ -319,7 +321,8 @@ try {
       const state = window.lobeAssetScene;
       state.model.dispose();
       if (!state.installation.disposed) throw new Error('Model did not dispose its material installation');
-      const model = await state.loadGLTF(state.engine, state.fixture.url),
+      // Same loader setup as the authored render, so the control differs only by the stripped lobes.
+      const model = await state.loadGLTF(state.engine, state.fixture.url, { decoders: { materials: false } }),
         original = JSON.stringify(model.asset.doc);
       for (const material of new Set(model.primitives.map((p) => p.material))) {
         material.extensions = structuredClone(material.extensions ?? {});
