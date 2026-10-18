@@ -9,7 +9,9 @@ import { traceIntersections, type Box3 } from './march.js';
 export { curveSurfaceCrossings, distanceGradient, signedDistance } from './distance.js';
 
 /** What two surfaces share: curves, the same surface (coincident), or nothing. */
-export type SurfaceIntersection = { kind: 'curves'; curves: CurveDef[] } | { kind: 'coincident' } | { kind: 'none' };
+export type SurfaceIntersection =
+  /** `crossings`: points where two curves cross (the surfaces touch tangentially there). */
+  { kind: 'curves'; curves: CurveDef[]; crossings?: V3[] } | { kind: 'coincident' } | { kind: 'none' };
 
 const parallel = (a: V3, b: V3) => length(cross(a, b)) <= 1e-12;
 
@@ -31,8 +33,8 @@ export function intersectSurfaces(a: SurfaceDef, b: SurfaceDef, box?: Box3): Sur
   if (a.kind === 'cylinder' && b.kind === 'cylinder' && parallel(a.frame.z, b.frame.z))
     return parallelCylinders(a.frame.origin, a.frame.z, a.radius, b.frame.origin, b.radius);
   if (!box) throw new RangeError(`intersecting ${a.kind} with ${b.kind} needs a box to trace the curves in`);
-  const curves = traceIntersections(a, b, box);
-  return curves.length ? { kind: 'curves', curves } : { kind: 'none' };
+  const { curves, crossings } = traceIntersections(a, b, box);
+  return curves.length ? { kind: 'curves', curves, crossings } : { kind: 'none' };
 }
 
 type Axis = { o: V3; z: V3 };
@@ -183,9 +185,10 @@ function planeCylinder(o: V3, n: V3, c: V3, axis: V3, x: V3, r: number): Surface
   if (Math.abs(along) <= 1e-12) {
     // Plane parallel to the axis: none, one tangent line or two lines along the axis.
     const d = dot(sub(c, o), n);
-    if (Math.abs(d) > r) return { kind: 'none' };
+    // Within rounding of the radius the plane touches the cylinder along one line (a fillet against its face).
+    if (Math.abs(d) > r * (1 + 1e-9)) return { kind: 'none' };
     const foot = sub(c, scale(n, d)),
-      half = Math.sqrt(Math.max(0, r * r - d * d)),
+      half = Math.abs(Math.abs(d) - r) <= 1e-9 * r ? 0 : Math.sqrt(Math.max(0, r * r - d * d)),
       across = unit(cross(n, axis))!;
     const lines: CurveDef[] = [{ kind: 'line', origin: add(foot, scale(across, half)), direction: axis }];
     if (half > 0) lines.push({ kind: 'line', origin: sub(foot, scale(across, half)), direction: axis });
@@ -209,11 +212,15 @@ function parallelCylinders(c1: V3, axis: V3, r1: number, c2: V3, r2: number): Su
     offset = sub(d, scale(axis, dot(d, axis))),
     gap = length(offset);
   if (gap <= 1e-12) return Math.abs(r1 - r2) <= 1e-12 ? { kind: 'coincident' } : { kind: 'none' };
-  if (gap > r1 + r2 || gap < Math.abs(r1 - r2)) return { kind: 'none' };
+  const touching = 1e-9 * Math.max(r1, r2);
+  if (gap > r1 + r2 + touching || gap < Math.abs(r1 - r2) - touching) return { kind: 'none' };
   const ex = scale(offset, 1 / gap),
     ey = cross(axis, ex),
     a = (r1 * r1 - r2 * r2 + gap * gap) / (2 * gap),
-    h = Math.sqrt(Math.max(0, r1 * r1 - a * a)),
+    h =
+      Math.abs(gap - (r1 + r2)) <= touching || Math.abs(gap - Math.abs(r1 - r2)) <= touching
+        ? 0
+        : Math.sqrt(Math.max(0, r1 * r1 - a * a)),
     base = add(c1, scale(ex, a)),
     lines: CurveDef[] = [{ kind: 'line', origin: add(base, scale(ey, h)), direction: axis }];
   if (h > 0) lines.push({ kind: 'line', origin: sub(base, scale(ey, h)), direction: axis });

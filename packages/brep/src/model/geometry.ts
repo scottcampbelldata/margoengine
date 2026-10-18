@@ -34,7 +34,9 @@ export function frameOf(origin: V3, z: V3, x?: V3): Frame {
   const zz = unit(z);
   if (!zz) throw new RangeError('frame axis must not be the zero vector');
   let xx = x ? unit([x[0] - dot(x, zz) * zz[0], x[1] - dot(x, zz) * zz[1], x[2] - dot(x, zz) * zz[2]]) : undefined;
-  if (!xx) xx = unit(Math.abs(zz[0]) < 0.9 ? cross([0, 1, 0], zz) : cross([0, 0, 1], zz))!;
+  // (An axis along y crosses y to nothing: then x is taken across the x axis instead.)
+  if (!xx)
+    xx = unit(Math.abs(zz[0]) < 0.9 ? cross([0, 1, 0], zz) : cross([0, 0, 1], zz)) ?? unit(cross([1, 0, 0], zz))!;
   return { origin, x: xx, y: cross(zz, xx), z: zz };
 }
 

@@ -8,7 +8,7 @@
 // its start. Where the surfaces touch tangentially the direction is undefined: that throws a RangeError.
 import { add, cross, dot, length, scale, sub, unit, type V3 } from '../geometry/vec.js';
 import { curveSurfaceCrossings, distanceGradient, meetDirection, signedDistance } from './distance.js';
-import { frameOf, type CurveDef, type SurfaceDef } from './geometry.js';
+import { curveEvaluator, frameOf, type CurveDef, type SurfaceDef } from './geometry.js';
 
 /** An axis-aligned box. */
 export interface Box3 {
@@ -18,10 +18,14 @@ export interface Box3 {
 
 const MAX_TURN = 0.08;
 
-/** Curves where surfaces `a` and `b` meet inside `box`: closed loops and branches cut where they leave it. */
-export function traceIntersections(a: SurfaceDef, b: SurfaceDef, box: Box3): CurveDef[] {
+/**
+ * Curves where surfaces `a` and `b` meet inside `box` (closed loops, and branches cut where they leave it), and the
+ * points where two of them cross: there the surfaces touch tangentially (two equal cylinders at right angles), and the
+ * Booleans put a vertex.
+ */
+export function traceIntersections(a: SurfaceDef, b: SurfaceDef, box: Box3): { curves: CurveDef[]; crossings: V3[] } {
   const size = length(sub(box.max, box.min));
-  if (!(size > 0)) return [];
+  if (!(size > 0)) return { curves: [], crossings: [] };
   const hmax = size / 8,
     scale0 = size + Math.max(...box.min.map(Math.abs), ...box.max.map(Math.abs)),
     branches: { points: V3[]; tangents: V3[] }[] = [],
@@ -64,13 +68,14 @@ export function traceIntersections(a: SurfaceDef, b: SurfaceDef, box: Box3): Cur
     curves.push(hermite(points, tangents, forward.closed));
   }
   // Curves that meet cross where the surfaces touch tangentially (two equal cylinders at right angles): the tracer
-  // steps over such a point, so it is found here instead.
-  // A chord lies within its sag of the curve, so chords of two crossing curves come that close.
+  // steps over such a point, so it is found here, from chords that come within their sag of each other, and moved onto
+  // both curves.
   const sag = (t: { points: V3[]; tangents: V3[] }, k: number) =>
       (length(sub(t.points[k + 1], t.points[k])) *
         Math.acos(Math.min(1, Math.abs(dot(t.tangents[k], t.tangents[k + 1]))))) /
       8,
-    near = 1e-6 * size;
+    near = 1e-6 * size,
+    crossings: V3[] = [];
   for (let i = 0; i < branches.length; i++)
     for (let j = i; j < branches.length; j++) {
       const p = branches[i].points,
@@ -78,17 +83,27 @@ export function traceIntersections(a: SurfaceDef, b: SurfaceDef, box: Box3): Cur
       for (let a = 0; a + 1 < p.length; a++)
         for (let b = i === j ? a + 2 : 0; b + 1 < q.length; b++) {
           if (i === j && a === 0 && b + 2 === q.length && p[0] === q[q.length - 1]) continue;
-          if (segmentGap(p[a], p[a + 1], q[b], q[b + 1]) <= 2 * (sag(branches[i], a) + sag(branches[j], b)) + near)
-            throw new RangeError(
-              'the surfaces touch tangentially where their curves cross: Booleans there are not supported yet',
-            );
+          const gap = closest(p[a], p[a + 1], q[b], q[b + 1]);
+          if (gap.distance > 2 * (sag(branches[i], a) + sag(branches[j], b)) + near) continue;
+          let x = scale(add(gap.p, gap.q), 0.5);
+          if (i !== j) {
+            const ci = curveEvaluator(curves[i]),
+              cj = curveEvaluator(curves[j]);
+            for (let k = 0; k < 60; k++) {
+              const yi = ci.at(ci.parameter(x)).slice(0, 3) as V3,
+                yj = cj.at(cj.parameter(x)).slice(0, 3) as V3;
+              x = scale(add(yi, yj), 0.5);
+              if (length(sub(yi, yj)) <= 1e-12 * scale0) break;
+            }
+          }
+          if (!crossings.some((c) => length(sub(c, x)) <= near)) crossings.push(x);
         }
     }
-  return curves;
+  return { curves, crossings };
 }
 
-/** The shortest distance between segments pq and rs. */
-function segmentGap(p: V3, q: V3, r: V3, s: V3): number {
+/** The closest points of segments pq and rs, and their distance. */
+function closest(p: V3, q: V3, r: V3, s: V3): { p: V3; q: V3; distance: number } {
   const d1 = sub(q, p),
     d2 = sub(s, r),
     w = sub(p, r),
@@ -97,7 +112,7 @@ function segmentGap(p: V3, q: V3, r: V3, s: V3): number {
     f = dot(d2, w);
   let t1 = 0,
     t2 = 0;
-  if (a <= 0 && e <= 0) return length(w);
+  if (a <= 0 && e <= 0) return { p, q: r, distance: length(w) };
   if (a <= 0) t2 = Math.max(0, Math.min(1, f / e));
   else {
     const c = dot(d1, w);
@@ -116,7 +131,9 @@ function segmentGap(p: V3, q: V3, r: V3, s: V3): number {
       }
     }
   }
-  return length(sub(add(p, scale(d1, t1)), add(r, scale(d2, t2))));
+  const x = add(p, scale(d1, t1)),
+    y = add(r, scale(d2, t2));
+  return { p: x, q: y, distance: length(sub(x, y)) };
 }
 
 function inside(box: Box3, p: V3, margin: number): boolean {

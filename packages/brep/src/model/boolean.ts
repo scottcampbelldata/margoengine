@@ -97,14 +97,17 @@ export function boolean(
   }
   for (const v of [...a.vertices, ...b.vertices]) size = Math.max(size, length(v.point));
   size = Math.max(size, 1e-6);
-  const merge = 1e-9 * size;
+  const merge = 1e-9 * size,
+    // Points within `touch` of each other, of a curve or of a surface are taken to meet there (1e-6 of the model): a
+    // crossing found a hair from a vertex (a curve touching a face tangentially) is that vertex.
+    touch = 1e3 * merge;
 
   // --- vertices: one per point, within the merge tolerance ----------------------------------------------------------
   const vertices: Vertex[] = [],
     original = new Map<Vertex, Vertex>();
   let vertexCount = 0;
   const vertexAt = (p: V3, keep?: Vertex): Vertex => {
-    for (const v of vertices) if (length(sub(v.point, p)) <= merge) return v;
+    for (const v of vertices) if (length(sub(v.point, p)) <= touch) return v;
     const v = new Vertex(keep?.name ?? `${name}/vertex:${vertexCount++}`, p, keep?.tolerance);
     vertices.push(v);
     return v;
@@ -112,9 +115,7 @@ export function boolean(
   for (const v of [...a.vertices, ...b.vertices]) original.set(v, vertexAt(v.point, v));
 
   // --- contacts: where each edge crosses the other solid's faces, edges or vertices, or lies in its faces --------------
-  // Points within `touch` of each other, of a curve or of a surface are taken to meet there (1e-6 of the model).
-  const touch = 1e3 * merge,
-    splits = new Map<Edge, { t: number; vertex: Vertex }[]>(),
+  const splits = new Map<Edge, { t: number; vertex: Vertex }[]>(),
     split = (e: Edge, t: number, vertex: Vertex) => splits.set(e, [...(splits.get(e) ?? []), { t, vertex }]),
     lying: [Edge, Face][] = [];
   /** The parameter of `p` on edge `e` when it lies on the edge (within touch, inside its range), else undefined. */
@@ -143,17 +144,19 @@ export function boolean(
         }
         for (const t of curveSurfaceCrossings(e.curve, g.surface, Math.min(t0, t1), Math.max(t0, t1))) {
           const p = c.at(t).slice(0, 3) as V3;
-          if (uvOf.get(g)!.contains(p)) split(e, t, vertexAt(p));
-          // On the face's boundary: the edge crosses one of its edges there, and both are cut.
-          else
-            for (const loop of g.loops)
-              for (const co of loop.coedges) {
-                const th = onEdge(co.edge, p);
-                if (th === undefined) continue;
-                const v = vertexAt(p);
-                split(e, t, v);
-                split(co.edge, th, v);
-              }
+          // On the face's boundary (tested first: the inside test is not reliable there): the edge crosses one of its
+          // edges, and both are cut.
+          let onBoundary = false;
+          for (const loop of g.loops)
+            for (const co of loop.coedges) {
+              const th = onEdge(co.edge, p);
+              if (th === undefined) continue;
+              const v = vertexAt(p);
+              split(e, t, v);
+              split(co.edge, th, v);
+              onBoundary = true;
+            }
+          if (!onBoundary && uvOf.get(g)!.contains(p)) split(e, t, vertexAt(p));
         }
       }
       // The other solid's vertices on this edge cut it.
@@ -279,6 +282,21 @@ export function boolean(
                 if (length(sub(c.at(t).slice(0, 3) as V3, s.vertex.point)) <= touch)
                   stops.push({ t, vertex: s.vertex });
               }
+        // Where two curves cross (the surfaces touch tangentially there): a vertex on each. At a corner the faces share
+        // (fillets meeting) that is all; inside both faces the faces would meet in a cusp, which is not supported yet.
+        for (const x of meet.crossings ?? []) {
+          const onEdges = [fa, fb].some((f) =>
+            f.loops.some((l) => l.coedges.some((co) => onEdge(co.edge, x) !== undefined)),
+          );
+          if (!onEdges && uvOf.get(fa)!.contains(x) && uvOf.get(fb)!.contains(x))
+            throw new RangeError(
+              `faces ${fa.name} and ${fb.name} touch tangentially where their curves cross: Booleans there are not supported yet`,
+            );
+          const t = c.parameter(x);
+          if (length(sub(c.at(t).slice(0, 3) as V3, x)) > touch) continue;
+          const v = vertexAt(x);
+          if (!stops.some((y) => y.vertex === v)) stops.push({ t, vertex: v });
+        }
         // Vertices of either face on the curve (a corner touching the other face) break it too.
         for (const f of [fa, fb])
           for (const loop of f.loops)
@@ -582,8 +600,11 @@ function splitFace(f: Face, fuv: FaceUV, halves: Half[]): Omit<Region, 'from'>[]
       bestChord = Infinity;
     for (const o of outgoing.get(v) ?? []) {
       const reverse = o.piece === h.piece && o.forward !== h.forward,
-        angle = reverse ? 3 * Math.PI : clockwise(back, tangent(o, false), normal),
         chord = reverse ? 3 * Math.PI : clockwise(backChord, sub(nearEnd(o, false), v.point), normal);
+      let angle = reverse ? 3 * Math.PI : clockwise(back, tangent(o, false), normal);
+      // A cusp: the half leaves along the way back (a rounding tangent to the edge it meets). Which side it bends to
+      // decides, from its chord: just past 0 or just short of a full turn.
+      if (!reverse && (angle < 1e-6 || angle > TWO_PI - 1e-6)) angle = chord;
       if (angle < bestAngle - 1e-9 || (Math.abs(angle - bestAngle) <= 1e-9 && chord < bestChord)) {
         best = o;
         bestAngle = angle;

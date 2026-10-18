@@ -105,6 +105,7 @@ export type { ValidityProblem } from './model/validate.js';
 export { bodiesToSTEP, meshBodies } from './model/export.js';
 export type { BodyMeshes } from './model/export.js';
 export { boolean } from './model/boolean.js';
+export { chamfer, fillet } from './model/blend.js';
 export type { BooleanOperation } from './model/boolean.js';
 export { curveSurfaceCrossings, intersectSurfaces, signedDistance } from './model/intersect.js';
 export type { SurfaceIntersection } from './model/intersect.js';
