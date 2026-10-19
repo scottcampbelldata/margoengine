@@ -39,7 +39,7 @@ export const canUseWorker = () => typeof Worker === 'function' && typeof globalT
 
 const errors = { TypeError, RangeError, SyntaxError };
 /** A worker's {name, message} as an Error; only the listed names map to their classes (own keys, so not `constructor`). */
-const reviveError = ({ name, message }) =>
+export const reviveError = ({ name, message }) =>
   new (Object.hasOwn(errors, name) ? errors[name] : Error)(
     typeof message === 'string' ? message : 'Parser worker failed',
   );

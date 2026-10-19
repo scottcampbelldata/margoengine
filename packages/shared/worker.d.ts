@@ -1,6 +1,8 @@
 export function transferables(value: unknown, out?: Set<Transferable>, seen?: Set<object>): Set<Transferable>;
 export function movable(input: ArrayBuffer | ArrayBufferView | string): ArrayBuffer | string;
 export function canUseWorker(): boolean;
+/** A worker's {name, message} as an Error: TypeError, RangeError or SyntaxError by name, else Error. */
+export function reviveError(error: { name: string; message: string }): Error;
 export function runWorker<T>(
   url: URL,
   message: Record<string, unknown>,
