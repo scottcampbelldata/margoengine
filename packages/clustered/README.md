@@ -34,8 +34,8 @@ lights.setLights([
   inner = angle × (1 − penumbra); penumbra 0 is a hard edge. Giving both forms throws.
 - A light that sets neither `decay` nor `angle` keeps the original shader term (`d * d`, and the cone's 1e-5 floor) bit
   for bit, and while no light sets them the shaders are exactly the original ones. Once one does, the light loop
-  evaluates each light by its own form. The volumetric fog's light loop in `@margoengine/environment`
-  still uses inverse-square for every light. `setLights()` replaces the list, validates all entries before changing it, and uploads only when called. Animate lights by calling it before rendering. Camera transformations and culling happen on the GPU.
+  evaluates each light by its own form, and so does the volumetric fog's froxel loop in `@margoengine/environment`
+  (the same terms, from one shared definition). `setLights()` replaces the list, validates all entries before changing it, and uploads only when called. Animate lights by calling it before rendering. Camera transformations and culling happen on the GPU.
 
 `lights.intensityScale` multiplies all local light radiance and defaults to 1.
 Set a nonnegative finite GPU-float value or a callback sampled each render, such

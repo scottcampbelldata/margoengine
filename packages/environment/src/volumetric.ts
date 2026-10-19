@@ -16,6 +16,7 @@ import { invertMatrix } from '@margoengine/math/mat4';
 import { sceneTarget } from '../../shared/msaa.js';
 import { preset } from '../../shared/preset.js';
 import { displayShader } from '../../shared/display.js';
+import { legacyTerms, decayTerms } from '../../shared/light-terms.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; STORAGE_BINDING: number; COPY_SRC: number };
@@ -56,7 +57,10 @@ export interface VolumetricFogOptions {
   temporal?: number;
   /** Directional cascades (`Shadows` from @margoengine/shadows): sunlight is shadowed in the fog, giving light shafts. */
   shadows?: VolumetricLightSource;
-  /** Clustered point and spot lights (`Clustered`); a `LocalShadows` attached to them shadows the fog too. */
+  /**
+   * Clustered point and spot lights (`Clustered`), with the falloff and cone clustered lights surfaces with (each light's
+   * decay, cone and unlimited range); a `LocalShadows` attached to them shadows the fog too.
+   */
   lights?: VolumetricLightSource;
   /**
    * Sampleable reversed-Z scene depth when no post capture (Tonemap, Bloom, PostStack, SSAO, TAA) owns the scene target,
@@ -114,8 +118,7 @@ ${
   for(var j=0u;j<count;j++){
     let light=clusterLights[clusterIndices[cell*1024u+j]];let delta=light.positionRange.xyz-p;let distance=length(delta);
     if(distance>=light.positionRange.w){continue;}let l=delta/max(distance,0.0001);
-    let falloff=pow(max(0.0,1-pow(distance/light.positionRange.w,4.0)),2.0)/max(distance*distance,0.01);
-    var cone=1.0;if(light.params.y>0.5){cone=clamp((dot(-l,light.directionOuter.xyz)-light.directionOuter.w)/max(light.params.x-light.directionOuter.w,0.00001),0.0,1.0);cone*=cone*(3-2*cone);}
+    ${lights.includes(decayTerms) ? decayTerms : legacyTerms}
     result+=light.colorIntensity.rgb*light.colorIntensity.w*falloff*cone*phase(dot(-l,v),g)${lights.includes('fn clusterShadow(') ? '*clusterShadow(light,p,vec3f(0))' : ''};
   }
   return result*clusterFrame.intensity.x;

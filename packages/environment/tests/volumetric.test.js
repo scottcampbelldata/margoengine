@@ -254,6 +254,37 @@ test("contract with clustered and shadows: the froxel light loop repeats cluster
   lights.dispose();
 });
 
+test("froxel lights take each light's decay, cone and unlimited range from clustered's own terms; old lights keep the old text", async () => {
+  const { Clustered } = await import('../../clustered/dist/index.js'),
+    { legacyTerms, decayTerms } = await import('../../shared/light-terms.js');
+  const gpu = mockGPU(),
+    lights = new Clustered({ grid: [4, 3, 2] });
+  lights.setup({ gpu: gpu.device, removePlugin() {} });
+  const local = () => {
+    const { frame, record } = rig({ options: { lights: { pbr: (g) => lights.pbr(g), bindings: () => [] } } }),
+      code = record(() => frame(0)).find((e) => e[0] === 'module' && /fn inject/.test(e[2].code))[2].code;
+    const start = code.indexOf('fn localLight(');
+    return code.slice(start, code.indexOf('return result*clusterFrame.intensity.x;', start));
+  };
+  try {
+    lights.setLights([{ position: [0, 2, 0], range: 5, direction: [0, -1, 0], outerAngle: 0.6 }]);
+    const old = local();
+    assert.ok(old.includes(`    ${legacyTerms}\n    result+=`) && !old.includes('let kind='));
+    lights.setLights([
+      { position: [0, 2, 0], range: 0, decay: 1 },
+      { position: [0, 3, 0], range: 6, direction: [0, -1, 0], angle: Math.PI / 2, penumbra: 0.4 },
+    ]);
+    const fresh = local();
+    assert.ok(fresh.includes(`    ${decayTerms}\n    result+=`) && !fresh.includes(legacyTerms));
+    assert.ok(lights.pbr(1).declarations.includes(decayTerms), "the very terms of clustered's light loop");
+    assert.equal(fresh.replace(decayTerms, legacyTerms), old, 'nothing else in the froxel loop changes');
+    lights.setLights([{ position: [0, 2, 0], range: 5, direction: [0, -1, 0], outerAngle: 0.6 }]);
+    assert.equal(local(), old, 'the original text once no light sets decay or angle');
+  } finally {
+    lights.dispose();
+  }
+});
+
 test('refuses to fog twice: environment Fog or sky fog switched on', () => {
   const fog = { name: 'fog', heightFalloff: 0, enabled: true },
     sky = { name: 'sky', options: { fog: { depth: () => undefined } } };
