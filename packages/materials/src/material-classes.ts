@@ -32,18 +32,13 @@ export class PhongMaterial extends Material {
 }
 /**
  * Metallic-roughness PBR (`shading: 'standard'`), with maps and the physical options. Takes every option of core's
- * `PbrMaterial` with its meaning and defaults: color '#4f46e5', roughness 0.5, metalness 0, doubleSided true (an
- * explicit `side` wins).
+ * `PbrMaterial` (`color`, `roughness`, `metalness`, `doubleSided`) with the same meaning. Defaults are a textured
+ * material's (white, roughness 1, metalness 0, front side), so a `map` shows its own colours; core's colour-only
+ * placeholder defaults (indigo, double-sided) would tint it.
  */
 export class PbrMaterial extends Material {
   constructor(options: Omit<MaterialOptions, Exclude<ModelKeys, keyof PhysicalOptions>> = {}) {
-    super({
-      ...options,
-      shading: 'standard',
-      color: options.color ?? '#4f46e5',
-      roughness: options.roughness ?? 0.5,
-      doubleSided: options.doubleSided ?? true,
-    });
+    super({ ...options, shading: 'standard' });
   }
 }
 /** View-space normals as colour (`shading: 'normal'`); normal maps apply, colour alpha and map alpha cut out. */

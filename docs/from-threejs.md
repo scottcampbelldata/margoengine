@@ -279,7 +279,7 @@ import {loadTexture, Texture, PbrMaterial, UnlitMaterial, createMesh} from '@mar
 const map = await loadTexture('/crate.jpg', {wrapS: 'repeat', wrapT: 'repeat', anisotropy: 8}); // colour maps read sRGB
 const normalMap = await loadTexture('/crate-normal.png');                                        // other slots linear
 const crate = createMesh(engine, boxGeometry(1, 1, 1), new PbrMaterial({
-  color: 0xffffff, map, normalMap, roughness: 0.7, side: 'front',
+  map, normalMap, roughness: 0.7,
   uvTransform: {offset: [0, 0], scale: [2, 2], rotation: 0}, // map.repeat / offset / rotation
 }));
 crate.root.setPosition([0, 0.5, 0]);
@@ -302,8 +302,8 @@ One class per three.js mesh material, each a `Material` with its shading fixed (
 | `MeshMatcapMaterial` | `MatcapMaterial` (`matcap`) |
 | `MeshDepthMaterial`, `MeshDistanceMaterial` | `DepthMaterial`, `DistanceMaterial` |
 
-`PbrMaterial` takes core `PbrMaterial`'s options with core's defaults (color `'#4f46e5'`, roughness 0.5, double-sided),
-so give a textured one `color: 0xffffff` and `side: 'front'` to match three.js.
+`PbrMaterial` takes core `PbrMaterial`'s options with the same meaning; its defaults match three.js's standard
+material (white, roughness 1, metalness 0, front side), so a textured one needs no extra options.
 
 Materials are used like three.js materials after the mesh exists:
 
@@ -327,7 +327,7 @@ box.material.color.set(0xff0000);  // or paint.color = '#f00': strings and numbe
 paint.blending = 'additive';        // render state is live: the next frame uses the matching pipeline
 paint.depthWrite = false;
 paint.wireframe = true;
-box.material = new PbrMaterial({color: 0xffffff, map: atlas}); // a live swap: shadows, lights, skin and picking stay
+box.material = new PbrMaterial({map: atlas}); // a live swap: shadows, lights, skin and picking stay
 box.renderOrder = 2;
 atlas.magFilter = 'nearest';        // sampler options apply next frame; flipY, colorSpace, mipmaps on atlas.update()
 const variant = paint.clone();      // same class and values, textures shared

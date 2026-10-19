@@ -44,21 +44,17 @@ test('each class is a Material with its shading fixed, whatever options say', ()
   assert.throws(() => new UnlitMaterial({ clearcoat: 1 }), /standard shading/);
 });
 
-test('PbrMaterial takes core PbrMaterial options with the same meaning and defaults', () => {
-  const core = new CorePbrMaterial(),
-    pbr = new PbrMaterial();
-  for (let k = 0; k < 3; k++) assert.ok(Math.abs(pbr.color[k] - core.data[k]) < 1e-6, 'default colour #4f46e5');
-  assert.equal(pbr.roughness, core.data[4]);
-  assert.equal(pbr.metalness, core.data[5]);
-  assert.equal(pbr.doubleSided, !!core.data[6]);
+test('PbrMaterial takes core PbrMaterial options with the same meaning, and untinted textured defaults', () => {
+  const pbr = new PbrMaterial();
+  assert.deepEqual(pbr.color, [1, 1, 1, 1], 'white, so a map shows its own colours');
+  assert.deepEqual([pbr.roughness, pbr.metalness, pbr.doubleSided], [1, 0, false]);
   const options = { color: '#84d6bd', roughness: 0.3, metalness: 1, doubleSided: false },
     a = new CorePbrMaterial(options),
     b = new PbrMaterial(options);
   for (let k = 0; k < 3; k++) assert.ok(Math.abs(b.color[k] - a.data[k]) < 1e-6);
   assert.deepEqual([b.roughness, b.metalness, b.doubleSided], [0.3, 1, false]);
   assert.deepEqual(new PbrMaterial({ color: [0.1, 0.2, 0.3] }).color, [0.1, 0.2, 0.3, 1], 'linear arrays as core');
-  assert.equal(new PbrMaterial({ side: 'front' }).side, 'front', 'an explicit side wins over the double default');
-  assert.equal(new PbrMaterial({ doubleSided: undefined }).doubleSided, true);
+  assert.equal(new PbrMaterial({ doubleSided: true }).side, 'double', 'core doubleSided means the same');
   assert.equal(new PbrMaterial({ clearcoat: 1 }).clearcoat, 1, 'physical options');
   assert.equal(new Material().roughness, 1, 'Material keeps its own defaults');
 });

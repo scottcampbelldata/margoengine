@@ -216,9 +216,10 @@ Each shading model has a class: a `Material` with its `shading` fixed and its op
 | `MatcapMaterial` | `matcap` | the `matcap` texture |
 | `DepthMaterial`, `DistanceMaterial` | `depth`, `distance` | packed depth or distance (below) |
 
-`PbrMaterial` shares its name with core's colour-only `PbrMaterial` and takes every core option with core's meaning
-and defaults: color `'#4f46e5'`, roughness 0.5, metalness 0, `doubleSided` true (an explicit `side` wins). Give a
-textured one `color: 0xffffff` for an untinted map.
+`PbrMaterial` shares its name with core's colour-only `PbrMaterial` and takes every core option (`color`,
+`roughness`, `metalness`, `doubleSided`) with the same meaning. Its defaults are a textured material's (white,
+roughness 1, metalness 0, front side), so a `map` shows its own colours; core's placeholder defaults (indigo,
+double-sided) are only core's.
 
 Everything is live on a `createMesh` mesh, from the next frame:
 
@@ -231,7 +232,7 @@ const mesh = createMesh(engine, geometry, paint);
 paint.color.set('#ff8800');       // or paint.color = 0xff8800; strings and numbers are sRGB, arrays linear
 paint.blending = 'additive';      // render state picks the matching pipeline
 paint.wireframe = true;
-mesh.material = new PbrMaterial({color: 0xffffff, map: tiles}); // swap
+mesh.material = new PbrMaterial({map: tiles}); // swap
 mesh.renderOrder = 2;
 tiles.magFilter = 'linear';       // sampler options: next frame
 const copy = paint.clone();
