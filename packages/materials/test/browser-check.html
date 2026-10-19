@@ -2,7 +2,7 @@
 <script type="module">
 import {createStage} from '/packages/margoengine/dist/index.js';
 import {planeGeometry,sphereGeometry,boxGeometry} from '/packages/geometry/dist/index.js';
-import {Texture,Material,createMesh,createInstancedMesh,loadTexture} from '/packages/materials/dist/index.js';
+import {Texture,Material,ShadowCatcherMaterial,createMesh,createInstancedMesh,loadTexture} from '/packages/materials/dist/index.js';
 const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,0,3],target:[0,0,0]}});
 const engine=stage.engine,device=engine.gpu,errors=[];
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
@@ -95,6 +95,16 @@ const shadowWall=setup=>{const light=[...engine.lighting.direction],radiance=[..
 scenarios.displacedShadow=()=>shadowWall((wall,c)=>{engine.lighting.direction.set([1,0,1,2]);const shadows=Shadows.attach(engine,{resolution:1024,filter:'hard'});shadows.add(wall);shadows.add(c);return ()=>plugin(shadows).destroy();});
 scenarios.displacedLocalShadow=()=>shadowWall((wall,c)=>{engine.lighting.direction[3]=0;const lights=Clustered.attach(engine,{shadows:{resolution:512}});lights.setLights([{position:[2,0,2],range:20,intensity:8,shadow:true}]);lights.add(wall);lights.addShadowCaster(c);return ()=>plugin(lights).destroy();});
 scenarios.displacedHookShadow=()=>shadowWall((wall,c)=>{engine.lighting.direction[3]=0;const lights=Clustered.attach(engine),local=LocalShadows.attach(engine,{lights});lights.setLights([{position:[2,0,2],range:20,intensity:8,castShadow:true}]);lights.add(wall);local.add(c);return ()=>{plugin(local).destroy();plugin(lights).destroy();};});
+// ShadowCatcherMaterial (black, opacity 0.6) at z 0 over a white unlit backdrop at z -0.5; an invisible caster at
+// (0.5, 0, 0.5) shades the centre under the sun or a point light: the backdrop shows through at 1 - 0.6 there, fully
+// where no shadow falls. The step sets opacity 0.3.
+const catcherScene=setup=>{const light=[...engine.lighting.direction],radiance=[...engine.lighting.radiance];engine.lighting.radiance[3]=0;const back=createMesh(engine,planeGeometry(4,4),new Material({shading:'basic'}));back.root.setPosition([0,0,-0.5]);const catcher=createMesh(engine,planeGeometry(2,2),new ShadowCatcherMaterial({opacity:0.6})),c=createMesh(engine,planeGeometry(0.4,0.4),new Material({shading:'basic',colorWrite:false,depthWrite:false}));c.root.setPosition([0.5,0,0.5]);const done=setup(catcher,c);return {destroy(){done();c.destroy();catcher.destroy();back.destroy();engine.lighting.direction.set(light);engine.lighting.radiance.set(radiance);},step(){catcher.material.opacity=0.3;}};};
+scenarios.catcherSun=()=>catcherScene((w,c)=>{engine.lighting.direction.set([1,0,1,2]);const shadows=Shadows.attach(engine,{resolution:1024,filter:'hard'});shadows.add(w);shadows.add(c);return ()=>plugin(shadows).destroy();});
+scenarios.catcherLocal=()=>catcherScene((w,c)=>{engine.lighting.direction[3]=0;const lights=Clustered.attach(engine,{shadows:{resolution:512}});lights.setLights([{position:[2,0,2],range:20,intensity:8,shadow:true}]);lights.add(w);lights.addShadowCaster(c);return ()=>plugin(lights).destroy();});
+scenarios.catcherHook=()=>catcherScene((w,c)=>{engine.lighting.direction[3]=0;const lights=Clustered.attach(engine),local=LocalShadows.attach(engine,{lights});lights.setLights([{position:[2,0,2],range:20,intensity:8,castShadow:true}]);lights.add(w);local.add(c);return ()=>{plugin(local).destroy();plugin(lights).destroy();};});
+// The share of light: the shadowed sun (luminance cos 45 x 2 at the centre) plus an unshadowed point light 1 unit in
+// front giving the same (intensity sqrt 2 pi): half the light is shadowed, alpha 0.3.
+scenarios.catcherShare=()=>catcherScene((w,c)=>{engine.lighting.direction.set([1,0,1,2]);const shadows=Shadows.attach(engine,{resolution:1024,filter:'hard'}),lights=Clustered.attach(engine);shadows.add(w);shadows.add(c);lights.setLights([{position:[0,0,1],range:100,intensity:Math.SQRT2*Math.PI}]);lights.add(w);return ()=>{plugin(lights).destroy();plugin(shadows).destroy();};});
 // lightMap: no lights at all. A Lambert plane whose UV1 reads the white half of a black/white lightmap shows its base
 // colour everywhere (UV0 would read black on the left); the step halves lightMapIntensity. An unlit white plane
 // multiplies by a grey lightmap.

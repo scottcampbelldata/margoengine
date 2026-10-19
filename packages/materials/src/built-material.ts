@@ -18,6 +18,7 @@ import { extendedMaterials } from '@margoengine/gltf-pro/extended';
 import { physicalMapsShader } from './physical-maps.js';
 import { depthDistanceShader } from './depth-distance.js';
 import { featureMaps, featureShader } from './features.js';
+import { catcherLit } from './catcher.js';
 import { readResponse } from '../../shared/loading.js';
 import { clusterBrdf } from '../../shared/light-terms.js';
 import { MargoError } from '@margoengine/math/errors';
@@ -1099,8 +1100,9 @@ const localTerm = 'result+=' + clusterBrdf + '*nl*',
   composed = { lambert: new Map<string, string>(), phong: new Map<string, string>() };
 /**
  * `code` with its lighting effects composed in (gltf-pro's `lit` hook): Lambert and Phong put their own BRDF in place of
- * clustered's per-light GGX term, so point and spot lights shade them exactly as the directional light does. Other
- * materials, and code without clustered lights, come back unchanged.
+ * clustered's per-light GGX term, so point and spot lights shade them exactly as the directional light does; a shadow
+ * catcher then measures its shadows (catcher.ts). Other materials, and code without clustered lights, come back
+ * unchanged.
  */
 function litShader(m: Material, code: string): string {
   const phong = m.shading === 'phong';
@@ -1115,7 +1117,7 @@ function litShader(m: Material, code: string): string {
       : code;
     cache.set(code, out);
   }
-  return out;
+  return phong ? out : catcherLit(out);
 }
 /** Live values: colours, scalar setters, map assignments and render state apply on the next frame to every mesh using the material. Shading is fixed. */
 export class Material {

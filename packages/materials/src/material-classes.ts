@@ -1,5 +1,7 @@
 // One class per shading model: a `Material` with its `shading` fixed and its options typed to what that model reads.
 import { Material, type MaterialOptions, type PhysicalOptions } from './built-material.js';
+import { catcherShader } from './catcher.js';
+import type { ColorInput } from '@margoengine/math/color';
 
 type DistanceKeys = 'depthPacking' | 'referencePosition' | 'nearDistance' | 'farDistance';
 /** Options no model but its own reads: shading itself, matcap, Phong, depth/distance output and physical lobes. */
@@ -73,5 +75,20 @@ export class DistanceMaterial extends Material {
     > = {},
   ) {
     super({ ...options, shading: 'distance' });
+  }
+}
+/**
+ * Invisible except for the shadows it receives (three.js ShadowMaterial): a ground plane for product shots. Where a
+ * shadow falls it draws `color` (default black) with alpha `opacity` (default 1) times the share of light the shadow
+ * takes, over the sun (`@margoengine/shadows`) and clustered point and spot lights (integrated maps or
+ * `LocalShadows`); elsewhere nothing. Register it with those effects (`shadows.add(mesh)`, `lights.add(mesh)`) like
+ * any receiver; it is transparent, so it casts no shadow and writes no depth. `color` and `opacity` stay live.
+ */
+export class ShadowCatcherMaterial extends Material {
+  constructor(options: { color?: ColorInput; opacity?: number } = {}) {
+    super({ color: options.color ?? [0, 0, 0], opacity: options.opacity ?? 1, shading: 'lambert', transparent: true });
+  }
+  override shader(source: string, group: number): string {
+    return catcherShader(super.shader(source, group));
   }
 }

@@ -301,6 +301,7 @@ One class per three.js mesh material, each a `Material` with its shading fixed (
 | `MeshNormalMaterial` | `NormalMaterial` |
 | `MeshMatcapMaterial` | `MatcapMaterial` (`matcap`) |
 | `MeshDepthMaterial`, `MeshDistanceMaterial` | `DepthMaterial`, `DistanceMaterial` |
+| `ShadowMaterial` | `ShadowCatcherMaterial` (`color`, `opacity`; sun and clustered local shadows) |
 
 `PbrMaterial` takes core `PbrMaterial`'s options with the same meaning; its defaults match three.js's standard
 material (white, roughness 1, metalness 0, front side), so a textured one needs no extra options.
@@ -1186,7 +1187,6 @@ features add no core or stage functionality.
 | General viewport/scissor support | Core draws accept viewport/scissor rectangles; optional native passes and picking do not inherit them, and camera aspect remains caller-controlled |
 | WebGL2 for optional packages | Closed v1 limit: core meshes, controls, labels, viewcube, bvh, LOD distance levels and the small glTF loader run on WebGL2; the rest needs WebGPU |
 | More than one directional light, configurable `HemisphereLight`, IES lights | One directional light; core diffuse ambient has RGB multipliers. Point, spot and rectangle area lights use clustered; glTF-pro keeps a fixed hemisphere fill |
-| `ShadowMaterial` on any mesh | Missing (`@margoengine/staging` ContactShadows is a ground shadow catcher for product shots) |
 | glTF `KHR_animation_pointer` | Files that require it are rejected. Dispersion, iridescence, anisotropy and diffuse transmission use the documented `@margoengine/gltf-pro/extended` material path; material variants (`selectVariant`) and glTF cameras (`viewGLTFCamera`) are supported |
 | Custom attributes on your own meshes | Arbitrary named attributes remain missing; independent `uvs1` and geometry groups with material arrays are supported by materials, including instancing and glTF export |
 | Standalone KTX2 or float/3D/array data textures on your own meshes | Missing (KTX2 works inside glTF; materials takes RGBA8 data) |

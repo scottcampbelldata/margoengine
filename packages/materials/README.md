@@ -215,6 +215,7 @@ Each shading model has a class: a `Material` with its `shading` fixed and its op
 | `NormalMaterial` | `normal` | view-space normals as colour |
 | `MatcapMaterial` | `matcap` | the `matcap` texture |
 | `DepthMaterial`, `DistanceMaterial` | `depth`, `distance` | packed depth or distance (below) |
+| `ShadowCatcherMaterial` | `lambert` (its own output) | `color`, `opacity`: only the shadows it receives (below) |
 
 `PbrMaterial` shares its name with core's colour-only `PbrMaterial` and takes every core option (`color`,
 `roughness`, `metalness`, `doubleSided`) with the same meaning. Its defaults are a textured material's (white,
@@ -580,4 +581,21 @@ Each map has its own UV transform slot (`material.setUVTransform(t, 'alphaMap')`
 ```ts
 const leaves = new LambertMaterial({map: leafColour, alphaMap: leafCutout, alphaTest: 0.5, side: 'double'});
 leaves.alphaMap = null; // live: the next frame draws without it
+```
+
+## Shadow catcher
+
+`ShadowCatcherMaterial` is invisible except for the shadows it receives, for ground planes under product shots
+(three.js ShadowMaterial). Where a shadow falls it draws `color` (default black) at alpha `opacity` (default 1) times
+the share of the light that the shadow takes: received / unshadowed luminance of a white Lambert surface, over the sun
+(`@margoengine/shadows`) and clustered point and spot lights (integrated maps or `LocalShadows`). An unshadowed light
+lightens the shadows of the others; ambient and environment light do not count. Register the plane with those
+effects like any receiver. It is transparent (drawn after opaque meshes, no depth write) and so casts no shadow.
+`color` and `opacity` are live, and `clone()` keeps it a catcher.
+
+```ts
+const ground = createMesh(engine, planeGeometry(20, 20), new ShadowCatcherMaterial({opacity: 0.5}));
+ground.root.setRotation([-Math.PI / 2, 0, 0]);
+shadows.add(ground);
+lights.add(ground); // clustered local shadows too
 ```

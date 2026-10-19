@@ -81,6 +81,11 @@ const expected = {
   fogOff: display(diffuse),
   toneMappedOff: [0.6, 0.6, 0.6].map(srgb),
   toneMappedFogged: [255, 0, 255],
+  // White behind a black catcher at alpha 0.6 (fully shadowed).
+  catcherSun: [102, 102, 102],
+  catcherLocal: [102, 102, 102],
+  catcherHook: [102, 102, 102],
+  catcherShare: [179, 179, 179],
   vertexColorsTint: [0, 0, 255],
   displacedHookShadow: gray((base / Math.PI) * Math.SQRT1_2 * (1 - (Math.SQRT2 / 10) ** 4) ** 2),
 };
@@ -122,6 +127,10 @@ try {
     'fogOff',
     'toneMappedOff',
     'toneMappedFogged',
+    'catcherSun',
+    'catcherLocal',
+    'catcherHook',
+    'catcherShare',
     'vertexColorsTint',
     'lightMapUnlit',
     'displace',
@@ -169,6 +178,11 @@ try {
       await step();
       near(await pixel(0.3), [255, 0, 0], 'the updated region (image top, flipY) shows the new pixels');
       near(await pixel(0.7), [0, 255, 0], 'outside the region the texture keeps its old pixels');
+    }
+    if (name.startsWith('catcher')) {
+      near(await pixel(0.5, 0.3), [255, 255, 255], 'no shadow there: the catcher draws nothing');
+      await step();
+      near(await pixel(), name === 'catcherShare' ? [217, 217, 217] : [179, 179, 179], 'opacity 0.3, live');
     }
     if (name === 'fogOff') {
       await step();

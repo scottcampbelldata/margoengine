@@ -14,6 +14,7 @@ import {
   UnlitMaterial,
   PbrMaterial,
   PhongMaterial,
+  ShadowCatcherMaterial,
   Texture,
   createInstancedMesh,
   createMesh,
@@ -57,6 +58,7 @@ const quad = {
   indices: [0, 1, 2, 0, 2, 3],
 };
 const codes = (log) => log.filter((e) => e[0] === 'module').map((e) => e[2].code);
+const codeOf = (log, id) => log.find((e) => e[0] === 'module' && e[1] === id)?.[2].code;
 const lightLoop = (code) => /fn clusterLighting\([\s\S]*?\n\}/.exec(code)?.[0] ?? '';
 
 test('clustered point and spot lights shade Lambert and Phong with their own BRDF, standard materials keep GGX', async () => {
@@ -488,5 +490,42 @@ test('fog false keeps a lit material out of the scene fog; toneMapped false clam
   }, TypeError);
   s.engine.removePlugin(fog.name);
   for (const mesh of meshes) mesh.destroy();
+  s.engine.dispose();
+});
+
+test('ShadowCatcherMaterial draws its colour with the shadowed share of sun and clustered light as alpha', async () => {
+  for (const hook of [false, true]) {
+    const s = await scene(),
+      catcher = new ShadowCatcherMaterial({ color: '#204060', opacity: 0.6 }),
+      mesh = createMesh(s.engine, quad, catcher),
+      remove = casters(s.engine, mesh, hook);
+    assert.deepEqual([catcher.shading, catcher.transparent, catcher.opacity], ['lambert', true, 0.6]);
+    const log = s.frame(),
+      beauty = codes(log).filter((c) => c.includes('fn margoCatcher(')),
+      code = beauty.find((c) => c.includes('@fragment fn fragment('));
+    assert.ok(code.includes('let margoShadow=margoCatcher(i,s); color=f.base.rgb;'), 'its own colour');
+    assert.ok(code.includes('return vec4f(color,margoShadow);'), 'the shadow as alpha');
+    assert.ok(code.includes('var lit=sun*shadowVisibility(i.position,n); var all=sun;'), 'the sun, shadowed and not');
+    const unshadowed = /fn margoCatcherLights\([\s\S]*?\n\}/.exec(code)[0];
+    assert.ok(!/clusterShadow/.test(unshadowed) && unshadowed.includes('margoLocalBrdf'), 'Lambert lights, unshadowed');
+    assert.ok(code.includes('lit+=dot(clusterLighting(') && code.includes('all+=dot(margoCatcherLights('));
+    assert.ok(!code.includes('return 0.0;}'), 'the placeholder is gone');
+    const pipeline = log.find(
+      (e) => e[0] === 'renderPipeline' && e[2].fragment?.module && codeOf(log, e[2].fragment.module) === code,
+    );
+    assert.ok(
+      pipeline[2].fragment.targets[0].blend && !pipeline[2].depthStencil.depthWriteEnabled,
+      'blended, no depth',
+    );
+    remove();
+    mesh.destroy();
+    s.engine.dispose();
+  }
+  // Clones are catchers too; with no shadowing effect the alpha is 0 everywhere.
+  const s = await scene(),
+    mesh = createMesh(s.engine, quad, new ShadowCatcherMaterial().clone()),
+    code = codes(s.frame()).find((c) => c.includes('fn margoCatcher(') && c.includes('@fragment fn fragment('));
+  assert.ok(code.includes('var lit=sun; var all=sun;\n  return f.base.a*select('));
+  mesh.destroy();
   s.engine.dispose();
 });
