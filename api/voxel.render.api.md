@@ -7,20 +7,26 @@ import { EngineKernel, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 import { ColorInput } from "@margoengine/math";
 
+export interface BlockPixels {
+    readonly width: number;
+    readonly height: number;
+    readonly data: Uint8Array | Uint8ClampedArray;
+}
+
 export class BlockTextures {
     readonly size: number;
     constructor(options?: BlockTexturesOptions);
     static load(urls: readonly (string | URL)[], options?: Omit<BlockTexturesOptions, 'images'>): Promise<BlockTextures>;
-    static fromAtlas(atlas: CanvasImageSource | ImageData, options?: Omit<BlockTexturesOptions, 'images'>): BlockTextures;
+    static fromAtlas(atlas: CanvasImageSource | ImageData | BlockPixels, options?: Omit<BlockTexturesOptions, 'images'>): BlockTextures;
     get layers(): number;
-    set(layer: number, image: CanvasImageSource | ImageData): void;
+    set(layer: number, image: CanvasImageSource | ImageData | BlockPixels): void;
     dispose(): void;
     [Symbol.dispose](): void;
 }
 
 export interface BlockTexturesOptions {
     size?: number;
-    images?: readonly (CanvasImageSource | ImageData)[];
+    images?: readonly (CanvasImageSource | ImageData | BlockPixels)[];
 }
 
 export class VoxelRenderer implements EnginePlugin {

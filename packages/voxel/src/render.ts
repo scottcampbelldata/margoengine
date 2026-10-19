@@ -20,7 +20,7 @@ import { blockMaterials, type ChunkMesh, sortQuads, VoxelMesher } from './mesher
 import { BlockTextures, blockTextureView } from './textures.js';
 import type { VoxelWorld } from './world.js';
 
-export { BlockTextures, type BlockTexturesOptions } from './textures.js';
+export { type BlockPixels, BlockTextures, type BlockTexturesOptions } from './textures.js';
 
 declare const GPUBufferUsage: {
   UNIFORM: number;

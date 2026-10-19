@@ -6,6 +6,13 @@ import { MargoError } from '@margoengine/math/errors';
 
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 
+/** Raw RGBA8 pixels, top row first, 4 bytes per texel: what `ImageData` holds, without needing the DOM. */
+export interface BlockPixels {
+  readonly width: number;
+  readonly height: number;
+  readonly data: Uint8Array | Uint8ClampedArray;
+}
+
 /** Options of {@link BlockTextures}. */
 export interface BlockTexturesOptions {
   /**
@@ -17,10 +24,10 @@ export interface BlockTexturesOptions {
    * One image per texture layer, layer 0 first, at most 256: anything `drawImage` takes, or raw `ImageData`-shaped
    * `{width, height, data}` RGBA8 pixels (top row first) of exactly `size` x `size`. Default: one white layer.
    */
-  images?: readonly (CanvasImageSource | ImageData)[];
+  images?: readonly (CanvasImageSource | ImageData | BlockPixels)[];
 }
 
-type Image = CanvasImageSource | ImageData;
+type Image = CanvasImageSource | ImageData | BlockPixels;
 interface State {
   levels: Uint8Array[][];
   dirty: Set<number>;
@@ -99,7 +106,7 @@ function mipChain(pixels: Uint8Array, size: number): Uint8Array[] {
   return out;
 }
 
-const isPixels = (image: Image): image is ImageData =>
+const isPixels = (image: Image): image is ImageData | BlockPixels =>
   !!image && typeof image === 'object' && 'data' in image && typeof image.data?.length === 'number';
 
 // An image's pixel size: natural size for <img>, display size for a VideoFrame, else width x height.
@@ -217,7 +224,7 @@ export class BlockTextures {
    * @throws MargoError `unsupported` for an image without OffscreenCanvas (raw pixels work anywhere).
    */
   static fromAtlas(
-    atlas: CanvasImageSource | ImageData,
+    atlas: CanvasImageSource | ImageData | BlockPixels,
     options: Omit<BlockTexturesOptions, 'images'> = {},
   ): BlockTextures {
     if (!atlas || typeof atlas !== 'object') throw new TypeError('BlockTextures.fromAtlas expects an image or pixels');
@@ -246,7 +253,7 @@ export class BlockTextures {
    * @throws TypeError or RangeError for a bad layer or image (as the constructor).
    * @throws MargoError `disposed` after {@link BlockTextures.dispose}.
    */
-  set(layer: number, image: CanvasImageSource | ImageData): void {
+  set(layer: number, image: CanvasImageSource | ImageData | BlockPixels): void {
     this.#put(checkLayer(layer), image);
   }
 
