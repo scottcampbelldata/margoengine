@@ -138,8 +138,10 @@ interface ClusteredShadow {
 
 interface LocalLightShadow {
     near?: number;
+    far?: number;
     bias?: number;
     normalBias?: number;
+    resolution?: number | readonly [number, number];
 }
 
 interface LocalShadowOptions {

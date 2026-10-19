@@ -71,8 +71,10 @@ export interface ClusteredShadow {
 
 export interface LocalLightShadow {
     near?: number;
+    far?: number;
     bias?: number;
     normalBias?: number;
+    resolution?: number | readonly [number, number];
 }
 
 export interface LocalShadowOptions {

@@ -1,5 +1,5 @@
 {
-  "commit": "3b2502d4",
+  "commit": "a2a34ab7",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -72,12 +72,12 @@
     },
     "@margoengine/clustered": {
       ".": {
-        "raw": 31949,
-        "gzip": 11065
+        "raw": 34396,
+        "gzip": 11848
       },
       "./shadows": {
-        "raw": 16272,
-        "gzip": 6048
+        "raw": 17161,
+        "gzip": 6401
       },
       "./area": {
         "raw": 15488,
@@ -700,8 +700,8 @@
     },
     "@margoengine/shadows": {
       ".": {
-        "raw": 30769,
-        "gzip": 11034
+        "raw": 32723,
+        "gzip": 11709
       }
     },
     "@margoengine/sky": {
@@ -898,6 +898,10 @@
       "./vox": {
         "raw": 29991,
         "gzip": 10656
+      },
+      "./physics": {
+        "raw": 17538,
+        "gzip": 6279
       }
     },
     "@margoengine/water": {
@@ -961,9 +965,9 @@
       "brotli": 22547
     },
     "packages/shadows/dist/index.js": {
-      "raw": 30769,
-      "gzip": 11034,
-      "brotli": 9861
+      "raw": 32723,
+      "gzip": 11709,
+      "brotli": 10477
     },
     "packages/machinery/dist/workers/cad-runtime.js": {
       "raw": 17489,

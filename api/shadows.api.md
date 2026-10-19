@@ -16,7 +16,7 @@ export interface ShadowContext {
 export type ShadowFilter = 'soft' | 'pcf' | 'hard';
 
 export interface ShadowOptions {
-    resolution?: number;
+    resolution?: number | readonly [number, number];
     distance?: number;
     lambda?: number;
     lightSize?: number;
@@ -27,6 +27,15 @@ export interface ShadowOptions {
         min: Vec3;
         max: Vec3;
         points?: readonly Vec3[];
+    };
+    frustum?: {
+        position: Vec3;
+        left: number;
+        right: number;
+        top: number;
+        bottom: number;
+        near: number;
+        far: number;
     };
     filter?: ShadowFilter;
     cascades?: number;

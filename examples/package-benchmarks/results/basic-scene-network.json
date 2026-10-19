@@ -1,5 +1,5 @@
 {
-  "commit": "3b2502d4",
+  "commit": "a2a34ab7",
   "dirty": false,
   "browser": "msedge 155.0.4283.45 headless",
   "adapter": "intel xe-2lpg",
@@ -11,17 +11,17 @@
       "encoding": "identity",
       "transferred": 808,
       "raw": 558,
-      "gzip": 370,
-      "brotli": 227
+      "gzip": 368,
+      "brotli": 226
     },
     {
-      "path": "assets/index-u1kTJlt5.js",
+      "path": "assets/index-Bq6p8pwm.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 22212,
+      "transferred": 22214,
       "raw": 51548,
-      "gzip": 21831,
-      "brotli": 19253
+      "gzip": 21833,
+      "brotli": 19260
     },
     {
       "path": "assets/geometry-CAWt7Gfm.js",
@@ -62,10 +62,10 @@
   ],
   "total": {
     "requests": 6,
-    "transferred": 31777,
+    "transferred": 31779,
     "raw": 67902,
     "gzip": 28760,
-    "brotli": 25356
+    "brotli": 25362
   },
   "notFetched": [
     {
@@ -89,12 +89,12 @@
       "raw": 77799
     },
     {
-      "path": "assets/dist-CC9toaMc.js",
-      "raw": 30354
-    },
-    {
       "path": "assets/dist-CjV6EXMB.js",
       "raw": 44
+    },
+    {
+      "path": "assets/dist-DGHKO0qm.js",
+      "raw": 32308
     },
     {
       "path": "assets/dist-DNNlJwYH.js",
