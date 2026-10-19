@@ -82,6 +82,7 @@ except `id`, `color` and `type` are optional.
 - Glass: `color` tints light entering the volume; `density` adds Beer-Lambert absorption toward `color` per world unit
   (`color^(density * distance)`); `scatter` (addition) adds interior scattering per world unit, a random-walk subsurface
   look; `anisotropy` shapes that scattering. Adjacent voxels of the same glass index form one volume (no inner faces).
+  A face of another model that coincides with a glass face (glass resting on a floor) is hit, not skipped.
 - Media voxels of one index form one volume; light entering it is attenuated and scattered, and next-event estimation
   works from inside it (shadow rays are attenuated through media, blocked by anything else).
 
@@ -95,6 +96,15 @@ except `id`, `color` and `type` are optional.
 | Environment map (addition) | `environment.map`: equirectangular linear RGB(A) floats, `intensity`, `rotation` about +Y | Replaces the constant sky; importance sampled by luminance x sin(theta). Its centre column faces -Z, three quarters +X. |
 | Emissive voxels | Any material with `emission > 0` | Faces sampled by emitted power, instances by power x area. |
 | Area lights (addition) | `scene.lights`: rectangles `position + s * edgeU + t * edgeV`, radiance `color * intensity`, `twoSided` | Facing `cross(edgeU, edgeV)`. They are seen and reflected, but do not block shadow rays. At most 256. |
+
+Sun and environment light that reaches a surface through smooth glass or off a mirror is sampled directly too, not only
+found by chance: voxel faces are planes, so the shadow ray refracts (exact Fresnel, tint, absorption) and reflects
+deterministically. Covered: any number of smooth glass volumes with parallel faces (slabs, windows), seen from outside
+or inside; light turned once by up to 8 glass instances whose model has one smooth glass material (the first in scene
+order that do not move and have no shear: in through one face and out through another, total internal reflection
+included) and by the faces of up to 8 mirror instances (models with smooth metal of `metalness` 1). Other light through
+glass (several turns, glass touching glass or media, partial internal reflections) is still found by path sampling;
+both are combined by multiple importance sampling, so nothing is counted twice.
 
 ## Camera
 
@@ -173,6 +183,7 @@ by floating-point rounding, which changes individual paths, not the converged im
 | Model size | 1-256 per axis |
 | Instances | 65,535 |
 | Area lights | 256 |
+| Light-sampled glass and mirror instances | 8 of each (others are path sampled) |
 | Voxel data | grids plus 512-byte mixed bricks within the device's `maxStorageBufferBindingSize` (WebGPU default 128 MiB: about 262,000 mixed bricks; uniform bricks cost one word) |
 | Environment map | 8192 x 4096, and width x height x 16 bytes within the binding size (4096 x 2048 at the default) |
 | Emissive faces | their tables (8 bytes each) within the binding size (about 16 million at the default) |
@@ -217,12 +228,20 @@ Numbers on other GPUs are not measured.
     worst 0.68%); a gold plane within 0.14% per channel of single scattering plus Kulla-Conty's Fresnel-weighted
     multiple scattering, both integrated numerically in the page;
   - the GGX plastic coat's albedo at 20, 60 and 80 degrees within 0.0002 of a numerical integration of the same model;
+  - light through glass and off mirrors: a glass slab's shadow at 0 and 40 degrees within 0.38% of
+    `cos * T / (1 - albedo * rd)` (transmission with internal reflections, floor-slab interreflection), also for a
+    point sun (only light sampling reaches it); the floor under glass resting on it within 0.83% of the refracted
+    irradiance; a mirror wall's floor `E (1 + R)` exact to 4 digits for a point and a disk sun; a floating glass cube's
+    shadow and caustic with light sampling equal to path sampling of the same light within 0.05% (IOR 1.5, totally
+    reflected chains) and 0.02% (IOR 1.33, perpendicular faces);
   - environment orientation; equal seeds bit-identical;
   - convergence: error against a 16,384-sample reference falls 0.0216, 0.0114, 0.0058, 0.0030 at 16, 64, 256, 1024
     samples (1/sqrt(N)), both projections;
-  - denoiser (480 x 300, against the same reference): RMSE of the diffuse scene x2.51 lower at 4 samples, x2.33 at 16,
-    x1.99 at 64, x1.51 at 1024, object edges no worse except at 64 samples (8% higher); scenes dominated by small-sun
-    caustics through glass gain less (x1.1-1.3);
+  - denoiser (480 x 300, against a 16,384-sample reference; two halves of 32,768 for the glass scenes, whose own noise
+    is removed in quadrature): RMSE of the diffuse scene x2.78 lower at 4 samples, x2.53 at 16, x2.15 at 64, x1.61 at
+    1024, object edges no worse except at 64 samples (8% higher); the material scene (glass, gold, plastic, cloud)
+    x2.42, x2.10, x2.19; a caustic scene (strong sun through a glass block and a low-IOR slab, a mirror panel, rough gold;
+    dim sky) x2.14, x2.03, x2.04 (asserted: at least x2 and x1.6);
   - depth of field blurs only out-of-focus edges; motion blur spreads a moving cube over its path;
   - viewport: disabled and disposed frames equal the raster frame bit for bit; a device restore redraws the same
     converged image bit for bit; resize restarts accumulation; Bloom composes with the HDR output;
@@ -247,8 +266,15 @@ Numbers on other GPUs are not measured.
 - Environment maps importance sampled by marginal and conditional CDFs (PBRT).
 - Random numbers: PCG (O'Neill 2014) with Jarzynski and Olano's hash (2020); thin lens by Shirley and Chiu's concentric
   disk mapping; orthonormal bases by Duff et al. (2017).
+- Light through smooth glass and off mirrors: deterministic refraction and reflection of shadow rays at planar voxel
+  faces with each interface's solid-angle Jacobian, the candidate directions solved per face axis from Snell's law and
+  mirror reflection, and MIS against BSDF-sampled paths through the same chain (a planar special case of specular
+  next-event estimation, cf. Hanika et al. 2015, "Manifold Next Event Estimation").
 - Denoising: the edge-avoiding a-trous wavelet filter (Dammertz et al. 2010) on albedo-demodulated radiance, with
-  variance-guided luminance stops (Schied et al. 2017) and a plane-distance geometric stop.
+  variance-guided luminance stops (Schied et al. 2017) and a plane-distance geometric stop. Light focused by glass,
+  mirrors and glossy metal onto diffuse surfaces is filtered separately, more widely. The luminance stop compares a
+  difference with the variance of that difference (both pixels' variances): against the centre's variance alone it
+  rejects bright, noisy neighbours more than dark ones, which darkened images by about 1.5% (measured).
 - PNG output written from the W3C PNG specification over the platform's zlib `CompressionStream`.
 
 ## Parity status and known gaps
@@ -264,10 +290,12 @@ Not done or not verified, stated plainly:
 - **No comparison against MagicaVoxel's renderer.** Images were not compared side by side; matching its exact look
   would need its proprietary material and lighting equations, which are not public. Mapping `.vox` render/material
   settings onto these inputs is the editor's job and is approximate.
-- **Denoiser:** a classical filter, not a learned one; it removes noise in smooth regions (about x2-2.5 lower error at
-  4-16 samples) but leaves caustic fireflies and edge pixels mostly as they are.
-- **Caustics converge slowly:** small-sun light through glass or off glossy surfaces is found only by path sampling;
-  `clamp` trades that noise for bias.
+- **Denoiser:** a classical filter, not a learned one. Averaged over four seeds against 131,072-sample references
+  (noise removed in quadrature) it lowers the error x2.40, x2.27, x2.27 at 4, 16, 64 samples on the material scene but
+  x1.86, x2.06, x1.93 on the caustic scene: short of x2 at 4 and 64 samples there. Edge pixels gain less.
+- **Caustics:** light turned more than once by glass (or by glass and a mirror), glossy reflections of a small sun and
+  glass beyond the 8 light-sampled instances are found by path sampling only and converge slowly; `clamp` trades that
+  noise for bias.
 - **Simplifications:** RGB only (no dispersion or spectral effects); refracted radiance is not scaled by the squared
   index ratio; media are homogeneous per palette index with grey extinction and do not emit; area lights do not block
   shadow rays; the ground is a plain diffuse plane; motion blur interpolates matrices linearly (fast rotations shrink a

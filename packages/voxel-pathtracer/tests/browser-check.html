@@ -21,7 +21,8 @@ const model=(id,size,fill,revision=1)=>{const [sx,sy,sz]=size,voxels=new Uint8Ar
  for(let y=0;y<sy;y++)for(let z=0;z<sz;z++)for(let x=0;x<sx;x++){const v=fill(x,y,z);if(v)voxels[x+sx*(z+sz*y)]=v;}return {id,revision,size,voxels};};
 const translate=(x,y,z,s=1)=>[s,0,0,0,0,s,0,0,0,0,s,0,x,y,z,1];
 const rotateY=(a,x,y,z,s=1)=>[Math.cos(a)*s,0,-Math.sin(a)*s,0,0,s,0,0,Math.sin(a)*s,0,Math.cos(a)*s,0,x,y,z,1];
-const ortho=(height)=>(out,aspect)=>{out.fill(0);out[0]=2/(height*aspect);out[5]=2/height;out[10]=1/1000;out[14]=0.5;out[15]=1;};
+// Orthographic projection for Camera.project: reversed depth, near plane at the camera (NDC 1), far plane 1000 behind.
+const ortho=(height)=>(out,aspect)=>{out.fill(0);out[0]=2/(height*aspect);out[5]=2/height;out[10]=1/1000;out[14]=1;out[15]=1;};
 const look=(position,target,extra={})=>{const c=engine.camera;c.position=position;c.target=target;c.project=extra.project;c.fov=extra.fov??45;c.up=extra.up??[0,1,0];c.near=extra.near??0.1;c.far=extra.far??2000;};
 const toBase64=async(blob)=>{const b=new Uint8Array(await blob.arrayBuffer());let s='';for(let i=0;i<b.length;i+=32768)s+=String.fromCharCode(...b.subarray(i,i+32768));return btoa(s);};
 const lum=(c,i)=>0.2126*c[i*3]+0.7152*c[i*3+1]+0.0722*c[i*3+2];
@@ -52,6 +53,21 @@ const scenes={
     {id:5,color:[1,0.6,0.25],type:'emit',emission:6},{id:6,color:[0.15,0.3,0.9],type:'plastic',roughness:0.1},
     {id:7,color:[0.95,0.95,0.95],type:'media',density:0.6,anisotropy:0.3}],
    environment:{skyColor:[0.55,0.7,1],skyIntensity:0.6,sunDirection:[0.5,0.8,0.35],sunIntensity:3,sunAngularSize:0.05,groundColor:[0.4,0.4,0.4],groundHeight:-1}};
+ },
+ // Caustics: a strong sun (dim sky) through a glass block and a low-IOR glass slab, reflected by a mirror panel onto
+ // the floor and a back wall, and by a rough gold ball.
+ caustics(){
+  const floor=model('floor',[48,1,48],()=>1),wall=model('wall',[30,12,1],()=>2),glass=model('glass',[8,8,8],()=>3),
+   slab=model('slab',[10,3,8],()=>4),mirror=model('mirror',[1,8,10],()=>5),
+   ball=model('ball',[8,8,8],(x,y,z)=>((x-3.5)**2+(y-3.5)**2+(z-3.5)**2<16)?6:0);
+  return {revision:1,models:[floor,wall,glass,slab,mirror,ball],
+   instances:[{id:'floor',modelId:'floor',matrix:translate(-24,-1,-24)},{id:'wall',modelId:'wall',matrix:translate(-20,0,-16)},
+    {id:'glass',modelId:'glass',matrix:rotateY(0.5,4,0,-4)},{id:'slab',modelId:'slab',matrix:translate(-6,0,4)},
+    {id:'mirror',modelId:'mirror',matrix:rotateY(-0.7,-17,0,-8)},{id:'ball',modelId:'ball',matrix:translate(-8,0,-12)}],
+   materials:[{id:1,color:[0.6,0.6,0.6],type:'diffuse'},{id:2,color:[0.8,0.8,0.8],type:'diffuse'},
+    {id:3,color:[0.9,1,0.95],type:'glass',ior:1.5},{id:4,color:[0.85,0.95,1],type:'glass',ior:1.33},
+    {id:5,color:[0.95,0.95,0.95],type:'metal',roughness:0},{id:6,color:[1,0.75,0.3],type:'metal',roughness:0.25}],
+   environment:{skyColor:[0.55,0.7,1],skyIntensity:0.15,sunDirection:[0.5,0.8,0.35],sunIntensity:4,sunAngularSize:0.05,groundColor:[0.4,0.4,0.4],groundHeight:-1}};
  },
  // Without glass or media (no caustics): the convergence and denoiser scene.
  opaque(){
@@ -195,6 +211,69 @@ window.check={
   look([20,14,24],[4,3,4]);
   return {...out,errors:errors.splice(0)};
  },
+ // Sunlight through smooth glass (light sampling through refraction chains, MIS with path sampling), closed forms with
+ // the exact unpolarised Fresnel the tracer uses: a floating slab's transparent shadow on a floor, and a floor seen
+ // through a wide slab resting on it (light refracted in, trapped light returned by internal reflection).
+ async glasslight(){
+  const out={},fres=(ci,eta)=>{const s2=eta*eta*(1-ci*ci);if(s2>=1)return 1;const ct=Math.sqrt(1-s2),rs=(eta*ci-ct)/(eta*ci+ct),rp=(ci-eta*ct)/(ci+eta*ct);return 0.5*(rs*rs+rp*rp);};
+  const ior=1.5,deg=Math.PI/180;
+  // Diffuse reflectance of the slab seen from below (both faces and their internal reflections, 2F / (1 + F)).
+  let rd=0;{const N=20000;for(let i=0;i<N;i++){const mu=(i+0.5)/N,F=fres(mu,1/ior);rd+=2*(2*F/(1+F))*mu/N;}}
+  for(const [name,theta,size] of [['slab shadow 0 deg',0,0.02],['slab shadow 40 deg',40,0.02],['slab shadow 40 deg point sun',40,0]]){
+   const sun=[Math.sin(theta*deg),Math.cos(theta*deg),0],F=fres(Math.cos(theta*deg),1/ior);
+   const scene={revision:1,models:[model('f',[256,1,256],()=>1),model('g',[256,8,256],()=>2)],instances:[{id:'f',modelId:'f',matrix:translate(-128,-1,-128)},{id:'g',modelId:'g',matrix:translate(-128,4,-128)}],
+    materials:[{id:1,color:[0.5,0.5,0.5],type:'diffuse'},{id:2,color:[1,1,1],type:'glass',ior}],environment:{skyIntensity:0,sunDirection:sun,sunIntensity:Math.PI,sunAngularSize:size}};
+   look([0,2,0.01],[0,0,0],{project:ortho(4)});
+   const s=await withTracer(scene,{maxBounces:16},async(t)=>{const image=await t.renderImage({width:32,height:32,samples:size?4096:256,aovs:true,jitter:false});return stats(image,(i)=>image.instance[i]===0);});
+   // Parallel faces keep the sun's direction; the slab transmits (1 - F) / (1 + F) with its internal reflections
+   // (only the direct (1 - F)^2 part for a point sun, which path sampling cannot hit); floor light the slab reflects
+   // back raises the floor's irradiance by 1 / (1 - albedo * rd).
+   const T=size?(1-F)/(1+F):(1-F)*(1-F);
+   out[name]={...s,expected:0.5*Math.cos(theta*deg)*T/(1-0.5*rd),slabReflectance:rd};
+  }
+  {
+   const theta=30,sun=[Math.sin(theta*deg),Math.cos(theta*deg),0],Fs=fres(Math.cos(theta*deg),1/ior),Fc=fres(1,1/ior);
+   // Internal diffuse reflectance of the top face (total internal reflection included), integrated numerically.
+   let ri=0;const N=20000;for(let i=0;i<N;i++){const mu=(i+0.5)/N;ri+=2*fres(mu,ior)*mu/N;}
+   // A wide slab resting on a floor model (separate instances whose faces coincide).
+   const scene={revision:1,models:[model('f',[128,1,128],()=>1),model('g',[128,4,128],()=>2)],instances:[{id:'f',modelId:'f',matrix:translate(-64,-1,-64)},{id:'g',modelId:'g',matrix:translate(-64,0,-64)}],
+    materials:[{id:1,color:[0.5,0.5,0.5],type:'diffuse'},{id:2,color:[1,1,1],type:'glass',ior}],environment:{skyIntensity:0,sunDirection:sun,sunIntensity:Math.PI,sunAngularSize:0.02}};
+   look([0,20,0.01],[0,0,0],{project:ortho(2)});
+   const s=await withTracer(scene,{maxBounces:64},async(t)=>{const image=await t.renderImage({width:24,height:24,samples:4096,aovs:true,jitter:false});return stats(image,(i)=>image.instance[i]===1);});
+   out['floor under glass']={...s,expected:(1-Fc)*0.5*(1-Fs)*Math.cos(theta*deg)/(ior*ior)/(1-0.5*ri),internalReflectance:ri};
+  }
+  {
+   // A tall mirror wall (smooth metal, f0 0.9) on a wide floor, the sun in front of it: the floor near the wall gets
+   // the sun and its mirror image, E (1 + R), R the Schlick reflectance at the wall; it sees no floor in the mirror
+   // (rays it sends up stay up), so nothing else lights it. A point sun is reached only by light sampling.
+   const l=Math.hypot(0.6,0.7,0.39),sun=[0.6/l,0.7/l,0.39/l],R=0.9+0.1*(1-sun[0])**5;
+   for(const [name,size] of [['mirror wall point sun',0],['mirror wall',0.05]]){
+    const scene={revision:1,models:[model('f',[256,1,256],()=>1),model('m',[1,64,256],()=>2)],instances:[{id:'f',modelId:'f',matrix:translate(-128,-1,-128)},{id:'m',modelId:'m',matrix:translate(-1,0,-128)}],
+     materials:[{id:1,color:[0.5,0.5,0.5],type:'diffuse'},{id:2,color:[0.9,0.9,0.9],type:'metal',roughness:0}],environment:{skyIntensity:0,sunDirection:sun,sunIntensity:Math.PI,sunAngularSize:size}};
+    look([12,60,0.01],[12,0,0],{project:ortho(16)});
+    const s=await withTracer(scene,{maxBounces:16},async(t)=>{const image=await t.renderImage({width:32,height:32,samples:size?4096:64,aovs:true,jitter:false});return stats(image,(i)=>image.instance[i]===0);});
+    out[name]={...s,expected:0.5*sun[1]*(1+R),reflectance:R};
+   }
+  }
+  // A floating glass cube's shadow and caustic (light through it and totally reflected inside it): light sampling of
+  // its mirror and Snell directions (one glass material) against path sampling of the same light (two identical
+  // glass materials, which light sampling leaves alone), over the pixels an opaque cube shadows.
+  for(const [ior,dir] of [[1.5,[0.4,0.8,0.25]],[1.33,[0.8,0.45,0.3]]]){
+   const l=Math.hypot(...dir),sun=dir.map((v)=>v/l),H=30,at=[-(sun[0]/sun[1])*(H+6),-(sun[2]/sun[1])*(H+6)];
+   const scene=(fill,materials)=>({revision:1,models:[model('f',[200,1,200],()=>1),model('g',[12,12,12],fill)],
+    instances:[{id:'f',modelId:'f',matrix:translate(-100,-1,-100)},{id:'g',modelId:'g',matrix:translate(-6,H,-6)}],
+    materials:[{id:1,color:[0.5,0.5,0.5],type:'diffuse'},...materials],environment:{skyIntensity:0,sunDirection:sun,sunIntensity:Math.PI,sunAngularSize:0.2}});
+   const glass=(id)=>({id,color:[1,1,1],type:'glass',ior});
+   look([at[0],80,at[1]+0.01],[at[0],0,at[1]],{project:ortho(40)});
+   const render=(s,samples,seed)=>withTracer(s,{maxBounces:64},(t)=>t.renderImage({width:48,height:48,samples,seed,aovs:true,jitter:false}));
+   const a=await render(scene(()=>2,[glass(2)]),1024,1),b=await render(scene((x)=>(x<6?2:3),[glass(2),glass(3)]),16384,2);
+   const c=await render(scene(()=>2,[{id:2,color:[0,0,0],type:'diffuse'}]),64,3);
+   const mask=(i)=>a.instance[i]===0&&c.instance[i]===0&&lum(c.color,i)<0.25*sun[1];
+   out[`glass cube ior ${ior}: light vs path sampling`]={...stats(a,mask),expected:stats(b,mask).mean};
+  }
+  look([20,14,24],[4,3,4]);
+  return {...out,errors:errors.splice(0)};
+ },
  // Microfacet sampling against numerical integration: a flat plane under a sky of radiance 1 seen at one angle
  // (orthographic) shows its directional albedo, which a midpoint quadrature of the same BRDF model computes here
  // independently of the shader's importance sampling and weights.
@@ -293,13 +372,22 @@ window.check={
  // edges (pixels whose 3x3 neighbourhood holds another instance id).
  async denoise(){
   const out={};
-  for(const name of ['diffuse','opaque','materials']){
+  for(const name of ['diffuse','opaque','materials','caustics']){
    look([18,14,26],[-3,3,-2]);
    out[name]=await withTracer(scenes[name](),{},async(t)=>{
     const W=480,H=300,reference=await t.renderImage({width:W,height:H,samples:16384,seed:99,aovs:true}),ids=reference.instance,edge=new Uint8Array(W*H);
+    // The glass scenes' reference: the mean of two halves, whose difference measures the reference's own noise (it
+    // adds to every error measured against it: refNoise^2).
+    let refNoise=0;
+    if(name==='materials'||name==='caustics'){
+     const b=await t.renderImage({width:W,height:H,samples:16384,seed:98});let se=0;
+     for(let i=0;i<W*H;i++){const d=neutral(lum(reference.color,i))-neutral(lum(b.color,i));se+=d*d;}
+     for(let k=0;k<W*H*3;k++)reference.color[k]=(reference.color[k]+b.color[k])/2;
+     refNoise=Math.sqrt(se/(W*H))/2;
+    }
     for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++)for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)if(ids[(y+dy)*W+x+dx]!==ids[y*W+x])edge[y*W+x]=1;
     const masked=(a,m)=>{let se=0,n=0;for(let i=0;i<W*H;i++){if(!m(i))continue;const d=neutral(lum(a.color,i))-neutral(lum(reference.color,i));se+=d*d;n++;}return Math.sqrt(se/n);};
-    const r={edgePixels:edge.reduce((a,b)=>a+b,0)};
+    const r={edgePixels:edge.reduce((a,b)=>a+b,0),refNoise};
     for(const n of [4,16,64,1024]){
      const raw=await t.renderImage({width:W,height:H,samples:n,seed:1}),den=await t.renderImage({width:W,height:H,samples:n,seed:1,denoise:true});
      r[n]={raw:masked(raw,()=>true),denoised:masked(den,()=>true),rawEdges:masked(raw,(i)=>edge[i]),denoisedEdges:masked(den,(i)=>edge[i])};
@@ -419,5 +507,7 @@ window.check={
   return {results,dense:{occupied,buildDenseArrayMs:buildMs,attachAndPackMs:firstPackMs,repackMs},errors:errors.splice(0)};
  },
 };
+// For ad-hoc measurements from scripts (page.evaluate): the scene builders and helpers above.
+window.lab={engine,scenes,VoxelPathTracer,look,withTracer,lum,neutral,error,model,translate,ortho};
 window.ready=true;
 </script></body></html>

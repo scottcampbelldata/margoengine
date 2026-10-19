@@ -16,7 +16,8 @@ export const FLAG_SUN = 1,
   FLAG_ENV = 4,
   FLAG_MOTION = 8,
   FLAG_JITTER = 16,
-  FLAG_CLAMP = 32;
+  FLAG_CLAMP = 32,
+  FLAG_SPLIT = 64;
 
 const f32 = new Float32Array(1),
   u32 = new Uint32Array(f32.buffer);
@@ -51,6 +52,8 @@ export interface LightLayout {
 export function lightLayout(s: SceneSnapshot): LightLayout {
   const env = s.environment.map;
   let size = 4;
+  const deflectorBase = size;
+  size += s.deflectors.length;
   const emissiveBase = size;
   size += s.emissiveInstances.length * 2;
   const emitters = s.emitters.map((e) => {
@@ -66,6 +69,14 @@ export function lightLayout(s: SceneSnapshot): LightLayout {
   size += env ? env.width * env.height : 0;
   const words = new Uint32Array(size),
     floats = new Float32Array(words.buffer);
+  // Header: where the light-sampled glass and mirror instances are and how many (pairs of GPU index and IOR, 0 for a
+  // mirror).
+  words[0] = deflectorBase;
+  words[1] = s.deflectors.length / 2;
+  for (let k = 0; k < s.deflectors.length; k += 2) {
+    words[deflectorBase + k] = s.deflectors[k];
+    floats[deflectorBase + k + 1] = s.deflectors[k + 1];
+  }
   for (let k = 0; k < s.emissiveInstances.length; k++) {
     words[emissiveBase + k * 2] = s.emissiveInstances[k];
     floats[emissiveBase + k * 2 + 1] = s.emissiveCdf[k];
@@ -113,7 +124,7 @@ export function sceneLayout(s: SceneSnapshot, gridOffsets: ArrayLike<number>, li
     floats.set(v.toWorld, b + 12);
     floats.set(v.previous ?? v.toWorld, b + 24);
     words[b + 36] = v.model;
-    words[b + 37] = v.previous ? 1 : 0;
+    words[b + 37] = (v.previous ? 1 : 0) | (v.prism ? 2 : 0) | (v.mirror ? 4 : 0);
     floats[b + 38] = v.lightPick;
   }
   words.set(s.nodes, nodeBase);

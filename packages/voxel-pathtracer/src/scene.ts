@@ -28,6 +28,8 @@ const MAX_LIGHTS = 256;
 export const MEDIA = 1,
   EMISSIVE = 4,
   SMOOTH = 8;
+/** Glass and mirror instances whose deflection of distant light is light-sampled, each (README, "Lighting"). */
+const MAX_DEFLECTORS = 8;
 const VOLUME = 2,
   PRESENT = 16;
 /** Roughness squared below which reflection and refraction are perfectly specular. */
@@ -77,6 +79,10 @@ interface SnapshotInstance {
   readonly box: Float64Array;
   /** Probability that light sampling picks this instance (0 without emissive faces). */
   lightPick: number;
+  /** Whether light sampling follows distant light through this instance's glass (one smooth glass material). */
+  prism: boolean;
+  /** Whether light sampling follows distant light reflected by this instance's smooth pure metal faces. */
+  mirror: boolean;
 }
 
 /** Environment with defaults applied. */
@@ -130,6 +136,11 @@ export interface SceneSnapshot {
   readonly emissiveCdf: Float32Array;
   /** Whether any instance has a previous transform (motion blur). */
   readonly moving: boolean;
+  /**
+   * Instances whose deflection of distant light is light-sampled, pairs of GPU index and IOR: up to MAX_DEFLECTORS
+   * glass instances (IOR) and as many mirror instances (IOR 0).
+   */
+  readonly deflectors: Float32Array;
   /** Mixed bricks plus grid words: the voxel buffer's words without padding. */
   readonly voxelWords: number;
 }
@@ -719,6 +730,64 @@ function packLights(list: unknown): { lights: Float32Array; count: number; power
   return { lights: Float32Array.from(out), count: weights.length, power: total };
 }
 
+// Whether the face normals of an instance (rows of its world-to-model transform) are orthogonal, as the shader's
+// per-axis mirror and Snell candidates assume (rotation and scale; not shear).
+function orthogonalFaces(r: Float64Array): boolean {
+  const row = (k: number) => {
+    const l = Math.hypot(r[k * 4], r[k * 4 + 1], r[k * 4 + 2]);
+    return [r[k * 4] / l, r[k * 4 + 1] / l, r[k * 4 + 2] / l];
+  };
+  const [a, b, c] = [row(0), row(1), row(2)];
+  const dot = (u: number[], v: number[]) => Math.abs(u[0] * v[0] + u[1] * v[1] + u[2] * v[2]);
+  return dot(a, b) < 1e-6 && dot(b, c) < 1e-6 && dot(a, c) < 1e-6;
+}
+
+// Light-sampled deflectors, first MAX_DEFLECTORS of each kind in GPU order: glass instances whose model uses exactly
+// one refracting palette index, that one smooth pure glass, that do not move and have orthogonal faces (entry: GPU
+// index, IOR); mirror instances whose model has smooth voxels of metalness 1 (entry: GPU index, 0).
+function deflectorTable(
+  instances: SnapshotInstance[],
+  models: readonly PackedModel[],
+  table: Float32Array,
+): Float32Array {
+  const iorOf = models.map((m) => {
+    let ior = 0;
+    for (let id = 1; id < 256; id++) {
+      if (!m.counts[id]) continue;
+      const b = id * MATERIAL_FLOATS,
+        flags = table[b + 15];
+      if (!(flags & VOLUME)) continue; // opaque surfaces and index-matched media do not refract
+      if (!(flags & SMOOTH) || table[b + 5] < 0.999 || ior) return 0;
+      ior = table[b + 11];
+    }
+    return ior;
+  });
+  const mirrors = models.map((m) => {
+    for (let id = 1; id < 256; id++) {
+      const b = id * MATERIAL_FLOATS;
+      if (m.counts[id] && table[b + 15] & SMOOTH && table[b + 4] === 1) return true;
+    }
+    return false;
+  });
+  const out: number[] = [];
+  let glass = 0,
+    mirror = 0;
+  for (const [g, v] of instances.entries()) {
+    const ior = iorOf[v.model];
+    if (ior && !v.previous && orthogonalFaces(v.toLocal) && glass < MAX_DEFLECTORS) {
+      v.prism = true;
+      glass++;
+      out.push(g, ior);
+    }
+    if (mirrors[v.model] && mirror < MAX_DEFLECTORS) {
+      v.mirror = true;
+      mirror++;
+      out.push(g, 0);
+    }
+  }
+  return Float32Array.from(out);
+}
+
 /**
  * Validates `scene` and builds its snapshot. Throws TypeError/RangeError naming the first problem; never changes
  * `cache` unless it succeeds. `maxWords` is the voxel buffer's word limit (the device's storage binding size / 4).
@@ -803,7 +872,18 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
       growBox(box, previous, size);
       moving = true;
     }
-    visible.push({ id, source: i, model, toWorld, toLocal: invertRows(toWorld), previous, box, lightPick: 0 });
+    visible.push({
+      id,
+      source: i,
+      model,
+      toWorld,
+      toLocal: invertRows(toWorld),
+      previous,
+      box,
+      lightPick: 0,
+      prism: false,
+      mirror: false,
+    });
   }
   // Every palette index a model uses needs a material.
   for (const [id, index] of modelIndex) {
@@ -889,6 +969,7 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
     emissiveInstances: Uint32Array.from(picks),
     emissiveCdf,
     moving,
+    deflectors: deflectorTable(ordered, packed, table),
     voxelWords,
   };
 }

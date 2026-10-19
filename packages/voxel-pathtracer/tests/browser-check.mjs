@@ -9,9 +9,11 @@
 // - energy: white furnaces of metal and glass planes at roughness 0.2/0.5/0.8/1 and 20/60/80 degrees equal 1 (multiple-
 //   scattering compensation), gold equals Kulla-Conty's expectation from numerically integrated albedos;
 // - microfacet: the GGX plastic coat's albedo against numerical integration of the same model;
+// - glasslight: sunlight through glass slabs and off a mirror wall against closed forms (point and disk sun), and light
+//   sampling through a floating glass cube against path sampling of the same light;
 // - environment: the equirectangular map's orientation; determinism: equal seeds give identical images;
 // - convergence: error against a 4096-sample reference falls about as 1/sqrt(samples), both projections;
-// - denoise: error with and without the wavelet denoiser, overall and at object edges;
+// - denoise: error with and without the wavelet denoiser, overall and at object edges, also on two caustic scenes;
 // - lens: depth of field blurs out-of-focus edges only; motion blur spreads a moving cube along its path;
 // - viewport: disabled is bit-identical to raster, dispose restores raster, a device restore redraws the same image;
 // - capture: PNG dimensions, cancellation; `--timing` adds GPU time per frame at 1920x1080 and upload costs.
@@ -104,6 +106,17 @@ try {
     for (const name of ['rough plastic 1', 'white blend', 'white subsurface'])
       assert.ok(r[name].mean > 0.85 && r[name].mean < 1.005, `${name}: ${r[name].mean}`);
   }
+  if (wanted('glasslight')) {
+    const r = await run('glasslight');
+    for (const [name, s] of Object.entries(r)) {
+      if (name === 'errors') continue;
+      console.log(
+        `  ${name}: ${s.mean.toFixed(4)} expected ${s.expected.toFixed(4)} (${((s.mean / s.expected - 1) * 100).toFixed(2)}%, sd ${s.sd.toFixed(4)}, ${s.pixels} px)`,
+      );
+      assert.ok(s.pixels > 300, `${name}: the floor fills the view`);
+      near(s.mean, s.expected, s.expected * 0.01, name);
+    }
+  }
   if (wanted('microfacet')) {
     const r = await run('microfacet');
     for (const [name, m] of Object.entries(r)) {
@@ -167,13 +180,23 @@ try {
   }
   if (wanted('denoise')) {
     const r = await run('denoise');
-    for (const name of ['diffuse', 'opaque', 'materials']) {
-      const d = r[name];
+    for (const name of ['diffuse', 'opaque', 'materials', 'caustics']) {
+      const d = r[name],
+        // Error against the converged image: the reference's own noise removed in quadrature.
+        clean = (e) => Math.sqrt(Math.max(e * e - d.refNoise * d.refNoise, 0));
       for (const n of [4, 16, 64, 1024])
         console.log(
-          `  ${name} ${n} spp: RMSE raw ${d[n].raw.toFixed(5)} denoised ${d[n].denoised.toFixed(5)} (x${(d[n].raw / d[n].denoised).toFixed(2)}); edges raw ${d[n].rawEdges.toFixed(5)} denoised ${d[n].denoisedEdges.toFixed(5)} (${d.edgePixels} px)`,
+          `  ${name} ${n} spp: RMSE raw ${d[n].raw.toFixed(5)} denoised ${d[n].denoised.toFixed(5)} (x${(d[n].raw / d[n].denoised).toFixed(2)}, x${(clean(d[n].raw) / clean(d[n].denoised)).toFixed(2)} without the reference's noise ${d.refNoise.toFixed(5)}); edges raw ${d[n].rawEdges.toFixed(5)} denoised ${d[n].denoisedEdges.toFixed(5)} (${d.edgePixels} px)`,
         );
-      // Asserted on the diffuse scene; the glossy and glass scenes are reported (their small-sun caustics dominate).
+      // The glass scenes (caustics through glass, by mirrors and glossy metal): denoising at least halves the error
+      // on the materials scene and nearly so on the caustics scene (README, "Denoiser").
+      if (name === 'materials' || name === 'caustics')
+        for (const n of [4, 16, 64])
+          assert.ok(
+            clean(d[n].denoised) * (name === 'materials' ? 2 : 1.6) <= clean(d[n].raw),
+            `${name} ${n} spp: denoising reduces error enough`,
+          );
+      // Edges asserted on the diffuse scene.
       if (name !== 'diffuse') continue;
       for (const n of [4, 16]) assert.ok(d[n].denoised < d[n].raw * 0.6, `${name} ${n} spp: denoising reduces error`);
       assert.ok(d[64].denoised < d[64].raw * 0.75, `${name} 64 spp: denoising reduces error`);

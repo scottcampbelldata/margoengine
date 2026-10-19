@@ -143,10 +143,11 @@ test('maxSamples stops tracing (converged) while the image is still drawn', asyn
   tracer.dispose();
 });
 
-test('denoising adds one prepare and five wavelet dispatches when new samples arrive', async () => {
-  const { tracer, frame } = await ready({ denoise: true, maxSamples: 2 });
-  assert.deepEqual(kinds(frame()), ['1 dispatch', '6 dispatch', 'draw3']);
-  assert.deepEqual(kinds(frame()), ['1 dispatch', '6 dispatch', 'draw3']);
+test('denoising adds a prepare, five regular and six caustic wavelet levels and a combine when new samples arrive', async () => {
+  const { tracer, frame, device } = await ready({ denoise: true, maxSamples: 2 });
+  assert.deepEqual(kinds(frame()), ['1 dispatch', '13 dispatch', 'draw3']);
+  assert.equal(traced(device).flags & 64, 64, 'the trace splits off the caustic part');
+  assert.deepEqual(kinds(frame()), ['1 dispatch', '13 dispatch', 'draw3']);
   assert.deepEqual(kinds(frame()), ['draw3'], 'converged: the denoised image is reused');
   tracer.dispose();
 });
