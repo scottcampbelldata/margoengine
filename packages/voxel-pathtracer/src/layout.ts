@@ -7,7 +7,7 @@ export const MODEL_WORDS = 12;
 /** Words per instance record: to-local rows, to-world rows, previous to-world rows, model, flags, light pick, 0. */
 export const INSTANCE_WORDS = 40;
 /** Words per hierarchy node. */
-export const NODE_WORDS = 8;
+const NODE_WORDS = 8;
 /** Bytes of the frame uniform. */
 export const FRAME_BYTES = 368;
 /** Frame uniform flag bits (config.z). */

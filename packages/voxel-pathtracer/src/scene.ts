@@ -15,25 +15,25 @@ import type {
 } from './types.js';
 
 /** Voxels per brick edge. Bricks are the coarse traversal level. */
-export const BRICK = 8;
+const BRICK = 8;
 /** u32 words of a mixed brick (one byte per voxel). */
 export const BRICK_WORDS = (BRICK * BRICK * BRICK) / 4;
 /** Grid entry flag of a brick whose voxels are all one non-zero palette index (index in the low byte). */
 export const UNIFORM = 0x80000000;
 /** Instances at most: ids AOVs store `(instance + 1) * 256 + palette` exactly in a float. */
-export const MAX_INSTANCES = 65535;
+const MAX_INSTANCES = 65535;
 /** Area lights at most. */
-export const MAX_LIGHTS = 256;
+const MAX_LIGHTS = 256;
 /** Material flags (float 15 of a packed material). */
 export const MEDIA = 1,
-  VOLUME = 2,
   EMISSIVE = 4,
-  SMOOTH = 8,
+  SMOOTH = 8;
+const VOLUME = 2,
   PRESENT = 16;
 /** Roughness squared below which reflection and refraction are perfectly specular. */
 export const DELTA_ALPHA = 1e-3;
 /** Floats per packed material, 256 materials. */
-export const MATERIAL_FLOATS = 16;
+const MATERIAL_FLOATS = 16;
 
 const TYPES: readonly TraceMaterialType[] = ['diffuse', 'plastic', 'metal', 'glass', 'emit', 'blend', 'media'];
 const where = 'VoxelPathTracer';
@@ -63,7 +63,7 @@ interface ModelEmitters {
 }
 
 /** An instance as traced: rows of its affine transforms (3 x 4, row-major). */
-export interface SnapshotInstance {
+interface SnapshotInstance {
   readonly id: string;
   /** Index in the caller's `scene.instances`. */
   readonly source: number;
@@ -80,7 +80,7 @@ export interface SnapshotInstance {
 }
 
 /** Environment with defaults applied. */
-export interface ResolvedEnvironment {
+interface ResolvedEnvironment {
   readonly sky: TraceVec3;
   readonly sunDirection: TraceVec3;
   /** Sun irradiance colour (colour times intensity). */
@@ -177,7 +177,7 @@ const checkList = <T>(value: unknown, name: string): readonly T[] => {
 };
 
 /** Rows (3 x 4, row-major) of a column-major affine matrix; throws for a wrong shape, non-affine or singular matrix. */
-export function affineRows(matrix: unknown, name: string): Float64Array {
+function affineRows(matrix: unknown, name: string): Float64Array {
   if ((!Array.isArray(matrix) && !ArrayBuffer.isView(matrix)) || (matrix as ArrayLike<unknown>).length !== 16)
     throw new TypeError(`${where} ${name} must be 16 numbers (a column-major 4x4 matrix)`);
   const m = matrix as ArrayLike<unknown>;
@@ -204,7 +204,7 @@ const det3 = (r: ArrayLike<number>) =>
   r[0] * (r[5] * r[10] - r[6] * r[9]) - r[1] * (r[4] * r[10] - r[6] * r[8]) + r[2] * (r[4] * r[9] - r[5] * r[8]);
 
 /** Inverse of affine rows (3 x 4, row-major). */
-export function invertRows(r: ArrayLike<number>): Float64Array {
+function invertRows(r: ArrayLike<number>): Float64Array {
   const det = det3(r),
     out = new Float64Array(12);
   // Inverse 3x3: columns are the cross products of the rows over the determinant.
@@ -229,7 +229,7 @@ export function invertRows(r: ArrayLike<number>): Float64Array {
 }
 
 /** Packs a dense model into bricks (throws for a wrong shape before reading voxels). */
-export function packModel(model: TraceModel, name: string): PackedModel {
+function packModel(model: TraceModel, name: string): PackedModel {
   const size = checkVec3(model.size, `${name}.size`, true, 'pass integer dimensions 1 to 256');
   if (!size.every((v) => Number.isInteger(v) && v >= 1 && v <= 256))
     throw new RangeError(
@@ -310,7 +310,7 @@ export function packModel(model: TraceModel, name: string): PackedModel {
 }
 
 /** Palette index of a model cell, 0 outside the model. */
-export function voxelAt(m: PackedModel, x: number, y: number, z: number): number {
+function voxelAt(m: PackedModel, x: number, y: number, z: number): number {
   if (x < 0 || y < 0 || z < 0 || x >= m.size[0] || y >= m.size[1] || z >= m.size[2]) return 0;
   const [bx, , bz] = m.bricks,
     entry = m.grid[(x >> 3) + bx * ((z >> 3) + bz * (y >> 3))];
@@ -431,7 +431,7 @@ function modelEmitters(m: PackedModel, materials: Float32Array, cache: SceneCach
 }
 
 /** Mean world area of a unit face under affine rows (for picking emissive instances). */
-export function faceAreas(rows: ArrayLike<number>): [number, number, number] {
+function faceAreas(rows: ArrayLike<number>): [number, number, number] {
   const col = (c: number) => [rows[c], rows[4 + c], rows[8 + c]];
   const area = (a: number[], b: number[]) =>
     Math.hypot(a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]);
@@ -458,7 +458,7 @@ function growBox(box: Float64Array, rows: ArrayLike<number>, size: readonly numb
  * (so depth stays under 12 + log2(count) + 1, at most 29 for 65,535 boxes), at most 2 boxes per leaf. Returns the
  * nodes and the leaf order of the boxes.
  */
-export function buildHierarchy(boxes: Float64Array, count: number): { nodes: Uint32Array; order: Int32Array } {
+function buildHierarchy(boxes: Float64Array, count: number): { nodes: Uint32Array; order: Int32Array } {
   const order = new Int32Array(count).map((_, i) => i),
     nodes: number[] = [],
     f32 = new Float32Array(1),

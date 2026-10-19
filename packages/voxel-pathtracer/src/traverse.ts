@@ -4,7 +4,7 @@
 import { BRICK_WORDS, type PackedModel, type SceneSnapshot, UNIFORM } from './scene.js';
 
 /** Result of {@link march}: the boundary crossed and the cell entered. */
-export interface MarchHit {
+interface MarchHit {
   /** Ray parameter of the boundary (world distance when the world direction is unit length). */
   t: number;
   /** Palette index of the cell entered (0 for empty space or leaving the model). */
@@ -25,7 +25,7 @@ const inverse = (d: number) => 1 / (Math.abs(d) < TINY ? (d < 0 ? -TINY : TINY) 
  * first boundary into a cell whose palette index differs from `target` (0 outside a volume). When `target` is not 0
  * and the ray leaves the model first, the exit through the model's box is returned with value 0.
  */
-export function march(
+function march(
   m: PackedModel,
   ox: number,
   oy: number,
