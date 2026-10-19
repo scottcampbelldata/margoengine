@@ -16,16 +16,41 @@ export type { LocalShadowOptions, LocalLightShadow, LocalShadowSource, LocalShad
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number; COPY_SRC: number };
 export interface PointLight {
   position: Vec3;
+  /**
+   * Distance where the light ends, windowed smoothly: `clamp(1 - (d / range)^4, 0, 1)^2`. 0 is unlimited (window 1;
+   * the light reaches every cluster), not allowed for a light with a shadow map.
+   */
   range: number;
   color?: Vec3;
   intensity?: number;
+  /**
+   * Distance falloff exponent, 0 or more: attenuation is `window / max(d^decay, 0.01)` (2 is inverse-square, 0 none).
+   * A light that sets neither `decay` nor `angle` keeps the original inverse-square shader term, `d * d`, bit for bit.
+   */
+  decay?: number;
   shadow?: boolean | LocalLightShadow;
   castShadow?: boolean;
 }
 export interface SpotLight extends PointLight {
   direction: Vec3;
-  outerAngle: number;
+  /** Cone half-angle in radians, below pi / 2, with `innerAngle` (0 to outer) where the smooth edge starts. */
+  outerAngle?: number;
   innerAngle?: number;
+  /**
+   * Instead of outer/inner: cone half-angle in radians, below pi / 2. The cone is
+   * `smoothstep(cos(angle), cos(angle * (1 - penumbra)), dot(-L, direction))`, so it is outer = angle,
+   * inner = angle * (1 - penumbra); penumbra 0 is a hard edge.
+   */
+  angle?: number;
+  /** With `angle`: share of the cone that fades, 0 (hard edge, default) to 1. */
+  penumbra?: number;
+}
+/** What `Clustered.add` hands a receiver: this lighting, or the same without local-light shadows. */
+export interface ClusteredLighting {
+  readonly owner?: Engine;
+  pbr(group: number): { declarations: string; light: string };
+  shader(source: string, group?: number): string;
+  bindings(): GPUBindGroupEntry[];
 }
 export interface ClusteredOptions {
   grid?: readonly [number, number, number];
@@ -40,7 +65,7 @@ export interface ClusteredArea {
   bindings(): GPUBindGroupEntry[];
 }
 export interface ClusteredReceiver {
-  addLighting(effect: Clustered): () => void;
+  addLighting(effect: ClusteredLighting): () => void;
 }
 export class Clustered implements EnginePlugin {
   readonly name = 'clustered';
@@ -56,7 +81,20 @@ export class Clustered implements EnginePlugin {
   private counts?: GPUBuffer;
   private indices?: GPUBuffer;
   private entries: GPUBindGroupEntry[] = [];
+  /** Bindings 4-7 alone: `entries` without the integrated shadow maps. */
+  private lightEntries: GPUBindGroupEntry[] = [];
   private receivers = new Map<ClusteredReceiver, () => void>();
+  /** Some light sets `decay` or `angle`: the shaders carry `decayTerms`. */
+  private decay = false;
+  /** This lighting without local-light shadows, for receivers added with `receiveShadow: false`. */
+  private readonly unshadowed: ClusteredLighting = ((lights: Clustered) => ({
+    get owner() {
+      return lights.engine;
+    },
+    pbr: (group: number) => lights.pbr(group, false),
+    shader: (source: string, group?: number) => lights.shader(source, group, false),
+    bindings: () => lights.bindings(false),
+  }))(this);
   private readonly values = new Float32Array(32);
   private readonly ints = new Uint32Array(this.values.buffer);
   private readonly data = new Float32Array(1024 * 16);
@@ -69,12 +107,11 @@ export class Clustered implements EnginePlugin {
   private readonly hooks = new Map<number, { declarations: string; light: string }>();
   private shadowHook?: ClusteredShadow;
   private areaHook?: ClusteredArea;
-  private joined?: [
-    GPUBindGroupEntry[] | undefined,
-    GPUBindGroupEntry[] | undefined,
-    GPUBindGroupEntry[],
-    GPUBindGroupEntry[],
-  ];
+  /** Joined bindings without (0) and with (1) shadows: the parts they were joined from, then the result. */
+  private readonly joined: (
+    | [GPUBindGroupEntry[] | undefined, GPUBindGroupEntry[] | undefined, GPUBindGroupEntry[], GPUBindGroupEntry[]]
+    | undefined
+  )[] = [];
   get shadow(): ClusteredShadow | undefined {
     return this.shadowHook;
   }
@@ -118,58 +155,105 @@ export class Clustered implements EnginePlugin {
       finiteVector(light.color ?? [1, 1, 1], 3, 'Light color');
       if (
         !Number.isFinite(Math.fround(light.range)) ||
-        light.range <= 0 ||
+        light.range < 0 ||
         !Number.isFinite(Math.fround(light.intensity ?? 1)) ||
         (light.intensity ?? 1) < 0 ||
         (light.color ?? []).some((v: number) => v < 0)
       )
         throw new RangeError('Invalid light range/color/intensity');
+      if (light.decay !== undefined && !(Number.isFinite(Math.fround(light.decay)) && light.decay >= 0))
+        throw new RangeError('Light decay must be a finite number of 0 or more; 2 is inverse-square');
+      if (light.range === 0 && (light.castShadow || (light.shadow !== undefined && light.shadow !== false)))
+        throw new RangeError('A light with a shadow map needs a finite range (0 is unlimited); give it a range');
       if ('direction' in light) {
         finiteVector(light.direction, 3, 'Spot direction');
-        if (
+        const { angle, penumbra = 0 } = light;
+        if (angle !== undefined) {
+          if (light.outerAngle !== undefined || light.innerAngle !== undefined)
+            throw new TypeError('Spot light: give angle and penumbra, or outerAngle and innerAngle, not both');
+          if (!(angle > 0 && angle < Math.PI / 2 && penumbra >= 0 && penumbra <= 1) || !Math.hypot(...light.direction))
+            throw new RangeError('Spot angle must be in (0, pi/2) radians, penumbra in 0..1, direction nonzero');
+        } else if (light.penumbra !== undefined)
+          throw new TypeError('Spot penumbra goes with angle; use innerAngle with outerAngle');
+        else if (
           !Math.hypot(...light.direction) ||
           !Number.isFinite(light.outerAngle) ||
-          light.outerAngle <= 0 ||
-          light.outerAngle >= Math.PI / 2 ||
+          light.outerAngle! <= 0 ||
+          light.outerAngle! >= Math.PI / 2 ||
           !Number.isFinite(light.innerAngle ?? 0) ||
           (light.innerAngle ?? 0) < 0 ||
-          (light.innerAngle ?? 0) > light.outerAngle
+          (light.innerAngle ?? 0) > light.outerAngle!
         )
           throw new RangeError('Invalid spot cone');
       }
     }
-    if (this.localShadows) this.localShadows.configure(lights);
+    const fresh = (light: PointLight | SpotLight) =>
+      light.decay !== undefined || (light as SpotLight).angle !== undefined;
+    // Local shadow maps read the outer cone; an angle is that cone.
+    if (this.localShadows)
+      this.localShadows.configure(
+        lights.map((light) =>
+          (light as SpotLight).angle === undefined ? light : { ...light, outerAngle: (light as SpotLight).angle },
+        ),
+      );
     else if (lights.some((light) => light.shadow !== undefined && light.shadow !== false))
       throw new RangeError('Light shadows require ClusteredOptions.shadows');
     let shadows = 0;
     lights.forEach((light, i) => {
-      const offset = i * 16;
-      this.data.set([...light.position, light.range, ...(light.color ?? [1, 1, 1]), light.intensity ?? 1], offset);
+      const offset = i * 16,
+        decay = light.decay ?? 2;
+      // Range 0 is unlimited: the window of an infinite range is 1 and culling never drops the light.
+      this.data.set(
+        [...light.position, light.range || Infinity, ...(light.color ?? [1, 1, 1]), light.intensity ?? 1],
+        offset,
+      );
       if ('direction' in light) {
-        const length = Math.hypot(...light.direction);
+        const length = Math.hypot(...light.direction),
+          { angle, penumbra = 0 } = light;
         this.data.set(
           [
             ...light.direction.map((v: number) => v / length),
-            Math.cos(light.outerAngle),
-            Math.cos(light.innerAngle ?? 0),
-            1,
+            Math.cos(angle ?? light.outerAngle!),
+            Math.cos(angle === undefined ? (light.innerAngle ?? 0) : angle * (1 - penumbra)),
+            fresh(light) ? 2 + decay : 1,
             0,
             0,
           ],
           offset + 8,
         );
-      } else this.data.fill(0, offset + 8, offset + 16);
+      } else {
+        this.data.fill(0, offset + 8, offset + 16);
+        if (fresh(light)) this.data[offset + 13] = -1 - decay;
+      }
       this.data[offset + 14] = light.castShadow ? ++shadows : 0;
       if (this.localShadows) this.data[offset + 15] = this.localShadows.shadowIndex(i);
     });
+    const decay = lights.some(fresh);
+    if (decay !== this.decay) {
+      this.decay = decay;
+      this.shaders.clear();
+      this.hooks.clear();
+    }
     this.lightCount = lights.length;
     this.dirty = true;
     return this;
   }
-  add(receiver: ClusteredReceiver): () => void {
-    if (this.disposed || !receiver || typeof receiver.addLighting !== 'function' || this.receivers.has(receiver))
+  /**
+   * Lights `receiver` (a gltf-pro model, materials mesh or terrain; core meshes are lit without it). With
+   * `receiveShadow: false` it gets the same lighting without local-light shadows: their maps neither darken it nor
+   * need it to cast (cast with `addShadowCaster` or `LocalShadows.add`). Core meshes share core's shader and always
+   * receive. Returns the remover.
+   */
+  add(receiver: ClusteredReceiver, { receiveShadow = true }: { receiveShadow?: boolean } = {}): () => void {
+    if (
+      this.disposed ||
+      !receiver ||
+      typeof receiver.addLighting !== 'function' ||
+      this.receivers.has(receiver) ||
+      typeof receiveShadow !== 'boolean'
+    )
       throw new TypeError('Invalid or duplicate clustered receiver');
-    const remove = receiver.addLighting(this);
+    const remove = receiver.addLighting(receiveShadow ? this : this.unshadowed);
     this.receivers.set(receiver, remove);
     return () => {
       if (this.receivers.delete(receiver)) remove();
@@ -181,29 +265,41 @@ export class Clustered implements EnginePlugin {
       throw new Error('Light shadows require a live ClusteredOptions.shadows effect');
     return this.localShadows.add(source);
   }
-  bindings(): GPUBindGroupEntry[] {
+  /** The lit shader's bindings; `shadows: false` leaves out the local shadow maps (see `add`). */
+  bindings(shadows = true): GPUBindGroupEntry[] {
     if (!this.uniform || this.disposed) throw new Error('Clustered lighting is not attached');
-    const shadow = this.shadowHook?.bindings(),
+    const own = shadows ? this.entries : this.lightEntries,
+      shadow = shadows ? this.shadowHook?.bindings() : undefined,
       area = this.areaHook?.bindings();
-    if (!shadow && !area) return this.entries;
-    let joined = this.joined;
-    if (!joined || joined[0] !== shadow || joined[1] !== area || joined[2] !== this.entries)
-      this.joined = joined = [shadow, area, this.entries, [...this.entries, ...(shadow ?? []), ...(area ?? [])]];
+    if (!shadow && !area) return own;
+    let joined = this.joined[+shadows];
+    if (!joined || joined[0] !== shadow || joined[1] !== area || joined[2] !== own)
+      this.joined[+shadows] = joined = [shadow, area, own, [...own, ...(shadow ?? []), ...(area ?? [])]];
     return joined[3];
   }
-  pbr(group: number): { declarations: string; light: string } {
-    let hook = this.hooks.get(group);
+  /** gltf-pro lighting hooks in bind group `group`; `shadows: false` leaves out local-light shadows (see `add`). */
+  pbr(group: number, shadows = true): { declarations: string; light: string } {
+    // Hooks and shaders without shadows are cached under -1 - group.
+    const key = shadows ? group : -1 - group;
+    let hook = this.hooks.get(key);
     if (!hook) {
       hook = {
-        declarations: clusteredSampling(group, this.shadowHook, this.areaHook, !!this.localShadows),
+        declarations: this.sampling(group, shadows),
         light: 'clusterLighting(i.clip.xy,i.position,s.n,f.eye.xyz,s.base.rgb,s.roughness,s.metal)',
       };
-      this.hooks.set(group, hook);
+      this.hooks.set(key, hook);
     }
     return hook;
   }
-  shader(source: string, group = 0): string {
-    let cache = this.shaders.get(group);
+  private sampling(group: number, shadows: boolean): string {
+    return shadows
+      ? clusteredSampling(group, this.shadowHook, this.areaHook, !!this.localShadows, this.decay)
+      : clusteredSampling(group, undefined, this.areaHook, false, this.decay);
+  }
+  /** Patches a core-style lit shader with the clustered light loop; `shadows: false` without local-light shadows. */
+  shader(source: string, group = 0, shadows = true): string {
+    const key = shadows ? group : -1 - group;
+    let cache = this.shaders.get(key);
     const cached = cache?.get(source);
     if (cached) return cached;
     const base = source.includes('let base=terrainColor') ? 'base' : 'i.color';
@@ -217,10 +313,10 @@ export class Clustered implements EnginePlugin {
         'var color=clusterLighting(i.clip.xy,i.position,s.n,f.eye.xyz,s.base.rgb,s.roughness,s.metal)+',
       );
     if (code === source) throw new Error('Clustered lighting requires the standard PBR shader');
-    const output = clusteredSampling(group, this.shadowHook, this.areaHook, !!this.localShadows) + code;
+    const output = this.sampling(group, shadows) + code;
     if (!cache) {
       cache = new Map();
-      this.shaders.set(group, cache);
+      this.shaders.set(key, cache);
     }
     cache.set(source, output);
     return output;
@@ -243,7 +339,7 @@ export class Clustered implements EnginePlugin {
       layout: 'auto',
       compute: { module: this.device.createShaderModule({ code: cullingShader }), entryPoint: 'main' },
     });
-    this.entries = [this.uniform, this.lights, this.counts, this.indices].map((buffer, i) => ({
+    this.entries = this.lightEntries = [this.uniform, this.lights, this.counts, this.indices].map((buffer, i) => ({
       binding: i + 4,
       resource: { buffer },
     }));
@@ -338,7 +434,7 @@ export class Clustered implements EnginePlugin {
     this.uniform = this.lights = this.counts = this.indices = undefined;
     this.pipeline = undefined;
     this.group = undefined;
-    this.entries = [];
+    this.entries = this.lightEntries = [];
     this.shaders.clear();
   }
   onDeviceRestored(engine: Engine): void {

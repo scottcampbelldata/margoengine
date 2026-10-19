@@ -37,11 +37,26 @@ export const cullingShader =
   }
   clusterCounts[id]=count;
 }`;
+// A light's distance falloff and spot cone, as written before lights had a decay.
+const legacyTerms = /* wgsl */ `let falloff=pow(max(0.0,1-pow(distance/light.positionRange.w,4.0)),2.0)/max(distance*distance,0.01);
+    var cone=1.0;if(light.params.y>0.5){cone=clamp((dot(-l,light.directionOuter.xyz)-light.directionOuter.w)/max(light.params.x-light.directionOuter.w,0.00001),0.0,1.0);cone*=cone*(3-2*cone);}`;
+/**
+ * The same terms once any light sets `decay` or `angle` (`setLights`): params.y holds 0 (point) or 1 (spot) for a light
+ * that sets neither, which keeps the terms above, and -(1 + decay) (point) or 2 + decay (spot) for one that does, so
+ * every `params.y > 0.5` spot test elsewhere still holds. Those lights get window / max(d^decay, 0.01) and the cone
+ * smoothstep(cos outer, cos inner, dot(-L, direction)), a hard edge when the two are equal (penumbra 0).
+ */
+const decayTerms = /* wgsl */ `let kind=light.params.y;let legacy=kind==0.0||kind==1.0;let decay=select(-1.0-kind,kind-2.0,kind>0.5);
+    let falloff=pow(max(0.0,1-pow(distance/light.positionRange.w,4.0)),2.0)/select(max(pow(max(distance,0.0001),decay),0.01),max(distance*distance,0.01),legacy);
+    var cone=1.0;if(kind>0.5){let x=dot(-l,light.directionOuter.xyz);let lo=light.directionOuter.w;let hi=light.params.x;
+      if(legacy){cone=clamp((x-lo)/max(hi-lo,0.00001),0.0,1.0);}else if(hi>lo){cone=clamp((x-lo)/(hi-lo),0.0,1.0);}else{cone=select(0.0,1.0,x>=lo);}
+      cone*=cone*(3-2*cone);}`;
 export function clusteredSampling(
   group: number,
   shadow?: boolean | { declarations(group: number): string },
   area?: { declarations(group: number): string },
   integratedShadows = false,
+  decay = false,
 ): string {
   const shadows = shadow === true || integratedShadows,
     hook = typeof shadow === 'object' ? shadow : undefined;
@@ -68,8 +83,7 @@ fn clusterLighting(pixel:vec2f,position:vec3f,n:vec3f,eye:vec3f,base:vec3f,rough
     let d=a2/(3.14159265*pow(nh*nh*(a2-1)+1,2.0));
     let g=2*nv/(nv+sqrt(a2+(1-a2)*nv*nv))*2*nl/max(nl+sqrt(a2+(1-a2)*nl*nl),0.0001);
     let f0=mix(vec3f(0.04),base,metal);let fresnel=f0+(1-f0)*pow(1-vh,5.0);
-    let falloff=pow(max(0.0,1-pow(distance/light.positionRange.w,4.0)),2.0)/max(distance*distance,0.01);
-    var cone=1.0;if(light.params.y>0.5){cone=clamp((dot(-l,light.directionOuter.xyz)-light.directionOuter.w)/max(light.params.x-light.directionOuter.w,0.00001),0.0,1.0);cone*=cone*(3-2*cone);}
+    ${decay ? decayTerms : legacyTerms}
     result+=((1-fresnel)*(1-metal)*base/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl*light.colorIntensity.rgb*light.colorIntensity.w*falloff*cone${hook ? '*clusterShadow(light,position,n)' : ''}${shadows ? '*clusterShadowVisibility(light,position,n)' : ''};
   }
   return ${area ? '(result+clusterAreaLighting(position,n,v,nv,base,roughness,metal))' : 'result'}*clusterFrame.intensity.x;

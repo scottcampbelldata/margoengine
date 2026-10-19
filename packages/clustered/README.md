@@ -15,14 +15,34 @@ lights.setLights([
 engine.start();
 ```
 
-Positions and directions are world space; cone angles are radians below π/2. Light radiance uses smooth range attenuation, inverse-square distance attenuation, and smooth inner/outer spot cones. `setLights()` replaces the list, validates all entries before changing it, and uploads only when called. Animate lights by calling it before rendering. Camera transformations and culling happen on the GPU.
+Positions and directions are world space; cone angles are radians below π/2. Light radiance uses smooth range attenuation, inverse-square distance attenuation, and smooth inner/outer spot cones.
+
+Crocotile's (three.js-style) light parameters map one to one, with the falloff `@margoengine/bvh`'s vertex-light bake uses:
+
+```ts
+lights.setLights([
+  {position:[0,3,0], range:0, decay:1, color:[1,0.8,0.6], intensity:4},                     // Distance 0: unlimited
+  {position:[2,4,0], range:10, decay:2, direction:[0,-1,0], angle:0.5, penumbra:0.3, intensity:8},
+]);
+```
+
+- Attenuation is `window / max(d^decay, 0.01)` with `window = range > 0 ? clamp(1 - (d/range)^4, 0, 1)^2 : 1`.
+  `decay` defaults to 2 (inverse-square); 0 turns distance falloff off. `range: 0` is unlimited (the light reaches every
+  cluster); a light with a shadow map needs a finite range.
+- A spot takes `angle` (half-angle, below π/2) and `penumbra` (0 to 1, default 0) instead of `outerAngle`/`innerAngle`:
+  the cone is `smoothstep(cos(angle), cos(angle * (1 - penumbra)), dot(-L, direction))`, so outer = angle and
+  inner = angle × (1 − penumbra); penumbra 0 is a hard edge. Giving both forms throws.
+- A light that sets neither `decay` nor `angle` keeps the original shader term (`d * d`, and the cone's 1e-5 floor) bit
+  for bit, and while no light sets them the shaders are exactly the original ones. Once one does, the light loop
+  evaluates each light by its own form. The volumetric fog's light loop in `@margoengine/environment`
+  still uses inverse-square for every light. `setLights()` replaces the list, validates all entries before changing it, and uploads only when called. Animate lights by calling it before rendering. Camera transformations and culling happen on the GPU.
 
 `lights.intensityScale` multiplies all local light radiance and defaults to 1.
 Set a nonnegative finite GPU-float value or a callback sampled each render, such
 as `() => sky.nightFactor` for automatic night lights. Zero clears the GPU cluster
 lists; authored intensities remain unchanged. The setting survives restoration.
 
-Core meshes receive local lighting automatically. Call `lights.add(pbrModel)` or `lights.add(terrain)` for optional renderers; the returned function unregisters the receiver. Directional shadows compose with local lighting in either registration order.
+Core meshes receive local lighting automatically. Call `lights.add(pbrModel)` or `lights.add(terrain)` for optional renderers; the returned function unregisters the receiver. `lights.add(model, {receiveShadow: false})` lights it without any local-light shadow (integrated maps or `LocalShadows`); casting stays per object through `addShadowCaster` / `LocalShadows.add`. Core meshes share core's shader and always receive. Directional shadows compose with local lighting in either registration order.
 
 ## Point and spot shadows
 

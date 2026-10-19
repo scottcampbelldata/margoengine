@@ -119,7 +119,7 @@ test('game modules reject bad inputs before allocating GPU resources', () => {
     assert.throws(() => new Shadows(options), /options/);
   assert.throws(() => new Clustered({ grid: [0, 9, 24] }), /grid/);
   const lights = new Clustered();
-  assert.throws(() => lights.setLights([{ position: [0, 0, 0], range: 0 }]), /range/);
+  assert.throws(() => lights.setLights([{ position: [0, 0, 0], range: -1 }]), /range/);
   assert.throws(
     () => lights.setLights([{ position: [0, 0, 0], range: 1, direction: [0, 0, 0], outerAngle: 0.2 }]),
     /cone/,

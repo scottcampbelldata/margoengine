@@ -11,6 +11,7 @@ import {
   type Camera,
   type Vec3,
 } from '@margoengine/core/extension';
+import { MargoError } from '@margoengine/math/errors';
 import { preset } from '../../shared/preset.js';
 import { instanceLayout, instancedDepth } from '../../shared/instances.js';
 import { shadowPrimitivesInto } from '../../shared/shadow-source.js';
@@ -87,6 +88,8 @@ export interface ShadowSource {
 interface Source {
   source: ShadowSource | Mesh;
   static: boolean;
+  /** Draws into the shadow map (`castShadow`). */
+  cast: boolean;
   version: number;
   removeLighting?: () => void;
   meshPrimitive?: ShadowPrimitive[];
@@ -255,8 +258,29 @@ export class Shadows implements EnginePlugin {
       if (!Number.isFinite(Math.fround(v)) || v < 0) throw new RangeError('Invalid shadow options');
     }
   }
-  add(source: ShadowSource | MeshHandle, { static: cached = false }: { static?: boolean } = {}): () => void {
-    if (this.disposed || !source || typeof cached !== 'boolean') throw new TypeError('Invalid shadow source');
+  /**
+   * Adds `source` (a core mesh, gltf-pro model, materials mesh or custom source) as a shadow caster and, for sources
+   * with their own lighting (`addLighting`: gltf-pro models, materials meshes, terrain), a receiver. `castShadow: false`
+   * keeps it out of the shadow map; `receiveShadow: false` leaves its lighting unshadowed (both default true, as
+   * Crocotile's per-object Cast Shadows and Receive Shadows). Core meshes share core's shader, so every core mesh
+   * receives and `receiveShadow: false` is refused for one. `static` caches it in the still map. Returns the remover.
+   */
+  add(
+    source: ShadowSource | MeshHandle,
+    {
+      static: cached = false,
+      castShadow = true,
+      receiveShadow = true,
+    }: { static?: boolean; castShadow?: boolean; receiveShadow?: boolean } = {},
+  ): () => void {
+    if (
+      this.disposed ||
+      !source ||
+      typeof cached !== 'boolean' ||
+      typeof castShadow !== 'boolean' ||
+      typeof receiveShadow !== 'boolean'
+    )
+      throw new TypeError('Invalid shadow source');
     if ('disposed' in source && source.disposed) throw new Error('Shadow source is disposed');
     const runtime = 'id' in source ? meshRuntime(source as MeshHandle) : (source as ShadowSource);
     if ('id' in runtime) {
@@ -273,8 +297,13 @@ export class Shadows implements EnginePlugin {
     if (this.sources.some((r) => r.source === runtime)) throw new Error('Duplicate shadow source');
     const triangles = 'id' in runtime ? meshTriangles(runtime) : undefined,
       lightingSource = triangles?.kind === 'pbr' ? (triangles.source.model as ShadowSource) : (runtime as ShadowSource);
+    if (!receiveShadow && 'id' in runtime && triangles?.kind !== 'pbr')
+      throw new MargoError(
+        'unsupported',
+        "Shadows: a core mesh always receives (core's one shader is patched for all); use a materials or gltf-pro mesh for receiveShadow: false",
+      );
     let removeLighting: (() => void) | undefined;
-    if (typeof lightingSource.addLighting === 'function') {
+    if (receiveShadow && typeof lightingSource.addLighting === 'function') {
       let owner = this.lightingOwners.get(lightingSource);
       if (owner) owner.count++;
       else {
@@ -288,7 +317,7 @@ export class Shadows implements EnginePlugin {
         }
       };
     }
-    const r: Source = { source: runtime, static: cached, version: -1, removeLighting };
+    const r: Source = { source: runtime, static: cached, cast: castShadow, version: -1, removeLighting };
     this.sources.push(r);
     this.invalidate();
     return () => {
@@ -516,6 +545,7 @@ export class Shadows implements EnginePlugin {
     let hash = 2166136261;
     for (let i = 0; i < this.sources.length; i++) {
       const r = this.sources[i];
+      if (!r.cast) continue;
       if (r.static) {
         if ('shadowVersion' in r.source && r.version !== r.source.shadowVersion) {
           r.version = r.source.shadowVersion ?? 0;
@@ -689,7 +719,7 @@ export class Shadows implements EnginePlugin {
   }
   private casters(record: Source, level: number): readonly ShadowPrimitive[] {
     const source = record.source;
-    if ('drawShadow' in source && source.drawShadow) return emptyPrimitives;
+    if (!record.cast || ('drawShadow' in source && source.drawShadow)) return emptyPrimitives;
     if ('id' in source) {
       const triangles = meshTriangles(source);
       if (!triangles) return emptyPrimitives;
@@ -750,7 +780,7 @@ export class Shadows implements EnginePlugin {
       for (let i = 0; i < this.sources.length; i++) {
         const r = this.sources[i];
         const callback = 'drawShadow' in r.source ? r.source.drawShadow : undefined;
-        if ('disposed' in r.source && r.source.disposed) continue;
+        if (!r.cast || ('disposed' in r.source && r.source.disposed)) continue;
         // Explicit static sources and drawShadow callbacks stay on one pass. Other sources carry both.
         if ((r.static || callback) && r.static !== cached) continue;
         if (callback) {
