@@ -198,6 +198,57 @@ test('VoxelStreamer adds closest first, at most chunksPerFrame per update', asyn
   await streamer.dispose();
 });
 
+test('VoxelStreamer stops adding once frameBudget is spent, always adds one, and keeps chunksPerFrame', async (t) => {
+  // A clock that only moves when a chunk joins: each add costs exactly 1 ms of streamer time.
+  let now = 0;
+  const realNow = performance.now;
+  performance.now = () => now;
+  t.after(() => (performance.now = realNow));
+  const world = new VoxelWorld({ blocks }),
+    seen = track(world),
+    streamer = new VoxelStreamer({ world, distance: 5, verticalDistance: 1, chunksPerFrame: Infinity, workers: 3 }),
+    centre = chunkOf([500, 70, 10]);
+  assert.equal(streamer.frameBudget, 0.5);
+  world.onChunk((cx, cy, cz, chunk) => chunk && (now += 1));
+  streamer.viewers = [[500, 70, 10]];
+  const frames = (budget, perFrame, count) => {
+    streamer.frameBudget = budget;
+    streamer.chunksPerFrame = perFrame;
+    const out = [];
+    return settle(
+      () => {
+        const n = seen.added.length;
+        streamer.update();
+        if (seen.added.length > n) out.push(seen.added.length - n);
+      },
+      () => out.length >= count || streamer.pending === 0,
+    ).then(() => out);
+  };
+  // 2.5 ms: the third chunk ends at 3 ms, so three join and the fourth waits (12 are ready: 4 per worker).
+  let added = await frames(2.5, Infinity, 20);
+  assert.ok(Math.max(...added) === 3 && added.filter((n) => n === 3).length > 10, `per update: ${added}`);
+  // 0: one chunk per update; it never stalls.
+  added = await frames(0, Infinity, 20);
+  assert.deepEqual(new Set(added), new Set([1]));
+  // chunksPerFrame still caps a larger budget.
+  added = await frames(100, 2, 20);
+  assert.ok(Math.max(...added) === 2 && added.filter((n) => n === 2).length > 10, `per update: ${added}`);
+  // Infinity: everything ready joins.
+  added = await frames(Infinity, Infinity, Infinity);
+  assert.equal(seen.added.length, ring(centre, 5, 1).size);
+  assert.ok(Math.max(...added) > 3, `per update: ${added}`);
+  assert.throws(() => (streamer.frameBudget = -1), RangeError);
+  assert.throws(() => (streamer.frameBudget = Number.NaN), RangeError);
+  assert.throws(() => (streamer.frameBudget = '1'), TypeError);
+  assert.equal(streamer.frameBudget, Infinity);
+  await streamer.dispose();
+  const other = new VoxelWorld({ blocks });
+  assert.throws(() => new VoxelStreamer({ world: other, frameBudget: -0.5 }), RangeError);
+  const zero = new VoxelStreamer({ world: other, frameBudget: 0 });
+  assert.equal(zero.frameBudget, 0);
+  await zero.dispose();
+});
+
 test('VoxelStreamer reads the store before the generator; an app module worker generates the rest; failures', async (t) => {
   const { started, jobs } = useWorkers(t),
     store = new MemoryChunkStore();

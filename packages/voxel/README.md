@@ -424,6 +424,7 @@ const streamer = VoxelStreamer.attach(engine, {
   generator: { seed: 7, seaLevel: 0, trees: 0.01 }, // NoiseTerrainOptions: the built-in worker
   store: new IndexedDBChunkStore('world-1'), // default: a MemoryChunkStore
   distance: 8, // chunks in x and z (256 blocks); verticalDistance: 4
+  frameBudget: 0.5, // main-thread ms per update for chunks joining the world (and chunksPerFrame: 8)
 });
 streamer.viewers.push(otherPlayer.position); // more positions to load around, in blocks
 if (streamer.pending === 0) hideLoadingScreen(); // chunks in range not loaded yet
@@ -447,8 +448,11 @@ serveVoxelGenerator((chunk, cx, cy, cz, { blocks }) => {
   viewer, so walking back and forth over a chunk border reloads nothing. `distance` and `verticalDistance` can change
   at run time.
 - **Order.** Loads start closest first, at most 4 per worker in flight; finished chunks join the world closest first,
-  at most `chunksPerFrame` (default 8) per `update()`, and lighting and meshing follow through `world.onChunk` and
-  `world.dirty`. A generated chunk is unpacked when it joins (about 0.15 ms on the main thread).
+  and lighting and meshing follow through `world.onChunk` and `world.dirty`. A generated chunk is unpacked when it
+  joins (about 0.06-0.08 ms on the main thread of the desktop below, 0.15-0.19 ms on the laptop). Per `update()` at
+  most `chunksPerFrame` (default 8) join, and none after `frameBudget` milliseconds (default 0.5) of adding them,
+  listeners included; one always joins, so loading never stalls (0 means one per update). Behind a loading screen set
+  both to `Infinity`.
 - **Saving.** Chunks edited through the world (`onChange`), and chunks someone else added, are saved to the store when
   they unload; chunks generated or read from the store and not edited are dropped and regenerate the same. A failed
   save is reported to `onError` and the chunk is kept in memory, where a reload finds it, until a save succeeds.
@@ -470,6 +474,14 @@ Measured with Node 24 worker threads on the development laptop (8 logical cores)
 CPU (2026-10-19; `node --test packages/voxel/tests/stream-benchmark.test.js` prints yours): `noiseTerrain` 1.4-1.8 ms
 per chunk on one thread; filling a 565-chunk range: 495 chunks/s with 1 worker, 803 with 2, 765 with 3 (the machine
 had no core left for the third); `update()` 11-14 us per call, unpacking included.
+
+The cost of `update()` per frame while chunks join, measured with Node 26 on the RTX A6000 desktop (32 logical cores)
+while other jobs kept it at 10-52% CPU (2026-10-19; same file, 3 terrain workers keeping 12 chunks ready, 16 ms
+frames, 565 chunks): with only the 8-chunk cap (the behaviour before `frameBudget`) 0.51-0.64 ms median, 0.76-1.29 ms
+p95 and 0.91-1.97 ms at worst, 7.8 chunks a frame; with the default 0.5 ms budget 0.52-0.56 ms median, 0.67-0.73 ms
+p95, 0.76-0.85 ms at worst, 7.3-7.6 chunks a frame; with 0.25 ms 0.36-0.39 ms median and 0.60-0.72 ms at worst,
+4.4-4.6 chunks a frame (565 chunks in 3.6-3.8 s instead of 2.2 s). Not yet measured on the laptop, where 8 chunks
+cost 1.2-1.5 ms.
 
 ## Rendering (`@margoengine/voxel/render`)
 

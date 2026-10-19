@@ -226,6 +226,12 @@ export interface VoxelStreamerOptions {
   memoryBudget?: number;
   /** Most chunks added to the world per {@link VoxelStreamer.update}: an integer >= 1 or Infinity. Default 8. */
   chunksPerFrame?: number;
+  /**
+   * Main-thread milliseconds per {@link VoxelStreamer.update} for adding finished chunks (unpacking each, adding it,
+   * and the world's onChunk listeners): no chunk is started once it is spent, but one always joins, so streaming
+   * never stalls. A number >= 0 (0: one chunk per update) or Infinity. Default 0.5.
+   */
+  frameBudget?: number;
 }
 
 // A chunk position in a viewer's load range; `d` is its squared distance in chunks to the nearest viewer's chunk.
@@ -246,7 +252,7 @@ interface Held {
   used: number;
 }
 // A finished load waiting to join the world: a generated chunk stays packed until then, so its unpack counts against
-// chunksPerFrame.
+// chunksPerFrame and frameBudget.
 type Ready = Omit<Held, 'chunk'> & { chunk: VoxelChunk | PackedChunk };
 
 const streamed = new WeakSet<VoxelWorld>();
@@ -257,6 +263,11 @@ const whole = (name: string, value: unknown, min: number, max: number): number =
   if (typeof value !== 'number') throw new TypeError(`VoxelStreamer ${name} must be a number`);
   if (!(value === max || (Number.isInteger(value) && value >= min && value <= max)))
     throw new RangeError(`VoxelStreamer ${name} is ${value}; pass an integer in ${min}..${max}`);
+  return value;
+};
+const milliseconds = (value: unknown): number => {
+  if (typeof value !== 'number') throw new TypeError('VoxelStreamer frameBudget must be a number of milliseconds');
+  if (!(value >= 0)) throw new RangeError(`VoxelStreamer frameBudget is ${value}; pass milliseconds >= 0 or Infinity`);
   return value;
 };
 const bytes = (value: unknown): number => {
@@ -274,12 +285,12 @@ const report = (error: unknown): void => {
  * {@link VoxelStreamer.attach}) and the positions in {@link VoxelStreamer.viewers}. A chunk loads when it is within
  * `distance` chunks of a viewer's chunk in x and z and `verticalDistance` in y, and unloads once it is more than one
  * chunk past that for every viewer (the margin keeps chunks at the edge from loading and unloading over and over).
- * Loads run closest first, the store first and then the generator; at most `chunksPerFrame` finished chunks join the
- * world per update, closest first. Lighting and meshing follow through the world's onChunk and dirty set. A chunk that
- * was edited (`world.onChange`), or that someone else added, is saved to the store when it unloads; one generated or
- * read from the store and not edited is dropped. Over `memoryBudget` it unloads the least recently used chunks outside
- * the load range, then stops loading until there is room (a budget smaller than the load range loads the closest
- * chunks only).
+ * Loads run closest first, the store first and then the generator; finished chunks join the world closest first, per
+ * update at most `chunksPerFrame` and no more once `frameBudget` milliseconds are spent (at least one). Lighting and
+ * meshing follow through the world's onChunk and dirty set. A chunk that was edited (`world.onChange`), or that
+ * someone else added, is saved to the store when it unloads; one generated or read from the store and not edited is
+ * dropped. Over `memoryBudget` it unloads the least recently used chunks outside the load range, then stops loading
+ * until there is room (a budget smaller than the load range loads the closest chunks only).
  *
  * ```ts
  * const store = new IndexedDBChunkStore('world-1');
@@ -307,6 +318,7 @@ export class VoxelStreamer {
   #vertical: number;
   #budget: number;
   #perFrame: number;
+  #frameBudget: number;
   #pool: JobPool | undefined;
   #terrain: NoiseTerrainOptions | undefined;
   #camera: { readonly position: Vec3 } | undefined;
@@ -359,8 +371,8 @@ export class VoxelStreamer {
    * @throws TypeError when `world` is not a VoxelWorld, `store` is not a ChunkStore, `generator` is neither terrain
    * options nor a URL, or a number option is not a number; as `noiseTerrain` for wrong terrain options.
    * @throws RangeError for `distance` or `verticalDistance` not an integer in 0..64, `workers` not an integer >= 1,
-   * `chunksPerFrame` not an integer >= 1 or Infinity, `memoryBudget` not > 0, or a terrain option out of range or block
-   * name the world's types lack.
+   * `chunksPerFrame` not an integer >= 1 or Infinity, `frameBudget` not >= 0, `memoryBudget` not > 0, or a terrain
+   * option out of range or block name the world's types lack.
    * @throws MargoError `'attached'` when another VoxelStreamer streams `world`; `'unsupported'` for a generator in a
    * context without Web Workers.
    */
@@ -375,6 +387,7 @@ export class VoxelStreamer {
     this.#distance = whole('distance', options.distance ?? 8, 0, 64);
     this.#vertical = whole('verticalDistance', options.verticalDistance ?? 4, 0, 64);
     this.#perFrame = whole('chunksPerFrame', options.chunksPerFrame ?? 8, 1, Infinity);
+    this.#frameBudget = milliseconds(options.frameBudget ?? 0.5);
     this.#budget = bytes(options.memoryBudget ?? 128 * 1024 * 1024);
     const cores = globalThis.navigator?.hardwareConcurrency || 4;
     this.workers = whole('workers', options.workers ?? Math.max(1, Math.min(3, cores >> 2)), 1, 64);
@@ -438,12 +451,22 @@ export class VoxelStreamer {
     this.#vertical = whole('verticalDistance', value, 0, 64);
     this.#view = '\0';
   }
-  /** Most chunks added per update: an integer >= 1, or Infinity (behind a loading screen). */
+  /** Most chunks added per update: an integer >= 1, or Infinity (with `frameBudget` Infinity behind a loading screen). */
   get chunksPerFrame(): number {
     return this.#perFrame;
   }
   set chunksPerFrame(value: number) {
     this.#perFrame = whole('chunksPerFrame', value, 1, Infinity);
+  }
+  /**
+   * Main-thread milliseconds per update for adding finished chunks, >= 0 or Infinity: once spent, no more join that
+   * update (one always does). Applies from the next update.
+   */
+  get frameBudget(): number {
+    return this.#frameBudget;
+  }
+  set frameBudget(value: number) {
+    this.#frameBudget = milliseconds(value);
   }
   /** Bytes of loaded chunk data to keep to, > 0 (Infinity allowed). */
   get memoryBudget(): number {
@@ -459,8 +482,8 @@ export class VoxelStreamer {
     return n;
   }
   /**
-   * Unloads what left the range, adds up to `chunksPerFrame` finished chunks, unloads to the budget and starts the
-   * next loads, closest first. Call it once a frame (attach does).
+   * Unloads what left the range, adds finished chunks (up to `chunksPerFrame`, within `frameBudget`), unloads to the
+   * memory budget and starts the next loads, closest first. Call it once a frame (attach does).
    * @throws TypeError or RangeError for a viewer that is not three finite numbers.
    * @throws MargoError `'disposed'` after {@link VoxelStreamer.dispose}.
    */
@@ -586,10 +609,11 @@ export class VoxelStreamer {
   #add(): void {
     if (!this.#ready.size) return;
     const far = (key: string) => this.#ring.get(key)?.d ?? Infinity,
-      queue = [...this.#ready].sort((a, b) => far(a[0]) - far(b[0]));
+      queue = [...this.#ready].sort((a, b) => far(a[0]) - far(b[0])),
+      start = performance.now();
     let added = 0;
     for (const [key, ready] of queue) {
-      if (added === this.#perFrame) break;
+      if (added === this.#perFrame || (added && performance.now() - start >= this.#frameBudget)) break;
       const { cx, cy, cz, edited } = ready;
       this.#ready.delete(key);
       if (edited) this.#unsaved.delete(key);
