@@ -7,7 +7,7 @@ import { wgsl } from '../../core/dist/shaders.js';
 import { Skeleton, Skin } from '../../animation/dist/index.js';
 import { Material, PhongMaterial, UnlitMaterial, createMesh } from '../dist/index.js';
 
-async function scene() {
+async function scene({ depthFormat = 'depth32float' } = {}) {
   const gpu = mockGPU(),
     store = await TransformStore.create(64),
     renderer = { backend: 'webgpu', gpu: gpu.device, add() {}, remove() {}, render() {}, dispose() {} };
@@ -19,7 +19,7 @@ async function scene() {
     null,
   );
   engine.camera.update(4 / 3, true);
-  const view = context(gpu, { samples: 1, format: 'bgra8unorm', depthFormat: 'depth32float', shader: wgsl });
+  const view = context(gpu, { samples: 1, format: 'bgra8unorm', depthFormat, shader: wgsl });
   let n = 0;
   const frame = () =>
     gpu.record(() => {
@@ -265,5 +265,79 @@ test('colours take set(input) and assignment with hex strings, 0xrrggbb numbers 
     assert.throws(() => m.color.set(value), { name });
   }
   assert.deepEqual(m.color, [0, 0.25, 1, 1], 'a rejected colour changes nothing');
+  s.engine.dispose();
+});
+
+test('render state set after createMesh selects the matching pipeline next frame, and back', async () => {
+  const s = await scene(),
+    m = new Material(),
+    mesh = createMesh(s.engine, quad, m),
+    beauty = (log) => of(log, 'renderPipeline').filter((e) => e[2].fragment?.entryPoint === 'fragment'),
+    bound = (log) => of(log, 'pass.setPipeline').map((e) => e[1]);
+  const [plain] = beauty(s.frame());
+  m.blending = 'additive';
+  m.depthWrite = false;
+  m.colorWrite = false;
+  assert.equal(m.customState, true);
+  assert.equal(mesh.primitives[0].material.renderState.depthWrite, false);
+  let log = s.frame();
+  let [made] = beauty(log);
+  assert.equal(made[2].fragment.targets[0].blend.color.dstFactor, 'one', 'additive');
+  assert.equal(made[2].fragment.targets[0].writeMask, 0, 'colorWrite false');
+  assert.equal(made[2].depthStencil.depthWriteEnabled, false);
+  m.polygonOffset = true;
+  m.polygonOffsetFactor = 2;
+  m.polygonOffsetUnits = 3;
+  [made] = beauty(s.frame());
+  assert.deepEqual(
+    [made[2].depthStencil.depthBias, made[2].depthStencil.depthBiasSlopeScale],
+    [-3, -2],
+    'away from the camera in reverse-Z',
+  );
+  Object.assign(m, { blending: 'normal', depthWrite: undefined, colorWrite: true, polygonOffset: false });
+  assert.equal(mesh.primitives[0].material.renderState, undefined);
+  log = s.frame();
+  assert.equal(beauty(log).length, 0, 'the default state reuses the first pipeline');
+  assert.ok(bound(log).includes(plain[1]));
+  m.wireframe = true;
+  log = s.frame();
+  assert.equal(beauty(log)[0][2].primitive.topology, 'line-list', 'wireframe is live too');
+  mesh.primitives[0].material.wireframe = false;
+  assert.equal(m.wireframe, false, 'the native flag writes the material');
+  for (const [key, value, name] of [
+    ['blending', 'screen', 'TypeError'],
+    ['depthTest', 1, 'TypeError'],
+    ['depthWrite', null, 'TypeError'],
+    ['wireframe', 'yes', 'TypeError'],
+    ['polygonOffsetUnits', 0.5, 'RangeError'],
+    ['polygonOffsetFactor', Infinity, 'RangeError'],
+    ['stencilRef', -1, 'RangeError'],
+    ['stencilFunc', 'lesser', 'TypeError'],
+    ['stencilZPass', 'increment', 'TypeError'],
+  ]) {
+    const before = m[key];
+    assert.throws(
+      () => {
+        m[key] = value;
+      },
+      { name, message: new RegExp('Material ' + key + '.*; set') },
+    );
+    assert.equal(m[key], before, key + ' unchanged');
+  }
+  s.engine.dispose();
+});
+
+test('a live stencil reference keeps its pipeline; other stencil state picks a new one', async () => {
+  const s = await scene({ depthFormat: 'depth24plus-stencil8' }),
+    m = new Material({ stencilWrite: true, stencilRef: 1, stencilZPass: 'replace' });
+  createMesh(s.engine, quad, m);
+  s.frame();
+  m.stencilRef = 2;
+  let log = s.frame();
+  assert.equal(of(log, 'renderPipeline').length, 0);
+  assert.ok(of(log, 'pass.setStencilReference').some((e) => e[1] === 2));
+  m.stencilFunc = 'equal';
+  log = s.frame();
+  assert.equal(of(log, 'renderPipeline')[0][2].depthStencil.stencilFront.compare, 'equal');
   s.engine.dispose();
 });

@@ -544,6 +544,82 @@ const finiteFloat = (v: unknown, label: string): number => {
     throw new RangeError('Material ' + label + ' must be finite as float32');
   return v;
 };
+/** Render state, live: each change selects the matching beauty pipeline on the next draw. */
+interface Raster {
+  blending: Blending;
+  depthWrite: boolean | undefined;
+  depthTest: boolean;
+  colorWrite: boolean;
+  polygonOffset: boolean;
+  polygonOffsetFactor: number;
+  polygonOffsetUnits: number;
+  polygonOffsetClamp: number;
+  stencilWrite: boolean;
+  stencilRef: number;
+  stencilReadMask: number;
+  stencilWriteMask: number;
+  stencilFunc: GPUCompareFunction;
+  stencilFail: GPUStencilOperation;
+  stencilZFail: GPUStencilOperation;
+  stencilZPass: GPUStencilOperation;
+  wireframe: boolean;
+}
+const rasterDefaults: Raster = {
+  blending: 'normal',
+  depthWrite: undefined,
+  depthTest: true,
+  colorWrite: true,
+  polygonOffset: false,
+  polygonOffsetFactor: 0,
+  polygonOffsetUnits: 0,
+  polygonOffsetClamp: 0,
+  stencilWrite: false,
+  stencilRef: 0,
+  stencilReadMask: 255,
+  stencilWriteMask: 255,
+  stencilFunc: 'always',
+  stencilFail: 'keep',
+  stencilZFail: 'keep',
+  stencilZPass: 'keep',
+  wireframe: false,
+};
+const flag = (v: unknown, label: string): boolean => {
+  if (typeof v !== 'boolean') throw new TypeError('Material ' + label + ' must be a boolean; set true or false');
+  return v;
+};
+const oneOf = (list: readonly string[], kind: string) => (v: unknown, label: string) => {
+  if (!list.includes(v as string)) throw new TypeError('Material ' + label + ' is invalid; set ' + kind);
+  return v;
+};
+const rasterChecks: Record<keyof Raster, (v: never, label: string) => unknown> = {
+  blending: oneOf(['normal', 'additive', 'multiply', 'none'], "'normal', 'additive', 'multiply' or 'none'"),
+  depthWrite: (v, label) => (v === undefined ? v : flag(v, label)),
+  depthTest: flag,
+  colorWrite: flag,
+  polygonOffset: flag,
+  polygonOffsetFactor: rasterFloat,
+  polygonOffsetUnits: (v: number) => {
+    if (typeof v !== 'number')
+      throw new TypeError(
+        'Material polygonOffsetUnits must be a number; set an integer between -2147483647 and 2147483647',
+      );
+    if (!Number.isInteger(v) || Math.abs(v) > 0x7fffffff)
+      throw new RangeError(
+        'Material polygonOffsetUnits is out of range; set an integer between -2147483647 and 2147483647',
+      );
+    return v;
+  },
+  polygonOffsetClamp: rasterFloat,
+  stencilWrite: flag,
+  stencilRef: rasterMask,
+  stencilReadMask: rasterMask,
+  stencilWriteMask: rasterMask,
+  stencilFunc: oneOf(stencilFunctions, 'a WebGPU comparison name'),
+  stencilFail: oneOf(stencilOperations, 'a WebGPU stencil operation name'),
+  stencilZFail: oneOf(stencilOperations, 'a WebGPU stencil operation name'),
+  stencilZPass: oneOf(stencilOperations, 'a WebGPU stencil operation name'),
+  wireframe: flag,
+};
 function distanceRange(near: number, far: number): void {
   finiteFloat(near, 'nearDistance');
   finiteFloat(far, 'farDistance');
@@ -777,11 +853,10 @@ export function materialShader(source: string, group: number, shading: Shading):
   cache.set(key, output);
   return output;
 }
-/** Live values: color/emissive arrays, scalar setters and map assignments apply on the next frame to every mesh using the material. Shading and render state are fixed. */
+/** Live values: colours, scalar setters, map assignments and render state apply on the next frame to every mesh using the material. Shading is fixed. */
 export class Material {
   readonly shading: Shading;
-  /** Draws triangle edges instead of filled surfaces. Fixed at construction; defaults to false. */
-  readonly wireframe: boolean;
+  private readonly raster: Raster = { ...rasterDefaults };
   private packing: DepthPacking = 'basic';
   private reference: readonly [number, number, number] = [0, 0, 0];
   private near = 1;
@@ -790,22 +865,6 @@ export class Material {
   private readonly glow: LiveColor;
   private readonly highlight: LiveColor;
   private gloss = 30;
-  readonly blending: Blending;
-  readonly depthWrite?: boolean;
-  readonly depthTest: boolean;
-  readonly colorWrite: boolean;
-  readonly polygonOffset: boolean;
-  readonly polygonOffsetFactor: number;
-  readonly polygonOffsetUnits: number;
-  readonly polygonOffsetClamp: number;
-  readonly stencilWrite: boolean;
-  readonly stencilRef: number;
-  readonly stencilReadMask: number;
-  readonly stencilWriteMask: number;
-  readonly stencilFunc: GPUCompareFunction;
-  readonly stencilFail: GPUStencilOperation;
-  readonly stencilZFail: GPUStencilOperation;
-  readonly stencilZPass: GPUStencilOperation;
   /** gltf-pro layout: [roughness, metalness, normalScale, aoMapIntensity] and [alphaMode, alphaTest, side (front 0, double 1, back 2), 0]. */
   readonly factors: number[];
   readonly settings: number[];
@@ -918,18 +977,13 @@ export class Material {
   private attenuation = [1, 1, 1, Infinity];
   private readonly tinted = [0, 0, 0];
   constructor(o: MaterialOptions = {}) {
-    const shading = o.shading ?? 'standard',
-      blending = o.blending ?? 'normal';
-    for (const key of ['colorWrite', 'polygonOffset', 'stencilWrite', 'wireframe'] as const)
-      if (o[key] !== undefined && typeof o[key] !== 'boolean')
-        throw new TypeError('Material ' + key + ' must be a boolean; set true or false');
+    const shading = o.shading ?? 'standard';
+    for (const key of Object.keys(rasterDefaults) as (keyof Raster)[])
+      if (o[key] !== undefined) this.setRaster(key, o[key]);
     if (
       !['standard', 'basic', 'normal', 'matcap', 'depth', 'distance', 'lambert', 'phong'].includes(shading) ||
-      !['normal', 'additive', 'multiply', 'none'].includes(blending) ||
       (o.side !== undefined && !['front', 'back', 'double'].includes(o.side)) ||
-      [o.transparent, o.doubleSided, o.depthWrite, o.depthTest].some(
-        (v) => v !== undefined && typeof v !== 'boolean',
-      ) ||
+      [o.transparent, o.doubleSided].some((v) => v !== undefined && typeof v !== 'boolean') ||
       (o.normalScale !== undefined && !Number.isFinite(o.normalScale))
     )
       throw new TypeError('Invalid material options');
@@ -937,7 +991,6 @@ export class Material {
       if (o[slot] != null && !(o[slot] instanceof Texture))
         throw new TypeError('Material ' + slot + ' must be a Texture');
     this.shading = shading;
-    this.wireframe = o.wireframe ?? false;
     this.depthPacking = o.depthPacking === undefined ? (shading === 'distance' ? 'rgba' : 'basic') : o.depthPacking;
     if (o.referencePosition !== undefined) this.referencePosition = o.referencePosition;
     const near = o.nearDistance === undefined ? 1 : o.nearDistance,
@@ -945,44 +998,6 @@ export class Material {
     distanceRange(near, far);
     this.near = near;
     this.far = far;
-    this.blending = blending;
-    this.depthWrite = o.depthWrite;
-    this.depthTest = o.depthTest ?? true;
-    this.colorWrite = o.colorWrite ?? true;
-    this.polygonOffset = o.polygonOffset ?? false;
-    this.polygonOffsetFactor = rasterFloat(
-      o.polygonOffsetFactor === undefined ? 0 : o.polygonOffsetFactor,
-      'polygonOffsetFactor',
-    );
-    this.polygonOffsetClamp = rasterFloat(
-      o.polygonOffsetClamp === undefined ? 0 : o.polygonOffsetClamp,
-      'polygonOffsetClamp',
-    );
-    const units = o.polygonOffsetUnits === undefined ? 0 : o.polygonOffsetUnits;
-    if (typeof units !== 'number')
-      throw new TypeError(
-        'Material polygonOffsetUnits must be a number; set an integer between -2147483647 and 2147483647',
-      );
-    if (!Number.isInteger(units) || Math.abs(units) > 0x7fffffff)
-      throw new RangeError(
-        'Material polygonOffsetUnits is out of range; set an integer between -2147483647 and 2147483647',
-      );
-    this.polygonOffsetUnits = units;
-    this.stencilWrite = o.stencilWrite ?? false;
-    this.stencilRef = rasterMask(o.stencilRef === undefined ? 0 : o.stencilRef, 'stencilRef');
-    this.stencilReadMask = rasterMask(o.stencilReadMask === undefined ? 255 : o.stencilReadMask, 'stencilReadMask');
-    this.stencilWriteMask = rasterMask(o.stencilWriteMask === undefined ? 255 : o.stencilWriteMask, 'stencilWriteMask');
-    this.stencilFunc = o.stencilFunc === undefined ? 'always' : o.stencilFunc;
-    this.stencilFail = o.stencilFail === undefined ? 'keep' : o.stencilFail;
-    this.stencilZFail = o.stencilZFail === undefined ? 'keep' : o.stencilZFail;
-    this.stencilZPass = o.stencilZPass === undefined ? 'keep' : o.stencilZPass;
-    if (
-      !stencilFunctions.includes(this.stencilFunc) ||
-      [this.stencilFail, this.stencilZFail, this.stencilZPass].some((value) => !stencilOperations.includes(value))
-    )
-      throw new TypeError(
-        'Material stencil function or operation is invalid; use a WebGPU comparison and stencil operation name',
-      );
     this.blend = o.transparent ?? false;
     const rgba = linear(o.color ?? [1, 1, 1], 'color');
     if (rgba.length === 3) rgba.push(unit(o.opacity ?? 1, 'opacity'));
@@ -1038,6 +1053,114 @@ export class Material {
     if (o.transmission !== undefined || o.transmissionMap != null || o.thicknessMap != null) this.volume = [0, 1, 1, 1];
     if (mapped(this)) while (this.uvt.length < mapSlots.length * 8) this.uvt.push(...this.uvDefault);
     Object.assign(this, Object.fromEntries(used.map((k) => [k, o[k]])));
+  }
+  /** Beauty-pass blending (default 'normal'). It and the depth, colour-write, polygon-offset and stencil state below are live: a change selects the matching pipeline on the next draw. */
+  get blending(): Blending {
+    return this.raster.blending;
+  }
+  set blending(v: Blending) {
+    this.setRaster('blending', v);
+  }
+  get depthWrite(): boolean | undefined {
+    return this.raster.depthWrite;
+  }
+  set depthWrite(v: boolean | undefined) {
+    this.setRaster('depthWrite', v);
+  }
+  get depthTest(): boolean {
+    return this.raster.depthTest;
+  }
+  set depthTest(v: boolean) {
+    this.setRaster('depthTest', v);
+  }
+  get colorWrite(): boolean {
+    return this.raster.colorWrite;
+  }
+  set colorWrite(v: boolean) {
+    this.setRaster('colorWrite', v);
+  }
+  get polygonOffset(): boolean {
+    return this.raster.polygonOffset;
+  }
+  set polygonOffset(v: boolean) {
+    this.setRaster('polygonOffset', v);
+  }
+  get polygonOffsetFactor(): number {
+    return this.raster.polygonOffsetFactor;
+  }
+  set polygonOffsetFactor(v: number) {
+    this.setRaster('polygonOffsetFactor', v);
+  }
+  get polygonOffsetUnits(): number {
+    return this.raster.polygonOffsetUnits;
+  }
+  set polygonOffsetUnits(v: number) {
+    this.setRaster('polygonOffsetUnits', v);
+  }
+  get polygonOffsetClamp(): number {
+    return this.raster.polygonOffsetClamp;
+  }
+  set polygonOffsetClamp(v: number) {
+    this.setRaster('polygonOffsetClamp', v);
+  }
+  get stencilWrite(): boolean {
+    return this.raster.stencilWrite;
+  }
+  set stencilWrite(v: boolean) {
+    this.setRaster('stencilWrite', v);
+  }
+  get stencilRef(): number {
+    return this.raster.stencilRef;
+  }
+  set stencilRef(v: number) {
+    this.setRaster('stencilRef', v);
+  }
+  get stencilReadMask(): number {
+    return this.raster.stencilReadMask;
+  }
+  set stencilReadMask(v: number) {
+    this.setRaster('stencilReadMask', v);
+  }
+  get stencilWriteMask(): number {
+    return this.raster.stencilWriteMask;
+  }
+  set stencilWriteMask(v: number) {
+    this.setRaster('stencilWriteMask', v);
+  }
+  get stencilFunc(): GPUCompareFunction {
+    return this.raster.stencilFunc;
+  }
+  set stencilFunc(v: GPUCompareFunction) {
+    this.setRaster('stencilFunc', v);
+  }
+  get stencilFail(): GPUStencilOperation {
+    return this.raster.stencilFail;
+  }
+  set stencilFail(v: GPUStencilOperation) {
+    this.setRaster('stencilFail', v);
+  }
+  get stencilZFail(): GPUStencilOperation {
+    return this.raster.stencilZFail;
+  }
+  set stencilZFail(v: GPUStencilOperation) {
+    this.setRaster('stencilZFail', v);
+  }
+  get stencilZPass(): GPUStencilOperation {
+    return this.raster.stencilZPass;
+  }
+  set stencilZPass(v: GPUStencilOperation) {
+    this.setRaster('stencilZPass', v);
+  }
+  /** Draws triangle edges instead of filled surfaces (default false), live. */
+  get wireframe(): boolean {
+    return this.raster.wireframe;
+  }
+  set wireframe(v: boolean) {
+    this.setRaster('wireframe', v);
+  }
+  private setRaster<K extends keyof Raster>(key: K, v: unknown): void {
+    this.raster[key] = rasterChecks[key](v as never, key) as Raster[K];
+    renderStates.delete(this);
   }
   /**
    * Base colour, linear RGBA with opacity in [3]: the live array every mesh reads. `color.set(input)` and
@@ -1731,7 +1854,9 @@ function surface(g: PBRMaterial, current: () => Material, runtime: Engine): void
     renderState: get(renderStateOf),
     wireframe: {
       ...get((m) => m.wireframe),
-      set: (v: boolean) => Object.assign(current(), { wireframe: v }),
+      set: (v: boolean) => {
+        current().wireframe = v;
+      },
     },
     shading: {
       enumerable: true,
