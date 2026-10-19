@@ -1,5 +1,5 @@
 {
-  "commit": "37968a0c",
+  "commit": "6222ee66",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -566,8 +566,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 31888,
-        "gzip": 11392
+        "raw": 32116,
+        "gzip": 11459
       }
     },
     "@margoengine/points": {
@@ -872,40 +872,40 @@
     },
     "@margoengine/voxel": {
       ".": {
-        "raw": 13042,
-        "gzip": 4697
+        "raw": 13272,
+        "gzip": 4808
       },
       "./query": {
         "raw": 6822,
         "gzip": 3020
       },
       "./codec": {
-        "raw": 24055,
-        "gzip": 8372
+        "raw": 24285,
+        "gzip": 8486
       },
       "./stream": {
-        "raw": 33764,
-        "gzip": 11983
+        "raw": 34648,
+        "gzip": 12316
       },
       "./generate": {
-        "raw": 9837,
-        "gzip": 3985
+        "raw": 10166,
+        "gzip": 4136
       },
       "./mesher": {
         "raw": 14494,
         "gzip": 6217
       },
       "./light": {
-        "raw": 20867,
-        "gzip": 7421
+        "raw": 21097,
+        "gzip": 7531
       },
       "./vox": {
-        "raw": 30123,
-        "gzip": 10689
+        "raw": 32360,
+        "gzip": 11603
       },
       "./physics": {
-        "raw": 19914,
-        "gzip": 7198
+        "raw": 24753,
+        "gzip": 9019
       },
       "./render": {
         "raw": 39426,
@@ -916,8 +916,8 @@
         "gzip": 4112
       },
       "dist/workers/terrain.js": {
-        "raw": 13174,
-        "gzip": 5499
+        "raw": 13503,
+        "gzip": 5654
       }
     },
     "@margoengine/water": {
@@ -1066,9 +1066,9 @@
       "brotli": 3623
     },
     "packages/voxel/dist/workers/terrain.js": {
-      "raw": 13014,
-      "gzip": 5467,
-      "brotli": 4883
+      "raw": 13327,
+      "gzip": 5624,
+      "brotli": 5012
     },
     "node_modules/@dimforge/rapier3d-compat/dist/rapier.mjs": {
       "raw": 4335248,

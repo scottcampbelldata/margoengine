@@ -43,6 +43,8 @@ export class VoxelStreamer {
     set verticalDistance(value: number);
     get chunksPerFrame(): number;
     set chunksPerFrame(value: number);
+    get frameBudget(): number;
+    set frameBudget(value: number);
     get memoryBudget(): number;
     set memoryBudget(value: number);
     get pending(): number;
@@ -61,6 +63,7 @@ export interface VoxelStreamerOptions {
     workers?: number;
     memoryBudget?: number;
     chunksPerFrame?: number;
+    frameBudget?: number;
 }
 
 // Not exported from this entry, but used by the exports above:
