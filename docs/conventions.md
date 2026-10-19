@@ -79,3 +79,4 @@ A name declared and exported by two packages must mean the same thing, or be ren
 | `SurfaceOptions` | procedural, machinery | procedural's renamed `MarchingCubesOptions`. |
 | `Vector3` (navigation) | math | Navigation takes math's `Vec3Like`; math's `Vector3` is the class. |
 | `loadGLTF`, `parseGLTF` | gltf, gltf-pro | Open, group B (HANDOFF "API rough edges" item 7). |
+| `PbrMaterial` | core, materials, react | Kept, one meaning (Scott's naming): materials' `PbrMaterial` takes every core `PbrMaterial` option with the same meaning and defaults (color `'#4f46e5'`, roughness 0.5, metalness 0, `doubleSided` true) and adds maps and physical options; core's stays the constant-colour material of core meshes, and react's is the JSX element that builds core's. Allowlisted. |

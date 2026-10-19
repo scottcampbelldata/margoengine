@@ -76,7 +76,7 @@ npm install @margoengine/geometry @margoengine/materials @margoengine/gltf-pro @
 | `WebGLRenderer`, `PerspectiveCamera`, `Mesh`, `MeshStandardMaterial` (colour only) | `@margoengine/core` |
 | WebGL fallback | `@margoengine/webgl` |
 | `BoxGeometry`, `SphereGeometry`, `ExtrudeGeometry`, `BufferGeometryUtils` | `@margoengine/geometry` |
-| `TextureLoader`, `MeshStandardMaterial` with maps, `MeshBasicMaterial`, `MeshMatcapMaterial` | `@margoengine/materials` |
+| `TextureLoader`, `MeshStandardMaterial` with maps and the other mesh materials | `@margoengine/materials` |
 | `GLTFLoader` (textured, extensions) | `@margoengine/gltf-pro` (+ `@margoengine/decoders` for Draco, meshopt, KTX2) |
 | `FBXLoader`, `USDZLoader`, `PLYLoader`/`PCDLoader`/`3MFLoader`, `STLLoader`/`OBJLoader` | `@margoengine/fbx`, `@margoengine/usdz`, `@margoengine/loaders`, `@margoengine/machinery` |
 | `AnimationMixer`, skinning, morphs | `@margoengine/animation` (+ `@margoengine/animator` for blending) |
@@ -243,8 +243,8 @@ immutable once attached; build a new `Geometry` to change it. For UVs, vertex co
 
 ## Materials and textures
 
-Core's `PbrMaterial` is colour, roughness, metalness and `doubleSided`. Textures, transparency, unlit and matcap
-shading come from `@margoengine/materials`, which draws through gltf-pro (WebGPU only).
+Core's `PbrMaterial` is colour, roughness, metalness and `doubleSided`. Textures, transparency and the other shading
+models come from `@margoengine/materials`, which draws through gltf-pro (WebGPU only).
 
 Core materials are live, like three.js's `material.color.set(...)`: `set` changes the given values in place and every
 mesh using the material shows them on the next frame (no new material, pipeline or bind group).
@@ -274,25 +274,71 @@ const glass = new THREE.MeshStandardMaterial({color: '#88ccff', transparent: tru
 
 ```ts
 import {boxGeometry, planeGeometry} from '@margoengine/geometry';
-import {loadTexture, Texture, Material, createMesh} from '@margoengine/materials';
+import {loadTexture, Texture, PbrMaterial, UnlitMaterial, createMesh} from '@margoengine/materials';
 
 const map = await loadTexture('/crate.jpg', {wrapS: 'repeat', wrapT: 'repeat', anisotropy: 8}); // colour maps read sRGB
 const normalMap = await loadTexture('/crate-normal.png');                                        // other slots linear
-const crate = createMesh(engine, boxGeometry(1, 1, 1), new Material({
-  map, normalMap, roughness: 0.7,
+const crate = createMesh(engine, boxGeometry(1, 1, 1), new PbrMaterial({
+  color: 0xffffff, map, normalMap, roughness: 0.7, side: 'front',
   uvTransform: {offset: [0, 0], scale: [2, 2], rotation: 0}, // map.repeat / offset / rotation
 }));
 crate.root.setPosition([0, 0.5, 0]);
 const video = document.querySelector('video');
-createMesh(engine, planeGeometry(1.6, 0.9), new Material({shading: 'basic', map: new Texture(video)}));
-const glass = new Material({color: '#88ccff', transparent: true, opacity: 0.4, doubleSided: true});
+createMesh(engine, planeGeometry(1.6, 0.9), new UnlitMaterial({map: new Texture(video)}));
+const glass = new PbrMaterial({color: '#88ccff', transparent: true, opacity: 0.4, side: 'double'});
 createMesh(engine, planeGeometry(2, 2), glass, {renderOrder: 1});
 glass.opacity = 0.6; // colours, scalars and maps are live
 ```
 
-- `shading`: `'standard'` (MeshStandardMaterial), `'basic'` (MeshBasicMaterial), `'normal'`, `'matcap'` (with `matcap`).
-- Maps: `map`, `normalMap`, `metalRoughnessMap` (glTF packing), `aoMap`, `emissiveMap`. Render state: `transparent`,
-  `alphaTest`, `blending` (`'normal'`, `'additive'`, `'multiply'`, `'none'`), `depthWrite`, `depthTest`.
+One class per three.js mesh material, each a `Material` with its shading fixed (`new Material({shading})` also works):
+
+| three.js | `@margoengine/materials` |
+| --- | --- |
+| `MeshBasicMaterial` | `UnlitMaterial` |
+| `MeshLambertMaterial` | `LambertMaterial` |
+| `MeshPhongMaterial` | `PhongMaterial` (`specular`, `shininess`) |
+| `MeshStandardMaterial`, `MeshPhysicalMaterial` | `PbrMaterial` (maps and physical options) |
+| `MeshNormalMaterial` | `NormalMaterial` |
+| `MeshMatcapMaterial` | `MatcapMaterial` (`matcap`) |
+| `MeshDepthMaterial`, `MeshDistanceMaterial` | `DepthMaterial`, `DistanceMaterial` |
+
+`PbrMaterial` takes core `PbrMaterial`'s options with core's defaults (color `'#4f46e5'`, roughness 0.5, double-sided),
+so give a textured one `color: 0xffffff` and `side: 'front'` to match three.js.
+
+Materials are used like three.js materials after the mesh exists:
+
+```js
+mesh.material = other;
+mesh.material.color.set(0xff0000);
+material.blending = THREE.AdditiveBlending; material.depthWrite = false; material.wireframe = true;
+texture.magFilter = THREE.NearestFilter;
+mesh.renderOrder = 2;
+const copy = material.clone(); material.dispose();
+```
+
+```ts
+import {boxGeometry} from '@margoengine/geometry';
+import {PbrMaterial, PhongMaterial, Texture, createMesh} from '@margoengine/materials';
+
+const atlas = new Texture(new OffscreenCanvas(256, 256));
+const paint = new PhongMaterial({color: 0x84d6bd, shininess: 40});
+const box = createMesh(engine, boxGeometry(1, 1, 1), paint);
+box.material.color.set(0xff0000);  // or paint.color = '#f00': strings and numbers are sRGB, arrays linear
+paint.blending = 'additive';        // render state is live: the next frame uses the matching pipeline
+paint.depthWrite = false;
+paint.wireframe = true;
+box.material = new PbrMaterial({color: 0xffffff, map: atlas}); // a live swap: shadows, lights, skin and picking stay
+box.renderOrder = 2;
+atlas.magFilter = 'nearest';        // sampler options apply next frame; flipY, colorSpace, mipmaps on atlas.update()
+const variant = paint.clone();      // same class and values, textures shared
+variant.copy(paint);                // same shading: copies every value in place
+paint.dispose();                    // frees what no mesh uses; createMesh with it now throws
+```
+
+- Maps: `map`, `normalMap`, `metalRoughnessMap` (glTF packing), `aoMap`, `emissiveMap`, and the physical maps below.
+  Render state, live: `transparent`, `alphaTest`, `blending` (`'normal'`, `'additive'`, `'multiply'`, `'none'`),
+  `depthWrite`, `depthTest`, `colorWrite`, `polygonOffset*`, the stencil options and `wireframe`.
+- A grouped mesh's `mesh.material` is a frozen array; assign a new array of the same length to swap it.
 - `Texture` takes an image, bitmap, canvas, video, `ImageData` or `{data, width, height}` (DataTexture). Call
   `texture.update()` after drawing to a canvas (CanvasTexture `needsUpdate`); videos re-upload by themselves.
 - UV transforms follow glTF `KHR_texture_transform` (rotation about the UV origin, no `center`). One slot:
@@ -317,11 +363,14 @@ const pane = createMesh(engine, planeGeometry(2, 2), new Material({color: '#88cc
 oit.add(pane);  // and oit.add(model) for a loaded glTF's BLEND primitives
 ```
 
-- `MeshPhysicalMaterial`: physical options on `Material` (`clearcoat`, `clearcoatRoughness`, `sheenColor`, `sheenRoughness`,
-  `specularIntensity`, `specularColor`, `ior`, `transmission`, `thickness`, `attenuationColor`, `attenuationDistance`;
-  factors only). Glass refracts with `Transmission.attach(engine).add(mesh)` from `@margoengine/materials/transmission`
-  (needs an HDR post capture such as `PostStack` with `Tonemap`); without it the background shows through tinted.
-- Not available: Lambert, Phong, physical maps, dispersion and arbitrary named vertex attributes on your own meshes.
+- `MeshPhysicalMaterial`: physical options on `PbrMaterial` (`clearcoat`, `clearcoatRoughness`, `sheenColor`,
+  `sheenRoughness`, `specularIntensity`, `specularColor`, `anisotropy`, `iridescence`, `ior`, `dispersion`,
+  `transmission`, `thickness`, `attenuationColor`, `attenuationDistance`) and their maps (`clearcoatMap`,
+  `sheenColorMap`, `transmissionMap`, `thicknessMap`, ...). Set one at any time and that material switches to the
+  physical shader; materials that never use them keep the plain one. Glass refracts with
+  `Transmission.attach(engine).add(mesh)` from `@margoengine/materials/transmission` (needs an HDR post capture such as
+  `PostStack` with `Tonemap`); without it the background shows through tinted.
+- Not available: arbitrary named vertex attributes on your own meshes.
 
 ## Lights and shadows
 
@@ -1102,7 +1151,7 @@ is wrapped per frame until `capture()`; an engine that never imports `@margoengi
 
 | three.js | Margo |
 | --- | --- |
-| `geometry.dispose()`, `material.dispose()` | Core frees a `Geometry`'s GPU buffers when its last mesh is gone; `mesh.dispose()` |
+| `geometry.dispose()`, `material.dispose()` | Core frees a `Geometry`'s GPU buffers when its last mesh is gone; `mesh.dispose()`; a materials `Material` has `dispose()` |
 | `texture.dispose()` | `texture.dispose()` (materials never dispose shared textures) |
 | `scene.remove(gltf.scene)` + traverse and dispose | `model.dispose()` |
 | `mixer.uncacheRoot(...)` | `animation.dispose()` (or `model.dispose()`, which removes it) |
@@ -1118,10 +1167,11 @@ engine recreates the device and every plugin rebuilds its GPU state; no reload i
 
 Remaining gaps and documented limits from [`docs/threejs-parity.md`](threejs-parity.md). The optional-package backlog
 does not reopen the core freeze or the closed v1 limits listed there. Complete actionable PARTIAL rows before MISSING
-rows, starting with the wireframe material flag.
+rows.
 
-Materials already support physical factors and maps, iridescence, anisotropy, dispersion, normal/depth/distance modes,
-and front/back/double sides. Blend/depth controls, polygon offset, color-write suppression and stencil are available
+Materials already support one class per shading model (unlit, Lambert, Phong, PBR, normal, matcap, depth, distance),
+physical factors and maps, iridescence, anisotropy, dispersion, wireframe, front/back/double sides, live swaps and
+live render state. Blend/depth controls, polygon offset, color-write suppression and stencil are available
 through `Material` and gltf-pro render state, with optional `StencilBuffer` for a scene stencil attachment. These
 features add no core or stage functionality.
 
@@ -1132,8 +1182,6 @@ features add no core or stage functionality.
 | WebGL2 for optional packages | Closed v1 limit: core meshes, controls, labels, viewcube, bvh, LOD distance levels and the small glTF loader run on WebGL2; the rest needs WebGPU |
 | More than one directional light, configurable `HemisphereLight`, IES lights | One directional light; core diffuse ambient has RGB multipliers. Point, spot and rectangle area lights use clustered; glTF-pro keeps a fixed hemisphere fill |
 | `ShadowMaterial` on any mesh | Missing (`@margoengine/staging` ContactShadows is a ground shadow catcher for product shots) |
-| Lambert and Phong materials | Closed v1 limit: FBX import converts them to PBR; dedicated legacy shaders remain absent |
-| Wireframe material flag | Missing; inspector overlays and geometry `wireframe` drawn with lines are available |
 | glTF `KHR_animation_pointer` | Files that require it are rejected. Dispersion, iridescence, anisotropy and diffuse transmission use the documented `@margoengine/gltf-pro/extended` material path; material variants (`selectVariant`) and glTF cameras (`viewGLTFCamera`) are supported |
 | Custom attributes on your own meshes | Arbitrary named attributes remain missing; independent `uvs1` and geometry groups with material arrays are supported by materials, including instancing and glTF export |
 | Standalone KTX2 or float/3D/array data textures on your own meshes | Missing (KTX2 works inside glTF; materials takes RGBA8 data) |

@@ -201,6 +201,59 @@ installation.dispose();
 
 The installation restores replaced extensions and blend modes when disposed and releases its capture reference. For direct compilation of a transmissive graph, pass `nodeMaterial(graph, {opaqueColor})`, render the opaque snapshot before drawing, and set the material's `settings[0]` to `2`, as with `transmission()`. A constant zero transmission factor does not acquire a capture; compile a new graph to activate transmission after changing that constant. Screen-space refraction, volume, shadow, and device-restoration limits above apply equally to node materials. A caller needing custom WGSL can write a `MaterialExtension` directly.
 
+## Material classes and live use
+
+Each shading model has a class: a `Material` with its `shading` fixed and its options typed to what that model reads.
+`new Material({shading})` keeps working; every class tree-shakes on its own.
+
+| Class | `shading` | Reads |
+| --- | --- | --- |
+| `UnlitMaterial` | `basic` | colour, maps, emissive; no lighting |
+| `LambertMaterial` | `lambert` | diffuse lighting only |
+| `PhongMaterial` | `phong` | Lambert plus `specular` and `shininess` |
+| `PbrMaterial` | `standard` | metallic-roughness, maps and the physical options |
+| `NormalMaterial` | `normal` | view-space normals as colour |
+| `MatcapMaterial` | `matcap` | the `matcap` texture |
+| `DepthMaterial`, `DistanceMaterial` | `depth`, `distance` | packed depth or distance (below) |
+
+`PbrMaterial` shares its name with core's colour-only `PbrMaterial` and takes every core option with core's meaning
+and defaults: color `'#4f46e5'`, roughness 0.5, metalness 0, `doubleSided` true (an explicit `side` wins). Give a
+textured one `color: 0xffffff` for an untinted map.
+
+Everything is live on a `createMesh` mesh, from the next frame:
+
+```ts
+import {PbrMaterial, PhongMaterial, createMesh, loadTexture} from '@margoengine/materials';
+
+const tiles = await loadTexture('/tiles.png', {magFilter: 'nearest'});
+const paint = new PhongMaterial({color: 0x84d6bd, map: tiles});
+const mesh = createMesh(engine, geometry, paint);
+paint.color.set('#ff8800');       // or paint.color = 0xff8800; strings and numbers are sRGB, arrays linear
+paint.blending = 'additive';      // render state picks the matching pipeline
+paint.wireframe = true;
+mesh.material = new PbrMaterial({color: 0xffffff, map: tiles}); // swap
+mesh.renderOrder = 2;
+tiles.magFilter = 'linear';       // sampler options: next frame
+const copy = paint.clone();
+paint.dispose();
+```
+
+- `mesh.material = other` swaps a single-material mesh; a grouped mesh takes an array of the same length (reading it
+  gives a frozen snapshot). The model, geometry, transform, render order, skin and every shadows, clustered, fog,
+  IBL, SSAO, OIT and selection registration stay; transparent sorting and picking follow the new material. Each
+  material's per-engine uniforms are retained while a mesh uses it and released with its last use.
+- `color`, `emissive` and `specular` are the live linear arrays meshes read (element writes work); `set(input)` and
+  assignment take `'#rrggbb'`, `'#rgb'`, `0xrrggbb` (sRGB) or linear `[r, g, b]` (keeps opacity) / `[r, g, b, a]`.
+  Every colour option, including the physical ones, takes numbers.
+- Render state is live: `blending`, `depthWrite`, `depthTest`, `colorWrite`, `polygonOffset*`, the stencil options and
+  `wireframe`. Returning to the defaults reuses the original pipeline; a `stencilRef` change alone keeps its pipeline.
+- `clone()` makes an independent material of the same class sharing only textures; `copy(source)` writes a
+  same-shading source's values into this one in place; `dispose()` frees what no live mesh uses, after which
+  `createMesh` and `mesh.material =` refuse it (MargoError `disposed`). Textures stay the caller's.
+- `Texture` options are live too: `magFilter`, `minFilter`, `wrapS`, `wrapT` and `anisotropy` rebuild the sampler on
+  next use; `flipY`, `colorSpace` and `mipmaps` apply on the next `update()`, which then uploads the whole source.
+- Physical options and maps enable on demand (below); `mesh.renderOrder` is live.
+
 ## Meshes with two UV sets and material groups
 
 `createMesh(engine, geometry, material)` draws CPU geometry through glTF-pro's PBR renderer. `MeshGeometry` accepts
@@ -233,7 +286,8 @@ Normal maps selected from UV1 or transformed UVs derive their tangent frame from
 A material array requires at least one group. Each group has a nonnegative integer `materialIndex` into that array,
 and triangle-aligned `start` and positive `count` in index units, or vertex units without indices. Ranges must fit and
 must not overlap; gaps are omitted. A single material keeps drawing the whole geometry and ignores groups.
-`mesh.material` is that single material, or a frozen snapshot of the supplied array; the materials themselves stay live.
+`mesh.material` is that single material, or a frozen snapshot of the supplied array; the materials themselves stay
+live, and assigning swaps them (see above).
 
 Groups become primitives of one `PBRModel`, share packed vertices and GPU vertex buffers, and move with one root.
 `createInstancedMesh(engine, geometry, materials, capacity)` uses the same groups and shares one live `instances`
@@ -322,20 +376,20 @@ material flag. Core materials keep their existing API.
 ## Wireframe
 
 `new Material({wireframe: true})` draws triangle edges with native WebGPU lines. `wireframe` defaults to `false`
-and is fixed at construction. Geometry groups and instanced meshes use each group's material setting.
+and is live. Geometry groups and instanced meshes use each group's material setting.
 Edges include triangulation diagonals; shared triangle edges can be drawn more than once. Wide-line thickness
 controls are not provided.
 
 Wireframe alone keeps the existing render-state and transparency paths. The original triangle geometry remains
-available to picking and glTF export. Native `primitive.material.wireframe` accepts a live boolean, so assigning
-`true` or `false` changes subsequent draws without replacing the source triangle data.
+available to picking and glTF export. `material.wireframe` (and, on a materials mesh, `primitive.material.wireframe`,
+which writes the material) changes subsequent draws without replacing the source triangle data.
 Beauty, auxiliary and shadow passes use the same edges, including deformed vertices. Lines ignore triangle
 face culling and polygon offset. Directional casters explicitly registered with `{static: true}` keep their
 manual update policy: call `Shadows.invalidate()` after changing the native flag.
 
 ## Polygon offset and stencil
 
-`polygonOffset`, `polygonOffsetFactor`, `polygonOffsetUnits` and `polygonOffsetClamp` are fixed at construction.
+`polygonOffset`, `polygonOffsetFactor`, `polygonOffsetUnits` and `polygonOffsetClamp` are live.
 Positive factors and units push polygons away from the camera; negative values pull them forward. Signs are
 converted for reverse-Z. Units must be integers within ±2147483647; factor and clamp must be finite as float32.
 Clamp defaults to zero (unclamped). Points and lines ignore polygon offset.
@@ -344,7 +398,8 @@ Enable `stencilWrite` to apply stencil comparison and operations. `stencilFunc` 
 `stencilFail`, `stencilZFail` and `stencilZPass` default to `keep`. These use WebGPU comparison/operation names.
 `stencilRef` defaults to zero; `stencilReadMask` and `stencilWriteMask` default to `0xff`. Masks and references
 accept unsigned 32-bit integers; the attachment's eight stencil bits determine the effective value.
-Use `stencilWriteMask: 0` for comparison without changing stencil. These properties are fixed at construction.
+Use `stencilWriteMask: 0` for comparison without changing stencil. These properties are live; a `stencilRef` change
+alone keeps its pipeline (the reference is set per draw).
 
 ```ts
 import {Material, StencilBuffer, createMesh} from '@margoengine/materials';
@@ -468,9 +523,11 @@ Maps multiply their corresponding factors; existing factor defaults remain uncha
 default 0). Iridescence uses `iridescence` (default 0), `iridescenceIOR` (default 1.3) and
 `iridescenceThicknessRange` (nanometres, default `[100, 400]`).
 
-Physical and transmissive capabilities are fixed at construction. A non-null map reserves its lobe, and a
-transmission or thickness map also reserves transmissive rendering even when its factor is zero. To add
-anisotropy, iridescence or transmission maps later, reserve that capability with its factor set to zero first.
+Physical and transmissive capabilities enable on demand: a physical option or non-null map set at construction or
+later (standard shading only) makes that material physical, and from the next frame gltf-pro draws it with the
+matching physical variant; materials that never use them keep the plain shader, uniform layout and queue phase. A
+transmission or thickness map, like `transmission`, makes it transmissive even when its factor is zero. Volume values
+(`thickness`, `attenuationColor`, `attenuationDistance`) are part of transmission: set it first.
 Factors, map assignments (including `null`), texture `update()` calls and per-slot UV transforms stay live.
 Clearcoat normals and anisotropy derive independent tangent frames from their own transformed UV set.
 

@@ -489,8 +489,9 @@ export type Blending = 'normal' | 'additive' | 'multiply' | 'none';
 type LiveColor = number[] & { set(value: ColorInput): number[] };
 /**
  * Physical options (three.js MeshPhysicalMaterial names, glTF KHR_materials_* meaning; gltf-pro's physical shader draws
- * them, so a mesh and the same glTF material render alike). Any of them makes the material physical, fixed at
- * construction; `transmission` makes it transmissive (drawn after opaque meshes). Values stay live.
+ * them, so a mesh and the same glTF material render alike). Any of them, at construction or set later, makes the
+ * material physical (standard shading only); `transmission` and its maps make it transmissive (drawn after opaque
+ * meshes). Values stay live.
  */
 export interface PhysicalOptions {
   /** KHR_materials_clearcoat: layer strength and roughness, 0-1. */
@@ -530,7 +531,7 @@ export interface PhysicalOptions {
   dispersion?: number;
   /** KHR_materials_transmission: share of light passing through, 0-1. Refracts the scene with `@margoengine/materials/transmission`; otherwise the background shows through tinted. */
   transmission?: number;
-  /** Linear R transmission and G volume thickness. Either reserves transmissive rendering at construction. */
+  /** Linear R transmission and G volume thickness. Either makes the material transmissive, even at factor 0. */
   transmissionMap?: Texture | null;
   thicknessMap?: Texture | null;
   /** KHR_materials_volume: thickness in mesh units (0 = thin-walled, no refraction), and the colour white light reaches after `attenuationDistance` world units inside. */
@@ -568,7 +569,7 @@ export interface MaterialOptions extends PhysicalOptions {
   /** Faces drawn by triangle meshes. Explicit side takes precedence over doubleSided. */
   side?: MaterialSide;
   doubleSided?: boolean;
-  /** Draws triangle edges instead of filled surfaces. Fixed at construction; defaults to false. */
+  /** Draws triangle edges instead of filled surfaces; defaults to false. Live, like all render state below. */
   wireframe?: boolean;
   blending?: Blending;
   depthWrite?: boolean;
