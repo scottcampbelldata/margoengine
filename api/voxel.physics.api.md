@@ -5,18 +5,24 @@
 ```ts
 import { Vec3 } from "@margoengine/core";
 import { ColorInput } from "@margoengine/math";
-import { CollisionEvent, Physics } from "@margoengine/physics";
+import { CollisionEvent, Physics, PhysicsBody } from "@margoengine/physics";
 
 export class VoxelPhysics {
     readonly radius: number;
+    readonly body: PhysicsBody;
     constructor(physics: Physics, world: VoxelWorld, options?: VoxelPhysicsOptions);
-    get colliders(): ReadonlyMap<string, CollisionEvent['colliderA']>;
+    get budget(): number;
+    set budget(value: number);
+    get pending(): number;
+    get colliders(): ReadonlyMap<string, readonly CollisionEvent['colliderA'][]>;
+    chunkOf(collider: CollisionEvent['colliderA']): string | undefined;
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
 
 export interface VoxelPhysicsOptions {
     radius?: number;
+    budget?: number;
 }
 
 // Not exported from this entry, but used by the exports above:

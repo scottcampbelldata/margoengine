@@ -414,6 +414,10 @@ export type ShapeOptions = {
     columns: number;
     heights: ArrayLike<number>;
     scale: Vec3;
+}
+ | {
+    shape: 'custom';
+    desc: ColliderDesc;
 };
 
 export type Vec3 = readonly [number, number, number];
