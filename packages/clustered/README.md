@@ -98,8 +98,21 @@ can ask for: memory is `maxLights × 6 × resolution² × 4` bytes whatever the 
 smaller map renders into the top-left corner of its layers (a point light all six cube faces, a spot its cone) and is
 sampled there with matching UVs, so a 256 light has 256 texels of detail next to a 1024 one; it keeps two texels per
 side as a guard band, so the 3×3 filter never reads past it. A light at the full size uploads and renders exactly what
-it did before these options existed, and the shaders never change. These per-light options belong to
-`ClusteredOptions.shadows`; `LocalShadows` (`castShadow` lights) keeps one `resolution` for all its lights.
+it did before these options existed, and the shaders never change.
+
+`LocalShadows` (`castShadow` lights) takes the same per-light map size and near/far from the light's `shadow` object,
+up to its own `resolution`, the same way (corner viewport, matching UVs, two-texel guard band, no shader change):
+
+```ts
+import {LocalShadows} from '@margoengine/clustered/shadows';
+const lights = Clustered.attach(engine), local = LocalShadows.attach(engine, {lights, resolution: 1024});
+lights.setLights([{position: [0, 4, 0], range: 12, castShadow: true, shadow: {resolution: [512, 256], far: 8}}]);
+local.add(blocker);
+```
+
+Without `ClusteredOptions.shadows` a castShadow light's `shadow` may hold only `resolution`, `near` (default far /
+1000) and `far`: `LocalShadows` takes its biases, in texels, from its options. A size above its `resolution` throws
+when the maps render. With both systems attached, a light with `castShadow` and a `shadow` object is shadowed by both.
 
 `addShadowCaster()` accepts core meshes, individual loaded glTF/FBX nodes and sources exposing `shadowPrimitives`
 (a primitive with `displacement`, a materials mesh with a `displacementMap`, is drawn displaced here and in

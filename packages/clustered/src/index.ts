@@ -6,6 +6,7 @@ import { viewMatrix } from '../../shared/view.js';
 import { orthographic } from '../../shared/projection.js';
 import { coreReceives, unshadowedCore } from '../../shared/shadow-source.js';
 import { cullingShader, clusteredSampling } from './shader.js';
+import { shadowCamera } from './local-shadow-math.js';
 import {
   LocalShadowMaps,
   type LocalShadowOptions,
@@ -29,7 +30,12 @@ export interface PointLight {
    * A light that sets neither `decay` nor `angle` keeps the original inverse-square shader term, `d * d`, bit for bit.
    */
   decay?: number;
+  /**
+   * Integrated shadow map (`ClusteredOptions.shadows`): `true` or its settings. On a `castShadow` light the object's
+   * `resolution`, `near` and `far` also set its `LocalShadows` map; without integrated maps it may hold only those.
+   */
   shadow?: boolean | LocalLightShadow;
+  /** Shadowed by `LocalShadows` (`@margoengine/clustered/shadows`), with `shadow`'s map size and near/far if given. */
   castShadow?: boolean;
 }
 export interface SpotLight extends PointLight {
@@ -102,6 +108,8 @@ export class Clustered implements EnginePlugin {
   private readonly values = new Float32Array(32);
   private readonly ints = new Uint32Array(this.values.buffer);
   private readonly data = new Float32Array(1024 * 16);
+  /** Per light: LocalShadows map width, height, near and far from a castShadow light's `shadow`, 0 where unset. */
+  private readonly shadowCameras = new Float32Array(1024 * 4);
   private lightCount = 0;
   private dirty = true;
   private disposed = false;
@@ -168,11 +176,22 @@ export class Clustered implements EnginePlugin {
       if (light.decay !== undefined && !(Number.isFinite(Math.fround(light.decay)) && light.decay >= 0))
         throw new RangeError('Light decay must be a finite number of 0 or more; 2 is inverse-square');
       const shadow = light.shadow,
-        far = shadow && typeof shadow === 'object' ? shadow.far : undefined;
-      if (light.range === 0 && (light.castShadow || (shadow !== undefined && shadow !== false && far === undefined)))
+        settings = shadow && typeof shadow === 'object' ? shadow : undefined;
+      if (
+        light.range === 0 &&
+        settings?.far === undefined &&
+        (light.castShadow || (shadow !== undefined && shadow !== false))
+      )
         throw new RangeError(
-          'A light with a shadow map needs a finite range (0 is unlimited); give it a range, or an integrated shadow a far',
+          'A light with a shadow map needs a finite range (0 is unlimited); give it a range, or its shadow a far',
         );
+      if (light.castShadow && settings) {
+        if (!this.localShadows && (settings.bias !== undefined || settings.normalBias !== undefined))
+          throw new TypeError(
+            "LocalShadows takes bias and normalBias from its options; a castShadow light's shadow sets resolution, near and far",
+          );
+        shadowCamera(settings, light.range);
+      }
       if ('direction' in light) {
         finiteVector(light.direction, 3, 'Spot direction');
         const { angle, penumbra = 0 } = light;
@@ -204,8 +223,17 @@ export class Clustered implements EnginePlugin {
           (light as SpotLight).angle === undefined ? light : { ...light, outerAngle: (light as SpotLight).angle },
         ),
       );
-    else if (lights.some((light) => light.shadow !== undefined && light.shadow !== false))
-      throw new RangeError('Light shadows require ClusteredOptions.shadows');
+    else if (
+      lights.some(
+        (light) =>
+          light.shadow !== undefined &&
+          light.shadow !== false &&
+          !(light.castShadow && light.shadow && typeof light.shadow === 'object'),
+      )
+    )
+      throw new RangeError(
+        'Light shadows require ClusteredOptions.shadows; for LocalShadows, give a castShadow light a shadow of resolution, near and far',
+      );
     let shadows = 0;
     lights.forEach((light, i) => {
       const offset = i * 16,
@@ -234,6 +262,9 @@ export class Clustered implements EnginePlugin {
         if (fresh(light)) this.data[offset + 13] = -1 - decay;
       }
       this.data[offset + 14] = light.castShadow ? ++shadows : 0;
+      const settings = light.castShadow && light.shadow && typeof light.shadow === 'object' ? light.shadow : undefined;
+      if (settings) this.shadowCameras.set(shadowCamera(settings, light.range), i * 4);
+      else this.shadowCameras.fill(0, i * 4, i * 4 + 4);
       if (this.localShadows) this.data[offset + 15] = this.localShadows.shadowIndex(i);
     });
     const decay = lights.some(fresh);

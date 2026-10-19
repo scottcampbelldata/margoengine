@@ -54,6 +54,36 @@ export function localShadowMatrix(
     if (!Number.isFinite(out[i])) throw new RangeError('Local shadow matrix overflow');
 }
 /**
+ * `LocalShadows`' settings from a castShadow light's `shadow` object: map width, height, near and far, 0 where unset
+ * (the plugin's resolution, far / 1000 and the light's range). Throws on a bad value; the plugin checks the size limit.
+ */
+export function shadowCamera(
+  shadow: { resolution?: number | readonly [number, number]; near?: number; far?: number },
+  range: number,
+): [number, number, number, number] {
+  const size = shadow.resolution,
+    pair = Array.isArray(size) && size.length === 2,
+    width = typeof size === 'number' ? size : pair ? size[0] : NaN,
+    height = typeof size === 'number' ? size : pair ? size[1] : NaN;
+  if (size !== undefined && !(Number.isInteger(width) && Number.isInteger(height) && Math.min(width, height) >= 16))
+    throw new RangeError('Invalid light shadow resolution: give an integer or [width, height] of 16 or more');
+  if (
+    (shadow.near !== undefined && typeof shadow.near !== 'number') ||
+    (shadow.far !== undefined && typeof shadow.far !== 'number')
+  )
+    throw new TypeError('Light shadow near and far must be numbers');
+  const far = Math.fround(shadow.far ?? range),
+    near = Math.fround(shadow.near ?? far * 1e-3);
+  if (!(Number.isFinite(far) && near > 0 && near < far))
+    throw new RangeError('Invalid light shadow near/far: give 0 < near < far, finite (far defaults to the range)');
+  return [
+    size === undefined ? 0 : width,
+    size === undefined ? 0 : height,
+    shadow.near === undefined ? 0 : near,
+    shadow.far === undefined ? 0 : far,
+  ];
+}
+/**
  * A light whose map (`width` x `height`) is smaller than its `size` x `size` layers renders into each layer's top-left
  * corner (a viewport). Narrows the render matrix `camera` (at `c`) so its frustum lands inside that corner less two
  * texels per side, which keeps the receiver's 3x3 filter taps inside it, and writes into `sample` (at `s`) the same

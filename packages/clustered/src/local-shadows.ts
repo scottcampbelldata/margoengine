@@ -22,7 +22,12 @@ export interface LocalShadowOptions {
   resolution?: number;
   maxLights?: number;
 }
+/**
+ * A light's shadow settings. The integrated maps (`ClusteredOptions.shadows`) read all of them; `LocalShadows` reads
+ * `resolution`, `near` and `far` of a `castShadow` light (its biases are its own options, in texels).
+ */
 export interface LocalLightShadow {
+  /** Shadow-camera near distance (default `min(0.1, far / 100)` integrated, `far / 1000` for `LocalShadows`). */
   near?: number;
   /**
    * Shadow-camera far distance (default the light's `range`; required for an unlimited range, 0). Casters and
@@ -32,10 +37,12 @@ export interface LocalLightShadow {
   bias?: number;
   normalBias?: number;
   /**
-   * This light's map size in texels: one integer (square) or `[width, height]`, each from 16 up to
-   * `LocalShadowOptions.resolution` (the default). A point light (or a pi/2 spot) renders all six cube faces at this
-   * size, a spot its cone. A smaller map renders into the top-left corner of its layers, so it costs that light's
-   * detail, not memory; it keeps two texels per side as a guard band for the 3x3 filter.
+   * This light's map size in texels: one integer (square) or `[width, height]`, each from 16 up to the `resolution`
+   * of the maps that shadow it (`ClusteredOptions.shadows`, or `LocalShadows` for a castShadow light), the default. A
+   * point light (or a pi/2 spot) renders all six cube faces at this size (width along each face's own x), a spot its
+   * cone. A smaller map renders into
+   * the top-left corner of its layers, so it costs that light's detail, not memory; it keeps two texels per side as
+   * a guard band for the 3x3 filter.
    */
   resolution?: number | readonly [number, number];
 }

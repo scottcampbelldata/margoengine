@@ -13,7 +13,7 @@ import { instanceLayout, instancedDepth } from '../../shared/instances.js';
 import { displacedDepth } from '../../shared/displacement.js';
 import { preset } from '../../shared/preset.js';
 import type { Clustered, ClusteredShadow } from './index.js';
-import { hemisphere } from './local-shadow-math.js';
+import { hemisphere, viewportMatrix } from './local-shadow-math.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -23,7 +23,11 @@ export interface LocalShadowOptions {
   lights: Clustered;
   /** Shadowed lights with maps (1-16, default 4); further `castShadow` lights stay unshadowed. A point light uses six layers, a spot light one (six for a pi / 2 hemisphere). */
   maxLights?: number;
-  /** Square size of each layer in texels (default 512). */
+  /**
+   * Square size of each layer in texels (default 512), and the largest map a castShadow light's `shadow.resolution`
+   * may ask for (a smaller one draws into its layers' top-left corner). Layers are allocated for the lights in use at
+   * this size: `layers × resolution² × 4` bytes (a point light takes six, so one at 2048 is 96 MiB).
+   */
   resolution?: number;
   /** Receiver offset toward the light, in shadow-map texels at the receiver (default 1). */
   bias?: number;
@@ -82,7 +86,7 @@ interface Draw {
 const MAX_LIGHTS = 16,
   LAYERS = MAX_LIGHTS * 6,
   FRAME_FLOATS = 4 + MAX_LIGHTS * 4 + LAYERS * 16,
-  SLOT_FLOATS = 12;
+  SLOT_FLOATS = 16;
 // Reversed depth (near 1, far 0) for float precision. lights[k]: first layer, point (1) or spot (0), texel size per unit distance.
 // A point light picks the cube face by the major axis of the offset receiver, so faces need no seam filtering.
 const sampling = (group: number) => /* wgsl */ `
@@ -182,6 +186,10 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   private sources: Source[] = [];
   private readonly values = new Float32Array(FRAME_FLOATS);
   private readonly matrices = new Float32Array(LAYERS * 64);
+  /** Receivers' matrices per layer: the depth pass's, or for a smaller map the same mapped into its corner. */
+  private readonly sampled = new Float32Array(LAYERS * 16);
+  /** Per layer: a smaller map's viewport width and height, 0 for the whole layer. */
+  private readonly viewports = new Uint32Array(LAYERS * 2);
   private readonly slots = new Float32Array(MAX_LIGHTS * SLOT_FLOATS).fill(NaN);
   private readonly dirtyLayers = new Uint8Array(LAYERS);
   private readonly bases = new Int32Array(MAX_LIGHTS);
@@ -345,6 +353,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       size = o.resolution ?? 512,
       max = o.maxLights ?? 4,
       data = this.lights['data'],
+      cameras = this.lights['shadowCameras'],
       count = this.lights['lightCount'],
       slots = this.slots,
       values = this.values;
@@ -372,45 +381,62 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       const at = j * 16,
         slot = data[at + 14] - 1;
       if (slot < 0 || slot >= max) continue;
+      // The light's `shadow` map size and near/far (Clustered.setLights), 0 where unset.
       const point = data[at + 13] < 0.5 || hemisphere(data[at + 11]),
         base = bases[slot],
-        range = data[at + 3],
+        c = j * 4,
+        width = cameras[c] || size,
+        height = cameras[c + 1] || size,
+        range = cameras[c + 3] || data[at + 3],
+        near = cameras[c + 2] || range * 1e-3,
         s = slot * SLOT_FLOATS;
+      if (width > size || height > size)
+        throw new RangeError(
+          `A castShadow light's shadow.resolution exceeds LocalShadows resolution ${size}; lower it or raise resolution`,
+        );
       let same = slots[s + 11] === base && slots[s + 10] === (point ? 1 : 0);
       for (let k = 0; k < 8; k++) if (slots[s + k] !== data[at + (k < 4 ? k : k + 4)]) same = false;
       if (slots[s + 8] !== size) same = false;
+      for (let k = 0; k < 4; k++) if (slots[s + 12 + k] !== cameras[c + k]) same = false;
       if (same && !this.changed) continue;
       for (let k = 0; k < 8; k++) slots[s + k] = data[at + (k < 4 ? k : k + 4)];
       slots[s + 8] = size;
       slots[s + 10] = point ? 1 : 0;
       slots[s + 11] = base;
+      for (let k = 0; k < 4; k++) slots[s + 12 + k] = cameras[c + k];
       // Two texels of margin per side keep the 3x3 filter inside a cube face; the spot frustum covers the outer cone.
-      const margin = size / (size - 4),
+      // A smaller map draws into its layers' top-left corner: viewportMatrix keeps that margin and maps the UVs.
+      const scaled = width !== size || height !== size,
+        margin = size / (size - 4),
         cos = data[at + 11],
-        tan = (point ? 1 : Math.sqrt(1 - cos * cos) / cos) * margin,
-        near = range * 1e-3;
+        cone = point ? 1 : Math.sqrt(1 - cos * cos) / cos,
+        tan = scaled ? cone : cone * margin;
       values[4 + slot * 4] = base;
       values[5 + slot * 4] = point ? 1 : 0;
-      values[6 + slot * 4] = (2 * tan) / size;
+      values[6 + slot * 4] = scaled ? (2 * cone) / (Math.min(width, height) - 4) : (2 * tan) / size;
       for (let face = 0; face < (point ? 6 : 1); face++) {
+        const layer = base + face;
         lightMatrix(
           this.matrices,
-          (base + face) * 64,
+          layer * 64,
           data.subarray(at, at + 3),
           point ? axes[face] : data.subarray(at + 8, at + 11),
           tan,
           near,
           range,
         );
-        this.dirtyLayers[base + face] = 1;
+        if (scaled) viewportMatrix(this.matrices, layer * 64, this.sampled, layer * 16, width, height, size);
+        else this.sampled.set(this.matrices.subarray(layer * 64, layer * 64 + 16), layer * 16);
+        this.viewports[layer * 2] = scaled ? width : 0;
+        this.viewports[layer * 2 + 1] = scaled ? height : 0;
+        this.dirtyLayers[layer] = 1;
       }
     }
     values[0] = used;
     values[1] = o.bias ?? 1;
     values[2] = o.normalBias ?? 1.5;
     values[3] = 1 / size;
-    for (let l = 0; l < layers; l++)
-      values.set(this.matrices.subarray(l * 64, l * 64 + 16), 4 + MAX_LIGHTS * 4 + l * 16);
+    values.set(this.sampled.subarray(0, layers * 16), 4 + MAX_LIGHTS * 4);
     c.device.queue.writeBuffer(
       this.frame!,
       0,
@@ -524,6 +550,8 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       const pass = c.encoder.beginRenderPass(this.depthPass);
       this.offset[0] = l * 256;
       try {
+        const width = this.viewports[l * 2];
+        if (width) pass.setViewport(0, 0, width, this.viewports[l * 2 + 1], 0, 1);
         pass.setBindGroup(0, this.cameraGroup!, this.offset);
         for (const d of list) {
           const p = d.p!;

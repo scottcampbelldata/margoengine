@@ -457,3 +457,145 @@ test('local shadows: replacing indices behind stable primitive identity refreshe
     h.cleanup();
   }
 });
+
+test('local shadows: castShadow lights take shadow resolution, near and far; a full-size map uploads what plain lights do', () => {
+  const h = harness(),
+    viewports = [],
+    begin = h.context.encoder.beginRenderPass;
+  h.context.encoder.beginRenderPass = (d) => ({ ...begin(d), setViewport: (...args) => viewports.push(args) });
+  const lights = Clustered.attach(h.engine, { grid: [2, 2, 2] }),
+    shadows = LocalShadows.attach(h.engine, { lights, resolution: 64 }),
+    point = { position: [0, 3, 0], range: 10, castShadow: true },
+    upload = () => new Uint8Array(shadows.bindings()[0].resource.buffer.data).slice();
+  try {
+    for (const [shadow, type] of [
+      [{ resolution: 15 }, RangeError],
+      [{ resolution: [16] }, RangeError],
+      [{ resolution: [16, 32.5] }, RangeError],
+      [{ near: 0 }, RangeError],
+      [{ near: 10 }, RangeError],
+      [{ near: 5, far: 4 }, RangeError],
+      [{ far: Infinity }, RangeError],
+      [{ far: '8' }, TypeError],
+      [{ bias: 1 }, TypeError],
+      [true, RangeError],
+    ])
+      assert.throws(() => lights.setLights([{ ...point, shadow }]), type, JSON.stringify(shadow));
+    assert.throws(() => lights.setLights([{ ...point, castShadow: false, shadow: { far: 5 } }]), /ClusteredOptions/);
+    assert.throws(() => lights.setLights([{ ...point, range: 0 }]), /finite range/);
+    lights.setLights([point]);
+    h.frame();
+    const plain = upload();
+    for (const shadow of [{}, { resolution: 64 }, { resolution: [64, 64] }]) {
+      lights.setLights([{ ...point, shadow }]);
+      shadows.invalidate();
+      h.frame();
+      assert.deepEqual(upload(), plain, `${JSON.stringify(shadow)} is today's light`);
+    }
+    assert.equal(viewports.length, 0, 'full-size maps set no viewport');
+    lights.setLights([{ ...point, shadow: { resolution: 128 } }]);
+    assert.throws(() => h.frame(), /exceeds LocalShadows resolution 64/);
+    // Unlimited range with an explicit far: depth 0 (reversed) at far, 1 at far / 1000.
+    lights.setLights([{ ...point, range: 0, shadow: { far: 8 } }]);
+    h.frame();
+    const v = new Float32Array(shadows.bindings()[0].resource.buffer.data),
+      depth = (d) => {
+        const m = v.subarray(4 + 64, 4 + 64 + 16),
+          p = [d, 3, 0],
+          z = m[2] * p[0] + m[6] * p[1] + m[10] * p[2] + m[14],
+          w = m[3] * p[0] + m[7] * p[1] + m[11] * p[2] + m[15];
+        return z / w;
+      };
+    assert.ok(Math.abs(depth(8)) < 1e-5 && Math.abs(depth(0.008) - 1) < 1e-3, `${depth(8)} ${depth(0.008)}`);
+  } finally {
+    shadows.dispose();
+    lights.dispose();
+  }
+});
+
+test('local shadows: a smaller castShadow map renders into its layer corner with a guard band and matching UVs', () => {
+  const h = harness(),
+    size = 512,
+    passes = [],
+    begin = h.context.encoder.beginRenderPass;
+  h.context.encoder.beginRenderPass = (d) => {
+    const record = { viewport: null };
+    passes.push(record);
+    return { ...begin(d), setViewport: (...args) => (record.viewport = args) };
+  };
+  const lights = Clustered.attach(h.engine, { grid: [2, 2, 2] }),
+    shadows = LocalShadows.attach(h.engine, { lights, maxLights: 3, resolution: size }),
+    position = [2, 3, 4],
+    spot = { position, range: 10, direction: [0, 0, -1], outerAngle: Math.PI / 6, castShadow: true };
+  lights.setLights([
+    { position, range: 10, castShadow: true, shadow: { near: 0.25, resolution: [128, 64] } },
+    spot,
+    { ...spot, shadow: { far: 3, resolution: 32 } },
+  ]);
+  shadows.add(caster(h.engine));
+  const close = (actual, expected, label) =>
+    assert.ok(Math.abs(actual - expected) < 1e-3, `${label}: ${actual} != ${expected}`);
+  try {
+    h.frame();
+    assert.equal(passes.length, 8);
+    const frame = new Float32Array(shadows.bindings()[0].resource.buffer.data),
+      cameras = new Float32Array(shadows['cameras'].data),
+      clip = (m, o, p) =>
+        [0, 1, 2, 3].map((r) => m[o + r] * p[0] + m[o + 4 + r] * p[1] + m[o + 8 + r] * p[2] + m[o + 12 + r]);
+    // Layer texel a receiver samples (frame matrix, whole layer) and the texel the depth pass drew (camera + viewport).
+    const texels = (layer, p) => {
+      const s = clip(frame, 4 + 64 + layer * 16, p),
+        r = clip(cameras, layer * 64, p),
+        [width, height] = passes[layer].viewport?.slice(2, 4) ?? [size, size];
+      return {
+        sampled: [(s[0] / s[3]) * 0.5 + 0.5, 0.5 - (s[1] / s[3]) * 0.5].map((uv) => uv * size),
+        drawn: [((r[0] / r[3]) * 0.5 + 0.5) * width, (0.5 - (r[1] / r[3]) * 0.5) * height],
+        depth: [s[2] / s[3], r[2] / r[3]],
+      };
+    };
+    const axes = [
+      [1, 0, 0],
+      [-1, 0, 0],
+      [0, 1, 0],
+      [0, -1, 0],
+      [0, 0, 1],
+      [0, 0, -1],
+    ];
+    for (let face = 0; face < 6; face++) {
+      assert.deepEqual(passes[face].viewport, [0, 0, 128, 64, 0, 1], `face ${face} renders its corner`);
+      for (const perpendicular of axes.filter((axis) => axis.every((v, i) => v * axes[face][i] === 0)))
+        for (const lateral of [0.3, 1]) {
+          const t = texels(
+            face,
+            position.map((v, i) => v + axes[face][i] * 2 + perpendicular[i] * 2 * lateral),
+          );
+          close(t.sampled[0], t.drawn[0], `face ${face} u`);
+          close(t.sampled[1], t.drawn[1], `face ${face} v`);
+          close(t.depth[0], t.depth[1], `face ${face} depth`);
+          const inset = Math.min(t.drawn[0], 128 - t.drawn[0], t.drawn[1], 64 - t.drawn[1]);
+          // The cube face's 90-degree edge lands two texels inside the corner: the 3x3 filter never leaves it.
+          if (lateral === 1) close(inset, 2, `face ${face} guard band`);
+          else assert.ok(inset > 2, `face ${face} interior`);
+        }
+      close(
+        texels(
+          face,
+          position.map((v, i) => v + axes[face][i] * 0.25),
+        ).depth[0],
+        1,
+        `face ${face} near`,
+      );
+    }
+    close(frame[6], 2 / (64 - 4), "the bias texel is the smaller map's");
+    assert.equal(passes[6].viewport, null, 'the full-size spot renders its whole layer');
+    assert.deepEqual(frame.subarray(4 + 64 + 6 * 16, 4 + 64 + 7 * 16), cameras.subarray(6 * 64, 6 * 64 + 16));
+    // The third light (slot 2, layer 7) has far 3: reversed depth 0 three units down its cone, centred in its corner.
+    assert.deepEqual(passes[7].viewport, [0, 0, 32, 32, 0, 1]);
+    const axis = texels(7, [2, 3, 1]);
+    close(axis.depth[0], 0, 'far plane');
+    axis.sampled.forEach((v) => close(v, 16, 'cone axis at the corner centre'));
+  } finally {
+    shadows.dispose();
+    lights.dispose();
+  }
+});

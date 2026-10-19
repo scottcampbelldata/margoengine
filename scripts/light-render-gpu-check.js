@@ -6,9 +6,10 @@
 //   the same range and decay (so cluster culling drops no lit cluster) and a wall above it not at all; with
 //   LocalShadows or integrated shadows its six-face cube shadow is the point light's, pixel for pixel.
 // - shadow map size and shadow camera: the occluder's shadow edge (its 10-90% ramp along the floor, in world units) is
-//   wide at 64 texels and sharp at 1024, per axis for [width, height] maps, for a directional `frustum` and for
-//   integrated point lights' per-light `shadow.resolution`; a directional frustum shadows only inside its box and before
-//   its far; a local light's `shadow.far` drops casters past it; full-size options render pixel-identical frames.
+//   wide at 64 texels and sharp at 1024, per axis for [width, height] maps, for a directional `frustum` and for point
+//   lights' per-light `shadow.resolution` (integrated maps and LocalShadows); a directional frustum shadows only inside
+//   its box and before its far; a local light's `shadow.far` drops casters past it; full-size options render
+//   pixel-identical frames.
 // Run after npm run build:packages: node scripts/light-render-gpu-check.js (takes the GPU lock).
 import assert from 'node:assert/strict';
 import { openBrowser } from './browser.js';
@@ -290,7 +291,8 @@ try {
   const sizes = await browser.page.evaluate(async () => {
     const { instance, engine, scene, frame, diff, project, strip } = window.lightCheck,
       { Shadows } = await import('/packages/shadows/dist/index.js'),
-      { Clustered } = await import('/packages/clustered/dist/index.js');
+      { Clustered } = await import('/packages/clustered/dist/index.js'),
+      { LocalShadows } = await import('/packages/clustered/dist/shadows.js');
     // Brightest channel of single pixels along a floor line, and the world length of its 10%-90% ramp.
     const ramp = (bytes, [from, to]) => {
       const values = [];
@@ -364,7 +366,8 @@ try {
     cascaded.options.resolution = [1024, 1024];
     out.tupleVsNumber = diff(number.bytes, (await frame({})).bytes);
     instance.removePlugin(cascaded.name);
-    // Local: integrated maps at 1024 texels per layer, a point light over a 1 x 1 occluder; the sun off.
+    // Local: 1024-texel layers, a point light over a 1 x 1 occluder; the sun off. Integrated maps (`shadow`) and
+    // LocalShadows (`castShadow`, the same `shadow` object for its size and near/far).
     engine.lighting.direction.set([0, 1, 0, 0]);
     scene.occluder.setScale([1, 0.2, 1]);
     const point = { position: [0, 5, 0], range: 12, intensity: 40 },
@@ -379,31 +382,44 @@ try {
           [0.5, 0, 0.5],
           [0.5, 0, 1.6],
         ],
-      },
-      lights = Clustered.attach(instance, { grid: [8, 8, 16], shadows: { resolution: 1024 } });
-    lights.addShadowCaster(scene.occluder);
-    lights.setLights([point]);
-    out.localPlain = strip(await frame(near));
-    lights.setLights([{ ...point, shadow: true }]);
-    const full = await frame(near);
-    lights.setLights([{ ...point, shadow: { resolution: [1024, 1024] } }]);
-    out.localFullVsSame = diff(full.bytes, (await frame(near)).bytes);
-    for (const resolution of [64, 1024, [1024, 64]]) {
-      lights.setLights([{ ...point, shadow: { resolution } }]);
-      out[`local ${resolution}`] = await measure(local, near);
+      };
+    for (const system of ['integrated', 'plugin']) {
+      const integrated = system === 'integrated',
+        lights = Clustered.attach(instance, {
+          grid: [8, 8, 16],
+          ...(integrated ? { shadows: { resolution: 1024 } } : {}),
+        }),
+        plugin = integrated ? undefined : LocalShadows.attach(instance, { lights, resolution: 1024 }),
+        shadowed = (light, shadow) =>
+          integrated
+            ? { ...light, shadow: shadow ?? true }
+            : { ...light, castShadow: true, ...(shadow ? { shadow } : {}) };
+      if (integrated) lights.addShadowCaster(scene.occluder);
+      else plugin.add(scene.occluder);
+      lights.setLights([point]);
+      out[`${system} plain`] = strip(await frame(near));
+      lights.setLights([shadowed(point)]);
+      const full = await frame(near);
+      lights.setLights([shadowed(point, { resolution: [1024, 1024] })]);
+      out[`${system} full vs same`] = diff(full.bytes, (await frame(near)).bytes);
+      for (const resolution of [64, 1024, [1024, 64]]) {
+        lights.setLights([shadowed(point, { resolution })]);
+        out[`${system} ${resolution}`] = await measure(local, near);
+      }
+      for (const [name, light] of [
+        ['clipped', shadowed(point, { far: 2 })],
+        ['unlimited', shadowed({ ...point, range: 0 }, { far: 8 })],
+        ['spotPlain', spot],
+        ['spot', shadowed(spot)],
+        ['spotSmall', shadowed(spot, { resolution: 128 })],
+        ['spotClipped', shadowed(spot, { far: 2, resolution: 128 })],
+      ]) {
+        lights.setLights([light]);
+        out[`${system} ${name}`] = strip(await frame(near));
+      }
+      if (plugin) instance.removePlugin(plugin.name);
+      lights.dispose();
     }
-    for (const [name, light] of [
-      ['clipped', { ...point, shadow: { far: 2 } }],
-      ['unlimited', { ...point, range: 0, shadow: { far: 8 } }],
-      ['spotPlain', spot],
-      ['spot', { ...spot, shadow: true }],
-      ['spotSmall', { ...spot, shadow: { resolution: 128 } }],
-      ['spotClipped', { ...spot, shadow: { far: 2, resolution: 128 } }],
-    ]) {
-      lights.setLights([light]);
-      out[name] = strip(await frame(near));
-    }
-    lights.dispose();
     return out;
   });
   console.log(JSON.stringify(sizes));
@@ -421,16 +437,22 @@ try {
     ['sun 1024', 'ss'],
     ['sun 1024,64', 'sw'],
     ['sun 64,1024', 'ws'],
-    ['local 64', 'ww'],
-    ['local 1024', 'ss'],
-    ['local 1024,64', 'sw'],
+    // The downward cube face's map x is world X for the integrated maps and world Z for LocalShadows (its face basis).
+    ...[
+      ['integrated', 'sw'],
+      ['plugin', 'ws'],
+    ].flatMap(([system, wide]) => [
+      [`${system} 64`, 'ww'],
+      [`${system} 1024`, 'ss'],
+      [`${system} 1024,64`, wide],
+    ]),
   ]) {
     const f = sizes[name];
     [...axes].forEach((axis, i) => (axis === 'w' ? wide : sharp)(f[i ? 'z' : 'x'], `${name} ${i ? 'z' : 'x'}`));
     if (name.startsWith('sun')) {
       dark(f.under, sizes.plain.under);
       lit(f.open, sizes.plain.open, `${name}: the open floor`);
-    } else dark(f.under, sizes.localPlain.under);
+    } else dark(f.under, sizes[`${name.split(' ')[0]} plain`].under);
   }
   for (const name of ['sun soft', 'sun hard', 'sun 2:1 pcf', 'sun 2:1 soft']) {
     dark(sizes[name].under, sizes.plain.under);
@@ -446,14 +468,17 @@ try {
   lit(sizes.half.underRight, sizes.plain.underRight, 'outside the frustum (right of its box)');
   lit(sizes.short.under, sizes.plain.under, 'past the frustum far');
   assert.equal(sizes.tupleVsNumber.pixels, 0, 'resolution [1024, 1024] renders what 1024 does');
-  assert.equal(sizes.localFullVsSame.pixels, 0, 'shadow.resolution at the layer size renders what shadow: true does');
-  lit(sizes.clipped.under, sizes.localPlain.under, 'a caster past shadow.far');
-  dark(sizes.unlimited.under, sizes.localPlain.under);
-  for (const name of ['spot', 'spotSmall']) dark(sizes[name].under, sizes.spotPlain.under);
-  lit(sizes.spotClipped.under, sizes.spotPlain.under, 'a spot caster past shadow.far');
+  for (const system of ['integrated', 'plugin']) {
+    const s = (name) => sizes[`${system} ${name}`];
+    assert.equal(s('full vs same').pixels, 0, `${system}: shadow.resolution at the layer size renders the default map`);
+    lit(s('clipped').under, s('plain').under, `${system}: a caster past shadow.far`);
+    dark(s('unlimited').under, s('plain').under);
+    for (const name of ['spot', 'spotSmall']) dark(s(name).under, s('spotPlain').under);
+    lit(s('spotClipped').under, s('spotPlain').under, `${system}: a spot caster past shadow.far`);
+  }
   assert.deepEqual(errors, []);
   console.log(
-    `shadow map size and camera: edges widen at 64 texels and sharpen at 1024 per map axis (directional frustum, integrated point), frustum box and far clip, local far clip, full-size options pixel-identical`,
+    `shadow map size and camera: edges widen at 64 texels and sharpen at 1024 per map axis (directional frustum, integrated and LocalShadows point lights), frustum box and far clip, local far clip, full-size options pixel-identical`,
   );
 } finally {
   await browser?.close();
