@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Margo Engine capture browser checks</title></head>
+<body style="margin:0"><canvas id="view" style="width:200px;height:150px;display:block"></canvas>
+<script type="module">
+  import { Engine, PbrMaterial, box } from '@margoengine/core';
+  import { TransparentCanvas } from '@margoengine/environment';
+  import * as capture from '../dist/capture.js';
+  window.margo = { Engine, PbrMaterial, box, TransparentCanvas, ...capture };
+</script>
+</body>
+</html>

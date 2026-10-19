@@ -214,3 +214,64 @@ Import `exportUSDZ` from `@margoengine/exporters/usdz` to load only USDZ seriali
 Save as `.usdz`. A supported Apple device can open `<a rel="ar" href="model.usdz"><img src="preview.png" alt="View the model in AR"></a>`. No headset is required to generate or validate the file.
 
 Hierarchy is baked into world-space meshes. Textures, vertex colors and alpha masks are rejected; animation, skins and morphs are not exported. Quick Look presentation remains untested on Apple hardware. `node --test tests/usdz.test.js` checks ZIP layout and loader round trips. Install the official `usd-core` wheel and run `python tests/validate-usdz.py model.usdz` for independent metadata, topology and available OpenUSD package/material validators.
+
+## Render to file
+
+`@margoengine/exporters/capture` saves stills, image sequences, animated GIFs and WebM videos. Your code drives time:
+each encoder asks `frame(i)` for frame `i`, so set the scene state for that frame there, then call `capture`.
+
+```ts
+import {capture, encodePNG, encodeJPEG, encodeSequence, encodeGIF, encodeWEBM} from '@margoengine/exporters/capture';
+
+// Still (F12): exact pixels, whatever the window size and device pixel ratio.
+const shot = capture(engine, {width: 1920, height: 1080, camera: selected ?? engine.camera});
+const png = await encodePNG(shot);                       // Uint8Array, also works in Node
+const jpg = await encodeJPEG(shot, 0.9);                 // browser encoder, quality 0..1
+
+// Transparent background: attach TransparentCanvas (@margoengine/environment) first.
+const sprite = capture(engine, {width: 256, height: 256, background: '#203040', backgroundAlpha: 0.5});
+
+// Movie as numbered files: walk_000.png, walk_001.png ...
+const frame = (i) => (timeline.seek(i / 30), capture(engine, {width: 640, height: 360}));
+for await (const file of encodeSequence(120, frame, {name: 'walk_', pad: 3, format: 'png'}))
+  await save(file.name, file.data);
+
+// Spin GIF: 24 frames, 50 ms apart, one full turn.
+const gif = await encodeGIF(24, (i) => {
+  orbit(camera, (i / 24) * 2 * Math.PI);
+  return capture(engine, {width: 320, height: 240, camera});
+}, {fps: 1000 / 50});
+const webm = await encodeWEBM(120, frame, {fps: 30});    // browser only
+```
+
+| Option | Function | Default |
+| --- | --- | --- |
+| `width`, `height` | `capture` | Required. Output pixels, whole numbers >= 1 |
+| `camera` | `capture` | `engine.camera` |
+| `background`, `backgroundAlpha` | `capture` | None, 1. Drawn under the scene; shows only where the canvas is transparent. `backgroundAlpha` is Crocotile's Background Transparency (1 opaque, 0 transparent) |
+| `name`, `format`, `pad`, `quality` | `encodeSequence` | `'frame'`, `'png'` (or `'jpg'`), 0 digits (`String(count - 1).length` pads every name to one width), 0.92 |
+| `fps`, `dither` | `encodeGIF` | 30, `false`. fps at most 50 |
+| `fps`, `bitsPerSecond` | `encodeWEBM` | 30, the browser's |
+
+- **Capture.** The canvas is hidden for the call (`display: none`, so `Engine.render` keeps the backing size set by
+  `capture`), rendered with `delta: 0`, read back with `drawImage` in the same task, then restored and redrawn through
+  the primary camera; the page never shows the capture frame. Pixels are RGBA8, top row first, not premultiplied.
+  Sizes above 4096 per side render in tiles through a clip-space view offset on the camera's projection (its own
+  `project` hook included); passes that read neighbouring pixels (bloom, SSAO, outlines) can show seams there.
+  Pixel-sized lines, points and labels are drawn as at a device pixel ratio of 1. Toggle skyboxes and helpers in the
+  scene before capturing; call it outside frame callbacks.
+- **GIF.** GIF89a with a NETSCAPE2.0 loop-forever block and a colour table per frame. Frames with at most 256 colours
+  (255 with transparency) are exact; others are quantised by median cut over a 5-bit histogram, with optional 4x4
+  Bayer dithering. Alpha below 128 is transparent. Delays are whole hundredths, rounded cumulatively (30 fps: 3, 4, 3).
+- **JPEG** has no alpha: Chromium writes transparent pixels as black, so capture JPEG frames opaque.
+- **WebM** uses MediaRecorder on a `captureStream(0)` canvas with `requestFrame()` per frame, recording each frame for
+  1/fps s of wall time and pausing while the next is produced. A throwaway one-frame recording warms the browser's
+  media pipeline first (cold, it starts about 1 s late and keeps paused time). Durations follow timers, so they are
+  close to 1/fps, and the codec (VP8/VP9) and bit rate are the browser's. Keep the window visible while recording.
+
+`node --test packages/exporters/tests/capture.test.js` decodes every GIF with an independent GIF89a decoder (exact
+pixels, delays, loop, transparency, LZW resets and the end-code width, quantisation error), round-trips PNG through
+zlib, and checks capture sizing, tiling and restoring against a mocked canvas.
+`node scripts/gpu-lock.mjs run --owner=<id> -- node packages/exporters/tests/capture-browser.mjs` checks a real
+WebGPU engine: a 333x111 capture from a 200x150 canvas, 4200x100 tiles against a direct render, transparency, GIFs
+decoded by `ImageDecoder`, JPEG and WebM duration.

@@ -30,6 +30,10 @@
     "./dae": {
       "types": "./dist/dae.d.ts",
       "import": "./dist/dae.js"
+    },
+    "./capture": {
+      "types": "./dist/capture.d.ts",
+      "import": "./dist/capture.js"
     }
   },
   "files": [
