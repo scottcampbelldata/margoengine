@@ -4,11 +4,13 @@
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type FrameGraph, type PassContext } from '@margoengine/core/extension';
 import type { Environment } from './environment.js';
-import { background as backgroundShader } from './shaders.js';
+import type { RGBA8Image } from './ultrahdr.js';
+import { background as backgroundShader, imageBackground as imageBackgroundShader } from './shaders.js';
 import { invertMatrix } from '@margoengine/math/mat4';
+import { MargoError } from '@margoengine/math/errors';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
-declare const GPUTextureUsage: { TEXTURE_BINDING: number };
+declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
 
 export interface EnvironmentBackgroundOptions {
@@ -295,6 +297,330 @@ export class EnvironmentBackground {
   private releaseState(): void {
     this.state?.uniform.destroy();
     this.state?.fallback?.destroy();
+    this.state = undefined;
+  }
+}
+
+/** An image `ImageBackground.load` decodes: an RGBA8Image or ImageData, a URL, or anything `createImageBitmap` takes. */
+export type ImageBackgroundSource = RGBA8Image | ImageBitmapSource | string | URL;
+/** The three skybox shapes: six cube faces, an equirectangular sphere, or a panorama around a cylinder. */
+export type ImageBackgroundShape = 'box' | 'sphere' | 'cylinder';
+
+/** Images and settings of an `ImageBackground`; `Image` is what `images` holds (decoded pixels, or any source for `load`). */
+export interface ImageBackgroundOptions<Image = RGBA8Image> {
+  /**
+   * 'box': six square faces of one size in WebGPU cube order +X, -X, +Y, -Y, +Z, -Z, row 0 at the top (as `CubeFaces`).
+   * 'sphere': one equirectangular panorama, centre column facing -Z and row 0 straight up (as the HDR equirect).
+   * 'cylinder': one panorama wrapped once around a vertical unit-radius cylinder (see `height`).
+   */
+  shape: ImageBackgroundShape;
+  /** Six faces for 'box', one panorama for 'sphere' and 'cylinder': 8-bit sRGB RGBA, row 0 at the top. */
+  images: readonly Image[];
+  /** 'nearest' keeps pixel-art skies crisp, 'linear' filters. Default 'linear'; settable later. */
+  filter?: 'nearest' | 'linear';
+  /**
+   * 'cylinder' only: the height the image covers on the unit-radius cylinder, centred on the horizon. The horizontal
+   * angle maps to u over the full 360 degrees (as the sphere); v = 0.5 - y / (height * r) for a view direction with
+   * vertical part y and horizontal length r, so v is linear in height on the cylinder. Above and below the image the
+   * top and bottom rows repeat. Default 2 * PI * imageHeight / imageWidth (square texels); settable later.
+   */
+  height?: number;
+  /** Rotation about +Y in radians. Default 0; settable later. */
+  rotation?: number;
+  /** Frame graph order; must run after core's main pass (order 0). Default 0.5, before glTF-pro models (1). */
+  order?: number;
+  /** Plugin and pass name. Default 'background'. */
+  name?: string;
+}
+
+const isPixels = (value: unknown): value is RGBA8Image =>
+  typeof value === 'object' && value !== null && ArrayBuffer.isView((value as RGBA8Image).data);
+
+/** Decodes one `ImageBackgroundSource` to 8-bit RGBA through createImageBitmap and a 2D OffscreenCanvas. */
+async function decodeImage(source: ImageBackgroundSource): Promise<RGBA8Image> {
+  if (isPixels(source)) return source;
+  if (typeof source === 'string' || source instanceof URL) {
+    const response = await fetch(source);
+    if (!response.ok)
+      throw new MargoError('failed', `ImageBackground: ${source} answered HTTP ${response.status}; check the URL`);
+    source = await response.blob();
+  }
+  const bitmap = await createImageBitmap(source);
+  try {
+    const context = new OffscreenCanvas(bitmap.width, bitmap.height).getContext('2d');
+    if (!context)
+      throw new MargoError('unsupported', 'ImageBackground: no 2D OffscreenCanvas to read the image; pass ImageData');
+    context.drawImage(bitmap, 0, 0);
+    return context.getImageData(0, 0, bitmap.width, bitmap.height);
+  } finally {
+    bitmap.close();
+  }
+}
+
+interface ImageState {
+  device: GPUDevice;
+  texture: GPUTexture;
+  view: GPUTextureView;
+  uniform: GPUBuffer;
+  layout: GPUBindGroupLayout;
+  pipelineLayout: GPUPipelineLayout;
+  module: GPUShaderModule;
+  pipelines: Map<string, GPURenderPipeline>;
+  group?: GPUBindGroup;
+  /** The filter `group`'s sampler was made with. */
+  filter?: 'nearest' | 'linear';
+}
+
+/**
+ * Skybox from ordinary 8-bit sRGB images (PNG, JPG, a canvas): six faces for a box, one panorama for a sphere
+ * (equirectangular) or a cylinder. The images are kept on the CPU and uploaded as `rgba8unorm-srgb`, so sampling
+ * decodes sRGB to linear exactly, on the GPU, before filtering; they are uploaded again after a device restore. Drawn
+ * like `ColorBackground`: a full-screen triangle at reversed-Z depth 0 under a read-only `greater-equal` test (only
+ * pixels the scene left empty), the exact sRGB pixels on the canvas (no tone mapping) and linear values on an HDR
+ * target. Background only: it lights nothing. Also usable without an engine through `record(context)`.
+ */
+export class ImageBackground {
+  readonly name: string;
+  readonly order: number;
+  readonly shape: ImageBackgroundShape;
+  private readonly images: readonly RGBA8Image[];
+  private filterValue!: 'nearest' | 'linear';
+  private heightValue!: number;
+  private rotationValue = 0;
+  private state?: ImageState;
+  private disposed = false;
+  private readonly floats = new Float32Array(24);
+  private readonly inverse = new Float64Array(16);
+  private readonly colorAttachment: GPURenderPassColorAttachment = {
+    view: undefined!,
+    loadOp: 'load',
+    storeOp: 'store',
+  };
+  private readonly depthAttachment: GPURenderPassDepthStencilAttachment = { view: undefined!, depthReadOnly: true };
+  private readonly passDescriptor: GPURenderPassDescriptor = {
+    label: 'image background',
+    colorAttachments: [this.colorAttachment],
+    depthStencilAttachment: this.depthAttachment,
+  };
+
+  /** Same as `engine.use(new ImageBackground(options))`; returns the ImageBackground. */
+  static attach(engine: EngineKernel, options: ImageBackgroundOptions): ImageBackground {
+    const value = new ImageBackground(options);
+    engine.use(value);
+    return value;
+  }
+  /** Decodes `options.images` (URLs, blobs, image elements, bitmaps, canvases or ImageData), then constructs. */
+  static async load(options: ImageBackgroundOptions<ImageBackgroundSource>): Promise<ImageBackground> {
+    return new ImageBackground({ ...options, images: await Promise.all([...(options.images ?? [])].map(decodeImage)) });
+  }
+  constructor(options: ImageBackgroundOptions) {
+    const { shape, images } = options;
+    if (!['box', 'sphere', 'cylinder'].includes(shape))
+      throw new TypeError(`ImageBackground shape ${shape} is unknown; use 'box', 'sphere' or 'cylinder'`);
+    const count = shape === 'box' ? 6 : 1;
+    if (!Array.isArray(images) || images.length !== count)
+      throw new TypeError(
+        `ImageBackground ${shape} takes ${count === 6 ? 'six images (+X, -X, +Y, -Y, +Z, -Z)' : 'one image'}; pass that many`,
+      );
+    for (const image of images)
+      if (
+        !isPixels(image) ||
+        !Number.isSafeInteger(image.width) ||
+        !Number.isSafeInteger(image.height) ||
+        !(image.width > 0 && image.height > 0) ||
+        image.data.length !== image.width * image.height * 4 ||
+        (shape === 'box' && (image.width !== image.height || image.width !== images[0].width))
+      )
+        throw new TypeError(
+          `ImageBackground images need 8-bit RGBA data of width * height * 4${shape === 'box' ? ' and square faces of one size' : ''}; decode them with ImageBackground.load`,
+        );
+    this.shape = shape;
+    this.images = [...images];
+    this.name = options.name ?? 'background';
+    this.order = finiteNumber(options.order ?? 0.5, 'order');
+    if (this.order <= 0) throw new RangeError('Background order must be greater than 0 (after the main pass)');
+    this.filter = options.filter ?? 'linear';
+    this.height = options.height ?? (2 * Math.PI * images[0].height) / images[0].width;
+    this.rotation = options.rotation ?? 0;
+  }
+
+  get filter(): 'nearest' | 'linear' {
+    return this.filterValue;
+  }
+  set filter(value: 'nearest' | 'linear') {
+    if (value !== 'nearest' && value !== 'linear')
+      throw new TypeError(`ImageBackground filter ${value} is unknown; use 'nearest' or 'linear'`);
+    this.filterValue = value;
+  }
+  get height(): number {
+    return this.heightValue;
+  }
+  set height(value: number) {
+    this.heightValue = finiteNumber(value, 'cylinder height', Number.MIN_VALUE);
+  }
+  get rotation(): number {
+    return this.rotationValue;
+  }
+  set rotation(value: number) {
+    this.rotationValue = finiteNumber(value, 'rotation');
+  }
+
+  setup(engine: EngineKernel): void {
+    if (this.disposed) throw new MargoError('disposed', 'ImageBackground is disposed; create a new one');
+    if (engine.backend !== 'webgpu')
+      throw new MargoError('unsupported', 'ImageBackground requires the WebGPU backend; create the engine with WebGPU');
+  }
+  registerPasses(graph: FrameGraph): void {
+    graph.add({
+      name: this.name,
+      order: this.order,
+      execute: (context) => {
+        if (context.backend === 'webgpu') this.record(context);
+      },
+    });
+  }
+  onDeviceRestored(): void {
+    this.release();
+  }
+  dispose(): void {
+    this.disposed = true;
+    this.release();
+  }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
+
+  /** Records the background into `context.encoder` over `context.color`, testing against `context.depth`. */
+  record(context: GPUContext): void {
+    if (this.disposed) return;
+    const device = context.device,
+      state = this.state?.device === device ? this.state : this.upload(device),
+      depthFormat = context.descriptor.depthStencil?.format ?? 'depth32float',
+      count = context.descriptor.multisample?.count ?? 1,
+      key = `${context.format}|${depthFormat}|${count}`;
+    let pipeline = state.pipelines.get(key);
+    if (!pipeline) {
+      pipeline = device.createRenderPipeline({
+        label: 'image background',
+        layout: state.pipelineLayout,
+        vertex: { module: state.module, entryPoint: 'vertexMain' },
+        fragment: {
+          module: state.module,
+          entryPoint: 'fragmentMain',
+          targets: [{ format: context.format }],
+          constants: { outputHdr: context.format === 'rgba16float' || context.format === 'rgba32float' ? 1 : 0 },
+        },
+        primitive: { topology: 'triangle-list', cullMode: 'none' },
+        multisample: { count },
+        depthStencil: { format: depthFormat, depthWriteEnabled: false, depthCompare: 'greater-equal' },
+      });
+      state.pipelines.set(key, pipeline);
+    }
+    if (state.filter !== this.filterValue) {
+      state.group = device.createBindGroup({
+        layout: state.layout,
+        entries: [
+          { binding: 0, resource: { buffer: state.uniform } },
+          {
+            binding: 1,
+            resource: device.createSampler({
+              label: 'image background',
+              magFilter: this.filterValue,
+              minFilter: this.filterValue,
+              // Panoramas wrap around in u; cube faces ignore address modes.
+              addressModeU: 'repeat',
+            }),
+          },
+          { binding: 2, resource: state.view },
+        ],
+      });
+      state.filter = this.filterValue;
+    }
+    const camera = context.camera,
+      f = this.floats;
+    if (!invertMatrix(camera.matrix, this.inverse)) return;
+    for (let i = 0; i < 16; i++) f[i] = this.inverse[i];
+    f[16] = camera.position[0];
+    f[17] = camera.position[1];
+    f[18] = camera.position[2];
+    f[19] = 1;
+    f[20] = Math.cos(this.rotationValue);
+    f[21] = Math.sin(this.rotationValue);
+    f[22] = this.heightValue;
+    device.queue.writeBuffer(state.uniform, 0, f);
+    this.colorAttachment.view = context.color;
+    this.depthAttachment.view = context.depth;
+    if (depthFormat.includes('stencil')) this.depthAttachment.stencilReadOnly = true;
+    else delete this.depthAttachment.stencilReadOnly;
+    const pass = context.encoder.beginRenderPass(this.passDescriptor);
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, state.group!);
+    pass.draw(3);
+    pass.end();
+  }
+
+  /** Uploads the images to `device` (sRGB texture, cube for a box) with the uniform and pipeline layout. */
+  private upload(device: GPUDevice): ImageState {
+    this.release();
+    const box = this.shape === 'box',
+      { width, height } = this.images[0],
+      limit = device.limits.maxTextureDimension2D;
+    if (width > limit || height > limit)
+      throw new RangeError(`ImageBackground image ${width}x${height} exceeds the device limit ${limit}; downscale it`);
+    const texture = device.createTexture({
+      label: 'image background',
+      size: [width, height, this.images.length],
+      format: 'rgba8unorm-srgb',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    let uniform: GPUBuffer | undefined;
+    try {
+      this.images.forEach((image, z) =>
+        device.queue.writeTexture(
+          { texture, origin: { x: 0, y: 0, z } },
+          image.data as Uint8Array<ArrayBuffer>,
+          { bytesPerRow: width * 4, rowsPerImage: height },
+          [width, height, 1],
+        ),
+      );
+      uniform = device.createBuffer({
+        label: 'image background',
+        size: 96,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+      const layout = device.createBindGroupLayout({
+        label: 'image background',
+        entries: [
+          { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform', minBindingSize: 96 } },
+          { binding: 1, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
+          {
+            binding: 2,
+            visibility: GPUShaderStage.FRAGMENT,
+            texture: { sampleType: 'float', viewDimension: box ? 'cube' : '2d' },
+          },
+        ],
+      });
+      this.state = {
+        device,
+        texture,
+        view: texture.createView({ dimension: box ? 'cube' : '2d' }),
+        uniform,
+        layout,
+        pipelineLayout: device.createPipelineLayout({ bindGroupLayouts: [layout] }),
+        module: device.createShaderModule({ code: imageBackgroundShader(this.shape) }),
+        pipelines: new Map(),
+      };
+      return this.state;
+    } catch (error) {
+      texture.destroy();
+      uniform?.destroy();
+      throw error;
+    }
+  }
+  private release(): void {
+    this.state?.texture.destroy();
+    this.state?.uniform.destroy();
     this.state = undefined;
   }
 }

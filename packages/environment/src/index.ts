@@ -16,7 +16,11 @@ export { Environment, type EnvironmentOptions, type EnvironmentSource, type Cube
 export {
   EnvironmentBackground,
   EnvironmentBackground as Skybox,
+  ImageBackground,
   type EnvironmentBackgroundOptions,
+  type ImageBackgroundOptions,
+  type ImageBackgroundShape,
+  type ImageBackgroundSource,
 } from './background.js';
 export {
   ColorBackground,

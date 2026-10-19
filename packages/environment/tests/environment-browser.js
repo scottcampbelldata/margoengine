@@ -11,6 +11,7 @@ import {
   iblLayoutEntries,
   iblBindGroupEntries,
   ColorBackground,
+  ImageBackground,
   EnvironmentLighting,
   Fog,
   decodeUltraHDR,
@@ -143,9 +144,18 @@ function karisApproximation(nv, roughness) {
   return [-1.04 * a004 + r[2], 1.04 * a004 + r[3]];
 }
 
-const tonemap = (c) => {
-  const m = c / (1 + c);
-  return 255 * (m < 0.0031308 ? m * 12.92 : 1.055 * m ** (1 / 2.4) - 0.055);
+// The display curve of packages/shared/display.js (Khronos PBR Neutral, then exact sRGB), as 8-bit values.
+const tonemap = (rgb) => {
+  const x = Math.min(...rgb),
+    offset = x < 0.08 ? x - 6.25 * x * x : 0.04;
+  let v = rgb.map((c) => c - offset);
+  const peak = Math.max(...v);
+  if (peak >= 0.76) {
+    const top = 1 - (0.24 * 0.24) / (peak + 0.24 - 0.76),
+      g = 1 - 1 / (0.15 * (peak - top) + 1);
+    v = v.map((c) => (c * top) / peak + (top - (c * top) / peak) * g);
+  }
+  return v.map((m) => 255 * (m < 0.0031308 ? m * 12.92 : 1.055 * m ** (1 / 2.4) - 0.055));
 };
 function directionAt(camera, x, y, width, height) {
   const m = camera.matrix,
@@ -454,7 +464,7 @@ window.runEnvironmentTests = async () => {
     const size = 48,
       camera = new Camera({ position: [0, 0, 1], target: [0, 0, 0], fov: 90, near: 0.1, far: 50 });
     camera.update(1, true);
-    async function render(background, { format = 'rgba16float', depthClear = 0 } = {}) {
+    async function render(background, { format = 'rgba16float', depthClear = 0, view = camera } = {}) {
       const color = device.createTexture({
         size: [size, size],
         format,
@@ -486,7 +496,7 @@ window.runEnvironmentTests = async () => {
         color: colorView,
         depth: depthView,
         format,
-        camera,
+        camera: view,
         width: size,
         height: size,
         descriptor: { depthStencil: { format: 'depth32float' } },
@@ -528,7 +538,7 @@ window.runEnvironmentTests = async () => {
             worst,
             format === 'rgba16float'
               ? Math.abs(got[k] - expected[k]) / expected[k]
-              : Math.abs(got[k] - tonemap(expected[k])),
+              : Math.abs(got[k] - tonemap(expected)[k]),
           );
       }
       assert(worst < tolerance, `${label}: error ${worst}`);
@@ -568,6 +578,127 @@ window.runEnvironmentTests = async () => {
     sharp.dispose();
     report.checks.push(
       'background pass: expected colors per direction (equirect, cube, rotation, exposure, blur), linear HDR and core tone-mapped output, never over non-cleared depth',
+    );
+
+    // 5b. ImageBackground: 8-bit sRGB images as a box, sphere and cylinder, nearest filtering, every sampled pixel
+    // predicted by CPU mirrors of the lookups (scene.test.js checks the mirrors); HDR values in 8-bit sRGB steps.
+    const linearToByte = (c) => 255 * (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055);
+    const equirectUv = ([x, y, z]) => [
+      0.5 + Math.atan2(x || 0, -z || 0) / (2 * Math.PI),
+      Math.acos(Math.min(1, Math.max(-1, y))) / Math.PI,
+    ];
+    const cylinderUv = (d, height) => [
+      equirectUv(d)[0],
+      Math.min(1, Math.max(0, 0.5 - d[1] / (height * Math.max(Math.hypot(d[0], d[2]), 1e-6)))),
+    ];
+    function cubeUv([x, y, z]) {
+      const [ax, ay, az] = [Math.abs(x), Math.abs(y), Math.abs(z)];
+      const [face, sc, tc, ma] =
+        ax >= ay && ax >= az
+          ? [x > 0 ? 0 : 1, x > 0 ? -z : z, -y, ax]
+          : ay >= az
+            ? [y > 0 ? 2 : 3, x, y > 0 ? z : -z, ay]
+            : [z > 0 ? 4 : 5, z > 0 ? x : -x, -y, az];
+      return [face, (sc / ma + 1) / 2, (tc / ma + 1) / 2];
+    }
+    // Every texel its own colour: red from the column, green from the row, blue from the layer.
+    const image = (width, height, layer = 0) => {
+      const data = new Uint8Array(width * height * 4);
+      for (let y = 0; y < height; y++)
+        for (let x = 0; x < width; x++) data.set([17 + x * 7, 9 + y * 13, 5 + layer * 41, 255], (y * width + x) * 4);
+      return { width, height, data };
+    };
+    // The nearest texel at (u, v) and how far the sample sits from a texel edge (clamped rows count as far).
+    const texel = (img, u, v) => {
+      const fx = u * img.width,
+        fy = v * img.height,
+        x = ((Math.floor(fx) % img.width) + img.width) % img.width,
+        y = Math.min(img.height - 1, Math.floor(fy)),
+        i = (y * img.width + x) * 4;
+      return {
+        bytes: [...img.data.subarray(i, i + 3)],
+        edge: Math.min(Math.abs(fx - Math.round(fx)), v > 0 && v < 1 ? Math.abs(fy - Math.round(fy)) : 1),
+      };
+    };
+    const look = (target) => {
+      const view = new Camera({ position: [0, 0, 0], target, fov: 90, near: 0.1, far: 50 });
+      view.update(1, true);
+      return view;
+    };
+    const verify = async (options, lookup, label, view = camera) => {
+      const background = new ImageBackground({ filter: 'nearest', ...options }),
+        linear = await render(background, { view }),
+        bytes = await render(background, { format: 'rgba8unorm', view });
+      let checked = 0,
+        worst = 0;
+      for (let y = 1; y < size; y += 2)
+        for (let x = 1; x < size; x += 2) {
+          const d = rotateY(directionAt(view, x, y, size, size), options.rotation ?? 0),
+            expected = lookup(d);
+          if (expected.edge < 0.03) continue;
+          checked++;
+          const got = linear(x, y),
+            raw = bytes(x, y);
+          for (let k = 0; k < 3; k++) {
+            // The linear (HDR) value, measured in 8-bit steps: GPUs decode sRGB to within a fraction of a step
+            // (one here gave 0.01361 for byte 31, exactly 0.01370), and the target is half float.
+            worst = Math.max(worst, Math.abs(linearToByte(got[k]) - expected.bytes[k]));
+            assert(
+              raw[k] === expected.bytes[k],
+              `${label} at ${x},${y}: canvas byte ${raw[k]} vs ${expected.bytes[k]}`,
+            );
+          }
+        }
+      assert(checked > 200 && worst < 0.3, `${label}: ${checked} pixels, worst linear error ${worst} of an 8-bit step`);
+      background.dispose();
+      return { checked, worst };
+    };
+    const faces = Array.from({ length: 6 }, (_, face) => image(16, 16, face)),
+      panorama = image(32, 16),
+      boxLookup = (d) => {
+        const [face, u, v] = cubeUv(d);
+        return texel(faces[face], u, v);
+      };
+    report.imageBackground = {
+      boxFront: await verify({ shape: 'box', images: faces }, boxLookup, 'box towards -Z'),
+      boxCorner: await verify({ shape: 'box', images: faces }, boxLookup, 'box +X +Y -Z corner', look([1, 1, -1])),
+      boxOpposite: await verify({ shape: 'box', images: faces }, boxLookup, 'box -X -Y +Z corner', look([-1, -1, 1])),
+      sphere: await verify({ shape: 'sphere', images: [panorama] }, (d) => texel(panorama, ...equirectUv(d)), 'sphere'),
+      sphereRotated: await verify(
+        { shape: 'sphere', images: [panorama], rotation: Math.PI / 2 },
+        (d) => texel(panorama, ...equirectUv(d)),
+        'rotated sphere',
+      ),
+      sphereUp: await verify(
+        { shape: 'sphere', images: [panorama] },
+        (d) => texel(panorama, ...equirectUv(d)),
+        'sphere looking up',
+        look([0.3, 1, -0.6]),
+      ),
+      cylinder: await verify(
+        { shape: 'cylinder', images: [panorama] },
+        (d) => texel(panorama, ...cylinderUv(d, Math.PI)),
+        'cylinder (default square texels)',
+      ),
+      cylinderClamped: await verify(
+        { shape: 'cylinder', images: [panorama], height: 1 },
+        (d) => texel(panorama, ...cylinderUv(d, 1)),
+        'cylinder, height 1: top and bottom rows above and below',
+      ),
+    };
+    const crisp = new ImageBackground({ shape: 'sphere', images: [panorama], filter: 'nearest' }),
+      nearest = await render(crisp);
+    crisp.filter = 'linear';
+    const smooth = await render(crisp),
+      differs = samples.some(([x, y]) => nearest(x, y)[0] !== smooth(x, y)[0]),
+      clipped = await render(crisp, { format: 'rgba8unorm', depthClear: 1 });
+    assert(differs, 'linear filtering changed nothing');
+    for (let y = 0; y < size; y += 5)
+      for (let x = 0; x < size; x += 5)
+        assert(clipped(x, y).join() === '64,0,64,255', `image background drew over geometry at ${x},${y}`);
+    crisp.dispose();
+    report.checks.push(
+      'image background: 8-bit sRGB box (three views), sphere (rotated, looking up) and cylinder (default and clamped height) give the predicted texel per pixel, decoded exactly to linear on HDR targets and returned byte for byte on the canvas; linear filtering switches live; never over non-cleared depth',
     );
   }
   codedEnvironment.dispose();
@@ -757,7 +888,7 @@ window.runEnvironmentTests = async () => {
           );
         } else if (covered > 0) {
           edgePixels++;
-          const expected = coded(directionAt(engine.camera, x, y, width, height)).map(tonemap),
+          const expected = tonemap(coded(directionAt(engine.camera, x, y, width, height))),
             uncovered = 1 - covered / sceneSamples;
           for (let k = 0; k < 3; k++)
             edgeWorst = Math.max(
@@ -766,7 +897,7 @@ window.runEnvironmentTests = async () => {
             );
         } else if ((x + y) % 7 === 0) {
           backgroundPixels++;
-          const expected = coded(directionAt(engine.camera, x, y, width, height)).map(tonemap);
+          const expected = tonemap(coded(directionAt(engine.camera, x, y, width, height)));
           for (let k = 0; k < 3; k++) worst = Math.max(worst, Math.abs(withBackground[i + k] - expected[k]));
         }
       }

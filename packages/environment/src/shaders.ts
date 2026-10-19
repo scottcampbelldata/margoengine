@@ -208,6 +208,18 @@ fn smithG1(x: f32, a2: f32) -> f32 { return 2.0 * x / (x + sqrt(a2 + (1.0 - a2) 
 }
 `;
 
+// The full-screen triangle of both backgrounds, passing its NDC position to the fragment.
+const screen = /* wgsl */ `override outputHdr: bool = false;
+struct Varyings { @builtin(position) position: vec4f, @location(0) ndc: vec2f }
+@vertex fn vertexMain(@builtin(vertex_index) index: u32) -> Varyings {
+  let p = vec2f(f32((index << 1u) & 2u), f32(index & 2u)) * 2.0 - 1.0;
+  var out: Varyings;
+  out.position = vec4f(p, 0.0, 1.0);
+  out.ndc = p;
+  return out;
+}
+`;
+
 // Full-screen background at reversed-Z depth 0, so the 'greater-equal' test only passes where the depth
 // buffer still holds its cleared value. Output matches core: Reinhard then sRGB encode into the canvas
 // format, or linear radiance when the destination is an HDR rgba16float buffer (outputHdr).
@@ -220,16 +232,7 @@ struct Uniforms { inverseViewProjection: mat4x4f, eye: vec4f, params: vec4f, mod
 @group(0) @binding(2) var equirect: texture_2d<f32>;
 @group(0) @binding(3) var cube: texture_cube<f32>;
 @group(0) @binding(4) var specular: texture_cube<f32>;
-override outputHdr: bool = false;
-struct Varyings { @builtin(position) position: vec4f, @location(0) ndc: vec2f }
-@vertex fn vertexMain(@builtin(vertex_index) index: u32) -> Varyings {
-  let p = vec2f(f32((index << 1u) & 2u), f32(index & 2u)) * 2.0 - 1.0;
-  var out: Varyings;
-  out.position = vec4f(p, 0.0, 1.0);
-  out.ndc = p;
-  return out;
-}
-${displayShader}
+${screen}${displayShader}
 @fragment fn fragmentMain(v: Varyings) -> @location(0) vec4f {
   let world = u.inverseViewProjection * vec4f(v.ndc, 0.5, 1.0);
   let ray = normalize(world.xyz / world.w - u.eye.xyz);
@@ -247,5 +250,30 @@ ${displayShader}
   color *= u.params.x;
   if (outputHdr) { return vec4f(color, 1.0); }
   return vec4f(toDisplay(color), 1.0);
+}
+`;
+
+// 8-bit image background (ImageBackground). The texture is rgba8unorm-srgb, so the GPU applies the sRGB decode before
+// filtering and every sample is linear. On the canvas the exact sRGB encoding is written back (no tone mapping: the
+// image's own pixels show, as ColorBackground's colour does); on an HDR target the linear value (outputHdr).
+// Cylinder: u as the equirect; v linear in height on the unit-radius cylinder, the image spanning params.z of it
+// centred on the horizon; clamping v repeats the top and bottom rows above and below.
+export const imageBackground = (shape: 'box' | 'sphere' | 'cylinder'): string =>
+  common +
+  /* wgsl */ `
+struct Uniforms { inverseViewProjection: mat4x4f, eye: vec4f, params: vec4f }
+@group(0) @binding(0) var<uniform> u: Uniforms;
+@group(0) @binding(1) var imageSampler: sampler;
+@group(0) @binding(2) var image: ${shape === 'box' ? 'texture_cube' : 'texture_2d'}<f32>;
+${screen}fn cylinderUv(d: vec3f) -> vec2f {
+  return vec2f(equirectUv(d).x, clamp(0.5 - d.y / (u.params.z * max(length(d.xz), 1e-6)), 0.0, 1.0));
+}
+@fragment fn fragmentMain(v: Varyings) -> @location(0) vec4f {
+  let world = u.inverseViewProjection * vec4f(v.ndc, 0.5, 1.0);
+  let ray = normalize(world.xyz / world.w - u.eye.xyz);
+  let d = vec3f(u.params.x * ray.x - u.params.y * ray.z, ray.y, u.params.y * ray.x + u.params.x * ray.z);
+  let color = textureSampleLevel(image, imageSampler, ${{ box: 'd', sphere: 'equirectUv(d)', cylinder: 'cylinderUv(d)' }[shape]}, 0.0).rgb;
+  if (outputHdr) { return vec4f(color, 1.0); }
+  return vec4f(select(color * 12.92, 1.055 * pow(color, vec3f(1.0 / 2.4)) - 0.055, color >= vec3f(0.0031308)), 1.0);
 }
 `;

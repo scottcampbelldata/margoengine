@@ -10,6 +10,7 @@ import { parseGLTF } from '../../gltf-pro/dist/index.js';
 import { extendedMaterials } from '../../gltf-pro/dist/extended.js';
 import {
   ColorBackground,
+  ImageBackground,
   Environment,
   EnvironmentLighting,
   Fog,
@@ -487,6 +488,172 @@ test('ColorBackground fills only cleared depth with exact sRGB on the canvas and
     [],
     'disposed backgrounds draw nothing',
   );
+});
+
+// CPU mirrors of ImageBackground's lookups (shaders.ts): the equirect convention, the cylinder's height mapping and the
+// WebGPU cube face selection (major axis, then (sc, tc) / |ma| per face), so the browser test can predict every texel.
+const equirectUv = ([x, y, z]) => [
+  0.5 + Math.atan2(x || 0, -z || 0) / (2 * Math.PI),
+  Math.acos(Math.min(1, Math.max(-1, y))) / Math.PI,
+];
+const cylinderUv = (d, height) => [
+  equirectUv(d)[0],
+  Math.min(1, Math.max(0, 0.5 - d[1] / (height * Math.max(Math.hypot(d[0], d[2]), 1e-6)))),
+];
+function cubeUv([x, y, z]) {
+  const [ax, ay, az] = [Math.abs(x), Math.abs(y), Math.abs(z)];
+  const [face, sc, tc, ma] =
+    ax >= ay && ax >= az
+      ? [x > 0 ? 0 : 1, x > 0 ? -z : z, -y, ax]
+      : ay >= az
+        ? [y > 0 ? 2 : 3, x, y > 0 ? z : -z, ay]
+        : [z > 0 ? 4 : 5, z > 0 ? x : -x, -y, az];
+  return [face, (sc / ma + 1) / 2, (tc / ma + 1) / 2];
+}
+
+test('ImageBackground lookups: sphere and cylinder u around +Y, cylinder v by height clamped to the edge rows, cube faces', () => {
+  const near = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 1e-12);
+  assert.ok(near(equirectUv([0, 0, -1]), [0.5, 0.5]), '-Z is the image centre');
+  assert.ok(near(equirectUv([1, 0, 0]), [0.75, 0.5]), '+X is a quarter turn right');
+  assert.ok(near(equirectUv([0, 1, 0]), [0.5, 0]), '+Y is row 0');
+  const up45 = [0, Math.SQRT1_2, -Math.SQRT1_2],
+    square = (2 * Math.PI * 4) / 8; // the default height of an 8 x 4 panorama
+  assert.ok(near(cylinderUv(up45, 2), [0.5, 0]), 'height 2 ends at 45 degrees');
+  assert.ok(near(cylinderUv(up45, square), [0.5, 0.5 - 1 / Math.PI]), 'v is linear in height (tan of elevation)');
+  assert.ok(near(cylinderUv([0, 0.9, -0.1], 2), [0.5, 0]), 'above the image: the top row');
+  assert.ok(near(cylinderUv([0, -1, 0], 2), [0.5, 1]), 'straight down: the bottom row');
+  assert.ok(near(cylinderUv([-1, -0.25, 0], 2), [0.25, 0.625]));
+  // The cube lookup inverts the documented face convention (faceDirection in shaders.ts).
+  const faceDirection = (face, u, v) =>
+    [
+      [1, -v, -u],
+      [-1, -v, u],
+      [u, 1, v],
+      [u, -1, -v],
+      [u, -v, 1],
+      [-u, -v, -1],
+    ][face];
+  for (let face = 0; face < 6; face++)
+    for (const [u, v] of [
+      [-0.5, 0.25],
+      [0.75, -0.9],
+    ]) {
+      const [f, s, t] = cubeUv(faceDirection(face, u, v));
+      assert.ok(f === face && near([s, t], [(u + 1) / 2, (v + 1) / 2]), `face ${face}`);
+    }
+});
+
+test('ImageBackground validates, uploads sRGB bytes unchanged, switches filter and draws only on cleared depth', async () => {
+  const pixel = (width, height, fill = 0) => ({ width, height, data: new Uint8Array(width * height * 4).fill(fill) }),
+    faces = Array.from({ length: 6 }, (_, i) => pixel(2, 2, i * 40));
+  for (const options of [
+    { shape: 'dome', images: [pixel(2, 1)] },
+    { shape: 'box', images: faces.slice(1) },
+    { shape: 'box', images: [...faces.slice(1), pixel(4, 4)] },
+    { shape: 'box', images: [...faces.slice(1), pixel(2, 1)] },
+    { shape: 'sphere', images: [] },
+    { shape: 'sphere', images: [{ width: 2, height: 1, data: new Uint8Array(4) }] },
+    { shape: 'sphere', images: [pixel(2, 1)], filter: 'cubic' },
+  ])
+    assert.throws(() => new ImageBackground(options), TypeError, options.shape);
+  for (const options of [
+    { shape: 'cylinder', images: [pixel(2, 1)], height: 0 },
+    { shape: 'cylinder', images: [pixel(2, 1)], rotation: NaN },
+    { shape: 'sphere', images: [pixel(2, 1)], order: 0 },
+  ])
+    assert.throws(() => new ImageBackground(options), RangeError);
+  assert.throws(
+    () => new ImageBackground({ shape: 'sphere', images: [pixel(2, 1)] }).setup({ backend: 'webgl2' }),
+    /WebGPU/,
+  );
+  const decoded = pixel(8, 4),
+    cylinder = await ImageBackground.load({ shape: 'cylinder', images: [decoded] });
+  assert.equal(cylinder.images[0], decoded, 'load passes decoded pixels (ImageData) through');
+  assert.equal(cylinder.height, Math.PI, 'default height keeps texels square: 2 PI * 4 / 8');
+  assert.equal(cylinder.filter, 'linear');
+  assert.equal(cylinder.order, 0.5);
+
+  const gpu = mockGPU(),
+    box = new ImageBackground({ shape: 'box', images: faces, filter: 'nearest', rotation: 0.5 }),
+    run = passes(box),
+    frame = context(gpu, { format: 'bgra8unorm', samples: 4 });
+  const first = gpu.record(() => {
+    frame.begin(0);
+    run(frame.c);
+  });
+  const texture = first.find((entry) => entry[0] === 'texture' && entry[2].label === 'image background')[2];
+  assert.deepEqual([texture.format, texture.size], ['rgba8unorm-srgb', [2, 2, 6]]);
+  const uploads = first.filter((entry) => entry[0] === 'writeTexture');
+  assert.deepEqual(
+    uploads.map((entry) => [entry[1].origin.z, entry[2]]),
+    faces.map((face, z) => [z, 'Uint8Array:' + Buffer.from(face.data).toString('hex')]),
+    'six faces in layer order, bytes unchanged (the GPU decodes sRGB when sampling)',
+  );
+  assert.equal(first.find((entry) => entry[0] === 'view' && entry[2])[2].dimension, 'cube');
+  assert.deepEqual(
+    first.filter((entry) => entry[0] === 'sampler').map((entry) => [entry[2].magFilter, entry[2].minFilter]),
+    [['nearest', 'nearest']],
+  );
+  const pipeline = first.find((entry) => entry[0] === 'renderPipeline')[2];
+  assert.equal(pipeline.depthStencil.depthCompare, 'greater-equal');
+  assert.equal(pipeline.depthStencil.depthWriteEnabled, false);
+  assert.equal(pipeline.fragment.constants.outputHdr, 0);
+  assert.match(first.find((entry) => entry[0] === 'module')[2].code, /texture_cube<f32>/);
+  const uniform = [...hexFloats(first.find((entry) => entry[0] === 'writeBuffer')[3])];
+  assert.ok(Math.abs(uniform[20] - Math.cos(0.5)) < 1e-7 && Math.abs(uniform[21] - Math.sin(0.5)) < 1e-7);
+  assert.ok(first.some((entry) => entry[0] === 'pass.draw' && entry[1] === 3));
+  // Steady frames create nothing; a new filter makes one sampler and bind group, no texture upload.
+  const steady = gpu
+    .record(() => {
+      frame.begin(1);
+      run(frame.c);
+    })
+    .filter((entry) => ['texture', 'writeTexture', 'buffer', 'renderPipeline', 'group', 'sampler'].includes(entry[0]));
+  assert.deepEqual(steady, []);
+  box.filter = 'linear';
+  const switched = gpu
+    .record(() => {
+      frame.begin(2);
+      run(frame.c);
+    })
+    .map((entry) => entry[0]);
+  assert.deepEqual(
+    switched.filter((name) => ['texture', 'writeTexture', 'sampler', 'group'].includes(name)),
+    ['sampler', 'group'],
+  );
+  assert.throws(() => {
+    box.filter = 'cubic';
+  }, TypeError);
+  // A device restore uploads the kept images again; dispose releases the texture and uniform.
+  box.onDeviceRestored();
+  const restored = gpu.record(() => {
+    frame.begin(3);
+    run(frame.c);
+  });
+  assert.equal(restored.filter((entry) => entry[0] === 'writeTexture').length, 6);
+  assert.equal(gpu.record(() => box.dispose()).filter((entry) => entry[0] === 'destroy').length, 2);
+
+  // Panoramas: a 2D texture, the sphere and cylinder lookups, the cylinder height in the uniform, linear on HDR.
+  for (const shape of ['sphere', 'cylinder']) {
+    const panorama = new ImageBackground({ shape, images: [pixel(8, 4, 99)], height: 1.5 }),
+      hdr = context(gpu, { format: 'rgba16float', samples: 1 }),
+      calls = gpu.record(() => {
+        hdr.begin(0);
+        passes(panorama)(hdr.c);
+      });
+    assert.deepEqual(
+      calls.find((entry) => entry[0] === 'texture' && entry[2].label === 'image background')[2].size,
+      [8, 4, 1],
+    );
+    assert.equal(calls.find((entry) => entry[0] === 'view' && entry[2])[2].dimension, '2d');
+    const code = calls.find((entry) => entry[0] === 'module')[2].code;
+    assert.match(code, /texture_2d<f32>/);
+    assert.match(code, shape === 'sphere' ? /imageSampler, equirectUv\(d\)/ : /imageSampler, cylinderUv\(d\)/);
+    assert.equal(calls.find((entry) => entry[0] === 'sampler')[2].addressModeU, 'repeat');
+    assert.equal(calls.find((entry) => entry[0] === 'renderPipeline')[2].fragment.constants.outputHdr, 1);
+    assert.equal(hexFloats(calls.find((entry) => entry[0] === 'writeBuffer')[3])[22], 1.5);
+    panorama.dispose();
+  }
 });
 
 // ------------------------------------------------------------------ UltraHDR
