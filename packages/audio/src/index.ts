@@ -2,6 +2,8 @@ export { AudioListener } from './listener.js';
 export type { AudioListenerOptions } from './listener.js';
 export { Audio, PositionalAudio } from './audio.js';
 export type { AudioOptions, PositionalAudioOptions } from './audio.js';
+export { AudioVoicePool } from './voices.js';
+export type { AudioVoicePoolOptions } from './voices.js';
 export { AudioAnalyser } from './analyser.js';
 export type { AudioAnalyserOptions } from './analyser.js';
 export { loadAudioBuffer, clearAudioBufferCache, decodeAudio } from './loader.js';

@@ -3,6 +3,7 @@ import {
   AudioListener,
   Audio,
   PositionalAudio,
+  AudioVoicePool,
   AudioAnalyser,
   loadAudioBuffer,
   distanceGain,
@@ -271,6 +272,42 @@ window.runOfflineTests = async () => {
     );
   }
   checks.push('fadeIn ramps linearly from silence');
+
+  // Voice pool, equal-power panning: a source at azimuth -90 degrees reaches only the left channel, +90 only the right.
+  const pooled = async (seconds, voices, plays) => {
+    const context = new OfflineAudioContext(2, Math.round(seconds * rate), rate),
+      listener = new AudioListener({ context, autoResume: false });
+    listener.setPose([0, 0, 0], [0, 0, -1]);
+    const pool = new AudioVoicePool(listener, constant(context, 0.1), { voices, panningModel: 'equalpower' }),
+      used = plays.map(([position, options]) => pool.play(position, options)),
+      rendered = await context.startRendering();
+    listener.dispose();
+    return { used, left: rendered.getChannelData(0), right: rendered.getChannelData(1) };
+  };
+  {
+    // Two voices overlap: left at volume 1, right at 0.5, both 3 m away (inverse model: gain 1/3).
+    const { used, left, right } = await pooled(0.08, 2, [[[-3, 0, 0]], [[3, 0, 0], { volume: 0.5 }]]),
+      at = Math.round(0.04 * rate);
+    measurements.voicePool = [left[at], right[at]];
+    assert(used[0] !== used[1], 'Overlapping pool plays share a voice');
+    assert(near(left[at], 0.5 / 3, 0.002) && near(right[at], 0.25 / 3, 0.002), `Pool levels ${measurements.voicePool}`);
+  }
+  {
+    // One voice: the second play steals it (the left play never sounds) and plays the 0.1 s buffer at double speed.
+    const { left, right } = await pooled(0.1, 1, [[[-3, 0, 0]], [[3, 0, 0], { playbackRate: 2 }]]);
+    let leftPeak = 0;
+    for (const value of left) leftPeak = Math.max(leftPeak, Math.abs(value));
+    measurements.voiceSteal = [leftPeak, right[Math.round(0.03 * rate)], right[Math.round(0.07 * rate)]];
+    assert(
+      leftPeak < 1e-4 &&
+        near(measurements.voiceSteal[1], 0.5 / 3, 0.002) &&
+        Math.abs(measurements.voiceSteal[2]) < 1e-4,
+      `Pool steal ${measurements.voiceSteal}`,
+    );
+  }
+  checks.push(
+    'AudioVoicePool: overlapping plays sound on separate voices at their own positions and per-play volumes (samples within 0.002); a play past the voice count steals the oldest voice; playbackRate 2 halves the length',
+  );
   return { checks, measurements };
 };
 

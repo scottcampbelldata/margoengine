@@ -8,6 +8,7 @@ const {
   AudioListener,
   Audio,
   PositionalAudio,
+  AudioVoicePool,
   AudioAnalyser,
   loadAudioBuffer,
   clearAudioBufferCache,
@@ -809,4 +810,83 @@ test('many seeks and syncs leave only the live source connected; stop and dispos
   assert.deepEqual([audio.source, last.outputs.size, audio.gain.outputs.size], [null, 0, 0]);
   audio.sync(4, true);
   assert.equal(context.bufferSources.at(-1), last, 'a disposed sound stays silent');
+});
+
+test('voice pool: overlapping plays sound on separate voices sharing one buffer, at their own positions and levels', () => {
+  const context = new FakeAudioContext({ state: 'running' }),
+    listener = new AudioListener({ context, smoothing: 0.02 }),
+    shared = buffer(1),
+    pool = new AudioVoicePool(listener, shared, { voices: 3, refDistance: 2, volume: 0.8 });
+  assert.equal(pool.voices.length, 3);
+  const a = pool.play([1, 2, 3]),
+    b = pool.play([-4, 0, 0], { volume: 0.5, playbackRate: 1.2 }),
+    c = pool.play([0, 0, 9]);
+  assert.equal(new Set([a, b, c]).size, 3);
+  for (const voice of [a, b, c]) {
+    assert.ok(voice instanceof PositionalAudio && voice.isPlaying);
+    assert.equal(voice.refDistance, 2);
+    assert.equal(voice.source.buffer, shared);
+    assert.equal(voice.source.outputs.size, 1);
+  }
+  assert.equal(context.bufferSources.length, 3);
+  assert.deepEqual([...a.worldPosition], [1, 2, 3]);
+  assert.deepEqual([...c.worldPosition], [0, 0, 9]);
+  assert.deepEqual(b.panner.positionX.last(), ['set', -4, 0]);
+  assert.equal(a.gain.gain.value, 0.8);
+  assert.deepEqual(b.gain.gain.last(), ['set', 0.5, 0]);
+  assert.deepEqual(b.source.playbackRate.last(), ['set', 1.2, 0]);
+  assert.deepEqual(a.source.playbackRate.last(), ['set', 1, 0]);
+  listener.dispose();
+});
+
+test('voice pool steals the oldest voice when all sound, reuses an ended voice first, resets per-play options', () => {
+  const context = new FakeAudioContext({ state: 'running' }),
+    listener = new AudioListener({ context, smoothing: 0.02 }),
+    pool = new AudioVoicePool(listener, buffer(1), { voices: 2 });
+  const first = pool.play([1, 0, 0]),
+    stolen = first.source,
+    second = pool.play([2, 0, 0]);
+  context.currentTime = 0.5;
+  const third = pool.play([3, 0, 0], { volume: 0.25, playbackRate: 0.8 });
+  assert.equal(third, first, 'the oldest voice is stolen');
+  assert.notEqual(third.source, stolen);
+  assert.deepEqual([stolen.outputs.size, stolen.stopped.when, stolen.onended], [0, 0, null], 'cut off at once');
+  assert.deepEqual(third.panner.positionX.last(), ['set', 3, 0.5], 'a reused voice jumps instead of easing');
+  assert.deepEqual(third.gain.gain.last(), ['set', 0.25, 0.5]);
+  assert.equal(listener.smoothing, 0.02, 'smoothing is restored');
+  assert.equal(pool.play([4, 0, 0]), second, 'then the next oldest');
+  third.source.end();
+  assert.equal(first.isPlaying, false);
+  const fifth = pool.play([5, 0, 0]);
+  assert.equal(fifth, first, 'an ended voice is reused before any steal');
+  assert.deepEqual(fifth.source.playbackRate.last(), ['set', 1, 0.5], 'per-play options reset to the pool defaults');
+  assert.deepEqual(fifth.gain.gain.last(), ['set', 1, 0.5]);
+  assert.equal(pool.play([6, 0, 0]), second);
+  assert.equal(context.bufferSources.filter((node) => node.outputs.size > 0).length, 2, 'never more than 2 sound');
+  listener.dispose();
+});
+
+test('voice pool stopAll and dispose release every voice; play after dispose throws MargoError disposed', () => {
+  const context = new FakeAudioContext({ state: 'running' }),
+    listener = new AudioListener({ context }),
+    pool = new AudioVoicePool(listener, buffer(1), { voices: 3 });
+  const sources = [pool.play([0, 0, 0]), pool.play([1, 0, 0])].map((voice) => voice.source);
+  assert.equal(pool.stopAll(), pool);
+  assert.ok(pool.voices.every((voice) => !voice.isPlaying));
+  assert.ok(sources.every((source) => source.outputs.size === 0));
+  const live = pool.play([2, 0, 0]).source;
+  pool.dispose();
+  assert.equal(live.outputs.size, 0);
+  for (const voice of pool.voices) assert.deepEqual([voice.gain.outputs.size, voice.panner.outputs.size], [0, 0]);
+  assert.equal(listener.sources.size, 0, 'the listener no longer holds the voices');
+  assert.throws(
+    () => pool.play([0, 0, 0]),
+    (error) => error.name === 'MargoError' && error.code === 'disposed' && /new AudioVoicePool/.test(error.message),
+  );
+  pool.dispose();
+  assert.throws(() => new AudioVoicePool(listener, buffer(1), { voices: 0 }), RangeError);
+  assert.throws(() => new AudioVoicePool(listener, buffer(1), { voices: 1.5 }), RangeError);
+  assert.throws(() => new AudioVoicePool(listener, null), TypeError);
+  assert.equal(listener.sources.size, 0);
+  listener.dispose();
 });
