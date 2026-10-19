@@ -29,7 +29,7 @@
 //   (Schied et al. 2017, "Spatiotemporal Variance-Guided Filtering"), on albedo-demodulated radiance.
 // Material flags and record sizes must match scene.ts and layout.ts.
 import { displayShader } from '../../shared/display.js';
-import { DELTA_ALPHA, EMISSIVE, MATERIAL_FLOATS, MEDIA, SMOOTH } from './scene.js';
+import { ADDITIVE, DELTA_ALPHA, EMISSIVE, MATERIAL_FLOATS, MEDIA, SMOOTH, UNTINTED } from './scene.js';
 import { SPECTRUM } from './spectrum.js';
 import {
   FLAG_CLAMP,
@@ -41,6 +41,10 @@ import {
   FLAG_AREA,
   FLAG_CAMERA_MOTION,
   FLAG_CLEAR_GLASS,
+  FLAG_HIDE_SUN,
+  FLAG_NO_SUN_MEDIA,
+  FLAG_OPAQUE_SHADOWS,
+  FLAG_SUN_DIFFUSE,
   FLAG_SUN,
   INSTANCE_WORDS,
   MODEL_WORDS,
@@ -79,6 +83,8 @@ struct Frame {
  lensFov:vec4f,
  // Brown-Conrady k1, k2, p1, p2.
  distortion:vec4f,
+ // Scattering events allowed per path: diffuse, specular, scatter (0xffff: no cap).
+ limits:vec4u,
 }
 `;
 
@@ -198,6 +204,12 @@ const SPLIT=${FLAG_SPLIT}u;
 const AREA_NEE=${FLAG_AREA}u;
 const CAMERA_MOTION=${FLAG_CAMERA_MOTION}u;
 const CLEAR_GLASS=${FLAG_CLEAR_GLASS}u;
+const OPAQUE_SHADOWS=${FLAG_OPAQUE_SHADOWS}u;
+const SUN_DIFFUSE=${FLAG_SUN_DIFFUSE}u;
+const NO_SUN_MEDIA=${FLAG_NO_SUN_MEDIA}u;
+const HIDE_SUN=${FLAG_HIDE_SUN}u;
+const ADDITIVE=${ADDITIVE}u;
+const UNTINTED=${UNTINTED}u;
 const MODEL=${MODEL_WORDS}u;
 const INSTANCE=${INSTANCE_WORDS}u;
 @group(0) @binding(0) var<uniform> f:Frame;
@@ -314,8 +326,12 @@ fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit
  let ex=select(select(2u,1u,tf.y<=tf.z),0u,tf.x<=tf.y&&tf.x<=tf.z);
  return found(h,boxExit,0u,ex,stp,d,vec3i(floor(o+d*boxExit)));
 }
-// Extinction of a see-through cell for shadow rays, -1 when the cell blocks light (only media let it through).
-fn extinction(v:u32)->f32 {let x=materials[v*MV+3u];return select(-1.0,x.x,(u32(x.w)&MEDIA)!=0u);}
+// Extinction of a see-through cell for shadow rays, -1 when the cell blocks light (only media let it through, and
+// none with opaque shadows).
+fn extinction(v:u32)->f32 {
+ let x=materials[v*MV+3u];
+ return select(-1.0,x.x,(u32(x.w)&MEDIA)!=0u&&(f.config.z&OPAQUE_SHADOWS)==0u);
+}
 // Optical depth along a shadow ray through one model, -1 when blocked.
 fn marchShadow(model:u32,o:vec3f,d:vec3f,tMax:f32)->f32 {
  let mb=f.scene.x+model*MODEL;
@@ -559,11 +575,11 @@ fn cameraRay(px:vec2f)->Ray {
 
 // Materials: 4 vec4 per palette index (scene.ts packMaterial).
 // disp: Cauchy coefficient B (square micrometres; 0 without dispersion), ior the index at the d line.
-struct Mat {color:vec3f,alpha:f32,metal:f32,glass:f32,spec:f32,f0:f32,emission:vec3f,ior:f32,density:f32,scatter:f32,g:f32,flags:u32,disp:f32}
+struct Mat {color:vec3f,alpha:f32,metal:f32,glass:f32,spec:f32,f0:f32,emission:vec3f,ior:f32,density:f32,scatter:f32,g:f32,flags:u32,disp:f32,metalColor:vec3f}
 fn material(id:u32)->Mat {
  let a=materials[id*MV];let b=materials[id*MV+1u];let c=materials[id*MV+2u];let e=materials[id*MV+3u];
  let x=materials[id*MV+4u];
- return Mat(a.xyz,a.w,b.x,b.y,b.z,b.w,c.xyz,c.w,e.x,e.y,e.z,u32(e.w),x.x);
+ return Mat(a.xyz,a.w,b.x,b.y,b.z,b.w,c.xyz,c.w,e.x,e.y,e.z,u32(e.w),x.x,x.yzw);
 }
 // Index of a dispersive material at wavelength l (nanometres).
 fn iorAt(m:Mat,l:f32)->f32 {let x=l*0.001;return m.ior+m.disp*(1.0/(x*x)-1.0/(LAMBDA_D*LAMBDA_D));}
@@ -576,7 +592,7 @@ fn collapse(lambda:ptr<function,f32>,thr:ptr<function,vec3f>) {
  let w=sampleLambda(vec2f(rand(),rand()));
  *thr*=spectralRgb(w.x)/w.y;*lambda=w.x;
 }
-fn groundMat()->Mat {var m:Mat;m.color=f.ground.xyz;m.alpha=1.0;m.ior=1.5;return m;}
+fn groundMat()->Mat {var m:Mat;m.color=f.ground.xyz;m.metalColor=f.ground.xyz;m.alpha=1.0;m.ior=1.5;return m;}
 fn schlick3(f0:vec3f,c:f32)->vec3f {return f0+(1.0-f0)*pow(1.0-clamp(c,0.0,1.0),5.0);}
 fn schlick1(f0:f32,c:f32)->f32 {return f0+(1.0-f0)*pow(1.0-clamp(c,0.0,1.0),5.0);}
 fn cosineDir(n:vec3f)->vec3f {
@@ -602,33 +618,37 @@ fn tableGlass(mu:f32,r:f32,eta:f32)->f32 {
  return mix(a,b,fz);
 }
 struct Eval {f:vec3f,pdf:f32}
-// BSDF times cos(wi) and the density of sampling wi, over the lobes other than glass and perfectly specular ones.
-fn evalSurface(m:Mat,n:vec3f,wo:vec3f,wi:vec3f)->Eval {
+// BSDF times cos(wi) over the lobes in mask (1 diffuse, 2 glossy: metal and coat), and the density of sampling wi
+// over all of them; glass and perfectly specular lobes are not included. An additive coat leaves the diffuse base
+// whole (MagicaVoxel) instead of taking its reflection out of it.
+fn evalLobes(m:Mat,n:vec3f,wo:vec3f,wi:vec3f,mask:u32)->Eval {
  var e:Eval;
  let ci=dot(n,wi);let co=dot(n,wo);
  if(ci<=0.0||co<=0.0){return e;}
  let pb=max(0.0,1.0-m.metal-m.glass);
  let pc=m.spec*schlick1(m.f0,co);
- e.f=pb*(1.0-pc)*m.color*(ci*INV_PI);
+ if((mask&1u)!=0u){e.f=pb*select(1.0-pc,1.0,(m.flags&ADDITIVE)!=0u)*m.color*(ci*INV_PI);}
  e.pdf=pb*(1.0-pc)*ci*INV_PI;
  if((m.flags&SMOOTH)==0u){
   let h=normalize(wo+wi);let nh=dot(n,h);let vh=max(dot(wo,h),0.0);let a2=m.alpha*m.alpha;
   let d=ggxD(a2,nh);let lo=lambdaG(a2,co);let g2=1.0/(1.0+lo+lambdaG(a2,ci));
   let spec=d*g2/(4.0*co);
-  e.f+=(m.metal*schlick3(m.color,vh)+pb*m.spec*schlick1(m.f0,vh))*spec;
+  let gloss=(mask&2u)!=0u;
+  if(gloss){e.f+=(m.metal*schlick3(m.metalColor,vh)+pb*m.spec*schlick1(m.f0,vh))*spec;}
   var qms=0.0;
   if(m.metal>0.0){
    // Multiple scattering between the microfacets (Kulla and Conty): (1 - E(mu_o)) (1 - E(mu_i)) / (pi (1 - Eavg)),
    // scaled by Favg^2 Eavg / (1 - Favg (1 - Eavg)) with Favg the hemispherical average of Schlick's Fresnel.
    let rough=sqrt(m.alpha);let ea=tableEavg(rough);
    qms=clamp(1.0-tableE(co,rough),0.0,1.0);
-   let fa=m.color+(1.0-m.color)/21.0;
-   e.f+=m.metal*fa*fa*ea/(1.0-fa*(1.0-ea))*qms*(1.0-tableE(ci,rough))/(PI*max(1.0-ea,1e-4))*ci;
+   let fa=m.metalColor+(1.0-m.metalColor)/21.0;
+   if(gloss){e.f+=m.metal*fa*fa*ea/(1.0-fa*(1.0-ea))*qms*(1.0-tableE(ci,rough))/(PI*max(1.0-ea,1e-4))*ci;}
   }
   e.pdf+=(m.metal*(1.0-qms)+pb*pc)*d/((1.0+lo)*4.0*co)+m.metal*qms*ci*INV_PI;
  }
  return e;
 }
+fn evalSurface(m:Mat,n:vec3f,wo:vec3f,wi:vec3f)->Eval {return evalLobes(m,n,wo,wi,3u);}
 // lobe: 0 cosine (diffuse, multiple scattering), 1 microfacet reflection, 2 perfect mirror, 3 dielectric.
 struct Bounce {wi:vec3f,w:vec3f,pdf:f32,transmit:bool,ok:bool,lobe:u32}
 // Dielectric interface with relative index eta = n(incident side) / n(other side); smooth or GGX-rough. Rough
@@ -668,7 +688,7 @@ fn sampleSurface(m:Mat,n:vec3f,wo:vec3f,etaI:f32)->Bounce {
  let pc=m.spec*schlick1(m.f0,co);
  let qm=m.metal/rest;let qc=pb*pc/rest;
  if((m.flags&SMOOTH)!=0u){
-  if(r<qm){s.wi=reflect(-wo,n);s.w=schlick3(m.color,co);s.ok=true;s.lobe=2u;return s;}
+  if(r<qm){s.wi=reflect(-wo,n);s.w=schlick3(m.metalColor,co);s.ok=true;s.lobe=2u;return s;}
   if(r<qm+qc){s.wi=reflect(-wo,n);s.w=vec3f(1.0);s.ok=true;s.lobe=2u;return s;}
   s.wi=cosineDir(n);
  } else {
@@ -701,9 +721,9 @@ fn sampleHg(d:vec3f,g:f32)->vec3f {
  let s=sqrt(max(0.0,1.0-c*c));let p=TAU*u.y;
  return basis(d)*vec3f(s*cos(p),s*sin(p),c);
 }
-fn evalAt(kind:u32,m:Mat,n:vec3f,wo:vec3f,wi:vec3f)->Eval {
+fn evalAt(kind:u32,m:Mat,n:vec3f,wo:vec3f,wi:vec3f,mask:u32)->Eval {
  if(kind==1u){let p=hgPdf(dot(-wo,wi),m.g);return Eval(vec3f(p),p);}
- return evalSurface(m,n,wo,wi);
+ return evalLobes(m,n,wo,wi,mask);
 }
 
 // Lights.
@@ -723,14 +743,17 @@ fn envPdf(d:vec3f,t:vec4f)->f32 {
 }
 // Radiance of the environment and sun disk in direction d, weighted against light sampling when the path was sampled
 // with density bsdfPdf (0: no light sampling could have found it) through a chain of refractions with Jacobian j.
-fn environment(d:vec3f,bsdfPdf:f32,j:f32)->vec3f {
+// camera: the ray has not scattered yet (the sun disk then shows unless hidden; scattered rays see it unless the sun
+// lights diffuse lobes only, by light sampling alone).
+fn environment(d:vec3f,bsdfPdf:f32,j:f32,camera:bool)->vec3f {
  var c=f.sky.xyz;
  if((f.config.z&ENV)!=0u){
   let t=envTexel(envUV(d));
   c=t.xyz*f.sky.w;
   if(bsdfPdf>0.0){c*=power2(bsdfPdf,envPdf(d,t)/j);}
  }
- if((f.config.z&SUN)!=0u&&f.sunLight.w>0.0&&dot(d,f.sun.xyz)>=f.sun.w){
+ let seen=select((f.config.z&SUN_DIFFUSE)==0u,(f.config.z&HIDE_SUN)==0u,camera);
+ if(seen&&(f.config.z&SUN)!=0u&&f.sunLight.w>0.0&&dot(d,f.sun.xyz)>=f.sun.w){
   c+=f.sunLight.xyz*select(1.0,power2(bsdfPdf,1.0/f.sunLight.w/j),bsdfPdf>0.0);
  }
  return c;
@@ -933,18 +956,19 @@ fn glassCandidates(kind:u32,m:Mat,n:vec3f,o:vec3f,medium:u32,mInst:u32,s:vec3f,l
   }
  }
 }
-// Next-event estimation at a surface (kind 0) or a medium scattering point (kind 1): one sample of each light kind,
+// Next-event estimation at a surface (kind 0, over the lobes in mask: 1 diffuse, 2 glossy) or a medium scattering
+// point (kind 1): one sample of each light kind,
 // all through one BSDF evaluation and one shadow ray (the shader stays small): 0 the sun, 1 an emissive face, 2 an
 // area light, 3 the environment; 4 evaluates the BSDF for the glass walk kept among the candidates. Distant lights also
 // through smooth glass (straight chains blocked by it and the candidates of glassCandidates are walked by the path
 // loop); emissive voxels and area lights from outside glass only.
-fn direct(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,medium:u32,mInst:u32,w:ptr<function,Walk>)->vec3f {
+fn direct(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,medium:u32,mInst:u32,w:ptr<function,Walk>,mask:u32)->vec3f {
  var L=vec3f(0.0);
  let air=medium==0u||(material(medium).flags&MEDIA)!=0u;
  for(var q=0u;q<5u;q++){
   var wi=vec3f(0.0);var dist=INF;var radiance=vec3f(0.0);var lp=0.0;var far=false;
   if(q==0u){
-   if((f.config.z&SUN)==0u){continue;}
+   if((f.config.z&SUN)==0u||(kind==1u&&(f.config.z&NO_SUN_MEDIA)!=0u)){continue;}
    wi=f.sun.xyz;
    if(f.sunLight.w>0.0){wi=cone(f.sun.xyz,f.sun.w);}
    radiance=f.sunLight.xyz;lp=select(0.0,1.0/f.sunLight.w,f.sunLight.w>0.0);far=true;
@@ -978,7 +1002,11 @@ fn direct(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,medium:u32,mInst:u32,w:ptr<fun
    if((*w).total==0.0){continue;}
    wi=(*w).d;
   }
-  let e=evalAt(kind,m,n,wo,wi);
+  // With the sun on diffuse lobes only, nothing else finds it: its light-sampled share is the whole estimate.
+  let sunOnly=q==0u&&(f.config.z&SUN_DIFFUSE)!=0u;
+  let lobes=select(mask,mask&1u,sunOnly);
+  if(kind==0u&&lobes==0u){continue;}
+  let e=evalAt(kind,m,n,wo,wi,lobes);
   if(q==4u){
    if(any(e.f>vec3f(0.0))){(*w).f=e.f*(*w).light*((*w).total/(*w).weight);(*w).pdf=e.pdf;}else{(*w).total=0.0;}
    continue;
@@ -986,10 +1014,10 @@ fn direct(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,medium:u32,mInst:u32,w:ptr<fun
   // The straight direction (not from inside glass, where glassCandidates finds the ways out).
   if(any(e.f>vec3f(0.0))&&(air||!far)){
    let v=shadow(o,wi,dist);
-   if(v>0.0){L+=e.f*radiance*v*select(1.0,power2(lp,e.pdf)/lp,lp>0.0);}
-   else if(far&&(f.config.z&CLEAR_GLASS)!=0u){offer(w,1.0,o,wi,medium,mInst,wi,NONE,radiance,lp);}
+   if(v>0.0){L+=e.f*radiance*v*select(1.0,select(power2(lp,e.pdf),1.0,sunOnly)/lp,lp>0.0);}
+   else if(far&&!sunOnly&&(f.config.z&CLEAR_GLASS)!=0u){offer(w,1.0,o,wi,medium,mInst,wi,NONE,radiance,lp);}
   }
-  if(far){glassCandidates(kind,m,n,o,medium,mInst,wi,radiance,lp,w);}
+  if(far&&!sunOnly){glassCandidates(kind,m,n,o,medium,mInst,wi,radiance,lp,w);}
  }
  return L;
 }
@@ -1041,6 +1069,8 @@ fn radiance(px:vec2u)->Path {
  var medium=0u;var mInst=NONE;
  var lastPdf=0.0;
  var bounces=0u;
+ // Events per kind for the caps in f.limits: diffuse, specular, scatter.
+ var nd=0u;var ns=0u;var nm=0u;
  var feature=true;var tint=vec3f(1.0);var primary=true;
  var diffuse=false;var focused=false;var C=vec3f(0.0);
  // Distant-light MIS: density of the last vertex that sampled distant lights, Jacobian of the refractions since,
@@ -1100,13 +1130,13 @@ fn radiance(px:vec2u)->Path {
      // Glass to media or to other glass: left to path sampling (the path side ends its chain there too).
      if(wGlass){stop=true;}
      else if((mb.flags&MEDIA)!=0u){wMedium=h.value;wInst=h.inst;wo=wp-woff;}
-     else if(isMirror(mb)&&mirrorAt(h.inst)){wT*=schlick3(mb.color,ci);wN++;wG=h.inst;wd=reflect(wd,wn);wo=wp+woff;}
+     else if(isMirror(mb)&&mirrorAt(h.inst)){wT*=schlick3(mb.metalColor,ci);wN++;wG=h.inst;wd=reflect(wd,wn);wo=wp+woff;}
      else if(mb.glass<0.999||!clearGlass(mb)){stop=true;}
      else {
       let eta=1.0/mb.ior;
       let fr=fresnel(ci,eta);
       let dt=refract(wd,wn,eta);
-      wT*=mb.color*(1.0-fr);wJ*=-dot(wn,dt)/(eta*eta*ci);
+      wT*=select(mb.color,vec3f(1.0),(mb.flags&UNTINTED)!=0u)*(1.0-fr);wJ*=-dot(wn,dt)/(eta*eta*ci);
       wEntered=true;wIn=wd;wMedium=h.value;wInst=h.inst;wo=wp-woff;wd=dt;
      }
     }
@@ -1135,7 +1165,8 @@ fn radiance(px:vec2u)->Path {
      p=o+d*ts;
      if(feature){feature=false;res.albedo=tint*md.albedo;res.normal=-d;res.primary=select(0.0,1.0,bounces==0u);}
      bounces++;
-     if(bounces>f.config.x){break;}
+     if(bounces>f.config.x||nm>=f.limits.z){break;}
+     nm++;
      scatter=true;
     }
    }
@@ -1146,7 +1177,7 @@ fn radiance(px:vec2u)->Path {
   else {
    if(h.inst==NONE){
     let kept=chainOk&&chainSet&&(deflections==0u||(deflections==1u&&deflectOk&&!glassStart));
-    let add=thr*environment(d,select(0.0,sunPdf,kept),jChain);L+=add;if(focused){C+=add;}
+    let add=thr*environment(d,select(0.0,sunPdf,kept),jChain,bounces==0u);L+=add;if(focused){C+=add;}
     break;
    }
    if(h.inst==AREA){
@@ -1181,7 +1212,8 @@ fn radiance(px:vec2u)->Path {
      d=s.wi;lastPdf=0.0;
      if(feature){tint*=s.w;}
      bounces++;
-     if(bounces>f.config.x){break;}
+     if(bounces>f.config.x||ns>=f.limits.y){break;}
+     ns++;
      if(!roulette(&thr,bounces)){break;}
      continue;
     }
@@ -1199,7 +1231,8 @@ fn radiance(px:vec2u)->Path {
   // Light sampled at a glossy metal seen from a diffuse vertex is a caustic too (light focused by the metal).
   if(soft){
    var walk:Walk;
-   let add=thr*direct(select(0u,1u,scatter),m,n,-d,p+off,medium,mInst,&walk);L+=add;
+   let lobes=select(0u,1u,nd<f.limits.x)|select(0u,2u,ns<f.limits.y);
+   let add=thr*direct(select(0u,1u,scatter),m,n,-d,p+off,medium,mInst,&walk,lobes);L+=add;
    let caustic=focused||(diffuse&&!scatter&&m.metal>0.5&&m.alpha<0.1);
    if(caustic){C+=add;}
    if(walk.total>0.0){
@@ -1226,6 +1259,8 @@ fn radiance(px:vec2u)->Path {
   if(m.disp>0.0&&m.glass>0.0){collapse(&lambda,&thr);m.ior=iorAt(m,lambda);}
   let s=sampleSurface(m,n,wo,etaI);
   if(!s.ok){done=true;continue;}
+  if(s.lobe==0u){if(nd>=f.limits.x){done=true;continue;}nd++;}
+  else{if(ns>=f.limits.y){done=true;continue;}ns++;}
   if(s.lobe<=1u){
    // A new chain starts here; light sampling of distant lights ran unless the vertex is inside rough glass.
    let roughGlass=!inAir&&!clearGlass(material(medium));
@@ -1243,7 +1278,7 @@ fn radiance(px:vec2u)->Path {
   thr*=s.w;
   if(s.transmit){
    if(h.inst==GROUND){done=true;continue;}
-   medium=h.value;mInst=h.inst;o=p-off;thr*=m.color;
+   medium=h.value;mInst=h.inst;o=p-off;if((m.flags&UNTINTED)==0u){thr*=m.color;}
   } else {o=p+off;}
   if(feature){tint*=s.w;}
   d=s.wi;lastPdf=select(0.0,s.pdf,inAir);
@@ -1415,7 +1450,7 @@ fn tap(x:i32)->f32 {return select(select(0.0625,0.25,abs(x)==1),0.375,x==0);}
 
 /** Draws the accumulated (or denoised) image: bilinear upsampling, exposure, tone mapping, first-hit depth. */
 export const DISPLAY: string = /* wgsl */ `${displayShader}
-struct View {matrix:mat4x4f,inverse:mat4x4f,size:vec4f,params:vec4f}
+struct View {matrix:mat4x4f,inverse:mat4x4f,size:vec4f,params:vec4f,encoding:vec4f}
 @group(0) @binding(0) var<uniform> v:View;
 @group(0) @binding(1) var<storage,read> color:array<vec4f>;
 @group(0) @binding(2) var<storage,read> features:array<vec4f>;
@@ -1426,6 +1461,13 @@ struct VOut {@builtin(position) pos:vec4f}
 }
 struct FOut {@location(0) color:vec4f,@builtin(frag_depth) depth:f32}
 fn srgb(c:vec3f)->vec3f {return select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.055,c>=vec3f(0.0031308));}
+// Krzysztof Narkowicz's fit of the ACES film curve (2016), after the 0.6 pre-scale of his reference.
+fn acesNarkowicz(c:vec3f)->vec3f {let x=0.6*c;return clamp(x*(2.51*x+0.03)/(x*(2.43*x+0.59)+0.14),vec3f(0.0),vec3f(1.0));}
+// Display encoding: sRGB, or the power 1 / gamma when v.encoding.x is set.
+fn encodeOut(c:vec3f)->vec3f {
+ let x=clamp(c,vec3f(0.0),vec3f(1.0));
+ return select(srgb(x),pow(x,vec3f(1.0/max(v.encoding.x,1.0))),v.encoding.x>0.0);
+}
 @fragment fn fs(i:VOut)->FOut {
  let tw=v.size.x;let th=v.size.y;let W=u32(tw);
  let q=i.pos.xy*vec2f(tw,th)/v.size.zw-0.5;
@@ -1435,7 +1477,12 @@ fn srgb(c:vec3f)->vec3f {return select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.055
  let c=mix(mix(color[y0*W+x0].xyz,color[y0*W+x1].xyz,fr.x),mix(color[y1*W+x0].xyz,color[y1*W+x1].xyz,fr.x),fr.y)*v.params.x*v.params.y;
  var rgb=max(c,vec3f(0.0));
  let mode=u32(v.params.z);
- if((mode&1u)==0u){if((mode&2u)!=0u){rgb=srgb(min(rgb,vec3f(1.0)));}else{rgb=toDisplay(rgb);}}
+ if((mode&1u)==0u){
+  if((mode&2u)!=0u){rgb=encodeOut(rgb);}
+  else if((mode&4u)!=0u){rgb=encodeOut(acesNarkowicz(rgb));}
+  else if(v.encoding.x>0.0){rgb=encodeOut(pbrNeutral(rgb));}
+  else{rgb=toDisplay(rgb);}
+ }
  var o:FOut;
  o.color=vec4f(rgb,1.0);
  let nx=u32(clamp(floor(i.pos.x*tw/v.size.z),0.0,tw-1.0));let ny=u32(clamp(floor(i.pos.y*th/v.size.w),0.0,th-1.0));

@@ -9,7 +9,7 @@ export const INSTANCE_WORDS = 40;
 /** Words per hierarchy node. */
 const NODE_WORDS = 8;
 /** Bytes of the frame uniform. */
-export const FRAME_BYTES = 608;
+export const FRAME_BYTES = 624;
 /** Frame uniform flag bits (config.z). */
 export const FLAG_SUN = 1,
   FLAG_GROUND = 2,
@@ -20,7 +20,11 @@ export const FLAG_SUN = 1,
   FLAG_SPLIT = 64,
   FLAG_AREA = 128,
   FLAG_CAMERA_MOTION = 256,
-  FLAG_CLEAR_GLASS = 512;
+  FLAG_CLEAR_GLASS = 512,
+  FLAG_OPAQUE_SHADOWS = 1024,
+  FLAG_SUN_DIFFUSE = 2048,
+  FLAG_NO_SUN_MEDIA = 4096,
+  FLAG_HIDE_SUN = 8192;
 
 const f32 = new Float32Array(1),
   u32 = new Uint32Array(f32.buffer);

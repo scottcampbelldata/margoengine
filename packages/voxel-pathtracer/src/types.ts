@@ -60,6 +60,23 @@ export interface TraceMaterial {
    * colours (traced per wavelength, 380-780 nm); it is not light-sampled through (README, "Lighting").
    */
   abbe?: number;
+  /**
+   * Compatible addition: linear RGB reflectance at normal incidence (F0) of the metal lobe, each component 0 to 1.
+   * Default `color`; set it when the metal lobe and the diffuse or plastic part of a `blend` differ (MagicaVoxel
+   * reflects `min(1, specular x color)` from its metal lobe and `color` from the rest).
+   */
+  metalColor?: TraceVec3;
+  /**
+   * Compatible addition: how the dielectric coat of `plastic`, `metal` (below full metalness) and `blend` combines with
+   * the diffuse base: 'layered' (default) takes the coat's reflection out of the light reaching the base; 'additive'
+   * adds the coat on top of the full diffuse base, as MagicaVoxel does (brighter by up to the coat's Fresnel).
+   */
+  coat?: 'layered' | 'additive';
+  /**
+   * Compatible addition: whether `color` tints light entering glass and blend volumes (true, default). false: glass is
+   * clear at its faces and `color` acts only through `density` absorption, as in MagicaVoxel.
+   */
+  tint?: boolean;
 }
 
 /** A dense voxel model, shared by any number of instances. */
@@ -140,6 +157,11 @@ export interface TraceEnvironment {
    * light.
    */
   physicalSky?: TracePhysicalSky;
+  /**
+   * Compatible addition: whether camera rays see the sun disk (true, default). Reflections and lighting are unchanged;
+   * false is MagicaVoxel's default (sun disk off).
+   */
+  sunVisible?: boolean;
 }
 
 /** Compatible addition: the Preetham daylight sky of {@link TraceEnvironment.physicalSky}. */
@@ -245,10 +267,52 @@ export interface VoxelPathTracerOptions {
   distortion?: TraceLensDistortion | null;
   /** Compatible addition: largest luminance one path may add (firefly clamp; biased), above 0 or Infinity. Default Infinity. */
   clamp?: number;
-  /** Compatible addition: 'neutral' (Khronos PBR Neutral, Margo's display transform) or 'linear' (clipped). Default 'neutral'. */
-  toneMapping?: 'neutral' | 'linear';
+  /**
+   * Compatible addition: 'neutral' (Khronos PBR Neutral, Margo's display transform), 'linear' (clipped) or
+   * 'aces-narkowicz' (Krzysztof Narkowicz's per-channel fit of the ACES film curve after a 0.6 pre-scale, MagicaVoxel's
+   * film). Default 'neutral'.
+   */
+  toneMapping?: 'neutral' | 'linear' | 'aces-narkowicz';
+  /**
+   * Compatible addition: display encoding after tone mapping: undefined (default) encodes sRGB; a number from 1 to 5
+   * raises to the power 1 / gamma (MagicaVoxel encodes with 2.2).
+   */
+  gamma?: number;
+  /**
+   * Compatible addition: caps on scattering events of each kind along a path, on top of `maxBounces`: diffuse lobes,
+   * specular ones (metal, coats, glass) and media. A path reaching a capped kind's next event ends there, after adding
+   * the light it met. null or absent: no caps. MagicaVoxel's defaults are 2, 5 and 5.
+   */
+  bounceLimits?: TraceBounceLimits | null;
+  /**
+   * Compatible addition: whether shadow rays toward the sun, emissive voxels and area lights pass through glass
+   * (refracted, tinted) and media (attenuated): true (default); false: any voxel blocks them, as with MagicaVoxel's
+   * TR-Shadow off. Paths that find a light through glass by scattering still count it.
+   */
+  transparentShadows?: boolean;
+  /**
+   * Compatible addition: whether the sun lights glossy and specular lobes (highlights on metal, coats and glass) and is
+   * seen in reflections: true (default); false: only diffuse lobes receive the sun, as with MagicaVoxel's MIS-Reflect
+   * off. The sky and other lights are unchanged.
+   */
+  sunSpecular?: boolean;
+  /**
+   * Compatible addition: whether the sun lights media directly: true (default); false: media are lit by the sky and
+   * other surfaces only, as with MagicaVoxel's MIS-Scatter off.
+   */
+  sunInMedia?: boolean;
   /** Compatible addition: frame-graph order of the pass that draws the traced image. Default 20. */
   order?: number;
+}
+
+/** Compatible addition: per-kind caps of {@link VoxelPathTracerOptions.bounceLimits}, each 1 to 64; absent: no cap. */
+export interface TraceBounceLimits {
+  /** Diffuse scattering events (Lambert lobes, the ground). */
+  diffuse?: number;
+  /** Specular and glossy events: metal and coat reflections, glass reflection and refraction. */
+  specular?: number;
+  /** Scattering events in media and interior scattering. */
+  scatter?: number;
 }
 
 /**

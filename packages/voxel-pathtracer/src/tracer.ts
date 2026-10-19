@@ -23,6 +23,10 @@ import {
   FLAG_AREA,
   FLAG_CAMERA_MOTION,
   FLAG_CLEAR_GLASS,
+  FLAG_HIDE_SUN,
+  FLAG_NO_SUN_MEDIA,
+  FLAG_OPAQUE_SHADOWS,
+  FLAG_SUN_DIFFUSE,
   FLAG_SPLIT,
   FLAG_SUN,
   FRAME_BYTES,
@@ -47,6 +51,7 @@ import { DENOISE, DISPLAY, TABLE_VEC4, TABLES, TRACE } from './shaders.js';
 import { LAMBDA_MAX, LAMBDA_MIN } from './spectrum.js';
 import { raycastSnapshot } from './traverse.js';
 import type {
+  TraceBounceLimits,
   TraceFisheye,
   TraceLensDistortion,
   TracePreviousCamera,
@@ -79,7 +84,7 @@ const DEFAULT_WORDS = (128 << 20) / 4, // WebGPU's default maxStorageBufferBindi
   LUMINANCE_SIGMA = 1.5, // luminance stop of the regular chain, in standard deviations of the difference
   CAUSTIC_SIGMA = 4, // and of the caustic chain
   DENOISE_PASSES = ATROUS + CAUSTIC_LEVELS + 2, // prepare, the two chains, combine
-  VIEW_BYTES = 160,
+  VIEW_BYTES = 176,
   PARAM_STRIDE = 256;
 
 /** Resolved tracer options (every field set). */
@@ -97,7 +102,12 @@ interface Settings {
   lensRotation: number;
   shutter: number;
   clamp: number;
-  toneMapping: 'neutral' | 'linear';
+  toneMapping: 'neutral' | 'linear' | 'aces-narkowicz';
+  gamma: number | undefined;
+  bounceLimits: Required<TraceBounceLimits> | undefined;
+  transparentShadows: boolean;
+  sunSpecular: boolean;
+  sunInMedia: boolean;
   order: number;
   previousCamera: TracePreviousCamera | undefined;
   projection: 'camera' | 'panorama' | 'fisheye';
@@ -119,6 +129,11 @@ const DEFAULTS: Settings = {
   shutter: 0,
   clamp: Infinity,
   toneMapping: 'neutral',
+  gamma: undefined,
+  bounceLimits: undefined,
+  transparentShadows: true,
+  sunSpecular: true,
+  sunInMedia: true,
   order: 20,
   previousCamera: undefined,
   projection: 'camera',
@@ -140,6 +155,10 @@ const RESETS: readonly (keyof Settings)[] = [
   'fisheye',
   'distortion',
   'clamp',
+  'bounceLimits',
+  'transparentShadows',
+  'sunSpecular',
+  'sunInMedia',
 ];
 
 const whole = (value: unknown, name: string, min: number, max: number, fix: string) => {
@@ -151,6 +170,18 @@ const flag = (value: unknown, name: string) => {
   if (typeof value !== 'boolean') throw new TypeError(`VoxelPathTracer ${name} must be true or false`);
   return value;
 };
+
+/** Per-kind bounce caps with absent kinds uncapped (BOUNCE_FREE); null clears them. */
+const BOUNCE_FREE = 0xffff;
+function bounceLimits(value: unknown): Required<TraceBounceLimits> | undefined {
+  if (value === null) return undefined;
+  if (typeof value !== 'object')
+    throw new TypeError('VoxelPathTracer bounceLimits must be {diffuse?, specular?, scatter?} or null');
+  const o = value as Record<string, unknown>,
+    cap = (k: 'diffuse' | 'specular' | 'scatter') =>
+      o[k] === undefined ? BOUNCE_FREE : whole(o[k], `bounceLimits.${k}`, 1, 64, 'pass 1 to 64, or leave it out');
+  return { diffuse: cap('diffuse'), specular: cap('specular'), scatter: cap('scatter') };
+}
 
 /** Validates `input` over `base`; throws before returning anything. */
 function settings(input: Partial<Omit<VoxelPathTracerOptions, 'scene'>>, base: Settings): Settings {
@@ -188,12 +219,18 @@ function settings(input: Partial<Omit<VoxelPathTracerOptions, 'scene'>>, base: S
     s.clamp = v;
   }
   if (o.toneMapping !== undefined) {
-    if (o.toneMapping !== 'neutral' && o.toneMapping !== 'linear')
+    if (o.toneMapping !== 'neutral' && o.toneMapping !== 'linear' && o.toneMapping !== 'aces-narkowicz')
       throw new TypeError(
-        `VoxelPathTracer toneMapping ${String(o.toneMapping)} is unknown; pass 'neutral' or 'linear'`,
+        `VoxelPathTracer toneMapping ${String(o.toneMapping)} is unknown; pass 'neutral', 'linear' or 'aces-narkowicz'`,
       );
     s.toneMapping = o.toneMapping;
   }
+  if ('gamma' in o)
+    s.gamma = o.gamma === undefined ? undefined : checkNumber(o.gamma, 'gamma', 1, 5, 'pass 1 to 5, or undefined for sRGB');
+  if (o.bounceLimits !== undefined) s.bounceLimits = bounceLimits(o.bounceLimits);
+  if (o.transparentShadows !== undefined) s.transparentShadows = flag(o.transparentShadows, 'transparentShadows');
+  if (o.sunSpecular !== undefined) s.sunSpecular = flag(o.sunSpecular, 'sunSpecular');
+  if (o.sunInMedia !== undefined) s.sunInMedia = flag(o.sunInMedia, 'sunInMedia');
   if (o.order !== undefined) s.order = checkNumber(o.order, 'order', -1e9, 1e9, 'pass a finite frame-graph order');
   if (o.previousCamera !== undefined) s.previousCamera = previousCamera(o.previousCamera);
   if (o.projection !== undefined) {
@@ -353,8 +390,19 @@ const neutral = (c: number[]) => {
     t = 1 - 1 / (0.15 * (peak - top) + 1);
   return v.map((y) => (y * top) / peak + (top - (y * top) / peak) * t);
 };
-const encode = (v: number) =>
-  Math.round(255 * Math.min(1, Math.max(0, v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055)));
+// Narkowicz's fit after the 0.6 pre-scale his reference applies (the shader's acesNarkowicz).
+const acesNarkowicz = (c: number[]) =>
+  c.map((y) => {
+    const x = 0.6 * y;
+    return Math.min(1, Math.max(0, (x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14)));
+  });
+const toneCurve = (mode: Settings['toneMapping']) =>
+  mode === 'linear' ? (c: number[]) => c : mode === 'aces-narkowicz' ? acesNarkowicz : neutral;
+/** 8-bit display value: sRGB, or the power 1 / gamma. */
+const encode = (v: number, gamma?: number) => {
+  const x = Math.min(1, Math.max(0, v));
+  return Math.round(255 * (gamma ? x ** (1 / gamma) : x <= 0.0031308 ? x * 12.92 : 1.055 * x ** (1 / 2.4) - 0.055));
+};
 const aborted = (signal?: AbortSignal) => {
   if (signal?.aborted) throw signal.reason ?? new DOMException('The render was aborted', 'AbortError');
 };
@@ -475,14 +523,24 @@ export class VoxelPathTracer implements EnginePlugin {
 
   /** Compatible addition: the options in effect (scene excluded), defaults filled in. */
   get options(): Readonly<
-    Omit<Required<VoxelPathTracerOptions>, 'scene' | 'focusDistance' | 'previousCamera' | 'distortion' | 'fisheye'> & {
+    Omit<
+      Required<VoxelPathTracerOptions>,
+      'scene' | 'focusDistance' | 'previousCamera' | 'distortion' | 'fisheye' | 'gamma' | 'bounceLimits'
+    > & {
       focusDistance?: number;
       previousCamera?: TracePreviousCamera;
       fisheye: Required<TraceFisheye>;
       distortion?: Required<TraceLensDistortion>;
+      gamma?: number;
+      bounceLimits?: TraceBounceLimits;
     }
   > {
-    return { ...this.#settings };
+    const caps = this.#settings.bounceLimits,
+      cap = (v: number) => (v === BOUNCE_FREE ? undefined : v);
+    return {
+      ...this.#settings,
+      bounceLimits: caps && { diffuse: cap(caps.diffuse), specular: cap(caps.specular), scatter: cap(caps.scatter) },
+    };
   }
 
   /**
@@ -562,7 +620,8 @@ export class VoxelPathTracer implements EnginePlugin {
     return this.#enqueue(async () => {
       const o = this.#renderOptions(options, 1 << 26),
         exposure = 2 ** this.#settings.exposure,
-        linear = this.#settings.toneMapping === 'linear',
+        tone = toneCurve(this.#settings.toneMapping),
+        gamma = this.#settings.gamma,
         writer = new PngWriter(o.width, o.height);
       try {
         await this.#render(o, false, async (_y0, rows, band) => {
@@ -570,8 +629,8 @@ export class VoxelPathTracer implements EnginePlugin {
             c = [0, 0, 0];
           for (let i = 0; i < o.width * rows; i++) {
             for (let k = 0; k < 3; k++) c[k] = Math.max(0, band.color[i * 3 + k] * exposure);
-            const v = linear ? c : neutral(c);
-            for (let k = 0; k < 3; k++) bytes[i * 3 + k] = encode(v[k]);
+            const v = tone(c);
+            for (let k = 0; k < 3; k++) bytes[i * 3 + k] = encode(v[k], gamma);
           }
           await writer.write(bytes, rows);
         });
@@ -1129,8 +1188,14 @@ export class VoxelPathTracer implements EnginePlugin {
     if (cameraMotion) flags |= FLAG_CAMERA_MOTION;
     if (o.clamp < Infinity) flags |= FLAG_CLAMP;
     if (s.lightPower > 0) flags |= FLAG_AREA;
-    if (s.clearGlass) flags |= FLAG_CLEAR_GLASS;
+    if (s.clearGlass && o.transparentShadows) flags |= FLAG_CLEAR_GLASS;
+    if (!o.transparentShadows) flags |= FLAG_OPAQUE_SHADOWS;
+    if (!o.sunSpecular) flags |= FLAG_SUN_DIFFUSE;
+    if (!o.sunInMedia) flags |= FLAG_NO_SUN_MEDIA;
+    if (!e.sunVisible) flags |= FLAG_HIDE_SUN;
     u.set([o.maxBounces, seed >>> 0, flags, s.lightCount], 40);
+    const caps = o.bounceLimits;
+    u.set(caps ? [caps.diffuse, caps.specular, caps.scatter, 0] : [BOUNCE_FREE, BOUNCE_FREE, BOUNCE_FREE, 0], 152);
     const sl = layout.scene,
       ll = layout.lights;
     u.set([sl.modelBase, sl.instanceBase, sl.nodeBase, s.instances.length ? sl.nodeCount : 0], 44);
@@ -1319,10 +1384,14 @@ export class VoxelPathTracer implements EnginePlugin {
     v.set(c.camera.matrix, 0);
     v.set(inverse, 16);
     v.set([width, height, c.width, c.height], 32);
-    const mode = (c.format === 'rgba16float' ? 1 : 0) | (o.toneMapping === 'linear' ? 2 : 0);
+    const mode =
+      (c.format === 'rgba16float' ? 1 : 0) |
+      (o.toneMapping === 'linear' ? 2 : 0) |
+      (o.toneMapping === 'aces-narkowicz' ? 4 : 0);
     // First-hit depth only where pixels are the camera's own perspective rays (far otherwise).
     const depth = o.projection === 'camera' && !o.distortion ? 1 / this.#samples : 0;
     v.set([denoised ? 1 : 1 / this.#samples, 2 ** o.exposure, mode, depth], 36);
+    v.set([o.gamma ?? 0, 0, 0, 0], 40);
     device.queue.writeBuffer(view.uniform, 0, v);
     const pass = c.encoder.beginRenderPass({
       colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],

@@ -1,5 +1,15 @@
 // @margoengine/voxel-pathtracer: a progressive WebGPU path tracer for instanced voxel models (README.md).
 export { VoxelPathTracer } from './tracer.js';
+export {
+  fromMagicaVoxel,
+  magicaVoxelCamera,
+  magicaVoxelLighting,
+  magicaVoxelLinear,
+  magicaVoxelMaterial,
+  magicaVoxelMatrix,
+  magicaVoxelModel,
+} from './magicavoxel.js';
+export type { MagicaVoxelCamera, MagicaVoxelDict, MagicaVoxelLighting } from './magicavoxel.js';
 export type {
   TraceAreaLight,
   TraceEnvironment,
@@ -19,5 +29,6 @@ export type {
   TraceFisheye,
   TraceLensDistortion,
   TracePhysicalSky,
+  TraceBounceLimits,
   VoxelTraceScene,
 } from './types.js';

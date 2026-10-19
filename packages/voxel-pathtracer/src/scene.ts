@@ -29,7 +29,9 @@ const MAX_LIGHTS = 256;
 /** Material flags (float 15 of a packed material). */
 export const MEDIA = 1,
   EMISSIVE = 4,
-  SMOOTH = 8;
+  SMOOTH = 8,
+  ADDITIVE = 32,
+  UNTINTED = 64;
 /** Glass and mirror instances whose deflection of distant light is light-sampled, each (README, "Lighting"). */
 const MAX_DEFLECTORS = 8;
 const VOLUME = 2,
@@ -96,6 +98,8 @@ interface ResolvedEnvironment {
   readonly sunAngularSize: number;
   readonly ground?: TraceVec3;
   readonly groundHeight: number;
+  /** Whether camera rays see the sun disk. */
+  readonly sunVisible: boolean;
   readonly map?: PackedEnvironment;
   /** A newly baked physical sky, kept in the cache when the snapshot succeeds. */
   readonly skyCache?: { key: string; data: Float32Array };
@@ -364,7 +368,15 @@ function packMaterial(m: TraceMaterial, name: string, out: Float32Array): void {
     density = optional(m.density, type === 'media' ? 1 : 0, `${name}.density`, 0, 1e6, 'pass 0 or more per world unit'),
     scatter = optional(m.scatter, 0, `${name}.scatter`, 0, 1e6, 'pass 0 or more per world unit'),
     anisotropy = optional(m.anisotropy, 0, `${name}.anisotropy`, -0.95, 0.95, 'pass -0.95 to 0.95'),
-    abbe = optional(m.abbe, 0, `${name}.abbe`, 0, 200, 'pass 0 (no dispersion) or an Abbe number of 5 to 200');
+    abbe = optional(m.abbe, 0, `${name}.abbe`, 0, 200, 'pass 0 (no dispersion) or an Abbe number of 5 to 200'),
+    metalColor =
+      m.metalColor === undefined
+        ? color
+        : checkVec3(m.metalColor, `${name}.metalColor`, true, 'pass linear RGB, each 0 to 1');
+  if (m.coat !== undefined && m.coat !== 'layered' && m.coat !== 'additive')
+    throw new TypeError(`${where} ${name}.coat ${String(m.coat)} is unknown; pass 'layered' or 'additive'`);
+  if (m.tint !== undefined && typeof m.tint !== 'boolean')
+    throw new TypeError(`${where} ${name}.tint must be true or false`);
   if (abbe > 0 && abbe < 5)
     throw new RangeError(`${where} ${name}.abbe ${abbe} is out of range; pass 0 (no dispersion) or 5 to 200`);
   const base = m.id * MATERIAL_FLOATS,
@@ -377,6 +389,8 @@ function packMaterial(m: TraceMaterial, name: string, out: Float32Array): void {
   if (pGlass > 0) flags |= VOLUME;
   if (!media && emission > 0 && luminance(glow[0], glow[1], glow[2]) * emission > 0) flags |= EMISSIVE;
   if (alpha < DELTA_ALPHA) flags |= SMOOTH;
+  if (m.coat === 'additive') flags |= ADDITIVE;
+  if (m.tint === false) flags |= UNTINTED;
   out.set(
     [
       Math.min(color[0], 1),
@@ -398,9 +412,10 @@ function packMaterial(m: TraceMaterial, name: string, out: Float32Array): void {
       flags,
       // Cauchy coefficient (square micrometres) of the glass lobe's dispersion.
       pGlass > 0 ? cauchyB(ior, abbe) : 0,
-      0,
-      0,
-      0,
+      // The metal lobe's reflectance at normal incidence.
+      Math.min(metalColor[0], 1),
+      Math.min(metalColor[1], 1),
+      Math.min(metalColor[2], 1),
     ],
     base,
   );
@@ -699,6 +714,8 @@ function resolveEnvironment(environment: TraceEnvironment | undefined, cache: Sc
         ? undefined
         : checkVec3(e.groundColor, `${name}.groundColor`, true, 'pass linear RGB'),
     groundHeight = optional(e.groundHeight, 0, `${name}.groundHeight`, -1e9, 1e9, 'pass a finite height');
+  if (e.sunVisible !== undefined && typeof e.sunVisible !== 'boolean')
+    throw new TypeError(`${where} ${name}.sunVisible must be true or false`);
   const sun = [direction[0] / length, direction[1] / length, direction[2] / length] as TraceVec3;
   let map = e.map === undefined ? undefined : packEnvironment(e.map, cache),
     skyCache: SceneCache['sky'];
@@ -726,6 +743,7 @@ function resolveEnvironment(environment: TraceEnvironment | undefined, cache: Sc
     sunAngularSize,
     ground: ground && [Math.min(ground[0], 1), Math.min(ground[1], 1), Math.min(ground[2], 1)],
     groundHeight,
+    sunVisible: e.sunVisible !== false,
     map,
     skyCache,
   };
