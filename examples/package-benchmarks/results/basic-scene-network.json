@@ -1,5 +1,5 @@
 {
-  "commit": "539a03db",
+  "commit": "a3487d5f",
   "dirty": false,
   "browser": "msedge 155.0.4283.45 headless",
   "adapter": "intel xe-2lpg",
@@ -33,15 +33,6 @@
       "brotli": 19267
     },
     {
-      "path": "assets/dist-CoxE7TLT.js",
-      "role": "@margoengine/gltf (app.load)",
-      "encoding": "gzip",
-      "transferred": 5407,
-      "raw": 12388,
-      "gzip": 5035,
-      "brotli": 4535
-    },
-    {
       "path": "assets/extension-DuYhGmhk.js",
       "role": "Shared chunk",
       "encoding": "identity",
@@ -49,6 +40,15 @@
       "raw": 40,
       "gzip": 54,
       "brotli": 44
+    },
+    {
+      "path": "assets/dist-CoxE7TLT.js",
+      "role": "@margoengine/gltf (app.load)",
+      "encoding": "gzip",
+      "transferred": 5407,
+      "raw": 12388,
+      "gzip": 5035,
+      "brotli": 4535
     },
     {
       "path": "model.glb",

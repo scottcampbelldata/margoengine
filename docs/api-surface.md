@@ -31,7 +31,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/dof | `.` 2 |  |  | 6,283 |
 | @margoengine/ecs | `.` 6 |  |  | 1,350 |
 | @margoengine/environment | `.` 53, `./probes` 7, `./volumetric` 3 | 12 |  | 25,372 |
-| @margoengine/exporters | `.` 35, `./usdz` 2, `./model` 6, `./dae` 3, `./capture` 13 | 30 |  | 23,361 |
+| @margoengine/exporters | `.` 35, `./usdz` 2, `./model` 6, `./dae` 3, `./capture` 13 | 30 |  | 23,433 |
 | @margoengine/fbx | `.` 4, `./worker` 2 | 1 |  | 16,674 |
 | @margoengine/fsm | `.` 3 |  |  | 875 |
 | @margoengine/geometry | `.` 64 |  |  | 16,079 |
@@ -49,7 +49,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/lod | `.` 18 |  |  | 10,250 |
 | @margoengine/machinery | `.` 49, `./cad` 8, `./cad-async` 3, `./kinematics` 7, `./surface` 4, `./telemetry` 2, `./section` 3, `./assembly` 1, `./metrology` 7, `./spatial` 2, `./clearance` 2, `./materials` 2, `./overlays` 7, `./exploded` 2, `./edges` 3, `./dimensions` 7 | 14 |  | 42,810 |
 | margoengine | `.` 22 | 1 |  | 2,790 |
-| @margoengine/materials | `.` 84, `./transmission` 8 | 9 |  | 40,285 |
+| @margoengine/materials | `.` 84, `./transmission` 8 | 9 |  | 40,317 |
 | @margoengine/math | `.` 40, `./vector2` 1, `./vector3` 1, `./vector4` 1, `./quaternion` 1, `./euler` 1, `./matrix3` 1, `./matrix4` 1, `./color` 7, `./box3` 1, `./sphere` 1, `./plane` 1, `./ray` 1, `./frustum` 1, `./spherical` 1, `./mathutils` 21, `./mat4` 4, `./validate` 1, `./quat` 2, `./vec3` 7, `./errors` 2, `./mesh` 1, `./billboard` 4 | 81 |  | 10,499 |
 | @margoengine/navigation | `.` 2 |  |  | 989 |
 | @margoengine/navmesh | `.` 4 |  |  | 3,140 |
