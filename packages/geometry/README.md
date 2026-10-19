@@ -45,7 +45,7 @@ Every function returns a plain `GeometryData` (`positions`, `normals`, `uvs`, `i
 | `ShapeGeometry`, `ExtrudeGeometry` | `shapeGeometry`, `extrudeGeometry` |
 | `LineCurve(3)`, `QuadraticBezierCurve(3)`, `CubicBezierCurve(3)`, `EllipseCurve`, `ArcCurve`, `SplineCurve`, `CatmullRomCurve3`, `CurvePath`, `Path`, `Shape` | same names; points are `[x, y]` or `[x, y, z]` arrays |
 | `ShapeUtils.area`, `isClockWise`, `triangulateShape`, `Earcut.triangulate` | `shapeArea`, `isClockWise`, `triangulateShape`, `triangulate` |
-| `BufferGeometryUtils.mergeGeometries`, `mergeVertices`, `computeMikkTSpaceTangents` | `mergeGeometries`, `mergeVertices`, `computeTangents` |
+| `BufferGeometryUtils.mergeGeometries`, `mergeVertices`, `computeMikkTSpaceTangents`, `toCreasedNormals` | `mergeGeometries`, `mergeVertices`, `computeTangents`, `creasedNormals` (plus smoothing groups) |
 | `computeVertexNormals`, `toNonIndexed`, `applyMatrix4`, `center`, `computeBoundingBox`, `computeBoundingSphere` | same names, pure functions returning new data |
 | `EdgesGeometry`, `WireframeGeometry` | `edgesGeometry`, `wireframe` (line index pairs) |
 | `LoopSubdivision` (three-subdivide) | `loopSubdivide` |
@@ -83,6 +83,18 @@ the same radius and local origin for every LOD to avoid size changes.
 | `extrudePath` | none; a 3D curve, shape x follows the frame normal and y the binormal |
 
 `mergeVertices(data, options)`: `tolerance` (1e-4 per component), `positionOnly` (false: normals, UVs and tangents must match too), `removeDegenerate` (false). `edgesGeometry(data, thresholdAngle = 1)` takes degrees like Three.js.
+
+`creasedNormals(positions, options)` returns flat-or-smooth vertex normals (a `Float32Array`, xyz per vertex) for
+meshes stored one vertex per triangle corner, like tiles: each corner averages (angle weighted) the faces at the same
+position that are within `angle` degrees of its own face (default 180; 0 is flat) and share its smoothing group.
+`indices` (optional), `groups` (one id per triangle; only equal ids smooth together) and `tolerance` (1e-4 per
+component, for matching positions) are the other options. Zero-area triangles are ignored. It takes plain arrays, so
+it works on `GeometryData` and on any `{positions, indices?}` mesh.
+
+```ts
+const tiles = toNonIndexed(boxGeometry(1, 1, 1));
+tiles.normals = creasedNormals(tiles.positions, {angle: 45, groups: tileGroups}); // tileGroups: one id per triangle
+```
 
 ## Limits
 

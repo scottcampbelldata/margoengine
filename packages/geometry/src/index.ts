@@ -46,12 +46,14 @@ export {
   computeBoundingSphere,
   computeTangents,
   computeVertexNormals,
+  creasedNormals,
   edgesGeometry,
   mergeGeometries,
   mergeVertices,
   toNonIndexed,
   wireframe,
   wireframePositions,
+  type CreasedNormalsOptions,
   type MergeVerticesOptions,
 } from './utils.js';
 export { loopSubdivide } from './subdivide.js';

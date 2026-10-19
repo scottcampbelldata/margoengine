@@ -227,7 +227,7 @@ const angles = new Float64Array(3);
  * Interior angles of triangle (a, b, c) at each corner, written to `angles`. Each edge is measured once and shared
  * by the two corners it touches; a zero-length edge gives its corners an angle of 0.
  */
-function corners(P: Float32Array, a: number, b: number, c: number): void {
+function corners(P: ArrayLike<number>, a: number, b: number, c: number): void {
   const ux = P[b * 3] - P[a * 3],
     uy = P[b * 3 + 1] - P[a * 3 + 1],
     uz = P[b * 3 + 2] - P[a * 3 + 2];
@@ -296,6 +296,127 @@ export function computeVertexNormals(data: GeometryData): GeometryData {
     }
   }
   return clone(data, { normals });
+}
+
+/** Options for `creasedNormals`. */
+export interface CreasedNormalsOptions {
+  /** Triangle vertex indices. Omitted, every three vertices form a triangle (one vertex per corner). */
+  indices?: ArrayLike<number> | null;
+  /** Faces whose normals differ by more than this many degrees keep separate normals: 0 is flat, 180 fully smooth. Default 180. */
+  angle?: number;
+  /** One smoothing group id per triangle; only triangles with equal ids smooth together. Omitted, all share one group. */
+  groups?: ArrayLike<number> | null;
+  /** Maximum per-component difference for two corners to count as the same position. Default 1e-4. */
+  tolerance?: number;
+}
+
+/**
+ * Vertex normals with a crease angle and smoothing groups (Crocotile's Flat/Smooth vertex normals; three.js
+ * `toCreasedNormals`). Each triangle corner averages, weighted by corner angle like `computeVertexNormals`, the face
+ * normals of the triangles that touch the same position (within `tolerance`), are in the same smoothing group and are
+ * within `angle` degrees of its own face. Made for meshes that store one vertex per corner (tiles); a vertex shared by
+ * several triangles gets the average of its corners. Zero-area triangles add nothing, and a vertex used only by them
+ * gets [0, 0, 0]. Works on plain arrays, so it serves `GeometryData` and any `{positions, indices?}` mesh.
+ */
+export function creasedNormals(positions: ArrayLike<number>, options: CreasedNormalsOptions = {}): Float32Array {
+  const { indices, angle = 180, groups, tolerance = 1e-4 } = options,
+    count = positions.length / 3,
+    cornerCount = indices ? indices.length : count;
+  if (!Number.isInteger(count) || cornerCount % 3)
+    throw new RangeError('creasedNormals positions/indices must hold whole triangles; pass xyz per vertex, 3 per face');
+  if (!(angle >= 0 && angle <= 180)) throw new RangeError('creasedNormals angle must be 0..180 degrees');
+  if (!(tolerance >= 0 && tolerance < Infinity))
+    throw new RangeError('creasedNormals tolerance must be finite and >= 0');
+  const triangles = cornerCount / 3;
+  if (groups && groups.length !== triangles)
+    throw new RangeError('creasedNormals groups must have one id per triangle');
+  const P = positions instanceof Float32Array ? positions : Float32Array.from(positions),
+    vertexOf = new Uint32Array(cornerCount);
+  for (let c = 0; c < cornerCount; c++) {
+    const v = indices ? indices[c] : c;
+    if (!(Number.isInteger(v) && v >= 0 && v < count))
+      throw new RangeError('creasedNormals index out of range; indices must address positions');
+    vertexOf[c] = v;
+  }
+  // Welding on position alone maps every corner to one id per distinct position.
+  const welded = mergeVertices(
+      { positions: P, normals: new Float32Array(0), uvs: new Float32Array(0), indices: vertexOf },
+      { tolerance, positionOnly: true },
+    ),
+    weld = welded.indices,
+    ids = welded.positions.length / 3;
+  // Unit face normals (0 for zero-area faces) and corner angles.
+  const face = new Float64Array(triangles * 3),
+    weight = new Float64Array(cornerCount);
+  for (let t = 0; t < triangles; t++) {
+    const a = vertexOf[t * 3],
+      b = vertexOf[t * 3 + 1],
+      c = vertexOf[t * 3 + 2];
+    const ux = P[b * 3] - P[a * 3],
+      uy = P[b * 3 + 1] - P[a * 3 + 1],
+      uz = P[b * 3 + 2] - P[a * 3 + 2],
+      vx = P[c * 3] - P[a * 3],
+      vy = P[c * 3 + 1] - P[a * 3 + 1],
+      vz = P[c * 3 + 2] - P[a * 3 + 2];
+    const nx = uy * vz - uz * vy,
+      ny = uz * vx - ux * vz,
+      nz = ux * vy - uy * vx,
+      l = Math.hypot(nx, ny, nz);
+    // Collinear float32 corners leave rounding noise in the cross product, so zero area is relative to the edges.
+    if (!(l > 1e-6 * Math.hypot(ux, uy, uz) * Math.hypot(vx, vy, vz))) continue;
+    face[t * 3] = nx / l;
+    face[t * 3 + 1] = ny / l;
+    face[t * 3 + 2] = nz / l;
+    corners(P, a, b, c);
+    weight[t * 3] = angles[0];
+    weight[t * 3 + 1] = angles[1];
+    weight[t * 3 + 2] = angles[2];
+  }
+  // Corners grouped by welded position (counting sort).
+  const start = new Uint32Array(ids + 1),
+    order = new Uint32Array(cornerCount);
+  for (let c = 0; c < cornerCount; c++) start[weld[c] + 1]++;
+  for (let i = 0; i < ids; i++) start[i + 1] += start[i];
+  const fill = start.slice(0, ids);
+  for (let c = 0; c < cornerCount; c++) order[fill[weld[c]]++] = c;
+  // The small slack keeps exactly-at-threshold creases (and coplanar faces at angle 0) smooth despite rounding.
+  const limit = Math.cos((angle * Math.PI) / 180) - 1e-6,
+    acc = new Float64Array(count * 3);
+  for (let c = 0; c < cornerCount; c++) {
+    const t = (c / 3) | 0,
+      fx = face[t * 3],
+      fy = face[t * 3 + 1],
+      fz = face[t * 3 + 2];
+    if (!fx && !fy && !fz) continue;
+    let sx = 0,
+      sy = 0,
+      sz = 0;
+    for (let k = start[weld[c]]; k < start[weld[c] + 1]; k++) {
+      const o = order[k],
+        u = (o / 3) | 0,
+        gx = face[u * 3],
+        gy = face[u * 3 + 1],
+        gz = face[u * 3 + 2];
+      if ((groups && groups[u] !== groups[t]) || fx * gx + fy * gy + fz * gz < limit) continue;
+      sx += gx * weight[o];
+      sy += gy * weight[o];
+      sz += gz * weight[o];
+    }
+    const l = Math.hypot(sx, sy, sz) || 1,
+      v = vertexOf[c] * 3;
+    acc[v] += sx / l;
+    acc[v + 1] += sy / l;
+    acc[v + 2] += sz / l;
+  }
+  const normals = new Float32Array(count * 3);
+  for (let v = 0; v < normals.length; v += 3) {
+    const l = Math.hypot(acc[v], acc[v + 1], acc[v + 2]);
+    if (!l) continue;
+    normals[v] = acc[v] / l;
+    normals[v + 1] = acc[v + 1] / l;
+    normals[v + 2] = acc[v + 2] / l;
+  }
+  return normals;
 }
 
 /**
