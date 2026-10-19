@@ -500,3 +500,49 @@ test('texture sampler options rebuild the sampler next frame; upload options wai
   assert.throws(() => new Texture(source, { mipmaps: 'yes' }), TypeError);
   s.engine.dispose();
 });
+
+test('mesh.renderOrder re-sorts the next frame, within the opaque and the transparent phase', async () => {
+  const s = await scene(),
+    order = [],
+    mesh = (name, material, z, options) => {
+      const m = createMesh(s.engine, quad, material, options),
+        draw = m.draw.bind(m);
+      m.root.setPosition([0, 0, z]);
+      m.draw = (...args) => {
+        order.push(name);
+        return draw(...args);
+      };
+      return m;
+    },
+    glass = new Material({ transparent: true, opacity: 0.5 });
+  const a = mesh('a', new Material(), 0),
+    b = mesh('b', new Material(), 0, { renderOrder: 1 }),
+    near = mesh('near', glass, 2),
+    far = mesh('far', glass, -4);
+  const frame = () => {
+    order.length = 0;
+    s.frame();
+    return [...order];
+  };
+  assert.deepEqual(frame(), ['a', 'b', 'far', 'near'], 'transparent back to front');
+  assert.equal(b.renderOrder, 1);
+  b.renderOrder = -1;
+  near.renderOrder = -1;
+  assert.deepEqual(frame(), ['b', 'a', 'near', 'far']);
+  a.renderOrder = -2;
+  far.renderOrder = -2.5;
+  assert.deepEqual(frame(), ['a', 'b', 'far', 'near']);
+  for (const [value, name] of [
+    ['1', 'TypeError'],
+    [Number.NaN, 'RangeError'],
+    [Infinity, 'RangeError'],
+  ])
+    assert.throws(
+      () => {
+        a.renderOrder = value;
+      },
+      { name, message: /renderOrder.*; set a finite number/ },
+    );
+  assert.equal(a.renderOrder, -2);
+  s.engine.dispose();
+});

@@ -1846,6 +1846,8 @@ const blends: Record<Blending, GPUBlendState | null | undefined> = {
 interface MaterialDraws {
   add(entry: Entry): void;
   delete(entry: Entry): void;
+  /** Re-sorts on the next frame (a render order changed). */
+  reorder(): void;
 }
 const queues = new WeakMap<Engine, MaterialDraws>(),
   late = (m: Material) => m.transparent || m.transmissive;
@@ -1933,6 +1935,9 @@ function queue(runtime: Engine): MaterialDraws {
     delete(entry) {
       const index = members.indexOf(entry);
       if (index >= 0) members.splice(index, 1);
+      arranged = false;
+    },
+    reorder() {
       arranged = false;
     },
   };
@@ -2066,6 +2071,8 @@ export type MaterialMesh<M extends Material | readonly Material[] = Material> = 
    * `worldTriangles`, bounds and exports see the new data at once.
    */
   setGeometry(geometry: MeshGeometry, range?: GeometryRange): MaterialMesh<M>;
+  /** Draw order among materials meshes, lower first within the opaque and the transparent phase; live. */
+  renderOrder: number;
 };
 /**
  * Creates one gltf-pro `PBRModel`. A material array draws the geometry's nonempty, nonoverlapping triangle groups;
@@ -2202,6 +2209,16 @@ export function createMesh<M extends Material | readonly Material[]>(
   };
   return Object.defineProperties(model, {
     material: { get: () => snapshot ?? assigned[0], set: swap },
+    renderOrder: {
+      get: () => entry.order,
+      set: (v: number) => {
+        if (typeof v !== 'number')
+          throw new TypeError('Material mesh renderOrder must be a number; set a finite number');
+        if (!Number.isFinite(v)) throw new RangeError('Material mesh renderOrder must be finite; set a finite number');
+        entry.order = v;
+        set.reorder();
+      },
+    },
     setGeometry: { value: setGeometry },
   }) as MaterialMesh<M>;
 }
