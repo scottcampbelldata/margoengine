@@ -28,6 +28,7 @@ export interface TraceEnvironment {
     groundColor?: TraceVec3;
     groundHeight?: number;
     map?: TraceEnvironmentMap;
+    physicalSky?: TracePhysicalSky;
 }
 
 export interface TraceEnvironmentMap {
@@ -82,6 +83,11 @@ export interface TraceModel {
     revision: number;
     size: TraceVec3;
     voxels: Uint8Array;
+}
+
+export interface TracePhysicalSky {
+    turbidity?: number;
+    intensity?: number;
 }
 
 export interface TracePreviousCamera {

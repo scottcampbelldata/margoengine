@@ -13,6 +13,7 @@ import type {
   TraceVec3,
   VoxelTraceScene,
 } from './types.js';
+import { bakeSky, SKY_HEIGHT, SKY_WIDTH } from './sky.js';
 import { cauchyB } from './spectrum.js';
 
 /** Voxels per brick edge. Bricks are the coarse traversal level. */
@@ -96,6 +97,8 @@ interface ResolvedEnvironment {
   readonly ground?: TraceVec3;
   readonly groundHeight: number;
   readonly map?: PackedEnvironment;
+  /** A newly baked physical sky, kept in the cache when the snapshot succeeds. */
+  readonly skyCache?: { key: string; data: Float32Array };
 }
 
 /** An environment map with its sampling tables. */
@@ -151,6 +154,8 @@ export interface SceneCache {
   models: Map<string, PackedModel>;
   emitters: WeakMap<PackedModel, ModelEmitters>;
   environment?: PackedEnvironment;
+  /** The last baked physical sky and the parameters it was baked for. */
+  sky?: { key: string; data: Float32Array };
 }
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
@@ -692,14 +697,35 @@ function resolveEnvironment(environment: TraceEnvironment | undefined, cache: Sc
         ? undefined
         : checkVec3(e.groundColor, `${name}.groundColor`, true, 'pass linear RGB'),
     groundHeight = optional(e.groundHeight, 0, `${name}.groundHeight`, -1e9, 1e9, 'pass a finite height');
+  const sun = [direction[0] / length, direction[1] / length, direction[2] / length] as TraceVec3;
+  let map = e.map === undefined ? undefined : packEnvironment(e.map, cache),
+    skyCache: SceneCache['sky'];
+  if (e.physicalSky !== undefined) {
+    if (e.map !== undefined) throw new TypeError(`${where} ${name} has both map and physicalSky; pass one of them`);
+    const p = e.physicalSky;
+    if (!isObject(p)) throw new TypeError(`${where} ${name}.physicalSky must be {turbidity?, intensity?}`);
+    const turbidity = optional(
+        p.turbidity,
+        3,
+        `${name}.physicalSky.turbidity`,
+        1.7,
+        10,
+        'pass 1.7 (clear) to 10 (hazy)',
+      ),
+      intensity = optional(p.intensity, 0.1, `${name}.physicalSky.intensity`, 0, 1e6, 'pass 0 or more'),
+      key = `${turbidity},${intensity},${sun.join(',')}`;
+    skyCache = cache.sky?.key === key ? cache.sky : { key, data: bakeSky(turbidity, sun, intensity) };
+    map = packEnvironment({ width: SKY_WIDTH, height: SKY_HEIGHT, data: skyCache.data }, cache);
+  }
   return {
     sky: [sky[0] * skyIntensity, sky[1] * skyIntensity, sky[2] * skyIntensity],
-    sunDirection: [direction[0] / length, direction[1] / length, direction[2] / length],
+    sunDirection: sun,
     sun: [sunColor[0] * sunIntensity, sunColor[1] * sunIntensity, sunColor[2] * sunIntensity],
     sunAngularSize,
     ground: ground && [Math.min(ground[0], 1), Math.min(ground[1], 1), Math.min(ground[2], 1)],
     groundHeight,
-    map: e.map === undefined ? undefined : packEnvironment(e.map, cache),
+    map,
+    skyCache,
   };
 }
 
@@ -973,6 +999,7 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
   // Success: keep the packed models (and only those) and the environment tables for the next scene.
   cache.models = reused;
   if (environment.map) cache.environment = environment.map;
+  if (environment.skyCache) cache.sky = environment.skyCache;
   return {
     revision: scene.revision,
     models: packed,

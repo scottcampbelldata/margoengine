@@ -103,6 +103,7 @@ except `id`, `color` and `type` are optional.
 | Sky | `skyColor * skyIntensity`, constant radiance from every direction | Reached by scattered paths. Default white, intensity 1. |
 | Sun | `sunColor * sunIntensity` is the **irradiance** on a surface facing it, whatever its size; `sunAngularSize` (radians) softens shadows and shows a disk | Sampled directly (next-event estimation) and by paths, combined by multiple importance sampling. Default intensity 0 (off), size 0.0093. |
 | Ground | `groundColor` adds an infinite diffuse plane at `groundHeight` | Casts and receives like any surface. |
+| Physical sky (addition) | `environment.physicalSky`: `{turbidity (1.7-10, default 3), intensity (radiance per kcd/m^2, default 0.1)}` | Preetham, Shirley and Smits' daylight model for `sunDirection`, baked to a 1024 x 512 map and importance sampled like one; black below the horizon (a sun below it is taken on the horizon). The sun disk stays the `sun*` light. Not together with `map`. |
 | Environment map (addition) | `environment.map`: equirectangular linear RGB(A) floats, `intensity`, `rotation` about +Y | Replaces the constant sky; importance sampled by luminance x sin(theta). Its centre column faces -Z, three quarters +X. |
 | Emissive voxels | Any material with `emission > 0` | Faces sampled by emitted power, instances by power x area. |
 | Area lights (addition) | `scene.lights`: rectangles `position + s * edgeU + t * edgeV`, radiance `color * intensity`, `twoSided`, `opaque` | Facing `cross(edgeU, edgeV)`. Solid panels by default: seen, reflected and casting shadows (from the sun, the sky, emissive voxels and each other); a one-sided light's back is black. `opaque: false` keeps the earlier see-through light (no shadows, no back face). Dark (`intensity` 0) solid panels stay as occluders. At most 256. |
@@ -232,6 +233,7 @@ RTX A6000 (Ampere), Windows 11, Edge 155 (headless, WebGPU, D3D12), 2026-10-19, 
 | Same, 4 samples per frame | 31.98 ms | 98 MiB |
 
 CPU: packing that 256^3 model takes 43-59 ms (attach or a new revision); `setScene` with unchanged revisions 0.2-0.5 ms;
+a new physical sky (other turbidity, intensity or sun direction) bakes in 50-63 ms, an unchanged one 1.4-3.8 ms;
 encoding a frame 0.2 ms. A 1500 x 1100, 64-sample denoised PNG capture of the material scene took 0.77-0.88 s.
 Numbers on other GPUs are not measured.
 
@@ -248,6 +250,10 @@ Numbers on other GPUs are not measured.
   - GPU first hits equal `raycast` on all 19,200 pixels of a scene of rotated, scaled, sheared and mirrored instances,
     perspective and orthographic, distances within 2.6e-6 relative; also panorama (12,800 pixels), equisolid 200-degree
     fisheye (16,384) and Brown-Conrady distortion (19,200), all agreeing, distances within 4.4e-6;
+  - physical sky against Preetham's formulas (typed again in the page): zenith luminance 0.65255 (0.65250) at
+    turbidity 3, sun 40 degrees up, and 0.80458 (0.80453) at turbidity 6, sun 25 degrees, chromaticity equal to 4
+    digits; luminance ratios to the zenith in 10 directions (including near the sun) within 0.04%; a diffuse floor under
+    the sky alone 0.43842 (0.43857) and 0.47004 (0.47019), 0.5 / pi times the numerically integrated irradiance;
   - projections: small emissive markers in known directions land where the formulas put them, within 0.13 px for 5
     panorama directions, 0.08 px for 7 equidistant (180-degree) and equisolid (200-degree) fisheye directions and
     0.16 px for 5 points under distortion k1 -0.15, k2 0.05, p1 0.01, p2 -0.005 (up to 1.4 half-heights off centre);
@@ -311,7 +317,9 @@ Numbers on other GPUs are not measured.
 - Homogeneous media by free-flight sampling with Beer-Lambert absorption as a path weight, Henyey-Greenstein phase;
   their emission by the track-length estimator (emission times the distance flown in the medium, whose expectation
   is the attenuated integral).
-- Environment maps importance sampled by marginal and conditional CDFs (PBRT).
+- Environment maps importance sampled by marginal and conditional CDFs (PBRT). The physical sky: Preetham, Shirley and
+  Smits ("A Practical Analytic Model for Daylight", 1999): Perez's distribution with their turbidity fits for luminance
+  and chromaticity, xyY to linear sRGB, baked per texel.
 - Dispersion: one wavelength per path, sampled from a mix of a uniform and a logistic density, weighted by its colour
   matching weight over that density. The weights come from Wyman, Sloan and Shirley's analytic fit of the CIE 1931
   2-degree observer ("Simple Analytic Approximations to the CIE XYZ Color Matching Functions", 2013) through the sRGB
@@ -352,6 +360,7 @@ Not done or not verified, stated plainly:
 - **Simplifications:** RGB everywhere except dispersive glass, which samples one wavelength per path (no hero-wavelength
   sharing, so dispersion converges with colour noise); refracted radiance is not scaled by the squared
   index ratio; media are homogeneous per palette index with grey extinction; the ground is a plain diffuse plane; motion blur interpolates matrices and the camera's corner rays linearly (fast rotations shrink
-  a little); no chromatic aberration; no physical sky model (use an environment map); bloom comes from `@margoengine/post`.
+  a little); no chromatic aberration; the physical sky is Preetham's (no multiple scattering, ozone or night sky);
+  bloom comes from `@margoengine/post`.
 - **Measured only on one machine** (RTX A6000, Edge 155, Windows). Other GPUs, browsers and the editor's own scenes are
   untested.

@@ -280,6 +280,53 @@ window.check={
   look([20,14,24],[4,3,4]);
   return {...out,errors:errors.splice(0)};
  },
+ // Physical sky against Preetham, Shirley and Smits' formulas (typed again here): zenith luminance and chromaticity,
+ // luminance ratios to the zenith in several directions (narrow views), and a diffuse floor under the sky alone,
+ // 0.5 / pi times the irradiance integrated numerically from the formulas.
+ async sky(){
+  const out={},deg=Math.PI/180,intensity=0.1;
+  const model1999=(T,s)=>{
+   const P=(a,b,c,d,e)=>(th,g)=>(1+a*Math.exp(b/Math.max(Math.cos(th),1e-4)))*(1+c*Math.exp(d*g)+e*Math.cos(g)**2);
+   const FY=P(0.1787*T-1.463,-0.3554*T+0.4275,-0.0227*T+5.3251,0.1206*T-2.5771,-0.067*T+0.3703);
+   const Fx=P(-0.0193*T-0.2592,-0.0665*T+0.0008,-0.0004*T+0.2125,-0.0641*T-0.8989,-0.0033*T+0.0452);
+   const Fy=P(-0.0167*T-0.2608,-0.095*T+0.0092,-0.0079*T+0.2102,-0.0441*T-1.6537,-0.0109*T+0.0529);
+   const chi=(4/9-T/120)*(Math.PI-2*s),Yz=(4.0453*T-4.971)*Math.tan(chi)-0.2155*T+2.4192;
+   const xz=T*T*(0.00166*s**3-0.00375*s**2+0.00209*s)+T*(-0.02903*s**3+0.06377*s**2-0.03202*s+0.00394)+0.11693*s**3-0.21196*s**2+0.06052*s+0.25886;
+   const yz=T*T*(0.00275*s**3-0.0061*s**2+0.00317*s)+T*(-0.04214*s**3+0.0897*s**2-0.04153*s+0.00516)+0.15346*s**3-0.26756*s**2+0.0667*s+0.26688;
+   return {Yz,xz,yz,Y:(th,g)=>(Yz*FY(th,g))/FY(0,s)};
+  };
+  const xyOf=(r,g,b)=>{const X=0.4124*r+0.3576*g+0.1805*b,Y=0.2126*r+0.7152*g+0.0722*b,Z=0.0193*r+0.1192*g+0.9505*b;return [X/(X+Y+Z),Y/(X+Y+Z)];};
+  const view=async(env,dir,up)=>{
+   look([0,0,0],dir,{fov:1,up});
+   return withTracer({revision:1,models:[],instances:[],materials:[],environment:env},{maxBounces:1},async(t)=>{
+    const img=await t.renderImage({width:16,height:16,samples:16});const c=[0,0,0];
+    for(let i=0;i<256;i++)for(let k=0;k<3;k++)c[k]+=img.color[i*3+k]/256;return c;
+   });
+  };
+  for(const [T,elev] of [[3,40],[6,25]]){
+   const s=(90-elev)*deg,sun=[0,Math.sin(elev*deg),-Math.cos(elev*deg)],m=model1999(T,s);
+   const env={sunDirection:sun,sunIntensity:0,physicalSky:{turbidity:T,intensity}};
+   const z=await view(env,[0,1,0],[0,0,-1]),Yz=0.2126*z[0]+0.7152*z[1]+0.0722*z[2],[x,y]=xyOf(...z);
+   out[`T ${T} sun ${elev} deg zenith`]={luminance:Yz,expected:intensity*m.Yz,x,y,xz:m.xz,yz:m.yz};
+   // Directions at elevation e and azimuth a from the sun's (the sun is toward -z).
+   for(const [e,a] of [[30,0],[30,90],[30,180],[60,45],[10,120]]){
+    const th=(90-e)*deg,d=[Math.cos(e*deg)*Math.sin(a*deg),Math.sin(e*deg),-Math.cos(e*deg)*Math.cos(a*deg)];
+    const g=Math.acos(d[0]*sun[0]+d[1]*sun[1]+d[2]*sun[2]),c=await view(env,d,[0,1,0]),L=0.2126*c[0]+0.7152*c[1]+0.0722*c[2];
+    out[`T ${T} sun ${elev} deg, elevation ${e} azimuth ${a}`]={ratio:L/Yz,expected:m.Y(th,g)/m.Yz};
+   }
+   // The floor under the sky alone: irradiance integrated over the upper hemisphere (midpoint rule).
+   let E=0;const N=400,M=800;
+   for(let i=0;i<N;i++){const th=(i+0.5)/N*Math.PI/2;for(let j=0;j<M;j++){const ph=(j+0.5)/M*2*Math.PI,d=[Math.sin(th)*Math.sin(ph),Math.cos(th),-Math.sin(th)*Math.cos(ph)];
+    const g=Math.acos(Math.min(1,Math.max(-1,d[0]*sun[0]+d[1]*sun[1]+d[2]*sun[2])));E+=intensity*m.Y(th,g)*Math.cos(th)*Math.sin(th)*(Math.PI/2/N)*(2*Math.PI/M);}}
+   look([0,20,0.01],[0,0,0],{project:ortho(4)});
+   out[`T ${T} sun ${elev} deg floor`]=await withTracer({revision:1,models:[model('f',[256,1,256],()=>1)],instances:[{id:'f',modelId:'f',matrix:translate(-128,-1,-128)}],
+    materials:[{id:1,color:[0.5,0.5,0.5],type:'diffuse'}],environment:env},{maxBounces:2},async(t)=>{
+    const img=await t.renderImage({width:16,height:16,samples:4096});let L=0;for(let i=0;i<256;i++)L+=lum(img.color,i)/256;return {luminance:L,expected:(0.5/Math.PI)*E};
+   });
+  }
+  look([20,14,24],[4,3,4]);
+  return {...out,errors:errors.splice(0)};
+ },
  // Projections. Markers: a 0.25-unit emissive cube 20 units from the eye in a known direction lands (its image
  // centroid) where the projection's formula puts that direction: equirectangular panorama, equidistant and equisolid
  // fisheyes, Brown-Conrady distortion of a 60-degree camera. Traversal: per-pixel GPU first hits against

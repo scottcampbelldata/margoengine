@@ -11,6 +11,8 @@
 // - microfacet: the GGX plastic coat's albedo against numerical integration of the same model;
 // - glasslight: sunlight through glass slabs and off a mirror wall against closed forms (point and disk sun), and light
 //   sampling through a floating glass cube against path sampling of the same light;
+// - sky: the physical sky's zenith luminance and chromaticity, luminance ratios and a floor's irradiance against
+//   Preetham's formulas;
 // - projections: markers land where the panorama, equidistant/equisolid fisheye and Brown-Conrady formulas put them;
 //   per-pixel first hits of each agree with raycast along rays computed in the page;
 // - arealight: a panel's shadow area under a point sun, its front, back and see-through back radiance, and a dark
@@ -122,6 +124,26 @@ try {
       );
       assert.ok(s.pixels > 300, `${name}: the floor fills the view`);
       near(s.mean, s.expected, s.expected * 0.01, name);
+    }
+  }
+  if (wanted('sky')) {
+    const r = await run('sky');
+    for (const [name, s] of Object.entries(r)) {
+      if (name === 'errors') continue;
+      if (name.endsWith('zenith')) {
+        console.log(
+          `  ${name}: luminance ${s.luminance.toFixed(5)} expected ${s.expected.toFixed(5)}, xy ${s.x.toFixed(4)} ${s.y.toFixed(4)} expected ${s.xz.toFixed(4)} ${s.yz.toFixed(4)}`,
+        );
+        near(s.luminance, s.expected, s.expected * 0.005, `${name} luminance`);
+        near(s.x, s.xz, 0.002, `${name} x`);
+        near(s.y, s.yz, 0.002, `${name} y`);
+      } else if (name.endsWith('floor')) {
+        console.log(`  ${name}: ${s.luminance.toFixed(5)} expected ${s.expected.toFixed(5)} (0.5 / pi x irradiance)`);
+        near(s.luminance, s.expected, s.expected * 0.01, name);
+      } else {
+        console.log(`  ${name}: ratio to zenith ${s.ratio.toFixed(4)} expected ${s.expected.toFixed(4)}`);
+        near(s.ratio, s.expected, s.expected * 0.01, name);
+      }
     }
   }
   if (wanted('projections')) {

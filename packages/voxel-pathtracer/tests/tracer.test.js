@@ -585,6 +585,21 @@ test('projection, fisheye and distortion reach the frame; they are validated and
   tracer.dispose();
 });
 
+test('a physical sky becomes an importance-sampled environment map; it is validated', async () => {
+  const scene = simpleScene({ environment: { sunDirection: [0.3, 0.6, 0.2], physicalSky: { turbidity: 4 } } }),
+    { tracer, frame, device } = await ready({ scene });
+  frame();
+  const u = new Uint32Array(device.buffers.findLast((b) => b.size === FRAME && !b.destroyed).data);
+  assert.ok(u[42] & 4, 'environment map on');
+  assert.deepEqual([u[52], u[53]], [1024, 512], 'baked at 1024 x 512');
+  const env = { revision: 2, environment: { physicalSky: { turbidity: 12 } } };
+  assert.throws(() => tracer.setScene(simpleScene(env)), RangeError);
+  const both = { width: 1, height: 1, data: new Float32Array(3) };
+  assert.throws(() => tracer.setScene(simpleScene({ environment: { map: both, physicalSky: {} } })), TypeError);
+  assert.throws(() => tracer.setScene(simpleScene({ environment: { physicalSky: 3 } })), TypeError);
+  tracer.dispose();
+});
+
 test('area lights cast shadows unless opaque is false; dark solid lights stay as occluders only', async () => {
   const light = (id, intensity, extra = {}) => ({
       id,

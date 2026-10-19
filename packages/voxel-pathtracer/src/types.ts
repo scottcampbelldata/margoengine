@@ -134,6 +134,20 @@ export interface TraceEnvironment {
   groundHeight?: number;
   /** Compatible addition: an HDR environment image replacing the constant sky, importance sampled. */
   map?: TraceEnvironmentMap;
+  /**
+   * Compatible addition: a physical daylight sky replacing the constant sky (not together with `map`): Preetham et
+   * al.'s analytic model for `sunDirection` and `turbidity`, importance sampled. The sun disk itself stays the `sun*`
+   * light.
+   */
+  physicalSky?: TracePhysicalSky;
+}
+
+/** Compatible addition: the Preetham daylight sky of {@link TraceEnvironment.physicalSky}. */
+export interface TracePhysicalSky {
+  /** Atmospheric turbidity, 1.7 (very clear) to 10 (hazy). Default 3. */
+  turbidity?: number;
+  /** Radiance per kcd/m^2 of the model's luminance, 0 or more. Default 0.1 (a clear noon zenith is then about 0.6). */
+  intensity?: number;
 }
 
 /** Compatible addition: a rectangular area light. */

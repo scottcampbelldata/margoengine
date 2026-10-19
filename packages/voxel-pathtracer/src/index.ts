@@ -18,5 +18,6 @@ export type {
   TracePreviousCamera,
   TraceFisheye,
   TraceLensDistortion,
+  TracePhysicalSky,
   VoxelTraceScene,
 } from './types.js';
