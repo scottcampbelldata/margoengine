@@ -2,29 +2,53 @@
 // Solid or vertical-gradient background: the scene.background = color equivalent.
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type FrameGraph, type PassContext } from '@margoengine/core/extension';
-import { SRGBToLinear as srgbToLinear } from '@margoengine/math/color';
+import {
+  type ColorInput,
+  LinearToSRGB as linearToSrgb,
+  parseColor,
+  SRGBToLinear as srgbToLinear,
+} from '@margoengine/math/color';
+
+export type { ColorInput } from '@margoengine/math/color';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 
-/** `'#rgb'`, `'#rrggbb'`, `0xrrggbb` or sRGB components `[r, g, b]` in 0..1. */
-export type ColorInput = string | number | readonly [number, number, number];
 type GPUContext = Extract<PassContext, { backend: 'webgpu' }>;
+type RGB = [number, number, number];
 
-/** sRGB components 0..1 of a ColorInput; throws TypeError on anything else. */
-export function srgbColor(value: ColorInput): [number, number, number] {
+// A ColorInput as sRGB components and linear RGB, each exact for its own kind of input: hex strings and numbers are
+// sRGB bytes, `[r, g, b]` arrays linear (docs/conventions.md).
+function colorPair(value: ColorInput): { srgb: RGB; linear: RGB } {
+  let hex = typeof value === 'number' ? value : undefined;
   if (typeof value === 'string') {
-    const hex = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(value)?.[1];
-    if (hex) return srgbColor(parseInt(hex.length === 3 ? hex.replace(/./g, '$&$&') : hex, 16));
-  } else if (typeof value === 'number') {
-    if (Number.isInteger(value) && value >= 0 && value <= 0xffffff)
-      return [((value >> 16) & 255) / 255, ((value >> 8) & 255) / 255, (value & 255) / 255];
-  } else if (
-    Array.isArray(value) &&
-    value.length === 3 &&
-    value.every((v) => typeof v === 'number' && v >= 0 && v <= 1)
-  )
-    return [value[0], value[1], value[2]];
-  throw new TypeError('Invalid color');
+    const digits = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(value)?.[1];
+    if (!digits)
+      throw new TypeError(`Color '${value}' is not '#rgb' or '#rrggbb'; pass a hex color or linear [r, g, b]`);
+    hex = parseInt(digits.length === 3 ? digits.replace(/./g, '$&$&') : digits, 16);
+  }
+  if (hex !== undefined) {
+    if (!Number.isInteger(hex) || hex < 0 || hex > 0xffffff)
+      throw new RangeError(`Color ${hex} is outside 0x000000..0xffffff`);
+    const srgb: RGB = [((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255];
+    return { srgb, linear: [srgbToLinear(srgb[0]), srgbToLinear(srgb[1]), srgbToLinear(srgb[2])] };
+  }
+  const linear = parseColor(value, [0, 0, 0]) as RGB;
+  return { srgb: [linearToSrgb(linear[0]), linearToSrgb(linear[1]), linearToSrgb(linear[2])], linear };
+}
+
+/**
+ * sRGB components (display values, 0..1 for displayable colors) of a ColorInput: hex strings and numbers as given,
+ * linear `[r, g, b]` arrays encoded with the sRGB transfer function.
+ * @throws TypeError for a string that is not `#rgb`/`#rrggbb` or any other value; RangeError for a number outside
+ * 0x000000..0xffffff or a negative or non-finite array component.
+ */
+export function srgbColor(value: ColorInput): RGB {
+  return colorPair(value).srgb;
+}
+
+/** @internal Linear RGB of a ColorInput (hex decoded from sRGB, arrays as given); throws as {@link srgbColor}. */
+export function linearColor(value: ColorInput): RGB {
+  return colorPair(value).linear;
 }
 
 const shader = /* wgsl */ `
@@ -56,8 +80,8 @@ export interface ColorBackgroundOptions {
 export class ColorBackground {
   readonly name: string;
   readonly order: number;
-  private top!: [number, number, number];
-  private under?: [number, number, number];
+  private top!: { srgb: RGB; linear: RGB };
+  private under?: { srgb: RGB; linear: RGB };
   private state?: {
     device: GPUDevice;
     uniform: GPUBuffer;
@@ -94,19 +118,22 @@ export class ColorBackground {
     this.color = options.color ?? 0;
     this.bottom = options.bottom;
   }
-  /** sRGB components of the (top) color. Accepts any ColorInput. */
-  get color(): [number, number, number] {
-    return [...this.top];
+  /**
+   * The (top) color. Set any ColorInput (hex is sRGB, `[r, g, b]` linear); reads linear `[r, g, b]`, so assigning it
+   * back keeps the color.
+   */
+  get color(): RGB {
+    return [...this.top.linear];
   }
   set color(value: ColorInput) {
-    this.top = srgbColor(value);
+    this.top = colorPair(value);
   }
-  /** sRGB components of the bottom gradient color, or undefined for a solid color. */
-  get bottom(): [number, number, number] | undefined {
-    return this.under && [...this.under];
+  /** The bottom gradient color as `color`, or undefined for a solid color. */
+  get bottom(): RGB | undefined {
+    return this.under && [...this.under.linear];
   }
   set bottom(value: ColorInput | undefined) {
-    this.under = value === undefined ? undefined : srgbColor(value);
+    this.under = value === undefined ? undefined : colorPair(value);
   }
 
   setup(engine: EngineKernel): void {
@@ -182,8 +209,8 @@ export class ColorBackground {
       v = this.values,
       bottom = this.under ?? this.top;
     for (let i = 0; i < 3; i++) {
-      v[i] = (hdr ? srgbToLinear(this.top[i]) : this.top[i]) * this.alpha;
-      v[4 + i] = (hdr ? srgbToLinear(bottom[i]) : bottom[i]) * this.alpha;
+      v[i] = (hdr ? this.top.linear[i] : this.top.srgb[i]) * this.alpha;
+      v[4 + i] = (hdr ? bottom.linear[i] : bottom.srgb[i]) * this.alpha;
     }
     v[3] = v[7] = this.alpha;
     device.queue.writeBuffer(state.uniform, 0, v);

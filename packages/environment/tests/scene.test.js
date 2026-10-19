@@ -194,7 +194,7 @@ test('Fog validates options, uploads only when changed and rebuilds its uniform 
   const values = hexFloats(writes[0][3]);
   assert.deepEqual(
     [...values].map((v) => +v.toFixed(5)),
-    [1, 0.21404, 0, 3, 2, 20, 0, 0.5],
+    [1, 0.5, 0, 3, 2, 20, 0, 0.5],
   );
   assert.deepEqual(
     frame.c.bindings.map((entry) => entry.binding),
@@ -488,6 +488,46 @@ test('ColorBackground fills only cleared depth with exact sRGB on the canvas and
     [],
     'disposed backgrounds draw nothing',
   );
+});
+
+test('color arrays are linear RGB as everywhere in Margo: encoded on the canvas, as given on HDR targets, read back', () => {
+  assert.deepEqual(
+    srgbColor([0.5, 0.25, 0]).map((v) => +v.toFixed(5)),
+    [0.73536, 0.5371, 0],
+  );
+  assert.throws(() => srgbColor([-1, 0, 0]), RangeError);
+  assert.throws(() => srgbColor([1, Number.NaN, 0]), RangeError);
+  assert.throws(() => srgbColor([1, 0]), TypeError);
+  assert.throws(() => srgbColor(0x1000000), RangeError);
+  assert.throws(() => srgbColor('#12'), TypeError);
+  const gpu = mockGPU(),
+    background = new ColorBackground({ color: [0.5, 0.25, 0], bottom: '#336699' }),
+    run = passes(background),
+    frame = context(gpu, { format: 'bgra8unorm' }),
+    floats = (entry) => [...hexFloats(entry[3])].map((v) => +v.toFixed(5)),
+    upload = (i, format) => {
+      frame.state.format = format;
+      const log = gpu.record(() => {
+        frame.begin(i);
+        run(frame.c);
+      });
+      return floats(log.find((entry) => entry[0] === 'writeBuffer'));
+    };
+  assert.deepEqual(upload(0, 'bgra8unorm'), [0.73536, 0.5371, 0, 1, 0.2, 0.4, 0.6, 1]);
+  assert.deepEqual(upload(1, 'rgba16float'), [0.5, 0.25, 0, 1, 0.0331, 0.13287, 0.31855, 1]);
+  // Read back linear, so assigning a color back keeps it (hex colors read back decoded).
+  assert.deepEqual(background.color, [0.5, 0.25, 0]);
+  assert.deepEqual(
+    background.bottom.map((v) => +v.toFixed(5)),
+    [0.0331, 0.13287, 0.31855],
+  );
+  background.color = background.color;
+  background.bottom = background.bottom;
+  assert.deepEqual(upload(2, 'bgra8unorm'), [0.73536, 0.5371, 0, 1, 0.2, 0.4, 0.6, 1]);
+  background.dispose();
+  const fog = new Fog({ color: [0.2, 0.4, 0.8] });
+  assert.deepEqual(fog.color, [0.2, 0.4, 0.8]);
+  fog.dispose();
 });
 
 // CPU mirrors of ImageBackground's lookups (shaders.ts): the equirect convention, the cylinder's height mapping and the

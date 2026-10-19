@@ -546,7 +546,8 @@ while the floor beside them and under the square's transparent border keeps its 
 frames reuse the cached static map; removing the slab lights the floor again 2 frames later. A floor with no sky is lit
 inside a 40-block shadow range (0.9316) and black beyond it. A clustered point light (range 8, 3 blocks up) gives 0.990
 under it, 0.557 two blocks away, 0.164 at four and 0 outside its range, and nothing once removed. Linear fog from 0 to
-40 blocks at 19.42 blocks gives [0.4949, 0.5430, 0.7710] against [0.4940, 0.5424, 0.7710] expected. IBL and the
+40 blocks toward linear [0.2, 0.4, 0.8] at 19.42 blocks gives [0.5757, 0.6724, 0.8662] against [0.5750, 0.6721, 0.8662]
+expected. IBL and the
 hemisphere ambient at daylight 0 are 0.02914 of daylight 1 (0.03 / 1.03 = 0.02913). Block light 15 under no sky shows
 `blockLightColor` [0.2, 0.4, 0.8] as [0.2000, 0.3999, 0.7998]. Two-frame animation shows red then blue after a second.
 A water cell's side top edge moves 6 rows at 4x and 5 at 1x between crest and trough (5.54 expected). Greedy against

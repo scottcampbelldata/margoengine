@@ -9,8 +9,7 @@ import { Environment, type EnvironmentOptions, type EnvironmentSource } from './
 import { loadEnvironmentImage } from './load.js';
 import type { UltraHDROptions } from './ultrahdr.js';
 import { IBL_WGSL, iblBindGroupEntries } from './ibl.js';
-import { SRGBToLinear as srgbToLinear } from '@margoengine/math/color';
-import { srgbColor, type ColorInput } from './color.js';
+import { linearColor, type ColorInput } from './color.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 
@@ -259,7 +258,10 @@ export class EnvironmentLighting extends ShaderEffect {
 }
 
 export interface FogOptions {
-  /** Fog color; fully fogged pixels show exactly this color on the canvas. Default '#ffffff'. */
+  /**
+   * Fog color: hex is sRGB, `[r, g, b]` linear (as everywhere in Margo); fully fogged pixels show exactly this color on
+   * the canvas. Default '#ffffff'.
+   */
   color?: ColorInput;
   /** Linear fog start and end distance from the camera (Three.js Fog). Defaults 1 and 1000. */
   near?: number;
@@ -322,8 +324,7 @@ export class Fog extends ShaderEffect {
     return this.colorValue;
   }
   set color(value: ColorInput) {
-    const c = srgbColor(value);
-    for (let i = 0; i < 3; i++) this.values[i] = srgbToLinear(c[i]);
+    this.values.set(linearColor(value));
     this.colorValue = value;
     this.dirty = true;
   }

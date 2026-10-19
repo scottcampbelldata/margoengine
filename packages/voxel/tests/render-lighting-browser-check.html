@@ -130,8 +130,8 @@ window.check={
   const fog=Fog.attach(engine,{color:[0.2,0.4,0.8],near:0,far:40}),remove=fog.add(renderer);
   const {img,frames}=await until((i)=>Math.abs(at(i,p)[2]-before[2])>0.01);const after=at(img,p),distance=Math.hypot(p[0]-e[0],p[1]-e[1],p[2]-e[2]);
   remove();drop(fog);renderer.dispose();
-  // Fog takes sRGB components (environment ColorInput) and mixes in linear light on HDR targets.
-  const colour=[0.2,0.4,0.8].map((v)=>v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4);
+  // A linear colour array (docs/conventions.md); on HDR targets fog mixes in linear light.
+  const colour=[0.2,0.4,0.8];
   return {before,after,distance,colour,far:40,frames,errors:errors.splice(0)};
  },
  // A uniform environment (radiance 0.5) as image-based light, sun and hemisphere ambient off: the IBL ambient is
