@@ -9,6 +9,9 @@ import { server } from '../scripts/serve-catalog.js';
 let url;
 const entries = JSON.parse(await readFile(new URL('../docs/catalog.json', import.meta.url), 'utf8'));
 before(async () => {
+  // Node's fetch reuses idle sockets; if the server's 5 s keep-alive timer closes one first (seconds pass between the
+  // example fetches on a loaded machine), the reused request fails with ECONNRESET. Let the client close idle sockets.
+  server.keepAliveTimeout = 0;
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   url = `http://127.0.0.1:${server.address().port}`;
@@ -64,7 +67,11 @@ test('preview serves static files and rejects escaped paths and unsupported meth
   }
 });
 
-test('catalog searches, copies exact text, links examples, and handles clipboard denial', async () => {
+// No step has a deadline of its own (a loaded machine slows the browser by minutes, see tests/browser/catalog.test.js);
+// the test as a whole has one.
+test('catalog searches, copies exact text, links examples, and handles clipboard denial', {
+  timeout: 15 * 60_000,
+}, async () => {
   let browser;
   try {
     browser = await chromium.launch({ channel: 'msedge', headless: true });
@@ -73,6 +80,20 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
   }
   try {
     const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
+    context.setDefaultTimeout(0);
+    // The page clears #copy-status 7 s after each copy, so reading it later fails on a slow machine: record every
+    // message it shows instead.
+    await context.addInitScript(() => {
+      window.statuses = [];
+      addEventListener('DOMContentLoaded', () => {
+        const status = document.querySelector('#copy-status');
+        new MutationObserver(() => window.statuses.push(status.textContent)).observe(status, {
+          childList: true,
+          characterData: true,
+          subtree: true,
+        });
+      });
+    });
     const page = await context.newPage();
     const clipboard = async () => (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n');
     const waitForClipboard = (expected) =>
@@ -128,10 +149,11 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
     await page.getByRole('button', { name: 'Copy import for Kinematics', exact: true }).click();
     await waitForClipboard("import { Kinematics } from '@margoengine/machinery';");
     assert.equal(await clipboard(), "import { Kinematics } from '@margoengine/machinery';");
-    await page.evaluate(() => {
+    const shown = await page.evaluate(() => {
       navigator.clipboard.writeText = async () => {
         throw new Error('Denied');
       };
+      return window.statuses.length;
     });
     await page.getByRole('button', { name: 'Copy import for SectionPlanes', exact: true }).click();
     await page.waitForFunction(
@@ -141,7 +163,8 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
       await page.evaluate(() => window.getSelection().toString()),
       "import { SectionPlanes } from '@margoengine/machinery';",
     );
-    assert.match(await page.locator('#copy-status').textContent(), /Ctrl\+C/);
+    // The denied copy showed the select-and-press-Ctrl+C message (however long ago).
+    assert.match((await page.evaluate((from) => window.statuses.slice(from), shown)).join('\n'), /Ctrl\+C/);
     for (const width of [375, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       assert.equal(

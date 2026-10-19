@@ -1,6 +1,6 @@
 // Real-browser catalog check (Edge): layout overflow, real clicks and the browser clipboard. Not part of `verify`:
 // headless Edge shuts down on low-priority threads, so on a loaded machine browser.close() can take 4-6 minutes.
-// `tests/catalog.test.js` covers the same behaviour in jsdom inside verify. Run under the GPU lock:
+// `tests/catalog.test.js` runs nearly the same checks inside verify. Run under the GPU lock:
 //   node scripts/gpu-lock.mjs run --owner=<agent id> -- npm run test:catalog:browser
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -30,9 +30,11 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
   }
   try {
     const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
-    context.setDefaultTimeout(60_000);
+    // No step has a deadline of its own (a loaded machine slows the browser by minutes); the test as a whole has one.
+    context.setDefaultTimeout(0);
     // Count finished clipboard writes: copy handlers are async (the example copy fetches first), so wait for the
-    // write to land instead of reading the clipboard right after the click.
+    // write to land instead of reading the clipboard right after the click. The page clears #copy-status 7 s after
+    // each copy, so waiting for a message after a slow round trip can miss it: record every message it shows.
     await context.addInitScript(() => {
       window.copies = 0;
       const write = navigator.clipboard.writeText.bind(navigator.clipboard);
@@ -40,6 +42,15 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
         await write(text);
         window.copies++;
       };
+      window.statuses = [];
+      addEventListener('DOMContentLoaded', () => {
+        const status = document.querySelector('#copy-status');
+        new MutationObserver(() => window.statuses.push(status.textContent)).observe(status, {
+          childList: true,
+          characterData: true,
+          subtree: true,
+        });
+      });
     });
     const page = await context.newPage();
     const copy = async (locator) => {
@@ -101,13 +112,14 @@ test('catalog searches, copies exact text, links examples, and handles clipboard
       await copy(page.getByRole('button', { name: 'Copy import for Kinematics', exact: true })),
       "import { Kinematics } from '@margoengine/machinery';",
     );
-    await page.evaluate(() => {
+    const shown = await page.evaluate(() => {
       navigator.clipboard.writeText = async () => {
         throw new Error('Denied');
       };
+      return window.statuses.length;
     });
     await page.getByRole('button', { name: 'Copy import for SectionPlanes', exact: true }).click();
-    await page.waitForFunction(() => /Ctrl\+C/.test(document.querySelector('#copy-status').textContent));
+    await page.waitForFunction((from) => window.statuses.slice(from).some((text) => /Ctrl\+C/.test(text)), shown);
     assert.equal(
       await page.evaluate(() => window.getSelection().toString()),
       "import { SectionPlanes } from '@margoengine/machinery';",
