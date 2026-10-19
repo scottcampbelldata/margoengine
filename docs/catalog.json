@@ -1102,6 +1102,29 @@
     "category": "World and effects"
   },
   {
+    "id": "voxel",
+    "title": "Voxel",
+    "category": "World and effects",
+    "package": "@margoengine/voxel",
+    "version": "1.0.0",
+    "published": false,
+    "description": "Voxel worlds: a block-type registry, 32-cubed palette chunks with light bytes, and a chunked world with dirty tracking and change events.",
+    "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
+    "keywords": "voxel",
+    "install": "npm install @margoengine/core@1.0.0 @margoengine/voxel@1.0.0",
+    "imports": "import { BlockTypes } from '@margoengine/voxel';",
+    "exports": [
+      "BlockTypes",
+      "CHUNK_SIZE",
+      "VoxelChunk",
+      "VoxelWorld",
+      "blockData",
+      "blockId",
+      "blockState",
+      "chunkKey"
+    ]
+  },
+  {
     "id": "water",
     "title": "Water",
     "package": "@margoengine/water",
