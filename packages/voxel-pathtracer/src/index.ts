@@ -16,5 +16,7 @@ export type {
   VoxelTraceImage,
   VoxelTraceRenderOptions,
   TracePreviousCamera,
+  TraceFisheye,
+  TraceLensDistortion,
   VoxelTraceScene,
 } from './types.js';

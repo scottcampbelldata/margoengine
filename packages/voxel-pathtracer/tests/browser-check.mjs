@@ -11,6 +11,8 @@
 // - microfacet: the GGX plastic coat's albedo against numerical integration of the same model;
 // - glasslight: sunlight through glass slabs and off a mirror wall against closed forms (point and disk sun), and light
 //   sampling through a floating glass cube against path sampling of the same light;
+// - projections: markers land where the panorama, equidistant/equisolid fisheye and Brown-Conrady formulas put them;
+//   per-pixel first hits of each agree with raycast along rays computed in the page;
 // - arealight: a panel's shadow area under a point sun, its front, back and see-through back radiance, and a dark
 //   panel occluding a lit ceiling against view factors;
 // - dispersion: a line's shift through a tilted slab per wavelength against Snell with Cauchy's index; colour order over
@@ -120,6 +122,26 @@ try {
       );
       assert.ok(s.pixels > 300, `${name}: the floor fills the view`);
       near(s.mean, s.expected, s.expected * 0.01, name);
+    }
+  }
+  if (wanted('projections')) {
+    const r = await run('projections');
+    for (const [name, s] of Object.entries(r)) {
+      if (name === 'errors' || name.startsWith('traversal')) continue;
+      console.log(
+        `  ${name}: (${s.measured.map((v) => v.toFixed(2)).join(', ')}) expected (${s.expected.map((v) => v.toFixed(2)).join(', ')}), ${s.error.toFixed(3)} px`,
+      );
+      assert.ok(s.error < 0.25, `${name}: marker ${s.error} px from its projection`);
+    }
+    for (const name of ['traversal panorama', 'traversal fisheye', 'traversal distorted']) {
+      const t = r[name];
+      console.log(
+        `  ${name}: ${t.same}/${t.pixels} pixels agree with raycast (${t.hits} hit voxels), depth within ${t.maxRelativeDepth.toExponential(2)}`,
+        t.mismatch.length ? JSON.stringify(t.mismatch) : '',
+      );
+      assert.ok(t.hits > 300, `${name}: the view shows voxels`);
+      assert.ok(t.same >= t.pixels - Math.ceil(t.pixels * 0.002), `${name}: GPU and CPU first hits differ`);
+      assert.ok(t.maxRelativeDepth < 1e-4, `${name}: depth`);
     }
   }
   if (wanted('arealight')) {

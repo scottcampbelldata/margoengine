@@ -8,7 +8,7 @@ import { inflateSync } from 'node:zlib';
 import { VoxelPathTracer } from '../dist/index.js';
 import { fakeDevice, fakeEngine, materials, model, settle, simpleScene, translate } from './support.js';
 
-const FRAME = 560;
+const FRAME = 608;
 const isMargo = (code) => (error) => error.name === 'MargoError' && error.code === code;
 
 // Attaches and runs frames until the trace and display pipelines are compiled.
@@ -553,6 +553,35 @@ test('previousCamera with a shutter adds the shutter-open pose to the frame; it 
   tracer.setOptions({ previousCamera: null });
   frame();
   assert.equal(new Uint32Array(last())[42] & 256, 0, 'null removes the camera motion');
+  tracer.dispose();
+});
+
+test('projection, fisheye and distortion reach the frame; they are validated and restart', async () => {
+  const { tracer, frame, device } = await ready();
+  const last = () => device.buffers.findLast((b) => b.size === FRAME && !b.destroyed).data;
+  tracer.setOptions({ projection: 'fisheye', fisheye: { mapping: 'equisolid', fov: 200 } });
+  frame();
+  let u = new Uint32Array(last()),
+    f = new Float32Array(last());
+  assert.deepEqual([...u.subarray(140, 143)], [2, 1, 0], 'fisheye, equisolid, no distortion');
+  assert.ok(Math.abs(f[144] - (200 * Math.PI) / 180) < 1e-6);
+  assert.ok(Math.abs(f[145] - Math.sin((200 * Math.PI) / 720)) < 1e-6);
+  assert.equal(u[38], 0, 'accumulation restarted');
+  tracer.setOptions({ projection: 'camera', distortion: { k1: -0.2, p2: 0.01 } });
+  frame();
+  u = new Uint32Array(last());
+  f = new Float32Array(last());
+  assert.deepEqual([...u.subarray(140, 143)], [0, 1, 1], 'camera with distortion');
+  assert.deepEqual(
+    [...f.subarray(148, 152)].map((v) => Math.round(v * 1e6) / 1e6),
+    [-0.2, 0, 0, 0.01],
+  );
+  assert.throws(() => tracer.setOptions({ projection: 'cylinder' }), TypeError);
+  assert.throws(() => tracer.setOptions({ fisheye: { fov: 400 } }), RangeError);
+  assert.throws(() => tracer.setOptions({ fisheye: { mapping: 'stereographic' } }), TypeError);
+  assert.throws(() => tracer.setOptions({ distortion: { k1: 2 } }), RangeError);
+  tracer.setOptions({ distortion: null });
+  assert.equal(tracer.options.distortion, undefined);
   tracer.dispose();
 });
 

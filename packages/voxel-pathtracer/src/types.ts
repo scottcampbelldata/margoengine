@@ -216,12 +216,53 @@ export interface VoxelPathTracerOptions {
    * motion.
    */
   previousCamera?: TracePreviousCamera | null;
+  /**
+   * Compatible addition: how pixels map to rays. 'camera' (default) uses the engine camera's projection; 'panorama'
+   * is an equirectangular 360 x 180 degree view around the camera (azimuth across, elevation down the image, the view
+   * direction at the centre); 'fisheye' follows `fisheye`. Both ignore the camera's projection and depth of field.
+   */
+  projection?: 'camera' | 'panorama' | 'fisheye';
+  /** Compatible addition: the fisheye of `projection: 'fisheye'`. */
+  fisheye?: TraceFisheye;
+  /**
+   * Compatible addition: Brown-Conrady lens distortion of the 'camera' projection; null or absent: none. Coordinates
+   * are measured from the image centre in units of half the image height (y up).
+   */
+  distortion?: TraceLensDistortion | null;
   /** Compatible addition: largest luminance one path may add (firefly clamp; biased), above 0 or Infinity. Default Infinity. */
   clamp?: number;
   /** Compatible addition: 'neutral' (Khronos PBR Neutral, Margo's display transform) or 'linear' (clipped). Default 'neutral'. */
   toneMapping?: 'neutral' | 'linear';
   /** Compatible addition: frame-graph order of the pass that draws the traced image. Default 20. */
   order?: number;
+}
+
+/**
+ * Compatible addition: a circular fisheye centred in the image, its circle the image height. A ray at angle theta from
+ * the view direction lands at radius r (in half image heights): theta = r fov / 2 (equidistant) or
+ * sin(theta / 2) = r sin(fov / 4) (equisolid, equal area). Pixels outside the circle are black.
+ */
+export interface TraceFisheye {
+  /** 'equidistant' (default) or 'equisolid'. */
+  mapping?: 'equidistant' | 'equisolid';
+  /** Field of view across the circle in degrees, above 0 to 360. Default 180. */
+  fov?: number;
+}
+
+/**
+ * Compatible addition: Brown-Conrady distortion: an undistorted point (x, y), r^2 = x^2 + y^2, is seen at
+ * x (1 + k1 r^2 + k2 r^4) + 2 p1 x y + p2 (r^2 + 2 x^2), y (1 + k1 r^2 + k2 r^4) + p1 (r^2 + 2 y^2) + 2 p2 x y.
+ * Negative k1 is barrel distortion, positive pincushion. Each coefficient -1 to 1, default 0.
+ */
+export interface TraceLensDistortion {
+  /** Radial r^2 coefficient. */
+  k1?: number;
+  /** Radial r^4 coefficient. */
+  k2?: number;
+  /** First tangential (decentring) coefficient. */
+  p1?: number;
+  /** Second tangential coefficient. */
+  p2?: number;
 }
 
 /** Compatible addition: a camera pose for {@link VoxelPathTracerOptions.previousCamera}. */

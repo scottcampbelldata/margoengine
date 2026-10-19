@@ -46,6 +46,8 @@ import { DENOISE, DISPLAY, TABLE_VEC4, TABLES, TRACE } from './shaders.js';
 import { LAMBDA_MAX, LAMBDA_MIN } from './spectrum.js';
 import { raycastSnapshot } from './traverse.js';
 import type {
+  TraceFisheye,
+  TraceLensDistortion,
   TracePreviousCamera,
   TraceVec3,
   VoxelPathTracerOptions,
@@ -97,6 +99,9 @@ interface Settings {
   toneMapping: 'neutral' | 'linear';
   order: number;
   previousCamera: TracePreviousCamera | undefined;
+  projection: 'camera' | 'panorama' | 'fisheye';
+  fisheye: Required<TraceFisheye>;
+  distortion: Required<TraceLensDistortion> | undefined;
 }
 const DEFAULTS: Settings = {
   samplesPerFrame: 1,
@@ -115,6 +120,9 @@ const DEFAULTS: Settings = {
   toneMapping: 'neutral',
   order: 20,
   previousCamera: undefined,
+  projection: 'camera',
+  fisheye: { mapping: 'equidistant', fov: 180 },
+  distortion: undefined,
 };
 // Options whose change invalidates the accumulated samples (the others only change how they are shown or paced).
 const RESETS: readonly (keyof Settings)[] = [
@@ -127,6 +135,9 @@ const RESETS: readonly (keyof Settings)[] = [
   'lensRotation',
   'shutter',
   'previousCamera',
+  'projection',
+  'fisheye',
+  'distortion',
   'clamp',
 ];
 
@@ -184,6 +195,36 @@ function settings(input: Partial<Omit<VoxelPathTracerOptions, 'scene'>>, base: S
   }
   if (o.order !== undefined) s.order = checkNumber(o.order, 'order', -1e9, 1e9, 'pass a finite frame-graph order');
   if (o.previousCamera !== undefined) s.previousCamera = previousCamera(o.previousCamera);
+  if (o.projection !== undefined) {
+    if (o.projection !== 'camera' && o.projection !== 'panorama' && o.projection !== 'fisheye')
+      throw new TypeError(
+        `VoxelPathTracer projection ${String(o.projection)} is unknown; pass 'camera', 'panorama' or 'fisheye'`,
+      );
+    s.projection = o.projection;
+  }
+  if (o.fisheye !== undefined) {
+    if (!o.fisheye || typeof o.fisheye !== 'object')
+      throw new TypeError('VoxelPathTracer fisheye must be {mapping?, fov?}');
+    const e = o.fisheye as Record<string, unknown>;
+    if (e.mapping !== undefined && e.mapping !== 'equidistant' && e.mapping !== 'equisolid')
+      throw new TypeError(
+        `VoxelPathTracer fisheye.mapping ${String(e.mapping)} is unknown; pass 'equidistant' or 'equisolid'`,
+      );
+    s.fisheye = {
+      mapping: (e.mapping as 'equidistant' | 'equisolid' | undefined) ?? 'equidistant',
+      fov: e.fov === undefined ? 180 : checkNumber(e.fov, 'fisheye.fov', 1e-3, 360, 'pass degrees above 0 to 360'),
+    };
+  }
+  if (o.distortion !== undefined) {
+    if (o.distortion === null) s.distortion = undefined;
+    else {
+      if (typeof o.distortion !== 'object')
+        throw new TypeError('VoxelPathTracer distortion must be {k1?, k2?, p1?, p2?} or null');
+      const d = o.distortion as Record<string, unknown>,
+        c = (k: string) => (d[k] === undefined ? 0 : checkNumber(d[k], `distortion.${k}`, -1, 1, 'pass -1 to 1'));
+      s.distortion = { k1: c('k1'), k2: c('k2'), p1: c('p1'), p2: c('p2') };
+    }
+  }
   return s;
 }
 
@@ -433,9 +474,11 @@ export class VoxelPathTracer implements EnginePlugin {
 
   /** Compatible addition: the options in effect (scene excluded), defaults filled in. */
   get options(): Readonly<
-    Omit<Required<VoxelPathTracerOptions>, 'scene' | 'focusDistance' | 'previousCamera'> & {
+    Omit<Required<VoxelPathTracerOptions>, 'scene' | 'focusDistance' | 'previousCamera' | 'distortion' | 'fisheye'> & {
       focusDistance?: number;
       previousCamera?: TracePreviousCamera;
+      fisheye: Required<TraceFisheye>;
+      distortion?: Required<TraceLensDistortion>;
     }
   > {
     return { ...this.#settings };
@@ -1067,6 +1110,21 @@ export class VoxelPathTracer implements EnginePlugin {
     if (e.ground) flags |= FLAG_GROUND;
     if (env) flags |= FLAG_ENV;
     if ((s.moving || cameraMotion) && o.shutter > 0) flags |= FLAG_MOTION;
+    // Projection: mode (0 camera, 1 panorama, 2 fisheye), fisheye mapping, distortion on; fov and sin(fov / 4);
+    // the Brown-Conrady coefficients.
+    const fov = (o.fisheye.fov * Math.PI) / 180,
+      dist = o.projection === 'camera' ? o.distortion : undefined;
+    u.set(
+      [
+        o.projection === 'camera' ? 0 : o.projection === 'panorama' ? 1 : 2,
+        o.fisheye.mapping === 'equisolid' ? 1 : 0,
+        dist && (dist.k1 || dist.k2 || dist.p1 || dist.p2) ? 1 : 0,
+        0,
+      ],
+      140,
+    );
+    f.set([fov, Math.sin(fov / 4), 0, 0], 144);
+    f.set(dist ? [dist.k1, dist.k2, dist.p1, dist.p2] : [0, 0, 0, 0], 148);
     if (cameraMotion) flags |= FLAG_CAMERA_MOTION;
     if (o.clamp < Infinity) flags |= FLAG_CLAMP;
     if (s.lightPower > 0) flags |= FLAG_AREA;
@@ -1105,7 +1163,12 @@ export class VoxelPathTracer implements EnginePlugin {
         caustic = k > ATROUS,
         level = caustic ? k - ATROUS : k,
         last = k === ATROUS || k === ATROUS + CAUSTIC_LEVELS;
-      u.set([t.width, t.height, k === 0 ? 0 : 1 << (level - 1), (last ? 1 : 0) | (k === 0 ? 2 : 0)], at);
+      // Flags: 1 last level, 2 the prepare pass, 4 no plane test (rays not the camera's corner-ray interpolation).
+      const flat = this.#settings.projection !== 'camera' || this.#settings.distortion !== undefined;
+      u.set(
+        [t.width, t.height, k === 0 ? 0 : 1 << (level - 1), (last ? 1 : 0) | (k === 0 ? 2 : 0) | (flat ? 4 : 0)],
+        at,
+      );
       // Edge stops: luminance difference over LUMINANCE_SIGMA (CAUSTIC_SIGMA) standard deviations of the difference
       // (widened at low sample counts in the shader), normal cosine^128, plane distance over a footprint.
       f.set([caustic ? CAUSTIC_SIGMA : LUMINANCE_SIGMA, 128, 1, 1 / samples], at + 4);
@@ -1255,7 +1318,9 @@ export class VoxelPathTracer implements EnginePlugin {
     v.set(inverse, 16);
     v.set([width, height, c.width, c.height], 32);
     const mode = (c.format === 'rgba16float' ? 1 : 0) | (o.toneMapping === 'linear' ? 2 : 0);
-    v.set([denoised ? 1 : 1 / this.#samples, 2 ** o.exposure, mode, 1 / this.#samples], 36);
+    // First-hit depth only where pixels are the camera's own perspective rays (far otherwise).
+    const depth = o.projection === 'camera' && !o.distortion ? 1 / this.#samples : 0;
+    v.set([denoised ? 1 : 1 / this.#samples, 2 ** o.exposure, mode, depth], 36);
     device.queue.writeBuffer(view.uniform, 0, v);
     const pass = c.encoder.beginRenderPass({
       colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],

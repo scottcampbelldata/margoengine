@@ -280,6 +280,75 @@ window.check={
   look([20,14,24],[4,3,4]);
   return {...out,errors:errors.splice(0)};
  },
+ // Projections. Markers: a 0.25-unit emissive cube 20 units from the eye in a known direction lands (its image
+ // centroid) where the projection's formula puts that direction: equirectangular panorama, equidistant and equisolid
+ // fisheyes, Brown-Conrady distortion of a 60-degree camera. Traversal: per-pixel GPU first hits against
+ // VoxelPathTracer.raycast along rays computed here from the same formulas.
+ async projections(){
+  const out={},deg=Math.PI/180,eye=[0,5,0];
+  const norm=(v)=>{const l=Math.hypot(...v);return v.map((x)=>x/l);};
+  const along=(b,a,x,y)=>[0,1,2].map((k)=>a*b.fw[k]+x*b.rt[k]+y*b.up[k]);
+  const basisOf=(p,t,u=[0,1,0])=>{const fw=norm([t[0]-p[0],t[1]-p[1],t[2]-p[2]]),rt=norm([fw[1]*u[2]-fw[2]*u[1],fw[2]*u[0]-fw[0]*u[2],fw[0]*u[1]-fw[1]*u[0]]);
+   return {fw,rt,up:[rt[1]*fw[2]-rt[2]*fw[1],rt[2]*fw[0]-rt[0]*fw[2],rt[0]*fw[1]-rt[1]*fw[0]]};};
+  const b0=basisOf(eye,[0,5,-1]);
+  const marker=(d)=>({revision:1,models:[model('m',[1,1,1],()=>1)],instances:[{id:'m',modelId:'m',matrix:translate(eye[0]+20*d[0]-0.125,eye[1]+20*d[1]-0.125,eye[2]+20*d[2]-0.125,0.25)}],materials:[{id:1,color:[1,1,1],type:'emit',emission:1}],environment:{skyIntensity:0}});
+  const centroid=(scene,options,W,H)=>withTracer(scene,{maxBounces:1,...options},async(t)=>{
+   const img=await t.renderImage({width:W,height:H,samples:64});let s=0,mx=0,my=0;
+   for(let y=0;y<H;y++)for(let x=0;x<W;x++){const v=lum(img.color,y*W+x);s+=v;mx+=v*(x+0.5);my+=v*(y+0.5);}
+   return [mx/s,my/s];
+  });
+  // Brown-Conrady forward model (undistorted to distorted, half-height units, y up).
+  const K={k1:-0.15,k2:0.05,p1:0.01,p2:-0.005};
+  const distort=([x,y])=>{const r2=x*x+y*y,rad=1+K.k1*r2+K.k2*r2*r2;return [x*rad+2*K.p1*x*y+K.p2*(r2+2*x*x),y*rad+K.p1*(r2+2*y*y)+2*K.p2*x*y];};
+  const undistort=([xd,yd])=>{let x=xd,y=yd;for(let i=0;i<20;i++){const r2=x*x+y*y,rad=1+K.k1*r2+K.k2*r2*r2;x=(xd-(2*K.p1*x*y+K.p2*(r2+2*x*x)))/rad;y=(yd-(K.p1*(r2+2*y*y)+2*K.p2*x*y))/rad;}return [x,y];};
+  const cases=[];
+  for(const [az,el] of [[0,0],[90,30],[-135,-20],[170,60],[45,-70]])
+   cases.push({name:`panorama az ${az} el ${el}`,W:512,H:256,options:{projection:'panorama'},d:along(b0,Math.cos(el*deg)*Math.cos(az*deg),Math.cos(el*deg)*Math.sin(az*deg),Math.sin(el*deg)),
+    expected:[(az/360+0.5)*512,(0.5-el/180)*256]});
+  for(const [mapping,fov,list] of [['equidistant',180,[[0,0],[30,45],[60,200],[85,300]]],['equisolid',200,[[30,45],[60,200],[95,120]]]])
+   for(const [th,al] of list){
+    const r=mapping==='equidistant'?th/(fov/2):Math.sin(th*deg/2)/Math.sin(fov*deg/4);
+    cases.push({name:`fisheye ${mapping} ${fov} theta ${th} at ${al}`,W:256,H:256,options:{projection:'fisheye',fisheye:{mapping,fov}},
+     d:along(b0,Math.cos(th*deg),Math.sin(th*deg)*Math.cos(al*deg),Math.sin(th*deg)*Math.sin(al*deg)),expected:[128+r*Math.cos(al*deg)*128,128-r*Math.sin(al*deg)*128]});
+   }
+  const tan=Math.tan(30*deg);
+  for(const u of [[0,0],[0.5,0.3],[-0.8,0.6],[1.1,-0.7],[-1.2,-0.8]]){
+   const [xd,yd]=distort(u);
+   cases.push({name:`distortion at ${u.join(', ')}`,W:320,H:240,options:{distortion:K},d:norm(along(b0,1,u[0]*tan,u[1]*tan)),expected:[160+xd*120,120-yd*120]});
+  }
+  look(eye,[0,5,-1],{fov:60});
+  for(const c of cases){
+   const at=await centroid(marker(c.d),c.options,c.W,c.H);
+   out[c.name]={measured:at,expected:c.expected,error:Math.hypot(at[0]-c.expected[0],at[1]-c.expected[1])};
+  }
+  // Traversal against the CPU, per pixel centre.
+  const scene=scenes.traversal(),pos=[26,22,30],target=[2,0,-4],b=basisOf(pos,target);
+  look(pos,target,{fov:60});
+  const views={
+   panorama:{W:160,H:80,options:{projection:'panorama'},ray:(px,py,W,H)=>{const phi=(px/W-0.5)*2*Math.PI,el=(0.5-py/H)*Math.PI;return along(b,Math.cos(el)*Math.cos(phi),Math.cos(el)*Math.sin(phi),Math.sin(el));}},
+   fisheye:{W:128,H:128,options:{projection:'fisheye',fisheye:{mapping:'equisolid',fov:200}},ray:(px,py,W,H)=>{const x=(px-W/2)/(H/2),y=(H/2-py)/(H/2),r=Math.hypot(x,y),s=r*Math.sin(200*deg/4);
+    if(s>1)return null;const th=2*Math.asin(s);if(th>100*deg+1e-6)return null;return along(b,Math.cos(th),r?Math.sin(th)*x/r:0,r?Math.sin(th)*y/r:0);}},
+   distorted:{W:160,H:120,options:{distortion:K},ray:null},
+  };
+  for(const [name,v] of Object.entries(views)){
+   out[`traversal ${name}`]=await withTracer(scene,{maxBounces:1,...v.options},async(tracer)=>{
+    const image=await tracer.renderImage({width:v.W,height:v.H,samples:1,jitter:false,aovs:true}),pin=rays(v.W,v.H);
+    let hits=0,same=0,maxDepth=0;const mismatch=[];
+    for(let y=0;y<v.H;y++)for(let x=0;x<v.W;x++){
+     const i=y*v.W+x;let o=pos,d;
+     if(v.ray)d=v.ray(x+0.5,y+0.5,v.W,v.H);
+     else{const [ux,uy]=undistort([(x+0.5-v.W/2)/(v.H/2),(v.H/2-y-0.5)/(v.H/2)]),r=pin(ux*v.H/2+v.W/2,v.H/2-uy*v.H/2);o=r.o;d=r.d;}
+     const cpu=d?tracer.raycast(o,d):null,cpuInstance=cpu?scene.instances.findIndex((s)=>s.id===cpu.instanceId):-1;
+     if(cpu)hits++;
+     if(image.instance[i]===cpuInstance&&(!cpu||image.palette[i]===cpu.paletteIndex)){same++;if(cpu)maxDepth=Math.max(maxDepth,Math.abs(image.depth[i]-cpu.distance)/cpu.distance);}
+     else if(mismatch.length<4)mismatch.push({x,y,gpu:[image.instance[i],image.palette[i]],cpu:cpu&&[cpuInstance,cpu.paletteIndex]});
+    }
+    return {pixels:v.W*v.H,hits,same,maxRelativeDepth:maxDepth,mismatch};
+   });
+  }
+  look([20,14,24],[4,3,4]);
+  return {...out,errors:errors.splice(0)};
+ },
  // Area lights as solid panels. Shadow: a 4 x 4 panel (facing down) 8 above a floor under a point sun at 45 degrees
  // casts a 16-unit shadow there (none with opaque false). Seen: the front shows its radiance, a one-sided panel's back
  // is black (opaque) or not there (the sky through it). Occlusion of another light: a dark panel between a floor and

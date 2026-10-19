@@ -38,12 +38,24 @@ export interface TraceEnvironmentMap {
     rotation?: number;
 }
 
+export interface TraceFisheye {
+    mapping?: 'equidistant' | 'equisolid';
+    fov?: number;
+}
+
 export interface TraceInstance {
     id: string;
     modelId: string;
     matrix: readonly number[];
     visible?: boolean;
     previousMatrix?: readonly number[];
+}
+
+export interface TraceLensDistortion {
+    k1?: number;
+    k2?: number;
+    p1?: number;
+    p2?: number;
 }
 
 export interface TraceMaterial {
@@ -91,9 +103,11 @@ export class VoxelPathTracer implements EnginePlugin {
     get ready(): Promise<void>;
     get status(): 'compiling' | 'ready' | 'failed' | 'disposed';
     get error(): unknown;
-    get options(): Readonly<Omit<Required<VoxelPathTracerOptions>, 'scene' | 'focusDistance' | 'previousCamera'> & {
+    get options(): Readonly<Omit<Required<VoxelPathTracerOptions>, 'scene' | 'focusDistance' | 'previousCamera' | 'distortion' | 'fisheye'> & {
         focusDistance?: number;
         previousCamera?: TracePreviousCamera;
+        fisheye: Required<TraceFisheye>;
+        distortion?: Required<TraceLensDistortion>;
     }>;
     setScene(scene: VoxelTraceScene): void;
     setOptions(options: Partial<Omit<VoxelPathTracerOptions, 'scene'>>): void;
@@ -123,6 +137,9 @@ export interface VoxelPathTracerOptions {
     lensRotation?: number;
     shutter?: number;
     previousCamera?: TracePreviousCamera | null;
+    projection?: 'camera' | 'panorama' | 'fisheye';
+    fisheye?: TraceFisheye;
+    distortion?: TraceLensDistortion | null;
     clamp?: number;
     toneMapping?: 'neutral' | 'linear';
     order?: number;

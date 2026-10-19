@@ -130,6 +130,16 @@ The engine camera is used as is: perspective by default, orthographic (or any af
   `shutter` above 0 blurs the camera's own move toward the engine camera (shutter close), sharing the instances' time
   per sample. Projection, near and far are the engine camera's; the corner rays and lens axes are interpolated
   linearly, exact for translations and close for small turns.
+- **Panorama and fisheye (addition):** `projection: 'panorama'` renders an equirectangular 360 x 180 degree view around
+  the camera position (azimuth across the image, elevation down it, the view direction at the centre, up as the
+  camera's). `projection: 'fisheye'` renders a circular fisheye whose circle is the image height, `fisheye.mapping`
+  `'equidistant'` (angle proportional to radius) or `'equisolid'` (equal area), `fisheye.fov` up to 360 degrees; pixels
+  outside the circle are black. Both ignore the camera's projection and depth of field; overlays drawn later are not
+  depth-tested against them (the pass writes far depth).
+- **Lens distortion (addition):** `distortion: {k1, k2, p1, p2}` applies Brown-Conrady radial and tangential distortion
+  to the camera projection, in coordinates measured from the image centre in half image heights (y up): an undistorted
+  point is seen at `x (1 + k1 r^2 + k2 r^4) + 2 p1 x y + p2 (r^2 + 2 x^2)` and likewise for y. Each pixel's ray is found
+  by inverting that (fixed-point iteration).
 
 ## Options
 
@@ -147,6 +157,9 @@ The engine camera is used as is: perspective by default, orthographic (or any af
 | `lensBlades`, `lensRotation` | 0, 0 | 0 or 3-16; radians | yes |
 | `shutter` | 0 | 0-1 | yes |
 | `previousCamera` | none | `{position, target, up?, fov?}` or null | yes |
+| `projection` | `'camera'` | `'camera'`, `'panorama'`, `'fisheye'` | yes |
+| `fisheye` | `{mapping: 'equidistant', fov: 180}` | mapping `'equidistant'` or `'equisolid'`, fov above 0 to 360 | yes |
+| `distortion` | none | `{k1, k2, p1, p2}`, each -1 to 1, or null | yes |
 | `clamp` (largest luminance a path may add; biased firefly control) | Infinity | above 0 | yes |
 | `toneMapping` | `'neutral'` (Khronos PBR Neutral, Margo's display transform) | `'neutral'`, `'linear'` | no |
 | `order` (frame-graph order of the pass) | 20 | finite | no |
@@ -233,7 +246,11 @@ Numbers on other GPUs are not measured.
 - `tests/browser-check.mjs` (real WebGPU, run under `scripts/gpu-lock.mjs`) on the RTX A6000:
   - shaders compile with no diagnostics; no WebGPU validation errors anywhere;
   - GPU first hits equal `raycast` on all 19,200 pixels of a scene of rotated, scaled, sheared and mirrored instances,
-    perspective and orthographic, distances within 2.6e-6 relative;
+    perspective and orthographic, distances within 2.6e-6 relative; also panorama (12,800 pixels), equisolid 200-degree
+    fisheye (16,384) and Brown-Conrady distortion (19,200), all agreeing, distances within 4.4e-6;
+  - projections: small emissive markers in known directions land where the formulas put them, within 0.13 px for 5
+    panorama directions, 0.08 px for 7 equidistant (180-degree) and equisolid (200-degree) fisheye directions and
+    0.16 px for 5 points under distortion k1 -0.15, k2 0.05, p1 0.01, p2 -0.005 (up to 1.4 half-heights off centre);
   - closed-form checks: furnaces (convex cube in a uniform sky) diffuse 0.5000 and 1.0000, smooth metal, smooth plastic
     and clear glass 1.0000, media 0.9999, subsurface 0.9998, constant environment map 0.4998 (expected 0.5); emission
     3.0000; Beer-Lambert 0.3678 (e^-1 = 0.3679); emissive media 8 deep emitting 2 per unit 15.996 without
@@ -335,7 +352,6 @@ Not done or not verified, stated plainly:
 - **Simplifications:** RGB everywhere except dispersive glass, which samples one wavelength per path (no hero-wavelength
   sharing, so dispersion converges with colour noise); refracted radiance is not scaled by the squared
   index ratio; media are homogeneous per palette index with grey extinction; the ground is a plain diffuse plane; motion blur interpolates matrices and the camera's corner rays linearly (fast rotations shrink
-  a little); no panoramic/fisheye projections, lens distortion or
-  chromatic aberration; no physical sky model (use an environment map); bloom comes from `@margoengine/post`.
+  a little); no chromatic aberration; no physical sky model (use an environment map); bloom comes from `@margoengine/post`.
 - **Measured only on one machine** (RTX A6000, Edge 155, Windows). Other GPUs, browsers and the editor's own scenes are
   untested.

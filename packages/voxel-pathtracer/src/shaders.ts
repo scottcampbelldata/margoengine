@@ -72,6 +72,12 @@ struct Frame {
  prevForward:vec4f,
  prevRight:vec4f,
  prevUp:vec4f,
+ // Projection mode (0 camera, 1 panorama, 2 fisheye), fisheye mapping (0 equidistant, 1 equisolid), distortion on.
+ projection:vec4u,
+ // Fisheye field of view (radians) and sin(fov / 4).
+ lensFov:vec4f,
+ // Brown-Conrady k1, k2, p1, p2.
+ distortion:vec4f,
 }
 `;
 
@@ -491,9 +497,50 @@ fn lensPoint()->vec2f {
  var s=u;if(s.x+s.y>1.0){s=1.0-s;}
  return vec2f(cos(a0),sin(a0))*s.x+vec2f(cos(a1),sin(a1))*s.y;
 }
+// The undistorted pixel position seen at pixel position px (Brown-Conrady, inverted by fixed-point iteration), in
+// units of half the image height from the centre, y up.
+fn undistort(px:vec2f)->vec2f {
+ let W=f32(f.image.x);let H=f32(f.image.y);
+ let xd=vec2f(px.x-0.5*W,0.5*H-px.y)/(0.5*H);
+ let k=f.distortion;
+ var u=xd;
+ for(var i=0;i<20;i++){
+  let r2=dot(u,u);
+  let radial=1.0+k.x*r2+k.y*r2*r2;
+  let t=vec2f(2.0*k.z*u.x*u.y+k.w*(r2+2.0*u.x*u.x),k.z*(r2+2.0*u.y*u.y)+2.0*k.w*u.x*u.y);
+  u=(xd-t)/radial;
+ }
+ return vec2f(u.x*0.5*H+0.5*W,0.5*H-u.y*0.5*H);
+}
+// Panorama and fisheye rays from the eye along the camera's axes (interpolated with camera motion); d = 0 outside a
+// fisheye's circle.
+fn wideRay(px:vec2f)->Ray {
+ var eye=f.eye.xyz;var fw=f.forward.xyz;var rt=f.right.xyz;var up=f.up.xyz;
+ if((f.config.z&CAMERA_MOTION)!=0u&&motion<1.0){
+  eye=mix(f.prevEye.xyz,eye,motion);fw=normalize(mix(f.prevForward.xyz,fw,motion));
+  rt=normalize(mix(f.prevRight.xyz,rt,motion));up=normalize(mix(f.prevUp.xyz,up,motion));
+ }
+ let W=f32(f.image.x);let H=f32(f.image.y);
+ if(f.projection.x==1u){
+  let phi=(px.x/W-0.5)*TAU;let el=(0.5-px.y/H)*PI;
+  return Ray(eye,normalize(cos(el)*(sin(phi)*rt+cos(phi)*fw)+sin(el)*up));
+ }
+ let p=vec2f(px.x-0.5*W,0.5*H-px.y)/(0.5*H);
+ let r=length(p);
+ var th=r*0.5*f.lensFov.x;
+ if(f.projection.y==1u){let s=r*f.lensFov.y;if(s>1.0){return Ray(eye,vec3f(0.0));}th=2.0*asin(s);}
+ if(th>0.5*f.lensFov.x+1e-6){return Ray(eye,vec3f(0.0));}
+ let a=select(vec2f(0.0),p/r,r>0.0);
+ return Ray(eye,normalize(cos(th)*fw+sin(th)*(a.x*rt+a.y*up)));
+}
+// The ray through pixel position px without the lens: the projection's, distortion applied.
+fn viewRay(px:vec2f)->Ray {
+ if(f.projection.x!=0u){return wideRay(px);}
+ return pinhole(select(px,undistort(px),f.projection.z!=0u));
+}
 fn cameraRay(px:vec2f)->Ray {
- var r=pinhole(px);
- if(f.forward.w>0.0){
+ var r=viewRay(px);
+ if(f.forward.w>0.0&&f.projection.x==0u){
   var eye=f.eye;var fw=f.forward.xyz;var rt=f.right.xyz;var up=f.up.xyz;
   if((f.config.z&CAMERA_MOTION)!=0u&&motion<1.0){
    eye=mix(f.prevEye,f.eye,motion);fw=normalize(mix(f.prevForward.xyz,fw,motion));
@@ -986,6 +1033,7 @@ fn radiance(px:vec2u)->Path {
  motion=1.0;
  if((f.config.z&MOTION)!=0u){motion=1.0-f.weights.z*rand();}
  let ray=cameraRay(vec2f(px)+jit);
+ if(dot(ray.d,ray.d)==0.0){res.albedo=vec3f(0.0);res.primary=1.0;return res;}
  var o=ray.o;var d=ray.d;
  var thr=vec3f(1.0);var L=vec3f(0.0);
  var medium=0u;var mInst=NONE;
@@ -1160,8 +1208,9 @@ fn radiance(px:vec2u)->Path {
 @compute @workgroup_size(8,8) fn ids(@builtin(global_invocation_id) gid:vec3u) {
  if(gid.x>=f.tile.x||gid.y>=f.tile.y){return;}
  motion=1.0;
- let ray=pinhole(vec2f(f32(gid.x+f.image.z)+0.5,f32(gid.y+f.image.w)+0.5));
- let h=closest(ray.o,ray.d,0u,NONE);
+ let ray=viewRay(vec2f(f32(gid.x+f.image.z)+0.5,f32(gid.y+f.image.w)+0.5));
+ var h:Hit;h.inst=NONE;
+ if(dot(ray.d,ray.d)>0.0){h=closest(ray.o,ray.d,0u,NONE);}
  var v=-1.0;
  if(h.inst==GROUND){v=-2.0;}else if(h.inst==AREA){v=-3.0;}else if(h.inst!=NONE){v=f32(h.inst+1u)*256.0+f32(h.value);}
  normals[gid.y*f.tile.x+gid.x].w=v;
@@ -1247,7 +1296,7 @@ fn variance(i:u32,c:vec3f,m2:f32,caustic:bool,g:vec2u)->f32 {
  let foot=select(0.0,length(hitPoint(x+1.0,y,t)-hitPoint(x,y,t)),t>0.0);
  // Features seen through glass or a mirror (most samples): no plane test, the first hit's plane is not theirs.
  let through=normals[i].w*k<0.5;
- guide[i]=vec4f(oct(select(vec3f(0.0,0.0,1.0),nn/len,len>1e-6)),t,select(foot,-1.0,through));
+ guide[i]=vec4f(oct(select(vec3f(0.0,0.0,1.0),nn/len,len>1e-6)),t,select(foot,-1.0,through||(p.size.w&4u)!=0u));
 }
 fn tap(x:i32)->f32 {return select(select(0.0625,0.25,abs(x)==1),0.375,x==0);}
 @compute @workgroup_size(8,8) fn atrous(@builtin(global_invocation_id) g:vec3u) {
