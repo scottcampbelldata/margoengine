@@ -41,6 +41,10 @@
     "./physics": {
       "types": "./dist/physics.d.ts",
       "import": "./dist/physics.js"
+    },
+    "./render": {
+      "types": "./dist/render.d.ts",
+      "import": "./dist/render.js"
     }
   },
   "files": [

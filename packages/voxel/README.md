@@ -420,3 +420,74 @@ Measured with Node 24 worker threads on the development laptop (8 logical cores)
 CPU (2026-10-19; `node --test packages/voxel/tests/stream-benchmark.test.js` prints yours): `noiseTerrain` 1.4-1.8 ms
 per chunk on one thread; filling a 565-chunk range: 495 chunks/s with 1 worker, 803 with 2, 765 with 3 (the machine
 had no core left for the third); `update()` 11-14 us per call, unpacking included.
+
+## Rendering (`@margoengine/voxel/render`)
+
+`VoxelRenderer` draws a world with an engine (WebGPU): it meshes the world's dirty chunks in workers, keeps their quads
+on the GPU and draws every chunk layer with one indirect draw. `BlockTextures` holds the block textures.
+
+```ts
+import { BlockTextures, VoxelRenderer } from '@margoengine/voxel/render';
+import { VoxelLighting } from '@margoengine/voxel/light';
+
+const textures = await BlockTextures.load(['stone.png', 'dirt.png', 'grass-top.png', 'grass-side.png']); // layers 0-3
+// or BlockTextures.fromAtlas(image, { size: 16 }), or new BlockTextures({ images: [canvas, bitmap, ...] })
+const lighting = VoxelLighting.attach(world); // the renderer shades with the chunks' light bytes
+const voxels = VoxelRenderer.attach(engine, { world, textures });
+engine.onFrame(() => lighting.update());
+world.setBlock(x, y, z, stone); // drawn two frames later
+textures.set(3, canvas); // live
+voxels.daylight = 0.3; // dusk: sky light dims, block light (torches) does not
+voxels.stats; // {chunks, visible, quads, bytes, draws} of the last frame
+voxels.dispose(); // workers and GPU buffers; textures.dispose() separately
+```
+
+- **Meshing.** Each frame the renderer takes the keys in `world.dirty` (it is their consumer), sends loaded chunks to a
+  `VoxelMesher` (option `workers`) nearest first and frees removed ones at once. Finished meshes are uploaded nearest
+  first, about 4 MiB per frame. Translucent quads come back sorted from the camera; chunks within 64 blocks are sorted
+  again on the CPU after the camera moves 4 blocks, and translucent chunks draw back to front.
+- **GPU memory.** One storage buffer holds every quad (12 bytes) in pages of 64; a chunk layer takes a run of pages
+  (first fit, reused in place while it still fits). The buffer starts at 4 MiB and doubles up to `maxQuadBytes`
+  (default 96 MiB, at most the device's storage binding limit); a mesh that does not fit waits until chunks free pages.
+  Vertices are pulled from it by vertex index (no vertex buffers, no extra GPU feature).
+- **Draws.** Pass order -6 prepares: frustum cull per chunk on the CPU (`@margoengine/math/frustum`) into the indirect
+  arguments, uploads, the frame uniform. Order 1 draws opaque blocks (back faces culled) and cutout blocks (both sides,
+  alpha to coverage at 4x MSAA, alpha test at 0.5 at 1x) by replaying a render bundle of one `drawIndexedIndirect` per
+  chunk layer, re-recorded only when the set of chunk layers with quads, a buffer or the target changes (0.2-0.8 ms for
+  2,000 draws). Order 4.5 draws translucent blocks (premultiplied over, no depth write). Pipelines compile
+  asynchronously: the first frames after attaching, or on a new target format, draw nothing.
+- **Shading.** Each pixel is shaded where its ray meets the face's plane, never from interpolated attributes: texture
+  coordinates and their gradients (nearest texels up close, trilinear mips in the distance, no seams on tiled greedy
+  quads), and AO, sky light and block light bilinear between the quad's corners, so a greedy quad shades like the unit
+  faces it covers. Lighting (this release): `engine.lighting`'s sun scaled by sky visibility, a hemisphere ambient term
+  (`radiance[3]` times the ambient colour) times AO, sky light and `daylight`, block light as warm emission, and each
+  type's `emissive`. Without light bytes every face sits in the dark: attach `VoxelLighting`, or fill them
+  (`chunk.fillLight(0xf0)` is open sky). rgba16float targets get linear colour; others PBR Neutral and sRGB. The
+  fragment keeps glTF-pro's lighting hook points for shadows, clustered lights, IBL and fog (DESIGN.md phase 5).
+- **Materials.** One 16-byte entry per `blockMaterials` id: texture layer, animation frames and fps (up to 255.99,
+  1/256 steps), tint, roughness, metalness, emissive. `fancyLeaves: false` draws cutout cubes solid; cross blocks
+  always cut out.
+- **Textures.** An `rgba8unorm-srgb` 2D array: up to 256 layers of `size` x `size` texels (a power of two; default the
+  first image's width, or 16; other sizes are drawn at it, nearest-neighbour). Mips are made once on the CPU per layer:
+  colour averaged in linear light weighted by alpha; for cutout textures (alpha only 0 and 255) alpha is rescaled so an
+  alpha test keeps the level-0 coverage (Castano 2010), so leaves stay dense in the distance; other alpha is averaged.
+  Raw `{width, height, data}` pixels need no DOM. Missing layers are white.
+- **T-junctions.** A greedy quad's edges pass through the corners of smaller neighbours; once the rasterizer snaps the
+  vertices to its subpixel grid, slivers there let single samples of the background through (up to 41 pixels of a
+  320 x 240 grazing view on the Arc 140V). The vertex shader stretches merged quads 1/128 pixel along their own edges,
+  in their plane, which closes them (none left in the browser check). Within that fraction of a pixel of an edge a
+  sample can then belong to the neighbour, so a greedy image differs from a one-quad-per-face image in a few edge
+  pixels (under 0.6% of those drawn, never over an area).
+- **Device loss.** On `engine.rebootDevice()` (or a lost device) every chunk is meshed and uploaded again.
+- **Errors.** `TypeError` for a wrong world, textures or option type, `RangeError` for values out of range (including
+  `maxQuadBytes` over the device limit), `MargoError` `'unsupported'` without WebGPU or Web Workers; `BlockTextures`
+  throws `RangeError` for sizes and layers, `MargoError` `'unsupported'` for an image without OffscreenCanvas,
+  `'failed'` when `load` gets an HTTP error, `'disposed'` after `dispose()`.
+
+Checked on the Arc 140V (`node scripts/gpu-lock.mjs run --owner=you -- node packages/voxel/tests/render-browser-check.mjs`):
+no T-junction cracks at 4x and 1x MSAA, greedy and one-quad-per-face images equal outside edge samples on the canvas
+format and rgba16float, glass and cutout composites to their exact linear values, an edit drawn two frames later, the
+same image after `engine.rebootDevice()`, no validation errors. Rough timing (`--timing`, machine not quiet, timestamp
+queries in 65 us steps): a synthetic render-distance-16 world (2,178 chunks, 1.13M quads, 13.7 MiB) spawns in 1.5-4.6 s
+and its voxel passes take about 3.2 ms of GPU at 1920 x 1080 with 4x MSAA (582 chunks visible), 0.9 ms of CPU per frame
+for the whole `engine.render`.
