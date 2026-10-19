@@ -266,6 +266,31 @@ mesh.setGeometry({positions: more, normals: moreNormals, uvs: moreUvs, indices: 
 remain caller-owned. Device restoration rebuilds the model and texture bindings. Constructed material shading cannot
 be copied to another GPU device without rebuilding its material resources. Core and the stage facade are unchanged.
 
+## Animated tiles
+
+A tile animation (Crocotile 3D's per-tileset UV animation) is a looping list of frames, each with a duration in
+seconds and the four corner UVs of its tile. `tileAnimationFrame(animation, time, start?)` returns the frame shown at
+`time`, deterministic and looping in both directions; a time on a boundary shows the next frame. `start` is a frame
+(`{frame: 2}`) or an offset in seconds (`{seconds: 0.4}`, a tile's custom start time). Durations must be finite and
+greater than zero.
+
+`tileAnimator(mesh, geometry, tiles)` plays them on a `createMesh` mesh whose tiles are four consecutive vertices:
+each call writes the changed tiles' corner UVs into `geometry.uvs` and uploads only those vertices, one range per run
+of neighbouring tiles. Tiles whose frame did not change upload nothing. Reading the animation file format is the
+application's job.
+
+```ts
+import {createMesh, tileAnimator} from '@margoengine/materials';
+
+const water = {frames: [
+  {duration: 0.2, uvs: [0, 0, 0.25, 0, 0.25, 0.25, 0, 0.25]},
+  {duration: 0.2, uvs: [0.25, 0, 0.5, 0, 0.5, 0.25, 0.25, 0.25]},
+]};
+const mesh = createMesh(engine, geometry, tileset); // geometry.uvs is a number[] or Float32Array
+const play = tileAnimator(mesh, geometry, [{vertex: 0, animation: water}, {vertex: 4, animation: water, start: {frame: 1}}]);
+engine.onFrame(() => play(performance.now() / 1000));
+```
+
 ## Painting textures
 
 `texture.update()` re-uploads the whole source (canvas, ImageData, ImageBitmap, VideoFrame or raw

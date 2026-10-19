@@ -389,3 +389,4 @@ export function install(model: PBRModel): MaterialInstallation {
 
 // Mesh materials and imported glTF extensions share the same PBR renderer.
 export * from './built-material.js';
+export * from './tile-animation.js';
