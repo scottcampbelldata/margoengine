@@ -33,6 +33,10 @@
     "./vox": {
       "types": "./dist/vox.d.ts",
       "import": "./dist/vox.js"
+    },
+    "./physics": {
+      "types": "./dist/physics.d.ts",
+      "import": "./dist/physics.js"
     }
   },
   "files": [
@@ -43,7 +47,13 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/physics": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/physics": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@margoengine/math": "^1.0.0"

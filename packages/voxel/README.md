@@ -274,3 +274,40 @@ const bytes = writeVox(scene); // the same bytes as the file, except what you ch
 
 Measured with Node on the development laptop (2026-10-19; `node --test packages/voxel/tests/vox.test.js` prints
 yours): a 1M-voxel model writes in about 10 ms and parses in about 6 ms (4 MiB); pasting it takes about 0.7-1.1 s.
+
+## Physics (`@margoengine/voxel/physics`)
+
+Rapier voxel colliders for the chunks near moving bodies, so mobs, item drops and debris of a
+[`@margoengine/physics`](../physics/README.md) world collide with the blocks. Needs `@margoengine/physics` (an optional
+peer: only this entry uses it) with `@dimforge/rapier3d-compat` 0.17.1 or newer.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { VoxelPhysics } from '@margoengine/voxel/physics';
+
+const physics = Physics.attach(engine, { rapier: RAPIER });
+const voxels = new VoxelPhysics(physics, world, { radius: 1 });
+physics.addBody(mesh, { colliders: { shape: 'box' } }); // lands on the blocks
+world.setBlock(x, y, z, 0); // the collider changes in place; the body falls
+voxels.colliders; // Map of chunk key -> Rapier collider
+voxels.dispose();
+```
+
+- **Which chunks.** Before each physics step, every loaded chunk within `radius` chunks (per axis, default 1: the
+  body's chunk and its 26 neighbours) of any non-fixed body gets one collider; sleeping bodies count, so they keep their
+  floor, and kinematic ones count, so character controllers walk on blocks. Chunks out of range or unloaded lose theirs.
+- **What collides.** The chunk's surface: cells of block types with `solid` (the default) that touch a non-solid cell
+  or an unloaded chunk. Buried cells are left out, so an underground chunk costs almost nothing.
+- **Seams and edits.** Neighbouring colliders are coupled with Rapier's `combineVoxelStates`, so bodies slide across
+  chunk borders without catching on internal edges. `onChange` edits call `setVoxel` (and `propagateVoxelChange` on
+  chunk borders): no rebuilds. A digging edit adds the solid cells it uncovers.
+- **Not physics bodies.** `Physics` collision events and queries skip these colliders; pick with
+  `raycastVoxels` (`./query`).
+- **Known Rapier bug.** Rapier 0.21.0 panics (`RuntimeError: unreachable`, ending the Rapier instance) when a
+  `sphere` collider meets a voxel edge: rolling off a ledge, across a chunk border or into a wall. Give round bodies a
+  `convexHull` or a capsule until Rapier fixes it; boxes, capsules, cylinders and convex hulls work.
+
+Measured with Node on the development laptop (2026-10-19; `node --test packages/voxel/tests/physics.test.js` prints
+yours): one terrain-surface chunk builds in about 2 ms (Rapier's collider creation is most of it), a uniform air chunk in
+0.2 ms; a body spawning on terrain builds 18 colliders in about 16 ms and crossing a chunk border builds 6 in 5-7 ms;
+a surface dig or place costs about 3 us with colliders against 0.5 us without.
