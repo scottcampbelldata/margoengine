@@ -7,6 +7,7 @@ import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 import { MaterialExtension, MaterialExtensionTexture, PBRModel, PreparedGeometry } from "@margoengine/gltf-pro";
 import { PBRInstances } from "@margoengine/gltf-pro/instancing";
+import { ColorInput } from "@margoengine/math";
 
 export interface AddNode {
     type: 'add';
@@ -68,7 +69,15 @@ export interface ColorNode {
     value: readonly [number, number, number, number];
 }
 
+export class DepthMaterial extends Material {
+    constructor(options?: Omit<MaterialOptions, Exclude<ModelKeys, 'depthPacking'> | MetalKeys | LightKeys | 'normalMap' | 'normalScale'>);
+}
+
 export type DepthPacking = 'basic' | 'rgba';
+
+export class DistanceMaterial extends Material {
+    constructor(options?: Omit<MaterialOptions, Exclude<ModelKeys, DistanceKeys> | MetalKeys | LightKeys | 'normalMap' | 'normalScale'>);
+}
 
 export interface EmitNode {
     type: 'emit';
@@ -99,30 +108,18 @@ export interface IridescenceOptions {
     iridescenceThicknessTexture?: ClearcoatTexture;
 }
 
+export class LambertMaterial extends Material {
+    constructor(options?: Omit<MaterialOptions, ModelKeys | MetalKeys>);
+}
+
 export type MapSlot = (typeof mapSlots)[number];
+
+export class MatcapMaterial extends Material {
+    constructor(options?: Omit<MaterialOptions, Exclude<ModelKeys, 'matcap'> | MetalKeys | LightKeys>);
+}
 
 export class Material {
     readonly shading: Shading;
-    readonly wireframe: boolean;
-    readonly color: number[];
-    readonly emissive: number[];
-    readonly specular: number[];
-    readonly blending: Blending;
-    readonly depthWrite?: boolean;
-    readonly depthTest: boolean;
-    readonly colorWrite: boolean;
-    readonly polygonOffset: boolean;
-    readonly polygonOffsetFactor: number;
-    readonly polygonOffsetUnits: number;
-    readonly polygonOffsetClamp: number;
-    readonly stencilWrite: boolean;
-    readonly stencilRef: number;
-    readonly stencilReadMask: number;
-    readonly stencilWriteMask: number;
-    readonly stencilFunc: GPUCompareFunction;
-    readonly stencilFail: GPUStencilOperation;
-    readonly stencilZFail: GPUStencilOperation;
-    readonly stencilZPass: GPUStencilOperation;
     readonly factors: number[];
     readonly settings: number[];
     readonly uvt: number[];
@@ -161,6 +158,46 @@ export class Material {
     readonly volume?: number[];
     readonly extensions: readonly string[];
     constructor(o?: MaterialOptions);
+    get blending(): Blending;
+    set blending(v: Blending);
+    get depthWrite(): boolean | undefined;
+    set depthWrite(v: boolean | undefined);
+    get depthTest(): boolean;
+    set depthTest(v: boolean);
+    get colorWrite(): boolean;
+    set colorWrite(v: boolean);
+    get polygonOffset(): boolean;
+    set polygonOffset(v: boolean);
+    get polygonOffsetFactor(): number;
+    set polygonOffsetFactor(v: number);
+    get polygonOffsetUnits(): number;
+    set polygonOffsetUnits(v: number);
+    get polygonOffsetClamp(): number;
+    set polygonOffsetClamp(v: number);
+    get stencilWrite(): boolean;
+    set stencilWrite(v: boolean);
+    get stencilRef(): number;
+    set stencilRef(v: number);
+    get stencilReadMask(): number;
+    set stencilReadMask(v: number);
+    get stencilWriteMask(): number;
+    set stencilWriteMask(v: number);
+    get stencilFunc(): GPUCompareFunction;
+    set stencilFunc(v: GPUCompareFunction);
+    get stencilFail(): GPUStencilOperation;
+    set stencilFail(v: GPUStencilOperation);
+    get stencilZFail(): GPUStencilOperation;
+    set stencilZFail(v: GPUStencilOperation);
+    get stencilZPass(): GPUStencilOperation;
+    set stencilZPass(v: GPUStencilOperation);
+    get wireframe(): boolean;
+    set wireframe(v: boolean);
+    get color(): LiveColor;
+    set color(v: ColorInput);
+    get emissive(): LiveColor;
+    set emissive(v: ColorInput);
+    get specular(): LiveColor;
+    set specular(v: ColorInput);
     get depthPacking(): DepthPacking;
     set depthPacking(v: DepthPacking);
     get referencePosition(): readonly [number, number, number];
@@ -188,11 +225,11 @@ export class Material {
     get transmission(): number;
     set transmission(v: number);
     get specularColor(): number[];
-    set specularColor(c: Color);
+    set specularColor(c: ColorInput);
     get specularIntensity(): number;
     set specularIntensity(v: number);
     get sheenColor(): number[];
-    set sheenColor(c: Color);
+    set sheenColor(c: ColorInput);
     get sheenRoughness(): number;
     set sheenRoughness(v: number);
     get ior(): number;
@@ -202,7 +239,7 @@ export class Material {
     get thickness(): number;
     set thickness(v: number);
     get attenuationColor(): number[];
-    set attenuationColor(c: Color);
+    set attenuationColor(c: ColorInput);
     get attenuationDistance(): number;
     set attenuationDistance(v: number);
     get transmissive(): boolean;
@@ -229,6 +266,10 @@ export class Material {
     set doubleSided(v: boolean);
     setUVTransform(t: TextureTransform | null, slot?: MapSlot): this;
     get customState(): boolean;
+    clone(): this;
+    copy(source: Material): this;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
     shader(source: string, group: number): string;
     bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[];
 }
@@ -259,8 +300,9 @@ export interface MaterialLobeOptions {
 }
 
 export type MaterialMesh<M extends Material | readonly Material[] = Material> = PBRModel & {
-    readonly material: M extends Material ? Material : readonly Material[];
+    material: M extends Material ? Material : readonly Material[];
     setGeometry(geometry: MeshGeometry, range?: GeometryRange): MaterialMesh<M>;
+    renderOrder: number;
 };
 
 export type MaterialNode = ValueNode | NormalMapNode | MetalRoughNode | ClearcoatNode | TransmissionNode | EmitNode;
@@ -271,13 +313,13 @@ export interface MaterialOptions extends PhysicalOptions {
     referencePosition?: readonly [number, number, number];
     nearDistance?: number;
     farDistance?: number;
-    specular?: Color;
+    specular?: ColorInput;
     shininess?: number;
-    color?: Color;
+    color?: ColorInput;
     opacity?: number;
     roughness?: number;
     metalness?: number;
-    emissive?: Color;
+    emissive?: ColorInput;
     map?: Texture | null;
     metalRoughnessMap?: Texture | null;
     normalMap?: Texture | null;
@@ -378,6 +420,18 @@ export interface NormalMapNode {
     texCoord?: 0 | 1;
 }
 
+export class NormalMaterial extends Material {
+    constructor(options?: Omit<MaterialOptions, ModelKeys | MetalKeys | LightKeys>);
+}
+
+export class PbrMaterial extends Material {
+    constructor(options?: Omit<MaterialOptions, Exclude<ModelKeys, keyof PhysicalOptions>>);
+}
+
+export class PhongMaterial extends Material {
+    constructor(options?: Omit<MaterialOptions, Exclude<ModelKeys, 'specular' | 'shininess'> | MetalKeys>);
+}
+
 export interface PhysicalOptions {
     clearcoat?: number;
     clearcoatRoughness?: number;
@@ -385,12 +439,12 @@ export interface PhysicalOptions {
     clearcoatRoughnessMap?: Texture | null;
     clearcoatNormalMap?: Texture | null;
     clearcoatNormalScale?: number;
-    sheenColor?: Color;
+    sheenColor?: ColorInput;
     sheenRoughness?: number;
     sheenColorMap?: Texture | null;
     sheenRoughnessMap?: Texture | null;
     specularIntensity?: number;
-    specularColor?: Color;
+    specularColor?: ColorInput;
     specularIntensityMap?: Texture | null;
     specularColorMap?: Texture | null;
     anisotropy?: number;
@@ -407,7 +461,7 @@ export interface PhysicalOptions {
     transmissionMap?: Texture | null;
     thicknessMap?: Texture | null;
     thickness?: number;
-    attenuationColor?: Color;
+    attenuationColor?: ColorInput;
     attenuationDistance?: number;
 }
 
@@ -455,6 +509,22 @@ export class Texture {
     get width(): number;
     get height(): number;
     get isVideo(): boolean;
+    get magFilter(): Filter;
+    set magFilter(v: Filter);
+    get minFilter(): Filter;
+    set minFilter(v: Filter);
+    get wrapS(): Wrap;
+    set wrapS(v: Wrap);
+    get wrapT(): Wrap;
+    set wrapT(v: Wrap);
+    get anisotropy(): number;
+    set anisotropy(v: number);
+    get flipY(): boolean;
+    set flipY(v: boolean);
+    get colorSpace(): 'srgb' | 'linear' | undefined;
+    set colorSpace(v: 'srgb' | 'linear' | undefined);
+    get mipmaps(): boolean;
+    set mipmaps(v: boolean);
     update(region?: TextureRegion): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -520,6 +590,10 @@ export interface TransmissionOptions extends TransmissionPassOptions {
     volume?: VolumeOptions;
 }
 
+export class UnlitMaterial extends Material {
+    constructor(options?: Omit<MaterialOptions, ModelKeys | MetalKeys | 'normalMap' | 'normalScale' | 'aoMap' | 'aoMapIntensity'>);
+}
+
 export type ValueNode = ColorNode | ScalarNode | TextureNode | AddNode | MulNode | MixNode;
 
 export interface VolumeOptions {
@@ -579,7 +653,17 @@ export function transmission(options?: TransmissionOptions): MaterialExtension;
 
 // Not exported from this entry, but used by the exports above:
 
-type Color = string | readonly number[];
+type DistanceKeys = 'depthPacking' | 'referencePosition' | 'nearDistance' | 'farDistance';
+
+type LightKeys = 'emissive' | 'emissiveMap' | 'aoMap' | 'aoMapIntensity';
+
+type LiveColor = number[] & {
+    set(value: ColorInput): number[];
+};
+
+type MetalKeys = 'roughness' | 'metalness' | 'metalRoughnessMap';
+
+type ModelKeys = 'shading' | 'matcap' | 'specular' | 'shininess' | DistanceKeys | keyof PhysicalOptions;
 
 type Pixels = {
     data: ArrayLike<number>;
