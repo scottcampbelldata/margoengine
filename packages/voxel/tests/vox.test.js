@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { BlockTypes, VoxelWorld } from '../dist/index.js';
 import { parseVox, pasteVoxModel, writeVox } from '../dist/vox.js';
 
@@ -787,6 +788,120 @@ test('pasteVoxModel: scene transforms, groups and hidden nodes match a brute-for
   }
 });
 
+// What pasting must do, voxel by voxel: one setBlock each, in file order (pasteVoxModel batches by chunk).
+function pasteBySetBlock(world, cells, mapping) {
+  let changed = 0;
+  for (const [x, y, z, index] of cells) {
+    const state = mapping[index];
+    if (state && world.setBlock(x, y, z, state) !== state) changed++;
+  }
+  return changed;
+}
+// A world with the same random blocks for both sides of a comparison, every event recorded per cell.
+function comparedWorld(seed) {
+  const next = random(seed),
+    int = (n) => Math.floor(next() * n),
+    blocks = new BlockTypes();
+  for (let i = 1; i <= 6; i++) blocks.define(`c${i}`);
+  const world = new VoxelWorld({ blocks, minY: -300, maxY: 300 }),
+    edits = [];
+  for (let k = 3000; k--; ) edits.push(int(180) - 90, int(180) - 90, int(180) - 90, int(7));
+  world.setBlocks(edits);
+  world.addChunk(9, 9, 9);
+  world.dirty.clear();
+  const changes = new Map(),
+    added = [];
+  let stale = 0;
+  world.onChange((x, y, z, state, previous) => {
+    if (world.getBlock(x, y, z) !== state) stale++; // each call sees its own cell written, as setBlock's do
+    const key = `${x},${y},${z}`;
+    changes.set(key, [...(changes.get(key) ?? []), previous, state]);
+  });
+  world.onChunk((cx, cy, cz, chunk) => added.push(`${cx},${cy},${cz} ${chunk ? 'added' : 'removed'}`));
+  added.length = 0;
+  const result = () => {
+    const cells = [];
+    for (const key of [...new Set([...world.dirty, ...added.map((a) => a.split(' ')[0])])].sort()) {
+      const [cx, cy, cz] = key.split(',').map(Number),
+        chunk = world.getChunk(cx, cy, cz);
+      for (let i = 0; chunk && i < 32768; i++) cells.push(chunk.get(i & 31, i >> 10, (i >> 5) & 31));
+    }
+    return {
+      dirty: [...world.dirty].sort(),
+      added: added.sort(),
+      changes: [...changes].sort(),
+      cells,
+      stale,
+    };
+  };
+  return { world, result };
+}
+
+test('pasteVoxModel: batching by chunk changes what one setBlock per voxel would (cells, dirty, onChange per cell)', () => {
+  const next = random(17),
+    int = (n) => Math.floor(next() * n),
+    mapping = Array.from({ length: 256 }, (_, i) => (i ? i % 7 : 0)); // index 7 maps to 0: skipped
+  let changed = 0;
+  for (let trial = 0; trial < 24; trial++) {
+    const models = Array.from({ length: trial % 2 ? 1 : 3 }, () => {
+      const s = trial % 2 ? [1 + int(70), 1 + int(70), 1 + int(70)] : [1 + int(24), 1 + int(24), 1 + int(24)],
+        voxels = [];
+      // Random cells (some twice, so order matters), and a dense run that fills whole chunk rows.
+      for (let k = int(trial % 2 ? 20000 : 4000); k--; ) voxels.push(int(s[0]), int(s[1]), int(s[2]), 1 + int(7));
+      for (let k = 0; k < s[0] * s[1] && k < 3000; k++) voxels.push(k % s[0], Math.floor(k / s[0]), 0, 1 + (k % 3));
+      return { size: s, voxels: Uint8Array.from(voxels) };
+    });
+    const frame = () => ({ translation: [int(41) - 20, int(41) - 20, int(41) - 20] }),
+      scene = {
+        version: 200,
+        models,
+        palette: new Uint8Array(1024),
+        materials: [],
+        layers: [{ id: 0 }],
+        chunks: undefined,
+        nodes: [
+          { id: 0, type: 'transform', child: 1, layer: -1, frames: [{}] },
+          { id: 1, type: 'group', children: [2, 4, 6] },
+          { id: 2, type: 'transform', child: 3, layer: 0, frames: [frame()] },
+          { id: 3, type: 'shape', models: [{ model: 0 }] },
+          {
+            id: 4,
+            type: 'transform',
+            child: 5,
+            layer: 0,
+            frames: [{ ...frame(), rotation: [0, 1, 0, -1, 0, 0, 0, 0, 1] }],
+          },
+          { id: 5, type: 'shape', models: [{ model: 1 }] },
+          { id: 6, type: 'transform', child: 7, layer: 0, frames: [frame()] },
+          { id: 7, type: 'shape', models: [{ model: 2 }] },
+        ],
+      },
+      at = [int(100) - 50, int(100) - 50, int(100) - 50];
+    let cells;
+    if (trial % 2) {
+      const [model] = models,
+        v = model.voxels;
+      cells = [];
+      for (let i = 0; i < v.length; i += 4)
+        cells.push([at[0] + v[i], at[1] + v[i + 2], at[2] + model.size[1] - 1 - v[i + 1], v[i + 3]]);
+    } else {
+      const { min, voxels } = oracle(scene);
+      cells = voxels.map(([x, y, z, index]) => [x - min[0] + at[0], y - min[1] + at[1], z - min[2] + at[2], index]);
+    }
+    const batched = comparedWorld(trial),
+      single = comparedWorld(trial),
+      count = pasteVoxModel(batched.world, trial % 2 ? models[0] : scene, at, mapping);
+    assert.equal(count, pasteBySetBlock(single.world, cells, mapping), `trial ${trial}: changed cells`);
+    const a = batched.result(),
+      b = single.result();
+    assert.equal(a.stale, 0, `trial ${trial}: an onChange call saw its cell unwritten`);
+    for (const key of ['dirty', 'added', 'changes', 'cells'])
+      assert.deepEqual(a[key], b[key], `trial ${trial}: ${key}`);
+    changed += count;
+  }
+  assert.ok(changed > 100000, `${changed} cells changed`);
+});
+
 test('benchmark: parse, write and paste a 1M-voxel model (printed)', (t) => {
   const next = random(2),
     voxels = new Uint8Array(4 << 20);
@@ -806,13 +921,64 @@ test('benchmark: parse, write and paste a 1M-voxel model (printed)', (t) => {
   start = performance.now();
   const back = parseVox(bytes);
   const parse = performance.now() - start;
-  const blocks = new BlockTypes();
-  blocks.define('a');
-  const world = new VoxelWorld({ blocks });
-  start = performance.now();
-  pasteVoxModel(world, back.models[0], [0, 0, 0], new Uint32Array(256).fill(1));
-  const paste = performance.now() - start;
   t.diagnostic(
-    `1,048,576 voxels (${(bytes.length / 2 ** 20).toFixed(1)} MiB): write ${write.toFixed(1)} ms, parse ${parse.toFixed(1)} ms, paste ${paste.toFixed(0)} ms`,
+    `1,048,576 voxels (${(bytes.length / 2 ** 20).toFixed(1)} MiB): write ${write.toFixed(1)} ms, parse ${parse.toFixed(1)} ms`,
   );
+  // Pasting, best of 3, against one setBlock per voxel: random cells, and MagicaVoxel's knight tiled 2,635 times.
+  const mapping = Uint32Array.from({ length: 256 }, (_, i) => (i ? 1 + (i % 8) : 0)),
+    world = () => {
+      const blocks = new BlockTypes();
+      for (let i = 1; i <= 8; i++) blocks.define(`b${i}`);
+      return new VoxelWorld({ blocks });
+    },
+    best = (run) => {
+      let ms = Infinity,
+        w,
+        changed;
+      for (let r = 0; r < 3; r++) {
+        w = world();
+        const begin = performance.now();
+        changed = run(w);
+        ms = Math.min(ms, performance.now() - begin);
+      }
+      return { ms, w, changed };
+    },
+    tile = (k) => [21 * (k % 52), 21 * Math.floor(k / 52), 0],
+    tiles = 2635,
+    knight = parseVox(new Uint8Array(readFileSync(new URL('./fixtures/chr_knight.vox', import.meta.url)))),
+    [model] = knight.models,
+    tiled = {
+      ...knight,
+      nodes: [
+        { id: 0, type: 'transform', child: 1, layer: -1, frames: [{}] },
+        { id: 1, type: 'group', children: Array.from({ length: tiles }, (_, k) => 2 + 2 * k) },
+        ...Array.from({ length: tiles }, (_, k) => [
+          { id: 2 + 2 * k, type: 'transform', child: 3 + 2 * k, layer: 0, frames: [{ translation: tile(k) }] },
+          { id: 3 + 2 * k, type: 'shape', models: [{ model: 0 }] },
+        ]).flat(),
+      ],
+      layers: [{ id: 0 }],
+    };
+  // The knight (20 x 21 x 20) centred on translation t: MagicaVoxel cell c = t + v - (10, 10, 10) becomes world
+  // (c0, c2, -1 - c1); the pasted box's minimum corner, (-10, -10, -1061), goes to the origin.
+  const knightCells = [],
+    randomCells = [];
+  for (let k = 0; k < tiles; k++) {
+    const [tx, ty] = tile(k),
+      v = model.voxels;
+    for (let i = 0; i < v.length; i += 4) knightCells.push([tx + v[i], v[i + 2], 1070 - ty - v[i + 1], v[i + 3]]);
+  }
+  for (let i = 0; i < voxels.length; i += 4)
+    randomCells.push([voxels[i], voxels[i + 2], 255 - voxels[i + 1], voxels[i + 3]]);
+  for (const [name, target, cells] of [
+    ['random cells in a 256^3 box', back.models[0], randomCells],
+    [`chr_knight.vox x ${tiles} (${(tiles * model.voxels.length) / 4} voxels)`, tiled, knightCells],
+  ]) {
+    const batched = best((w) => pasteVoxModel(w, target, [0, 0, 0], mapping)),
+      single = best((w) => pasteBySetBlock(w, cells, mapping));
+    assert.equal(batched.changed, single.changed, name);
+    for (let i = 0; i < cells.length; i += 997)
+      assert.equal(batched.w.getBlock(...cells[i].slice(0, 3)), single.w.getBlock(...cells[i].slice(0, 3)), name);
+    t.diagnostic(`paste ${name}: ${batched.ms.toFixed(0)} ms (one setBlock per voxel: ${single.ms.toFixed(0)} ms)`);
+  }
 });

@@ -39,6 +39,7 @@ function reencode(bits: number, words: Uint32Array | null, to: number, remap: Ui
   if (!to) return null;
   const out = new Uint32Array(1024 * to),
     mask = (1 << bits) - 1;
+  if ((!bits || !words) && !remap?.[0]) return out; // every cell was and stays slot 0
   for (let cell = 0; cell < CELLS; cell++) {
     let s = bits && words ? (words[(cell * bits) >>> 5] >>> ((cell * bits) & 31)) & mask : 0;
     if (remap) s = remap[s];
@@ -46,6 +47,15 @@ function reencode(bits: number, words: Uint32Array | null, to: number, remap: Ui
   }
   return out;
 }
+
+/**
+ * Package-internal (the package entry does not export it): widens the cell indices once so that `set` can add those
+ * of the first `count` `states` that the palette lacks without widening again (one re-encode instead of one per
+ * width step).
+ */
+export let reserveCells: (chunk: VoxelChunk, states: ArrayLike<number>, count: number) => void;
+/** Package-internal: after sets prepared by {@link reserveCells}, narrows indices the remaining states do not need. */
+export let settleCells: (chunk: VoxelChunk) => void;
 
 /**
  * The 32,768 block states and light bytes of one chunk. States are stored as indices into a palette of the distinct
@@ -65,6 +75,17 @@ export class VoxelChunk {
   private words: Uint32Array | null = null;
   private lightByte = 0;
   private lightCells: Uint8Array | null = null;
+  static {
+    reserveCells = (chunk, states, count) => {
+      const missing = new Set<number>();
+      for (let i = 0; i < count; i++) if (chunk.find(states[i]) < 0) missing.add(states[i]);
+      const slots = chunk.size + missing.size - chunk.free.length;
+      if (slots > chunk.palette.length && chunk.palette.length < CELLS) chunk.grow(slots);
+    };
+    settleCells = (chunk) => {
+      if (chunk.bits && (chunk.live === 1 || widthFor(2 * chunk.live) < chunk.bits)) chunk.compact();
+    };
+  }
   /**
    * A uniform chunk: every cell is `state` (default 0, air) and every light byte 0.
    * @throws TypeError or RangeError when `state` is not an unsigned 32-bit integer.
@@ -239,21 +260,22 @@ export class VoxelChunk {
     for (let s = 0; s < size; s++) if (palette[s] === state && counts[s]) return s;
     return -1;
   }
+  // Widens the indices to hold `slots` palette slots; a wider width keeps every slot number.
+  private grow(slots: number): void {
+    const bits = widthFor(slots),
+      cap = capacity(bits),
+      palette = new Uint32Array(cap),
+      counts = new Uint16Array(cap);
+    palette.set(this.palette);
+    counts.set(this.counts);
+    this.words = reencode(this.bits, this.words, bits, null);
+    this.palette = palette;
+    this.counts = counts;
+    this.bits = bits;
+    if (cap > 16) this.lookup ??= new Map(Array.from(palette.subarray(0, this.size), (s, slot) => [s, slot]));
+  }
   private add(state: number): number {
-    if (!this.free.length && this.size === this.palette.length) {
-      // Full: the next index width keeps every slot number.
-      const bits = widthFor(this.size + 1),
-        cap = capacity(bits),
-        palette = new Uint32Array(cap),
-        counts = new Uint16Array(cap);
-      palette.set(this.palette);
-      counts.set(this.counts);
-      this.words = reencode(this.bits, this.words, bits, null);
-      this.palette = palette;
-      this.counts = counts;
-      this.bits = bits;
-      if (cap > 16) this.lookup ??= new Map(Array.from(palette.subarray(0, this.size), (s, slot) => [s, slot]));
-    }
+    if (!this.free.length && this.size === this.palette.length) this.grow(this.size + 1);
     const slot = this.free.pop() ?? this.size++;
     this.palette[slot] = state;
     this.lookup?.set(state, slot);

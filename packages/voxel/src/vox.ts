@@ -1,7 +1,7 @@
 // MagicaVoxel .vox read/write, from the published format notes (github.com/ephtracy/voxel-model:
 // MagicaVoxel-file-format-vox.txt and MagicaVoxel-file-format-vox-extension.txt), versions 150 and 200.
 import type { Vec3 } from '@margoengine/math';
-import { VoxelWorld } from './world.js';
+import { VoxelWorld, writeChunkCells } from './world.js';
 
 /** One model of a {@link VoxScene}: a SIZE chunk and the XYZI chunk after it. */
 export interface VoxModel {
@@ -876,7 +876,9 @@ function placements(scene: VoxScene): Placement[] {
  * `mapping[i]` is the block state for palette index i (0 skips those voxels). Without a mapping a scene's colours
  * become block types named `vox:rrggbb` with that colour, defined in `world.blocks` unless already there; a bare model
  * has no palette, so it needs a mapping. Empty cells of a model leave the world as it was. Nothing is written when a
- * check fails.
+ * check fails. Voxels are written chunk by chunk (each chunk's in file order), with the results of one
+ * {@link VoxelWorld.setBlock} per voxel: the same cells, dirty keys and count, and `onChange` once per changed cell
+ * right after it is written; only the order across chunks differs.
  * @throws TypeError for a world that is not a VoxelWorld, a bare model without a mapping, or fields of the wrong type.
  * @throws RangeError when `at` is not 3 integers, the pasted box leaves the world's y range or 32-bit x and z, a used
  * mapping entry is not a defined block state, or the model or scene is invalid as for {@link writeVox}.
@@ -946,20 +948,100 @@ export function pasteVoxModel(
       names.set(name, states[i]);
     }
   }
-  let changed = 0;
-  for (const { model: m, source, sign, base } of placed) {
-    const v = m.voxels,
+  return paste(world, placed, shift, states);
+}
+
+// Chunk bounds [cx0, cy0, cz0, cx1, cy1, cz1] of placements moved by `shift`.
+function chunkBounds(placed: readonly Placement[], shift: readonly number[]): number[] {
+  const out = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
+  for (const p of placed)
+    for (let a = 0; a < 3; a++) {
+      const span = p.sign[a] * (p.model.size[p.source[a]] - 1),
+        lo = p.base[a] + shift[a] + Math.min(0, span),
+        hi = p.base[a] + shift[a] + Math.max(0, span);
+      out[a] = Math.min(out[a], lo >> 5);
+      out[a + 3] = Math.max(out[a + 3], hi >> 5);
+    }
+  return out;
+}
+
+// Writes the placed voxels chunk by chunk, each chunk once: setBlock per voxel in file order looks the chunk up again
+// whenever the chunk changes and widens a palette one step at a time. A stable counting sort by chunk keeps the voxel
+// order within each chunk, so every cell ends as its last voxel says and changes as often as setBlock would make it.
+function paste(world: VoxelWorld, placed: readonly Placement[], shift: readonly number[], states: Uint32Array): number {
+  const [x0, y0, z0, x1, y1, z1] = chunkBounds(placed, shift),
+    nx = x1 - x0 + 1,
+    ny = y1 - y0 + 1,
+    nz = z1 - z0 + 1,
+    grid = nx * ny * nz;
+  // Models spread far apart would need a huge chunk grid: paste them one at a time (one model spans <= 9^3 chunks).
+  if (placed.length > 1 && grid > placed.reduce((sum, p) => sum + p.model.voxels.length, 0) + 4096) {
+    let changed = 0;
+    for (const p of placed) changed += paste(world, [p], shift, states);
+    return changed;
+  }
+  // Pass 1 notes each voxel's chunk, local cell and colour and counts the voxels per chunk; pass 2 places each at its
+  // chunk's next slot.
+  const total = placed.reduce((sum, p) => sum + p.model.voxels.length / 4, 0),
+    chunkOf = new Int32Array(total),
+    localOf = new Uint16Array(total),
+    colorOf = new Uint8Array(total),
+    starts = new Uint32Array(grid + 1);
+  let k = 0;
+  for (const { model, source, sign, base } of placed) {
+    const v = model.voxels,
+      s0 = source[0],
+      s1 = source[1],
+      s2 = source[2],
+      // 0 or -1 per axis: (v ^ m) - m is v or -v in integer arithmetic (sign * v would make -0, a float).
+      g0 = sign[0] < 0 ? -1 : 0,
+      g1 = sign[1] < 0 ? -1 : 0,
+      g2 = sign[2] < 0 ? -1 : 0,
       bx = base[0] + shift[0],
       by = base[1] + shift[1],
       bz = base[2] + shift[2];
-    for (let i = 0; i < v.length; i += 4) {
-      const state = states[v[i + 3]];
-      if (!state) continue;
-      const x = bx + sign[0] * v[i + source[0]],
-        y = by + sign[1] * v[i + source[1]],
-        z = bz + sign[2] * v[i + source[2]];
-      if (world.setBlock(x, y, z, state) !== state) changed++;
+    for (let i = 0; i < v.length; i += 4, k++) {
+      const color = v[i + 3];
+      if (!states[color]) {
+        chunkOf[k] = -1;
+        continue;
+      }
+      const x = bx + ((v[i + s0] ^ g0) - g0),
+        y = by + ((v[i + s1] ^ g1) - g1),
+        z = bz + ((v[i + s2] ^ g2) - g2),
+        chunk = (((x >> 5) - x0) * ny + (y >> 5) - y0) * nz + (z >> 5) - z0;
+      chunkOf[k] = chunk;
+      localOf[k] = (x & 31) | ((z & 31) << 5) | ((y & 31) << 10);
+      colorOf[k] = color;
+      starts[chunk + 1]++;
     }
+  }
+  for (let c = 0; c < grid; c++) starts[c + 1] += starts[c];
+  if (!starts[grid]) return 0;
+  const cells = new Uint16Array(starts[grid]),
+    colors = new Uint8Array(starts[grid]);
+  for (let i = 0; i < total; i++) {
+    const chunk = chunkOf[i];
+    if (chunk < 0) continue;
+    const slot = starts[chunk]++;
+    cells[slot] = localOf[i];
+    colors[slot] = colorOf[i];
+  }
+  // After pass 2, starts[c] is where chunk c's voxels end, which is where chunk c + 1's begin.
+  let changed = 0;
+  for (let c = 0, from = 0; c < grid; from = starts[c++]) {
+    if (starts[c] === from) continue;
+    changed += writeChunkCells(
+      world,
+      x0 + Math.floor(c / (ny * nz)),
+      y0 + (Math.floor(c / nz) % ny),
+      z0 + (c % nz),
+      cells,
+      colors,
+      states,
+      from,
+      starts[c],
+    );
   }
   return changed;
 }

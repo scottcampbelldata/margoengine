@@ -267,13 +267,19 @@ const bytes = writeVox(scene); // the same bytes as the file, except what you ch
   on write a typed field replaces its key only when its value changed, so untouched text keeps its exact form.
 - **Pasting.** MagicaVoxel's z (up) becomes world y and its y becomes world -z (right-handed, not mirrored); the pasted
   box has its minimum corner at `at`. A scene pastes frame 0 of every shape not hidden by its node or layer, each
-  model centred on its transform's translation. A bare model has no palette, so it needs a mapping.
+  model centred on its transform's translation. A bare model has no palette, so it needs a mapping. Voxels are
+  written chunk by chunk (a stable sort keeps each chunk's voxels in file order, and each chunk's palette widens once),
+  with the results of one `setBlock` per voxel: the same cells, return count and dirty keys, and `onChange` once per
+  changed cell right after it is written. Only the order across chunks differs.
 - **Errors.** `parseVox` throws `RangeError` for truncated, oversized or inconsistent files (voxels outside SIZE, a
   SIZE outside 1-256, counts past the chunk, broken node references or cycles) and `TypeError` for bytes that are
   not a .vox file; it allocates no more than the file holds. `writeVox` rejects what `parseVox` would.
 
 Measured with Node on the development laptop (2026-10-19; `node --test packages/voxel/tests/vox.test.js` prints
-yours): a 1M-voxel model writes in about 10 ms and parses in about 6 ms (4 MiB); pasting it takes about 0.7-1.1 s.
+yours): a 1M-voxel model writes in about 10 ms and parses in about 6 ms (4 MiB). Pasting, measured with Node 26 on
+the RTX A6000 desktop (32 logical cores) while other jobs kept it at 36-72% CPU (2026-10-19, best of 3): 1M random
+cells in a 256-cubed box 43-57 ms (one `setBlock` per voxel, as pasting did before: 261-282 ms), and MagicaVoxel's
+`chr_knight.vox` tiled 2,635 times (1,048,730 voxels) 45-52 ms (113-142 ms).
 
 ## Physics (`@margoengine/voxel/physics`)
 

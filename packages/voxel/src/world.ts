@@ -1,6 +1,6 @@
 import { MargoError } from '@margoengine/math/errors';
 import { BlockTypes } from './blocks.js';
-import { stateError, VoxelChunk } from './chunk.js';
+import { reserveCells, settleCells, stateError, VoxelChunk } from './chunk.js';
 
 /** Key of chunk (cx, cy, cz) in {@link VoxelWorld.dirty}: `'cx,cy,cz'`. Chunk coordinates are cell >> 5. */
 export const chunkKey = (cx: number, cy: number, cz: number): string => `${cx},${cy},${cz}`;
@@ -25,6 +25,36 @@ const chunkError = (cx: unknown, cy: unknown, cz: unknown): Error =>
     : new TypeError('Chunk coordinates must be numbers');
 // Chunk coordinates are cell >> 5 of a 32-bit cell coordinate: 27-bit signed integers.
 const isChunk = (c: number): boolean => (c << 5) >> 5 === c;
+
+/**
+ * Package-internal (the package entry does not export it): writes `table[colors[i]]` into local cell `cells[i]`
+ * (`x | z << 5 | y << 10`) of chunk (cx, cy, cz) for i in from..to - 1, in that order, as one setBlock each would: the
+ * chunk is added (air) first when it is not loaded, onChange runs after each changed cell, and the dirty keys are the
+ * same (neighbours are marked once the chunk is written). Returns how many writes changed a cell. Nothing is checked:
+ * every `table` entry used must be a defined, non-air block state and the chunk inside minY..maxY.
+ */
+export let writeChunkCells: (
+  world: VoxelWorld,
+  cx: number,
+  cy: number,
+  cz: number,
+  cells: Uint16Array,
+  colors: Uint8Array,
+  table: Uint32Array,
+  from: number,
+  to: number,
+) => number;
+// For each border code bx * 9 + by * 3 + bz (per axis 0: inside, 1: at 0, 2: at 31), the 27-bit mask of neighbour
+// offsets (dx + 1) * 9 + (dy + 1) * 3 + (dz + 1) whose one-cell shell holds such a cell (13, the chunk itself, set).
+const SHELL = Array.from({ length: 27 }, (_, code) => {
+  const range = (b: number) => (b === 1 ? [-1, 0] : b === 2 ? [0, 1] : [0]);
+  let mask = 0;
+  for (const dx of range((code / 9) | 0))
+    for (const dy of range(((code / 3) | 0) % 3))
+      for (const dz of range(code % 3)) mask |= 1 << ((dx + 1) * 9 + (dy + 1) * 3 + dz + 1);
+  return mask;
+});
+const border = (l: number): number => (l === 0 ? 1 : l === 31 ? 2 : 0);
 
 /**
  * A chunked voxel world: {@link VoxelChunk}s keyed by chunk coordinates, cells addressed by 32-bit integer
@@ -56,6 +86,47 @@ export class VoxelWorld {
   private cz = 0;
   private key = '';
   private chunk: VoxelChunk | undefined;
+  static {
+    writeChunkCells = (world, cx, cy, cz, cells, colors, table, from, to) => {
+      const key = chunkKey(cx, cy, cz),
+        chunk = world.chunks.get(key) ?? world.addChunk(cx, cy, cz),
+        seen = new Uint8Array(256),
+        used = new Uint32Array(256),
+        x = cx * 32,
+        y = cy * 32,
+        z = cz * 32;
+      // Room for every new state first: one re-encode at most, instead of one per index width step.
+      let count = 0;
+      for (let i = from; i < to; i++)
+        if (!seen[colors[i]]) {
+          seen[colors[i]] = 1;
+          used[count++] = table[colors[i]];
+        }
+      reserveCells(chunk, used, count);
+      let changed = 0,
+        codes = 0;
+      for (let i = from; i < to; i++) {
+        const c = cells[i],
+          s = table[colors[i]],
+          p = chunk.set(c & 31, c >> 10, (c >> 5) & 31, s);
+        if (p === s) continue;
+        if (!changed++) world.dirty.add(key);
+        codes |= 1 << (border(c & 31) * 9 + border(c >> 10) * 3 + border((c >> 5) & 31));
+        for (const listener of world.listeners) listener(x + (c & 31), y + (c >> 10), z + ((c >> 5) & 31), s, p);
+      }
+      settleCells(chunk);
+      if (!changed) return 0;
+      world.dirty.add(key); // again, in case a listener took it
+      let offsets = 0;
+      for (let code = 0; code < 27; code++) if (codes & (1 << code)) offsets |= SHELL[code];
+      for (let o = 0; o < 27; o++) {
+        if (o === 13 || !(offsets & (1 << o))) continue;
+        const near = chunkKey(cx + ((o / 9) | 0) - 1, cy + (((o / 3) | 0) % 3) - 1, cz + (o % 3) - 1);
+        if (world.chunks.has(near)) world.dirty.add(near);
+      }
+      return changed;
+    };
+  }
   /**
    * @throws TypeError when `options.blocks` is not a {@link BlockTypes} or minY/maxY is not a number.
    * @throws RangeError unless minY and maxY are integers with -32768 <= minY <= maxY <= 32767.
