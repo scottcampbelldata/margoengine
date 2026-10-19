@@ -38,6 +38,7 @@ import {
   FLAG_JITTER,
   FLAG_MOTION,
   FLAG_SPLIT,
+  FLAG_AREA,
   FLAG_SUN,
   INSTANCE_WORDS,
   MODEL_WORDS,
@@ -179,6 +180,7 @@ const MOTION=${FLAG_MOTION}u;
 const JITTER=${FLAG_JITTER}u;
 const CLAMP=${FLAG_CLAMP}u;
 const SPLIT=${FLAG_SPLIT}u;
+const AREA_NEE=${FLAG_AREA}u;
 const MODEL=${MODEL_WORDS}u;
 const INSTANCE=${INSTANCE_WORDS}u;
 @group(0) @binding(0) var<uniform> f:Frame;
@@ -358,22 +360,32 @@ fn traceInstance(i:u32,o:vec3f,d:vec3f,medium:u32,mInst:u32,h:ptr<function,Hit>)
   r.inst=i;*h=r;
  }
 }
+fn opaqueArea(k:u32)->bool {return ll(f.lights.z+k*16u+15u)!=0.0;}
+// Distance along o + t d (t > 0) to area light k's rectangle from either face, -1 when the ray misses it.
+fn rectHit(k:u32,o:vec3f,d:vec3f)->f32 {
+ let b=f.lights.z+k*16u;
+ let c=vec3f(ll(b),ll(b+1u),ll(b+2u));let eu=vec3f(ll(b+4u),ll(b+5u),ll(b+6u));let ev=vec3f(ll(b+8u),ll(b+9u),ll(b+10u));
+ let n=cross(eu,ev);let dn=dot(d,n);
+ if(abs(dn)<1e-20){return -1.0;}
+ let t=dot(c-o,n)/dn;
+ if(t<=0.0){return -1.0;}
+ let q=o+d*t-c;
+ let uu=dot(eu,eu);let uv=dot(eu,ev);let vv=dot(ev,ev);let qu=dot(q,eu);let qv=dot(q,ev);let den=uu*vv-uv*uv;
+ let s=(qu*vv-qv*uv)/den;let r=(qv*uu-qu*uv)/den;
+ if(s<0.0||s>1.0||r<0.0||r>1.0){return -1.0;}
+ return t;
+}
 // Closest boundary along a world ray: ground plane, area lights, then voxels through the hierarchy. In a volume
 // (medium != 0) the volume's own instance is walked for the cell where the volume ends.
 fn closest(o:vec3f,d:vec3f,medium:u32,mInst:u32)->Hit {
  var h:Hit;h.t=INF;h.inst=NONE;
  if((f.config.z&HAS_GROUND)!=0u&&abs(d.y)>1e-9){let t=(f.ground.w-o.y)/d.y;if(t>0.0){h.t=t;h.inst=GROUND;}}
  for(var k=0u;k<f.config.w;k++){
+  // The back of a see-through one-sided light is not there; solid lights are hit from both faces.
   let b=f.lights.z+k*16u;
-  let c=vec3f(ll(b),ll(b+1u),ll(b+2u));let eu=vec3f(ll(b+4u),ll(b+5u),ll(b+6u));let ev=vec3f(ll(b+8u),ll(b+9u),ll(b+10u));
-  let n=cross(eu,ev);let dn=dot(d,n);
-  if(abs(dn)<1e-20||(dn>0.0&&ll(b+7u)==0.0)){continue;}
-  let t=dot(c-o,n)/dn;
+  if(ll(b+7u)==0.0&&!opaqueArea(k)&&dot(d,cross(vec3f(ll(b+4u),ll(b+5u),ll(b+6u)),vec3f(ll(b+8u),ll(b+9u),ll(b+10u))))>0.0){continue;}
+  let t=rectHit(k,o,d);
   if(t<=0.0||t>=h.t){continue;}
-  let q=o+d*t-c;
-  let uu=dot(eu,eu);let uv=dot(eu,ev);let vv=dot(ev,ev);let qu=dot(q,eu);let qv=dot(q,ev);let den=uu*vv-uv*uv;
-  let s=(qu*vv-qv*uv)/den;let r=(qv*uu-qu*uv)/den;
-  if(s<0.0||s>1.0||r<0.0||r>1.0){continue;}
   h.t=t;h.inst=AREA;h.value=k;
  }
  if(f.scene.w==0u){return h;}
@@ -399,6 +411,8 @@ fn closest(o:vec3f,d:vec3f,medium:u32,mInst:u32)->Hit {
 // Transmittance toward a light: 0 when the ground or a non-medium voxel blocks it, else exp(-optical depth).
 fn shadow(o:vec3f,d:vec3f,tMax:f32)->f32 {
  if((f.config.z&HAS_GROUND)!=0u&&abs(d.y)>1e-9){let t=(f.ground.w-o.y)/d.y;if(t>0.0&&t<tMax){return 0.0;}}
+ // Solid area lights (a light sampled on its own rectangle ends just before it).
+ for(var k=0u;k<f.config.w;k++){if(opaqueArea(k)){let t=rectHit(k,o,d);if(t>0.0&&t<tMax*(1.0-1e-4)){return 0.0;}}}
  if(f.scene.w==0u){return 1.0;}
  let inv=safeInv(d);
  var tau=0.0;
@@ -736,7 +750,7 @@ fn throughGlass(start:vec3f,dir:vec3f,medium0:u32,mInst0:u32)->Through {
   if(medium!=0u){let md=mediumOf(medium);r.t*=exp(-(md.absorb+md.sigma)*min(h.t,1e30));}
   if(h.inst==NONE){r.d=d;return r;}
   let p=o+d*h.t;
-  if(h.inst==AREA){o=p+d*(1e-4*max(1.0,h.t));continue;}
+  if(h.inst==AREA){if(opaqueArea(h.value)){break;}o=p+d*(1e-4*max(1.0,h.t));continue;}
   if(h.inst==GROUND){break;}
   let n=h.sgn*normalize(rowOf(localX(h.inst),h.axis));
   let off=h.sgn*EPS*colOf(worldX(h.inst),h.axis);
@@ -891,7 +905,7 @@ fn direct(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,medium:u32,mInst:u32)->vec3f {
  }
  let air=medium==0u||(material(medium).flags&MEDIA)!=0u;
  if(air&&f.lights.x>0u){L+=lightTerm(kind,m,n,wo,o,sampleEmitter());}
- if(air&&f.config.w>0u){L+=lightTerm(kind,m,n,wo,o,sampleArea());}
+ if(air&&(f.config.z&AREA_NEE)!=0u){L+=lightTerm(kind,m,n,wo,o,sampleArea());}
  if((f.config.z&ENV)!=0u){
   let w=f.env.x;let h=f.env.y;
   let u1=rand();
@@ -925,8 +939,10 @@ fn emitWeight(h:Hit,n:vec3f,d:vec3f,radiance:vec3f,lastPdf:f32)->f32 {
 fn areaHit(k:u32,d:vec3f,t:f32,lastPdf:f32)->vec3f {
  let b=f.lights.z+k*16u;
  let radiance=vec3f(ll(b+12u),ll(b+13u),ll(b+14u));
- if(lastPdf<=0.0){return radiance;}
  let n=normalize(cross(vec3f(ll(b+4u),ll(b+5u),ll(b+6u)),vec3f(ll(b+8u),ll(b+9u),ll(b+10u))));
+ // The back of a one-sided solid light is black.
+ if(ll(b+7u)==0.0&&dot(d,n)>0.0){return vec3f(0.0);}
+ if(lastPdf<=0.0){return radiance;}
  let pk=ll(b+3u)-select(0.0,ll(b-13u),k>0u);
  let lp=pk/ll(b+11u)*t*t/max(abs(dot(n,d)),1e-6);
  return radiance*power2(lastPdf,lp);

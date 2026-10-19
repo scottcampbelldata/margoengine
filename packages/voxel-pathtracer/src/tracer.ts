@@ -20,6 +20,7 @@ import {
   FLAG_GROUND,
   FLAG_JITTER,
   FLAG_MOTION,
+  FLAG_AREA,
   FLAG_SPLIT,
   FLAG_SUN,
   FRAME_BYTES,
@@ -1010,6 +1011,7 @@ export class VoxelPathTracer implements EnginePlugin {
     if (env) flags |= FLAG_ENV;
     if (s.moving && o.shutter > 0) flags |= FLAG_MOTION;
     if (o.clamp < Infinity) flags |= FLAG_CLAMP;
+    if (s.lightPower > 0) flags |= FLAG_AREA;
     u.set([o.maxBounces, seed >>> 0, flags, s.lightCount], 40);
     const sl = layout.scene,
       ll = layout.lights;

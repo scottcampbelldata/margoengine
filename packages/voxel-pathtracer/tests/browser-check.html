@@ -280,6 +280,53 @@ window.check={
   look([20,14,24],[4,3,4]);
   return {...out,errors:errors.splice(0)};
  },
+ // Area lights as solid panels. Shadow: a 4 x 4 panel (facing down) 8 above a floor under a point sun at 45 degrees
+ // casts a 16-unit shadow there (none with opaque false). Seen: the front shows its radiance, a one-sided panel's back
+ // is black (opaque) or not there (the sky through it). Occlusion of another light: a dark panel between a floor and
+ // a lit ceiling leaves the floor rho L (F_ceiling - F_panel), F the view factors of parallel rectangles centred above.
+ async arealight(){
+  const out={},floor=model('f',[64,1,64],()=>1),mat=[{id:1,color:[0.5,0.5,0.5],type:'diffuse'}];
+  // Square panels centred over the origin facing down (cross(edgeU, edgeV) = -y).
+  const panel=(id,y,size,intensity,extra={})=>({id,position:[-size/2,y,-size/2],edgeU:[size,0,0],edgeV:[0,0,size],intensity,color:[1,1,1],...extra});
+  const base=(lights,env)=>({revision:1,models:[floor],instances:[{id:'f',modelId:'f',matrix:translate(-32,-1,-32)}],materials:mat,lights,environment:env});
+  // Shadow area: the floor 8 units along -x from the panel (away from the sun), seen straight down (0.125 units per
+  // pixel).
+  const sun={skyIntensity:0,sunDirection:[1,1,0],sunIntensity:Math.PI,sunAngularSize:0};
+  look([-8,40,0.01],[-8,0,0],{project:ortho(16)});
+  for(const [name,extra] of [['shadow area',{}],['shadow area, opaque false',{opaque:false}]]){
+   out[name]=await withTracer(base([panel('p',8,4,1,extra)],sun),{maxBounces:2},async(t)=>{
+    const W=128,H=128,img=await t.renderImage({width:W,height:H,samples:64,aovs:true});
+    // Shadowed: below half the sunlit floor's radiance (0.5 x cos 45 degrees).
+    let dark=0,n=0;for(let i=0;i<W*H;i++){if(img.instance[i]!==0)continue;n++;if(lum(img.color,i)<0.5*0.5*Math.SQRT1_2)dark++;}
+    return {area:dark*(16/W)*(16/H),floorPixels:n};
+   });
+  }
+  // Seen: front from below, back from above (sky 0.25 behind it).
+  const sky={skyColor:[1,1,1],skyIntensity:0.25};
+  const seen=async(name,extra,from)=>{
+   look(from,[0,8,0],{project:ortho(2),up:[0,0,1]});
+   out[name]=await withTracer({revision:1,models:[],instances:[],materials:[],lights:[panel('p',8,4,3,extra)],environment:sky},{maxBounces:2},async(t)=>{
+    const img=await t.renderImage({width:16,height:16,samples:16});let s=0;for(let i=0;i<256;i++)s+=lum(img.color,i);return {radiance:s/256};
+   });
+  };
+  await seen('front',{},[0.01,0,0]);
+  await seen('back',{},[0.01,16,0]);
+  await seen('back, opaque false',{opaque:false},[0.01,16,0]);
+  // Occlusion: a lit ceiling (radiance 2, 40 x 40, height 6) and a dark 4 x 4 panel at height 2 over the floor point
+  // at the origin, seen at a grazing angle under the panel (orthographic, 0.05 units across).
+  const corner=(X,Y)=>(1/(2*Math.PI))*(X/Math.sqrt(1+X*X)*Math.atan(Y/Math.sqrt(1+X*X))+Y/Math.sqrt(1+Y*Y)*Math.atan(X/Math.sqrt(1+Y*Y)));
+  const centred=(a,h)=>4*corner(a/2/h,a/2/h),Fc=centred(40,6),Fp=centred(4,2);
+  look([40,10,0.01],[0,0,0],{project:ortho(0.05)});
+  for(const [name,extra,expected] of [['occluded ceiling',{},0.5*2*(Fc-Fp)],['occluded ceiling, opaque false',{opaque:false},0.5*2*Fc]]){
+   const r=await withTracer(base([panel('c',6,40,2),panel('p',2,4,0,extra)],{skyIntensity:0}),{maxBounces:2},async(t)=>{
+    const img=await t.renderImage({width:8,height:8,samples:4096,aovs:true});let s=0,n=0;
+    for(let i=0;i<64;i++){if(img.instance[i]!==0)continue;s+=lum(img.color,i);n++;}return {mean:s/n,pixels:n};
+   });
+   out[name]={...r,expected};
+  }
+  look([20,14,24],[4,3,4]);
+  return {...out,errors:errors.splice(0)};
+ },
  // Dispersion. Snell per wavelength: an emissive line seen straight down (orthographic) through a tilted glass slab
  // appears displaced by the slab's lateral shift t sin(theta - theta') / cos(theta'), theta' from Cauchy's n(lambda);
  // the displacement is measured from the line's luminance centroid against renders without the slab. White furnace:

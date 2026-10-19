@@ -17,7 +17,8 @@ export const FLAG_SUN = 1,
   FLAG_MOTION = 8,
   FLAG_JITTER = 16,
   FLAG_CLAMP = 32,
-  FLAG_SPLIT = 64;
+  FLAG_SPLIT = 64,
+  FLAG_AREA = 128;
 
 const f32 = new Float32Array(1),
   u32 = new Uint32Array(f32.buffer);

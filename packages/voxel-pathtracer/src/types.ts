@@ -150,8 +150,14 @@ export interface TraceAreaLight {
   color?: TraceVec3;
   /** Emitted radiance multiplier, 0 or more. Default 1. */
   intensity?: number;
-  /** Emit from both faces. Default false (the back face is invisible and dark). */
+  /** Emit from both faces. Default false (the back face is dark). */
   twoSided?: boolean;
+  /**
+   * Compatible addition: the light is a solid panel: it casts shadows (blocks shadow rays and paths from both faces)
+   * and a one-sided light shows a black back face. Default true. false restores the earlier behaviour: no shadows,
+   * and the back face of a one-sided light is invisible (rays pass through it).
+   */
+  opaque?: boolean;
   /** Hidden lights neither emit nor show. Default true. */
   visible?: boolean;
 }

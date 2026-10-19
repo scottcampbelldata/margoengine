@@ -726,20 +726,25 @@ function packLights(list: unknown): { lights: Float32Array; count: number; power
       throw new TypeError(`${where} ${name}.twoSided must be true or false`);
     if (light.visible !== undefined && typeof light.visible !== 'boolean')
       throw new TypeError(`${where} ${name}.visible must be true or false`);
+    if (light.opaque !== undefined && typeof light.opaque !== 'boolean')
+      throw new TypeError(`${where} ${name}.opaque must be true or false`);
+    const opaque = light.opaque !== false;
     const area = Math.hypot(u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]);
     if (!(area > 1e-12)) throw new RangeError(`${where} ${name} has no area (edges zero or parallel); pass two edges`);
     if (light.visible === false) continue;
     const radiance = [color[0] * intensity, color[1] * intensity, color[2] * intensity],
       power = luminance(radiance[0], radiance[1], radiance[2]) * area * (light.twoSided ? 2 : 1);
-    if (!(power > 0)) continue;
-    weights.push(power);
-    out.push(p[0], p[1], p[2], 0, u[0], u[1], u[2], light.twoSided ? 1 : 0, v[0], v[1], v[2], area, ...radiance, 0);
+    // Dark lights stay when they cast shadows (never picked by light sampling).
+    if (!(power > 0) && !opaque) continue;
+    weights.push(power > 0 ? power : 0);
+    out.push(p[0], p[1], p[2], 0, u[0], u[1], u[2], light.twoSided ? 1 : 0, v[0], v[1], v[2], area, ...radiance);
+    out.push(opaque ? 1 : 0);
   }
   const total = weights.reduce((a, b) => a + b, 0);
   let sum = 0;
   for (let k = 0; k < weights.length; k++) {
     sum += weights[k];
-    out[k * 16 + 3] = k === weights.length - 1 ? 1 : sum / total;
+    out[k * 16 + 3] = k === weights.length - 1 || !(total > 0) ? 1 : sum / total;
   }
   return { lights: Float32Array.from(out), count: weights.length, power: total };
 }

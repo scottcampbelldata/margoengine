@@ -105,7 +105,7 @@ except `id`, `color` and `type` are optional.
 | Ground | `groundColor` adds an infinite diffuse plane at `groundHeight` | Casts and receives like any surface. |
 | Environment map (addition) | `environment.map`: equirectangular linear RGB(A) floats, `intensity`, `rotation` about +Y | Replaces the constant sky; importance sampled by luminance x sin(theta). Its centre column faces -Z, three quarters +X. |
 | Emissive voxels | Any material with `emission > 0` | Faces sampled by emitted power, instances by power x area. |
-| Area lights (addition) | `scene.lights`: rectangles `position + s * edgeU + t * edgeV`, radiance `color * intensity`, `twoSided` | Facing `cross(edgeU, edgeV)`. They are seen and reflected, but do not block shadow rays. At most 256. |
+| Area lights (addition) | `scene.lights`: rectangles `position + s * edgeU + t * edgeV`, radiance `color * intensity`, `twoSided`, `opaque` | Facing `cross(edgeU, edgeV)`. Solid panels by default: seen, reflected and casting shadows (from the sun, the sky, emissive voxels and each other); a one-sided light's back is black. `opaque: false` keeps the earlier see-through light (no shadows, no back face). Dark (`intensity` 0) solid panels stay as occluders. At most 256. |
 
 Sun and environment light that reaches a surface through smooth glass or off a mirror is sampled directly too, not only
 found by chance: voxel faces are planes, so the shadow ray refracts (exact Fresnel, tint, absorption) and reflects
@@ -236,6 +236,10 @@ Numbers on other GPUs are not measured.
     (3.9267); tinted absorbing glass slab 0.3321 (0.3322 with exact Fresnel);
     sun irradiance, point and disk, 0.5000; two emissive planes 0.6671 (2/3); a large area light 1.0000; shadow through
     an absorbing medium 0.1839 (0.5 e^-1); a non-uniform environment map over a plane within 1% of the texel integral;
+  - area lights as panels: a 4 x 4 panel 8 above a floor under a point sun at 45 degrees shadows 16.000 units^2 of it
+    (exactly its area; 0 with `opaque: false`); its front shows radiance 3.0000 (3), a one-sided back 0 and, see-through,
+    the sky 0.2500; a dark panel between a floor and a lit 40 x 40 ceiling leaves the floor 0.3762 against
+    rho L (F_ceiling - F_panel) = 0.3774 from parallel-rectangle view factors (0.9314 against 0.9316 see-through);
   - energy compensation: white furnaces of a metal plane and a 16-voxel clear glass slab at roughness 0.2, 0.5, 0.8 and
     1.0, seen at 20, 60 and 80 degrees, all within 0.79% of 1 (worst: metal at roughness 0.2 and 80 degrees; glass
     worst 0.68%); a gold plane within 0.14% per channel of single scattering plus Kulla-Conty's Fresnel-weighted
@@ -323,8 +327,7 @@ Not done or not verified, stated plainly:
   noise for bias.
 - **Simplifications:** RGB everywhere except dispersive glass, which samples one wavelength per path (no hero-wavelength
   sharing, so dispersion converges with colour noise); refracted radiance is not scaled by the squared
-  index ratio; media are homogeneous per palette index with grey extinction; area lights do not block
-  shadow rays; the ground is a plain diffuse plane; motion blur interpolates matrices linearly (fast rotations shrink a
+  index ratio; media are homogeneous per palette index with grey extinction; the ground is a plain diffuse plane; motion blur interpolates matrices linearly (fast rotations shrink a
   little) and moves instances only (no camera motion blur); no panoramic/fisheye projections, lens distortion or
   chromatic aberration; no physical sky model (use an environment map); bloom comes from `@margoengine/post`.
 - **Measured only on one machine** (RTX A6000, Edge 155, Windows). Other GPUs, browsers and the editor's own scenes are

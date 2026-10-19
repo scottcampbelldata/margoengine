@@ -14,6 +14,7 @@ export interface TraceAreaLight {
     color?: TraceVec3;
     intensity?: number;
     twoSided?: boolean;
+    opaque?: boolean;
     visible?: boolean;
 }
 

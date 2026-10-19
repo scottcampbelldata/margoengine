@@ -510,7 +510,7 @@ test('the frame uniform carries the environment, lights and options the shader r
   const buffer = device.buffers.findLast((b) => b.size === FRAME && !b.destroyed),
     f = new Float32Array(buffer.data),
     u = new Uint32Array(buffer.data);
-  assert.equal(u[42], 1 | 2 | 16 | 32, 'sun, ground, jitter, clamp');
+  assert.equal(u[42], 1 | 2 | 16 | 32 | 128, 'sun, ground, jitter, clamp, area light sampling');
   assert.equal(u[43], 1, 'one area light');
   assert.deepEqual([...f.subarray(56, 59)], [1, 0.5, 2]);
   assert.deepEqual([...f.subarray(60, 63)], [0, 1, 0]);
@@ -525,5 +525,29 @@ test('the frame uniform carries the environment, lights and options the shader r
   assert.equal(f[75], 20);
   assert.ok(Math.abs(f[23] - 0.2) < 1e-7, 'lens radius is half the aperture');
   assert.equal(f[27], 5);
+  tracer.dispose();
+});
+
+test('area lights cast shadows unless opaque is false; dark solid lights stay as occluders only', async () => {
+  const light = (id, intensity, extra = {}) => ({
+      id,
+      position: [0, 5, 0],
+      edgeU: [1, 0, 0],
+      edgeV: [0, 0, 1],
+      intensity,
+      ...extra,
+    }),
+    scene = simpleScene({ lights: [light('lit', 4), light('dark', 0), light('ghost', 0, { opaque: false })] }),
+    { tracer, frame, device } = await ready({ scene });
+  frame();
+  const u = new Uint32Array(device.buffers.findLast((b) => b.size === FRAME && !b.destroyed).data);
+  assert.equal(u[43], 2, 'the dark see-through light is dropped, the dark solid one kept');
+  assert.ok(u[42] & 128, 'light sampling on: some light has power');
+  assert.throws(() => tracer.setScene({ ...scene, revision: 2, lights: [light('x', 1, { opaque: 1 })] }), TypeError);
+  tracer.setScene({ ...scene, revision: 3, lights: [light('dark', 0)] });
+  frame();
+  const v = new Uint32Array(device.buffers.findLast((b) => b.size === FRAME && !b.destroyed).data);
+  assert.equal(v[43], 1);
+  assert.equal(v[42] & 128, 0, 'nothing to sample when every light is dark');
   tracer.dispose();
 });

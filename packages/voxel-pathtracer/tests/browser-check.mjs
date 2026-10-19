@@ -11,6 +11,8 @@
 // - microfacet: the GGX plastic coat's albedo against numerical integration of the same model;
 // - glasslight: sunlight through glass slabs and off a mirror wall against closed forms (point and disk sun), and light
 //   sampling through a floating glass cube against path sampling of the same light;
+// - arealight: a panel's shadow area under a point sun, its front, back and see-through back radiance, and a dark
+//   panel occluding a lit ceiling against view factors;
 // - dispersion: a line's shift through a tilted slab per wavelength against Snell with Cauchy's index; colour order over
 //   the spectrum; a dispersive white furnace per channel;
 // - environment: the equirectangular map's orientation; determinism: equal seeds give identical images;
@@ -116,6 +118,27 @@ try {
         `  ${name}: ${s.mean.toFixed(4)} expected ${s.expected.toFixed(4)} (${((s.mean / s.expected - 1) * 100).toFixed(2)}%, sd ${s.sd.toFixed(4)}, ${s.pixels} px)`,
       );
       assert.ok(s.pixels > 300, `${name}: the floor fills the view`);
+      near(s.mean, s.expected, s.expected * 0.01, name);
+    }
+  }
+  if (wanted('arealight')) {
+    const r = await run('arealight');
+    console.log(
+      `  4 x 4 panel's shadow under a point sun: ${r['shadow area'].area.toFixed(3)} units^2 (expected 16); opaque false ${r['shadow area, opaque false'].area.toFixed(3)} (0)`,
+    );
+    near(r['shadow area'].area, 16, 0.32, 'panel shadow area');
+    assert.equal(r['shadow area, opaque false'].area, 0, 'a see-through panel casts no shadow');
+    console.log(
+      `  seen: front ${r.front.radiance.toFixed(4)} (3), back ${r.back.radiance.toFixed(4)} (0), back with opaque false ${r['back, opaque false'].radiance.toFixed(4)} (sky 0.25)`,
+    );
+    near(r.front.radiance, 3, 0.001, 'panel front radiance');
+    near(r.back.radiance, 0, 0.001, 'one-sided panel back');
+    near(r['back, opaque false'].radiance, 0.25, 0.001, 'see-through panel back');
+    for (const name of ['occluded ceiling', 'occluded ceiling, opaque false']) {
+      const s = r[name];
+      console.log(
+        `  ${name}: floor ${s.mean.toFixed(4)} expected ${s.expected.toFixed(4)} (${((s.mean / s.expected - 1) * 100).toFixed(2)}%, view factors)`,
+      );
       near(s.mean, s.expected, s.expected * 0.01, name);
     }
   }
