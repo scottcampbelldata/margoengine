@@ -46,6 +46,26 @@ scenarios.canvasRegion=()=>{
   const t=new Texture(c,{magFilter:'nearest',minFilter:'nearest',mipmaps:false}),m=createMesh(engine,planeGeometry(2,2),new Material({shading:'basic',map:t}));
   return {destroy(){m.destroy();t.dispose();},step(){g.fillStyle='#ff0000';g.fillRect(0,0,8,8);t.update({x:0,y:0,width:8,height:4});}};
 };
+// Lambert and Phong under a known light: from +Z (towards the camera), irradiance 2, ambient 0.1. Phong's highlight peaks at the centre.
+const {Fog,EnvironmentLighting}=await import('/packages/environment/dist/index.js');
+const lit=(material,extra)=>{const light=[...engine.lighting.direction],radiance=[...engine.lighting.radiance];engine.lighting.direction.set([0,0,1,2]);engine.lighting.radiance.set([1,1,1,0.1]);const m=createMesh(engine,planeGeometry(2,2),material),e=extra?.(m);return {destroy(){e?.destroy();m.destroy();engine.lighting.direction.set(light);engine.lighting.radiance.set(radiance);}};};
+const plugin=p=>({destroy(){p.dispose?.();engine.removePlugin(p.name);}});
+scenarios.lambert=()=>lit(new Material({shading:'lambert',map:solid(188,188,188)}));
+scenarios.phong=()=>lit(new Material({shading:'phong',map:solid(188,188,188),specular:[0.1,0.1,0.1],shininess:30}));
+scenarios.phongFog=()=>lit(new Material({shading:'phong',map:solid(188,188,188)}),m=>{const fog=Fog.attach(engine,{color:'#ff00ff',near:0,far:0.01});fog.add(m);return plugin(fog);});
+// A uniform environment: a black Lambert surface reflects none of it (no IBL specular), a black standard one does.
+const sky={width:8,height:4,data:new Float32Array(8*4*4).fill(2)};
+const ibl=shading=>async()=>{const lighting=await EnvironmentLighting.load(engine,sky),light=[...engine.lighting.direction];engine.lighting.direction[3]=0;const m=createMesh(engine,planeGeometry(2,2),new Material({shading,color:[0,0,0]}));lighting.add(m);return {destroy(){m.destroy();lighting.dispose();engine.lighting.direction.set(light);},step(){m.material.color.fill(1,0,3);}};};
+scenarios.iblLambert=ibl('lambert');
+scenarios.iblStandard=ibl('standard');
+scenarios.litEffects=()=>{
+  const ground=createMesh(engine,boxGeometry(4,0.2,4),new Material({shading:'lambert',map:solid(200,200,200),alphaTest:0.5}));ground.root.setPosition([0,-0.6,0]);
+  const model=createMesh(engine,sphereGeometry(0.5,32,16),new Material({shading:'phong',color:'#3366ff',emissive:[0.05,0,0],transparent:true,opacity:0.9}));
+  const shadows=Shadows.attach(engine,{resolution:1024}),lights=Clustered.attach(engine),ssao=SSAO.attach(engine),fog=Fog.attach(engine,{near:2,far:50});
+  for(const m of [ground,model]){shadows.add(m);lights.add(m);ssao.add(m);fog.add(m);}
+  lights.setLights([{position:[0,1.5,1],range:6,color:[1,0.5,0.2],intensity:10}]);
+  return {destroy(){for(const p of [ssao,shadows,lights,fog])plugin(p).destroy();ground.destroy();model.destroy();}};
+};
 const video=document.createElement('video'),source=document.createElement('canvas');source.width=16;source.height=16;const sc=source.getContext('2d');sc.fillStyle='#ff00ff';sc.fillRect(0,0,16,16);
 video.muted=true;video.playsInline=true;video.srcObject=source.captureStream(30);
 const videoTexture=new Texture(video);

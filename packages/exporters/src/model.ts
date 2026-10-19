@@ -97,6 +97,7 @@ interface PixelTexture {
 }
 type TextureOwner = Partial<Record<(typeof slots)[number], PixelTexture | null>> & {
   shading?: string;
+  shininess?: number;
   uvt?: readonly number[];
   thickness?: number;
   attenuationColor?: readonly number[];
@@ -265,7 +266,12 @@ class Writer extends Bin {
         t = (i: number) => this.textureInfo(model, m, i, owner),
         P = m.physical,
         ext: Json = {};
-      const [roughness, metallic, normalScale, occlusion] = m.factors,
+      // Lambert and Phong export as glTF dielectrics (metallic 0, no metal-roughness texture) whose GGX lobe matches
+      // the Blinn-Phong exponent n: Beckmann alpha = sqrt(2 / (n + 2)) (Walter et al. 2007), glTF roughness = sqrt(alpha).
+      // Lambert is n = 0, roughness 1. The Phong specular colour is not exported.
+      const exponent = owner?.shading === 'phong' ? (owner.shininess ?? 30) : owner?.shading === 'lambert' ? 0 : -1,
+        [normalScale, occlusion] = m.factors.slice(2),
+        [roughness, metallic] = exponent < 0 ? m.factors : [(2 / (exponent + 2)) ** 0.25, 0],
         mode = ['OPAQUE', 'MASK', 'BLEND'][m.settings[0]];
       // gltf-pro holds emissiveFactor * strength; factors above 1 move into KHR_materials_emissive_strength.
       const strength = Math.max(e.KHR_materials_emissive_strength?.emissiveStrength ?? 1, ...m.emission);
@@ -353,7 +359,7 @@ class Writer extends Bin {
             metallicFactor: metallic,
             roughnessFactor: roughness,
             baseColorTexture: t(0),
-            metallicRoughnessTexture: t(1),
+            metallicRoughnessTexture: exponent < 0 ? t(1) : undefined,
           }),
           normalTexture: scaled(t(2), 'scale', normalScale),
           occlusionTexture: scaled(t(3), 'strength', occlusion),

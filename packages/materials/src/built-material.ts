@@ -367,7 +367,8 @@ export async function loadTexture(
   }
 }
 
-export type Shading = 'standard' | 'basic' | 'normal' | 'matcap' | 'depth' | 'distance';
+/** `lambert` is diffuse only; `phong` adds a Blinn-Phong highlight (`specular`, `shininess`); `basic` is unlit. */
+export type Shading = 'standard' | 'basic' | 'normal' | 'matcap' | 'depth' | 'distance' | 'lambert' | 'phong';
 export type DepthPacking = 'basic' | 'rgba';
 export type Blending = 'normal' | 'additive' | 'multiply' | 'none';
 type Color = string | readonly number[];
@@ -431,6 +432,9 @@ export interface MaterialOptions extends PhysicalOptions {
   /** Distance normalization bounds, finite as float32: 0 <= nearDistance < farDistance. Defaults to 1 and 1000. */
   nearDistance?: number;
   farDistance?: number;
+  /** Phong only: highlight colour (default sRGB `#111111`) and Blinn-Phong exponent, finite and >= 0 (default 30). Live. */
+  specular?: Color;
+  shininess?: number;
   color?: Color;
   opacity?: number;
   roughness?: number;
@@ -591,7 +595,45 @@ const linear = (c: Color, label: string): number[] => {
   v.forEach((x) => unit(x, label));
   return v;
 };
-const outputs: Record<Exclude<Shading, 'standard' | 'depth' | 'distance'>, string> = {
+// Lambert and Blinn-Phong rewrite gltf-pro's direct and hemisphere terms in place, so every lighting hook point
+// (direct+ambient(s), var color=, fn ambient, the tone-map line) and the shadows, fog and SSAO hooks stay. Radiance is
+// scaled as on the standard path: the diffuse BRDF base/pi times n.l times the light's irradiance, the hemisphere times
+// base. Blinn-Phong (Blinn 1977) is the microfacet BRDF D*F*G/(4 n.l n.v) with Blinn's distribution normalised over
+// projected microfacet area, D = (n+2)/(2 pi) (n.h)^n, the implicit G = n.l n.v and F = the specular colour, which
+// leaves (n+2)/(8 pi) (n.h)^n * specular. margoFront and margoAmbientLayers are the layered hook interface
+// (shared/pbr-hooks.js): local lights shade the surface as a dielectric of the matching microfacet roughness (Walter et al.
+// 2007: Beckmann alpha = sqrt(2/(n+2)), roughness = sqrt(alpha); Lambert is roughness 1), and an ambient hook (IBL,
+// probes) keeps only its diffuse part, the term on the surface minus the term on a black surface.
+const litEdits = (phong: boolean): [RegExp | string, string][] => [
+  [
+    /fn hemisphere_ambient\(s:Surface\)->vec3f \{[^}]*\}/,
+    'fn hemisphere_ambient(s:Surface)->vec3f {return s.base.rgb*mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(s.n.y*0.5+0.5,0.0,1.0))*f.radiance.w*s.occlusion;}',
+  ],
+  [
+    /fn direct_light\(s:Surface,v:vec3f,l:vec3f\)->vec3f \{[^}]*\}/,
+    `fn direct_light(s:Surface,v:vec3f,l:vec3f)->vec3f {
+  let nl=clamp(dot(s.n,l),0.0,1.0);${phong ? '\n  let h=(v+l)/max(length(v+l),0.0001); let spec=mat_phong.rgb*(mat_phong.w+2)/25.13274123*pow(max(dot(s.n,h),0.0001),mat_phong.w);' : ''}
+  return (s.base.rgb/3.14159265${phong ? '+spec' : ''})*nl*f.radiance.rgb*f.light.w;
+}`,
+  ],
+  [
+    '@fragment fn fragment(',
+    `fn margoFront(s:Surface)->Surface {var o=s; o.metal=0; o.roughness=${phong ? 'max(pow(2/(mat_phong.w+2),0.25),0.045)' : '1.0'}; return o;}
+fn margoAmbientTerm(i:Out,s:Surface,v:vec3f)->vec3f {return vec3f(0);}
+fn margoAmbientLayers(i:Out,s:Surface,v:vec3f)->vec3f {var o=margoFront(s); let d=margoAmbientTerm(i,o,v); o.base=vec4f(vec3f(0),o.base.a); return d-margoAmbientTerm(i,o,v);}
+@fragment fn fragment(`,
+  ],
+  // Auxiliary entries (G-buffer, ambient) keep the beauty bind group layout.
+  ...(phong
+    ? [
+        ['fn surface(i:Out,front:bool)->Surface {', 'fn surface(i:Out,front:bool)->Surface {\n  _=&mat_phong;'] as [
+          string,
+          string,
+        ],
+      ]
+    : []),
+];
+const outputs: Record<Exclude<Shading, 'standard' | 'depth' | 'distance' | 'lambert' | 'phong'>, string> = {
   basic: 'return vec4f(mat_out(s.base.rgb+s.emissive),alpha);',
   normal: 'return vec4f(normalize((f.view*vec4f(s.n,0)).xyz)*0.5+0.5,alpha);',
   matcap:
@@ -687,15 +729,23 @@ export function materialShader(source: string, group: number, shading: Shading):
       count++;
       return `textureSample(mat_normalMap,mat_normalMapS,${uv}).xyz*2-1+0*textureSample(normalMap,normalSampler,${uv}).xyz`;
     });
-  if (shading !== 'standard')
+  const lit = shading === 'lambert' || shading === 'phong',
+    edits = lit ? litEdits(shading === 'phong') : [];
+  if (shading !== 'standard' && !lit)
     code = code.replace(/@fragment fn fragment\([^{]*\{\s*let s=surface\(i,front\);/, (head) => {
       count++;
       return `${head}\n  let alpha=select(1.0,s.base.a,f.settings.x>1.5);\n  if(f.coordsB.w<0.5){${outputs[shading]}}`;
     });
+  for (const [from, to] of edits)
+    code = code.replace(from, () => {
+      count++;
+      return to;
+    });
   if (shading === 'matcap')
     // Auxiliary entries call surface() but not the beauty fragment. Retain the same bind group layout there.
     code = code.replace('fn surface(i:Out,front:bool)->Surface {', '$&\n  _=mat_matcap;_=mat_matcapS;');
-  if (count !== (shading === 'standard' ? 5 : 6)) throw new Error('Materials require the standard gltf-pro PBR shader');
+  if (count !== (shading === 'standard' ? 5 : lit ? 5 + edits.length : 6))
+    throw new Error('Materials require the standard gltf-pro PBR shader');
   const declarations = names
     .slice(0, shading === 'matcap' ? 6 : 5)
     .map(
@@ -703,7 +753,12 @@ export function materialShader(source: string, group: number, shading: Shading):
         `@group(${group}) @binding(${32 + i * 2}) var mat_${name}:texture_2d<f32>;\n@group(${group}) @binding(${33 + i * 2}) var mat_${name}S:sampler;`,
     )
     .join('\n');
-  const output = declarations + '\n' + (shading === 'basic' || shading === 'matcap' ? encode + '\n' : '') + code;
+  const output =
+    declarations +
+    '\n' +
+    (shading === 'phong' ? `@group(${group}) @binding(197) var<uniform> mat_phong:vec4f;\n` : '') +
+    (shading === 'basic' || shading === 'matcap' ? encode + '\n' : '') +
+    code;
   if (!cache) patched.set(source, (cache = new Map()));
   cache.set(key, output);
   return output;
@@ -719,6 +774,9 @@ export class Material {
   private far = 1000;
   readonly color: number[];
   readonly emissive: number[];
+  /** Phong highlight colour, linear RGB (live array). */
+  readonly specular: number[];
+  private gloss = 30;
   readonly blending: Blending;
   readonly depthWrite?: boolean;
   readonly depthTest: boolean;
@@ -853,7 +911,7 @@ export class Material {
       if (o[key] !== undefined && typeof o[key] !== 'boolean')
         throw new TypeError('Material ' + key + ' must be a boolean; set true or false');
     if (
-      !['standard', 'basic', 'normal', 'matcap', 'depth', 'distance'].includes(shading) ||
+      !['standard', 'basic', 'normal', 'matcap', 'depth', 'distance', 'lambert', 'phong'].includes(shading) ||
       !['normal', 'additive', 'multiply', 'none'].includes(blending) ||
       (o.side !== undefined && !['front', 'back', 'double'].includes(o.side)) ||
       [o.transparent, o.doubleSided, o.depthWrite, o.depthTest].some(
@@ -916,6 +974,10 @@ export class Material {
     this.color = linear(o.color ?? [1, 1, 1], 'color');
     if (this.color.length === 3) this.color.push(unit(o.opacity ?? 1, 'opacity'));
     this.emissive = linear(o.emissive ?? [0, 0, 0], 'emissive').slice(0, 3);
+    if ((o.specular !== undefined || o.shininess !== undefined) && shading !== 'phong')
+      throw new TypeError("Material specular and shininess need phong shading; set shading: 'phong'");
+    this.specular = linear(o.specular ?? '#111111', 'specular').slice(0, 3);
+    this.shininess = o.shininess ?? 30;
     this.factors = [
       unit(o.roughness ?? 1, 'roughness'),
       unit(o.metalness ?? 0, 'metalness'),
@@ -1181,6 +1243,15 @@ export class Material {
   set aoMapIntensity(v: number) {
     this.factors[3] = unit(v, 'aoMapIntensity');
   }
+  /** Phong's Blinn-Phong exponent, finite and >= 0: higher is a smaller, sharper highlight. */
+  get shininess(): number {
+    return this.gloss;
+  }
+  set shininess(v: number) {
+    if (typeof v !== 'number' || !(v >= 0 && v < Infinity))
+      throw new RangeError('Material shininess must be a finite number >= 0; Crocotile and three.js default to 30');
+    this.gloss = v;
+  }
   get opacity(): number {
     return this.color[3];
   }
@@ -1283,6 +1354,16 @@ export class Material {
       values[6] = +(this.packing === 'rgba');
       device.queue.writeBuffer(buffer, 0, values);
       entries.push({ binding: 196, resource: { buffer } });
+    }
+    if (this.shading === 'phong') {
+      const owner = engine ?? device,
+        state = mapState(this, owner),
+        buffer = materialBuffer(this, device, owner, 16),
+        values = (state.values ??= new Float32Array(4));
+      values.set(this.specular, 0);
+      values[3] = this.gloss;
+      device.queue.writeBuffer(buffer, 0, values);
+      entries.push({ binding: 197, resource: { buffer } });
     }
     return entries;
   }

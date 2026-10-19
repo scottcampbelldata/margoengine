@@ -381,6 +381,27 @@ on both the main reverse-Z renderer and forward-Z offscreen renderers; construct
 Native stencil faces follow raster winding, including mirrored transforms.
 The reference stays live per draw, resets to zero for draws without one, and reuses the pipeline.
 
+## Lambert and Phong materials
+
+`shading: 'lambert'` is diffuse only: `base/pi * n.l` times each light's irradiance plus `base` times the hemisphere
+ambient, with no specular and no environment specular. `shading: 'phong'` adds a Blinn-Phong highlight (Blinn 1977, half
+vector): `specular * (shininess + 2) / (8 pi) * (n.h)^shininess`, the microfacet BRDF of Blinn's distribution normalised
+over projected microfacet area with an implicit geometry term. `specular` (default sRGB `#111111`) and `shininess`
+(default 30, finite and >= 0) stay live. Base maps, vertex colours, emissive, `alphaTest`, `transparent`, sides and
+UV transforms work as for `standard`; `basic` is the unlit choice. Roughness, metalness and the metal-roughness map
+are ignored.
+
+Both use the engine's directional light and ambient, and compose with shadows, fog and SSAO through gltf-pro's
+lighting hooks. An environment (`EnvironmentLighting`, probes) adds only its diffuse part. Clustered point and spot
+lights shade these surfaces with their own microfacet model, as a dielectric of the matching roughness
+(`(2 / (shininess + 2)) ** 0.25`, Walter et al. 2007; 1 for Lambert): diffuse matches, the highlight shape is close and
+its strength follows F0 0.04 rather than `specular`. `exportModel` writes both as metallic 0 with that roughness.
+
+```ts
+const tiles = new Material({shading: 'phong', map: tileset, specular: '#222222', shininess: 12, alphaTest: 0.5});
+tiles.shininess = 40; // live
+```
+
 ## Depth and distance materials
 
 `Material({shading: 'depth'})` writes projected depth, while `Material({shading: 'distance'})` writes world-space
