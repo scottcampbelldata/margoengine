@@ -21,6 +21,13 @@ export class CatmullRomCurve3 extends Curve<MutableVec3> {
 
 export type CatmullRomType = 'centripetal' | 'chordal' | 'catmullrom' | 'uniform';
 
+export interface CreasedNormalsOptions {
+    indices?: ArrayLike<number> | null;
+    angle?: number;
+    groups?: ArrayLike<number> | null;
+    tolerance?: number;
+}
+
 export class CubicBezierCurve<V extends Vec = MutableVec2> extends Curve<V> {
     v0: V;
     v1: V;
@@ -194,6 +201,8 @@ export function computeTangents(data: GeometryData): GeometryData;
 export function computeVertexNormals(data: GeometryData): GeometryData;
 
 export function coneGeometry(radius?: number, height?: number, radialSegments?: number, heightSegments?: number, openEnded?: boolean, thetaStart?: number, thetaLength?: number): GeometryData;
+
+export function creasedNormals(positions: ArrayLike<number>, options?: CreasedNormalsOptions): Float32Array;
 
 export function cylinderGeometry(radiusTop?: number, radiusBottom?: number, height?: number, radialSegments?: number, heightSegments?: number, openEnded?: boolean, thetaStart?: number, thetaLength?: number): GeometryData;
 

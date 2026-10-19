@@ -25,6 +25,23 @@ interface AnimationData {
     channels: readonly AnimationChannelData[];
 }
 
+interface CameraData {
+    type: 'perspective' | 'orthographic';
+    name?: string;
+    perspective?: {
+        yfov: number;
+        znear: number;
+        zfar?: number;
+        aspectRatio?: number;
+    };
+    orthographic?: {
+        xmag: number;
+        ymag: number;
+        znear: number;
+        zfar: number;
+    };
+}
+
 interface ExportNode {
     name?: string;
     translation?: readonly number[];
@@ -36,6 +53,8 @@ interface ExportNode {
     children?: readonly ExportNode[];
     skin?: SkinData;
     morphWeights?: readonly number[];
+    camera?: CameraData;
+    light?: LightData;
 }
 
 interface ExportScene {
@@ -53,9 +72,20 @@ interface GeometryData {
     tangents?: ArrayLike<number>;
     colors?: ArrayLike<number>;
     indices?: ArrayLike<number>;
+    faceSizes?: ArrayLike<number>;
     joints?: ArrayLike<number>;
     weights?: ArrayLike<number>;
     morphs?: readonly MorphData[];
+}
+
+interface LightData {
+    type: 'directional' | 'point' | 'spot';
+    name?: string;
+    color: readonly number[];
+    intensity: number;
+    range?: number;
+    innerConeAngle?: number;
+    outerConeAngle?: number;
 }
 
 interface Lookup<K, V> {
@@ -74,6 +104,7 @@ interface MaterialData {
     baseColorTexture?: TextureData;
     metallicRoughnessTexture?: TextureData;
     normalTexture?: TextureData;
+    unlit?: boolean;
 }
 
 interface MorphData {
@@ -100,5 +131,10 @@ interface TextureData {
     image: Uint8Array;
     mimeType: 'image/png' | 'image/jpeg';
     name?: string;
+    magFilter?: 'nearest' | 'linear';
+    minFilter?: 'nearest' | 'linear';
+    mipmaps?: boolean;
+    wrapS?: 'repeat' | 'clamp' | 'mirror';
+    wrapT?: 'repeat' | 'clamp' | 'mirror';
 }
 ```

@@ -68,7 +68,7 @@ node --test tests/catalog.test.js
 | [`@margoengine/fbx`](../packages/fbx/README.md) | Binary and ASCII FBX conversion into the optional Margo glTF animation pipeline. |
 | [`@margoengine/usdz`](../packages/usdz/README.md) | Optional static USDA, USDC and USDZ ingestion through Margo glTF PBR. |
 | [`@margoengine/usdz-export`](../packages/usdz-export/README.md) | Static scene USDZ packaging for AR Quick Look. |
-| [`@margoengine/exporters`](../packages/exporters/README.md) | glTF/GLB, STL, OBJ and PLY exporters for Margo Engine scenes and geometry data. |
+| [`@margoengine/exporters`](../packages/exporters/README.md) | glTF/GLB, STL, OBJ, PLY, USDZ and COLLADA exporters for Margo Engine scenes and geometry data. |
 | [`@margoengine/ifc`](../packages/ifc/README.md) | IFC geometry and BIM identifiers for Margo Engine, using an initialized web-ifc runtime. |
 | [`@margoengine/blender`](../packages/blender/README.md) | Optional offline Blender .margo assets using Margo's WebGPU PBR renderer. |
 | [`@margoengine/cache`](../packages/cache/README.md) | Opt-in offline asset cache: a fetch-compatible IndexedDB cache for GLB, .bin, textures and STEP files with ETag/Last-Modified revalidation, app versioning, range requests, a byte budget with LRU eviction and network fallback. |

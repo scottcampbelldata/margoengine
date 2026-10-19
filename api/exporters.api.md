@@ -19,6 +19,33 @@ export interface AnimationData {
     channels: readonly AnimationChannelData[];
 }
 
+export interface CameraData {
+    type: 'perspective' | 'orthographic';
+    name?: string;
+    perspective?: {
+        yfov: number;
+        znear: number;
+        zfar?: number;
+        aspectRatio?: number;
+    };
+    orthographic?: {
+        xmag: number;
+        ymag: number;
+        znear: number;
+        zfar: number;
+    };
+}
+
+export interface DAEOptions extends SceneOptions {
+    colorSpace?: 'srgb' | 'linear';
+    texturePrefix?: string;
+}
+
+export interface DAEResult {
+    dae: string;
+    textures: Map<string, Uint8Array>;
+}
+
 export interface ExportAnimation {
     model: PBRModel;
     clips: readonly ExportClip[];
@@ -40,6 +67,8 @@ export interface ExportNode {
     children?: readonly ExportNode[];
     skin?: SkinData;
     morphWeights?: readonly number[];
+    camera?: CameraData;
+    light?: LightData;
 }
 
 export interface ExportScene {
@@ -82,9 +111,20 @@ export interface GeometryData {
     tangents?: ArrayLike<number>;
     colors?: ArrayLike<number>;
     indices?: ArrayLike<number>;
+    faceSizes?: ArrayLike<number>;
     joints?: ArrayLike<number>;
     weights?: ArrayLike<number>;
     morphs?: readonly MorphData[];
+}
+
+export interface LightData {
+    type: 'directional' | 'point' | 'spot';
+    name?: string;
+    color: readonly number[];
+    intensity: number;
+    range?: number;
+    innerConeAngle?: number;
+    outerConeAngle?: number;
 }
 
 export interface MaterialData {
@@ -99,6 +139,7 @@ export interface MaterialData {
     baseColorTexture?: TextureData;
     metallicRoughnessTexture?: TextureData;
     normalTexture?: TextureData;
+    unlit?: boolean;
 }
 
 export interface ModelExportOptions {
@@ -123,11 +164,18 @@ export interface OBJOptions extends SceneOptions {
     materials?: boolean;
     mtlName?: string;
     colors?: boolean;
+    colorSpace?: 'srgb' | 'linear';
+    textures?: boolean;
+    texturePrefix?: string;
+    groups?: boolean;
+    mergeVertices?: boolean;
+    scale?: number;
 }
 
 export interface OBJResult {
     obj: string;
     mtl: string | null;
+    textures: Map<string, Uint8Array>;
 }
 
 export interface PLYOptions extends SceneOptions {
@@ -157,10 +205,17 @@ export interface TextureData {
     image: Uint8Array;
     mimeType: 'image/png' | 'image/jpeg';
     name?: string;
+    magFilter?: 'nearest' | 'linear';
+    minFilter?: 'nearest' | 'linear';
+    mipmaps?: boolean;
+    wrapS?: 'repeat' | 'clamp' | 'mirror';
+    wrapT?: 'repeat' | 'clamp' | 'mirror';
 }
 
 export interface USDZOptions extends SceneOptions {
 }
+
+export function exportDAE(source: ExportSource, options?: DAEOptions): DAEResult;
 
 export function exportGLB(source: ExportSource, options?: GLTFOptions): Uint8Array;
 
