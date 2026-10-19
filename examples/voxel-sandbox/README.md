@@ -105,6 +105,22 @@ It holds the GPU lock, waits for `scripts/quiet-gate.mjs` (numbers from a busy m
 over 300 still frames, voxel GPU time median and p95 over 100 frames, a 10 s flight at 11 blocks/s while chunks
 stream in, and chunks, quads, quad bytes, draws and chunk data bytes.
 
+Measured 2026-10-19 on the RTX A6000 desktop, quiet-gated (copy in
+`examples/package-benchmarks/results/voxel-sandbox-bench.json`):
+
+| | Render distance 8 | Render distance 16 |
+| --- | --- | --- |
+| Spawn to every chunk in range drawn (3 loads) | 2.45-2.50 s | 8.8-9.2 s |
+| First voxel draw | 375 ms | 418 ms |
+| Frame CPU, still (median / p95) | 0.6 / 0.9 ms | 1.3 / 1.7 ms |
+| Frame CPU, flying 11 blocks/s (median / p95 / worst) | 0.7 / 2.9 / 5.5 ms | 1.6 / 4.4 / 8.4 ms |
+| Chunks loaded / with quads / visible | 1,379 / 602 / 206 | 5,579 / 2,435 / 772 |
+| Quads, quad bytes on the GPU | 1,182,034, 14.5 MB | 4,838,612, 59.5 MB |
+| Draws, chunk data on the CPU | 322, 15.9 MB | 1,170, 64.1 MB |
+
+Voxel GPU time from timestamps between passes is rough: 2.56 ms median at render distance 8 in this run and 0.39 ms in
+an earlier, busier one; 0.72 ms at 16 in both. Render distance 16 misses the design's 6 s spawn target.
+
 ### Visual checks
 
 `scripts/visual-regression.js` defines `voxel-overview`, `voxel-ground` (high, light and phone) and `voxel-night`

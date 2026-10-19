@@ -49,7 +49,23 @@ Step 3, phase 5 done: `VoxelRenderer.addLighting` (Shadows, Clustered, Fog, Envi
 `shadowVersion` (`shadows.add(voxels, {static: true})`), `blockLightColor`, day/night through `daylight`, animated
 liquids (uniform rise plus rippled normals: per-vertex waves would crack greedy quads; DESIGN.md as built). Its GPU check
 (`packages/voxel/tests/render-lighting-browser-check.mjs`) passes every numeric expectation at 4x and 1x on the A6000;
-check:merge passes (3,006 tests, 15 proofs, 55 views). Phase 13 and the step 7 follow-ups are with worktree agents.
+check:merge passes (3,006 tests, 15 proofs, 55 views). Step 3, phase 13 done: `examples/voxel-sandbox` (playable;
+shadows and torch point lights; site page `/voxel/`; `npm run dev:voxel`), its 7 visual references on the
+`nvidia-ampere-msedge-155` profile (the views carry `profiles: VOXEL` in scripts/visual-regression.js, so other
+profiles skip them; on the laptop record them with `npm run visual:update -- --only=voxel --runs=4` and add the
+Intel profile id to `VOXEL`), and the quiet-gated benchmark in docs/limits.md (render distance 8 fills in 2.5 s, 16 in
+8.8-9.2 s, over the 6 s target). The quiet gate now reads the processor-time counter: `Win32_Processor.LoadPercentage`
+read 18-97% on this idle desktop. Step 7 done: ball meshes and border crossings built within a per-step budget
+(`VoxelPhysics.budget`), voxel contacts raise `Physics` events (`voxels.body`), `.vox` paste by chunk (4-6x faster),
+`VoxelStreamer.frameBudget`, `noiseTerrain` without water beside caves or leaves in caves, the catalog clipboard test
+no longer races its 7 s status timer. Environment colour arrays are now linear like the rest of Margo (Scott,
+2026-10-19). The Rapier report is posted (#1046). `@margoengine/voxel-pathtracer` (for Codex's MagicaVoxel editor at
+C:\Development\Projects\MagicaVoxel) is on branch `worktree-agent-a63cac143225721f2`, not pushed by request, with
+tarballs in test-results; its remaining gaps (energy loss on rough metal and glass, caustic denoising, dispersion,
+emissive media, area-light occlusion, camera motion blur, panoramic/fisheye/distortion, a physical sky) are being
+fixed, and a side-by-side against MagicaVoxel 0.99.7.2 (downloaded with Scott's OK to C:\Tools, used only as a black
+box to render our own scenes) is next. `margo3d-studio` (step 6's posed-picking fixture) is on this PC at
+C:\Development\Projects\margo3d-studio.
 
 Tile editor engine work (Scott, 2026-10-18/19): Scott started `tile-asset-editor` (a Crocotile 3D 2.7.4 equivalent,
 own repository `scottcampbelldata/tile-asset-editor`) as the base of his own 3D modeller and game engine, and

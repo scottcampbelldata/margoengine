@@ -196,11 +196,11 @@ on vfx's texture option). Avoided taken names: `World`, `RayHit`, `WorkerPool`.
 Order: 1 first; then 2, 6, 7, 8, 10, 11, 12 can run in parallel (they need only the storage API); 3 after 2; 4 after
 3; 5 after 4; 9 after 3 and 8; 13 last.
 
-## As built (phases 1-12; recorded by the merger 2026-10-19)
+## As built (phases 1-13; recorded by the merger 2026-10-19)
 
 Status: on main are phases 1 (storage), 2 (mesher), 3 (worker mesher), 4 (renderer), 5 (renderer lighting), 6 (light),
-7 (queries), 8 (codec, store), 9 (streaming, generation), 10 (.vox), 11 (Rapier) and 12 (extras: audio and vfx). Phase
-13 (example and benchmarks) remains. Names and decisions beyond the lists above:
+7 (queries), 8 (codec, store), 9 (streaming, generation), 10 (.vox), 11 (Rapier), 12 (extras: audio and vfx) and 13
+(example and benchmarks). Names and decisions beyond the lists above:
 
 - Storage: `BlockType` (what `get` and `table` return); `VoxelChunk.getLight`/`setLight`/`fillLight`/`byteLength`;
   `VoxelWorld.heightmap`, `blocks`, `minY`, `maxY`, `onChunk(listener)` (fires for loaded chunks at subscribe, after
@@ -251,5 +251,10 @@ Status: on main are phases 1 (storage), 2 (mesher), 3 (worker mesher), 4 (render
   (0.04 sin 1.6t) and ripples only in its shading normal (three travelling waves of world x, z), because per-vertex
   height by position would open cracks at greedy quads' T-junctions and make merged and unit meshes differ.
   GPU-verified on the RTX A6000 (tests/render-lighting-browser-check.mjs).
+- Example and benchmarks (phase 13): `examples/voxel-sandbox` (site page `/voxel/`; shadows, torch point lights, Sky,
+  Bloom), visual references on the RTX A6000 profile only (other profiles skip them until recorded), benchmark
+  `npm run bench:voxel` behind the quiet gate. Measured on the A6000 at 1920 x 1080, 4x MSAA (docs/limits.md): render
+  distance 8 fills in 2.45-2.50 s (1.18 M quads, 322 draws, 0.6 ms frame CPU), 16 in 8.8-9.2 s (4.84 M quads, 1,170
+  draws, 1.3 ms), over the 6 s target above; GPU time per frame is not yet measured reliably.
 - Extras: `AudioVoicePool` in @margoengine/audio; `ParticleAtlas` on @margoengine/vfx's texture option. The decoders
   pool was not moved onto `JobPool` (its per-worker queue and timeout semantics differ).
