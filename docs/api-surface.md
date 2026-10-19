@@ -30,7 +30,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/decoders | `.` 23, `./meshopt` 5 | 1 |  | 478,417 |
 | @margoengine/dof | `.` 2 |  |  | 6,283 |
 | @margoengine/ecs | `.` 6 |  |  | 1,350 |
-| @margoengine/environment | `.` 53, `./probes` 7, `./volumetric` 3 | 12 |  | 25,372 |
+| @margoengine/environment | `.` 53, `./probes` 7, `./volumetric` 3 | 13 |  | 25,372 |
 | @margoengine/exporters | `.` 35, `./usdz` 2, `./model` 6, `./dae` 3, `./capture` 13 | 30 |  | 23,433 |
 | @margoengine/fbx | `.` 4, `./worker` 2 | 1 |  | 16,674 |
 | @margoengine/fsm | `.` 3 |  |  | 875 |

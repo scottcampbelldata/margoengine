@@ -13,9 +13,9 @@ export class ColorBackground {
     protected alpha: number;
     static attach(engine: EngineKernel, options?: ColorBackgroundOptions): ColorBackground;
     constructor(options?: ColorBackgroundOptions);
-    get color(): [number, number, number];
+    get color(): RGB;
     set color(value: ColorInput);
-    get bottom(): [number, number, number] | undefined;
+    get bottom(): RGB | undefined;
     set bottom(value: ColorInput | undefined);
     setup(engine: EngineKernel): void;
     registerPasses(graph: FrameGraph): void;
@@ -32,7 +32,7 @@ export interface ColorBackgroundOptions {
     name?: string;
 }
 
-export type ColorInput = string | number | readonly [number, number, number];
+export { ColorInput } from "@margoengine/math";
 
 export class ColorOutput {
     readonly options: Readonly<ColorOutputOptions>;
@@ -378,7 +378,7 @@ export function radianceToIrradianceSH(radiance: ArrayLike<number>): Float32Arra
 
 export function shBasis(x: number, y: number, z: number, out?: Float64Array | Float32Array | number[]): number[] | Float32Array<ArrayBufferLike> | Float64Array<ArrayBufferLike>;
 
-export function srgbColor(value: ColorInput): [number, number, number];
+export function srgbColor(value: ColorInput): RGB;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -397,6 +397,8 @@ interface PBRHooks {
     readonly sheen?: string;
     output?(color: string): string;
 }
+
+type RGB = [number, number, number];
 
 abstract class ShaderEffect {
     readonly name: string;
