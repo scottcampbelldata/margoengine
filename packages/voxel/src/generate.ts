@@ -61,9 +61,9 @@ export interface NoiseTerrainOptions {
   amplitude?: number;
   /** Width of the largest hills, in blocks (> 0). Default 192. */
   scale?: number;
-  /** How much rock is tunnelled into caves, 0 (none) to 1. Default 0.3. */
+  /** How much rock is tunnelled into caves, 0 (none) to 1; rock beside water is never tunnelled. Default 0.3. */
   caves?: number;
-  /** Chance that a grass column grows a tree, 0 to 1. Default 0.01. */
+  /** Chance that a grass column grows a tree where its crown has open air, 0 to 1. Default 0.01. */
   trees?: number;
   /**
    * Names of the block types to build with, looked up in the world's types; each defaults to its key. `log` and
@@ -82,7 +82,8 @@ export interface NoiseTerrainOptions {
 
 const NAMES = ['stone', 'dirt', 'grass', 'sand', 'water', 'log', 'leaves'] as const;
 const R = 2, // tree crown radius: trees standing up to R columns outside a chunk reach into it
-  W = 32 + 2 * R;
+  M = 2 * R, // heights kept around the chunk: those trees' crowns cover columns up to 2R outside it
+  W = 32 + 2 * M;
 
 const option = (value: unknown, name: string, fallback: number, ok: (v: number) => boolean, range: string): number => {
   if (value === undefined) return fallback;
@@ -113,9 +114,11 @@ const blend = (f: Float64Array, x: number, y: number, z: number): number => {
 /**
  * The built-in world generator: a fractal (fbm) simplex heightmap of grass over dirt over stone, sand beaches and sea
  * floors, water up to `seaLevel`, cave tunnels where two 3D simplex fields are both near zero (sampled every 4 blocks
- * and blended, never through the top block), and trees on grass: a column grows one when its hash says so, so a crown
- * that crosses a chunk border is the same in every chunk. Block types come by name ({@link NoiseTerrainOptions.blocks}),
- * so it works with any `BlockTypes`. Runs on any thread; VoxelStreamer runs it in workers.
+ * and blended, never through the top block, and never beside water: rock next to the sea stays), and trees on grass:
+ * a column grows one when its hash says so and its whole crown is in the open air above the ground (no leaves in
+ * hillsides or caves), so a crown that crosses a chunk border is the same in every chunk. Block types come by name
+ * ({@link NoiseTerrainOptions.blocks}), so it works with any `BlockTypes`. Runs on any thread; VoxelStreamer runs it in
+ * workers.
  * @throws TypeError for an option of the wrong type; the returned function throws TypeError for a context without
  * `blocks`.
  * @throws RangeError for an option out of range; the returned function throws RangeError for a block name the context
@@ -163,13 +166,23 @@ export function noiseTerrain(options: NoiseTerrainOptions = {}): VoxelGenerate {
       y0 = cy * 32,
       z0 = cz * 32,
       y1 = y0 + 31,
-      heights = new Int32Array(W * W);
+      heights = new Int32Array(W * W),
+      known = new Uint8Array(W * W),
+      // Column heights within R of the chunk come first; those up to 2R out only when a tree there needs them.
+      heightAt = (i: number, j: number): number => {
+        const k = i + j * W;
+        if (!known[k]) {
+          known[k] = 1;
+          heights[k] = surface(x0 + i - M, z0 + j - M);
+        }
+        return heights[k];
+      };
     let low = Infinity,
       high = -Infinity;
-    for (let j = 0; j < W; j++)
-      for (let i = 0; i < W; i++) {
-        const h = (heights[i + j * W] = surface(x0 + i - R, z0 + j - R));
-        if (i >= R && j >= R && i < 32 + R && j < 32 + R) {
+    for (let j = M - R; j < W - M + R; j++)
+      for (let i = M - R; i < W - M + R; i++) {
+        const h = heightAt(i, j);
+        if (i >= M && j >= M && i < 32 + M && j < 32 + M) {
           low = Math.min(low, h);
           high = Math.max(high, h);
         }
@@ -181,7 +194,7 @@ export function noiseTerrain(options: NoiseTerrainOptions = {}): VoxelGenerate {
     else if (y0 <= Math.max(high, seaLevel))
       for (let z = 0; z < 32; z++)
         for (let x = 0; x < 32; x++) {
-          const h = heights[x + R + (z + R) * W],
+          const h = heights[x + M + (z + M) * W],
             top = Math.min(y1, Math.max(h, seaLevel));
           for (let y = y0; y <= top; y++)
             chunk.set(
@@ -207,18 +220,26 @@ export function noiseTerrain(options: NoiseTerrainOptions = {}): VoxelGenerate {
           }
       for (let z = 0; z < 32; z++)
         for (let x = 0; x < 32; x++) {
-          const top = Math.min(31, heights[x + R + (z + R) * W] - 1 - y0);
-          for (let y = 0; y <= top; y++)
+          const c = x + M + (z + M) * W,
+            top = Math.min(31, heights[c] - 1 - y0),
+            // Rock at a height where a side neighbour column holds sea (above its ground, at or below seaLevel) stays,
+            // so water never borders a cave. Above a cave cell its own column is ground: the top block is never carved.
+            side = Math.min(heights[c - 1], heights[c + 1], heights[c - W], heights[c + W]);
+          for (let y = 0; y <= top; y++) {
+            if (y + y0 > side && y + y0 <= seaLevel) continue;
             if (Math.abs(blend(a, x, y, z)) < width && Math.abs(blend(b, x, y, z)) < width) chunk.set(x, y, z, 0);
+          }
         }
     }
 
     // Trees: logs replace air and leaves, leaves fill air only, so overlapping trees give the same cells in any order.
+    // A tree grows only where its whole crown is in the open air above the ground of every column it covers (no
+    // leaves in a hillside or a cave); that depends on the heights within R of its column alone.
     if (treeCut > 0)
-      for (let j = 0; j < W; j++)
-        for (let i = 0; i < W; i++) {
-          const wx = x0 + i - R,
-            wz = z0 + j - R,
+      for (let j = M - R; j < W - M + R; j++)
+        for (let i = M - R; i < W - M + R; i++) {
+          const wx = x0 + i - M,
+            wz = z0 + j - M,
             r = hash(wx, wz, seed),
             h = heights[i + j * W];
           if (r >= treeCut || h <= seaLevel + 1) continue;
@@ -226,6 +247,11 @@ export function noiseTerrain(options: NoiseTerrainOptions = {}): VoxelGenerate {
             lx = wx - x0,
             lz = wz - z0;
           if (top + 1 < y0 || h + 1 > y1) continue;
+          let open = true;
+          for (let dz = -R; dz <= R && open; dz++)
+            for (let dx = -R; dx <= R; dx++)
+              if (Math.abs(dx) + Math.abs(dz) < 4 && heightAt(i + dx, j + dz) >= top - 2) open = false;
+          if (!open) continue;
           const put = (x: number, y: number, z: number, state: number) => {
             if ((x & 31) !== x || (y & 31) !== y || (z & 31) !== z) return;
             const was = chunk.get(x, y, z);

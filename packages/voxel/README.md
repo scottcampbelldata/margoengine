@@ -464,9 +464,14 @@ serveVoxelGenerator((chunk, cx, cy, cz, { blocks }) => {
   over dirt over stone, sand at the shore and on the sea floor, water up to `seaLevel` (0), cave tunnels where two 3D
   simplex fields are both near zero (`caves` 0..1, default 0.3: about 5% of the rock), and trees on grass (`trees`, the
   chance per column, default 0.01) placed by a hash of the column, so a crown that crosses a chunk border is the same
-  in every chunk and every generation order. Block types come by name (`blocks: {stone, dirt, grass, sand, water, log,
-  leaves}`, each defaulting to its key), checked when the streamer is created. It runs on any thread (a
-  `VoxelGenerate`); the streamer runs it in `dist/workers/terrain.js`, a classic script without `eval`.
+  in every chunk and every generation order. Caves never reach water: rock at a height where a side neighbour column
+  holds sea stays (the top block is never carved either). A tree grows only where its whole crown is in open air above
+  the ground of every column it covers, so no leaves end up in hillsides or caves; both rules read only the column
+  heights around a cell, so chunks stay independent of generation order. The generator's tests scan 144-chunk regions
+  across chunk borders for water beside cave air and leaves in the ground (none). Block types come by name
+  (`blocks: {stone, dirt, grass, sand, water, log, leaves}`, each defaulting to its key), checked when the streamer
+  is created. It runs on any thread (a `VoxelGenerate`); the streamer runs it in `dist/workers/terrain.js`, a classic
+  script without `eval`.
 - **Errors.** `TypeError` and `RangeError` for options; MargoError `'attached'` for a second streamer on a world,
   `'unsupported'` for a generator without Web Workers, `'disposed'` after `dispose()`.
 

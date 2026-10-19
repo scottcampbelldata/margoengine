@@ -40,8 +40,15 @@ for (let cy = -1; cy <= 1; cy++)
   for (let cz = 0; cz < 4; cz++) for (let cx = 0; cx < 4; cx++) region.push([cx, cy, cz]);
 
 test('noiseTerrain: same seed and options give the same chunks in any order and from any instance', () => {
-  const options = { seed: 42, trees: 0.05 },
-    a = noiseTerrain(options),
+  // Also a coast full of caves, where the rock kept beside the sea and the trees kept off slopes depend on neighbours.
+  for (const options of [
+    { seed: 42, trees: 0.05 },
+    { seed: 2, caves: 1, trees: 0.05, seaLevel: 12 },
+  ])
+    sameInAnyOrder(options);
+});
+function sameInAnyOrder(options) {
+  const a = noiseTerrain(options),
     first = new Map(region.map(([cx, cy, cz]) => [`${cx},${cy},${cz}`, cells(generate(a, cx, cy, cz))])),
     next = random(9),
     shuffled = region.slice().sort(() => next() - 0.5),
@@ -58,7 +65,7 @@ test('noiseTerrain: same seed and options give the same chunks in any order and 
     ),
     'another seed gives another world',
   );
-});
+}
 
 test('noiseTerrain trees are whole across chunk borders: every trunk has its full crown, every leaf a trunk', () => {
   const fn = noiseTerrain({ seed: 7, trees: 0.06 }),
@@ -134,6 +141,90 @@ test('noiseTerrain layers: grass or sand on dirt on stone, water to sea level, c
   const solid = generate(noiseTerrain({ seed: 3, caves: 0 }), 0, -9, 0);
   assert.equal(solid.pack().bits, 0, 'deep rock without caves is one uniform chunk');
   assert.equal(solid.get(0, 0, 0), id.stone);
+});
+
+// The chunks of an nx x ny x nz region from chunk c0, each generated on its own, in one array (cell x + X (z + Z y)),
+// with each column's ground: the highest stone, dirt, grass or sand cell (caves never carve the top block).
+function assemble(fn, [cx0, cy0, cz0], [nx, ny, nz]) {
+  const X = 32 * nx,
+    Y = 32 * ny,
+    Z = 32 * nz,
+    data = new Uint8Array(X * Y * Z);
+  for (let cy = 0; cy < ny; cy++)
+    for (let cz = 0; cz < nz; cz++)
+      for (let cx = 0; cx < nx; cx++) {
+        const chunk = generate(fn, cx0 + cx, cy0 + cy, cz0 + cz);
+        for (let y = 0; y < 32; y++)
+          for (let z = 0; z < 32; z++)
+            for (let x = 0; x < 32; x++) data[32 * cx + x + X * (32 * cz + z + Z * (32 * cy + y))] = chunk.get(x, y, z);
+      }
+  const inside = (x, y, z) => x >= 0 && y >= 0 && z >= 0 && x < X && y < Y && z < Z,
+    at = (x, y, z) => (inside(x, y, z) ? data[x + X * (z + Z * y)] : -1),
+    ground = new Int32Array(X * Z).fill(-1),
+    terrain = [id.stone, id.dirt, id.grass, id.sand];
+  for (let z = 0; z < Z; z++)
+    for (let x = 0; x < X; x++)
+      for (let y = Y - 1; y >= 0; y--)
+        if (terrain.includes(at(x, y, z))) {
+          ground[x + X * z] = y;
+          break;
+        }
+  return { X, Y, Z, at, ground: (x, z) => ground[x + X * z] };
+}
+
+test('noiseTerrain: no water beside cave air, no leaves in the ground, whole crowns in open air (scanned across chunk borders)', () => {
+  const near = [
+    [1, 0, 0],
+    [-1, 0, 0],
+    [0, 1, 0],
+    [0, -1, 0],
+    [0, 0, 1],
+    [0, 0, -1],
+  ];
+  // Seeds and sea levels where the generator before this rule put water beside caves and leaves in caves.
+  for (const options of [
+    { seed: 1, caves: 1, trees: 0.05 },
+    { seed: 2, caves: 1, trees: 0.05, seaLevel: 12 },
+    { seed: 4, caves: 0.6, trees: 0.08, seaLevel: 6 },
+  ]) {
+    const { X, Y, Z, at, ground } = assemble(noiseTerrain(options), [-3, -2, -3], [6, 4, 6]),
+      // Air below its column's ground is cave air; air above it is sky.
+      cave = (x, y, z) => at(x, y, z) === 0 && y < ground(x, z);
+    let water = 0,
+      caves = 0,
+      wet = 0,
+      buried = 0,
+      trees = 0,
+      cut = 0;
+    for (let y = 0; y < Y; y++)
+      for (let z = 0; z < Z; z++)
+        for (let x = 0; x < X; x++) {
+          const s = at(x, y, z);
+          if (cave(x, y, z)) caves++;
+          if (s === id.water) {
+            water++;
+            if (near.some(([dx, dy, dz]) => cave(x + dx, y + dy, z + dz))) wet++;
+          } else if ((s === id.leaves || s === id.log) && y <= ground(x, z)) buried++;
+          // A trunk's foot: its crown (two 5 x 5 layers without corners, two plus layers) is all leaves and logs.
+          if (s === id.log && at(x, y - 1, z) === id.grass && y - 1 === ground(x, z)) {
+            let top = y;
+            while (at(x, top + 1, z) === id.log) top++;
+            for (let dy = -2; dy <= 1; dy++)
+              for (let dz = -2; dz <= 2; dz++)
+                for (let dx = -2; dx <= 2; dx++) {
+                  const c = at(x + dx, top + dy, z + dz);
+                  if (c >= 0 && Math.abs(dx) + Math.abs(dz) < (dy < 0 ? 4 : 2) && c !== id.leaves && c !== id.log)
+                    cut++;
+                }
+            trees++;
+          }
+        }
+    const what = `${JSON.stringify(options)}: ${water} water, ${caves} cave cells, ${trees} trees`;
+    assert.equal(wet, 0, `${what}: water cells beside cave air`);
+    assert.equal(buried, 0, `${what}: leaves or logs at or below their column's ground`);
+    assert.equal(cut, 0, `${what}: crown cells that are not leaves or logs`);
+    assert.ok(water > 20000 && caves > 100000 && trees > 100, what);
+  }
 });
 
 test('noiseTerrain finds block types by name in any BlockTypes; errors name the problem', () => {
