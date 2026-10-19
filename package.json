@@ -84,6 +84,7 @@
     "packages/culling",
     "packages/oit",
     "packages/cache",
+    "packages/voxel",
     "examples/vite",
     "examples/gameplay-sandbox",
     "examples/react-viewer",

@@ -63,6 +63,7 @@ const layers = {
   'Post-processing': ['post', 'tonemap', 'dof', 'taa', 'transitions'],
   'World and effects': [
     'terrain',
+    'voxel',
     'water',
     'scenery',
     'scatter',

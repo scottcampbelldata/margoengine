@@ -1,0 +1,33 @@
+{
+  "name": "@margoengine/voxel",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Voxel worlds: a block-type registry, 32-cubed palette chunks with light bytes, and a chunked world with dirty tracking and change events.",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0"
+  },
+  "dependencies": {
+    "@margoengine/math": "^1.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js voxel",
+    "test": "npm run build && node --test tests/*.test.js",
+    "prepack": "npm run build"
+  },
+  "homepage": "https://margoengine.com"
+}
