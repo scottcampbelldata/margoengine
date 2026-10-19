@@ -1,0 +1,1369 @@
+/// <reference lib="esnext.disposable" preserve="true" />
+// @margoengine/voxel-pathtracer: the engine plugin. One compute pass per frame adds samples to the viewport's
+// accumulation buffers, an optional wavelet denoiser filters them, and a full-screen pass draws the result (tone mapped,
+// with the first hit's depth) over the frame at `order` 20. Captures render tiles of any size on their own buffers
+// with copies of the scene, so the viewport and later scene changes cannot disturb them (README, "Captures").
+import type { EngineKernel } from '@margoengine/core';
+import {
+  Camera,
+  type Engine,
+  type EnginePlugin,
+  engineRuntime,
+  type FrameGraph,
+  type PassContext,
+} from '@margoengine/core/extension';
+import { MargoError } from '@margoengine/math/errors';
+import { invertMatrix } from '@margoengine/math/mat4';
+import {
+  FLAG_CLAMP,
+  FLAG_ENV,
+  FLAG_GROUND,
+  FLAG_JITTER,
+  FLAG_MOTION,
+  FLAG_SUN,
+  FRAME_BYTES,
+  type LightLayout,
+  lightLayout,
+  modelWords,
+  type SceneLayout,
+  sceneLayout,
+} from './layout.js';
+import { PngWriter } from './png.js';
+import {
+  buildSnapshot,
+  checkNumber,
+  checkVec3,
+  type PackedEnvironment,
+  type PackedModel,
+  type SceneCache,
+  type SceneSnapshot,
+} from './scene.js';
+import { DENOISE, DISPLAY, TRACE } from './shaders.js';
+import { raycastSnapshot } from './traverse.js';
+import type {
+  TraceVec3,
+  VoxelPathTracerOptions,
+  VoxelPathTracerStats,
+  VoxelTraceCaptureOptions,
+  VoxelTraceHit,
+  VoxelTraceImage,
+  VoxelTraceRenderOptions,
+  VoxelTraceScene,
+} from './types.js';
+
+declare const GPUBufferUsage: {
+  MAP_READ: number;
+  COPY_SRC: number;
+  COPY_DST: number;
+  UNIFORM: number;
+  STORAGE: number;
+};
+declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number; COMPUTE: number };
+declare const GPUMapMode: { READ: number };
+type Context = Extract<PassContext, { backend: 'webgpu' }>;
+
+const DEFAULT_WORDS = (128 << 20) / 4, // WebGPU's default maxStorageBufferBindingSize, in words
+  TILE = 1024, // capture tile edge
+  APRON = 64, // capture tile margin while denoising (reach of five a-trous levels: 2 * (1 + 2 + 4 + 8 + 16) = 62)
+  ATROUS = 5,
+  VIEW_BYTES = 160,
+  PARAM_STRIDE = 256;
+
+/** Resolved tracer options (every field set). */
+interface Settings {
+  samplesPerFrame: number;
+  maxBounces: number;
+  maxSamples: number;
+  seed: number;
+  resolutionScale: number;
+  exposure: number;
+  aperture: number;
+  focusDistance: number | undefined;
+  denoise: boolean;
+  lensBlades: number;
+  lensRotation: number;
+  shutter: number;
+  clamp: number;
+  toneMapping: 'neutral' | 'linear';
+  order: number;
+}
+const DEFAULTS: Settings = {
+  samplesPerFrame: 1,
+  maxBounces: 8,
+  maxSamples: 1024,
+  seed: 0,
+  resolutionScale: 1,
+  exposure: 0,
+  aperture: 0,
+  focusDistance: undefined,
+  denoise: false,
+  lensBlades: 0,
+  lensRotation: 0,
+  shutter: 0,
+  clamp: Infinity,
+  toneMapping: 'neutral',
+  order: 20,
+};
+// Options whose change invalidates the accumulated samples (the others only change how they are shown or paced).
+const RESETS: readonly (keyof Settings)[] = [
+  'maxBounces',
+  'seed',
+  'resolutionScale',
+  'aperture',
+  'focusDistance',
+  'lensBlades',
+  'lensRotation',
+  'shutter',
+  'clamp',
+];
+
+const whole = (value: unknown, name: string, min: number, max: number, fix: string) => {
+  const v = checkNumber(value, name, min, max, fix);
+  if (!Number.isInteger(v)) throw new RangeError(`VoxelPathTracer ${name} ${v} must be a whole number; ${fix}`);
+  return v;
+};
+const flag = (value: unknown, name: string) => {
+  if (typeof value !== 'boolean') throw new TypeError(`VoxelPathTracer ${name} must be true or false`);
+  return value;
+};
+
+/** Validates `input` over `base`; throws before returning anything. */
+function settings(input: Partial<Omit<VoxelPathTracerOptions, 'scene'>>, base: Settings): Settings {
+  if (!input || typeof input !== 'object') throw new TypeError('VoxelPathTracer options must be an object');
+  const s = { ...base },
+    o = input as Record<string, unknown>;
+  if (o.samplesPerFrame !== undefined)
+    s.samplesPerFrame = whole(o.samplesPerFrame, 'samplesPerFrame', 1, 64, 'pass 1 to 64');
+  if (o.maxBounces !== undefined) s.maxBounces = whole(o.maxBounces, 'maxBounces', 1, 64, 'pass 1 to 64');
+  if (o.maxSamples !== undefined) {
+    const v = checkNumber(o.maxSamples, 'maxSamples', 1, Infinity, 'pass 1 or more, or Infinity');
+    if (v !== Infinity && !Number.isInteger(v))
+      throw new RangeError(`VoxelPathTracer maxSamples ${v} must be a whole number or Infinity`);
+    s.maxSamples = v;
+  }
+  if (o.seed !== undefined) s.seed = whole(o.seed, 'seed', 0, 0xffffffff, 'pass an integer 0 to 4294967295');
+  if (o.resolutionScale !== undefined)
+    s.resolutionScale = checkNumber(o.resolutionScale, 'resolutionScale', 0.1, 2, 'pass 0.1 to 2');
+  if (o.exposure !== undefined) s.exposure = checkNumber(o.exposure, 'exposure', -20, 20, 'pass EV stops, -20 to 20');
+  if (o.aperture !== undefined) s.aperture = checkNumber(o.aperture, 'aperture', 0, 1e6, 'pass a diameter, 0 or more');
+  if (o.focusDistance !== undefined)
+    s.focusDistance = checkNumber(o.focusDistance, 'focusDistance', 1e-6, 1e9, 'pass a distance above 0');
+  if (o.denoise !== undefined) s.denoise = flag(o.denoise, 'denoise');
+  if (o.lensBlades !== undefined) {
+    const v = whole(o.lensBlades, 'lensBlades', 0, 16, 'pass 0 (round) or 3 to 16');
+    if (v === 1 || v === 2) throw new RangeError('VoxelPathTracer lensBlades must be 0 (round) or 3 to 16');
+    s.lensBlades = v;
+  }
+  if (o.lensRotation !== undefined)
+    s.lensRotation = checkNumber(o.lensRotation, 'lensRotation', -1e6, 1e6, 'pass radians');
+  if (o.shutter !== undefined) s.shutter = checkNumber(o.shutter, 'shutter', 0, 1, 'pass 0 (off) to 1');
+  if (o.clamp !== undefined) {
+    const v = checkNumber(o.clamp, 'clamp', 0, Infinity, 'pass a luminance above 0, or Infinity');
+    if (!(v > 0)) throw new RangeError('VoxelPathTracer clamp must be above 0 (Infinity turns it off)');
+    s.clamp = v;
+  }
+  if (o.toneMapping !== undefined) {
+    if (o.toneMapping !== 'neutral' && o.toneMapping !== 'linear')
+      throw new TypeError(
+        `VoxelPathTracer toneMapping ${String(o.toneMapping)} is unknown; pass 'neutral' or 'linear'`,
+      );
+    s.toneMapping = o.toneMapping;
+  }
+  if (o.order !== undefined) s.order = checkNumber(o.order, 'order', -1e9, 1e9, 'pass a finite frame-graph order');
+  return s;
+}
+
+// First-fit allocator over runs of free words: [start, length] pairs sorted by start, neighbours merged.
+class Runs {
+  runs: number[];
+  constructor(start: number, capacity: number) {
+    this.runs = capacity > start ? [start, capacity - start] : [];
+  }
+  alloc(n: number): number {
+    const r = this.runs;
+    for (let i = 0; i < r.length; i += 2)
+      if (r[i + 1] >= n) {
+        const at = r[i];
+        r[i] += n;
+        r[i + 1] -= n;
+        if (!r[i + 1]) r.splice(i, 2);
+        return at;
+      }
+    return -1;
+  }
+  release(start: number, n: number): void {
+    const r = this.runs;
+    let i = 0;
+    while (i < r.length && r[i] < start) i += 2;
+    if (i < r.length && start + n === r[i]) {
+      r[i] = start;
+      r[i + 1] += n;
+    } else r.splice(i, 0, start, n);
+    if (i && r[i - 2] + r[i - 1] === start) {
+      r[i - 1] += r[i + 1];
+      r.splice(i, 2);
+    }
+  }
+}
+
+interface Pipelines {
+  trace: GPUComputePipeline;
+  ids: GPUComputePipeline;
+  prepare: GPUComputePipeline;
+  atrous: GPUComputePipeline;
+}
+/** Scene buffers on one device. */
+interface SceneBuffers {
+  materials: GPUBuffer;
+  voxels: GPUBuffer;
+  scene: GPUBuffer;
+  lights: GPUBuffer;
+  env: GPUBuffer;
+}
+interface Gpu {
+  device: GPUDevice;
+  lost: boolean;
+  traceLayout: GPUBindGroupLayout;
+  denoiseLayout: GPUBindGroupLayout;
+  displayLayout: GPUBindGroupLayout;
+  pipelines?: Pipelines;
+  display: Map<string, { pipeline?: GPURenderPipeline }>;
+  buffers: SceneBuffers;
+  capacity: number;
+  runs: Runs;
+  regions: Map<PackedModel, number>;
+  envSource?: PackedEnvironment;
+  layout?: { scene: SceneLayout; lights: LightLayout };
+  version: number;
+  resources: number;
+  view?: View;
+}
+/** Accumulation (and denoiser) buffers of one image size. */
+interface Targets {
+  width: number;
+  height: number;
+  accum: GPUBuffer;
+  albedo: GPUBuffer;
+  normals: GPUBuffer;
+  ping?: GPUBuffer;
+  pong?: GPUBuffer;
+  guide?: GPUBuffer;
+  params?: GPUBuffer;
+  denoiseGroups?: GPUBindGroup[];
+}
+interface View extends Targets {
+  frame: GPUBuffer;
+  uniform: GPUBuffer;
+  traceGroup?: GPUBindGroup;
+  traceKey?: string;
+  displayRaw?: GPUBindGroup;
+  displayDenoised?: GPUBindGroup;
+  denoisedAt: number;
+}
+
+let serial = 0;
+const neutral = (c: number[]) => {
+  const x = Math.min(c[0], c[1], c[2]),
+    offset = x < 0.08 ? x - 6.25 * x * x : 0.04,
+    v = c.map((y) => y - offset),
+    peak = Math.max(v[0], v[1], v[2]);
+  if (peak < 0.76) return v;
+  const top = 1 - (0.24 * 0.24) / (peak + 0.24 - 0.76),
+    t = 1 - 1 / (0.15 * (peak - top) + 1);
+  return v.map((y) => (y * top) / peak + (top - (y * top) / peak) * t);
+};
+const encode = (v: number) =>
+  Math.round(255 * Math.min(1, Math.max(0, v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055)));
+const aborted = (signal?: AbortSignal) => {
+  if (signal?.aborted) throw signal.reason ?? new DOMException('The render was aborted', 'AbortError');
+};
+
+/**
+ * Progressive WebGPU path tracer for voxel scenes: an engine plugin that, while `enabled`, replaces the frame with a
+ * path-traced image of a {@link VoxelTraceScene} seen through the engine camera (perspective, or orthographic through
+ * `Camera.project`), refining it every frame until `maxSamples`. Models are walked in 8^3 bricks and voxels
+ * (Amanatides-Woo), instances through a bounding volume hierarchy; materials, lights and options are listed in the
+ * README. `capture` renders a PNG of any size off screen.
+ *
+ * ```ts
+ * const tracer = VoxelPathTracer.attach(engine, { scene });
+ * await tracer.ready; // pipelines compiled (frames before this show the ordinary raster image)
+ * tracer.setScene(next); // validated whole; the accumulation restarts
+ * const png = await tracer.capture({ width: 3840, height: 2160, samples: 512 });
+ * tracer.dispose();
+ * ```
+ */
+export class VoxelPathTracer implements EnginePlugin {
+  /** Plugin name, unique per tracer. */
+  readonly name = `voxel-pathtracer:${serial++}`;
+  #engine?: Engine;
+  #graph?: FrameGraph;
+  #removePass?: () => void;
+  #disposed = false;
+  #enabled = true;
+  #settings: Settings;
+  #cache: SceneCache = { models: new Map(), emitters: new WeakMap() };
+  #snapshot: SceneSnapshot;
+  #version = 1;
+  #gpu?: Gpu;
+  #status: 'compiling' | 'ready' | 'failed' | 'disposed' = 'compiling';
+  #error: unknown;
+  #ready!: Promise<void>;
+  #settle?: [() => void, (error: unknown) => void];
+  #samples = 0;
+  #key = new Float64Array(30);
+  #frameMs = 0;
+  #lastTrace = 0;
+  #bytes = 0;
+  #width = 0;
+  #height = 0;
+  #capturing = 0;
+  #job: Promise<unknown> = Promise.resolve();
+  #frame = new ArrayBuffer(FRAME_BYTES);
+  #view = new Float32Array(VIEW_BYTES / 4);
+  #inverse = new Float64Array(16);
+  #corners = new Float32Array(32);
+
+  private constructor(options: VoxelPathTracerOptions) {
+    if (!options || typeof options !== 'object')
+      throw new TypeError('VoxelPathTracer.attach expects (engine, {scene, ...options})');
+    const { scene, ...rest } = options;
+    this.#settings = settings(rest, DEFAULTS);
+    this.#snapshot = buildSnapshot(scene, this.#cache, DEFAULT_WORDS);
+    this.#newReady();
+  }
+
+  /**
+   * Creates a tracer for `options.scene` and adds it to `engine` (WebGPU backend). Pipelines compile in the background:
+   * until {@link VoxelPathTracer.ready} resolves, frames show the ordinary raster image.
+   * @throws TypeError when the scene or an option has the wrong shape (duplicate ids, a missing model or material).
+   * @throws RangeError for values out of range or a scene over the device's storage limits.
+   * @throws MargoError `unsupported` without the WebGPU backend.
+   */
+  static attach(engine: EngineKernel, options: VoxelPathTracerOptions): VoxelPathTracer {
+    const tracer = new VoxelPathTracer(options);
+    try {
+      engineRuntime(engine).use(tracer);
+    } catch (error) {
+      tracer.dispose();
+      throw error;
+    }
+    return tracer;
+  }
+
+  /** Whether the traced image replaces the frame. While false the tracer draws nothing and traces nothing. */
+  get enabled(): boolean {
+    return this.#enabled;
+  }
+  set enabled(value: boolean) {
+    flag(value, 'enabled');
+    if (value && !this.#enabled) this.#samples = 0;
+    this.#enabled = value;
+  }
+
+  /** Samples, timing and memory of the viewport image. */
+  get stats(): VoxelPathTracerStats {
+    return {
+      samples: this.#samples,
+      frameMs: this.#frameMs,
+      gpuBytes: this.#bytes,
+      converged: this.#samples >= this.#settings.maxSamples,
+      width: this.#width,
+      height: this.#height,
+      sceneRevision: this.#snapshot.revision,
+    };
+  }
+
+  /**
+   * Compatible addition: resolves once the compute pipelines are compiled on the current device (a new promise
+   * after a device restore); rejects with the compile error, or MargoError `disposed`.
+   */
+  get ready(): Promise<void> {
+    return this.#ready;
+  }
+
+  /** Compatible addition: 'compiling', 'ready', 'failed' (see `error`) or 'disposed'. */
+  get status(): 'compiling' | 'ready' | 'failed' | 'disposed' {
+    return this.#status;
+  }
+
+  /** Compatible addition: the pipeline error when `status` is 'failed'. */
+  get error(): unknown {
+    return this.#error;
+  }
+
+  /** Compatible addition: the options in effect (scene excluded), defaults filled in. */
+  get options(): Readonly<
+    Omit<Required<VoxelPathTracerOptions>, 'scene' | 'focusDistance'> & { focusDistance?: number }
+  > {
+    return { ...this.#settings };
+  }
+
+  /**
+   * Replaces the scene with a validated copy and restarts accumulation. Models whose id, revision and size match the
+   * current scene's keep their packed and uploaded voxels.
+   * @throws TypeError / RangeError for an invalid scene (the current scene stays); MargoError `disposed`.
+   */
+  setScene(scene: VoxelTraceScene): void {
+    this.#alive();
+    const limit = this.#gpu ? Math.floor(this.#gpu.device.limits.maxStorageBufferBindingSize / 4) : DEFAULT_WORDS;
+    this.#snapshot = buildSnapshot(scene, this.#cache, limit);
+    this.#version++;
+    this.#samples = 0;
+  }
+
+  /**
+   * Changes options (all validated before any applies). Sampling, lens, shutter and clamp changes restart
+   * accumulation; exposure, tone mapping, denoising and sample budgets apply to the current image.
+   * @throws TypeError / RangeError for an invalid option; MargoError `disposed`.
+   */
+  setOptions(options: Partial<Omit<VoxelPathTracerOptions, 'scene'>>): void {
+    this.#alive();
+    if (options && typeof options === 'object' && 'scene' in options)
+      throw new TypeError('VoxelPathTracer setOptions does not take a scene; call setScene');
+    const next = settings(options, this.#settings),
+      previous = this.#settings;
+    this.#settings = next;
+    if (RESETS.some((k) => !Object.is(previous[k], next[k]))) this.#samples = 0;
+    if (next.order !== previous.order && this.#graph) this.#register(this.#graph);
+  }
+
+  /** Discards the accumulated samples; the next frame starts a new image. */
+  reset(): void {
+    this.#alive();
+    this.#samples = 0;
+  }
+
+  /**
+   * Compatible addition: the closest visible voxel along a world ray (model-local cell, face, palette index), from the
+   * scene being traced. Ground and lights are not hit.
+   * @throws TypeError / RangeError for a malformed ray; MargoError `disposed`.
+   */
+  raycast(origin: TraceVec3, direction: TraceVec3, maxDistance = Infinity): VoxelTraceHit | null {
+    this.#alive();
+    const o = checkVec3(origin, 'raycast origin', false, 'pass a world point'),
+      d = checkVec3(direction, 'raycast direction', false, 'pass a direction');
+    if (!(Math.hypot(d[0], d[1], d[2]) > 0)) throw new RangeError('VoxelPathTracer raycast direction is zero');
+    checkNumber(maxDistance, 'raycast maxDistance', 0, Infinity, 'pass a distance, 0 or more');
+    const s = this.#snapshot,
+      found = raycastSnapshot(s, o, d, maxDistance);
+    if (!found) return null;
+    const instance = s.instances[found.instance],
+      { hit, distance } = found,
+      normal: [number, number, number] = [0, 0, 0],
+      length = Math.hypot(d[0], d[1], d[2]);
+    normal[hit.axis] = hit.sign;
+    return {
+      instanceId: instance.id,
+      modelId: s.models[instance.model].id,
+      cell: hit.cell,
+      normal,
+      adjacent: [hit.cell[0] + normal[0], hit.cell[1] + normal[1], hit.cell[2] + normal[2]],
+      paletteIndex: hit.value,
+      distance,
+      point: [o[0] + (d[0] / length) * distance, o[1] + (d[1] / length) * distance, o[2] + (d[2] / length) * distance],
+    };
+  }
+
+  /**
+   * Renders a PNG of `width` x `height` pixels at `samples` samples per pixel from the engine camera (its aspect set
+   * to the image's), on separate GPU buffers and in tiles; the viewport pauses tracing meanwhile and keeps its image.
+   * Rejects with the signal's reason when aborted, MargoError `failed` when the GPU device is lost, MargoError
+   * `disposed` when the tracer is disposed meanwhile.
+   * @throws TypeError / RangeError for invalid options (as a rejection).
+   */
+  capture(options: VoxelTraceCaptureOptions): Promise<Blob> {
+    return this.#enqueue(async () => {
+      const o = this.#renderOptions(options, 1 << 26),
+        exposure = 2 ** this.#settings.exposure,
+        linear = this.#settings.toneMapping === 'linear',
+        writer = new PngWriter(o.width, o.height);
+      try {
+        await this.#render(o, false, async (_y0, rows, band) => {
+          const bytes = new Uint8Array(o.width * rows * 3),
+            c = [0, 0, 0];
+          for (let i = 0; i < o.width * rows; i++) {
+            for (let k = 0; k < 3; k++) c[k] = Math.max(0, band.color[i * 3 + k] * exposure);
+            const v = linear ? c : neutral(c);
+            for (let k = 0; k < 3; k++) bytes[i * 3 + k] = encode(v[k]);
+          }
+          await writer.write(bytes, rows);
+        });
+        return await writer.finish();
+      } catch (error) {
+        writer.abort();
+        throw error;
+      }
+    });
+  }
+
+  /**
+   * Compatible addition: renders linear float data (and with `aovs` albedo, normals, depth, instance and palette ids)
+   * the way `capture` renders a PNG.
+   * @throws TypeError / RangeError for invalid options (as a rejection); see `capture` for the other rejections.
+   */
+  renderImage(options: VoxelTraceRenderOptions): Promise<VoxelTraceImage> {
+    return this.#enqueue(async () => {
+      const o = this.#renderOptions(options, 1 << 24),
+        n = o.width * o.height,
+        color = new Float32Array(n * 3),
+        aovs = options.aovs === true,
+        albedo = aovs ? new Float32Array(n * 3) : undefined,
+        normal = aovs ? new Float32Array(n * 3) : undefined,
+        depth = aovs ? new Float32Array(n) : undefined,
+        instance = aovs ? new Int32Array(n) : undefined,
+        palette = aovs ? new Uint8Array(n) : undefined,
+        sources = this.#snapshot.instances.map((v) => v.source);
+      await this.#render(o, aovs, async (y0, rows, band) => {
+        const at = y0 * o.width;
+        color.set(band.color, at * 3);
+        if (!aovs) return;
+        albedo!.set(band.albedo!, at * 3);
+        normal!.set(band.normal!, at * 3);
+        depth!.set(band.depth!, at);
+        for (let i = 0; i < o.width * rows; i++) {
+          const id = band.ids![i];
+          if (id >= 256) {
+            instance![at + i] = sources[Math.floor(id / 256) - 1] ?? -1;
+            palette![at + i] = id % 256;
+          } else instance![at + i] = id === -2 ? -2 : id === -3 ? -3 : -1;
+        }
+      });
+      return { width: o.width, height: o.height, samples: o.samples, color, albedo, normal, depth, instance, palette };
+    });
+  }
+
+  /** @internal Engine plugin hook: checks the device and starts compiling. */
+  setup(engine: Engine): void {
+    this.#alive();
+    const device = engine.gpu;
+    if (!device)
+      throw new MargoError('unsupported', 'VoxelPathTracer needs the WebGPU backend; create the engine with WebGPU');
+    const limit = Math.floor(device.limits.maxStorageBufferBindingSize / 4);
+    if (this.#snapshot.voxelWords > limit)
+      throw new RangeError(
+        `VoxelPathTracer scene needs ${this.#snapshot.voxelWords * 4} bytes of voxel bricks; this device binds at most ${limit * 4}`,
+      );
+    this.#engine = engine;
+    this.#state(device);
+  }
+
+  /** @internal Engine plugin hook: the trace, denoise and display pass. */
+  registerPasses(graph: FrameGraph): void {
+    this.#graph = graph;
+    this.#register(graph);
+  }
+
+  /** @internal Engine plugin hook: everything is rebuilt on the new device and accumulation restarts. */
+  onDeviceRestored(engine: Engine): void {
+    if (this.#disposed) return;
+    this.#release();
+    if (engine.gpu) this.#state(engine.gpu);
+  }
+
+  /** Removes the pass, frees every GPU buffer and leaves the engine. Pending captures reject. Safe to repeat. */
+  dispose(): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    try {
+      this.#removePass?.();
+    } catch {
+      // The graph is executing (dispose from inside a frame); the pass checks #disposed and does nothing.
+    }
+    this.#engine?.removePlugin(this.name);
+    this.#release();
+    this.#engine = this.#graph = this.#removePass = undefined;
+    if (this.#status === 'compiling') this.#settle?.[1](new MargoError('disposed', 'VoxelPathTracer is disposed'));
+    this.#status = 'disposed';
+  }
+
+  /** Same as {@link VoxelPathTracer.dispose} (for `using`). */
+  [Symbol.dispose](): void {
+    this.dispose();
+  }
+
+  #alive(): void {
+    if (this.#disposed) throw new MargoError('disposed', 'VoxelPathTracer is disposed; attach a new one');
+  }
+
+  #newReady(): void {
+    this.#ready = new Promise<void>((resolve, reject) => {
+      this.#settle = [resolve, reject];
+    });
+    this.#ready.catch(() => {});
+  }
+
+  #register(graph: FrameGraph): void {
+    this.#removePass?.();
+    this.#removePass = graph.add({
+      name: this.name,
+      order: this.#settings.order,
+      execute: (c) => {
+        if (c.backend === 'webgpu' && this.#enabled && !this.#disposed) this.#execute(c);
+      },
+    });
+  }
+
+  #buffer(gpu: Gpu, size: number, usage: number): GPUBuffer {
+    const b = gpu.device.createBuffer({ size: Math.max(16, Math.ceil(size / 4) * 4), usage });
+    this.#bytes += b.size;
+    return b;
+  }
+  #destroy(b: GPUBuffer | undefined): void {
+    if (!b) return;
+    this.#bytes -= b.size;
+    b.destroy();
+  }
+
+  // GPU state for `device`: layouts, empty scene buffers, pipelines compiling in the background.
+  #state(device: GPUDevice): Gpu {
+    if (this.#gpu?.device === device) return this.#gpu;
+    if (this.#gpu) this.#release();
+    const C = GPUShaderStage.COMPUTE,
+      F = GPUShaderStage.FRAGMENT,
+      entry = (binding: number, type: 'uniform' | 'read-only-storage' | 'storage', visibility = C) => ({
+        binding,
+        visibility,
+        buffer: { type },
+      }),
+      traceLayout = device.createBindGroupLayout({
+        entries: [
+          entry(0, 'uniform'),
+          entry(1, 'uniform'),
+          entry(2, 'read-only-storage'),
+          entry(3, 'read-only-storage'),
+          entry(4, 'read-only-storage'),
+          entry(5, 'read-only-storage'),
+          entry(6, 'storage'),
+          entry(7, 'storage'),
+          entry(8, 'storage'),
+        ],
+      }),
+      denoiseLayout = device.createBindGroupLayout({
+        entries: [
+          entry(0, 'uniform'),
+          entry(1, 'read-only-storage'),
+          entry(2, 'read-only-storage'),
+          entry(3, 'read-only-storage'),
+          entry(4, 'read-only-storage'),
+          entry(5, 'storage'),
+          entry(6, 'storage'),
+        ],
+      }),
+      displayLayout = device.createBindGroupLayout({
+        entries: [
+          entry(0, 'uniform', GPUShaderStage.VERTEX | F),
+          entry(1, 'read-only-storage', F),
+          entry(2, 'read-only-storage', F),
+        ],
+      });
+    const storage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+      gpu: Gpu = {
+        device,
+        lost: false,
+        traceLayout,
+        denoiseLayout,
+        displayLayout,
+        display: new Map(),
+        buffers: undefined as unknown as SceneBuffers,
+        capacity: 0,
+        runs: new Runs(4, 4),
+        regions: new Map(),
+        version: 0,
+        resources: 0,
+      };
+    this.#gpu = gpu;
+    gpu.buffers = {
+      materials: this.#buffer(
+        gpu,
+        256 * 64,
+        GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+      ),
+      voxels: this.#buffer(gpu, 16, storage),
+      scene: this.#buffer(gpu, 16, storage),
+      lights: this.#buffer(gpu, 16, storage),
+      env: this.#buffer(gpu, 16, storage),
+    };
+    gpu.capacity = 4;
+    void device.lost?.then(() => {
+      gpu.lost = true;
+    });
+    this.#samples = 0;
+    if (this.#status !== 'compiling') this.#newReady();
+    this.#status = 'compiling';
+    const trace = device.createShaderModule({ code: TRACE }),
+      denoise = device.createShaderModule({ code: DENOISE }),
+      layout = (l: GPUBindGroupLayout) => device.createPipelineLayout({ bindGroupLayouts: [l] }),
+      compute = (module: GPUShaderModule, entryPoint: string, l: GPUBindGroupLayout) =>
+        device.createComputePipelineAsync({ layout: layout(l), compute: { module, entryPoint } });
+    Promise.all([
+      compute(trace, 'trace', traceLayout),
+      compute(trace, 'ids', traceLayout),
+      compute(denoise, 'prepare', denoiseLayout),
+      compute(denoise, 'atrous', denoiseLayout),
+    ]).then(
+      ([t, ids, prepare, atrous]) => {
+        if (this.#gpu !== gpu || this.#disposed) return;
+        gpu.pipelines = { trace: t, ids, prepare, atrous };
+        this.#status = 'ready';
+        this.#settle?.[0]();
+      },
+      (error) => {
+        if (this.#gpu !== gpu || this.#disposed) return;
+        this.#status = 'failed';
+        this.#error = error;
+        this.#settle?.[1](error);
+        this.#engine?.onError(error);
+      },
+    );
+    return gpu;
+  }
+
+  #release(): void {
+    const gpu = this.#gpu;
+    if (!gpu) return;
+    this.#gpu = undefined;
+    for (const b of Object.values(gpu.buffers)) this.#destroy(b);
+    this.#releaseTargets(gpu.view);
+    if (gpu.view) {
+      this.#destroy(gpu.view.frame);
+      this.#destroy(gpu.view.uniform);
+    }
+    gpu.view = undefined;
+    this.#samples = 0;
+  }
+
+  #releaseTargets(t: Targets | undefined): void {
+    if (!t) return;
+    for (const b of [t.accum, t.albedo, t.normals, t.ping, t.pong, t.guide, t.params]) this.#destroy(b);
+    t.ping = t.pong = t.guide = t.params = undefined;
+    t.denoiseGroups = undefined;
+  }
+
+  // Uploads the snapshot when it changed: voxel regions (kept for unchanged models), scene, lights, environment.
+  #syncScene(gpu: Gpu): void {
+    if (gpu.version === this.#version) return;
+    const s = this.#snapshot,
+      device = gpu.device,
+      limit = Math.floor(device.limits.maxStorageBufferBindingSize / 4),
+      storage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+      present = new Set(s.models);
+    for (const [m, at] of gpu.regions)
+      if (!present.has(m)) {
+        gpu.runs.release(at, m.grid.length + m.payload.length);
+        gpu.regions.delete(m);
+      }
+    const place = (m: PackedModel) => {
+      const words = m.grid.length + m.payload.length,
+        at = gpu.runs.alloc(words);
+      if (at < 0) return false;
+      gpu.regions.set(m, at);
+      device.queue.writeBuffer(gpu.buffers.voxels, at * 4, modelWords(m, at));
+      return true;
+    };
+    let fits = true;
+    for (const m of s.models) if (!gpu.regions.has(m) && !(fits = place(m))) break;
+    if (!fits) {
+      // Repack every model into a buffer with room to spare (the snapshot was checked against the limit).
+      const capacity = Math.min(limit, Math.max(s.voxelWords * 2, 1 << 16));
+      this.#destroy(gpu.buffers.voxels);
+      gpu.buffers.voxels = this.#buffer(gpu, capacity * 4, storage);
+      gpu.capacity = capacity;
+      gpu.runs = new Runs(4, capacity);
+      gpu.regions.clear();
+      for (const m of s.models) place(m);
+      gpu.resources++;
+    }
+    const lights = lightLayout(s),
+      scene = sceneLayout(
+        s,
+        s.models.map((m) => gpu.regions.get(m)!),
+        lights,
+      );
+    const upload = (key: 'scene' | 'lights' | 'env', data: ArrayBufferView) => {
+      if (gpu.buffers[key].size < data.byteLength) {
+        this.#destroy(gpu.buffers[key]);
+        gpu.buffers[key] = this.#buffer(gpu, Math.max(data.byteLength, gpu.buffers[key].size * 2), storage);
+        gpu.resources++;
+      }
+      if (data.byteLength) device.queue.writeBuffer(gpu.buffers[key], 0, data as Uint32Array<ArrayBuffer>);
+    };
+    upload('scene', scene.words);
+    upload('lights', lights.words);
+    const env = s.environment.map;
+    if (env && env !== gpu.envSource) {
+      upload('env', env.texels);
+      gpu.envSource = env;
+    }
+    device.queue.writeBuffer(gpu.buffers.materials, 0, s.materials as Float32Array<ArrayBuffer>);
+    gpu.layout = { scene, lights };
+    gpu.version = this.#version;
+  }
+
+  // Accumulation targets of `width` x `height` (plus the denoiser's when `denoise`).
+  #targets(gpu: Gpu, t: Targets | undefined, width: number, height: number, denoise: boolean): Targets {
+    const storage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+      bytes = width * height * 16;
+    let out = t;
+    if (!out || out.width !== width || out.height !== height) {
+      this.#releaseTargets(out);
+      out = {
+        ...(out ?? {}),
+        width,
+        height,
+        accum: this.#buffer(gpu, bytes, storage),
+        albedo: this.#buffer(gpu, bytes, storage),
+        normals: this.#buffer(gpu, bytes, storage),
+      } as Targets;
+      gpu.resources++;
+    }
+    if (denoise && !out.ping) {
+      out.ping = this.#buffer(gpu, bytes, storage);
+      out.pong = this.#buffer(gpu, bytes, storage);
+      out.guide = this.#buffer(gpu, bytes, storage);
+      out.params = this.#buffer(gpu, PARAM_STRIDE * (ATROUS + 1), GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+      const groups: GPUBindGroup[] = [],
+        o = out;
+      for (let k = 0; k <= ATROUS; k++) {
+        const src = k === 0 ? o.pong! : k % 2 ? o.ping! : o.pong!,
+          dst = k === 0 ? o.ping! : k % 2 ? o.pong! : o.ping!;
+        groups.push(
+          gpu.device.createBindGroup({
+            layout: gpu.denoiseLayout,
+            entries: [
+              { binding: 0, resource: { buffer: o.params!, offset: k * PARAM_STRIDE, size: 176 } },
+              { binding: 1, resource: { buffer: o.accum } },
+              { binding: 2, resource: { buffer: o.albedo } },
+              { binding: 3, resource: { buffer: o.normals } },
+              { binding: 4, resource: { buffer: src } },
+              { binding: 5, resource: { buffer: dst } },
+              { binding: 6, resource: { buffer: o.guide! } },
+            ],
+          }),
+        );
+      }
+      out.denoiseGroups = groups;
+      gpu.resources++;
+    } else if (!denoise && out.ping) {
+      for (const b of [out.ping, out.pong, out.guide, out.params]) this.#destroy(b);
+      out.ping = out.pong = out.guide = out.params = undefined;
+      out.denoiseGroups = undefined;
+      gpu.resources++;
+    }
+    return out;
+  }
+
+  #traceGroup(gpu: Gpu, frame: GPUBuffer, t: Targets, buffers = gpu.buffers): GPUBindGroup {
+    return gpu.device.createBindGroup({
+      layout: gpu.traceLayout,
+      entries: [
+        { binding: 0, resource: { buffer: frame } },
+        { binding: 1, resource: { buffer: buffers.materials } },
+        { binding: 2, resource: { buffer: buffers.voxels } },
+        { binding: 3, resource: { buffer: buffers.scene } },
+        { binding: 4, resource: { buffer: buffers.lights } },
+        { binding: 5, resource: { buffer: buffers.env } },
+        { binding: 6, resource: { buffer: t.accum } },
+        { binding: 7, resource: { buffer: t.albedo } },
+        { binding: 8, resource: { buffer: t.normals } },
+      ],
+    });
+  }
+
+  // Frame uniform for a camera, image and tile (layout.ts FRAME_BYTES; Frame in shaders.ts).
+  #writeFrame(
+    device: GPUDevice,
+    target: GPUBuffer,
+    camera: Camera,
+    image: readonly [number, number, number, number],
+    tile: readonly [number, number, number, number],
+    seed: number,
+    jitter: boolean,
+    layout: { scene: SceneLayout; lights: LightLayout },
+    s: SceneSnapshot,
+  ): boolean {
+    const o = this.#settings,
+      f = new Float32Array(this.#frame),
+      u = new Uint32Array(this.#frame);
+    const inv = this.#inverse;
+    if (!invertMatrix(camera.matrix, inv)) return false;
+    // Corner rays in float64: near-plane points (NDC depth 1, reversed) and directions toward NDC depth 0.5.
+    const unproject = (x: number, y: number, z: number) => {
+      const w = inv[3] * x + inv[7] * y + inv[11] * z + inv[15];
+      return [0, 1, 2].map((r) => (inv[r] * x + inv[4 + r] * y + inv[8 + r] * z + inv[12 + r]) / w);
+    };
+    for (const [k, [x, y]] of [
+      [-1, 1],
+      [1, 1],
+      [-1, -1],
+      [1, -1],
+    ].entries()) {
+      const a = unproject(x, y, 1),
+        b = unproject(x, y, 0.5);
+      f.set([a[0], a[1], a[2], 0], k * 4);
+      f.set([b[0] - a[0], b[1] - a[1], b[2] - a[2], 0], 76 + k * 4);
+    }
+    this.#corners.set(f.subarray(0, 16), 0);
+    this.#corners.set(f.subarray(76, 92), 16);
+    const p = camera.position,
+      t = camera.target,
+      forward = [t[0] - p[0], t[1] - p[1], t[2] - p[2]],
+      distance = Math.hypot(forward[0], forward[1], forward[2]) || 1;
+    for (let k = 0; k < 3; k++) forward[k] /= distance;
+    const up = camera.up,
+      right = [
+        forward[1] * up[2] - forward[2] * up[1],
+        forward[2] * up[0] - forward[0] * up[2],
+        forward[0] * up[1] - forward[1] * up[0],
+      ],
+      rl = Math.hypot(right[0], right[1], right[2]) || 1;
+    for (let k = 0; k < 3; k++) right[k] /= rl;
+    const top = [
+      right[1] * forward[2] - right[2] * forward[1],
+      right[2] * forward[0] - right[0] * forward[2],
+      right[0] * forward[1] - right[1] * forward[0],
+    ];
+    f.set([p[0], p[1], p[2], o.focusDistance ?? distance], 16);
+    f.set([forward[0], forward[1], forward[2], o.aperture / 2], 20);
+    f.set([right[0], right[1], right[2], o.lensBlades], 24);
+    f.set([top[0], top[1], top[2], o.lensRotation], 28);
+    u.set(image, 32);
+    u.set(tile, 36);
+    const e = s.environment,
+      sunOn = e.sun[0] + e.sun[1] + e.sun[2] > 0,
+      env = e.map;
+    let flags = jitter ? FLAG_JITTER : 0;
+    if (sunOn) flags |= FLAG_SUN;
+    if (e.ground) flags |= FLAG_GROUND;
+    if (env) flags |= FLAG_ENV;
+    if (s.moving && o.shutter > 0) flags |= FLAG_MOTION;
+    if (o.clamp < Infinity) flags |= FLAG_CLAMP;
+    u.set([o.maxBounces, seed >>> 0, flags, s.lightCount], 40);
+    const sl = layout.scene,
+      ll = layout.lights;
+    u.set([sl.modelBase, sl.instanceBase, sl.nodeBase, s.instances.length ? sl.nodeCount : 0], 44);
+    u.set([s.emissiveInstances.length, ll.emissiveBase, ll.areaBase, 0], 48);
+    u.set([env?.width ?? 0, env?.height ?? 0, ll.marginalBase, ll.conditionalBase], 52);
+    f.set([e.sky[0], e.sky[1], e.sky[2], env?.intensity ?? 0], 56);
+    const half = e.sunAngularSize / 2,
+      solid = half > 0 ? 2 * Math.PI * (1 - Math.cos(half)) : 0,
+      scale = half > 0 ? 1 / (Math.PI * Math.sin(half) ** 2) : 1;
+    f.set([e.sunDirection[0], e.sunDirection[1], e.sunDirection[2], half > 0 ? Math.cos(half) : 1], 60);
+    f.set([e.sun[0] * scale, e.sun[1] * scale, e.sun[2] * scale, solid], 64);
+    f.set([e.ground?.[0] ?? 0, e.ground?.[1] ?? 0, e.ground?.[2] ?? 0, e.groundHeight], 68);
+    f.set([env?.integral ?? 0, env?.rotation ?? 0, o.shutter, o.clamp < Infinity ? o.clamp : 0], 72);
+    device.queue.writeBuffer(target, 0, this.#frame);
+    return true;
+  }
+
+  // Denoiser levels: tile size, a-trous step, last-level flag; edge-stopping strengths; where the tile lies in the
+  // image and the camera's corner rays (from the last #writeFrame) to place first hits in the world.
+  #denoiseParams(
+    device: GPUDevice,
+    t: Targets,
+    samples: number,
+    tile: readonly [number, number, number, number],
+  ): void {
+    const data = new ArrayBuffer(PARAM_STRIDE * (ATROUS + 1)),
+      u = new Uint32Array(data),
+      f = new Float32Array(data);
+    for (let k = 0; k <= ATROUS; k++) {
+      const at = (k * PARAM_STRIDE) / 4;
+      u.set([t.width, t.height, k === 0 ? 0 : 1 << (k - 1), k === ATROUS ? 1 : 0], at);
+      // Edge stops: luminance difference over 2 standard deviations, normal cosine^128, plane distance over a footprint.
+      f.set([2, 128, 1, 1 / samples], at + 4);
+      u.set(tile, at + 8);
+      f.set(this.#corners, at + 12);
+    }
+    device.queue.writeBuffer(t.params!, 0, data);
+  }
+
+  #encodeDenoise(gpu: Gpu, encoder: GPUCommandEncoder, t: Targets): void {
+    const p = gpu.pipelines!,
+      pass = encoder.beginComputePass(),
+      x = Math.ceil(t.width / 8),
+      y = Math.ceil(t.height / 8);
+    for (let k = 0; k <= ATROUS; k++) {
+      pass.setPipeline(k ? p.atrous : p.prepare);
+      pass.setBindGroup(0, t.denoiseGroups![k]);
+      pass.dispatchWorkgroups(x, y);
+    }
+    pass.end();
+  }
+
+  // The display pipeline for this target (format, samples, depth), compiled asynchronously: undefined until ready.
+  #display(gpu: Gpu, c: Context): GPURenderPipeline | undefined {
+    const samples = c.descriptor.multisample?.count ?? 1,
+      depth = c.descriptor.depthStencil?.format ?? 'depth32float',
+      key = `${c.format}|${samples}|${depth}`;
+    let entry = gpu.display.get(key);
+    if (!entry) {
+      const device = gpu.device,
+        module = device.createShaderModule({ code: DISPLAY }),
+        pending: { pipeline?: GPURenderPipeline } = {};
+      gpu.display.set(key, (entry = pending));
+      device
+        .createRenderPipelineAsync({
+          layout: device.createPipelineLayout({ bindGroupLayouts: [gpu.displayLayout] }),
+          vertex: { module, entryPoint: 'vs' },
+          fragment: { module, entryPoint: 'fs', targets: [{ format: c.format }] },
+          primitive: { topology: 'triangle-list' },
+          depthStencil: { format: depth, depthWriteEnabled: true, depthCompare: 'always' },
+          multisample: { count: samples },
+        })
+        .then(
+          (pipeline) => {
+            pending.pipeline = pipeline;
+          },
+          (error) => this.#engine?.onError(error),
+        );
+    }
+    return entry.pipeline;
+  }
+
+  // Accumulation key: scene, settings, size and every camera value a ray depends on.
+  #moved(c: Context, width: number, height: number): boolean {
+    const k = this.#key,
+      cam = c.camera,
+      values = [this.#version, width, height, ...cam.matrix, ...cam.position, ...cam.target, ...cam.up];
+    let changed = false;
+    for (let i = 0; i < values.length; i++)
+      if (!Object.is(k[i], values[i])) {
+        k[i] = values[i];
+        changed = true;
+      }
+    return changed;
+  }
+
+  #execute(c: Context): void {
+    const gpu = this.#state(c.device);
+    if (!gpu.pipelines || gpu.lost) return;
+    this.#syncScene(gpu);
+    const o = this.#settings,
+      limit = Math.floor(gpu.device.limits.maxStorageBufferBindingSize / 16);
+    let width = Math.max(1, Math.round(c.width * o.resolutionScale)),
+      height = Math.max(1, Math.round(c.height * o.resolutionScale));
+    if (width * height > limit) {
+      const k = Math.sqrt(limit / (width * height));
+      width = Math.max(1, Math.floor(width * k));
+      height = Math.max(1, Math.floor(height * k));
+    }
+    const pipeline = this.#display(gpu, c);
+    if (!pipeline) return;
+    const device = gpu.device;
+    let view = gpu.view;
+    if (!view) {
+      const frame = this.#buffer(gpu, FRAME_BYTES, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST),
+        uniform = this.#buffer(gpu, VIEW_BYTES, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+      view = gpu.view = { ...this.#targets(gpu, undefined, width, height, o.denoise), frame, uniform, denoisedAt: -1 };
+    } else Object.assign(view, this.#targets(gpu, view, width, height, o.denoise));
+    if (this.#moved(c, width, height)) this.#samples = 0;
+    this.#width = width;
+    this.#height = height;
+    const key = `${gpu.resources}`;
+    if (view.traceKey !== key) {
+      view.traceGroup = this.#traceGroup(gpu, view.frame, view);
+      const group = (color: GPUBuffer) =>
+        device.createBindGroup({
+          layout: gpu.displayLayout,
+          entries: [
+            { binding: 0, resource: { buffer: view!.uniform } },
+            { binding: 1, resource: { buffer: color } },
+            { binding: 2, resource: { buffer: view!.albedo } },
+          ],
+        });
+      view.displayRaw = group(view.accum);
+      view.displayDenoised = view.pong ? group(view.pong) : undefined;
+      view.traceKey = key;
+      view.denoisedAt = -1;
+    }
+    if (!this.#capturing && this.#samples < o.maxSamples) {
+      const count = Math.min(o.samplesPerFrame, o.maxSamples - this.#samples);
+      if (
+        !this.#writeFrame(
+          device,
+          view.frame,
+          c.camera,
+          [width, height, 0, 0],
+          [width, height, this.#samples, count],
+          o.seed,
+          true,
+          gpu.layout!,
+          this.#snapshot,
+        )
+      )
+        return;
+      const pass = c.encoder.beginComputePass();
+      pass.setPipeline(gpu.pipelines.trace);
+      pass.setBindGroup(0, view.traceGroup!);
+      pass.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(height / 8));
+      pass.end();
+      this.#samples += count;
+      const now = performance.now();
+      if (this.#lastTrace) this.#frameMs = now - this.#lastTrace;
+      this.#lastTrace = now;
+    } else this.#lastTrace = 0;
+    if (!this.#samples) return;
+    const denoised = o.denoise && view.denoiseGroups !== undefined;
+    if (denoised && view.denoisedAt !== this.#samples) {
+      this.#denoiseParams(device, view, this.#samples, [0, 0, width, height]);
+      this.#encodeDenoise(gpu, c.encoder, view);
+      view.denoisedAt = this.#samples;
+    }
+    const v = this.#view,
+      inverse = this.#inverse;
+    if (!invertMatrix(c.camera.matrix, inverse)) return;
+    v.set(c.camera.matrix, 0);
+    v.set(inverse, 16);
+    v.set([width, height, c.width, c.height], 32);
+    const mode = (c.format === 'rgba16float' ? 1 : 0) | (o.toneMapping === 'linear' ? 2 : 0);
+    v.set([denoised ? 1 : 1 / this.#samples, 2 ** o.exposure, mode, 1 / this.#samples], 36);
+    device.queue.writeBuffer(view.uniform, 0, v);
+    const pass = c.encoder.beginRenderPass({
+      colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
+      depthStencilAttachment: { view: c.depth, depthLoadOp: 'load', depthStoreOp: 'store', stencilReadOnly: true },
+    });
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, denoised ? view.displayDenoised! : view.displayRaw!);
+    pass.draw(3);
+    pass.end();
+  }
+
+  #enqueue<T>(run: () => Promise<T>): Promise<T> {
+    const job = this.#job.then(
+      () => run(),
+      () => run(),
+    );
+    this.#job = job.catch(() => {});
+    return job;
+  }
+
+  #renderOptions(
+    options: VoxelTraceRenderOptions | VoxelTraceCaptureOptions,
+    maxPixels: number,
+  ): {
+    width: number;
+    height: number;
+    samples: number;
+    denoise: boolean;
+    jitter: boolean;
+    seed: number;
+    signal?: AbortSignal;
+  } {
+    this.#alive();
+    if (!options || typeof options !== 'object')
+      throw new TypeError('VoxelPathTracer render options must be {width, height, samples}');
+    const width = whole(options.width, 'width', 1, 16384, 'pass the image width in pixels'),
+      height = whole(options.height, 'height', 1, 16384, 'pass the image height in pixels'),
+      samples = whole(options.samples, 'samples', 1, 1 << 20, 'pass samples per pixel, 1 or more');
+    if (width * height > maxPixels)
+      throw new RangeError(`VoxelPathTracer ${width}x${height} is over ${maxPixels} pixels; render a smaller image`);
+    const r = options as VoxelTraceRenderOptions,
+      denoise = r.denoise === undefined ? this.#settings.denoise : flag(r.denoise, 'denoise'),
+      jitter = r.jitter === undefined ? true : flag(r.jitter, 'jitter'),
+      seed = r.seed === undefined ? this.#settings.seed : whole(r.seed, 'seed', 0, 0xffffffff, 'pass an integer seed');
+    if (r.signal !== undefined && !(r.signal instanceof AbortSignal))
+      throw new TypeError('VoxelPathTracer signal must be an AbortSignal');
+    aborted(r.signal);
+    return { width, height, samples, denoise, jitter, seed, signal: r.signal };
+  }
+
+  // Renders tiles band by band and hands each band (rows y0..y0+rows) to `consume`.
+  async #render(
+    o: {
+      width: number;
+      height: number;
+      samples: number;
+      denoise: boolean;
+      jitter: boolean;
+      seed: number;
+      signal?: AbortSignal;
+    },
+    aovs: boolean,
+    consume: (
+      y0: number,
+      rows: number,
+      band: {
+        color: Float32Array;
+        albedo?: Float32Array;
+        normal?: Float32Array;
+        depth?: Float32Array;
+        ids?: Float32Array;
+      },
+    ) => Promise<void>,
+  ): Promise<void> {
+    this.#alive();
+    if (this.#status === 'compiling') await this.#ready;
+    this.#alive();
+    const gpu = this.#gpu;
+    if (!gpu?.pipelines)
+      throw new MargoError('state', 'VoxelPathTracer is not attached to a WebGPU engine; attach it first');
+    const device = gpu.device,
+      engineCamera = this.#engine!.camera,
+      camera = new Camera({
+        fov: engineCamera.fov,
+        position: engineCamera.position,
+        target: engineCamera.target,
+        near: engineCamera.near,
+        far: engineCamera.far,
+      });
+    camera.up = engineCamera.up;
+    camera.project = engineCamera.project;
+    camera.update(o.width / o.height, true);
+    this.#syncScene(gpu);
+    const snapshot = this.#snapshot,
+      layout = gpu.layout!,
+      storage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+      created: GPUBuffer[] = [],
+      make = (size: number, usage: number) => {
+        const b = this.#buffer(gpu, size, usage);
+        created.push(b);
+        return b;
+      };
+    let targets: Targets | undefined;
+    this.#capturing++;
+    try {
+      // Private copies of the scene buffers: setScene during the render cannot change what it traces.
+      const copies = {} as SceneBuffers,
+        encoder = device.createCommandEncoder();
+      for (const key of ['materials', 'voxels', 'scene', 'lights', 'env'] as const) {
+        const source = gpu.buffers[key],
+          usage = key === 'materials' ? GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST : storage;
+        copies[key] = make(source.size, usage);
+        encoder.copyBufferToBuffer(source, 0, copies[key], 0, source.size);
+      }
+      device.queue.submit([encoder.finish()]);
+      const multi = o.width > TILE || o.height > TILE,
+        apron = o.denoise && multi ? APRON : 0,
+        tw = Math.min(o.width, TILE) + 2 * apron,
+        th = Math.min(o.height, TILE) + 2 * apron,
+        frame = make(FRAME_BYTES, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST),
+        bytes = tw * th * 16,
+        staging = (aovs ? [0, 1, 2] : [0]).map(() => make(bytes, GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST));
+      let group: GPUBindGroup | undefined,
+        submitted = 0;
+      const check = () => {
+        aborted(o.signal);
+        this.#alive();
+        if (gpu.lost || this.#gpu !== gpu)
+          throw new MargoError('failed', 'VoxelPathTracer lost its GPU device during the render; render again');
+      };
+      for (let y0 = 0; y0 < o.height; y0 += TILE) {
+        const rows = Math.min(TILE, o.height - y0),
+          band = {
+            color: new Float32Array(o.width * rows * 3),
+            albedo: aovs ? new Float32Array(o.width * rows * 3) : undefined,
+            normal: aovs ? new Float32Array(o.width * rows * 3) : undefined,
+            depth: aovs ? new Float32Array(o.width * rows) : undefined,
+            ids: aovs ? new Float32Array(o.width * rows) : undefined,
+          };
+        for (let x0 = 0; x0 < o.width; x0 += TILE) {
+          const cols = Math.min(TILE, o.width - x0),
+            rx0 = Math.max(0, x0 - apron),
+            ry0 = Math.max(0, y0 - apron),
+            rx1 = Math.min(o.width, x0 + cols + apron),
+            ry1 = Math.min(o.height, y0 + rows + apron),
+            w = rx1 - rx0,
+            h = ry1 - ry0;
+          if (!targets || targets.width !== w || targets.height !== h) {
+            this.#releaseTargets(targets);
+            targets = this.#targets(gpu, undefined, w, h, o.denoise);
+            group = this.#traceGroup(gpu, frame, targets, copies);
+          }
+          const batch = Math.max(1, Math.min(16, Math.floor((1 << 20) / (w * h))));
+          for (let s = 0; s < o.samples; s += batch) {
+            check();
+            const count = Math.min(batch, o.samples - s);
+            this.#writeFrame(
+              device,
+              frame,
+              camera,
+              [o.width, o.height, rx0, ry0],
+              [w, h, s, count],
+              o.seed,
+              o.jitter,
+              layout,
+              snapshot,
+            );
+            const e = device.createCommandEncoder(),
+              pass = e.beginComputePass();
+            pass.setPipeline(gpu.pipelines.trace);
+            pass.setBindGroup(0, group!);
+            pass.dispatchWorkgroups(Math.ceil(w / 8), Math.ceil(h / 8));
+            pass.end();
+            device.queue.submit([e.finish()]);
+            if (++submitted % 4 === 0) await device.queue.onSubmittedWorkDone();
+          }
+          check();
+          const e = device.createCommandEncoder();
+          if (aovs) {
+            this.#writeFrame(
+              device,
+              frame,
+              camera,
+              [o.width, o.height, rx0, ry0],
+              [w, h, 0, 1],
+              o.seed,
+              false,
+              layout,
+              snapshot,
+            );
+            const pass = e.beginComputePass();
+            pass.setPipeline(gpu.pipelines.ids);
+            pass.setBindGroup(0, group!);
+            pass.dispatchWorkgroups(Math.ceil(w / 8), Math.ceil(h / 8));
+            pass.end();
+          }
+          if (o.denoise) {
+            this.#denoiseParams(device, targets, o.samples, [rx0, ry0, o.width, o.height]);
+            this.#encodeDenoise(gpu, e, targets);
+          }
+          const size = w * h * 16;
+          e.copyBufferToBuffer(o.denoise ? targets.pong! : targets.accum, 0, staging[0], 0, size);
+          if (aovs) {
+            e.copyBufferToBuffer(targets.albedo, 0, staging[1], 0, size);
+            e.copyBufferToBuffer(targets.normals, 0, staging[2], 0, size);
+          }
+          device.queue.submit([e.finish()]);
+          const maps = staging.map((b) => b.mapAsync(GPUMapMode.READ, 0, size));
+          try {
+            await Promise.all(maps);
+          } catch (error) {
+            check();
+            throw new MargoError(
+              'failed',
+              `VoxelPathTracer could not read the render back (${String(error)}); render again`,
+            );
+          }
+          const read = (b: GPUBuffer) => new Float32Array(b.getMappedRange(0, size).slice(0)),
+            c = read(staging[0]),
+            a = aovs ? read(staging[1]) : undefined,
+            n = aovs ? read(staging[2]) : undefined;
+          for (const b of staging) b.unmap();
+          const scale = o.denoise ? 1 : 1 / o.samples;
+          for (let y = 0; y < rows; y++)
+            for (let x = 0; x < cols; x++) {
+              const src = (y0 + y - ry0) * w + (x0 + x - rx0),
+                dst = y * o.width + x0 + x;
+              for (let k = 0; k < 3; k++) band.color[dst * 3 + k] = c[src * 4 + k] * scale;
+              if (a && n) {
+                for (let k = 0; k < 3; k++) {
+                  band.albedo![dst * 3 + k] = a[src * 4 + k] / o.samples;
+                  band.normal![dst * 3 + k] = n[src * 4 + k] / o.samples;
+                }
+                const inv = a[src * 4 + 3] / o.samples;
+                band.depth![dst] = inv > 0 ? 1 / inv : Infinity;
+                band.ids![dst] = n[src * 4 + 3];
+              }
+            }
+        }
+        check();
+        await consume(y0, rows, band);
+      }
+    } finally {
+      this.#capturing--;
+      this.#releaseTargets(targets);
+      for (const b of created) this.#destroy(b);
+    }
+  }
+}

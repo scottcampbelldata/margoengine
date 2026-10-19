@@ -85,6 +85,7 @@
     "packages/oit",
     "packages/cache",
     "packages/voxel",
+    "packages/voxel-pathtracer",
     "examples/vite",
     "examples/gameplay-sandbox",
     "examples/voxel-sandbox",

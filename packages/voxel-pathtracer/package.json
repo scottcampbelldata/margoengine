@@ -1,0 +1,33 @@
+{
+  "name": "@margoengine/voxel-pathtracer",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Progressive WebGPU path tracer for instanced voxel models: diffuse, plastic, metal, glass, emissive, blended and volumetric materials, sun, sky, HDR environment and area lights, depth of field, motion blur, a denoiser and PNG capture.",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0"
+  },
+  "dependencies": {
+    "@margoengine/math": "^1.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js voxel-pathtracer",
+    "test": "npm run build && node --test tests/*.test.js",
+    "prepack": "npm run build"
+  },
+  "homepage": "https://margoengine.com"
+}

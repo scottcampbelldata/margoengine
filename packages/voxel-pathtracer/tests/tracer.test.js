@@ -1,0 +1,492 @@
+// VoxelPathTracer as an engine plugin against a recording WebGPU device: what each frame encodes (trace dispatch,
+// denoiser, display draw), which changes restart accumulation, enable/disable, maxSamples, uploads reused by id and
+// revision, disposal, device restore, and captures (PNG bytes, cancellation, device loss). Real-GPU pixels are
+// tests/browser-check.mjs.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { inflateSync } from 'node:zlib';
+import { VoxelPathTracer } from '../dist/index.js';
+import { fakeDevice, fakeEngine, materials, model, settle, simpleScene, translate } from './support.js';
+
+const FRAME = 368;
+const isMargo = (code) => (error) => error.name === 'MargoError' && error.code === code;
+
+// Attaches and runs frames until the trace and display pipelines are compiled.
+async function ready(options = {}, harness = fakeEngine()) {
+  const tracer = VoxelPathTracer.attach(harness.engine, { scene: simpleScene(), ...options });
+  await tracer.ready;
+  harness.frame();
+  await settle();
+  return { tracer, ...harness };
+}
+// The viewport's frame uniform: first sample and sample count of the last trace dispatch.
+const traced = (device) => {
+  const frame = device.buffers.findLast((b) => b.size === FRAME && !b.destroyed),
+    u = new Uint32Array(frame.data);
+  return { first: u[38], count: u[39], seed: u[41], flags: u[42], width: u[32], height: u[33] };
+};
+const kinds = (passes) =>
+  passes.map((p) =>
+    p.type === 'render'
+      ? `draw${p.commands.find((c) => c[0] === 'draw')?.[1]}`
+      : `${p.commands.filter((c) => c[0] === 'dispatchWorkgroups').length} dispatch`,
+  );
+
+test('a frame traces samplesPerFrame samples, then draws the image; nothing before the pipelines are ready', async () => {
+  const h = fakeEngine(),
+    tracer = VoxelPathTracer.attach(h.engine, { scene: simpleScene(), samplesPerFrame: 3 });
+  assert.equal(tracer.status, 'compiling');
+  assert.deepEqual(h.frame(), [], 'compiling: the raster frame shows');
+  await tracer.ready;
+  assert.equal(tracer.status, 'ready');
+  h.frame();
+  await settle();
+  assert.deepEqual(kinds(h.frame()), ['1 dispatch', 'draw3']);
+  assert.deepEqual(traced(h.device), { first: 0, count: 3, seed: 0, flags: 16, width: 64, height: 48 });
+  h.frame();
+  assert.equal(traced(h.device).first, 3);
+  assert.equal(tracer.stats.samples, 6);
+  assert.equal(tracer.stats.width, 64);
+  const draw = h.device.passes.find((p) => p.type === 'render');
+  assert.equal(draw.descriptor.colorAttachments[0].loadOp, 'load');
+  assert.equal(draw.descriptor.depthStencilAttachment.stencilReadOnly, true);
+  tracer.dispose();
+});
+
+test('camera, size, scene, sampling options, enable and reset restart accumulation; display options do not', async () => {
+  const { tracer, frame, device, camera, context } = await ready();
+  frame();
+  frame();
+  assert.equal(traced(device).first, 1);
+  const restarts = [
+    ['camera move', () => (camera.position = [21, 14, 24])],
+    ['camera target', () => (camera.target = [4, 2, 4])],
+    ['field of view', () => (camera.fov = 30)],
+    [
+      'orthographic projection',
+      () =>
+        (camera.project = (out) => {
+          out.fill(0);
+          out[0] = 0.05;
+          out[5] = 0.05;
+          out[10] = 0.001;
+          out[14] = 0.5;
+          out[15] = 1;
+        }),
+    ],
+    ['resize', () => (context.width = 80)],
+    ['scene', () => tracer.setScene(simpleScene({ revision: 2 }))],
+    ['maxBounces', () => tracer.setOptions({ maxBounces: 3 })],
+    ['seed', () => tracer.setOptions({ seed: 9 })],
+    ['aperture', () => tracer.setOptions({ aperture: 0.5 })],
+    ['focus', () => tracer.setOptions({ focusDistance: 10 })],
+    ['blades', () => tracer.setOptions({ lensBlades: 6 })],
+    ['shutter', () => tracer.setOptions({ shutter: 0.5 })],
+    ['clamp', () => tracer.setOptions({ clamp: 8 })],
+    ['resolution scale', () => tracer.setOptions({ resolutionScale: 0.5 })],
+    ['reset', () => tracer.reset()],
+    [
+      'enable',
+      () => {
+        tracer.enabled = false;
+        frame();
+        tracer.enabled = true;
+      },
+    ],
+  ];
+  for (const [name, change] of restarts) {
+    frame();
+    assert.ok(traced(device).first > 0, `${name}: accumulating before`);
+    change();
+    frame();
+    assert.equal(traced(device).first, 0, `${name} restarts accumulation`);
+  }
+  assert.equal(traced(device).seed, 9);
+  assert.equal(traced(device).width, 40, 'resolutionScale 0.5 of 80');
+  for (const [name, options] of [
+    ['exposure', { exposure: 2 }],
+    ['tone mapping', { toneMapping: 'linear' }],
+    ['samples per frame', { samplesPerFrame: 2 }],
+    ['max samples', { maxSamples: 500 }],
+    ['denoise', { denoise: true }],
+  ]) {
+    frame();
+    const before = traced(device).first;
+    tracer.setOptions(options);
+    frame();
+    assert.ok(traced(device).first > before, `${name} keeps accumulating`);
+  }
+  tracer.dispose();
+});
+
+test('disabled tracers encode nothing and leave the frame alone', async () => {
+  const { tracer, frame } = await ready();
+  assert.equal(frame().length, 2);
+  tracer.enabled = false;
+  assert.deepEqual(frame(), []);
+  assert.throws(() => (tracer.enabled = 'yes'), TypeError);
+  tracer.enabled = true;
+  assert.equal(frame().length, 2);
+  tracer.dispose();
+});
+
+test('maxSamples stops tracing (converged) while the image is still drawn', async () => {
+  const { tracer, frame } = await ready({ maxSamples: 3, samplesPerFrame: 2 });
+  assert.deepEqual(kinds(frame()), ['1 dispatch', 'draw3']);
+  assert.deepEqual(kinds(frame()), ['1 dispatch', 'draw3']);
+  assert.equal(tracer.stats.samples, 3, 'the last frame traces only what is left');
+  assert.ok(tracer.stats.converged);
+  assert.deepEqual(kinds(frame()), ['draw3']);
+  tracer.setOptions({ maxSamples: 4 });
+  assert.equal(tracer.stats.converged, false);
+  assert.deepEqual(kinds(frame()), ['1 dispatch', 'draw3']);
+  tracer.dispose();
+});
+
+test('denoising adds one prepare and five wavelet dispatches when new samples arrive', async () => {
+  const { tracer, frame } = await ready({ denoise: true, maxSamples: 2 });
+  assert.deepEqual(kinds(frame()), ['1 dispatch', '6 dispatch', 'draw3']);
+  assert.deepEqual(kinds(frame()), ['1 dispatch', '6 dispatch', 'draw3']);
+  assert.deepEqual(kinds(frame()), ['draw3'], 'converged: the denoised image is reused');
+  tracer.dispose();
+});
+
+test('voxel uploads are kept for unchanged models and released for removed ones', async () => {
+  const a = model('a', [16, 16, 16], (x, y, z) => ((x + y + z) % 3 ? 1 : 0)),
+    b = model('b', [8, 8, 8], () => 2),
+    scene = {
+      revision: 1,
+      models: [a, b],
+      instances: [
+        { id: 'ia', modelId: 'a', matrix: translate(0, 0, 0) },
+        { id: 'ib', modelId: 'b', matrix: translate(20, 0, 0) },
+      ],
+      materials: materials([1, 2]),
+    },
+    { tracer, frame, device } = await ready({ scene });
+  frame();
+  const voxels = device.buffers.filter((b) => b.usage & 128 && !b.destroyed).sort((x, y) => y.size - x.size)[0],
+    words = new Uint32Array(voxels.data),
+    before = words.slice();
+  // b is a uniform brick: one grid word with the uniform flag and palette 2, no payload.
+  assert.ok(words.includes(0x80000002), 'uniform brick of palette 2');
+  // A new revision of b changes only b's region; a's words stay where they were.
+  tracer.setScene({ ...scene, revision: 2, models: [a, model('b', [8, 8, 8], (x) => (x < 4 ? 2 : 0), 2)] });
+  frame();
+  const after = new Uint32Array(voxels.data);
+  let same = 0;
+  for (let i = 0; i < before.length; i++) if (before[i] === after[i]) same++;
+  assert.ok(same > before.length - 200, `a's region unchanged (${before.length - same} words differ)`);
+  assert.ok(!voxels.destroyed, 'no reallocation for a small change');
+  tracer.dispose();
+});
+
+test('dispose frees every GPU buffer, removes the pass and plugin, and rejects later work', async () => {
+  const { tracer, frame, device, engine } = await ready({ denoise: true });
+  frame();
+  assert.ok(tracer.stats.gpuBytes > 0);
+  tracer.dispose();
+  assert.equal(tracer.stats.gpuBytes, 0);
+  assert.ok(
+    device.buffers.every((b) => b.destroyed),
+    'every buffer destroyed',
+  );
+  assert.equal(engine.plugins.size, 0);
+  assert.deepEqual(frame(), []);
+  tracer.dispose();
+  await assert.rejects(tracer.capture({ width: 4, height: 4, samples: 1 }), isMargo('disposed'));
+});
+
+test('engine.removePlugin disposes the tracer; disposing while compiling rejects ready', async () => {
+  const h = fakeEngine(),
+    tracer = VoxelPathTracer.attach(h.engine, { scene: simpleScene() });
+  tracer.dispose();
+  await assert.rejects(tracer.ready, isMargo('disposed'));
+  const second = VoxelPathTracer.attach(h.engine, { scene: simpleScene() });
+  h.engine.removePlugin(second.name);
+  assert.equal(second.status, 'disposed');
+  assert.ok(h.device.buffers.every((b) => b.destroyed));
+});
+
+test('a restored device gets fresh buffers, pipelines and accumulation; the old one is released', async () => {
+  const { tracer, frame, device, engine } = await ready();
+  frame();
+  frame();
+  const fresh = fakeDevice();
+  engine.gpu = fresh;
+  tracer.onDeviceRestored(engine);
+  assert.ok(
+    device.buffers.every((b) => b.destroyed),
+    'old device buffers released',
+  );
+  assert.equal(tracer.status, 'compiling');
+  assert.equal(tracer.stats.samples, 0);
+  await tracer.ready;
+  frame();
+  await settle();
+  assert.deepEqual(kinds(frame()), ['1 dispatch', 'draw3']);
+  assert.equal(traced(fresh).first, 0);
+  assert.ok(
+    fresh.buffers.some((b) => !b.destroyed && b.size > 1000),
+    'scene uploaded again',
+  );
+  tracer.dispose();
+  assert.ok(fresh.buffers.every((b) => b.destroyed));
+});
+
+test('the engine switching devices without a restore call is handled the same way', async () => {
+  const { tracer, frame, device, engine } = await ready();
+  frame();
+  engine.gpu = fakeDevice();
+  frame();
+  assert.ok(device.buffers.every((b) => b.destroyed));
+  await tracer.ready;
+  frame();
+  await settle();
+  assert.deepEqual(kinds(frame()), ['1 dispatch', 'draw3']);
+  tracer.dispose();
+});
+
+test('order changes move the pass; the pass leaves with the plugin', async () => {
+  const { tracer, frame, engine } = await ready();
+  engine.frameGraph.add({
+    name: 'probe',
+    order: 10,
+    execute: () => engine.gpu.passes.push({ type: 'probe', commands: [] }),
+  });
+  assert.deepEqual(
+    frame().map((p) => p.type),
+    ['probe', 'compute', 'render'],
+  );
+  tracer.setOptions({ order: 5 });
+  assert.deepEqual(
+    frame().map((p) => p.type),
+    ['compute', 'render', 'probe'],
+  );
+  tracer.dispose();
+  assert.deepEqual(
+    frame().map((p) => p.type),
+    ['probe'],
+  );
+});
+
+// Decodes an 8-bit RGB PNG (filters 0-4) into rows of bytes.
+function decodePNG(bytes) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  assert.deepEqual([...bytes.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+  let at = 8,
+    width = 0,
+    height = 0;
+  const idat = [];
+  for (;;) {
+    const length = view.getUint32(at),
+      type = String.fromCharCode(...bytes.subarray(at + 4, at + 8)),
+      data = bytes.subarray(at + 8, at + 8 + length);
+    if (type === 'IHDR') {
+      width = view.getUint32(at + 8);
+      height = view.getUint32(at + 12);
+      assert.deepEqual([...data.subarray(8)], [8, 2, 0, 0, 0]);
+    }
+    if (type === 'IDAT') idat.push(data);
+    at += 12 + length;
+    if (type === 'IEND') break;
+  }
+  const raw = inflateSync(Buffer.concat(idat)),
+    stride = width * 3,
+    out = new Uint8Array(width * height * 3);
+  for (let y = 0; y < height; y++) {
+    const type = raw[y * (stride + 1)],
+      line = raw.subarray(y * (stride + 1) + 1, (y + 1) * (stride + 1));
+    for (let i = 0; i < stride; i++) {
+      const a = i >= 3 ? out[y * stride + i - 3] : 0,
+        b = y ? out[(y - 1) * stride + i] : 0,
+        c = i >= 3 && y ? out[(y - 1) * stride + i - 3] : 0;
+      let p = 0;
+      if (type === 1) p = a;
+      else if (type === 2) p = b;
+      else if (type === 3) p = (a + b) >> 1;
+      else if (type === 4) {
+        const q = a + b - c,
+          pa = Math.abs(q - a),
+          pb = Math.abs(q - b),
+          pc = Math.abs(q - c);
+        p = pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+      }
+      out[y * stride + i] = (line[i] + p) & 255;
+    }
+  }
+  return { width, height, pixels: out };
+}
+
+test('capture renders the requested size in tiles and encodes a PNG of the tone-mapped image', async () => {
+  const h = fakeEngine(),
+    { tracer, device } = await ready({ toneMapping: 'linear' }, h);
+  // The fake GPU runs no shaders: each read-back of a tile's colour sums is filled with a gradient that encodes the
+  // pixel's position in the full image (the frame uniform says where the tile is), times the sample count.
+  let frame;
+  device.onMap = (b) => {
+    const f = new Float32Array(b.data),
+      u = new Uint32Array(frame.data),
+      [W, H, x0, y0] = u.subarray(32, 36),
+      [w] = u.subarray(36, 38);
+    for (let i = 0; i < f.length / 4; i++) {
+      const x = x0 + (i % w),
+        y = y0 + Math.floor(i / w);
+      f.set([(x / (W - 1)) * 7, (y / (H - 1)) * 7, 0.5 * 7, 7], i * 4);
+    }
+  };
+  const create = device.createBuffer.bind(device);
+  device.createBuffer = (d) => {
+    const b = create(d);
+    if (d.size === FRAME) frame = b;
+    return b;
+  };
+  const blob = await tracer.capture({ width: 1500, height: 1100, samples: 7 });
+  assert.equal(blob.type, 'image/png');
+  const png = decodePNG(new Uint8Array(await blob.arrayBuffer()));
+  assert.equal(png.width, 1500);
+  assert.equal(png.height, 1100);
+  const srgb = (v) => Math.round(255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055));
+  for (const [x, y] of [
+    [0, 0],
+    [1499, 0],
+    [1023, 1023],
+    [1024, 1024],
+    [700, 1099],
+  ]) {
+    const p = (y * 1500 + x) * 3;
+    assert.deepEqual(
+      [...png.pixels.subarray(p, p + 3)],
+      [srgb(x / 1499), srgb(y / 1099), srgb(0.5)],
+      `pixel ${x},${y} (tile seams must not show)`,
+    );
+  }
+  assert.ok(device.submits > 4, 'four tiles traced');
+  assert.equal(
+    tracer.stats.gpuBytes,
+    h.device.buffers.filter((b) => !b.destroyed).reduce((n, b) => n + b.size, 0),
+  );
+  tracer.dispose();
+});
+
+test('renderImage returns linear colour and AOVs mapped back to the caller instance indices', async () => {
+  const scene = {
+      revision: 1,
+      models: [model('m', [2, 2, 2], () => 3)],
+      instances: [
+        { id: 'hidden', modelId: 'm', matrix: translate(-9, 0, 0), visible: false },
+        { id: 'shown', modelId: 'm', matrix: translate(0, 0, 0) },
+      ],
+      materials: materials([3]),
+    },
+    { tracer, device } = await ready({ scene });
+  // Every read-back gets (2, 4, 6, w): w is the id in the normals buffer and the inverse-distance sum in albedo.
+  device.onMap = (b) => {
+    const f = new Float32Array(b.data);
+    for (let i = 0; i < f.length / 4; i++) f.set([2, 4, 6, [1 * 256 + 3, -1, -2][i % 3]], i * 4);
+  };
+  const image = await tracer.renderImage({ width: 3, height: 2, samples: 2, aovs: true });
+  assert.deepEqual([...image.color.subarray(0, 3)], [1, 2, 3]);
+  assert.deepEqual([...image.albedo.subarray(0, 3)], [1, 2, 3]);
+  assert.deepEqual([...image.normal.subarray(0, 3)], [1, 2, 3]);
+  assert.deepEqual([...image.instance], [1, -1, -2, 1, -1, -2], 'GPU instance 0 is scene.instances[1]');
+  assert.deepEqual([...image.palette], [3, 0, 0, 3, 0, 0]);
+  assert.equal(image.depth[0], Math.fround(2 / 259), 'distance = samples / inverse-distance sum (float32)');
+  assert.equal(image.depth[1], Infinity);
+  tracer.dispose();
+});
+
+test('capture cancels between dispatches, releases its buffers and lets the viewport trace again', async () => {
+  const { tracer, device, frame } = await ready();
+  frame();
+  const bytes = tracer.stats.gpuBytes,
+    controller = new AbortController();
+  let waits = 0;
+  device.queue.onSubmittedWorkDone = async () => {
+    if (++waits === 2) controller.abort(new DOMException('stop', 'AbortError'));
+  };
+  await assert.rejects(
+    tracer.capture({ width: 256, height: 256, samples: 1000, signal: controller.signal }),
+    (error) => error.name === 'AbortError',
+  );
+  assert.equal(tracer.stats.gpuBytes, bytes, 'capture buffers released');
+  assert.ok(device.submits < 100, `stopped early (${device.submits} submits)`);
+  assert.deepEqual(kinds(frame()), ['1 dispatch', 'draw3'], 'viewport traces again');
+  // An already-aborted signal rejects at once; invalid sizes reject with RangeError.
+  await assert.rejects(
+    tracer.capture({ width: 8, height: 8, samples: 1, signal: AbortSignal.abort() }),
+    (e) => e.name === 'AbortError',
+  );
+  await assert.rejects(tracer.capture({ width: 0, height: 8, samples: 1 }), RangeError);
+  await assert.rejects(tracer.capture({ width: 9000, height: 9000, samples: 1 }), RangeError);
+  await assert.rejects(tracer.renderImage({ width: 8, height: 8, samples: 1.5 }), RangeError);
+  tracer.dispose();
+});
+
+test('the viewport pauses while a capture runs and keeps its samples', async () => {
+  const { tracer, device, frame } = await ready();
+  frame();
+  frame();
+  const samples = tracer.stats.samples;
+  let release;
+  const gate = new Promise((r) => {
+    release = r;
+  });
+  device.mapGate = gate;
+  const job = tracer.capture({ width: 8, height: 8, samples: 8 });
+  await settle();
+  assert.deepEqual(kinds(frame()), ['draw3'], 'paused: drawn, not traced');
+  assert.equal(tracer.stats.samples, samples);
+  release();
+  await job;
+  assert.deepEqual(kinds(frame()), ['1 dispatch', 'draw3']);
+  assert.equal(tracer.stats.samples, samples + 1);
+  tracer.dispose();
+});
+
+test('a capture whose device is lost rejects with MargoError failed', async () => {
+  const { tracer, device } = await ready();
+  device.onMap = () => {
+    throw new Error('device lost');
+  };
+  device.lose();
+  await settle();
+  await assert.rejects(tracer.capture({ width: 8, height: 8, samples: 1 }), isMargo('failed'));
+  tracer.dispose();
+});
+
+test('the frame uniform carries the environment, lights and options the shader reads', async () => {
+  const scene = simpleScene({
+      environment: {
+        skyColor: [0.5, 0.25, 1],
+        skyIntensity: 2,
+        sunDirection: [0, 2, 0],
+        sunIntensity: 3,
+        sunAngularSize: 0.2,
+        groundColor: [0.3, 0.3, 0.3],
+        groundHeight: -1,
+      },
+      lights: [{ id: 'l', position: [0, 5, 0], edgeU: [1, 0, 0], edgeV: [0, 0, 1], intensity: 4 }],
+    }),
+    { tracer, frame, device } = await ready({ scene, clamp: 20, aperture: 0.4, lensBlades: 5 });
+  frame();
+  const buffer = device.buffers.findLast((b) => b.size === FRAME && !b.destroyed),
+    f = new Float32Array(buffer.data),
+    u = new Uint32Array(buffer.data);
+  assert.equal(u[42], 1 | 2 | 16 | 32, 'sun, ground, jitter, clamp');
+  assert.equal(u[43], 1, 'one area light');
+  assert.deepEqual([...f.subarray(56, 59)], [1, 0.5, 2]);
+  assert.deepEqual([...f.subarray(60, 63)], [0, 1, 0]);
+  assert.ok(Math.abs(f[63] - Math.cos(0.1)) < 1e-6);
+  // Irradiance 3 from a disk of half-angle 0.1: radiance 3 / (pi sin^2 0.1), solid angle 2 pi (1 - cos 0.1).
+  assert.ok(Math.abs(f[64] - 3 / (Math.PI * Math.sin(0.1) ** 2)) / f[64] < 1e-6);
+  assert.ok(Math.abs(f[67] - 2 * Math.PI * (1 - Math.cos(0.1))) < 1e-6);
+  assert.deepEqual(
+    [...f.subarray(68, 72)].map((v) => Math.round(v * 100) / 100),
+    [0.3, 0.3, 0.3, -1],
+  );
+  assert.equal(f[75], 20);
+  assert.ok(Math.abs(f[23] - 0.2) < 1e-7, 'lens radius is half the aperture');
+  assert.equal(f[27], 5);
+  tracer.dispose();
+});
