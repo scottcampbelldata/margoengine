@@ -14,6 +14,7 @@ import { viewMatrix } from '../../shared/view.js';
 import { Cleanup } from '../../shared/cleanup.js';
 import type { PBRSource } from '../../shared/pbr-source.js';
 import { setMeshSource, clearMeshSource, type MeshSource } from '../../shared/mesh-source.js';
+import { margoError } from '../../shared/errors.js';
 import { shadowPrimitivesInto } from '../../shared/shadow-source.js';
 import {
   GLTFAsset,
@@ -300,9 +301,12 @@ export function validatePreparedGeometry(data: PreparedGeometry): void {
     throw new RangeError('Invalid prepared PBR geometry');
   for (let i = 0; i < indices.length; i++)
     if (indices[i] >= count) throw new RangeError('Invalid prepared PBR geometry');
-  for (let i = 0; i < vertices.length; i++)
+  checkVertices(vertices, 0, count);
+}
+function checkVertices(vertices: Float32Array, from: number, to: number): void {
+  for (let i = from * 20; i < to * 20; i++)
     if (!Number.isFinite(vertices[i])) throw new RangeError('Non-finite prepared PBR vertex');
-  for (let i = 0; i < vertices.length; i += 20) {
+  for (let i = from * 20; i < to * 20; i += 20) {
     const sign = vertices[i + 11];
     if (
       vertices[i + 3] !== 1 ||
@@ -375,6 +379,8 @@ interface DrawResource {
   mergedInto?: DrawResource;
   /** Set on the one resource that draws a material batch. */
   batch?: StaticBatch;
+  /** Set once `writeGeometry` rewrote this primitive: shadows then redraw it every frame instead of caching it. */
+  edited?: boolean;
 }
 interface ShadowCasterRecord {
   primitive: PBRPrimitive;
@@ -448,9 +454,12 @@ function fillShadow(r: DrawResource, value: ShadowCasterRecord): void {
   if (m.maps[0]?.extensions?.KHR_texture_transform) value.alphaTransform = coordinates?.transform;
   else delete value.alphaTransform;
   value.instances = p.instances;
+  // ponytail: edited geometry stays a dynamic caster after its first write; add a geometry revision to the shadow
+  // still-hash if edited static levels need the cached atlas back.
   value.dynamic =
     !r.batch &&
-    (p.definition.attributes?.JOINTS_0 !== undefined ||
+    (!!r.edited ||
+      p.definition.attributes?.JOINTS_0 !== undefined ||
       !!p.definition.targets?.length ||
       !!p.instances ||
       !!p.deformed);
@@ -1230,6 +1239,143 @@ export class PBRModel implements EnginePlugin {
         buffer.destroy();
       }
     return true;
+  }
+  /**
+   * Replaces the geometry of every triangle primitive in place: `geometry[i]` becomes `primitives[i]`'s vertices and
+   * indices (`PreparedGeometry` layout), keeping nodes, materials, instances and plugin registrations. A GPU buffer is
+   * rewritten when the new data fits it and reallocated at twice its size (or the data size) otherwise, so repeated
+   * edits stop allocating. With `range` (vertex units) only those vertices differ from the current ones: the vertex
+   * count and the index contents stay the same (the arrays may be new objects, which refreshes identity-keyed caches
+   * such as BVHs) and only the range's bytes upload. CPU readers (bounds, BVH, worldTriangles, exporters) see the new
+   * arrays at once. Static material batches are retired, and edited primitives cast shadows as dynamic from then on.
+   * Renderers from `createRenderer` keep the geometry they were created with.
+   */
+  writeGeometry(
+    geometry: readonly PreparedGeometry[],
+    range?: { readonly start: number; readonly count: number },
+  ): void {
+    if (this.disposed) throw margoError('disposed', 'PBRModel is disposed; create a new model');
+    const list = this.primitives,
+      max = this.resources[0]?.device.limits.maxBufferSize ?? Infinity,
+      shared = new Set(this.bufferSources.values());
+    if (!Array.isArray(geometry) || geometry.length !== list.length)
+      throw new RangeError('PBR geometry needs one entry per primitive; pass model.primitives.length entries');
+    for (let i = 0; i < list.length; i++) {
+      const p = list[i],
+        g = geometry[i];
+      if (
+        p.deformed ||
+        p.definition.targets?.length ||
+        p.definition.attributes?.JOINTS_0 !== undefined ||
+        this.bufferSources.has(p) ||
+        shared.has(p)
+      )
+        throw new TypeError('PBR geometry writes need unskinned, unmorphed, unshared primitives; recreate the model');
+      if (!range) validatePreparedGeometry(g);
+      else if (
+        !(g?.vertices instanceof Float32Array) ||
+        !(g.indices instanceof Uint32Array) ||
+        g.vertices.length !== p.vertices.length ||
+        g.indices.length !== p.indices.length
+      )
+        throw new RangeError('A ranged PBR geometry write keeps the vertex and index counts; omit the range to resize');
+      if (g.topology) throw new TypeError('PBR geometry writes take triangle lists; remove topology');
+      if (g.vertices.byteLength > max || g.indices.byteLength > max)
+        throw new RangeError('PBR buffer exceeds device limit; split the geometry into smaller meshes');
+    }
+    if (range) {
+      const { start, count } = range,
+        total = list[0].vertices.length / 20;
+      if (
+        !Number.isSafeInteger(start) ||
+        !Number.isSafeInteger(count) ||
+        start < 0 ||
+        count < 1 ||
+        start + count > total
+      )
+        throw new RangeError(
+          'PBR geometry range must be whole vertices inside the mesh; pass start >= 0 and count >= 1',
+        );
+      for (const vertices of new Set(geometry.map((g) => g.vertices))) checkVertices(vertices, start, start + count);
+    }
+    this.retireBatches();
+    const written = new Map<Float32Array | Uint32Array, GPUBuffer>(),
+      claimed = new Set<GPUBuffer>(),
+      dropped = new Set<GPUBuffer>();
+    // Points and lines may share a triangle primitive's buffers; they keep their contents.
+    for (const r of this.resources)
+      if (!list.includes(r.primitive)) for (const b of [r.vertex, r.index]) claimed.add(b);
+    // Each new array gets one buffer: its own old one when it fits and no other array took it, else a larger one.
+    const place = (
+      r: DrawResource,
+      from: GPUBuffer,
+      data: Float32Array | Uint32Array,
+      usage: number,
+      part?: number[],
+    ) => {
+      let to = written.get(data);
+      if (!to) {
+        if (!claimed.has(from) && (part || data.byteLength <= from.size)) {
+          if (!part) r.device.queue.writeBuffer(from, 0, data as Float32Array<ArrayBuffer>);
+          else if (part[1])
+            r.device.queue.writeBuffer(from, part[0] * 4, data as Float32Array<ArrayBuffer>, part[0], part[1]);
+          to = from;
+        } else {
+          to = r.device.createBuffer({
+            size: Math.min(max, Math.max(data.byteLength, from.size * 2)),
+            usage: usage | GPUBufferUsage.COPY_DST,
+          });
+          r.device.queue.writeBuffer(to, 0, data as Float32Array<ArrayBuffer>);
+        }
+        written.set(data, to);
+        claimed.add(to);
+      }
+      if (to !== from) dropped.add(from);
+      return to;
+    };
+    for (const r of this.resources) {
+      const i = list.indexOf(r.primitive);
+      if (i < 0) continue;
+      const p = r.primitive,
+        g = geometry[i];
+      r.vertex = place(
+        r,
+        r.vertex,
+        g.vertices,
+        GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE,
+        range && [range.start * 20, range.count * 20],
+      );
+      r.index = place(r, r.index, g.indices, GPUBufferUsage.INDEX, range && [0, 0]);
+      if (!range && r.wireframe) {
+        dropped.add(r.wireframe.index);
+        r.wireframe = undefined;
+      }
+      p.buffers = { vertex: r.vertex, index: r.index };
+      r.edited = true;
+    }
+    for (let i = 0; i < list.length; i++) {
+      for (const data of [list[i].vertices, list[i].indices]) if (!written.has(data)) this.gpuCache.delete(data);
+      list[i].vertices = geometry[i].vertices;
+      list[i].indices = geometry[i].indices;
+    }
+    for (const [data, buffer] of written) this.gpuCache.set(data, buffer);
+    for (const buffer of dropped)
+      if (!this.resources.some((r) => r.vertex === buffer || r.index === buffer)) buffer.destroy();
+  }
+  /** Drops every static material batch for good: its parts draw individually from their own, now editable, buffers. */
+  private retireBatches(): void {
+    if (!this.staticBatches?.length) return;
+    for (const r of this.resources)
+      if (r.batch)
+        for (const b of [r.vertex, r.index, r.wireframe?.index, r.uniform, r.extension?.uniform, r.volume])
+          b?.destroy();
+    this.resources = this.resources.filter((r) => !r.batch);
+    for (const r of this.resources) r.mergedInto = undefined;
+    for (const { primitive } of this.staticBatches) {
+      this.gpuCache.delete(primitive.vertices);
+      this.gpuCache.delete(primitive.indices);
+    }
+    this.staticBatches = [];
   }
   /** Bakes static same-material triangles once the asset's geometry and instances are final. */
   private commitStaticBatches(): void {

@@ -243,7 +243,26 @@ Picking either group returns the shared mesh node. The existing shadows, lightin
 the model; existing texture-alpha picking/shadow limitations remain. Export preserves group materials and UV1.
 
 Packing is cached by geometry identity: finish editing attributes before the first call to `packGeometry` or mesh
-creation, and use a new geometry object for changed attributes. `mesh.dispose()` releases model resources; textures
+creation, and use a new geometry object for changed attributes, or edit a live mesh with `setGeometry`.
+
+`mesh.setGeometry(geometry)` repacks the edited (or a new) geometry into the same mesh: materials, transform, render
+order and shadow, clustered, SSAO and selection registrations stay. GPU buffers are rewritten while the data fits
+and reallocated at twice their size when it outgrows them, so repeated edits stop allocating. Group ranges may move
+and resize; their number and material slots must stay (create a new mesh to change them). For a same-sized edit,
+`mesh.setGeometry(geometry, {start, count})` repacks and uploads only those vertices (indices and groups are not
+read), for example a tile's four UVs each frame. Raycasts, `worldTriangles`, stage bounds and exports see the new
+data at once. An edited mesh casts shadows as a dynamic caster from then on, and static same-material batches of
+its groups are retired.
+
+```ts
+const geometry = {positions, normals, uvs, indices};
+const mesh = createMesh(engine, geometry, tiles);
+geometry.uvs.set([0.5, 0, 0.75, 0, 0.75, 0.25, 0.5, 0.25], 8); // vertices 4-7
+mesh.setGeometry(geometry, {start: 4, count: 4}); // uploads 320 bytes
+mesh.setGeometry({positions: more, normals: moreNormals, uvs: moreUvs, indices: moreIndices}); // resize
+```
+
+`mesh.dispose()` releases model resources; textures
 remain caller-owned. Device restoration rebuilds the model and texture bindings. Constructed material shading cannot
 be copied to another GPU device without rebuilding its material resources. Core and the stage facade are unchanged.
 

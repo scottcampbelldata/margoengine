@@ -16,6 +16,7 @@ import { extendedMaterials } from '@margoengine/gltf-pro/extended';
 import { physicalMapsShader } from './physical-maps.js';
 import { depthDistanceShader } from './depth-distance.js';
 import { readResponse } from '../../shared/loading.js';
+import { MargoError } from '@margoengine/math/errors';
 export type { TextureTransform, MaterialSide } from '@margoengine/gltf-pro';
 export { packAtlas, transformUVs, type Atlas, type AtlasOptions } from './atlas.js';
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
@@ -1239,14 +1240,16 @@ export interface MeshGeometry {
   groups?: readonly { start: number; count: number; materialIndex: number }[];
 }
 const packed = new WeakMap<object, PreparedGeometry>();
-/** Packs once per geometry object into gltf-pro's 80-byte vertex (position, normal, tangent, UV0, UV1, color). Later edits to the object are not seen. */
+/** Packs once per geometry object into gltf-pro's 80-byte vertex (position, normal, tangent, UV0, UV1, color). Later edits to the object are not seen; `mesh.setGeometry` repacks. */
 export function packGeometry(g: MeshGeometry): PreparedGeometry {
   let out = packed.get(g);
-  if (out) return out;
+  if (!out) packed.set(g, (out = pack(g)));
+  return out;
+}
+function vertexCount(g: MeshGeometry): number {
   const { positions: p, normals: n, uvs, uvs1, tangents: t, colors: c } = g ?? ({} as MeshGeometry),
     count = p?.length / 3,
-    width = c ? c.length / count : 0,
-    scale = c instanceof Uint8Array || c instanceof Uint8ClampedArray ? 1 / 255 : 1;
+    width = c ? c.length / count : 0;
   if (
     !Number.isInteger(count) ||
     count < 3 ||
@@ -1258,8 +1261,15 @@ export function packGeometry(g: MeshGeometry): PreparedGeometry {
     (c && width !== 3 && width !== 4)
   )
     throw new RangeError('Mismatched mesh geometry attributes');
-  const v = new Float32Array(count * 20);
-  for (let i = 0, o = 0; i < count; i++, o += 20) {
+  return count;
+}
+/** Packed vertices `from` to `to` (exclusive) of validated geometry, in a new array. */
+function packVertices(g: MeshGeometry, from: number, to: number): Float32Array {
+  const { positions: p, normals: n, uvs, uvs1, tangents: t, colors: c } = g,
+    width = c ? c.length / (p.length / 3) : 0,
+    scale = c instanceof Uint8Array || c instanceof Uint8ClampedArray ? 1 / 255 : 1;
+  const v = new Float32Array((to - from) * 20);
+  for (let i = from, o = 0; i < to; i++, o += 20) {
     const length = Math.hypot(n[i * 3], n[i * 3 + 1], n[i * 3 + 2]),
       tl = t ? Math.hypot(t[i * 4], t[i * 4 + 1], t[i * 4 + 2]) : 0;
     if (!length) throw new RangeError('Mesh normals must be non-zero');
@@ -1282,6 +1292,11 @@ export function packGeometry(g: MeshGeometry): PreparedGeometry {
     for (let k = 0; k < 4; k++) v[o + 16 + k] = c && k < width ? c[i * width + k] * scale : 1;
   }
   if (v.some((value) => !Number.isFinite(value))) throw new RangeError('Non-finite mesh geometry attribute');
+  return v;
+}
+function pack(g: MeshGeometry): PreparedGeometry {
+  const count = vertexCount(g),
+    v = packVertices(g, 0, count);
   const indexCount = g.indices?.length ?? count;
   if (!Number.isSafeInteger(indexCount) || indexCount < 3 || indexCount % 3)
     throw new RangeError('Mesh indices must contain complete triangles');
@@ -1289,12 +1304,45 @@ export function packGeometry(g: MeshGeometry): PreparedGeometry {
     for (let i = 0; i < indexCount; i++)
       if (!Number.isSafeInteger(g.indices[i]) || g.indices[i] < 0 || g.indices[i] >= count)
         throw new RangeError('Invalid mesh geometry index');
-  out = {
+  return {
     vertices: v,
     indices: g.indices ? Uint32Array.from(g.indices) : Uint32Array.from({ length: count }, (_, i) => i),
   };
-  packed.set(g, out);
-  return out;
+}
+type Group = { start: number; count: number; materialIndex: number };
+/** The validated triangle groups `createMesh` turns into primitives, in primitive order. */
+function meshGroups(geometry: MeshGeometry, indexCount: number, materials: readonly Material[], array: boolean) {
+  const groups: readonly Group[] | undefined = array
+    ? geometry.groups
+    : [{ start: 0, count: indexCount, materialIndex: 0 }];
+  if (!Array.isArray(groups) || !groups.length) throw new RangeError('Material arrays require geometry groups');
+  for (const g of groups)
+    if (
+      !g ||
+      !Number.isSafeInteger(g.start) ||
+      !Number.isSafeInteger(g.count) ||
+      !Number.isSafeInteger(g.materialIndex) ||
+      g.start < 0 ||
+      g.count <= 0 ||
+      g.start % 3 ||
+      g.count % 3 ||
+      g.start + g.count > indexCount ||
+      g.materialIndex < 0 ||
+      g.materialIndex >= materials.length
+    )
+      throw new RangeError('Invalid mesh geometry group');
+  const ranges = [...groups].sort((a, b) => a.start - b.start);
+  for (let i = 1; i < ranges.length; i++)
+    if (ranges[i].start < ranges[i - 1].start + ranges[i - 1].count)
+      throw new RangeError('Mesh geometry groups must not overlap');
+  return groups;
+}
+const groupIndices = (indices: Uint32Array, g: Group) =>
+  g.start === 0 && g.count === indices.length ? indices : indices.slice(g.start, g.start + g.count);
+/** Vertex range of a `setGeometry` update: `count` vertices from vertex `start`. */
+export interface GeometryRange {
+  start: number;
+  count: number;
 }
 interface Entry {
   model: PBRModel;
@@ -1413,11 +1461,19 @@ function queue(runtime: Engine): MaterialDraws {
 /** A materials mesh: the gltf-pro model plus the live `material` it draws with (read by @margoengine/exporters `exportModel`). */
 export type MaterialMesh<M extends Material | readonly Material[] = Material> = PBRModel & {
   readonly material: M extends Material ? Material : readonly Material[];
+  /**
+   * Live edit: repacks `geometry` (the same object edited in place, or a new one) into this mesh's buffers, reusing
+   * the GPU buffers while the data fits (gltf-pro `writeGeometry`). Groups may move and resize but keep their number
+   * and material slots. With `range`, only those vertices are repacked and uploaded and the vertex count must stay;
+   * indices and groups are not read, so a per-frame UV animation uploads just its vertices. Raycasts,
+   * `worldTriangles`, bounds and exports see the new data at once.
+   */
+  setGeometry(geometry: MeshGeometry, range?: GeometryRange): MaterialMesh<M>;
 };
 /**
  * Creates one gltf-pro `PBRModel`. A material array draws the geometry's nonempty, nonoverlapping triangle groups;
  * uncovered indices are omitted. A scalar material draws the entire geometry, ignoring groups.
- * Move it with `model.root`, remove it with `model.destroy()`.
+ * Move it with `model.root`, edit it with `model.setGeometry(geometry, range?)`, remove it with `model.destroy()`.
  * It works with `shadows.add`, `clustered.add` and `ssao.add` like a loaded glTF. Textures are not disposed with the model.
  */
 export function createMesh<M extends Material | readonly Material[]>(
@@ -1432,32 +1488,9 @@ export function createMesh<M extends Material | readonly Material[]>(
   if (!materials.length || materials.some((m) => !(m instanceof Material)) || !Number.isFinite(renderOrder))
     throw new TypeError('Invalid material mesh');
   const data = packGeometry(geometry),
-    groups = Array.isArray(material) ? geometry.groups : [{ start: 0, count: data.indices.length, materialIndex: 0 }];
-  if (!Array.isArray(groups) || !groups.length) throw new RangeError('Material arrays require geometry groups');
-  for (const g of groups)
-    if (
-      !g ||
-      !Number.isSafeInteger(g.start) ||
-      !Number.isSafeInteger(g.count) ||
-      !Number.isSafeInteger(g.materialIndex) ||
-      g.start < 0 ||
-      g.count <= 0 ||
-      g.start % 3 ||
-      g.count % 3 ||
-      g.start + g.count > data.indices.length ||
-      g.materialIndex < 0 ||
-      g.materialIndex >= materials.length
-    )
-      throw new RangeError('Invalid mesh geometry group');
-  const ranges = [...groups].sort((a, b) => a.start - b.start);
-  for (let i = 1; i < ranges.length; i++)
-    if (ranges[i].start < ranges[i - 1].start + ranges[i - 1].count)
-      throw new RangeError('Mesh geometry groups must not overlap');
-  const prepared = groups.map((g) => ({
-    vertices: data.vertices,
-    indices:
-      g.start === 0 && g.count === data.indices.length ? data.indices : data.indices.slice(g.start, g.start + g.count),
-  }));
+    array = Array.isArray(material),
+    groups = meshGroups(geometry, data.indices.length, materials, array);
+  const prepared = groups.map((g) => ({ vertices: data.vertices, indices: groupIndices(data.indices, g) }));
   const runtime = engineRuntime(engine),
     set = queue(runtime);
   const doc = {
@@ -1567,8 +1600,53 @@ export function createMesh<M extends Material | readonly Material[]>(
   }
   set.add(entry);
   model.onDispose(() => set.delete(entry));
-  return Object.defineProperty(model, 'material', {
-    value: Array.isArray(material) ? materials : material,
+  let current = groups,
+    owned = false; // false while the primitives still draw packGeometry's cached (shareable) arrays
+  const setGeometry = (next: MeshGeometry, range?: GeometryRange): MaterialMesh<M> => {
+    if (model.disposed) throw new MargoError('disposed', 'Material mesh is disposed; create a new mesh');
+    const mesh = model as MaterialMesh<M>;
+    if (range === undefined) {
+      const data = pack(next),
+        list = meshGroups(next, data.indices.length, materials, array);
+      if (list.length !== current.length || list.some((g, i) => g.materialIndex !== current[i].materialIndex))
+        throw new RangeError('Mesh geometry groups must keep their number and material slots; create a new mesh');
+      model.writeGeometry(list.map((g) => ({ vertices: data.vertices, indices: groupIndices(data.indices, g) })));
+      current = list;
+    } else {
+      const vertices = model.primitives[0].vertices,
+        total = vertices.length / 20,
+        { start, count } = range;
+      if (
+        !Number.isSafeInteger(start) ||
+        !Number.isSafeInteger(count) ||
+        start < 0 ||
+        count < 1 ||
+        start + count > total
+      )
+        throw new RangeError(
+          'Mesh geometry range must be whole vertices inside the mesh; pass start >= 0 and count >= 1',
+        );
+      if (vertexCount(next) !== total)
+        throw new RangeError('A ranged mesh geometry update keeps the vertex count; omit the range to resize');
+      const chunk = packVertices(next, start, start + count);
+      let moved = false;
+      for (let i = 0; i < chunk.length && !moved; i += 20)
+        for (let k = 0; k < 3; k++) moved ||= chunk[i + k] !== vertices[start * 20 + i + k];
+      // Moved positions need new array identities: BVH and selection caches key on them.
+      const target = owned && !moved ? vertices : vertices.slice();
+      target.set(chunk, start * 20);
+      model.writeGeometry(
+        model.primitives.map((p) => ({ vertices: target, indices: moved ? p.indices.slice() : p.indices })),
+        range,
+      );
+    }
+    owned = true;
+    packed.delete(next);
+    return mesh;
+  };
+  return Object.defineProperties(model, {
+    material: { value: Array.isArray(material) ? materials : material },
+    setGeometry: { value: setGeometry },
   }) as MaterialMesh<M>;
 }
 /** A materials mesh drawn as `instances.count` instances in one draw call (three.js InstancedMesh); `instances` holds each one's matrix, tint and UV transform. */

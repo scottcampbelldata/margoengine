@@ -45,6 +45,7 @@ try {
     'additive',
     'mask',
     'effects',
+    'geometry',
     'video',
   ]) {
     if (name === 'video') await page.evaluate(() => window.videoStep('#ff00ff'));
@@ -56,6 +57,14 @@ try {
     if (name === 'flipTop') {
       near(await pixel(0.3), [255, 0, 0], 'image top at UV v=1');
       near(await pixel(0.7), [0, 0, 255], 'image bottom at UV v=0');
+    }
+    const step = async () => assert.deepEqual(await page.evaluate(() => window.check.step()), [], name + ' step');
+    if (name === 'geometry') {
+      near(center, [5, 6, 9], 'the first quad is off centre');
+      await step();
+      near(await pixel(), [0, 0, 255], 'a full update covers the centre');
+      await step();
+      near(await pixel(), [255, 0, 0], 'a ranged UV update samples the red top');
     }
     if (name === 'standard' || name === 'effects')
       assert.ok(

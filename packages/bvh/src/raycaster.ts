@@ -161,14 +161,6 @@ function primitiveEntry(p: ModelPrimitiveLike): PrimitiveEntry {
   }
   return entry;
 }
-const sphereCache = new WeakMap<readonly ModelPrimitiveLike[], Float64Array[]>();
-/** Local bounding spheres of a model's primitives, cached per primitives array (gltf-pro never replaces it). */
-function modelSpheres(model: ModelLike): Float64Array[] {
-  let spheres = sphereCache.get(model.primitives);
-  if (!spheres || spheres.length !== model.primitives.length)
-    sphereCache.set(model.primitives, (spheres = model.primitives.map((p) => primitiveEntry(p).sphere)));
-  return spheres;
-}
 /** The cached BVH of a model primitive (primitives sharing vertex and index arrays share it), built on first use. */
 export function getPrimitiveBVH(primitive: ModelPrimitiveLike, options?: BVHBuildOptions): MeshBVH {
   const entry = primitiveEntry(primitive);
@@ -532,12 +524,13 @@ export class Raycaster {
     for (const model of models) {
       if (model.disposed) continue;
       const primitives = model.primitives,
-        spheres = modelSpheres(model),
         rootMask = layerMasks.get(model.root);
       for (let index = 0; index < primitives.length; index++) {
         const primitive = primitives[index],
           node = primitive.node as unknown as RuntimeMesh,
-          instances = primitive.instances;
+          instances = primitive.instances,
+          // Per ray, not per model: a rewritten primitive (new vertex or index array) gets a fresh sphere.
+          sphere = primitiveEntry(primitive).sphere;
         if (instances) {
           // ponytail: a linear scan over instances (one 4x4 product and sphere test each); add a BVH over instances past ~100k.
           if (
@@ -549,12 +542,12 @@ export class Raycaster {
           const world = store.matrices.subarray(node.id * 16, node.id * 16 + 16);
           for (let k = 0; k < instances.count; k++) {
             const m = multiplyMatrices(world, instances.data.subarray(k * 24, k * 24 + 16), scratch),
-              entry = this.entry(m, 0, spheres[index]);
+              entry = this.entry(m, 0, sphere);
             if (entry >= 0) candidates.push({ node, entry, model, primitive, index, matrix: m.slice(), instance: k });
           }
           continue;
         }
-        const entry = this.entry(store.matrices, node.id * 16, spheres[index]);
+        const entry = this.entry(store.matrices, node.id * 16, sphere);
         if (entry >= 0 && this.usable(runtime, node, layerMasks.get(node) ?? rootMask ?? 1, model))
           candidates.push({ node, entry, model, primitive, index });
       }
