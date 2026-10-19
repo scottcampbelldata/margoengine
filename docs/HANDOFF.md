@@ -2,6 +2,44 @@
 
 Last updated 2026-10-19. Read this first when starting a new session. Update it whenever work lands.
 
+## Resume here (2026-10-19, moving from the laptop to scott dev)
+
+State on GitHub: `main` has everything finished (see the next two paragraphs). Branch `wip/voxel-phase4-renderer`
+(`814c02a8`, based on `993f2013`) holds voxel phase 4: `VoxelRenderer` and `BlockTextures` in
+`packages/voxel/src/render.ts` and `textures.ts`, Node tests in `packages/voxel/tests/render.test.js` and a real-WebGPU
+check in `packages/voxel/tests/render-browser-check.{mjs,html}`. Built and unit-tested on the laptop, NOT yet run: the
+browser check, `build:site`, `visual:check` and `verify` (the agent paused because the laptop was on battery).
+
+1. Setup: `git pull --rebase`, `npm install`, `npm run build:packages`. In a git worktree, run
+   `node scripts/worktree-node-modules.mjs` instead of `npm install` (junctions to the main checkout, own packages).
+2. Phase 4: `git switch -c voxel-phase4 origin/wip/voxel-phase4-renderer`, `git rebase origin/main` (expect conflicts
+   only in `packages/voxel/package.json` exports and `README.md`: keep both sides). Then run the Node tests, the
+   browser check under `node scripts/gpu-lock.mjs run --owner=<you> -- node packages/voxel/tests/render-browser-check.mjs`,
+   `npm run check:merge`. Phase 4 is done when: greedy-merged and naive meshes render IDENTICAL pixels at 4x and 1x
+   MSAA on the canvas format and an rgba16float target; T-junction cracks are measured (fix if any); cutout leaves and
+   translucent glass composite as expected; a block edit shows within 2 frames; device-loss restore draws the same
+   image; no validation errors; the worst case of 196,608 quads in one layer draws. Merge to main one commit per
+   change, push, delete the wip branch.
+3. Phase 5 (renderer lighting) and phase 13 (playable `examples/voxel-sandbox`, a `/voxel/` site page with visual
+   baselines, benchmarks at render distance 8 and 16 behind the quiet gate, `docs/limits.md` rows): see
+   `packages/voxel/DESIGN.md` (Renderer, Phases, and the As built section: its decisions bind later phases).
+4. If scott dev is the NVIDIA PC: run `npm run check:merge` to check the NVIDIA visual profile, unchecked since
+   `431222c0` (see the next paragraph for what changed). A view that changes on purpose:
+   `npm run visual:update -- --only=<view>` with the reason in the commit.
+5. Rules that held this work: AGENTS.md; Margo clean-room names with three.js usage flow, never three.js names or
+   constants (Scott approved every public name listed in this file and DESIGN.md; for voxel he delegated naming);
+   core + stage frozen except up to about 2 KB Scott allowed for fixes that cannot be optional (21,343 B now); every
+   rendering feature gets a real-GPU check with numeric expectations; push verified work to main; downloads and
+   anything posted publicly need Scott's OK.
+6. Waiting on Scott: the Rapier bug report draft `docs/drafts/rapier-ball-voxel-issue.md` (not posted); the
+   `margo3d-studio` posed-picking fixture (that repository was not on the laptop or GitHub).
+7. Small follow-ups found on the way: a cave-heavy chunk near a ball builds a 125 ms triangle mesh in one frame;
+   `.vox` paste is ~1 s per million voxels (per-cell setBlock); the streamer can spend 1.2-1.5 ms a frame unpacking at
+   8 chunks per frame; a chunk-border crossing costs a 5-7 ms physics build; voxel contacts give no `Physics` events;
+   `noiseTerrain` can leave water beside cave air and leaves inside caves; the catalog clipboard browser test is flaky
+   under heavy load.
+
+
 Tile editor engine work (Scott, 2026-10-18/19): Scott started `tile-asset-editor` (a Crocotile 3D 2.7.4 equivalent,
 own repository `scottcampbelldata/tile-asset-editor`) as the base of his own 3D modeller and game engine, and
 approved the engine gaps it needs; the 2026-10-17 "no further parity work is authorized" line below is superseded for
@@ -2016,8 +2054,8 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
    starts with a feature audit against the current release and Scott's scope sign-off. Update 2026-10-18: Scott
    started the tile editor before 1.0 (see the top of this file); the voxel and node editors remain later work.
 
-Worker practice: agents run in git worktrees; they must start with `git reset --hard perf/auto-quality` (worktrees
-default to an old base). Do not junction the whole node_modules (then `@margoengine/*` resolves to the main checkout's
+Worker practice: agents run in git worktrees; they must start from the current `main` (`git reset --hard origin/main`; worktrees
+default to an old base). `node scripts/worktree-node-modules.mjs` sets up node_modules as described next. Do not junction the whole node_modules (then `@margoengine/*` resolves to the main checkout's
 packages): make a real `node_modules` folder holding junctions to the main checkout's third-party packages and
 `@margoengine/*` junctions to the worktree's own packages. Never run a full `npm install` in a worktree; lockfile only
 via `npm install --package-lock-only --offline --no-audit --no-fund --ignore-scripts`. Also junction `margoengine`
