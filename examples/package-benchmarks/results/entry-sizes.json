@@ -1,5 +1,5 @@
 {
-  "commit": "bf92aeee",
+  "commit": "bd33309c",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -872,24 +872,28 @@
     },
     "@margoengine/voxel": {
       ".": {
-        "raw": 12414,
-        "gzip": 4546
+        "raw": 12910,
+        "gzip": 4664
       },
       "./query": {
         "raw": 6822,
         "gzip": 3020
       },
       "./codec": {
-        "raw": 23427,
-        "gzip": 8218
+        "raw": 23923,
+        "gzip": 8339
       },
       "./stream": {
-        "raw": 12506,
-        "gzip": 4642
+        "raw": 12624,
+        "gzip": 4664
       },
       "./mesher": {
         "raw": 8932,
         "gzip": 4030
+      },
+      "./light": {
+        "raw": 20735,
+        "gzip": 7388
       }
     },
     "@margoengine/water": {

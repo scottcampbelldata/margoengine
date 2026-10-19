@@ -72,6 +72,7 @@ export class VoxelChunk {
     fill(state: number): void;
     getLight(x: number, y: number, z: number): number;
     setLight(x: number, y: number, z: number, light: number): void;
+    fillLight(light: number): void;
     pack(): PackedChunk;
     static unpack(packed: PackedChunk): VoxelChunk;
 }
@@ -88,6 +89,7 @@ export class VoxelWorld {
     getChunk(cx: number, cy: number, cz: number): VoxelChunk | undefined;
     addChunk(cx: number, cy: number, cz: number, chunk?: VoxelChunk): VoxelChunk;
     removeChunk(cx: number, cy: number, cz: number): VoxelChunk | undefined;
+    onChunk(listener: (cx: number, cy: number, cz: number, chunk: VoxelChunk | undefined) => void): () => void;
     heightmap(cx: number, cz: number): Int16Array | undefined;
     onChange(listener: (x: number, y: number, z: number, state: number, previous: number) => void): () => void;
 }
