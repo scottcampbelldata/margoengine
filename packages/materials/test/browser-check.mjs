@@ -86,6 +86,8 @@ const expected = {
   catcherLocal: [102, 102, 102],
   catcherHook: [102, 102, 102],
   catcherShare: [179, 179, 179],
+  wgslUnlit: [1, 0.5, 0.25].map(srgb),
+  wgslLit: gray(local * Math.SQRT1_2),
   vertexColorsTint: [0, 0, 255],
   displacedHookShadow: gray((base / Math.PI) * Math.SQRT1_2 * (1 - (Math.SQRT2 / 10) ** 4) ** 2),
 };
@@ -131,6 +133,9 @@ try {
     'catcherLocal',
     'catcherHook',
     'catcherShare',
+    'wgslUnlit',
+    'wgslDisplace',
+    'wgslLit',
     'vertexColorsTint',
     'lightMapUnlit',
     'displace',
@@ -178,6 +183,17 @@ try {
       await step();
       near(await pixel(0.3), [255, 0, 0], 'the updated region (image top, flipY) shows the new pixels');
       near(await pixel(0.7), [0, 255, 0], 'outside the region the texture keeps its old pixels');
+    }
+    if (name === 'wgslUnlit') {
+      await step();
+      near(await pixel(), [0.25, 1, 0.5].map(srgb), 'a uniform changed live');
+    }
+    if (name === 'wgslDisplace') {
+      const scaled = await redWidth();
+      await step();
+      const plain = await redWidth();
+      assert.ok(Math.abs(scaled / plain - 1.5) < 0.03, `displace() scales by uniforms.gain: ${scaled} / ${plain} px`);
+      console.log('  red width scaled / plain', scaled, plain);
     }
     if (name.startsWith('catcher')) {
       near(await pixel(0.5, 0.3), [255, 255, 255], 'no shadow there: the catcher draws nothing');

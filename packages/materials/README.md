@@ -599,3 +599,47 @@ ground.root.setRotation([-Math.PI / 2, 0, 0]);
 shadows.add(ground);
 lights.add(ground); // clustered local shadows too
 ```
+
+## WGSL materials
+
+`WgslMaterial` runs your WGSL inside gltf-pro's PBR shader, at the sites `@margoengine/shader`'s `NodeMaterial` uses;
+every other Material option (shading, maps, render state, the options above) still applies, and the chosen shading
+lights the surface your code returns.
+
+- `fn shade(i: Out, s: Surface) -> Surface` (required) runs at the end of the material's surface, before the face and
+  alpha tests, in every pass (beauty, G-buffer, SSAO ambient). `i` holds the interpolated vertex outputs:
+  `position` (world, vec3f), `normal` (world, vec3f), `tangent` (vec4f), `uv` (vec4f: UV0 in `xy`, UV1 in `zw`),
+  `color` (vec4f) and `clip`. `s` is what the material computed: `base` (linear RGBA, opacity in `a`), `n` (world
+  shading normal), `roughness`, `metal`, `occlusion`, `emissive` (linear RGB). Return the surface to light.
+- `fn displace(i: Input) -> vec3f` (optional) returns the mesh-space vertex position, before the model and instance
+  matrices. `i` is the vertex input: `position`, `normal`, `tangent`, `uv` (as above) and `color`, all vec4f.
+- `uniforms: {name: value}`: a number is an `f32`, 2 to 4 numbers a `vec2f` to `vec4f`; read them as
+  `uniforms.name`. `material.uniforms.name = value` (same component count) or writing an array uniform's elements in
+  place changes them from the next frame.
+- `textures: {name: texture}`: read `name` with its sampler `nameSampler`; sRGB unless the Texture says otherwise.
+  Assign another Texture to the same name to swap it live.
+
+The WGSL, uniform names and texture names are fixed at construction. The constructor throws `TypeError` for a
+missing or misdeclared entry point, a name that is not a WGSL identifier or that the PBR shader already uses (`f`,
+`uv`, `surface`, `margo...`, `mat_...`), a uniform that is not 1 to 4 numbers or a texture that is not a Texture, and
+`RangeError` for a non-finite uniform. Errors inside your WGSL are WebGPU's own: they show as a validation error
+(console, `device` `uncapturederror`) when the shader first draws. `clone()` copies the uniforms and shares the
+textures.
+
+```ts
+const water = new WgslMaterial({
+  shading: 'phong',
+  wgsl: `fn shade(i: Out, s: Surface) -> Surface {
+  var o = s;
+  o.base = vec4f(o.base.rgb * textureSample(ripples, ripplesSampler, i.uv.xy + uniforms.flow * uniforms.time).rgb, 1.0);
+  return o;
+}`,
+  uniforms: {flow: [0.05, 0.02], time: 0},
+  textures: {ripples},
+});
+createMesh(engine, planeGeometry(10, 10), water);
+let time = 0;
+engine.onFrame((_, delta) => {
+  water.uniforms.time = time += delta; // live from the next frame
+});
+```

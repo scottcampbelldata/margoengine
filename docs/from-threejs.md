@@ -376,6 +376,9 @@ oit.add(pane);  // and oit.add(model) for a loaded glTF's BLEND primitives
   physical shader; materials that never use them keep the plain one. Glass refracts with
   `Transmission.attach(engine).add(mesh)` from `@margoengine/materials/transmission` (needs an HDR post capture such as
   `PostStack` with `Tonemap`); without it the background shows through tinted.
+- `ShaderMaterial` / `onBeforeCompile`: `WgslMaterial` runs your WGSL `fn shade(i: Out, s: Surface) -> Surface`
+  (and optionally `fn displace(i: Input) -> vec3f`) inside the PBR shader, with live `uniforms` and `textures`; the
+  chosen `shading` still lights it. Node graphs: `NodeMaterial` (`@margoengine/shader`), below.
 - Not available: arbitrary named vertex attributes on your own meshes.
 
 ## Lights and shadows

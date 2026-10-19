@@ -16,6 +16,7 @@ import {
   PhongMaterial,
   ShadowCatcherMaterial,
   Texture,
+  WgslMaterial,
   createInstancedMesh,
   createMesh,
 } from '../dist/index.js';
@@ -526,6 +527,91 @@ test('ShadowCatcherMaterial draws its colour with the shadowed share of sun and 
     mesh = createMesh(s.engine, quad, new ShadowCatcherMaterial().clone()),
     code = codes(s.frame()).find((c) => c.includes('fn margoCatcher(') && c.includes('@fragment fn fragment('));
   assert.ok(code.includes('var lit=sun; var all=sun;\n  return f.base.a*select('));
+  mesh.destroy();
+  s.engine.dispose();
+});
+
+const shade = `fn shade(i: Out, s: Surface) -> Surface {
+  var o = s;
+  o.base = vec4f(uniforms.tint * textureSample(noise, noiseSampler, i.uv.xy).rgb * uniforms.gain, 1.0);
+  return o;
+}`;
+
+test('WgslMaterial validates its WGSL entry points and names, uniforms and textures', () => {
+  const ok = { wgsl: shade, uniforms: { tint: [1, 1, 1], gain: 1 }, textures: { noise: solid(1, 2, 3) } };
+  assert.equal(new WgslMaterial(ok).shading, 'standard');
+  for (const [options, error] of [
+    [{}, TypeError],
+    [{ wgsl: 'fn shade(i: Out) -> Surface {}' }, TypeError],
+    [{ ...ok, wgsl: shade + '\nfn displace(i: Out) -> vec3f {return vec3f(0);}' }, TypeError],
+    [{ ...ok, uniforms: { 'bad-name': 1 } }, TypeError],
+    [{ ...ok, uniforms: { margoTint: 1 } }, TypeError],
+    [{ ...ok, uniforms: { f: 1 } }, TypeError],
+    [{ ...ok, uniforms: { tint: [1, 2, 3, 4, 5] } }, TypeError],
+    [{ ...ok, uniforms: { tint: [1] } }, TypeError],
+    [{ ...ok, uniforms: { tint: [1, Infinity, 1] } }, RangeError],
+    [{ ...ok, textures: { noise: {} } }, TypeError],
+    [{ ...ok, textures: { gain: solid(0, 0, 0) } }, TypeError],
+  ])
+    assert.throws(() => new WgslMaterial(options), error, JSON.stringify(Object.keys(options)));
+  const m = new WgslMaterial(ok);
+  assert.throws(() => {
+    m.uniforms.tint = 2;
+  }, TypeError);
+  assert.throws(() => {
+    m.uniforms.extra = 2;
+  }, TypeError);
+  assert.throws(() => {
+    m.textures.noise = null;
+  }, TypeError);
+});
+
+test('WgslMaterial splices shade() and displace(), binds its uniforms and textures, all live', async () => {
+  const s = await scene(),
+    noise = solid(10, 20, 30),
+    material = new WgslMaterial({
+      shading: 'basic',
+      wgsl: `${shade}\nfn displace(i: Input) -> vec3f {return i.position.xyz * uniforms.gain;}`,
+      uniforms: { tint: [1, 0.5, 0.25], gain: 2 },
+      textures: { noise },
+    }),
+    mesh = createMesh(s.engine, quad, material);
+  let log = s.frame();
+  const code = codes(log).find((c) => c.includes('fn shade('));
+  assert.ok(
+    code.startsWith(
+      'struct WgslUniforms {@align(16) tint:vec3f, @align(16) gain:f32}\n@group(2) @binding(48) var<uniform> uniforms:WgslUniforms;\n@group(2) @binding(50) var noise:texture_2d<f32>;\n@group(2) @binding(51) var noiseSampler:sampler;\n',
+    ),
+  );
+  assert.ok(
+    code.includes('fn surface(i:Out,front:bool)->Surface {\n  _=&uniforms;_=noise;_=noiseSampler;'),
+    'every binding stays in the layout',
+  );
+  assert.ok(/s=shade\(i,s\);\n {2}if\(margoFaceTest&&!facing/.test(code), 'before the face and alpha tests');
+  assert.ok(code.includes('let p=f.model*vec4f(displace(i),1);'));
+  assert.ok(code.endsWith(`${material.wgsl}\n`));
+  const uniform = log
+      .find((e) => e[0] === 'group' && e[2].entries.some((x) => x.binding === 48))[2]
+      .entries.find((x) => x.binding === 48).resource.buffer,
+    written = () => [...floats(log.filter((e) => e[0] === 'writeBuffer' && e[1] === uniform).at(-1)[3])];
+  assert.deepEqual(written(), [1, 0.5, 0.25, 0, 2, 0, 0, 0]);
+  material.uniforms.gain = 3;
+  material.uniforms.tint[1] = 0.75;
+  assert.deepEqual([...material.uniforms.tint], [1, 0.75, 0.25]);
+  log = s.frame();
+  assert.deepEqual(written(), [1, 0.75, 0.25, 0, 3, 0, 0, 0], 'live, also element by element');
+  assert.deepEqual(codes(log), [], 'no new shader');
+  const copy = material.clone();
+  copy.uniforms.gain = 9;
+  assert.equal(material.uniforms.gain, 3, 'a clone has its own uniforms');
+  assert.equal(copy.textures.noise, noise, 'and shares the textures');
+  material.textures.noise = solid(1, 1, 1);
+  log = s.frame();
+  assert.ok(
+    log.some((e) => e[0] === 'group' && e[2].entries.some((x) => x.binding === 50)),
+    'a texture swap rebinds',
+  );
+  assert.deepEqual(codes(log), [], 'with the same shader');
   mesh.destroy();
   s.engine.dispose();
 });

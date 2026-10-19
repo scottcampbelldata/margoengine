@@ -2,7 +2,7 @@
 <script type="module">
 import {createStage} from '/packages/margoengine/dist/index.js';
 import {planeGeometry,sphereGeometry,boxGeometry} from '/packages/geometry/dist/index.js';
-import {Texture,Material,ShadowCatcherMaterial,createMesh,createInstancedMesh,loadTexture} from '/packages/materials/dist/index.js';
+import {Texture,Material,ShadowCatcherMaterial,WgslMaterial,createMesh,createInstancedMesh,loadTexture} from '/packages/materials/dist/index.js';
 const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,0,3],target:[0,0,0]}});
 const engine=stage.engine,device=engine.gpu,errors=[];
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
@@ -105,6 +105,12 @@ scenarios.catcherHook=()=>catcherScene((w,c)=>{engine.lighting.direction[3]=0;co
 // The share of light: the shadowed sun (luminance cos 45 x 2 at the centre) plus an unshadowed point light 1 unit in
 // front giving the same (intensity sqrt 2 pi): half the light is shadowed, alpha 0.3.
 scenarios.catcherShare=()=>catcherScene((w,c)=>{engine.lighting.direction.set([1,0,1,2]);const shadows=Shadows.attach(engine,{resolution:1024,filter:'hard'}),lights=Clustered.attach(engine);shadows.add(w);shadows.add(c);lights.setLights([{position:[0,0,1],range:100,intensity:Math.SQRT2*Math.PI}]);lights.add(w);return ()=>{plugin(lights).destroy();plugin(shadows).destroy();};});
+// WgslMaterial: an unlit shade() colours the plane uniforms.tint x a white texture x uniforms.gain (tint changes live);
+// a displace() scales a red 1x1 plane by uniforms.gain 1.5 (then 1, live); a Lambert shade() leans the normal 45 degrees.
+const wgslShade=`fn shade(i: Out, s: Surface) -> Surface {var o = s; o.base = vec4f(uniforms.tint * textureSample(noise, noiseSampler, i.uv.xy).rgb * uniforms.gain, 1.0); return o;}`;
+scenarios.wgslUnlit=()=>{const m=createMesh(engine,planeGeometry(2,2),new WgslMaterial({shading:'basic',wgsl:wgslShade,uniforms:{tint:[1,0.5,0.25],gain:1},textures:{noise:solid(255,255,255)}}));return {destroy(){m.destroy();},step(){m.material.uniforms.tint=[0.25,1,0.5];}};};
+scenarios.wgslDisplace=()=>{const m=createMesh(engine,planeGeometry(1,1),new WgslMaterial({shading:'basic',color:[1,0,0],wgsl:`fn shade(i: Out, s: Surface) -> Surface {return s;}\nfn displace(i: Input) -> vec3f {return i.position.xyz * uniforms.gain;}`,uniforms:{gain:1.5}}));return {destroy(){m.destroy();},step(){m.material.uniforms.gain=1;}};};
+scenarios.wgslLit=()=>{const light=[...engine.lighting.direction],radiance=[...engine.lighting.radiance];engine.lighting.direction.set([0,0,1,2]);engine.lighting.radiance[3]=0;const m=createMesh(engine,planeGeometry(2,2),new WgslMaterial({shading:'lambert',map:solid(188,188,188),wgsl:`fn shade(i: Out, s: Surface) -> Surface {var o = s; o.n = normalize(vec3f(1.0, 0.0, 1.0)); return o;}`}));return {destroy(){m.destroy();engine.lighting.direction.set(light);engine.lighting.radiance.set(radiance);}};};
 // lightMap: no lights at all. A Lambert plane whose UV1 reads the white half of a black/white lightmap shows its base
 // colour everywhere (UV0 would read black on the left); the step halves lightMapIntensity. An unlit white plane
 // multiplies by a grey lightmap.

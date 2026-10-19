@@ -391,3 +391,4 @@ export function install(model: PBRModel): MaterialInstallation {
 export * from './built-material.js';
 export * from './material-classes.js';
 export * from './tile-animation.js';
+export * from './wgsl-material.js';
