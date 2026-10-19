@@ -155,6 +155,15 @@ export class VoxelChunk {
     this.lightByte = light;
     this.lightCells = null;
   }
+  /** Bytes of the typed arrays the chunk holds now (palette, its counts, cell indices and per-cell light). */
+  get byteLength(): number {
+    return (
+      this.palette.byteLength +
+      this.counts.byteLength +
+      (this.words?.byteLength ?? 0) +
+      (this.lightCells?.byteLength ?? 0)
+    );
+  }
   /** A copy of the chunk as transferable typed arrays; {@link VoxelChunk.unpack} rebuilds it. */
   pack(): PackedChunk {
     return {
