@@ -7,18 +7,22 @@ import {
   drawables,
   normalMatrix,
   isObject,
+  samplerOf,
   type AnimationData,
   type AnimationChannelData,
+  type CameraData,
   type ExportNode,
   type ExportScene,
   type ExportSource,
   type Geo,
+  type LightData,
   type Mat,
   type Node,
   type SceneOptions,
   type SkinData,
   type TextureData,
 } from './scene.js';
+import { cameraDefinition, lightDefinition } from './scene-metadata.js';
 
 export interface GLTFOptions extends SceneOptions {
   /** Write every mesh as a root node with its world transform instead of keeping the hierarchy. Default false. */
@@ -51,6 +55,7 @@ const FLOAT = 5126,
   ARRAY_BUFFER = 34962,
   ELEMENT_ARRAY_BUFFER = 34963;
 const same = (a: number[], b: number[]) => a.every((v, i) => Math.fround(v) === b[i]);
+const wraps = { repeat: 10497, clamp: 33071, mirror: 33648 };
 interface PrimitiveData {
   attributes: Record<string, number>;
   indices: number;
@@ -79,6 +84,14 @@ class Writer {
   private readonly textureCache = new Map<TextureData, number>();
   private readonly imageCache = new Map<Uint8Array, number>();
   private readonly skinCache = new Map<SkinData, number>();
+  private readonly cache = new Map<unknown, number>();
+  readonly used = new Set<string>();
+
+  private memo(key: unknown, make: () => number): number {
+    let index = this.cache.get(key);
+    if (index === undefined) this.cache.set(key, (index = make()));
+    return index;
+  }
 
   private list(key: string, value: unknown): number {
     const list = (this.json[key] ??= []) as unknown[];
@@ -187,8 +200,18 @@ class Writer {
       source = this.list('images', image);
       this.imageCache.set(texture.image, source);
     }
-    if (!this.json.samplers) this.list('samplers', { magFilter: 9729, minFilter: 9987, wrapS: 10497, wrapT: 10497 });
-    index = this.list('textures', { sampler: 0, source });
+    const s = samplerOf(texture),
+      nearest = s.minFilter === 'nearest',
+      sampler = {
+        magFilter: s.magFilter === 'nearest' ? 9728 : 9729,
+        minFilter: s.mipmaps ? (nearest ? 9984 : 9987) : nearest ? 9728 : 9729,
+        wrapS: wraps[s.wrapS],
+        wrapT: wraps[s.wrapT],
+      };
+    index = this.list('textures', {
+      sampler: this.memo(JSON.stringify(sampler), () => this.list('samplers', sampler)),
+      source,
+    });
     this.textureCache.set(texture, index);
     return index;
   }
@@ -212,6 +235,10 @@ class Writer {
     if (mat.alphaMode !== 'OPAQUE') out.alphaMode = mat.alphaMode;
     if (mat.alphaCutoff !== undefined) out.alphaCutoff = mat.alphaCutoff;
     if (mat.doubleSided) out.doubleSided = true;
+    if (mat.unlit) {
+      out.extensions = { KHR_materials_unlit: {} };
+      this.used.add('KHR_materials_unlit');
+    }
     index = this.list('materials', out);
     this.materialCache.set(mat, index);
     return index;
@@ -243,6 +270,21 @@ class Writer {
       mesh.extras = { targetNames: geo.morphs.map((morph, i) => morph.name ?? 'Target ' + i) };
     if (name) mesh.name = name;
     return this.list('meshes', mesh);
+  }
+
+  camera(camera: CameraData): number {
+    return this.memo(camera, () => this.list('cameras', cameraDefinition(camera)));
+  }
+
+  /** A KHR_lights_punctual light index. */
+  light(light: LightData): number {
+    return this.memo(light, () => {
+      this.used.add('KHR_lights_punctual');
+      const lights = (((this.json.extensions ??= {}) as Record<string, { lights: unknown[] }>).KHR_lights_punctual ??= {
+        lights: [],
+      }).lights;
+      return lights.push(lightDefinition(light)) - 1;
+    });
   }
 
   node(name: string | undefined, t: number[], r: number[], s: number[], mesh?: number): Record<string, unknown> {
@@ -412,6 +454,8 @@ function document(source: ExportSource, options: GLTFOptions): Writer {
     const check = (node: Node): void => {
       if (node.skin || node.geometry?.joints || node.geometry?.morphs || node.morphWeights)
         throw new TypeError('Flatten does not support skins, morphs or animation');
+      if (node.camera || node.light)
+        throw new TypeError('Flatten does not support cameras or lights; keep the hierarchy');
       node.children.forEach(check);
     };
     roots.forEach(check);
@@ -450,6 +494,8 @@ function document(source: ExportSource, options: GLTFOptions): Writer {
         nodeData.set(node.source, node);
       }
       if (node.morphWeights) out.weights = Array.from(node.morphWeights);
+      if (node.camera) out.camera = writer.camera(node.camera);
+      if (node.light) out.extensions = { KHR_lights_punctual: { light: writer.light(node.light) } };
       if (node.children.length) out.children = node.children.map(visit);
       return index;
     };
@@ -467,13 +513,17 @@ function document(source: ExportSource, options: GLTFOptions): Writer {
     for (const animation of animations ?? []) writer.animation(animation, resolve, nodeData);
   }
   json.scenes = [sceneNodes.length ? { nodes: sceneNodes } : {}];
+  if (writer.used.size) json.extensionsUsed = [...writer.used];
   if (writer.length) json.buffers = [{ byteLength: writer.length }];
   // Stable key order: asset first, buffers last.
   const order = [
     'asset',
+    'extensionsUsed',
+    'extensions',
     'scene',
     'scenes',
     'nodes',
+    'cameras',
     'skins',
     'animations',
     'meshes',

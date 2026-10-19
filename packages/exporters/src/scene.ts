@@ -59,11 +59,21 @@ export interface AnimationData {
   channels: readonly AnimationChannelData[];
 }
 
-/** An encoded PNG or JPEG image referenced by a material. */
+/** An encoded PNG or JPEG image referenced by a material, with its sampler. */
 export interface TextureData {
   image: Uint8Array;
   mimeType: 'image/png' | 'image/jpeg';
   name?: string;
+  /** Magnification filter. Default 'linear'; 'nearest' keeps pixel art crisp. */
+  magFilter?: 'nearest' | 'linear';
+  /** Minification filter. Default 'linear'. */
+  minFilter?: 'nearest' | 'linear';
+  /** Sample mipmaps when minifying. Default true. */
+  mipmaps?: boolean;
+  /** Wrap mode across u. Default 'repeat'. */
+  wrapS?: 'repeat' | 'clamp' | 'mirror';
+  /** Wrap mode across v. Default 'repeat'. */
+  wrapT?: 'repeat' | 'clamp' | 'mirror';
 }
 
 /** A glTF metallic-roughness material described as data. */
@@ -81,6 +91,32 @@ export interface MaterialData {
   baseColorTexture?: TextureData;
   metallicRoughnessTexture?: TextureData;
   normalTexture?: TextureData;
+  /** Shade with base color only, ignoring lights: KHR_materials_unlit in glTF. Default false. */
+  unlit?: boolean;
+}
+
+/** A glTF camera on a data-scene node, looking down the node's -Z; a gltf-pro `GLTFCamera` record fits as it is. */
+export interface CameraData {
+  type: 'perspective' | 'orthographic';
+  name?: string;
+  /** Angles in radians; omitted `zfar` is an infinite projection. */
+  perspective?: { yfov: number; znear: number; zfar?: number; aspectRatio?: number };
+  orthographic?: { xmag: number; ymag: number; znear: number; zfar: number };
+}
+
+/** A KHR_lights_punctual light on a data-scene node, pointing down the node's -Z; a gltf-pro `GLTFLight` record fits as it is. */
+export interface LightData {
+  type: 'directional' | 'point' | 'spot';
+  name?: string;
+  /** Linear rgb in [0, 1]. */
+  color: readonly number[];
+  /** Candela (point, spot) or lux (directional). */
+  intensity: number;
+  /** Point and spot cutoff distance; omitted is infinite. */
+  range?: number;
+  /** Spot cone angles in radians. Defaults 0 and PI / 4. */
+  innerConeAngle?: number;
+  outerConeAngle?: number;
 }
 
 /** A node of a plain data scene. Rotation is a quaternion [x, y, z, w]. */
@@ -95,6 +131,10 @@ export interface ExportNode {
   children?: readonly ExportNode[];
   skin?: SkinData;
   morphWeights?: readonly number[];
+  /** Written by the glTF writers only. */
+  camera?: CameraData;
+  /** Written by the glTF writers only. */
+  light?: LightData;
 }
 
 /** A plain data scene; geometry and material objects shared between nodes are written once. */
@@ -149,6 +189,7 @@ export interface Mat {
   baseColorTexture?: TextureData;
   metallicRoughnessTexture?: TextureData;
   normalTexture?: TextureData;
+  unlit?: boolean;
 }
 /** @internal Normalized node. */
 export interface Node {
@@ -166,6 +207,8 @@ export interface Node {
   morphWeights?: Float32Array;
   /** Optional-package primitives retained on their original scene node. */
   primitives?: { geometry: Geo; material: Mat }[];
+  camera?: CameraData;
+  light?: LightData;
 }
 
 function fail(message: string): never {
@@ -350,8 +393,30 @@ function checkTexture(texture: unknown, label: string): TextureData | undefined 
   const jpeg = image.length > 3 && image[0] === 0xff && image[1] === 0xd8 && image[2] === 0xff;
   if (mimeType === 'image/png' ? !png : mimeType === 'image/jpeg' ? !jpeg : true)
     fail(`${label} must be a PNG or JPEG matching its mimeType`);
+  for (const [key, values] of [
+    ['magFilter', filters],
+    ['minFilter', filters],
+    ['wrapS', wraps],
+    ['wrapT', wraps],
+  ] as const)
+    if (texture[key] !== undefined && !(values as readonly unknown[]).includes(texture[key]))
+      fail(`${label} ${key} must be ${values.join(' or ')}`);
+  if (texture.mipmaps !== undefined && typeof texture.mipmaps !== 'boolean') fail(`${label} mipmaps must be boolean`);
   return texture as unknown as TextureData;
 }
+const filters = ['nearest', 'linear'] as const,
+  wraps = ['repeat', 'clamp', 'mirror'] as const;
+
+/** @internal A texture's sampler with the defaults filled in. */
+export const samplerOf = (
+  t: TextureData,
+): Required<Pick<TextureData, 'magFilter' | 'minFilter' | 'mipmaps' | 'wrapS' | 'wrapT'>> => ({
+  magFilter: t.magFilter ?? 'linear',
+  minFilter: t.minFilter ?? 'linear',
+  mipmaps: t.mipmaps ?? true,
+  wrapS: t.wrapS ?? 'repeat',
+  wrapT: t.wrapT ?? 'repeat',
+});
 
 /** Validates and normalizes a core PbrMaterial or material data. Base color is linear. */
 export function normalizeMaterial(data: PbrMaterial | MaterialData): Mat {
@@ -377,6 +442,7 @@ export function normalizeMaterial(data: PbrMaterial | MaterialData): Mat {
   if ([...color, ...emissive].some((v) => v < 0 || v > 1)) throw new RangeError('Material colors must be in [0, 1]');
   if (m.name !== undefined && typeof m.name !== 'string') fail('Material name must be a string');
   if (m.doubleSided !== undefined && typeof m.doubleSided !== 'boolean') fail('doubleSided must be boolean');
+  if (m.unlit !== undefined && typeof m.unlit !== 'boolean') fail('unlit must be boolean');
   const alphaMode = m.alphaMode ?? 'OPAQUE';
   if (!['OPAQUE', 'MASK', 'BLEND'].includes(alphaMode)) fail('Unknown alphaMode');
   if (m.alphaCutoff !== undefined && (alphaMode !== 'MASK' || !Number.isFinite(m.alphaCutoff) || !(m.alphaCutoff >= 0)))
@@ -393,6 +459,7 @@ export function normalizeMaterial(data: PbrMaterial | MaterialData): Mat {
     baseColorTexture: checkTexture(m.baseColorTexture, 'baseColorTexture'),
     metallicRoughnessTexture: checkTexture(m.metallicRoughnessTexture, 'metallicRoughnessTexture'),
     normalTexture: checkTexture(m.normalTexture, 'normalTexture'),
+    unlit: m.unlit,
   };
 }
 
@@ -724,6 +791,11 @@ export function collect(source: ExportSource, options: SceneOptions = {}): Node[
       parent,
     );
     node.source = data;
+    for (const key of ['camera', 'light'] as const)
+      if (data[key] !== undefined) {
+        if (!isObject(data[key])) fail(`${key} must be an object`);
+        node[key] = data[key] as never;
+      }
     if (data.skin !== undefined) {
       if (!isObject(data.skin)) fail('Skin must be an object');
       node.skin = data.skin;

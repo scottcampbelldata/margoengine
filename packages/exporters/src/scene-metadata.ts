@@ -1,13 +1,14 @@
-// Camera and punctual-light attachments from the loaded model's live public records. Keep runtime node handles out
-// of JSON, and snapshot nested values before the model writer awaits texture encoding.
+// Camera and punctual-light definitions from the loaded model's live public records or data-scene nodes. Keep
+// runtime node handles out of JSON, and snapshot nested values before the model writer awaits texture encoding.
 import type { GLTFCamera, GLTFLight, PBRModel } from '@margoengine/gltf-pro';
 import type { GLTFCameraDefinition, GLTFLightDefinition } from '../../shared/gltf.js';
 import type { Bin } from './container.js';
+import type { CameraData, LightData } from './scene.js';
 
 function numeric(value: number, subject: string, valid: (value: number) => boolean): number {
-  if (typeof value !== 'number') throw new TypeError(`${subject} must be a number; update the live camera or light`);
+  if (typeof value !== 'number') throw new TypeError(`${subject} must be a number; update the camera or light`);
   if (!Number.isFinite(value) || !valid(value))
-    throw new RangeError(`${subject} is outside its glTF range; update the live camera or light`);
+    throw new RangeError(`${subject} is outside its glTF range; update the camera or light`);
   return value;
 }
 
@@ -19,7 +20,8 @@ function named<T extends { name?: string }>(out: T, name?: string): T {
   return out;
 }
 
-function cameraDefinition(camera: GLTFCamera): GLTFCameraDefinition {
+/** @internal */
+export function cameraDefinition(camera: CameraData): GLTFCameraDefinition {
   const out = named<GLTFCameraDefinition>({ type: camera.type }, camera.name);
   if (camera.type !== 'perspective' && camera.type !== 'orthographic')
     throw new TypeError('Camera type is unsupported; use perspective or orthographic');
@@ -48,7 +50,8 @@ function cameraDefinition(camera: GLTFCamera): GLTFCameraDefinition {
   return out;
 }
 
-function lightDefinition(light: GLTFLight): GLTFLightDefinition {
+/** @internal */
+export function lightDefinition(light: LightData): GLTFLightDefinition {
   if (light.type !== 'directional' && light.type !== 'point' && light.type !== 'spot')
     throw new TypeError('Light type is unsupported; use directional, point or spot');
   if (!Array.isArray(light.color) || light.color.length !== 3)

@@ -107,12 +107,32 @@ const glb = exportGLB({nodes: [mesh, joint], animations: [{name: 'Move', channel
 
 Load these GLBs with `@margoengine/gltf-pro` and attach `@margoengine/animation` for skinning, morphs and clip playback. Other export formats continue to write the static base geometry.
 
+## Data-scene samplers, unlit materials, cameras and lights
+
+`TextureData` takes `magFilter` and `minFilter` (`'nearest'` or `'linear'`, default linear), `mipmaps` (default true)
+and `wrapS`/`wrapT` (`'repeat'`, `'clamp'` or `'mirror'`, default repeat). Equal samplers are written once; one image's
+bytes are shared by textures with different samplers. `MaterialData.unlit: true` writes `KHR_materials_unlit`. A node's
+`camera` (`{type, perspective: {yfov, znear, zfar?, aspectRatio?}}` or `{type, orthographic: {xmag, ymag, znear, zfar}}`)
+becomes a glTF camera and its `light` (`{type: 'directional' | 'point' | 'spot', color, intensity, range?,
+innerConeAngle?, outerConeAngle?}`) a `KHR_lights_punctual` light; both face the node's -Z and shared objects are
+written once. A gltf-pro `GLTFCamera` or `GLTFLight` record fits as it is. `flatten: true` rejects cameras and lights.
+Only the glTF writers use cameras and lights.
+
+```ts
+const pixels = {image: pngBytes, mimeType: 'image/png', magFilter: 'nearest', minFilter: 'nearest', mipmaps: false};
+const glb = exportGLB({nodes: [
+  {geometry, material: {baseColorTexture: pixels, unlit: true}},
+  {translation: [0, 3, 0], light: {type: 'point', color: [1, 0.9, 0.7], intensity: 40, range: 10}},
+  {translation: [0, 1, 6], camera: {type: 'perspective', perspective: {yfov: 0.8, znear: 0.1}}},
+]});
+```
+
 ## Limits
 
-The engine/data-scene `exportGLTF` and `exportGLB` entrypoints do not write cameras, lights, instancing extensions or
-KHR material extensions; use `exportModel` for loaded glTF-pro camera/light attachments and PBR metadata. Export does
-not produce Draco or meshopt compression, sparse accessors or interleaved buffers. Engine/data-scene skins support
-four influences per vertex, and their texture samplers are fixed (linear, mipmapped, repeat). `exportGLTF` puts images
+The engine/data-scene `exportGLTF` and `exportGLB` entrypoints write cameras, lights and `KHR_materials_unlit` only
+from data-scene nodes and materials, and no instancing or other KHR material extensions; use `exportModel` for loaded
+glTF-pro camera/light attachments and PBR metadata. Export does not produce Draco or meshopt compression, sparse
+accessors or interleaved buffers. Engine/data-scene skins support four influences per vertex. `exportGLTF` puts images
 in the buffer rather than separate image files. OBJ and PLY write `vn`/normals per vertex rather than deduplicating
 them. Node names are not made unique. The existing `@margoengine/gltf` loader accepts what these exporters write from
 an engine, but data-scene exports with deformation, vertex colors or textures need the optional packages described above.
