@@ -49,7 +49,7 @@ struct Frame {
 `;
 
 /** The path tracer: entry points `trace` (accumulate samples) and `ids` (pixel-centre instance and palette ids). */
-export const TRACE = /* wgsl */ `${FRAME}
+export const TRACE: string = /* wgsl */ `${FRAME}
 const PI=3.141592653589793;
 const TAU=6.283185307179586;
 const INV_PI=0.3183098861837907;
@@ -769,7 +769,7 @@ fn radiance(px:vec2u)->Path {
  * normals, on the distance of a neighbour's first hit from the pixel's tangent plane (in pixel footprints, so coplanar
  * voxel faces blend and parallel ones at other heights do not) and on luminance against its standard deviation.
  */
-export const DENOISE = /* wgsl */ `
+export const DENOISE: string = /* wgsl */ `
 struct Params {size:vec4u,sigma:vec4f,tile:vec4u,origins:array<vec4f,4>,directions:array<vec4f,4>}
 @group(0) @binding(0) var<uniform> p:Params;
 @group(0) @binding(1) var<storage,read> accum:array<vec4f>;
@@ -859,7 +859,7 @@ fn tap(x:i32)->f32 {return select(select(0.0625,0.25,abs(x)==1),0.375,x==0);}
 `;
 
 /** Draws the accumulated (or denoised) image: bilinear upsampling, exposure, tone mapping, first-hit depth. */
-export const DISPLAY = /* wgsl */ `${displayShader}
+export const DISPLAY: string = /* wgsl */ `${displayShader}
 struct View {matrix:mat4x4f,inverse:mat4x4f,size:vec4f,params:vec4f}
 @group(0) @binding(0) var<uniform> v:View;
 @group(0) @binding(1) var<storage,read> color:array<vec4f>;
