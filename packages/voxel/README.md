@@ -459,11 +459,11 @@ voxels.dispose(); // workers and GPU buffers; textures.dispose() separately
 - **Shading.** Each pixel is shaded where its ray meets the face's plane, never from interpolated attributes: texture
   coordinates and their gradients (nearest texels up close, trilinear mips in the distance, no seams on tiled greedy
   quads), and AO, sky light and block light bilinear between the quad's corners, so a greedy quad shades like the unit
-  faces it covers. Lighting (this release): `engine.lighting`'s sun scaled by sky visibility, a hemisphere ambient term
-  (`radiance[3]` times the ambient colour) times AO, sky light and `daylight`, block light as warm emission, and each
-  type's `emissive`. Without light bytes every face sits in the dark: attach `VoxelLighting`, or fill them
-  (`chunk.fillLight(0xf0)` is open sky). rgba16float targets get linear colour; others PBR Neutral and sRGB. The
-  fragment keeps glTF-pro's lighting hook points for shadows, clustered lights, IBL and fog (DESIGN.md phase 5).
+  faces it covers. Lighting: `engine.lighting`'s sun (PBR, scaled by sky visibility unless a shadow map covers the
+  face, see below), a hemisphere ambient term (`radiance[3]` times the ambient colour) times AO, sky light and
+  `daylight`, block light as emission in `blockLightColor`, and each type's `emissive`. Without light bytes every face
+  sits in the dark: attach `VoxelLighting`, or fill them (`chunk.fillLight(0xf0)` is open sky). rgba16float targets get
+  linear colour; others PBR Neutral and sRGB.
 - **Materials.** One 16-byte entry per `blockMaterials` id: texture layer, animation frames and fps (up to 255.99,
   1/256 steps), tint, roughness, metalness, emissive. `fancyLeaves: false` draws cutout cubes solid; cross blocks
   always cut out.
@@ -500,3 +500,55 @@ because the two meshes put different vertices on the same edges and the rasteriz
 switched off, a grazing slab view shows 14 crack pixels at 4x on this GPU; with it on, none. Rough timing (`--timing`,
 machine not quiet): the render-distance-16 world above spawns in 0.63 s; its voxel passes take about 0.26 ms of GPU
 (the timestamps here come in 0.26 ms steps) and `engine.render` 0.3 ms of CPU per frame.
+
+### Lighting effects, day and night, water and lava
+
+```ts
+import { Shadows } from '@margoengine/shadows';
+import { Clustered } from '@margoengine/clustered';
+import { EnvironmentLighting, Fog } from '@margoengine/environment';
+
+const shadows = Shadows.attach(engine, { distance: 96, cascades: 2 });
+shadows.add(voxels, { static: true }); // casts (opaque and cutout) and receives; the map is redrawn only on change
+const lights = Clustered.attach(engine);
+lights.setLights([{ position: [x, y, z], range: 10, color: [1, 0.7, 0.4], intensity: 20 }]);
+lights.add(voxels);
+Fog.attach(engine, { color: '#b8c8d8', near: 64, far: 256 }).add(voxels);
+environment.add(voxels); // an EnvironmentLighting: image-based ambient instead of the hemisphere term
+engine.onFrame(() => (voxels.daylight = 1 - sky.nightFactor)); // a Sky drives engine.lighting's sun and moon itself
+voxels.blockLightColor = [1, 0.7, 0.45]; // torches warmer
+```
+
+- **Effects.** `addLighting(effect)` takes any object with glTF-pro's lighting hooks (`pbr(group)`, `bindings()`):
+  `Shadows`, `Clustered`, `Fog` and `EnvironmentLighting` call it from their `add`. The shader is composed again and
+  compiled in the background; until it is ready the previous pipelines keep drawing. Each effect's remover takes it
+  out again. Effects' bindings are group 1 (shadows 1-3, clustered 4-7, IBL 20-24, fog 25).
+- **Shadows.** `drawShadow` draws the opaque and cutout chunks inside each cascade (CPU-culled per cascade) into the
+  map, cutout blocks alpha tested at their texture's level 0; translucent blocks cast none. Every quad reaches 1/64
+  block past its edges in the map, so T-junction slivers cannot let light through and merged and unit quads cast the
+  same shadow. With `{static: true}` the map is redrawn only when `shadowVersion` changes (chunks with opaque or cutout
+  quads arriving, changing or leaving inside the last map's cascades, new textures or buffers) or the cascades move.
+- **Sun and sky.** Without a shadow map the sun reaches a face as far as the open sky does (sky light squared, so
+  caves stay dark). Inside a shadow map's range the map decides alone (an overhang's shadow is the map's, not a dimmed
+  sky term); over the last tenth of the range the sky term fades back in, and beyond it the sky term rules.
+- **Ambient.** The hemisphere term, or IBL's when an `EnvironmentLighting` is added, is scaled by the occlusion: AO x
+  (0.03 + sky light x `daylight`), so caves and night dim it and block light does not. `daylight` 0 leaves 0.03 / 1.03
+  of the daytime ambient.
+- **Animation.** A block type's `animation: {frames, fps}` steps through `frames` texture layers from its first one
+  (lava and water textures, fire). Liquid surfaces (the mesher's wave bit: a liquid cell's top and sides with no same
+  liquid above) rise and fall together by 0.04 blocks (`0.04 sin(1.6 t)`) and ripple: the top's shading normal follows
+  three travelling waves of world x and z, so neighbouring quads and chunks match.
+
+Checked on the NVIDIA RTX A6000 (2026-10-19, `node scripts/gpu-lock.mjs run --owner=you -- node
+packages/voxel/tests/render-lighting-browser-check.mjs`; linear HDR radiance at projected world points, 4x and 1x MSAA):
+with the sun straight down and no ambient, the floor under a 4 x 4 slab and under a cutout block's opaque square is 0
+while the floor beside them and under the square's transparent border keeps its unshadowed value (0.9272); five still
+frames reuse the cached static map; removing the slab lights the floor again 2 frames later. A floor with no sky is lit
+inside a 40-block shadow range (0.9316) and black beyond it. A clustered point light (range 8, 3 blocks up) gives 0.990
+under it, 0.557 two blocks away, 0.164 at four and 0 outside its range, and nothing once removed. Linear fog from 0 to
+40 blocks at 19.42 blocks gives [0.4949, 0.5430, 0.7710] against [0.4940, 0.5424, 0.7710] expected. IBL and the
+hemisphere ambient at daylight 0 are 0.02914 of daylight 1 (0.03 / 1.03 = 0.02913). Block light 15 under no sky shows
+`blockLightColor` [0.2, 0.4, 0.8] as [0.2000, 0.3999, 0.7998]. Two-frame animation shows red then blue after a second.
+A water cell's side top edge moves 6 rows at 4x and 5 at 1x between crest and trough (5.54 expected). Greedy against
+one-quad-per-face with soft shadows, a point light, fog and the waving pool: 141-267 differing edge pixels of 76,800 at
+4x, 34-74 at 1x, never a 2 x 2 block. No validation errors.

@@ -196,11 +196,11 @@ on vfx's texture option). Avoided taken names: `World`, `RayHit`, `WorkerPool`.
 Order: 1 first; then 2, 6, 7, 8, 10, 11, 12 can run in parallel (they need only the storage API); 3 after 2; 4 after
 3; 5 after 4; 9 after 3 and 8; 13 last.
 
-## As built (phases 1-4, 6-12; recorded by the merger 2026-10-19)
+## As built (phases 1-12; recorded by the merger 2026-10-19)
 
-Status: on main are phases 1 (storage), 2 (mesher), 3 (worker mesher), 4 (renderer), 6 (light), 7 (queries), 8 (codec,
-store), 9 (streaming, generation), 10 (.vox), 11 (Rapier) and 12 (extras: audio and vfx). Phases 5 (renderer lighting)
-and 13 (example and benchmarks) remain. Names and decisions beyond the lists above:
+Status: on main are phases 1 (storage), 2 (mesher), 3 (worker mesher), 4 (renderer), 5 (renderer lighting), 6 (light),
+7 (queries), 8 (codec, store), 9 (streaming, generation), 10 (.vox), 11 (Rapier) and 12 (extras: audio and vfx). Phase
+13 (example and benchmarks) remains. Names and decisions beyond the lists above:
 
 - Storage: `BlockType` (what `get` and `table` return); `VoxelChunk.getLight`/`setLight`/`fillLight`/`byteLength`;
   `VoxelWorld.heightmap`, `blocks`, `minY`, `maxY`, `onChunk(listener)` (fires for loaded chunks at subscribe, after
@@ -239,5 +239,17 @@ and 13 (example and benchmarks) remain. Names and decisions beyond the lists abo
   Greedy and one-quad-per-face images differ only in edge samples (under 0.6% of drawn pixels, never a 2 x 2 block):
   bit-identical images are impossible because the two meshes put different vertices on the same edges. Render bundles
   kept (re-record 0.1-0.8 ms). GPU-verified on the Arc 140V and the RTX A6000 (tests/render-browser-check.mjs).
+- Renderer lighting (phase 5): `addLighting(effect)` takes a `VoxelRendererEffect` (glTF-pro hooks: `pbr(group)`,
+  `bindings()`), composes it with `lightPBR` into all three pipelines (group 1) and keeps the previous pipelines
+  drawing while the new ones compile; `drawShadow(VoxelShadowContext)`, `shadowVersion`, live `blockLightColor`
+  (default [1, 0.82, 0.6]). Shadow pass: opaque depth only, cutout alpha tested at level 0, translucent casts none,
+  every quad extended 1/64 block in its plane (extending merged quads alone made merged meshes cast 1.6 cm larger
+  shadows than unit quads). Sun: sky visibility squared without a shadow map; with one, the map alone inside its range,
+  the sky term fading back over its last tenth (read from the shadows package's `shadowFrame` uniform). Day and night:
+  the app sets `daylight` (for example `1 - sky.nightFactor`); the sun and moon come through `engine.lighting` as
+  before. Deviation from "liquid tops move vertically by world x,z": the surface rises and falls uniformly
+  (0.04 sin 1.6t) and ripples only in its shading normal (three travelling waves of world x, z), because per-vertex
+  height by position would open cracks at greedy quads' T-junctions and make merged and unit meshes differ.
+  GPU-verified on the RTX A6000 (tests/render-lighting-browser-check.mjs).
 - Extras: `AudioVoicePool` in @margoengine/audio; `ParticleAtlas` on @margoengine/vfx's texture option. The decoders
   pool was not moved onto `JobPool` (its per-worker queue and timeout semantics differ).

@@ -163,9 +163,10 @@ async function settle(frame, done, label = 'renderer') {
     await new Promise((resolve) => setTimeout(resolve, 2));
   }
 }
-// The buffers the renderer binds now: from its newest bind group, and the newest live indirect buffer.
+// The buffers the renderer binds now: from its newest beauty bind group (the 240-byte frame uniform at binding 0; not
+// a lighting group 1 or a shadow group), and the newest live indirect buffer.
 function bound(device) {
-  const entries = device.groups.at(-1).entries,
+  const entries = device.groups.findLast((g) => g.entries[0]?.resource.buffer?.size === 240).entries,
     buffer = (i) => entries[i].resource.buffer;
   return {
     frame: new Float32Array(buffer(0).data),
@@ -622,4 +623,150 @@ test('VoxelRenderer: argument errors, WebGPU required, dispose', () => {
   assert.throws(() => (r.daylight = Number.NaN), RangeError);
   r.dispose();
   r.dispose();
+});
+
+test('addLighting: hooks composed into every pipeline, group 1 bound in the bundle and translucent pass; removed again', async () => {
+  const { world, renderer, frame, device, passes, engine, STONE, GLASS } = setup();
+  try {
+    world.setBlocks([3, 3, 3, STONE, 9, 3, 3, GLASS]);
+    await settle(frame, () => renderer.stats.chunks === 1 && device.bundles.length > 0);
+    const light = device.createBuffer({ size: 16, usage: 64 }),
+      effect = {
+        pbr: (group) => ({
+          declarations: `@group(${group}) @binding(9) var<uniform> testLight:vec4f;\n`,
+          light: 'testLight.rgb',
+          output: (color) => `(${color})*testLight.w`,
+        }),
+        bindings: () => [{ binding: 9, resource: { buffer: light } }],
+      };
+    const remove = renderer.addLighting(effect),
+      lit = (bundle) => bundle.commands.some(([name, index]) => name === 'setBindGroup' && index === 1);
+    await settle(frame, () => lit(device.bundles.at(-1)), 'lit bundle');
+    const pipelines = device.bundles
+      .at(-1)
+      .commands.filter(([name]) => name === 'setPipeline')
+      .map(([, p]) => p);
+    for (const p of pipelines) {
+      assert.match(p.fragment.module.code, /var color=testLight\.rgb\+direct\+/);
+      assert.match(p.fragment.module.code, /color=\(select\(color,pbrNeutral/);
+    }
+    const group = device.bundles.at(-1).commands.find(([name, index]) => name === 'setBindGroup' && index === 1)[2];
+    assert.deepEqual(group.entries, effect.bindings());
+    frame();
+    const translucent = passes.find((p) => p.commands.some(([name]) => name === 'drawIndexed'));
+    assert.ok(translucent.commands.some(([name, index]) => name === 'setBindGroup' && index === 1));
+    // A shadow map's uniform in the declarations: inside its range the map decides the sun, not sky visibility.
+    const shadowed = {
+      pbr: (group) => ({
+        declarations: `struct S {view:mat4x4f,splits:vec4f}\n@group(${group}) @binding(1) var<uniform> shadowFrame:S;\n`,
+        direct: (d) => `(${d})`,
+      }),
+      bindings: () => [{ binding: 1, resource: { buffer: light } }],
+    };
+    const unshadow = renderer.addLighting(shadowed);
+    await settle(
+      frame,
+      () =>
+        device.bundles
+          .at(-1)
+          .commands.find(([n]) => n === 'setPipeline')[1]
+          .fragment.module.code.includes('shadowFrame.splits.w'),
+      'shadowed sun',
+    );
+    unshadow();
+    remove();
+    await settle(frame, () => !lit(device.bundles.at(-1)), 'unlit bundle');
+    assert.throws(() => renderer.addLighting({}), TypeError);
+    assert.throws(
+      () => renderer.addLighting({ ...effect, owner: {} }),
+      (e) => e.name === 'MargoError' && e.code === 'attached',
+    );
+    assert.equal(engine.stats.drawCalls > 0, true);
+  } finally {
+    renderer.dispose();
+  }
+  assert.throws(
+    () => renderer.addLighting({ pbr: () => undefined, bindings: () => [] }),
+    (e) => e.name === 'MargoError' && e.code === 'disposed',
+  );
+});
+
+test('drawShadow: opaque and cutout chunks inside the cascade only; shadowVersion moves for changes inside it', async () => {
+  const { world, renderer, frame, device, STONE, LEAVES } = setup();
+  try {
+    world.addChunk(0, 0, 0, cubes(STONE, 4));
+    world.addChunk(1, 0, 0, cubes(LEAVES, 4));
+    world.addChunk(10, 0, 0, cubes(STONE, 4));
+    await settle(frame, () => renderer.stats.chunks === 3);
+    // An orthographic light matrix covering x 0-64, y 0-32 (depth along z): chunks 0 and 1, not 10.
+    const matrix = new Float32Array(16);
+    matrix[0] = 1 / 32;
+    matrix[12] = -1;
+    matrix[5] = 1 / 16;
+    matrix[13] = -1;
+    matrix[10] = 1 / 200;
+    matrix[14] = 0.5;
+    matrix[15] = 1;
+    const draw = (cascade = 1) => {
+      const commands = [];
+      renderer.drawShadow({ context: { device }, pass: recorder(commands), matrix, cascade });
+      return commands;
+    };
+    assert.deepEqual(draw(), [], 'pipelines still compiling');
+    const compiling = renderer.shadowVersion;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    assert.ok(renderer.shadowVersion > compiling, 'ready pipelines redraw the map');
+    const commands = draw(),
+      calls = commands.filter(([name]) => name === 'drawIndexed'),
+      pipelines = commands.filter(([name]) => name === 'setPipeline').map(([, p]) => p);
+    assert.equal(calls.length, 2, 'chunk 0 opaque and chunk 1 cutout; chunk 10 culled');
+    assert.deepEqual(
+      calls.map(([, count]) => count),
+      [24 * 6, 24 * 6],
+    );
+    assert.equal(pipelines[0].fragment, undefined, 'opaque casts depth only');
+    assert.equal(pipelines[1].fragment.entryPoint, 'shadowCutout');
+    assert.equal(pipelines[0].depthStencil.depthCompare, 'less-equal');
+    const uniform = device.buffers.find((b) => b.size === 1024 && b.usage & 64);
+    assert.deepEqual(new Float32Array(uniform.data, 256, 16), matrix, 'cascade 1 slot');
+    // Changes outside the cascade leave the map; inside, it is drawn again.
+    let version = renderer.shadowVersion;
+    world.setBlock(10 * 32 + 1, 1, 1, STONE);
+    await settle(frame, () => !world.dirty.size && renderer.stats.quads === 3 * 24 + 6);
+    frame();
+    assert.equal(renderer.shadowVersion, version, 'edit in a culled chunk');
+    world.setBlock(1, 1, 1, STONE);
+    await settle(frame, () => renderer.stats.quads === 3 * 24 + 12);
+    assert.ok(renderer.shadowVersion > version, 'edit inside the cascade');
+    version = renderer.shadowVersion;
+    world.removeChunk(1, 0, 0);
+    await settle(frame, () => renderer.stats.chunks === 2);
+    assert.ok(renderer.shadowVersion > version, 'a cutout chunk left the cascade');
+  } finally {
+    renderer.dispose();
+  }
+});
+
+test('blockLightColor: live in the frame uniform, validated', async () => {
+  const { world, renderer, frame, device, STONE } = setup();
+  try {
+    world.setBlock(3, 3, 3, STONE);
+    await settle(frame, () => renderer.stats.chunks === 1 && device.groups.length > 0);
+    assert.deepEqual(
+      [...bound(device).frame.subarray(48, 51)].map((v) => +v.toFixed(5)),
+      [1, 0.82, 0.6],
+    );
+    renderer.blockLightColor = [0.2, 0.4, 0.8];
+    frame();
+    assert.deepEqual(
+      [...bound(device).frame.subarray(48, 51)].map((v) => +v.toFixed(5)),
+      [0.2, 0.4, 0.8],
+    );
+    assert.deepEqual(renderer.blockLightColor, [0.2, 0.4, 0.8]);
+    assert.throws(() => (renderer.blockLightColor = [1, 2]), TypeError);
+    assert.throws(() => (renderer.blockLightColor = [1, -1, 0]), RangeError);
+    assert.throws(() => (renderer.blockLightColor = [1, Number.POSITIVE_INFINITY, 0]), RangeError);
+  } finally {
+    renderer.dispose();
+  }
 });

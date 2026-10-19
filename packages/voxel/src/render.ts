@@ -10,11 +10,12 @@ import {
   type FrameGraph,
   type PassContext,
 } from '@margoengine/core/extension';
-import type { Vec3 } from '@margoengine/math';
+import type { Vec3, Vec3Like } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
 import { Frustum } from '@margoengine/math/frustum';
 import { invertMatrix } from '@margoengine/math/mat4';
 import { neutralShader } from '../../shared/display.js';
+import { lightPBR, type PBRHooks } from '../../shared/pbr-hooks.js';
 import { blockMaterials, type ChunkMesh, sortQuads, VoxelMesher } from './mesher.js';
 import { BlockTextures, blockTextureView } from './textures.js';
 import type { VoxelWorld } from './world.js';
@@ -45,26 +46,22 @@ const PAGE = 64, // quads per page
   // bits (some mobile Vulkan GPUs) can open slivers up to 1/32 pixel: raise it if cracks show there.
   EDGE_PIXELS = 1 / 128;
 
-// Bindings (group 0): frame uniform, quad pool, page -> chunk slot, slot -> chunk origin, material table, block textures,
-// sampler. Vertex pulling: quad = vertex_index >> 2, corner = vertex_index & 3, chunk = pages[quad >> 6]. The fragment
-// shades from the point where the pixel's ray meets the face's plane (never from interpolated attributes), so a greedy
-// quad shades its pixels bit for bit like the unit faces it covers; only which quad owns a sample within a fraction of a
-// pixel of a quad edge can differ. Its lit part keeps gltf-pro's hook points (packages/shared/pbr-hooks.js) for
-// shadows, clustered lights, IBL and fog.
-const SHADER = /* wgsl */ `${neutralShader}
-struct Frame {camera:mat4x4f,inverse:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f,ambient:vec4f,glow:vec4f,viewport:vec4f,settings:vec4f}
-@group(0) @binding(0) var<uniform> f:Frame;
-@group(0) @binding(1) var<storage,read> quads:array<u32>;
-@group(0) @binding(2) var<storage,read> pages:array<u32>;
-@group(0) @binding(3) var<storage,read> origins:array<vec4f>;
-@group(0) @binding(4) var<storage,read> materials:array<vec4u>;
-@group(0) @binding(5) var blockTextures:texture_2d_array<f32>;
-@group(0) @binding(6) var blockSampler:sampler;
-override MODE:u32=0u; // 0 opaque, 1 cutout (alpha test), 2 cutout (alpha to coverage), 3 translucent (premultiplied)
-override EDGE:f32=0.0; // pixels a merged quad's edges move out (vertex stage)
-struct Out {@builtin(position) clip:vec4f,@location(0) @interpolate(flat) words:vec3u,@location(1) @interpolate(flat) origin:vec4f,@location(2) @interpolate(flat) material:vec4u}
-// Chunk-local position of corner c, (0, 0), (w, 0), (w, h) or (0, h) along the face's u and v (see ChunkMesh).
-fn place(w0:u32,c:u32)->vec3f {
+// Group 0 bindings 1-6, shared by the beauty and shadow shaders: quad pool, page -> chunk slot, slot -> chunk origin,
+// material table, block textures, sampler. Vertex pulling: quad = vertex_index >> 2, corner = vertex_index & 3, chunk =
+// pages[quad >> 6]. voxelPlace gives corner c of a quad, (0, 0), (w, 0), (w, h) or (0, h) along the face's u and v
+// (see ChunkMesh), with a liquid's lowered top; voxelRise lifts the surface of a liquid with the wave bit by the same
+// height everywhere at time t, so merged and unit quads, tops and sides and neighbouring chunks stay joined (the ripples
+// are in the shading normal, voxelRipple). voxelTile maps chunk-local point l on a face to texture coordinates in blocks
+// (the sampler repeats), v running down the sides; voxelLayer is a material's texture layer at time t (its animation).
+const COMMON = /* wgsl */ `
+@group(0) @binding(1) var<storage,read> voxelQuads:array<u32>;
+@group(0) @binding(2) var<storage,read> voxelPages:array<u32>;
+@group(0) @binding(3) var<storage,read> voxelOrigins:array<vec4f>;
+@group(0) @binding(4) var<storage,read> voxelMaterials:array<vec4u>;
+@group(0) @binding(5) var voxelTextures:texture_2d_array<f32>;
+@group(0) @binding(6) var voxelSampler:sampler;
+fn voxelRise(w1:u32,t:f32)->f32 {return select(0.0,0.04*sin(t*1.6),(w1&0x100000u)!=0u);}
+fn voxelPlace(w0:u32,w1:u32,c:u32,t:f32)->vec3f {
  let face=(w0>>15u)&7u;let su=select(0.0,f32(((w0>>18u)&31u)+1u),c==1u||c==2u);let sv=select(0.0,f32(((w0>>23u)&31u)+1u),c>=2u);
  var p=vec3f(f32(w0&31u),f32((w0>>5u)&31u),f32((w0>>10u)&31u));
  switch face {
@@ -74,43 +71,10 @@ fn place(w0:u32,c:u32)->vec3f {
   case 6u {p+=vec3f(su,sv,su);}
   default {p+=vec3f(1.0-su,sv,su);}
  }
- if(face==2u||(face!=3u&&face<6u&&c>=2u)){p.y-=f32(w0>>29u)*0.125;} // a liquid's lowered top
+ if(face==2u||(face!=3u&&face<6u&&c>=2u)){p.y+=voxelRise(w1,t)-f32(w0>>29u)*0.125;}
  return p;
 }
-// How far to stretch a quad across its edge from pixel position s to along so that edge moves EDGE pixels out: EDGE
-// over the quad's on-screen thickness there (the distance to the corner across), so the corner slides at most a pixel
-// and half the quad; 0 for an edge under 1/16 pixel long, whose direction is too uncertain (no sample fits beside it).
-fn stretch(s:vec2f,along:vec2f,across:vec2f)->f32 {
- let d=s-along;let l=length(d);let a=s-across;if(l<0.0625){return 0.0;}
- return min(min(EDGE/max(abs(dot(vec2f(-d.y,d.x)/l,a)),0.000001),0.5),1.0/max(length(a),0.000001));
-}
-@vertex fn vertex(@builtin(vertex_index) index:u32)->Out {
- let q=index>>2u;let w0=quads[q*3u];let face=(w0>>15u)&7u;var c=index&3u;
- if((w0&0x10000000u)!=0u){c=(c+1u)&3u;} // flip: triangles share corners 1 and 3
- if(face==0u||face==2u||face==5u){c=(4u-c)&3u;} // u x v points into these faces: reverse the winding
- let origin=origins[pages[q>>6u]];var clip=f.camera*vec4f(origin.xyz+place(w0,c),1.0);
- // T-junctions: neighbours' corners lie on a merged quad's edges, and once the rasterizer snaps them to its subpixel
- // grid a sliver between the two can stay uncovered. Stretching the quad along its own edges in clip space (so it stays
- // in its plane) moves every edge out a fraction of a pixel and closes it; the overlap shades like either quad there.
- // Unit quads share all their corners with their neighbours and stay as they are.
- if(EDGE>0.0&&((w0>>18u)&0x3ffu)!=0u){
-  let u=f.camera*vec4f(origin.xyz+place(w0,c^1u),1.0);let v=f.camera*vec4f(origin.xyz+place(w0,3u-c),1.0);
-  if(clip.w>0.0&&u.w>0.0&&v.w>0.0){
-   let half=f.viewport.xy*0.5;let s=clip.xy/clip.w*half;let su=u.xy/u.w*half;let sv=v.xy/v.w*half;
-   clip+=stretch(s,su,sv)*(clip-v)+stretch(s,sv,su)*(clip-u);
-  }
- }
- var o:Out;o.clip=clip;o.words=vec3u(w0,quads[q*3u+1u],quads[q*3u+2u]);o.origin=origin;o.material=materials[o.words.y&4095u];return o;
-}
-struct Surface {base:vec4f,n:vec3f,roughness:f32,metal:f32,occlusion:f32,emissive:vec3f}
-struct Pixel {clip:vec4f,position:vec3f}
-// Where the ray through framebuffer position px meets the plane n.p = k: a function of the pixel and the plane only.
-fn hit(px:vec2f,n:vec3f,k:f32)->vec3f {
- let a=f.inverse*vec4f(px.x*f.viewport.z*2.0-1.0,1.0-px.y*f.viewport.w*2.0,0.0,1.0);let b=f.inverse[2];
- let h=a-b*((dot(n,a.xyz)-k*a.w)/(dot(n,b.xyz)-k*b.w));return h.xyz/h.w;
-}
-// Texture coordinates of chunk-local point l on a face, in blocks (the sampler repeats), v running down the sides.
-fn tile(face:u32,l:vec3f,cell:vec3f)->vec2f {
+fn voxelTile(face:u32,l:vec3f,cell:vec3f)->vec2f {
  switch face {
   case 0u {return vec2f(-l.z,-l.y);}
   case 1u {return vec2f(l.z,-l.y);}
@@ -122,10 +86,64 @@ fn tile(face:u32,l:vec3f,cell:vec3f)->vec2f {
   default {return vec2f(cell.x+1.0-l.x,-l.y);}
  }
 }
-// AO (0-3), sky light and block light (0-15) of corner c. Interpolated with mixes that return a exactly when a == b,
-// so a quad merged along an axis its corners are equal on shades exactly like its unit faces.
-fn corner(w:vec3u,c:u32)->vec3f {return vec3f(f32((w.y>>(12u+2u*c))&3u),f32((w.z>>(8u*c))&15u),f32((w.z>>(8u*c+4u))&15u));}
-fn mix3(a:vec3f,b:vec3f,t:f32)->vec3f {return a+(b-a)*t;}
+fn voxelLayer(m:vec4u,t:f32)->u32 {return (m.x&255u)+u32(floor(t*f32(m.z>>16u)/256.0))%(((m.x>>8u)&255u)+1u);}
+`;
+// Sky visibility of the sun: without a shadow map the sun reaches a face as far as the open sky does. With one
+// (`shadows.add(voxels)`), the map decides inside its range and sky visibility fades back in over the last tenth of it;
+// this reads the shadows package's own uniform (shadowFrame.view and splits.w, its receivers' "outside" test).
+const SUN = 'fn voxelSun(p:vec3f,sky:f32)->f32 {return sky*sky;}',
+  SHADOWED_SUN =
+    'fn voxelSun(p:vec3f,sky:f32)->f32 {let d=-(shadowFrame.view*vec4f(p,1.0)).z;return mix(1.0,sky*sky,smoothstep(0.9*shadowFrame.splits.w,shadowFrame.splits.w,d));}';
+
+// The beauty shader. MODE: 0 opaque, 1 cutout (alpha test), 2 cutout (alpha to coverage), 3 translucent
+// (premultiplied); EDGE: pixels a merged quad's edges move out. T-junctions: neighbours' corners lie on a merged quad's
+// edges, and once the rasterizer snaps them to its subpixel grid a sliver between the two can stay uncovered;
+// voxelStretch moves each edge EDGE pixels out along the quad's own edges in clip space (so it stays in its plane): EDGE
+// over the quad's on-screen thickness there, at most a pixel and half the quad, 0 for an edge under 1/16 pixel long,
+// whose direction is too uncertain. Unit quads share all their corners with their neighbours and stay as they are.
+// The fragment shades from voxelHit, the point where the pixel's ray meets the face's plane (never from interpolated
+// attributes), so a greedy quad shades its pixels bit for bit like the unit faces it covers; AO and light (voxelCorner)
+// are mixed bilinearly with voxelMix, which returns a exactly when a == b; texture gradients come from the neighbouring
+// pixels' hits. Its lit part keeps gltf-pro's hook points (packages/shared/pbr-hooks.js) for shadows, clustered lights,
+// IBL and fog; `f.glow` is the block light colour and time, `f.ambient.w` the daylight.
+const SHADER = /* wgsl */ `${neutralShader}
+struct Frame {camera:mat4x4f,inverse:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f,ambient:vec4f,glow:vec4f,viewport:vec4f,settings:vec4f}
+@group(0) @binding(0) var<uniform> f:Frame;
+${COMMON}
+override MODE:u32=0u;
+override EDGE:f32=0.0;
+struct Out {@builtin(position) clip:vec4f,@location(0) @interpolate(flat) words:vec3u,@location(1) @interpolate(flat) origin:vec4f,@location(2) @interpolate(flat) material:vec4u}
+fn voxelStretch(s:vec2f,along:vec2f,across:vec2f)->f32 {
+ let d=s-along;let l=length(d);let a=s-across;if(l<0.0625){return 0.0;}
+ return min(min(EDGE/max(abs(dot(vec2f(-d.y,d.x)/l,a)),0.000001),0.5),1.0/max(length(a),0.000001));
+}
+@vertex fn vertex(@builtin(vertex_index) index:u32)->Out {
+ let q=index>>2u;let w0=voxelQuads[q*3u];let w1=voxelQuads[q*3u+1u];let face=(w0>>15u)&7u;var c=index&3u;let t=f.glow.w;
+ if((w0&0x10000000u)!=0u){c=(c+1u)&3u;}
+ if(face==0u||face==2u||face==5u){c=(4u-c)&3u;}
+ let origin=voxelOrigins[voxelPages[q>>6u]];var clip=f.camera*vec4f(origin.xyz+voxelPlace(w0,w1,c,t),1.0);
+ if(EDGE>0.0&&((w0>>18u)&0x3ffu)!=0u){
+  let u=f.camera*vec4f(origin.xyz+voxelPlace(w0,w1,c^1u,t),1.0);let v=f.camera*vec4f(origin.xyz+voxelPlace(w0,w1,3u-c,t),1.0);
+  if(clip.w>0.0&&u.w>0.0&&v.w>0.0){
+   let half=f.viewport.xy*0.5;let s=clip.xy/clip.w*half;let su=u.xy/u.w*half;let sv=v.xy/v.w*half;
+   clip+=voxelStretch(s,su,sv)*(clip-v)+voxelStretch(s,sv,su)*(clip-u);
+  }
+ }
+ var o:Out;o.clip=clip;o.words=vec3u(w0,w1,voxelQuads[q*3u+2u]);o.origin=origin;o.material=voxelMaterials[w1&4095u];return o;
+}
+struct Surface {base:vec4f,n:vec3f,roughness:f32,metal:f32,occlusion:f32,emissive:vec3f}
+struct VoxelPixel {clip:vec4f,position:vec3f}
+fn voxelHit(px:vec2f,n:vec3f,k:f32)->vec3f {
+ let a=f.inverse*vec4f(px.x*f.viewport.z*2.0-1.0,1.0-px.y*f.viewport.w*2.0,0.0,1.0);let b=f.inverse[2];
+ let h=a-b*((dot(n,a.xyz)-k*a.w)/(dot(n,b.xyz)-k*b.w));return h.xyz/h.w;
+}
+fn voxelCorner(w:vec3u,c:u32)->vec3f {return vec3f(f32((w.y>>(12u+2u*c))&3u),f32((w.z>>(8u*c))&15u),f32((w.z>>(8u*c+4u))&15u));}
+fn voxelMix(a:vec3f,b:vec3f,t:f32)->vec3f {return a+(b-a)*t;}
+fn voxelRipple(p:vec2f,t:f32)->vec3f {
+ let a=0.035*cos(dot(p,vec2f(1.3,0.4))+t*1.7);let b=0.03*cos(dot(p,vec2f(-0.5,1.6))+t*1.3);let c=0.015*cos(dot(p,vec2f(2.9,2.3))+t*2.9);
+ return normalize(vec3f(-(1.3*a-0.5*b+2.9*c),1.0,-(0.4*a+1.6*b+2.3*c)));
+}
+${SUN}
 fn ambient(s:Surface)->vec3f {let f0=mix(vec3f(0.04),s.base.rgb,s.metal);return (s.base.rgb*(1.0-s.metal)+f0*0.5)*mix(vec3f(0.35,0.3,0.25),vec3f(1.0),clamp(s.n.y*0.5+0.5,0.0,1.0))*f.ambient.rgb*f.radiance.w*s.occlusion;}
 fn direct_light(s:Surface,v:vec3f,l:vec3f)->vec3f {
  let h=(v+l)/max(length(v+l),0.0001);
@@ -136,37 +154,57 @@ fn direct_light(s:Surface,v:vec3f,l:vec3f)->vec3f {
  return ((1.0-fresnel)*(1.0-s.metal)*s.base.rgb/3.14159265+d*g*fresnel/max(4.0*nl*nv,0.0001))*nl*f.radiance.rgb*f.light.w;
 }
 @fragment fn fragment(o:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {
- let w=o.words;let face=(w.x>>15u)&7u;let O=o.origin.xyz;let drop=f32(w.x>>29u)*0.125;
+ let w=o.words;let face=(w.x>>15u)&7u;let O=o.origin.xyz;let t=f.glow.w;let drop=f32(w.x>>29u)*0.125-voxelRise(w.y,t);
  let cell=vec3f(f32(w.x&31u),f32((w.x>>5u)&31u),f32((w.x>>10u)&31u));let size=vec2f(f32(((w.x>>18u)&31u)+1u),f32(((w.x>>23u)&31u)+1u));
  let axis=face>>1u;var n=vec3f(f32(axis==0u),f32(axis==1u),f32(axis==2u));var k=dot(n,O+cell)+f32((face&1u)==0u);
  if(face==2u){k-=drop;}
  if(face==6u){n=vec3f(1.0,0.0,-1.0);k=(O.x+cell.x)-(O.z+cell.z);}
  if(face==7u){n=vec3f(1.0,0.0,1.0);k=O.x+cell.x+1.0+O.z+cell.z;}
- var i:Pixel;i.clip=o.clip;i.position=hit(o.clip.xy,n,k);let l=i.position-O;
- // Bilinear AO and light over the quad, from the hit's (u, v) on the face.
+ var i:VoxelPixel;i.clip=o.clip;i.position=voxelHit(o.clip.xy,n,k);let l=i.position-O;
  var uv=l.xy;var at=cell.xy;
  if(axis==0u){uv=l.zy;at=cell.zy;} else if(axis==1u){uv=l.xz;at=cell.xz;}
- let t=clamp((uv-at)/vec2f(size.x,size.y-select(0.0,drop,face<6u&&axis!=1u)),vec2f(0.0),vec2f(1.0));
- let light=mix3(mix3(corner(w,0u),corner(w,1u),t.x),mix3(corner(w,3u),corner(w,2u),t.x),t.y);
- // Texture: gradients from the neighbouring pixels' hits, so mips need no derivatives of a tiled coordinate.
- let m=o.material;let frames=((m.x>>8u)&255u)+1u;
- let layer=(m.x&255u)+u32(floor(f.glow.w*f32(m.z>>16u)/256.0))%frames;
- let s0=tile(face,l,cell);let s1=tile(face,hit(o.clip.xy+vec2f(1.0,0.0),n,k)-O,cell);let s2=tile(face,hit(o.clip.xy+vec2f(0.0,1.0),n,k)-O,cell);
- let texel=textureSampleGrad(blockTextures,blockSampler,s0,layer,s1-s0,s2-s0);
- let c=unpack4x8unorm(m.y).rgb;let tint=select(c/12.92,pow((c+0.055)/1.055,vec3f(2.4)),c>vec3f(0.04045));
+ let r=clamp((uv-at)/vec2f(size.x,size.y-select(0.0,drop,face<6u&&axis!=1u)),vec2f(0.0),vec2f(1.0));
+ let lit=voxelMix(voxelMix(voxelCorner(w,0u),voxelCorner(w,1u),r.x),voxelMix(voxelCorner(w,3u),voxelCorner(w,2u),r.x),r.y);
+ let m=o.material;let layer=voxelLayer(m,t);
+ let s0=voxelTile(face,l,cell);let s1=voxelTile(face,voxelHit(o.clip.xy+vec2f(1.0,0.0),n,k)-O,cell);let s2=voxelTile(face,voxelHit(o.clip.xy+vec2f(0.0,1.0),n,k)-O,cell);
+ let texel=textureSampleGrad(voxelTextures,voxelSampler,s0,layer,s1-s0,s2-s0);
+ let tc=unpack4x8unorm(m.y).rgb;let tint=select(tc/12.92,pow((tc+0.055)/1.055,vec3f(2.4)),tc>vec3f(0.04045));
  var s:Surface;s.base=vec4f(texel.rgb*tint,select(texel.a,1.0,(m.x&0x10000u)!=0u));
  if(MODE==1u&&s.base.a<0.5){discard;}
- s.n=select(vec3f(0.0,1.0,0.0),n*select(-1.0,1.0,(face&1u)==0u)*select(-1.0,1.0,front),face<6u);
+ let side=select(-1.0,1.0,front);
+ s.n=select(vec3f(0.0,1.0,0.0),n*select(-1.0,1.0,(face&1u)==0u)*side,face<6u);
+ if(face==2u&&(w.y&0x100000u)!=0u){s.n=voxelRipple(i.position.xz,t)*side;}
  s.roughness=clamp(f32(m.z&255u)/255.0,0.045,1.0);s.metal=f32((m.z>>8u)&255u)/255.0;
- let sky=light.y/15.0;let block=light.z/15.0;let skyLight=sky/(4.0-3.0*sky);let ao=0.4+0.2*light.x;
+ let sky=lit.y/15.0;let block=lit.z/15.0;let skyLight=sky/(4.0-3.0*sky);let ao=0.4+0.2*lit.x;
  s.occlusion=ao*(0.03+skyLight*f.ambient.w);
  s.emissive=s.base.rgb*(bitcast<f32>(m.w)+block/(4.0-3.0*block)*ao*f.glow.rgb);
  let v=normalize(f.eye.xyz-i.position);let lightDirection=normalize(f.light.xyz);
- let direct=direct_light(s,v,lightDirection)*skyLight*skyLight;
+ let direct=direct_light(s,v,lightDirection)*voxelSun(i.position,skyLight);
  var color=direct+ambient(s)+s.emissive;
  if(f.settings.w<0.5) {color=pbrNeutral(max(color,vec3f(0))); color=select(color*12.92,1.055*pow(color,vec3f(1.0/2.4))-0.055,color>=vec3f(0.0031308));}
  if(MODE==3u){return vec4f(color*s.base.a,s.base.a);}
  return vec4f(color,select(1.0,s.base.a,MODE==2u));
+}`;
+
+// The shadow-map shader: opaque chunks depth only (shadowVertex), cutout ones alpha tested at their texture's level 0
+// (shadowCutout). No winding (both sides cast). Every quad reaches 1/64 block past its edges in its plane, so T-junction
+// slivers cannot let light through the map (a texel is at least a few centimetres; the snapping error is 1/256 of one),
+// and merged and unit quads cast the same outline. Translucent blocks cast no shadow.
+const SHADOW_SHADER = /* wgsl */ `
+struct VoxelShadow {matrix:mat4x4f,time:vec4f}
+@group(0) @binding(0) var<uniform> shadow:VoxelShadow;
+${COMMON}
+struct ShadowOut {@builtin(position) clip:vec4f,@location(0) @interpolate(flat) words:vec2u,@location(1) local:vec3f}
+@vertex fn shadowVertex(@builtin(vertex_index) index:u32)->ShadowOut {
+ let q=index>>2u;let w0=voxelQuads[q*3u];let w1=voxelQuads[q*3u+1u];let c=index&3u;let t=shadow.time.x;
+ var p=voxelPlace(w0,w1,c,t);
+ p+=(normalize(p-voxelPlace(w0,w1,c^1u,t))+normalize(p-voxelPlace(w0,w1,3u-c,t)))*${1 / 64};
+ var o:ShadowOut;o.clip=shadow.matrix*vec4f(voxelOrigins[voxelPages[q>>6u]].xyz+p,1.0);o.words=vec2u(w0,w1);o.local=p;return o;
+}
+@fragment fn shadowCutout(o:ShadowOut) {
+ let face=(o.words.x>>15u)&7u;let cell=vec3f(f32(o.words.x&31u),f32((o.words.x>>5u)&31u),f32((o.words.x>>10u)&31u));
+ let m=voxelMaterials[o.words.y&4095u];
+ if((m.x&0x10000u)==0u&&textureSampleLevel(voxelTextures,voxelSampler,voxelTile(face,o.local,cell),voxelLayer(m,shadow.time.x),0.0).a<0.5){discard;}
 }`;
 
 /** Options of {@link VoxelRenderer.attach}. */
@@ -186,6 +224,41 @@ export interface VoxelRendererOptions {
   daylight?: number;
   /** Cutout cubes (leaves) are see-through; false draws them solid. Cross blocks always cut out. Default true. */
   fancyLeaves?: boolean;
+}
+
+/**
+ * A lighting effect for {@link VoxelRenderer.addLighting}: an object with glTF-pro's lighting hooks (contract version 1),
+ * such as `Shadows`, `Clustered`, `Fog` or `EnvironmentLighting`. Their `add(voxels)` calls `addLighting` for you.
+ */
+export interface VoxelRendererEffect {
+  /**
+   * WGSL hooks for bind group `group` (the renderer passes 1): `declarations` and any of `direct` (wraps the sun
+   * term), `light` (local lights), `ambient` (replaces the hemisphere ambient) and `output` (wraps the display colour).
+   * Undefined while the effect is not ready; the renderer asks every frame.
+   */
+  pbr(group: number):
+    | {
+        readonly declarations: string;
+        direct?(direct: string): string;
+        readonly light?: string;
+        readonly ambient?: string;
+        output?(color: string): string;
+      }
+    | undefined;
+  /** Bind group entries of those hooks' bindings. */
+  bindings(): GPUBindGroupEntry[];
+}
+
+/** What `Shadows` hands {@link VoxelRenderer.drawShadow}: one cascade's depth pass and light matrix. */
+export interface VoxelShadowContext {
+  /** The frame's pass context; the renderer reads its `device`. */
+  readonly context: { readonly device: GPUDevice };
+  /** The cascade's depth pass (depth32float, less-equal). */
+  readonly pass: GPURenderPassEncoder;
+  /** The cascade's light view-projection matrix (column-major, depth 0 to 1). */
+  readonly matrix: Float32Array;
+  /** Cascade index, 0 to 3. */
+  readonly cascade: number;
 }
 
 /** What a {@link VoxelRenderer} holds and drew in its last frame. */
@@ -264,11 +337,27 @@ interface Finished {
   eye: Vec3;
 }
 interface Pipelines {
+  /** Format, samples and depth format they draw to. */
+  target: string;
   layers: GPURenderPipeline[];
+  /** The effects composed into them, whose bindings fill group 1. */
+  effects: VoxelRendererEffect[];
   groups?: GPUBindGroup[];
   groupVersion?: number;
+  lights?: GPUBindGroup[];
+  lightBound?: unknown[];
+  lightVersion?: number;
   bundle?: GPURenderBundle;
   bundleKey?: string;
+}
+interface ShadowState {
+  uniform: GPUBuffer;
+  values: Float32Array;
+  /** Opaque (depth only) and cutout (alpha tested) pipelines, once compiled. */
+  ready?: GPURenderPipeline[];
+  /** Per pipeline, per cascade. */
+  groups?: GPUBindGroup[][];
+  groupVersion?: number;
 }
 interface Gpu {
   device: GPUDevice;
@@ -282,6 +371,7 @@ interface Gpu {
   sampler: GPUSampler;
   view?: GPUTextureView;
   pipelines: Map<string, { ready?: Pipelines }>;
+  shadow?: ShadowState;
 }
 
 let serial = 0;
@@ -340,6 +430,14 @@ export class VoxelRenderer implements EnginePlugin {
   #frustum = new Frustum();
   #box = { min: { x: 0, y: 0, z: 0 }, max: { x: 0, y: 0, z: 0 } };
   #stats = { chunks: 0, visible: 0, quads: 0, bytes: 0, draws: 0 };
+  #effects = new Set<VoxelRendererEffect>();
+  #composed = { from: '', code: SHADER };
+  #lightVersion = 0;
+  #shadowVersion = 0;
+  #shadowResources = -1;
+  /** The cascades of the last shadow map drawn: chunks changing outside them leave the map as it is. */
+  #shadowFrusta: Frustum[] = [];
+  #blockLight: [number, number, number] = [1, 0.82, 0.6];
 
   private constructor(options: VoxelRendererOptions) {
     if (!options || typeof options !== 'object')
@@ -392,9 +490,110 @@ export class VoxelRenderer implements EnginePlugin {
     this.#daylight = value;
   }
 
+  /**
+   * Linear colour of block light (torches, lava: `BlockTypeOptions.light`), 0 to 1 or above per channel. Live. Default
+   * warm white `[1, 0.82, 0.6]`.
+   */
+  get blockLightColor(): Vec3 {
+    return this.#blockLight;
+  }
+  set blockLightColor(value: Vec3) {
+    if (!Array.isArray(value) || value.length !== 3 || value.some((v) => typeof v !== 'number'))
+      throw new TypeError(
+        'VoxelRenderer blockLightColor must be [r, g, b]; pass linear numbers such as [1, 0.82, 0.6]',
+      );
+    if (!value.every((v) => v >= 0 && Number.isFinite(v)))
+      throw new RangeError(`VoxelRenderer blockLightColor [${value}] must be finite and >= 0`);
+    this.#blockLight = [value[0], value[1], value[2]];
+  }
+
   /** Chunks, quads, bytes and draw calls of the last frame. */
   get stats(): VoxelRendererStats {
     return this.#stats;
+  }
+
+  /**
+   * Changes whenever the shadow map must be drawn again: chunks with opaque or cutout quads arrive, change or leave
+   * inside the last map's cascades, the textures or GPU buffers change, or the shadow pipelines become ready. `Shadows`
+   * redraws a `static` source's map only then (and when its cascades move).
+   */
+  get shadowVersion(): number {
+    return this.#shadowVersion;
+  }
+
+  /**
+   * Lights the voxels with an effect's glTF-pro lighting hooks: `shadows.add(voxels, {static: true})`,
+   * `clustered.add(voxels)`, `fog.add(voxels)` and `environment.add(voxels)` call this. The shader is composed again
+   * and compiled in the background; until it is ready the previous one keeps drawing. Returns a remover.
+   * @throws TypeError when `effect` has no `pbr` and `bindings` functions.
+   * @throws MargoError `attached` when the effect belongs to another engine, `disposed` after `dispose()`.
+   */
+  addLighting(effect: VoxelRendererEffect): () => void {
+    if (this.#disposed) throw new MargoError('disposed', 'VoxelRenderer is disposed; attach a new one');
+    if (!effect || typeof effect.pbr !== 'function' || typeof effect.bindings !== 'function')
+      throw new TypeError(
+        'VoxelRenderer lighting effects need pbr(group) and bindings(); pass Shadows, Clustered, Fog or EnvironmentLighting',
+      );
+    const owner = (effect as { owner?: unknown }).owner;
+    if (owner && this.#engine && owner !== this.#engine)
+      throw new MargoError(
+        'attached',
+        'VoxelRenderer lighting effect belongs to another engine; use one of this engine',
+      );
+    this.#effects.add(effect);
+    return () => {
+      this.#effects.delete(effect);
+    };
+  }
+
+  /**
+   * `Shadows` calls this per cascade (add the renderer with `shadows.add(voxels, {static: true})`): the opaque and
+   * cutout chunks inside the cascade, culled on the CPU, into its depth pass. Translucent blocks cast no shadow.
+   */
+  drawShadow({ context, pass, matrix, cascade }: VoxelShadowContext): void {
+    const gpu = this.#gpu;
+    if (this.#disposed || !gpu || gpu.device !== context.device || !this.#chunks.size) return;
+    const s = this.#shadowState(gpu);
+    if (!s.ready) return;
+    const frustum = (this.#shadowFrusta[cascade] ??= new Frustum()).setFromProjectionMatrix({ elements: matrix });
+    s.values.set(matrix);
+    s.values[16] = this.#time;
+    gpu.device.queue.writeBuffer(s.uniform, cascade * 256, s.values);
+    if (s.groupVersion !== this.#resources) {
+      const entries: GPUBindGroupEntry[] = [
+        { binding: 1, resource: { buffer: gpu.pool } },
+        { binding: 2, resource: { buffer: gpu.pageTable } },
+        { binding: 3, resource: { buffer: gpu.origins } },
+        { binding: 4, resource: { buffer: gpu.materials } },
+        { binding: 5, resource: gpu.view! },
+        { binding: 6, resource: gpu.sampler },
+      ];
+      s.groups = s.ready.map((pipeline, l) =>
+        [0, 1, 2, 3].map((i) =>
+          gpu.device.createBindGroup({
+            layout: pipeline.getBindGroupLayout(0),
+            entries: [
+              { binding: 0, resource: { buffer: s.uniform, offset: i * 256, size: 80 } },
+              ...entries.slice(0, l ? 6 : 3),
+            ],
+          }),
+        ),
+      );
+      s.groupVersion = this.#resources;
+    }
+    pass.setIndexBuffer(gpu.index, 'uint32');
+    for (let l = 0; l < 2; l++) {
+      let bound = false;
+      for (const chunk of this.#chunks.values()) {
+        if (!chunk.quads[l] || !frustum.intersectsBox(this.#chunkBox(chunk))) continue;
+        if (!bound) {
+          pass.setPipeline(s.ready[l]);
+          pass.setBindGroup(0, s.groups![l][cascade]);
+          bound = true;
+        }
+        pass.drawIndexed(chunk.quads[l] * 6, 1, 0, chunk.start[l] * PAGE * 4, 0);
+      }
+    }
   }
 
   /** @internal Engine plugin hook. */
@@ -434,6 +633,7 @@ export class VoxelRenderer implements EnginePlugin {
     this.#chunks.clear();
     this.#finished.clear();
     this.#known.clear();
+    this.#effects.clear();
     this.#engine = undefined;
   }
 
@@ -494,8 +694,11 @@ export class VoxelRenderer implements EnginePlugin {
 
   #release(): void {
     const g = this.#gpu;
-    if (g) for (const b of [g.frame, g.pool, g.pageTable, g.origins, g.args, g.materials, g.index]) b.destroy();
+    if (g)
+      for (const b of [g.frame, g.pool, g.pageTable, g.origins, g.args, g.materials, g.index, g.shadow?.uniform])
+        b?.destroy();
     this.#gpu = this.#ready = undefined;
+    this.#shadowVersion++;
     this.#slots = [];
     this.#slotTop = 0;
     this.#origins = new Float32Array(0);
@@ -517,6 +720,10 @@ export class VoxelRenderer implements EnginePlugin {
     }
     this.#submit(eye);
     this.#upload(gpu);
+    if (this.#shadowResources !== this.#resources) {
+      this.#shadowResources = this.#resources;
+      this.#shadowVersion++;
+    }
     // Frame uniform: camera, its inverse (for the per-pixel plane hits), eye, engine lighting, daylight, block light
     // colour, time, target size and the HDR flag in settings.w (no tone mapping on rgba16float targets).
     const f = this.#frame,
@@ -529,9 +736,7 @@ export class VoxelRenderer implements EnginePlugin {
     f.set(lighting.radiance, 40);
     f.set(lighting.ambient ?? [1, 1, 1], 44);
     f[47] = this.#daylight;
-    f[48] = 1; // block light colour: warm white
-    f[49] = 0.82;
-    f[50] = 0.6;
+    f.set(this.#blockLight, 48);
     f[51] = this.#time;
     f[52] = c.width;
     f[53] = c.height;
@@ -652,6 +857,7 @@ export class VoxelRenderer implements EnginePlugin {
       this.#chunks.set(key, chunk);
     }
     if (chunk.slot < 0) chunk.slot = this.#slot(gpu, chunk);
+    if (chunk.quads[0] || chunk.quads[1] || mesh.opaque.length || mesh.cutout.length) this.#shadowChanged(chunk);
     for (let l = 0; l < 3; l++) {
       const quads = layers[l].length / 3,
         need = Math.ceil(quads / PAGE);
@@ -750,27 +956,92 @@ export class VoxelRenderer implements EnginePlugin {
       this.#slots.push(chunk.slot);
       this.#args.fill(0, chunk.slot * 10, chunk.slot * 10 + 10);
     }
-    if (chunk.quads[0] || chunk.quads[1]) this.#residency++;
+    if (chunk.quads[0] || chunk.quads[1]) {
+      this.#residency++;
+      this.#shadowChanged(chunk);
+    }
     this.#full = false;
+  }
+
+  #chunkBox(chunk: Chunk): { min: Vec3Like; max: Vec3Like } {
+    const box = this.#box;
+    box.min.x = chunk.x;
+    box.min.y = chunk.y;
+    box.min.z = chunk.z;
+    box.max.x = chunk.x + 32;
+    box.max.y = chunk.y + 32;
+    box.max.z = chunk.z + 32;
+    return box;
+  }
+
+  // A chunk's opaque or cutout quads change: the static shadow map is drawn again if the chunk is in one of its cascades.
+  #shadowChanged(chunk: Chunk): void {
+    const frusta = this.#shadowFrusta;
+    if (!frusta.length) this.#shadowVersion++;
+    else {
+      const box = this.#chunkBox(chunk);
+      if (frusta.some((f) => f?.intersectsBox(box))) this.#shadowVersion++;
+    }
+  }
+
+  // The shadow uniform (four 256-byte cascade slots) and pipelines, compiled asynchronously on first use; the map is
+  // drawn again once they are ready.
+  #shadowState(gpu: Gpu): ShadowState {
+    if (gpu.shadow) return gpu.shadow;
+    const device = gpu.device,
+      s: ShadowState = {
+        uniform: device.createBuffer({ size: 1024, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+        values: new Float32Array(20),
+      },
+      module = device.createShaderModule({ code: SHADOW_SHADER }),
+      create = (cutout: boolean) =>
+        device.createRenderPipelineAsync({
+          layout: 'auto',
+          vertex: { module, entryPoint: 'shadowVertex' },
+          ...(cutout ? { fragment: { module, entryPoint: 'shadowCutout', targets: [] } } : {}),
+          primitive: { cullMode: 'none' },
+          depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less-equal' },
+        });
+    gpu.shadow = s;
+    Promise.all([create(false), create(true)])
+      .then((pipelines) => {
+        if (this.#gpu !== gpu) return;
+        s.ready = pipelines;
+        this.#shadowVersion++;
+      })
+      .catch((error) => this.#engine?.onError(error));
+    return s;
+  }
+
+  // This frame's shader: the lit part composed with every added effect that is ready (pbr(1) gives hooks), and those
+  // effects (their bindings fill group 1 in order). Hooks and compositions are cached by the effects and lightPBR.
+  #composition(): { code: string; effects: VoxelRendererEffect[] } {
+    let code = SHADER;
+    const effects: VoxelRendererEffect[] = [];
+    for (const effect of this.#effects) {
+      const hooks = effect.pbr(1);
+      if (!hooks) continue;
+      code = lightPBR(code, hooks as PBRHooks);
+      effects.push(effect);
+    }
+    const composed = this.#composed;
+    if (composed.from !== code) {
+      composed.from = code;
+      composed.code = code.includes('var<uniform> shadowFrame') ? code.replace(SUN, SHADOWED_SUN) : code;
+    }
+    return { code: composed.code, effects };
   }
 
   // Frustum cull per chunk into the indirect arguments, the translucent chunks sorted back to front, stats.
   #cull(c: Context, gpu: Gpu, eye: Vec3): void {
     const frustum = this.#frustum.fromArray(c.camera.planes),
-      box = this.#box,
       args = this.#args,
       list = this.#translucent,
       stats = this.#stats,
       distance = (k: Chunk) => (k.x + 16 - eye[0]) ** 2 + (k.y + 16 - eye[1]) ** 2 + (k.z + 16 - eye[2]) ** 2;
     list.length = stats.chunks = stats.visible = stats.quads = stats.draws = 0;
     for (const chunk of this.#chunks.values()) {
-      box.min.x = chunk.x;
-      box.min.y = chunk.y;
-      box.min.z = chunk.z;
-      box.max.x = chunk.x + 32;
-      box.max.y = chunk.y + 32;
-      box.max.z = chunk.z + 32;
-      const seen = frustum.intersectsBox(box),
+      const seen = frustum.intersectsBox(this.#chunkBox(chunk)),
         a = chunk.slot * 10;
       for (let l = 0; l < 2; l++) {
         args[a + l * 5] = chunk.quads[l] * 6;
@@ -802,15 +1073,19 @@ export class VoxelRenderer implements EnginePlugin {
     }
   }
 
-  // The three pipelines for this target (format, samples, depth format), compiled asynchronously: undefined until ready.
+  // The three pipelines for this target (format, samples, depth format) and composed shader, compiled asynchronously.
+  // While a new composition compiles, the last pipelines for the target keep drawing as long as their effects are
+  // still added; undefined when there are none.
   #pipelines(c: Context, gpu: Gpu): Pipelines | undefined {
     const samples = c.descriptor.multisample?.count ?? 1,
       depth = c.descriptor.depthStencil!.format,
-      key = `${c.format}|${samples}|${depth}`;
+      target = `${c.format}|${samples}|${depth}`,
+      { code, effects } = this.#composition(),
+      key = `${target}|${code}`;
     let entry = gpu.pipelines.get(key);
     if (!entry) {
       const device = gpu.device,
-        module = device.createShaderModule({ code: SHADER }),
+        module = device.createShaderModule({ code }),
         pending: { ready?: Pipelines } = {},
         over = { operation: 'add', srcFactor: 'one', dstFactor: 'one-minus-src-alpha' } as const,
         create = (mode: number, write: boolean, blend?: GPUBlendState) =>
@@ -830,11 +1105,17 @@ export class VoxelRenderer implements EnginePlugin {
       gpu.pipelines.set(key, (entry = pending));
       Promise.all([create(0, true), create(samples > 1 ? 2 : 1, true), create(3, false, { color: over, alpha: over })])
         .then((layers) => {
-          if (this.#gpu === gpu) pending.ready = { layers };
+          if (this.#gpu !== gpu) return;
+          pending.ready = { target, layers, effects };
+          // Older compositions for this target are dropped once a newer one is ready.
+          for (const [k, e] of gpu.pipelines)
+            if (e.ready && e !== pending && e.ready.target === target) gpu.pipelines.delete(k);
         })
         .catch((error) => this.#engine?.onError(error));
     }
-    return entry.ready;
+    if (entry.ready) return entry.ready;
+    const last = this.#ready;
+    return last?.target === target && last.effects.every((e) => this.#effects.has(e) && e.pbr(1)) ? last : undefined;
   }
 
   // Bind groups (per pipeline: 'auto' layouts) and the opaque + cutout bundle, re-recorded only when the chunk layers
@@ -855,7 +1136,19 @@ export class VoxelRenderer implements EnginePlugin {
       );
       p.groupVersion = this.#resources;
     }
-    const key = `${this.#resources}|${this.#residency}`;
+    // Group 1: the effects' bindings, in composition order; new bind groups when any of their resources changes.
+    if (p.effects.length) {
+      const entries = p.effects.flatMap((e) => e.bindings()),
+        bound = entries.map((e) => ('buffer' in e.resource ? e.resource.buffer : e.resource));
+      if (!p.lights || bound.length !== p.lightBound!.length || bound.some((x, i) => x !== p.lightBound![i])) {
+        p.lights = p.layers.map((pipeline) =>
+          gpu.device.createBindGroup({ layout: pipeline.getBindGroupLayout(1), entries }),
+        );
+        p.lightBound = bound;
+        p.lightVersion = ++this.#lightVersion;
+      }
+    }
+    const key = `${this.#resources}|${this.#residency}|${p.lightVersion}`;
     if (p.bundleKey === key) return;
     const encoder = gpu.device.createRenderBundleEncoder({
       colorFormats: [c.format],
@@ -867,6 +1160,7 @@ export class VoxelRenderer implements EnginePlugin {
     for (let l = 0; l < 2; l++) {
       encoder.setPipeline(p.layers[l]);
       encoder.setBindGroup(0, p.groups![l]);
+      if (p.lights) encoder.setBindGroup(1, p.lights[l]);
       for (const chunk of this.#chunks.values())
         if (chunk.quads[l]) encoder.drawIndexedIndirect(gpu.args, chunk.slot * 40 + l * 20);
     }
@@ -897,6 +1191,7 @@ export class VoxelRenderer implements EnginePlugin {
     const pass = this.#pass(c);
     pass.setPipeline(p.layers[2]);
     pass.setBindGroup(0, p.groups[2]);
+    if (p.lights) pass.setBindGroup(1, p.lights[2]);
     pass.setIndexBuffer(gpu.index, 'uint32');
     for (const k of this.#translucent) pass.drawIndexed(k.quads[2] * 6, 1, 0, k.start[2] * PAGE * 4, 0);
     pass.end();
