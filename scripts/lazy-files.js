@@ -208,6 +208,14 @@ export const LAZY_FILES = [
     measure: 'file',
     when: 'First `VoxelMesher.mesh()` calls (`@margoengine/voxel/mesher`): up to `workers` workers, reused until `dispose()`',
   },
+  {
+    package: '@margoengine/voxel',
+    file: 'packages/voxel/dist/workers/terrain.js',
+    label: 'workers/terrain.js',
+    kind: 'Worker',
+    measure: 'file',
+    when: 'First chunks a `VoxelStreamer` with `generator: NoiseTerrainOptions` generates (`@margoengine/voxel/stream`): up to `workers` workers, reused until `dispose()`',
+  },
   // Third-party Wasm runtimes.
   {
     package: '@margoengine/physics',

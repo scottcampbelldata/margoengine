@@ -22,6 +22,10 @@
       "types": "./dist/stream.d.ts",
       "import": "./dist/stream.js"
     },
+    "./generate": {
+      "types": "./dist/generate.d.ts",
+      "import": "./dist/generate.js"
+    },
     "./mesher": {
       "types": "./dist/mesher.d.ts",
       "import": "./dist/mesher.js"
@@ -56,7 +60,8 @@
     }
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^1.0.0",
+    "@margoengine/procedural": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js voxel",
