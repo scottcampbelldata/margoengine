@@ -31,12 +31,28 @@ export class VoxelRenderer implements EnginePlugin {
     static attach(engine: EngineKernel, options: VoxelRendererOptions): VoxelRenderer;
     get daylight(): number;
     set daylight(value: number);
+    get blockLightColor(): Vec3;
+    set blockLightColor(value: Vec3);
     get stats(): VoxelRendererStats;
+    get shadowVersion(): number;
+    addLighting(effect: VoxelRendererEffect): () => void;
+    drawShadow({ context, pass, matrix, cascade }: VoxelShadowContext): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(): void;
     dispose(): void;
     [Symbol.dispose](): void;
+}
+
+export interface VoxelRendererEffect {
+    pbr(group: number): {
+        readonly declarations: string;
+        direct?(direct: string): string;
+        readonly light?: string;
+        readonly ambient?: string;
+        output?(color: string): string;
+    } | undefined;
+    bindings(): GPUBindGroupEntry[];
 }
 
 export interface VoxelRendererOptions {
@@ -54,6 +70,15 @@ export interface VoxelRendererStats {
     readonly quads: number;
     readonly bytes: number;
     readonly draws: number;
+}
+
+export interface VoxelShadowContext {
+    readonly context: {
+        readonly device: GPUDevice;
+    };
+    readonly pass: GPURenderPassEncoder;
+    readonly matrix: Float32Array;
+    readonly cascade: number;
 }
 
 // Not exported from this entry, but used by the exports above:
