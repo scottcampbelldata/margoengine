@@ -158,3 +158,51 @@ prints yours): a surface chunk (4-bit, 7 states, dense sky light) is 49,163 byte
 1,876 without light); raw encode about 100 MB/s and decode about 140 MB/s; deflated encode and decode 1-4 ms each,
 most of it Node's stream overhead (32 decodes in flight: about 0.7 ms each). 20,000 block changes in 8 chunks: 1.9
 bytes each. 1,000 entities: 17,940 bytes in full, 1,796 when 30% moved.
+
+## Meshing: `@margoengine/voxel/mesher`
+
+`meshChunk` turns one chunk and the one-cell shell of its neighbours into greedy quads, 12 bytes each, for a renderer
+that pulls vertices from a storage buffer. It is pure and synchronous (phase 3 runs it in workers).
+
+```ts
+import { meshChunk, meshInput, decodeQuad, blockMaterials, QUAD_WORDS } from '@margoengine/voxel/mesher';
+
+for (const key of world.dirty) {
+  const input = meshInput(world, key); // {chunk: packed, shell, light, blocks}; undefined for a removed chunk
+  world.dirty.delete(key);
+  if (!input) continue; // drop that chunk's mesh
+  const mesh = meshChunk(input); // {opaque, cutout, translucent: Uint32Array, visibility}
+  for (let i = 0; i < mesh.opaque.length / QUAD_WORDS; i++) decodeQuad(mesh.opaque, i); // {x, y, z, face, w, h, ...}
+}
+const materials = blockMaterials(blocks.table); // material id per block id * 6 + face
+```
+
+- **Faces.** An opaque cube hides every face against it; faces between blocks of the same id (glass and glass, water
+  and water, leaves and leaves) are hidden; every other face stays, so stone behind glass keeps its face and the glass
+  face against the stone goes. Invisible blocks emit nothing. `cross` blocks emit two diagonal quads (faces 6 and 7),
+  unshaded and lit by their own cell. A `liquid` cell without the same liquid above is a surface: its top and sides
+  drop by its state data's low 3 bits in eighths of a block (`blockState(water, level)`) and carry the wave bit; a
+  lowered top under a solid block stays, and a side above a lower surface of the same liquid stays.
+- **Shading.** Each vertex gets ambient occlusion from the opaque cubes beside it in the face's front layer (0 when both
+  edge cells are opaque, else 3 minus the count of edge and diagonal cells; 0fps.net's rule) and smooth light, the
+  rounded mean of the open cells around it. The AO picks the triangle diagonal (the brighter pair). Faces merge only when
+  their words are equal and their corners equal along the merge axis, so a merged quad shades exactly like the unit
+  faces it covers; the tests check this against a one-quad-per-face oracle.
+- **Quad words** (low bits first). Word 0: x 0-4, y 5-9, z 10-14 (the local cell), face 15-17 (+x, -x, +y, -y, +z, -z,
+  then the two cross diagonals), w - 1 at 18-22, h - 1 at 23-27, flip 28, liquidDrop 29-31. Word 1: material 0-11, AO
+  per corner at 12-19 (2 bits each), wave 20. Word 2: per corner c, sky light at bits 8c-8c+3 and block light at
+  8c+4-8c+7. The u and v axes are z, y on x faces, x, z on y faces and x, y on z faces; corners run (0, 0), (w, 0),
+  (w, h), (0, h). `ChunkMesh` documents the geometry in full.
+- **Materials.** `blockMaterials(table)` numbers each distinct texture layer of each block in id order (up to 4,096), so
+  a renderer builds its material table (layer, tint, roughness, metalness, emissive, animation) from the same walk.
+- **Visibility.** `mesh.visibility` has bit `a * 6 + b` set when chunk faces a < b see each other through cells that are
+  not opaque cubes, for cave culling.
+- **Shell.** `MeshInput.shell` and `.light` hold the 6,536 cells of the 34-cubed block around the chunk outside it, in
+  index order `(x + 1) + 34 (z + 1) + 1156 (y + 1)` for local x, y, z in -1..32; `meshInput` reads them from the
+  loaded neighbours (unloaded cells are air with light 0).
+
+Measured with Node on one core of the development laptop while other jobs ran (2026-10-19; `node --test
+packages/voxel/tests/mesher-benchmark.test.js` prints yours): about 2 ms per random-terrain chunk (5,900 quads) and
+7.5 ms for a full-chunk stone checkerboard (98,304 quads, the most opaque cubes can make); `meshInput` 0.2 ms. A 3D
+checkerboard of two different blocks that hide nothing (two glasses, say) shows every face of every cell: 196,608 quads
+in one layer.

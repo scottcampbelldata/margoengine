@@ -21,6 +21,10 @@
     "./stream": {
       "types": "./dist/stream.d.ts",
       "import": "./dist/stream.js"
+    },
+    "./mesher": {
+      "types": "./dist/mesher.d.ts",
+      "import": "./dist/mesher.js"
     }
   },
   "files": [
