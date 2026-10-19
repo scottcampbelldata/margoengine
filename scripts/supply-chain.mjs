@@ -134,6 +134,7 @@ const ASSETS = [
     'packages/environment/tests/fixtures/NOTICE.md',
     'test fixtures: OpenEXR test images (BSD-3-Clause), three.js spot1Lux.hdr (MIT)',
   ],
+  ['packages/voxel/tests/fixtures/NOTICE.md', 'test fixture: MagicaVoxel sample chr_knight.vox (ephtracy, MIT)'],
 ];
 
 /** Every published package: packages/* with a package.json, plus the two npm tools. */
