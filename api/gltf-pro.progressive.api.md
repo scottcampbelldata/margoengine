@@ -580,6 +580,10 @@ class PBRModel implements EnginePlugin {
     }[];
     setup(engine: Engine, device?: GPUDevice | null): void;
     shareBuffers(target: PBRPrimitive, source: PBRPrimitive): boolean;
+    writeGeometry(geometry: readonly PreparedGeometry[], range?: {
+        readonly start: number;
+        readonly count: number;
+    }): void;
     registerPasses(graph: FrameGraph): void;
     image(index: number): Exclude<GLTFImage, undefined>;
     uploadImage(index: number, device: GPUDevice, srgb?: boolean): GPUTexture;

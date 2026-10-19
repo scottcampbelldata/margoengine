@@ -1,5 +1,5 @@
 {
-  "commit": "8ac80fa",
+  "commit": "7cccdf27",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -10,8 +10,8 @@
   "packages": {
     "@margoengine/animation": {
       ".": {
-        "raw": 19553,
-        "gzip": 6580
+        "raw": 34574,
+        "gzip": 11235
       },
       "./vat": {
         "raw": 17984,
@@ -26,8 +26,8 @@
     },
     "@margoengine/audio": {
       ".": {
-        "raw": 21732,
-        "gzip": 6661
+        "raw": 22899,
+        "gzip": 6985
       }
     },
     "@margoengine/blender": {
@@ -44,8 +44,8 @@
     },
     "@margoengine/bvh": {
       ".": {
-        "raw": 40779,
-        "gzip": 15349
+        "raw": 45410,
+        "gzip": 17287
       }
     },
     "@margoengine/cache": {
@@ -182,16 +182,24 @@
     },
     "@margoengine/exporters": {
       ".": {
-        "raw": 56686,
-        "gzip": 19425
+        "raw": 66906,
+        "gzip": 23328
       },
       "./usdz": {
-        "raw": 17406,
-        "gzip": 6569
+        "raw": 19169,
+        "gzip": 7243
       },
       "./model": {
-        "raw": 21793,
-        "gzip": 8464
+        "raw": 21949,
+        "gzip": 8559
+      },
+      "./dae": {
+        "raw": 21110,
+        "gzip": 8142
+      },
+      "./capture": {
+        "raw": 10011,
+        "gzip": 4376
       }
     },
     "@margoengine/fbx": {
@@ -204,8 +212,8 @@
         "gzip": 17466
       },
       "dist/workers/fbx.js": {
-        "raw": 129564,
-        "gzip": 41571
+        "raw": 134320,
+        "gzip": 43551
       }
     },
     "@margoengine/fsm": {
@@ -216,8 +224,8 @@
     },
     "@margoengine/geometry": {
       ".": {
-        "raw": 41193,
-        "gzip": 15327
+        "raw": 43246,
+        "gzip": 16079
       }
     },
     "@margoengine/gizmo": {
@@ -234,12 +242,12 @@
     },
     "@margoengine/gltf-pro": {
       ".": {
-        "raw": 123354,
-        "gzip": 38480
+        "raw": 126601,
+        "gzip": 39441
       },
       "./asset": {
         "raw": 13866,
-        "gzip": 4976
+        "gzip": 4975
       },
       "./scene": {
         "raw": 2493,
@@ -254,16 +262,16 @@
         "gzip": 2448
       },
       "./prepare": {
-        "raw": 45235,
-        "gzip": 15280
+        "raw": 45231,
+        "gzip": 15276
       },
       "./progressive": {
-        "raw": 140919,
-        "gzip": 44934
+        "raw": 144158,
+        "gzip": 45907
       },
       "./worker": {
-        "raw": 125589,
-        "gzip": 39141
+        "raw": 128835,
+        "gzip": 40119
       },
       "dist/workers/gltf.js": {
         "raw": 55174,
@@ -330,16 +338,16 @@
     },
     "@margoengine/loaders": {
       ".": {
-        "raw": 77594,
-        "gzip": 27947
+        "raw": 109734,
+        "gzip": 38718
       },
       "./worker": {
-        "raw": 18614,
-        "gzip": 7309
+        "raw": 18611,
+        "gzip": 7310
       },
       "dist/workers/usd.js": {
-        "raw": 17402,
-        "gzip": 6800
+        "raw": 17399,
+        "gzip": 6806
       }
     },
     "@margoengine/lod": {
@@ -430,8 +438,8 @@
     },
     "@margoengine/materials": {
       ".": {
-        "raw": 105764,
-        "gzip": 32119
+        "raw": 111727,
+        "gzip": 34140
       },
       "./transmission": {
         "raw": 15769,
@@ -526,6 +534,10 @@
       "./mesh": {
         "raw": 342,
         "gzip": 259
+      },
+      "./billboard": {
+        "raw": 5235,
+        "gzip": 2265
       }
     },
     "@margoengine/navigation": {
@@ -810,8 +822,8 @@
         "gzip": 8847
       },
       "dist/workers/usdz.js": {
-        "raw": 145630,
-        "gzip": 47297
+        "raw": 148878,
+        "gzip": 48255
       }
     },
     "@margoengine/usdz-export": {
@@ -979,19 +991,19 @@
       "brotli": 12864
     },
     "packages/fbx/dist/workers/fbx.js": {
-      "raw": 128569,
-      "gzip": 41497,
-      "brotli": 36623
+      "raw": 133293,
+      "gzip": 43466,
+      "brotli": 38064
     },
     "packages/usdz/dist/workers/usdz.js": {
-      "raw": 144155,
-      "gzip": 47177,
-      "brotli": 41304
+      "raw": 147355,
+      "gzip": 48118,
+      "brotli": 42099
     },
     "packages/loaders/dist/workers/usd.js": {
-      "raw": 17210,
-      "gzip": 6771,
-      "brotli": 6070
+      "raw": 17207,
+      "gzip": 6777,
+      "brotli": 6096
     },
     "packages/bvh/dist/bvh.worker.js": {
       "raw": 6794,

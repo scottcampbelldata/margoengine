@@ -458,6 +458,8 @@
       "packGeometry",
       "sheen",
       "specular",
+      "tileAnimationFrame",
+      "tileAnimator",
       "transformUVs",
       "transmission"
     ],
@@ -1283,9 +1285,16 @@
     "imports": "import { Animation } from '@margoengine/animation';",
     "exports": [
       "Animation",
+      "Skeleton",
+      "Skin",
+      "applyKeyframeClip",
+      "bakeKeyframeClip",
+      "createKeyframeClip",
       "multiplyMatrices",
+      "sampleKeyframes",
       "sampleTrack",
-      "sampleTrackInto"
+      "sampleTrackInto",
+      "segmentTime"
     ],
     "category": "Animation and interaction"
   },

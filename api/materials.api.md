@@ -14,6 +14,12 @@ export interface AddNode {
     b: ValueNode;
 }
 
+export interface AnimatedTile {
+    vertex: number;
+    animation: TileAnimation;
+    start?: TileAnimationStart;
+}
+
 export interface AnisotropyOptions {
     strength?: number;
     rotation?: number;
@@ -75,6 +81,11 @@ export interface EmitNode {
 
 export type Filter = 'linear' | 'nearest';
 
+export interface GeometryRange {
+    start: number;
+    count: number;
+}
+
 export type InstancedMesh<M extends Material | readonly Material[] = Material> = MaterialMesh<M> & {
     readonly instances: PBRInstances;
 };
@@ -95,6 +106,7 @@ export class Material {
     readonly wireframe: boolean;
     readonly color: number[];
     readonly emissive: number[];
+    readonly specular: number[];
     readonly blending: Blending;
     readonly depthWrite?: boolean;
     readonly depthTest: boolean;
@@ -203,6 +215,8 @@ export class Material {
     set normalScale(v: number);
     get aoMapIntensity(): number;
     set aoMapIntensity(v: number);
+    get shininess(): number;
+    set shininess(v: number);
     get opacity(): number;
     set opacity(v: number);
     get alphaTest(): number;
@@ -246,6 +260,7 @@ export interface MaterialLobeOptions {
 
 export type MaterialMesh<M extends Material | readonly Material[] = Material> = PBRModel & {
     readonly material: M extends Material ? Material : readonly Material[];
+    setGeometry(geometry: MeshGeometry, range?: GeometryRange): MaterialMesh<M>;
 };
 
 export type MaterialNode = ValueNode | NormalMapNode | MetalRoughNode | ClearcoatNode | TransmissionNode | EmitNode;
@@ -256,6 +271,8 @@ export interface MaterialOptions extends PhysicalOptions {
     referencePosition?: readonly [number, number, number];
     nearDistance?: number;
     farDistance?: number;
+    specular?: Color;
+    shininess?: number;
     color?: Color;
     opacity?: number;
     roughness?: number;
@@ -405,7 +422,7 @@ export interface ScalarNode {
     value: number;
 }
 
-export type Shading = 'standard' | 'basic' | 'normal' | 'matcap' | 'depth' | 'distance';
+export type Shading = 'standard' | 'basic' | 'normal' | 'matcap' | 'depth' | 'distance' | 'lambert' | 'phong';
 
 export interface SheenOptions {
     colorFactor?: readonly [number, number, number];
@@ -438,7 +455,7 @@ export class Texture {
     get width(): number;
     get height(): number;
     get isVideo(): boolean;
-    update(): void;
+    update(region?: TextureRegion): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
     bind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined;
@@ -461,9 +478,31 @@ export interface TextureOptions {
     flipY?: boolean;
 }
 
+export interface TextureRegion {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
 export type TextureSource = ImageBitmap | HTMLImageElement | HTMLCanvasElement | OffscreenCanvas | HTMLVideoElement | VideoFrame | ImageData | RawImage;
 
 export { TextureTransform } from "@margoengine/gltf-pro";
+
+export interface TileAnimation {
+    frames: readonly TileFrame[];
+}
+
+export type TileAnimationStart = {
+    frame: number;
+} | {
+    seconds: number;
+};
+
+export interface TileFrame {
+    duration: number;
+    uvs: ArrayLike<number>;
+}
 
 export interface TransmissionNode {
     type: 'transmission';
@@ -527,6 +566,12 @@ export function packGeometry(g: MeshGeometry): PreparedGeometry;
 export function sheen(options?: SheenOptions, base?: MaterialExtension): MaterialExtension;
 
 export function specular(options?: SpecularOptions, base?: MaterialExtension): MaterialExtension;
+
+export function tileAnimationFrame(animation: TileAnimation, time: number, start?: TileAnimationStart): number;
+
+export function tileAnimator(mesh: MaterialMesh<Material | readonly Material[]>, geometry: MeshGeometry & {
+    uvs: number[] | Float32Array;
+}, tiles: readonly AnimatedTile[]): (time: number) => number;
 
 export function transformUVs(uvs: ArrayLike<number>, { offset, scale, rotation }: TextureTransform): Float32Array;
 

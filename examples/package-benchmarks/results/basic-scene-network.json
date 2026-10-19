@@ -1,8 +1,8 @@
 {
-  "commit": "8ac80fa",
+  "commit": "7cccdf27",
   "dirty": false,
-  "browser": "msedge 155.0.4283.60 headless",
-  "adapter": "nvidia ampere",
+  "browser": "msedge 155.0.4283.45 headless",
+  "adapter": "intel xe-2lpg",
   "method": "Vite production build of tests/fixtures/basic-scene (base ./, es2022), served by vite preview (its own on-the-fly gzip); transferred = Playwright requestfinished sizes (encoded body + response headers); raw, gzip and brotli of the same built files at zlib defaults",
   "files": [
     {
