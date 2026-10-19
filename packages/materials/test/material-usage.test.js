@@ -432,3 +432,71 @@ test('dispose() frees what no mesh uses and refuses later meshes; live meshes ke
   );
   s.engine.dispose();
 });
+
+test('texture sampler options rebuild the sampler next frame; upload options wait for update()', async () => {
+  const s = await scene();
+  s.gpu.device.createCommandEncoder = () => ({ ...s.gpu.encoder, finish: () => ({}) }); // mipmap generation
+  const source = { width: 4, height: 4 }, // an external image (copyExternalImageToTexture)
+    t = new Texture(source, { mipmaps: false }),
+    samplers = (log) => of(log, 'sampler').map((e) => e[2]),
+    textures = (log) => of(log, 'texture').filter((e) => e[2].size[0] === 4),
+    uploads = (log) => of(log, 'copyExternalImageToTexture');
+  createMesh(s.engine, quad, new UnlitMaterial({ map: t }));
+  let log = s.frame();
+  assert.equal(samplers(log).filter((d) => d.magFilter === 'linear' && d.addressModeU === 'clamp-to-edge').length, 1);
+  assert.equal(uploads(log)[0][1].flipY, true);
+  t.magFilter = 'nearest';
+  t.wrapS = 'repeat';
+  assert.deepEqual([t.magFilter, t.minFilter, t.wrapS, t.wrapT], ['nearest', 'linear', 'repeat', 'clamp']);
+  log = s.frame();
+  assert.deepEqual(
+    samplers(log).map((d) => [d.magFilter, d.minFilter, d.addressModeU, d.addressModeV]),
+    [['nearest', 'linear', 'repeat', 'clamp-to-edge']],
+    'one new sampler',
+  );
+  const [, fresh] = of(log, 'sampler')[0];
+  assert.ok(
+    of(log, 'group').some((e) => JSON.stringify(e[2]).includes(`"${fresh}"`)),
+    'the draw binds the new sampler',
+  );
+  assert.equal(samplers(s.frame()).length, 0, 'then stable');
+  // Upload options: nothing happens until update(), which then uploads the whole source (even with a region).
+  t.flipY = false;
+  t.colorSpace = 'linear';
+  t.mipmaps = true;
+  log = s.frame();
+  assert.deepEqual([uploads(log).length, textures(log).length, samplers(log).length], [0, 0, 0]);
+  t.update({ x: 0, y: 0, width: 1, height: 1 });
+  log = s.frame();
+  const [made] = textures(log);
+  assert.deepEqual([made[2].format, made[2].mipLevelCount], ['rgba8unorm', 3], 'a linear copy with a mip chain');
+  assert.deepEqual(uploads(log)[0][3], [4, 4], 'the whole source');
+  assert.equal(uploads(log)[0][1].flipY, false);
+  assert.deepEqual(
+    samplers(log).map((d) => d.lodMaxClamp),
+    [32],
+    'the sampler follows the new mip chain',
+  );
+  t.anisotropy = 8;
+  t.magFilter = 'linear';
+  assert.equal(samplers(s.frame())[0].maxAnisotropy, 8);
+  for (const [key, value, name] of [
+    ['magFilter', 'cubic', 'TypeError'],
+    ['wrapT', 'clamp-to-edge', 'TypeError'],
+    ['anisotropy', 32, 'RangeError'],
+    ['anisotropy', 1.5, 'RangeError'],
+    ['flipY', 1, 'TypeError'],
+    ['colorSpace', 'display-p3', 'TypeError'],
+  ]) {
+    const before = t[key];
+    assert.throws(
+      () => {
+        t[key] = value;
+      },
+      { name, message: new RegExp('Texture ' + key + ' is invalid; set') },
+    );
+    assert.equal(t[key], before);
+  }
+  assert.throws(() => new Texture(source, { mipmaps: 'yes' }), TypeError);
+  s.engine.dispose();
+});

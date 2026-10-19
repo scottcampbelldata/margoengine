@@ -45,6 +45,11 @@ scenarios.swap=()=>{
   const m=createMesh(engine,planeGeometry(2,2),new Material({shading:'basic',color:[1,0,0]})),next=[new Material({shading:'normal'}),new Material({shading:'basic',color:[0,0,1]})];
   return {destroy(){m.destroy();},step(){m.material=next.shift();}};
 };
+// A live sampler change: two texels, red then blue, magnified with nearest filtering, then linear (blended).
+scenarios.sampler=()=>{
+  const t=new Texture({data:new Uint8Array([255,0,0,255,0,0,255,255]),width:2,height:1},{magFilter:'nearest',minFilter:'nearest',mipmaps:false}),m=createMesh(engine,planeGeometry(2,2),new Material({shading:'basic',map:t}));
+  return {destroy(){m.destroy();t.dispose();},step(){t.magFilter='linear';}};
+};
 // Texture.update(region): the whole canvas turns red but only its top half uploads; with flipY it lands at the plane's top.
 scenarios.canvasRegion=()=>{
   const c=new OffscreenCanvas(8,8),g=c.getContext('2d');g.fillStyle='#00ff00';g.fillRect(0,0,8,8);

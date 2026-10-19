@@ -9,9 +9,9 @@ page.on('pageerror', (e) => pageErrors.push(e.message));
 page.on('console', (m) => {
   if (m.type() === 'error' || m.type() === 'warning') pageErrors.push(m.text());
 });
-const pixel = async (y = 0.5) => {
+const pixel = async (y = 0.5, x = 0.5) => {
   const image = await decodePNG(await page.locator('canvas').screenshot()),
-    o = (Math.floor(image.height * y) * image.width + Math.floor(image.width / 2)) * 4;
+    o = (Math.floor(image.height * y) * image.width + Math.floor(image.width * x)) * 4;
   return [...image.data.slice(o, o + 3)];
 };
 const near = (actual, expected, label, tolerance = 3) =>
@@ -65,6 +65,7 @@ try {
     'effects',
     'geometry',
     'swap',
+    'sampler',
     'canvasRegion',
     'lambert',
     'phong',
@@ -98,6 +99,13 @@ try {
       near(await pixel(), [128, 128, 255], 'swapped to normal shading');
       await step();
       near(await pixel(), [0, 0, 255], 'swapped back to unlit, another colour');
+    }
+    if (name === 'sampler') {
+      const left = await pixel(0.5, 0.4);
+      near(left, [255, 0, 0], 'nearest: the left texel only');
+      await step();
+      const blended = await pixel(0.5, 0.4);
+      assert.ok(blended[2] > 40 && blended[0] > 100, 'linear: the left texel blends in the right one: ' + blended);
     }
     if (name === 'canvasRegion') {
       near(await pixel(0.3), [0, 255, 0], 'region before');

@@ -56,8 +56,13 @@ export interface TextureRegion {
 }
 interface Slot {
   texture?: GPUTexture;
+  /** The mipmaps option the GPU copy was made with. */
+  mips?: boolean;
   views: Map<string, GPUTextureView>;
   sampler: GPUSampler;
+  /** The sampler options revision and mip setting `sampler` was made with. */
+  samplerVersion: number;
+  samplerMips: boolean;
   version: number;
   time?: number;
   /** Union [x0, y0, x1, y1] of `update(region)` calls since this up-to-date copy was last uploaded. */
@@ -65,6 +70,21 @@ interface Slot {
 }
 const wraps = { repeat: 'repeat', clamp: 'clamp-to-edge', mirror: 'mirror-repeat' } as const,
   maxPixels = 16_777_216;
+const optional = (list: readonly unknown[]) => (v: unknown) => v === undefined || list.includes(v);
+/** Valid values of each texture option, and how the fix reads when one is not. */
+const textureOptions: Record<keyof TextureOptions, [(v: unknown) => boolean, string]> = {
+  colorSpace: [optional(['srgb', 'linear']), "'srgb', 'linear' or undefined (the slot's default)"],
+  wrapS: [optional(['repeat', 'clamp', 'mirror']), "'repeat', 'clamp' or 'mirror'"],
+  wrapT: [optional(['repeat', 'clamp', 'mirror']), "'repeat', 'clamp' or 'mirror'"],
+  magFilter: [optional(['linear', 'nearest']), "'linear' or 'nearest'"],
+  minFilter: [optional(['linear', 'nearest']), "'linear' or 'nearest'"],
+  mipmaps: [optional([true, false]), 'true or false'],
+  anisotropy: [
+    (v) => v === undefined || (Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 16),
+    'an integer 1 through 16',
+  ],
+  flipY: [optional([true, false]), 'true or false'],
+};
 const mipShader = `struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f}
 @vertex fn vertex(@builtin(vertex_index) i:u32)->Out {let p=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));var o:Out;o.clip=vec4f(p[i],0,1);o.uv=p[i]*vec2f(0.5,-0.5)+0.5;return o;}
 @group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var imageSampler:sampler;
@@ -139,24 +159,26 @@ const raw = (s: unknown): s is RawImage =>
 /** A shareable texture. GPU copies are made lazily per device; video sources re-upload whenever `currentTime` changes, other sources on `update()`. */
 export class Texture {
   private version = 0;
+  private samplerVersion = 0;
+  /** A flipY, colorSpace or mipmaps change makes the next `update()` a full one. */
+  private reshaped = false;
   private readonly slots = new Map<GPUDevice, Slot>();
+  /** The options in effect (a copy of the constructor's); the accessors below change them. */
+  readonly options: TextureOptions;
   constructor(
     readonly source: TextureSource,
-    readonly options: TextureOptions = {},
+    options: TextureOptions = {},
     private readonly owned = false,
   ) {
     const o = options,
-      [w, h] = dimensions(source),
-      pick = (v: unknown, list: readonly string[]) => v === undefined || list.includes(v as string);
+      [w, h] = dimensions(source);
     if (
       !source ||
       typeof source !== 'object' ||
-      !pick(o.colorSpace, ['srgb', 'linear']) ||
-      ![o.wrapS, o.wrapT].every((v) => pick(v, ['repeat', 'clamp', 'mirror'])) ||
-      ![o.magFilter, o.minFilter].every((v) => pick(v, ['linear', 'nearest'])) ||
-      (o.anisotropy !== undefined && !(Number.isInteger(o.anisotropy) && o.anisotropy >= 1 && o.anisotropy <= 16))
+      !(Object.keys(textureOptions) as (keyof TextureOptions)[]).every((k) => textureOptions[k][0](o[k]))
     )
       throw new TypeError('Invalid texture source or options');
+    this.options = { ...o };
     if (
       raw(source) &&
       (!Number.isInteger(w) ||
@@ -177,6 +199,68 @@ export class Texture {
   get isVideo(): boolean {
     return typeof (this.source as HTMLVideoElement).videoWidth === 'number';
   }
+  /** Sampler options, live: a change takes effect on the next frame (the sampler is rebuilt on next use). */
+  get magFilter(): Filter {
+    return this.options.magFilter ?? 'linear';
+  }
+  set magFilter(v: Filter) {
+    this.setOption('magFilter', v);
+  }
+  get minFilter(): Filter {
+    return this.options.minFilter ?? 'linear';
+  }
+  set minFilter(v: Filter) {
+    this.setOption('minFilter', v);
+  }
+  get wrapS(): Wrap {
+    return this.options.wrapS ?? 'clamp';
+  }
+  set wrapS(v: Wrap) {
+    this.setOption('wrapS', v);
+  }
+  get wrapT(): Wrap {
+    return this.options.wrapT ?? 'clamp';
+  }
+  set wrapT(v: Wrap) {
+    this.setOption('wrapT', v);
+  }
+  /** Used with linear filters and mipmaps only. */
+  get anisotropy(): number {
+    return this.options.anisotropy ?? 1;
+  }
+  set anisotropy(v: number) {
+    this.setOption('anisotropy', v);
+  }
+  /** Upload options: a change takes effect on the next `update()`, which then uploads the whole source. */
+  get flipY(): boolean {
+    return this.options.flipY ?? true;
+  }
+  set flipY(v: boolean) {
+    this.setOption('flipY', v);
+  }
+  /** Undefined: sRGB for colour slots (map, emissive, sheen and specular colour), linear for the others. */
+  get colorSpace(): 'srgb' | 'linear' | undefined {
+    return this.options.colorSpace;
+  }
+  set colorSpace(v: 'srgb' | 'linear' | undefined) {
+    this.setOption('colorSpace', v);
+  }
+  get mipmaps(): boolean {
+    return this.options.mipmaps ?? !this.isVideo;
+  }
+  set mipmaps(v: boolean) {
+    this.setOption('mipmaps', v);
+  }
+  private setOption<K extends keyof TextureOptions>(key: K, v: TextureOptions[K]): void {
+    const [valid, fix] = textureOptions[key];
+    if (!valid(v))
+      throw new (key === 'anisotropy' && typeof v === 'number' ? RangeError : TypeError)(
+        'Texture ' + key + ' is invalid; set ' + fix,
+      );
+    this.options[key] = v;
+    if (key === 'flipY' || key === 'colorSpace' || key === 'mipmaps') this.reshaped = true;
+    else this.samplerVersion++;
+  }
   /**
    * Re-upload on next use (canvas, raw data or VideoFrame contents changed). With `region`, only that rectangle of the
    * current source uploads, into the same texture rows the full upload uses (flipped for `flipY` external sources;
@@ -186,8 +270,9 @@ export class Texture {
    * the affected texels needs per-level rounding (odd sizes shift the 2x2 footprint) for little gain.
    */
   update(region?: TextureRegion): void {
-    if (region === undefined) {
+    if (region === undefined || this.reshaped) {
       this.version++;
+      this.reshaped = false;
       return;
     }
     if (!region || typeof region !== 'object')
@@ -231,35 +316,43 @@ export class Texture {
       video = this.isVideo;
     let slot = this.slots.get(device);
     if (!slot) {
-      const mips = o.mipmaps ?? !video,
-        min = o.minFilter ?? 'linear',
-        mag = o.magFilter ?? 'linear',
-        aniso = min === 'linear' && mag === 'linear' && mips ? (o.anisotropy ?? 1) : 1;
+      const mips = o.mipmaps ?? !video;
       slot = {
         views: new Map(),
         version: -1,
-        sampler: device.createSampler({
-          addressModeU: wraps[o.wrapS ?? 'clamp'],
-          addressModeV: wraps[o.wrapT ?? 'clamp'],
-          magFilter: mag,
-          minFilter: min,
-          mipmapFilter: min,
-          lodMaxClamp: mips ? 32 : 0,
-          maxAnisotropy: aniso,
-        }),
+        sampler: this.sampler(device, mips),
+        samplerVersion: this.samplerVersion,
+        samplerMips: mips,
       };
       this.slots.set(device, slot);
       device.lost?.then(() => this.slots.delete(device));
+    }
+    // Rebuilt lazily: after a sampler option changed, or once the GPU copy's mip chain changed with `update()`.
+    const mips = slot.mips ?? o.mipmaps ?? !video;
+    if (slot.samplerVersion !== this.samplerVersion || slot.samplerMips !== mips) {
+      slot.sampler = this.sampler(device, mips);
+      slot.samplerVersion = this.samplerVersion;
+      slot.samplerMips = mips;
     }
     if (!w || !h || ('readyState' in s && s.readyState < 2))
       return slot.texture ? [this.view(slot, srgb), slot.sampler] : undefined;
     if (w > device.limits.maxTextureDimension2D || h > device.limits.maxTextureDimension2D)
       throw new RangeError('Texture exceeds device limit');
     let t = slot.texture;
-    if (!t || t.width !== w || t.height !== h) {
+    const pending = slot.version !== this.version;
+    // A new colour space or mip setting needs a new GPU copy; it is made on the upload after `update()`.
+    if (
+      !t ||
+      t.width !== w ||
+      t.height !== h ||
+      (pending &&
+        (slot.mips !== (o.mipmaps ?? !video) ||
+          (o.colorSpace !== undefined && t.format !== (o.colorSpace === 'srgb' ? 'rgba8unorm-srgb' : 'rgba8unorm'))))
+    ) {
       t?.destroy();
       const format = o.colorSpace ? o.colorSpace === 'srgb' : srgb,
         levels = (o.mipmaps ?? !video) ? Math.floor(Math.log2(Math.max(w, h))) + 1 : 1;
+      slot.mips = o.mipmaps ?? !video;
       t = slot.texture = device.createTexture({
         size: [w, h],
         format: format ? 'rgba8unorm-srgb' : 'rgba8unorm',
@@ -269,6 +362,10 @@ export class Texture {
       });
       slot.views.clear();
       slot.version = -1;
+      if (slot.samplerMips !== slot.mips) {
+        slot.sampler = this.sampler(device, slot.mips);
+        slot.samplerMips = slot.mips;
+      }
     }
     const currentTime = 'currentTime' in s ? s.currentTime : undefined;
     if (slot.version !== this.version || (video && currentTime !== slot.time)) {
@@ -300,6 +397,20 @@ export class Texture {
       mipmaps(device, t);
     }
     return [this.view(slot, srgb), slot.sampler];
+  }
+  private sampler(device: GPUDevice, mips: boolean): GPUSampler {
+    const o = this.options,
+      min = o.minFilter ?? 'linear',
+      mag = o.magFilter ?? 'linear';
+    return device.createSampler({
+      addressModeU: wraps[o.wrapS ?? 'clamp'],
+      addressModeV: wraps[o.wrapT ?? 'clamp'],
+      magFilter: mag,
+      minFilter: min,
+      mipmapFilter: min,
+      lodMaxClamp: mips ? 32 : 0,
+      maxAnisotropy: min === 'linear' && mag === 'linear' && mips ? (o.anisotropy ?? 1) : 1,
+    });
   }
   private view(slot: Slot, srgb: boolean): GPUTextureView {
     const t = slot.texture!,
