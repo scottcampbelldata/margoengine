@@ -43,6 +43,7 @@ test('published worker URLs stay literal import.meta.url', () => {
     ['packages/machinery/dist', './workers/occt-import-js.js?no-inline'],
     ['packages/machinery/dist', './workers/occt-import-js.wasm?no-inline'],
     ['packages/voxel/dist', './workers/mesher.js?no-inline'],
+    ['packages/voxel/dist', './workers/terrain.js?no-inline'],
   ];
   for (const [dir, url] of expected) {
     const files = readdirSync(join(root, dir)).filter((file) => file.endsWith('.js'));

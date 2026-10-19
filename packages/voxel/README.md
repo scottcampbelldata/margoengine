@@ -359,3 +359,64 @@ Measured with Node 24 worker threads on the development laptop (8 logical cores)
 at 98-100% CPU (2026-10-19; `node --test packages/voxel/tests/mesher-worker-benchmark.test.js` prints yours), 64
 random-terrain chunks of about 5,600 quads: 326 meshes/s with 1 worker, 540 with 2, 828 with 3 (3.1-3.7 ms per mesh per
 worker, `meshInput` on the main thread included).
+
+## Streaming and generation (`./stream`, `./generate`)
+
+`VoxelStreamer` (in `@margoengine/voxel/stream`) loads the chunks around the camera and other viewers and unloads the
+rest: from the store first, else from a generator running in workers. `@margoengine/voxel/generate` holds the built-in
+generator, `noiseTerrain`, and `serveVoxelGenerator` for your own.
+
+```ts
+import { IndexedDBChunkStore, VoxelStreamer } from '@margoengine/voxel/stream';
+
+const streamer = VoxelStreamer.attach(engine, {
+  world,
+  generator: { seed: 7, seaLevel: 0, trees: 0.01 }, // NoiseTerrainOptions: the built-in worker
+  store: new IndexedDBChunkStore('world-1'), // default: a MemoryChunkStore
+  distance: 8, // chunks in x and z (256 blocks); verticalDistance: 4
+});
+streamer.viewers.push(otherPlayer.position); // more positions to load around, in blocks
+if (streamer.pending === 0) hideLoadingScreen(); // chunks in range not loaded yet
+addEventListener('pagehide', () => streamer.save()); // edits of loaded chunks; unloads save their own
+await streamer.dispose(); // saves, flushes the store, stops the workers; the chunks stay in the world
+```
+
+```ts
+// islands.worker.js, your module worker. Vite: import islands from './islands.worker.js?worker&url'
+import { serveVoxelGenerator } from '@margoengine/voxel/generate';
+
+serveVoxelGenerator((chunk, cx, cy, cz, { blocks }) => {
+  const stone = blocks.find((type) => type.name === 'stone').id; // the world's BlockTypes table
+  if (cy < 0) chunk.fill(stone); // chunk: a new air VoxelChunk; cell (x, y, z) is world (32 cx + x, ...)
+});
+// Main thread: new VoxelStreamer({ world, generator: islands }) (or attach), then streamer.update() each frame.
+```
+
+- **Range.** A chunk loads when it is within `distance` chunks of a viewer's chunk in x and z (a circle) and
+  `verticalDistance` in y, inside the world's minY..maxY. It unloads once it is more than one chunk past that for every
+  viewer, so walking back and forth over a chunk border reloads nothing. `distance` and `verticalDistance` can change
+  at run time.
+- **Order.** Loads start closest first, at most 4 per worker in flight; finished chunks join the world closest first,
+  at most `chunksPerFrame` (default 8) per `update()`, and lighting and meshing follow through `world.onChunk` and
+  `world.dirty`. A generated chunk is unpacked when it joins (about 0.15 ms on the main thread).
+- **Saving.** Chunks edited through the world (`onChange`), and chunks someone else added, are saved to the store when
+  they unload; chunks generated or read from the store and not edited are dropped and regenerate the same. A failed
+  save is reported to `onError` and the chunk is kept in memory, where a reload finds it, until a save succeeds.
+- **Memory.** Over `memoryBudget` (default 128 MiB of `chunk.byteLength`) the least recently used chunks outside the
+  load range unload first; if the range alone is over, loading stops (closest chunks loaded) until there is room.
+- **Failures.** A chunk the store or the generator fails on goes to `onError` (the engine's with `attach`) and is
+  tried again only after it leaves the range and comes back.
+- **`noiseTerrain(options)`.** A fractal simplex heightmap (`height` 8, `amplitude` 32, `scale` 192 blocks) of grass
+  over dirt over stone, sand at the shore and on the sea floor, water up to `seaLevel` (0), cave tunnels where two 3D
+  simplex fields are both near zero (`caves` 0..1, default 0.3: about 5% of the rock), and trees on grass (`trees`, the
+  chance per column, default 0.01) placed by a hash of the column, so a crown that crosses a chunk border is the same
+  in every chunk and every generation order. Block types come by name (`blocks: {stone, dirt, grass, sand, water, log,
+  leaves}`, each defaulting to its key), checked when the streamer is created. It runs on any thread (a
+  `VoxelGenerate`); the streamer runs it in `dist/workers/terrain.js`, a classic script without `eval`.
+- **Errors.** `TypeError` and `RangeError` for options; MargoError `'attached'` for a second streamer on a world,
+  `'unsupported'` for a generator without Web Workers, `'disposed'` after `dispose()`.
+
+Measured with Node 24 worker threads on the development laptop (8 logical cores) while other jobs kept it at 96-99%
+CPU (2026-10-19; `node --test packages/voxel/tests/stream-benchmark.test.js` prints yours): `noiseTerrain` 1.4-1.8 ms
+per chunk on one thread; filling a 565-chunk range: 495 chunks/s with 1 worker, 803 with 2, 765 with 3 (the machine
+had no core left for the third); `update()` 11-14 us per call, unpacking included.

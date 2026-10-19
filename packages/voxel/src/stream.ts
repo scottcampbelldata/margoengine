@@ -1,9 +1,13 @@
-// Chunk stores (design: packages/voxel/DESIGN.md, `./stream`): where unloaded chunks are saved and found again.
-// Records are encodeChunk bytes; VoxelStreamer (phase 9) joins this entry.
+// Chunk stores and the streamer (design: packages/voxel/DESIGN.md, `./stream`): where unloaded chunks are saved and
+// found again (records are encodeChunk bytes), and VoxelStreamer, which loads and unloads chunks around viewers.
+import type { EngineKernel } from '@margoengine/core';
+import type { Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
-import { VoxelChunk } from './chunk.js';
+import { JobPool } from '../../shared/worker-pool.js';
+import { type PackedChunk, VoxelChunk } from './chunk.js';
 import { decodeChunk, encodeChunk } from './codec.js';
-import { chunkKey } from './world.js';
+import { type NoiseTerrainOptions, noiseTerrain } from './generate.js';
+import { chunkKey, VoxelWorld } from './world.js';
 
 /**
  * Where chunks are saved when they unload and looked up before they are generated again. Chunk coordinates are
@@ -197,5 +201,480 @@ export class IndexedDBChunkStore implements ChunkStore {
       () => this.writing.delete(batch),
     );
     return batch;
+  }
+}
+
+/** Options of {@link VoxelStreamer}. */
+export interface VoxelStreamerOptions {
+  /** The world chunks are added to and removed from. One streamer per world. */
+  world: VoxelWorld;
+  /**
+   * Where chunks missing from the store come from: {@link NoiseTerrainOptions} for the built-in terrain (run in
+   * classic workers, dist/workers/terrain.js), or the URL of your own module worker that calls
+   * `serveVoxelGenerator` from `@margoengine/voxel/generate`. Default none: such chunks load as air.
+   */
+  generator?: NoiseTerrainOptions | URL | string;
+  /** Where edited chunks are saved when they unload, and looked for before generating. Default a MemoryChunkStore. */
+  store?: ChunkStore;
+  /** Load radius in chunks around each viewer, in x and z (a circle), an integer in 0..64. Default 8 (256 blocks). */
+  distance?: number;
+  /** Load radius in chunks above and below each viewer, an integer in 0..64. Default 4. */
+  verticalDistance?: number;
+  /** Generator workers, started as jobs arrive. Default a quarter of the logical cores, 1 to 3. */
+  workers?: number;
+  /** Bytes of loaded chunk data ({@link VoxelChunk.byteLength}) to keep to. Default 128 MiB. */
+  memoryBudget?: number;
+  /** Most chunks added to the world per {@link VoxelStreamer.update}: an integer >= 1 or Infinity. Default 8. */
+  chunksPerFrame?: number;
+}
+
+// A chunk position in a viewer's load range; `d` is its squared distance in chunks to the nearest viewer's chunk.
+interface Spot {
+  key: string;
+  cx: number;
+  cy: number;
+  cz: number;
+  d: number;
+}
+// A chunk in the world (`used`: the last ring it was in) or on its way; `edited` ones are saved when they unload.
+interface Held {
+  cx: number;
+  cy: number;
+  cz: number;
+  chunk: VoxelChunk;
+  edited: boolean;
+  used: number;
+}
+// A finished load waiting to join the world: a generated chunk stays packed until then, so its unpack counts against
+// chunksPerFrame.
+type Ready = Omit<Held, 'chunk'> & { chunk: VoxelChunk | PackedChunk };
+
+const streamed = new WeakSet<VoxelWorld>();
+let plugins = 0;
+const isChunk = (c: number): boolean => (c << 5) >> 5 === c;
+// An integer in min..max (max itself may be Infinity).
+const whole = (name: string, value: unknown, min: number, max: number): number => {
+  if (typeof value !== 'number') throw new TypeError(`VoxelStreamer ${name} must be a number`);
+  if (!(value === max || (Number.isInteger(value) && value >= min && value <= max)))
+    throw new RangeError(`VoxelStreamer ${name} is ${value}; pass an integer in ${min}..${max}`);
+  return value;
+};
+const bytes = (value: unknown): number => {
+  if (typeof value !== 'number') throw new TypeError('VoxelStreamer memoryBudget must be a number of bytes');
+  if (!(value > 0)) throw new RangeError(`VoxelStreamer memoryBudget is ${value}; pass bytes > 0 or Infinity`);
+  return value;
+};
+const report = (error: unknown): void => {
+  if (typeof reportError === 'function') reportError(error);
+  else console.error(error);
+};
+
+/**
+ * Loads and unloads the chunks of a {@link VoxelWorld} around its viewers: the engine camera (with
+ * {@link VoxelStreamer.attach}) and the positions in {@link VoxelStreamer.viewers}. A chunk loads when it is within
+ * `distance` chunks of a viewer's chunk in x and z and `verticalDistance` in y, and unloads once it is more than one
+ * chunk past that for every viewer (the margin keeps chunks at the edge from loading and unloading over and over).
+ * Loads run closest first, the store first and then the generator; at most `chunksPerFrame` finished chunks join the
+ * world per update, closest first. Lighting and meshing follow through the world's onChunk and dirty set. A chunk that
+ * was edited (`world.onChange`), or that someone else added, is saved to the store when it unloads; one generated or
+ * read from the store and not edited is dropped. Over `memoryBudget` it unloads the least recently used chunks outside
+ * the load range, then stops loading until there is room (a budget smaller than the load range loads the closest
+ * chunks only).
+ *
+ * ```ts
+ * const store = new IndexedDBChunkStore('world-1');
+ * const streamer = VoxelStreamer.attach(engine, { world, generator: { seed: 7 }, store });
+ * streamer.viewers.push(otherPlayer.position); // more positions (blocks) to load around
+ * addEventListener('pagehide', () => streamer.save()); // edits of loaded chunks too
+ * ```
+ */
+export class VoxelStreamer {
+  /** The streamed world. */
+  readonly world: VoxelWorld;
+  /** Where edited chunks go when they unload. */
+  readonly store: ChunkStore;
+  /** Number of generator workers (started only with a generator). */
+  readonly workers: number;
+  /** Positions (in blocks) to load around besides the engine camera; read each update. */
+  viewers: Vec3[] = [];
+  /**
+   * Receives failures: a chunk that could not be read or generated (tried again after it leaves the load range and
+   * comes back) and a save that failed on unload (the chunk is kept, loads find it, and {@link VoxelStreamer.save}
+   * tries again). Default the engine's onError with attach, else reportError or console.error.
+   */
+  onError: (error: unknown) => void = report;
+  #distance: number;
+  #vertical: number;
+  #budget: number;
+  #perFrame: number;
+  #pool: JobPool | undefined;
+  #terrain: NoiseTerrainOptions | undefined;
+  #camera: { readonly position: Vec3 } | undefined;
+  #engine: EngineKernel | undefined;
+  #plugin = '';
+  #view = '\0'; // viewer chunks of the current ring
+  #centres: number[] = [];
+  #ring = new Map<string, Spot>();
+  #order: Spot[] = [];
+  #next = 0; // #order before it is loaded, loading, ready or failed (rewound when a chunk unloads)
+  #tick = 0;
+  #full = false;
+  #loaded = new Map<string, Held>();
+  #loading = new Map<string, AbortController>();
+  #ready = new Map<string, Ready>();
+  #failed = new Map<string, { cx: number; cy: number; cz: number }>();
+  #unsaved = new Map<string, Held>(); // edited chunks out of the world whose save has not succeeded yet
+  #last: Held | undefined; // the chunk of the last edit
+  #lx = Number.NaN;
+  #ly = 0;
+  #lz = 0;
+  #offChunk: () => void;
+  #offChange: () => void;
+  #disposed = false;
+  #closing: Promise<void> = Promise.resolve();
+
+  /**
+   * A streamer the engine drives: each frame runs {@link VoxelStreamer.update} with the camera as a viewer, failures go
+   * to `engine.onError`, and disposing the engine disposes the streamer.
+   * @throws as the constructor.
+   */
+  static attach(engine: EngineKernel, options: VoxelStreamerOptions): VoxelStreamer {
+    const streamer = new VoxelStreamer(options),
+      name = `voxel-streamer-${++plugins}`;
+    streamer.#camera = engine.camera;
+    streamer.#engine = engine;
+    streamer.#plugin = name;
+    streamer.onError = (error) => engine.onError(error);
+    try {
+      engine.use({ name, setup() {}, onPreUpdate: () => streamer.update(), dispose: () => void streamer.dispose() });
+    } catch (error) {
+      void streamer.dispose();
+      throw error;
+    }
+    return streamer;
+  }
+  /**
+   * A streamer you drive: call {@link VoxelStreamer.update} once a frame. It adopts the chunks already loaded as
+   * edited (saved when they unload). Built-in terrain options and their block names are checked here.
+   * @throws TypeError when `world` is not a VoxelWorld, `store` is not a ChunkStore, `generator` is neither terrain
+   * options nor a URL, or a number option is not a number; as `noiseTerrain` for wrong terrain options.
+   * @throws RangeError for `distance` or `verticalDistance` not an integer in 0..64, `workers` not an integer >= 1,
+   * `chunksPerFrame` not an integer >= 1 or Infinity, `memoryBudget` not > 0, or a terrain option out of range or block
+   * name the world's types lack.
+   * @throws MargoError `'attached'` when another VoxelStreamer streams `world`; `'unsupported'` for a generator in a
+   * context without Web Workers.
+   */
+  constructor(options: VoxelStreamerOptions) {
+    if (!(options?.world instanceof VoxelWorld))
+      throw new TypeError('VoxelStreamer needs {world}: pass {world: new VoxelWorld({blocks})}');
+    const { world, generator, store = new MemoryChunkStore() } = options;
+    if (typeof store?.get !== 'function' || typeof store.put !== 'function' || typeof store.flush !== 'function')
+      throw new TypeError('VoxelStreamer store must be a ChunkStore (get, put, delete, flush)');
+    this.world = world;
+    this.store = store;
+    this.#distance = whole('distance', options.distance ?? 8, 0, 64);
+    this.#vertical = whole('verticalDistance', options.verticalDistance ?? 4, 0, 64);
+    this.#perFrame = whole('chunksPerFrame', options.chunksPerFrame ?? 8, 1, Infinity);
+    this.#budget = bytes(options.memoryBudget ?? 128 * 1024 * 1024);
+    const cores = globalThis.navigator?.hardwareConcurrency || 4;
+    this.workers = whole('workers', options.workers ?? Math.max(1, Math.min(3, cores >> 2)), 1, 64);
+    const url = typeof generator === 'string' || generator instanceof URL;
+    if (generator !== undefined && !url) {
+      if (!generator || typeof generator !== 'object')
+        throw new TypeError('VoxelStreamer generator must be NoiseTerrainOptions or the URL of a module worker');
+      this.#terrain = structuredClone(generator);
+      // A chunk far above the ground: checks the options and block names here, where the error reaches the caller.
+      noiseTerrain(this.#terrain)(new VoxelChunk(), 0, 1 << 20, 0, { blocks: world.blocks.table });
+    }
+    if (generator !== undefined && typeof Worker !== 'function')
+      throw new MargoError('unsupported', 'VoxelStreamer generators run in Web Workers, which this context lacks');
+    if (streamed.has(world))
+      throw new MargoError('attached', 'VoxelWorld already has a VoxelStreamer; dispose() it before creating another');
+    streamed.add(world);
+    if (generator !== undefined)
+      this.#pool = new JobPool(
+        () =>
+          url
+            ? new Worker(generator, { type: 'module', name: 'margoengine-generator' })
+            : new Worker(new URL(/* @vite-ignore */ './workers/terrain.js?no-inline', import.meta.url), {
+                name: 'margoengine-terrain',
+              }),
+        this.workers,
+      );
+    this.#offChunk = world.onChunk((cx, cy, cz, chunk) => {
+      const key = chunkKey(cx, cy, cz);
+      this.#last = undefined;
+      if (!chunk) {
+        this.#loaded.delete(key);
+        this.#next = 0;
+      } else if (!this.#loaded.has(key)) this.#loaded.set(key, { cx, cy, cz, chunk, edited: true, used: this.#tick });
+    });
+    this.#offChange = world.onChange((x, y, z) => {
+      const cx = x >> 5,
+        cy = y >> 5,
+        cz = z >> 5;
+      if (!this.#last || cx !== this.#lx || cy !== this.#ly || cz !== this.#lz) {
+        this.#lx = cx;
+        this.#ly = cy;
+        this.#lz = cz;
+        this.#last = this.#loaded.get(chunkKey(cx, cy, cz));
+      }
+      if (this.#last) this.#last.edited = true;
+    });
+  }
+  /** Load radius in chunks in x and z, an integer in 0..64; a change applies at the next update. */
+  get distance(): number {
+    return this.#distance;
+  }
+  set distance(value: number) {
+    this.#distance = whole('distance', value, 0, 64);
+    this.#view = '\0';
+  }
+  /** Load radius in chunks in y, an integer in 0..64; a change applies at the next update. */
+  get verticalDistance(): number {
+    return this.#vertical;
+  }
+  set verticalDistance(value: number) {
+    this.#vertical = whole('verticalDistance', value, 0, 64);
+    this.#view = '\0';
+  }
+  /** Most chunks added per update: an integer >= 1, or Infinity (behind a loading screen). */
+  get chunksPerFrame(): number {
+    return this.#perFrame;
+  }
+  set chunksPerFrame(value: number) {
+    this.#perFrame = whole('chunksPerFrame', value, 1, Infinity);
+  }
+  /** Bytes of loaded chunk data to keep to, > 0 (Infinity allowed). */
+  get memoryBudget(): number {
+    return this.#budget;
+  }
+  set memoryBudget(value: number) {
+    this.#budget = bytes(value);
+  }
+  /** Chunks in the load range of the last update that are not loaded yet, failed ones excluded: 0 when it is full. */
+  get pending(): number {
+    let n = 0;
+    for (const key of this.#ring.keys()) if (!this.#loaded.has(key) && !this.#failed.has(key)) n++;
+    return n;
+  }
+  /**
+   * Unloads what left the range, adds up to `chunksPerFrame` finished chunks, unloads to the budget and starts the
+   * next loads, closest first. Call it once a frame (attach does).
+   * @throws TypeError or RangeError for a viewer that is not three finite numbers.
+   * @throws MargoError `'disposed'` after {@link VoxelStreamer.dispose}.
+   */
+  update(): void {
+    if (this.#disposed) throw new MargoError('disposed', 'VoxelStreamer is disposed; create a new VoxelStreamer');
+    const centres: number[] = [];
+    for (const p of this.#camera ? [this.#camera.position, ...this.viewers] : this.viewers) {
+      if (typeof p?.[0] !== 'number' || typeof p[1] !== 'number' || typeof p[2] !== 'number')
+        throw new TypeError('VoxelStreamer viewers must be [x, y, z] positions in blocks');
+      if (!Number.isFinite(p[0] + p[1] + p[2]))
+        throw new RangeError(`VoxelStreamer viewer [${p[0]}, ${p[1]}, ${p[2]}] is not finite; pass finite positions`);
+      centres.push(Math.floor(p[0] / 32), Math.floor(p[1] / 32), Math.floor(p[2] / 32));
+    }
+    const view = centres.join();
+    if (view !== this.#view) {
+      this.#view = view;
+      this.#centres = centres;
+      this.#move();
+    }
+    this.#add();
+    this.#evict();
+    this.#start();
+  }
+  /**
+   * Saves every edited chunk (loaded, or unloaded with a failed save) to the store and flushes it; unloads save by
+   * themselves. Call it when the page hides.
+   * @throws MargoError `'disposed'` (rejects) after {@link VoxelStreamer.dispose}, which saved already.
+   * @throws (rejects) the store's error when a save failed; those chunks stay edited for the next save.
+   */
+  save(): Promise<void> {
+    if (this.#disposed)
+      return Promise.reject(new MargoError('disposed', 'VoxelStreamer is disposed; its dispose() saved already'));
+    return this.#save();
+  }
+  /**
+   * Stops streaming: cancels pending loads, stops the workers, then saves the edited chunks and flushes the store (the
+   * returned promise settles as {@link VoxelStreamer.save}'s). Loaded chunks stay in the world.
+   */
+  dispose(): Promise<void> {
+    if (this.#disposed) return this.#closing;
+    this.#disposed = true;
+    this.#offChunk();
+    this.#offChange();
+    streamed.delete(this.world);
+    for (const job of this.#loading.values()) job.abort();
+    this.#loading.clear();
+    this.#ready.clear();
+    this.#pool?.dispose();
+    this.#closing = this.#save();
+    this.#engine?.removePlugin(this.#plugin);
+    return this.#closing;
+  }
+  [Symbol.dispose](): void {
+    void this.dispose();
+  }
+
+  // Within one chunk past the load range of some viewer.
+  #keeps(cx: number, cy: number, cz: number): boolean {
+    const d = this.#distance + 1,
+      v = this.#vertical + 1,
+      c = this.#centres;
+    for (let i = 0; i < c.length; i += 3) {
+      const dx = cx - c[i],
+        dz = cz - c[i + 2];
+      if (dx * dx + dz * dz <= d * d && Math.abs(cy - c[i + 1]) <= v) return true;
+    }
+    return false;
+  }
+  // A viewer changed chunk: rebuild the load ring, then drop what is past the unload range.
+  #move(): void {
+    const d = this.#distance,
+      v = this.#vertical,
+      c = this.#centres,
+      { minY, maxY } = this.world,
+      ring = new Map<string, Spot>();
+    for (let i = 0; i < c.length; i += 3)
+      for (let dx = -d; dx <= d; dx++)
+        for (let dz = -d; dz <= d; dz++) {
+          const cx = c[i] + dx,
+            cz = c[i + 2] + dz;
+          if (dx * dx + dz * dz > d * d || !isChunk(cx) || !isChunk(cz)) continue;
+          for (let dy = -v; dy <= v; dy++) {
+            const cy = c[i + 1] + dy;
+            if (cy * 32 > maxY || cy * 32 + 31 < minY) continue;
+            const key = chunkKey(cx, cy, cz),
+              distance = dx * dx + dy * dy + dz * dz,
+              spot = ring.get(key);
+            if (!spot) ring.set(key, { key, cx, cy, cz, d: distance });
+            else if (distance < spot.d) spot.d = distance;
+          }
+        }
+    this.#ring = ring;
+    this.#order = [...ring.values()].sort((a, b) => a.d - b.d);
+    this.#next = 0;
+    const tick = ++this.#tick;
+    for (const [key, held] of this.#loaded)
+      if (ring.has(key)) held.used = tick;
+      else if (!this.#keeps(held.cx, held.cy, held.cz)) this.#unload(key, held);
+    for (const [key, job] of this.#loading) {
+      const [cx, cy, cz] = key.split(',').map(Number);
+      if (!this.#keeps(cx, cy, cz)) {
+        job.abort();
+        this.#loading.delete(key);
+      }
+    }
+    for (const [key, held] of this.#ready) if (!this.#keeps(held.cx, held.cy, held.cz)) this.#ready.delete(key);
+    for (const [key, spot] of this.#failed) if (!this.#keeps(spot.cx, spot.cy, spot.cz)) this.#failed.delete(key);
+  }
+  // Over budget: unload the least recently used chunks outside the load ring; stop loading while still over.
+  #evict(): void {
+    let total = 0;
+    for (const held of this.#loaded.values()) total += held.chunk.byteLength;
+    if (total > this.#budget)
+      for (const [key, held] of [...this.#loaded]
+        .filter(([key]) => !this.#ring.has(key))
+        .sort((a, b) => a[1].used - b[1].used)) {
+        if (total <= this.#budget) break;
+        total -= held.chunk.byteLength;
+        this.#unload(key, held);
+      }
+    this.#full = total > this.#budget;
+  }
+  #add(): void {
+    if (!this.#ready.size) return;
+    const far = (key: string) => this.#ring.get(key)?.d ?? Infinity,
+      queue = [...this.#ready].sort((a, b) => far(a[0]) - far(b[0]));
+    let added = 0;
+    for (const [key, ready] of queue) {
+      if (added === this.#perFrame) break;
+      const { cx, cy, cz, edited } = ready;
+      this.#ready.delete(key);
+      if (edited) this.#unsaved.delete(key);
+      if (this.world.getChunk(cx, cy, cz)) continue; // someone added one meanwhile: theirs stays
+      let chunk: VoxelChunk;
+      try {
+        chunk = ready.chunk instanceof VoxelChunk ? ready.chunk : VoxelChunk.unpack(ready.chunk);
+      } catch (error) {
+        this.#failed.set(key, ready); // a generator worker posted something that is not a PackedChunk
+        this.onError(error);
+        continue;
+      }
+      this.#loaded.set(key, { cx, cy, cz, chunk, edited, used: this.#ring.has(key) ? this.#tick : 0 });
+      this.world.addChunk(cx, cy, cz, chunk);
+      added++;
+    }
+  }
+  // Starts loads closest first, at most 4 per worker in flight or waiting to be added.
+  #start(): void {
+    if (this.#full) return;
+    for (const order = this.#order; this.#next < order.length; this.#next++) {
+      if (this.#loading.size + this.#ready.size >= 4 * this.workers) return;
+      const spot = order[this.#next],
+        { key } = spot;
+      if (this.#loaded.has(key) || this.#loading.has(key) || this.#ready.has(key) || this.#failed.has(key)) continue;
+      const kept = this.#unsaved.get(key);
+      if (kept) this.#ready.set(key, kept);
+      else this.#load(spot);
+    }
+  }
+  // Store first, then the generator (air without one).
+  #load(spot: Spot): void {
+    const { key, cx, cy, cz, d } = spot,
+      job = new AbortController(),
+      pool = this.#pool;
+    this.#loading.set(key, job);
+    (async (): Promise<VoxelChunk | PackedChunk> => {
+      const stored = await this.store.get(cx, cy, cz);
+      if (stored || !pool) return stored ?? new VoxelChunk();
+      job.signal.throwIfAborted();
+      return pool.run<PackedChunk>(() => ({ cx, cy, cz, blocks: this.world.blocks.table, terrain: this.#terrain }), {
+        priority: d,
+        signal: job.signal,
+      });
+    })().then(
+      (chunk) => {
+        if (this.#loading.get(key) !== job) return;
+        this.#loading.delete(key);
+        this.#ready.set(key, { cx, cy, cz, chunk, edited: false, used: 0 });
+      },
+      (error) => {
+        if (this.#loading.get(key) !== job) return;
+        this.#loading.delete(key);
+        this.#failed.set(key, spot);
+        this.onError(error);
+      },
+    );
+  }
+  #unload(key: string, held: Held): void {
+    this.#loaded.delete(key);
+    if (held.edited) this.#persist(key, held).catch((error) => this.onError(error));
+    this.world.removeChunk(held.cx, held.cy, held.cz);
+  }
+  // Saves an unloaded edited chunk, keeping it in #unsaved (where loads look first) until the store has it.
+  #persist(key: string, held: Held): Promise<void> {
+    this.#unsaved.set(key, held);
+    return this.store.put(held.cx, held.cy, held.cz, held.chunk).then(() => {
+      if (this.#unsaved.get(key) === held) this.#unsaved.delete(key);
+    });
+  }
+  async #save(): Promise<void> {
+    const puts: Promise<void>[] = [];
+    for (const held of this.#loaded.values())
+      if (held.edited) {
+        held.edited = false;
+        puts.push(
+          this.store.put(held.cx, held.cy, held.cz, held.chunk).catch((error) => {
+            held.edited = true;
+            throw error;
+          }),
+        );
+      }
+    for (const [key, held] of this.#unsaved) puts.push(this.#persist(key, held));
+    const results = await Promise.allSettled(puts);
+    await this.store.flush();
+    for (const result of results) if (result.status === 'rejected') throw result.reason;
   }
 }
