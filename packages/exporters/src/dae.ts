@@ -50,9 +50,10 @@ const same = (v: number) => v;
 /**
  * Exports a COLLADA 1.4.1 document (Y up, meters) with the scene's node hierarchy as row-major matrices, one geometry
  * per shared geometry (positions, normals, TEXCOORD and COLOR sources; `<triangles>`, or `<polylist>` when
- * `faceSizes` marks quads), and one material per shared material: `constant` for unlit, `lambert` for rough
- * dielectrics (roughness 1, metalness 0), else `phong`, with a base color or texture and transparency for MASK and
- * BLEND. Image paths are relative to the document; the image files come back in `textures`. Static pose only:
+ * `faceSizes` marks quads), and one material per shared material: `constant` for unlit, `lambert` for `shading:
+ * 'lambert'`, `phong` with its `specular` and `shininess` for `shading: 'phong'`; a standard material becomes
+ * `lambert` when it is a rough dielectric (roughness 1, metalness 0), else an equivalent `phong`. Each has a base
+ * color or texture and transparency for MASK and BLEND. Image paths are relative to the document; the image files come back in `textures`. Static pose only:
  * skins, morph targets, animation, cameras and lights are not written.
  */
 export function exportDAE(source: ExportSource, options: DAEOptions = {}): DAEResult {
@@ -110,8 +111,12 @@ export function exportDAE(source: ExportSource, options: DAEOptions = {}): DAERe
     const emission = mat.emissive.some((v) => v) ? `<emission><color>${rgba(mat.emissive)}</color></emission>` : '';
     let technique: string;
     if (mat.unlit) technique = `<constant><emission>${base}</emission>${transparent}</constant>`;
-    else if (mat.roughness === 1 && mat.metalness === 0)
+    else if (mat.shading === 'lambert' || (mat.shading === 'standard' && mat.roughness === 1 && mat.metalness === 0))
       technique = `<lambert>${emission}<diffuse>${base}</diffuse>${transparent}</lambert>`;
+    else if (mat.shading === 'phong')
+      technique =
+        `<phong>${emission}<diffuse>${base}</diffuse><specular><color>${rgba(mat.specular)}</color></specular>` +
+        `<shininess><float>${num(mat.shininess)}</float></shininess>${transparent}</phong>`;
     else {
       // Metals keep their color in the specular term (F0 = mix(0.04, base, metalness)); the exponent is the
       // Blinn-Phong equivalent of the microfacet roughness, 2 / alpha^2 - 2 with alpha = roughness^2.

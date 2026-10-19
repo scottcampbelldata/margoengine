@@ -147,8 +147,10 @@ for (const [path, bytes] of textures) save(path, bytes);
   `onlyVisible`.
 - **Geometry.** One `<geometry>` per shared geometry: positions, normals, `TEXCOORD` (t = 1 - v) and `COLOR` sources,
   all indexed by one offset, as `<triangles>`, or `<polylist>` when `faceSizes` marks quads.
-- **Materials.** One effect per shared material: `<constant>` for `unlit`, `<lambert>` for roughness 1 and
-  metalness 0, otherwise `<phong>` (specular F0 = mix(0.04, base, metalness), shininess 2 / roughness^4 - 2). The base
+- **Materials.** One effect per shared material: `<constant>` for `unlit`, `<lambert>` for `shading: 'lambert'`,
+  `<phong>` with the material's `specular` and `shininess` for `shading: 'phong'`. A standard material becomes
+  `<lambert>` at roughness 1 and metalness 0, otherwise an equivalent `<phong>` (specular F0 = mix(0.04, base,
+  metalness), shininess 2 / roughness^4 - 2). The base
   color texture, when present, replaces the base color through a `surface`/`sampler2D` pair carrying the texture's
   filters and wrap modes; MASK and BLEND write `<transparent opaque="A_ONE">` from the texture or color alpha.
   Effect colors are sRGB. Instances bind the material and `UVSET0`.
@@ -160,7 +162,10 @@ for (const [path, bytes] of textures) save(path, bytes);
 
 `TextureData` takes `magFilter` and `minFilter` (`'nearest'` or `'linear'`, default linear), `mipmaps` (default true)
 and `wrapS`/`wrapT` (`'repeat'`, `'clamp'` or `'mirror'`, default repeat). Equal samplers are written once; one image's
-bytes are shared by textures with different samplers. `MaterialData.unlit: true` writes `KHR_materials_unlit`. A node's
+bytes are shared by textures with different samplers. `MaterialData.unlit: true` writes `KHR_materials_unlit`.
+`MaterialData.shading: 'lambert' | 'phong'` (with `specular`, default sRGB #111111, and `shininess`, default 30) is the
+lighting model as `@margoengine/materials` names it: COLLADA writes the matching effect, MTL `illum 1` or `Ks`/`Ns`/
+`illum 2`, and glTF metalness 0 with roughness 1 (lambert) or `(2 / (shininess + 2))^(1/4)` (phong). A node's
 `camera` (`{type, perspective: {yfov, znear, zfar?, aspectRatio?}}` or `{type, orthographic: {xmag, ymag, znear, zfar}}`)
 becomes a glTF camera and its `light` (`{type: 'directional' | 'point' | 'spot', color, intensity, range?,
 innerConeAngle?, outerConeAngle?}`) a `KHR_lights_punctual` light; both face the node's -Z and shared objects are

@@ -103,12 +103,15 @@ export function exportOBJ(source: ExportSource, options: OBJOptions = {}): OBJRe
           `newmtl ${name}`,
           `Kd ${kd.join(' ')}`,
           'Ka 0 0 0',
-          'Ks 0 0 0',
+          ...(m.shading === 'phong'
+            ? [`Ks ${m.specular.map((v) => num(toSrgb(v))).join(' ')}`, `Ns ${num(m.shininess)}`]
+            : ['Ks 0 0 0']),
           `Ke ${m.emissive.map((v) => num(toSrgb(v))).join(' ')}`,
           `Pr ${num(m.roughness)}`,
           `Pm ${num(m.metalness)}`,
           `d ${num(m.color[3])}`,
-          'illum 2',
+          // MTL illumination models: 1 diffuse only, 2 diffuse plus highlight.
+          m.shading === 'lambert' ? 'illum 1' : 'illum 2',
         );
         if (withTextures && m.baseColorTexture) {
           const file = files.name(m.baseColorTexture);

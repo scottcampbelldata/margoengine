@@ -98,6 +98,17 @@ export interface MaterialData {
   normalTexture?: TextureData;
   /** Shade with base color only, ignoring lights: KHR_materials_unlit in glTF. Default false. */
   unlit?: boolean;
+  /**
+   * The lighting model, named as in `@margoengine/materials`: `'standard'` (default, metallic-roughness), `'lambert'`
+   * (diffuse only) or `'phong'` (diffuse plus a Blinn-Phong highlight from `specular` and `shininess`). COLLADA writes
+   * the matching effect and MTL its `illum`, `Ks` and `Ns`. glTF has neither model, so both are written with metalness
+   * 0 and roughness 1 (lambert) or `(2 / (shininess + 2))^(1/4)` (phong); `roughness` and `metalness` are ignored.
+   */
+  shading?: 'standard' | 'lambert' | 'phong';
+  /** Phong highlight color, linear rgb in [0, 1]. Default sRGB #111111. */
+  specular?: readonly number[];
+  /** Phong highlight exponent, finite and >= 0. Default 30. */
+  shininess?: number;
 }
 
 /** A glTF camera on a data-scene node, looking down the node's -Z; a gltf-pro `GLTFCamera` record fits as it is. */
@@ -196,6 +207,9 @@ export interface Mat {
   metallicRoughnessTexture?: TextureData;
   normalTexture?: TextureData;
   unlit?: boolean;
+  shading: 'standard' | 'lambert' | 'phong';
+  specular: number[];
+  shininess: number;
 }
 /** @internal Normalized node. */
 export interface Node {
@@ -439,6 +453,9 @@ export const samplerOf = (
   wrapT: t.wrapT ?? 'repeat',
 });
 
+/** sRGB #111111 in linear rgb, the default Phong highlight. */
+const PHONG_SPECULAR = [0, 0, 0].map(() => ((17 / 255 + 0.055) / 1.055) ** 2.4);
+
 /** Validates and normalizes a core PbrMaterial or material data. Base color is linear. */
 export function normalizeMaterial(data: PbrMaterial | MaterialData): Mat {
   if (isCoreMaterial(data)) {
@@ -452,6 +469,9 @@ export function normalizeMaterial(data: PbrMaterial | MaterialData): Mat {
       doubleSided: d[6] === 1,
       emissive: [0, 0, 0],
       alphaMode: 'OPAQUE',
+      shading: 'standard',
+      specular: [...PHONG_SPECULAR],
+      shininess: 30,
     };
   }
   if (!isObject(data)) fail('Expected PbrMaterial or material data');
@@ -468,6 +488,14 @@ export function normalizeMaterial(data: PbrMaterial | MaterialData): Mat {
   if (!['OPAQUE', 'MASK', 'BLEND'].includes(alphaMode)) fail('Unknown alphaMode');
   if (m.alphaCutoff !== undefined && (alphaMode !== 'MASK' || !Number.isFinite(m.alphaCutoff) || !(m.alphaCutoff >= 0)))
     throw new RangeError('alphaCutoff needs MASK mode and a value >= 0');
+  const shading = m.shading ?? 'standard';
+  if (!['standard', 'lambert', 'phong'].includes(shading))
+    fail("Material shading must be 'standard', 'lambert' or 'phong'");
+  const specular = vector(m.specular, [...PHONG_SPECULAR], 'Specular'),
+    shininess = m.shininess ?? 30;
+  if (specular.some((v) => v < 0 || v > 1)) throw new RangeError('Material specular must be linear rgb in [0, 1]');
+  if (!(shininess >= 0 && shininess < Infinity)) throw new RangeError('Material shininess must be finite and >= 0');
+  const lit = shading !== 'standard';
   return {
     name: m.name,
     color,
@@ -475,12 +503,15 @@ export function normalizeMaterial(data: PbrMaterial | MaterialData): Mat {
     alphaMode,
     alphaCutoff: m.alphaCutoff,
     doubleSided: m.doubleSided ?? false,
-    roughness: unit(m.roughness, 'Roughness', 1),
-    metalness: unit(m.metalness, 'Metalness', 0),
+    roughness: shading === 'phong' ? (2 / (shininess + 2)) ** 0.25 : lit ? 1 : unit(m.roughness, 'Roughness', 1),
+    metalness: lit ? 0 : unit(m.metalness, 'Metalness', 0),
     baseColorTexture: checkTexture(m.baseColorTexture, 'baseColorTexture'),
     metallicRoughnessTexture: checkTexture(m.metallicRoughnessTexture, 'metallicRoughnessTexture'),
     normalTexture: checkTexture(m.normalTexture, 'normalTexture'),
     unlit: m.unlit,
+    shading,
+    specular,
+    shininess,
   };
 }
 
