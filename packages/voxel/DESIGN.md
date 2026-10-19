@@ -226,7 +226,7 @@ Status: on main are phases 1 (storage), 2 (mesher), 3 (worker mesher), 4 (render
 - .vox: `VoxChunk`; records keep their raw `attributes`; all 48 rotation bytes; `pasteVoxModel` pastes a whole scene
   (z up becomes world y, y becomes world -z). Pasting is about 1 s per million voxels (per-cell setBlock): batch later.
 - Rapier: `new VoxelPhysics(physics, world, {radius})`, `colliders`; colliders follow every non-fixed body and are
-  kept until no body is within radius + 1. Rapier 0.21.0 panics on ball-vs-voxel edges (dimforge/rapier #1029, #1043,
+  kept until no body is within radius + 1. Rapier 0.21.0 panics on ball-vs-voxel edges (dimforge/rapier #1046 reports it; see #1029, #1043,
   #993, fix PR #1030), so chunks near a ball get a FIX_INTERNAL_EDGES triangle mesh and keep a disabled voxel
   collider; a cave-heavy chunk near a ball costs ~125 ms to build (not yet spread over frames). Voxel contacts produce
   no `Physics` collision events.

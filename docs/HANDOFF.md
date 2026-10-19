@@ -31,7 +31,7 @@ browser check, `build:site`, `visual:check` and `verify` (the agent paused becau
    core + stage frozen except up to about 2 KB Scott allowed for fixes that cannot be optional (21,343 B now); every
    rendering feature gets a real-GPU check with numeric expectations; push verified work to main; downloads and
    anything posted publicly need Scott's OK.
-6. Waiting on Scott: the Rapier bug report draft `docs/drafts/rapier-ball-voxel-issue.md` (not posted); the
+6. Posted 2026-10-19: the Rapier bug report, as dimforge/rapier#1046. Waiting on Scott: the
    `margo3d-studio` posed-picking fixture (that repository was not on the laptop or GitHub).
 7. Small follow-ups found on the way: a cave-heavy chunk near a ball builds a 125 ms triangle mesh in one frame;
    `.vox` paste is ~1 s per million voxels (per-cell setBlock); the streamer can spend 1.2-1.5 ms a frame unpacking at
@@ -87,7 +87,7 @@ store, streaming and `noiseTerrain`, `.vox` with the `chr_knight.vox` MIT fixtur
 working via triangle meshes, `AudioVoicePool`, vfx `ParticleAtlas`). Remaining: phase 4 (chunk renderer), 5
 (renderer lighting: shadows, clustered, fog, IBL, day/night, animated water/lava), 13 (playable example, site page,
 visual baselines, measured performance at render distance 8 and 16). Rapier 0.21.0 panics on ball-vs-voxel edges
-(upstream #1029/#1043/#993, unreviewed fix PR #1030); a draft report exists for Scott, not posted.
+(upstream #1029/#1043/#993, unreviewed fix PR #1030); reported as #1046 on 2026-10-19.
 Known limits: `setGeometry` cannot change the number of material groups; dispose a `Skin` before `setGeometry` on a
 skinned mesh; DAE export is static only; WebM pacing is approximate; GIF frame rate is capped at 50.
 

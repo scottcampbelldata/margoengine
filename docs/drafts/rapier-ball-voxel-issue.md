@@ -1,4 +1,4 @@
-# DRAFT (not posted; Scott decides): rapier issue
+# Posted 2026-10-19 as dimforge/rapier#1046 (https://github.com/dimforge/rapier/issues/1046): rapier issue
 
 **Title:** `RuntimeError: unreachable` in `World.step` when a ball rolls off the edge of a Voxels collider (rapier3d-compat 0.21.0)
 
