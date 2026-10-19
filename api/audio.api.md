@@ -141,6 +141,24 @@ export interface AudioOptions {
     onEnded?: (audio: Audio) => void;
 }
 
+export class AudioVoicePool {
+    readonly listener: AudioListener;
+    readonly buffer: AudioBuffer;
+    readonly voices: readonly PositionalAudio[];
+    constructor(listener: AudioListener, buffer: AudioBuffer, options?: AudioVoicePoolOptions);
+    play(position: Vec3, options?: {
+        volume?: number;
+        playbackRate?: number;
+    }): PositionalAudio;
+    stopAll(): this;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface AudioVoicePoolOptions extends Omit<PositionalAudioOptions, 'mesh' | 'autoplay' | 'filters'> {
+    voices?: number;
+}
+
 export type DistanceModel = 'linear' | 'inverse' | 'exponential';
 
 export interface LoadAudioOptions {

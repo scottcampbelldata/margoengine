@@ -6,6 +6,12 @@
 import { EngineKernel, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 
+export interface ParticleAtlas {
+    columns: number;
+    rows: number;
+    frames: 'random' | 'lifetime';
+}
+
 export class VFX extends VFXBase {
     constructor(options?: VFXOptions);
     static attach(instance: EngineKernel, options?: VFXOptions): VFX;
@@ -26,7 +32,7 @@ export interface VFXFeatures {
     };
     texture?: {
         copy(texture: VFXTexture): VFXTexture;
-        patch(billboard: string): string;
+        patch(billboard: string, texture: VFXTexture): string;
         create(device: GPUDevice, texture: VFXTexture, owned: Owned): GPUBindGroupEntry[];
     };
 }
@@ -69,6 +75,7 @@ export interface VFXTexture {
     width: number;
     height: number;
     data: Uint8Array | Uint8ClampedArray;
+    atlas?: ParticleAtlas;
 }
 
 // Not exported from this entry, but used by the exports above:

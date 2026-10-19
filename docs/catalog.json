@@ -1549,6 +1549,7 @@
       "Audio",
       "AudioAnalyser",
       "AudioListener",
+      "AudioVoicePool",
       "PositionalAudio",
       "clearAudioBufferCache",
       "coneGain",

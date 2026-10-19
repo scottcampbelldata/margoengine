@@ -1,5 +1,5 @@
 {
-  "commit": "993f2013",
+  "commit": "203dc9a4",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -26,8 +26,8 @@
     },
     "@margoengine/audio": {
       ".": {
-        "raw": 22899,
-        "gzip": 6985
+        "raw": 24243,
+        "gzip": 7431
       }
     },
     "@margoengine/blender": {
@@ -834,12 +834,12 @@
     },
     "@margoengine/vfx": {
       ".": {
-        "raw": 21476,
-        "gzip": 7546
+        "raw": 22914,
+        "gzip": 8060
       },
       "./base": {
-        "raw": 15886,
-        "gzip": 5761
+        "raw": 15898,
+        "gzip": 5764
       },
       "./obstacles": {
         "raw": 2762,
@@ -854,8 +854,8 @@
         "gzip": 1115
       },
       "./texture": {
-        "raw": 1186,
-        "gzip": 645
+        "raw": 2608,
+        "gzip": 1265
       }
     },
     "@margoengine/video": {
@@ -900,8 +900,8 @@
         "gzip": 10656
       },
       "./physics": {
-        "raw": 17538,
-        "gzip": 6279
+        "raw": 19782,
+        "gzip": 7165
       },
       "dist/workers/mesher.js": {
         "raw": 9126,
@@ -954,9 +954,9 @@
       "brotli": 6819
     },
     "packages/creative/dist/particles.js": {
-      "raw": 22133,
-      "gzip": 7818,
-      "brotli": 7065
+      "raw": 23571,
+      "gzip": 8329,
+      "brotli": 7531
     },
     "packages/creative/dist/post.js": {
       "raw": 16996,

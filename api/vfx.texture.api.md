@@ -13,6 +13,12 @@ type Owned = {
     destroy(): void;
 }[];
 
+interface ParticleAtlas {
+    columns: number;
+    rows: number;
+    frames: 'random' | 'lifetime';
+}
+
 interface VFXFeatures {
     obstacles?: {
         patch(simulation: string): string;
@@ -28,7 +34,7 @@ interface VFXFeatures {
     };
     texture?: {
         copy(texture: VFXTexture): VFXTexture;
-        patch(billboard: string): string;
+        patch(billboard: string, texture: VFXTexture): string;
         create(device: GPUDevice, texture: VFXTexture, owned: Owned): GPUBindGroupEntry[];
     };
 }
@@ -47,5 +53,6 @@ interface VFXTexture {
     width: number;
     height: number;
     data: Uint8Array | Uint8ClampedArray;
+    atlas?: ParticleAtlas;
 }
 ```
