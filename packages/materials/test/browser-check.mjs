@@ -43,7 +43,8 @@ const base = ((188 / 255 + 0.055) / 1.055) ** 2.4,
   highlight = ((0.1 * 32) / (8 * Math.PI)) * 2,
   // A clustered point light 1 unit away (intensity 2, range 100: window (1 - 1e-8)^2), straight on: n.l = n.h = 1.
   local = (base * 2) / Math.PI;
-const gray = (v) => display([v, v, v]),
+const srgb = (v) => Math.round(255 * (1.055 * v ** (1 / 2.4) - 0.055)),
+  gray = (v) => display([v, v, v]),
   lambert = (n, l) => Math.max(0, n.reduce((s, x, k) => s + x * l[k], 0) / Math.hypot(...n) / Math.hypot(...l));
 const expected = {
   clusteredLambert: display([local, local, local]),
@@ -77,6 +78,9 @@ const expected = {
   emissiveIntensity: gray(0.5),
   flatShading: gray(local),
   vertexColors: [255, 0, 0],
+  fogOff: display(diffuse),
+  toneMappedOff: [0.6, 0.6, 0.6].map(srgb),
+  toneMappedFogged: [255, 0, 255],
   vertexColorsTint: [0, 0, 255],
   displacedHookShadow: gray((base / Math.PI) * Math.SQRT1_2 * (1 - (Math.SQRT2 / 10) ** 4) ** 2),
 };
@@ -115,6 +119,9 @@ try {
     'emissiveIntensity',
     'flatShading',
     'vertexColors',
+    'fogOff',
+    'toneMappedOff',
+    'toneMappedFogged',
     'vertexColorsTint',
     'lightMapUnlit',
     'displace',
@@ -162,6 +169,14 @@ try {
       await step();
       near(await pixel(0.3), [255, 0, 0], 'the updated region (image top, flipY) shows the new pixels');
       near(await pixel(0.7), [0, 255, 0], 'outside the region the texture keeps its old pixels');
+    }
+    if (name === 'fogOff') {
+      await step();
+      near(await pixel(), [255, 0, 255], 'fog true again, live');
+    }
+    if (name === 'toneMappedOff') {
+      await step();
+      near(await pixel(), gray(0.6), 'tone mapped again, live');
     }
     if (name === 'vertexColors') {
       await step();

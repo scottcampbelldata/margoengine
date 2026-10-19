@@ -575,6 +575,13 @@ export interface MaterialOptions extends PhysicalOptions {
   flatShading?: boolean;
   /** Multiplies colour and opacity by the geometry's vertex colours (default true); false ignores them. Live. */
   vertexColors?: boolean;
+  /** Lit shadings: false leaves this material out of the scene fog (default true; unlit output is never fogged). Live. */
+  fog?: boolean;
+  /**
+   * Lit shadings: false skips the display tone map (PBR Neutral) and only clamps before sRGB encoding, as unlit
+   * output does (default true; unlit, normal, matcap, depth and distance output never tone map). Live.
+   */
+  toneMapped?: boolean;
   map?: Texture | null;
   metalRoughnessMap?: Texture | null;
   normalMap?: Texture | null;
@@ -963,7 +970,8 @@ function featureKey(m: Material): string {
     (displacement ? 'd' : '') +
     (light ? (m.shading === 'basic' ? 'u' : 'l') : '') +
     (m.flatShading && m.shading !== 'basic' && m.shading !== 'depth' && m.shading !== 'distance' ? 'f' : '') +
-    (m.vertexColors ? '' : 'v')
+    (m.vertexColors ? '' : 'v') +
+    (lit.includes(m.shading) ? (m.fog ? '' : 'g') + (m.toneMapped ? '' : 't') : '')
   );
 }
 /** The feature uniform of `m` for `owner`, written with its current values. */
@@ -1123,7 +1131,7 @@ export class Material {
   private gloss = 30;
   private glowScale = 1;
   /** On/off features (features.ts letters f...). */
-  private readonly switches = { flatShading: false, vertexColors: true };
+  private readonly switches = { flatShading: false, vertexColors: true, fog: true, toneMapped: true };
   /** gltf-pro layout: [roughness, metalness, normalScale, aoMapIntensity] and [alphaMode, alphaTest, side (front 0, double 1, back 2), 0]. */
   readonly factors: number[];
   readonly settings: number[];
@@ -1311,6 +1319,7 @@ export class Material {
       if (o[slot] != null && !(o[slot] instanceof Texture))
         throw new TypeError('Material ' + slot + ' must be a Texture');
     this.shading = shading;
+    this.switches.toneMapped = lit.includes(shading);
     this.depthPacking = o.depthPacking === undefined ? (shading === 'distance' ? 'rgba' : 'basic') : o.depthPacking;
     if (o.referencePosition !== undefined) this.referencePosition = o.referencePosition;
     const near = o.nearDistance === undefined ? 1 : o.nearDistance,
@@ -1355,6 +1364,8 @@ export class Material {
       'emissiveIntensity',
       'flatShading',
       'vertexColors',
+      'fog',
+      'toneMapped',
     ] as const)
       if (o[key] !== undefined) this[key] = o[key] as never;
     // Physical options enable their lobes as they are set (transmission before the volume values that need it); the
@@ -1506,6 +1517,20 @@ export class Material {
   }
   set vertexColors(v: boolean) {
     this.switches.vertexColors = flag(v, 'vertexColors');
+  }
+  /** Scene fog (`@margoengine/environment` Fog) mixes into this lit material while true (default). */
+  get fog(): boolean {
+    return this.switches.fog;
+  }
+  set fog(v: boolean) {
+    this.switches.fog = flag(v, 'fog');
+  }
+  /** The display tone map, while true (the default for lit shadings, false for the others, which never tone map). */
+  get toneMapped(): boolean {
+    return this.switches.toneMapped;
+  }
+  set toneMapped(v: boolean) {
+    this.switches.toneMapped = flag(v, 'toneMapped');
   }
   /** Scales `emissive` (default 1, finite, >= 0): the emission drawn is emissive x emissiveMap x emissiveIntensity. */
   get emissiveIntensity(): number {

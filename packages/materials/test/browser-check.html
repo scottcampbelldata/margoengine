@@ -63,6 +63,14 @@ const plugin=p=>({destroy(){p.dispose?.();engine.removePlugin(p.name);}});
 scenarios.lambert=()=>lit(new Material({shading:'lambert',map:solid(188,188,188)}));
 scenarios.phong=()=>lit(new Material({shading:'phong',map:solid(188,188,188),specular:[0.1,0.1,0.1],shininess:30}));
 scenarios.phongFog=()=>lit(new Material({shading:'phong',map:solid(188,188,188)}),m=>{const fog=Fog.attach(engine,{color:'#ff00ff',near:0,far:0.01});fog.add(m);return plugin(fog);});
+// fog false: the same Lambert as above under a full magenta fog shows its own colour, fogged again once fog is true
+// (live). toneMapped false: a black Lambert emitting 0.6 (no lights) encodes 0.6 untouched, tone mapped once true;
+// under a full fog it is still fogged.
+const fogged=(material,extra)=>lit(material,m=>{const fog=Fog.attach(engine,{color:'#ff00ff',near:0,far:0.01});fog.add(m);extra?.(m);return plugin(fog);});
+scenarios.fogOff=()=>{const material=new Material({shading:'lambert',map:solid(188,188,188),fog:false});return {...fogged(material),step(){material.fog=true;}};};
+const glowing=extra=>new Material({shading:'lambert',color:[0,0,0],emissive:[0.6,0.6,0.6],toneMapped:false,...extra});
+scenarios.toneMappedOff=()=>{const light=[...engine.lighting.direction],radiance=[...engine.lighting.radiance];engine.lighting.direction[3]=0;engine.lighting.radiance[3]=0;const m=createMesh(engine,planeGeometry(2,2),glowing());return {destroy(){m.destroy();engine.lighting.direction.set(light);engine.lighting.radiance.set(radiance);},step(){m.material.toneMapped=true;}};};
+scenarios.toneMappedFogged=()=>fogged(glowing());
 // alphaMap: green 0 on the left texel, 255 on the right, cut at alphaTest 0.5; then removed live. And a half-green map blended.
 const halves=(left,right)=>new Texture({data:new Uint8Array([...left,...right]),width:2,height:1},{magFilter:'nearest',minFilter:'nearest',mipmaps:false});
 scenarios.alphaMap=()=>{const m=createMesh(engine,planeGeometry(2,2),new Material({shading:'basic',color:[1,0,0],alphaMap:halves([0,0,0,255],[0,255,0,255]),alphaTest:0.5}));return {destroy(){m.destroy();},step(){m.material.alphaMap=null;}};};

@@ -19,6 +19,7 @@ import {
   createMesh,
 } from '../dist/index.js';
 import { NodeMaterial, normalLocal, positionLocal } from '../../shader/dist/index.js';
+import { Fog } from '../../environment/dist/index.js';
 import { exportModel } from '../../exporters/dist/model.js';
 import { readGLB } from '../../exporters/tests/helpers.js';
 import { headless, headlessModels } from '../../../tests/support/pbr-snapshot.js';
@@ -183,18 +184,23 @@ test('alphaMap compiles in only while set: green multiplies opacity, bindings 19
 });
 
 // Every feature option at its default; the values that turn each on; what turns them off again (the scalars may stay).
-const defaults = {
+const off = {
   alphaMap: null,
   bumpMap: null,
-  bumpScale: 1,
   displacementMap: null,
-  displacementScale: 1,
-  displacementBias: 0,
   lightMap: null,
-  lightMapIntensity: 1,
-  emissiveIntensity: 1,
   flatShading: false,
   vertexColors: true,
+  fog: true,
+  toneMapped: true,
+};
+const defaults = {
+  ...off,
+  bumpScale: 1,
+  displacementScale: 1,
+  displacementBias: 0,
+  lightMapIntensity: 1,
+  emissiveIntensity: 1,
 };
 const used = () => ({
   alphaMap: solid(0, 0, 0),
@@ -208,15 +214,9 @@ const used = () => ({
   emissiveIntensity: 4,
   flatShading: true,
   vertexColors: false,
+  fog: false,
+  toneMapped: false,
 });
-const off = {
-  alphaMap: null,
-  bumpMap: null,
-  displacementMap: null,
-  lightMap: null,
-  flatShading: false,
-  vertexColors: true,
-};
 
 test('a material with every feature at its default draws exactly the GPU calls of a plain one', async () => {
   for (const hook of [false, true]) {
@@ -450,6 +450,43 @@ test('vertexColors false passes white from the vertex stage; instance tints stil
   assert.throws(() => {
     material.vertexColors = 'no';
   }, TypeError);
+  for (const mesh of meshes) mesh.destroy();
+  s.engine.dispose();
+});
+
+test('fog false keeps a lit material out of the scene fog; toneMapped false clamps instead of tone mapping', async () => {
+  const s = await scene(),
+    fog = Fog.attach(s.engine, { color: '#ff00ff', near: 0, far: 1 }),
+    materials = [
+      new PhongMaterial({ fog: false }),
+      new LambertMaterial({ toneMapped: false }),
+      new PbrMaterial({ fog: false, toneMapped: false }),
+      new UnlitMaterial({ fog: false, toneMapped: true }),
+    ],
+    meshes = materials.map((m) => createMesh(s.engine, quad, m));
+  for (const mesh of meshes) fog.add(mesh);
+  const lit = codes(s.frame()).filter((c) => c.includes('fogAmount(i.position,f.eye.xyz)'));
+  const phong = lit.find((c) => c.includes('mat_phong')),
+    lambert = lit.find((c) => c.includes('fn margoFront(s:Surface)') && !c.includes('mat_phong')),
+    both = lit.find((c) => c.includes('margoUnfogged') && c.includes('margoNeutral'));
+  assert.ok(
+    phong.includes(',fogAmount(i.position,f.eye.xyz));if(f.settings.w<0.5) {}color=margoUnfogged;'),
+    'fog mixed, then dropped',
+  );
+  assert.ok(!phong.includes('margoNeutral'), 'still tone mapped');
+  assert.ok(lambert.includes('fn pbrNeutral(input:vec3f)->vec3f {return min(input,vec3f(1));}\nfn margoNeutral('));
+  assert.ok(!lambert.includes('margoUnfogged'), 'still fogged');
+  assert.ok(both, 'both together');
+  assert.equal(lit.length, 4, 'the unlit material is unchanged (it is neither fogged nor tone mapped)');
+  assert.deepEqual(
+    [new PbrMaterial().toneMapped, new UnlitMaterial().toneMapped, new NormalMaterial().toneMapped],
+    [true, false, false],
+    'defaults',
+  );
+  assert.throws(() => {
+    materials[0].fog = 0;
+  }, TypeError);
+  s.engine.removePlugin(fog.name);
   for (const mesh of meshes) mesh.destroy();
   s.engine.dispose();
 });

@@ -31,7 +31,7 @@ const bump = `fn margoBump(n:vec3f,p:vec3f,height:f32,facing:bool)->vec3f {
 `;
 /**
  * `code` with the features `key` names: `a` alphaMap, `b` bumpMap, `d` displacementMap, `f` flatShading, `v`
- * vertexColors false, `l` lightMap on a lit shading (baked irradiance: diffuse colour times the map, added like
+ * vertexColors false, `g` fog false, `t` toneMapped false, `l` lightMap on a lit shading (baked irradiance: diffuse colour times the map, added like
  * emissive) or `u` on an unlit one (the map multiplies the colour).
  */
 export function featureShader(code: string, group: number, key: string): string {
@@ -43,6 +43,21 @@ export function featureShader(code: string, group: number, key: string): string 
     maps = [has('a'), has('b'), has('d'), has('l') || has('u')];
   let out = code;
   if (maps[0]) out = edit(out, '\n  let mr=', `\n  s.base.a*=${sample(0)}.g;\n  let mr=`);
+  // Fog: the output hook (shared/pbr-hooks.js) wraps the tone-mapped colour at this anchor; the colour it fogs is then
+  // replaced by the same value unfogged, which keeps the fog's bindings in the layout and its mix dead.
+  if (has('g'))
+    out = edit(
+      out,
+      '  if(f.settings.w<0.5) {color=pbrNeutral(max(color,vec3f(0))); color=',
+      '  let margoUnfogged=select(color,pbrNeutral(max(color,vec3f(0))),f.settings.w<0.5);\n  if(f.settings.w<0.5) {color=pbrNeutral(max(color,vec3f(0)));}color=margoUnfogged;\n  if(f.settings.w<0.5) { color=',
+    );
+  // No tone map: every pbrNeutral call (the display line, fog's wrap of it) becomes the clamp unlit output applies.
+  if (has('t'))
+    out = edit(
+      out,
+      'fn pbrNeutral(input:vec3f)->vec3f {',
+      'fn pbrNeutral(input:vec3f)->vec3f {return min(input,vec3f(1));}\nfn margoNeutral(input:vec3f)->vec3f {',
+    );
   // Vertex colours: the vertex stage passes white (instancing still multiplies its tints in).
   if (has('v')) out = edit(out, 'o.uv=i.uv; o.color=i.color;', 'o.uv=i.uv; o.color=vec4f(1);');
   // The face normal from the world position's screen derivatives; framebuffer y points down, so dP/dy x dP/dx faces
