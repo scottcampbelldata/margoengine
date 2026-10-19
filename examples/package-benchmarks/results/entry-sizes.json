@@ -1,5 +1,5 @@
 {
-  "commit": "a3487d5f",
+  "commit": "fd6d719b",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -906,6 +906,10 @@
       "./physics": {
         "raw": 19914,
         "gzip": 7198
+      },
+      "./render": {
+        "raw": 33801,
+        "gzip": 13450
       },
       "dist/workers/mesher.js": {
         "raw": 9126,
