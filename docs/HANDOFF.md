@@ -45,6 +45,11 @@ measured (14 pixels in a grazing view without the edge stretch, none with it). G
 for sub-pixel edge ownership (0.04-0.52% of drawn pixels, never an area); bit-identical images are impossible with two
 different meshes on a real rasterizer. Step 4 done: `npm run check:merge` passes on the A6000 (3,003 Node tests, 15
 proofs, all 55 views of the `nvidia-ampere-msedge-155` profile with no reference changes); core + stage 21,343 B.
+Step 3, phase 5 done: `VoxelRenderer.addLighting` (Shadows, Clustered, Fog, EnvironmentLighting), `drawShadow` and
+`shadowVersion` (`shadows.add(voxels, {static: true})`), `blockLightColor`, day/night through `daylight`, animated
+liquids (uniform rise plus rippled normals: per-vertex waves would crack greedy quads; DESIGN.md as built). Its GPU check
+(`packages/voxel/tests/render-lighting-browser-check.mjs`) passes every numeric expectation at 4x and 1x on the A6000;
+check:merge passes (3,006 tests, 15 proofs, 55 views). Phase 13 and the step 7 follow-ups are with worktree agents.
 
 Tile editor engine work (Scott, 2026-10-18/19): Scott started `tile-asset-editor` (a Crocotile 3D 2.7.4 equivalent,
 own repository `scottcampbelldata/tile-asset-editor`) as the base of his own 3D modeller and game engine, and
