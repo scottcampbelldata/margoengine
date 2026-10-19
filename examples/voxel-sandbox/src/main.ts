@@ -131,6 +131,7 @@ async function boot(): Promise<void> {
       hours,
       timeScale: deterministic ? 0 : DAY,
       distance: distance * 32,
+      lightBlocks: blocks.table.flatMap((type, id) => (type.light > 0 ? [id] : [])),
     }),
     lines = new Lines();
   engine.use(lines);
