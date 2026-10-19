@@ -18,14 +18,16 @@ export class Clustered implements EnginePlugin {
     get owner(): Engine | undefined;
     static attach(instance: EngineKernel, options?: ClusteredOptions): Clustered;
     setLights(lights: readonly (PointLight | SpotLight)[]): this;
-    add(receiver: ClusteredReceiver): () => void;
+    add(receiver: ClusteredReceiver, { receiveShadow }?: {
+        receiveShadow?: boolean;
+    }): () => void;
     addShadowCaster(source: MeshHandle | LocalShadowSource): () => void;
-    bindings(): GPUBindGroupEntry[];
-    pbr(group: number): {
+    bindings(shadows?: boolean): GPUBindGroupEntry[];
+    pbr(group: number, shadows?: boolean): {
         declarations: string;
         light: string;
     };
-    shader(source: string, group?: number): string;
+    shader(source: string, group?: number, shadows?: boolean): string;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     get lightLists(): {
@@ -43,13 +45,23 @@ export interface ClusteredArea {
     bindings(): GPUBindGroupEntry[];
 }
 
+export interface ClusteredLighting {
+    readonly owner?: Engine;
+    pbr(group: number): {
+        declarations: string;
+        light: string;
+    };
+    shader(source: string, group?: number): string;
+    bindings(): GPUBindGroupEntry[];
+}
+
 export interface ClusteredOptions {
     grid?: readonly [number, number, number];
     shadows?: LocalShadowOptions;
 }
 
 export interface ClusteredReceiver {
-    addLighting(effect: Clustered): () => void;
+    addLighting(effect: ClusteredLighting): () => void;
 }
 
 export interface ClusteredShadow {
@@ -99,19 +111,22 @@ export interface PointLight {
     range: number;
     color?: Vec3;
     intensity?: number;
+    decay?: number;
     shadow?: boolean | LocalLightShadow;
     castShadow?: boolean;
 }
 
 export interface SpotLight extends PointLight {
     direction: Vec3;
-    outerAngle: number;
+    outerAngle?: number;
     innerAngle?: number;
+    angle?: number;
+    penumbra?: number;
 }
 
 export function clusteredSampling(group: number, shadow?: boolean | {
     declarations(group: number): string;
 }, area?: {
     declarations(group: number): string;
-}, integratedShadows?: boolean): string;
+}, integratedShadows?: boolean, decay?: boolean): string;
 ```

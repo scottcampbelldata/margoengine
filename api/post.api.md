@@ -24,6 +24,7 @@ export interface BloomOptions {
     strength?: number;
     threshold?: number;
     exposure?: number;
+    radius?: number;
 }
 
 export class FXAA implements EnginePlugin {
@@ -133,6 +134,8 @@ export class SceneFade implements EnginePlugin {
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
+
+export function bloomWeights(radius: number, levels: number): number[];
 
 // Not exported from this entry, but used by the exports above:
 

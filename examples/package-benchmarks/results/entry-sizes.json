@@ -1,5 +1,5 @@
 {
-  "commit": "7cccdf27",
+  "commit": "06e580ca",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -72,8 +72,8 @@
     },
     "@margoengine/clustered": {
       ".": {
-        "raw": 28075,
-        "gzip": 9709
+        "raw": 30103,
+        "gzip": 10450
       },
       "./shadows": {
         "raw": 14389,
@@ -168,8 +168,8 @@
     },
     "@margoengine/environment": {
       ".": {
-        "raw": 71409,
-        "gzip": 23932
+        "raw": 78439,
+        "gzip": 25372
       },
       "./probes": {
         "raw": 36242,
@@ -578,12 +578,12 @@
     },
     "@margoengine/post": {
       ".": {
-        "raw": 64074,
-        "gzip": 18055
+        "raw": 65277,
+        "gzip": 18471
       },
       "./bloom": {
-        "raw": 16072,
-        "gzip": 5334
+        "raw": 17273,
+        "gzip": 5687
       },
       "./ssao": {
         "raw": 26172,
@@ -700,8 +700,8 @@
     },
     "@margoengine/shadows": {
       ".": {
-        "raw": 28899,
-        "gzip": 10463
+        "raw": 29393,
+        "gzip": 10673
       }
     },
     "@margoengine/sky": {
@@ -926,14 +926,14 @@
       "brotli": 5425
     },
     "packages/environment/dist/index.js": {
-      "raw": 71409,
-      "gzip": 23932,
-      "brotli": 21337
+      "raw": 78439,
+      "gzip": 25372,
+      "brotli": 22547
     },
     "packages/shadows/dist/index.js": {
-      "raw": 28899,
-      "gzip": 10463,
-      "brotli": 9341
+      "raw": 29393,
+      "gzip": 10673,
+      "brotli": 9488
     },
     "packages/machinery/dist/workers/cad-runtime.js": {
       "raw": 17489,

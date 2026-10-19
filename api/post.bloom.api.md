@@ -24,5 +24,8 @@ export interface BloomOptions {
     strength?: number;
     threshold?: number;
     exposure?: number;
+    radius?: number;
 }
+
+export function bloomWeights(radius: number, levels: number): number[];
 ```

@@ -75,8 +75,10 @@ export class Shadows implements EnginePlugin {
     get depthTexture(): GPUTexture | undefined;
     get owner(): Engine | undefined;
     static attach(instance: EngineKernel, options?: ShadowOptions): Shadows;
-    add(source: ShadowSource | MeshHandle, { static: cached }?: {
+    add(source: ShadowSource | MeshHandle, { static: cached, castShadow, receiveShadow }?: {
         static?: boolean;
+        castShadow?: boolean;
+        receiveShadow?: boolean;
     }): () => void;
     invalidate(): void;
     bindings(): GPUBindGroupEntry[];

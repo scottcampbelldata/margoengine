@@ -619,6 +619,7 @@
       "Fog",
       "IBL_BINDING",
       "IBL_WGSL",
+      "ImageBackground",
       "SH_BASIS",
       "SH_IRRADIANCE_BANDS",
       "Skybox",
@@ -992,7 +993,8 @@
       "PostStack",
       "SSAO",
       "SSR",
-      "SceneFade"
+      "SceneFade",
+      "bloomWeights"
     ],
     "category": "Post-processing"
   },

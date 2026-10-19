@@ -80,14 +80,16 @@ class Clustered implements EnginePlugin {
     get owner(): Engine | undefined;
     static attach(instance: EngineKernel, options?: ClusteredOptions): Clustered;
     setLights(lights: readonly (PointLight | SpotLight)[]): this;
-    add(receiver: ClusteredReceiver): () => void;
+    add(receiver: ClusteredReceiver, { receiveShadow }?: {
+        receiveShadow?: boolean;
+    }): () => void;
     addShadowCaster(source: MeshHandle | LocalShadowSource): () => void;
-    bindings(): GPUBindGroupEntry[];
-    pbr(group: number): {
+    bindings(shadows?: boolean): GPUBindGroupEntry[];
+    pbr(group: number, shadows?: boolean): {
         declarations: string;
         light: string;
     };
-    shader(source: string, group?: number): string;
+    shader(source: string, group?: number, shadows?: boolean): string;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     get lightLists(): {
@@ -105,13 +107,23 @@ interface ClusteredArea {
     bindings(): GPUBindGroupEntry[];
 }
 
+interface ClusteredLighting {
+    readonly owner?: Engine;
+    pbr(group: number): {
+        declarations: string;
+        light: string;
+    };
+    shader(source: string, group?: number): string;
+    bindings(): GPUBindGroupEntry[];
+}
+
 interface ClusteredOptions {
     grid?: readonly [number, number, number];
     shadows?: LocalShadowOptions;
 }
 
 interface ClusteredReceiver {
-    addLighting(effect: Clustered): () => void;
+    addLighting(effect: ClusteredLighting): () => void;
 }
 
 interface ClusteredShadow {
@@ -161,13 +173,16 @@ interface PointLight {
     range: number;
     color?: Vec3;
     intensity?: number;
+    decay?: number;
     shadow?: boolean | LocalLightShadow;
     castShadow?: boolean;
 }
 
 interface SpotLight extends PointLight {
     direction: Vec3;
-    outerAngle: number;
+    outerAngle?: number;
     innerAngle?: number;
+    angle?: number;
+    penumbra?: number;
 }
 ```
