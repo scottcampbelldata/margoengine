@@ -133,6 +133,11 @@ interface LocalShadowPrimitive {
         readonly count: number;
         upload(device: GPUDevice): GPUBuffer;
     };
+    displacement?: {
+        readonly buffer: GPUBuffer;
+        readonly view: GPUTextureView;
+        readonly sampler: GPUSampler;
+    };
 }
 
 interface LocalShadowSource {

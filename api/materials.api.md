@@ -129,6 +129,22 @@ export class Material {
     aoMap: Texture | null;
     emissiveMap: Texture | null;
     matcap: Texture | null;
+    get alphaMap(): Texture | null;
+    set alphaMap(v: Texture | null);
+    get bumpMap(): Texture | null;
+    set bumpMap(v: Texture | null);
+    get bumpScale(): number;
+    set bumpScale(v: number);
+    get displacementMap(): Texture | null;
+    set displacementMap(v: Texture | null);
+    get displacementScale(): number;
+    set displacementScale(v: number);
+    get displacementBias(): number;
+    set displacementBias(v: number);
+    get lightMap(): Texture | null;
+    set lightMap(v: Texture | null);
+    get lightMapIntensity(): number;
+    set lightMapIntensity(v: number);
     get clearcoatMap(): Texture | null;
     set clearcoatMap(v: Texture | null);
     get clearcoatRoughnessMap(): Texture | null;
@@ -196,6 +212,16 @@ export class Material {
     set color(v: ColorInput);
     get emissive(): LiveColor;
     set emissive(v: ColorInput);
+    get flatShading(): boolean;
+    set flatShading(v: boolean);
+    get vertexColors(): boolean;
+    set vertexColors(v: boolean);
+    get fog(): boolean;
+    set fog(v: boolean);
+    get toneMapped(): boolean;
+    set toneMapped(v: boolean);
+    get emissiveIntensity(): number;
+    set emissiveIntensity(v: number);
     get specular(): LiveColor;
     set specular(v: ColorInput);
     get depthPacking(): DepthPacking;
@@ -264,7 +290,7 @@ export class Material {
     set side(v: MaterialSide);
     get doubleSided(): boolean;
     set doubleSided(v: boolean);
-    setUVTransform(t: TextureTransform | null, slot?: MapSlot): this;
+    setUVTransform(t: TextureTransform | null, slot?: MapSlot | 'alphaMap' | 'bumpMap' | 'displacementMap' | 'lightMap'): this;
     get customState(): boolean;
     clone(): this;
     copy(source: Material): this;
@@ -320,6 +346,11 @@ export interface MaterialOptions extends PhysicalOptions {
     roughness?: number;
     metalness?: number;
     emissive?: ColorInput;
+    emissiveIntensity?: number;
+    flatShading?: boolean;
+    vertexColors?: boolean;
+    fog?: boolean;
+    toneMapped?: boolean;
     map?: Texture | null;
     metalRoughnessMap?: Texture | null;
     normalMap?: Texture | null;
@@ -328,6 +359,14 @@ export interface MaterialOptions extends PhysicalOptions {
     aoMapIntensity?: number;
     emissiveMap?: Texture | null;
     matcap?: Texture | null;
+    alphaMap?: Texture | null;
+    bumpMap?: Texture | null;
+    bumpScale?: number;
+    displacementMap?: Texture | null;
+    displacementScale?: number;
+    displacementBias?: number;
+    lightMap?: Texture | null;
+    lightMapIntensity?: number;
     transparent?: boolean;
     alphaTest?: number;
     side?: MaterialSide;
@@ -478,6 +517,14 @@ export interface ScalarNode {
 
 export type Shading = 'standard' | 'basic' | 'normal' | 'matcap' | 'depth' | 'distance' | 'lambert' | 'phong';
 
+export class ShadowCatcherMaterial extends Material {
+    constructor(options?: {
+        color?: ColorInput;
+        opacity?: number;
+    });
+    shader(source: string, group: number): string;
+}
+
 export interface SheenOptions {
     colorFactor?: readonly [number, number, number];
     roughnessFactor?: number;
@@ -601,6 +648,22 @@ export interface VolumeOptions {
     thicknessTexture?: ClearcoatTexture;
     attenuationColor?: readonly [number, number, number];
     attenuationDistance?: number;
+}
+
+export class WgslMaterial extends Material {
+    readonly wgsl: string;
+    readonly uniforms: Record<string, number | Float32Array>;
+    readonly textures: Record<string, Texture>;
+    constructor(options: WgslMaterialOptions);
+    clone(): this;
+    shader(source: string, group: number): string;
+    bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[];
+}
+
+export interface WgslMaterialOptions extends MaterialOptions {
+    wgsl: string;
+    uniforms?: Readonly<Record<string, number | readonly number[]>>;
+    textures?: Readonly<Record<string, Texture>>;
 }
 
 export type Wrap = 'repeat' | 'clamp' | 'mirror';

@@ -536,12 +536,18 @@ interface PBRMaterial extends GLTFMaterial {
     renderState?: PBRRenderState;
     extension?: MaterialExtension;
     shading?: PBRMaterialShading;
+    displacement?: {
+        readonly buffer: GPUBuffer;
+        readonly view: GPUTextureView;
+        readonly sampler: GPUSampler;
+    };
     extendedFrame?: boolean;
 }
 
 interface PBRMaterialShading extends LightingEffect {
     readonly replacesTextures?: boolean;
     readonly texturedTint?: boolean;
+    lit?(code: string): string;
 }
 
 class PBRModel implements EnginePlugin {
@@ -706,6 +712,7 @@ interface ShadowCasterRecord {
     texCoord: 0 | 1;
     alphaTransform?: Float32Array;
     instances?: PBRInstances;
+    displacement?: PBRMaterial['displacement'];
     dynamic: boolean;
 }
 
