@@ -286,11 +286,13 @@ import { Physics } from '@margoengine/physics';
 import { VoxelPhysics } from '@margoengine/voxel/physics';
 
 const physics = Physics.attach(engine, { rapier: RAPIER });
-const voxels = new VoxelPhysics(physics, world, { radius: 1 });
+const voxels = new VoxelPhysics(physics, world, { radius: 1, budget: 2 });
 physics.addBody(mesh, { colliders: { shape: 'box' } }); // lands on the blocks
 physics.addBody(ball, { colliders: { shape: 'sphere' } }); // rolls on them (triangle meshes, see below)
 world.setBlock(x, y, z, 0); // the collider changes in place; the body falls
-voxels.colliders; // Map of chunk key -> the Rapier collider bodies touch
+voxels.budget = 4; // milliseconds of mesh building per physics step, live
+voxels.pending; // chunks whose meshes are still being built
+voxels.colliders; // Map of chunk key -> the Rapier colliders bodies touch
 voxels.dispose();
 ```
 
@@ -309,19 +311,45 @@ voxels.dispose();
   rapier issues 1029 and 1043). So chunks within `radius` of a body with a `sphere` collider also get a triangle mesh
   of the same faces (merged into rectangles, built with `FIX_INTERNAL_EDGES` so balls roll over edges and seams without
   a kick) and their voxel collider is disabled; it is still edited and coupled, so voxel chunks beside them stay
-  seamless for boxes and capsules. They switch back once no ball body is within `radius + 1`. An edit in or beside
-  a mesh chunk rebuilds its mesh before the next step. Rapier can drop up to one step of travel where a ball passes
-  from one collider to the next (separate Rapier boxes do the same); there is no bump.
+  seamless for boxes and capsules. They switch back once no ball body is within `radius + 1`. A mesh is cut into
+  pieces of at most 2,048 triangles (the chunk is halved, horizontal cuts first, until each piece fits: a terrain
+  surface is 1-2 pieces, a 50% random cave chunk 60), so no single Rapier build is long and an edit in or beside a
+  piece rebuilds only that piece. Rapier can drop up to one step of travel where a ball passes from one collider to
+  the next, a chunk border or a piece seam (separate Rapier boxes do the same); there is no bump.
+- **Building meshes over steps.** `budget` (milliseconds per physics step, default 2, live) spreads the mesh building;
+  voxel colliders are built in the step that needs them. Mesh work a body can reach before the next step (its
+  collider's size, plus two steps of its velocity, plus 1 m) is built in that step whatever it costs: the pieces
+  around a ball, an edited piece under a body. The rest (meshes for a ball still a chunk away) is built nearest first
+  while the step's estimated cost fits the budget, at least one unit (one scan of a chunk or one mesh piece) per step.
+  `budget: Infinity` builds everything in the step that needs it. What a ball touches meanwhile:
+  - A chunk entering a ball's radius keeps its voxel collider (for the other bodies) while its mesh pieces are built,
+    disabled, over the next steps, and switches to the mesh when the last piece is done. The ball is a chunk away.
+  - A ball that reaches a chunk before its mesh is done (spawned or teleported into it, very fast, a chunk loaded
+    under it) switches it in that step: the voxel collider is disabled and the pieces within reach of every body (the
+    ball, a box resting elsewhere in the chunk) are built at once; each other piece is built in the budget or in the
+    step a body comes within reach of it. A ball never touches a voxel collider and no body loses the blocks under it.
+  - An edited piece keeps its previous mesh until its rebuild replaces it (in the same step when a body is within
+    reach of it).
 - **Not physics bodies.** `Physics` collision events and queries skip these colliders; pick with
   `raycastVoxels` (`./query`).
 
-Measured with Node on the development laptop (2026-10-19, other jobs running; `node --test
-packages/voxel/tests/physics.test.js` prints yours). Per chunk, best of 15: a terrain-surface chunk builds its voxel
-collider in 1.5 ms and its triangle mesh (2,280 triangles) in 4.9 ms; a uniform stone chunk with open faces 1.8 ms and
-1.2 ms; a 50% random cave chunk 4.4 ms and 125 ms (65,876 triangles), the worst case for a ball. A body spawning on
-terrain builds 18 voxel colliders in 12-43 ms, a ball 15 voxel colliders and 15 meshes in 48-109 ms. A dig or
-place on voxel chunks costs 2-6 us against 0.4-1.3 us without colliders; an edit in a mesh chunk costs one 2-6 ms
-rebuild at the next step.
+Measured with Node 26 on the reference desktop (NVIDIA RTX A6000, AMD Ryzen 9 9950X, 32 logical cores; 2026-10-19,
+other agents' jobs running, 11-15% total CPU; three runs of `node --test packages/voxel/tests/physics.test.js`, which
+prints yours; time spent in VoxelPhysics per physics step). One chunk built all at once (best of 3): a terrain-surface
+chunk's voxel collider 0.6 ms and triangle mesh 2.3-2.5 ms (2 pieces); a uniform stone chunk 0.9-1.0 ms and 1.0-1.1 ms;
+a 50% random cave chunk 1.7-2.5 ms and 38-41 ms (60 pieces), the worst case for a ball. Per physics step:
+
+- That cave chunk entering a ball's radius: 35-46 ms in one step with `budget: Infinity`; 27-29 steps of at most
+  1.9-2.2 ms with the default.
+- A ball spawned inside a cave chunk, at the corner of four pieces: 5.2-6.5 ms in its first step (5 of 39 pieces),
+  then 20-21 steps of at most 2.0 ms.
+- A dig or place on voxel chunks costs 1.2-1.5 us against 0.2-0.3 us without colliders; an edit in a mesh chunk
+  rebuilds one piece at the next step, 1.1-1.7 ms.
+
+A ball rolling over the piece seams of a floor under caves (41-piece chunks) trails a one-box floor by at most
+0.26 m after 150 steps, with no kick (the chunk-border case: 0.23 m). The cost of one unit on slower machines, and so
+their worst step, is unverified; the development laptop measured these builds two to three times slower before this
+change.
 
 ## Meshing in workers: `VoxelMesher`
 
