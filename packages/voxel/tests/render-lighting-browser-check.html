@@ -1,0 +1,198 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Voxel lighting browser check</title><style>body{margin:0}canvas{display:block;width:320px;height:240px}</style></head><body><canvas></canvas>
+<script type="module">
+// VoxelRenderer lighting (phase 5) on a real GPU: a white floor read back from the HDR scene (rgba16float, under Bloom)
+// at world points projected through the camera, so every number is linear radiance. Shadows (hard filter, a slab and
+// a cutout square), the sun beyond the shadow range, a clustered point light, fog, IBL, daylight, block light colour,
+// texture animation, the liquid wave, and greedy against one-quad-per-face meshes with the lighting on. Driven by
+// render-lighting-browser-check.mjs.
+import {Engine} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {Clustered} from '/packages/clustered/dist/index.js';
+import {Environment,EnvironmentLighting,Fog} from '/packages/environment/dist/index.js';
+import {BlockTypes,VoxelChunk,VoxelWorld,blockState} from '/packages/voxel/dist/index.js';
+import {meshChunk,meshInput} from '/packages/voxel/dist/mesher.js';
+import {BlockTextures,VoxelRenderer} from '/packages/voxel/dist/render.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const canvas=document.querySelector('canvas'),errors=[],runtime=()=>engineRuntime(engine);
+const watch=(device)=>device.addEventListener('uncapturederror',(e)=>errors.push(e.error.message));
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[18,22,14],target:[18,1,32],near:0.1,far:400}});
+watch(runtime().gpu);
+const device=()=>runtime().gpu;
+// Naive meshes: every merged quad of a mesher reply becomes its w x h unit quads (same words, cell moved, size 1).
+let naive=false;
+const Native=globalThis.Worker,AT_U=[10,10,0,0,0,0],AT_V=[5,5,10,10,5,5];
+const expand=(words)=>{const out=[];for(let i=0;i<words.length;i+=3){const w0=words[i],face=(w0>>>15)&7,w=((w0>>>18)&31)+1,h=((w0>>>23)&31)+1;
+ if(face>5){out.push(w0,words[i+1],words[i+2]);continue;}const base=(w0&~(0x3ff<<18))>>>0;
+ for(let v=0;v<h;v++)for(let u=0;u<w;u++)out.push((base+(u<<AT_U[face])+(v<<AT_V[face]))>>>0,words[i+1],words[i+2]);}return Uint32Array.from(out);};
+const naiveMesh=(m)=>({...m,opaque:expand(m.opaque),cutout:expand(m.cutout),translucent:expand(m.translucent)});
+globalThis.Worker=class extends Native{#naive=naive;
+ set onmessage(listener){super.onmessage=listener&&((event)=>listener(this.#naive&&event.data?.result?{data:{result:naiveMesh(event.data.result)}}:event));}
+ get onmessage(){return super.onmessage;}};
+const tile=(f)=>{const data=new Uint8Array(1024);for(let y=0;y<16;y++)for(let x=0;x<16;x++)data.set(f(x,y),(y*16+x)*4);return {width:16,height:16,data};};
+const textures=new BlockTextures({images:[
+ tile(()=>[255,255,255,255]), // 0 white
+ tile((x,y)=>x>=4&&x<12&&y>=4&&y<12?[255,255,255,255]:[0,0,0,0]), // 1 a square cut out of a transparent border
+ tile(()=>[255,0,0,255]), // 2 red, animation frame 0
+ tile(()=>[0,0,255,255]), // 3 blue, animation frame 1
+ tile(()=>[200,200,200,255]), // 4 grey
+]});
+const blocks=new BlockTypes(),WHITE=blocks.define('white',{textures:0,roughness:1}),GREY=blocks.define('grey',{textures:4,roughness:1}),
+ STONE=blocks.define('stone',{textures:0,roughness:1}),SQUARE=blocks.define('square',{layer:'cutout',textures:1,roughness:1}),
+ ANIM=blocks.define('anim',{textures:2,animation:{frames:2,fps:1},emissive:1}),
+ WATER=blocks.define('water',{layer:'translucent',shape:'liquid',liquid:true,solid:false,textures:0,emissive:1});
+// A 64 x 64 floor of white blocks at y = 0 (top at y = 1) in four chunks, open sky everywhere (light 0xf0) unless
+// `light(x, y, z)` gives another byte for the cells above it.
+function floorWorld(light){const w=new VoxelWorld({blocks}),keys=[];
+ for(let cz=0;cz<2;cz++)for(let cx=0;cx<2;cx++){const c=new VoxelChunk();c.fillLight(0xf0);
+  for(let z=0;z<32;z++)for(let x=0;x<32;x++){c.set(x,0,z,WHITE);if(light)for(let y=1;y<32;y++){const b=light(cx*32+x,y,cz*32+z);if(b!==undefined)c.setLight(x,y,z,b);}}
+  w.addChunk(cx,0,cz,c);keys.push(`${cx},0,${cz}`);}
+ return {w,keys};}
+const quadsOf=(w,ks,mode)=>ks.reduce((n,k)=>{let m=meshChunk(meshInput(w,k));if(mode==='naive')m=naiveMesh(m);return n+(m.opaque.length+m.cutout.length+m.translucent.length)/3;},0);
+const post=Bloom.attach(engine,{strength:0.2,threshold:1,exposure:0});
+const module=()=>device().createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+async function readHDR(texture){
+ const d=device(),pipeline=d.createComputePipeline({layout:'auto',compute:{module:module(),entryPoint:'main'}}),bytes=texture.width*texture.height*16,
+  output=d.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=d.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=d.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,d.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);d.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+async function shot(frames=3){for(let i=0;i<frames;i++){engine.render({delta:0});await device().queue.onSubmittedWorkDone();}engine.render({delta:0});await device().queue.onSubmittedWorkDone();return readHDR(post.sceneTexture);}
+// The pixel of world point p (after a render, so the camera matrix is current) and its linear RGB.
+const pixel=(p)=>{const m=engine.camera.matrix,x=m[0]*p[0]+m[4]*p[1]+m[8]*p[2]+m[12],y=m[1]*p[0]+m[5]*p[1]+m[9]*p[2]+m[13],w=m[3]*p[0]+m[7]*p[1]+m[11]*p[2]+m[15];
+ return [Math.floor((x/w*0.5+0.5)*canvas.width),Math.floor((0.5-y/w*0.5)*canvas.height)];};
+const at=(img,p)=>{const [x,y]=pixel(p),i=(y*canvas.width+x)*4;return [img[i],img[i+1],img[i+2]];};
+const probe=(img,points)=>Object.fromEntries(Object.entries(points).map(([k,p])=>[k,at(img,p)]));
+const look=(position,target)=>{engine.camera.position=position;engine.camera.target=target;};
+// Sun straight down at `sun` intensity, hemisphere ambient at `ambient`, white.
+const lights=(sun,ambient)=>{const l=runtime().lighting;l.direction.set([0,1,0,sun]);l.radiance.set([1,1,1,ambient]);l.ambient?.set([1,1,1]);};
+let renderer;
+async function ready(r,w,ks,mode='greedy'){
+ const quads=quadsOf(w,ks,mode);let stable=0;
+ for(let i=0;i<4000&&stable<3;i++){engine.render({delta:0});await device().queue.onSubmittedWorkDone();
+  stable=r.stats.quads===quads&&r.stats.draws&&!w.dirty.size?stable+1:0;await new Promise((resolve)=>setTimeout(resolve,1));}
+ if(stable<3)throw new Error(`${mode} renderer not ready: ${r.stats.quads} of ${quads} quads`);
+}
+function attach(w,ks,mode='greedy'){naive=mode==='naive';for(const k of ks)w.dirty.add(k);return VoxelRenderer.attach(engine,{world:w,textures,workers:2});}
+// Renders until `done(image)` (pipelines compile asynchronously after an effect is added); the frames it took.
+async function until(done,limit=600){for(let i=1;i<=limit;i++){const img=await shot(0);if(done(img))return {img,frames:i};await new Promise((r)=>setTimeout(r,2));}return {img:await shot(0),frames:Infinity};}
+const drop=(effect)=>{engine.removePlugin(effect.name);};
+const slab=[];for(let z=30;z<34;z++)for(let x=10;x<14;x++)slab.push([x,6,z]);
+window.check={
+ samples:sceneSamples,
+ // A 4 x 4 stone slab and a cutout square 5 blocks over the floor, the sun straight down, no ambient.
+ async shadows(){
+  lights(3,0);const {w,keys}=floorWorld();w.setBlocks([...slab.flatMap(([x,y,z])=>[x,y,z,STONE]),24,6,32,SQUARE]);
+  renderer=attach(w,keys);await ready(renderer,w,keys);look([18,22,14],[18,1,32]);
+  const P={under:[12,1,32],open:[20,1,32],square:[24.5,1,32.5],border:[24.1,1,32.5],edge:[24.5,1,32.9]};
+  const before=probe(await shot(),P);
+  const shadows=Shadows.attach(engine,{distance:60,cascades:1,filter:'hard',resolution:2048}),remove=shadows.add(renderer,{static:true});
+  const {img,frames}=await until((i)=>at(i,P.under)[0]<1e-4&&at(i,P.square)[0]<1e-4);
+  const after=probe(img,P);
+  // Still frames: the static map is reused, nothing redrawn.
+  const hits=shadows.stats.cacheHits;for(let i=0;i<5;i++){engine.render({delta:0});await device().queue.onSubmittedWorkDone();}
+  const still={cacheHits:shadows.stats.cacheHits-hits};
+  // Removing the slab: frames (60 Hz) until the floor under it is lit again.
+  w.setBlocks(slab.flatMap(([x,y,z])=>[x,y,z,0]));let lit=Infinity;
+  for(let i=1;i<=60;i++){await new Promise(requestAnimationFrame);engine.render({delta:0});await device().queue.onSubmittedWorkDone();
+   if(at(await readHDR(post.sceneTexture),P.under)[0]>0.5*before.open[0]){lit=i;break;}}
+  const version=renderer.shadowVersion;remove();drop(shadows);renderer.dispose();
+  return {before,after,frames,still,lit,version,errors:errors.splice(0)};
+ },
+ // Cells above x 4-7 and 50-63 see no sky. Within the shadow range (40) the map decides (open: lit); beyond it the
+ // sun is scaled by sky visibility (none: dark).
+ async beyondRange(){
+  lights(3,0);const {w,keys}=floorWorld((x)=>(x>=4&&x<8)||x>=50?0x00:undefined);
+  renderer=attach(w,keys);await ready(renderer,w,keys);look([-14,6,32],[64,1,32]);
+  const P={near0:[6,1,32],near15:[12,1,32],far0:[57,1,32],far15:[40,1,32]},before=probe(await shot(),P);
+  const shadows=Shadows.attach(engine,{distance:40,cascades:1,filter:'hard'}),remove=shadows.add(renderer,{static:true});
+  const {img,frames}=await until((i)=>at(i,P.near0)[0]>0.01);const after=probe(img,P);
+  remove();drop(shadows);renderer.dispose();
+  return {before,after,frames,errors:errors.splice(0)};
+ },
+ // One point light 3 blocks over the floor, range 8; sun and ambient off.
+ async clustered(){
+  lights(0,0);const {w,keys}=floorWorld();renderer=attach(w,keys);await ready(renderer,w,keys);look([32,14,-4],[32,1,14]);
+  const P={under:[32,1,10],d2:[34,1,10],d4:[36,1,10],out:[32,1,22]},before=probe(await shot(),P);
+  const clustered=Clustered.attach(engine);clustered.setLights([{position:[32,4,10],range:8,intensity:30,color:[1,1,1]}]);
+  const remove=clustered.add(renderer),{img,frames}=await until((i)=>at(i,P.under)[0]>0);const after=probe(img,P);
+  remove();const removed=probe(await shot(),P);drop(clustered);renderer.dispose();
+  return {before,after,removed,frames,errors:errors.splice(0)};
+ },
+ // Linear fog from 0 to 40 blocks toward a blue: a floor point's colour moves toward it by distance / 40.
+ async fog(){
+  lights(3,0);const {w,keys}=floorWorld();renderer=attach(w,keys);await ready(renderer,w,keys);look([32,12,14],[32,1,32]);
+  const p=[32,1,30],e=engine.camera.position,before=at(await shot(),p);
+  const fog=Fog.attach(engine,{color:[0.2,0.4,0.8],near:0,far:40}),remove=fog.add(renderer);
+  const {img,frames}=await until((i)=>Math.abs(at(i,p)[2]-before[2])>0.01);const after=at(img,p),distance=Math.hypot(p[0]-e[0],p[1]-e[1],p[2]-e[2]);
+  remove();drop(fog);renderer.dispose();
+  // Fog takes sRGB components (environment ColorInput) and mixes in linear light on HDR targets.
+  const colour=[0.2,0.4,0.8].map((v)=>v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4);
+  return {before,after,distance,colour,far:40,frames,errors:errors.splice(0)};
+ },
+ // A uniform environment (radiance 0.5) as image-based light, sun and hemisphere ambient off: the IBL ambient is
+ // scaled by the voxel occlusion, AO x (0.03 + sky light x daylight), so daylight 0 over 1 is 0.03 / 1.03.
+ async ibl(){
+  lights(0,0);const {w,keys}=floorWorld();renderer=attach(w,keys);await ready(renderer,w,keys);look([32,12,14],[32,1,32]);
+  const p=[32,1,30],before=at(await shot(),p);
+  const environment=await Environment.create(engine,{width:16,height:8,data:new Float32Array(16*8*4).fill(0.5)});engine.use(environment);
+  const ibl=EnvironmentLighting.attach(engine,environment),remove=ibl.add(renderer);
+  const {img,frames}=await until((i)=>at(i,p)[0]>0.01);const day=at(img,p);
+  renderer.daylight=0;const night=at(await shot(),p);renderer.daylight=1;
+  remove();drop(ibl);drop(environment);renderer.dispose();
+  return {before,day,night,frames,errors:errors.splice(0)};
+ },
+ // No effects: hemisphere ambient at daylight 1 and 0 (ratio 0.03 / 1.03); block light 15 under no sky with the sun
+ // and ambient off is exactly the block light colour on a white face.
+ async daylight(){
+  lights(0,1);const {w,keys}=floorWorld((x,y,z)=>x>=40&&x<48&&z>=40&&z<48?0x0f:undefined);renderer=attach(w,keys);await ready(renderer,w,keys);
+  look([32,12,14],[32,1,32]);const p=[32,1,30],day=at(await shot(),p);renderer.daylight=0;const night=at(await shot(),p);renderer.daylight=1;
+  lights(0,0);renderer.blockLightColor=[0.2,0.4,0.8];look([44,10,34],[44,1,44]);const torch=at(await shot(),[44,1,44]);
+  let thrown=[];for(const bad of [[1,2],[1,-1,0],'red'])try{renderer.blockLightColor=bad;}catch(e){thrown.push(e.name);}
+  renderer.dispose();
+  return {day,night,torch,thrown,errors:errors.splice(0)};
+ },
+ // Two texture layers at one frame a second: red until t = 1 s, blue after (emissive, lights off).
+ async animation(){
+  lights(0,0);const w=new VoxelWorld({blocks}),keys=['0,0,0'];w.setBlock(0,0,0,ANIM);look([0.5,0.5,-3],[0.5,0.5,0]);renderer=attach(w,keys);await ready(renderer,w,keys);
+  look([0.5,0.5,-3],[0.5,0.5,0]);const p=[0.5,0.5,0];engine.render({delta:0.25});const first=at(await shot(),p);
+  engine.render({delta:1});const second=at(await shot(),p);renderer.dispose();
+  return {first,second,errors:errors.splice(0)};
+ },
+ // A lone water cell's surface rises 0.04 * sin(1.6 t): seen level from 3 blocks, the top edge of its -z side moves
+ // 0.08 blocks between the crest and the trough (both above the eye, so the side face holds the topmost pixel).
+ async wave(){
+  lights(0,0);const w=new VoxelWorld({blocks}),keys=['0,0,0'];w.setBlock(0,0,0,WATER);look([0.5,0.5,-3],[0.5,0.5,0]);renderer=attach(w,keys);await ready(renderer,w,keys);
+  look([0.5,0.5,-3],[0.5,0.5,0]);const column=canvas.width>>1,edge=(img)=>{for(let y=0;y<canvas.height;y++)if(img[(y*canvas.width+column)*4]>0.5)return y;return -1;};
+  const crest=Math.PI/2/1.6,trough=3*Math.PI/2/1.6;engine.render({delta:crest});const high=edge(await shot());
+  for(let k=0;k<4;k++)engine.render({delta:(trough-crest)/4});const low=edge(await shot());renderer.dispose();
+  const f=canvas.height/2/Math.tan(engine.camera.fov*Math.PI/360);
+  return {high,low,expected:0.08*f/3,errors:errors.splice(0)};
+ },
+ // Greedy against one quad per face with shadows (soft), a point light, fog and a waving pool at its crest.
+ async greedyVsNaive(){
+  lights(3,0.4);const make=()=>{const {w,keys}=floorWorld();const e=[];
+   for(let z=4;z<60;z++)for(let x=4;x<60;x++)if((x*7+z*13)%11<3)e.push(x,0,z,GREY);
+   for(let z=36;z<48;z++)for(let x=36;x<48;x++){e.push(x,0,z,x===36||x===47||z===36||z===47?STONE:WATER);}
+   for(const [x,y,z] of slab)e.push(x,y,z,STONE);e.push(24,6,32,SQUARE);w.setBlocks(e);return {w,keys};};
+  const shadows=Shadows.attach(engine,{distance:60,cascades:2}),clustered=Clustered.attach(engine),fog=Fog.attach(engine,{color:[0.5,0.6,0.7],near:10,far:120});
+  clustered.setLights([{position:[30,4,30],range:12,intensity:20,color:[1,0.8,0.6]}]);
+  const views=[[[18,22,14],[18,1,32]],[[-4,8,-4],[40,1,40]],[[50,10,30],[40,1,42]]],images={},stats={};
+  for(const mode of ['greedy','naive']){const {w,keys}=make();renderer=attach(w,keys,mode);await ready(renderer,w,keys,mode);
+   const removers=[shadows.add(renderer,{static:true}),clustered.add(renderer),fog.add(renderer)];
+   engine.render({delta:Math.PI/2/1.6});look(...views[0]);await until((i)=>at(i,[12,1,32])[0]<at(i,[20,1,32])[0]*0.5);
+   images[mode]=[];for(const v of views){look(...v);images[mode].push(await shot(6));}
+   stats[mode]={...renderer.stats};for(const r of removers)r();renderer.dispose();}
+  drop(shadows);drop(clustered);drop(fog);
+  const W=canvas.width,results=images.greedy.map((a,i)=>{const b=images.naive[i];let differing=0,lit=0,blocks=0;const n=a.length/4,diff=new Uint8Array(n);
+   for(let p=0;p<a.length;p+=4){let d=0;for(let c=0;c<3;c++)d=Math.max(d,Math.abs(a[p+c]-b[p+c]));if(d>1e-6){differing++;diff[p/4]=1;}if(b[p]+b[p+1]+b[p+2]>0)lit++;}
+   for(let j=0;j<n-W-1;j++)if(diff[j]&&diff[j+1]&&diff[j+W]&&diff[j+W+1]&&(j+1)%W)blocks++;return {differing,lit,blocks};});
+  return {results,stats,errors:errors.splice(0)};
+ },
+};
+window.ready=true;
+</script></body></html>
