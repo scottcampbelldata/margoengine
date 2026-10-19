@@ -733,7 +733,17 @@ const encode =
   'fn mat_out(c:vec3f)->vec3f {if(f.settings.w>0.5){return c;}let x=clamp(c,vec3f(0),vec3f(1));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>=vec3f(0.0031308));}';
 const patched = new Map<string, Map<string, string>>();
 type MapState = { refs: number; device?: GPUDevice; buffer?: GPUBuffer; values?: Float32Array };
-const mapStates = new WeakMap<Material, Map<object, MapState>>();
+const mapStates = new WeakMap<Material, Map<object, MapState>>(),
+  disposedMaterials = new WeakSet<Material>();
+/** Throws for a disposed material: meshes may not start drawing one. */
+function usable(m: Material): void {
+  if (disposedMaterials.has(m))
+    throw new MargoError('disposed', 'Material is disposed; create a new Material or clone() it before disposing');
+}
+/** A field copy for clone/copy: arrays and plain objects are duplicated, everything else (textures, nodes) shared. */
+const duplicate = (v: unknown): unknown =>
+  Array.isArray(v) ? v.slice() : v && Object.getPrototypeOf(v) === Object.prototype ? { ...v } : v;
+let baseKeys: readonly string[] | undefined;
 function mapState(m: Material, owner: object): MapState {
   let states = mapStates.get(m);
   if (!states) mapStates.set(m, (states = new Map()));
@@ -1472,6 +1482,60 @@ export class Material {
   private sync(): void {
     this.settings[0] = this.blend ? 2 : this.settings[1] > 0 ? 1 : 0;
   }
+  /**
+   * A new material of the same class with this one's values; it shares the textures (and a NodeMaterial's nodes) and
+   * nothing else, so editing either leaves the other alone.
+   */
+  clone(): this {
+    const c = Object.create(Object.getPrototypeOf(this)) as this;
+    for (const [key, value] of Object.entries(this)) (c as Record<string, unknown>)[key] = duplicate(value);
+    return Object.assign(c, {
+      rgba: liveColor(this.rgba.slice(), 'color'),
+      glow: liveColor(this.glow.slice(), 'emissive'),
+      highlight: liveColor(this.highlight.slice(), 'specular'),
+    });
+  }
+  /**
+   * Copies every Material value of `source` (same shading) into this material in place, textures shared: meshes using
+   * this material show them next frame. Fields a subclass adds (a NodeMaterial's nodes) stay this material's.
+   */
+  copy(source: Material): this {
+    usable(this);
+    if (!(source instanceof Material)) throw new TypeError('Material copy needs a source Material; pass one');
+    if (source.shading !== this.shading)
+      throw new TypeError(
+        `Material copy needs the same shading ('${this.shading}', not '${source.shading}'); clone() the source instead`,
+      );
+    const to = this as unknown as Record<string, unknown>,
+      from = source as unknown as Record<string, unknown>;
+    for (const key of (baseKeys ??= Object.keys(new Material()))) {
+      const a = to[key],
+        b = from[key];
+      // Arrays copy into the existing ones: live colours and gltf-pro rows keep their identity.
+      if (Array.isArray(a) && Array.isArray(b)) a.splice(0, a.length, ...b);
+      else to[key] = duplicate(b);
+    }
+    renderStates.delete(this);
+    return this;
+  }
+  /**
+   * Frees what this material owns that no live mesh uses (uniform buffers it made outside a mesh); meshes still
+   * drawing it keep theirs until they go. Afterwards `createMesh` and `mesh.material = ` refuse it (MargoError
+   * 'disposed'); `clone()` still works. Textures stay the caller's.
+   */
+  dispose(): void {
+    disposedMaterials.add(this);
+    const states = mapStates.get(this);
+    for (const [owner, state] of states ?? [])
+      if (!state.refs) {
+        state.buffer?.destroy();
+        states!.delete(owner);
+      }
+  }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
   /** gltf-pro beauty shader patch; subclasses (such as `@margoengine/shader`'s NodeMaterial) may extend it. */
   shader(source: string, group: number): string {
     if (mapped(this)) return physicalMapsShader(source, group, mapPlan(this).slots);
@@ -1909,6 +1973,7 @@ export function createMesh<M extends Material | readonly Material[]>(
     assigned: Material[] = array ? [...(material as readonly Material[])] : [material as Material];
   if (!assigned.length || assigned.some((m) => !(m instanceof Material)) || !Number.isFinite(renderOrder))
     throw new TypeError('Invalid material mesh');
+  assigned.forEach(usable);
   const data = packGeometry(geometry),
     groups = meshGroups(geometry, data.indices.length, assigned, array);
   const prepared = groups.map((g) => ({ vertices: data.vertices, indices: groupIndices(data.indices, g) }));
@@ -1965,6 +2030,7 @@ export function createMesh<M extends Material | readonly Material[]>(
           ? `Material mesh material must be an array of ${assigned.length} Materials, one per slot; pass one for each`
           : 'Material mesh material must be one Material; pass a Material (a material array needs a grouped mesh)',
       );
+    (list as Material[]).forEach(usable);
     assigned.splice(0, assigned.length, ...(list as Material[]));
     for (let i = 0; i < groups.length; i++) entry.materials[i] = assigned[groups[i].materialIndex];
     if (array) snapshot = Object.freeze([...assigned]);

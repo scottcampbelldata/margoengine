@@ -5,7 +5,7 @@ import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gp
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { wgsl } from '../../core/dist/shaders.js';
 import { Skeleton, Skin } from '../../animation/dist/index.js';
-import { Material, PhongMaterial, UnlitMaterial, createMesh } from '../dist/index.js';
+import { Material, PhongMaterial, Texture, UnlitMaterial, createMesh } from '../dist/index.js';
 
 async function scene({ depthFormat = 'depth32float' } = {}) {
   const gpu = mockGPU(),
@@ -339,5 +339,96 @@ test('a live stencil reference keeps its pipeline; other stencil state picks a n
   m.stencilFunc = 'equal';
   log = s.frame();
   assert.equal(of(log, 'renderPipeline')[0][2].depthStencil.stencilFront.compare, 'equal');
+  s.engine.dispose();
+});
+
+test('clone() is an independent copy of the same class that shares only textures', async () => {
+  const s = await scene(),
+    map = new Texture({ data: new Uint8Array(16), width: 2, height: 2 }, { mipmaps: false }),
+    m = new PhongMaterial({ color: '#ff8000', map, shininess: 12, blending: 'additive', side: 'back' });
+  m.setUVTransform({ offset: [0.5, 0] });
+  const c = m.clone();
+  assert.ok(c instanceof PhongMaterial && c !== m);
+  assert.deepEqual(
+    [c.shading, c.color, c.shininess, c.blending, c.side, c.uvt],
+    [m.shading, m.color, m.shininess, m.blending, m.side, m.uvt],
+  );
+  assert.equal(c.map, map, 'textures are shared');
+  assert.notEqual(c.color, m.color);
+  c.color.set(0x0000ff);
+  c.roughness = 0.2;
+  c.blending = 'normal';
+  c.setUVTransform(null);
+  assert.deepEqual(
+    [m.color[2], m.roughness, m.blending, m.uvt[2]],
+    [0, 1, 'additive', 0.5],
+    'the original is untouched',
+  );
+  // Each draws with its own uniform.
+  createMesh(s.engine, quad, m);
+  createMesh(s.engine, quad, c);
+  assert.equal(phongBuffers(s.frame()).length, 2);
+  const glass = new Material({ transmission: 1, thickness: 0.5, iridescence: 0.5 }).clone();
+  glass.thickness = 2;
+  assert.deepEqual([glass.transmissive, glass.thickness, glass.extensions.includes('iridescence')], [true, 2, true]);
+  s.engine.dispose();
+});
+
+test('copy(source) writes every value into this material in place; meshes show it next frame', async () => {
+  const s = await scene(),
+    target = new Material(),
+    color = target.color,
+    mesh = createMesh(s.engine, quad, target),
+    map = new Texture({ data: new Uint8Array(16), width: 2, height: 2 }, { mipmaps: false });
+  s.frame();
+  const source = new Material({ color: [0, 0, 1], roughness: 0.3, transparent: true, opacity: 0.5, map, clearcoat: 1 });
+  assert.equal(target.copy(source), target);
+  assert.equal(target.color, color, 'same live array');
+  assert.deepEqual(
+    [target.color, target.roughness, target.transparent, target.map, target.clearcoat],
+    [[0, 0, 1, 0.5], 0.3, true, map, 1],
+  );
+  source.color.set(0xff0000);
+  assert.equal(target.color[0], 0, 'no link to the source afterwards');
+  const log = s.frame(),
+    frame = of(log, 'writeBuffer').find((e) => e[3].length === 880 * 2);
+  assert.deepEqual([...floats(frame[3]).slice(76, 80)], [0, 0, 1, 0.5]);
+  assert.equal(mesh.primitives[0].material.settings[0], 2, 'now blended');
+  assert.throws(() => target.copy(new Material({ shading: 'phong' })), { name: 'TypeError', message: /same shading/ });
+  assert.throws(() => target.copy({}), TypeError);
+  s.engine.dispose();
+});
+
+test('dispose() frees what no mesh uses and refuses later meshes; live meshes keep drawing', async () => {
+  const s = await scene(),
+    map = new Texture({ data: new Uint8Array(16), width: 2, height: 2 }, { mipmaps: false }),
+    m = new PhongMaterial({ map }),
+    mesh = createMesh(s.engine, quad, m);
+  const [owned] = phongBuffers(s.frame());
+  // A uniform made outside any mesh (no engine owner) has no user.
+  const loose = m.bindings(s.gpu.device).find((e) => e.binding === 197).resource.buffer;
+  let log = s.record(() => m.dispose());
+  assert.deepEqual(
+    of(log, 'destroy'),
+    [['destroy', s.id(loose)]],
+    'only the unused uniform goes: textures and mesh uniforms stay',
+  );
+  log = s.frame();
+  assert.ok(of(log, 'pass.drawIndexed').length > 0, 'the mesh still draws');
+  assert.throws(() => createMesh(s.engine, quad, m), { name: 'MargoError', code: 'disposed' });
+  assert.throws(
+    () => {
+      createMesh(s.engine, quad, new Material()).material = m;
+    },
+    { name: 'MargoError', code: 'disposed' },
+  );
+  assert.throws(() => m.copy(new PhongMaterial()), { name: 'MargoError', code: 'disposed' });
+  const again = m.clone();
+  assert.doesNotThrow(() => createMesh(s.engine, quad, again), 'a clone of a disposed material is usable');
+  log = s.record(() => mesh.dispose());
+  assert.ok(
+    of(log, 'destroy').some((e) => e[1] === owned[1]),
+    'its last mesh releases the engine uniform',
+  );
   s.engine.dispose();
 });
