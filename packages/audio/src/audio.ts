@@ -19,6 +19,8 @@ export interface AudioOptions {
   offset?: number;
   /** Seconds to play (buffer sources, ignored while looping). */
   duration?: number;
+  /** Timeline second where {@link Audio.sync} starts this sound, default 0. */
+  timelineStart?: number;
   /** Start as soon as a buffer is set. */
   autoplay?: boolean;
   /** Effect chain between the source and the volume stage, e.g. BiquadFilterNodes. */
@@ -68,6 +70,11 @@ const checkFinite = (value: number, name: string, min = -Infinity): number => {
  * Graph: source -> filters -> fade gain -> volume gain -> [panner] -> listener.input.
  */
 export class Audio implements ListenerSource {
+  /**
+   * Seconds {@link Audio.sync} lets a playing sound drift from the timeline before it re-seeks, default 0.05:
+   * above audio-clock and frame jitter, below what reads as out of sync. Raise it if steady playback stutters.
+   */
+  static syncTolerance = 0.05;
   readonly listener: AudioListener;
   readonly context: BaseAudioContext;
   /** Volume stage (user volume times hidden-mute). */
@@ -92,6 +99,7 @@ export class Audio implements ListenerSource {
   private detuneValue: number;
   private offsetValue: number;
   private durationValue: number | undefined;
+  private timelineStartValue: number;
   private volumeValue: number;
   private muted = false;
   private disposed = false;
@@ -114,6 +122,7 @@ export class Audio implements ListenerSource {
     this.detuneValue = checkFinite(options.detune ?? 0, 'detune');
     this.offsetValue = checkFinite(options.offset ?? 0, 'offset', 0);
     this.durationValue = options.duration === undefined ? undefined : checkFinite(options.duration, 'duration', 0);
+    this.timelineStartValue = checkFinite(options.timelineStart ?? 0, 'timelineStart');
     this.volumeValue = checkFinite(options.volume ?? 1, 'volume', 0);
     this.autoplay = options.autoplay ?? false;
     this.onEnded = options.onEnded ?? null;
@@ -193,38 +202,8 @@ export class Audio implements ListenerSource {
     checkFinite(delay, 'delay', 0);
     if (this.playing) return this;
     if (!this.fading) this.setFade(1);
-    const context = this.context;
-    if (this.kind === 'buffer') {
-      this.stopNode();
-      const buffer = this.buffer!,
-        node = context.createBufferSource();
-      node.buffer = buffer;
-      node.loop = this.loopValue;
-      node.loopStart = this.loopStartValue;
-      node.loopEnd = this.loopEndValue;
-      node.playbackRate.setValueAtTime(this.rateValue, context.currentTime);
-      node.detune?.setValueAtTime(this.detuneValue, context.currentTime);
-      node.onended = () => {
-        disconnect(node);
-        if (this.source !== node) return;
-        this.source = null;
-        if (!this.playing) return;
-        this.playing = false;
-        this.progress = 0;
-        this.onEnded?.(this);
-      };
-      node.connect(this.head);
-      const position = this.playhead(buffer.duration);
-      this.progress = position - this.offsetValue;
-      this.startedAt = context.currentTime + delay;
-      const remaining =
-        this.durationValue === undefined || this.loopValue
-          ? undefined
-          : Math.max(0, this.durationValue - Math.max(0, position - this.offsetValue));
-      if (remaining === undefined) node.start(this.startedAt, position);
-      else node.start(this.startedAt, position, remaining);
-      this.source = node;
-    } else if (this.kind === 'media') {
+    if (this.kind === 'buffer') this.startBuffer(this.context.currentTime + delay);
+    else if (this.kind === 'media') {
       const media = this.media!;
       if (delay > 0) {
         this.clearTimer();
@@ -269,6 +248,69 @@ export class Audio implements ListenerSource {
         this.haltOther(true);
       }, delay * 1000);
     else this.haltOther(true);
+    return this;
+  }
+
+  /**
+   * Moves the playhead to `seconds` within the buffer (or the media element's time), whether playing, paused or
+   * stopped. A playing buffer restarts on one new source node at the new position; the old node is stopped and
+   * disconnected first, so the two never overlap. Looping wraps the position into the loop region. Without looping
+   * it clamps to the end of the buffer, where a playing sound ends as if it had played through (`onEnded` fires).
+   * Stream and node sources cannot seek and ignore it.
+   */
+  seek(seconds: number): this {
+    checkFinite(seconds, 'seconds', 0);
+    if (this.media) this.media.currentTime = seconds;
+    else if (this.buffer) {
+      this.progress = seconds - this.offsetValue;
+      if (this.playing) this.startBuffer(Math.max(this.context.currentTime, this.startedAt));
+    }
+    return this;
+  }
+
+  /**
+   * Follows an external timeline clock, such as an editor's animation timeline; call it every frame. The sound is
+   * silent before timeline second `timelineStart`; after it the buffer position is
+   * `offset + timelineSeconds - timelineStart`, wrapped by the loop region, and a non-looping sound is silent past
+   * its end. While `playing` it plays and re-seeks only when it drifts more than {@link Audio.syncTolerance} from
+   * the timeline, so steady playback is never chopped. With `playing` false (a paused timeline, scrubbing) it only
+   * moves the playhead and stays silent. `rate` is the timeline speed and sets `playbackRate`; zero or negative
+   * (reverse) is silent, as Web Audio cannot play a buffer backwards. Buffer sources only; before setBuffer it does
+   * nothing.
+   */
+  sync(timelineSeconds: number, playing: boolean, rate = 1): this {
+    checkFinite(timelineSeconds, 'timelineSeconds');
+    checkFinite(rate, 'rate');
+    const buffer = this.buffer;
+    if (!buffer) return this;
+    const local = timelineSeconds - this.timelineStartValue,
+      length = Math.min(buffer.duration - this.offsetValue, this.durationValue ?? Infinity),
+      // A clip that ended on its own stays ended through the last frames of clock jitter before the timeline does.
+      left = this.loopValue ? Infinity : length - local;
+    if (!playing || rate <= 0 || local < 0 || left <= (this.playing ? 0 : Audio.syncTolerance)) {
+      this.pause();
+      this.progress = Math.max(0, this.loopValue ? local : Math.min(local, length));
+      return this;
+    }
+    if (rate !== this.rateValue) this.playbackRate = rate;
+    if (!this.playing) {
+      this.progress = local;
+      return this.play();
+    }
+    const target = this.playhead(buffer.duration, local),
+      current = this.currentTime;
+    let drift = Math.abs(target - current);
+    if (this.loopValue) {
+      // Positions either side of the loop seam are close, not a loop length apart.
+      let start = this.loopStartValue,
+        end = this.loopEndValue > 0 ? Math.min(this.loopEndValue, buffer.duration) : buffer.duration;
+      if (!(end > start)) {
+        start = 0;
+        end = buffer.duration;
+      }
+      if (target >= start && current >= start) drift = Math.min(drift, end - start - drift);
+    }
+    if (drift > Audio.syncTolerance) this.seek(target);
     return this;
   }
 
@@ -393,6 +435,13 @@ export class Audio implements ListenerSource {
   set duration(value: number | undefined) {
     this.durationValue = value === undefined ? undefined : checkFinite(value, 'duration', 0);
   }
+  /** Timeline second where {@link Audio.sync} starts this sound. */
+  get timelineStart(): number {
+    return this.timelineStartValue;
+  }
+  set timelineStart(value: number) {
+    this.timelineStartValue = checkFinite(value, 'timelineStart');
+  }
   /** Current playhead in seconds within the buffer (buffer sources) or media element time. */
   get currentTime(): number {
     if (this.media) return this.media.currentTime;
@@ -464,6 +513,40 @@ export class Audio implements ListenerSource {
     if (end > start && position >= end) position = start + ((position - start) % (end - start));
     else if (!(end > start) && bufferDuration > 0) position %= bufferDuration;
     return position;
+  }
+
+  /** Replaces the buffer source with one that starts at context time `when` from the current playhead. */
+  private startBuffer(when: number): void {
+    this.stopNode();
+    const context = this.context,
+      buffer = this.buffer!,
+      node = context.createBufferSource();
+    node.buffer = buffer;
+    node.loop = this.loopValue;
+    node.loopStart = this.loopStartValue;
+    node.loopEnd = this.loopEndValue;
+    node.playbackRate.setValueAtTime(this.rateValue, context.currentTime);
+    node.detune?.setValueAtTime(this.detuneValue, context.currentTime);
+    node.onended = () => {
+      disconnect(node);
+      if (this.source !== node) return;
+      this.source = null;
+      if (!this.playing) return;
+      this.playing = false;
+      this.progress = 0;
+      this.onEnded?.(this);
+    };
+    node.connect(this.head);
+    const position = this.playhead(buffer.duration);
+    this.progress = position - this.offsetValue;
+    this.startedAt = when;
+    const remaining =
+      this.durationValue === undefined || this.loopValue
+        ? undefined
+        : Math.max(0, this.durationValue - Math.max(0, position - this.offsetValue));
+    if (remaining === undefined) node.start(when, position);
+    else node.start(when, position, remaining);
+    this.source = node;
   }
 
   private stopNode(delay = 0): void {

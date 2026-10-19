@@ -229,8 +229,32 @@ window.runOfflineTests = async () => {
       near(out2[10], 0.2 + 10 / rate, 1e-4) && out2[Math.round(0.15 * rate)] === 0 && ended === 1,
       `Offset/duration ${out2[10]} ${out2[Math.round(0.15 * rate)]} ended=${ended}`,
     );
+    // Seeking while playing: one source reads on from the new position (two would sum), and seeking past the end of
+    // a non-looping buffer ends it. Suspend times sit on render-quantum boundaries.
+    const context3 = new OfflineAudioContext(1, seconds * rate, rate),
+      listener3 = new AudioListener({ context: context3, autoResume: false }),
+      first = (128 * 20) / rate,
+      second = (128 * 60) / rate;
+    let ended3 = 0;
+    const seeking = new Audio(listener3, { onEnded: () => ended3++ }).setBuffer(ramp).play();
+    void context3.suspend(first).then(() => {
+      seeking.seek(0.8);
+      return context3.resume();
+    });
+    void context3.suspend(second).then(() => {
+      seeking.seek(5);
+      return context3.resume();
+    });
+    const out3 = (await context3.startRendering()).getChannelData(0),
+      at = (time) => out3[Math.round(time * rate)];
+    for (let i = 0; i < 50 && !ended3; i++) await sleep(10);
+    assert(
+      near(at(0.03), 0.03, 1e-3) && near(at(0.1), 0.8 + 0.1 - first, 1e-3) && at(0.2) === 0 && ended3 === 1,
+      `Seek ${at(0.03)} ${at(0.1)} ${at(0.2)} ended=${ended3}`,
+    );
   }
   checks.push('Offset, duration and loop points select the right samples; onEnded fires at the natural end');
+  checks.push('Seeking while playing reads on from the new position on one source; past the end it ends');
 
   // Fade-in ramp from silence.
   {

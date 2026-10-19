@@ -678,3 +678,135 @@ test('positional mesh updates reuse direction storage across 120 frames and pres
     listener.dispose();
   }
 });
+
+test('seek moves the playhead on exactly one new source while playing, and only the position while paused or stopped', () => {
+  const context = new FakeAudioContext(),
+    listener = new AudioListener({ context });
+  let ended = 0;
+  const audio = new Audio(listener, { onEnded: () => ended++ }).setBuffer(buffer(10)).play();
+  const first = audio.source;
+  context.currentTime = 1;
+  audio.seek(6);
+  assert.equal(context.bufferSources.length, 2, 'one new source per seek');
+  assert.deepEqual(audio.source.started, { when: 1, offset: 6, duration: undefined });
+  assert.deepEqual(
+    [first.outputs.size, first.onended, first.stopped.when],
+    [0, null, 0],
+    'old source released at once',
+  );
+  assert.equal(audio.currentTime, 6);
+  context.currentTime = 2;
+  audio.playbackRate = 2;
+  context.currentTime = 3;
+  assert.equal(audio.currentTime, 9, '1 s at rate 1, then 1 s at rate 2');
+  audio.pause();
+  assert.equal(audio.currentTime, 9);
+  audio.play();
+  assert.equal(audio.source.started.offset, 9, 'pause and resume keep the position');
+  audio.pause();
+  const sources = context.bufferSources.length;
+  audio.seek(2);
+  assert.equal(context.bufferSources.length, sources, 'a paused seek creates no source');
+  assert.equal(audio.currentTime, 2);
+  audio.play();
+  assert.equal(audio.source.started.offset, 2);
+  audio.stop().seek(4);
+  assert.equal(audio.currentTime, 4);
+  audio.play().seek(25);
+  assert.equal(audio.source.started.offset, 10, 'past the end of a non-looping buffer clamps to the end');
+  audio.source.end();
+  assert.deepEqual([audio.isPlaying, ended], [false, 1], 'and ends there as if played through');
+  audio.loop = true;
+  audio.loopStart = 2;
+  audio.loopEnd = 4;
+  audio.seek(5);
+  assert.equal(audio.currentTime, 3, 'looping wraps into the loop region');
+  assert.throws(() => audio.seek(-1), RangeError);
+  assert.throws(() => audio.seek(NaN), RangeError);
+});
+
+test('sync follows an external timeline: silent before timelineStart, re-seeks only past the drift tolerance', () => {
+  const context = new FakeAudioContext({ state: 'running' }),
+    listener = new AudioListener({ context, smoothing: 0 });
+  const audio = new Audio(listener, { timelineStart: 2 }).setBuffer(buffer(10));
+  assert.equal(audio.timelineStart, 2);
+  audio.sync(1, true);
+  assert.deepEqual([audio.isPlaying, context.bufferSources.length], [false, 0], 'silent before the start');
+  context.currentTime = 10;
+  audio.sync(3, true);
+  assert.deepEqual(audio.source.started, { when: 10, offset: 1, duration: undefined }, '1 s into the clip');
+  // A second of steady playback with +-10 ms of jitter between the editor and audio clocks: no re-seek.
+  for (let frame = 1; frame <= 60; frame++) {
+    context.currentTime = 10 + frame / 60 + (frame % 2 ? 0.01 : -0.01);
+    audio.sync(3 + frame / 60, true);
+  }
+  assert.equal(context.bufferSources.length, 1);
+  context.currentTime = 11;
+  audio.sync(8, true); // a scrub while playing
+  assert.equal(context.bufferSources.length, 2);
+  assert.deepEqual(audio.source.started, { when: 11, offset: 6, duration: undefined });
+  audio.sync(8.04, true);
+  assert.equal(context.bufferSources.length, 2, `${Audio.syncTolerance * 1000} ms tolerance: 40 ms is kept`);
+  audio.sync(8.06, true);
+  assert.equal(context.bufferSources.length, 3, '60 ms re-seeks');
+  // Paused timeline: scrubbing moves the playhead silently; playing again starts there.
+  audio.sync(5, false);
+  assert.deepEqual([audio.isPlaying, audio.source, audio.currentTime], [false, null, 3]);
+  audio.sync(6, false);
+  assert.deepEqual([context.bufferSources.length, audio.currentTime], [3, 4]);
+  audio.sync(6, true, 2);
+  assert.deepEqual([audio.source.started.offset, audio.playbackRate], [4, 2], 'timeline speed sets playbackRate');
+  audio.sync(6, true, -1);
+  assert.deepEqual([audio.isPlaying, audio.source], [false, null], 'reverse playback is silent');
+  audio.sync(1, true);
+  assert.equal(audio.isPlaying, false, 'scrubbing back before the start is silent');
+  // Past the end of a non-looping clip: silent; a clip that ended on its own is not restarted within the tolerance.
+  audio.sync(12.5, true);
+  assert.equal(audio.isPlaying, false);
+  audio.sync(11.9, true);
+  audio.source.end();
+  audio.sync(11.97, true);
+  assert.deepEqual([audio.isPlaying, audio.source], [false, null]);
+  audio.timelineStart = 0;
+  assert.throws(() => (audio.timelineStart = Infinity), RangeError);
+  assert.throws(() => audio.sync(NaN, true), RangeError);
+  new Audio(listener).sync(1, true); // before setBuffer: nothing to do
+});
+
+test('sync wraps the timeline through the loop region without re-seeking across the loop seam', () => {
+  const context = new FakeAudioContext({ state: 'running' }),
+    listener = new AudioListener({ context });
+  const audio = new Audio(listener, { loop: true, loopStart: 2, loopEnd: 4 }).setBuffer(buffer(10));
+  audio.sync(5, true); // 0..4, then 2..4: 3 s into the buffer
+  assert.equal(audio.source.started.offset, 3);
+  context.currentTime = 1.02; // audio wrapped to 2.02 while the timeline (3.99) has not
+  audio.sync(5.99, true);
+  assert.equal(context.bufferSources.length, 1, 'positions either side of the seam are 30 ms apart, not 2 s');
+  audio.sync(0.03, true); // the intro, a loop length away from 2.02 but outside the region
+  assert.equal(context.bufferSources.length, 2);
+  assert.ok(close(audio.source.started.offset, 0.03));
+  audio.sync(105, true);
+  assert.ok(close(audio.currentTime, 3), `long timelines wrap: ${audio.currentTime}`);
+});
+
+test('many seeks and syncs leave only the live source connected; stop and dispose release it', () => {
+  const context = new FakeAudioContext({ state: 'running' }),
+    listener = new AudioListener({ context });
+  const audio = new Audio(listener, { loop: true }).setBuffer(buffer(10)).play();
+  for (let i = 0; i < 100; i++) audio.seek(i % 10);
+  for (let i = 0; i < 100; i++) audio.sync(i / 2, true);
+  assert.ok(context.bufferSources.length > 150);
+  const connected = context.bufferSources.filter((node) => node.outputs.size > 0);
+  assert.equal(connected.length, 1);
+  assert.equal(connected[0], audio.source);
+  assert.ok(context.bufferSources.slice(0, -1).every((node) => node.onended === null && node.stopped));
+  const live = audio.source;
+  audio.stop();
+  assert.deepEqual([audio.source, live.outputs.size], [null, 0]);
+  audio.sync(3, true);
+  const last = audio.source;
+  audio.dispose();
+  assert.deepEqual([audio.source, last.outputs.size, audio.gain.outputs.size], [null, 0, 0]);
+  audio.sync(4, true);
+  assert.equal(context.bufferSources.at(-1), last, 'a disposed sound stays silent');
+});
