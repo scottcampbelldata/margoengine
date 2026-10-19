@@ -72,6 +72,7 @@ const layers = {
   'World and effects': [
     'terrain',
     'voxel',
+    'voxel-pathtracer',
     'water',
     'scenery',
     'scatter',

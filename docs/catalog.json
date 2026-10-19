@@ -1131,6 +1131,22 @@
     "exampleSource": false
   },
   {
+    "id": "voxel-pathtracer",
+    "title": "Voxel path tracer",
+    "category": "World and effects",
+    "package": "@margoengine/voxel-pathtracer",
+    "version": "1.0.0",
+    "published": false,
+    "description": "Progressive WebGPU path tracer for instanced voxel models: diffuse, plastic, metal, glass, emissive, blended and volumetric materials, sun, sky, HDR environment and area lights, depth of field, motion blur, a denoiser and PNG capture.",
+    "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
+    "keywords": "voxel path tracer ray tracing render magicavoxel",
+    "install": "npm install @margoengine/core@1.0.0 @margoengine/voxel-pathtracer@1.0.0",
+    "imports": "import { VoxelPathTracer } from '@margoengine/voxel-pathtracer';",
+    "exports": [
+      "VoxelPathTracer"
+    ]
+  },
+  {
     "id": "water",
     "title": "Water",
     "package": "@margoengine/water",

@@ -3,14 +3,14 @@
 
 Margo Engine's own code is MIT licensed (`LICENSE`; every tarball ships a copy). This file lists everything else that
 reaches users: npm packages our published packages depend on, third-party code shipped inside our tarballs, and the
-assets the site and examples use. It covers all 78 published packages (76 in `packages/`
+assets the site and examples use. It covers all 79 published packages (77 in `packages/`
 plus `create-margo` and `margo-convert`). `node scripts/supply-chain.mjs --check` (in `npm run verify`, through
 `tests/supply-chain.test.js`) fails when this file is stale, a dependency has no stated reason, a licence is outside
 the allowed list, or a runtime dependency has an install script, a deprecation or a non-registry source.
 
 ## Runtime npm dependencies of published packages (direct and transitive)
 
-67 of 78 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
+68 of 79 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
 Versions are the ones in `package-lock.json`; users get whatever their own lockfile resolves inside our ranges.
 
 | Package | Version (lock) | Licence | Kind | Used by | Why |
@@ -148,6 +148,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/video` | none | none | LICENSE |
 | `@margoengine/viewcube` | none | none | LICENSE |
 | `@margoengine/voxel` | none | none | LICENSE |
+| `@margoengine/voxel-pathtracer` | none | none | LICENSE |
 | `@margoengine/water` | none | none | LICENSE |
 | `@margoengine/webgl` | none | none | LICENSE |
 | `@margoengine/wfc` | none | none | LICENSE |

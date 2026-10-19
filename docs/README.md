@@ -38,7 +38,7 @@ node --test tests/catalog.test.js
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-76 packages in 10 layers, the same as the [catalog](https://margoengine.com/catalog/).
+77 packages in 10 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (2)
 
@@ -107,12 +107,13 @@ node --test tests/catalog.test.js
 | [`@margoengine/taa`](../packages/taa/README.md) | Optional temporal anti-aliasing with motion vectors and YCoCg history clamping. |
 | [`@margoengine/transitions`](../packages/transitions/README.md) | WebGPU scene wipes, noise dissolves and chromatic displacement. |
 
-### World and effects (11)
+### World and effects (12)
 
 | Package | What it is |
 | --- | --- |
 | [`@margoengine/terrain`](../packages/terrain/README.md) | Geometry clipmaps and triplanar terrain layers. |
 | [`@margoengine/voxel`](../packages/voxel/README.md) | Voxel worlds: a block-type registry, 32-cubed palette chunks with light bytes, and a chunked world with dirty tracking and change events. |
+| [`@margoengine/voxel-pathtracer`](../packages/voxel-pathtracer/README.md) | Progressive WebGPU path tracer for instanced voxel models: diffuse, plastic, metal, glass, emissive, blended and volumetric materials, sun, sky, HDR environment and area lights, depth of field, motion blur, a denoiser and PNG capture. |
 | [`@margoengine/water`](../packages/water/README.md) | Gerstner water surfaces, terrain-coupled shallow-water flow, foam and spray. |
 | [`@margoengine/scenery`](../packages/scenery/README.md) | Procedural moonlit skies and scenery passes for Margo Engine. |
 | [`@margoengine/scatter`](../packages/scatter/README.md) | Seeded instancing, distance-based LOD and procedural wind. |
