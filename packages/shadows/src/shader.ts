@@ -49,7 +49,15 @@ const filters: Record<ShadowFilter, string> = {
 // uncorrelated with x). The last tenth of each cascade's depth range dithers into the next cascade (noise.y threshold):
 // no hard seam where texel size changes, still one map lookup per tap; the next cascade's sphere holds the band. The
 // last cascade (its split equals splits.w) and unused ones never switch. Comments stay out of the WGSL: they would ship.
-export function shadowSampling(group: number, filter: ShadowFilter = 'soft'): string {
+// `anisotropic` (a non-square map or an explicit frustum): light-space x and y map to UVs at different scales, so the
+// receiver-plane slope and the PCSS radii take each axis's own row length and texel; otherwise the text is unchanged.
+export function shadowSampling(group: number, filter: ShadowFilter = 'soft', anisotropic = false): string {
+  const body = anisotropic
+    ? filters[filter]
+        .replaceAll('length(rowX)*0.5', 'vec2f(length(rowX),length(rowY))*0.5')
+        .replace('max(texel.x,', 'max(texel,')
+        .replace('clamp(penumbra,texel.x,0.1)', 'clamp(penumbra,texel,vec2f(0.1))')
+    : filters[filter];
   return /* wgsl */ `
 struct ShadowFrame {matrices:array<mat4x4f,4>,view:mat4x4f,splits:vec4f,ranges:vec4f,settings:vec4f}
 @group(${group}) @binding(1) var<uniform> shadowFrame:ShadowFrame;
@@ -73,8 +81,8 @@ fn shadowVisibility(position:vec3f,normal:vec3f)->f32 {
   let dimensions=vec2f(textureDimensions(shadowMap));let texel=1.0/dimensions;
   let matrix=shadowFrame.matrices[layer];let rowX=vec3f(matrix[0].x,matrix[1].x,matrix[2].x);let rowY=vec3f(matrix[0].y,matrix[1].y,matrix[2].y);let rowZ=vec3f(matrix[0].z,matrix[1].z,matrix[2].z);
   let lightNormal=vec3f(dot(normal,normalize(rowX)),dot(normal,normalize(rowY)),dot(normal,normalize(rowZ)));var slope=vec2f(0);
-  if(abs(lightNormal.z)>0.001){slope=clamp(vec2f(-lightNormal.x,lightNormal.y)*2*length(rowZ)/(length(rowX)*lightNormal.z),vec2f(-2),vec2f(2));}
-  reference-=dot(abs(slope),texel)*0.5;${filters[filter]}
+  if(abs(lightNormal.z)>0.001){slope=clamp(${anisotropic ? 'vec2f(-lightNormal.x/length(rowX),lightNormal.y/length(rowY))*2*length(rowZ)/lightNormal.z' : 'vec2f(-lightNormal.x,lightNormal.y)*2*length(rowZ)/(length(rowX)*lightNormal.z)'},vec2f(-2),vec2f(2));}
+  reference-=dot(abs(slope),texel)*0.5;${body}
 }
 fn shadowLit(direct:vec3f,position:vec3f,normal:vec3f)->vec3f {if(all(direct==vec3f(0))){return direct;}return direct*shadowVisibility(position,normal);}
 `;

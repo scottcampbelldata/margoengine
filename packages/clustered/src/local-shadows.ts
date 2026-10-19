@@ -4,7 +4,7 @@ import { finiteVector } from '@margoengine/math/validate';
 import { instanceLayout, instancedDepth } from '../../shared/instances.js';
 import { displacedDepth } from '../../shared/displacement.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
-import { hemisphere, localShadowMatrix } from './local-shadow-math.js';
+import { hemisphere, localShadowMatrix, viewportMatrix } from './local-shadow-math.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUTextureUsage: {
   RENDER_ATTACHMENT: number;
@@ -14,13 +14,30 @@ declare const GPUTextureUsage: {
 };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 export interface LocalShadowOptions {
+  /**
+   * Size of every shadow layer in texels (default 512), and the largest map a light's `shadow.resolution` may ask for.
+   * Each of the `maxLights` slots reserves six `depth32float` layers at this size, whatever its lights ask for:
+   * `maxLights × 6 × resolution² × 4` bytes (four slots at 512: 24 MiB; one slot at 2048: 96 MiB).
+   */
   resolution?: number;
   maxLights?: number;
 }
 export interface LocalLightShadow {
   near?: number;
+  /**
+   * Shadow-camera far distance (default the light's `range`; required for an unlimited range, 0). Casters and
+   * receivers past it are unshadowed.
+   */
+  far?: number;
   bias?: number;
   normalBias?: number;
+  /**
+   * This light's map size in texels: one integer (square) or `[width, height]`, each from 16 up to
+   * `LocalShadowOptions.resolution` (the default). A point light (or a pi/2 spot) renders all six cube faces at this
+   * size, a spot its cone. A smaller map renders into the top-left corner of its layers, so it costs that light's
+   * detail, not memory; it keeps two texels per side as a guard band for the 3x3 filter.
+   */
+  resolution?: number | readonly [number, number];
 }
 export interface LocalShadowPrimitive {
   primitive?: object;
@@ -111,7 +128,11 @@ export class LocalShadowMaps {
   private readonly values: Float32Array;
   private indices: number[] = [];
   private activeLayers: number[] = [];
+  /** Depth-pass matrices per layer; `values` holds the sampling ones (the same unless the light's map is smaller). */
+  private readonly cameras: Float32Array;
   private matrices: Float32Array[] = [];
+  /** Per layer: viewport width and height of a smaller light's map, 0 for the whole layer. */
+  private viewports = new Uint32Array(0);
   private dirty = true;
   private disposed = false;
   private epoch = 0;
@@ -139,13 +160,16 @@ export class LocalShadowMaps {
     )
       throw new RangeError('Invalid local shadow options');
     this.values = new Float32Array(this.maxLights * 6 * 20);
-    this.matrices = Array.from({ length: this.maxLights * 6 }, (_, i) => this.values.subarray(i * 20, i * 20 + 16));
+    this.cameras = new Float32Array(this.maxLights * 6 * 16);
+    this.matrices = Array.from({ length: this.maxLights * 6 }, (_, i) => this.cameras.subarray(i * 16, i * 16 + 16));
   }
   /** Validate and stage the entire replacement before changing any live light state. */
   configure(lights: readonly ShadowLight[]): void {
     if (this.disposed || !Array.isArray(lights) || lights.length > 1024)
       throw new RangeError('Expected at most 1,024 lights');
     const values = new Float32Array(this.values.length),
+      cameras = new Float32Array(this.cameras.length),
+      viewports = new Uint32Array(this.maxLights * 12),
       indices: number[] = [],
       layers: number[] = [];
     let slot = 0;
@@ -164,12 +188,12 @@ export class LocalShadowMaps {
       const settings = option === true ? {} : option;
       if (
         typeof light.range !== 'number' ||
-        [settings.near, settings.bias, settings.normalBias].some(
+        [settings.near, settings.far, settings.bias, settings.normalBias].some(
           (value) => value !== undefined && typeof value !== 'number',
         )
       )
         throw new TypeError('Local shadow settings must be numbers');
-      const far = Math.fround(light.range);
+      const far = Math.fround(settings.far ?? light.range);
       const near = Math.fround(settings.near ?? Math.min(0.1, far / 100)),
         bias = Math.fround(settings.bias ?? 0.0005),
         normalBias = Math.fround(settings.normalBias ?? 0.02);
@@ -185,6 +209,20 @@ export class LocalShadowMaps {
         normalBias < 0
       )
         throw new RangeError('Invalid local light shadow settings');
+      const size = settings.resolution ?? this.resolution,
+        pair = Array.isArray(size) && size.length === 2,
+        width = typeof size === 'number' ? size : pair ? size[0] : NaN,
+        height = typeof size === 'number' ? size : pair ? size[1] : NaN;
+      if (
+        !Number.isInteger(width) ||
+        !Number.isInteger(height) ||
+        Math.min(width, height) < 16 ||
+        Math.max(width, height) > this.resolution
+      )
+        throw new RangeError(
+          `Invalid local light shadow resolution: give an integer or [width, height] from 16 to ${this.resolution} (LocalShadowOptions.resolution)`,
+        );
+      const scaled = width !== this.resolution || height !== this.resolution;
       const spot = light.direction !== undefined;
       if (spot) {
         finiteVector(light.direction, 3, 'Shadow spot direction');
@@ -209,8 +247,8 @@ export class LocalShadowMaps {
               : upY
             : ups[face];
         localShadowMatrix(
-          values,
-          offset,
+          cameras,
+          layer * 16,
           light.position,
           direction,
           up,
@@ -218,6 +256,11 @@ export class LocalShadowMaps {
           far,
           cone ? light.outerAngle! * 2 : Math.PI / 2,
         );
+        if (scaled) {
+          viewportMatrix(cameras, layer * 16, values, offset, width, height, this.resolution);
+          viewports[layer * 2] = width;
+          viewports[layer * 2 + 1] = height;
+        } else values.set(cameras.subarray(layer * 16, layer * 16 + 16), offset);
         values[offset + 16] = bias;
         values[offset + 17] = normalBias;
         // settings.z: a hemisphere spot picks its cube face like a point light.
@@ -227,6 +270,8 @@ export class LocalShadowMaps {
       indices.push(++slot);
     }
     this.values.set(values);
+    this.cameras.set(cameras);
+    this.viewports = viewports;
     this.indices = indices;
     this.activeLayers = layers;
     this.dirty = true;
@@ -349,7 +394,10 @@ export class LocalShadowMaps {
     try {
       for (const layer of this.activeLayers) {
         this.depthAttachment.view = this.views[layer];
-        const pass = context.encoder.beginRenderPass(this.depthPass);
+        const pass = context.encoder.beginRenderPass(this.depthPass),
+          width = this.viewports[layer * 2];
+        // The clear covers the whole layer; outside a smaller map it reads as unoccluded.
+        if (width) pass.setViewport(0, 0, width, this.viewports[layer * 2 + 1], 0, 1);
         this.stats.passes++;
         const submitted = new Map<Mesh, Set<object>>();
         try {

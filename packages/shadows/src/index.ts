@@ -18,6 +18,7 @@ import { shadowPrimitivesInto, coreReceives, unshadowedCore } from '../../shared
 import { viewMatrix } from '../../shared/view.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { sectionState, sectionShader } from '../../shared/section.js';
+import { finiteVector } from '@margoengine/math/validate';
 import { cascadeSplits, fitCascades } from './cascades.js';
 import { shadowSampling, shadowDepth, type ShadowFilter } from './shader.js';
 export { cascadeSplits, fitCascades } from './cascades.js';
@@ -31,7 +32,14 @@ declare const GPUTextureUsage: {
 };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 export interface ShadowOptions {
-  resolution?: number;
+  /**
+   * Map size in texels (default 2048): one integer of 16 or more for a square map, or `[width, height]`, each a power of
+   * two from 16, up to the device's `maxTextureDimension2D`. Memory is two `depth32float` arrays of width × height ×
+   * one layer per cascade (2048 square with four cascades: 128 MiB). Cascades and `bounds` cover a square light-space
+   * region, so a non-square map gives its axes different texel sizes; a `frustum` spreads the map over its own
+   * extents. Live: a new size reallocates the maps next frame (only then).
+   */
+  resolution?: number | readonly [number, number];
   distance?: number;
   lambda?: number;
   lightSize?: number;
@@ -41,6 +49,15 @@ export interface ShadowOptions {
   /** Fixed world-space caster and receiver bounds, rendered in one camera-independent map. */
   bounds?: { min: Vec3; max: Vec3; points?: readonly Vec3[] };
   /**
+   * An explicit orthographic shadow camera in place of the cascades (`distance`) and `bounds`, as Crocotile's light
+   * shadow camera: one camera-independent map. It sits at `position` and looks along the engine's light direction with
+   * world +Y up (+Z when the light is within about 8 degrees of vertical); `left`/`right` and `bottom`/`top` are its
+   * view extents around `position`, `near`/`far` distances in front of it along the light. Casters and receivers
+   * outside that box get no shadow. Give `bounds` or `frustum`, not both; edits take effect next frame. Requires finite
+   * `left < right`, `bottom < top` and `near < far` (near may be negative).
+   */
+  frustum?: { position: Vec3; left: number; right: number; top: number; bottom: number; near: number; far: number };
+  /**
    * Edge filter (default `'soft'`). `'soft'` is PCSS: penumbrae widen with blocker distance and `lightSize`, 16
    * blocker reads and 32 comparison taps per lit pixel. `'pcf'` takes four hardware comparison taps (an edge about
    * three texels wide, `lightSize` unused): the light and phone quality tiers use it. `'hard'` takes one. Read when
@@ -49,7 +66,7 @@ export interface ShadowOptions {
   filter?: ShadowFilter;
   /**
    * Cascades, 1 to 4 (default 4). Fewer cascades render fewer depth passes per frame and cover `distance` with coarser
-   * texels; the phone quality tier uses 2. Ignored with `bounds` (always one map). Fixed at construction.
+   * texels; the phone quality tier uses 2. Ignored with `bounds` or `frustum` (always one map). Fixed at construction.
    */
   cascades?: number;
 }
@@ -111,6 +128,7 @@ interface Draw {
   displaced?: GPUBindGroup;
 }
 const emptyPrimitives: readonly ShadowPrimitive[] = [];
+const powerOfTwo = (v: number) => Number.isInteger(v) && v >= 16 && Number.isInteger(Math.log2(v));
 export class Shadows implements EnginePlugin {
   readonly name = 'shadows';
   readonly matrices = new Float32Array(64);
@@ -137,6 +155,11 @@ export class Shadows implements EnginePlugin {
     submitted: Map<Mesh, Set<object>>;
   }[] = [];
   private readonly cascadeCount: number;
+  /** Validated map size, and the size the maps were allocated at. */
+  private width = 2048;
+  private height = 2048;
+  private mapWidth = 0;
+  private mapHeight = 0;
   private readonly fitCamera = {
     position: [0, 0, 0],
     target: [0, 0, 0],
@@ -181,7 +204,7 @@ export class Shadows implements EnginePlugin {
   private readonly copySize = { width: 0, height: 0, depthOrArrayLayers: 4 };
   constructor(readonly options: ShadowOptions = {}) {
     this.options = preset('shadows', options);
-    this.cascadeCount = this.options.bounds ? 1 : (this.options.cascades ?? 4);
+    this.cascadeCount = this.options.bounds || this.options.frustum ? 1 : (this.options.cascades ?? 4);
     this.copySize.depthOrArrayLayers = this.cascadeCount;
     this.validate();
   }
@@ -230,19 +253,43 @@ export class Shadows implements EnginePlugin {
     }
     if (!validPoints)
       throw new RangeError('Invalid shadow bounds points: at least four finite Vec3 points inside min/max required');
+    const frustum = o.frustum;
+    if (frustum !== undefined) {
+      if (o.bounds !== undefined) throw new TypeError('Shadow bounds and frustum are alternatives: give one of them');
+      if (!frustum || typeof frustum !== 'object')
+        throw new TypeError('Invalid shadow frustum: give {position, left, right, top, bottom, near, far}');
+      finiteVector(frustum.position, 3, 'Shadow frustum position');
+      const { left, right, top, bottom, near, far } = frustum,
+        finite = Number.isFinite;
+      if (
+        !(finite(left) && finite(right) && finite(top) && finite(bottom) && finite(near) && finite(far)) ||
+        left >= right ||
+        bottom >= top ||
+        near >= far
+      )
+        throw new RangeError('Invalid shadow frustum: finite left < right, bottom < top and near < far required');
+    }
     const cascades = o.cascades ?? 4;
     if (!Number.isInteger(cascades) || cascades < 1 || cascades > 4)
       throw new RangeError('Invalid shadow cascades: use an integer from 1 to 4');
-    if ((o.bounds ? 1 : cascades) !== this.cascadeCount)
+    if ((o.bounds || frustum ? 1 : cascades) !== this.cascadeCount)
       throw new RangeError(
-        'Shadow bounds mode and cascade count cannot change after construction; create a new Shadows instead',
+        'Shadow bounds mode, frustum mode and cascade count cannot change after construction; create a new Shadows instead',
       );
     const filter = o.filter ?? 'soft';
     if (filter !== 'soft' && filter !== 'pcf' && filter !== 'hard')
       throw new RangeError(`Invalid shadow filter '${String(filter)}': use 'soft', 'pcf' or 'hard'`);
+    const resolution = o.resolution ?? 2048,
+      square = typeof resolution === 'number';
+    if (!square && (!Array.isArray(resolution) || resolution.length !== 2 || !resolution.every(powerOfTwo)))
+      throw new RangeError(
+        'Invalid shadow resolution: give one integer of 16 or more, or [width, height] powers of two from 16',
+      );
+    const width = square ? resolution : resolution[0],
+      height = square ? resolution : resolution[1];
     if (
-      !Number.isInteger(o.resolution ?? 2048) ||
-      (o.resolution ?? 2048) < 16 ||
+      !Number.isInteger(width) ||
+      width < 16 ||
       !Number.isFinite(o.distance ?? 500) ||
       (o.distance ?? 500) <= 0 ||
       !Number.isFinite(o.lambda ?? 0.5) ||
@@ -261,6 +308,12 @@ export class Shadows implements EnginePlugin {
               : (o.casterMargin ?? 100);
       if (!Number.isFinite(Math.fround(v)) || v < 0) throw new RangeError('Invalid shadow options');
     }
+    this.width = width;
+    this.height = height;
+  }
+  /** Light-space x and y scale differently: receivers take the per-axis filter (shader.ts `shadowSampling`). */
+  private anisotropic(): boolean {
+    return !!this.options.frustum || this.width !== this.height;
   }
   /**
    * Adds `source` (a core mesh, gltf-pro model, materials mesh or custom source) as a shadow caster and, for sources
@@ -345,7 +398,8 @@ export class Shadows implements EnginePlugin {
   shader(source: string, group = 0): string {
     const filter = this.options.filter ?? 'soft',
       receive = unshadowedCore(this.engine, source),
-      key = filter + group + receive;
+      anisotropic = this.anisotropic(),
+      key = filter + group + receive + (anisotropic ? 'a' : '');
     let cache = this.shaders.get(key);
     const cached = cache?.get(source);
     if (cached) return cached;
@@ -357,7 +411,7 @@ export class Shadows implements EnginePlugin {
     );
     if (code === source) code = source.replace('direct+ambient(s)', 'shadowLit(direct,i.position,s.n)+ambient(s)');
     if (code === source) throw new Error('Shadows require the standard PBR lighting shader');
-    const output = shadowSampling(group, filter) + code;
+    const output = shadowSampling(group, filter, anisotropic) + code;
     if (!cache) {
       cache = new Map();
       this.shaders.set(key, cache);
@@ -367,12 +421,16 @@ export class Shadows implements EnginePlugin {
   }
   pbr(group: number): { declarations: string; direct(direct: string): string } {
     const filter = this.options.filter ?? 'soft',
-      key = filter + group;
+      anisotropic = this.anisotropic(),
+      key = filter + group + (anisotropic ? 'a' : '');
     let hooks = this.hooks.get(key);
     if (!hooks)
       this.hooks.set(
         key,
-        (hooks = { declarations: shadowSampling(group, filter), direct: (d) => `shadowLit(${d},i.position,s.n)` }),
+        (hooks = {
+          declarations: shadowSampling(group, filter, anisotropic),
+          direct: (d) => `shadowLit(${d},i.position,s.n)`,
+        }),
       );
     return hooks;
   }
@@ -381,29 +439,10 @@ export class Shadows implements EnginePlugin {
     this.engine = engine;
     this.device = engine.gpu;
     this.validate();
-    const size = this.options.resolution ?? 2048;
-    if (size > this.device.limits.maxTextureDimension2D || this.device.limits.maxTextureArrayLayers < this.cascadeCount)
-      throw new RangeError('Shadow map exceeds device limit');
+    this.checkLimits();
     for (const r of this.sources)
       if ('id' in r.source && r.source.engine !== engine) throw new Error('Shadow mesh belongs to another engine');
-    const texture = () =>
-      this.device!.createTexture({
-        size: [size, size, this.cascadeCount],
-        format: 'depth32float',
-        usage:
-          GPUTextureUsage.RENDER_ATTACHMENT |
-          GPUTextureUsage.TEXTURE_BINDING |
-          GPUTextureUsage.COPY_SRC |
-          GPUTextureUsage.COPY_DST,
-      });
-    this.cached = texture();
-    this.combined = texture();
-    this.views = Array.from({ length: this.cascadeCount }, (_, baseArrayLayer) =>
-      this.combined!.createView({ dimension: '2d', baseArrayLayer, arrayLayerCount: 1 }),
-    );
-    this.cachedViews = Array.from({ length: this.cascadeCount }, (_, baseArrayLayer) =>
-      this.cached!.createView({ dimension: '2d', baseArrayLayer, arrayLayerCount: 1 }),
-    );
+    this.textures();
     this.uniform = this.device.createBuffer({ size: 368, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.sampler = this.device.createSampler({ compare: 'less-equal', magFilter: 'linear', minFilter: 'linear' });
     this.alphaSampler = this.device.createSampler();
@@ -419,10 +458,48 @@ export class Shadows implements EnginePlugin {
       [1, 1],
     );
     this.whiteView = this.white.createView();
+    this.bind();
+  }
+  private checkLimits(): void {
+    const limits = this.device!.limits;
+    if (
+      this.width > limits.maxTextureDimension2D ||
+      this.height > limits.maxTextureDimension2D ||
+      limits.maxTextureArrayLayers < this.cascadeCount
+    )
+      throw new RangeError('Shadow map exceeds device limit; lower resolution');
+  }
+  /** (Re)creates the cached and combined depth arrays at the validated size. */
+  private textures(): void {
+    this.cached?.destroy();
+    this.combined?.destroy();
+    const texture = () =>
+      this.device!.createTexture({
+        size: [this.width, this.height, this.cascadeCount],
+        format: 'depth32float',
+        usage:
+          GPUTextureUsage.RENDER_ATTACHMENT |
+          GPUTextureUsage.TEXTURE_BINDING |
+          GPUTextureUsage.COPY_SRC |
+          GPUTextureUsage.COPY_DST,
+      });
+    this.cached = texture();
+    this.combined = texture();
+    this.views = Array.from({ length: this.cascadeCount }, (_, baseArrayLayer) =>
+      this.combined!.createView({ dimension: '2d', baseArrayLayer, arrayLayerCount: 1 }),
+    );
+    this.cachedViews = Array.from({ length: this.cascadeCount }, (_, baseArrayLayer) =>
+      this.cached!.createView({ dimension: '2d', baseArrayLayer, arrayLayerCount: 1 }),
+    );
+    this.mapWidth = this.width;
+    this.mapHeight = this.height;
+  }
+  /** Receiver bindings: a fresh array view whenever the maps are reallocated, so receivers rebuild their groups. */
+  private bind(): void {
     this.entries = [
-      { binding: 1, resource: { buffer: this.uniform } },
-      { binding: 2, resource: this.combined.createView({ dimension: '2d-array' }) },
-      { binding: 3, resource: this.sampler },
+      { binding: 1, resource: { buffer: this.uniform! } },
+      { binding: 2, resource: this.combined!.createView({ dimension: '2d-array' }) },
+      { binding: 3, resource: this.sampler! },
     ];
     this.dirty = true;
   }
@@ -511,6 +588,11 @@ export class Shadows implements EnginePlugin {
   }
   private render(c: Context): void {
     this.validate();
+    if (this.width !== this.mapWidth || this.height !== this.mapHeight) {
+      this.checkLimits();
+      this.textures();
+      this.bind();
+    }
     const clipped = !!sectionState(c);
     // Plane coefficients and enabled are live uniforms. Redraw while a
     // section is attached, and once after removal, rather than caching an
@@ -518,7 +600,7 @@ export class Shadows implements EnginePlugin {
     if (clipped || this.clipped) this.dirty = true;
     this.clipped = clipped;
     for (let i = 0; i < 3; i++) this.light[i] = this.engine!.lighting.direction[i];
-    if (this.options.bounds) {
+    if (this.options.bounds || this.options.frustum) {
       this.fitBounds();
       // All visible receivers select layer zero, including when the camera orbits outside the fixed box.
       this.splits.fill(c.camera.far);
@@ -530,7 +612,8 @@ export class Shadows implements EnginePlugin {
         camera,
         c.width / c.height,
         this.light as unknown as [number, number, number],
-        this.options.resolution ?? 2048,
+        // The coarser axis's texel: whole texels on both power-of-two axes, so snapping stays stable.
+        Math.min(this.width, this.height),
         this.splits,
         this.matrices,
         this.ranges,
@@ -599,12 +682,14 @@ export class Shadows implements EnginePlugin {
     } else this.stats.cacheHits++;
     this.copySource.texture = this.cached!;
     this.copyDestination.texture = this.combined!;
-    this.copySize.width = this.copySize.height = this.options.resolution ?? 2048;
+    this.copySize.width = this.width;
+    this.copySize.height = this.height;
     c.encoder.copyTextureToTexture(this.copySource, this.copyDestination, this.copySize);
     if (moving) for (let cascade = 0; cascade < this.cascadeCount; cascade++) this.depth(c, cascade, false);
   }
   private fitBounds(): void {
-    const { min, max, points } = this.options.bounds!,
+    const { bounds, frustum } = this.options,
+      points = bounds?.points,
       length = Math.hypot(this.light[0], this.light[1], this.light[2]);
     if (!length) throw new RangeError('Zero shadow direction');
     const zx = -this.light[0] / length,
@@ -622,7 +707,16 @@ export class Shadows implements EnginePlugin {
       yy = zz * xx - zx * xz,
       yz = zx * xy - zy * xx;
     let centerX: number, centerY: number, centerZ: number, halfX: number, halfY: number, halfZ: number;
-    if (points) {
+    if (frustum) {
+      // This basis is a camera looking along the light (z, its travel) with x minus that camera's right and y its up.
+      const e = frustum.position;
+      centerX = e[0] * xx + e[1] * xy + e[2] * xz - (frustum.left + frustum.right) * 0.5;
+      centerY = e[0] * yx + e[1] * yy + e[2] * yz + (frustum.bottom + frustum.top) * 0.5;
+      centerZ = e[0] * zx + e[1] * zy + e[2] * zz + (frustum.near + frustum.far) * 0.5;
+      halfX = (frustum.right - frustum.left) * 0.5;
+      halfY = (frustum.top - frustum.bottom) * 0.5;
+      halfZ = (frustum.far - frustum.near) * 0.5;
+    } else if (points) {
       let minX = Infinity,
         minY = Infinity,
         minZ = Infinity,
@@ -648,7 +742,8 @@ export class Shadows implements EnginePlugin {
       halfY = (maxY - minY) * 0.5;
       halfZ = (maxZ - minZ) * 0.5;
     } else {
-      const cx = (min[0] + max[0]) * 0.5,
+      const { min, max } = bounds!,
+        cx = (min[0] + max[0]) * 0.5,
         cy = (min[1] + max[1]) * 0.5,
         cz = (min[2] + max[2]) * 0.5,
         hx = (max[0] - min[0]) * 0.5,
@@ -661,17 +756,18 @@ export class Shadows implements EnginePlugin {
       halfY = Math.abs(yx) * hx + Math.abs(yy) * hy + Math.abs(yz) * hz;
       halfZ = Math.abs(zx) * hx + Math.abs(zy) * hy + Math.abs(zz) * hz;
     }
-    const resolution = this.options.resolution ?? 2048,
+    const resolution = Math.min(this.width, this.height),
       // Projecting the AABB half extents is equivalent to fitting all eight world-space corners.
-      // Keep square world texels: the established receiver-plane PCSS filter uses one XY texel scale.
+      // Bounds keep a square light-space region (square world texels on a square map), snapped by the coarser axis's
+      // texel; a frustum is the user's box exactly, so it neither pads nor snaps nor adds the caster margin.
       radius = Math.max(halfX, halfY) * (1 + 2 / resolution),
-      rx = radius,
-      ry = radius,
-      depth = 2 * (halfZ + (this.options.casterMargin ?? 100)),
+      rx = frustum ? halfX : radius,
+      ry = frustum ? halfY : radius,
+      depth = frustum ? 2 * halfZ : 2 * (halfZ + (this.options.casterMargin ?? 100)),
       tx = (2 * rx) / resolution,
       ty = (2 * ry) / resolution,
-      px = Math.round(centerX / tx) * tx,
-      py = Math.round(centerY / ty) * ty,
+      px = frustum ? centerX : Math.round(centerX / tx) * tx,
+      py = frustum ? centerY : Math.round(centerY / ty) * ty,
       pz = centerZ,
       m = this.matrices;
     if (!(radius > 0) || !(depth > 0)) throw new RangeError('Shadow bounds points have no light-space extent');

@@ -770,3 +770,157 @@ test("a pi/2 (hemisphere) spot shadow renders a point light's six cube faces; fa
     assertDisposed(h);
   }
 });
+
+test('per-light shadow resolution and far validate; a light at the layer size uploads what shadow:true does', () => {
+  const h = harness(),
+    effect = new Clustered({ grid: [1, 1, 1], shadows: { resolution: 64, maxLights: 1 } }),
+    viewports = [],
+    begin = h.context.encoder.beginRenderPass;
+  h.context.encoder.beginRenderPass = (descriptor) => ({
+    ...begin(descriptor),
+    setViewport: (...args) => viewports.push(args),
+  });
+  const packed = () =>
+    new Uint8Array(effect.bindings().find((entry) => entry.binding === 28).resource.buffer.data).slice();
+  try {
+    effect.setLights([point()]);
+    h.engine.use(effect);
+    h.frame();
+    const plain = packed();
+    for (const shadow of [
+      { resolution: 15 },
+      { resolution: 65 },
+      { resolution: 16.5 },
+      { resolution: [64] },
+      { resolution: [16, 65] },
+      { resolution: [16, NaN] },
+      { resolution: '32' },
+      { near: 1, far: 1 },
+      { far: NaN },
+      { far: -1 },
+    ])
+      assert.throws(() => effect.setLights([point(shadow)]), RangeError, JSON.stringify(shadow));
+    assert.throws(() => effect.setLights([point({ far: '8' })]), TypeError);
+    assert.throws(() => effect.setLights([{ ...point(), range: 0 }]), /finite range/);
+    assert.throws(() => effect.setLights([{ ...point(), range: 0, castShadow: true }]), /finite range/);
+    for (const shadow of [{ resolution: 64 }, { resolution: [64, 64] }]) {
+      effect.setLights([point(shadow)]);
+      h.frame();
+      assert.deepEqual(packed(), plain, `${JSON.stringify(shadow)}: the full layer is today's light`);
+    }
+    assert.equal(viewports.length, 0, 'full-size maps set no viewport');
+    // Unlimited range: an explicit far bounds the shadow camera (default near min(0.1, far / 100)).
+    effect.setLights([{ ...point({ far: 8 }), range: 0 }]);
+    h.frame();
+    const faces = new Float32Array(effect.bindings().find((entry) => entry.binding === 28).resource.buffer.data),
+      [x, y, z] = point().position,
+      depth = (distance) => {
+        const p = [x + distance, y, z],
+          clip = [2, 3].map(
+            (row) => faces[row] * p[0] + faces[4 + row] * p[1] + faces[8 + row] * p[2] + faces[12 + row],
+          );
+        return clip[0] / clip[1];
+      };
+    assert.ok(
+      Math.abs(depth(8) - 1) < 1e-5 && Math.abs(depth(0.08)) < 1e-5,
+      `far 8: ${depth(8)}, near: ${depth(0.08)}`,
+    );
+  } finally {
+    effect.dispose();
+    assertDisposed(h);
+  }
+});
+
+test('a smaller per-light map renders into its layer corner with a guard band and samples with matching UV scale', () => {
+  const h = harness(),
+    size = 512,
+    effect = new Clustered({ grid: [1, 1, 1], shadows: { resolution: size, maxLights: 3 } }),
+    position = [2, 3, 4],
+    near = 0.25,
+    passes = [],
+    begin = h.context.encoder.beginRenderPass;
+  h.context.encoder.beginRenderPass = (descriptor) => {
+    const pass = begin(descriptor),
+      record = { viewport: null, uniform: null };
+    passes.push(record);
+    return {
+      ...pass,
+      setViewport: (...args) => (record.viewport = args),
+      setBindGroup: (index, group) => {
+        if (index === 0) record.uniform = group.entries[0].resource.buffer;
+      },
+    };
+  };
+  effect.setLights([
+    { position, range: 10, shadow: { near, resolution: [128, 64] } },
+    { position, range: 10, direction: [0, 0, -1], outerAngle: Math.PI / 6, shadow: { near } },
+    { position, range: 10, direction: [0, 0, -1], outerAngle: Math.PI / 6, shadow: { near, far: 3, resolution: 32 } },
+  ]);
+  h.engine.use(effect);
+  effect.addShadowCaster({ shadowPrimitives: [caster(h)] });
+  const clip = (m, offset, p) =>
+    [0, 1, 2, 3].map(
+      (row) => m[offset + row] * p[0] + m[offset + 4 + row] * p[1] + m[offset + 8 + row] * p[2] + m[offset + 12 + row],
+    );
+  const close = (actual, expected, label) =>
+    assert.ok(Math.abs(actual - expected) < 1e-3, `${label}: ${actual} != ${expected}`);
+  try {
+    h.frame();
+    assert.equal(passes.length, 8);
+    const sampled = new Float32Array(effect.bindings().find((entry) => entry.binding === 28).resource.buffer.data);
+    // Layer texel a receiver samples (sampling matrix, whole layer) and the texel its caster drew (render matrix + viewport).
+    const texels = (layer, p, pass = layer) => {
+      const s = clip(sampled, layer * 20, p),
+        r = clip(new Float32Array(passes[pass].uniform.data), 0, p),
+        [width, height] = passes[pass].viewport?.slice(2, 4) ?? [size, size];
+      return {
+        sampled: [(s[0] / s[3]) * 0.5 + 0.5, 0.5 - (s[1] / s[3]) * 0.5].map((uv) => uv * size),
+        drawn: [((r[0] / r[3]) * 0.5 + 0.5) * width, (0.5 - (r[1] / r[3]) * 0.5) * height],
+        depth: [s[2] / s[3], r[2] / r[3]],
+        width,
+        height,
+      };
+    };
+    const axes = [
+      [1, 0, 0],
+      [-1, 0, 0],
+      [0, 1, 0],
+      [0, -1, 0],
+      [0, 0, 1],
+      [0, 0, -1],
+    ];
+    for (let face = 0; face < 6; face++) {
+      assert.deepEqual(passes[face].viewport, [0, 0, 128, 64, 0, 1], `face ${face} renders its corner`);
+      for (const perpendicular of axes.filter((axis) => axis.every((v, i) => v * axes[face][i] === 0)))
+        for (const lateral of [0.3, 1]) {
+          const p = position.map((v, i) => v + axes[face][i] * 2 + perpendicular[i] * 2 * lateral),
+            t = texels(face, p);
+          close(t.sampled[0], t.drawn[0], `face ${face} u`);
+          close(t.sampled[1], t.drawn[1], `face ${face} v`);
+          close(t.depth[0], t.depth[1], `face ${face} depth`);
+          const inset = Math.min(t.drawn[0], 128 - t.drawn[0], t.drawn[1], 64 - t.drawn[1]);
+          // The cube face's 90-degree edge lands two texels inside the corner: the 3x3 filter never leaves it.
+          if (lateral === 1) close(inset, 2, `face ${face} guard band`);
+          else assert.ok(inset > 2, `face ${face} interior`);
+        }
+    }
+    assert.equal(passes[6].viewport, null, 'the full-size spot renders its whole layer');
+    for (let k = 0; k < 16; k++)
+      assert.equal(
+        sampled[6 * 20 + k],
+        new Float32Array(passes[6].uniform.data)[k],
+        'and samples with its render matrix',
+      );
+    // The third light (slot 2: layer 12) has far 3: depth 1 three units down its cone, its 32-texel map in the corner.
+    assert.deepEqual(passes[7].viewport, [0, 0, 32, 32, 0, 1]);
+    close(texels(12, [2, 3, 4 - 3], 7).depth[0], 1, 'far plane');
+    close(texels(12, [2, 3, 4 - near], 7).depth[0], 0, 'near plane');
+    assert.ok(
+      texels(12, [2, 3, 4 - 3], 7).sampled.every((v) => Math.abs(v - 16) < 1e-3),
+      'cone axis at the corner centre',
+    );
+  } finally {
+    effect.dispose();
+    assertDisposed(h);
+  }
+});

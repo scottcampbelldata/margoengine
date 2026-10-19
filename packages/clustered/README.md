@@ -76,10 +76,30 @@ layers and buffer limits before allocation. `setLights()` validates the full
 replacement before changing the list; too many shadowed lights reject explicitly.
 
 Per-light `shadow` defaults to false. `shadow:true` uses near distance
-`min(0.1, range/100)`, depth bias 0.0005 and world-space normal bias 0.02.
-An object overrides those values; near must be positive and below the light's
-range, and both biases must be finite and nonnegative. Animate positions,
-directions, ranges or shadow settings with `setLights()` before rendering.
+`min(0.1, far/100)`, far distance `range`, depth bias 0.0005, world-space normal bias 0.02 and a map of
+`shadows.resolution` texels. An object overrides those values; near must be positive and below far, and both biases
+must be finite and nonnegative. Animate positions, directions, ranges or shadow settings with `setLights()` before
+rendering.
+
+Per light, as Crocotile's Shadow Map Width/Height and shadow camera Near/Far:
+
+```ts
+const lights = Clustered.attach(engine, {shadows: {resolution: 1024, maxLights: 2}});
+lights.setLights([
+  {position: [0, 4, 0], range: 12, intensity: 30, shadow: {resolution: 256, near: 0.2, far: 8}},
+  {position: [3, 5, 1], range: 0, decay: 1, direction: [0, -1, 0], angle: 0.6, shadow: {resolution: [1024, 512], far: 20}},
+]);
+```
+
+`far` (default the light's `range`) ends the shadow camera: casters and receivers past it are unshadowed, and a light
+with unlimited range (`range: 0`) can have a shadow map only with an explicit `far`. `resolution` is one integer or
+`[width, height]`, each from 16 up to `shadows.resolution`, which stays the size of every layer and so the most a light
+can ask for: memory is `maxLights × 6 × resolution² × 4` bytes whatever the lights ask (one slot at 2048: 96 MiB). A
+smaller map renders into the top-left corner of its layers (a point light all six cube faces, a spot its cone) and is
+sampled there with matching UVs, so a 256 light has 256 texels of detail next to a 1024 one; it keeps two texels per
+side as a guard band, so the 3×3 filter never reads past it. A light at the full size uploads and renders exactly what
+it did before these options existed, and the shaders never change. These per-light options belong to
+`ClusteredOptions.shadows`; `LocalShadows` (`castShadow` lights) keeps one `resolution` for all its lights.
 
 `addShadowCaster()` accepts core meshes, individual loaded glTF/FBX nodes and sources exposing `shadowPrimitives`
 (a primitive with `displacement`, a materials mesh with a `displacementMap`, is drawn displaced here and in

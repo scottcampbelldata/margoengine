@@ -19,7 +19,7 @@ export interface PointLight {
   position: Vec3;
   /**
    * Distance where the light ends, windowed smoothly: `clamp(1 - (d / range)^4, 0, 1)^2`. 0 is unlimited (window 1;
-   * the light reaches every cluster), not allowed for a light with a shadow map.
+   * the light reaches every cluster), not allowed for a light with a shadow map unless its `shadow` sets `far`.
    */
   range: number;
   color?: Vec3;
@@ -167,8 +167,12 @@ export class Clustered implements EnginePlugin {
         throw new RangeError('Invalid light range/color/intensity');
       if (light.decay !== undefined && !(Number.isFinite(Math.fround(light.decay)) && light.decay >= 0))
         throw new RangeError('Light decay must be a finite number of 0 or more; 2 is inverse-square');
-      if (light.range === 0 && (light.castShadow || (light.shadow !== undefined && light.shadow !== false)))
-        throw new RangeError('A light with a shadow map needs a finite range (0 is unlimited); give it a range');
+      const shadow = light.shadow,
+        far = shadow && typeof shadow === 'object' ? shadow.far : undefined;
+      if (light.range === 0 && (light.castShadow || (shadow !== undefined && shadow !== false && far === undefined)))
+        throw new RangeError(
+          'A light with a shadow map needs a finite range (0 is unlimited); give it a range, or an integrated shadow a far',
+        );
       if ('direction' in light) {
         finiteVector(light.direction, 3, 'Spot direction');
         const { angle, penumbra = 0 } = light;

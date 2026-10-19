@@ -53,3 +53,35 @@ export function localShadowMatrix(
   for (let i = offset; i < offset + 16; i++)
     if (!Number.isFinite(out[i])) throw new RangeError('Local shadow matrix overflow');
 }
+/**
+ * A light whose map (`width` x `height`) is smaller than its `size` x `size` layers renders into each layer's top-left
+ * corner (a viewport). Narrows the render matrix `camera` (at `c`) so its frustum lands inside that corner less two
+ * texels per side, which keeps the receiver's 3x3 filter taps inside it, and writes into `sample` (at `s`) the same
+ * matrix with the corner's UVs mapped into the whole layer's: uv * (width, height) / size.
+ */
+export function viewportMatrix(
+  camera: Float32Array,
+  c: number,
+  sample: Float32Array,
+  s: number,
+  width: number,
+  height: number,
+  size: number,
+): void {
+  const gx = (width - 4) / width,
+    gy = (height - 4) / height,
+    sx = width / size,
+    sy = height / size;
+  for (let k = 0; k < 16; k += 4) {
+    const x = Math.fround(camera[c + k] * gx),
+      y = Math.fround(camera[c + k + 1] * gy),
+      w = camera[c + k + 3];
+    camera[c + k] = x;
+    camera[c + k + 1] = y;
+    // uv = ndc * (0.5, -0.5) + 0.5, so scaling uv by (sx, sy) is ndc.x * sx + sx - 1 and ndc.y * sy + 1 - sy.
+    sample[s + k] = sx * x + (sx - 1) * w;
+    sample[s + k + 1] = sy * y + (1 - sy) * w;
+    sample[s + k + 2] = camera[c + k + 2];
+    sample[s + k + 3] = w;
+  }
+}

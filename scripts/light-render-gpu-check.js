@@ -5,6 +5,10 @@
 // - pi/2 spots: a downward spot of angle pi/2 (penumbra 0) lights everything below its plane exactly as a point light of
 //   the same range and decay (so cluster culling drops no lit cluster) and a wall above it not at all; with
 //   LocalShadows or integrated shadows its six-face cube shadow is the point light's, pixel for pixel.
+// - shadow map size and shadow camera: the occluder's shadow edge (its 10-90% ramp along the floor, in world units) is
+//   wide at 64 texels and sharp at 1024, per axis for [width, height] maps, for a directional `frustum` and for
+//   integrated point lights' per-light `shadow.resolution`; a directional frustum shadows only inside its box and before
+//   its far; a local light's `shadow.far` drops casters past it; full-size options render pixel-identical frames.
 // Run after npm run build:packages: node scripts/light-render-gpu-check.js (takes the GPU lock).
 import assert from 'node:assert/strict';
 import { openBrowser } from './browser.js';
@@ -281,6 +285,175 @@ try {
   assert.deepEqual(errors, []);
   console.log(
     `pi/2 spot: pixel-identical to a point light in front of its plane (unshadowed, LocalShadows cube, integrated cube), dark behind it`,
+  );
+
+  const sizes = await browser.page.evaluate(async () => {
+    const { instance, engine, scene, frame, diff, project, strip } = window.lightCheck,
+      { Shadows } = await import('/packages/shadows/dist/index.js'),
+      { Clustered } = await import('/packages/clustered/dist/index.js');
+    // Brightest channel of single pixels along a floor line, and the world length of its 10%-90% ramp.
+    const ramp = (bytes, [from, to]) => {
+      const values = [];
+      for (let i = 0; i <= 200; i++) {
+        const [x, y] = project(from.map((v, k) => v + ((to[k] - v) * i) / 200)),
+          o = (y * 256 + x) * 4;
+        values.push(Math.max(bytes[o], bytes[o + 1], bytes[o + 2]));
+      }
+      const lo = Math.min(...values),
+        hi = Math.max(...values),
+        inside = values.filter((v) => v > lo + 0.1 * (hi - lo) && v < lo + 0.9 * (hi - lo)).length;
+      return { lo, hi, width: +((inside / 200) * Math.hypot(...to.map((v, k) => v - from[k]))).toFixed(3) };
+    };
+    const out = {};
+    scene.wall.visible = false;
+    // Directional: the sun tilted 11 degrees toward +Z, so its shadow camera's right is world +X; no ambient.
+    scene.occluder.setPosition([0, 2.5, 0]).setScale([4.4, 0.2, 2]);
+    engine.lighting.direction.set([0, 1, 0.2, 3]);
+    engine.lighting.radiance.set([1, 1, 1, 0]);
+    const where = { open: [1.6, 0, 2], under: [-1.6, 0, -0.5], underRight: [1.6, 0, -0.5] },
+      edges = {
+        x: [
+          [1.7, 0, -0.5],
+          [2.7, 0, -0.5],
+        ],
+        z: [
+          [1, 0, 0],
+          [1, 0, 1],
+        ],
+      },
+      measure = async (lines = edges, points = where) => {
+        const f = await frame(points);
+        return {
+          ...strip(f),
+          ...Object.fromEntries(Object.entries(lines).map(([k, line]) => [k, ramp(f.bytes, line)])),
+        };
+      };
+    out.plain = strip(await frame(where));
+    const box = { position: [0, 5, 0], left: -3.5, right: 3.5, bottom: -3.5, top: 3.5, near: 0.5, far: 10 },
+      sun = new Shadows({ frustum: { ...box }, resolution: 64, filter: 'pcf' });
+    instance.use(sun);
+    for (const mesh of [scene.occluder, scene.left, scene.right]) sun.add(mesh);
+    for (const resolution of [64, 1024, [1024, 64], [64, 1024]]) {
+      sun.options.resolution = resolution;
+      out[`sun ${resolution}`] = await measure();
+    }
+    // The other two filters' per-axis forms compile and shadow.
+    for (const filter of ['soft', 'hard']) {
+      sun.options.filter = filter;
+      out[`sun ${filter}`] = await measure();
+    }
+    // Twice as tall as wide, the floor tilted along the camera's y: a receiver-plane slope taken from the x row would be
+    // half the true one, short by more than the bias at 64 texels, and the lit floor would self-shadow.
+    sun.options.resolution = 64;
+    sun.options.frustum = { ...box, bottom: -7, top: 7 };
+    for (const filter of ['pcf', 'soft']) {
+      sun.options.filter = filter;
+      out[`sun 2:1 ${filter}`] = strip(await frame(where));
+    }
+    sun.options.filter = 'pcf';
+    sun.options.resolution = 1024;
+    sun.options.frustum = { ...box, right: 0 };
+    out.half = strip(await frame(where));
+    sun.options.frustum = { ...box, far: 4 };
+    out.short = strip(await frame(where));
+    instance.removePlugin(sun.name);
+    const cascaded = new Shadows({ resolution: 1024 });
+    instance.use(cascaded);
+    for (const mesh of [scene.occluder, scene.left, scene.right]) cascaded.add(mesh);
+    const number = await frame({});
+    cascaded.options.resolution = [1024, 1024];
+    out.tupleVsNumber = diff(number.bytes, (await frame({})).bytes);
+    instance.removePlugin(cascaded.name);
+    // Local: integrated maps at 1024 texels per layer, a point light over a 1 x 1 occluder; the sun off.
+    engine.lighting.direction.set([0, 1, 0, 0]);
+    scene.occluder.setScale([1, 0.2, 1]);
+    const point = { position: [0, 5, 0], range: 12, intensity: 40 },
+      spot = { ...point, direction: [0, -1, 0], angle: 0.8 },
+      near = { under: [0.5, 0, 0.3] },
+      local = {
+        x: [
+          [0.6, 0, 0.3],
+          [1.6, 0, 0.3],
+        ],
+        z: [
+          [0.5, 0, 0.5],
+          [0.5, 0, 1.6],
+        ],
+      },
+      lights = Clustered.attach(instance, { grid: [8, 8, 16], shadows: { resolution: 1024 } });
+    lights.addShadowCaster(scene.occluder);
+    lights.setLights([point]);
+    out.localPlain = strip(await frame(near));
+    lights.setLights([{ ...point, shadow: true }]);
+    const full = await frame(near);
+    lights.setLights([{ ...point, shadow: { resolution: [1024, 1024] } }]);
+    out.localFullVsSame = diff(full.bytes, (await frame(near)).bytes);
+    for (const resolution of [64, 1024, [1024, 64]]) {
+      lights.setLights([{ ...point, shadow: { resolution } }]);
+      out[`local ${resolution}`] = await measure(local, near);
+    }
+    for (const [name, light] of [
+      ['clipped', { ...point, shadow: { far: 2 } }],
+      ['unlimited', { ...point, range: 0, shadow: { far: 8 } }],
+      ['spotPlain', spot],
+      ['spot', { ...spot, shadow: true }],
+      ['spotSmall', { ...spot, shadow: { resolution: 128 } }],
+      ['spotClipped', { ...spot, shadow: { far: 2, resolution: 128 } }],
+    ]) {
+      lights.setLights([light]);
+      out[name] = strip(await frame(near));
+    }
+    lights.dispose();
+    return out;
+  });
+  console.log(JSON.stringify(sizes));
+  const lit = (actual, expected, name) =>
+    assert.ok(
+      actual.every((v, i) => Math.abs(v - expected[i]) <= 0.03 * expected[i] + 1),
+      `${name}: ${actual} vs unshadowed ${expected}`,
+    );
+  // Intel Xe2, 2026-10-19: 64 texels 0.15-0.37 world units (sun texels 0.11, point-face texels about 0.16), 1024 texels
+  // 0-0.04 (about one screen pixel).
+  const wide = (ramp, name) => assert.ok(ramp.width >= 0.12, `${name}: a 64-texel edge is wide (${ramp.width})`),
+    sharp = (ramp, name) => assert.ok(ramp.width <= 0.06, `${name}: a 1024-texel edge is sharp (${ramp.width})`);
+  for (const [name, axes] of [
+    ['sun 64', 'ww'],
+    ['sun 1024', 'ss'],
+    ['sun 1024,64', 'sw'],
+    ['sun 64,1024', 'ws'],
+    ['local 64', 'ww'],
+    ['local 1024', 'ss'],
+    ['local 1024,64', 'sw'],
+  ]) {
+    const f = sizes[name];
+    [...axes].forEach((axis, i) => (axis === 'w' ? wide : sharp)(f[i ? 'z' : 'x'], `${name} ${i ? 'z' : 'x'}`));
+    if (name.startsWith('sun')) {
+      dark(f.under, sizes.plain.under);
+      lit(f.open, sizes.plain.open, `${name}: the open floor`);
+    } else dark(f.under, sizes.localPlain.under);
+  }
+  for (const name of ['sun soft', 'sun hard', 'sun 2:1 pcf', 'sun 2:1 soft']) {
+    dark(sizes[name].under, sizes.plain.under);
+    lit(sizes[name].open, sizes.plain.open, `${name}: the open floor`);
+  }
+  // Exact up to rounding: the per-axis slope gives 190 of 190 here; the x row's slope (half the true one) gave 183.
+  for (const name of ['sun 2:1 pcf', 'sun 2:1 soft'])
+    assert.ok(
+      sizes[name].open.every((v, i) => Math.abs(v - sizes.plain.open[i]) <= 1),
+      `${name}: no self-shadowing on the open floor (${sizes[name].open} vs ${sizes.plain.open})`,
+    );
+  dark(sizes.half.under, sizes.plain.under);
+  lit(sizes.half.underRight, sizes.plain.underRight, 'outside the frustum (right of its box)');
+  lit(sizes.short.under, sizes.plain.under, 'past the frustum far');
+  assert.equal(sizes.tupleVsNumber.pixels, 0, 'resolution [1024, 1024] renders what 1024 does');
+  assert.equal(sizes.localFullVsSame.pixels, 0, 'shadow.resolution at the layer size renders what shadow: true does');
+  lit(sizes.clipped.under, sizes.localPlain.under, 'a caster past shadow.far');
+  dark(sizes.unlimited.under, sizes.localPlain.under);
+  for (const name of ['spot', 'spotSmall']) dark(sizes[name].under, sizes.spotPlain.under);
+  lit(sizes.spotClipped.under, sizes.spotPlain.under, 'a spot caster past shadow.far');
+  assert.deepEqual(errors, []);
+  console.log(
+    `shadow map size and camera: edges widen at 64 texels and sharpen at 1024 per map axis (directional frustum, integrated point), frustum box and far clip, local far clip, full-size options pixel-identical`,
   );
 } finally {
   await browser?.close();

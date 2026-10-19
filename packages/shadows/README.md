@@ -21,6 +21,27 @@ engine.start();
 
 `filter` picks the edge: `'soft'` (default) is the PCSS above; `'pcf'` takes four hardware comparison taps half a texel apart (each is the sampler's own 2x2 bilinear comparison, together a smooth edge about three texels wide) with no blocker search and no spiral, for phones and light tiers; `'hard'` takes one tap. `cascades` (1-4, default 4) renders fewer layers: fewer depth passes per frame, coarser texels over the same `distance`; `bounds` always uses one map. `@margoengine/quality` sets `filter:'pcf'` on its light and phone tiers and `cascades:2` on phones when the app leaves them unset.
 
+Map size and an explicit shadow camera, as Crocotile's per-light Shadow Map Width/Height and shadow camera
+Near/Far/Left/Right/Top/Bottom:
+
+```ts
+const sun = Shadows.attach(engine, {
+  resolution: [2048, 1024], // width, height: powers of two; one number keeps a square map
+  frustum: { position: [0, 20, 10], left: -15, right: 15, bottom: -8, top: 8, near: 0.5, far: 60 },
+});
+sun.options.frustum!.right = 20; // live: next frame
+sun.options.resolution = 1024;   // live: the maps are reallocated next frame (only when the size changes)
+```
+
+`frustum` is an orthographic camera at `position` looking along the engine's light direction (world +Y up, +Z when the
+light is within about 8 degrees of vertical): `left`/`right` and `bottom`/`top` are its view extents around `position`,
+`near`/`far` distances in front of it. It replaces the cascades and `bounds` with one camera-independent map spread
+exactly over that box; casters and receivers outside it get no shadow. Give `bounds` or `frustum`, not both; switching
+between them live is fine, switching to cascades needs a new `Shadows`. With a non-square map or a `frustum`, light-space
+x and y map to texels at different scales, so receivers take a per-axis variant of the filter (receiver-plane slope and
+PCSS radii per axis); a square map without a frustum keeps the shaders above byte for byte. Cascades and `bounds` keep
+covering a square region, so a non-square map there just gives the two axes different texel sizes.
+
 `lambda:0` gives uniform splits; `lambda:1` gives logarithmic splits. `lightSize` is the tangent of the sun's angular radius; `bias` is normalized depth and `normalBias` is world distance. `casterMargin` extends the depth bounds to include casters outside the camera slice. Shadows follow the engine's directional light.
 
 Core meshes receive shadows automatically. `shadows.add(pbrModel)` or `shadows.add(loadedMesh)` adds the owning model's lighting hook and reads current stride-80 buffers after animation compute. Registering both draws each primitive once; a dynamic registration takes precedence over a cached registration. Removing one registration preserves the remaining lighting hook. Alpha-masked PBR casters honor their base map, vertex alpha, UV set, texture transform and cutoff; blended casters are omitted. A caster primitive with `displacement` (materials meshes with a `displacementMap`) is drawn displaced along its normals, as its beauty pass is, and redraws every frame so live scale and bias edits show. No duplicate core geometry is created. `shadows.add(clipmapTerrain)` uses its GPU height sampling for depth and its lighting hook for reception. Custom sources can implement `drawShadow(ShadowContext)`.
@@ -37,4 +58,4 @@ While a core mesh opts out, core's shader patch keeps that mesh's direct light w
 
 Static geometry renders into a cached depth array. Each frame copies that array and adds dynamic casters, so dynamic geometry cannot overwrite the cache. Cache invalidation occurs when snapped cascade matrices, clipmap origins, source membership, disposal or device change. Call `invalidate()` after moving/hiding a static mesh, editing its geometry/material, or changing a height texture. Moving the camera far enough to move a cascade rerenders static geometry. No fixed draw-call reduction is promised. `stats` reports static/dynamic primitive draws and cache hits; custom sources record their own draws.
 
-At resolution 2048, the two four-layer maps occupy 128 MiB. Choose smaller maps for constrained devices. All resources are released by `dispose()`/`destroy()` and recreated after device restoration. `cascadeSplits()` and `fitCascades()` are exported for custom cameras. The package has no core/stage imports from other feature packages and does not enter their base bundle.
+At resolution 2048, the two four-layer maps occupy 128 MiB (width × height × layers × 4 bytes each). Choose smaller maps for constrained devices. All resources are released by `dispose()`/`destroy()` and recreated after device restoration. `cascadeSplits()` and `fitCascades()` are exported for custom cameras. The package has no core/stage imports from other feature packages and does not enter their base bundle.
