@@ -85,7 +85,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/video | `.` 2 |  |  | 1,902 |
 | @margoengine/viewcube | `.` 5 |  |  | 3,227 |
 | @margoengine/voxel | `.` 14, `./query` 7, `./codec` 8, `./stream` 5, `./generate` 5, `./mesher` 11, `./light` 3, `./vox` 9, `./physics` 2, `./render` 8 | 78 |  | 4,808 |
-| @margoengine/voxel-pathtracer | `.` 16 |  |  |  |
+| @margoengine/voxel-pathtracer | `.` 16 |  |  | 29,256 |
 | @margoengine/water | `.` 6 |  |  | 15,392 |
 | @margoengine/webgl | `.` 3 |  |  | 2,593 |
 | @margoengine/wfc | `.` 3, `./overlapping` 5 |  |  | 1,622 |
