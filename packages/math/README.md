@@ -18,6 +18,28 @@ Core interop: `toArray()` with no target returns a tuple that `setPosition`, `se
 
 Shared types and errors (type-only, 0 runtime bytes for the types): every Margo package takes its tuple and colour types from here (`Vec2`, `Vec3`, `Vec4`, `Quat`, `MutableVec2`, `MutableVec3`, `Mat4`, `ColorInput`, `HeightField`, the `*Like` shapes), and throws `MargoError` (`code`: `disposed`, `attached`, `state`, `unsupported`, `failed`) for everything that is not an argument `TypeError`/`RangeError`; see [docs/conventions.md](../../docs/conventions.md). `@margoengine/math/mesh` has `meshWorldMatrix(engine, mesh)`, the live world matrix of a visible core mesh (or null), which lines, points and text re-export; it is the one entry that imports `@margoengine/core/extension` at runtime.
 
+Billboards (`@margoengine/math/billboard`, Crocotile-style object billboards; the mesh's front faces its local +Z):
+`billboardRotation(cameraWorld, position, {mode, lockY, snap, parent})` returns the `[x, y, z, w]` rotation that turns
+the mesh toward the camera. `mode: 'direction'` (default) matches the camera's orientation (parallel to the view
+plane), `'position'` points +Z at the camera position; `lockY` keeps up at +Y (yaw only); `snap` rounds the yaw to that
+many degrees; `parent` (its world matrix) makes the result the local rotation. `billboardDirection(facing, toCamera,
+available?)` picks the 8-direction animation suffix (`'N'` ... `'NW'`) sprite-sheet style: a camera in front of the
+object shows `'S'`, behind it `'N'`, at the object's left (its local +X) `'W'`; `available` limits it to the suffixes
+an animation has. Per frame, for unparented meshes:
+
+```ts
+import {Matrix4, Vector3} from '@margoengine/math';
+import {billboardDirection, billboardRotation} from '@margoengine/math/billboard';
+const c = engine.camera,
+  eye = new Vector3(...c.position),
+  cameraWorld = new Matrix4().lookAt(eye, new Vector3(...c.target), new Vector3(...c.up)).setPosition(eye).elements;
+for (const mesh of billboards) {
+  const p = [mesh.position.x, mesh.position.y, mesh.position.z];
+  mesh.setQuaternion(billboardRotation(cameraWorld, p, {lockY: true, snap: 45}));
+  play(`walk_${billboardDirection(heading, [eye.x - p[0], eye.y - p[1], eye.z - p[2]])}`);
+}
+```
+
 Limits: matrices are Float64Array (copy into a Float32Array for GPU upload). No input validation, so NaN propagates. `Color.setStyle` reads `#rgb`, `#rrggbb`, `rgb()` and `hsl()` but not named colors. Not included: Line3, Triangle, Cylindrical, Matrix2, `Vector3.project`/`unproject` (no camera object), `Euler.reorder`, ColorManagement and Display-P3, `generateUUID`. `Sphere.setFromPoints` is a bounding-box-centered sphere, not the minimal one.
 
 MIT. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.

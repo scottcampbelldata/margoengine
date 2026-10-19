@@ -93,6 +93,10 @@
     "./mesh": {
       "types": "./dist/mesh.d.ts",
       "import": "./dist/mesh.js"
+    },
+    "./billboard": {
+      "types": "./dist/billboard.d.ts",
+      "import": "./dist/billboard.js"
     }
   },
   "files": [
