@@ -290,8 +290,8 @@ const voxels = new VoxelPhysics(physics, world, { radius: 1, budget: 2 });
 physics.addBody(mesh, { colliders: { shape: 'box' } }); // lands on the blocks
 physics.addBody(ball, { colliders: { shape: 'sphere' } }); // rolls on them (triangle meshes, see below)
 world.setBlock(x, y, z, 0); // the collider changes in place; the body falls
-voxels.budget = 4; // milliseconds of mesh building per physics step, live
-voxels.pending; // chunks whose meshes are still being built
+voxels.budget = 4; // milliseconds of collider building per physics step, live
+voxels.pending; // chunks whose colliders are still being built
 voxels.colliders; // Map of chunk key -> the Rapier colliders bodies touch
 voxels.dispose();
 ```
@@ -316,12 +316,13 @@ voxels.dispose();
   surface is 1-2 pieces, a 50% random cave chunk 60), so no single Rapier build is long and an edit in or beside a
   piece rebuilds only that piece. Rapier can drop up to one step of travel where a ball passes from one collider to
   the next, a chunk border or a piece seam (separate Rapier boxes do the same); there is no bump.
-- **Building meshes over steps.** `budget` (milliseconds per physics step, default 2, live) spreads the mesh building;
-  voxel colliders are built in the step that needs them. Mesh work a body can reach before the next step (its
-  collider's size, plus two steps of its velocity, plus 1 m) is built in that step whatever it costs: the pieces
-  around a ball, an edited piece under a body. The rest (meshes for a ball still a chunk away) is built nearest first
-  while the step's estimated cost fits the budget, at least one unit (one scan of a chunk or one mesh piece) per step.
-  `budget: Infinity` builds everything in the step that needs it. What a ball touches meanwhile:
+- **Building over steps.** `budget` (milliseconds per physics step, default 2, live) spreads the building. What a
+  body can reach before the next step (its collider's size, plus two steps of its velocity, plus 1 m) is built in that
+  step whatever it costs: the surroundings of a body that spawns or is teleported, a chunk loaded under a body, the
+  mesh pieces around a ball, an edited piece under a body. Everything else (chunks entering the radius, about a chunk
+  from the body that needs them; meshes for a ball still a chunk away; stale borders) is built nearest first while the
+  step's estimated cost fits the budget, at least one unit (one chunk's voxel collider, one scan of a chunk, or one
+  mesh piece) per step. `budget: Infinity` builds everything in the step that needs it. What a ball touches meanwhile:
   - A chunk entering a ball's radius keeps its voxel collider (for the other bodies) while its mesh pieces are built,
     disabled, over the next steps, and switches to the mesh when the last piece is done. The ball is a chunk away.
   - A ball that reaches a chunk before its mesh is done (spawned or teleported into it, very fast, a chunk loaded
@@ -343,6 +344,13 @@ a 50% random cave chunk 1.7-2.5 ms and 38-41 ms (60 pieces), the worst case for 
   1.9-2.2 ms with the default.
 - A ball spawned inside a cave chunk, at the corner of four pieces: 5.2-6.5 ms in its first step (5 of 39 pieces),
   then 20-21 steps of at most 2.0 ms.
+- A body crossing chunk borders over cave chunks at 12 m/s: worst steps 11-13 ms all at once, 3.1-3.3 ms with the
+  default (one cave chunk's voxel collider, 1.7-2.5 ms, is the largest unit). The chunk under it always had its
+  collider.
+- On terrain (8 x 8 chunk columns): a body crossing a chunk border builds 6 voxel colliders, 1.9-2.4 ms all at once,
+  at most 2.0 ms a step with the default; a ball builds 9 colliders and meshes, 5.9-6.9 ms all at once, over 4-5 steps
+  of at most 2.1 ms. A body spawning there builds 18 colliders (6.1-7.4 ms at once, or 4-6 steps of at most 2.0 ms), a
+  ball 30 (18-21 ms, or 14-17 steps of at most 2.0 ms).
 - A dig or place on voxel chunks costs 1.2-1.5 us against 0.2-0.3 us without colliders; an edit in a mesh chunk
   rebuilds one piece at the next step, 1.1-1.7 ms.
 

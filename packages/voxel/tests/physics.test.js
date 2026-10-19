@@ -477,7 +477,7 @@ rtest('an edit on a chunk border keeps the seam smooth (propagateVoxelChange)', 
 });
 
 rtest('colliders follow the radius rule: near moving bodies, loaded chunks only, kept one chunk further', () => {
-  const { physics, world, voxels } = setup({}, [0, 0, 0]);
+  const { physics, world, voxels } = setup({ budget: Infinity }, [0, 0, 0]);
   for (let cx = -3; cx <= 3; cx++) fill(world, cx * 32, cx * 32 + 32, 0, 1, 0, 32, stone);
   const body = physics.addBody(null, {
     position: [16, 16, 16],
@@ -512,7 +512,7 @@ rtest('colliders follow the radius rule: near moving bodies, loaded chunks only,
   assert.equal(voxels.colliders.size, 0, 'fixed bodies do not count; no moving body, no colliders');
   assert.equal(physics.world.colliders.len(), 1);
   physics.dispose();
-  const wide = setup({ radius: 2 }, [0, 0, 0]);
+  const wide = setup({ radius: 2, budget: Infinity }, [0, 0, 0]);
   for (let cx = -3; cx <= 3; cx++) fill(wide.world, cx * 32, cx * 32 + 32, 0, 1, 0, 32, stone);
   wide.physics.addBody(null, { position: [16, 16, 16], colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] } });
   wide.physics.step();
@@ -742,6 +742,47 @@ rtest('a ball spawned inside a cave chunk gets the mesh around it at once; no bo
   assert.ok(lowest > 2.35, `and never sank into it (lowest ${lowest})`);
   assert.ok(drift < 0.01, `the box on the platform kept its floor through the switch (moved ${drift})`);
   physics.dispose();
+});
+
+rtest('chunks entering a moving body radius are built within the budget, never under it (measured)', (t) => {
+  // Cave chunks at chunk y -1 under a one-cell floor (top y 1) over chunks x -3..3, z -1..1.
+  const cross = (budget) => {
+    const { physics, world, voxels, spent } = timed({ budget }, [0, 0, 0]);
+    for (let cx = -3; cx <= 3; cx++)
+      for (let cz = -1; cz <= 1; cz++) {
+        world.addChunk(cx, -1, cz, caves(cx * 7 + cz + 20));
+        const floor = world.addChunk(cx, 0, cz);
+        for (let x = 0; x < 32; x++) for (let z = 0; z < 32; z++) floor.set(x, 0, z, stone);
+      }
+    const body = physics.addBody(null, {
+      type: 'kinematicPosition',
+      position: [-80, 1.5, 16],
+      colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] },
+    });
+    physics.step();
+    spent.length = 0;
+    let holes = 0;
+    // 12 m/s along x across chunk borders -64, -32, 0, 32 and 64.
+    for (let x = -80; x < 80; x += 0.2) {
+      body.setNextPosition([x, 1.5, 16]);
+      physics.step();
+      const cx = Math.floor(x / 32),
+        have = voxels.colliders;
+      if (!have.has(chunkKey(cx, 0, 0)) || !have.has(chunkKey(cx, -1, 0))) holes++;
+    }
+    physics.dispose();
+    return { spent, holes };
+  };
+  cross(Infinity); // warm up
+  const whole = cross(Infinity),
+    spread = cross(2);
+  const top = (list) => [...list].sort((a, b) => b - a).slice(0, 5);
+  t.diagnostic(
+    `crossing chunk borders over cave chunks: budget Infinity, worst steps ${top(whole.spent).map((v) => v.toFixed(1))} ms; ` +
+      `budget 2: ${top(spread.spent).map((v) => v.toFixed(1))} ms`,
+  );
+  assert.equal(spread.holes, 0, 'the chunk under the body always had its collider');
+  assert.ok(max(spread.spent) < max(whole.spent) / 2, 'the border crossing cost is spread');
 });
 
 rtest('dispose removes every collider and stops following edits and steps', () => {

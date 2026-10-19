@@ -15,7 +15,7 @@ export interface VoxelPhysicsOptions {
    */
   radius?: number;
   /**
-   * Milliseconds of triangle-mesh building per physics step, default 2 (see {@link VoxelPhysics.budget}). `Infinity`
+   * Milliseconds of collider building per physics step, default 2 (see {@link VoxelPhysics.budget}). `Infinity`
    * builds everything in the step that needs it. A number >= 0.
    */
   budget?: number;
@@ -148,10 +148,10 @@ const checkBudget = (budget: unknown): number => {
  * still updated and coupled so the voxel chunks beside it stay seamless; that lasts until no ball body is within
  * `radius + 1`. An edit rebuilds only the pieces holding the changed cell and its neighbours.
  *
- * Mesh building is spread over steps by {@link VoxelPhysics.budget}: what a body can reach before the next step is
- * built at once, the rest nearest first within the budget. A chunk keeps its voxel collider until its mesh is
- * complete, a ball arriving early switches it at once (with the pieces around every body built in that step), and an
- * edited piece keeps its previous mesh until the rebuild replaces it.
+ * Building is spread over steps by {@link VoxelPhysics.budget}: what a body can reach before the next step is built
+ * at once, the rest nearest first within the budget. A chunk keeps its voxel collider until its mesh is complete, a
+ * ball arriving early switches it at once (with the pieces around every body built in that step), and an edited
+ * piece keeps its previous mesh until the rebuild replaces it.
  *
  * The colliders are not physics bodies: `Physics` collision events and queries skip them (use `raycastVoxels` from
  * `@margoengine/voxel/query` for picking).
@@ -226,11 +226,11 @@ export class VoxelPhysics {
     this.offChange = world.onChange(this.edit);
   }
   /**
-   * Milliseconds of triangle-mesh building per physics step (default 2; live); voxel colliders are built in the step
-   * that needs them. Mesh work a body can reach before the next step (the pieces around a ball, an edited piece under
-   * a body) is always done in that step. The rest (meshes still away from balls) is built nearest first while the
-   * step's estimated cost stays within the budget; a step with nothing urgent still does one unit (one scan or one
-   * mesh piece), so building always progresses. `Infinity` builds everything at once.
+   * Milliseconds of collider building per physics step (default 2; live). Work a body can reach before the next step
+   * (its own surroundings, the mesh pieces around a ball, an edited piece under a body) is always done in that step.
+   * The rest (chunks entering the radius, meshes still away from balls, stale borders) is built nearest first while
+   * the step's estimated cost stays within the budget; a step with nothing urgent still does one unit (one chunk's
+   * voxel collider, one scan or one mesh piece), so building always progresses. `Infinity` builds everything at once.
    * @throws RangeError for a negative or NaN value, TypeError for a non-number.
    */
   get budget(): number {
@@ -239,7 +239,7 @@ export class VoxelPhysics {
   set budget(value: number) {
     this.limit = checkBudget(value);
   }
-  /** Chunks with mesh work left: pieces still to build or rebuild. */
+  /** Chunks with collider work left: a voxel collider or mesh pieces still to build or rebuild. */
   get pending(): number {
     return this.work.size;
   }
@@ -370,8 +370,11 @@ export class VoxelPhysics {
     this.reach();
     let urgent = false;
     for (const entry of this.work) {
-      if (entry.rebuild) this.unit(0, entry); // voxel colliders are built in the step that needs them
       if (this.reaches(entry, WHOLE, false)) {
+        if (entry.rebuild) {
+          this.unit(0, entry);
+          urgent = true;
+        }
         // A ball about to touch a chunk that is not a mesh yet: switch now (pieces near bodies are built below).
         if (entry.mode !== MESH && this.reaches(entry, WHOLE, true)) {
           if (entry.mode === VOXELS) this.setMode(entry, true);
