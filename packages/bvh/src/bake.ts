@@ -267,31 +267,24 @@ function checkLight(light: BakeLight): CheckedLight {
 }
 
 /**
- * How {@link limitPalette} measures closeness. Margo's reading of Crocotile's modes: `'nearest'` is the closest RGB in
- * sRGB-encoded values (what the palette's hex codes mean); `'luminance'` the closest relative luminance (linear
- * Rec. 709 Y), ignoring hue; `'balanced'` the closest colour in OKLab (Ottosson 2020), a perceptual space that weighs
- * lightness and hue evenly.
+ * How {@link limitPalette} picks entries (Crocotile's modes): `'nearest'` is the closest RGB in sRGB-encoded values
+ * (what the palette's hex codes mean); `'luminance'` the closest relative luminance (linear Rec. 709 Y), ignoring hue;
+ * `'balanced'` is `'nearest'` after stretching the colours so the darkest and brightest of them map to the palette's
+ * lowest and highest r, g and b values, which spreads a bake over the whole palette.
  */
 export type PaletteMode = 'nearest' | 'balanced' | 'luminance';
 
 /** Coordinates of a linear RGB colour in which `mode` measures Euclidean distance. */
 function paletteSpace(r: number, g: number, b: number, mode: PaletteMode): [number, number, number] {
-  if (mode === 'nearest') return [LinearToSRGB(r), LinearToSRGB(g), LinearToSRGB(b)];
   if (mode === 'luminance') return [0.2126 * r + 0.7152 * g + 0.0722 * b, 0, 0];
-  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b),
-    m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b),
-    s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
-  return [
-    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
-    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
-    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
-  ];
+  return [LinearToSRGB(r), LinearToSRGB(g), LinearToSRGB(b)];
 }
 
 /**
  * Snaps each linear RGBA colour (four values per vertex, as {@link bakeVertexColors} returns) to the closest
  * `palette` entry by `mode` (default `'nearest'`), keeping alpha. Returns a new array of linear RGBA; ties go to the
- * earlier palette entry.
+ * earlier palette entry. `'balanced'` looks at all `colors` together; when they are all equal it matches as
+ * `'nearest'`.
  */
 export function limitPalette(
   colors: ArrayLike<number>,
@@ -304,15 +297,24 @@ export function limitPalette(
   if (colors.length % 4) throw new RangeError('Palette colors must be RGBA, four values per vertex');
   const linear = palette.map((c) => parseColor(c) as number[]),
     keys = linear.map(([r, g, b]) => paletteSpace(r, g, b, mode)),
-    out = new Float32Array(colors.length);
+    out = new Float32Array(colors.length),
+    lo = [0, 1, 2].map((c) => Math.min(...keys.map((key) => key[c]))),
+    hi = [0, 1, 2].map((c) => Math.max(...keys.map((key) => key[c])));
+  let low = Infinity,
+    high = -Infinity;
+  if (mode === 'balanced')
+    for (let i = 0; i < colors.length; i += 4)
+      for (let c = 0; c < 3; c++) {
+        const v = LinearToSRGB(Math.max(colors[i + c], 0));
+        low = Math.min(low, v);
+        high = Math.max(high, v);
+      }
+  // Balanced: v -> lo + (v - low) * (hi - lo) / (high - low) per channel; equal colours (or another mode) stay as is.
+  const stretch = high > low ? (c: number, v: number) => lo[c] + ((v - low) * (hi[c] - lo[c])) / (high - low) : null;
   // ponytail: linear scan over the palette per vertex; fine for editor palettes (<= 256 entries).
   for (let i = 0; i < colors.length; i += 4) {
-    const [x, y, z] = paletteSpace(
-      Math.max(colors[i], 0),
-      Math.max(colors[i + 1], 0),
-      Math.max(colors[i + 2], 0),
-      mode,
-    );
+    let [x, y, z] = paletteSpace(Math.max(colors[i], 0), Math.max(colors[i + 1], 0), Math.max(colors[i + 2], 0), mode);
+    if (stretch) [x, y, z] = [stretch(0, x), stretch(1, y), stretch(2, z)];
     let best = 0,
       distance = Infinity;
     for (let k = 0; k < keys.length; k++) {

@@ -141,21 +141,28 @@ test('apply modes, multiplier and hidden lights', () => {
   assert.throws(() => bakeVertexColors({ ...floor(0), colors: [1, 1] }, null), RangeError);
 });
 
-test('limitPalette picks entries by RGB, OKLab or luminance and keeps alpha', () => {
+test('limitPalette picks entries by RGB, a stretched RGB range or luminance and keeps alpha', () => {
   const linear = (hex) => ((parseInt(hex, 16) / 255 + 0.055) / 1.055) ** 2.4;
-  const grey = Math.fround(linear('80'));
-  // Dark green: closest sRGB value is black, closest luminance is red (hue ignored), OKLab picks red over white.
+  const grey = Math.fround(linear('80')),
+    dim = Math.fround(linear('40'));
+  // Dark green: closest sRGB value is black, closest luminance is red (hue ignored).
   const four = ['#000000', '#ffffff', '#ff0000', '#0000ff'],
     green = [0, 0.3, 0, 0.5];
   assert.deepEqual([...limitPalette(green, four)], [0, 0, 0, 0.5]);
   assert.deepEqual([...limitPalette(green, four, 'luminance')], [1, 0, 0, 0.5]);
-  assert.deepEqual([...limitPalette(green, four, 'balanced')], [1, 0, 0, 0.5]);
-  // Dark blue: sRGB distance prefers mid grey, OKLab and luminance prefer blue.
+  // One colour has no range to stretch: balanced matches as nearest.
+  assert.deepEqual([...limitPalette(green, four, 'balanced')], [0, 0, 0, 0.5]);
+  // Dark blue: sRGB distance prefers mid grey, luminance prefers blue.
   const three = ['#000000', '#808080', '#0000ff'],
     navy = [0.05, 0.05, 0.3, 1];
   assert.deepEqual([...limitPalette(navy, three)], [grey, grey, grey, 1]);
-  assert.deepEqual([...limitPalette(navy, three, 'balanced')], [0, 0, 1, 1]);
   assert.deepEqual([...limitPalette(navy, three, 'luminance')], [0, 0, 1, 1]);
+  // A black-to-white bake on a dark palette: nearest crowds mid and white onto the top entry, balanced maps the
+  // brightest value to the palette's highest and spreads the middle over the rest.
+  const dark = ['#000000', '#404040', '#808080'],
+    bake = [0, 0, 0, 1, linear('80'), linear('80'), linear('80'), 1, 1, 1, 1, 1];
+  assert.deepEqual([...limitPalette(bake, dark)], [0, 0, 0, 1, grey, grey, grey, 1, grey, grey, grey, 1]);
+  assert.deepEqual([...limitPalette(bake, dark, 'balanced')], [0, 0, 0, 1, dim, dim, dim, 1, grey, grey, grey, 1]);
   // Several colours at once; ties go to the earlier entry; out-of-range bakes still map.
   assert.deepEqual(
     [...limitPalette([2, 2, 2, 1, 0.01, 0, 0, 1], ['#fff', '#ffffff', '#000'])],

@@ -104,8 +104,10 @@ Per vertex: `(sum of lights) * (1 - strength * occludedRays / rays) * multiplier
 `'standard'`. Falloff is shared with Margo's GPU lights: directional `color * intensity * max(N.L, 0)`; point and spot
 times `window / max(d^decay, 0.01)` with `window = distance > 0 ? clamp(1 - (d / distance)^4, 0, 1)^2 : 1`; spot also
 times `smoothstep(cos(angle), cos(angle * (1 - penumbra)), dot(-L, direction))`, a hard edge at penumbra 0. Results
-are not clamped. Palette modes are Margo's reading of Crocotile's: `'nearest'` closest RGB in sRGB-encoded values,
-`'luminance'` closest linear Rec. 709 luminance (hue ignored), `'balanced'` closest in OKLab. Crocotile casts rays over
+are not clamped. Palette modes follow Crocotile's: `'nearest'` closest RGB in sRGB-encoded values, `'luminance'`
+closest linear Rec. 709 luminance (hue ignored), `'balanced'` nearest after stretching the colours so their darkest and
+brightest values map to the palette's lowest and highest r, g and b, which spreads a bake over the whole palette.
+Crocotile casts rays over
 the whole sphere and keeps the upper half; here every ray is cast in the hemisphere, so `rays` is the count used. The
 bake runs synchronously on the calling thread (measured about 0.23 s for 20,000 vertices at 33 rays each, Node 24 on
 one laptop core).
