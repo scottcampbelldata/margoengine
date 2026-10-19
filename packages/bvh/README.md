@@ -69,6 +69,47 @@ can still override material sides.
 
 Other exports: `buildBVH` (raw `BVHData`), `shapecast` callbacks with `NOT_INTERSECTED`/`INTERSECTED`/`CONTAINED`, `getGeometryBVH`/`setGeometryBVH`/`hasGeometryBVH`, `setMeshLayers`/`getMeshLayers`, `terminateBVHWorker`, `frustumPlanes`, `multiplyMatrices`, `invertMatrix`.
 
+## Baking light and AO into vertex colours
+
+`bakeVertexColors(target, occluder, options)` is Crocotile's Bake Lighting panel on the CPU: it returns linear RGBA
+vertex colours (`Float32Array`, four per vertex) for `target.positions` and `target.normals` (same space as the
+occluder BVH; use `creasedNormals` from `@margoengine/geometry` for flat or smooth normals), and
+`limitPalette(colors, palette, mode)` snaps them to a palette.
+
+```ts
+import {MeshBVH, bakeVertexColors, limitPalette, worldTriangles} from '@margoengine/bvh';
+const cast = worldTriangles(engine, castAgainst); // Cast Against: the meshes that occlude
+const occluder = MeshBVH.build({positions: cast.vertices, indices: cast.indices});
+const colors = bakeVertexColors({positions, normals, colors: existing}, occluder, {
+  lights: [{type: 'ambient', intensity: 0.2}, {type: 'directional', direction: [1, 2, 1]},
+    {type: 'spot', position: [0, 4, 0], direction: [0, -1, 0], angle: 0.5, penumbra: 0.3, distance: 10}],
+  ao: {strength: 0.8, rays: 32, distance: 1}, apply: 'standard', seed: 1,
+});
+const pixelArt = limitPalette(colors, ['#1a1c2c', '#5d275d', '#b13e53', '#ef7d57', '#ffcd75'], 'balanced');
+```
+
+| Option | Default |
+| --- | --- |
+| `lights` | omitted: lighting term 1 (AO only). Types `ambient`, `directional` (`direction` toward the light), `point`, `spot` (`direction` the cone points, `angle` half-angle in radians, `penumbra` 0..1); `color`, `intensity`, `distance` (0 unlimited), `decay` (2), `visible` |
+| `shadows` | true: a ray toward each directional, point and spot light |
+| `backfaces` | true: occluder back faces block rays; false lets them through |
+| `includeHidden` | false: lights with `visible: false` are skipped |
+| `ao` | omitted: no AO. `strength` 1, `rays` 32 (cosine-weighted over the hemisphere), `distance` 1 |
+| `apply` | `'none'` overwrites; `'standard'` multiplies onto `target.colors` (RGB or RGBA; alpha is kept) |
+| `multiplier` | 1, scales the baked RGB |
+| `seed` | 0; same inputs and seed, same colours |
+| `bias` | 1e-3, ray origins move this far along the normal |
+
+Per vertex: `(sum of lights) * (1 - strength * occludedRays / rays) * multiplier`, times the existing colour with
+`'standard'`. Falloff is shared with Margo's GPU lights: directional `color * intensity * max(N.L, 0)`; point and spot
+times `window / max(d^decay, 0.01)` with `window = distance > 0 ? clamp(1 - (d / distance)^4, 0, 1)^2 : 1`; spot also
+times `smoothstep(cos(angle), cos(angle * (1 - penumbra)), dot(-L, direction))`, a hard edge at penumbra 0. Results
+are not clamped. Palette modes are Margo's reading of Crocotile's: `'nearest'` closest RGB in sRGB-encoded values,
+`'luminance'` closest linear Rec. 709 luminance (hue ignored), `'balanced'` closest in OKLab. Crocotile casts rays over
+the whole sphere and keeps the upper half; here every ray is cast in the hemisphere, so `rays` is the count used. The
+bake runs synchronously on the calling thread (measured about 0.23 s for 20,000 vertices at 33 rays each, Node 24 on
+one laptop core).
+
 ## Benchmark
 
 `npm run bench` on Node 22, one core of a shared 2-core container, 1M triangles:
@@ -90,7 +131,7 @@ That is roughly 3,000 to 4,200 times the brute-force ray rate. The tree takes ab
 
 ## Tests
 
-`npm test` runs 25 Node tests. Every query is compared with a brute-force scan over all triangles using the same exact predicates: about 2,800 first-hit rays and 2,000 all-hit rays (all three sides, near/far), 1,600 closest-point queries, 1,600 spheres, 1,200 oriented boxes (mirrored and sheared), 120 BVH pairs under random matrices (full pair sets), 240 random frusta (triangles and leaves), on random soups, an indexed bumpy sphere, and the Suzanne and Cow models from [alecjacobson/common-3d-test-models](https://github.com/alecjacobson/common-3d-test-models). They also cover tree structure for every option set, serialization and zero-copy transfer, corrupt-data rejection, refit after moving vertices, core `Geometry` normals, `shapecast`, SSR import safety, and the Raycaster against world-space brute force over 400 rays and 8 transformed meshes with hidden, parented, layered and filtered meshes. Regression checks verify conservative ray rejection under shear and one conversion per plain position/normal attribute during construction. Seven deformed-source tests cover poses outside bind bounds, morph and eight-weight skin samples, topology refits/rebuilds, several primitives per node, mirrored transforms and normals, near/far, side overrides, hidden ancestors, layers, filters, asynchronous ray/matrix snapshots, disposal/id reuse and malformed readback data.
+`npm test` runs 44 Node tests. The bake tests check AO of exactly 1 on an open plane and darker AO toward a box, shadow rays (including backfaces), point falloff and spot cone values against the formulas, seed determinism, apply modes and palette picks per mode. Every query is compared with a brute-force scan over all triangles using the same exact predicates: about 2,800 first-hit rays and 2,000 all-hit rays (all three sides, near/far), 1,600 closest-point queries, 1,600 spheres, 1,200 oriented boxes (mirrored and sheared), 120 BVH pairs under random matrices (full pair sets), 240 random frusta (triangles and leaves), on random soups, an indexed bumpy sphere, and the Suzanne and Cow models from [alecjacobson/common-3d-test-models](https://github.com/alecjacobson/common-3d-test-models). They also cover tree structure for every option set, serialization and zero-copy transfer, corrupt-data rejection, refit after moving vertices, core `Geometry` normals, `shapecast`, SSR import safety, and the Raycaster against world-space brute force over 400 rays and 8 transformed meshes with hidden, parented, layered and filtered meshes. Regression checks verify conservative ray rejection under shear and one conversion per plain position/normal attribute during construction. Seven deformed-source tests cover poses outside bind bounds, morph and eight-weight skin samples, topology refits/rebuilds, several primitives per node, mirrored transforms and normals, near/far, side overrides, hidden ancestors, layers, filters, asynchronous ray/matrix snapshots, disposal/id reuse and malformed readback data.
 
 `npm run test:browser` (Playwright, honoring `BROWSER_CHANNEL`, `BROWSER_EXECUTABLE` and `BROWSER_ARGS`) builds a 200k-triangle BVH in the worker and checks it is byte-identical to the synchronous build while main-thread timers keep running, transfers, concurrency, errors, abort and terminate. It then creates real engines on WebGPU and WebGL2, checks picked mesh, point, normal and distance for translated, scaled, mirrored, hidden and parented meshes, compares the Raycaster with rendered pixels on a 64x64 grid and with `engine.pick` on WebGPU, requires zero WebGPU validation errors, and builds a production Vite consumer that must emit the worker.
 

@@ -47,4 +47,6 @@ export {
 } from './raycaster.js';
 export type { ModelLike, ModelPrimitiveLike, PickProxy } from './raycaster.js';
 export { worldTriangles } from './triangles.js';
+export { bakeVertexColors, limitPalette } from './bake.js';
+export type { BakeAmbientOcclusion, BakeLight, BakeOptions, BakeTarget, PaletteMode } from './bake.js';
 export type { WorldTriangles, WorldTrianglesOptions } from './triangles.js';
