@@ -10,6 +10,8 @@ import { LocalShadows } from '../../clustered/dist/shadows.js';
 import { Shadows } from '../../shadows/dist/index.js';
 import {
   LambertMaterial,
+  NormalMaterial,
+  UnlitMaterial,
   PbrMaterial,
   PhongMaterial,
   Texture,
@@ -102,12 +104,13 @@ const featureBuffers = (history) =>
       .filter((e) => e[0] === 'group')
       .flatMap((e) => e[2].entries.filter((entry) => entry.binding === 198).map((entry) => entry.resource.buffer)),
   );
-/** The last feature uniform write in `log`; `history` holds the frames that bound the buffers. */
-const featureUniform = (log, history) => {
-  const ids = featureBuffers(history),
-    writes = log.filter((e) => e[0] === 'writeBuffer' && ids.has(e[1]));
-  return writes.length ? [...floats(writes.at(-1)[3])] : undefined;
+/** Feature uniform writes in `log`, as numbers; `history` holds the frames that bound the buffers. */
+const featureWrites = (log, history) => {
+  const ids = featureBuffers(history);
+  return log.filter((e) => e[0] === 'writeBuffer' && ids.has(e[1])).map((e) => [...floats(e[3])]);
 };
+/** The last feature uniform write in `log`. */
+const featureUniform = (log, history) => featureWrites(log, history).at(-1);
 const solid = (r, g, b, a = 255) =>
   new Texture(
     { data: new Uint8Array([r, g, b, a, r, g, b, a, r, g, b, a, r, g, b, a]), width: 2, height: 2 },
@@ -184,6 +187,8 @@ const defaults = {
   displacementMap: null,
   displacementScale: 1,
   displacementBias: 0,
+  lightMap: null,
+  lightMapIntensity: 1,
 };
 const used = () => ({
   alphaMap: solid(0, 0, 0),
@@ -192,8 +197,10 @@ const used = () => ({
   displacementMap: solid(0, 0, 0),
   displacementScale: 2,
   displacementBias: 0.5,
+  lightMap: solid(0, 0, 0),
+  lightMapIntensity: 4,
 });
-const off = { alphaMap: null, bumpMap: null, displacementMap: null };
+const off = { alphaMap: null, bumpMap: null, displacementMap: null, lightMap: null };
 
 test('a material with every feature at its default draws exactly the GPU calls of a plain one', async () => {
   for (const hook of [false, true]) {
@@ -297,5 +304,49 @@ test('features apply after a subclass patch: NodeMaterial positions and instance
   assert.ok(all.some((c) => c.includes('let p=margoI*vec4f(i.position.xyz+i.normal.xyz*margoDisplacement(i.uv),1);')));
   a.destroy();
   b.destroy();
+  s.engine.dispose();
+});
+
+test('lightMap adds baked light on lit shadings, multiplies unlit colour, reads UV1 and sRGB, and is ignored elsewhere', async () => {
+  const s = await scene(),
+    map = solid(64, 64, 64),
+    [lambert, unlit, normal] = [
+      new LambertMaterial({ lightMap: map, lightMapIntensity: 2 }),
+      new UnlitMaterial({ lightMap: map }),
+      new NormalMaterial({ lightMap: map }),
+    ],
+    meshes = [lambert, unlit, normal].map((m) => createMesh(s.engine, quad, m));
+  const log = s.frame(),
+    all = codes(log),
+    sampled = 'textureSample(margoLightMap,margoLightSampler,margoFeatureUV(i.uv,3u)).rgb*margoFeatures.values.w';
+  assert.ok(
+    all.some((c) =>
+      c.includes(`s.emissive+=s.base.rgb*(1-s.metal)*s.occlusion*${sampled};
+  let facing=`),
+    ),
+    'lit: indirect diffuse',
+  );
+  assert.ok(
+    all.some((c) => c.includes(`s.base=vec4f(s.base.rgb*${sampled},s.base.a);`)),
+    'unlit: multiplies the colour',
+  );
+  assert.equal(all.filter((c) => c.includes('margoLightMap')).length, 2, 'normal shading compiles none of it');
+  assert.equal(bindings(log).filter((list) => list.includes(186)).length, 2, 'nor binds it');
+  const views = log.filter((e) => e[0] === 'view' && e[2]?.format);
+  assert.ok(
+    views.some((e) => e[2].format === 'rgba8unorm-srgb'),
+    'a colour map: sRGB by default',
+  );
+  assert.ok(
+    featureWrites(log, s.history).some((v) => v[3] === 2 && v[4 + 3 * 8 + 3] === 1),
+    'lightMapIntensity, on UV1',
+  );
+  lambert.setUVTransform({ offset: [0.5, 0] }, 'lightMap');
+  lambert.setUVTransform({ scale: [2, 2] });
+  const rows = featureWrites(s.frame(), s.history)
+    .map((v) => v.slice(4 + 3 * 8))
+    .find((v) => v[2] === 0.5);
+  assert.deepEqual([rows[0], rows[3]], [1, 1], 'its own slot keeps UV1 and ignores the all-slot transform');
+  for (const mesh of meshes) mesh.destroy();
   s.engine.dispose();
 });

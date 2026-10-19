@@ -71,6 +71,9 @@ const expected = {
   // point light (intensity 8 at distance sqrt 8, window (1 - (sqrt 8 / 20)^4)^2).
   displacedShadow: gray(local * Math.SQRT1_2),
   displacedLocalShadow: gray((base / Math.PI) * Math.SQRT1_2 * (1 - (Math.SQRT2 / 10) ** 4) ** 2),
+  // Base colour times a white lightmap (intensity 1), unlit white times sRGB 128.
+  lightMapLambert: gray(base),
+  lightMapUnlit: [128, 128, 128],
   displacedHookShadow: gray((base / Math.PI) * Math.SQRT1_2 * (1 - (Math.SQRT2 / 10) ** 4) ** 2),
 };
 try {
@@ -104,6 +107,8 @@ try {
     'bumpFacing',
     'bumpAway',
     'bumpNormalMap',
+    'lightMapLambert',
+    'lightMapUnlit',
     'displace',
     'displaceInstanced',
     'displacedShadow',
@@ -149,6 +154,11 @@ try {
       await step();
       near(await pixel(0.3), [255, 0, 0], 'the updated region (image top, flipY) shows the new pixels');
       near(await pixel(0.7), [0, 255, 0], 'outside the region the texture keeps its old pixels');
+    }
+    if (name === 'lightMapLambert') {
+      near(await pixel(0.5, 0.3), gray(base), 'lightMap reads UV1 (the white texel), not UV0 (black on the left)');
+      await step();
+      near(await pixel(), gray(base * 0.5), 'lightMapIntensity 0.5, live');
     }
     if (name === 'displace' || name === 'displaceInstanced') {
       const displaced = await redWidth();

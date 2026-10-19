@@ -567,6 +567,7 @@ while it is in use: a material that never sets one keeps exactly its shader, bin
 | `alphaMap` | Green channel (linear) multiplies opacity, before `alphaTest` and blending (`transparent`) |
 | `bumpMap`, `bumpScale` | Red channel (linear) is a height, `bumpScale` (default 1, finite, negative inverts) its full range in mesh units; its screen-space slope tilts the shading normal (Mikkelsen 2010), after `normalMap` when both are set |
 | `displacementMap`, `displacementScale`, `displacementBias` | Each vertex moves along its normal by red (linear) * scale (default 1) + bias (default 0) mesh units, before the model and instance matrices: in the beauty and G-buffer passes and in the directional (`Shadows`) and clustered (integrated and `LocalShadows`) shadow maps. Normals are not recomputed; CPU picking, bounds and exports see the undisplaced mesh |
+| `lightMap`, `lightMapIntensity` | Baked light (RGB, sRGB by default), read on UV1 (`geometry.uvs1`, else UV0) unless `setUVTransform(t, 'lightMap')` names another set; it keeps its own UV set when `uvTransform` moves the other maps. Lit shadings (standard, Lambert, Phong) add diffuse colour * map * intensity (default 1) as indirect light, darkened by `aoMap`; unlit materials multiply their colour by map * intensity. Normal, matcap, depth and distance output ignore it. glTF has no light maps: `exportModel` leaves it out |
 
 Each map has its own UV transform slot (`material.setUVTransform(t, 'alphaMap')`); `uvTransform` and
 `setUVTransform(t)` without a slot set it with the other maps'.

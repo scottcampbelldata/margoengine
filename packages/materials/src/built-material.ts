@@ -591,6 +591,13 @@ export interface MaterialOptions extends PhysicalOptions {
   /** Finite; defaults 1 and 0. Live. */
   displacementScale?: number;
   displacementBias?: number;
+  /**
+   * Baked light (sRGB colour by default), on UV1 unless its UV transform names another set: lit shadings add diffuse
+   * colour * map * `lightMapIntensity` as indirect light (aoMap applies), unlit ones multiply their colour by it. Live.
+   */
+  lightMap?: Texture | null;
+  /** Finite; default 1. Live. */
+  lightMapIntensity?: number;
   transparent?: boolean;
   alphaTest?: number;
   /** Faces drawn by triangle meshes. Explicit side takes precedence over doubleSided. */
@@ -935,10 +942,21 @@ function materialBuffer(
   }
   return state[field];
 }
+const lit: readonly Shading[] = ['standard', 'lambert', 'phong'];
+/** The feature maps `m` draws now; a lightMap means nothing to normal, matcap, depth and distance output. */
+function featureMapsUsed(m: Material): boolean[] {
+  const maps = m['featureTextures'];
+  return [!!maps[0], !!maps[1], !!maps[2], !!maps[3] && (m.shading === 'basic' || lit.includes(m.shading))];
+}
 /** The feature letters (features.ts) `m` uses now: its shader variant. */
 function featureKey(m: Material): string {
-  const maps = m['featureTextures'];
-  return (maps[0] ? 'a' : '') + (maps[1] ? 'b' : '') + (maps[2] ? 'd' : '');
+  const [alpha, bump, displacement, light] = featureMapsUsed(m);
+  return (
+    (alpha ? 'a' : '') +
+    (bump ? 'b' : '') +
+    (displacement ? 'd' : '') +
+    (light ? (m.shading === 'basic' ? 'u' : 'l') : '')
+  );
 }
 /** The feature uniform of `m` for `owner`, written with its current values. */
 function featureUniform(m: Material, device: GPUDevice, owner: object): GPUBuffer {
@@ -950,14 +968,14 @@ function featureUniform(m: Material, device: GPUDevice, owner: object): GPUBuffe
 }
 /** Feature map `k`'s view and sampler; a map still loading reads white (alpha, bump) or black (displacement, light). */
 const featureTexture = (m: Material, k: number, device: GPUDevice) =>
-  m['featureTextures'][k]!.bind(device, false) ?? fallback(device, k < 2 ? 0 : 3);
+  m['featureTextures'][k]!.bind(device, k === 3) ?? fallback(device, k < 2 ? 0 : 3);
 /** `entries` plus the feature uniform and maps `m` uses now (none for a material without features). */
 function featureBindings(m: Material, device: GPUDevice, owner: object, entries: GPUBindGroupEntry[]) {
-  const maps = m['featureTextures'];
+  const maps = featureMapsUsed(m);
   if (!maps.some(Boolean)) return entries;
   const out = [...entries, { binding: 198, resource: { buffer: featureUniform(m, device, owner) } }];
-  maps.forEach((texture, k) => {
-    if (!texture) return;
+  maps.forEach((used, k) => {
+    if (!used) return;
     const [view, sampler] = featureTexture(m, k, device);
     out.push({ binding: 180 + k * 2, resource: view }, { binding: 181 + k * 2, resource: sampler });
   });
@@ -1160,6 +1178,18 @@ export class Material {
   set displacementBias(v: number) {
     this.featureValues[2] = rasterFloat(v, 'displacementBias');
   }
+  get lightMap(): Texture | null {
+    return this.featureTextures[3];
+  }
+  set lightMap(v: Texture | null) {
+    this.setFeatureMap(3, v);
+  }
+  get lightMapIntensity(): number {
+    return this.featureValues[3];
+  }
+  set lightMapIntensity(v: number) {
+    this.featureValues[3] = rasterFloat(v, 'lightMapIntensity');
+  }
   private readonly physicalTextures: (Texture | null)[] = Array(12).fill(null);
   private setMap(i: number, value: Texture | null): void {
     const key = mapSlots[i + 5] as keyof PhysicalOptions;
@@ -1309,6 +1339,8 @@ export class Material {
       'displacementMap',
       'displacementScale',
       'displacementBias',
+      'lightMap',
+      'lightMapIntensity',
     ] as const)
       if (o[key] !== undefined) this[key] = o[key] as never;
     // Physical options enable their lobes as they are set (transmission before the volume values that need it); the

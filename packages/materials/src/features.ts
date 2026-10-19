@@ -29,13 +29,18 @@ const bump = `fn margoBump(n:vec3f,p:vec3f,height:f32,facing:bool)->vec3f {
   return select(n,normalize(o),dot(o,o)>0.0);
 }
 `;
-/** `code` with the features `key` names: `a` alphaMap, `b` bumpMap, `d` displacementMap. */
+/**
+ * `code` with the features `key` names: `a` alphaMap, `b` bumpMap, `d` displacementMap, `l` lightMap on a lit shading
+ * (baked irradiance: diffuse colour times the map, added like emissive) or `u` on an unlit one (the map multiplies
+ * the colour).
+ */
 export function featureShader(code: string, group: number, key: string): string {
   let inner = cache.get(code);
   const id = key + group,
     hit = inner?.get(id);
   if (hit !== undefined) return hit;
-  const maps = featureMaps.map((_, k) => key.includes('abdl'[k]));
+  const has = (letter: string) => key.includes(letter),
+    maps = [has('a'), has('b'), has('d'), has('l') || has('u')];
   let out = code;
   if (maps[0]) out = edit(out, '\n  let mr=', `\n  s.base.a*=${sample(0)}.g;\n  let mr=`);
   // After the normal map: the bump tilts the mapped normal.
@@ -45,6 +50,11 @@ export function featureShader(code: string, group: number, key: string): string 
       /\n {2}s\.n=normalize\([^\n]*\);/,
       (line) => `${line}\n  s.n=margoBump(s.n,i.position,${sample(1)}.r*margoFeatures.values.x,facing);`,
     );
+  const light = `${sample(3)}.rgb*margoFeatures.values.w`;
+  if (has('u')) out = edit(out, '\n  let mr=', `\n  s.base=vec4f(s.base.rgb*${light},s.base.a);\n  let mr=`);
+  // Indirect diffuse: occlusion applies, metals reflect none.
+  if (has('l'))
+    out = edit(out, '\n  let facing=', `\n  s.emissive+=s.base.rgb*(1-s.metal)*s.occlusion*${light};\n  let facing=`);
   // In mesh space, before the model (or instance) matrix, so every pass drawing this shader displaces alike.
   if (maps[2])
     out = edit(
