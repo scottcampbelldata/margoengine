@@ -220,6 +220,7 @@ if (want('site')) {
       '/sizes.html',
       '/night-citadel/',
       '/gameplay-sandbox/',
+      '/voxel/',
       '/demos/flight-helmet.html',
       '/demos/character-animation.html',
       '/demos/robot-expressive.html',

@@ -1,6 +1,6 @@
 // Assembles margoengine.com into site/dist: the landing page from site/, the package
-// catalog from docs/ under /catalog/, and the live demos (Night Citadel, the gameplay sandbox and
-// the example pages) each under their own folder.
+// catalog from docs/ under /catalog/, and the live demos (Night Citadel, the gameplay sandbox, the
+// voxel sandbox under /voxel/ and the example pages) each under their own folder.
 // Run `npm run build:packages` first. Deploy the folder with `npx wrangler pages deploy site/dist`.
 // `npm run build:site` measures every package (entry-sizes.mjs) and a basic glTF scene's network log
 // (basic-scene-network.mjs, under the GPU lock) first, for /sizes.html.
@@ -60,6 +60,7 @@ else
 // A relative base lets the showcase run from its subfolder.
 await site({ root: 'apps/showcase-night-citadel', base: './', build: { outDir: `${out}/night-citadel` } });
 await site({ root: 'examples/gameplay-sandbox', base: './', build: { outDir: `${out}/gameplay-sandbox` } });
+await site({ root: 'examples/voxel-sandbox', base: './', build: { outDir: `${out}/voxel` } });
 const pages = ['character-animation', 'robot-expressive', 'flight-helmet', 'windy-meadow', 'tokyo-diorama'];
 await site({
   configFile: false,

@@ -104,6 +104,13 @@ It holds the GPU lock, waits for `scripts/quiet-gate.mjs` (numbers from a busy m
 over 300 still frames, voxel GPU time median and p95 over 100 frames, a 10 s flight at 11 blocks/s while chunks
 stream in, and chunks, quads, quad bytes, draws and chunk data bytes.
 
+### Visual checks
+
+`scripts/visual-regression.js` defines `voxel-overview`, `voxel-ground` (high, light and phone) and `voxel-night`
+(high) on the site build's `/voxel/?view=...`. They are marked `pending` and have no baselines yet, because the
+renderer's lighting is still changing; they run only when named:
+`npm run visual:update -- --only=voxel --runs=4` records them (then drop `pending`).
+
 ## Tests
 
 ```sh

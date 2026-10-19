@@ -1124,7 +1124,11 @@
       "blockId",
       "blockState",
       "chunkKey"
-    ]
+    ],
+    "example": "../voxel/",
+    "exampleTitle": "Voxel sandbox",
+    "exampleNote": "A small block-building game: streamed terrain with caves, trees and plants, sky and torch light, walking, swimming and flying, breaking and placing blocks, saved in the browser.",
+    "exampleSource": false
   },
   {
     "id": "water",

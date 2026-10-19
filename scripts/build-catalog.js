@@ -6,7 +6,8 @@ import { PACKAGE_LISTS, withPackageList } from './package-lists.js';
 
 const existingText = await readFile('docs/catalog.json', 'utf8'),
   existing = JSON.parse(existingText);
-const postfxExamples = {
+// Packages whose catalog example is a live site demo rather than a file under docs/examples/.
+const siteExamples = {
   dof: {
     example: '../demos/dof/',
     exampleTitle: 'Circular bokeh',
@@ -19,6 +20,13 @@ const postfxExamples = {
     exampleTitle: 'Highlights and color',
     exampleNote:
       'Run the optional tonemapping package with the current Core 0.1 engine. Compare AgX, ACES fitted and Neutral, exposure, contrast and a local 33-cube LUT.',
+    exampleSource: false,
+  },
+  voxel: {
+    example: '../voxel/',
+    exampleTitle: 'Voxel sandbox',
+    exampleNote:
+      'A small block-building game: streamed terrain with caves, trees and plants, sky and torch light, walking, swimming and flying, breaking and placing blocks, saved in the browser.',
     exampleSource: false,
   },
 };
@@ -121,7 +129,7 @@ for (const id of await readdir('packages')) {
   assert.ok(category, `${manifest.name} has no layer: add it to the layers in scripts/build-catalog.js`);
   entries.push({
     ...previous,
-    ...postfxExamples[id],
+    ...siteExamples[id],
     id,
     title: previous?.title ?? (id === 'margoengine' ? 'Stage facade' : id[0].toUpperCase() + id.slice(1)),
     category,

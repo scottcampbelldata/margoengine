@@ -86,6 +86,18 @@ const demos = [
     mask: ['#fps', '#delta', '#refresh-note'],
   },
   { id: 'gameplay-sandbox', path: 'gameplay-sandbox/', ready: '!!window.sandbox', mask: ['#telemetry *'] },
+  // Voxel sandbox deterministic views (seed 1, fixed camera and clock, no HUD; examples/voxel-sandbox/README.md).
+  // `pending`: no baselines yet (the voxel renderer's lighting is still changing), so these run only when --only names
+  // them; record them with `npm run visual:update -- --only=voxel --runs=4` and then drop `pending`.
+  { id: 'voxel-overview', path: 'voxel/?view=overview', ready: 'window.voxelSandbox?.ready===true', pending: true },
+  { id: 'voxel-ground', path: 'voxel/?view=ground', ready: 'window.voxelSandbox?.ready===true', pending: true },
+  {
+    id: 'voxel-night',
+    path: 'voxel/?view=night',
+    ready: 'window.voxelSandbox?.ready===true',
+    views: ['high'],
+    pending: true,
+  },
   {
     id: 'character-animation',
     path: 'demos/character-animation.html',
@@ -124,8 +136,11 @@ const demos = [
       views: ['model'],
     })),
 ];
+// A view's query (`?quality=high`) appended to a demo path that may already have one (`voxel/?view=ground`).
+const withQuery = (path, query) => (query && path.includes('?') ? `${path}&${query.slice(1)}` : path + query);
 const allCases = demos
     .filter((demo) => (loss ? !demo.dev : !demo.lossOnly))
+    .filter((demo) => !demo.pending || only.some((o) => demo.id.includes(o)))
     .flatMap((demo) =>
       (demo.views ?? ['high', 'light', 'phone']).map((view) => ({ id: `${demo.id}-${view}`, demo, view: views[view] })),
     ),
@@ -314,7 +329,9 @@ process.on('SIGINT', () => {
 });
 
 const started = Date.now(),
-  results = new Map(cases.map((c) => [c.id, { id: c.id, url: c.demo.path + c.view.query, captures: [], errors: [] }]));
+  results = new Map(
+    cases.map((c) => [c.id, { id: c.id, url: withQuery(c.demo.path, c.view.query), captures: [], errors: [] }]),
+  );
 let server,
   devServer,
   environment = {},
@@ -401,7 +418,7 @@ try {
         });
         try {
           // 90 s: generous for a busy laptop (a 30-140 s first load was the dev server's file watcher, now off).
-          await page.goto((demo.dev ? devOrigin : origin) + '/' + demo.path + query, { timeout: 90_000 });
+          await page.goto((demo.dev ? devOrigin : origin) + '/' + withQuery(demo.path, query), { timeout: 90_000 });
           await page.waitForFunction(demo.ready, null, { timeout: 120_000 });
           if (loss) {
             result.before = await capture();
