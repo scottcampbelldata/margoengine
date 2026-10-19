@@ -23,7 +23,7 @@ if (existsSync(rapierEntry)) {
 const skip = RAPIER ? false : 'Rapier not found: set MARGOENGINE_RAPIER to a @dimforge/rapier3d-compat folder';
 const rtest = (name, fn) => test(name, { skip }, fn);
 
-// Rapier calls counted, to tell in-place updates (setVoxel) from rebuilds (ColliderDesc.voxels).
+// Rapier calls counted, to tell in-place updates (setVoxel) from rebuilds (ColliderDesc.voxels or .trimesh).
 const calls = { builds: 0, setVoxel: 0, propagate: 0, combine: 0 };
 if (RAPIER) {
   const count = (owner, name, counter) => {
@@ -34,6 +34,7 @@ if (RAPIER) {
     };
   };
   count(RAPIER.ColliderDesc, 'voxels', 'builds');
+  count(RAPIER.ColliderDesc, 'trimesh', 'builds');
   count(RAPIER.Collider.prototype, 'setVoxel', 'setVoxel');
   count(RAPIER.Collider.prototype, 'propagateVoxelChange', 'propagate');
   count(RAPIER.Collider.prototype, 'combineVoxelStates', 'combine');
@@ -73,21 +74,265 @@ const cube = (physics, half, position, velocity) =>
     colliders: { shape: 'box', halfExtents: [half, half, half], friction: 0, frictionCombine: 'min' },
   });
 
-rtest('a ball rests on a voxel floor, keeps it while asleep and falls once the block under it is removed', () => {
+// 'mesh' or 'voxels' per chunk key: the collider kind VoxelPhysics chose.
+const kinds = (voxels) =>
+  Object.fromEntries(
+    [...voxels.colliders]
+      .sort(([a], [b]) => (a < b ? -1 : 1))
+      .map(([key, c]) => [key, c.shapeType() === RAPIER.ShapeType.TriMesh ? 'mesh' : 'voxels']),
+  );
+const ballBody = (physics, radius, position, options = {}) =>
+  physics.addBody(null, { position, colliders: { shape: 'sphere', radius, ...options.collider }, ...options.body });
+// Ledgy terrain over chunks x 0..1, z 0..1 (borders x 32 and z 32): a floor (top y 1), a plateau with 2-cell ledges,
+// a 2-high wall, a 1-deep pit (lowest top y 0) and a step.
+const ledges = (world, width = 64) => {
+  fill(world, 0, width, -2, 1, 0, 64, stone);
+  fill(world, 40, 48, 1, 3, 8, 56, stone);
+  fill(world, 4, 30, 1, 3, 20, 21, dirt);
+  fill(world, 20, 24, 0, 1, 30, 36, 0);
+  fill(world, 10, 14, 1, 2, 40, 50, stone);
+};
+
+rtest('a box rests on a voxel floor, keeps it while asleep and falls once the block under it is removed', () => {
   const { physics, world, voxels } = setup();
   fill(world, 0, 8, 0, 1, 0, 8, stone);
-  const ball = physics.addBody(null, { position: [4.5, 3, 4.5], colliders: { shape: 'sphere', radius: 0.4 } });
+  const box = physics.addBody(null, {
+    position: [4.5, 3, 4.5],
+    colliders: { shape: 'box', halfExtents: [0.4, 0.4, 0.4] },
+  });
   steps(physics, 240);
-  assert.ok(Math.abs(ball.position[1] - 1.4) < 0.01, `rests on the floor top (y ${ball.position[1]})`);
-  assert.ok(ball.sleeping, 'falls asleep on the floor');
+  assert.ok(Math.abs(box.position[1] - 1.4) < 0.01, `rests on the floor top (y ${box.position[1]})`);
+  assert.ok(box.sleeping, 'falls asleep on the floor');
   steps(physics, 10);
-  assert.deepEqual(keys(voxels), ['0,0,0'], 'a sleeping body keeps its chunk collider');
+  assert.deepEqual(kinds(voxels), { '0,0,0': 'voxels' }, 'a sleeping body keeps its chunk collider');
   const builds = calls.builds;
-  world.setBlock(4, 0, 4, 0);
+  world.setBlock(4, 0, 4, 0); // the 0.8-wide box fits the 1-wide hole
   steps(physics, 60);
-  assert.ok(ball.position[1] < -1, `falls through the hole (y ${ball.position[1]})`);
+  assert.ok(box.position[1] < -1, `falls through the hole (y ${box.position[1]})`);
   assert.equal(calls.builds, builds, 'the edit changed the collider in place');
   physics.dispose();
+});
+
+rtest('a ball rests on a mesh chunk, sleeps, and falls once the block under it is removed', () => {
+  const { physics, world, voxels } = setup();
+  fill(world, 0, 8, 0, 1, 0, 8, stone);
+  const ball = ballBody(physics, 0.4, [4.5, 3, 4.5]);
+  steps(physics, 240);
+  assert.deepEqual(kinds(voxels), { '0,0,0': 'mesh' }, 'a chunk near a ball is a triangle mesh');
+  assert.ok(Math.abs(ball.position[1] - 1.4) < 0.01, `rests on the floor top (y ${ball.position[1]})`);
+  assert.ok(ball.sleeping, 'falls asleep on the floor');
+  const builds = calls.builds,
+    setVoxel = calls.setVoxel;
+  world.setBlock(4, 0, 4, 0);
+  world.setBlock(0, 0, 0, 0); // two edits before the step: one rebuild
+  steps(physics, 60);
+  assert.ok(ball.position[1] < -1, `falls through the hole (y ${ball.position[1]})`);
+  assert.equal(calls.builds, builds + 1, 'the mesh was rebuilt once for both edits');
+  assert.ok(calls.setVoxel > setVoxel, 'its disabled voxel collider is kept up to date in place');
+  physics.dispose();
+});
+
+rtest('balls roll off ledges, across chunk borders and into walls without a panic (96 seeded balls)', () => {
+  let lowest = Infinity,
+    crossings = 0;
+  for (let seed = 1; seed <= 16; seed++) {
+    const next = random(seed),
+      { physics, world, voxels } = setup();
+    ledges(world);
+    const balls = [];
+    for (let i = 0; i < 6; i++) {
+      const radius = 0.2 + next() * 0.4;
+      balls.push([
+        ballBody(physics, radius, [6 + next() * 52, 4 + next() * 2, 6 + next() * 52], {
+          body: { linearVelocity: [(next() - 0.5) * 16, 0, (next() - 0.5) * 16] },
+          collider: { restitution: next() * 0.5 },
+        }),
+        radius,
+      ]);
+    }
+    const sides = balls.map(([b]) => [b.position[0] < 32, b.position[2] < 32]);
+    for (let i = 0; i < 400; i++) {
+      physics.step(); // a panic here would end the Rapier instance (RuntimeError: unreachable)
+      for (const [b, radius] of balls) {
+        const [x, y, z] = b.position;
+        if (x > 1 && x < 63 && z > 1 && z < 63) lowest = Math.min(lowest, y - radius);
+      }
+    }
+    balls.forEach(([b], i) => {
+      if (b.position[0] < 32 !== sides[i][0]) crossings++;
+      if (b.position[2] < 32 !== sides[i][1]) crossings++;
+    });
+    assert.ok(
+      Object.values(kinds(voxels)).every((kind) => kind === 'mesh'),
+      'every chunk near a ball is a mesh',
+    );
+    physics.dispose();
+  }
+  assert.ok(lowest > -0.05, `no ball sank below the lowest floor top y 0 (lowest bottom ${lowest})`);
+  assert.ok(crossings > 30, `balls crossed chunk borders (${crossings} times)`);
+});
+
+rtest('balls roll across x and z chunk borders without a kick or a snag (seeded)', (t) => {
+  let lag = 0;
+  for (let seed = 1; seed <= 12; seed++) {
+    const next = random(seed),
+      radius = 0.25 + next() * 0.3,
+      start = [27, 1 + radius + 0.002, 28 + next() * 2],
+      v = [3 + next() * 6, 0, 2 + next() * 4],
+      w = [v[2] / radius, 0, -v[0] / radius]; // rolling, not sliding
+    // The reference: the same ball on one Rapier box, without VoxelPhysics.
+    const reference = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+    reference.createCollider(RAPIER.ColliderDesc.cuboid(32, 1.5, 32).setTranslation(32, -0.5, 32));
+    const ref = reference.createRigidBody(
+      RAPIER.RigidBodyDesc.dynamic()
+        .setTranslation(...start)
+        .setLinvel(...v)
+        .setAngvel({ x: w[0], y: w[1], z: w[2] })
+        .setCanSleep(false),
+    );
+    reference.createCollider(RAPIER.ColliderDesc.ball(radius), ref);
+    const { physics, world } = setup();
+    fill(world, 0, 64, -2, 1, 0, 64, stone);
+    const ball = ballBody(physics, radius, start, { body: { linearVelocity: v, angularVelocity: w, canSleep: false } });
+    // Slip: how far the spin is from rolling without sliding at the current velocity.
+    const slip = (lin, ang) => Math.hypot(ang[0] - lin[2] / radius, ang[1], ang[2] + lin[0] / radius);
+    let bump = 0,
+      refBump = 0,
+      spin = 0,
+      refSpin = 0;
+    for (let i = 0; i < 150; i++) {
+      physics.step();
+      reference.step();
+      if (i < 4) continue;
+      const lv = ref.linvel(),
+        av = ref.angvel();
+      bump = Math.max(bump, Math.abs(ball.linearVelocity[1]));
+      refBump = Math.max(refBump, Math.abs(lv.y));
+      spin = Math.max(spin, slip(ball.linearVelocity, ball.angularVelocity));
+      refSpin = Math.max(refSpin, slip([lv.x, lv.y, lv.z], [av.x, av.y, av.z]));
+    }
+    const p = ref.translation(),
+      lv = ref.linvel(),
+      [x, y, z] = ball.position,
+      [vx, , vz] = ball.linearVelocity;
+    lag = Math.max(lag, Math.hypot(x - p.x, y - p.y, z - p.z));
+    const speed = Math.hypot(vx, vz),
+      refSpeed = Math.hypot(lv.x, lv.z);
+    assert.ok(x > 33 && z > 33, `seed ${seed}: crossed both borders (${x}, ${z})`);
+    assert.ok(bump <= refBump + 0.01, `seed ${seed}: no vertical kick (|vy| ${bump} vs ${refBump} on one box)`);
+    assert.ok(spin <= refSpin + 0.02, `seed ${seed}: no snag in the roll (slip ${spin} vs ${refSpin})`);
+    assert.ok(Math.abs(speed - refSpeed) < 0.01, `seed ${seed}: kept its speed (${speed} vs ${refSpeed})`);
+    // Rapier can drop up to one step of travel where a ball passes from one collider to the next (separate boxes
+    // do it too), so the path may trail the one-box path by a step for each of the three chunks it enters.
+    const trail = Math.hypot(x - p.x, y - p.y, z - p.z);
+    assert.ok(trail < (3 * refSpeed) / 60 + 0.02, `seed ${seed}: trails the one-box path by ${trail} m`);
+    reference.free();
+    physics.dispose();
+  }
+  t.diagnostic(`largest trail behind the one-box path after the x and z borders: ${lag.toFixed(3)} m`);
+});
+
+rtest('chunks switch to meshes as a ball comes and back to voxels once it leaves, with hysteresis', () => {
+  const { physics, world, voxels } = setup({}, [0, 0, 0]);
+  for (let cx = -3; cx <= 4; cx++) fill(world, cx * 32, cx * 32 + 32, 0, 1, 0, 32, stone);
+  physics.addBody(null, { position: [16, 16, 16], colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] } });
+  const ball = ballBody(physics, 0.4, [3 * 32 + 16, 16, 16], { body: { type: 'kinematicPosition' } });
+  physics.step();
+  const v = 'voxels',
+    m = 'mesh';
+  assert.deepEqual(kinds(voxels), {
+    '-1,0,0': v,
+    '0,0,0': v,
+    '1,0,0': v,
+    '2,0,0': m,
+    '3,0,0': m,
+    '4,0,0': m,
+  });
+  ball.setPosition([2 * 32 + 16, 16, 16]);
+  physics.step();
+  assert.deepEqual(
+    kinds(voxels),
+    { '-1,0,0': v, '0,0,0': v, '1,0,0': m, '2,0,0': m, '3,0,0': m, '4,0,0': m },
+    'chunk 1 is a mesh once the ball is within a chunk of it; chunk 4, two chunks away, stays one',
+  );
+  const builds = calls.builds;
+  for (let i = 0; i < 10; i++) {
+    ball.setPosition([i & 1 ? 95.99 : 96.01, 16, 16]); // on the chunk 2 | 3 border
+    physics.step();
+  }
+  assert.equal(calls.builds, builds, 'a ball on a chunk border makes nothing flip');
+  ball.remove();
+  physics.step();
+  assert.deepEqual(
+    kinds(voxels),
+    { '-1,0,0': v, '0,0,0': v, '1,0,0': v, '2,0,0': v },
+    'without the ball: voxels again, chunks beyond two of the box dropped',
+  );
+  physics.dispose();
+});
+
+rtest('mixed scene: balls, capsules and boxes over mesh and voxel chunks', () => {
+  const next = random(11),
+    { physics, world, voxels } = setup();
+  ledges(world, 192); // six chunks along x: balls start in the first two
+  const bodies = [];
+  for (let i = 0; i < 12; i++) {
+    const kind = i % 3,
+      position = [kind ? 6 + next() * 170 : 6 + next() * 50, 4 + next() * 2, 6 + next() * 52],
+      body = physics.addBody(null, {
+        position,
+        linearVelocity: [(next() - 0.5) * 10, 0, (next() - 0.5) * 10],
+        colliders:
+          kind === 0
+            ? { shape: 'sphere', radius: 0.3 }
+            : kind === 1
+              ? { shape: 'capsule', halfHeight: 0.3, radius: 0.3 }
+              : { shape: 'box', halfExtents: [0.3, 0.3, 0.3] },
+      });
+    bodies.push(body);
+  }
+  const seen = new Set();
+  let lowest = Infinity;
+  for (let i = 0; i < 400; i++) {
+    physics.step();
+    for (const kind of Object.values(kinds(voxels))) seen.add(kind);
+    for (const b of bodies) {
+      const [x, y, z] = b.position;
+      if (x > 1 && x < 191 && z > 1 && z < 63) lowest = Math.min(lowest, y);
+    }
+  }
+  assert.deepEqual([...seen].sort(), ['mesh', 'voxels'], 'both kinds of collider at once');
+  assert.ok(lowest > 0.2, `no body sank through the terrain (lowest centre ${lowest})`);
+  physics.dispose();
+});
+
+rtest('cubes slide between the mesh chunks around a ball and voxel chunks without snagging (seeded)', () => {
+  for (let seed = 1; seed <= 12; seed++) {
+    const next = random(seed),
+      { physics, world, voxels } = setup();
+    fill(world, 0, 128, -2, 1, 0, 32, stone);
+    // A ball in chunk 0 makes chunks 0 and 1 meshes; chunk 2 stays voxels. Odd seeds go mesh -> voxels.
+    ballBody(physics, 0.4, [16, 8, 16], { body: { type: 'kinematicPosition' } });
+    const out = seed & 1,
+      half = 0.3 + next() * 0.2,
+      v = [(out ? 1 : -1) * (3 + next() * 6), 0, (next() - 0.5) * 3],
+      body = cube(physics, half, [out ? 58 : 70, 1 + half + 0.002, 10 + next() * 10], v);
+    let bump = 0,
+      spin = 0;
+    for (let i = 0; i < 300 && Math.abs(body.position[0] - 64) < 7; i++) {
+      physics.step();
+      if (i > 3) {
+        bump = Math.max(bump, Math.abs(body.linearVelocity[1]));
+        spin = Math.max(spin, Math.hypot(...body.angularVelocity));
+      }
+    }
+    const k = kinds(voxels);
+    assert.ok(k['1,0,0'] === 'mesh' && k['2,0,0'] === 'voxels', `seed ${seed}: a mesh | voxels border at x 64`);
+    assert.ok(out ? body.position[0] > 70 : body.position[0] < 58, `seed ${seed}: crossed it (x ${body.position[0]})`);
+    assert.ok(bump < 0.05 && spin < 0.05, `seed ${seed}: no kick or tumble (|vy| ${bump}, |w| ${spin})`);
+    assert.ok(Math.abs(body.linearVelocity[0] - v[0]) < 0.01 * Math.abs(v[0]), `seed ${seed}: kept its speed`);
+    physics.dispose();
+  }
 });
 
 rtest('cubes slide across chunk borders without snagging (seeded)', () => {
@@ -138,7 +383,7 @@ rtest('an edit on a chunk border keeps the seam smooth (propagateVoxelChange)', 
   physics.dispose();
 });
 
-rtest('colliders follow the radius rule: near moving bodies, loaded chunks only', () => {
+rtest('colliders follow the radius rule: near moving bodies, loaded chunks only, kept one chunk further', () => {
   const { physics, world, voxels } = setup({}, [0, 0, 0]);
   for (let cx = -3; cx <= 3; cx++) fill(world, cx * 32, cx * 32 + 32, 0, 1, 0, 32, stone);
   const body = physics.addBody(null, {
@@ -148,16 +393,22 @@ rtest('colliders follow the radius rule: near moving bodies, loaded chunks only'
   physics.step();
   assert.deepEqual(keys(voxels), ['-1,0,0', '0,0,0', '1,0,0'], 'the body chunk and its loaded neighbours');
   assert.equal(physics.world.colliders.len(), 4, 'three chunk colliders and the body');
+  let builds = calls.builds;
+  for (let i = 0; i < 10; i++) {
+    body.setPosition([i & 1 ? 31.99 : 32.01, 16, 16]); // on the chunk 0 | 1 border
+    physics.step();
+  }
+  assert.equal(calls.builds, builds + 1, 'a body on a chunk border builds chunk 2 once and drops nothing');
   body.setPosition([3 * 32 + 16, 16, 16]);
   physics.step();
-  assert.deepEqual(keys(voxels), ['2,0,0', '3,0,0'], 'moved with the body; chunk 4 is not loaded');
+  assert.deepEqual(keys(voxels), ['1,0,0', '2,0,0', '3,0,0'], 'moved with the body; chunk 1 kept, 4 not loaded');
   const other = physics.addBody(null, { type: 'kinematicPosition', position: [-3 * 32 + 5, 5, 5], colliders: [] });
   physics.step();
-  assert.deepEqual(keys(voxels), ['-2,0,0', '-3,0,0', '2,0,0', '3,0,0'], 'kinematic bodies count too');
+  assert.deepEqual(keys(voxels), ['-2,0,0', '-3,0,0', '1,0,0', '2,0,0', '3,0,0'], 'kinematic bodies count too');
   world.removeChunk(3, 0, 0);
   physics.step();
-  assert.deepEqual(keys(voxels), ['-2,0,0', '-3,0,0', '2,0,0'], 'an unloaded chunk loses its collider');
-  const builds = calls.builds;
+  assert.deepEqual(keys(voxels), ['-2,0,0', '-3,0,0', '1,0,0', '2,0,0'], 'an unloaded chunk loses its collider');
+  builds = calls.builds;
   fill(world, 96, 128, 0, 1, 0, 32, dirt); // loads it again
   physics.step();
   assert.ok(voxels.colliders.has('3,0,0') && calls.builds === builds + 1, 'a reloaded chunk gets one again');
@@ -178,13 +429,13 @@ rtest('colliders follow the radius rule: near moving bodies, loaded chunks only'
 
 rtest('a chunk that comes back after edits made out of range leaves no stale seam', () => {
   const { physics, world, voxels } = setup();
-  fill(world, 0, 96, -1, 0, 0, 16, stone); // floor, top at y 0
+  fill(world, 0, 128, -1, 0, 0, 16, stone); // floor, top at y 0
   fill(world, 30, 34, 0, 1, 0, 16, stone); // a wall across the chunk border x 32
   const body = cube(physics, 0.4, [20, 0.402, 8.3], [0, 0, 0]);
   physics.step();
-  body.setPosition([2 * 32 + 16, 0.402, 8.3]); // away: chunk 0 drops out of range, chunk 1 stays
+  body.setPosition([3 * 32 + 16, 0.402, 8.3]); // away: chunk 0 drops out of range, chunk 1 stays
   physics.step();
-  assert.deepEqual(keys(voxels), ['1,-1,0', '1,0,0', '2,-1,0']);
+  assert.deepEqual(keys(voxels), ['1,-1,0', '1,0,0', '2,-1,0', '3,-1,0']);
   fill(world, 30, 32, 0, 1, 0, 16, 0); // chunk 0's half of the wall goes while it has no collider
   const builds = calls.builds;
   body.setPosition([20, 0.402, 8.3]);
@@ -205,88 +456,127 @@ rtest('a chunk that comes back after edits made out of range leaves no stale sea
   physics.dispose();
 });
 
-rtest('edits update colliders in place and match the world (ray oracle, seeded)', () => {
-  const next = random(7),
-    { physics, world, voxels } = setup({}, [0, 0, 0]);
-  const height = (x, z) => 6 + Math.floor(8 + 7 * Math.sin(x * 0.21) * Math.cos(z * 0.17));
-  const edits = [];
-  for (let x = -32; x < 64; x++)
-    for (let z = -32; z < 64; z++)
-      for (let y = 0; y < height(x, z); y++) edits.push(x, y, z, y > 9 && (x + z) % 3 ? dirt : stone);
-  world.setBlocks(edits);
-  physics.addBody(null, { type: 'kinematicPosition', position: [16, 16, 16], colliders: [] });
-  const builds = calls.builds;
-  physics.step();
-  assert.equal(voxels.colliders.size, 9);
-  assert.equal(calls.builds, builds + 9, 'one build per chunk');
-  const ray = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }),
-    solid = (x, y, z) => blocks.get(world.getBlock(x, y, z) & 0xffff).solid;
-  // Every ray from outside the 3 x 1 x 3 chunks must hit the first solid cell the world has on its line.
-  const check = (label) => {
-    physics.step();
-    let rays = 0;
-    const cast = (origin, dir, expected) => {
-      ray.origin = { x: origin[0], y: origin[1], z: origin[2] };
-      ray.dir = { x: dir[0], y: dir[1], z: dir[2] };
-      const hit = physics.world.castRay(ray, 200, true),
-        got = hit ? hit.timeOfImpact : null;
-      rays++;
-      if (expected === null ? got !== null : got === null || Math.abs(got - expected) > 1e-3)
-        assert.fail(`${label}: ray from ${origin} along ${dir} hit ${got}, expected ${expected}`);
-    };
+for (const mesh of [false, true])
+  rtest(`edits keep ${mesh ? 'mesh' : 'voxel'} colliders matching the world (ray oracle, seeded)`, () => {
+    const next = random(7),
+      { physics, world, voxels } = setup({}, [0, 0, 0]);
+    const height = (x, z) => 6 + Math.floor(8 + 7 * Math.sin(x * 0.21) * Math.cos(z * 0.17));
+    const edits = [];
     for (let x = -32; x < 64; x++)
-      for (let z = -32; z < 64; z++) {
-        let y = 31;
-        while (y >= 0 && !solid(x, y, z)) y--;
-        cast([x + 0.5, 40, z + 0.5], [0, -1, 0], y < 0 ? null : 40 - (y + 1));
-      }
-    for (let y = 0; y < 32; y += 3)
-      for (let z = -32; z < 64; z += 5) {
-        let x = -32;
-        while (x < 64 && !solid(x, y, z)) x++;
-        cast([-40, y + 0.5, z + 0.5], [1, 0, 0], x === 64 ? null : x + 40);
-        x = 63;
-        while (x >= -32 && !solid(x, y, z)) x--;
-        cast([70, y + 0.5, z + 0.5], [-1, 0, 0], x < -32 ? null : 70 - (x + 1));
-      }
-    return rays;
-  };
-  check('before edits');
-  const before = { ...calls };
-  let flips = 0;
-  for (let i = 0; i < 600; i++) {
-    const cell = [-32 + Math.floor(next() * 96), Math.floor(next() * 24), -32 + Math.floor(next() * 96)];
-    if (next() < 0.5) cell[next() < 0.5 ? 0 : 2] = [-1, 0, 31, 32][Math.floor(next() * 4)]; // chunk borders
-    const state = [0, stone, dirt, flower][Math.floor(next() * 4)],
-      was = world.getBlock(...cell);
-    if (blocks.get(state).solid !== blocks.get(was & 0xffff).solid) flips++;
-    world.setBlock(...cell, state);
-  }
-  const rays = check('after 600 edits'),
-    updates = calls.setVoxel - before.setVoxel;
-  assert.equal(calls.builds, before.builds, 'no rebuilds');
-  assert.ok(flips > 200 && updates >= flips, `${updates} setVoxel calls for ${flips} solidity flips`);
-  world.setBlock(-30, 0, -30, 0);
-  const kept = calls.setVoxel;
-  world.setBlock(-30, 0, -30, stone); // air -> stone: one setVoxel
-  world.setBlock(-30, 0, -30, dirt); // stone -> dirt: still solid
-  world.setBlock(-30, 30, -30, flower); // air -> flower: still not solid
-  assert.equal(calls.setVoxel, kept + 1, 'only the solidity change touched the collider');
-  assert.ok(rays > 9000);
-  physics.dispose();
-});
+      for (let z = -32; z < 64; z++)
+        for (let y = 0; y < height(x, z); y++) edits.push(x, y, z, y > 9 && (x + z) % 3 ? dirt : stone);
+    world.setBlocks(edits);
+    // A kinematic body (a ball for meshes) whose radius covers all 9 chunks; rays skip it.
+    const anchor = physics.addBody(null, {
+      type: 'kinematicPosition',
+      position: [16, 16, 16],
+      colliders: mesh ? { shape: 'sphere', radius: 0.4 } : [],
+    });
+    const builds = calls.builds;
+    physics.step();
+    assert.equal(voxels.colliders.size, 9);
+    assert.equal(calls.builds, builds + (mesh ? 18 : 9), mesh ? 'voxels and a mesh per chunk' : 'one build per chunk');
+    assert.ok(Object.values(kinds(voxels)).every((kind) => kind === (mesh ? 'mesh' : 'voxels')));
+    const ray = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }),
+      solid = (x, y, z) => blocks.get(world.getBlock(x, y, z) & 0xffff).solid;
+    // Every ray from outside the 3 x 1 x 3 chunks must hit the first solid cell the world has on its line.
+    const check = (label) => {
+      physics.step();
+      let rays = 0;
+      const cast = (origin, dir, expected) => {
+        ray.origin = { x: origin[0], y: origin[1], z: origin[2] };
+        ray.dir = { x: dir[0], y: dir[1], z: dir[2] };
+        const hit = physics.world.castRay(ray, 200, true, undefined, undefined, undefined, anchor.raw),
+          got = hit ? hit.timeOfImpact : null;
+        rays++;
+        if (expected === null ? got !== null : got === null || Math.abs(got - expected) > 1e-3)
+          assert.fail(`${label}: ray from ${origin} along ${dir} hit ${got}, expected ${expected}`);
+      };
+      for (let x = -32; x < 64; x++)
+        for (let z = -32; z < 64; z++) {
+          let y = 31;
+          while (y >= 0 && !solid(x, y, z)) y--;
+          cast([x + 0.5, 40, z + 0.5], [0, -1, 0], y < 0 ? null : 40 - (y + 1));
+        }
+      // Rows along x and along z through every cell height the edits reach.
+      for (let y = 0; y < 24; y++)
+        for (let a = -32; a < 64; a++) {
+          let b = -32;
+          while (b < 64 && !solid(b, y, a)) b++;
+          cast([-40, y + 0.5, a + 0.5], [1, 0, 0], b === 64 ? null : b + 40);
+          b = 63;
+          while (b >= -32 && !solid(b, y, a)) b--;
+          cast([70, y + 0.5, a + 0.5], [-1, 0, 0], b < -32 ? null : 70 - (b + 1));
+          b = -32;
+          while (b < 64 && !solid(a, y, b)) b++;
+          cast([a + 0.5, y + 0.5, -40], [0, 0, 1], b === 64 ? null : b + 40);
+          b = 63;
+          while (b >= -32 && !solid(a, y, b)) b--;
+          cast([a + 0.5, y + 0.5, 70], [0, 0, -1], b < -32 ? null : 70 - (b + 1));
+        }
+      return rays;
+    };
+    check('before edits');
+    const before = { ...calls };
+    let flips = 0;
+    for (let i = 0; i < 600; i++) {
+      const cell = [-32 + Math.floor(next() * 96), Math.floor(next() * 24), -32 + Math.floor(next() * 96)];
+      if (next() < 0.5) cell[next() < 0.5 ? 0 : 2] = [-1, 0, 31, 32][Math.floor(next() * 4)]; // chunk borders
+      const state = [0, stone, dirt, flower][Math.floor(next() * 4)],
+        was = world.getBlock(...cell);
+      if (blocks.get(state).solid !== blocks.get(was & 0xffff).solid) flips++;
+      world.setBlock(...cell, state);
+      if (mesh && i % 100 === 99) check(`after ${i + 1} edits`); // meshes rebuild at the next step
+    }
+    const rays = check('after 600 edits'),
+      updates = calls.setVoxel - before.setVoxel;
+    if (mesh) assert.ok(calls.builds - before.builds <= 9 * 7, 'meshes: at most one rebuild per chunk and step');
+    else assert.equal(calls.builds, before.builds, 'no rebuilds');
+    assert.ok(flips > 200 && updates >= flips, `${updates} setVoxel calls for ${flips} solidity flips`);
+    // A shaft dug in chunk 0's last column, beside solid cells of chunks 0 and 1: from inside it, rays must hit
+    // the walls the digging exposed on both sides of the chunk border (each in its own chunk's collider).
+    const shaft = [31, 2, 40, 31, 3, 40, 31, 4, 40, 30, 2, 40, 32, 2, 40, 30, 3, 40, 32, 3, 40];
+    world.setBlocks(shaft.flatMap((c, i) => (i % 3 === 2 ? [c, stone] : [c])));
+    physics.step();
+    world.setBlock(31, 3, 40, 0);
+    world.setBlock(31, 2, 40, 0);
+    physics.step();
+    for (const [dir, side] of [
+      [1, 'chunk 1'],
+      [-1, 'chunk 0'],
+    ]) {
+      ray.origin = { x: 31.5, y: 2.5, z: 40.5 };
+      ray.dir = { x: dir, y: 0, z: 0 };
+      const hit = physics.world.castRay(ray, 10, true, undefined, undefined, undefined, anchor.raw);
+      assert.ok(hit && Math.abs(hit.timeOfImpact - 0.5) < 1e-3, `the shaft wall in ${side} (hit ${hit?.timeOfImpact})`);
+    }
+    world.setBlock(-30, 0, -30, 0);
+    physics.step();
+    const kept = { ...calls };
+    world.setBlock(-30, 0, -30, stone); // air -> stone
+    world.setBlock(-30, 0, -30, dirt); // stone -> dirt: still solid
+    world.setBlock(-30, 30, -30, flower); // air -> flower: still not solid
+    physics.step();
+    assert.equal(calls.setVoxel, kept.setVoxel + 1, 'only the solidity change touched the voxel collider');
+    assert.equal(calls.builds, kept.builds + (mesh ? 1 : 0), mesh ? 'and rebuilt one mesh' : 'and rebuilt nothing');
+    assert.ok(rays > 18000);
+    physics.dispose();
+  });
 
 rtest('dispose removes every collider and stops following edits and steps', () => {
   const { physics, world, voxels } = setup();
   fill(world, -40, 40, 0, 1, -8, 8, stone);
   physics.addBody(null, { position: [0.5, 1.6, 0.5], colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] } });
+  ballBody(physics, 0.4, [-35.5, 1.5, 0.5]); // meshes in chunk x -2 and its neighbours
   physics.step();
-  assert.equal(physics.world.colliders.len(), 1 + voxels.colliders.size);
+  assert.ok(Object.values(kinds(voxels)).includes('mesh') && Object.values(kinds(voxels)).includes('voxels'));
+  assert.ok(physics.world.colliders.len() > 2 + voxels.colliders.size, 'mesh chunks keep a disabled voxel collider');
   voxels.dispose();
   assert.equal(voxels.colliders.size, 0);
-  assert.equal(physics.world.colliders.len(), 1, 'only the body collider is left');
+  assert.equal(physics.world.colliders.len(), 2, 'only the body colliders are left');
   const before = { ...calls };
   world.setBlock(3, 0, 3, 0);
+  world.setBlock(-36, 0, 0, 0);
   physics.step();
   assert.deepEqual(calls, before, 'no setVoxel, no rebuild after dispose');
   voxels.dispose();
@@ -317,13 +607,17 @@ rtest('arguments and an old Rapier are rejected with clear errors', () => {
 });
 
 rtest('benchmark: collider builds and edit updates (printed)', (t) => {
-  // One chunk alone in its world, built by the first step (Rapier's ColliderDesc.voxels included); best of 3.
-  const single = (make) => {
+  // One chunk alone in its world, built by the first step (Rapier's collider creation included); best of 3.
+  const single = (make, ball) => {
     let best = Infinity;
     for (let i = 0; i < 3; i++) {
       const { physics, world } = setup({}, [0, 0, 0]);
       world.addChunk(0, 0, 0, make());
-      physics.addBody(null, { type: 'kinematicPosition', position: [16, 16, 16], colliders: [] });
+      physics.addBody(null, {
+        type: 'kinematicPosition',
+        position: [16, 16, 16],
+        colliders: ball ? { shape: 'sphere', radius: 0.4 } : [],
+      });
       const start = performance.now();
       physics.step();
       best = Math.min(best, performance.now() - start);
@@ -345,10 +639,12 @@ rtest('benchmark: collider builds and edit updates (printed)', (t) => {
       for (let i = 0; i < 32768; i++) if (next() < 0.5) chunk.set(i & 31, i >> 10, (i >> 5) & 31, stone);
       return chunk;
     };
-  t.diagnostic(
-    `one chunk build: terrain surface ${single(surface)} ms, solid with open faces ${single(() => new VoxelChunk(stone))} ms, ` +
-      `50% random ${single(caves)} ms, air ${single(() => new VoxelChunk())} ms`,
-  );
+  for (const ball of [false, true])
+    t.diagnostic(
+      `one chunk, ${ball ? 'triangle mesh' : 'voxel collider'}: terrain surface ${single(surface, ball)} ms, ` +
+        `solid with open faces ${single(() => new VoxelChunk(stone), ball)} ms, 50% random ${single(caves, ball)} ms, ` +
+        `air ${single(() => new VoxelChunk(), ball)} ms`,
+    );
   // Terrain over 8 x 8 chunk columns: uniform stone at chunk y -2..0, the surface in chunk y 1, nothing above.
   const world = new VoxelWorld({ blocks }),
     height = (x, z) => 42 + Math.floor(8 * Math.sin(x * 0.13) * Math.cos(z * 0.11));
@@ -361,26 +657,35 @@ rtest('benchmark: collider builds and edit updates (printed)', (t) => {
       world.setBlocks(edits);
     }
   const physics = new Physics(null, { rapier: RAPIER, gravity: [0, 0, 0] }),
-    voxels = new VoxelPhysics(physics, world),
-    body = physics.addBody(null, { type: 'kinematicPosition', position: [-80, 40, -80], colliders: [] });
-  let builds = calls.builds,
-    start = performance.now();
-  physics.step();
-  const spawn = performance.now() - start,
-    spawned = calls.builds - builds;
-  let crossing = 0;
-  builds = calls.builds;
-  for (let i = 1; i <= 4; i++) {
-    body.setPosition([-80 + i * 32, 40, -80]);
-    start = performance.now();
+    voxels = new VoxelPhysics(physics, world);
+  for (const ball of [false, true]) {
+    const body = physics.addBody(null, {
+      type: 'kinematicPosition',
+      position: [-80, 40, ball ? 48 : -80],
+      colliders: ball ? { shape: 'sphere', radius: 0.4 } : [],
+    });
+    let builds = calls.builds,
+      start = performance.now();
     physics.step();
-    crossing += performance.now() - start;
+    const spawn = performance.now() - start,
+      spawned = calls.builds - builds;
+    let crossing = 0;
+    builds = calls.builds;
+    for (let i = 1; i <= 4; i++) {
+      body.setPosition([-80 + i * 32, 40, ball ? 48 : -80]);
+      start = performance.now();
+      physics.step();
+      crossing += performance.now() - start;
+    }
+    t.diagnostic(
+      `${ball ? 'a ball' : 'a body'} on terrain: spawn ${spawned} colliders in ${spawn.toFixed(1)} ms; crossing a ` +
+        `chunk border ${((calls.builds - builds) / 4).toFixed(1)} builds in ${(crossing / 4).toFixed(1)} ms`,
+    );
   }
-  const crossed = (calls.builds - builds) / 4,
-    cells = [];
-  for (const [key] of voxels.colliders) {
+  const cells = [];
+  for (const [key, collider] of voxels.colliders) {
     const [cx, cy, cz] = key.split(',').map(Number);
-    if (cy !== 1) continue;
+    if (cy !== 1 || collider.shapeType() === RAPIER.ShapeType.TriMesh) continue;
     for (let i = 0; i < 100; i++) {
       const x = cx * 32 + Math.floor(next() * 32),
         z = cz * 32 + Math.floor(next() * 32);
@@ -398,11 +703,21 @@ rtest('benchmark: collider builds and edit updates (printed)', (t) => {
   const without = edit(plain),
     updates = calls.setVoxel,
     withColliders = edit(world);
-  t.diagnostic(`spawn on terrain: ${spawned} chunk colliders in ${spawn.toFixed(1)} ms, coupling included`);
-  t.diagnostic(`a body crossing a chunk border: ${crossed} new colliders, ${(crossing / 4).toFixed(1)} ms`);
   t.diagnostic(
-    `dig + place at the surface: ${withColliders.toFixed(1)} us per edit with colliders (` +
+    `dig + place at the surface of voxel chunks: ${withColliders.toFixed(1)} us per edit (` +
       `${((calls.setVoxel - updates) / (cells.length / 3) / 2).toFixed(1)} setVoxel each), ${without.toFixed(1)} us without`,
+  );
+  // A mesh chunk rebuilds at the next step however many edits it took.
+  const [meshKey] = [...voxels.colliders].find(
+      ([key, c]) => key.split(',')[1] === '1' && c.shapeType() === RAPIER.ShapeType.TriMesh,
+    ),
+    [mx, , mz] = meshKey.split(',').map(Number),
+    builds = calls.builds;
+  world.setBlock(mx * 32 + 5, height(mx * 32 + 5, mz * 32 + 5) - 1, mz * 32 + 5, 0);
+  const start = performance.now();
+  physics.step();
+  t.diagnostic(
+    `an edit in a mesh chunk: ${calls.builds - builds} rebuild at the next step, ${(performance.now() - start).toFixed(1)} ms`,
   );
   physics.dispose();
 });

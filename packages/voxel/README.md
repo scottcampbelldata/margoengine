@@ -277,7 +277,7 @@ yours): a 1M-voxel model writes in about 10 ms and parses in about 6 ms (4 MiB);
 
 ## Physics (`@margoengine/voxel/physics`)
 
-Rapier voxel colliders for the chunks near moving bodies, so mobs, item drops and debris of a
+Rapier colliders for the chunks near moving bodies, so mobs, item drops, debris and balls of a
 [`@margoengine/physics`](../physics/README.md) world collide with the blocks. Needs `@margoengine/physics` (an optional
 peer: only this entry uses it) with `@dimforge/rapier3d-compat` 0.17.1 or newer.
 
@@ -288,29 +288,40 @@ import { VoxelPhysics } from '@margoengine/voxel/physics';
 const physics = Physics.attach(engine, { rapier: RAPIER });
 const voxels = new VoxelPhysics(physics, world, { radius: 1 });
 physics.addBody(mesh, { colliders: { shape: 'box' } }); // lands on the blocks
+physics.addBody(ball, { colliders: { shape: 'sphere' } }); // rolls on them (triangle meshes, see below)
 world.setBlock(x, y, z, 0); // the collider changes in place; the body falls
-voxels.colliders; // Map of chunk key -> Rapier collider
+voxels.colliders; // Map of chunk key -> the Rapier collider bodies touch
 voxels.dispose();
 ```
 
 - **Which chunks.** Before each physics step, every loaded chunk within `radius` chunks (per axis, default 1: the
-  body's chunk and its 26 neighbours) of any non-fixed body gets one collider; sleeping bodies count, so they keep their
-  floor, and kinematic ones count, so character controllers walk on blocks. Chunks out of range or unloaded lose theirs.
+  body's chunk and its 26 neighbours) of any non-fixed body gets a collider; sleeping bodies count, so they keep their
+  floor, and kinematic ones count, so character controllers walk on blocks. A chunk keeps it until no body is within
+  `radius + 1` (a body resting on a chunk border does not make chunks come and go) or the chunk unloads.
 - **What collides.** The chunk's surface: cells of block types with `solid` (the default) that touch a non-solid cell
   or an unloaded chunk. Buried cells are left out, so an underground chunk costs almost nothing.
-- **Seams and edits.** Neighbouring colliders are coupled with Rapier's `combineVoxelStates`, so bodies slide across
-  chunk borders without catching on internal edges. `onChange` edits call `setVoxel` (and `propagateVoxelChange` on
-  chunk borders): no rebuilds. A digging edit adds the solid cells it uncovers.
+- **Seams and edits.** Each chunk has a Rapier voxel collider, coupled with its neighbours through
+  `combineVoxelStates`, so bodies slide across chunk borders without catching on internal edges. `onChange` edits
+  call `setVoxel` (and `propagateVoxelChange` on chunk borders): no rebuilds. A digging edit adds the solid cells it
+  uncovers.
+- **Balls.** Rapier 0.21.0 panics (`RuntimeError: unreachable`, which ends the Rapier instance) when a `sphere`
+  collider meets a voxel edge: rolling off a ledge, across a chunk border or into a wall (open upstream reports:
+  rapier issues 1029 and 1043). So chunks within `radius` of a body with a `sphere` collider also get a triangle mesh
+  of the same faces (merged into rectangles, built with `FIX_INTERNAL_EDGES` so balls roll over edges and seams without
+  a kick) and their voxel collider is disabled; it is still edited and coupled, so voxel chunks beside them stay
+  seamless for boxes and capsules. They switch back once no ball body is within `radius + 1`. An edit in or beside
+  a mesh chunk rebuilds its mesh before the next step. Rapier can drop up to one step of travel where a ball passes
+  from one collider to the next (separate Rapier boxes do the same); there is no bump.
 - **Not physics bodies.** `Physics` collision events and queries skip these colliders; pick with
   `raycastVoxels` (`./query`).
-- **Known Rapier bug.** Rapier 0.21.0 panics (`RuntimeError: unreachable`, ending the Rapier instance) when a
-  `sphere` collider meets a voxel edge: rolling off a ledge, across a chunk border or into a wall. Give round bodies a
-  `convexHull` or a capsule until Rapier fixes it; boxes, capsules, cylinders and convex hulls work.
 
-Measured with Node on the development laptop (2026-10-19; `node --test packages/voxel/tests/physics.test.js` prints
-yours): one terrain-surface chunk builds in about 2 ms (Rapier's collider creation is most of it), a uniform air chunk in
-0.2 ms; a body spawning on terrain builds 18 colliders in about 16 ms and crossing a chunk border builds 6 in 5-7 ms;
-a surface dig or place costs about 3 us with colliders against 0.5 us without.
+Measured with Node on the development laptop (2026-10-19, other jobs running; `node --test
+packages/voxel/tests/physics.test.js` prints yours). Per chunk, best of 15: a terrain-surface chunk builds its voxel
+collider in 1.5 ms and its triangle mesh (2,280 triangles) in 4.9 ms; a uniform stone chunk with open faces 1.8 ms and
+1.2 ms; a 50% random cave chunk 4.4 ms and 125 ms (65,876 triangles), the worst case for a ball. A body spawning on
+terrain builds 18 voxel colliders in 12-43 ms, a ball 15 voxel colliders and 15 meshes in 48-109 ms. A dig or
+place on voxel chunks costs 2-6 us against 0.4-1.3 us without colliders; an edit in a mesh chunk costs one 2-6 ms
+rebuild at the next step.
 
 ## Meshing in workers: `VoxelMesher`
 
