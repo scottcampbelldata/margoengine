@@ -56,7 +56,8 @@ Everything here is on branch `worktree-agent-a63cac143225721f2` (not pushed, Cod
   emitter, cloud): 94-96% of pixels within 3 levels, 99.5-100% within 6, mean 1.3-1.5 levels (noise level).
 - Calibration boards: diffuse, metal, plastic, sun, sky, exposure, ACES: every tile within 3 levels; emitters (with
   `_ldr`) every tile; sun penumbra 99.6-99.9% of pixels within 3; horizon 98-99.5%; metal reflections 96%.
-- Our render time for those scenes: 1.7-2.2 s each (A6000). MagicaVoxel's time is not measured yet.
+- Speed, same A6000, 960 x 800 at 1024 samples: MagicaVoxel about 14 s (glass) and 15 s (diffuse) by stopwatch on
+  its progress bar (+-1 s); ours 1.85 s and 1.70 s (`capture`), about 8x faster. Ours 1.7-2.2 s on all six scenes.
 
 ## Open: match MagicaVoxel
 
@@ -78,7 +79,6 @@ Everything here is on branch `worktree-agent-a63cac143225721f2` (not pushed, Cod
 9. Blend materials (`_type _blend`) and metal Fresnel at grazing angles (rough red metal: 1-5 levels): not compared
    beyond the sky boards.
 10. Emitter light on the ground near emitters: ours about 6% brighter.
-11. Render speed: time MagicaVoxel on the same scenes (stopwatch on its progress bar) and record both.
 
 ## Open: exceed MagicaVoxel (already in the tracer, keep proving)
 
