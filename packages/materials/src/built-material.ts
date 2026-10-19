@@ -18,6 +18,7 @@ import { extendedMaterials } from '@margoengine/gltf-pro/extended';
 import { physicalMapsShader } from './physical-maps.js';
 import { depthDistanceShader } from './depth-distance.js';
 import { readResponse } from '../../shared/loading.js';
+import { clusterBrdf } from '../../shared/light-terms.js';
 import { MargoError } from '@margoengine/math/errors';
 import { parseColor, type ColorInput } from '@margoengine/math/color';
 export type { TextureTransform, MaterialSide } from '@margoengine/gltf-pro';
@@ -803,9 +804,11 @@ const liveColor = (values: number[], label: string): LiveColor =>
 // base. Blinn-Phong (Blinn 1977) is the microfacet BRDF D*F*G/(4 n.l n.v) with Blinn's distribution normalised over
 // projected microfacet area, D = (n+2)/(2 pi) (n.h)^n, the implicit G = n.l n.v and F = the specular colour, which
 // leaves (n+2)/(8 pi) (n.h)^n * specular. margoFront and margoAmbientLayers are the layered hook interface
-// (shared/pbr-hooks.js): local lights shade the surface as a dielectric of the matching microfacet roughness (Walter et al.
-// 2007: Beckmann alpha = sqrt(2/(n+2)), roughness = sqrt(alpha); Lambert is roughness 1), and an ambient hook (IBL,
-// probes) keeps only its diffuse part, the term on the surface minus the term on a black surface.
+// (shared/pbr-hooks.js): clustered point and spot lights get these same BRDFs (`litShader`); other local-light hooks
+// (area lights) shade the surface as a dielectric of the matching microfacet roughness (Walter et al. 2007: Beckmann
+// alpha = sqrt(2/(n+2)), roughness = sqrt(alpha); Lambert is roughness 1), and an ambient hook (IBL, probes) keeps only
+// its diffuse part, the term on the surface minus the term on a black surface.
+const phongLobe = (n: string) => `mat_phong.rgb*(mat_phong.w+2)/25.13274123*pow(max(dot(${n},h),0.0001),mat_phong.w)`;
 const litEdits = (phong: boolean): [RegExp | string, string][] => [
   [
     /fn hemisphere_ambient\(s:Surface\)->vec3f \{[^}]*\}/,
@@ -814,7 +817,7 @@ const litEdits = (phong: boolean): [RegExp | string, string][] => [
   [
     /fn direct_light\(s:Surface,v:vec3f,l:vec3f\)->vec3f \{[^}]*\}/,
     `fn direct_light(s:Surface,v:vec3f,l:vec3f)->vec3f {
-  let nl=clamp(dot(s.n,l),0.0,1.0);${phong ? '\n  let h=(v+l)/max(length(v+l),0.0001); let spec=mat_phong.rgb*(mat_phong.w+2)/25.13274123*pow(max(dot(s.n,h),0.0001),mat_phong.w);' : ''}
+  let nl=clamp(dot(s.n,l),0.0,1.0);${phong ? `\n  let h=(v+l)/max(length(v+l),0.0001); let spec=${phongLobe('s.n')};` : ''}
   return (s.base.rgb/3.14159265${phong ? '+spec' : ''})*nl*f.radiance.rgb*f.light.w;
 }`,
   ],
@@ -974,6 +977,28 @@ export function materialShader(source: string, group: number, shading: Shading):
   if (!cache) patched.set(source, (cache = new Map()));
   cache.set(key, output);
   return output;
+}
+const localTerm = 'result+=' + clusterBrdf + '*nl*',
+  composed = { lambert: new Map<string, string>(), phong: new Map<string, string>() };
+/**
+ * `code` with its lighting effects composed in (gltf-pro's `lit` hook): Lambert and Phong put their own BRDF in place of
+ * clustered's per-light GGX term, so point and spot lights shade them exactly as the directional light does. Other
+ * materials, and code without clustered lights, come back unchanged.
+ */
+function litShader(m: Material, code: string): string {
+  const phong = m.shading === 'phong';
+  if (!phong && m.shading !== 'lambert') return code;
+  const cache = composed[m.shading as 'lambert' | 'phong'];
+  let out = cache.get(code);
+  if (out === undefined) {
+    if (cache.size >= 64) cache.clear();
+    out = code.includes(localTerm)
+      ? code.split(localTerm).join('result+=margoLocalBrdf(n,v,l,base)*nl*') +
+        `\nfn margoLocalBrdf(n:vec3f,v:vec3f,l:vec3f,base:vec3f)->vec3f {${phong ? `let h=(v+l)/max(length(v+l),0.0001);return base/3.14159265+${phongLobe('n')};` : 'return base/3.14159265;'}}\n`
+      : code;
+    cache.set(code, out);
+  }
+  return out;
 }
 /** Live values: colours, scalar setters, map assignments and render state apply on the next frame to every mesh using the material. Shading is fixed. */
 export class Material {
@@ -2049,6 +2074,7 @@ function surface(g: PBRMaterial, current: () => Material, runtime: Engine): void
           return mapped(m) && m.transmissive;
         },
         shader: (code: string, group: number) => current().shader(code, group),
+        lit: (code: string) => litShader(current(), code),
         bindings: () => current().bindings(runtime.gpu!, runtime),
       } satisfies PBRMaterialShading,
     },

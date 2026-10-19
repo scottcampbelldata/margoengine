@@ -12,3 +12,6 @@ export const decayTerms = /* wgsl */ `let kind=light.params.y;let legacy=kind==0
     var cone=1.0;if(kind>0.5){let x=dot(-l,light.directionOuter.xyz);let lo=light.directionOuter.w;let hi=light.params.x;
       if(legacy){cone=clamp((x-lo)/max(hi-lo,0.00001),0.0,1.0);}else if(hi>lo){cone=clamp((x-lo)/(hi-lo),0.0,1.0);}else{cone=select(0.0,1.0,x>=lo);}
       cone*=cone*(3-2*cone);}`;
+// The per-light BRDF of clustered's light loop (GGX with Fresnel, as gltf-pro's direct light), in the loop's locals (n, v,
+// l, h, base, metal, nl, nv, d, g, fresnel). @margoengine/materials' Lambert and Phong put their own BRDF in its place.
+export const clusterBrdf = '((1-fresnel)*(1-metal)*base/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))';

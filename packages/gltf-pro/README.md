@@ -192,7 +192,10 @@ point's static resource interface. `extension.lighting: false` suppresses
 scene lighting while retaining the material's own shading. Callbacks own their
 resources and must recreate them after device restoration. Cross-device
 renderers reject local shading until the caller recreates it for that device;
-same-device renderers can reuse it.
+same-device renderers can reuse it. Its optional `lit(code)` rewrites the shader
+after the `addLighting()` effects are composed in (materials' Lambert and Phong
+put their own BRDF in clustered's light loop there); returning `code` changes
+nothing.
 
 ### Optional material extension slot
 

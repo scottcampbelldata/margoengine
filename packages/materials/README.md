@@ -449,9 +449,10 @@ are ignored.
 
 Both use the engine's directional light and ambient, and compose with shadows, fog and SSAO through gltf-pro's
 lighting hooks. An environment (`EnvironmentLighting`, probes) adds only its diffuse part. Clustered point and spot
-lights shade these surfaces with their own microfacet model, as a dielectric of the matching roughness
-(`(2 / (shininess + 2)) ** 0.25`, Walter et al. 2007; 1 for Lambert): diffuse matches, the highlight shape is close and
-its strength follows F0 0.04 rather than `specular`. `exportModel` writes both as metallic 0 with that roughness.
+lights use the same Lambert and Blinn-Phong terms as the directional light. Rectangle area lights
+(`@margoengine/clustered/area`) shade these surfaces as a dielectric of the matching roughness
+(`(2 / (shininess + 2)) ** 0.25`, Walter et al. 2007; 1 for Lambert). `exportModel` writes both as metallic 0 with that
+roughness.
 
 ```ts
 const tiles = new Material({shading: 'phong', map: tileset, specular: '#222222', shininess: 12, alphaTest: 0.5});

@@ -32,8 +32,12 @@ const display = (c) => {
 const base = ((188 / 255 + 0.055) / 1.055) ** 2.4,
   diffuse = [0.675, 0.65, 0.625].map((sky) => base * (2 / Math.PI + 0.1 * sky)),
   // Blinn-Phong at n.h = 1: specular 0.1 * (30 + 2) / (8 pi) * n.l (1) * irradiance (2).
-  highlight = ((0.1 * 32) / (8 * Math.PI)) * 2;
+  highlight = ((0.1 * 32) / (8 * Math.PI)) * 2,
+  // A clustered point light 1 unit away (intensity 2, range 100: window (1 - 1e-8)^2), straight on: n.l = n.h = 1.
+  local = (base * 2) / Math.PI;
 const expected = {
+  clusteredLambert: display([local, local, local]),
+  clusteredPhong: display([local + highlight, local + highlight, local + highlight]),
   lambert: display(diffuse),
   phong: display(diffuse.map((d) => d + highlight)),
   phongFog: [255, 0, 255],
@@ -72,6 +76,8 @@ try {
     'phongFog',
     'iblLambert',
     'iblStandard',
+    'clusteredLambert',
+    'clusteredPhong',
     'litEffects',
     'video',
   ]) {

@@ -1,4 +1,4 @@
-import { legacyTerms, decayTerms } from '../../shared/light-terms.js';
+import { legacyTerms, decayTerms, clusterBrdf } from '../../shared/light-terms.js';
 const declarations = (group: number) => /* wgsl */ `
 struct ClusterFrame {view:mat4x4f,grid:vec4u,screen:vec4f,depth:vec4f,intensity:vec4f}
 struct ClusterLight {positionRange:vec4f,colorIntensity:vec4f,directionOuter:vec4f,params:vec4f}
@@ -74,7 +74,7 @@ fn clusterLighting(pixel:vec2f,position:vec3f,n:vec3f,eye:vec3f,base:vec3f,rough
     let g=2*nv/(nv+sqrt(a2+(1-a2)*nv*nv))*2*nl/max(nl+sqrt(a2+(1-a2)*nl*nl),0.0001);
     let f0=mix(vec3f(0.04),base,metal);let fresnel=f0+(1-f0)*pow(1-vh,5.0);
     ${decay ? decayTerms : legacyTerms}
-    result+=((1-fresnel)*(1-metal)*base/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl*light.colorIntensity.rgb*light.colorIntensity.w*falloff*cone${hook ? term('clusterShadow(light,position,n)') : ''}${shadows ? term('clusterShadowVisibility(light,position,n)') : ''};
+    result+=${clusterBrdf}*nl*light.colorIntensity.rgb*light.colorIntensity.w*falloff*cone${hook ? term('clusterShadow(light,position,n)') : ''}${shadows ? term('clusterShadowVisibility(light,position,n)') : ''};
   }
   return ${area ? '(result+clusterAreaLighting(position,n,v,nv,base,roughness,metal))' : 'result'}*clusterFrame.intensity.x;
 }`;

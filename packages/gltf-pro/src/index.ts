@@ -623,6 +623,11 @@ export interface LightingEffect {
 export interface PBRMaterialShading extends LightingEffect {
   readonly replacesTextures?: boolean;
   readonly texturedTint?: boolean;
+  /**
+   * Rewrites the shader once the model's lighting effects are composed in (`shader` runs before them): Lambert and Phong
+   * materials give clustered lights their own BRDF there. Return `code` itself to leave it unchanged.
+   */
+  lit?(code: string): string;
 }
 function uploadCompressedImage(
   device: GPUDevice,
@@ -2120,6 +2125,7 @@ export class PBRModel implements EnginePlugin {
           const surface = scratch.code;
           // Effects with `pbr` hooks compose at gltf-pro's hook points; others (materials, LOD baking) still patch the text.
           if (mode !== 'gbuffer' && lighting) this.lighting.forEach(patchDrawLighting, scratch);
+          if (shading?.lit) scratch.code = shading.lit(scratch.code);
           const patched = scratch.code,
             ambient = scratch.ambient;
           // An `ambient` hook (environment IBL) is what SSAO's ambient replay returns from the lit fragment, `_=color` keeping every

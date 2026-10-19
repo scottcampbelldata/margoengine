@@ -63,6 +63,10 @@ const plugin=p=>({destroy(){p.dispose?.();engine.removePlugin(p.name);}});
 scenarios.lambert=()=>lit(new Material({shading:'lambert',map:solid(188,188,188)}));
 scenarios.phong=()=>lit(new Material({shading:'phong',map:solid(188,188,188),specular:[0.1,0.1,0.1],shininess:30}));
 scenarios.phongFog=()=>lit(new Material({shading:'phong',map:solid(188,188,188)}),m=>{const fog=Fog.attach(engine,{color:'#ff00ff',near:0,far:0.01});fog.add(m);return plugin(fog);});
+// One clustered point light 1 unit in front of the plane's centre (intensity 2, range 100), no directional light, no ambient.
+const local=material=>{const light=[...engine.lighting.direction],radiance=[...engine.lighting.radiance];engine.lighting.direction[3]=0;engine.lighting.radiance[3]=0;const lights=Clustered.attach(engine),m=createMesh(engine,planeGeometry(2,2),material);lights.add(m);lights.setLights([{position:[0,0,1],range:100,intensity:2}]);return {destroy(){m.destroy();plugin(lights).destroy();engine.lighting.direction.set(light);engine.lighting.radiance.set(radiance);}};};
+scenarios.clusteredLambert=()=>local(new Material({shading:'lambert',map:solid(188,188,188)}));
+scenarios.clusteredPhong=()=>local(new Material({shading:'phong',map:solid(188,188,188),specular:[0.1,0.1,0.1],shininess:30}));
 // A uniform environment: a black Lambert surface reflects none of it (no IBL specular), a black standard one does.
 const sky={width:8,height:4,data:new Float32Array(8*4*4).fill(2)};
 const ibl=shading=>async()=>{const lighting=await EnvironmentLighting.load(engine,sky),light=[...engine.lighting.direction];engine.lighting.direction[3]=0;const m=createMesh(engine,planeGeometry(2,2),new Material({shading,color:[0,0,0]}));lighting.add(m);return {destroy(){m.destroy();lighting.dispose();engine.lighting.direction.set(light);},step(){m.material.color.fill(1,0,3);}};};
