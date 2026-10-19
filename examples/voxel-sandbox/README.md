@@ -66,10 +66,11 @@ to load), quads, quad memory and draw calls (`voxels.stats`).
   under it is not loaded. Breaking and placing use `raycastVoxels` (reach 6); a solid block is never placed inside the
   body, plants need a solid block under them, and breaking a block also breaks a plant or torch standing on it.
 - **Light, sky, fog and post** live in one function, `setupLighting` in `src/lighting.ts`: `Sky` (Preetham, clouds,
-  sun and moon into `engine.lighting`), Sky's depth fog closing in before the render distance, Bloom (HDR and a little
-  glow), and the voxel `daylight` following the sky's night factor. The voxel renderer's own lighting hooks (shadows,
-  clustered lights, fog, IBL, day/night, water animation; `packages/voxel/DESIGN.md` phase 5) are being built in
-  parallel and go there when they land.
+  sun and moon into `engine.lighting`), sun and moon shadows (`Shadows`, 2 cascades to 96 blocks, the voxels added
+  with `{static: true}`), a `Clustered` point light on each of the 24 light-emitting blocks (torches, glowstone)
+  nearest the camera, Sky's depth fog closing in before the render distance, Bloom (HDR and a little glow), and the
+  voxel `daylight` following the sky's night factor. Water ripples and bobs (the renderer's liquid animation).
+  `window.voxelSandbox.scene` exposes the shadows and lights.
 
 ## Deterministic mode: screenshots and benchmarks
 
@@ -107,9 +108,10 @@ stream in, and chunks, quads, quad bytes, draws and chunk data bytes.
 ### Visual checks
 
 `scripts/visual-regression.js` defines `voxel-overview`, `voxel-ground` (high, light and phone) and `voxel-night`
-(high) on the site build's `/voxel/?view=...`. They are marked `pending` and have no baselines yet, because the
-renderer's lighting is still changing; they run only when named:
-`npm run visual:update -- --only=voxel --runs=4` records them (then drop `pending`).
+(high) on the site build's `/voxel/?view=...`. References exist on the RTX A6000 profile
+(`nvidia-ampere-msedge-155`, recorded 2026-10-19 with shadows and torch lights; four runs each, pixel-identical). On
+hardware whose profile is not in the views' `profiles` list they are captured but skipped: record them there with
+`npm run visual:update -- --only=voxel --runs=4` and add the profile to `VOXEL` in that script.
 
 ## Tests
 
@@ -123,6 +125,7 @@ breaks and places a block, swims, changes the render distance and finds the edit
 
 ## Not done yet
 
-- No shadows, fog on the voxels themselves, IBL or animated water surface (the renderer's lighting phase).
+- No image-based light (the sky's ambient is a constant colour); `Fog.add(voxels)` works but the sky's depth fog hides
+  the range edge better, so the example uses that.
 - No touch controls (phones only show the deterministic views well), no mobs or items, no crafting.
 - Water does not flow; breaking a lake's shore leaves a wall of water.
