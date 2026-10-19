@@ -181,7 +181,7 @@ GPU. An empty selection returns `[]`; WebGL2 returns `null`. Foreign/disposed
 roots and unavailable GPU resources report errors. The frozen `Stage.fit` and
 internal facade adapter retain their original contracts.
 
-Register with `shadows.add(model)` and `clustered.add(model)` for optional directional shadows and local PBR lights, including the current skinned vertex buffer. `addLighting()` accepts an optional shader/binding hook without importing these packages. `shadowPrimitives` exposes current opaque/masked GPU geometry to depth consumers; blended materials are omitted.
+Register with `shadows.add(model)` and `clustered.add(model)` for optional directional shadows and local PBR lights, including the current skinned vertex buffer. `addLighting()` accepts an optional shader/binding hook without importing these packages. `shadowPrimitives` exposes current opaque/masked GPU geometry to depth consumers; blended materials are omitted. A material's `displacement` (materials' `displacementMap`: its feature uniform, view and sampler) is passed on with each of its primitives so depth passes displace them as the beauty pass does (`shared/displacement.js`).
 
 `primitive.material.shading` accepts one `LightingEffect` for that material's
 surface shader and group 2 bindings. Constructed materials use it so geometry

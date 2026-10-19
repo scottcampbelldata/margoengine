@@ -14,6 +14,14 @@ const pixel = async (y = 0.5, x = 0.5) => {
     o = (Math.floor(image.height * y) * image.width + Math.floor(image.width * x)) * 4;
   return [...image.data.slice(o, o + 3)];
 };
+/** Pixels of the canvas's middle row that are red (an unlit red surface). */
+const redWidth = async () => {
+  const image = await decodePNG(await page.locator('canvas').screenshot()),
+    row = Math.floor(image.height / 2) * image.width;
+  let n = 0;
+  for (let x = 0; x < image.width; x++) if (image.data[(row + x) * 4] > 200 && image.data[(row + x) * 4 + 1] < 60) n++;
+  return n;
+};
 const near = (actual, expected, label, tolerance = 3) =>
   assert.ok(
     actual.every((v, i) => Math.abs(v - expected[i]) <= tolerance),
@@ -59,6 +67,11 @@ const expected = {
   bumpFacing: gray(local * lambert([-256 / 255, 0, 1], [-1, 0, 1])),
   bumpAway: [0, 0, 0],
   bumpNormalMap: gray(local * lambert([-256 / 255, 0, 1], [-1, 0, 1])),
+  // The displaced caster's shadow lies off the centre: the wall at n.l = cos 45 under the sun (irradiance 2) or the
+  // point light (intensity 8 at distance sqrt 8, window (1 - (sqrt 8 / 20)^4)^2).
+  displacedShadow: gray(local * Math.SQRT1_2),
+  displacedLocalShadow: gray((base / Math.PI) * Math.SQRT1_2 * (1 - (Math.SQRT2 / 10) ** 4) ** 2),
+  displacedHookShadow: gray((base / Math.PI) * Math.SQRT1_2 * (1 - (Math.SQRT2 / 10) ** 4) ** 2),
 };
 try {
   console.log('adapter', JSON.stringify(hardware.webgpu));
@@ -91,6 +104,11 @@ try {
     'bumpFacing',
     'bumpAway',
     'bumpNormalMap',
+    'displace',
+    'displaceInstanced',
+    'displacedShadow',
+    'displacedLocalShadow',
+    'displacedHookShadow',
     'litEffects',
     'video',
   ]) {
@@ -131,6 +149,19 @@ try {
       await step();
       near(await pixel(0.3), [255, 0, 0], 'the updated region (image top, flipY) shows the new pixels');
       near(await pixel(0.7), [0, 255, 0], 'outside the region the texture keeps its old pixels');
+    }
+    if (name === 'displace' || name === 'displaceInstanced') {
+      const displaced = await redWidth();
+      await step();
+      const flat = await redWidth();
+      assert.ok(Math.abs(displaced / flat - 1.5) < 0.03, `displaced 1 of 3 units nearer: ${displaced} / ${flat} px`);
+      console.log('  red width displaced / flat', displaced, flat);
+    }
+    if (name.startsWith('displaced')) {
+      await step();
+      const shadowed = await pixel();
+      assert.ok(Math.max(...shadowed) < 0.25 * Math.max(...center), `${name} undisplaced shadow: ${shadowed}`);
+      console.log('  undisplaced caster shadow', shadowed);
     }
     if (name === 'bumpAway') {
       await step();

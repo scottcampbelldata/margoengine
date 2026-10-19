@@ -13,6 +13,7 @@ import {
 } from '@margoengine/core/extension';
 import { preset } from '../../shared/preset.js';
 import { instanceLayout, instancedDepth } from '../../shared/instances.js';
+import { displacedDepth } from '../../shared/displacement.js';
 import { shadowPrimitivesInto, coreReceives, unshadowedCore } from '../../shared/shadow-source.js';
 import { viewMatrix } from '../../shared/view.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
@@ -74,6 +75,8 @@ export interface ShadowPrimitive {
   texCoord?: number /** Two packed vec4 affine rows applied after UV selection. */;
   alphaTransform?: Float32Array;
   instances?: { readonly count: number; upload(device: GPUDevice): GPUBuffer };
+  /** Vertex displacement along the normal (materials `displacementMap`, 80-byte vertices): bound at group 1. */
+  displacement?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
   /** Skinned, morphed, instanced, or deformed casters redraw every frame. Unset casters are cached while they stay put. */
   dynamic?: boolean;
 }
@@ -104,6 +107,8 @@ interface Draw {
   alpha?: GPUTextureView;
   sampler?: GPUSampler;
   section?: GPUBuffer;
+  displacement?: ShadowPrimitive['displacement'];
+  displaced?: GPUBindGroup;
 }
 const emptyPrimitives: readonly ShadowPrimitive[] = [];
 export class Shadows implements EnginePlugin {
@@ -842,6 +847,8 @@ export class Shadows implements EnginePlugin {
     const inst = p.instances;
     if (inst && !inst.count) return;
     if (inst && p.stride !== 80) throw new RangeError('Instanced shadow casters need 80-byte vertices');
+    const displacement = p.displacement;
+    if (displacement && p.stride !== 80) throw new RangeError('Displaced shadow casters need 80-byte vertices');
     const transform = p.alphaTransform;
     if (
       transform !== undefined &&
@@ -852,10 +859,12 @@ export class Shadows implements EnginePlugin {
     )
       throw new TypeError('Shadow alpha transform requires finite affine rows and PBR vertices');
     const lines = p.topology === 'line-list',
-      key = p.stride + (transform ? 1 : 0) + (inst ? 2 : 0) + (lines ? 4 : 0) + (section ? 8 : 0);
+      key =
+        p.stride + (transform ? 1 : 0) + (inst ? 2 : 0) + (lines ? 4 : 0) + (section ? 8 : 0) + (displacement ? 16 : 0);
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       let code = shadowDepth(p.stride === 80, !!transform);
+      if (displacement) code = displacedDepth(code, 1);
       if (inst) code = instancedDepth(code);
       if (section) {
         code = code
@@ -876,6 +885,7 @@ export class Shadows implements EnginePlugin {
                 p.stride === 80
                   ? [
                       { shaderLocation: 0, offset: 0, format: 'float32x4' },
+                      ...(displacement ? [{ shaderLocation: 1, offset: 16, format: 'float32x4' as const }] : []),
                       { shaderLocation: 3, offset: 48, format: 'float32x4' },
                       { shaderLocation: 4, offset: 64, format: 'float32x4' },
                     ]
@@ -904,7 +914,8 @@ export class Shadows implements EnginePlugin {
       record.pipeline !== pipeline ||
       record.alpha !== p.alphaTexture ||
       record.sampler !== p.alphaSampler ||
-      record.section !== section?.buffer
+      record.section !== section?.buffer ||
+      record.displacement !== displacement
     ) {
       if (record) for (const b of record.uniforms) b.destroy();
       records.delete(identity);
@@ -943,6 +954,17 @@ export class Shadows implements EnginePlugin {
         alpha: p.alphaTexture,
         sampler: p.alphaSampler,
         section: section?.buffer,
+        displacement,
+        displaced: displacement
+          ? this.device!.createBindGroup({
+              layout: pipeline.getBindGroupLayout(1),
+              entries: [
+                { binding: 0, resource: { buffer: displacement.buffer } },
+                { binding: 1, resource: displacement.view },
+                { binding: 2, resource: displacement.sampler },
+              ],
+            })
+          : undefined,
       };
       records.set(identity, record);
     }
@@ -955,6 +977,7 @@ export class Shadows implements EnginePlugin {
     this.device!.queue.writeBuffer(record.uniforms[cascade], 0, record.values as Float32Array<ArrayBuffer>);
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, record.groups[cascade]);
+    if (record.displaced) pass.setBindGroup(1, record.displaced);
     pass.setVertexBuffer(0, p.vertex);
     pass.setIndexBuffer(p.index, 'uint32');
     if (inst) {

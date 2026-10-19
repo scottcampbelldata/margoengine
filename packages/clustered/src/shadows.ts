@@ -10,6 +10,7 @@ import {
   type Mesh,
 } from '@margoengine/core/extension';
 import { instanceLayout, instancedDepth } from '../../shared/instances.js';
+import { displacedDepth } from '../../shared/displacement.js';
 import { preset } from '../../shared/preset.js';
 import type { Clustered, ClusteredShadow } from './index.js';
 import { hemisphere } from './local-shadow-math.js';
@@ -46,6 +47,8 @@ export interface LocalShadowPrimitive {
   cutoff?: number;
   texCoord?: number;
   instances?: { readonly count: number; readonly needsUpdate?: boolean; upload(device: GPUDevice): GPUBuffer };
+  /** Vertex displacement along the normal (materials `displacementMap`, 80-byte vertices), bound at group 2. */
+  displacement?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
 }
 export interface LocalShadowSource {
   readonly shadowPrimitives: readonly LocalShadowPrimitive[];
@@ -73,6 +76,8 @@ interface Draw {
   seen: boolean;
   p?: LocalShadowPrimitive;
   key: string;
+  displacement?: LocalShadowPrimitive['displacement'];
+  displaced?: GPUBindGroup;
 }
 const MAX_LIGHTS = 16,
   LAYERS = MAX_LIGHTS * 6,
@@ -168,6 +173,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   private alphaSampler?: GPUSampler;
   private cameraLayout?: GPUBindGroupLayout;
   private drawLayout?: GPUBindGroupLayout;
+  private displaceLayout?: GPUBindGroupLayout;
   private cameraGroup?: GPUBindGroup;
   private layerViews: GPUTextureView[] = [];
   private entries: GPUBindGroupEntry[] = [];
@@ -469,6 +475,9 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
         )
           moved = true;
         if (p.alphaTransform) for (let k = 0; k < 8; k++) if (d.values[20 + k] !== p.alphaTransform[k]) moved = true;
+        // ponytail: displaced casters redraw every frame (live scale and bias live in a GPU buffer); compare their
+        // values on the CPU if many static displaced casters make that costly.
+        if (p.displacement) moved = true;
         if (moved) {
           casters = true;
           d.matrix.set(node.matrix);
@@ -520,6 +529,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
           const p = d.p!;
           pass.setPipeline(this.pipeline(d.key));
           pass.setBindGroup(1, d.group);
+          if (d.displaced) pass.setBindGroup(2, d.displaced);
           pass.setVertexBuffer(0, p.vertex);
           pass.setIndexBuffer(p.index, 'uint32');
           if (p.instances) {
@@ -550,7 +560,9 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     )
       throw new TypeError('Local shadow alpha transform requires finite affine rows and PBR vertices');
     const identity = p.primitive ?? p.index,
-      key = `${p.stride}${p.instances ? 'i' : ''}${(p.cutoff ?? 0) > 0 ? 'm' : ''}${transform ? 't' : ''}${p.topology === 'line-list' ? 'l' : ''}`;
+      displacement = p.displacement,
+      key = `${p.stride}${p.instances ? 'i' : ''}${(p.cutoff ?? 0) > 0 ? 'm' : ''}${transform ? 't' : ''}${p.topology === 'line-list' ? 'l' : ''}${displacement ? 'd' : ''}`;
+    if (displacement && p.stride !== 80) throw new RangeError('Displaced shadow casters need 80-byte vertices');
     let records = this.draws.get(p.node);
     if (!records) this.draws.set(p.node, (records = new Map()));
     let d = records.get(identity);
@@ -560,7 +572,8 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       d.index !== p.index ||
       d.alpha !== p.alphaTexture ||
       d.sampler !== p.alphaSampler ||
-      d.key !== key
+      d.key !== key ||
+      d.displacement !== displacement
     ) {
       d?.uniform.destroy();
       const uniform = this.device!.createBuffer({
@@ -590,6 +603,17 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
           instances: -1,
           seen: true,
           key,
+          displacement,
+          displaced: displacement
+            ? this.device!.createBindGroup({
+                layout: this.displacementLayout(),
+                entries: [
+                  { binding: 0, resource: { buffer: displacement.buffer } },
+                  { binding: 1, resource: displacement.view },
+                  { binding: 2, resource: displacement.sampler },
+                ],
+              })
+            : undefined,
         };
         records.set(identity, d);
         this.changed = true;
@@ -600,14 +624,29 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     }
     return d;
   }
+  /** Group 2 of a displaced caster (shared/displacement.js `displacedDepth`): its uniform, map and sampler. */
+  private displacementLayout(): GPUBindGroupLayout {
+    const V = GPUShaderStage.VERTEX;
+    return (this.displaceLayout ??= this.device!.createBindGroupLayout({
+      entries: [
+        { binding: 0, visibility: V, buffer: { type: 'uniform' } },
+        { binding: 1, visibility: V, texture: { sampleType: 'float' } },
+        { binding: 2, visibility: V, sampler: { type: 'filtering' } },
+      ],
+    }));
+  }
   private pipeline(key: string): GPURenderPipeline {
     let pipeline = this.pipelines.get(key);
     if (pipeline) return pipeline;
     const pbr = key.startsWith('80'),
-      code = depth(pbr, key.includes('t')),
+      displaced = key.includes('d'),
+      plain = depth(pbr, key.includes('t')),
+      code = displaced ? displacedDepth(plain, 2) : plain,
       module = this.device!.createShaderModule({ code: key.includes('i') ? instancedDepth(code) : code });
     pipeline = this.device!.createRenderPipeline({
-      layout: this.device!.createPipelineLayout({ bindGroupLayouts: [this.cameraLayout!, this.drawLayout!] }),
+      layout: this.device!.createPipelineLayout({
+        bindGroupLayouts: [this.cameraLayout!, this.drawLayout!, ...(displaced ? [this.displacementLayout()] : [])],
+      }),
       vertex: {
         module,
         entryPoint: 'vertex',
@@ -617,6 +656,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
             attributes: pbr
               ? [
                   { shaderLocation: 0, offset: 0, format: 'float32x4' },
+                  ...(displaced ? [{ shaderLocation: 1, offset: 16, format: 'float32x4' as const }] : []),
                   { shaderLocation: 3, offset: 48, format: 'float32x4' },
                   { shaderLocation: 4, offset: 64, format: 'float32x4' },
                 ]
@@ -644,6 +684,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       this.alphaSampler =
       this.cameraLayout =
       this.drawLayout =
+      this.displaceLayout =
       this.cameraGroup =
         undefined;
     this.layerViews = [];

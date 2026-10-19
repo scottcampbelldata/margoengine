@@ -2,7 +2,7 @@
 <script type="module">
 import {createStage} from '/packages/margoengine/dist/index.js';
 import {planeGeometry,sphereGeometry,boxGeometry} from '/packages/geometry/dist/index.js';
-import {Texture,Material,createMesh,loadTexture} from '/packages/materials/dist/index.js';
+import {Texture,Material,createMesh,createInstancedMesh,loadTexture} from '/packages/materials/dist/index.js';
 const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,0,3],target:[0,0,0]}});
 const engine=stage.engine,device=engine.gpu,errors=[];
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
@@ -74,6 +74,19 @@ const bumped=(direction,extra)=>{const light=[...engine.lighting.direction],radi
 scenarios.bumpFacing=()=>bumped([-1,0,1]);
 scenarios.bumpAway=()=>bumped([1,0,1]);
 scenarios.bumpNormalMap=()=>bumped([-1,0,1],{normalMap:solid(128,128,255)});
+// displacementMap: a red unlit 1x1 plane moved 1 unit along its normal (z 0 to 1, the camera at z 3) looks 1.5 times
+// as wide; the step sets displacementScale 0.
+scenarios.displace=()=>{const m=createMesh(engine,planeGeometry(1,1),new Material({shading:'basic',color:[1,0,0],displacementMap:solid(255,255,255)}));return {destroy(){m.destroy();},step(){m.material.displacementScale=0;}};};
+// The same through an instanced draw (one instance at the identity), also cast into a directional shadow map.
+scenarios.displaceInstanced=()=>{const m=createInstancedMesh(engine,planeGeometry(1,1),new Material({shading:'basic',color:[1,0,0],displacementMap:solid(255,255,255)}),1),shadows=Shadows.attach(engine,{resolution:256});m.instances.setMatrixAt(0,[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);m.instances.count=1;shadows.add(m);return {destroy(){plugin(shadows).destroy();m.destroy();},step(){m.material.displacementScale=0;}};};
+// Shadow casters displace too. An invisible 0.4x0.4 caster at (0.5, 0, 0.5) facing +z shades the centre of a Lambert
+// wall, lit from (1, 0, 1) (sun) or from a point light at (2, 0, 2); displaced 1 unit along its normal (displacementBias
+// 1) its shadow lands near x = -1, off the centre. The step sets the bias to 0: the shadow returns to the centre.
+const {LocalShadows}=await import('/packages/clustered/dist/shadows.js');
+const shadowWall=setup=>{const light=[...engine.lighting.direction],radiance=[...engine.lighting.radiance];engine.lighting.radiance[3]=0;const wall=createMesh(engine,planeGeometry(2,2),new Material({shading:'lambert',map:solid(188,188,188)})),c=createMesh(engine,planeGeometry(0.4,0.4),new Material({shading:'basic',colorWrite:false,depthWrite:false,displacementMap:solid(0,0,0),displacementBias:1}));c.root.setPosition([0.5,0,0.5]);const done=setup(wall,c);return {destroy(){done();c.destroy();wall.destroy();engine.lighting.direction.set(light);engine.lighting.radiance.set(radiance);},step(){c.material.displacementBias=0;}};};
+scenarios.displacedShadow=()=>shadowWall((wall,c)=>{engine.lighting.direction.set([1,0,1,2]);const shadows=Shadows.attach(engine,{resolution:1024,filter:'hard'});shadows.add(wall);shadows.add(c);return ()=>plugin(shadows).destroy();});
+scenarios.displacedLocalShadow=()=>shadowWall((wall,c)=>{engine.lighting.direction[3]=0;const lights=Clustered.attach(engine,{shadows:{resolution:512}});lights.setLights([{position:[2,0,2],range:20,intensity:8,shadow:true}]);lights.add(wall);lights.addShadowCaster(c);return ()=>plugin(lights).destroy();});
+scenarios.displacedHookShadow=()=>shadowWall((wall,c)=>{engine.lighting.direction[3]=0;const lights=Clustered.attach(engine),local=LocalShadows.attach(engine,{lights});lights.setLights([{position:[2,0,2],range:20,intensity:8,castShadow:true}]);lights.add(wall);local.add(c);return ()=>{plugin(local).destroy();plugin(lights).destroy();};});
 // One clustered point light 1 unit in front of the plane's centre (intensity 2, range 100), no directional light, no ambient.
 const local=material=>{const light=[...engine.lighting.direction],radiance=[...engine.lighting.radiance];engine.lighting.direction[3]=0;engine.lighting.radiance[3]=0;const lights=Clustered.attach(engine),m=createMesh(engine,planeGeometry(2,2),material);lights.add(m);lights.setLights([{position:[0,0,1],range:100,intensity:2}]);return {destroy(){m.destroy();plugin(lights).destroy();engine.lighting.direction.set(light);engine.lighting.radiance.set(radiance);}};};
 scenarios.clusteredLambert=()=>local(new Material({shading:'lambert',map:solid(188,188,188)}));

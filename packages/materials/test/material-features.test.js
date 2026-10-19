@@ -6,7 +6,17 @@ import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gp
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { wgsl } from '../../core/dist/shaders.js';
 import { Clustered } from '../../clustered/dist/index.js';
-import { LambertMaterial, PbrMaterial, PhongMaterial, Texture, createMesh } from '../dist/index.js';
+import { LocalShadows } from '../../clustered/dist/shadows.js';
+import { Shadows } from '../../shadows/dist/index.js';
+import {
+  LambertMaterial,
+  PbrMaterial,
+  PhongMaterial,
+  Texture,
+  createInstancedMesh,
+  createMesh,
+} from '../dist/index.js';
+import { NodeMaterial, normalLocal, positionLocal } from '../../shader/dist/index.js';
 
 async function scene() {
   const gpu = mockGPU(),
@@ -85,9 +95,16 @@ test('clustered point and spot lights shade Lambert and Phong with their own BRD
 
 const floats = (hex) => new Float32Array(Uint8Array.from(Buffer.from(hex, 'hex')).buffer);
 const bindings = (log) => log.filter((e) => e[0] === 'group').map((e) => e[2].entries.map((entry) => entry.binding));
-/** The last feature uniform write (to a 144-byte buffer) in `log`; `history` holds the frames that made the buffers. */
+/** Buffers bound as a feature uniform (binding 198) in the frames of `history`. */
+const featureBuffers = (history) =>
+  new Set(
+    history
+      .filter((e) => e[0] === 'group')
+      .flatMap((e) => e[2].entries.filter((entry) => entry.binding === 198).map((entry) => entry.resource.buffer)),
+  );
+/** The last feature uniform write in `log`; `history` holds the frames that bound the buffers. */
 const featureUniform = (log, history) => {
-  const ids = new Set(history.filter((e) => e[0] === 'buffer' && e[2].size === 144).map((e) => e[1])),
+  const ids = featureBuffers(history),
     writes = log.filter((e) => e[0] === 'writeBuffer' && ids.has(e[1]));
   return writes.length ? [...floats(writes.at(-1)[3])] : undefined;
 };
@@ -96,14 +113,30 @@ const solid = (r, g, b, a = 255) =>
     { data: new Uint8Array([r, g, b, a, r, g, b, a, r, g, b, a, r, g, b, a]), width: 2, height: 2 },
     { mipmaps: false },
   );
-/** GPU calls of one frame drawing `material` on a fresh mock device. */
-async function oneFrame(material) {
+/** GPU calls of one frame drawing `material` on a fresh mock device, cast into every kind of shadow map. */
+async function oneFrame(material, hook = false) {
   const s = await scene(),
     mesh = createMesh(s.engine, quad, material),
+    remove = casters(s.engine, mesh, hook),
     log = s.frame();
+  remove();
   mesh.destroy();
   s.engine.dispose();
   return log;
+}
+/** Directional shadows and a clustered light shadowed by its integrated maps or (`hook`) LocalShadows, casting `mesh`. */
+function casters(engine, mesh, hook) {
+  const shadows = Shadows.attach(engine, { resolution: 256, cascades: 1 }),
+    lights = Clustered.attach(engine, hook ? {} : { shadows: { resolution: 64, maxLights: 1 } }),
+    local = hook ? LocalShadows.attach(engine, { lights, resolution: 64 }) : undefined;
+  lights.setLights([{ position: [0, 0, 2], range: 5, ...(hook ? { castShadow: true } : { shadow: true }) }]);
+  shadows.add(mesh);
+  lights.add(mesh);
+  if (local) local.add(mesh);
+  else lights.addShadowCaster(mesh);
+  return () => {
+    for (const plugin of [local, lights, shadows]) if (plugin) engine.removePlugin(plugin.name);
+  };
 }
 
 test('alphaMap compiles in only while set: green multiplies opacity, bindings 198 and 180-181, live UV rows', async () => {
@@ -143,12 +176,38 @@ test('alphaMap compiles in only while set: green multiplies opacity, bindings 19
   s.engine.dispose();
 });
 
+// Every feature option at its default; the values that turn each on; what turns them off again (the scalars may stay).
+const defaults = {
+  alphaMap: null,
+  bumpMap: null,
+  bumpScale: 1,
+  displacementMap: null,
+  displacementScale: 1,
+  displacementBias: 0,
+};
+const used = () => ({
+  alphaMap: solid(0, 0, 0),
+  bumpMap: solid(0, 0, 0),
+  bumpScale: 3,
+  displacementMap: solid(0, 0, 0),
+  displacementScale: 2,
+  displacementBias: 0.5,
+});
+const off = { alphaMap: null, bumpMap: null, displacementMap: null };
+
 test('a material with every feature at its default draws exactly the GPU calls of a plain one', async () => {
-  const expected = await oneFrame(new PbrMaterial());
-  assert.deepEqual(await oneFrame(new PbrMaterial({ alphaMap: null, bumpMap: null, bumpScale: 1 })), expected);
-  const toggled = new PbrMaterial({ alphaMap: solid(0, 0, 0), bumpMap: solid(0, 0, 0), bumpScale: 3 });
-  toggled.alphaMap = toggled.bumpMap = null;
-  assert.deepEqual(await oneFrame(toggled), expected, 'a bumpScale without a bumpMap adds nothing either');
+  for (const hook of [false, true]) {
+    const expected = await oneFrame(new PbrMaterial(), hook);
+    assert.ok(
+      codes(expected).some((c) => c.includes('fn shadowVisibility(')) &&
+        codes(expected).some((c) => c.includes('@fragment fn fragment(i:') && !c.includes('fn surface(')),
+      'the frame lights the mesh and draws it into the shadow maps',
+    );
+    assert.deepEqual(await oneFrame(new PbrMaterial(defaults), hook), expected);
+    const toggled = new PbrMaterial(used());
+    Object.assign(toggled, off);
+    assert.deepEqual(await oneFrame(toggled, hook), expected, 'a feature turned off, scalars left set, adds nothing');
+  }
 });
 
 test('bumpMap tilts the mapped normal by its screen-space slope; bumpScale is live and validated', async () => {
@@ -176,5 +235,67 @@ test('bumpMap tilts the mapped normal by its screen-space slope; bumpScale is li
     material.bumpScale = Infinity;
   }, RangeError);
   mesh.destroy();
+  s.engine.dispose();
+});
+
+test('displacementMap moves vertices along the normal in mesh space, in the beauty and in every shadow map', async () => {
+  for (const hook of [false, true]) {
+    const s = await scene(),
+      material = new PbrMaterial({ displacementMap: solid(255, 0, 0), displacementScale: 0.5, displacementBias: 0.1 }),
+      mesh = createMesh(s.engine, quad, material),
+      remove = casters(s.engine, mesh, hook);
+    let log = s.frame();
+    const all = codes(log),
+      beauty = all.filter((c) => c.includes('fn surface(')),
+      depth = all.filter((c) => !c.includes('fn surface(') && c.includes('@vertex'));
+    assert.ok(
+      beauty.length &&
+        beauty.every((c) => c.includes('let p=f.model*vec4f(i.position.xyz+i.normal.xyz*margoDisplacement(i.uv),1);')),
+    );
+    assert.ok(beauty[0].includes('fn margoDisplacement(uv:vec4f)->f32 {'));
+    const displaced = depth.filter((c) => c.includes('vec4f(i.position.xyz+i.normal.xyz*margoDisplacement(i.uv),1)'));
+    assert.equal(displaced.length, 2, `the directional and the ${hook ? 'LocalShadows' : 'integrated'} caster shaders`);
+    for (const c of displaced) assert.ok(c.includes('@location(0) position:vec4f,@location(1) normal:vec4f,'));
+    const modules = new Map(log.filter((e) => e[0] === 'module').map((e) => [e[1], e[2].code])),
+      pipelines = log.filter((e) => e[0] === 'renderPipeline' && displaced.includes(modules.get(e[2].vertex.module)));
+    assert.equal(pipelines.length, 2);
+    for (const e of pipelines)
+      assert.deepEqual(e[2].vertex.buffers[0].attributes[1], { format: 'float32x4', offset: 16, shaderLocation: 1 });
+    // The casters bind the material's feature uniform, the map and its sampler.
+    const [uniform] = featureBuffers(s.history);
+    assert.equal(
+      log.filter((e) => e[0] === 'group' && e[2].entries.length === 3 && e[2].entries[0].resource.buffer === uniform)
+        .length,
+      2,
+    );
+    assert.deepEqual(featureUniform(log, s.history).slice(1, 3), [0.5, 0.1].map(Math.fround));
+    material.displacementBias = -0.25;
+    log = s.frame();
+    assert.equal(featureUniform(log, s.history)[2], -0.25, 'live');
+    remove();
+    mesh.destroy();
+    s.engine.dispose();
+  }
+});
+
+test('features apply after a subclass patch: NodeMaterial positions and instances displace too', async () => {
+  const s = await scene(),
+    node = new NodeMaterial({
+      positionNode: positionLocal.add(normalLocal.mul(0.25)),
+      displacementMap: solid(255, 0, 0),
+    }),
+    a = createMesh(s.engine, quad, node),
+    b = createInstancedMesh(s.engine, quad, new PbrMaterial({ displacementMap: solid(255, 0, 0) }), 2);
+  b.instances.count = 2;
+  const all = codes(s.frame());
+  assert.ok(
+    all.some((c) =>
+      c.includes('let p=f.model*vec4f(i.position.xyz + (i.normal.xyz * 0.25)+i.normal.xyz*margoDisplacement(i.uv),1);'),
+    ),
+    "on top of the node's position",
+  );
+  assert.ok(all.some((c) => c.includes('let p=margoI*vec4f(i.position.xyz+i.normal.xyz*margoDisplacement(i.uv),1);')));
+  a.destroy();
+  b.destroy();
   s.engine.dispose();
 });

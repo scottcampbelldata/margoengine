@@ -3,8 +3,9 @@
 // text, bindings and uniforms exactly. Bindings (group 2): 198 the uniform below, 180-187 one texture and sampler per
 // map, in uniform-row order.
 import { MargoError } from '@margoengine/math/errors';
-/** Uniform rows: [bumpScale, displacementScale, displacementBias, lightMapIntensity], then two UV rows per map. */
-export const featureStruct = 'struct MargoFeatures {values:vec4f,uvt:array<vec4f,8>}';
+// The uniform (MargoFeatures: [bumpScale, displacementScale, displacementBias, lightMapIntensity], then two UV rows per
+// map) and the displacement are shared with the shadow casters' depth shaders.
+import { featureStruct, displacementWgsl } from '../../shared/displacement.js';
 /** Feature maps in UV-row (and binding) order, with their WGSL names. */
 export const featureMaps = ['alphaMap', 'bumpMap', 'displacementMap', 'lightMap'] as const;
 const names = ['Alpha', 'Bump', 'Displacement', 'Light'];
@@ -28,7 +29,7 @@ const bump = `fn margoBump(n:vec3f,p:vec3f,height:f32,facing:bool)->vec3f {
   return select(n,normalize(o),dot(o,o)>0.0);
 }
 `;
-/** `code` with the features `key` names: `a` alphaMap, `b` bumpMap. */
+/** `code` with the features `key` names: `a` alphaMap, `b` bumpMap, `d` displacementMap. */
 export function featureShader(code: string, group: number, key: string): string {
   let inner = cache.get(code);
   const id = key + group,
@@ -44,11 +45,18 @@ export function featureShader(code: string, group: number, key: string): string 
       /\n {2}s\.n=normalize\([^\n]*\);/,
       (line) => `${line}\n  s.n=margoBump(s.n,i.position,${sample(1)}.r*margoFeatures.values.x,facing);`,
     );
+  // In mesh space, before the model (or instance) matrix, so every pass drawing this shader displaces alike.
+  if (maps[2])
+    out = edit(
+      out,
+      /let p=f\.model\*vec4f\(([^;]*),1\);/,
+      (_, position) => `let p=f.model*vec4f(${position}+i.normal.xyz*margoDisplacement(i.uv),1);`,
+    );
   const declarations = maps.some(Boolean)
     ? `${featureStruct}
 @group(${group}) @binding(198) var<uniform> margoFeatures:MargoFeatures;
 ${maps.map((used, k) => (used ? `@group(${group}) @binding(${180 + k * 2}) var margo${names[k]}Map:texture_2d<f32>;\n@group(${group}) @binding(${181 + k * 2}) var margo${names[k]}Sampler:sampler;\n` : '')).join('')}fn margoFeatureUV(uv:vec4f,k:u32)->vec2f {let a=margoFeatures.uvt[k*2]; let p=vec3f(select(uv.xy,uv.zw,a.w>0.5),1); return vec2f(dot(a.xyz,p),dot(margoFeatures.uvt[k*2+1].xyz,p));}
-${maps[1] ? bump : ''}`
+${maps[1] ? bump : ''}${maps[2] ? displacementWgsl : ''}`
     : '';
   out = declarations + out;
   if (!inner) {

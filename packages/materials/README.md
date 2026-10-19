@@ -566,6 +566,7 @@ while it is in use: a material that never sets one keeps exactly its shader, bin
 | --- | --- |
 | `alphaMap` | Green channel (linear) multiplies opacity, before `alphaTest` and blending (`transparent`) |
 | `bumpMap`, `bumpScale` | Red channel (linear) is a height, `bumpScale` (default 1, finite, negative inverts) its full range in mesh units; its screen-space slope tilts the shading normal (Mikkelsen 2010), after `normalMap` when both are set |
+| `displacementMap`, `displacementScale`, `displacementBias` | Each vertex moves along its normal by red (linear) * scale (default 1) + bias (default 0) mesh units, before the model and instance matrices: in the beauty and G-buffer passes and in the directional (`Shadows`) and clustered (integrated and `LocalShadows`) shadow maps. Normals are not recomputed; CPU picking, bounds and exports see the undisplaced mesh |
 
 Each map has its own UV transform slot (`material.setUVTransform(t, 'alphaMap')`); `uvTransform` and
 `setUVTransform(t)` without a slot set it with the other maps'.

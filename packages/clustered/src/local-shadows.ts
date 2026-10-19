@@ -2,6 +2,7 @@ import type { Mesh as MeshHandle } from '@margoengine/core';
 import { meshRuntime, type Engine, type Mesh, type PassContext } from '@margoengine/core/extension';
 import { finiteVector } from '@margoengine/math/validate';
 import { instanceLayout, instancedDepth } from '../../shared/instances.js';
+import { displacedDepth } from '../../shared/displacement.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { hemisphere, localShadowMatrix } from './local-shadow-math.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
@@ -37,6 +38,8 @@ export interface LocalShadowPrimitive {
   texCoord?: number;
   alphaTransform?: Float32Array;
   instances?: { readonly count: number; upload(device: GPUDevice): GPUBuffer };
+  /** Vertex displacement along the normal (materials `displacementMap`, 80-byte vertices), bound at group 1. */
+  displacement?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
 }
 export interface LocalShadowSource {
   shadowPrimitives?: readonly LocalShadowPrimitive[];
@@ -66,6 +69,8 @@ interface Draw {
   alpha?: GPUTextureView;
   sampler?: GPUSampler;
   epoch: number;
+  displacement?: LocalShadowPrimitive['displacement'];
+  displaced?: GPUBindGroup;
 }
 const emptyPrimitives: readonly LocalShadowPrimitive[] = [];
 const directions: readonly (readonly number[])[] = [
@@ -415,6 +420,8 @@ export class LocalShadowMaps {
     if (inst && !inst.count) return;
     if (inst && p.stride !== 80) throw new RangeError('Instanced local shadow casters need PBR vertices');
     if (p.stride !== 24 && p.stride !== 80) throw new RangeError('Unsupported local shadow vertex stride');
+    const displacement = p.displacement;
+    if (displacement && p.stride !== 80) throw new RangeError('Displaced local shadow casters need PBR vertices');
     if (
       transform !== undefined &&
       (!(transform instanceof Float32Array) ||
@@ -432,10 +439,11 @@ export class LocalShadowMaps {
     )
       throw new RangeError('Invalid local shadow primitive');
     const lines = p.topology === 'line-list',
-      key = p.stride + (transform ? 1 : 0) + (inst ? 2 : 0) + (lines ? 4 : 0);
+      key = p.stride + (transform ? 1 : 0) + (inst ? 2 : 0) + (lines ? 4 : 0) + (displacement ? 8 : 0);
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
-      const code = depthShader(p.stride === 80, !!transform),
+      const depth = depthShader(p.stride === 80, !!transform),
+        code = displacement ? displacedDepth(depth, 1) : depth,
         module = this.device!.createShaderModule({
           code: inst
             ? instancedDepth(code).replace(
@@ -456,6 +464,7 @@ export class LocalShadowMaps {
                 p.stride === 80
                   ? [
                       { shaderLocation: 0, offset: 0, format: 'float32x4' },
+                      ...(displacement ? [{ shaderLocation: 1, offset: 16, format: 'float32x4' as const }] : []),
                       { shaderLocation: 3, offset: 48, format: 'float32x4' },
                       { shaderLocation: 4, offset: 64, format: 'float32x4' },
                     ]
@@ -482,7 +491,8 @@ export class LocalShadowMaps {
       record.vertex !== p.vertex ||
       record.pipeline !== pipeline ||
       record.alpha !== p.alphaTexture ||
-      record.sampler !== p.alphaSampler
+      record.sampler !== p.alphaSampler ||
+      record.displacement !== displacement
     ) {
       if (record) this.destroyDraw(record);
       records.delete(identity);
@@ -494,6 +504,17 @@ export class LocalShadowMaps {
         alpha: p.alphaTexture,
         sampler: p.alphaSampler,
         epoch: this.epoch,
+        displacement,
+        displaced: displacement
+          ? this.device!.createBindGroup({
+              layout: pipeline.getBindGroupLayout(1),
+              entries: [
+                { binding: 0, resource: { buffer: displacement.buffer } },
+                { binding: 1, resource: displacement.view },
+                { binding: 2, resource: displacement.sampler },
+              ],
+            })
+          : undefined,
       };
       records.set(identity, record);
     }
@@ -531,6 +552,7 @@ export class LocalShadowMaps {
     this.device!.queue.writeBuffer(face.uniform, 0, record.values as Float32Array<ArrayBuffer>);
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, face.group);
+    if (record.displaced) pass.setBindGroup(1, record.displaced);
     pass.setVertexBuffer(0, p.vertex);
     pass.setIndexBuffer(p.index, 'uint32');
     if (inst) {

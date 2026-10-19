@@ -81,7 +81,9 @@ An object overrides those values; near must be positive and below the light's
 range, and both biases must be finite and nonnegative. Animate positions,
 directions, ranges or shadow settings with `setLights()` before rendering.
 
-`addShadowCaster()` accepts core meshes, individual loaded glTF/FBX nodes and sources exposing `shadowPrimitives`,
+`addShadowCaster()` accepts core meshes, individual loaded glTF/FBX nodes and sources exposing `shadowPrimitives`
+(a primitive with `displacement`, a materials mesh with a `displacementMap`, is drawn displaced here and in
+`LocalShadows`),
 including glTF Pro models and their current deformed vertex buffers. Overlapping model/node registrations draw each primitive once, including distinct materials sharing GPU geometry. PBR masks
 honor alpha, vertex alpha, UV0/UV1 and texture transforms; blended PBR primitives
 are excluded. Hidden ancestors and disposed sources stop casting. Register a

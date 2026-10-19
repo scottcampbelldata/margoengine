@@ -97,6 +97,7 @@ const shared = new WeakMap<
     white: GPUTextureView;
     normal: GPUTextureView;
     anisotropy?: GPUTextureView;
+    black?: GPUTextureView;
     sampler: GPUSampler;
     pipelines: Map<string, GPURenderPipeline>;
   }
@@ -140,7 +141,17 @@ function fallback(device: GPUDevice, role: number): readonly [GPUTextureView, GP
     );
     d.anisotropy = texture.createView();
   }
-  return [role === 2 ? d.anisotropy! : role === 1 ? d.normal : d.white, d.sampler];
+  // Black: a displacement or light map still loading displaces and lights nothing.
+  if (role === 3 && !d.black) {
+    const texture = device.createTexture({
+      size: [1, 1],
+      format: 'rgba8unorm',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    device.queue.writeTexture({ texture }, new Uint8Array([0, 0, 0, 255]), { bytesPerRow: 4 }, [1, 1]);
+    d.black = texture.createView();
+  }
+  return [role === 3 ? d.black! : role === 2 ? d.anisotropy! : role === 1 ? d.normal : d.white, d.sampler];
 }
 interface ImageDimensions {
   videoWidth?: number;
@@ -572,6 +583,14 @@ export interface MaterialOptions extends PhysicalOptions {
   bumpMap?: Texture | null;
   /** Height of `bumpMap`'s full range in mesh units, finite (negative inverts); default 1. Live. */
   bumpScale?: number;
+  /**
+   * Moves each vertex along its normal by red (linear) * `displacementScale` + `displacementBias` mesh units, in every
+   * pass that draws the material (beauty, G-buffer, directional and clustered shadow maps). Live.
+   */
+  displacementMap?: Texture | null;
+  /** Finite; defaults 1 and 0. Live. */
+  displacementScale?: number;
+  displacementBias?: number;
   transparent?: boolean;
   alphaTest?: number;
   /** Faces drawn by triangle meshes. Explicit side takes precedence over doubleSided. */
@@ -862,6 +881,7 @@ type MapState = {
   values?: Float32Array;
   features?: GPUBuffer;
   featureData?: Float32Array;
+  displacement?: { buffer: GPUBuffer; view: GPUTextureView; sampler: GPUSampler };
 };
 const mapStates = new WeakMap<Material, Map<object, MapState>>(),
   disposedMaterials = new WeakSet<Material>();
@@ -918,23 +938,41 @@ function materialBuffer(
 /** The feature letters (features.ts) `m` uses now: its shader variant. */
 function featureKey(m: Material): string {
   const maps = m['featureTextures'];
-  return (maps[0] ? 'a' : '') + (maps[1] ? 'b' : '');
+  return (maps[0] ? 'a' : '') + (maps[1] ? 'b' : '') + (maps[2] ? 'd' : '');
 }
-/** `entries` plus the feature uniform and maps `m` uses now (none for a material without features). */
-function featureBindings(m: Material, device: GPUDevice, owner: object, entries: GPUBindGroupEntry[]) {
-  const maps = m['featureTextures'];
-  if (!maps.some(Boolean)) return entries;
+/** The feature uniform of `m` for `owner`, written with its current values. */
+function featureUniform(m: Material, device: GPUDevice, owner: object): GPUBuffer {
   const buffer = materialBuffer(m, device, owner, 144, 'features'),
     data = (mapState(m, owner).featureData ??= new Float32Array(36));
   data.set(m['featureValues']);
   device.queue.writeBuffer(buffer, 0, data);
-  const out = [...entries, { binding: 198, resource: { buffer } }];
+  return buffer;
+}
+/** Feature map `k`'s view and sampler; a map still loading reads white (alpha, bump) or black (displacement, light). */
+const featureTexture = (m: Material, k: number, device: GPUDevice) =>
+  m['featureTextures'][k]!.bind(device, false) ?? fallback(device, k < 2 ? 0 : 3);
+/** `entries` plus the feature uniform and maps `m` uses now (none for a material without features). */
+function featureBindings(m: Material, device: GPUDevice, owner: object, entries: GPUBindGroupEntry[]) {
+  const maps = m['featureTextures'];
+  if (!maps.some(Boolean)) return entries;
+  const out = [...entries, { binding: 198, resource: { buffer: featureUniform(m, device, owner) } }];
   maps.forEach((texture, k) => {
     if (!texture) return;
-    const [view, sampler] = texture.bind(device, false) ?? fallback(device, 0);
+    const [view, sampler] = featureTexture(m, k, device);
     out.push({ binding: 180 + k * 2, resource: view }, { binding: 181 + k * 2, resource: sampler });
   });
   return out;
+}
+/** What shadow casters bind to displace `m` like its beauty shader (gltf-pro `PBRMaterial.displacement`), kept while the same. */
+function displacementOf(m: Material, device: GPUDevice | null | undefined, owner: object) {
+  if (!m.displacementMap || !device) return undefined;
+  const state = mapState(m, owner),
+    buffer = featureUniform(m, device, owner),
+    [view, sampler] = featureTexture(m, 2, device),
+    last = state.displacement;
+  return last?.buffer === buffer && last.view === view && last.sampler === sampler
+    ? last
+    : (state.displacement = { buffer, view, sampler });
 }
 function mapped(m: Material): boolean {
   return !!m.physical && (m.physical.length > 12 || mapSlots.slice(5).some((k) => m[k] != null));
@@ -1104,6 +1142,24 @@ export class Material {
   set bumpScale(v: number) {
     this.featureValues[0] = rasterFloat(v, 'bumpScale');
   }
+  get displacementMap(): Texture | null {
+    return this.featureTextures[2];
+  }
+  set displacementMap(v: Texture | null) {
+    this.setFeatureMap(2, v);
+  }
+  get displacementScale(): number {
+    return this.featureValues[1];
+  }
+  set displacementScale(v: number) {
+    this.featureValues[1] = rasterFloat(v, 'displacementScale');
+  }
+  get displacementBias(): number {
+    return this.featureValues[2];
+  }
+  set displacementBias(v: number) {
+    this.featureValues[2] = rasterFloat(v, 'displacementBias');
+  }
   private readonly physicalTextures: (Texture | null)[] = Array(12).fill(null);
   private setMap(i: number, value: Texture | null): void {
     const key = mapSlots[i + 5] as keyof PhysicalOptions;
@@ -1246,7 +1302,14 @@ export class Material {
     this.aoMap = o.aoMap ?? null;
     this.emissiveMap = o.emissiveMap ?? null;
     this.matcap = o.matcap ?? null;
-    for (const key of ['alphaMap', 'bumpMap', 'bumpScale'] as const)
+    for (const key of [
+      'alphaMap',
+      'bumpMap',
+      'bumpScale',
+      'displacementMap',
+      'displacementScale',
+      'displacementBias',
+    ] as const)
       if (o[key] !== undefined) this[key] = o[key] as never;
     // Physical options enable their lobes as they are set (transmission before the volume values that need it); the
     // constructor names every extension its options use.
@@ -2154,6 +2217,7 @@ function surface(g: PBRMaterial, current: () => Material, runtime: Engine): void
     extended: get(extendedOf),
     extensions: get(extensionsOf),
     renderState: get(renderStateOf),
+    displacement: get((m) => displacementOf(m, runtime.gpu, runtime)),
     wireframe: {
       ...get((m) => m.wireframe),
       set: (v: boolean) => {
