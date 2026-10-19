@@ -15,6 +15,14 @@ function fixture(kind = 'combined', eight = false) {
     p = doc.meshes[0].primitives[0];
   buffers[doc.animations[0].samplers[0].output].set([0, 0, 0, 2, 0, 0]);
   buffers[p.targets[0].POSITION].set([1.5, 0, 0, 1.5, 0, 0, 1.5, 0, 0]);
+  // Distinct TEXCOORD_0 so posed hits can check UV interpolation against the GPU output.
+  const uv = new Float32Array([0.1, 0.2, 0.7, 0.3, 0.4, 0.9]),
+    uvIndex = buffers.length;
+  buffers.push(uv);
+  doc.buffers.push({ byteLength: uv.byteLength });
+  doc.bufferViews.push({ buffer: uvIndex, byteLength: uv.byteLength });
+  doc.accessors.push({ bufferView: uvIndex, componentType: 5126, count: 3, type: 'VEC2' });
+  p.attributes.TEXCOORD_0 = doc.accessors.length - 1;
   if (kind === 'skin') {
     delete p.targets;
     delete doc.meshes[0].weights;
@@ -232,6 +240,25 @@ export async function deformedPickingBrowserChecks(page) {
         read.destroy();
       }
     };
+    /** All 20 floats per vertex from the GPU output (the bind vertices when nothing deforms the primitive). */
+    const readVertices = async (primitive) => {
+      if (!primitive.deformed) return primitive.vertices.slice();
+      const device = engine.gpu,
+        read = device.createBuffer({
+          size: primitive.vertices.byteLength,
+          usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+        });
+      try {
+        const encoder = device.createCommandEncoder();
+        encoder.copyBufferToBuffer(primitive.deformed, 0, read, 0, primitive.vertices.byteLength);
+        device.queue.submit([encoder.finish()]);
+        await read.mapAsync(GPUMapMode.READ);
+        return new Float32Array(read.getMappedRange()).slice();
+      } finally {
+        if (read.mapState === 'mapped') read.unmap();
+        read.destroy();
+      }
+    };
     const bvh = async (model, x, label) => {
       const ray = new Raycaster([x, -0.2, 3], [0, 0, -1]),
         hits = await ray.intersectModel(model);
@@ -247,9 +274,41 @@ export async function deformedPickingBrowserChecks(page) {
           Math.abs(hits[0].point[2]) < 1e-6,
         label + ': BVH changed the analytic triangle hit',
       );
+      // Posed metadata: identity from the actual PBRModel snapshot, UV from the GPU's own deformed vertices.
+      const primitive = model.primitives[0],
+        posed = await readVertices(primitive),
+        face = primitive.indices.subarray(hits[0].faceIndex * 3, hits[0].faceIndex * 3 + 3),
+        uv = [0, 1].map((k) => face.reduce((sum, v, j) => sum + hits[0].barycoord[j] * posed[v * 20 + 12 + k], 0));
+      assert(
+        hits[0].primitiveIndex === 0 && hits[0].nodeIndex === primitive.nodeIndex,
+        label + ': posed hit identity ' + JSON.stringify([hits[0].primitiveIndex, hits[0].nodeIndex]),
+      );
+      assert(
+        uv.some((value) => value > 0.05) &&
+          Math.abs(hits[0].uv[0] - uv[0]) < 1e-6 &&
+          Math.abs(hits[0].uv[1] - uv[1]) < 1e-6,
+        label + ': posed UV ' + JSON.stringify({ hit: hits[0].uv, gpu: uv }),
+      );
+      const snapshots = await model.readPickingGeometry();
+      assert(
+        snapshots.length > 0 &&
+          snapshots.every(
+            (snapshot) =>
+              model.primitives[snapshot.primitiveIndex]?.node === snapshot.node &&
+              snapshot.nodeIndex === model.primitives[snapshot.primitiveIndex].nodeIndex,
+          ),
+        label + ': snapshot identity does not match model.primitives',
+      );
       const miss = await new Raycaster([x + 0.9, -0.2, 3], [0, 0, -1]).intersectModel(model);
       assert(miss.length === 0, label + ': BVH falsely hit beyond the triangle');
-      return { distance: hits[0].distance, point: Array.from(hits[0].point), barycoord: Array.from(hits[0].barycoord) };
+      return {
+        distance: hits[0].distance,
+        point: Array.from(hits[0].point),
+        barycoord: Array.from(hits[0].barycoord),
+        uv: Array.from(hits[0].uv),
+        primitiveIndex: hits[0].primitiveIndex,
+        nodeIndex: hits[0].nodeIndex,
+      };
     };
     try {
       const baseline = load(payload.fixtures[0].data),

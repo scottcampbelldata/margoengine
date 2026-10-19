@@ -185,6 +185,8 @@ export interface PickingGeometry {
     readonly doubleSided: boolean;
     readonly side?: Side;
     readonly matrix: Float32Array;
+    readonly primitiveIndex?: number;
+    readonly nodeIndex?: number;
 }
 
 export interface Ray {

@@ -11,8 +11,11 @@ Registration changes no beauty shader, vertex layout or material bindings.
 snapshot for `Raycaster.intersectModel(model)` in `@margoengine/bvh`. Static
 geometry uses CPU copies; animated geometry is copied from the actual GPU output.
 The optional `prepareDeformation` hook encodes the latest pose before reading,
-without advancing animation time. Snapshots include world matrices, indices and
-material sides captured with the query. Restoration, disposal or replacement of
+without advancing animation time. Snapshots include world matrices, indices,
+material sides and identity (`primitiveIndex` in `model.primitives`, absent for
+point and line primitives, and the glTF `nodeIndex` when it has one) captured
+with the query,
+before any readback. Restoration, disposal or replacement of
 an in-flight deformation output invalidates the result and releases staging
 buffers. Caller-provided deformation buffers need `COPY_SRC` for CPU snapshots.
 

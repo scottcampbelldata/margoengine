@@ -628,6 +628,8 @@ interface PBRPickingGeometry {
     doubleSided: boolean;
     side?: MaterialSide;
     matrix: Float32Array;
+    primitiveIndex?: number;
+    nodeIndex?: number;
 }
 
 interface PBRPrimitive {

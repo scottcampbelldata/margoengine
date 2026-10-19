@@ -385,3 +385,99 @@ test('intersectModel validates source ownership, snapshots, finite layouts, topo
   f.source.disposed = true;
   await assert.rejects(ray.intersectModel(f.source), /disposed/);
 });
+
+/** Writes TEXCOORD_0 (offset 12 of the 20-float PBR vertex) for each vertex. */
+function withUVs(target, uvs) {
+  uvs.forEach(([u, v], i) => {
+    target[i * 20 + 12] = u;
+    target[i * 20 + 13] = v;
+  });
+  return target;
+}
+
+test('intersectModel interpolates posed TEXCOORD_0 and reports the snapshot primitiveIndex and nodeIndex', async () => {
+  const f = fixture(),
+    ray = new Raycaster([0, 0, 2], [0, 0, -1]);
+  withUVs(f.snapshot.vertices, [
+    [0, 0],
+    [1, 0],
+    [0, 1],
+  ]);
+  f.snapshot.primitiveIndex = 3;
+  f.snapshot.nodeIndex = 7;
+  const [hit] = await ray.intersectModel(f.source);
+  // Barycentric (0.25, 0.25, 0.5) at the triangle's centre line.
+  close(hit.uv[0], 0.25);
+  close(hit.uv[1], 0.5);
+  assert.equal(hit.primitiveIndex, 3);
+  assert.equal(hit.nodeIndex, 7);
+  // The UVs come from the posed snapshot itself: a pose that changes them (same topology, so the BVH refits) shows.
+  f.snapshot.vertices = withUVs(f.snapshot.vertices.slice(), [
+    [0.5, 0.5],
+    [0.5, 0.5],
+    [0.5, 0.5],
+  ]);
+  const [again] = await ray.intersectModel(f.source);
+  assert.deepEqual(again.uv, [0.5, 0.5]);
+  assert.equal(again.primitiveIndex, 3);
+  // Later edits to the returned snapshot object never reach an earlier hit.
+  f.snapshot.primitiveIndex = 9;
+  assert.equal(again.primitiveIndex, 3);
+});
+
+test('intersectModel keeps each snapshot identity for shared nodes, filtered, reordered and refitted snapshots', async () => {
+  const f = fixture(),
+    near = { ...f.snapshot, primitiveIndex: 0, nodeIndex: 1 },
+    far = {
+      ...f.snapshot,
+      vertices: (() => {
+        const v = vertices();
+        for (let i = 0; i < 3; i++) v[i * 20 + 2] = -1;
+        return v;
+      })(),
+      indices: new Uint32Array([0, 1, 2]),
+      // Primitive 1 of the same node is not in this query's snapshots (e.g. batched or filtered by the producer).
+      primitiveIndex: 2,
+      nodeIndex: 1,
+    },
+    ray = new Raycaster([0, 0, 2], [0, 0, -1]);
+  f.source.readPickingGeometry = async () => [near, far];
+  const ids = (hits) => hits.map((hit) => [hit.primitiveIndex, hit.nodeIndex, hit.distance]);
+  assert.deepEqual(ids(await ray.intersectModel(f.source)), [
+    [0, 1, 2],
+    [2, 1, 3],
+  ]);
+  ray.firstHitOnly = true;
+  assert.deepEqual(ids(await ray.intersectModel(f.source)), [[0, 1, 2]]);
+  ray.firstHitOnly = false;
+  // Reordered snapshots with the same node and topology reuse each cached BVH position by refitting; identity still
+  // comes from the snapshot, never from its position or node.
+  f.source.readPickingGeometry = async () => [far, near];
+  assert.deepEqual(ids(await ray.intersectModel(f.source)), [
+    [0, 1, 2],
+    [2, 1, 3],
+  ]);
+  // A filter that skips the first snapshot leaves the second one's identity unchanged.
+  let calls = 0;
+  ray.filter = () => calls++ > 0;
+  assert.deepEqual(ids(await ray.intersectModel(f.source)), [[0, 1, 2]]);
+  ray.filter = null;
+  // Only the far one returned this time: it is not renumbered to 0.
+  f.source.readPickingGeometry = async () => [far];
+  assert.deepEqual(ids(await ray.intersectModel(f.source)), [[2, 1, 3]]);
+});
+
+test('intersectModel keeps custom sources without identity metadata working and invents none', async () => {
+  const f = fixture(),
+    ray = new Raycaster([0, 0, 2], [0, 0, -1]);
+  const [hit] = await ray.intersectModel(f.source);
+  assert.ok(!('primitiveIndex' in hit) && !('nodeIndex' in hit), 'no identity without snapshot metadata');
+  assert.deepEqual(hit.uv, [0, 0], 'UVs come from the stride-20 vertex every snapshot carries');
+  for (const bad of [-1, 1.5, Number.NaN, '0']) {
+    f.snapshot.primitiveIndex = bad;
+    await assert.rejects(ray.intersectModel(f.source), /primitiveIndex/);
+  }
+  delete f.snapshot.primitiveIndex;
+  f.snapshot.nodeIndex = -2;
+  await assert.rejects(ray.intersectModel(f.source), /nodeIndex/);
+});

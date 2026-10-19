@@ -329,3 +329,102 @@ test('Animation owns one stable immediate-deformation hook through restoration a
   }
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
+
+/** Three primitives: 0 and 1 share glTF node 1, 2 is on node 2; node 0 is their parent. */
+function sharedNodeQuads() {
+  const f = materialQuad(),
+    [primitive] = f.doc.meshes[0].primitives;
+  f.doc.meshes[0].primitives.push({ ...primitive });
+  f.doc.meshes.push({ primitives: [{ ...primitive }] });
+  f.doc.nodes = [{ children: [1, 2] }, { mesh: 0 }, { mesh: 1, translation: [0, 0, -1] }];
+  return f;
+}
+
+test('PBR picking snapshots carry each primitive index and glTF node index, also for per-node sources and removed nodes', async () => {
+  const s = await scene(sharedNodeQuads());
+  try {
+    const { primitives } = s.model,
+      identity = (snapshots) => snapshots.map((snapshot) => [snapshot.primitiveIndex, snapshot.nodeIndex]);
+    assert.deepEqual(
+      primitives.map((p) => p.nodeIndex),
+      [1, 1, 2],
+    );
+    const snapshots = await s.model.readPickingGeometry();
+    assert.deepEqual(identity(snapshots), [
+      [0, 1],
+      [1, 1],
+      [2, 2],
+    ]);
+    for (const snapshot of snapshots) assert.equal(primitives[snapshot.primitiveIndex].node, snapshot.node);
+    // The per-node source filters the model's snapshots; the survivors keep their model-wide indices.
+    const { meshTriangles } = await import('../packages/shared/mesh-source.js');
+    assert.deepEqual(identity(await meshTriangles(primitives[2].node).source.readPickingGeometry()), [[2, 2]]);
+    assert.deepEqual(identity(await meshTriangles(primitives[0].node).source.readPickingGeometry()), [
+      [0, 1],
+      [1, 1],
+    ]);
+    // A node whose id now names another mesh is dropped; the remaining snapshot is not renumbered.
+    const shared = primitives[0].node;
+    s.engine.meshes.set(shared.id, { ...shared });
+    assert.deepEqual(identity(await s.model.readPickingGeometry()), [[2, 2]]);
+    s.engine.meshes.set(shared.id, shared);
+  } finally {
+    s.dispose();
+  }
+});
+
+test('PBR deformed snapshots keep identity captured before readback and posed UVs reach Raycaster.intersectModel', async () => {
+  const s = await scene(sharedNodeQuads(), { pending: true }),
+    { primitives } = s.model,
+    deformed = primitives[1],
+    output = s.output(deformed),
+    posed = deformed.vertices.slice();
+  // Pose: lift primitive 1 in front of primitive 0 and give it its own UVs, which only the GPU output holds.
+  for (let i = 0; i < posed.length; i += 20) {
+    posed[i + 2] = 0.5;
+    posed[i + 12] = posed[i + 12] * 0.5;
+    posed[i + 13] = posed[i + 13] * 0.5;
+  }
+  try {
+    s.model.prepareDeformation = () => new Float32Array(output.data).set(posed);
+    const pending = s.model.readPickingGeometry();
+    // Identity changes while mapAsync is pending must not reach this query's snapshots.
+    const nodeIndex = deformed.nodeIndex;
+    deformed.nodeIndex = 99;
+    s.model.primitives.reverse();
+    s.readers[0].resolve();
+    const snapshots = await pending;
+    s.model.primitives.reverse();
+    deformed.nodeIndex = nodeIndex;
+    assert.deepEqual(
+      snapshots.map((snapshot) => [snapshot.primitiveIndex, snapshot.nodeIndex]),
+      [
+        [0, 1],
+        [1, 1],
+        [2, 2],
+      ],
+    );
+    assert.deepEqual(snapshots[1].vertices, posed);
+
+    const { Raycaster } = await import('../packages/bvh/dist/index.js'),
+      ray = new Raycaster([0.5, -0.25, 4], [0, 0, -1]);
+    const query = ray.intersectModel(s.model);
+    await Promise.resolve();
+    s.readers.at(-1).resolve();
+    const hits = await query;
+    assert.deepEqual(
+      hits.map((hit) => [hit.primitiveIndex, hit.nodeIndex]),
+      [
+        [1, 1],
+        [0, 1],
+        [2, 2],
+      ],
+    );
+    // Off the quad diagonal, so one triangle per quad: quad UVs at (0.5, -0.25) are (0.75, 0.625); posed ones are half.
+    const near = hits[0];
+    assert.ok(Math.abs(near.uv[0] - 0.375) < 1e-6 && Math.abs(near.uv[1] - 0.3125) < 1e-6, String(near.uv));
+    assert.ok(Math.abs(hits[1].uv[0] - 0.75) < 1e-6 && Math.abs(hits[1].uv[1] - 0.625) < 1e-6, String(hits[1].uv));
+  } finally {
+    s.dispose();
+  }
+});

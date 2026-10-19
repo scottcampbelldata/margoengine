@@ -207,7 +207,11 @@ export interface RaycasterHit {
   frontFace: boolean;
   /** Hit point in the mesh's local space. */
   localPoint: Vec3;
-  /** Model hits only: the model, the primitive and its index in `model.primitives`, the glTF node index and TEXCOORD_0 at the hit. */
+  /**
+   * Model hits only: the model, the primitive and its index in `model.primitives`, the glTF node index and TEXCOORD_0 at
+   * the hit. `intersectModel` hits carry `uv` from the posed snapshot, and `primitiveIndex` and `nodeIndex` when the
+   * snapshot supplies them (gltf-pro's `PBRModel` does); they have no `model` or `primitive` object.
+   */
   model?: ModelLike;
   primitive?: ModelPrimitiveLike;
   primitiveIndex?: number;
@@ -228,13 +232,20 @@ export interface IntersectOptions {
 /** Snapshot of one PBR primitive in its current deformed pose. No core Geometry is created or assigned. */
 export interface PickingGeometry {
   readonly node: Mesh;
-  /** PBR vertex layout: 20 floats per vertex, position xyz at 0 and normal xyz at 4. */
+  /** PBR vertex layout: 20 floats per vertex, position xyz at 0, normal xyz at 4 and TEXCOORD_0 at 12. */
   readonly vertices: Float32Array;
   readonly indices: Uint32Array;
   readonly doubleSided: boolean;
   readonly side?: Side;
   /** Local-to-world matrix captured with the vertex snapshot, before any asynchronous GPU readback. */
   readonly matrix: Float32Array;
+  /**
+   * Index of the primitive in its model's `primitives`, captured with the snapshot (before any readback), and copied to
+   * hits as `primitiveIndex`. Optional: a source that leaves it out gets hits without one.
+   */
+  readonly primitiveIndex?: number;
+  /** glTF node index of the primitive, captured with the snapshot and copied to hits as `nodeIndex`. Optional. */
+  readonly nodeIndex?: number;
 }
 /** Structural interface implemented by gltf-pro's PBRModel, without a runtime or package dependency on gltf-pro. */
 export interface DeformedPickingSource {
@@ -402,6 +413,17 @@ export class Raycaster {
       if (matrix[3] || matrix[7] || matrix[11] || matrix[15] !== 1)
         throw new RangeError('Picking matrix must be affine');
       if (indices.some((index) => index >= count)) throw new RangeError('Picking index exceeds vertex count');
+      // Identity is the snapshot's own, captured by the source before its readback; never derived from position or node.
+      const { primitiveIndex, nodeIndex } = snapshot;
+      for (const [name, value] of [
+        ['primitiveIndex', primitiveIndex],
+        ['nodeIndex', nodeIndex],
+      ] as const) {
+        if (value === undefined) continue;
+        if (typeof value !== 'number') throw new TypeError(`Picking ${name} must be a number`);
+        if (!Number.isSafeInteger(value) || value < 0)
+          throw new RangeError(`Picking ${name} must be a non-negative integer`);
+      }
       let cached = previous[i];
       if (
         !cached ||
@@ -451,6 +473,11 @@ export class Raycaster {
           best = distance;
           hits.length = 0;
         }
+        // TEXCOORD_0 of the posed snapshot (offset 12 of the 20-float vertex), weighted like the sync model path.
+        const a = hit.face[0] * 20 + 12,
+          b = hit.face[1] * 20 + 12,
+          c = hit.face[2] * 20 + 12,
+          [wa, wb, wc] = hit.barycoord;
         hits.push({
           mesh: handle,
           distance,
@@ -461,6 +488,12 @@ export class Raycaster {
           barycoord: hit.barycoord,
           frontFace: hit.frontFace,
           localPoint: hit.point,
+          uv: [
+            wa * vertices[a] + wb * vertices[b] + wc * vertices[c],
+            wa * vertices[a + 1] + wb * vertices[b + 1] + wc * vertices[c + 1],
+          ],
+          ...(primitiveIndex === undefined ? {} : { primitiveIndex }),
+          ...(nodeIndex === undefined ? {} : { nodeIndex }),
         });
       }
     }

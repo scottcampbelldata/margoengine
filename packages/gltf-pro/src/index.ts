@@ -203,6 +203,13 @@ export interface PBRPickingGeometry {
   doubleSided: boolean;
   side?: MaterialSide;
   matrix: Float32Array;
+  /**
+   * Index of the primitive in `model.primitives`, captured when the query started (before any GPU readback). Absent
+   * for point and line primitives, which `model.primitives` does not list.
+   */
+  primitiveIndex?: number;
+  /** glTF node index of the primitive, captured with `primitiveIndex`. Absent for a primitive with no glTF node. */
+  nodeIndex?: number;
 }
 const opaquePasses = new WeakMap<Context, Set<PBRModel>>();
 // A symbol keeps separately bundled optional consumers interoperable without
@@ -1793,11 +1800,16 @@ export class PBRModel implements EnginePlugin {
       revision = this.gpuRevision;
     if (this.disposed || this.engine.disposed || !device) return [];
     this.engine.store.tick(false);
+    // Identity is captured now: snapshots can be filtered, primitives can share a node and the list can change while
+    // mapAsync is pending, so neither the node nor a snapshot's position may stand in for it.
+    const primitiveIndices = new Map(this.primitives.map((primitive, index) => [primitive, index]));
     const records = this.resources
       .filter((resource) => !resource.batch)
       .map((resource) => ({
         resource,
         primitive: resource.primitive,
+        primitiveIndex: primitiveIndices.get(resource.primitive),
+        nodeIndex: resource.primitive.nodeIndex,
         deformed: resource.primitive.deformed,
         matrix: resource.primitive.node.matrix.slice(),
         vertices: resource.primitive.deformed ? undefined : resource.primitive.vertices.slice(),
@@ -1846,6 +1858,9 @@ export class PBRModel implements EnginePlugin {
           indices: record.indices,
           doubleSided: record.doubleSided,
           side: record.side,
+          ...(record.primitiveIndex === undefined ? {} : { primitiveIndex: record.primitiveIndex }),
+          // Merged static batches mark "no glTF node" with -1; report no identity rather than an invented one.
+          ...(record.nodeIndex >= 0 ? { nodeIndex: record.nodeIndex } : {}),
         }));
     } catch (error) {
       if (
