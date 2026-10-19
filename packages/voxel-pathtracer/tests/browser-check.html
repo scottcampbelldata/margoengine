@@ -170,6 +170,12 @@ window.check={
   // of radiance 1, seen straight on: exp(-1).
   look([0,0,40],[0,0,0],{project:ortho(4)});
   out['beer-lambert exp(-1)']=await withTracer({revision:1,models:[solid(8,1)],instances:[{id:'m',modelId:'cube',matrix:translate(-4,-4,-4)}],materials:[{id:1,color:[0,0,0],type:'media',density:0.125}],environment:{skyColor:[1,1,1]}},{maxBounces:8},async(t)=>{const image=await t.renderImage({width:32,height:32,samples:256,aovs:true,jitter:false});return stats(image,(i)=>image.instance[i]===0);});
+  // Emissive media: a black (non-scattering) medium 8 deep emitting j = 2 per unit, straight on, black sky:
+  // L = (j / sigma) (1 - exp(-sigma d)), and j d without extinction.
+  for(const sigma of [0,0.125,0.5]){
+   const s=await withTracer({revision:1,models:[solid(8,1)],instances:[{id:'m',modelId:'cube',matrix:translate(-4,-4,-4)}],materials:[{id:1,color:[0,0,0],type:'media',density:sigma,emission:2,emissionColor:[1,1,1]}],environment:{skyIntensity:0}},{maxBounces:8},async(t)=>{const image=await t.renderImage({width:32,height:32,samples:1024,aovs:true,jitter:false});return stats(image,(i)=>image.instance[i]===0);});
+   out[`emissive media sigma ${sigma}`]={...s,expected:sigma?(2/sigma)*(1-Math.exp(-sigma*8)):16};
+  }
   // Glass slab 8 deep, colour 0.5 (tint on entry), density 0.0866 (absorption 0.5^(0.0866*8) = 0.6185), straight on,
   // sky 1 behind and in front: R + (1-R)^2 * 0.5 * 0.6185 / (1 - R^2 0.6185^2) + higher orders (R = 0.04).
   out['tinted glass slab']=await withTracer({revision:1,models:[solid(8,1)],instances:[{id:'m',modelId:'cube',matrix:translate(-4,-4,-4)}],materials:[{id:1,color:[0.5,0.5,0.5],type:'glass',density:0.0866}],environment:{skyColor:[1,1,1]}},{maxBounces:32},async(t)=>{const image=await t.renderImage({width:32,height:32,samples:1024,aovs:true,jitter:false});return stats(image,(i)=>image.instance[i]===0);});

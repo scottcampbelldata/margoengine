@@ -70,10 +70,15 @@ except `id`, `color` and `type` are optional.
 | `glass` | Smooth or GGX-rough dielectric with exact Fresnel and refraction | transmission 1, roughness 0, ior 1.5, density 0 |
 | `emit` | Lambert plus emitted radiance `color * emission` | emission 1, specular 0 |
 | `blend` | metal (`metalness`) + glass (`(1 - metalness) * transmission`) + plastic (the rest) | roughness 0.2, specular 1 |
-| `media` | Index-matched homogeneous participating medium (cloud, fog, smoke): extinction `density` per world unit, single-scattering albedo `color`, Henyey-Greenstein `anisotropy` | density 1, anisotropy 0 |
+| `media` | Index-matched homogeneous participating medium (cloud, fog, smoke): extinction `density` per world unit, single-scattering albedo `color`, Henyey-Greenstein `anisotropy`, optional emission per world unit | density 1, anisotropy 0 |
 
 - `color` is linear RGB. Reflectance and albedo use it clamped to 1; emission `color * emission` is not clamped.
-- Any surface type may emit (`emission > 0`). Emissive voxels are lights: every exposed emissive face is sampled.
+- Any surface type may emit (`emission > 0`, colour `emissionColor`, default `color`). Emissive voxels are lights: every
+  exposed emissive face is sampled.
+- Emissive media (addition): a `media` material with `emission` adds `emission x emissionColor` radiance per world unit
+  along every ray through it, attenuated by its own extinction (fire, glowing gas): a ray crossing depth d sees
+  `(j / density) (1 - exp(-density d))`. Their light reaches other surfaces only through paths that cross them (they
+  are not light-sampled), so a scene lit mainly by glowing media converges slowly.
 - Roughness below about 0.03 is perfectly specular. Roughness is perceptual: the GGX alpha is `roughness^2`.
 - Rough metal and rough glass keep their energy: metals add Kulla and Conty's multiple-scattering lobe (weighted by the
   average Fresnel, so coloured metals saturate as they should) and rough dielectric interfaces are normalised by their
@@ -226,7 +231,9 @@ Numbers on other GPUs are not measured.
     perspective and orthographic, distances within 2.6e-6 relative;
   - closed-form checks: furnaces (convex cube in a uniform sky) diffuse 0.5000 and 1.0000, smooth metal, smooth plastic
     and clear glass 1.0000, media 0.9999, subsurface 0.9998, constant environment map 0.4998 (expected 0.5); emission
-    3.0000; Beer-Lambert 0.3678 (e^-1 = 0.3679); tinted absorbing glass slab 0.3321 (0.3322 with exact Fresnel);
+    3.0000; Beer-Lambert 0.3678 (e^-1 = 0.3679); emissive media 8 deep emitting 2 per unit 15.996 without
+    extinction (16; the ray starts 0.002 inside each face), 10.1105 at density 0.125 (10.1139) and 3.9272 at 0.5
+    (3.9267); tinted absorbing glass slab 0.3321 (0.3322 with exact Fresnel);
     sun irradiance, point and disk, 0.5000; two emissive planes 0.6671 (2/3); a large area light 1.0000; shadow through
     an absorbing medium 0.1839 (0.5 e^-1); a non-uniform environment map over a plane within 1% of the texel integral;
   - energy compensation: white furnaces of a metal plane and a 16-voxel clear glass slab at roughness 0.2, 0.5, 0.8 and
@@ -273,7 +280,9 @@ Numbers on other GPUs are not measured.
   at Imageworks", 2017) and albedo normalisation for rough dielectrics (as in Turquin 2019). The albedo tables
   (E(mu, roughness) 32 x 32, Eavg 32, dielectric E(mu, roughness, eta) 16 x 16 x 32) are integrated once per device on
   the GPU with the tracer's own sampling code and a low-discrepancy R2/R3 sequence (Roberts 2018).
-- Homogeneous media by free-flight sampling with Beer-Lambert absorption as a path weight, Henyey-Greenstein phase.
+- Homogeneous media by free-flight sampling with Beer-Lambert absorption as a path weight, Henyey-Greenstein phase;
+  their emission by the track-length estimator (emission times the distance flown in the medium, whose expectation
+  is the attenuated integral).
 - Environment maps importance sampled by marginal and conditional CDFs (PBRT).
 - Dispersion: one wavelength per path, sampled from a mix of a uniform and a logistic density, weighted by its colour
   matching weight over that density. The weights come from Wyman, Sloan and Shirley's analytic fit of the CIE 1931
@@ -314,7 +323,7 @@ Not done or not verified, stated plainly:
   noise for bias.
 - **Simplifications:** RGB everywhere except dispersive glass, which samples one wavelength per path (no hero-wavelength
   sharing, so dispersion converges with colour noise); refracted radiance is not scaled by the squared
-  index ratio; media are homogeneous per palette index with grey extinction and do not emit; area lights do not block
+  index ratio; media are homogeneous per palette index with grey extinction; area lights do not block
   shadow rays; the ground is a plain diffuse plane; motion blur interpolates matrices linearly (fast rotations shrink a
   little) and moves instances only (no camera motion blur); no panoramic/fisheye projections, lens distortion or
   chromatic aberration; no physical sky model (use an environment map); bloom comes from `@margoengine/post`.

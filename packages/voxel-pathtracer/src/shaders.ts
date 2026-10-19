@@ -599,13 +599,14 @@ fn sampleSurface(m:Mat,n:vec3f,wo:vec3f,etaI:f32)->Bounce {
  return s;
 }
 // Interior of a volume: free-flight sampling coefficient, scattering weight, absorption, phase anisotropy.
-struct Medium {sigma:f32,albedo:vec3f,absorb:vec3f,g:f32,media:bool}
+// emit: radiance a medium adds per world unit (media only).
+struct Medium {sigma:f32,albedo:vec3f,absorb:vec3f,g:f32,media:bool,emit:vec3f}
 fn mediumOf(id:u32)->Medium {
  var r:Medium;
  if(id==0u){return r;}
  let m=material(id);
  r.g=m.g;
- if((m.flags&MEDIA)!=0u){r.sigma=m.density;r.albedo=m.color;r.media=true;}
+ if((m.flags&MEDIA)!=0u){r.sigma=m.density;r.albedo=m.color;r.media=true;r.emit=m.emission;}
  else{r.sigma=m.scatter;r.albedo=vec3f(1.0);r.absorb=m.density*-log(max(m.color,vec3f(1e-4)));}
  return r;
 }
@@ -974,8 +975,11 @@ fn radiance(px:vec2u)->Path {
   var scatter=false;var p=o+d*h.t;
   if(medium!=0u){
    let md=mediumOf(medium);
+   var ts=INF;
+   if(md.sigma>0.0){ts=-log(1.0-rand())/md.sigma;}
+   // Emission along the segment by the track-length estimator: E[j min(ts, t)] = j (1 - e^(-sigma t)) / sigma.
+   if(any(md.emit!=vec3f(0.0))){let add=thr*md.emit*min(ts,min(h.t,1e30));L+=add;if(focused){C+=add;}}
    if(md.sigma>0.0){
-    let ts=-log(1.0-rand())/md.sigma;
     if(ts<h.t){
      thr*=exp(-md.absorb*ts)*md.albedo;
      p=o+d*ts;

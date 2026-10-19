@@ -416,6 +416,23 @@ test('dispersive glass packs its Cauchy coefficient; renderImage passes a fixed 
   tracer.dispose();
 });
 
+test('media emit emissionColor x emission per unit; emissionColor is validated', async () => {
+  const fire = { id: 1, color: [0.2, 0.2, 0.2], type: 'media', density: 0.5, emission: 3, emissionColor: [1, 0.5, 0] },
+    { tracer, device } = await ready({ scene: simpleScene({ materials: [fire] }) });
+  const table = new Float32Array(device.buffers.find((b) => b.size === 256 * 80 && !b.destroyed).data);
+  assert.deepEqual([...table.subarray(20 + 8, 20 + 11)], [3, 1.5, 0]);
+  assert.equal(table[20 + 15] & 4, 0, 'not a light-sampled emitter');
+  assert.throws(
+    () => tracer.setScene(simpleScene({ revision: 2, materials: [{ ...fire, emissionColor: [1, -1, 0] }] })),
+    RangeError,
+  );
+  assert.throws(
+    () => tracer.setScene(simpleScene({ revision: 2, materials: [{ ...fire, emissionColor: 'red' }] })),
+    TypeError,
+  );
+  tracer.dispose();
+});
+
 test('capture cancels between dispatches, releases its buffers and lets the viewport trace again', async () => {
   const { tracer, device, frame } = await ready();
   frame();

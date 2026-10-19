@@ -341,6 +341,10 @@ function packMaterial(m: TraceMaterial, name: string, out: Float32Array): void {
   if (!TYPES.includes(m.type as TraceMaterialType))
     throw new TypeError(`${where} ${name}.type ${String(m.type)} is unknown; pass one of ${TYPES.join(', ')}`);
   const color = checkVec3(m.color, `${name}.color`, true, 'pass linear RGB, 0 or more'),
+    glow =
+      m.emissionColor === undefined
+        ? color
+        : checkVec3(m.emissionColor, `${name}.emissionColor`, true, 'pass linear RGB, 0 or more'),
     type = m.type,
     unit = (value: unknown, fallback: number, field: string) =>
       optional(value, fallback, `${name}.${field}`, 0, 1, 'pass 0 to 1'),
@@ -364,7 +368,7 @@ function packMaterial(m: TraceMaterial, name: string, out: Float32Array): void {
   let flags = PRESENT;
   if (media) flags |= MEDIA;
   if (pGlass > 0) flags |= VOLUME;
-  if (!media && emission > 0 && luminance(color[0], color[1], color[2]) * emission > 0) flags |= EMISSIVE;
+  if (!media && emission > 0 && luminance(glow[0], glow[1], glow[2]) * emission > 0) flags |= EMISSIVE;
   if (alpha < DELTA_ALPHA) flags |= SMOOTH;
   out.set(
     [
@@ -376,9 +380,10 @@ function packMaterial(m: TraceMaterial, name: string, out: Float32Array): void {
       pGlass,
       media ? 0 : specular,
       ((ior - 1) / (ior + 1)) ** 2,
-      media ? 0 : color[0] * emission,
-      media ? 0 : color[1] * emission,
-      media ? 0 : color[2] * emission,
+      // Surfaces: emitted radiance; media: emitted radiance per world unit (not a light-sampled emitter).
+      glow[0] * emission,
+      glow[1] * emission,
+      glow[2] * emission,
       ior,
       density,
       scatter,

@@ -52,6 +52,7 @@ export interface TraceMaterial {
     roughness?: number;
     metalness?: number;
     emission?: number;
+    emissionColor?: TraceVec3;
     ior?: number;
     transmission?: number;
     density?: number;

@@ -4,8 +4,8 @@
 // - traversal: per-pixel first hits on the GPU (instance, palette index, distance) equal VoxelPathTracer.raycast on
 //   the CPU for rotated, scaled, sheared and mirrored instances, perspective and orthographic;
 // - analytic: furnaces (diffuse, metal, plastic, glass, media, blend, constant environment map), direct emission,
-//   Beer-Lambert media, a tinted absorbing glass slab, sun irradiance (point and disk), two emissive planes (emitter
-//   sampling with MIS) and a large area light, each against its closed-form value;
+//   Beer-Lambert media, emissive media, a tinted absorbing glass slab, sun irradiance (point and disk), two emissive
+//   planes (emitter sampling with MIS) and a large area light, each against its closed-form value;
 // - energy: white furnaces of metal and glass planes at roughness 0.2/0.5/0.8/1 and 20/60/80 degrees equal 1 (multiple-
 //   scattering compensation), gold equals Kulla-Conty's expectation from numerically integrated albedos;
 // - microfacet: the GGX plastic coat's albedo against numerical integration of the same model;

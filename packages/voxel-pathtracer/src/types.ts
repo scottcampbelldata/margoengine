@@ -33,8 +33,14 @@ export interface TraceMaterial {
   roughness?: number;
   /** Share of the metal lobe, 0 to 1 (`metal` and `blend`). */
   metalness?: number;
-  /** Emitted radiance as a multiple of `color`, 0 or more. Any surface type may emit; `emit` defaults to 1. */
+  /**
+   * Emitted radiance as a multiple of `color` (or `emissionColor`), 0 or more. Any surface type may emit; `emit`
+   * defaults to 1. Compatible addition: `media` emit too, `emission x emissionColor` radiance per world unit along a
+   * ray (fire, glowing gas), attenuated by the medium itself.
+   */
   emission?: number;
+  /** Compatible addition: linear RGB of the emission, each component 0 or more. Default `color`. */
+  emissionColor?: TraceVec3;
   /** Index of refraction, 1 to 3 (glass refraction and the plastic coat's Fresnel). Default 1.5. */
   ior?: number;
   /** Share of the glass lobe, 0 to 1 (`blend`; `glass` is 1). */
