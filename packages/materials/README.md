@@ -565,6 +565,7 @@ while it is in use: a material that never sets one keeps exactly its shader, bin
 | Option | Meaning |
 | --- | --- |
 | `alphaMap` | Green channel (linear) multiplies opacity, before `alphaTest` and blending (`transparent`) |
+| `bumpMap`, `bumpScale` | Red channel (linear) is a height, `bumpScale` (default 1, finite, negative inverts) its full range in mesh units; its screen-space slope tilts the shading normal (Mikkelsen 2010), after `normalMap` when both are set |
 
 Each map has its own UV transform slot (`material.setUVTransform(t, 'alphaMap')`); `uvTransform` and
 `setUVTransform(t)` without a slot set it with the other maps'.

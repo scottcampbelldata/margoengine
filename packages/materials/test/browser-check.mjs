@@ -35,6 +35,8 @@ const base = ((188 / 255 + 0.055) / 1.055) ** 2.4,
   highlight = ((0.1 * 32) / (8 * Math.PI)) * 2,
   // A clustered point light 1 unit away (intensity 2, range 100: window (1 - 1e-8)^2), straight on: n.l = n.h = 1.
   local = (base * 2) / Math.PI;
+const gray = (v) => display([v, v, v]),
+  lambert = (n, l) => Math.max(0, n.reduce((s, x, k) => s + x * l[k], 0) / Math.hypot(...n) / Math.hypot(...l));
 const expected = {
   clusteredLambert: display([local, local, local]),
   clusteredPhong: display([local + highlight, local + highlight, local + highlight]),
@@ -53,6 +55,10 @@ const expected = {
   video: [255, 0, 255],
   // White at alpha 128/255 over the clear colour [5, 6, 9].
   alphaBlend: [5, 6, 9].map((b) => Math.round((255 * 128) / 255 + (b * 127) / 255)),
+  // Bumped normal (-256/255, 0, 1) normalised, lit from (-1, 0, 1) (towards it) or (1, 0, 1) (away: n.l clamps to 0).
+  bumpFacing: gray(local * lambert([-256 / 255, 0, 1], [-1, 0, 1])),
+  bumpAway: [0, 0, 0],
+  bumpNormalMap: gray(local * lambert([-256 / 255, 0, 1], [-1, 0, 1])),
 };
 try {
   console.log('adapter', JSON.stringify(hardware.webgpu));
@@ -82,6 +88,9 @@ try {
     'clusteredPhong',
     'alphaMap',
     'alphaBlend',
+    'bumpFacing',
+    'bumpAway',
+    'bumpNormalMap',
     'litEffects',
     'video',
   ]) {
@@ -122,6 +131,10 @@ try {
       await step();
       near(await pixel(0.3), [255, 0, 0], 'the updated region (image top, flipY) shows the new pixels');
       near(await pixel(0.7), [0, 255, 0], 'outside the region the texture keeps its old pixels');
+    }
+    if (name === 'bumpAway') {
+      await step();
+      near(await pixel(), gray(local * Math.SQRT1_2), 'bumpMap removed live: the flat normal at 45 degrees');
     }
     if (name === 'alphaMap') {
       near(await pixel(0.5, 0.4), [5, 6, 9], 'alphaMap green 0 cuts at alphaTest 0.5');

@@ -67,6 +67,13 @@ scenarios.phongFog=()=>lit(new Material({shading:'phong',map:solid(188,188,188)}
 const halves=(left,right)=>new Texture({data:new Uint8Array([...left,...right]),width:2,height:1},{magFilter:'nearest',minFilter:'nearest',mipmaps:false});
 scenarios.alphaMap=()=>{const m=createMesh(engine,planeGeometry(2,2),new Material({shading:'basic',color:[1,0,0],alphaMap:halves([0,0,0,255],[0,255,0,255]),alphaTest:0.5}));return {destroy(){m.destroy();},step(){m.material.alphaMap=null;}};};
 scenarios.alphaBlend=()=>createMesh(engine,planeGeometry(2,2),new Material({shading:'basic',alphaMap:solid(0,128,0),transparent:true}));
+// bumpMap: a 256-texel red ramp across the plane at bumpScale 2 rises 256/255 units per unit of x, tilting the normal
+// to (-256/255, 0, 1). Lambert under irradiance 2, no ambient; the step removes the map live.
+const ramp=new Texture({data:Uint8Array.from({length:1024},(_,k)=>k%4===3?255:k%4?0:k>>2),width:256,height:1},{mipmaps:false});
+const bumped=(direction,extra)=>{const light=[...engine.lighting.direction],radiance=[...engine.lighting.radiance];engine.lighting.direction.set([...direction,2]);engine.lighting.radiance[3]=0;const m=createMesh(engine,planeGeometry(2,2),new Material({shading:'lambert',map:solid(188,188,188),bumpMap:ramp,bumpScale:2,...extra}));return {destroy(){m.destroy();engine.lighting.direction.set(light);engine.lighting.radiance.set(radiance);},step(){m.material.bumpMap=null;}};};
+scenarios.bumpFacing=()=>bumped([-1,0,1]);
+scenarios.bumpAway=()=>bumped([1,0,1]);
+scenarios.bumpNormalMap=()=>bumped([-1,0,1],{normalMap:solid(128,128,255)});
 // One clustered point light 1 unit in front of the plane's centre (intensity 2, range 100), no directional light, no ambient.
 const local=material=>{const light=[...engine.lighting.direction],radiance=[...engine.lighting.radiance];engine.lighting.direction[3]=0;engine.lighting.radiance[3]=0;const lights=Clustered.attach(engine),m=createMesh(engine,planeGeometry(2,2),material);lights.add(m);lights.setLights([{position:[0,0,1],range:100,intensity:2}]);return {destroy(){m.destroy();plugin(lights).destroy();engine.lighting.direction.set(light);engine.lighting.radiance.set(radiance);}};};
 scenarios.clusteredLambert=()=>local(new Material({shading:'lambert',map:solid(188,188,188)}));

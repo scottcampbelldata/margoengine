@@ -145,8 +145,36 @@ test('alphaMap compiles in only while set: green multiplies opacity, bindings 19
 
 test('a material with every feature at its default draws exactly the GPU calls of a plain one', async () => {
   const expected = await oneFrame(new PbrMaterial());
-  assert.deepEqual(await oneFrame(new PbrMaterial({ alphaMap: null })), expected);
-  const toggled = new PbrMaterial({ alphaMap: solid(0, 0, 0) });
-  toggled.alphaMap = null;
-  assert.deepEqual(await oneFrame(toggled), expected);
+  assert.deepEqual(await oneFrame(new PbrMaterial({ alphaMap: null, bumpMap: null, bumpScale: 1 })), expected);
+  const toggled = new PbrMaterial({ alphaMap: solid(0, 0, 0), bumpMap: solid(0, 0, 0), bumpScale: 3 });
+  toggled.alphaMap = toggled.bumpMap = null;
+  assert.deepEqual(await oneFrame(toggled), expected, 'a bumpScale without a bumpMap adds nothing either');
+});
+
+test('bumpMap tilts the mapped normal by its screen-space slope; bumpScale is live and validated', async () => {
+  const s = await scene(),
+    material = new PbrMaterial({ normalMap: solid(128, 128, 255), bumpMap: solid(10, 0, 0), bumpScale: 0.5 }),
+    mesh = createMesh(s.engine, quad, material);
+  const log = s.frame();
+  const code = codes(log).find((c) => c.includes('margoBump'));
+  assert.ok(
+    /\n {2}s\.n=normalize\(t\*sampledNormal[^\n]*\);\n {2}s\.n=margoBump\(s\.n,i\.position,textureSample\(margoBumpMap,margoBumpSampler,margoFeatureUV\(i\.uv,1u\)\)\.r\*margoFeatures\.values\.x,facing\);/.test(
+      code,
+    ),
+    'right after the normal-mapped normal',
+  );
+  assert.ok(code.includes('fn margoBump(n:vec3f,p:vec3f,height:f32,facing:bool)->vec3f {'));
+  assert.ok(!code.includes('margoAlphaMap'), 'only the maps in use are bound');
+  assert.ok(bindings(log).some((list) => [198, 182, 183].every((b) => list.includes(b)) && !list.includes(180)));
+  assert.equal(featureUniform(log, s.history)[0], 0.5);
+  material.bumpScale = -2;
+  assert.equal(featureUniform(s.frame(), s.history)[0], -2, 'live');
+  assert.throws(() => {
+    material.bumpScale = '1';
+  }, TypeError);
+  assert.throws(() => {
+    material.bumpScale = Infinity;
+  }, RangeError);
+  mesh.destroy();
+  s.engine.dispose();
 });

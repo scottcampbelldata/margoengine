@@ -568,6 +568,10 @@ export interface MaterialOptions extends PhysicalOptions {
   matcap?: Texture | null;
   /** Opacity map: its green channel (linear) multiplies opacity, before `alphaTest` and blending. Live. */
   alphaMap?: Texture | null;
+  /** Height map (red, linear) that tilts the shading normal by its screen-space slope, after `normalMap`. Live. */
+  bumpMap?: Texture | null;
+  /** Height of `bumpMap`'s full range in mesh units, finite (negative inverts); default 1. Live. */
+  bumpScale?: number;
   transparent?: boolean;
   alphaTest?: number;
   /** Faces drawn by triangle meshes. Explicit side takes precedence over doubleSided. */
@@ -914,7 +918,7 @@ function materialBuffer(
 /** The feature letters (features.ts) `m` uses now: its shader variant. */
 function featureKey(m: Material): string {
   const maps = m['featureTextures'];
-  return maps[0] ? 'a' : '';
+  return (maps[0] ? 'a' : '') + (maps[1] ? 'b' : '');
 }
 /** `entries` plus the feature uniform and maps `m` uses now (none for a material without features). */
 function featureBindings(m: Material, device: GPUDevice, owner: object, entries: GPUBindGroupEntry[]) {
@@ -1088,6 +1092,18 @@ export class Material {
   set alphaMap(v: Texture | null) {
     this.setFeatureMap(0, v);
   }
+  get bumpMap(): Texture | null {
+    return this.featureTextures[1];
+  }
+  set bumpMap(v: Texture | null) {
+    this.setFeatureMap(1, v);
+  }
+  get bumpScale(): number {
+    return this.featureValues[0];
+  }
+  set bumpScale(v: number) {
+    this.featureValues[0] = rasterFloat(v, 'bumpScale');
+  }
   private readonly physicalTextures: (Texture | null)[] = Array(12).fill(null);
   private setMap(i: number, value: Texture | null): void {
     const key = mapSlots[i + 5] as keyof PhysicalOptions;
@@ -1230,7 +1246,8 @@ export class Material {
     this.aoMap = o.aoMap ?? null;
     this.emissiveMap = o.emissiveMap ?? null;
     this.matcap = o.matcap ?? null;
-    if (o.alphaMap != null) this.alphaMap = o.alphaMap;
+    for (const key of ['alphaMap', 'bumpMap', 'bumpScale'] as const)
+      if (o[key] !== undefined) this[key] = o[key] as never;
     // Physical options enable their lobes as they are set (transmission before the volume values that need it); the
     // constructor names every extension its options use.
     const used = (Object.keys(extensions) as (keyof PhysicalOptions)[]).filter((k) => o[k] != null);

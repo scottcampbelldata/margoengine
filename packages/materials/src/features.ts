@@ -19,7 +19,16 @@ function edit(code: string, from: string | RegExp, to: string | ((match: string,
     );
   return next;
 }
-/** `code` with the features `key` names: `a` alphaMap. */
+// Bump mapping from screen-space derivatives (Mikkelsen 2010, "Bump Mapping Unparametrized Surfaces on the GPU"): the
+// height's screen gradient through the surface's, R1 = dP/dy x N, R2 = N x dP/dx, N' = |det| N - sign(det) (dH/dx R1 +
+// dH/dy R2). det takes the face's sign so a back face sees the bump mirrored, as the surface's other side.
+const bump = `fn margoBump(n:vec3f,p:vec3f,height:f32,facing:bool)->vec3f {
+  let sx=dpdx(p); let sy=dpdy(p); let r1=cross(sy,n); let r2=cross(n,sx);
+  let det=dot(sx,r1)*select(-1.0,1.0,facing); let o=abs(det)*n-sign(det)*(dpdx(height)*r1+dpdy(height)*r2);
+  return select(n,normalize(o),dot(o,o)>0.0);
+}
+`;
+/** `code` with the features `key` names: `a` alphaMap, `b` bumpMap. */
 export function featureShader(code: string, group: number, key: string): string {
   let inner = cache.get(code);
   const id = key + group,
@@ -28,11 +37,18 @@ export function featureShader(code: string, group: number, key: string): string 
   const maps = featureMaps.map((_, k) => key.includes('abdl'[k]));
   let out = code;
   if (maps[0]) out = edit(out, '\n  let mr=', `\n  s.base.a*=${sample(0)}.g;\n  let mr=`);
+  // After the normal map: the bump tilts the mapped normal.
+  if (maps[1])
+    out = edit(
+      out,
+      /\n {2}s\.n=normalize\([^\n]*\);/,
+      (line) => `${line}\n  s.n=margoBump(s.n,i.position,${sample(1)}.r*margoFeatures.values.x,facing);`,
+    );
   const declarations = maps.some(Boolean)
     ? `${featureStruct}
 @group(${group}) @binding(198) var<uniform> margoFeatures:MargoFeatures;
 ${maps.map((used, k) => (used ? `@group(${group}) @binding(${180 + k * 2}) var margo${names[k]}Map:texture_2d<f32>;\n@group(${group}) @binding(${181 + k * 2}) var margo${names[k]}Sampler:sampler;\n` : '')).join('')}fn margoFeatureUV(uv:vec4f,k:u32)->vec2f {let a=margoFeatures.uvt[k*2]; let p=vec3f(select(uv.xy,uv.zw,a.w>0.5),1); return vec2f(dot(a.xyz,p),dot(margoFeatures.uvt[k*2+1].xyz,p));}
-`
+${maps[1] ? bump : ''}`
     : '';
   out = declarations + out;
   if (!inner) {
