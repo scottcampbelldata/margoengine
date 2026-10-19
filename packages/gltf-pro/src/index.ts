@@ -1263,8 +1263,11 @@ export class PBRModel implements EnginePlugin {
     for (let i = 0; i < list.length; i++) {
       const p = list[i],
         g = geometry[i];
+      if (p.deformed)
+        throw new TypeError(
+          'PBR geometry writes need an undeformed primitive; dispose its Skin or other deformer, write, then attach it again',
+        );
       if (
-        p.deformed ||
         p.definition.targets?.length ||
         p.definition.attributes?.JOINTS_0 !== undefined ||
         this.bufferSources.has(p) ||

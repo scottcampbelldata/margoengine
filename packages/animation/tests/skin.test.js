@@ -222,6 +222,24 @@ test('an attached skin deforms a createMesh mesh on the GPU with normalised weig
   assert.throws(() => engine.use(new Skin(s, [0, 0, 0, 0], [1, 0, 0, 0])), { code: 'state' });
 });
 
+test('a skinned mesh refuses live geometry edits until its skin is disposed, then takes a new skin', async () => {
+  const { engine } = await world(),
+    s = arm(),
+    mesh = createMesh(engine, strip, new Material({ color: [1, 1, 1, 1] })),
+    joints = new Array(16).fill(0),
+    weights = new Array(16).fill(1),
+    skin = Skin.attach(mesh, s, joints, weights);
+  assert.throws(() => mesh.setGeometry(strip), { name: 'TypeError', message: /dispose its Skin/ });
+  skin.dispose();
+  const moved = { ...strip, positions: strip.positions.map((v, i) => (i % 3 === 2 ? 1 : v)) };
+  mesh.setGeometry(moved);
+  assert.equal(mesh.primitives[0].vertices[2], 1, 'the edit reached the source vertices');
+  const again = Skin.attach(mesh, s, joints, weights);
+  assert.ok(mesh.primitives[0].deformed, 'the new skin deforms the edited geometry');
+  again.dispose();
+  mesh.dispose();
+});
+
 test('CPU skinning bends a two-bone arm, blends weights, follows the root on zero weights and keeps mirrored normals', () => {
   const s = new Skeleton([
       { name: 'upper', parent: -1 },
