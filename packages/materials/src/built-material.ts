@@ -1249,7 +1249,7 @@ export class Material {
   }
   set shininess(v: number) {
     if (typeof v !== 'number' || !(v >= 0 && v < Infinity))
-      throw new RangeError('Material shininess must be a finite number >= 0; Crocotile and three.js default to 30');
+      throw new RangeError('Material shininess must be a finite number >= 0 (default 30)');
     this.gloss = v;
   }
   get opacity(): number {
