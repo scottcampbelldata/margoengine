@@ -571,6 +571,8 @@ export interface MaterialOptions extends PhysicalOptions {
   emissive?: ColorInput;
   /** Scales `emissive` (and its map), finite and >= 0 (default 1), so emission can exceed 1 for bloom. Live. */
   emissiveIntensity?: number;
+  /** Shades each triangle with its own face normal instead of the interpolated vertex normals; default false. Live. */
+  flatShading?: boolean;
   map?: Texture | null;
   metalRoughnessMap?: Texture | null;
   normalMap?: Texture | null;
@@ -957,7 +959,8 @@ function featureKey(m: Material): string {
     (alpha ? 'a' : '') +
     (bump ? 'b' : '') +
     (displacement ? 'd' : '') +
-    (light ? (m.shading === 'basic' ? 'u' : 'l') : '')
+    (light ? (m.shading === 'basic' ? 'u' : 'l') : '') +
+    (m.flatShading && m.shading !== 'basic' && m.shading !== 'depth' && m.shading !== 'distance' ? 'f' : '')
   );
 }
 /** The feature uniform of `m` for `owner`, written with its current values. */
@@ -1116,6 +1119,8 @@ export class Material {
   private readonly highlight: LiveColor;
   private gloss = 30;
   private glowScale = 1;
+  /** On/off features (features.ts letters f...). */
+  private readonly switches = { flatShading: false };
   /** gltf-pro layout: [roughness, metalness, normalScale, aoMapIntensity] and [alphaMode, alphaTest, side (front 0, double 1, back 2), 0]. */
   readonly factors: number[];
   readonly settings: number[];
@@ -1345,6 +1350,7 @@ export class Material {
       'lightMap',
       'lightMapIntensity',
       'emissiveIntensity',
+      'flatShading',
     ] as const)
       if (o[key] !== undefined) this[key] = o[key] as never;
     // Physical options enable their lobes as they are set (transmission before the volume values that need it); the
@@ -1482,6 +1488,13 @@ export class Material {
   }
   set emissive(v: ColorInput) {
     this.glow.set(v);
+  }
+  /** Face normals instead of interpolated ones (default false), for lit, normal and matcap shading. */
+  get flatShading(): boolean {
+    return this.switches.flatShading;
+  }
+  set flatShading(v: boolean) {
+    this.switches.flatShading = flag(v, 'flatShading');
   }
   /** Scales `emissive` (default 1, finite, >= 0): the emission drawn is emissive x emissiveMap x emissiveIntensity. */
   get emissiveIntensity(): number {

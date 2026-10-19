@@ -193,6 +193,7 @@ const defaults = {
   lightMap: null,
   lightMapIntensity: 1,
   emissiveIntensity: 1,
+  flatShading: false,
 };
 const used = () => ({
   alphaMap: solid(0, 0, 0),
@@ -204,8 +205,9 @@ const used = () => ({
   lightMap: solid(0, 0, 0),
   lightMapIntensity: 4,
   emissiveIntensity: 4,
+  flatShading: true,
 });
-const off = { alphaMap: null, bumpMap: null, displacementMap: null, lightMap: null };
+const off = { alphaMap: null, bumpMap: null, displacementMap: null, lightMap: null, flatShading: false };
 
 test('a material with every feature at its default draws exactly the GPU calls of a plain one', async () => {
   for (const hook of [false, true]) {
@@ -401,3 +403,25 @@ test('exportModel writes emissiveIntensity as KHR_materials_emissive_strength ov
     const off = await material(new PbrMaterial({ emissive: [1, 1, 1], emissiveIntensity: 0 }));
     assert.equal(off.emissiveFactor, undefined);
   }));
+
+test('flatShading shades with the face normal for lit, normal and matcap shading; unlit ignores it', async () => {
+  const s = await scene(),
+    materials = [new LambertMaterial(), new NormalMaterial(), new UnlitMaterial()].map((m) =>
+      Object.assign(m, { flatShading: true }),
+    ),
+    meshes = materials.map((m) => createMesh(s.engine, quad, m));
+  const flat = codes(s.frame()).filter((c) => c.includes('let n=normalize(cross(dpdy(i.position),dpdx(i.position)));'));
+  assert.equal(flat.length, 2, 'Lambert and normal, not unlit');
+  assert.ok(flat.every((c) => !c.includes('let n=normalize(i.normal)*select(-1.0,1.0,facing);')));
+  assert.throws(() => {
+    materials[0].flatShading = 1;
+  }, TypeError);
+  materials[0].flatShading = false;
+  const smooth = codes(s.frame());
+  assert.ok(
+    smooth.length === 1 && smooth[0].includes('let n=normalize(i.normal)*select(-1.0,1.0,facing);'),
+    'off again, live: the smooth variant',
+  );
+  for (const mesh of meshes) mesh.destroy();
+  s.engine.dispose();
+});
