@@ -112,6 +112,9 @@ interface MaterialData {
     metallicRoughnessTexture?: TextureData;
     normalTexture?: TextureData;
     unlit?: boolean;
+    shading?: 'standard' | 'lambert' | 'phong';
+    specular?: readonly number[];
+    shininess?: number;
 }
 
 interface MorphData {
