@@ -60,6 +60,7 @@ skeleton.restorePose(1); // Restore Pose; restorePose(1, true) also resets neste
 skeleton.setBindPose(); // the current pose becomes the base pose, inverse binds recomputed
 skin.setInfluences(first, joints4, weights4); // weight painting
 const world = skeleton.worldMatrix(1, mesh.primitives[0].node.matrix); // for drawing and picking bones
+const posed = skin.pose(geometry.positions, geometry.normals); // CPU skinning: picking, Export Static Pose (OBJ/DAE)
 skin.dispose();
 ```
 
@@ -97,3 +98,12 @@ Sampling is a pure function of time, so editing, scrubbing, playback and offline
 LINEAR, both at their keys and exact everywhere; other tracks are LINEAR at the keys plus every `1 / fps` second inside
 eased segments, exact at those times. Pass the result to `@margoengine/exporters` as an `ExportScene` animation; tracks
 whose target `resolve` maps to undefined are left out.
+
+`skin.pose()` runs the GPU pass's maths on the CPU (linear blend of the four bone matrices; normals by the cofactor
+matrix, flipped under mirroring scales) and returns Float32 positions and normals in the mesh's space.
+`tests/raw-rig-roundtrip.test.js` writes a raw rig and clip with `@margoengine/exporters` `exportGLB` (bones as export
+nodes under the mesh node, `skeleton.inverseBindMatrices`, `bakeKeyframeClip`), reads it back through gltf-pro and
+`Animation`, and matches `skin.pose()` within 1e-4 at frame and key times.
+`node scripts/animation-skin-browser-tests.js` (real WebGPU, after building the packages) reads back the deformed
+buffer of a skinned `createMesh` strip and matches `skin.pose()` positions and normals within 1e-5 after posing, a
+ranged `setInfluences` and a device restore, with no validation errors.

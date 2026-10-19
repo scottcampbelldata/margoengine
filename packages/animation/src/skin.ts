@@ -307,6 +307,41 @@ export class Skin implements EnginePlugin {
     return this;
   }
   /**
+   * CPU skinning at the skeleton's current pose, with the GPU pass's maths: bind-pose `positions` (and `normals`), xyz
+   * per vertex in skeleton space, to posed copies. For picking a posed mesh and for exporting a static pose.
+   */
+  pose(positions: ArrayLike<number>, normals?: ArrayLike<number>): { positions: Float32Array; normals?: Float32Array } {
+    const p = finite(positions, this.count * 3, 'Skin positions'),
+      n = normals === undefined ? undefined : finite(normals, this.count * 3, 'Skin normals'),
+      matrices = this.skeleton.skinMatrices,
+      m = new Float64Array(16),
+      out = new Float32Array(this.count * 3),
+      outNormals = n && new Float32Array(this.count * 3);
+    for (let v = 0, i = 0; v < this.count; v++, i += 3) {
+      m.fill(0);
+      for (let c = 0; c < 4; c++) {
+        const w = this.weights[v * 8 + 4 + c],
+          at = this.ids[v * 8 + c] * 16;
+        if (w) for (let k = 0; k < 16; k++) m[k] += w * matrices[at + k];
+      }
+      for (let r = 0; r < 3; r++) out[i + r] = m[r] * p[i] + m[4 + r] * p[i + 1] + m[8 + r] * p[i + 2] + m[12 + r];
+      if (!n || !outNormals) continue;
+      // Cofactor columns (determinant times the inverse transpose), flipped for a mirroring blend, as the shader does.
+      const a = [m[5] * m[10] - m[6] * m[9], m[6] * m[8] - m[4] * m[10], m[4] * m[9] - m[5] * m[8]],
+        b = [m[9] * m[2] - m[10] * m[1], m[10] * m[0] - m[8] * m[2], m[8] * m[1] - m[9] * m[0]],
+        c = [m[1] * m[6] - m[2] * m[5], m[2] * m[4] - m[0] * m[6], m[0] * m[5] - m[1] * m[4]],
+        sign = Math.sign(m[0] * a[0] + m[1] * a[1] + m[2] * a[2]),
+        x = (a[0] * n[i] + b[0] * n[i + 1] + c[0] * n[i + 2]) * sign,
+        y = (a[1] * n[i] + b[1] * n[i + 1] + c[1] * n[i + 2]) * sign,
+        z = (a[2] * n[i] + b[2] * n[i + 1] + c[2] * n[i + 2]) * sign,
+        length = Math.hypot(x, y, z) || 1;
+      outNormals[i] = x / length;
+      outNormals[i + 1] = y / length;
+      outNormals[i + 2] = z / length;
+    }
+    return outNormals ? { positions: out, normals: outNormals } : { positions: out };
+  }
+  /**
    * A skin that deforms `mesh` on the GPU from now on, as a plugin of the mesh's engine. `mesh` is a `createMesh` mesh
    * (or any gltf-pro model whose primitives share one vertex array) with one vertex per four influences.
    */

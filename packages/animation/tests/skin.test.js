@@ -221,3 +221,34 @@ test('an attached skin deforms a createMesh mesh on the GPU with normalised weig
   assert.throws(() => Skin.attach(mesh, s, new Array(16).fill(0), new Array(16).fill(1)), { code: 'disposed' });
   assert.throws(() => engine.use(new Skin(s, [0, 0, 0, 0], [1, 0, 0, 0])), { code: 'state' });
 });
+
+test('CPU skinning bends a two-bone arm, blends weights, follows the root on zero weights and keeps mirrored normals', () => {
+  const s = new Skeleton([
+      { name: 'upper', parent: -1 },
+      { name: 'forearm', parent: 0, translation: [0, 1, 0] },
+    ]),
+    // (0, 1.5, 0) on the forearm; (0, 2, 0) half on each bone (weights 3 + 3 normalise); (1, 0, 0) with zero weights.
+    positions = [0, 1.5, 0, 0, 2, 0, 1, 0, 0],
+    normals = [1, 0, 0, 1, 0, 0, 0, 0, 1],
+    skin = new Skin(s, [1, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1], [1, 0, 0, 0, 3, 3, 0, 0, 0, 0, 0, 0]);
+  close(skin.pose(positions).positions, positions, 0, 'bind pose is the rest geometry');
+  assert.equal(skin.pose(positions).normals, undefined);
+  s.setPose(1, { rotation: q90z });
+  let posed = skin.pose(positions, normals);
+  // Forearm: T(0, 1, 0) R(90 z) times the inverse bind T(0, -1, 0), so (0, 1.5, 0) -> (-0.5, 1, 0).
+  close(posed.positions, [-0.5, 1, 0, -0.5, 1.5, 0, 1, 0, 0], 1e-6);
+  close(posed.normals.subarray(0, 3), [0, 1, 0], 1e-6, 'rotated normal');
+  close(posed.normals.subarray(3, 6), [Math.SQRT1_2, Math.SQRT1_2, 0], 1e-6, 'blended normal');
+  s.setPose(0, { rotation: q90z });
+  close(skin.pose(positions).positions.subarray(6, 9), [0, 1, 0], 1e-6, 'zero-sum weights follow the root');
+  // A mirroring scale flips positions and keeps normals pointing out of the mirrored surface.
+  s.restorePose().setPose(0, { scale: [-1, 1, 1] });
+  posed = skin.pose(positions, normals);
+  close(posed.positions.subarray(6, 9), [-1, 0, 0], 1e-6);
+  close(posed.normals.subarray(0, 3), [-1, 0, 0], 1e-6);
+  // setBindPose makes the current pose the rest: the mesh stays where it is drawn now.
+  s.setPose(1, { rotation: q90z }).setBindPose();
+  close(skin.pose(positions).positions, positions, 1e-6);
+  assert.throws(() => skin.pose([0, 0, 0]), { name: 'TypeError', message: /Skin positions needs 9 numbers/ });
+  assert.throws(() => skin.pose(positions, [0, 0, Number.NaN, 0, 0, 0, 0, 0, 0]), RangeError);
+});
