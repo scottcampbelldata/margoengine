@@ -39,6 +39,12 @@ browser check, `build:site`, `visual:check` and `verify` (the agent paused becau
    `noiseTerrain` can leave water beside cave air and leaves inside caves; the catalog clipboard browser test is flaky
    under heavy load.
 
+Progress on scott dev (NVIDIA RTX A6000, 2026-10-19): step 1 done. Step 2 done: phase 4 rebased onto main and on main;
+its browser check passes on the A6000 at 4x and 1x (now including the 196,608-quads-per-layer worst case); cracks
+measured (14 pixels in a grazing view without the edge stretch, none with it). Greedy and naive images are equal except
+for sub-pixel edge ownership (0.04-0.52% of drawn pixels, never an area); bit-identical images are impossible with two
+different meshes on a real rasterizer. Step 4 done: `npm run check:merge` passes on the A6000 (3,003 Node tests, 15
+proofs, all 55 views of the `nvidia-ampere-msedge-155` profile with no reference changes); core + stage 21,343 B.
 
 Tile editor engine work (Scott, 2026-10-18/19): Scott started `tile-asset-editor` (a Crocotile 3D 2.7.4 equivalent,
 own repository `scottcampbelldata/tile-asset-editor`) as the base of his own 3D modeller and game engine, and

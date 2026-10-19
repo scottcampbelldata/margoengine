@@ -196,11 +196,11 @@ on vfx's texture option). Avoided taken names: `World`, `RayHit`, `WorkerPool`.
 Order: 1 first; then 2, 6, 7, 8, 10, 11, 12 can run in parallel (they need only the storage API); 3 after 2; 4 after
 3; 5 after 4; 9 after 3 and 8; 13 last.
 
-## As built (phases 1-3, 6-12; recorded by the merger 2026-10-19)
+## As built (phases 1-4, 6-12; recorded by the merger 2026-10-19)
 
-Status: on main are phases 1 (storage), 2 (mesher), 3 (worker mesher), 6 (light), 7 (queries), 8 (codec, store),
-9 (streaming, generation), 10 (.vox), 11 (Rapier) and 12 (extras: audio and vfx). Phases 4 (renderer), 5 (renderer
-lighting) and 13 (example and benchmarks) remain. Names and decisions beyond the lists above:
+Status: on main are phases 1 (storage), 2 (mesher), 3 (worker mesher), 4 (renderer), 6 (light), 7 (queries), 8 (codec,
+store), 9 (streaming, generation), 10 (.vox), 11 (Rapier) and 12 (extras: audio and vfx). Phases 5 (renderer lighting)
+and 13 (example and benchmarks) remain. Names and decisions beyond the lists above:
 
 - Storage: `BlockType` (what `get` and `table` return); `VoxelChunk.getLight`/`setLight`/`fillLight`/`byteLength`;
   `VoxelWorld.heightmap`, `blocks`, `minY`, `maxY`, `onChunk(listener)` (fires for loaded chunks at subscribe, after
@@ -230,5 +230,14 @@ lighting) and 13 (example and benchmarks) remain. Names and decisions beyond the
   #993, fix PR #1030), so chunks near a ball get a FIX_INTERNAL_EDGES triangle mesh and keep a disabled voxel
   collider; a cave-heavy chunk near a ball costs ~125 ms to build (not yet spread over frames). Voxel contacts produce
   no `Physics` collision events.
+- Renderer (phase 4): `VoxelRendererOptions` as designed; `VoxelRendererStats` {chunks, visible, quads, bytes, draws};
+  `BlockTextures` (constructor `{images, size}`, `load(urls)`, `fromAtlas(image, {size})`, `layers`, live
+  `set(layer, image)`, `dispose()`). The quad pool starts at 4 MiB (not 64) and doubles to `maxQuadBytes`; the static index buffer holds the
+  196,608-quad worst case (4.5 MiB). Each pixel is shaded where its ray meets the face plane (texture gradients from the
+  neighbouring pixels' hits), so greedy quads shade like unit faces; merged quads are stretched 1/128 pixel along their
+  edges to close T-junction cracks (14 crack pixels in a grazing view on the RTX A6000 without it, none with it).
+  Greedy and one-quad-per-face images differ only in edge samples (under 0.6% of drawn pixels, never a 2 x 2 block):
+  bit-identical images are impossible because the two meshes put different vertices on the same edges. Render bundles
+  kept (re-record 0.1-0.8 ms). GPU-verified on the Arc 140V and the RTX A6000 (tests/render-browser-check.mjs).
 - Extras: `AudioVoicePool` in @margoengine/audio; `ParticleAtlas` on @margoengine/vfx's texture option. The decoders
   pool was not moved onto `JobPool` (its per-worker queue and timeout semantics differ).

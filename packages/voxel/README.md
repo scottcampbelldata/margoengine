@@ -491,3 +491,12 @@ same image after `engine.rebootDevice()`, no validation errors. Rough timing (`-
 queries in 65 us steps): a synthetic render-distance-16 world (2,178 chunks, 1.13M quads, 13.7 MiB) spawns in 1.5-4.6 s
 and its voxel passes take about 3.2 ms of GPU at 1920 x 1080 with 4x MSAA (582 chunks visible), 0.9 ms of CPU per frame
 for the whole `engine.render`.
+
+Checked again on the NVIDIA RTX A6000 desktop (2026-10-19, Edge 155): every check above passes at 4x and 1x MSAA, plus
+the worst case: one chunk of 196,608 cutout quads and one of 196,608 translucent quads (3D checkerboards of two types
+each) draw in full with no validation error. Greedy against one-quad-per-face: 22-207 differing edge pixels of
+29,975-56,488 drawn at 4x (0.04-0.52%), 12-44 at 1x, never a 2 x 2 block; bit-identical images are not possible
+because the two meshes put different vertices on the same edges and the rasterizer snaps each. With the edge stretch
+switched off, a grazing slab view shows 14 crack pixels at 4x on this GPU; with it on, none. Rough timing (`--timing`,
+machine not quiet): the render-distance-16 world above spawns in 0.63 s; its voxel passes take about 0.26 ms of GPU
+(the timestamps here come in 0.26 ms steps) and `engine.render` 0.3 ms of CPU per frame.
