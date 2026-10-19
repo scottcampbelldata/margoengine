@@ -206,3 +206,52 @@ export function normalizeColors(colors: Float32Array): void {
 export function throwIfAborted(signal: AbortSignal | undefined, format: string): void {
   if (signal?.aborted) throw new LoaderError(format, 'aborted', 'aborted');
 }
+
+/** Decodes text input: strings pass through, bytes decode as UTF-8 without a byte order mark. */
+export function toText(input: BinaryInput | string, format: string): string {
+  return typeof input === 'string' ? input : new TextDecoder().decode(toBytes(input, format));
+}
+
+/**
+ * Resolves `path` against the folder of `from` (both `/` or `\` separated, relative to the root file) and removes
+ * `.` and `..` segments. Absolute paths and URLs (`/x`, `C:/x`, `https://x`) come back with forward slashes only.
+ */
+export function resolvePath(from: string, path: string): string {
+  path = path.replaceAll('\\', '/');
+  if (/^(\/|[a-z][a-z\d+.-]*:)/i.test(path)) return path;
+  const parts = from.replaceAll('\\', '/').split('/').slice(0, -1);
+  for (const part of path.split('/'))
+    if (part === '..' && parts.length && parts[parts.length - 1] !== '..') parts.pop();
+    else if (part && part !== '.') parts.push(part);
+  return parts.join('/');
+}
+
+const NONE = 0xffffffff;
+/**
+ * Gives every distinct (position, a, b, c) index tuple one output vertex, so corners that share a position but differ
+ * in UV, normal or color index stay separate (seams are kept). Pass 0xffffffff for an absent index.
+ */
+export class CornerWelder {
+  private readonly heads: Uint32Array;
+  private readonly next = uints();
+  /** Four indices per output vertex: position, a, b, c. */
+  readonly keys = uints();
+  constructor(positionCount: number) {
+    this.heads = new Uint32Array(positionCount).fill(NONE);
+  }
+  get count(): number {
+    return this.next.length;
+  }
+  weld(p: number, a: number, b: number, c: number): number {
+    const keys = this.keys.array,
+      next = this.next.array;
+    for (let v = this.heads[p]; v !== NONE; v = next[v])
+      if (keys[v * 4 + 1] === a && keys[v * 4 + 2] === b && keys[v * 4 + 3] === c) return v;
+    const v = this.next.length;
+    this.next.push(this.heads[p]);
+    this.heads[p] = v;
+    this.keys.push3(p, a, b);
+    this.keys.push(c);
+    return v;
+  }
+}

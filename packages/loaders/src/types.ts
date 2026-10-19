@@ -32,6 +32,12 @@ export interface LoadedGeometry {
   attributes?: Record<string, Float32Array>;
 }
 
+/**
+ * Reads a file a model refers to (an MTL library, a TSX tileset), given its path relative to the folder of the file
+ * being parsed. Return the bytes, or the text. In Electron read from disk; in a browser `fetch(new URL(path, base))`.
+ */
+export type AssetResolver = (path: string) => Promise<Uint8Array | string>;
+
 /** Bounds shared by every parser. Counts past these throw a `LoaderError` with code `'limit'`. */
 export interface ParseLimits {
   /** Maximum vertices or points. Default 8,000,000. */

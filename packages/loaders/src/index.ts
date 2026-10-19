@@ -1,5 +1,16 @@
 export { LoaderError } from './types.js';
-export type { LoadedGeometry, LoadedGroup, ParseLimits, LoaderErrorCode } from './types.js';
+export type { LoadedGeometry, LoadedGroup, ParseLimits, LoaderErrorCode, AssetResolver } from './types.js';
+export { parseOBJ, parseMTL } from './obj.js';
+export type {
+  LoadedOBJ,
+  OBJGroup,
+  OBJParseOptions,
+  OBJStatement,
+  MTLMaterial,
+  MTLMap,
+  MTLMapOptions,
+  MTLParseOptions,
+} from './obj.js';
 export type { BinaryInput } from './util.js';
 export { parsePLY, parsePLYHeader } from './ply.js';
 export type { PLYOptions, PLYHeader, PLYElement, PLYProperty } from './ply.js';

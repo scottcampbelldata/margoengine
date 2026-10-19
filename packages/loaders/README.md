@@ -1,6 +1,6 @@
 # @margoengine/loaders
 
-PLY, 3MF, DXF, PCD, OFF, XYZ, legacy VTK and static USDA/USDZ loaders for Margo Engine, each tree-shakable on its own.
+PLY, 3MF, DXF, PCD, OFF, XYZ, OBJ/MTL, legacy VTK and static USDA/USDZ loaders for Margo Engine, each tree-shakable on its own.
 
 Build from source with `npm run build` in `packages/loaders`.
 
@@ -35,6 +35,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parseOFF` | none | `OFF` with `ST`, `C`, `N` prefixes (texture coordinates, colors 0..1 or 0..255, normals) |
 | `parseXYZ` | `XYZLoader` | xyz, xyz+rgb, xyz+normal, xyz+normal+rgb, xyz+intensity, PTS (xyz+intensity+rgb), chemistry XYZ |
 | `parseVTK` | `VTKLoader` (legacy part) | `# vtk DataFile Version` 1.0 to 5.1, ASCII or BINARY `DATASET POLYDATA`: POINTS, POLYGONS, TRIANGLE_STRIPS, 5.x OFFSETS/CONNECTIVITY, point NORMALS, COLOR_SCALARS, TEXTURE_COORDINATES, SCALARS |
+| `parseOBJ` (async), `parseMTL` | `OBJLoader`, `MTLLoader` | See [OBJ and MTL](#obj-and-mtl) |
 
 Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per group), `pointsToGeometry` (octahedron markers for clouds), `createMeshes` (engine meshes with `PbrMaterial` colors), `load` / `fetchBytes`, `detectFormat` / `parseAny`, `computeVertexNormals`, `decompressLZF`, `readZipDirectory` / `readZipEntry` / `crc32`, `parsePLYHeader`, `parsePCDHeader`.
 
@@ -69,11 +70,11 @@ Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per
 - Core `Geometry` holds positions and normals only, at most 1,000,000 vertices: UVs and vertex colors are kept in `LoadedGeometry` but not rendered, and larger meshes must be split by group. Point clouds render as octahedron markers (subsampled past `maxPoints`) because core has no point primitive.
 - PLY face colors and other per-face properties are ignored. OFF per-face colors and binary OFF are not supported. VTK XML (`.vtp`, `.vtu`), other legacy dataset types, VERTICES/LINES cells and cell data are not read. PCD ignores fields other than position, normal, rgb/rgba and intensity.
 - 3MF: textures (`texture2dgroup`), composite materials, multi-properties, beam lattices, slices and ZIP64 or encrypted packages are not supported; objects of type `other` are skipped.
-- STL, OBJ, STEP and IGES live in the machinery package; glTF in gltf and gltf-pro.
+- STL, STEP and IGES live in the machinery package (its OBJ reader is the CAD path: positions and faces only); glTF in gltf and gltf-pro.
 
 ## Tests
 
-`npm test` in `packages/loaders` runs Node tests for: every PLY encoding and attribute naming generated in the test, PLY point clouds, OFF and XYZ variants, LZF round trips against an independent compressor, PCD ascii, binary and binary_compressed fixtures, VTK ASCII, big-endian BINARY and 5.1 polydata, ZIP archives with stored and deflate entries (written with `node:zlib`), 3MF components, mirrored transforms, colors, units and production parts, error cases for every format (bad headers, truncation, out-of-range indices, limits, zip bombs, CRC failures, cycles, aborts), `fetchBytes` limits against a local HTTP server, an SSR import check with throwing browser globals, and real files from three.js, PCL, libigl and PyVista (`npm run fixtures` re-downloads them; see `tests/fixtures/SOURCES.txt`) compared with independent reads. `npm run test:browser` (a real-GPU script, not in CI) loads `facecolors.3mf` in Chromium, creates engine meshes, checks five face colors in the rendered pixels, a GPU pick, `maxBytes`, disposal, and zero WebGPU validation errors.
+`npm test` in `packages/loaders` runs Node tests for: OBJ/MTL fixtures covering every statement, map option and error line (and a Crocotile-style file checked against three.js `OBJLoader` as an oracle), every PLY encoding and attribute naming generated in the test, PLY point clouds, OFF and XYZ variants, LZF round trips against an independent compressor, PCD ascii, binary and binary_compressed fixtures, VTK ASCII, big-endian BINARY and 5.1 polydata, ZIP archives with stored and deflate entries (written with `node:zlib`), 3MF components, mirrored transforms, colors, units and production parts, error cases for every format (bad headers, truncation, out-of-range indices, limits, zip bombs, CRC failures, cycles, aborts), `fetchBytes` limits against a local HTTP server, an SSR import check with throwing browser globals, and real files from three.js, PCL, libigl and PyVista (`npm run fixtures` re-downloads them; see `tests/fixtures/SOURCES.txt`) compared with independent reads. `npm run test:browser` (a real-GPU script, not in CI) loads `facecolors.3mf` in Chromium, creates engine meshes, checks five face colors in the rendered pixels, a GPU pick, `maxBytes`, disposal, and zero WebGPU validation errors.
 
 MIT licensed.
 
@@ -86,3 +87,44 @@ MIT licensed.
 Triangles and convex planar polygons are supported; meshes must author `subdivisionScheme = "none"`. Binary USDC (the common production USDZ encoding), composition/references, animation, subdivision, hole faces, textures, varying colors and concave polygons are rejected explicitly. Use OpenUSD `usdcat` to convert a binary root, or load it with `@margoengine/usdz`, which reads USDC natively; flatten/tessellate unsupported features before loading. File normals and UVs are not retained; normals are recomputed. `units` defaults to `'meters'`; `'file'` keeps authored scale. `maxDepth` defaults to 32 (maximum 64), `maxEntryBytes` to 64 MiB, and vertex/triangle/ZIP limits apply.
 
 Root `npm run modern:test:interop` checks round trips, units, transforms, visibility, winding, topology/composition errors, CRC, alignment, USDC rejection and budgets. Full IFC geometry parsing is provided separately by `@margoengine/ifc` with web-ifc.
+
+## Files that refer to other files
+
+Parsers stay pure and return plain data. Files a model refers to come through a resolver you pass, `(path) => Promise<Uint8Array | string>`, called with paths relative to the folder of the file being parsed (`../` and `./` already resolved). Images are never read by the loaders: every result lists its texture paths in `images`, in the same form, ready for the same resolver (or `new URL(path, base)` in a browser).
+
+```ts
+// Electron (main or preload): read next to the model.
+const resolve = (path) => fs.promises.readFile(join(dirname(file), path));
+// Browser: fetch next to the model.
+const resolve = async (path) => new Uint8Array(await (await fetch(new URL(path, modelUrl))).arrayBuffer());
+```
+
+## OBJ and MTL
+
+`await parseOBJ(textOrBytes, {resolve, signal, maxVertices, maxTriangles})` reads `v` (with `w`, or `r g b` vertex colors after xyz, 0..1 or 0..255), `vt`, `vn`, faces of any size with `v`, `v/vt`, `v//vn`, `v/vt/vn` and negative indices, `o`, `g`, `s`, `usemtl` and `mtllib` (several files, or one name with spaces), `\` continuations, comments and CRLF. Other statements (`l`, `p`, curves) are kept in `extras`; malformed lines throw a `LoaderError` naming the line.
+
+- Every distinct `v/vt/vn` corner becomes one vertex, so UV and normal seams survive (a corner without `vt` or `vn` reads zeros when others have them); `positionIndices` maps each vertex back to its `v` line for re-welding.
+- `uvs` use Margo's convention: v = 1 - vt v (OBJ has v = 0 at the bottom of the image).
+- Faces are fan-triangulated: face f with n = `faceSizes[f]` corners c0..cn-1 gives triangles (c0, ck, ck+1), in file order, so quads and n-gons can be rebuilt from `indices` and `faceSizes`. `smoothingGroups` holds each face's `s` value (0 = off).
+- `groups` split at every change of `o`, `g` or `usemtl` and carry `object`, `groupNames` and `material`. With `resolve`, every MTL library is read once (`materials`, first definition of a name wins) and each group gets its material's `Kd` and `d` as `color`, so `createMeshes` colors it. A library the resolver cannot read, or a `usemtl` naming nothing, is a `warnings` entry, not an error.
+
+`parseMTL(textOrBytes, {path})` returns `{name, Ka, Kd, Ks, Ke, Ns, d, Tr, illum, maps, extras}[]`. `maps` holds `map_Kd`, `map_Ka`, `map_Ks`, `map_Ke`, `map_Ns`, `map_d`, `bump` (also written `map_Bump`), `disp`, `decal`, `refl` and any other `map_*` as `{file, path, options}`, where `options` uses the spec's names (`o`, `s`, `t` as three numbers, `clamp`, `blendu`, `blendv`, `cc` as booleans, `bm`, `boost`, `texres`, `mm`, `imfchan`, `type`). Statements it does not interpret, and maps with unknown options, stay in `extras`.
+
+Textured meshes: `createMeshes` gives core `PbrMaterial` colors only. For textures, hand the data to `createMesh` from `@margoengine/materials` (not a dependency of this package):
+
+```ts
+import {Material, createMesh, loadTexture} from '@margoengine/materials';
+import {SRGBToLinear} from '@margoengine/math/color';
+
+const obj = await parseOBJ(bytes, {resolve});
+const byName = new Map(obj.materials.map((m) => [m.name, m]));
+const materials = await Promise.all(obj.groups.map(async (g) => {
+  const map = byName.get(g.material)?.maps.map_Kd;
+  return new Material({map: map ? await loadTexture(new URL(map.path, modelUrl)) : null});
+}));
+createMesh(engine, {
+  positions: obj.positions, indices: obj.indices, uvs: obj.uvs, colors: obj.colors?.map(SRGBToLinear),
+  normals: obj.normals ?? computeVertexNormals(obj.positions, obj.indices),
+  groups: obj.groups.map((g, i) => ({start: g.start, count: g.count, materialIndex: i})),
+}, materials);
+```

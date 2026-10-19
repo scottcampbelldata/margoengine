@@ -3,13 +3,13 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
-  "description": "PLY, 3MF, PCD, OFF, XYZ, legacy VTK and static USDA/USDZ loaders for Margo Engine.",
+  "description": "PLY, 3MF, PCD, OFF, XYZ, OBJ/MTL, legacy VTK and static USDA/USDZ loaders for Margo Engine.",
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test tests/loaders.test.js tests/dxf.test.js",
+    "test": "npm run build && node --test tests/loaders.test.js tests/dxf.test.js tests/obj.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "fixtures": "node scripts/fetch-fixtures.js",
     "prepack": "npm run build"
