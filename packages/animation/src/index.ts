@@ -21,6 +21,20 @@ import {
 } from './gltf.js';
 export { sampleTrack, sampleTrackInto, multiplyMatrices, type Interpolation } from './sampling.js';
 export { Skeleton, Skin, type BoneData, type BonePose } from './skin.js';
+export {
+  createKeyframeClip,
+  sampleKeyframes,
+  applyKeyframeClip,
+  segmentTime,
+  bakeKeyframeClip,
+  type KeyInterpolation,
+  type Keyframe,
+  type KeyframeTrackData,
+  type KeyframeClipData,
+  type KeyframeTrack,
+  type KeyframeClip,
+  type BakedChannel,
+} from './keyframes.js';
 declare const GPUBufferUsage: { STORAGE: number; VERTEX: number; COPY_DST: number; COPY_SRC: number; UNIFORM: number };
 interface Track {
   node: number;

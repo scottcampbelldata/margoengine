@@ -1,0 +1,243 @@
+import { finite, type Skeleton } from './skin.js';
+
+/** How a key moves to the next key: hold then jump, straight, or a cubic ease in, out, or in and out. */
+export type KeyInterpolation = 'discrete' | 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+/** One key of a keyframe track. */
+export interface Keyframe {
+  /** Seconds, >= 0, strictly increasing within a track. */
+  time: number;
+  /** [x, y, z] for translation and scale, a quaternion [x, y, z, w] for rotation (normalised on input). */
+  value: readonly number[];
+  /** Shapes the time from this key to the next one (rotations slerp by the eased factor). Default 'linear'. */
+  interpolation?: KeyInterpolation;
+}
+/** Keys for one property of one bone or node. */
+export interface KeyframeTrackData {
+  /** Stable id of the animated bone (its name) or of the caller's own node. */
+  target: string;
+  path: 'translation' | 'rotation' | 'scale';
+  keys: readonly Keyframe[];
+}
+/** Raw clip input for {@link createKeyframeClip}. */
+export interface KeyframeClipData {
+  name?: string;
+  tracks: readonly KeyframeTrackData[];
+}
+/** A validated track: key times, 3 or 4 values per key, and each key's interpolation. */
+export interface KeyframeTrack {
+  readonly target: string;
+  readonly path: 'translation' | 'rotation' | 'scale';
+  readonly times: Float64Array;
+  readonly values: Float64Array;
+  readonly interpolations: readonly KeyInterpolation[];
+}
+/** A validated clip; `duration` is its last key time. */
+export interface KeyframeClip {
+  readonly name: string;
+  readonly duration: number;
+  readonly tracks: readonly KeyframeTrack[];
+}
+/** One glTF animation channel from {@link bakeKeyframeClip}: the shape of exporters' `AnimationChannelData`. */
+export interface BakedChannel<N> {
+  node: N;
+  path: 'translation' | 'rotation' | 'scale';
+  interpolation: 'STEP' | 'LINEAR';
+  times: Float32Array;
+  values: Float32Array;
+}
+
+const kinds: readonly KeyInterpolation[] = ['discrete', 'linear', 'easeIn', 'easeOut', 'easeInOut'];
+const ease = (kind: KeyInterpolation, u: number): number =>
+  kind === 'discrete'
+    ? 0
+    : kind === 'easeIn'
+      ? u * u * u
+      : kind === 'easeOut'
+        ? 1 - (1 - u) ** 3
+        : kind === 'easeInOut'
+          ? u < 0.5
+            ? 4 * u * u * u
+            : 1 - (2 - 2 * u) ** 3 / 2
+          : u;
+
+/** Validates raw keys into a clip. Throws TypeError for bad shapes or a repeated target+path, RangeError for bad numbers. */
+export function createKeyframeClip(data: KeyframeClipData): KeyframeClip {
+  if (!data || !Array.isArray(data.tracks)) throw new TypeError('Keyframe clip needs a tracks array');
+  if (data.name !== undefined && typeof data.name !== 'string')
+    throw new TypeError('Keyframe clip name must be a string');
+  const seen = new Set<string>();
+  const tracks = data.tracks.map((track, t): KeyframeTrack => {
+    const label = `Keyframe track ${t}`;
+    if (!track || typeof track.target !== 'string' || !track.target)
+      throw new TypeError(`${label} needs a nonempty string target`);
+    const { target, path, keys } = track;
+    if (path !== 'translation' && path !== 'rotation' && path !== 'scale')
+      throw new TypeError(`${label} path ${path} is invalid; use translation, rotation or scale`);
+    if (seen.has(target + ':' + path)) throw new TypeError(`${label} repeats ${target} ${path}; merge the keys`);
+    seen.add(target + ':' + path);
+    if (!Array.isArray(keys) || !keys.length) throw new TypeError(`${label} needs a nonempty keys array`);
+    const width = path === 'rotation' ? 4 : 3,
+      times = new Float64Array(keys.length),
+      values = new Float64Array(keys.length * width);
+    const interpolations = keys.map((key, k) => {
+      const time = key?.time,
+        interpolation = key?.interpolation ?? 'linear';
+      if (typeof time !== 'number' || !Number.isFinite(time) || time < 0 || (k > 0 && time <= times[k - 1]))
+        throw new RangeError(`${label} key ${k} time ${time} is invalid; use increasing seconds >= 0`);
+      if (!kinds.includes(interpolation))
+        throw new TypeError(
+          `${label} key ${k} interpolation ${interpolation} is invalid; use one of ${kinds.join(', ')}`,
+        );
+      const value = finite(key.value, width, `${label} key ${k} value`),
+        length = width === 4 ? Math.hypot(value[0], value[1], value[2], value[3]) : 1;
+      if (!length) throw new RangeError(`${label} key ${k} is a zero quaternion; pass a unit quaternion`);
+      for (let c = 0; c < width; c++) values[k * width + c] = value[c] / length;
+      times[k] = time;
+      return interpolation;
+    });
+    return { target, path, times, values, interpolations };
+  });
+  return {
+    name: data.name ?? '',
+    duration: Math.max(0, ...tracks.map((track) => track.times[track.times.length - 1])),
+    tracks,
+  };
+}
+
+/**
+ * A track's value at `time` seconds: the first key's before it, the last key's after it, else the two surrounding keys
+ * blended by the earlier key's interpolation (rotations by shortest-path slerp). Deterministic for any frame rate.
+ */
+export function sampleKeyframes(track: KeyframeTrack, time: number, out?: Float64Array): Float64Array {
+  if (typeof time !== 'number' || !Number.isFinite(time))
+    throw new RangeError(`Keyframe sample time ${time} is invalid; pass finite seconds`);
+  const { times, values } = track,
+    width = track.path === 'rotation' ? 4 : 3,
+    last = times.length - 1;
+  if (out !== undefined && !(out instanceof Float64Array && out.length >= width))
+    throw new TypeError(`Keyframe sample target must be a Float64Array of at least ${width} numbers`);
+  out ??= new Float64Array(width);
+  let a = 0;
+  if (time >= times[last]) a = last;
+  else if (time > times[0])
+    for (let hi = last; a + 1 < hi; ) {
+      const mid = (a + hi) >> 1;
+      if (times[mid] <= time) a = mid;
+      else hi = mid;
+    }
+  const f =
+    a === last || time <= times[a] ? 0 : ease(track.interpolations[a], (time - times[a]) / (times[a + 1] - times[a]));
+  const i = a * width,
+    j = Math.min(a + 1, last) * width;
+  if (width === 3 || f === 0 || f === 1) {
+    for (let c = 0; c < width; c++)
+      out[c] = f === 1 ? values[j + c] : values[i + c] + (values[j + c] - values[i + c]) * f;
+    return out;
+  }
+  let dot = 0;
+  for (let c = 0; c < 4; c++) dot += values[i + c] * values[j + c];
+  const sign = dot < 0 ? -1 : 1,
+    angle = Math.acos(Math.min(1, Math.abs(dot))),
+    s = Math.sin(angle),
+    x = s > 1e-6 ? Math.sin((1 - f) * angle) / s : 1 - f,
+    y = (s > 1e-6 ? Math.sin(f * angle) / s : f) * sign;
+  for (let c = 0; c < 4; c++) out[c] = values[i + c] * x + values[j + c] * y;
+  const length = Math.hypot(out[0], out[1], out[2], out[3]);
+  for (let c = 0; c < 4; c++) out[c] /= length;
+  return out;
+}
+
+/** Poses `skeleton` at `time`: every track whose target names one of its bones sets that bone's property. */
+export function applyKeyframeClip(clip: KeyframeClip, skeleton: Skeleton, time: number): void {
+  for (const track of clip.tracks) {
+    const bone = skeleton.index(track.target);
+    if (bone >= 0) skeleton.setPose(bone, { [track.path]: sampleKeyframes(track, time) });
+  }
+}
+
+/**
+ * Clip time for a segment that has run `elapsed` seconds: scaled by `timeScale` (negative plays from the end in
+ * reverse), wrapped by `loop`, else held at the ends of `[0, duration]`.
+ */
+export function segmentTime(
+  elapsed: number,
+  duration: number,
+  { loop = false, timeScale = 1 }: { loop?: boolean; timeScale?: number } = {},
+): number {
+  if (![elapsed, duration, timeScale].every(Number.isFinite) || elapsed < 0 || duration < 0)
+    throw new RangeError('Segment time needs finite elapsed and duration >= 0 and a finite timeScale');
+  const t = elapsed * Math.abs(timeScale),
+    local = loop && duration > 0 ? t % duration : Math.min(t, duration);
+  return timeScale < 0 ? duration - local : local;
+}
+
+/** The largest Float32 below a positive Float32 time. */
+function before(time: number): number {
+  const below = new Float32Array([time]);
+  new Uint32Array(below.buffer)[0]--;
+  return below[0];
+}
+/**
+ * glTF samplers for a clip, ready for exporters' `AnimationData` (`{name, channels}`) once `resolve` maps each track
+ * target to its `ExportNode`; tracks it maps to undefined are left out. A track of only discrete keys becomes STEP at
+ * its keys and one of only linear keys becomes LINEAR at its keys, both exact everywhere; any other track is LINEAR at
+ * its keys plus every `1 / fps` second inside eased segments, exact at those times, and a discrete segment inside it
+ * holds until one Float32 step before the next key.
+ */
+export function bakeKeyframeClip<N>(
+  clip: KeyframeClip,
+  fps: number,
+  resolve: (target: string) => N | undefined,
+): { name: string; channels: BakedChannel<N>[] } {
+  if (typeof fps !== 'number' || !Number.isFinite(fps) || fps <= 0)
+    throw new RangeError(`Keyframe bake fps ${fps} is invalid; pass frames per second > 0`);
+  if (typeof resolve !== 'function') throw new TypeError('Keyframe bake needs a resolve(target) function');
+  const channels: BakedChannel<N>[] = [];
+  for (const track of clip.tracks) {
+    const node = resolve(track.target);
+    if (node === undefined) continue;
+    const width = track.path === 'rotation' ? 4 : 3,
+      { times: keys, interpolations } = track,
+      used = new Set(interpolations.slice(0, -1)),
+      plain = used.size === 0 || (used.size === 1 && (used.has('discrete') || used.has('linear'))),
+      times: number[] = [],
+      values: number[] = [],
+      add = (time: number, from = time) => {
+        const stored = Math.fround(time);
+        if (times.length && stored <= times[times.length - 1]) return false;
+        times.push(stored);
+        values.push(...sampleKeyframes(track, from));
+        return true;
+      };
+    for (let k = 0; k < keys.length; k++) {
+      if (!add(keys[k]))
+        throw new RangeError(
+          `Keyframe track ${track.target} ${track.path} keys are closer than Float32 time precision`,
+        );
+      if (plain || k === keys.length - 1 || interpolations[k] === 'linear') continue;
+      const end = Math.fround(keys[k + 1]);
+      if (interpolations[k] === 'discrete') add(before(end), keys[k]);
+      else
+        for (let n = Math.floor(keys[k] * fps) + 1; n / fps < keys[k + 1]; n++)
+          if (Math.fround(n / fps) < end) add(n / fps, Math.fround(n / fps));
+    }
+    if (width === 4)
+      for (let i = 4; i < values.length; i += 4)
+        if (
+          values[i] * values[i - 4] +
+            values[i + 1] * values[i - 3] +
+            values[i + 2] * values[i - 2] +
+            values[i + 3] * values[i - 1] <
+          0
+        )
+          for (let c = 0; c < 4; c++) values[i + c] = -values[i + c];
+    channels.push({
+      node,
+      path: track.path,
+      interpolation: plain && used.has('discrete') ? 'STEP' : 'LINEAR',
+      times: Float32Array.from(times),
+      values: Float32Array.from(values),
+    });
+  }
+  return { name: clip.name, channels };
+}

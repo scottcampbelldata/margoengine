@@ -70,3 +70,30 @@ array (any `createMesh` mesh). An unchanged pose dispatches nothing. A pose chan
 changed ones.
 Validation rejects bad indices and counts, repeated names, parent cycles and anything but one root (`RangeError` /
 `TypeError`). Material meshes do not render through `model.createRenderer(otherDevice)`, so neither does a skin.
+
+## Keyframe clips from raw keys
+
+```ts
+import {createKeyframeClip, applyKeyframeClip, sampleKeyframes, segmentTime, bakeKeyframeClip} from '@margoengine/animation';
+const wave = createKeyframeClip({name: 'Wave', tracks: [
+  {target: 'forearm', path: 'rotation', keys: [
+    {time: 0, value: [0, 0, 0, 1], interpolation: 'easeInOut'}, // shapes the time until the next key
+    {time: 0.5, value: [0, 0, 0.38268, 0.92388], interpolation: 'discrete'},
+    {time: 1, value: [0, 0, 0, 1]},
+  ]},
+  {target: 'door', path: 'translation', keys: [{time: 0, value: [0, 0, 0]}, {time: 1, value: [2, 0, 0]}]},
+]});
+const t = segmentTime(elapsed, wave.duration, {loop: true, timeScale: -1}); // a reversed, looping segment
+applyKeyframeClip(wave, skeleton, t); // poses bones named by track targets
+const door = sampleKeyframes(wave.tracks[1], t); // any other target: sample it yourself
+const animation = bakeKeyframeClip(wave, 30, (target) => exportNodes.get(target)); // exporters AnimationData
+```
+
+Tracks target a bone (by name) or the caller's node by a stable string id, for translation, rotation and scale. Each
+key carries its own interpolation for the time until the next key: `discrete` (hold, then jump at the next key),
+`linear`, `easeIn`, `easeOut` or `easeInOut` (cubic); rotations slerp along the shortest path by the eased factor.
+Sampling is a pure function of time, so editing, scrubbing, playback and offline rendering agree at any frame rate.
+`bakeKeyframeClip` writes glTF samplers: a track of only discrete keys becomes STEP and one of only linear keys becomes
+LINEAR, both at their keys and exact everywhere; other tracks are LINEAR at the keys plus every `1 / fps` second inside
+eased segments, exact at those times. Pass the result to `@margoengine/exporters` as an `ExportScene` animation; tracks
+whose target `resolve` maps to undefined are left out.
