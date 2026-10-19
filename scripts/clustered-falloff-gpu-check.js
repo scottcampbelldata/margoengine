@@ -2,7 +2,8 @@
 // decay-aware light terms of clusteredSampling (packages/clustered/src/shader.ts) compute falloff and cone per sample
 // in a compute shader, and both must match the definition shared with @margoengine/bvh's vertex-light bake: window / max(d^decay, 0.01), window =
 // range > 0 ? clamp(1 - (d/range)^4, 0, 1)^2 : 1, cone = smoothstep(cos(angle), cos(angle * (1 - penumbra)), dot(-L,
-// direction)) with penumbra 0 a hard edge. Lights without decay or angle must keep the original inverse-square term.
+// direction)) with penumbra 0 a hard edge, up to a pi/2 hemisphere. Lights without decay or angle must keep the original
+// inverse-square term.
 // Run: node scripts/clustered-falloff-gpu-check.js (takes the GPU lock).
 import assert from 'node:assert/strict';
 import { openBrowser } from './browser.js';
@@ -26,6 +27,11 @@ const cases = [
     { position: top, range: 6, direction: [0.2, -1, 0.1], angle: 40 * deg, penumbra: 0.3, decay: 1.2 },
     [0.8, 0.5, -0.3],
   ],
+  // A hemisphere (angle pi/2), lit just in front of its plane, dark just behind it, with and without a penumbra.
+  [{ position: top, range: 0, direction: [1, 0, 0], angle: 90 * deg }, [0.02, 1, 0]],
+  [{ position: top, range: 0, direction: [1, 0, 0], angle: 90 * deg }, [-0.02, 1, 0]],
+  [{ position: top, range: 5, direction: [1, 0, 0], angle: 90 * deg, penumbra: 0.5 }, [1, 1.5, 0.5]],
+  [{ position: top, range: 5, direction: [0, -1, 0], outerAngle: 90 * deg, innerAngle: 1 }, [2.5, 2.9, 0]],
 ];
 const smoothstep = (low, high, x) => {
   if (x < low) return 0;
@@ -126,6 +132,7 @@ try {
   });
   assert.equal(got[1], 1, 'a point light has no cone');
   assert.deepEqual([got[13], got[15]], [1, 0], 'penumbra 0: a hard edge either side of 30 degrees');
+  assert.deepEqual([got[21], got[23]], [1, 0], 'angle pi/2: lit in front of the plane, dark behind');
   console.log(
     `${cases.length} lights: GPU falloff and cone match the definition (worst relative error ${worst.toExponential(2)}) on ${browser.hardware.webgpu?.vendor} ${browser.hardware.webgpu?.architecture}`,
   );

@@ -2,6 +2,9 @@
 // - receiveShadow: a core mesh with `mesh.receiveShadow = false` (or `shadows.add(mesh, {receiveShadow: false})`) is
 //   lit inside the occluder's shadow exactly as with no shadow plugin, while the receiving half is dark, for
 //   @margoengine/shadows and for clustered local shadows (LocalShadows and ClusteredOptions.shadows).
+// - pi/2 spots: a downward spot of angle pi/2 (penumbra 0) lights everything below its plane exactly as a point light of
+//   the same range and decay (so cluster culling drops no lit cluster) and a wall above it not at all; with
+//   LocalShadows or integrated shadows its six-face cube shadow is the point light's, pixel for pixel.
 // Run after npm run build:packages: node scripts/light-render-gpu-check.js (takes the GPU lock).
 import assert from 'node:assert/strict';
 import { openBrowser } from './browser.js';
@@ -38,7 +41,9 @@ try {
       left: mesh([3, 0.2, 7], [-1.6, -0.1, 0]).setMaterial(grey),
       right: mesh([3, 0.2, 7], [1.6, -0.1, 0]).setMaterial(grey),
       occluder: mesh([4.4, 0.2, 2], [0, 2.5, 0]).setMaterial(grey),
+      wall: mesh([8, 8, 0.2], [0, 4, -3.1]).setMaterial(grey),
     };
+    scene.wall.visible = false;
     // Copy the canvas texture right after submit: MSAA resolve, core batches and the frame graph stay in the path.
     const render = async () => {
       const device = engine.gpu,
@@ -69,13 +74,15 @@ try {
         read.destroy();
       }
     };
-    // RGB at the projected world point (3x3 mean).
-    const pixel = (bytes, position) => {
+    // Canvas pixel of a world point, and the RGB there (3x3 mean).
+    const project = (position) => {
       const m = engine.camera.matrix,
         v = [0, 0, 0, 0];
       for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) v[r] += m[c * 4 + r] * [...position, 1][c];
-      const x = Math.round(((v[0] / v[3]) * 0.5 + 0.5) * width),
-        y = Math.round((0.5 - (v[1] / v[3]) * 0.5) * height),
+      return [Math.round(((v[0] / v[3]) * 0.5 + 0.5) * width), Math.round((0.5 - (v[1] / v[3]) * 0.5) * height)];
+    };
+    const pixel = (bytes, position) => {
+      const [x, y] = project(position),
         rgb = [0, 0, 0];
       for (let dy = -1; dy <= 1; dy++)
         for (let dx = -1; dx <= 1; dx++)
@@ -84,9 +91,9 @@ try {
     };
     // Points: under the occluder (shadowed) and in the open, on each half.
     const points = { left: [-1.6, 0, 0], right: [1.6, 0, 0], leftOpen: [-1.6, 0, 2.8], rightOpen: [1.6, 0, 2.8] };
-    const frame = async () => {
+    const frame = async (where = points) => {
       const bytes = await render();
-      return { bytes, ...Object.fromEntries(Object.entries(points).map(([k, p]) => [k, pixel(bytes, p)])) };
+      return { bytes, ...Object.fromEntries(Object.entries(where).map(([k, p]) => [k, pixel(bytes, p)])) };
     };
     // Pixels that differ between two frames, and how many lie right of the centre column (the right half).
     const diff = (a, b) => {
@@ -102,7 +109,18 @@ try {
       }
       return { pixels, right, max };
     };
-    window.lightCheck = { instance, engine, scene, frame, diff, strip: ({ bytes, ...rest }) => rest };
+    // Pixels that differ, and the lowest canvas row holding one.
+    const rows = (a, b) => {
+      let pixels = 0,
+        lowest = -1;
+      for (let i = 0; i < a.length; i += 4)
+        if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2]) {
+          pixels++;
+          lowest = Math.max(lowest, Math.floor(i / 4 / width));
+        }
+      return { pixels, lowest };
+    };
+    window.lightCheck = { instance, engine, scene, frame, diff, rows, project, strip: ({ bytes, ...rest }) => rest };
   });
 
   const receive = await browser.page.evaluate(async () => {
@@ -206,6 +224,63 @@ try {
   assert.deepEqual(errors, []);
   console.log(
     `receiveShadow: the non-receiving half is pixel-identical to the frame without shadows (directional, LocalShadows, integrated) on ${browser.hardware.webgpu?.vendor} ${browser.hardware.webgpu?.architecture}`,
+  );
+
+  const hemisphere = await browser.page.evaluate(async () => {
+    const { instance, engine, scene, frame, rows, project, strip } = window.lightCheck,
+      { Clustered } = await import('/packages/clustered/dist/index.js'),
+      { LocalShadows } = await import('/packages/clustered/dist/shadows.js');
+    // A light at y = 2 over a small occluder at y = 1, a wall behind reaching above the light; sun and ambient off.
+    scene.wall.visible = true;
+    scene.occluder.setPosition([0, 1, 0]).setScale([1.6, 0.2, 1.6]);
+    engine.lighting.direction.set([0, 1, 0, 0]);
+    engine.lighting.radiance.set([1, 1, 1, 0]);
+    const where = {
+        floorShadow: [0.6, 0, 1.25],
+        floorOpen: [1.6, 0, 2.8],
+        wallLow: [0, 1, -3],
+        wallHigh: [0, 3.2, -3],
+      },
+      point = { position: [0, 2, 0], range: 10, intensity: 20, decay: 2 },
+      spot = { ...point, direction: [0, -1, 0], angle: Math.PI / 2 };
+    const pair = async (lights, extra) => {
+      lights.setLights([{ ...point, ...extra }]);
+      const p = await frame(where);
+      lights.setLights([{ ...spot, ...extra }]);
+      const s = await frame(where);
+      return { point: strip(p), spot: strip(s), diff: rows(p.bytes, s.bytes) };
+    };
+    const out = { lightRow: project([0, 2, -3])[1] };
+    let lights = Clustered.attach(instance, { grid: [8, 8, 16] });
+    out.unshadowed = await pair(lights, {});
+    const local = LocalShadows.attach(instance, { lights });
+    local.add(scene.occluder);
+    out.local = await pair(lights, { castShadow: true });
+    instance.removePlugin(local.name);
+    lights.dispose();
+    lights = Clustered.attach(instance, { grid: [8, 8, 16], shadows: { resolution: 512 } });
+    lights.addShadowCaster(scene.occluder);
+    out.integrated = await pair(lights, { shadow: true });
+    lights.dispose();
+    return out;
+  });
+  console.log(JSON.stringify(hemisphere));
+  const { unshadowed: u } = hemisphere;
+  assert.ok(Math.min(...u.point.wallHigh) > 40, 'the point light lights the wall above it');
+  assert.deepEqual(u.spot.wallHigh, [0, 0, 0], 'the pi/2 spot does not light behind its plane');
+  assert.ok(Math.min(...u.spot.wallLow, ...u.spot.floorOpen) > 40, 'the pi/2 spot lights everything in front');
+  for (const name of ['unshadowed', 'local', 'integrated']) {
+    const { diff: delta, point: p } = hemisphere[name];
+    assert.ok(delta.pixels > 100, `${name}: the wall above the light differs (${JSON.stringify(delta)})`);
+    assert.ok(
+      delta.lowest <= hemisphere.lightRow + 1,
+      `${name}: below the light's plane the pi/2 spot equals the point light (differing row ${delta.lowest}, plane row ${hemisphere.lightRow})`,
+    );
+    if (name !== 'unshadowed') dark(p.floorShadow, u.point.floorShadow);
+  }
+  assert.deepEqual(errors, []);
+  console.log(
+    `pi/2 spot: pixel-identical to a point light in front of its plane (unshadowed, LocalShadows cube, integrated cube), dark behind it`,
   );
 } finally {
   await browser?.close();

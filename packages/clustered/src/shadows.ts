@@ -12,6 +12,7 @@ import {
 import { instanceLayout, instancedDepth } from '../../shared/instances.js';
 import { preset } from '../../shared/preset.js';
 import type { Clustered, ClusteredShadow } from './index.js';
+import { hemisphere } from './local-shadow-math.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -19,7 +20,7 @@ type Context = Extract<PassContext, { backend: 'webgpu' }>;
 export interface LocalShadowOptions {
   /** The clustered lights whose `castShadow` lights get shadow maps. */
   lights: Clustered;
-  /** Shadowed lights with maps (1-16, default 4); further `castShadow` lights stay unshadowed. A point light uses six layers, a spot light one. */
+  /** Shadowed lights with maps (1-16, default 4); further `castShadow` lights stay unshadowed. A point light uses six layers, a spot light one (six for a pi / 2 hemisphere). */
   maxLights?: number;
   /** Square size of each layer in texels (default 512). */
   resolution?: number;
@@ -350,7 +351,8 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
         slot = data[at + 14] - 1;
       if (slot < 0 || slot >= max) continue;
       used = Math.max(used, slot + 1);
-      const point = data[at + 13] < 0.5;
+      // A hemisphere spot (cosine data[at + 11]) is shadowed as a point light: six cube faces.
+      const point = data[at + 13] < 0.5 || hemisphere(data[at + 11]);
       bases[slot] = point ? 6 : 1;
     }
     for (let s = 0; s < used; s++) {
@@ -364,7 +366,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       const at = j * 16,
         slot = data[at + 14] - 1;
       if (slot < 0 || slot >= max) continue;
-      const point = data[at + 13] < 0.5,
+      const point = data[at + 13] < 0.5 || hemisphere(data[at + 11]),
         base = bases[slot],
         range = data[at + 3],
         s = slot * SLOT_FLOATS;

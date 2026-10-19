@@ -3,6 +3,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Clustered, clusteredSampling } from '../dist/index.js';
+import { cullingShader } from '../src/shader.ts';
+import { bakeVertexColors } from '../../bvh/dist/index.js';
 import { wgsl } from '../../core/src/shaders.ts';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
@@ -106,7 +108,8 @@ test('setLights validates decay, the angle/penumbra cone and unlimited ranges be
     [{ position: [0, 1, 0], range: 0, castShadow: true }, RangeError],
     [{ ...spot, angle: 0.5, outerAngle: 0.5 }, TypeError],
     [{ ...spot, outerAngle: 0.5, penumbra: 0.5 }, TypeError],
-    [{ ...spot, angle: Math.PI / 2 }, RangeError],
+    [{ ...spot, angle: Math.PI / 2 + 1e-9 }, RangeError],
+    [{ ...spot, outerAngle: Math.PI / 2 + 1e-9 }, RangeError],
     [{ ...spot, angle: 0 }, RangeError],
     [{ ...spot, angle: 0.5, penumbra: 1.5 }, RangeError],
     [{ ...spot, direction: [0, 0, 0], angle: 0.5 }, RangeError],
@@ -197,5 +200,114 @@ test('core meshes with receiveShadow false skip local-light shadows; the patch e
   } finally {
     lights.dispose();
     plain.dispose();
+  }
+});
+
+test('a spot of exactly pi/2 (a hemisphere) is accepted as angle or outerAngle and packed like any cone', () => {
+  const lights = new Clustered({ grid: [2, 2, 2] }),
+    spot = { position: [0, 3, 0], range: 6, direction: [0, -1, 0] };
+  lights.setLights([
+    { ...spot, angle: Math.PI / 2 },
+    { ...spot, angle: Math.PI / 2, penumbra: 0.5 },
+    { ...spot, outerAngle: Math.PI / 2, innerAngle: 1 },
+  ]);
+  const data = lights['data'];
+  assert.deepEqual(
+    [data[11], data[12], data[13], data[16 + 12], data[32 + 11], data[32 + 12], data[32 + 13]],
+    [Math.cos(Math.PI / 2), Math.cos(Math.PI / 2), 4, Math.cos(Math.PI / 4), Math.cos(Math.PI / 2), Math.cos(1), 1].map(
+      Math.fround,
+    ),
+  );
+  lights.dispose();
+});
+
+test("cluster culling never drops a cluster a spot lights, up to pi/2 (CPU mirror of cullingShader's cone test)", () => {
+  // The mirror below repeats these lines; the shader must still have them.
+  for (const line of [
+    'let delta=p-clamp(p,lo,hi);if(dot(delta,delta)>light.positionRange.w*light.positionRange.w){continue;}',
+    'let relative=center-p;let axial=dot(relative,direction);let radial=length(relative-direction*axial);',
+    'let cosine=light.directionOuter.w;let sine=sqrt(max(0.0,1-cosine*cosine));',
+    'if(axial+radius<0||radial*cosine-axial*sine>radius){continue;}',
+  ])
+    assert.ok(cullingShader.includes(line), line);
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+    sub = (a, b) => a.map((v, i) => v - b[i]);
+  const kept = (lo, hi, p, direction, cosine, range) => {
+    const delta = sub(
+      p,
+      p.map((v, i) => Math.min(Math.max(v, lo[i]), hi[i])),
+    );
+    if (dot(delta, delta) > range * range) return false;
+    const center = lo.map((v, i) => (v + hi[i]) / 2),
+      radius = Math.hypot(...sub(hi, lo)) / 2,
+      relative = sub(center, p),
+      axial = dot(relative, direction),
+      radial = Math.hypot(...relative.map((v, i) => v - direction[i] * axial)),
+      sine = Math.sqrt(Math.max(0, 1 - cosine * cosine));
+    return !(axial + radius < 0 || radial * cosine - axial * sine > radius);
+  };
+  let seed = 7;
+  const random = () => ((seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31) * 2 - 1;
+  const p = [0.3, -0.2, -5],
+    direction = [0.36, 0.48, -0.8],
+    range = 6;
+  for (const angle of [0.3, 1.2, 1.55, Math.PI / 2]) {
+    const cosine = Math.fround(Math.cos(angle));
+    let lit = 0,
+      culled = 0;
+    for (let n = 0; n < 4000; n++) {
+      const size = [0.2 + Math.abs(random()), 0.2 + Math.abs(random()), 0.2 + Math.abs(random())],
+        lo = p.map((v, i) => v + random() * 8 - size[i] / 2),
+        hi = lo.map((v, i) => v + size[i]);
+      let any = false;
+      for (let k = 0; k < 125 && !any; k++) {
+        const q = lo.map((v, i) => v + (hi[i] - v) * ((Math.floor(k / 5 ** i) % 5) / 4)),
+          d = Math.hypot(...sub(q, p));
+        any = d > 0 && d < range && dot(sub(q, p), direction) / d >= cosine;
+      }
+      if (any) {
+        lit++;
+        assert.ok(
+          kept(lo, hi, p, direction, cosine, range),
+          `angle ${angle}: a lit cluster [${lo}]-[${hi}] was culled`,
+        );
+      } else if (!kept(lo, hi, p, direction, cosine, range)) culled++;
+    }
+    assert.ok(lit > 30 && culled > 1000, `angle ${angle}: ${lit} lit clusters, ${culled} culled`);
+  }
+});
+
+test("a pi/2 spot's falloff and cone are bvh bakeVertexColors' numbers", () => {
+  // Vertices 2 m from a spot along +x, each facing it (Lambert 1), at 0 to 120 degrees off the axis.
+  const degrees = [0, 30, 44, 60, 89, 91, 120],
+    positions = degrees.flatMap((a) => [2 * Math.cos((a * Math.PI) / 180), 2 * Math.sin((a * Math.PI) / 180), 0]),
+    normals = positions.map((v) => -v / 2);
+  for (const [penumbra, decay, range] of [
+    [0, 2, 0],
+    [0.5, 1, 5],
+    [1, 0, 3],
+  ]) {
+    const baked = bakeVertexColors({ positions, normals }, null, {
+      shadows: false,
+      lights: [
+        {
+          type: 'spot',
+          position: [0, 0, 0],
+          direction: [1, 0, 0],
+          angle: Math.PI / 2,
+          penumbra,
+          decay,
+          distance: range,
+        },
+      ],
+    });
+    degrees.forEach((a, k) => {
+      const want = attenuation(2, range, decay) * cone(Math.PI / 2, penumbra, Math.cos((a * Math.PI) / 180));
+      assert.ok(
+        Math.abs(baked[k * 4] - want) < 1e-6,
+        `penumbra ${penumbra}, ${a} degrees: bake ${baked[k * 4]}, ${want}`,
+      );
+    });
+    assert.equal(baked[5 * 4], 0, 'nothing behind the hemisphere');
   }
 });

@@ -254,6 +254,26 @@ test('local shadows: light matrices put the light frustum in reversed depth and 
   lights.dispose();
 });
 
+test('local shadows: a castShadow pi/2 spot (a hemisphere) takes the six cube layers of a point light', () => {
+  const h = harness(),
+    lights = Clustered.attach(h.engine, { grid: [2, 2, 2] }),
+    shadows = LocalShadows.attach(h.engine, { lights, maxLights: 2, resolution: 64 });
+  const point = { position: [0, 3, 0], range: 10, castShadow: true };
+  lights.setLights([point, { ...point, direction: [0, -1, 0], angle: Math.PI / 2, penumbra: 0.3 }]);
+  shadows.add(caster(h.engine));
+  h.frame();
+  assert.equal(h.passes.length, 12);
+  const v = new Float32Array(shadows.bindings()[0].resource.buffer.data),
+    layers = (first) => v.subarray(4 + 64 + first * 16, 4 + 64 + (first + 6) * 16);
+  assert.deepEqual([...v.subarray(8, 11)], [6, 1, v[6]], 'base layer 6, cube faces, the point texel size');
+  assert.deepEqual(layers(6), layers(0), "the point light's face matrices");
+  lights.setLights([point, { ...point, direction: [0, -1, 0], angle: 1.5 }]);
+  h.frame();
+  assert.equal(new Float32Array(shadows.bindings()[0].resource.buffer.data)[9], 0, 'a narrower cone is one map');
+  shadows.dispose();
+  lights.dispose();
+});
+
 test('local shadows: options are validated', () => {
   const lights = new Clustered();
   assert.throws(() => new LocalShadows({}), /Clustered/);

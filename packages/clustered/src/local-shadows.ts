@@ -3,7 +3,7 @@ import { meshRuntime, type Engine, type Mesh, type PassContext } from '@margoeng
 import { finiteVector } from '@margoengine/math/validate';
 import { instanceLayout, instancedDepth } from '../../shared/instances.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
-import { localShadowMatrix } from './local-shadow-math.js';
+import { hemisphere, localShadowMatrix } from './local-shadow-math.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUTextureUsage: {
   RENDER_ATTACHMENT: number;
@@ -188,15 +188,17 @@ export class LocalShadowMaps {
           typeof light.outerAngle !== 'number' ||
           !Number.isFinite(light.outerAngle) ||
           light.outerAngle <= 0 ||
-          light.outerAngle >= Math.PI / 2
+          light.outerAngle > Math.PI / 2
         )
           throw new RangeError('Invalid shadow spot cone');
       }
-      for (let face = 0; face < (spot ? 1 : 6); face++) {
+      // One perspective map for a spot cone; a point light or a hemisphere spot gets the six cube faces.
+      const cone = spot && !hemisphere(Math.cos(light.outerAngle!));
+      for (let face = 0; face < (cone ? 1 : 6); face++) {
         const layer = slot * 6 + face,
           offset = layer * 20,
-          direction = spot ? light.direction! : directions[face],
-          up = spot
+          direction = cone ? light.direction! : directions[face],
+          up = cone
             ? Math.abs(direction[1]) / Math.hypot(direction[0], direction[1], direction[2]) > 0.99
               ? upZ
               : upY
@@ -209,10 +211,12 @@ export class LocalShadowMaps {
           up,
           near,
           far,
-          spot ? light.outerAngle! * 2 : Math.PI / 2,
+          cone ? light.outerAngle! * 2 : Math.PI / 2,
         );
         values[offset + 16] = bias;
         values[offset + 17] = normalBias;
+        // settings.z: a hemisphere spot picks its cube face like a point light.
+        if (spot && !cone) values[offset + 18] = 1;
         layers.push(layer);
       }
       indices.push(++slot);

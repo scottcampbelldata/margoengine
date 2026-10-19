@@ -733,3 +733,40 @@ test('integrated local shadows draw wireframe indices with reusable line and tri
     assertDisposed(h);
   }
 });
+
+test("a pi/2 (hemisphere) spot shadow renders a point light's six cube faces; face 0 tells the shader to pick one", () => {
+  const h = harness(),
+    effect = new Clustered({ grid: [1, 1, 1], shadows: { resolution: 16, maxLights: 2 } }),
+    begin = h.context.encoder.beginRenderPass,
+    position = [1, 3, 2];
+  let depthPasses = 0;
+  h.context.encoder.beginRenderPass = (descriptor) => {
+    depthPasses++;
+    return begin(descriptor);
+  };
+  effect.setLights([
+    { position, range: 8, shadow: true },
+    { position, range: 8, direction: [0, -1, 0], angle: Math.PI / 2, penumbra: 0.2, shadow: true },
+  ]);
+  h.engine.use(effect);
+  try {
+    h.frame();
+    assert.equal(depthPasses, 12, 'six faces each');
+    const packed = new Float32Array(effect.bindings().find((entry) => entry.binding === 28).resource.buffer.data);
+    for (let face = 0; face < 6; face++)
+      assert.deepEqual(
+        packed.subarray((6 + face) * 20, (6 + face) * 20 + 18),
+        packed.subarray(face * 20, face * 20 + 18),
+        `face ${face}: the point light's matrix and biases`,
+      );
+    assert.deepEqual([packed[18], packed[6 * 20 + 18], packed[7 * 20 + 18]], [0, 1, 1]);
+    assert.ok(h.context.shader.includes('if(light.params.y<0.5||settings.z>0.5){layer+=clusterShadowFace('));
+    depthPasses = 0;
+    effect.setLights([{ position, range: 8, direction: [0, -1, 0], angle: 1.5, shadow: true }]);
+    h.frame();
+    assert.equal(depthPasses, 1, 'a narrower cone keeps its one perspective map');
+  } finally {
+    effect.dispose();
+    assertDisposed(h);
+  }
+});

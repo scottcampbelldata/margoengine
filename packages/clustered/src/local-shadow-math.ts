@@ -1,3 +1,8 @@
+/**
+ * A spot whose outer cone reaches a hemisphere (cosine below 1e-6: within 1e-6 rad of pi / 2) needs a 180-degree
+ * frustum, which one perspective map cannot hold: its shadow is the six cube faces of a point light.
+ */
+export const hemisphere = (cosine: number): boolean => cosine < 1e-6;
 /** A right-handed perspective view with WebGPU's zero-to-one clip depth. */
 export function localShadowMatrix(
   out: Float32Array,

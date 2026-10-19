@@ -112,7 +112,7 @@ fn clusterShadowVisibility(light:ClusterLight,position:vec3f,normal:vec3f)->f32 
   var layer=(u32(light.params.w)-1u)*6u;
   let settings=clusterShadowFaces[layer].settings;
   let receiver=position+normal/max(length(normal),0.000001)*settings.y;
-  if(light.params.y<0.5){layer+=clusterShadowFace(receiver-light.positionRange.xyz);}
+  if(light.params.y<0.5||settings.z>0.5){layer+=clusterShadowFace(receiver-light.positionRange.xyz);}
   let face=clusterShadowFaces[layer];
   let clip=face.matrix*vec4f(receiver,1);
   if(clip.w<=0.0){return 1.0;}

@@ -34,11 +34,14 @@ export interface PointLight {
 }
 export interface SpotLight extends PointLight {
   direction: Vec3;
-  /** Cone half-angle in radians, below pi / 2, with `innerAngle` (0 to outer) where the smooth edge starts. */
+  /**
+   * Cone half-angle in radians, up to pi / 2 (a hemisphere), with `innerAngle` (0 to outer) where the smooth edge
+   * starts. A hemisphere's local shadow map is the six cube faces of a point light.
+   */
   outerAngle?: number;
   innerAngle?: number;
   /**
-   * Instead of outer/inner: cone half-angle in radians, below pi / 2. The cone is
+   * Instead of outer/inner: cone half-angle in radians, up to pi / 2 (a hemisphere). The cone is
    * `smoothstep(cos(angle), cos(angle * (1 - penumbra)), dot(-L, direction))`, so it is outer = angle,
    * inner = angle * (1 - penumbra); penumbra 0 is a hard edge.
    */
@@ -172,15 +175,15 @@ export class Clustered implements EnginePlugin {
         if (angle !== undefined) {
           if (light.outerAngle !== undefined || light.innerAngle !== undefined)
             throw new TypeError('Spot light: give angle and penumbra, or outerAngle and innerAngle, not both');
-          if (!(angle > 0 && angle < Math.PI / 2 && penumbra >= 0 && penumbra <= 1) || !Math.hypot(...light.direction))
-            throw new RangeError('Spot angle must be in (0, pi/2) radians, penumbra in 0..1, direction nonzero');
+          if (!(angle > 0 && angle <= Math.PI / 2 && penumbra >= 0 && penumbra <= 1) || !Math.hypot(...light.direction))
+            throw new RangeError('Spot angle must be in (0, pi/2] radians, penumbra in 0..1, direction nonzero');
         } else if (light.penumbra !== undefined)
           throw new TypeError('Spot penumbra goes with angle; use innerAngle with outerAngle');
         else if (
           !Math.hypot(...light.direction) ||
           !Number.isFinite(light.outerAngle) ||
           light.outerAngle! <= 0 ||
-          light.outerAngle! >= Math.PI / 2 ||
+          light.outerAngle! > Math.PI / 2 ||
           !Number.isFinite(light.innerAngle ?? 0) ||
           (light.innerAngle ?? 0) < 0 ||
           (light.innerAngle ?? 0) > light.outerAngle!

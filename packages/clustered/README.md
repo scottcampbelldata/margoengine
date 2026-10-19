@@ -15,7 +15,7 @@ lights.setLights([
 engine.start();
 ```
 
-Positions and directions are world space; cone angles are radians below π/2. Light radiance uses smooth range attenuation, inverse-square distance attenuation, and smooth inner/outer spot cones.
+Positions and directions are world space; cone angles are radians up to π/2 (a hemisphere: everything in front of the light). Light radiance uses smooth range attenuation, inverse-square distance attenuation, and smooth inner/outer spot cones.
 
 Crocotile's (three.js-style) light parameters map one to one, with the falloff `@margoengine/bvh`'s vertex-light bake uses:
 
@@ -29,7 +29,7 @@ lights.setLights([
 - Attenuation is `window / max(d^decay, 0.01)` with `window = range > 0 ? clamp(1 - (d/range)^4, 0, 1)^2 : 1`.
   `decay` defaults to 2 (inverse-square); 0 turns distance falloff off. `range: 0` is unlimited (the light reaches every
   cluster); a light with a shadow map needs a finite range.
-- A spot takes `angle` (half-angle, below π/2) and `penumbra` (0 to 1, default 0) instead of `outerAngle`/`innerAngle`:
+- A spot takes `angle` (half-angle, up to π/2) and `penumbra` (0 to 1, default 0) instead of `outerAngle`/`innerAngle`:
   the cone is `smoothstep(cos(angle), cos(angle * (1 - penumbra)), dot(-L, direction))`, so outer = angle and
   inner = angle × (1 − penumbra); penumbra 0 is a hard edge. Giving both forms throws.
 - A light that sets neither `decay` nor `angle` keeps the original shader term (`d * d`, and the cone's 1e-5 floor) bit
@@ -68,7 +68,9 @@ function localShadows(engine:EngineKernel,blocker:Mesh) {
 `shadows` defaults to resolution 512 and a maximum of four shadowed lights.
 `maxLights` is an integer from 1 through 32, independent of the 1,024-light
 lighting limit. Each slot reserves six `depth32float` layers; point lights render
-all six faces and spot lights render one perspective face. Four slots at 512
+all six faces and spot lights render one perspective face; a spot at the full π/2 (a hemisphere, which needs a
+180° frustum no single perspective map holds) renders the six cube faces of a point light, here and in
+`LocalShadows`. Four slots at 512
 reserve 24 MiB of depth storage. Attachment validates texture dimensions, array
 layers and buffer limits before allocation. `setLights()` validates the full
 replacement before changing the list; too many shadowed lights reject explicitly.
