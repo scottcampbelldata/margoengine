@@ -22,6 +22,22 @@ export type {
   DAEInstance,
   DAEParseOptions,
 } from './dae.js';
+export { parseTMX, tmxLayerQuads } from './tmx.js';
+export type {
+  LoadedTMX,
+  TMXParseOptions,
+  TMXTileset,
+  TMXTilesetRef,
+  TMXLayer,
+  TMXLayerCommon,
+  TMXTileLayer,
+  TMXObjectLayer,
+  TMXObject,
+  TMXProperties,
+  TileQuads,
+  TileQuadsGroup,
+  TileQuadsOptions,
+} from './tmx.js';
 export type { BinaryInput } from './util.js';
 export { parsePLY, parsePLYHeader } from './ply.js';
 export type { PLYOptions, PLYHeader, PLYElement, PLYProperty } from './ply.js';

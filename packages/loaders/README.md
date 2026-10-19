@@ -1,6 +1,6 @@
 # @margoengine/loaders
 
-PLY, 3MF, DXF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, legacy VTK and static USDA/USDZ loaders for Margo Engine, each tree-shakable on its own.
+PLY, 3MF, DXF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, legacy VTK and static USDA/USDZ loaders for Margo Engine, each tree-shakable on its own.
 
 Build from source with `npm run build` in `packages/loaders`.
 
@@ -37,6 +37,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parseVTK` | `VTKLoader` (legacy part) | `# vtk DataFile Version` 1.0 to 5.1, ASCII or BINARY `DATASET POLYDATA`: POINTS, POLYGONS, TRIANGLE_STRIPS, 5.x OFFSETS/CONNECTIVITY, point NORMALS, COLOR_SCALARS, TEXTURE_COORDINATES, SCALARS |
 | `parseOBJ` (async), `parseMTL` | `OBJLoader`, `MTLLoader` | See [OBJ and MTL](#obj-and-mtl) |
 | `parseDAE`, `flattenDAE` | `ColladaLoader` | See [COLLADA](#collada) |
+| `parseTMX` (async), `tmxLayerQuads` | none | See [Tiled TMX](#tiled-tmx) |
 
 Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per group), `pointsToGeometry` (octahedron markers for clouds), `createMeshes` (engine meshes with `PbrMaterial` colors), `load` / `fetchBytes`, `detectFormat` / `parseAny`, `computeVertexNormals`, `decompressLZF`, `readZipDirectory` / `readZipEntry` / `crc32`, `parsePLYHeader`, `parsePCDHeader`.
 
@@ -75,7 +76,7 @@ Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per
 
 ## Tests
 
-`npm test` in `packages/loaders` runs Node tests for: OBJ/MTL fixtures covering every statement, map option and error line (and a Crocotile-style file checked against three.js `OBJLoader` as an oracle), COLLADA Y-up and Z-up fixtures (polylist quads, textured phong, TRS stacks, symbol-bound materials, trifans, tristrips, holes, errors; world-space corners checked against three.js `ColladaLoader` under jsdom), every PLY encoding and attribute naming generated in the test, PLY point clouds, OFF and XYZ variants, LZF round trips against an independent compressor, PCD ascii, binary and binary_compressed fixtures, VTK ASCII, big-endian BINARY and 5.1 polydata, ZIP archives with stored and deflate entries (written with `node:zlib`), 3MF components, mirrored transforms, colors, units and production parts, error cases for every format (bad headers, truncation, out-of-range indices, limits, zip bombs, CRC failures, cycles, aborts), `fetchBytes` limits against a local HTTP server, an SSR import check with throwing browser globals, and real files from three.js, PCL, libigl and PyVista (`npm run fixtures` re-downloads them; see `tests/fixtures/SOURCES.txt`) compared with independent reads. `npm run test:browser` (a real-GPU script, not in CI) loads `facecolors.3mf` in Chromium, creates engine meshes, checks five face colors in the rendered pixels, a GPU pick, `maxBytes`, disposal, and zero WebGPU validation errors.
+`npm test` in `packages/loaders` runs Node tests for: OBJ/MTL fixtures covering every statement, map option and error line (and a Crocotile-style file checked against three.js `OBJLoader` as an oracle), COLLADA Y-up and Z-up fixtures (polylist quads, textured phong, TRS stacks, symbol-bound materials, trifans, tristrips, holes, errors; world-space corners checked against three.js `ColladaLoader` under jsdom), TMX/TSX fixtures (csv, base64 plain, zlib and gzip written with `node:zlib`, legacy tiles, flips and their UVs, external and merged tilesets, infinite chunks, group offsets, errors), every PLY encoding and attribute naming generated in the test, PLY point clouds, OFF and XYZ variants, LZF round trips against an independent compressor, PCD ascii, binary and binary_compressed fixtures, VTK ASCII, big-endian BINARY and 5.1 polydata, ZIP archives with stored and deflate entries (written with `node:zlib`), 3MF components, mirrored transforms, colors, units and production parts, error cases for every format (bad headers, truncation, out-of-range indices, limits, zip bombs, CRC failures, cycles, aborts), `fetchBytes` limits against a local HTTP server, an SSR import check with throwing browser globals, and real files from three.js, PCL, libigl and PyVista (`npm run fixtures` re-downloads them; see `tests/fixtures/SOURCES.txt`) compared with independent reads. `npm run test:browser` (a real-GPU script, not in CI) loads `facecolors.3mf` in Chromium, creates engine meshes, checks five face colors in the rendered pixels, a GPU pick, `maxBytes`, disposal, and zero WebGPU validation errors.
 
 MIT licensed.
 
@@ -141,3 +142,23 @@ createMesh(engine, {
 - Not imported, each reported in `warnings`: `<lines>` and `<linestrips>`, polygon holes (the outer polygon is kept), `lookat` and `skew`, skins and morphs (`instance_controller` nodes get no mesh), animations, embedded image data, non-mesh geometry.
 
 `flattenDAE(dae)` bakes the hierarchy into one `LoadedGeometry` (mirrored nodes keep outward winding) with a group per node instance and primitive, named after the node and colored with the bound material's diffuse color, so `createMeshes(engine, flattenDAE(dae))` shows the scene.
+
+## Tiled TMX
+
+`await parseTMX(textOrBytes, {resolve, signal})` reads orthogonal Tiled maps (other orientations throw `unsupported`) and returns `{orientation, renderorder, width, height, tilewidth, tileheight, infinite, tilesets, tilesetRefs, layers, properties, warnings}`.
+
+- Tilesets: embedded or external TSX (read through `resolve`, each file once), with `tilewidth`, `tileheight`, `spacing`, `margin`, `columns`, `tilecount` and `image: {path, width, height}`, the path relative to the TMX folder. Tilesets with the same image and grid are merged, so `tilesets` has no duplicates; `tilesetRefs` keeps every `firstgid` and the tileset it maps to.
+- Tile layers: csv, base64 (plain, zlib or gzip through `DecompressionStream`, size-capped; zstd throws `unsupported`) and legacy `<tile gid>` data, infinite-map `<chunk>`s merged into one grid whose top-left cell is `x`, `y`. `gids` hold the global tile ids with the flip bits cleared (the hexagonal-rotation bit too), `flips` the bits as 1 horizontal, 2 vertical, 4 diagonal.
+- Object layers: `{name, type, x, y, width, height, rotation, visible, gid, flips, properties}` per object, in pixels. Custom properties come typed (`int`, `float`, `bool`).
+- Group layers are flattened: offsets add up, opacity multiplies, visibility combines. Image layers and image-collection tilesets are reported in `warnings`.
+
+`tmxLayerQuads(map, layer, {tileSize})` turns one tile layer into a `LoadedGeometry` of quads on the XZ plane facing +Y (column along +X, row along +Z, `tileSize` world units per cell, default 1, layer offsets included), four vertices per tile with UVs from the atlas rectangle (spacing and margin honored, flips applied in Tiled's order, v = 0 at the top of the image), `faceSizes` all 4, one group per tileset and `cells` mapping each quad back to its layer cell. One object per layer, as Crocotile imports TMX:
+
+```ts
+const map = await parseTMX(bytes, {resolve});
+for (const layer of map.layers) {
+  if (layer.type !== 'tile' || !layer.visible) continue;
+  const quads = tmxLayerQuads(map, layer, {tileSize: 1});
+  for (const group of quads.groups) console.log(layer.name, map.tilesets[group.tileset].image?.path, group.count / 6);
+}
+```

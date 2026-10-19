@@ -113,34 +113,45 @@ export function readZipDirectory(input: BinaryInput, options: ZipOptions = {}): 
   return entries;
 }
 
-async function inflate(data: Uint8Array, size: number, name: string, signal?: AbortSignal): Promise<Uint8Array> {
+/**
+ * Inflates `data` to exactly `size` bytes, failing as soon as it would grow past them (zip-bomb safe). `subject` names
+ * the data in errors and `owner` is their format.
+ */
+export async function inflate(
+  data: Uint8Array,
+  size: number,
+  subject: string,
+  signal?: AbortSignal,
+  format: 'deflate-raw' | 'deflate' | 'gzip' = 'deflate-raw',
+  owner = F,
+): Promise<Uint8Array> {
   if (typeof DecompressionStream !== 'function')
-    throw new LoaderError(F, 'unsupported', 'DecompressionStream is not available in this runtime');
+    throw new LoaderError(owner, 'unsupported', 'DecompressionStream is not available in this runtime');
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       controller.enqueue(data);
       controller.close();
     },
-  }).pipeThrough(new DecompressionStream('deflate-raw') as unknown as ReadableWritablePair<Uint8Array, Uint8Array>);
+  }).pipeThrough(new DecompressionStream(format) as unknown as ReadableWritablePair<Uint8Array, Uint8Array>);
   const reader = stream.getReader(),
     output = new Uint8Array(size);
   let length = 0;
   try {
     for (;;) {
-      if (signal?.aborted) throw new LoaderError(F, 'aborted', 'aborted');
+      if (signal?.aborted) throw new LoaderError(owner, 'aborted', 'aborted');
       const { done, value } = await reader.read();
       if (done) break;
       if (length + value.length > size)
-        throw new LoaderError(F, 'zip', `entry "${name}" inflates past its declared size of ${size} bytes`);
+        throw new LoaderError(owner, 'zip', `${subject} inflates past its declared size of ${size} bytes`);
       output.set(value, length);
       length += value.length;
     }
   } catch (error) {
     void reader.cancel().catch(() => {});
     if (error instanceof LoaderError) throw error;
-    throw new LoaderError(F, 'zip', `entry "${name}" has corrupt deflate data (${(error as Error)?.message ?? error})`);
+    throw new LoaderError(owner, 'zip', `${subject} has corrupt deflate data (${(error as Error)?.message ?? error})`);
   }
-  if (length !== size) throw new LoaderError(F, 'zip', `entry "${name}" inflated to ${length} bytes, expected ${size}`);
+  if (length !== size) throw new LoaderError(owner, 'zip', `${subject} inflated to ${length} bytes, expected ${size}`);
   return output;
 }
 
@@ -179,7 +190,7 @@ export async function readZipEntry(input: BinaryInput, entry: ZipEntry, options:
     if (entry.compressedSize !== entry.size)
       throw new LoaderError(F, 'zip', `stored entry "${entry.name}" has mismatched sizes`);
     output = data;
-  } else if (entry.method === 8) output = await inflate(data, entry.size, entry.name, options.signal);
+  } else if (entry.method === 8) output = await inflate(data, entry.size, `entry "${entry.name}"`, options.signal);
   else
     throw new LoaderError(
       F,
