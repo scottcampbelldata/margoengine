@@ -32,8 +32,8 @@ const bump = `fn margoBump(n:vec3f,p:vec3f,height:f32,facing:bool)->vec3f {
 /**
  * `code` with the features `key` names: `a` alphaMap, `b` bumpMap, `d` displacementMap, `f` flatShading, `v`
  * vertexColors false, `g` fog false, `t` toneMapped false, `l` lightMap on a lit shading (baked irradiance: diffuse colour times the map, added like
- * emissive) or `u` on an unlit one (the map multiplies the colour), `n` a tangent-space map or anisotropy (the derived
- * normal-map frame follows this package's UV orientation).
+ * emissive) or `u` on an unlit one (the map multiplies the colour), `n` a tangent-space map, anisotropy or an extension
+ * lobe sampling one (the derived normal-map frame follows this package's UV orientation).
  */
 export function featureShader(code: string, group: number, key: string): string {
   let inner = cache.get(code);
@@ -74,6 +74,7 @@ export function featureShader(code: string, group: number, key: string): string 
   // texture origin. Materials meshes have three.js UV orientation and flipY uploads, so up the image is increasing v,
   // where MikkTSpace tangents of these UVs put B too (mikktspace.c: vOt along increasing t; bitangent = fSign *
   // cross(vN, tangent)). Authored tangents keep b = cross(n, t) * w: this only changes the frame drawn without them.
+  // One definition serves every caller: the base surface and extension lobes (clearcoat(), lobes, node normalMap).
   if (has('n')) out = edit(out, 'mat3x3f(t*scale,-b*scale,n)', 'mat3x3f(t*scale,b*scale,n)');
   // After the normal map: the bump tilts the mapped normal.
   if (maps[1])

@@ -962,9 +962,15 @@ function featureMapsUsed(m: Material): boolean[] {
   const maps = m['featureTextures'];
   return [!!maps[0], !!maps[1], !!maps[2], !!maps[3] && (m.shading === 'basic' || lit.includes(m.shading))];
 }
-/** The feature letters (features.ts) `m` uses now: its shader variant. */
-function featureKey(m: Material): string {
-  const [alpha, bump, displacement, light] = featureMapsUsed(m);
+/**
+ * The feature letters (features.ts) `m` uses now on gltf-pro shader `code`: its shader variant. An extension lobe
+ * sampling a tangent-space map (clearcoat(), materialLobes anisotropy, a node graph's normalMap) calls the shared
+ * frame from declarations placed ahead of its definition, so it takes `n` too.
+ */
+function featureKey(m: Material, code: string): string {
+  const [alpha, bump, displacement, light] = featureMapsUsed(m),
+    first = code.indexOf('margoCotangentFrame('),
+    lobeFrame = first > 2 && !code.startsWith('fn ', first - 3);
   return (
     (alpha ? 'a' : '') +
     (bump ? 'b' : '') +
@@ -973,7 +979,7 @@ function featureKey(m: Material): string {
     (m.flatShading && m.shading !== 'basic' && m.shading !== 'depth' && m.shading !== 'distance' ? 'f' : '') +
     (m.vertexColors ? '' : 'v') +
     (lit.includes(m.shading) ? (m.fog ? '' : 'g') + (m.toneMapped ? '' : 't') : '') +
-    (m.normalMap || m.clearcoatNormalMap || m.extensions.includes('anisotropy') ? 'n' : '')
+    (m.normalMap || m.clearcoatNormalMap || m.extensions.includes('anisotropy') || lobeFrame ? 'n' : '')
   );
 }
 /** The feature uniform of `m` for `owner`, written with its current values. */
@@ -2345,7 +2351,7 @@ function surface(g: PBRMaterial, current: () => Material, runtime: Engine): void
         },
         shader: (code: string, group: number) => {
           const m = current(),
-            key = featureKey(m),
+            key = featureKey(m, code),
             own = m.shader(code, group);
           return key ? featureShader(own, group, key) : own;
         },

@@ -17,9 +17,13 @@ import {
   ShadowCatcherMaterial,
   Texture,
   WgslMaterial,
+  clearcoat,
   createInstancedMesh,
   createMesh,
+  materialLobes,
+  nodeMaterial,
 } from '../dist/index.js';
+import { parseGLTF } from '../../gltf-pro/dist/index.js';
 import { NodeMaterial, normalLocal, positionLocal } from '../../shader/dist/index.js';
 import { Fog } from '../../environment/dist/index.js';
 import { exportModel } from '../../exporters/dist/model.js';
@@ -452,6 +456,51 @@ test('tangent-space maps and anisotropy point the derived frame up three.js UVs 
   // gltf-pro's frame (glTF: B toward decreasing v) only for the material without one; b = cross(n, t) * w untouched.
   assert.deepEqual(signs.sort(), ['', '', '', '-']);
   for (const mesh of meshes) mesh.destroy();
+  s.engine.dispose();
+});
+
+test('extension lobes sampling a tangent-space map take the materials frame (+b) on createMesh meshes, not on glTF', async () => {
+  const s = await scene(),
+    texture = { view: s.gpu.device.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: 4 }).createView() },
+    graph = (normal) => ({
+      nodes: [
+        {
+          type: 'emit',
+          color: { type: 'color', value: [1, 1, 1, 1] },
+          ...(normal ? { normal: { type: 'normalMap', texture: { type: 'texture', texture } } } : {}),
+        },
+      ],
+    }),
+    // glTF quad without TANGENT: the same extension keeps glTF's B (decreasing v) there.
+    doc = {
+      asset: { version: '2.0' },
+      buffers: [{ byteLength: 60 }],
+      bufferViews: [{ buffer: 0, byteLength: 60 }],
+      accessors: [
+        { bufferView: 0, componentType: 5126, count: 3, type: 'VEC3', min: [0, 0, 0], max: [1, 1, 0] },
+        { bufferView: 0, componentType: 5126, count: 3, type: 'VEC2', byteOffset: 36 },
+      ],
+      materials: [{}],
+      meshes: [{ primitives: [{ attributes: { POSITION: 0, TEXCOORD_0: 1 }, material: 0 }] }],
+      nodes: [{ mesh: 0 }],
+    },
+    gltf = () => parseGLTF(s.engine, doc, [new Float32Array([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0])]);
+  const sign = (model, extension) => {
+    model.primitives[0].extension = extension;
+    const found = codes(s.frame()).map((c) => /return mat3x3f\(t\*scale,(-?)b\*scale,n\);/.exec(c)?.[1]);
+    model.destroy();
+    return found.join();
+  };
+  const mesh = () => createMesh(s.engine, quad, new PbrMaterial());
+  assert.equal(sign(mesh(), clearcoat({ factor: 1, clearcoatNormalTexture: texture })), '');
+  assert.equal(sign(mesh(), materialLobes({ anisotropy: { strength: 1 } })), '');
+  assert.equal(sign(mesh(), nodeMaterial(graph(true))), '');
+  // Feature off: lobes without a tangent-space map, and a physical material with maps but no normal map, keep the text.
+  assert.equal(sign(mesh(), clearcoat({ factor: 1 })), '-');
+  assert.equal(sign(mesh(), materialLobes({ sheen: { colorFactor: [1, 1, 1] } })), '-');
+  assert.equal(sign(mesh(), nodeMaterial(graph(false))), '-');
+  assert.equal(sign(createMesh(s.engine, quad, new PbrMaterial({ sheen: 1, sheenColorMap: solid(9, 9, 9) }))), '-');
+  assert.equal(sign(gltf(), clearcoat({ factor: 1, clearcoatNormalTexture: texture })), '-');
   s.engine.dispose();
 });
 
