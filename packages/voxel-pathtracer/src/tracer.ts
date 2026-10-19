@@ -21,6 +21,7 @@ import {
   FLAG_JITTER,
   FLAG_MOTION,
   FLAG_AREA,
+  FLAG_CAMERA_MOTION,
   FLAG_SPLIT,
   FLAG_SUN,
   FRAME_BYTES,
@@ -45,6 +46,7 @@ import { DENOISE, DISPLAY, TABLE_VEC4, TABLES, TRACE } from './shaders.js';
 import { LAMBDA_MAX, LAMBDA_MIN } from './spectrum.js';
 import { raycastSnapshot } from './traverse.js';
 import type {
+  TracePreviousCamera,
   TraceVec3,
   VoxelPathTracerOptions,
   VoxelPathTracerStats,
@@ -94,6 +96,7 @@ interface Settings {
   clamp: number;
   toneMapping: 'neutral' | 'linear';
   order: number;
+  previousCamera: TracePreviousCamera | undefined;
 }
 const DEFAULTS: Settings = {
   samplesPerFrame: 1,
@@ -111,6 +114,7 @@ const DEFAULTS: Settings = {
   clamp: Infinity,
   toneMapping: 'neutral',
   order: 20,
+  previousCamera: undefined,
 };
 // Options whose change invalidates the accumulated samples (the others only change how they are shown or paced).
 const RESETS: readonly (keyof Settings)[] = [
@@ -122,6 +126,7 @@ const RESETS: readonly (keyof Settings)[] = [
   'lensBlades',
   'lensRotation',
   'shutter',
+  'previousCamera',
   'clamp',
 ];
 
@@ -178,7 +183,23 @@ function settings(input: Partial<Omit<VoxelPathTracerOptions, 'scene'>>, base: S
     s.toneMapping = o.toneMapping;
   }
   if (o.order !== undefined) s.order = checkNumber(o.order, 'order', -1e9, 1e9, 'pass a finite frame-graph order');
+  if (o.previousCamera !== undefined) s.previousCamera = previousCamera(o.previousCamera);
   return s;
+}
+
+// A validated copy of a previous camera pose (undefined for null).
+function previousCamera(value: unknown): TracePreviousCamera | undefined {
+  if (value === null) return undefined;
+  if (!value || typeof value !== 'object')
+    throw new TypeError('VoxelPathTracer previousCamera must be {position, target, up?, fov?} or null');
+  const c = value as Record<string, unknown>,
+    position = checkVec3(c.position, 'previousCamera.position', false, 'pass a world point'),
+    target = checkVec3(c.target, 'previousCamera.target', false, 'pass a world point'),
+    up = c.up === undefined ? undefined : checkVec3(c.up, 'previousCamera.up', false, 'pass a direction'),
+    fov = c.fov === undefined ? undefined : checkNumber(c.fov, 'previousCamera.fov', 1e-3, 179.999, 'pass degrees');
+  if (position.every((v, i) => v === target[i]))
+    throw new RangeError('VoxelPathTracer previousCamera.position equals its target; pass a distinct target');
+  return { position, target, up, fov };
 }
 
 // First-fit allocator over runs of free words: [start, length] pairs sorted by start, neighbours merged.
@@ -412,7 +433,10 @@ export class VoxelPathTracer implements EnginePlugin {
 
   /** Compatible addition: the options in effect (scene excluded), defaults filled in. */
   get options(): Readonly<
-    Omit<Required<VoxelPathTracerOptions>, 'scene' | 'focusDistance'> & { focusDistance?: number }
+    Omit<Required<VoxelPathTracerOptions>, 'scene' | 'focusDistance' | 'previousCamera'> & {
+      focusDistance?: number;
+      previousCamera?: TracePreviousCamera;
+    }
   > {
     return { ...this.#settings };
   }
@@ -941,26 +965,12 @@ export class VoxelPathTracer implements EnginePlugin {
     });
   }
 
-  // Frame uniform for a camera, image and tile (layout.ts FRAME_BYTES; Frame in shaders.ts).
-  #writeFrame(
-    device: GPUDevice,
-    target: GPUBuffer,
-    camera: Camera,
-    image: readonly [number, number, number, number],
-    tile: readonly [number, number, number, number],
-    seed: number,
-    jitter: boolean,
-    split: boolean,
-    layout: { scene: SceneLayout; lights: LightLayout },
-    s: SceneSnapshot,
-    wavelength = 0,
-  ): boolean {
-    const o = this.#settings,
-      f = new Float32Array(this.#frame),
-      u = new Uint32Array(this.#frame);
+  // Corner rays (near-plane points at `origins`, directions toward NDC depth 0.5 at `directions`) and the lens frame
+  // (eye and target distance, forward, right, up at `lens`) of a camera, into frame floats `f`; false when singular.
+  #pose(camera: Camera, f: Float32Array, origins: number, directions: number, lens: number): boolean {
     const inv = this.#inverse;
     if (!invertMatrix(camera.matrix, inv)) return false;
-    // Corner rays in float64: near-plane points (NDC depth 1, reversed) and directions toward NDC depth 0.5.
+    // In float64: near-plane points are NDC depth 1 (reversed).
     const unproject = (x: number, y: number, z: number) => {
       const w = inv[3] * x + inv[7] * y + inv[11] * z + inv[15];
       return [0, 1, 2].map((r) => (inv[r] * x + inv[4 + r] * y + inv[8 + r] * z + inv[12 + r]) / w);
@@ -973,11 +983,9 @@ export class VoxelPathTracer implements EnginePlugin {
     ].entries()) {
       const a = unproject(x, y, 1),
         b = unproject(x, y, 0.5);
-      f.set([a[0], a[1], a[2], 0], k * 4);
-      f.set([b[0] - a[0], b[1] - a[1], b[2] - a[2], 0], 76 + k * 4);
+      f.set([a[0], a[1], a[2], 0], origins + k * 4);
+      f.set([b[0] - a[0], b[1] - a[1], b[2] - a[2], 0], directions + k * 4);
     }
-    this.#corners.set(f.subarray(0, 16), 0);
-    this.#corners.set(f.subarray(76, 92), 16);
     const p = camera.position,
       t = camera.target,
       forward = [t[0] - p[0], t[1] - p[1], t[2] - p[2]],
@@ -996,10 +1004,59 @@ export class VoxelPathTracer implements EnginePlugin {
       right[2] * forward[0] - right[0] * forward[2],
       right[0] * forward[1] - right[1] * forward[0],
     ];
-    f.set([p[0], p[1], p[2], o.focusDistance ?? distance], 16);
-    f.set([forward[0], forward[1], forward[2], o.aperture / 2], 20);
-    f.set([right[0], right[1], right[2], o.lensBlades], 24);
-    f.set([top[0], top[1], top[2], o.lensRotation], 28);
+    f.set([p[0], p[1], p[2], distance], lens);
+    f.set([forward[0], forward[1], forward[2], 0], lens + 4);
+    f.set([right[0], right[1], right[2], 0], lens + 8);
+    f.set([top[0], top[1], top[2], 0], lens + 12);
+    return true;
+  }
+
+  // Frame uniform for a camera, image and tile (layout.ts FRAME_BYTES; Frame in shaders.ts).
+  #writeFrame(
+    device: GPUDevice,
+    target: GPUBuffer,
+    camera: Camera,
+    image: readonly [number, number, number, number],
+    tile: readonly [number, number, number, number],
+    seed: number,
+    jitter: boolean,
+    split: boolean,
+    layout: { scene: SceneLayout; lights: LightLayout },
+    s: SceneSnapshot,
+    wavelength = 0,
+  ): boolean {
+    const o = this.#settings,
+      f = new Float32Array(this.#frame),
+      u = new Uint32Array(this.#frame);
+    if (!this.#pose(camera, f, 0, 76, 16)) return false;
+    this.#corners.set(f.subarray(0, 16), 0);
+    this.#corners.set(f.subarray(76, 92), 16);
+    f[19] = o.focusDistance ?? f[19];
+    f[23] = o.aperture / 2;
+    f[27] = o.lensBlades;
+    f[31] = o.lensRotation;
+    // Camera motion: the shutter-open pose's corner rays (92, 108) and lens frame (124), from a camera like the
+    // engine's at that pose.
+    let cameraMotion = false;
+    const pc = o.previousCamera;
+    if (pc && o.shutter > 0) {
+      const prev = new Camera({
+        fov: pc.fov ?? camera.fov,
+        position: pc.position,
+        target: pc.target,
+        near: camera.near,
+        far: camera.far,
+      });
+      prev.up = pc.up ?? camera.up;
+      prev.project = camera.project;
+      try {
+        prev.update(image[0] / image[1], true);
+        cameraMotion = this.#pose(prev, f, 92, 108, 124);
+        f[127] = o.focusDistance ?? f[127];
+      } catch {
+        cameraMotion = false; // a view parallel to `up`: no camera motion
+      }
+    }
     u.set(image, 32);
     u.set(tile, 36);
     const e = s.environment,
@@ -1009,7 +1066,8 @@ export class VoxelPathTracer implements EnginePlugin {
     if (sunOn) flags |= FLAG_SUN;
     if (e.ground) flags |= FLAG_GROUND;
     if (env) flags |= FLAG_ENV;
-    if (s.moving && o.shutter > 0) flags |= FLAG_MOTION;
+    if ((s.moving || cameraMotion) && o.shutter > 0) flags |= FLAG_MOTION;
+    if (cameraMotion) flags |= FLAG_CAMERA_MOTION;
     if (o.clamp < Infinity) flags |= FLAG_CLAMP;
     if (s.lightPower > 0) flags |= FLAG_AREA;
     u.set([o.maxBounces, seed >>> 0, flags, s.lightCount], 40);

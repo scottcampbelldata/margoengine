@@ -72,6 +72,13 @@ export interface TraceModel {
     voxels: Uint8Array;
 }
 
+export interface TracePreviousCamera {
+    position: TraceVec3;
+    target: TraceVec3;
+    up?: TraceVec3;
+    fov?: number;
+}
+
 export type TraceVec3 = readonly [number, number, number];
 
 export class VoxelPathTracer implements EnginePlugin {
@@ -84,8 +91,9 @@ export class VoxelPathTracer implements EnginePlugin {
     get ready(): Promise<void>;
     get status(): 'compiling' | 'ready' | 'failed' | 'disposed';
     get error(): unknown;
-    get options(): Readonly<Omit<Required<VoxelPathTracerOptions>, 'scene' | 'focusDistance'> & {
+    get options(): Readonly<Omit<Required<VoxelPathTracerOptions>, 'scene' | 'focusDistance' | 'previousCamera'> & {
         focusDistance?: number;
+        previousCamera?: TracePreviousCamera;
     }>;
     setScene(scene: VoxelTraceScene): void;
     setOptions(options: Partial<Omit<VoxelPathTracerOptions, 'scene'>>): void;
@@ -114,6 +122,7 @@ export interface VoxelPathTracerOptions {
     lensBlades?: number;
     lensRotation?: number;
     shutter?: number;
+    previousCamera?: TracePreviousCamera | null;
     clamp?: number;
     toneMapping?: 'neutral' | 'linear';
     order?: number;

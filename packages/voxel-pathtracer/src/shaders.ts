@@ -39,6 +39,7 @@ import {
   FLAG_MOTION,
   FLAG_SPLIT,
   FLAG_AREA,
+  FLAG_CAMERA_MOTION,
   FLAG_SUN,
   INSTANCE_WORDS,
   MODEL_WORDS,
@@ -64,6 +65,13 @@ struct Frame {
  ground:vec4f,
  weights:vec4f,
  directions:array<vec4f,4>,
+ // The camera at shutter open (camera motion blur): corner rays and lens frame as above.
+ prevOrigins:array<vec4f,4>,
+ prevDirections:array<vec4f,4>,
+ prevEye:vec4f,
+ prevForward:vec4f,
+ prevRight:vec4f,
+ prevUp:vec4f,
 }
 `;
 
@@ -181,6 +189,7 @@ const JITTER=${FLAG_JITTER}u;
 const CLAMP=${FLAG_CLAMP}u;
 const SPLIT=${FLAG_SPLIT}u;
 const AREA_NEE=${FLAG_AREA}u;
+const CAMERA_MOTION=${FLAG_CAMERA_MOTION}u;
 const MODEL=${MODEL_WORDS}u;
 const INSTANCE=${INSTANCE_WORDS}u;
 @group(0) @binding(0) var<uniform> f:Frame;
@@ -457,8 +466,14 @@ fn voxelAt(model:u32,c:vec3i)->u32 {
 struct Ray {o:vec3f,d:vec3f}
 fn pinhole(px:vec2f)->Ray {
  let uv=px/vec2f(f32(f.image.x),f32(f.image.y));
- let o=mix(mix(f.origins[0],f.origins[1],uv.x),mix(f.origins[2],f.origins[3],uv.x),uv.y).xyz;
- let d=mix(mix(f.directions[0],f.directions[1],uv.x),mix(f.directions[2],f.directions[3],uv.x),uv.y).xyz;
+ var o=mix(mix(f.origins[0],f.origins[1],uv.x),mix(f.origins[2],f.origins[3],uv.x),uv.y).xyz;
+ var d=mix(mix(f.directions[0],f.directions[1],uv.x),mix(f.directions[2],f.directions[3],uv.x),uv.y).xyz;
+ if((f.config.z&CAMERA_MOTION)!=0u&&motion<1.0){
+  // Camera motion blur: the corner rays interpolated between the shutter-open and shutter-close poses.
+  let po=mix(mix(f.prevOrigins[0],f.prevOrigins[1],uv.x),mix(f.prevOrigins[2],f.prevOrigins[3],uv.x),uv.y).xyz;
+  let pd=mix(mix(f.prevDirections[0],f.prevDirections[1],uv.x),mix(f.prevDirections[2],f.prevDirections[3],uv.x),uv.y).xyz;
+  o=mix(po,o,motion);d=mix(pd,d,motion);
+ }
  return Ray(o,normalize(d));
 }
 fn lensPoint()->vec2f {
@@ -479,10 +494,15 @@ fn lensPoint()->vec2f {
 fn cameraRay(px:vec2f)->Ray {
  var r=pinhole(px);
  if(f.forward.w>0.0){
-  let t=(f.eye.w-dot(r.o-f.eye.xyz,f.forward.xyz))/dot(r.d,f.forward.xyz);
+  var eye=f.eye;var fw=f.forward.xyz;var rt=f.right.xyz;var up=f.up.xyz;
+  if((f.config.z&CAMERA_MOTION)!=0u&&motion<1.0){
+   eye=mix(f.prevEye,f.eye,motion);fw=normalize(mix(f.prevForward.xyz,fw,motion));
+   rt=normalize(mix(f.prevRight.xyz,rt,motion));up=normalize(mix(f.prevUp.xyz,up,motion));
+  }
+  let t=(eye.w-dot(r.o-eye.xyz,fw))/dot(r.d,fw);
   let focus=r.o+r.d*t;
   let l=lensPoint()*f.forward.w;
-  r.o=r.o+f.right.xyz*l.x+f.up.xyz*l.y;
+  r.o=r.o+rt*l.x+up*l.y;
   r.d=normalize(focus-r.o);
  }
  return r;

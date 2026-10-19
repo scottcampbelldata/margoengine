@@ -8,7 +8,7 @@ import { inflateSync } from 'node:zlib';
 import { VoxelPathTracer } from '../dist/index.js';
 import { fakeDevice, fakeEngine, materials, model, settle, simpleScene, translate } from './support.js';
 
-const FRAME = 368;
+const FRAME = 560;
 const isMargo = (code) => (error) => error.name === 'MargoError' && error.code === code;
 
 // Attaches and runs frames until the trace and display pipelines are compiled.
@@ -525,6 +525,34 @@ test('the frame uniform carries the environment, lights and options the shader r
   assert.equal(f[75], 20);
   assert.ok(Math.abs(f[23] - 0.2) < 1e-7, 'lens radius is half the aperture');
   assert.equal(f[27], 5);
+  tracer.dispose();
+});
+
+test('previousCamera with a shutter adds the shutter-open pose to the frame; it is validated and restarts', async () => {
+  const { tracer, frame, device } = await ready();
+  const last = () => device.buffers.findLast((b) => b.size === FRAME && !b.destroyed).data;
+  tracer.setOptions({ previousCamera: { position: [18, 14, 24], target: [2, 3, 4] } });
+  frame();
+  assert.equal(new Uint32Array(last())[42] & (8 | 256), 0, 'no camera motion without a shutter');
+  tracer.setOptions({ shutter: 1 });
+  frame();
+  const f = new Float32Array(last()),
+    u = new Uint32Array(last());
+  assert.equal(u[42] & (8 | 256), 8 | 256, 'motion and camera motion');
+  assert.equal(u[38], 0, 'accumulation restarted');
+  // Shutter-open eye 2 units along -x of the engine camera's; same lens axes (a pure translation).
+  assert.deepEqual([...f.subarray(124, 127)], [18, 14, 24]);
+  assert.deepEqual([f[16] - f[124], f[17] - f[125], f[18] - f[126]], [2, 0, 0]);
+  for (let k = 0; k < 4; k++) assert.ok(Math.abs(f[k * 4] - f[92 + k * 4] - 2) < 1e-4, 'corner origins moved by 2');
+  assert.throws(() => tracer.setOptions({ previousCamera: { position: [1, 2, 3], target: [1, 2, 3] } }), RangeError);
+  assert.throws(
+    () => tracer.setOptions({ previousCamera: { position: [0, 0, 0], target: [1, 0, 0], fov: 180 } }),
+    RangeError,
+  );
+  assert.throws(() => tracer.setOptions({ previousCamera: [0, 0, 0] }), TypeError);
+  tracer.setOptions({ previousCamera: null });
+  frame();
+  assert.equal(new Uint32Array(last())[42] & 256, 0, 'null removes the camera motion');
   tracer.dispose();
 });
 

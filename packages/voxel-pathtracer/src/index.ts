@@ -15,5 +15,6 @@ export type {
   VoxelTraceHit,
   VoxelTraceImage,
   VoxelTraceRenderOptions,
+  TracePreviousCamera,
   VoxelTraceScene,
 } from './types.js';

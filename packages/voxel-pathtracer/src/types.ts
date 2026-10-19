@@ -205,16 +205,35 @@ export interface VoxelPathTracerOptions {
   /** Compatible addition: rotation of the aperture polygon in radians. Default 0. */
   lensRotation?: number;
   /**
-   * Compatible addition: motion blur, 0 to 1: the share of each instance's move from `previousMatrix` to `matrix` the
-   * shutter stays open for (ending at `matrix`). Default 0 (off).
+   * Compatible addition: motion blur, 0 to 1: the share of each instance's move from `previousMatrix` to `matrix` (and
+   * of the camera's from `previousCamera` to the engine camera) the shutter stays open for, ending at the current pose.
+   * Default 0 (off).
    */
   shutter?: number;
+  /**
+   * Compatible addition: the camera pose at shutter open, for camera motion blur with `shutter` above 0; the engine
+   * camera is the pose at shutter close. Projection, near and far are the engine camera's. null or absent: no camera
+   * motion.
+   */
+  previousCamera?: TracePreviousCamera | null;
   /** Compatible addition: largest luminance one path may add (firefly clamp; biased), above 0 or Infinity. Default Infinity. */
   clamp?: number;
   /** Compatible addition: 'neutral' (Khronos PBR Neutral, Margo's display transform) or 'linear' (clipped). Default 'neutral'. */
   toneMapping?: 'neutral' | 'linear';
   /** Compatible addition: frame-graph order of the pass that draws the traced image. Default 20. */
   order?: number;
+}
+
+/** Compatible addition: a camera pose for {@link VoxelPathTracerOptions.previousCamera}. */
+export interface TracePreviousCamera {
+  /** Eye position, world units. */
+  position: TraceVec3;
+  /** Look-at point, world units; must differ from `position`. */
+  target: TraceVec3;
+  /** Screen-up direction, not parallel to the view. Default: the engine camera's `up`. */
+  up?: TraceVec3;
+  /** Vertical field of view in degrees, in (0, 180), for perspective cameras. Default: the engine camera's. */
+  fov?: number;
 }
 
 /** What {@link VoxelPathTracer.stats} reports. */

@@ -126,6 +126,10 @@ The engine camera is used as is: perspective by default, orthographic (or any af
 - **Motion blur (addition):** give an instance `previousMatrix` (shutter open) and set `shutter` (0-1, the share of the
   move from `previousMatrix` to `matrix` the shutter is open for, ending at `matrix`). Matrices are interpolated
   linearly per sample.
+- **Camera motion blur (addition):** `previousCamera` (`{position, target, up?, fov?}`, the pose at shutter open) with
+  `shutter` above 0 blurs the camera's own move toward the engine camera (shutter close), sharing the instances' time
+  per sample. Projection, near and far are the engine camera's; the corner rays and lens axes are interpolated
+  linearly, exact for translations and close for small turns.
 
 ## Options
 
@@ -142,6 +146,7 @@ The engine camera is used as is: perspective by default, orthographic (or any af
 | `denoise` | false | boolean | no |
 | `lensBlades`, `lensRotation` | 0, 0 | 0 or 3-16; radians | yes |
 | `shutter` | 0 | 0-1 | yes |
+| `previousCamera` | none | `{position, target, up?, fov?}` or null | yes |
 | `clamp` (largest luminance a path may add; biased firefly control) | Infinity | above 0 | yes |
 | `toneMapping` | `'neutral'` (Khronos PBR Neutral, Margo's display transform) | `'neutral'`, `'linear'` | no |
 | `order` (frame-graph order of the pass) | 20 | finite | no |
@@ -264,7 +269,9 @@ Numbers on other GPUs are not measured.
     1024, object edges no worse except at 64 samples (8% higher); the material scene (glass, gold, plastic, cloud)
     x2.42, x2.10, x2.19; a caustic scene (strong sun through a glass block and a low-IOR slab, a mirror panel, rough gold;
     dim sky) x2.14, x2.03, x2.04 (asserted: at least x2 and x1.6);
-  - depth of field blurs only out-of-focus edges; motion blur spreads a moving cube over its path;
+  - depth of field blurs only out-of-focus edges; motion blur spreads a moving cube over its path; camera motion of 2
+    units with the shutter open moves a 1-unit line's centroid by 0.9977 (1) and widens its profile to a standard
+    deviation of 0.6455 units (the box convolution's sqrt(5/12) = 0.6455);
   - viewport: disabled and disposed frames equal the raster frame bit for bit; a device restore redraws the same
     converged image bit for bit; resize restarts accumulation; Bloom composes with the HDR output;
   - a 1500 x 1100 denoised PNG decodes to that size; a 2048^2 x 4096-sample capture cancels within 0.32 s.
@@ -327,8 +334,8 @@ Not done or not verified, stated plainly:
   noise for bias.
 - **Simplifications:** RGB everywhere except dispersive glass, which samples one wavelength per path (no hero-wavelength
   sharing, so dispersion converges with colour noise); refracted radiance is not scaled by the squared
-  index ratio; media are homogeneous per palette index with grey extinction; the ground is a plain diffuse plane; motion blur interpolates matrices linearly (fast rotations shrink a
-  little) and moves instances only (no camera motion blur); no panoramic/fisheye projections, lens distortion or
+  index ratio; media are homogeneous per palette index with grey extinction; the ground is a plain diffuse plane; motion blur interpolates matrices and the camera's corner rays linearly (fast rotations shrink
+  a little); no panoramic/fisheye projections, lens distortion or
   chromatic aberration; no physical sky model (use an environment map); bloom comes from `@margoengine/post`.
 - **Measured only on one machine** (RTX A6000, Edge 155, Windows). Other GPUs, browsers and the editor's own scenes are
   untested.

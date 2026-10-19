@@ -18,7 +18,8 @@
 // - environment: the equirectangular map's orientation; determinism: equal seeds give identical images;
 // - convergence: error against a 4096-sample reference falls about as 1/sqrt(samples), both projections;
 // - denoise: error with and without the wavelet denoiser, overall and at object edges, also on two caustic scenes;
-// - lens: depth of field blurs out-of-focus edges only; motion blur spreads a moving cube along its path;
+// - lens: depth of field blurs out-of-focus edges only; motion blur spreads a moving cube along its path; camera motion
+//   blur widens a line's profile to the box-convolution width;
 // - viewport: disabled is bit-identical to raster, dispose restores raster, a device restore redraws the same image;
 // - capture: PNG dimensions, cancellation; `--timing` adds GPU time per frame at 1920x1080 and upload costs.
 // Results go to test-results/voxel-pathtracer-browser-check.json; `pictures` writes PNGs to test-results/voxel-pathtracer.
@@ -264,6 +265,13 @@ try {
     assert.ok(r.blurred.lit > 3 * r.still.lit, 'motion blur spreads the cube along its path');
     assert.equal(r.blurred.full, 0, 'no pixel sees the moving cube all the time');
     assert.ok(r.still.full >= r.still.lit - 4, 'without a shutter the cube is solid');
+    const c = r.camera,
+      width = Math.sqrt(5 / 12);
+    console.log(
+      `  camera motion (2 units, shutter 1): line centroid moved ${c.shift.toFixed(4)} (1), profile width ${c.width.toFixed(4)} (${width.toFixed(4)}; sharp ${c.sharpWidth.toFixed(4)})`,
+    );
+    near(c.shift, 1, 0.01, 'camera motion: centroid shift');
+    near(c.width, width, width * 0.01, 'camera motion: blur width');
   }
   if (wanted('viewport')) {
     const r = await run('viewport');

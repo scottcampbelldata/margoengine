@@ -511,8 +511,22 @@ window.check={
   const coverage=async(shutter)=>withTracer(moving,{shutter},async(t)=>{const image=await t.renderImage({width:200,height:100,samples:256}),row=50,v=[];for(let x=0;x<200;x++)v.push(lum(image.color,row*200+x));
    return {lit:v.filter((x)=>x>0.02).length,full:v.filter((x)=>x>0.98).length,max:Math.max(...v)};});
   const still=await coverage(0),blurred=await coverage(1);
+  // Camera motion blur: an emissive line 1 unit wide seen straight down (orthographic, 8 px per unit) by a camera that
+  // moves 2 units along +x while the shutter (1) is open. The profile across the line is a 1-unit box convolved with a
+  // 2-unit box: its centroid moves by 1 unit and its variance is (1^2 + 2^2) / 12.
+  const line=(dx)=>({revision:1,models:[model('line',[1,1,64],()=>1)],instances:[{id:'l',modelId:'line',matrix:translate(dx,0,-32)}],materials:[{id:1,color:[1,1,1],type:'emit',emission:1}],environment:{skyIntensity:0}});
+  look([0.5,40,0.01],[0.5,0,0],{project:ortho(8)});
+  const profile=async(scene,options)=>withTracer(scene,options,async(t)=>{
+   const W=256,H=64,img=await t.renderImage({width:W,height:H,samples:256});
+   let s=0,m=0,m2=0;for(let y=0;y<H;y++)for(let x=0;x<W;x++){const v=lum(img.color,y*W+x),c=x+0.5;s+=v;m+=v*c;m2+=v*c*c;}
+   return {mean:m/s,variance:m2/s-(m/s)**2};
+  });
+  const pc={position:[-1.5,40,0.01],target:[-1.5,0,0]};
+  const sharpLine=await profile(line(0),{}),shifted=await profile(line(1),{}),moving2=await profile(line(0),{shutter:1,previousCamera:pc});
+  const ppu=shifted.mean-sharpLine.mean;
+  const camera={pixelsPerUnit:ppu,shift:(moving2.mean-sharpLine.mean)/ppu,width:Math.sqrt(moving2.variance)/Math.abs(ppu),sharpWidth:Math.sqrt(sharpLine.variance)/Math.abs(ppu)};
   look([20,14,24],[4,3,4]);
-  return {sharp,focused,still,blurred,errors:errors.splice(0)};
+  return {sharp,focused,still,blurred,camera,errors:errors.splice(0)};
  },
  // Viewport: disabled leaves the raster frame bit for bit, enabled replaces it, dispose restores it, and a device
  // restore draws the same traced image again (fixed seed, converged).
