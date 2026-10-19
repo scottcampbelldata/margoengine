@@ -90,13 +90,19 @@ try {
   assert.deepEqual(pixel(reduced, 100), [0, 0, 255]);
   for (const x of [220, 260])
     assert.notDeepEqual(pixel(reduced, x), pixel(instanced, x), 'Instance count failed to update every group');
+  // Unlit texels reach the screen as authored. Under SSAO they stay linear in its HDR target and its composite applies
+  // the display curve (shared/display.js: Khronos PBR Neutral, then sRGB), which rolls bright texels towards white:
+  // orange 255,128,0 shows as 241,124,33 and green as 33,241,33.
+  const near = (actual, expected) => actual.every((v, i) => Math.abs(v - expected[i]) <= 2);
   for (const withSSAO of [false, true]) {
     await page.evaluate((withSSAO) => uvGroups.matcap(withSSAO), withSSAO);
     const matcap = await capture(withSSAO ? 'grouped-matcap-ssao' : 'grouped-matcap'),
       left = pixel(matcap, 80),
-      right = pixel(matcap, 240);
-    assert.ok(left[0] > 150 && left[1] > 70 && left[0] > left[1] && left[2] < 20, `Matcap texture lost: ${left}`);
-    assert.ok(right[1] > 150 && right[0] < 20 && right[2] < 20, `Grouped basic texture lost: ${right}`);
+      right = pixel(matcap, 240),
+      orange = withSSAO ? [241, 124, 33] : [255, 128, 0],
+      green = withSSAO ? [33, 241, 33] : [0, 255, 0];
+    assert.ok(near(left, orange), `Matcap texture lost: ${left}, expected ${orange}`);
+    assert.ok(near(right, green), `Grouped basic texture lost: ${right}, expected ${green}`);
   }
   const normals = {};
   for (const mode of ['zero', 'uv0', 'uv1']) {
