@@ -13,6 +13,7 @@ import type {
   TraceVec3,
   VoxelTraceScene,
 } from './types.js';
+import { cauchyB } from './spectrum.js';
 
 /** Voxels per brick edge. Bricks are the coarse traversal level. */
 const BRICK = 8;
@@ -34,8 +35,8 @@ const VOLUME = 2,
   PRESENT = 16;
 /** Roughness squared below which reflection and refraction are perfectly specular. */
 export const DELTA_ALPHA = 1e-3;
-/** Floats per packed material, 256 materials. */
-const MATERIAL_FLOATS = 16;
+/** Floats per packed material (5 vec4), 256 materials. */
+export const MATERIAL_FLOATS = 20;
 
 const TYPES: readonly TraceMaterialType[] = ['diffuse', 'plastic', 'metal', 'glass', 'emit', 'blend', 'media'];
 const where = 'VoxelPathTracer';
@@ -334,7 +335,7 @@ function voxelAt(m: PackedModel, x: number, y: number, z: number): number {
 
 const luminance = (r: number, g: number, b: number) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
-/** Packs one material (16 floats) after validating it; returns its flags. */
+/** Packs one material (MATERIAL_FLOATS floats) after validating it; returns its flags. */
 function packMaterial(m: TraceMaterial, name: string, out: Float32Array): void {
   if (!isObject(m)) throw new TypeError(`${where} ${name} must be an object {id, color, type}`);
   if (!TYPES.includes(m.type as TraceMaterialType))
@@ -351,7 +352,10 @@ function packMaterial(m: TraceMaterial, name: string, out: Float32Array): void {
     ior = optional(m.ior, 1.5, `${name}.ior`, 1, 3, 'pass 1 to 3 (glass is about 1.5)'),
     density = optional(m.density, type === 'media' ? 1 : 0, `${name}.density`, 0, 1e6, 'pass 0 or more per world unit'),
     scatter = optional(m.scatter, 0, `${name}.scatter`, 0, 1e6, 'pass 0 or more per world unit'),
-    anisotropy = optional(m.anisotropy, 0, `${name}.anisotropy`, -0.95, 0.95, 'pass -0.95 to 0.95');
+    anisotropy = optional(m.anisotropy, 0, `${name}.anisotropy`, -0.95, 0.95, 'pass -0.95 to 0.95'),
+    abbe = optional(m.abbe, 0, `${name}.abbe`, 0, 200, 'pass 0 (no dispersion) or an Abbe number of 5 to 200');
+  if (abbe > 0 && abbe < 5)
+    throw new RangeError(`${where} ${name}.abbe ${abbe} is out of range; pass 0 (no dispersion) or 5 to 200`);
   const base = m.id * MATERIAL_FLOATS,
     alpha = roughness * roughness,
     media = type === 'media',
@@ -380,6 +384,11 @@ function packMaterial(m: TraceMaterial, name: string, out: Float32Array): void {
       scatter,
       anisotropy,
       flags,
+      // Cauchy coefficient (square micrometres) of the glass lobe's dispersion.
+      pGlass > 0 ? cauchyB(ior, abbe) : 0,
+      0,
+      0,
+      0,
     ],
     base,
   );
@@ -757,7 +766,7 @@ function deflectorTable(
       const b = id * MATERIAL_FLOATS,
         flags = table[b + 15];
       if (!(flags & VOLUME)) continue; // opaque surfaces and index-matched media do not refract
-      if (!(flags & SMOOTH) || table[b + 5] < 0.999 || ior) return 0;
+      if (!(flags & SMOOTH) || table[b + 5] < 0.999 || table[b + 16] > 0 || ior) return 0;
       ior = table[b + 11];
     }
     return ior;

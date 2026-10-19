@@ -397,6 +397,25 @@ test('renderImage returns linear colour and AOVs mapped back to the caller insta
   tracer.dispose();
 });
 
+test('dispersive glass packs its Cauchy coefficient; renderImage passes a fixed wavelength; both are validated', async () => {
+  const glass = { id: 1, color: [1, 1, 1], type: 'glass', ior: 1.5, abbe: 40 },
+    { tracer, device } = await ready({ scene: simpleScene({ materials: [glass] }) });
+  // Materials: 20 floats each; float 16 is B = (n_d - 1) / (V (1 / 0.4861^2 - 1 / 0.6563^2)) in square micrometres.
+  const table = new Float32Array(device.buffers.find((b) => b.size === 256 * 80 && !b.destroyed).data);
+  assert.ok(Math.abs(table[20 + 16] - 0.5 / (40 * (1 / 0.4861 ** 2 - 1 / 0.6563 ** 2))) < 1e-7);
+  const before = device.buffers.length;
+  await tracer.renderImage({ width: 2, height: 2, samples: 1, wavelength: 550 });
+  const frame = device.buffers.slice(before).find((b) => b.size === FRAME);
+  assert.equal(new Float32Array(frame.data)[51], 550, 'the frame carries the fixed wavelength');
+  await assert.rejects(
+    async () => tracer.renderImage({ width: 2, height: 2, samples: 1, wavelength: 300 }),
+    RangeError,
+  );
+  assert.throws(() => tracer.setScene(simpleScene({ revision: 2, materials: [{ ...glass, abbe: 3 }] })), RangeError);
+  assert.throws(() => tracer.setScene(simpleScene({ revision: 2, materials: [{ ...glass, abbe: '40' }] })), TypeError);
+  tracer.dispose();
+});
+
 test('capture cancels between dispatches, releases its buffers and lets the viewport trace again', async () => {
   const { tracer, device, frame } = await ready();
   frame();

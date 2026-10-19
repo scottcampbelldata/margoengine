@@ -47,6 +47,13 @@ export interface TraceMaterial {
   scatter?: number;
   /** Compatible addition: Henyey-Greenstein anisotropy for media and interior scattering, -0.95 to 0.95. */
   anisotropy?: number;
+  /**
+   * Compatible addition: Abbe number V_d of the glass lobe, 0 (default: no dispersion) or 5 to 200. The index then
+   * follows Cauchy's law through `ior` at 587.6 nm with V_d = (n_d - 1) / (n_F - n_C) (486.1 and 656.3 nm): about 64
+   * for crown glass, 30-40 for flint, 55 for diamond, 20 for strongly dispersive glass. Light through it splits into
+   * colours (traced per wavelength, 380-780 nm); it is not light-sampled through (README, "Lighting").
+   */
+  abbe?: number;
 }
 
 /** A dense voxel model, shared by any number of instances. */
@@ -234,6 +241,11 @@ export interface VoxelTraceRenderOptions {
   aovs?: boolean;
   /** Seed for this render. Default: the tracer's `seed`. */
   seed?: number;
+  /**
+   * Trace dispersive glass at this one wavelength (nanometres, 380 to 780) with weight 1 instead of over the spectrum:
+   * a monochromatic image for checking refraction per wavelength. Default: the whole spectrum.
+   */
+  wavelength?: number;
 }
 
 /** Compatible addition: a rendered linear image from {@link VoxelPathTracer.renderImage}. */

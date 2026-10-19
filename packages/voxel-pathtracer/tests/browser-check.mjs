@@ -11,6 +11,8 @@
 // - microfacet: the GGX plastic coat's albedo against numerical integration of the same model;
 // - glasslight: sunlight through glass slabs and off a mirror wall against closed forms (point and disk sun), and light
 //   sampling through a floating glass cube against path sampling of the same light;
+// - dispersion: a line's shift through a tilted slab per wavelength against Snell with Cauchy's index; colour order over
+//   the spectrum; a dispersive white furnace per channel;
 // - environment: the equirectangular map's orientation; determinism: equal seeds give identical images;
 // - convergence: error against a 4096-sample reference falls about as 1/sqrt(samples), both projections;
 // - denoise: error with and without the wavelet denoiser, overall and at object edges, also on two caustic scenes;
@@ -116,6 +118,28 @@ try {
       assert.ok(s.pixels > 300, `${name}: the floor fills the view`);
       near(s.mean, s.expected, s.expected * 0.01, name);
     }
+  }
+  if (wanted('dispersion')) {
+    const r = await run('dispersion');
+    console.log(`  line at ${r.calibration.line.toFixed(3)} px, ${r.calibration.pixelsPerUnit.toFixed(3)} px per unit`);
+    for (const [name, s] of Object.entries(r)) {
+      if (!name.startsWith('abbe')) continue;
+      console.log(
+        `  ${name}: slab shift ${s.measured.toFixed(4)} expected ${s.expected.toFixed(4)} (n ${s.n.toFixed(4)}, Snell)`,
+      );
+      near(s.measured, s.expected, 0.005, name);
+    }
+    const spread = r['abbe 20 450 nm'].measured - r['abbe 20 650 nm'].measured,
+      expected = r['abbe 20 450 nm'].expected - r['abbe 20 650 nm'].expected;
+    console.log(`  450 - 650 nm: ${spread.toFixed(4)} expected ${expected.toFixed(4)}`);
+    near(spread, expected, expected * 0.02, 'dispersion between 450 and 650 nm');
+    const { red, green, blue } = r.spectrum;
+    console.log(
+      `  whole spectrum, per channel: red ${red.toFixed(4)} green ${green.toFixed(4)} blue ${blue.toFixed(4)}`,
+    );
+    assert.ok(red < green && green < blue, 'blue refracts more than red');
+    console.log(`  white furnace: ${r.furnace.mean.map((v) => v.toFixed(4)).join(' ')} (${r.furnace.pixels} px)`);
+    for (const v of r.furnace.mean) near(v, 1, 0.01, 'dispersive glass white furnace');
   }
   if (wanted('microfacet')) {
     const r = await run('microfacet');

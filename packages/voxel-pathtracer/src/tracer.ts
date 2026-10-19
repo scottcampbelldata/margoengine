@@ -37,9 +37,11 @@ import {
   type PackedEnvironment,
   type PackedModel,
   type SceneCache,
+  MATERIAL_FLOATS,
   type SceneSnapshot,
 } from './scene.js';
 import { DENOISE, DISPLAY, TABLE_VEC4, TABLES, TRACE } from './shaders.js';
+import { LAMBDA_MAX, LAMBDA_MIN } from './spectrum.js';
 import { raycastSnapshot } from './traverse.js';
 import type {
   TraceVec3,
@@ -699,7 +701,7 @@ export class VoxelPathTracer implements EnginePlugin {
     gpu.buffers = {
       materials: this.#buffer(
         gpu,
-        256 * 64,
+        256 * MATERIAL_FLOATS * 4,
         GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
       ),
       voxels: this.#buffer(gpu, 16, storage),
@@ -950,6 +952,7 @@ export class VoxelPathTracer implements EnginePlugin {
     split: boolean,
     layout: { scene: SceneLayout; lights: LightLayout },
     s: SceneSnapshot,
+    wavelength = 0,
   ): boolean {
     const o = this.#settings,
       f = new Float32Array(this.#frame),
@@ -1012,6 +1015,7 @@ export class VoxelPathTracer implements EnginePlugin {
       ll = layout.lights;
     u.set([sl.modelBase, sl.instanceBase, sl.nodeBase, s.instances.length ? sl.nodeCount : 0], 44);
     u.set([s.emissiveInstances.length, ll.emissiveBase, ll.areaBase, 0], 48);
+    f[51] = wavelength; // fixed wavelength of dispersive glass, 0 to sample the spectrum
     u.set([env?.width ?? 0, env?.height ?? 0, ll.marginalBase, ll.conditionalBase], 52);
     f.set([e.sky[0], e.sky[1], e.sky[2], env?.intensity ?? 0], 56);
     const half = e.sunAngularSize / 2,
@@ -1222,6 +1226,7 @@ export class VoxelPathTracer implements EnginePlugin {
     denoise: boolean;
     jitter: boolean;
     seed: number;
+    wavelength: number;
     signal?: AbortSignal;
   } {
     this.#alive();
@@ -1235,11 +1240,15 @@ export class VoxelPathTracer implements EnginePlugin {
     const r = options as VoxelTraceRenderOptions,
       denoise = r.denoise === undefined ? this.#settings.denoise : flag(r.denoise, 'denoise'),
       jitter = r.jitter === undefined ? true : flag(r.jitter, 'jitter'),
-      seed = r.seed === undefined ? this.#settings.seed : whole(r.seed, 'seed', 0, 0xffffffff, 'pass an integer seed');
+      seed = r.seed === undefined ? this.#settings.seed : whole(r.seed, 'seed', 0, 0xffffffff, 'pass an integer seed'),
+      wavelength =
+        r.wavelength === undefined
+          ? 0
+          : checkNumber(r.wavelength, 'wavelength', LAMBDA_MIN, LAMBDA_MAX, 'pass nanometres, 380 to 780');
     if (r.signal !== undefined && !(r.signal instanceof AbortSignal))
       throw new TypeError('VoxelPathTracer signal must be an AbortSignal');
     aborted(r.signal);
-    return { width, height, samples, denoise, jitter, seed, signal: r.signal };
+    return { width, height, samples, denoise, jitter, seed, wavelength, signal: r.signal };
   }
 
   // Renders tiles band by band and hands each band (rows y0..y0+rows) to `consume`.
@@ -1251,6 +1260,7 @@ export class VoxelPathTracer implements EnginePlugin {
       denoise: boolean;
       jitter: boolean;
       seed: number;
+      wavelength: number;
       signal?: AbortSignal;
     },
     aovs: boolean,
@@ -1359,6 +1369,7 @@ export class VoxelPathTracer implements EnginePlugin {
               o.denoise,
               layout,
               snapshot,
+              o.wavelength,
             );
             const e = device.createCommandEncoder(),
               pass = e.beginComputePass();

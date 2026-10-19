@@ -58,6 +58,7 @@ export interface TraceMaterial {
     specular?: number;
     scatter?: number;
     anisotropy?: number;
+    abbe?: number;
 }
 
 export type TraceMaterialType = 'diffuse' | 'plastic' | 'metal' | 'glass' | 'emit' | 'blend' | 'media';
@@ -166,6 +167,7 @@ export interface VoxelTraceRenderOptions {
     jitter?: boolean;
     aovs?: boolean;
     seed?: number;
+    wavelength?: number;
 }
 
 export interface VoxelTraceScene {

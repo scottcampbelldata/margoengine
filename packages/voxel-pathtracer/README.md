@@ -83,6 +83,11 @@ except `id`, `color` and `type` are optional.
   (`color^(density * distance)`); `scatter` (addition) adds interior scattering per world unit, a random-walk subsurface
   look; `anisotropy` shapes that scattering. Adjacent voxels of the same glass index form one volume (no inner faces).
   A face of another model that coincides with a glass face (glass resting on a floor) is hit, not skipped.
+- Dispersion (addition): `abbe` (Abbe number V_d, 5-200; 0 or absent is none) makes the glass index depend on the
+  wavelength by Cauchy's law through `ior` at 587.6 nm, so light splits into colours: about 64 for crown glass, 30-40
+  for flint, 20 for a strong effect. A path takes one wavelength (380-780 nm) at its first dispersive glass and carries
+  its RGB weight from then on; a white furnace stays white. Dispersive glass adds colour noise and is not light
+  sampled through.
 - Media voxels of one index form one volume; light entering it is attenuated and scattered, and next-event estimation
   works from inside it (shadow rays are attenuated through media, blocked by anything else).
 
@@ -169,7 +174,8 @@ by floating-point rounding, which changes individual paths, not the converged im
   its whole raw image. Up to 16384 per side and 67,108,864 pixels.
 - `renderImage(options)` (addition) returns the linear float image (3 floats per pixel), and with `aovs: true` the
   first-hit albedo, normal, distance and the instance (index into `scene.instances`) and palette index under each
-  pixel centre. `jitter: false` traces pixel centres only. Up to 16,777,216 pixels.
+  pixel centre. `jitter: false` traces pixel centres only; `wavelength` (380-780 nm) traces dispersive glass at that one
+  wavelength with weight 1 (a monochromatic check). Up to 16,777,216 pixels.
 - Both reject with the signal's reason when aborted (checked between GPU submissions, at most 4 in flight), with
   `MargoError` `failed` when the device is lost, with `MargoError` `disposed` when the tracer is disposed meanwhile, and
   with `TypeError`/`RangeError` for invalid options. Jobs run one at a time in call order.
@@ -228,6 +234,11 @@ Numbers on other GPUs are not measured.
     worst 0.68%); a gold plane within 0.14% per channel of single scattering plus Kulla-Conty's Fresnel-weighted
     multiple scattering, both integrated numerically in the page;
   - the GGX plastic coat's albedo at 20, 60 and 80 degrees within 0.0002 of a numerical integration of the same model;
+  - dispersion: an emissive line seen through a 12-unit glass slab tilted 0.6 rad (orthographic, 32 px per unit)
+    shifts by Snell's lateral offset at each wavelength, from Cauchy's index with V_d 20: 450 nm 2.8351 (expected
+    2.8333), 550 nm 2.7700 (2.7682), 650 nm 2.7315 (2.7298), no dispersion 2.7533 (2.7516); the 450-650 nm spread
+    0.1036 (0.1035); over the whole spectrum blue lands furthest and red least; a dispersive glass cube in a white
+    furnace stays white per channel (1.0025, 0.9993, 0.9968);
   - light through glass and off mirrors: a glass slab's shadow at 0 and 40 degrees within 0.38% of
     `cos * T / (1 - albedo * rd)` (transmission with internal reflections, floor-slab interreflection), also for a
     point sun (only light sampling reaches it); the floor under glass resting on it within 0.83% of the refracted
@@ -264,6 +275,11 @@ Numbers on other GPUs are not measured.
   the GPU with the tracer's own sampling code and a low-discrepancy R2/R3 sequence (Roberts 2018).
 - Homogeneous media by free-flight sampling with Beer-Lambert absorption as a path weight, Henyey-Greenstein phase.
 - Environment maps importance sampled by marginal and conditional CDFs (PBRT).
+- Dispersion: one wavelength per path, sampled from a mix of a uniform and a logistic density, weighted by its colour
+  matching weight over that density. The weights come from Wyman, Sloan and Shirley's analytic fit of the CIE 1931
+  2-degree observer ("Simple Analytic Approximations to the CIE XYZ Color Matching Functions", 2013) through the sRGB
+  matrix (IEC 61966-2-1), normalised per channel so an equal-energy spectrum is white; Cauchy's index from the Abbe
+  number.
 - Random numbers: PCG (O'Neill 2014) with Jarzynski and Olano's hash (2020); thin lens by Shirley and Chiu's concentric
   disk mapping; orthonormal bases by Duff et al. (2017).
 - Light through smooth glass and off mirrors: deterministic refraction and reflection of shadow rays at planar voxel
@@ -296,7 +312,8 @@ Not done or not verified, stated plainly:
 - **Caustics:** light turned more than once by glass (or by glass and a mirror), glossy reflections of a small sun and
   glass beyond the 8 light-sampled instances are found by path sampling only and converge slowly; `clamp` trades that
   noise for bias.
-- **Simplifications:** RGB only (no dispersion or spectral effects); refracted radiance is not scaled by the squared
+- **Simplifications:** RGB everywhere except dispersive glass, which samples one wavelength per path (no hero-wavelength
+  sharing, so dispersion converges with colour noise); refracted radiance is not scaled by the squared
   index ratio; media are homogeneous per palette index with grey extinction and do not emit; area lights do not block
   shadow rays; the ground is a plain diffuse plane; motion blur interpolates matrices linearly (fast rotations shrink a
   little) and moves instances only (no camera motion blur); no panoramic/fisheye projections, lens distortion or

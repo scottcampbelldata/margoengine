@@ -22,12 +22,15 @@
 //   planar special case of specular next-event estimation, cf. Hanika et al. 2015, "Manifold Next Event Estimation");
 // - volumes: homogeneous media by free-flight sampling with Beer-Lambert absorption as a weight, Henyey-Greenstein
 //   phase function; environment maps importance sampled by marginal and conditional CDFs (PBRT);
+// - dispersion: a path takes one wavelength at its first dispersive glass (sampled, weighted by its linear sRGB colour
+//   matching weight over its density; spectrum.ts), Cauchy's index from the Abbe number;
 // - random numbers: PCG (O'Neill 2014) with the hash of Jarzynski and Olano (2020);
 // - denoising: the edge-avoiding a-trous wavelet filter (Dammertz et al. 2010) with variance-guided luminance weights
 //   (Schied et al. 2017, "Spatiotemporal Variance-Guided Filtering"), on albedo-demodulated radiance.
 // Material flags and record sizes must match scene.ts and layout.ts.
 import { displayShader } from '../../shared/display.js';
-import { DELTA_ALPHA, EMISSIVE, MEDIA, SMOOTH } from './scene.js';
+import { DELTA_ALPHA, EMISSIVE, MATERIAL_FLOATS, MEDIA, SMOOTH } from './scene.js';
+import { SPECTRUM } from './spectrum.js';
 import {
   FLAG_CLAMP,
   FLAG_ENV,
@@ -159,7 +162,7 @@ fn albedoGlass(mu:f32,r:f32,eta:f32)->f32 {
 `;
 
 /** The path tracer: entry points `trace` (accumulate samples) and `ids` (pixel-centre instance and palette ids). */
-export const TRACE: string = /* wgsl */ `${FRAME}${COMMON}
+export const TRACE: string = /* wgsl */ `${FRAME}${COMMON}${SPECTRUM}
 const INF=3.0e38;
 const NONE=0xffffffffu;
 const GROUND=0xfffffffeu;
@@ -179,7 +182,8 @@ const SPLIT=${FLAG_SPLIT}u;
 const MODEL=${MODEL_WORDS}u;
 const INSTANCE=${INSTANCE_WORDS}u;
 @group(0) @binding(0) var<uniform> f:Frame;
-@group(0) @binding(1) var<uniform> materials:array<vec4f,1024>;
+const MV=${MATERIAL_FLOATS / 4}u;
+@group(0) @binding(1) var<uniform> materials:array<vec4f,${(256 * MATERIAL_FLOATS) / 4}>;
 @group(0) @binding(2) var<storage,read> voxels:array<u32>;
 @group(0) @binding(3) var<storage,read> scene:array<u32>;
 @group(0) @binding(4) var<storage,read> lights:array<u32>;
@@ -292,7 +296,7 @@ fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit
  return found(h,boxExit,0u,ex,stp,d,vec3i(floor(o+d*boxExit)));
 }
 // Extinction of a see-through cell for shadow rays, -1 when the cell blocks light (only media let it through).
-fn extinction(v:u32)->f32 {let x=materials[v*4u+3u];return select(-1.0,x.x,(u32(x.w)&MEDIA)!=0u);}
+fn extinction(v:u32)->f32 {let x=materials[v*MV+3u];return select(-1.0,x.x,(u32(x.w)&MEDIA)!=0u);}
 // Optical depth along a shadow ray through one model, -1 when blocked.
 fn marchShadow(model:u32,o:vec3f,d:vec3f,tMax:f32)->f32 {
  let mb=f.scene.x+model*MODEL;
@@ -471,10 +475,23 @@ fn cameraRay(px:vec2f)->Ray {
 }
 
 // Materials: 4 vec4 per palette index (scene.ts packMaterial).
-struct Mat {color:vec3f,alpha:f32,metal:f32,glass:f32,spec:f32,f0:f32,emission:vec3f,ior:f32,density:f32,scatter:f32,g:f32,flags:u32}
+// disp: Cauchy coefficient B (square micrometres; 0 without dispersion), ior the index at the d line.
+struct Mat {color:vec3f,alpha:f32,metal:f32,glass:f32,spec:f32,f0:f32,emission:vec3f,ior:f32,density:f32,scatter:f32,g:f32,flags:u32,disp:f32}
 fn material(id:u32)->Mat {
- let a=materials[id*4u];let b=materials[id*4u+1u];let c=materials[id*4u+2u];let e=materials[id*4u+3u];
- return Mat(a.xyz,a.w,b.x,b.y,b.z,b.w,c.xyz,c.w,e.x,e.y,e.z,u32(e.w));
+ let a=materials[id*MV];let b=materials[id*MV+1u];let c=materials[id*MV+2u];let e=materials[id*MV+3u];
+ let x=materials[id*MV+4u];
+ return Mat(a.xyz,a.w,b.x,b.y,b.z,b.w,c.xyz,c.w,e.x,e.y,e.z,u32(e.w),x.x);
+}
+// Index of a dispersive material at wavelength l (nanometres).
+fn iorAt(m:Mat,l:f32)->f32 {let x=l*0.001;return m.ior+m.disp*(1.0/(x*x)-1.0/(LAMBDA_D*LAMBDA_D));}
+// Smooth glass without dispersion: what light sampling refracts through.
+fn clearGlass(m:Mat)->bool {return (m.flags&SMOOTH)!=0u&&m.disp==0.0;}
+// The path's wavelength, taken at its first dispersive interface (or fixed by the frame): the throughput is weighted
+// by that wavelength's RGB weight over its density.
+fn collapse(lambda:ptr<function,f32>,thr:ptr<function,vec3f>) {
+ if(*lambda>0.0){return;}
+ let w=sampleLambda(vec2f(rand(),rand()));
+ *thr*=spectralRgb(w.x)/w.y;*lambda=w.x;
 }
 fn groundMat()->Mat {var m:Mat;m.color=f.ground.xyz;m.alpha=1.0;m.ior=1.5;return m;}
 fn schlick3(f0:vec3f,c:f32)->vec3f {return f0+(1.0-f0)*pow(1.0-clamp(c,0.0,1.0),5.0);}
@@ -727,7 +744,7 @@ fn throughGlass(start:vec3f,dir:vec3f,medium0:u32,mInst0:u32)->Through {
   if(h.value==0u){
    let ma=material(medium);
    if((ma.flags&MEDIA)!=0u){medium=0u;mInst=NONE;o=p-off;continue;}
-   if((ma.flags&SMOOTH)==0u){break;}
+   if(!clearGlass(ma)){break;}
    let fr=fresnel(ci,ma.ior);
    if(fr>=1.0){
     // Total internal reflection: part of the chain in light-sampled instances only (as on the path side).
@@ -744,7 +761,7 @@ fn throughGlass(start:vec3f,dir:vec3f,medium0:u32,mInst0:u32)->Through {
    if(inGlass){break;}
    if((mb.flags&MEDIA)!=0u){medium=h.value;mInst=h.inst;o=p-off;continue;}
    if(isMirror(mb)&&mirrorAt(h.inst)){r.t*=schlick3(mb.color,ci);r.n++;r.g=h.inst;d=reflect(d,n);o=p+off;continue;}
-   if(mb.glass<0.999||(mb.flags&SMOOTH)==0u){break;}
+   if(mb.glass<0.999||!clearGlass(mb)){break;}
    let eta=1.0/mb.ior;
    let fr=fresnel(ci,eta);
    let dt=refract(d,n,eta);
@@ -804,7 +821,7 @@ fn distant(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,medium:u32,mInst:u32,s:vec3f,
  // the shadow walk is compiled once).
  let inGlass=medium!=0u&&(material(medium).flags&MEDIA)==0u;
  var ior=1.0;
- if(inGlass){let mm=material(medium);if((mm.flags&SMOOTH)==0u){return L;}ior=mm.ior;}
+ if(inGlass){let mm=material(medium);if(!clearGlass(mm)){return L;}ior=mm.ior;}
  let gb=lights[0];
  let groups=select(1u+lights[1],1u,inGlass);
  for(var g=0u;g<groups;g++){
@@ -945,6 +962,8 @@ fn radiance(px:vec2u)->Path {
  // most one, by a light-sampled instance, and none when the vertex is inside glass).
  var sunPdf=0.0;var jChain=1.0;var chainOk=false;var chainSet=false;
  var glassStart=false;var deflections=0u;var deflectOk=true;var entryDir=vec3f(0.0);
+ // Wavelength of the path (nanometres) once dispersive glass has been met, or fixed for the whole frame.
+ var lambda=bitcast<f32>(f.lights.w);
  res.albedo=vec3f(1.0);res.normal=-d;res.primary=1.0;
  let limit=f.config.x*4u+16u;
  for(var it=0u;it<limit;it++){
@@ -991,17 +1010,18 @@ fn radiance(px:vec2u)->Path {
     off=h.sgn*EPS*colOf(worldX(h.inst),h.axis);
     if(h.value==0u){
      // Leaving a volume into empty space: media end without a surface, glass refracts out or reflects back in.
-     let mm=material(medium);
+     var mm=material(medium);
      if((mm.flags&MEDIA)!=0u){medium=0u;mInst=NONE;o=p-off;continue;}
+     if(mm.disp>0.0){collapse(&lambda,&thr);mm.ior=iorAt(mm,lambda);}
      let sm=(mm.flags&SMOOTH)!=0u;
      let s=dielectric(mm.alpha,n,-d,mm.ior,sm);
      if(!s.ok){break;}
      focused=focused||diffuse;
-     if(s.transmit&&sm){
+     if(s.transmit&&clearGlass(mm)){
       jChain*=abs(dot(n,s.wi))/(mm.ior*mm.ior*dot(n,-d));
       if(!chainSet){chainSet=true;}
       else if(!same(s.wi,entryDir)){deflections++;deflectOk=deflectOk&&prismAt(mInst);}
-     } else if(!(sm&&prismAt(mInst)&&fresnel(dot(n,-d),mm.ior)>=1.0)){chainOk=false;}
+     } else if(!(clearGlass(mm)&&prismAt(mInst)&&fresnel(dot(n,-d),mm.ior)>=1.0)){chainOk=false;}
      thr*=s.w;
      if(s.transmit){medium=0u;mInst=NONE;o=p-off;}else{o=p+off;}
      d=s.wi;lastPdf=0.0;
@@ -1040,15 +1060,17 @@ fn radiance(px:vec2u)->Path {
   }
   let inAir=medium==0u||(material(medium).flags&MEDIA)!=0u;
   let wo=-d;
-  let etaI=select(material(medium).ior,1.0,inAir);
+  var etaI=1.0;
+  if(!inAir){var mi=material(medium);if(mi.disp>0.0){collapse(&lambda,&thr);mi.ior=iorAt(mi,lambda);}etaI=mi.ior;}
+  if(m.disp>0.0&&m.glass>0.0){collapse(&lambda,&thr);m.ior=iorAt(m,lambda);}
   let s=sampleSurface(m,n,wo,etaI);
   if(!s.ok){break;}
   if(s.lobe<=1u){
    // A new chain starts here; light sampling of distant lights ran unless the vertex is inside rough glass.
-   let roughGlass=!inAir&&(material(medium).flags&SMOOTH)==0u;
+   let roughGlass=!inAir&&!clearGlass(material(medium));
    sunPdf=select(s.pdf,0.0,roughGlass);jChain=1.0;chainOk=true;chainSet=inAir;
    glassStart=!inAir;deflections=0u;deflectOk=true;
-  } else if(s.lobe==3u&&s.transmit&&(m.flags&SMOOTH)!=0u&&m.glass>=0.999&&inAir){
+  } else if(s.lobe==3u&&s.transmit&&clearGlass(m)&&m.glass>=0.999&&inAir){
    // Into pure smooth glass from air or media (light sampling does not refract glass into glass or mixed voxels).
    jChain*=abs(dot(n,s.wi))*m.ior*m.ior/dot(n,wo);
    entryDir=d;
@@ -1070,7 +1092,8 @@ fn radiance(px:vec2u)->Path {
  }
  res.color=L;res.caustic=C;
  if((f.config.z&CLAMP)!=0u){let l=lum(res.color);if(l>f.weights.w){res.color*=f.weights.w/l;res.caustic*=f.weights.w/l;}}
- if(!all((res.color>=vec3f(0.0))&(res.color<vec3f(1e30)))){res.color=vec3f(0.0);res.caustic=vec3f(0.0);}
+ // Finite values only (dispersive paths may carry negative channel weights; their mean is right).
+ if(!all(abs(res.color)<vec3f(1e30))||!all(abs(res.caustic)<vec3f(1e30))){res.color=vec3f(0.0);res.caustic=vec3f(0.0);}
  return res;
 }
 
