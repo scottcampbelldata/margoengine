@@ -21,6 +21,11 @@ export interface GeometryData {
   colors?: ArrayLike<number>;
   /** Triangle list. Omit for non-indexed triangles. */
   indices?: ArrayLike<number>;
+  /**
+   * Corners per face in index order: 3 for one triangle, 4 for the next two triangles forming a quad (sharing an
+   * edge, as (a, b, c) and (a, c, d)). OBJ and DAE write those quads as 4-corner faces; other formats write triangles.
+   */
+  faceSizes?: ArrayLike<number>;
   /** Four joint indices and weights per vertex, required together. */
   joints?: ArrayLike<number>;
   weights?: ArrayLike<number>;
@@ -172,6 +177,7 @@ export interface Geo {
   colorSize: 3 | 4;
   indices: Uint32Array;
   count: number;
+  faceSizes?: Uint8Array;
   joints?: Uint16Array;
   weights?: Float32Array;
   morphs?: { name?: string; positions: Float32Array; normals?: Float32Array; tangents?: Float32Array }[];
@@ -305,6 +311,21 @@ export function normalizeGeometry(data: Geometry | GeometryData): Geo {
     normals.set(fl > 1e-12 ? [fx / fl, fy / fl, fz / fl] : [0, 0, 1], i * 3);
   }
   const geo: Geo = { positions, normals, indices, count, colorSize: 4 };
+  if (data.faceSizes !== undefined) {
+    const sizes = data.faceSizes;
+    if (!isObject(sizes) || typeof sizes.length !== 'number') fail('faceSizes must be an array of 3s and 4s');
+    let at = 0;
+    for (let f = 0; f < sizes.length; f++) {
+      if (sizes[f] !== 3 && sizes[f] !== 4) throw new RangeError('faceSizes values must be 3 or 4');
+      at += sizes[f] === 4 ? 6 : 3;
+      if (at > indices.length) break;
+      if (sizes[f] === 4 && !quad(indices, at - 6))
+        throw new RangeError(`faceSizes[${f}] is 4 but its two triangles share no edge; write them as two 3s`);
+    }
+    if (at !== indices.length)
+      throw new RangeError('faceSizes must cover every triangle once: a 3 per triangle, a 4 per triangle pair');
+    geo.faceSizes = Uint8Array.from(sizes);
+  }
   if (data.uvs !== undefined) geo.uvs = floats(data.uvs, count * 2, 'UVs');
   if (data.uvs1 !== undefined) geo.uvs1 = floats(data.uvs1, count * 2, 'UVs 1');
   if (data.tangents !== undefined) {
@@ -820,6 +841,60 @@ export function collect(source: ExportSource, options: SceneOptions = {}): Node[
   return (source as ExportScene).nodes
     .map((node) => visit(node, null, 0))
     .filter((node): node is Node => node !== null);
+}
+
+/** Corners [a, b, c, d] of the quad split as (a, b, c) and (a, c, d) at `at`, in any rotation, else null. */
+function quad(indices: ArrayLike<number>, at: number): number[] | null {
+  for (let k = 0; k < 3; k++) {
+    const a = indices[at + k],
+      b = indices[at + ((k + 1) % 3)],
+      c = indices[at + ((k + 2) % 3)];
+    for (let j = 0; j < 3; j++) {
+      const d = indices[at + 3 + ((j + 2) % 3)];
+      if (indices[at + 3 + j] === a && indices[at + 3 + ((j + 1) % 3)] === c && d !== a && d !== b && d !== c)
+        return [a, b, c, d];
+    }
+  }
+  return null;
+}
+
+/** @internal Faces in index order: triangles, and quads where `faceSizes` marks them (validated by normalizeGeometry). */
+export function polygons(faceSizes: Uint8Array | undefined, indices: Uint32Array): number[][] {
+  const out: number[][] = [];
+  for (let f = 0, at = 0; at < indices.length; f++)
+    if (faceSizes?.[f] === 4) {
+      out.push(quad(indices, at)!);
+      at += 6;
+    } else {
+      out.push([indices[at], indices[at + 1], indices[at + 2]]);
+      at += 3;
+    }
+  return out;
+}
+
+/** @internal Names each texture image's file once, `${prefix}${name}.png` or `.jpg`, and collects name -> bytes. */
+export function textureFiles(prefix: unknown): { files: Map<string, Uint8Array>; name(texture: TextureData): string } {
+  if (typeof prefix !== 'string' || !/^[\w./-]*$/.test(prefix))
+    throw new TypeError('texturePrefix may hold only letters, digits, _ . - and /');
+  const files = new Map<string, Uint8Array>(),
+    names = new Map<Uint8Array, string>();
+  return {
+    files,
+    name(texture) {
+      let name = names.get(texture.image);
+      if (name === undefined) {
+        const base =
+            prefix +
+            ((texture.name ?? '').replace(/\.(png|jpe?g)$/i, '').replace(/[^\w.-]+/g, '_') || `texture_${names.size}`),
+          ext = texture.mimeType === 'image/png' ? '.png' : '.jpg';
+        name = base + ext;
+        for (let n = 2; files.has(name); n++) name = `${base}_${n}${ext}`;
+        names.set(texture.image, name);
+        files.set(name, texture.image);
+      }
+      return name;
+    },
+  };
 }
 
 /** @internal A drawable with its world transform, in depth-first order. */

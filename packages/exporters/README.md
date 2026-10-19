@@ -62,7 +62,7 @@ Engine export entrypoints also bake back-only optional PBR triangles by reversin
 - **Deduplication.** One `Geometry` (or geometry data object) is written once: POSITION (with exact Float32 `min`/`max`), NORMAL, optional TANGENT, TEXCOORD_0 and COLOR_0, and indices. One glTF mesh is written per geometry and material pair, and one glTF material per `PbrMaterial`. Images are deduplicated by byte array.
 - **Materials.** `PbrMaterial.data` maps to `pbrMetallicRoughness`: `baseColorFactor` is already linear, then `roughnessFactor`, `metallicFactor` and `doubleSided`. Material data adds emission, alpha mode and base color, metallic-roughness and normal textures.
 - **Binary layout.** Each bufferView starts on a 4-byte boundary, the buffer length is a multiple of 4, GLB JSON is padded with spaces and BIN with zeros. Indices are 16-bit up to 65535 vertices (65535 itself is the restart value) and 32-bit above. Normals and tangents are normalized and tangent `w` is forced to +1 or -1, as the validator requires.
-- **STL, OBJ, PLY** write world-space data. STL uses face normals from the transformed triangle. OBJ writes one `g` group per mesh, `v`/`vt`/`vn` and 1-based `f v/vt/vn` faces, with `vt` flipped to OBJ's v-up. The MTL has `Kd` and `Ke` in sRGB plus `Pr`, `Pm` and `d`. PLY merges all meshes into one vertex and face list, with optional 8-bit sRGB colors from vertex colors or the material.
+- **STL, OBJ, PLY** write world-space data. STL uses face normals from the transformed triangle. OBJ writes one `g` group (or `o` object) per mesh, `v`/`vt`/`vn` and 1-based `f v/vt/vn` faces, with `vt` flipped to OBJ's v-up. The MTL has `Kd` and `Ke` in sRGB plus `Pr`, `Pm`, `d` and optional `map_Kd`/`map_d`. PLY merges all meshes into one vertex and face list, with optional 8-bit sRGB colors from vertex colors or the material.
 - **Tree-shaking and SSR.** Each format is its own module and `sideEffects` is false, so importing only `exportSTL` leaves out the glTF writer. Nothing touches `window`, `document`, `navigator` or GPU globals, and base64 is done without `btoa` or `Buffer`.
 
 ## Options
@@ -81,8 +81,13 @@ Engine export entrypoints also bake back-only optional PBR triangles by reversin
 | `name` | STL | ASCII `solid` name, or the 80-byte binary header (must not start with `solid`) |
 | `materials`, `mtlName` | OBJ | `false`, `'scene.mtl'` |
 | `colors` | OBJ, PLY | `false`. OBJ appends sRGB vertex colors to `v` lines; PLY writes uchar `red green blue` |
+| `colorSpace` | OBJ | `'srgb'`. `'linear'` writes the vertex colors unconverted |
+| `textures`, `texturePrefix` | OBJ | `false`, `''`. With `materials`, writes `map_Kd` (plus `map_d` for MASK/BLEND) and returns the images in `textures` |
+| `groups` | OBJ | `true`, one `g` per mesh; `false` writes `o` objects |
+| `mergeVertices` | OBJ | `false`. Welds a mesh's corners whose position, uv, normal and written color agree within 1e-5 |
+| `scale` | OBJ | `1`. Multiplies every position |
 
-`GeometryData` is `{positions, normals, uvs?, tangents?, colors?, indices?, joints?, weights?, morphs?}` with xyz, xyz, uv, xyzw and linear rgb or rgba per vertex. Inputs are validated: finite Float32 values, matching lengths, complete triangles, indices in range, colors in [0, 1], nonzero scales and quaternions, PNG or JPEG bytes that match `mimeType`, and textured materials only on geometry with UVs.
+`GeometryData` is `{positions, normals, uvs?, tangents?, colors?, indices?, faceSizes?, joints?, weights?, morphs?}` with xyz, xyz, uv, xyzw and linear rgb or rgba per vertex. `faceSizes` lists corners per face in index order: 3 for a triangle, 4 for the next two triangles when they form a quad (sharing an edge, as (a, b, c), (a, c, d)); OBJ and DAE write those quads as 4-corner faces, the other formats write the triangles. Inputs are validated: finite Float32 values, matching lengths, complete triangles, indices in range, colors in [0, 1], nonzero scales and quaternions, PNG or JPEG bytes that match `mimeType`, and textured materials only on geometry with UVs.
 
 ## Data-scene skin, morph and animation export
 
@@ -106,6 +111,21 @@ const glb = exportGLB({nodes: [mesh, joint], animations: [{name: 'Move', channel
 ```
 
 Load these GLBs with `@margoengine/gltf-pro` and attach `@margoengine/animation` for skinning, morphs and clip playback. Other export formats continue to write the static base geometry.
+
+## OBJ textures and quads
+
+```ts
+const {obj, mtl, textures} = exportOBJ(scene, {
+  materials: true, mtlName: 'level.mtl', textures: true, texturePrefix: 'textures/',
+  colors: true, colorSpace: 'linear', mergeVertices: true, groups: false, scale: 16,
+});
+for (const [path, bytes] of textures) save(path, bytes); // e.g. 'textures/tileset.png', relative to the OBJ
+```
+
+Texture files are named from `TextureData.name` (unsafe characters become `_`, a trailing `.png`/`.jpg` is dropped)
+or `texture_<n>`, with `.png` or `.jpg` from the `mimeType`; one image's bytes become one file, and a name already
+taken gets `_2`, `_3`. The files are the `TextureData` bytes as given. `texturePrefix` may hold letters, digits,
+`_ . - /`.
 
 ## Data-scene samplers, unlit materials, cameras and lights
 
@@ -133,8 +153,8 @@ The engine/data-scene `exportGLTF` and `exportGLB` entrypoints write cameras, li
 from data-scene nodes and materials, and no instancing or other KHR material extensions; use `exportModel` for loaded
 glTF-pro camera/light attachments and PBR metadata. Export does not produce Draco or meshopt compression, sparse
 accessors or interleaved buffers. Engine/data-scene skins support four influences per vertex. `exportGLTF` puts images
-in the buffer rather than separate image files. OBJ and PLY write `vn`/normals per vertex rather than deduplicating
-them. Node names are not made unique. The existing `@margoengine/gltf` loader accepts what these exporters write from
+in the buffer rather than separate image files. PLY writes every vertex as given; OBJ welds only whole
+corners (`mergeVertices`), never `v`, `vt` and `vn` separately. Node names are not made unique. The existing `@margoengine/gltf` loader accepts what these exporters write from
 an engine, but data-scene exports with deformation, vertex colors or textures need the optional packages described above.
 
 ## Tests
