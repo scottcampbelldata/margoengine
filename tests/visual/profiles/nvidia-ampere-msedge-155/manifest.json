@@ -1429,16 +1429,198 @@
     "renderedInputsDirty": false,
     "renderedInputChanges": []
    }
+  },
+  "voxel-overview-high": {
+   "url": "voxel/?view=overview&quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.62",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T12:36:35.938Z",
+    "commit": "c22e1ff584b6199cc68bb4fca7b0448d4e15fe93",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
+   }
+  },
+  "voxel-overview-light": {
+   "url": "voxel/?view=overview&quality=low",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.62",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T12:36:35.938Z",
+    "commit": "c22e1ff584b6199cc68bb4fca7b0448d4e15fe93",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
+   }
+  },
+  "voxel-overview-phone": {
+   "url": "voxel/?view=overview",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.62",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T12:36:35.938Z",
+    "commit": "c22e1ff584b6199cc68bb4fca7b0448d4e15fe93",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
+   }
+  },
+  "voxel-ground-high": {
+   "url": "voxel/?view=ground&quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.62",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T12:36:35.938Z",
+    "commit": "c22e1ff584b6199cc68bb4fca7b0448d4e15fe93",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
+   }
+  },
+  "voxel-ground-light": {
+   "url": "voxel/?view=ground&quality=low",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.62",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T12:36:35.938Z",
+    "commit": "c22e1ff584b6199cc68bb4fca7b0448d4e15fe93",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
+   }
+  },
+  "voxel-ground-phone": {
+   "url": "voxel/?view=ground",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.62",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T12:36:35.938Z",
+    "commit": "c22e1ff584b6199cc68bb4fca7b0448d4e15fe93",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
+   }
+  },
+  "voxel-night-high": {
+   "url": "voxel/?view=night&quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.62",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T12:36:35.938Z",
+    "commit": "c22e1ff584b6199cc68bb4fca7b0448d4e15fe93",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
+   }
   }
  },
  "profile": "nvidia-ampere-msedge-155",
  "environment": {
-  "browser": "msedge 155.0.4283.60",
+  "browser": "msedge 155.0.4283.62",
   "gpu": "nvidia ampere",
   "acPowerBefore": true,
   "acPowerAfter": true,
-  "date": "2026-10-18T09:23:53.336Z",
-  "commit": "121a67a689a34006125784c32c2cc07e56c2f600",
+  "date": "2026-10-19T12:36:35.938Z",
+  "commit": "c22e1ff584b6199cc68bb4fca7b0448d4e15fe93",
   "packagesDirty": false,
   "renderedInputsDirty": false,
   "renderedInputChanges": []
