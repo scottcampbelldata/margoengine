@@ -83,6 +83,8 @@ interface Sandbox {
   player: VoxelCharacter;
   streamer: VoxelStreamer;
   voxels: VoxelRenderer;
+  /** The light: sky, shadows, local lights (lighting.ts). */
+  scene: SceneLighting;
   /** The block under the crosshair. */
   readonly target: VoxelHit | null;
   /** Milliseconds from the streamer's start: first voxel draw, every chunk in range loaded, ready (see README). */
@@ -564,6 +566,7 @@ async function boot(): Promise<void> {
     player,
     streamer,
     voxels,
+    scene,
     get target() {
       return hit;
     },

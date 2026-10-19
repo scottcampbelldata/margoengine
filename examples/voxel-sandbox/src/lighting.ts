@@ -32,6 +32,10 @@ export interface SceneLighting {
   setDistance(blocks: number): void;
   /** Clock hours (0-24) of the sun. */
   hours: number;
+  /** The sun's (and moon's) shadow maps. */
+  readonly shadows: Shadows;
+  /** The local lights of light-emitting blocks near the camera. */
+  readonly lights: Clustered;
   dispose(): void;
 }
 
@@ -109,6 +113,8 @@ export function setupLighting(engine: EngineKernel, voxels: VoxelRenderer, optio
     set hours(value) {
       sky.options.hours = value;
     },
+    shadows,
+    lights: lamps.clustered,
     dispose() {
       engine.removePlugin(daylight);
       lamps.dispose();
@@ -124,7 +130,11 @@ export function setupLighting(engine: EngineKernel, voxels: VoxelRenderer, optio
 // found when a chunk first comes that near (a palette check, then a scan only if it holds one) and kept up to date
 // from the world's edits; a chunk that is replaced or unloaded is scanned again.
 const LAMPS = 24;
-function blockLights(engine: EngineKernel, voxels: VoxelRenderer, ids: ReadonlySet<number>): { dispose(): void } {
+function blockLights(
+  engine: EngineKernel,
+  voxels: VoxelRenderer,
+  ids: ReadonlySet<number>,
+): { clustered: Clustered; dispose(): void } {
   const world = voxels.world,
     clustered = Clustered.attach(engine),
     remove = clustered.add(voxels),
@@ -178,9 +188,16 @@ function blockLights(engine: EngineKernel, voxels: VoxelRenderer, ids: ReadonlyS
       const d = (a: readonly number[]) => (a[0] - p[0]) ** 2 + (a[1] - p[1]) ** 2 + (a[2] - p[2]) ** 2;
       near.sort((a, b) => d(a) - d(b));
       clustered.setLights(
-        near.slice(0, LAMPS).map(
-          (at): PointLight => ({ position: [at[0], at[1] + 0.2, at[2]], range: 9, color: [1, 0.66, 0.36], intensity: 3 }),
-        ),
+        near
+          .slice(0, LAMPS)
+          .map(
+            (at): PointLight => ({
+              position: [at[0], at[1] + 0.2, at[2]],
+              range: 9,
+              color: [1, 0.66, 0.36],
+              intensity: 3,
+            }),
+          ),
       );
       last[0] = p[0];
       last[1] = p[1];
@@ -189,6 +206,7 @@ function blockLights(engine: EngineKernel, voxels: VoxelRenderer, ids: ReadonlyS
     },
   });
   return {
+    clustered,
     dispose() {
       offChange();
       offChunk();
