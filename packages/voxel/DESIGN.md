@@ -195,3 +195,40 @@ on vfx's texture option). Avoided taken names: `World`, `RayHit`, `WorkerPool`.
    benchmark JSON for RD 8 and 16 behind the quiet gate, README, limits.md rows, catalog, api:update.
 Order: 1 first; then 2, 6, 7, 8, 10, 11, 12 can run in parallel (they need only the storage API); 3 after 2; 4 after
 3; 5 after 4; 9 after 3 and 8; 13 last.
+
+## As built (phases 1-3, 6-12; recorded by the merger 2026-10-19)
+
+Status: on main are phases 1 (storage), 2 (mesher), 3 (worker mesher), 6 (light), 7 (queries), 8 (codec, store),
+9 (streaming, generation), 10 (.vox), 11 (Rapier) and 12 (extras: audio and vfx). Phases 4 (renderer), 5 (renderer
+lighting) and 13 (example and benchmarks) remain. Names and decisions beyond the lists above:
+
+- Storage: `BlockType` (what `get` and `table` return); `VoxelChunk.getLight`/`setLight`/`fillLight`/`byteLength`;
+  `VoxelWorld.heightmap`, `blocks`, `minY`, `maxY`, `onChunk(listener)` (fires for loaded chunks at subscribe, after
+  each addChunk incl. setBlock's automatic air chunk, and with undefined after removeChunk). Block state: id in the low
+  16 bits, data in the high 16. Chunk keys are strings 'cx,cy,cz'. A removed chunk's heights stay in the heightmap.
+- Mesher: `meshInput(world, key)`, `blockMaterials(blocks)`, `DecodedQuad`; `ChunkMesh` fields `opaque`, `cutout`,
+  `translucent`, `visibility` (cave-culling connectivity bit a*6+b for chunk faces a < b). Quad word 2 holds each
+  corner's sky light in the LOW nibble and block light in the high one (the reverse of the chunk light byte).
+  Material ids number distinct (block, texture layer) pairs, up to 4,096. Worst case 196,608 quads in one layer
+  (a two-glass 3D checkerboard), twice the 98,304 the index buffer above assumes.
+- Worker mesher: `VoxelMesherOptions`, `VoxelMesher.workers`, `mesh(world, key, priority, eye?)`, `sortQuads`;
+  internal `packages/shared/worker-pool.js` (`JobPool`). The mesh input is built when a worker takes the job;
+  re-calling `mesh` on a running job discards it. 828 meshes/s with 3 workers measured under full CPU load.
+- Light: `VoxelLighting.attach(world, {budget})` (default 4096 cells per `update()`, Infinity allowed). Changed
+  chunks go into `world.dirty`; there is no separate event.
+- Queries: `raycastVoxels(..., filter?)`; `VoxelSweep.hit`; `VoxelMoveIntent.direction`; `VoxelCharacterOptions.speeds`
+  {walk, sprint, swim, fly, jump}; `VoxelCharacter.renderPosition` (interpolated) and fixed 1/120 s steps.
+- Codec and store: `EntityState`, `MemoryChunkStore`; `encodeChunk`/`decodeChunk` are async; stores take and return
+  `VoxelChunk`.
+- Streaming and generation: `VoxelStreamerOptions.chunksPerFrame` (default 8), `VoxelStreamer.viewers`, `onError`,
+  `pending`, `save()`; `VoxelGenerateContext`; `@margoengine/procedural` is a dependency. ~800 generated chunks/s with
+  2 workers under load; unpacking 8 chunks a frame costs 1.2-1.5 ms on the main thread at full speed.
+- .vox: `VoxChunk`; records keep their raw `attributes`; all 48 rotation bytes; `pasteVoxModel` pastes a whole scene
+  (z up becomes world y, y becomes world -z). Pasting is about 1 s per million voxels (per-cell setBlock): batch later.
+- Rapier: `new VoxelPhysics(physics, world, {radius})`, `colliders`; colliders follow every non-fixed body and are
+  kept until no body is within radius + 1. Rapier 0.21.0 panics on ball-vs-voxel edges (dimforge/rapier #1029, #1043,
+  #993, fix PR #1030), so chunks near a ball get a FIX_INTERNAL_EDGES triangle mesh and keep a disabled voxel
+  collider; a cave-heavy chunk near a ball costs ~125 ms to build (not yet spread over frames). Voxel contacts produce
+  no `Physics` collision events.
+- Extras: `AudioVoicePool` in @margoengine/audio; `ParticleAtlas` on @margoengine/vfx's texture option. The decoders
+  pool was not moved onto `JobPool` (its per-worker queue and timeout semantics differ).

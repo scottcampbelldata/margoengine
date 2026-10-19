@@ -1,6 +1,46 @@
 # Margo Engine handoff
 
-Last updated 2026-10-17. Read this first when starting a new session. Update it whenever work lands.
+Last updated 2026-10-19. Read this first when starting a new session. Update it whenever work lands.
+
+Tile editor engine work (Scott, 2026-10-18/19): Scott started `tile-asset-editor` (a Crocotile 3D 2.7.4 equivalent,
+own repository `scottcampbelldata/tile-asset-editor`) as the base of his own 3D modeller and game engine, and
+approved the engine gaps it needs; the 2026-10-17 "no further parity work is authorized" line below is superseded for
+this work. On main (`0b7a4e75`..`ffaccf80`), all in optional packages: Lambert/Phong shading, `mesh.setGeometry`
+(ranged), `Texture.update(region)`, animated tiles; material classes (`UnlitMaterial`, `LambertMaterial`,
+`PhongMaterial`, `PbrMaterial` with untinted defaults, `NormalMaterial`, `MatcapMaterial`, `DepthMaterial`,
+`DistanceMaterial`) used like three.js materials (live `mesh.material` swaps, `color.set`, live render state and
+samplers, `clone`/`copy`/`dispose`); `creasedNormals`; math `/billboard`; bvh `bakeVertexColors`/`limitPalette`;
+clustered/shadows decay, angle + penumbra up to 90 degrees, per-object cast/receive; Bloom `radius`;
+`ImageBackground`; fog with each light's decay/cone; raw-data `Skeleton`/`Skin`, eased keyframe clips, CPU skinning;
+audio `seek`/`sync`; loaders OBJ/MTL, COLLADA, TMX; exporters OBJ/MTL completion, `exportDAE`, data-scene glTF
+samplers/unlit/lights/cameras, explicit lambert/phong, `/capture` (exact-size capture, PNG/JPG, sequences, GIF, WebM).
+Core gained only `mesh.receiveShadow` (Scott allowed about 2 KB of core growth for fixes that cannot be optional):
+core + stage 21,343 B gzip (50,814 raw), core 19,120 (44,244). Naming rule (Scott): Margo clean-room names, three.js
+usage flow, never three.js class names or constants.
+Visual baselines: the Intel set (`tests/visual/*.png`) was re-recorded at `b5d2420a` because every view failed at
+`431222c0` (pages changed after 2026-10-15); all 55 pass on every merge since. The NVIDIA profile
+(`tests/visual/profiles/nvidia-ampere-msedge-155`) has NOT been checked since `431222c0`: on the NVIDIA PC run
+`npm run check:merge`. WGSL changed since then in gltf-pro/materials (Lambert/Phong), clustered (decay, cone, 90-degree
+spots, receive patch), shadows (receive patch), environment (ImageBackground, fog light terms) and post (bloom radius);
+feature-off output is designed to be unchanged, so any failing view there is a regression unless it is one of those
+features' own pages.
+Also on main since: material features (alpha/bump/displacement/light maps, `emissiveIntensity`, `flatShading`,
+`vertexColors`, `fog`, `toneMapped`, `ShadowCatcherMaterial`, `WgslMaterial`, exact clustered Lambert/Phong);
+per-light shadow map size and shadow-camera bounds for every light type; normal maps on materials meshes without
+tangents and through the extension helpers now bend the right way (they were inverted), and `exportModel` writes
+materials meshes in glTF orientation (a round trip was inverting their normal maps; `exportGLB(engine)` now refuses
+their textures instead of dropping them); the stale `materials-uv-groups-gpu-check` matcap expectation (display-curve
+change `56ee9876`) updated; posed-picking metadata (`uv`, `primitiveIndex`, `nodeIndex` on
+`Raycaster.intersectModel` hits, `ab75f70b`; the consumer repo `margo3d-studio` is not on the laptop).
+`@margoengine/voxel` (Minecraft-style game and the MagicaVoxel-style editor; design and as-built notes in
+`packages/voxel/DESIGN.md`): phases 1-3 and 6-12 on main (storage, mesher, worker mesher, light, queries, codec and
+store, streaming and `noiseTerrain`, `.vox` with the `chr_knight.vox` MIT fixture, Rapier colliders with balls
+working via triangle meshes, `AudioVoicePool`, vfx `ParticleAtlas`). Remaining: phase 4 (chunk renderer), 5
+(renderer lighting: shadows, clustered, fog, IBL, day/night, animated water/lava), 13 (playable example, site page,
+visual baselines, measured performance at render distance 8 and 16). Rapier 0.21.0 panics on ball-vs-voxel edges
+(upstream #1029/#1043/#993, unreviewed fix PR #1030); a draft report exists for Scott, not posted.
+Known limits: `setGeometry` cannot change the number of material groups; dispose a `Skin` before `setGeometry` on a
+skinned mesh; DAE export is static only; WebM pacing is approximate; GIF frame rate is capped at 50.
 
 Large-assembly drawing (2026-10-17): core gains one hook, `Batch.claimed` (core neither binds nor encodes a claimed
 batch and `engine.stats.drawCalls` leaves it out; picks still draw it), plus the type-only `DrawOptions.partIds`, set on
@@ -1973,7 +2013,8 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
 7. POST-LAUNCH (Scott, 2026-10-15): "Margo Studio" - feature-for-feature equivalents of MagicaVoxel, Crocotile 3D
    and Dust3D, built on and for Margo with new, modern code (no copied code or branding; their file formats are
    supported for import/export). Plan, ground rules and draft feature inventories: `docs/margo-studio.md`. Each tool
-   starts with a feature audit against the current release and Scott's scope sign-off. Not before 1.0.
+   starts with a feature audit against the current release and Scott's scope sign-off. Update 2026-10-18: Scott
+   started the tile editor before 1.0 (see the top of this file); the voxel and node editors remain later work.
 
 Worker practice: agents run in git worktrees; they must start with `git reset --hard perf/auto-quality` (worktrees
 default to an old base). Do not junction the whole node_modules (then `@margoengine/*` resolves to the main checkout's
