@@ -146,6 +146,15 @@ export class VoxelChunk {
     }
     this.lightCells[x | (z << 5) | (y << 10)] = light;
   }
+  /**
+   * Sets every cell's light byte to `light` (`sky << 4 | block`), so the chunk keeps one byte for all of them again.
+   * @throws RangeError (TypeError for non-numbers) for a byte outside 0..255.
+   */
+  fillLight(light: number): void {
+    if ((light & 255) !== light) throw integerError('Light byte', light, 255, 'pass sky << 4 | block');
+    this.lightByte = light;
+    this.lightCells = null;
+  }
   /** A copy of the chunk as transferable typed arrays; {@link VoxelChunk.unpack} rebuilds it. */
   pack(): PackedChunk {
     return {

@@ -47,6 +47,9 @@ export class VoxelWorld {
   private readonly chunks = new Map<string, VoxelChunk>();
   private readonly columns = new Map<string, { heights: Int16Array; chunks: number }>();
   private readonly listeners = new Set<(x: number, y: number, z: number, state: number, previous: number) => void>();
+  private readonly chunkListeners = new Set<
+    (cx: number, cy: number, cz: number, chunk: VoxelChunk | undefined) => void
+  >();
   // The last chunk looked up (or found missing), so runs of nearby reads and edits build no keys.
   private cx = Number.NaN;
   private cy = 0;
@@ -140,6 +143,7 @@ export class VoxelWorld {
     else this.columns.set(`${cx},${cz}`, { heights: new Int16Array(1024).fill(-32768), chunks: 1 });
     this.dirty.add(key);
     this.touch(cx, cy, cz, -1, 1, -1, 1, -1, 1);
+    for (const listener of this.chunkListeners) listener(cx, cy, cz, chunk);
     return chunk;
   }
   /**
@@ -158,7 +162,25 @@ export class VoxelWorld {
     if (column && !--column.chunks) this.columns.delete(`${cx},${cz}`);
     this.dirty.add(key);
     this.touch(cx, cy, cz, -1, 1, -1, 1, -1, 1);
+    for (const listener of this.chunkListeners) listener(cx, cy, cz, undefined);
     return chunk;
+  }
+  /**
+   * Calls `listener(cx, cy, cz, chunk)` at once for every loaded chunk and then after each addChunk (including the
+   * air chunk a setBlock adds, before that edit's onChange), and `listener(cx, cy, cz, undefined)` after each
+   * removeChunk. Returns an unsubscribe function.
+   * @throws TypeError when `listener` is not a function.
+   */
+  onChunk(listener: (cx: number, cy: number, cz: number, chunk: VoxelChunk | undefined) => void): () => void {
+    if (typeof listener !== 'function') throw new TypeError('onChunk expects a function (cx, cy, cz, chunk)');
+    for (const [key, chunk] of this.chunks) {
+      const [cx, cy, cz] = key.split(',').map(Number);
+      listener(cx, cy, cz, chunk);
+    }
+    this.chunkListeners.add(listener);
+    return () => {
+      this.chunkListeners.delete(listener);
+    };
   }
   /**
    * The heightmap of chunk column (cx, cz) while any of its chunks is loaded: 32 x 32 int16 heights, index
