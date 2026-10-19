@@ -38,8 +38,8 @@ const VOLUME = 2,
   PRESENT = 16;
 /** Roughness squared below which reflection and refraction are perfectly specular. */
 export const DELTA_ALPHA = 1e-3;
-/** Floats per packed material (5 vec4), 256 materials. */
-export const MATERIAL_FLOATS = 20;
+/** Floats per packed material (6 vec4), 256 materials. */
+export const MATERIAL_FLOATS = 24;
 
 const TYPES: readonly TraceMaterialType[] = ['diffuse', 'plastic', 'metal', 'glass', 'emit', 'blend', 'media'];
 const where = 'VoxelPathTracer';
@@ -100,6 +100,8 @@ interface ResolvedEnvironment {
   readonly groundHeight: number;
   /** Whether camera rays see the sun disk. */
   readonly sunVisible: boolean;
+  /** Ground-to-sky fade constant of camera rays (0: none). */
+  readonly groundHorizon: number;
   readonly map?: PackedEnvironment;
   /** A newly baked physical sky, kept in the cache when the snapshot succeeds. */
   readonly skyCache?: { key: string; data: Float32Array };
@@ -364,6 +366,7 @@ function packMaterial(m: TraceMaterial, name: string, out: Float32Array): void {
     transmission = unit(m.transmission, type === 'glass' ? 1 : 0, 'transmission'),
     specular = unit(m.specular, type === 'diffuse' || type === 'emit' ? 0 : 1, 'specular'),
     emission = optional(m.emission, type === 'emit' ? 1 : 0, `${name}.emission`, 0, 1e6, 'pass 0 or more'),
+    cameraEmission = optional(m.cameraEmission, -1, `${name}.cameraEmission`, 0, 1e6, 'pass 0 or more'),
     ior = optional(m.ior, 1.5, `${name}.ior`, 1, 3, 'pass 1 to 3 (glass is about 1.5)'),
     density = optional(m.density, type === 'media' ? 1 : 0, `${name}.density`, 0, 1e6, 'pass 0 or more per world unit'),
     scatter = optional(m.scatter, 0, `${name}.scatter`, 0, 1e6, 'pass 0 or more per world unit'),
@@ -416,6 +419,11 @@ function packMaterial(m: TraceMaterial, name: string, out: Float32Array): void {
       Math.min(metalColor[0], 1),
       Math.min(metalColor[1], 1),
       Math.min(metalColor[2], 1),
+      // Radiance camera rays see (w: 1 when set; surfaces only).
+      cameraEmission >= 0 && !media ? glow[0] * cameraEmission : 0,
+      cameraEmission >= 0 && !media ? glow[1] * cameraEmission : 0,
+      cameraEmission >= 0 && !media ? glow[2] * cameraEmission : 0,
+      cameraEmission >= 0 && !media ? 1 : 0,
     ],
     base,
   );
@@ -714,6 +722,7 @@ function resolveEnvironment(environment: TraceEnvironment | undefined, cache: Sc
         ? undefined
         : checkVec3(e.groundColor, `${name}.groundColor`, true, 'pass linear RGB'),
     groundHeight = optional(e.groundHeight, 0, `${name}.groundHeight`, -1e9, 1e9, 'pass a finite height');
+  const groundHorizon = optional(e.groundHorizon, 0, `${name}.groundHorizon`, 0, 1e6, 'pass 0 (no fade) or more');
   if (e.sunVisible !== undefined && typeof e.sunVisible !== 'boolean')
     throw new TypeError(`${where} ${name}.sunVisible must be true or false`);
   const sun = [direction[0] / length, direction[1] / length, direction[2] / length] as TraceVec3;
@@ -744,6 +753,7 @@ function resolveEnvironment(environment: TraceEnvironment | undefined, cache: Sc
     ground: ground && [Math.min(ground[0], 1), Math.min(ground[1], 1), Math.min(ground[2], 1)],
     groundHeight,
     sunVisible: e.sunVisible !== false,
+    groundHorizon,
     map,
     skyCache,
   };

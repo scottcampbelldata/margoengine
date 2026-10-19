@@ -1,0 +1,46 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>vox render</title></head><body><canvas width="960" height="800"></canvas>
+<script type="module">
+// Renders a MagicaVoxel .vox (bytes from the driver) through @margoengine/voxel-pathtracer's MagicaVoxel mapping.
+import {Engine} from '/packages/core/dist/index.js';
+import * as PT from '/packages/voxel-pathtracer/dist/index.js';
+import {parseVox} from '/packages/voxel/dist/vox.js';
+const errors=[];
+const dict=(b,o)=>{const dv=new DataView(b.buffer,b.byteOffset,b.byteLength);const n=dv.getInt32(o,true);o+=4;const d={};
+ const rd=()=>{const l=dv.getInt32(o,true);o+=4;const s=new TextDecoder('latin1').decode(b.subarray(o,o+l));o+=l;return s;};
+ for(let i=0;i<n;i++){const k=rd();d[k]=rd();}return d;};
+window.render=async(b64,opt)=>{
+ const bytes=Uint8Array.from(atob(b64),(c)=>c.charCodeAt(0)),vox=parseVox(bytes);
+ const robj=[],cams=new Map();
+ for(const c of vox.chunks??[]){if(c.id==='rOBJ')robj.push(dict(c.content,0));if(c.id==='rCAM'){const dv=new DataView(c.content.buffer,c.content.byteOffset);cams.set(dv.getInt32(0,true),dict(c.content,4));}}
+ // Scene graph: transforms (translation, rotation) down to shapes.
+ const nodes=new Map(vox.nodes.map((n)=>[n.id,n])),models=[],instances=[];
+ const mul=(A,B)=>[0,1,2].flatMap((i)=>[0,1,2].map((j)=>A[3*i]*B[j]+A[3*i+1]*B[3+j]+A[3*i+2]*B[6+j]));
+ const walk=(id,R,t)=>{const n=nodes.get(id);if(!n)return;
+  if(n.type==='transform'){const f=n.frames[0]??{};const r=f.rotation??[1,0,0,0,1,0,0,0,1],tr=f.translation??[0,0,0];
+   const t2=[0,1,2].map((i)=>t[i]+R[3*i]*tr[0]+R[3*i+1]*tr[1]+R[3*i+2]*tr[2]);walk(n.child,mul(R,r),t2);}
+  else if(n.type==='group'){for(const c of n.children)walk(c,R,t);}
+  else{const m=n.models[0].model,mv=vox.models[m];if(!models[m])models[m]=PT.magicaVoxelModel('m'+m,1,mv.size,mv.voxels);
+   instances.push({id:'i'+instances.length,modelId:'m'+m,matrix:PT.magicaVoxelMatrix(mv.size,t,R)});}};
+ if(vox.nodes.length)walk(0,[1,0,0,0,1,0,0,0,1],[0,0,0]);
+ else vox.models.forEach((mv,m)=>{models[m]=PT.magicaVoxelModel('m'+m,1,mv.size,mv.voxels);instances.push({id:'i'+m,modelId:'m'+m,matrix:PT.magicaVoxelMatrix(mv.size,[0,0,Math.floor(mv.size[2]/2)])});});
+ const used=new Set();for(const mv of vox.models)for(let i=3;i<mv.voxels.length;i+=4)used.add(mv.voxels[i]);
+ const attrs=new Map(vox.materials.map((m)=>[m.id,m.attributes]));
+ const tweak=opt.tweak?new Function('m',opt.tweak):(m)=>m;
+ const materials=[...used].map((id)=>tweak(PT.magicaVoxelMaterial(id,vox.palette.subarray(4*id,4*id+3),attrs.get(id))));
+ const light=PT.magicaVoxelLighting(robj),cam=PT.magicaVoxelCamera(cams.get(opt.camera??1),robj);
+ const canvas=document.querySelector('canvas');canvas.width=opt.width;canvas.height=opt.height;
+ const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:cam.position,target:cam.target,fov:cam.fov,near:0.5,far:4000}});
+ engine.camera.up=cam.up;
+ engine.gpu?.addEventListener?.('uncapturederror',(e)=>errors.push(e.error.message));
+ const tracer=PT.VoxelPathTracer.attach(engine,{scene:{revision:1,models:models.filter(Boolean),instances,materials,environment:{...light.environment,...(opt.environment??{})}},
+  ...light.options,...(opt.options??{}),seed:1});
+ await tracer.ready;
+ const t0=performance.now();
+ const blob=await tracer.capture({width:opt.width,height:opt.height,samples:opt.samples});
+ const ms=performance.now()-t0;
+ const out=new Uint8Array(await blob.arrayBuffer());let s='';for(let i=0;i<out.length;i+=32768)s+=String.fromCharCode(...out.subarray(i,i+32768));
+ tracer.dispose();engine.dispose();
+ return {png:btoa(s),errors:errors.splice(0),ms,unsupported:light.unsupported,options:light.options};
+};
+window.ready=true;
+</script></body></html>

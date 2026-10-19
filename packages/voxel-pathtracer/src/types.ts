@@ -41,6 +41,12 @@ export interface TraceMaterial {
   emission?: number;
   /** Compatible addition: linear RGB of the emission, each component 0 or more. Default `color`. */
   emissionColor?: TraceVec3;
+  /**
+   * Compatible addition: the radiance multiplier of `emissionColor` that camera rays see on this surface (before they
+   * scatter), 0 or more, while lighting keeps `emission`: a light that shows dimmer or brighter than it shines.
+   * Default: `emission`. MagicaVoxel's emitter LDR setting l shows 1 + 3 l.
+   */
+  cameraEmission?: number;
   /** Index of refraction, 1 to 3 (glass refraction and the plastic coat's Fresnel). Default 1.5. */
   ior?: number;
   /** Share of the glass lobe, 0 to 1 (`blend`; `glass` is 1). */
@@ -162,6 +168,12 @@ export interface TraceEnvironment {
    * false is MagicaVoxel's default (sun disk off).
    */
   sunVisible?: boolean;
+  /**
+   * Compatible addition: camera rays fade the ground into the sky toward the horizon: where a camera ray meets the
+   * ground at depression angle d, the sky's horizon radiance replaces the share a / (a + sin d) of it, with a this
+   * value, 0 (default: no fade) or more. MagicaVoxel's horizon setting h is about a = 0.007 h.
+   */
+  groundHorizon?: number;
 }
 
 /** Compatible addition: the Preetham daylight sky of {@link TraceEnvironment.physicalSky}. */

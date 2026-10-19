@@ -1195,7 +1195,8 @@ export class VoxelPathTracer implements EnginePlugin {
     if (!e.sunVisible) flags |= FLAG_HIDE_SUN;
     u.set([o.maxBounces, seed >>> 0, flags, s.lightCount], 40);
     const caps = o.bounceLimits;
-    u.set(caps ? [caps.diffuse, caps.specular, caps.scatter, 0] : [BOUNCE_FREE, BOUNCE_FREE, BOUNCE_FREE, 0], 152);
+    u.set(caps ? [caps.diffuse, caps.specular, caps.scatter] : [BOUNCE_FREE, BOUNCE_FREE, BOUNCE_FREE], 152);
+    f[155] = e.groundHorizon;
     const sl = layout.scene,
       ll = layout.lights;
     u.set([sl.modelBase, sl.instanceBase, sl.nodeBase, s.instances.length ? sl.nodeCount : 0], 44);

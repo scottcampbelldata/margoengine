@@ -401,8 +401,8 @@ test('dispersive glass packs its Cauchy coefficient; renderImage passes a fixed 
   const glass = { id: 1, color: [1, 1, 1], type: 'glass', ior: 1.5, abbe: 40 },
     { tracer, device } = await ready({ scene: simpleScene({ materials: [glass] }) });
   // Materials: 20 floats each; float 16 is B = (n_d - 1) / (V (1 / 0.4861^2 - 1 / 0.6563^2)) in square micrometres.
-  const table = new Float32Array(device.buffers.find((b) => b.size === 256 * 80 && !b.destroyed).data);
-  assert.ok(Math.abs(table[20 + 16] - 0.5 / (40 * (1 / 0.4861 ** 2 - 1 / 0.6563 ** 2))) < 1e-7);
+  const table = new Float32Array(device.buffers.find((b) => b.size === 256 * 96 && !b.destroyed).data);
+  assert.ok(Math.abs(table[24 + 16] - 0.5 / (40 * (1 / 0.4861 ** 2 - 1 / 0.6563 ** 2))) < 1e-7);
   const before = device.buffers.length;
   await tracer.renderImage({ width: 2, height: 2, samples: 1, wavelength: 550 });
   const frame = device.buffers.slice(before).find((b) => b.size === FRAME);
@@ -419,9 +419,9 @@ test('dispersive glass packs its Cauchy coefficient; renderImage passes a fixed 
 test('media emit emissionColor x emission per unit; emissionColor is validated', async () => {
   const fire = { id: 1, color: [0.2, 0.2, 0.2], type: 'media', density: 0.5, emission: 3, emissionColor: [1, 0.5, 0] },
     { tracer, device } = await ready({ scene: simpleScene({ materials: [fire] }) });
-  const table = new Float32Array(device.buffers.find((b) => b.size === 256 * 80 && !b.destroyed).data);
-  assert.deepEqual([...table.subarray(20 + 8, 20 + 11)], [3, 1.5, 0]);
-  assert.equal(table[20 + 15] & 4, 0, 'not a light-sampled emitter');
+  const table = new Float32Array(device.buffers.find((b) => b.size === 256 * 96 && !b.destroyed).data);
+  assert.deepEqual([...table.subarray(24 + 8, 24 + 11)], [3, 1.5, 0]);
+  assert.equal(table[24 + 15] & 4, 0, 'not a light-sampled emitter');
   assert.throws(
     () => tracer.setScene(simpleScene({ revision: 2, materials: [{ ...fire, emissionColor: [1, -1, 0] }] })),
     RangeError,

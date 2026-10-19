@@ -77,8 +77,8 @@ within 0.79%, light through glass and off mirrors, dispersion against Snell per 
 shadows, camera motion blur width, the Preetham sky against its formulas, 1/sqrt(N) convergence, denoiser error at
 least x2 lower at 4/16/64 samples on two glass scenes, the raster frame bit for bit when disabled or disposed, the same
 converged image after a device restore. Light sampling through glass costs time per sample (README, "Measured
-performance"). Open items (no MagicaVoxel image comparison; synthetic comparison scenes are in
-`test-results/pt-compare`) are listed in its README.
+performance"). MagicaVoxel parity (Scott: match or exceed it in every way): the measured mapping, current scores and
+every open item, including the ones from before this work, are in `docs/magicavoxel-parity.md`.
 
 Tile editor engine work (Scott, 2026-10-18/19): Scott started `tile-asset-editor` (a Crocotile 3D 2.7.4 equivalent,
 own repository `scottcampbelldata/tile-asset-editor`) as the base of his own 3D modeller and game engine, and

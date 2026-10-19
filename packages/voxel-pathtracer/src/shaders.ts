@@ -83,7 +83,8 @@ struct Frame {
  lensFov:vec4f,
  // Brown-Conrady k1, k2, p1, p2.
  distortion:vec4f,
- // Scattering events allowed per path: diffuse, specular, scatter (0xffff: no cap).
+ // Scattering events allowed per path: diffuse, specular, scatter (0xffff: no cap); w: the ground's horizon fade
+ // constant (f32 bits).
  limits:vec4u,
 }
 `;
@@ -575,11 +576,11 @@ fn cameraRay(px:vec2f)->Ray {
 
 // Materials: 4 vec4 per palette index (scene.ts packMaterial).
 // disp: Cauchy coefficient B (square micrometres; 0 without dispersion), ior the index at the d line.
-struct Mat {color:vec3f,alpha:f32,metal:f32,glass:f32,spec:f32,f0:f32,emission:vec3f,ior:f32,density:f32,scatter:f32,g:f32,flags:u32,disp:f32,metalColor:vec3f}
+struct Mat {color:vec3f,alpha:f32,metal:f32,glass:f32,spec:f32,f0:f32,emission:vec3f,ior:f32,density:f32,scatter:f32,g:f32,flags:u32,disp:f32,metalColor:vec3f,seen:vec4f}
 fn material(id:u32)->Mat {
  let a=materials[id*MV];let b=materials[id*MV+1u];let c=materials[id*MV+2u];let e=materials[id*MV+3u];
  let x=materials[id*MV+4u];
- return Mat(a.xyz,a.w,b.x,b.y,b.z,b.w,c.xyz,c.w,e.x,e.y,e.z,u32(e.w),x.x,x.yzw);
+ return Mat(a.xyz,a.w,b.x,b.y,b.z,b.w,c.xyz,c.w,e.x,e.y,e.z,u32(e.w),x.x,x.yzw,materials[id*MV+5u]);
 }
 // Index of a dispersive material at wavelength l (nanometres).
 fn iorAt(m:Mat,l:f32)->f32 {let x=l*0.001;return m.ior+m.disp*(1.0/(x*x)-1.0/(LAMBDA_D*LAMBDA_D));}
@@ -757,6 +758,13 @@ fn environment(d:vec3f,bsdfPdf:f32,j:f32,camera:bool)->vec3f {
   c+=f.sunLight.xyz*select(1.0,power2(bsdfPdf,1.0/f.sunLight.w/j),bsdfPdf>0.0);
  }
  return c;
+}
+// Sky radiance at the horizon in d's azimuth (constant sky or environment map; no sun disk).
+fn horizonSky(d:vec3f)->vec3f {
+ if((f.config.z&ENV)==0u){return f.sky.xyz;}
+ let h=vec3f(d.x,0.0,d.z);
+ if(dot(h,h)<1e-12){return envTexel(envUV(vec3f(0.0,0.0,-1.0))).xyz*f.sky.w;}
+ return envTexel(envUV(normalize(h))).xyz*f.sky.w;
 }
 fn cone(axis:vec3f,cosMax:f32)->vec3f {
  let u=vec2f(rand(),rand());let c=1.0-u.x*(1.0-cosMax);let s=sqrt(max(0.0,1.0-c*c));let p=TAU*u.y;
@@ -1187,6 +1195,12 @@ fn radiance(px:vec2u)->Path {
    }
    if(h.inst==GROUND){
     n=vec3f(0.0,select(-1.0,1.0,d.y<0.0),0.0);
+    // Seen by the camera, the ground fades into the horizon's sky by a / (a + sin(depression)).
+    let fade=bitcast<f32>(f.limits.w);
+    if(bounces==0u&&fade>0.0&&d.y<0.0){
+     let w=fade/(fade-d.y/length(d));
+     let add=thr*w*horizonSky(d);L+=add;thr*=1.0-w;
+    }
     off=n*max(1e-4,1e-6*length(p));
     m=groundMat();
    } else {
@@ -1223,7 +1237,11 @@ fn radiance(px:vec2u)->Path {
      medium=h.value;mInst=h.inst;o=p-off;continue;
     }
    }
-   if((m.flags&EMISSIVE)!=0u){let add=thr*m.emission*emitWeight(h,n,d,m.emission,lastPdf);L+=add;if(focused){C+=add;}}
+   if((m.flags&EMISSIVE)!=0u||m.seen.w>0.0){
+    // Camera rays (nothing scattered yet) see the camera radiance when one is set.
+    let e=select(m.emission,m.seen.xyz,bounces==0u&&m.seen.w>0.0);
+    let add=thr*e*emitWeight(h,n,d,m.emission,lastPdf);L+=add;if(focused){C+=add;}
+   }
    let pb=max(0.0,1.0-m.metal-m.glass);
    soft=pb>1e-6||((m.flags&SMOOTH)==0u&&m.metal>0.0);
    if(feature&&(soft||bounces>=3u)){feature=false;res.albedo=tint*m.color;res.normal=n;res.primary=select(0.0,1.0,bounces==0u);}

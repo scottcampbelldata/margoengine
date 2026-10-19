@@ -85,14 +85,16 @@ export function magicaVoxelMaterial(id: number, rgb: ArrayLike<number>, attribut
     type = get(a, '_type') ?? '_diffuse',
     color = linear3(rgb),
     weight = num(a, '_weight'),
-    rough = clamp01(num(a, '_rough') ?? 0),
+    // MagicaVoxel's roughness r matches a GGX width of about 0.13 r (fitted to its reflections, r 0.05 to 1).
+    rough = Math.sqrt(0.13 * clamp01(num(a, '_rough') ?? 0)),
     legacySpec = num(a, '_spec'),
     specular = legacySpec !== undefined ? 1 + legacySpec : (num(a, '_sp') ?? 1),
     ior = Math.min(3, Math.max(1, 1 + (num(a, '_ior') ?? (num(a, '_ri') ?? 1) - 1))),
     density = Math.max(0, num(a, '_d') ?? 0),
     g = Math.min(0.95, Math.max(-0.95, num(a, '_g') ?? 0)),
     media = get(a, '_media_type') ?? (type === '_media' ? '_scatter' : '_absorb'),
-    trans = clamp01(weight ?? num(a, '_alpha') ?? num(a, '_trans') ?? 0),
+    // The glass share of a partly transparent voxel goes as the square root of `_trans` (fitted at 0.25 and 0.5).
+    trans = Math.sqrt(clamp01(weight ?? num(a, '_alpha') ?? num(a, '_trans') ?? 0)),
     metalColor: TraceVec3 = [
       Math.min(1, specular * color[0]),
       Math.min(1, specular * color[1]),
@@ -139,7 +141,7 @@ export function magicaVoxelMaterial(id: number, rgb: ArrayLike<number>, attribut
         color,
         metalColor,
         metalness: clamp01(num(a, '_metal') ?? 0),
-        transmission: clamp01(num(a, '_alpha') ?? num(a, '_trans') ?? 0),
+        transmission: Math.sqrt(clamp01(num(a, '_alpha') ?? num(a, '_trans') ?? 0)),
         roughness: rough,
         ior,
         specular: 1,
@@ -150,7 +152,9 @@ export function magicaVoxelMaterial(id: number, rgb: ArrayLike<number>, attribut
     case '_emit': {
       const emit = Math.max(0, weight ?? num(a, '_emit') ?? 0),
         power = num(a, '_flux') ?? 0;
-      return { id, type: 'emit', color, emission: 1 + 3 * emit * 10 ** power };
+      const ldr = clamp01(num(a, '_ldr') ?? 0);
+      // A non-zero `_ldr` l shows the emitter at 1 + 3 l to the camera; the light it casts stays the same.
+      return { id, type: 'emit', color, emission: 1 + 3 * emit * 10 ** power, ...(ldr > 0 ? { cameraEmission: 1 + 3 * ldr } : {}) };
     }
     case '_media': {
       // The older `_weight` reads as density 0.1 (measured at weights 0.3 and 0.89).
@@ -163,8 +167,8 @@ export function magicaVoxelMaterial(id: number, rgb: ArrayLike<number>, attribut
         color,
         density: d,
         anisotropy: g,
-        // Emissive media: radiance per voxel along a ray, measured at about 2 x `_d` x colour.
-        ...(media === '_emit' ? { emission: 2 * d } : {}),
+        // Emissive media glow 0.93 x `_d` x colour per voxel and neither absorb nor scatter (measured, `_d` 0.01 to 1).
+        ...(media === '_emit' ? { density: 0, emission: 0.93 * d } : {}),
       };
     }
     default:
@@ -209,8 +213,17 @@ export function magicaVoxelLighting(objects: Iterable<MagicaVoxelDict>): MagicaV
     ]),
     sunColor: colorOf(o('_inf'), '_k', [1, 1, 1]),
     sunIntensity: 5 * Math.max(0, sunI),
+    // `_area` a: a sun disk about 0.69 a radians across (fitted to its penumbrae at 0.07 and 0.2).
+    sunAngularSize: Math.min(0.5, 0.69 * Math.max(0, num(o('_inf'), '_area') ?? 0.07)),
     sunVisible: (num(o('_inf'), '_disk') ?? 0) !== 0,
-    ...(groundOn ? { groundColor: colorOf(o('_ground'), '_color', linear3([80, 80, 80])), groundHeight: 0 } : {}),
+    ...(groundOn
+      ? {
+          groundColor: colorOf(o('_ground'), '_color', linear3([80, 80, 80])),
+          groundHeight: 0,
+          // `_hor` h: the camera's ground fades into the sky by a / (a + sin depression), a = 0.007 h (fitted).
+          groundHorizon: 0.007 * Math.max(0, num(o('_ground'), '_hor') ?? 0.1),
+        }
+      : {}),
   };
   if (mode === 1) unsupported.push('atmosphere sky (_atm): a uniform sky stands in');
   if (mode === 2) unsupported.push('image sky (_ibl): pass the HDR image as environment.map');
@@ -239,12 +252,18 @@ export function magicaVoxelLighting(objects: Iterable<MagicaVoxelDict>): MagicaV
   };
 }
 
-/** The camera of an rCAM dictionary (`_focus`, `_angle` pitch yaw roll in degrees, `_radius`, `_fov`, `_mode`). */
-export function magicaVoxelCamera(camera: MagicaVoxelDict): MagicaVoxelCamera {
+/**
+ * The camera of an rCAM dictionary (`_focus`, `_angle` pitch yaw roll in degrees, `_radius`, `_mode`). MagicaVoxel
+ * renders with the field of view of its lens render object, so pass the file's rOBJ dictionaries as `objects`; the
+ * camera's own `_fov` applies only without a `_lens` object.
+ */
+export function magicaVoxelCamera(camera: MagicaVoxelDict, objects: Iterable<MagicaVoxelDict> = []): MagicaVoxelCamera {
+  let lens: MagicaVoxelDict | undefined;
+  for (const o of objects) if (get(o, '_type') === '_lens') lens = o;
   const focus = nums(camera, '_focus') ?? [0, 0, 0],
     angle = nums(camera, '_angle') ?? [0, 0, 0],
     radius = Math.max(1e-3, num(camera, '_radius') ?? 100),
-    fov = Math.min(179, Math.max(1, num(camera, '_fov') ?? 45)),
+    fov = Math.min(179, Math.max(1, num(lens, '_fov') ?? num(camera, '_fov') ?? 45)),
     mode = get(camera, '_mode') ?? 'pers',
     [p, y, r] = angle.map((v) => ((v ?? 0) * Math.PI) / 180),
     offset = [Math.cos(p) * Math.sin(y), -Math.cos(p) * Math.cos(y), -Math.sin(p)],
