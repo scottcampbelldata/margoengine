@@ -77,6 +77,7 @@ export class Engine {
     disposed: boolean;
     onError: (error: unknown) => void;
     collected: number;
+    unshadowed: number;
     readonly plugins: ReadonlyMap<string, EnginePlugin>;
     pace?: (time: number) => boolean;
     features?: GPUFeatureName[];
@@ -181,6 +182,8 @@ export class Mesh {
     geometry: Geometry | null;
     get material(): PbrMaterial;
     set material(value: PbrMaterial);
+    get receiveShadow(): boolean;
+    set receiveShadow(value: boolean);
     constructor(engine: Engine, id: number);
     get visible(): boolean;
     set visible(value: boolean);
@@ -331,6 +334,7 @@ interface Mesh {
     readonly scale: VectorRef;
     readonly geometry: Geometry | null;
     readonly material: PbrMaterial;
+    receiveShadow: boolean;
     check(): void;
     setPosition(value: Vec3): this;
     setScale(value: Vec3): this;

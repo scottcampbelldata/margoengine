@@ -114,6 +114,7 @@ export interface Mesh {
     readonly scale: VectorRef;
     readonly geometry: Geometry | null;
     readonly material: PbrMaterial;
+    receiveShadow: boolean;
     check(): void;
     setPosition(value: Vec3): this;
     setScale(value: Vec3): this;

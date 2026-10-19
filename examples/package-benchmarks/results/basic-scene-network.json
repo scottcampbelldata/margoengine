@@ -1,5 +1,5 @@
 {
-  "commit": "06e580ca",
+  "commit": "baa5223f",
   "dirty": false,
   "browser": "msedge 155.0.4283.45 headless",
   "adapter": "intel xe-2lpg",
@@ -11,7 +11,7 @@
       "encoding": "identity",
       "transferred": 808,
       "raw": 558,
-      "gzip": 369,
+      "gzip": 370,
       "brotli": 227
     },
     {
@@ -24,13 +24,13 @@
       "brotli": 938
     },
     {
-      "path": "assets/index-6lVitIoM.js",
+      "path": "assets/index-DSlBwoSD.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 22134,
-      "raw": 51269,
-      "gzip": 21753,
-      "brotli": 19190
+      "transferred": 22214,
+      "raw": 51548,
+      "gzip": 21833,
+      "brotli": 19262
     },
     {
       "path": "assets/extension-DuYhGmhk.js",
@@ -62,10 +62,10 @@
   ],
   "total": {
     "requests": 6,
-    "transferred": 31699,
-    "raw": 67623,
-    "gzip": 28681,
-    "brotli": 25293
+    "transferred": 31779,
+    "raw": 67902,
+    "gzip": 28762,
+    "brotli": 25365
   },
   "notFetched": [
     {
@@ -101,8 +101,8 @@
       "raw": 39744
     },
     {
-      "path": "assets/dist-DXGls4ew.js",
-      "raw": 28978
+      "path": "assets/dist-DXu7pPa8.js",
+      "raw": 28902
     },
     {
       "path": "assets/occt-import-js-BhHfLpto.wasm",

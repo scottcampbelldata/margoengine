@@ -22,15 +22,15 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/cache | `.` 5 |  |  | 2,421 |
 | @margoengine/cameras | `.` 3, `./origin` 3 |  |  | 1,674 |
 | @margoengine/cinematic | `.` 3 |  |  | 1,820 |
-| @margoengine/clustered | `.` 13, `./shadows` 4, `./area` 4 | 24 |  | 9,709 |
+| @margoengine/clustered | `.` 13, `./shadows` 4, `./area` 4 | 24 |  | 10,640 |
 | @margoengine/controls | `.` 44, `./walk` 6 | 23 |  | 18,382 |
-| @margoengine/core | `.` 15, `./extension` 23 | 14 |  | 19,040 |
+| @margoengine/core | `.` 15, `./extension` 23 | 14 |  | 19,120 |
 | @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 17,361 |
 | @margoengine/culling | `.` 6 |  |  | 8,679 |
 | @margoengine/decoders | `.` 23, `./meshopt` 5 | 1 |  | 478,417 |
 | @margoengine/dof | `.` 2 |  |  | 6,283 |
 | @margoengine/ecs | `.` 6 |  |  | 1,350 |
-| @margoengine/environment | `.` 53, `./probes` 7, `./volumetric` 3 | 12 |  | 23,932 |
+| @margoengine/environment | `.` 53, `./probes` 7, `./volumetric` 3 | 12 |  | 25,372 |
 | @margoengine/exporters | `.` 35, `./usdz` 2, `./model` 6, `./dae` 3, `./capture` 13 | 30 |  | 23,328 |
 | @margoengine/fbx | `.` 4, `./worker` 2 | 1 |  | 16,674 |
 | @margoengine/fsm | `.` 3 |  |  | 875 |
@@ -57,7 +57,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/oit | `.` 2 |  |  | 2,210 |
 | @margoengine/physics | `.` 35 | 20 |  | 11,392 |
 | @margoengine/points | `.` 42 | 3 |  | 15,647 |
-| @margoengine/post | `.` 13, `./bloom` 3, `./ssao` 3, `./scene-fade` 4, `./stack` 1, `./fxaa` 1, `./decals` 4, `./ssr` 4 | 4 |  | 18,055 |
+| @margoengine/post | `.` 13, `./bloom` 3, `./ssao` 3, `./scene-fade` 4, `./stack` 1, `./fxaa` 1, `./decals` 4, `./ssr` 4 | 4 |  | 18,471 |
 | @margoengine/procedural | `.` 26, `./noise` 10, `./lsystem` 12, `./voronoi` 15 |  |  | 7,236 |
 | @margoengine/quality | `.` 17, `./warm` 3 | 1 |  | 1,623 |
 | @margoengine/react | `.` 102, `./kit` 29, `./post` 12, `./physics` 16, `./xr` 12 | 31 |  | 20,966 |
@@ -66,7 +66,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/scenery | `.` 2, `./sky` 2 |  |  | 218 |
 | @margoengine/selection | `.` 10 |  |  | 12,400 |
 | @margoengine/shader | `.` 142, `./noise` 9 | 39 |  | 11,893 |
-| @margoengine/shadows | `.` 8 | 1 |  | 10,463 |
+| @margoengine/shadows | `.` 8 | 1 |  | 10,623 |
 | @margoengine/sky | `.` 9, `./base` 10, `./preetham` 1, `./bruneton` 1, `./clouds` 1, `./night` 1, `./fog` 1, `./reflection` 1, `./lighting` 1 | 94 |  | 14,373 |
 | @margoengine/splats | `.` 4, `./data` 3 |  |  | 6,354 |
 | @margoengine/splines | `.` 3 |  |  | 1,299 |

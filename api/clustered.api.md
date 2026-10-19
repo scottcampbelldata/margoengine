@@ -128,5 +128,5 @@ export function clusteredSampling(group: number, shadow?: boolean | {
     declarations(group: number): string;
 }, area?: {
     declarations(group: number): string;
-}, integratedShadows?: boolean, decay?: boolean): string;
+}, integratedShadows?: boolean, decay?: boolean, receive?: boolean): string;
 ```
