@@ -30,7 +30,7 @@
     "@margoengine/gltf-pro": "^1.0.0"
   },
   "homepage": "https://margoengine.com",
-  "devDependencies": {
+  "dependencies": {
     "@margoengine/math": "^1.0.0"
   }
 }

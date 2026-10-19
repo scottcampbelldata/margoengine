@@ -39,3 +39,34 @@ Run the character demo at `/examples/robot-expressive.html` (also `character-ani
 The demo leaves facial weights under the sliders' control by removing weight tracks from its clips. Expressions persist while playing, pausing and switching clips. Presets include a neutral reset; playback speed and a reset-view button accompany touch-enabled orbit controls. The studio floor uses the optional shadows and tone-mapping packages.
 
 After building the packages, run `node --test packages/animation/tests/*.test.js` for influence validation, packed formats, lifecycle, and allocation checks. `node scripts/animation-influences-browser-tests.js` checks real WebGPU deformation against an independent CPU reference, four-influence parity, eight active influences with morphs, a 1,001-joint palette, and device restoration. Its pinned [Babylon.js octopus fixture](tests/fixtures/README.md) has 48,222 vertices, 91 joints, seven clips, and 1,552 vertices with genuine secondary skin weights. The CC BY 4.0 asset downloads into `test-results/` and is not bundled with the package.
+
+## Skeletons and skins from raw data
+
+`Skeleton` and `Skin` rig a mesh from plain arrays, for editors that author bones and weights themselves (no glTF
+document needed). Bones live in the skinned mesh's local space; exactly one bone is the root (`parent: -1`).
+
+```ts
+import {Material, createMesh} from '@margoengine/materials';
+import {Skeleton, Skin} from '@margoengine/animation';
+const skeleton = new Skeleton([
+  {name: 'upper', parent: -1},
+  {name: 'forearm', parent: 0, translation: [0, 1, 0]},
+]); // inverse bind matrices come from this base pose unless passed as a second argument
+const mesh = createMesh(stage.engine, geometry, new Material({map: tileTexture}));
+// Four bone indices and four weights per vertex; weights normalise to sum 1, a zero sum follows the root bone.
+const skin = Skin.attach(mesh, skeleton, joints, weights); // or new Skin(...) for CPU-only skinning
+skeleton.setPose(1, {rotation: [0, 0, Math.SQRT1_2, Math.SQRT1_2]}); // posing; the GPU follows next frame
+skeleton.restorePose(1); // Restore Pose; restorePose(1, true) also resets nested bones; restorePose() resets all
+skeleton.setBindPose(); // the current pose becomes the base pose, inverse binds recomputed
+skin.setInfluences(first, joints4, weights4); // weight painting
+const world = skeleton.worldMatrix(1, mesh.primitives[0].node.matrix); // for drawing and picking bones
+skin.dispose();
+```
+
+`Skin.attach` reuses the four-influence compute shader above and swaps the mesh's draw buffer (`primitive.deformed`), so
+textures, nearest sampling, vertex colours, shadows and GPU picking follow the pose; the mesh needs one shared vertex
+array (any `createMesh` mesh). An unchanged pose dispatches nothing. A pose change uploads 64 bytes per bone;
+`setInfluences` costs O(changed vertices) on the CPU, then the next frame uploads 32 bytes per vertex spanning the
+changed ones.
+Validation rejects bad indices and counts, repeated names, parent cycles and anything but one root (`RangeError` /
+`TypeError`). Material meshes do not render through `model.createRenderer(otherDevice)`, so neither does a skin.
