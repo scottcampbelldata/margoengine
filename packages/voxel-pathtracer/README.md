@@ -75,6 +75,10 @@ except `id`, `color` and `type` are optional.
 - `color` is linear RGB. Reflectance and albedo use it clamped to 1; emission `color * emission` is not clamped.
 - Any surface type may emit (`emission > 0`). Emissive voxels are lights: every exposed emissive face is sampled.
 - Roughness below about 0.03 is perfectly specular. Roughness is perceptual: the GGX alpha is `roughness^2`.
+- Rough metal and rough glass keep their energy: metals add Kulla and Conty's multiple-scattering lobe (weighted by the
+  average Fresnel, so coloured metals saturate as they should) and rough dielectric interfaces are normalised by their
+  directional albedo. A white rough metal or clear rough glass in a white sky is white at every roughness (measured
+  within 0.79%). The plastic coat stays single scattering (its rough highlights lose a little energy at grazing angles).
 - Glass: `color` tints light entering the volume; `density` adds Beer-Lambert absorption toward `color` per world unit
   (`color^(density * distance)`); `scatter` (addition) adds interior scattering per world unit, a random-walk subsurface
   look; `anisotropy` shapes that scattering. Adjacent voxels of the same glass index form one volume (no inner faces).
@@ -208,7 +212,11 @@ Numbers on other GPUs are not measured.
     3.0000; Beer-Lambert 0.3678 (e^-1 = 0.3679); tinted absorbing glass slab 0.3321 (0.3322 with exact Fresnel);
     sun irradiance, point and disk, 0.5000; two emissive planes 0.6671 (2/3); a large area light 1.0000; shadow through
     an absorbing medium 0.1839 (0.5 e^-1); a non-uniform environment map over a plane within 1% of the texel integral;
-  - GGX metal and plastic albedo at 20, 60 and 80 degrees within 0.0006 of a numerical integration of the same model;
+  - energy compensation: white furnaces of a metal plane and a 16-voxel clear glass slab at roughness 0.2, 0.5, 0.8 and
+    1.0, seen at 20, 60 and 80 degrees, all within 0.79% of 1 (worst: metal at roughness 0.2 and 80 degrees; glass
+    worst 0.68%); a gold plane within 0.14% per channel of single scattering plus Kulla-Conty's Fresnel-weighted
+    multiple scattering, both integrated numerically in the page;
+  - the GGX plastic coat's albedo at 20, 60 and 80 degrees within 0.0002 of a numerical integration of the same model;
   - environment orientation; equal seeds bit-identical;
   - convergence: error against a 16,384-sample reference falls 0.0216, 0.0114, 0.0058, 0.0030 at 16, 64, 256, 1024
     samples (1/sqrt(N)), both projections;
@@ -231,6 +239,10 @@ Numbers on other GPUs are not measured.
   roulette (structure as in PBRT, Pharr, Jakob and Humphreys).
 - GGX / Trowbridge-Reitz microfacets with height-correlated Smith masking (Walter et al. 2007, Heitz 2014), sampled from
   visible normals (Heitz 2018); Schlick's Fresnel for conductors and coats, exact dielectric Fresnel for glass.
+- Energy compensation: Kulla and Conty's multiple-scattering lobe for conductors ("Revisiting Physically Based Shading
+  at Imageworks", 2017) and albedo normalisation for rough dielectrics (as in Turquin 2019). The albedo tables
+  (E(mu, roughness) 32 x 32, Eavg 32, dielectric E(mu, roughness, eta) 16 x 16 x 32) are integrated once per device on
+  the GPU with the tracer's own sampling code and a low-discrepancy R2/R3 sequence (Roberts 2018).
 - Homogeneous media by free-flight sampling with Beer-Lambert absorption as a path weight, Henyey-Greenstein phase.
 - Environment maps importance sampled by marginal and conditional CDFs (PBRT).
 - Random numbers: PCG (O'Neill 2014) with Jarzynski and Olano's hash (2020); thin lens by Shirley and Chiu's concentric
@@ -252,8 +264,6 @@ Not done or not verified, stated plainly:
 - **No comparison against MagicaVoxel's renderer.** Images were not compared side by side; matching its exact look
   would need its proprietary material and lighting equations, which are not public. Mapping `.vox` render/material
   settings onto these inputs is the editor's job and is approximate.
-- **Energy loss on rough surfaces:** single-scattering GGX without multiple-scattering compensation darkens very rough
-  metal and glass (measured albedo 0.56 for white metal at roughness 0.8 seen at 20 degrees).
 - **Denoiser:** a classical filter, not a learned one; it removes noise in smooth regions (about x2-2.5 lower error at
   4-16 samples) but leaves caustic fireflies and edge pixels mostly as they are.
 - **Caustics converge slowly:** small-sun light through glass or off glossy surfaces is found only by path sampling;

@@ -6,6 +6,11 @@
 // - surfaces: Lambert, GGX / Trowbridge-Reitz microfacets with height-correlated Smith masking (Walter et al. 2007,
 //   Heitz 2014) sampled from visible normals (Heitz 2018), Schlick's Fresnel for conductors and coats, exact unpolarised
 //   dielectric Fresnel with refraction for glass; orthonormal bases by Duff et al. (2017);
+// - energy compensation: the multiple-scattering lobe of Kulla and Conty ("Revisiting Physically Based Shading at
+//   Imageworks", 2017) for conductors, Fresnel-weighted by the hemispherical average of Schlick's Fresnel, and an
+//   albedo normalisation for rough dielectrics (as in Turquin, "Practical multiple scattering compensation for
+//   microfacet models", 2019); the albedo tables are integrated on the GPU at start-up by TABLES below, with the
+//   tracer's own sampling code and a low-discrepancy R2/R3 sequence (Roberts 2018);
 // - volumes: homogeneous media by free-flight sampling with Beer-Lambert absorption as a weight, Henyey-Greenstein
 //   phase function; environment maps importance sampled by marginal and conditional CDFs (PBRT);
 // - random numbers: PCG (O'Neill 2014) with the hash of Jarzynski and Olano (2020);
@@ -48,11 +53,103 @@ struct Frame {
 }
 `;
 
-/** The path tracer: entry points `trace` (accumulate samples) and `ids` (pixel-centre instance and palette ids). */
-export const TRACE: string = /* wgsl */ `${FRAME}
+// Fixed-point multipliers of the R2 and R3 sequences (fract(k * alpha) computed exactly in u32 arithmetic).
+const fixed = (a: number) => `${Math.round(a * 2 ** 32) % 2 ** 32}u`;
+
+/** Constants and microfacet functions shared by the tracer and the table generator. */
+const COMMON = /* wgsl */ `
 const PI=3.141592653589793;
 const TAU=6.283185307179586;
 const INV_PI=0.3183098861837907;
+fn basis(n:vec3f)->mat3x3f {
+ let s=select(-1.0,1.0,n.z>=0.0);let a=-1.0/(s+n.z);let b=n.x*n.y*a;
+ return mat3x3f(vec3f(1.0+s*n.x*n.x*a,s*b,-s*n.x),vec3f(b,s+n.y*n.y*a,-n.y),n);
+}
+fn ggxD(a2:f32,nh:f32)->f32 {let k=nh*nh*(a2-1.0)+1.0;return a2/(PI*k*k);}
+fn lambdaG(a2:f32,c:f32)->f32 {let c2=max(c*c,1e-8);return 0.5*(sqrt(1.0+a2*(1.0-c2)/c2)-1.0);}
+fn fresnel(ci:f32,eta:f32)->f32 {
+ let s2=eta*eta*max(0.0,1.0-ci*ci);
+ if(s2>=1.0){return 1.0;}
+ let ct=sqrt(1.0-s2);
+ let rs=(eta*ci-ct)/(eta*ci+ct);let rp=(ci-eta*ct)/(ci+eta*ct);
+ return 0.5*(rs*rs+rp*rp);
+}
+// A GGX microfacet normal sampled from the normals visible from wo (Heitz 2018), for uniform numbers u.
+fn vndfU(wo:vec3f,alpha:f32,n:vec3f,u:vec2f)->vec3f {
+ let tb=basis(n);let w=transpose(tb)*wo;
+ let vh=normalize(vec3f(alpha*w.x,alpha*w.y,w.z));
+ let l2=vh.x*vh.x+vh.y*vh.y;
+ let t1=select(vec3f(1.0,0.0,0.0),vec3f(-vh.y,vh.x,0.0)*inverseSqrt(max(l2,1e-20)),l2>1e-12);
+ let t2=cross(vh,t1);
+ let r=sqrt(u.x);let p=TAU*u.y;
+ let p1=r*cos(p);let s=0.5*(1.0+vh.z);let p2=(1.0-s)*sqrt(max(0.0,1.0-p1*p1))+s*r*sin(p);
+ let m=p1*t1+p2*t2+sqrt(max(0.0,1.0-p1*p1-p2*p2))*vh;
+ return tb*normalize(vec3f(alpha*m.x,alpha*m.y,max(1e-6,m.z)));
+}
+`;
+
+/** Floats of the albedo tables (TABLES), as vec4: E(mu, r) 32 x 32, Eavg(r) 32, glass E(mu, r, eta) 16 x 16 x 32. */
+export const TABLE_VEC4 = 2312;
+
+/**
+ * Albedo tables for energy compensation, one cell per invocation: directional albedo E(mu, roughness) of the GGX
+ * conductor lobe with Fresnel 1, its cosine-weighted average Eavg(roughness), and the directional albedo of the rough
+ * dielectric interface E(mu, roughness, eta) (reflection plus refraction). Each is the expected weight of the tracer's
+ * own estimator (visible-normal sampling, G2 / G1 weights) over 4,096 (65,536 for Eavg) low-discrepancy samples.
+ */
+export const TABLES: string = /* wgsl */ `${COMMON}
+@group(0) @binding(0) var<storage,read_write> table:array<f32>;
+const E_MU=32u;const E_R=32u;const G_MU=16u;const G_R=16u;const G_ETA=32u;
+const E_AVG_BASE=1024u;const GLASS_BASE=1056u;const TABLE_SIZE=9248u;const SAMPLES=4096u;
+fn seq(k:u32,a:u32)->f32 {return f32((k*a+0x80000000u)>>8u)*5.960464477539063e-8;}
+fn muAt(i:u32,n:u32)->f32 {return max(f32(i)/f32(n-1u),0.002);}
+fn roughAt(j:u32,n:u32)->f32 {return f32(j)/f32(n-1u);}
+fn reflectWeight(mu:f32,alpha:f32,u:vec2f)->f32 {
+ let a2=alpha*alpha;let n=vec3f(0.0,0.0,1.0);let wo=vec3f(sqrt(max(0.0,1.0-mu*mu)),0.0,mu);
+ let lo=lambdaG(a2,mu);let wi=reflect(-wo,vndfU(wo,alpha,n,u));
+ return select(0.0,(1.0+lo)/(1.0+lo+lambdaG(a2,wi.z)),wi.z>0.0);
+}
+fn albedoE(mu:f32,r:f32)->f32 {
+ let alpha=max(r*r,1e-4);var sum=0.0;
+ for(var k=0u;k<SAMPLES;k++){sum+=reflectWeight(mu,alpha,vec2f(seq(k,${fixed(0.7548776662466927)}),seq(k,${fixed(0.5698402909980532)})));}
+ return sum/f32(SAMPLES);
+}
+fn averageE(r:f32)->f32 {
+ let alpha=max(r*r,1e-4);var sum=0.0;let n=SAMPLES*16u;
+ for(var k=0u;k<n;k++){
+  let mu=max(sqrt(seq(k,${fixed(0.8191725133961645)})),0.002);
+  sum+=reflectWeight(mu,alpha,vec2f(seq(k,${fixed(0.6710436067037893)}),seq(k,${fixed(0.5497004779019703)})));
+ }
+ return sum/f32(n);
+}
+fn albedoGlass(mu:f32,r:f32,eta:f32)->f32 {
+ let alpha=max(r*r,1e-4);let a2=alpha*alpha;let n=vec3f(0.0,0.0,1.0);let wo=vec3f(sqrt(max(0.0,1.0-mu*mu)),0.0,mu);
+ let lo=lambdaG(a2,mu);var sum=0.0;
+ for(var k=0u;k<SAMPLES;k++){
+  let m=vndfU(wo,alpha,n,vec2f(seq(k,${fixed(0.7548776662466927)}),seq(k,${fixed(0.5698402909980532)})));
+  let c=dot(wo,m);
+  if(c<=0.0){continue;}
+  let fr=fresnel(c,eta);
+  let wr=reflect(-wo,m);
+  if(wr.z>0.0){sum+=fr*(1.0+lo)/(1.0+lo+lambdaG(a2,wr.z));}
+  if(fr<1.0){let wt=refract(-wo,m,eta);if(wt.z<0.0){sum+=(1.0-fr)*(1.0+lo)/(1.0+lo+lambdaG(a2,-wt.z));}}
+ }
+ return sum/f32(SAMPLES);
+}
+@compute @workgroup_size(64) fn tables(@builtin(global_invocation_id) g:vec3u) {
+ let i=g.x;
+ if(i<E_AVG_BASE){table[i]=albedoE(muAt(i%E_MU,E_MU),roughAt(i/E_MU,E_R));return;}
+ if(i<GLASS_BASE){table[i]=averageE(roughAt(i-E_AVG_BASE,E_R));return;}
+ if(i<TABLE_SIZE){
+  let j=i-GLASS_BASE;
+  let eta=exp((2.0*f32(j/(G_MU*G_R))/f32(G_ETA-1u)-1.0)*log(3.0));
+  table[i]=albedoGlass(muAt(j%G_MU,G_MU),roughAt((j/G_MU)%G_R,G_R),eta);
+ }
+}
+`;
+
+/** The path tracer: entry points `trace` (accumulate samples) and `ids` (pixel-centre instance and palette ids). */
+export const TRACE: string = /* wgsl */ `${FRAME}${COMMON}
 const INF=3.0e38;
 const NONE=0xffffffffu;
 const GROUND=0xfffffffeu;
@@ -79,6 +176,7 @@ const INSTANCE=${INSTANCE_WORDS}u;
 @group(0) @binding(6) var<storage,read_write> accum:array<vec4f>;
 @group(0) @binding(7) var<storage,read_write> albedo:array<vec4f>;
 @group(0) @binding(8) var<storage,read_write> normals:array<vec4f>;
+@group(0) @binding(9) var<uniform> tables:array<vec4f,${TABLE_VEC4}>;
 var<private> rng:u32;
 var<private> motion:f32;
 
@@ -360,27 +458,27 @@ fn material(id:u32)->Mat {
 fn groundMat()->Mat {var m:Mat;m.color=f.ground.xyz;m.alpha=1.0;m.ior=1.5;return m;}
 fn schlick3(f0:vec3f,c:f32)->vec3f {return f0+(1.0-f0)*pow(1.0-clamp(c,0.0,1.0),5.0);}
 fn schlick1(f0:f32,c:f32)->f32 {return f0+(1.0-f0)*pow(1.0-clamp(c,0.0,1.0),5.0);}
-fn ggxD(a2:f32,nh:f32)->f32 {let k=nh*nh*(a2-1.0)+1.0;return a2/(PI*k*k);}
-fn lambdaG(a2:f32,c:f32)->f32 {let c2=max(c*c,1e-8);return 0.5*(sqrt(1.0+a2*(1.0-c2)/c2)-1.0);}
-fn basis(n:vec3f)->mat3x3f {
- let s=select(-1.0,1.0,n.z>=0.0);let a=-1.0/(s+n.z);let b=n.x*n.y*a;
- return mat3x3f(vec3f(1.0+s*n.x*n.x*a,s*b,-s*n.x),vec3f(b,s+n.y*n.y*a,-n.y),n);
-}
 fn cosineDir(n:vec3f)->vec3f {
  let u=vec2f(rand(),rand());let r=sqrt(u.x);let p=TAU*u.y;
  return basis(n)*vec3f(r*cos(p),r*sin(p),sqrt(max(0.0,1.0-u.x)));
 }
-// A GGX microfacet normal sampled from the normals visible from wo (Heitz 2018).
-fn vndf(wo:vec3f,alpha:f32,n:vec3f)->vec3f {
- let tb=basis(n);let w=transpose(tb)*wo;
- let vh=normalize(vec3f(alpha*w.x,alpha*w.y,w.z));
- let l2=vh.x*vh.x+vh.y*vh.y;
- let t1=select(vec3f(1.0,0.0,0.0),vec3f(-vh.y,vh.x,0.0)*inverseSqrt(max(l2,1e-20)),l2>1e-12);
- let t2=cross(vh,t1);
- let u=vec2f(rand(),rand());let r=sqrt(u.x);let p=TAU*u.y;
- let p1=r*cos(p);let s=0.5*(1.0+vh.z);let p2=(1.0-s)*sqrt(max(0.0,1.0-p1*p1))+s*r*sin(p);
- let m=p1*t1+p2*t2+sqrt(max(0.0,1.0-p1*p1-p2*p2))*vh;
- return tb*normalize(vec3f(alpha*m.x,alpha*m.y,max(1e-6,m.z)));
+fn vndf(wo:vec3f,alpha:f32,n:vec3f)->vec3f {return vndfU(wo,alpha,n,vec2f(rand(),rand()));}
+// Albedo tables (TABLES): bilinear in (mu, roughness), trilinear with log(eta) for the dielectric.
+fn tab(i:u32)->f32 {return tables[i>>2u][i&3u];}
+fn tableE(mu:f32,r:f32)->f32 {
+ let x=clamp(mu,0.0,1.0)*31.0;let y=clamp(r,0.0,1.0)*31.0;let x0=min(u32(x),30u);let y0=min(u32(y),30u);
+ let fx=x-f32(x0);let fy=y-f32(y0);let i=x0+32u*y0;
+ return mix(mix(tab(i),tab(i+1u),fx),mix(tab(i+32u),tab(i+33u),fx),fy);
+}
+fn tableEavg(r:f32)->f32 {let y=clamp(r,0.0,1.0)*31.0;let y0=min(u32(y),30u);return mix(tab(1024u+y0),tab(1025u+y0),y-f32(y0));}
+fn tableGlass(mu:f32,r:f32,eta:f32)->f32 {
+ let x=clamp(mu,0.0,1.0)*15.0;let y=clamp(r,0.0,1.0)*15.0;let z=clamp((log(eta)/log(3.0)+1.0)*0.5,0.0,1.0)*31.0;
+ let x0=min(u32(x),14u);let y0=min(u32(y),14u);let z0=min(u32(z),30u);
+ let fx=x-f32(x0);let fy=y-f32(y0);let fz=z-f32(z0);
+ let i=1056u+x0+16u*(y0+16u*z0);
+ let a=mix(mix(tab(i),tab(i+1u),fx),mix(tab(i+16u),tab(i+17u),fx),fy);
+ let b=mix(mix(tab(i+256u),tab(i+257u),fx),mix(tab(i+272u),tab(i+273u),fx),fy);
+ return mix(a,b,fz);
 }
 struct Eval {f:vec3f,pdf:f32}
 // BSDF times cos(wi) and the density of sampling wi, over the lobes other than glass and perfectly specular ones.
@@ -397,19 +495,22 @@ fn evalSurface(m:Mat,n:vec3f,wo:vec3f,wi:vec3f)->Eval {
   let d=ggxD(a2,nh);let lo=lambdaG(a2,co);let g2=1.0/(1.0+lo+lambdaG(a2,ci));
   let spec=d*g2/(4.0*co);
   e.f+=(m.metal*schlick3(m.color,vh)+pb*m.spec*schlick1(m.f0,vh))*spec;
-  e.pdf+=(m.metal+pb*pc)*d/((1.0+lo)*4.0*co);
+  var qms=0.0;
+  if(m.metal>0.0){
+   // Multiple scattering between the microfacets (Kulla and Conty): (1 - E(mu_o)) (1 - E(mu_i)) / (pi (1 - Eavg)),
+   // scaled by Favg^2 Eavg / (1 - Favg (1 - Eavg)) with Favg the hemispherical average of Schlick's Fresnel.
+   let rough=sqrt(m.alpha);let ea=tableEavg(rough);
+   qms=clamp(1.0-tableE(co,rough),0.0,1.0);
+   let fa=m.color+(1.0-m.color)/21.0;
+   e.f+=m.metal*fa*fa*ea/(1.0-fa*(1.0-ea))*qms*(1.0-tableE(ci,rough))/(PI*max(1.0-ea,1e-4))*ci;
+  }
+  e.pdf+=(m.metal*(1.0-qms)+pb*pc)*d/((1.0+lo)*4.0*co)+m.metal*qms*ci*INV_PI;
  }
  return e;
 }
-fn fresnel(ci:f32,eta:f32)->f32 {
- let s2=eta*eta*max(0.0,1.0-ci*ci);
- if(s2>=1.0){return 1.0;}
- let ct=sqrt(1.0-s2);
- let rs=(eta*ci-ct)/(eta*ci+ct);let rp=(ci-eta*ct)/(ci+eta*ct);
- return 0.5*(rs*rs+rp*rp);
-}
 struct Bounce {wi:vec3f,w:vec3f,pdf:f32,transmit:bool,ok:bool}
-// Dielectric interface with relative index eta = n(incident side) / n(other side); smooth or GGX-rough.
+// Dielectric interface with relative index eta = n(incident side) / n(other side); smooth or GGX-rough. Rough
+// interfaces divide by their directional albedo, so the energy masking and shadowing would lose comes back.
 fn dielectric(alpha:f32,n:vec3f,wo:vec3f,eta:f32,isSmooth:bool)->Bounce {
  var s:Bounce;
  var m=n;
@@ -425,7 +526,10 @@ fn dielectric(alpha:f32,n:vec3f,wo:vec3f,eta:f32,isSmooth:bool)->Bounce {
   if(dot(s.wi,n)>=0.0){return s;}
  }
  s.w=vec3f(1.0);
- if(!isSmooth){let a2=alpha*alpha;let lo=lambdaG(a2,dot(n,wo));s.w=vec3f((1.0+lo)/(1.0+lo+lambdaG(a2,abs(dot(n,s.wi)))));}
+ if(!isSmooth){
+  let a2=alpha*alpha;let co=dot(n,wo);let lo=lambdaG(a2,co);
+  s.w=vec3f((1.0+lo)/(1.0+lo+lambdaG(a2,abs(dot(n,s.wi))))/max(tableGlass(co,sqrt(alpha),eta),0.05));
+ }
  s.ok=true;
  return s;
 }
@@ -445,7 +549,8 @@ fn sampleSurface(m:Mat,n:vec3f,wo:vec3f,etaI:f32)->Bounce {
   if(r<qm+qc){s.wi=reflect(-wo,n);s.w=vec3f(1.0);s.ok=true;return s;}
   s.wi=cosineDir(n);
  } else {
-  if(r<qm+qc){s.wi=reflect(-wo,vndf(wo,m.alpha,n));}
+  let qms=select(0.0,clamp(1.0-tableE(co,sqrt(m.alpha)),0.0,1.0),m.metal>0.0);
+  if(r<qm*(1.0-qms)+qc){s.wi=reflect(-wo,vndf(wo,m.alpha,n));}
   else{s.wi=cosineDir(n);}
  }
  let e=evalSurface(m,n,wo,s.wi);

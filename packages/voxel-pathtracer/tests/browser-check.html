@@ -207,13 +207,48 @@ window.check={
     const h=[wo[0]+wi[0],wo[1]+wi[1],wo[2]+wi[2]],hl=Math.hypot(...h),nh=h[2]/hl,vh=(wo[0]*h[0]+wo[1]*h[1]+wo[2]*h[2])/hl;
     const f=D(a2,nh)/(1+L(a2,mu)+L(a2,ci))/(4*mu*ci)*schlick(f0,vh);e+=f*ci*si*(Math.PI/2/N)*(2*Math.PI/(2*N));}}return e;};
   const plane={revision:1,models:[model('p',[64,1,64],()=>1)],instances:[{id:'p',modelId:'p',matrix:translate(-32,-1,-32)}],environment:{skyColor:[1,1,1]}};
-  for(const [name,material,f0,diffuse] of [['metal r0.5',{color:[1,1,1],type:'metal',roughness:0.5},1,false],['metal r0.8',{color:[1,1,1],type:'metal',roughness:0.8},1,false],['plastic r0.4',{color:[1,1,1],type:'plastic',roughness:0.4},0.04,true]])
+  // Conductors add multiple scattering on top of this single-scattering model: see energy().
+  for(const [name,material,f0,diffuse] of [['plastic r0.4',{color:[1,1,1],type:'plastic',roughness:0.4},0.04,true],['plastic r0.8',{color:[1,1,1],type:'plastic',roughness:0.8},0.04,true]])
    for(const deg of [20,60,80]){
     const mu=Math.cos(deg*Math.PI/180),r=material.roughness;
     look([50*Math.sin(deg*Math.PI/180),50*mu,0],[0,0,0],{project:ortho(4)});
     const measured=await withTracer({...plane,materials:[{id:1,...material}]},{maxBounces:2},async(t)=>{const image=await t.renderImage({width:24,height:24,samples:2048,aovs:true,jitter:false});return stats(image,(i)=>image.instance[i]===0);});
     out[`${name} ${deg} deg`]={measured:measured.mean,sd:measured.sd,pixels:measured.pixels,integrated:albedo(mu,r*r,f0,diffuse)};
    }
+  look([20,14,24],[4,3,4]);
+  return {...out,errors:errors.splice(0)};
+ },
+ // Energy compensation: white furnaces of a flat white metal plane and a thick clear glass slab, seen at one angle
+ // (orthographic) in a sky of radiance 1, must show 1 at every roughness; a gold plane must show the single-scattering
+ // albedo plus Kulla-Conty's Fresnel-weighted multiple scattering, both integrated numerically here.
+ async energy(){
+  const out={},D=(a2,c)=>{const k=c*c*(a2-1)+1;return a2/(Math.PI*k*k);},L=(a2,c)=>{const c2=Math.max(c*c,1e-8);return 0.5*(Math.sqrt(1+a2*(1-c2)/c2)-1);};
+  // Single-scattering albedo of the GGX conductor lobe with Schlick Fresnel f0 (per channel), midpoint quadrature.
+  const ss=(mu,alpha,f0,N=384)=>{const a2=alpha*alpha,wo=[Math.sqrt(1-mu*mu),0,mu],e=f0.map(()=>0);
+   for(let i=0;i<N;i++){const th=(i+0.5)/N*Math.PI/2,ci=Math.cos(th),si=Math.sin(th);for(let j=0;j<2*N;j++){const ph=(j+0.5)/(2*N)*2*Math.PI,wi=[si*Math.cos(ph),si*Math.sin(ph),ci];
+    const h=[wo[0]+wi[0],wo[1]+wi[1],wo[2]+wi[2]],hl=Math.hypot(...h),nh=h[2]/hl,vh=(wo[0]*h[0]+wo[1]*h[1]+wo[2]*h[2])/hl,w=D(a2,nh)/(1+L(a2,mu)+L(a2,ci))/(4*mu*ci)*ci*si*(Math.PI/2/N)*(2*Math.PI/(2*N));
+    for(let c=0;c<f0.length;c++)e[c]+=w*(f0[c]+(1-f0[c])*(1-Math.min(1,Math.max(0,vh)))**5);}}return e;};
+  const surface=(model,material,deg,options={})=>{
+   const mu=Math.cos(deg*Math.PI/180);look([50*Math.sin(deg*Math.PI/180),50*mu,0],[0,0,0],{project:ortho(4)});
+   return withTracer({revision:1,models:[model],instances:[{id:'p',modelId:model.id,matrix:translate(-32,-model.size[1],-32)}],materials:[{id:1,...material}],environment:{skyColor:[1,1,1]}},{maxBounces:64,...options},async(t)=>{
+    const image=await t.renderImage({width:24,height:24,samples:1024,aovs:true,jitter:false}),rgb=[0,0,0];let n=0;
+    for(let i=0;i<image.width*image.height;i++)if(image.instance[i]===0){for(let c=0;c<3;c++)rgb[c]+=image.color[i*3+c];n++;}
+    return {rgb:rgb.map((v)=>v/n),pixels:n};
+   });
+  };
+  const plane=model('plane',[64,1,64],()=>1),slab=model('slab',[64,16,64],()=>1);
+  for(const r of [0.2,0.5,0.8,1])for(const deg of [20,60,80]){
+   out[`metal r${r} ${deg} deg`]=await surface(plane,{color:[1,1,1],type:'metal',roughness:r},deg);
+   out[`glass r${r} ${deg} deg`]=await surface(slab,{color:[1,1,1],type:'glass',roughness:r},deg);
+  }
+  // Gold: E_F(mu) + (1 - E(mu)) Favg^2 Eavg / (1 - Favg (1 - Eavg)), E and Eavg with Fresnel 1.
+  const gold=[1,0.75,0.3];
+  for(const [r,deg] of [[0.5,60],[0.8,20],[1,80]]){
+   const alpha=r*r,mu=Math.cos(deg*Math.PI/180),ef=ss(mu,alpha,gold),e=ss(mu,alpha,[1])[0];
+   let eavg=0;for(let i=0;i<32;i++){const m=(i+0.5)/32;eavg+=2*ss(m,alpha,[1],128)[0]*m/32;}
+   const expected=gold.map((f0,c)=>{const fa=f0+(1-f0)/21;return ef[c]+(1-e)*fa*fa*eavg/(1-fa*(1-eavg));});
+   out[`gold r${r} ${deg} deg`]={...(await surface(plane,{color:gold,type:'metal',roughness:r},deg)),expected,singleScattering:ef};
+  }
   look([20,14,24],[4,3,4]);
   return {...out,errors:errors.splice(0)};
  },

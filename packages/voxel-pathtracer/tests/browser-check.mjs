@@ -6,6 +6,9 @@
 // - analytic: furnaces (diffuse, metal, plastic, glass, media, blend, constant environment map), direct emission,
 //   Beer-Lambert media, a tinted absorbing glass slab, sun irradiance (point and disk), two emissive planes (emitter
 //   sampling with MIS) and a large area light, each against its closed-form value;
+// - energy: white furnaces of metal and glass planes at roughness 0.2/0.5/0.8/1 and 20/60/80 degrees equal 1 (multiple-
+//   scattering compensation), gold equals Kulla-Conty's expectation from numerically integrated albedos;
+// - microfacet: the GGX plastic coat's albedo against numerical integration of the same model;
 // - environment: the equirectangular map's orientation; determinism: equal seeds give identical images;
 // - convergence: error against a 4096-sample reference falls about as 1/sqrt(samples), both projections;
 // - denoise: error with and without the wavelet denoiser, overall and at object edges;
@@ -78,6 +81,8 @@ try {
         'white media': [1, 0.02],
         'diffuse 0.5 env map': [0.5, 0.005],
         'emission 3': [3, 0.001],
+        'rough metal 1': [1, 0.02],
+        'rough glass': [1, 0.02],
         'beer-lambert exp(-1)': [Math.exp(-1), 0.01],
         'tinted glass slab': [0.04 + (0.96 * 0.96 * 0.5 * 0.6185) / (1 - 0.04 * 0.6185), 0.01],
         'sun 0': [0.5, 0.005],
@@ -95,7 +100,8 @@ try {
         near(s.mean, s.expected, s.expected * 0.01, `${name} (integrated ${s.expected.toFixed(4)})`);
     }
     // Single-scattering GGX loses some energy at high roughness (no multiple-scattering compensation): bounded.
-    for (const name of ['rough metal 1', 'rough plastic 1', 'rough glass', 'white blend', 'white subsurface'])
+    // The plastic coat (and the coat inside blend) is single scattering: bounded, not exact.
+    for (const name of ['rough plastic 1', 'white blend', 'white subsurface'])
       assert.ok(r[name].mean > 0.85 && r[name].mean < 1.005, `${name}: ${r[name].mean}`);
   }
   if (wanted('microfacet')) {
@@ -107,6 +113,23 @@ try {
       );
       near(m.measured, m.integrated, 0.006, name);
     }
+  }
+  if (wanted('energy')) {
+    const r = await run('energy');
+    let worst = 0;
+    for (const [name, m] of Object.entries(r)) {
+      if (name === 'errors') continue;
+      const expected = m.expected ?? [1, 1, 1],
+        error = Math.max(...m.rgb.map((v, c) => Math.abs(v - expected[c]) / expected[c]));
+      console.log(
+        `  ${name}: ${m.rgb.map((v) => v.toFixed(4)).join(' ')} expected ${expected.map((v) => v.toFixed(4)).join(' ')} (${(error * 100).toFixed(2)}%, ${m.pixels} px)`,
+      );
+      assert.ok(m.pixels > 400, `${name}: the surface fills the view`);
+      worst = Math.max(worst, error);
+      assert.ok(error < 0.02, `${name}: ${(error * 100).toFixed(2)}% from the expected albedo`);
+    }
+    report.results.energy.worst = worst;
+    console.log(`  worst relative error ${(worst * 100).toFixed(2)}%`);
   }
   if (wanted('environment')) {
     const r = await run('environment');

@@ -38,7 +38,7 @@ import {
   type SceneCache,
   type SceneSnapshot,
 } from './scene.js';
-import { DENOISE, DISPLAY, TRACE } from './shaders.js';
+import { DENOISE, DISPLAY, TABLE_VEC4, TABLES, TRACE } from './shaders.js';
 import { raycastSnapshot } from './traverse.js';
 import type {
   TraceVec3,
@@ -229,6 +229,9 @@ interface Gpu {
   pipelines?: Pipelines;
   display: Map<string, { pipeline?: GPURenderPipeline }>;
   buffers: SceneBuffers;
+  /** Energy-compensation albedo tables (uniform) and the storage buffer the GPU integrates them into. */
+  tables: GPUBuffer;
+  tableScratch: GPUBuffer;
   capacity: number;
   runs: Runs;
   regions: Map<PackedModel, number>;
@@ -637,8 +640,10 @@ export class VoxelPathTracer implements EnginePlugin {
           entry(6, 'storage'),
           entry(7, 'storage'),
           entry(8, 'storage'),
+          entry(9, 'uniform'),
         ],
       }),
+      tablesLayout = device.createBindGroupLayout({ entries: [entry(0, 'storage')] }),
       denoiseLayout = device.createBindGroupLayout({
         entries: [
           entry(0, 'uniform'),
@@ -666,6 +671,8 @@ export class VoxelPathTracer implements EnginePlugin {
         displayLayout,
         display: new Map(),
         buffers: undefined as unknown as SceneBuffers,
+        tables: undefined as unknown as GPUBuffer,
+        tableScratch: undefined as unknown as GPUBuffer,
         capacity: 0,
         runs: new Runs(4, 4),
         regions: new Map(),
@@ -684,6 +691,8 @@ export class VoxelPathTracer implements EnginePlugin {
       lights: this.#buffer(gpu, 16, storage),
       env: this.#buffer(gpu, 16, storage),
     };
+    gpu.tables = this.#buffer(gpu, TABLE_VEC4 * 16, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+    gpu.tableScratch = this.#buffer(gpu, TABLE_VEC4 * 16, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
     gpu.capacity = 4;
     void device.lost?.then(() => {
       gpu.lost = true;
@@ -693,6 +702,7 @@ export class VoxelPathTracer implements EnginePlugin {
     this.#status = 'compiling';
     const trace = device.createShaderModule({ code: TRACE }),
       denoise = device.createShaderModule({ code: DENOISE }),
+      tables = device.createShaderModule({ code: TABLES }),
       layout = (l: GPUBindGroupLayout) => device.createPipelineLayout({ bindGroupLayouts: [l] }),
       compute = (module: GPUShaderModule, entryPoint: string, l: GPUBindGroupLayout) =>
         device.createComputePipelineAsync({ layout: layout(l), compute: { module, entryPoint } });
@@ -701,9 +711,25 @@ export class VoxelPathTracer implements EnginePlugin {
       compute(trace, 'ids', traceLayout),
       compute(denoise, 'prepare', denoiseLayout),
       compute(denoise, 'atrous', denoiseLayout),
+      compute(tables, 'tables', tablesLayout),
     ]).then(
-      ([t, ids, prepare, atrous]) => {
+      ([t, ids, prepare, atrous, table]) => {
         if (this.#gpu !== gpu || this.#disposed) return;
+        // Integrate the albedo tables once per device; queue order puts them before any trace.
+        const encoder = device.createCommandEncoder(),
+          pass = encoder.beginComputePass();
+        pass.setPipeline(table);
+        pass.setBindGroup(
+          0,
+          device.createBindGroup({
+            layout: tablesLayout,
+            entries: [{ binding: 0, resource: { buffer: gpu.tableScratch } }],
+          }),
+        );
+        pass.dispatchWorkgroups(Math.ceil((TABLE_VEC4 * 4) / 64));
+        pass.end();
+        encoder.copyBufferToBuffer(gpu.tableScratch, 0, gpu.tables, 0, TABLE_VEC4 * 16);
+        device.queue.submit([encoder.finish()]);
         gpu.pipelines = { trace: t, ids, prepare, atrous };
         this.#status = 'ready';
         this.#settle?.[0]();
@@ -724,6 +750,8 @@ export class VoxelPathTracer implements EnginePlugin {
     if (!gpu) return;
     this.#gpu = undefined;
     for (const b of Object.values(gpu.buffers)) this.#destroy(b);
+    this.#destroy(gpu.tables);
+    this.#destroy(gpu.tableScratch);
     this.#releaseTargets(gpu.view);
     if (gpu.view) {
       this.#destroy(gpu.view.frame);
@@ -866,6 +894,7 @@ export class VoxelPathTracer implements EnginePlugin {
         { binding: 6, resource: { buffer: t.accum } },
         { binding: 7, resource: { buffer: t.albedo } },
         { binding: 8, resource: { buffer: t.normals } },
+        { binding: 9, resource: { buffer: gpu.tables } },
       ],
     });
   }
