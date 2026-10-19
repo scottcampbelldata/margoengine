@@ -13,6 +13,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "dof-phone": {
@@ -28,6 +39,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "tonemap-high": {
@@ -43,6 +65,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "tonemap-phone": {
@@ -58,6 +91,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "night-citadel-high": {
@@ -65,14 +109,25 @@
    "size": "640x360",
    "runs": 4,
    "noise": {
-    "changed": 0.000026,
-    "hot": 0.00000868,
-    "mean": 0.000326,
-    "max": 32
+    "changed": 0.000013,
+    "hot": 0.00000434,
+    "mean": 0.000191,
+    "max": 27
    },
    "tolerance": {
-    "changed": 0.000578,
-    "hot": 0.000226
+    "changed": 0.000539,
+    "hot": 0.000213
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "night-citadel-light": {
@@ -80,14 +135,25 @@
    "size": "640x360",
    "runs": 4,
    "noise": {
-    "changed": 0.000773,
-    "hot": 0.0000434,
-    "mean": 0.00668,
-    "max": 77
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
    },
    "tolerance": {
-    "changed": 0.00282,
-    "hot": 0.00033
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "night-citadel-phone": {
@@ -95,14 +161,25 @@
    "size": "195x422",
    "runs": 4,
    "noise": {
-    "changed": 0.00376,
-    "hot": 0.0000365,
-    "mean": 0.0146,
-    "max": 36
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
    },
    "tolerance": {
-    "changed": 0.0118,
-    "hot": 0.000309
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "gameplay-sandbox-high": {
@@ -110,14 +187,25 @@
    "size": "640x360",
    "runs": 4,
    "noise": {
-    "changed": 0.0518,
-    "hot": 0.00341,
-    "mean": 0.357,
-    "max": 201
+    "changed": 0.0000564,
+    "hot": 0,
+    "mean": 0.000278,
+    "max": 8
    },
    "tolerance": {
-    "changed": 0.156,
-    "hot": 0.0104
+    "changed": 0.000669,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "gameplay-sandbox-light": {
@@ -125,14 +213,25 @@
    "size": "640x360",
    "runs": 4,
    "noise": {
-    "changed": 0.0133,
-    "hot": 0.000707,
-    "mean": 0.0813,
-    "max": 179
+    "changed": 0.0000521,
+    "hot": 0,
+    "mean": 0.000273,
+    "max": 8
    },
    "tolerance": {
-    "changed": 0.0404,
-    "hot": 0.00232
+    "changed": 0.000656,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "gameplay-sandbox-phone": {
@@ -140,14 +239,25 @@
    "size": "195x422",
    "runs": 4,
    "noise": {
-    "changed": 0.0155,
-    "hot": 0.000389,
-    "mean": 0.0748,
-    "max": 144
+    "changed": 0.0000243,
+    "hot": 0,
+    "mean": 0.0000243,
+    "max": 1
    },
    "tolerance": {
-    "changed": 0.047,
-    "hot": 0.00137
+    "changed": 0.000573,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "character-animation-high": {
@@ -163,6 +273,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "character-animation-light": {
@@ -178,6 +299,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "character-animation-phone": {
@@ -193,6 +325,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "windy-meadow-high": {
@@ -208,6 +351,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "windy-meadow-light": {
@@ -223,6 +377,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "windy-meadow-phone": {
@@ -238,6 +403,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "earth-high": {
@@ -253,6 +429,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "earth-light": {
@@ -268,6 +455,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "earth-phone": {
@@ -283,6 +481,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "flight-helmet-high": {
@@ -298,6 +507,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "flight-helmet-light": {
@@ -313,6 +533,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "flight-helmet-phone": {
@@ -328,6 +559,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-MetalRoughSpheres-model": {
@@ -343,6 +585,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-AlphaBlendModeTest-model": {
@@ -358,6 +611,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-NormalTangentMirrorTest-model": {
@@ -373,6 +637,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-TextureTransformTest-model": {
@@ -388,6 +663,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-OrientationTest-model": {
@@ -403,6 +689,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-NegativeScaleTest-model": {
@@ -418,6 +715,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-BoxVertexColors-model": {
@@ -433,6 +741,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-InterpolationTest-model": {
@@ -448,6 +767,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-MorphStressTest-model": {
@@ -463,6 +793,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-RiggedFigure-model": {
@@ -478,6 +819,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-Fox-model": {
@@ -493,6 +845,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-MultipleScenes-model": {
@@ -508,6 +871,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-Cameras-model": {
@@ -523,6 +897,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-DirectionalLight-model": {
@@ -538,6 +923,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-PointLightIntensityTest-model": {
@@ -553,6 +949,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-LightsPunctualLamp-model": {
@@ -568,6 +975,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-NodePerformanceTest-model": {
@@ -583,6 +1001,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-SciFiHelmet-model": {
@@ -598,6 +1027,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-ToyCar-model": {
@@ -613,6 +1053,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-SheenChair-model": {
@@ -628,6 +1079,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-MaterialsVariantsShoe-model": {
@@ -643,6 +1105,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-IridescenceLamp-model": {
@@ -658,6 +1131,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-AnisotropyBarnLamp-model": {
@@ -673,6 +1157,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-DiffuseTransmissionTeacup-model": {
@@ -688,6 +1183,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-CommercialRefrigerator-model": {
@@ -703,6 +1209,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-Lantern-model": {
@@ -718,6 +1235,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-BoomBox-model": {
@@ -733,6 +1261,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-Corset-model": {
@@ -748,6 +1287,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-FlightHelmet-model": {
@@ -763,6 +1313,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "dof-light": {
@@ -778,6 +1339,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-MeshPrimitiveModes-model": {
@@ -793,6 +1365,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-MeshoptCubeTest-model": {
@@ -808,6 +1391,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "khronos-ABeautifulGame-model": {
@@ -823,6 +1417,17 @@
    "tolerance": {
     "changed": 0.0005,
     "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 155.0.4283.45",
+    "gpu": "intel xe-2lpg",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-19T01:56:44.993Z",
+    "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   }
  },
@@ -831,8 +1436,11 @@
   "gpu": "intel xe-2lpg",
   "acPowerBefore": true,
   "acPowerAfter": true,
-  "date": "2026-10-15T20:51:52.655Z",
-  "commit": "e525b6e"
+  "date": "2026-10-19T01:56:44.993Z",
+  "commit": "80aa5c9a197782ae7e7f90be96b45c52f8375b4f",
+  "packagesDirty": false,
+  "renderedInputsDirty": false,
+  "renderedInputChanges": []
  },
  "method": {
   "hot": 24,
@@ -841,5 +1449,6 @@
    "changed": 0.0005,
    "hot": 0.0002
   }
- }
+ },
+ "profile": "legacy"
 }
