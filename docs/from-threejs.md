@@ -335,7 +335,8 @@ variant.copy(paint);                // same shading: copies every value in place
 paint.dispose();                    // frees what no mesh uses; createMesh with it now throws
 ```
 
-- Maps: `map`, `normalMap`, `metalRoughnessMap` (glTF packing), `aoMap`, `emissiveMap`, and the physical maps below.
+- Maps: `map`, `normalMap`, `metalRoughnessMap` (glTF packing), `aoMap`, `emissiveMap`, `alphaMap` (green channel),
+  and the physical maps below.
   Render state, live: `transparent`, `alphaTest`, `blending` (`'normal'`, `'additive'`, `'multiply'`, `'none'`),
   `depthWrite`, `depthTest`, `colorWrite`, `polygonOffset*`, the stencil options and `wireframe`.
 - A grouped mesh's `mesh.material` is a frozen array; assign a new array of the same length to swap it.

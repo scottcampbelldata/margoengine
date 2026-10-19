@@ -556,3 +556,20 @@ glTF parsing and export preserve `KHR_materials_dispersion`. The retained glTF r
 the extension. For imported `KHR_materials_volume.thicknessTexture`, use `install(model)`; native glTF transmission
 uses scalar thickness. Constructed meshes support their live `thicknessMap` through `Transmission`.
 The screen-space volume approximation and existing transmission limitations still apply.
+
+## Alpha, bump, displacement and light maps
+
+Every `Material` takes these maps and options, live like the others. Each one compiles into a material's shader only
+while it is in use: a material that never sets one keeps exactly its shader, bindings and uniforms.
+
+| Option | Meaning |
+| --- | --- |
+| `alphaMap` | Green channel (linear) multiplies opacity, before `alphaTest` and blending (`transparent`) |
+
+Each map has its own UV transform slot (`material.setUVTransform(t, 'alphaMap')`); `uvTransform` and
+`setUVTransform(t)` without a slot set it with the other maps'.
+
+```ts
+const leaves = new LambertMaterial({map: leafColour, alphaMap: leafCutout, alphaTest: 0.5, side: 'double'});
+leaves.alphaMap = null; // live: the next frame draws without it
+```

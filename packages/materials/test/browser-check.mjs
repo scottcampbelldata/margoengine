@@ -51,6 +51,8 @@ const expected = {
   additive: [5, 194, 9],
   mask: [5, 6, 9],
   video: [255, 0, 255],
+  // White at alpha 128/255 over the clear colour [5, 6, 9].
+  alphaBlend: [5, 6, 9].map((b) => Math.round((255 * 128) / 255 + (b * 127) / 255)),
 };
 try {
   console.log('adapter', JSON.stringify(hardware.webgpu));
@@ -78,6 +80,8 @@ try {
     'iblStandard',
     'clusteredLambert',
     'clusteredPhong',
+    'alphaMap',
+    'alphaBlend',
     'litEffects',
     'video',
   ]) {
@@ -118,6 +122,12 @@ try {
       await step();
       near(await pixel(0.3), [255, 0, 0], 'the updated region (image top, flipY) shows the new pixels');
       near(await pixel(0.7), [0, 255, 0], 'outside the region the texture keeps its old pixels');
+    }
+    if (name === 'alphaMap') {
+      near(await pixel(0.5, 0.4), [5, 6, 9], 'alphaMap green 0 cuts at alphaTest 0.5');
+      near(await pixel(0.5, 0.6), [255, 0, 0], 'alphaMap green 255 keeps the surface');
+      await step();
+      near(await pixel(0.5, 0.4), [255, 0, 0], 'alphaMap removed live');
     }
     if (name === 'iblLambert' || name === 'iblStandard') {
       if (name === 'iblStandard') assert.ok(Math.max(...center) > 3, 'a black dielectric reflects the sky: ' + center);

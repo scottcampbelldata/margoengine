@@ -17,6 +17,7 @@ import { PBRInstances } from '@margoengine/gltf-pro/instancing';
 import { extendedMaterials } from '@margoengine/gltf-pro/extended';
 import { physicalMapsShader } from './physical-maps.js';
 import { depthDistanceShader } from './depth-distance.js';
+import { featureMaps, featureShader } from './features.js';
 import { readResponse } from '../../shared/loading.js';
 import { clusterBrdf } from '../../shared/light-terms.js';
 import { MargoError } from '@margoengine/math/errors';
@@ -565,6 +566,8 @@ export interface MaterialOptions extends PhysicalOptions {
   aoMapIntensity?: number;
   emissiveMap?: Texture | null;
   matcap?: Texture | null;
+  /** Opacity map: its green channel (linear) multiplies opacity, before `alphaTest` and blending. Live. */
+  alphaMap?: Texture | null;
   transparent?: boolean;
   alphaTest?: number;
   /** Faces drawn by triangle meshes. Explicit side takes precedence over doubleSided. */
@@ -847,7 +850,15 @@ const outputs: Record<Exclude<Shading, 'standard' | 'depth' | 'distance' | 'lamb
 const encode =
   'fn mat_out(c:vec3f)->vec3f {if(f.settings.w>0.5){return c;}let x=clamp(c,vec3f(0),vec3f(1));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>=vec3f(0.0031308));}';
 const patched = new Map<string, Map<string, string>>();
-type MapState = { refs: number; device?: GPUDevice; buffer?: GPUBuffer; values?: Float32Array };
+/** A material's GPU state for one engine: `buffer` its shading's uniform, `features` the feature uniform (features.ts). */
+type MapState = {
+  refs: number;
+  device?: GPUDevice;
+  buffer?: GPUBuffer;
+  values?: Float32Array;
+  features?: GPUBuffer;
+  featureData?: Float32Array;
+};
 const mapStates = new WeakMap<Material, Map<object, MapState>>(),
   disposedMaterials = new WeakSet<Material>();
 /** Throws for a disposed material: meshes may not start drawing one. */
@@ -872,24 +883,54 @@ function retainMaps(m: Material, engine: Engine): () => void {
   return () => {
     if (--state.refs) return;
     state.buffer?.destroy();
+    state.features?.destroy();
     mapStates.get(m)?.delete(engine);
   };
 }
-function materialBuffer(m: Material, device: GPUDevice, owner: object, size: number): GPUBuffer {
+function materialBuffer(
+  m: Material,
+  device: GPUDevice,
+  owner: object,
+  size: number,
+  field: 'buffer' | 'features' = 'buffer',
+): GPUBuffer {
   const state = mapState(m, owner);
-  if (state.device !== device || !state.buffer) {
-    state.buffer?.destroy();
+  if (state.device !== device || !state[field]) {
+    state[field]?.destroy();
     state.device = device;
-    state.buffer = device.createBuffer({ size, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    const buffer = state.buffer;
+    const buffer = (state[field] = device.createBuffer({
+      size,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    }));
     device.lost?.then(() => {
-      if (state.buffer === buffer) {
+      if (state[field] === buffer) {
         buffer.destroy();
-        state.buffer = undefined;
+        state[field] = undefined;
       }
     });
   }
-  return state.buffer;
+  return state[field];
+}
+/** The feature letters (features.ts) `m` uses now: its shader variant. */
+function featureKey(m: Material): string {
+  const maps = m['featureTextures'];
+  return maps[0] ? 'a' : '';
+}
+/** `entries` plus the feature uniform and maps `m` uses now (none for a material without features). */
+function featureBindings(m: Material, device: GPUDevice, owner: object, entries: GPUBindGroupEntry[]) {
+  const maps = m['featureTextures'];
+  if (!maps.some(Boolean)) return entries;
+  const buffer = materialBuffer(m, device, owner, 144, 'features'),
+    data = (mapState(m, owner).featureData ??= new Float32Array(36));
+  data.set(m['featureValues']);
+  device.queue.writeBuffer(buffer, 0, data);
+  const out = [...entries, { binding: 198, resource: { buffer } }];
+  maps.forEach((texture, k) => {
+    if (!texture) return;
+    const [view, sampler] = texture.bind(device, false) ?? fallback(device, 0);
+    out.push({ binding: 180 + k * 2, resource: view }, { binding: 181 + k * 2, resource: sampler });
+  });
+  return out;
 }
 function mapped(m: Material): boolean {
   return !!m.physical && (m.physical.length > 12 || mapSlots.slice(5).some((k) => m[k] != null));
@@ -1025,6 +1066,28 @@ export class Material {
   aoMap: Texture | null;
   emissiveMap: Texture | null;
   matcap: Texture | null;
+  /** The feature maps (features.ts `featureMaps` order). */
+  private readonly featureTextures: (Texture | null)[] = [null, null, null, null];
+  /** The feature uniform (features.ts): four values, then two UV rows per feature map (lightMap's on UV1). */
+  private readonly featureValues: number[] = [
+    1,
+    1,
+    0,
+    1,
+    ...Array(3).fill(textureTransform({}, 0)).flat(),
+    ...textureTransform({}, 1),
+  ];
+  private setFeatureMap(k: number, v: Texture | null): void {
+    if (v != null && !(v instanceof Texture))
+      throw new TypeError(`Material ${featureMaps[k]} must be a Texture; pass a Texture or null`);
+    this.featureTextures[k] = v ?? null;
+  }
+  get alphaMap(): Texture | null {
+    return this.featureTextures[0];
+  }
+  set alphaMap(v: Texture | null) {
+    this.setFeatureMap(0, v);
+  }
   private readonly physicalTextures: (Texture | null)[] = Array(12).fill(null);
   private setMap(i: number, value: Texture | null): void {
     const key = mapSlots[i + 5] as keyof PhysicalOptions;
@@ -1167,6 +1230,7 @@ export class Material {
     this.aoMap = o.aoMap ?? null;
     this.emissiveMap = o.emissiveMap ?? null;
     this.matcap = o.matcap ?? null;
+    if (o.alphaMap != null) this.alphaMap = o.alphaMap;
     // Physical options enable their lobes as they are set (transmission before the volume values that need it); the
     // constructor names every extension its options use.
     const used = (Object.keys(extensions) as (keyof PhysicalOptions)[]).filter((k) => o[k] != null);
@@ -1593,13 +1657,28 @@ export class Material {
   set doubleSided(v: boolean) {
     this.settings[2] = +!!v;
   }
-  /** Live: sets one map slot's UV transform, or every slot's without `slot`; null restores the identity. */
-  setUVTransform(t: TextureTransform | null, slot?: MapSlot): this {
-    const i = slot === undefined ? -1 : mapSlots.indexOf(slot);
-    if (slot !== undefined && i < 0) throw new TypeError('Invalid UV transform slot');
-    const { texCoord } = textureCoordinates({ extensions: { KHR_texture_transform: t ?? {} } }),
-      rows = textureTransform(t ?? {}, texCoord);
-    if (i < 0) this.uvDefault = rows;
+  /**
+   * Live: sets one map slot's UV transform, or every slot's without `slot` (but `lightMap`'s, which stays on its own
+   * UV set); null restores the identity (UV1 for `lightMap`, unless the transform names a `texCoord`).
+   */
+  setUVTransform(
+    t: TextureTransform | null,
+    slot?: MapSlot | 'alphaMap' | 'bumpMap' | 'displacementMap' | 'lightMap',
+  ): this {
+    const f = featureMaps.indexOf(slot as (typeof featureMaps)[number]),
+      i = slot === undefined || f >= 0 ? -1 : mapSlots.indexOf(slot as MapSlot);
+    if (slot !== undefined && f < 0 && i < 0) throw new TypeError('Invalid UV transform slot');
+    const transform: TextureTransform = f === 3 ? { texCoord: 1, ...t } : (t ?? {}),
+      { texCoord } = textureCoordinates({ extensions: { KHR_texture_transform: transform } }),
+      rows = textureTransform(transform, texCoord);
+    if (f >= 0) {
+      this.featureValues.splice(4 + f * 8, 8, ...rows);
+      return this;
+    }
+    if (i < 0) {
+      this.uvDefault = rows;
+      for (let k = 0; k < 3; k++) this.featureValues.splice(4 + k * 8, 8, ...rows);
+    }
     while (this.uvt.length < Math.max(40, (i + 1) * 8)) this.uvt.push(...this.uvDefault);
     for (let k = 0; k < this.uvt.length / 8; k++) if (i < 0 || k === i) this.uvt.splice(k * 8, 8, ...rows);
     return this;
@@ -1665,6 +1744,7 @@ export class Material {
     for (const [owner, state] of states ?? [])
       if (!state.refs) {
         state.buffer?.destroy();
+        state.features?.destroy();
         states!.delete(owner);
       }
   }
@@ -2073,9 +2153,17 @@ function surface(g: PBRMaterial, current: () => Material, runtime: Engine): void
           const m = current();
           return mapped(m) && m.transmissive;
         },
-        shader: (code: string, group: number) => current().shader(code, group),
+        shader: (code: string, group: number) => {
+          const m = current(),
+            key = featureKey(m),
+            own = m.shader(code, group);
+          return key ? featureShader(own, group, key) : own;
+        },
         lit: (code: string) => litShader(current(), code),
-        bindings: () => current().bindings(runtime.gpu!, runtime),
+        bindings: () => {
+          const m = current();
+          return featureBindings(m, runtime.gpu!, runtime, m.bindings(runtime.gpu!, runtime));
+        },
       } satisfies PBRMaterialShading,
     },
   });
