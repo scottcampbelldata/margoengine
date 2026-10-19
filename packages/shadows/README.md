@@ -25,7 +25,15 @@ engine.start();
 
 Core meshes receive shadows automatically. `shadows.add(pbrModel)` or `shadows.add(loadedMesh)` adds the owning model's lighting hook and reads current stride-80 buffers after animation compute. Registering both draws each primitive once; a dynamic registration takes precedence over a cached registration. Removing one registration preserves the remaining lighting hook. Alpha-masked PBR casters honor their base map, vertex alpha, UV set, texture transform and cutoff; blended casters are omitted. No duplicate core geometry is created. `shadows.add(clipmapTerrain)` uses its GPU height sampling for depth and its lighting hook for reception. Custom sources can implement `drawShadow(ShadowContext)`.
 
-Per object, as Crocotile's Cast Shadows and Receive Shadows (both default on): `shadows.add(source, {castShadow: false})` lights the object with the shadow map but leaves it out of the map, and `{receiveShadow: false}` draws it into the map but keeps its own lighting unshadowed (no lighting hook is added). Receiving is per object for sources with their own lighting hook (glTF-pro models, materials meshes, clipmap terrain); core meshes share core's one shader, which is patched for all of them, so `receiveShadow: false` on a core mesh throws a `MargoError` with code `unsupported`. To change either flag, call the remover and add the object again.
+Per object, as Crocotile's Cast Shadows and Receive Shadows (both default on): `shadows.add(source, {castShadow: false})` lights the object with the shadow map but leaves it out of the map, and `{receiveShadow: false}` draws it into the map but keeps its own lighting unshadowed (no lighting hook is added). Receiving is per object for sources with their own lighting hook (glTF-pro models, materials meshes, clipmap terrain) and for core meshes: `receiveShadow: false` on a core mesh sets core's `mesh.receiveShadow = false` and the remover restores the earlier value. Setting `mesh.receiveShadow` directly works too, for meshes added or not:
+
+```ts
+shadows.add(groundTile);            // casts and receives
+shadows.add(lamp, { receiveShadow: false }); // casts, lit as if unshadowed
+marker.receiveShadow = false;      // same for any core mesh, next frame
+```
+
+While a core mesh opts out, core's shader patch keeps that mesh's direct light where it is shadowed (`select` on its instance factor); with none, the patch is the original text. To change either flag of another source, call the remover and add the object again.
 
 Static geometry renders into a cached depth array. Each frame copies that array and adds dynamic casters, so dynamic geometry cannot overwrite the cache. Cache invalidation occurs when snapped cascade matrices, clipmap origins, source membership, disposal or device change. Call `invalidate()` after moving/hiding a static mesh, editing its geometry/material, or changing a height texture. Moving the camera far enough to move a cascade rerenders static geometry. No fixed draw-call reduction is promised. `stats` reports static/dynamic primitive draws and cache hits; custom sources record their own draws.
 

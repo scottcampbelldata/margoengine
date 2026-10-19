@@ -42,7 +42,7 @@ Set a nonnegative finite GPU-float value or a callback sampled each render, such
 as `() => sky.nightFactor` for automatic night lights. Zero clears the GPU cluster
 lists; authored intensities remain unchanged. The setting survives restoration.
 
-Core meshes receive local lighting automatically. Call `lights.add(pbrModel)` or `lights.add(terrain)` for optional renderers; the returned function unregisters the receiver. `lights.add(model, {receiveShadow: false})` lights it without any local-light shadow (integrated maps or `LocalShadows`); casting stays per object through `addShadowCaster` / `LocalShadows.add`. Core meshes share core's shader and always receive. Directional shadows compose with local lighting in either registration order.
+Core meshes receive local lighting automatically. Call `lights.add(pbrModel)` or `lights.add(terrain)` for optional renderers; the returned function unregisters the receiver. `lights.add(model, {receiveShadow: false})` lights it without any local-light shadow (integrated maps or `LocalShadows`); casting stays per object through `addShadowCaster` / `LocalShadows.add`. A core mesh with `mesh.receiveShadow = false` (core) is lit without local-light shadows too; the core shader patch carries that test only while some mesh opts out. Directional shadows compose with local lighting in either registration order.
 
 ## Point and spot shadows
 

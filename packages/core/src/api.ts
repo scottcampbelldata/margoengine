@@ -26,6 +26,11 @@ export interface Mesh {
   readonly scale: VectorRef;
   readonly geometry: Geometry | null;
   readonly material: PbrMaterial;
+  /**
+   * Whether `@margoengine/shadows` and clustered local-light shadows darken this mesh (default true); `false` keeps
+   * its direct light unshadowed while it still casts. Throws TypeError for a non-boolean.
+   */
+  receiveShadow: boolean;
   check(): void;
   setPosition(value: Vec3): this;
   setScale(value: Vec3): this;

@@ -4,6 +4,7 @@ import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type Ve
 import { finiteVector } from '@margoengine/math/validate';
 import { viewMatrix } from '../../shared/view.js';
 import { orthographic } from '../../shared/projection.js';
+import { coreReceives, unshadowedCore } from '../../shared/shadow-source.js';
 import { cullingShader, clusteredSampling } from './shader.js';
 import {
   LocalShadowMaps,
@@ -102,7 +103,7 @@ export class Clustered implements EnginePlugin {
   private dirty = true;
   private disposed = false;
   private readonly view = this.values.subarray(0, 16);
-  private readonly shaders = new Map<number, Map<string, string>>();
+  private readonly shaders = new Map<string, Map<string, string>>();
   private readonly localShadows?: LocalShadowMaps;
   private readonly hooks = new Map<number, { declarations: string; light: string }>();
   private shadowHook?: ClusteredShadow;
@@ -241,8 +242,8 @@ export class Clustered implements EnginePlugin {
   /**
    * Lights `receiver` (a gltf-pro model, materials mesh or terrain; core meshes are lit without it). With
    * `receiveShadow: false` it gets the same lighting without local-light shadows: their maps neither darken it nor
-   * need it to cast (cast with `addShadowCaster` or `LocalShadows.add`). Core meshes share core's shader and always
-   * receive. Returns the remover.
+   * need it to cast (cast with `addShadowCaster` or `LocalShadows.add`). Core meshes are not added: set
+   * `mesh.receiveShadow = false` on one instead. Returns the remover.
    */
   add(receiver: ClusteredReceiver, { receiveShadow = true }: { receiveShadow?: boolean } = {}): () => void {
     if (
@@ -291,21 +292,25 @@ export class Clustered implements EnginePlugin {
     }
     return hook;
   }
-  private sampling(group: number, shadows: boolean): string {
+  private sampling(group: number, shadows: boolean, receive = false): string {
     return shadows
-      ? clusteredSampling(group, this.shadowHook, this.areaHook, !!this.localShadows, this.decay)
+      ? clusteredSampling(group, this.shadowHook, this.areaHook, !!this.localShadows, this.decay, receive)
       : clusteredSampling(group, undefined, this.areaHook, false, this.decay);
   }
-  /** Patches a core-style lit shader with the clustered light loop; `shadows: false` without local-light shadows. */
+  /**
+   * Patches a core-style lit shader with the clustered light loop; `shadows: false` without local-light shadows. Core
+   * meshes with `receiveShadow` false skip local-light shadows while the engine has one.
+   */
   shader(source: string, group = 0, shadows = true): string {
-    const key = shadows ? group : -1 - group;
+    const receive = shadows && !!(this.localShadows || this.shadowHook) && unshadowedCore(this.engine, source),
+      key = `${shadows ? group : -1 - group}${receive}`;
     let cache = this.shaders.get(key);
     const cached = cache?.get(source);
     if (cached) return cached;
     const base = source.includes('let base=terrainColor') ? 'base' : 'i.color';
     let code = source.replace(
       /let linear=([^;]+);/,
-      `let linear=$1+clusterLighting(i.clip.xy,i.position,n,frame.eye.xyz,${base},i.material.x,i.material.y);`,
+      `${receive ? `clusterReceive=${coreReceives};` : ''}let linear=$1+clusterLighting(i.clip.xy,i.position,n,frame.eye.xyz,${base},i.material.x,i.material.y);`,
     );
     if (code === source)
       code = source.replace(
@@ -313,7 +318,7 @@ export class Clustered implements EnginePlugin {
         'var color=clusterLighting(i.clip.xy,i.position,s.n,f.eye.xyz,s.base.rgb,s.roughness,s.metal)+',
       );
     if (code === source) throw new Error('Clustered lighting requires the standard PBR shader');
-    const output = this.sampling(group, shadows) + code;
+    const output = this.sampling(group, shadows, receive) + code;
     if (!cache) {
       cache = new Map();
       this.shaders.set(key, cache);

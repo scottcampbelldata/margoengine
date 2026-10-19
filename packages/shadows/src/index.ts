@@ -11,10 +11,9 @@ import {
   type Camera,
   type Vec3,
 } from '@margoengine/core/extension';
-import { MargoError } from '@margoengine/math/errors';
 import { preset } from '../../shared/preset.js';
 import { instanceLayout, instancedDepth } from '../../shared/instances.js';
-import { shadowPrimitivesInto } from '../../shared/shadow-source.js';
+import { shadowPrimitivesInto, coreReceives, unshadowedCore } from '../../shared/shadow-source.js';
 import { viewMatrix } from '../../shared/view.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { sectionState, sectionShader } from '../../shared/section.js';
@@ -262,8 +261,8 @@ export class Shadows implements EnginePlugin {
    * Adds `source` (a core mesh, gltf-pro model, materials mesh or custom source) as a shadow caster and, for sources
    * with their own lighting (`addLighting`: gltf-pro models, materials meshes, terrain), a receiver. `castShadow: false`
    * keeps it out of the shadow map; `receiveShadow: false` leaves its lighting unshadowed (both default true, as
-   * Crocotile's per-object Cast Shadows and Receive Shadows). Core meshes share core's shader, so every core mesh
-   * receives and `receiveShadow: false` is refused for one. `static` caches it in the still map. Returns the remover.
+   * Crocotile's per-object Cast Shadows and Receive Shadows). For a core mesh `receiveShadow: false` sets
+   * `mesh.receiveShadow = false` and the remover restores it. `static` caches it in the still map. Returns the remover.
    */
   add(
     source: ShadowSource | MeshHandle,
@@ -297,13 +296,14 @@ export class Shadows implements EnginePlugin {
     if (this.sources.some((r) => r.source === runtime)) throw new Error('Duplicate shadow source');
     const triangles = 'id' in runtime ? meshTriangles(runtime) : undefined,
       lightingSource = triangles?.kind === 'pbr' ? (triangles.source.model as ShadowSource) : (runtime as ShadowSource);
-    if (!receiveShadow && 'id' in runtime && triangles?.kind !== 'pbr')
-      throw new MargoError(
-        'unsupported',
-        "Shadows: a core mesh always receives (core's one shader is patched for all); use a materials or gltf-pro mesh for receiveShadow: false",
-      );
     let removeLighting: (() => void) | undefined;
-    if (receiveShadow && typeof lightingSource.addLighting === 'function') {
+    if (!receiveShadow && 'id' in runtime && triangles?.kind !== 'pbr') {
+      const previous = runtime.receiveShadow;
+      runtime.receiveShadow = false;
+      removeLighting = () => {
+        runtime.receiveShadow = previous;
+      };
+    } else if (receiveShadow && typeof lightingSource.addLighting === 'function') {
       let owner = this.lightingOwners.get(lightingSource);
       if (owner) owner.count++;
       else {
@@ -339,11 +339,17 @@ export class Shadows implements EnginePlugin {
   }
   shader(source: string, group = 0): string {
     const filter = this.options.filter ?? 'soft',
-      key = filter + group;
+      receive = unshadowedCore(this.engine, source),
+      key = filter + group + receive;
     let cache = this.shaders.get(key);
     const cached = cache?.get(source);
     if (cached) return cached;
-    let code = source.replace('let linear=direct*', 'let linear=shadowLit(direct,i.position,i.normal)*');
+    let code = source.replace(
+      'let linear=direct*',
+      receive
+        ? `let linear=select(direct,shadowLit(direct,i.position,i.normal),${coreReceives})*`
+        : 'let linear=shadowLit(direct,i.position,i.normal)*',
+    );
     if (code === source) code = source.replace('direct+ambient(s)', 'shadowLit(direct,i.position,s.n)+ambient(s)');
     if (code === source) throw new Error('Shadows require the standard PBR lighting shader');
     const output = shadowSampling(group, filter) + code;

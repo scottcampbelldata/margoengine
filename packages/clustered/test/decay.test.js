@@ -159,3 +159,43 @@ test('add(receiver, {receiveShadow: false}) lights it without local-light shadow
     lights.dispose();
   }
 });
+
+test('core meshes with receiveShadow false skip local-light shadows; the patch exists only while the engine has one', () => {
+  const h = harness(),
+    lights = new Clustered({ grid: [2, 2, 2], shadows: { maxLights: 1 } }),
+    plain = new Clustered({ grid: [2, 2, 2] });
+  lights.setLights([{ position: [0, 2, 1], range: 6, shadow: true }]);
+  h.engine.use(lights);
+  try {
+    h.frame();
+    const original = h.context.shader,
+      hook = lights.pbr(2).declarations;
+    h.engine.unshadowed = 1;
+    h.frame();
+    const patched = h.context.shader;
+    assert.ok(patched.includes('\nvar<private> clusterReceive=true;\n'));
+    assert.ok(patched.includes('clusterReceive=fract(i.material.z+0.125)<0.25;let linear='));
+    assert.ok(patched.includes('*select(1.0,clusterShadowVisibility(light,position,n),clusterReceive);'));
+    assert.equal(lights.pbr(2).declarations, hook, 'model hooks are unchanged');
+    assert.ok(!lights.shader('let linear=direct;').includes('clusterReceive'), 'only core-shaped shaders');
+    assert.ok(
+      clusteredSampling(0, { declarations: () => '' }, undefined, false, false, true).includes(
+        '*select(1.0,clusterShadow(light,position,n),clusterReceive);',
+      ),
+      'LocalShadows terms too',
+    );
+    h.engine.unshadowed = 0;
+    h.frame();
+    assert.equal(h.context.shader, original, 'the original text once no core mesh opts out');
+    h.engine.removePlugin(lights.name);
+    h.engine.use(plain);
+    h.frame();
+    const unlit = h.context.shader;
+    h.engine.unshadowed = 1;
+    h.frame();
+    assert.equal(h.context.shader, unlit, 'without local shadows there is nothing to skip');
+  } finally {
+    lights.dispose();
+    plain.dispose();
+  }
+});

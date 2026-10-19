@@ -181,6 +181,16 @@ export class Mesh {
     this.current = value;
     this.engine.collected = -1;
   }
+  private receives = true;
+  /** Shadowed by shadow plugins (default true). Assigning re-collects instances next frame; false adds 0.25 to float 22. */
+  get receiveShadow(): boolean {
+    return this.receives;
+  }
+  set receiveShadow(value: boolean) {
+    if (typeof value !== 'boolean') throw new TypeError('Invalid receiveShadow');
+    this.receives = value;
+    this.engine.collected = -1;
+  }
   constructor(
     readonly engine: Engine,
     readonly id: number,
@@ -305,6 +315,7 @@ export class Engine {
   private revision = 0;
   // Last full collection: revision, visibility, material values, and each entity's instance offset (-1 when not drawn).
   /** @internal Revision of the last full instance collection; -1 forces one. */ collected = -1;
+  /** @internal Meshes with receiveShadow false at the last full collection; shadow plugins patch for them only then. */ unshadowed = 0;
   private readonly materials = new Set<[PbrMaterial, ...number[]]>();
   private seen: Uint8Array;
   private slots: Int32Array;
@@ -507,6 +518,8 @@ export class Engine {
     }
   }
   private readonly collect = (mesh: Mesh): void => {
+    const unshadowed = !mesh.receiveShadow;
+    this.unshadowed += +unshadowed;
     if (mesh.geometry && this.store.visible[mesh.id]) {
       if (this.checkedMaterials.get(mesh.material) !== this.materialFrame) {
         const material = mesh.material.data;
@@ -523,6 +536,8 @@ export class Engine {
       this.slots[mesh.id] = offset;
       batch.instances.set(mesh.matrix, offset);
       batch.instances.set(mesh.material.data, offset + 16);
+      // doubleSided (0 or 1) + 0.25: every `< 0.5` single-sided test keeps its meaning.
+      if (unshadowed) batch.instances[offset + 22] += 0.25;
       batch.instances[offset + 23] = mesh.id;
       this.stats.visible++;
     }
@@ -599,7 +614,7 @@ export class Engine {
       for (let i = 0; !full && i < 8; i++) full = values[0].data[i] !== values[i + 1];
     if (full) {
       for (const batch of this.batches.values()) batch.count = batch.mask = 0;
-      this.stats.visible = 0;
+      this.stats.visible = this.unshadowed = 0;
       this.materialFrame++;
       this.materials.clear();
       this.slots.fill(-1);

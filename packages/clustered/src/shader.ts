@@ -57,16 +57,19 @@ export function clusteredSampling(
   area?: { declarations(group: number): string },
   integratedShadows = false,
   decay = false,
+  receive = false,
 ): string {
   const shadows = shadow === true || integratedShadows,
-    hook = typeof shadow === 'object' ? shadow : undefined;
+    hook = typeof shadow === 'object' ? shadow : undefined,
+    // A core mesh with receiveShadow false sets clusterReceive false before calling clusterLighting.
+    term = (call: string) => (receive ? `*select(1.0,${call},clusterReceive)` : '*' + call);
   const code =
     declarations(group) +
     (hook ? hook.declarations(group) : '') +
     (area ? area.declarations(group) : '') +
     /* wgsl */ `
 @group(${group}) @binding(6) var<storage,read> clusterCounts:array<u32>;
-@group(${group}) @binding(7) var<storage,read> clusterIndices:array<u32>;
+@group(${group}) @binding(7) var<storage,read> clusterIndices:array<u32>;${receive ? '\nvar<private> clusterReceive=true;' : ''}
 fn clusterLighting(pixel:vec2f,position:vec3f,n:vec3f,eye:vec3f,base:vec3f,roughness:f32,metal:f32)->vec3f {
   let grid=clusterFrame.grid.xyz;let depth=-(clusterFrame.view*vec4f(position,1)).z;
   if(depth<clusterFrame.depth.x||depth>clusterFrame.depth.y){return vec3f(0);}
@@ -84,7 +87,7 @@ fn clusterLighting(pixel:vec2f,position:vec3f,n:vec3f,eye:vec3f,base:vec3f,rough
     let g=2*nv/(nv+sqrt(a2+(1-a2)*nv*nv))*2*nl/max(nl+sqrt(a2+(1-a2)*nl*nl),0.0001);
     let f0=mix(vec3f(0.04),base,metal);let fresnel=f0+(1-f0)*pow(1-vh,5.0);
     ${decay ? decayTerms : legacyTerms}
-    result+=((1-fresnel)*(1-metal)*base/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl*light.colorIntensity.rgb*light.colorIntensity.w*falloff*cone${hook ? '*clusterShadow(light,position,n)' : ''}${shadows ? '*clusterShadowVisibility(light,position,n)' : ''};
+    result+=((1-fresnel)*(1-metal)*base/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl*light.colorIntensity.rgb*light.colorIntensity.w*falloff*cone${hook ? term('clusterShadow(light,position,n)') : ''}${shadows ? term('clusterShadowVisibility(light,position,n)') : ''};
   }
   return ${area ? '(result+clusterAreaLighting(position,n,v,nv,base,roughness,metal))' : 'result'}*clusterFrame.intensity.x;
 }`;
