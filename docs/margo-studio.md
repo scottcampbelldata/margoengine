@@ -51,11 +51,14 @@ small FBX writer. Crocotile 3D 2.7.4 is the tile editor's reference (see section
 
 Engine gaps still open in Margo (research 2026-10-18, largest first; editor UI is not counted): a GPU voxel path
 tracer with progressive accumulation and MagicaVoxel's materials (diffuse, metal, plastic, glass, emissive, cloud),
-sky and lens (new package; Margo only rasterises today); voxel storage for many 256^3 models, grid operations for the
-brushes and exact voxel picking (new `@margoengine/voxel`); a greedy mesher with AO in a worker; `.vox` read/write;
-3D compute dispatch with storage textures for its voxel shaders (`@margoengine/shader`'s `ComputePass` is
-one-dimensional today); a denoiser (the three.js parity doc currently says not to add one: Scott decides); `.qb` and
-slice exporters; optionally a sparse octree with LOD for Viewer-scale scenes. Avoid one core entity per voxel (use
+sky and lens (built 2026-10-19 as the optional `@margoengine/voxel-pathtracer`: instanced dense models, those
+materials plus blend and subsurface, sun, sky, ground, HDR environment maps, emissive voxels and area lights, depth of
+field, motion blur, an a-trous denoiser, PNG capture; checked against closed-form results on the RTX A6000, not
+compared with MagicaVoxel's images; open items in its README); voxel storage for many 256^3 models, grid
+operations for the brushes and exact voxel picking (new `@margoengine/voxel`); a greedy mesher with AO in a worker;
+`.vox` read/write; 3D compute dispatch with storage textures for its voxel shaders (`@margoengine/shader`'s
+`ComputePass` is one-dimensional today); a denoiser (requested with the path tracer 2026-10-19; it has a classical
+one, about 2-2.5x lower error at 4-16 samples, not a learned one); `.qb` and slice exporters; optionally a sparse octree with LOD for Viewer-scale scenes. Avoid one core entity per voxel (use
 chunk meshes or instancing) and never add vertex colour to core meshes for this; 256^3 fits WebGPU's default limits,
 2048-scale scenes only sparse.
 
