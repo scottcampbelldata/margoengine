@@ -38,6 +38,19 @@ export interface MeshInput {
 
 export const QUAD_WORDS = 3;
 
+export class VoxelMesher {
+    readonly workers: number;
+    constructor(options?: VoxelMesherOptions);
+    mesh(world: VoxelWorld, key: string, priority?: number, eye?: Vec3): Promise<ChunkMesh | null>;
+    cancel(key: string): void;
+    dispose(): void;
+    [Symbol.dispose](): void;
+}
+
+export interface VoxelMesherOptions {
+    workers?: number;
+}
+
 export function blockMaterials(blocks: readonly BlockType[]): Uint16Array;
 
 export function decodeQuad(words: Uint32Array, i: number): DecodedQuad;
@@ -45,6 +58,8 @@ export function decodeQuad(words: Uint32Array, i: number): DecodedQuad;
 export function meshChunk(input: MeshInput): ChunkMesh;
 
 export function meshInput(world: VoxelWorld, key: string): MeshInput | undefined;
+
+export function sortQuads(words: Uint32Array, eye: Vec3): Uint32Array;
 
 // Not exported from this entry, but used by the exports above:
 

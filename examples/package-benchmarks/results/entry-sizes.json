@@ -1,5 +1,5 @@
 {
-  "commit": "a2a34ab7",
+  "commit": "993f2013",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -438,8 +438,8 @@
     },
     "@margoengine/materials": {
       ".": {
-        "raw": 131569,
-        "gzip": 40244
+        "raw": 131725,
+        "gzip": 40285
       },
       "./transmission": {
         "raw": 15769,
@@ -888,8 +888,8 @@
         "gzip": 4664
       },
       "./mesher": {
-        "raw": 8932,
-        "gzip": 4030
+        "raw": 14498,
+        "gzip": 6222
       },
       "./light": {
         "raw": 20735,
@@ -902,6 +902,10 @@
       "./physics": {
         "raw": 17538,
         "gzip": 6279
+      },
+      "dist/workers/mesher.js": {
+        "raw": 9126,
+        "gzip": 4112
       }
     },
     "@margoengine/water": {
@@ -1043,6 +1047,11 @@
       "raw": 6794,
       "gzip": 3012,
       "brotli": 2591
+    },
+    "packages/voxel/dist/workers/mesher.js": {
+      "raw": 8902,
+      "gzip": 4081,
+      "brotli": 3623
     },
     "node_modules/@dimforge/rapier3d-compat/dist/rapier.mjs": {
       "raw": 4335248,
