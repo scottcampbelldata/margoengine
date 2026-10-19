@@ -438,6 +438,23 @@ test('flatShading shades with the face normal for lit, normal and matcap shading
   s.engine.dispose();
 });
 
+test('tangent-space maps and anisotropy point the derived frame up three.js UVs (+b); other materials keep the text', async () => {
+  const s = await scene(),
+    tilt = solid(128, 200, 200),
+    materials = [
+      new PbrMaterial({ map: tilt }),
+      new PbrMaterial({ normalMap: tilt }),
+      new PbrMaterial({ clearcoat: 1, clearcoatNormalMap: tilt }),
+      new PbrMaterial({ anisotropy: 0.5, anisotropyRotation: 1 }),
+    ],
+    meshes = materials.map((m) => createMesh(s.engine, quad, m)),
+    signs = codes(s.frame()).map((c) => /return mat3x3f\(t\*scale,(-?)b\*scale,n\);/.exec(c)?.[1]);
+  // gltf-pro's frame (glTF: B toward decreasing v) only for the material without one; b = cross(n, t) * w untouched.
+  assert.deepEqual(signs.sort(), ['', '', '', '-']);
+  for (const mesh of meshes) mesh.destroy();
+  s.engine.dispose();
+});
+
 test('vertexColors false passes white from the vertex stage; instance tints still multiply in', async () => {
   const s = await scene(),
     material = new PbrMaterial({ vertexColors: false }),

@@ -972,7 +972,8 @@ function featureKey(m: Material): string {
     (light ? (m.shading === 'basic' ? 'u' : 'l') : '') +
     (m.flatShading && m.shading !== 'basic' && m.shading !== 'depth' && m.shading !== 'distance' ? 'f' : '') +
     (m.vertexColors ? '' : 'v') +
-    (lit.includes(m.shading) ? (m.fog ? '' : 'g') + (m.toneMapped ? '' : 't') : '')
+    (lit.includes(m.shading) ? (m.fog ? '' : 'g') + (m.toneMapped ? '' : 't') : '') +
+    (m.normalMap || m.clearcoatNormalMap || m.extensions.includes('anisotropy') ? 'n' : '')
   );
 }
 /** The feature uniform of `m` for `owner`, written with its current values. */

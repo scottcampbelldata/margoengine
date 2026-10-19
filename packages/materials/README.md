@@ -283,7 +283,10 @@ mesh.root.setPosition([0, 1, 0]);
 
 `setUVTransform(transform, slot?)` selects UV0 or UV1 with `texCoord` as well as offset, scale and rotation. Without a
 slot it updates every map except `matcap`, including maps assigned later; `null` restores UV0 and the identity transform. Updates take effect next frame.
-Normal maps selected from UV1 or transformed UVs derive their tangent frame from those coordinates.
+Normal maps selected from UV1 or transformed UVs derive their tangent frame from those coordinates. Without `tangents`
+the derived frame follows three.js UV orientation: a normal map's +Y (green) points toward increasing v, up a `flipY`
+image, as it does with tangents whose bitangent `cross(normal, tangent) * w` runs along increasing v. glTF assets keep
+glTF's convention (decreasing v, texture origin at the image's top-left).
 
 A material array requires at least one group. Each group has a nonnegative integer `materialIndex` into that array,
 and triangle-aligned `start` and positive `count` in index units, or vertex units without indices. Ranges must fit and
