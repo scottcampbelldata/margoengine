@@ -59,6 +59,8 @@ const MARGIN = 3,
   ALLOWANCE = { changed: 0.0005, hot: 0.0002 },
   GATED = Object.keys(ALLOWANCE);
 
+// Baseline profiles with references for the voxel sandbox views (recorded on the RTX A6000 desktop, 2026-10-19).
+const VOXEL = ['nvidia-ampere-msedge-155'];
 const iphone =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1';
 const desktop = { viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1, factor: 2 };
@@ -87,16 +89,16 @@ const demos = [
   },
   { id: 'gameplay-sandbox', path: 'gameplay-sandbox/', ready: '!!window.sandbox', mask: ['#telemetry *'] },
   // Voxel sandbox deterministic views (seed 1, fixed camera and clock, no HUD; examples/voxel-sandbox/README.md).
-  // `pending`: no baselines yet (the voxel renderer's lighting is still changing), so these run only when --only names
-  // them; record them with `npm run visual:update -- --only=voxel --runs=4` and then drop `pending`.
-  { id: 'voxel-overview', path: 'voxel/?view=overview', ready: 'window.voxelSandbox?.ready===true', pending: true },
-  { id: 'voxel-ground', path: 'voxel/?view=ground', ready: 'window.voxelSandbox?.ready===true', pending: true },
+  // `profiles`: the baseline profiles that have references for them. On other hardware they are captured but skipped,
+  // not failed, until `npm run visual:update -- --only=voxel --runs=4` records them there and the profile is added here.
+  { id: 'voxel-overview', path: 'voxel/?view=overview', ready: 'window.voxelSandbox?.ready===true', profiles: VOXEL },
+  { id: 'voxel-ground', path: 'voxel/?view=ground', ready: 'window.voxelSandbox?.ready===true', profiles: VOXEL },
   {
     id: 'voxel-night',
     path: 'voxel/?view=night',
     ready: 'window.voxelSandbox?.ready===true',
     views: ['high'],
-    pending: true,
+    profiles: VOXEL,
   },
   {
     id: 'character-animation',
@@ -330,7 +332,10 @@ process.on('SIGINT', () => {
 
 const started = Date.now(),
   results = new Map(
-    cases.map((c) => [c.id, { id: c.id, url: withQuery(c.demo.path, c.view.query), captures: [], errors: [] }]),
+    cases.map((c) => [
+      c.id,
+      { id: c.id, url: withQuery(c.demo.path, c.view.query), profiles: c.demo.profiles, captures: [], errors: [] },
+    ]),
   );
 let server,
   devServer,
@@ -556,6 +561,12 @@ try {
         (await readFile(resolve(baselines, `${r.id}.png`))
           .then((b) => decodePNG(new Uint8Array(b)))
           .catch(() => undefined));
+    if (!baseline && !failed && r.profiles && !r.profiles.includes(profile.id)) {
+      const why = `not recorded on ${profile.id} yet (npm run visual:update -- --only=${r.id} --runs=4)`;
+      console.log(`SKIP ${r.id}: ${why}`);
+      rows.push({ ...r, status: 'skipped', why });
+      continue;
+    }
     if (!baseline || failed) {
       exitCode = 1;
       const why = failed ? (r.errors[0] ?? 'missing capture') : 'no baseline (run visual:update)';
@@ -606,7 +617,7 @@ try {
     resolve(out, 'index.html'),
     `<!doctype html><meta charset="utf-8"><title>Visual ${update ? 'update' : loss ? 'device loss' : 'check'}</title>
 <style>body{font:14px system-ui;margin:16px;background:#111;color:#ddd}td{vertical-align:top;padding:6px;border-top:1px solid #333}img{max-width:420px;display:block}.FAIL{color:#f66}.pass{color:#6c6}pre{white-space:pre-wrap;max-width:420px;font-size:12px}</style>
-<h1>Visual ${update ? 'update' : loss ? 'device loss' : 'check'}: ${rows.filter((r) => r.status === 'pass' || r.status === 'updated').length}/${rows.length} ok</h1>
+<h1>Visual ${update ? 'update' : loss ? 'device loss' : 'check'}: ${rows.filter((r) => ['pass', 'updated', 'skipped'].includes(r.status)).length}/${rows.length} ok</h1>
 <p>profile: ${esc(profile.id)} (${esc(baselines)})<br>${esc(JSON.stringify(environment))}<br>baselines: ${esc(JSON.stringify(manifest.environment ?? {}))}<br>${runs} run(s), ${seconds} s. d = max RGB difference per pixel; hot = share of pixels with d &gt; ${HOT}.</p>
 <table>${rows.map((r) => `<tr><td><b class="${r.status.split(' ')[0]}">${r.status}</b> ${esc(r.id)}<br><code>/${esc(r.url)}</code><pre>${esc(JSON.stringify({ loss: r.loss, metrics: r.metrics, noise: r.noise, tolerance: r.tolerance, baselineEnvironment: r.baselineEnvironment, why: r.why }, null, 1))}\n${esc(r.errors.slice(0, 8).join('\n'))}</pre></td>${r.images ? ['baseline', 'actual', 'diff'].map((k) => `<td>${k}<img src="${r.id}.${k}.png"></td>`).join('') : ''}</tr>`).join('\n')}</table>`,
   );
