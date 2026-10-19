@@ -7,7 +7,7 @@ import { parseGLTF, parseGLTFAsync } from '@margoengine/gltf-pro';
 import { instancing } from '@margoengine/gltf-pro/instancing';
 import { exportModel } from '../dist/model.js';
 import { headless, headlessModels } from '../../../tests/support/pbr-snapshot.js';
-import { accessor, readGLB, validate, validator } from './helpers.js';
+import { accessor, glTFUV, readGLB, validate, validator } from './helpers.js';
 
 const quad = {
   positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0],
@@ -45,6 +45,45 @@ function imagePixel(model, textureIndex) {
   return [...inflateSync(Buffer.concat(chunks)).subarray(1, 5)];
 }
 
+test('exportModel writes a materials mesh in glTF orientation: v flipped, image upright, transform conjugated', () =>
+  headlessModels(async () => {
+    // Raw texture rows are GPU rows, row 0 at v = 0 (the image's bottom): red at the bottom, blue at the top.
+    const map = new Texture({ width: 1, height: 2, data: Uint8Array.of(255, 0, 0, 255, 0, 0, 255, 255) }),
+      material = new Material({ map }),
+      tangents = [1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, -1];
+    // A quarter turn of v-up UVs: u' = v, v'' = -u.
+    material.setUVTransform({ rotation: Math.PI / 2 }, 'map');
+    const bytes = await exportModel(createMesh(await headless(), { ...quad, tangents }, material), { binary: true }),
+      { json, bin } = readGLB(bytes),
+      attributes = json.meshes[0].primitives[0].attributes,
+      transform = json.materials[0].pbrMetallicRoughness.baseColorTexture.extensions.KHR_texture_transform;
+    assert.deepEqual([...accessor(json, bin, attributes.TEXCOORD_0)], [0, 1, 1, 1, 1, 0, 0, 0]);
+    // B = cross(N, T) * w runs toward increasing v there and decreasing v here: up the image in both, so unchanged.
+    assert.deepEqual([...accessor(json, bin, attributes.TANGENT)], tangents);
+    // In glTF's v' = 1 - v the turn reads u' = 1 - v', 1 - v''' = 1 + u: rotation -pi/2 about offset (1, 1).
+    assert.ok(Math.abs(transform.rotation + Math.PI / 2) < 1e-6, `rotation ${transform.rotation}`);
+    for (const [value, expected] of [...transform.offset.map((v) => [v, 1]), ...transform.scale.map((v) => [v, 1])])
+      assert.ok(Math.abs(value - expected) < 1e-6, JSON.stringify(transform));
+    const copy = await parseGLTFAsync(await headless(), bytes),
+      image = copy.asset.doc.images[0],
+      png = copy.asset.view(image.bufferView),
+      view = new DataView(png.buffer, png.byteOffset),
+      chunks = [];
+    for (let at = 8; at < png.length; at += view.getUint32(at) + 12)
+      if (new TextDecoder().decode(png.subarray(at + 4, at + 8)) === 'IDAT')
+        chunks.push(png.subarray(at + 8, at + 8 + view.getUint32(at)));
+    const rows = inflateSync(Buffer.concat(chunks));
+    // PNG rows run top first: blue, then red.
+    assert.deepEqual(
+      [[...rows.subarray(1, 5)], [...rows.subarray(6, 10)]],
+      [
+        [0, 0, 255, 255],
+        [255, 0, 0, 255],
+      ],
+    );
+    await valid(bytes);
+  }));
+
 test('exportModel writes distinct packed UV1 to GLB and preserves it on reimport', () =>
   headlessModels(async () => {
     const source = withUV1(createMesh(await headless(), quad, new Material()), uv1),
@@ -52,10 +91,10 @@ test('exportModel writes distinct packed UV1 to GLB and preserves it on reimport
       { json, bin } = readGLB(bytes),
       attributes = json.meshes[0].primitives[0].attributes;
     assert.notEqual(attributes.TEXCOORD_1, undefined, 'independent UV1 accessor');
-    assert.deepEqual([...accessor(json, bin, attributes.TEXCOORD_1)], uv1);
+    assert.deepEqual([...accessor(json, bin, attributes.TEXCOORD_1)], glTFUV(uv1));
     const copy = await parseGLTFAsync(await headless(), bytes);
-    assert.deepEqual(packedUV(copy.primitives[0], 0), quad.uvs);
-    assert.deepEqual(packedUV(copy.primitives[0], 1), uv1);
+    assert.deepEqual(packedUV(copy.primitives[0], 0), glTFUV(quad.uvs));
+    assert.deepEqual(packedUV(copy.primitives[0], 1), glTFUV(uv1));
     await valid(bytes);
   }));
 
@@ -71,13 +110,14 @@ test('exportModel retains all-zero UV1 selected by a live material map and its a
       p = result.json.meshes[0].primitives[0],
       map = result.json.materials[0].occlusionTexture;
     assert.equal(map.texCoord, 1, 'live UV row selects TEXCOORD_1');
-    assert.deepEqual([...accessor(result.json, result.bin, p.attributes.TEXCOORD_1)], Array(8).fill(0));
-    assert.deepEqual(map.extensions.KHR_texture_transform, { offset: [0.25, 0.5], scale: [2, 0.5] });
+    assert.deepEqual([...accessor(result.json, result.bin, p.attributes.TEXCOORD_1)], glTFUV(Array(8).fill(0)));
+    // The v-up rows (u' = 2u + 0.25, v'' = 0.5v + 0.5) conjugated by v -> 1 - v: offset y 1 - 0.5 - 0.5.
+    assert.deepEqual(map.extensions.KHR_texture_transform, { offset: [0.25, 0], scale: [2, 0.5] });
     const copy = parseGLTF(await headless(), result.json, [result.bin.buffer], [{ width: 1, height: 1 }]);
-    assert.deepEqual(packedUV(copy.primitives[0], 1), Array(8).fill(0));
+    assert.deepEqual(packedUV(copy.primitives[0], 1), glTFUV(Array(8).fill(0)));
     assert.deepEqual(
       copy.primitives[0].material.uvt.slice(24, 32).map((v) => v || 0),
-      [2, 0, 0.25, 1, 0, 0.5, 0.5, 0],
+      [2, 0, 0.25, 1, 0, 0.5, 0, 0],
     );
     if (validator) {
       const report = await validate(result.text, { 'scene.bin': result.bin });
@@ -132,7 +172,7 @@ test('exportModel chooses each group texture owner by original material slot and
     const maps = copy.primitives.map((p) => p.material.maps[0].index);
     assert.deepEqual(imagePixel(copy, maps[0]), [0, 64, 255, 255]);
     assert.deepEqual(imagePixel(copy, maps[1]), [255, 32, 0, 255]);
-    assert.deepEqual(packedUV(copy.primitives[0], 1), uv1);
+    assert.deepEqual(packedUV(copy.primitives[0], 1), glTFUV(uv1));
     await valid(bytes);
   }));
 
@@ -200,8 +240,8 @@ for (const instanced of [false, true])
       );
       assert.equal(copy.primitives[0].material.settings[0], 2);
       for (const p of copy.primitives) {
-        assert.deepEqual(packedUV(p, 0), quad.uvs);
-        assert.deepEqual(packedUV(p, 1), uv1);
+        assert.deepEqual(packedUV(p, 0), glTFUV(quad.uvs));
+        assert.deepEqual(packedUV(p, 1), glTFUV(uv1));
         if (instanced) {
           assert.equal(p.instances.count, 2);
           assert.deepEqual([...p.instances.getMatrixAt(1)].slice(12, 15), [2, 0, 0]);

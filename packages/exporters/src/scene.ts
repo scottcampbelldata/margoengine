@@ -231,6 +231,27 @@ export interface Node {
   light?: LightData;
 }
 
+/** @internal Map slots of an @margoengine/materials Material, in gltf-pro's map order. */
+export const materialSlots = [
+  'map',
+  'metalRoughnessMap',
+  'normalMap',
+  'aoMap',
+  'emissiveMap',
+  'clearcoatMap',
+  'clearcoatRoughnessMap',
+  'clearcoatNormalMap',
+  'transmissionMap',
+  'sheenColorMap',
+  'sheenRoughnessMap',
+  'specularIntensityMap',
+  'specularColorMap',
+  'iridescenceMap',
+  'iridescenceThicknessMap',
+  'anisotropyMap',
+  'thicknessMap',
+] as const;
+
 function fail(message: string): never {
   throw new TypeError(message);
 }
@@ -662,7 +683,9 @@ export function collect(source: ExportSource, options: SceneOptions = {}): Node[
   };
   const pbrSkins = new Map<PBRSource, Map<number, SkinData>>();
   const pbr = (triangles: Extract<ReturnType<typeof meshTriangles>, { kind: 'pbr' }>, node: Node): void => {
-    const { model: source, primitives } = triangles.source;
+    const { model: source, primitives } = triangles.source,
+      // A materials mesh (createMesh) draws its live Material's textures, which gltf-pro's maps do not list.
+      owner = (source as { material?: Record<string, unknown> | readonly Record<string, unknown>[] }).material;
     if (!primitives.length) return;
     node.primitives = primitives.map((primitive) => {
       const { vertices, indices, definition, material: mat } = primitive,
@@ -671,11 +694,14 @@ export function collect(source: ExportSource, options: SceneOptions = {}): Node[
       if (!Number.isInteger(count) || !count) fail('Invalid PBR primitive vertices');
       if (
         mat.maps.some((map: unknown) => map) ||
+        materialSlots.some((k) => (Array.isArray(owner) ? owner[definition.material!] : owner)?.[k]) ||
         mat.extension ||
         primitive.extension ||
         Object.keys(mat.extensions ?? {}).length
       )
-        fail('PBR texture and material extension export is unsupported');
+        fail(
+          'PBR texture and material extension export is unsupported; export textured models with exportModel (@margoengine/exporters/model)',
+        );
       const attribute = (offset: number, width: number): Float32Array => {
         const out = new Float32Array(count * width);
         for (let i = 0; i < count; i++)

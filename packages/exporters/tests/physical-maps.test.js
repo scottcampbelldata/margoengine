@@ -8,7 +8,7 @@ import { extendedMaterials } from '@margoengine/gltf-pro/extended';
 import { instancing } from '@margoengine/gltf-pro/instancing';
 import { exportModel } from '../dist/model.js';
 import { headless, headlessModels } from '../../../tests/support/pbr-snapshot.js';
-import { accessor, readGLB, validate, validator } from './helpers.js';
+import { accessor, glTFRows, glTFUV, readGLB, validate, validator } from './helpers.js';
 
 const quad = {
   positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0],
@@ -35,6 +35,8 @@ const maps = [
 ];
 const pixel = (rgba) => new Texture({ width: 1, height: 1, data: Uint8Array.from(rgba) });
 const rgba = (slot) => [slot * 11, 240 - slot * 7, slot * 13, 255 - slot * 3];
+// The owner rows below (offset [0.125, 0.25], scale [2, 0.5], rotation 0.3) in glTF's v down.
+const glTFOffset = [0.125 + 0.5 * Math.sin(0.3), 0.75 - 0.5 * Math.cos(0.3)];
 const near = (a, b, label) => {
   assert.equal(a.length, b.length, label);
   a.forEach((v, i) => assert.ok(Math.abs(v - b[i]) < 1e-6, `${label}[${i}]: ${v} vs ${b[i]}`));
@@ -125,19 +127,20 @@ test('exportModel writes all physical owner maps with their channel pixels, UV s
       const info = extension[`KHR_materials_${family}`][field];
       assert.ok(info, `${name} glTF texture reference`);
       assert.equal(info.texCoord ?? 0, slot === 16 ? 1 : 0, `${name} UV set`);
-      near(info.extensions.KHR_texture_transform.offset, [0.125, 0.25], `${name} offset`);
+      // Conjugated by glTF's v -> 1 - v: the rotation negates, the offset becomes (x + a1, 1 - y - b1).
+      near(info.extensions.KHR_texture_transform.offset, glTFOffset, `${name} offset`);
       near(info.extensions.KHR_texture_transform.scale, [2, 0.5], `${name} scale`);
-      assert.ok(Math.abs(info.extensions.KHR_texture_transform.rotation - 0.3) < 1e-6);
+      assert.ok(Math.abs(info.extensions.KHR_texture_transform.rotation + 0.3) < 1e-6);
       assert.deepEqual(imagePixel(copy, info.index), rgba(slot), `${name} encoded RGBA channels`);
       if (slot < 16)
         near(
           copy.primitives[0].material.uvt.slice(slot * 8, slot * 8 + 8),
-          owner.uvt.slice(slot * 8, slot * 8 + 8),
+          glTFRows(owner.uvt.slice(slot * 8, slot * 8 + 8)),
           name,
         );
     }
-    assert.deepEqual([...accessor(json, bin, attrs.TEXCOORD_0)], Array(8).fill(0));
-    assert.deepEqual([...accessor(json, bin, attrs.TEXCOORD_1)], Array(8).fill(0));
+    assert.deepEqual([...accessor(json, bin, attrs.TEXCOORD_0)], glTFUV(Array(8).fill(0)));
+    assert.deepEqual([...accessor(json, bin, attrs.TEXCOORD_1)], glTFUV(Array(8).fill(0)));
     assert.equal(extension.KHR_materials_clearcoat.clearcoatNormalTexture.scale, 0.45);
     assert.deepEqual(extension.KHR_materials_iridescence.iridescenceFactor, 0.65);
     assert.equal(extension.KHR_materials_iridescence.iridescenceIor, 1.45);
@@ -152,7 +155,7 @@ test('exportModel writes all physical owner maps with their channel pixels, UV s
       loaded = await parseGLTFAsync(await headless(), changed, { decoders: { materials: extendedMaterials } }),
       info = loaded.asset.doc.materials[0].extensions.KHR_materials_iridescence.iridescenceTexture;
     assert.deepEqual(imagePixel(loaded, info.index), [17, 39, 83, 121]);
-    assert.equal(info.extensions.KHR_texture_transform.offset[0], 0.625);
+    near([info.extensions.KHR_texture_transform.offset[0]], [0.625 + 0.5 * Math.sin(0.3)], 'live offset');
   }));
 
 test('exportModel writes live physical owner volume values rather than packed per-unit attenuation', () =>
@@ -307,7 +310,7 @@ test('exportModel roundtrips all physical maps and live controls from a real Mat
     for (const [slot, name, family, field] of maps) {
       const info = extension[`KHR_materials_${family}`][field];
       assert.equal(info.texCoord, 1, `${name} live coordinate selection`);
-      near(info.extensions.KHR_texture_transform.offset, [0.125, 0.25], `${name} live transform`);
+      near(info.extensions.KHR_texture_transform.offset, glTFOffset, `${name} live transform`);
       assert.deepEqual(imagePixel(copy, info.index), rgba(slot), `${name} encoded channels`);
     }
     assert.equal(extension.KHR_materials_clearcoat.clearcoatNormalTexture.scale, 0.45);
@@ -337,7 +340,7 @@ test('exportModel roundtrips all physical maps and live controls from a real Mat
     assert.equal(changed.KHR_materials_volume.thicknessTexture.texCoord ?? 0, 0);
     assert.deepEqual(
       changed.KHR_materials_volume.thicknessTexture.extensions.KHR_texture_transform.offset,
-      [0.75, 0.875],
+      [0.75, -0.875],
     );
   }));
 
@@ -360,7 +363,8 @@ test('exportModel includes a physical map assigned before the first draw with it
     );
     assert.deepEqual(sheen.sheenColorFactor, [0.25, 0.5, 0.75]);
     assert.equal(sheen.sheenColorTexture.texCoord, 1);
-    assert.deepEqual(sheen.sheenColorTexture.extensions.KHR_texture_transform, { offset: [0.25, 0.5], scale: [1, 1] });
+    // offset y 0.5 in v-up UVs is 1 - 0.5 - 1 = -0.5 in glTF's v down.
+    assert.deepEqual(sheen.sheenColorTexture.extensions.KHR_texture_transform, { offset: [0.25, -0.5], scale: [1, 1] });
     assert.equal(specular.specularColorTexture.index, sheen.sheenColorTexture.index);
     assert.equal(json.textures.length, 1, 'late maps keep Texture identity deduplication');
     assert.notEqual(json.meshes[0].primitives[0].attributes.TEXCOORD_1, undefined, 'late all-zero UV1 remains present');

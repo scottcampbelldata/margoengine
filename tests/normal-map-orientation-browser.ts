@@ -11,6 +11,10 @@ import type { MeshGeometry } from '../packages/materials/dist/index.js';
 import { parseGLTF } from '../packages/gltf-pro/dist/index.js';
 import type { MaterialExtension, PBRModel } from '../packages/gltf-pro/dist/index.js';
 import { planeGeometry, computeTangents } from '../packages/geometry/dist/index.js';
+import { exportDAE, exportGLB, exportOBJ } from '../packages/exporters/dist/index.js';
+import { exportModel } from '../packages/exporters/dist/model.js';
+import { parseDAE, parseOBJ, flattenDAE } from '../packages/loaders/dist/index.js';
+import { parseGLTFAsync } from '../packages/gltf-pro/dist/index.js';
 
 // Which way a normal map's +Y (green) bends the surface, on the GPU. A normal map's +Y is up the image (glTF 2.0
 // material.schema.json normalTexture: "+X is right and +Y is up. +Z points toward the viewer"). Where image-up lands
@@ -36,8 +40,8 @@ engine.camera.project = (out) => {
 engine.onError = (error) => errors.push(String(error));
 device.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
 
-/** Tangent-space normals as an image, row 0 the image's top; `normal(x, yUp)` takes image-up y, 0 bottom to 1 top. */
-function image(size: number, normal: (x: number, yUp: number) => [number, number, number]) {
+/** Tangent-space normals as pixels, row 0 the image's top; `normal(x, yUp)` takes image-up y, 0 bottom to 1 top. */
+function pixels(size: number, normal: (x: number, yUp: number) => [number, number, number]) {
   const data = new Uint8ClampedArray(size * size * 4);
   for (let row = 0; row < size; row++)
     for (let column = 0; column < size; column++) {
@@ -47,8 +51,12 @@ function image(size: number, normal: (x: number, yUp: number) => [number, number
       for (let k = 0; k < 3; k++) data[o + k] = Math.round((n[k] / length) * 127.5 + 127.5);
       data[o + 3] = 255;
     }
-  return createImageBitmap(new ImageData(data, size, size), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+  return new ImageData(data, size, size);
 }
+const bitmapOf = (data: ImageData | Blob) =>
+  createImageBitmap(data, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+const image = (size: number, normal: (x: number, yUp: number) => [number, number, number]) =>
+  bitmapOf(pixels(size, normal));
 // tilt: every texel 128,200,200 (bent toward image-up). bump: a raised Gaussian dome, its normals from the height's slope.
 const maps = {
   tilt: () => image(4, () => [0, 0.569, 0.569]),
@@ -198,9 +206,134 @@ function mesh(bitmap: ImageBitmap, kind: string) {
   };
 }
 
+// Export round trip: a textured, normal-mapped createMesh plane, written by each exporter and read back by its importer.
+// Colour: 2 x 2 texels, image top red | green, bottom blue | white (sampled nearest, so quadrants stay crisp).
+const colourPixels = new ImageData(
+    Uint8ClampedArray.from([255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255]),
+    2,
+    2,
+  ),
+  tiltPixels = pixels(4, () => [0, 0.569, 0.569]),
+  sampling = { magFilter: 'nearest', minFilter: 'nearest', mipmaps: false } as const;
+async function encode(data: ImageData) {
+  const canvas = new OffscreenCanvas(data.width, data.height);
+  canvas.getContext('2d')!.putImageData(data, 0, 0);
+  return new Uint8Array(await (await canvas.convertToBlob({ type: 'image/png' })).arrayBuffer());
+}
+const [colourBitmap, tiltBitmap, colourPNG, tiltPNG] = await Promise.all([
+  bitmapOf(colourPixels),
+  bitmapOf(tiltPixels),
+  encode(colourPixels),
+  encode(tiltPixels),
+]);
+// Materials meshes take three.js UVs (v up); GeometryData and the loaders use Margo's (glTF's) v down.
+const flipV = (uvs: ArrayLike<number>) => Float32Array.from(uvs, (v, i) => (i % 2 ? 1 - v : v));
+/** The source asset, as the editor holds it: one materials mesh (MikkTSpace tangents with `tangents`). */
+function original(normal: boolean, tangents = false) {
+  const colour = new Texture(colourBitmap, sampling),
+    tilt = normal ? new Texture(tiltBitmap) : null,
+    model = createMesh(
+      engine,
+      tangents ? computeTangents(planeGeometry(3, 2)) : planeGeometry(3, 2),
+      new Material({ color: [1, 1, 1], roughness: 1, metalness: 0, map: colour, normalMap: tilt }),
+    );
+  return {
+    model,
+    dispose() {
+      model.dispose();
+      colour.dispose();
+      tilt?.dispose();
+    },
+  };
+}
+/** The same asset as a data scene, per GeometryData's documented convention (glTF UVs, v down). */
+function dataScene(normal: boolean) {
+  const g = planeGeometry(3, 2),
+    texture = (image: Uint8Array) => ({ image, mimeType: 'image/png' as const, ...sampling });
+  return {
+    nodes: [
+      {
+        geometry: { positions: g.positions, normals: g.normals, indices: g.indices, uvs: flipV(g.uvs!) },
+        material: {
+          roughness: 1,
+          metalness: 0,
+          baseColorTexture: texture(colourPNG),
+          ...(normal ? { normalTexture: { image: tiltPNG, mimeType: 'image/png' as const } } : {}),
+        },
+      },
+    ],
+  };
+}
+type Loaded = { positions: Float32Array; normals?: Float32Array; indices?: Uint32Array; uvs?: Float32Array };
+/** A loaders result drawn as a materials mesh, its Margo UVs turned back to three.js orientation. */
+async function loaded(g: Loaded, png: Uint8Array) {
+  const colour = new Texture(await bitmapOf(new Blob([png as Uint8Array<ArrayBuffer>])), sampling),
+    model = createMesh(
+      engine,
+      { positions: g.positions, normals: g.normals!, indices: g.indices, uvs: flipV(g.uvs!) },
+      new Material({ color: [1, 1, 1], roughness: 1, metalness: 0, map: colour }),
+    );
+  return {
+    dispose() {
+      model.dispose();
+      colour.dispose();
+    },
+  };
+}
+async function glb(bytes: Uint8Array) {
+  const model = await parseGLTFAsync(engine, bytes, {});
+  return { dispose: () => model.dispose() };
+}
+/** Builds round-trip `path`: the original, or the asset after export and re-import (the original is gone by then). */
+async function roundTrip(path: string): Promise<{ dispose(): void }> {
+  if (path.startsWith('original')) return original(path !== 'original-plain', path === 'original-tangents');
+  if (path === 'scene-glb') return glb(exportGLB(dataScene(true)));
+  if (path === 'scene-obj') {
+    const out = exportOBJ(dataScene(false), { materials: true, textures: true }),
+      obj = await parseOBJ(out.obj, { resolve: async () => out.mtl! }),
+      map = obj.materials[0].maps.map_Kd!;
+    return loaded(obj, out.textures.get(map.path)!);
+  }
+  if (path === 'scene-dae') {
+    const out = exportDAE(dataScene(false)),
+      dae = parseDAE(out.dae);
+    return loaded(flattenDAE(dae), out.textures.get(dae.materials[0].diffuse!.texture!.path)!);
+  }
+  const source = original(true, path === 'model-glb-tangents');
+  try {
+    return await glb(path === 'engine-glb' ? exportGLB(engine) : await exportModel(source.model, { binary: true }));
+  } finally {
+    source.dispose();
+  }
+}
+
+/** Renders the current scene lit along `direction`; throws on any WebGPU or engine error. */
+async function draw(direction: number[]) {
+  engine.lighting.direction.set(direction);
+  engine.lighting.radiance.set([1, 1, 1, 0]);
+  device.pushErrorScope('validation');
+  engine.render();
+  await device.queue.onSubmittedWorkDone();
+  const error = await device.popErrorScope();
+  if (error) throw new Error(error.message);
+  if (errors.length) throw new Error(errors.join('\n'));
+}
+
 let current: { dispose(): void } | undefined;
 (window as any).normalOrientation = {
   errors,
+  /** Draws round-trip `path` lit from image-up (`fromUp`) or image-down; returns the export error, if any. */
+  async roundTrip(path: string, fromUp: boolean) {
+    current?.dispose();
+    current = undefined;
+    try {
+      current = await roundTrip(path);
+    } catch (error) {
+      return String(error);
+    }
+    await draw([0, fromUp ? 0.6 : -0.6, 0.8, 2.5]);
+    return '';
+  },
   /**
    * Draws `kind` with `map`, lit from the image-up (`fromUp`) or image-down side (anisotropy: along or across its
    * image right-up axis); returns image-up's world y sign.
@@ -212,20 +345,13 @@ let current: { dispose(): void } | undefined;
       side = fromUp ? 1 : -1,
       lobe = lobeOf(kind);
     current = kind.startsWith('gltf') ? gltf(bitmap, kind) : mesh(bitmap, kind);
-    engine.lighting.direction.set(
+    await draw(
       lobe === 'coat'
         ? [0, 0.8 * side, 0.6, 12]
         : lobe === 'aniso'
           ? [0.5 * side, 0.5, 0.7, 1]
           : [0, 0.6 * up * side, 0.8, 2.5],
     );
-    engine.lighting.radiance.set([1, 1, 1, 0]);
-    device.pushErrorScope('validation');
-    engine.render();
-    await device.queue.onSubmittedWorkDone();
-    const error = await device.popErrorScope();
-    if (error) throw new Error(error.message);
-    if (errors.length) throw new Error(errors.join('\n'));
     return up;
   },
   dispose() {

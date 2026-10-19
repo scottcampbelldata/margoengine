@@ -13,7 +13,7 @@ import { exportModel } from '../dist/model.js';
 import { headless, headlessModels } from '../../../tests/support/pbr-snapshot.js';
 import { bigGLB } from '../../../tests/support/big-glb.js';
 import { instancedGLTF } from '../../../tests/support/instanced-gltf.js';
-import { readGLB, validate, validator } from './helpers.js';
+import { glTFRows, readGLB, validate, validator } from './helpers.js';
 
 const asset = (name) =>
   readFile(new URL(`../../../examples/assets/${name}`, import.meta.url)).then((b) => new Uint8Array(b));
@@ -303,15 +303,20 @@ test(
       ]);
       assert.equal(json.images.length, 2, 'one image per Texture');
       const copy = await reimport(glb, { instancing });
-      // Raw images are written row 0 first (no flip), losslessly.
+      // Raw rows are the GPU rows (row 0 at v = 0, the image's bottom): written last row first, losslessly.
       for (const [i, texture] of [
         [0, base],
         [1, normal],
-      ])
+      ]) {
+        const { width, height, data } = texture.source,
+          rows = Array.from({ length: height }, (_, y) =>
+            data.subarray((height - 1 - y) * width * 4, (height - y) * width * 4),
+          );
         assert.deepEqual(decodePNG(docImage(copy, json.textures[i].source)), {
           ...texture.source,
-          data: Uint8Array.from(texture.source.data),
+          data: Uint8Array.from(rows.flatMap((row) => [...row])),
         });
+      }
       // Two models -> two wrapped scene roots (a has a root transform), materials from the live Material values.
       assert.equal(copy.primitives.length, 2);
       const [p, q] = copy.primitives;
@@ -320,11 +325,12 @@ test(
         [q, b.primitives[0]],
       ]) {
         for (const key of ['base', 'factors', 'emission']) close(x.material[key], m.material[key], 1e-6, key);
-        // UV transforms travel with textures: the map, normal and occlusion slots of `textured`.
+        // UV transforms travel with textures, conjugated to glTF's v down: the map, normal and occlusion slots of
+        // `textured` (untextured `masked` keeps the identity).
         for (const slot of m === a.primitives[0] ? [0, 2, 3] : [0, 1, 2, 3, 4])
           close(
             x.material.uvt.slice(slot * 8, slot * 8 + 8),
-            m.material.uvt.slice(slot * 8, slot * 8 + 8),
+            glTFRows(m.material.uvt.slice(slot * 8, slot * 8 + 8)),
             1e-6,
             `uvt ${slot}`,
           );
@@ -335,10 +341,11 @@ test(
           0,
           'settings',
         );
-        // Packed vertices equal, except UV1: packGeometry copies UV0 there and only TEXCOORD_0 is written.
+        // Packed vertices equal, except UV0's v (glTF v down) and UV1: packGeometry copies UV0 there and only
+        // TEXCOORD_0 is written.
         close(
           x.vertices,
-          m.vertices.map((v, i) => (i % 20 === 14 || i % 20 === 15 ? 0 : v)),
+          m.vertices.map((v, i) => (i % 20 === 13 ? 1 - v : i % 20 === 14 || i % 20 === 15 ? 0 : v)),
           0,
           'vertices',
         );

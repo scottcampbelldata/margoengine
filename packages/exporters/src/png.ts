@@ -14,12 +14,11 @@ const crcTable = /* @__PURE__ */ Int32Array.from({ length: 256 }, (_, n) => {
 });
 
 /**
- * RGBA8 PNG (Sub filter, zlib from CompressionStream) of a texture source, at most `max` pixels on its longer side.
- * Raw `{data, width, height}` rows encode directly (anywhere) and never flip, as @margoengine/materials uploads them;
- * other sources and resizing draw through an OffscreenCanvas.
+ * RGBA8 PNG (Sub filter, zlib from CompressionStream) of a texture source, at most `max` pixels on its longer side,
+ * its rows bottom first with `flipY`. Raw `{data, width, height}` rows encode directly (anywhere); other sources and
+ * resizing draw through an OffscreenCanvas.
  */
 export async function png(source: PNGSource, max: number, flipY: boolean): Promise<Uint8Array> {
-  flipY &&= !raw(source);
   const dimensions = source as {
       videoWidth?: number;
       displayWidth?: number;
@@ -35,8 +34,10 @@ export async function png(source: PNGSource, max: number, flipY: boolean): Promi
   const scale = Math.min(1, max / Math.max(w, h)),
     W = Math.max(1, Math.round(w * scale)),
     H = Math.max(1, Math.round(h * scale));
-  let rgba = raw(source) ? source.data : undefined;
+  let rgba = raw(source) ? source.data : undefined,
+    reverse = flipY;
   if (!raw(source) || scale < 1) {
+    reverse = false;
     if (typeof OffscreenCanvas !== 'function')
       throw new TypeError('Encoding this texture needs OffscreenCanvas (a browser or worker)');
     let image: CanvasImageSource;
@@ -59,7 +60,7 @@ export async function png(source: PNGSource, max: number, flipY: boolean): Promi
     rows = new Uint8Array((stride + 1) * H);
   for (let y = 0; y < H; y++) {
     const o = y * (stride + 1),
-      i = y * stride;
+      i = (reverse ? H - 1 - y : y) * stride;
     rows[o] = 1;
     for (let x = 0; x < stride; x++) rows[o + 1 + x] = rgba![i + x] - (x < 4 ? 0 : rgba![i + x - 4]);
   }

@@ -38,6 +38,11 @@ export async function headlessEngine(capacity = 256) {
   return new Engine({ width: 1, height: 1, getContext() {} }, store, renderer, undefined, null);
 }
 
+/** A materials mesh's three.js UVs (v up) as exportModel writes them for glTF (v down): v -> 1 - v. */
+export const glTFUV = (uvs) => Array.from(uvs, (v, i) => (i % 2 ? 1 - v : v));
+/** A materials UV row pair [a0, a1, x, set, b0, b1, y, 0] as exportModel writes it: conjugated by v -> 1 - v. */
+export const glTFRows = ([a0, a1, x, set, b0, b1, y, w]) => [a0, -a1, x + a1, set, -b0, b1, 1 - y - b1, w];
+
 export function readGLB(bytes) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (

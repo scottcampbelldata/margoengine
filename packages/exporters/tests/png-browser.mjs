@@ -1,5 +1,5 @@
 // exportModel's canvas paths in a real browser (no WebGPU needed): ImageBitmap sources encode through OffscreenCanvas,
-// flipY flips rows, maxTextureSize shrinks, raw rows stay unflipped. Each PNG is decoded back by the browser itself.
+// flipY flips rows (raw rows too), maxTextureSize shrinks. Each PNG is decoded back by the browser itself.
 // Run after building the package: node packages/exporters/tests/png-browser.mjs
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
@@ -51,7 +51,7 @@ try {
   const row = (data, y) => data.slice(y * 16, y * 16 + 16);
   assert.deepEqual(result.plain, { width: 4, height: 2, data: result.source }, 'bitmap, no flip');
   assert.deepEqual(result.flipped.data, [...row(result.source, 1), ...row(result.source, 0)], 'bitmap, flipped rows');
-  assert.deepEqual(result.raw.data, result.source, 'raw rows never flip');
+  assert.deepEqual(result.raw.data, [...row(result.source, 1), ...row(result.source, 0)], 'raw rows, flipped');
   assert.deepEqual([result.shrunk.width, result.shrunk.height], [16, 8], 'maxTextureSize 16 on 64x32');
   assert.deepEqual([result.rawShrunk.width, result.rawShrunk.height], [3, 2], 'maxTextureSize 3 on raw 6x3');
   console.log(`png-browser: 5 checks passed (${browser.version()})`);

@@ -7,7 +7,7 @@ import { instancing } from '@margoengine/gltf-pro/instancing';
 import { exportModel } from '../dist/model.js';
 import { exportGLTF } from '../dist/index.js';
 import { headless, headlessModels } from '../../../tests/support/pbr-snapshot.js';
-import { accessor, readGLB, validate, validator } from './helpers.js';
+import { accessor, glTFUV, readGLB, validate, validator } from './helpers.js';
 
 const quad = {
   positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0],
@@ -47,7 +47,7 @@ test('exportModel bakes packed back-only triangle winding and normals without ch
     assert.deepEqual(values(result, out, 'NORMAL'), flippedNormals);
     assert.deepEqual(values(result, out, 'TANGENT'), quad.tangents);
     assert.deepEqual(values(result, out, 'POSITION'), quad.positions);
-    assert.deepEqual(values(result, out, 'TEXCOORD_0'), quad.uvs);
+    assert.deepEqual(values(result, out, 'TEXCOORD_0'), glTFUV(quad.uvs));
     assert.equal(result.json.materials[0].doubleSided, undefined);
     assert.deepEqual(p.vertices, beforeVertices);
     assert.deepEqual(p.indices, beforeIndices);

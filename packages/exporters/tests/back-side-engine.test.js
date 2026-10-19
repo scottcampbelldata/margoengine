@@ -1,11 +1,11 @@
 // Engine-based exporters use the shared optional PBR source protocol, independently of exportModel().
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Material, createMesh } from '@margoengine/materials';
+import { Material, Texture, createMesh } from '@margoengine/materials';
 import { parseGLTF } from '@margoengine/gltf-pro';
 import { readZipDirectory, readZipEntry } from '@margoengine/loaders';
 import { exportModel } from '../dist/model.js';
-import { exportGLTF, exportGLB, exportUSDZ, exportOBJ, exportPLY, exportSTL } from '../dist/index.js';
+import { exportDAE, exportGLTF, exportGLB, exportUSDZ, exportOBJ, exportPLY, exportSTL } from '../dist/index.js';
 import { headless, headlessModels } from '../../../tests/support/pbr-snapshot.js';
 import { accessor, readGLB, parseOBJ, parsePLY, parseASCIISTL } from './helpers.js';
 
@@ -163,4 +163,13 @@ test('engine glTF extraction flips loaded morph normal deltas while retaining sk
     assert.deepEqual(attribute(result, out, 'JOINTS_0'), Array(16).fill(0));
     assert.deepEqual([...accessor(result.json, result.bin, result.json.skins[0].inverseBindMatrices)], identity);
     assert.deepEqual(source.asset.accessor(p.definition.targets[0].NORMAL), before);
+  }));
+
+test('engine exports reject a textured materials mesh instead of dropping its textures', () =>
+  headlessModels(async () => {
+    const engine = await headless(),
+      map = new Texture({ width: 1, height: 1, data: Uint8Array.of(255, 0, 0, 255) });
+    createMesh(engine, quad, new Material({ map }));
+    for (const write of [exportGLTF, exportGLB, exportOBJ, exportDAE])
+      assert.throws(() => write(engine), /exportModel/);
   }));

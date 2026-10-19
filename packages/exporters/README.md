@@ -44,6 +44,13 @@ output. `exportModel` writes live perspective/orthographic projections, light co
 with node attachments, hierarchy and live transforms. Hidden nodes follow `onlyVisible`; a model with no cameras or
 lights exports without camera arrays or punctual-light declarations. No additional light type is introduced.
 
+Materials meshes use three.js UV orientation (v = 0 at the bottom of a `flipY` texture); glTF puts v = 0 at the
+image's top. `exportModel` writes their UVs as `1 - v`, each texture's PNG with its GPU rows bottom first (a `flipY`
+image as it is, raw pixel rows and `flipY: false` sources reversed) and each UV transform rewritten for the flipped v
+(rotation negated, offset moved). Tangents are kept: their bitangent runs up the image in both conventions. So a
+re-import draws the same pixels, normal maps included, and the PNGs open upright in other tools; the re-imported
+model's UVs are glTF's (`1 - v` of the source).
+
 Geometry groups remain primitives under one mesh node, with each group's material, textures and index range. Independent UV1 coordinates are written as `TEXCOORD_1`; referenced UV sets are retained even when every coordinate is zero. Texture UV selection and affine transforms use the live material rows, including changes made with `material.setUVTransform({texCoord: 1}, 'aoMap')`. An unused UV1 copy of UV0 is omitted.
 
 Physical `Material` maps are saved to the matching glTF extensions: clearcoat factor, roughness and normal; transmission; sheen color and roughness; specular intensity and color; iridescence factor and thickness; anisotropy; and volume thickness. Each map keeps its live UV set and transform, sampler and original RGBA channels. A shared `Texture` is written once, including when several groups or physical lobes use it. Iridescence and anisotropy controls and the live volume thickness, attenuation color and attenuation distance are exported with the maps; infinite attenuation distance uses glTF's omitted default.
@@ -54,7 +61,7 @@ Live `side: 'back'` triangle materials are saved as ordinary front-only glTF mat
 
 ## How it works
 
-Engine exports recognize primitives loaded by `@margoengine/gltf-pro` and `@margoengine/fbx`, without attaching core geometry. glTF/GLB retain all primitives on each node and their bind-pose skin/morph data; other formats write base geometry. Automatic export of PBR textures, material extensions, and more than four skin influences throws explicitly. An engine forest containing no supported mesh geometry also throws; visibility filtering and intentionally empty data scenes remain supported.
+Engine exports recognize primitives loaded by `@margoengine/gltf-pro` and `@margoengine/fbx`, without attaching core geometry. glTF/GLB retain all primitives on each node and their bind-pose skin/morph data; other formats write base geometry. Automatic export of PBR textures (a textured `createMesh` mesh included: use `exportModel`), material extensions, and more than four skin influences throws explicitly. An engine forest containing no supported mesh geometry also throws; visibility filtering and intentionally empty data scenes remain supported.
 
 Engine export entrypoints also bake back-only optional PBR triangles by reversing winding and negating base and morph normals. This preserves their visible side in glTF, GLB, USDZ, OBJ, PLY and STL, including mirrored world transforms. Front-only and double-sided materials retain their existing geometry behavior.
 
@@ -88,7 +95,7 @@ Engine export entrypoints also bake back-only optional PBR triangles by reversin
 | `mergeVertices` | OBJ | `false`. Welds a mesh's corners whose position, uv, normal and written color agree within 1e-5 |
 | `scale` | OBJ | `1`. Multiplies every position |
 
-`GeometryData` is `{positions, normals, uvs?, tangents?, colors?, indices?, faceSizes?, joints?, weights?, morphs?}` with xyz, xyz, uv, xyzw and linear rgb or rgba per vertex. `faceSizes` lists corners per face in index order: 3 for a triangle, 4 for the next two triangles when they form a quad (sharing an edge, as (a, b, c), (a, c, d)); OBJ and DAE write those quads as 4-corner faces, the other formats write the triangles. Inputs are validated: finite Float32 values, matching lengths, complete triangles, indices in range, colors in [0, 1], nonzero scales and quaternions, PNG or JPEG bytes that match `mimeType`, and textured materials only on geometry with UVs.
+`GeometryData` is `{positions, normals, uvs?, tangents?, colors?, indices?, faceSizes?, joints?, weights?, morphs?}` with xyz, xyz, uv, xyzw and linear rgb or rgba per vertex. `uvs` follow glTF (v = 0 at the image's top, images as encoded): a materials mesh's three.js UVs go in as `1 - v`. `faceSizes` lists corners per face in index order: 3 for a triangle, 4 for the next two triangles when they form a quad (sharing an edge, as (a, b, c), (a, c, d)); OBJ and DAE write those quads as 4-corner faces, the other formats write the triangles. Inputs are validated: finite Float32 values, matching lengths, complete triangles, indices in range, colors in [0, 1], nonzero scales and quaternions, PNG or JPEG bytes that match `mimeType`, and textured materials only on geometry with UVs.
 
 ## Data-scene skin, morph and animation export
 

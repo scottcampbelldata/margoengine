@@ -112,7 +112,7 @@ const resolve = async (path) => new Uint8Array(await (await fetch(new URL(path, 
 
 `parseMTL(textOrBytes, {path})` returns `{name, Ka, Kd, Ks, Ke, Ns, d, Tr, illum, maps, extras}[]`. `maps` holds `map_Kd`, `map_Ka`, `map_Ks`, `map_Ke`, `map_Ns`, `map_d`, `bump` (also written `map_Bump`), `disp`, `decal`, `refl` and any other `map_*` as `{file, path, options}`, where `options` uses the spec's names (`o`, `s`, `t` as three numbers, `clamp`, `blendu`, `blendv`, `cc` as booleans, `bm`, `boost`, `texres`, `mm`, `imfchan`, `type`). Statements it does not interpret, and maps with unknown options, stay in `extras`.
 
-Textured meshes: `createMeshes` gives core `PbrMaterial` colors only. For textures, hand the data to `createMesh` from `@margoengine/materials` (not a dependency of this package):
+Textured meshes: `createMeshes` gives core `PbrMaterial` colors only. For textures, hand the data to `createMesh` from `@margoengine/materials` (not a dependency of this package). `createMesh` takes three.js UVs (v = 0 at the bottom of a `flipY` texture), so turn Margo's v back with `1 - v`; passed as they are, the texture draws upside down:
 
 ```ts
 import {Material, createMesh, loadTexture} from '@margoengine/materials';
@@ -125,7 +125,8 @@ const materials = await Promise.all(obj.groups.map(async (g) => {
   return new Material({map: map ? await loadTexture(new URL(map.path, modelUrl)) : null});
 }));
 createMesh(engine, {
-  positions: obj.positions, indices: obj.indices, uvs: obj.uvs, colors: obj.colors?.map(SRGBToLinear),
+  positions: obj.positions, indices: obj.indices, uvs: obj.uvs?.map((v, i) => (i % 2 ? 1 - v : v)),
+  colors: obj.colors?.map(SRGBToLinear),
   normals: obj.normals ?? computeVertexNormals(obj.positions, obj.indices),
   groups: obj.groups.map((g, i) => ({start: g.start, count: g.count, materialIndex: i})),
 }, materials);

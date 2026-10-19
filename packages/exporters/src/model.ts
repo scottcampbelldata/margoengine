@@ -15,7 +15,7 @@ import type {
 import type { PNGSource } from './png.js';
 type PBRPrimitive = ModelPrimitive & { instances?: { count: number; data: Float32Array } };
 import { Bin, ARRAY_BUFFER, ELEMENT_ARRAY_BUFFER, FLOAT, type GLTFJsonResult } from './container.js';
-import { decompose } from './scene.js';
+import { decompose, materialSlots as slots } from './scene.js';
 import { writeSceneMetadata } from './scene-metadata.js';
 export type { GLTFJsonResult } from './container.js';
 
@@ -63,26 +63,15 @@ const clean = <T extends Json>(o: T): T => {
 };
 const scaled = (info: Json | undefined, key: string, value: number) =>
   info && value !== 1 ? { ...info, [key]: value } : info;
-// Constructed Material order. Loaded glTF uses slots 16/17 for diffuse transmission, never thickness.
-const slots = [
-  'map',
-  'metalRoughnessMap',
-  'normalMap',
-  'aoMap',
-  'emissiveMap',
-  'clearcoatMap',
-  'clearcoatRoughnessMap',
-  'clearcoatNormalMap',
-  'transmissionMap',
-  'sheenColorMap',
-  'sheenRoughnessMap',
-  'specularIntensityMap',
-  'specularColorMap',
-  'iridescenceMap',
-  'iridescenceThicknessMap',
-  'anisotropyMap',
-  'thicknessMap',
-] as const;
+// Constructed Material slots (scene.ts). Loaded glTF uses slots 16/17 for diffuse transmission, never thickness.
+// Materials meshes sample three.js UVs (v up) from flipY uploads; glTF puts v = 0 at the image's top. The writer maps
+// one onto the other: v -> 1 - v for both UV sets, each image written with its GPU rows bottom first, and each UV
+// transform conjugated by that flip. Tangents keep their direction: their bitangent, toward increasing v, is up the
+// image in glTF too, as a derived frame's is.
+const flipV = (uvs: Float32Array) => {
+  for (let i = 1; i < uvs.length; i += 2) uvs[i] = 1 - uvs[i];
+  return uvs;
+};
 interface PixelTexture {
   source: PNGSource;
   isVideo?: boolean;
@@ -207,8 +196,8 @@ class Writer extends Bin {
         attributes.TANGENT = this.accessor(tangents, 'VEC4', FLOAT, ARRAY_BUFFER);
       // glTF indexed semantics must start at 0, even when only UV1 is sampled.
       if (hasUV1 || usesUV(0) || uvs.some((x) => x))
-        attributes.TEXCOORD_0 = this.accessor(uvs, 'VEC2', FLOAT, ARRAY_BUFFER);
-      if (hasUV1) attributes.TEXCOORD_1 = this.accessor(uvs1, 'VEC2', FLOAT, ARRAY_BUFFER);
+        attributes.TEXCOORD_0 = this.accessor(flipV(uvs), 'VEC2', FLOAT, ARRAY_BUFFER);
+      if (hasUV1) attributes.TEXCOORD_1 = this.accessor(flipV(uvs1), 'VEC2', FLOAT, ARRAY_BUFFER);
       if (colors.some((x) => x !== 1)) attributes.COLOR_0 = this.accessor(colors, 'VEC4', FLOAT, ARRAY_BUFFER);
     }
     // 65535 is the primitive restart value for 16-bit indices.
@@ -391,7 +380,10 @@ class Writer extends Bin {
     if (!map && !texture) return undefined;
     const info: Json = { index: map ? this.docTexture(model, map.index) : this.pixelTexture(texture!) };
     // Rows: [cos*sx, sin*sy, offset x, uv set], [-sin*sx, cos*sy, offset y, 0].
-    const [a0, a1, x, texCoord, b0, b1, y] = (texture ? (owner?.uvt ?? m.uvt!) : m.uvt!).slice(i * 8, i * 8 + 8);
+    let [a0, a1, x, texCoord, b0, b1, y] = (texture ? (owner?.uvt ?? m.uvt!) : m.uvt!).slice(i * 8, i * 8 + 8);
+    // A materials texture's rows act on v-up UVs: in glTF's v' = 1 - v they read u' = a0 u - a1 v' + x + a1 and
+    // 1 - v'' = -b0 u + b1 v' + 1 - y - b1 (the rotation negates, the scale stays).
+    if (texture) [a1, x, b0, y] = [-a1, x + a1, -b0, 1 - y - b1];
     if (texCoord) info.texCoord = texCoord;
     if (a0 !== 1 || a1 || x || b0 || b1 !== 1 || y) {
       const r = Math.atan2(-b0, a0),
@@ -466,7 +458,7 @@ class Writer extends Bin {
     });
   }
 
-  /** An @margoengine/materials Texture: its sampler options and its pixels as PNG, flipped back to glTF's v-down rows. */
+  /** An @margoengine/materials Texture: its sampler options and its pixels as PNG, its GPU rows bottom first. */
   private pixelTexture(texture: PixelTexture): number {
     return this.memo(texture, () => {
       const o = texture.options ?? {},
@@ -479,7 +471,9 @@ class Writer extends Bin {
         wrapS: wraps[o.wrapS ?? 'clamp'],
         wrapT: wraps[o.wrapT ?? 'clamp'],
       });
-      this.encode(image, texture.source, o.flipY ?? true);
+      // flipY uploads put the image's bottom row first on the GPU (v = 0), so they write the image as it is; raw rows
+      // and flipY: false sources uploaded as they are, so they write reversed.
+      this.encode(image, texture.source, !(o.flipY ?? true) || 'data' in texture.source);
       return this.list('textures', { sampler, source: this.list('images', image) });
     });
   }

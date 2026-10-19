@@ -10,6 +10,11 @@
 // From ffd0f05e until materials' feature letter n, 'mesh' and 'mesh-uv1' read 75 / 221 and 96-99 / 222: dents. Until
 // the extension lobes took letter n too, 'mesh-node' read 75 / 221, dome 96 / 222; 'mesh-coat' 16 / 99, dome 16 / 159;
 // 'mesh-aniso' 0 / 249. Their glTF twins read as now throughout.
+// Round trips (same day): the source plane reads 226,2,2 | 2,226,2 / 2,2,225 | 221 lit from image-up and 92 | 92 /
+// 92 | 75 from image-down. Every re-import now matches it, maxDiff 0. Before exportModel wrote glTF UVs (it kept v up
+// and wrote the images upside down) its GLB re-import had upright colours but the normal map inverted: 92 / 225 per
+// probe, maxDiff 146-147. exportGLB(engine) drew the plane untextured (200 grey, maxDiff 199-200) and now refuses it;
+// loaders' OBJ UVs passed to createMesh without 1 - v draw upside down (maxDiff 204).
 // Run: node scripts/gpu-lock.mjs run --owner=<you> -- node scripts/normal-map-orientation-gpu-check.js [--measure]
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -55,16 +60,73 @@ try {
     results[kind].bumpImageTop = level(dome.image, 160, top);
     results[kind].bumpImageBottom = level(dome.image, 160, bottom);
   }
+  // Export round trips: each re-import must draw what its source drew (OBJ and DAE carry no normal map, so their
+  // source is the plane without one), lit from image-up and image-down. Probes: the quadrant centres, image-top-left
+  // first (red, green, blue, white when upright); maxDiff: the largest channel difference over the whole canvas.
+  // engine-glb must refuse the textured materials mesh (it used to drop the textures and UVs).
+  const sources = {
+      'model-glb': 'original',
+      'model-glb-tangents': 'original-tangents',
+      'engine-glb': 'original',
+      'scene-glb': 'original',
+      'scene-obj': 'original-plain',
+      'scene-dae': 'original-plain',
+    },
+    rgb = (image, x, y) => [...image.data.subarray((y * image.width + x) * 4, (y * image.width + x) * 4 + 3)],
+    drawn = {},
+    trips = {};
+  for (const path of ['original', 'original-tangents', 'original-plain', ...Object.keys(sources)])
+    for (const fromUp of [true, false]) {
+      const error = await page.evaluate((args) => window.normalOrientation.roundTrip(...args), [path, fromUp]),
+        label = `trip-${path}-${fromUp ? 'up' : 'down'}`;
+      if (error) {
+        trips[path] = { error };
+        break;
+      }
+      const image = await decodePNG(await page.locator('canvas').screenshot({ path: `${output}/${label}.png` }));
+      drawn[label] = image;
+      const source = drawn[`trip-${sources[path]}-${fromUp ? 'up' : 'down'}`];
+      let maxDiff = 0;
+      if (source)
+        for (let i = 0; i < image.data.length; i++)
+          maxDiff = Math.max(maxDiff, Math.abs(image.data[i] - source.data[i]));
+      (trips[path] ??= {})[fromUp ? 'fromUp' : 'fromDown'] = {
+        probes: [
+          [100, 80],
+          [220, 80],
+          [100, 160],
+          [220, 160],
+        ].map(([x, y]) => rgb(image, x, y)),
+        ...(source ? { maxDiff } : {}),
+      };
+    }
+  results.roundTrips = trips;
   console.log(JSON.stringify({ hardware: browser.hardware, results }, null, 2));
   await writeFile(`${output}/gpu.json`, JSON.stringify({ hardware: browser.hardware, results }, null, 2) + '\n');
   assert.deepEqual(errors, []);
-  if (!measure)
+  if (!measure) {
     for (const kind of cases) {
       const r = results[kind];
       assert.ok(r.tiltFromUp > r.tiltFromDown + 40, `${kind}: image-up tilt lit from below: ${JSON.stringify(r)}`);
       if (!kind.endsWith('-aniso'))
         assert.ok(r.bumpImageTop > r.bumpImageBottom + 40, `${kind}: dome shades as a dent: ${JSON.stringify(r)}`);
     }
+    // The sources: upright quadrants (each probe's own channel leads by 150+), the tilt lit from image-up brighter.
+    const leads = (rgb, k) => rgb.every((v, c) => c === k || rgb[k] > v + 150);
+    for (const path of ['original', 'original-tangents', 'original-plain']) {
+      const { fromUp, fromDown } = trips[path];
+      fromUp.probes.slice(0, 3).forEach((rgb, k) => assert.ok(leads(rgb, k), `${path} quadrant ${k}: ${rgb}`));
+      if (path !== 'original-plain')
+        assert.ok(fromUp.probes[3][0] > fromDown.probes[3][0] + 100, `${path}: ${JSON.stringify(trips[path])}`);
+    }
+    assert.match(trips['engine-glb'].error ?? '', /exportModel/);
+    for (const path of Object.keys(sources).filter((p) => p !== 'engine-glb'))
+      for (const lit of ['fromUp', 'fromDown'])
+        assert.ok(
+          trips[path][lit]?.maxDiff <= 2,
+          `${path} ${lit} differs from its source: ${JSON.stringify(trips[path])}`,
+        );
+  }
 } finally {
   await browser?.page.evaluate(() => window.normalOrientation?.dispose()).catch(() => {});
   await browser?.close();
