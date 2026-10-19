@@ -64,6 +64,7 @@ try {
     'mask',
     'effects',
     'geometry',
+    'swap',
     'canvasRegion',
     'lambert',
     'phong',
@@ -90,6 +91,13 @@ try {
       near(await pixel(), [0, 0, 255], 'a full update covers the centre');
       await step();
       near(await pixel(), [255, 0, 0], 'a ranged UV update samples the red top');
+    }
+    if (name === 'swap') {
+      near(center, [255, 0, 0], 'the first material');
+      await step();
+      near(await pixel(), [128, 128, 255], 'swapped to normal shading');
+      await step();
+      near(await pixel(), [0, 0, 255], 'swapped back to unlit, another colour');
     }
     if (name === 'canvasRegion') {
       near(await pixel(0.3), [0, 255, 0], 'region before');

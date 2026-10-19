@@ -7,6 +7,8 @@ import {
   textureTransform,
   textureCoordinates,
   type PreparedGeometry,
+  type PBRMaterial,
+  type PBRMaterialShading,
   type PBRRenderState,
   type TextureTransform,
   type MaterialSide,
@@ -1489,7 +1491,8 @@ export interface GeometryRange {
 }
 interface Entry {
   model: PBRModel;
-  materials: readonly Material[];
+  /** The material each primitive draws with, in primitive order. */
+  materials: Material[];
   order: number;
   opaque: boolean;
   blend: boolean;
@@ -1601,9 +1604,123 @@ function queue(runtime: Engine): MaterialDraws {
   queues.set(runtime, draws);
   return draws;
 }
+const renderStates = new WeakMap<Material, PBRRenderState>(),
+  features = new WeakMap<Material, NonNullable<PBRMaterial['extended']>>(),
+  named = new WeakMap<Material, { key: string; value: Record<string, object> }>();
+/** gltf-pro's beauty pipeline overrides for `m`, or undefined for the default pipeline. */
+function renderStateOf(m: Material): PBRRenderState | undefined {
+  if (!m.customState) return undefined;
+  let state = renderStates.get(m);
+  if (state) return state;
+  const stencil: GPUStencilFaceState = {
+    compare: m.stencilFunc,
+    failOp: m.stencilFail,
+    depthFailOp: m.stencilZFail,
+    passOp: m.stencilZPass,
+  };
+  state = {
+    blend: blends[m.blending],
+    depthWrite: m.depthWrite,
+    depthCompare: m.depthTest ? undefined : 'always',
+    ...(m.colorWrite ? {} : { colorWrite: false }),
+    ...(m.polygonOffset
+      ? {
+          depthBiasMode: 'away' as const,
+          depthBias: m.polygonOffsetUnits,
+          depthBiasSlopeScale: m.polygonOffsetFactor,
+          depthBiasClamp: m.polygonOffsetClamp,
+        }
+      : {}),
+    ...(m.stencilWrite
+      ? {
+          stencilFront: stencil,
+          stencilBack: { ...stencil },
+          stencilReference: m.stencilRef,
+          stencilReadMask: m.stencilReadMask,
+          stencilWriteMask: m.stencilWriteMask,
+        }
+      : {}),
+  };
+  renderStates.set(m, state);
+  return state;
+}
+/** gltf-pro's extended-material features (iridescence, anisotropy rows) for `m`, kept while they stay the same. */
+function extendedOf(m: Material): PBRMaterial['extended'] {
+  if (!m.physical || m.physical.length <= 12) return undefined;
+  const iridescence = m.extensions.includes('iridescence'),
+    anisotropy = m.extensions.includes('anisotropy');
+  let f = features.get(m);
+  if (f?.iridescence !== iridescence || f.anisotropy !== anisotropy)
+    features.set(m, (f = { iridescence, anisotropy, diffuseTransmission: false }));
+  return f;
+}
+/** The glTF `extensions` record @margoengine/exporters reads to name the KHR_materials_* in use; one object per list. */
+function extensionsOf(m: Material): Record<string, object> | undefined {
+  if (!m.physical) return undefined;
+  const key = m.extensions.join();
+  let record = named.get(m);
+  if (record?.key !== key)
+    named.set(m, (record = { key, value: Object.fromEntries(m.extensions.map((e) => ['KHR_materials_' + e, {}])) }));
+  return record.value;
+}
+/**
+ * Points gltf-pro material record `g` at `current()`, read on every draw: values, maps (through the shading hook),
+ * physical rows, render state and wireframe all follow a material swap or a live edit from the next frame.
+ */
+function surface(g: PBRMaterial, current: () => Material, runtime: Engine): void {
+  const plain = g.ext,
+    // Enumerable and configurable like the data properties they replace (`{...record}` copies still work).
+    get = (read: (m: Material) => unknown): PropertyDescriptor => ({
+      get: () => read(current()),
+      enumerable: true,
+      configurable: true,
+    });
+  Object.defineProperties(g, {
+    extendedFrame: { value: true, enumerable: true },
+    base: get((m) => m.color),
+    emission: get((m) => m.emissive),
+    factors: get((m) => m.factors),
+    settings: get((m) => m.settings),
+    // The native frame holds 13 slots; the sparse map uniform owns all 17 slots.
+    uvt: get((m) => m.uvt.slice(0, extendedOf(m) ? 144 : 104)),
+    // Physical: gltf-pro's factor-only variant (five maps), live arrays, and the tinted-blend constant.
+    physical: get((m) => m.physical),
+    ext: get((m) => m.ext ?? plain),
+    volume: get((m) => m.volume),
+    dispersion: get((m) => m.dispersion),
+    tint: get((m) => m.tint),
+    extended: get(extendedOf),
+    extensions: get(extensionsOf),
+    renderState: get(renderStateOf),
+    wireframe: {
+      ...get((m) => m.wireframe),
+      set: (v: boolean) => Object.assign(current(), { wireframe: v }),
+    },
+    shading: {
+      enumerable: true,
+      value: {
+        get replacesTextures() {
+          return mapped(current());
+        },
+        get texturedTint() {
+          const m = current();
+          return mapped(m) && m.transmissive;
+        },
+        shader: (code: string, group: number) => current().shader(code, group),
+        bindings: () => current().bindings(runtime.gpu!, runtime),
+      } satisfies PBRMaterialShading,
+    },
+  });
+}
 /** A materials mesh: the gltf-pro model plus the live `material` it draws with (read by @margoengine/exporters `exportModel`). */
 export type MaterialMesh<M extends Material | readonly Material[] = Material> = PBRModel & {
-  readonly material: M extends Material ? Material : readonly Material[];
+  /**
+   * The material it draws with, or a frozen snapshot of the material array (one per slot that `groups` index).
+   * Assigning swaps it live from the next frame: one Material for a single-material mesh, an array of the same length
+   * for a grouped one. Transform, geometry, render order, skin and shadow, clustered, fog, IBL, SSAO, OIT and
+   * selection registrations stay; transparent sorting and picking follow the new material.
+   */
+  material: M extends Material ? Material : readonly Material[];
   /**
    * Live edit: repacks `geometry` (the same object edited in place, or a new one) into this mesh's buffers, reusing
    * the GPU buffers while the data fits (gltf-pro `writeGeometry`). Groups may move and resize but keep their number
@@ -1625,29 +1742,22 @@ export function createMesh<M extends Material | readonly Material[]>(
   material: M,
   { renderOrder = 0 }: { renderOrder?: number } = {},
 ): MaterialMesh<M> {
-  const materials: readonly Material[] = Array.isArray(material)
-    ? Object.freeze([...material])
-    : [material as Material];
-  if (!materials.length || materials.some((m) => !(m instanceof Material)) || !Number.isFinite(renderOrder))
+  const array = Array.isArray(material),
+    // The current material of each slot (`groups[i].materialIndex`); a swap replaces the contents.
+    assigned: Material[] = array ? [...(material as readonly Material[])] : [material as Material];
+  if (!assigned.length || assigned.some((m) => !(m instanceof Material)) || !Number.isFinite(renderOrder))
     throw new TypeError('Invalid material mesh');
   const data = packGeometry(geometry),
-    array = Array.isArray(material),
-    groups = meshGroups(geometry, data.indices.length, materials, array);
+    groups = meshGroups(geometry, data.indices.length, assigned, array);
   const prepared = groups.map((g) => ({ vertices: data.vertices, indices: groupIndices(data.indices, g) }));
   const runtime = engineRuntime(engine),
     set = queue(runtime);
+  // Placeholder glTF materials: every value gltf-pro draws comes from the slot's current Material (`surface`).
   const doc = {
     asset: { version: '2.0' },
     nodes: [{ mesh: 0 }],
     meshes: [{ primitives: groups.map((g) => ({ material: g.materialIndex })) }],
-    materials: materials.map((m) => ({
-      pbrMetallicRoughness: { baseColorFactor: m.color, roughnessFactor: m.factors[0], metallicFactor: m.factors[1] },
-      emissiveFactor: m.emissive,
-      alphaMode: ['OPAQUE', 'MASK', 'BLEND'][m.settings[0]],
-      alphaCutoff: m.settings[1],
-      doubleSided: m.doubleSided,
-      ...(m.physical && { extensions: Object.fromEntries(m.extensions.map((e) => ['KHR_materials_' + e, {}])) }),
-    })),
+    materials: assigned.map(() => ({})),
   };
   const model = new PBRModel(
     engine,
@@ -1655,84 +1765,48 @@ export function createMesh<M extends Material | readonly Material[]>(
     [],
     [prepared],
   );
-  const releaseMaps = [...new Set(groups.map((g) => materials[g.materialIndex]))].map((m) => retainMaps(m, runtime));
-  model.onDispose(() => releaseMaps.forEach((release) => release()));
-  for (const primitive of model.primitives) {
-    const m = materials[primitive.definition.material!],
-      g = primitive.material;
-    Object.assign(g, {
-      extendedFrame: true,
-      wireframe: m.wireframe,
-      base: m.color,
-      emission: m.emissive,
-      factors: m.factors,
-      settings: m.settings,
-    });
-    // The native frame holds 13 slots; the sparse map uniform owns all 17 slots.
-    Object.defineProperty(g, 'uvt', { get: () => m.uvt.slice(0, g.extended ? 144 : 104) });
-    // Physical: gltf-pro's factor-only variant (five maps), live arrays, and the tinted-blend constant read every frame.
-    if (m.physical) {
-      Object.assign(g, { physical: m.physical, ext: m.ext, volume: m.volume, maps: g.maps.slice(0, 5) });
-      Object.defineProperty(g, 'dispersion', { get: () => m.dispersion });
-      Object.defineProperty(g, 'tint', { get: () => m.tint });
-      if (m.physical.length > 12)
-        g.extended = {
-          iridescence: m.extensions.includes('iridescence'),
-          anisotropy: m.extensions.includes('anisotropy'),
-          diffuseTransmission: false,
-        };
-    }
-    if (m.customState)
-      g.renderState = {
-        blend: blends[m.blending],
-        depthWrite: m.depthWrite,
-        depthCompare: m.depthTest ? undefined : 'always',
-        ...(m.colorWrite ? {} : { colorWrite: false }),
-        ...(m.polygonOffset
-          ? {
-              depthBiasMode: 'away' as const,
-              depthBias: m.polygonOffsetUnits,
-              depthBiasSlopeScale: m.polygonOffsetFactor,
-              depthBiasClamp: m.polygonOffsetClamp,
-            }
-          : {}),
-        ...(m.stencilWrite
-          ? {
-              stencilFront: {
-                compare: m.stencilFunc,
-                failOp: m.stencilFail,
-                depthFailOp: m.stencilZFail,
-                passOp: m.stencilZPass,
-              },
-              stencilBack: {
-                compare: m.stencilFunc,
-                failOp: m.stencilFail,
-                depthFailOp: m.stencilZFail,
-                passOp: m.stencilZPass,
-              },
-              stencilReference: m.stencilRef,
-              stencilReadMask: m.stencilReadMask,
-              stencilWriteMask: m.stencilWriteMask,
-            }
-          : {}),
-      } satisfies PBRRenderState;
-    g.shading = {
-      get replacesTextures() {
-        return mapped(m);
-      },
-      get texturedTint() {
-        return mapped(m) && m.transmissive;
-      },
-      shader: (code: string, group: number) => m.shader(code, group),
-      bindings: () => m.bindings(runtime.gpu!, runtime),
+  // Per-engine uniform buffers are retained once per material in use and released when the last use goes.
+  const held = new Map<Material, () => void>(),
+    hold = () => {
+      const used = new Set(groups.map((g) => assigned[g.materialIndex]));
+      for (const m of used) if (!held.has(m)) held.set(m, retainMaps(m, runtime));
+      for (const [m, release] of held)
+        if (!used.has(m)) {
+          held.delete(m);
+          release();
+        }
     };
+  hold();
+  model.onDispose(() => {
+    for (const release of held.values()) release();
+    held.clear();
+  });
+  for (const primitive of model.primitives) {
+    const slot = primitive.definition.material!;
+    // Primitives of one slot share their glTF material.
+    if (!Object.hasOwn(primitive.material, 'extendedFrame')) surface(primitive.material, () => assigned[slot], runtime);
   }
   const entry: Entry = {
     model,
-    materials: groups.map((g) => materials[g.materialIndex]),
+    materials: groups.map((g) => assigned[g.materialIndex]),
     order: renderOrder,
     opaque: false,
     blend: false,
+  };
+  let snapshot = array ? Object.freeze([...assigned]) : undefined;
+  const swap = (next: Material | readonly Material[]) => {
+    if (model.disposed) throw new MargoError('disposed', 'Material mesh is disposed; create a new mesh');
+    const list: readonly unknown[] = Array.isArray(next) ? next : [next];
+    if (Array.isArray(next) !== array || list.length !== assigned.length || list.some((m) => !(m instanceof Material)))
+      throw new TypeError(
+        array
+          ? `Material mesh material must be an array of ${assigned.length} Materials, one per slot; pass one for each`
+          : 'Material mesh material must be one Material; pass a Material (a material array needs a grouped mesh)',
+      );
+    assigned.splice(0, assigned.length, ...(list as Material[]));
+    for (let i = 0; i < groups.length; i++) entry.materials[i] = assigned[groups[i].materialIndex];
+    if (array) snapshot = Object.freeze([...assigned]);
+    hold();
   };
   model.registerPasses = () => {};
   try {
@@ -1750,7 +1824,7 @@ export function createMesh<M extends Material | readonly Material[]>(
     const mesh = model as MaterialMesh<M>;
     if (range === undefined) {
       const data = pack(next),
-        list = meshGroups(next, data.indices.length, materials, array);
+        list = meshGroups(next, data.indices.length, assigned, array);
       if (list.length !== current.length || list.some((g, i) => g.materialIndex !== current[i].materialIndex))
         throw new RangeError('Mesh geometry groups must keep their number and material slots; create a new mesh');
       model.writeGeometry(list.map((g) => ({ vertices: data.vertices, indices: groupIndices(data.indices, g) })));
@@ -1788,7 +1862,7 @@ export function createMesh<M extends Material | readonly Material[]>(
     return mesh;
   };
   return Object.defineProperties(model, {
-    material: { value: Array.isArray(material) ? materials : material },
+    material: { get: () => snapshot ?? assigned[0], set: swap },
     setGeometry: { value: setGeometry },
   }) as MaterialMesh<M>;
 }

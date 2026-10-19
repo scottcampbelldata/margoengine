@@ -157,12 +157,13 @@ export type GLTFLoadOptions = Omit<AssetOptions, 'buffers'> & CompressionOptions
 const srgbMaps = [0, 4, 9, 12, 17],
   normalMaps = [2, 7],
   blended = (m: PBRMaterial) => m.settings[0] === 2 || (!!m.tint && !m.extension?.replacesPhysical);
-// An extended material's binding plan, by material object (progressive loading swaps in copies with fewer maps).
-const plans = new WeakMap<object, ExtendedPlan>();
+// An extended material's binding plan, by material object (progressive loading swaps in copies with fewer maps) and
+// features object (a materials mesh's record follows the Material it draws, whose features can change).
+const plans = new WeakMap<object, ExtendedPlan & { from: object }>();
 const planOf = (m: PBRMaterial, x: GLTFExtendedMaterials): ExtendedPlan => {
   let plan = plans.get(m);
-  if (!plan) plans.set(m, (plan = x.plan(m.maps, m.extended!)));
-  return plan;
+  if (plan?.from !== m.extended) plans.set(m, (plan = { ...x.plan(m.maps, m.extended!), from: m.extended! }));
+  return plan!;
 };
 // Map slot i of resource material m gets its own texture and sampler: base slots always; extension slots of extended
 // materials only when bound, once per shared glTF texture.

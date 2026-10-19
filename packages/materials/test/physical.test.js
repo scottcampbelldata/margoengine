@@ -204,11 +204,7 @@ test("physical materials meshes draw gltf-pro's factor-only physical variant: 5 
   assert.equal(g.ext, m.ext);
   assert.equal(g.maps.length, 5);
   assert.equal(g.tint, undefined);
-  assert.deepEqual(Object.keys(mesh.asset.doc.materials[0].extensions), [
-    'KHR_materials_clearcoat',
-    'KHR_materials_sheen',
-    'KHR_materials_ior',
-  ]);
+  assert.deepEqual(Object.keys(g.extensions), ['KHR_materials_clearcoat', 'KHR_materials_sheen', 'KHR_materials_ior']);
   let log = frame(0);
   const code = of(log, 'module')
     .map((e) => e[2].code)
@@ -223,9 +219,9 @@ test("physical materials meshes draw gltf-pro's factor-only physical variant: 5 
     [v[101], v[208], v[216], v[219]].map((x) => +x.toFixed(6)),
     [1.4, 0.5, 0.2, 0],
   );
-  // Plain materials keep their doc and shader: no extensions, standard variant.
+  // Plain materials keep their shader: no extensions, standard variant.
   const plain = createMesh(engine, sphereGeometry(1, 8, 4), new Material());
-  assert.equal('extensions' in plain.asset.doc.materials[0], false);
+  assert.equal(plain.primitives[0].material.extensions, undefined);
   assert.equal(plain.primitives[0].material.physical, undefined);
 });
 
