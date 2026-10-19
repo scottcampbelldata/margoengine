@@ -25,6 +25,10 @@
     "./mesher": {
       "types": "./dist/mesher.d.ts",
       "import": "./dist/mesher.js"
+    },
+    "./light": {
+      "types": "./dist/light.d.ts",
+      "import": "./dist/light.js"
     }
   },
   "files": [

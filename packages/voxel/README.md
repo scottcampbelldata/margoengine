@@ -206,3 +206,37 @@ packages/voxel/tests/mesher-benchmark.test.js` prints yours): about 2 ms per ran
 7.5 ms for a full-chunk stone checkerboard (98,304 quads, the most opaque cubes can make); `meshInput` 0.2 ms. A 3D
 checkerboard of two different blocks that hide nothing (two glasses, say) shows every face of every cell: 196,608 quads
 in one layer.
+
+## Light (`@margoengine/voxel/light`)
+
+Sky and block light in the chunks' light bytes, by breadth-first flood fill on the main thread with a per-call budget.
+
+```ts
+import { VoxelLighting, MAX_LIGHT } from '@margoengine/voxel/light';
+
+const lighting = VoxelLighting.attach(world, { budget: 4096 }); // also lights the chunks already loaded
+engine.onFrame(() => lighting.update()); // at most `budget` cells a call, so big changes spread over frames
+lighting.skyLight(x, y, z); // 0..MAX_LIGHT (15)
+lighting.blockLight(x, y, z);
+lighting.budget = Infinity; // e.g. behind a loading screen
+lighting.dispose();
+```
+
+- **Sky light** is 15 in every cell above its column's heightmap (`world.heightmap`: the highest cell with opacity > 0,
+  so glass passes it at full strength) and spreads from there; **block light** spreads from each type's `light`. Each
+  step costs 1 plus the entered cell's `opacity` (stone's 15 stops it; leaves with `opacity: 1` dim it by 2 a block).
+- Edits and chunk loads and removals (`world.onChunk`) are queued as they happen; `update()` applies them in order,
+  across chunk borders: a chunk loaded later takes light in from its loaded neighbours and gives its own out. Darkening
+  uses the two-queue removal flood, so removing a torch, closing a roof or unloading a chunk clears only what that
+  light reached. A removed chunk's heights stay in the heightmap, so a cave stays dark when the chunks above it unload;
+  a chunk loaded again decides the heights of its own 32 cells per column.
+- Chunks whose light changed, and loaded neighbours whose one-cell shell holds a changed cell, go into `world.dirty`.
+  A chunk entirely under open sky keeps one light byte (`chunk.fillLight`); its first differing cell makes it 32 KiB.
+- A chunk load is never split; it counts the cells it lights plus an eighth of those it scans (about 130 for open sky,
+  up to about 13,000 for mixed blocks with emitters). `update()` returns the cells processed: 0 once light is current.
+- Errors: `TypeError`/`RangeError` for a wrong world, budget or cell; `MargoError` `'attached'` for a second lighting
+  on one world, `'disposed'` for `update()` after `dispose()`.
+
+Measured with Node on the development laptop (2026-10-19; `node --test packages/voxel/tests/light-benchmark.test.js`
+prints yours): a torch placed or removed in open air (3,300 cells) about 4,000-6,000 cells/ms; a 32 x 32 stone roof
+removed over a 30-deep room (70,000 cells) about 5,400-7,600 cells/ms, put back about 6,800-8,500 cells/ms.
