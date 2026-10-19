@@ -1001,16 +1001,10 @@ export class Material {
   matcap: Texture | null;
   private readonly physicalTextures: (Texture | null)[] = Array(12).fill(null);
   private setMap(i: number, value: Texture | null): void {
+    const key = mapSlots[i + 5] as keyof PhysicalOptions;
     if (value != null) {
-      if (!(value instanceof Texture)) throw new TypeError('Material ' + mapSlots[i + 5] + ' must be a Texture');
-      const capability =
-        i === 10 ? 'anisotropy' : i === 8 || i === 9 ? 'iridescence' : i === 3 || i === 11 ? 'transmission' : undefined;
-      if (
-        this.extensions &&
-        (!this.physical ||
-          (capability === 'transmission' ? !this.volume : capability && !this.extensions.includes(capability)))
-      )
-        throw new TypeError('Material ' + mapSlots[i + 5] + ' needs the corresponding option at construction');
+      if (!(value instanceof Texture)) throw new TypeError('Material ' + key + ' must be a Texture');
+      this.enable(key);
       while (this.uvt.length < mapSlots.length * 8) this.uvt.push(...this.uvDefault);
     }
     this.physicalTextures[i] = value ?? null;
@@ -1088,13 +1082,16 @@ export class Material {
     this.setMap(11, v);
   }
   private rotation = 0;
-  /** Physical materials only, gltf-pro layout: [clearcoat, clearcoatRoughness, 1, transmission, specularColor rgb, specularIntensity, sheenColor rgb, sheenRoughness], and [0, ior, 0, dispersion]. */
+  /**
+   * Physical materials only (set once any physical option is), gltf-pro layout: [clearcoat, clearcoatRoughness, 1,
+   * transmission, specularColor rgb, specularIntensity, sheenColor rgb, sheenRoughness], and [0, ior, 0, dispersion].
+   */
   readonly physical?: number[];
   readonly ext?: number[];
-  /** Transmissive materials only, gltf-pro layout: [thickness, transmittance per world unit rgb]. */
+  /** Transmissive materials only (set once transmission or its maps are), gltf-pro layout: [thickness, transmittance per world unit rgb]. */
   readonly volume?: number[];
-  /** glTF extensions (`KHR_materials_<name>`) the physical options use. */
-  readonly extensions: readonly string[];
+  /** glTF extensions (`KHR_materials_<name>`) the physical options use, in the order they were first set. */
+  readonly extensions: readonly string[] = [];
   private attenuation = [1, 1, 1, Infinity];
   private readonly tinted = [0, 0, 0];
   constructor(o: MaterialOptions = {}) {
@@ -1144,35 +1141,14 @@ export class Material {
     this.aoMap = o.aoMap ?? null;
     this.emissiveMap = o.emissiveMap ?? null;
     this.matcap = o.matcap ?? null;
-    this.clearcoatMap = o.clearcoatMap ?? null;
-    this.clearcoatRoughnessMap = o.clearcoatRoughnessMap ?? null;
-    this.clearcoatNormalMap = o.clearcoatNormalMap ?? null;
-    this.transmissionMap = o.transmissionMap ?? null;
-    this.thicknessMap = o.thicknessMap ?? null;
-    this.sheenColorMap = o.sheenColorMap ?? null;
-    this.sheenRoughnessMap = o.sheenRoughnessMap ?? null;
-    this.specularIntensityMap = o.specularIntensityMap ?? null;
-    this.specularColorMap = o.specularColorMap ?? null;
-    this.anisotropyMap = o.anisotropyMap ?? null;
-    this.iridescenceMap = o.iridescenceMap ?? null;
-    this.iridescenceThicknessMap = o.iridescenceThicknessMap ?? null;
+    // Physical options enable their lobes as they are set (transmission before the volume values that need it); the
+    // constructor names every extension its options use.
     const used = (Object.keys(extensions) as (keyof PhysicalOptions)[]).filter((k) => o[k] != null);
-    if (
-      o.dispersion !== undefined &&
-      (typeof o.dispersion !== 'number' || !Number.isFinite(Math.fround(o.dispersion)) || o.dispersion < 0)
-    )
-      throw new RangeError('Material dispersion must be a finite number >= 0');
+    if (o.dispersion === null) throw new RangeError('Material dispersion must be a finite number >= 0');
+    if (used.length && shading !== 'standard') throw new TypeError('Physical options need standard shading');
     this.extensions = [
       ...new Set([...used.map((k) => extensions[k]), ...(o.thicknessMap != null ? ['transmission'] : [])]),
     ];
-    if (!used.length) return;
-    if (shading !== 'standard') throw new TypeError('Physical options need standard shading');
-    this.physical = [0, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 0];
-    this.ext = [0, 1.5, 0, 0];
-    if (this.extensions.includes('anisotropy') || this.extensions.includes('iridescence'))
-      this.physical.push(0, 1.3, 100, 400, 0, 1, 0, 0, 0, 1, 1, 1);
-    if (o.transmission !== undefined || o.transmissionMap != null || o.thicknessMap != null) this.volume = [0, 1, 1, 1];
-    if (mapped(this)) while (this.uvt.length < mapSlots.length * 8) this.uvt.push(...this.uvDefault);
     Object.assign(this, Object.fromEntries(used.map((k) => [k, o[k]])));
   }
   /** Beauty-pass blending (default 'normal'). It and the depth, colour-write, polygon-offset and stencil state below are live: a change selects the matching pipeline on the next draw. */
@@ -1340,16 +1316,47 @@ export class Material {
     distanceRange(this.near, v);
     this.far = v;
   }
-  private set(i: number, v: number, label: string): void {
-    if (!this.physical) throw new TypeError(`Material ${label} needs a physical option at construction`);
-    this.physical[i] = unit(v, label);
+  /**
+   * Makes this a physical material with `key`'s lobe, on first use: gltf-pro then draws it with the matching physical
+   * shader variant (by pipeline key), while materials that never set a physical option keep the plain one.
+   */
+  private enable(key: keyof PhysicalOptions): number[] {
+    if (this.shading !== 'standard')
+      throw new TypeError(`Material ${key} needs standard shading; use PbrMaterial or shading: 'standard'`);
+    // `extensions` gains a name only with a capability: the first physical option, a thin-film or anisotropy lobe,
+    // transmission. Other live edits of a physical material leave it as constructed (exporters read it).
+    const self = this as { physical?: number[]; ext?: number[]; volume?: number[] },
+      list = this.extensions as string[],
+      add = (name: string) => list.includes(name) || list.push(name),
+      name = extensions[key];
+    if (!self.physical) add(name);
+    const physical = (self.physical ??= [0, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 0]);
+    self.ext ??= [0, 1.5, 0, 0];
+    if (name === 'anisotropy' || name === 'iridescence') {
+      if (physical.length <= 12) physical.push(0, 1.3, 100, 400, 0, 1, 0, 0, 0, 1, 1, 1);
+      add(name);
+    }
+    if (!this.volume && (key === 'transmission' || key === 'transmissionMap' || key === 'thicknessMap')) {
+      self.volume = [0, 1, 1, 1];
+      add(name);
+      add('transmission');
+    }
+    if (mapped(this)) while (this.uvt.length < mapSlots.length * 8) this.uvt.push(...this.uvDefault);
+    return physical;
   }
-  private setColor(i: number, c: ColorInput, label: string): void {
+  private set(i: number, v: number, label: keyof PhysicalOptions): void {
+    const x = unit(v, label);
+    this.enable(label)[i] = x;
+  }
+  private setColor(i: number, c: ColorInput, label: keyof PhysicalOptions): void {
     const v = linear(c, label);
     for (let k = 0; k < 3; k++) this.set(i + k, v[k], label);
   }
-  private setVolume(i: number, v: number, label: string): void {
-    if (!this.volume) throw new TypeError(`Material ${label} needs transmission at construction`);
+  private setVolume(i: number, v: number, label: 'thickness' | 'attenuationColor' | 'attenuationDistance'): void {
+    if (!this.volume)
+      throw new TypeError(
+        `Material ${label} is part of transmission; set transmission (or a transmission or thickness map) first`,
+      );
     if (!(v >= 0 && (v < Infinity || i === 4))) throw new RangeError(`Material ${label} must be a finite number >= 0`);
     if (i) this.attenuation[i - 1] = v;
     else this.volume[0] = v;
@@ -1374,27 +1381,21 @@ export class Material {
     return this.physical?.[2] ?? 1;
   }
   set clearcoatNormalScale(v: number) {
-    if (!this.physical) throw new TypeError('Material clearcoatNormalScale needs a physical option at construction');
     if (!Number.isFinite(v)) throw new RangeError('Invalid clearcoatNormalScale');
-    this.physical[2] = v;
-  }
-  private advanced(label: string): number[] {
-    if (!this.physical || !this.extensions.includes(label))
-      throw new TypeError('Material ' + label + ' needs the corresponding option at construction');
-    return this.physical;
+    this.enable('clearcoatNormalScale')[2] = v;
   }
   get anisotropy(): number {
     return this.physical?.[16] ?? 0;
   }
   set anisotropy(v: number) {
-    this.advanced('anisotropy')[16] = unit(v, 'anisotropy');
+    this.set(16, v, 'anisotropy');
   }
   get anisotropyRotation(): number {
     return this.rotation;
   }
   set anisotropyRotation(v: number) {
-    const p = this.advanced('anisotropy');
     if (!Number.isFinite(v)) throw new RangeError('Invalid anisotropyRotation');
+    const p = this.enable('anisotropyRotation');
     this.rotation = v;
     p[17] = Math.cos(v);
     p[18] = Math.sin(v);
@@ -1403,23 +1404,22 @@ export class Material {
     return this.physical?.[12] ?? 0;
   }
   set iridescence(v: number) {
-    this.advanced('iridescence')[12] = unit(v, 'iridescence');
+    this.set(12, v, 'iridescence');
   }
   get iridescenceIOR(): number {
     return this.physical?.[13] ?? 1.3;
   }
   set iridescenceIOR(v: number) {
-    const p = this.advanced('iridescence');
     if (!(v >= 1 && v < Infinity)) throw new RangeError('Invalid iridescenceIOR');
-    p[13] = v;
+    this.enable('iridescenceIOR')[13] = v;
   }
   get iridescenceThicknessRange(): readonly [number, number] {
     return [this.physical?.[14] ?? 100, this.physical?.[15] ?? 400];
   }
   set iridescenceThicknessRange(v: readonly [number, number]) {
-    const p = this.advanced('iridescence');
     if (!Array.isArray(v) || v.length !== 2 || !v.every(Number.isFinite) || v[0] < 0 || v[1] < v[0])
       throw new RangeError('Invalid iridescenceThicknessRange');
+    const p = this.enable('iridescenceThicknessRange');
     p[14] = v[0];
     p[15] = v[1];
   }
@@ -1427,7 +1427,6 @@ export class Material {
     return this.physical?.[3] ?? 0;
   }
   set transmission(v: number) {
-    if (!this.volume) throw new TypeError('Material transmission needs transmission at construction');
     this.set(3, v, 'transmission');
   }
   get specularColor(): number[] {
@@ -1458,18 +1457,18 @@ export class Material {
     return this.ext?.[1] ?? 1.5;
   }
   set ior(v: number) {
-    if (!this.ext) throw new TypeError('Material ior needs a physical option at construction');
     if (!(v >= 1 && v < Infinity)) throw new RangeError('Material ior must be a finite number >= 1');
-    this.ext[1] = v;
+    this.enable('ior');
+    this.ext![1] = v;
   }
   get dispersion(): number {
     return this.ext?.[3] ?? 0;
   }
   set dispersion(v: number) {
-    if (!this.ext) throw new TypeError('Material dispersion needs a physical option at construction');
     if (typeof v !== 'number' || !Number.isFinite(Math.fround(v)) || v < 0)
       throw new RangeError('Material dispersion must be a finite number >= 0');
-    this.ext[3] = v;
+    this.enable('dispersion');
+    this.ext![3] = v;
   }
   get thickness(): number {
     return this.volume?.[0] ?? 0;

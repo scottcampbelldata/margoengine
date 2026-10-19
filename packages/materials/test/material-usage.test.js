@@ -546,3 +546,53 @@ test('mesh.renderOrder re-sorts the next frame, within the opaque and the transp
   assert.equal(a.renderOrder, -2);
   s.engine.dispose();
 });
+
+test('physical options set after createMesh switch that material to the physical variant; others keep theirs', async () => {
+  const s = await scene(),
+    coat = new Material(),
+    plain = new Material(),
+    mesh = createMesh(s.engine, quad, coat),
+    other = createMesh(s.engine, quad, plain),
+    beauty = (log) => of(log, 'renderPipeline').filter((e) => e[2].fragment?.entryPoint === 'fragment');
+  let log = s.frame();
+  const standard = of(log, 'pass.setPipeline').at(-1)[1];
+  assert.ok(!codes(log).some((c) => c.includes('fn layers(')), 'no physical code at first');
+  coat.clearcoat = 1;
+  assert.equal(mesh.primitives[0].material.physical, coat.physical);
+  log = s.frame();
+  assert.equal(beauty(log).length, 1, 'one new pipeline, for the coated material only');
+  assert.ok(
+    codes(log).some((c) => c.includes('fn layers(')),
+    'the physical variant',
+  );
+  assert.ok(
+    of(log, 'pass.setPipeline').some((e) => e[1] === standard),
+    'the plain mesh still draws the standard pipeline',
+  );
+  assert.equal(other.primitives[0].material.physical, undefined);
+  // Transmission on demand: drawn after opaque meshes with the tinted blend; anisotropy: the extended layout.
+  coat.transmission = 1;
+  coat.anisotropy = 0.5;
+  assert.deepEqual(coat.extensions, ['clearcoat', 'transmission', 'anisotropy']);
+  log = s.frame();
+  assert.ok(codes(log).some((c) => c.includes('fn margoAnisotropy(')));
+  assert.ok(
+    of(log, 'writeBuffer').some((e) => e[3].length === 1088 * 2),
+    'extended uniform rows',
+  );
+  assert.ok(
+    of(log, 'renderPipeline').some((e) => e[2].fragment.entryPoint === 'margoTint'),
+    'tinted transmission',
+  );
+  assert.throws(
+    () => {
+      new PhongMaterial().clearcoat = 1;
+    },
+    { name: 'TypeError', message: /clearcoat needs standard shading/ },
+  );
+  assert.throws(() => {
+    plain.ior = 0.5;
+  }, RangeError);
+  assert.equal(plain.physical, undefined, 'a rejected value enables nothing');
+  s.engine.dispose();
+});

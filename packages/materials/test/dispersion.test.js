@@ -8,21 +8,19 @@ import { Material, createMesh } from '../dist/index.js';
 test('dispersion reserves physical rendering at zero without reserving transmission', () => {
   const plain = new Material();
   assert.equal(plain.dispersion, 0);
-  assert.throws(() => {
-    plain.dispersion = 1;
-  }, /physical option at construction/);
+  plain.dispersion = 1; // on demand
+  assert.deepEqual([plain.dispersion, plain.extensions, plain.transmissive], [1, ['dispersion'], false]);
   const material = new Material({ dispersion: 0 });
   assert.ok(material.physical);
   assert.deepEqual(material.extensions, ['dispersion']);
   assert.equal(material.dispersion, 0);
   assert.equal(material.transmissive, false);
   assert.equal(material.volume, undefined);
-  assert.throws(() => {
-    material.transmission = 0.5;
-  }, /transmission at construction/);
   material.dispersion = 2.5;
   assert.equal(material.dispersion, 2.5);
   assert.equal(material.transmissive, false);
+  material.transmission = 0.5;
+  assert.deepEqual([material.transmissive, material.extensions], [true, ['dispersion', 'transmission']]);
   assert.throws(() => new Material({ shading: 'basic', dispersion: 0 }), /standard shading/);
   const physical = new Material({ ior: 1.5 });
   physical.dispersion = 0.75;

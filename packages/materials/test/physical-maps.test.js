@@ -75,15 +75,19 @@ test('physical map scalar controls remain live and validate their ranges', () =>
   })) {
     assert.throws(() => new Material({ [key]: value }), RangeError, key);
   }
+  // Lobes added later extend the physical rows on demand.
+  const later = new Material({ clearcoat: 1 });
+  later.anisotropy = 1;
+  assert.deepEqual([later.physical.length, later.anisotropy, later.extensions], [24, 1, ['clearcoat', 'anisotropy']]);
+  later.iridescenceMap = texture();
+  assert.deepEqual([later.physical.length, later.extensions.at(-1), later.uvt.length], [24, 'iridescence', 136]);
   assert.throws(() => {
-    new Material({ clearcoat: 1 }).anisotropy = 1;
-  }, /construction/);
+    new Material({ shading: 'lambert' }).anisotropyMap = texture();
+  }, /anisotropyMap needs standard shading/);
   assert.throws(() => {
-    new Material({ clearcoat: 1 }).anisotropyMap = texture();
-  }, /construction/);
-  assert.throws(() => {
-    new Material({ clearcoat: 1 }).iridescenceMap = texture();
-  }, /construction/);
+    later.anisotropy = 2;
+  }, RangeError);
+  assert.equal(later.anisotropy, 1);
   const live = new Material({ clearcoat: 1, uvTransform: { texCoord: 1, offset: [0.2, 0.3] } });
   live.clearcoatMap = texture();
   assert.equal(live.uvt.length, 136);

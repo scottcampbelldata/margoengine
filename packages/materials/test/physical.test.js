@@ -96,9 +96,10 @@ test('Material physical options: live gltf-pro arrays, validation, fixed shape',
   assert.deepEqual(plain.extensions, []);
   assert.equal(plain.transmissive, false);
   assert.equal(plain.tint, undefined);
-  assert.throws(() => {
-    plain.clearcoat = 1;
-  }, /physical option at construction/);
+  // A physical option set later makes the material physical on demand.
+  plain.clearcoat = 1;
+  assert.deepEqual(plain.physical, [1, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 0]);
+  assert.deepEqual([plain.ext, plain.extensions, plain.transmissive], [[0, 1.5, 0, 0], ['clearcoat'], false]);
   const coat = new Material({
     color: [0.6, 0.05, 0.05],
     clearcoat: 1,
@@ -118,11 +119,15 @@ test('Material physical options: live gltf-pro arrays, validation, fixed shape',
   coat.ior = 1.33;
   assert.deepEqual([coat.physical[0], ...coat.physical.slice(8, 11), coat.ext[1]], [0.25, 0, 0.5, 0, 1.33]);
   assert.throws(() => {
-    coat.transmission = 0.5;
-  }, /transmission at construction/);
-  assert.throws(() => {
     coat.thickness = 1;
-  }, /transmission at construction/);
+  }, /part of transmission; set transmission/);
+  coat.transmission = 0.5;
+  coat.thickness = 1;
+  assert.deepEqual(
+    [coat.transmissive, coat.volume, coat.extensions.slice(4)],
+    [true, [1, 1, 1, 1], ['transmission']],
+    'transmission is a new capability; volume values are part of it',
+  );
   assert.throws(() => {
     coat.ior = 0.5;
   }, RangeError);
