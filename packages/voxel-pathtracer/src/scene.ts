@@ -145,6 +145,8 @@ export interface SceneSnapshot {
    * glass instances (IOR) and as many mirror instances (IOR 0).
    */
   readonly deflectors: Float32Array;
+  /** Whether a model holds smooth, pure, non-dispersive glass (light sampling may refract through it). */
+  readonly clearGlass: boolean;
   /** Mixed bricks plus grid words: the voxel buffer's words without padding. */
   readonly voxelWords: number;
 }
@@ -1016,6 +1018,19 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
     emissiveCdf,
     moving,
     deflectors: deflectorTable(ordered, packed, table),
+    clearGlass: packed.some((m) =>
+      m.counts.some((n, id) => {
+        const b = id * MATERIAL_FLOATS;
+        return (
+          id > 0 &&
+          n > 0 &&
+          (table[b + 15] & VOLUME) !== 0 &&
+          (table[b + 15] & SMOOTH) !== 0 &&
+          table[b + 5] >= 0.999 &&
+          table[b + 16] === 0
+        );
+      }),
+    ),
     voxelWords,
   };
 }

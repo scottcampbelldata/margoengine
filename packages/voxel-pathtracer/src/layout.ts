@@ -19,7 +19,8 @@ export const FLAG_SUN = 1,
   FLAG_CLAMP = 32,
   FLAG_SPLIT = 64,
   FLAG_AREA = 128,
-  FLAG_CAMERA_MOTION = 256;
+  FLAG_CAMERA_MOTION = 256,
+  FLAG_CLEAR_GLASS = 512;
 
 const f32 = new Float32Array(1),
   u32 = new Uint32Array(f32.buffer);

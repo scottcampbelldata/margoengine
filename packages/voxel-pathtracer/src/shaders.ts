@@ -40,6 +40,7 @@ import {
   FLAG_SPLIT,
   FLAG_AREA,
   FLAG_CAMERA_MOTION,
+  FLAG_CLEAR_GLASS,
   FLAG_SUN,
   INSTANCE_WORDS,
   MODEL_WORDS,
@@ -196,6 +197,7 @@ const CLAMP=${FLAG_CLAMP}u;
 const SPLIT=${FLAG_SPLIT}u;
 const AREA_NEE=${FLAG_AREA}u;
 const CAMERA_MOTION=${FLAG_CAMERA_MOTION}u;
+const CLEAR_GLASS=${FLAG_CLEAR_GLASS}u;
 const MODEL=${MODEL_WORDS}u;
 const INSTANCE=${INSTANCE_WORDS}u;
 @group(0) @binding(0) var<uniform> f:Frame;
@@ -782,101 +784,48 @@ fn sampleArea()->LightPoint {
  r.twoSided=ll(b+7u)!=0.0;
  return r;
 }
-fn lightTerm(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,ls:LightPoint)->vec3f {
- if(ls.pdfA<=0.0){return vec3f(0.0);}
- let v=ls.p-o;let d2=dot(v,v);let dist=sqrt(d2);let wi=v/dist;
- var cl=-dot(ls.n,wi);
- if(ls.twoSided){cl=abs(cl);}
- if(cl<=0.0){return vec3f(0.0);}
- let e=evalAt(kind,m,n,wo,wi);
- if(!any(e.f>vec3f(0.0))){return vec3f(0.0);}
- let tr=shadow(o,wi,dist);
- if(tr<=0.0){return vec3f(0.0);}
- let lp=ls.pdfA*d2/cl;
- return e.f*ls.radiance*tr*power2(lp,e.pdf)/lp;
+// Shadow rays toward distant lights through smooth glass and off mirrors are walked by the path loop itself (radiance,
+// one closest-hit call for both): refraction with Fresnel transmission, entry tint, absorption and media, the product
+// of the interfaces' solid-angle Jacobians dw(near) / dw(far), and the direction it finally leaves in. A vertex offers
+// every candidate that needs such a walk with a selection weight and one is kept with probability weight / total
+// (weighted reservoir sampling), its result scaled by total / weight: an unbiased estimate of their sum at the cost of
+// one walk. light, lp: the light's radiance and density; f (BSDF value times light times total / weight) and pdf are
+// filled in for the kept one.
+struct Walk {total:f32,weight:f32,o:vec3f,d:vec3f,medium:u32,mInst:u32,s:vec3f,want:u32,light:vec3f,lp:f32,f:vec3f,pdf:f32}
+fn offer(w:ptr<function,Walk>,weight:f32,o:vec3f,d0:vec3f,medium:u32,mInst:u32,s:vec3f,want:u32,light:vec3f,lp:f32) {
+ (*w).total+=weight;
+ if(rand()*(*w).total<weight){
+  (*w).weight=weight;(*w).o=o;(*w).d=d0;(*w).medium=medium;(*w).mInst=mInst;(*w).s=s;(*w).want=want;(*w).light=light;
+  (*w).lp=lp;
+ }
 }
-// A shadow ray toward a distant light that refracts through smooth glass: transmittance (Fresnel transmission, entry
-// tint, absorption, media), the product of the interfaces' solid-angle Jacobians dw(near) / dw(far) and the direction
-// it finally leaves in; t = 0 when something opaque, rough glass or total internal reflection stops it.
-// n counts the crossings (entered from air, left to air) that changed the direction and the mirror reflections, g is
-// the instance of the last.
-struct Through {t:vec3f,j:f32,d:vec3f,n:u32,g:u32}
 fn prismAt(inst:u32)->bool {return (scene[f.scene.y+inst*INSTANCE+37u]&2u)!=0u;}
 fn mirrorAt(inst:u32)->bool {return (scene[f.scene.y+inst*INSTANCE+37u]&4u)!=0u;}
 fn isMirror(m:Mat)->bool {return m.metal>=1.0&&(m.flags&SMOOTH)!=0u;}
 // Directions equal to float precision (refraction chains through axis faces reproduce them to about 1e-7); mirror
 // candidates skip components smaller than SAME_C, whose flip would repeat a direction.
 const SAME_C=1e-5;
+// Selection weight of a candidate whose chain a box model makes unlikely (likely ones weigh 1).
+const UNLIKELY=0.02;
 fn same(a:vec3f,b:vec3f)->bool {let e=a-b;return dot(e,e)<SAME_C*SAME_C;}
-fn throughGlass(start:vec3f,dir:vec3f,medium0:u32,mInst0:u32)->Through {
- var r:Through;r.t=vec3f(1.0);r.j=1.0;r.g=NONE;
- var o=start;var d=dir;var medium=medium0;var mInst=mInst0;
- var entered=false;var inDir=d;
- for(var k=0u;k<16u;k++){
-  let h=closest(o,d,medium,mInst);
-  if(medium!=0u){let md=mediumOf(medium);r.t*=exp(-(md.absorb+md.sigma)*min(h.t,1e30));}
-  if(h.inst==NONE){r.d=d;return r;}
-  let p=o+d*h.t;
-  if(h.inst==AREA){if(opaqueArea(h.value)){break;}o=p+d*(1e-4*max(1.0,h.t));continue;}
-  if(h.inst==GROUND){break;}
-  let n=h.sgn*normalize(rowOf(localX(h.inst),h.axis));
-  let off=h.sgn*EPS*colOf(worldX(h.inst),h.axis);
-  let inGlass=medium!=0u&&(material(medium).flags&MEDIA)==0u;
-  let ci=-dot(n,d);
-  if(h.value==0u){
-   let ma=material(medium);
-   if((ma.flags&MEDIA)!=0u){medium=0u;mInst=NONE;o=p-off;continue;}
-   if(!clearGlass(ma)){break;}
-   let fr=fresnel(ci,ma.ior);
-   if(fr>=1.0){
-    // Total internal reflection: part of the chain in light-sampled instances only (as on the path side).
-    if(!prismAt(mInst)){break;}
-    d=reflect(d,n);o=p+off;continue;
-   }
-   let dt=refract(d,n,ma.ior);
-   r.t*=1.0-fr;r.j*=-dot(n,dt)/(ma.ior*ma.ior*ci);
-   if(entered&&!same(dt,inDir)){r.n++;r.g=mInst;}
-   entered=false;medium=0u;mInst=NONE;o=p-off;d=dt;
-  } else {
-   let mb=material(h.value);
-   // Glass to media or to other glass: left to path sampling (the path side ends its chain there too).
-   if(inGlass){break;}
-   if((mb.flags&MEDIA)!=0u){medium=h.value;mInst=h.inst;o=p-off;continue;}
-   if(isMirror(mb)&&mirrorAt(h.inst)){r.t*=schlick3(mb.color,ci);r.n++;r.g=h.inst;d=reflect(d,n);o=p+off;continue;}
-   if(mb.glass<0.999||!clearGlass(mb)){break;}
-   let eta=1.0/mb.ior;
-   let fr=fresnel(ci,eta);
-   let dt=refract(d,n,eta);
-   r.t*=mb.color*(1.0-fr);r.j*=-dot(n,dt)/(eta*eta*ci);
-   entered=true;inDir=d;medium=h.value;mInst=h.inst;o=p-off;d=dt;
-  }
- }
- r.t=vec3f(0.0);
- return r;
-}
-// Light from distant direction s along candidate direction d0 at the vertex, through glass: want = NONE for chains
-// that keep their direction after leaving the vertex's own glass, else the light-sampled instance that must turn it
-// (exactly once). Distinct candidates are distinct directions, so no chain is counted twice.
-fn candidate(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,medium:u32,mInst:u32,d0:vec3f,s:vec3f,light:vec3f,lp:f32,want:u32)->vec3f {
- let e=evalAt(kind,m,n,wo,d0);
- if(!any(e.f>vec3f(0.0))){return vec3f(0.0);}
- let tr=throughGlass(o,d0,medium,mInst);
- if(!any(tr.t>vec3f(0.0))||!same(tr.d,s)){return vec3f(0.0);}
- if(select(tr.n!=1u||tr.g!=want,tr.n!=0u,want==NONE)){return vec3f(0.0);}
- if(lp>0.0){return e.f*light*tr.t*tr.j*power2(lp/tr.j,e.pdf)/lp;}
- return e.f*light*tr.t*tr.j;
-}
 fn rowSel(u0:vec3f,u1:vec3f,u2:vec3f,k:u32)->vec3f {return select(select(u2,u1,k==1u),u0,k==0u);}
-// Unit outward normal of face k (0..5 = +x -x +y -y +z -z in model space) of instance inst.
-fn faceNormal(inst:u32,k:u32)->vec3f {return select(-1.0,1.0,(k&1u)==0u)*normalize(rowOf(localX(inst),k>>1u));}
-// Whether the ray o + t d (t > 0) meets the box of instance inst.
-fn meetsBox(inst:u32,o:vec3f,d:vec3f)->bool {
- let x=localX(inst);
- let mb=f.scene.x+scene[f.scene.y+inst*INSTANCE+36u]*MODEL;
- let sz=vec3f(f32(scene[mb]),f32(scene[mb+1u]),f32(scene[mb+2u]));
+fn comp(v:vec3f,k:u32)->f32 {return select(select(v.z,v.y,k==1u),v.x,k==0u);}
+// Whether the ray o + t d (t > 0) meets the model box [0, sz] of an instance whose world-to-model transform is x.
+// Where the ray o + t d (t > 0) meets the model box [0, sz] of an instance whose world-to-model transform is x: the
+// axis of the face it enters through (0..2; 3 when it starts inside, 4 when it misses) and the distance to it.
+fn boxEntry(x:Xform,sz:vec3f,o:vec3f,d:vec3f)->vec2f {
  let lo=xpoint(x,o);let inv=safeInv(xdir(x,d));
  let ta=-lo*inv;let tb=(sz-lo)*inv;let tn=min(ta,tb);let tf=max(ta,tb);
- return max(max(tn.x,tn.y),tn.z)<min(min(tf.x,tf.y),tf.z)&&min(min(tf.x,tf.y),tf.z)>0.0;
+ let t0=max(max(tn.x,tn.y),tn.z);let t1=min(min(tf.x,tf.y),tf.z);
+ if(!(t0<t1&&t1>0.0)){return vec2f(4.0,0.0);}
+ if(t0<=0.0){return vec2f(3.0,0.0);}
+ return vec2f(select(select(2.0,1.0,t0==tn.y),0.0,t0==tn.x),t0);
+}
+// The axis of the box face that a ray from inside (o, d) leaves through.
+fn boxExit(x:Xform,sz:vec3f,o:vec3f,d:vec3f)->u32 {
+ let lo=xpoint(x,o);let inv=safeInv(xdir(x,d));
+ let tf=max(-lo*inv,(sz-lo)*inv);let t1=min(min(tf.x,tf.y),tf.z);
+ return select(select(2u,1u,t1==tf.y),0u,t1==tf.x);
 }
 // Bits (1, 2, 4) of the axes along which v has a component that a mirror visibly flips.
 fn flippable(v:vec3f,u0:vec3f,u1:vec3f,u2:vec3f)->u32 {
@@ -890,33 +839,40 @@ fn flipped(v:vec3f,u0:vec3f,u1:vec3f,u2:vec3f,bits:u32)->vec3f {
  if((bits&4u)!=0u){r-=2.0*dot(v,u2)*u2;}
  return r;
 }
-// Light from distant direction s (radiance, or irradiance when lp is 0: a point sun) reaching a vertex, directly or
-// through smooth glass. Faces of a voxel instance have three orthogonal normals; mirrors (total internal reflection)
-// flip components along them and refraction keeps the tangential component times the IOR ratio, so the directions
-// that leave a light-sampled instance in s are: s mirrored along any axes (in and out through parallel faces) and, for
-// IOR below sqrt 2, the per-axis magnitudes of Snell through two perpendicular faces with every sign. A mirror
-// instance reflects s by each of its face orientations.
-fn distant(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,medium:u32,mInst:u32,s:vec3f,light:vec3f,lp:f32)->vec3f {
- var L=vec3f(0.0);
- // Groups of candidates: inside glass the vertex's own instance (face k = j / 8, mirrors j % 8); outside the straight
- // direction, then per light-sampled instance 7 mirrors and 6 x 8 perpendicular-face directions (one call site, so
- // the shadow walk is compiled once).
+// Candidate directions d0 at a vertex for distant light leaving the glass in direction s (radiance light, density lp),
+// offered for the shadow walk: want = NONE for chains that keep their direction after leaving the vertex's own glass,
+// else the light-sampled instance that must turn it (exactly once); distinct candidates are distinct directions, so no
+// chain is counted twice. Faces of a voxel instance have three orthogonal normals; mirrors (total internal
+// reflection) flip components along them and refraction keeps the tangential component times the IOR ratio, so the
+// directions that leave a light-sampled instance in s are: s mirrored along any axes (in and out through parallel
+// faces) and, for IOR below sqrt 2, the per-axis magnitudes of Snell through two perpendicular faces with every sign. A
+// mirror instance reflects s by each of its face orientations. The straight direction is direct()'s.
+fn glassCandidates(kind:u32,m:Mat,n:vec3f,o:vec3f,medium:u32,mInst:u32,s:vec3f,light:vec3f,lp:f32,w:ptr<function,Walk>) {
+ // Groups: inside glass the vertex's own instance (face k = j / 8, mirrors j % 8); outside, per light-sampled
+ // instance, 7 mirrors and 6 x 8 perpendicular-face directions.
  let inGlass=medium!=0u&&(material(medium).flags&MEDIA)==0u;
  var ior=1.0;
- if(inGlass){let mm=material(medium);if(!clearGlass(mm)){return L;}ior=mm.ior;}
+ if(inGlass){let mm=material(medium);if(!clearGlass(mm)){return;}ior=mm.ior;}
  let gb=lights[0];
  let groups=select(1u+lights[1],1u,inGlass);
- for(var g=0u;g<groups;g++){
+ for(var g=select(1u,0u,inGlass);g<groups;g++){
   var inst=mInst;var eta=ior;var per=48u;var want=NONE;
   if(!inGlass){
    per=1u;
    if(g>0u){inst=lights[gb+g*2u-2u];eta=ll(gb+g*2u-1u);want=inst;per=select(select(55u,7u,eta*eta>=2.0),6u,eta==0.0);}
   }
-  let u0=faceNormal(inst,0u);let u1=faceNormal(inst,2u);let u2=faceNormal(inst,4u);
+  // The instance's frame (unit face normals) and box, read once per group (none for the straight direction).
+  var u0=vec3f(1.0,0.0,0.0);var u1=vec3f(0.0,1.0,0.0);var u2=vec3f(0.0,0.0,1.0);
+  var x:Xform;var sz=vec3f(0.0);
+  if(inGlass||g>0u){
+   x=localX(inst);u0=normalize(x.r0.xyz);u1=normalize(x.r1.xyz);u2=normalize(x.r2.xyz);
+   let mb=f.scene.x+scene[f.scene.y+inst*INSTANCE+36u]*MODEL;
+   sz=vec3f(f32(scene[mb]),f32(scene[mb+1u]),f32(scene[mb+2u]));
+  }
   let c=vec3f(dot(s,u0),dot(s,u1),dot(s,u2));
   let mirrors=inGlass&&prismAt(inst);
   for(var j=0u;j<per;j++){
-   var d0=s;
+   var d0=s;var weight=1.0;
    if(inGlass){
     // Out through face k after mirrors b (never along k's own axis).
     let k=j>>3u;let b=j&7u;
@@ -926,69 +882,115 @@ fn distant(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,medium:u32,mInst:u32,s:vec3f,
     if(dot(tin,tin)<0.5){continue;}
     if((b&~(flippable(tin,u0,u1,u2)&~(1u<<(k>>1u))))!=0u){continue;}
     d0=-flipped(tin,u0,u1,u2,b);
+    // Selection weight: in a box, the ray first reaches face k (no mirror) or a mirroring face.
+    let first=boxExit(x,sz,o,d0);
+    if((b==0u&&first!=(k>>1u))||(b!=0u&&(b&(1u<<first))==0u)){weight=UNLIKELY;}
    } else if(g>0u){
+    // The axes the walk should enter the instance's box through and, for glass, the first faces it should meet inside
+    // (bits), for the selection weight.
+    var axes=7u;var inner=0u;
     if(eta==0.0){
      // Reflected by a mirror face k toward the vertex.
      let nk=select(-1.0,1.0,(j&1u)==0u)*rowSel(u0,u1,u2,j>>1u);
      if(dot(nk,s)<=0.0){continue;}
-     d0=reflect(s,nk);
+     d0=reflect(s,nk);axes=1u<<(j>>1u);
     } else if(j<7u){
-     // In and out through parallel faces with mirrors between: s mirrored.
+     // In and out through parallel faces with mirrors between: s mirrored (never along the entry axis, IOR >= sqrt 2).
      if(((j+1u)&~flippable(s,u0,u1,u2))!=0u){continue;}
-     d0=flipped(s,u0,u1,u2,j+1u);
+     d0=flipped(s,u0,u1,u2,j+1u);axes=select(7u,7u&~(j+1u),eta*eta>=2.0);inner=j+1u;
     } else {
      // In through a face of axis a (vertex side), out through one of axis b: magnitudes per axis, then every sign.
      let pair=(j-7u)>>3u;let sg=(j-7u)&7u;
      let a=pair>>1u;let bb=(a+1u+(pair&1u))%3u;let cc=3u-a-bb;
-     let tA=abs(c[a])/eta;let tC=abs(c[cc])/eta;
+     let tA=abs(comp(c,a))/eta;let dC=abs(comp(c,cc));let tC=dC/eta;
      let tB2=1.0-tA*tA-tC*tC;
      if(tB2<0.0){continue;}
-     let dB=eta*sqrt(tB2);let dC=abs(c[cc]);
+     let dB=eta*sqrt(tB2);
      let dA2=1.0-dB*dB-dC*dC;
      if(dA2<0.0){continue;}
-     var mag=vec3f(0.0);mag[a]=sqrt(dA2);mag[bb]=dB;mag[cc]=dC;
+     // Selects, not dynamic indexing (which can push the vector to memory).
+     let ax=vec3u(0u,1u,2u);
+     let mag=select(vec3f(0.0),vec3f(sqrt(dA2)),ax==vec3u(a))+select(vec3f(0.0),vec3f(dB),ax==vec3u(bb))+select(vec3f(0.0),vec3f(dC),ax==vec3u(cc));
      let signs=select(0u,1u,mag.x>=SAME_C)|select(0u,2u,mag.y>=SAME_C)|select(0u,4u,mag.z>=SAME_C);
      if((sg&~signs)!=0u){continue;}
      let q=select(mag,-mag,vec3<bool>((sg&1u)!=0u,(sg&2u)!=0u,(sg&4u)!=0u));
-     d0=q.x*u0+q.y*u1+q.z*u2;
+     d0=q.x*u0+q.y*u1+q.z*u2;axes=1u<<a;inner=1u<<bb;
     }
-    if(!meetsBox(inst,o,d0)){continue;}
+    let be=boxEntry(x,sz,o,d0);let entry=u32(be.x);
+    if(entry==4u){continue;}
+    // Selection weight: unlikely chains (another entry face, which needs a non-convex model, or another first face
+    // inside the box than the chain's) are rarely walked and weighted accordingly.
+    if(entry<3u&&(axes&(1u<<entry))==0u){weight=UNLIKELY;}
+    else if(entry<3u&&eta>0.0&&inner!=0u){
+     let ue=rowSel(u0,u1,u2,entry);let ne=select(ue,-ue,dot(d0,ue)>0.0);
+     let ti=refract(d0,ne,1.0/eta);
+     if((inner&(1u<<boxExit(x,sz,o+d0*be.y,ti)))==0u){weight=UNLIKELY;}
+    }
    }
-   L+=candidate(kind,m,n,wo,o,medium,mInst,d0,s,light,lp,want);
+   // A surface's own back side cannot see the light (the BSDF of the kept one is evaluated by direct()).
+   if(kind==0u&&m.glass==0.0&&dot(n,d0)<=0.0){continue;}
+   offer(w,weight,o,d0,medium,mInst,s,want,light,lp);
   }
  }
- return L;
 }
-// Next-event estimation at a surface (kind 0) or a medium scattering point (kind 1): one sample of each light kind.
-// Distant lights also through smooth glass; emissive voxels and area lights from outside glass only.
-fn direct(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,medium:u32,mInst:u32)->vec3f {
+// Next-event estimation at a surface (kind 0) or a medium scattering point (kind 1): one sample of each light kind,
+// all through one BSDF evaluation and one shadow ray (the shader stays small): 0 the sun, 1 an emissive face, 2 an
+// area light, 3 the environment; 4 evaluates the BSDF for the glass walk kept among the candidates. Distant lights also
+// through smooth glass (straight chains blocked by it and the candidates of glassCandidates are walked by the path
+// loop); emissive voxels and area lights from outside glass only.
+fn direct(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,medium:u32,mInst:u32,w:ptr<function,Walk>)->vec3f {
  var L=vec3f(0.0);
- // Distant samples (direction and density, radiance): the sun's and the environment's, traced in one loop below.
- var ds:array<vec4f,2>;var dl:array<vec3f,2>;var nd=0u;
- if((f.config.z&SUN)!=0u){
-  var wi=f.sun.xyz;
-  if(f.sunLight.w>0.0){wi=cone(f.sun.xyz,f.sun.w);}
-  ds[0]=vec4f(wi,select(0.0,1.0/f.sunLight.w,f.sunLight.w>0.0));dl[0]=f.sunLight.xyz;nd=1u;
- }
  let air=medium==0u||(material(medium).flags&MEDIA)!=0u;
- if(air&&f.lights.x>0u){L+=lightTerm(kind,m,n,wo,o,sampleEmitter());}
- if(air&&(f.config.z&AREA_NEE)!=0u){L+=lightTerm(kind,m,n,wo,o,sampleArea());}
- if((f.config.z&ENV)!=0u){
-  let w=f.env.x;let h=f.env.y;
-  let u1=rand();
-  var lo=0u;var hi=h-1u;
-  while(lo<hi){let mid=(lo+hi)/2u;if(ll(f.env.z+mid)<u1){lo=mid+1u;}else{hi=mid;}}
-  let row=lo;let cb=f.env.w+row*w;let u2=rand();
-  lo=0u;hi=w-1u;
-  while(lo<hi){let mid=(lo+hi)/2u;if(ll(cb+mid)<u2){lo=mid+1u;}else{hi=mid;}}
-  let uv=vec2f((f32(lo)+rand())/f32(w),(f32(row)+rand())/f32(h));
-  let phi=(uv.x-0.5)*TAU+f.weights.y;let th=uv.y*PI;
-  let wi=vec3f(sin(th)*sin(phi),cos(th),-sin(th)*cos(phi));
-  let t=envmap[row*w+lo];
-  let lp=envPdf(wi,t);
-  if(lp>0.0){ds[nd]=vec4f(wi,lp);dl[nd]=t.xyz*f.sky.w;nd++;}
+ for(var q=0u;q<5u;q++){
+  var wi=vec3f(0.0);var dist=INF;var radiance=vec3f(0.0);var lp=0.0;var far=false;
+  if(q==0u){
+   if((f.config.z&SUN)==0u){continue;}
+   wi=f.sun.xyz;
+   if(f.sunLight.w>0.0){wi=cone(f.sun.xyz,f.sun.w);}
+   radiance=f.sunLight.xyz;lp=select(0.0,1.0/f.sunLight.w,f.sunLight.w>0.0);far=true;
+  } else if(q<3u){
+   if(!air||(q==1u&&f.lights.x==0u)||(q==2u&&(f.config.z&AREA_NEE)==0u)){continue;}
+   var ls:LightPoint;
+   if(q==1u){ls=sampleEmitter();}else{ls=sampleArea();}
+   if(ls.pdfA<=0.0){continue;}
+   let v=ls.p-o;let d2=dot(v,v);dist=sqrt(d2);wi=v/dist;
+   var cl=-dot(ls.n,wi);
+   if(ls.twoSided){cl=abs(cl);}
+   if(cl<=0.0){continue;}
+   radiance=ls.radiance;lp=ls.pdfA*d2/cl;
+  } else if(q==3u){
+   if((f.config.z&ENV)==0u){continue;}
+   let ew=f.env.x;let eh=f.env.y;
+   let u1=rand();
+   var lo=0u;var hi=eh-1u;
+   while(lo<hi){let mid=(lo+hi)/2u;if(ll(f.env.z+mid)<u1){lo=mid+1u;}else{hi=mid;}}
+   let row=lo;let cb=f.env.w+row*ew;let u2=rand();
+   lo=0u;hi=ew-1u;
+   while(lo<hi){let mid=(lo+hi)/2u;if(ll(cb+mid)<u2){lo=mid+1u;}else{hi=mid;}}
+   let uv=vec2f((f32(lo)+rand())/f32(ew),(f32(row)+rand())/f32(eh));
+   let phi=(uv.x-0.5)*TAU+f.weights.y;let th=uv.y*PI;
+   wi=vec3f(sin(th)*sin(phi),cos(th),-sin(th)*cos(phi));
+   let t=envmap[row*ew+lo];
+   lp=envPdf(wi,t);
+   if(lp<=0.0){continue;}
+   radiance=t.xyz*f.sky.w;far=true;
+  } else {
+   if((*w).total==0.0){continue;}
+   wi=(*w).d;
+  }
+  let e=evalAt(kind,m,n,wo,wi);
+  if(q==4u){
+   if(any(e.f>vec3f(0.0))){(*w).f=e.f*(*w).light*((*w).total/(*w).weight);(*w).pdf=e.pdf;}else{(*w).total=0.0;}
+   continue;
+  }
+  // The straight direction (not from inside glass, where glassCandidates finds the ways out).
+  if(any(e.f>vec3f(0.0))&&(air||!far)){
+   let v=shadow(o,wi,dist);
+   if(v>0.0){L+=e.f*radiance*v*select(1.0,power2(lp,e.pdf)/lp,lp>0.0);}
+   else if(far&&(f.config.z&CLEAR_GLASS)!=0u){offer(w,1.0,o,wi,medium,mInst,wi,NONE,radiance,lp);}
+  }
+  if(far){glassCandidates(kind,m,n,o,medium,mInst,wi,radiance,lp,w);}
  }
- for(var q=0u;q<nd;q++){L+=distant(kind,m,n,wo,o,medium,mInst,ds[q].xyz,dl[q],ds[q].w);}
  return L;
 }
 // Weight of an emissive face found by BSDF sampling against light sampling of the same face.
@@ -1049,10 +1051,74 @@ fn radiance(px:vec2u)->Path {
  var glassStart=false;var deflections=0u;var deflectOk=true;var entryDir=vec3f(0.0);
  // Wavelength of the path (nanometres) once dispersive glass has been met, or fixed for the whole frame.
  var lambda=bitcast<f32>(f.lights.w);
+ // The shadow walk a vertex left (pending), being walked (walking): ray, medium, transmittance, Jacobian, turns and
+ // the instance of the last, whether the current glass was entered from air and in which direction; then its weight.
+ var pending=false;var walking=false;var done=false;
+ var wo=vec3f(0.0);var wd=vec3f(0.0);var wMedium=0u;var wInst=NONE;var wT=vec3f(1.0);var wJ=1.0;var wN=0u;var wG=NONE;
+ var wEntered=false;var wIn=vec3f(0.0);var wSteps=0u;var wS=vec3f(0.0);var wWant=NONE;var wAdd=vec3f(0.0);
+ var wLp=0.0;var wPdf=0.0;var wCaustic=false;
  res.albedo=vec3f(1.0);res.normal=-d;res.primary=1.0;
- let limit=f.config.x*4u+16u;
+ let limit=f.config.x*4u+16u+(f.config.x+1u)*16u;
  for(var it=0u;it<limit;it++){
-  let h=closest(o,d,medium,mInst);
+  if(pending){
+   pending=false;walking=true;wT=vec3f(1.0);wJ=1.0;wN=0u;wG=NONE;wEntered=false;wIn=wd;wSteps=0u;
+  }
+  if(!walking&&done){break;}
+  let h=closest(select(o,wo,walking),select(d,wd,walking),select(medium,wMedium,walking),select(mInst,wInst,walking));
+  if(walking){
+   // One step of the shadow walk.
+   wSteps++;
+   var stop=false;var ok=false;
+   if(wMedium!=0u){let md=mediumOf(wMedium);wT*=exp(-(md.absorb+md.sigma)*min(h.t,1e30));}
+   if(h.inst==NONE){stop=true;ok=same(wd,wS)&&select(wN==1u&&wG==wWant,wN==0u,wWant==NONE);}
+   else if(h.inst==GROUND||wSteps>16u){stop=true;}
+   else if(h.inst==AREA){if(opaqueArea(h.value)){stop=true;}else{wo=wo+wd*(h.t+1e-4*max(1.0,h.t));}}
+   else {
+    let wp=wo+wd*h.t;
+    let wn=h.sgn*normalize(rowOf(localX(h.inst),h.axis));
+    let woff=h.sgn*EPS*colOf(worldX(h.inst),h.axis);
+    let wGlass=wMedium!=0u&&(material(wMedium).flags&MEDIA)==0u;
+    let ci=-dot(wn,wd);
+    if(h.value==0u){
+     let ma=material(wMedium);
+     if((ma.flags&MEDIA)!=0u){wMedium=0u;wInst=NONE;wo=wp-woff;}
+     else if(!clearGlass(ma)){stop=true;}
+     else {
+      let fr=fresnel(ci,ma.ior);
+      if(fr>=1.0){
+       // Total internal reflection: part of the chain in light-sampled instances only (as on the path side).
+       if(!prismAt(wInst)){stop=true;}else{wd=reflect(wd,wn);wo=wp+woff;}
+      } else {
+       let dt=refract(wd,wn,ma.ior);
+       wT*=1.0-fr;wJ*=-dot(wn,dt)/(ma.ior*ma.ior*ci);
+       if(wEntered&&!same(dt,wIn)){wN++;wG=wInst;}
+       wEntered=false;wMedium=0u;wInst=NONE;wo=wp-woff;wd=dt;
+      }
+     }
+    } else {
+     let mb=material(h.value);
+     // Glass to media or to other glass: left to path sampling (the path side ends its chain there too).
+     if(wGlass){stop=true;}
+     else if((mb.flags&MEDIA)!=0u){wMedium=h.value;wInst=h.inst;wo=wp-woff;}
+     else if(isMirror(mb)&&mirrorAt(h.inst)){wT*=schlick3(mb.color,ci);wN++;wG=h.inst;wd=reflect(wd,wn);wo=wp+woff;}
+     else if(mb.glass<0.999||!clearGlass(mb)){stop=true;}
+     else {
+      let eta=1.0/mb.ior;
+      let fr=fresnel(ci,eta);
+      let dt=refract(wd,wn,eta);
+      wT*=mb.color*(1.0-fr);wJ*=-dot(wn,dt)/(eta*eta*ci);
+      wEntered=true;wIn=wd;wMedium=h.value;wInst=h.inst;wo=wp-woff;wd=dt;
+     }
+    }
+   }
+   if(stop){
+    walking=false;
+    if(ok&&any(wT>vec3f(0.0))){
+     let add=wAdd*wT*wJ*select(1.0,power2(wLp/wJ,wPdf)/wLp,wLp>0.0);L+=add;if(wCaustic){C+=add;}
+    }
+   }
+   continue;
+  }
   if(primary){primary=false;res.inv=select(0.0,1.0/max(h.t,1e-6),h.inst!=NONE);}
   // The vertex: a scattering point in a medium (kind 1) or a surface (kind 0); light sampling is called from one place
   // for both (the shader stays small).
@@ -1132,8 +1198,15 @@ fn radiance(px:vec2u)->Path {
   }
   // Light sampled at a glossy metal seen from a diffuse vertex is a caustic too (light focused by the metal).
   if(soft){
-   let add=thr*direct(select(0u,1u,scatter),m,n,-d,p+off,medium,mInst);L+=add;
-   if(focused||(diffuse&&!scatter&&m.metal>0.5&&m.alpha<0.1)){C+=add;}
+   var walk:Walk;
+   let add=thr*direct(select(0u,1u,scatter),m,n,-d,p+off,medium,mInst,&walk);L+=add;
+   let caustic=focused||(diffuse&&!scatter&&m.metal>0.5&&m.alpha<0.1);
+   if(caustic){C+=add;}
+   if(walk.total>0.0){
+    // Walked from the next loop turn on; the path resumes after it.
+    pending=true;wo=walk.o;wd=walk.d;wMedium=walk.medium;wInst=walk.mInst;wS=walk.s;wWant=walk.want;
+    wAdd=thr*walk.f;wLp=walk.lp;wPdf=walk.pdf;wCaustic=caustic;
+   }
   }
   if(scatter){
    let md=mediumOf(medium);
@@ -1143,7 +1216,7 @@ fn radiance(px:vec2u)->Path {
    sunPdf=hgPdf(dot(d,wi),md.g);jChain=1.0;chainOk=true;chainSet=md.media;
    glassStart=!md.media;deflections=0u;deflectOk=true;
    o=p;d=wi;
-   if(!roulette(&thr,bounces)){break;}
+   if(!roulette(&thr,bounces)){done=true;}
    continue;
   }
   let inAir=medium==0u||(material(medium).flags&MEDIA)!=0u;
@@ -1152,7 +1225,7 @@ fn radiance(px:vec2u)->Path {
   if(!inAir){var mi=material(medium);if(mi.disp>0.0){collapse(&lambda,&thr);mi.ior=iorAt(mi,lambda);}etaI=mi.ior;}
   if(m.disp>0.0&&m.glass>0.0){collapse(&lambda,&thr);m.ior=iorAt(m,lambda);}
   let s=sampleSurface(m,n,wo,etaI);
-  if(!s.ok){break;}
+  if(!s.ok){done=true;continue;}
   if(s.lobe<=1u){
    // A new chain starts here; light sampling of distant lights ran unless the vertex is inside rough glass.
    let roughGlass=!inAir&&!clearGlass(material(medium));
@@ -1169,14 +1242,13 @@ fn radiance(px:vec2u)->Path {
   if(s.lobe==0u||(s.lobe==1u&&m.alpha>=0.1)){diffuse=true;}else{focused=focused||diffuse;}
   thr*=s.w;
   if(s.transmit){
-   if(h.inst==GROUND){break;}
+   if(h.inst==GROUND){done=true;continue;}
    medium=h.value;mInst=h.inst;o=p-off;thr*=m.color;
   } else {o=p+off;}
   if(feature){tint*=s.w;}
   d=s.wi;lastPdf=select(0.0,s.pdf,inAir);
   bounces++;
-  if(bounces>f.config.x){break;}
-  if(!roulette(&thr,bounces)){break;}
+  if(bounces>f.config.x||!roulette(&thr,bounces)){done=true;}
  }
  res.color=L;res.caustic=C;
  if((f.config.z&CLAMP)!=0u){let l=lum(res.color);if(l>f.weights.w){res.color*=f.weights.w/l;res.caustic*=f.weights.w/l;}}

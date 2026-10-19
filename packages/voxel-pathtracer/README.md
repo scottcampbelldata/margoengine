@@ -115,7 +115,10 @@ or inside; light turned once by up to 8 glass instances whose model has one smoo
 order that do not move and have no shear: in through one face and out through another, total internal reflection
 included) and by the faces of up to 8 mirror instances (models with smooth metal of `metalness` 1). Other light through
 glass (several turns, glass touching glass or media, partial internal reflections) is still found by path sampling;
-both are combined by multiple importance sampling, so nothing is counted twice.
+both are combined by multiple importance sampling, so nothing is counted twice. A shadow ray that has to refract is
+walked by the path loop itself; of the candidate directions a surface point has for such walks, one is walked per
+point, chosen by weighted reservoir sampling and weighted back (unbiased; candidates a box model makes unlikely are
+chosen rarely).
 
 ## Camera
 
@@ -227,14 +230,22 @@ RTX A6000 (Ampere), Windows 11, Edge 155 (headless, WebGPU, D3D12), 2026-10-19, 
 
 | Scene at 1920 x 1080 | GPU per frame | GPU memory |
 | --- | --- | --- |
-| Material scene (7 models, glass, metal, emitter, cloud, sun, sky, ground), 1 sample | 5.24 ms | 95 MiB |
-| Same, denoised | 8.59 ms | 190 MiB |
-| One dense 256^3 model (3,967,601 voxels, terrain), 1 sample | 8.39 ms | 98 MiB |
-| Same, 4 samples per frame | 31.98 ms | 98 MiB |
+| Material scene (7 models, glass, metal, emitter, cloud, sun, sky, ground), 1 sample | 12.39 ms | 95 MiB |
+| Same, denoised | 19.92 ms | 285 MiB |
+| One dense 256^3 model (3,967,601 voxels, terrain), 1 sample | 9.90 ms | 98 MiB |
+| Same, 4 samples per frame | 36.96 ms | 98 MiB |
+
+Light sampling through glass and mirrors made a sample dearer than before it (measured the same day on the same
+machine: 6.09 ms for the material scene, 8.45 ms for the dense one, 9.11 ms denoised): glass and mirror candidates need
+walks, and the larger shader is slower even where there is no glass. Noise per sample fell (two renders' difference at
+64 samples, 480 x 300: material scene 0.0347 to 0.0284, caustic scene 0.0484 to 0.0336), which does not make up for the
+time in the material scene (about 17% more noise at equal time); the caustic scene's time was not measured. The earlier
+version also converged to a wrong image where glass rests on another model (the floor under it was black). The
+denoiser's second (caustic) chain doubles its memory.
 
 CPU: packing that 256^3 model takes 43-59 ms (attach or a new revision); `setScene` with unchanged revisions 0.2-0.5 ms;
 a new physical sky (other turbidity, intensity or sun direction) bakes in 50-63 ms, an unchanged one 1.4-3.8 ms;
-encoding a frame 0.2 ms. A 1500 x 1100, 64-sample denoised PNG capture of the material scene took 0.77-0.88 s.
+encoding a frame 0.2 ms. A 1500 x 1100, 64-sample denoised PNG capture of the material scene took 1.25-1.38 s.
 Numbers on other GPUs are not measured.
 
 ## Verification
@@ -278,20 +289,21 @@ Numbers on other GPUs are not measured.
     2.8333), 550 nm 2.7700 (2.7682), 650 nm 2.7315 (2.7298), no dispersion 2.7533 (2.7516); the 450-650 nm spread
     0.1036 (0.1035); over the whole spectrum blue lands furthest and red least; a dispersive glass cube in a white
     furnace stays white per channel (1.0025, 0.9993, 0.9968);
-  - light through glass and off mirrors: a glass slab's shadow at 0 and 40 degrees within 0.38% of
+  - light through glass and off mirrors: a glass slab's shadow at 0 and 40 degrees within 0.30% of
     `cos * T / (1 - albedo * rd)` (transmission with internal reflections, floor-slab interreflection), also for a
-    point sun (only light sampling reaches it); the floor under glass resting on it within 0.83% of the refracted
+    point sun (only light sampling reaches it); the floor under glass resting on it within 0.87% of the refracted
     irradiance; a mirror wall's floor `E (1 + R)` exact to 4 digits for a point and a disk sun; a floating glass cube's
-    shadow and caustic with light sampling equal to path sampling of the same light within 0.05% (IOR 1.5, totally
-    reflected chains) and 0.02% (IOR 1.33, perpendicular faces);
+    shadow and caustic with light sampling equal to path sampling of the same light within 0.31% (IOR 1.5, totally
+    reflected chains) and 0.40% (IOR 1.33, perpendicular faces) at 1024 against 16,384 samples (0.32% and 0.41%, the
+    other way, at 4096 against 32,768: within the path-sampled side's noise);
   - environment orientation; equal seeds bit-identical;
   - convergence: error against a 16,384-sample reference falls 0.0216, 0.0114, 0.0058, 0.0030 at 16, 64, 256, 1024
     samples (1/sqrt(N)), both projections;
   - denoiser (480 x 300, against a 16,384-sample reference; two halves of 32,768 for the glass scenes, whose own noise
     is removed in quadrature): RMSE of the diffuse scene x2.78 lower at 4 samples, x2.53 at 16, x2.15 at 64, x1.61 at
     1024, object edges no worse except at 64 samples (8% higher); the material scene (glass, gold, plastic, cloud)
-    x2.42, x2.10, x2.19; a caustic scene (strong sun through a glass block and a low-IOR slab, a mirror panel, rough gold;
-    dim sky) x2.14, x2.03, x2.04 (asserted: at least x2 and x1.6);
+    x2.42, x2.30, x2.29; a caustic scene (strong sun through a glass block and a low-IOR slab, a mirror panel, rough gold;
+    dim sky) x2.22, x2.10, x2.08 (asserted: at least x2 and x1.6);
   - depth of field blurs only out-of-focus edges; motion blur spreads a moving cube over its path; camera motion of 2
     units with the shutter open moves a 1-unit line's centroid by 0.9977 (1) and widens its profile to a standard
     deviation of 0.6455 units (the box convolution's sqrt(5/12) = 0.6455);
@@ -330,7 +342,9 @@ Numbers on other GPUs are not measured.
 - Light through smooth glass and off mirrors: deterministic refraction and reflection of shadow rays at planar voxel
   faces with each interface's solid-angle Jacobian, the candidate directions solved per face axis from Snell's law and
   mirror reflection, and MIS against BSDF-sampled paths through the same chain (a planar special case of specular
-  next-event estimation, cf. Hanika et al. 2015, "Manifold Next Event Estimation").
+  next-event estimation, cf. Hanika et al. 2015, "Manifold Next Event Estimation"); one walk per surface point among
+  the candidates by weighted reservoir sampling (as in Talbot et al. 2005, resampled importance sampling), walked by
+  the path loop's own closest-hit call so the shader holds one traversal.
 - Denoising: the edge-avoiding a-trous wavelet filter (Dammertz et al. 2010) on albedo-demodulated radiance, with
   variance-guided luminance stops (Schied et al. 2017) and a plane-distance geometric stop. Light focused by glass,
   mirrors and glossy metal onto diffuse surfaces is filtered separately, more widely. The luminance stop compares a
@@ -352,8 +366,10 @@ Not done or not verified, stated plainly:
   would need its proprietary material and lighting equations, which are not public. Mapping `.vox` render/material
   settings onto these inputs is the editor's job and is approximate.
 - **Denoiser:** a classical filter, not a learned one. Averaged over four seeds against 131,072-sample references
-  (noise removed in quadrature) it lowers the error x2.40, x2.27, x2.27 at 4, 16, 64 samples on the material scene but
-  x1.86, x2.06, x1.93 on the caustic scene: short of x2 at 4 and 64 samples there. Edge pixels gain less.
+  (noise removed in quadrature) it lowers the error x2.46, x2.32, x2.24 at 4, 16, 64 samples on the material scene and
+  x2.20, x2.09, x2.03 on the caustic scene (whose undenoised error rose a little when the glass walks became one per
+  point; its denoised error stayed within 4%). Edge pixels gain less.
+- **Speed:** light sampling through glass costs time even in scenes without glass (see "Measured performance").
 - **Caustics:** light turned more than once by glass (or by glass and a mirror), glossy reflections of a small sun and
   glass beyond the 8 light-sampled instances are found by path sampling only and converge slowly; `clamp` trades that
   noise for bias.
