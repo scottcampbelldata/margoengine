@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#79a6d9">
+  <meta name="description" content="A small Minecraft-style voxel sandbox on Margo Engine: streamed terrain, light, building and saves.">
+  <title>Voxel sandbox · Margo Engine</title>
+  <link rel="icon" href="data:,">
+</head>
+<body>
+  <canvas id="scene" tabindex="0" aria-label="Voxel world. Click to play: WASD moves, the mouse looks, left click breaks a block, right click places one."></canvas>
+  <div id="underwater" aria-hidden="true"></div>
+  <div id="crosshair" aria-hidden="true"></div>
+  <pre id="hud" aria-live="off"></pre>
+  <div id="toast" role="status"></div>
+  <div id="hotbar-label" aria-hidden="true"></div>
+  <div id="hotbar" aria-label="Hotbar"></div>
+  <section id="overlay" data-state="loading">
+    <h1>Voxel sandbox</h1>
+    <p id="overlay-status" role="status">Starting WebGPU</p>
+    <p class="play">Click to play</p>
+    <dl>
+      <dt>WASD</dt><dd>move</dd>
+      <dt>Mouse</dt><dd>look</dd>
+      <dt>Space</dt><dd>jump, swim up; twice to fly</dd>
+      <dt>Shift</dt><dd>sprint; down when flying or swimming</dd>
+      <dt>F</dt><dd>fly on / off</dd>
+      <dt>Left / right click</dt><dd>break / place a block</dd>
+      <dt>Middle click</dt><dd>pick the block you look at</dd>
+      <dt>1-9, wheel</dt><dd>choose a block</dd>
+      <dt>V</dt><dd>render distance 4, 8, 12, 16</dd>
+      <dt>T</dt><dd>time of day</dd>
+      <dt>H</dt><dd>hide the HUD</dd>
+      <dt>Esc</dt><dd>pause (saves)</dd>
+    </dl>
+    <pre id="error" hidden></pre>
+  </section>
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>

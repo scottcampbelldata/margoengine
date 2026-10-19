@@ -1,0 +1,20 @@
+{
+  "name": "@margoengine/voxel-sandbox",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "test": "node --test test/*.test.js",
+    "test:browser": "node test/play.browser.mjs"
+  },
+  "dependencies": {
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/lines": "^1.0.0",
+    "@margoengine/post": "^1.0.0",
+    "@margoengine/quality": "^1.0.0",
+    "@margoengine/sky": "^1.0.0",
+    "@margoengine/voxel": "^1.0.0"
+  }
+}

@@ -1,0 +1,178 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #79a6d9;
+  color: #f4f4f4;
+  font: 14px/1.4 system-ui, sans-serif;
+  user-select: none;
+}
+#scene {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  outline: none;
+}
+#underwater {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: rgba(20, 60, 150, 0.45);
+  opacity: 0;
+}
+#underwater.on {
+  opacity: 1;
+}
+#crosshair {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  background:
+    linear-gradient(#fff, #fff) center / 2px 18px no-repeat,
+    linear-gradient(#fff, #fff) center / 18px 2px no-repeat;
+  mix-blend-mode: difference;
+}
+#hud {
+  position: fixed;
+  left: 8px;
+  top: 8px;
+  margin: 0;
+  padding: 6px 8px;
+  font: 12px/1.45 ui-monospace, Consolas, monospace;
+  background: rgba(0, 0, 0, 0.42);
+  border-radius: 4px;
+  pointer-events: none;
+  white-space: pre;
+}
+#hud:empty,
+#hud.hidden {
+  display: none;
+}
+#toast {
+  position: fixed;
+  left: 50%;
+  top: 18%;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+#toast.show {
+  opacity: 1;
+}
+#hotbar {
+  position: fixed;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 4px;
+  pointer-events: none;
+}
+#hotbar .slot {
+  position: relative;
+  width: min(44px, calc((100vw - 64px) / 9));
+  height: min(44px, calc((100vw - 64px) / 9));
+  display: grid;
+  place-items: center;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+}
+#hotbar .slot.selected {
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+}
+#hotbar canvas {
+  width: 72%;
+  height: 72%;
+  image-rendering: pixelated;
+}
+#hotbar span {
+  position: absolute;
+  left: 3px;
+  top: 0;
+  font-size: 10px;
+  opacity: 0.7;
+}
+#hotbar-label {
+  position: fixed;
+  left: 50%;
+  bottom: 70px;
+  transform: translateX(-50%);
+  text-shadow: 0 1px 2px #000;
+  opacity: 0;
+  transition: opacity 0.4s;
+  pointer-events: none;
+}
+#hotbar-label.show {
+  opacity: 1;
+}
+#overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 16, 28, 0.55);
+  text-align: center;
+  cursor: pointer;
+}
+#overlay[hidden] {
+  display: none;
+}
+#overlay h1 {
+  margin: 0 0 6px;
+  font-size: 28px;
+  letter-spacing: 0.02em;
+}
+#overlay .play {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 4px 0 14px;
+}
+#overlay[data-state='loading'] .play,
+#overlay[data-state='loading'] dl {
+  display: none;
+}
+#overlay dl {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 2px 14px;
+  margin: 0;
+  text-align: left;
+  font-size: 13px;
+}
+#overlay dt {
+  text-align: right;
+  font-weight: 600;
+}
+#overlay dd {
+  margin: 0;
+  opacity: 0.85;
+}
+#error {
+  max-width: 70ch;
+  white-space: pre-wrap;
+  color: #ffb4a8;
+  margin-top: 16px;
+}
+body.deterministic #overlay,
+body.deterministic #hud,
+body.deterministic #toast,
+body.deterministic #hotbar-label {
+  display: none;
+}
