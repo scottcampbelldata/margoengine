@@ -17,6 +17,10 @@
     "./codec": {
       "types": "./dist/codec.d.ts",
       "import": "./dist/codec.js"
+    },
+    "./stream": {
+      "types": "./dist/stream.d.ts",
+      "import": "./dist/stream.js"
     }
   },
   "files": [

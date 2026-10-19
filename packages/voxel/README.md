@@ -109,12 +109,15 @@ prints yours): about 200 rays/ms for 64-block rays over terrain, 600 sweeps/ms f
 
 ## Codecs (`./codec`)
 
-Bytes for saves and the network. Decoders treat their input as hostile: every count
+## Codecs and chunk stores (`./codec`, `./stream`)
+
+Bytes for saves and the network, and where unloaded chunks go. Decoders treat their input as hostile: every count
 and length is checked against the bytes before it is read or allocated, a deflated chunk stops inflating at the
 largest possible chunk (262,148 bytes), and anything malformed throws a `RangeError` naming the problem.
 
 ```ts
 import { encodeChunk, decodeChunk, encodeBlockChanges, applyBlockChanges, EntityCodec } from '@margoengine/voxel/codec';
+import { IndexedDBChunkStore, MemoryChunkStore } from '@margoengine/voxel/stream';
 
 const bytes = await encodeChunk(chunk); // deflate-raw by default; {light: false}, {compress: false}
 world.addChunk(cx, cy, cz, await decodeChunk(bytes));
@@ -127,6 +130,11 @@ applyBlockChanges(otherWorld, message); // all or nothing, through setBlocks (di
 const codec = new EntityCodec({ position: 'position', rotation: 'rotation', health: 'u8', anim: 'u16' });
 socket.send(codec.encode(players, acked)); // Maps of u32 id -> entity; only what changed since `acked`
 const state = codec.decode(message, received); // `received`: the receiver's copy of `acked`
+
+const store = new IndexedDBChunkStore('world-1'); // or new MemoryChunkStore()
+store.put(cx, cy, cz, chunk); // copies the chunk now; puts in one task share one transaction
+const saved = await store.get(cx, cy, cz); // a VoxelChunk or undefined; sees uncommitted puts
+await store.flush(); // e.g. on visibilitychange: everything committed, or the first failure
 ```
 
 - **Chunks.** u8 version (1), u8 flags (1 light, 2 dense light, 4 deflated), then (deflate-raw when flagged) a
@@ -139,6 +147,11 @@ const state = codec.decode(message, received); // `received`: the receiver's cop
   (smallest-three in 32 bits: at most 0.28 degrees, about 0.08 on average), `'u8'`, `'u16'`, `'f32'`; up to 32 per
   schema, in the schema's key order. Per entity in id order: varint id offset, varint field mask (0 = removed),
   changed fields. Decoding against a baseline the bytes were not encoded from throws when an entity is missing.
+- **Stores.** `ChunkStore` is `get`, `put`, `delete`, `flush` (promises; invalid arguments to put and delete throw
+  at the call). `IndexedDBChunkStore(name)` keeps one
+  deflated record per chunk keyed `[cx, cy, cz]` in object store `'chunks'`, writes each task's puts and deletes in
+  one transaction after the previous one, and reports a failed commit (MargoError `'failed'`) through those puts and
+  the next `flush`. `MemoryChunkStore` keeps uncompressed records in memory (tests, servers).
 
 Measured with Node 24 on the development laptop (2026-10-19; `node --test packages/voxel/tests/codec-benchmark.test.js`
 prints yours): a surface chunk (4-bit, 7 states, dense sky light) is 49,163 bytes raw and 2,586 deflated (16,395 and
