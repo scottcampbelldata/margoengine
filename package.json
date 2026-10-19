@@ -96,6 +96,7 @@
     "catalog": "node scripts/serve-catalog.js",
     "dev:sandbox": "vite examples/gameplay-sandbox",
     "dev:voxel": "vite examples/voxel-sandbox",
+    "bench:voxel": "node examples/voxel-sandbox/bench.mjs",
     "build:packages": "node scripts/build-modern.js --precompiled",
     "api:check": "node scripts/api-report.js",
     "api:update": "node scripts/api-report.js --update",

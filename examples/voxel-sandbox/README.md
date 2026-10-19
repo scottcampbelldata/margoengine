@@ -92,6 +92,18 @@ windows, torches and a glowstone lamp post by the lake (`src/showcase.ts`) once 
   4.5 (needs `?gpuTiming` and an adapter with `timestamp-query`; null otherwise).
 - `world`, `player`, `streamer`, `voxels`, `target`, `spawned`: the live objects, for tests and the console.
 
+### Benchmark
+
+```sh
+node examples/voxel-sandbox/bench.mjs   # or npm run bench:voxel; options --distances=8,16 --loads=3 --no-quiet
+```
+
+It holds the GPU lock, waits for `scripts/quiet-gate.mjs` (numbers from a busy machine are labelled DIAGNOSTIC), loads
+`?view=overview` at render distance 8 and 16 in headless Edge at 1920 x 1080 with the high tier (4x MSAA), and writes
+`test-results/voxel-sandbox-bench.json`: spawn time (median of 3 loads after a warm-up load), frame CPU median and p95
+over 300 still frames, voxel GPU time median and p95 over 100 frames, a 10 s flight at 11 blocks/s while chunks
+stream in, and chunks, quads, quad bytes, draws and chunk data bytes.
+
 ## Tests
 
 ```sh
