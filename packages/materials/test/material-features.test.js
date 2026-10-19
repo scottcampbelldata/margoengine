@@ -19,6 +19,9 @@ import {
   createMesh,
 } from '../dist/index.js';
 import { NodeMaterial, normalLocal, positionLocal } from '../../shader/dist/index.js';
+import { exportModel } from '../../exporters/dist/model.js';
+import { readGLB } from '../../exporters/tests/helpers.js';
+import { headless, headlessModels } from '../../../tests/support/pbr-snapshot.js';
 
 async function scene() {
   const gpu = mockGPU(),
@@ -189,6 +192,7 @@ const defaults = {
   displacementBias: 0,
   lightMap: null,
   lightMapIntensity: 1,
+  emissiveIntensity: 1,
 };
 const used = () => ({
   alphaMap: solid(0, 0, 0),
@@ -199,6 +203,7 @@ const used = () => ({
   displacementBias: 0.5,
   lightMap: solid(0, 0, 0),
   lightMapIntensity: 4,
+  emissiveIntensity: 4,
 });
 const off = { alphaMap: null, bumpMap: null, displacementMap: null, lightMap: null };
 
@@ -350,3 +355,49 @@ test('lightMap adds baked light on lit shadings, multiplies unlit colour, reads 
   for (const mesh of meshes) mesh.destroy();
   s.engine.dispose();
 });
+
+test('emissiveIntensity scales the emission gltf-pro draws, live and validated, with no shader change', async () => {
+  const s = await scene(),
+    material = new PbrMaterial({ emissive: [1, 0.5, 0], emissiveIntensity: 3 }),
+    mesh = createMesh(s.engine, quad, material),
+    emission = (log) => {
+      const frame = log.filter((e) => e[0] === 'writeBuffer' && e[3].length >= 880 * 2).at(-1);
+      return [...floats(frame[3]).slice(84, 87)];
+    };
+  let log = s.frame();
+  assert.ok(codes(log).every((c) => !c.includes('margoFeatures')));
+  assert.deepEqual(emission(log), [3, 1.5, 0]);
+  material.emissiveIntensity = 0.5;
+  material.emissive.set([0.5, 0.5, 1]);
+  log = s.frame();
+  assert.deepEqual(emission(log), [0.25, 0.25, 0.5], 'live, with the live colour');
+  assert.deepEqual([...material.emissive], [0.5, 0.5, 1], 'the colour itself is not scaled');
+  for (const bad of [-1, Infinity, Number.NaN])
+    assert.throws(() => {
+      material.emissiveIntensity = bad;
+    }, RangeError);
+  assert.throws(() => {
+    material.emissiveIntensity = '2';
+  }, TypeError);
+  mesh.destroy();
+  s.engine.dispose();
+});
+
+test('exportModel writes emissiveIntensity as KHR_materials_emissive_strength over the emissive factor', () =>
+  headlessModels(async () => {
+    const engine = await headless(),
+      material = async (m) =>
+        readGLB(await exportModel(createMesh(engine, quad, m), { binary: true })).json.materials[0];
+    const strong = await material(new PbrMaterial({ emissive: [1, 0.5, 0], emissiveIntensity: 3 }));
+    assert.deepEqual(strong.emissiveFactor, [1, 0.5, 0]);
+    assert.deepEqual(strong.extensions.KHR_materials_emissive_strength, { emissiveStrength: 3 });
+    const dim = await material(new PbrMaterial({ emissive: [0.5, 0.5, 0.5], emissiveIntensity: 0.5 }));
+    assert.deepEqual(
+      [dim.emissiveFactor, dim.extensions.KHR_materials_emissive_strength],
+      [[0.5, 0.5, 0.5], { emissiveStrength: 0.5 }],
+    );
+    const plain = await material(new PbrMaterial({ emissive: [0.5, 0.5, 0.5] }));
+    assert.equal(plain.extensions?.KHR_materials_emissive_strength, undefined);
+    const off = await material(new PbrMaterial({ emissive: [1, 1, 1], emissiveIntensity: 0 }));
+    assert.equal(off.emissiveFactor, undefined);
+  }));

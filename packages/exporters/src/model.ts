@@ -105,6 +105,8 @@ type TextureOwner = Partial<Record<(typeof slots)[number], PixelTexture | null>>
   anisotropyRotation?: number;
   dispersion?: number;
   transmissive?: boolean;
+  emissive?: readonly number[];
+  emissiveIntensity?: number;
 };
 function textureOwner(model: PBRModel, index?: number): TextureOwner | undefined {
   const owner = (model as { material?: TextureOwner | readonly TextureOwner[] }).material;
@@ -273,8 +275,11 @@ class Writer extends Bin {
         [normalScale, occlusion] = m.factors.slice(2),
         [roughness, metallic] = exponent < 0 ? m.factors : [(2 / (exponent + 2)) ** 0.25, 0],
         mode = ['OPAQUE', 'MASK', 'BLEND'][m.settings[0]];
-      // gltf-pro holds emissiveFactor * strength; factors above 1 move into KHR_materials_emissive_strength.
-      const strength = Math.max(e.KHR_materials_emissive_strength?.emissiveStrength ?? 1, ...m.emission);
+      // gltf-pro holds emissiveFactor * strength; factors above 1 move into KHR_materials_emissive_strength. A materials
+      // Material's emissiveIntensity is that strength, its emissive the factor.
+      const intensity = owner?.emissiveIntensity ?? 1,
+        own = intensity !== 1 && intensity > 0,
+        strength = own ? intensity : Math.max(e.KHR_materials_emissive_strength?.emissiveStrength ?? 1, ...m.emission);
       if (strength !== 1) ext.KHR_materials_emissive_strength = { emissiveStrength: strength };
       if (m.ext![0] || owner?.shading === 'basic') ext.KHR_materials_unlit = {};
       if (e.KHR_materials_ior || m.ext![1] !== 1.5) ext.KHR_materials_ior = { ior: m.ext![1] };
@@ -364,7 +369,11 @@ class Writer extends Bin {
           normalTexture: scaled(t(2), 'scale', normalScale),
           occlusionTexture: scaled(t(3), 'strength', occlusion),
           emissiveTexture: t(4),
-          emissiveFactor: m.emission.some((x: number) => x) ? m.emission.map((x: number) => x / strength) : undefined,
+          emissiveFactor: m.emission.some((x: number) => x)
+            ? own
+              ? [...owner!.emissive!]
+              : m.emission.map((x: number) => x / strength)
+            : undefined,
           alphaMode: mode === 'OPAQUE' ? undefined : mode,
           alphaCutoff: mode === 'MASK' && m.settings[1] !== 0.5 ? m.settings[1] : undefined,
           doubleSided: side(m) === 'double' ? true : undefined,

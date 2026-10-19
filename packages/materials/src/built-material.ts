@@ -569,6 +569,8 @@ export interface MaterialOptions extends PhysicalOptions {
   roughness?: number;
   metalness?: number;
   emissive?: ColorInput;
+  /** Scales `emissive` (and its map), finite and >= 0 (default 1), so emission can exceed 1 for bloom. Live. */
+  emissiveIntensity?: number;
   map?: Texture | null;
   metalRoughnessMap?: Texture | null;
   normalMap?: Texture | null;
@@ -1113,6 +1115,7 @@ export class Material {
   private readonly glow: LiveColor;
   private readonly highlight: LiveColor;
   private gloss = 30;
+  private glowScale = 1;
   /** gltf-pro layout: [roughness, metalness, normalScale, aoMapIntensity] and [alphaMode, alphaTest, side (front 0, double 1, back 2), 0]. */
   readonly factors: number[];
   readonly settings: number[];
@@ -1341,6 +1344,7 @@ export class Material {
       'displacementBias',
       'lightMap',
       'lightMapIntensity',
+      'emissiveIntensity',
     ] as const)
       if (o[key] !== undefined) this[key] = o[key] as never;
     // Physical options enable their lobes as they are set (transmission before the volume values that need it); the
@@ -1478,6 +1482,17 @@ export class Material {
   }
   set emissive(v: ColorInput) {
     this.glow.set(v);
+  }
+  /** Scales `emissive` (default 1, finite, >= 0): the emission drawn is emissive x emissiveMap x emissiveIntensity. */
+  get emissiveIntensity(): number {
+    return this.glowScale;
+  }
+  set emissiveIntensity(v: number) {
+    if (typeof v !== 'number')
+      throw new TypeError('Material emissiveIntensity must be a number; set a finite number >= 0');
+    if (!(v >= 0 && Number.isFinite(Math.fround(v))))
+      throw new RangeError('Material emissiveIntensity is out of range; set a finite number >= 0');
+    this.glowScale = v;
   }
   /** Phong highlight colour, linear RGB, live like `color`. */
   get specular(): LiveColor {
@@ -2201,6 +2216,16 @@ function renderStateOf(m: Material): PBRRenderState | undefined {
   renderStates.set(m, state);
   return state;
 }
+const scaledEmission = new WeakMap<Material, number[]>();
+/** gltf-pro's emission row: the live emissive colour itself, or (emissiveIntensity not 1) it scaled. */
+function emissionOf(m: Material): number[] {
+  const k = m.emissiveIntensity;
+  if (k === 1) return m.emissive;
+  let out = scaledEmission.get(m);
+  if (!out) scaledEmission.set(m, (out = [0, 0, 0]));
+  for (let i = 0; i < 3; i++) out[i] = m.emissive[i] * k;
+  return out;
+}
 /** gltf-pro's extended-material features (iridescence, anisotropy rows) for `m`, kept while they stay the same. */
 function extendedOf(m: Material): PBRMaterial['extended'] {
   if (!m.physical || m.physical.length <= 12) return undefined;
@@ -2235,7 +2260,7 @@ function surface(g: PBRMaterial, current: () => Material, runtime: Engine): void
   Object.defineProperties(g, {
     extendedFrame: { value: true, enumerable: true },
     base: get((m) => m.color),
-    emission: get((m) => m.emissive),
+    emission: get(emissionOf),
     factors: get((m) => m.factors),
     settings: get((m) => m.settings),
     // The native frame holds 13 slots; the sparse map uniform owns all 17 slots.
