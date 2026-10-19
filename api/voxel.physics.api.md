@@ -86,6 +86,7 @@ class VoxelChunk {
     getLight(x: number, y: number, z: number): number;
     setLight(x: number, y: number, z: number, light: number): void;
     fillLight(light: number): void;
+    get byteLength(): number;
     pack(): PackedChunk;
     static unpack(packed: PackedChunk): VoxelChunk;
 }

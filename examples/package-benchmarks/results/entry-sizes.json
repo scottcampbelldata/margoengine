@@ -1,5 +1,5 @@
 {
-  "commit": "203dc9a4",
+  "commit": "539a03db",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -872,40 +872,48 @@
     },
     "@margoengine/voxel": {
       ".": {
-        "raw": 12910,
-        "gzip": 4664
+        "raw": 13042,
+        "gzip": 4697
       },
       "./query": {
         "raw": 6822,
         "gzip": 3020
       },
       "./codec": {
-        "raw": 23923,
-        "gzip": 8339
+        "raw": 24055,
+        "gzip": 8372
       },
       "./stream": {
-        "raw": 12624,
-        "gzip": 4664
+        "raw": 33764,
+        "gzip": 11983
+      },
+      "./generate": {
+        "raw": 9837,
+        "gzip": 3985
       },
       "./mesher": {
-        "raw": 14498,
-        "gzip": 6222
+        "raw": 14494,
+        "gzip": 6217
       },
       "./light": {
-        "raw": 20735,
-        "gzip": 7388
+        "raw": 20867,
+        "gzip": 7421
       },
       "./vox": {
-        "raw": 29991,
-        "gzip": 10656
+        "raw": 30123,
+        "gzip": 10689
       },
       "./physics": {
-        "raw": 19782,
-        "gzip": 7165
+        "raw": 19914,
+        "gzip": 7198
       },
       "dist/workers/mesher.js": {
         "raw": 9126,
         "gzip": 4112
+      },
+      "dist/workers/terrain.js": {
+        "raw": 13174,
+        "gzip": 5499
       }
     },
     "@margoengine/water": {
@@ -1052,6 +1060,11 @@
       "raw": 8902,
       "gzip": 4081,
       "brotli": 3623
+    },
+    "packages/voxel/dist/workers/terrain.js": {
+      "raw": 13014,
+      "gzip": 5467,
+      "brotli": 4883
     },
     "node_modules/@dimforge/rapier3d-compat/dist/rapier.mjs": {
       "raw": 4335248,
