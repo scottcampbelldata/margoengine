@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Bloom, SSAO } from '../dist/index.js';
+import { Bloom, SSAO, bloomWeights } from '../dist/index.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
 test('Bloom captures HDR, preserves scene depth for later overlays, resizes and restores without leaks', () => {
@@ -58,4 +58,53 @@ test('Bloom rejects invalid grade settings before allocation and rechecks mutabl
   options.strength = Infinity;
   assert.throws(() => h.frame(), /Invalid/);
   effect.dispose();
+});
+
+test('bloomWeights: radius 0.5 is the unweighted chain, the total stays the level count, 0 and 1 favour the ends', () => {
+  assert.deepEqual(bloomWeights(0.5, 6), [1, 1, 1, 1, 1, 1]);
+  for (const radius of [0, 0.2, 0.7, 1]) {
+    const w = bloomWeights(radius, 6),
+      k = 4 ** (2 * radius - 1);
+    assert.ok(Math.abs(w.reduce((a, b) => a + b) - 6) < 1e-12);
+    for (let j = 1; j < 6; j++) assert.ok(Math.abs(w[j] / w[j - 1] - k) < 1e-12);
+  }
+  // 1 / (1 + 1/4 + ... + 1/4^5) = 1024 / 1365 of the glow in the tightest level at 0, the widest at 1.
+  assert.ok(Math.abs(bloomWeights(0, 6)[0] / 6 - 1024 / 1365) < 1e-12);
+  assert.ok(Math.abs(bloomWeights(1, 6)[5] / 6 - 1024 / 1365) < 1e-12);
+  assert.deepEqual(bloomWeights(0, 1), [1]);
+});
+
+test('Bloom radius: validated, weights each up step, and switches back to the unweighted chain at 0.5', () => {
+  for (const radius of [-0.1, 1.1, NaN, '0.5']) assert.throws(() => new Bloom({ radius }), RangeError);
+  const h = optionalGPU(),
+    options = { radius: 0 },
+    effect = new Bloom(options);
+  h.engine.use(effect);
+  h.frame();
+  const weights = h.resources.find((r) => r.size === 1280);
+  assert.ok(weights && weights.usage & GPUBufferUsage.UNIFORM);
+  // 128 x 96 viewport: six levels, five up steps; step i reads w[i] and, on the first (i = 4), w[5] for the level below.
+  const slices = new Float32Array(weights.data),
+    w = bloomWeights(0, 6);
+  for (let i = 0; i < 5; i++) {
+    assert.ok(Math.abs(slices[i * 64] - w[i]) < 1e-6);
+    assert.ok(Math.abs(slices[i * 64 + 1] - (i === 4 ? w[5] : 1)) < 1e-6);
+  }
+  const up = h.groups.filter((g) => g.entries.some((e) => e.binding === 4 && e.resource.buffer === weights));
+  assert.deepEqual(
+    up.map((g) => g.entries.find((e) => e.binding === 4).resource.offset),
+    [1024, 768, 512, 256, 0],
+  );
+  const groups = h.counts.groups;
+  h.frame();
+  assert.equal(h.counts.groups, groups, 'a steady weighted frame creates no bind groups');
+  options.radius = 0.5;
+  h.frame();
+  const unweighted = h.groups.slice(groups);
+  assert.equal(unweighted.length, 12, 'the chain (6 down + 5 up) and the presentation are rebuilt once');
+  assert.ok(unweighted.every((g) => !g.entries.some((e) => e.resource.buffer === weights)));
+  options.radius = 2;
+  assert.throws(() => h.frame(), RangeError);
+  effect.dispose();
+  assert.equal(weights.destroyed, true);
 });

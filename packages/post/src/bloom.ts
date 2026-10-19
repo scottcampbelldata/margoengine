@@ -30,6 +30,13 @@ export interface BloomOptions {
   threshold?: number;
   /** Exposure in stops, applied before the AgX display transform, -10 to 10 (default 0). */
   exposure?: number;
+  /**
+   * How far the glow spreads, 0 to 1 (default 0.5). Level j of the chain (j = 0 is the half-resolution level, the
+   * tightest blur) is weighted by `k^j` with `k = 4^(2 * radius - 1)`, and the weights are scaled to sum to the number
+   * of levels, so the total glow stays the same: 0 puts about three quarters of it in the tightest level, 1 about three
+   * quarters in the widest, and 0.5 weighs every level equally (the chain as it is without a radius).
+   */
+  radius?: number;
 }
 /** 3x3 tent (1 2 1 by 1 2 1, over 16) of bilinear taps one texel of `t` apart: every upsample of the chain. */
 const tent = `
@@ -78,6 +85,22 @@ fn downsample(id:vec2u,top:bool){
  let uv=(vec2f(id.xy)+0.5)/vec2f(size);
  textureStore(output,vec2i(id.xy),vec4f(textureLoad(detail,vec2i(id.xy),0).rgb+tent(source,bilinear,uv),1));
 }`;
+// With a radius other than 0.5, each up step weighs its own level by settings.x and the sum below by settings.y (the
+// smallest level's weight on the first step, 1 after it), read from that step's slice of the weights buffer.
+const weighted = chain.replace('.rgb+tent(source,bilinear,uv)', '.rgb*settings.x+tent(source,bilinear,uv)*settings.y');
+if (weighted === chain) throw margoError('failed', 'Bloom: the up pass lost its weights; update the radius patch');
+/** Byte stride of the per-step weights: the largest `minUniformBufferOffsetAlignment` WebGPU allows. */
+const slice = 256;
+/**
+ * Weight of each chain level for a glow `radius` (see {@link BloomOptions.radius}): `k^j` with
+ * `k = 4^(2 * radius - 1)`, scaled so the weights sum to `levels`. Radius 0.5 gives exactly 1 for every level.
+ */
+export function bloomWeights(radius: number, levels: number): number[] {
+  const k = 4 ** (2 * radius - 1),
+    raw = Array.from({ length: levels }, (_, j) => k ** j),
+    total = raw.reduce((a, b) => a + b, 0);
+  return raw.map((w) => (w * levels) / total);
+}
 // The 8-bit output is dithered (Gjøl, "Low Complexity, High Fidelity: INSIDE", GDC 2016): triangular noise of up to one
 // 8-bit step (settings.z; 0 for float targets), hashed from the pixel position so a frame repeats exactly. The noise
 // also stays within each channel's distance to 0 and 1, so black stays black, nothing clips (no bias) and a
@@ -135,6 +158,13 @@ export class Bloom implements EnginePlugin {
   /** Built with the textures and replayed every frame, so a steady frame creates no GPU objects. */
   private steps: Step[] = [];
   private levels = 1;
+  /** Up steps read per-level weights (a radius other than 0.5); their pipeline and buffer are made on first use. */
+  private weighted = false;
+  private weightedUp?: GPUComputePipeline;
+  private weights?: GPUBuffer;
+  private readonly weightValues = new Float32Array((5 * slice) / 4);
+  /** The view the chain was built over. */
+  private source?: GPUTextureView;
   private textures: GPUTexture[] = [];
   private group?: GPUBindGroup;
   private present?: GPURenderPipeline;
@@ -155,7 +185,6 @@ export class Bloom implements EnginePlugin {
   private readonly presentation: GPURenderPassDescriptor = { colorAttachments: [this.attachment] };
   private disposed = false;
   private host?: StackHost;
-  private input?: GPUTextureView;
   private key = '';
 
   constructor(readonly options: BloomOptions = {}) {
@@ -181,8 +210,12 @@ export class Bloom implements EnginePlugin {
   private validate(): void {
     const s = this.options.strength ?? 0.8,
       t = this.options.threshold ?? 1,
-      e = this.options.exposure ?? 0;
+      e = this.options.exposure ?? 0,
+      r = this.options.radius ?? 0.5;
     if (
+      !Number.isFinite(r) ||
+      r < 0 ||
+      r > 1 ||
       !Number.isFinite(s) ||
       s < 0 ||
       s > 4 ||
@@ -312,12 +345,7 @@ export class Bloom implements EnginePlugin {
     this.scene = this.textures[0].createView();
     this.depth = this.textures[1].createView();
     this.present = render(device, composite, c.format, { multisample: c.descriptor.multisample });
-    this.group = bind(device, this.present, [
-      this.scene,
-      this.chain(device, this.scene),
-      { buffer: this.uniform! },
-      this.sampler,
-    ]);
+    this.link(device, this.scene);
     // Last, so a frame that failed part-way rebuilds everything above on the next one.
     this.capture = new SceneTarget(device, this.textures[0], this.textures[1], c.descriptor.multisample?.count ?? 4);
   }
@@ -338,10 +366,32 @@ export class Bloom implements EnginePlugin {
         }),
       );
   }
+  /** The chain over `source` and the presentation bind group that reads it, weighted when the radius asks for it. */
+  private link(device: GPUDevice, source: GPUTextureView): void {
+    this.weighted = (this.options.radius ?? 0.5) !== 0.5;
+    this.group = bind(device, this.present!, [
+      source,
+      this.chain(device, source),
+      { buffer: this.uniform! },
+      this.sampler,
+    ]);
+    this.source = source;
+  }
   /** Views, bind groups and dispatch sizes of the chain over `source`; returns the view the presentation reads. */
   private chain(device: GPUDevice, source: GPUTextureView): GPUTextureView {
+    if (this.weighted) {
+      this.weights ??= device.createBuffer({
+        size: this.weightValues.byteLength,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+      this.weightedUp ??= device.createComputePipeline({
+        layout: 'auto',
+        compute: { module: device.createShaderModule({ code: weighted }), entryPoint: 'up' },
+      });
+    }
     const [down, up] = this.textures.slice(-2),
-      [prefilter, reduce, expand] = this.passes,
+      [prefilter, reduce] = this.passes,
+      expand = this.weighted ? this.weightedUp! : this.passes[2],
       levels = this.levels,
       mip = (texture: GPUTexture, baseMipLevel: number) => texture.createView({ baseMipLevel, mipLevelCount: 1 }),
       downs = Array.from({ length: levels }, (_, i) => mip(down, i)),
@@ -363,7 +413,14 @@ export class Bloom implements EnginePlugin {
         { buffer: this.uniform! },
       ]);
     // The smallest level stands for itself; each level above adds the tent of the sum below it.
-    for (let i = levels - 2; i >= 0; i--) step(expand, i, [ups[i + 1] ?? downs[i + 1], this.sampler, ups[i], downs[i]]);
+    for (let i = levels - 2; i >= 0; i--)
+      step(expand, i, [
+        ups[i + 1] ?? downs[i + 1],
+        this.sampler,
+        ups[i],
+        downs[i],
+        this.weighted ? { buffer: this.weights!, offset: i * slice, size: 16 } : undefined,
+      ]);
     this.steps = steps;
     return ups[0] ?? downs[0];
   }
@@ -383,25 +440,17 @@ export class Bloom implements EnginePlugin {
     if (this.textures[1]?.width !== width || this.textures[1].height !== height) {
       for (const texture of this.textures) texture.destroy();
       this.textures = [];
-      this.input = undefined;
+      this.source = undefined;
       this.allocate(device, width, height);
     }
     if (this.key !== key) {
       this.key = key;
-      this.input = undefined;
+      this.source = undefined;
       this.present = render(device, output.hdr ? linear : composite, output.format, {
         multisample: output.multisample,
       });
     }
-    if (this.input !== input) {
-      this.group = bind(device, this.present!, [
-        input,
-        this.chain(device, input),
-        { buffer: this.uniform! },
-        this.sampler,
-      ]);
-      this.input = input;
-    }
+    if (this.source !== input) this.link(device, input);
     this.apply(c, output.view, output.format);
   }
   private apply(c: Context, view: GPUTextureView, format: GPUTextureFormat): void {
@@ -411,6 +460,16 @@ export class Bloom implements EnginePlugin {
     this.values[2] = format.includes('8unorm') ? 1 / 255 : 0;
     this.values[3] = this.options.threshold ?? 1;
     c.device.queue.writeBuffer(this.uniform!, 0, this.values);
+    const radius = this.options.radius ?? 0.5;
+    if ((radius !== 0.5) !== this.weighted) this.link(c.device, this.source!);
+    if (this.weighted) {
+      const weights = bloomWeights(radius, this.levels);
+      for (let i = 0; i < this.levels - 1; i++) {
+        this.weightValues[(i * slice) / 4] = weights[i];
+        this.weightValues[(i * slice) / 4 + 1] = i === this.levels - 2 ? weights[i + 1] : 1;
+      }
+      c.device.queue.writeBuffer(this.weights!, 0, this.weightValues);
+    }
     const compute = c.encoder.beginComputePass();
     for (const [pipeline, group, x, y] of this.steps) {
       compute.setPipeline(pipeline);
@@ -429,15 +488,17 @@ export class Bloom implements EnginePlugin {
     this.capture?.dispose();
     this.capture = undefined;
     this.uniform?.destroy();
+    this.weights?.destroy();
     for (const texture of this.textures) texture.destroy();
-    this.uniform = this.sampler = this.group = this.present = undefined;
+    this.uniform = this.weights = this.sampler = this.group = this.present = this.weightedUp = undefined;
+    this.weighted = false;
     this.passes = [];
     this.steps = [];
     this.textures = [];
     this.scene = this.depth = this.original = this.originalDepth = undefined;
     this.originalFormat = undefined;
     this.sourceShader = this.linearShader = this.key = '';
-    this.input = undefined;
+    this.source = undefined;
     this.scenePipelines.clear();
     this.sceneOptions.pipeline = undefined;
     this.originalDraw = undefined;

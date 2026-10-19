@@ -209,7 +209,11 @@ spreads the light above `threshold` through a chain of up to six levels (1/2 to 
 downsamples, the first one Karis-weighted so single bright pixels do not flicker, then tent upsamples added back level
 by level) and presents with Margo's display curve (Khronos PBR Neutral, then sRGB: the same as core and Tonemap's default), dithered by up to one step
 before 8-bit output so dark gradients do not band. `strength` is the share of that light spread back as glow (the
-levels are averaged). Exposure is in stops. `depthTexture` exposes its
+levels are averaged). Exposure is in stops. `radius` (0 to 1, default 0.5) sets how far the glow spreads: level j
+(j = 0 the tightest) is weighted by `k^j` with `k = 4^(2 * radius - 1)`, scaled so the weights sum to the level count
+(`bloomWeights(radius, levels)` returns them), so the total glow stays the same; 0.5 is the even chain, 0 keeps about
+three quarters of the glow in the tightest level and 1 in the widest. Like the other options it may change per frame
+(`bloom.options.radius = 0.2`). `depthTexture` exposes its
 viewport-sized scene depth for water. `sceneTexture` exposes the borrowed linear
 HDR scene color, with `COPY_SRC` usage for water refraction. Both change on
 resize/restoration and remain owned by Bloom. Alone it owns scene capture and cannot share it with

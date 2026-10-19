@@ -43,8 +43,17 @@ test('Post root and feature subpaths preserve all runtime export identities', as
   const [root, bloom, ssao, fade, stack, fxaa, ssr] = await Promise.all(
     ['', '/bloom', '/ssao', '/scene-fade', '/stack', '/fxaa', '/ssr'].map((path) => import('@margoengine/post' + path)),
   );
-  assert.deepEqual(Object.keys(root).sort(), ['Bloom', 'FXAA', 'PostStack', 'SSAO', 'SSR', 'SceneFade']);
-  assert.deepEqual(Object.keys(bloom), ['Bloom']);
+  assert.deepEqual(Object.keys(root).sort(), [
+    'Bloom',
+    'FXAA',
+    'PostStack',
+    'SSAO',
+    'SSR',
+    'SceneFade',
+    'bloomWeights',
+  ]);
+  assert.deepEqual(Object.keys(bloom).sort(), ['Bloom', 'bloomWeights']);
+  assert.equal(root.bloomWeights, bloom.bloomWeights);
   assert.deepEqual(Object.keys(ssao), ['SSAO']);
   assert.deepEqual(Object.keys(stack), ['PostStack']);
   assert.deepEqual(Object.keys(fxaa), ['FXAA']);
