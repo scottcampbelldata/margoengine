@@ -13,6 +13,10 @@
     "./query": {
       "types": "./dist/query.d.ts",
       "import": "./dist/query.js"
+    },
+    "./codec": {
+      "types": "./dist/codec.d.ts",
+      "import": "./dist/codec.js"
     }
   },
   "files": [

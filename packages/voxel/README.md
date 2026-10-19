@@ -106,3 +106,42 @@ engine.onFrame((_, dt) => {
 Measured with Node on one core of the development laptop (2026-10-19; `node --test packages/voxel/tests/query.test.js`
 prints yours): about 200 rays/ms for 64-block rays over terrain, 600 sweeps/ms for a player box moving one block, and
 700 character updates/ms at 60 Hz (two fixed steps each).
+
+## Codecs (`./codec`)
+
+Bytes for saves and the network. Decoders treat their input as hostile: every count
+and length is checked against the bytes before it is read or allocated, a deflated chunk stops inflating at the
+largest possible chunk (262,148 bytes), and anything malformed throws a `RangeError` naming the problem.
+
+```ts
+import { encodeChunk, decodeChunk, encodeBlockChanges, applyBlockChanges, EntityCodec } from '@margoengine/voxel/codec';
+
+const bytes = await encodeChunk(chunk); // deflate-raw by default; {light: false}, {compress: false}
+world.addChunk(cx, cy, cz, await decodeChunk(bytes));
+
+const edits = [];
+world.onChange((x, y, z, state) => edits.push(x, y, z, state));
+socket.send(encodeBlockChanges(edits)); // sorted, last state per cell, typically 2-4 bytes per change
+applyBlockChanges(otherWorld, message); // all or nothing, through setBlocks (dirty marking, change events)
+
+const codec = new EntityCodec({ position: 'position', rotation: 'rotation', health: 'u8', anim: 'u16' });
+socket.send(codec.encode(players, acked)); // Maps of u32 id -> entity; only what changed since `acked`
+const state = codec.decode(message, received); // `received`: the receiver's copy of `acked`
+```
+
+- **Chunks.** u8 version (1), u8 flags (1 light, 2 dense light, 4 deflated), then (deflate-raw when flagged) a
+  varint palette length and states, u8 index bits and the `PackedChunk` words as little-endian u32, and the light:
+  one byte when every cell shares it, else 32,768. `encodeChunk` reads the chunk before it returns.
+- **Block changes.** A flat `[x, y, z, state, ...]` list in and out (`decodeBlockChanges` returns an Int32Array that
+  `setBlocks` takes). Varint count, then per change sorted by chunk and cell index: a varint step (odd: new chunk,
+  then three zigzag varint chunk offsets; even: the cell index offset) and a varint state.
+- **Entities.** Fields `'position'` (1/512 block, error <= 1/1024, |coordinate| < 2,097,152), `'rotation'`
+  (smallest-three in 32 bits: at most 0.28 degrees, about 0.08 on average), `'u8'`, `'u16'`, `'f32'`; up to 32 per
+  schema, in the schema's key order. Per entity in id order: varint id offset, varint field mask (0 = removed),
+  changed fields. Decoding against a baseline the bytes were not encoded from throws when an entity is missing.
+
+Measured with Node 24 on the development laptop (2026-10-19; `node --test packages/voxel/tests/codec-benchmark.test.js`
+prints yours): a surface chunk (4-bit, 7 states, dense sky light) is 49,163 bytes raw and 2,586 deflated (16,395 and
+1,876 without light); raw encode about 100 MB/s and decode about 140 MB/s; deflated encode and decode 1-4 ms each,
+most of it Node's stream overhead (32 decodes in flight: about 0.7 ms each). 20,000 block changes in 8 chunks: 1.9
+bytes each. 1,000 entities: 17,940 bytes in full, 1,796 when 30% moved.
