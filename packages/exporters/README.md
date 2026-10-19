@@ -1,6 +1,7 @@
 # @margoengine/exporters
 
-glTF 2.0 / GLB, STL, OBJ (with MTL), PLY and static USDZ export for Margo Engine scenes and plain geometry data.
+glTF 2.0 / GLB, STL, OBJ (with MTL), PLY, static USDZ and static COLLADA 1.4.1 (`.dae`) export for Margo Engine scenes
+and plain geometry data.
 
 Build from source with `npm run build` in `packages/exporters`.
 
@@ -126,6 +127,34 @@ Texture files are named from `TextureData.name` (unsafe characters become `_`, a
 or `texture_<n>`, with `.png` or `.jpg` from the `mimeType`; one image's bytes become one file, and a name already
 taken gets `_2`, `_3`. The files are the `TextureData` bytes as given. `texturePrefix` may hold letters, digits,
 `_ . - /`.
+
+## COLLADA (.dae)
+
+`exportDAE(engineOrDataScene, options)` from `@margoengine/exporters/dae` (or the package root) returns
+`{dae, textures}`: a COLLADA 1.4.1 document (Y up, meters) and its image files keyed by their path relative to the
+`.dae`. Options are the scene options plus `colorSpace` (`'srgb'` default or `'linear'`, for vertex colors) and
+`texturePrefix`, named as for OBJ.
+
+```ts
+import {exportDAE} from '@margoengine/exporters/dae';
+
+const {dae, textures} = exportDAE(scene, {texturePrefix: 'textures/'});
+save('level.dae', dae);
+for (const [path, bytes] of textures) save(path, bytes);
+```
+
+- **Hierarchy.** Every node is a `<node>` with its local transform as a row-major `<matrix>`; hidden nodes follow
+  `onlyVisible`.
+- **Geometry.** One `<geometry>` per shared geometry: positions, normals, `TEXCOORD` (t = 1 - v) and `COLOR` sources,
+  all indexed by one offset, as `<triangles>`, or `<polylist>` when `faceSizes` marks quads.
+- **Materials.** One effect per shared material: `<constant>` for `unlit`, `<lambert>` for roughness 1 and
+  metalness 0, otherwise `<phong>` (specular F0 = mix(0.04, base, metalness), shininess 2 / roughness^4 - 2). The base
+  color texture, when present, replaces the base color through a `surface`/`sampler2D` pair carrying the texture's
+  filters and wrap modes; MASK and BLEND write `<transparent opaque="A_ONE">` from the texture or color alpha.
+  Effect colors are sRGB. Instances bind the material and `UVSET0`.
+- **Not written.** Static pose only, as Crocotile: skins, morph targets, animation, cameras and lights are not
+  exported (skinned and morphed meshes keep their base geometry). Metallic-roughness and normal textures, emissive
+  textures, double-sidedness and a second UV set are not written either. An empty or fully hidden scene throws.
 
 ## Data-scene samplers, unlit materials, cameras and lights
 

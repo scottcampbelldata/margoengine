@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
-  "description": "glTF/GLB, STL, OBJ and PLY exporters for Margo Engine scenes and geometry data.",
+  "description": "glTF/GLB, STL, OBJ, PLY, USDZ and COLLADA exporters for Margo Engine scenes and geometry data.",
   "publishConfig": {
     "access": "public"
   },
@@ -26,6 +26,10 @@
     "./model": {
       "types": "./dist/model.d.ts",
       "import": "./dist/model.js"
+    },
+    "./dae": {
+      "types": "./dist/dae.d.ts",
+      "import": "./dist/dae.js"
     }
   },
   "files": [

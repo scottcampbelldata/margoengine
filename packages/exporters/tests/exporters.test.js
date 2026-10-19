@@ -103,6 +103,7 @@ async function buildScene() {
 
 test('public API exposes exporter functions and module evaluation is SSR-safe', () => {
   assert.deepEqual(Object.keys(exporters).sort(), [
+    'exportDAE',
     'exportGLB',
     'exportGLTF',
     'exportModel',
@@ -116,7 +117,7 @@ test('public API exposes exporter functions and module evaluation is SSR-safe', 
     const m = await import(${JSON.stringify(new URL('../dist/index.js', import.meta.url).href)});
     const geometry = {positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], normals: [0, 0, 1, 0, 0, 1, 0, 0, 1], indices: [0, 1, 2]};
     const scene = {nodes: [{geometry}]};
-    m.exportGLB(scene); m.exportGLTF(scene); m.exportSTL(scene); m.exportOBJ(scene); m.exportPLY(scene);`;
+    m.exportGLB(scene); m.exportGLTF(scene); m.exportSTL(scene); m.exportOBJ(scene); m.exportPLY(scene); m.exportDAE(scene);`;
   execFileSync(process.execPath, ['--input-type=module', '-e', script], { stdio: 'pipe' });
 });
 

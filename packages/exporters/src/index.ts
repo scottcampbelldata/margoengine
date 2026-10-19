@@ -8,6 +8,8 @@ export { exportPLY } from './ply.js';
 export type { PLYOptions } from './ply.js';
 export { exportUSDZ } from './usdz.js';
 export type { USDZOptions } from './usdz.js';
+export { exportDAE } from './dae.js';
+export type { DAEOptions, DAEResult } from './dae.js';
 export type {
   ExportSource,
   ExportScene,
