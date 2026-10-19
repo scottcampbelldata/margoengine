@@ -311,3 +311,40 @@ Measured with Node on the development laptop (2026-10-19; `node --test packages/
 yours): one terrain-surface chunk builds in about 2 ms (Rapier's collider creation is most of it), a uniform air chunk in
 0.2 ms; a body spawning on terrain builds 18 colliders in about 16 ms and crossing a chunk border builds 6 in 5-7 ms;
 a surface dig or place costs about 3 us with colliders against 0.5 us without.
+
+## Meshing in workers: `VoxelMesher`
+
+`VoxelMesher` (also in `@margoengine/voxel/mesher`) runs `meshChunk` in a pool of workers that share one priority
+queue. The worker script ships as `dist/workers/mesher.js`, a classic script without `eval` (fine under a strict CSP)
+that your bundler copies as an asset.
+
+```ts
+import { VoxelMesher } from '@margoengine/voxel/mesher';
+
+const mesher = new VoxelMesher(); // {workers}: default half the logical cores minus one, 1 to 4
+for (const key of world.dirty) {
+  world.dirty.delete(key);
+  mesher.mesh(world, key, distanceToCamera(key), camera.position).then((mesh) => {
+    if (mesh) upload(key, mesh); // null: cancelled, superseded, or the chunk is gone (world.getChunk tells which)
+  });
+}
+mesher.cancel(key); // the pending job of one chunk resolves null
+mesher.dispose(); // every pending job resolves null; the workers stop
+```
+
+- **Order.** Lower `priority` is meshed sooner (the chunk's distance to the camera, say); equal priorities in call order.
+  Workers start as jobs arrive, up to `workers`.
+- **Newest wins.** A `mesh` call for a key that already has a queued or running job supersedes it: the older promise
+  resolves null at once (a running job's result is dropped when it arrives) and only the newest call's mesh is
+  delivered. The `MeshInput` is built with `meshInput` when a worker takes the job, so it holds the world's latest
+  blocks and a queued job holds no copy; its buffers and the mesh's arrays move between the threads without copies.
+- **Translucent order.** Pass the camera's world position as `eye` and the worker returns `translucent` sorted back to
+  front by quad centre distance. `sortQuads(words, localEye)` does the same on any thread (to re-sort a near chunk after
+  the camera moves; `localEye` is the world position minus 32 times the chunk coordinates). Large merged quads beside
+  small ones can still sort wrong: centre distance is Minecraft's order, not an exact one.
+- **Failures.** A worker that crashes rejects its job's promise and is replaced for the next job.
+
+Measured with Node 24 worker threads on the development laptop (8 logical cores) while other jobs kept the whole machine
+at 98-100% CPU (2026-10-19; `node --test packages/voxel/tests/mesher-worker-benchmark.test.js` prints yours), 64
+random-terrain chunks of about 5,600 quads: 326 meshes/s with 1 worker, 540 with 2, 828 with 3 (3.1-3.7 ms per mesh per
+worker, `meshInput` on the main thread included).

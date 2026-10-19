@@ -200,6 +200,14 @@ export const LAZY_FILES = [
     external: [],
     when: 'First `buildAsync()` where `Worker` exists; one worker shared until `terminateBVHWorker()`',
   },
+  {
+    package: '@margoengine/voxel',
+    file: 'packages/voxel/dist/workers/mesher.js',
+    label: 'workers/mesher.js',
+    kind: 'Worker',
+    measure: 'file',
+    when: 'First `VoxelMesher.mesh()` calls (`@margoengine/voxel/mesher`): up to `workers` workers, reused until `dispose()`',
+  },
   // Third-party Wasm runtimes.
   {
     package: '@margoengine/physics',

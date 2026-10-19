@@ -1,5 +1,9 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 // @margoengine/voxel/mesher: the pure chunk mesher. One chunk plus the one-cell shell of its neighbours becomes greedy
 // quads in the 12-byte vertex-pulling format of packages/voxel/DESIGN.md ("Data formats"); phase 3 runs it in workers.
+import type { Vec3 } from '@margoengine/math';
+import { MargoError } from '@margoengine/math/errors';
+import { JobPool } from '../../shared/worker-pool.js';
 import type { BlockType } from './blocks.js';
 import type { PackedChunk, VoxelChunk } from './chunk.js';
 import type { VoxelWorld } from './world.js';
@@ -567,6 +571,15 @@ export function decodeQuad(words: Uint32Array, i: number): DecodedQuad {
 // Chunk coordinates are cell >> 5 of a 32-bit cell coordinate: 27-bit signed integers.
 const isChunk = (c: number): boolean => (c << 5) >> 5 === c;
 
+// The chunk coordinates of a 'cx,cy,cz' key.
+function chunkCoordinates(key: string): number[] {
+  if (typeof key !== 'string') throw new TypeError('Chunk key must be a string; build it with chunkKey(cx, cy, cz)');
+  const c = /^(-?\d+),(-?\d+),(-?\d+)$/.exec(key)?.slice(1).map(Number);
+  if (!c || !c.every(isChunk))
+    throw new RangeError(`Chunk key "${key}" is not three chunk coordinates; build it with chunkKey(cx, cy, cz)`);
+  return c;
+}
+
 /**
  * The {@link MeshInput} of chunk `key` (`'cx,cy,cz'`, from `chunkKey`) of `world`: the chunk packed, the states and
  * light bytes of its shell from the loaded neighbours (unloaded cells are air with light 0) and `world.blocks.table`.
@@ -576,11 +589,7 @@ const isChunk = (c: number): boolean => (c << 5) >> 5 === c;
  */
 export function meshInput(world: VoxelWorld, key: string): MeshInput | undefined {
   if (typeof world?.getChunk !== 'function') throw new TypeError('meshInput expects a VoxelWorld and a chunk key');
-  if (typeof key !== 'string') throw new TypeError('Chunk key must be a string; build it with chunkKey(cx, cy, cz)');
-  const c = /^(-?\d+),(-?\d+),(-?\d+)$/.exec(key)?.slice(1).map(Number);
-  if (!c || !c.every(isChunk))
-    throw new RangeError(`Chunk key "${key}" is not three chunk coordinates; build it with chunkKey(cx, cy, cz)`);
-  const [cx, cy, cz] = c,
+  const [cx, cy, cz] = chunkCoordinates(key),
     chunk = world.getChunk(cx, cy, cz);
   if (!chunk) return undefined;
   const near: (VoxelChunk | undefined)[] = [];
@@ -606,4 +615,174 @@ export function meshInput(world: VoxelWorld, key: string): MeshInput | undefined
       }
     }
   return { chunk: chunk.pack(), shell, light, blocks: world.blocks.table };
+}
+
+/**
+ * Sorts the quads of a layer array back to front from `eye`, in place: farthest quad centre first, equal distances in
+ * their current order. The translucent pass draws a chunk's quads in this order; {@link VoxelMesher.mesh} sorts in its
+ * worker when given an eye, and a renderer can re-sort a near chunk's quads after the camera moves.
+ * @param eye The camera position in the chunk's local block units: world position minus 32 times the chunk coordinates.
+ * @returns `words`.
+ * @throws TypeError when `words` is not a Uint32Array or `eye` is not three numbers.
+ * @throws RangeError when `words` is not whole quads or `eye` is not finite.
+ */
+export function sortQuads(words: Uint32Array, eye: Vec3): Uint32Array {
+  if (!(words instanceof Uint32Array))
+    throw new TypeError('sortQuads expects a Uint32Array of quads, such as mesh.translucent');
+  checkEye(eye, 'sortQuads eye');
+  if (words.length % QUAD_WORDS)
+    throw new RangeError(
+      `sortQuads got ${words.length} words, not whole quads of ${QUAD_WORDS}; pass a ChunkMesh layer`,
+    );
+  const n = words.length / QUAD_WORDS,
+    distance = new Float64Array(n),
+    order = new Uint32Array(n),
+    [ex, ey, ez] = eye;
+  for (let i = 0; i < n; i++) {
+    const w0 = words[i * 3],
+      face = (w0 >>> 15) & 7,
+      u = ((w0 >>> 18) & 31) / 2, // half the size along u and v, less half a cell
+      v = ((w0 >>> 23) & 31) / 2;
+    // The centre: the cell centre moved half a cell toward the normal and spread over the quad (see ChunkMesh).
+    let x = (w0 & 31) + 0.5,
+      y = ((w0 >>> 5) & 31) + 0.5,
+      z = ((w0 >>> 10) & 31) + 0.5;
+    if (face < 2) (x += face ? -0.5 : 0.5), (z += u), (y += v);
+    else if (face < 4) (y += face === 2 ? 0.5 : -0.5), (x += u), (z += v);
+    else if (face < 6) (z += face === 4 ? 0.5 : -0.5), (x += u), (y += v);
+    distance[i] = (x - ex) ** 2 + (y - ey) ** 2 + (z - ez) ** 2;
+    order[i] = i;
+  }
+  // ponytail: centre distance (Minecraft's order) can misorder a large merged quad against a small one beside it; a
+  // topological sort of the quads if that shows.
+  order.sort((a, b) => distance[b] - distance[a] || a - b);
+  const copy = words.slice();
+  for (let i = 0; i < n; i++) words.set(copy.subarray(order[i] * 3, order[i] * 3 + 3), i * 3);
+  return words;
+}
+
+function checkEye(eye: Vec3, name: string): void {
+  if (!Array.isArray(eye) || eye.length !== 3 || !eye.every((c) => typeof c === 'number'))
+    throw new TypeError(`${name} must be [x, y, z] in blocks`);
+  if (!eye.every(Number.isFinite)) throw new RangeError(`${name} is [${eye.join(', ')}]; pass finite coordinates`);
+}
+
+/** Options of {@link VoxelMesher}. */
+export interface VoxelMesherOptions {
+  /**
+   * Number of workers, started as jobs arrive. Default: half the logical cores (`navigator.hardwareConcurrency`, 4
+   * when unknown) minus one, from 1 to 4: 3 on an 8-thread laptop, leaving the main thread and the world generation
+   * workers their share.
+   */
+  workers?: number;
+}
+
+/**
+ * Meshes chunks off the main thread: each job runs {@link meshChunk} in one of a pool of workers, lowest priority
+ * number first (equal priorities in call order). The {@link MeshInput} is built with {@link meshInput} on this thread
+ * when a worker takes the job, so it holds the world's latest blocks and a queued job holds no copy; its buffers and
+ * the mesh's move between the threads without copies. A newer `mesh` call for a key supersedes the older pending one,
+ * so only the newest edit's mesh is delivered.
+ *
+ * ```ts
+ * const mesher = new VoxelMesher();
+ * for (const key of world.dirty) {
+ *   mesher.mesh(world, key, distanceToCamera(key)).then((mesh) => mesh && upload(key, mesh));
+ *   world.dirty.delete(key);
+ * }
+ * ```
+ */
+export class VoxelMesher {
+  /** Number of workers in the pool. */
+  readonly workers: number;
+  #pool: JobPool;
+  #jobs = new Map<string, AbortController>();
+  #disposed = false;
+
+  /**
+   * @throws RangeError when `workers` is not a whole number of 1 or more.
+   * @throws MargoError `unsupported` when this context has no Web Workers.
+   */
+  constructor(options: VoxelMesherOptions = {}) {
+    const cores = globalThis.navigator?.hardwareConcurrency || 4,
+      { workers = Math.min(4, Math.max(1, (cores >> 1) - 1)) } = options;
+    if (!Number.isInteger(workers) || workers < 1)
+      throw new RangeError(`VoxelMesher workers is ${workers}; pass a whole number of 1 or more`);
+    if (typeof Worker !== 'function')
+      throw new MargoError(
+        'unsupported',
+        'VoxelMesher needs Web Workers; mesh on this thread with meshChunk(meshInput(world, key))',
+      );
+    this.workers = workers;
+    this.#pool = new JobPool(
+      () =>
+        new Worker(new URL(/* @vite-ignore */ './workers/mesher.js?no-inline', import.meta.url), {
+          name: 'margoengine-mesher',
+        }),
+      workers,
+    );
+  }
+
+  /**
+   * Meshes chunk `key` of `world` in a worker. Resolves null when the job was cancelled ({@link VoxelMesher.cancel},
+   * dispose) or superseded by a newer `mesh` call for the key (keep the current mesh until that one arrives), and when
+   * the chunk is not loaded once a worker takes the job (drop its mesh). Rejects when the worker fails.
+   * @param priority Lower is meshed sooner, such as the chunk's distance to the camera. Default 0.
+   * @param eye The camera's world position: the translucent quads come back sorted from it ({@link sortQuads}).
+   * @throws TypeError when `world` is not a VoxelWorld, `key` is not a string or `eye` is not three numbers.
+   * @throws RangeError when `key` is not three chunk coordinates, or `priority` or `eye` is not finite.
+   * @throws MargoError `disposed` after {@link VoxelMesher.dispose}.
+   */
+  mesh(world: VoxelWorld, key: string, priority = 0, eye?: Vec3): Promise<ChunkMesh | null> {
+    if (this.#disposed) throw new MargoError('disposed', 'VoxelMesher is disposed; create a new VoxelMesher');
+    if (typeof world?.getChunk !== 'function') throw new TypeError('VoxelMesher.mesh expects a VoxelWorld and a key');
+    const [cx, cy, cz] = chunkCoordinates(key);
+    if (typeof priority !== 'number' || !Number.isFinite(priority))
+      throw new RangeError(`VoxelMesher.mesh priority is ${priority}; pass a finite number`);
+    if (eye !== undefined) checkEye(eye, 'VoxelMesher.mesh eye');
+    const local = eye && [eye[0] - cx * 32, eye[1] - cy * 32, eye[2] - cz * 32];
+    this.cancel(key);
+    const job = new AbortController(),
+      done = () => this.#jobs.get(key) === job && this.#jobs.delete(key);
+    this.#jobs.set(key, job);
+    return this.#pool
+      .run<ChunkMesh | undefined>(
+        () => {
+          const input = meshInput(world, key);
+          return input && { input, eye: local };
+        },
+        { priority, signal: job.signal },
+      )
+      .then(
+        (mesh) => {
+          done();
+          return mesh ?? null;
+        },
+        (error) => {
+          done();
+          if (job.signal.aborted) return null;
+          throw error;
+        },
+      );
+  }
+
+  /** Drops the pending job of chunk `key`, if any: its `mesh` promise resolves null. */
+  cancel(key: string): void {
+    const job = this.#jobs.get(key);
+    this.#jobs.delete(key);
+    job?.abort();
+  }
+
+  /** Cancels every pending job and terminates the workers. */
+  dispose(): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    for (const job of this.#jobs.values()) job.abort();
+    this.#jobs.clear();
+    this.#pool.dispose();
+  }
+
+  [Symbol.dispose](): void {
+    this.dispose();
+  }
 }
