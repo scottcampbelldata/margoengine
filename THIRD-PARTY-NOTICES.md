@@ -169,6 +169,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | [`packages/creative/examples/earth/assets/ATTRIBUTION.md`](packages/creative/examples/earth/assets/ATTRIBUTION.md) | Earth demo: NASA Blue Marble, Solar System Scope textures (CC BY 4.0) |
 | [`examples/assets/damaged-helmet-CREDITS.md`](examples/assets/damaged-helmet-CREDITS.md) | DamagedHelmet (CC BY-NC 4.0 / CC BY 4.0): internal tests and benchmarks only, never served |
 | [`packages/environment/tests/fixtures/NOTICE.md`](packages/environment/tests/fixtures/NOTICE.md) | test fixtures: OpenEXR test images (BSD-3-Clause), three.js spot1Lux.hdr (MIT) |
+| [`packages/voxel/tests/fixtures/NOTICE.md`](packages/voxel/tests/fixtures/NOTICE.md) | test fixture: MagicaVoxel sample chr_knight.vox (ephtracy, MIT) |
 
 ## Development and workspace tooling (never shipped)
 
