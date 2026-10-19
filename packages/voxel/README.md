@@ -58,3 +58,51 @@ packages/voxel/tests/benchmark.test.js` prints yours): chunk get about 120 M/s a
 about 7 M/s on random cells and 115 M/s along a column; pack + unpack of a 4-bit chunk 0.13 ms.
 
 MIT. Optional, tree-shakable package; core peer ^1.0.0. Build and unit tests: `npm test --workspace @margoengine/voxel`
+
+## Queries: `@margoengine/voxel/query`
+
+Ray casts for picking (`engine.pick` does not see voxels), swept boxes for anything that moves through blocks, and a
+player body.
+
+```ts
+import { raycastVoxels, sweepBox, VoxelCharacter } from '@margoengine/voxel/query';
+
+const hit = raycastVoxels(world, eye, forward, 8); // {cell, normal, adjacent, point, distance, state} or null
+if (hit) world.setBlock(...hit.adjacent, stone); // place against the face; setBlock(...hit.cell, 0) breaks it
+raycastVoxels(world, eye, forward, 8, (state, type) => type.liquid); // pick water instead
+
+// An item or a mob: never tunnels, whatever the speed.
+const { position, hit: axes, onGround } = sweepBox(world, box, [vx * dt, vy * dt, vz * dt]); // box: {min, max}, a Box3
+
+const player = new VoxelCharacter(world, { stepHeight: 0.6, speeds: { walk: 4.317 } });
+player.position = [0.5, 80, 0.5]; // feet; assign again to teleport
+player.flying = false;
+engine.onFrame((_, dt) => {
+  player.update(dt, { direction: [forwardX, 0, forwardZ], jump, descend, sprint });
+  const [x, y, z] = player.renderPosition; // interpolated between fixed steps: smooth at any refresh rate
+  engine.camera.position = [x, y + 1.62, z];
+});
+```
+
+- **Ray casts.** Cell by cell (Amanatides and Woo, 1987); a cell is the half-open box `[x, x + 1)` on each axis. A ray
+  through an exact edge or corner skips the cells it only touches; a ray in a face plane runs in the cells on the
+  plane's positive side; a ray that starts inside a block hits it at distance 0 with normal `[0, 0, 0]`. `point` lies
+  exactly on the face (that coordinate is an integer). By default every drawn block except liquids is hit, solid or
+  not, and a cross block (flower, torch) is hit as its whole cell; the optional `filter(state, type)` changes that.
+- **Sweeps.** `sweepBox` moves along y, then x, then z, each axis stopped by the first solid block (`solid: true`,
+  as its whole cell) after scanning every cell layer the move crosses. Touching, or overlapping by up to 1e-6 blocks,
+  is not a collision, and a box can leave a block placed inside it. `position` is the box's new min corner; `onGround`
+  is true when the downward move was stopped, or with motion y 0, when the box rests on a block.
+- **Player body.** `update(dt, intent)` runs fixed 1/120 s steps (the remainder carries over, at most 0.25 s per
+  call), so the path is the same at 30, 60 or 144 Hz; `renderPosition` interpolates between the last two steps.
+  Walking accelerates and brakes in about 0.15 s on the ground (weakly in the air), falls at `gravity` (default 32
+  blocks/s², capped at 78.4 blocks/s) and jumps at `speeds.jump` (9: 1.27 blocks high). It steps onto ledges up to
+  `stepHeight` (0.6) only from the ground, when landing or in liquid, and only when the raised body fits under the
+  ceiling. Full blocks make ground ledges whole blocks, so 0.6 matters when climbing out of water and for anything
+  that leaves the feet off the grid. In a liquid block it swims: slower (`speeds.swim`, 2), buoyant (a fifth of
+  gravity), `jump` swims up, and jumping against a wall climbs out onto the bank. `flying` turns gravity off; `jump`
+  and `descend` rise and sink at `speeds.fly` (11). Defaults: size `[0.6, 1.8, 0.6]`, walk 4.317, sprint 5.612.
+
+Measured with Node on one core of the development laptop (2026-10-19; `node --test packages/voxel/tests/query.test.js`
+prints yours): about 200 rays/ms for 64-block rays over terrain, 600 sweeps/ms for a player box moving one block, and
+700 character updates/ms at 60 Hz (two fixed steps each).
