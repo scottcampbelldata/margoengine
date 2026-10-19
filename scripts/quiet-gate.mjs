@@ -9,8 +9,17 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const onAC = () =>
   ps('(Get-CimInstance -Namespace root/wmi -ClassName BatteryStatus | Select-Object -First 1).PowerOnline') !== 'False';
-export const cpuLoad = () =>
-  Number(ps('(Get-CimInstance Win32_Processor | Measure-Object LoadPercentage -Average).Average')) || 0;
+// The processor-time performance counter, as Task Manager shows it. Win32_Processor.LoadPercentage misreads on some
+// machines: 18-97% from one call to the next on an idle 32-thread desktop whose counter read 4-8% (2026-10-19); it
+// stays as the fallback where the counter class is missing.
+export const cpuLoad = () => {
+  const counter = ps(
+    '(Get-CimInstance Win32_PerfFormattedData_PerfOS_Processor -Filter "Name=\'_Total\'").PercentProcessorTime',
+  );
+  return counter !== '' && Number.isFinite(Number(counter))
+    ? Number(counter)
+    : Number(ps('(Get-CimInstance Win32_Processor | Measure-Object LoadPercentage -Average).Average')) || 0;
+};
 const topProcesses = () =>
   ps(
     `Get-Process | Sort-Object CPU -Descending | Select-Object -First 8 Name,Id,@{n='cpuSeconds';e={[int]$_.CPU}} | ConvertTo-Json -Compress`,
