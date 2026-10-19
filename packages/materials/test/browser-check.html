@@ -40,6 +40,12 @@ scenarios.geometry=()=>{
   let n=0;
   return {destroy(){m.destroy();},step(){if(n++)m.setGeometry(Object.assign(full,{uvs:[0,0.6,1,0.6,1,1,0,1]}),{start:0,count:4});else m.setGeometry(full);}};
 };
+// Texture.update(region): the whole canvas turns red but only its top half uploads; with flipY it lands at the plane's top.
+scenarios.canvasRegion=()=>{
+  const c=new OffscreenCanvas(8,8),g=c.getContext('2d');g.fillStyle='#00ff00';g.fillRect(0,0,8,8);
+  const t=new Texture(c,{magFilter:'nearest',minFilter:'nearest',mipmaps:false}),m=createMesh(engine,planeGeometry(2,2),new Material({shading:'basic',map:t}));
+  return {destroy(){m.destroy();t.dispose();},step(){g.fillStyle='#ff0000';g.fillRect(0,0,8,8);t.update({x:0,y:0,width:8,height:4});}};
+};
 const video=document.createElement('video'),source=document.createElement('canvas');source.width=16;source.height=16;const sc=source.getContext('2d');sc.fillStyle='#ff00ff';sc.fillRect(0,0,16,16);
 video.muted=true;video.playsInline=true;video.srcObject=source.captureStream(30);
 const videoTexture=new Texture(video);

@@ -46,6 +46,7 @@ try {
     'mask',
     'effects',
     'geometry',
+    'canvasRegion',
     'video',
   ]) {
     if (name === 'video') await page.evaluate(() => window.videoStep('#ff00ff'));
@@ -65,6 +66,12 @@ try {
       near(await pixel(), [0, 0, 255], 'a full update covers the centre');
       await step();
       near(await pixel(), [255, 0, 0], 'a ranged UV update samples the red top');
+    }
+    if (name === 'canvasRegion') {
+      near(await pixel(0.3), [0, 255, 0], 'region before');
+      await step();
+      near(await pixel(0.3), [255, 0, 0], 'the updated region (image top, flipY) shows the new pixels');
+      near(await pixel(0.7), [0, 255, 0], 'outside the region the texture keeps its old pixels');
     }
     if (name === 'standard' || name === 'effects')
       assert.ok(

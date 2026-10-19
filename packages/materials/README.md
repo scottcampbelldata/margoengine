@@ -266,6 +266,22 @@ mesh.setGeometry({positions: more, normals: moreNormals, uvs: moreUvs, indices: 
 remain caller-owned. Device restoration rebuilds the model and texture bindings. Constructed material shading cannot
 be copied to another GPU device without rebuilding its material resources. Core and the stage facade are unchanged.
 
+## Painting textures
+
+`texture.update()` re-uploads the whole source (canvas, ImageData, ImageBitmap, VideoFrame or raw
+`{data, width, height}`) on next use. `texture.update({x, y, width, height})` uploads only that rectangle of the
+current source, in its top-left pixel coordinates, to the rows the full upload would use: `flipY` (default true)
+flips external sources, while raw data and ImageData rows are never flipped, exactly as in the full upload. The
+colour space and texture are unchanged. Rectangles updated between two frames upload as their bounding rectangle.
+Without mipmaps nothing else runs; with mipmaps the whole chain regenerates on the GPU (one draw per level).
+
+```ts
+const canvas = new OffscreenCanvas(1024, 1024);
+const atlas = new Texture(canvas, {magFilter: 'nearest', mipmaps: false});
+canvas.getContext('2d')!.fillRect(32, 48, 16, 16); // a brush stroke
+atlas.update({x: 32, y: 48, width: 16, height: 16}); // uploads 16x16 pixels
+```
+
 ## Front, back and double sides
 
 `new Material({side: 'back'})` draws only the triangle's back side. `side` accepts `front` (default), `back` or

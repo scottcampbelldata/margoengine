@@ -44,12 +44,21 @@ export interface TextureOptions {
   anisotropy?: number;
   flipY?: boolean;
 }
+/** A pixel rectangle of a texture source, `x` and `y` from its top-left corner (raw data: its first row). */
+export interface TextureRegion {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 interface Slot {
   texture?: GPUTexture;
   views: Map<string, GPUTextureView>;
   sampler: GPUSampler;
   version: number;
   time?: number;
+  /** Union [x0, y0, x1, y1] of `update(region)` calls since this up-to-date copy was last uploaded. */
+  region?: number[];
 }
 const wraps = { repeat: 'repeat', clamp: 'clamp-to-edge', mirror: 'mirror-repeat' } as const,
   maxPixels = 16_777_216;
@@ -165,9 +174,41 @@ export class Texture {
   get isVideo(): boolean {
     return typeof (this.source as HTMLVideoElement).videoWidth === 'number';
   }
-  /** Re-upload on next use (canvas, raw data or VideoFrame contents changed). */
-  update(): void {
-    this.version++;
+  /**
+   * Re-upload on next use (canvas, raw data or VideoFrame contents changed). With `region`, only that rectangle of the
+   * current source uploads, into the same texture rows the full upload uses (flipped for `flipY` external sources;
+   * raw data and ImageData rows are never flipped) and in the same colour space; regions updated between two uses
+   * upload as their bounding rectangle. Without mipmaps nothing else is touched. With mipmaps the whole chain
+   * regenerates from level 0: one GPU draw per level, about a third of a full-texture fill, whereas regenerating only
+   * the affected texels needs per-level rounding (odd sizes shift the 2x2 footprint) for little gain.
+   */
+  update(region?: TextureRegion): void {
+    if (region === undefined) {
+      this.version++;
+      return;
+    }
+    if (!region || typeof region !== 'object')
+      throw new TypeError('Texture update region must be an object; pass {x, y, width, height} or nothing');
+    const { x, y, width, height } = region,
+      [w, h] = dimensions(this.source);
+    if (
+      ![x, y, width, height].every(Number.isSafeInteger) ||
+      x < 0 ||
+      y < 0 ||
+      width < 1 ||
+      height < 1 ||
+      x + width > w ||
+      y + height > h
+    )
+      throw new RangeError(
+        `Texture update region must be whole pixels inside the ${w}x${h} source; pass integers with width, height >= 1`,
+      );
+    // Out-of-date copies upload everything anyway.
+    for (const slot of this.slots.values())
+      if (slot.version === this.version) {
+        const r = (slot.region ??= [x, y, x + width, y + height]);
+        r.splice(0, 4, Math.min(r[0], x), Math.min(r[1], y), Math.max(r[2], x + width), Math.max(r[3], y + height));
+      }
   }
   /** Frees GPU copies and closes an ImageBitmap created by `loadTexture`. A later use of a still-open source uploads again. */
   dispose(): void {
@@ -232,6 +273,27 @@ export class Texture {
       else device.queue.copyExternalImageToTexture({ source: s, flipY: o.flipY ?? true }, { texture: t }, [w, h]);
       slot.version = this.version;
       slot.time = currentTime;
+      slot.region = undefined;
+      mipmaps(device, t);
+    } else if (slot.region) {
+      const [x, y, x1, y1] = slot.region,
+        size = [x1 - x, y1 - y],
+        flip = o.flipY ?? true;
+      slot.region = undefined;
+      if (raw(s))
+        device.queue.writeTexture(
+          { texture: t, origin: [x, y] },
+          s.data,
+          { offset: (y * w + x) * 4, bytesPerRow: w * 4 },
+          size,
+        );
+      // flipY copies the source rectangle bottom row first, so it lands where the full flipped upload put those rows.
+      else
+        device.queue.copyExternalImageToTexture(
+          { source: s, origin: [x, y], flipY: flip },
+          { texture: t, origin: [x, flip ? h - y1 : y] },
+          size,
+        );
       mipmaps(device, t);
     }
     return [this.view(slot, srgb), slot.sampler];
