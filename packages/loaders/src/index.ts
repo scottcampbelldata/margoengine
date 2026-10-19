@@ -11,6 +11,17 @@ export type {
   MTLMapOptions,
   MTLParseOptions,
 } from './obj.js';
+export { parseDAE, flattenDAE } from './dae.js';
+export type {
+  LoadedDAE,
+  DAEGeometry,
+  DAEGroup,
+  DAEMaterial,
+  DAEChannel,
+  DAENode,
+  DAEInstance,
+  DAEParseOptions,
+} from './dae.js';
 export type { BinaryInput } from './util.js';
 export { parsePLY, parsePLYHeader } from './ply.js';
 export type { PLYOptions, PLYHeader, PLYElement, PLYProperty } from './ply.js';

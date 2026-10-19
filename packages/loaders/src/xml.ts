@@ -103,6 +103,39 @@ export function readXML(xml: string, handler: XMLHandler, format = 'XML', maxDep
   if (stack.length) throw new LoaderError(format, 'truncated', `document ends inside <${stack[stack.length - 1]}>`);
 }
 
+/** One element of a document read by `readXMLTree`. */
+export interface XMLElement {
+  name: string;
+  attributes: Record<string, string>;
+  children: XMLElement[];
+  /** The element's own text (not its children's), concatenated. */
+  text: string;
+}
+
+/** Reads a whole document into elements; returns a nameless root whose children are the top-level elements. */
+export function readXMLTree(xml: string, format: string): XMLElement {
+  const root: XMLElement = { name: '', attributes: Object.create(null), children: [], text: '' },
+    stack = [root];
+  readXML(
+    xml,
+    {
+      open(name, attributes) {
+        const element: XMLElement = { name, attributes, children: [], text: '' };
+        stack[stack.length - 1].children.push(element);
+        stack.push(element);
+      },
+      close() {
+        stack.pop();
+      },
+      text(text) {
+        stack[stack.length - 1].text += text;
+      },
+    },
+    format,
+  );
+  return root;
+}
+
 function local(name: string): string {
   const colon = name.indexOf(':');
   return colon < 0 ? name : name.slice(colon + 1);
