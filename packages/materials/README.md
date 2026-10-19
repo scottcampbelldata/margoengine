@@ -570,6 +570,7 @@ while it is in use: a material that never sets one keeps exactly its shader, bin
 | `lightMap`, `lightMapIntensity` | Baked light (RGB, sRGB by default), read on UV1 (`geometry.uvs1`, else UV0) unless `setUVTransform(t, 'lightMap')` names another set; it keeps its own UV set when `uvTransform` moves the other maps. Lit shadings (standard, Lambert, Phong) add diffuse colour * map * intensity (default 1) as indirect light, darkened by `aoMap`; unlit materials multiply their colour by map * intensity. Normal, matcap, depth and distance output ignore it. glTF has no light maps: `exportModel` leaves it out |
 | `emissiveIntensity` | Scales `emissive` and `emissiveMap` (default 1, finite, >= 0), so emission can pass 1 (bloom). No shader change. `exportModel` writes it as `KHR_materials_emissive_strength` with `emissive` as the factor |
 | `flatShading` | Each triangle shades with its own face normal (from the position's screen derivatives, facing the viewer on both sides) instead of the interpolated vertex normals; lit, normal and matcap shading. Default false |
+| `vertexColors` | Geometry `colors` multiply colour and opacity while true (the default, Margo's behaviour so far); false ignores them. Instance tints (`setColorAt`) still apply |
 
 Each map has its own UV transform slot (`material.setUVTransform(t, 'alphaMap')`); `uvTransform` and
 `setUVTransform(t)` without a slot set it with the other maps'.

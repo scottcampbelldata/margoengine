@@ -30,9 +30,9 @@ const bump = `fn margoBump(n:vec3f,p:vec3f,height:f32,facing:bool)->vec3f {
 }
 `;
 /**
- * `code` with the features `key` names: `a` alphaMap, `b` bumpMap, `d` displacementMap, `f` flatShading, `l` lightMap
- * on a lit shading (baked irradiance: diffuse colour times the map, added like emissive) or `u` on an unlit one (the
- * map multiplies the colour).
+ * `code` with the features `key` names: `a` alphaMap, `b` bumpMap, `d` displacementMap, `f` flatShading, `v`
+ * vertexColors false, `l` lightMap on a lit shading (baked irradiance: diffuse colour times the map, added like
+ * emissive) or `u` on an unlit one (the map multiplies the colour).
  */
 export function featureShader(code: string, group: number, key: string): string {
   let inner = cache.get(code);
@@ -43,6 +43,8 @@ export function featureShader(code: string, group: number, key: string): string 
     maps = [has('a'), has('b'), has('d'), has('l') || has('u')];
   let out = code;
   if (maps[0]) out = edit(out, '\n  let mr=', `\n  s.base.a*=${sample(0)}.g;\n  let mr=`);
+  // Vertex colours: the vertex stage passes white (instancing still multiplies its tints in).
+  if (has('v')) out = edit(out, 'o.uv=i.uv; o.color=i.color;', 'o.uv=i.uv; o.color=vec4f(1);');
   // The face normal from the world position's screen derivatives; framebuffer y points down, so dP/dy x dP/dx faces
   // the camera on both sides, the side the back-face flip would have chosen.
   if (has('f'))

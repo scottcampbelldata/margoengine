@@ -276,7 +276,11 @@ export function instancedShader(code: string): string {
     '(f.model*vec4f(i.tangent.xyz,0)).xyz,i.tangent.w*f.coordsB.y)',
     '(margoI*vec4f(i.tangent.xyz,0)).xyz,i.tangent.w*margoS)',
   );
-  edit('o.uv=i.uv; o.color=i.color;', 'o.uv=i.uv*k.uvt.xyxy+k.uvt.zwzw; o.color=i.color*k.tint; o.mirror=margoS;');
+  // `vec4f(1)`: a materials Material with vertexColors false.
+  edit(
+    /o\.uv=i\.uv; o\.color=(i\.color|vec4f\(1\));/,
+    'o.uv=i.uv*k.uvt.xyxy+k.uvt.zwzw; o.color=$1*k.tint; o.mirror=margoS;',
+  );
   edit('let facing=front==(f.coordsB.y>0);', 'let facing=front==(i.mirror>0);');
   if (instancedCode.size >= 64) instancedCode.clear();
   instancedCode.set(code, out);

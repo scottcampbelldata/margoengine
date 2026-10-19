@@ -339,6 +339,7 @@ paint.dispose();                    // frees what no mesh uses; createMesh with 
   `bumpMap` with `bumpScale`, `displacementMap` with `displacementScale` and `displacementBias` (shadow maps displace
   too), `lightMap` with `lightMapIntensity` (UV1), and the physical maps below. `emissiveIntensity` scales `emissive`
   (glTF export: `KHR_materials_emissive_strength`). `flatShading: true` shades with face normals.
+  `vertexColors` defaults to true here (geometry colours always multiplied); set false to ignore them.
   Render state, live: `transparent`, `alphaTest`, `blending` (`'normal'`, `'additive'`, `'multiply'`, `'none'`),
   `depthWrite`, `depthTest`, `colorWrite`, `polygonOffset*`, the stencil options and `wireframe`.
 - A grouped mesh's `mesh.material` is a frozen array; assign a new array of the same length to swap it.

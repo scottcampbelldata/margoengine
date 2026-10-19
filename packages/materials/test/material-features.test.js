@@ -194,6 +194,7 @@ const defaults = {
   lightMapIntensity: 1,
   emissiveIntensity: 1,
   flatShading: false,
+  vertexColors: true,
 };
 const used = () => ({
   alphaMap: solid(0, 0, 0),
@@ -206,8 +207,16 @@ const used = () => ({
   lightMapIntensity: 4,
   emissiveIntensity: 4,
   flatShading: true,
+  vertexColors: false,
 });
-const off = { alphaMap: null, bumpMap: null, displacementMap: null, lightMap: null, flatShading: false };
+const off = {
+  alphaMap: null,
+  bumpMap: null,
+  displacementMap: null,
+  lightMap: null,
+  flatShading: false,
+  vertexColors: true,
+};
 
 test('a material with every feature at its default draws exactly the GPU calls of a plain one', async () => {
   for (const hook of [false, true]) {
@@ -422,6 +431,25 @@ test('flatShading shades with the face normal for lit, normal and matcap shading
     smooth.length === 1 && smooth[0].includes('let n=normalize(i.normal)*select(-1.0,1.0,facing);'),
     'off again, live: the smooth variant',
   );
+  for (const mesh of meshes) mesh.destroy();
+  s.engine.dispose();
+});
+
+test('vertexColors false passes white from the vertex stage; instance tints still multiply in', async () => {
+  const s = await scene(),
+    material = new PbrMaterial({ vertexColors: false }),
+    meshes = [createMesh(s.engine, quad, material), createInstancedMesh(s.engine, quad, material, 1)];
+  meshes[1].instances.count = 1;
+  const all = codes(s.frame());
+  assert.ok(all.some((c) => c.includes('o.uv=i.uv; o.color=vec4f(1); return o;')));
+  assert.ok(
+    all.some((c) => c.includes('o.color=vec4f(1)*k.tint;')),
+    'instanced',
+  );
+  assert.ok(all.every((c) => !c.includes('o.color=i.color')));
+  assert.throws(() => {
+    material.vertexColors = 'no';
+  }, TypeError);
   for (const mesh of meshes) mesh.destroy();
   s.engine.dispose();
 });

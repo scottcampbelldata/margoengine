@@ -76,6 +76,8 @@ const expected = {
   lightMapUnlit: [128, 128, 128],
   emissiveIntensity: gray(0.5),
   flatShading: gray(local),
+  vertexColors: [255, 0, 0],
+  vertexColorsTint: [0, 0, 255],
   displacedHookShadow: gray((base / Math.PI) * Math.SQRT1_2 * (1 - (Math.SQRT2 / 10) ** 4) ** 2),
 };
 try {
@@ -112,6 +114,8 @@ try {
     'lightMapLambert',
     'emissiveIntensity',
     'flatShading',
+    'vertexColors',
+    'vertexColorsTint',
     'lightMapUnlit',
     'displace',
     'displaceInstanced',
@@ -158,6 +162,10 @@ try {
       await step();
       near(await pixel(0.3), [255, 0, 0], 'the updated region (image top, flipY) shows the new pixels');
       near(await pixel(0.7), [0, 255, 0], 'outside the region the texture keeps its old pixels');
+    }
+    if (name === 'vertexColors') {
+      await step();
+      near(await pixel(), [255, 255, 255], 'vertexColors false, live: the vertex colours are ignored');
     }
     if (name === 'flatShading') {
       await step();

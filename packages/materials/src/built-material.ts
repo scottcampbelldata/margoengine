@@ -573,6 +573,8 @@ export interface MaterialOptions extends PhysicalOptions {
   emissiveIntensity?: number;
   /** Shades each triangle with its own face normal instead of the interpolated vertex normals; default false. Live. */
   flatShading?: boolean;
+  /** Multiplies colour and opacity by the geometry's vertex colours (default true); false ignores them. Live. */
+  vertexColors?: boolean;
   map?: Texture | null;
   metalRoughnessMap?: Texture | null;
   normalMap?: Texture | null;
@@ -960,7 +962,8 @@ function featureKey(m: Material): string {
     (bump ? 'b' : '') +
     (displacement ? 'd' : '') +
     (light ? (m.shading === 'basic' ? 'u' : 'l') : '') +
-    (m.flatShading && m.shading !== 'basic' && m.shading !== 'depth' && m.shading !== 'distance' ? 'f' : '')
+    (m.flatShading && m.shading !== 'basic' && m.shading !== 'depth' && m.shading !== 'distance' ? 'f' : '') +
+    (m.vertexColors ? '' : 'v')
   );
 }
 /** The feature uniform of `m` for `owner`, written with its current values. */
@@ -1120,7 +1123,7 @@ export class Material {
   private gloss = 30;
   private glowScale = 1;
   /** On/off features (features.ts letters f...). */
-  private readonly switches = { flatShading: false };
+  private readonly switches = { flatShading: false, vertexColors: true };
   /** gltf-pro layout: [roughness, metalness, normalScale, aoMapIntensity] and [alphaMode, alphaTest, side (front 0, double 1, back 2), 0]. */
   readonly factors: number[];
   readonly settings: number[];
@@ -1351,6 +1354,7 @@ export class Material {
       'lightMapIntensity',
       'emissiveIntensity',
       'flatShading',
+      'vertexColors',
     ] as const)
       if (o[key] !== undefined) this[key] = o[key] as never;
     // Physical options enable their lobes as they are set (transmission before the volume values that need it); the
@@ -1495,6 +1499,13 @@ export class Material {
   }
   set flatShading(v: boolean) {
     this.switches.flatShading = flag(v, 'flatShading');
+  }
+  /** Geometry vertex colours (RGBA) multiply colour and opacity while true (default); instance tints still apply. */
+  get vertexColors(): boolean {
+    return this.switches.vertexColors;
+  }
+  set vertexColors(v: boolean) {
+    this.switches.vertexColors = flag(v, 'vertexColors');
   }
   /** Scales `emissive` (default 1, finite, >= 0): the emission drawn is emissive x emissiveMap x emissiveIntensity. */
   get emissiveIntensity(): number {

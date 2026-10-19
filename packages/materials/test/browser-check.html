@@ -99,6 +99,11 @@ scenarios.emissiveIntensity=()=>{const light=[...engine.lighting.direction],radi
 // full n.l = 1, smooth shading cos 45 (the step turns flatShading off live).
 const leaning=()=>{const g=planeGeometry(2,2);return {...g,normals:Array.from({length:g.normals.length/3},()=>[1,0,1]).flat()};};
 scenarios.flatShading=()=>{const light=[...engine.lighting.direction],radiance=[...engine.lighting.radiance];engine.lighting.direction.set([0,0,1,2]);engine.lighting.radiance[3]=0;const m=createMesh(engine,leaning(),new Material({shading:'lambert',map:solid(188,188,188),flatShading:true}));return {destroy(){m.destroy();engine.lighting.direction.set(light);engine.lighting.radiance.set(radiance);},step(){m.material.flatShading=false;}};};
+// vertexColors: an unlit white plane with red vertex colours draws red, white once vertexColors is false (live); an
+// instanced one with vertexColors false keeps its blue instance tint.
+const reddened=()=>{const g=planeGeometry(2,2);return {...g,colors:Array.from({length:g.positions.length/3},()=>[1,0,0]).flat()};};
+scenarios.vertexColors=()=>{const m=createMesh(engine,reddened(),new Material({shading:'basic'}));return {destroy(){m.destroy();},step(){m.material.vertexColors=false;}};};
+scenarios.vertexColorsTint=()=>{const m=createInstancedMesh(engine,reddened(),new Material({shading:'basic',vertexColors:false}),1);m.instances.setMatrixAt(0,[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);m.instances.setColorAt(0,[0,0,1]);m.instances.count=1;return m;};
 // One clustered point light 1 unit in front of the plane's centre (intensity 2, range 100), no directional light, no ambient.
 const local=material=>{const light=[...engine.lighting.direction],radiance=[...engine.lighting.radiance];engine.lighting.direction[3]=0;engine.lighting.radiance[3]=0;const lights=Clustered.attach(engine),m=createMesh(engine,planeGeometry(2,2),material);lights.add(m);lights.setLights([{position:[0,0,1],range:100,intensity:2}]);return {destroy(){m.destroy();plugin(lights).destroy();engine.lighting.direction.set(light);engine.lighting.radiance.set(radiance);}};};
 scenarios.clusteredLambert=()=>local(new Material({shading:'lambert',map:solid(188,188,188)}));
