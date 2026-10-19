@@ -10,6 +10,8 @@ export type AnyOptions = PLYOptions & ThreeMFOptions & PCDOptions & OFFOptions &
     format?: LoaderFormat;
 };
 
+export type AssetResolver = (path: string) => Promise<Uint8Array | string>;
+
 export type BinaryInput = ArrayBuffer | ArrayBufferView;
 
 export const CORE_MAX_VERTICES = 1000000;
@@ -22,6 +24,61 @@ export interface CreateMeshesOptions extends Pick<ToGeometryOptions, 'normals'>,
     doubleSided?: boolean;
     merge?: boolean;
     vertexColors?: 'average' | 'ignore';
+}
+
+export interface DAEChannel {
+    color?: [number, number, number, number];
+    texture?: {
+        path: string;
+        texcoord?: string;
+    };
+}
+
+export interface DAEGeometry extends LoadedGeometry {
+    kind: 'mesh';
+    id: string;
+    name?: string;
+    indices: Uint32Array;
+    groups: DAEGroup[];
+    faceSizes: Uint32Array;
+    positionIndices: Uint32Array;
+}
+
+export interface DAEGroup extends LoadedGroup {
+    symbol?: string;
+}
+
+export interface DAEInstance {
+    geometry: number;
+    materials: Record<string, number>;
+}
+
+export interface DAEMaterial {
+    id: string;
+    name?: string;
+    shading: 'constant' | 'lambert' | 'phong' | 'blinn';
+    emission?: DAEChannel;
+    ambient?: DAEChannel;
+    diffuse?: DAEChannel;
+    specular?: DAEChannel;
+    reflective?: DAEChannel;
+    transparent?: DAEChannel;
+    opaque?: string;
+    shininess?: number;
+    reflectivity?: number;
+    transparency?: number;
+    indexOfRefraction?: number;
+}
+
+export interface DAENode {
+    id?: string;
+    name?: string;
+    matrix: number[];
+    instances: DAEInstance[];
+    children: DAENode[];
+}
+
+export interface DAEParseOptions extends ParseLimits {
 }
 
 export const DEFAULT_MAX_BYTES: number;
@@ -86,6 +143,16 @@ export interface FetchOptions {
     init?: RequestInit;
 }
 
+export interface LoadedDAE {
+    upAxis: 'X_UP' | 'Y_UP' | 'Z_UP';
+    meter: number;
+    geometries: DAEGeometry[];
+    materials: DAEMaterial[];
+    images: string[];
+    nodes: DAENode[];
+    warnings: string[];
+}
+
 export interface LoadedGeometry {
     kind: 'mesh' | 'points';
     positions: Float32Array;
@@ -112,6 +179,33 @@ export interface LoadedMeshes {
     dispose(): void;
 }
 
+export interface LoadedOBJ extends LoadedGeometry {
+    groups: OBJGroup[];
+    faceSizes: Uint32Array;
+    smoothingGroups: Uint32Array;
+    positionIndices: Uint32Array;
+    materialLibraries: string[];
+    materials: MTLMaterial[];
+    images: string[];
+    extras: OBJStatement[];
+    warnings: string[];
+}
+
+export interface LoadedTMX {
+    orientation: 'orthogonal';
+    renderorder: string;
+    width: number;
+    height: number;
+    tilewidth: number;
+    tileheight: number;
+    infinite: boolean;
+    tilesets: TMXTileset[];
+    tilesetRefs: TMXTilesetRef[];
+    layers: TMXLayer[];
+    properties: TMXProperties;
+    warnings: string[];
+}
+
 export class LoaderError extends Error {
     readonly format: string;
     readonly code: LoaderErrorCode;
@@ -121,6 +215,63 @@ export class LoaderError extends Error {
 export type LoaderErrorCode = 'header' | 'truncated' | 'limit' | 'range' | 'syntax' | 'unsupported' | 'zip' | 'aborted' | 'fetch';
 
 export type LoaderFormat = 'ply' | '3mf' | 'pcd' | 'off' | 'xyz' | 'vtk' | 'usda' | 'usdz';
+
+export interface MTLMap {
+    file: string;
+    path: string;
+    options: MTLMapOptions;
+}
+
+export interface MTLMapOptions {
+    o?: [number, number, number];
+    s?: [number, number, number];
+    t?: [number, number, number];
+    clamp?: boolean;
+    blendu?: boolean;
+    blendv?: boolean;
+    cc?: boolean;
+    bm?: number;
+    boost?: number;
+    texres?: number;
+    mm?: [number, number];
+    imfchan?: string;
+    type?: string;
+}
+
+export interface MTLMaterial {
+    name: string;
+    Ka?: [number, number, number];
+    Kd?: [number, number, number];
+    Ks?: [number, number, number];
+    Ke?: [number, number, number];
+    Ns?: number;
+    d?: number;
+    Tr?: number;
+    illum?: number;
+    maps: Record<string, MTLMap>;
+    extras: OBJStatement[];
+}
+
+export interface MTLParseOptions {
+    path?: string;
+}
+
+export interface OBJGroup extends LoadedGroup {
+    object?: string;
+    groupNames: string[];
+    material?: string;
+}
+
+export interface OBJParseOptions extends ParseLimits {
+    resolve?: AssetResolver;
+    signal?: AbortSignal;
+}
+
+export interface OBJStatement {
+    keyword: string;
+    value: string;
+    line: number;
+}
 
 export interface OFFOptions extends ParseLimits {
 }
@@ -185,6 +336,77 @@ export interface PointsToGeometryOptions {
 
 export const THREEMF_UNITS: Readonly<Record<string, number>>;
 
+export type TMXLayer = TMXTileLayer | TMXObjectLayer;
+
+export interface TMXLayerCommon {
+    id?: number;
+    name: string;
+    visible: boolean;
+    opacity: number;
+    offsetx: number;
+    offsety: number;
+    properties: TMXProperties;
+}
+
+export interface TMXObject {
+    id?: number;
+    name: string;
+    type: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation: number;
+    visible: boolean;
+    gid?: number;
+    flips?: number;
+    properties: TMXProperties;
+}
+
+export interface TMXObjectLayer extends TMXLayerCommon {
+    type: 'object';
+    objects: TMXObject[];
+}
+
+export interface TMXParseOptions {
+    resolve?: AssetResolver;
+    signal?: AbortSignal;
+}
+
+export type TMXProperties = Record<string, string | number | boolean>;
+
+export interface TMXTileLayer extends TMXLayerCommon {
+    type: 'tile';
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    gids: Uint32Array;
+    flips: Uint8Array;
+}
+
+export interface TMXTileset {
+    name?: string;
+    source?: string;
+    tilewidth: number;
+    tileheight: number;
+    spacing: number;
+    margin: number;
+    columns: number;
+    tilecount: number;
+    image?: {
+        path: string;
+        width: number;
+        height: number;
+    };
+    properties: TMXProperties;
+}
+
+export interface TMXTilesetRef {
+    firstgid: number;
+    tileset: number;
+}
+
 export interface ThreeMFOptions extends ParseLimits, Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'maxRatio'> {
     units?: 'meters' | 'file';
     maxDepth?: number;
@@ -195,6 +417,24 @@ export interface ThreeMFResult extends LoadedGeometry {
     kind: 'mesh';
     unit: string;
     metadata: Record<string, string>;
+}
+
+export interface TileQuads extends LoadedGeometry {
+    kind: 'mesh';
+    normals: Float32Array;
+    uvs: Float32Array;
+    indices: Uint32Array;
+    faceSizes: Uint32Array;
+    groups: TileQuadsGroup[];
+    cells: Uint32Array;
+}
+
+export interface TileQuadsGroup extends LoadedGroup {
+    tileset: number;
+}
+
+export interface TileQuadsOptions {
+    tileSize?: number;
 }
 
 export interface ToGeometryOptions {
@@ -275,13 +515,23 @@ export function faceNormal(positions: ArrayLike<number>, a: number, b: number, c
 
 export function fetchBytes(url: string | URL, options?: FetchOptions): Promise<Uint8Array>;
 
+export function flattenDAE(dae: LoadedDAE): LoadedGeometry & {
+    faceSizes: Uint32Array;
+};
+
 export function load<T, O extends object = object>(url: string | URL, parse: (input: Uint8Array, options?: O) => T | Promise<T>, options?: O & FetchOptions): Promise<T>;
 
 export function parse3MF(input: BinaryInput, options?: ThreeMFOptions): Promise<ThreeMFResult>;
 
 export function parseAny(input: BinaryInput, options?: AnyOptions): Promise<LoadedGeometry>;
 
+export function parseDAE(input: BinaryInput | string, options?: DAEParseOptions): LoadedDAE;
+
 export function parseDXF(input: BinaryInput, options?: DXFOptions): DXFResult;
+
+export function parseMTL(input: BinaryInput | string, options?: MTLParseOptions): MTLMaterial[];
+
+export function parseOBJ(input: BinaryInput | string, options?: OBJParseOptions): Promise<LoadedOBJ>;
 
 export function parseOFF(input: BinaryInput, options?: OFFOptions): LoadedGeometry;
 
@@ -292,6 +542,8 @@ export function parsePCDHeader(input: BinaryInput, options?: ParseLimits): PCDHe
 export function parsePLY(input: BinaryInput, options?: PLYOptions): LoadedGeometry;
 
 export function parsePLYHeader(input: BinaryInput): PLYHeader;
+
+export function parseTMX(input: BinaryInput | string, options?: TMXParseOptions): Promise<LoadedTMX>;
 
 export function parseUSDA(input: string | BinaryInput, options?: USDOptions): LoadedGeometry;
 
@@ -308,6 +560,8 @@ export function readUSDA(text: string, options?: USDAReadOptions): USDALayer;
 export function readZipDirectory(input: BinaryInput, options?: ZipOptions): ZipEntry[];
 
 export function readZipEntry(input: BinaryInput, entry: ZipEntry, options?: ZipOptions): Promise<Uint8Array>;
+
+export function tmxLayerQuads(map: LoadedTMX, layer: TMXTileLayer, options?: TileQuadsOptions): TileQuads;
 
 export function toGeometry(loaded: LoadedGeometry, options?: ToGeometryOptions): Geometry;
 

@@ -7,6 +7,7 @@ import { EngineKernel, EnginePlugin, Mesh } from "@margoengine/core";
 import { FrameGraph } from "@margoengine/core/extension";
 
 export class Audio implements ListenerSource {
+    static syncTolerance: number;
     readonly listener: AudioListener;
     readonly context: BaseAudioContext;
     readonly gain: GainNode;
@@ -27,6 +28,8 @@ export class Audio implements ListenerSource {
     play(delay?: number): this;
     pause(): this;
     stop(delay?: number): this;
+    seek(seconds: number): this;
+    sync(timelineSeconds: number, playing: boolean, rate?: number): this;
     fadeIn(seconds: number): this;
     fadeOut(seconds: number, { pause }?: {
         pause?: boolean;
@@ -51,6 +54,8 @@ export class Audio implements ListenerSource {
     set offset(value: number);
     get duration(): number | undefined;
     set duration(value: number | undefined);
+    get timelineStart(): number;
+    set timelineStart(value: number);
     get currentTime(): number;
     update(_engine: EngineKernel | null): void;
     dispose(): void;
@@ -130,6 +135,7 @@ export interface AudioOptions {
     detune?: number;
     offset?: number;
     duration?: number;
+    timelineStart?: number;
     autoplay?: boolean;
     filters?: AudioNode[];
     onEnded?: (audio: Audio) => void;
