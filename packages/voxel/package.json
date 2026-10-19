@@ -29,6 +29,10 @@
     "./light": {
       "types": "./dist/light.d.ts",
       "import": "./dist/light.js"
+    },
+    "./vox": {
+      "types": "./dist/vox.d.ts",
+      "import": "./dist/vox.js"
     }
   },
   "files": [

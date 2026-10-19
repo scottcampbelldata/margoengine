@@ -240,3 +240,37 @@ lighting.dispose();
 Measured with Node on the development laptop (2026-10-19; `node --test packages/voxel/tests/light-benchmark.test.js`
 prints yours): a torch placed or removed in open air (3,300 cells) about 4,000-6,000 cells/ms; a 32 x 32 stone roof
 removed over a 30-deep room (70,000 cells) about 5,400-7,600 cells/ms, put back about 6,800-8,500 cells/ms.
+
+## MagicaVoxel `.vox` files (`@margoengine/voxel/vox`)
+
+```ts
+import { parseVox, writeVox, pasteVoxModel } from '@margoengine/voxel/vox';
+
+const scene = parseVox(new Uint8Array(await (await fetch('castle.vox')).arrayBuffer()));
+scene.models[0].size; // [x, y, z], MagicaVoxel z up; voxels: Uint8Array of x, y, z, palette index
+scene.palette; // 256 RGBA8 colours, palette index i at 4 * i
+scene.nodes; // transform / group / shape nodes; transform frames have rotation (3 x 3), translation, frame
+scene.materials[0].rough; // MATL: type, weight, rough, spec, ior, att, flux, plastic (+ attributes Map)
+
+pasteVoxModel(world, scene, [0, 64, 0]); // every visible shape; colours become 'vox:rrggbb' block types
+pasteVoxModel(world, scene.models[2], [10, 64, 0], mapping); // one model: mapping[paletteIndex] = block state
+
+scene.nodes[2].frames[0].translation = [0, 0, 8];
+const bytes = writeVox(scene); // the same bytes as the file, except what you changed
+```
+
+- **Format.** Versions 150 and 200, from MagicaVoxel's published notes: SIZE + XYZI models, PACK, RGBA (file colour k
+  is palette index k + 1; the default palette when absent), MATL, nTRN (the packed rotation byte as a signed
+  permutation matrix, `_t`, `_f` per frame), nGRP, nSHP (a model per frame) and LAYR. Every other chunk (rOBJ, rCAM,
+  NOTE, IMAP, META, MATT, future ones) stays as bytes in `scene.chunks`, which also records the file's chunk order, so
+  `writeVox(parseVox(file))` is the file byte for byte. Typed fields are decoded from each dictionary's `attributes`;
+  on write a typed field replaces its key only when its value changed, so untouched text keeps its exact form.
+- **Pasting.** MagicaVoxel's z (up) becomes world y and its y becomes world -z (right-handed, not mirrored); the pasted
+  box has its minimum corner at `at`. A scene pastes frame 0 of every shape not hidden by its node or layer, each
+  model centred on its transform's translation. A bare model has no palette, so it needs a mapping.
+- **Errors.** `parseVox` throws `RangeError` for truncated, oversized or inconsistent files (voxels outside SIZE, a
+  SIZE outside 1-256, counts past the chunk, broken node references or cycles) and `TypeError` for bytes that are
+  not a .vox file; it allocates no more than the file holds. `writeVox` rejects what `parseVox` would.
+
+Measured with Node on the development laptop (2026-10-19; `node --test packages/voxel/tests/vox.test.js` prints
+yours): a 1M-voxel model writes in about 10 ms and parses in about 6 ms (4 MiB); pasting it takes about 0.7-1.1 s.
