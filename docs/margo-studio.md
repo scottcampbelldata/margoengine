@@ -1,4 +1,4 @@
-# Margo Studio (planned, post-launch)
+# Margo Studio (tile editor started 2026-10-18; voxel and node editors planned)
 
 Three authoring tools built on Margo and for Margo, each a feature-for-feature equivalent of an existing tool,
 written as new, modern TypeScript on WebGPU. They are also the strongest proof that Margo is more than a viewer:
@@ -39,7 +39,25 @@ building starts.
 - Web first; optional desktop shell (Tauri) later.
 - Outputs: glTF/GLB via `@margoengine/exporters`, plus Margo-native extras (colliders, navmesh, animator graphs).
 
+## What the reference tools are built with (checked 2026-10-18)
+
+Neither uses three.js. MagicaVoxel 0.99.7.2 (2025-07-12; Windows, last macOS build 0.99.6.2) is closed-source C++ with
+its own UI on OpenGL (GLSL voxel shaders, ray-cast editor view), free to use but not to redistribute; its `.vox`
+format is published (https://github.com/ephtracy/voxel-model). Dust3D 1.1.6 (2026-06-08; Windows, macOS, Linux) is
+MIT-licensed C++17 on Qt 5/6 with OpenGL, Eigen, its own mesh booleans (CGAL removed in 2023), AutoRemesher and a
+small FBX writer. Crocotile 3D 2.7.4 is the tile editor's reference (see section 2).
+
 ## 1. Voxel editor (MagicaVoxel equivalent)
+
+Engine gaps still open in Margo (research 2026-10-18, largest first; editor UI is not counted): a GPU voxel path
+tracer with progressive accumulation and MagicaVoxel's materials (diffuse, metal, plastic, glass, emissive, cloud),
+sky and lens (new package; Margo only rasterises today); voxel storage for many 256^3 models, grid operations for the
+brushes and exact voxel picking (new `@margoengine/voxel`); a greedy mesher with AO in a worker; `.vox` read/write;
+3D compute dispatch with storage textures for its voxel shaders (`@margoengine/shader`'s `ComputePass` is
+one-dimensional today); a denoiser (the three.js parity doc currently says not to add one: Scott decides); `.qb` and
+slice exporters; optionally a sparse octree with LOD for Viewer-scale scenes. Avoid one core entity per voxel (use
+chunk meshes or instancing) and never add vertex colour to core meshes for this; 256^3 fits WebGPU's default limits,
+2048-scale scenes only sparse.
 
 Draft inventory to verify:
 - Models up to 256 x 256 x 256; multiple models per scene; scene/world editor with groups, transforms, layers,
@@ -57,6 +75,27 @@ Draft inventory to verify:
 
 ## 2. Tile / level editor (Crocotile 3D equivalent)
 
+Started 2026-10-18 as `tile-asset-editor` (Electron + TypeScript + Margo, its own repository
+`scottcampbelldata/tile-asset-editor`; parity spec `docs/superpowers/specs/2026-10-18-crocotile3d-parity-design.md`
+there, reference Crocotile 3D 2.7.4). The engine side was audited against the 2.7.4 manual and the spec, and every
+engine gap found is built in optional packages (core grew only by `mesh.receiveShadow`, +72 B):
+- materials / gltf-pro: Lambert and Phong shading, live `mesh.setGeometry` (ranged), `Texture.update(region)` for
+  painting, animated tiles (`tileAnimationFrame`, `tileAnimator`); material classes (`UnlitMaterial`,
+  `LambertMaterial`, `PhongMaterial`, `PbrMaterial`, ...) used like three.js materials (live swaps, `color.set`,
+  live render state and samplers, `clone`/`copy`/`dispose`).
+- geometry `creasedNormals` (angle threshold, smoothing groups); math `/billboard` (direction/position modes,
+  Y lock, snap, 8-direction picking); bvh `bakeVertexColors` and `limitPalette` (Crocotile's bake panel).
+- clustered/shadows: decay, angle + penumbra up to 90 degrees, per-object cast/receive (core meshes too); post Bloom
+  radius; environment `ImageBackground` (box, sphere, cylinder from PNG/JPG) and fog with each light's decay/cone.
+- animation: `Skeleton`/`Skin` from raw arrays, keyframe clips with per-key easing baked to glTF, CPU skinning for
+  static-pose export; audio `seek` and timeline `sync`.
+- loaders `parseOBJ`/`parseMTL`, `parseDAE`/`flattenDAE`, `parseTMX`/`tmxLayerQuads`; exporters OBJ/MTL (textures,
+  quads, groups, colour space, welding), `exportDAE`, data-scene glTF samplers/unlit/lights/cameras, explicit
+  lambert/phong in all three; exporters `/capture` (exact-size capture, PNG/JPG, sequences, GIF, WebM).
+Still open on the engine side: per-light shadow map width/height and shadow-camera bounds (Crocotile exposes them;
+Margo has one resolution and fixed bounds per `Shadows`). Editor work (panels, undo, native `.crocotile`/`.c3dp`
+codecs, UI parity) lives in the editor repository.
+
 Draft inventory to verify:
 - Tilesets from images (multiple), tile picking, draw tiles onto camera-aligned or grid-aligned 3D planes.
 - Vertex / edge / face editing, extrude, subdivide, merge, flip, rotate/mirror tiles, UV editing.
@@ -69,6 +108,17 @@ Draft inventory to verify:
 
 ## 3. Node / skeleton modeller (Dust3D equivalent)
 
+Engine gaps still open in Margo (research 2026-10-18, largest first; editor UI is not counted): a skeleton sweep
+mesher that builds the surface around the radius nodes with cut faces, round ends, chamfer and branch-joint stitching
+(new modeller package; this is Dust3D's core); robust triangle-mesh booleans (`@margoengine/brep`'s booleans work on
+exact B-rep surfaces, not triangle soups); a procedural motion library (about 40 clips across biped, quadruped,
+bird, fish, snake, insect, spider; in `@margoengine/animation`); automatic UV unwrap with chart packing and seam
+bleed (`geometry`); a texture-space baker (colour, normal, AO, patterns; `bvh`'s bake is per-vertex); auto-rig and
+weight binding (`animation`, on top of the raw-data `Skeleton`/`Skin`); FBX export with rig and animation
+(`@margoengine/fbx` only imports); Verlet hair chains and cloth; then smaller items: a ragdoll builder (`physics`),
+Catmull-Clark subdivision (Loop only today), shell offset, `.ds3` read/write, a WAV writer (`audio`), and last a
+quad remesher. Already covered: crease normals, glTF/OBJ export with skins, IK, physics joints, live geometry.
+
 Draft inventory to verify:
 - Place and connect nodes with radii in front/side views; symmetry; parts tree with per-part settings (subdivision,
   rounding, chamfer, cut faces, colour, material, deform).
@@ -80,6 +130,7 @@ Draft inventory to verify:
 
 ## Order and size
 
-After Margo 1.0 launches. Suggested order: voxel editor (smallest, most self-contained, great demo), tile/level editor
-(feeds the game guide), node modeller (hardest: meshing and auto-rigging). Each starts with its feature audit and a
-written scope sign-off from Scott before building.
+Scott started the tile/level editor first (2026-10-18, before 1.0) as the base of his own 3D modeller and game
+engine; its engine gaps were approved and built that day (section 2). Then the voxel editor and the node modeller
+(hardest: meshing and auto-rigging). Each starts with its feature audit and a written scope sign-off from Scott
+before building; the engine-gap lists in sections 1 and 3 are research, not approved work.
