@@ -1,0 +1,388 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Voxel path tracer browser check</title><style>body{margin:0}canvas{display:block;width:320px;height:240px}</style></head><body><canvas></canvas>
+<script type="module">
+// Real-WebGPU checks of @margoengine/voxel-pathtracer, driven by browser-check.mjs. Every scene is synthetic and built
+// here. window.check.* return plain data (numbers measured on this GPU); the script asserts and prints them.
+import {Engine} from '/packages/core/dist/index.js';
+import {Camera,box,engineRuntime} from '/packages/core/dist/extension.js';
+import {VoxelPathTracer} from '/packages/voxel-pathtracer/dist/index.js';
+const canvas=document.querySelector('canvas'),errors=[],messages=[];
+const runtime=()=>engineRuntime(engine);
+const device=()=>runtime().gpu;
+// Shader diagnostics: every module the page creates reports its compilation messages.
+const watch=(d)=>{
+ d.addEventListener('uncapturederror',(e)=>errors.push(e.error.message));
+ const create=d.createShaderModule.bind(d);
+ d.createShaderModule=(desc)=>{const m=create(desc);m.getCompilationInfo().then((info)=>{for(const x of info.messages)messages.push(`${x.type} ${x.lineNum}:${x.linePos} ${x.message}`);});return m;};
+};
+const engine=await Engine.create(canvas,{backend:'webgpu',features:['timestamp-query'],camera:{position:[20,14,24],target:[4,3,4],near:0.1,far:2000}});
+watch(device());
+// Model helpers: dense palette arrays, index = x + sx * (z + sz * y).
+const model=(id,size,fill,revision=1)=>{const [sx,sy,sz]=size,voxels=new Uint8Array(sx*sy*sz);
+ for(let y=0;y<sy;y++)for(let z=0;z<sz;z++)for(let x=0;x<sx;x++){const v=fill(x,y,z);if(v)voxels[x+sx*(z+sz*y)]=v;}return {id,revision,size,voxels};};
+const translate=(x,y,z,s=1)=>[s,0,0,0,0,s,0,0,0,0,s,0,x,y,z,1];
+const rotateY=(a,x,y,z,s=1)=>[Math.cos(a)*s,0,-Math.sin(a)*s,0,0,s,0,0,Math.sin(a)*s,0,Math.cos(a)*s,0,x,y,z,1];
+const ortho=(height)=>(out,aspect)=>{out.fill(0);out[0]=2/(height*aspect);out[5]=2/height;out[10]=1/1000;out[14]=0.5;out[15]=1;};
+const look=(position,target,extra={})=>{const c=engine.camera;c.position=position;c.target=target;c.project=extra.project;c.fov=extra.fov??45;c.up=extra.up??[0,1,0];c.near=extra.near??0.1;c.far=extra.far??2000;};
+const toBase64=async(blob)=>{const b=new Uint8Array(await blob.arrayBuffer());let s='';for(let i=0;i<b.length;i+=32768)s+=String.fromCharCode(...b.subarray(i,i+32768));return btoa(s);};
+const lum=(c,i)=>0.2126*c[i*3]+0.7152*c[i*3+1]+0.0722*c[i*3+2];
+const neutral=(x)=>{const y=Math.max(x,0);return y<0.76?y:1-0.24*0.24/(y+0.24-0.76);};
+// Mean and spread of the luminance of the pixels where mask(i) holds.
+const stats=(image,mask)=>{let n=0,s=0,s2=0;for(let i=0;i<image.width*image.height;i++){if(!mask(i))continue;const l=lum(image.color,i);n++;s+=l;s2+=l*l;}const mean=s/n;return {pixels:n,mean,sd:Math.sqrt(Math.max(0,s2/n-mean*mean))};};
+// Errors against a reference image: RMSE of tone-mapped luminance (what is seen) and mean absolute linear error.
+const error=(a,b)=>{let se=0,ae=0;const n=a.width*a.height;for(let i=0;i<n;i++){const d=neutral(lum(a.color,i))-neutral(lum(b.color,i));se+=d*d;ae+=Math.abs(lum(a.color,i)-lum(b.color,i));}return {rmse:Math.sqrt(se/n),mae:ae/n};};
+const withTracer=async(scene,options,run)=>{const t=VoxelPathTracer.attach(engine,{scene,...options});try{await t.ready;return await run(t);}finally{t.dispose();}};
+const solid=(n,v)=>model('cube',[n,n,n],()=>v);
+const furnace=(materials,environment={skyColor:[1,1,1],skyIntensity:1})=>({revision:1,models:[solid(8,1)],instances:[{id:'cube',modelId:'cube',matrix:rotateY(0.6,-4,-4,-4)}],materials,environment});
+// Synthetic scenes (original content; nothing from any reference application).
+const scenes={
+ // A floor slab, a white diffuse block, a gold rough-metal ball, a clear glass block, a warm emissive bar, a blue
+ // plastic step and a hazy cloud, under a sun and a pale sky with a grey ground plane.
+ materials(){
+  const floor=model('floor',[48,1,48],()=>1),block=model('block',[8,8,8],()=>2),
+   metal=model('metal',[8,8,8],(x,y,z)=>((x-3.5)**2+(y-3.5)**2+(z-3.5)**2<16)?3:0),glass=model('glass',[8,8,8],()=>4),
+   lamp=model('lamp',[2,10,2],()=>5),step=model('step',[10,4,6],(x,y)=>y<=x/2.5?6:0),
+   cloud=model('cloud',[10,6,8],(x,y,z)=>((x-4.5)**2/25+(y-2.5)**2/9+(z-3.5)**2/16<1)?7:0);
+  return {revision:1,models:[floor,block,metal,glass,lamp,step,cloud],
+   instances:[{id:'floor',modelId:'floor',matrix:translate(-24,-1,-24)},{id:'block',modelId:'block',matrix:translate(-14,0,-6)},
+    {id:'metal',modelId:'metal',matrix:translate(-4,0,-8)},{id:'glass',modelId:'glass',matrix:rotateY(0.5,6,0,-4)},
+    {id:'lamp',modelId:'lamp',matrix:translate(-8,0,4)},{id:'step',modelId:'step',matrix:translate(2,0,6)},
+    {id:'cloud',modelId:'cloud',matrix:translate(-16,9,-12)}],
+   materials:[{id:1,color:[0.55,0.55,0.55],type:'diffuse'},{id:2,color:[0.85,0.85,0.85],type:'diffuse'},
+    {id:3,color:[1,0.75,0.3],type:'metal',roughness:0.25},{id:4,color:[0.9,1,0.95],type:'glass',ior:1.5},
+    {id:5,color:[1,0.6,0.25],type:'emit',emission:6},{id:6,color:[0.15,0.3,0.9],type:'plastic',roughness:0.1},
+    {id:7,color:[0.95,0.95,0.95],type:'media',density:0.6,anisotropy:0.3}],
+   environment:{skyColor:[0.55,0.7,1],skyIntensity:0.6,sunDirection:[0.5,0.8,0.35],sunIntensity:3,sunAngularSize:0.05,groundColor:[0.4,0.4,0.4],groundHeight:-1}};
+ },
+ // Without glass or media (no caustics): the convergence and denoiser scene.
+ opaque(){
+  const s=scenes.materials();
+  s.instances=s.instances.filter((i)=>i.id!=='glass'&&i.id!=='cloud');s.models=s.models.filter((m)=>m.id!=='glass'&&m.id!=='cloud');
+  s.materials=s.materials.filter((m)=>m.id!==4&&m.id!==7);
+  return s;
+ },
+ // Every surface diffuse (same lights): no glossy caustics, so the error falls as 1/sqrt(samples).
+ diffuse(){
+  const s=scenes.opaque();
+  s.materials=s.materials.map((m)=>m.type==='emit'?m:{id:m.id,color:m.color,type:'diffuse'});
+  return s;
+ },
+ // Traversal: random sparse models across brick borders, shared by rotated, scaled, sheared and mirrored instances.
+ traversal(){
+  let seed=7;const random=()=>((seed=(Math.imul(seed,1103515245)+12345)>>>0)>>>8)/16777216;
+  const a=model('a',[21,13,17],()=>random()<0.08?1+Math.floor(random()*200):0),b=model('b',[40,9,40],(x,y,z)=>y<1||((x*z+y)%23===0)?201+(x+z)%40:0),
+   c=model('c',[1,1,1],()=>255);
+  const materials=[];for(let id=1;id<=255;id++)materials.push({id,color:[(id%7)/7,(id%5)/5,(id%3)/3],type:'diffuse'});
+  return {revision:1,models:[a,b,c],materials,instances:[
+   {id:'a1',modelId:'a',matrix:rotateY(0.7,-6,1,-2)},{id:'a2',modelId:'a',matrix:[0.5,0,0,0,0.5,1.5,0,0,0,0,0.75,0,6,0,-14,1]},
+   {id:'a3',modelId:'a',matrix:[-1,0,0,0,0,1,0,0,0,0,1,0,30,2,0,1]},{id:'b',modelId:'b',matrix:translate(-20,-9,-20)},
+   {id:'c',modelId:'c',matrix:translate(0.25,12,0.25,3)},{id:'hidden',modelId:'c',matrix:translate(3,3,3,6),visible:false}]};
+ },
+};
+// The same primary rays as the shader (through the near plane toward NDC depth 0.5), from a copy of the engine camera.
+function rays(width,height){
+ const src=engine.camera,c=new Camera({fov:src.fov,position:src.position,target:src.target,near:src.near,far:src.far});
+ c.up=src.up;c.project=src.project;c.update(width/height,true);
+ const m=c.matrix,inv=invert(m);
+ const un=(x,y,z)=>{const v=[0,1,2,3].map((r)=>inv[r]*x+inv[4+r]*y+inv[8+r]*z+inv[12+r]);return [v[0]/v[3],v[1]/v[3],v[2]/v[3]];};
+ return (px,py)=>{const nx=px/width*2-1,ny=1-py/height*2,a=un(nx,ny,1),b=un(nx,ny,0.5),d=[b[0]-a[0],b[1]-a[1],b[2]-a[2]],l=Math.hypot(...d);return {o:a,d:d.map((v)=>v/l)};};
+}
+function invert(m){ // 4x4 column-major inverse (Gauss-Jordan, float64)
+ const a=[];for(let r=0;r<4;r++){a.push([]);for(let c=0;c<4;c++)a[r].push(m[c*4+r]);for(let c=0;c<4;c++)a[r].push(r===c?1:0);}
+ for(let c=0;c<4;c++){let p=c;for(let r=c+1;r<4;r++)if(Math.abs(a[r][c])>Math.abs(a[p][c]))p=r;[a[c],a[p]]=[a[p],a[c]];const k=a[c][c];for(let j=0;j<8;j++)a[c][j]/=k;
+  for(let r=0;r<4;r++)if(r!==c){const f=a[r][c];for(let j=0;j<8;j++)a[r][j]-=f*a[c][j];}}
+ const out=new Float64Array(16);for(let r=0;r<4;r++)for(let c=0;c<4;c++)out[c*4+r]=a[r][c+4];return out;
+}
+const readCanvas=()=>{const c=new OffscreenCanvas(canvas.width,canvas.height).getContext('2d');c.drawImage(canvas,0,0);return c.getImageData(0,0,canvas.width,canvas.height).data;};
+const diff=(a,b)=>{let n=0,max=0;for(let i=0;i<a.length;i+=4){let d=0;for(let k=0;k<3;k++)d=Math.max(d,Math.abs(a[i+k]-b[i+k]));if(d)n++;max=Math.max(max,d);}return {differing:n,max};};
+const frames=async(n)=>{for(let i=0;i<n;i++){engine.render({delta:0});await device().queue.onSubmittedWorkDone();}};
+// A finished frame read back in the task that rendered it (the canvas texture is only valid until the task ends).
+const shot=async()=>{await frames(2);engine.render({delta:0});return readCanvas();};
+window.check={
+ async compile(){
+  const scene=scenes.materials();
+  const r=await withTracer(scene,{denoise:true},async(tracer)=>{await frames(4);await new Promise((r)=>setTimeout(r,300));await frames(4);return {status:tracer.status,stats:tracer.stats};});
+  await new Promise((r)=>setTimeout(r,300));
+  return {...r,messages:messages.splice(0),errors:errors.splice(0)};
+ },
+ // GPU first hits (pixel-centre ids and distances) against VoxelPathTracer.raycast on the CPU, per pixel, for a
+ // perspective and an orthographic camera.
+ async traversal(){
+  const scene=scenes.traversal(),out={};
+  for(const [name,extra] of [['perspective',{fov:60}],['orthographic',{project:ortho(40)}]]){
+   look([26,22,30],[2,0,-4],extra);
+   const W=160,H=120;
+   out[name]=await withTracer(scene,{maxBounces:1},async(tracer)=>{
+    const image=await tracer.renderImage({width:W,height:H,samples:1,jitter:false,aovs:true}),ray=rays(W,H);
+    let hits=0,same=0,mismatch=[],maxDepth=0;
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+     const i=y*W+x,{o,d}=ray(x+0.5,y+0.5),cpu=tracer.raycast(o,d),gpuInstance=image.instance[i];
+     const cpuInstance=cpu?scene.instances.findIndex((v)=>v.id===cpu.instanceId):-1;
+     if(cpu)hits++;
+     if(gpuInstance===cpuInstance&&(!cpu||image.palette[i]===cpu.paletteIndex)){same++;if(cpu)maxDepth=Math.max(maxDepth,Math.abs(image.depth[i]-cpu.distance)/cpu.distance);}
+     else if(mismatch.length<6)mismatch.push({x,y,gpu:[gpuInstance,image.palette[i],image.depth[i]],cpu:cpu&&[cpuInstance,cpu.paletteIndex,cpu.distance]});
+    }
+    return {pixels:W*H,hits,same,maxRelativeDepth:maxDepth,mismatch};
+   });
+  }
+  look([20,14,24],[4,3,4]);
+  return {...out,errors:errors.splice(0)};
+ },
+ // Analytic checks, each a mean over the pixels of one object.
+ async analytic(){
+  const out={},cubeMask=(image)=>(i)=>image.instance[i]===0;
+  const furnaceRun=async(name,material,options={},env)=>{
+   look([14,10,18],[0,0,0],{fov:35});
+   out[name]=await withTracer(furnace([{id:1,...material}],env),{maxBounces:64,...options},async(t)=>{const image=await t.renderImage({width:96,height:72,samples:options.samples??512,aovs:true,jitter:false});return stats(image,cubeMask(image));});
+  };
+  // Furnaces: a convex cube in a uniform sky of radiance 1 reflects albedo x 1 (every reflected path escapes).
+  await furnaceRun('diffuse 0.5',{color:[0.5,0.5,0.5],type:'diffuse'});
+  await furnaceRun('diffuse 1',{color:[1,1,1],type:'diffuse'});
+  await furnaceRun('smooth metal 1',{color:[1,1,1],type:'metal',roughness:0});
+  await furnaceRun('rough metal 1',{color:[1,1,1],type:'metal',roughness:0.5});
+  await furnaceRun('smooth plastic 1',{color:[1,1,1],type:'plastic',roughness:0});
+  await furnaceRun('rough plastic 1',{color:[1,1,1],type:'plastic',roughness:0.4});
+  await furnaceRun('clear glass',{color:[1,1,1],type:'glass'});
+  await furnaceRun('rough glass',{color:[1,1,1],type:'glass',roughness:0.3});
+  await furnaceRun('white media',{color:[1,1,1],type:'media',density:0.8});
+  await furnaceRun('white blend',{color:[1,1,1],type:'blend',metalness:0.3,transmission:0.5,roughness:0.2});
+  // An environment map of constant radiance 1 is the same furnace through importance sampling.
+  const map={width:64,height:32,data:new Float32Array(64*32*3).fill(1)};
+  await furnaceRun('diffuse 0.5 env map',{color:[0.5,0.5,0.5],type:'diffuse'},{},{map});
+  // Emission seen directly: radiance color x emission (the black sky adds nothing).
+  await furnaceRun('emission 3',{color:[1,1,1],type:'emit',emission:3},{},{skyIntensity:0});
+  // Beer-Lambert: a non-scattering absorbing medium (albedo 0) 8 voxels deep at extinction 0.125 in front of a sky
+  // of radiance 1, seen straight on: exp(-1).
+  look([0,0,40],[0,0,0],{project:ortho(4)});
+  out['beer-lambert exp(-1)']=await withTracer({revision:1,models:[solid(8,1)],instances:[{id:'m',modelId:'cube',matrix:translate(-4,-4,-4)}],materials:[{id:1,color:[0,0,0],type:'media',density:0.125}],environment:{skyColor:[1,1,1]}},{maxBounces:8},async(t)=>{const image=await t.renderImage({width:32,height:32,samples:256,aovs:true,jitter:false});return stats(image,(i)=>image.instance[i]===0);});
+  // Glass slab 8 deep, colour 0.5 (tint on entry), density 0.0866 (absorption 0.5^(0.0866*8) = 0.6185), straight on,
+  // sky 1 behind and in front: R + (1-R)^2 * 0.5 * 0.6185 / (1 - R^2 0.6185^2) + higher orders (R = 0.04).
+  out['tinted glass slab']=await withTracer({revision:1,models:[solid(8,1)],instances:[{id:'m',modelId:'cube',matrix:translate(-4,-4,-4)}],materials:[{id:1,color:[0.5,0.5,0.5],type:'glass',density:0.0866}],environment:{skyColor:[1,1,1]}},{maxBounces:32},async(t)=>{const image=await t.renderImage({width:32,height:32,samples:1024,aovs:true,jitter:false});return stats(image,(i)=>image.instance[i]===0);});
+  // Sun irradiance: a flat diffuse plane (albedo 0.5) under a sun of irradiance pi straight above, black sky:
+  // radiance 0.5 x pi / pi = 0.5, for a point sun and a 0.2 radian disk.
+  const plane=(size)=>({revision:1,models:[model('p',[64,1,64],()=>1)],instances:[{id:'p',modelId:'p',matrix:translate(-32,-1,-32)}],materials:[{id:1,color:[0.5,0.5,0.5],type:'diffuse'}],environment:{skyIntensity:0,sunDirection:[0,1,0],sunIntensity:Math.PI,sunAngularSize:size}});
+  look([0,10,0.01],[0,0,0],{fov:30});
+  for(const size of [0,0.2]){out[`sun ${size}`]=await withTracer(plane(size),{maxBounces:4},async(t)=>{const image=await t.renderImage({width:32,height:32,samples:256,aovs:true,jitter:false});return stats(image,(i)=>image.instance[i]===0);});}
+  // Two parallel emissive planes: floor albedo 0.5 under an emissive ceiling (colour 0.5, emission 2: radiance 1,
+  // albedo 0.5) 2 units up, 128 units each side: floor radiance 0.5 / (1 - 0.25) = 2/3 (emitter sampling + MIS).
+  const slabs={revision:1,models:[model('f',[256,1,256],()=>1),model('c',[256,1,256],()=>2)],instances:[{id:'f',modelId:'f',matrix:translate(-128,-1,-128)},{id:'c',modelId:'c',matrix:translate(-128,2,-128)}],materials:[{id:1,color:[0.5,0.5,0.5],type:'diffuse'},{id:2,color:[0.5,0.5,0.5],type:'emit',emission:2}],environment:{skyIntensity:0}};
+  look([0,1.5,0.01],[0,0,0],{fov:20});
+  out['emissive ceiling 2/3']=await withTracer(slabs,{maxBounces:24},async(t)=>{const image=await t.renderImage({width:32,height:32,samples:1024,aovs:true,jitter:false});return stats(image,(i)=>image.instance[i]===0);});
+  // A large area light (radiance 2, 2000 units square, 1 unit up) over the same floor: radiance 0.5 x 2.
+  const lit={revision:1,models:[model('f',[64,1,64],()=>1)],instances:[{id:'f',modelId:'f',matrix:translate(-32,-1,-32)}],materials:[{id:1,color:[0.5,0.5,0.5],type:'diffuse'}],environment:{skyIntensity:0},lights:[{id:'l',position:[-1000,1,-1000],edgeU:[2000,0,0],edgeV:[0,0,2000],intensity:2}]};
+  look([0,0.5,0.01],[0,0,0],{fov:20});
+  out['area light 1']=await withTracer(lit,{maxBounces:4},async(t)=>{const image=await t.renderImage({width:32,height:32,samples:512,aovs:true,jitter:false});return stats(image,(i)=>image.instance[i]===0);});
+  // Subsurface random walk: a clear glass cube with interior scattering 0.5 per unit (optical depth 4 across) loses
+  // no energy apart from paths cut at 64 events.
+  look([14,10,18],[0,0,0],{fov:35});
+  out['white subsurface']=await withTracer(furnace([{id:1,color:[1,1,1],type:'glass',scatter:0.5,anisotropy:0.3}]),{maxBounces:64},async(t)=>{const image=await t.renderImage({width:96,height:72,samples:512,aovs:true,jitter:false});return stats(image,(i)=>image.instance[i]===0);});
+  // Shadow rays through media: an absorbing slab 4 deep at extinction 0.25 between a point sun of irradiance pi and
+  // a diffuse plane (albedo 0.5): radiance 0.5 exp(-1).
+  const shaded={revision:1,models:[model('p',[64,1,64],()=>1),model('s',[64,4,64],()=>2)],instances:[{id:'p',modelId:'p',matrix:translate(-32,-1,-32)},{id:'s',modelId:'s',matrix:translate(-32,2,-32)}],materials:[{id:1,color:[0.5,0.5,0.5],type:'diffuse'},{id:2,color:[0,0,0],type:'media',density:0.25}],environment:{skyIntensity:0,sunDirection:[0,1,0],sunIntensity:Math.PI,sunAngularSize:0}};
+  look([0,1,0.01],[0,0,0],{fov:20});
+  out['media shadow']=await withTracer(shaded,{maxBounces:4},async(t)=>{const image=await t.renderImage({width:32,height:32,samples:256,aovs:true,jitter:false});return stats(image,(i)=>image.instance[i]===0);});
+  // A non-uniform environment map (dim background, a bright patch high in the sky) over an upward diffuse plane
+  // (albedo 0.5): radiance 0.5 E / pi with E integrated exactly over the texels here.
+  {
+   const W=64,H=32,data=new Float32Array(W*H*3).fill(0.2);
+   for(let y=3;y<6;y++)for(let x=10;x<14;x++)data.set([60,50,40],(y*W+x)*3);
+   let E=[0,0,0];
+   for(let y=0;y<H/2;y++){const t0=y/H*Math.PI,t1=(y+1)/H*Math.PI,k=(2*Math.PI/W)*(Math.sin(t1)**2-Math.sin(t0)**2)/2;for(let x=0;x<W;x++)for(let c=0;c<3;c++)E[c]+=data[(y*W+x)*3+c]*k;}
+   const lit={revision:1,models:[model('p',[64,1,64],()=>1)],instances:[{id:'p',modelId:'p',matrix:translate(-32,-1,-32)}],materials:[{id:1,color:[0.5,0.5,0.5],type:'diffuse'}],environment:{map:{width:W,height:H,data,rotation:0.4}}};
+   look([0,6,0.01],[0,0,0],{fov:20});
+   const s=await withTracer(lit,{maxBounces:2},async(t)=>{const image=await t.renderImage({width:32,height:32,samples:1024,aovs:true,jitter:false});return stats(image,(i)=>image.instance[i]===0);});
+   out['env map plane']={...s,expected:0.5*(0.2126*E[0]+0.7152*E[1]+0.0722*E[2])/Math.PI};
+  }
+  look([20,14,24],[4,3,4]);
+  return {...out,errors:errors.splice(0)};
+ },
+ // Microfacet sampling against numerical integration: a flat plane under a sky of radiance 1 seen at one angle
+ // (orthographic) shows its directional albedo, which a midpoint quadrature of the same BRDF model computes here
+ // independently of the shader's importance sampling and weights.
+ async microfacet(){
+  const out={},D=(a2,c)=>{const k=c*c*(a2-1)+1;return a2/(Math.PI*k*k);},L=(a2,c)=>{const c2=Math.max(c*c,1e-8);return 0.5*(Math.sqrt(1+a2*(1-c2)/c2)-1);};
+  const schlick=(f0,c)=>f0+(1-f0)*(1-Math.min(1,Math.max(0,c)))**5;
+  // E(mu) = integral of f(wo, wi) cos(wi) over the hemisphere, f = metal and coat GGX lobes + coat-weighted Lambert.
+  const albedo=(mu,alpha,f0,diffuse)=>{const a2=alpha*alpha,wo=[Math.sqrt(1-mu*mu),0,mu],N=768;let e=diffuse?(1-schlick(f0,mu)):0;
+   for(let i=0;i<N;i++){const th=(i+0.5)/N*Math.PI/2,ci=Math.cos(th),si=Math.sin(th);for(let j=0;j<2*N;j++){const ph=(j+0.5)/(2*N)*2*Math.PI,wi=[si*Math.cos(ph),si*Math.sin(ph),ci];
+    const h=[wo[0]+wi[0],wo[1]+wi[1],wo[2]+wi[2]],hl=Math.hypot(...h),nh=h[2]/hl,vh=(wo[0]*h[0]+wo[1]*h[1]+wo[2]*h[2])/hl;
+    const f=D(a2,nh)/(1+L(a2,mu)+L(a2,ci))/(4*mu*ci)*schlick(f0,vh);e+=f*ci*si*(Math.PI/2/N)*(2*Math.PI/(2*N));}}return e;};
+  const plane={revision:1,models:[model('p',[64,1,64],()=>1)],instances:[{id:'p',modelId:'p',matrix:translate(-32,-1,-32)}],environment:{skyColor:[1,1,1]}};
+  for(const [name,material,f0,diffuse] of [['metal r0.5',{color:[1,1,1],type:'metal',roughness:0.5},1,false],['metal r0.8',{color:[1,1,1],type:'metal',roughness:0.8},1,false],['plastic r0.4',{color:[1,1,1],type:'plastic',roughness:0.4},0.04,true]])
+   for(const deg of [20,60,80]){
+    const mu=Math.cos(deg*Math.PI/180),r=material.roughness;
+    look([50*Math.sin(deg*Math.PI/180),50*mu,0],[0,0,0],{project:ortho(4)});
+    const measured=await withTracer({...plane,materials:[{id:1,...material}]},{maxBounces:2},async(t)=>{const image=await t.renderImage({width:24,height:24,samples:2048,aovs:true,jitter:false});return stats(image,(i)=>image.instance[i]===0);});
+    out[`${name} ${deg} deg`]={measured:measured.mean,sd:measured.sd,pixels:measured.pixels,integrated:albedo(mu,r*r,f0,diffuse)};
+   }
+  look([20,14,24],[4,3,4]);
+  return {...out,errors:errors.splice(0)};
+ },
+ // Environment map orientation: an image whose columns are coloured by azimuth, seen straight along -Z, +X, -X.
+ async environment(){
+  const W=64,H=32,data=new Float32Array(W*H*3);
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const q=Math.floor(x/(W/4));data.set(q===0?[1,0,0]:q===1?[0,1,0]:q===2?[0,0,1]:[1,1,0],(y*W+x)*3);}
+  const scene={revision:1,models:[],instances:[],materials:[],environment:{map:{width:W,height:H,data}}},out={};
+  for(const [name,target] of [['-z',[0,0,-1]],['+x',[1,0,0]],['-x',[-1,0,0]],['+z',[0,0,1]]]){
+   look([0,0,0],target,{fov:10});
+   out[name]=await withTracer(scene,{},async(t)=>{const image=await t.renderImage({width:8,height:8,samples:4});return [...image.color.subarray(4*8*3+12,4*8*3+15)].map((v)=>Math.round(v*100)/100);});
+  }
+  look([20,14,24],[4,3,4]);
+  return {...out,errors:errors.splice(0)};
+ },
+ // Same seed: the same image twice; another seed: a different one.
+ async determinism(){
+  look([18,14,26],[-3,3,-2]);
+  const scene=scenes.materials();
+  return withTracer(scene,{},async(t)=>{
+   const a=await t.renderImage({width:96,height:64,samples:16,seed:5}),b=await t.renderImage({width:96,height:64,samples:16,seed:5}),c=await t.renderImage({width:96,height:64,samples:16,seed:6});
+   let same=0,other=0;for(let i=0;i<a.color.length;i++){if(a.color[i]===b.color[i])same++;if(a.color[i]!==c.color[i])other++;}
+   return {values:a.color.length,identical:same,differentWithOtherSeed:other,errors:errors.splice(0)};
+  });
+ },
+ // Error against a 16384-sample reference falls as samples grow, for both projections (diffuse scene), and for the
+ // glossy scene (reported: its small-sun glossy caustics converge slower).
+ async convergence(){
+  const out={};
+  for(const [name,scene,extra] of [['perspective',scenes.diffuse(),{}],['orthographic',scenes.diffuse(),{project:ortho(30)}],['glossy perspective',scenes.opaque(),{}]]){
+   look([18,14,26],[-3,3,-2],extra);
+   out[name]=await withTracer(scene,{},async(t)=>{
+    const W=128,H=80,reference=await t.renderImage({width:W,height:H,samples:16384,seed:99}),r={};
+    for(const n of [16,64,256,1024])r[n]=error(await t.renderImage({width:W,height:H,samples:n,seed:1}),reference);
+    return r;
+   });
+  }
+  look([20,14,24],[4,3,4]);
+  return {...out,errors:errors.splice(0)};
+ },
+ // Denoiser evidence: error against a 16384-sample reference with and without denoising, overall and at object
+ // edges (pixels whose 3x3 neighbourhood holds another instance id).
+ async denoise(){
+  const out={};
+  for(const name of ['diffuse','opaque','materials']){
+   look([18,14,26],[-3,3,-2]);
+   out[name]=await withTracer(scenes[name](),{},async(t)=>{
+    const W=480,H=300,reference=await t.renderImage({width:W,height:H,samples:16384,seed:99,aovs:true}),ids=reference.instance,edge=new Uint8Array(W*H);
+    for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++)for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)if(ids[(y+dy)*W+x+dx]!==ids[y*W+x])edge[y*W+x]=1;
+    const masked=(a,m)=>{let se=0,n=0;for(let i=0;i<W*H;i++){if(!m(i))continue;const d=neutral(lum(a.color,i))-neutral(lum(reference.color,i));se+=d*d;n++;}return Math.sqrt(se/n);};
+    const r={edgePixels:edge.reduce((a,b)=>a+b,0)};
+    for(const n of [4,16,64,1024]){
+     const raw=await t.renderImage({width:W,height:H,samples:n,seed:1}),den=await t.renderImage({width:W,height:H,samples:n,seed:1,denoise:true});
+     r[n]={raw:masked(raw,()=>true),denoised:masked(den,()=>true),rawEdges:masked(raw,(i)=>edge[i]),denoisedEdges:masked(den,(i)=>edge[i])};
+    }
+    return r;
+   });
+  }
+  look([20,14,24],[4,3,4]);
+  return {...out,errors:errors.splice(0)};
+ },
+ // Depth of field: a thin bright bar at the focus distance stays sharp; the same bar 6 units nearer spreads out.
+ // Motion blur: a cube moving 8 units with the shutter fully open covers its path at partial coverage.
+ async lens(){
+  const bars={revision:1,models:[model('bar',[1,12,1],()=>1)],instances:[{id:'near',modelId:'bar',matrix:translate(-3,-6,4)},{id:'far',modelId:'bar',matrix:translate(3,-6,-2)}],materials:[{id:1,color:[1,1,1],type:'emit',emission:4}],environment:{skyIntensity:0}};
+  look([0,0,20],[0,0,0],{fov:40});
+  // Edge spread of each bar along the middle row: pixels between 10% and 90% of the bar's peak.
+  const widths=(image)=>{const row=Math.floor(image.height/2),l=[];for(let x=0;x<image.width;x++)l.push(lum(image.color,row*image.width+x));
+   const half=image.width/2,w=(a,b)=>{const seg=l.slice(a,b),peak=Math.max(...seg);return seg.filter((v)=>v>0.1*peak&&v<0.9*peak).length;};return {near:w(0,half),far:w(half,image.width)};};
+  // The far bar's front face is 21 units from the camera, the near bar's 15.
+  const sharp=await withTracer(bars,{aperture:0},async(t)=>widths(await t.renderImage({width:200,height:100,samples:256}))),
+   focused=await withTracer(bars,{aperture:2,focusDistance:21},async(t)=>widths(await t.renderImage({width:200,height:100,samples:1024})));
+  const moving={revision:1,models:[solid(2,1)],instances:[{id:'m',modelId:'cube',matrix:translate(3,-1,-1),previousMatrix:translate(-5,-1,-1)}],materials:[{id:1,color:[1,1,1],type:'emit',emission:1}],environment:{skyIntensity:0}};
+  look([0,0,20],[0,0,0],{fov:40});
+  const coverage=async(shutter)=>withTracer(moving,{shutter},async(t)=>{const image=await t.renderImage({width:200,height:100,samples:256}),row=50,v=[];for(let x=0;x<200;x++)v.push(lum(image.color,row*200+x));
+   return {lit:v.filter((x)=>x>0.02).length,full:v.filter((x)=>x>0.98).length,max:Math.max(...v)};});
+  const still=await coverage(0),blurred=await coverage(1);
+  look([20,14,24],[4,3,4]);
+  return {sharp,focused,still,blurred,errors:errors.splice(0)};
+ },
+ // Viewport: disabled leaves the raster frame bit for bit, enabled replaces it, dispose restores it, and a device
+ // restore draws the same traced image again (fixed seed, converged).
+ async viewport(){
+  const mesh=engine.createMesh();mesh.setGeometry(box());mesh.setScale([3,3,3]);
+  look([18,14,26],[-3,3,-2]);
+  const raster=await shot();
+  const tracer=VoxelPathTracer.attach(engine,{scene:scenes.materials(),maxSamples:16,samplesPerFrame:4});
+  await tracer.ready;
+  tracer.enabled=false;const disabled=await shot();
+  tracer.enabled=true;
+  let i=0;while(!tracer.stats.converged&&i++<200){engine.render({delta:0});await device().queue.onSubmittedWorkDone();await new Promise((r)=>setTimeout(r,1));}
+  engine.render({delta:0});const traced=readCanvas(),statsBefore=tracer.stats;
+  const old=device();await engine.rebootDevice();watch(device());
+  i=0;while(tracer.status!=='ready'&&i++<500)await new Promise((r)=>setTimeout(r,10));
+  i=0;while(!tracer.stats.converged&&i++<500){engine.render({delta:0});await device().queue.onSubmittedWorkDone();await new Promise((r)=>setTimeout(r,1));}
+  engine.render({delta:0});const restored=readCanvas(),statsAfter=tracer.stats;
+  // Resize: the traced size follows the canvas and accumulation restarts.
+  canvas.style.width='400px';await frames(1);const resized=tracer.stats;canvas.style.width='320px';
+  tracer.dispose();const after=await shot();
+  mesh.dispose();
+  return {disabled:diff(disabled,raster),traced:diff(traced,raster),restored:diff(restored,traced),afterDispose:diff(after,raster),newDevice:device()!==old,statsBefore,statsAfter,resized,errors:errors.splice(0),messages:messages.splice(0)};
+ },
+ // With @margoengine/post's Bloom the tracer draws linear HDR into Bloom's rgba16float scene target and Bloom tone maps:
+ // a bright emitter gains a glow around it that the plain traced frame does not have.
+ async bloom(){
+  const {Bloom}=await import('/packages/post/dist/bloom.js');
+  look([18,14,26],[-3,3,-2]);
+  const tracer=VoxelPathTracer.attach(engine,{scene:scenes.materials(),maxSamples:8,samplesPerFrame:4});
+  await tracer.ready;
+  const settle=async()=>{tracer.reset();for(let i=0;i<50&&!tracer.stats.converged;i++){engine.render({delta:0});await device().queue.onSubmittedWorkDone();await new Promise((r)=>setTimeout(r,1));}};
+  await settle();const plain=await shot();
+  const bloom=Bloom.attach(engine,{strength:0.6,threshold:1});
+  await settle();const bloomed=await shot();
+  bloom.dispose();tracer.dispose();
+  return {difference:diff(bloomed,plain),errors:errors.splice(0),messages:messages.splice(0)};
+ },
+ // Captures: a PNG of the asked size decodes to it; cancelling stops early; the interactive image is untouched.
+ async capture(){
+  look([18,14,26],[-3,3,-2]);
+  return withTracer(scenes.materials(),{denoise:true},async(t)=>{
+   const t0=performance.now(),png=await t.capture({width:1500,height:1100,samples:64}),ms=performance.now()-t0,bitmap=await createImageBitmap(png);
+   const controller=new AbortController(),t1=performance.now(),job=t.capture({width:2048,height:2048,samples:4096,signal:controller.signal});
+   setTimeout(()=>controller.abort(),300);
+   let reason;try{await job;}catch(e){reason=e.name;}
+   return {size:[bitmap.width,bitmap.height],bytes:png.size,ms,cancelledAfterMs:performance.now()-t1,reason,png:await toBase64(png),gpuBytesAfter:t.stats.gpuBytes,errors:errors.splice(0)};
+  });
+ },
+ async picture(name,width,height,samples,camera,options={}){
+  look(...camera);
+  return withTracer(scenes[name](),options,async(t)=>{const t0=performance.now(),png=await t.capture({width,height,samples});return {png:await toBase64(png),ms:performance.now()-t0,errors:errors.splice(0)};});
+ },
+ // Timing on this GPU: viewport GPU time per frame (timestamp queries around the tracer's pass) at 1920 x 1080,
+ // scene upload time and memory, for the material scene and a dense 256^3 model.
+ async timing(){
+  const results={};
+  const d=device(),query=d.createQuerySet({type:'timestamp',count:2}),resolve=d.createBuffer({size:16,usage:GPUBufferUsage.QUERY_RESOLVE|GPUBufferUsage.COPY_SRC}),read=d.createBuffer({size:16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+  const stamp=(name,order,index)=>runtime().frameGraph.add({name,order,execute:(c)=>c.encoder.beginComputePass({timestampWrites:{querySet:query,beginningOfPassWriteIndex:index}}).end()});
+  const off=[stamp('t0',19.999,0),stamp('t1',20.001,1),runtime().frameGraph.add({name:'t-resolve',order:99,execute:(c)=>{c.encoder.resolveQuerySet(query,0,2,resolve,0);c.encoder.copyBufferToBuffer(resolve,0,read,0,16);}})];
+  canvas.style.width='1920px';canvas.style.height='1080px';
+  // A dense model: 256^3 with terrain-like hills (about 6 million voxels), several materials.
+  let seed=3;const random=()=>((seed=(Math.imul(seed,1103515245)+12345)>>>0)>>>8)/16777216;
+  const t0=performance.now(),big=model('big',[256,256,256],(x,y,z)=>{const h=60+30*Math.sin(x*0.05)*Math.cos(z*0.04)+10*Math.sin(x*0.13+z*0.11);return y<h?(y>h-2?2:1):(y<h+1&&random()<0.02?3:0);}),buildMs=performance.now()-t0;
+  const dense={revision:1,models:[big],instances:[{id:'big',modelId:'big',matrix:translate(-128,-60,-128)}],materials:[{id:1,color:[0.5,0.4,0.3],type:'diffuse'},{id:2,color:[0.3,0.6,0.2],type:'diffuse'},{id:3,color:[1,0.8,0.4],type:'emit',emission:5}],environment:{skyColor:[0.6,0.7,1],sunIntensity:3,sunDirection:[0.3,0.8,0.2],groundColor:[0.3,0.3,0.3],groundHeight:-60}};
+  let occupied=0;for(const v of big.voxels)if(v)occupied++;
+  for(const [name,scene,camera,options] of [
+   ['materials 1 spp',scenes.materials(),[[18,14,26],[-3,3,-2]],{}],
+   ['materials 1 spp denoised',scenes.materials(),[[18,14,26],[-3,3,-2]],{denoise:true}],
+   ['dense 256^3 1 spp',dense,[[180,120,200],[0,0,0]],{}],
+   ['dense 256^3 4 spp',dense,[[180,120,200],[0,0,0]],{samplesPerFrame:4}],
+  ]){
+   look(...camera);
+   const a0=performance.now(),tracer=VoxelPathTracer.attach(engine,{scene,maxSamples:Infinity,...options}),attachMs=performance.now()-a0;
+   await tracer.ready;
+   for(let i=0;i<10;i++){engine.render({delta:0});await d.queue.onSubmittedWorkDone();}
+   const gpu=[],cpu=[];
+   for(let i=0;i<40;i++){const c0=performance.now();engine.render({delta:0});cpu.push(performance.now()-c0);await read.mapAsync(GPUMapMode.READ);const s=new BigInt64Array(read.getMappedRange().slice(0));read.unmap();gpu.push(Number(s[1]-s[0])/1e6);}
+   const u0=performance.now();tracer.setScene({...scene,revision:2});const resceneMs=performance.now()-u0;
+   const median=(a)=>[...a].sort((x,y)=>x-y)[a.length>>1];
+   results[name]={size:[canvas.width,canvas.height],gpuMs:median(gpu),gpuMinMs:Math.min(...gpu),cpuEncodeMs:median(cpu),attachMs,setSceneSameRevisionMs:resceneMs,gpuBytes:tracer.stats.gpuBytes,samples:tracer.stats.samples};
+   tracer.dispose();
+  }
+  // Packing cost of a changed 256^3 model (new revision): what an edit costs on the CPU.
+  const p0=performance.now(),tr=VoxelPathTracer.attach(engine,{scene:dense});const firstPackMs=performance.now()-p0;
+  const q0=performance.now();tr.setScene({...dense,revision:3,models:[{...big,revision:2}]});const repackMs=performance.now()-q0;tr.dispose();
+  for(const f of off)f();
+  canvas.style.width='320px';canvas.style.height='240px';
+  look([20,14,24],[4,3,4]);
+  return {results,dense:{occupied,buildDenseArrayMs:buildMs,attachAndPackMs:firstPackMs,repackMs},errors:errors.splice(0)};
+ },
+};
+window.ready=true;
+</script></body></html>
