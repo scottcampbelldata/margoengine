@@ -69,14 +69,16 @@ C:\Development\Projects\margo3d-studio.
 
 Voxel path tracer (2026-10-19, for the clean-room MagicaVoxel-equivalent editor Codex builds in
 `C:\Development\Projects\MagicaVoxel`): new optional package `@margoengine/voxel-pathtracer` (`VoxelPathTracer`, the
-editor's agreed contract plus compatible additions; core and stage untouched, 29,256 B gzip root entry). Node tests
-(29, about 0.6 s) run in `npm run verify`; the real-GPU check `packages/voxel-pathtracer/tests/browser-check.mjs`
-(run under the GPU lock) passes on the A6000: per-pixel GPU/CPU traversal agreement, closed-form furnace, Beer-Lambert,
-irradiance and emitter-MIS values, GGX albedo against numerical integration, 1/sqrt(N) convergence, denoiser error
-x2.3 lower at 16 samples, the raster frame bit for bit when disabled or disposed, the same converged image after a
-device restore. Open items
-(no MagicaVoxel image comparison, single-scattering GGX energy loss, classical denoiser, slow small-sun caustics) are
-listed in its README.
+editor's agreed contract plus compatible additions; core and stage untouched, 42,991 B gzip root entry). Node tests
+(35, about 0.6 s) run in `npm run verify`; the real-GPU check `packages/voxel-pathtracer/tests/browser-check.mjs`
+(run under the GPU lock) passes on the A6000: per-pixel GPU/CPU traversal agreement (also panorama, fisheye and lens
+distortion), closed-form furnace, Beer-Lambert, irradiance and emitter-MIS values, energy-compensated white furnaces
+within 0.79%, light through glass and off mirrors, dispersion against Snell per wavelength, emissive media, area-light
+shadows, camera motion blur width, the Preetham sky against its formulas, 1/sqrt(N) convergence, denoiser error at
+least x2 lower at 4/16/64 samples on two glass scenes, the raster frame bit for bit when disabled or disposed, the same
+converged image after a device restore. Light sampling through glass costs time per sample (README, "Measured
+performance"). Open items (no MagicaVoxel image comparison; synthetic comparison scenes are in
+`test-results/pt-compare`) are listed in its README.
 
 Tile editor engine work (Scott, 2026-10-18/19): Scott started `tile-asset-editor` (a Crocotile 3D 2.7.4 equivalent,
 own repository `scottcampbelldata/tile-asset-editor`) as the base of his own 3D modeller and game engine, and
