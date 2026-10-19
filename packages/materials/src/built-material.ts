@@ -19,6 +19,7 @@ import { physicalMapsShader } from './physical-maps.js';
 import { depthDistanceShader } from './depth-distance.js';
 import { readResponse } from '../../shared/loading.js';
 import { MargoError } from '@margoengine/math/errors';
+import { parseColor, type ColorInput } from '@margoengine/math/color';
 export type { TextureTransform, MaterialSide } from '@margoengine/gltf-pro';
 export { packAtlas, transformUVs, type Atlas, type AtlasOptions } from './atlas.js';
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
@@ -373,7 +374,8 @@ export async function loadTexture(
 export type Shading = 'standard' | 'basic' | 'normal' | 'matcap' | 'depth' | 'distance' | 'lambert' | 'phong';
 export type DepthPacking = 'basic' | 'rgba';
 export type Blending = 'normal' | 'additive' | 'multiply' | 'none';
-type Color = string | readonly number[];
+/** A live linear colour array (what gltf-pro reads every frame) whose `set` takes any colour input, like the option. */
+type LiveColor = number[] & { set(value: ColorInput): number[] };
 /**
  * Physical options (three.js MeshPhysicalMaterial names, glTF KHR_materials_* meaning; gltf-pro's physical shader draws
  * them, so a mesh and the same glTF material render alike). Any of them makes the material physical, fixed at
@@ -389,14 +391,14 @@ export interface PhysicalOptions {
   clearcoatNormalMap?: Texture | null;
   clearcoatNormalScale?: number;
   /** KHR_materials_sheen: sheen colour (default black: none) and roughness 0-1. */
-  sheenColor?: Color;
+  sheenColor?: ColorInput;
   sheenRoughness?: number;
   /** sRGB RGB colour and linear A roughness. */
   sheenColorMap?: Texture | null;
   sheenRoughnessMap?: Texture | null;
   /** KHR_materials_specular: dielectric specular strength 0-1 and F0 colour. */
   specularIntensity?: number;
-  specularColor?: Color;
+  specularColor?: ColorInput;
   /** Linear A intensity and sRGB RGB colour. */
   specularIntensityMap?: Texture | null;
   specularColorMap?: Texture | null;
@@ -422,7 +424,7 @@ export interface PhysicalOptions {
   thicknessMap?: Texture | null;
   /** KHR_materials_volume: thickness in mesh units (0 = thin-walled, no refraction), and the colour white light reaches after `attenuationDistance` world units inside. */
   thickness?: number;
-  attenuationColor?: Color;
+  attenuationColor?: ColorInput;
   attenuationDistance?: number;
 }
 export interface MaterialOptions extends PhysicalOptions {
@@ -435,13 +437,13 @@ export interface MaterialOptions extends PhysicalOptions {
   nearDistance?: number;
   farDistance?: number;
   /** Phong only: highlight colour (default sRGB `#111111`) and Blinn-Phong exponent, finite and >= 0 (default 30). Live. */
-  specular?: Color;
+  specular?: ColorInput;
   shininess?: number;
-  color?: Color;
+  color?: ColorInput;
   opacity?: number;
   roughness?: number;
   metalness?: number;
-  emissive?: Color;
+  emissive?: ColorInput;
   map?: Texture | null;
   metalRoughnessMap?: Texture | null;
   normalMap?: Texture | null;
@@ -581,22 +583,32 @@ const extensions: Record<keyof PhysicalOptions, string> = {
   attenuationColor: 'volume',
   attenuationDistance: 'volume',
 };
-const linear = (c: Color, label: string): number[] => {
+// '#rrggbb', '#rgb' and 0xrrggbb are sRGB (math's parseColor); arrays are linear [r, g, b] or [r, g, b, a], each 0-1.
+const linear = (c: ColorInput, label: string): number[] => {
+  if (typeof c === 'number' && !(Number.isInteger(c) && c >= 0 && c <= 0xffffff))
+    throw new RangeError('Material ' + label + ' number must be a 0xrrggbb sRGB colour; set 0x000000 through 0xffffff');
   const v =
-    typeof c === 'string'
-      ? /^#[0-9a-f]{6}$/i.test(c)
-        ? [1, 3, 5].map((i) => {
-            const x = parseInt(c.slice(i, i + 2), 16) / 255;
-            return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
-          })
-        : []
+    typeof c === 'number' || (typeof c === 'string' && /^#([0-9a-f]{3}){1,2}$/i.test(c))
+      ? (parseColor(c) as number[])
       : Array.isArray(c)
         ? [...c]
         : [];
-  if (v.length < 3 || v.length > 4) throw new TypeError('Invalid material ' + label);
+  if (v.length < 3 || v.length > 4)
+    throw new TypeError(
+      'Invalid material ' + label + "; set '#rrggbb', '#rgb', 0xrrggbb or linear [r, g, b] with components 0-1",
+    );
   v.forEach((x) => unit(x, label));
   return v;
 };
+/** `values` with a `set(input)` that writes the parsed colour into it (opacity only from a four-component array). */
+const liveColor = (values: number[], label: string): LiveColor =>
+  Object.defineProperty(values, 'set', {
+    value(input: ColorInput) {
+      const v = linear(input, label);
+      for (let k = 0; k < Math.min(v.length, values.length); k++) values[k] = v[k];
+      return values;
+    },
+  }) as LiveColor;
 // Lambert and Blinn-Phong rewrite gltf-pro's direct and hemisphere terms in place, so every lighting hook point
 // (direct+ambient(s), var color=, fn ambient, the tone-map line) and the shadows, fog and SSAO hooks stay. Radiance is
 // scaled as on the standard path: the diffuse BRDF base/pi times n.l times the light's irradiance, the hemisphere times
@@ -774,10 +786,9 @@ export class Material {
   private reference: readonly [number, number, number] = [0, 0, 0];
   private near = 1;
   private far = 1000;
-  readonly color: number[];
-  readonly emissive: number[];
-  /** Phong highlight colour, linear RGB (live array). */
-  readonly specular: number[];
+  private readonly rgba: LiveColor;
+  private readonly glow: LiveColor;
+  private readonly highlight: LiveColor;
   private gloss = 30;
   readonly blending: Blending;
   readonly depthWrite?: boolean;
@@ -973,12 +984,13 @@ export class Material {
         'Material stencil function or operation is invalid; use a WebGPU comparison and stencil operation name',
       );
     this.blend = o.transparent ?? false;
-    this.color = linear(o.color ?? [1, 1, 1], 'color');
-    if (this.color.length === 3) this.color.push(unit(o.opacity ?? 1, 'opacity'));
-    this.emissive = linear(o.emissive ?? [0, 0, 0], 'emissive').slice(0, 3);
+    const rgba = linear(o.color ?? [1, 1, 1], 'color');
+    if (rgba.length === 3) rgba.push(unit(o.opacity ?? 1, 'opacity'));
+    this.rgba = liveColor(rgba, 'color');
+    this.glow = liveColor(linear(o.emissive ?? [0, 0, 0], 'emissive').slice(0, 3), 'emissive');
     if ((o.specular !== undefined || o.shininess !== undefined) && shading !== 'phong')
       throw new TypeError("Material specular and shininess need phong shading; set shading: 'phong'");
-    this.specular = linear(o.specular ?? '#111111', 'specular').slice(0, 3);
+    this.highlight = liveColor(linear(o.specular ?? '#111111', 'specular').slice(0, 3), 'specular');
     this.shininess = o.shininess ?? 30;
     this.factors = [
       unit(o.roughness ?? 1, 'roughness'),
@@ -1027,6 +1039,31 @@ export class Material {
     if (mapped(this)) while (this.uvt.length < mapSlots.length * 8) this.uvt.push(...this.uvDefault);
     Object.assign(this, Object.fromEntries(used.map((k) => [k, o[k]])));
   }
+  /**
+   * Base colour, linear RGBA with opacity in [3]: the live array every mesh reads. `color.set(input)` and
+   * `color = input` take '#rrggbb', '#rgb', 0xrrggbb (sRGB) or linear [r, g, b] (keeping opacity) or [r, g, b, a];
+   * writing elements in place also works.
+   */
+  get color(): LiveColor {
+    return this.rgba;
+  }
+  set color(v: ColorInput) {
+    this.rgba.set(v);
+  }
+  /** Emissive colour, linear RGB, live like `color`. */
+  get emissive(): LiveColor {
+    return this.glow;
+  }
+  set emissive(v: ColorInput) {
+    this.glow.set(v);
+  }
+  /** Phong highlight colour, linear RGB, live like `color`. */
+  get specular(): LiveColor {
+    return this.highlight;
+  }
+  set specular(v: ColorInput) {
+    this.highlight.set(v);
+  }
   get depthPacking(): DepthPacking {
     return this.packing;
   }
@@ -1063,7 +1100,7 @@ export class Material {
     if (!this.physical) throw new TypeError(`Material ${label} needs a physical option at construction`);
     this.physical[i] = unit(v, label);
   }
-  private setColor(i: number, c: Color, label: string): void {
+  private setColor(i: number, c: ColorInput, label: string): void {
     const v = linear(c, label);
     for (let k = 0; k < 3; k++) this.set(i + k, v[k], label);
   }
@@ -1152,7 +1189,7 @@ export class Material {
   get specularColor(): number[] {
     return this.physical?.slice(4, 7) ?? [1, 1, 1];
   }
-  set specularColor(c: Color) {
+  set specularColor(c: ColorInput) {
     this.setColor(4, c, 'specularColor');
   }
   get specularIntensity(): number {
@@ -1164,7 +1201,7 @@ export class Material {
   get sheenColor(): number[] {
     return this.physical?.slice(8, 11) ?? [0, 0, 0];
   }
-  set sheenColor(c: Color) {
+  set sheenColor(c: ColorInput) {
     this.setColor(8, c, 'sheenColor');
   }
   get sheenRoughness(): number {
@@ -1199,7 +1236,7 @@ export class Material {
   get attenuationColor(): number[] {
     return this.attenuation.slice(0, 3);
   }
-  set attenuationColor(c: Color) {
+  set attenuationColor(c: ColorInput) {
     const v = linear(c, 'attenuationColor');
     for (let k = 0; k < 3; k++) this.setVolume(k + 1, v[k], 'attenuationColor');
   }

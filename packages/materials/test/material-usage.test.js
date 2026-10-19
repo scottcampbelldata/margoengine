@@ -204,3 +204,66 @@ test('swapping between extended physical materials recompiles gltf-pro for the n
   );
   s.engine.dispose();
 });
+
+test('colours take set(input) and assignment with hex strings, 0xrrggbb numbers and linear arrays, live', async () => {
+  const s = await scene(),
+    m = new PhongMaterial({ color: 0xff8000, opacity: 0.5 }),
+    mesh = createMesh(s.engine, quad, m),
+    color = m.color;
+  assert.deepEqual(new Material({ color: 0xff8000 }).color, new Material({ color: '#ff8000' }).color);
+  assert.deepEqual(m.color.set('#00f'), [0, 0, 1, 0.5], 'hex keeps opacity');
+  m.color = 0x00ff00;
+  assert.equal(m.color, color, 'assignment writes into the live array');
+  assert.deepEqual(m.color, [0, 1, 0, 0.5]);
+  m.color.set([0.1, 0.2, 0.3]);
+  assert.deepEqual(m.color, [0.1, 0.2, 0.3, 0.5]);
+  m.color = [0, 0, 1, 1];
+  assert.equal(m.opacity, 1, 'a four-component array sets opacity too');
+  m.emissive.set(0x808080);
+  assert.ok(Math.abs(m.emissive[0] - 0.2158605) < 1e-6, 'numbers are sRGB');
+  m.emissive = '#000';
+  m.specular = 0xffffff;
+  assert.deepEqual([...m.emissive, ...m.specular], [0, 0, 0, 1, 1, 1]);
+  m.color[1] = 0.25; // element writes keep working
+  assert.equal(mesh.primitives[0].material.base, color);
+  const log = s.frame(),
+    frame = of(log, 'writeBuffer').find((e) => e[3].length === 880 * 2);
+  assert.deepEqual([...floats(frame[3]).slice(76, 80)], [0, 0.25, 1, 1]);
+  const phong = phongBuffers(log)[0];
+  assert.deepEqual(
+    [...floats(of(log, 'writeBuffer').find((e) => e[1] === phong[1])[3])],
+    [1, 1, 1, 30],
+    'Phong reads the assigned specular',
+  );
+  // Every colour option takes numbers.
+  const glass = new Material({
+    sheenColor: 0xffffff,
+    specularColor: 0x000000,
+    attenuationColor: 0x808080,
+    transmission: 1,
+  });
+  assert.deepEqual(
+    [glass.sheenColor, glass.specularColor],
+    [
+      [1, 1, 1],
+      [0, 0, 0],
+    ],
+  );
+  glass.sheenColor = 0x000000;
+  assert.deepEqual(glass.sheenColor, [0, 0, 0]);
+  assert.ok(Math.abs(glass.attenuationColor[0] - 0.2158605) < 1e-6);
+  for (const [value, name] of [
+    [0x1000000, 'RangeError'],
+    [1.5, 'RangeError'],
+    [-1, 'RangeError'],
+    ['red', 'TypeError'],
+    ['#ff00', 'TypeError'],
+    [[1, 1], 'TypeError'],
+    [[2, 0, 0], 'RangeError'],
+  ]) {
+    assert.throws(() => new Material({ color: value }), { name, message: /material color/i });
+    assert.throws(() => m.color.set(value), { name });
+  }
+  assert.deepEqual(m.color, [0, 0.25, 1, 1], 'a rejected colour changes nothing');
+  s.engine.dispose();
+});
