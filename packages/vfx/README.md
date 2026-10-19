@@ -38,6 +38,26 @@ and make the same GPU calls:
   million.
 - `texture: {width, height, data}` (RGBA8, sRGB, up to 4096²) replaces the soft disc; texel RGB multiplies the
   particle colour and texel alpha its opacity. Copied at construction.
+- `texture: {width, height, data, atlas: {columns, rows, frames}}` treats the texture as `columns` x `rows` equal
+  frames, numbered left to right from the top row. `frames: 'random'` gives each particle one frame picked when it
+  spawns (block-break debris showing pieces of the block's texture); `'lifetime'` steps each particle through every
+  frame in order from spawn to death (a flipbook). Sampling stays half a texel inside the frame, so linear filtering
+  never shows a neighbouring frame, and the billboard triangle grows to hold the whole square frame. Without `atlas`
+  the WGSL and GPU calls are unchanged.
+
+```ts
+// Block-break debris: 24 pieces of a 16 x 16 block texture, a random 4 x 4 texel piece each.
+const debris = VFX.attach(engine, {
+  capacity: 256, rate: 0, size: 0.1, lifetime: [0.5, 1], velocity: [0, 3, 0], spread: 2, ground: 0,
+  texture: {width: 16, height: 16, data: stonePixels, atlas: {columns: 4, rows: 4, frames: 'random'}},
+});
+debris.options.position = [x + 0.5, y + 0.5, z + 0.5];
+debris.burst(24);
+```
+
+`node packages/vfx/test/browser-check.mjs` (real GPU; run it under `node scripts/gpu-lock.mjs run`) draws 64
+particles with a 2 x 2 atlas at 1x and 4x MSAA and checks each one's centre and four points near its corners against
+the frame it must show (the shader's hash of its birth angle for `'random'`, its age quarter for `'lifetime'`).
 
 `obstacles`, `wrap`, `sort` and `texture` are read when the effect attaches.
 
@@ -62,12 +82,12 @@ span from 15.7 to 13.5 ms. Same particle state and pixels within the old rendere
 
 ### Load only what you use
 
-`VFX` from `@margoengine/vfx` (about 7.0 kB min+gzip) carries all four features. An effect that uses none of them can
-import the same class from `@margoengine/vfx/base` (about 5.2 kB); add features as a second argument from their own
-entries: `/obstacles` (1.2 kB alone), `/wrap` (0.4 kB), `/sort` (1.1 kB), `/texture` (0.6 kB). Sizes are vite library
+`VFX` from `@margoengine/vfx` (about 8.1 kB min+gzip) carries all four features. An effect that uses none of them can
+import the same class from `@margoengine/vfx/base` (about 5.8 kB); add features as a second argument from their own
+entries: `/obstacles` (1.2 kB alone), `/wrap` (0.4 kB), `/sort` (1.1 kB), `/texture` (1.3 kB). Sizes are vite library
 builds with bare imports external, each entry compressed on its own
 ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)), so a bundle that combines them adds
-less: the whole root is 7.0 kB. `node examples/package-benchmarks/vfx-size.mjs` measures base-plus-feature bundles
+less: the whole root is 8.1 kB. `node examples/package-benchmarks/vfx-size.mjs` measures base-plus-feature bundles
 (`results/vfx-size.json`, at an earlier commit, `76af7a0`).
 
 ```ts

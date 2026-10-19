@@ -1,0 +1,61 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>VFX atlas browser check</title></head><body>
+<script type="module">
+// Draws 64 particles with an atlas texture on the real GPU and reads back the pixels. The particle records are written
+// directly (an 8 x 8 grid facing the camera, known birth angles and ages), so every particle's frame is known: for
+// 'random' the same hash of the birth angle the shader uses, for 'lifetime' the age bucket.
+import {VFX} from '/packages/vfx/dist/index.js';
+import {Camera} from '/packages/core/dist/extension.js';
+const adapter=await navigator.gpu.requestAdapter({powerPreference:'high-performance'}),device=await adapter.requestDevice(),errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const size=256,grid=8,n=grid*grid,sprite=0.5,spacing=0.8;
+const camera=new Camera({position:[0,0,10],target:[0,0,0],fov:40,near:0.1,far:100});camera.update(1,true);
+// 8 x 8 texels in four 4 x 4 frames: red, green on the top row; blue, white below.
+const colors=[[255,0,0],[0,255,0],[0,0,255],[255,255,255]],data=new Uint8Array(8*8*4);
+for(let y=0;y<8;y++)for(let x=0;x<8;x++)data.set([...colors[(y>>2)*2+(x>>2)],255],(y*8+x)*4);
+const hash=v=>{let x=v>>>0;x=Math.imul(x^(x>>>16),0x7feb352d)>>>0;x=Math.imul(x^(x>>>15),0x846ca68b)>>>0;return(x^(x>>>16))>>>0;};
+const project=(x,y)=>{const m=camera.matrix,w=m[3]*x+m[7]*y+m[15];return[Math.floor(((m[0]*x+m[4]*y+m[12])/w*0.5+0.5)*size),Math.floor((0.5-(m[1]*x+m[5]*y+m[13])/w*0.5)*size)];};
+window.check=async(frames,samples)=>{
+ const effect=new VFX({capacity:n,rate:0,gravity:[0,0,0],velocity:[0,0,0],spread:0,turbulence:0,ground:-100,size:sprite,texture:{width:8,height:8,data,atlas:{columns:2,rows:2,frames}}});
+ // Split layout: position/life and velocity/size of every particle, then colour and rotation (angle, spin, initial life).
+ const records=new Float32Array(n*16),bits=new Uint32Array(records.buffer),expected=[];
+ for(let i=0;i<n;i++){
+  const x=((i%grid)-3.5)*spacing,y=(3.5-Math.floor(i/grid))*spacing,age=frames==='lifetime'?((i%4)+0.5)/4:0;
+  records.set([x,y,0,4*(1-age),0,0,0,sprite],i*8);records.set([1,1,1,1,i*0.37,0,4,0],n*8+i*8);
+  expected.push({x,y,angle:records[n*8+i*8+4],frame:frames==='lifetime'?i%4:hash(bits[n*8+i*8+4])%4,alpha:1-age});
+ }
+ device.pushErrorScope('validation');
+ effect.setup({gpu:device,stats:{drawCalls:0},removePlugin(){}});
+ device.queue.writeBuffer(effect.gpuState.particles,0,records);
+ const target=(format,count,usage)=>device.createTexture({size:[size,size],format,sampleCount:count,usage});
+ const color=target('rgba8unorm',samples,GPUTextureUsage.RENDER_ATTACHMENT|(samples===1?GPUTextureUsage.COPY_SRC:0)),
+  resolved=samples>1?target('rgba8unorm',1,GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC):color,
+  depth=target('depth32float',samples,GPUTextureUsage.RENDER_ATTACHMENT),
+  pixels=device.createBuffer({size:size*size*4,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),
+  drawn=device.createBuffer({size:20,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),
+  encoder=device.createCommandEncoder();
+ encoder.beginRenderPass({colorAttachments:[{view:color.createView(),loadOp:'clear',storeOp:'store',clearValue:[0,0,0,0]}],depthStencilAttachment:{view:depth.createView(),depthLoadOp:'clear',depthStoreOp:'store',depthClearValue:0}}).end();
+ const context={backend:'webgpu',device,delta:0,camera,width:size,height:size,format:'rgba8unorm',color:color.createView(),depth:depth.createView(),descriptor:{multisample:{count:samples},depthStencil:{format:'depth32float'}},encoder};
+ effect.simulate(context);effect.draw(context);
+ if(samples>1)encoder.beginRenderPass({colorAttachments:[{view:color.createView(),resolveTarget:resolved.createView(),loadOp:'load',storeOp:'store'}]}).end();
+ encoder.copyTextureToBuffer({texture:resolved},{buffer:pixels,bytesPerRow:size*4},[size,size]);
+ encoder.copyBufferToBuffer(effect.gpuState.visible,0,drawn,0,20);
+ device.queue.submit([encoder.finish()]);
+ await Promise.all([pixels.mapAsync(GPUMapMode.READ),drawn.mapAsync(GPUMapMode.READ)]);
+ const image=new Uint8Array(pixels.getMappedRange().slice(0)),visible=new Uint32Array(drawn.getMappedRange().slice(0))[1];
+ // Each particle's centre and four points 85% of the way to its (rotated) corners, where linear filtering would read
+ // the neighbouring frame if sampling were not kept inside the cell.
+ const mismatches=[],histogram=[0,0,0,0];let checked=0,largest=0;
+ for(const [i,p] of expected.entries()){
+  histogram[p.frame]++;const cs=Math.cos(p.angle),sn=Math.sin(p.angle),want=colors[p.frame].map(c=>Math.round(c*p.alpha));
+  for(const [u,v] of [[0,0],[0.85,0.85],[-0.85,0.85],[0.85,-0.85],[-0.85,-0.85]]){
+   const [px,py]=project(p.x+(u*cs-v*sn)*sprite*0.5,p.y+(u*sn+v*cs)*sprite*0.5),at=(py*size+px)*4,got=[...image.subarray(at,at+3)];
+   const difference=Math.max(...got.map((c,k)=>Math.abs(c-want[k])));checked++;largest=Math.max(largest,difference);
+   if(difference>2)mismatches.push({particle:i,frame:p.frame,u,v,want,got});
+  }
+ }
+ const error=await device.popErrorScope();
+ effect.dispose();for(const t of [color,resolved,depth])t.destroy();pixels.destroy();drawn.destroy();
+ return {error:error?.message??null,errors:errors.splice(0),visible,checked,largest,histogram,mismatches:mismatches.slice(0,8)};
+};
+window.ready=true;
+</script></body></html>

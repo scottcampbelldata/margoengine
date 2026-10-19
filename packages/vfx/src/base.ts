@@ -49,7 +49,7 @@ export interface VFXOptions {
   wrap?: boolean;
   /** Draw back to front: bitonic sort of the live list each frame. Read at attach. */
   sort?: boolean;
-  /** RGBA8 sRGB sprite multiplied by the particle colour, instead of the soft disc. Read at construction. */
+  /** RGBA8 sRGB sprite (or atlas of frames) multiplied by the particle colour, instead of the soft disc. Read at construction. */
   texture?: VFXTexture;
 }
 export type VFXObstacle =
@@ -59,6 +59,20 @@ export interface VFXTexture {
   width: number;
   height: number;
   data: Uint8Array | Uint8ClampedArray;
+  /** Treat the texture as a grid of frames instead of one sprite. */
+  atlas?: ParticleAtlas;
+}
+/**
+ * The `atlas` of a particle texture: `columns` x `rows` equal frames, numbered left to right from the top row. With
+ * `frames: 'random'` each particle shows one frame picked at random when it spawns (debris that uses parts of a block
+ * texture); with `'lifetime'` it steps through every frame in order from spawn to death (a flipbook).
+ */
+export interface ParticleAtlas {
+  /** Frames across, 1 to the texture width. */
+  columns: number;
+  /** Frames down, 1 to the texture height. */
+  rows: number;
+  frames: 'random' | 'lifetime';
 }
 /** Features add each GPU object they create here at once, so a setup that fails part-way still releases it. */
 type Owned = { destroy(): void }[];
@@ -82,7 +96,7 @@ export interface VFXFeatures {
   };
   texture?: {
     copy(texture: VFXTexture): VFXTexture;
-    patch(billboard: string): string;
+    patch(billboard: string, texture: VFXTexture): string;
     create(device: GPUDevice, texture: VFXTexture, owned: Owned): GPUBindGroupEntry[];
   };
 }
@@ -226,7 +240,7 @@ export class VFX implements EnginePlugin {
     let simulation = simulationShader;
     if (o.obstacles) simulation = f.obstacles!.patch(simulation);
     if (o.wrap) simulation = f.wrap!.patch(simulation);
-    this.billboard = this.sprite ? f.texture!.patch(billboardShader) : billboardShader;
+    this.billboard = this.sprite ? f.texture!.patch(billboardShader, this.sprite) : billboardShader;
     this.alive = buffer(size * 4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
     this.indirect = buffer(20, GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_SRC);
     this.respawn = buffer(4, GPUBufferUsage.STORAGE);
