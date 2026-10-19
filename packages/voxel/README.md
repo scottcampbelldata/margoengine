@@ -289,6 +289,9 @@ const physics = Physics.attach(engine, { rapier: RAPIER });
 const voxels = new VoxelPhysics(physics, world, { radius: 1, budget: 2 });
 physics.addBody(mesh, { colliders: { shape: 'box' } }); // lands on the blocks
 physics.addBody(ball, { colliders: { shape: 'sphere' } }); // rolls on them (triangle meshes, see below)
+physics.on('contactstart', (event) => {
+  if (event.bodyB === voxels.body) console.log(event.bodyA, 'hit chunk', voxels.chunkOf(event.colliderB));
+});
 world.setBlock(x, y, z, 0); // the collider changes in place; the body falls
 voxels.budget = 4; // milliseconds of collider building per physics step, live
 voxels.pending; // chunks whose colliders are still being built
@@ -331,8 +334,13 @@ voxels.dispose();
     step a body comes within reach of it. A ball never touches a voxel collider and no body loses the blocks under it.
   - An edited piece keeps its previous mesh until its rebuild replaces it (in the same step when a body is within
     reach of it).
-- **Not physics bodies.** `Physics` collision events and queries skip these colliders; pick with
-  `raycastVoxels` (`./query`).
+- **Events and queries.** Every collider belongs to `voxels.body`, one fixed `PhysicsBody` whose `userData` is the
+  VoxelPhysics, so contacts with blocks raise the `Physics` events (`contactstart`, `contactend`, and
+  `intersectionstart`/`intersectionend` for sensors) with it as `bodyA` or `bodyB` (its `mesh` is null),
+  `contactFilter` sees it, and `physics.raycast` and the other queries hit blocks near bodies (pick anywhere with
+  `raycastVoxels` from `./query`). `voxels.chunkOf(collider)` names the chunk of a voxel or mesh collider. A collider
+  swap (a chunk switching between voxels and a mesh, a rebuilt piece) ends the contact with the old collider and starts
+  one with the new in the same step. Removing `voxels.body` disposes the VoxelPhysics.
 
 Measured with Node 26 on the reference desktop (NVIDIA RTX A6000, AMD Ryzen 9 9950X, 32 logical cores; 2026-10-19,
 other agents' jobs running, 11-15% total CPU; three runs of `node --test packages/voxel/tests/physics.test.js`, which

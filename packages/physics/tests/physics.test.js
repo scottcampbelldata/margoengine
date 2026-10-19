@@ -601,6 +601,31 @@ rtest('trimesh, convex hull and heightfield colliders support resting bodies', (
   physics.dispose();
 });
 
+rtest('custom colliders take a Rapier ColliderDesc and raise the same events', () => {
+  const physics = create(),
+    plane = RAPIER.ColliderDesc.trimesh(
+      new Float32Array([-10, 0.5, -10, 10, 0.5, -10, 10, 0.5, 10, -10, 0.5, 10]),
+      new Uint32Array([0, 2, 1, 0, 3, 2]),
+      RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES,
+    ).setTranslation(0, 1, 0),
+    floor = physics.addBody(null, { type: 'fixed', colliders: { shape: 'custom', desc: plane, friction: 0.25 } }),
+    log = [];
+  physics.on('contactstart', (event) => log.push(event));
+  const ball = physics.addBody(null, { position: [0.3, 4, -0.2], colliders: { shape: 'sphere', radius: 0.5 } });
+  run(physics, 3);
+  near(ball.position[1], 2, 0.02, 'rests on the desc at its own translation (y 0.5 + 1)');
+  assert.equal(floor.colliders[0].friction(), 0.25, 'the other options apply on top');
+  assert.equal(log.length, 1);
+  assert.ok(log[0].bodyA === floor || log[0].bodyB === floor, 'its contact events name the body');
+  const moved = physics.addBody(null, {
+    type: 'fixed',
+    colliders: { shape: 'custom', desc: RAPIER.ColliderDesc.ball(1).setTranslation(0, 9, 0), offset: [0, 5, 0] },
+  });
+  near(moved.colliders[0].translation().y, 5, 1e-6, 'an offset replaces its translation');
+  assert.throws(() => physics.addBody(null, { colliders: { shape: 'custom', desc: {} } }), TypeError);
+  physics.dispose();
+});
+
 rtest('collider materials, mass, collision groups and contact filters', () => {
   const physics = create();
   ground(physics, { collisionGroups: collisionGroups([0], [0, 1]) });

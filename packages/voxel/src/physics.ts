@@ -1,7 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // @margoengine/voxel/physics: Rapier voxel colliders for the chunks near moving bodies (design: DESIGN.md phase 11).
 // Only types come from @margoengine/physics: this entry adds no runtime import, so neither it nor the root pulls Rapier.
-import type { CollisionEvent, Physics } from '@margoengine/physics';
+import type { CollisionEvent, Physics, PhysicsBody, ShapeOptions } from '@margoengine/physics';
 import { MargoError } from '@margoengine/math/errors';
 import type { VoxelChunk } from './chunk.js';
 import { chunkKey, VoxelWorld } from './world.js';
@@ -22,6 +22,7 @@ export interface VoxelPhysicsOptions {
 }
 
 type Collider = CollisionEvent['colliderA'];
+type Desc = Extract<ShapeOptions, { shape: 'custom' }>['desc'];
 interface Vec {
   x: number;
   y: number;
@@ -38,10 +39,13 @@ interface BodyCollider extends Collider {
   translationWrtParent(target?: Vec): Vec | null;
   roundRadius(): number;
 }
+interface MassDesc extends Desc {
+  setMassProperties(mass: number, center: Vec, inertia: Vec, frame: Vec & { w: number }): MassDesc;
+}
 interface RapierVoxels {
   ColliderDesc: {
-    voxels?(cells: Int32Array, size: Vec): unknown;
-    trimesh(vertices: Float32Array, indices: Uint32Array, flags?: number): unknown;
+    voxels?(cells: Int32Array, size: Vec): MassDesc;
+    trimesh(vertices: Float32Array, indices: Uint32Array, flags?: number): MassDesc;
   };
   Collider?: { prototype: Partial<VoxelCollider> };
   ShapeType: Record<
@@ -59,8 +63,6 @@ interface RapierBody {
 }
 interface RapierWorld {
   forEachRigidBody(f: (body: RapierBody) => void): void;
-  createCollider(desc: unknown): Collider;
-  removeCollider(collider: Collider, wakeUp: boolean): void;
 }
 // A box of chunk-local cells [x0, y0, z0, x1, y1, z1) meshed as one Rapier triangle mesh.
 interface Piece {
@@ -103,6 +105,8 @@ interface Near {
 }
 
 const ONE = { x: 1, y: 1, z: 1 },
+  ZERO = { x: 0, y: 0, z: 0 },
+  IDENTITY = { x: 0, y: 0, z: 0, w: 1 },
   WHOLE: readonly number[] = [0, 0, 0, 32, 32, 32],
   // Face d: +x, -x, +y, -y, +z, -z; d ^ 1 is the opposite face, d >> 1 its axis.
   DX = [1, -1, 0, 0, 0, 0],
@@ -153,20 +157,29 @@ const checkBudget = (budget: unknown): number => {
  * ball arriving early switches it at once (with the pieces around every body built in that step), and an edited
  * piece keeps its previous mesh until the rebuild replaces it.
  *
- * The colliders are not physics bodies: `Physics` collision events and queries skip them (use `raycastVoxels` from
- * `@margoengine/voxel/query` for picking).
+ * Every collider belongs to {@link VoxelPhysics.body}, one fixed `PhysicsBody`, so `Physics` collision events
+ * (`contactstart`, `contactend`, and sensor intersections) and queries report that body for contacts with blocks;
+ * {@link VoxelPhysics.chunkOf} names the chunk of a collider.
  */
 export class VoxelPhysics {
   /** Chunks per axis around each moving body's chunk that get colliders. */
   readonly radius: number;
+  /**
+   * The fixed body that owns every voxel collider and mesh piece. Collision events between a body and the blocks
+   * name it as `bodyA` or `bodyB` (`event.bodyB === voxels.body`); its `userData` is this VoxelPhysics. Removing it
+   * disposes this VoxelPhysics.
+   */
+  readonly body: PhysicsBody;
   private readonly physics: Physics;
   private readonly world: VoxelWorld;
   private readonly rapier: RapierVoxels;
   private readonly raw: RapierWorld;
   private limit: number;
   private readonly entries = new Map<string, Entry>();
-  // Entries with something to build.
+  // Entries with something to build, and the entry of every collider handle.
   private readonly work = new Set<Entry>();
+  private readonly owners = new Map<number, Entry>();
+  private readonly retired: Collider[] = [];
   private centres = new Map<string, number>(); // body chunk key -> 1 when a ball body is there
   private near = new Map<string, Near>();
   private needed: Near[] = [];
@@ -186,7 +199,8 @@ export class VoxelPhysics {
   private readonly offStep: () => void;
   private readonly offChange: () => void;
   /**
-   * Keeps colliders for `world`'s chunks near the bodies of `physics`, from the next physics step on.
+   * Keeps colliders for `world`'s chunks near the bodies of `physics`, from the next physics step on, on a new fixed
+   * body ({@link VoxelPhysics.body}).
    * @throws TypeError when `physics` is not a `@margoengine/physics` Physics or `world` is not a {@link VoxelWorld}.
    * @throws RangeError (TypeError for a non-number) unless `options.radius` is an integer >= 1 and `options.budget`
    * a number >= 0.
@@ -222,6 +236,7 @@ export class VoxelPhysics {
     this.rapier = rapier;
     this.raw = physics.world as unknown as RapierWorld;
     this.radius = radius;
+    this.body = physics.addBody(null, { type: 'fixed', colliders: [], userData: this });
     this.offStep = physics.on('beforestep', () => this.update());
     this.offChange = world.onChange(this.edit);
   }
@@ -260,19 +275,27 @@ export class VoxelPhysics {
     }
     return out;
   }
-  /** Removes every collider and stops following the world and the physics steps. Calling it again does nothing. */
+  /**
+   * The chunk key ({@link chunkKey}) of one of this VoxelPhysics' colliders (voxels or mesh piece), such as the
+   * `colliderA` or `colliderB` of a collision event with {@link VoxelPhysics.body}; undefined for any other collider.
+   */
+  chunkOf(collider: CollisionEvent['colliderA']): string | undefined {
+    return this.owners.get(collider?.handle)?.key;
+  }
+  /**
+   * Removes {@link VoxelPhysics.body} with every collider and stops following the world and the physics steps. Calling
+   * it again does nothing.
+   */
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
     this.offStep();
     this.offChange();
-    if (!this.physics.isDisposed)
-      for (const entry of this.entries.values()) {
-        if (entry.collider) this.detach(entry.collider);
-        for (const piece of entry.pieces) if (piece.collider) this.detach(piece.collider);
-      }
+    if (!this.physics.isDisposed) this.body.remove(); // its colliders go with it
     this.entries.clear();
     this.work.clear();
+    this.owners.clear();
+    this.retired.length = 0;
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
@@ -280,6 +303,12 @@ export class VoxelPhysics {
   }
   // Brings the colliders in line with the bodies and the loaded chunks; runs before each physics step.
   private update(): void {
+    if (!this.body.valid) return this.dispose(); // the app removed the voxel body
+    for (const collider of this.retired) {
+      this.owners.delete(collider.handle);
+      this.body.removeCollider(collider);
+    }
+    this.retired.length = 0;
     const r = this.radius,
       ballShape = this.rapier.ShapeType.Ball,
       centres = new Map<string, number>();
@@ -490,7 +519,7 @@ export class VoxelPhysics {
       this.work.add(entry);
       return;
     }
-    for (const piece of entry.pieces) if (piece.collider) this.detach(piece.collider);
+    for (const piece of entry.pieces) if (piece.collider) this.retire(piece.collider);
     entry.pieces = [];
     entry.faces = null;
     entry.collider?.setEnabled(true);
@@ -503,24 +532,30 @@ export class VoxelPhysics {
     entry.collider?.setEnabled(false);
     for (const piece of entry.pieces) piece.collider?.setEnabled(true);
   }
-  // Adds a parentless collider (enabled or not).
-  private attach(desc: unknown, enabled: boolean): Collider {
-    const collider = this.raw.createCollider(desc);
-    if (!enabled) collider.setEnabled(false);
+  // Adds a collider to the voxel body (enabled or not) for `entry`.
+  private attach(desc: MassDesc, entry: Entry, enabled: boolean): Collider {
+    // Explicit zero mass: otherwise Rapier integrates every voxel and triangle into the fixed body's mass properties
+    // at the next step (8 ms for 11 cave chunks on the reference desktop).
+    desc.setMassProperties(0, ZERO, ZERO, IDENTITY);
+    const collider = this.body.addCollider({ shape: 'custom', desc, enabled });
+    this.owners.set(collider.handle, entry);
     return collider;
   }
-  private detach(collider: Collider): void {
-    this.raw.removeCollider(collider, true);
+  // Disables a replaced collider and removes it at the next update, so the step in between ends its contacts with
+  // `contactend` events (Physics drops the events of a collider removed before the step).
+  private retire(collider: Collider): void {
+    collider.setEnabled(false);
+    this.retired.push(collider);
   }
   private remove(entry: Entry): void {
     if (entry.collider) {
-      this.detach(entry.collider);
+      this.retire(entry.collider);
       for (let d = 0; d < 6; d++) {
         const other = this.entries.get(neighbour(entry, d));
         if (other) other.stale |= 1 << (d ^ 1);
       }
     }
-    for (const piece of entry.pieces) if (piece.collider) this.detach(piece.collider);
+    for (const piece of entry.pieces) if (piece.collider) this.retire(piece.collider);
     this.entries.delete(entry.key);
     this.work.delete(entry);
   }
@@ -580,9 +615,10 @@ export class VoxelPhysics {
     if (keep) entry.scanned = true;
     const collider = this.attach(
       this.rapier.ColliderDesc.voxels!(cells.subarray(0, n), ONE),
+      entry,
       entry.mode !== MESH,
     ) as VoxelCollider;
-    if (entry.collider) this.detach(entry.collider);
+    if (entry.collider) this.retire(entry.collider);
     entry.collider = collider;
     entry.rebuild = false;
     // A border whose old neighbour came back: the pieces along it lack the faces that neighbour hid.
@@ -603,7 +639,7 @@ export class VoxelPhysics {
   private piece(entry: Entry, i: number): boolean {
     const piece = entry.pieces[i],
       triangles = this.triangles(entry, piece.box);
-    if (piece.collider && triangles < 0) this.detach(piece.collider);
+    if (piece.collider && triangles < 0) this.retire(piece.collider);
     if (triangles < 0) {
       const box = piece.box,
         size = [box[3] - box[0], box[4] - box[1], box[5] - box[2]],
@@ -625,10 +661,11 @@ export class VoxelPhysics {
               this.indices.subarray(0, triangles * 3),
               R.TriMeshFlags?.FIX_INTERNAL_EDGES,
             ),
+            entry,
             entry.mode === MESH,
           )
         : null;
-    if (piece.collider) this.detach(piece.collider);
+    if (piece.collider) this.retire(piece.collider);
     piece.collider = collider;
     piece.dirty = false;
     return false;

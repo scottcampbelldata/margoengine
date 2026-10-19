@@ -510,6 +510,7 @@ rtest('colliders follow the radius rule: near moving bodies, loaded chunks only,
   physics.addBody(null, { type: 'fixed', position: [16, 16, 16], colliders: { shape: 'box', halfExtents: [1, 1, 1] } });
   physics.step();
   assert.equal(voxels.colliders.size, 0, 'fixed bodies do not count; no moving body, no colliders');
+  physics.step(); // dropped colliders stay disabled for one step, so their contacts end with events
   assert.equal(physics.world.colliders.len(), 1);
   physics.dispose();
   const wide = setup({ radius: 2, budget: Infinity }, [0, 0, 0]);
@@ -783,6 +784,91 @@ rtest('chunks entering a moving body radius are built within the budget, never u
   );
   assert.equal(spread.holes, 0, 'the chunk under the body always had its collider');
   assert.ok(max(spread.spent) < max(whole.spent) / 2, 'the border crossing cost is spread');
+});
+
+rtest('contacts with blocks raise Physics collision events naming voxels.body and the chunk', () => {
+  const { physics, world, voxels } = setup();
+  fill(world, 0, 64, 0, 1, 0, 16, stone);
+  const events = [],
+    T = RAPIER.ShapeType;
+  for (const type of ['contactstart', 'contactend', 'intersectionstart', 'intersectionend'])
+    physics.on(type, (e) => {
+      const a = e.bodyA === voxels.body;
+      assert.ok(a || e.bodyB === voxels.body, 'every event here involves the blocks');
+      const collider = a ? e.colliderA : e.colliderB,
+        other = a ? e.bodyB : e.bodyA;
+      assert.equal(a ? e.meshA : e.meshB, null);
+      events.push(
+        `${type} ${other.userData} ${voxels.chunkOf(collider)} ${collider.shapeType() === T.Voxels ? 'voxels' : 'mesh'}`,
+      );
+    });
+  assert.equal(voxels.body.userData, voxels);
+  assert.equal(voxels.body.type, 'fixed');
+  const box = physics.addBody(null, {
+    position: [8.5, 2, 8.5],
+    userData: 'box',
+    colliders: { shape: 'box', halfExtents: [0.4, 0.4, 0.4] },
+  });
+  steps(physics, 60);
+  assert.deepEqual(events.splice(0), ['contactstart box 0,0,0 voxels'], 'a box landing on voxels');
+  const ball = ballBody(physics, 0.4, [40.5, 3, 8.5], { body: { userData: 'ball' } });
+  steps(physics, 60);
+  assert.deepEqual(
+    events.splice(0),
+    ['contactend box 0,0,0 voxels', 'contactstart box 0,0,0 mesh', 'contactstart ball 1,0,0 mesh'],
+    'the switch to meshes ends the voxel contact and starts a mesh one in the same step; the ball lands on a mesh',
+  );
+  ball.remove();
+  steps(physics, 2);
+  assert.deepEqual(
+    events.splice(0),
+    ['contactend box 0,0,0 mesh', 'contactstart box 0,0,0 voxels'],
+    'and back: a dropped mesh piece ends its contacts too',
+  );
+  world.setBlock(8, 0, 8, 0);
+  world.setBlock(9, 0, 8, 0);
+  steps(physics, 30);
+  assert.deepEqual(events.splice(0), ['contactend box 0,0,0 voxels'], 'the box fell through the hole it was on');
+  const sensor = physics.addBody(null, {
+    type: 'kinematicPosition',
+    position: [30.5, 0.5, 8.5],
+    userData: 'sensor',
+    colliders: { shape: 'box', halfExtents: [0.2, 0.2, 0.2], sensor: true },
+  });
+  steps(physics, 2);
+  assert.deepEqual(events.splice(0), ['intersectionstart sensor 0,0,0 voxels'], 'sensors see blocks');
+  sensor.setPosition([30.5, 3, 8.5]);
+  steps(physics, 2);
+  assert.deepEqual(events.splice(0), ['intersectionend sensor 0,0,0 voxels']);
+  const hit = physics.raycast([40.5, 10, 3.5], [0, -1, 0]);
+  assert.ok(hit?.body === voxels.body && Math.abs(hit.distance - 9) < 1e-6, 'queries see blocks near bodies');
+  assert.equal(voxels.chunkOf(box.colliders[0]), undefined);
+  physics.dispose();
+  // contactFilter sees the voxel body too: a ghost passes through the blocks, a box does not.
+  const filtered = new Physics(null, {
+      rapier: RAPIER,
+      contactFilter: (a, b) => !(a.userData === 'ghost' || b.userData === 'ghost'),
+    }),
+    floor = new VoxelWorld({ blocks }),
+    other = new VoxelPhysics(filtered, floor);
+  fill(floor, 0, 16, 0, 1, 0, 16, stone);
+  const ghost = filtered.addBody(null, {
+      position: [4.5, 2, 4.5],
+      userData: 'ghost',
+      colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] },
+    }),
+    solid = filtered.addBody(null, {
+      position: [10.5, 2, 4.5],
+      userData: 'box',
+      colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] },
+    });
+  steps(filtered, 60);
+  assert.ok(ghost.position[1] < -2 && Math.abs(solid.position[1] - 1.5) < 0.01, 'the filter decides per body pair');
+  other.body.remove();
+  filtered.step();
+  assert.equal(other.colliders.size, 0, 'removing voxels.body disposes the VoxelPhysics');
+  floor.setBlock(1, 0, 1, 0);
+  filtered.dispose();
 });
 
 rtest('dispose removes every collider and stops following edits and steps', () => {

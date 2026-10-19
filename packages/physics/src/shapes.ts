@@ -16,7 +16,12 @@ export type ShapeOptions =
   | { shape: 'cone'; halfHeight: number; radius: number }
   | { shape: 'convexHull'; geometry?: GeometryLike; points?: ArrayLike<number> }
   | { shape: 'trimesh'; geometry?: GeometryLike; vertices?: ArrayLike<number>; indices?: ArrayLike<number> }
-  | { shape: 'heightfield'; rows: number; columns: number; heights: ArrayLike<number>; scale: Vec3 };
+  | { shape: 'heightfield'; rows: number; columns: number; heights: ArrayLike<number>; scale: Vec3 }
+  /**
+   * A Rapier `ColliderDesc` you built yourself, for shapes and flags this wrapper does not cover (voxels,
+   * triangle-mesh flags). The other options apply on top; its own translation is kept unless `offset` is given.
+   */
+  | { shape: 'custom'; desc: ColliderDesc };
 
 export type CombineRule = 'average' | 'min' | 'multiply' | 'max';
 
@@ -208,6 +213,13 @@ export function createColliderDesc(
       desc = R.ColliderDesc.heightfield(rows, columns, values, vec(scale));
       break;
     }
+    case 'custom':
+      if (typeof options.desc?.setActiveEvents !== 'function')
+        throw new TypeError(
+          "A 'custom' collider needs a Rapier ColliderDesc: {shape: 'custom', desc: RAPIER.ColliderDesc.ball(1)}",
+        );
+      desc = options.desc;
+      break;
     default:
       throw new TypeError(`Unknown collider shape ${(options as { shape: string }).shape}`);
   }
@@ -239,9 +251,12 @@ export function configureCollider(
   center: Vec3,
   hooks: boolean,
 ): ColliderDesc {
-  const offset = options.offset ?? [0, 0, 0];
-  checkVec(offset, 'Collider offset');
-  desc.setTranslation(offset[0] + center[0], offset[1] + center[1], offset[2] + center[2]);
+  // A custom desc keeps its own translation unless an offset is given.
+  if (options.shape !== 'custom' || options.offset) {
+    const offset = options.offset ?? [0, 0, 0];
+    checkVec(offset, 'Collider offset');
+    desc.setTranslation(offset[0] + center[0], offset[1] + center[1], offset[2] + center[2]);
+  }
   if (options.rotation) desc.setRotation(quat(options.rotation));
   if (options.friction !== undefined) desc.setFriction(options.friction);
   if (options.restitution !== undefined) desc.setRestitution(options.restitution);
