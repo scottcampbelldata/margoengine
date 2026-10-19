@@ -1,0 +1,233 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Voxel renderer browser check</title><style>body{margin:0}canvas{display:block;width:320px;height:240px}</style></head><body><canvas></canvas>
+<script type="module">
+// Renders a fixed small world with VoxelRenderer twice, from the greedy meshes and from the same meshes expanded to one
+// quad per block face (the mesher workers' replies rewritten on the way in), and reads back the canvas (bgra8unorm) or
+// the HDR scene (rgba16float, under Bloom) per view for comparison; a constant-colour slab for T-junction cracks;
+// composites with known numbers, an edit-to-pixels check, device restore and a 16-chunk-radius timing world. Driven by
+// render-browser-check.mjs.
+import {Engine} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {BlockTypes,VoxelChunk,VoxelWorld,blockState} from '/packages/voxel/dist/index.js';
+import {VoxelLighting} from '/packages/voxel/dist/light.js';
+import {meshChunk,meshInput} from '/packages/voxel/dist/mesher.js';
+import {BlockTextures,VoxelRenderer} from '/packages/voxel/dist/render.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const canvas=document.querySelector('canvas'),errors=[],runtime=()=>engineRuntime(engine);
+const watch=(device)=>device.addEventListener('uncapturederror',(e)=>errors.push(e.error.message));
+const engine=await Engine.create(canvas,{backend:'webgpu',features:['timestamp-query'],camera:{position:[-14,30,-14],target:[30,10,30],near:0.1,far:400}});
+watch(runtime().gpu);
+// Naive meshes: every merged quad of a mesher reply becomes its w x h unit quads (same words, cell moved, size 1).
+let naive=false;
+const Native=globalThis.Worker,AT_U=[10,10,0,0,0,0],AT_V=[5,5,10,10,5,5];
+const expand=(words)=>{const out=[];for(let i=0;i<words.length;i+=3){const w0=words[i],face=(w0>>>15)&7,w=((w0>>>18)&31)+1,h=((w0>>>23)&31)+1;
+ if(face>5){out.push(w0,words[i+1],words[i+2]);continue;}const base=(w0&~(0x3ff<<18))>>>0;
+ for(let v=0;v<h;v++)for(let u=0;u<w;u++)out.push((base+(u<<AT_U[face])+(v<<AT_V[face]))>>>0,words[i+1],words[i+2]);}return Uint32Array.from(out);};
+const naiveMesh=(m)=>({...m,opaque:expand(m.opaque),cutout:expand(m.cutout),translucent:expand(m.translucent)});
+globalThis.Worker=class extends Native{#naive=naive;
+ set onmessage(listener){super.onmessage=listener&&((event)=>listener(this.#naive&&event.data?.result?{data:{result:naiveMesh(event.data.result)}}:event));}
+ get onmessage(){return super.onmessage;}};
+// Textures: 16 x 16 seeded patterns, raw RGBA8.
+let seed=3;const random=()=>((seed=(Math.imul(seed,1103515245)+12345)>>>0)>>>8)/16777216;
+const tile=(f)=>{const data=new Uint8Array(1024);for(let y=0;y<16;y++)for(let x=0;x<16;x++)data.set(f(x,y),(y*16+x)*4);return {width:16,height:16,data};};
+const noisy=(r,g,b,a=255)=>tile(()=>{const k=0.8+0.4*random();return [r*k,g*k,b*k,a];});
+const images=[
+ noisy(128,128,128), // 0 stone
+ noisy(134,96,67), // 1 dirt
+ noisy(92,160,60), // 2 grass top
+ tile((x,y)=>y<3?[92,160,60,255]:[134,96,67,255]), // 3 grass side
+ noisy(60,100,200,170), // 4 water
+ tile((x,y)=>x==0||y==0||x==15||y==15?[220,230,240,255]:[200,220,255,50]), // 5 glass
+ tile(()=>random()<0.6?[60,140,40,255]:[0,0,0,0]), // 6 leaves
+ tile((x,y)=>Math.abs(x-7.5)<1.5&&y>5||(x-7.5)**2+(y-4)**2<9?[230,60,60,255]:[0,0,0,0]), // 7 flower
+ noisy(150,110,70), // 8 log
+ tile(()=>[255,255,255,255]), // 9 white
+ tile((x,y)=>x>=4&&x<12&&y>=4&&y<12?[255,255,255,255]:[255,255,255,0]), // 10 square cut out of a border
+ tile(()=>[255,255,255,102]), // 11 white at alpha 0.4
+ tile((x,y)=>Math.abs(x-7.5)<2&&y>4?[255,200,80,255]:[0,0,0,0]), // 12 torch
+];
+const textures=new BlockTextures({images});
+const blocks=new BlockTypes(),STONE=blocks.define('stone',{textures:0}),DIRT=blocks.define('dirt',{textures:1}),
+ GRASS=blocks.define('grass',{textures:[3,3,2,1,3,3]}),WATER=blocks.define('water',{layer:'translucent',shape:'liquid',liquid:true,solid:false,textures:4,opacity:1}),
+ GLASS=blocks.define('glass',{layer:'translucent',textures:5}),LEAVES=blocks.define('leaves',{layer:'cutout',textures:6,opacity:1}),
+ FLOWER=blocks.define('flower',{layer:'cutout',shape:'cross',solid:false,textures:7}),LOG=blocks.define('log',{textures:8}),
+ TORCH=blocks.define('torch',{layer:'cutout',shape:'cross',solid:false,textures:12,light:14,emissive:1}),
+ GOLD=blocks.define('gold',{textures:9,color:[1,0.7,0.1],emissive:2}),
+ RED=blocks.define('red',{textures:9,color:[1,0,0],emissive:1}),GREEN=blocks.define('cutout test',{layer:'cutout',textures:10,color:[0,1,0],emissive:1}),
+ BLUE=blocks.define('glass test',{layer:'translucent',textures:11,color:[0,0,1],emissive:1}),
+ WHITE=blocks.define('white',{textures:9,emissive:1}),WHITE2=blocks.define('white 2',{textures:9,emissive:1});
+// The fixed world: 2 x 2 chunks of seeded hills, a flat stone floor with dirt patches (T-junctions), a pool of lowered
+// water, a glass wall, a tree, flowers, a torch and an overhang.
+const world=new VoxelWorld({blocks}),keys=[];
+for(let cz=0;cz<2;cz++)for(let cx=0;cx<2;cx++){world.addChunk(cx,0,cz);keys.push(`${cx},0,${cz}`);}
+const edits=[],put=(x,y,z,s)=>edits.push(x,y,z,s);
+for(let z=0;z<64;z++)for(let x=0;x<64;x++){
+ const floor=x<40&&z>=30&&z<60,h=floor?12:Math.round(11+2*Math.sin(x*0.21)*Math.cos(z*0.17)+random());
+ for(let y=0;y<=h;y++)put(x,y,z,y===h?(floor?(random()<0.18?DIRT:STONE):GRASS):y>h-3?DIRT:STONE);
+}
+for(let z=4;z<16;z++)for(let x=44;x<56;x++){for(let y=6;y<=14;y++)put(x,y,z,x===44||x===55||z===4||z===15||y===6?STONE:y<=10?(y===10?blockState(WATER,2):WATER):0);}
+for(let x=20;x<25;x++)for(let y=14;y<17;y++)put(x,y,10,GLASS);
+for(let y=12;y<16;y++)put(10,y,10,LOG);
+for(let x=9;x<12;x++)for(let y=16;y<19;y++)for(let z=9;z<12;z++)put(x,y,z,LEAVES);
+for(let x=26;x<34;x++)for(let z=18;z<26;z++)put(x,17,z,STONE); // overhang
+for(let x=26;x<28;x++)put(x,13,18,STONE),put(x,14,18,STONE),put(x,15,18,STONE),put(x,16,18,STONE);
+world.setBlocks(edits);
+for(const [x,z] of [[5,5],[6,8],[30,20],[33,22],[14,26]]){let y=31;while(y>0&&!world.getBlock(x,y-1,z))y--;world.setBlock(x,y,z,FLOWER);}
+world.setBlock(23,13,12,TORCH);
+const lighting=VoxelLighting.attach(world,{budget:Infinity});while(lighting.update());
+// Composite scene in a second world: a red block behind a 0.4-alpha blue glass and behind a cutout square.
+const flat=new VoxelWorld({blocks});flat.setBlocks([0,0,0,RED,2,0,0,RED,0,0,2,BLUE,2,0,2,GREEN]);
+const flatKeys=['0,0,0'];
+// Crack scene: a closed 96 x 4 x 96 slab of two white emissive block types (they never merge with each other, so the
+// greedy quads meet in T-junctions); lit only by emission, every face has the same colour.
+const slab=new VoxelWorld({blocks}),slabKeys=[],slabEdits=[];
+for(let cz=0;cz<3;cz++)for(let cx=0;cx<3;cx++){slab.addChunk(cx,0,cz);slabKeys.push(`${cx},0,${cz}`);}
+for(let z=0;z<96;z++)for(let x=0;x<96;x++)for(let y=0;y<4;y++)slabEdits.push(x,y,z,random()<0.3?WHITE2:WHITE);
+slab.setBlocks(slabEdits);
+// Expected quads per mode (the renderer is ready when its stats show them).
+const quadsOf=(w,ks,mode)=>ks.reduce((n,k)=>{let m=meshChunk(meshInput(w,k));if(mode==='naive')m=naiveMesh(m);return n+(m.opaque.length+m.cutout.length+m.translucent.length)/3;},0);
+const views=[
+ {name:'overview',position:[-14,30,-14],target:[30,10,30]},
+ {name:'floor grazing',position:[-6,13.6,45],target:[90,12.9,46]},
+ {name:'floor grazing diagonal',position:[-3,14.2,31],target:[60,12.5,70]},
+ {name:'hills grazing',position:[64,13,-2],target:[0,12,62]},
+ {name:'pool and glass',position:[30,18,-6],target:[40,11,12]},
+ {name:'tree and overhang',position:[18,16,6],target:[24,15,20]},
+];
+let post,renderer;
+const device=()=>runtime().gpu;
+const module=()=>device().createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+async function readHDR(texture){
+ const d=device(),pipeline=d.createComputePipeline({layout:'auto',compute:{module:module(),entryPoint:'main'}}),bytes=texture.width*texture.height*16,
+  output=d.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=d.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=d.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,d.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);d.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+const readCanvas=()=>{const c=new OffscreenCanvas(canvas.width,canvas.height).getContext('2d');c.drawImage(canvas,0,0);return c.getImageData(0,0,canvas.width,canvas.height).data;};
+// One finished frame of the current view: the canvas is read in the task that rendered it.
+async function shot(){
+ for(let i=0;i<3;i++){engine.render({delta:0});await device().queue.onSubmittedWorkDone();}
+ engine.render({delta:0});
+ if(!post)return readCanvas();
+ await device().queue.onSubmittedWorkDone();return readHDR(post.sceneTexture);
+}
+async function ready(r,w,ks,mode){
+ const quads=quadsOf(w,ks,mode);let stable=0;
+ for(let i=0;i<4000&&stable<3;i++){engine.render({delta:0});await device().queue.onSubmittedWorkDone();
+  stable=r.stats.quads===quads&&r.stats.draws&&!w.dirty.size?stable+1:0;await new Promise((resolve)=>setTimeout(resolve,1));}
+ if(stable<3)throw new Error(`${mode} renderer not ready: ${r.stats.quads} of ${quads} quads`);
+}
+function attach(w,ks,mode){
+ naive=mode==='naive';for(const k of ks)w.dirty.add(k);
+ return VoxelRenderer.attach(engine,{world:w,textures,workers:2});
+}
+const look=(v)=>{engine.camera.position=v.position;engine.camera.target=v.target;};
+// Pixels that differ at all, the largest channel difference, pixels drawn (not background) and 2 x 2 blocks of
+// differing pixels: a shading difference covers areas, a sample owned by the quad across an edge does not.
+function compare(a,b,bg){let differing=0,lit=0,max=0,blocks=0;const W=canvas.width,n=a.length/4,diff=new Uint8Array(n);
+ const far=(p,img)=>Math.abs(img[p]-bg[0])+Math.abs(img[p+1]-bg[1])+Math.abs(img[p+2]-bg[2]);
+ for(let p=0;p<a.length;p+=4){let d=0;for(let c=0;c<4;c++)d=Math.max(d,Math.abs(a[p+c]-b[p+c]));if(d>0||!Object.is(a[p],b[p])){differing++;diff[p/4]=1;}max=Math.max(max,d);if(far(p,b)>0)lit++;}
+ for(let i=0;i<n-W-1;i++)if(diff[i]&&diff[i+1]&&diff[i+W]&&diff[i+W+1]&&(i+1)%W)blocks++;
+ return {differing,lit,pixels:n,max,blocks};}
+window.check={
+ samples:sceneSamples,
+ async greedyVsNaive(hdr){
+  post=hdr?Bloom.attach(engine,{strength:0.2,threshold:1,exposure:0}):undefined;
+  look(views[0]);engine.render({delta:0});await device().queue.onSubmittedWorkDone();
+  const empty=await shot(),bg=[empty[0],empty[1],empty[2]],images={},stats={};
+  for(const mode of ['greedy','naive']){
+   renderer=attach(world,keys,mode);await ready(renderer,world,keys,mode);images[mode]=[];
+   for(const v of views){look(v);images[mode].push(await shot());}
+   stats[mode]={...renderer.stats};renderer.dispose();
+  }
+  const results=Object.fromEntries(views.map((v,i)=>[v.name,compare(images.greedy[i],images.naive[i],bg)]));
+  post?.dispose();post=undefined;
+  return {results,stats,format:hdr?'rgba16float':navigator.gpu.getPreferredCanvasFormat(),size:[canvas.width,canvas.height],errors:errors.splice(0)};
+ },
+ // T-junction cracks: pixels of the slab where the naive image is the slab colour and the greedy one is not.
+ async cracks(){
+  const l=runtime().lighting,saved=[l.direction.slice(),l.radiance.slice()];l.direction[3]=0;l.radiance[3]=0;
+  const shots={},slabViews=[[[-4,4.25,48],[100,4,48.5]],[[-2,4.6,-2],[90,3.6,80]],[[48,4.12,-5],[48.3,4,100]],[[-3,-0.4,40],[100,0,60]],[[30,5,-30],[50,0,60]]];
+  for(const mode of ['greedy','naive']){renderer=attach(slab,slabKeys,mode);await ready(renderer,slab,slabKeys,mode);shots[mode]=[];
+   for(const [position,target] of slabViews){look({position,target});shots[mode].push(await shot());}renderer.dispose();}
+  l.direction.set(saved[0]);l.radiance.set(saved[1]);
+  const mid=((canvas.height>>1)*canvas.width+(canvas.width>>1))*4,colour=[...shots.naive[4].slice(mid,mid+4)];
+  // Interior pixels: the naive image has the slab colour there and at the 8 pixels around (silhouettes excluded).
+  const W=canvas.width,H=canvas.height,isSlab=(img,x,y)=>{const p=(y*W+x)*4;return img[p]===colour[0]&&img[p+1]===colour[1]&&img[p+2]===colour[2];};
+  // Holes of image a inside image b's surface (b and its 8 neighbours the slab colour).
+  const holes=(a,b)=>{const list=[];let interior=0,count=0;
+   for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){let inside=true;for(let dy=-1;dy<=1&&inside;dy++)for(let dx=-1;dx<=1;dx++)inside&&=isSlab(b,x+dx,y+dy);
+    if(!inside)continue;interior++;if(!isSlab(a,x,y)){count++;if(list.length<8)list.push([x,y,[...a.slice((y*W+x)*4,(y*W+x)*4+3)]]);}}
+   return {interior,count,list};};
+  const counts=shots.naive.map((n,i)=>{const g=shots.greedy[i],h=holes(g,n);return {interior:h.interior,cracks:h.count,list:h.list,naiveHoles:holes(n,g).count};});
+  return {colour,counts,errors:errors.splice(0)};
+ },
+ // HDR numbers with the lights off: every block emissive 1, so a pixel is its linear base colour.
+ async composites(){
+  post=Bloom.attach(engine,{strength:0.2,threshold:1,exposure:0});
+  const l=runtime().lighting,saved=[l.direction.slice(),l.radiance.slice()];l.direction[3]=0;l.radiance[3]=0;
+  renderer=attach(flat,flatKeys,'greedy');await ready(renderer,flat,flatKeys,'greedy');
+  const at=async(position,target)=>{look({position,target});const img=await shot(),w=canvas.width,h=canvas.height,
+   px=(fx,fy)=>{const p=(Math.floor(h*fy)*w+Math.floor(w*fx))*4;return [img[p],img[p+1],img[p+2]];};return px;};
+  // Blue glass (0.4) at z 2..3 in front of red at z 0..1, seen from +z.
+  let px=await at([0.5,0.5,7],[0.5,0.5,0]);const glass=px(0.5,0.5);
+  // Cutout: green square in the middle of the face, transparent border showing the red block behind.
+  // 0.3 blocks left of the face centre (4.5 blocks away, 60 degree field of view): the border, whose ray goes on through
+  // the back face's border to the red block.
+  px=await at([2.5,0.5,7.5],[2.5,0.5,0]);const square=px(0.5,0.5),border=px(0.5-(0.3*canvas.height/2/(Math.tan(Math.PI/6)*4.5))/canvas.width,0.5);
+  // The red block alone.
+  px=await at([0.5,0.5,-5],[0.5,0.5,0]);const red=px(0.5,0.5);
+  renderer.dispose();post.dispose();post=undefined;l.direction.set(saved[0]);l.radiance.set(saved[1]);
+  return {glass,square,border,red,errors:errors.splice(0)};
+ },
+ // Frames at 60 Hz from a block edit to its pixels: a gold block placed in view and removed again, five times.
+ async edit(){
+  renderer=attach(world,keys,'greedy');await ready(renderer,world,keys,'greedy');
+  look({position:[20.5,14.5,40],target:[20.5,14.5,50]});await shot();
+  const centre=()=>{const img=readCanvas(),p=((canvas.height>>1)*canvas.width+(canvas.width>>1))*4;return [img[p],img[p+1],img[p+2]];};
+  engine.render({delta:0});const before=centre(),frames=[];let gold;
+  const until=async(changed)=>{for(let i=1;i<=30;i++){await new Promise(requestAnimationFrame);engine.render({delta:1/60});const c=centre();if(changed(c))return [i,c];}return [Infinity,centre()];};
+  for(let k=0;k<5;k++){
+   world.setBlock(20,14,44,GOLD);const [n,c]=await until((c)=>c.join()!==before.join());frames.push(n);gold=c;
+   world.setBlock(20,14,44,0);await until((c)=>c.join()===before.join());
+  }
+  return {before,gold,frames,errors:errors.splice(0)};
+ },
+ // engine.rebootDevice(): the renderer meshes everything again on the new device and draws the same image.
+ async restore(){
+  look(views[0]);const before=await shot(),old=device();await engine.rebootDevice();watch(device());
+  await ready(renderer,world,keys,'greedy');const after=await shot();const stats={...renderer.stats};renderer.dispose();
+  return {result:compare(after,before,[0,0,0]),newDevice:device()!==old,stats,errors:errors.splice(0)};
+ },
+ // A synthetic world of render distance 16 (33 x 33 x 2 chunks): stats, GPU time of the voxel passes, bundle cost.
+ async timing(){
+  const big=new VoxelWorld({blocks}),bigKeys=[];
+  for(let cz=-16;cz<=16;cz++)for(let cx=-16;cx<=16;cx++)for(let cy=0;cy<2;cy++){
+   const chunk=new VoxelChunk();chunk.fillLight(0xf0);
+   for(let z=0;z<32;z++)for(let x=0;x<32;x++){const wx=cx*32+x,wz=cz*32+z,h=Math.round(30+9*Math.sin(wx*0.031)*Math.cos(wz*0.027)+4*Math.sin(wx*0.11+wz*0.07));
+    for(let y=0;y<32;y++){const wy=cy*32+y;if(wy<=h)chunk.set(x,y,z,wy===h?GRASS:wy>h-3?DIRT:STONE);}}
+   big.addChunk(cx,cy,cz,chunk);bigKeys.push(`${cx},${cy},${cz}`);}
+  const d=device(),records=[],make=d.createRenderBundleEncoder.bind(d);
+  d.createRenderBundleEncoder=(desc)=>{const t0=performance.now(),e=make(desc),finish=e.finish.bind(e);e.finish=()=>{const b=finish();records.push(performance.now()-t0);return b;};return e;};
+  canvas.style.width='1920px';canvas.style.height='1080px';look({position:[0,48,0],target:[200,30,120]});engine.camera.far=800;
+  const start=performance.now();renderer=VoxelRenderer.attach(engine,{world:big,textures});let stable=0,last=-1;
+  for(let i=0;i<20000&&stable<30;i++){engine.render({delta:0});await d.queue.onSubmittedWorkDone();stable=renderer.stats.quads===last&&!big.dirty.size?stable+1:0;last=renderer.stats.quads;await new Promise((r)=>setTimeout(r,0));}
+  const spawn=performance.now()-start,query=d.createQuerySet({type:'timestamp',count:4}),resolve=d.createBuffer({size:32,usage:GPUBufferUsage.QUERY_RESOLVE|GPUBufferUsage.COPY_SRC}),read=d.createBuffer({size:32,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+  const stamp=(name,order,index)=>runtime().frameGraph.add({name,order,execute:(c)=>c.encoder.beginComputePass({timestampWrites:{querySet:query,beginningOfPassWriteIndex:index}}).end()});
+  const off=[stamp('t0',0.999,0),stamp('t1',1.001,1),stamp('t2',4.499,2),stamp('t3',4.501,3),runtime().frameGraph.add({name:'t-resolve',order:9.99,execute:(c)=>{c.encoder.resolveQuerySet(query,0,4,resolve,0);c.encoder.copyBufferToBuffer(resolve,0,read,0,32);}})];
+  const gpu=[],cpu=[];
+  for(let i=0;i<120;i++){const t=performance.now();engine.render({delta:1/60});cpu.push(performance.now()-t);await read.mapAsync(GPUMapMode.READ);const s=new BigInt64Array(read.getMappedRange().slice(0));read.unmap();if(i>=20)gpu.push(Number(s[1]-s[0]+s[3]-s[2])/1e6);}
+  for(const f of off)f();
+  const stats={...renderer.stats},bundleRecords=records.length,recordMs=records.slice(-5);
+  // Re-record cost: a cutout flower in a chunk without cutout quads changes the bundle's draws.
+  records.length=0;big.setBlock(3,40,3,FLOWER);for(let i=0;i<10&&!records.length;i++){engine.render({delta:0});await d.queue.onSubmittedWorkDone();await new Promise((r)=>setTimeout(r,5));}
+  renderer.dispose();d.createRenderBundleEncoder=make;const size=[canvas.width,canvas.height];canvas.style.width='320px';canvas.style.height='240px';
+  const median=(a)=>[...a].sort((x,y)=>x-y)[a.length>>1];
+  return {size,chunks:bigKeys.length,stats,spawnMs:Math.round(spawn),gpuMs:median(gpu),gpuMinMs:Math.min(...gpu),cpuFrameMs:median(cpu),bundleRecords,reRecordMs:records[0],recordMs,errors:errors.splice(0)};
+ },
+};
+window.ready=true;
+</script></body></html>
