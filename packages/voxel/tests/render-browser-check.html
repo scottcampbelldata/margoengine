@@ -202,6 +202,21 @@ window.check={
   await ready(renderer,world,keys,'greedy');const after=await shot();const stats={...renderer.stats};renderer.dispose();
   return {result:compare(after,before,[0,0,0]),newDevice:device()!==old,stats,errors:errors.splice(0)};
  },
+ // The most quads one chunk layer can hold: a 3D checkerboard of two cutout cube types (chunk 0,0,0) and one of two
+ // glasses (chunk 2,0,0) show every face of every cell, 196,608 quads each. An indirect draw past the index buffer is
+ // skipped (no error) and a direct one is a validation error, so each chunk must cover its view.
+ async worst(){
+  const w=new VoxelWorld({blocks}),ks=['0,0,0','2,0,0'],e=[];
+  for(let y=0;y<32;y++)for(let z=0;z<32;z++)for(let x=0;x<32;x++){const odd=(x+y+z)&1;e.push(x,y,z,odd?LEAVES:GREEN,x+64,y,z,odd?GLASS:BLUE);}
+  w.setBlocks(e);
+  const shots=[[[16,16,-12],[16,16,16]],[[80,16,-12],[80,16,16]]];look({position:shots[0][0],target:shots[0][1]});
+  const empty=await shot(),bg=[empty[0],empty[1],empty[2]];
+  renderer=attach(w,ks,'greedy');await ready(renderer,w,ks,'greedy');
+  const lit=[];for(const [position,target] of shots){look({position,target});const img=await shot();let n=0;
+   for(let p=0;p<img.length;p+=4)if(img[p]!==bg[0]||img[p+1]!==bg[1]||img[p+2]!==bg[2])n++;lit.push(n);}
+  look({position:[48,40,-40],target:[48,16,16]});await shot();const stats={...renderer.stats};renderer.dispose();
+  return {expected:quadsOf(w,ks,'greedy'),stats,lit,pixels:canvas.width*canvas.height,errors:errors.splice(0)};
+ },
  // A synthetic world of render distance 16 (33 x 33 x 2 chunks): stats, GPU time of the voxel passes, bundle cost.
  async timing(){
   const big=new VoxelWorld({blocks}),bigKeys=[];

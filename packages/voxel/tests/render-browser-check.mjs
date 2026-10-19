@@ -8,6 +8,7 @@
 //   and never a 2 x 2 block;
 // - a cutout square and translucent glass composite to their exact linear numbers;
 // - a block edit is drawn within two 60 Hz frames (best of five); engine.rebootDevice() draws the same image again;
+// - the worst case, 196,608 quads in one chunk layer (cutout and translucent), draws;
 // - no WebGPU validation errors; sane stats.
 // `--timing` adds a 16-chunk-radius synthetic world: spawn time, GPU time of the voxel passes (timestamp queries,
 // rough unless run behind scripts/quiet-gate.mjs) and the render bundle record cost.
@@ -96,6 +97,17 @@ try {
     assert.ok(d.newDevice);
     assert.equal(d.result.differing, 0, `restored image: ${JSON.stringify(d.result)}`);
     console.log(`ok ${samples}x device restore: same image, ${d.stats.chunks} chunks ${d.stats.quads} quads`);
+    const wc = await page.evaluate(() => window.check.worst());
+    report.results[`${samples}x worst case`] = wc;
+    assert.deepEqual(wc.errors, []);
+    assert.equal(wc.expected, 2 * 196608, 'two full checkerboard chunks');
+    assert.equal(wc.stats.quads, wc.expected, JSON.stringify(wc.stats));
+    assert.equal(wc.stats.draws, 2, `one cutout and one translucent draw: ${JSON.stringify(wc.stats)}`);
+    for (const [i, n] of wc.lit.entries())
+      assert.ok(n > wc.pixels * 0.9, `worst-case chunk ${i} covers ${n} of ${wc.pixels} pixels`);
+    console.log(
+      `ok ${samples}x worst case: 196,608 cutout and 196,608 translucent quads drawn (${wc.lit.join(', ')} px)`,
+    );
   }
   if (process.argv.includes('--timing')) {
     await page.goto(`http://127.0.0.1:${port}${path}`);
