@@ -110,8 +110,35 @@ Every item is done only when all of these hold:
       under the drill's 30 nm bite out of the rib's wall) is settled by the rays. The rib, tee and rounded tee with the
       drill 30 and 100 nm off centre now cut in all 72 cases (27 refused before) within 1.4e-11 of closed forms with
       the sliver (a circular segment of height |off|, the part in the fillet by quadrature); offsets from 0.01 nm to
-      10 um either side all cut. Jubilee survey 145 of 145, every drilled volume identical to before. Left: tangency
-      along a circle or a traced curve, coincident freeform patches, loops round a torus's tube.
+      10 um either side all cut. Jubilee survey 145 of 145, every drilled volume identical to before.
+      Contact along curves, tori cut round the tube, coincident spline faces, written 2026-10-20 (same branch):
+      - A torus face whose loops go round its tube (a box face through the axis) is worked in (v, u): the loops of one
+        face on a torus all go round the same way. Where the face holds every circle round the tube (a torus with a
+        hole drilled through the tube) its mass integrates across the cut it is opened at; it threw before.
+      - Surfaces touching along a circle or a curve cut neither face there. Coaxial pairs within the tolerance give one
+        circle; a region's point inside is taken from several, skipping any where the other face only touches it (it
+        must lie within the tolerance all round to count as on it). Traced pairs: seeds where the normals are parallel
+        within 1e-6 are skipped (a meridian lying in the other surface seeds at its rounding errors); a curve crossing
+        a curve of touching is walked straight through it and a vertex goes there; within the tolerance of touching
+        along a curve, the curves turned back along it a hair from it are cut there and joined across it.
+      - Steps are short enough that the middle of each cubic lies within 1e-10 of the model of the curve: where the
+        surfaces are nearly tangent a 1 nm stray off them put the two faces' edges 0.2 um apart (volumes 3e-7 off).
+      - Spline faces on one surface (a second copy, pieces of one patch with their own control points, a patch carried
+        on past the other's edge) overlap as planes do and merge onto a patch that holds them all; an edge found again
+        as a plane's curve along it is that edge (their middles by parameter differ).
+      Tested against closed forms or quadrature, all three operations: a half and a quarter torus, a torus cut 10 mm off
+      its axis, a drilled torus (4e-11 of Gauss quadrature); a ball in a bore and in a torus's tube, a ring on a plane,
+      in a bore and round a bore, exactly, 0.1 nm either way and 100 nm or 1 um past (within 1e-11); a cylinder of the
+      tube's radius along the torus, exactly and 1e-12 mm to 1e-3 mm either way (within 6e-11 of quadrature); a pipe
+      elbow with a pipe running on from its end and 3 mm into it, the pipe's seam through the crossing (2e-11); the
+      bump block against a second copy, its halves and middle, the patch carried on to x = 15 and from x = -4, lifted
+      0.1 nm and 1 um (exact, or within 3e-10). The slanted hole now cuts within 3e-11 of quadrature 30 nm out and
+      beyond (6e-10 before). Jubilee survey 145 of 145 (55 s; main 52 s); 84 drilled volumes moved, by 2.6e-7 at most.
+      The five that moved most came nearer: subtract + intersect - part on bodies 83, 29, 31, 28 fell from 2.6e-7,
+      1.9e-7, 1.2e-7, 5.7e-8 to 1.4e-8, 2e-14, 3e-9, 3e-12; body 121 stays 2e-5 off (its subtract larger than the part,
+      as before). Left: faces further apart than the tolerance but within their vertices' and edges' own 1e-7 m (two
+      boxes side by side, one 30-100 nm taller: refused with a RangeError, on main too), body 121, Codex's corpus check,
+      OpenCascade comparison.
 
 ## Phase 4: blends
 

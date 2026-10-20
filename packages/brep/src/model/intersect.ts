@@ -19,14 +19,15 @@ const parallel = (a: XYZ, b: XYZ) => length(cross(a, b)) <= 1e-12;
  * plane, plane with cylinder, parallel cylinders, and surfaces of revolution on one axis: planes across it, spheres
  * centred on it, cylinders, cones and tori about it, which meet in circles); otherwise the curves are traced inside
  * `box` (march.ts), which those pairs (and every pair with a spline surface) need. Surfaces that come within
- * `tolerance` of touching (a plane or a cylinder along a cylinder, or two traced surfaces at a point) are taken to
- * touch: one line where they run alongside, crossing curves where they meet at a point (the Booleans pass 1e-6 of the
- * model). Throws a RangeError where a traced curve lands exactly on a point where the surfaces touch.
+ * `tolerance` of touching (a plane or a cylinder along a cylinder, surfaces about one axis along a circle, or two
+ * traced surfaces at a point) are taken to touch: one line or circle where they run alongside, crossing curves where
+ * they meet at a point (the Booleans pass 1e-6 of the model). Traced surfaces touching along a curve give no curve
+ * there: only the curves crossing it, traced straight through it.
  */
 export function intersectSurfaces(a: SurfaceDef, b: SurfaceDef, box?: Box3, tolerance = 0): SurfaceIntersection {
   if (b.kind === 'plane' && a.kind !== 'plane') return intersectSurfaces(b, a, box, tolerance);
   if (a.kind === 'plane' && b.kind === 'plane') return planePlane(a.frame.origin, a.frame.z, b.frame.origin, b.frame.z);
-  const coaxial = revolutionPair(a, b);
+  const coaxial = revolutionPair(a, b, tolerance);
   if (coaxial) return coaxial;
   if (a.kind === 'plane' && b.kind === 'cylinder')
     return planeCylinder(a.frame.origin, a.frame.z, b.frame.origin, b.frame.z, b.frame.x, b.radius, tolerance);
@@ -48,8 +49,11 @@ const fromAxis = (axis: Axis, p: XYZ) => {
   return { h, rho: length(sub(d, scale(axis.z, h))) };
 };
 
-/** The circles two surfaces of revolution on one axis meet in; undefined when they share no axis. */
-function revolutionPair(a: SurfaceDef, b: SurfaceDef): SurfaceIntersection | undefined {
+/**
+ * The circles two surfaces of revolution on one axis meet in; undefined when they share no axis. Within `tolerance` of
+ * touching (a ball in a bore, a ring on a plane), they touch along one circle.
+ */
+function revolutionPair(a: SurfaceDef, b: SurfaceDef, tolerance: number): SurfaceIntersection | undefined {
   if (a.kind === 'spline' || b.kind === 'spline') return undefined;
   const size =
       1 +
@@ -86,7 +90,7 @@ function revolutionPair(a: SurfaceDef, b: SurfaceDef): SurfaceIntersection | und
     points: P2[] = [];
   for (const m of ma)
     for (const n of mb) {
-      const met = meet(m, n, tol);
+      const met = meet(m, n, tol, Math.max(tol, tolerance));
       if (met === 'same') return { kind: 'coincident' };
       for (const q of met)
         if (q[0] > tol && !points.some((r) => Math.abs(r[0] - q[0]) <= tol && Math.abs(r[1] - q[1]) <= tol))
@@ -129,9 +133,12 @@ function meridians(s: SurfaceDef, axis: Axis): Meridian[] {
 
 const cross2 = (a: P2, b: P2) => a[0] * b[1] - a[1] * b[0];
 
-/** Where two profile curves meet ('same' when they are one curve). A touch gives one point. */
-function meet(m: Meridian, n: Meridian, tol: number): P2[] | 'same' {
-  if (m.kind === 'circle' && n.kind === 'line') return meet(n, m, tol);
+/**
+ * Where two profile curves meet ('same' when they are one curve, within `tol`). A touch gives one point, and so do curves
+ * that come within `near` of touching (or of it apart): the point between them.
+ */
+function meet(m: Meridian, n: Meridian, tol: number, near: number): P2[] | 'same' {
+  if (m.kind === 'circle' && n.kind === 'line') return meet(n, m, tol, near);
   if (m.kind === 'line' && n.kind === 'line') {
     const den = cross2(m.d, n.d),
       w: P2 = [n.p[0] - m.p[0], n.p[1] - m.p[1]];
@@ -143,22 +150,23 @@ function meet(m: Meridian, n: Meridian, tol: number): P2[] | 'same' {
     const w: P2 = [n.c[0] - m.p[0], n.c[1] - m.p[1]],
       s0 = w[0] * m.d[0] + w[1] * m.d[1],
       off = cross2(m.d, w),
-      disc = n.r * n.r - off * off;
-    if (disc < -2 * tol * n.r) return [];
-    const half = Math.sqrt(Math.max(0, disc)),
+      dip = n.r - Math.abs(off),
+      disc = n.r * n.r - off * off,
       at = (s: number): P2 => [m.p[0] + m.d[0] * s, m.p[1] + m.d[1] * s];
-    return half <= tol ? [at(s0)] : [at(s0 - half), at(s0 + half)];
+    if (dip < -near) return [];
+    const half = Math.sqrt(Math.max(0, disc));
+    return Math.abs(dip) <= near || half <= tol ? [at(s0)] : [at(s0 - half), at(s0 + half)];
   }
   if (m.kind === 'circle' && n.kind === 'circle') {
     const dx = n.c[0] - m.c[0],
       dy = n.c[1] - m.c[1],
       d = Math.hypot(dx, dy);
     if (d <= tol) return Math.abs(m.r - n.r) <= tol ? 'same' : [];
-    if (d > m.r + n.r + tol || d < Math.abs(m.r - n.r) - tol) return [];
+    if (d > m.r + n.r + near || d < Math.abs(m.r - n.r) - near) return [];
     const a = (m.r * m.r - n.r * n.r + d * d) / (2 * d),
       h = Math.sqrt(Math.max(0, m.r * m.r - a * a)),
       base: P2 = [m.c[0] + (a * dx) / d, m.c[1] + (a * dy) / d];
-    return h <= tol
+    return h <= tol || Math.abs(d - m.r - n.r) <= near || Math.abs(d - Math.abs(m.r - n.r)) <= near
       ? [base]
       : [
           [base[0] - (h * dy) / d, base[1] + (h * dx) / d],

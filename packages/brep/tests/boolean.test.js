@@ -634,13 +634,266 @@ test('Booleans where the surfaces come within the tolerance of touching: cut as 
   }
 });
 
+/** Gauss-Legendre nodes and weights on [-1, 1]. */
+function gaussLegendre(n) {
+  const x = [],
+    w = [];
+  for (let i = 1; i <= n; i++) {
+    let z = Math.cos((Math.PI * (i - 0.25)) / (n + 0.5)),
+      dp = 1;
+    for (let k = 0; k < 100; k++) {
+      let p1 = 1,
+        p2 = 0;
+      for (let j = 1; j <= n; j++) [p1, p2] = [((2 * j - 1) * z * p1 - (j - 1) * p2) / j, p1];
+      dp = (n * (z * p1 - p2)) / (z * z - 1);
+      const dz = p1 / dp;
+      z -= dz;
+      if (Math.abs(dz) < 1e-16) break;
+    }
+    x.push(z);
+    w.push(2 / ((1 - z * z) * dp * dp));
+  }
+  return { x, w };
+}
+const GL48 = gaussLegendre(48);
+/** The integral of f over [a, b], taken in x = a + (b - a)(1 - cos pi s) / 2 so that square-root ends integrate well. */
+function integrate(f, a, b) {
+  let sum = 0;
+  for (let i = 0; i < GL48.x.length; i++) {
+    const s = (1 + GL48.x[i]) / 2,
+      x = a + ((b - a) * (1 - Math.cos(Math.PI * s))) / 2;
+    sum += (GL48.w[i] * f(x) * (b - a) * Math.PI * Math.sin(Math.PI * s)) / 4;
+  }
+  return sum;
+}
+/**
+ * The volume common to a torus (major 20 mm, minor 5 mm, about z) and a cylinder of radius rc along y through
+ * (20, 0, 0) from y0 to y1: in each plane across y, the width of the lower of the two over x (they cross where the
+ * torus's section and the cylinder's circle do), finer in y towards y = 0 where the curves turn.
+ */
+function pipeInTube(rc, y0, y1) {
+  const slice = (y) => {
+    const hc = (x) => Math.sqrt(Math.max(0, rc * rc - x * x)),
+      ht = (x) => Math.sqrt(Math.max(0, 25 - (Math.hypot(20 + x, y) - 20) ** 2)),
+      lo = Math.max(-rc, Math.sqrt(225 - y * y) - 20),
+      hi = Math.min(rc, Math.sqrt(625 - y * y) - 20),
+      f = (x) => hc(x) ** 2 - ht(x) ** 2,
+      cuts = [lo];
+    for (let k = 0; k < 400; k++) {
+      let a = lo + ((hi - lo) * k) / 400,
+        b = lo + ((hi - lo) * (k + 1)) / 400;
+      if (f(a) < 0 !== f(b) < 0) {
+        for (let i = 0; i < 100; i++) {
+          const m = (a + b) / 2;
+          if (f(m) < 0 === f(a) < 0) a = m;
+          else b = m;
+        }
+        cuts.push((a + b) / 2);
+      }
+    }
+    cuts.push(hi);
+    let sum = 0;
+    for (let i = 0; i + 1 < cuts.length; i++) sum += integrate((x) => 2 * Math.min(hc(x), ht(x)), cuts[i], cuts[i + 1]);
+    return sum;
+  };
+  let v = 0;
+  for (const b of [y1, -y0]) {
+    if (!(b > 0)) continue;
+    const knots = [0, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2].filter((y) => y < b);
+    knots.push(b);
+    for (let i = 0; i + 1 < knots.length; i++) v += integrate(slice, knots[i], knots[i + 1]);
+  }
+  return v;
+}
+
+test('Booleans that cut a torus round its tube: through its axis, across its hole, and through the tube', () => {
+  // Major 20, minor 5: 2 pi^2 R r^2. A box face through the axis cuts it round its tube in two circles, the faces left
+  // with u and v swapped; a plane 10 mm off the axis cuts it in two traced loops round the tube. All three operations
+  // to the closed forms, or (the traced loops) to each other.
+  const T = 2 * Math.PI ** 2 * 20 * 25,
+    volume = (b) => (b.faces.length ? model.massProperties(b).volume / mm ** 3 : 0),
+    ring = () => torus('t', 20 * mm, 5 * mm);
+  for (const [label, tool, size, common] of [
+    ['half', () => box('b', [30 * mm, 60 * mm, 60 * mm], at(0, -30, -30)), 108000, T / 2],
+    ['quarter', () => box('b', [30 * mm, 30 * mm, 60 * mm], at(0, 0, -30)), 54000, T / 4],
+  ])
+    for (const [op, want] of [
+      ['union', size + T - common],
+      ['intersect', common],
+      ['subtract', T - common],
+    ]) {
+      const out = boolean('c', op, ring(), tool());
+      assert.deepEqual(validateBody(out), []);
+      assert.ok(Math.abs(volume(out) - want) <= 1e-9 * want, `${label} ${op}: ${volume(out)} vs ${want}`);
+    }
+  const slab = () => box('b', [30 * mm, 60 * mm, 60 * mm], at(10, -30, -30)),
+    [u, i, s] = ['union', 'intersect', 'subtract'].map((op) => {
+      const out = boolean('c', op, ring(), slab());
+      assert.deepEqual(validateBody(out), []);
+      return volume(out);
+    });
+  assert.ok(Math.abs(i + s - T) <= 1e-8 * T && Math.abs(u + i - T - 108000) <= 1e-8 * T, `${u} ${i} ${s}`);
+  // A 3 mm hole through the tube leaves the torus's face holding every circle round the tube: its mass integrates
+  // across the cut it is opened at (it threw before). The hole's share by Gauss quadrature over its section.
+  const G = gaussLegendre(24);
+  let shared = 0;
+  for (let a = 0; a < 24; a++)
+    for (let b = 0; b < 64; b++) {
+      const r = 1.5 * (1 + G.x[a]),
+        t = (2 * Math.PI * b) / 64,
+        rho = Math.hypot(20 + r * Math.cos(t), 1 + r * Math.sin(t));
+      shared += 2 * Math.sqrt(25 - (rho - 20) ** 2) * r * 1.5 * G.w[a] * ((2 * Math.PI) / 64);
+    }
+  for (const [op, want] of [
+    ['subtract', T - shared],
+    ['intersect', shared],
+    ['union', T + Math.PI * 9 * 40 - shared],
+  ]) {
+    const out = boolean('d', op, ring(), cylinder('c', 3 * mm, 40 * mm, at(20, 1, -20)));
+    assert.deepEqual(validateBody(out), []);
+    assert.ok(Math.abs(volume(out) - want) <= 1e-9 * want, `drilled ${op}: ${volume(out)} vs ${want}`);
+  }
+});
+
+test('Booleans where surfaces touch along a circle: balls and rings in bores and on planes, a ball in a tube', () => {
+  // Surfaces about one axis touching along a circle cut neither face there (a ball in a bore, a ring on a plane or in
+  // a bore, a bore through its hole); a sphere centred on a torus's core circle touches its tube along a meridian, a
+  // traced pair with no curve between them. Exactly, within the tolerance (0.1 nm either way: they touch) and past it
+  // (100 nm, 1 um), all three operations come to the closed forms of the actual sizes (a sphere less the caps outside
+  // the bore, a torus less the segment of its section below the plane, by Pappus).
+  const volume = (b) => (b.faces.length ? model.massProperties(b).volume / mm ** 3 : 0),
+    T = 2 * Math.PI ** 2 * 20 * 25,
+    segment = (d) => (d <= 0 ? 0 : 25 * Math.acos((5 - d) / 5) - (5 - d) * Math.sqrt(10 * d - d * d)),
+    check = (label, a, b, va, vb, common) => {
+      for (const [op, want] of [
+        ['union', va + vb - common],
+        ['intersect', common],
+        ['subtract', va - common],
+      ]) {
+        const out = boolean('c', op, a(), b());
+        assert.deepEqual(validateBody(out), [], `${label} ${op}`);
+        assert.ok(
+          Math.abs(volume(out) - want) <= 1e-9 * Math.max(want, va),
+          `${label} ${op}: ${volume(out)} vs ${want}`,
+        );
+      }
+    };
+  for (const e of [0, 1e-7, -1e-7, 1e-4, -1e-3]) {
+    const r = 5 + e,
+      ball = (4 / 3) * Math.PI * r ** 3;
+    check(
+      `ball ${r} in a 5 mm bore`,
+      () => cylinder('c', 5 * mm, 20 * mm, at(0, 0, -10)),
+      () => sphere('s', r * mm),
+      500 * Math.PI,
+      ball,
+      ball - (r > 5 ? (4 / 3) * Math.PI * (r * r - 25) ** 1.5 : 0),
+    );
+    check(
+      `ring ${e} into a plane`,
+      () => box('b', [60 * mm, 60 * mm, 10 * mm], at(-30, -30, -15 + e)),
+      () => torus('t', 20 * mm, 5 * mm),
+      36000,
+      T,
+      2 * Math.PI * 20 * segment(e),
+    );
+    // In the tube (a ball poking out of it has no closed form).
+    if (e <= 1e-7)
+      check(
+        `ball ${r} in a tube`,
+        () => torus('t', 20 * mm, 5 * mm),
+        () => sphere('s', r * mm, at(20, 0, 0)),
+        T,
+        ball,
+        ball,
+      );
+  }
+  check(
+    'ring in a bore',
+    () => cylinder('c', 25 * mm, 20 * mm, at(0, 0, -10)),
+    () => torus('t', 20 * mm, 5 * mm),
+    12500 * Math.PI,
+    T,
+    T,
+  );
+  check(
+    'bore through a ring',
+    () => cylinder('c', 15 * mm, 20 * mm, at(0, 0, -10)),
+    () => torus('t', 20 * mm, 5 * mm),
+    4500 * Math.PI,
+    T,
+    0,
+  );
+});
+
+test('Booleans where surfaces touch along a circle and curves cross it: a pipe in a torus, a pipe elbow', () => {
+  // A cylinder of the tube's radius along a tangent of the torus's core circle touches the tube along a meridian, and
+  // leaves it along two curves that cross that circle: the tracer walks them straight through it, where a vertex goes.
+  // A hair off the tube's radius (to 0.1 nm, within the tolerance) the curves turn back along the circle a few
+  // micrometres from it: they are joined across it, as if the surfaces touched. Past the tolerance they are followed
+  // round, steps short enough that the curve lies on both surfaces where they are nearly tangent (else the two faces'
+  // edges part, a tenth of a micrometre in a 1 nm stray). The common part to quadrature, for every radius.
+  const volume = (b) => (b.faces.length ? model.massProperties(b).volume / mm ** 3 : 0),
+    T = 2 * Math.PI ** 2 * 20 * 25;
+  for (const e of [0, 1e-7, -1e-4]) {
+    const rc = 5 + e,
+      common = pipeInTube(rc, -2, 2),
+      pipe = Math.PI * rc * rc * 4;
+    for (const [op, want] of [
+      ['union', T + pipe - common],
+      ['intersect', common],
+      ['subtract', T - common],
+    ]) {
+      const out = boolean(
+        'c',
+        op,
+        torus('t', 20 * mm, 5 * mm),
+        cylinder('c', rc * mm, 4 * mm, at(20, -2, 0, [0, 1, 0])),
+      );
+      assert.deepEqual(validateBody(out), [], `${e} ${op}`);
+      assert.ok(Math.abs(volume(out) - want) <= 1e-9 * want, `${e} ${op}: ${volume(out)} vs ${want}`);
+    }
+  }
+  // A pipe elbow: a quarter of the torus, a straight pipe on at its end (its side touching the tube along the end
+  // circle, an edge of both), and one running 3 mm on into the elbow, its seam through a point the curves cross.
+  const quarter = () =>
+    boolean('q', 'intersect', torus('t', 20 * mm, 5 * mm), box('b', [30 * mm, 30 * mm, 60 * mm], at(0, 0, -30)));
+  for (const [label, pipe, length, common] of [
+    ['on at y = 0', () => cylinder('p', 5 * mm, 10 * mm, at(20, -10, 0, [0, 1, 0])), 10, 0],
+    [
+      'into it, seam up',
+      () => cylinder('p', 5 * mm, 13 * mm, at(20, -10, 0, [0, 1, 0], [0, 0, 1])),
+      13,
+      pipeInTube(5, 0, 3),
+    ],
+  ])
+    for (const [op, want] of [
+      ['union', T / 4 + 25 * Math.PI * length - common],
+      ['intersect', common],
+      ['subtract', T / 4 - common],
+    ]) {
+      const out = boolean('c', op, quarter(), pipe());
+      assert.deepEqual(validateBody(out), [], `${label} ${op}`);
+      assert.ok(
+        Math.abs(volume(out) - want) <= 1e-9 * Math.max(want, T / 4),
+        `${label} ${op}: ${volume(out)} vs ${want}`,
+      );
+    }
+});
+
 test('Booleans: what is not supported yet throws a RangeError', () => {
-  // A box whose face runs through a torus's axis cuts the torus round its tube, in two circles: a loop round a torus's
-  // tube is not supported yet.
+  // Faces a little further apart than the tolerance (1e-6 of the model, 20 nm here) but within their vertices' and
+  // edges' own (1e-7 m): two boxes side by side, one 50 nm taller. Its top's edge along the other's side and the
+  // other's top corner are taken to meet at the corner but not along the edge. Not supported yet.
   assert.throws(
     () =>
-      boolean('h', 'intersect', torus('t', 20 * mm, 5 * mm), box('b', [60 * mm, 60 * mm, 60 * mm], at(0, -30, -30))),
-    { name: 'RangeError', message: /round a torus's tube/ },
+      boolean(
+        'c',
+        'union',
+        box('a', [10 * mm, 10 * mm, 5 * mm], at(0, 0, 0)),
+        box('b', [10 * mm, 10 * mm, 5.00005 * mm], at(5, 0, 0)),
+      ),
+    { name: 'RangeError' },
   );
 });
 

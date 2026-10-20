@@ -107,7 +107,7 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
   const fuv = new FaceUV(face),
     s = fuv.surface,
     flip = fuv.flip,
-    sign = face.sense ? 1 : -1,
+    sign = fuv.sense ? 1 : -1,
     out = new Float64Array(K),
     g = new Float64Array(K);
   /** The integrands at (u', v). */
@@ -235,6 +235,14 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
       line = new Float64Array(K);
     quad((up) => G(up, l.v), from, to, piecesOf(to - from, true), line);
     for (let k = 0; k < K; k++) out[k] -= line[k];
+  }
+
+  // A torus with holes, cut open round its tube inside the face: the cut's far side, run towards -u' with the face
+  // below it (G is zero on its near side).
+  if (fuv.cutInside) {
+    const line = new Float64Array(K);
+    quad((up) => G(up, fuv.vCut + s.vPeriod), 0, s.uPeriod, piecesOf(s.uPeriod, true), line);
+    for (let k = 0; k < K; k++) out[k] += line[k];
   }
 
   // A second covered pole: its line, run with the face on its left (towards -u' at the high pole, +u' at the low).

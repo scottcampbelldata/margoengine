@@ -2,9 +2,10 @@
 // (u, v) polylines, continuous across a periodic surface's seam (a loop round a cylinder runs a whole period in u),
 // with u mirrored when the face normal opposes the surface's, so the face always lies left of its loops. Inside is
 // decided loop by loop, by signed crossings of a line up from the point, which works for loops round a cylinder or a
-// sphere's pole as well as for closed ones.
+// sphere's pole as well as for closed ones. On a torus the loops of a face that go round it all go the same way (two
+// that went different ways would cross): round its axis, in u; or round its tube, in v, and then u and v are swapped.
 import type { Surface } from '../geometry/surfaces.js';
-import { distance, type XYZ } from '../geometry/vec.js';
+import { distance, scale, type XYZ } from '../geometry/vec.js';
 import { curveEvaluator, surfaceEvaluator } from './geometry.js';
 import type { Edge, Face } from './topology.js';
 import { edgeParameters } from './validate.js';
@@ -21,8 +22,86 @@ export interface UVLoop {
 /** Samples per edge in (u, v): a line maps to a straight line on the surfaces Booleans take; a curve takes enough points to follow its turn. */
 export const edgeSamples = (edge: Edge) => (edge.curve.kind === 'line' ? 1 : 128);
 
+/**
+ * A surface with its parameters swapped, S'(u, v) = S(v, u): for a face whose loops go round a torus's tube, so that
+ * they go round in u. Its natural normal is the reverse of the surface's.
+ */
+class Swapped implements Surface {
+  readonly uPeriod: number;
+  readonly vPeriod: number;
+  readonly uDomain: readonly [number, number];
+  readonly vDomain: readonly [number, number];
+  readonly breaks?: () => readonly [readonly number[], readonly number[]];
+  constructor(readonly raw: Surface) {
+    this.uPeriod = raw.vPeriod;
+    this.vPeriod = raw.uPeriod;
+    this.uDomain = raw.vDomain;
+    this.vDomain = raw.uDomain;
+    const breaks = raw.breaks?.bind(raw);
+    if (breaks)
+      this.breaks = () => {
+        const [u, v] = breaks();
+        return [v, u];
+      };
+  }
+  at(u: number, v: number): number[] {
+    const d = this.raw.at(v, u);
+    return [d[0], d[1], d[2], d[6], d[7], d[8], d[3], d[4], d[5]];
+  }
+  normal(u: number, v: number): XYZ {
+    return scale(this.raw.normal(v, u), -1);
+  }
+  parameters(p: readonly number[], hint?: readonly number[]): [number, number] {
+    const [u, v] = this.raw.parameters(p, hint && [hint[1], hint[0]]);
+    return [v, u];
+  }
+  steps(box: readonly number[], deflection: number, turn: number): [number, number] {
+    const [du, dv] = this.raw.steps([box[2], box[3], box[0], box[1]], deflection, turn);
+    return [dv, du];
+  }
+  pole(side: 1 | -1): number | undefined {
+    return this.raw.uPole?.(side);
+  }
+  uPole(side: 1 | -1): number | undefined {
+    return this.raw.pole(side);
+  }
+  singular(u: number, v: number): boolean {
+    return this.raw.singular(v, u);
+  }
+}
+
+/**
+ * Whether closed loops through these points, on a surface closed both ways, go round it in v (a torus cut through its
+ * axis: round its tube). Throws a RangeError for a loop that goes round both ways (a helix's thread across a torus).
+ */
+export function roundV(s: Surface, loops: readonly (readonly XYZ[])[], name: string): boolean {
+  if (!s.uPeriod || !s.vPeriod) return false;
+  let around = false;
+  for (const samples of loops) {
+    if (!samples.length) continue;
+    const start = s.parameters(samples[0]);
+    let [u, v] = start;
+    for (let k = 1; k <= samples.length; k++) {
+      const [pu, pv] = s.parameters(samples[k % samples.length], [u, v]);
+      u = pu + Math.round((u - pu) / s.uPeriod) * s.uPeriod;
+      v = pv + Math.round((v - pv) / s.vPeriod) * s.vPeriod;
+    }
+    const ku = Math.round((u - start[0]) / s.uPeriod),
+      kv = Math.round((v - start[1]) / s.vPeriod);
+    if (ku && kv) throw new RangeError(`face ${name}: a loop goes round a torus both ways: not supported yet`);
+    if (kv) around = true;
+  }
+  return around;
+}
+
 export class FaceUV {
   readonly surface: Surface;
+  /** The face's own surface (`surface` is it with u and v swapped when its loops go round a torus's tube). */
+  readonly raw: Surface;
+  /** Whether u and v are swapped: the face's loops go round in v of its own surface. */
+  readonly swapped: boolean;
+  /** The face's sense against `surface`'s natural normal (reversed when u and v are swapped). */
+  readonly sense: boolean;
   /** u is mirrored (u' = -u) when the face normal is the reverse of the surface's natural normal. */
   readonly flip: boolean;
   /** The u' period (0 when u is open). */
@@ -35,6 +114,8 @@ export class FaceUV {
    * so v runs from here one period on and the face's loops and points lie in that range.
    */
   vCut = -Math.PI;
+  /** Whether the face contains the circle at `vCut` (a torus with holes): its v then runs the whole period from it. */
+  cutInside = false;
   /** A millionth of the face's size (from its vertices): points this close to a pole are at it. */
   #miss = 0;
   /** The surface's poles (where u, or v, has no meaning) and their points, found once. */
@@ -45,9 +126,26 @@ export class FaceUV {
    */
   readonly poleLines: { loop: number; at: number; v: number }[] = [];
 
-  constructor(readonly face: Face) {
-    this.surface = surfaceEvaluator(face.surface);
-    this.flip = !face.sense;
+  /** `swapped` takes u and v swapped or not (for loops traced later); by default, as the face's own loops need. */
+  constructor(
+    readonly face: Face,
+    swapped?: boolean,
+  ) {
+    this.raw = surfaceEvaluator(face.surface);
+    const samplesOf = face.loops.map((loop) => {
+      const samples: XYZ[] = [];
+      for (const c of loop.coedges) {
+        const ts = edgeParameters(c.edge, edgeSamples(c.edge));
+        if (!c.forward) ts.reverse();
+        const curve = curveEvaluator(c.edge.curve);
+        for (let k = 0; k < ts.length - 1; k++) samples.push(curve.at(ts[k]).slice(0, 3) as XYZ);
+      }
+      return samples;
+    });
+    this.swapped = swapped ?? roundV(this.raw, samplesOf, face.name);
+    this.surface = this.swapped ? new Swapped(this.raw) : this.raw;
+    this.sense = this.swapped ? !face.sense : face.sense;
+    this.flip = !this.sense;
     this.period = this.surface.uPeriod;
     const corners = face.loops.flatMap((l) => l.coedges.map((c) => c.start.point));
     if (corners.length)
@@ -57,14 +155,7 @@ export class FaceUV {
           ...[0, 1, 2].map((k) => Math.max(...corners.map((q) => q[k])) - Math.min(...corners.map((q) => q[k]))),
           1e-9,
         );
-    face.loops.forEach((loop, li) => {
-      const samples: XYZ[] = [];
-      for (const c of loop.coedges) {
-        const ts = edgeParameters(c.edge, edgeSamples(c.edge));
-        if (!c.forward) ts.reverse();
-        const curve = curveEvaluator(c.edge.curve);
-        for (let k = 0; k < ts.length - 1; k++) samples.push(curve.at(ts[k]).slice(0, 3) as XYZ);
-      }
+    samplesOf.forEach((samples, li) => {
       const { loop: traced, lines } = this.trace(samples);
       for (const at of lines) this.poleLines.push({ loop: li, at, v: traced.points[at][1] });
       this.loops.push(traced);
@@ -72,21 +163,32 @@ export class FaceUV {
     const vPeriod = this.surface.vPeriod;
     if (vPeriod && this.loops.length) {
       // The cut is a circle round the tube that no loop crosses, so it lies wholly inside or wholly outside the face.
-      const cut = gaps(
-        this.loops.map((l) => vRange(l)),
-        vPeriod,
-      ).find((g) => {
-        const shifted = this.loops.map((l) => shiftV(l, g, vPeriod));
-        return !shifted.every((l) => leftOf(l, this.period, shifted[0].points[0][0], g + 1e-9 * vPeriod));
-      });
+      // Between loops that go round the other way it must lie outside, or the face would lie in two parts; a face
+      // whose loops all close (a torus with holes) may contain every such circle, and then contains the cut.
+      const options = gaps(
+          this.loops.map((l) => vRange(l)),
+          vPeriod,
+        ),
+        wraps = this.loops.some((l) => l.wrap),
+        cut = wraps
+          ? options.find(
+              (g) =>
+                !inAbove(
+                  this.loops.map((l) => shiftV(l, g, vPeriod)),
+                  this.period,
+                  g,
+                ),
+            )
+          : options[0];
       if (cut === undefined)
-        throw new RangeError(`face ${this.face.name}: it goes all the way round a torus's tube: not supported yet`);
+        throw new RangeError(`face ${this.face.name}: no circle round its torus's tube cuts it open`);
       this.vCut = cut;
       this.loops.forEach((l, i) => {
         this.loops[i] = shiftV(l, cut, vPeriod);
       });
-      this.box[2] = Math.min(...this.loops.map((l) => vRange(l)[0]));
-      this.box[3] = Math.max(...this.loops.map((l) => vRange(l)[1]));
+      this.cutInside = !wraps && inAbove(this.loops, this.period, cut);
+      this.box[2] = this.cutInside ? cut : Math.min(...this.loops.map((l) => vRange(l)[0]));
+      this.box[3] = this.cutInside ? cut + vPeriod : Math.max(...this.loops.map((l) => vRange(l)[1]));
     }
   }
 
@@ -170,7 +272,7 @@ export class FaceUV {
     if (!points.length || !this.period) return { points, wrap: 0 };
     const back = this.near(this.at(points[0]), points[points.length - 1]);
     if (this.surface.vPeriod && Math.abs(back[1] - points[0][1]) > this.surface.vPeriod / 2)
-      throw new RangeError(`face ${this.face.name}: a loop round a torus's tube is not supported yet`);
+      throw new RangeError(`face ${this.face.name}: a loop goes round a torus both ways: not supported yet`);
     return { points, wrap: Math.round((back[0] - points[0][0]) / this.period) };
   }
 
@@ -214,7 +316,7 @@ export class FaceUV {
   normal(p: XYZ): XYZ {
     const raw = this.surface.parameters(p),
       n = this.surface.normal(raw[0], raw[1]);
-    return this.face.sense ? n : [-n[0], -n[1], -n[2]];
+    return this.sense ? n : [-n[0], -n[1], -n[2]];
   }
 
   /** Whether a point of the surface lies inside the face: left of every loop (a face with no loops is the whole surface). */
@@ -272,6 +374,38 @@ function crossings(loop: UVLoop, period: number, u: number, v: number): number {
 export function leftOf(loop: UVLoop, period: number, u: number, v: number): boolean {
   const bias = loop.wrap > 0 ? 1 : loop.wrap < 0 ? 0 : polygonArea(loop.points) < 0 ? 1 : 0;
   return crossings(loop, period, u, v) + bias === 1;
+}
+
+/**
+ * Whether the point just above v = `cut` lies inside the face bounded by `loops` (all at or above the cut): left of
+ * every loop when none goes round in u'; else as the first loop the line up from there crosses says, the face lying
+ * above a loop that runs towards +u' there and below one that runs towards -u'.
+ */
+function inAbove(loops: readonly UVLoop[], period: number, cut: number): boolean {
+  const round = loops.find((l) => l.wrap);
+  if (!round) return loops.every((l) => leftOf(l, period, loops[0].points[0][0], cut + 1e-9 * (period || 1)));
+  const p = round.points,
+    q = p.length > 1 ? p[1] : [p[0][0] + round.wrap * period, p[0][1]],
+    u = (p[0][0] + q[0]) / 2;
+  let lowest = Infinity,
+    up = true;
+  for (const l of loops) {
+    const n = l.points.length;
+    for (let i = 0; i < n; i++) {
+      const a = l.points[i],
+        b: UV = i + 1 < n ? l.points[i + 1] : [l.points[0][0] + l.wrap * period, l.points[0][1]];
+      if (a[0] === b[0]) continue;
+      const lo = Math.min(a[0], b[0]),
+        hi = Math.max(a[0], b[0]);
+      for (let k = period ? Math.ceil((lo - u) / period) : 0; k <= (period ? Math.floor((hi - u) / period) : 0); k++) {
+        const x = u + k * period;
+        if (x < lo || x >= hi) continue;
+        const y = a[1] + ((x - a[0]) * (b[1] - a[1])) / (b[0] - a[0]);
+        if (y < lowest) [lowest, up] = [y, b[0] > a[0]];
+      }
+    }
+  }
+  return !up;
 }
 
 /** Signed area of a closed polyline (counter-clockwise positive). */

@@ -14,7 +14,7 @@ import {
   type CurveDef,
   type SurfaceDef,
 } from './geometry.js';
-import { FaceUV, gaps, leftOf, shiftV, vRange, type UV, type UVLoop } from './faces.js';
+import { FaceUV, gaps, leftOf, roundV, shiftV, vRange, type UV, type UVLoop } from './faces.js';
 import { curveSurfaceCrossings, intersectSurfaces, signedDistance } from './intersect.js';
 import type { Box3 } from './march.js';
 import { Body, Edge, Face, Vertex, type History, type Name } from './topology.js';
@@ -60,12 +60,22 @@ interface Half {
   used?: boolean;
 }
 
-/** One face of the result before it is made: the input face it is part of, its loops, and a point inside it. */
+/** A point inside a region, and how far it lies from the region's loops. */
+interface Inside {
+  point: XYZ;
+  clearance: number;
+}
+
+/**
+ * One face of the result before it is made: the input face it is part of, its loops, a point inside it, and other
+ * points inside it, furthest from its loops first (`point` is the one it was classified from).
+ */
 interface Region {
   face: Face;
   from: 'a' | 'b';
   loops: Half[][];
   point: XYZ;
+  inside: Inside[];
 }
 
 const TWO_PI = 2 * Math.PI;
@@ -89,8 +99,12 @@ const RAYS = [
  * 1e-6 of touching; where the result's surface touches itself, its sheets meet at a point or along a line without
  * sharing a vertex or edge there; where they come a little further than that from touching, the curves passing each
  * other there a few micrometres apart are cut apart, and a curve passing that far inside a face's edge (or cutting a
- * sliver that thin off a face) splits the face there. Throws a RangeError for what is not supported yet (a loop round a
- * torus's tube) and when the result is not a valid solid.
+ * sliver that thin off a face) splits the face there. Surfaces touching along a circle or a curve (a ball in a bore or
+ * in a torus's tube, a pipe running on from an elbow) cut neither face along it, exactly or within the tolerance; the
+ * curves crossing it cross it at a vertex. A torus is cut round its tube as well as round its axis, and spline faces
+ * lying on one surface (copies, pieces of one patch with their own control points) overlap as planes do. Throws a
+ * RangeError for what is not supported yet (faces further apart than the tolerance but within their vertices' and
+ * edges' own, 1e-7 m) and when the result is not a valid solid.
  */
 export function boolean(
   name: Name,
@@ -295,10 +309,9 @@ export function boolean(
       curveEvaluator(p.curve)
         .at((p.t0 + p.t1) / 2)
         .slice(0, 3) as XYZ,
-    /** Whether piece p runs along piece q (same ends, p's middle on q within its range). */
-    along = (p: Piece, q: Piece) => {
-      const m = middle(p),
-        c = curveEvaluator(q.curve),
+    /** Whether point m lies on piece q, within its range. */
+    onPiece = (m: XYZ, q: Piece) => {
+      const c = curveEvaluator(q.curve),
         lo = Math.min(q.t0, q.t1),
         hi = Math.max(q.t0, q.t1);
       let t = c.parameter(m);
@@ -307,6 +320,8 @@ export function boolean(
         t >= lo - 1e-9 * (hi - lo) && t <= hi + 1e-9 * (hi - lo) && length(sub(c.at(t).slice(0, 3) as XYZ, m)) <= touch
       );
     },
+    /** Whether piece p runs along piece q (same ends, p's middle on q within its range). */
+    along = (p: Piece, q: Piece) => onPiece(middle(p), q),
     byEnds = new Map<string, Piece[]>();
   for (const e of a.edges) for (const p of piecesOf.get(e)!) byEnds.set(ends(p), [...(byEnds.get(ends(p)) ?? []), p]);
   for (const e of b.edges)
@@ -389,14 +404,14 @@ export function boolean(
             if (length(sub(c.at(t).slice(0, 3) as XYZ, v.point)) <= near) stops.push({ t, vertex: v });
           }
       stops.sort((x, y) => x.t - y.t);
-      /** A boundary piece of `f` between these vertices that the stretch runs along, if any. */
+      /**
+       * A boundary piece of `f` between these vertices that the stretch runs along (its middle `m` on the piece: the
+       * piece's own middle lies elsewhere along it where the two curves are parametrized differently, as a spline edge
+       * and the curve a plane cuts from its spline face along it), if any.
+       */
       const onBoundary = (f: Face, start: Vertex, end: Vertex, m: XYZ) => {
         for (const q of boundaryOf(f))
-          if (
-            ((q.start === start && q.end === end) || (q.start === end && q.end === start)) &&
-            length(sub(middle(q), m)) <= touch
-          )
-            return q;
+          if (((q.start === start && q.end === end) || (q.start === end && q.end === start)) && onPiece(m, q)) return q;
         return undefined;
       };
       const push = (t0: number, t1: number, start: Vertex, end: Vertex) => {
@@ -470,7 +485,15 @@ export function boolean(
   // --- classification and selection ---------------------------------------------------------------------------------
   const kept: { region: Region; flip: boolean }[] = [];
   for (const r of regions) {
-    const where = classify(r.point, uvOf.get(r.face)!, r.from === 'a' ? faces.b : faces.a, uvOf, merge, 4 * size);
+    const { where, point } = classify(
+      r.inside,
+      uvOf.get(r.face)!,
+      r.from === 'a' ? faces.b : faces.a,
+      uvOf,
+      merge,
+      4 * size,
+    );
+    r.point = point;
     const keep =
       op === 'union'
         ? where === 'out' || (where === 'same' && r.from === 'a')
@@ -508,7 +531,7 @@ export function boolean(
           const [p, q] = [free[j], free[k]];
           if (p.i === q.i || p.forward === q.forward) continue;
           const [x, y] = [facing[p.i], facing[q.i]];
-          if (!sameSide(x.region.face, x.sense, y.region.face, y.sense, piece)) continue;
+          if (!sameSide(x.region.face, x.sense, y.region.face, y.sense, piece, touch)) continue;
           if (top(p.i) !== top(q.i)) group[top(q.i)] = top(p.i);
           joined.set(piece, new Set([...(joined.get(piece) ?? []), `${p.i},${p.forward}`, `${q.i},${q.forward}`]));
           free.splice(k, 1);
@@ -519,31 +542,35 @@ export function boolean(
     }
     if (list.length !== 2 || list[0].i === list[1].i || list[0].forward === list[1].forward) continue;
     const [x, y] = [facing[list[0].i], facing[list[1].i]];
-    if (top(list[0].i) !== top(list[1].i) && sameSide(x.region.face, x.sense, y.region.face, y.sense, piece))
+    if (top(list[0].i) !== top(list[1].i) && sameSide(x.region.face, x.sense, y.region.face, y.sense, piece, touch))
       group[top(list[1].i)] = top(list[0].i);
   }
   const members = new Map<number, number[]>();
   facing.forEach((_, i) => members.set(top(i), [...(members.get(top(i)) ?? []), i]));
   /** Each result face: the input face it is named from, its sense, its loops, a point inside it, and its other sources. */
   const outputs: { face: Face; sense: boolean; loops: Half[][]; point: XYZ; sources: Face[] }[] = [];
+  /** A kept region on its own: its loops, turned over where the result takes it the other way. */
+  const single = (i: number, sources: Face[]) => {
+    const { region, sense } = facing[i],
+      flip = sense !== region.face.sense;
+    outputs.push({
+      face: region.face,
+      sense,
+      loops: region.loops.map((cycle) =>
+        (flip ? [...cycle].reverse() : cycle).map((h) => ({
+          piece: h.piece,
+          forward: flip ? !h.forward : h.forward,
+        })),
+      ),
+      point: region.point,
+      sources,
+    });
+  };
   for (const list of members.values()) {
     const first = facing[list[0]],
       sources = [...new Set(list.map((i) => facing[i].region.face))];
     if (list.length === 1) {
-      const { region } = first,
-        flip = first.sense !== region.face.sense;
-      outputs.push({
-        face: region.face,
-        sense: first.sense,
-        loops: region.loops.map((cycle) =>
-          (flip ? [...cycle].reverse() : cycle).map((h) => ({
-            piece: h.piece,
-            forward: flip ? !h.forward : h.forward,
-          })),
-        ),
-        point: region.point,
-        sources,
-      });
+      single(list[0], sources);
       continue;
     }
     const inside = new Set(list),
@@ -554,10 +581,24 @@ export function boolean(
           if (u.length > 2) return !joined.get(h.piece)?.has(`${i},${h.forward}`);
           return !(u.length === 2 && u[0].i !== u[1].i && inside.has(u[0].i) && inside.has(u[1].i));
         })
-        .map(({ h }) => ({ piece: h.piece, forward: h.forward })),
-      host = new Face(first.region.face.name, first.region.face.surface, first.sense);
+        .map(({ h }) => ({ piece: h.piece, forward: h.forward }));
+    // A spline patch ends at its domain's bounds: the merged face goes on one of its regions' surfaces that every edge
+    // of it lies on (the larger patch, of a piece of it and the whole), or the regions stay faces of their own.
+    let hostOf = first;
+    if (list.some((i) => facing[i].region.face.surface.kind === 'spline')) {
+      const points = halves.flatMap((h) => samplesOf(h.piece)),
+        fits = list.find((i) =>
+          points.every((p) => Math.abs(signedDistance(facing[i].region.face.surface, p)) <= touch),
+        );
+      if (fits === undefined) {
+        for (const i of list) single(i, [facing[i].region.face]);
+        continue;
+      }
+      hostOf = facing[fits];
+    }
+    const host = new Face(hostOf.region.face.name, hostOf.region.face.surface, hostOf.sense);
     for (const r of splitFace(host, new FaceUV(host), halves))
-      outputs.push({ face: first.region.face, sense: first.sense, loops: r.loops, point: r.point, sources });
+      outputs.push({ face: hostOf.region.face, sense: hostOf.sense, loops: r.loops, point: r.point, sources });
   }
 
   // --- pieces that continue one another (one curve, the same two faces) at a vertex nothing else meets join again -----
@@ -643,7 +684,14 @@ export function boolean(
         shells.filter(
           (t) =>
             t !== s &&
-            classify(pointOf.get(s.faces[0])!, resultUV.get(s.faces[0])!, t.faces, resultUV, merge, 4 * size) === 'in',
+            classify(
+              [{ point: pointOf.get(s.faces[0])!, clearance: Infinity }],
+              resultUV.get(s.faces[0])!,
+              t.faces,
+              resultUV,
+              merge,
+              4 * size,
+            ).where === 'in',
         ),
       ),
       cavity = around.map((list) => list.length % 2 === 1);
@@ -768,7 +816,23 @@ function clockwise(from: XYZ, to: XYZ, normal: XYZ): number {
  * ways: each region's loops, and a point well inside it.
  */
 function splitFace(f: Face, fuv: FaceUV, halves: Half[]): Omit<Region, 'from'>[] {
-  if (!halves.length) return [{ face: f, loops: [], point: fuv.at([0, 0]) }];
+  if (!halves.length) {
+    // The whole surface (a sphere or torus): points spread over it, none on a line or circle of its parameters that
+    // another surface could touch it along (an equator, a meridian).
+    const s = fuv.surface,
+      range = (period: number, domain: readonly [number, number]): readonly [number, number] =>
+        period ? [0, period] : Number.isFinite(domain[0]) && Number.isFinite(domain[1]) ? domain : [0, 0],
+      [u0, u1] = range(s.uPeriod, s.uDomain),
+      [v0, v1] = range(s.vPeriod, s.vDomain),
+      inside = [
+        [0.13, 0.29],
+        [0.61, 0.73],
+        [0.37, 0.57],
+        [0.83, 0.17],
+        [0.07, 0.89],
+      ].map(([a, b]) => ({ point: fuv.at([u0 + a * (u1 - u0), v0 + b * (v1 - v0)]), clearance: Infinity }));
+    return [{ face: f, loops: [], point: inside[0].point, inside }];
+  }
   const outgoing = new Map<Vertex, Half[]>(),
     startOf = (h: Half) => (h.forward ? h.piece.start : h.piece.end),
     endOf = (h: Half) => (h.forward ? h.piece.end : h.piece.start);
@@ -812,16 +876,19 @@ function splitFace(f: Face, fuv: FaceUV, halves: Half[]): Omit<Region, 'from'>[]
     if (x !== h) throw new RangeError(`splitting face ${f.name} left an open chain of edges`);
     cycles.push(cycle);
   }
-  // Each cycle in (u', v), continuous along it.
-  const loops = cycles.map((cycle) => {
+  // Each cycle in (u', v), continuous along it; with u and v swapped where the cycles go round a torus's tube.
+  const cycleSamples = cycles.map((cycle) => {
     const samples: XYZ[] = [];
     for (const h of cycle) {
       const s = samplesOf(h.piece),
         seq = h.forward ? s : [...s].reverse();
       samples.push(...seq.slice(0, -1));
     }
-    return fuv.trace(samples).loop;
+    return samples;
   });
+  const swap = roundV(fuv.raw, cycleSamples, f.name);
+  if (swap !== fuv.swapped) fuv = new FaceUV(f, swap);
+  const loops = cycleSamples.map((samples) => fuv.trace(samples).loop);
   // A torus is cut open round its tube where no cycle crosses, so v runs over one period from the cut; the region
   // the cut runs through is then in two parts, joined below.
   const vPeriod = fuv.surface.vPeriod,
@@ -833,7 +900,7 @@ function splitFace(f: Face, fuv: FaceUV, halves: Half[]): Omit<Region, 'from'>[]
     sides = ([u, v]: UV) => open.map((l) => (leftOf(l, fuv.period, u, v) ? '1' : '0')).join('');
   // Cycles bound one region when a point inside next to each lies on the same side of every cycle.
   const probes = open.map((l) => probe(fuv, l, open, vBounds)),
-    points = probes.map((x) => x.point),
+    points = probes.map((x) => x[0].point),
     groups = new Map<string, number[]>();
   points.forEach((q, i) => {
     const key = sides(q);
@@ -849,12 +916,14 @@ function splitFace(f: Face, fuv: FaceUV, halves: Half[]): Omit<Region, 'from'>[]
       groups.delete(high);
     }
   }
-  // Of the region's loops' points, the one furthest from every loop.
-  return [...groups.values()].map((group) => ({
-    face: f,
-    loops: group.map((i) => cycles[i]),
-    point: fuv.at(points[group.reduce((x, y) => (probes[y].clearance > probes[x].clearance ? y : x))]),
-  }));
+  // The region's loops' points, furthest from every loop first.
+  return [...groups.values()].map((group) => {
+    const inside = group
+      .flatMap((i) => probes[i])
+      .sort((x, y) => y.clearance - x.clearance)
+      .map((x) => ({ point: fuv.at(x.point), clearance: x.clearance }));
+    return { face: f, loops: group.map((i) => cycles[i]), point: inside[0].point, inside };
+  });
 }
 
 /**
@@ -939,18 +1008,18 @@ function passes(c: ReturnType<typeof curveEvaluator>, p: XYZ, near: number): num
 }
 
 /**
- * A point inside the region left of a loop, and how far it lies from the nearest loop (in the surface's own measure
- * there): from the middles of the loop's longest segments, halfway to the next loop (or surface end) on their left,
- * the one furthest from every loop. The middle of the longest alone can lie a hair from another loop (a drill's circle
- * passing 30 nm inside a face's edge), within the Booleans' tolerance of the other solid, which would take it to lie
- * on the other solid's face.
+ * Points inside the region left of a loop, each with how far it lies from the nearest loop (in the surface's own
+ * measure there), furthest first: from the middles of the loop's longest segments, a quarter, half and three quarters
+ * of the way to the next loop (or surface end) on their left. The middle of the longest alone can lie a hair from
+ * another loop (a drill's circle passing 30 nm inside a face's edge), within the Booleans' tolerance of the other solid,
+ * which would take it to lie on the other solid's face; or on a circle where another surface touches this one.
  */
 function probe(
   fuv: FaceUV,
   loop: UVLoop,
   all: UVLoop[],
   vBounds: readonly [number, number],
-): { point: UV; clearance: number } {
+): { point: UV; clearance: number }[] {
   const period = fuv.period,
     segment = (l: UVLoop, i: number): [UV, UV] => [
       l.points[i],
@@ -963,8 +1032,8 @@ function probe(
     order = lengths.map((_, i) => i).sort((x, y) => lengths[y] - lengths[x] || x - y),
     [v0, v1] = vBounds,
     shifts = period ? [-2, -1, 0, 1, 2] : [0];
-  /** Halfway from the middle of segment i to the next loop or surface end on its left. */
-  const from = (i: number): UV => {
+  /** From the middle of segment i, a quarter, half and three quarters of the way to the next loop or surface end on its left. */
+  const from = (i: number): UV[] => {
     const [p0, q0] = segment(loop, i),
       len = lengths[i],
       m: UV = [(p0[0] + q0[0]) / 2, (p0[1] + q0[1]) / 2],
@@ -987,7 +1056,7 @@ function probe(
         }
       }
     if (!Number.isFinite(s)) s = len;
-    return [m[0] + (d[0] * s) / 2, m[1] + (d[1] * s) / 2];
+    return [0.5, 0.25, 0.75].map((k): UV => [m[0] + d[0] * s * k, m[1] + d[1] * s * k]);
   };
   /** The distance from (u', v) to the nearest loop or surface end, each way scaled by the surface's stretch there. */
   const clearance = ([u, v]: UV, h: number): number => {
@@ -1009,51 +1078,80 @@ function probe(
       }
     return best;
   };
-  let point: UV = from(order[0]),
-    clear = -1;
+  const out: { point: UV; clearance: number }[] = [];
   for (const i of order.slice(0, 8)) {
     if (!(lengths[i] > 0)) break;
-    const q = from(i),
-      c = clearance(q, 1e-3 * lengths[order[0]]);
-    if (c > clear) [point, clear] = [q, c];
+    for (const q of from(i)) out.push({ point: q, clearance: Math.max(0, clearance(q, 1e-3 * lengths[order[0]])) });
   }
-  return { point, clearance: Math.max(clear, 0) };
+  if (!out.length) out.push({ point: from(order[0])[0], clearance: 0 });
+  return out.sort((x, y) => y.clearance - x.clearance);
 }
 
 /**
- * Where a point of a face lies against the solid bounded by `others`: on one of its faces facing the same way or
- * the opposite way, or in or out of it (rays in three directions, majority of their crossing counts).
+ * Where a region of a face lies against the solid bounded by `others`: on one of its faces facing the same way or the
+ * opposite way, or in or out of it (rays in three directions from a point inside, majority of their crossing counts).
+ * A point within the tolerance of another face lies on it where the two run along each other all round it; where that
+ * face only touches this one there (along a circle or a curve, or at a point), the next point is taken. Also gives the
+ * point the answer came from.
  */
 function classify(
-  p: XYZ,
+  inside: Inside[],
   fuv: FaceUV,
   others: Face[],
   uvOf: Map<Face, FaceUV>,
   merge: number,
   reach: number,
-): 'in' | 'out' | 'same' | 'opposite' {
-  const n = fuv.normal(p);
-  for (const g of others) {
-    if (Math.abs(signedDistance(g.surface, p)) > 1e3 * merge) continue;
-    const guv = uvOf.get(g)!;
-    if (!guv.contains(p)) continue;
-    // On g only where g runs along the face there (within a milliradian): a point of a sliver no wider than the
-    // tolerance, next to where g crosses the face, lies that close to g without being on it, and the rays settle it.
-    const along = dot(n, guv.normal(p));
-    if (Math.abs(along) < 1 - 5e-7) continue;
-    return along > 0 ? 'same' : 'opposite';
-  }
-  let inside = 0;
-  for (const direction of RAYS) {
-    const line: CurveDef = { kind: 'line', origin: p, direction },
-      c = curveEvaluator(line);
+): { where: 'in' | 'out' | 'same' | 'opposite'; point: XYZ } {
+  const touch = 1e3 * merge;
+  let first: { where: 'same' | 'opposite'; point: XYZ } | undefined;
+  candidates: for (const { point: p, clearance } of inside) {
+    const n = fuv.normal(p);
+    for (const g of others) {
+      if (Math.abs(signedDistance(g.surface, p)) > touch) continue;
+      const guv = uvOf.get(g)!;
+      if (!guv.contains(p)) continue;
+      // On g only where g runs along the face there (within a milliradian): a point of a sliver no wider than the
+      // tolerance, next to where g crosses the face, lies that close to g without being on it, and the rays settle it.
+      const along = dot(n, guv.normal(p));
+      if (Math.abs(along) < 1 - 5e-7) continue;
+      const where = along > 0 ? 'same' : 'opposite';
+      if (alongside(fuv, g.surface, p, Math.min(clearance / 2, 1e7 * merge), touch)) return { where, point: p };
+      first ??= { where, point: p };
+      continue candidates;
+    }
     let count = 0;
-    for (const g of others)
-      for (const t of curveSurfaceCrossings(line, g.surface, 0, reach))
-        if (uvOf.get(g)!.contains(c.at(t).slice(0, 3) as XYZ)) count++;
-    if (count % 2) inside++;
+    for (const direction of RAYS) {
+      const line: CurveDef = { kind: 'line', origin: p, direction },
+        c = curveEvaluator(line);
+      let crossings = 0;
+      for (const g of others)
+        for (const t of curveSurfaceCrossings(line, g.surface, 0, reach))
+          if (uvOf.get(g)!.contains(c.at(t).slice(0, 3) as XYZ)) crossings++;
+      if (crossings % 2) count++;
+    }
+    return { where: count >= 2 ? 'in' : 'out', point: p };
   }
-  return inside >= 2 ? 'in' : 'out';
+  // Every point lies where the faces touch: they meet along all of the region.
+  return first!;
+}
+
+/**
+ * Whether surface `g` stays within `touch` of the face's surface all round `p`, out to `rho` along it (eight ways): the
+ * two lie on one surface there, rather than touching along a curve or at a point through `p`.
+ */
+function alongside(fuv: FaceUV, g: SurfaceDef, p: XYZ, rho: number, touch: number): boolean {
+  if (!(rho > 0)) return true;
+  const [u, v] = fuv.near(p),
+    h = 1e-6,
+    su = distance(fuv.at([u + h, v]), fuv.at([u - h, v])) / (2 * h),
+    sv = distance(fuv.at([u, v + h]), fuv.at([u, v - h])) / (2 * h);
+  for (let k = 0; k < 8; k++) {
+    const a = (k * Math.PI) / 4,
+      du = su > 0 ? (rho * Math.cos(a)) / su : 0,
+      dv = sv > 0 ? (rho * Math.sin(a)) / sv : 0;
+    if (Math.abs(signedDistance(g, fuv.at([u + du, v + dv]))) > touch) return false;
+  }
+  return true;
 }
 
 /**
@@ -1136,24 +1234,43 @@ function join(p: Piece, q: Piece, v: Vertex, touch: number): Piece | undefined {
   return { curve: p.curve, start, end, t0, t1, name: p.name, from: p.from };
 }
 
-/** Whether two faces lie on one surface and face the same way where they meet along `piece`. */
-function sameSide(f: Face, fSense: boolean, g: Face, gSense: boolean, piece: Piece): boolean {
-  if (f.surface !== g.surface) {
-    try {
-      if (intersectSurfaces(f.surface, g.surface).kind !== 'coincident') return false;
-    } catch {
-      return false;
-    }
-  }
+/** Whether two faces lie on one surface (within `touch`) and face the same way where they meet along `piece`. */
+function sameSide(f: Face, fSense: boolean, g: Face, gSense: boolean, piece: Piece, touch: number): boolean {
   const m = curveEvaluator(piece.curve)
-      .at((piece.t0 + piece.t1) / 2)
-      .slice(0, 3) as XYZ,
-    normal = (s: Face, sense: boolean) => {
-      const e = surfaceEvaluator(s.surface),
+    .at((piece.t0 + piece.t1) / 2)
+    .slice(0, 3) as XYZ;
+  if (f.surface !== g.surface) {
+    if (f.surface.kind === 'spline' || g.surface.kind === 'spline') {
+      // A spline face on the same surface as the other (another copy of it, or a piece of it with its own control
+      // points): f's surface lies within the tolerance of g's all round the piece's middle, a tenth of its domain out.
+      const e = surfaceEvaluator(f.surface),
         [u, v] = e.parameters(m),
-        n = e.normal(u, v);
-      return sense ? n : scale(n, -1);
-    };
+        span = (d: readonly [number, number], period: number) =>
+          (period || (Number.isFinite(d[1] - d[0]) ? d[1] - d[0] : 0)) / 10,
+        du = span(e.uDomain, e.uPeriod),
+        dv = span(e.vDomain, e.vPeriod),
+        clamp = (x: number, d: readonly [number, number], period: number) =>
+          period ? x : Math.min(d[1], Math.max(d[0], x));
+      for (const i of [-1, 0, 1])
+        for (const j of [-1, 0, 1]) {
+          const q = e
+            .at(clamp(u + i * du, e.uDomain, e.uPeriod), clamp(v + j * dv, e.vDomain, e.vPeriod))
+            .slice(0, 3) as XYZ;
+          if (Math.abs(signedDistance(g.surface, q)) > touch) return false;
+        }
+    } else
+      try {
+        if (intersectSurfaces(f.surface, g.surface).kind !== 'coincident') return false;
+      } catch {
+        return false;
+      }
+  }
+  const normal = (s: Face, sense: boolean) => {
+    const e = surfaceEvaluator(s.surface),
+      [u, v] = e.parameters(m),
+      n = e.normal(u, v);
+    return sense ? n : scale(n, -1);
+  };
   return dot(normal(f, fSense), normal(g, gSense)) > 0;
 }
 

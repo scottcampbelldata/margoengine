@@ -795,6 +795,119 @@ test('a drill through a thin spline wall: curves from one edge of its domain to 
   }
 });
 
+/**
+ * A block on z = 0 whose top is the bicubic Bezier patch of net P (P[i][j] = [x, y, z], i along x and j along y, its
+ * border rows straight in x and in y), and four planar sides.
+ */
+function netBlock(P) {
+  const w = new Writer(),
+    line = (a, b, pa, pb) => w.edge(a, b, w.line(pa, sub(pb, pa))),
+    bezier = (pts) =>
+      w.add(
+        `B_SPLINE_CURVE_WITH_KNOTS('',3,(${pts.map((p) => w.point(p)).join(',')}),.UNSPECIFIED.,.F.,.F.,(4,4),(0.,1.),.UNSPECIFIED.)`,
+      ),
+    T = [P[0][0], P[3][0], P[3][3], P[0][3]],
+    B = T.map((q) => [q[0], q[1], 0]),
+    [b0, b1, b2, b3] = B.map((p) => w.vertex(p)),
+    [t0, t1, t2, t3] = T.map((p) => w.vertex(p)),
+    e01 = w.edge(t0, t1, bezier([0, 1, 2, 3].map((i) => P[i][0]))),
+    e12 = w.edge(t1, t2, bezier([0, 1, 2, 3].map((j) => P[3][j]))),
+    e32 = w.edge(t3, t2, bezier([0, 1, 2, 3].map((i) => P[i][3]))),
+    e03 = w.edge(t0, t3, bezier([0, 1, 2, 3].map((j) => P[0][j]))),
+    [v0, v1, v2, v3] = [0, 1, 2, 3].map((k) => line([b0, b1, b2, b3][k], [t0, t1, t2, t3][k], B[k], T[k])),
+    f01 = line(b0, b1, B[0], B[1]),
+    f12 = line(b1, b2, B[1], B[2]),
+    f32 = line(b3, b2, B[3], B[2]),
+    f03 = line(b0, b3, B[0], B[3]),
+    net = [0, 1, 2, 3].map((i) => `(${[0, 1, 2, 3].map((j) => w.point(P[i][j])).join(',')})`).join(','),
+    top = w.add(
+      `B_SPLINE_SURFACE_WITH_KNOTS('',3,3,(${net}),.UNSPECIFIED.,.F.,.F.,.F.,(4,4),(4,4),(0.,1.),(0.,1.),.UNSPECIFIED.)`,
+    ),
+    plane = (o, n, x) => w.add(`PLANE('',${w.axis(o, n, x)})`);
+  return w.file([
+    w.face([w.loop([e01, true], [e12, true], [e32, false], [e03, false])], top),
+    w.face([w.loop([f03, true], [f32, true], [f12, false], [f01, false])], plane(B[0], [0, 0, -1], X)),
+    w.face([w.loop([f01, true], [v1, true], [e01, false], [v0, false])], plane(B[0], [0, -1, 0], X)),
+    w.face([w.loop([f12, true], [v2, true], [e12, false], [v1, false])], plane(B[1], X, [0, 1, 0])),
+    w.face([w.loop([f32, false], [v3, true], [e32, true], [v2, false])], plane(B[3], [0, 1, 0], [-1, 0, 0])),
+    w.face([w.loop([f03, false], [v0, true], [e03, true], [v3, false])], plane(B[0], [-1, 0, 0], [0, -1, 0])),
+  ]);
+}
+
+test('spline Booleans on coincident patches: a second copy, pieces of the patch, the patch carried on past its edge', () => {
+  // The bump block against blocks whose tops lie on its own patch, each with its own control points (blossoming the
+  // cubic in x over [a, b], which may run past [0, 1]: the same polynomial carried on): the faces on one surface overlap,
+  // their edges lying in each other cut them, and kept faces on one patch merge where one patch holds them all. Lifted
+  // 0.1 nm (within the tolerance) the tops count as one surface; lifted 1 um they are cut apart. Volumes to the exact
+  // integrals of the polynomial (8 Gauss points).
+  const mm = 0.001,
+    volume = (b) => (b.faces.length ? model.massProperties(b).volume / mm ** 3 : 0),
+    net = BUMP.map((row, i) => row.map((h, j) => [(10 * i) / 3, (10 * j) / 3, h])),
+    lerp = (p, q, t) => p.map((x, k) => x + (q[k] - x) * t),
+    blossom = (c, ts) => {
+      let pts = c;
+      for (const t of ts) pts = pts.slice(0, -1).map((p, i) => lerp(p, pts[i + 1], t));
+      return pts[0];
+    },
+    piece = (a, b, lift = 0) =>
+      [0, 1, 2, 3].map((i) =>
+        [0, 1, 2, 3].map((j) => {
+          const p = blossom(
+            [0, 1, 2, 3].map((k) => net[k][j]),
+            [
+              [a, a, a],
+              [a, a, b],
+              [a, b, b],
+              [b, b, b],
+            ][i],
+          );
+          return [p[0], p[1], p[2] + lift];
+        }),
+      ),
+    load = (P) => model.bodiesFromSTEP(parseSTEP(netBlock(P))).bodies[0],
+    rectangle = (x0, x1, y0, y1) => {
+      let sum = 0;
+      for (const [s, ws] of GAUSS8)
+        for (const [t, wt] of GAUSS8) sum += bumpHeight(x0 + s * (x1 - x0), y0 + t * (y1 - y0)) * ws * wt;
+      return sum * (x1 - x0) * (y1 - y0);
+    },
+    area = (x0, x1) => rectangle(x0, x1, 0, 10);
+  for (const [label, b, union, intersect, subtract, tolerance] of [
+    ['a second copy', () => load(net), area(0, 10), area(0, 10), 0, 1e-12],
+    ['its right half', () => load(piece(0.5, 1)), area(0, 10), area(5, 10), area(0, 5), 1e-12],
+    ['its middle', () => load(piece(0.3, 0.7)), area(0, 10), area(3, 7), area(0, 10) - area(3, 7), 1e-12],
+    ['carried on to x = 15', () => load(piece(0.5, 1.5)), area(0, 15), area(5, 10), area(0, 5), 1e-12],
+    ['carried on from x = -4', () => load(piece(-0.4, 0.6)), area(-4, 10), area(0, 6), area(6, 10), 1e-12],
+    [
+      'its middle, 0.1 nm up',
+      () => load(piece(0.3, 0.7, 1e-7)),
+      area(0, 10),
+      area(3, 7),
+      area(0, 10) - area(3, 7),
+      1e-7,
+    ],
+    [
+      'carried on to x = 15, 1 um down',
+      () => load(piece(0.5, 1.5, -1e-3)),
+      area(0, 15) - 50e-3,
+      area(5, 10) - 50e-3,
+      area(0, 5) + 50e-3,
+      1e-10,
+    ],
+  ])
+    for (const [op, want] of [
+      ['union', union],
+      ['intersect', intersect],
+      ['subtract', subtract],
+    ]) {
+      const out = model.boolean('c', op, load(net), b());
+      assert.deepEqual(model.validateBody(out), [], `${label} ${op}`);
+      assert.ok(Math.abs(volume(out) - want) <= tolerance * 612.5, `${label} ${op}: ${volume(out)} vs ${want}`);
+      // On one patch, kept tops merge: the union of a piece with the whole has the whole's six faces.
+      if (op === 'union' && union === area(0, 10)) assert.equal(out.faces.length, 6, `${label} union faces`);
+    }
+});
+
 test('an imported edge a micrometre off its face keeps that gap as its tolerance, and the part still cuts', () => {
   const mm = 0.001,
     { bodies, problems } = model.bodiesFromSTEP(parseSTEP(bumpBlock({ lift: 0.001 }))),

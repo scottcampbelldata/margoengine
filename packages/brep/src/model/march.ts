@@ -2,15 +2,18 @@
 // cone or a torus), traced point by point inside a box. Seeds are where lines and circles lying on one surface cross
 // the other (found by the crossing search, so none is missed along them); from each seed the curve is followed both
 // ways: a step along the direction the two surfaces meet in, then Newton's method back onto both surfaces in the plane
-// across the step, with the step shortened until the curve turns less than 0.08 rad over it. Every traced point lies
-// on both surfaces to rounding; the curve between them is a cubic Hermite spline through the points and their exact
-// tangents (deviation about 1e-11 of the step for that turn). A branch ends where it leaves the box or comes back to
-// its start. Where the surfaces touch at a point, or come within the tolerance of touching there, their curves cross in
-// an X (or pass each other a hair apart): a walk heading into that point finds it (where the normals are parallel,
-// midway between the surfaces), puts a point there and carries straight on along the X, as through an exact touch.
-// Where the surfaces come a little further than the tolerance from touching, the curves passing each other there are
-// followed round their turns: near such a point no step is longer than a quarter of the distance to it.
-// Where the walk lands exactly on such a point the direction is undefined: that throws a RangeError.
+// across the step, with the step shortened until the curve turns less than 0.08 rad over it, and until the middle of
+// the cubic it makes lies within 1e-10 of the model of the curve (where the surfaces are nearly tangent a stray off
+// them is a far longer one across the curve on each). Every traced point lies on both surfaces to rounding; the curve
+// between them is a cubic Hermite spline through the points and their exact tangents. A branch ends where it leaves
+// the box or comes back to its start. Where the surfaces touch at a point, or come within the tolerance of touching
+// there, their curves cross in an X (or pass each other a hair apart): a walk heading into that point finds it (where
+// the normals are parallel, midway between the surfaces), puts a point there and carries straight on along the X, as
+// through an exact touch. Where the surfaces come a little further than the tolerance from touching, the curves passing
+// each other there are followed round their turns: near such a point no step is longer than a quarter of the distance
+// to it. Where they touch along a curve (a cylinder lying in a torus's tube along a meridian) no curve is traced along
+// it, and curves that cross it are walked straight through it, a vertex where they cross; within the tolerance of
+// touching along a curve, the curves turned back along it a hair from it are joined across it as if they touched.
 import { add, cross, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
 import { curveSurfaceCrossings, distanceGradient, meetDirection, signedDistance, splineFoot } from './distance.js';
 import { curveEvaluator, frameOf, surfaceEvaluator, type CurveDef, type SurfaceDef } from './geometry.js';
@@ -54,7 +57,8 @@ interface Reach {
  * Booleans put a vertex. Surfaces that come within `tolerance` of touching at a point (1e-6 of the box unless given)
  * are taken to touch there: their curves cross there too, or, where the surfaces curve apart every way (they kiss), the
  * loop round the point is dropped (they only touch). Where they come further apart than that, the curves passing each
- * other there are traced apart, however close.
+ * other there are traced apart, however close. Surfaces touching along a curve give no curve along it; the curves
+ * crossing it cross it at a vertex, also where the surfaces come within the tolerance of touching along it.
  */
 export function traceIntersections(
   a: SurfaceDef,
@@ -73,11 +77,12 @@ export function traceIntersections(
   const past = (s: SurfaceDef, p: XYZ) =>
     s.kind === 'spline' && length(sub(p, splineFoot(s, p, true).q)) > 1e-10 * scale0;
   const trace = (known: Touch[], missed: Touch[]) => {
-    const branches: { points: XYZ[]; tangents: XYZ[] }[] = [],
+    const branches: Branch[] = [],
       curves: CurveDef[] = [],
       touches = [...known],
       misses = [...missed],
-      kisses: Touch[] = [];
+      kisses: Touch[] = [],
+      contacts: XYZ[] = [];
     const covered = (p: XYZ) => {
       // Within a few steps of a near touch the curves traced through it run along its arms, which the curves passing
       // each other there leave by about width^2 over the distance from it.
@@ -117,9 +122,13 @@ export function traceIntersections(
       }
       if (touches.some(({ x, width }) => length(sub(s, x)) < 10 * width)) continue;
       if (kisses.some(({ x, width }) => length(sub(s, x)) <= 2 * width + near)) continue;
+      // A seed where the normals are parallel within 1e-6 (surfaces crossing at less than that stay within the
+      // tolerance of each other across the model): on a curve along which they touch (a torus's meridian lying in a
+      // cylinder, seeded at the rounding errors along it), or where such a curve and another cross. The curves
+      // through it are walked from other seeds, straight through it.
       const t0 = meetDirection(a, b, s);
-      if (!t0) throw new RangeError('the surfaces touch tangentially: Booleans there are not supported yet');
-      const forward = walk(a, b, s, t0, reach, touches, misses);
+      if (!t0 || apart(a, b, s) < 1e-6) continue;
+      const forward = walk(a, b, s, t0, reach, touches, misses, contacts);
       if (forward.lost) continue;
       let points = forward.points,
         tangents = forward.tangents;
@@ -141,7 +150,7 @@ export function traceIntersections(
         }
       }
       if (!forward.closed) {
-        const back = walk(a, b, s, scale(t0, -1), reach, touches, misses);
+        const back = walk(a, b, s, scale(t0, -1), reach, touches, misses, contacts);
         if (back.lost) continue;
         points = [...back.points.slice(1).reverse(), ...points];
         tangents = [
@@ -153,10 +162,10 @@ export function traceIntersections(
         ];
       }
       if (points.length < 2 || points.every((p) => length(sub(p, points[0])) === 0)) continue;
-      branches.push({ points, tangents });
+      branches.push({ points, tangents, closed: forward.closed });
       curves.push(hermite(points, tangents, forward.closed));
     }
-    return { branches, curves, touches, misses };
+    return { branches, curves, touches, misses, contacts };
   };
   // A seed walked before a near touch was found may lie where the curves passing each other there turn, and its walk
   // follow one round the turn: traced again knowing every near touch, no walk starts there. A walk that passed a near
@@ -165,7 +174,12 @@ export function traceIntersections(
   let traced = trace([], []);
   if (traced.touches.some(({ width }) => width > 0) || traced.misses.length)
     traced = trace(traced.touches, traced.misses);
-  const { branches, curves, touches } = traced;
+  const { touches, contacts } = traced;
+  // Where the surfaces come within the tolerance of touching along a curve, they touch there: no curve runs along it,
+  // and the curves crossing it are joined across it.
+  const branches = unband(a, b, traced.branches, touches, contacts, reach),
+    curves =
+      branches === traced.branches ? traced.curves : branches.map((t) => hermite(t.points, t.tangents, t.closed));
   // Curves that meet cross where the surfaces touch tangentially (two equal cylinders at right angles): the tracer
   // steps over such a point, so it is found here, from chords that come within their sag of each other, and moved onto
   // both curves.
@@ -177,6 +191,8 @@ export function traceIntersections(
   // The touches the walks went through are crossings of their curves (where the curves pass each other a hair apart,
   // the only one there: the walks went straight through it).
   for (const { x } of touches) if (!crossings.some((c) => length(sub(c, x)) <= near)) crossings.push(x);
+  // So are the points where the walks crossed a curve along which the surfaces touch.
+  for (const x of contacts) if (!crossings.some((c) => length(sub(c, x)) <= near)) crossings.push(x);
   for (let i = 0; i < branches.length; i++)
     for (let j = i; j < branches.length; j++) {
       const p = branches[i].points,
@@ -213,6 +229,195 @@ export function traceIntersections(
         }
     }
   return { curves, crossings };
+}
+
+/** A traced curve: its points, its unit tangents there, and whether it closes on its start. */
+interface Branch {
+  points: XYZ[];
+  tangents: XYZ[];
+  closed: boolean;
+}
+
+/**
+ * Whether the surfaces come within the tolerance of touching across the curve at `p` (heading along `t`): a ridge
+ * across it where their normals are parallel (a curve along which they nearly touch) lies within the curve's own
+ * distance from it, and the surfaces are no further apart than the tolerance there. The curve is then one edge of a
+ * band where they only touch, a hair across (a cylinder a nanometre narrower than a torus's tube, lying in it).
+ */
+function banded(a: SurfaceDef, b: SurfaceDef, p: XYZ, t: XYZ, { tolerance, delta, scale0 }: Reach): boolean {
+  const ga = distanceGradient(a, p),
+    gb = distanceGradient(b, p),
+    sine = length(cross(ga, gb));
+  if (sine > 1e-2) return false;
+  const sign = dot(ga, gb) < 0 ? -1 : 1,
+    e = unit(cross(ga, t));
+  if (!e) return false;
+  const mismatch = (x: XYZ) => dot(sub(distanceGradient(a, x), scale(distanceGradient(b, x), sign)), e),
+    m0 = mismatch(p),
+    // The surfaces' curvatures across the curve must differ (by 1e-4 of the model's, well above the rounding of the
+    // differences): along a curve that only crosses a curve of touching, they curve alike across it.
+    rate = (mismatch(add(p, scale(e, delta))) - mismatch(sub(p, scale(e, delta)))) / (2 * delta);
+  if (!(Math.abs(rate) >= 1e-4 / scale0)) return false;
+  let s = -m0 / rate;
+  if (Math.abs(s) > 4 * (sine / Math.abs(rate)) + delta) return false;
+  s -= mismatch(add(p, scale(e, s))) / rate;
+  const r = add(p, scale(e, s));
+  return Math.abs(signedDistance(a, r) - sign * signedDistance(b, r)) <= tolerance;
+}
+
+/**
+ * The traced curves less their stretches along which the surfaces come within the tolerance of touching (`banded`, two
+ * points or more in a row, 1e-3 of the model or more from a known touch): there the surfaces only touch, and no curve
+ * runs between them. The
+ * ends left facing each other across such a stretch (the curves crossing a curve along which the surfaces touch, which a
+ * hair's gap turned into loops along it) are joined straight across, and the point where the joined curve crosses it is
+ * added to `contacts` (as are those of a curve crossed exactly); points found in the stretches are dropped from it. The
+ * curves as they are when nothing is banded.
+ */
+function unband(
+  a: SurfaceDef,
+  b: SurfaceDef,
+  branches: Branch[],
+  touches: Touch[],
+  contacts: XYZ[],
+  reach: Reach,
+): Branch[] {
+  const { scale0 } = reach,
+    removed: XYZ[] = [];
+  let any = false;
+  const pieces: Branch[] = [];
+  for (const branch of branches) {
+    const { points, tangents } = branch,
+      // A closed curve's last point is its first again: its points are taken round once.
+      closed = branch.closed && points.length > 2,
+      n = closed ? points.length - 1 : points.length,
+      step = (i: number, k: number) => (closed ? (i + k + n) % n : i + k),
+      marks = points.slice(0, n).map(
+        // Away from points where the surfaces touch (where curves cross, the surfaces also come within the
+        // tolerance across them a few micrometres out).
+        (p, i) =>
+          !touches.some(({ x, width }) => length(sub(p, x)) <= 10 * width + 1e-3 * scale0) &&
+          !contacts.some((x) => length(sub(p, x)) <= 1e-3 * scale0) &&
+          banded(a, b, p, tangents[i], reach),
+      ),
+      // Runs of two marked points or more.
+      cut = marks.map((m, i) => m && [step(i, -1), step(i, 1)].some((j) => j >= 0 && j < n && marks[j]));
+    if (!cut.some(Boolean)) {
+      pieces.push(branch);
+      continue;
+    }
+    any = true;
+    for (let i = 0; i < n; i++) if (cut[i]) removed.push(points[i]);
+    if (cut.every(Boolean)) continue;
+    // A closed curve is taken from its first point kept after a cut; the runs of points kept are its pieces.
+    const from = closed ? cut.findIndex((c, i) => !c && cut[step(i, -1)]) : 0,
+      order = Array.from({ length: n }, (_, i) => (closed ? (from + i) % n : i)),
+      // The way each stretch dropped runs: its tangent halfway along it.
+      along = new Map<number, XYZ>();
+    for (let i = 0; i < n; i++) {
+      if (!cut[i] || along.has(i)) continue;
+      let lo = i,
+        hi = i;
+      while (cut[step(lo, -1)] && step(lo, -1) >= 0 && step(lo, -1) !== i) lo = step(lo, -1);
+      while (step(hi, 1) < n && cut[step(hi, 1)] && step(hi, 1) !== lo) hi = step(hi, 1);
+      const count = closed ? (hi - lo + n) % n : hi - lo,
+        middle = tangents[closed ? (lo + Math.floor(count / 2)) % n : lo + Math.floor(count / 2)];
+      for (let k = 0, j = lo; k <= count; k++, j = step(j, 1)) along.set(j, middle);
+    }
+    let run: number[] = [];
+    for (const i of [...order, -1]) {
+      if (i >= 0 && !cut[i]) {
+        run.push(i);
+        continue;
+      }
+      if (run.length >= 2) {
+        const piece = { points: run.map((k) => points[k]), tangents: run.map((k) => tangents[k]), closed: false };
+        // Where the curve bends into the band it runs along it: its ends are taken back to where it runs across the
+        // band (the way the stretch dropped next to them runs), so they face each other across it.
+        const before = closed || run[0] > 0 ? along.get(step(run[0], -1)) : undefined,
+          after = closed || run[run.length - 1] < n - 1 ? along.get(step(run[run.length - 1], 1)) : undefined;
+        trim(piece, before, after, removed);
+        if (piece.points.length >= 2) pieces.push(piece);
+      }
+      run = [];
+    }
+  }
+  if (!any) return branches;
+  // Points found where the walks crossed a curve of touching, inside a stretch dropped (a curve bending into a band),
+  // were no crossing.
+  const spacing = (q: XYZ) => removed.reduce((d, r) => Math.min(d, length(sub(q, r))), Infinity);
+  for (let i = contacts.length - 1; i >= 0; i--) if (spacing(contacts[i]) <= 1e-3 * scale0) contacts.splice(i, 1);
+  // Join the loose ends facing each other straight across a dropped stretch, nearest first.
+  for (let joined = true; joined; ) {
+    joined = false;
+    let best: { i: number; j: number; endI: boolean; endJ: boolean; d: number } | undefined;
+    const ends = (k: number) => {
+      const t = pieces[k];
+      return [
+        { end: true, p: t.points[t.points.length - 1], out: t.tangents[t.tangents.length - 1] },
+        { end: false, p: t.points[0], out: scale(t.tangents[0], -1) },
+      ];
+    };
+    for (let i = 0; i < pieces.length; i++) {
+      if (pieces[i].closed) continue;
+      for (let j = i; j < pieces.length; j++) {
+        if (pieces[j].closed) continue;
+        for (const x of ends(i))
+          for (const y of ends(j)) {
+            if (i === j && x.end === y.end) continue;
+            const gap = sub(y.p, x.p),
+              d = length(gap),
+              chord = unit(gap);
+            if (!chord || d > 5e-2 * scale0 || dot(x.out, y.out) > -0.5) continue;
+            if (dot(chord, x.out) < 0.5 || dot(chord, y.out) > -0.5) continue;
+            if (!best || d < best.d) best = { i, j, endI: x.end, endJ: y.end, d };
+          }
+      }
+    }
+    if (!best) break;
+    const flip = (t: Branch): Branch => ({
+        points: [...t.points].reverse(),
+        tangents: [...t.tangents].reverse().map((v) => scale(v, -1)),
+        closed: t.closed,
+      }),
+      first = best.endI ? pieces[best.i] : flip(pieces[best.i]);
+    if (best.i === best.j) {
+      first.closed = true;
+      first.points.push(first.points[0]);
+      first.tangents.push(first.tangents[0]);
+      pieces[best.i] = first;
+    } else {
+      const second = best.endJ ? flip(pieces[best.j]) : pieces[best.j],
+        p = first.points[first.points.length - 1],
+        q = second.points[0];
+      const { x } = leastApart(a, b, p, first.tangents[first.tangents.length - 1], q, second.tangents[0]);
+      if (!contacts.some((c) => length(sub(c, x)) <= 1e-9 * scale0)) contacts.push(x);
+      pieces[best.i] = {
+        points: [...first.points, ...second.points],
+        tangents: [...first.tangents, ...second.tangents],
+        closed: false,
+      };
+      pieces.splice(best.j, 1);
+    }
+    joined = true;
+  }
+  return pieces;
+}
+
+/**
+ * Takes points off a piece's loose ends (its start next to a band running along `start`, its end next to one along
+ * `end`) while the curve there runs within 75 degrees of the band, adding them to `removed`: the bend where it ran into
+ * the band, left facing across it.
+ */
+function trim(piece: Branch, start: XYZ | undefined, end: XYZ | undefined, removed: XYZ[]): void {
+  while (end && piece.points.length > 2 && Math.abs(dot(piece.tangents[piece.tangents.length - 1], end)) > 0.25) {
+    removed.push(piece.points.pop()!);
+    piece.tangents.pop();
+  }
+  while (start && piece.points.length > 2 && Math.abs(dot(piece.tangents[0], start)) > 0.25) {
+    removed.push(piece.points.shift()!);
+    piece.tangents.shift();
+  }
 }
 
 /** The closest points of segments pq and rs, and their distance. */
@@ -300,7 +505,7 @@ function apart(a: SurfaceDef, b: SurfaceDef, p: XYZ): number {
  * between them is least, or greatest, or a saddle): Newton's method on the normals' mismatch across their common normal
  * (its rate of change there, the difference of the surfaces' curvatures, by central differences over `delta`), and on
  * the distances along it. Undefined when it does not settle, or when the surfaces curve alike along some direction
- * (they touch along a line there).
+ * (they touch along a line or a curve there).
  */
 function touchPoint(a: SurfaceDef, b: SurfaceDef, guess: XYZ, delta: number, scale0: number): Touch | undefined {
   let x = guess;
@@ -344,6 +549,9 @@ function touchPoint(a: SurfaceDef, b: SurfaceDef, guess: XYZ, delta: number, sca
       v2 = add(scale(e1, -Math.sin(angle)), scale(e2, Math.cos(angle))),
       gap = signedDistance(a, x) - sign * signedDistance(b, x),
       width = Math.sqrt((2 * Math.abs(gap)) / Math.min(Math.abs(l1), Math.abs(l2)));
+    // The surfaces curving alike one way (to a millionth): they touch along a curve through x, not at it alone.
+    if (Math.min(Math.abs(l1), Math.abs(l2)) <= 1e-6 * Math.max(Math.abs(l1), Math.abs(l2), 1 / scale0))
+      return undefined;
     if (!(l1 > 0 && l2 < 0)) return { x, gap, arms: undefined, width };
     return {
       x,
@@ -383,6 +591,7 @@ function walk(
   reach: Reach,
   touches: Touch[],
   misses: Touch[],
+  contacts: XYZ[],
 ): { points: XYZ[]; tangents: XYZ[]; closed: boolean; lost?: boolean } {
   const { box, hmax, scale0, tolerance, delta } = reach,
     points: XYZ[] = [start],
@@ -447,6 +656,16 @@ function walk(
         if (dot(tq, along) < 0) tq = scale(tq, -1);
         if (Math.acos(Math.min(1, dot(tq, along))) <= 2 * MAX_TURN && dot(sub(q, touch.x), along) > 0) past = { q, tq };
       }
+      // Through an exact touch, the cubics in and out of it as close to both surfaces as a step's: else it is closed in
+      // on first. (Curves passing each other at a near touch turn a few widths from it, and are jumped as they come.)
+      if (past && touch.width <= 1e-12 * scale0 && h > 1e-6 * hmax) {
+        const off = Math.max(straying(a, b, p, t, touch.x, along), straying(a, b, touch.x, along, past.q, past.tq)),
+          allowed = Math.max(1e-10 * scale0 * Math.min(sines[sines.length - 1], apart(a, b, past.q)), 1e-14 * scale0);
+        if (off > allowed) {
+          h /= 2;
+          continue;
+        }
+      }
       if (past) {
         if (!touches.includes(touch)) touches.push(touch);
         if (length(sub(start, touch.x)) < 10 * touch.width) return { points, tangents, closed: false, lost: true };
@@ -463,12 +682,44 @@ function walk(
       normals = q && cross(distanceGradient(a, q), distanceGradient(b, q)),
       sine = normals ? length(normals) : 0;
     let tq = normals && sine > 1e-9 ? scale(normals, 1 / sine) : undefined;
-    if (q && !tq) throw new RangeError('the surfaces touch tangentially: Booleans there are not supported yet');
+    if (q && !tq) {
+      // Landed where the normals are parallel: where this curve crosses a curve along which the surfaces touch (a
+      // cylinder lying in a torus's tube touches it along a circle, and the curves where it leaves the tube cross that
+      // circle). The curve runs on smoothly through it: closed in on in short steps (the cubic across it is not
+      // checked), then on past it the way the walk was going, onto both surfaces.
+      if (h > 1e-4 * hmax) {
+        h /= 2;
+        continue;
+      }
+      const on = beyond(a, b, q, t, hmax, scale0);
+      if (!on) throw new RangeError('the surfaces touch tangentially: Booleans there are not supported yet');
+      const { x } = leastApart(a, b, p, t, on.q, on.tq);
+      if (!contacts.some((c) => length(sub(c, x)) <= 1e-9 * scale0)) contacts.push(x);
+      points.push(on.q);
+      tangents.push(on.tq);
+      sines.push(apart(a, b, on.q));
+      travelled += length(sub(on.q, p));
+      if (!inside(box, on.q, 0)) return { points, tangents, closed: false };
+      continue;
+    }
     if (q && tq && dot(tq, t) < 0) tq = scale(tq, -1);
     const turn = tq ? Math.acos(Math.min(1, dot(t, tq))) : Infinity;
     if (!q || !tq || turn > MAX_TURN || dot(sub(q, p), t) <= 0) {
       h /= 2;
       if (h < 1e-12 * hmax) throw new RangeError('an intersection curve could not be followed (it turns too sharply)');
+      continue;
+    }
+    // Where the surfaces are nearly tangent, the cubic between two points strays a little off them and lies much
+    // further across the curve on each (by that over the sine of the angle between the normals), so the edges the two
+    // faces get would part: the step is short enough that its middle lies within 1e-10 of the model of the curve.
+    // Only where the angle holds (falls by less than 2 in 100 over the step) or is under 1e-4 already: where it falls
+    // faster the walk is closing on a point where it vanishes (a touch, jumped as before from a few widths out, or
+    // where the curve crosses one of touching) rather than running along a band.
+    const steady = sine >= 0.98 * sines[sines.length - 1] || sine < 1e-4,
+      off = steady ? straying(a, b, p, t, q, tq) : 0,
+      allowed = Math.max(1e-10 * scale0 * Math.min(sine, sines[sines.length - 1]), 1e-14 * scale0);
+    if (off > allowed && h > 1e-6 * hmax) {
+      h /= 2;
       continue;
     }
     // Past a spline surface's edge (its domain's bound) the curve runs on that surface's continuation, with a kink at
@@ -483,14 +734,56 @@ function walk(
       }
       return { points, tangents, closed: false };
     }
+    // Stepped over a curve along which the surfaces touch: the normals' angle came down nearly to nothing at the last
+    // point or between it and its neighbours, and goes up again. Where it is least, the curve crosses it.
+    const n = sines.length;
+    if (n >= 2 && sines[n - 1] < 1e-3 && sines[n - 1] < sines[n - 2] && sine > sines[n - 1]) {
+      const before = leastApart(a, b, points[n - 2], tangents[n - 2], p, t),
+        after = leastApart(a, b, p, t, q, tq),
+        { x, sine: least } = before.sine < after.sine ? before : after;
+      // A curve crossing one of touching: the angle falls to nothing there, a thousandth of what it is a step away.
+      if (
+        least < 1e-6 &&
+        least < 1e-3 * Math.min(sines[n - 2], sine) &&
+        !contacts.some((c) => length(sub(c, x)) <= 1e-9 * scale0)
+      )
+        contacts.push(x);
+    }
     points.push(q);
     tangents.push(tq);
     sines.push(sine);
     travelled += length(sub(q, p));
     if (!inside(box, q, 0)) return { points, tangents, closed: false };
-    if (turn < MAX_TURN / 3) h = Math.min(hmax, h * 1.5);
+    if (turn < MAX_TURN / 3 && off <= allowed / 8) h = Math.min(hmax, h * 1.5);
   }
   throw new RangeError('an intersection curve did not end within 200,000 steps');
+}
+
+/**
+ * A point of the curve past `x`, a point on both surfaces where their normals are parallel that the curve runs through
+ * heading along `t`: settled across `t` from 1e-9 of the model beyond `x` (twice as far, and so on up to the longest
+ * step) where the normals part again, with the curve's direction there within two turns of `t`. Undefined when none is
+ * found.
+ */
+function beyond(
+  a: SurfaceDef,
+  b: SurfaceDef,
+  x: XYZ,
+  t: XYZ,
+  hmax: number,
+  scale0: number,
+): { q: XYZ; tq: XYZ } | undefined {
+  for (let d = 1e-9 * scale0; d <= hmax; d *= 2) {
+    const target = add(x, scale(t, d)),
+      q = settle(a, b, target, target, t, scale0),
+      normals = q && cross(distanceGradient(a, q), distanceGradient(b, q)),
+      sine = normals ? length(normals) : 0;
+    if (!q || !normals || sine <= 1e-9 || dot(sub(q, x), t) <= 0) continue;
+    let tq = scale(normals, 1 / sine);
+    if (dot(tq, t) < 0) tq = scale(tq, -1);
+    if (Math.acos(Math.min(1, dot(tq, t))) <= 2 * MAX_TURN) return { q, tq };
+  }
+  return undefined;
 }
 
 /**
@@ -528,6 +821,59 @@ function edgeExit(s: SurfaceDef, other: SurfaceDef, q: XYZ, scale0: number): XYZ
     t = Math.min(hi, Math.max(lo, t - g / speed));
   }
   return x && Math.abs(signedDistance(other, x)) <= 1e-10 * scale0 ? x : undefined;
+}
+
+/**
+ * The point of the cubic from p to q (as `hermite` makes it) where the surfaces' normals come nearest parallel (a
+ * golden-section search along it): where the curve crosses a curve along which the surfaces touch, and every point of
+ * that curve lies on both surfaces (so settling onto them could land anywhere along it).
+ */
+function leastApart(a: SurfaceDef, b: SurfaceDef, p: XYZ, tp: XYZ, q: XYZ, tq: XYZ): { x: XYZ; sine: number } {
+  const k = handleOf(p, tp, q, tq),
+    p1 = add(p, scale(tp, k)),
+    p2 = sub(q, scale(tq, k)),
+    at = (s: number): XYZ => {
+      const r = 1 - s;
+      return add(
+        add(scale(p, r * r * r), scale(p1, 3 * r * r * s)),
+        add(scale(p2, 3 * r * s * s), scale(q, s * s * s)),
+      );
+    },
+    g = (Math.sqrt(5) - 1) / 2;
+  let lo = 0,
+    hi = 1,
+    x1 = hi - g,
+    x2 = g,
+    f1 = apart(a, b, at(x1)),
+    f2 = apart(a, b, at(x2));
+  for (let i = 0; i < 80 && hi - lo > 1e-15; i++) {
+    if (f1 <= f2) {
+      [hi, x2, f2] = [x2, x1, f1];
+      x1 = hi - g * (hi - lo);
+      f1 = apart(a, b, at(x1));
+    } else {
+      [lo, x1, f1] = [x1, x2, f2];
+      x2 = lo + g * (hi - lo);
+      f2 = apart(a, b, at(x2));
+    }
+  }
+  const x = at((lo + hi) / 2);
+  return { x, sine: apart(a, b, x) };
+}
+
+/** The handle length of the cubic from p to q with unit tangents tp and tq (as `hermite` makes it). */
+function handleOf(p: XYZ, tp: XYZ, q: XYZ, tq: XYZ): number {
+  const len = length(sub(q, p)),
+    turn = Math.acos(Math.min(1, dot(tp, tq)));
+  return turn > 1e-6 ? (2 / 3) * len * (Math.tan(turn / 4) / Math.sin(turn / 2)) : len / 3;
+}
+
+/** How far the middle of the cubic from p to q (as `hermite` makes it) lies off either surface. */
+function straying(a: SurfaceDef, b: SurfaceDef, p: XYZ, tp: XYZ, q: XYZ, tq: XYZ): number {
+  const k = handleOf(p, tp, q, tq),
+    // (P0 + 3 P1 + 3 P2 + P3) / 8 with P1 = p + k tp, P2 = q - k tq.
+    mid = add(scale(add(p, q), 0.5), scale(sub(tp, tq), (3 * k) / 8));
+  return Math.max(Math.abs(signedDistance(a, mid)), Math.abs(signedDistance(b, mid)));
 }
 
 /** A C1 cubic B-spline (a chain of Bezier segments) through the points with the given unit tangents. */
