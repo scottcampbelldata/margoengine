@@ -6,6 +6,8 @@
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 
+export type AtmosphereBelow = 'horizon' | 'surface';
+
 export interface AtmosphereSettings {
     rayleigh: number;
     rayleighColor: TraceVec3;
@@ -370,7 +372,7 @@ export function atmosphereRadiance(view: number[], sun: number[], s: AtmosphereS
 
 export function atmosphereTransmittance(sun: number[], s: AtmosphereSettings): TraceVec3;
 
-export function bakeAtmosphere(sunMagicaVoxel: number[], s: AtmosphereSettings, scale: TraceVec3, width?: number, height?: number): TraceEnvironmentMap;
+export function bakeAtmosphere(sunMagicaVoxel: number[], s: AtmosphereSettings, scale: TraceVec3, width?: number, height?: number, below?: AtmosphereBelow): TraceEnvironmentMap;
 
 export const fromMagicaVoxel: (p: ArrayLike<number>) => TraceVec3;
 

@@ -32,7 +32,8 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
     (`test-results/mv-vox.{html,mjs}`, also kept in the tools folder) writes `<name>-ours.png` through
     `magicaVoxelMaterial`, `magicaVoxelLighting`, `magicaVoxelCamera`, `magicaVoxelModel` and `magicaVoxelMatrix`.
   - Score: `node score.cjs` (all scenes), `node cmp.cjs <name> <board>` (tile by tile), `node diff.cjs <name>` (pixels,
-    writes a side-by-side and difference PNG).
+    writes a side-by-side and difference PNG), `node panos.cjs` (the 16 atmosphere panoramas, the half below the
+    horizon on 2-degree blocks).
 
 ## What MagicaVoxel does (measured)
 
@@ -47,7 +48,7 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
 | Sun light | diffuse lobes only (no metal, coat or glass highlights); not in clouds; any voxel blocks it | sun boards |
 | Bounces | diffuse 2, specular 5, scatter 5 by default (`_bounce`) | glass-over-base tiles |
 | Ground | albedo `_color` at z = 0; camera rays fade it into the sky behind it by 1 - e^(-D `_hor` / 2030) at distance D (atmosphere sky: 2250, and the nearest 100 do not fade) | per pixel against our unfaded ground: `_hor` 0.1 and 0.5, cameras 60-180 from their focus, D 40-5000 |
-| Atmosphere sky `_env _mode 1` | single scattering, Rayleigh + Cornette-Shanks Mie (`_mie_g`) + ozone, top 8 km over a 25 000 km planet; densities scale by (e^(3.3 d) - 1) / (e^1.32 - 1); Mie extinction 1.29 - 0.2 d times its scattering; below the horizon the light comes along the horizon's path with the phase of the real direction | 16 panoramas (`test-results/mv-calib/A-pano-*`): mean 0.3-1.0 levels and 97-100% of directions within 3 for 13 of them |
+| Atmosphere sky `_env _mode 1` | single scattering, Rayleigh + Cornette-Shanks Mie (`_mie_g`) + ozone, top 8 km over a 25 000 km planet; densities scale by (e^(3.3 d) - 1) / (e^1.32 - 1); Mie extinction 1.29 - 0.2 d times its scattering; below the horizon the light comes along the horizon's path with the phase of the real direction (the ground fades into it); with the ground off that light fades into a dim surface (item 4b) | 16 panoramas (`test-results/mv-calib/A-pano-*`): mean 0.3-1.0 levels and 97-100% of directions within 3 for 13 of them |
 | Sun under the atmosphere | irradiance 10 x `_i` (not 5) times the air's transmittance along the sun's path | lit scenes at sun 50, 20, 5 degrees: regions within 0-1 level |
 | Camera | rCAM focus, pitch, yaw, radius; field of view from rOBJ `_lens _fov`, not rCAM | camera scenes |
 | Lens `_proj 2` (Pano) | equal-angle panorama: 180 degrees down the image and the same 0.225 degrees per pixel across at 960 x 800 (216 degrees; 360 on a 2:1 image) | `A-pano-e5`: a sun 90 degrees off the view lands 400 px from the centre; our render with `panoramaFit: 'height'`: 99.53% of the sky half within 3 levels |
@@ -132,11 +133,21 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
    view the ground 1-4 degrees down is 2-3 levels too bright in red and green (the ground's own light, not the fade:
    the fade is 1-3% there) and the far ground just below the horizon 2-3 levels too dark in red; dense air (`_ray_d`
    0.8-1, `_mie_d` 1) is 2.4-3.1 levels off on average; ozone is fitted at `_o3_d` 1 only (linear assumed);
-   `_bounce`-style sky light on objects is unchecked for non-default `_atm` settings. New (2026-10-20, from our
-   render of `A-pano-e5` with the Pano lens mapped): with the ground off MagicaVoxel's sky darkens and reddens below
-   the horizon (at the view's azimuth 124/112/75 at the horizon, 105/96/65 at 2.4 degrees down, 33/22/6 at 22.6
-   degrees down), while ours keeps the horizon's light (129/118/80 all the way down); the sky half matches (99.53%
-   within 3). Ours below the horizon is also the ground fade's target, so a change there must keep the fade scenes.
+   `_bounce`-style sky light on objects is unchecked for non-default `_atm` settings.
+4b. Atmosphere sky below the horizon with the ground off (`_setting _ground 0`): done (2026-10-20,
+   `bakeAtmosphere(..., 'surface')`, chosen by the lighting helper when the ground is off). MagicaVoxel's lower half
+   is a noisy path-traced surface seen through air: at depression d the horizon's light (our earlier below-horizon
+   value) keeps the share w = exp(-(sin d / (1.08 sin(sun)^0.81))^0.68), the rest is 0.035 / pi times the sun and sky
+   light on level ground (its nadir is that for every default-like air setting: ratio 0.036-0.050 at suns 5-90
+   degrees). Found by measuring 2-degree blocks of all 16 panoramas: Rayleigh off makes the nadir nearly black and
+   dense Rayleigh makes it red (so it is air light, not just a lit surface), and the depth of the fade scales with the
+   sun's height (about 7.5 degrees at a 5-degree sun, 53 at 90). Our renders of the 16 panoramas (1024 samples)
+   against MagicaVoxel's, the half below the horizon on 3 x 2-degree blocks: mean difference 47.8 -> 4.2 levels
+   (default air: sun 20 degrees 60.6 -> 1.1, 97% of blocks within 3; sun 5 72.3 -> 4.0; sun 45 46.3 -> 2.6; sun 90
+   40.8 -> 2.4); worse only for the extreme settings ozone 1 (3.4 -> 5.1) and Rayleigh 0 (12.2 -> 15.5). The sky
+   half is unchanged (98.1% of pixels within 3 on average, 99.04-99.94% for default-like air), and with the ground on
+   the map is bit-identical (the ground fades into the horizon's light as before: `atm-sky-e5` and `atm-e20`
+   re-rendered byte-identical). The surface's albedo is fitted at the default ground colour only.
 5. Image sky (`_mode 2`, `_ibl`): done. The caller decodes the HDR file the helper names (`imageSky.path`) and
    passes it as the `imageSky` option; the helper sets intensity and turn. Panoramas of our own ramp image: 99.84%
    of pixels within 3 levels (the rest on the image's wrap seam); a scene lit by it: 99.76%.

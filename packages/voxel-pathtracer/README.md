@@ -540,7 +540,9 @@ emitters `colour x (1 + 3 x emission x 10^power)`, metal reflectance `min(1, spe
 0.001 x `_d`. Its atmosphere sky (`_env _mode 1`) is reproduced by `bakeAtmosphere` (exported with
 `atmosphereRadiance` and `atmosphereTransmittance`): single scattering with Rayleigh, Cornette-Shanks Mie and ozone
 terms fitted to 16 of MagicaVoxel's panoramas (0.3-1 levels mean for the default and singly changed settings), baked
-to a 256 x 512 map in about 0.55 s; the sun then lights at 10 x intensity through the air's transmittance. Its display settings
+to a 256 x 512 map in about 0.55 s (below the horizon the horizon's light, which the ground fades into, or with the
+ground off that light fading into a dim surface: `bakeAtmosphere`'s `below` argument); the sun then lights at 10 x
+intensity through the air's transmittance. Its display settings
 map to `environment.background`, `vignette`, `edges` and `grid`; a transparent background (`_setting _bg_a`) is
 reported as `transparentBackground` (pass `transparent: true` to `capture`) and non-cubic voxels (`_setting _scale`)
 as `voxelScale`, which `magicaVoxelMatrix` takes as its fourth argument (the scene scaled about the origin); its image sky (`_env _mode 2`) needs the decoded HDR
@@ -563,8 +565,8 @@ Not done or not verified, stated plainly:
   materials, the orth and iso camera modes and lens projection 1 are reproduced but not yet compared with
   MagicaVoxel's images (its Pano lens is: 99.5% of the sky within 3 levels); subsurface is fitted at one density only;
   glass over a lit floor is 1-2 levels brighter; under the atmosphere, a view into a low sun matches on 98.7% of
-  pixels, very dense air settings by 2-3 levels on average, and with the ground off its sky below the horizon is not
-  yet MagicaVoxel's (docs/magicavoxel-parity.md).
+  pixels and very dense air settings by 2-3 levels on average; with the ground off its sky below the horizon is
+  within 4.2 levels on average (2-degree blocks), not per pixel (docs/magicavoxel-parity.md).
 - **Denoiser:** a classical filter, not a learned one. While the camera moves, surfaces it uncovers are noisy for a
   few frames, and for a few frames after it stops the history makes diffuse and cloud scenes slightly worse than
   without it (numbers under "Viewport"). Averaged over four seeds against 131,072-sample references

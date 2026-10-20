@@ -298,6 +298,24 @@ test('atmosphere sky: a baked map, the sun dimmed by the air at 10 x _i, its own
   }
   const blueness = (y) => texel(6, y)[2] / texel(6, y)[0];
   assert.ok(blueness(511) < blueness(510) && blueness(510) < blueness(509), 'reddening down to the horizon');
+  // With MagicaVoxel's ground off the sky below the horizon fades into a dim surface: the half above is unchanged,
+  // the horizon nearly continuous (0.18 degrees down: 97%), the nadir about 0.035 / pi of the light on level ground (a 20-degree sun: 0.08 x _i 0.7).
+  const sun20 = [Math.cos(0.349), 0, Math.sin(0.349)],
+    on = bakeAtmosphere(sun20, settings, [0.7, 0.7, 0.7], 16, 512),
+    off = bakeAtmosphere(sun20, settings, [0.7, 0.7, 0.7], 16, 512, 'surface'),
+    at16 = (m, x, y) => [0, 1, 2].map((k) => m.data[3 * (y * 16 + x) + k]);
+  assert.deepEqual(off.data.subarray(0, 3 * 16 * 256), on.data.subarray(0, 3 * 16 * 256));
+  at16(off, 3, 256).forEach((v, k) => assert.ok(v / at16(on, 3, 256)[k] > 0.95, 'nearly continuous at the horizon'));
+  at16(off, 3, 511).forEach((v, k) => assert.ok(v < 0.35 * at16(on, 3, 511)[k], 'dark toward the nadir'));
+  near(at16(off, 3, 511)[1], 0.084, 0.01);
+  const ground = (setting) =>
+    magicaVoxelLighting([
+      { _type: '_env', _mode: '1' },
+      { _type: '_inf', _i: '0.7', _angle: '20 90' },
+      { _type: '_setting', _ground: setting },
+    ]).environment.map;
+  const lower = (m) => m.data[3 * ((m.height - 1) * m.width + 7) + 1];
+  assert.ok(lower(ground('0')) < 0.35 * lower(ground('1')), 'ground off: the surface below');
 });
 
 test('cameras: rCAM focus, pitch, yaw and radius; the lens object gives the field of view', () => {

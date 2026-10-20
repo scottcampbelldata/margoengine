@@ -9,7 +9,7 @@ export {
   validateTraceOptions,
   VOXEL_PATHTRACER_DEFAULTS,
 } from './options.js';
-export type { AtmosphereSettings } from './atmosphere.js';
+export type { AtmosphereBelow, AtmosphereSettings } from './atmosphere.js';
 export {
   fromMagicaVoxel,
   magicaVoxelCamera,

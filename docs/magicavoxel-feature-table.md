@@ -103,6 +103,5 @@ Legend: **yes**, **no**, **open** (MagicaVoxel has it, Margo does not match it y
 
 - It is a complete, free editor that artists already use; Margo renders, it does not edit.
 - Transparent-background PNGs, non-cubic voxels, blend materials, its orthographic and isometric cameras and its
-  lens projection 1 are not compared with MagicaVoxel's images yet; under the atmosphere with the ground off, its sky
-  below the horizon is not reproduced yet.
+  lens projection 1 are not compared with MagicaVoxel's images yet.
 - Margo is measured on one PC and one browser only.

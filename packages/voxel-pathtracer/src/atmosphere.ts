@@ -147,11 +147,27 @@ export function atmosphereTransmittance(sun: number[], s: AtmosphereSettings): T
 }
 
 /**
+ * What a baked atmosphere map holds below the horizon: 'horizon', the horizon's light in each azimuth with the view's
+ * phase (what the far ground fades into: MagicaVoxel with its ground on), or 'surface', that light fading with depth
+ * into a dim surface lit by the sun and sky (MagicaVoxel with its ground off).
+ */
+export type AtmosphereBelow = 'horizon' | 'surface';
+
+// 'surface' (fitted to 10 of MagicaVoxel's panoramas with its ground off, sun 5 to 90 degrees, default and singly
+// changed air: 1.4-4.5 levels RMS on 2-degree blocks): at depression d the horizon's light keeps the share
+// w = exp(-(sin d / (BELOW_SCALE sin(sun)^BELOW_SUN))^BELOW_POWER), the rest is BELOW_ALBEDO / pi times the sun and
+// sky light on level ground.
+const BELOW_SCALE = 1.08,
+  BELOW_SUN = 0.81,
+  BELOW_POWER = 0.68,
+  BELOW_ALBEDO = 0.035;
+
+/**
  * The sky baked into an equirectangular map in tracer axes (y up; MagicaVoxel (x, y, z) = tracer (x, -z, y)). `scale`
  * multiplies each channel (the sun's `_i` times its colour). Above the horizon every row within 3 degrees of it is
  * integrated and, higher up, every `height / 256`-th, the rows between interpolated (a tall map resolves the band just
- * above the horizon at about the cost of a 256-row one). Below the horizon it follows `atmosphereRadiance` (each
- * column's horizon path, integrated once).
+ * above the horizon at about the cost of a 256-row one). Below the horizon each column's horizon path is integrated
+ * once and shown as `below` says.
  */
 export function bakeAtmosphere(
   sunMagicaVoxel: number[],
@@ -159,6 +175,7 @@ export function bakeAtmosphere(
   scale: TraceVec3,
   width = 256,
   height = 128,
+  below: AtmosphereBelow = 'horizon',
 ): TraceEnvironmentMap {
   const data = new Float32Array(width * height * 3),
     sun = sunMagicaVoxel,
@@ -167,22 +184,20 @@ export function bakeAtmosphere(
     elevation = (y: number) => Math.PI / 2 - ((y + 0.5) / height) * Math.PI,
     // Rows integrated: the top one, every step-th, all within 3 degrees of the horizon and the last above it.
     exact = (y: number) => y === 0 || y % step === 0 || y === above - 1 || elevation(y) < (3 * Math.PI) / 180,
-    rows = Array.from({ length: above }, (_, y) => y).filter(exact);
+    rows = Array.from({ length: above }, (_, y) => y).filter(exact),
+    lows: { r: number[]; m: number[] }[] = [];
   // The map's centre column faces -Z and its three-quarter column +X (TraceEnvironmentMap): tracer direction
   // (sin phi, 0, -cos phi) at the horizon, which is MagicaVoxel (sin phi, cos phi, 0).
-  for (let x = 0; x < width; x++) {
+  const view = (x: number, y: number) => {
     const phi = ((x + 0.5) / width - 0.5) * 2 * Math.PI,
-      sp = Math.sin(phi),
-      cp = Math.cos(phi),
-      put = (y: number, L: readonly number[]) =>
-        data.set([L[0] * scale[0], L[1] * scale[1], L[2] * scale[2]], 3 * (y * width + x)),
-      view = (y: number) => {
-        const theta = ((y + 0.5) / height) * Math.PI;
-        return [Math.sin(theta) * sp, Math.sin(theta) * cp, Math.cos(theta)];
-      };
+      theta = ((y + 0.5) / height) * Math.PI;
+    return [Math.sin(theta) * Math.sin(phi), Math.sin(theta) * Math.cos(phi), Math.cos(theta)];
+  };
+  for (let x = 0; x < width; x++) {
     let prev = -1;
     for (const y of rows) {
-      put(y, atmosphereRadiance(view(y), sun, s));
+      const L = atmosphereRadiance(view(x, y), sun, s);
+      data.set([L[0] * scale[0], L[1] * scale[1], L[2] * scale[2]], 3 * (y * width + x));
       // Rows skipped since the last integrated one: linear in elevation between the two.
       for (let k = prev + 1; prev >= 0 && k < y; k++) {
         const t = (elevation(prev) - elevation(k)) / (elevation(prev) - elevation(y));
@@ -192,14 +207,30 @@ export function bakeAtmosphere(
       }
       prev = y;
     }
-    const low = inScatter(pathOf(view(height - 1)), sun, s);
+    lows.push(inScatter(pathOf(view(x, height - 1)), sun, s));
+  }
+  // The dim surface of 'surface': the sun through the air and the sky above on level ground.
+  const ground = [0, 0, 0];
+  if (below === 'surface') {
+    const t = atmosphereTransmittance(sun, s),
+      dOmega = (Math.PI / height) * ((2 * Math.PI) / width);
+    for (let y = 0; y < above; y++) {
+      const theta = ((y + 0.5) / height) * Math.PI,
+        w = Math.max(0, Math.cos(theta)) * Math.sin(theta) * dOmega;
+      for (let x = 0; x < width; x++) for (let c = 0; c < 3; c++) ground[c] += data[3 * (y * width + x) + c] * w;
+    }
+    for (let c = 0; c < 3; c++)
+      ground[c] = (BELOW_ALBEDO / Math.PI) * (ground[c] + 10 * scale[c] * t[c] * Math.max(0, sun[2]));
+  }
+  const depth = BELOW_SCALE * Math.max(1e-3, sun[2]) ** BELOW_SUN;
+  for (let x = 0; x < width; x++) {
+    const low = lows[x];
     for (let y = above; y < height; y++) {
-      const v = view(y),
-        [pR, pM] = phases(v[0] * sun[0] + v[1] * sun[1] + v[2] * sun[2], s.mieG);
-      put(
-        y,
-        [0, 1, 2].map((k) => low.r[k] * pR + low.m[k] * pM),
-      );
+      const v = view(x, y),
+        [pR, pM] = phases(v[0] * sun[0] + v[1] * sun[1] + v[2] * sun[2], s.mieG),
+        w = below === 'surface' ? Math.exp(-((-v[2] / depth) ** BELOW_POWER)) : 1;
+      for (let c = 0; c < 3; c++)
+        data[3 * (y * width + x) + c] = w * (low.r[c] * pR + low.m[c] * pM) * scale[c] + (1 - w) * ground[c];
     }
   }
   return { width, height, data };
