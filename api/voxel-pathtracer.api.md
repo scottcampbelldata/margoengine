@@ -21,8 +21,10 @@ export interface MagicaVoxelCamera {
     target: TraceVec3;
     up: TraceVec3;
     fov: number;
-    projection: 'perspective' | 'orthographic';
+    projection: 'perspective' | 'orthographic' | 'panorama' | 'stereographic';
     distance: number;
+    orthographicHeight?: number;
+    options: Partial<Pick<VoxelPathTracerOptions, 'projection' | 'panoramaFit' | 'fisheye'>>;
 }
 
 export type MagicaVoxelDict = Readonly<Record<string, string>> | ReadonlyMap<string, string>;
@@ -73,6 +75,7 @@ export interface TraceBounceLimits {
     diffuse?: number;
     specular?: number;
     scatter?: number;
+    subsurface?: number;
 }
 
 export interface TraceEdges {
@@ -108,7 +111,7 @@ export interface TraceEnvironmentMap {
 }
 
 export interface TraceFisheye {
-    mapping?: 'equidistant' | 'equisolid';
+    mapping?: 'equidistant' | 'equisolid' | 'stereographic';
     fov?: number;
 }
 
@@ -274,6 +277,7 @@ export interface VoxelPathTracerOptions {
     shutter?: number;
     previousCamera?: TracePreviousCamera | null;
     projection?: 'camera' | 'panorama' | 'fisheye';
+    panoramaFit?: 'width' | 'height';
     fisheye?: TraceFisheye;
     distortion?: TraceLensDistortion | null;
     clamp?: number;
