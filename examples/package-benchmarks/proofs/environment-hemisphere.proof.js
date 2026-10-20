@@ -8,13 +8,13 @@
 //    physical and transmissive shaders give the same WGSL.
 // 3. Six frames of each effect's passes (uploads, patch, bindings; a device restore) record the same GPU calls.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/environment-hemisphere.proof.js [ref] [pin] [--current]
-// Pinned: 6c20076d against the working tree until the series lands; --current: 6c20076d against the working tree.
+// Pinned: 6c20076d against b4700864, the series' last code commit; --current: 6c20076d against the working tree.
 import assert from 'node:assert/strict';
 import { refs, versions, load as loadAt, commit, announce } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 
-const { ref, pin } = refs('6c20076d', undefined, '6c20076d');
+const { ref, pin } = refs('6c20076d', 'b4700864', '6c20076d');
 const root = await versions('environment', ref, 'src/index.ts', pin),
   probes = await versions('environment', ref, 'src/probes.ts', pin);
 // gltf-pro's shaders and the hook composer (packages/shared, inlined into gltf-pro) from the same refs.

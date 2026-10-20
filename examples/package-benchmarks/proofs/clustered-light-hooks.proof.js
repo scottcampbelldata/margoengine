@@ -6,7 +6,7 @@
 // it lights: identical at `ref` and in the working tree, without the entries and with each attached but empty (each creates
 // its buffer and hook only once it has something to draw).
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/clustered-light-hooks.proof.js [ref] [pin] [--current]
-// Pinned: 6c20076d against the working tree until the series lands; --current: 6c20076d against the working tree.
+// Pinned: 6c20076d against b4700864, the series' last code commit; --current: 6c20076d against the working tree.
 import assert from 'node:assert/strict';
 import { refs, versions, entryAt } from './compare.js';
 import { mockGPU, context, passes } from './gpu-recorder.js';
@@ -14,7 +14,7 @@ import { Engine, TransformStore } from '../../../packages/core/dist/extension.js
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 
-const { ref, pin } = refs('6c20076d', undefined, '6c20076d');
+const { ref, pin } = refs('6c20076d', 'b4700864', '6c20076d');
 const { baseline, candidate } = await versions('clustered', ref, undefined, pin);
 const gltf = await entryAt('gltf-pro', 'src/index.ts', pin),
   { DirectionalLights } = await entryAt('clustered', 'src/directional.ts', pin),
