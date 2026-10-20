@@ -482,9 +482,9 @@ test('renderImage returns linear colour and AOVs mapped back to the caller insta
 test('dispersive glass packs its Cauchy coefficient; renderImage passes a fixed wavelength; both are validated', async () => {
   const glass = { id: 1, color: [1, 1, 1], type: 'glass', ior: 1.5, abbe: 40 },
     { tracer, device } = await ready({ scene: simpleScene({ materials: [glass] }) });
-  // Materials: 20 floats each; float 16 is B = (n_d - 1) / (V (1 / 0.4861^2 - 1 / 0.6563^2)) in square micrometres.
-  const table = new Float32Array(device.buffers.find((b) => b.size === 256 * 96 && !b.destroyed).data);
-  assert.ok(Math.abs(table[24 + 16] - 0.5 / (40 * (1 / 0.4861 ** 2 - 1 / 0.6563 ** 2))) < 1e-7);
+  // Materials: 32 floats each; float 16 is B = (n_d - 1) / (V (1 / 0.4861^2 - 1 / 0.6563^2)) in square micrometres.
+  const table = new Float32Array(device.buffers.find((b) => b.size === 256 * 128 && !b.destroyed).data);
+  assert.ok(Math.abs(table[32 + 16] - 0.5 / (40 * (1 / 0.4861 ** 2 - 1 / 0.6563 ** 2))) < 1e-7);
   const before = device.buffers.length;
   await tracer.renderImage({ width: 2, height: 2, samples: 1, wavelength: 550 });
   const frame = device.buffers.slice(before).find((b) => b.size === FRAME);
@@ -498,12 +498,39 @@ test('dispersive glass packs its Cauchy coefficient; renderImage passes a fixed 
   tracer.dispose();
 });
 
+test('block textures: per-face indices in the material table, texels in the scene buffer; both validated', async () => {
+  const red = { width: 2, height: 1, data: new Uint8Array([255, 0, 0, 255, 0, 0, 255, 128]) },
+    green = { width: 1, height: 1, data: new Uint8Array([0, 255, 0, 255]) },
+    textured = { id: 1, color: [1, 1, 1], type: 'diffuse', texture: [0, 0, 1, 1, 0, 1] },
+    { tracer, device } = await ready({ scene: simpleScene({ materials: [textured], textures: [red, green] }) });
+  const table = new Float32Array(device.buffers.find((b) => b.size === 256 * 128 && !b.destroyed).data);
+  assert.deepEqual([...table.subarray(32 + 24, 32 + 30)], [1, 1, 2, 2, 1, 2], 'texture + 1 per face');
+  // The scene buffer: word 0 the table, then first texel word, width, height per texture; texels red-low RGBA.
+  const words = device.buffers
+    .filter((b) => !b.destroyed && b.data && new Uint32Array(b.data)[0] > 0)
+    .map((b) => new Uint32Array(b.data))
+    .find((w) => w[w[0] + 1] === 2 && w[w[0] + 2] === 1);
+  assert.ok(words, 'the texture table');
+  const t = words[0];
+  assert.deepEqual([words[t + 1], words[t + 2], words[t + 5], words[t + 6]], [2, 1, 1, 1]);
+  assert.deepEqual([...words.subarray(words[t], words[t] + 2)], [0xff0000ff, 0x80ff0000]);
+  assert.equal(words[words[t + 4]], 0xff00ff00);
+  for (const [scene, error] of [
+    [{ textures: [{ ...red, data: new Uint8Array(4) }] }, TypeError],
+    [{ textures: [{ ...red, width: 0 }] }, RangeError],
+    [{ textures: [red], materials: [{ ...textured, texture: 1 }] }, RangeError],
+    [{ textures: [red], materials: [{ ...textured, texture: [0, 0] }] }, TypeError],
+  ])
+    assert.throws(() => tracer.setScene(simpleScene({ revision: 2, ...scene })), error);
+  tracer.dispose();
+});
+
 test('media emit emissionColor x emission per unit; emissionColor is validated', async () => {
   const fire = { id: 1, color: [0.2, 0.2, 0.2], type: 'media', density: 0.5, emission: 3, emissionColor: [1, 0.5, 0] },
     { tracer, device } = await ready({ scene: simpleScene({ materials: [fire] }) });
-  const table = new Float32Array(device.buffers.find((b) => b.size === 256 * 96 && !b.destroyed).data);
-  assert.deepEqual([...table.subarray(24 + 8, 24 + 11)], [3, 1.5, 0]);
-  assert.equal(table[24 + 15] & 4, 0, 'not a light-sampled emitter');
+  const table = new Float32Array(device.buffers.find((b) => b.size === 256 * 128 && !b.destroyed).data);
+  assert.deepEqual([...table.subarray(32 + 8, 32 + 11)], [3, 1.5, 0]);
+  assert.equal(table[32 + 15] & 4, 0, 'not a light-sampled emitter');
   assert.throws(
     () => tracer.setScene(simpleScene({ revision: 2, materials: [{ ...fire, emissionColor: [1, -1, 0] }] })),
     RangeError,

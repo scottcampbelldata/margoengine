@@ -32,6 +32,7 @@ import { displayShader } from '../../shared/display.js';
 import {
   ADDITIVE,
   CONTACT,
+  CUTOUT,
   DELTA_ALPHA,
   GLOSSY_ALPHA,
   EMISSIVE,
@@ -242,6 +243,7 @@ const UNTINTED=${UNTINTED}u;
 const SUNLIT=${SUNLIT}u;
 const VOXELWISE=${VOXELWISE}u;
 const CONTACT=${CONTACT}u;
+const CUTOUT=${CUTOUT}u;
 // march's want for a voxelwise volume: stop at the next voxel face whatever lies behind it.
 const STEP=0xfffffffeu;
 const MODEL=${MODEL_WORDS}u;
@@ -337,7 +339,7 @@ fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit
   let entry=voxels[grid+u32(bc.x+nb.x*(bc.z+nb.z*bc.y))];
   let tOut=min(min(bn.x,bn.y),min(bn.z,tExit));
   let lo=bc*8;let hi=min(lo+8,sz)-1;
-  if(entry==0u||(entry>=0x80000000u&&!step)){
+  if(entry==0u||(entry>=0x80000000u&&!step&&!cutMat(entry&255u))){
    let u=select(0u,entry&255u,entry!=0u);
    if(step){if(!skip){return found(h,t,u,axis,stp,d,clamp(vec3i(floor(o+d*t)),lo,hi));}skip=false;}
    else if(u!=want){return found(h,t,u,axis,stp,d,clamp(vec3i(floor(o+d*t)),lo,hi));}
@@ -350,7 +352,15 @@ fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit
     let l=vec3u(c-lo);let k=l.x+8u*(l.z+8u*l.y);
     let v=select((voxels[entry+(k>>2u)]>>((k&3u)*8u))&255u,entry&255u,uniform);
     if(step){if(!skip){return found(h,vt,v,va,stp,d,c);}skip=false;}
-    else if(v!=want){return found(h,vt,v,va,stp,d,c);}
+    else if(v!=want){
+     if(!cutMat(v)){return found(h,vt,v,va,stp,d,c);}
+     let r=cutThrough(v,o,d,vt,va==3u,c,vn);
+     if(r==0u){return found(h,vt,v,va,stp,d,c);}
+     if(r==2u){
+      let ax=select(select(2u,1u,vn.y<=vn.z),0u,vn.x<=vn.y&&vn.x<=vn.z);
+      return found(h,min(min(vn.x,vn.y),vn.z),v,ax,stp,d,c);
+     }
+    }
     if(vn.x<vn.y&&vn.x<vn.z){va=0u;vt=vn.x;c.x+=stp.x;vn.x+=ad.x;}
     else if(vn.y<vn.z){va=1u;vt=vn.y;c.y+=stp.y;vn.y+=ad.y;}
     else{va=2u;vt=vn.z;c.z+=stp.z;vn.z+=ad.z;}
@@ -398,7 +408,7 @@ fn marchShadow(model:u32,o:vec3f,d:vec3f,tMax:f32)->f32 {
   let entry=voxels[grid+u32(bc.x+nb.x*(bc.z+nb.z*bc.y))];
   let tOut=min(min(bn.x,bn.y),min(bn.z,tExit));
   let lo=bc*8;let hi=min(lo+8,sz)-1;
-  if(entry>=0x80000000u){
+  if(entry>=0x80000000u&&!cutMat(entry&255u)){
    // A uniform brick: the start cell's share, then the rest of the brick.
    if(start){
     let c0=floor(o+d*t);let cn=(c0+up-o)*inv;let tc=min(min(min(cn.x,cn.y),cn.z),tOut);
@@ -412,11 +422,14 @@ fn marchShadow(model:u32,o:vec3f,d:vec3f,tMax:f32)->f32 {
    var c=clamp(vec3i(floor(o+d*t)),lo,hi);
    var vn=(vec3f(c)+up-o)*inv;
    var vt=t;
+   let uniform=entry>=0x80000000u;
    loop {
     let l=vec3u(c-lo);let k=l.x+8u*(l.z+8u*l.y);
-    let v=(voxels[entry+(k>>2u)]>>((k&3u)*8u))&255u;
+    let v=select((voxels[entry+(k>>2u)]>>((k&3u)*8u))&255u,entry&255u,uniform);
     let next=min(min(vn.x,vn.y),min(vn.z,tOut));
-    if(v!=0u){let x=extinction(v,start);if(x<0.0){return -1.0;}depth+=x*max(next-vt,0.0);}
+    // A cut-out cell lets the shadow through where both its texels on the ray are cut away.
+    if(cutMat(v)){if(cutThrough(v,o,d,vt,start&&vt==0.0,c,vn)!=1u){return -1.0;}}
+    else if(v!=0u){let x=extinction(v,start);if(x<0.0){return -1.0;}depth+=x*max(next-vt,0.0);}
     start=false;
     if(vn.x<vn.y&&vn.x<vn.z){vt=vn.x;c.x+=stp.x;vn.x+=ad.x;}
     else if(vn.y<vn.z){vt=vn.y;c.y+=stp.y;vn.y+=ad.y;}
@@ -562,6 +575,51 @@ fn gridLine(p:vec3f,n:vec3f)->bool {
  let s=f.grid.w;let q=abs(p/s-round(p/s))*s;let a=abs(n);
  let k=select(select(2u,1u,a.y>=a.z),0u,a.x>=a.y&&a.x>=a.z);
  return (k!=0u&&q.x<f.grid2.x)||(k!=1u&&q.y<f.grid2.x)||(k!=2u&&q.z<f.grid2.x);
+}
+// Block textures (scene word 0: the table's start, 0 without; per texture its first texel word, width, height): the
+// texel of palette v's face (0 +x, 1 -x, 2 +y, 3 -y, 4 +z, 5 -z) at model point l as linear colour and alpha, 1 where
+// the material has none. Faces tile as in @margoengine/voxel's renderer: tops by x and z, sides with v running down.
+fn texelAt(v:u32,face:u32,l:vec3f)->vec4f {
+ let base=scene[0];
+ if(base==0u){return vec4f(1.0);}
+ let slot=materials[v*MV+6u+face/4u][face%4u];
+ if(slot<0.5){return vec4f(1.0);}
+ var uv=vec2f(-l.x,-l.y);
+ switch face {
+  case 0u {uv=vec2f(-l.z,-l.y);}
+  case 1u {uv=vec2f(l.z,-l.y);}
+  case 2u {uv=l.xz;}
+  case 3u {uv=vec2f(l.x,-l.z);}
+  case 4u {uv=vec2f(l.x,-l.y);}
+  default {}
+ }
+ let t=base+4u*(u32(slot)-1u);let w=scene[t+1u];let ht=scene[t+2u];let q=fract(uv);
+ let c=unpack4x8unorm(scene[scene[t]+min(u32(q.y*f32(ht)),ht-1u)*w+min(u32(q.x*f32(w)),w-1u)]);
+ return vec4f(select(c.rgb/12.92,pow((c.rgb+0.055)/1.055,vec3f(2.4)),c.rgb>vec3f(0.04045)),c.a);
+}
+// The face of cell c that model point l lies on, across axis a (the side nearer l).
+fn faceOf(a:u32,l:vec3f,c:vec3i)->u32 {return a*2u+select(1u,0u,l[a]-f32(c[a])>0.5);}
+// Hit h's texel at world point p (its face from where p lies on the cell, so a voxel's inner faces read their own).
+fn faceTexel(h:Hit,p:vec3f)->vec4f {
+ if(scene[0]==0u||h.inst>=AREA){return vec4f(1.0);}
+ let l=xpoint(localX(h.inst),p);
+ return texelAt(h.value,faceOf(h.axis,l,h.cell),l);
+}
+fn cutMat(v:u32)->bool {return v!=0u&&(u32(materials[v*MV+3u].w)&CUTOUT)!=0u;}
+// A ray (model space o + t d) through cut-out cell c of palette v, entering at t0 (inside: it starts in the cell), next
+// boundaries vn: 0 when the texel where it enters is solid, 1 when that and the one where it leaves are both cut away
+// (it goes on), 2 when only the one where it leaves is solid (the voxel's inner face).
+fn cutThrough(v:u32,o:vec3f,d:vec3f,t0:f32,inside:bool,c:vec3i,vn:vec3f)->u32 {
+ let cut=materials[v*MV+7u].z;
+ if(!inside){
+  // The face it enters by: the axis whose cell plane the entry point lies nearest.
+  let l=o+d*t0;let e=min(abs(l-vec3f(c)),abs(l-vec3f(c+1)));
+  let a=select(select(2u,1u,e.y<=e.z),0u,e.x<=e.y&&e.x<=e.z);
+  if(texelAt(v,faceOf(a,l,c),l).a>=cut){return 0u;}
+ }
+ let t1=min(min(vn.x,vn.y),vn.z);let ax=select(select(2u,1u,vn.y<=vn.z),0u,vn.x<=vn.y&&vn.x<=vn.z);
+ let l=o+d*t1;
+ return select(1u,2u,texelAt(v,faceOf(ax,l,c),l).a>=cut);
 }
 fn lineMat(c:vec3f)->Mat {var m:Mat;m.color=c;m.metalColor=c;m.alpha=1.0;m.ior=1.5;return m;}
 fn voxelAt(model:u32,c:vec3i)->u32 {
@@ -1383,6 +1441,7 @@ fn radiance(px:vec2u)->Path {
      if(medium!=0u&&(material(medium).flags&MEDIA)==0u){chainOk=false;}
      medium=h.value;mInst=h.inst;o=p-off;continue;
     }
+    let tex=faceTexel(h,p).rgb;m.color*=tex;m.metalColor*=tex;
     // Edge bands and grid lines on what the camera sees (MagicaVoxel's display settings): the line colour, lit.
     if(bounces==0u&&medium==0u){
      if(f.edges.w>0.0&&edgeBand(h,p)){m=lineMat(f.edges.xyz);}
@@ -1503,6 +1562,7 @@ fn radiance(px:vec2u)->Path {
    if(h.inst==GROUND){m=groundMat();if(f.grid2.y>0.0&&gridLine(p,n)){m=lineMat(f.grid.xyz);}}
    else{
     n=normalize(h.sgn*rowOf(localX(h.inst),h.axis));m=material(h.value);
+    let tex=faceTexel(h,p).rgb;m.color*=tex;m.metalColor*=tex;
     if(f.edges.w>0.0&&edgeBand(h,p)){m=lineMat(f.edges.xyz);}else if(f.grid2.y>1.5&&gridLine(p,n)){m=lineMat(f.grid.xyz);}
    }
    if(dot(n,ray.d)>0.0){n=-n;}

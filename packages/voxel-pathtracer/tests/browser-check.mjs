@@ -20,6 +20,8 @@
 // - dispersion: a line's shift through a tilted slab per wavelength against Snell with Cauchy's index; colour order over
 //   the spectrum; a dispersive white furnace per channel;
 // - environment: the equirectangular map's orientation; determinism: equal seeds give identical images;
+// - textures: every pixel's albedo is the texel the CPU finds through the same face tiling, on a rotated block;
+// - cutout: rays and shadows pass texels cut away by alpha (a leaf wall, a leaf slab over a floor under a high sun);
 // - transparent: alpha is the camera rays' coverage, covered pixels match the opaque render, escapes add nothing;
 // - convergence: error against a 4096-sample reference falls about as 1/sqrt(samples), both projections;
 // - denoise: error with and without the wavelet denoiser, overall and at object edges, also on two caustic scenes;
@@ -306,6 +308,30 @@ try {
     assert.deepEqual(r['+x'], [1, 1, 0]);
     assert.deepEqual(r['-x'], [0, 1, 0]);
     assert.deepEqual(r['+z'], [1, 0, 0]);
+  }
+  if (wanted('textures')) {
+    const r = await run('textures');
+    console.log(
+      `  ${r.same}/${r.hits} pixels' albedo equal the CPU's texel, faces ${r.faces.join(' ')}`,
+      JSON.stringify(r.bad),
+    );
+    assert.deepEqual(r.errors, []);
+    assert.ok(r.faces.length >= 3, 'three faces in view');
+    assert.ok(r.same >= 0.995 * r.hits, 'texels as the CPU tiles them (texel and face borders may differ by rounding)');
+  }
+  if (wanted('cutout')) {
+    const r = await run('cutout');
+    console.log(' ', JSON.stringify(r));
+    assert.deepEqual(r.errors, []);
+    assert.ok(
+      r.wall.checked > 1000 && r.wall.right === r.wall.checked,
+      'the wall shows the block behind exactly through its cut texels',
+    );
+    assert.ok(
+      Math.abs(r.shadow.lit - r.shadow.expected) < 0.03 * r.shadow.expected,
+      'sunlight through the cut stripes',
+    );
+    assert.ok(r.shadow.dark < 0.01, 'shadow under the solid stripes');
   }
   if (wanted('transparent')) {
     const r = await run('transparent');

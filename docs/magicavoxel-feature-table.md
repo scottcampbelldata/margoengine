@@ -40,6 +40,7 @@ Legend: **yes**, **no**, **open** (MagicaVoxel has it, Margo does not match it y
 | Glass dispersion (rainbow splitting) | not checked | yes |
 | Glowing media (fire, gas) | yes (emissive cloud) | yes |
 | Area lights (rectangle panels) | not checked | yes |
+| Block textures (pixel art per voxel face, see-through texels) | no (its files hold palette colours only) | yes, tiled like `@margoengine/voxel`'s block games |
 
 ## Light and sky
 

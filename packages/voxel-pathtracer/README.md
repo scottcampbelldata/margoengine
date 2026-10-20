@@ -108,6 +108,16 @@ except `id`, `color` and `type` are optional.
     glass share and the rest scatters there.
   - `contactTransmission` (blend): a ray inside the volume reaches another voxel's surface only with the glass share's
     probability, else the path ends (MagicaVoxel's partly transparent glass over what it rests on).
+- Block textures (addition): `scene.textures` lists RGBA8 images (`{width, height, data}`, 1-1024 texels a side, sRGB
+  colour, linear alpha, rows from the top; at most 4096); a material's `texture` is one index for every face or six for
+  +x, -x, +y, -y, +z, -z in model axes. A face's texel (nearest) multiplies `color` and `metalColor`; emission stays
+  untextured. Faces tile as in `@margoengine/voxel`'s renderer (tops by x and z, sides with v running down), one
+  texture per voxel face, so a block game's 16 x 16 pixel art looks as it does there. The denoiser keeps textures
+  sharp: it filters lighting, not surface colour.
+- Cut-out texels (addition): with a `texture`, `cutout` (an alpha threshold, for example 0.5) lets rays and shadows
+  through texels whose alpha is below it. A ray crossing such a voxel meets the texel where it enters, else the one
+  where it leaves (the voxel's inner face, as leaves show theirs), else goes on to the next voxel. `raycast` still picks
+  whole voxels.
 
 ## Lighting
 
@@ -265,6 +275,7 @@ by floating-point rounding, which changes individual paths, not the converged im
 | Model size | 1-256 per axis |
 | Instances | 65,535 |
 | Area lights | 256 |
+| Block textures | 4096, each 1-1024 texels a side (in the scene buffer, within the binding size) |
 | Light-sampled glass and mirror instances | 8 of each (others are path sampled) |
 | Voxel data | grids plus 512-byte mixed bricks within the device's `maxStorageBufferBindingSize` (WebGPU default 128 MiB: about 262,000 mixed bricks; uniform bricks cost one word) |
 | Environment map | 8192 x 4096, and width x height x 16 bytes within the binding size (4096 x 2048 at the default) |

@@ -14,6 +14,7 @@ export {
 export type { MagicaVoxelCamera, MagicaVoxelDict, MagicaVoxelLighting, MagicaVoxelLook } from './magicavoxel.js';
 export type {
   TraceAreaLight,
+  TraceTexture,
   TraceEnvironment,
   TraceEnvironmentMap,
   TraceInstance,

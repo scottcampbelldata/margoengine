@@ -249,6 +249,77 @@ window.check={
   look([20,14,24],[4,3,4]);
   return {...out,errors:errors.splice(0)};
  },
+ // Block textures: a rotated block with its own texture per face (sizes 4 x 4 and, on top, 8 x 2); every pixel's
+ // first-hit albedo equals the texel the CPU finds from raycast's hit through the same tiling, times the colour.
+ async textures(){
+  const sizes=[[4,4],[4,4],[8,2],[4,4],[4,4],[4,4]];
+  const textures=sizes.map(([w,h],f)=>{const data=new Uint8Array(w*h*4);for(let y=0;y<h;y++)for(let x=0;x<w;x++)data.set([20+30*x,20+100*y/h,10+40*f,255],4*(y*w+x));return {width:w,height:h,data};});
+  const c=Math.cos(0.5),s=Math.sin(0.5),M=[c,0,-s,0,0,1,0,0,s,0,c,0,-3,-2,-3,1];
+  const scene={revision:1,models:[model('b',[6,4,5],()=>1)],instances:[{id:'b',modelId:'b',matrix:M}],materials:[{id:1,color:[0.9,0.8,0.7],type:'diffuse',texture:[0,1,2,3,4,5]}],textures};
+  look([12,9,6],[0,0,-1],{fov:50});
+  const W=160,H=120,lin=(v)=>{v/=255;return v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4;};
+  const out=await withTracer(scene,{maxBounces:1},async(t)=>{
+   const image=await t.renderImage({width:W,height:H,samples:1,jitter:false,aovs:true}),ray=rays(W,H);
+   let hits=0,same=0,worst=0;const faces=new Set(),bad=[];
+   for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const i=y*W+x,{o,d}=ray(x+0.5,y+0.5),hit=t.raycast(o,d);
+    if(!hit)continue;hits++;
+    // Model-local point: the instance is a rotation about y plus a translation.
+    const p=[hit.point[0]-M[12],hit.point[1]-M[13],hit.point[2]-M[14]],l=[c*p[0]-s*p[2],p[1],s*p[0]+c*p[2]];
+    const n=hit.normal,axis=n[0]?0:n[1]?1:2,face=axis*2+((n[axis]>0)?0:1);faces.add(face);
+    const uv=[[-l[2],-l[1]],[l[2],-l[1]],[l[0],l[2]],[l[0],-l[2]],[l[0],-l[1]],[-l[0],-l[1]]][face],fr=(v)=>v-Math.floor(v);
+    const [w,h]=sizes[face],tx=Math.min(Math.floor(fr(uv[0])*w),w-1),ty=Math.min(Math.floor(fr(uv[1])*h),h-1),px=textures[face].data.subarray(4*(ty*w+tx),4*(ty*w+tx)+3);
+    const want=[0,1,2].map((k)=>lin(px[k])*[0.9,0.8,0.7][k]),got=[...image.albedo.subarray(3*i,3*i+3)];
+    const e=Math.max(...want.map((v,k)=>Math.abs(v-got[k])));
+    if(e<1e-4)same++;else if(bad.length<5)bad.push({x,y,face,want,got});
+    worst=Math.max(worst,e);
+   }
+   return {hits,same,faces:[...faces].sort(),bad};
+  });
+  look([20,14,24],[4,3,4]);
+  return {...out,errors:errors.splice(0)};
+ },
+ // Cut-out texels: a leaf wall whose texels' top halves are cut away (front and back alike) shows the red block behind
+ // through them and its own colour elsewhere; under a leaf slab cut away where x mod 1 < 0.5, an overhead sun lights
+ // the floor in those stripes only.
+ async cutout(){
+  const tex=(w,h,alpha)=>{const data=new Uint8Array(w*h*4);for(let y=0;y<h;y++)for(let x=0;x<w;x++)data.set([255,255,255,alpha(x,y)],4*(y*w+x));return {width:w,height:h,data};};
+  const textures=[tex(2,2,(x,y)=>y===0?0:255),tex(2,1,(x)=>x===0?0:255)];
+  const leaf={id:1,color:[0.3,0.8,0.3],type:'diffuse',texture:[0,0,1,1,0,0],cutout:0.5};
+  const out={};
+  // The wall: 4 x 4 x 1 at the origin, the red block behind it.
+  const wall={revision:1,models:[model('w',[4,4,1],()=>1),model('r',[4,4,1],()=>2)],instances:[{id:'w',modelId:'w',matrix:translate(0,0,0)},{id:'r',modelId:'r',matrix:translate(0,0,-3)}],materials:[leaf,{id:2,color:[1,0,0],type:'diffuse'}],textures,environment:{skyColor:[1,1,1]}};
+  look([2,2,10],[2,2,0],{project:ortho(6)});
+  const W=96,H=96;
+  out.wall=await withTracer(wall,{maxBounces:1},async(t)=>{
+   const image=await t.renderImage({width:W,height:H,samples:1,jitter:false,aovs:true}),ray=rays(W,H);
+   let checked=0,right=0;const bad=[];
+   for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const {o,d}=ray(x+0.5,y+0.5),py=o[1]+d[1]*((1-o[2])/d[2]),px=o[0]+d[0]*((1-o[2])/d[2]);
+    if(px<0.02||px>3.98||py<0.02||py>3.98)continue;
+    const fy=py-Math.floor(py);if(Math.abs(fy-0.5)<0.03||fy<0.03||fy>0.97)continue;
+    checked++;const want=fy>0.5?2:1,got=image.palette[y*W+x];
+    if(got===want)right++;else if(bad.length<4)bad.push({x,y,py,want,got});
+   }
+   return {checked,right,bad};
+  });
+  // The slab over a floor; the camera between them looks straight down (orthographic).
+  const slab={revision:1,models:[model('s',[8,1,8],()=>1),model('f',[12,1,12],()=>2)],instances:[{id:'s',modelId:'s',matrix:translate(-4,4,-4)},{id:'f',modelId:'f',matrix:translate(-6,-1,-6)}],materials:[leaf,{id:2,color:[0.5,0.5,0.5],type:'diffuse'}],textures,environment:{skyColor:[0,0,0],sunIntensity:3,sunDirection:[0,1,0],sunAngularSize:0.001}};
+  look([0,2,0],[0,0,0],{project:ortho(6),up:[0,0,-1]});
+  out.shadow=await withTracer(slab,{maxBounces:1},async(t)=>{
+   const image=await t.renderImage({width:W,height:H,samples:16,seed:2}),ray=rays(W,H);
+   let lit=0,nl=0,dark=0,nd=0;
+   for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const {o,d}=ray(x+0.5,y+0.5),s=-o[1]/d[1],px=o[0]+d[0]*s,pz=o[2]+d[2]*s;
+    if(Math.abs(px)>3.8||Math.abs(pz)>3.8)continue;
+    const fx=px-Math.floor(px),v=image.color[3*(y*W+x)];
+    if(fx>0.1&&fx<0.4){lit+=v;nl++;}else if(fx>0.6&&fx<0.9){dark+=v;nd++;}
+   }
+   return {lit:lit/nl,dark:dark/nd,expected:0.5*3/Math.PI,pixels:nl+nd};
+  });
+  look([20,14,24],[4,3,4]);
+  return {...out,errors:errors.splice(0)};
+ },
  // Analytic checks, each a mean over the pixels of one object.
  async analytic(){
   const out={},cubeMask=(image)=>(i)=>image.instance[i]===0;

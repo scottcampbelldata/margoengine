@@ -65,6 +65,18 @@ export interface TraceMaterial {
    * shows what it rests on. Default false.
    */
   contactTransmission?: boolean;
+  /**
+   * Compatible addition: block textures. An index into `scene.textures` for every face, or one per face in model axes
+   * (+x, -x, +y, -y, +z, -z). A face's texel (nearest, the tiling of `@margoengine/voxel`'s renderer: tops by x and z,
+   * sides with v running down) multiplies `color` and `metalColor`; emission stays untextured.
+   */
+  texture?: number | readonly [number, number, number, number, number, number];
+  /**
+   * Compatible addition: with a `texture`, texels whose alpha is below this (0 to 1, for example 0.5) let rays and
+   * shadows through: a ray crossing such a voxel meets the texel where it enters, else the one where it leaves (the
+   * voxel's inner face), else goes on (leaves). Default 0 (none).
+   */
+  cutout?: number;
   /** Index of refraction, 1 to 3 (glass refraction and the plastic coat's Fresnel). Default 1.5. */
   ior?: number;
   /** Share of the glass lobe, 0 to 1 (`blend`; `glass` is 1). */
@@ -226,6 +238,16 @@ export interface TracePhysicalSky {
   intensity?: number;
 }
 
+/** Compatible addition: a block texture for {@link TraceMaterial.texture}. */
+export interface TraceTexture {
+  /** Width in texels, 1 to 1024. */
+  width: number;
+  /** Height in texels, 1 to 1024. */
+  height: number;
+  /** RGBA, 4 bytes per texel, rows from the top; colour sRGB-encoded, alpha linear. */
+  data: Uint8Array | Uint8ClampedArray;
+}
+
 /** Compatible addition: a rectangular area light. */
 export interface TraceAreaLight {
   /** Unique, non-empty id. */
@@ -266,6 +288,8 @@ export interface VoxelTraceScene {
   environment?: TraceEnvironment;
   /** Compatible addition: rectangular area lights (at most 256). */
   lights?: readonly TraceAreaLight[];
+  /** Compatible addition: block textures that materials index (at most 4096). */
+  textures?: readonly TraceTexture[];
 }
 
 /** Options of {@link VoxelPathTracer.attach}; all but `scene` can change later with `setOptions`. */

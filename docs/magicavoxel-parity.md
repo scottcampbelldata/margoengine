@@ -171,6 +171,23 @@ Large worlds need no work (row above). Done: the denoiser's caustic chain runs o
 256 MiB and from 18.7-19.0 to 14.4-14.6 ms per frame. Next candidate: render the large world in MagicaVoxel for a
 speed comparison.
 
+## Voxel sandbox photo mode (Scott, 2026-10-20)
+
+Scott asked for the worthwhile parts of a path-traced photo mode for the Minecraft-style voxel sandbox
+(`examples/voxel-sandbox` on main, drawn by `@margoengine/voxel`'s raster renderer), in this order after the
+MagicaVoxel parity work (parity is blocked while it needs the desktop, so this may start earlier):
+
+1. Block textures in the path tracer: per-face texture layers (the sandbox's 16 x 16 pixel art: +x, -x, +y, -y, +z,
+   -z), nearest filtering, multiplying the material colour; the denoiser demodulates them like any albedo. Also a
+   selling point over MagicaVoxel, which has no textures.
+2. See-through texture pixels (cutout): a face pixel with low alpha lets the ray pass on through the voxel (leaves).
+3. Photo mode in the sandbox: its chunks as path-tracer models (about a dozen block types, well under 255 materials;
+   an edited chunk re-uploads alone), water and glass as glass, torch light as an emitter; needs this branch and main
+   together (the branch predates the sandbox).
+
+Not worth it yet: crossed-card plants (tall grass, flowers, torch shape): new non-cube geometry in the traversal for 4
+blocks. Photo mode leaves grass and flowers out and shows torches as small glowing blocks.
+
 ## Finish the package (before it can be pushed or published)
 
 - Done: environment maps are filtered bilinearly (radiance; sampling densities stay per texel), which the smooth

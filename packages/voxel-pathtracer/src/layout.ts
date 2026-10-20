@@ -116,8 +116,18 @@ export function sceneLayout(s: SceneSnapshot, gridOffsets: ArrayLike<number>, li
     instanceBase = modelBase + s.models.length * MODEL_WORDS,
     nodeBase = instanceBase + s.instances.length * INSTANCE_WORDS,
     nodeCount = s.nodes.length / NODE_WORDS,
-    words = new Uint32Array(nodeBase + s.nodes.length),
+    // Block textures after the nodes: word 0 holds the table's start; per texture first texel word, width, height.
+    textureBase = nodeBase + s.nodes.length,
+    texelWords = s.textures.reduce((n, t) => n + t.texels.length, 0),
+    words = new Uint32Array(textureBase + 4 * s.textures.length + texelWords),
     floats = new Float32Array(words.buffer);
+  words[0] = s.textures.length ? textureBase : 0;
+  let texel = textureBase + 4 * s.textures.length;
+  for (const [k, t] of s.textures.entries()) {
+    words.set([texel, t.width, t.height, 0], textureBase + 4 * k);
+    words.set(t.texels, texel);
+    texel += t.texels.length;
+  }
   for (const [i, m] of s.models.entries()) {
     const b = modelBase + i * MODEL_WORDS,
       e = lights.emitters[i];

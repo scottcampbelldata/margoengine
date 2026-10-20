@@ -4,6 +4,7 @@
 // scene leaves the current one untouched (README, "Scenes"). Pure CPU code; the GPU layout is in layout.ts.
 import type {
   TraceAreaLight,
+  TraceTexture,
   TraceEnvironment,
   TraceEnvironmentMap,
   TraceInstance,
@@ -26,6 +27,7 @@ export const UNIFORM = 0x80000000;
 const MAX_INSTANCES = 65535;
 /** Area lights at most. */
 const MAX_LIGHTS = 256;
+const MAX_TEXTURES = 4096;
 /** Material flags (float 15 of a packed material). */
 export const MEDIA = 1,
   EMISSIVE = 4,
@@ -34,7 +36,8 @@ export const MEDIA = 1,
   UNTINTED = 64,
   SUNLIT = 128,
   VOXELWISE = 256,
-  CONTACT = 512;
+  CONTACT = 512,
+  CUTOUT = 1024;
 /** Glass and mirror instances whose deflection of distant light is light-sampled, each (README, "Lighting"). */
 const MAX_DEFLECTORS = 8;
 const VOLUME = 2,
@@ -44,7 +47,7 @@ export const DELTA_ALPHA = 1e-3;
 /** GGX alpha below which a lobe counts as specular for caustics (the trace shader's GLOSSY). */
 export const GLOSSY_ALPHA = 0.1;
 /** Floats per packed material (6 vec4), 256 materials. */
-export const MATERIAL_FLOATS = 24;
+export const MATERIAL_FLOATS = 32;
 
 const TYPES: readonly TraceMaterialType[] = ['diffuse', 'plastic', 'metal', 'glass', 'emit', 'blend', 'media'];
 const where = 'VoxelPathTracer';
@@ -169,6 +172,8 @@ export interface SceneSnapshot {
   readonly focusing: boolean;
   /** Mixed bricks plus grid words: the voxel buffer's words without padding. */
   readonly voxelWords: number;
+  /** Block textures: texels as RGBA8 words (red in the low byte), rows from the top. */
+  readonly textures: readonly { width: number; height: number; texels: Uint32Array }[];
 }
 
 /** Caches of the previous snapshot, reused by id and revision. */
@@ -362,8 +367,36 @@ function voxelAt(m: PackedModel, x: number, y: number, z: number): number {
 
 const luminance = (r: number, g: number, b: number) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
+/** Validates block textures and copies their texels as RGBA8 words. */
+function packTextures(list: unknown): { width: number; height: number; texels: Uint32Array }[] {
+  if (list === undefined) return [];
+  const textures = checkList<TraceTexture>(list, 'textures');
+  if (textures.length > MAX_TEXTURES)
+    throw new RangeError(`${where} scene.textures has ${textures.length}; at most ${MAX_TEXTURES} are supported`);
+  return textures.map((t, i) => {
+    const name = `scene.textures[${i}]`;
+    if (!isObject(t)) throw new TypeError(`${where} ${name} must be an object {width, height, data}`);
+    for (const k of ['width', 'height'] as const) {
+      if (typeof t[k] !== 'number' || !Number.isInteger(t[k]))
+        throw new TypeError(`${where} ${name}.${k} must be an integer number of texels`);
+      if (t[k] < 1 || t[k] > 1024) throw new RangeError(`${where} ${name}.${k} ${t[k]} is outside 1 to 1024`);
+    }
+    if (!(t.data instanceof Uint8Array || t.data instanceof Uint8ClampedArray))
+      throw new TypeError(`${where} ${name}.data must be a Uint8Array of RGBA bytes`);
+    if (t.data.length !== t.width * t.height * 4)
+      throw new TypeError(
+        `${where} ${name}.data has ${t.data.length} bytes; pass width x height x 4 = ${t.width * t.height * 4}`,
+      );
+    const texels = new Uint32Array(t.width * t.height);
+    for (let k = 0; k < texels.length; k++)
+      texels[k] =
+        (t.data[4 * k] | (t.data[4 * k + 1] << 8) | (t.data[4 * k + 2] << 16) | (t.data[4 * k + 3] << 24)) >>> 0;
+    return { width: t.width, height: t.height, texels };
+  });
+}
+
 /** Packs one material (MATERIAL_FLOATS floats) after validating it; returns its flags. */
-function packMaterial(m: TraceMaterial, name: string, out: Float32Array): void {
+function packMaterial(m: TraceMaterial, name: string, out: Float32Array, textures: number): void {
   if (!isObject(m)) throw new TypeError(`${where} ${name} must be an object {id, color, type}`);
   if (!TYPES.includes(m.type as TraceMaterialType))
     throw new TypeError(`${where} ${name}.type ${String(m.type)} is unknown; pass one of ${TYPES.join(', ')}`);
@@ -386,6 +419,7 @@ function packMaterial(m: TraceMaterial, name: string, out: Float32Array): void {
     scatter = optional(m.scatter, 0, `${name}.scatter`, 0, 1e6, 'pass 0 or more per world unit'),
     anisotropy = optional(m.anisotropy, 0, `${name}.anisotropy`, -0.95, 0.95, 'pass -0.95 to 0.95'),
     abbe = optional(m.abbe, 0, `${name}.abbe`, 0, 200, 'pass 0 (no dispersion) or an Abbe number of 5 to 200'),
+    cutout = optional(m.cutout, 0, `${name}.cutout`, 0, 1, 'pass an alpha threshold 0 to 1 (0: none)'),
     metalColor =
       m.metalColor === undefined
         ? color
@@ -400,6 +434,21 @@ function packMaterial(m: TraceMaterial, name: string, out: Float32Array): void {
     throw new TypeError(`${where} ${name}.sunlit must be true or false`);
   if (m.contactTransmission !== undefined && typeof m.contactTransmission !== 'boolean')
     throw new TypeError(`${where} ${name}.contactTransmission must be true or false`);
+  const faces =
+    m.texture === undefined ? undefined : typeof m.texture === 'number' ? Array(6).fill(m.texture) : m.texture;
+  if (faces !== undefined) {
+    if (
+      !Array.isArray(faces) ||
+      faces.length !== 6 ||
+      !faces.every((v) => typeof v === 'number' && Number.isInteger(v))
+    )
+      throw new TypeError(
+        `${where} ${name}.texture must be a texture index or six (+x, -x, +y, -y, +z, -z) into scene.textures`,
+      );
+    for (const v of faces)
+      if (v < 0 || v >= textures)
+        throw new RangeError(`${where} ${name}.texture ${v} is not an index into scene.textures (${textures})`);
+  }
   if (abbe > 0 && abbe < 5)
     throw new RangeError(`${where} ${name}.abbe ${abbe} is out of range; pass 0 (no dispersion) or 5 to 200`);
   const base = m.id * MATERIAL_FLOATS,
@@ -417,6 +466,7 @@ function packMaterial(m: TraceMaterial, name: string, out: Float32Array): void {
   if (m.sunlit === true && media) flags |= SUNLIT;
   if (m.voxelwise === true && pGlass > 0 && pGlass < 1) flags |= VOXELWISE;
   if (m.contactTransmission === true && pGlass > 0 && pGlass < 1) flags |= CONTACT;
+  if (cutout > 0 && faces !== undefined && !media) flags |= CUTOUT;
   out.set(
     [
       Math.min(color[0], 1),
@@ -447,6 +497,11 @@ function packMaterial(m: TraceMaterial, name: string, out: Float32Array): void {
       cameraEmission >= 0 && !media ? glow[1] * cameraEmission : 0,
       cameraEmission >= 0 && !media ? glow[2] * cameraEmission : 0,
       cameraEmission >= 0 && !media ? 1 : 0,
+      // Texture per face (+x, -x, +y, -y, +z, -z) plus 1; 0 untextured.
+      ...(faces ?? Array(6).fill(-1)).map((v: number) => v + 1),
+      // Texels with alpha below this let rays through (0: none).
+      cutout,
+      0,
     ],
     base,
   );
@@ -951,8 +1006,9 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
     materials = checkList<TraceMaterial>(scene.materials, 'materials');
   if (instances.length > MAX_INSTANCES)
     throw new RangeError(`${where} scene.instances has ${instances.length}; at most ${MAX_INSTANCES} are supported`);
-  // Materials.
-  const table = new Float32Array(256 * MATERIAL_FLOATS);
+  // Textures and materials.
+  const textures = packTextures(scene.textures),
+    table = new Float32Array(256 * MATERIAL_FLOATS);
   for (const [i, m] of materials.entries()) {
     const name = `scene.materials[${i}]`;
     if (!isObject(m)) throw new TypeError(`${where} ${name} must be an object {id, color, type}`);
@@ -961,7 +1017,7 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
     if (m.id < 1 || m.id > 255) throw new RangeError(`${where} ${name}.id ${m.id} is outside 1 to 255 (0 is empty)`);
     if (table[m.id * MATERIAL_FLOATS + 15])
       throw new TypeError(`${where} ${name}.id ${m.id} is used twice; give each palette index one material`);
-    packMaterial(m, name, table);
+    packMaterial(m, name, table, textures.length);
   }
   // Models (packed or reused by id, revision and size).
   const packed: PackedModel[] = [],
@@ -1145,5 +1201,6 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
       }),
     ),
     voxelWords,
+    textures,
   };
 }
