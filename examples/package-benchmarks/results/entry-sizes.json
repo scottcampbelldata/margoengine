@@ -1,5 +1,5 @@
 {
-  "commit": "5dbbb652",
+  "commit": "85ea3a15",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -38,8 +38,8 @@
     },
     "@margoengine/brep": {
       ".": {
-        "raw": 271113,
-        "gzip": 94268
+        "raw": 278995,
+        "gzip": 97338
       }
     },
     "@margoengine/bvh": {
@@ -422,8 +422,8 @@
         "gzip": 4051
       },
       "dist/workers/brep-runtime.js": {
-        "raw": 128077,
-        "gzip": 44658
+        "raw": 128785,
+        "gzip": 44894
       },
       "dist/workers/cad-runtime.js": {
         "raw": 17555,
@@ -884,20 +884,20 @@
         "gzip": 8486
       },
       "./stream": {
-        "raw": 34648,
-        "gzip": 12316
+        "raw": 35250,
+        "gzip": 12525
       },
       "./generate": {
-        "raw": 10166,
-        "gzip": 4136
+        "raw": 10271,
+        "gzip": 4186
       },
       "./mesher": {
         "raw": 14494,
         "gzip": 6217
       },
       "./light": {
-        "raw": 21097,
-        "gzip": 7531
+        "raw": 21128,
+        "gzip": 7545
       },
       "./vox": {
         "raw": 32360,
@@ -908,16 +908,16 @@
         "gzip": 9019
       },
       "./render": {
-        "raw": 39426,
-        "gzip": 14896
+        "raw": 45200,
+        "gzip": 16756
       },
       "dist/workers/mesher.js": {
         "raw": 9126,
         "gzip": 4112
       },
       "dist/workers/terrain.js": {
-        "raw": 13503,
-        "gzip": 5654
+        "raw": 13578,
+        "gzip": 5692
       }
     },
     "@margoengine/voxel-pathtracer": {
@@ -997,9 +997,9 @@
       "brotli": 6390
     },
     "packages/machinery/dist/workers/brep-runtime.js": {
-      "raw": 126910,
-      "gzip": 44567,
-      "brotli": 38537
+      "raw": 127602,
+      "gzip": 44802,
+      "brotli": 38749
     },
     "packages/machinery/dist/workers/occt-import-js.js": {
       "raw": 97856,
@@ -1072,9 +1072,9 @@
       "brotli": 3623
     },
     "packages/voxel/dist/workers/terrain.js": {
-      "raw": 13327,
-      "gzip": 5624,
-      "brotli": 5012
+      "raw": 13402,
+      "gzip": 5661,
+      "brotli": 5040
     },
     "node_modules/@dimforge/rapier3d-compat/dist/rapier.mjs": {
       "raw": 4335248,
