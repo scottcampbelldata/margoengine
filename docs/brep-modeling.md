@@ -91,12 +91,15 @@ Where OpenCascade still leads (freeform NURBS intersections, advanced blends, he
 - Imported edges keep the gap the file's geometry has as their tolerance (Jubilee: 469 edges up to 1.3 micrometres off
   their faces though the file declares 1e-5 mm), up to 10 micrometres or 1e-4 of the part; the Booleans keep an edge's
   tolerance on its pieces and match crossings within it.
+- Curves cross a spline surface on every sheet: the surface's parameter cells (two to a knot span, boxes padded by how
+  far the surface strays inside them) are met by the curve's pieces and Newton's method runs from each (a ray between a
+  thread's turns once saw one turn). Traces seeded on or past a spline's edge are dropped or end there; long rational
+  curves are sampled at most a quarter of the surface's smallest radius apart.
 - Measured: a block with a bicubic top cut by two holes and a box matches the exact integrals within 1e-7, and by a
-  second spline block within 1e-6 (tests/step-tessellate.test.js). Jubilee, a hole drilled through the middle of each
-  of 145 solids: 127 valid (78 before this, 72 on 575f4efd); left: 14 results with an intersection edge in one face
-  only (one checked: a plane face whose existing hole the drill overlaps), 3 tangential contacts (3.2), 1 open chain,
-  1 probe slip. A drill through a spline part takes 0.5 to 1 s; the slowest part 31 s (one process each, the 1.5 s
-  file read included).
+  second spline block within 1e-6; a thin extruded spline wall drilled through, within 1e-7
+  (tests/step-tessellate.test.js). Jubilee, a hole drilled through the middle of each of 145 solids (sized from its
+  mesh): 144 valid (78 before this, 72 on 575f4efd); the last is a true tangency (3.2). A spline cut takes 40 to 160
+  ms; every part drills within 4.3 s, the 1.5 s file read included.
 
 ## Booleans, fillets and chamfers: second cut (2026-10-17, 511d19d)
 

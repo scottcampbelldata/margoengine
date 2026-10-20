@@ -38,8 +38,9 @@ Every item is done only when all of these hold:
       Claude's drill check (2026-10-20, a hole through the middle of each Jubilee solid): 78 of 145 valid after the
       mass and apex fixes; of the 67 failures 62 are spline faces (3.1), 2 tangential contacts (3.2), 2 results with an
       edge off its surface, 1 a probe sizing slip. Imported cones (a face covering or running through its apex) now cut.
-      Later the same day (spline Booleans and tolerant edges, below): 127 of 145; left 14 results with an intersection
-      edge in one face only, 3 tangential contacts, 1 open chain, 1 probe slip.
+      Later the same day (spline Booleans and tolerant edges, below): 127 of 145; then 144 of 145 after fixing curve
+      crossings with every sheet of a spline, traces seeded on or past a spline's edge, and sampling of long rational
+      curves (the drill now sized from the mesh). Left: Jubilee 104, a true tangency (3.2).
 - [ ] 1.3 Topology checker: Euler-Poincare (V - E + F - (L - F) - 2(S - G) = 0), every edge used twice and oppositely in
       a solid, consistent orientation, no face crossing another; run on every file read and every operation result.
       Written (claude/kernel): validateBody (Euler-Poincare, one piece per shell) on every operation and import;
@@ -66,9 +67,14 @@ Every item is done only when all of these hold:
 - [ ] 3.1 Booleans on spline surfaces: signed distance and projection, subdivision seeds, traced intersections.
       Written 2026-10-20 (claude/kernel-speed): signed distance by projection, seeds along iso lines, curves ended
       exactly at the spline's domain edge; a bicubic block cut by holes, a box and another spline block matches exact
-      integrals within 1e-7 (1e-6 spline on spline); Jubilee drills pass on 127 of 145 solids (78 before). Left:
+      integrals within 1e-7 (1e-6 spline on spline); Jubilee drills pass on 144 of 145 solids (78 before). Left:
       Codex's corpus check and OpenCascade comparison, speed against OpenCascade.
 - [ ] 3.2 Tangential contact inside faces, and coincident freeform patches.
+      Tried 2026-10-20 on a drill internally tangent to a slanted hole (their curves cross at the touching point):
+      cutting both curves at the crossing (every pass of a curve that crosses itself) gives valid topology, but faces
+      whose loops touch at that vertex are split into the wrong regions (volume off by 6 to 8 mm3 of 7844, or an open
+      chain, by the hole's seam direction), so the Boolean still refuses it. Needs: region assembly where loops touch at
+      a vertex (and where that vertex is also on a face's seam).
 
 ## Phase 4: blends
 
