@@ -114,3 +114,21 @@ test('light colours may be wide-gamut (negative linear sRGB channels) but not of
     RangeError,
   );
 });
+
+test('the light-loop hooks bind storage buffers only: no texture or sampler (the 16-texture budget stays as it was)', async () => {
+  const { IESLights, parseIES } = await import('../dist/ies.js'),
+    { ProjectorLights } = await import('../dist/projector.js'),
+    stub = { setLights() {} };
+  const hooks = [
+    new DirectionalLights({ lights: stub }),
+    new IESLights({ lights: stub }),
+    new ProjectorLights({ lights: stub }),
+    new AreaLights({ lights: stub }),
+  ];
+  for (const hook of hooks) {
+    const code = hook.declarations(2);
+    assert.doesNotMatch(code, /texture_|sampler/, hook.name);
+    assert.match(code, /var<storage,read>/, hook.name);
+  }
+  void parseIES;
+});

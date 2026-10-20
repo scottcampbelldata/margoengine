@@ -159,3 +159,10 @@ test('environment colours take CSS color(display-p3 ...): outside sRGB their lin
   assert.ok(values[0] < -0.2 && values[1] > 1.04 && values[2] < -0.07, `P3 green: ${values.slice(0, 3)}`);
   assert.throws(() => new HemisphereLight({ sky: 'color(rec2020 1 0 0)' }), TypeError);
 });
+
+test('the hemisphere binds one uniform, no texture or sampler', () => {
+  const { sky } = effects(),
+    code = sky.pbr(2).declarations;
+  assert.doesNotMatch(code, /texture_|sampler/);
+  assert.match(code, /@group\(2\) @binding\(144\) var<uniform> margoSkyLightData/);
+});

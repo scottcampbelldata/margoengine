@@ -18,6 +18,7 @@ export const HEMISPHERE_BINDING = 144;
 /** The core-shader term the hemisphere writes (`n`: the shaded normal); LightProbes and SSAO recognise it. */
 export const HEMISPHERE_TERM = 'margoSkyLight(n)';
 
+/** Options of {@link HemisphereLight}. */
 export interface HemisphereLightOptions {
   /** Light from above (normal +y): hex is sRGB, `[r, g, b]` linear. Default '#ffffff'. */
   sky?: ColorInput;

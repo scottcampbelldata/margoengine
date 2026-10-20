@@ -39,9 +39,10 @@ export interface ProjectorLightOptions {
 }
 /** Distinct images per {@link ProjectorLights.setProjectors} call. */
 export const MAX_PROJECTOR_IMAGES = 16;
-/** Texels per image side, and in all images together. */
-export const MAX_PROJECTOR_SIZE = 4096,
-  MAX_PROJECTOR_TEXELS = 1 << 24;
+/** Texels per projector image side. */
+export const MAX_PROJECTOR_SIZE = 4096;
+/** Texels in all projector images together. */
+export const MAX_PROJECTOR_TEXELS = 1 << 24;
 const MAX_LIGHTS = 1024,
   HEADER_WORDS = 4 + MAX_PROJECTOR_IMAGES * 4,
   BINDING = 143;
