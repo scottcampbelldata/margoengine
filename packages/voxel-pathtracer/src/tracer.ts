@@ -1203,6 +1203,11 @@ export class VoxelPathTracer implements EnginePlugin {
     const caps = o.bounceLimits;
     u.set(caps ? [caps.diffuse, caps.specular, caps.scatter] : [BOUNCE_FREE, BOUNCE_FREE, BOUNCE_FREE], 152);
     f[155] = e.groundFade;
+    // Uniform fog: extinction, anisotropy, on; colour; the glow's hemisphere table.
+    const fog = e.fog;
+    f.set(fog ? [fog.density, fog.anisotropy, 1, 0] : [0, 0, 0, 0], 156);
+    f.set(fog ? [fog.color[0], fog.color[1], fog.color[2], 0] : [0, 0, 0, 0], 160);
+    f.set(fog ? fog.hemisphere : new Float32Array(16), 164);
     const sl = layout.scene,
       ll = layout.lights;
     u.set([sl.modelBase, sl.instanceBase, sl.nodeBase, s.instances.length ? sl.nodeCount : 0], 44);

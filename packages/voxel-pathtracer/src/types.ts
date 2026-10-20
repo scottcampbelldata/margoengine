@@ -175,6 +175,12 @@ export interface TraceEnvironment {
    */
   physicalSky?: TracePhysicalSky;
   /**
+   * Compatible addition: uniform fog filling the space outside volumes. Rays fade over distance d toward the fog's glow
+   * by 1 - exp(-density d); the glow is the sky and sun light the fog scatters (Henyey-Greenstein, no shadows), rays
+   * leaving the scene see only it, and the sun reaches surfaces only through it, as in MagicaVoxel's uniform fog.
+   */
+  fog?: TraceFog;
+  /**
    * Compatible addition: whether camera rays see the sun disk (true, default). Reflections and lighting are unchanged;
    * false is MagicaVoxel's default (sun disk off).
    */
@@ -182,9 +188,20 @@ export interface TraceEnvironment {
   /**
    * Compatible addition: camera rays fade the ground into the sky with distance: where a camera ray meets the ground at
    * distance D, the sky's horizon radiance replaces the share D / (D + groundFade) of it, so the ground is half faded
-   * at this distance (world units). 0 or absent: no fade. MagicaVoxel's horizon setting h is about 2040 / h.
+   * at this distance (world units). 0 or absent: no fade; uniform `fog` replaces it. MagicaVoxel's horizon setting h
+   * is about 2040 / h.
    */
   groundFade?: number;
+}
+
+/** Compatible addition: the uniform fog of {@link TraceEnvironment.fog}. */
+export interface TraceFog {
+  /** Extinction per world unit, above 0. MagicaVoxel's density d is about 0.001 d per voxel. */
+  density: number;
+  /** Linear RGB single-scattering colour, each 0 to 1. Default [1, 1, 1]. */
+  color?: TraceVec3;
+  /** Henyey-Greenstein anisotropy, -0.95 to 0.95. Default 0. */
+  anisotropy?: number;
 }
 
 /** Compatible addition: the Preetham daylight sky of {@link TraceEnvironment.physicalSky}. */

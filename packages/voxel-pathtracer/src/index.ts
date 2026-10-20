@@ -30,5 +30,6 @@ export type {
   TraceLensDistortion,
   TracePhysicalSky,
   TraceBounceLimits,
+  TraceFog,
   VoxelTraceScene,
 } from './types.js';

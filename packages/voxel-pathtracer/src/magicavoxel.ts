@@ -69,6 +69,9 @@ const colorOf = (d: MagicaVoxelDict | undefined, key: string, fallback: TraceVec
   const c = nums(d, key);
   return c && c.length >= 3 ? linear3(c) : fallback;
 };
+/** An 8-bit colour as value / 255 (no 2.2 power), white when absent. */
+const rawColor = (c: number[] | undefined): TraceVec3 =>
+  c && c.length >= 3 ? [clamp01(c[0] / 255), clamp01(c[1] / 255), clamp01(c[2] / 255)] : [1, 1, 1];
 /** MagicaVoxel (x, y, z), z up, to tracer (x, z, -y), y up. */
 export const fromMagicaVoxel = (p: ArrayLike<number>): TraceVec3 => [p[0], p[2], -p[1]];
 
@@ -231,6 +234,17 @@ export function magicaVoxelLighting(objects: Iterable<MagicaVoxelDict>): MagicaV
     // `_area` a: a sun disk about 0.69 a radians across (fitted to its penumbrae at 0.07 and 0.2).
     sunAngularSize: Math.min(0.5, 0.69 * Math.max(0, num(o('_inf'), '_area') ?? 0.07)),
     sunVisible: (num(o('_inf'), '_disk') ?? 0) !== 0,
+    // Uniform fog `_d` d: extinction about 0.001 d per voxel (fitted at d 0.5 and 5); phase `_g`; colour `_k` taken
+    // as value / 255 without the 2.2 power (unlike every other colour: measured per channel).
+    ...((num(o('_fog_uni'), '_d') ?? 0) > 0
+      ? {
+          fog: {
+            density: 0.001 * (num(o('_fog_uni'), '_d') ?? 0),
+            color: rawColor(nums(o('_fog_uni'), '_k')),
+            anisotropy: Math.min(0.95, Math.max(-0.95, num(o('_fog_uni'), '_g') ?? 0)),
+          },
+        }
+      : {}),
     ...(groundOn
       ? {
           groundColor: colorOf(o('_ground'), '_color', linear3([80, 80, 80])),
@@ -243,7 +257,7 @@ export function magicaVoxelLighting(objects: Iterable<MagicaVoxelDict>): MagicaV
   };
   if (mode === 1) unsupported.push('atmosphere sky (_atm): a uniform sky stands in');
   if (mode === 2) unsupported.push('image sky (_ibl): pass the HDR image as environment.map');
-  if ((num(o('_fog_uni'), '_d') ?? 0) > 0) unsupported.push('uniform fog (_fog_uni)');
+
   if ((num(o('_bloom'), '_mix') ?? 0.5) > 0 && (num(o('_bloom'), '_scale') ?? 0) > 0) unsupported.push('bloom (_bloom)');
   if ((num(setting, '_edge') ?? 0) !== 0) unsupported.push('edges (_edge)');
   if ((num(setting, '_grid') ?? 0) !== 0) unsupported.push('grid (_grid)');

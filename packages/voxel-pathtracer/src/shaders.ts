@@ -87,6 +87,10 @@ struct Frame {
  // Scattering events allowed per path: diffuse, specular, scatter (0xffff: no cap); w: the distance at which camera
  // rays see the ground half faded into the sky (f32 bits; 0 none).
  limits:vec4u,
+ // Uniform fog: extinction per unit, anisotropy, on (z > 0); colour; sky-glow share by view elevation (16 values).
+ fog:vec4f,
+ fogColor:vec4f,
+ fogHemi:array<vec4f,4>,
 }
 `;
 
@@ -782,6 +786,19 @@ fn horizonSky(d:vec3f)->vec3f {
  if(dot(h,h)<1e-12){return envTexel(envUV(vec3f(0.0,0.0,-1.0))).xyz*f.sky.w;}
  return envTexel(envUV(normalize(h))).xyz*f.sky.w;
 }
+// The glow of uniform fog seen along d: sky and sun light it scatters toward the viewer (no shadows).
+fn fogHemiAt(u:f32)->f32 {
+ let x=clamp((u+1.0)*7.5,0.0,15.0);let i=min(u32(x),14u);let fr=x-f32(i);
+ return mix(f.fogHemi[i>>2u][i&3u],f.fogHemi[(i+1u)>>2u][(i+1u)&3u],fr);
+}
+fn fogGlow(d:vec3f)->vec3f {
+ var l=horizonSky(vec3f(0.0,0.0,-1.0))*fogHemiAt(d.y);
+ if((f.config.z&SUN)!=0u){
+  let e=select(f.sunLight.xyz,f.sunLight.xyz*f.sunLight.w,f.sunLight.w>0.0);
+  l+=e*hgPdf(dot(f.sun.xyz,d),f.fog.y);
+ }
+ return f.fogColor.xyz*l;
+}
 fn cone(axis:vec3f,cosMax:f32)->vec3f {
  let u=vec2f(rand(),rand());let c=1.0-u.x*(1.0-cosMax);let s=sqrt(max(0.0,1.0-c*c));let p=TAU*u.y;
  return basis(axis)*vec3f(s*cos(p),s*sin(p),c);
@@ -991,8 +1008,10 @@ fn direct(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,medium:u32,mInst:u32,w:ptr<fun
  let air=medium==0u||(material(medium).flags&MEDIA)!=0u;
  for(var q=0u;q<5u;q++){
   var wi=vec3f(0.0);var dist=INF;var radiance=vec3f(0.0);var lp=0.0;var far=false;
+  // In uniform fog distant lights are out of reach (their light arrives through the fog's glow).
+  let fogged=f.fog.z>0.0;
   if(q==0u){
-   if((f.config.z&SUN)==0u||(kind==1u&&(f.config.z&NO_SUN_MEDIA)!=0u&&(m.flags&SUNLIT)==0u)){continue;}
+   if(fogged||(f.config.z&SUN)==0u||(kind==1u&&(f.config.z&NO_SUN_MEDIA)!=0u&&(m.flags&SUNLIT)==0u)){continue;}
    wi=f.sun.xyz;
    if(f.sunLight.w>0.0){wi=cone(f.sun.xyz,f.sun.w);}
    radiance=f.sunLight.xyz;lp=select(0.0,1.0/f.sunLight.w,f.sunLight.w>0.0);far=true;
@@ -1007,7 +1026,7 @@ fn direct(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,medium:u32,mInst:u32,w:ptr<fun
    if(cl<=0.0){continue;}
    radiance=ls.radiance;lp=ls.pdfA*d2/cl;
   } else if(q==3u){
-   if((f.config.z&ENV)==0u){continue;}
+   if(fogged||(f.config.z&ENV)==0u){continue;}
    let ew=f.env.x;let eh=f.env.y;
    let u1=rand();
    var lo=0u;var hi=eh-1u;
@@ -1037,7 +1056,8 @@ fn direct(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,medium:u32,mInst:u32,w:ptr<fun
   }
   // The straight direction (not from inside glass, where glassCandidates finds the ways out).
   if(any(e.f>vec3f(0.0))&&(air||!far)){
-   let v=shadow(o,wi,dist);
+   var v=shadow(o,wi,dist);
+   if(fogged&&!far){v*=exp(-f.fog.x*dist);}
    if(v>0.0){L+=e.f*radiance*v*select(1.0,select(power2(lp,e.pdf),1.0,sunOnly)/lp,lp>0.0);}
    else if(far&&!sunOnly&&(f.config.z&CLEAR_GLASS)!=0u){offer(w,1.0,o,wi,medium,mInst,wi,NONE,radiance,lp);}
   }
@@ -1174,6 +1194,13 @@ fn radiance(px:vec2u)->Path {
    continue;
   }
   if(primary){primary=false;res.inv=select(0.0,1.0/max(h.t,1e-6),h.inst!=NONE);}
+  // Uniform fog outside volumes: the segment fades toward the fog's glow (all of it for a ray leaving the scene).
+  if(f.fog.z>0.0&&medium==0u){
+   let dl=length(d);let tr=select(exp(-f.fog.x*h.t*dl),0.0,h.inst==NONE);
+   let add=thr*fogGlow(d/dl)*(1.0-tr);L+=add;if(focused){C+=add;}
+   thr*=tr;
+   if(h.inst==NONE){break;}
+  }
   // The vertex: a scattering point in a medium (kind 1) or a surface (kind 0); light sampling is called from one place
   // for both (the shader stays small).
   var scatter=false;var p=o+d*h.t;
@@ -1213,7 +1240,7 @@ fn radiance(px:vec2u)->Path {
     n=vec3f(0.0,select(-1.0,1.0,d.y<0.0),0.0);
     // Seen by the camera, the ground at distance D fades into the horizon's sky by D / (D + fade).
     let fade=bitcast<f32>(f.limits.w);
-    if(bounces==0u&&fade>0.0){
+    if(bounces==0u&&fade>0.0&&f.fog.z==0.0){
      let dist=h.t*length(d);let w=dist/(dist+fade);
      let add=thr*w*horizonSky(d);L+=add;thr*=1.0-w;
     }

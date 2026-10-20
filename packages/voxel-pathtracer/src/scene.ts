@@ -104,6 +104,8 @@ interface ResolvedEnvironment {
   readonly sunVisible: boolean;
   /** Distance at which camera rays see the ground half faded into the sky (0: no fade). */
   readonly groundFade: number;
+  /** Uniform fog: extinction per unit, colour, anisotropy and the hemisphere table of its sky glow (16 values). */
+  readonly fog?: { density: number; color: TraceVec3; anisotropy: number; hemisphere: Float32Array };
   readonly map?: PackedEnvironment;
   /** A newly baked physical sky, kept in the cache when the snapshot succeeds. */
   readonly skyCache?: { key: string; data: Float32Array };
@@ -731,6 +733,21 @@ function resolveEnvironment(environment: TraceEnvironment | undefined, cache: Sc
         : checkVec3(e.groundColor, `${name}.groundColor`, true, 'pass linear RGB'),
     groundHeight = optional(e.groundHeight, 0, `${name}.groundHeight`, -1e9, 1e9, 'pass a finite height');
   const groundFade = optional(e.groundFade, 0, `${name}.groundFade`, 0, 1e12, 'pass 0 (no fade) or a distance');
+  let fog: ResolvedEnvironment['fog'];
+  if (e.fog !== undefined) {
+    if (!isObject(e.fog)) throw new TypeError(`${where} ${name}.fog must be {density, color?, anisotropy?}`);
+    const density = optional(e.fog.density, 0, `${name}.fog.density`, 0, 1e6, 'pass an extinction per unit above 0'),
+      fogColor =
+        e.fog.color === undefined ? ([1, 1, 1] as TraceVec3) : checkVec3(e.fog.color, `${name}.fog.color`, true, 'pass linear RGB 0 to 1'),
+      anisotropy = optional(e.fog.anisotropy, 0, `${name}.fog.anisotropy`, -0.95, 0.95, 'pass -0.95 to 0.95');
+    if (density > 0)
+      fog = {
+        density,
+        color: [Math.min(fogColor[0], 1), Math.min(fogColor[1], 1), Math.min(fogColor[2], 1)],
+        anisotropy,
+        hemisphere: fogHemisphere(anisotropy),
+      };
+  }
   if (e.sunVisible !== undefined && typeof e.sunVisible !== 'boolean')
     throw new TypeError(`${where} ${name}.sunVisible must be true or false`);
   const sun = [direction[0] / length, direction[1] / length, direction[2] / length] as TraceVec3;
@@ -762,9 +779,37 @@ function resolveEnvironment(environment: TraceEnvironment | undefined, cache: Sc
     groundHeight,
     sunVisible: e.sunVisible !== false,
     groundFade,
+    fog,
     map,
     skyCache,
   };
+}
+
+/**
+ * The share of the Henyey-Greenstein phase function (anisotropy g) that the upper hemisphere of directions holds, for
+ * 16 view elevations u = -1..1 (the y component of the scattered ray's direction): the fog's glow from a uniform sky.
+ */
+function fogHemisphere(g: number): Float32Array {
+  const out = new Float32Array(16),
+    N = 48,
+    M = 96;
+  for (let k = 0; k < 16; k++) {
+    const u = -1 + (2 * k) / 15,
+      d = [Math.sqrt(Math.max(0, 1 - u * u)), u, 0];
+    let sum = 0;
+    for (let i = 0; i < N; i++) {
+      const cy = (i + 0.5) / N, // cos of the polar angle from +y, upper hemisphere
+        sy = Math.sqrt(1 - cy * cy);
+      for (let j = 0; j < M; j++) {
+        const phi = ((j + 0.5) / M) * 2 * Math.PI,
+          c = d[0] * sy * Math.cos(phi) + d[1] * cy,
+          den = 1 + g * g - 2 * g * c;
+        sum += (1 - g * g) / (4 * Math.PI * den * Math.sqrt(den));
+      }
+    }
+    out[k] = (sum * 2 * Math.PI) / (N * M);
+  }
+  return out;
 }
 
 function packLights(list: unknown): { lights: Float32Array; count: number; power: number } {
