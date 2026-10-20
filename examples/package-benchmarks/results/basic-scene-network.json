@@ -1,5 +1,5 @@
 {
-  "commit": "bb3e98d4",
+  "commit": "b35efb47",
   "dirty": false,
   "browser": "msedge 155.0.4283.62 headless",
   "adapter": "nvidia ampere",
@@ -11,8 +11,17 @@
       "encoding": "identity",
       "transferred": 808,
       "raw": 558,
-      "gzip": 370,
-      "brotli": 228
+      "gzip": 366,
+      "brotli": 227
+    },
+    {
+      "path": "assets/index-CTz-vgjb.js",
+      "role": "Entry: core + stage + app",
+      "encoding": "gzip",
+      "transferred": 22210,
+      "raw": 51548,
+      "gzip": 21829,
+      "brotli": 19256
     },
     {
       "path": "assets/geometry-CAWt7Gfm.js",
@@ -22,15 +31,6 @@
       "raw": 2036,
       "gzip": 1016,
       "brotli": 938
-    },
-    {
-      "path": "assets/index-CKGOmRLm.js",
-      "role": "Entry: core + stage + app",
-      "encoding": "gzip",
-      "transferred": 22216,
-      "raw": 51548,
-      "gzip": 21835,
-      "brotli": 19267
     },
     {
       "path": "assets/extension-DuYhGmhk.js",
@@ -62,22 +62,22 @@
   ],
   "total": {
     "requests": 6,
-    "transferred": 31781,
+    "transferred": 31775,
     "raw": 67902,
-    "gzip": 28764,
-    "brotli": 25371
+    "gzip": 28754,
+    "brotli": 25359
   },
   "notFetched": [
     {
-      "path": "assets/brep-runtime-Bu1po_DX.js",
-      "raw": 127602
+      "path": "assets/brep-runtime-SjtFxWjP.js",
+      "raw": 127583
     },
     {
-      "path": "assets/cad-Blsc0oFN.js",
+      "path": "assets/cad-DQcbkYM6.js",
       "raw": 108
     },
     {
-      "path": "assets/cad-DZ4VkNBk-BE0W57p-.js",
+      "path": "assets/cad-DZ4VkNBk-COhLLAbF.js",
       "raw": 38296
     },
     {
@@ -93,16 +93,16 @@
       "raw": 44
     },
     {
+      "path": "assets/dist-CjVGX7OB.js",
+      "raw": 61245
+    },
+    {
       "path": "assets/dist-Cstm_qM2.js",
       "raw": 39744
     },
     {
       "path": "assets/dist-DGHKO0qm.js",
       "raw": 32308
-    },
-    {
-      "path": "assets/dist-jMGxPXJG.js",
-      "raw": 61245
     },
     {
       "path": "assets/occt-import-js-BhHfLpto.wasm",

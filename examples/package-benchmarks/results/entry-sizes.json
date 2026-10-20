@@ -1,5 +1,5 @@
 {
-  "commit": "bb3e98d4",
+  "commit": "b35efb47",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -38,8 +38,8 @@
     },
     "@margoengine/brep": {
       ".": {
-        "raw": 278995,
-        "gzip": 97338
+        "raw": 292990,
+        "gzip": 102537
       }
     },
     "@margoengine/bvh": {
@@ -438,8 +438,8 @@
         "gzip": 4051
       },
       "dist/workers/brep-runtime.js": {
-        "raw": 128785,
-        "gzip": 44894
+        "raw": 128766,
+        "gzip": 44903
       },
       "dist/workers/cad-runtime.js": {
         "raw": 17555,
@@ -1029,9 +1029,9 @@
       "brotli": 6390
     },
     "packages/machinery/dist/workers/brep-runtime.js": {
-      "raw": 127602,
-      "gzip": 44802,
-      "brotli": 38749
+      "raw": 127583,
+      "gzip": 44809,
+      "brotli": 38709
     },
     "packages/machinery/dist/workers/occt-import-js.js": {
       "raw": 97856,
