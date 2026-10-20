@@ -85,7 +85,9 @@ try {
       0.15 * c['cloud sunInMedia true'].mean,
       'sunlit medium',
     );
-    near(c['ground fade 0.75'].mean, 0.75, 0.01, 'ground fade');
+    // Fade scale = the ground's distance: the sky takes 1 - 1/e of the grey ground; from that distance on, none.
+    near(c['ground fade'].mean, 1 - 0.5 / Math.E, 0.01, 'ground fade');
+    near(c['ground fade start'].mean, 0.5, 0.01, 'ground fade start');
     near(c['fog floor'].mean, 0.25 * Math.exp(-0.5) + 0.5 * (1 - Math.exp(-0.5)), 0.008, 'fog floor');
     near(c['fog sky 0.5'].mean, 0.5, 0.002, 'fog glow');
     assert.equal(c['aces gamma byte'].byte, 175, 'ACES and gamma 2.2');

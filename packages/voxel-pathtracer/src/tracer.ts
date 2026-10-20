@@ -1209,6 +1209,7 @@ export class VoxelPathTracer implements EnginePlugin {
     f.set(fog ? [fog.density, fog.anisotropy, 1, 0] : [0, 0, 0, 0], 156);
     f.set(fog ? [fog.color[0], fog.color[1], fog.color[2], 0] : [0, 0, 0, 0], 160);
     f.set(fog ? fog.hemisphere : new Float32Array(16), 164);
+    f.set([e.groundFadeStart, 0, 0, 0], 180);
     const sl = layout.scene,
       ll = layout.lights;
     u.set([sl.modelBase, sl.instanceBase, sl.nodeBase, s.instances.length ? sl.nodeCount : 0], 44);

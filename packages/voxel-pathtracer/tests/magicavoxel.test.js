@@ -4,6 +4,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   VoxelPathTracer,
+  atmosphereRadiance,
+  bakeAtmosphere,
   fromMagicaVoxel,
   magicaVoxelCamera,
   magicaVoxelLighting,
@@ -134,7 +136,7 @@ test('render objects: sky, sun, ground fade, film, bounces and fog', () => {
   near(e.sunAngularSize, 0.69 * 0.07);
   assert.equal(e.sunVisible, false);
   near3(e.groundColor, [lin(80), lin(80), lin(80)]);
-  near(e.groundFade, 20400);
+  near(e.groundFade, 20300);
   near(e.fog.density, 0.005);
   near3(e.fog.color, [1, 200 / 255, 150 / 255]);
   near(e.fog.anisotropy, 0.3);
@@ -164,6 +166,59 @@ test('render objects: sky, sun, ground fade, film, bounces and fog', () => {
     [null, true, true, true, true],
   );
   assert.throws(() => magicaVoxelLighting([], { look: 'cycles' }), TypeError);
+});
+
+test('atmosphere sky: a baked map, the sun dimmed by the air at 10 x _i, its own ground fade', () => {
+  const objects = (elevation) => [
+    { _type: '_env', _mode: '1' },
+    { _type: '_inf', _i: '0.7', _k: '255 255 255', _angle: `${elevation} 90`, _area: '0.07', _disk: '0' },
+    { _type: '_atm', _ray_d: '0.4', _ray_k: '45 104 255', _mie_d: '0.4', _mie_k: '255 255 255', _mie_g: '0.85' },
+    { _type: '_ground', _color: '80 80 80', _hor: '0.1' },
+    { _type: '_setting', _ground: '1' },
+  ];
+  const high = magicaVoxelLighting(objects(50)),
+    low = magicaVoxelLighting(objects(5));
+  assert.ok(!high.unsupported.some((u) => u.includes('atmosphere')));
+  near(high.environment.sunIntensity, 7);
+  near(high.environment.groundFade, 22500);
+  assert.equal(high.environment.groundFadeStart, 100);
+  const map = high.environment.map;
+  assert.equal(map.data.length, 3 * map.width * map.height);
+  assert.ok(map.data.every(Number.isFinite));
+  // Low sun: the air reddens it; the zenith sky is blue.
+  const [r, , b] = low.environment.sunColor;
+  assert.ok(r > 0.6 && b < 0.25 && r > 2 * b, `low sun ${low.environment.sunColor}`);
+  const zenith = atmosphereRadiance([0, 0, 1], [Math.cos(0.87), 0, Math.sin(0.87)], {
+    rayleigh: 0.4,
+    rayleighColor: [45 / 255, 104 / 255, 1],
+    mie: 0.4,
+    mieColor: [1, 1, 1],
+    mieG: 0.85,
+    ozone: 0,
+    ozoneColor: [0, 0, 0],
+  });
+  assert.ok(zenith[2] > zenith[1] && zenith[1] > zenith[0], `zenith ${zenith}`);
+  // Below the horizon the light comes along the horizon's path: continuous across it, and toward the sun the
+  // forward glow fades as the view drops.
+  const e10 = (10 * Math.PI) / 180,
+    baked = bakeAtmosphere(
+      [Math.cos(e10), 0, Math.sin(e10)],
+      {
+        rayleigh: 0.4,
+        rayleighColor: [0.2, 0.4, 1],
+        mie: 0.4,
+        mieColor: [1, 1, 1],
+        mieG: 0.85,
+        ozone: 0,
+        ozoneColor: [0, 0, 0],
+      },
+      [1, 1, 1],
+      16,
+      64,
+    ),
+    at = (x, y) => baked.data[3 * (y * 16 + x)];
+  assert.ok(Math.abs(at(3, 32) / at(3, 31) - 1) < 0.3, `horizon ${at(3, 31)} ${at(3, 32)}`);
+  assert.ok(at(12, 34) > at(12, 44) && at(12, 44) > 0, `toward the sun ${at(12, 34)} ${at(12, 44)}`);
 });
 
 test('cameras: rCAM focus, pitch, yaw and radius; the lens object gives the field of view', () => {
@@ -210,6 +265,7 @@ test('MagicaVoxel options and environment reach the frame uniform; invalid ones 
         sunVisible: false,
         groundColor: [0.1, 0.1, 0.1],
         groundFade: 500,
+        groundFadeStart: 40,
         fog: { density: 0.01, color: [1, 0.5, 0.25], anisotropy: 0.3 },
       },
     }),
@@ -227,7 +283,7 @@ test('MagicaVoxel options and environment reach the frame uniform; invalid ones 
   h.frame();
   await settle();
   h.frame();
-  const frame = h.device.buffers.findLast((b) => b.size === 720 && !b.destroyed),
+  const frame = h.device.buffers.findLast((b) => b.size === 736 && !b.destroyed),
     u = new Uint32Array(frame.data),
     f = new Float32Array(frame.data);
   assert.equal(u[42] & (1024 | 2048 | 4096 | 8192 | 16384), 1024 | 2048 | 4096 | 8192 | 16384);
@@ -238,6 +294,7 @@ test('MagicaVoxel options and environment reach the frame uniform; invalid ones 
   near(f[157], 0.3);
   assert.equal(f[158], 1);
   near3([...f.subarray(160, 163)], [1, 0.5, 0.25]);
+  assert.equal(f[180], 40);
   near(f[164 + 7], f[164 + 8], 0.05); // isotropy near the horizon is about a half either side
   assert.deepEqual(tracer.options.bounceLimits, { diffuse: 2, specular: 5, scatter: undefined });
   assert.throws(() => tracer.setOptions({ gamma: 0.5 }), RangeError);

@@ -187,11 +187,13 @@ export interface TraceEnvironment {
   sunVisible?: boolean;
   /**
    * Compatible addition: camera rays fade the ground into the sky with distance: where a camera ray meets the ground at
-   * distance D, the sky's horizon radiance replaces the share D / (D + groundFade) of it, so the ground is half faded
-   * at this distance (world units). 0 or absent: no fade; uniform `fog` replaces it. MagicaVoxel's horizon setting h
-   * is about 2040 / h.
+   * distance D, the sky behind it (the environment in the ray's direction, without the sun disk) replaces the share
+   * 1 - e^(-(D - groundFadeStart) / groundFade) of it (world units). 0 or absent: no fade; uniform `fog` replaces it.
+   * MagicaVoxel's horizon setting h is about 2030 / h from the camera.
    */
   groundFade?: number;
+  /** Compatible addition: camera distance at which `groundFade` starts (world units; default 0). */
+  groundFadeStart?: number;
 }
 
 /** Compatible addition: the uniform fog of {@link TraceEnvironment.fog}. */

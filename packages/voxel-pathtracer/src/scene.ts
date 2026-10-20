@@ -104,6 +104,7 @@ interface ResolvedEnvironment {
   readonly sunVisible: boolean;
   /** Distance at which camera rays see the ground half faded into the sky (0: no fade). */
   readonly groundFade: number;
+  readonly groundFadeStart: number;
   /** Uniform fog: extinction per unit, colour, anisotropy and the hemisphere table of its sky glow (16 values). */
   readonly fog?: { density: number; color: TraceVec3; anisotropy: number; hemisphere: Float32Array };
   readonly map?: PackedEnvironment;
@@ -733,6 +734,7 @@ function resolveEnvironment(environment: TraceEnvironment | undefined, cache: Sc
         : checkVec3(e.groundColor, `${name}.groundColor`, true, 'pass linear RGB'),
     groundHeight = optional(e.groundHeight, 0, `${name}.groundHeight`, -1e9, 1e9, 'pass a finite height');
   const groundFade = optional(e.groundFade, 0, `${name}.groundFade`, 0, 1e12, 'pass 0 (no fade) or a distance');
+  const groundFadeStart = optional(e.groundFadeStart, 0, `${name}.groundFadeStart`, 0, 1e12, 'pass a distance');
   let fog: ResolvedEnvironment['fog'];
   if (e.fog !== undefined) {
     if (!isObject(e.fog)) throw new TypeError(`${where} ${name}.fog must be {density, color?, anisotropy?}`);
@@ -781,6 +783,7 @@ function resolveEnvironment(environment: TraceEnvironment | undefined, cache: Sc
     groundHeight,
     sunVisible: e.sunVisible !== false,
     groundFade,
+    groundFadeStart,
     fog,
     map,
     skyCache,

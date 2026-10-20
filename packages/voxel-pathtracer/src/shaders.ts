@@ -94,13 +94,15 @@ struct Frame {
  lensFov:vec4f,
  // Brown-Conrady k1, k2, p1, p2.
  distortion:vec4f,
- // Scattering events allowed per path: diffuse, specular, scatter (0xffff: no cap); w: the distance at which camera
- // rays see the ground half faded into the sky (f32 bits; 0 none).
+ // Scattering events allowed per path: diffuse, specular, scatter (0xffff: no cap); w: the ground fade's distance
+ // scale (f32 bits; 0 none).
  limits:vec4u,
  // Uniform fog: extinction per unit, anisotropy, on (z > 0); colour; sky-glow share by view elevation (16 values).
  fog:vec4f,
  fogColor:vec4f,
  fogHemi:array<vec4f,4>,
+ // Ground fade: x the camera distance where it starts.
+ groundFade:vec4f,
 }
 `;
 
@@ -767,6 +769,16 @@ fn envTexel(uv:vec2f)->vec4f {
  let x=min(u32(uv.x*f32(f.env.x)),f.env.x-1u);let y=min(u32(uv.y*f32(f.env.y)),f.env.y-1u);
  return envmap[y*f.env.x+x];
 }
+// Radiance filtered bilinearly between texel centres (wrapping in azimuth); sampling densities stay per texel.
+fn envSmooth(uv:vec2f)->vec3f {
+ let w=f.env.x;let h=f.env.y;
+ let px=uv.x*f32(w)-0.5;let py=clamp(uv.y*f32(h)-0.5,0.0,f32(h-1u));
+ let fx=floor(px);let ax=px-fx;let y0=u32(py);let y1=min(y0+1u,h-1u);let ay=py-f32(y0);
+ let x0=u32(i32(fx)+i32(w))%w;let x1=(x0+1u)%w;
+ let a=mix(envmap[y0*w+x0].xyz,envmap[y0*w+x1].xyz,ax);
+ let b=mix(envmap[y1*w+x0].xyz,envmap[y1*w+x1].xyz,ax);
+ return mix(a,b,ay);
+}
 fn envPdf(d:vec3f,t:vec4f)->f32 {
  let s=sqrt(max(0.0,1.0-d.y*d.y));
  if(s<=1e-6||f.weights.x<=0.0){return 0.0;}
@@ -779,8 +791,8 @@ fn envPdf(d:vec3f,t:vec4f)->f32 {
 fn environment(d:vec3f,bsdfPdf:f32,j:f32,camera:bool)->vec3f {
  var c=f.sky.xyz;
  if((f.config.z&ENV)!=0u){
-  let t=envTexel(envUV(d));
-  c=t.xyz*f.sky.w;
+  let uv=envUV(d);let t=envTexel(uv);
+  c=envSmooth(uv)*f.sky.w;
   if(bsdfPdf>0.0){c*=power2(bsdfPdf,envPdf(d,t)/j);}
  }
  let seen=select((f.config.z&SUN_DIFFUSE)==0u,(f.config.z&HIDE_SUN)==0u,camera);
@@ -789,12 +801,17 @@ fn environment(d:vec3f,bsdfPdf:f32,j:f32,camera:bool)->vec3f {
  }
  return c;
 }
+// The sky behind direction d (constant sky or environment map; no sun disk).
+fn skyBehind(d:vec3f)->vec3f {
+ if((f.config.z&ENV)==0u){return f.sky.xyz;}
+ return envSmooth(envUV(d))*f.sky.w;
+}
 // Sky radiance at the horizon in d's azimuth (constant sky or environment map; no sun disk).
 fn horizonSky(d:vec3f)->vec3f {
  if((f.config.z&ENV)==0u){return f.sky.xyz;}
  let h=vec3f(d.x,0.0,d.z);
- if(dot(h,h)<1e-12){return envTexel(envUV(vec3f(0.0,0.0,-1.0))).xyz*f.sky.w;}
- return envTexel(envUV(normalize(h))).xyz*f.sky.w;
+ if(dot(h,h)<1e-12){return envSmooth(envUV(vec3f(0.0,0.0,-1.0)))*f.sky.w;}
+ return envSmooth(envUV(normalize(h)))*f.sky.w;
 }
 // The glow of uniform fog seen along d: sky and sun light it scatters toward the viewer (no shadows).
 fn fogHemiAt(u:f32)->f32 {
@@ -1050,7 +1067,7 @@ fn direct(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,medium:u32,mInst:u32,w:ptr<fun
    let t=envmap[row*ew+lo];
    lp=envPdf(wi,t);
    if(lp<=0.0){continue;}
-   radiance=t.xyz*f.sky.w;far=true;
+   radiance=envSmooth(envUV(wi))*f.sky.w;far=true;
   } else {
    if((*w).total==0.0){continue;}
    wi=(*w).d;
@@ -1248,11 +1265,11 @@ fn radiance(px:vec2u)->Path {
    }
    if(h.inst==GROUND){
     n=vec3f(0.0,select(-1.0,1.0,d.y<0.0),0.0);
-    // Seen by the camera, the ground at distance D fades into the horizon's sky by D / (D + fade).
+    // Seen by the camera, the ground at distance D fades into the sky behind it by 1 - e^(-(D - start) / fade).
     let fade=bitcast<f32>(f.limits.w);
     if(bounces==0u&&fade>0.0&&f.fog.z==0.0){
-     let dist=h.t*length(d);let w=dist/(dist+fade);
-     let add=thr*w*horizonSky(d);L+=add;thr*=1.0-w;
+     let w=1.0-exp(-max(0.0,h.t*length(d)-f.groundFade.x)/fade);
+     let add=thr*w*skyBehind(d);L+=add;thr*=1.0-w;
     }
     off=n*max(1e-4,1e-6*length(p));
     m=groundMat();

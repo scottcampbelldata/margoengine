@@ -9,7 +9,7 @@ export const INSTANCE_WORDS = 40;
 /** Words per hierarchy node. */
 const NODE_WORDS = 8;
 /** Bytes of the frame uniform. */
-export const FRAME_BYTES = 720;
+export const FRAME_BYTES = 736;
 /** Frame uniform flag bits (config.z). */
 export const FLAG_SUN = 1,
   FLAG_GROUND = 2,

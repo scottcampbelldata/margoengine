@@ -157,7 +157,8 @@ window.check={
   // Ground fade: ground (albedo 0.5) under sky 1 seen 14.14 away, fade distance 14.14: half way to the sky, 0.75.
   const empty={revision:1,models:[model('d',[1,1,1],()=>1)],instances:[{id:'d',modelId:'d',matrix:translate(500,500,500)}],materials:[{id:1,color:[0.5,0.5,0.5],type:'diffuse'}]};
   look([0,10,0],[0,0,-10],{fov:2});
-  out['ground fade 0.75']=await withTracer({...empty,environment:{skyColor:[1,1,1],groundColor:[0.5,0.5,0.5],groundHeight:0,groundFade:Math.hypot(10,10)}},{maxBounces:8},async(t)=>{const im=await render(t,256,8);return stats(im,()=>true);});
+  out['ground fade']=await withTracer({...empty,environment:{skyColor:[1,1,1],groundColor:[0.5,0.5,0.5],groundHeight:0,groundFade:Math.hypot(10,10)}},{maxBounces:8},async(t)=>{const im=await render(t,256,8);return stats(im,()=>true);});
+  out['ground fade start']=await withTracer({...empty,environment:{skyColor:[1,1,1],groundColor:[0.5,0.5,0.5],groundHeight:0,groundFade:Math.hypot(10,10),groundFadeStart:Math.hypot(10,10)}},{maxBounces:8},async(t)=>{const im=await render(t,256,8);return stats(im,()=>true);});
   // Uniform fog (white, isotropic, extinction 0.05): a floor (albedo 0.5) under sky 1 is lit by the glow 0.5 (half the
   // sky) to 0.25 and seen 10 away: 0.25 exp(-0.5) + 0.5 (1 - exp(-0.5)); a ray to the sky sees 0.5.
   look([0,10,0.01],[0,0,0],{fov:10});
@@ -604,10 +605,11 @@ window.check={
   look([20,14,24],[4,3,4]);
   return {...out,errors:errors.splice(0)};
  },
- // Environment map orientation: an image whose columns are coloured by azimuth, seen straight along -Z, +X, -X.
+ // Environment map orientation: an image whose columns are coloured by azimuth in four bands centred on the
+ // columns facing +Z, -X, -Z and +X (the map is filtered bilinearly, so each view looks at a band's middle).
  async environment(){
   const W=64,H=32,data=new Float32Array(W*H*3);
-  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const q=Math.floor(x/(W/4));data.set(q===0?[1,0,0]:q===1?[0,1,0]:q===2?[0,0,1]:[1,1,0],(y*W+x)*3);}
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const q=Math.floor(((x+W/8)%W)/(W/4));data.set(q===0?[1,0,0]:q===1?[0,1,0]:q===2?[0,0,1]:[1,1,0],(y*W+x)*3);}
   const scene={revision:1,models:[],instances:[],materials:[],environment:{map:{width:W,height:H,data}}},out={};
   for(const [name,target] of [['-z',[0,0,-1]],['+x',[1,0,0]],['-x',[-1,0,0]],['+z',[0,0,1]]]){
    look([0,0,0],target,{fov:10});

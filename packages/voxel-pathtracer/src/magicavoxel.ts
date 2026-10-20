@@ -6,6 +6,7 @@
 // min(1, specular x colour), the coat adds to the diffuse base, glass colour acts through `_d` absorption only, media
 // extinction is `_d` per voxel, and the film is Narkowicz's ACES fit with a 2.2 power.
 // MagicaVoxel is z-up; the tracer is y-up: tracer (x, y, z) = MagicaVoxel (x, z, -y).
+import { atmosphereTransmittance, bakeAtmosphere } from './atmosphere.js';
 import type {
   TraceBounceLimits,
   TraceEnvironment,
@@ -240,16 +241,45 @@ export function magicaVoxelLighting(
       specular: Math.min(64, Math.max(1, Math.round(num(bounce, '_specular') ?? 5))),
       scatter: Math.min(64, Math.max(1, Math.round(num(bounce, '_scatter') ?? 5))),
     };
+  const sunMV = [Math.cos(elevation) * Math.cos(azimuth), Math.cos(elevation) * Math.sin(azimuth), Math.sin(elevation)],
+    sunColor = colorOf(o('_inf'), '_k', [1, 1, 1]),
+    atm = o('_atm'),
+    atmosphere =
+      mode === 1
+        ? {
+            rayleigh: num(atm, '_ray_d') ?? 0.4,
+            rayleighColor: rawColor(nums(atm, '_ray_k') ?? [45, 104, 255]),
+            mie: num(atm, '_mie_d') ?? 0.4,
+            mieColor: rawColor(nums(atm, '_mie_k')),
+            mieG: Math.min(0.99, Math.max(-0.99, num(atm, '_mie_g') ?? 0.85)),
+            ozone: num(atm, '_o3_d') ?? 0,
+            ozoneColor: rawColor(nums(atm, '_o3_k') ?? [105, 255, 110]),
+          }
+        : undefined;
   const environment: TraceEnvironment = {
     skyColor: colorOf(o('_uni'), '_k', [1, 1, 1]),
     skyIntensity: Math.max(0, num(o('_uni'), '_i') ?? 0.7),
-    sunDirection: fromMagicaVoxel([
-      Math.cos(elevation) * Math.cos(azimuth),
-      Math.cos(elevation) * Math.sin(azimuth),
-      Math.sin(elevation),
-    ]),
-    sunColor: colorOf(o('_inf'), '_k', [1, 1, 1]),
-    sunIntensity: 5 * Math.max(0, sunI),
+    sunDirection: fromMagicaVoxel(sunMV),
+    // In atmosphere mode the sun reaches the ground through the air (dimmed and reddened toward the horizon).
+    sunColor: atmosphere
+      ? ((t) => [sunColor[0] * t[0], sunColor[1] * t[1], sunColor[2] * t[2]] as TraceVec3)(
+          atmosphereTransmittance(sunMV, atmosphere),
+        )
+      : sunColor,
+    // Measured: 5 x `_i` under the uniform sky; 10 x `_i` (before the air dims it) under the atmosphere sky.
+    sunIntensity: (atmosphere ? 10 : 5) * Math.max(0, sunI),
+    // Atmosphere sky (`_env _mode 1`): single scattering fitted to MagicaVoxel's panoramas, baked to a map.
+    ...(atmosphere
+      ? {
+          map: bakeAtmosphere(
+            sunMV,
+            atmosphere,
+            [sunColor[0] * Math.max(0, sunI), sunColor[1] * Math.max(0, sunI), sunColor[2] * Math.max(0, sunI)],
+            256,
+            256,
+          ),
+        }
+      : {}),
     // `_area` a: a sun disk about 0.69 a radians across (fitted to its penumbrae at 0.07 and 0.2).
     sunAngularSize: Math.min(0.5, 0.69 * Math.max(0, num(o('_inf'), '_area') ?? 0.07)),
     sunVisible: (num(o('_inf'), '_disk') ?? 0) !== 0,
@@ -268,13 +298,18 @@ export function magicaVoxelLighting(
       ? {
           groundColor: colorOf(o('_ground'), '_color', linear3([80, 80, 80])),
           groundHeight: 0,
-          // `_hor` h: the camera's ground at distance D fades into the sky by D / (D + 2040 / h) (fitted at camera
-          // heights 14 and 66, h 0.1 and 0.5).
-          ...((num(o('_ground'), '_hor') ?? 0.1) > 0 ? { groundFade: 2040 / (num(o('_ground'), '_hor') ?? 0.1) } : {}),
+          // `_hor` h: the ground the camera sees at distance D fades into the sky behind it by 1 - e^(-D h / c),
+          // c 2030 under the uniform sky (measured per pixel against the unfaded ground: h 0.1 and 0.5, cameras 60-180
+          // from their focus, D 40-5000). Under the atmosphere c is about 2250 and the nearest 100 do not fade (two
+          // views; the one into a low sun prefers 2400, the one away from it 2100).
+          ...((num(o('_ground'), '_hor') ?? 0.1) > 0
+            ? mode === 1
+              ? { groundFade: 2250 / (num(o('_ground'), '_hor') ?? 0.1), groundFadeStart: 100 }
+              : { groundFade: 2030 / (num(o('_ground'), '_hor') ?? 0.1) }
+            : {}),
         }
       : {}),
   };
-  if (mode === 1) unsupported.push('atmosphere sky (_atm): a uniform sky stands in');
   if (mode === 2) unsupported.push('image sky (_ibl): pass the HDR image as environment.map');
 
   if ((num(o('_bloom'), '_mix') ?? 0.5) > 0 && (num(o('_bloom'), '_scale') ?? 0) > 0)

@@ -41,7 +41,9 @@ Everything here is on branch `worktree-agent-a63cac143225721f2` (not pushed, Cod
 | Sun `_inf` | irradiance 5 x `_i`; azimuth = yaw - 90 degrees; disk ~0.69 x `_area` rad across | penumbra fits at 0.07 and 0.2 |
 | Sun light | diffuse lobes only (no metal, coat or glass highlights); not in clouds; any voxel blocks it | sun boards |
 | Bounces | diffuse 2, specular 5, scatter 5 by default (`_bounce`) | glass-over-base tiles |
-| Ground | albedo `_color` at z = 0; camera rays fade it into the sky by D / (D + 2040 / `_hor`) at distance D | `_hor` 0.1 and 0.5, camera heights 14 and 66 |
+| Ground | albedo `_color` at z = 0; camera rays fade it into the sky behind it by 1 - e^(-D `_hor` / 2030) at distance D (atmosphere sky: 2250, and the nearest 100 do not fade) | per pixel against our unfaded ground: `_hor` 0.1 and 0.5, cameras 60-180 from their focus, D 40-5000 |
+| Atmosphere sky `_env _mode 1` | single scattering, Rayleigh + Cornette-Shanks Mie (`_mie_g`) + ozone, top 8 km over a 25 000 km planet; densities scale by (e^(3.3 d) - 1) / (e^1.32 - 1); Mie extinction 1.29 - 0.2 d times its scattering; below the horizon the light comes along the horizon's path with the phase of the real direction | 16 panoramas (`test-results/mv-calib/A-pano-*`): mean 0.3-1.0 levels and 97-100% of directions within 3 for 13 of them |
+| Sun under the atmosphere | irradiance 10 x `_i` (not 5) times the air's transmittance along the sun's path | lit scenes at sun 50, 20, 5 degrees: regions within 0-1 level |
 | Camera | rCAM focus, pitch, yaw, radius; field of view from rOBJ `_lens _fov`, not rCAM | camera scenes |
 | Missing MATL keys | read as 0 (roughness 0, IOR 1, metal 0, emission 0), specular 1 | MagicaVoxel's own panel |
 | Legacy keys | `_weight` wins (metalness, transparency, emission); `_spec` = specular - 1; `_ior` is always n - 1; cloud `_weight` reads as density 0.1 | panel readings |
@@ -64,6 +66,10 @@ Everything here is on branch `worktree-agent-a63cac143225721f2` (not pushed, Cod
 - Close oblique view with the camera set exactly in MagicaVoxel and both at 8192 samples: 100.00% within 3 levels.
 - Calibration boards: diffuse, metal, plastic, sun, sky, exposure, ACES: every tile within 3 levels; emitters (with
   `_ldr`) every tile; sun penumbra 99.6-99.9% of pixels within 3; horizon 98-99.5%; metal reflections 96%.
+- Atmosphere sky (`test-results/pt-compare/atm`, 4096 samples each): the diffuse scene lit at sun 50, 20 and 5
+  degrees 99.99, 99.91 and 99.79% within 3; views with the sky and horizon in frame 99.5% (sun 20, away from it) and
+  97.7% (sun 5, toward it). Ground-fade scenes under the uniform sky (`X-hor-1`, `X-hor-5`, `H-r60`, `H-r180`,
+  `H-corners`): 99.77-99.99%.
 - Speed, same A6000, 960 x 800 at 1024 samples: MagicaVoxel about 14 s (glass) and 15 s (diffuse) by stopwatch on
   its progress bar (+-1 s); ours 1.85 s and 1.70 s (`capture`), about 8x faster. Ours 1.7-2.2 s on all six scenes.
 
@@ -82,7 +88,12 @@ Everything here is on branch `worktree-agent-a63cac143225721f2` (not pushed, Cod
    glow and the sun reaches surfaces only through it; its colour is value / 255 (no 2.2 power); the ground's horizon
    fade is off under fog. 9 fog scenes (densities 0.002 to 5, sky, sun, coloured fog with anisotropy, camera 190 and
    400 away) within 3 levels on 99.5-100% of pixels.
-4. Atmosphere sky (`_env _mode 1`, `_atm` Rayleigh / Mie / ozone): not implemented; needs its own calibration.
+4. Atmosphere sky (`_env _mode 1`, `_atm`): done (`src/atmosphere.ts`, baked to a 256 x 256 map in 0.5 s; the
+   lighting helper bakes it and dims and reddens the sun through the air). Open: the view into a low sun is 97.7%
+   (the half degree above the horizon is up to 8 levels bluer than MagicaVoxel; the ground fade prefers a scale of
+   2400 there and 2100 looking away from the sun); dense air (`_ray_d` 0.8-1, `_mie_d` 1) is 2.4-3.1 levels off on
+   average; ozone is fitted at `_o3_d` 1 only (linear assumed); `_bounce`-style sky light on objects is unchecked for
+   non-default `_atm` settings.
 5. Image sky (`_mode 2`, `_ibl`): the helper reports it; the caller must load the HDR file into `environment.map`
    (rotation and intensity mapping unverified).
 6. Background colour (`_bg`, `_setting _bg_c`, `_bg_a` transparent background), voxel `_scale`, edges `_edge`, grid
@@ -105,9 +116,12 @@ with MagicaVoxel against Margo for the product page, once speed is measured.
 
 ## Finish the package (before it can be pushed or published)
 
+- Done: environment maps are filtered bilinearly (radiance; sampling densities stay per texel), which the smooth
+  atmosphere needs and any HDR map benefits from; the GPU `environment` check now looks at the middle of its colour
+  bands.
 - Done: README documents every new option, material field, `environment.fog`/`groundFade`/`sunVisible` and the
-  `magicaVoxel*` helpers; `tests/magicavoxel.test.js` (9 tests: materials with current, older and missing keys, render
-  objects, cameras, models and placement, options reaching the frame); the real-GPU `compat` check (closed forms for
+  `magicaVoxel*` helpers; `tests/magicavoxel.test.js` (10 tests: materials with current, older and missing keys, render
+  objects, the atmosphere, cameras, models and placement, options reaching the frame); the real-GPU `compat` check (closed forms for
   energy compensation, metalColor, additive coat, untinted glass, voxelwise blend, camera emission, diffuse caps 1/2/3,
   the sun on diffuse lobes only, opaque shadows, the sun in media and sunlit media, ground fade, fog, the ACES and gamma
   byte); Biome format and lint clean; hygiene 10.0 on every gate for the package.
