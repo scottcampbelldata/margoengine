@@ -89,16 +89,28 @@ export function traceIntersections(a: SurfaceDef, b: SurfaceDef, box: Box3): { c
           if (i === j && a === 0 && b + 2 === q.length && p[0] === q[q.length - 1]) continue;
           const gap = closest(p[a], p[a + 1], q[b], q[b + 1]);
           if (gap.distance > 2 * (sag(branches[i], a) + sag(branches[j], b)) + near) continue;
+          // Curves that cross meet at an angle; chords lying along each other (two curves running a hair apart where
+          // the surfaces nearly touch, or one curve traced twice) are not a crossing.
+          const da = unit(sub(p[a + 1], p[a])),
+            db = unit(sub(q[b + 1], q[b]));
+          if (da && db && Math.abs(dot(da, db)) > Math.cos(0.05)) continue;
           let x = scale(add(gap.p, gap.q), 0.5);
-          if (i !== j) {
-            const ci = curveEvaluator(curves[i]),
-              cj = curveEvaluator(curves[j]);
-            for (let k = 0; k < 60; k++) {
-              const yi = ci.at(ci.parameter(x)).slice(0, 3) as XYZ,
-                yj = cj.at(cj.parameter(x)).slice(0, 3) as XYZ;
-              x = scale(add(yi, yj), 0.5);
-              if (length(sub(yi, yj)) <= 1e-12 * scale0) break;
-            }
+          // Onto both curves (both passes of one curve that crosses itself), from the chords that met.
+          const di = curves[i],
+            dj = curves[j],
+            ci = curveEvaluator(di),
+            cj = curveEvaluator(dj),
+            ki = di.kind === 'spline' ? di.knots[0] : undefined,
+            kj = dj.kind === 'spline' ? dj.knots[0] : undefined;
+          let ti = ki ? (ki[a] + ki[a + 1]) / 2 : undefined,
+            tj = kj ? (kj[b] + kj[b + 1]) / 2 : undefined;
+          for (let k = 0; k < 60; k++) {
+            ti = ci.parameter(x, ti);
+            tj = cj.parameter(x, tj);
+            const yi = ci.at(ti).slice(0, 3) as XYZ,
+              yj = cj.at(tj).slice(0, 3) as XYZ;
+            x = scale(add(yi, yj), 0.5);
+            if (length(sub(yi, yj)) <= 1e-12 * scale0) break;
           }
           if (!crossings.some((c) => length(sub(c, x)) <= near)) crossings.push(x);
         }

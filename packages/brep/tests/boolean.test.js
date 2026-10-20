@@ -441,17 +441,97 @@ test('Booleans: faces on one plane, edges along edges and vertices on faces (the
   ]);
 });
 
-test('Booleans: what is not supported yet throws a RangeError that says so', () => {
-  // Two equal cylinders at right angles touch tangentially where their curves cross.
+test('Booleans where the surfaces touch tangentially: two equal cylinders crossed, a hole touching a drill wall', () => {
+  // Two equal cylinders at right angles touch where their curves cross: union, common part (the Steinmetz solid,
+  // 16 r^3 / 3) and difference to their closed forms.
+  const r = 10,
+    length = 60,
+    rod = Math.PI * r * r * length,
+    steinmetz = (16 * r ** 3) / 3,
+    volume = (b) => model.massProperties(b).volume / mm ** 3,
+    a = () => cylinder('a', r * mm, length * mm, at(0, 0, -30)),
+    b = () => cylinder('b', r * mm, length * mm, at(-30, 0, 0, [1, 0, 0], [0, 1, 0]));
+  for (const [op, want] of [
+    ['union', 2 * rod - steinmetz],
+    ['intersect', steinmetz],
+    ['subtract', rod - steinmetz],
+  ]) {
+    const out = boolean('y', op, a(), b());
+    assert.deepEqual(validateBody(out), []);
+    assert.ok(Math.abs(volume(out) - want) <= 1e-7 * want, `${op}: ${volume(out)} vs ${want}`);
+  }
+  // A slanted 0.5 mm hole whose axis passes 1 mm from a 1.5 mm drill's touches the drill wall from inside at one
+  // point, where the two windows it cuts in the wall meet and their curve crosses itself. Whatever way the hole's seam
+  // faces, the block keeps 8000 less the drill and the part of the hole outside it (that part by quadrature over the
+  // hole's section: inside the drill a chord of 2 sqrt(2.25 - x^2) / cos a).
+  const slant = 0.2,
+    dir = [0, Math.cos(slant), -Math.sin(slant)],
+    n = 1000;
+  let shared = 0;
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < n; j++) {
+      const rho = (0.5 * (i + 0.5)) / n,
+        x = 1 + rho * Math.cos((2 * Math.PI * (j + 0.5)) / n);
+      shared += ((2 * Math.sqrt(Math.max(0, 2.25 - x * x))) / Math.cos(slant)) * rho * (0.5 / n) * ((2 * Math.PI) / n);
+    }
+  const want = 8000 - Math.PI * 2.25 * 20 - ((Math.PI * 0.25 * 20) / Math.cos(slant) - shared);
+  for (const seam of [
+    [1, 0, 0],
+    [-1, 0, 0],
+    [0, 0.2, 1],
+  ]) {
+    const block = box('k', [20 * mm, 20 * mm, 20 * mm], at(-10, -10, -10)),
+      hole = cylinder('s', 0.5 * mm, 40 * mm, frameOf([1 * mm, -20 * dir[1] * mm, -20 * dir[2] * mm], dir, seam)),
+      drill = cylinder('h', 1.5 * mm, 40 * mm, at(0, 0, -20)),
+      out = boolean('d', 'subtract', boolean('p', 'subtract', block, hole), drill);
+    assert.deepEqual(validateBody(out), []);
+    assert.ok(Math.abs(volume(out) - want) <= 1e-6 * want, `seam ${seam}: ${volume(out)} vs ${want}`);
+  }
+});
+
+test('Booleans where the surfaces touch along a line: a drill as wide as a rib', () => {
+  // A 3 mm drill through a 3 mm rib grazes both its walls along a line: the rib is left two halves meeting along those
+  // lines. Standing on a base, the drill goes on into it and touches the corners where the walls meet the base's top.
+  // Whichever way the drill's seam faces (along a line it grazes, or not), union, common part and difference come to
+  // their closed forms.
+  const volume = (b) => model.massProperties(b).volume / mm ** 3,
+    disk = Math.PI * 2.25,
+    rib = () => box('r', [3 * mm, 20 * mm, 10 * mm], at(-1.5, -10, 0)),
+    tee = () => boolean('t', 'union', box('b', [20 * mm, 20 * mm, 10 * mm], at(-10, -10, -10)), rib());
+  for (const seam of [
+    [1, 0, 0],
+    [0.6, 0.8, 0],
+  ])
+    for (const [part, size, through] of [
+      [rib, 600, 10],
+      [tee, 4600, 20],
+    ])
+      for (const [op, want] of [
+        ['union', size + (40 - through) * disk],
+        ['intersect', through * disk],
+        ['subtract', size - through * disk],
+      ]) {
+        const out = boolean('c', op, part(), cylinder('h', 1.5 * mm, 40 * mm, at(0, 0, -20, [0, 0, 1], seam)));
+        assert.deepEqual(validateBody(out), []);
+        assert.ok(Math.abs(volume(out) - want) <= 1e-9 * want, `${op} seam ${seam}: ${volume(out)} vs ${want}`);
+      }
+});
+
+test('Booleans: what is not supported yet throws a RangeError', () => {
+  // The same hole a nanometre past touching the drill wall: the two curves pass a hair apart, which is not followed yet.
+  const slant = 0.2,
+    dir = [0, Math.cos(slant), -Math.sin(slant)],
+    block = box('k', [20 * mm, 20 * mm, 20 * mm], at(-10, -10, -10)),
+    hole = cylinder(
+      's',
+      0.5 * mm,
+      40 * mm,
+      frameOf([1.000001 * mm, -20 * dir[1] * mm, -20 * dir[2] * mm], dir, [1, 0, 0]),
+    );
   assert.throws(
     () =>
-      boolean(
-        'y',
-        'union',
-        cylinder('a', 10 * mm, 60 * mm, at(0, 0, -30)),
-        cylinder('b', 10 * mm, 60 * mm, at(-30, 0, 0, [1, 0, 0])),
-      ),
-    { name: 'RangeError', message: /touch tangentially/ },
+      boolean('d', 'subtract', boolean('p', 'subtract', block, hole), cylinder('h', 1.5 * mm, 40 * mm, at(0, 0, -20))),
+    { name: 'RangeError' },
   );
 });
 

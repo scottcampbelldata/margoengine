@@ -24,9 +24,12 @@ export function edgeParameters(edge: Edge, count: number): number[] {
     r.end !== edge.end.point ||
     r.sense !== edge.sameSense
   ) {
-    const c = curveEvaluator(edge.curve),
-      t0 = c.parameter(edge.start.point);
-    let t1 = edge.closed ? t0 : c.parameter(edge.end.point, t0);
+    const c = curveEvaluator(edge.curve);
+    let t0 = c.parameter(edge.start.point),
+      t1 = edge.closed ? t0 : c.parameter(edge.end.point, t0);
+    // A closed edge on a curve that does not repeat (a loop cut from a curve that crosses itself) is all of it.
+    if (edge.closed && !c.period && Number.isFinite(c.domain[0]) && Number.isFinite(c.domain[1]))
+      [t0, t1] = edge.sameSense ? [c.domain[0], c.domain[1]] : [c.domain[1], c.domain[0]];
     if (c.period) {
       if (edge.sameSense && t1 <= t0 + 1e-12) t1 += c.period;
       if (!edge.sameSense && t1 >= t0 - 1e-12) t1 -= c.period;

@@ -126,6 +126,113 @@ export function curveEvaluator(def: CurveDef): Curve {
   return c;
 }
 
+/**
+ * The stretch [a, b] of a B-spline curve as a curve of its own, exactly (knots inserted at a and b until the curve
+ * passes through its control points there, Boehm's algorithm, in homogeneous coordinates for rational curves). On a
+ * closed curve b may run past the domain's end: the two stretches either side of its seam are joined. Other curves
+ * are returned as they are.
+ */
+export function sliceCurve(def: CurveDef, a: number, b: number): CurveDef {
+  if (def.kind !== 'spline') return def;
+  const p = def.degrees[0],
+    U0 = def.knots[0].flatMap((k, i) => Array<number>(def.multiplicities[0][i]).fill(k)),
+    lo = U0[p],
+    hi = U0[U0.length - 1 - p];
+  if (def.closed) {
+    // On a closed curve the stretch may start a period off (a piece joined across the curve's start): moved to start
+    // in the first period, it runs past the end at most once.
+    const period = hi - lo,
+      k = Math.floor((a - lo) / period + 1e-12);
+    a -= k * period;
+    b -= k * period;
+    if (b > hi + 1e-12 * period) {
+      const first = sliceCurve({ ...def, closed: false }, a, hi),
+        second = sliceCurve({ ...def, closed: false }, lo, b - period);
+      return joinSplines(first, second);
+    }
+  }
+  let U = [...U0],
+    P = def.points.map((q, i) => {
+      const w = def.weights?.[i] ?? 1;
+      return [q[0] * w, q[1] * w, q[2] * w, w];
+    });
+  // Boehm: one more knot at t.
+  const insert = (t: number) => {
+    let k = p;
+    while (k + 1 < U.length - p - 1 && U[k + 1] <= t) k++;
+    const Q: number[][] = [];
+    for (let i = 0; i <= P.length; i++) {
+      if (i <= k - p) Q.push(P[i]);
+      else if (i > k) Q.push(P[i - 1]);
+      else {
+        const alpha = (t - U[i]) / (U[i + p] - U[i]);
+        Q.push(P[i].map((x, c) => alpha * x + (1 - alpha) * P[i - 1][c]));
+      }
+    }
+    P = Q;
+    U = [...U.slice(0, k + 1), t, ...U.slice(k + 1)];
+  };
+  for (const t of [a, b]) {
+    const clamp = Math.min(hi, Math.max(lo, t));
+    while (U.filter((x) => x === clamp).length < p) insert(clamp);
+  }
+  const ca = Math.min(hi, Math.max(lo, a)),
+    cb = Math.min(hi, Math.max(lo, b)),
+    lastA = U.lastIndexOf(ca),
+    firstB = U.indexOf(cb),
+    ctrl = P.slice(lastA - p, firstB),
+    inner = U.slice(lastA + 1, firstB),
+    rational = def.weights !== undefined,
+    knots: number[] = [],
+    multiplicities: number[] = [];
+  for (const t of [ca, ...inner, cb]) {
+    if (knots.length && knots[knots.length - 1] === t) multiplicities[multiplicities.length - 1]++;
+    else {
+      knots.push(t);
+      multiplicities.push(1);
+    }
+  }
+  multiplicities[0] = p + 1;
+  multiplicities[multiplicities.length - 1] = p + 1;
+  return {
+    kind: 'spline',
+    degrees: [p],
+    counts: [ctrl.length],
+    knots: [knots],
+    multiplicities: [multiplicities],
+    points: ctrl.map((q) => [q[0] / q[3], q[1] / q[3], q[2] / q[3]] as XYZ),
+    ...(rational ? { weights: ctrl.map((q) => q[3]) } : {}),
+  };
+}
+
+/** Two clamped B-splines of one degree, the second starting where the first ends, as one (a corner allowed there). */
+function joinSplines(first: CurveDef, second: CurveDef): CurveDef {
+  if (first.kind !== 'spline' || second.kind !== 'spline') return first;
+  const p = first.degrees[0],
+    k1 = first.knots[0],
+    m1 = first.multiplicities[0],
+    k2 = second.knots[0],
+    m2 = second.multiplicities[0],
+    shift = k1[k1.length - 1] - k2[0],
+    rational = first.weights !== undefined || second.weights !== undefined;
+  return {
+    kind: 'spline',
+    degrees: [p],
+    counts: [first.points.length + second.points.length - 1],
+    knots: [[...k1, ...k2.slice(1).map((t) => t + shift)]],
+    multiplicities: [[...m1.slice(0, -1), p, ...m2.slice(1)]],
+    points: [...first.points, ...second.points.slice(1)],
+    ...(rational
+      ? {
+          weights: [
+            ...(first.weights ?? first.points.map(() => 1)),
+            ...(second.weights ?? second.points.map(() => 1)).slice(1),
+          ],
+        }
+      : {}),
+  };
+}
+
 /** Writes a surface as STEP and returns its id. */
 export function writeSurface(w: StepWriter, def: SurfaceDef): string {
   const place = (f: Frame) => w.axis(f.origin, f.z, f.x);

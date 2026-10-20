@@ -5,7 +5,7 @@
 // grouped into faces by which side of every loop a point inside each lies. Inside/outside comes from rays cast
 // against the other solid's exact faces (three directions, majority), not from a mesh.
 import { cross, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
-import { curveEvaluator, surfaceEvaluator, type CurveDef } from './geometry.js';
+import { curveEvaluator, frameOf, sliceCurve, surfaceEvaluator, type CurveDef, type SurfaceDef } from './geometry.js';
 import { FaceUV, gaps, leftOf, shiftV, vRange, type UV, type UVLoop } from './faces.js';
 import { curveSurfaceCrossings, intersectSurfaces, signedDistance } from './intersect.js';
 import type { Box3 } from './march.js';
@@ -76,8 +76,10 @@ const RAYS = [
  * generated from their two faces, and what was removed as deleted. Supported: faces on planes,
  * cylinders, cones, spheres, tori and spline surfaces in any position: faces on one surface, edges along edges and
  * vertices on faces meet within 1e-6 of the model (or an imported edge's own tolerance); faces left on one surface
- * facing the same way, and edges split along one curve, are joined. Throws a RangeError for what is not supported yet
- * (tangential contact) and when the result is not a valid solid.
+ * facing the same way, and edges split along one curve, are joined. Surfaces touching at a point (two of their curves
+ * crossing there) or along a line (a plane along a cylinder) are cut there; where the result's surface touches itself,
+ * its sheets meet at a point or along a line without sharing a vertex or edge there. Throws a RangeError for what is
+ * not supported yet (curves passing within a hair of touching) and when the result is not a valid solid.
  */
 export function boolean(
   name: Name,
@@ -194,6 +196,55 @@ export function boolean(
   contacts(a.edges, faces.b, vertsB);
   contacts(b.edges, faces.a, vertsA);
 
+  // --- what each pair of faces shares, worked out once; where two of its curves cross the surfaces touch, and every
+  // edge of either face through that point (tangent to the other surface there, so no crossing found it) is cut -----
+  const meets: { fa: Face; fb: Face; meet: ReturnType<typeof intersectSurfaces> }[] = [];
+  for (const fa of faces.a)
+    for (const fb of faces.b) {
+      const box = overlap(boxes.get(fa)!, boxes.get(fb)!);
+      if (!box) continue;
+      const meet = intersectSurfaces(fa.surface, fb.surface, box);
+      if (meet.kind === 'none') continue;
+      meets.push({ fa, fb, meet });
+      if (meet.kind !== 'curves') continue;
+      // Where the surfaces touch along a line (a plane along a cylinder, cylinders side by side), the line ends where
+      // either face's edges meet it: the edges crossing it there cross the plane through it square to the surfaces.
+      const touching: XYZ[] = [];
+      for (const curve of meet.curves) {
+        if (curve.kind !== 'line') continue;
+        const o = curve.origin,
+          d = curve.direction,
+          n = uvOf.get(fa)!.normal(o);
+        if (Math.abs(dot(n, uvOf.get(fb)!.normal(o))) <= 1 - 1e-9) continue;
+        const across = unit(cross(d, n));
+        if (!across) continue;
+        const square: SurfaceDef = { kind: 'plane', frame: frameOf(o, across, d) },
+          off = (p: XYZ) => length(cross(sub(p, o), d));
+        for (const f of [fa, fb])
+          for (const loop of f.loops)
+            for (const co of loop.coedges) {
+              const e = co.edge,
+                c = curveEvaluator(e.curve),
+                [t0, t1] = edgeParameters(e, 1);
+              // An edge along the line (a drill's seam lying in the wall it grazes) is cut at the points found.
+              if (edgeParameters(e, 2).every((t) => off(c.at(t).slice(0, 3) as XYZ) <= touch)) continue;
+              for (const t of curveSurfaceCrossings(e.curve, square, Math.min(t0, t1), Math.max(t0, t1))) {
+                const p = c.at(t).slice(0, 3) as XYZ;
+                if (off(p) <= touch) touching.push(p);
+              }
+            }
+      }
+      for (const x of [...(meet.crossings ?? []), ...touching])
+        for (const f of [fa, fb])
+          for (const loop of f.loops)
+            for (const co of loop.coedges) {
+              const t = onEdge(co.edge, x);
+              if (t === undefined) continue;
+              const v = vertexAt(x);
+              if (!(splits.get(co.edge) ?? []).some((s) => s.vertex === v)) split(co.edge, t, v);
+            }
+    }
+
   // --- original edges cut into pieces at their crossings ------------------------------------------------------------
   const piecesOf = new Map<Edge, Piece[]>();
   for (const e of [...a.edges, ...b.edges]) {
@@ -280,109 +331,105 @@ export function boolean(
     }
 
   // --- intersection curves of each pair of faces, kept where they lie inside both -----------------------------------
-  for (const fa of faces.a)
-    for (const fb of faces.b) {
-      const box = overlap(boxes.get(fa)!, boxes.get(fb)!);
-      if (!box) continue;
-      const meet = intersectSurfaces(fa.surface, fb.surface, box);
-      if (meet.kind === 'none') continue;
-      // Faces on one surface: their edges lying in each other cut them (above), and no curve runs between them.
-      if (meet.kind === 'coincident') continue;
-      let k = 0;
-      for (const curve of meet.curves) {
-        const c = curveEvaluator(curve),
-          period = c.period,
-          closed = period > 0,
-          // Where either face's edges cross the other face, on this curve: the ends of its stretches inside both.
-          stops: { t: number; vertex: Vertex }[] = [];
-        for (const f of [fa, fb])
-          for (const loop of f.loops)
-            for (const co of loop.coedges)
-              for (const s of splits.get(co.edge) ?? []) {
-                if (stops.some((x) => x.vertex === s.vertex)) continue;
-                const t = c.parameter(s.vertex.point);
-                if (length(sub(c.at(t).slice(0, 3) as XYZ, s.vertex.point)) <= Math.max(touch, s.vertex.tolerance))
-                  stops.push({ t, vertex: s.vertex });
-              }
-        // Where two curves cross (the surfaces touch tangentially there): a vertex on each. At a corner the faces share
-        // (fillets meeting) that is all; inside both faces the faces would meet in a cusp, which is not supported yet.
-        for (const x of meet.crossings ?? []) {
-          const onEdges = [fa, fb].some((f) =>
-            f.loops.some((l) => l.coedges.some((co) => onEdge(co.edge, x) !== undefined)),
-          );
-          if (!onEdges && uvOf.get(fa)!.contains(x) && uvOf.get(fb)!.contains(x))
-            throw new RangeError(
-              `faces ${fa.name} and ${fb.name} touch tangentially where their curves cross: Booleans there are not supported yet`,
-            );
-          const t = c.parameter(x);
-          if (length(sub(c.at(t).slice(0, 3) as XYZ, x)) > touch) continue;
-          const v = vertexAt(x);
-          if (!stops.some((y) => y.vertex === v)) stops.push({ t, vertex: v });
-        }
-        // Vertices of either face on the curve (a corner touching the other face) break it too.
-        for (const f of [fa, fb])
-          for (const loop of f.loops)
-            for (const co of loop.coedges) {
-              const v = original.get(co.start)!;
-              if (stops.some((x) => x.vertex === v)) continue;
-              const t = c.parameter(v.point);
-              if (length(sub(c.at(t).slice(0, 3) as XYZ, v.point)) <= Math.max(touch, v.tolerance))
-                stops.push({ t, vertex: v });
+  for (const { fa, fb, meet } of meets) {
+    if (meet.kind === 'none') continue;
+    // Faces on one surface: their edges lying in each other cut them (above), and no curve runs between them.
+    if (meet.kind === 'coincident') continue;
+    let k = 0;
+    for (const curve of meet.curves) {
+      const c = curveEvaluator(curve),
+        period = c.period,
+        closed = period > 0,
+        // Where either face's edges cross the other face, on this curve: the ends of its stretches inside both.
+        stops: { t: number; vertex: Vertex }[] = [];
+      for (const f of [fa, fb])
+        for (const loop of f.loops)
+          for (const co of loop.coedges)
+            for (const s of splits.get(co.edge) ?? []) {
+              if (stops.some((x) => x.vertex === s.vertex)) continue;
+              const t = c.parameter(s.vertex.point);
+              if (length(sub(c.at(t).slice(0, 3) as XYZ, s.vertex.point)) <= Math.max(touch, s.vertex.tolerance))
+                stops.push({ t, vertex: s.vertex });
             }
-        stops.sort((x, y) => x.t - y.t);
-        /** A boundary piece of `f` between these vertices that the stretch runs along, if any. */
-        const onBoundary = (f: Face, start: Vertex, end: Vertex, m: XYZ) => {
-          for (const q of boundaryOf(f))
-            if (
-              ((q.start === start && q.end === end) || (q.start === end && q.end === start)) &&
-              length(sub(middle(q), m)) <= touch
-            )
-              return q;
-          return undefined;
-        };
-        const push = (t0: number, t1: number, start: Vertex, end: Vertex) => {
-          const m = c.at((t0 + t1) / 2).slice(0, 3) as XYZ,
-            onA = onBoundary(fa, start, end, m),
-            onB = onBoundary(fb, start, end, m);
-          // Along an edge of either face: that edge, cutting the other face where it lies inside it.
-          if (onA && onB) return;
-          if (onA) {
-            if (uvOf.get(fb)!.contains(m)) addInner(fb, onA);
-            return;
+      // Where two curves cross (the surfaces touch tangentially there): a vertex on each, at every pass of a curve that
+      // crosses itself. The regions the curves bound meet at that point (at a corner the faces share, fillets meeting;
+      // inside both, a hole touching a drill wall from inside).
+      for (const x of meet.crossings ?? []) {
+        const v = vertexAt(x);
+        // Passes of one curve through the point lie far apart along it: a stop at the vertex within a millionth of
+        // the curve is the same pass, found another way (from an edge cut there).
+        for (const t of passes(c, x, touch))
+          if (!stops.some((y) => y.vertex === v && Math.abs(y.t - t) <= 1e-6 * (c.domain[1] - c.domain[0])))
+            stops.push({ t, vertex: v });
+      }
+      // Vertices of either face on the curve (a corner touching the other face) break it too.
+      for (const f of [fa, fb])
+        for (const loop of f.loops)
+          for (const co of loop.coedges) {
+            const v = original.get(co.start)!;
+            if (stops.some((x) => x.vertex === v)) continue;
+            const t = c.parameter(v.point);
+            if (length(sub(c.at(t).slice(0, 3) as XYZ, v.point)) <= Math.max(touch, v.tolerance))
+              stops.push({ t, vertex: v });
           }
-          if (onB) {
-            if (uvOf.get(fa)!.contains(m)) addInner(fa, onB);
-            return;
-          }
-          if (!uvOf.get(fa)!.contains(m) || !uvOf.get(fb)!.contains(m)) return;
-          const piece: Piece = {
-            curve,
-            start,
-            end,
-            t0,
-            t1,
-            name: `${name}/edge:${fa.name}|${fb.name}#${k++}`,
-            from: [fa.name, fb.name],
-          };
-          addInner(fa, piece);
-          addInner(fb, piece);
-        };
-        if (closed && !stops.length) {
-          const t0 = c.domain[0],
-            p0 = c.at(t0).slice(0, 3) as XYZ;
-          if (uvOf.get(fa)!.contains(p0) && uvOf.get(fb)!.contains(p0)) {
-            const v = vertexAt(p0);
-            push(t0, t0 + period, v, v);
-          }
-          continue;
+      stops.sort((x, y) => x.t - y.t);
+      /** A boundary piece of `f` between these vertices that the stretch runs along, if any. */
+      const onBoundary = (f: Face, start: Vertex, end: Vertex, m: XYZ) => {
+        for (const q of boundaryOf(f))
+          if (
+            ((q.start === start && q.end === end) || (q.start === end && q.end === start)) &&
+            length(sub(middle(q), m)) <= touch
+          )
+            return q;
+        return undefined;
+      };
+      const push = (t0: number, t1: number, start: Vertex, end: Vertex) => {
+        const m = c.at((t0 + t1) / 2).slice(0, 3) as XYZ;
+        // Where the surfaces only touch along the stretch (a plane along a cylinder, cylinders side by side), neither
+        // crosses the other: each face is kept or dropped alike on both sides of it, so it cuts neither (a drill as wide
+        // as a rib grazes the rib's walls; its seam lying along one such line is no reason to cut the wall there).
+        if (Math.abs(dot(uvOf.get(fa)!.normal(m), uvOf.get(fb)!.normal(m))) > 1 - 1e-9) return;
+        const onA = onBoundary(fa, start, end, m),
+          onB = onBoundary(fb, start, end, m);
+        // Along an edge of either face: that edge, cutting the other face where it lies inside it.
+        if (onA && onB) return;
+        if (onA) {
+          if (uvOf.get(fb)!.contains(m)) addInner(fb, onA);
+          return;
         }
-        for (let i = 0; i < stops.length - (closed ? 0 : 1); i++) {
-          const s = stops[i],
-            e = closed && i === stops.length - 1 ? { t: stops[0].t + period, vertex: stops[0].vertex } : stops[i + 1];
-          if (s.vertex !== e.vertex || closed) push(s.t, e.t, s.vertex, e.vertex);
+        if (onB) {
+          if (uvOf.get(fa)!.contains(m)) addInner(fa, onB);
+          return;
         }
+        if (!uvOf.get(fa)!.contains(m) || !uvOf.get(fb)!.contains(m)) return;
+        const piece: Piece = {
+          curve,
+          start,
+          end,
+          t0,
+          t1,
+          name: `${name}/edge:${fa.name}|${fb.name}#${k++}`,
+          from: [fa.name, fb.name],
+        };
+        addInner(fa, piece);
+        addInner(fb, piece);
+      };
+      if (closed && !stops.length) {
+        const t0 = c.domain[0],
+          p0 = c.at(t0).slice(0, 3) as XYZ;
+        if (uvOf.get(fa)!.contains(p0) && uvOf.get(fb)!.contains(p0)) {
+          const v = vertexAt(p0);
+          push(t0, t0 + period, v, v);
+        }
+        continue;
+      }
+      for (let i = 0; i < stops.length - (closed ? 0 : 1); i++) {
+        const s = stops[i],
+          e = closed && i === stops.length - 1 ? { t: stops[0].t + period, vertex: stops[0].vertex } : stops[i + 1];
+        if (s.vertex !== e.vertex || closed) push(s.t, e.t, s.vertex, e.vertex);
       }
     }
+  }
 
   // --- each face split along its new edges into regions -------------------------------------------------------------
   const regions: Region[] = [];
@@ -433,7 +480,27 @@ export function boolean(
   facing.forEach(({ halves }, i) => {
     for (const h of halves) uses.set(h.piece, [...(uses.get(h.piece) ?? []), { i, forward: h.forward }]);
   });
+  // Uses of a piece inside a merged face, by region and direction: of a piece used more than twice (a wall cut along a
+  // drill's seam where the drill only grazes it, so the drill's side runs along it both ways), the two that join one
+  // surface's regions facing the same way.
+  const joined = new Map<Piece, Set<string>>();
   for (const [piece, list] of uses) {
+    if (list.length > 2) {
+      const free = [...list];
+      for (let j = 0; j < free.length; j++)
+        for (let k = j + 1; k < free.length; k++) {
+          const [p, q] = [free[j], free[k]];
+          if (p.i === q.i || p.forward === q.forward) continue;
+          const [x, y] = [facing[p.i], facing[q.i]];
+          if (!sameSide(x.region.face, x.sense, y.region.face, y.sense, piece)) continue;
+          if (top(p.i) !== top(q.i)) group[top(q.i)] = top(p.i);
+          joined.set(piece, new Set([...(joined.get(piece) ?? []), `${p.i},${p.forward}`, `${q.i},${q.forward}`]));
+          free.splice(k, 1);
+          free.splice(j--, 1);
+          break;
+        }
+      continue;
+    }
     if (list.length !== 2 || list[0].i === list[1].i || list[0].forward === list[1].forward) continue;
     const [x, y] = [facing[list[0].i], facing[list[1].i]];
     if (top(list[0].i) !== top(list[1].i) && sameSide(x.region.face, x.sense, y.region.face, y.sense, piece))
@@ -465,12 +532,13 @@ export function boolean(
     }
     const inside = new Set(list),
       halves = list
-        .flatMap((i) => facing[i].halves)
-        .filter((h) => {
+        .flatMap((i) => facing[i].halves.map((h) => ({ h, i })))
+        .filter(({ h, i }) => {
           const u = uses.get(h.piece)!;
+          if (u.length > 2) return !joined.get(h.piece)?.has(`${i},${h.forward}`);
           return !(u.length === 2 && u[0].i !== u[1].i && inside.has(u[0].i) && inside.has(u[1].i));
         })
-        .map((h) => ({ piece: h.piece, forward: h.forward })),
+        .map(({ h }) => ({ piece: h.piece, forward: h.forward })),
       host = new Face(first.region.face.name, first.region.face.surface, first.sense);
     for (const r of splitFace(host, new FaceUV(host), halves))
       outputs.push({ face: first.region.face, sense: first.sense, loops: r.loops, point: r.point, sources });
@@ -492,6 +560,20 @@ export function boolean(
   for (const { face } of outputs) counts.set(face, (counts.get(face) ?? 0) + 1);
   const edgeOf = (p: Piece) => {
     if (!p.edge) {
+      // A piece of a traced intersection curve keeps only its own stretch of it: the curve may cross itself (where the
+      // surfaces touch), and an edge found from its ends would not know which pass they lie on (nor, ending where it
+      // starts, which loop it is).
+      const c = curveEvaluator(p.curve),
+        whole = c.period
+          ? Math.abs(Math.abs(p.t1 - p.t0) - c.period) <= 1e-9 * c.period
+          : Math.abs(Math.min(p.t0, p.t1) - c.domain[0]) <= 1e-12 * (c.domain[1] - c.domain[0]) &&
+            Math.abs(Math.max(p.t0, p.t1) - c.domain[1]) <= 1e-12 * (c.domain[1] - c.domain[0]);
+      if (p.from.length > 1 && p.curve.kind === 'spline' && !whole) {
+        const [lo, hi] = p.t1 >= p.t0 ? [p.t0, p.t1] : [p.t1, p.t0],
+          cut = sliceCurve(p.curve, lo, hi),
+          d = curveEvaluator(cut).domain;
+        [p.curve, p.t0, p.t1] = [cut, p.t1 >= p.t0 ? d[0] : d[1], p.t1 >= p.t0 ? d[1] : d[0]];
+      }
       p.edge = new Edge(p.name, p.curve, p.start, p.end, p.t1 >= p.t0, p.tolerance);
       // A split edge continues as its pieces; an intersection edge is new, made from the two faces.
       if (p.from.length > 1) generated.push([p.name, p.from]);
@@ -515,6 +597,7 @@ export function boolean(
     made.push(face);
     pointOf.set(face, output.point);
   }
+  splitPinches(made);
   // One shell per connected set of faces (a solid with a cavity has two; disjoint pieces make several).
   const body = new Body(name, 'solid'),
     parent = new Map<Face, Face>(made.map((f) => [f, f]));
@@ -565,6 +648,63 @@ export function boolean(
       `${op} ${name}: the result is not a valid solid (${problems.length} problems; first: ${problems[0].name}: ${problems[0].problem})`,
     );
   return body;
+}
+
+/**
+ * A vertex the faces meet at in more than one fan (two sheets of the surface touching at a point: a drill as wide as a
+ * rib grazing the rib's corner, two equal cylinders crossed) becomes one vertex per fan, all at that point, so each
+ * sheet closes on its own (as the sheets touching along a line share no edge there). The fans are the edge ends joined
+ * through the corners of the loops; a closed edge whose two ends would part keeps its vertex.
+ */
+function splitPinches(faces: Face[]): void {
+  const ends: { edge: Edge; atEnd: boolean }[] = [],
+    index = new Map<Edge, number>(),
+    node = (edge: Edge, atEnd: boolean) => {
+      let i = index.get(edge);
+      if (i === undefined) {
+        i = ends.length;
+        index.set(edge, i);
+        ends.push({ edge, atEnd: false }, { edge, atEnd: true });
+      }
+      return i + (atEnd ? 1 : 0);
+    },
+    parent: number[] = [];
+  const find = (x: number): number => {
+    while ((parent[x] ?? x) !== x) x = parent[x] = parent[parent[x]] ?? parent[x];
+    return x;
+  };
+  for (const f of faces)
+    for (const l of f.loops) {
+      const cs = l.coedges;
+      // A loop turns at each vertex from the end of one coedge to the start of the next.
+      for (let i = 0; i < cs.length; i++) {
+        const a = cs[i],
+          b = cs[(i + 1) % cs.length],
+          x = find(node(a.edge, a.forward)),
+          y = find(node(b.edge, !b.forward));
+        if (x !== y) parent[x] = y;
+      }
+    }
+  const fans = new Map<Vertex, Map<number, number[]>>();
+  ends.forEach(({ edge, atEnd }, i) => {
+    const v = atEnd ? edge.end : edge.start,
+      byRoot = fans.get(v) ?? new Map<number, number[]>(),
+      root = find(i);
+    byRoot.set(root, [...(byRoot.get(root) ?? []), i]);
+    fans.set(v, byRoot);
+  });
+  for (const [v, byRoot] of fans) {
+    if (byRoot.size < 2) continue;
+    const groups = [...byRoot.values()];
+    if (groups.some((g) => g.some((i) => ends[i].edge.closed && !g.includes(i ^ 1)))) continue;
+    groups.slice(1).forEach((g, k) => {
+      const copy = new Vertex(`${v.name}#${k + 1}`, v.point, v.tolerance);
+      for (const i of g) {
+        if (ends[i].atEnd) ends[i].edge.end = copy;
+        else ends[i].edge.start = copy;
+      }
+    });
+  }
 }
 
 /** Samples of a piece in 3D from its start to its end (ends exactly at its vertices), shared by both its uses. */
@@ -690,6 +830,28 @@ function splitFace(f: Face, fuv: FaceUV, halves: Half[]): Omit<Region, 'from'>[]
     loops: group.map((i) => cycles[i]),
     point: fuv.at(points[group[0]]),
   }));
+}
+
+/**
+ * Every parameter where a curve passes within `near` of `p`: from the nearest of 512 samples on each stretch that
+ * comes close (a local minimum of the distance), settled by the curve's own projection from there.
+ */
+function passes(c: ReturnType<typeof curveEvaluator>, p: XYZ, near: number): number[] {
+  const [a, b] = c.domain,
+    n = 512,
+    d = Array.from({ length: n + 1 }, (_, k) => length(sub(c.at(a + ((b - a) * k) / n).slice(0, 3) as XYZ, p))),
+    out: number[] = [];
+  for (let k = 0; k <= n; k++) {
+    const prev = k > 0 ? d[k - 1] : c.period ? d[n - 1] : Infinity,
+      next = k < n ? d[k + 1] : c.period ? d[1] : Infinity;
+    if (d[k] > prev || d[k] > next) continue;
+    const t = c.parameter(p, a + ((b - a) * k) / n);
+    if (length(sub(c.at(t).slice(0, 3) as XYZ, p)) > near) continue;
+    const same = (s: number) =>
+      Math.abs(s - t) <= 1e-9 * (b - a) || (c.period > 0 && Math.abs(Math.abs(s - t) - c.period) <= 1e-9 * (b - a));
+    if (!out.some(same)) out.push(t);
+  }
+  return out;
 }
 
 /** A point inside the region left of a loop: halfway from the middle of the loop's longest segment to the next loop (or surface end) on its left. */

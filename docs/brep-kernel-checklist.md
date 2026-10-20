@@ -40,7 +40,8 @@ Every item is done only when all of these hold:
       edge off its surface, 1 a probe sizing slip. Imported cones (a face covering or running through its apex) now cut.
       Later the same day (spline Booleans and tolerant edges, below): 127 of 145; then 144 of 145 after fixing curve
       crossings with every sheet of a spline, traces seeded on or past a spline's edge, and sampling of long rational
-      curves (the drill now sized from the mesh). Left: Jubilee 104, a true tangency (3.2).
+      curves (the drill now sized from the mesh). Left: Jubilee 104, where the mesh-sized drill is within 0.34 nm
+      of grazing a 3 mm rib (near contact, 3.2); drilled at exactly 1.5 mm it now cuts.
 - [ ] 1.3 Topology checker: Euler-Poincare (V - E + F - (L - F) - 2(S - G) = 0), every edge used twice and oppositely in
       a solid, consistent orientation, no face crossing another; run on every file read and every operation result.
       Written (claude/kernel): validateBody (Euler-Poincare, one piece per shell) on every operation and import;
@@ -70,11 +71,20 @@ Every item is done only when all of these hold:
       integrals within 1e-7 (1e-6 spline on spline); Jubilee drills pass on 144 of 145 solids (78 before). Left:
       Codex's corpus check and OpenCascade comparison, speed against OpenCascade.
 - [ ] 3.2 Tangential contact inside faces, and coincident freeform patches.
-      Tried 2026-10-20 on a drill internally tangent to a slanted hole (their curves cross at the touching point):
-      cutting both curves at the crossing (every pass of a curve that crosses itself) gives valid topology, but faces
-      whose loops touch at that vertex are split into the wrong regions (volume off by 6 to 8 mm3 of 7844, or an open
-      chain, by the hole's seam direction), so the Boolean still refuses it. Needs: region assembly where loops touch at
-      a vertex (and where that vertex is also on a face's seam).
+      Written 2026-10-20 (claude/kernel-speed), exact contact: surfaces touching at a point (two equal cylinders
+      crossed, a slanted hole touching a drill wall from inside) get a vertex at every pass of each curve through it and
+      every edge through it is cut there; traced pieces keep only their own stretch of a curve that crosses itself.
+      Surfaces touching along a line (a drill as wide as a rib grazing its walls) cut neither face along it; the line
+      ends where either face's edges cross it. Where the result's surface touches itself, its sheets meet without
+      sharing a vertex or edge there (a pinch vertex becomes one per fan). Tested against closed forms: the Steinmetz
+      solid (union, intersect, subtract), the tangent hole in three seam directions, a 3 mm drill through a 3 mm rib
+      alone and on a base (all three operations, two seam directions, within 1e-9). Jubilee 104 drilled at exactly
+      1.5 mm (its 3 mm rib) cuts in all three operations; its common part matches an independent integral over the
+      drill's section (203.2639 mm3 both). Left: near contact. The survey's drill, sized from the 32-bit mesh, misses
+      one rib wall by 0.34 nm and dips 0.28 nm into the other; there the drill's curves with the wall's 0.5 mm round
+      pass about 1 um apart instead of crossing, the tracer steps from one to the other, and the Boolean refuses
+      (an error, not a wrong result). Needs: the tracer to walk through a near touch as it does an exact one. Also
+      left: tangency along a circle or a traced curve, and coincident freeform patches.
 
 ## Phase 4: blends
 
