@@ -116,6 +116,20 @@ function displayed(c: TraceVec3, film: MagicaVoxelDict | undefined): TraceVec3 {
   };
   return [one(c[0]), one(c[1]), one(c[2])];
 }
+/**
+ * Subsurface (`_media_type _sss`): a cloud of extinction 14 x `_d` per voxel that the sun lights through its own volume
+ * only (so faces away from the sun stay dark and nothing behind it is lit through it), its scattering events capped
+ * by `bounceLimits.subsurface`. Fitted on 6- and 3-voxel blocks at `_d` 0.05 on a black base: sky-lit tops at diffuse
+ * caps 2 and 4, the sun-lit top and its slope toward the sun (light travels several voxels inside).
+ */
+const subsurface = (id: number, color: TraceVec3, d: number, g: number): TraceMaterial => ({
+  id,
+  type: 'media',
+  color,
+  density: 14 * d,
+  anisotropy: g,
+  sunlit: true,
+});
 /** MagicaVoxel (x, y, z), z up, to tracer (x, z, -y), y up. */
 export const fromMagicaVoxel = (p: ArrayLike<number>): TraceVec3 => [p[0], p[2], -p[1]];
 
@@ -169,8 +183,7 @@ export function magicaVoxelMaterial(id: number, rgb: ArrayLike<number>, attribut
     }
     case '_glass':
       // Subsurface glass renders like the subsurface cloud (measured within 4 levels of it).
-      if (media === '_sss' && trans >= 1)
-        return { id, type: 'media', color, density: 100 * density, anisotropy: g, sunlit: true };
+      if (media === '_sss' && trans >= 1) return subsurface(id, color, density, g);
       return {
         id,
         type: trans < 1 ? 'blend' : 'glass',
@@ -223,9 +236,7 @@ export function magicaVoxelMaterial(id: number, rgb: ArrayLike<number>, attribut
       const d = num(a, '_d') ?? (weight === undefined ? 0 : Math.min(0.1, weight));
       if (media === '_absorb')
         return { id, type: 'glass', color, ior: 1, roughness: 0, density: d, tint: false, specular: 0 };
-      // Subsurface: a dense cloud (100 x `_d`) the sun lights where it reaches a voxel directly, so only the faces
-      // toward the sun glow (fitted on sun-lit and sky-lit tiles and their neighbours: tops within 2-12 levels).
-      if (media === '_sss') return { id, type: 'media', color, density: 100 * d, anisotropy: g, sunlit: true };
+      if (media === '_sss') return subsurface(id, color, d, g);
       return {
         id,
         type: 'media',
@@ -274,10 +285,13 @@ export function magicaVoxelLighting(
     film = o('_film'),
     bounce = o('_bounce'),
     lens = o('_lens'),
+    diffuseCap = Math.min(64, Math.max(1, Math.round(num(bounce, '_diffuse') ?? 2))),
     caps: TraceBounceLimits = {
-      diffuse: Math.min(64, Math.max(1, Math.round(num(bounce, '_diffuse') ?? 2))),
+      diffuse: diffuseCap,
       specular: Math.min(64, Math.max(1, Math.round(num(bounce, '_specular') ?? 5))),
       scatter: Math.min(64, Math.max(1, Math.round(num(bounce, '_scatter') ?? 5))),
+      // Subsurface follows the diffuse cap: 2 d + 1 events (fitted at caps 2 and 4; the specular cap does nothing).
+      subsurface: Math.min(64, 2 * diffuseCap + 1),
     };
   const sunMV = [Math.cos(elevation) * Math.cos(azimuth), Math.cos(elevation) * Math.sin(azimuth), Math.sin(elevation)],
     sunColor = colorOf(o('_inf'), '_k', [1, 1, 1]),
@@ -412,7 +426,7 @@ export function magicaVoxelLighting(
       ...(look === 'magicavoxel'
         ? {
             bounceLimits: caps,
-            maxBounces: Math.min(64, caps.diffuse! + caps.specular! + caps.scatter!),
+            maxBounces: Math.min(64, caps.diffuse! + caps.specular! + caps.scatter! + caps.subsurface!),
             transparentShadows: false,
             sunSpecular: false,
             sunInMedia: false,

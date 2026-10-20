@@ -270,6 +270,10 @@ fn mat(i:u32)->vec4f {if(TABLES){return materials[i];}return table0[i];}
 @group(0) @binding(10) var<storage,read_write> caustics:array<vec4f>;
 var<private> rng:u32;
 var<private> motion:f32;
+// Whether the path entered the medium it is in through a face toward the sun; and whether the shadow ray being cast
+// passes only the cell it starts in (see extinction).
+var<private> sunFace:bool;
+var<private> sunCell:bool;
 
 fn lum(c:vec3f)->f32 {return dot(c,vec3f(0.2126,0.7152,0.0722));}
 fn hash(v:u32)->u32 {let s=v*747796405u+2891336453u;let w=((s>>((s>>28u)+4u))^s)*277803737u;return (w>>22u)^w;}
@@ -390,11 +394,12 @@ fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit
  return found(h,boxExit,0u,ex,stp,d,vec3i(floor(o+d*boxExit)));
 }
 // Extinction of a see-through cell for shadow rays, -1 when the cell blocks light (only media let it through; with
-// opaque shadows none, except a sun-lit medium in the cell the shadow ray starts in: as in MagicaVoxel, light reaches
-// a sun-lit volume only through its own cell, so only its faces toward the light glow).
-fn extinction(v:u32,start:bool)->f32 {
+// opaque shadows none, except the sun-lit volume the shadow ray starts in, or only its start cell for a sun ray from a
+// walk that entered the volume through a face turned from the sun: as in MagicaVoxel's subsurface, light reaches a
+// point in it through that volume alone, mostly from its faces toward the light).
+fn extinction(v:u32,own:bool)->f32 {
  let x=mat(v*MV+3u);let fl=u32(x.w);
- return select(-1.0,x.x,(fl&MEDIA)!=0u&&((f.config.z&OPAQUE_SHADOWS)==0u||((fl&SUNLIT)!=0u&&start)));
+ return select(-1.0,x.x,(fl&MEDIA)!=0u&&((f.config.z&OPAQUE_SHADOWS)==0u||((fl&SUNLIT)!=0u&&own)));
 }
 // Optical depth along a shadow ray through one model, -1 when blocked.
 fn marchShadow(model:u32,o:vec3f,d:vec3f,tMax:f32)->f32 {
@@ -415,24 +420,25 @@ fn marchShadow(model:u32,o:vec3f,d:vec3f,tMax:f32)->f32 {
  var bc=clamp(vec3i(floor((o+d*tEnter)*0.125)),vec3i(0),nb-1);
  var bn=((vec3f(bc)+up)*8.0-o)*inv;
  var t=tEnter;var depth=0.0;
- // The cell the ray starts in (when it starts inside the model).
- var start=tEnter==0.0;
+ // The cell the ray starts in (when it starts inside the model), and whether it is still in the volume it started in
+ // (one material from the start cell on, no gap).
+ var start=tEnter==0.0;var own=start;var vol=0u;
  loop {
   let entry=voxels[grid+u32(bc.x+nb.x*(bc.z+nb.z*bc.y))];
   let tOut=min(min(bn.x,bn.y),min(bn.z,tExit));
   let lo=bc*8;let hi=min(lo+8,sz)-1;
   let ue=base|(entry&255u);
   if(entry>=0x80000000u&&!cutMat(ue)){
-   // A uniform brick: the start cell's share, then the rest of the brick.
-   if(start){
-    let c0=floor(o+d*t);let cn=(c0+up-o)*inv;let tc=min(min(min(cn.x,cn.y),cn.z),tOut);
-    let k=extinction(ue,true);if(k<0.0){return -1.0;}depth+=k*(tc-t);
-    start=false;
-    if(tc<tOut){let k2=extinction(ue,false);if(k2<0.0){return -1.0;}depth+=k2*(tOut-tc);}
-   } else {
-    let k=extinction(ue,false);if(k<0.0){return -1.0;}depth+=k*(tOut-t);
+   // A uniform brick: one material over the whole span (when only the start cell passes light, its share first).
+   own=own&&(vol==0u||vol==ue);vol=ue;
+   var t1=t;
+   if(own&&sunCell){
+    let c0=floor(o+d*t);let cn=(c0+up-o)*inv;t1=min(min(min(cn.x,cn.y),cn.z),tOut);
+    let k=extinction(ue,true);if(k<0.0){return -1.0;}depth+=k*(t1-t);own=false;
    }
-  } else if(entry!=0u){
+   if(t1<tOut){let k=extinction(ue,own);if(k<0.0){return -1.0;}depth+=k*(tOut-t1);}
+  } else if(entry==0u){own=false;}
+  else {
    var c=clamp(vec3i(floor(o+d*t)),lo,hi);
    var vn=(vec3f(c)+up-o)*inv;
    var vt=t;
@@ -443,8 +449,12 @@ fn marchShadow(model:u32,o:vec3f,d:vec3f,tMax:f32)->f32 {
     let v=select(0u,base|pv,pv!=0u);
     let next=min(min(vn.x,vn.y),min(vn.z,tOut));
     // A cut-out cell lets the shadow through where both its texels on the ray are cut away.
-    if(cutMat(v)){if(cutThrough(v,o,d,vt,start&&vt==0.0,c,vn)!=1u){return -1.0;}}
-    else if(v!=0u){let x=extinction(v,start);if(x<0.0){return -1.0;}depth+=x*max(next-vt,0.0);}
+    if(cutMat(v)){if(cutThrough(v,o,d,vt,start&&vt==0.0,c,vn)!=1u){return -1.0;}own=false;}
+    else if(v!=0u){
+     own=own&&(vol==0u||vol==v);vol=v;
+     let x=extinction(v,own);if(x<0.0){return -1.0;}depth+=x*max(next-vt,0.0);
+     own=own&&!sunCell;
+    } else {own=false;}
     start=false;
     if(vn.x<vn.y&&vn.x<vn.z){vt=vn.x;c.x+=stp.x;vn.x+=ad.x;}
     else if(vn.y<vn.z){vt=vn.y;c.y+=stp.y;vn.y+=ad.y;}
@@ -1216,7 +1226,9 @@ fn direct(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,medium:u32,mInst:u32,w:ptr<fun
   }
   // The straight direction (not from inside glass, where glassCandidates finds the ways out).
   if(any(e.f>vec3f(0.0))&&(air||!far)){
+   sunCell=q==0u&&kind==1u&&(m.flags&SUNLIT)!=0u&&!sunFace;
    var v=shadow(o,wi,dist);
+   sunCell=false;
    if(fogged&&!far){v*=exp(-f.fog.x*dist);}
    if(v>0.0){L+=e.f*radiance*v*select(1.0,select(power2(lp,e.pdf),1.0,sunOnly)/lp,lp>0.0);}
    else if(far&&!sunOnly&&(f.config.z&CLEAR_GLASS)!=0u){offer(w,1.0,o,wi,medium,mInst,wi,NONE,radiance,lp);}
@@ -1273,8 +1285,9 @@ fn radiance(px:vec2u)->Path {
  var medium=0u;var mInst=NONE;
  var lastPdf=0.0;
  var bounces=0u;
- // Events per kind for the caps in f.limits: diffuse, specular, scatter.
- var nd=0u;var ns=0u;var nm=0u;
+ // Events per kind for the caps in f.limits: diffuse, specular, scatter (low 16 bits of z) and scattering in sun-lit
+ // media (subsurface, high 16 bits of z).
+ var nd=0u;var ns=0u;var nm=0u;var nu=0u;
  var feature=true;var tint=vec3f(1.0);var primary=true;
  var diffuse=false;var focused=false;var C=vec3f(0.0);
  // Distant-light MIS: density of the last vertex that sampled distant lights, Jacobian of the refractions since,
@@ -1390,8 +1403,10 @@ fn radiance(px:vec2u)->Path {
      p=o+d*ts;
      if(feature){feature=false;res.albedo=tint*md.albedo;res.normal=-d;res.primary=select(0.0,1.0,bounces==0u);}
      bounces++;
-     if(bounces>f.config.x||nm>=f.limits.z){break;}
-     nm++;
+     // Sun-lit media: each diffuse event before takes 4 from the subsurface cap (MagicaVoxel's neighbours of subsurface
+     // blocks under diffuse caps 2 and 4).
+     if((material(medium).flags&SUNLIT)!=0u){if(bounces>f.config.x||nu+4u*nd>=(f.limits.z>>16u)){break;}nu++;}
+     else{if(bounces>f.config.x||nm>=(f.limits.z&0xffffu)){break;}nm++;}
      scatter=true;
     }
    }
@@ -1456,6 +1471,7 @@ fn radiance(px:vec2u)->Path {
     m=material(h.value);
     if((m.flags&MEDIA)!=0u){
      if(medium!=0u&&(material(medium).flags&MEDIA)==0u){chainOk=false;}
+     sunFace=dot(n,f.sun.xyz)>0.0;
      medium=h.value;mInst=h.inst;o=p-off;continue;
     }
     let tex=faceTexel(h,p).rgb;m.color*=tex;m.metalColor*=tex;

@@ -50,7 +50,7 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
 | Metal | reflectance min(1, `_sp` x colour); GGX width ~0.13 x `_rough`; no multiple-scattering energy compensation | sky boards, reflection blur fit, rough gold sphere |
 | Plastic coat | diffuse colour + Fresnel (added, not energy-conserving) | `_ior` 0, 0.3, 0.6 |
 | Glass | Fresnel reflection of the sky exact; colour only through `_d` absorption = -ln(colour) x `_d` per voxel; glass share sqrt(`_trans`) at the block's faces to the air, none inside; what the block rests on shows through with that share again | glass rows; P boards (64 tiles: `_trans` 0.1-1, heights 1-6, white and black base, sky and sun) |
-| Subsurface `_sss` | scattering events are diffuse events (they follow the diffuse cap, not the scatter cap) and the sun lights them; only cells facing the sun glow, so neighbours on its far side get no light from it | G boards with caps 2/5/5, 2/10/5, 4/5/5; neighbours under the sun |
+| Subsurface `_sss` | a cloud of extinction about 14 x `_d` per voxel whose events follow the diffuse cap: 2 x cap + 1 of them, each diffuse event before them using 4; light travels several voxels inside (the sun-lit top brightens toward the sun across all 6 voxels: 178 to 206); the sun reaches a point through its own block when the walk entered by a face toward the sun, through its own cell otherwise, and nothing behind the block is lit through it | G boards with caps 2/5/5, 2/10/5, 4/5/5 (tiles (5,5) and (7,5) and their neighbours), the sun-lit top's profile |
 | Emitter | radiance colour x (1 + 3 x `_emit` x 10^`_flux`); a non-zero `_ldr` l shows 1 + 3 l to the camera only; emitters reflect no light | 4 decades of exposure, glow between neighbouring tiles |
 | Cloud | extinction `_d` per voxel, colour = scattering albedo, HG `_g` | cloud rows |
 | Emissive cloud | 0.93 x `_d` x colour per voxel, no self-absorption | isolated blocks |
@@ -81,14 +81,28 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
 
 ## Open: match MagicaVoxel
 
-1. Subsurface (`_media_type _sss`): a dense cloud (100 x `_d`, material `sunlit`) the sun lights only through each
-   point's own cell, so only faces toward the sun glow. The neighbouring cloud that was 20 levels too bright is within
-   5; sun-lit tops within 6 (184 against 190; subsurface glass 185 against 183). Open: sky-lit tops are 7-12 levels
-   too dark, and MagicaVoxel's subsurface follows the diffuse cap (cap 4: +13 levels), which our volume cannot copy
-   (counting its events as diffuse made every top 25-45 levels too dark): MagicaVoxel's subsurface is not a plain
-   volume walk. Nor an unlimited one (2026-10-20, 256 samples): with the scatter cap at 64 the sky-lit subsurface
-   tile reads 169 against MagicaVoxel's 136 (ours at cap 5: 124), and dense scattering clouds overshoot too (d 1:
-   167 against 132), so the answer lies between, specific to `_sss`.
+1. Subsurface (`_media_type _sss`): done (2026-10-20). Fitted against the four G renders on disk (1024 samples):
+   a cloud of 14 x `_d` per voxel (was 100 x), material `sunlit`, its events capped by the new
+   `bounceLimits.subsurface` = 2 x diffuse cap + 1 (each diffuse event earlier on the path uses 4: MagicaVoxel's
+   neighbours of the block brighten with the diffuse cap too); a shadow ray from inside it crosses its own block, or
+   only its own cell when the walk entered through a face turned from the sun. What showed the way: MagicaVoxel's
+   sun-lit top is not flat but rises toward the sun across the whole block (178 to 206; ours now 180 to 195, was flat
+   with a dip at every voxel boundary), so its light travels several voxels, and a plain walk of any density cannot
+   reach the sky-lit level with 2 events. Tiles (5,5) and (7,5), largest channel difference in levels:
+
+   | Board | before | now | tiles within 3 (of 56) | mean |
+   | --- | --- | --- | --- | --- |
+   | `G-sky-lin` (caps 2/5/5) | 11.7, 7.0 | 1.6, 1.6 | 53 -> 55 | 1.06 -> 0.80 |
+   | `G-sky-s10` (2/10/5) | 11.8, 6.6 | 1.5, 1.2 | 53 -> 55 | 1.08 -> 0.82 |
+   | `G-sky-d4` (4/5/5) | 25.2, 15.8 | 1.6, 1.2 | 51 -> 53 | 1.80 -> 0.96 |
+   | `G-sun60-lin` (2/5/5) | 5.4, 3.2 | 1.9, 3.8 | 51 -> 52 | 0.89 -> 0.78 |
+
+   Every tile of the sky boards is within 6 except `G-sky-d4`'s partly transparent glass (`_trans` 0.5 and 0.25,
+   8.5 levels, unchanged: MagicaVoxel brightens them with the diffuse cap). Cost: under the sun the absorbing cloud
+   diagonal to the block went from 1.5 to 4.3 levels and the emissive cloud from 5.1 to 5.6 (the blue cloud beside it
+   from 4.9 to 4.5). Open: only `_d` 0.05 and a white block on a black base were measured; whether the extinction
+   scales linearly with `_d`, what the scatter cap does to `_sss`, and a sun-lit render at diffuse cap 4 need
+   MagicaVoxel renders (listed under "Renders needed").
 2. Partly transparent glass (`_trans` below 1): done (material `contactTransmission`): glass share sqrt(`_trans`) at
    the block's faces to the air, no picks inside, and what it rests on is reached with the share again. P boards
    (`_trans` 0.1-1, heights 1, 2, 3, 6, white and black base): 64 of 64 tiles within 3 levels sky-lit (mean 0.6) and

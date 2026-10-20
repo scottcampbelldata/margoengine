@@ -105,10 +105,16 @@ try {
       'sunlit medium',
     );
     near(
+      c['sunlit cloud scatter cap 1'].mean,
+      c['sunlit cloud sunInMedia false'].mean,
+      0.05 * c['sunlit cloud sunInMedia false'].mean,
+      'sunlit medium ignores the scatter cap',
+    );
+    near(
       c['sunlit slab transparentShadows false'].mean,
       c['sunlit slab transparentShadows true'].mean,
       0.03 * c['sunlit slab transparentShadows true'].mean,
-      'sunlit slab lit through its own cells',
+      'sunlit slab lit through its own volume',
     );
     // Fade scale = the ground's distance: the sky takes 1 - 1/e of the grey ground; from that distance on, none.
     near(c['ground fade'].mean, 1 - 0.5 / Math.E, 0.01, 'ground fade');

@@ -48,9 +48,11 @@ export interface TraceMaterial {
    */
   cameraEmission?: number;
   /**
-   * Compatible addition: a medium the sun lights even with `sunInMedia` false. With `transparentShadows` false a
-   * shadow ray crosses only the cell it starts in (attenuated), so only cells that see the sun directly are lit:
-   * MagicaVoxel's subsurface media. Default false.
+   * Compatible addition: a medium the sun lights even with `sunInMedia` false; its scattering events count against
+   * `bounceLimits.subsurface`, not `scatter`. With `transparentShadows` false a shadow ray from inside it crosses the
+   * rest of this volume (attenuated) and nothing after it, or only its start cell for a sun ray from a path that
+   * entered the volume through a face turned from the sun, so mainly faces toward the sun glow: MagicaVoxel's
+   * subsurface media. Default false.
    */
   sunlit?: boolean;
   /**
@@ -491,8 +493,13 @@ export interface TraceBounceLimits {
   diffuse?: number;
   /** Specular and glossy events: metal and coat reflections, glass reflection and refraction. */
   specular?: number;
-  /** Scattering events in media and interior scattering. */
+  /** Scattering events in media (other than `sunlit` ones) and interior scattering. */
   scatter?: number;
+  /**
+   * Scattering events in `sunlit` media (MagicaVoxel's subsurface), where each diffuse event earlier on the path uses 4
+   * of them.
+   */
+  subsurface?: number;
 }
 
 /**

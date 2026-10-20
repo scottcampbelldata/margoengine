@@ -124,8 +124,11 @@ except `id`, `color` and `type` are optional.
   - `tint: false`: glass colour acts only through `density` absorption, not at its faces (default true).
   - `cameraEmission`: the emission multiplier camera rays see on the surface, while lighting keeps `emission` (a light
     that shows dimmer than it shines).
-  - `sunlit` (media): the sun lights the medium even when `sunInMedia` is off; with `transparentShadows` off a shadow
-    ray crosses only the cell it starts in, so only cells that see the sun directly are lit.
+  - `sunlit` (media): the sun lights the medium even when `sunInMedia` is off, and its scattering events count against
+    `bounceLimits.subsurface` (each diffuse event earlier on the path uses 4 of them) instead of `scatter`; with
+    `transparentShadows` off a shadow ray from inside it crosses the rest of its volume and nothing after it (only its
+    start cell for a sun ray from a path that entered through a face turned from the sun), so mainly faces toward the
+    sun glow.
   - `voxelwise` (blend): every voxel face inside the volume picks a lobe again; light passes straight through the
     glass share and the rest scatters there.
   - `contactTransmission` (blend): a ray inside the volume reaches another voxel's surface only with the glass share's
@@ -218,7 +221,7 @@ The engine camera is used as is: perspective by default, orthographic (or any af
 | `clamp` (largest luminance a path may add; biased firefly control) | Infinity | above 0 | yes |
 | `toneMapping` | `'neutral'` (Khronos PBR Neutral, Margo's display transform) | `'neutral'`, `'linear'`, `'aces-narkowicz'` (Narkowicz's ACES fit after x0.6) | no |
 | `gamma` (display encoding after tone mapping) | sRGB | 1-5 (power 1 / gamma), or undefined for sRGB | no |
-| `bounceLimits` (events per kind on top of `maxBounces`) | none | `{diffuse?, specular?, scatter?}` each 1-64, or null | yes |
+| `bounceLimits` (events per kind on top of `maxBounces`) | none | `{diffuse?, specular?, scatter?, subsurface?}` each 1-64, or null | yes |
 | `transparentShadows` (shadow rays through glass and media) | true | boolean; false: any voxel blocks them | yes |
 | `sunSpecular` (the sun lights glossy lobes, is seen in reflections) | true | boolean; false: diffuse lobes only | yes |
 | `sunInMedia` (the sun lights media directly) | true | boolean | yes |
@@ -551,7 +554,7 @@ PNG and float captures with cancellation; device-loss recovery.
 Not done or not verified, stated plainly:
 
 - **MagicaVoxel parity is not complete:** a transparent background (`_bg_a`) and non-cubic voxels (`_scale`) are
-  reproduced but not yet compared with MagicaVoxel's images; sky-lit subsurface blocks are 7-12 levels too dark; glass over a lit floor is 1-2 levels brighter; under the atmosphere, a view into a low sun matches on 97.7% of
+  reproduced but not yet compared with MagicaVoxel's images; subsurface is fitted at one density only; glass over a lit floor is 1-2 levels brighter; under the atmosphere, a view into a low sun matches on 97.7% of
   pixels and very dense air settings by 2-3 levels on average (docs/magicavoxel-parity.md).
 - **Denoiser:** a classical filter, not a learned one. While the camera moves, surfaces it uncovers are noisy for a
   few frames, and for a few frames after it stops the history makes diffuse and cloud scenes slightly worse than

@@ -109,7 +109,15 @@ test('media: scatter, absorb, emit and subsurface types', () => {
   near(glow.emission, 0.93 * 0.2);
   const sss = magicaVoxelMaterial(8, [255, 255, 255], { _type: '_media', _d: '0.05', _media_type: '_sss' });
   assert.deepEqual([sss.type, sss.sunlit], ['media', true]);
-  near(sss.density, 5);
+  near(sss.density, 0.7);
+  // Subsurface glass renders as the subsurface cloud.
+  const sssGlass = magicaVoxelMaterial(8, [255, 255, 255], {
+    _type: '_glass',
+    _trans: '1',
+    _d: '0.05',
+    _media_type: '_sss',
+  });
+  assert.deepEqual([sssGlass.type, sssGlass.sunlit, sssGlass.density], ['media', true, sss.density]);
   // The older _weight reads as density 0.1, scattering.
   near(magicaVoxelMaterial(8, [255, 255, 255], { _type: '_media', _weight: '0.3' }).density, 0.1);
   assert.throws(() => magicaVoxelMaterial(0, [0, 0, 0]), RangeError);
@@ -144,7 +152,10 @@ test('render objects: sky, sun, ground fade, film, bounces and fog', () => {
   assert.equal(o.toneMapping, 'aces-narkowicz');
   assert.equal(o.gamma, 2.2);
   near(o.exposure, -1);
-  assert.deepEqual(o.bounceLimits, { diffuse: 2, specular: 5, scatter: 5 });
+  // Subsurface events follow the diffuse cap: 2 d + 1.
+  assert.deepEqual(o.bounceLimits, { diffuse: 2, specular: 5, scatter: 5, subsurface: 5 });
+  assert.equal(o.maxBounces, 17);
+  assert.equal(magicaVoxelLighting([{ _type: '_bounce', _diffuse: '4' }]).options.bounceLimits.subsurface, 9);
   assert.deepEqual(
     [o.transparentShadows, o.sunSpecular, o.sunInMedia, o.energyCompensation],
     [false, false, false, false],
@@ -320,7 +331,7 @@ test('MagicaVoxel options and environment reach the frame uniform; invalid ones 
     }),
     tracer = VoxelPathTracer.attach(h.engine, {
       scene,
-      bounceLimits: { diffuse: 2, specular: 5 },
+      bounceLimits: { diffuse: 2, specular: 5, subsurface: 7 },
       transparentShadows: false,
       sunSpecular: false,
       sunInMedia: false,
@@ -340,7 +351,8 @@ test('MagicaVoxel options and environment reach the frame uniform; invalid ones 
     f = new Float32Array(frame.data);
   assert.equal(u[42] & (1024 | 2048 | 4096 | 8192 | 16384), 1024 | 2048 | 4096 | 8192 | 16384);
   assert.equal(u[42] & 512, 0, 'no glass walks with opaque shadows');
-  assert.deepEqual([...u.subarray(152, 155)], [2, 5, 0xffff]);
+  // Scatter (uncapped) in the low 16 bits of the third word, subsurface in the high 16.
+  assert.deepEqual([...u.subarray(152, 155)], [2, 5, 0xffff + 7 * 0x10000]);
   assert.equal(f[155], 500);
   near(f[156], 0.01);
   near(f[157], 0.3);
@@ -364,7 +376,7 @@ test('MagicaVoxel options and environment reach the frame uniform; invalid ones 
   tracer.setOptions({ edges: null, grid: null });
   assert.equal(tracer.options.edges, undefined);
   near(f[164 + 7], f[164 + 8], 0.05); // isotropy near the horizon is about a half either side
-  assert.deepEqual(tracer.options.bounceLimits, { diffuse: 2, specular: 5, scatter: undefined });
+  assert.deepEqual(tracer.options.bounceLimits, { diffuse: 2, specular: 5, scatter: undefined, subsurface: 7 });
   assert.throws(() => tracer.setOptions({ gamma: 0.5 }), RangeError);
   assert.throws(() => tracer.setOptions({ toneMapping: 'filmic' }), TypeError);
   assert.throws(() => tracer.setOptions({ bounceLimits: { diffuse: 0 } }), RangeError);

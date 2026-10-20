@@ -190,6 +190,11 @@ const renders = {
   'D-sun-aces': ['D', merge(common, light.sun, film.aces)],
   'G-sky-lin': ['G', merge(common, light.sky, film.lin)],
   'G-sun60-lin': ['G', merge(common, light.sun60, film.lin)],
+  // Bounce caps (subsurface follows the diffuse cap): specular 10, diffuse 4, scatter 10, and diffuse 4 under the sun.
+  'G-sky-s10': ['G', merge(common, light.sky, film.lin, { _bounce: { _specular: 10 } })],
+  'G-sky-d4': ['G', merge(common, light.sky, film.lin, { _bounce: { _diffuse: 4 } })],
+  'G-sky-sc10': ['G', merge(common, light.sky, film.lin, { _bounce: { _scatter: 10 } })],
+  'G-sun60-d4': ['G', merge(common, light.sun60, film.lin, { _bounce: { _diffuse: 4 } })],
   'P-sky-lin': ['P', merge(common, light.sky, film.lin)],
   'P-sun60-lin': ['P', merge(common, light.sun60, film.lin)],
   'E-dark-lin': ['E', merge(common, light.dark, film.lin)],

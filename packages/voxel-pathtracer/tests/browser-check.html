@@ -174,12 +174,13 @@ window.check={
   // when the medium is sunlit (with transparent shadows: as with sunInMedia).
   const cloud=(sunlit)=>({revision:1,models:[solid(8,1)],instances:[{id:'m',modelId:'cube',matrix:translate(-4,-4,-4)}],materials:[{id:1,color:[1,1,1],type:'media',density:0.3,sunlit}],environment:{skyIntensity:0,sunDirection:[0.3,1,0.2],sunIntensity:3}});
   look([14,10,18],[0,0,0],{fov:35});
-  for(const [name,opts,sunlit] of [['cloud sunInMedia true',{},false],['cloud sunInMedia false',{sunInMedia:false,transparentShadows:false},false],['sunlit cloud sunInMedia false',{sunInMedia:false},true]]){
+  // A sun-lit medium's events count against the subsurface cap, not the scatter cap.
+  for(const [name,opts,sunlit] of [['cloud sunInMedia true',{},false],['cloud sunInMedia false',{sunInMedia:false,transparentShadows:false},false],['sunlit cloud sunInMedia false',{sunInMedia:false},true],['sunlit cloud scatter cap 1',{sunInMedia:false,bounceLimits:{scatter:1}},true]]){
    out[name]=await withTracer(cloud(sunlit),{maxBounces:16,...opts},async(t)=>{const im=await render(t,512,64);return stats(im,first(im));});
   }
-  // With opaque shadows a sun-lit medium is lit only through each point's own cell: a one-voxel slab under an
-  // overhead sun is lit as with transparent shadows.
-  const slab={revision:1,models:[model('s',[16,1,16],()=>1)],instances:[{id:'s',modelId:'s',matrix:translate(-8,0,-8)}],materials:[{id:1,color:[1,1,1],type:'media',density:0.5,sunlit:true}],environment:{skyIntensity:0,sunDirection:[0,1,0],sunIntensity:3}};
+  // With opaque shadows a sun-lit medium is lit through its own volume (entered from the sun's side): a three-voxel
+  // slab under an overhead sun is lit as with transparent shadows.
+  const slab={revision:1,models:[model('s',[16,3,16],()=>1)],instances:[{id:'s',modelId:'s',matrix:translate(-8,0,-8)}],materials:[{id:1,color:[1,1,1],type:'media',density:0.5,sunlit:true}],environment:{skyIntensity:0,sunDirection:[0,1,0],sunIntensity:3}};
   look([0,6,0.01],[0,0,0],{fov:20});
   for(const ts of [true,false]){out[`sunlit slab transparentShadows ${ts}`]=await withTracer(slab,{maxBounces:16,sunInMedia:false,transparentShadows:ts},async(t)=>{const im=await render(t,1024);return stats(im,first(im));});}
   // Ground fade: ground (albedo 0.5) under sky 1 seen 14.14 away, fade distance 14.14: half way to the sky, 0.75.
