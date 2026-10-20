@@ -49,7 +49,8 @@ Everything here is on branch `worktree-agent-a63cac143225721f2` (not pushed, Cod
 | Legacy keys | `_weight` wins (metalness, transparency, emission); `_spec` = specular - 1; `_ior` is always n - 1; cloud `_weight` reads as density 0.1 | panel readings |
 | Metal | reflectance min(1, `_sp` x colour); GGX width ~0.13 x `_rough`; no multiple-scattering energy compensation | sky boards, reflection blur fit, rough gold sphere |
 | Plastic coat | diffuse colour + Fresnel (added, not energy-conserving) | `_ior` 0, 0.3, 0.6 |
-| Glass | Fresnel reflection of the sky exact; colour only through `_d` absorption = -ln(colour) x `_d` per voxel; glass share sqrt(`_trans`) | glass rows |
+| Glass | Fresnel reflection of the sky exact; colour only through `_d` absorption = -ln(colour) x `_d` per voxel; glass share sqrt(`_trans`) at the block's faces to the air, none inside; what the block rests on shows through with that share again | glass rows; P boards (64 tiles: `_trans` 0.1-1, heights 1-6, white and black base, sky and sun) |
+| Subsurface `_sss` | scattering events are diffuse events (they follow the diffuse cap, not the scatter cap) and the sun lights them; only cells facing the sun glow, so neighbours on its far side get no light from it | G boards with caps 2/5/5, 2/10/5, 4/5/5; neighbours under the sun |
 | Emitter | radiance colour x (1 + 3 x `_emit` x 10^`_flux`); a non-zero `_ldr` l shows 1 + 3 l to the camera only; emitters reflect no light | 4 decades of exposure, glow between neighbouring tiles |
 | Cloud | extinction `_d` per voxel, colour = scattering albedo, HG `_g` | cloud rows |
 | Emissive cloud | 0.93 x `_d` x colour per voxel, no self-absorption | isolated blocks |
@@ -75,12 +76,17 @@ Everything here is on branch `worktree-agent-a63cac143225721f2` (not pushed, Cod
 
 ## Open: match MagicaVoxel
 
-1. Subsurface (`_media_type _sss`): mapped to a cloud of 10 x `_d` that the sun lights through itself (material
-   `sunlit`): the cloud tile is within 2.5 levels sun-lit and 3 sky-lit, subsurface glass within 6-7. Open: a cloud
-   next to a sun-lit subsurface block comes out up to 20 levels brighter than in MagicaVoxel.
-2. Partly transparent glass (`_trans` below 1): glass share sqrt(`_trans`) per voxel face, re-picked at every face
-   inside the block (material `voxelwise`): `_trans` 0.25 within 3 levels sky- and sun-lit, 0.5 sun-lit within 3 but
-   sky-lit 10 levels too dark (was 13 too bright). The rule for faces inside the block is not pinned down yet.
+1. Subsurface (`_media_type _sss`): a dense cloud (100 x `_d`, material `sunlit`) the sun lights only through each
+   point's own cell, so only faces toward the sun glow. The neighbouring cloud that was 20 levels too bright is within
+   5; sun-lit tops within 6 (184 against 190; subsurface glass 185 against 183). Open: sky-lit tops are 7-12 levels
+   too dark, and MagicaVoxel's subsurface follows the diffuse cap (cap 4: +13 levels), which our volume cannot copy
+   (counting its events as diffuse made every top 25-45 levels too dark): MagicaVoxel's subsurface is not a plain
+   volume walk.
+2. Partly transparent glass (`_trans` below 1): done (material `contactTransmission`): glass share sqrt(`_trans`) at
+   the block's faces to the air, no picks inside, and what it rests on is reached with the share again. P boards
+   (`_trans` 0.1-1, heights 1, 2, 3, 6, white and black base): 64 of 64 tiles within 3 levels sky-lit (mean 0.6) and
+   sun-lit (mean 0.4); the G board's `_trans` 0.5 tile from 10 levels to within 3. Open: `_blend` materials still
+   re-pick at every face (`voxelwise`); not compared yet.
 2b. Glass over a lit floor: MagicaVoxel is darker by a fixed factor per refractive index (0.997 at 1.1, 0.976 at 1.3,
    0.959 at 1.5, 0.957 at 2), independent of its bounce caps (checked with specular 10 and diffuse 4): 1-2 levels.
 3. Fog `_fog_uni`: done (`environment.fog`). MagicaVoxel's fog fades rays by exp(-0.001 x `_d` x distance) toward
@@ -122,8 +128,9 @@ with MagicaVoxel against Margo for the product page, once speed is measured.
 - Done: README documents every new option, material field, `environment.fog`/`groundFade`/`sunVisible` and the
   `magicaVoxel*` helpers; `tests/magicavoxel.test.js` (10 tests: materials with current, older and missing keys, render
   objects, the atmosphere, cameras, models and placement, options reaching the frame); the real-GPU `compat` check (closed forms for
-  energy compensation, metalColor, additive coat, untinted glass, voxelwise blend, camera emission, diffuse caps 1/2/3,
-  the sun on diffuse lobes only, opaque shadows, the sun in media and sunlit media, ground fade, fog, the ACES and gamma
+  energy compensation, metalColor, additive coat, untinted glass, voxelwise blend, contact transmission, camera
+  emission, diffuse caps 1/2/3, the sun on diffuse lobes only, opaque shadows, the sun in media, sunlit media and a
+  sunlit slab under opaque shadows, ground fade and its start, fog, the ACES and gamma
   byte); Biome format and lint clean; hygiene 10.0 on every gate for the package.
 - Open: `npm run verify` on the branch, size entries (measure:size), rebuild the tarballs for Codex.
 

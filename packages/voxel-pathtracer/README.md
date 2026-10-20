@@ -102,9 +102,12 @@ except `id`, `color` and `type` are optional.
   - `tint: false`: glass colour acts only through `density` absorption, not at its faces (default true).
   - `cameraEmission`: the emission multiplier camera rays see on the surface, while lighting keeps `emission` (a light
     that shows dimmer than it shines).
-  - `sunlit` (media): the sun lights the medium through itself even when `sunInMedia` and `transparentShadows` are off.
+  - `sunlit` (media): the sun lights the medium even when `sunInMedia` is off; with `transparentShadows` off a shadow
+    ray crosses only the cell it starts in, so only cells that see the sun directly are lit.
   - `voxelwise` (blend): every voxel face inside the volume picks a lobe again; light passes straight through the
-    glass share and the rest scatters there (MagicaVoxel's partly transparent voxels).
+    glass share and the rest scatters there.
+  - `contactTransmission` (blend): a ray inside the volume reaches another voxel's surface only with the glass share's
+    probability, else the path ends (MagicaVoxel's partly transparent glass over what it rests on).
 
 ## Lighting
 
@@ -408,8 +411,7 @@ PNG and float captures with cancellation; device-loss recovery.
 Not done or not verified, stated plainly:
 
 - **MagicaVoxel parity is not complete:** its image sky, edges, grid, background colour and vignette are not
-  reproduced; partly transparent glass under an open sky and subsurface next to clouds differ by up to 10-20 levels;
-  glass over a lit floor is 1-2 levels brighter; under the atmosphere, a view into a low sun matches on 97.7% of
+  reproduced; sky-lit subsurface blocks are 7-12 levels too dark; glass over a lit floor is 1-2 levels brighter; under the atmosphere, a view into a low sun matches on 97.7% of
   pixels and very dense air settings by 2-3 levels on average (docs/magicavoxel-parity.md).
 - **Denoiser:** a classical filter, not a learned one. Averaged over four seeds against 131,072-sample references
   (noise removed in quadrature) it lowers the error x2.46, x2.32, x2.24 at 4, 16, 64 samples on the material scene and

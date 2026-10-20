@@ -172,7 +172,16 @@ const merge = (...parts) => {
   return r;
 };
 
-const boards = { D: build(D, () => 0), G: build(G, gBase), E: build(E, () => 0) };
+// Partly transparent glass: columns _trans 0.1 ... 1, rows block heights 1, 2, 3, 6 on a white base, then on black.
+const P = [1, 2, 3, 6, 1, 2, 3, 6].flatMap((h) =>
+  [0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 1].map((trans) => ({ ...glass(grey(255), { trans }), height: h })),
+);
+const boards = {
+  D: build(D, () => 0),
+  G: build(G, gBase),
+  E: build(E, () => 0),
+  P: build(P, (j) => (j < 4 ? 230 : 20)),
+};
 const renders = {
   'D-sky-lin': ['D', merge(common, light.sky, film.lin)],
   'D-sky-aces': ['D', merge(common, light.sky, film.aces)],
@@ -181,12 +190,14 @@ const renders = {
   'D-sun-aces': ['D', merge(common, light.sun, film.aces)],
   'G-sky-lin': ['G', merge(common, light.sky, film.lin)],
   'G-sun60-lin': ['G', merge(common, light.sun60, film.lin)],
+  'P-sky-lin': ['P', merge(common, light.sky, film.lin)],
+  'P-sun60-lin': ['P', merge(common, light.sun60, film.lin)],
   'E-dark-lin': ['E', merge(common, light.dark, film.lin)],
   'E-dark-e1': ['E', merge(common, light.dark, film.lin, { _film: { _expo: 0.1 } })],
   'E-dark-e3': ['E', merge(common, light.dark, film.lin, { _film: { _expo: 0.001 } })],
   'E-dark-e5': ['E', merge(common, light.dark, film.lin, { _film: { _expo: 0.00001 } })],
 };
-const size = { D: [64, 64, 1], G: [64, 64, 7], E: [64, 64, 1] };
+const size = { D: [64, 64, 1], G: [64, 64, 7], E: [64, 64, 1], P: [64, 64, 7] };
 for (const [name, [board, render]] of Object.entries(renders)) {
   const b = boards[board];
   writeVox(`${__dirname}/${name}.vox`, {

@@ -48,8 +48,9 @@ export interface TraceMaterial {
    */
   cameraEmission?: number;
   /**
-   * Compatible addition: a medium the sun lights even with `sunInMedia` false, whose own cells shadow rays cross
-   * (attenuated) even with `transparentShadows` false: MagicaVoxel's subsurface media. Default false.
+   * Compatible addition: a medium the sun lights even with `sunInMedia` false. With `transparentShadows` false a
+   * shadow ray crosses only the cell it starts in (attenuated), so only cells that see the sun directly are lit:
+   * MagicaVoxel's subsurface media. Default false.
    */
   sunlit?: boolean;
   /**
@@ -58,6 +59,12 @@ export interface TraceMaterial {
    * Default false (the volume is one piece of material).
    */
   voxelwise?: boolean;
+  /**
+   * Compatible addition: for a `blend` volume, a ray inside it reaches another voxel's surface through the face they
+   * share only with the glass share's probability (otherwise the path ends), as MagicaVoxel's partly transparent glass
+   * shows what it rests on. Default false.
+   */
+  contactTransmission?: boolean;
   /** Index of refraction, 1 to 3 (glass refraction and the plastic coat's Fresnel). Default 1.5. */
   ior?: number;
   /** Share of the glass lobe, 0 to 1 (`blend`; `glass` is 1). */

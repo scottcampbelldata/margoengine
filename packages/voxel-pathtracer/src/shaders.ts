@@ -31,6 +31,7 @@
 import { displayShader } from '../../shared/display.js';
 import {
   ADDITIVE,
+  CONTACT,
   DELTA_ALPHA,
   EMISSIVE,
   MATERIAL_FLOATS,
@@ -231,6 +232,7 @@ const ADDITIVE=${ADDITIVE}u;
 const UNTINTED=${UNTINTED}u;
 const SUNLIT=${SUNLIT}u;
 const VOXELWISE=${VOXELWISE}u;
+const CONTACT=${CONTACT}u;
 // march's want for a voxelwise volume: stop at the next voxel face whatever lies behind it.
 const STEP=0xfffffffeu;
 const MODEL=${MODEL_WORDS}u;
@@ -356,11 +358,12 @@ fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit
  let ex=select(select(2u,1u,tf.y<=tf.z),0u,tf.x<=tf.y&&tf.x<=tf.z);
  return found(h,boxExit,0u,ex,stp,d,vec3i(floor(o+d*boxExit)));
 }
-// Extinction of a see-through cell for shadow rays, -1 when the cell blocks light (only media let it through, and
-// none with opaque shadows).
-fn extinction(v:u32)->f32 {
+// Extinction of a see-through cell for shadow rays, -1 when the cell blocks light (only media let it through; with
+// opaque shadows none, except a sun-lit medium in the cell the shadow ray starts in: as in MagicaVoxel, light reaches
+// a sun-lit volume only through its own cell, so only its faces toward the light glow).
+fn extinction(v:u32,start:bool)->f32 {
  let x=materials[v*MV+3u];let fl=u32(x.w);
- return select(-1.0,x.x,(fl&MEDIA)!=0u&&((f.config.z&OPAQUE_SHADOWS)==0u||(fl&SUNLIT)!=0u));
+ return select(-1.0,x.x,(fl&MEDIA)!=0u&&((f.config.z&OPAQUE_SHADOWS)==0u||((fl&SUNLIT)!=0u&&start)));
 }
 // Optical depth along a shadow ray through one model, -1 when blocked.
 fn marchShadow(model:u32,o:vec3f,d:vec3f,tMax:f32)->f32 {
@@ -380,12 +383,22 @@ fn marchShadow(model:u32,o:vec3f,d:vec3f,tMax:f32)->f32 {
  var bc=clamp(vec3i(floor((o+d*tEnter)*0.125)),vec3i(0),nb-1);
  var bn=((vec3f(bc)+up)*8.0-o)*inv;
  var t=tEnter;var depth=0.0;
+ // The cell the ray starts in (when it starts inside the model).
+ var start=tEnter==0.0;
  loop {
   let entry=voxels[grid+u32(bc.x+nb.x*(bc.z+nb.z*bc.y))];
   let tOut=min(min(bn.x,bn.y),min(bn.z,tExit));
   let lo=bc*8;let hi=min(lo+8,sz)-1;
   if(entry>=0x80000000u){
-   let k=extinction(entry&255u);if(k<0.0){return -1.0;}depth+=k*(tOut-t);
+   // A uniform brick: the start cell's share, then the rest of the brick.
+   if(start){
+    let c0=floor(o+d*t);let cn=(c0+up-o)*inv;let tc=min(min(min(cn.x,cn.y),cn.z),tOut);
+    let k=extinction(entry&255u,true);if(k<0.0){return -1.0;}depth+=k*(tc-t);
+    start=false;
+    if(tc<tOut){let k2=extinction(entry&255u,false);if(k2<0.0){return -1.0;}depth+=k2*(tOut-tc);}
+   } else {
+    let k=extinction(entry&255u,false);if(k<0.0){return -1.0;}depth+=k*(tOut-t);
+   }
   } else if(entry!=0u){
    var c=clamp(vec3i(floor(o+d*t)),lo,hi);
    var vn=(vec3f(c)+up-o)*inv;
@@ -394,13 +407,15 @@ fn marchShadow(model:u32,o:vec3f,d:vec3f,tMax:f32)->f32 {
     let l=vec3u(c-lo);let k=l.x+8u*(l.z+8u*l.y);
     let v=(voxels[entry+(k>>2u)]>>((k&3u)*8u))&255u;
     let next=min(min(vn.x,vn.y),min(vn.z,tOut));
-    if(v!=0u){let x=extinction(v);if(x<0.0){return -1.0;}depth+=x*max(next-vt,0.0);}
+    if(v!=0u){let x=extinction(v,start);if(x<0.0){return -1.0;}depth+=x*max(next-vt,0.0);}
+    start=false;
     if(vn.x<vn.y&&vn.x<vn.z){vt=vn.x;c.x+=stp.x;vn.x+=ad.x;}
     else if(vn.y<vn.z){vt=vn.y;c.y+=stp.y;vn.y+=ad.y;}
     else{vt=vn.z;c.z+=stp.z;vn.z+=ad.z;}
     if(vt>=tOut||any(c<lo)||any(c>hi)){break;}
    }
   }
+  start=false;
   if(tOut>=tExit){break;}
   if(bn.x<bn.y&&bn.x<bn.z){t=bn.x;bc.x+=stp.x;bn.x+=ad.x*8.0;}
   else if(bn.y<bn.z){t=bn.y;bc.y+=stp.y;bn.y+=ad.y*8.0;}
@@ -1277,6 +1292,8 @@ fn radiance(px:vec2u)->Path {
     let lx=localX(h.inst);
     n=h.sgn*normalize(rowOf(lx,h.axis));
     off=h.sgn*EPS*colOf(worldX(h.inst),h.axis);
+    // From inside a contact-transmitting blend, another voxel's surface is reached only with the glass share.
+    if(medium!=0u&&h.value!=0u&&h.value!=medium){let mc=material(medium);if((mc.flags&CONTACT)!=0u&&rand()>=mc.glass){break;}}
     if(h.value==0u){
      // Leaving a volume into empty space: media end without a surface, glass refracts out or reflects back in.
      var mm=material(medium);

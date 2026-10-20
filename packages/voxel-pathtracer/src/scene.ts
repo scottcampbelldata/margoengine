@@ -33,7 +33,8 @@ export const MEDIA = 1,
   ADDITIVE = 32,
   UNTINTED = 64,
   SUNLIT = 128,
-  VOXELWISE = 256;
+  VOXELWISE = 256,
+  CONTACT = 512;
 /** Glass and mirror instances whose deflection of distant light is light-sampled, each (README, "Lighting"). */
 const MAX_DEFLECTORS = 8;
 const VOLUME = 2,
@@ -389,6 +390,8 @@ function packMaterial(m: TraceMaterial, name: string, out: Float32Array): void {
     throw new TypeError(`${where} ${name}.voxelwise must be true or false`);
   if (m.sunlit !== undefined && typeof m.sunlit !== 'boolean')
     throw new TypeError(`${where} ${name}.sunlit must be true or false`);
+  if (m.contactTransmission !== undefined && typeof m.contactTransmission !== 'boolean')
+    throw new TypeError(`${where} ${name}.contactTransmission must be true or false`);
   if (abbe > 0 && abbe < 5)
     throw new RangeError(`${where} ${name}.abbe ${abbe} is out of range; pass 0 (no dispersion) or 5 to 200`);
   const base = m.id * MATERIAL_FLOATS,
@@ -405,6 +408,7 @@ function packMaterial(m: TraceMaterial, name: string, out: Float32Array): void {
   if (m.tint === false) flags |= UNTINTED;
   if (m.sunlit === true && media) flags |= SUNLIT;
   if (m.voxelwise === true && pGlass > 0 && pGlass < 1) flags |= VOXELWISE;
+  if (m.contactTransmission === true && pGlass > 0 && pGlass < 1) flags |= CONTACT;
   out.set(
     [
       Math.min(color[0], 1),

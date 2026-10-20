@@ -67,7 +67,8 @@ test('glass: _ior is n - 1, colour through _d absorption only, partial transpare
   const half = magicaVoxelMaterial(6, [255, 255, 255], { _type: '_glass', _trans: '0.25', _ior: '0.3' });
   assert.equal(half.type, 'blend');
   near(half.transmission, 0.5);
-  assert.equal(half.voxelwise, true);
+  assert.equal(half.contactTransmission, true);
+  assert.equal(half.voxelwise, undefined);
   near(magicaVoxelMaterial(6, [255, 255, 255], { _type: '_glass', _weight: '1', _ior: '1.5' }).ior, 2.5);
   const scatter = magicaVoxelMaterial(6, [255, 255, 255], {
     _type: '_glass',
@@ -108,7 +109,7 @@ test('media: scatter, absorb, emit and subsurface types', () => {
   near(glow.emission, 0.93 * 0.2);
   const sss = magicaVoxelMaterial(8, [255, 255, 255], { _type: '_media', _d: '0.05', _media_type: '_sss' });
   assert.deepEqual([sss.type, sss.sunlit], ['media', true]);
-  near(sss.density, 0.5);
+  near(sss.density, 5);
   // The older _weight reads as density 0.1, scattering.
   near(magicaVoxelMaterial(8, [255, 255, 255], { _type: '_media', _weight: '0.3' }).density, 0.1);
   assert.throws(() => magicaVoxelMaterial(0, [0, 0, 0]), RangeError);

@@ -126,6 +126,12 @@ window.check={
   for(const coat of ['layered','additive']){out[`coat ${coat}`]=await withTracer(furnace([{id:1,color:[0.5,0.5,0.5],type:'plastic',roughness:0,ior:1.5,coat}]),{maxBounces:64},async(t)=>{const im=await render(t,512,64);return stats(im,first(im));});}
   out['untinted glass']=await withTracer(furnace([{id:1,color:[0.5,0.5,0.5],type:'glass',tint:false}]),{maxBounces:64},async(t)=>{const im=await render(t,512,64);return stats(im,first(im));});
   out['voxelwise blend']=await withTracer(furnace([{id:1,color:[1,1,1],type:'blend',metalness:0,transmission:0.5,roughness:0,voxelwise:true}]),{maxBounces:64},async(t)=>{const im=await render(t,512,64);return stats(im,first(im));});
+  // Contact transmission: a clear-glass blend (share 0.5, black rest, IOR 1) on an emitter shows half of it; with
+  // contactTransmission the emitter is reached with the share again: a quarter.
+  const veil=(contact)=>({revision:1,models:[model('b',[16,1,16],()=>1),model('e',[16,1,16],()=>2)],instances:[{id:'b',modelId:'b',matrix:translate(-8,0,-8)},{id:'e',modelId:'e',matrix:translate(-8,-1,-8)}],materials:[{id:1,color:[0,0,0],type:'blend',metalness:0,transmission:0.5,roughness:0,ior:1,tint:false,contactTransmission:contact},{id:2,color:[1,1,1],type:'emit',emission:1}],environment:{skyIntensity:0}});
+  look([0,6,0.01],[0,0,0],{fov:20});
+  for(const contact of [false,true]){out[`contact transmission ${contact}`]=await withTracer(veil(contact),{maxBounces:8},async(t)=>{const im=await render(t,1024);return stats(im,first(im));});}
+  look([14,10,18],[0,0,0],{fov:35});
   // Camera emission: an emitter casting emission 3 shows 0.5 to the camera (black sky).
   out['camera emission 0.5']=await withTracer(furnace([{id:1,color:[1,1,1],type:'emit',emission:3,cameraEmission:0.5}],{skyIntensity:0}),{maxBounces:8},async(t)=>{const im=await render(t,64,64);return stats(im,first(im));});
   // Diffuse caps: floor (albedo 0.5) under an emissive ceiling (radiance 1, albedo 0.5): 0.5 with 1 or 2 diffuse
@@ -148,12 +154,17 @@ window.check={
   // (Without sunSpecular a path cannot find the sun through the glass by chance either, as in MagicaVoxel.)
   for(const ts of [true,false]){out[`floor under glass transparentShadows ${ts}`]=await withTracer(shaded,{maxBounces:8,transparentShadows:ts,sunSpecular:ts},async(t)=>{const im=await render(t,256);return stats(im,first(im));});}
   // The sun in media: a white cloud lit only by the sun (black sky, no ground) is dark without sunInMedia and lit again
-  // when the medium is sunlit.
+  // when the medium is sunlit (with transparent shadows: as with sunInMedia).
   const cloud=(sunlit)=>({revision:1,models:[solid(8,1)],instances:[{id:'m',modelId:'cube',matrix:translate(-4,-4,-4)}],materials:[{id:1,color:[1,1,1],type:'media',density:0.3,sunlit}],environment:{skyIntensity:0,sunDirection:[0.3,1,0.2],sunIntensity:3}});
   look([14,10,18],[0,0,0],{fov:35});
-  for(const [name,opts,sunlit] of [['cloud sunInMedia true',{},false],['cloud sunInMedia false',{sunInMedia:false,transparentShadows:false},false],['sunlit cloud sunInMedia false',{sunInMedia:false,transparentShadows:false},true]]){
+  for(const [name,opts,sunlit] of [['cloud sunInMedia true',{},false],['cloud sunInMedia false',{sunInMedia:false,transparentShadows:false},false],['sunlit cloud sunInMedia false',{sunInMedia:false},true]]){
    out[name]=await withTracer(cloud(sunlit),{maxBounces:16,...opts},async(t)=>{const im=await render(t,512,64);return stats(im,first(im));});
   }
+  // With opaque shadows a sun-lit medium is lit only through each point's own cell: a one-voxel slab under an
+  // overhead sun is lit as with transparent shadows.
+  const slab={revision:1,models:[model('s',[16,1,16],()=>1)],instances:[{id:'s',modelId:'s',matrix:translate(-8,0,-8)}],materials:[{id:1,color:[1,1,1],type:'media',density:0.5,sunlit:true}],environment:{skyIntensity:0,sunDirection:[0,1,0],sunIntensity:3}};
+  look([0,6,0.01],[0,0,0],{fov:20});
+  for(const ts of [true,false]){out[`sunlit slab transparentShadows ${ts}`]=await withTracer(slab,{maxBounces:16,sunInMedia:false,transparentShadows:ts},async(t)=>{const im=await render(t,1024);return stats(im,first(im));});}
   // Ground fade: ground (albedo 0.5) under sky 1 seen 14.14 away, fade distance 14.14: half way to the sky, 0.75.
   const empty={revision:1,models:[model('d',[1,1,1],()=>1)],instances:[{id:'d',modelId:'d',matrix:translate(500,500,500)}],materials:[{id:1,color:[0.5,0.5,0.5],type:'diffuse'}]};
   look([0,10,0],[0,0,-10],{fov:2});

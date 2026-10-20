@@ -67,6 +67,12 @@ try {
     assert.ok(gain > 0.01 && gain < 0.06, `additive coat adds the base's share of the Fresnel: ${gain}`);
     near(c['untinted glass'].mean, 1, 0.02, 'untinted glass is clear');
     near(c['voxelwise blend'].mean, 1, 0.03, 'voxelwise blend keeps its energy');
+    near(
+      c['contact transmission true'].mean / c['contact transmission false'].mean,
+      0.5,
+      0.02,
+      'contact transmission halves what the blend rests on',
+    );
     near(c['camera emission 0.5'].mean, 0.5, 0.005, 'camera emission');
     near(c['diffuse cap 1'].mean, 0.5, 0.01, 'diffuse cap 1');
     near(c['diffuse cap 2'].mean, 0.5, 0.01, 'diffuse cap 2');
@@ -84,6 +90,12 @@ try {
       c['cloud sunInMedia true'].mean,
       0.15 * c['cloud sunInMedia true'].mean,
       'sunlit medium',
+    );
+    near(
+      c['sunlit slab transparentShadows false'].mean,
+      c['sunlit slab transparentShadows true'].mean,
+      0.03 * c['sunlit slab transparentShadows true'].mean,
+      'sunlit slab lit through its own cells',
     );
     // Fade scale = the ground's distance: the sky takes 1 - 1/e of the grey ground; from that distance on, none.
     near(c['ground fade'].mean, 1 - 0.5 / Math.E, 0.01, 'ground fade');
