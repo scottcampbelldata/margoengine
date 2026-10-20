@@ -88,7 +88,8 @@ const DEFAULT_WORDS = (128 << 20) / 4, // WebGPU's default maxStorageBufferBindi
   CAUSTIC_SIGMA = 4, // and of the caustic chain
   DENOISE_PASSES = ATROUS + CAUSTIC_LEVELS + 2, // prepare, the two chains, combine
   VIEW_BYTES = 176,
-  PARAM_STRIDE = 256;
+  PARAM_STRIDE = 512,
+  PARAM_BYTES = 368;
 
 /** Resolved tracer options (every field set). */
 interface Settings {
@@ -424,6 +425,9 @@ interface View extends Targets {
   traceKey?: string;
   displayRaw?: GPUBindGroup;
   displayDenoised?: GPUBindGroup;
+  /** The denoised image blended with its history (in ping), shown when the last denoising kept history. */
+  displayResolved?: GPUBindGroup;
+  resolved?: boolean;
   denoisedAt: number;
 }
 
@@ -450,6 +454,13 @@ const toneCurve = (mode: Settings['toneMapping']) =>
 const encode = (v: number, gamma?: number) => {
   const x = Math.min(1, Math.max(0, v));
   return Math.round(255 * (gamma ? x ** (1 / gamma) : x <= 0.0031308 ? x * 12.92 : 1.055 * x ** (1 / 2.4) - 0.055));
+};
+/** FNV-1a over a matrix's float32 bits. */
+const cameraHash = (m: ArrayLike<number>) => {
+  const bits = new Uint32Array(Float32Array.from(m).buffer);
+  let h = 0x811c9dc5;
+  for (const b of bits) h = Math.imul(h ^ b, 0x01000193);
+  return h >>> 0;
 };
 const aborted = (signal?: AbortSignal) => {
   if (signal?.aborted) throw signal.reason ?? new DOMException('The render was aborted', 'AbortError');
@@ -491,6 +502,16 @@ export class VoxelPathTracer implements EnginePlugin {
   #cap = 64;
   #hold = 0;
   #streak = 0;
+  /** The viewport's last denoised frame (its camera, scene version and size) and whether the camera moved since. */
+  #history = {
+    matrix: new Float32Array(16),
+    corners: new Float32Array(32),
+    version: -1,
+    width: 0,
+    height: 0,
+    valid: false,
+  };
+  #restarted = false;
   /** The viewport shows preview samples (the full tracer is still compiling). */
   #previewing = false;
   #ready!: Promise<void>;
@@ -542,7 +563,7 @@ export class VoxelPathTracer implements EnginePlugin {
   }
   set enabled(value: boolean) {
     flag(value, 'enabled');
-    if (value && !this.#enabled) this.#samples = 0;
+    if (value && !this.#enabled) this.#restart();
     this.#enabled = value;
   }
 
@@ -634,14 +655,20 @@ export class VoxelPathTracer implements EnginePlugin {
     const next = settings(options, this.#settings),
       previous = this.#settings;
     this.#settings = next;
-    if (RESETS.some((k) => !Object.is(previous[k], next[k]))) this.#samples = 0;
+    if (RESETS.some((k) => !Object.is(previous[k], next[k]))) this.#restart();
     if (next.order !== previous.order && this.#graph) this.#register(this.#graph);
   }
 
   /** Discards the accumulated samples; the next frame starts a new image. */
   reset(): void {
     this.#alive();
+    this.#restart();
+  }
+
+  // A new image that the viewport's history must not blend into (the camera's moves keep it).
+  #restart(): void {
     this.#samples = 0;
+    this.#history.valid = false;
   }
 
   /**
@@ -1060,7 +1087,14 @@ export class VoxelPathTracer implements EnginePlugin {
   }
 
   // Accumulation targets of `width` x `height` (plus the denoiser's when `denoise`).
-  #targets(gpu: Gpu, t: Targets | undefined, width: number, height: number, denoise: boolean): Targets {
+  #targets(
+    gpu: Gpu,
+    t: Targets | undefined,
+    width: number,
+    height: number,
+    denoise: boolean,
+    temporal = false,
+  ): Targets {
     const storage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
       bytes = width * height * 16;
     let out = t;
@@ -1079,7 +1113,8 @@ export class VoxelPathTracer implements EnginePlugin {
     if (denoise && !out.ping) {
       out.ping = this.#buffer(gpu, bytes, storage);
       out.pong = this.#buffer(gpu, bytes, storage);
-      out.guide = this.#buffer(gpu, bytes, storage);
+      // The viewport's guide also holds the denoiser's history (two more images of its size).
+      out.guide = this.#buffer(gpu, temporal ? 3 * bytes : bytes, storage);
       out.caustics = this.#buffer(gpu, bytes, storage);
       out.cping = this.#buffer(gpu, bytes, storage);
       out.cpong = this.#buffer(gpu, bytes, storage);
@@ -1087,7 +1122,7 @@ export class VoxelPathTracer implements EnginePlugin {
       const groups: GPUBindGroup[] = [],
         o = out;
       // Pass k: 0 prepare (regular -> ping, caustic -> cping), 1..ATROUS the regular chain ending in pong, then the
-      // caustic chain ending in cping, last combine (pong += cping).
+      // caustic chain ending in cping, last combine (pong += cping; the viewport's, blended with its history, to ping).
       for (let k = 0; k < DENOISE_PASSES; k++) {
         const j = k - ATROUS,
           [src, dst] =
@@ -1106,7 +1141,7 @@ export class VoxelPathTracer implements EnginePlugin {
           gpu.device.createBindGroup({
             layout: gpu.denoiseLayout,
             entries: [
-              { binding: 0, resource: { buffer: o.params!, offset: k * PARAM_STRIDE, size: 176 } },
+              { binding: 0, resource: { buffer: o.params!, offset: k * PARAM_STRIDE, size: PARAM_BYTES } },
               { binding: 1, resource: { buffer: o.accum } },
               { binding: 2, resource: { buffer: o.albedo } },
               { binding: 3, resource: { buffer: o.normals } },
@@ -1114,7 +1149,10 @@ export class VoxelPathTracer implements EnginePlugin {
               { binding: 5, resource: { buffer: dst } },
               { binding: 6, resource: { buffer: o.guide! } },
               { binding: 7, resource: { buffer: o.caustics! } },
-              { binding: 8, resource: { buffer: k === 0 ? o.cping! : gpu.dummy } },
+              {
+                binding: 8,
+                resource: { buffer: k === 0 ? o.cping! : temporal && k === DENOISE_PASSES - 1 ? o.ping! : gpu.dummy },
+              },
             ],
           }),
         );
@@ -1318,7 +1356,8 @@ export class VoxelPathTracer implements EnginePlugin {
     t: Targets,
     samples: number,
     tile: readonly [number, number, number, number],
-  ): void {
+    history = 0,
+  ): boolean {
     const data = new ArrayBuffer(PARAM_STRIDE * DENOISE_PASSES),
       u = new Uint32Array(data),
       f = new Float32Array(data);
@@ -1329,8 +1368,15 @@ export class VoxelPathTracer implements EnginePlugin {
         last = k === ATROUS || k === ATROUS + CAUSTIC_LEVELS;
       // Flags: 1 last level, 2 the prepare pass, 4 no plane test (rays not the camera's corner-ray interpolation).
       const flat = this.#settings.projection !== 'camera' || this.#settings.distortion !== undefined;
+      // 8 and up: the viewport's history (prepare and combine), never with flat rays.
+      const keep = flat ? 0 : history;
       u.set(
-        [t.width, t.height, k === 0 ? 0 : 1 << (level - 1), (last ? 1 : 0) | (k === 0 ? 2 : 0) | (flat ? 4 : 0)],
+        [
+          t.width,
+          t.height,
+          k === 0 ? 0 : 1 << (level - 1),
+          (last ? 1 : 0) | (k === 0 ? 2 : 0) | (flat ? 4 : 0) | (k === 0 || k === DENOISE_PASSES - 1 ? keep : 0),
+        ],
         at,
       );
       // Edge stops: luminance difference over LUMINANCE_SIGMA (CAUSTIC_SIGMA) standard deviations of the difference
@@ -1338,8 +1384,12 @@ export class VoxelPathTracer implements EnginePlugin {
       f.set([caustic ? CAUSTIC_SIGMA : LUMINANCE_SIGMA, 128, 1, 1 / samples], at + 4);
       u.set(tile, at + 8);
       f.set(this.#corners, at + 12);
+      // The previous viewport frame: view-projection and corner rays (prepare reprojects into them).
+      f.set(this.#history.matrix, at + 44);
+      f.set(this.#history.corners, at + 60);
     }
     device.queue.writeBuffer(t.params!, 0, data);
+    return history !== 0 && this.#settings.projection === 'camera' && this.#settings.distortion === undefined;
   }
 
   #encodeDenoise(gpu: Gpu, encoder: GPUCommandEncoder, t: Targets): void {
@@ -1442,13 +1492,18 @@ export class VoxelPathTracer implements EnginePlugin {
       const frame = this.#buffer(gpu, FRAME_BYTES, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST),
         uniform = this.#buffer(gpu, VIEW_BYTES, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
       view = gpu.view = {
-        ...this.#targets(gpu, undefined, width, height, o.denoise !== false),
+        ...this.#targets(gpu, undefined, width, height, o.denoise !== false, true),
         frame,
         uniform,
         denoisedAt: -1,
       };
-    } else Object.assign(view, this.#targets(gpu, view, width, height, o.denoise !== false));
-    if (this.#moved(c, width, height) || (gpu.pipelines && this.#previewing)) this.#samples = 0;
+    } else Object.assign(view, this.#targets(gpu, view, width, height, o.denoise !== false, true));
+    if (this.#moved(c, width, height) || (gpu.pipelines && this.#previewing)) {
+      this.#samples = 0;
+      this.#restarted = true;
+      // The denoised image is stale even when the new accumulation reaches the same sample count.
+      view.denoisedAt = -1;
+    }
     this.#previewing = !gpu.pipelines;
     this.#width = width;
     this.#height = height;
@@ -1466,6 +1521,7 @@ export class VoxelPathTracer implements EnginePlugin {
         });
       view.displayRaw = group(view.accum);
       view.displayDenoised = view.pong ? group(view.pong) : undefined;
+      view.displayResolved = view.ping ? group(view.ping) : undefined;
       view.traceKey = key;
       view.denoisedAt = -1;
     }
@@ -1504,7 +1560,9 @@ export class VoxelPathTracer implements EnginePlugin {
           c.camera,
           [width, height, 0, 0],
           [width, height, this.#samples, count],
-          o.seed,
+          // With the denoiser's history every camera draws its own sample sequence (the history averages frames, which
+          // must not repeat one sequence); a camera's sequence stays the same, so equal inputs still give equal images.
+          o.denoise !== false ? (o.seed ^ cameraHash(c.camera.matrix)) >>> 0 : o.seed,
           true,
           view.caustics !== undefined,
           gpu.layout!,
@@ -1535,7 +1593,24 @@ export class VoxelPathTracer implements EnginePlugin {
       this.#samples >= view.denoisedAt * 1.25 ||
       this.#samples >= o.maxSamples;
     if (denoised && view.denoisedAt !== this.#samples && due) {
-      this.#denoiseParams(device, view, this.#samples, [0, 0, width, height]);
+      // History: kept by the viewport (8); used (16) when only the camera changed since it was written; 64 the
+      // accumulation restarted (the camera moved).
+      const h = this.#history,
+        reuse = h.valid && h.version === this.#version && h.width === width && h.height === height;
+      view.resolved = this.#denoiseParams(
+        device,
+        view,
+        this.#samples,
+        [0, 0, width, height],
+        8 | (reuse ? 16 : 0) | (this.#restarted ? 64 : 0),
+      );
+      h.matrix.set(c.camera.matrix);
+      h.corners.set(this.#corners);
+      h.version = this.#version;
+      h.width = width;
+      h.height = height;
+      h.valid = true;
+      this.#restarted = false;
       this.#encodeDenoise(gpu, c.encoder, view);
       view.denoisedAt = this.#samples;
     }
@@ -1559,7 +1634,7 @@ export class VoxelPathTracer implements EnginePlugin {
       depthStencilAttachment: { view: c.depth, depthLoadOp: 'load', depthStoreOp: 'store', stencilReadOnly: true },
     });
     pass.setPipeline(pipeline);
-    pass.setBindGroup(0, denoised ? view.displayDenoised! : view.displayRaw!);
+    pass.setBindGroup(0, denoised ? (view.resolved ? view.displayResolved! : view.displayDenoised!) : view.displayRaw!);
     pass.draw(3);
     pass.end();
   }

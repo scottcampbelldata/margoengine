@@ -1276,7 +1276,21 @@ fn radiance(px:vec2u)->Path {
    }
    continue;
   }
-  if(primary){primary=false;res.inv=select(0.0,1.0/max(h.t,1e-6),h.inst!=NONE);}
+  if(primary){
+   primary=false;
+   // The first hit's distance along the pixel centre's ray to the plane of the face this sample hit (camera rays): the
+   // denoiser places first hits on centre rays, where a jittered sample's own distance lies up to half a pixel off
+   // along the surface, which moves its history every frame the camera moves.
+   var tc=h.t;
+   if(f.projection.x==0u&&f.projection.z==0u&&h.inst!=NONE&&h.inst!=AREA){
+    var n=vec3f(0.0,1.0,0.0);
+    if(h.inst!=GROUND){n=rowOf(localX(h.inst),h.axis);}
+    let mo=motion;motion=1.0;let c=viewRay(vec2f(px)+0.5);motion=mo;
+    let den=dot(n,c.d);
+    if(abs(den)>1e-4*length(n)){let t2=dot(n,o+d*h.t-c.o)/den;if(abs(t2-h.t)<0.5*h.t){tc=t2;}}
+   }
+   res.inv=select(0.0,1.0/max(tc,1e-6),h.inst!=NONE);
+  }
   // Uniform fog outside volumes: the segment fades toward the fog's glow (all of it for a ray leaving the scene).
   if(f.fog.z>0.0&&medium==0u){
    let dl=length(d);let tr=select(exp(-f.fog.x*h.t*dl),0.0,h.inst==NONE);
@@ -1531,7 +1545,7 @@ fn radiance(px:vec2u)->Path {
  * Filtering", and Schied et al.).
  */
 export const DENOISE: string = /* wgsl */ `
-struct Params {size:vec4u,sigma:vec4f,tile:vec4u,origins:array<vec4f,4>,directions:array<vec4f,4>}
+struct Params {size:vec4u,sigma:vec4f,tile:vec4u,origins:array<vec4f,4>,directions:array<vec4f,4>,prev:mat4x4f,prevOrigins:array<vec4f,4>,prevDirections:array<vec4f,4>}
 @group(0) @binding(0) var<uniform> p:Params;
 @group(0) @binding(1) var<storage,read> accum:array<vec4f>;
 @group(0) @binding(2) var<storage,read> albedo:array<vec4f>;
@@ -1541,7 +1555,20 @@ struct Params {size:vec4u,sigma:vec4f,tile:vec4u,origins:array<vec4f,4>,directio
 @group(0) @binding(6) var<storage,read_write> guide:array<vec4f>;
 @group(0) @binding(7) var<storage,read> caustics:array<vec4f>;
 @group(0) @binding(8) var<storage,read_write> dst2:array<vec4f>;
+// The viewport's guide holds its history after the guide itself (n = width x height), as halves: at n + i the
+// demodulated estimate and sample weight of the last frame after a restart and its guide (the distance as f32 bits); at
+// 2n + i this frame's estimate and weight, then the previously displayed colour (prepare copies it from dst, where
+// combine left it) and its weight in samples, at most 8, plus 16 x prepare's mask of the bilinear taps to read it from.
 fn lum(c:vec3f)->f32 {return dot(c,vec3f(0.2126,0.7152,0.0722));}
+// pack2x16float rounded to the nearest half: some GPUs truncate toward zero (measured on an RTX A6000: every value
+// lower), which history stored every frame compounds into a darker image (1% over 32 frames).
+fn packHalves(v:vec2f)->u32 {
+ let b=pack2x16float(v);
+ let up=abs(v)-abs(unpack2x16float(b))>abs(unpack2x16float(b+0x00010001u))-abs(v);
+ return b+select(0u,1u,up.x)+select(0u,0x10000u,up.y);
+}
+fn ycocg(c:vec3f)->vec3f {return vec3f(dot(c,vec3f(0.25,0.5,0.25)),dot(c,vec3f(0.5,0.0,-0.5)),dot(c,vec3f(-0.25,0.5,-0.25)));}
+fn fromYcocg(c:vec3f)->vec3f {return vec3f(c.x+c.y-c.z,c.x+c.z,c.x-c.y-c.z);}
 fn oct(n:vec3f)->vec2f {
  let a=n/(abs(n.x)+abs(n.y)+abs(n.z));
  if(a.z>=0.0){return a.xy;}
@@ -1558,6 +1585,24 @@ fn hitPoint(x:f32,y:f32,t:f32)->vec3f {
  let uv=(vec2f(f32(p.tile.x),f32(p.tile.y))+vec2f(x,y))/vec2f(f32(p.tile.z),f32(p.tile.w));
  let o=mix(mix(p.origins[0],p.origins[1],uv.x),mix(p.origins[2],p.origins[3],uv.x),uv.y).xyz;
  let d=mix(mix(p.directions[0],p.directions[1],uv.x),mix(p.directions[2],p.directions[3],uv.x),uv.y).xyz;
+ return o+normalize(d)*t;
+}
+// The camera ray's direction through tile pixel position (x, y).
+fn viewDir(x:f32,y:f32)->vec3f {
+ let uv=(vec2f(f32(p.tile.x),f32(p.tile.y))+vec2f(x,y))/vec2f(f32(p.tile.z),f32(p.tile.w));
+ return normalize(mix(mix(p.directions[0],p.directions[1],uv.x),mix(p.directions[2],p.directions[3],uv.x),uv.y).xyz);
+}
+// Where world point P (w 1; a direction with w 0) lay in the previous frame's image, in pixels; negative when behind it.
+fn previousPixel(P:vec4f)->vec2f {
+ let clip=p.prev*P;
+ if(clip.w<=1e-6){return vec2f(-1.0);}
+ return vec2f((clip.x/clip.w*0.5+0.5)*f32(p.size.x),(0.5-clip.y/clip.w*0.5)*f32(p.size.y));
+}
+// The same through the previous frame's corner rays.
+fn prevHitPoint(x:f32,y:f32,t:f32)->vec3f {
+ let uv=(vec2f(f32(p.tile.x),f32(p.tile.y))+vec2f(x,y))/vec2f(f32(p.tile.z),f32(p.tile.w));
+ let o=mix(mix(p.prevOrigins[0],p.prevOrigins[1],uv.x),mix(p.prevOrigins[2],p.prevOrigins[3],uv.x),uv.y).xyz;
+ let d=mix(mix(p.prevDirections[0],p.prevDirections[1],uv.x),mix(p.prevDirections[2],p.prevDirections[3],uv.x),uv.y).xyz;
  return o+normalize(d)*t;
 }
 fn albedoAt(i:u32)->vec3f {return max(albedo[i].xyz*p.sigma.w,vec3f(0.02));}
@@ -1586,7 +1631,7 @@ fn variance(i:u32,c:vec3f,m2:f32,caustic:bool,g:vec2u)->f32 {
  let cc=select(vec3f(0.0),caustics[i].xyz*k,split);
  let c=accum[i].xyz*k-cc;let a=albedoAt(i);
  let la=max(lum(a),0.02);
- dst[i]=vec4f(c/a,variance(i,c,accum[i].w*k,false,g.xy)/(la*la));
+ var e=c/a;var ev=variance(i,c,accum[i].w*k,false,g.xy)/(la*la);
  if(split){dst2[i]=vec4f(cc/a,variance(i,cc,caustics[i].w*k,true,g.xy)/(la*la));}
  let nn=normals[i].xyz;let len=length(nn);
  let inv=albedo[i].w*k;
@@ -1595,7 +1640,44 @@ fn variance(i:u32,c:vec3f,m2:f32,caustic:bool,g:vec2u)->f32 {
  let foot=select(0.0,length(hitPoint(x+1.0,y,t)-hitPoint(x,y,t)),t>0.0);
  // Features seen through glass or a mirror (most samples): no plane test, the first hit's plane is not theirs.
  let through=normals[i].w*k<0.5;
- guide[i]=vec4f(oct(select(vec3f(0.0,0.0,1.0),nn/len,len>1e-6)),t,select(foot,-1.0,through||(p.size.w&4u)!=0u));
+ let nrm=select(vec3f(0.0,0.0,1.0),nn/len,len>1e-6);
+ // Viewport history (flag 8; 16: it is valid): where the history saw the same surface (position within two footprints,
+ // normals within about 25 degrees) its estimate counts as up to 32 samples (8 seen through glass or a mirror, whose
+ // reflections move otherwise), fading out by 64 samples of the present (32 while the camera holds still). It is kept
+ // from the last restart (flag 64), so while the camera holds still the samples it adds are not counted twice.
+ if((p.size.w&8u)!=0u){
+  var nh=0.0;var mask=0u;
+  let m=w*h;
+  if((p.size.w&16u)!=0u){
+   let P=hitPoint(x,y,t);let q=select(previousPixel(vec4f(viewDir(x,y),0.0)),previousPixel(vec4f(P,1.0)),t>0.0);
+   if(t>0.0&&len>1e-6&&all(q>=vec2f(0.0))&&q.x<f32(w)&&q.y<f32(h)){
+    let pg=bitcast<vec4u>(guide[m+u32(q.y)*w+u32(q.x)]);let tp=bitcast<f32>(pg.w);
+    let onSurface=length(prevHitPoint(floor(q.x)+0.5,floor(q.y)+0.5,tp)-P)<2.0*foot+1e-3*t;
+    if(tp>0.0&&onSurface&&dot(unoct(unpack2x16float(pg.z)),nrm)>0.9){
+     let h0=unpack2x16float(pg.x);let h1=unpack2x16float(pg.y);
+     nh=h1.y*max(0.0,1.0-n/select(32.0,64.0,(p.size.w&64u)!=0u));
+     // The variance of the blend, and the luminance stop's widening for few samples (atrous) as for n + nh of them.
+     let wide=(1.0+2.0/sqrt(n+nh))/(1.0+2.0/sqrt(n));
+     e=(e*n+vec3f(h0,h1.x)*nh)/(n+nh);ev*=n/(n+nh)*wide*wide;
+    }
+   }
+   // The displayed colour's taps (combine reads them bilinearly around q) that saw no occluder in front of this
+   // pixel's first hit (or of the sky): a tap that did shows what the camera's move uncovered here, which would ghost.
+   let b=floor(q-0.5);
+   for(var k=0u;k<4u;k++){
+    let at=b+vec2f(f32(k&1u),f32(k>>1u));
+    if(at.x<0.0||at.y<0.0||at.x>=f32(w)||at.y>=f32(h)){continue;}
+    let tp=bitcast<f32>(bitcast<vec4u>(guide[m+u32(at.y)*w+u32(at.x)]).w);
+    let d=length(P-prevHitPoint(at.x+0.5,at.y+0.5,0.0));
+    if(tp<=0.0||(t>0.0&&tp>0.98*d-2.0*foot)){mask|=1u<<k;}
+   }
+  }
+  let shown=dst[i];
+  guide[2u*m+i]=bitcast<vec4f>(vec4u(packHalves(e.xy),packHalves(vec2f(e.z,min(select(32.0,8.0,through),n+nh))),
+   packHalves(shown.xy),packHalves(vec2f(shown.z,clamp(shown.w,0.0,8.0)+16.0*f32(mask)))));
+ }
+ dst[i]=vec4f(e,ev);
+ guide[i]=vec4f(oct(nrm),t,select(foot,-1.0,through||(p.size.w&4u)!=0u));
 }
 fn tap(x:i32)->f32 {return select(select(0.0625,0.25,abs(x)==1),0.375,x==0);}
 @compute @workgroup_size(8,8) fn atrous(@builtin(global_invocation_id) g:vec3u) {
@@ -1632,11 +1714,55 @@ fn tap(x:i32)->f32 {return select(select(0.0625,0.25,abs(x)==1),0.375,x==0);}
  if((p.size.w&1u)!=0u){r=vec4f(r.xyz*albedoAt(i),1.0);}
  dst[i]=r;
 }
-// The filtered caustics (src) added to the filtered rest (dst), both remodulated.
+// The filtered caustics (src) added to the filtered rest (dst), both remodulated. The viewport (flag 8) blends that with
+// its previous displayed colour, reprojected and bilinearly read, into dst2: the frames' jittered samples average into
+// antialiased edges. Where all four taps saw an occluder in front of this pixel's surface (prepare's mask; the camera's
+// move uncovered it) the history is dropped; one clear tap is enough, which keeps both sides of an edge. After a restart
+// (flag 64) the history is clamped to this frame's 3x3 neighbourhood (its mean and 1.25 standard deviations, in YCoCg),
+// which limits what lags behind the move. The history counts as at most 8 samples against this frame's; while the
+// camera holds still nothing moved, it is not clamped and fades out by 8 samples, whose jitter antialiases as well.
 @compute @workgroup_size(8,8) fn combine(@builtin(global_invocation_id) g:vec3u) {
- if(g.x>=p.size.x||g.y>=p.size.y){return;}
- let i=g.y*p.size.x+g.x;
- dst[i]=vec4f(dst[i].xyz+src[i].xyz,1.0);
+ let w=p.size.x;let h=p.size.y;
+ if(g.x>=w||g.y>=h){return;}
+ let i=g.y*w+g.x;
+ if((p.size.w&8u)==0u){dst[i]=vec4f(dst[i].xyz+src[i].xyz,1.0);return;}
+ let m=w*h;let gi=guide[i];let n=1.0/p.sigma.w;
+ // The denoiser's history for the next frame, from a restart or where there was none.
+ let est=bitcast<vec4u>(guide[2u*m+i]);let mask=u32(unpack2x16float(est.w).y/16.0);
+ if((p.size.w&64u)!=0u||(p.size.w&16u)==0u){
+  guide[m+i]=bitcast<vec4f>(vec4u(est.x,est.y,pack2x16float(gi.xy),bitcast<u32>(gi.z)));
+ }
+ let c=dst[i].xyz+src[i].xyz;
+ var nh=0.0;var hc=vec3f(0.0);
+ if((p.size.w&16u)!=0u&&mask!=0u){
+  let x=f32(g.x)+0.5;let y=f32(g.y)+0.5;
+  let q=select(previousPixel(vec4f(viewDir(x,y),0.0)),previousPixel(vec4f(hitPoint(x,y,gi.z),1.0)),gi.z>0.0)-0.5;
+  let b=floor(q);let fr=q-b;
+  var s=vec4f(0.0);var sw=0.0;
+  for(var k=0u;k<4u;k++){
+   let at=b+vec2f(f32(k&1u),f32(k>>1u));
+   if(at.x<0.0||at.y<0.0||at.x>=f32(w)||at.y>=f32(h)){continue;}
+   let wk=select(1.0-fr.x,fr.x,(k&1u)!=0u)*select(1.0-fr.y,fr.y,(k>>1u)!=0u);
+   let v=bitcast<vec4u>(guide[2u*m+u32(at.y)*w+u32(at.x)]);
+   let b2=unpack2x16float(v.w);
+   s+=vec4f(unpack2x16float(v.z),b2.x,b2.y-16.0*floor(b2.y/16.0))*wk;
+   sw+=wk;
+  }
+  if(sw>0.01){
+   hc=s.xyz/sw;
+   if((p.size.w&64u)!=0u){
+    var m1=vec3f(0.0);var m2=vec3f(0.0);
+    for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){
+     let o=u32(clamp(i32(g.y)+y,0,i32(h)-1))*w+u32(clamp(i32(g.x)+x,0,i32(w)-1));
+     let cq=ycocg(dst[o].xyz+src[o].xyz);m1+=cq;m2+=cq*cq;
+    }}
+    m1/=9.0;let sd=1.25*sqrt(max(m2/9.0-m1*m1,vec3f(0.0)));
+    hc=fromYcocg(clamp(ycocg(hc),m1-sd,m1+sd));
+   }
+   nh=min(s.w/sw,8.0)*max(0.0,1.0-n/select(8.0,64.0,(p.size.w&64u)!=0u));
+  }
+ }
+ dst2[i]=vec4f(min((c*n+hc*nh)/(n+nh),vec3f(65000.0)),n+nh);
 }
 `;
 

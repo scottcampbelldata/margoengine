@@ -176,7 +176,7 @@ The engine camera is used as is: perspective by default, orthographic (or any af
 | `exposure` (EV) | 0 | -20-20 | no |
 | `aperture` | 0 | 0+ | yes |
 | `focusDistance` | camera to target | above 0 | yes |
-| `denoise` | false | boolean, or `'auto'` (viewport: every frame below 32 samples, then as the samples grow by a quarter; captures denoise) | no |
+| `denoise` | false | boolean, or `'auto'` (viewport: every frame below 32 samples, then as the samples grow by a quarter; captures denoise); the viewport's denoiser keeps a history across camera moves (see below) | no |
 | `lensBlades`, `lensRotation` | 0, 0 | 0 or 3-16; radians | yes |
 | `shutter` | 0 | 0-1 | yes |
 | `previousCamera` | none | `{position, target, up?, fov?}` or null | yes |
@@ -207,6 +207,17 @@ by floating-point rounding, which changes individual paths, not the converged im
   draws over the frame with exposure and tone mapping, writing each pixel's first-hit depth (so overlays drawn later
   depth-test against the traced image). On an `rgba16float` target (for example under `@margoengine/post` Bloom) it
   writes linear HDR and leaves tone mapping to that pass.
+- With `denoise` on, the viewport's denoiser keeps a history while the camera moves: each frame reprojects the last
+  frame's estimate onto the surfaces it sees again (up to 32 samples' worth, 8 through glass or mirrors) and blends the
+  displayed image with the last one (temporal antialiasing: the frames' jittered samples average into smooth edges).
+  Measured at 960 x 800, 1 sample per frame, 30 frames, 8-bit RMS error against a 2048-sample image of the last
+  camera (diffuse, glass and cloud scenes): turning 0.001 degrees per frame 2.40 / 6.08 / 5.22 before, 0.98 / 2.33 /
+  1.60 now; turning 0.5 degrees per frame 2.40 / 6.05 / 5.00 before, 2.13 / 2.78 / 2.32 now. Where a move uncovers a
+  surface (behind an object the camera passes) the history starts again there, so those pixels are noisier for a few
+  frames; 8 frames after the camera stops the diffuse and cloud scenes are 1.10 and 2.28 against 0.96 and 2.03 without
+  history (the glass scene 1.95 against 2.03). A camera that never moves gives the same image as before. Every camera
+  pose draws its own sample sequence, so equal inputs still give equal images. Cost at 1920 x 1080: two more images of
+  history (348 against 285 MiB for the denoised material scene) and about 0.6 ms per frame.
 - `enabled = false` leaves ordinary rendering unchanged (measured bit-identical); the tracer then encodes nothing.
 - Until then the viewport shows a preview: a small kernel (compiled in a fraction of the full tracer's time, about 0.15
   against 2 s on an RTX A6000) draws the first hit lit by the sun and the sky; accumulation starts over when the full
@@ -256,15 +267,18 @@ by floating-point rounding, which changes individual paths, not the converged im
 
 ## Measured performance
 
-RTX A6000 (Ampere), Windows 11, Edge 155 (headless, WebGPU, D3D12), 2026-10-19, from
-`tests/browser-check.mjs timing` (GPU time between timestamp queries around the pass, median of 40 frames):
+RTX A6000 (Ampere), Windows 11, Edge 155 (headless, WebGPU, D3D12), 2026-10-20, from
+`tests/browser-check.mjs timing` (GPU time between timestamp queries around the pass, median of 40 frames; the same
+day's run before the denoiser's history in brackets):
 
 | Scene at 1920 x 1080 | GPU per frame | GPU memory |
 | --- | --- | --- |
-| Material scene (7 models, glass, metal, emitter, cloud, sun, sky, ground), 1 sample | 12.39 ms | 95 MiB |
-| Same, denoised | 19.92 ms | 285 MiB |
-| One dense 256^3 model (3,967,601 voxels, terrain), 1 sample | 9.90 ms | 98 MiB |
-| Same, 4 samples per frame | 36.96 ms | 98 MiB |
+| Material scene (7 models, glass, metal, emitter, cloud, sun, sky, ground), 1 sample | 13.63 ms (13.57) | 95 MiB |
+| Same, denoised | 21.69 ms (20.97-21.23) | 348 MiB (285) |
+| One dense 256^3 model (3,967,601 voxels, terrain), 1 sample | 10.81 ms (10.68-10.75) | 98 MiB |
+| Same, 4 samples per frame | 42.14 ms (41.55-41.88) | 98 MiB |
+
+The previous day's run of the same check gave 12.39, 19.92, 9.90 and 36.96 ms: compare rows from one day only.
 
 Light sampling through glass and mirrors made a sample dearer than before it (measured the same day on the same
 machine: 6.09 ms for the material scene, 8.45 ms for the dense one, 9.11 ms denoised): glass and mirror candidates need
@@ -281,10 +295,11 @@ Numbers on other GPUs are not measured.
 
 ## Verification
 
-- `tests/*.test.js` (Node, 29 tests, about 0.6 s; part of `npm run verify`): validation and atomic failure, dense
+- `tests/*.test.js` (Node, 46 tests, about 1.1 s; part of `npm run verify`): validation and atomic failure, dense
   indexing, all 255 palette identities, transformed/mirrored/hidden instances, model reuse by revision, voxel traversal
   against a brute-force slab test (2,000 random rays over 5 models whose sizes are not multiples of 8), resets for each
-  camera/size/scene/option change, enable/disable, `maxSamples`, the denoiser's passes, upload reuse, disposal, device
+  camera/size/scene/option change, enable/disable, `maxSamples`, the denoiser's passes and when the viewport's history
+  is kept, used or dropped, upload reuse, disposal, device
   restore and device switch, pass order, PNG encoding with tile placement, AOV mapping, cancellation, pausing, device
   loss during a capture, and the frame uniform's lighting values. A recording fake device stands in for WebGPU.
 - `tests/browser-check.mjs` (real WebGPU, run under `scripts/gpu-lock.mjs`) on the RTX A6000:
@@ -377,7 +392,13 @@ Numbers on other GPUs are not measured.
   the candidates by weighted reservoir sampling (as in Talbot et al. 2005, resampled importance sampling), walked by
   the path loop's own closest-hit call so the shader holds one traversal.
 - Denoising: the edge-avoiding a-trous wavelet filter (Dammertz et al. 2010) on albedo-demodulated radiance, with
-  variance-guided luminance stops (Schied et al. 2017) and a plane-distance geometric stop. Light focused by glass,
+  variance-guided luminance stops (Schied et al. 2017) and a plane-distance geometric stop. In the viewport the
+  demodulated estimate is accumulated over frames by reprojection with position and normal tests, as in Schied et
+  al.'s spatiotemporal filter, and the output is blended with the previous output (temporal antialiasing, Karis 2014,
+  "High Quality Temporal Supersampling"), clamped to the neighbourhood's mean and standard deviation in YCoCg (Salvi
+  2016) and dropped where the reprojected taps saw an occluder. First-hit distances for reprojection are taken along
+  each pixel's centre ray to the plane of the face the sample hit. History is stored in halves rounded to nearest
+  (some GPUs convert toward zero, which compounds into a darker image). Light focused by glass,
   mirrors and glossy metal onto diffuse surfaces is filtered separately, more widely. The luminance stop compares a
   difference with the variance of that difference (both pixels' variances): against the centre's variance alone it
   rejects bright, noisy neighbours more than dark ones, which darkened images by about 1.5% (measured).
@@ -422,7 +443,9 @@ Not done or not verified, stated plainly:
 - **MagicaVoxel parity is not complete:** a transparent background (`_bg_a`) and non-cubic voxels (`_scale`) are
   not reproduced; sky-lit subsurface blocks are 7-12 levels too dark; glass over a lit floor is 1-2 levels brighter; under the atmosphere, a view into a low sun matches on 97.7% of
   pixels and very dense air settings by 2-3 levels on average (docs/magicavoxel-parity.md).
-- **Denoiser:** a classical filter, not a learned one. Averaged over four seeds against 131,072-sample references
+- **Denoiser:** a classical filter, not a learned one. While the camera moves, surfaces it uncovers are noisy for a
+  few frames, and for a few frames after it stops the history makes diffuse and cloud scenes slightly worse than
+  without it (numbers under "Viewport"). Averaged over four seeds against 131,072-sample references
   (noise removed in quadrature) it lowers the error x2.46, x2.32, x2.24 at 4, 16, 64 samples on the material scene and
   x2.20, x2.09, x2.03 on the caustic scene (whose undenoised error rose a little when the glass walks became one per
   point; its denoised error stayed within 4%). Edge pixels gain less.

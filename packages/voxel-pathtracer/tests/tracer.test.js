@@ -152,6 +152,36 @@ test('denoising adds a prepare, five regular and six caustic wavelet levels and 
   tracer.dispose();
 });
 
+test('the viewport denoiser keeps history across camera moves and while still; other restarts drop it', async () => {
+  const { tracer, frame, device, camera } = await ready({ denoise: true });
+  // Flags of the prepare (first) and combine (last) passes: 8 keep, 16 use, 64 restarted.
+  const history = () => {
+    const u = new Uint32Array(device.buffers.findLast((b) => b.size === 512 * 13 && !b.destroyed).data),
+      first = u[3] & 120,
+      last = u[(12 * 512) / 4 + 3] & 120;
+    assert.equal(first, last, 'prepare and combine agree');
+    return first;
+  };
+  frame();
+  assert.equal(history() & 88, 8 | 64, 'the first denoised frame starts the history');
+  frame();
+  assert.equal(history() & 88, 8 | 16, 'still: used, kept, not restarted');
+  camera.position = [21, 14, 24];
+  frame();
+  assert.equal(history() & 88, 8 | 16 | 64, 'a camera move reprojects it');
+  frame();
+  assert.equal(history() & 88, 8 | 16);
+  tracer.setOptions({ seed: 3 });
+  frame();
+  assert.equal(history() & 88, 8, 'a sampling change starts a new history');
+  frame();
+  assert.equal(history() & 88, 8 | 16);
+  tracer.reset();
+  frame();
+  assert.equal(history() & 88, 8, 'reset() too');
+  tracer.dispose();
+});
+
 test('voxel uploads are kept for unchanged models and released for removed ones', async () => {
   const a = model('a', [16, 16, 16], (x, y, z) => ((x + y + z) % 3 ? 1 : 0)),
     b = model('b', [8, 8, 8], () => 2),
