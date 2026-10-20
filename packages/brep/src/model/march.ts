@@ -44,9 +44,13 @@ export function traceIntersections(a: SurfaceDef, b: SurfaceDef, box: Box3): { c
       }
       return false;
     });
+  // A seed settled past a spline's edge lies on its continuation: its walk would trace a curve already found again, or
+  // run out and back to the edge.
+  const past = (s: SurfaceDef, p: XYZ) =>
+    s.kind === 'spline' && length(sub(p, splineFoot(s, p, true).q)) > 1e-10 * scale0;
   for (const seed of [...seeds(a, b, box), ...seeds(b, a, box)]) {
     const s = settle(a, b, seed, seed, meetDirection(a, b, seed) ?? [0, 0, 0], scale0);
-    if (!s || !inside(box, s, 1e-9 * size) || covered(s)) continue;
+    if (!s || !inside(box, s, 1e-9 * size) || covered(s) || past(a, s) || past(b, s)) continue;
     const t0 = meetDirection(a, b, s);
     if (!t0) throw new RangeError('the surfaces touch tangentially: Booleans there are not supported yet');
     const forward = walk(a, b, s, t0, box, hmax, scale0);
@@ -249,7 +253,10 @@ function walk(
  */
 function edgeExit(s: SurfaceDef, other: SurfaceDef, q: XYZ, scale0: number): XYZ | undefined {
   if (s.kind !== 'spline') return undefined;
-  const foot = splineFoot(s, q);
+  let foot = splineFoot(s, q);
+  if (length(sub(q, foot.q)) <= 1e-10 * scale0) return undefined;
+  // Found from the last place, the foot may lie on another sheet: the surface's own search decides.
+  foot = splineFoot(s, q, true);
   if (length(sub(q, foot.q)) <= 1e-10 * scale0) return undefined;
   const e = surfaceEvaluator(s),
     [u, v] = foot.uv,

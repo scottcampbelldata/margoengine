@@ -543,6 +543,38 @@ test('a line through a thread flank crosses it once a turn (every sheet, not onl
   assert.equal(model.curveSurfaceCrossings(line, sheet.faces[0].surface, 0, 6 * mm).length, 6);
 });
 
+test('a long rational helix crosses a thin pin twice every pass, and a flank cut off its edges is traced once', () => {
+  // 40 turns and 45 degrees of a rational quadratic helix (no simple speed bound) pass a 0.3 mm pin 41 times: 82
+  // crossings. Sampled 256 times it was seen 16 times (Jubilee 28: a drill missed most turns of a thread's edge).
+  const mm = 0.001,
+    n = 40 * 8 + 2,
+    points = Array.from({ length: n }, (_, i) => {
+      const t = (2 * Math.PI * i) / 8;
+      return [2 * mm * Math.cos(t), 2 * mm * Math.sin(t), (0.5 * mm * t) / (2 * Math.PI)];
+    }),
+    knots = Array.from({ length: n - 1 }, (_, i) => i),
+    helix = {
+      kind: 'spline',
+      degrees: [2],
+      counts: [n],
+      knots: [knots],
+      multiplicities: [knots.map((_, i) => (i === 0 || i === n - 2 ? 3 : 1))],
+      points,
+      weights: points.map((_, i) => (i % 2 ? 0.95 : 1)),
+    },
+    pin = { kind: 'cylinder', frame: model.frameOf([1.9 * mm, 0.4 * mm, 0], Z, X), radius: 0.3 * mm };
+  assert.equal(model.curveSurfaceCrossings(helix, pin, 0, n - 2).length, 82);
+  // A post through six turns of flank, running off its edges: seeds settled past an edge once traced curves twice,
+  // and their overlaps read as 100 tangential crossings.
+  const [sheet] = model.bodiesFromSTEP(parseSTEP(flank(6, 8, 2, 1.4, 0.5, 0.15))).bodies,
+    s = sheet.faces[0].surface,
+    corner = (f) => [0, 1, 2].map((k) => f(...s.points.map((p) => p[k]))),
+    post = { kind: 'cylinder', frame: model.frameOf([1.75 * mm, 0.3 * mm, 0], Z, X), radius: 0.35 * mm },
+    meet = model.intersectSurfaces(s, post, { min: corner(Math.min), max: corner(Math.max) });
+  assert.equal(meet.kind, 'curves');
+  assert.deepEqual(meet.crossings, []);
+});
+
 test('a thread flank (a ruled B-spline round many turns) meshes, and its exact area matches the mesh', () => {
   // A point's nearest place on such a surface, or on its edges, is easily on the next turn: that once cut the edges to
   // a part of a span, crossed the mesh's boundary and left the exact area at 1% to 50% of the true one.

@@ -28,10 +28,13 @@ function controlBox(s: SurfaceDef & { kind: 'spline' }): { min: XYZ; max: XYZ } 
 /** Where the last point projected onto each spline surface landed: the next projection starts there. */
 const lastFoot = new WeakMap<SurfaceDef, [number, number]>();
 
-/** The nearest place on a spline surface to `p`: its (u, v), point and unit normal. */
-export function splineFoot(s: SurfaceDef, p: XYZ): { uv: [number, number]; q: XYZ; n: XYZ } {
+/**
+ * The nearest place on a spline surface to `p`: its (u, v), point and unit normal; found from where the last point
+ * landed, or (`fresh`) by the surface's own search.
+ */
+export function splineFoot(s: SurfaceDef, p: XYZ, fresh = false): { uv: [number, number]; q: XYZ; n: XYZ } {
   const e = surfaceEvaluator(s),
-    uv = e.parameters(p, lastFoot.get(s));
+    uv = e.parameters(p, fresh ? undefined : lastFoot.get(s));
   lastFoot.set(s, uv);
   return { uv, q: e.at(uv[0], uv[1]).slice(0, 3) as XYZ, n: e.normal(uv[0], uv[1]) };
 }
@@ -220,6 +223,66 @@ function bisect(f: (t: number) => number, lo: number, flo: number, hi: number, f
   return Math.abs(flo) <= Math.abs(fhi) ? lo : hi;
 }
 
+/** The smallest radius of curvature of an analytic surface near a curve (Infinity for a plane). */
+function featureSize(s: SurfaceDef, c: { at(t: number): number[] }, t0: number, t1: number): number {
+  switch (s.kind) {
+    case 'plane':
+      return Infinity;
+    case 'cylinder':
+    case 'sphere':
+      return s.radius;
+    case 'torus':
+      return s.minor;
+    case 'cone': {
+      // The cone's radius where the curve runs (smallest over a few of its points), not less than a millionth of it.
+      let r = Infinity;
+      for (let k = 0; k <= 16; k++) {
+        const p = c.at(t0 + ((t1 - t0) * k) / 16),
+          h = dot(sub(p.slice(0, 3) as XYZ, s.frame.origin), s.frame.z);
+        r = Math.min(r, Math.abs(s.radius + h * Math.tan(s.angle)));
+      }
+      return Math.max(r, 1e-6 * Math.abs(s.radius) || 1e-12);
+    }
+    default:
+      return Infinity;
+  }
+}
+
+/**
+ * Parameters along a spline curve over [t0, t1]: the curve's own samples where it turns a fifth of a radian, each
+ * stretch then cut so neighbours lie at most `feature` / 4 apart (at least 256 in all, at most 100,000).
+ */
+function splineSamples(
+  c: { at(t: number): number[]; sample(a: number, b: number, deflection: number, turn: number): number[] },
+  t0: number,
+  t1: number,
+  feature: number,
+): number[] {
+  const base = 256,
+    coarse: number[] = [];
+  for (let k = 0; k <= base; k++) coarse.push(t0 + ((t1 - t0) * k) / base);
+  let length = 0;
+  for (let k = 1; k <= base; k++) {
+    const p = c.at(coarse[k - 1]),
+      q = c.at(coarse[k]);
+    length += Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]);
+  }
+  const turned = c.sample(t0, t1, length || 1, 0.2),
+    stops = [...new Set([...coarse, ...turned])].sort((x, y) => x - y),
+    out = [stops[0]],
+    gap = Number.isFinite(feature) ? feature / 4 : Infinity;
+  for (let k = 1; k < stops.length && out.length < 100_000; k++) {
+    const a = stops[k - 1],
+      b = stops[k],
+      p = c.at(a),
+      q = c.at(b),
+      chord = Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]),
+      pieces = Math.min(1000, Math.max(1, Math.ceil(chord / gap)));
+    for (let i = 1; i <= pieces; i++) out.push(a + ((b - a) * i) / pieces);
+  }
+  return out;
+}
+
 /**
  * Parameters in [t0, t1] where the curve crosses the surface (its signed distance changes sign), each found to the
  * last bit. Intervals are split until each either provably holds no crossing or is shorter than `resolution` (a
@@ -242,12 +305,14 @@ export function curveSurfaceCrossings(
   if (surface.kind === 'spline') return splineCrossings(curve, surface, t0, t1);
   const speed = speedBound(curve);
   if (!Number.isFinite(speed)) {
-    // Splines: sign changes between dense samples.
-    const n = 256;
-    let a = t0,
+    // Splines (rational ones have no simple speed bound): sign changes between samples close enough that the curve
+    // cannot enter and leave the surface between two of them (a quarter of its smallest radius apart, and where the
+    // curve turns a fifth of a radian), so a helix passing a drill once a turn is seen every turn.
+    const ts = splineSamples(c, t0, t1, featureSize(surface, c, t0, t1));
+    let a = ts[0],
       fa = f(a);
-    for (let k = 1; k <= n; k++) {
-      const b = t0 + ((t1 - t0) * k) / n,
+    for (let k = 1; k < ts.length; k++) {
+      const b = ts[k],
         fb = f(b);
       if (negative(fa) !== negative(fb)) out.push(bisect(f, a, fa, b, fb));
       a = b;
