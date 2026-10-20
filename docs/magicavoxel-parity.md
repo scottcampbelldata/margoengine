@@ -7,8 +7,8 @@ commercial replacement must beat it, not tie it.
 Clean room: MagicaVoxel (0.99.7.2 in `C:\Tools`) is used only as a black box. We write our own `.vox` scenes, it renders
 them, we compare its PNG snapshots with ours. Its code, shaders, `config/` and `shader/` folders are never read.
 
-Everything here is on branch `worktree-agent-a63cac143225721f2` (not pushed, Codex's request). Nothing touches
-`@margoengine/core` or the stage.
+This work landed on main on 2026-10-20 (Scott's request; it had been held on branch
+`worktree-agent-a63cac143225721f2` at Codex's request). Nothing touches `@margoengine/core` or the stage.
 
 ## How to compare
 
@@ -86,7 +86,9 @@ Everything here is on branch `worktree-agent-a63cac143225721f2` (not pushed, Cod
    5; sun-lit tops within 6 (184 against 190; subsurface glass 185 against 183). Open: sky-lit tops are 7-12 levels
    too dark, and MagicaVoxel's subsurface follows the diffuse cap (cap 4: +13 levels), which our volume cannot copy
    (counting its events as diffuse made every top 25-45 levels too dark): MagicaVoxel's subsurface is not a plain
-   volume walk.
+   volume walk. Nor an unlimited one (2026-10-20, 256 samples): with the scatter cap at 64 the sky-lit subsurface
+   tile reads 169 against MagicaVoxel's 136 (ours at cap 5: 124), and dense scattering clouds overshoot too (d 1:
+   167 against 132), so the answer lies between, specific to `_sss`.
 2. Partly transparent glass (`_trans` below 1): done (material `contactTransmission`): glass share sqrt(`_trans`) at
    the block's faces to the air, no picks inside, and what it rests on is reached with the share again. P boards
    (`_trans` 0.1-1, heights 1, 2, 3, 6, white and black base): 64 of 64 tiles within 3 levels sky-lit (mean 0.6) and
@@ -182,8 +184,12 @@ MagicaVoxel parity work (parity is blocked while it needs the desktop, so this m
    selling point over MagicaVoxel, which has no textures.
 2. See-through texture pixels (cutout): a face pixel with low alpha lets the ray pass on through the voxel (leaves).
 3. Photo mode in the sandbox: its chunks as path-tracer models (about a dozen block types, well under 255 materials;
-   an edited chunk re-uploads alone), water and glass as glass, torch light as an emitter; needs this branch and main
-   together (the branch predates the sandbox).
+   an edited chunk re-uploads alone), water and glass as glass, torch light as an emitter. Main merged into this
+   branch (Scott's go-ahead) and then rebased onto it for main; `examples/voxel-sandbox/src/photo.ts` (P toggles, Enter
+   saves a PNG, `?photo` starts in it).
+
+Status: 1 and 2 committed (b7d16afd); the texture GPU check passed on every pixel, the cut-out check is written and
+waits for the GPU. 3 builds and passes the sandbox's tests; its screenshots wait for the GPU.
 
 Not worth it yet: crossed-card plants (tall grass, flowers, torch shape): new non-cube geometry in the traversal for 4
 blocks. Photo mode leaves grass and flowers out and shows torches as small glowing blocks.
@@ -202,13 +208,43 @@ blocks. Photo mode leaves grass and flowers out and shows torches as small glowi
   byte); Biome format and lint clean; hygiene 10.0 on every gate for the package.
 - Open: `npm run verify` on the branch, size entries (measure:size), rebuild the tarballs for Codex.
 
-## Open from before the parity work (do not lose)
+## Paused when the voxel and path tracer work began (do not lose)
 
-- Voxel sandbox: render distance 16 fills in 8.8-9.2 s, over the 6 s target (docs/limits.md).
-- Voxel sandbox visual references for the Intel laptop profile: record there and add its profile id to `VOXEL` in
-  `scripts/visual-regression.js`.
-- Path tracer: light sampling through glass costs about 2x per sample in the glass scene; the denoiser on the caustic
-  scene is just under 2x better than raw (target 2x).
-- main's docs/HANDOFF.md still says the MagicaVoxel comparison is next; update it when this branch lands.
-- `C:\Development\Projects\margoengine\.claude\launch.json` (untracked, voxel-sandbox dev server): keep or delete.
-- `margo3d-studio` (HANDOFF step 6 posed-picking fixture) is on this PC, not yet used.
+Scott (2026-10-20): list what was set aside on 2026-10-19 and continue it. Checked with `git worktree list`, `git cherry
+origin/main <branch>` (patch-level, so rebased copies do not count) and the handoff files.
+
+1. CAD kernel, `@margoengine/brep` (the standing goal: replace OpenCascade; `docs/brep-kernel-checklist.md` on the
+   branch). Branch `claude/kernel` (worktree `C:\Development\Projects\margoengine-claude`), 17 commits on top of main
+   431222c0, none on main yet:
+   - Phase 0 work (13 commits): real JT 9.5 and JT 10 meshes, JT MultiXT segments, Parasolid cliff-edge and
+     charted-spine blends, tolerant edges along fin SP-curves, torus bands, STEP export cutting closed surfaces at
+     their seam and B-spline edges in pieces; the branches `claude/integration-2026-10-18`, `claude/jt-real-files`,
+     `claude/step-seam-edges`, `claude/smooth-trace-curves`, `claude/vibrant-satoshi-2c802e` and
+     `claude/confident-proskuriakova-8da001` are subsets of it.
+   - Checklist 1.1-1.3: `model.massProperties` (exact, from the faces), `model.bodiesFromSTEP` (STEP solids into the
+     modeler), `model.checkBody` (Euler-Poincare, connected shells, outward faces, no crossing edges).
+   - Codex validated the tip dc5d3f50 (branch `codex/test-dc5d3f50`, with its API and size records): check:merge
+     passed (2,709/2,709 tests, proofs 15/15, visuals 55/55, brep 81/81, brep hygiene 10). Its comparison with
+     OpenCascade over the corpus was paused by Scott on 2026-10-19 11:11 UTC to free the CPU (interim report:
+     `C:\Development\Projects\margoengine-split\test-results\kernel-dc5d3f50\RESULTS-FOR-CLAUDE-IN-PROGRESS.md`).
+     Its findings, the next kernel work:
+     - a negative signed volume and area on an imported body (Jubilee body 48), and a round trip that changes it;
+     - round-trip mass exactly doubled on a circular pattern (Jubilee CirPattern bodies 10, 12, 14, 17);
+     - mass and the checker throwing a pole/apex error on cone and sphere apex faces (Jubilee bodies 70, 90; Radial
+       Engine JT part 10);
+     - mass differences from OpenCascade up to 4.7e-5 relative on the model tests, and a tiny sheet's round trip at
+       1e-2;
+     - operations on imported parts: Margo's cuts valid on 84 of 200 parts (OpenCascade 200), fillets on 4 (OpenCascade
+       67), 304 Margo throws.
+   - Then the checklist goes on at 1.4 (crash immunity) and 1.5 (harnesses).
+   - `7e2741db docs(studio)`: the engine gaps of the Crocotile-equivalent tile editor (docs only).
+2. Sky: `fix(night-citadel): water reflects the actual night sky` (one commit on `worktree-agent-aa8330c71e56a38e4`)
+   never landed. It changes Night Citadel's look, so it needs Scott's look approval and Codex's re-recorded references.
+3. Voxel sandbox: render distance 16 fills in 8.8-9.2 s, over the 6 s target (docs/limits.md); visual references for
+   the Intel laptop profile (record there and add its profile id to `VOXEL` in `scripts/visual-regression.js`).
+4. Path tracer: light sampling through glass costs about 2x per sample in the glass scene; the denoiser on the caustic
+   scene is just under 2x better than raw (target 2x).
+5. `C:\Development\Projects\margoengine\.claude\launch.json` (untracked, voxel-sandbox dev server): keep or delete;
+   `margo3d-studio` (HANDOFF step 6's posed-picking fixture) is on this PC, not yet used.
+
+Not ours: Codex's own branches (`codex/margotile-*`, its test branches) and its worktrees.
