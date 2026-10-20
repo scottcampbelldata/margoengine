@@ -14,15 +14,33 @@ export interface ValidityProblem {
 
 /** Curve parameters of points along an edge, start to end (a closed edge goes once round). */
 export function edgeParameters(edge: Edge, count: number): number[] {
-  const c = curveEvaluator(edge.curve),
-    t0 = c.parameter(edge.start.point);
-  let t1 = edge.closed ? t0 : c.parameter(edge.end.point, t0);
-  if (c.period) {
-    if (edge.sameSense && t1 <= t0 + 1e-12) t1 += c.period;
-    if (!edge.sameSense && t1 >= t0 - 1e-12) t1 -= c.period;
+  // Projecting the ends is costly on a spline (the end from the start's parameter is a far guess), and every pass over
+  // a face asks again: kept per edge while its curve, ends and sense stay the same.
+  let r = ends.get(edge);
+  if (
+    !r ||
+    r.curve !== edge.curve ||
+    r.start !== edge.start.point ||
+    r.end !== edge.end.point ||
+    r.sense !== edge.sameSense
+  ) {
+    const c = curveEvaluator(edge.curve),
+      t0 = c.parameter(edge.start.point);
+    let t1 = edge.closed ? t0 : c.parameter(edge.end.point, t0);
+    if (c.period) {
+      if (edge.sameSense && t1 <= t0 + 1e-12) t1 += c.period;
+      if (!edge.sameSense && t1 >= t0 - 1e-12) t1 -= c.period;
+    }
+    r = { curve: edge.curve, start: edge.start.point, end: edge.end.point, sense: edge.sameSense, t0, t1 };
+    ends.set(edge, r);
   }
+  const { t0, t1 } = r;
   return Array.from({ length: count + 1 }, (_, k) => t0 + ((t1 - t0) * k) / count);
 }
+const ends = new WeakMap<
+  Edge,
+  { curve: Edge['curve']; start: XYZ; end: XYZ; sense: boolean; t0: number; t1: number }
+>();
 
 /** Problems with `body`, empty when it is valid. */
 export function validateBody(body: Body): ValidityProblem[] {

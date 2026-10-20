@@ -81,10 +81,11 @@ function quadKnots(
   pieces: number,
   into: Float64Array,
 ) {
+  if (knots.length < 2) return quad(f, a, b, pieces, into);
   const lo = Math.min(a, b),
     hi = Math.max(a, b),
     inside = knots.filter((k) => k > lo && k < hi);
-  if (knots.length < 2 || inside.length > 512) return quad(f, a, b, pieces, into);
+  if (inside.length > 512) return quad(f, a, b, pieces, into);
   const cuts = [a, ...(a < b ? inside : inside.reverse()), b],
     per = Math.max(1, Math.ceil(pieces / (cuts.length - 1)));
   for (let i = 0; i + 1 < cuts.length; i++) quad(f, cuts[i], cuts[i + 1], per, into);
@@ -190,9 +191,10 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
   };
 
   // Along every loop: - integral of G du' (across: + integral of G dv), with (u', v) followed continuously from
-  // FaceUV's own start of the loop. Edges are cut where they turn a sixteenth of a turn: the sampler weighs turning only
-  // on pieces longer than a hundredth of its deflection, so the deflection is the face's size (finite), not infinite.
-  const size = faceSize(face),
+  // FaceUV's own start of the loop. A spline edge is cut where it turns a sixteenth of a turn (a helix runs dozens of
+  // turns): the sampler weighs turning only on pieces longer than a hundredth of its deflection, so that deflection is
+  // the face's size. Lines and conics keep one piece per span, exact already.
+  const size = face.loops.some((l) => l.coedges.some((co) => co.edge.curve.kind === 'spline')) ? faceSize(face) : 1,
     step = new Float64Array(K);
   face.loops.forEach((loop, li) => {
     let hint: UV = fuv.loops[li].points[0] ?? fuv.near(loop.coedges[0].start.point);
@@ -200,7 +202,7 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
       const curve = curveEvaluator(co.edge.curve),
         [t0, t1] = edgeParameters(co.edge, 1),
         [a, b] = co.forward ? [t0, t1] : [t1, t0],
-        breaks = curve.sample(a, b, size, Math.PI / 8);
+        breaks = curve.sample(a, b, co.edge.curve.kind === 'spline' ? size : Number.POSITIVE_INFINITY, Math.PI / 8);
       for (let i = 0; i + 1 < breaks.length; i++) {
         step.fill(0);
         quad(

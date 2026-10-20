@@ -114,7 +114,7 @@ class Spline implements Curve {
   readonly domain: readonly [number, number];
   private readonly breaks: number[];
   private seeds?: { t: number; p: number[] }[];
-  private extent?: number;
+  private extent?: [number, number];
   /** The farthest apart two neighbouring samples lie. */
   private step = 0;
   constructor(
@@ -135,31 +135,53 @@ class Spline implements Curve {
     return curveAt(this.spline, this.clamp(t));
   }
   parameter(p: readonly number[], hint?: number) {
-    // Newton on |C(t) - p| from the hint, kept when it lands within a millionth of the curve's size. Otherwise (no
-    // hint, or one far along a curve that comes back near itself, such as the other end of a helix) from the nearest of
-    // 8 samples per knot span, the next nearest tried until one lands or the rest lie farther than the best found plus
-    // a sample step.
-    let best = { t: this.domain[0], miss: Infinity };
+    // Newton on |C(t) - p| from the hint. From a hint near the point (an eighth of the longest control-polygon leg) it
+    // finds the nearest place there; from a far one (the other end of an edge) it can settle on a wrong turn of a curve
+    // that comes back near itself (a helix), so it is kept only when it lands within a millionth of the curve's size,
+    // else the samples decide.
     if (hint !== undefined) {
-      best = this.newton(p, hint);
-      if (best.miss <= 1e-6 * this.size()) return best.t;
+      const r = this.newton(p, hint);
+      if (r.start <= this.hull()[1] / 8 || r.miss <= 1e-6 * this.size()) return r.t;
+      return this.nearest(p, r).t;
     }
+    return this.nearest(p, { t: this.domain[0], miss: Infinity, start: Infinity }).t;
+  }
+  /**
+   * From the samples nearest the point that are each nearer than their neighbours (one per stretch of the curve that
+   * passes the point: one per turn of a helix), nearest first, until one lands or the rest lie farther than the best
+   * found plus a sample step.
+   */
+  private nearest(
+    p: readonly number[],
+    best: { t: number; miss: number; start: number },
+  ): { t: number; miss: number; start: number } {
     const seeds = this.samples(),
-      near: { t: number; d: number }[] = [];
-    for (const seed of seeds) {
-      const d = distance(seed.p, p);
-      if (near.length === 16 && d >= near[15].d) continue;
-      let k = Math.min(near.length, 15);
-      while (k > 0 && near[k - 1].d > d) k--;
-      near.splice(k, 0, { t: seed.t, d });
-      if (near.length > 16) near.pop();
+      n = seeds.length,
+      d = new Float64Array(n);
+    let nearest = 0;
+    for (let i = 0; i < n; i++) {
+      d[i] = distance(seeds[i].p, p);
+      if (d[i] < d[nearest]) nearest = i;
     }
-    for (const { t, d } of near) {
-      if (best.miss <= 1e-9 * this.size() || d > best.miss + this.step) break;
-      const r = this.newton(p, t);
+    // Most points land from the nearest sample. A tolerant vertex lies a little off the curve; a wrong turn of a helix
+    // misses by its pitch, a few hundredths of the curve's size: within a thousandth is taken as landed.
+    const first = this.newton(p, seeds[nearest].t);
+    if (first.miss < best.miss) best = first;
+    if (best.miss <= 1e-3 * this.size()) return best;
+    const minima: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const prev = i > 0 ? d[i - 1] : this.period ? d[n - 1] : Infinity,
+        next = i + 1 < n ? d[i + 1] : this.period ? d[0] : Infinity;
+      if (d[i] <= prev && d[i] <= next) minima.push(i);
+    }
+    minima.sort((a, b) => d[a] - d[b]);
+    for (const i of minima.slice(0, 16)) {
+      if (i === nearest) continue;
+      if (best.miss <= 1e-9 * this.size() || d[i] > best.miss + this.step) break;
+      const r = this.newton(p, seeds[i].t);
       if (r.miss < best.miss) best = r;
     }
-    return best.t;
+    return best;
   }
   /** 8 samples per knot span and the domain's end. */
   private samples(): { t: number; p: number[] }[] {
@@ -179,21 +201,39 @@ class Spline implements Curve {
     }
     return this.seeds;
   }
-  /** The diagonal of the samples' box. */
+  /** The diagonal of the control points' box (the curve lies inside it). */
   private size(): number {
-    if (this.extent === undefined) {
-      const pts = this.samples().map((s) => s.p);
-      this.extent =
-        Math.hypot(...[0, 1, 2].map((k) => Math.max(...pts.map((q) => q[k])) - Math.min(...pts.map((q) => q[k])))) || 1;
+    return this.hull()[0];
+  }
+  /** The control points' box diagonal and longest control-polygon leg, found once. */
+  private hull(): [number, number] {
+    if (!this.extent) {
+      const q = this.spline.points,
+        lo = [Infinity, Infinity, Infinity],
+        hi = [-Infinity, -Infinity, -Infinity];
+      let leg = 0,
+        prev: number[] | undefined;
+      for (let i = 0; i < q.length; i += 4) {
+        const c = [q[i] / q[i + 3], q[i + 1] / q[i + 3], q[i + 2] / q[i + 3]];
+        for (let k = 0; k < 3; k++) {
+          lo[k] = Math.min(lo[k], c[k]);
+          hi[k] = Math.max(hi[k], c[k]);
+        }
+        if (prev) leg = Math.max(leg, distance(prev, c));
+        prev = c;
+      }
+      this.extent = [Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) || 1, leg];
     }
     return this.extent;
   }
-  private newton(p: readonly number[], from: number): { t: number; miss: number } {
-    let t = this.clamp(from);
+  private newton(p: readonly number[], from: number): { t: number; miss: number; start: number } {
+    let t = this.clamp(from),
+      start = Infinity;
     for (let i = 0; i < 40; i++) {
       const c = this.at(t),
         d = c.slice(3),
         dd = dot(d, d);
+      if (i === 0) start = distance(c, p);
       if (!dd) break;
       const step = dot(sub(c, p), d) / dd,
         next = this.clamp(t - step);
@@ -203,7 +243,7 @@ class Spline implements Curve {
       }
       t = next;
     }
-    return { t, miss: distance(this.at(t), p) };
+    return { t, miss: distance(this.at(t), p), start };
   }
   sample(a: number, b: number, deflection: number, turn: number) {
     return ordered(a, b, (lo, hi) => {

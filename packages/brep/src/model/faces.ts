@@ -35,8 +35,10 @@ export class FaceUV {
    * so v runs from here one period on and the face's loops and points lie in that range.
    */
   vCut = -Math.PI;
-  /** How far a projection may land from its point before the global search is asked (a millionth of the face's size). */
+  /** A millionth of the face's size (from its vertices): points this close to a pole are at it. */
   #miss = 0;
+  /** The surface's poles (where u, or v, has no meaning) and their points, found once. */
+  #poles?: { at: { v: number } | { u: number }; point: number[] }[];
   /**
    * Where a loop runs through a pole or apex (a cone's sector, a sphere's lune): there u has no meaning, so the loop
    * runs along the pole's line at v from the u' it arrives with to the u' it leaves with (its points `at` and `at + 1`).
@@ -174,30 +176,26 @@ export class FaceUV {
 
   /** Where `p` is a pole or apex: the v of one where u has no meaning, or the u' of one where v has none. */
   poleOf(p: XYZ): { v: number } | { u: number } | undefined {
-    const s = this.surface,
-      within = Math.max(this.#miss, 1e-12) * 100;
-    for (const side of [1, -1] as const) {
-      const v = s.pole(side),
-        u = s.uPole?.(side);
-      if (v !== undefined && distance(s.at(0, v), p) <= within) return { v };
-      if (u !== undefined && distance(s.at(u, 0), p) <= within) return { u: this.flip ? -u : u };
+    if (!this.#poles) {
+      const s = this.surface;
+      this.#poles = [];
+      for (const side of [1, -1] as const) {
+        const v = s.pole(side),
+          u = s.uPole?.(side);
+        if (v !== undefined) this.#poles.push({ at: { v }, point: s.at(0, v) });
+        if (u !== undefined) this.#poles.push({ at: { u: this.flip ? -u : u }, point: s.at(u, 0) });
+      }
     }
+    const within = Math.max(this.#miss, 1e-12) * 100;
+    for (const pole of this.#poles) if (distance(pole.point, p) <= within) return pole.at;
     return undefined;
   }
 
   /** (u', v) of a point on the surface, its u (and v) moved by whole periods next to `hint` when given. */
   near(p: XYZ, hint?: UV): UV {
-    const s = this.surface;
-    let raw = s.parameters(p, hint ? [this.flip ? -hint[0] : hint[0], hint[1]] : undefined);
-    if (hint && this.#miss) {
-      // A search started far from the point (the other end of a line edge) can settle on a wrong nearest point, such as
-      // the next turn of a helical sweep: unless it lands on the point, the global search decides.
-      const miss = distance(s.at(raw[0], raw[1]), p);
-      if (miss > this.#miss) {
-        const global = s.parameters(p);
-        if (distance(s.at(global[0], global[1]), p) < miss) raw = global;
-      }
-    }
+    // A spline surface checks a far hint itself (it can settle on the next turn of a helical sweep).
+    const s = this.surface,
+      raw = s.parameters(p, hint ? [this.flip ? -hint[0] : hint[0], hint[1]] : undefined);
     let u = this.flip ? -raw[0] : raw[0],
       v = raw[1];
     if (hint) {

@@ -355,7 +355,7 @@ class Extrusion implements Surface {
   }
 }
 
-/** Starts a spline surface's projection tries, nearest sample first, before taking the closest it reached. */
+/** Most starts a spline surface's projection tries, nearest sample first, before taking the closest it reached. */
 const TRIES = 32;
 
 class SplinePatch implements Surface {
@@ -367,6 +367,7 @@ class SplinePatch implements Surface {
   private readonly vBreaks: number[];
   private seeds?: { u: number; v: number; p: number[] }[];
   private cell = 0;
+  private rows: [number, number] = [0, 0];
   private readonly size: number;
   constructor(
     private readonly s: SplineSurface,
@@ -400,64 +401,87 @@ class SplinePatch implements Surface {
     return normalOf(this, u, v);
   }
   parameters(p: readonly number[], hint?: readonly number[]): [number, number] {
-    // From the hint, kept when it lands within a millionth of the surface's size (a point of a tolerant edge may lie
-    // that far off). A start far from the point (the other end of a line edge) can settle on a wrong nearest place,
-    // such as the next turn of a helical sweep: then the samples decide.
+    // From a hint within a quarter of a sample cell of the point, Gauss-Newton finds the nearest place there. From a far one (the
+    // other end of a line edge) it can settle on a wrong nearest place, such as the next turn of a helical sweep: it is
+    // kept only when it lands within a millionth of the surface's size, else the samples decide.
+    this.grid();
     if (hint) {
       const r = this.newton(p, hint[0], hint[1]);
-      return r.miss <= 1e-6 * this.size ? r.uv : this.nearest(p, r).uv;
+      return r.start <= this.cell / 4 || r.miss <= 1e-6 * this.size ? r.uv : this.nearest(p, r).uv;
     }
-    return this.nearest(p).uv;
+    return this.nearest(p, { uv: [this.uDomain[0], this.vDomain[0]], miss: Infinity, start: Infinity }).uv;
   }
   /**
-   * From the nearest of up to 4 x 4 samples per knot span (about 8192 in all, at least one per span); the nearest can lie
-   * on the wrong turn of a surface that comes back near itself, so the next nearest are tried, until one lands on the
-   * point or the rest lie farther than the best found plus a sample cell.
+   * Up to 4 samples per knot span in each direction (at most 48 a direction, at least one a span), u-major, and the
+   * farthest apart two neighbouring samples lie.
+   */
+  private grid(): void {
+    if (this.seeds) return;
+    const samples = (breaks: number[]) => {
+        const out: number[] = [],
+          per = Math.max(1, Math.min(4, Math.floor(48 / Math.max(1, breaks.length - 1))));
+        for (let i = 1; i < breaks.length; i++)
+          for (let k = 0; k < per; k++) out.push(breaks[i - 1] + ((breaks[i] - breaks[i - 1]) * (k + 0.5)) / per);
+        return out;
+      },
+      us = samples(this.uBreaks),
+      vs = samples(this.vBreaks);
+    this.seeds = us.flatMap((su) => vs.map((sv) => ({ u: su, v: sv, p: this.at(su, sv) })));
+    this.rows = [us.length, vs.length];
+    let cell = 0;
+    for (let i = 0; i < us.length; i++)
+      for (let j = 0; j < vs.length; j++) {
+        const q = this.seeds[i * vs.length + j].p;
+        if (i + 1 < us.length) cell = Math.max(cell, distance(q, this.seeds[(i + 1) * vs.length + j].p));
+        if (j + 1 < vs.length) cell = Math.max(cell, distance(q, this.seeds[i * vs.length + j + 1].p));
+      }
+    this.cell = cell;
+  }
+  /**
+   * From the samples nearer the point than their grid neighbours (one per stretch of the surface that passes it: one
+   * per turn of a helical sweep), nearest first, until one lands or the rest lie farther than the best plus a cell.
    */
   private nearest(
     p: readonly number[],
-    best = { uv: [this.uDomain[0], this.vDomain[0]] as [number, number], miss: Infinity },
-  ): { uv: [number, number]; miss: number } {
-    if (!this.seeds) {
-      const spans = Math.max(1, this.uBreaks.length - 1) * Math.max(1, this.vBreaks.length - 1),
-        per = Math.max(1, Math.min(4, Math.floor(Math.sqrt(8192 / spans)))),
-        samples = (breaks: number[]) => {
-          const out: number[] = [];
-          for (let i = 1; i < breaks.length; i++)
-            for (let k = 0; k < per; k++) out.push(breaks[i - 1] + ((breaks[i] - breaks[i - 1]) * (k + 0.5)) / per);
-          return out;
-        },
-        us = samples(this.uBreaks),
-        vs = samples(this.vBreaks);
-      this.seeds = us.flatMap((su) => vs.map((sv) => ({ u: su, v: sv, p: this.at(su, sv) })));
-      // The farthest apart two neighbouring samples lie.
-      let cell = 0;
-      for (let i = 0; i < us.length; i++)
-        for (let j = 0; j < vs.length; j++) {
-          const q = this.seeds[i * vs.length + j].p;
-          if (i + 1 < us.length) cell = Math.max(cell, distance(q, this.seeds[(i + 1) * vs.length + j].p));
-          if (j + 1 < vs.length) cell = Math.max(cell, distance(q, this.seeds[i * vs.length + j + 1].p));
-        }
-      this.cell = cell;
+    best: { uv: [number, number]; miss: number; start: number },
+  ): { uv: [number, number]; miss: number; start: number } {
+    this.grid();
+    const seeds = this.seeds!,
+      [nu, nv] = this.rows,
+      d = new Float64Array(seeds.length);
+    let nearest = 0;
+    for (let k = 0; k < seeds.length; k++) {
+      d[k] = distance(seeds[k].p, p);
+      if (d[k] < d[nearest]) nearest = k;
     }
-    const near: { seed: { u: number; v: number }; d: number }[] = [];
-    for (const seed of this.seeds) {
-      const d = distance(seed.p, p);
-      if (near.length === TRIES && d >= near[TRIES - 1].d) continue;
-      let k = Math.min(near.length, TRIES - 1);
-      while (k > 0 && near[k - 1].d > d) k--;
-      near.splice(k, 0, { seed, d });
-      if (near.length > TRIES) near.pop();
-    }
-    for (const { seed, d } of near) {
-      if (best.miss < 1e-9 * this.size || d > best.miss + this.cell) break;
-      const r = this.newton(p, seed.u, seed.v);
+    // Most points land from the nearest sample. A tolerant edge lies a little off the surface; a wrong turn of a
+    // helical sweep misses by its pitch, a few hundredths of the surface's size: within a thousandth is taken as landed.
+    const first = this.newton(p, seeds[nearest].u, seeds[nearest].v);
+    if (first.miss < best.miss) best = first;
+    if (best.miss <= 1e-3 * this.size) return best;
+    const at = (i: number, j: number) => {
+        if (this.uPeriod) i = (i + nu) % nu;
+        if (this.vPeriod) j = (j + nv) % nv;
+        return i < 0 || i >= nu || j < 0 || j >= nv ? Infinity : d[i * nv + j];
+      },
+      minima: number[] = [];
+    for (let i = 0; i < nu; i++)
+      for (let j = 0; j < nv; j++) {
+        const x = d[i * nv + j];
+        if (x <= at(i - 1, j) && x <= at(i + 1, j) && x <= at(i, j - 1) && x <= at(i, j + 1)) minima.push(i * nv + j);
+      }
+    minima.sort((a, b) => d[a] - d[b]);
+    for (const k of minima.slice(0, TRIES)) {
+      if (k === nearest) continue;
+      if (best.miss < 1e-9 * this.size || d[k] > best.miss + this.cell) break;
+      const r = this.newton(p, seeds[k].u, seeds[k].v);
       if (r.miss < best.miss) best = r;
     }
     return best;
   }
   /** Gauss-Newton on |S(u, v) - p|^2 from (u, v); where a step leaves the domain, along the bound alone. */
-  private newton(p: readonly number[], u: number, v: number): { uv: [number, number]; miss: number } {
+  private newton(p: readonly number[], u: number, v: number): { uv: [number, number]; miss: number; start: number } {
+    let start = Infinity;
     for (let i = 0; i < 50; i++) {
       const d = this.at(u, v),
         r = sub(d, p),
@@ -469,6 +493,7 @@ class SplinePatch implements Surface {
         g1 = dot(su, r),
         g2 = dot(sv, r),
         det = a * c - b * b;
+      if (i === 0) start = length(r);
       if (length(r) < 1e-12 * this.size) break;
       if (!(det > 1e-30 * (a * c || 1))) {
         // Singular (a pole): move along whichever derivative exists.
@@ -486,7 +511,7 @@ class SplinePatch implements Surface {
       else if (fv !== nv && fu === nu) [u, v] = [a > 0 ? this.fit(u - g1 / a, this.uDomain, this.uPeriod) : u, fv];
       else [u, v] = [fu, fv];
     }
-    return { uv: [u, v], miss: distance(this.at(u, v), p) };
+    return { uv: [u, v], miss: distance(this.at(u, v), p), start };
   }
   breaks(): readonly [readonly number[], readonly number[]] {
     return [this.uBreaks, this.vBreaks];
