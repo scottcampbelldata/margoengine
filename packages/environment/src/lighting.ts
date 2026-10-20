@@ -17,6 +17,8 @@ declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 export interface PBRHooks {
   readonly declarations: string;
   readonly ambient?: string;
+  /** Sky light toward the unit normal `n`, replacing gltf-pro's built-in sky gradient (gltf-pro PBRLighting `sky`). */
+  readonly sky?: string;
   /** Ambient light of a physical material's clearcoat layer (gltf-pro PBRLighting `coat`). */
   readonly coat?: string;
   /** Ambient light of a physical material's sheen layer (gltf-pro PBRLighting `sheen`). */

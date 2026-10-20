@@ -204,6 +204,14 @@ export interface PBRLighting {
   /** vec3f replacing the hemisphere ambient (image-based lighting). SSAO's ambient replay returns it. At most one effect. */
   readonly ambient?: string;
   /**
+   * vec3f sky light toward the unit normal `n`, an expression in `n` (environment's HemisphereLight): it replaces the
+   * built-in sky gradient times its strength `f.radiance.w` wherever the shader uses it (the hemisphere ambient, the
+   * clearcoat and sheen defaults, an ambient hook's own fallback to it such as light probes'). An ambient hook that does
+   * not fall back to the gradient (image-based lighting) keeps the sky ambient beside its own, in either order. At most
+   * one effect.
+   */
+  readonly sky?: string;
+  /**
    * vec3f ambient light of the clearcoat layer, before its Fresnel, in terms of `s` (Surface: `s.cn` coat normal, `s.cr`
    * coat roughness) and `v` (unit vector to the eye); replaces the hemisphere in physical materials (image-based
    * lighting: prefiltered radiance along the coat's reflection). Shaders without a coat ignore it. At most one effect.

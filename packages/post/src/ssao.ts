@@ -537,13 +537,21 @@ export class SSAO implements EnginePlugin {
     if (this.ambientSource !== c.shader) {
       this.ambientSource = c.shader;
       this.ambientAll = c.shader.includes('let margoAmbient=');
+      // environment's HemisphereLight writes its light as `*margoSkyLight(n)` in place of the ambient term, or beside
+      // margoAmbient where image-based light replaced that term.
+      const sky = /let linear=[^;]*i\.color\*\(1\.0-i\.material\.y\)\*margoSkyLight\(n\)/.test(c.shader);
       this.ambientCode = this.ambientAll
-        ? c.shader.replace(/(let direct=[\s\S]*)return (vec4f\([^\n]+\));/, '$1_=$2;return vec4f(margoAmbient,1);')
+        ? c.shader.replace(
+            /(let direct=[\s\S]*)return (vec4f\([^\n]+\));/,
+            `$1_=$2;return vec4f(margoAmbient${sky ? '+i.color*(1.0-i.material.y)*margoSkyLight(n)' : ''},1);`,
+          )
         : c.shader.replace(
             /let direct=[\s\S]*return vec4f\([^\n]+\);/,
-            c.shader.includes('skyAmbient.rgb')
-              ? 'return vec4f(i.color*(1.0-i.material.y)*skyAmbient.rgb,1);'
-              : 'return vec4f(i.color*(1.0-i.material.y)*frame.radiance.w*frame.ambient.rgb,1);',
+            sky
+              ? 'return vec4f(i.color*(1.0-i.material.y)*margoSkyLight(n),1);'
+              : c.shader.includes('skyAmbient.rgb')
+                ? 'return vec4f(i.color*(1.0-i.material.y)*skyAmbient.rgb,1);'
+                : 'return vec4f(i.color*(1.0-i.material.y)*frame.radiance.w*frame.ambient.rgb,1);',
           );
     }
     const code = this.ambientCode;
@@ -569,7 +577,10 @@ export class SSAO implements EnginePlugin {
         bindings: this.ambientAll
           ? c.bindings
           : c.bindings.filter(
-              (entry) => entry.binding === 18 || (entry.binding === 8 && c.shader.includes('skyAmbient.rgb')),
+              (entry) =>
+                entry.binding === 18 ||
+                (entry.binding === 8 && c.shader.includes('skyAmbient.rgb')) ||
+                (entry.binding === 144 && c.shader.includes('fn margoSkyLight(')),
             ),
       });
     } finally {

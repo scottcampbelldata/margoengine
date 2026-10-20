@@ -16,6 +16,7 @@ const ongoing = [
   'clustered-local-shadows',
   'color-output',
   'deformed-shadows',
+  'environment-hemisphere',
   'environment-volumetric',
   'gltf-pro-lighting-hooks',
   'lines-perspective',

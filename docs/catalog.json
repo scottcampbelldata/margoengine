@@ -620,6 +620,7 @@
     "install": "npm install @margoengine/core@1.0.0 @margoengine/environment@1.0.0",
     "imports": "import { Environment } from '@margoengine/environment';",
     "exports": [
+      "AmbientLight",
       "ColorBackground",
       "ColorOutput",
       "Environment",
@@ -627,6 +628,8 @@
       "EnvironmentLighting",
       "FOG_BINDING",
       "Fog",
+      "HEMISPHERE_BINDING",
+      "HemisphereLight",
       "IBL_BINDING",
       "IBL_WGSL",
       "ImageBackground",

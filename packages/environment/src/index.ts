@@ -41,3 +41,10 @@ export {
   type LightingTarget,
 } from './lighting.js';
 export { IBL_WGSL, iblLayoutEntries, iblBindGroupEntries } from './ibl.js';
+export {
+  HemisphereLight,
+  AmbientLight,
+  HEMISPHERE_BINDING,
+  type HemisphereLightOptions,
+  type AmbientLightOptions,
+} from './hemisphere.js';

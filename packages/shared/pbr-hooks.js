@@ -9,6 +9,12 @@ export function lightPBR(code, hooks) {
   if (out !== undefined) return out;
   return composeLightPBR(code, hooks, cache);
 }
+// gltf-pro's built-in sky light, a fixed gradient times the ambient strength f.radiance.w, wherever a shader writes it (the
+// hemisphere ambient, the clearcoat and sheen defaults, a light probe's fallback; also in materials' and VAT's shaders).
+const gradient = /mix\(vec3f\(0\.35,0\.3,0\.25\),vec3f\(1(?:\.0)?\),clamp\(([\w.]+)\.y\*0\.5\+0\.5,0\.0,1\.0\)\)/g;
+/** `text` with the built-in sky gradient replaced by the `sky` hook (margoSkyHook) and its strength (`*f.radiance.w`) dropped. */
+const skyText = (text) => text.replace(gradient, 'margoSkyHook($1)').replaceAll('*f.radiance.w', '');
+const hasGradient = (text) => text !== undefined && new RegExp(gradient.source).test(text);
 // Keep the miss-only replacement closures outside the hot cache lookup's function context.
 function composeLightPBR(code, hooks, cache) {
   let out = code;
@@ -33,8 +39,12 @@ function composeLightPBR(code, hooks, cache) {
       out += `\nfn margoLocal${n}(i:Out,s:Surface,v:vec3f)->vec3f {return ${hooks.light};}\n`;
     } else edit('var color=', 'var color=' + hooks.light + '+');
   }
+  // A sky hook composed before: an ambient hook that falls back to the built-in sky (light probes) uses the hook's sky
+  // there; one that does not (image-based light) leaves the sky ambient in place, so the two add.
+  const sky = out.includes('fn margoSkyHook(');
   if (hooks.ambient) {
-    edit(/fn ambient\(s:Surface\)->vec3f \{[^}]*\}/, 'fn ambient(s:Surface)->vec3f {return vec3f(0);}');
+    if (!sky || hasGradient(hooks.ambient))
+      edit(/fn ambient\(s:Surface\)->vec3f \{[^}]*\}/, 'fn ambient(s:Surface)->vec3f {return vec3f(0);}');
     if (layered)
       edit(
         'fn margoAmbientTerm(i:Out,s:Surface,v:vec3f)->vec3f {return vec3f(0);}',
@@ -56,6 +66,29 @@ function composeLightPBR(code, hooks, cache) {
         new RegExp(`fn ${name}\\(s:Surface,v:vec3f\\)->vec3f \\{return [^;]*;\\}`),
         () => `fn ${name}(s:Surface,v:vec3f)->vec3f {return ${expression};}`,
       );
+  if (hooks.sky) {
+    if (sky)
+      throw margoError('unsupported', 'Two sky lighting hooks on one shader; attach one HemisphereLight per engine');
+    // An ambient hook composed before replaced the sky ambient: unless it falls back to the sky itself, bring it back.
+    const ambient = /let margoAmbient=([^;]*);/.exec(out)?.[1],
+      term = /fn margoAmbientTerm\(i:Out,s:Surface,v:vec3f\)->vec3f \{return ([^;]*);\}/.exec(out)?.[1];
+    if (ambient !== undefined && !hasGradient(ambient) && !hasGradient(term))
+      edit(
+        'fn ambient(s:Surface)->vec3f {return vec3f(0);}',
+        `fn ambient(s:Surface)->vec3f {${
+          out.includes('fn margoHemisphere(')
+            ? 'return margoHemisphere(s);'
+            : out.includes('fn hemisphere_ambient(')
+              ? 'return hemisphere_ambient(s);'
+              : // VAT crowds write their hemisphere ambient inline: the same terms as gltf-pro's.
+                'let f0=mix(vec3f(0.04),s.base.rgb,s.metal);return (s.base.rgb*(1.0-s.metal)+f0*0.5)*margoSkyHook(s.n)*s.occlusion;'
+        }}`,
+      );
+    out += `
+fn margoSkyHook(n:vec3f)->vec3f {return ${hooks.sky};}
+`;
+  }
+  if (hooks.sky || sky) out = skyText(out);
   if (hooks.output)
     edit(
       'if(f.settings.w<0.5) {color=pbrNeutral(max(color,vec3f(0)));',

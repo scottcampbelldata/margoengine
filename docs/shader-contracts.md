@@ -25,6 +25,7 @@ Text anchors in core's shader (the full list, with the package file using each, 
 | `let linear=direct*`, `let linear=…;` | shadows, clustered, environment IBL, scatter (also mirrored in terrain's own shader) |
 | `let n=normalize(i.normal)*select(-1.0,1.0,facing);` | terrain colors: a block opened after it and closed with the fragment shadows `i` and `n` with the terrain's per-pixel albedo, roughness and normal, so later patches keep their text |
 | `frame.radiance.w` | sky lighting (sky ambient), environment IBL (zeroes the constant ambient) |
+| `*frame.radiance.w*frame.ambient.rgb` (terrain: `*frame.radiance.w`), or the same zeroed by IBL | environment HemisphereLight (writes `*margoSkyLight(n)` in its place; LightProbes and post SSAO recognise that term) |
 | `let mapped=linear/…return vec4f(…);` | tonemap, post stack/bloom/SSAO capture, creative post, dof: the HDR capture returns `vec4f(linear,1)` |
 | `let mapped=linear/(1.0+linear);`, `return vec4f(linear,1);` | environment Fog (on the canvas, or after an HDR capture) |
 | `let direct=…return vec4f(…);`, `i.color*(1.0-i.material.y)*frame.radiance.w` | post SSAO ambient replay |
@@ -52,6 +53,10 @@ shaders. The extended guard includes `margoFaceTest`; the compact guard does not
 extended and physical shaders, with node overrides applied before either face or alpha rejection.
 
 Core-mesh effects reserve group 0 binding 18 for TAA's jittered camera and 19 for toon parameters; sky ambient uses 8.
+In the lit shader's group (0 for core meshes, 2 for gltf-pro), clustered's directional lights use 141, IES profiles 142
+and projector images 143 (storage buffers, no textures), and environment's HemisphereLight 144 (a uniform). gltf-pro's
+`sky` lighting hook replaces its built-in sky gradient (`mix(vec3f(0.35,0.3,0.25),vec3f(1),...)` times `f.radiance.w`)
+wherever a shader writes it; `packages/shared/pbr-hooks.js` finds it by that text, so it must stay byte for byte.
 Terrain color patches share one mesh-ID varying and one per-pixel block; inside it `i.color`, `i.material` and `n` are
 the terrain's own values, so lighting patches applied before or after it (and the SSAO, SSR and HDR-capture rewrites of
 the fragment's tail) shade it unchanged. Wet ones allocate distinct bindings from 40 and name their functions per mesh.

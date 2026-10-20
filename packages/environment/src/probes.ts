@@ -11,6 +11,7 @@ import { MargoError } from '@margoengine/math/errors';
 import type { Environment } from './environment.js';
 import { IBL_WGSL, iblBindGroupEntries } from './ibl.js';
 import { IBL_BINDING, ShaderEffect, type LightingTarget, type PBRHooks } from './lighting.js';
+import { HEMISPHERE_TERM } from './hemisphere.js';
 import { evaluateSH } from './sh.js';
 import { halfToFloat } from './half.js';
 import { common } from './shaders.js';
@@ -648,11 +649,14 @@ export class LightProbes extends ShaderEffect {
     const base = source.includes('let base=terrainColor') ? 'base' : 'i.color',
       env = !!this.environment,
       color = source.includes('frame.ambient.rgb') ? '*frame.ambient.rgb' : '';
-    const code = source.replace(
-      /let linear=([^;]+);/,
-      (_, terms: string) =>
-        `let margoAmbient=probeShade(i.position,n,v,${base},i.material.y,i.material.x,${env ? 'vec3f(0)' : `${base}*(1.0-i.material.y)*frame.radiance.w${color}`});let linear=${terms.replace('frame.radiance.w', '0.0')}+margoAmbient;`,
-    );
+    // A HemisphereLight patched first: without an environment its light is the fallback outside the probes; with one it adds.
+    const code = source.replace(/let linear=([^;]+);/, (_, terms: string) => {
+      const sky = !env && terms.includes(`*${HEMISPHERE_TERM}`),
+        fallback = env
+          ? 'vec3f(0)'
+          : `${base}*(1.0-i.material.y)*${sky ? HEMISPHERE_TERM : `frame.radiance.w${color}`}`;
+      return `let margoAmbient=probeShade(i.position,n,v,${base},i.material.y,i.material.x,${fallback});let linear=${(sky ? terms.replace(`*${HEMISPHERE_TERM}`, '*0.0') : terms).replace('frame.radiance.w', '0.0')}+margoAmbient;`;
+    });
     return code === source ? source : shadingWgsl(group, env) + code;
   }
   protected hooks(group: number): PBRHooks {

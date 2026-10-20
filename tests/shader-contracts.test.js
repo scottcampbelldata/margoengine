@@ -25,6 +25,8 @@ const contracts = [
   ['environment/src/lighting.ts', 'core', 'frame.radiance.w'],
   ['environment/src/lighting.ts', 'core', 'let mapped=pbrNeutral(max(linear,vec3f(0)));'],
   ['environment/src/lighting.ts', 'hdr', 'return vec4f(linear,1);'],
+  ['environment/src/hemisphere.ts', 'core', /\*frame\.radiance\.w(?:\*frame\.ambient\.rgb)?/],
+  ['environment/src/hemisphere.ts', 'terrain', /\*frame\.radiance\.w(?:\*frame\.ambient\.rgb)?/],
   ['sky/src/lighting.ts', 'core', 'frame.radiance.w'],
   ['taa/src/index.ts', 'core', 'o.clip=frame.camera*p'],
   ['tonemap/src/index.ts', 'core', linearBlock],
