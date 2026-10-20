@@ -814,6 +814,37 @@ test('an imported edge a micrometre off its face keeps that gap as its tolerance
   assert.deepEqual(model.validateBody(cut), []);
 });
 
+test('circle edges a micrometre off their cylinder or plane keep that gap as their tolerance', () => {
+  // A 5 mm cylinder whose bottom circle is 1 um wider than its side and whose top circle lies 1 um above its lid: an
+  // exact bound settles circles on analytic faces without samples, and must not settle these.
+  const r = 5,
+    h = 10,
+    w = new Writer(),
+    v0 = w.vertex([r + 0.001, 0, 0]),
+    v1 = w.vertex([r, 0, h + 0.001]),
+    bottom = w.edge(v0, v0, w.circle([0, 0, 0], Z, X, r + 0.001)),
+    top = w.edge(v1, v1, w.circle([0, 0, h + 0.001], Z, X, r)),
+    seam = w.edge(v0, v1, w.line([r, 0, 0], Z)),
+    text = w.file([
+      w.face(
+        [w.loop([bottom, true], [seam, true], [top, false], [seam, false])],
+        w.add(`CYLINDRICAL_SURFACE('',${w.axis([0, 0, 0])},${real(r)})`),
+      ),
+      w.face([w.loop([bottom, false])], w.add(`PLANE('',${w.axis([0, 0, 0])})`), false),
+      w.face([w.loop([top, true])], w.add(`PLANE('',${w.axis([0, 0, h])})`)),
+    ]),
+    { bodies, problems } = model.bodiesFromSTEP(parseSTEP(text)),
+    [body] = bodies,
+    circles = body.edges.filter((e) => e.curve.kind === 'circle'),
+    line = body.edges.find((e) => e.curve.kind === 'line');
+  assert.deepEqual(problems, []);
+  assert.equal(circles.length, 2);
+  for (const e of circles) assert.ok(Math.abs(e.tolerance - 1.5e-6) <= 1e-12, `tolerance ${e.tolerance}`);
+  // The seam lies on the side; its start vertex is 1 um off it.
+  assert.equal(line.tolerance, 1e-7);
+  assert.ok(Math.abs(line.start.tolerance - 1.5e-6) <= 1e-12, `vertex tolerance ${line.start.tolerance}`);
+});
+
 test('a tessellated solid (AP242): triangles, strips and fans through pnindex, read as written', () => {
   // A unit tetrahedron (millimetres): two TRIANGULATED_FACEs and one COMPLEX_TRIANGULATED_FACE share one point list.
   for (const [strips, fans] of [

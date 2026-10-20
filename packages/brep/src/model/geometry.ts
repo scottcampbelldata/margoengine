@@ -126,6 +126,34 @@ export function curveEvaluator(def: CurveDef): Curve {
   return c;
 }
 
+const boxCache = new WeakMap<CurveDef, readonly number[] | undefined>();
+
+/**
+ * Whether `p` lies farther than `gap` from every point of a B-spline curve, judged by its control points' box (the curve
+ * lies inside it while every weight is positive). False for other curves, where a projection is cheap anyway.
+ */
+export function apart(def: CurveDef, p: readonly number[], gap: number): boolean {
+  if (def.kind !== 'spline') return false;
+  let box = boxCache.get(def);
+  if (!boxCache.has(def)) {
+    const lo = [Infinity, Infinity, Infinity],
+      hi = [-Infinity, -Infinity, -Infinity];
+    let positive = true;
+    def.points.forEach((q, k) => {
+      if (!((def.weights?.[k] ?? 1) > 0)) positive = false;
+      for (let i = 0; i < 3; i++) {
+        lo[i] = Math.min(lo[i], q[i]);
+        hi[i] = Math.max(hi[i], q[i]);
+      }
+    });
+    box = positive ? [...lo, ...hi] : undefined;
+    boxCache.set(def, box);
+  }
+  if (!box) return false;
+  for (let i = 0; i < 3; i++) if (p[i] < box[i] - gap || p[i] > box[i + 3] + gap) return true;
+  return false;
+}
+
 /**
  * The stretch [a, b] of a B-spline curve as a curve of its own, exactly (knots inserted at a and b until the curve
  * passes through its control points there, Boehm's algorithm, in homogeneous coordinates for rational curves). On a

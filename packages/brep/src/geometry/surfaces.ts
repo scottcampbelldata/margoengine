@@ -62,7 +62,7 @@ const local = (f: Frame, p: readonly number[]) => {
     x = dot(d, f.x),
     y = dot(d, f.y),
     z = dot(d, f.z);
-  return { u: wrap(Math.atan2(y, x)), x, y, z, r: Math.hypot(x, y) };
+  return { u: wrap(Math.atan2(y, x)), x, y, z, r: Math.sqrt(x * x + y * y) };
 };
 
 class Plane implements Surface {
@@ -73,7 +73,17 @@ class Plane implements Surface {
   constructor(private readonly f: Frame) {}
   at(u: number, v: number) {
     const { origin: o, x, y } = this.f;
-    return [o[0] + u * x[0] + v * y[0], o[1] + u * x[1] + v * y[1], o[2] + u * x[2] + v * y[2], ...x, ...y];
+    return [
+      o[0] + u * x[0] + v * y[0],
+      o[1] + u * x[1] + v * y[1],
+      o[2] + u * x[2] + v * y[2],
+      x[0],
+      x[1],
+      x[2],
+      y[0],
+      y[1],
+      y[2],
+    ];
   }
   normal() {
     return this.f.z;
@@ -111,16 +121,26 @@ class Cone implements Surface {
     return this.radius + v * this.tan;
   }
   at(u: number, v: number) {
-    const [e, t] = radial(this.f, u),
+    // radial() written out (here and on spheres and tori), so evaluating allocates only the result: mass properties
+    // evaluate surfaces millions of times.
+    const { origin: o, x, y, z } = this.f,
+      c = Math.cos(u),
+      s = Math.sin(u),
+      e0 = c * x[0] + s * y[0],
+      e1 = c * x[1] + s * y[1],
+      e2 = c * x[2] + s * y[2],
       r = this.rho(v),
-      z = this.f.z,
-      o = this.f.origin;
+      tan = this.tan;
     return [
-      o[0] + r * e[0] + v * z[0],
-      o[1] + r * e[1] + v * z[1],
-      o[2] + r * e[2] + v * z[2],
-      ...scale(t, r),
-      ...add(scale(e, this.tan), z),
+      o[0] + r * e0 + v * z[0],
+      o[1] + r * e1 + v * z[1],
+      o[2] + r * e2 + v * z[2],
+      (-s * x[0] + c * y[0]) * r,
+      (-s * x[1] + c * y[1]) * r,
+      (-s * x[2] + c * y[2]) * r,
+      e0 * tan + z[0],
+      e1 * tan + z[1],
+      e2 * tan + z[2],
     ];
   }
   normal(u: number, v: number) {
@@ -159,17 +179,27 @@ class Sphere implements Surface {
     private readonly radius: number,
   ) {}
   at(u: number, v: number) {
-    const [e, t] = radial(this.f, u),
+    const { origin: o, x, y, z } = this.f,
+      c = Math.cos(u),
+      s = Math.sin(u),
+      e0 = c * x[0] + s * y[0],
+      e1 = c * x[1] + s * y[1],
+      e2 = c * x[2] + s * y[2],
       R = this.radius,
       cv = Math.cos(v),
       sv = Math.sin(v),
-      { origin: o, z } = this.f;
+      rc = R * cv,
+      rs = -R * sv;
     return [
-      o[0] + R * (cv * e[0] + sv * z[0]),
-      o[1] + R * (cv * e[1] + sv * z[1]),
-      o[2] + R * (cv * e[2] + sv * z[2]),
-      ...scale(t, R * cv),
-      ...add(scale(e, -R * sv), scale(z, R * cv)),
+      o[0] + R * (cv * e0 + sv * z[0]),
+      o[1] + R * (cv * e1 + sv * z[1]),
+      o[2] + R * (cv * e2 + sv * z[2]),
+      (-s * x[0] + c * y[0]) * rc,
+      (-s * x[1] + c * y[1]) * rc,
+      (-s * x[2] + c * y[2]) * rc,
+      e0 * rs + z[0] * rc,
+      e1 * rs + z[1] * rc,
+      e2 * rs + z[2] * rc,
     ];
   }
   normal(u: number, v: number): XYZ {
@@ -205,17 +235,27 @@ class Torus implements Surface {
     private readonly minor: number,
   ) {}
   at(u: number, v: number) {
-    const [e, t] = radial(this.f, u),
+    const { origin: o, x, y, z } = this.f,
+      c = Math.cos(u),
+      s = Math.sin(u),
+      e0 = c * x[0] + s * y[0],
+      e1 = c * x[1] + s * y[1],
+      e2 = c * x[2] + s * y[2],
       cv = Math.cos(v),
       sv = Math.sin(v),
       ring = this.major + this.minor * cv,
-      { origin: o, z } = this.f;
+      ms = -this.minor * sv,
+      mc = this.minor * cv;
     return [
-      o[0] + ring * e[0] + this.minor * sv * z[0],
-      o[1] + ring * e[1] + this.minor * sv * z[1],
-      o[2] + ring * e[2] + this.minor * sv * z[2],
-      ...scale(t, ring),
-      ...add(scale(e, -this.minor * sv), scale(z, this.minor * cv)),
+      o[0] + ring * e0 + this.minor * sv * z[0],
+      o[1] + ring * e1 + this.minor * sv * z[1],
+      o[2] + ring * e2 + this.minor * sv * z[2],
+      (-s * x[0] + c * y[0]) * ring,
+      (-s * x[1] + c * y[1]) * ring,
+      (-s * x[2] + c * y[2]) * ring,
+      e0 * ms + z[0] * mc,
+      e1 * ms + z[1] * mc,
+      e2 * ms + z[2] * mc,
     ];
   }
   normal(u: number, v: number): XYZ {
@@ -369,6 +409,10 @@ class SplinePatch implements Surface {
   private cell = 0;
   private rows: [number, number] = [0, 0];
   private readonly size: number;
+  /** The last evaluation, kept as a copy: a projection evaluates where it lands, and its caller then asks again there. */
+  private lastU = Number.NaN;
+  private lastV = Number.NaN;
+  private readonly last = new Float64Array(9);
   constructor(
     private readonly s: SplineSurface,
     uClosed: boolean,
@@ -395,7 +439,13 @@ class SplinePatch implements Surface {
     return Math.min(hi, Math.max(lo, t));
   }
   at(u: number, v: number) {
-    return surfaceAt(this.s, this.fit(u, this.uDomain, this.uPeriod), this.fit(v, this.vDomain, this.vPeriod));
+    const l = this.last;
+    if (u === this.lastU && v === this.lastV) return [l[0], l[1], l[2], l[3], l[4], l[5], l[6], l[7], l[8]];
+    const d = surfaceAt(this.s, this.fit(u, this.uDomain, this.uPeriod), this.fit(v, this.vDomain, this.vPeriod));
+    this.lastU = u;
+    this.lastV = v;
+    l.set(d);
+    return d;
   }
   normal(u: number, v: number) {
     return normalOf(this, u, v);
@@ -507,14 +557,21 @@ class SplinePatch implements Surface {
         else break;
         continue;
       }
-      const nu = u + (-c * g1 + b * g2) / det,
-        nv = v + (b * g1 - a * g2) / det,
+      const du = (-c * g1 + b * g2) / det,
+        dv = (b * g1 - a * g2) / det,
+        nu = u + du,
+        nv = v + dv,
         fu = this.fit(nu, this.uDomain, this.uPeriod),
         fv = this.fit(nv, this.vDomain, this.vPeriod);
       // Held by a bound in one parameter: the other moves alone (the joint step's share of it assumed the first moved).
       if (fu !== nu && fv === nv) [u, v] = [fu, c > 0 ? this.fit(v - g2 / c, this.vDomain, this.vPeriod) : v];
       else if (fv !== nv && fu === nu) [u, v] = [a > 0 ? this.fit(u - g1 / a, this.uDomain, this.uPeriod) : u, fv];
-      else [u, v] = [fu, fv];
+      else {
+        [u, v] = [fu, fv];
+        // A point off the surface (a tolerant edge, a ray) never reaches a zero residual: done once the step moves the
+        // foot less than the residual test's own bound.
+        if (a * du * du + 2 * b * du * dv + c * dv * dv < (1e-12 * this.size) ** 2) break;
+      }
     }
     return { uv: [u, v], miss: distance(this.at(u, v), p), along };
   }

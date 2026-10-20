@@ -5,7 +5,15 @@
 // grouped into faces by which side of every loop a point inside each lies. Inside/outside comes from rays cast
 // against the other solid's exact faces (three directions, majority), not from a mesh.
 import { cross, distance, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
-import { curveEvaluator, frameOf, sliceCurve, surfaceEvaluator, type CurveDef, type SurfaceDef } from './geometry.js';
+import {
+  apart,
+  curveEvaluator,
+  frameOf,
+  sliceCurve,
+  surfaceEvaluator,
+  type CurveDef,
+  type SurfaceDef,
+} from './geometry.js';
 import { FaceUV, gaps, leftOf, shiftV, vRange, type UV, type UVLoop } from './faces.js';
 import { curveSurfaceCrossings, intersectSurfaces, signedDistance } from './intersect.js';
 import type { Box3 } from './march.js';
@@ -353,9 +361,11 @@ export function boolean(
           for (const co of loop.coedges)
             for (const s of splits.get(co.edge) ?? []) {
               if (stops.some((x) => x.vertex === s.vertex)) continue;
+              // Most of these lie nowhere near the curve: a box round it rules them out before a costly projection.
+              const near = Math.max(touch, s.vertex.tolerance);
+              if (apart(curve, s.vertex.point, near)) continue;
               const t = c.parameter(s.vertex.point);
-              if (length(sub(c.at(t).slice(0, 3) as XYZ, s.vertex.point)) <= Math.max(touch, s.vertex.tolerance))
-                stops.push({ t, vertex: s.vertex });
+              if (length(sub(c.at(t).slice(0, 3) as XYZ, s.vertex.point)) <= near) stops.push({ t, vertex: s.vertex });
             }
       // Where two curves cross (the surfaces touch tangentially there): a vertex on each, at every pass of a curve that
       // crosses itself. The regions the curves bound meet at that point (at a corner the faces share, fillets meeting;
@@ -372,11 +382,11 @@ export function boolean(
       for (const f of [fa, fb])
         for (const loop of f.loops)
           for (const co of loop.coedges) {
-            const v = original.get(co.start)!;
-            if (stops.some((x) => x.vertex === v)) continue;
+            const v = original.get(co.start)!,
+              near = Math.max(touch, v.tolerance);
+            if (stops.some((x) => x.vertex === v) || apart(curve, v.point, near)) continue;
             const t = c.parameter(v.point);
-            if (length(sub(c.at(t).slice(0, 3) as XYZ, v.point)) <= Math.max(touch, v.tolerance))
-              stops.push({ t, vertex: v });
+            if (length(sub(c.at(t).slice(0, 3) as XYZ, v.point)) <= near) stops.push({ t, vertex: v });
           }
       stops.sort((x, y) => x.t - y.t);
       /** A boundary piece of `f` between these vertices that the stretch runs along, if any. */
@@ -608,7 +618,12 @@ export function boolean(
   const body = new Body(name, 'solid'),
     parent = new Map<Face, Face>(made.map((f) => [f, f]));
   const root = (f: Face): Face => {
-    while (parent.get(f) !== f) f = parent.get(f)!;
+    // Each step skips a level (path halving), so long chains of joined faces stay short.
+    while (parent.get(f) !== f) {
+      const up = parent.get(parent.get(f)!)!;
+      parent.set(f, up);
+      f = up;
+    }
     return f;
   };
   for (const f of made)

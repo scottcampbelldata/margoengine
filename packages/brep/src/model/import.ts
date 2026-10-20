@@ -104,7 +104,12 @@ class Importer {
     // One shell per connected set of faces (STEP lists a solid's outer shell and voids, and a sheet's shells, together).
     const parent = new Map<Face, Face>(faces.map((f) => [f, f])),
       root = (f: Face): Face => {
-        while (parent.get(f) !== f) f = parent.get(f)!;
+        // Each step skips a level (path halving), so long chains of joined faces stay short.
+        while (parent.get(f) !== f) {
+          const up = parent.get(parent.get(f)!)!;
+          parent.set(f, up);
+          f = up;
+        }
         return f;
       };
     for (const f of faces)
@@ -112,7 +117,12 @@ class Importer {
         for (const c of l.coedges)
           for (const o of c.edge.coedges) if (parent.has(o.loop.face)) parent.set(root(o.loop.face), root(f));
     const groups = new Map<Face, Face[]>();
-    for (const f of faces) groups.set(root(f), [...(groups.get(root(f)) ?? []), f]);
+    for (const f of faces) {
+      const r = root(f),
+        group = groups.get(r);
+      if (group) group.push(f);
+      else groups.set(r, [f]);
+    }
     const shells = [...groups.values()].map((group) => {
       const shell = body.shell();
       for (const f of group) shell.add(f);

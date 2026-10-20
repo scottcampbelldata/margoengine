@@ -10,9 +10,15 @@ export const cross = (a: readonly number[], b: readonly number[]): XYZ => [
   a[2] * b[0] - a[0] * b[2],
   a[0] * b[1] - a[1] * b[0],
 ];
-export const length = (a: readonly number[]): number => Math.hypot(a[0], a[1], a[2]);
-export const distance = (a: readonly number[], b: readonly number[]): number =>
-  Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+// A square root, not Math.hypot: hypot is several times slower in V8 and these run millions of times an operation; the
+// kernel's lengths (metres) are far from where squaring would overflow or underflow.
+export const length = (a: readonly number[]): number => Math.sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
+export const distance = (a: readonly number[], b: readonly number[]): number => {
+  const x = a[0] - b[0],
+    y = a[1] - b[1],
+    z = a[2] - b[2];
+  return Math.sqrt(x * x + y * y + z * z);
+};
 /** `a` scaled to unit length, or undefined when it has none. */
 export const unit = (a: readonly number[]): XYZ | undefined => {
   const l = length(a);
