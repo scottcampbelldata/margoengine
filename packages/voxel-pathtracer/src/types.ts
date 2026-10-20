@@ -169,11 +169,11 @@ export interface TraceEnvironment {
    */
   sunVisible?: boolean;
   /**
-   * Compatible addition: camera rays fade the ground into the sky toward the horizon: where a camera ray meets the
-   * ground at depression angle d, the sky's horizon radiance replaces the share a / (a + sin d) of it, with a this
-   * value, 0 (default: no fade) or more. MagicaVoxel's horizon setting h is about a = 0.007 h.
+   * Compatible addition: camera rays fade the ground into the sky with distance: where a camera ray meets the ground at
+   * distance D, the sky's horizon radiance replaces the share D / (D + groundFade) of it, so the ground is half faded
+   * at this distance (world units). 0 or absent: no fade. MagicaVoxel's horizon setting h is about 2040 / h.
    */
-  groundHorizon?: number;
+  groundFade?: number;
 }
 
 /** Compatible addition: the Preetham daylight sky of {@link TraceEnvironment.physicalSky}. */
@@ -313,6 +313,12 @@ export interface VoxelPathTracerOptions {
    * other surfaces only, as with MagicaVoxel's MIS-Scatter off.
    */
   sunInMedia?: boolean;
+  /**
+   * Compatible addition: whether rough metal and rough glass get back the energy their single-scattering microfacet
+   * model loses (Kulla-Conty and albedo normalisation): true (default); false: they darken with roughness, as in
+   * MagicaVoxel.
+   */
+  energyCompensation?: boolean;
   /** Compatible addition: frame-graph order of the pass that draws the traced image. Default 20. */
   order?: number;
 }

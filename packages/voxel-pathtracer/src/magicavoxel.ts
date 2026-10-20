@@ -153,8 +153,16 @@ export function magicaVoxelMaterial(id: number, rgb: ArrayLike<number>, attribut
       const emit = Math.max(0, weight ?? num(a, '_emit') ?? 0),
         power = num(a, '_flux') ?? 0;
       const ldr = clamp01(num(a, '_ldr') ?? 0);
-      // A non-zero `_ldr` l shows the emitter at 1 + 3 l to the camera; the light it casts stays the same.
-      return { id, type: 'emit', color, emission: 1 + 3 * emit * 10 ** power, ...(ldr > 0 ? { cameraEmission: 1 + 3 * ldr } : {}) };
+      // Radiance colour x (1 + 3 x emission x 10^power); a non-zero `_ldr` l shows 1 + 3 l to the camera only. Emitters
+      // reflect nothing (neighbouring emitters do not light each other: measured between tiles).
+      return {
+        id,
+        type: 'emit',
+        color: [0, 0, 0],
+        emissionColor: color,
+        emission: 1 + 3 * emit * 10 ** power,
+        ...(ldr > 0 ? { cameraEmission: 1 + 3 * ldr } : {}),
+      };
     }
     case '_media': {
       // The older `_weight` reads as density 0.1 (measured at weights 0.3 and 0.89).
@@ -220,8 +228,9 @@ export function magicaVoxelLighting(objects: Iterable<MagicaVoxelDict>): MagicaV
       ? {
           groundColor: colorOf(o('_ground'), '_color', linear3([80, 80, 80])),
           groundHeight: 0,
-          // `_hor` h: the camera's ground fades into the sky by a / (a + sin depression), a = 0.007 h (fitted).
-          groundHorizon: 0.007 * Math.max(0, num(o('_ground'), '_hor') ?? 0.1),
+          // `_hor` h: the camera's ground at distance D fades into the sky by D / (D + 2040 / h) (fitted at camera
+          // heights 14 and 66, h 0.1 and 0.5).
+          ...((num(o('_ground'), '_hor') ?? 0.1) > 0 ? { groundFade: 2040 / (num(o('_ground'), '_hor') ?? 0.1) } : {}),
         }
       : {}),
   };
@@ -245,6 +254,7 @@ export function magicaVoxelLighting(objects: Iterable<MagicaVoxelDict>): MagicaV
       transparentShadows: false,
       sunSpecular: false,
       sunInMedia: false,
+      energyCompensation: false,
       lensBlades: blades >= 3 && blades <= 16 ? blades : 0,
       lensRotation: ((num(lens, '_blade_r') ?? 0) * Math.PI) / 180,
     },

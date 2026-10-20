@@ -100,8 +100,8 @@ interface ResolvedEnvironment {
   readonly groundHeight: number;
   /** Whether camera rays see the sun disk. */
   readonly sunVisible: boolean;
-  /** Ground-to-sky fade constant of camera rays (0: none). */
-  readonly groundHorizon: number;
+  /** Distance at which camera rays see the ground half faded into the sky (0: no fade). */
+  readonly groundFade: number;
   readonly map?: PackedEnvironment;
   /** A newly baked physical sky, kept in the cache when the snapshot succeeds. */
   readonly skyCache?: { key: string; data: Float32Array };
@@ -722,7 +722,7 @@ function resolveEnvironment(environment: TraceEnvironment | undefined, cache: Sc
         ? undefined
         : checkVec3(e.groundColor, `${name}.groundColor`, true, 'pass linear RGB'),
     groundHeight = optional(e.groundHeight, 0, `${name}.groundHeight`, -1e9, 1e9, 'pass a finite height');
-  const groundHorizon = optional(e.groundHorizon, 0, `${name}.groundHorizon`, 0, 1e6, 'pass 0 (no fade) or more');
+  const groundFade = optional(e.groundFade, 0, `${name}.groundFade`, 0, 1e12, 'pass 0 (no fade) or a distance');
   if (e.sunVisible !== undefined && typeof e.sunVisible !== 'boolean')
     throw new TypeError(`${where} ${name}.sunVisible must be true or false`);
   const sun = [direction[0] / length, direction[1] / length, direction[2] / length] as TraceVec3;
@@ -753,7 +753,7 @@ function resolveEnvironment(environment: TraceEnvironment | undefined, cache: Sc
     ground: ground && [Math.min(ground[0], 1), Math.min(ground[1], 1), Math.min(ground[2], 1)],
     groundHeight,
     sunVisible: e.sunVisible !== false,
-    groundHorizon,
+    groundFade,
     map,
     skyCache,
   };

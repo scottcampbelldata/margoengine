@@ -24,6 +24,7 @@ import {
   FLAG_CAMERA_MOTION,
   FLAG_CLEAR_GLASS,
   FLAG_HIDE_SUN,
+  FLAG_NO_COMPENSATION,
   FLAG_NO_SUN_MEDIA,
   FLAG_OPAQUE_SHADOWS,
   FLAG_SUN_DIFFUSE,
@@ -108,6 +109,7 @@ interface Settings {
   transparentShadows: boolean;
   sunSpecular: boolean;
   sunInMedia: boolean;
+  energyCompensation: boolean;
   order: number;
   previousCamera: TracePreviousCamera | undefined;
   projection: 'camera' | 'panorama' | 'fisheye';
@@ -134,6 +136,7 @@ const DEFAULTS: Settings = {
   transparentShadows: true,
   sunSpecular: true,
   sunInMedia: true,
+  energyCompensation: true,
   order: 20,
   previousCamera: undefined,
   projection: 'camera',
@@ -159,6 +162,7 @@ const RESETS: readonly (keyof Settings)[] = [
   'transparentShadows',
   'sunSpecular',
   'sunInMedia',
+  'energyCompensation',
 ];
 
 const whole = (value: unknown, name: string, min: number, max: number, fix: string) => {
@@ -231,6 +235,7 @@ function settings(input: Partial<Omit<VoxelPathTracerOptions, 'scene'>>, base: S
   if (o.transparentShadows !== undefined) s.transparentShadows = flag(o.transparentShadows, 'transparentShadows');
   if (o.sunSpecular !== undefined) s.sunSpecular = flag(o.sunSpecular, 'sunSpecular');
   if (o.sunInMedia !== undefined) s.sunInMedia = flag(o.sunInMedia, 'sunInMedia');
+  if (o.energyCompensation !== undefined) s.energyCompensation = flag(o.energyCompensation, 'energyCompensation');
   if (o.order !== undefined) s.order = checkNumber(o.order, 'order', -1e9, 1e9, 'pass a finite frame-graph order');
   if (o.previousCamera !== undefined) s.previousCamera = previousCamera(o.previousCamera);
   if (o.projection !== undefined) {
@@ -1193,10 +1198,11 @@ export class VoxelPathTracer implements EnginePlugin {
     if (!o.sunSpecular) flags |= FLAG_SUN_DIFFUSE;
     if (!o.sunInMedia) flags |= FLAG_NO_SUN_MEDIA;
     if (!e.sunVisible) flags |= FLAG_HIDE_SUN;
+    if (!o.energyCompensation) flags |= FLAG_NO_COMPENSATION;
     u.set([o.maxBounces, seed >>> 0, flags, s.lightCount], 40);
     const caps = o.bounceLimits;
     u.set(caps ? [caps.diffuse, caps.specular, caps.scatter] : [BOUNCE_FREE, BOUNCE_FREE, BOUNCE_FREE], 152);
-    f[155] = e.groundHorizon;
+    f[155] = e.groundFade;
     const sl = layout.scene,
       ll = layout.lights;
     u.set([sl.modelBase, sl.instanceBase, sl.nodeBase, s.instances.length ? sl.nodeCount : 0], 44);

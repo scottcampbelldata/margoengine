@@ -42,6 +42,7 @@ import {
   FLAG_CAMERA_MOTION,
   FLAG_CLEAR_GLASS,
   FLAG_HIDE_SUN,
+  FLAG_NO_COMPENSATION,
   FLAG_NO_SUN_MEDIA,
   FLAG_OPAQUE_SHADOWS,
   FLAG_SUN_DIFFUSE,
@@ -83,8 +84,8 @@ struct Frame {
  lensFov:vec4f,
  // Brown-Conrady k1, k2, p1, p2.
  distortion:vec4f,
- // Scattering events allowed per path: diffuse, specular, scatter (0xffff: no cap); w: the ground's horizon fade
- // constant (f32 bits).
+ // Scattering events allowed per path: diffuse, specular, scatter (0xffff: no cap); w: the distance at which camera
+ // rays see the ground half faded into the sky (f32 bits; 0 none).
  limits:vec4u,
 }
 `;
@@ -209,6 +210,7 @@ const OPAQUE_SHADOWS=${FLAG_OPAQUE_SHADOWS}u;
 const SUN_DIFFUSE=${FLAG_SUN_DIFFUSE}u;
 const NO_SUN_MEDIA=${FLAG_NO_SUN_MEDIA}u;
 const HIDE_SUN=${FLAG_HIDE_SUN}u;
+const NO_COMPENSATION=${FLAG_NO_COMPENSATION}u;
 const ADDITIVE=${ADDITIVE}u;
 const UNTINTED=${UNTINTED}u;
 const MODEL=${MODEL_WORDS}u;
@@ -643,7 +645,7 @@ fn evalLobes(m:Mat,n:vec3f,wo:vec3f,wi:vec3f,mask:u32)->Eval {
    let rough=sqrt(m.alpha);let ea=tableEavg(rough);
    qms=clamp(1.0-tableE(co,rough),0.0,1.0);
    let fa=m.metalColor+(1.0-m.metalColor)/21.0;
-   if(gloss){e.f+=m.metal*fa*fa*ea/(1.0-fa*(1.0-ea))*qms*(1.0-tableE(ci,rough))/(PI*max(1.0-ea,1e-4))*ci;}
+   if(gloss&&(f.config.z&NO_COMPENSATION)==0u){e.f+=m.metal*fa*fa*ea/(1.0-fa*(1.0-ea))*qms*(1.0-tableE(ci,rough))/(PI*max(1.0-ea,1e-4))*ci;}
   }
   e.pdf+=(m.metal*(1.0-qms)+pb*pc)*d/((1.0+lo)*4.0*co)+m.metal*qms*ci*INV_PI;
  }
@@ -672,7 +674,8 @@ fn dielectric(alpha:f32,n:vec3f,wo:vec3f,eta:f32,isSmooth:bool)->Bounce {
  s.w=vec3f(1.0);
  if(!isSmooth){
   let a2=alpha*alpha;let co=dot(n,wo);let lo=lambdaG(a2,co);
-  s.w=vec3f((1.0+lo)/(1.0+lo+lambdaG(a2,abs(dot(n,s.wi))))/max(tableGlass(co,sqrt(alpha),eta),0.05));
+  let norm=select(max(tableGlass(co,sqrt(alpha),eta),0.05),1.0,(f.config.z&NO_COMPENSATION)!=0u);
+  s.w=vec3f((1.0+lo)/(1.0+lo+lambdaG(a2,abs(dot(n,s.wi))))/norm);
  }
  s.ok=true;
  return s;
@@ -1195,10 +1198,10 @@ fn radiance(px:vec2u)->Path {
    }
    if(h.inst==GROUND){
     n=vec3f(0.0,select(-1.0,1.0,d.y<0.0),0.0);
-    // Seen by the camera, the ground fades into the horizon's sky by a / (a + sin(depression)).
+    // Seen by the camera, the ground at distance D fades into the horizon's sky by D / (D + fade).
     let fade=bitcast<f32>(f.limits.w);
-    if(bounces==0u&&fade>0.0&&d.y<0.0){
-     let w=fade/(fade-d.y/length(d));
+    if(bounces==0u&&fade>0.0){
+     let dist=h.t*length(d);let w=dist/(dist+fade);
      let add=thr*w*horizonSky(d);L+=add;thr*=1.0-w;
     }
     off=n*max(1e-4,1e-6*length(p));
