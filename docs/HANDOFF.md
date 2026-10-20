@@ -1518,6 +1518,13 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       captured; GPU-culled CulledMeshes parts use the main camera's culling in captures; per-frame cost is real (above):
       a quiet-gated measurement and, if it holds, a cheaper volume path (L1 default, or one probe-lookup per tile) are
       the follow-ups.
+      Live reflection capture (2026-10-20): `probes.setLive({facesPerFrame, priority: 'nearest'|'dynamic', samples})` (or
+      the `live` option) re-captures reflection probes a few cube faces per frame, one probe at a time, prefiltering
+      with its sixth face (bounded GGX, now one 64-thread workgroup per texel); `refresh(index?)` re-captures from code;
+      `ReflectionProbe.dynamic`. Volume stays bake-only; captures see what the frame draws (culling off for the whole
+      scene). RTX A6000, quiet-gated (`probes-live-gpu.mjs --bench`): a moved box shows in the probe in 7-11 frames at
+      1 face/frame (bound 12), 1 frame at 6; capture GPU time per frame <= 0.066 ms, the prefilter frame median 0.20 ms
+      (max 0.33). Tests: `packages/environment/tests/probes-live.test.js`.
    f. [DONE] Rectangle area lights (LTC), three.js RectAreaLight equivalent: `@margoengine/clustered/area`
       (`packages/clustered/src/area.ts`), `AreaLights.attach(engine, {lights})` + `setLights([{position, direction,
       width, height, up?, color?, intensity?, twoSided?}])`, up to 64. Intensity = radiance (three.js units; a light of

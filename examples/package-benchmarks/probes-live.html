@@ -1,0 +1,92 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Live light probes GPU check</title><style>body{margin:0}#host{width:960px;height:540px}</style></head><body><div id="host"></div>
+<script type="module">
+// Driven by probes-live-gpu.mjs. The probes.html room (six walls each radiating exactly its linear colour: ambient 1,
+// sun off) with one 128 px reflection probe at its centre in live mode, a mirror floor that shows the probe, and a
+// magenta box (radiance 1, 0, 1: no wall has it) that the runner moves into and out of the probe's view. Frames render
+// with culling off, as live capture asks when probes must see what the main camera does not.
+// GPU time of the probes' capture: every render and compute pass encoded inside the light-probes:capture pass gets
+// timestamp queries (encoders created there are wrapped), read back after each frame.
+import {createStage} from '/packages/margoengine/dist/index.js';
+import {box,PbrMaterial} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {LightProbes} from '/packages/environment/dist/probes.js';
+import {Stats} from '/packages/stats/dist/index.js';
+const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,features:['timestamp-query'],camera:{position:[0,1.7,1.9],target:[0.4,0.4,-1]}});
+const engine=stage.engine,device=engine.gpu,errors=[];device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const lighting=engineRuntime(engine).lighting;lighting.direction[3]=0;lighting.radiance[3]=1;
+const room={min:[-2,0,-2],max:[2,3,2]},probePoint=[0,1.5,0];
+const slabs={px:[[0.8,0.1,0.1],[0.2,3.4,4.4],[2.1,1.5,0]],nx:[[0.1,0.7,0.1],[0.2,3.4,4.4],[-2.1,1.5,0]],py:[[0.9,0.9,0.9],[4.4,0.2,4.4],[0,3.1,0]],
+  ny:[[1,1,1],[4.4,0.2,4.4],[0,-0.1,0]],pz:[[0.1,0.2,0.8],[4.4,3.4,0.2],[0,1.5,2.1]],nz:[[0.8,0.7,0.1],[4.4,3.4,0.2],[0,1.5,-2.1]]};
+for(const [name,[color,size,centre]] of Object.entries(slabs)){const m=engine.createMesh().setGeometry(box(...size));
+  m.setMaterial(name==='ny'?new PbrMaterial({color,roughness:0,metalness:1}):new PbrMaterial({color,roughness:1,metalness:0}));m.position.set(...centre);}
+const mover=engine.createMesh().setGeometry(box(0.5,0.5,0.5));mover.setMaterial(new PbrMaterial({color:[1,0,1],roughness:1,metalness:0}));
+const away=[0,-6,0];mover.position.set(...away);
+// Timestamp queries on the capture pass's encoders.
+const query=device.createQuerySet({type:'timestamp',count:1024}),
+  resolveBuffer=device.createBuffer({size:1024*8,usage:GPUBufferUsage.QUERY_RESOLVE|GPUBufferUsage.COPY_SRC}),
+  timeBuffer=device.createBuffer({size:1024*8,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+const createEncoder=device.createCommandEncoder.bind(device),kinds=[];let timing=false;
+device.createCommandEncoder=(descriptor)=>{const encoder=createEncoder(descriptor);if(!timing)return encoder;
+  const render=encoder.beginRenderPass.bind(encoder),compute=encoder.beginComputePass.bind(encoder);
+  const writes=(kind)=>{const i=kinds.length;kinds.push(kind);return {querySet:query,beginningOfPassWriteIndex:2*i,endOfPassWriteIndex:2*i+1};};
+  encoder.beginRenderPass=(d)=>render({...d,timestampWrites:writes('render')});
+  encoder.beginComputePass=(d={})=>compute({...d,timestampWrites:writes('compute')});
+  return encoder;};
+engine.use({name:'probe-timer',setup(){},registerPasses(graph){
+  graph.add({name:'probe-timer:on',order:-0.6,execute(){timing=true;kinds.length=0;}});
+  graph.add({name:'probe-timer:off',order:-0.4,execute(){timing=false;}});}});
+const stats=Stats.attach(engine,{profiling:true});
+let probes=null,readback=null;
+// Probe octahedral level 0 read back from the probe buffer (1,088-byte header, 8 bytes per texel: float16 r, g, b).
+const half=(h)=>{const e=(h>>10)&31,m=h&1023,s=h>>15?-1:1;return e===0?s*m*2**-24:e===31?(m?NaN:s*Infinity):s*(1+m/1024)*2**(e-15);};
+const octEncode=(d)=>{const s=Math.abs(d[0])+Math.abs(d[1])+Math.abs(d[2]),a=d.map(v=>v/s);let q=[a[0],a[2]];
+  if(a[1]<0)q=[(1-Math.abs(a[2]))*(a[0]>=0?1:-1),(1-Math.abs(a[0]))*(a[2]>=0?1:-1)];return q.map(v=>v*0.5+0.5);};
+async function texel(direction){
+  const R=probes.resolution,offset=1088+probes.reflectionOffset(0)*8,size=R*R*8;
+  readback??=device.createBuffer({size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+  const encoder=createEncoder();encoder.copyBufferToBuffer(probes['buffer'],offset,readback,0,size);device.queue.submit([encoder.finish()]);
+  await readback.mapAsync(GPUMapMode.READ);const words=new Uint32Array(readback.getMappedRange());
+  const l=Math.hypot(...direction),[u,v]=octEncode(direction.map(x=>x/l)),x=Math.min(R-1,Math.floor(u*R)),y=Math.min(R-1,Math.floor(v*R)),i=(y*R+x)*2;
+  const rgb=[half(words[i]&0xffff),half(words[i]>>>16),half(words[i+1]&0xffff)];readback.unmap();return rgb;
+}
+async function times(){
+  const n=kinds.length;if(!n)return {captureMs:0,filterMs:0,passes:0};
+  const encoder=createEncoder();encoder.resolveQuerySet(query,0,2*n,resolveBuffer,0);encoder.copyBufferToBuffer(resolveBuffer,0,timeBuffer,0,16*n);
+  device.queue.submit([encoder.finish()]);await timeBuffer.mapAsync(GPUMapMode.READ);
+  const t=new BigUint64Array(timeBuffer.getMappedRange(0,16*n));let captureMs=0,filterMs=0;
+  for(let i=0;i<n;i++){const ms=Number(t[2*i+1]-t[2*i])/1e6;if(kinds[i]==='compute')filterMs+=ms;else captureMs+=ms;}
+  timeBuffer.unmap();return {captureMs,filterMs,passes:n};
+}
+const frame=async()=>{engine.render({culling:false});await device.queue.onSubmittedWorkDone();return times();};
+window.check={
+  probePoint,
+  async setup({facesPerFrame=1,resolution=128,samples=256}={}){
+    probes?.dispose();readback?.destroy();readback=null;
+    probes=LightProbes.attach(engine,{reflections:[{position:probePoint,...room,blend:0}],resolution,live:{facesPerFrame,samples}});
+    for(let i=0;i<14;i++)await frame();
+    return {errors:errors.splice(0),refreshes:probes.refreshes};
+  },
+  // Moves the box (or sends it away with null), then renders frames until the probe texel toward `look` turns magenta
+  // (present) or back to a wall colour (absent). Returns the frames that took and each frame's capture GPU time.
+  async move({to,look,present,limit=40}){
+    mover.position.set(...(to??away));
+    const rows=[];
+    for(let n=1;n<=limit;n++){const t=await frame();const c=await texel(look);rows.push({...t,texel:c});
+      const magenta=c[0]>0.6&&c[2]>0.6&&c[1]<0.3;if(magenta===present)return {frames:n,rows,errors:errors.splice(0)};}
+    return {frames:null,rows,errors:errors.splice(0)};
+  },
+  async skip(n){for(let i=0;i<n;i++)await frame();},
+  // Capture GPU time of `count` live frames, and the main frame's own GPU passes (Stats, every 15th frame).
+  async bench(count=180){
+    const rows=[],main=[];
+    for(let i=0;i<count;i++){rows.push(await frame());if(i%15===14){await new Promise(r=>setTimeout(r,5));let s=0;const ms=stats.gpuPassMilliseconds;for(let k=0;k<stats.gpuPassCount;k++)s+=ms[k];if(stats.gpuPassCount)main.push(s);}}
+    return {rows,main,errors:errors.splice(0)};
+  },
+  // One bake with the timers on (its capture frame renders last, so the queries hold it): six faces plus the
+  // full-source GGX convolution, the per-refresh cost live capture's bounded prefilter avoids. Live capture resumes.
+  async bake(){const live=probes.live;probes.setLive(null);await probes.bake();const t=await times();probes.setLive(live);
+    return {...t,errors:errors.splice(0)};},
+  screenshot:()=>frame(),
+};
+window.ready=true;
+</script></body></html>

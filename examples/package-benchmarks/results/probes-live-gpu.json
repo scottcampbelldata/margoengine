@@ -1,0 +1,242 @@
+{
+  "benchmark": "probes-live-gpu",
+  "recordedAt": "2026-10-20T12:47:59.022Z",
+  "canvas": [
+    960,
+    540
+  ],
+  "probe": {
+    "resolution": 128,
+    "samples": 256
+  },
+  "powerOnline": {
+    "before": "",
+    "after": ""
+  },
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "155.0.4283.62",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  },
+  "latency": [
+    {
+      "facesPerFrame": 1,
+      "boundFrames": 12,
+      "appearFrames": [
+        10,
+        11,
+        10,
+        9,
+        8,
+        7
+      ],
+      "vanishFrames": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ]
+    },
+    {
+      "facesPerFrame": 2,
+      "boundFrames": 6,
+      "appearFrames": [
+        4,
+        5,
+        4
+      ],
+      "vanishFrames": [
+        3,
+        3,
+        3
+      ]
+    },
+    {
+      "facesPerFrame": 6,
+      "boundFrames": 2,
+      "appearFrames": [
+        1
+      ],
+      "vanishFrames": [
+        1
+      ]
+    }
+  ],
+  "quietGate": {
+    "ac": true,
+    "cpuLoadPercent": 18,
+    "waitedSeconds": 101,
+    "checkedAt": "2026-10-20T12:49:43.049Z",
+    "topProcesses": [
+      {
+        "Name": "python",
+        "Id": 30204,
+        "cpuSeconds": 46427
+      },
+      {
+        "Name": "python",
+        "Id": 35460,
+        "cpuSeconds": 46325
+      },
+      {
+        "Name": "python",
+        "Id": 28160,
+        "cpuSeconds": 45915
+      },
+      {
+        "Name": "python",
+        "Id": 2164,
+        "cpuSeconds": 43509
+      },
+      {
+        "Name": "ChatGPT",
+        "Id": 25824,
+        "cpuSeconds": 15253
+      },
+      {
+        "Name": "ChatGPT",
+        "Id": 37500,
+        "cpuSeconds": 7784
+      },
+      {
+        "Name": "codex",
+        "Id": 34076,
+        "cpuSeconds": 7708
+      },
+      {
+        "Name": "ChatGPT",
+        "Id": 68440,
+        "cpuSeconds": 6026
+      }
+    ]
+  },
+  "cpuLoadAtStart": 9,
+  "cost": [
+    {
+      "facesPerFrame": 1,
+      "frames": 180,
+      "captureMsPerFrame": {
+        "count": 180,
+        "median": 0.0655,
+        "p95": 0.2621,
+        "max": 0.3277
+      },
+      "faceOnlyFramesMs": {
+        "count": 150,
+        "median": 0.0655,
+        "p95": 0.0655,
+        "max": 0.0655
+      },
+      "prefilterFramesMs": {
+        "count": 30,
+        "median": 0.1966,
+        "p95": 0.3277,
+        "max": 0.3277
+      },
+      "prefilterComputeMs": {
+        "count": 30,
+        "median": 0.1966,
+        "p95": 0.2621,
+        "max": 0.2621
+      },
+      "mainFrameGpuMs": {
+        "count": 12,
+        "median": 0.2621,
+        "p95": 3.67,
+        "max": 3.67
+      }
+    },
+    {
+      "facesPerFrame": 2,
+      "frames": 180,
+      "captureMsPerFrame": {
+        "count": 180,
+        "median": 0.1311,
+        "p95": 0.2621,
+        "max": 0.2621
+      },
+      "faceOnlyFramesMs": {
+        "count": 120,
+        "median": 0.0655,
+        "p95": 0.1311,
+        "max": 0.1311
+      },
+      "prefilterFramesMs": {
+        "count": 60,
+        "median": 0.1966,
+        "p95": 0.2621,
+        "max": 0.2621
+      },
+      "prefilterComputeMs": {
+        "count": 60,
+        "median": 0.1311,
+        "p95": 0.1966,
+        "max": 0.1966
+      },
+      "mainFrameGpuMs": {
+        "count": 12,
+        "median": 0.1966,
+        "p95": 0.2621,
+        "max": 0.2621
+      }
+    },
+    {
+      "facesPerFrame": 6,
+      "frames": 180,
+      "captureMsPerFrame": {
+        "count": 180,
+        "median": 0.3277,
+        "p95": 1.7039,
+        "max": 2.8836
+      },
+      "faceOnlyFramesMs": null,
+      "prefilterFramesMs": {
+        "count": 180,
+        "median": 0.3277,
+        "p95": 1.7039,
+        "max": 2.8836
+      },
+      "prefilterComputeMs": {
+        "count": 180,
+        "median": 0.1311,
+        "p95": 1.5073,
+        "max": 2.7525
+      },
+      "mainFrameGpuMs": {
+        "count": 12,
+        "median": 0.1966,
+        "p95": 0.2621,
+        "max": 0.2621
+      }
+    }
+  ],
+  "bakeForComparison": [
+    {
+      "facesMs": 0.1966,
+      "exactPrefilterMs": 94.7651
+    },
+    {
+      "facesMs": 0.1311,
+      "exactPrefilterMs": 91.947
+    },
+    {
+      "facesMs": 0,
+      "exactPrefilterMs": 23.4619
+    }
+  ]
+}

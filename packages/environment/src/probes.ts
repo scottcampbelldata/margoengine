@@ -7,6 +7,7 @@
 // EnvironmentLighting's (gltf-pro's physical material with every light still fits WebGPU's 16).
 import type { EngineKernel } from '@margoengine/core';
 import { Camera, engineRuntime, type FrameGraph, type PassContext, type Vec3 } from '@margoengine/core/extension';
+import { MargoError } from '@margoengine/math/errors';
 import type { Environment } from './environment.js';
 import { IBL_WGSL, iblBindGroupEntries } from './ibl.js';
 import { IBL_BINDING, ShaderEffect, type LightingTarget, type PBRHooks } from './lighting.js';
@@ -60,6 +61,7 @@ type CaptureResources = {
   environmentView?: GPUTextureView;
   environmentParams?: GPUBuffer;
 };
+type Waiter = { resolve: () => void; reject: (error: unknown) => void };
 
 /** A box filled with a grid of irradiance probes, one at the centre of each cell. */
 export interface IrradianceVolume {
@@ -83,6 +85,28 @@ export interface ReflectionProbe {
   max: Vec3;
   /** World distance outside the box over which the probe fades out (default 10% of the box's smallest side; the box faces are inside). */
   blend?: number;
+  /** Re-captured by live capture under `priority: 'dynamic'` ({@link LiveReflectionOptions}); default false. */
+  dynamic?: boolean;
+}
+/**
+ * Live reflection capture ({@link LightProbes.setLive}): reflection probes re-captured while the scene changes, a few cube
+ * faces per frame. One probe is refreshed at a time: its six faces, then its prefilter with the sixth face, after which
+ * shading uses the new radiance. With a still camera, a change shows in a probe within (eligible probes + 1) refreshes
+ * of `6 / facesPerFrame` frames each.
+ */
+export interface LiveReflectionOptions {
+  /** Cube faces captured per frame, across probes (1-96, default 1). */
+  facesPerFrame?: number;
+  /**
+   * Which probes refresh: 'nearest' (default) every reflection probe, 'dynamic' only those marked `dynamic`. Each round
+   * refreshes every eligible probe once, the one whose box is nearest the camera first.
+   */
+  priority?: 'nearest' | 'dynamic';
+  /**
+   * GGX importance samples per rough texel of the live prefilter (power of two, 64-4096, default 256): a fixed cost per
+   * refresh, so the prefilter never spikes a frame. `bake()` keeps its full-source convolution unless given `samples`.
+   */
+  samples?: number;
 }
 /** Options of {@link LightProbes}. */
 export interface LightProbeOptions {
@@ -98,6 +122,8 @@ export interface LightProbeOptions {
   far?: number;
   /** Plugin and pass name. Default 'light-probes'. */
   name?: string;
+  /** Starts live reflection capture ({@link LightProbes.setLive}); default off. */
+  live?: LiveReflectionOptions;
 }
 /** Options of {@link LightProbes.bake}. */
 export interface ProbeBakeOptions {
@@ -113,7 +139,8 @@ export const MAX_REFLECTION_PROBES = 16;
 export const PROBE_BINDING = 26;
 const CAPTURE_BINDING = 27,
   HEADER_BYTES = 64 + MAX_REFLECTION_PROBES * 64,
-  MAX_VOLUME_PROBES = 4096;
+  MAX_VOLUME_PROBES = 4096,
+  LIVE_SAMPLES = 256;
 // Capture cameras per cube face: forward and up (right = forward x up); the WGSL below uses the same table.
 const FACES: readonly (readonly [Vec3, Vec3])[] = [
   [
@@ -234,6 +261,10 @@ fn probeShade(p:vec3f,n:vec3f,v:vec3f,base:vec3f,metal:f32,rough:f32,ambient:vec
 
 // Bake: radiance = capture (premultiplied over the environment where nothing was drawn, alpha < 1), projected to SH
 // (normalised cube texel solid angles), resampled to octahedral level 0 and GGX-convolved (n = v = r) into the rougher levels.
+// The sampled prefilter runs one workgroup per output texel: its 64 threads split the GGX samples (i, i + 64, ...) and
+// add their sums in workgroup memory, so no thread runs a long chain of dependent texture reads (one thread per texel
+// looping over every sample was latency-bound: a 2.0 ms median for a 128 px probe at 256 samples on an RTX A6000).
+// Same samples, same estimate.
 const bakeWgsl = (environment: boolean, sampled: boolean) =>
   dataWgsl('read_write', 0, 0) +
   (sampled ? common : '') +
@@ -286,22 +317,29 @@ fn coefficientHalf(h:u32)->f32 {if(h>=bake.count*3u){return 0.0;}return coeffici
   let s=bake.size;if(id.x>=s||id.y>=s){return;}
   store(bake.offset+id.y*s+id.x,sampleFaces(octDecode((vec2f(id.xy)+0.5)/f32(s))));
 }
-@compute @workgroup_size(8,8) fn prefilter(@builtin(global_invocation_id) id:vec3u) {
-  let s=bake.size;if(id.x>=s||id.y>=s){return;}
 ${
   sampled
     ? `
-  let n=normalize(octDecode((vec2f(id.xy)+0.5)/f32(s)));
+var<workgroup> texelSum:array<vec4f,64>;
+@compute @workgroup_size(64) fn prefilter(@builtin(workgroup_id) g:vec3u,@builtin(local_invocation_index) k:u32) {
+  let s=bake.size;
+  let n=normalize(octDecode((vec2f(g.xy)+0.5)/f32(s)));
   let up=select(vec3f(1,0,0),vec3f(0,0,1),abs(n.z)<0.999);
   let t=normalize(cross(up,n));let b=cross(n,t);let alpha=bake.roughness*bake.roughness;
   var sum=vec4f(0);
-  for(var i=0u;i<bake.count;i++){
+  for(var i=k;i<bake.count;i+=64u){
     let hl=importanceGGX(hammersley(i,bake.count),alpha);
     let h=t*hl.x+b*hl.y+n*hl.z;let l=2.0*hl.z*h-n;let nl=dot(n,l);
     if(nl>0.0){sum+=vec4f(sampleFaces(l)*nl,nl);}
   }
+  texelSum[k]=sum;workgroupBarrier();
+  for(var stride=32u;stride>0u;stride>>=1u){if(k<stride){texelSum[k]+=texelSum[k+stride];}workgroupBarrier();}
+  if(k==0u){let total=texelSum[0];store(bake.offset+g.y*s+g.x,total.rgb/max(total.a,1e-20));}
+}
 `
     : `
+@compute @workgroup_size(8,8) fn prefilter(@builtin(global_invocation_id) id:vec3u) {
+  let s=bake.size;if(id.x>=s||id.y>=s){return;}
   let n=normalize(octDecode((vec2f(id.xy)+0.5)/f32(s)));let a=bake.roughness*bake.roughness;let a2=a*a;let m=bake.sourceSize;
   var sum=vec4f(0);
   for(var j=0u;j<m*m;j++){
@@ -309,11 +347,10 @@ ${
     let nh=dot(n,normalize(n+l));let q=nh*nh*(a2-1.0)+1.0;let w=a2/(q*q)*nl/(r*r*r);
     sum+=vec4f(probeTexel(bake.source+j)*w,w);
   }
-`
-}
   store(bake.offset+id.y*s+id.x,sum.rgb/max(sum.a,1e-20));
 }
-`;
+`
+}`;
 
 // The capture shader: core's lit shader with every patch, drawn from the probe camera (its own Frame at CAPTURE_BINDING;
 // core's binding 0 kept statically used), output as linear radiance, without fog (receivers fog themselves) and with
@@ -379,7 +416,8 @@ const levelTexels = (size: number) => {
  * Light probes baked from the scene on the GPU: an irradiance volume (L1/L2 SH probes on a grid, trilinear between them)
  * and up to 16 box-projected reflection probes. `engine.use(probes)` lights core meshes, `probes.add(model)` gltf-pro and
  * materials models and terrain; added models are also captured. They replace the ambient term (and EnvironmentLighting:
- * pass the environment as the fallback instead of attaching both). `await probes.bake()` captures at load or on demand.
+ * pass the environment as the fallback instead of attaching both). `await probes.bake()` captures at load or on demand;
+ * {@link setLive} keeps reflection probes current while the scene changes, and {@link refresh} re-captures one from code.
  */
 export class LightProbes extends ShaderEffect {
   readonly environment?: Environment;
@@ -410,6 +448,18 @@ export class LightProbes extends ShaderEffect {
   private readonly bakeCache = new Map<boolean, BakePipelines>();
   private captureResources?: CaptureResources;
   private readonly volumePosition: [number, number, number] = [0.1, 0.1, 0.1];
+  // Live and on-demand reflection capture: the probe being refreshed (-1: none), its next face and capture point, the
+  // probes refreshed this round, the probes whose radiance is on the GPU, requested refreshes and their promises.
+  private liveOptions: Readonly<Required<LiveReflectionOptions>> | null = null;
+  private job = -1;
+  private jobFace = 0;
+  private readonly jobPosition: [number, number, number] = [0, 0, 0];
+  private jobWaiters: Waiter[] = [];
+  private readonly refreshQueue: number[] = [];
+  private readonly refreshWaiters: Waiter[][];
+  private readonly roundDone: Uint8Array;
+  private readonly active: Uint8Array;
+  private refreshCount = 0;
 
   /** Same as `engine.use(new LightProbes(options))`; returns the LightProbes. */
   static attach(engine: EngineKernel, options: LightProbeOptions): LightProbes {
@@ -474,6 +524,8 @@ export class LightProbes extends ShaderEffect {
         (probe.blend !== undefined && (!finite(probe.blend) || probe.blend < 0))
       )
         throw new RangeError('Invalid reflection probe: min < max, position inside the box, blend >= 0');
+      if (probe.dynamic !== undefined && typeof probe.dynamic !== 'boolean')
+        throw new TypeError('Reflection probe dynamic must be a boolean; pass true, false or omit it');
       const blend = probe.blend ?? 0.1 * Math.min(...probe.max.map((v, i) => v - probe.min[i])),
         o = 64 + j * 64;
       [probe.position, probe.min, probe.max].forEach((v, k) =>
@@ -490,6 +542,10 @@ export class LightProbes extends ShaderEffect {
     view.setUint32(48, this.reflections.length, true);
     this.environment = environment;
     this.texelCount = texels;
+    this.roundDone = new Uint8Array(this.reflections.length);
+    this.active = new Uint8Array(this.reflections.length);
+    this.refreshWaiters = this.reflections.map(() => []);
+    if (options.live !== undefined) this.setLive(options.live);
   }
 
   /** GPU bytes of the probe buffer: a 1,088-byte header, 64 B per L2 volume probe (32 B per L1), 8 B per reflection texel. */
@@ -499,6 +555,65 @@ export class LightProbes extends ShaderEffect {
   /** True once a bake has finished (the probes then light receivers). */
   get baked(): boolean {
     return !!this.snapshot;
+  }
+  /** The live capture settings ({@link setLive}), or null while live capture is off. */
+  get live(): Readonly<Required<LiveReflectionOptions>> | null {
+    return this.liveOptions;
+  }
+  /** Reflection probe refreshes completed by live and on-demand capture (each: six faces and a prefilter). */
+  get refreshes(): number {
+    return this.refreshCount;
+  }
+  /**
+   * Starts live reflection capture with these settings, or stops it with null. While it runs, every frame captures up
+   * to `facesPerFrame` cube faces of one reflection probe at a time (refreshed whole before the next starts, chosen by
+   * `priority`) and prefilters a probe with its sixth face, so shading switches to complete new radiance at once.
+   * Captures draw what the frame draws: core meshes the frame culls (outside the main camera) are missing from them, so
+   * render with `culling: false` (`engine.start({culling: false})`) when probes must see the whole scene. The irradiance
+   * volume is bake-only. A probe captured live lights receivers from its first refresh, baked or not.
+   */
+  setLive(options: LiveReflectionOptions | null): void {
+    if (options === null) {
+      this.liveOptions = null;
+      // A live refresh in progress stops too; one that a refresh() call waits for finishes.
+      if (!this.jobWaiters.length) this.job = -1;
+      return;
+    }
+    if (typeof options !== 'object') throw new TypeError('LightProbes live options must be an object or null');
+    if (!this.reflections.length)
+      throw new TypeError('LightProbes live capture needs reflection probes; add some to `reflections`');
+    const facesPerFrame = options.facesPerFrame ?? 1,
+      priority = options.priority ?? 'nearest',
+      samples = powerOfTwo(options.samples, LIVE_SAMPLES, 64, 4096, 'live samples');
+    if (!Number.isInteger(facesPerFrame) || facesPerFrame < 1 || facesPerFrame > 6 * MAX_REFLECTION_PROBES)
+      throw new RangeError('LightProbes live facesPerFrame must be an integer from 1 to 96');
+    if (priority !== 'nearest' && priority !== 'dynamic')
+      throw new TypeError("LightProbes live priority must be 'nearest' or 'dynamic'");
+    this.liveOptions = Object.freeze({ facesPerFrame, priority, samples });
+    this.roundDone.fill(0);
+  }
+  /**
+   * Re-captures reflection probe `index` (every reflection probe when omitted) over the next frames, ahead of the live
+   * order and sliced like it (live `facesPerFrame` and `samples`, or one face per frame and 256 samples without live
+   * capture, which this does not need). Resolves when the GPU has finished the probe's prefilter; the engine must keep
+   * rendering. Rejects if the probes are disposed first.
+   */
+  async refresh(index?: number): Promise<void> {
+    if (this.disposed) throw new MargoError('disposed', `${this.name} is disposed; create new LightProbes`);
+    if (!this.engine || !this.gpu)
+      throw new MargoError('state', `${this.name} is not attached; engine.use(probes) first`);
+    if (index !== undefined && (!Number.isInteger(index) || index < 0 || index >= this.reflections.length))
+      throw new RangeError(`Reflection probe index must be an integer from 0 to ${this.reflections.length - 1}`);
+    const indices = index === undefined ? this.reflections.map((_, j) => j) : [index];
+    await Promise.all(
+      indices.map(
+        (j) =>
+          new Promise<void>((resolve, reject) => {
+            this.refreshWaiters[j].push({ resolve, reject });
+            if (!this.refreshQueue.includes(j)) this.refreshQueue.push(j);
+          }),
+      ),
+    );
   }
   /** Moves a reflection probe's capture point inside its box. Call `bake()` again to capture the scene there. */
   setReflectionPosition(index: number, position: Vec3): void {
@@ -596,10 +711,19 @@ export class LightProbes extends ShaderEffect {
     this.headerBaked = baked;
     const view = this.headerView;
     if (this.volume) view.setUint32(44, baked ? (this.volume.sh === 2 ? 4 : 2) : 0, true); // vec4u per probe; 0 = unbaked
-    for (let j = 0; j < this.reflections.length; j++) view.setUint32(64 + j * 64 + 60, +baked, true);
+    for (let j = 0; j < this.reflections.length; j++)
+      view.setUint32(64 + j * 64 + 60, +(baked || !!this.active[j]), true);
     this.gpu!.queue.writeBuffer(this.buffer!, 0, view.buffer);
   }
   private release(): void {
+    // The GPU radiance is gone: live-captured probes are dark until captured again, and a refresh in progress restarts.
+    this.active.fill(0);
+    if (this.job !== -1 && this.jobWaiters.length) {
+      this.refreshWaiters[this.job].unshift(...this.jobWaiters);
+      if (!this.refreshQueue.includes(this.job)) this.refreshQueue.unshift(this.job);
+    }
+    this.jobWaiters = [];
+    this.job = -1;
     const resources = this.captureResources;
     this.captureResources = undefined;
     if (resources) for (const resource of resources.owned) resource.destroy();
@@ -621,10 +745,13 @@ export class LightProbes extends ShaderEffect {
       name: this.name + ':capture',
       order: -0.5,
       execute: (c) => {
-        if (c.backend === 'webgpu' && this.pending && c.device === this.gpu) {
+        if (c.backend !== 'webgpu' || c.device !== this.gpu) return;
+        if (this.pending) {
           this.pending = false;
+          // The bake re-captures every face into the shared targets: a live refresh in progress starts over.
+          this.jobFace = 0;
           this.captureAll(c);
-        }
+        } else if (this.job !== -1 || this.refreshQueue.length || this.liveOptions) this.captureSlice(c);
       },
     });
   }
@@ -845,7 +972,9 @@ export class LightProbes extends ShaderEffect {
       throw error;
     }
   }
-  private captureAll(c: Context): void {
+  // This frame's capture setup: the capture pipeline for the frame's shader, the bake pipelines for the filter mode and
+  // the pooled resources with this frame's descriptor and bindings. Returns the bake pipelines.
+  private prepare(c: Context, samples: number): BakePipelines {
     const device = c.device,
       buffers = c.descriptor.vertex.buffers?.length;
     if (this.capture?.source !== c.shader || this.capture.buffers !== buffers) {
@@ -863,7 +992,7 @@ export class LightProbes extends ShaderEffect {
         }),
       };
     }
-    const bake = this.bakePipelines(device),
+    const bake = this.bakePipelines(device, samples > 0),
       resources = this.resources(device),
       descriptor = resources.descriptor;
     // Copy this frame's optional descriptor keys, without retaining keys removed by a host between bakes.
@@ -888,6 +1017,12 @@ export class LightProbes extends ShaderEffect {
     if (this.captureProxy?.device !== device)
       this.captureProxy = { device, proxy: captureDevice(device, captureLights) };
     if (!resources.view) resources.view = { ...c };
+    return bake;
+  }
+  private captureAll(c: Context): void {
+    const samples = this.bakeSamples,
+      bake = this.prepare(c, samples),
+      resources = this.captureResources!;
     if (this.volume) {
       const volume = this.volume,
         size = volume.resolution ?? 16,
@@ -898,104 +1033,232 @@ export class LightProbes extends ShaderEffect {
             position[0] = volume.min[0] + ((x + 0.5) * (volume.max[0] - volume.min[0])) / volume.counts[0];
             position[1] = volume.min[1] + ((y + 0.5) * (volume.max[1] - volume.min[1])) / volume.counts[1];
             position[2] = volume.min[2] + ((z + 0.5) * (volume.max[2] - volume.min[2])) / volume.counts[2];
-            this.captureProbe(
-              c,
-              resources,
-              bake,
-              position,
-              size,
-              x + volume.counts[0] * (y + volume.counts[1] * z),
-              -1,
-            );
+            for (let face = 0; face < 6; face++)
+              this.captureFace(
+                c,
+                resources,
+                bake,
+                position,
+                size,
+                face,
+                x + volume.counts[0] * (y + volume.counts[1] * z),
+                -1,
+                samples,
+              );
           }
     }
     for (let index = 0; index < this.reflections.length; index++)
-      this.captureProbe(c, resources, bake, this.reflections[index].position, this.resolution, -1, index);
+      for (let face = 0; face < 6; face++)
+        this.captureFace(
+          c,
+          resources,
+          bake,
+          this.reflections[index].position,
+          this.resolution,
+          face,
+          -1,
+          index,
+          samples,
+        );
   }
-  private captureProbe(
+  // Live and on-demand capture for this frame: up to facesPerFrame cube faces of one reflection probe at a time (they
+  // share the capture target), the probe's prefilter with its sixth face. A capture that throws (an unrecognised
+  // shader, say) turns live capture off and rejects the waiting refreshes before the error stops the engine, so a
+  // restarted engine does not hit it again.
+  private captureSlice(c: Context): void {
+    const live = this.liveOptions,
+      samples = live ? live.samples : LIVE_SAMPLES;
+    let bake: BakePipelines | undefined;
+    try {
+      for (let budget = live ? live.facesPerFrame : 1; budget > 0; budget--) {
+        if (this.job === -1 && !this.nextJob(c.camera)) return;
+        bake ??= this.prepare(c, samples);
+        const face = this.jobFace++;
+        this.captureFace(
+          c,
+          this.captureResources!,
+          bake,
+          this.jobPosition,
+          this.resolution,
+          face,
+          -1,
+          this.job,
+          samples,
+        );
+        if (face === 5) this.finishJob();
+      }
+    } catch (error) {
+      this.liveOptions = null;
+      this.job = -1;
+      this.rejectRefreshes(error);
+      throw error;
+    }
+  }
+  private rejectRefreshes(error: unknown): void {
+    const waiting = this.jobWaiters;
+    this.jobWaiters = [];
+    this.refreshQueue.length = 0;
+    for (const waiter of waiting) waiter.reject(error);
+    for (let j = 0; j < this.refreshWaiters.length; j++) {
+      const list = this.refreshWaiters[j];
+      this.refreshWaiters[j] = [];
+      for (const waiter of list) waiter.reject(error);
+    }
+  }
+  // Picks the next probe to refresh: a requested one first, then (live) the eligible probe nearest the camera that this
+  // round has not refreshed yet, starting a new round when all have been. False when there is nothing to capture.
+  private nextJob(camera: Camera): boolean {
+    let next = this.refreshQueue.length ? this.refreshQueue.shift()! : -1;
+    const live = this.liveOptions;
+    if (next === -1 && live) {
+      const eye = camera.position,
+        dynamicOnly = live.priority === 'dynamic';
+      for (let round = 0; round < 2 && next === -1; round++) {
+        if (round) this.roundDone.fill(0);
+        let best = Infinity;
+        for (let j = 0; j < this.reflections.length; j++) {
+          const probe = this.reflections[j];
+          if (this.roundDone[j] || (dynamicOnly && !probe.dynamic)) continue;
+          // Squared distance from the camera to the probe's influence box (0 inside it).
+          let d = 0;
+          for (let k = 0; k < 3; k++) {
+            const below = probe.min[k] - eye[k],
+              above = eye[k] - probe.max[k],
+              out = below > above ? below : above;
+            if (out > 0) d += out * out;
+          }
+          if (d < best) {
+            best = d;
+            next = j;
+          }
+        }
+      }
+    }
+    if (next === -1) return false;
+    this.job = next;
+    this.jobFace = 0;
+    const position = this.reflections[next].position;
+    this.jobPosition[0] = position[0];
+    this.jobPosition[1] = position[1];
+    this.jobPosition[2] = position[2];
+    // Promises of refreshes requested before this capture began resolve when it ends.
+    if (this.refreshWaiters[next].length) {
+      const waiting = this.refreshWaiters[next];
+      this.refreshWaiters[next] = this.jobWaiters;
+      this.jobWaiters = waiting;
+    }
+    return true;
+  }
+  private finishJob(): void {
+    const j = this.job,
+      device = this.gpu!;
+    this.job = -1;
+    this.roundDone[j] = 1;
+    this.refreshCount++;
+    if (!this.active[j]) {
+      // Lit from now on: the flag lands after the prefilter's submit, before this frame's shading.
+      this.active[j] = 1;
+      const at = 64 + j * 64 + 60;
+      this.headerView.setUint32(at, 1, true);
+      device.queue.writeBuffer(this.buffer!, at, this.header, at, 4);
+    }
+    if (this.jobWaiters.length) {
+      const waiters = this.jobWaiters;
+      this.jobWaiters = [];
+      device.queue.onSubmittedWorkDone().then(
+        () => {
+          for (const waiter of waiters) waiter.resolve();
+        },
+        (error: unknown) => {
+          for (const waiter of waiters) waiter.reject(error);
+        },
+      );
+    }
+  }
+  private captureFace(
     c: Context,
     resources: CaptureResources,
     bake: BakePipelines,
     position: Vec3,
     size: number,
+    face: number,
     volumeIndex: number,
     reflectionIndex: number,
+    samples: number,
   ): void {
     const device = c.device,
       target = resources.targets.get(size)!,
       lighting = engineRuntime(this.engine!).lighting,
       values = resources.values,
       view = resources.view!;
-    for (let face = 0; face < 6; face++) {
-      const camera = resources.cameras[face],
-        eye = resources.positions[face],
-        aim = resources.aims[face],
-        forward = FACES[face][0];
-      for (let axis = 0; axis < 3; axis++) {
-        eye[axis] = position[axis];
-        aim[axis] = position[axis] + forward[axis];
-      }
-      // Draw receivers borrow this camera; restore its capture settings before reusing it.
-      camera.fov = 90;
-      camera.near = this.near;
-      camera.far = this.far;
-      camera.position = eye;
-      camera.target = aim;
-      camera.up = FACES[face][1];
-      camera.project = undefined;
-      camera.cancelFit();
-      camera.update(1, true);
-      values.set(camera.matrix);
-      values.set(position, 16);
-      values[19] = 0;
-      values.set(lighting.direction, 20);
-      values.set(lighting.radiance, 24);
-      values.fill(1, 28, 31);
-      if (lighting.ambient) values.set(lighting.ambient, 28);
-      device.queue.writeBuffer(resources.frame, 0, values);
-      const encoder = device.createCommandEncoder(),
-        color = target.colors[face],
-        depth = target.depthView,
-        savedEncoder = c.encoder,
-        savedColor = c.color,
-        savedDepth = c.depth,
-        savedDescriptor = c.descriptor;
-      encoder.beginRenderPass(target.passes[face]).end();
-      c.encoder = encoder;
-      c.color = color;
-      c.depth = depth;
-      c.descriptor = resources.descriptor;
-      resources.draw.pipeline = this.capture!.pipeline;
-      resources.draw.bindings = resources.bindings;
-      resources.draw.clear = false;
-      try {
-        c.draw(resources.draw);
-      } finally {
-        c.encoder = savedEncoder;
-        c.color = savedColor;
-        c.depth = savedDepth;
-        c.descriptor = savedDescriptor;
-      }
-      if (this.disposed || this.gpu !== device) throw new Error('Light probe bake interrupted');
-      for (const key in view)
-        if (!Object.prototype.hasOwnProperty.call(c, key)) delete (view as unknown as Record<string, unknown>)[key];
-      Object.assign(view, c);
-      view.device = this.captureProxy!.proxy;
-      view.encoder = encoder;
-      view.camera = camera;
-      view.color = color;
-      view.depth = depth;
-      view.descriptor = resources.descriptor;
-      view.format = 'rgba16float';
-      view.width = view.height = size;
-      for (const model of this.captured) {
-        model.draw(view, 'beauty', color, depth);
-        if (this.disposed || this.gpu !== device) throw new Error('Light probe bake interrupted');
-      }
-      if (face === 5) this.filterProbe(resources, target, bake, encoder, volumeIndex, reflectionIndex);
-      resources.commands[0] = encoder.finish();
-      device.queue.submit(resources.commands);
+    const camera = resources.cameras[face],
+      eye = resources.positions[face],
+      aim = resources.aims[face],
+      forward = FACES[face][0];
+    for (let axis = 0; axis < 3; axis++) {
+      eye[axis] = position[axis];
+      aim[axis] = position[axis] + forward[axis];
     }
+    // Draw receivers borrow this camera; restore its capture settings before reusing it.
+    camera.fov = 90;
+    camera.near = this.near;
+    camera.far = this.far;
+    camera.position = eye;
+    camera.target = aim;
+    camera.up = FACES[face][1];
+    camera.project = undefined;
+    camera.cancelFit();
+    camera.update(1, true);
+    values.set(camera.matrix);
+    values.set(position, 16);
+    values[19] = 0;
+    values.set(lighting.direction, 20);
+    values.set(lighting.radiance, 24);
+    values.fill(1, 28, 31);
+    if (lighting.ambient) values.set(lighting.ambient, 28);
+    device.queue.writeBuffer(resources.frame, 0, values);
+    const encoder = device.createCommandEncoder(),
+      color = target.colors[face],
+      depth = target.depthView,
+      savedEncoder = c.encoder,
+      savedColor = c.color,
+      savedDepth = c.depth,
+      savedDescriptor = c.descriptor;
+    encoder.beginRenderPass(target.passes[face]).end();
+    c.encoder = encoder;
+    c.color = color;
+    c.depth = depth;
+    c.descriptor = resources.descriptor;
+    resources.draw.pipeline = this.capture!.pipeline;
+    resources.draw.bindings = resources.bindings;
+    resources.draw.clear = false;
+    try {
+      c.draw(resources.draw);
+    } finally {
+      c.encoder = savedEncoder;
+      c.color = savedColor;
+      c.depth = savedDepth;
+      c.descriptor = savedDescriptor;
+    }
+    if (this.disposed || this.gpu !== device) throw new Error('Light probe bake interrupted');
+    for (const key in view)
+      if (!Object.prototype.hasOwnProperty.call(c, key)) delete (view as unknown as Record<string, unknown>)[key];
+    Object.assign(view, c);
+    view.device = this.captureProxy!.proxy;
+    view.encoder = encoder;
+    view.camera = camera;
+    view.color = color;
+    view.depth = depth;
+    view.descriptor = resources.descriptor;
+    view.format = 'rgba16float';
+    view.width = view.height = size;
+    for (const model of this.captured) {
+      model.draw(view, 'beauty', color, depth);
+      if (this.disposed || this.gpu !== device) throw new Error('Light probe bake interrupted');
+    }
+    if (face === 5) this.filterProbe(resources, target, bake, encoder, volumeIndex, reflectionIndex, samples);
+    resources.commands[0] = encoder.finish();
+    device.queue.submit(resources.commands);
   }
   private captureGroup(
     resources: CaptureResources,
@@ -1003,6 +1266,7 @@ export class LightProbes extends ShaderEffect {
     pipeline: GPUComputePipeline,
     entry: keyof BakePipelines,
     slot: number,
+    samples: number,
   ): GPUBindGroup {
     let groups = target.groups.get(pipeline);
     if (!groups) target.groups.set(pipeline, (groups = []));
@@ -1012,7 +1276,7 @@ export class LightProbes extends ShaderEffect {
         { binding: 0, resource: { buffer: this.buffer! } },
         { binding: 1, resource: { buffer: resources.params, offset: slot * 256, size: 32 } },
       ];
-      if (entry !== 'prefilter' || this.bakeSamples > 0) {
+      if (entry !== 'prefilter' || samples > 0) {
         entries.push({ binding: 2, resource: target.array });
         // Without an environment SH reads textureLoad and the sampler is absent from its static layout.
         if (entry !== 'sh' || this.environment) entries.push({ binding: 3, resource: resources.sampler });
@@ -1034,6 +1298,7 @@ export class LightProbes extends ShaderEffect {
     encoder: GPUCommandEncoder,
     volumeIndex: number,
     reflectionIndex: number,
+    samples: number,
   ): void {
     const slots = resources.slots,
       floats = resources.floats,
@@ -1049,7 +1314,7 @@ export class LightProbes extends ShaderEffect {
       slots[at + 2] = !volume && slot > 0 ? base : 0;
       slots[at + 3] = this.resolution;
       floats[at + 4] = !volume && slot > 0 ? slot / (count - 1) : 0;
-      slots[at + 5] = volume ? (this.volume!.sh === 1 ? 4 : 9) : slot > 0 ? this.bakeSamples : 0;
+      slots[at + 5] = volume ? (this.volume!.sh === 1 ? 4 : 9) : slot > 0 ? samples : 0;
       slots[at + 6] = slots[at + 7] = 0;
       if (!volume) offset += size ** 2;
     }
@@ -1058,21 +1323,21 @@ export class LightProbes extends ShaderEffect {
     for (let slot = 0; slot < count; slot++) {
       const entry = volume ? 'sh' : slot === 0 ? 'resample' : 'prefilter',
         size = slots[slot * 64 + 1],
-        x = volume ? 1 : Math.ceil(size / 8),
+        // Sampled prefilter: one 64-thread workgroup per texel; otherwise 8 x 8 texels per workgroup.
+        x = volume ? 1 : entry === 'prefilter' && samples > 0 ? size : Math.ceil(size / 8),
         pipeline = bake[entry];
       pass.setPipeline(pipeline);
-      pass.setBindGroup(0, this.captureGroup(resources, target, pipeline, entry, slot));
+      pass.setBindGroup(0, this.captureGroup(resources, target, pipeline, entry, slot, samples));
       pass.dispatchWorkgroups(x, x);
     }
     pass.end();
   }
-  private bakePipelines(device: GPUDevice): BakePipelines {
+  private bakePipelines(device: GPUDevice, sampled: boolean): BakePipelines {
     if (this.bakeDevice !== device) {
       this.bakeCache.clear();
       this.bakeDevice = device;
     }
-    const sampled = this.bakeSamples > 0,
-      cached = this.bakeCache.get(sampled);
+    const cached = this.bakeCache.get(sampled);
     if (cached) return cached;
     const module = device.createShaderModule({ code: bakeWgsl(!!this.environment, sampled) });
     const make = (entryPoint: string) =>
@@ -1085,6 +1350,8 @@ export class LightProbes extends ShaderEffect {
     super.dispose();
     this.release();
     this.captured.clear();
+    this.liveOptions = null;
+    this.rejectRefreshes(new MargoError('disposed', `${this.name} was disposed before the refresh finished`));
   }
 }
 

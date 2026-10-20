@@ -23,6 +23,7 @@ export interface LightProbeOptions {
     near?: number;
     far?: number;
     name?: string;
+    live?: LiveReflectionOptions;
 }
 
 export class LightProbes extends ShaderEffect {
@@ -34,6 +35,10 @@ export class LightProbes extends ShaderEffect {
     constructor(options: LightProbeOptions);
     get byteLength(): number;
     get baked(): boolean;
+    get live(): Readonly<Required<LiveReflectionOptions>> | null;
+    get refreshes(): number;
+    setLive(options: LiveReflectionOptions | null): void;
+    refresh(index?: number): Promise<void>;
     setReflectionPosition(index: number, position: Vec3): void;
     protected get device(): GPUDevice | null | undefined;
     protected entries(): GPUBindGroupEntry[];
@@ -50,6 +55,12 @@ export class LightProbes extends ShaderEffect {
     dispose(): void;
 }
 
+export interface LiveReflectionOptions {
+    facesPerFrame?: number;
+    priority?: 'nearest' | 'dynamic';
+    samples?: number;
+}
+
 export const MAX_REFLECTION_PROBES = 16;
 
 export const PROBE_BINDING = 26;
@@ -64,6 +75,7 @@ export interface ReflectionProbe {
     min: Vec3;
     max: Vec3;
     blend?: number;
+    dynamic?: boolean;
 }
 
 // Not exported from this entry, but used by the exports above:
