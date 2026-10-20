@@ -111,6 +111,8 @@ interface ResolvedEnvironment {
   /** Distance at which camera rays see the ground half faded into the sky (0: no fade). */
   readonly groundFade: number;
   readonly groundFadeStart: number;
+  /** Whether the ground fade applies to models too. */
+  readonly fadeModels: boolean;
   readonly background: TraceVec3 | undefined;
   /** Uniform fog: extinction per unit, colour, anisotropy and the hemisphere table of its sky glow (16 values). */
   readonly fog?: { density: number; color: TraceVec3; anisotropy: number; hemisphere: Float32Array };
@@ -825,13 +827,18 @@ function resolveEnvironment(environment: TraceEnvironment | undefined, cache: Sc
   }
   if (e.sunVisible !== undefined && typeof e.sunVisible !== 'boolean')
     throw new TypeError(`${where} ${name}.sunVisible must be true or false`);
+  if (e.fadeModels !== undefined && typeof e.fadeModels !== 'boolean')
+    throw new TypeError(`${where} ${name}.fadeModels must be true or false`);
   const sun = [direction[0] / length, direction[1] / length, direction[2] / length] as TraceVec3;
   let map = e.map === undefined ? undefined : packEnvironment(e.map, cache),
     skyCache: SceneCache['sky'];
   if (e.physicalSky !== undefined) {
     if (e.map !== undefined) throw new TypeError(`${where} ${name} has both map and physicalSky; pass one of them`);
     const p = e.physicalSky;
-    if (!isObject(p)) throw new TypeError(`${where} ${name}.physicalSky must be {turbidity?, intensity?}`);
+    if (!isObject(p))
+      throw new TypeError(`${where} ${name}.physicalSky must be {turbidity?, intensity?, horizonBelow?}`);
+    if (p.horizonBelow !== undefined && typeof p.horizonBelow !== 'boolean')
+      throw new TypeError(`${where} ${name}.physicalSky.horizonBelow must be true or false`);
     const turbidity = optional(
         p.turbidity,
         3,
@@ -841,8 +848,9 @@ function resolveEnvironment(environment: TraceEnvironment | undefined, cache: Sc
         'pass 1.7 (clear) to 10 (hazy)',
       ),
       intensity = optional(p.intensity, 0.1, `${name}.physicalSky.intensity`, 0, 1e6, 'pass 0 or more'),
-      key = `${turbidity},${intensity},${sun.join(',')}`;
-    skyCache = cache.sky?.key === key ? cache.sky : { key, data: bakeSky(turbidity, sun, intensity) };
+      below = p.horizonBelow === true,
+      key = `${turbidity},${intensity},${sun.join(',')},${below}`;
+    skyCache = cache.sky?.key === key ? cache.sky : { key, data: bakeSky(turbidity, sun, intensity, below) };
     map = packEnvironment({ width: SKY_WIDTH, height: SKY_HEIGHT, data: skyCache.data }, cache);
   }
   return {
@@ -855,6 +863,7 @@ function resolveEnvironment(environment: TraceEnvironment | undefined, cache: Sc
     sunVisible: e.sunVisible !== false,
     groundFade,
     groundFadeStart,
+    fadeModels: e.fadeModels === true,
     background,
     fog,
     map,

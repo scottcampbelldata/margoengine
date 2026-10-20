@@ -29,9 +29,15 @@ const XZ = [0.00166, -0.00375, 0.00209, 0, -0.02903, 0.06377, -0.03202, 0.00394,
 /**
  * Linear sRGB sky radiance (3 floats per texel, rows from straight up, the centre column facing -Z, three quarters
  * +X: the environment map convention) for turbidity `turbidity`, sun direction `sun` (unit; below the horizon it is
- * taken on the horizon) and radiance scale `intensity` per kcd/m^2. Below the horizon the sky is black.
+ * taken on the horizon) and radiance scale `intensity` per kcd/m^2. Below the horizon the sky is black, or with
+ * `horizonBelow` the horizon row repeated.
  */
-export function bakeSky(turbidity: number, sun: readonly number[], intensity: number): Float32Array {
+export function bakeSky(
+  turbidity: number,
+  sun: readonly number[],
+  intensity: number,
+  horizonBelow = false,
+): Float32Array {
   const t = turbidity,
     s = Math.acos(Math.min(1, Math.max(0, sun[1]))),
     h = Math.hypot(sun[0], sun[2]),
@@ -66,6 +72,11 @@ export function bakeSky(turbidity: number, sun: readonly number[], intensity: nu
       out[k + 1] = Math.max(0, -0.9689 * X + 1.8758 * Y + 0.0415 * Z) * intensity;
       out[k + 2] = Math.max(0, 0.0557 * X - 0.204 * Y + 1.057 * Z) * intensity;
     }
+  }
+  if (horizonBelow) {
+    const row = SKY_WIDTH * 3,
+      last = (SKY_HEIGHT / 2 - 1) * row;
+    for (let j = SKY_HEIGHT / 2; j < SKY_HEIGHT; j++) out.copyWithin(j * row, last, last + row);
   }
   return out;
 }

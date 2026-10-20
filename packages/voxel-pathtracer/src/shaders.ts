@@ -104,7 +104,7 @@ struct Frame {
  fog:vec4f,
  fogColor:vec4f,
  fogHemi:array<vec4f,4>,
- // Ground fade: x the camera distance where it starts.
+ // Ground fade: x the camera distance where it starts, y 1 when it fades models too.
  groundFade:vec4f,
  // Background for camera rays leaving the scene (w > 0: on); edge bands (colour, width; width 0: off); grid lines
  // (colour, spacing; half width, mode 0 off, 1 ground, 2 ground and voxels).
@@ -1395,14 +1395,15 @@ fn radiance(px:vec2u)->Path {
     if(feature){feature=false;res.albedo=tint;res.normal=-d;res.primary=select(0.0,1.0,bounces==0u);}
     break;
    }
+   // Seen by the camera, the ground (and models, when asked) at distance D fades into the sky behind it by
+   // 1 - e^(-(D - start) / fade).
+   let fade=bitcast<f32>(f.limits.w);
+   if(bounces==0u&&fade>0.0&&f.fog.z==0.0&&(h.inst==GROUND||f.groundFade.y>0.0)){
+    let w=1.0-exp(-max(0.0,h.t*length(d)-f.groundFade.x)/fade);
+    let add=thr*w*skyBehind(d);L+=add;thr*=1.0-w;
+   }
    if(h.inst==GROUND){
     n=vec3f(0.0,select(-1.0,1.0,d.y<0.0),0.0);
-    // Seen by the camera, the ground at distance D fades into the sky behind it by 1 - e^(-(D - start) / fade).
-    let fade=bitcast<f32>(f.limits.w);
-    if(bounces==0u&&fade>0.0&&f.fog.z==0.0){
-     let w=1.0-exp(-max(0.0,h.t*length(d)-f.groundFade.x)/fade);
-     let add=thr*w*skyBehind(d);L+=add;thr*=1.0-w;
-    }
     off=n*max(1e-4,1e-6*length(p));
     m=groundMat();
     if(bounces==0u&&f.grid2.y>0.0&&gridLine(p,n)){m=lineMat(f.grid.xyz);}
@@ -1573,7 +1574,7 @@ fn radiance(px:vec2u)->Path {
     c+=m.color*e*ndl/PI*shadow(p+n*max(1e-3,1e-6*length(p)),f.sun.xyz,INF);
    }
    let fade=bitcast<f32>(f.limits.w);
-   if(h.inst==GROUND&&fade>0.0&&f.fog.z==0.0){
+   if((h.inst==GROUND||f.groundFade.y>0.0)&&fade>0.0&&f.fog.z==0.0){
     let w=1.0-exp(-max(0.0,h.t*length(ray.d)-f.groundFade.x)/fade);c=mix(c,skyBehind(ray.d),w);
    }
   }

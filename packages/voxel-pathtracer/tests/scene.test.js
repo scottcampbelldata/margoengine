@@ -83,6 +83,12 @@ test('scene validation names the problem: shapes are TypeError, values RangeErro
     [{ ...base, materials: [{ id: 1, color: [1, 1, 1], type: 'media', anisotropy: 1 }] }, RangeError, /anisotropy/],
     [{ ...base, environment: { sunDirection: [0, 0, 0] } }, RangeError, /sunDirection is zero/],
     [{ ...base, environment: { sunAngularSize: 1 } }, RangeError, /sunAngularSize/],
+    [{ ...base, environment: { fadeModels: 1 } }, TypeError, /fadeModels must be true or false/],
+    [
+      { ...base, environment: { physicalSky: { horizonBelow: 'yes' } } },
+      TypeError,
+      /horizonBelow must be true or false/,
+    ],
     [{ ...base, environment: { map: { width: 2, height: 1, data: new Float32Array(5) } } }, TypeError, /has 5 floats/],
     [
       { ...base, environment: { map: { width: 1, height: 1, data: new Float32Array([1, -1, 1]) } } },

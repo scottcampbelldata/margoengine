@@ -214,6 +214,11 @@ export interface TraceEnvironment {
   /** Compatible addition: camera distance at which `groundFade` starts (world units; default 0). */
   groundFadeStart?: number;
   /**
+   * Compatible addition: `groundFade` fades models as well as the ground (a game world's far edge into a clear sky, as
+   * its distance fog does). Default false.
+   */
+  fadeModels?: boolean;
+  /**
    * Compatible addition: linear radiance camera rays show where they leave the scene, in place of the sky and the sun
    * disk; lighting is unchanged (MagicaVoxel's background colour). Absent: the sky.
    */
@@ -236,6 +241,11 @@ export interface TracePhysicalSky {
   turbidity?: number;
   /** Radiance per kcd/m^2 of the model's luminance, 0 or more. Default 0.1 (a clear noon zenith is then about 0.6). */
   intensity?: number;
+  /**
+   * Below the horizon the sky keeps its horizon colour in each direction (true: a world with no ground under it, such as
+   * a game's loaded area, fades into it) instead of black (false, default).
+   */
+  horizonBelow?: boolean;
 }
 
 /** Compatible addition: a block texture for {@link TraceMaterial.texture}. */

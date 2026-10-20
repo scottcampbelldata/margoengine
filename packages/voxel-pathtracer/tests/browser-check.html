@@ -187,6 +187,9 @@ window.check={
   look([0,10,0],[0,0,-10],{fov:2});
   out['ground fade']=await withTracer({...empty,environment:{skyColor:[1,1,1],groundColor:[0.5,0.5,0.5],groundHeight:0,groundFade:Math.hypot(10,10)}},{maxBounces:8},async(t)=>{const im=await render(t,256,8);return stats(im,()=>true);});
   out['ground fade start']=await withTracer({...empty,environment:{skyColor:[1,1,1],groundColor:[0.5,0.5,0.5],groundHeight:0,groundFade:Math.hypot(10,10),groundFadeStart:Math.hypot(10,10)}},{maxBounces:8},async(t)=>{const im=await render(t,256,8);return stats(im,()=>true);});
+  // Models fade too when asked: a grey slab (a model; no ground plane) seen 14.14 away under sky 1 reflects 0.5.
+  const slab50={revision:1,models:[model('m',[64,1,64],()=>1)],instances:[{id:'m',modelId:'m',matrix:translate(-32,-1,-42)}],materials:[{id:1,color:[0.5,0.5,0.5],type:'diffuse'}]};
+  for(const fadeModels of [true,false])out[`model fade ${fadeModels}`]=await withTracer({...slab50,environment:{skyColor:[1,1,1],groundFade:Math.hypot(10,10),fadeModels}},{maxBounces:8},async(t)=>{const im=await render(t,256,8);return stats(im,()=>true);});
   // Uniform fog (white, isotropic, extinction 0.05): a floor (albedo 0.5) under sky 1 is lit by the glow 0.5 (half the
   // sky) to 0.25 and seen 10 away: 0.25 exp(-0.5) + 0.5 (1 - exp(-0.5)); a ray to the sky sees 0.5.
   look([0,10,0.01],[0,0,0],{fov:10});

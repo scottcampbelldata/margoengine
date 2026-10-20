@@ -709,6 +709,21 @@ test('a physical sky becomes an importance-sampled environment map; it is valida
   tracer.dispose();
 });
 
+test('a physical sky is black below the horizon, or keeps its horizon colour there with horizonBelow', async () => {
+  for (const horizonBelow of [false, true]) {
+    const scene = simpleScene({ environment: { sunDirection: [0.3, 0.6, 0.2], physicalSky: { horizonBelow } } }),
+      { tracer, frame, device } = await ready({ scene });
+    frame();
+    const env = new Float32Array(device.buffers.findLast((b) => b.size === 1024 * 512 * 16 && !b.destroyed).data),
+      at = (x, y) => [0, 1, 2].map((k) => env[(y * 1024 + x) * 4 + k]);
+    for (const x of [0, 300, 700]) {
+      assert.ok(at(x, 255)[2] > 0, 'the sky just above the horizon is lit');
+      assert.deepEqual(at(x, 400), horizonBelow ? at(x, 255) : [0, 0, 0]);
+    }
+    tracer.dispose();
+  }
+});
+
 test('area lights cast shadows unless opaque is false; dark solid lights stay as occluders only', async () => {
   const light = (id, intensity, extra = {}) => ({
       id,

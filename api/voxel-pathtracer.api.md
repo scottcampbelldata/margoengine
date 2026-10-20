@@ -80,6 +80,7 @@ export interface TraceEnvironment {
     sunVisible?: boolean;
     groundFade?: number;
     groundFadeStart?: number;
+    fadeModels?: boolean;
     background?: TraceVec3;
 }
 
@@ -162,6 +163,7 @@ export interface TraceModel {
 export interface TracePhysicalSky {
     turbidity?: number;
     intensity?: number;
+    horizonBelow?: boolean;
 }
 
 export interface TracePreviousCamera {

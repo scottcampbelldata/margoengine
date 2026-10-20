@@ -107,6 +107,8 @@ try {
     // Fade scale = the ground's distance: the sky takes 1 - 1/e of the grey ground; from that distance on, none.
     near(c['ground fade'].mean, 1 - 0.5 / Math.E, 0.01, 'ground fade');
     near(c['ground fade start'].mean, 0.5, 0.01, 'ground fade start');
+    near(c['model fade true'].mean, 1 - 0.5 / Math.E, 0.01, 'fadeModels fades a model');
+    near(c['model fade false'].mean, 0.5, 0.01, 'models keep their colour without fadeModels');
     near(c['fog floor'].mean, 0.25 * Math.exp(-0.5) + 0.5 * (1 - Math.exp(-0.5)), 0.008, 'fog floor');
     near(c['fog sky 0.5'].mean, 0.5, 0.002, 'fog glow');
     assert.equal(c['aces gamma byte'].byte, 175, 'ACES and gamma 2.2');
