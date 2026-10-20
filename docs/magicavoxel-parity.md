@@ -52,6 +52,7 @@ Everything here is on branch `worktree-agent-a63cac143225721f2` (not pushed, Cod
 | Cloud | extinction `_d` per voxel, colour = scattering albedo, HG `_g` | cloud rows |
 | Emissive cloud | 0.93 x `_d` x colour per voxel, no self-absorption | isolated blocks |
 | Bloom | not in saved snapshots (default and scale 0.5 identical) | bloom scenes |
+| Uniform fog | extinction 0.001 x `_d` per voxel toward an unshadowed sky + sun glow; escaping rays see the glow; no direct sun; colour value / 255 | 9 fog scenes |
 | Depth of field | `_aperture` 0.25 and 2 gave the same sharp image | DOF scenes |
 
 ## Current scores (ours vs MagicaVoxel, 1024 samples each, 960 x 800)
@@ -76,7 +77,11 @@ Everything here is on branch `worktree-agent-a63cac143225721f2` (not pushed, Cod
    sky-lit 10 levels too dark (was 13 too bright). The rule for faces inside the block is not pinned down yet.
 2b. Glass over a lit floor: MagicaVoxel is darker by a fixed factor per refractive index (0.997 at 1.1, 0.976 at 1.3,
    0.959 at 1.5, 0.957 at 2), independent of its bounce caps (checked with specular 10 and diffuse 4): 1-2 levels.
-3. Fog `_fog_uni` (density, colour, phase): not implemented (no global medium in the tracer).
+3. Fog `_fog_uni`: done (`environment.fog`). MagicaVoxel's fog fades rays by exp(-0.001 x `_d` x distance) toward
+   its glow, the glow being the sky and sun light it scatters without shadows; rays leaving the scene see only the
+   glow and the sun reaches surfaces only through it; its colour is value / 255 (no 2.2 power); the ground's horizon
+   fade is off under fog. 9 fog scenes (densities 0.002 to 5, sky, sun, coloured fog with anisotropy, camera 190 and
+   400 away) within 3 levels on 99.5-100% of pixels.
 4. Atmosphere sky (`_env _mode 1`, `_atm` Rayleigh / Mie / ozone): not implemented; needs its own calibration.
 5. Image sky (`_mode 2`, `_ibl`): the helper reports it; the caller must load the HDR file into `environment.map`
    (rotation and intensity mapping unverified).
