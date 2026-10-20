@@ -6,6 +6,42 @@
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 
+export interface AtmosphereSettings {
+    rayleigh: number;
+    rayleighColor: TraceVec3;
+    mie: number;
+    mieColor: TraceVec3;
+    mieG: number;
+    ozone: number;
+    ozoneColor: TraceVec3;
+}
+
+export interface MagicaVoxelCamera {
+    position: TraceVec3;
+    target: TraceVec3;
+    up: TraceVec3;
+    fov: number;
+    projection: 'perspective' | 'orthographic';
+    distance: number;
+}
+
+export type MagicaVoxelDict = Readonly<Record<string, string>> | ReadonlyMap<string, string>;
+
+export interface MagicaVoxelLighting {
+    environment: TraceEnvironment;
+    options: Partial<Omit<VoxelPathTracerOptions, 'scene'>>;
+    unsupported: string[];
+    imageSky?: {
+        path: string;
+        intensity: number;
+        rotation: number;
+    };
+    voxelScale?: [number, number, number];
+    transparentBackground?: boolean;
+}
+
+export type MagicaVoxelLook = 'magicavoxel' | 'margo';
+
 export interface TraceAreaLight {
     id: string;
     position: TraceVec3;
@@ -16,6 +52,17 @@ export interface TraceAreaLight {
     twoSided?: boolean;
     opaque?: boolean;
     visible?: boolean;
+}
+
+export interface TraceBounceLimits {
+    diffuse?: number;
+    specular?: number;
+    scatter?: number;
+}
+
+export interface TraceEdges {
+    color: TraceVec3;
+    width: number;
 }
 
 export interface TraceEnvironment {
@@ -29,6 +76,11 @@ export interface TraceEnvironment {
     groundHeight?: number;
     map?: TraceEnvironmentMap;
     physicalSky?: TracePhysicalSky;
+    fog?: TraceFog;
+    sunVisible?: boolean;
+    groundFade?: number;
+    groundFadeStart?: number;
+    background?: TraceVec3;
 }
 
 export interface TraceEnvironmentMap {
@@ -42,6 +94,19 @@ export interface TraceEnvironmentMap {
 export interface TraceFisheye {
     mapping?: 'equidistant' | 'equisolid';
     fov?: number;
+}
+
+export interface TraceFog {
+    density: number;
+    color?: TraceVec3;
+    anisotropy?: number;
+}
+
+export interface TraceGrid {
+    color: TraceVec3;
+    spacing: number;
+    width: number;
+    onVoxels?: boolean;
 }
 
 export interface TraceInstance {
@@ -67,6 +132,12 @@ export interface TraceMaterial {
     metalness?: number;
     emission?: number;
     emissionColor?: TraceVec3;
+    cameraEmission?: number;
+    sunlit?: boolean;
+    voxelwise?: boolean;
+    contactTransmission?: boolean;
+    texture?: number | readonly [number, number, number, number, number, number];
+    cutout?: number;
     ior?: number;
     transmission?: number;
     density?: number;
@@ -74,6 +145,9 @@ export interface TraceMaterial {
     scatter?: number;
     anisotropy?: number;
     abbe?: number;
+    metalColor?: TraceVec3;
+    coat?: 'layered' | 'additive';
+    tint?: boolean;
 }
 
 export type TraceMaterialType = 'diffuse' | 'plastic' | 'metal' | 'glass' | 'emit' | 'blend' | 'media';
@@ -97,6 +171,12 @@ export interface TracePreviousCamera {
     fov?: number;
 }
 
+export interface TraceTexture {
+    width: number;
+    height: number;
+    data: Uint8Array | Uint8ClampedArray;
+}
+
 export type TraceVec3 = readonly [number, number, number];
 
 export class VoxelPathTracer implements EnginePlugin {
@@ -109,11 +189,15 @@ export class VoxelPathTracer implements EnginePlugin {
     get ready(): Promise<void>;
     get status(): 'compiling' | 'ready' | 'failed' | 'disposed';
     get error(): unknown;
-    get options(): Readonly<Omit<Required<VoxelPathTracerOptions>, 'scene' | 'focusDistance' | 'previousCamera' | 'distortion' | 'fisheye'> & {
+    get options(): Readonly<Omit<Required<VoxelPathTracerOptions>, 'scene' | 'focusDistance' | 'previousCamera' | 'distortion' | 'fisheye' | 'gamma' | 'bounceLimits' | 'edges' | 'grid'> & {
         focusDistance?: number;
         previousCamera?: TracePreviousCamera;
         fisheye: Required<TraceFisheye>;
         distortion?: Required<TraceLensDistortion>;
+        gamma?: number;
+        bounceLimits?: TraceBounceLimits;
+        edges?: TraceEdges;
+        grid?: Required<TraceGrid>;
     }>;
     setScene(scene: VoxelTraceScene): void;
     setOptions(options: Partial<Omit<VoxelPathTracerOptions, 'scene'>>): void;
@@ -130,7 +214,7 @@ export class VoxelPathTracer implements EnginePlugin {
 
 export interface VoxelPathTracerOptions {
     scene: VoxelTraceScene;
-    samplesPerFrame?: number;
+    samplesPerFrame?: number | 'auto';
     maxBounces?: number;
     maxSamples?: number;
     seed?: number;
@@ -138,7 +222,7 @@ export interface VoxelPathTracerOptions {
     exposure?: number;
     aperture?: number;
     focusDistance?: number;
-    denoise?: boolean;
+    denoise?: boolean | 'auto';
     lensBlades?: number;
     lensRotation?: number;
     shutter?: number;
@@ -147,7 +231,16 @@ export interface VoxelPathTracerOptions {
     fisheye?: TraceFisheye;
     distortion?: TraceLensDistortion | null;
     clamp?: number;
-    toneMapping?: 'neutral' | 'linear';
+    toneMapping?: 'neutral' | 'linear' | 'aces-narkowicz';
+    gamma?: number;
+    bounceLimits?: TraceBounceLimits | null;
+    transparentShadows?: boolean;
+    sunSpecular?: boolean;
+    sunInMedia?: boolean;
+    energyCompensation?: boolean;
+    vignette?: number;
+    edges?: TraceEdges | null;
+    grid?: TraceGrid | null;
     order?: number;
 }
 
@@ -167,6 +260,7 @@ export interface VoxelTraceCaptureOptions {
     samples: number;
     signal?: AbortSignal;
     denoise?: boolean;
+    transparent?: boolean;
 }
 
 export interface VoxelTraceHit {
@@ -190,6 +284,7 @@ export interface VoxelTraceImage {
     readonly depth?: Float32Array;
     readonly instance?: Int32Array;
     readonly palette?: Uint8Array;
+    readonly alpha?: Float32Array;
 }
 
 export interface VoxelTraceRenderOptions {
@@ -202,6 +297,7 @@ export interface VoxelTraceRenderOptions {
     aovs?: boolean;
     seed?: number;
     wavelength?: number;
+    transparent?: boolean;
 }
 
 export interface VoxelTraceScene {
@@ -211,5 +307,29 @@ export interface VoxelTraceScene {
     materials: readonly TraceMaterial[];
     environment?: TraceEnvironment;
     lights?: readonly TraceAreaLight[];
+    textures?: readonly TraceTexture[];
 }
+
+export function atmosphereRadiance(view: number[], sun: number[], s: AtmosphereSettings): TraceVec3;
+
+export function atmosphereTransmittance(sun: number[], s: AtmosphereSettings): TraceVec3;
+
+export function bakeAtmosphere(sunMagicaVoxel: number[], s: AtmosphereSettings, scale: TraceVec3, width?: number, height?: number): TraceEnvironmentMap;
+
+export const fromMagicaVoxel: (p: ArrayLike<number>) => TraceVec3;
+
+export function magicaVoxelCamera(camera: MagicaVoxelDict, objects?: Iterable<MagicaVoxelDict>): MagicaVoxelCamera;
+
+export function magicaVoxelLighting(objects: Iterable<MagicaVoxelDict>, { look, imageSky }?: {
+    look?: MagicaVoxelLook;
+    imageSky?: Pick<TraceEnvironmentMap, 'width' | 'height' | 'data'>;
+}): MagicaVoxelLighting;
+
+export const magicaVoxelLinear: (value: number) => number;
+
+export function magicaVoxelMaterial(id: number, rgb: ArrayLike<number>, attributes?: MagicaVoxelDict): TraceMaterial;
+
+export function magicaVoxelMatrix(size: ArrayLike<number>, translation?: ArrayLike<number>, rotation?: ArrayLike<number>, scale?: ArrayLike<number>): number[];
+
+export function magicaVoxelModel(id: string, revision: number, size: ArrayLike<number>, voxels: Uint8Array): TraceModel;
 ```

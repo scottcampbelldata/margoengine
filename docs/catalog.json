@@ -1143,7 +1143,17 @@
     "install": "npm install @margoengine/core@1.0.0 @margoengine/voxel-pathtracer@1.0.0",
     "imports": "import { VoxelPathTracer } from '@margoengine/voxel-pathtracer';",
     "exports": [
-      "VoxelPathTracer"
+      "VoxelPathTracer",
+      "atmosphereRadiance",
+      "atmosphereTransmittance",
+      "bakeAtmosphere",
+      "fromMagicaVoxel",
+      "magicaVoxelCamera",
+      "magicaVoxelLighting",
+      "magicaVoxelLinear",
+      "magicaVoxelMaterial",
+      "magicaVoxelMatrix",
+      "magicaVoxelModel"
     ]
   },
   {

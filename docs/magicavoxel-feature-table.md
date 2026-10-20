@@ -1,6 +1,6 @@
 # MagicaVoxel and Margo: feature table
 
-MagicaVoxel 0.99.7.2 against `@margoengine/voxel-pathtracer` (branch `worktree-agent-a63cac143225721f2`). Every
+MagicaVoxel 0.99.7.2 against `@margoengine/voxel-pathtracer` (on main since 2026-10-20). Every
 number was measured on the same PC (RTX A6000, Windows 11; Margo in Edge, headless WebGPU) at 960 x 800 unless a row
 says otherwise. MagicaVoxel was used as a black box: we wrote scenes, it rendered them, we compared its PNGs with ours
 (method and scenes: [magicavoxel-parity.md](magicavoxel-parity.md)).

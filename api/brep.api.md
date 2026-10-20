@@ -405,11 +405,26 @@ export namespace model {
         readonly deleted: readonly Name[];
     }
 
+    export interface ImportedBodies {
+        readonly bodies: readonly (Body | undefined)[];
+        readonly problems: readonly {
+            readonly body: number;
+            readonly problem: string;
+        }[];
+    }
+
     export class Loop {
         face: Face;
         readonly coedges: Coedge[];
         constructor(face: Face);
         use(edge: Edge, forward: boolean): Coedge;
+    }
+
+    export interface MassProperties {
+        readonly volume: number;
+        readonly area: number;
+        readonly centroid: XYZ;
+        readonly inertia: readonly [number, number, number, number, number, number];
     }
 
     export type Name = string;
@@ -499,6 +514,8 @@ export namespace model {
         readonly weights?: readonly number[];
     }
 
+    export function bodiesFromSTEP(step: STEPModel): ImportedBodies;
+
     export function bodiesToSTEP(bodies: readonly Body[]): string;
 
     export function boolean(name: Name, op: BooleanOperation, a: Body, b: Body, { history }?: {
@@ -510,6 +527,8 @@ export namespace model {
     export function chamfer(name: Name, body: Body, edges: readonly Name[], distance: number, options?: {
         history?: History;
     }): Body;
+
+    export function checkBody(body: Body): ValidityProblem[];
 
     export function curveEvaluator(def: CurveDef): Curve;
 
@@ -530,6 +549,8 @@ export namespace model {
     export function frameOf(origin: XYZ, z: XYZ, x?: XYZ): Frame;
 
     export function intersectSurfaces(a: SurfaceDef, b: SurfaceDef, box?: Box3): SurfaceIntersection;
+
+    export function massProperties(body: Body): MassProperties;
 
     export function meshBodies(bodies: readonly Body[], options?: TessellationOptions): BodyMeshes;
 

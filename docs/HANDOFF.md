@@ -60,11 +60,8 @@ read 18-97% on this idle desktop. Step 7 done: ball meshes and border crossings 
 `VoxelStreamer.frameBudget`, `noiseTerrain` without water beside caves or leaves in caves, the catalog clipboard test
 no longer races its 7 s status timer. Environment colour arrays are now linear like the rest of Margo (Scott,
 2026-10-19). The Rapier report is posted (#1046). `@margoengine/voxel-pathtracer` (for Codex's MagicaVoxel editor at
-C:\Development\Projects\MagicaVoxel) is on branch `worktree-agent-a63cac143225721f2`, not pushed by request, with
-tarballs in test-results; its remaining gaps (energy loss on rough metal and glass, caustic denoising, dispersion,
-emissive media, area-light occlusion, camera motion blur, panoramic/fisheye/distortion, a physical sky) are being
-fixed, and a side-by-side against MagicaVoxel 0.99.7.2 (downloaded with Scott's OK to C:\Tools, used only as a black
-box to render our own scenes) is next. `margo3d-studio` (step 6's posed-picking fixture) is on this PC at
+C:\Development\Projects\MagicaVoxel) landed on main on 2026-10-20 at Scott's request (rebased, no merge commit); see
+the voxel path tracer paragraph below. `margo3d-studio` (step 6's posed-picking fixture) is on this PC at
 C:\Development\Projects\margo3d-studio.
 
 Voxel path tracer (2026-10-19, for the clean-room MagicaVoxel-equivalent editor Codex builds in
@@ -78,7 +75,15 @@ shadows, camera motion blur width, the Preetham sky against its formulas, 1/sqrt
 least x2 lower at 4/16/64 samples on two glass scenes, the raster frame bit for bit when disabled or disposed, the same
 converged image after a device restore. Light sampling through glass costs time per sample (README, "Measured
 performance"). MagicaVoxel parity (Scott: match or exceed it in every way): the measured mapping, current scores and
-every open item, including the ones from before this work, are in `docs/magicavoxel-parity.md`.
+every open item, including the ones from before this work, are in `docs/magicavoxel-parity.md`; the comparison with
+MagicaVoxel 0.99.7.2 (a black box in C:\Tools rendering our own scenes) scores 99.2-99.97% of pixels within 3 levels
+on six default scenes, and `docs/magicavoxel-feature-table.md` sets the two side by side. Since 2026-10-20 also: the
+MagicaVoxel helpers (`magicaVoxelMaterial`, `magicaVoxelLighting`, `magicaVoxelCamera`, `magicaVoxelModel`,
+`magicaVoxelMatrix`), its atmosphere and image skies, display settings, a preview kernel and display-paced samples, a
+viewport denoiser that keeps history while the camera moves, transparent captures, block textures with cut-out texels,
+and the voxel sandbox's photo mode (P) on top of them. Open (in the parity doc): six MagicaVoxel renders that need the
+desktop (blend, transparent background, `_scale`, orthographic, isometric, `_proj`), sky-lit subsurface 7-12 levels
+dark.
 
 Tile editor engine work (Scott, 2026-10-18/19): Scott started `tile-asset-editor` (a Crocotile 3D 2.7.4 equivalent,
 own repository `scottcampbelldata/tile-asset-editor`) as the base of his own 3D modeller and game engine, and

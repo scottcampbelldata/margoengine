@@ -14,15 +14,22 @@ Every item is done only when all of these hold:
 
 ## Phase 0: land current work
 
-- [ ] Integration branch (real JT 9.5 and JT 10 meshes, MultiXT, torus bands, tolerant edges, STEP seam edges, smooth
-      traced curves): Codex validation, then push.
+- [x] Integration branch (real JT 9.5 and JT 10 meshes, MultiXT, torus bands, tolerant edges, STEP seam edges, smooth
+      traced curves): Codex validation, then push. Codex's check:merge passed at dc5d3f50 (2,709/2,709, proofs 15/15,
+      visuals 55/55, brep 81/81); landed on main 2026-10-20 with 1.1-1.3 below.
 
 ## Phase 1: measuring sticks (every later item is checked with these)
 
 - [ ] 1.1 Exact mass properties: volume, area, centroid and inertia integrated over the B-rep's faces, not its mesh;
       matching closed forms and OpenCascade's GProp on the corpus and every operation result.
+      Written and on main (model.massProperties). Codex's interim comparison (dc5d3f50, paused 2026-10-19) found: a
+      negative signed volume on an imported body (Jubilee body 48), round trips that double it (CirPattern bodies 10,
+      12, 14, 17), pole/apex errors on cone and sphere apex faces (Jubilee 70 and 90, Radial Engine JT part 10), up to
+      4.7e-5 relative from GProp on the model tests. Fix these first.
 - [ ] 1.2 Import into the modeler: STEP, SAT, Parasolid and JT B-reps read as modeler bodies, so every operation (and
       mass properties, checking, healing, export) works on imported parts, not only on shapes built in Margo.
+      Written and on main for STEP (model.bodiesFromSTEP; SAT, XT and JT through their readers' B-reps). On 200 imported
+      corpus parts Codex measured cuts valid on 84 (OpenCascade 200) and fillets on 4 (OpenCascade 67), 304 throws.
 - [ ] 1.3 Topology checker: Euler-Poincare (V - E + F - (L - F) - 2(S - G) = 0), every edge used twice and oppositely in
       a solid, consistent orientation, no face crossing another; run on every file read and every operation result.
       Written (claude/kernel): validateBody (Euler-Poincare, one piece per shell) on every operation and import;
