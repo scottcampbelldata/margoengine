@@ -552,8 +552,10 @@ test('Booleans where the surfaces come within the tolerance of touching: cut as 
           );
         }
   // The slanted hole 1 nm and 10 nm either side of touching the drill wall: the two windows it cuts in the wall, or the
-  // one window they make, pass a few micrometres from crossing at the touch, and are cut as if they crossed there. The
-  // block keeps what the quadrature gives for the hole's axis that far off.
+  // one window they make, pass a few micrometres from crossing at the touch, and are cut as if they crossed there. 30,
+  // 50 and 100 nm either side, past the tolerance, their curves are followed round where they turn, about 10 um apart
+  // there, without stepping from one onto the other. The block keeps what the quadrature gives for the hole's axis that
+  // far off.
   const slant = 0.2,
     dir = [0, Math.cos(slant), -Math.sin(slant)],
     n = 1000,
@@ -568,7 +570,7 @@ test('Booleans where the surfaces come within the tolerance of touching: cut as 
         }
       return 8000 - Math.PI * 2.25 * 20 - ((Math.PI * 0.25 * 20) / Math.cos(slant) - shared);
     };
-  for (const off of [1e-6, -1e-6, 1e-5, -1e-5]) {
+  for (const off of [1e-6, -1e-6, 1e-5, -1e-5, 3e-5, -3e-5, 5e-5, -5e-5, 1e-4, -1e-4]) {
     const want = kept(1 + off);
     for (const seam of [
       [1, 0, 0],
@@ -591,21 +593,18 @@ test('Booleans where the surfaces come within the tolerance of touching: cut as 
 });
 
 test('Booleans: what is not supported yet throws a RangeError', () => {
-  // The same hole 30 nm past touching the drill wall, beyond the tolerance (about 21 nm here): the two windows' curves
-  // pass about 10 um apart, too close for the tracer to tell apart and too far apart to be a touch. Not followed yet.
-  const slant = 0.2,
-    dir = [0, Math.cos(slant), -Math.sin(slant)],
-    block = box('k', [20 * mm, 20 * mm, 20 * mm], at(-10, -10, -10)),
-    hole = cylinder(
-      's',
-      0.5 * mm,
-      40 * mm,
-      frameOf([1.00003 * mm, -20 * dir[1] * mm, -20 * dir[2] * mm], dir, [1, 0, 0]),
-    );
+  // A drill as wide as a rib, 30 nm off centre, beyond the tolerance (about 21 nm here): 30 nm into one wall and 30 nm
+  // short of the other. In their union the circles the drill leaves in the rib's top and bottom faces pass 30 nm inside
+  // those faces' edges along the wall it falls short of, and the faces are lost. Not supported yet.
   assert.throws(
     () =>
-      boolean('d', 'subtract', boolean('p', 'subtract', block, hole), cylinder('h', 1.5 * mm, 40 * mm, at(0, 0, -20))),
-    { name: 'RangeError' },
+      boolean(
+        'c',
+        'union',
+        box('r', [3 * mm, 20 * mm, 10 * mm], at(-1.5, -10, 0)),
+        cylinder('h', 1.5 * mm, 40 * mm, at(3e-5, 0, -20)),
+      ),
+    { name: 'RangeError', message: /not a valid solid/ },
   );
 });
 

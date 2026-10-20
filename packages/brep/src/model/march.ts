@@ -8,6 +8,8 @@
 // its start. Where the surfaces touch at a point, or come within the tolerance of touching there, their curves cross in
 // an X (or pass each other a hair apart): a walk heading into that point finds it (where the normals are parallel,
 // midway between the surfaces), puts a point there and carries straight on along the X, as through an exact touch.
+// Where the surfaces come a little further than the tolerance from touching, the curves passing each other there are
+// followed round their turns: near such a point no step is longer than a quarter of the distance to it.
 // Where the walk lands exactly on such a point the direction is undefined: that throws a RangeError.
 import { add, cross, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
 import { curveSurfaceCrossings, distanceGradient, meetDirection, signedDistance, splineFoot } from './distance.js';
@@ -51,7 +53,8 @@ interface Reach {
  * points where two of them cross: there the surfaces touch tangentially (two equal cylinders at right angles), and the
  * Booleans put a vertex. Surfaces that come within `tolerance` of touching at a point (1e-6 of the box unless given)
  * are taken to touch there: their curves cross there too, or, where the surfaces curve apart every way (they kiss), the
- * loop round the point is dropped (they only touch).
+ * loop round the point is dropped (they only touch). Where they come further apart than that, the curves passing each
+ * other there are traced apart, however close.
  */
 export function traceIntersections(
   a: SurfaceDef,
@@ -69,10 +72,11 @@ export function traceIntersections(
   // run out and back to the edge.
   const past = (s: SurfaceDef, p: XYZ) =>
     s.kind === 'spline' && length(sub(p, splineFoot(s, p, true).q)) > 1e-10 * scale0;
-  const trace = (known: Touch[]) => {
+  const trace = (known: Touch[], missed: Touch[]) => {
     const branches: { points: XYZ[]; tangents: XYZ[] }[] = [],
       curves: CurveDef[] = [],
       touches = [...known],
+      misses = [...missed],
       kisses: Touch[] = [];
     const covered = (p: XYZ) => {
       // Within a few steps of a near touch the curves traced through it run along its arms, which the curves passing
@@ -98,17 +102,24 @@ export function traceIntersections(
       const s = settle(a, b, seed, seed, meetDirection(a, b, seed) ?? [0, 0, 0], scale0);
       if (!s || !inside(box, s, 1e-9 * size) || covered(s) || past(a, s) || past(b, s)) continue;
       // A seed where curves passing each other at a near touch turn (known, or found from a seed where the normals are
-      // near parallel): the curves through it are walked from elsewhere, straight through the touch.
-      if (!touches.some(({ x, width }) => length(sub(s, x)) < 10 * width) && apart(a, b, s) < 0.5) {
+      // near parallel): the curves through it are walked from elsewhere, straight through the touch. Where the surfaces
+      // come further apart than the tolerance (a near miss), the walk from it follows the turn in short steps.
+      if (
+        !touches.some(({ x, width }) => length(sub(s, x)) < 10 * width) &&
+        !misses.some(({ x, width }) => length(sub(s, x)) < 10 * width) &&
+        apart(a, b, s) < 0.5
+      ) {
         const touch = touchPoint(a, b, s, reach.delta, scale0);
-        if (touch?.arms && touch.width > 0 && Math.abs(touch.gap) <= reach.tolerance && inside(box, touch.x, 0))
-          touches.push(touch);
+        if (touch && touch.width > 0 && inside(box, touch.x, 0)) {
+          if (touch.arms && Math.abs(touch.gap) <= reach.tolerance) touches.push(touch);
+          else if (Math.abs(touch.gap) > reach.tolerance) miss(misses, touch, reach);
+        }
       }
       if (touches.some(({ x, width }) => length(sub(s, x)) < 10 * width)) continue;
       if (kisses.some(({ x, width }) => length(sub(s, x)) <= 2 * width + near)) continue;
       const t0 = meetDirection(a, b, s);
       if (!t0) throw new RangeError('the surfaces touch tangentially: Booleans there are not supported yet');
-      const forward = walk(a, b, s, t0, reach, touches);
+      const forward = walk(a, b, s, t0, reach, touches, misses);
       if (forward.lost) continue;
       let points = forward.points,
         tangents = forward.tangents;
@@ -130,7 +141,7 @@ export function traceIntersections(
         }
       }
       if (!forward.closed) {
-        const back = walk(a, b, s, scale(t0, -1), reach, touches);
+        const back = walk(a, b, s, scale(t0, -1), reach, touches, misses);
         if (back.lost) continue;
         points = [...back.points.slice(1).reverse(), ...points];
         tangents = [
@@ -145,12 +156,15 @@ export function traceIntersections(
       branches.push({ points, tangents });
       curves.push(hermite(points, tangents, forward.closed));
     }
-    return { branches, curves, touches };
+    return { branches, curves, touches, misses };
   };
   // A seed walked before a near touch was found may lie where the curves passing each other there turn, and its walk
-  // follow one round the turn: traced again knowing every near touch, no walk starts there.
-  let traced = trace([]);
-  if (traced.touches.some(({ width }) => width > 0)) traced = trace(traced.touches);
+  // follow one round the turn: traced again knowing every near touch, no walk starts there. A walk that passed a near
+  // miss before it was found may have stepped from one curve onto the other: traced again, every walk keeps its steps
+  // short there.
+  let traced = trace([], []);
+  if (traced.touches.some(({ width }) => width > 0) || traced.misses.length)
+    traced = trace(traced.touches, traced.misses);
   const { branches, curves, touches } = traced;
   // Curves that meet cross where the surfaces touch tangentially (two equal cylinders at right angles): the tracer
   // steps over such a point, so it is found here, from chords that come within their sag of each other, and moved onto
@@ -345,9 +359,21 @@ function touchPoint(a: SurfaceDef, b: SurfaceDef, guess: XYZ, delta: number, sca
 }
 
 /**
+ * Adds `touch` to the near misses unless the same point is there already, or the curves passing each other there are
+ * further apart than a walk's longest step (none steps from one onto the other).
+ */
+function miss(misses: Touch[], touch: Touch, { hmax, scale0 }: Reach): void {
+  if (touch.width >= hmax) return;
+  if (!misses.some(({ x, width }) => length(sub(x, touch.x)) <= 0.1 * width + 1e-9 * scale0)) misses.push(touch);
+}
+
+/**
  * Follows the curve from `start` along `direction` until it leaves the box or returns to `start`, straight through
  * every touch it heads into (adding those it finds to `touches`). Lost when `start` lies where curves passing each
- * other at such a touch turn: walking straight through it, the walk never comes back there.
+ * other at such a touch turn: walking straight through it, the walk never comes back there. Near a point where the
+ * surfaces come further apart than the tolerance from touching (a near miss: known, or found as a touch is, and added
+ * to `misses`), the curves passing each other there are a few widths apart: no step is longer than a quarter of the
+ * walk's distance from it (or of its width), so none lands on the other curve, and the walk follows the turn.
  */
 function walk(
   a: SurfaceDef,
@@ -356,6 +382,7 @@ function walk(
   direction: XYZ,
   reach: Reach,
   touches: Touch[],
+  misses: Touch[],
 ): { points: XYZ[]; tangents: XYZ[]; closed: boolean; lost?: boolean } {
   const { box, hmax, scale0, tolerance, delta } = reach,
     points: XYZ[] = [start],
@@ -398,9 +425,13 @@ function walk(
       if (dot(sub(guess, p), t) <= 1.5 * h && !tried.some((y) => length(sub(y, guess)) <= h)) {
         tried.push(guess);
         const found = touchPoint(a, b, guess, delta, scale0);
-        if (found?.arms && Math.abs(found.gap) <= tolerance && inside(box, found.x, 0) && toward(found)) touch = found;
+        if (found && inside(box, found.x, 0) && toward(found)) {
+          if (found.arms && Math.abs(found.gap) <= tolerance) touch = found;
+          else if (Math.abs(found.gap) > tolerance) miss(misses, found, reach);
+        }
       }
     }
+    for (const { x, width } of misses) h = Math.min(h, Math.max(width, length(sub(x, p))) / 4);
     if (touch?.arms) {
       // Out along the arm nearest the way the curve is going, as far past the touch as the curve is short of it (and
       // clear of where curves passing each other there turn), and onto both surfaces there.

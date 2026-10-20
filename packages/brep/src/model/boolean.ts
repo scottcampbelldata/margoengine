@@ -79,9 +79,9 @@ const RAYS = [
  * facing the same way, and edges split along one curve, are joined. Surfaces touching at a point (two of their curves
  * crossing there) or along a line (a plane along a cylinder) are cut there, and so are surfaces that come within the
  * 1e-6 of touching; where the result's surface touches itself, its sheets meet at a point or along a line without
- * sharing a vertex or edge there. Throws a RangeError for what is not supported yet (curves passing each other a few
- * micrometres apart where the surfaces come a little further than that from touching) and when the result is not a
- * valid solid.
+ * sharing a vertex or edge there; where they come a little further than that from touching, the curves passing each
+ * other there a few micrometres apart are cut apart. Throws a RangeError for what is not supported yet (a curve passing
+ * a little further than the tolerance inside a face's edge can lose the face) and when the result is not a valid solid.
  */
 export function boolean(
   name: Name,

@@ -92,10 +92,18 @@ Every item is done only when all of these hold:
       either way (all three operations, two seams, within 1e-9), and the slanted hole 1 and 10 nm either side of
       touching (three seams, within 1e-6 of the quadrature). Jubilee 104 with the survey's drill (0.34 nm short of one
       wall, 0.28 nm into the other): valid in all three operations, common part 203.263868 mm3, subtract + intersect
-      - part = 7.6e-5 mm3 (as with the exact 1.5 mm drill); the survey drills 145 of 145. Left: contact a little past
-      the tolerance (the hole 30 to 100 nm off, curves about 10 um apart: refused with a RangeError in 8 of 18 cases,
-      never cut wrongly; from 300 nm it traces), tangency along a circle or a traced curve, and coincident freeform
-      patches.
+      - part = 7.6e-5 mm3 (as with the exact 1.5 mm drill); the survey drills 145 of 145.
+      Near misses, written 2026-10-20 (claude/jovial-goodall-b5bedd): where the surfaces come a little further than the
+      tolerance from touching, the curves passing each other there are traced apart. A walk that finds such a point
+      (as it finds a touch), or starts from a seed near it, keeps every step under a quarter of its distance from the
+      point (or of the width of the turn), so it follows the turn and never steps onto the other curve; a trace that
+      found one is redone knowing it. Before, a seed 5.6 um from the point started a walk that hopped between the two
+      windows' curves and went round eight times. The slanted hole 30, 50 and 100 nm either side of touching (three
+      seams) now cuts within 1e-6 of the quadrature (was refused in 8 of 18 cases), and every offset tried from 0.1 nm
+      to 10 um either side cuts within 6.1e-10 of it (90 cuts). Left: a curve a little further than the tolerance inside
+      a face's edge (the drill as wide as the rib 30 nm off centre: the union loses the rib's top and bottom faces and
+      is refused with a RangeError; the rib, tee and rounded tee 30 and 100 nm off refuse 27 of 72 cuts, as before,
+      never cutting wrongly), tangency along a circle or a traced curve, and coincident freeform patches.
 
 ## Phase 4: blends
 
