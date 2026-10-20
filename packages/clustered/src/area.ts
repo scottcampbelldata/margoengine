@@ -92,6 +92,7 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
   private entries: GPUBindGroupEntry[] = [];
   private readonly data = new Float32Array(HEADER + MAX_AREA_LIGHTS * LIGHT_FLOATS);
   private readonly count = new Uint32Array(this.data.buffer, 0, 1);
+  private listValue: readonly RectAreaLight[] = Object.freeze([]);
   private dirty = true;
   private disposed = false;
   constructor(options: AreaLightOptions) {
@@ -106,6 +107,10 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
     const effect = new AreaLights(options);
     engineRuntime(instance).use(effect);
     return effect;
+  }
+  /** The lights last given to `setLights`, in order (a frozen copy of the list; light helpers read it). */
+  get list(): readonly RectAreaLight[] {
+    return this.listValue;
   }
   /** Replaces the area lights (at most {@link MAX_AREA_LIGHTS}); validates every entry before changing anything. An empty list removes the shader code. */
   setLights(lights: readonly RectAreaLight[]): this {
@@ -149,6 +154,7 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
     });
     packed.forEach((values, i) => this.data.set(values, HEADER + i * LIGHT_FLOATS));
     this.count[0] = lights.length;
+    this.listValue = Object.freeze([...lights]);
     this.dirty = true;
     this.sync();
     return this;

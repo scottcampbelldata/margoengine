@@ -16,6 +16,7 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
     constructor(options: AreaLightOptions);
     get owner(): Engine | undefined;
     static attach(instance: EngineKernel, options: AreaLightOptions): AreaLights;
+    get list(): readonly RectAreaLight[];
     setLights(lights: readonly RectAreaLight[]): this;
     declarations(group: number): string;
     bindings(): GPUBindGroupEntry[];

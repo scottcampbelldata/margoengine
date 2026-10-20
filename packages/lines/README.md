@@ -4,7 +4,7 @@ Fat lines with joins, caps, dashes and antialiasing, plus the debug helpers, as 
 
 Build from source with `npm run build` in `packages/lines`.
 
-Replaces the three.js `Line2`, `LineSegments2`, `LineGeometry`, `LineSegmentsGeometry` and `LineMaterial` add-ons, and `GridHelper`, `PolarGridHelper`, `AxesHelper`, `BoxHelper`, `Box3Helper`, `ArrowHelper`, `CameraHelper`, `PlaneHelper` and `VertexNormalsHelper`.
+Replaces the three.js `Line2`, `LineSegments2`, `LineGeometry`, `LineSegmentsGeometry` and `LineMaterial` add-ons, and `GridHelper`, `PolarGridHelper`, `AxesHelper`, `BoxHelper`, `Box3Helper`, `ArrowHelper`, `CameraHelper`, `PlaneHelper`, `VertexNormalsHelper` and the light helpers (`PointLightHelper`, `SpotLightHelper`, `DirectionalLightHelper`, `HemisphereLightHelper`, `RectAreaLightHelper`).
 
 ```ts
 import {Engine, box} from '@margoengine/core';
@@ -76,6 +76,18 @@ dashed.dashOffset += 0.01;
 `new Lines({name, order})` sets the plugin name (default `'lines'`) and pass order (default `20`). `lines.stats` reports lines, segments and draw calls of the last frame.
 
 Helpers are `Line` subclasses and take the material options too (they default to butt caps and miter joins): `GridHelper({size, divisions, color1, color2})`, `PolarGridHelper({radius, sectors, rings, divisions, color1, color2})`, `AxesHelper({size})`, `Box3Helper(min, max, {color})`, `BoxHelper(mesh, {color})` (world bounds every frame), `ArrowHelper({direction, origin, length, color, headLength, headWidth})`, `CameraHelper(camera, {aspect})` (unprojects `camera.matrix`), `PlaneHelper({normal, constant, size, color})` and `VertexNormalsHelper(mesh, {size, color})` (world space with the normal matrix).
+
+Light helpers (three.js `PointLightHelper`, `SpotLightHelper`, `DirectionalLightHelper`, `HemisphereLightHelper`,
+`RectAreaLightHelper`) take the light objects themselves, typed by shape so lines imports neither
+`@margoengine/clustered` nor `@margoengine/environment`, and follow their changes each frame:
+`PointLightHelper(light, {size})` (three circles), `SpotLightHelper(light, {length})` (the outer cone to the range, or
+`length` for an unlimited one, and the inner rim), `DirectionalLightHelper(light, {size, position})` (a square across
+the light and a line the way it travels), `HemisphereLightHelper(light, {size, position})` (a sphere, sky colour above,
+ground below) and `RectAreaLightHelper(light)` (outline on AreaLights' axes and the normal). Lines take each light's
+colour, brightest channel scaled to 1, unless `color` is given. `new LightsHelper(() => lights)` draws a whole list in one
+line, for example `lines.add(new LightsHelper(() => [...clustered.list, ...suns.list, hemisphere]))`
+(`Clustered.list`, `DirectionalLights.list` and `AreaLights.list` return the lists last set); it rebuilds only when a
+value it draws changes and skips anything that is not a light. The Inspector's "Light helpers" toggle uses it.
 
 `BoxHelper` and `VertexNormalsHelper` also accept loader-owned glTF/FBX PBR nodes.
 They combine all primitives on the node and use retained CPU bind-pose positions

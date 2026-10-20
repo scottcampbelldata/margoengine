@@ -14,6 +14,7 @@ export class Inspector implements EnginePlugin {
         wireframe: boolean;
         normals: boolean;
         bounds: boolean;
+        lights: boolean;
     };
     constructor({ parent, effects }?: InspectorOptions);
     static attach(engine: EngineKernel, options?: InspectorOptions): Inspector;
@@ -38,5 +39,5 @@ export interface InspectorOptions {
 
 // Not exported from this entry, but used by the exports above:
 
-type Mode = 'wireframe' | 'normals' | 'bounds';
+type Mode = 'wireframe' | 'normals' | 'bounds' | 'lights';
 ```

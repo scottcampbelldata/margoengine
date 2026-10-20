@@ -8,7 +8,7 @@ import {
   type FrameGraph,
   type Mesh,
 } from '@margoengine/core/extension';
-import { Lines, Line, BoxHelper, VertexNormalsHelper, meshWorldMatrix } from '@margoengine/lines';
+import { Lines, Line, BoxHelper, VertexNormalsHelper, LightsHelper, meshWorldMatrix } from '@margoengine/lines';
 import { meshTriangles } from '../../shared/mesh-source.js';
 
 export interface InspectorOptions {
@@ -16,7 +16,7 @@ export interface InspectorOptions {
   /** Mutable options of an attached PostProcessing/Tonemap effect. */
   effects?: { exposure?: number; bloom?: number };
 }
-type Mode = 'wireframe' | 'normals' | 'bounds';
+type Mode = 'wireframe' | 'normals' | 'bounds' | 'lights';
 interface DebugLines {
   geometry: object;
   wireframe?: Line;
@@ -105,11 +105,15 @@ export class Inspector implements EnginePlugin {
   readonly name = 'inspector';
   readonly element: HTMLDivElement;
   readonly root: ShadowRoot;
-  readonly debug = { wireframe: false, normals: false, bounds: false };
+  readonly debug = { wireframe: false, normals: false, bounds: false, lights: false };
   private engine?: Engine;
   private selection: Mesh | null = null;
   private readonly lines = new Lines({ name: 'inspector:lines' });
   private readonly helpers = new Map<Mesh, DebugLines>();
+  private lightLines?: LightsHelper;
+  /** Core's sun as a directional light shape (direction it travels, colour), and the lights gathered each frame. */
+  private readonly sun = { direction: [0, -1, 0], color: [1, 1, 1] };
+  private readonly sceneLights: unknown[] = [];
   private readonly collapsed = new Set<Mesh>();
   private readonly items = new Map<Mesh, HTMLElement>();
   private readonly inputs = new Map<string, HTMLInputElement>();
@@ -137,6 +141,7 @@ export class Inspector implements EnginePlugin {
       ['wireframe', 'Wireframe'],
       ['normals', 'Vertex normals'],
       ['bounds', 'AABB bounds'],
+      ['lights', 'Light helpers'],
     ] as const) {
       const input = this.input(modes, key, text, 'checkbox');
       input.addEventListener('change', () => this.setDebug(key, input.checked));
@@ -273,6 +278,9 @@ export class Inspector implements EnginePlugin {
 
   private syncDebug(): void {
     const engine = this.engine!;
+    if (this.debug.lights && !this.lightLines && engine.backend === 'webgpu')
+      this.lightLines = this.lines.add(new LightsHelper(() => this.gatherLights(), { onTop: true, size: 0.25 }));
+    if (this.lightLines) this.lightLines.visible = this.debug.lights;
     if (!this.helpers.size && !this.debug.wireframe && !this.debug.normals && !this.debug.bounds) return;
     for (const [mesh, helpers] of this.helpers)
       if (engine.meshes.get(mesh.id) !== mesh || meshData(mesh)?.identity !== helpers.geometry) {
@@ -307,6 +315,28 @@ export class Inspector implements EnginePlugin {
             this.debug[mode] && (source.pbr ? meshWorldMatrix(engine, mesh) !== null : !!engine.store.visible[mesh.id]);
       }
     }
+  }
+
+  // Lights by shape, without importing their packages: core's sun, the `list` of clustered's plugins (point and spot,
+  // directional and area lights) and an environment hemisphere or ambient light. LightsHelper skips anything else.
+  private gatherLights(): readonly unknown[] {
+    const engine = this.engine!,
+      out = this.sceneLights,
+      { direction, radiance } = engine.lighting;
+    out.length = 0;
+    if (direction[3] > 0) {
+      for (let k = 0; k < 3; k++) {
+        this.sun.direction[k] = -direction[k];
+        this.sun.color[k] = radiance[k];
+      }
+      out.push(this.sun);
+    }
+    for (const plugin of engine.plugins.values()) {
+      const list = (plugin as { list?: unknown }).list;
+      if (plugin.name.startsWith('clustered') && Array.isArray(list)) for (const light of list) out.push(light);
+      else if (plugin.name.startsWith('environment:') && 'sky' in plugin) out.push(plugin);
+    }
+    return out;
   }
 
   private input(parent: HTMLElement, key: string, text: string, type: string): HTMLInputElement {
@@ -499,6 +529,7 @@ export class Inspector implements EnginePlugin {
     this.lines.clear();
     this.lines.dispose();
     this.helpers.clear();
+    this.lightLines = undefined;
     this.items.clear();
     this.collapsed.clear();
     this.selection = null;

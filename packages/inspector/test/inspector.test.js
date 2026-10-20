@@ -134,3 +134,29 @@ test('disabled debug rendering skips the frame mesh scan and resumes it for live
   for (let i = 0; i < 120; i++) frame();
   assert.equal(scans, afterCleanup, 'disposed debug helpers must release the steady-frame scan');
 });
+
+test('the light helpers toggle draws the sun, clustered lists and a hemisphere light by shape', async (t) => {
+  const { engine, inspector } = await scene(t);
+  Object.defineProperty(engine, 'backend', { value: 'webgpu', configurable: true });
+  const frame = () => engine.frameGraph.execute({ backend: 'webgpu', draw() {} });
+  // Plugins as clustered, its directional entry and environment's HemisphereLight present them (structural, no imports).
+  engine.plugins.set('clustered', { name: 'clustered', list: [{ position: [0, 1, 0], range: 2 }] });
+  engine.plugins.set('clustered:ies', { name: 'clustered:ies', list: [{ vertical: [0], candela: [[1]] }] });
+  engine.plugins.set('environment:hemisphere', { name: 'environment:hemisphere', sky: '#88aaff', ground: '#443322' });
+  assert.ok(field(inspector, 'lights'), 'a Light helpers checkbox');
+  frame();
+  assert.equal(inspector['lightLines'], undefined, 'nothing until switched on');
+  inspector.setDebug('lights', true);
+  frame();
+  const lines = inspector['lightLines'];
+  // The sun: a square and its direction (10 points); the point light: three circles (192); the hemisphere: three circles
+  // and its up line (194); the IES profile is skipped.
+  assert.equal(lines.count, 10 + 192 + 194);
+  assert.equal(lines.visible, true);
+  inspector.setDebug('lights', false);
+  frame();
+  assert.equal(lines.visible, false);
+  engine.plugins.delete('clustered');
+  engine.plugins.delete('clustered:ies');
+  engine.plugins.delete('environment:hemisphere');
+});

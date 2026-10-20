@@ -17,6 +17,24 @@ export {
 } from './helpers.js';
 export type { HelperOptions } from './helpers.js';
 export {
+  LightsHelper,
+  PointLightHelper,
+  SpotLightHelper,
+  DirectionalLightHelper,
+  HemisphereLightHelper,
+  RectAreaLightHelper,
+  lightKind,
+} from './light-helpers.js';
+export type {
+  LightShape,
+  PointLightShape,
+  SpotLightShape,
+  DirectionalLightShape,
+  RectAreaLightShape,
+  HemisphereLightShape,
+  LightHelperOptions,
+} from './light-helpers.js';
+export {
   computeLineDistances,
   expandLine,
   triangleArea,

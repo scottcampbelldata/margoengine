@@ -54,6 +54,15 @@ export class CameraHelper extends Line {
 
 export { ColorInput } from "@margoengine/math";
 
+export class DirectionalLightHelper extends OneLightHelper<DirectionalLightShape> {
+    constructor(light: DirectionalLightShape, options?: LightHelperOptions);
+}
+
+export interface DirectionalLightShape {
+    readonly direction: Vec3;
+    readonly color?: Vec3;
+}
+
 export interface ExpandLineOptions {
     mode?: LineMode;
     width?: number;
@@ -73,6 +82,30 @@ export class GridHelper extends Line {
 }
 
 export type HelperOptions = Omit<LineMaterialOptions, 'color'>;
+
+export class HemisphereLightHelper extends OneLightHelper<HemisphereLightShape> {
+    constructor(light: HemisphereLightShape, options?: LightHelperOptions);
+}
+
+export interface HemisphereLightShape {
+    readonly sky: ColorInput;
+    readonly ground?: ColorInput;
+}
+
+export interface LightHelperOptions extends HelperOptions {
+    color?: ColorInput;
+    size?: number;
+    length?: number;
+    position?: Vec3;
+}
+
+export type LightShape = PointLightShape | SpotLightShape | DirectionalLightShape | RectAreaLightShape | HemisphereLightShape;
+
+export class LightsHelper extends Line {
+    readonly lights: () => readonly unknown[];
+    constructor(lights: () => readonly unknown[], options?: LightHelperOptions);
+    update(): boolean;
+}
 
 export class Line {
     readonly material: LineMaterial;
@@ -190,6 +223,16 @@ export class PlaneHelper extends Line {
     setPlane(normal: Vec3, constant?: number, size?: number): this;
 }
 
+export class PointLightHelper extends OneLightHelper<PointLightShape> {
+    constructor(light: PointLightShape, options?: LightHelperOptions);
+}
+
+export interface PointLightShape {
+    readonly position: Vec3;
+    readonly range?: number;
+    readonly color?: Vec3;
+}
+
 export class PolarGridHelper extends Line {
     constructor({ radius, sectors, rings, divisions, color1, color2, ...options }?: {
         radius?: number;
@@ -201,11 +244,36 @@ export class PolarGridHelper extends Line {
     } & HelperOptions);
 }
 
+export class RectAreaLightHelper extends OneLightHelper<RectAreaLightShape> {
+    constructor(light: RectAreaLightShape, options?: LightHelperOptions);
+}
+
+export interface RectAreaLightShape {
+    readonly position: Vec3;
+    readonly direction: Vec3;
+    readonly width: number;
+    readonly height: number;
+    readonly up?: Vec3;
+    readonly color?: Vec3;
+}
+
 export interface SegmentIndices {
     a: number;
     b: number;
     prev: number;
     next: number;
+}
+
+export class SpotLightHelper extends OneLightHelper<SpotLightShape> {
+    constructor(light: SpotLightShape, options?: LightHelperOptions);
+}
+
+export interface SpotLightShape extends PointLightShape {
+    readonly direction: Vec3;
+    readonly outerAngle?: number;
+    readonly innerAngle?: number;
+    readonly angle?: number;
+    readonly penumbra?: number;
 }
 
 export const VERTICES_PER_SEGMENT: number;
@@ -226,6 +294,8 @@ export function expandLine(points: ArrayLike<number>, options?: ExpandLineOption
 
 export function geometryBounds(geometry: Geometry): Float32Array;
 
+export function lightKind(light: unknown): Kind | null;
+
 export { meshWorldMatrix } from "@margoengine/math";
 
 export { parseColor } from "@margoengine/math";
@@ -238,7 +308,14 @@ export function triangleArea(vertices: ArrayLike<number>): number;
 
 // Not exported from this entry, but used by the exports above:
 
+type Kind = 'point' | 'spot' | 'directional' | 'rect' | 'hemisphere';
+
 interface LineOwner {
     remove(line: Line): void;
+}
+
+class OneLightHelper<T extends LightShape> extends LightsHelper {
+    readonly light: T;
+    constructor(light: T, options: LightHelperOptions, expected: Kind);
 }
 ```

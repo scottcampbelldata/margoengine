@@ -23,9 +23,11 @@ PBR nodes, including every primitive on a node, and honor inherited visibility.
 PBR wireframes, normals and bounds show the retained CPU bind pose with the current
 world transform. They do not read animated vertex buffers back from the GPU.
 The loader keeps ownership of its geometry, and no duplicate core draw is created.
-Disposing a model removes its overlays. Debug drawing is disabled on WebGL2. The hierarchy and property
+Disposing a model removes its overlays. "Light helpers" draws the lights the engine has, found by shape without
+importing their packages: core's sun, every `clustered*` plugin's `list` (point and spot, directional and area lights)
+and an environment hemisphere or ambient light (lines' `LightsHelper`). Debug drawing is disabled on WebGL2. The hierarchy and property
 editor still work there. Neither core nor the stage facade is modified.
 
-`select(mesh)` selects an entity. `setDebug('wireframe' | 'normals' | 'bounds', true)`
+`select(mesh)` selects an entity. `setDebug('wireframe' | 'normals' | 'bounds' | 'lights', true)`
 toggles a scene overlay. `dispose()` releases the DOM, timer, GPU resources and
 registered passes; engine disposal also performs this cleanup.
