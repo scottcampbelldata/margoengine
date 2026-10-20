@@ -114,6 +114,30 @@ texels, not textures: physical materials with shadows, IBL and LocalShadows alre
 stage may have. At most 16 distinct images of up to 4,096 texels a side, 16,777,216 texels in all. Without images it
 adds nothing to the shaders or the GPU work.
 
+## Physical light units
+
+Margo's light intensities are photometric already, as glTF's KHR_lights_punctual (which gltf-pro's `applyGLTFLights`
+passes through unchanged): a point or spot `intensity` is candela, a directional light's (core's sun,
+`DirectionalLights`) lux on a surface facing it, an area light's nits; the linear output is luminance in nits.
+`@margoengine/clustered/units` holds the conversions, plain functions with no GPU work:
+
+```ts
+import {lumensToCandela, nitsToLumens, ev100, exposureFromEV100} from '@margoengine/clustered/units';
+lights.setLights([
+  {position: [0, 3, 0], range: 0, decay: 2, intensity: lumensToCandela(800)},                    // an 800 lm bulb
+  {position: [2, 3, 0], range: 0, direction: [0, -1, 0], outerAngle: 0.5, innerAngle: 0.3,
+    intensity: lumensToCandela(800, {outerAngle: 0.5, innerAngle: 0.3})},                         // the same in a cone
+]);
+lights.intensityScale = exposureFromEV100(ev100(2.8, 1 / 60, 800));                              // an indoor exposure
+```
+
+`lightSolidAngle(cone?)` is 4π for a point light and 2π(1 − (cos outer + cos inner)/2) for a spot: the smooth edge is a
+smoothstep in the cosine, which integrates to half its width, so the conversion is exact for clustered's cone.
+`lumensToCandela(lm, profile)` takes an IES profile's peak and flux. `candelaToLux`/`luxToCandela` (inverse square at
+normal incidence), `nitsToLumens`/`lumensToNits` (π L A per side of a rectangle light), `nitsToCandela` (an area light as
+the point light it matches face on), `ev100(aperture, shutter, iso)` and `exposureFromEV100(ev)` (1 / (1.2 × 2^ev),
+saturation-based) complete the set.
+
 ## Point and spot shadows
 
 Opt into bounded local shadow maps when creating the effect, enable shadows on

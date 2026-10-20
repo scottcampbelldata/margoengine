@@ -36,6 +36,10 @@
     "./projector": {
       "types": "./dist/projector.d.ts",
       "import": "./dist/projector.js"
+    },
+    "./units": {
+      "types": "./dist/units.d.ts",
+      "import": "./dist/units.js"
     }
   },
   "files": [
