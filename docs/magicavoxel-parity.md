@@ -134,6 +134,7 @@ Measured (RTX A6000, Edge headless, 960 x 800, `L-bg-off`: slab, two cubes, sun,
 | Time to MagicaVoxel's 1024-sample quality | about 14 s (1024 samples) | 0.48 s (64 samples, denoised), about 29x faster |
 | Package | about 30 MB application | 55 KB gzip (168 KB raw, 40% shader source) |
 | First lit viewport frame after opening | (its viewport) | 0.36-0.44 s with the preview kernel (was 2.1-2.8 s: the full tracer's compile) |
+| Large world: 64 terrain models of 256 x 256 x 32 (2048 x 2048 voxels, 12.6 million voxels; `mv-calib/bigworld.cjs`) | (not rendered yet) | 256 samples in 1.5 s (about 6 ms each at 960 x 800), 93 MiB of GPU memory |
 | Viewport samples in 4 s at 60 fps | (its viewport) | 1,465 light scene, 540 glass board, 351 sun board with `samplesPerFrame: 'auto'` (238-240 at 1 per frame): 6x / 2.3x / 1.5x, 2-6% of frames late |
 
 Done:
@@ -149,8 +150,8 @@ Checked and dropped: kernels specialised to the scene's features. Stubbing out g
 a scene without glass (12.45 against 12.32 ms per frame at 1920 x 1080) and cut compile time by about 15% (noisy);
 the README's note that the larger shader is slower where there is no glass did not hold.
 
-Next candidates (value first): large worlds (many models, MagicaVoxel's 2048-voxel scenes) speed and memory; denoiser
-quality at 1-16 samples (moving camera); a feature table for the product page.
+Large worlds need no work (row above). Next candidates (value first): denoiser quality at 1-16 samples (moving
+camera); render the large world in MagicaVoxel for a speed comparison; a feature table for the product page.
 
 ## Finish the package (before it can be pushed or published)
 
