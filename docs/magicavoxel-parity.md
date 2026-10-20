@@ -121,12 +121,36 @@ Everything here is on branch `worktree-agent-a63cac143225721f2` (not pushed, Cod
    beyond the sky boards.
 10. Emitter light on the ground near emitters: ours about 6% brighter.
 
-## Open: exceed MagicaVoxel (already in the tracer, keep proving)
+## Exceed MagicaVoxel
 
-Physically based mode (sun highlights, light through glass with refraction, multiple importance sampling), dispersion,
-emissive media, area lights, HDR environment maps, a physical sky, motion blur, panorama, fisheye and lens distortion,
-a denoiser, AOVs (albedo, normal, depth, ids), PNG capture of any size, WebGPU in the browser. To do: a feature table
-with MagicaVoxel against Margo for the product page, once speed is measured.
+Scott (2026-10-20): better in every way (faster, leaner, better parity, features and integration) without bloat;
+the best value first. Parity items still open above are finished after Codex frees the desktop.
+
+Measured (RTX A6000, Edge headless, 960 x 800, `L-bg-off`: slab, two cubes, sun, sky, ground):
+
+| | MagicaVoxel 0.99.7 | Margo |
+| --- | --- | --- |
+| Noise at 1024 samples (8-bit RMS against a 16,384-sample reference) | 0.32 | 0.24 raw, 0.16 denoised |
+| Time to MagicaVoxel's 1024-sample quality | about 14 s (1024 samples) | 0.48 s (64 samples, denoised), about 29x faster |
+| Package | about 30 MB application | 55 KB gzip (168 KB raw, 40% shader source) |
+| First lit viewport frame after opening | (its viewport) | 0.36-0.44 s with the preview kernel (was 2.1-2.8 s: the full tracer's compile) |
+| Viewport samples in 4 s at 60 fps | (its viewport) | 1,465 light scene, 540 glass board, 351 sun board with `samplesPerFrame: 'auto'` (238-240 at 1 per frame): 6x / 2.3x / 1.5x, 2-6% of frames late |
+
+Done:
+- Preview kernel: first hit lit by the sun (one shadow ray) and the sky, with edges, grid and the ground fade; the
+  viewport shows it from about 0.15 s of compile while the full tracer compiles (about 2 s, not cached by the browser
+  between page loads; on one device a second compile is cached).
+- `samplesPerFrame: 'auto'`: grows by a quarter after four frames on pace, caps at 80% of what fits an interval after
+  a late frame. A faster ramp (x1.5 after three) gave 40% more samples but twice the late frames and an 83 ms hitch.
+- `denoise: 'auto'`: every frame below 32 samples, then each time the samples grow by a quarter, and at convergence.
+- The MagicaVoxel helper sets `samplesPerFrame: 'auto'` for both looks and `denoise: 'auto'` for the Margo look.
+
+Checked and dropped: kernels specialised to the scene's features. Stubbing out glass light sampling did not speed up
+a scene without glass (12.45 against 12.32 ms per frame at 1920 x 1080) and cut compile time by about 15% (noisy);
+the README's note that the larger shader is slower where there is no glass did not hold.
+
+Next candidates (value first): large worlds (many models, MagicaVoxel's 2048-voxel scenes) speed and memory; denoiser
+quality at 1-16 samples (moving camera); a feature table for the product page.
 
 ## Finish the package (before it can be pushed or published)
 

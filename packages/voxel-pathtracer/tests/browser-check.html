@@ -209,6 +209,23 @@ window.check={
   await new Promise((r)=>setTimeout(r,300));
   return {...r,messages:messages.splice(0),errors:errors.splice(0)};
  },
+ // The preview kernel: while the full tracer compiles (about 2 s), frames already show the lit scene.
+ async preview(){
+  const scene=scenes.materials();
+  look([14,10,18],[0,0,0],{fov:35});
+  const tracer=VoxelPathTracer.attach(engine,{scene});
+  const t0=performance.now();let litWhileCompiling=-1,readyAt=-1;
+  while(performance.now()-t0<10000&&readyAt<0){
+   engine.render({delta:0});const d=readCanvas();await device().queue.onSubmittedWorkDone();
+   let lit=0;for(let i=0;i<d.length;i+=4*61){if(d[i]+d[i+1]+d[i+2]>30)lit++;}
+   const t=performance.now()-t0;
+   if(litWhileCompiling<0&&tracer.status==='compiling'&&lit>100)litWhileCompiling=t;
+   if(tracer.status==='ready')readyAt=t;
+   await new Promise((r)=>setTimeout(r,0));
+  }
+  tracer.dispose();
+  return {litWhileCompiling,readyAt,errors:errors.splice(0)};
+ },
  // GPU first hits (pixel-centre ids and distances) against VoxelPathTracer.raycast on the CPU, per pixel, for a
  // perspective and an orthographic camera.
  async traversal(){

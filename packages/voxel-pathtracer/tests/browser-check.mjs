@@ -115,6 +115,18 @@ try {
     assert.ok(r.stats.samples > 0, JSON.stringify(r.stats));
     console.log(`  ok: shaders compile with no messages; ${r.stats.samples} viewport samples`);
   }
+  if (wanted('preview')) {
+    const r = await run('preview');
+    console.log(
+      `  lit preview frames at ${Math.round(r.litWhileCompiling)} ms; full tracer ready at ${Math.round(r.readyAt)} ms`,
+    );
+    // (After another check on the same device the compile is cached and ready at once: nothing to preview then.)
+    if (r.readyAt > 500)
+      assert.ok(
+        r.litWhileCompiling >= 0 && r.litWhileCompiling < r.readyAt,
+        'the preview shows the scene before the tracer is ready',
+      );
+  }
   if (wanted('traversal')) {
     const r = await run('traversal');
     for (const name of ['perspective', 'orthographic']) {

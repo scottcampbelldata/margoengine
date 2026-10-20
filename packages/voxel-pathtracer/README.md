@@ -168,7 +168,7 @@ The engine camera is used as is: perspective by default, orthographic (or any af
 
 | Option | Default | Range | Restarts accumulation |
 | --- | --- | --- | --- |
-| `samplesPerFrame` | 1 | 1-64 | no |
+| `samplesPerFrame` | 1 | 1-64, or `'auto'` (as many as keep the display's pace) | no |
 | `maxBounces` | 8 | 1-64 (Russian roulette may end paths after 3) | yes |
 | `maxSamples` | 1024 | 1+ or `Infinity` | no (raising it continues) |
 | `seed` | 0 | integer 0-4294967295 | yes |
@@ -176,7 +176,7 @@ The engine camera is used as is: perspective by default, orthographic (or any af
 | `exposure` (EV) | 0 | -20-20 | no |
 | `aperture` | 0 | 0+ | yes |
 | `focusDistance` | camera to target | above 0 | yes |
-| `denoise` | false | boolean | no |
+| `denoise` | false | boolean, or `'auto'` (viewport: every frame below 32 samples, then as the samples grow by a quarter; captures denoise) | no |
 | `lensBlades`, `lensRotation` | 0, 0 | 0 or 3-16; radians | yes |
 | `shutter` | 0 | 0-1 | yes |
 | `previousCamera` | none | `{position, target, up?, fov?}` or null | yes |
@@ -208,6 +208,9 @@ by floating-point rounding, which changes individual paths, not the converged im
   depth-test against the traced image). On an `rgba16float` target (for example under `@margoengine/post` Bloom) it
   writes linear HDR and leaves tone mapping to that pass.
 - `enabled = false` leaves ordinary rendering unchanged (measured bit-identical); the tracer then encodes nothing.
+- Until then the viewport shows a preview: a small kernel (compiled in a fraction of the full tracer's time, about 0.15
+  against 2 s on an RTX A6000) draws the first hit lit by the sun and the sky; accumulation starts over when the full
+  tracer is ready. `stats.samples` reads 0 meanwhile.
 - `ready` resolves when the compute pipelines are compiled (they compile in the background from `attach`), rejects with
   the compile error (`status` `'failed'`, `error`), or with `MargoError` `disposed`. A device restore starts a new
   `ready`. Frames before it show the raster image; they never throw.

@@ -272,8 +272,11 @@ export interface VoxelTraceScene {
 export interface VoxelPathTracerOptions {
   /** The scene to trace. */
   scene: VoxelTraceScene;
-  /** Paths per pixel traced each frame, 1 to 64. Default 1. */
-  samplesPerFrame?: number;
+  /**
+   * Paths per pixel traced each frame, 1 to 64, or (compatible addition) 'auto': as many as keep frames at the
+   * display's pace, adjusted every frame (the viewport converges several times faster on a light scene). Default 1.
+   */
+  samplesPerFrame?: number | 'auto';
   /** Scattering events per path, 1 to 64 (Russian roulette may end paths earlier after 3). Default 8. */
   maxBounces?: number;
   /** Samples per pixel after which the viewport stops tracing (`stats.converged`), 1 or more or Infinity. Default 1024. */
@@ -288,8 +291,12 @@ export interface VoxelPathTracerOptions {
   aperture?: number;
   /** Distance from the camera to the plane in focus, world units, above 0. Default: camera position to target. */
   focusDistance?: number;
-  /** Edge-avoiding wavelet denoising of the viewport and captures. Default false. */
-  denoise?: boolean;
+  /**
+   * Edge-avoiding wavelet denoising of the viewport and captures. Default false. Compatible addition: 'auto' denoises
+   * the viewport every frame below 32 samples, then each time its samples grow by a quarter and at convergence
+   * (clean while moving, at a fraction of the cost); captures denoise.
+   */
+  denoise?: boolean | 'auto';
   /** Compatible addition: aperture polygon blades, 0 (round) or 3 to 16. Default 0. */
   lensBlades?: number;
   /** Compatible addition: rotation of the aperture polygon in radians. Default 0. */

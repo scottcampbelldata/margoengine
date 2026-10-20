@@ -92,7 +92,7 @@ const DEFAULT_WORDS = (128 << 20) / 4, // WebGPU's default maxStorageBufferBindi
 
 /** Resolved tracer options (every field set). */
 interface Settings {
-  samplesPerFrame: number;
+  samplesPerFrame: number | 'auto';
   maxBounces: number;
   maxSamples: number;
   seed: number;
@@ -100,7 +100,7 @@ interface Settings {
   exposure: number;
   aperture: number;
   focusDistance: number | undefined;
-  denoise: boolean;
+  denoise: boolean | 'auto';
   lensBlades: number;
   lensRotation: number;
   shutter: number;
@@ -227,7 +227,10 @@ function settings(input: Partial<Omit<VoxelPathTracerOptions, 'scene'>>, base: S
   const s = { ...base },
     o = input as Record<string, unknown>;
   if (o.samplesPerFrame !== undefined)
-    s.samplesPerFrame = whole(o.samplesPerFrame, 'samplesPerFrame', 1, 64, 'pass 1 to 64');
+    s.samplesPerFrame =
+      o.samplesPerFrame === 'auto'
+        ? 'auto'
+        : whole(o.samplesPerFrame, 'samplesPerFrame', 1, 64, "pass 1 to 64 or 'auto'");
   if (o.maxBounces !== undefined) s.maxBounces = whole(o.maxBounces, 'maxBounces', 1, 64, 'pass 1 to 64');
   if (o.maxSamples !== undefined) {
     const v = checkNumber(o.maxSamples, 'maxSamples', 1, Infinity, 'pass 1 or more, or Infinity');
@@ -242,7 +245,7 @@ function settings(input: Partial<Omit<VoxelPathTracerOptions, 'scene'>>, base: S
   if (o.aperture !== undefined) s.aperture = checkNumber(o.aperture, 'aperture', 0, 1e6, 'pass a diameter, 0 or more');
   if (o.focusDistance !== undefined)
     s.focusDistance = checkNumber(o.focusDistance, 'focusDistance', 1e-6, 1e9, 'pass a distance above 0');
-  if (o.denoise !== undefined) s.denoise = flag(o.denoise, 'denoise');
+  if (o.denoise !== undefined) s.denoise = o.denoise === 'auto' ? 'auto' : flag(o.denoise, 'denoise');
   if (o.lensBlades !== undefined) {
     const v = whole(o.lensBlades, 'lensBlades', 0, 16, 'pass 0 (round) or 3 to 16');
     if (v === 1 || v === 2) throw new RangeError('VoxelPathTracer lensBlades must be 0 (round) or 3 to 16');
@@ -379,6 +382,8 @@ interface Gpu {
   denoiseLayout: GPUBindGroupLayout;
   displayLayout: GPUBindGroupLayout;
   pipelines?: Pipelines;
+  /** The preview kernel, ready long before the full pipelines. */
+  preview?: GPUComputePipeline;
   display: Map<string, { pipeline?: GPURenderPipeline }>;
   buffers: SceneBuffers;
   /** Energy-compensation albedo tables (uniform) and the storage buffer the GPU integrates them into. */
@@ -480,6 +485,14 @@ export class VoxelPathTracer implements EnginePlugin {
   #gpu?: Gpu;
   #status: 'compiling' | 'ready' | 'failed' | 'disposed' = 'compiling';
   #error: unknown;
+  /** samplesPerFrame 'auto': the current count, the display interval estimate, the cap after a missed frame and frames to keep it. */
+  #auto = 1;
+  #interval = 0;
+  #cap = 64;
+  #hold = 0;
+  #streak = 0;
+  /** The viewport shows preview samples (the full tracer is still compiling). */
+  #previewing = false;
   #ready!: Promise<void>;
   #settle?: [() => void, (error: unknown) => void];
   #samples = 0;
@@ -536,7 +549,7 @@ export class VoxelPathTracer implements EnginePlugin {
   /** Samples, timing and memory of the viewport image. */
   get stats(): VoxelPathTracerStats {
     return {
-      samples: this.#samples,
+      samples: this.#previewing ? 0 : this.#samples,
       frameMs: this.#frameMs,
       gpuBytes: this.#bytes,
       converged: this.#samples >= this.#settings.maxSamples,
@@ -914,6 +927,13 @@ export class VoxelPathTracer implements EnginePlugin {
       layout = (l: GPUBindGroupLayout) => device.createPipelineLayout({ bindGroupLayouts: [l] }),
       compute = (module: GPUShaderModule, entryPoint: string, l: GPUBindGroupLayout) =>
         device.createComputePipelineAsync({ layout: layout(l), compute: { module, entryPoint } });
+    // The small preview kernel first: the viewport shows a lit image while the full tracer compiles.
+    compute(trace, 'preview', traceLayout).then(
+      (p) => {
+        if (this.#gpu === gpu && !this.#disposed && !gpu.pipelines) gpu.preview = p;
+      },
+      () => {},
+    );
     Promise.all([
       compute(trace, 'trace', traceLayout),
       compute(trace, 'ids', traceLayout),
@@ -1365,6 +1385,28 @@ export class VoxelPathTracer implements EnginePlugin {
     return entry.pipeline;
   }
 
+  // samplesPerFrame 'auto': the display interval is the fastest recent frame; the count grows by a quarter after four
+  // frames in a row keep that pace (a frame's cost shows in the frame time a few frames late). A frame that misses it
+  // (over 1.6 intervals) caps the count for 120 frames at 80% of what fits an interval at that frame's cost per sample,
+  // so the viewport misses about one frame every two seconds while probing.
+  #pace(ms: number): void {
+    this.#interval = this.#interval > 0 ? Math.min(this.#interval * 1.01, ms) : ms;
+    const pace = Math.min(50, Math.max(4, this.#interval));
+    if (ms > pace * 1.6) {
+      this.#cap = Math.max(1, Math.min(Math.floor(this.#auto * 0.8), Math.floor((this.#auto * 0.8 * pace) / ms)));
+      this.#auto = this.#cap;
+      this.#hold = 120;
+      this.#streak = 0;
+      return;
+    }
+    if (this.#hold > 0 && --this.#hold === 0) this.#cap = 64;
+    this.#streak = ms <= pace * 1.2 ? this.#streak + 1 : 0;
+    if (this.#streak >= 4) {
+      this.#auto = Math.min(this.#cap, Math.ceil(this.#auto * 1.25));
+      this.#streak = 0;
+    }
+  }
+
   // Accumulation key: scene, settings, size and every camera value a ray depends on.
   #moved(c: Context, width: number, height: number): boolean {
     const k = this.#key,
@@ -1381,7 +1423,7 @@ export class VoxelPathTracer implements EnginePlugin {
 
   #execute(c: Context): void {
     const gpu = this.#state(c.device);
-    if (!gpu.pipelines || gpu.lost) return;
+    if ((!gpu.pipelines && !gpu.preview) || gpu.lost) return;
     this.#syncScene(gpu);
     const o = this.#settings,
       limit = Math.floor(gpu.device.limits.maxStorageBufferBindingSize / 16);
@@ -1399,9 +1441,15 @@ export class VoxelPathTracer implements EnginePlugin {
     if (!view) {
       const frame = this.#buffer(gpu, FRAME_BYTES, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST),
         uniform = this.#buffer(gpu, VIEW_BYTES, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
-      view = gpu.view = { ...this.#targets(gpu, undefined, width, height, o.denoise), frame, uniform, denoisedAt: -1 };
-    } else Object.assign(view, this.#targets(gpu, view, width, height, o.denoise));
-    if (this.#moved(c, width, height)) this.#samples = 0;
+      view = gpu.view = {
+        ...this.#targets(gpu, undefined, width, height, o.denoise !== false),
+        frame,
+        uniform,
+        denoisedAt: -1,
+      };
+    } else Object.assign(view, this.#targets(gpu, view, width, height, o.denoise !== false));
+    if (this.#moved(c, width, height) || (gpu.pipelines && this.#previewing)) this.#samples = 0;
+    this.#previewing = !gpu.pipelines;
     this.#width = width;
     this.#height = height;
     const key = `${gpu.resources}`;
@@ -1421,8 +1469,34 @@ export class VoxelPathTracer implements EnginePlugin {
       view.traceKey = key;
       view.denoisedAt = -1;
     }
-    if (!this.#capturing && this.#samples < o.maxSamples) {
-      const count = Math.min(o.samplesPerFrame, o.maxSamples - this.#samples);
+    if (this.#previewing) {
+      // Until the full tracer is compiled: one preview sample per frame, written over the image.
+      if (
+        !this.#writeFrame(
+          device,
+          view.frame,
+          c.camera,
+          [width, height, 0, 0],
+          [width, height, 0, 1],
+          o.seed,
+          true,
+          false,
+          gpu.layout!,
+          this.#snapshot,
+        )
+      )
+        return;
+      const pass = c.encoder.beginComputePass();
+      pass.setPipeline(gpu.preview!);
+      pass.setBindGroup(0, view.traceGroup!);
+      pass.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(height / 8));
+      pass.end();
+      this.#samples = 1;
+    } else if (!this.#capturing && this.#samples < o.maxSamples) {
+      const count = Math.min(
+        o.samplesPerFrame === 'auto' ? this.#auto : o.samplesPerFrame,
+        o.maxSamples - this.#samples,
+      );
       if (
         !this.#writeFrame(
           device,
@@ -1439,18 +1513,28 @@ export class VoxelPathTracer implements EnginePlugin {
       )
         return;
       const pass = c.encoder.beginComputePass();
-      pass.setPipeline(gpu.pipelines.trace);
+      pass.setPipeline(gpu.pipelines!.trace);
       pass.setBindGroup(0, view.traceGroup!);
       pass.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(height / 8));
       pass.end();
       this.#samples += count;
       const now = performance.now();
-      if (this.#lastTrace) this.#frameMs = now - this.#lastTrace;
+      if (this.#lastTrace) {
+        this.#frameMs = now - this.#lastTrace;
+        if (o.samplesPerFrame === 'auto') this.#pace(this.#frameMs);
+      }
       this.#lastTrace = now;
     } else this.#lastTrace = 0;
     if (!this.#samples) return;
-    const denoised = o.denoise && view.denoiseGroups !== undefined;
-    if (denoised && view.denoisedAt !== this.#samples) {
+    const denoised = !this.#previewing && o.denoise !== false && view.denoiseGroups !== undefined;
+    // 'auto': every frame while the image is sparse, then as the samples grow by a quarter, and at convergence.
+    const due =
+      o.denoise === true ||
+      view.denoisedAt <= 0 ||
+      this.#samples < 32 ||
+      this.#samples >= view.denoisedAt * 1.25 ||
+      this.#samples >= o.maxSamples;
+    if (denoised && view.denoisedAt !== this.#samples && due) {
       this.#denoiseParams(device, view, this.#samples, [0, 0, width, height]);
       this.#encodeDenoise(gpu, c.encoder, view);
       view.denoisedAt = this.#samples;
@@ -1511,7 +1595,7 @@ export class VoxelPathTracer implements EnginePlugin {
     if (width * height > maxPixels)
       throw new RangeError(`VoxelPathTracer ${width}x${height} is over ${maxPixels} pixels; render a smaller image`);
     const r = options as VoxelTraceRenderOptions,
-      denoise = r.denoise === undefined ? this.#settings.denoise : flag(r.denoise, 'denoise'),
+      denoise = r.denoise === undefined ? this.#settings.denoise !== false : flag(r.denoise, 'denoise'),
       jitter = r.jitter === undefined ? true : flag(r.jitter, 'jitter'),
       seed = r.seed === undefined ? this.#settings.seed : whole(r.seed, 'seed', 0, 0xffffffff, 'pass an integer seed'),
       wavelength =

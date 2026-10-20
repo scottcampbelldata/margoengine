@@ -192,6 +192,8 @@ test('render objects: sky, sun, ground fade, film, bounces and fog', () => {
   // The 'margo' look keeps the film and lights but traces light physically.
   const margo = magicaVoxelLighting([{ _type: '_film', _expo: '0.5', _aces: '1', _gam: '2.2' }], { look: 'margo' });
   assert.equal(margo.options.toneMapping, 'aces-narkowicz');
+  assert.deepEqual([margo.options.samplesPerFrame, margo.options.denoise], ['auto', 'auto']);
+  assert.deepEqual([o.samplesPerFrame, o.denoise], ['auto', undefined]);
   near(margo.options.exposure, -1);
   assert.deepEqual(
     [
@@ -347,6 +349,10 @@ test('MagicaVoxel options and environment reach the frame uniform; invalid ones 
   assert.throws(() => tracer.setOptions({ edges: { color: [1, 0, 0], width: 0.7 } }), RangeError);
   assert.throws(() => tracer.setOptions({ grid: { color: [1, 0, 0], spacing: 0, width: 0.1 } }), RangeError);
   assert.throws(() => tracer.setOptions({ vignette: -1 }), RangeError);
+  tracer.setOptions({ samplesPerFrame: 'auto', denoise: 'auto' });
+  assert.deepEqual([tracer.options.samplesPerFrame, tracer.options.denoise], ['auto', 'auto']);
+  assert.throws(() => tracer.setOptions({ samplesPerFrame: 'fast' }), TypeError);
+  assert.throws(() => tracer.setOptions({ denoise: 'yes' }), TypeError);
   tracer.setOptions({ edges: null, grid: null });
   assert.equal(tracer.options.edges, undefined);
   near(f[164 + 7], f[164 + 8], 0.05); // isotropy near the horizon is about a half either side

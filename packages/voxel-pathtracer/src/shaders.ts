@@ -1468,6 +1468,42 @@ fn radiance(px:vec2u)->Path {
  else{accum[slot]+=c;albedo[slot]+=a;normals[slot]+=nn;if(split){caustics[slot]+=cs;}}
 }
 
+// Preview while the full tracer compiles (a small kernel compiles in a fraction of the time): the first hit lit by the
+// sky behind its normal and the sun (one shadow ray), misses showing the sky or the background; one sample, written
+// over the image.
+@compute @workgroup_size(8,8) fn preview(@builtin(global_invocation_id) gid:vec3u) {
+ if(gid.x>=f.tile.x||gid.y>=f.tile.y){return;}
+ motion=1.0;
+ let ray=viewRay(vec2f(f32(gid.x+f.image.z)+0.5,f32(gid.y+f.image.w)+0.5));
+ var c=vec3f(0.0);
+ if(dot(ray.d,ray.d)>0.0){
+  let h=closest(ray.o,ray.d,0u,NONE);
+  if(h.inst==NONE){c=select(environment(ray.d,0.0,1.0,true),f.background.xyz,f.background.w>0.0);}
+  else if(h.inst==AREA){c=areaHit(h.value,ray.d,h.t,0.0);}
+  else {
+   let p=ray.o+ray.d*h.t;
+   var n=vec3f(0.0,1.0,0.0);var m:Mat;
+   if(h.inst==GROUND){m=groundMat();if(f.grid2.y>0.0&&gridLine(p,n)){m=lineMat(f.grid.xyz);}}
+   else{
+    n=normalize(h.sgn*rowOf(localX(h.inst),h.axis));m=material(h.value);
+    if(f.edges.w>0.0&&edgeBand(h,p)){m=lineMat(f.edges.xyz);}else if(f.grid2.y>1.5&&gridLine(p,n)){m=lineMat(f.grid.xyz);}
+   }
+   if(dot(n,ray.d)>0.0){n=-n;}
+   c=select(m.emission,m.seen.xyz,m.seen.w>0.0)+m.color*skyBehind(n);
+   let ndl=dot(n,f.sun.xyz);
+   if((f.config.z&SUN)!=0u&&ndl>0.0){
+    let e=select(f.sunLight.xyz,f.sunLight.xyz*f.sunLight.w,f.sunLight.w>0.0);
+    c+=m.color*e*ndl/PI*shadow(p+n*max(1e-3,1e-6*length(p)),f.sun.xyz,INF);
+   }
+   let fade=bitcast<f32>(f.limits.w);
+   if(h.inst==GROUND&&fade>0.0&&f.fog.z==0.0){
+    let w=1.0-exp(-max(0.0,h.t*length(ray.d)-f.groundFade.x)/fade);c=mix(c,skyBehind(ray.d),w);
+   }
+  }
+ }
+ accum[gid.y*f.tile.x+gid.x]=vec4f(c,0.0);
+}
+
 @compute @workgroup_size(8,8) fn ids(@builtin(global_invocation_id) gid:vec3u) {
  if(gid.x>=f.tile.x||gid.y>=f.tile.y){return;}
  motion=1.0;

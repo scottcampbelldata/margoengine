@@ -393,6 +393,8 @@ export function magicaVoxelLighting(
     environment,
     options: {
       ...display,
+      // As many samples per frame as keep the display's pace (the same image, sooner).
+      samplesPerFrame: 'auto',
       toneMapping: (num(film, '_aces') ?? 1) !== 0 ? 'aces-narkowicz' : 'linear',
       gamma: Math.min(5, Math.max(1, num(film, '_gam') ?? 2.2)),
       exposure: Math.min(20, Math.max(-20, Math.log2(Math.max(expo, 2 ** -20)))),
@@ -406,6 +408,8 @@ export function magicaVoxelLighting(
             energyCompensation: false,
           }
         : {
+            // Margo's look also denoises the sparse viewport (clean while the camera moves).
+            denoise: 'auto',
             bounceLimits: null,
             maxBounces: 12,
             transparentShadows: true,
