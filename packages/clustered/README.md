@@ -88,6 +88,32 @@ throw. The shader reads a 1° × 5° grid of each profile (one column when it is
 buffer (binding 142), filtered bilinearly by hand: no textures. At most 16 distinct profiles at a time. Without profiles
 it adds nothing to the shaders or the GPU work.
 
+## Projector lights
+
+`@margoengine/clustered/projector` makes spot lights project an image (three.js `SpotLight.map`):
+
+```ts
+import {ProjectorLights} from '@margoengine/clustered/projector';
+const projectors = ProjectorLights.attach(engine, {lights});
+lights.setLights([{position: [0, 3, 2], range: 10, direction: [0, -1, -0.6], outerAngle: 0.5, intensity: 40}]);
+const bitmap = await createImageBitmap(await (await fetch('/slide.png')).blob());
+const canvas = new OffscreenCanvas(bitmap.width, bitmap.height), g = canvas.getContext('2d')!;
+g.drawImage(bitmap, 0, 0);
+projectors.setProjectors([g.getImageData(0, 0, bitmap.width, bitmap.height)]); // entry i: the spot at index i
+```
+
+Entry i of `setProjectors` belongs to the spot at index i of `lights.setLights` (an image, `{image, colorSpace, angle,
+aspect}` or null); point lights ignore theirs. The image's UVs are those of the spot's local shadow map
+(`localShadowMatrix`: a perspective along `direction` with a field of view of twice the outer angle, up +y, or +z within
+8° of vertical), so a shadowed projector's image and shadow line up; it appears upright and unmirrored seen from the
+light. `angle` (half the vertical field of view) and `aspect` (default 1, the square of the shadow map) change the
+frustum; the cone still bounds the light, so at the default it cuts a square image's corners. The image multiplies the
+light (filtered bilinearly, edges clamped, alpha premultiplied); outside it the light is dark. Images are sRGB unless
+`colorSpace: 'linear'`, and are copied on the call. They live in one storage buffer (binding 143) as packed rgba8
+texels, not textures: physical materials with shadows, IBL and LocalShadows already bind all 16 textures a shader
+stage may have. At most 16 distinct images of up to 4,096 texels a side, 16,777,216 texels in all. Without images it
+adds nothing to the shaders or the GPU work.
+
 ## Point and spot shadows
 
 Opt into bounded local shadow maps when creating the effect, enable shadows on

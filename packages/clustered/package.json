@@ -32,6 +32,10 @@
     "./ies": {
       "types": "./dist/ies.d.ts",
       "import": "./dist/ies.js"
+    },
+    "./projector": {
+      "types": "./dist/projector.d.ts",
+      "import": "./dist/projector.js"
     }
   },
   "files": [

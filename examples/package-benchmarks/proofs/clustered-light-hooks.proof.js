@@ -18,7 +18,9 @@ const { ref, pin } = refs('6c20076d', undefined, '6c20076d');
 const { baseline, candidate } = await versions('clustered', ref, undefined, pin);
 const gltf = await entryAt('gltf-pro', 'src/index.ts', pin),
   { DirectionalLights } = await entryAt('clustered', 'src/directional.ts', pin),
-  { IESLights, parseIES } = await entryAt('clustered', 'src/ies.ts', pin);
+  { IESLights, parseIES } = await entryAt('clustered', 'src/ies.ts', pin),
+  { ProjectorLights } = await entryAt('clustered', 'src/projector.ts', pin);
+const slide = { width: 2, height: 1, data: new Uint8Array([255, 0, 0, 255, 0, 0, 255, 255]) };
 const downlight = parseIES(
   ['IESNA:LM-63-2002', 'TILT=NONE', '1 -1 1 3 1 1 2 0 0 0', '1 1 10', '0 45 90', '0', '1000 600 0'].join('\n'),
 );
@@ -37,6 +39,12 @@ const hooks = [
     attach: (lights) => new IESLights({ lights }),
     fill: (hook, lit) => hook.setProfiles(lit ? [downlight, downlight] : [null]),
     marker: /\*clusterIes\(index,light,l\)/,
+  },
+  {
+    name: 'projector',
+    attach: (lights) => new ProjectorLights({ lights }),
+    fill: (hook, lit) => hook.setProjectors(lit ? [null, slide] : []),
+    marker: /\*clusterProjector\(index,light,position\)/,
   },
 ];
 
