@@ -1,6 +1,6 @@
 # Margo Engine Post
 
-Optional WebGPU frame-graph SSAO, GTAO, SSR and SSGI, bloom, motion blur, FXAA and an effect stack, separate from the frozen core and stage.
+Optional WebGPU frame-graph SSAO, GTAO, SSR and SSGI, bloom, motion blur, lens flare, FXAA and an effect stack, separate from the frozen core and stage.
 
 ## Combining effects: `PostStack`
 
@@ -261,6 +261,42 @@ taa = TAA.attach(stage.engine, {depth: () => stack.depthTexture});
   is. Options: `shutter` 0-1, `maxBlur` 1-128 px, `samples` 2-64 (`RangeError`); a velocity texture of another size
   throws `MargoError` code `state`. With no vectors for a frame (TAA's first frame) the frame is copied unblurred.
   GPU cost not measured yet. WebGPU only.
+
+## Lens flare: `LensFlare`
+
+`@margoengine/post/lens-flare` (5,776 B min+gzip, its own entry; it carries the stack) adds a lens flare for the sun:
+a glow around it, a halo ring about the screen centre on its side, and six tinted ghosts (the lens's internal
+reflections) on the line from the sun through the screen centre. It is an HDR `PostStack` effect; put it after SSR and
+before Bloom so the flare glows. `LensFlare.attach(engine, options)` runs it alone.
+
+```ts
+import {PostStack} from '@margoengine/post/stack';
+import {LensFlare} from '@margoengine/post/lens-flare';
+import {Bloom} from '@margoengine/post/bloom';
+PostStack.attach(stage.engine, [new LensFlare({intensity: 0.1}), new Bloom()]);   // follows engine.lighting
+// With @margoengine/sky: new LensFlare({sun: () => sky.lights[0].direction})    // w = 0 below the horizon hides it
+```
+
+- **The sun.** `sun()` gives the direction toward it (default `engine.lighting.direction`); its w, when given, scales
+  the flare and 0 or less hides it. The sun's screen point is found the way creative's god rays find it: a point far
+  along that direction (half the far distance) through the camera's own matrix, so perspective and orthographic alike;
+  behind the camera or outside the depth range there is no flare.
+- **Occlusion.** A compute pass tests an 8 x 8 grid of depth samples over a disc of `occlusionRadius` pixels around the
+  sun against the stack's depth (`host.depthTexture`): a sample sees the sun where nothing nearer than the sun's point
+  is drawn. The flare is scaled by the share that does, so a sun behind geometry disappears, one at an edge dims, and
+  one leaving the screen fades out. The share stays on the GPU (no readback).
+- **Checked on a real GPU** (NVIDIA RTX A6000, Edge 155; `post-effects-gpu.mjs --only=flare`,
+  [flare-gpu.json](../../examples/package-benchmarks/results/flare-gpu.json)), the frame with the flare minus without,
+  linear: the brightest pixel is the sun's projected pixel (within one pixel); the flare is mirror-symmetric about the
+  line from the sun through the centre (weighted mean offset 0.3 px) with each ghost on it; a box over the sun leaves
+  the frame unchanged (0); a box whose edge splits the disc leaves 0.4998 of the flare where 26 of the 52 depth
+  samples see past it (0.5); behind the camera and at strength 0, nothing; orthographic, the peak at the projected
+  pixel; in a stack with SSR and Bloom and alone, no errors.
+- **Limits.** One light (the sun), a fixed ghost set (positions, sizes and tints are not options), no starburst or
+  aperture-shaped ghosts, no flare from point or spot lights. A transparent surface in front of the sun that writes no
+  depth does not hide it; one that writes depth hides it fully. Options: `intensity` 0-10, `occlusionRadius` 1-64,
+  `color` three finite values >= 0 (`RangeError`); a zero direction throws `MargoError` code `state`. GPU cost not
+  measured yet. WebGPU only.
 
 ## Projected decals: `Decals`
 

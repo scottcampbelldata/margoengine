@@ -7,3 +7,4 @@ export { SSR, type SSROptions, type SSRModel, type SSRCapture } from './ssr.js';
 export { GTAO, type GTAOOptions } from './gtao.js';
 export { SSGI, type SSGIOptions } from './ssgi.js';
 export { MotionBlur, type MotionBlurOptions, type MotionVectors } from './motion-blur.js';
+export { LensFlare, type LensFlareOptions } from './lens-flare.js';

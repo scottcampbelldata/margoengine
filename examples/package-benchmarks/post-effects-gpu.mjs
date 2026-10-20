@@ -19,6 +19,11 @@
 //   motion from a velocity texture (HDR stage, 4x and 1x); a box moving 40 px/frame under TAA (taa.velocity, blurred
 //   after TAA's resolve); TAA's resolved frame is identical with and without MotionBlur (no blurred frame in its history);
 //   at rest under TAA the velocity texture equals taa.velocity.jitter everywhere and MotionBlur changes nothing.
+// flare: the flare (frame with LensFlare minus without, linear) peaks at the sun's projected pixel; it is mirror-
+//   symmetric about the line from the sun through the screen centre, with its ghosts on that line; a box over the sun
+//   hides it exactly (no change); a box whose edge splits the occlusion disc leaves exactly the share of the disc's
+//   depth samples that see past it (counted from the frame without the flare); behind the camera or with strength 0
+//   nothing; orthographic: the peak at the projected pixel; in a stack with SSR and Bloom and alone, no errors.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
@@ -306,6 +311,127 @@ const sections = {
     const all = await read();
     report.checks.combined = { nan: all.nan() };
     assert.equal(all.nan(), 0);
+    return report;
+  },
+  async flare() {
+    const report = { ...header(), checks: {} },
+      flare = { intensity: 1, occlusionRadius: 12 },
+      sunPixel = [300, 280];
+    const added = async (config) => {
+      const info = await run({ scene: 'sun', stack: [['flare', flare]], ...config }),
+        on = await read();
+      await set('flare', { enabled: false });
+      const off = await read();
+      let energy = 0,
+        peak = -1,
+        at = null;
+      const diff = (x, y) => on.at(x, y)[1] - off.at(x, y)[1];
+      for (let y = 0; y < on.height; y++)
+        for (let x = 0; x < on.width; x++) {
+          const d = diff(x, y);
+          energy += d;
+          if (d > peak) {
+            peak = d;
+            at = [x, y];
+          }
+        }
+      return { info, on, off, diff, energy, peak, at };
+    };
+    const open = await added({ sunPixel });
+    const [sx, sy] = open.info.sun.pixel,
+      cx = open.on.width / 2,
+      cy = open.on.height / 2,
+      len = Math.hypot(sx - cx, sy - cy),
+      ux = (sx - cx) / len,
+      uy = (sy - cy) / len;
+    // Mirror symmetry about the sun-centre line: the flare-weighted mean signed distance from it.
+    let moment = 0,
+      weight = 0;
+    for (let y = 0; y < open.on.height; y++)
+      for (let x = 0; x < open.on.width; x++) {
+        const d = Math.max(0, open.diff(x, y));
+        moment += d * ((x + 0.5 - cx) * -uy + (y + 0.5 - cy) * ux);
+        weight += d;
+      }
+    // Ghost centres (fractions of sun - centre, radii as fractions of the height) from the shader: brighter at each
+    // centre than two radii off the line on either side.
+    const ghosts = [
+      [-0.25, 0.05],
+      [-0.55, 0.03],
+      [-0.85, 0.08],
+      [-1.15, 0.04],
+    ].map(([k, r]) => {
+      const gx = cx + k * (sx - cx),
+        gy = cy + k * (sy - cy),
+        off = 2 * r * open.on.height;
+      return {
+        k,
+        centre: round(open.diff(gx, gy), 4),
+        aside: round(Math.max(open.diff(gx - uy * off, gy + ux * off), open.diff(gx + uy * off, gy - ux * off)), 4),
+      };
+    });
+    report.checks.open = {
+      sunPixel: open.info.sun.pixel.map((v) => round(v, 2)),
+      peakAt: open.at,
+      energy: round(open.energy, 2),
+      symmetryOffsetPixels: round(moment / weight, 3),
+      ghosts,
+    };
+    console.log('open', JSON.stringify(report.checks.open));
+    assert.ok(Math.hypot(open.at[0] + 0.5 - sx, open.at[1] + 0.5 - sy) <= 1.5, 'flare peak away from the sun');
+    assert.ok(Math.abs(moment / weight) < 0.5, 'flare not symmetric about the sun-centre line');
+    for (const g of ghosts) assert.ok(g.centre > 2 * g.aside && g.centre > 0, `no ghost at ${g.k} of sun - centre`);
+    // Fully covered: nothing; half covered: exactly the share of disc samples that see past the box.
+    const full = await added({ sunPixel, occluder: 'full' });
+    const half = await added({ sunPixel, occluder: 'half' });
+    let open64 = 0,
+      count = 0;
+    const background = half.off.at(2, 2)[1],
+      box = half.off.at(half.info.sun.pixel[0] + 3 * flare.occlusionRadius, half.info.sun.pixel[1])[1];
+    const r = flare.occlusionRadius,
+      [hx, hy] = half.info.sun.pixel;
+    for (let y = 0; y < 8; y++)
+      for (let x = 0; x < 8; x++) {
+        const ox = (x + 0.5) / 4 - 1,
+          oy = (y + 0.5) / 4 - 1;
+        if (ox * ox + oy * oy > 1) continue;
+        count++;
+        // Background (the clear colour, a corner pixel) or the dark box (inside it, right of the sun)?
+        const v = half.off.at(Math.floor(hx + ox * r), Math.floor(hy + oy * r))[1];
+        if (Math.abs(v - background) < Math.abs(v - box)) open64++;
+      }
+    report.checks.occlusion = {
+      full: round(full.energy, 4),
+      half: round(half.energy / open.energy, 4),
+      expectedHalf: round(open64 / count, 4),
+    };
+    console.log('occlusion', JSON.stringify(report.checks.occlusion));
+    assert.equal(full.energy, 0, 'a covered sun still flares');
+    assert.ok(open64 > 0 && open64 < count, 'the half occluder misses the disc');
+    assert.ok(Math.abs(half.energy / open.energy - open64 / count) < 0.01, 'partial occlusion off its share');
+    // Behind the camera, and with strength 0.
+    const behind = await added({ sunDirection: [0, 0, 1] }),
+      down = await added({ sunPixel, sunStrength: 0 });
+    report.checks.hidden = { behind: behind.energy, strengthZero: down.energy };
+    assert.equal(behind.energy, 0);
+    assert.equal(down.energy, 0);
+    // Orthographic: the peak at the sun's projection there too.
+    const ortho = await added({ camera: 'ortho', sunDirection: [0.02, 0.025, -1] });
+    report.checks.ortho = { sunPixel: ortho.info.sun.pixel.map((v) => round(v, 2)), peakAt: ortho.at };
+    console.log('ortho', JSON.stringify(report.checks.ortho));
+    assert.ok(
+      Math.hypot(ortho.at[0] + 0.5 - ortho.info.sun.pixel[0], ortho.at[1] + 0.5 - ortho.info.sun.pixel[1]) <= 1.5,
+    );
+    await run({
+      scene: 'sun',
+      sunPixel,
+      stack: [
+        ['ssr', {}],
+        ['flare', flare],
+        ['bloom', { strength: 0.3 }],
+      ],
+    });
+    await run({ scene: 'sun', sunPixel, probe: false, alone: flare, aloneEffect: 'flare' });
     return report;
   },
   async ssgi() {

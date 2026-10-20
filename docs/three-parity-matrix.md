@@ -46,7 +46,7 @@ The row stays PARTIAL because three.js's WebGLRenderer draws the whole scene. Cl
 | Long-tail model loaders (LDraw, VRML, 3DS, LWO, AMF, MD2, VOX, PDB, GCode, BVH motion capture, 3DM, KMZ, TDS) | Absent. |
 | DRACOExporter, EXRExporter, KTX2Exporter | Absent. |
 | SkeletonUtils, AnimationObjectGroup | Absent. |
-| GlitchPass, AfterimagePass, Lensflare | Absent. |
+| GlitchPass, AfterimagePass, Lensflare | GlitchPass and AfterimagePass absent. Lensflare COVERED since 2026-10-20: `LensFlare` in `@margoengine/post/lens-flare` (`packages/post/src/lens-flare.ts`). |
 | ArcballControls | Absent. Orbit, map, trackball, fly, and first-person exist. |
 | Light helpers, SkeletonHelper | Absent. |
 | Reflector, Refractor | Absent. Water does its own refraction. |

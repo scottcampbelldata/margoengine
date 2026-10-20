@@ -221,7 +221,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | Motion blur | COVERED | post `MotionBlur` (`packages/post/src/motion-blur.ts`, entry `@margoengine/post/motion-blur`); taa `taa.velocity` (`packages/taa/src/index.ts`) | HDR `PostStack` effect fed by a velocity callback (`velocity: () => taa.velocity`): tile and neighbour maximum velocities and a depth-classified gather after McGuire et al. 2012; subtracts TAA's jitter difference; with TAA it blurs TAA's resolved frame after its resolve so TAA's history stays sharp. Checked on a real GPU against the shutter's box (worst coverage error 0.022-0.057). Straight-line blur over one frame. WebGPU only. |
 | Color correction, grading | COVERED † | creative `lift`, `gain`, `saturation`, `contrast`; tonemap `contrast` | |
 | Simple screen effects (vignette, RGB shift or chromatic aberration, pixelation, halftone, dot screen, Sobel) | PARTIAL | shader `NodePass` with `inputColor`, `inputDepth`, `screenUV` (`packages/shader/src/post.ts`) | None is built in. Each is a few nodes in a `NodePass` (the shader README shows a vignette). transitions has chromatic displacement, but only as a scene-change wipe. |
-| Lensflare | MISSING | — | |
+| Lensflare | COVERED | post `LensFlare` (`packages/post/src/lens-flare.ts`, entry `@margoengine/post/lens-flare`) | HDR `PostStack` effect driven by the sun's direction (`engine.lighting.direction` by default, or `sun: () => sky.lights[0].direction`): glow, halo and six ghosts on the line through the screen centre, projected like creative's god rays. Hidden by geometry through a disc of depth samples around the sun (partly where geometry covers part of it). Checked on a real GPU: peak at the projected sun, partial cover 0.4998 for 0.5 of the samples. Sun only, fixed ghost set. WebGPU only. |
 
 ### 14. Controls
 
@@ -344,7 +344,6 @@ implementation tasks.
 | RoundedBoxGeometry | MISSING, grouped with the other extra geometries. | Add it in `@margoengine/geometry` when a mesh needs it. |
 | ArcballControls | MISSING. | Add it in `@margoengine/controls`. `camera.up` already rolls. |
 | Light helpers, SkeletonHelper | MISSING. | Draw them with `@margoengine/lines` or `@margoengine/inspector` when a debug view needs them. |
-| Lensflare | MISSING. | A sprite in `@margoengine/post` or `@margoengine/sky`. |
 | Reflector, Refractor | MISSING. Water refracts on its own. | A planar mirror in `@margoengine/environment` can use sequential camera captures; the mirror itself is not implemented. |
 | XRControllerModelFactory, XRHandModelFactory | MISSING. Poses and 25 joints already exist. | Models in `@margoengine/xr` after the headset test. |
 | SkeletonUtils | MISSING. | Clone and retarget in `@margoengine/animation` when a second character needs them. |

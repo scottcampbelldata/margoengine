@@ -1,0 +1,67 @@
+{
+ "date": "2026-10-20T17:19:39.305Z",
+ "commit": "0a47d0ed",
+ "gpu": {
+  "vendor": "nvidia",
+  "architecture": "ampere",
+  "device": "0x2230",
+  "description": "NVIDIA RTX A6000",
+  "fallback": false
+ },
+ "browser": "chromium 155.0.4283.62",
+ "checks": {
+  "open": {
+   "sunPixel": [
+    300,
+    280
+   ],
+   "peakAt": [
+    299,
+    279
+   ],
+   "energy": 18467.61,
+   "symmetryOffsetPixels": -0.297,
+   "ghosts": [
+    {
+     "k": -0.25,
+     "centre": 0.1696,
+     "aside": 0.0014
+    },
+    {
+     "k": -0.55,
+     "centre": 0.1656,
+     "aside": 0.0005
+    },
+    {
+     "k": -0.85,
+     "centre": 0.1501,
+     "aside": 0.0001
+    },
+    {
+     "k": -1.15,
+     "centre": 0.1201,
+     "aside": 0
+    }
+   ]
+  },
+  "occlusion": {
+   "full": 0,
+   "half": 0.4998,
+   "expectedHalf": 0.5
+  },
+  "hidden": {
+   "behind": 0,
+   "strengthZero": 0
+  },
+  "ortho": {
+   "sunPixel": [
+    716.7,
+    256.13
+   ],
+   "peakAt": [
+    716,
+    256
+   ]
+  }
+ }
+}

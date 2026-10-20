@@ -60,6 +60,27 @@ export interface GTAOOptions {
     enabled?: boolean;
 }
 
+export class LensFlare implements EnginePlugin {
+    readonly options: LensFlareOptions;
+    readonly name = "lens-flare";
+    constructor(options?: LensFlareOptions);
+    static attach(engine: EngineKernel, options?: LensFlareOptions): LensFlare;
+    get enabled(): boolean;
+    set enabled(value: boolean);
+    setup(engine: Engine): void;
+    onDeviceRestored(engine: Engine): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface LensFlareOptions {
+    sun?: () => ArrayLike<number>;
+    color?: readonly [number, number, number];
+    intensity?: number;
+    occlusionRadius?: number;
+    enabled?: boolean;
+}
+
 export class MotionBlur implements EnginePlugin {
     readonly options: MotionBlurOptions;
     readonly name = "motion-blur";
