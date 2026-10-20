@@ -143,12 +143,37 @@ test('maxSamples stops tracing (converged) while the image is still drawn', asyn
   tracer.dispose();
 });
 
-test('denoising adds a prepare, five regular and six caustic wavelet levels and a combine when new samples arrive', async () => {
+test('denoising adds a prepare, five regular wavelet levels and a combine when new samples arrive', async () => {
   const { tracer, frame, device } = await ready({ denoise: true, maxSamples: 2 });
+  assert.deepEqual(kinds(frame()), ['1 dispatch', '7 dispatch', 'draw3']);
+  assert.equal(traced(device).flags & 64, 0, 'diffuse only: no caustic part to split off');
+  assert.deepEqual(kinds(frame()), ['1 dispatch', '7 dispatch', 'draw3']);
+  assert.deepEqual(kinds(frame()), ['draw3'], 'converged: the denoised image is reused');
+  tracer.dispose();
+});
+
+test('materials that focus light add six caustic levels and their buffers; a diffuse scene drops them', async () => {
+  const glass = simpleScene({ materials: [{ id: 1, color: [0.9, 0.9, 0.9], type: 'glass' }] }),
+    { tracer, frame, device } = await ready({ denoise: true, scene: glass });
   assert.deepEqual(kinds(frame()), ['1 dispatch', '13 dispatch', 'draw3']);
   assert.equal(traced(device).flags & 64, 64, 'the trace splits off the caustic part');
-  assert.deepEqual(kinds(frame()), ['1 dispatch', '13 dispatch', 'draw3']);
-  assert.deepEqual(kinds(frame()), ['draw3'], 'converged: the denoised image is reused');
+  const withChain = tracer.stats.gpuBytes;
+  for (const [name, material] of [
+    ['rough metal', { type: 'metal', roughness: 0.5 }],
+    ['rough plastic', { type: 'plastic', roughness: 0.5 }],
+    ['diffuse', { type: 'diffuse' }],
+  ]) {
+    tracer.setScene(simpleScene({ revision: 2, materials: [{ id: 1, color: [0.5, 0.5, 0.5], ...material }] }));
+    assert.deepEqual(kinds(frame()), ['1 dispatch', '7 dispatch', 'draw3'], name);
+  }
+  assert.equal(withChain - tracer.stats.gpuBytes, 3 * 64 * 48 * 16, 'three images fewer');
+  for (const material of [
+    { type: 'metal', roughness: 0.2 },
+    { type: 'plastic', roughness: 0.1 },
+  ]) {
+    tracer.setScene(simpleScene({ revision: 3, materials: [{ id: 1, color: [0.5, 0.5, 0.5], ...material }] }));
+    assert.deepEqual(kinds(frame()), ['1 dispatch', '13 dispatch', 'draw3'], material.type);
+  }
   tracer.dispose();
 });
 

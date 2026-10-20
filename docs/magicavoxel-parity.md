@@ -158,9 +158,10 @@ Checked and dropped: kernels specialised to the scene's features. Stubbing out g
 a scene without glass (12.45 against 12.32 ms per frame at 1920 x 1080) and cut compile time by about 15% (noisy);
 the README's note that the larger shader is slower where there is no glass did not hold.
 
-Large worlds need no work (row above). Next candidates (value first): render the large world in MagicaVoxel for a
-speed comparison; allocate the denoiser's caustic chain only for scenes with glass, metal or coats (a third of its
-memory).
+Large worlds need no work (row above). Done: the denoiser's caustic chain runs only when a material can focus light
+(glass, or metal or a coat with roughness below about 0.32); a denoised diffuse scene at 1920 x 1080 went from 351 to
+256 MiB and from 18.7-19.0 to 14.4-14.6 ms per frame. Next candidate: render the large world in MagicaVoxel for a
+speed comparison.
 
 ## Finish the package (before it can be pushed or published)
 

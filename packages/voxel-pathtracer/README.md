@@ -217,7 +217,8 @@ by floating-point rounding, which changes individual paths, not the converged im
   frames; 8 frames after the camera stops the diffuse and cloud scenes are 1.10 and 2.28 against 0.96 and 2.03 without
   history (the glass scene 1.95 against 2.03). A camera that never moves gives the same image as before. Every camera
   pose draws its own sample sequence, so equal inputs still give equal images. Cost at 1920 x 1080: two more images of
-  history (348 against 285 MiB for the denoised material scene) and about 0.6 ms per frame.
+  history (348 against 285 MiB for the denoised material scene) and about 0.6 ms per frame; scenes without glass,
+  metal or glossy coats skip the caustic chain, which more than makes up for it (256 MiB for the dense scene).
 - `enabled = false` leaves ordinary rendering unchanged (measured bit-identical); the tracer then encodes nothing.
 - Until then the viewport shows a preview: a small kernel (compiled in a fraction of the full tracer's time, about 0.15
   against 2 s on an RTX A6000) draws the first hit lit by the sun and the sky; accumulation starts over when the full
@@ -268,17 +269,20 @@ by floating-point rounding, which changes individual paths, not the converged im
 ## Measured performance
 
 RTX A6000 (Ampere), Windows 11, Edge 155 (headless, WebGPU, D3D12), 2026-10-20, from
-`tests/browser-check.mjs timing` (GPU time between timestamp queries around the pass, median of 40 frames; the same
-day's run before the denoiser's history in brackets):
+`tests/browser-check.mjs timing` (GPU time between timestamp queries around the pass, median of 40 frames; two runs):
 
 | Scene at 1920 x 1080 | GPU per frame | GPU memory |
 | --- | --- | --- |
-| Material scene (7 models, glass, metal, emitter, cloud, sun, sky, ground), 1 sample | 13.63 ms (13.57) | 95 MiB |
-| Same, denoised | 21.69 ms (20.97-21.23) | 348 MiB (285) |
-| One dense 256^3 model (3,967,601 voxels, terrain), 1 sample | 10.81 ms (10.68-10.75) | 98 MiB |
-| Same, 4 samples per frame | 42.14 ms (41.55-41.88) | 98 MiB |
+| Material scene (7 models, glass, metal, emitter, cloud, sun, sky, ground), 1 sample | 13.76 ms | 95 MiB |
+| Same, denoised | 21.17-21.63 ms | 348 MiB |
+| One dense 256^3 model (3,967,601 voxels, terrain; diffuse and emissive), 1 sample | 10.68-10.75 ms | 98 MiB |
+| Same, denoised (no glass, metal or glossy coat: no caustic chain) | 14.42-14.61 ms | 256 MiB |
+| Same, 4 samples per frame | 42.07-42.40 ms | 98 MiB |
 
-The previous day's run of the same check gave 12.39, 19.92, 9.90 and 36.96 ms: compare rows from one day only.
+The same day, before the viewport denoiser kept history, the denoised material scene took 20.97-21.23 ms and 285 MiB;
+before the caustic chain was skipped for scenes without focusing materials, the denoised dense scene took 18.74-19.01
+ms and 351 MiB. The previous day's run gave 12.39, 19.92, 9.90 and 36.96 ms for the other rows: compare rows from one
+day only.
 
 Light sampling through glass and mirrors made a sample dearer than before it (measured the same day on the same
 machine: 6.09 ms for the material scene, 8.45 ms for the dense one, 9.11 ms denoised): glass and mirror candidates need
@@ -286,7 +290,8 @@ walks, and the larger shader is slower even where there is no glass. Noise per s
 64 samples, 480 x 300: material scene 0.0347 to 0.0284, caustic scene 0.0484 to 0.0336), which does not make up for the
 time in the material scene (about 17% more noise at equal time); the caustic scene's time was not measured. The earlier
 version also converged to a wrong image where glass rests on another model (the floor under it was black). The
-denoiser's second (caustic) chain doubles its memory.
+denoiser's second (caustic) chain, used only when a material can focus light (glass, or metal or a coat with roughness
+below about 0.32), adds three images of the canvas's size and six filter passes.
 
 CPU: packing that 256^3 model takes 43-59 ms (attach or a new revision); `setScene` with unchanged revisions 0.2-0.5 ms;
 a new physical sky (other turbidity, intensity or sun direction) bakes in 50-63 ms, an unchanged one 1.4-3.8 ms;
@@ -295,11 +300,11 @@ Numbers on other GPUs are not measured.
 
 ## Verification
 
-- `tests/*.test.js` (Node, 46 tests, about 1.1 s; part of `npm run verify`): validation and atomic failure, dense
+- `tests/*.test.js` (Node, 47 tests, about 1.1 s; part of `npm run verify`): validation and atomic failure, dense
   indexing, all 255 palette identities, transformed/mirrored/hidden instances, model reuse by revision, voxel traversal
   against a brute-force slab test (2,000 random rays over 5 models whose sizes are not multiples of 8), resets for each
-  camera/size/scene/option change, enable/disable, `maxSamples`, the denoiser's passes and when the viewport's history
-  is kept, used or dropped, upload reuse, disposal, device
+  camera/size/scene/option change, enable/disable, `maxSamples`, the denoiser's passes (the caustic chain only for
+  materials that focus light) and when the viewport's history is kept, used or dropped, upload reuse, disposal, device
   restore and device switch, pass order, PNG encoding with tile placement, AOV mapping, cancellation, pausing, device
   loss during a capture, and the frame uniform's lighting values. A recording fake device stands in for WebGPU.
 - `tests/browser-check.mjs` (real WebGPU, run under `scripts/gpu-lock.mjs`) on the RTX A6000:

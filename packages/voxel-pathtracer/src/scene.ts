@@ -41,6 +41,8 @@ const VOLUME = 2,
   PRESENT = 16;
 /** Roughness squared below which reflection and refraction are perfectly specular. */
 export const DELTA_ALPHA = 1e-3;
+/** GGX alpha below which a lobe counts as specular for caustics (the trace shader's GLOSSY). */
+export const GLOSSY_ALPHA = 0.1;
 /** Floats per packed material (6 vec4), 256 materials. */
 export const MATERIAL_FLOATS = 24;
 
@@ -160,6 +162,11 @@ export interface SceneSnapshot {
   readonly deflectors: Float32Array;
   /** Whether a model holds smooth, pure, non-dispersive glass (light sampling may refract through it). */
   readonly clearGlass: boolean;
+  /**
+   * Whether a model holds a material that can focus light (glass, or metal or a coat with GGX alpha below
+   * GLOSSY_ALPHA): only then do paths carry a caustic part, which the denoiser filters in a chain of its own.
+   */
+  readonly focusing: boolean;
   /** Mixed bricks plus grid words: the voxel buffer's words without padding. */
   readonly voxelWords: number;
 }
@@ -1124,6 +1131,16 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
           (table[b + 15] & SMOOTH) !== 0 &&
           table[b + 5] >= 0.999 &&
           table[b + 16] === 0
+        );
+      }),
+    ),
+    focusing: packed.some((m) =>
+      m.counts.some((n, id) => {
+        const b = id * MATERIAL_FLOATS;
+        return (
+          id > 0 &&
+          n > 0 &&
+          (table[b + 5] > 0 || (table[b + 3] < GLOSSY_ALPHA && (table[b + 4] > 0 || table[b + 6] * table[b + 7] > 0)))
         );
       }),
     ),

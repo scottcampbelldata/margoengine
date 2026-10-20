@@ -33,6 +33,7 @@ import {
   ADDITIVE,
   CONTACT,
   DELTA_ALPHA,
+  GLOSSY_ALPHA,
   EMISSIVE,
   MATERIAL_FLOATS,
   MEDIA,
@@ -219,6 +220,8 @@ const MEDIA=${MEDIA}u;
 const EMISSIVE=${EMISSIVE}u;
 const SMOOTH=${SMOOTH}u;
 const DELTA=${DELTA_ALPHA};
+// GGX alpha below which a lobe is specular for caustics (scene.ts decides from it whether a scene has any).
+const GLOSSY=${GLOSSY_ALPHA};
 const SUN=${FLAG_SUN}u;
 const HAS_GROUND=${FLAG_GROUND}u;
 const ENV=${FLAG_ENV}u;
@@ -1400,7 +1403,7 @@ fn radiance(px:vec2u)->Path {
    var walk:Walk;
    let lobes=select(0u,1u,nd<f.limits.x)|select(0u,2u,ns<f.limits.y);
    let add=thr*direct(select(0u,1u,scatter),m,n,-d,p+off,medium,mInst,&walk,lobes);L+=add;
-   let caustic=focused||(diffuse&&!scatter&&m.metal>0.5&&m.alpha<0.1);
+   let caustic=focused||(diffuse&&!scatter&&m.metal>0.5&&m.alpha<GLOSSY);
    if(caustic){C+=add;}
    if(walk.total>0.0){
     // Walked from the next loop turn on; the path resumes after it.
@@ -1444,7 +1447,7 @@ fn radiance(px:vec2u)->Path {
    deflections++;
   } else {chainOk=false;}
   // Diffuse-like after this vertex: cosine lobes and rough microfacets; specular: mirrors, glass, glossy (alpha < 0.1).
-  if(s.lobe==0u||(s.lobe==1u&&m.alpha>=0.1)){diffuse=true;}else{focused=focused||diffuse;}
+  if(s.lobe==0u||(s.lobe==1u&&m.alpha>=GLOSSY)){diffuse=true;}else{focused=focused||diffuse;}
   thr*=s.w;
   if(s.transmit){
    if(h.inst==GROUND){done=true;continue;}
@@ -1615,8 +1618,9 @@ fn variance(i:u32,c:vec3f,m2:f32,caustic:bool,g:vec2u)->f32 {
   var s1=0.0;var s2=0.0;
   for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){
    let q=u32(clamp(i32(g.y)+y,0,i32(h)-1))*w+u32(clamp(i32(g.x)+x,0,i32(w)-1));
-   var lq=lum(caustics[q].xyz*k);
-   if(!caustic){lq=lum(accum[q].xyz*k)-select(0.0,lq,(p.size.w&2u)!=0u);}
+   var lq=0.0;
+   if(caustic||(p.size.w&2u)!=0u){lq=lum(caustics[q].xyz*k);}
+   if(!caustic){lq=lum(accum[q].xyz*k)-lq;}
    s1+=lq;s2+=lq*lq;
   }}
   v=max(v,max(0.0,s2/9.0-(s1/9.0)*(s1/9.0)));
@@ -1628,7 +1632,8 @@ fn variance(i:u32,c:vec3f,m2:f32,caustic:bool,g:vec2u)->f32 {
  if(g.x>=w||g.y>=h){return;}
  let i=g.y*w+g.x;let k=p.sigma.w;let n=1.0/k;
  let split=(p.size.w&2u)!=0u;
- let cc=select(vec3f(0.0),caustics[i].xyz*k,split);
+ var cc=vec3f(0.0);
+ if(split){cc=caustics[i].xyz*k;}
  let c=accum[i].xyz*k-cc;let a=albedoAt(i);
  let la=max(lum(a),0.02);
  var e=c/a;var ev=variance(i,c,accum[i].w*k,false,g.xy)/(la*la);
@@ -1725,14 +1730,21 @@ fn tap(x:i32)->f32 {return select(select(0.0625,0.25,abs(x)==1),0.375,x==0);}
  let w=p.size.x;let h=p.size.y;
  if(g.x>=w||g.y>=h){return;}
  let i=g.y*w+g.x;
- if((p.size.w&8u)==0u){dst[i]=vec4f(dst[i].xyz+src[i].xyz,1.0);return;}
+ // Flag 2: there is a caustic chain (src) to add.
+ let split=(p.size.w&2u)!=0u;
+ if((p.size.w&8u)==0u){
+  var cs=vec3f(0.0);
+  if(split){cs=src[i].xyz;}
+  dst[i]=vec4f(dst[i].xyz+cs,1.0);return;
+ }
  let m=w*h;let gi=guide[i];let n=1.0/p.sigma.w;
  // The denoiser's history for the next frame, from a restart or where there was none.
  let est=bitcast<vec4u>(guide[2u*m+i]);let mask=u32(unpack2x16float(est.w).y/16.0);
  if((p.size.w&64u)!=0u||(p.size.w&16u)==0u){
   guide[m+i]=bitcast<vec4f>(vec4u(est.x,est.y,pack2x16float(gi.xy),bitcast<u32>(gi.z)));
  }
- let c=dst[i].xyz+src[i].xyz;
+ var c=dst[i].xyz;
+ if(split){c+=src[i].xyz;}
  var nh=0.0;var hc=vec3f(0.0);
  if((p.size.w&16u)!=0u&&mask!=0u){
   let x=f32(g.x)+0.5;let y=f32(g.y)+0.5;
@@ -1754,7 +1766,9 @@ fn tap(x:i32)->f32 {return select(select(0.0625,0.25,abs(x)==1),0.375,x==0);}
     var m1=vec3f(0.0);var m2=vec3f(0.0);
     for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){
      let o=u32(clamp(i32(g.y)+y,0,i32(h)-1))*w+u32(clamp(i32(g.x)+x,0,i32(w)-1));
-     let cq=ycocg(dst[o].xyz+src[o].xyz);m1+=cq;m2+=cq*cq;
+     var cq=dst[o].xyz;
+     if(split){cq+=src[o].xyz;}
+     cq=ycocg(cq);m1+=cq;m2+=cq*cq;
     }}
     m1/=9.0;let sd=1.25*sqrt(max(m2/9.0-m1*m1,vec3f(0.0)));
     hc=fromYcocg(clamp(ycocg(hc),m1-sd,m1+sd));

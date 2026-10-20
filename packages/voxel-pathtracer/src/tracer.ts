@@ -390,8 +390,10 @@ interface Gpu {
   /** Energy-compensation albedo tables (uniform) and the storage buffer the GPU integrates them into. */
   tables: GPUBuffer;
   tableScratch: GPUBuffer;
-  /** Bound where a binding is unused (no caustic buffer without denoising). */
+  /** Bound where a binding is unused (no caustic buffer without denoising): one for writable, one for read-only
+   * bindings, since a pass may not bind one buffer both ways. */
   dummy: GPUBuffer;
+  dummyRead: GPUBuffer;
   capacity: number;
   runs: Runs;
   regions: Map<PackedModel, number>;
@@ -416,7 +418,8 @@ interface Targets {
   cping?: GPUBuffer;
   cpong?: GPUBuffer;
   params?: GPUBuffer;
-  denoiseGroups?: GPUBindGroup[];
+  /** One per denoiser pass; none for the caustic chain's passes when there are no caustics. */
+  denoiseGroups?: (GPUBindGroup | undefined)[];
 }
 interface View extends Targets {
   frame: GPUBuffer;
@@ -920,6 +923,7 @@ export class VoxelPathTracer implements EnginePlugin {
         tables: undefined as unknown as GPUBuffer,
         tableScratch: undefined as unknown as GPUBuffer,
         dummy: undefined as unknown as GPUBuffer,
+        dummyRead: undefined as unknown as GPUBuffer,
         capacity: 0,
         runs: new Runs(4, 4),
         regions: new Map(),
@@ -941,6 +945,7 @@ export class VoxelPathTracer implements EnginePlugin {
     gpu.tables = this.#buffer(gpu, TABLE_VEC4 * 16, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
     gpu.tableScratch = this.#buffer(gpu, TABLE_VEC4 * 16, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
     gpu.dummy = this.#buffer(gpu, 16, GPUBufferUsage.STORAGE);
+    gpu.dummyRead = this.#buffer(gpu, 16, GPUBufferUsage.STORAGE);
     gpu.capacity = 4;
     void device.lost?.then(() => {
       gpu.lost = true;
@@ -1009,6 +1014,7 @@ export class VoxelPathTracer implements EnginePlugin {
     this.#destroy(gpu.tables);
     this.#destroy(gpu.tableScratch);
     this.#destroy(gpu.dummy);
+    this.#destroy(gpu.dummyRead);
     this.#releaseTargets(gpu.view);
     if (gpu.view) {
       this.#destroy(gpu.view.frame);
@@ -1086,13 +1092,15 @@ export class VoxelPathTracer implements EnginePlugin {
     gpu.version = this.#version;
   }
 
-  // Accumulation targets of `width` x `height` (plus the denoiser's when `denoise`).
+  // Accumulation targets of `width` x `height` (plus the denoiser's when `denoise`, with its caustic chain when
+  // `caustic`: the scene has materials that focus light).
   #targets(
     gpu: Gpu,
     t: Targets | undefined,
     width: number,
     height: number,
     denoise: boolean,
+    caustic: boolean,
     temporal = false,
   ): Targets {
     const storage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
@@ -1110,33 +1118,46 @@ export class VoxelPathTracer implements EnginePlugin {
       } as Targets;
       gpu.resources++;
     }
+    if (out.ping && (!denoise || (out.caustics !== undefined) !== caustic)) {
+      for (const b of [out.ping, out.pong, out.guide, out.params, out.caustics, out.cping, out.cpong]) this.#destroy(b);
+      out.ping = out.pong = out.guide = out.params = out.caustics = out.cping = out.cpong = undefined;
+      out.denoiseGroups = undefined;
+      gpu.resources++;
+    }
     if (denoise && !out.ping) {
       out.ping = this.#buffer(gpu, bytes, storage);
       out.pong = this.#buffer(gpu, bytes, storage);
       // The viewport's guide also holds the denoiser's history (two more images of its size).
       out.guide = this.#buffer(gpu, temporal ? 3 * bytes : bytes, storage);
-      out.caustics = this.#buffer(gpu, bytes, storage);
-      out.cping = this.#buffer(gpu, bytes, storage);
-      out.cpong = this.#buffer(gpu, bytes, storage);
+      if (caustic) {
+        out.caustics = this.#buffer(gpu, bytes, storage);
+        out.cping = this.#buffer(gpu, bytes, storage);
+        out.cpong = this.#buffer(gpu, bytes, storage);
+      }
       out.params = this.#buffer(gpu, PARAM_STRIDE * DENOISE_PASSES, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
-      const groups: GPUBindGroup[] = [],
-        o = out;
+      const groups: (GPUBindGroup | undefined)[] = [],
+        o = out,
+        read = (b: GPUBuffer | undefined) => b ?? gpu.dummyRead;
       // Pass k: 0 prepare (regular -> ping, caustic -> cping), 1..ATROUS the regular chain ending in pong, then the
       // caustic chain ending in cping, last combine (pong += cping; the viewport's, blended with its history, to ping).
       for (let k = 0; k < DENOISE_PASSES; k++) {
-        const j = k - ATROUS,
-          [src, dst] =
-            k === 0
-              ? [o.pong!, o.ping!]
-              : k <= ATROUS
-                ? k % 2
-                  ? [o.ping!, o.pong!]
-                  : [o.pong!, o.ping!]
-                : j <= CAUSTIC_LEVELS
-                  ? j % 2
-                    ? [o.cping!, o.cpong!]
-                    : [o.cpong!, o.cping!]
-                  : [o.cping!, o.pong!];
+        const j = k - ATROUS;
+        if (!caustic && k > ATROUS && j <= CAUSTIC_LEVELS) {
+          groups.push(undefined);
+          continue;
+        }
+        const [src, dst] =
+          k === 0
+            ? [o.pong!, o.ping!]
+            : k <= ATROUS
+              ? k % 2
+                ? [o.ping!, o.pong!]
+                : [o.pong!, o.ping!]
+              : j <= CAUSTIC_LEVELS
+                ? j % 2
+                  ? [o.cping!, o.cpong!]
+                  : [o.cpong!, o.cping!]
+                : [read(o.cping), o.pong!];
         groups.push(
           gpu.device.createBindGroup({
             layout: gpu.denoiseLayout,
@@ -1148,21 +1169,18 @@ export class VoxelPathTracer implements EnginePlugin {
               { binding: 4, resource: { buffer: src } },
               { binding: 5, resource: { buffer: dst } },
               { binding: 6, resource: { buffer: o.guide! } },
-              { binding: 7, resource: { buffer: o.caustics! } },
+              { binding: 7, resource: { buffer: read(o.caustics) } },
               {
                 binding: 8,
-                resource: { buffer: k === 0 ? o.cping! : temporal && k === DENOISE_PASSES - 1 ? o.ping! : gpu.dummy },
+                resource: {
+                  buffer: k === 0 ? (o.cping ?? gpu.dummy) : temporal && k === DENOISE_PASSES - 1 ? o.ping! : gpu.dummy,
+                },
               },
             ],
           }),
         );
       }
       out.denoiseGroups = groups;
-      gpu.resources++;
-    } else if (!denoise && out.ping) {
-      for (const b of [out.ping, out.pong, out.guide, out.params, out.caustics, out.cping, out.cpong]) this.#destroy(b);
-      out.ping = out.pong = out.guide = out.params = out.caustics = out.cping = out.cpong = undefined;
-      out.denoiseGroups = undefined;
       gpu.resources++;
     }
     return out;
@@ -1366,7 +1384,8 @@ export class VoxelPathTracer implements EnginePlugin {
         caustic = k > ATROUS,
         level = caustic ? k - ATROUS : k,
         last = k === ATROUS || k === ATROUS + CAUSTIC_LEVELS;
-      // Flags: 1 last level, 2 the prepare pass, 4 no plane test (rays not the camera's corner-ray interpolation).
+      // Flags: 1 last level, 2 a caustic chain (prepare splits it off, combine adds it), 4 no plane test (rays not the
+      // camera's corner-ray interpolation).
       const flat = this.#settings.projection !== 'camera' || this.#settings.distortion !== undefined;
       // 8 and up: the viewport's history (prepare and combine), never with flat rays.
       const keep = flat ? 0 : history;
@@ -1375,7 +1394,10 @@ export class VoxelPathTracer implements EnginePlugin {
           t.width,
           t.height,
           k === 0 ? 0 : 1 << (level - 1),
-          (last ? 1 : 0) | (k === 0 ? 2 : 0) | (flat ? 4 : 0) | (k === 0 || k === DENOISE_PASSES - 1 ? keep : 0),
+          (last ? 1 : 0) |
+            (t.caustics && (k === 0 || k === DENOISE_PASSES - 1) ? 2 : 0) |
+            (flat ? 4 : 0) |
+            (k === 0 || k === DENOISE_PASSES - 1 ? keep : 0),
         ],
         at,
       );
@@ -1398,8 +1420,10 @@ export class VoxelPathTracer implements EnginePlugin {
       x = Math.ceil(t.width / 8),
       y = Math.ceil(t.height / 8);
     for (let k = 0; k < DENOISE_PASSES; k++) {
+      const group = t.denoiseGroups![k];
+      if (!group) continue;
       pass.setPipeline(k === 0 ? p.prepare : k === DENOISE_PASSES - 1 ? p.combine : p.atrous);
-      pass.setBindGroup(0, t.denoiseGroups![k]);
+      pass.setBindGroup(0, group);
       pass.dispatchWorkgroups(x, y);
     }
     pass.end();
@@ -1492,12 +1516,13 @@ export class VoxelPathTracer implements EnginePlugin {
       const frame = this.#buffer(gpu, FRAME_BYTES, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST),
         uniform = this.#buffer(gpu, VIEW_BYTES, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
       view = gpu.view = {
-        ...this.#targets(gpu, undefined, width, height, o.denoise !== false, true),
+        ...this.#targets(gpu, undefined, width, height, o.denoise !== false, this.#snapshot.focusing, true),
         frame,
         uniform,
         denoisedAt: -1,
       };
-    } else Object.assign(view, this.#targets(gpu, view, width, height, o.denoise !== false, true));
+    } else
+      Object.assign(view, this.#targets(gpu, view, width, height, o.denoise !== false, this.#snapshot.focusing, true));
     if (this.#moved(c, width, height) || (gpu.pipelines && this.#previewing)) {
       this.#samples = 0;
       this.#restarted = true;
@@ -1783,7 +1808,7 @@ export class VoxelPathTracer implements EnginePlugin {
             h = ry1 - ry0;
           if (!targets || targets.width !== w || targets.height !== h) {
             this.#releaseTargets(targets);
-            targets = this.#targets(gpu, undefined, w, h, o.denoise);
+            targets = this.#targets(gpu, undefined, w, h, o.denoise, snapshot.focusing);
             group = this.#traceGroup(gpu, frame, targets, copies);
           }
           const batch = Math.max(1, Math.min(16, Math.floor((1 << 20) / (w * h))));
@@ -1798,7 +1823,7 @@ export class VoxelPathTracer implements EnginePlugin {
               [w, h, s, count],
               o.seed,
               o.jitter,
-              o.denoise,
+              targets.caustics !== undefined,
               layout,
               snapshot,
               o.wavelength,
@@ -1828,7 +1853,7 @@ export class VoxelPathTracer implements EnginePlugin {
               [w, h, 0, 1],
               o.seed,
               false,
-              o.denoise,
+              targets.caustics !== undefined,
               layout,
               snapshot,
             );
