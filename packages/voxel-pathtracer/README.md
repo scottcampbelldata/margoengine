@@ -559,9 +559,12 @@ PNG and float captures with cancellation; device-loss recovery.
 
 Not done or not verified, stated plainly:
 
-- **MagicaVoxel parity is not complete:** a transparent background (`_bg_a`) and non-cubic voxels (`_scale`) are
-  reproduced but not yet compared with MagicaVoxel's images; subsurface is fitted at one density only; glass over a lit floor is 1-2 levels brighter; under the atmosphere, a view into a low sun matches on 98.7% of
-  pixels and very dense air settings by 2-3 levels on average (docs/magicavoxel-parity.md).
+- **MagicaVoxel parity is not complete:** a transparent background (`_bg_a`), non-cubic voxels (`_scale`), blend
+  materials, the orth and iso camera modes and lens projection 1 are reproduced but not yet compared with
+  MagicaVoxel's images (its Pano lens is: 99.5% of the sky within 3 levels); subsurface is fitted at one density only;
+  glass over a lit floor is 1-2 levels brighter; under the atmosphere, a view into a low sun matches on 98.7% of
+  pixels, very dense air settings by 2-3 levels on average, and with the ground off its sky below the horizon is not
+  yet MagicaVoxel's (docs/magicavoxel-parity.md).
 - **Denoiser:** a classical filter, not a learned one. While the camera moves, surfaces it uncovers are noisy for a
   few frames, and for a few frames after it stops the history makes diffuse and cloud scenes slightly worse than
   without it (numbers under "Viewport"). Averaged over four seeds against 131,072-sample references

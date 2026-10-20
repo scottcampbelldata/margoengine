@@ -201,7 +201,7 @@ Measured (RTX A6000, Edge headless, 960 x 800, `L-bg-off`: slab, two cubes, sun,
 | --- | --- | --- |
 | Noise at 1024 samples (8-bit RMS against a 16,384-sample reference) | 0.32 | 0.24 raw, 0.16 denoised |
 | Time to MagicaVoxel's 1024-sample quality | about 14 s (1024 samples) | 0.48 s (64 samples, denoised), about 29x faster |
-| Package | about 30 MB application | 59 KB gzip (gzip -9 of `dist/index.js`, 180 KB raw) |
+| Package | about 30 MB application | 63 KB gzip (gzip -9 of `dist/index.js`, 192 KB raw; 2026-10-20) |
 | First lit viewport frame after opening | (its viewport) | 0.36-0.44 s with the preview kernel (was 2.1-2.8 s: the full tracer's compile) |
 | Large world: 64 terrain models of 256 x 256 x 32 (2048 x 2048 voxels, 12.6 million voxels; `mv-calib/bigworld.cjs`) | (not rendered yet) | 256 samples in 1.5 s (about 6 ms each at 960 x 800), 93 MiB of GPU memory |
 | Viewport samples in 4 s at 60 fps | (its viewport) | 1,465 light scene, 540 glass board, 351 sun board with `samplesPerFrame: 'auto'` (238-240 at 1 per frame): 6x / 2.3x / 1.5x, 2-6% of frames late |
@@ -263,13 +263,18 @@ blocks. Photo mode leaves grass and flowers out and shows torches as small glowi
   atmosphere needs and any HDR map benefits from; the GPU `environment` check now looks at the middle of its colour
   bands.
 - Done: README documents every new option, material field, `environment.fog`/`groundFade`/`sunVisible` and the
-  `magicaVoxel*` helpers; `tests/magicavoxel.test.js` (10 tests: materials with current, older and missing keys, render
-  objects, the atmosphere, cameras, models and placement, options reaching the frame); the real-GPU `compat` check (closed forms for
+  `magicaVoxel*` helpers; `tests/magicavoxel.test.js` (11 tests: materials with current, older and missing keys, render
+  objects, the atmosphere and its tall map, cameras, camera modes and lens projections, models and placement, options
+  reaching the frame); the real-GPU `compat` check (closed forms for
   energy compensation, metalColor, additive coat, untinted glass, voxelwise blend, contact transmission, camera
-  emission, diffuse caps 1/2/3, the sun on diffuse lobes only, opaque shadows, the sun in media, sunlit media and a
-  sunlit slab under opaque shadows, ground fade and its start, fog, the ACES and gamma
-  byte); Biome format and lint clean; hygiene 10.0 on every gate for the package.
-- Open: `npm run verify` on the branch, size entries (measure:size), rebuild the tarballs for Codex.
+  emission, diffuse caps 1/2/3, the sun on diffuse lobes only, opaque shadows, the sun in media, sunlit media outside
+  the scatter cap and a three-voxel sunlit slab lit through its own volume under opaque shadows, ground fade and its
+  start, fog, the ACES and gamma byte) and `projections` check (panorama fitted to the height, stereographic fisheye);
+  Biome format and lint clean; hygiene 10.0 on every gate for the package (2026-10-20, after the parity work).
+- 2026-10-20 (branch `claude/quizzical-northcutt-b56ae0`, after the subsurface, horizon, camera and defaults work):
+  `npm run verify` passed (3,116 of 3,116 tests, API reports match, core + stage 21,343 bytes gzip, proofs 15 of 15);
+  the package bundle grew by 1,030 bytes gzip (esbuild, minified: 59,281 -> 60,311).
+- Open: size entries (measure:size), rebuild the tarballs for Codex.
 
 ## Paused when the voxel and path tracer work began (do not lose)
 

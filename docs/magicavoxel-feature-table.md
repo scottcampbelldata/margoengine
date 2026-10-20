@@ -12,7 +12,7 @@ Legend: **yes**, **no**, **open** (MagicaVoxel has it, Margo does not match it y
 | | MagicaVoxel | Margo |
 | --- | --- | --- |
 | What it is | Free desktop voxel editor with a built-in path tracer | Path-tracing renderer for web apps and games (WebGPU, in the browser) |
-| Size | about 30 MB application | 59 KB gzip (the whole renderer) |
+| Size | about 30 MB application | 63 KB gzip (the whole renderer) |
 | 1024 samples (default scenes) | 14-15 s | 1.7-1.85 s, about 8x faster |
 | Time to MagicaVoxel's 1024-sample noise level | about 14 s | 0.48 s (64 samples, denoised), about 29x faster |
 | Noise at 1024 samples (8-bit RMS against a 16,384-sample reference) | 0.32 | 0.24 raw, 0.16 denoised |
@@ -33,7 +33,7 @@ Legend: **yes**, **no**, **open** (MagicaVoxel has it, Margo does not match it y
 | --- | --- | --- |
 | Diffuse, metal, plastic, glass, emitter | yes | yes, each matched within 3 levels on the calibration boards |
 | Cloud (scattering medium) | yes | yes |
-| Subsurface | yes | yes; sun-lit within 6 levels, sky-lit tops 7-12 levels darker (open) |
+| Subsurface | yes | yes; sky- and sun-lit tops within 1.2-3.8 levels at diffuse caps 2 and 4 (one density measured) |
 | Partly transparent glass | yes | yes, 64 of 64 calibration tiles within 3 levels |
 | Blend material | yes | yes, not compared yet |
 | Rough metal and rough glass that keep their energy | metal: no (measured); glass: not checked | yes (within 0.79% of white in a white sky) |
@@ -47,7 +47,7 @@ Legend: **yes**, **no**, **open** (MagicaVoxel has it, Margo does not match it y
 | Feature | MagicaVoxel | Margo |
 | --- | --- | --- |
 | Uniform sky, sun with soft shadows, ground | yes | yes |
-| Atmosphere sky (sunrise, sunset) | yes | yes; 97.7-100% of pixels within 3 levels |
+| Atmosphere sky (sunrise, sunset) | yes | yes; 98.7-100% of pixels within 3 levels |
 | Image (HDR) sky | yes | yes; 99.76% on a lit scene |
 | Fog | yes | yes; 99.5-100% on 9 fog scenes |
 | Sun highlights on metal and glass | no (measured: the sun lights diffuse surfaces only) | yes in the Margo look |
@@ -59,8 +59,9 @@ Legend: **yes**, **no**, **open** (MagicaVoxel has it, Margo does not match it y
 | --- | --- | --- |
 | Perspective | yes | yes |
 | Orthographic, isometric | yes | mapped, not compared yet |
+| Panorama lens (Pano) | yes | yes; 99.5% of the sky within 3 levels |
 | Depth of field | yes (no effect seen in its snapshots) | yes, round or polygon bokeh |
-| Panorama, fisheye, lens distortion | not checked | yes |
+| Fisheye, lens distortion | stereographic (its release notes; not compared) | yes: equidistant, equal-area, stereographic; Brown-Conrady |
 | Motion blur (objects and camera) | not checked | yes |
 
 ## Image
@@ -101,6 +102,7 @@ Legend: **yes**, **no**, **open** (MagicaVoxel has it, Margo does not match it y
 ## Where MagicaVoxel is ahead
 
 - It is a complete, free editor that artists already use; Margo renders, it does not edit.
-- Transparent-background PNGs, non-cubic voxels and its orthographic and isometric cameras are not compared with
-  MagicaVoxel's images yet; sky-lit subsurface is 7-12 levels dark.
+- Transparent-background PNGs, non-cubic voxels, blend materials, its orthographic and isometric cameras and its
+  lens projection 1 are not compared with MagicaVoxel's images yet; under the atmosphere with the ground off, its sky
+  below the horizon is not reproduced yet.
 - Margo is measured on one PC and one browser only.
