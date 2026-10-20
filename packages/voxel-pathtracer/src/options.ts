@@ -44,6 +44,7 @@ export interface Settings {
   order: number;
   previousCamera: TracePreviousCamera | undefined;
   projection: 'camera' | 'panorama' | 'fisheye';
+  panoramaFit: 'width' | 'height';
   fisheye: Required<TraceFisheye>;
   distortion: Required<TraceLensDistortion> | undefined;
 }
@@ -74,6 +75,7 @@ export const DEFAULTS: Settings = {
   order: 20,
   previousCamera: undefined,
   projection: 'camera',
+  panoramaFit: 'width',
   fisheye: { mapping: 'equidistant', fov: 180 },
   distortion: undefined,
 };
@@ -91,6 +93,7 @@ export const RESETS: readonly (keyof Settings)[] = [
   'shutter',
   'previousCamera',
   'projection',
+  'panoramaFit',
   'fisheye',
   'distortion',
   'clamp',
@@ -222,16 +225,26 @@ export function settings(input: Partial<Omit<VoxelPathTracerOptions, 'scene'>>, 
       );
     s.projection = o.projection;
   }
+  if (o.panoramaFit !== undefined) {
+    if (o.panoramaFit !== 'width' && o.panoramaFit !== 'height')
+      throw new TypeError(`VoxelPathTracer panoramaFit ${String(o.panoramaFit)} is unknown; pass 'width' or 'height'`);
+    s.panoramaFit = o.panoramaFit;
+  }
   if (o.fisheye !== undefined) {
     if (!o.fisheye || typeof o.fisheye !== 'object')
       throw new TypeError('VoxelPathTracer fisheye must be {mapping?, fov?}');
     const e = o.fisheye as Record<string, unknown>;
-    if (e.mapping !== undefined && e.mapping !== 'equidistant' && e.mapping !== 'equisolid')
+    if (
+      e.mapping !== undefined &&
+      e.mapping !== 'equidistant' &&
+      e.mapping !== 'equisolid' &&
+      e.mapping !== 'stereographic'
+    )
       throw new TypeError(
-        `VoxelPathTracer fisheye.mapping ${String(e.mapping)} is unknown; pass 'equidistant' or 'equisolid'`,
+        `VoxelPathTracer fisheye.mapping ${String(e.mapping)} is unknown; pass 'equidistant', 'equisolid' or 'stereographic'`,
       );
     s.fisheye = {
-      mapping: (e.mapping as 'equidistant' | 'equisolid' | undefined) ?? 'equidistant',
+      mapping: (e.mapping as TraceFisheye['mapping']) ?? 'equidistant',
       fov: e.fov === undefined ? 180 : checkNumber(e.fov, 'fisheye.fov', 1e-3, 360, 'pass degrees above 0 to 360'),
     };
   }

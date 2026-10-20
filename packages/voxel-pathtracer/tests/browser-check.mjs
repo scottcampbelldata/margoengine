@@ -13,7 +13,8 @@
 //   sampling through a floating glass cube against path sampling of the same light;
 // - sky: the physical sky's zenith luminance and chromaticity, luminance ratios and a floor's irradiance against
 //   Preetham's formulas;
-// - projections: markers land where the panorama, equidistant/equisolid fisheye and Brown-Conrady formulas put them;
+// - projections: markers land where the panorama (fitted to the width or the height), equidistant/equisolid/stereographic
+//   fisheye and Brown-Conrady formulas put them;
 //   per-pixel first hits of each agree with raycast along rays computed in the page;
 // - arealight: a panel's shadow area under a point sun, its front, back and see-through back radiance, and a dark
 //   panel occluding a lit ceiling against view factors;

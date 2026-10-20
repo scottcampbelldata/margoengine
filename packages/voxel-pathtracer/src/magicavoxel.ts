@@ -62,10 +62,21 @@ export interface MagicaVoxelCamera {
   up: TraceVec3;
   /** Vertical field of view in degrees. */
   fov: number;
-  /** 'perspective', or 'orthographic' for MagicaVoxel's ortho and iso modes. */
-  projection: 'perspective' | 'orthographic';
-  /** Distance from the eye to the target. */
+  /**
+   * 'perspective'; 'orthographic' for MagicaVoxel's orth and iso modes (give the engine camera an orthographic
+   * projection `orthographicHeight` tall); 'panorama' and 'stereographic' for its lens projections (pass `options` to
+   * the tracer).
+   */
+  projection: 'perspective' | 'orthographic' | 'panorama' | 'stereographic';
+  /** Distance from the eye to the target (an orthographic eye sits `orthographicHeight` further back than the radius). */
   distance: number;
+  /**
+   * Orthographic projection: the view's height in world units, 2 x radius x tan(fov / 2) (what the perspective view
+   * shows at the focus).
+   */
+  orthographicHeight?: number;
+  /** Tracer options the projection needs (panorama and stereographic lenses); empty otherwise. */
+  options: Partial<Pick<VoxelPathTracerOptions, 'projection' | 'panoramaFit' | 'fisheye'>>;
 }
 
 const get = (d: MagicaVoxelDict | undefined, key: string): string | undefined =>
@@ -453,22 +464,40 @@ export function magicaVoxelLighting(
   };
 }
 
+/** True isometric pitch: the three axes equally foreshortened, atan(1 / sqrt 2) below the horizontal. */
+const ISO_PITCH = -Math.atan(Math.SQRT1_2);
+
 /**
- * The camera of an rCAM dictionary (`_focus`, `_angle` pitch yaw roll in degrees, `_radius`, `_mode`). MagicaVoxel
- * renders with the field of view of its lens render object, so pass the file's rOBJ dictionaries as `objects`; the
- * camera's own `_fov` applies only without a `_lens` object.
+ * The camera of an rCAM dictionary (`_focus`, `_angle` pitch yaw roll in degrees, `_radius`, `_mode` pers, free,
+ * orth, iso or pano). MagicaVoxel renders with the field of view and projection of its lens render object (`_fov`,
+ * `_proj`), so pass the file's rOBJ dictionaries as `objects`; the camera's own `_fov` applies only without a `_lens`
+ * object. Orth and iso are orthographic, `orthographicHeight` tall; iso looks down at the isometric angle (35.26
+ * degrees) from the nearest diagonal (45 + 90 k degrees of yaw). Lens projection 2 (Pano, also `_mode pano`) is the
+ * equal-angle panorama (measured: 180 degrees down the image, the same angle per pixel across); 1 is taken as
+ * stereographic with the lens field of view (MagicaVoxel's release notes name a stereographic projection; not
+ * compared yet).
  */
 export function magicaVoxelCamera(camera: MagicaVoxelDict, objects: Iterable<MagicaVoxelDict> = []): MagicaVoxelCamera {
   let lens: MagicaVoxelDict | undefined;
   for (const o of objects) if (get(o, '_type') === '_lens') lens = o;
   const focus = nums(camera, '_focus') ?? [0, 0, 0],
-    angle = nums(camera, '_angle') ?? [0, 0, 0],
+    stored = nums(camera, '_angle') ?? [0, 0, 0],
     radius = Math.max(1e-3, num(camera, '_radius') ?? 100),
     fov = Math.min(179, Math.max(1, num(lens, '_fov') ?? num(camera, '_fov') ?? 45)),
     mode = get(camera, '_mode') ?? 'pers',
+    lensProjection = mode === 'pano' ? 2 : Math.round(num(lens, '_proj') ?? 0),
+    iso = mode === 'iso',
+    orthographic = (mode === 'orth' || iso) && lensProjection === 0,
+    // Iso: the isometric pitch, the yaw snapped to the nearest diagonal.
+    angle = iso
+      ? [(ISO_PITCH * 180) / Math.PI, 45 + 90 * Math.round(((stored[1] ?? 0) - 45) / 90), stored[2] ?? 0]
+      : stored,
     [p, y, r] = angle.map((v) => ((v ?? 0) * Math.PI) / 180),
     offset = [Math.cos(p) * Math.sin(y), -Math.cos(p) * Math.cos(y), -Math.sin(p)],
-    eye = [focus[0] + radius * offset[0], focus[1] + radius * offset[1], focus[2] + radius * offset[2]];
+    height = 2 * radius * Math.tan((fov * Math.PI) / 360),
+    // An orthographic eye sits one view height further back, so the image's lower edge starts above the ground.
+    distance = orthographic ? radius + height : radius,
+    eye = [focus[0] + distance * offset[0], focus[1] + distance * offset[1], focus[2] + distance * offset[2]];
   // Screen up: world z made perpendicular to the view, then rolled about it (looking straight down: +y).
   const f = offset.map((v) => -v),
     upGuess = Math.abs(f[2]) > 0.999 ? [Math.sin(y), Math.cos(y), 0] : [0, 0, 1],
@@ -483,8 +512,22 @@ export function magicaVoxelCamera(camera: MagicaVoxelDict, objects: Iterable<Mag
     target: fromMagicaVoxel(focus),
     up: fromMagicaVoxel(up),
     fov,
-    projection: mode === 'orth' || mode === 'iso' ? 'orthographic' : 'perspective',
-    distance: radius,
+    projection:
+      lensProjection === 2
+        ? 'panorama'
+        : lensProjection === 1
+          ? 'stereographic'
+          : orthographic
+            ? 'orthographic'
+            : 'perspective',
+    distance,
+    ...(orthographic ? { orthographicHeight: height } : {}),
+    options:
+      lensProjection === 2
+        ? { projection: 'panorama', panoramaFit: 'height' }
+        : lensProjection === 1
+          ? { projection: 'fisheye', fisheye: { mapping: 'stereographic', fov } }
+          : {},
   };
 }
 

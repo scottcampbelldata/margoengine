@@ -190,9 +190,10 @@ The engine camera is used as is: perspective by default, orthographic (or any af
   linearly, exact for translations and close for small turns.
 - **Panorama and fisheye (addition):** `projection: 'panorama'` renders an equirectangular 360 x 180 degree view around
   the camera position (azimuth across the image, elevation down it, the view direction at the centre, up as the
-  camera's). `projection: 'fisheye'` renders a circular fisheye whose circle is the image height, `fisheye.mapping`
-  `'equidistant'` (angle proportional to radius) or `'equisolid'` (equal area), `fisheye.fov` up to 360 degrees; pixels
-  outside the circle are black. Both ignore the camera's projection and depth of field; overlays drawn later are not
+  camera's); `panoramaFit: 'height'` keeps 180 degrees down the image and the same angle per pixel across
+  (MagicaVoxel's Pano lens). `projection: 'fisheye'` renders a circular fisheye whose circle is the image height,
+  `fisheye.mapping` `'equidistant'` (angle proportional to radius), `'equisolid'` (equal area) or `'stereographic'`
+  (angles kept; fills the frame), `fisheye.fov` up to 360 degrees; pixels outside the circle are black. Both ignore the camera's projection and depth of field; overlays drawn later are not
   depth-tested against them (the pass writes far depth).
 - **Lens distortion (addition):** `distortion: {k1, k2, p1, p2}` applies Brown-Conrady radial and tangential distortion
   to the camera projection, in coordinates measured from the image centre in half image heights (y up): an undistorted
@@ -216,7 +217,8 @@ The engine camera is used as is: perspective by default, orthographic (or any af
 | `shutter` | 0 | 0-1 | yes |
 | `previousCamera` | none | `{position, target, up?, fov?}` or null | yes |
 | `projection` | `'camera'` | `'camera'`, `'panorama'`, `'fisheye'` | yes |
-| `fisheye` | `{mapping: 'equidistant', fov: 180}` | mapping `'equidistant'` or `'equisolid'`, fov above 0 to 360 | yes |
+| `panoramaFit` | `'width'` | `'width'` (360 degrees across), `'height'` (180 down, same angle per pixel across) | yes |
+| `fisheye` | `{mapping: 'equidistant', fov: 180}` | mapping `'equidistant'`, `'equisolid'` or `'stereographic'`, fov above 0 to 360 | yes |
 | `distortion` | none | `{k1, k2, p1, p2}`, each -1 to 1, or null | yes |
 | `clamp` (largest luminance a path may add; biased firefly control) | Infinity | above 0 | yes |
 | `toneMapping` | `'neutral'` (Khronos PBR Neutral, Margo's display transform) | `'neutral'`, `'linear'`, `'aces-narkowicz'` (Narkowicz's ACES fit after x0.6) | no |
@@ -403,7 +405,8 @@ Numbers on other GPUs are not measured.
     digits; luminance ratios to the zenith in 10 directions (including near the sun) within 0.04%; a diffuse floor under
     the sky alone 0.43842 (0.43857) and 0.47004 (0.47019), 0.5 / pi times the numerically integrated irradiance;
   - projections: small emissive markers in known directions land where the formulas put them, within 0.13 px for 5
-    panorama directions, 0.08 px for 7 equidistant (180-degree) and equisolid (200-degree) fisheye directions and
+    panorama directions, 0.09 px for 3 more fitted to the height, 0.08 px for 7 equidistant (180-degree) and equisolid
+    (200-degree) and 0.03 px for 4 stereographic (90-degree) fisheye directions and
     0.16 px for 5 points under distortion k1 -0.15, k2 0.05, p1 0.01, p2 -0.005 (up to 1.4 half-heights off centre);
   - closed-form checks: furnaces (convex cube in a uniform sky) diffuse 0.5000 and 1.0000, smooth metal, smooth plastic
     and clear glass 1.0000, media 0.9999, subsurface 0.9998, constant environment map 0.4998 (expected 0.5); emission
@@ -520,7 +523,10 @@ Numbers on other GPUs are not measured.
 `magicaVoxelMaterial(id, rgb, attributes)`, `magicaVoxelLighting(renderObjects)`, `magicaVoxelCamera(camera,
 renderObjects)`, `magicaVoxelModel(id, revision, size, xyzi)` and `magicaVoxelMatrix(size, translation, rotation)`
 turn a `.vox` file's palette, MATL materials, rOBJ render settings, rCAM camera and models into this tracer's inputs
-(MagicaVoxel is z-up; tracer = MagicaVoxel (x, z, -y)). `magicaVoxelLighting` also returns the tracer options that
+(MagicaVoxel is z-up; tracer = MagicaVoxel (x, z, -y)). `magicaVoxelCamera` reports the projection: orthographic for
+the orth and iso modes (`orthographicHeight` tall, 2 x radius x tan(fov / 2); iso at the isometric angle from the
+nearest diagonal), and for the lens projections tracer `options` (Pano: the panorama fitted to the height; lens
+projection 1: stereographic). `magicaVoxelLighting` also returns the tracer options that
 reproduce MagicaVoxel's choices (ACES with gamma 2.2, bounce caps 2/5/5, no transparent shadows, the sun on diffuse
 lobes only and not in media, no energy compensation) and lists the settings it does not reproduce yet. With
 `{look: 'margo'}` it keeps the file's film, colours, sky, sun and fog but traces light physically (sun highlights on

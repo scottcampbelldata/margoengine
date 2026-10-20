@@ -397,6 +397,12 @@ export interface VoxelPathTracerOptions {
    * direction at the centre); 'fisheye' follows `fisheye`. Both ignore the camera's projection and depth of field.
    */
   projection?: 'camera' | 'panorama' | 'fisheye';
+  /**
+   * Compatible addition: how `projection: 'panorama'` fills the image. 'width' (default): 360 degrees across it and 180
+   * down it; 'height': 180 degrees down it and the same angle per pixel across (MagicaVoxel's Pano lens, 360 degrees
+   * across a 2:1 image).
+   */
+  panoramaFit?: 'width' | 'height';
   /** Compatible addition: the fisheye of `projection: 'fisheye'`. */
   fisheye?: TraceFisheye;
   /**
@@ -504,12 +510,13 @@ export interface TraceBounceLimits {
 
 /**
  * Compatible addition: a circular fisheye centred in the image, its circle the image height. A ray at angle theta from
- * the view direction lands at radius r (in half image heights): theta = r fov / 2 (equidistant) or
- * sin(theta / 2) = r sin(fov / 4) (equisolid, equal area). Pixels outside the circle are black.
+ * the view direction lands at radius r (in half image heights): theta = r fov / 2 (equidistant),
+ * sin(theta / 2) = r sin(fov / 4) (equisolid, equal area) or tan(theta / 2) = r tan(fov / 4) (stereographic, angles
+ * kept). Pixels outside the circle are black, except for the stereographic mapping, which fills the frame.
  */
 export interface TraceFisheye {
-  /** 'equidistant' (default) or 'equisolid'. */
-  mapping?: 'equidistant' | 'equisolid';
+  /** 'equidistant' (default), 'equisolid' or 'stereographic'. */
+  mapping?: 'equidistant' | 'equisolid' | 'stereographic';
   /** Field of view across the circle in degrees, above 0 to 360. Default 180. */
   fov?: number;
 }

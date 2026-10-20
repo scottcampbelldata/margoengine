@@ -4,7 +4,7 @@ const fs = require('fs'),
   { diff } = require('./diff.cjs');
 const rows = [];
 for (const name of fs.readFileSync('scenes.txt', 'utf8').split(/\s+/).filter(Boolean)) {
-  const board = { D: 'D', E: 'E', G: 'G' }[name[0]];
+  const board = { B: 'B', D: 'D', E: 'E', G: 'G', P: 'P' }[name[0]];
   const d = diff(name);
   let tiles = '';
   if (board) {

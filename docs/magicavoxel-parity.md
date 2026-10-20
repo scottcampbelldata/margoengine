@@ -45,6 +45,7 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
 | Atmosphere sky `_env _mode 1` | single scattering, Rayleigh + Cornette-Shanks Mie (`_mie_g`) + ozone, top 8 km over a 25 000 km planet; densities scale by (e^(3.3 d) - 1) / (e^1.32 - 1); Mie extinction 1.29 - 0.2 d times its scattering; below the horizon the light comes along the horizon's path with the phase of the real direction | 16 panoramas (`test-results/mv-calib/A-pano-*`): mean 0.3-1.0 levels and 97-100% of directions within 3 for 13 of them |
 | Sun under the atmosphere | irradiance 10 x `_i` (not 5) times the air's transmittance along the sun's path | lit scenes at sun 50, 20, 5 degrees: regions within 0-1 level |
 | Camera | rCAM focus, pitch, yaw, radius; field of view from rOBJ `_lens _fov`, not rCAM | camera scenes |
+| Lens `_proj 2` (Pano) | equal-angle panorama: 180 degrees down the image and the same 0.225 degrees per pixel across at 960 x 800 (216 degrees; 360 on a 2:1 image) | `A-pano-e5`: a sun 90 degrees off the view lands 400 px from the centre; our render with `panoramaFit: 'height'`: 99.53% of the sky half within 3 levels |
 | Missing MATL keys | read as 0 (roughness 0, IOR 1, metal 0, emission 0), specular 1 | MagicaVoxel's own panel |
 | Legacy keys | `_weight` wins (metalness, transparency, emission); `_spec` = specular - 1; `_ior` is always n - 1; cloud `_weight` reads as density 0.1 | panel readings |
 | Metal | reflectance min(1, `_sp` x colour); GGX width ~0.13 x `_rough`; no multiple-scattering energy compensation | sky boards, reflection blur fit, rough gold sphere |
@@ -107,7 +108,7 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
    the block's faces to the air, no picks inside, and what it rests on is reached with the share again. P boards
    (`_trans` 0.1-1, heights 1, 2, 3, 6, white and black base): 64 of 64 tiles within 3 levels sky-lit (mean 0.6) and
    sun-lit (mean 0.4); the G board's `_trans` 0.5 tile from 10 levels to within 3. Open: `_blend` materials still
-   re-pick at every face (`voxelwise`); not compared yet.
+   re-pick at every face (`voxelwise`); not compared yet (B boards: our side rendered, MagicaVoxel's needed).
 2b. Glass over a lit floor: MagicaVoxel is darker by a fixed factor per refractive index (0.997 at 1.1, 0.976 at 1.3,
    0.959 at 1.5, 0.957 at 2), independent of its bounce caps (checked with specular 10 and diffuse 4): 1-2 levels.
 3. Fog `_fog_uni`: done (`environment.fog`). MagicaVoxel's fog fades rays by exp(-0.001 x `_d` x distance) toward
@@ -126,7 +127,11 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
    view the ground 1-4 degrees down is 2-3 levels too bright in red and green (the ground's own light, not the fade:
    the fade is 1-3% there) and the far ground just below the horizon 2-3 levels too dark in red; dense air (`_ray_d`
    0.8-1, `_mie_d` 1) is 2.4-3.1 levels off on average; ozone is fitted at `_o3_d` 1 only (linear assumed);
-   `_bounce`-style sky light on objects is unchecked for non-default `_atm` settings.
+   `_bounce`-style sky light on objects is unchecked for non-default `_atm` settings. New (2026-10-20, from our
+   render of `A-pano-e5` with the Pano lens mapped): with the ground off MagicaVoxel's sky darkens and reddens below
+   the horizon (at the view's azimuth 124/112/75 at the horizon, 105/96/65 at 2.4 degrees down, 33/22/6 at 22.6
+   degrees down), while ours keeps the horizon's light (129/118/80 all the way down); the sky half matches (99.53%
+   within 3). Ours below the horizon is also the ground fade's target, so a change there must keep the fade scenes.
 5. Image sky (`_mode 2`, `_ibl`): done. The caller decodes the HDR file the helper names (`imageSky.path`) and
    passes it as the `imageSky` option; the helper sets intensity and turn. Panoramas of our own ramp image: 99.84%
    of pixels within 3 levels (the rest on the image's wrap seam); a scene lit by it: 99.76%.
@@ -138,10 +143,20 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
    the rest is the thin lines' sampling noise. Edges with the same correction: 99.1-99.8%. Transparent background (`_bg_a`): done
    as `capture({transparent: true})` (RGBA PNG; alpha = camera-ray coverage, the ground opaque); voxel `_scale`:
    done as `voxelScale` for `magicaVoxelMatrix` (the scene scaled about the origin, the camera unchanged). Neither is
-   compared yet (scenes `C-bga`, `C-scale` in `mv-calib`): whether MagicaVoxel's ground stays opaque and whether its
-   camera follows the scale are open.
-7. Camera modes: orthographic and iso (`_mode orth/iso`) and `_lens _proj` are mapped but not compared; depth of field
-   (`_aperture`) never showed in MagicaVoxel snapshots: find what enables it.
+   compared yet (scenes `C-bga`, `C-scale` in `mv-calib`; our side rendered 2026-10-20): whether MagicaVoxel's ground
+   stays opaque and whether its camera follows the scale are open.
+7. Camera modes (2026-10-20): mapped in `magicaVoxelCamera` and rendered by the harness (`mv-vox.html` now uses the
+   camera's projection; `C-orth`, `C-iso` and `C-proj1` were byte-identical before). Orth and iso: orthographic,
+   2 x radius x tan(fov / 2) tall (what the perspective view shows at the focus), the eye one view height further back
+   than the radius so the lower edge starts above the ground; iso looks down at the isometric angle (35.26 degrees)
+   from the diagonal nearest the stored yaw (`C-iso`: 45 degrees). Lens `_proj 2` (Pano; also `_mode pano`): the
+   tracer's panorama with `panoramaFit: 'height'` (new), measured on `A-pano-e5`. Lens `_proj 1`: stereographic with
+   the lens field of view (new fisheye mapping `'stereographic'`, filling the frame), taken from MagicaVoxel's release
+   notes, which name a stereographic projection. Unit tests in `tests/magicavoxel.test.js`; the GPU `projections`
+   check puts 3 height-fitted panorama and 4 stereographic markers within 0.08 px of their formulas. Open: the
+   orthographic extent, the iso angle and `_proj 1` are inferences until MagicaVoxel's renders of `C-orth`, `C-iso` and
+   `C-proj1` are compared (listed under "Renders needed"); depth of field (`_aperture`) never showed in MagicaVoxel
+   snapshots: find what enables it.
 8. Sample-panel toggles with non-default values (MIS-Reflect, MIS-Scatter, TR-Shadow, Shadow, Pixelated, Stochastic,
    Anti-Aliasing) and the `_bounce _energy` value: not compared. The physical defaults of the tracer correspond to
    MIS on and transparent shadows on, but their MagicaVoxel images were never rendered.
@@ -150,6 +165,25 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
 10. Emitter light on the ground near emitters: done (2026-10-20, `pt-compare/v2/emissive`, both at 8192 samples): the
     glow on the ground is 1.0014 x MagicaVoxel's with 99.9% of values within 3 levels (whole image 100.0%); the 6%
     was gone with the non-reflective emitters.
+
+## Renders needed from MagicaVoxel
+
+Waiting for Scott's word that the desktop is free (MagicaVoxel is not driven while Codex may be using it). All scenes
+are in `test-results/mv-calib` (written by `boards.cjs` and `lookscenes.cjs` from the tools folder; our side of each is
+already rendered). Procedure as under "How to compare": image 960 x 800, open the file, camera slot 1, then L, then
+type the zoom distance; snapshot to `<name>-mv.png` in the same folder.
+
+| File | What it settles | Slot | Zoom | Samples |
+| --- | --- | --- | --- | --- |
+| `C-orth.vox` | orthographic extent (`_mode orth`) | 1 | 110 | 8192 |
+| `C-iso.vox` | iso angle and extent (`_mode iso`, stored angle -12 30) | 1 | 110 | 8192 |
+| `C-proj1.vox` | lens projection 1 (taken as stereographic) | 1 | 110 | 8192 |
+| `C-bga.vox` | transparent background (`_bg_a`): keep the snapshot's alpha | 1 | 110 | 8192 |
+| `C-scale.vox` | non-cubic voxels (`_scale 1 1 2`) and the camera under them | 1 | 110 | 8192 |
+| `B-sky-lin.vox` | blend materials, sky-lit | 1 | 190 | 1024 |
+| `B-sun60-lin.vox` | blend materials, sun-lit | 1 | 190 | 1024 |
+| `G-sun60-d4.vox` | subsurface under the sun at diffuse cap 4 | 1 | 190 | 1024 |
+| `G-sky-sc10.vox` | subsurface and clouds at scatter cap 10 | 1 | 190 | 1024 |
 
 ## Exceed MagicaVoxel
 

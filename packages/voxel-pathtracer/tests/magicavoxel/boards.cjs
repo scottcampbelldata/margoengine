@@ -176,11 +176,32 @@ const merge = (...parts) => {
 const P = [1, 2, 3, 6, 1, 2, 3, 6].flatMap((h) =>
   [0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 1].map((trans) => ({ ...glass(grey(255), { trans }), height: h })),
 );
+// Blend materials: columns mixes of transparency, metal and roughness; rows heights 1 and 3 on white and black bases,
+// white then red.
+const blend = (color, { trans = 0, metal = 0, rough = 0, n = 1.3, sp = 1 } = {}) => ({
+  color,
+  mat: { _type: '_blend', _trans: trans, _metal: metal, _rough: rough, _sp: sp, _ior: +(n - 1).toFixed(4), _ri: n },
+});
+const mixes = [
+  { trans: 0.25 },
+  { trans: 0.5 },
+  { trans: 0.75 },
+  { metal: 0.5 },
+  { metal: 0.5, trans: 0.5 },
+  { metal: 1, rough: 0.2 },
+  { metal: 0.5, trans: 0.5, rough: 0.5 },
+  { trans: 0.5, n: 1.5, rough: 0.2 },
+];
+const B = [
+  [255, 255, 255],
+  [255, 60, 60],
+].flatMap((c) => [1, 3, 1, 3].flatMap((h) => mixes.map((m) => ({ ...blend(c, m), height: h }))));
 const boards = {
   D: build(D, () => 0),
   G: build(G, gBase),
   E: build(E, () => 0),
   P: build(P, (j) => (j < 4 ? 230 : 20)),
+  B: build(B, (j) => (j % 4 < 2 ? 230 : 20)),
 };
 const renders = {
   'D-sky-lin': ['D', merge(common, light.sky, film.lin)],
@@ -197,12 +218,14 @@ const renders = {
   'G-sun60-d4': ['G', merge(common, light.sun60, film.lin, { _bounce: { _diffuse: 4 } })],
   'P-sky-lin': ['P', merge(common, light.sky, film.lin)],
   'P-sun60-lin': ['P', merge(common, light.sun60, film.lin)],
+  'B-sky-lin': ['B', merge(common, light.sky, film.lin)],
+  'B-sun60-lin': ['B', merge(common, light.sun60, film.lin)],
   'E-dark-lin': ['E', merge(common, light.dark, film.lin)],
   'E-dark-e1': ['E', merge(common, light.dark, film.lin, { _film: { _expo: 0.1 } })],
   'E-dark-e3': ['E', merge(common, light.dark, film.lin, { _film: { _expo: 0.001 } })],
   'E-dark-e5': ['E', merge(common, light.dark, film.lin, { _film: { _expo: 0.00001 } })],
 };
-const size = { D: [64, 64, 1], G: [64, 64, 7], E: [64, 64, 1], P: [64, 64, 7] };
+const size = { D: [64, 64, 1], G: [64, 64, 7], E: [64, 64, 1], P: [64, 64, 7], B: [64, 64, 7] };
 for (const [name, [board, render]] of Object.entries(renders)) {
   const b = boards[board];
   writeVox(`${__dirname}/${name}.vox`, {

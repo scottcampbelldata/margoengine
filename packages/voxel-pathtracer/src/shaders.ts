@@ -705,7 +705,7 @@ fn undistort(px:vec2f)->vec2f {
  return vec2f(u.x*0.5*H+0.5*W,0.5*H-u.y*0.5*H);
 }
 // Panorama and fisheye rays from the eye along the camera's axes (interpolated with camera motion); d = 0 outside a
-// fisheye's circle.
+// fisheye's circle (the stereographic mapping fills the frame).
 fn wideRay(px:vec2f)->Ray {
  var eye=f.eye.xyz;var fw=f.forward.xyz;var rt=f.right.xyz;var up=f.up.xyz;
  if((f.config.z&CAMERA_MOTION)!=0u&&motion<1.0){
@@ -714,14 +714,16 @@ fn wideRay(px:vec2f)->Ray {
  }
  let W=f32(f.image.x);let H=f32(f.image.y);
  if(f.projection.x==1u){
-  let phi=(px.x/W-0.5)*TAU;let el=(0.5-px.y/H)*PI;
+  // Fitted to the width (360 degrees across) or to the height (the same angle per pixel across as down).
+  let phi=select((px.x/W-0.5)*TAU,(px.x-0.5*W)/H*PI,f.projection.w==1u);let el=(0.5-px.y/H)*PI;
   return Ray(eye,normalize(cos(el)*(sin(phi)*rt+cos(phi)*fw)+sin(el)*up));
  }
  let p=vec2f(px.x-0.5*W,0.5*H-px.y)/(0.5*H);
  let r=length(p);
  var th=r*0.5*f.lensFov.x;
  if(f.projection.y==1u){let s=r*f.lensFov.y;if(s>1.0){return Ray(eye,vec3f(0.0));}th=2.0*asin(s);}
- if(th>0.5*f.lensFov.x+1e-6){return Ray(eye,vec3f(0.0));}
+ if(f.projection.y==2u){th=2.0*atan(r*f.lensFov.y);}
+ else if(th>0.5*f.lensFov.x+1e-6){return Ray(eye,vec3f(0.0));}
  let a=select(vec2f(0.0),p/r,r>0.0);
  return Ray(eye,normalize(cos(th)*fw+sin(th)*(a.x*rt+a.y*up)));
 }

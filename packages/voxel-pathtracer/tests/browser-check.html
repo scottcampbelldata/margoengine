@@ -533,11 +533,15 @@ window.check={
   for(const [az,el] of [[0,0],[90,30],[-135,-20],[170,60],[45,-70]])
    cases.push({name:`panorama az ${az} el ${el}`,W:512,H:256,options:{projection:'panorama'},d:along(b0,Math.cos(el*deg)*Math.cos(az*deg),Math.cos(el*deg)*Math.sin(az*deg),Math.sin(el*deg)),
     expected:[(az/360+0.5)*512,(0.5-el/180)*256]});
-  for(const [mapping,fov,list] of [['equidistant',180,[[0,0],[30,45],[60,200],[85,300]]],['equisolid',200,[[30,45],[60,200],[95,120]]]])
+  // Fitted to the height (MagicaVoxel's Pano): 180 degrees down, the same angle per pixel across.
+  for(const [az,el] of [[0,0],[90,30],[-100,-20]])
+   cases.push({name:`panorama by height az ${az} el ${el}`,W:384,H:256,options:{projection:'panorama',panoramaFit:'height'},d:along(b0,Math.cos(el*deg)*Math.cos(az*deg),Math.cos(el*deg)*Math.sin(az*deg),Math.sin(el*deg)),
+    expected:[192+(az/180)*256,(0.5-el/180)*256]});
+  for(const [mapping,fov,list,W] of [['equidistant',180,[[0,0],[30,45],[60,200],[85,300]],256],['equisolid',200,[[30,45],[60,200],[95,120]],256],['stereographic',90,[[0,0],[20,45],[45,200],[60,170]],384]])
    for(const [th,al] of list){
-    const r=mapping==='equidistant'?th/(fov/2):Math.sin(th*deg/2)/Math.sin(fov*deg/4);
-    cases.push({name:`fisheye ${mapping} ${fov} theta ${th} at ${al}`,W:256,H:256,options:{projection:'fisheye',fisheye:{mapping,fov}},
-     d:along(b0,Math.cos(th*deg),Math.sin(th*deg)*Math.cos(al*deg),Math.sin(th*deg)*Math.sin(al*deg)),expected:[128+r*Math.cos(al*deg)*128,128-r*Math.sin(al*deg)*128]});
+    const r=mapping==='equidistant'?th/(fov/2):mapping==='equisolid'?Math.sin(th*deg/2)/Math.sin(fov*deg/4):Math.tan(th*deg/2)/Math.tan(fov*deg/4);
+    cases.push({name:`fisheye ${mapping} ${fov} theta ${th} at ${al}`,W,H:256,options:{projection:'fisheye',fisheye:{mapping,fov}},
+     d:along(b0,Math.cos(th*deg),Math.sin(th*deg)*Math.cos(al*deg),Math.sin(th*deg)*Math.sin(al*deg)),expected:[W/2+r*Math.cos(al*deg)*128,128-r*Math.sin(al*deg)*128]});
    }
   const tan=Math.tan(30*deg);
   for(const u of [[0,0],[0.5,0.3],[-0.8,0.6],[1.1,-0.7],[-1.2,-0.8]]){

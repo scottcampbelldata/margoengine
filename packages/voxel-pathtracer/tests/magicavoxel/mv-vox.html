@@ -31,13 +31,16 @@ window.render=async(b64,opt)=>{
  const canvas=document.querySelector('canvas');canvas.width=opt.width;canvas.height=opt.height;
  const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:cam.position,target:cam.target,fov:cam.fov,near:0.5,far:4000}});
  engine.camera.up=cam.up;
+ // Orthographic modes (orth, iso): an orthographic projection cam.orthographicHeight tall; lens projections (panorama,
+ // stereographic) come as tracer options (cam.options).
+ if(cam.projection==='orthographic'){const h=cam.orthographicHeight;engine.camera.project=(out,aspect)=>{out.fill(0);out[0]=2/(h*aspect);out[5]=2/h;out[10]=1/4000;out[14]=1;out[15]=1;};}
  // __cameraScale s: the eye moved toward the target to s x its distance (MagicaVoxel's slot glide stops short).
  const cs=opt.options&&opt.options.__cameraScale;
  if(cs){engine.camera.position=cam.position.map((v,k)=>cam.target[k]+(v-cam.target[k])*cs);}
  engine.gpu?.addEventListener?.('uncapturederror',(e)=>errors.push(e.error.message));
  const tAttach=performance.now();
  const tracer=PT.VoxelPathTracer.attach(engine,{scene:{revision:1,models:models.filter(Boolean),instances,materials,environment:{...light.environment,...(opt.environment??{})}},
-  ...light.options,...(opt.options??{}),seed:1});
+  ...light.options,...cam.options,...(opt.options??{}),seed:1});
  if(opt.orbit){
   // Orbit: the camera turns opt.orbit.step degrees about the target's vertical per frame for opt.orbit.frames frames; the last
   // viewport frame (as displayed) and a reference capture from that camera.
@@ -93,7 +96,7 @@ window.render=async(b64,opt)=>{
  const ms=performance.now()-t0;
  const out=new Uint8Array(await blob.arrayBuffer());let s='';for(let i=0;i<out.length;i+=32768)s+=String.fromCharCode(...out.subarray(i,i+32768));
  const gpuBytes=tracer.stats.gpuBytes;tracer.dispose();engine.dispose();
- return {png:btoa(s),errors:errors.splice(0),ms,readyMs,times:globalThis.__ptTimes,gpuMiB:+(gpuBytes/2**20).toFixed(1),unsupported:light.unsupported,options:light.options};
+ return {png:btoa(s),errors:errors.splice(0),ms,readyMs,times:globalThis.__ptTimes,gpuMiB:+(gpuBytes/2**20).toFixed(1),unsupported:light.unsupported,options:light.options,camera:{projection:cam.projection,orthographicHeight:cam.orthographicHeight,options:cam.options}};
 };
 window.ready=true;
 </script></body></html>

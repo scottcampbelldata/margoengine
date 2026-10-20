@@ -1202,20 +1202,21 @@ export class VoxelPathTracer implements EnginePlugin {
     if (e.ground) flags |= FLAG_GROUND;
     if (env) flags |= FLAG_ENV;
     if ((s.moving || cameraMotion) && o.shutter > 0) flags |= FLAG_MOTION;
-    // Projection: mode (0 camera, 1 panorama, 2 fisheye), fisheye mapping, distortion on; fov and sin(fov / 4);
-    // the Brown-Conrady coefficients.
+    // Projection: mode (0 camera, 1 panorama, 2 fisheye), fisheye mapping (0 equidistant, 1 equisolid, 2
+    // stereographic), distortion on, panorama fit (1: by height); fov and sin(fov / 4), or tan(fov / 4) for the
+    // stereographic mapping; the Brown-Conrady coefficients.
     const fov = (o.fisheye.fov * Math.PI) / 180,
       dist = o.projection === 'camera' ? o.distortion : undefined;
     u.set(
       [
         o.projection === 'camera' ? 0 : o.projection === 'panorama' ? 1 : 2,
-        o.fisheye.mapping === 'equisolid' ? 1 : 0,
+        o.fisheye.mapping === 'equisolid' ? 1 : o.fisheye.mapping === 'stereographic' ? 2 : 0,
         dist && (dist.k1 || dist.k2 || dist.p1 || dist.p2) ? 1 : 0,
-        0,
+        o.panoramaFit === 'height' ? 1 : 0,
       ],
       140,
     );
-    f.set([fov, Math.sin(fov / 4), 0, 0], 144);
+    f.set([fov, o.fisheye.mapping === 'stereographic' ? Math.tan(fov / 4) : Math.sin(fov / 4), 0, 0], 144);
     f.set(dist ? [dist.k1, dist.k2, dist.p1, dist.p2] : [0, 0, 0, 0], 148);
     if (cameraMotion) flags |= FLAG_CAMERA_MOTION;
     if (o.clamp < Infinity) flags |= FLAG_CLAMP;

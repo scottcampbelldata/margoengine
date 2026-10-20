@@ -58,6 +58,7 @@ try {
       JSON.stringify(r.errors),
       'unsupported',
       JSON.stringify(r.unsupported),
+      r.camera ? `camera ${JSON.stringify(r.camera)}` : '',
     );
   }
 } finally {

@@ -686,9 +686,22 @@ test('projection, fisheye and distortion reach the frame; they are validated and
     [...f.subarray(148, 152)].map((v) => Math.round(v * 1e6) / 1e6),
     [-0.2, 0, 0, 0.01],
   );
+  // Stereographic: tan(fov / 4) in place of sin(fov / 4); a panorama fitted to the image height.
+  tracer.setOptions({ projection: 'fisheye', fisheye: { mapping: 'stereographic', fov: 35 }, distortion: null });
+  frame();
+  u = new Uint32Array(last());
+  f = new Float32Array(last());
+  assert.deepEqual([...u.subarray(140, 144)], [2, 2, 0, 0], 'fisheye, stereographic');
+  assert.ok(Math.abs(f[145] - Math.tan((35 * Math.PI) / 720)) < 1e-6);
+  tracer.setOptions({ projection: 'panorama', panoramaFit: 'height' });
+  frame();
+  u = new Uint32Array(last());
+  assert.deepEqual([u[140], u[143]], [1, 1], 'panorama fitted to the height');
+  assert.equal(tracer.options.panoramaFit, 'height');
+  assert.throws(() => tracer.setOptions({ panoramaFit: 'both' }), TypeError);
   assert.throws(() => tracer.setOptions({ projection: 'cylinder' }), TypeError);
   assert.throws(() => tracer.setOptions({ fisheye: { fov: 400 } }), RangeError);
-  assert.throws(() => tracer.setOptions({ fisheye: { mapping: 'stereographic' } }), TypeError);
+  assert.throws(() => tracer.setOptions({ fisheye: { mapping: 'mercator' } }), TypeError);
   assert.throws(() => tracer.setOptions({ distortion: { k1: 2 } }), RangeError);
   tracer.setOptions({ distortion: null });
   assert.equal(tracer.options.distortion, undefined);
