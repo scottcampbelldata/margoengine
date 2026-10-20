@@ -90,7 +90,7 @@ scenarios.displaceInstanced=()=>{const m=createInstancedMesh(engine,planeGeometr
 // Shadow casters displace too. An invisible 0.4x0.4 caster at (0.5, 0, 0.5) facing +z shades the centre of a Lambert
 // wall, lit from (1, 0, 1) (sun) or from a point light at (2, 0, 2); displaced 1 unit along its normal (displacementBias
 // 1) its shadow lands near x = -1, off the centre. The step sets the bias to 0: the shadow returns to the centre.
-const {LocalShadows}=await import('/packages/clustered/dist/shadows.js');
+const {LocalShadows}=await import('/packages/clustered/dist/shadows.js'),{DirectionalLights}=await import('/packages/clustered/dist/directional.js');
 const shadowWall=setup=>{const light=[...engine.lighting.direction],radiance=[...engine.lighting.radiance];engine.lighting.radiance[3]=0;const wall=createMesh(engine,planeGeometry(2,2),new Material({shading:'lambert',map:solid(188,188,188)})),c=createMesh(engine,planeGeometry(0.4,0.4),new Material({shading:'basic',colorWrite:false,depthWrite:false,displacementMap:solid(0,0,0),displacementBias:1}));c.root.setPosition([0.5,0,0.5]);const done=setup(wall,c);return {destroy(){done();c.destroy();wall.destroy();engine.lighting.direction.set(light);engine.lighting.radiance.set(radiance);},step(){c.material.displacementBias=0;}};};
 scenarios.displacedShadow=()=>shadowWall((wall,c)=>{engine.lighting.direction.set([1,0,1,2]);const shadows=Shadows.attach(engine,{resolution:1024,filter:'hard'});shadows.add(wall);shadows.add(c);return ()=>plugin(shadows).destroy();});
 scenarios.displacedLocalShadow=()=>shadowWall((wall,c)=>{engine.lighting.direction[3]=0;const lights=Clustered.attach(engine,{shadows:{resolution:512}});lights.setLights([{position:[2,0,2],range:20,intensity:8,shadow:true}]);lights.add(wall);lights.addShadowCaster(c);return ()=>plugin(lights).destroy();});
@@ -105,6 +105,10 @@ scenarios.catcherHook=()=>catcherScene((w,c)=>{engine.lighting.direction[3]=0;co
 // The share of light: the shadowed sun (luminance cos 45 x 2 at the centre) plus an unshadowed point light 1 unit in
 // front giving the same (intensity sqrt 2 pi): half the light is shadowed, alpha 0.3.
 scenarios.catcherShare=()=>catcherScene((w,c)=>{engine.lighting.direction.set([1,0,1,2]);const shadows=Shadows.attach(engine,{resolution:1024,filter:'hard'}),lights=Clustered.attach(engine);shadows.add(w);shadows.add(c);lights.setLights([{position:[0,0,1],range:100,intensity:Math.SQRT2*Math.PI}]);lights.add(w);return ()=>{plugin(lights).destroy();plugin(shadows).destroy();};});
+// The same share with an unshadowed extra directional light (@margoengine/clustered/directional) from the viewer: the
+// catcher weighs local lights through the Lambert BRDF (1/pi), so illuminance sqrt 2 pi at n.l 1 matches the shadowed
+// sun's cos 45 x 2, and alpha is 0.3 again.
+scenarios.catcherDirectional=()=>catcherScene((w,c)=>{engine.lighting.direction.set([1,0,1,2]);const shadows=Shadows.attach(engine,{resolution:1024,filter:'hard'}),lights=Clustered.attach(engine),suns=DirectionalLights.attach(engine,{lights});shadows.add(w);shadows.add(c);suns.setLights([{direction:[0,0,-1],intensity:Math.SQRT2*Math.PI}]);lights.add(w);return ()=>{plugin(suns).destroy();plugin(lights).destroy();plugin(shadows).destroy();};});
 // WgslMaterial: an unlit shade() colours the plane uniforms.tint x a white texture x uniforms.gain (tint changes live);
 // a displace() scales a red 1x1 plane by uniforms.gain 1.5 (then 1, live); a Lambert shade() leans the normal 45 degrees.
 const wgslShade=`fn shade(i: Out, s: Surface) -> Surface {var o = s; o.base = vec4f(uniforms.tint * textureSample(noise, noiseSampler, i.uv.xy).rgb * uniforms.gain, 1.0); return o;}`;

@@ -86,6 +86,7 @@ const expected = {
   catcherLocal: [102, 102, 102],
   catcherHook: [102, 102, 102],
   catcherShare: [179, 179, 179],
+  catcherDirectional: [179, 179, 179],
   wgslUnlit: [1, 0.5, 0.25].map(srgb),
   wgslLit: gray(local * Math.SQRT1_2),
   vertexColorsTint: [0, 0, 255],
@@ -133,6 +134,7 @@ try {
     'catcherLocal',
     'catcherHook',
     'catcherShare',
+    'catcherDirectional',
     'wgslUnlit',
     'wgslDisplace',
     'wgslLit',
@@ -198,7 +200,11 @@ try {
     if (name.startsWith('catcher')) {
       near(await pixel(0.5, 0.3), [255, 255, 255], 'no shadow there: the catcher draws nothing');
       await step();
-      near(await pixel(), name === 'catcherShare' ? [217, 217, 217] : [179, 179, 179], 'opacity 0.3, live');
+      near(
+        await pixel(),
+        name === 'catcherShare' || name === 'catcherDirectional' ? [217, 217, 217] : [179, 179, 179],
+        'opacity 0.3, live',
+      );
     }
     if (name === 'fogOff') {
       await step();

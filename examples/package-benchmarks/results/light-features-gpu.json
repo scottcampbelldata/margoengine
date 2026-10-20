@@ -1,0 +1,84 @@
+{
+  "benchmark": "light-features-gpu",
+  "recordedAt": "2026-10-20T17:34:36.773Z",
+  "hardware": {
+    "vendor": "nvidia",
+    "architecture": "ampere",
+    "device": "",
+    "description": "",
+    "fallback": false
+  },
+  "browser": "chromium 155.0.4283.62",
+  "resolution": [
+    640,
+    480
+  ],
+  "tolerance": 3,
+  "checks": [
+    {
+      "check": "spot",
+      "samples": 960,
+      "lit": 186,
+      "maxDiff": 1
+    },
+    {
+      "check": "point",
+      "samples": 960,
+      "lit": 362,
+      "maxDiff": 1
+    },
+    {
+      "check": "directional",
+      "samples": 960,
+      "lit": 960,
+      "maxDiff": 0
+    },
+    {
+      "check": "ies",
+      "samples": 812,
+      "lit": 366,
+      "maxDiff": 1
+    },
+    {
+      "check": "projector",
+      "samples": 929,
+      "lit": 157,
+      "maxDiff": 1
+    },
+    {
+      "check": "hemisphere",
+      "samples": 79,
+      "lit": 79,
+      "maxDiff": 1
+    },
+    {
+      "check": "units",
+      "lumens": 800,
+      "candela": 1524.099,
+      "lux": 169.344,
+      "ev100": 6.5,
+      "exposure": 0.009207,
+      "pixel": [
+        310,
+        234
+      ],
+      "offCentre": 0.184,
+      "got": [
+        138,
+        138,
+        138
+      ],
+      "expected": [
+        138,
+        138,
+        138
+      ],
+      "atCentre": [
+        139,
+        139,
+        139
+      ],
+      "maxDiff": 0
+    }
+  ]
+}

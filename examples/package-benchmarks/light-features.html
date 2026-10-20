@@ -1,0 +1,53 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Light features GPU check</title><style>body{margin:0}#host{width:640px;height:480px}</style></head><body><div id="host"></div>
+<script type="module">
+// Driven by light-features-gpu.mjs. A grey Lambert floor (materials plane, base/pi BRDF, lit through lights.add), a Lambert
+// sphere and a core box; core's sun and ambient are off, so every lit pixel is one of the new lights alone: a spot or point
+// light (decay 2, unlimited range), an extra directional light, an IES-profiled point light, a projector spot, or the
+// hemisphere light (sphere and box only). unproject() turns pixel centres into floor points and view rays.
+import {createStage} from '/packages/margoengine/dist/index.js';
+import {box,PbrMaterial} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {invertMatrixStable} from '/packages/math/dist/mat4.js';
+import {planeGeometry,sphereGeometry} from '/packages/geometry/dist/index.js';
+import {Material,createMesh} from '/packages/materials/dist/index.js';
+import {Clustered} from '/packages/clustered/dist/index.js';
+import {DirectionalLights} from '/packages/clustered/dist/directional.js';
+import {IESLights,parseIES} from '/packages/clustered/dist/ies.js';
+import {ProjectorLights} from '/packages/clustered/dist/projector.js';
+import {HemisphereLight} from '/packages/environment/dist/index.js';
+const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,5,4],target:[0,0,0]}});
+const engine=stage.engine,device=engine.gpu,errors=[];device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const lighting=engineRuntime(engine).lighting;lighting.direction[3]=0;lighting.radiance[3]=0;
+const grey=[0.6,0.6,0.6];
+const lights=Clustered.attach(engine),suns=DirectionalLights.attach(engine,{lights}),ies=IESLights.attach(engine,{lights}),projectors=ProjectorLights.attach(engine,{lights});
+const floor=createMesh(engine,planeGeometry(40,40),new Material({shading:'lambert',color:grey}));floor.root.setQuaternion([-Math.SQRT1_2,0,0,Math.SQRT1_2]);lights.add(floor);
+const ball=createMesh(engine,sphereGeometry(1,96,48),new Material({shading:'lambert',color:grey}));ball.root.setPosition([-1.2,1,0]);
+const cube=engine.createMesh().setGeometry(box(1.2,1.2,1.2));cube.setMaterial(new PbrMaterial({color:grey,roughness:1,metalness:0}));cube.position.set(1.4,0.6,0);
+let hemisphere=null,removeHemisphere=[];
+const frame=async()=>{engine.render();await device.queue.onSubmittedWorkDone();};
+const inverse=new Float32Array(16),workspace=new Float64Array(52);
+const transform=(m,v)=>[0,1,2,3].map(r=>m[r]*v[0]+m[4+r]*v[1]+m[8+r]*v[2]+m[12+r]*v[3]);
+window.check={
+  // scene: {clustered, directional, ies (LM-63 text or null), projector ({width,height,data:[...]} or null), hemisphere ({sky,ground,intensity} or null), objects}.
+  async render(scene){
+    device.pushErrorScope('validation');
+    floor.root.visible=scene.objects!=='shapes';ball.root.visible=cube.visible=scene.objects==='shapes';
+    lights.setLights(scene.clustered??[]);lights.intensityScale=scene.scale??1;suns.setLights(scene.directional??[]);
+    ies.setProfiles(scene.ies?[parseIES(scene.ies)]:[]);
+    projectors.setProjectors(scene.projector?[{...scene.projector,data:new Uint8Array(scene.projector.data)}]:[]);
+    if(hemisphere){for(const r of removeHemisphere)r();engine.removePlugin(hemisphere.name);hemisphere=null;removeHemisphere=[];}
+    if(scene.hemisphere){hemisphere=HemisphereLight.attach(engine,scene.hemisphere);removeHemisphere=[hemisphere.add(ball)];}
+    for(let i=0;i<3;i++)await frame();
+    const e=await device.popErrorScope();return {error:e?.message??null,errors:errors.splice(0),eye:[...engine.camera.position]};
+  },
+  // Pixel centres -> the view ray (origin near the camera, unit direction away from it; reversed-Z: NDC z 1 is near) and its floor point (y = 0).
+  unproject(pixels){
+    const c=engine.canvas;invertMatrixStable(engine.camera.matrix,inverse,workspace);
+    return pixels.map(([x,y])=>{const ndc=[(x+0.5)/c.clientWidth*2-1,1-(y+0.5)/c.clientHeight*2];
+      const [a,b]=[0.9,0.1].map(z=>{const p=transform(inverse,[...ndc,z,1]);return p.slice(0,3).map(v=>v/p[3]);});
+      const d=b.map((v,k)=>v-a[k]),l=Math.hypot(...d),t=a[1]/(a[1]-b[1]);
+      return {origin:a,direction:d.map(v=>v/l),floor:[a[0]+(b[0]-a[0])*t,0,a[2]+(b[2]-a[2])*t]};});
+  },
+};
+window.ready=true;
+</script></body></html>
