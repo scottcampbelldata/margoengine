@@ -21,27 +21,89 @@ interface EdgeRecord {
   readonly start: XYZ;
   readonly end: XYZ;
   readonly sense: boolean;
+  /** The numbers it was found from, as valuesOf lists them: points and frames can be moved in place. */
+  readonly values: readonly number[];
   readonly t0: number;
   readonly t1: number;
   /** The start's parameter as projected, before a closed edge takes its curve's whole domain. */
   readonly a: number;
   offsets?: [number, number];
-  measured?: { readonly tolerance: number; readonly surfaces: readonly SurfaceDef[] };
+  measured?: {
+    readonly tolerance: number;
+    readonly surfaces: readonly { readonly def: SurfaceDef; readonly values: readonly number[] }[];
+  };
 }
 const records = new WeakMap<Edge, EdgeRecord>();
 
+/** Writes p's coordinates into `out` at n; returns the next index. */
+const put = (out: number[], n: number, p: readonly number[]): number => {
+  out[n] = p[0];
+  out[n + 1] = p[1];
+  out[n + 2] = p[2];
+  return n + 3;
+};
+
+/**
+ * Writes into `out` from index n the numbers an analytic curve's or surface's evaluator reads through its definition
+ * (its frame, or a line's origin and direction, and its sizes), which a caller can change in place; none for a spline,
+ * whose evaluator keeps its own copy of the control points. Returns the next index.
+ */
+function placement(def: CurveDef | SurfaceDef, out: number[], n: number): number {
+  if (def.kind === 'spline') return n;
+  if (def.kind === 'line') return put(out, put(out, n, def.origin), def.direction);
+  const f = def.frame;
+  n = put(out, put(out, put(out, put(out, n, f.origin), f.x), f.y), f.z);
+  switch (def.kind) {
+    case 'circle':
+    case 'cylinder':
+    case 'sphere':
+      out[n++] = def.radius;
+      break;
+    case 'cone':
+      out[n++] = def.radius;
+      out[n++] = def.angle;
+      break;
+    case 'ellipse':
+      out[n++] = def.a;
+      out[n++] = def.b;
+      break;
+    case 'torus':
+      out[n++] = def.major;
+      out[n++] = def.minor;
+      break;
+  }
+  return n;
+}
+
+/** Scratch for comparing a record's numbers with the current ones without allocating. */
+const scratch: number[] = [];
+
+/** Whether `values` equal the first n numbers of the scratch. */
+function same(values: readonly number[], n: number): boolean {
+  if (values.length !== n) return false;
+  for (let i = 0; i < n; i++) if (values[i] !== scratch[i]) return false;
+  return true;
+}
+
+/** An edge's ends and its curve's placement, written into the scratch; how many numbers. */
+const valuesOf = (edge: Edge): number =>
+  placement(edge.curve, scratch, put(scratch, put(scratch, 0, edge.start.point), edge.end.point));
+
 function recordOf(edge: Edge): EdgeRecord {
   // Projecting the ends is costly on a spline (the end from the start's parameter is a far guess), and every pass over
-  // a face asks again: kept per edge while its curve, ends and sense stay the same.
+  // a face asks again: kept per edge while its curve, ends and sense stay the same, in value as well as identity.
   let r = records.get(edge);
+  const n = valuesOf(edge);
   if (
     !r ||
     r.curve !== edge.curve ||
     r.start !== edge.start.point ||
     r.end !== edge.end.point ||
-    r.sense !== edge.sameSense
+    r.sense !== edge.sameSense ||
+    !same(r.values, n)
   ) {
-    const c = curveEvaluator(edge.curve),
+    const values = scratch.slice(0, n),
+      c = curveEvaluator(edge.curve),
       a = c.parameter(edge.start.point);
     let t0 = a,
       t1 = edge.closed ? t0 : c.parameter(edge.end.point, t0);
@@ -52,7 +114,7 @@ function recordOf(edge: Edge): EdgeRecord {
       if (edge.sameSense && t1 <= t0 + 1e-12) t1 += c.period;
       if (!edge.sameSense && t1 >= t0 - 1e-12) t1 -= c.period;
     }
-    r = { curve: edge.curve, start: edge.start.point, end: edge.end.point, sense: edge.sameSense, t0, t1, a };
+    r = { curve: edge.curve, start: edge.start.point, end: edge.end.point, sense: edge.sameSense, values, t0, t1, a };
     records.set(edge, r);
   }
   return r;
@@ -139,12 +201,12 @@ export function measureTolerances(body: Body, cap: number): void {
   for (const e of body.edges) {
     const c = curveEvaluator(e.curve),
       ts = edgeParameters(e, 16),
-      surfaces: SurfaceDef[] = [];
+      surfaces: { def: SurfaceDef; values: number[] }[] = [];
     let points: XYZ[] | undefined,
       gap = 0;
     for (const co of e.coedges) {
       const def = co.loop.face.surface;
-      surfaces.push(def);
+      surfaces.push({ def, values: scratch.slice(0, placement(def, scratch, 0)) });
       // A line or circle bounded well inside its tolerance of an analytic surface needs no samples (none could raise it).
       if (gapBound(e.curve, def, ts[0], ts[16]) <= e.tolerance / 2) continue;
       const s = surfaceEvaluator(def);
@@ -259,7 +321,11 @@ export function validateBody(body: Body): ValidityProblem[] {
     for (const use of uses) {
       // Measured within this tolerance (at these points and more between), or bounded well inside it: no samples.
       const def = use.loop.face.surface;
-      if (measured?.tolerance === e.tolerance && measured.surfaces.includes(def)) continue;
+      if (
+        measured?.tolerance === e.tolerance &&
+        measured.surfaces.some((m) => m.def === def && same(m.values, placement(def, scratch, 0)))
+      )
+        continue;
       if (gapBound(e.curve, def, ts[0], ts[4]) <= tolerance / 2) continue;
       const s = surfaceEvaluator(def);
       let hint: [number, number] | undefined;

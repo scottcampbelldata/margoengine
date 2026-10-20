@@ -184,3 +184,68 @@ test('modeler: revolve turns a profile of lines and arcs round an axis (ring, fr
     message: /touches the axis/,
   });
 });
+
+/** A sheet of one plane face bounded by a 1 mm circle through one vertex. */
+function disc() {
+  const body = new model.Body('disc', 'sheet'),
+    face = body.shell().add(new model.Face('face', { kind: 'plane', frame: frameOf([0, 0, 0], [0, 0, 1]) }, true)),
+    vertex = new model.Vertex('vertex', [0.001, 0, 0]);
+  face
+    .loop()
+    .use(
+      new model.Edge('edge', { kind: 'circle', frame: frameOf([0, 0, 0], [0, 0, 1]), radius: 0.001 }, vertex, vertex),
+      true,
+    );
+  return body;
+}
+
+test('modeler: validation sees points, frames and faces moved in place after an earlier check', () => {
+  // What validation keeps per edge between calls (end parameters, vertex distances, measured surfaces) must follow the
+  // numbers, not only which arrays hold them: the API lets callers move points and frames in place.
+  const moved = disc();
+  assert.deepEqual(validateBody(moved), []);
+  moved.vertices[0].point[2] = 0.001;
+  assert.ok(validateBody(moved).some(({ problem }) => problem.includes('off the curve')));
+  const imported = model.bodiesFromSTEP(parseSTEP(bodiesToSTEP([disc()]))).bodies[0];
+  assert.deepEqual(validateBody(imported), []);
+  imported.faces[0].surface.frame.origin[2] = 0.001;
+  assert.ok(validateBody(imported).some(({ problem }) => problem.includes('off the surface')));
+  const swung = disc();
+  assert.deepEqual(validateBody(swung), []);
+  swung.edges[0].curve.frame.origin[2] = 0.001;
+  assert.ok(validateBody(swung).some(({ problem }) => problem.includes('off the surface')));
+});
+
+test('modeler: a spline projection converges where the surface partials nearly align', () => {
+  // Su and Sv are 1e-7 from parallel at the start, so a step's linear part is tiny while the surface's curvature still
+  // carries the foot a long way: stopping on it left the point 1e-6 m off the surface it lies on.
+  const points = Array.from({ length: 3 }, (_, j) =>
+      Array.from({ length: 3 }, (_, i) => [i + j - 2, (i - 1) * 1e-7, 4 * (i === 2) + 4 * (j === 2) - 2 * i * j]),
+    ).flat(),
+    surface = model.surfaceEvaluator({
+      kind: 'spline',
+      degrees: [2, 2],
+      counts: [3, 3],
+      points,
+      knots: [
+        [0, 1],
+        [0, 1],
+      ],
+      multiplicities: [
+        [3, 3],
+        [3, 3],
+      ],
+    }),
+    point = [0, 1e-12, 1e-6],
+    at = surface.at(...surface.parameters(point, [0.5, 0.5]));
+  assert.ok(Math.hypot(...point.map((x, k) => x - at[k])) < 1e-9);
+});
+
+test('modeler: frames from axes of any finite size', () => {
+  // Directions are dimensionless: lengths square without overflow or underflow at any finite size.
+  for (const size of [1e200, 1e-200, 1e-160, 1e160]) {
+    assert.deepEqual(frameOf([0, 0, 0], [size, 0, 0]).z, [1, 0, 0]);
+    const z = frameOf([0, 0, 0], [0, size, size]).z;
+    assert.ok(z[0] === 0 && Math.abs(z[1] - Math.SQRT1_2) < 1e-15 && Math.abs(z[2] - Math.SQRT1_2) < 1e-15, `${z}`);
+  }
+});

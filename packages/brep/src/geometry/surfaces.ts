@@ -5,7 +5,7 @@ import { Enum, type STEPFile, type STEPValue } from '../step/file.js';
 import { angleStep, type Curve } from './curves.js';
 import { clamped, knotVector, spanBreaks, surfaceAt, type SplineSurface } from './nurbs.js';
 import { direction, frame, list, num, point, ref, unsupported, vector, type Frame } from './read.js';
-import { add, cross, distance, dot, length, scale, sub, unit, type XYZ } from './vec.js';
+import { add, cross, distance, dot, length, norm, scale, sub, unit, type XYZ } from './vec.js';
 
 const TAU = 2 * Math.PI;
 const wrap = (a: number) => (a < 0 ? a + TAU : a);
@@ -62,7 +62,7 @@ const local = (f: Frame, p: readonly number[]) => {
     x = dot(d, f.x),
     y = dot(d, f.y),
     z = dot(d, f.z);
-  return { u: wrap(Math.atan2(y, x)), x, y, z, r: Math.sqrt(x * x + y * y) };
+  return { u: wrap(Math.atan2(y, x)), x, y, z, r: norm(x, y, 0) };
 };
 
 class Plane implements Surface {
@@ -532,7 +532,8 @@ class SplinePatch implements Surface {
   }
   /** Gauss-Newton on |S(u, v) - p|^2 from (u, v); where a step leaves the domain, along the bound alone. */
   private newton(p: readonly number[], u: number, v: number): { uv: [number, number]; miss: number; along: number } {
-    let along = Infinity;
+    let along = Infinity,
+      last: number[] | undefined;
     for (let i = 0; i < 50; i++) {
       const d = this.at(u, v),
         r = sub(d, p),
@@ -550,6 +551,11 @@ class SplinePatch implements Surface {
         along = n ? length(sub(r, scale(n, dot(r, n)))) : length(r);
       }
       if (length(r) < 1e-12 * this.size) break;
+      // A point off the surface (a tolerant edge, a ray) never reaches a zero residual: done once the last step moved the
+      // foot less than that bound, measured on the surface (a step's linear part misses its curvature where Su and Sv
+      // nearly align, and can be tiny while the point still has far to go).
+      if (last && distance(d, last) < 1e-12 * this.size) break;
+      last = d;
       if (!(det > 1e-30 * (a * c || 1))) {
         // Singular (a pole): move along whichever derivative exists.
         if (a > 0) u = this.fit(u - g1 / a, this.uDomain, this.uPeriod);
@@ -557,21 +563,14 @@ class SplinePatch implements Surface {
         else break;
         continue;
       }
-      const du = (-c * g1 + b * g2) / det,
-        dv = (b * g1 - a * g2) / det,
-        nu = u + du,
-        nv = v + dv,
+      const nu = u + (-c * g1 + b * g2) / det,
+        nv = v + (b * g1 - a * g2) / det,
         fu = this.fit(nu, this.uDomain, this.uPeriod),
         fv = this.fit(nv, this.vDomain, this.vPeriod);
       // Held by a bound in one parameter: the other moves alone (the joint step's share of it assumed the first moved).
       if (fu !== nu && fv === nv) [u, v] = [fu, c > 0 ? this.fit(v - g2 / c, this.vDomain, this.vPeriod) : v];
       else if (fv !== nv && fu === nu) [u, v] = [a > 0 ? this.fit(u - g1 / a, this.uDomain, this.uPeriod) : u, fv];
-      else {
-        [u, v] = [fu, fv];
-        // A point off the surface (a tolerant edge, a ray) never reaches a zero residual: done once the step moves the
-        // foot less than the residual test's own bound.
-        if (a * du * du + 2 * b * du * dv + c * dv * dv < (1e-12 * this.size) ** 2) break;
-      }
+      else [u, v] = [fu, fv];
     }
     return { uv: [u, v], miss: distance(this.at(u, v), p), along };
   }
