@@ -67,6 +67,10 @@ try {
     assert.ok(gain > 0.01 && gain < 0.06, `additive coat adds the base's share of the Fresnel: ${gain}`);
     near(c['untinted glass'].mean, 1, 0.02, 'untinted glass is clear');
     near(c['voxelwise blend'].mean, 1, 0.03, 'voxelwise blend keeps its energy');
+    c.background.forEach((v, k) => near(v, [0.2, 0.4, 0.6][k], 1e-6, 'background'));
+    near(c.grid[0], 0.36, 0.01, 'grid lines cover 0.36 of the ground');
+    near(c.grid[0] + c.grid[2], 1, 0.01, 'grid: lines and ground share the pixels');
+    near(c.edges[0], 0.1211, 0.006, 'edge bands cover 0.1211 of the plate');
     near(
       c['contact transmission true'].mean / c['contact transmission false'].mean,
       0.5,

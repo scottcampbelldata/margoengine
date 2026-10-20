@@ -32,6 +32,8 @@ export type {
   TraceLensDistortion,
   TracePhysicalSky,
   TraceBounceLimits,
+  TraceEdges,
+  TraceGrid,
   TraceFog,
   VoxelTraceScene,
 } from './types.js';

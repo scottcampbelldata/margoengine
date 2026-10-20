@@ -201,6 +201,11 @@ export interface TraceEnvironment {
   groundFade?: number;
   /** Compatible addition: camera distance at which `groundFade` starts (world units; default 0). */
   groundFadeStart?: number;
+  /**
+   * Compatible addition: linear radiance camera rays show where they leave the scene, in place of the sky and the sun
+   * disk; lighting is unchanged (MagicaVoxel's background colour). Absent: the sky.
+   */
+  background?: TraceVec3;
 }
 
 /** Compatible addition: the uniform fog of {@link TraceEnvironment.fog}. */
@@ -356,8 +361,45 @@ export interface VoxelPathTracerOptions {
    * MagicaVoxel.
    */
   energyCompensation?: boolean;
+  /**
+   * Compatible addition: darkens the image away from its centre by 1 / (1 + t^2)^2, t = vignette x r / (0.2238 x
+   * image height), r the distance from the centre in pixels (a cos^4 falloff, MagicaVoxel's `_vig`), in the viewport
+   * and in captures. 0 (default) is off.
+   */
+  vignette?: number;
+  /**
+   * Compatible addition: camera rays see a band `width` (voxels) wide along voxel edges where the shape turns
+   * (outer and inner corners), in `color` lit as a diffuse surface (MagicaVoxel's edges). null (default) is off.
+   */
+  edges?: TraceEdges | null;
+  /**
+   * Compatible addition: camera rays see lines every `spacing` world units on the ground, and with `onVoxels` on
+   * voxel faces too, `2 x width` wide, in `color` lit as a diffuse surface (MagicaVoxel's grid). null (default) is
+   * off.
+   */
+  grid?: TraceGrid | null;
   /** Compatible addition: frame-graph order of the pass that draws the traced image. Default 20. */
   order?: number;
+}
+
+/** Compatible addition: edge bands (VoxelPathTracerOptions.edges). */
+export interface TraceEdges {
+  /** Linear RGB. */
+  color: TraceVec3;
+  /** Band width from the edge, in voxels (0 to 0.5). */
+  width: number;
+}
+
+/** Compatible addition: grid lines (VoxelPathTracerOptions.grid). */
+export interface TraceGrid {
+  /** Linear RGB. */
+  color: TraceVec3;
+  /** Distance between lines, world units. */
+  spacing: number;
+  /** Half the line width, world units. */
+  width: number;
+  /** Lines on voxel faces as well as the ground. Default false. */
+  onVoxels?: boolean;
 }
 
 /** Compatible addition: per-kind caps of {@link VoxelPathTracerOptions.bounceLimits}, each 1 to 64; absent: no cap. */

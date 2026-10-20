@@ -55,6 +55,11 @@ Everything here is on branch `worktree-agent-a63cac143225721f2` (not pushed, Cod
 | Cloud | extinction `_d` per voxel, colour = scattering albedo, HG `_g` | cloud rows |
 | Emissive cloud | 0.93 x `_d` x colour per voxel, no self-absorption | isolated blocks |
 | Bloom | not in saved snapshots (default and scale 0.5 identical) | bloom scenes |
+| Background `_bg` (`_setting _bg_c`) | camera rays leaving the scene show the colour exactly as displayed; lighting unchanged; the ground stops fading | on / off pair |
+| Vignette `_film _vig` v | cos^4 in screen space: 1 / (1 + t^2)^2, t = v r / (0.2238 H), r pixels from the centre, H image height; independent of the lens | v 0.5 and 1, fov 35 and 70, 960 x 800 and 600 x 600: within 0.001 |
+| Edges `_edge` | a band `_width` voxels wide along voxel edges where the shape turns (outer and inner corners), in `_color` lit like the face | top and oblique views, widths 0.2 and 0.5 |
+| Grid `_grid` | lines every `_spacing` voxels, `2 x _width` wide, in `_color` lit; on the ground, and on voxel faces with `_display` 0 | spacings 1 and 4, widths 0.02 and 0.1, both display modes |
+| Image sky `_env _mode 2` | radiance 3 x `_i`; MagicaVoxel +x at the image centre, azimuth toward +y to the left, rows by elevation; the second `_angle` turns it, the first does nothing; no ground fade | our own ramp HDR: five panoramas within 0.003 of the image width; lit scene 99.76% |
 | Uniform fog | extinction 0.001 x `_d` per voxel toward an unshadowed sky + sun glow; escaping rays see the glow; no direct sun; colour value / 255 | 9 fog scenes |
 | Depth of field | `_aperture` 0.25 and 2 gave the same sharp image | DOF scenes |
 
@@ -100,10 +105,13 @@ Everything here is on branch `worktree-agent-a63cac143225721f2` (not pushed, Cod
    2400 there and 2100 looking away from the sun); dense air (`_ray_d` 0.8-1, `_mie_d` 1) is 2.4-3.1 levels off on
    average; ozone is fitted at `_o3_d` 1 only (linear assumed); `_bounce`-style sky light on objects is unchecked for
    non-default `_atm` settings.
-5. Image sky (`_mode 2`, `_ibl`): the helper reports it; the caller must load the HDR file into `environment.map`
-   (rotation and intensity mapping unverified).
-6. Background colour (`_bg`, `_setting _bg_c`, `_bg_a` transparent background), voxel `_scale`, edges `_edge`, grid
-   `_grid`, vignette `_vig`: not implemented.
+5. Image sky (`_mode 2`, `_ibl`): done. The caller decodes the HDR file the helper names (`imageSky.path`) and
+   passes it as the `imageSky` option; the helper sets intensity and turn. Panoramas of our own ramp image: 99.84%
+   of pixels within 3 levels (the rest on the image's wrap seam); a scene lit by it: 99.76%.
+6. Display settings: done. Background colour (`environment.background`): 99.92%; vignette (`vignette`): 100% at
+   two strengths and two fields of view; edges (`edges`): 99.0-99.5%; grid (`grid`): 86-88% (positions and widths
+   within a pixel; MagicaVoxel's line borders are filtered differently). Open: transparent background (`_bg_a`,
+   a PNG with alpha) and voxel `_scale` (non-cubic voxels).
 7. Camera modes: orthographic and iso (`_mode orth/iso`) and `_lens _proj` are mapped but not compared; depth of field
    (`_aperture`) never showed in MagicaVoxel snapshots: find what enables it.
 8. Sample-panel toggles with non-default values (MIS-Reflect, MIS-Scatter, TR-Shadow, Shadow, Pixelated, Stochastic,

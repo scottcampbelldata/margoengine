@@ -10,6 +10,7 @@ import { atmosphereTransmittance, bakeAtmosphere } from './atmosphere.js';
 import type {
   TraceBounceLimits,
   TraceEnvironment,
+  TraceEnvironmentMap,
   TraceMaterial,
   TraceModel,
   TraceVec3,
@@ -35,8 +36,13 @@ export interface MagicaVoxelLighting {
    * shadows, the sun on diffuse lobes only and not in media) and the lens.
    */
   options: Partial<Omit<VoxelPathTracerOptions, 'scene'>>;
-  /** Settings found in the file that the tracer does not reproduce (bloom, fog, atmosphere, IBL, edges, grid). */
+  /** Settings found in the file that the tracer does not reproduce (bloom, a transparent background). */
   unsupported: string[];
+  /**
+   * The image sky (`_env _mode 2`): the HDR file `_ibl _path` names and how it is shown (3 x `_i`, turned by the
+   * second `_angle`). Pass the decoded image as the `imageSky` option to have it set as `environment.map`.
+   */
+  imageSky?: { path: string; intensity: number; rotation: number };
 }
 
 /** A camera from {@link magicaVoxelCamera}, in tracer world coordinates. */
@@ -84,6 +90,25 @@ const colorOf = (d: MagicaVoxelDict | undefined, key: string, fallback: TraceVec
 /** An 8-bit colour as value / 255 (no 2.2 power), white when absent. */
 const rawColor = (c: number[] | undefined): TraceVec3 =>
   c && c.length >= 3 ? [clamp01(c[0] / 255), clamp01(c[1] / 255), clamp01(c[2] / 255)] : [1, 1, 1];
+/**
+ * The linear radiance that the file's film (`_film`: exposure, ACES or not, gamma) shows as display value `c` (0-1):
+ * MagicaVoxel's background is a display colour.
+ */
+function displayed(c: TraceVec3, film: MagicaVoxelDict | undefined): TraceVec3 {
+  const gamma = Math.min(5, Math.max(1, num(film, '_gam') ?? 2.2)),
+    aces = (num(film, '_aces') ?? 1) !== 0,
+    expo = Math.max(num(film, '_expo') ?? 1, 2 ** -20);
+  const one = (v: number) => {
+    const x = Math.min(0.9999, v) ** gamma;
+    if (!aces) return x / expo;
+    // Narkowicz's fit inverted: (2.51 - 2.43 x) t^2 + (0.03 - 0.59 x) t - 0.14 x = 0, t = 0.6 L.
+    const a = 2.51 - 2.43 * x,
+      b = 0.03 - 0.59 * x,
+      t = (-b + Math.sqrt(b * b + 4 * a * 0.14 * x)) / (2 * a);
+    return t / 0.6 / expo;
+  };
+  return [one(c[0]), one(c[1]), one(c[2])];
+}
 /** MagicaVoxel (x, y, z), z up, to tracer (x, z, -y), y up. */
 export const fromMagicaVoxel = (p: ArrayLike<number>): TraceVec3 => [p[0], p[2], -p[1]];
 
@@ -217,7 +242,10 @@ export function magicaVoxelMaterial(id: number, rgb: ArrayLike<number>, attribut
  */
 export function magicaVoxelLighting(
   objects: Iterable<MagicaVoxelDict>,
-  { look = 'magicavoxel' }: { look?: MagicaVoxelLook } = {},
+  {
+    look = 'magicavoxel',
+    imageSky,
+  }: { look?: MagicaVoxelLook; imageSky?: Pick<TraceEnvironmentMap, 'width' | 'height' | 'data'> } = {},
 ): MagicaVoxelLighting {
   if (look !== 'magicavoxel' && look !== 'margo')
     throw new TypeError(`magicaVoxelLighting look ${String(look)} is unknown; pass 'magicavoxel' or 'margo'`);
@@ -235,6 +263,7 @@ export function magicaVoxelLighting(
     azimuth = (((angle[1] ?? 0) - 90) * Math.PI) / 180,
     setting = o('_setting'),
     groundOn = (num(setting, '_ground') ?? 1) !== 0,
+    bgOn = (num(setting, '_bg_c') ?? 0) !== 0,
     film = o('_film'),
     bounce = o('_bounce'),
     lens = o('_lens'),
@@ -296,6 +325,9 @@ export function magicaVoxelLighting(
           },
         }
       : {}),
+    // Background colour (`_setting _bg_c`): what camera rays leaving the scene show, as displayed (measured: the
+    // exact colour on screen, lighting unchanged, the ground no longer fading).
+    ...(bgOn ? { background: displayed(rawColor(nums(o('_bg'), '_color') ?? [0, 0, 0]), film) } : {}),
     ...(groundOn
       ? {
           groundColor: colorOf(o('_ground'), '_color', linear3([80, 80, 80])),
@@ -304,7 +336,8 @@ export function magicaVoxelLighting(
           // c 2030 under the uniform sky (measured per pixel against the unfaded ground: h 0.1 and 0.5, cameras 60-180
           // from their focus, D 40-5000). Under the atmosphere c is about 2250 and the nearest 100 do not fade (two
           // views; the one into a low sun prefers 2400, the one away from it 2100).
-          ...((num(o('_ground'), '_hor') ?? 0.1) > 0
+          // No fade under the image sky either (measured: the ground equals the unfaded ground at every distance).
+          ...((num(o('_ground'), '_hor') ?? 0.1) > 0 && !bgOn && mode !== 2
             ? mode === 1
               ? { groundFade: 2250 / (num(o('_ground'), '_hor') ?? 0.1), groundFadeStart: 100 }
               : { groundFade: 2030 / (num(o('_ground'), '_hor') ?? 0.1) }
@@ -312,18 +345,54 @@ export function magicaVoxelLighting(
         }
       : {}),
   };
-  if (mode === 2) unsupported.push('image sky (_ibl): pass the HDR image as environment.map');
+  // Image sky (`_env _mode 2`): measured with our own ramp image: MagicaVoxel +x at the image's centre column, azimuth
+  // turning toward +y to the left, rows by elevation; radiance 3 x `_i`; the second `_angle` turns it (the first does
+  // nothing). Within 0.003 of the image width at `_i` 0.25 and 1, turns 0, 30 and 120.
+  const ibl = o('_ibl'),
+    sky =
+      mode === 2
+        ? {
+            path: get(ibl, '_path') ?? '',
+            intensity: 3 * Math.max(0, num(ibl, '_i') ?? 1),
+            rotation: Math.PI / 2 - ((nums(ibl, '_angle')?.[1] ?? 0) * Math.PI) / 180,
+          }
+        : undefined;
+  if (sky && imageSky) environment.map = { ...imageSky, intensity: sky.intensity, rotation: sky.rotation };
+  else if (sky) unsupported.push('image sky (_ibl): pass the decoded _ibl _path image as the imageSky option');
 
   if ((num(o('_bloom'), '_mix') ?? 0.5) > 0 && (num(o('_bloom'), '_scale') ?? 0) > 0)
     unsupported.push('bloom (_bloom)');
-  if ((num(setting, '_edge') ?? 0) !== 0) unsupported.push('edges (_edge)');
-  if ((num(setting, '_grid') ?? 0) !== 0) unsupported.push('grid (_grid)');
-  if ((num(film, '_vig') ?? 0) > 0) unsupported.push('vignette (_film _vig)');
+  if ((num(setting, '_bg_a') ?? 0) !== 0) unsupported.push('transparent background (_setting _bg_a)');
+  const edge = o('_edge'),
+    grid = o('_grid'),
+    display = {
+      // Vignette `_vig` v: cos^4 falloff, t = v r / (0.2238 H) (measured at v 0.5 and 1, two fields of view, two
+      // image sizes: within 0.001).
+      vignette: Math.max(0, num(film, '_vig') ?? 0),
+      // Edges: a band `_width` voxels wide along turning voxel edges, in `_color` lit (measured on outer and inner
+      // corners at widths 0.2 and 0.5).
+      edges:
+        (num(setting, '_edge') ?? 0) !== 0
+          ? { color: colorOf(edge, '_color', [0, 0, 0]), width: Math.min(0.5, Math.max(0, num(edge, '_width') ?? 0.2)) }
+          : null,
+      // Grid: lines every `_spacing` with half width `_width` on the ground, and on voxels with `_display` 0
+      // (measured: spacing 1 and 4, widths 0.02 and 0.1, both display modes).
+      grid:
+        (num(setting, '_grid') ?? 0) !== 0
+          ? {
+              color: colorOf(grid, '_color', [0, 0, 0]),
+              spacing: Math.max(1e-3, num(grid, '_spacing') ?? 1),
+              width: Math.max(0, num(grid, '_width') ?? 0.02),
+              onVoxels: (num(grid, '_display') ?? 0) === 0,
+            }
+          : null,
+    };
   const expo = num(film, '_expo') ?? 1,
     blades = Math.round(num(lens, '_blade_n') ?? 0);
   return {
     environment,
     options: {
+      ...display,
       toneMapping: (num(film, '_aces') ?? 1) !== 0 ? 'aces-narkowicz' : 'linear',
       gamma: Math.min(5, Math.max(1, num(film, '_gam') ?? 2.2)),
       exposure: Math.min(20, Math.max(-20, Math.log2(Math.max(expo, 2 ** -20)))),
@@ -348,6 +417,7 @@ export function magicaVoxelLighting(
       lensRotation: ((num(lens, '_blade_r') ?? 0) * Math.PI) / 180,
     },
     unsupported,
+    ...(sky ? { imageSky: sky } : {}),
   };
 }
 

@@ -104,6 +104,12 @@ struct Frame {
  fogHemi:array<vec4f,4>,
  // Ground fade: x the camera distance where it starts.
  groundFade:vec4f,
+ // Background for camera rays leaving the scene (w > 0: on); edge bands (colour, width; width 0: off); grid lines
+ // (colour, spacing; half width, mode 0 off, 1 ground, 2 ground and voxels).
+ background:vec4f,
+ edges:vec4f,
+ grid:vec4f,
+ grid2:vec4f,
 }
 `;
 
@@ -520,6 +526,41 @@ fn shadow(o:vec3f,d:vec3f,tMax:f32)->f32 {
  }
  return exp(-tau);
 }
+fn unitAxis(a:u32)->vec3i {return select(select(vec3i(0,0,1),vec3i(0,1,0),a==1u),vec3i(1,0,0),a==0u);}
+// A filled cell of instance i's model (cells outside the model are empty).
+fn filled(model:u32,c:vec3i)->bool {
+ let mb=f.scene.x+model*MODEL;
+ let sz=vec3i(i32(scene[mb]),i32(scene[mb+1u]),i32(scene[mb+2u]));
+ if(any(c<vec3i(0))||any(c>=sz)){return false;}
+ return voxelAt(model,c)!=0u;
+}
+// Whether world point p on the face of hit h lies within the edge band: within f.edges.w (voxels) of a face edge where
+// the shape turns: the face ends there (outer corner) or meets a filled cell in front of the neighbour (inner corner).
+fn edgeBand(h:Hit,p:vec3f)->bool {
+ let model=scene[f.scene.y+h.inst*INSTANCE+36u];
+ let lp=xpoint(localX(h.inst),p);
+ let nrm=unitAxis(h.axis)*i32(h.sgn);
+ let w=f.edges.w;
+ for(var k=1u;k<3u;k++){
+  let a=(h.axis+k)%3u;let e=unitAxis(a);
+  let u=dot(lp-vec3f(h.cell),vec3f(e));
+  for(var s=-1;s<=1;s+=2){
+   let dist=select(u,1.0-u,s>0);
+   if(dist>=w){continue;}
+   let nb=h.cell+e*s;
+   if(!filled(model,nb)||filled(model,nb+nrm)){return true;}
+  }
+ }
+ return false;
+}
+// Whether world point p on a surface with normal n lies on a grid line (every f.grid.w units, f.grid2.x half width),
+// along the two axes across the surface.
+fn gridLine(p:vec3f,n:vec3f)->bool {
+ let s=f.grid.w;let q=abs(p/s-round(p/s))*s;let a=abs(n);
+ let k=select(select(2u,1u,a.y>=a.z),0u,a.x>=a.y&&a.x>=a.z);
+ return (k!=0u&&q.x<f.grid2.x)||(k!=1u&&q.y<f.grid2.x)||(k!=2u&&q.z<f.grid2.x);
+}
+fn lineMat(c:vec3f)->Mat {var m:Mat;m.color=c;m.metalColor=c;m.alpha=1.0;m.ior=1.5;return m;}
 fn voxelAt(model:u32,c:vec3i)->u32 {
  let mb=f.scene.x+model*MODEL;
  let nb=vec3i(i32(scene[mb+4u]),i32(scene[mb+5u]),i32(scene[mb+6u]));
@@ -1270,7 +1311,8 @@ fn radiance(px:vec2u)->Path {
   else {
    if(h.inst==NONE){
     let kept=chainOk&&chainSet&&(deflections==0u||(deflections==1u&&deflectOk&&!glassStart));
-    let add=thr*environment(d,select(0.0,sunPdf,kept),jChain,bounces==0u);L+=add;if(focused){C+=add;}
+    let bg=bounces==0u&&f.background.w>0.0;
+    let add=thr*select(environment(d,select(0.0,sunPdf,kept),jChain,bounces==0u),f.background.xyz,bg);L+=add;if(focused){C+=add;}
     break;
    }
    if(h.inst==AREA){
@@ -1288,6 +1330,7 @@ fn radiance(px:vec2u)->Path {
     }
     off=n*max(1e-4,1e-6*length(p));
     m=groundMat();
+    if(bounces==0u&&f.grid2.y>0.0&&gridLine(p,n)){m=lineMat(f.grid.xyz);}
    } else {
     let lx=localX(h.inst);
     n=h.sgn*normalize(rowOf(lx,h.axis));
@@ -1322,6 +1365,11 @@ fn radiance(px:vec2u)->Path {
     if((m.flags&MEDIA)!=0u){
      if(medium!=0u&&(material(medium).flags&MEDIA)==0u){chainOk=false;}
      medium=h.value;mInst=h.inst;o=p-off;continue;
+    }
+    // Edge bands and grid lines on what the camera sees (MagicaVoxel's display settings): the line colour, lit.
+    if(bounces==0u&&medium==0u){
+     if(f.edges.w>0.0&&edgeBand(h,p)){m=lineMat(f.edges.xyz);}
+     else if(f.grid2.y>1.5&&gridLine(p,n)){m=lineMat(f.grid.xyz);}
     }
    }
    if((m.flags&EMISSIVE)!=0u||m.seen.w>0.0){
@@ -1582,7 +1630,9 @@ fn encodeOut(c:vec3f)->vec3f {
  let a=floor(q);let fr=q-a;
  let x0=u32(clamp(a.x,0.0,tw-1.0));let x1=u32(clamp(a.x+1.0,0.0,tw-1.0));
  let y0=u32(clamp(a.y,0.0,th-1.0));let y1=u32(clamp(a.y+1.0,0.0,th-1.0));
- let c=mix(mix(color[y0*W+x0].xyz,color[y0*W+x1].xyz,fr.x),mix(color[y1*W+x0].xyz,color[y1*W+x1].xyz,fr.x),fr.y)*v.params.x*v.params.y;
+ var c=mix(mix(color[y0*W+x0].xyz,color[y0*W+x1].xyz,fr.x),mix(color[y1*W+x0].xyz,color[y1*W+x1].xyz,fr.x),fr.y)*v.params.x*v.params.y;
+ // Vignette: 1 / (1 + t^2)^2, t = strength x distance from the centre / (0.2238 x height).
+ if(v.encoding.y>0.0){let uv=i.pos.xy/v.size.zw-0.5;let t=v.encoding.y*length(vec2f(uv.x*v.size.z/v.size.w,uv.y))/0.2238;c/=(1.0+t*t)*(1.0+t*t);}
  var rgb=max(c,vec3f(0.0));
  let mode=u32(v.params.z);
  if((mode&1u)==0u){

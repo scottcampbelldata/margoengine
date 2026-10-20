@@ -8,7 +8,7 @@ import { inflateSync } from 'node:zlib';
 import { VoxelPathTracer } from '../dist/index.js';
 import { fakeDevice, fakeEngine, materials, model, settle, simpleScene, translate } from './support.js';
 
-const FRAME = 736;
+const FRAME = 800;
 const isMargo = (code) => (error) => error.name === 'MargoError' && error.code === code;
 
 // Attaches and runs frames until the trace and display pipelines are compiled.

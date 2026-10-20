@@ -124,7 +124,8 @@ except `id`, `color` and `type` are optional.
 
 Lighting additions: `environment.sunVisible: false` hides the sun disk from camera rays (it still lights and
 reflects); `environment.groundFade` (a distance) fades the ground camera rays see into the sky behind it by
-1 - e^(-(D - groundFadeStart) / groundFade) at camera distance D.
+1 - e^(-(D - groundFadeStart) / groundFade) at camera distance D; `environment.background` (linear RGB) is what
+camera rays show where they leave the scene, in place of the sky and the sun disk (the sky still lights).
 
 Sun and environment light that reaches a surface through smooth glass or off a mirror is sampled directly too, not only
 found by chance: voxel faces are planes, so the shadow ray refracts (exact Fresnel, tint, absorption) and reflects
@@ -190,6 +191,9 @@ The engine camera is used as is: perspective by default, orthographic (or any af
 | `sunSpecular` (the sun lights glossy lobes, is seen in reflections) | true | boolean; false: diffuse lobes only | yes |
 | `sunInMedia` (the sun lights media directly) | true | boolean | yes |
 | `energyCompensation` (rough metal and glass keep their energy) | true | boolean | yes |
+| `vignette` (cos^4 darkening: 1 / (1 + t^2)^2, t = vignette x r / (0.2238 x image height)) | 0 (off) | 0 or more | no |
+| `edges` (camera rays see a band `width` voxels wide along turning voxel edges, in `color`, lit) | null | `{color, width}` | yes |
+| `grid` (camera rays see lines every `spacing`, `2 x width` wide, on the ground and with `onVoxels` on voxels) | null | `{color, spacing, width, onVoxels?}` | yes |
 | `order` (frame-graph order of the pass) | 20 | finite | no |
 
 Accumulation also restarts on any change of the camera (matrix, position, target, up, projection), the drawing-buffer
@@ -395,7 +399,9 @@ emitters `colour x (1 + 3 x emission x 10^power)`, metal reflectance `min(1, spe
 0.001 x `_d`. Its atmosphere sky (`_env _mode 1`) is reproduced by `bakeAtmosphere` (exported with
 `atmosphereRadiance` and `atmosphereTransmittance`): single scattering with Rayleigh, Cornette-Shanks Mie and ozone
 terms fitted to 16 of MagicaVoxel's panoramas (0.3-1 levels mean for the default and singly changed settings), baked
-to a 256 x 256 map in about 0.5 s; the sun then lights at 10 x intensity through the air's transmittance. Six default-lit scenes (diffuse, metal at roughness 0.2 and 0.8, glass, emitter, cloud) match
+to a 256 x 256 map in about 0.5 s; the sun then lights at 10 x intensity through the air's transmittance. Its display settings
+map to `environment.background`, `vignette`, `edges` and `grid`; its image sky (`_env _mode 2`) needs the decoded HDR
+file passed as `magicaVoxelLighting(objects, { imageSky })` (the result's `imageSky.path` names it). Six default-lit scenes (diffuse, metal at roughness 0.2 and 0.8, glass, emitter, cloud) match
 MagicaVoxel's images within 3 of 255 levels on 99.2-99.97% of pixels; the measured mapping, the calibration procedure
 and the open items are in docs/magicavoxel-parity.md. Same scenes, same GPU (RTX A6000), 960 x 800 at 1024 samples:
 MagicaVoxel about 14-15 s, this tracer 1.7-1.85 s.
@@ -410,8 +416,8 @@ PNG and float captures with cancellation; device-loss recovery.
 
 Not done or not verified, stated plainly:
 
-- **MagicaVoxel parity is not complete:** its image sky, edges, grid, background colour and vignette are not
-  reproduced; sky-lit subsurface blocks are 7-12 levels too dark; glass over a lit floor is 1-2 levels brighter; under the atmosphere, a view into a low sun matches on 97.7% of
+- **MagicaVoxel parity is not complete:** a transparent background (`_bg_a`) and non-cubic voxels (`_scale`) are
+  not reproduced; sky-lit subsurface blocks are 7-12 levels too dark; glass over a lit floor is 1-2 levels brighter; under the atmosphere, a view into a low sun matches on 97.7% of
   pixels and very dense air settings by 2-3 levels on average (docs/magicavoxel-parity.md).
 - **Denoiser:** a classical filter, not a learned one. Averaged over four seeds against 131,072-sample references
   (noise removed in quadrature) it lowers the error x2.46, x2.32, x2.24 at 4, 16, 64 samples on the material scene and

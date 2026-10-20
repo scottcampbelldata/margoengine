@@ -132,6 +132,23 @@ window.check={
   look([0,6,0.01],[0,0,0],{fov:20});
   for(const contact of [false,true]){out[`contact transmission ${contact}`]=await withTracer(veil(contact),{maxBounces:8},async(t)=>{const im=await render(t,1024);return stats(im,first(im));});}
   look([14,10,18],[0,0,0],{fov:35});
+  // Display settings. Mean of one channel over the pixels where mask(i) holds.
+  const chan=(image,mask,k)=>{let n=0,s=0;for(let i=0;i<image.width*image.height;i++){if(mask(i)){n++;s+=image.color[i*3+k];}}return s/n;};
+  // Background: camera rays leaving the scene show exactly it (the sky still lights).
+  const far={revision:1,models:[model('d',[1,1,1],()=>1)],instances:[{id:'d',modelId:'d',matrix:translate(500,500,500)}],materials:[{id:1,color:[0.5,0.5,0.5],type:'diffuse'}]};
+  look([0,2,0],[0,10,-10],{fov:20});
+  out['background']=await withTracer({...far,environment:{skyColor:[1,1,1],background:[0.2,0.4,0.6]}},{maxBounces:4},async(t)=>{const im=await render(t,16,32);return [0,1,2].map((k)=>chan(im,()=>true,k));});
+  // Grid: a sky-lit ground (blue) seen from above with red lines every 1, half width 0.1: red covers
+  // 1 - (1 - 0.2)^2 = 0.36 of it (radiance = albedo under a white sky).
+  look([0.37,6,0.29],[0.37,0,0.3],{fov:30});
+  out['grid']=await withTracer({...far,environment:{skyColor:[1,1,1],groundColor:[0,0,1],groundHeight:0}},{maxBounces:8,grid:{color:[1,0,0],spacing:1,width:0.1}},async(t)=>{const im=await render(t,256,128);return [0,1,2].map((k)=>chan(im,()=>true,k));});
+  // Edges: an 8 x 8 plate (blue) seen from above with red bands 0.25 wide along its outer edges only: red covers
+  // 1 - (7.5 / 8)^2 = 0.1211 of its top.
+  const plate={revision:1,models:[model('p',[8,1,8],()=>1)],instances:[{id:'p',modelId:'p',matrix:translate(-4,0,-4)}],materials:[{id:1,color:[0,0,1],type:'diffuse'}],environment:{skyColor:[1,1,1]}};
+  look([0,60,0.001],[0,0,0],{fov:12});
+  // (512 px: the band is 10 px wide, so sampling pixel centres quantizes it by under 3%.)
+  out['edges']=await withTracer(plate,{maxBounces:8,edges:{color:[1,0,0],width:0.25}},async(t)=>{const im=await render(t,64,512);return [0,1,2].map((k)=>chan(im,first(im),k));});
+  look([14,10,18],[0,0,0],{fov:35});
   // Camera emission: an emitter casting emission 3 shows 0.5 to the camera (black sky).
   out['camera emission 0.5']=await withTracer(furnace([{id:1,color:[1,1,1],type:'emit',emission:3,cameraEmission:0.5}],{skyIntensity:0}),{maxBounces:8},async(t)=>{const im=await render(t,64,64);return stats(im,first(im));});
   // Diffuse caps: floor (albedo 0.5) under an emissive ceiling (radiance 1, albedo 0.5): 0.5 with 1 or 2 diffuse

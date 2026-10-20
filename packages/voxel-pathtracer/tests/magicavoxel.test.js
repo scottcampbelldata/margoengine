@@ -149,7 +149,44 @@ test('render objects: sky, sun, ground fade, film, bounces and fog', () => {
     [o.transparentShadows, o.sunSpecular, o.sunInMedia, o.energyCompensation],
     [false, false, false, false],
   );
-  assert.ok(unsupported.some((u) => u.includes('_edge')));
+  assert.deepEqual(o.edges, { color: [0, 0, 0], width: 0.2 });
+  assert.equal(o.grid, null);
+  assert.equal(o.vignette, 0);
+  assert.equal(unsupported.length, 0);
+  // Display settings: background (shown as its exact display colour, the ground then not fading), vignette, grid.
+  const shown = magicaVoxelLighting([
+    { _type: '_bg', _color: '200 100 50' },
+    { _type: '_film', _expo: '1', _aces: '0', _gam: '2.2', _vig: '0.5' },
+    { _type: '_grid', _color: '0 0 255', _spacing: '4', _width: '0.1', _display: '1' },
+    { _type: '_setting', _bg_c: '1', _grid: '1', _bg_a: '1' },
+  ]);
+  near3(shown.environment.background, [(200 / 255) ** 2.2, (100 / 255) ** 2.2, (50 / 255) ** 2.2]);
+  assert.equal(shown.environment.groundFade, undefined);
+  near(shown.options.vignette, 0.5);
+  assert.deepEqual(shown.options.grid, { color: [0, 0, 1], spacing: 4, width: 0.1, onVoxels: false });
+  assert.ok(shown.unsupported.some((u) => u.includes('_bg_a')));
+  // Image sky: 3 x _i, turned by the second _angle (MagicaVoxel +x at the image centre), no ground fade.
+  const imageSky = { width: 2, height: 1, data: new Float32Array(6) };
+  const ibl = [
+    { _type: '_env', _mode: '2' },
+    { _type: '_ibl', _path: 'sky.hdr', _i: '0.5', _angle: '10 30' },
+  ];
+  const withImage = magicaVoxelLighting(ibl, { imageSky });
+  near(withImage.environment.map.intensity, 1.5);
+  near(withImage.environment.map.rotation, Math.PI / 2 - Math.PI / 6);
+  assert.equal(withImage.environment.map.data, imageSky.data);
+  assert.equal(withImage.environment.groundFade, undefined);
+  assert.deepEqual(withImage.imageSky, { path: 'sky.hdr', intensity: 1.5, rotation: Math.PI / 2 - Math.PI / 6 });
+  assert.equal(withImage.unsupported.length, 0);
+  assert.ok(magicaVoxelLighting(ibl).unsupported.some((u) => u.includes('_ibl')));
+  // With ACES the background is the radiance ACES shows as that colour.
+  const acesBg = magicaVoxelLighting([
+    { _type: '_bg', _color: '128 128 128' },
+    { _type: '_film', _aces: '1', _gam: '2.2' },
+    { _type: '_setting', _bg_c: '1' },
+  ]).environment.background;
+  const x = 0.6 * acesBg[0];
+  near((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), (128 / 255) ** 2.2, 1e-9);
   assert.equal(magicaVoxelLighting([{ _type: '_setting', _ground: '0' }]).environment.groundColor, undefined);
   assert.equal(magicaVoxelLighting([{ _type: '_film', _aces: '0' }]).options.toneMapping, 'linear');
   // The 'margo' look keeps the film and lights but traces light physically.
@@ -267,6 +304,7 @@ test('MagicaVoxel options and environment reach the frame uniform; invalid ones 
         groundColor: [0.1, 0.1, 0.1],
         groundFade: 500,
         groundFadeStart: 40,
+        background: [0.1, 0.2, 0.3],
         fog: { density: 0.01, color: [1, 0.5, 0.25], anisotropy: 0.3 },
       },
     }),
@@ -279,12 +317,15 @@ test('MagicaVoxel options and environment reach the frame uniform; invalid ones 
       energyCompensation: false,
       toneMapping: 'aces-narkowicz',
       gamma: 2.2,
+      edges: { color: [1, 0, 0], width: 0.2 },
+      grid: { color: [0, 0, 1], spacing: 4, width: 0.1, onVoxels: true },
+      vignette: 0.5,
     });
   await tracer.ready;
   h.frame();
   await settle();
   h.frame();
-  const frame = h.device.buffers.findLast((b) => b.size === 736 && !b.destroyed),
+  const frame = h.device.buffers.findLast((b) => b.size === 800 && !b.destroyed),
     u = new Uint32Array(frame.data),
     f = new Float32Array(frame.data);
   assert.equal(u[42] & (1024 | 2048 | 4096 | 8192 | 16384), 1024 | 2048 | 4096 | 8192 | 16384);
@@ -296,6 +337,18 @@ test('MagicaVoxel options and environment reach the frame uniform; invalid ones 
   assert.equal(f[158], 1);
   near3([...f.subarray(160, 163)], [1, 0.5, 0.25]);
   assert.equal(f[180], 40);
+  near3([...f.subarray(184, 187)], [0.1, 0.2, 0.3]);
+  assert.equal(f[187], 1);
+  near3([...f.subarray(188, 191)], [1, 0, 0]);
+  near(f[191], 0.2);
+  near3([...f.subarray(192, 195)], [0, 0, 1]);
+  assert.deepEqual([f[195], +f[196].toFixed(4), f[197]], [4, 0.1, 2]);
+  assert.equal(tracer.options.vignette, 0.5);
+  assert.throws(() => tracer.setOptions({ edges: { color: [1, 0, 0], width: 0.7 } }), RangeError);
+  assert.throws(() => tracer.setOptions({ grid: { color: [1, 0, 0], spacing: 0, width: 0.1 } }), RangeError);
+  assert.throws(() => tracer.setOptions({ vignette: -1 }), RangeError);
+  tracer.setOptions({ edges: null, grid: null });
+  assert.equal(tracer.options.edges, undefined);
   near(f[164 + 7], f[164 + 8], 0.05); // isotropy near the horizon is about a half either side
   assert.deepEqual(tracer.options.bounceLimits, { diffuse: 2, specular: 5, scatter: undefined });
   assert.throws(() => tracer.setOptions({ gamma: 0.5 }), RangeError);

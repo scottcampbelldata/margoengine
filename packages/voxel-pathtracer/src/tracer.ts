@@ -53,7 +53,9 @@ import { LAMBDA_MAX, LAMBDA_MIN } from './spectrum.js';
 import { raycastSnapshot } from './traverse.js';
 import type {
   TraceBounceLimits,
+  TraceEdges,
   TraceFisheye,
+  TraceGrid,
   TraceLensDistortion,
   TracePreviousCamera,
   TraceVec3,
@@ -110,6 +112,9 @@ interface Settings {
   sunSpecular: boolean;
   sunInMedia: boolean;
   energyCompensation: boolean;
+  vignette: number;
+  edges: TraceEdges | undefined;
+  grid: Required<TraceGrid> | undefined;
   order: number;
   previousCamera: TracePreviousCamera | undefined;
   projection: 'camera' | 'panorama' | 'fisheye';
@@ -137,6 +142,9 @@ const DEFAULTS: Settings = {
   sunSpecular: true,
   sunInMedia: true,
   energyCompensation: true,
+  vignette: 0,
+  edges: undefined,
+  grid: undefined,
   order: 20,
   previousCamera: undefined,
   projection: 'camera',
@@ -163,6 +171,8 @@ const RESETS: readonly (keyof Settings)[] = [
   'sunSpecular',
   'sunInMedia',
   'energyCompensation',
+  'edges',
+  'grid',
 ];
 
 const whole = (value: unknown, name: string, min: number, max: number, fix: string) => {
@@ -185,6 +195,30 @@ function bounceLimits(value: unknown): Required<TraceBounceLimits> | undefined {
     cap = (k: 'diffuse' | 'specular' | 'scatter') =>
       o[k] === undefined ? BOUNCE_FREE : whole(o[k], `bounceLimits.${k}`, 1, 64, 'pass 1 to 64, or leave it out');
   return { diffuse: cap('diffuse'), specular: cap('specular'), scatter: cap('scatter') };
+}
+
+/** Edge bands, or undefined for null. */
+function edges(value: unknown): TraceEdges | undefined {
+  if (value === null) return undefined;
+  if (typeof value !== 'object') throw new TypeError('VoxelPathTracer edges must be {color, width} or null');
+  const o = value as Record<string, unknown>;
+  return {
+    color: checkVec3(o.color, 'VoxelPathTracer edges.color', true, 'pass linear RGB, 0 or more'),
+    width: checkNumber(o.width, 'edges.width', 0, 0.5, 'pass 0 to 0.5 voxels'),
+  };
+}
+/** Grid lines, or undefined for null. */
+function grid(value: unknown): Required<TraceGrid> | undefined {
+  if (value === null) return undefined;
+  if (typeof value !== 'object')
+    throw new TypeError('VoxelPathTracer grid must be {color, spacing, width, onVoxels?} or null');
+  const o = value as Record<string, unknown>;
+  return {
+    color: checkVec3(o.color, 'VoxelPathTracer grid.color', true, 'pass linear RGB, 0 or more'),
+    spacing: checkNumber(o.spacing, 'grid.spacing', 1e-3, 1e6, 'pass a distance above 0'),
+    width: checkNumber(o.width, 'grid.width', 0, 1e6, 'pass a half width, 0 or more'),
+    onVoxels: o.onVoxels === undefined ? false : flag(o.onVoxels, 'grid.onVoxels'),
+  };
 }
 
 /** Validates `input` over `base`; throws before returning anything. */
@@ -237,6 +271,9 @@ function settings(input: Partial<Omit<VoxelPathTracerOptions, 'scene'>>, base: S
   if (o.sunSpecular !== undefined) s.sunSpecular = flag(o.sunSpecular, 'sunSpecular');
   if (o.sunInMedia !== undefined) s.sunInMedia = flag(o.sunInMedia, 'sunInMedia');
   if (o.energyCompensation !== undefined) s.energyCompensation = flag(o.energyCompensation, 'energyCompensation');
+  if (o.vignette !== undefined) s.vignette = checkNumber(o.vignette, 'vignette', 0, 100, 'pass 0 (off) or more');
+  if (o.edges !== undefined) s.edges = edges(o.edges);
+  if (o.grid !== undefined) s.grid = grid(o.grid);
   if (o.order !== undefined) s.order = checkNumber(o.order, 'order', -1e9, 1e9, 'pass a finite frame-graph order');
   if (o.previousCamera !== undefined) s.previousCamera = previousCamera(o.previousCamera);
   if (o.projection !== undefined) {
@@ -531,7 +568,15 @@ export class VoxelPathTracer implements EnginePlugin {
   get options(): Readonly<
     Omit<
       Required<VoxelPathTracerOptions>,
-      'scene' | 'focusDistance' | 'previousCamera' | 'distortion' | 'fisheye' | 'gamma' | 'bounceLimits'
+      | 'scene'
+      | 'focusDistance'
+      | 'previousCamera'
+      | 'distortion'
+      | 'fisheye'
+      | 'gamma'
+      | 'bounceLimits'
+      | 'edges'
+      | 'grid'
     > & {
       focusDistance?: number;
       previousCamera?: TracePreviousCamera;
@@ -539,6 +584,8 @@ export class VoxelPathTracer implements EnginePlugin {
       distortion?: Required<TraceLensDistortion>;
       gamma?: number;
       bounceLimits?: TraceBounceLimits;
+      edges?: TraceEdges;
+      grid?: Required<TraceGrid>;
     }
   > {
     const caps = this.#settings.bounceLimits,
@@ -628,13 +675,21 @@ export class VoxelPathTracer implements EnginePlugin {
         exposure = 2 ** this.#settings.exposure,
         tone = toneCurve(this.#settings.toneMapping),
         gamma = this.#settings.gamma,
+        vignette = this.#settings.vignette,
         writer = new PngWriter(o.width, o.height);
       try {
-        await this.#render(o, false, async (_y0, rows, band) => {
+        await this.#render(o, false, async (y0, rows, band) => {
           const bytes = new Uint8Array(o.width * rows * 3),
             c = [0, 0, 0];
           for (let i = 0; i < o.width * rows; i++) {
-            for (let k = 0; k < 3; k++) c[k] = Math.max(0, band.color[i * 3 + k] * exposure);
+            let gain = exposure;
+            if (vignette > 0) {
+              const x = (i % o.width) + 0.5 - o.width / 2,
+                y = y0 + Math.floor(i / o.width) + 0.5 - o.height / 2,
+                t = (vignette * Math.hypot(x, y)) / (0.2238 * o.height);
+              gain /= (1 + t * t) ** 2;
+            }
+            for (let k = 0; k < 3; k++) c[k] = Math.max(0, band.color[i * 3 + k] * gain);
             const v = tone(c);
             for (let k = 0; k < 3; k++) bytes[i * 3 + k] = encode(v[k], gamma);
           }
@@ -1210,6 +1265,14 @@ export class VoxelPathTracer implements EnginePlugin {
     f.set(fog ? [fog.color[0], fog.color[1], fog.color[2], 0] : [0, 0, 0, 0], 160);
     f.set(fog ? fog.hemisphere : new Float32Array(16), 164);
     f.set([e.groundFadeStart, 0, 0, 0], 180);
+    // Background, edge bands, grid lines (MagicaVoxel's display settings).
+    const bg = e.background,
+      ed = o.edges,
+      gr = o.grid;
+    f.set(bg ? [bg[0], bg[1], bg[2], 1] : [0, 0, 0, 0], 184);
+    f.set(ed ? [ed.color[0], ed.color[1], ed.color[2], ed.width] : [0, 0, 0, 0], 188);
+    f.set(gr ? [gr.color[0], gr.color[1], gr.color[2], gr.spacing] : [0, 0, 0, 1], 192);
+    f.set(gr ? [gr.width, gr.onVoxels ? 2 : 1, 0, 0] : [0, 0, 0, 0], 196);
     const sl = layout.scene,
       ll = layout.lights;
     u.set([sl.modelBase, sl.instanceBase, sl.nodeBase, s.instances.length ? sl.nodeCount : 0], 44);
@@ -1405,7 +1468,7 @@ export class VoxelPathTracer implements EnginePlugin {
     // First-hit depth only where pixels are the camera's own perspective rays (far otherwise).
     const depth = o.projection === 'camera' && !o.distortion ? 1 / this.#samples : 0;
     v.set([denoised ? 1 : 1 / this.#samples, 2 ** o.exposure, mode, depth], 36);
-    v.set([o.gamma ?? 0, 0, 0, 0], 40);
+    v.set([o.gamma ?? 0, o.vignette, 0, 0], 40);
     device.queue.writeBuffer(view.uniform, 0, v);
     const pass = c.encoder.beginRenderPass({
       colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
