@@ -532,6 +532,17 @@ function flank(turns, perTurn, outerRadius, innerRadius, pitch, lift) {
   );
 }
 
+test('a line through a thread flank crosses it once a turn (every sheet, not only the nearest one)', () => {
+  // Six turns of flank; a line parallel to the axis at radius 1.7 mm and angle 0.6 pi meets each turn once. Counting
+  // by the distance to the nearest place followed along the line saw one sheet only, and in/out tests went wrong.
+  const step = parseSTEP(flank(6, 8, 2, 1.4, 0.5, 0.15)),
+    [sheet] = model.bodiesFromSTEP(step).bodies,
+    a = 0.6 * Math.PI,
+    mm = 0.001,
+    line = { kind: 'line', origin: [1.7 * mm * Math.cos(a), 1.7 * mm * Math.sin(a), -1 * mm], direction: [0, 0, 1] };
+  assert.equal(model.curveSurfaceCrossings(line, sheet.faces[0].surface, 0, 6 * mm).length, 6);
+});
+
 test('a thread flank (a ruled B-spline round many turns) meshes, and its exact area matches the mesh', () => {
   // A point's nearest place on such a surface, or on its edges, is easily on the next turn: that once cut the edges to
   // a part of a span, crossed the mesh's boundary and left the exact area at 1% to 50% of the true one.

@@ -239,49 +239,17 @@ export function curveSurfaceCrossings(
     f = (t: number) => signedDistance(surface, c.at(t).slice(0, 3) as XYZ),
     out: number[] = [];
   if (!(t1 > t0)) return out;
-  if (surface.kind === 'spline' && curve.kind === 'line') {
-    // A spline surface lies inside its control points' box: only the stretch of the line inside it can cross.
-    const box = controlBox(surface),
-      o = curve.origin,
-      d = curve.direction;
-    for (let k = 0; k < 3; k++) {
-      if (Math.abs(d[k]) < 1e-300) {
-        if (o[k] < box.min[k] || o[k] > box.max[k]) return out;
-        continue;
-      }
-      const a = (box.min[k] - o[k]) / d[k],
-        b = (box.max[k] - o[k]) / d[k];
-      t0 = Math.max(t0, Math.min(a, b));
-      t1 = Math.min(t1, Math.max(a, b));
-    }
-    if (!(t1 > t0)) return out;
-  }
+  if (surface.kind === 'spline') return splineCrossings(curve, surface, t0, t1);
   const speed = speedBound(curve);
-  if (!Number.isFinite(speed) || surface.kind === 'spline') {
-    // A spline curve, or a spline surface (no bound on its bend): sign changes between dense samples. A spline
-    // surface's distance can also jump where the nearest place moves to another part of it: a root counts only where
-    // the distance is about zero.
-    const n = surface.kind === 'spline' ? 512 : 256;
+  if (!Number.isFinite(speed)) {
+    // Splines: sign changes between dense samples.
+    const n = 256;
     let a = t0,
-      fa = f(a),
-      pa = c.at(a),
-      length3 = 0;
-    for (let k = 1; k <= n; k++) {
-      const b = t0 + ((t1 - t0) * k) / n,
-        pb = c.at(b);
-      length3 += Math.hypot(pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2]);
-      pa = pb;
-    }
-    const zero = 1e-9 * length3 + 1e-15;
+      fa = f(a);
     for (let k = 1; k <= n; k++) {
       const b = t0 + ((t1 - t0) * k) / n,
         fb = f(b);
-      if (negative(fa) !== negative(fb)) {
-        const t = bisect(f, a, fa, b, fb),
-          p = c.at(t).slice(0, 3) as XYZ;
-        // On the surface itself, not where the distance jumps or on its continuation past its edges.
-        if (surface.kind !== 'spline' || length(sub(p, splineFoot(surface, p).q)) <= zero) out.push(t);
-      }
+      if (negative(fa) !== negative(fb)) out.push(bisect(f, a, fa, b, fb));
       a = b;
       fa = fb;
     }
@@ -321,4 +289,147 @@ export function curveSurfaceCrossings(
   };
   visit(t0, f(t0), t1, f(t1), 0);
   return out;
+}
+
+/**
+ * A spline surface as cells of its parameter grid (two to a knot span each way, up to 128 a direction), each with a
+ * box round its corners, middle and edge midpoints, padded by twice the most any of them strays from the corners'
+ * plane average: the surface over the cell lies inside it.
+ */
+interface SplineCells {
+  readonly us: number[];
+  readonly vs: number[];
+  readonly boxes: { min: XYZ; max: XYZ }[];
+}
+const cellCache = new WeakMap<SurfaceDef, SplineCells>();
+function splineCells(s: SurfaceDef): SplineCells {
+  let cells = cellCache.get(s);
+  if (cells) return cells;
+  const e = surfaceEvaluator(s),
+    [ub, vb] = e.breaks?.() ?? [[], []],
+    params = (breaks: readonly number[], domain: readonly [number, number]) => {
+      const knots = breaks.length >= 2 ? breaks : domain,
+        per = Math.max(1, Math.min(2, Math.floor(128 / Math.max(1, knots.length - 1)))),
+        out: number[] = [];
+      for (let i = 1; i < knots.length; i++)
+        for (let k = 0; k < per; k++) out.push(knots[i - 1] + ((knots[i] - knots[i - 1]) * k) / per);
+      out.push(knots[knots.length - 1]);
+      return out;
+    },
+    us = params(ub, e.uDomain),
+    vs = params(vb, e.vDomain),
+    at = (u: number, v: number) => e.at(u, v).slice(0, 3) as XYZ,
+    grid = us.map((u) => vs.map((v) => at(u, v))),
+    boxes: { min: XYZ; max: XYZ }[] = [];
+  for (let i = 0; i + 1 < us.length; i++)
+    for (let j = 0; j + 1 < vs.length; j++) {
+      const corners = [grid[i][j], grid[i + 1][j], grid[i][j + 1], grid[i + 1][j + 1]],
+        um = (us[i] + us[i + 1]) / 2,
+        vm = (vs[j] + vs[j + 1]) / 2,
+        inner = [at(um, vm), at(um, vs[j]), at(um, vs[j + 1]), at(us[i], vm), at(us[i + 1], vm)],
+        mean = [0, 1, 2].map((k) => corners.reduce((a, c) => a + c[k], 0) / 4) as XYZ,
+        min: XYZ = [Infinity, Infinity, Infinity],
+        max: XYZ = [-Infinity, -Infinity, -Infinity];
+      let stray = 0;
+      for (const q of inner) stray = Math.max(stray, length(sub(q, mean)) - length(sub(corners[0], mean)), 0);
+      for (const q of [...corners, ...inner])
+        for (let k = 0; k < 3; k++) {
+          min[k] = Math.min(min[k], q[k]);
+          max[k] = Math.max(max[k], q[k]);
+        }
+      const pad = 2 * stray + 1e-9 * Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) + 1e-15;
+      boxes.push({ min: min.map((x) => x - pad) as XYZ, max: max.map((x) => x + pad) as XYZ });
+    }
+  cells = { us, vs, boxes };
+  cellCache.set(s, cells);
+  return cells;
+}
+
+/**
+ * Where a curve crosses a spline surface (not tangentially), every sheet of it: the curve in pieces (one for a line,
+ * 64 otherwise), each piece's padded box against the surface's cells, and Newton's method on S(u, v) = C(t) from each
+ * cell a piece's box meets. Roots outside the domain or the parameter range are dropped; nearby ones are merged.
+ */
+function splineCrossings(curve: CurveDef, surface: SurfaceDef, t0: number, t1: number): number[] {
+  const c = curveEvaluator(curve),
+    e = surfaceEvaluator(surface),
+    cells = splineCells(surface),
+    nv = cells.vs.length - 1,
+    pieces = curve.kind === 'line' ? 1 : 64,
+    scale0 = length(
+      sub(
+        controlBox(surface as SurfaceDef & { kind: 'spline' }).max,
+        controlBox(surface as SurfaceDef & { kind: 'spline' }).min,
+      ),
+    ),
+    roots: number[] = [],
+    meets = (a: { min: XYZ; max: XYZ }, b: { min: XYZ; max: XYZ }) =>
+      a.min[0] <= b.max[0] &&
+      b.min[0] <= a.max[0] &&
+      a.min[1] <= b.max[1] &&
+      b.min[1] <= a.max[1] &&
+      a.min[2] <= b.max[2] &&
+      b.min[2] <= a.max[2];
+  for (let k = 0; k < pieces; k++) {
+    const a = t0 + ((t1 - t0) * k) / pieces,
+      b = t0 + ((t1 - t0) * (k + 1)) / pieces;
+    let box: { min: XYZ; max: XYZ };
+    if (curve.kind === 'line') {
+      const p = c.at(a),
+        q = c.at(b);
+      box = {
+        min: [0, 1, 2].map((i) => Math.min(p[i], q[i])) as XYZ,
+        max: [0, 1, 2].map((i) => Math.max(p[i], q[i])) as XYZ,
+      };
+    } else {
+      const p = c.at(a).slice(0, 3) as XYZ,
+        q = c.at(b).slice(0, 3) as XYZ,
+        m = c.at((a + b) / 2).slice(0, 3) as XYZ,
+        sag = 2 * length(sub(m, scale(add3(p, q), 0.5)));
+      box = {
+        min: [0, 1, 2].map((i) => Math.min(p[i], q[i], m[i]) - sag) as XYZ,
+        max: [0, 1, 2].map((i) => Math.max(p[i], q[i], m[i]) + sag) as XYZ,
+      };
+    }
+    for (let i = 0; i < cells.boxes.length; i++) {
+      const cell = cells.boxes[i];
+      if (!meets(box, cell)) continue;
+      // Newton on F(u, v, t) = S(u, v) - C(t) from the cell's middle and the piece's middle.
+      let u = (cells.us[Math.floor(i / nv)] + cells.us[Math.floor(i / nv) + 1]) / 2,
+        v = (cells.vs[i % nv] + cells.vs[(i % nv) + 1]) / 2,
+        t = (a + b) / 2,
+        found = false;
+      for (let it = 0; it < 40; it++) {
+        const s = e.at(u, v),
+          q = c.at(t),
+          f: XYZ = [s[0] - q[0], s[1] - q[1], s[2] - q[2]];
+        if (length(f) <= 1e-13 * scale0) {
+          found = true;
+          break;
+        }
+        const step = solve3t([s[3], s[4], s[5]], [s[6], s[7], s[8]], [-q[3], -q[4], -q[5]], f);
+        if (!step) break;
+        u -= step[0];
+        v -= step[1];
+        t -= step[2];
+        if (!Number.isFinite(u + v + t)) break;
+      }
+      if (!found) continue;
+      const span = (d: readonly [number, number]) => 1e-9 * (d[1] - d[0]);
+      if (!e.uPeriod && (u < e.uDomain[0] - span(e.uDomain) || u > e.uDomain[1] + span(e.uDomain))) continue;
+      if (!e.vPeriod && (v < e.vDomain[0] - span(e.vDomain) || v > e.vDomain[1] + span(e.vDomain))) continue;
+      if (t < t0 - 1e-12 * (t1 - t0) || t > t1 + 1e-12 * (t1 - t0)) continue;
+      if (!roots.some((r) => Math.abs(r - t) <= 1e-9 * (t1 - t0))) roots.push(t);
+    }
+  }
+  return roots.sort((x, y) => x - y);
+}
+
+const add3 = (a: readonly number[], b: readonly number[]): XYZ => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+
+/** Solves x c1 + y c2 + z c3 = rhs (columns), by Cramer's rule; undefined when singular. */
+function solve3t(c1: XYZ, c2: XYZ, c3: XYZ, rhs: XYZ): XYZ | undefined {
+  const det = dot(c1, cross(c2, c3));
+  if (!(Math.abs(det) > 1e-300)) return undefined;
+  return [dot(rhs, cross(c2, c3)) / det, dot(c1, cross(rhs, c3)) / det, dot(c1, cross(c2, rhs)) / det];
 }
