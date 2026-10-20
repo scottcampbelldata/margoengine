@@ -235,6 +235,8 @@ environment fills in where nothing was drawn); GPU-culled
 
 ## Display P3 and HDR output
 
+Input colours can be Display P3 too: every environment colour (`Fog`, `ColorBackground`, `HemisphereLight`...) takes CSS `'color(display-p3 r g b)'` (math's `parseColor`), whose linear sRGB channels stay negative outside sRGB, so materials and lights carry the wide-gamut colour through Tonemap's excess output to a P3 canvas. A background colour outside sRGB is clipped on an sRGB canvas.
+
 ```ts
 import {Engine} from '@margoengine/core';
 import {ColorOutput} from '@margoengine/environment';

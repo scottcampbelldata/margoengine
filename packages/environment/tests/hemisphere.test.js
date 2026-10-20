@@ -152,3 +152,10 @@ test('HemisphereLight and AmbientLight upload sky and ground x intensity, live, 
   light.dispose();
   ambient.dispose();
 });
+
+test('environment colours take CSS color(display-p3 ...): outside sRGB their linear channels stay negative', () => {
+  const light = new HemisphereLight({ sky: 'color(display-p3 0 1 0)', ground: '#000000' });
+  const values = Array.from(light['values']);
+  assert.ok(values[0] < -0.2 && values[1] > 1.04 && values[2] < -0.07, `P3 green: ${values.slice(0, 3)}`);
+  assert.throws(() => new HemisphereLight({ sky: 'color(rec2020 1 0 0)' }), TypeError);
+});

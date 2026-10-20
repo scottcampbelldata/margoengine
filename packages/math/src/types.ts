@@ -70,7 +70,11 @@ export interface MatrixLike {
 }
 /** Anything indexable that can receive numbers: `number[]`, `Float32Array`, `Float64Array`, a GPU staging buffer view. */
 export type NumberArray = { [index: number]: number };
-/** Color space tags, spelled like three.js (`SRGBColorSpace`, `LinearSRGBColorSpace`). */
-export type ColorSpace = 'srgb' | 'srgb-linear';
+/**
+ * Color space tags, spelled like three.js (`SRGBColorSpace`, `LinearSRGBColorSpace`, `DisplayP3ColorSpace`,
+ * `LinearDisplayP3ColorSpace`) and CSS `color()`. Display P3 has the DCI-P3 primaries with the D65 white point and the
+ * sRGB transfer function; Margo's working space stays linear sRGB, where P3 colours outside sRGB have negative channels.
+ */
+export type ColorSpace = 'srgb' | 'srgb-linear' | 'display-p3' | 'display-p3-linear';
 /** Euler rotation orders. `XYZ` matches core `mesh.rotation` and `setRotation`. */
 export type EulerOrder = 'XYZ' | 'YXZ' | 'ZXY' | 'ZYX' | 'YZX' | 'XZY';

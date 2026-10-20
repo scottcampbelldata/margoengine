@@ -79,7 +79,9 @@ export class DirectionalLights implements EnginePlugin, ClusteredDirectional {
       finiteVector(color, 3, 'Directional light color');
       if (!length || !Number.isFinite(Math.fround(intensity)) || intensity < 0)
         throw new RangeError('Directional light needs a nonzero direction and a finite intensity of 0 or more');
-      // Negative channels are allowed: a wide-gamut (Display-P3) colour outside sRGB keeps them, as the light loop sums linearly.
+      // A wide-gamut (Display P3) colour keeps negative linear sRGB channels (the light loop sums linearly); its luminance cannot be negative.
+      if (!(0.2126 * color[0] + 0.7152 * color[1] + 0.0722 * color[2] >= 0))
+        throw new RangeError('Directional light color needs a luminance of 0 or more');
       return [
         -x / length,
         -y / length,

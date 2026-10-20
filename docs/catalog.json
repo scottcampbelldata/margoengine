@@ -71,15 +71,20 @@
       "MathUtils",
       "Matrix3",
       "Matrix4",
+      "P3_TO_SRGB",
       "Plane",
       "Quaternion",
       "Ray",
       "SRGBToLinear",
+      "SRGB_TO_P3",
       "Sphere",
       "Spherical",
       "Vector2",
       "Vector3",
-      "Vector4"
+      "Vector4",
+      "clipToSRGB",
+      "linearP3ToLinearSRGB",
+      "linearSRGBToLinearP3"
     ]
   },
   {

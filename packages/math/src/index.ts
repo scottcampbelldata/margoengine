@@ -5,7 +5,16 @@ export { Quaternion } from './quaternion.js';
 export { Euler } from './euler.js';
 export { Matrix3 } from './matrix3.js';
 export { Matrix4 } from './matrix4.js';
-export { Color, SRGBToLinear, LinearToSRGB } from './color.js';
+export {
+  Color,
+  SRGBToLinear,
+  LinearToSRGB,
+  P3_TO_SRGB,
+  SRGB_TO_P3,
+  linearP3ToLinearSRGB,
+  linearSRGBToLinearP3,
+  clipToSRGB,
+} from './color.js';
 export type { ColorLike, HSL } from './color.js';
 export { Box3 } from './box3.js';
 export { Sphere } from './sphere.js';

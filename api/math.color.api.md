@@ -11,6 +11,7 @@ export class Color {
     set(value: number | string | ColorLike): this;
     setScalar(s: number): this;
     setRGB(r: number, g: number, b: number, colorSpace?: ColorSpace): this;
+    getRGB<T extends NumberArray = number[]>(out?: T, colorSpace?: ColorSpace): T;
     setHex(hex: number, colorSpace?: ColorSpace): this;
     setHSL(h: number, s: number, l: number, colorSpace?: ColorSpace): this;
     setStyle(style: string, colorSpace?: ColorSpace): this;
@@ -52,13 +53,23 @@ export interface HSL {
 
 export const LinearToSRGB: (c: number) => number;
 
+export const P3_TO_SRGB: readonly number[];
+
 export const SRGBToLinear: (c: number) => number;
+
+export const SRGB_TO_P3: readonly number[];
+
+export function clipToSRGB<T extends NumberArray = number[]>(rgb: ArrayLike<number>, out?: T, offset?: number): T;
+
+export function linearP3ToLinearSRGB<T extends NumberArray = number[]>(rgb: ArrayLike<number>, out?: T, offset?: number): T;
+
+export function linearSRGBToLinearP3<T extends NumberArray = number[]>(rgb: ArrayLike<number>, out?: T, offset?: number): T;
 
 export function parseColor(value: ColorInput, out?: Float32Array | number[], offset?: number): Float32Array | number[];
 
 // Not exported from this entry, but used by the exports above:
 
-type ColorSpace = 'srgb' | 'srgb-linear';
+type ColorSpace = 'srgb' | 'srgb-linear' | 'display-p3' | 'display-p3-linear';
 
 type NumberArray = {
     [index: number]: number;

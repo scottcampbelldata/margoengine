@@ -217,9 +217,11 @@ export class Clustered implements EnginePlugin {
         light.range < 0 ||
         !Number.isFinite(Math.fround(light.intensity ?? 1)) ||
         (light.intensity ?? 1) < 0 ||
-        (light.color ?? []).some((v: number) => v < 0)
+        // A wide-gamut (Display P3) colour keeps negative linear sRGB channels; its luminance cannot be negative.
+        (light.color !== undefined &&
+          !(0.2126 * light.color[0] + 0.7152 * light.color[1] + 0.0722 * light.color[2] >= 0))
       )
-        throw new RangeError('Invalid light range/color/intensity');
+        throw new RangeError('Invalid light range/color/intensity (a colour needs a luminance of 0 or more)');
       if (light.decay !== undefined && !(Number.isFinite(Math.fround(light.decay)) && light.decay >= 0))
         throw new RangeError('Light decay must be a finite number of 0 or more; 2 is inverse-square');
       const shadow = light.shadow,

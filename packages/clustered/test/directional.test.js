@@ -96,3 +96,21 @@ test('Clustered.list is a frozen copy of the last setLights list', () => {
   assert.throws(() => lights.setLights([{ position: [0, 0, 0], range: -1 }]), RangeError);
   assert.equal(lights.list[0], point, 'a rejected list leaves the last one');
 });
+
+test('light colours may be wide-gamut (negative linear sRGB channels) but not of negative luminance', () => {
+  // Display P3 green in linear sRGB (math's linearP3ToLinearSRGB([0, 1, 0])).
+  const p3Green = [-0.2249, 1.0421, -0.0786],
+    lights = new Clustered({ grid: [2, 2, 2] }),
+    d = new DirectionalLights({ lights: { setLights() {} } }),
+    area = new AreaLights({ lights: { setLights() {} } });
+  lights.setLights([{ position: [0, 1, 0], range: 2, color: p3Green }]);
+  assert.equal(lights['data'][4], Math.fround(-0.2249));
+  d.setLights([{ direction: [0, -1, 0], color: p3Green }]);
+  area.setLights([{ position: [0, 1, 0], direction: [0, -1, 0], width: 1, height: 1, color: p3Green }]);
+  assert.throws(() => lights.setLights([{ position: [0, 1, 0], range: 2, color: [1, -1, 0] }]), /luminance/);
+  assert.throws(() => d.setLights([{ direction: [0, -1, 0], color: [-1, 0.1, 0] }]), /luminance/);
+  assert.throws(
+    () => area.setLights([{ position: [0, 1, 0], direction: [0, -1, 0], width: 1, height: 1, color: [0, -1, 0] }]),
+    RangeError,
+  );
+});

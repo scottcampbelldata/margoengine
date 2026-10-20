@@ -20,11 +20,128 @@ export const SRGBToLinear = (c: number): number => (c <= 0.04045 ? c / 12.92 : (
 /** sRGB transfer function, encoded (linear light to display value). */
 export const LinearToSRGB = (c: number): number => (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055);
 
+function invert3(m: readonly number[]): number[] {
+  const [a, b, c, d, e, f, g, h, i] = m,
+    A = e * i - f * h,
+    B = f * g - d * i,
+    C = d * h - e * g,
+    det = a * A + b * B + c * C;
+  return [A, c * h - b * i, b * f - c * e, B, a * i - c * g, c * d - a * f, C, b * g - a * h, a * e - b * d].map(
+    (v) => v / det,
+  );
+}
+const multiply3 = (a: readonly number[], b: readonly number[]): number[] =>
+  a.map((_, k) => {
+    const row = k - (k % 3),
+      col = k % 3;
+    return a[row] * b[col] + a[row + 1] * b[3 + col] + a[row + 2] * b[6 + col];
+  });
+/**
+ * Linear RGB to CIE XYZ (row-major 3x3) of three primaries and a white point, each a CIE 1931 `[x, y]` chromaticity: the
+ * columns are the primaries' XYZ, scaled so that RGB (1, 1, 1) is the white point at luminance Y = 1.
+ */
+function rgbToXYZ(r: number[], g: number[], b: number[], white: number[]): number[] {
+  const xyz = (p: number[]) => [p[0] / p[1], 1, (1 - p[0] - p[1]) / p[1]],
+    [R, G, B, W] = [r, g, b, white].map(xyz),
+    m = [R[0], G[0], B[0], R[1], G[1], B[1], R[2], G[2], B[2]],
+    inverse = invert3(m),
+    s = [0, 1, 2].map((i) => inverse[i * 3] * W[0] + inverse[i * 3 + 1] * W[1] + inverse[i * 3 + 2] * W[2]);
+  return m.map((v, i) => v * s[i % 3]);
+}
+// sRGB / Rec. 709 primaries (IEC 61966-2-1) and Display P3's (the DCI-P3 primaries, SMPTE EG 432-1), both with D65 white.
+const D65 = [0.3127, 0.329];
+/** Linear Display P3 to linear sRGB, row-major 3x3, derived from the two sets of primaries. */
+export const P3_TO_SRGB: readonly number[] = Object.freeze(
+  multiply3(
+    invert3(rgbToXYZ([0.64, 0.33], [0.3, 0.6], [0.15, 0.06], D65)),
+    rgbToXYZ([0.68, 0.32], [0.265, 0.69], [0.15, 0.06], D65),
+  ),
+);
+/** Linear sRGB to linear Display P3 (the inverse of {@link P3_TO_SRGB}). */
+export const SRGB_TO_P3: readonly number[] = Object.freeze(invert3(P3_TO_SRGB));
+function apply3(m: readonly number[], v: ArrayLike<number>, out: NumberArray, offset: number): void {
+  const x = v[0],
+    y = v[1],
+    z = v[2];
+  out[offset] = m[0] * x + m[1] * y + m[2] * z;
+  out[offset + 1] = m[3] * x + m[4] * y + m[5] * z;
+  out[offset + 2] = m[6] * x + m[7] * y + m[8] * z;
+}
+/** Linear Display P3 `rgb` as linear sRGB in `out` (default a new array); colours outside sRGB get negative channels. */
+export function linearP3ToLinearSRGB<T extends NumberArray = number[]>(rgb: ArrayLike<number>, out?: T, offset = 0): T {
+  const target = out ?? ([0, 0, 0] as unknown as T);
+  apply3(P3_TO_SRGB, rgb, target, offset);
+  return target;
+}
+/** Linear sRGB `rgb` as linear Display P3 in `out` (default a new array). */
+export function linearSRGBToLinearP3<T extends NumberArray = number[]>(rgb: ArrayLike<number>, out?: T, offset = 0): T {
+  const target = out ?? ([0, 0, 0] as unknown as T);
+  apply3(SRGB_TO_P3, rgb, target, offset);
+  return target;
+}
+/**
+ * Linear sRGB `rgb` brought inside sRGB from below, in `out` (default a new array): a colour with a negative channel (a
+ * wide-gamut colour) is desaturated toward its own luminance (Rec. 709 weights) just until no channel is negative, so
+ * its luminance and hue stay; channels above 1 (HDR) are kept. For inputs that take only sRGB, such as core's sun.
+ */
+export function clipToSRGB<T extends NumberArray = number[]>(rgb: ArrayLike<number>, out?: T, offset = 0): T {
+  const target = out ?? ([0, 0, 0] as unknown as T),
+    r = rgb[0],
+    g = rgb[1],
+    b = rgb[2],
+    y = Math.max(0, 0.2126 * r + 0.7152 * g + 0.0722 * b);
+  let t = 1;
+  if (r < 0) t = Math.min(t, y / (y - r));
+  if (g < 0) t = Math.min(t, y / (y - g));
+  if (b < 0) t = Math.min(t, y / (y - b));
+  target[offset] = Math.max(0, y + (r - y) * t);
+  target[offset + 1] = Math.max(0, y + (g - y) * t);
+  target[offset + 2] = Math.max(0, y + (b - y) * t);
+  return target;
+}
+/** Components `r, g, b` in `colorSpace` as linear sRGB at `out[offset..]`. */
+function toLinear(r: number, g: number, b: number, colorSpace: ColorSpace, out: NumberArray, offset: number): void {
+  const encoded = colorSpace === 'srgb' || colorSpace === 'display-p3',
+    v = encoded ? [SRGBToLinear(r), SRGBToLinear(g), SRGBToLinear(b)] : [r, g, b];
+  if (colorSpace === 'display-p3' || colorSpace === 'display-p3-linear') apply3(P3_TO_SRGB, v, out, offset);
+  else {
+    out[offset] = v[0];
+    out[offset + 1] = v[1];
+    out[offset + 2] = v[2];
+  }
+}
+const spaces: Readonly<Record<string, ColorSpace>> = {
+  srgb: 'srgb',
+  'srgb-linear': 'srgb-linear',
+  'display-p3': 'display-p3',
+  'display-p3-linear': 'display-p3-linear',
+};
+/** CSS `color(<space> r g b [/ alpha])` with a space Margo knows: its components (numbers or %) and space; else null. */
+function cssColor(text: string): { rgb: number[]; space: ColorSpace } | null {
+  const match = /^color\(\s*([a-z0-9-]+)\s+([^)]*)\)$/i.exec(text.trim());
+  if (!match) return null;
+  const space = spaces[match[1].toLowerCase()],
+    parts = match[2]
+      .split('/')[0]
+      .trim()
+      .split(/[\s,]+/);
+  if (!space)
+    throw new TypeError(`Color space '${match[1]}' is not srgb, srgb-linear, display-p3 or display-p3-linear`);
+  const rgb = parts.map((part) => (part.endsWith('%') ? parseFloat(part) / 100 : Number(part)));
+  if (rgb.length !== 3 || !rgb.every(Number.isFinite))
+    throw new TypeError(`Color '${text}' needs three numbers: color(${space} r g b)`);
+  return { rgb, space };
+}
+
 /**
  * Converts a {@link ColorInput} to linear RGB at `out[offset..offset + 2]` and returns `out` (default: a new
- * `[0, 0, 0]`; `offset` defaults to 0).
- * @throws RangeError for a number outside 0x000000..0xffffff or a negative/non-finite `[r, g, b]` component.
- * @throws TypeError for a string that is not `#rrggbb`/`#rgb`, or any other value.
+ * `[0, 0, 0]`; `offset` defaults to 0). Strings are `#rrggbb`, `#rgb` (sRGB) or CSS `color(display-p3 r g b)` (also
+ * `srgb`, `srgb-linear` and `display-p3-linear`; components 0..1 or %): a Display P3 colour outside sRGB keeps its
+ * negative linear sRGB channels, for the shaders that carry them to a wide-gamut canvas (tonemap, ColorOutput).
+ * @throws RangeError for a number outside 0x000000..0xffffff or a negative/non-finite `[r, g, b]` component (linear
+ * sRGB arrays stay non-negative: a negative one is a mistake far more often than a wide-gamut colour, which is given as
+ * `color(display-p3 ...)`).
+ * @throws TypeError for a string that is none of those, or any other value.
  */
 export function parseColor(
   value: ColorInput,
@@ -36,6 +153,10 @@ export function parseColor(
     if (!Number.isInteger(value) || value < 0 || value > 0xffffff)
       throw new RangeError('Numeric colors must be 0x000000..0xffffff');
     rgb = [(value >> 16) & 255, (value >> 8) & 255, value & 255].map((v) => SRGBToLinear(v / 255));
+  } else if (typeof value === 'string' && /^\s*color\(/i.test(value)) {
+    const { rgb: parts, space } = cssColor(value)!;
+    rgb = [0, 0, 0];
+    toLinear(parts[0], parts[1], parts[2], space, rgb, 0);
   } else if (typeof value === 'string') {
     const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(value),
       long = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(value);
@@ -86,11 +207,24 @@ export class Color {
     this.r = this.g = this.b = s;
     return this;
   }
+  /** Sets the colour from components in `colorSpace` (default linear sRGB); Display P3 outside sRGB gives negative channels. */
   setRGB(r: number, g: number, b: number, colorSpace: ColorSpace = 'srgb-linear'): this {
-    this.r = r;
-    this.g = g;
-    this.b = b;
-    return colorSpace === 'srgb' ? this.convertSRGBToLinear() : this;
+    const v = [0, 0, 0];
+    toLinear(r, g, b, colorSpace, v, 0);
+    this.r = v[0];
+    this.g = v[1];
+    this.b = v[2];
+    return this;
+  }
+  /** The colour's components in `colorSpace` (default linear sRGB), not clamped, into `out` (default a new array). */
+  getRGB<T extends NumberArray = number[]>(out?: T, colorSpace: ColorSpace = 'srgb-linear'): T {
+    const target = out ?? ([0, 0, 0] as unknown as T),
+      v = [this.r, this.g, this.b];
+    if (colorSpace === 'display-p3' || colorSpace === 'display-p3-linear')
+      apply3(SRGB_TO_P3, [this.r, this.g, this.b], v, 0);
+    const encode = colorSpace === 'srgb' || colorSpace === 'display-p3';
+    for (let k = 0; k < 3; k++) target[k] = encode ? LinearToSRGB(v[k]) : v[k];
+    return target;
   }
   setHex(hex: number, colorSpace: ColorSpace = 'srgb'): this {
     hex = Math.floor(hex);
@@ -108,7 +242,9 @@ export class Color {
   }
   /** Parses `#rgb`, `#rrggbb`, `rgb()`/`rgba()` (0-255 or %) and `hsl()`/`hsla()`. Alpha is ignored. Named colors are not supported. */
   setStyle(style: string, colorSpace: ColorSpace = 'srgb'): this {
-    const text = style.trim();
+    const text = style.trim(),
+      css = cssColor(text);
+    if (css) return this.setRGB(css.rgb[0], css.rgb[1], css.rgb[2], css.space);
     let match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(text);
     if (match) {
       const hex = match[1].length === 3 ? match[1].replace(/./g, '$&$&') : match[1];
@@ -156,20 +292,18 @@ export class Color {
     return this;
   }
 
-  /** 0xRRGGBB, encoded to sRGB by default. Channels are clamped to [0, 1]. */
+  /** 0xRRGGBB, encoded to sRGB by default (or the components in `colorSpace`). Channels are clamped to [0, 1]. */
   getHex(colorSpace: ColorSpace = 'srgb'): number {
-    const encode = (c: number): number => Math.round(unit(colorSpace === 'srgb' ? LinearToSRGB(c) : c) * 255);
-    return (encode(this.r) << 16) | (encode(this.g) << 8) | encode(this.b);
+    const [r, g, b] = this.getRGB([0, 0, 0], colorSpace),
+      encode = (c: number): number => Math.round(unit(c) * 255);
+    return (encode(r) << 16) | (encode(g) << 8) | encode(b);
   }
   /** `rrggbb` without `#`. `'#' + color.getHexString()` is accepted by core `PbrMaterial`. */
   getHexString(colorSpace: ColorSpace = 'srgb'): string {
     return this.getHex(colorSpace).toString(16).padStart(6, '0');
   }
   getHSL<T extends HSL>(target: T, colorSpace: ColorSpace = 'srgb'): T {
-    const convert = (c: number): number => (colorSpace === 'srgb' ? LinearToSRGB(c) : c);
-    const r = convert(this.r),
-      g = convert(this.g),
-      b = convert(this.b),
+    const [r, g, b] = this.getRGB([0, 0, 0], colorSpace),
       max = Math.max(r, g, b),
       min = Math.min(r, g, b),
       l = (min + max) / 2;

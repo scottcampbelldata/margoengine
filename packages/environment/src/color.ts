@@ -20,6 +20,11 @@ type RGB = [number, number, number];
 // sRGB bytes, `[r, g, b]` arrays linear (docs/conventions.md).
 function colorPair(value: ColorInput): { srgb: RGB; linear: RGB } {
   let hex = typeof value === 'number' ? value : undefined;
+  // CSS color(display-p3 r g b) and friends: linear sRGB, negative outside sRGB (math's parseColor).
+  if (typeof value === 'string' && /^\s*color\(/i.test(value)) {
+    const linear = parseColor(value, [0, 0, 0]) as RGB;
+    return { srgb: [linearToSrgb(linear[0]), linearToSrgb(linear[1]), linearToSrgb(linear[2])], linear };
+  }
   if (typeof value === 'string') {
     const digits = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(value)?.[1];
     if (!digits)

@@ -48,6 +48,7 @@ export class Color {
     set(value: number | string | ColorLike): this;
     setScalar(s: number): this;
     setRGB(r: number, g: number, b: number, colorSpace?: ColorSpace): this;
+    getRGB<T extends NumberArray = number[]>(out?: T, colorSpace?: ColorSpace): T;
     setHex(hex: number, colorSpace?: ColorSpace): this;
     setHSL(h: number, s: number, l: number, colorSpace?: ColorSpace): this;
     setStyle(style: string, colorSpace?: ColorSpace): this;
@@ -81,7 +82,7 @@ export interface ColorLike {
     b: number;
 }
 
-export type ColorSpace = 'srgb' | 'srgb-linear';
+export type ColorSpace = 'srgb' | 'srgb-linear' | 'display-p3' | 'display-p3-linear';
 
 export class Euler {
     x: number;
@@ -263,6 +264,8 @@ export type NumberArray = {
     [index: number]: number;
 };
 
+export const P3_TO_SRGB: readonly number[];
+
 export class Plane {
     normal: Vector3;
     constant: number;
@@ -352,6 +355,8 @@ export class Ray {
 }
 
 export const SRGBToLinear: (c: number) => number;
+
+export const SRGB_TO_P3: readonly number[];
 
 export class Sphere {
     center: Vector3;
@@ -544,6 +549,12 @@ export class Vector4 {
     toArray(): [number, number, number, number];
     toArray<T extends NumberArray>(out: T, offset?: number): T;
 }
+
+export function clipToSRGB<T extends NumberArray = number[]>(rgb: ArrayLike<number>, out?: T, offset?: number): T;
+
+export function linearP3ToLinearSRGB<T extends NumberArray = number[]>(rgb: ArrayLike<number>, out?: T, offset?: number): T;
+
+export function linearSRGBToLinearP3<T extends NumberArray = number[]>(rgb: ArrayLike<number>, out?: T, offset?: number): T;
 
 // Not exported from this entry, but used by the exports above:
 

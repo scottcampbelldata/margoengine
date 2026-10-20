@@ -16,7 +16,7 @@ and imported from there. Types are erased at build time, so this costs 0 runtime
 | `Quat` | `readonly [x, y, z, w]` | unit quaternions (`setQuaternion`) |
 | `MutableVec2`, `MutableVec3` | `[x, y]`, `[x, y, z]` | freshly allocated results the caller may modify (geometry curves, `@margoengine/math/vec3`) |
 | `Mat4` | `ArrayLike<number>` | column-major 4x4 (`camera.matrix`, world matrices) |
-| `ColorInput` | `string \| number \| readonly number[]` | `'#rrggbb'`, `'#rgb'`, `0xrrggbb` (sRGB) or linear `[r, g, b]`; decode with `parseColor` |
+| `ColorInput` | `string \| number \| readonly number[]` | `'#rrggbb'`, `'#rgb'`, `0xrrggbb` (sRGB), CSS `'color(display-p3 r g b)'` (also `srgb`, `srgb-linear`, `display-p3-linear`) or linear sRGB `[r, g, b]`; decode with `parseColor`. A P3 colour outside sRGB decodes to negative linear sRGB channels and keeps them; linear arrays must stay non-negative. Light colours (clustered, area, directional) may be negative per channel with a luminance of 0 or more; core's sun takes only sRGB, so give it `clipToSRGB(rgb)`. |
 | `HeightField` | `(x, z) => number` | ground height samplers |
 | `Vec2Like`, `Vec3Like`, `Vec4Like` | `{x, y}`, `{x, y, z}`, `{x, y, z, w}` | object-shaped input (`mesh.position`, Recast points) |
 | `SphereLike`, `PlaneLike`, `BoxLike` | `{center, radius}`, `{normal, constant}`, `{min, max}` | structural input of the bounds classes |

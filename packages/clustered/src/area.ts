@@ -128,7 +128,9 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
         ![light.width, light.height, intensity].every((v) => Number.isFinite(Math.fround(v)) && v >= 0) ||
         !light.width ||
         !light.height ||
-        (light.color ?? []).some((v: number) => v < 0) ||
+        // Wide-gamut colours keep negative linear sRGB channels; the luminance cannot be negative.
+        (light.color !== undefined &&
+          !(0.2126 * light.color[0] + 0.7152 * light.color[1] + 0.0722 * light.color[2] >= 0)) ||
         typeof (light.twoSided ?? false) !== 'boolean'
       )
         throw new RangeError('Invalid area light size/color/intensity/direction');
