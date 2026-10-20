@@ -1,5 +1,5 @@
 {
-  "commit": "6222ee66",
+  "commit": "5dbbb652",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -20,8 +20,8 @@
     },
     "@margoengine/animator": {
       ".": {
-        "raw": 13483,
-        "gzip": 4862
+        "raw": 31275,
+        "gzip": 11345
       }
     },
     "@margoengine/audio": {
@@ -38,8 +38,8 @@
     },
     "@margoengine/brep": {
       ".": {
-        "raw": 218076,
-        "gzip": 75730
+        "raw": 271113,
+        "gzip": 94268
       }
     },
     "@margoengine/bvh": {
@@ -172,8 +172,8 @@
         "gzip": 25782
       },
       "./probes": {
-        "raw": 36242,
-        "gzip": 13541
+        "raw": 40989,
+        "gzip": 14984
       },
       "./volumetric": {
         "raw": 17959,
@@ -422,8 +422,8 @@
         "gzip": 4051
       },
       "dist/workers/brep-runtime.js": {
-        "raw": 120402,
-        "gzip": 41865
+        "raw": 128077,
+        "gzip": 44658
       },
       "dist/workers/cad-runtime.js": {
         "raw": 17555,
@@ -922,8 +922,8 @@
     },
     "@margoengine/voxel-pathtracer": {
       ".": {
-        "raw": 119320,
-        "gzip": 42991
+        "raw": 164630,
+        "gzip": 58274
       }
     },
     "@margoengine/water": {
@@ -997,9 +997,9 @@
       "brotli": 6390
     },
     "packages/machinery/dist/workers/brep-runtime.js": {
-      "raw": 119235,
-      "gzip": 41771,
-      "brotli": 36153
+      "raw": 126910,
+      "gzip": 44567,
+      "brotli": 38537
     },
     "packages/machinery/dist/workers/occt-import-js.js": {
       "raw": 97856,
