@@ -68,7 +68,7 @@ Legend: **yes**, **no**, **open** (MagicaVoxel has it, Margo does not match it y
 | --- | --- | --- |
 | Exposure, gamma, ACES film curve | yes | yes, within 1 level |
 | Vignette | yes | yes, within 0.001 |
-| Voxel edges, grid, background colour | yes | yes; edges 99.0-99.5%, grid 86-88% (line borders), background 99.92% |
+| Voxel edges, grid, background colour | yes | yes; edges 99.0-99.8%, grid 92.7-94.6% (camera registered), background 99.92% |
 | Transparent background PNG | yes | yes, not compared yet |
 | Non-cubic voxels (`_scale`) | yes | yes, not compared yet |
 | Bloom | in its viewport, not in saved snapshots | through `@margoengine/post` |

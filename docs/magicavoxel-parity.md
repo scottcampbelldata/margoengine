@@ -109,8 +109,11 @@ Everything here is on branch `worktree-agent-a63cac143225721f2` (not pushed, Cod
    passes it as the `imageSky` option; the helper sets intensity and turn. Panoramas of our own ramp image: 99.84%
    of pixels within 3 levels (the rest on the image's wrap seam); a scene lit by it: 99.76%.
 6. Display settings: done. Background colour (`environment.background`): 99.92%; vignette (`vignette`): 100% at
-   two strengths and two fields of view; edges (`edges`): 99.0-99.5%; grid (`grid`): 86-88% (positions and widths
-   within a pixel; MagicaVoxel's line borders are filtered differently). Transparent background (`_bg_a`): done
+   two strengths and two fields of view; edges (`edges`): 99.0-99.5%; grid (`grid`): 86-88% as rendered, 92.7-94.6%
+   with our camera 0.04% closer (harness option `__cameraScale` 0.9996). Measured on the top views: line widths and
+   colours equal (summed line strength 0.997-1.002 of ours), MagicaVoxel's image 0.04% larger (its slot glide stops
+   about 0.05 voxels short of the typed radius), which moves 0.4-pixel lines by up to 0.2 px at the image's edges;
+   the rest is the thin lines' sampling noise. Edges with the same correction: 99.1-99.8%. Transparent background (`_bg_a`): done
    as `capture({transparent: true})` (RGBA PNG; alpha = camera-ray coverage, the ground opaque); voxel `_scale`:
    done as `voxelScale` for `magicaVoxelMatrix` (the scene scaled about the origin, the camera unchanged). Neither is
    compared yet (scenes `C-bga`, `C-scale` in `mv-calib`): whether MagicaVoxel's ground stays opaque and whether its
@@ -122,7 +125,9 @@ Everything here is on branch `worktree-agent-a63cac143225721f2` (not pushed, Cod
    MIS on and transparent shadows on, but their MagicaVoxel images were never rendered.
 9. Blend materials (`_type _blend`) and metal Fresnel at grazing angles (rough red metal: 1-5 levels): not compared
    beyond the sky boards.
-10. Emitter light on the ground near emitters: ours about 6% brighter.
+10. Emitter light on the ground near emitters: done (2026-10-20, `pt-compare/v2/emissive`, both at 8192 samples): the
+    glow on the ground is 1.0014 x MagicaVoxel's with 99.9% of values within 3 levels (whole image 100.0%); the 6%
+    was gone with the non-reflective emitters.
 
 ## Exceed MagicaVoxel
 

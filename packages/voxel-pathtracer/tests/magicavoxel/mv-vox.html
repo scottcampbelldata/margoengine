@@ -31,6 +31,9 @@ window.render=async(b64,opt)=>{
  const canvas=document.querySelector('canvas');canvas.width=opt.width;canvas.height=opt.height;
  const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:cam.position,target:cam.target,fov:cam.fov,near:0.5,far:4000}});
  engine.camera.up=cam.up;
+ // __cameraScale s: the eye moved toward the target to s x its distance (MagicaVoxel's slot glide stops short).
+ const cs=opt.options&&opt.options.__cameraScale;
+ if(cs){engine.camera.position=cam.position.map((v,k)=>cam.target[k]+(v-cam.target[k])*cs);}
  engine.gpu?.addEventListener?.('uncapturederror',(e)=>errors.push(e.error.message));
  const tAttach=performance.now();
  const tracer=PT.VoxelPathTracer.attach(engine,{scene:{revision:1,models:models.filter(Boolean),instances,materials,environment:{...light.environment,...(opt.environment??{})}},
@@ -86,7 +89,7 @@ window.render=async(b64,opt)=>{
  await tracer.ready;
  const readyMs=performance.now()-tAttach;
  const t0=performance.now();
- const blob=await tracer.capture({width:opt.width,height:opt.height,samples:opt.samples});
+ const blob=await tracer.capture({width:opt.width,height:opt.height,samples:opt.samples,transparent:!!light.transparentBackground});
  const ms=performance.now()-t0;
  const out=new Uint8Array(await blob.arrayBuffer());let s='';for(let i=0;i<out.length;i+=32768)s+=String.fromCharCode(...out.subarray(i,i+32768));
  const gpuBytes=tracer.stats.gpuBytes;tracer.dispose();engine.dispose();
