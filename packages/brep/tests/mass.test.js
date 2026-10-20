@@ -2,7 +2,22 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { model } from '../dist/index.js';
 
-const { boolean, box, cylinder, fillet, frameOf, massProperties, revolve, sphere, torus } = model;
+const {
+  Body,
+  Edge,
+  Face,
+  Vertex,
+  boolean,
+  box,
+  cylinder,
+  fillet,
+  frameOf,
+  massProperties,
+  revolve,
+  sphere,
+  torus,
+  validateBody,
+} = model;
 const mm = 0.001,
   close = (actual, expected, what, tolerance = 1e-9) =>
     assert.ok(
@@ -120,4 +135,99 @@ test('mass properties: a cone ring, a hemisphere over its pole, a box with a hol
       centroid: [5, 5, 5],
     },
   );
+});
+
+/**
+ * A cylinder of radius r, height h as an importer may hand it over: its side in three faces (the front half; the back
+ * half below and above a middle arc), that arc `off` outside the side and the top vertex at u = pi `miss` along the top
+ * off the line up to it, each within its tolerance. The side's faces still cover the whole side, so the volume is
+ * pi r^2 h.
+ */
+function imported(r, h, off, miss) {
+  const body = new Body('part', 'solid'),
+    shell = body.shell(),
+    side = { kind: 'cylinder', frame: frameOf([0, 0, 0], [0, 0, 1], [1, 0, 0]), radius: r },
+    ring = (z, radius) => ({ kind: 'circle', frame: frameOf([0, 0, z], [0, 0, 1], [1, 0, 0]), radius }),
+    at = (radius, u, z) => [radius * Math.cos(u), radius * Math.sin(u), z],
+    tolerance = 2 * Math.max(off, miss),
+    b0 = new Vertex('b0', at(r, 0, 0)),
+    b1 = new Vertex('b1', at(r, Math.PI, 0)),
+    m0 = new Vertex('m0', at(r + off, 0, h / 2), tolerance),
+    m1 = new Vertex('m1', at(r + off, Math.PI, h / 2), tolerance),
+    t0 = new Vertex('t0', at(r, 0, h)),
+    t1 = new Vertex('t1', at(r, Math.PI + miss / r, h), tolerance),
+    line = (name, a, b, to = b.point) => {
+      const d = to.map((x, k) => x - a.point[k]),
+        l = Math.hypot(...d);
+      return new Edge(name, { kind: 'line', origin: a.point, direction: d.map((x) => x / l) }, a, b, true, tolerance);
+    },
+    front0 = new Edge('bottom-front', ring(0, r), b0, b1),
+    back0 = new Edge('bottom-back', ring(0, r), b1, b0),
+    front1 = new Edge('top-front', ring(h, r), t0, t1),
+    back1 = new Edge('top-back', ring(h, r), t1, t0),
+    middle = new Edge('middle', ring(h / 2, r + off), m1, m0, true, tolerance),
+    low0 = line('low0', b0, m0),
+    high0 = line('high0', m0, t0),
+    low1 = line('low1', b1, m1),
+    high1 = line('high1', m1, t1, at(r, Math.PI, h));
+  const face = (name, surface, uses) => {
+    const loop = shell.add(new Face(name, surface, true)).loop();
+    for (const [e, forward] of uses) loop.use(e, forward);
+  };
+  face('front', side, [
+    [front0, true],
+    [low1, true],
+    [high1, true],
+    [front1, false],
+    [high0, false],
+    [low0, false],
+  ]);
+  face('back-low', side, [
+    [back0, true],
+    [low0, true],
+    [middle, false],
+    [low1, false],
+  ]);
+  face('back-high', side, [
+    [middle, true],
+    [high0, true],
+    [back1, false],
+    [high1, false],
+  ]);
+  face('top', { kind: 'plane', frame: frameOf([0, 0, h], [0, 0, 1], [1, 0, 0]) }, [
+    [front1, true],
+    [back1, true],
+  ]);
+  face('bottom', { kind: 'plane', frame: frameOf([0, 0, 0], [0, 0, -1], [1, 0, 0]) }, [
+    [back0, false],
+    [front0, false],
+  ]);
+  return body;
+}
+
+test('mass properties: imported edges a little off their faces, however the faces are split', () => {
+  // The middle arc 0.1 um outside the side moves round it faster than its foot, and the top vertex 10 nm off its line
+  // leaves the front and back-high loops open there. Both once made a face's integrals depend on where its inner
+  // integral starts (the front's at the bottom, back-high's at the middle): 8.6e-6 of the volume in all.
+  const [r, h] = [2, 10];
+  for (const [off, miss] of [
+    [1e-7, 0],
+    [0, 1e-8],
+    [1e-7, 1e-8],
+  ]) {
+    const part = imported(r * mm, h * mm, off, miss),
+      volume = Math.PI * r * r * h;
+    assert.deepEqual(validateBody(part), []);
+    expect(part, { volume, area: 2 * Math.PI * r * r + 2 * Math.PI * r * h, centroid: [0, 0, h / 2] }, 1e-12);
+    // A drill that misses the part: the Boolean joins the side's three faces into one and the volume stays (Jubilee
+    // body 121's thread crest, 35 half turns joined, came out 2e-5 of the part larger).
+    const drilled = boolean(
+      'd',
+      'subtract',
+      part,
+      cylinder('h', mm, 20 * mm, frameOf([10 * mm, 0, -5 * mm], [0, 0, 1], [1, 0, 0])),
+    );
+    assert.equal(drilled.faces.length, 3);
+    expect(drilled, { volume }, 1e-12);
+  }
 });

@@ -31,6 +31,24 @@ Every item is done only when all of these hold:
       edges settling on the next turn), and the pole/apex throws (loops through an apex or a collapsed spline row now
       run along its line). Jubilee: 30 bodies threw, now none; every volume within 0.17% of the mesh (its own chord
       error). Left: Codex's GProp comparison again, Radial Engine JT part 10, and the 4.7e-5 on the model tests.
+      Imported edges off their faces, fixed 2026-10-20 (claude/affectionate-satoshi-c47109): each face's integral along
+      its loops took an edge's rates in (u', v) from its tangent, which round a curved face moves faster or slower than
+      the edge's foot when the edge lies a little off the face (within its tolerance), and a vertex off its edges left
+      the loop open there; either way a face's integrals depended on where its inner integral starts (v*), so pieces of
+      a face did not add up to the face. The rates are now the foot's (the offset against the surface's second
+      derivatives, from one step of its first), and every loop is closed straight in (u', v) at each corner. Jubilee body
+      121 (a standoff whose thread crest is 35 half-turn faces, edges 0.2-0.9 um off it, one line 12.6 nm off its
+      vertex), drilled by the survey: the drill misses it, the Boolean joins the crest into one face, and subtract +
+      intersect - part was 2.0e-5 of the part; now 1.8e-14. A hand-built cylinder with the same two faults matches pi
+      r^2 h within 1e-12 however its side is split (8.6e-6 before). All 145 drilled bodies, moments about one point per
+      body: subtract + intersect - part over 1e-9 on none (worst 6.7e-10; main: 32, worst 2.0e-5). Drill survey 145 of
+      145 as on main (46 s both); 106 drilled volumes moved, 25 by more than 1e-6 (at most 1.75e-5, body 121), and 61
+      imported volumes, 25 by more than 1e-6 (at most 1.1e-5), all on bodies with tolerant edges; mass of all 145
+      solids as fast as before (32 s). Left: where an edge lies off both its faces their boundaries part, so an imported
+      shell does not quite close and its volume moves with the point moments are taken about (body 142: 1.2e-5 per mm,
+      as on main); lines and conics on spline faces take one Gauss piece, and no piece is split where an edge's foot
+      crosses the surface's knots, so a spline face's integrals still depend on v* (body 142's volume moves 1.9e-5 with
+      it, 15 other bodies by 1e-9 to 1.3e-8).
 - [ ] 1.2 Import into the modeler: STEP, SAT, Parasolid and JT B-reps read as modeler bodies, so every operation (and
       mass properties, checking, healing, export) works on imported parts, not only on shapes built in Margo.
       Written and on main for STEP (model.bodiesFromSTEP; SAT, XT and JT through their readers' B-reps). On 200 imported

@@ -193,16 +193,43 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
   // Along every loop: - integral of G du' (across: + integral of G dv), with (u', v) followed continuously from
   // FaceUV's own start of the loop. A spline edge is cut where it turns a sixteenth of a turn (a helix runs dozens of
   // turns): the sampler weighs turning only on pieces longer than a hundredth of its deflection, so that deflection is
-  // the face's size. Lines and conics keep one piece per span, exact already.
+  // the face's size. Lines and conics keep one piece per span, exact already. The rates are the edge's foot's (an
+  // imported edge may lie a little off the face).
   const size = face.loops.some((l) => l.coedges.some((co) => co.edge.curve.kind === 'spline')) ? faceSize(face) : 1,
-    step = new Float64Array(K);
+    step = new Float64Array(K),
+    bend = bendSteps(face, s),
+    // Gaps under a millionth of a millionth of the face's extent change its integrals by less than that.
+    small = 1e-12 * (across ? fuv.box[3] - fuv.box[2] : fuv.box[1] - fuv.box[0]);
+  /**
+   * From the end of one coedge's curve to the start of the next, straight in (u', v): an imported vertex a little off
+   * its edges (within its tolerance) leaves their curves' ends apart, and the loop has to close for the integral not to
+   * depend on v*. The faces either side of an edge bridge its ends alike, so pieces of a face add up to the face. At a
+   * pole, the pole's line closes the loop (below).
+   */
+  const bridge = (from: UV, to: UV) => {
+    const d = across ? to[1] - from[1] : to[0] - from[0];
+    if (!(Math.abs(d) > small)) return;
+    const gv = G((from[0] + to[0]) / 2, (from[1] + to[1]) / 2),
+      w = across ? d : -d;
+    for (let k = 0; k < K; k++) out[k] += gv[k] * w;
+  };
   face.loops.forEach((loop, li) => {
-    let hint: UV = fuv.loops[li].points[0] ?? fuv.near(loop.coedges[0].start.point);
+    let hint: UV = fuv.loops[li].points[0] ?? fuv.near(loop.coedges[0].start.point),
+      first: XYZ | undefined,
+      last: UV | undefined;
     for (const co of loop.coedges) {
       const curve = curveEvaluator(co.edge.curve),
         [t0, t1] = edgeParameters(co.edge, 1),
         [a, b] = co.forward ? [t0, t1] : [t1, t0],
-        breaks = curve.sample(a, b, co.edge.curve.kind === 'spline' ? size : Number.POSITIVE_INFINITY, Math.PI / 8);
+        breaks = curve.sample(a, b, co.edge.curve.kind === 'spline' ? size : Number.POSITIVE_INFINITY, Math.PI / 8),
+        pole = fuv.poleOf(co.start.point) !== undefined;
+      if (!pole) {
+        const p = curve.at(a).slice(0, 3) as XYZ,
+          uv = fuv.near(p, hint);
+        if (co === loop.coedges[0]) first = p;
+        else if (last) bridge(last, uv);
+        hint = uv;
+      }
       for (let i = 0; i + 1 < breaks.length; i++) {
         step.fill(0);
         quad(
@@ -210,7 +237,7 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
             const p = curve.at(t),
               uv = fuv.near(p.slice(0, 3) as XYZ, hint);
             hint = uv;
-            const [du, dv] = rates(s, flip, uv, p),
+            const [du, dv] = rates(s, flip, uv, p, bend),
               gv = G(uv[0], uv[1]),
               r = new Float64Array(K),
               w = across ? dv : -du;
@@ -224,7 +251,11 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
         );
         for (let k = 0; k < K; k++) out[k] += step[k];
       }
+      last = undefined;
+      if (fuv.poleOf(co.end.point) === undefined) hint = last = fuv.near(curve.at(b).slice(0, 3) as XYZ, hint);
     }
+    // Back to the first coedge's start, the short way (a loop round a cylinder ends a period on from where it began).
+    if (first && last && fuv.poleOf(loop.coedges[0].start.point) === undefined) bridge(last, fuv.near(first, last));
   });
 
   // Where a loop runs through a pole: along its line from the u' it arrives with to the u' it leaves with.
@@ -255,23 +286,62 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
 }
 
 /**
- * (du'/dt, dv/dt) along a curve on the surface at (u', v): the curve's tangent split into Su and Sv (least squares), u
- * mirrored where the face flips it. At a pole, where Su vanishes, both are taken as 0: the curve meets the pole's line
- * at a point.
+ * Parameter steps (u, v) for differencing a surface's first derivatives: a millionth of an angle's turn, of a spline's
+ * mean knot span, or of a metre along a straight parameter; none on a plane, which does not bend.
  */
-function rates(s: Surface, flip: boolean, uv: UV, p: number[]): [number, number] {
-  const d = s.at(flip ? -uv[0] : uv[0], uv[1]),
+function bendSteps(face: Face, s: Surface): [number, number] | undefined {
+  if (face.surface.kind === 'plane') return undefined;
+  const [uKnots, vKnots] = s.breaks?.() ?? [[], []],
+    scale = (period: number, domain: readonly [number, number], knots: readonly number[]) =>
+      knots.length >= 2
+        ? (knots[knots.length - 1] - knots[0]) / (knots.length - 1)
+        : period || (Number.isFinite(domain[1] - domain[0]) ? domain[1] - domain[0] : 1);
+  return [1e-6 * scale(s.uPeriod, s.uDomain, uKnots), 1e-6 * scale(s.vPeriod, s.vDomain, vKnots)];
+}
+
+/**
+ * (du'/dt, dv/dt) along a curve at (u', v), the foot on the surface of its point p: how fast that foot moves, u mirrored
+ * where the face flips it. On the surface that is the curve's tangent split into Su and Sv (least squares). An imported
+ * edge a little off its face (within its tolerance) moves faster or slower than its foot where the surface bends (round
+ * a cylinder, by its distance from the axis over the radius), and its tangent's rates then add up to the wrong change
+ * of u' along it: the face's integrals come out depending on where v* lies. So, with w = p - S the curve's offset, the
+ * foot's rates solve (A - W)(du, dv) = (Su.p', Sv.p'), A the surface's first fundamental form and W_ij = w.S_ij, its
+ * second derivatives found from one step of Su and Sv (`steps`, when the offset is large enough to matter). At a pole,
+ * where Su vanishes, both are taken as 0: the curve meets the pole's line at a point.
+ */
+function rates(s: Surface, flip: boolean, uv: UV, p: number[], steps?: [number, number]): [number, number] {
+  const u = flip ? -uv[0] : uv[0],
+    v = uv[1],
+    d = s.at(u, v),
     su = [d[3], d[4], d[5]],
     sv = [d[6], d[7], d[8]],
     tan = [p[3], p[4], p[5]],
-    a = su[0] * su[0] + su[1] * su[1] + su[2] * su[2],
-    b = su[0] * sv[0] + su[1] * sv[1] + su[2] * sv[2],
-    e = sv[0] * sv[0] + sv[1] * sv[1] + sv[2] * sv[2],
     ru = su[0] * tan[0] + su[1] * tan[1] + su[2] * tan[2],
-    rv = sv[0] * tan[0] + sv[1] * tan[1] + sv[2] * tan[2],
-    det = a * e - b * b;
-  if (!(Math.abs(det) > 1e-30 * (a * e + 1e-300))) return [0, 0];
-  const du = (ru * e - rv * b) / det;
+    rv = sv[0] * tan[0] + sv[1] * tan[1] + sv[2] * tan[2];
+  let a = su[0] * su[0] + su[1] * su[1] + su[2] * su[2],
+    b = su[0] * sv[0] + su[1] * sv[1] + su[2] * sv[2],
+    e = sv[0] * sv[0] + sv[1] * sv[1] + sv[2] * sv[2];
+  if (!(Math.abs(a * e - b * b) > 1e-30 * (a * e + 1e-300))) return [0, 0];
+  if (steps) {
+    const w = [p[0] - d[0], p[1] - d[1], p[2] - d[2]],
+      // A step's length on the surface is a millionth of the distance over which it bends: an offset under a millionth
+      // of that changes the rates by under 1e-12.
+      reach = 1e-6 * Math.min(Math.sqrt(a) * steps[0], Math.sqrt(e) * steps[1]);
+    if (w[0] * w[0] + w[1] * w[1] + w[2] * w[2] > reach * reach) {
+      // Forward steps, back from a domain end (a spline clamps there).
+      const hu = !s.uPeriod && u + steps[0] > s.uDomain[1] ? -steps[0] : steps[0],
+        hv = !s.vPeriod && v + steps[1] > s.vDomain[1] ? -steps[1] : steps[1],
+        du = s.at(u + hu, v),
+        dv = s.at(u, v + hv),
+        along = (q: number[], k: number) =>
+          w[0] * (q[k] - d[k]) + w[1] * (q[k + 1] - d[k + 1]) + w[2] * (q[k + 2] - d[k + 2]);
+      a -= along(du, 3) / hu;
+      b -= (along(du, 6) / hu + along(dv, 3) / hv) / 2;
+      e -= along(dv, 6) / hv;
+    }
+  }
+  const det = a * e - b * b,
+    du = (ru * e - rv * b) / det;
   return [flip ? -du : du, (a * rv - b * ru) / det];
 }
 

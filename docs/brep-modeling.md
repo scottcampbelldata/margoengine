@@ -147,6 +147,9 @@ Where OpenCascade still leads (freeform NURBS intersections, advanced blends, he
   A cone's sector (its face running through the apex) matches to 1e-9; a thread's flank (a ruled spline round 6 to 30
   turns) matches its fine mesh within 5e-4, integrated across the ruling and along the turns, split at the knots. On
   Jubilee's 145 bodies every volume is within 0.17% of a fine mesh (that mesh's own chord error: its plain cylinder is
-  0.16% low) and every round trip through STEP keeps it.
+  0.16% low) and every round trip through STEP keeps it. Imported edges a little off their faces and vertices a little
+  off their edges (within their tolerances) are integrated as their feet on the face, with each loop closed at its
+  corners, so the pieces of a face add up to it: a cylinder whose side is in three faces, one arc 0.1 um off it and one
+  vertex 10 nm off its line, matches pi r^2 h to 1e-12.
 - Next: blends on curved faces and along traced edges, setbacks and variable radius, freeform (spline) Booleans,
   healing (docs/brep-occt-gaps.md); the operations benchmark against OpenCascade (Codex prompt 511d19d, step 9).
