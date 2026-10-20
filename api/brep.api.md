@@ -548,7 +548,7 @@ export namespace model {
 
     export function frameOf(origin: XYZ, z: XYZ, x?: XYZ): Frame;
 
-    export function intersectSurfaces(a: SurfaceDef, b: SurfaceDef, box?: Box3): SurfaceIntersection;
+    export function intersectSurfaces(a: SurfaceDef, b: SurfaceDef, box?: Box3, tolerance?: number): SurfaceIntersection;
 
     export function massProperties(body: Body): MassProperties;
 

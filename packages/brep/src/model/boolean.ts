@@ -77,9 +77,11 @@ const RAYS = [
  * cylinders, cones, spheres, tori and spline surfaces in any position: faces on one surface, edges along edges and
  * vertices on faces meet within 1e-6 of the model (or an imported edge's own tolerance); faces left on one surface
  * facing the same way, and edges split along one curve, are joined. Surfaces touching at a point (two of their curves
- * crossing there) or along a line (a plane along a cylinder) are cut there; where the result's surface touches itself,
- * its sheets meet at a point or along a line without sharing a vertex or edge there. Throws a RangeError for what is
- * not supported yet (curves passing within a hair of touching) and when the result is not a valid solid.
+ * crossing there) or along a line (a plane along a cylinder) are cut there, and so are surfaces that come within the
+ * 1e-6 of touching; where the result's surface touches itself, its sheets meet at a point or along a line without
+ * sharing a vertex or edge there. Throws a RangeError for what is not supported yet (curves passing each other a few
+ * micrometres apart where the surfaces come a little further than that from touching) and when the result is not a
+ * valid solid.
  */
 export function boolean(
   name: Name,
@@ -160,7 +162,10 @@ export function boolean(
           lying.push([e, g]);
           continue;
         }
-        for (const t of curveSurfaceCrossings(e.curve, g.surface, Math.min(t0, t1), Math.max(t0, t1))) {
+        const lo = Math.min(t0, t1),
+          hi = Math.max(t0, t1),
+          f = (t: number) => signedDistance(g.surface, c.at(t).slice(0, 3) as XYZ);
+        for (const t of touches(c, f, curveSurfaceCrossings(e.curve, g.surface, lo, hi), lo, hi, touch)) {
           const p = c.at(t).slice(0, 3) as XYZ;
           // On the face's boundary (tested first: the inside test is not reliable there): the edge crosses one of its
           // edges, and both are cut.
@@ -203,7 +208,7 @@ export function boolean(
     for (const fb of faces.b) {
       const box = overlap(boxes.get(fa)!, boxes.get(fb)!);
       if (!box) continue;
-      const meet = intersectSurfaces(fa.surface, fb.surface, box);
+      const meet = intersectSurfaces(fa.surface, fb.surface, box, touch);
       if (meet.kind === 'none') continue;
       meets.push({ fa, fb, meet });
       if (meet.kind !== 'curves') continue;
@@ -768,7 +773,9 @@ function splitFace(f: Face, fuv: FaceUV, halves: Half[]): Omit<Region, 'from'>[]
       // A cusp: the half leaves along the way back (a rounding tangent to the edge it meets). Which side it bends to
       // decides, from its chord: just past 0 or just short of a full turn.
       if (!reverse && (angle < 1e-6 || angle > TWO_PI - 1e-6)) angle = chord;
-      if (angle < bestAngle - 1e-9 || (Math.abs(angle - bestAngle) <= 1e-9 && chord < bestChord)) {
+      // Halves leaving tangent to each other (a curve touching an edge, its point found to the square root of the
+      // rounding, so its tangent there a few 1e-8 off): their chords decide.
+      if (angle < bestAngle - 1e-6 || (Math.abs(angle - bestAngle) <= 1e-6 && chord < bestChord)) {
         best = o;
         bestAngle = angle;
         bestChord = chord;
@@ -830,6 +837,65 @@ function splitFace(f: Face, fuv: FaceUV, halves: Half[]): Omit<Region, 'from'>[]
     loops: group.map((i) => cycles[i]),
     point: fuv.at(points[group[0]]),
   }));
+}
+
+/**
+ * Crossings in [lo, hi] of curve `c` with a surface (`f`, its signed distance along the curve), where the curve dips
+ * into the surface by no more than `touch` (a drill a fraction of a nanometre past grazing a face's edge): the curve
+ * only touches the surface there, at its deepest point, which the crossings on either side of it move to (both, as at
+ * an exact touch, which counts twice; or the one before an end of the range, which is then that end where the dip runs
+ * on into the next edge). That is where surfaces touching along a line put the line's ends.
+ */
+function touches(
+  c: ReturnType<typeof curveEvaluator>,
+  f: (t: number) => number,
+  ts: number[],
+  lo: number,
+  hi: number,
+  touch: number,
+): number[] {
+  const out = [...ts].sort((x, y) => x - y),
+    at = (t: number) => c.at(t).slice(0, 3) as XYZ,
+    /** The deepest point between a and b, where the curve stays within the touch of the surface between them. */
+    deepest = (a: number, b: number): number | undefined => {
+      // Within the touch of the surface, a curve can only run so far into it before leaving: 1e-2 of the model.
+      if (!(b > a) || length(sub(at(b), at(a))) > 1e4 * touch) return undefined;
+      let best = a,
+        depth = Math.abs(f(a));
+      for (let k = 1; k <= 16; k++) {
+        const t = a + ((b - a) * k) / 16,
+          d = Math.abs(f(t));
+        if (d > depth) [best, depth] = [t, d];
+      }
+      if (depth > touch) return undefined;
+      let l = Math.max(a, best - (b - a) / 16),
+        h = Math.min(b, best + (b - a) / 16);
+      for (let k = 0; k < 80 && h > l; k++) {
+        const m1 = l + (h - l) / 3,
+          m2 = h - (h - l) / 3;
+        if (Math.abs(f(m1)) < Math.abs(f(m2))) l = m1;
+        else h = m2;
+      }
+      return Math.abs(f((l + h) / 2)) <= touch ? (l + h) / 2 : undefined;
+    },
+    moved = out.map(() => false);
+  for (let i = 0; i + 1 < out.length; i++) {
+    const m = deepest(out[i], out[i + 1]);
+    if (m === undefined) continue;
+    out[i] = out[i + 1] = m;
+    moved[i] = moved[i + 1] = true;
+    i++;
+  }
+  const n = out.length;
+  if (n && !moved[0]) {
+    const m = deepest(lo, out[0]);
+    if (m !== undefined) [out[0], moved[0]] = [m, true];
+  }
+  if (n && !moved[n - 1]) {
+    const m = deepest(out[n - 1], hi);
+    if (m !== undefined) out[n - 1] = m;
+  }
+  return out;
 }
 
 /**

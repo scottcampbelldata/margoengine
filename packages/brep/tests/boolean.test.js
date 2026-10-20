@@ -517,8 +517,82 @@ test('Booleans where the surfaces touch along a line: a drill as wide as a rib',
       }
 });
 
+test('Booleans where the surfaces come within the tolerance of touching: cut as if they touched', () => {
+  // Surfaces closer than the Booleans' tolerance (1e-6 of the model, about 21 nm here) touch. A drill as wide as a rib,
+  // 0.1 nm off centre, stops 0.1 nm short of one wall and dips 0.1 nm into the other: on its own, on a base, and on a
+  // base with 3 mm fillets where the walls meet it. The drill touches each fillet at a point, where wall and fillet
+  // meet; the surfaces curve apart every way there, so 0.1 nm into a fillet is a loop a micrometre across that is only a
+  // touch. Either way off centre, whichever way the seam faces, union, common part and difference come to the closed
+  // forms of the drill on centre.
+  const volume = (b) => model.massProperties(b).volume / mm ** 3,
+    disk = Math.PI * 2.25,
+    rib = () => box('r', [3 * mm, 20 * mm, 10 * mm], at(-1.5, -10, 0)),
+    tee = () => boolean('t', 'union', box('b', [20 * mm, 20 * mm, 10 * mm], at(-10, -10, -10)), rib()),
+    rounded = () => model.fillet('f', tee(), ['r/edge:-z:-x', 'r/edge:-z:+x'], 3 * mm);
+  for (const off of [1e-7, -1e-7])
+    for (const seam of [
+      [1, 0, 0],
+      [0.6, 0.8, 0],
+    ])
+      for (const [part, size, through] of [
+        [rib, 600, 10],
+        [tee, 4600, 20],
+        [rounded, 4600 + 360 * (1 - Math.PI / 4), 20],
+      ])
+        for (const [op, want] of [
+          ['union', size + (40 - through) * disk],
+          ['intersect', through * disk],
+          ['subtract', size - through * disk],
+        ]) {
+          const out = boolean('c', op, part(), cylinder('h', 1.5 * mm, 40 * mm, at(off, 0, -20, [0, 0, 1], seam)));
+          assert.deepEqual(validateBody(out), []);
+          assert.ok(
+            Math.abs(volume(out) - want) <= 1e-9 * want,
+            `${op} ${off} seam ${seam}: ${volume(out)} vs ${want}`,
+          );
+        }
+  // The slanted hole 1 nm and 10 nm either side of touching the drill wall: the two windows it cuts in the wall, or the
+  // one window they make, pass a few micrometres from crossing at the touch, and are cut as if they crossed there. The
+  // block keeps what the quadrature gives for the hole's axis that far off.
+  const slant = 0.2,
+    dir = [0, Math.cos(slant), -Math.sin(slant)],
+    n = 1000,
+    kept = (x0) => {
+      let shared = 0;
+      for (let i = 0; i < n; i++)
+        for (let j = 0; j < n; j++) {
+          const rho = (0.5 * (i + 0.5)) / n,
+            x = x0 + rho * Math.cos((2 * Math.PI * (j + 0.5)) / n);
+          shared +=
+            ((2 * Math.sqrt(Math.max(0, 2.25 - x * x))) / Math.cos(slant)) * rho * (0.5 / n) * ((2 * Math.PI) / n);
+        }
+      return 8000 - Math.PI * 2.25 * 20 - ((Math.PI * 0.25 * 20) / Math.cos(slant) - shared);
+    };
+  for (const off of [1e-6, -1e-6, 1e-5, -1e-5]) {
+    const want = kept(1 + off);
+    for (const seam of [
+      [1, 0, 0],
+      [-1, 0, 0],
+      [0, 0.2, 1],
+    ]) {
+      const block = box('k', [20 * mm, 20 * mm, 20 * mm], at(-10, -10, -10)),
+        hole = cylinder(
+          's',
+          0.5 * mm,
+          40 * mm,
+          frameOf([(1 + off) * mm, -20 * dir[1] * mm, -20 * dir[2] * mm], dir, seam),
+        ),
+        drill = cylinder('h', 1.5 * mm, 40 * mm, at(0, 0, -20)),
+        out = boolean('d', 'subtract', boolean('p', 'subtract', block, hole), drill);
+      assert.deepEqual(validateBody(out), []);
+      assert.ok(Math.abs(volume(out) - want) <= 1e-6 * want, `${off} seam ${seam}: ${volume(out)} vs ${want}`);
+    }
+  }
+});
+
 test('Booleans: what is not supported yet throws a RangeError', () => {
-  // The same hole a nanometre past touching the drill wall: the two curves pass a hair apart, which is not followed yet.
+  // The same hole 30 nm past touching the drill wall, beyond the tolerance (about 21 nm here): the two windows' curves
+  // pass about 10 um apart, too close for the tracer to tell apart and too far apart to be a touch. Not followed yet.
   const slant = 0.2,
     dir = [0, Math.cos(slant), -Math.sin(slant)],
     block = box('k', [20 * mm, 20 * mm, 20 * mm], at(-10, -10, -10)),
@@ -526,7 +600,7 @@ test('Booleans: what is not supported yet throws a RangeError', () => {
       's',
       0.5 * mm,
       40 * mm,
-      frameOf([1.000001 * mm, -20 * dir[1] * mm, -20 * dir[2] * mm], dir, [1, 0, 0]),
+      frameOf([1.00003 * mm, -20 * dir[1] * mm, -20 * dir[2] * mm], dir, [1, 0, 0]),
     );
   assert.throws(
     () =>

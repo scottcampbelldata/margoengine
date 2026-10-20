@@ -14,7 +14,7 @@ features. Clean room as before: published standards, textbooks and papers only; 
 | Browser download | 40,030 B gzip worker (114,562 B raw; measured at 2469a93, the modeler is not in it) | 7,604,031 B Wasm (occt-import-js) |
 | Formats without paid add-ons | STEP, SAT, Parasolid XT, JT 9.5+ (structure and XT B-rep), DXF (loaders) | STEP, IGES |
 | Self-check | file's own volume, area, centre: 16 of 16 match | none |
-| Modeling | primitives, extrude, revolve; Booleans on planes, cylinders, cones, spheres, tori and spline surfaces (any position, faces on one plane, edges along edges, imported edges within their tolerance); fillets and chamfers on straight edges and full circles; exact tangential contact at points and along lines | near-tangential contact, variable fillets, offsets, healing, ... (docs/brep-occt-gaps.md) |
+| Modeling | primitives, extrude, revolve; Booleans on planes, cylinders, cones, spheres, tori and spline surfaces (any position, faces on one plane, edges along edges, imported edges within their tolerance); fillets and chamfers on straight edges and full circles; tangential contact at points and along lines, exact or within 1e-6 of the model | contact just past that tolerance, variable fillets, offsets, healing, ... (docs/brep-occt-gaps.md) |
 
 Where OpenCascade still leads (freeform NURBS intersections, advanced blends, healing) and what matching it takes:
 `docs/brep-occt-gaps.md`.
@@ -98,8 +98,8 @@ Where OpenCascade still leads (freeform NURBS intersections, advanced blends, he
 - Measured: a block with a bicubic top cut by two holes and a box matches the exact integrals within 1e-7, and by a
   second spline block within 1e-6; a thin extruded spline wall drilled through, within 1e-7
   (tests/step-tessellate.test.js). Jubilee, a hole drilled through the middle of each of 145 solids (sized from its
-  mesh): 144 valid (78 before this, 72 on 575f4efd); the last is a near contact, its drill within 0.34 nm of
-  grazing a 3 mm rib (3.2), which drilled at exactly 1.5 mm now cuts. A spline cut takes 40 to 160
+  mesh): 145 valid (78 before this, 72 on 575f4efd); the last, 104, is a near contact, its drill within 0.34 nm of
+  grazing a 3 mm rib, cut as a touch since near contact (checklist 3.2). A spline cut takes 40 to 160
   ms; every part drills within 4.3 s, the 1.5 s file read included.
 
 ## Booleans, fillets and chamfers: second cut (2026-10-17, 511d19d)

@@ -18,20 +18,22 @@ const parallel = (a: XYZ, b: XYZ) => length(cross(a, b)) <= 1e-12;
  * What two analytic surfaces share: curves, the same surface, or nothing. Exact where a closed form exists (plane with
  * plane, plane with cylinder, parallel cylinders, and surfaces of revolution on one axis: planes across it, spheres
  * centred on it, cylinders, cones and tori about it, which meet in circles); otherwise the curves are traced inside
- * `box` (march.ts), which those pairs (and every pair with a spline surface) need. Throws a RangeError for tangential
- * contact.
+ * `box` (march.ts), which those pairs (and every pair with a spline surface) need. Surfaces that come within
+ * `tolerance` of touching (a plane or a cylinder along a cylinder, or two traced surfaces at a point) are taken to
+ * touch: one line where they run alongside, crossing curves where they meet at a point (the Booleans pass 1e-6 of the
+ * model). Throws a RangeError where a traced curve lands exactly on a point where the surfaces touch.
  */
-export function intersectSurfaces(a: SurfaceDef, b: SurfaceDef, box?: Box3): SurfaceIntersection {
-  if (b.kind === 'plane' && a.kind !== 'plane') return intersectSurfaces(b, a, box);
+export function intersectSurfaces(a: SurfaceDef, b: SurfaceDef, box?: Box3, tolerance = 0): SurfaceIntersection {
+  if (b.kind === 'plane' && a.kind !== 'plane') return intersectSurfaces(b, a, box, tolerance);
   if (a.kind === 'plane' && b.kind === 'plane') return planePlane(a.frame.origin, a.frame.z, b.frame.origin, b.frame.z);
   const coaxial = revolutionPair(a, b);
   if (coaxial) return coaxial;
   if (a.kind === 'plane' && b.kind === 'cylinder')
-    return planeCylinder(a.frame.origin, a.frame.z, b.frame.origin, b.frame.z, b.frame.x, b.radius);
+    return planeCylinder(a.frame.origin, a.frame.z, b.frame.origin, b.frame.z, b.frame.x, b.radius, tolerance);
   if (a.kind === 'cylinder' && b.kind === 'cylinder' && parallel(a.frame.z, b.frame.z))
-    return parallelCylinders(a.frame.origin, a.frame.z, a.radius, b.frame.origin, b.radius);
+    return parallelCylinders(a.frame.origin, a.frame.z, a.radius, b.frame.origin, b.radius, tolerance);
   if (!box) throw new RangeError(`intersecting ${a.kind} with ${b.kind} needs a box to trace the curves in`);
-  const { curves, crossings } = traceIntersections(a, b, box);
+  const { curves, crossings } = traceIntersections(a, b, box, tolerance || undefined);
   return curves.length ? { kind: 'curves', curves, crossings } : { kind: 'none' };
 }
 
@@ -178,15 +180,17 @@ function planePlane(o1: XYZ, n1: XYZ, o2: XYZ, n2: XYZ): SurfaceIntersection {
   return { kind: 'curves', curves: [{ kind: 'line', origin: point, direction: u }] };
 }
 
-function planeCylinder(o: XYZ, n: XYZ, c: XYZ, axis: XYZ, x: XYZ, r: number): SurfaceIntersection {
+function planeCylinder(o: XYZ, n: XYZ, c: XYZ, axis: XYZ, x: XYZ, r: number, tolerance: number): SurfaceIntersection {
   const along = dot(n, axis);
   if (Math.abs(along) <= 1e-12) {
     // Plane parallel to the axis: none, one tangent line or two lines along the axis.
-    const d = dot(sub(c, o), n);
-    // Within rounding of the radius the plane touches the cylinder along one line (a fillet against its face).
-    if (Math.abs(d) > r * (1 + 1e-9)) return { kind: 'none' };
+    const d = dot(sub(c, o), n),
+      // Within rounding of the radius, or the tolerance, the plane touches the cylinder along one line (a fillet
+      // against its face, a drill as wide as a rib).
+      touching = Math.max(1e-9 * r, tolerance);
+    if (Math.abs(d) > r + touching) return { kind: 'none' };
     const foot = sub(c, scale(n, d)),
-      half = Math.abs(Math.abs(d) - r) <= 1e-9 * r ? 0 : Math.sqrt(Math.max(0, r * r - d * d)),
+      half = Math.abs(Math.abs(d) - r) <= touching ? 0 : Math.sqrt(Math.max(0, r * r - d * d)),
       across = unit(cross(n, axis))!;
     const lines: CurveDef[] = [{ kind: 'line', origin: add(foot, scale(across, half)), direction: axis }];
     if (half > 0) lines.push({ kind: 'line', origin: sub(foot, scale(across, half)), direction: axis });
@@ -204,13 +208,20 @@ function planeCylinder(o: XYZ, n: XYZ, c: XYZ, axis: XYZ, x: XYZ, r: number): Su
   };
 }
 
-function parallelCylinders(c1: XYZ, axis: XYZ, r1: number, c2: XYZ, r2: number): SurfaceIntersection {
+function parallelCylinders(
+  c1: XYZ,
+  axis: XYZ,
+  r1: number,
+  c2: XYZ,
+  r2: number,
+  tolerance: number,
+): SurfaceIntersection {
   // In the plane across the axes: two circles; their crossing points run along the axis.
   const d = sub(c2, c1),
     offset = sub(d, scale(axis, dot(d, axis))),
     gap = length(offset);
   if (gap <= 1e-12) return Math.abs(r1 - r2) <= 1e-12 ? { kind: 'coincident' } : { kind: 'none' };
-  const touching = 1e-9 * Math.max(r1, r2);
+  const touching = Math.max(1e-9 * Math.max(r1, r2), tolerance);
   if (gap > r1 + r2 + touching || gap < Math.abs(r1 - r2) - touching) return { kind: 'none' };
   const ex = scale(offset, 1 / gap),
     ey = cross(axis, ex),

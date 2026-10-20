@@ -129,15 +129,17 @@ export function curveEvaluator(def: CurveDef): Curve {
 /**
  * The stretch [a, b] of a B-spline curve as a curve of its own, exactly (knots inserted at a and b until the curve
  * passes through its control points there, Boehm's algorithm, in homogeneous coordinates for rational curves). On a
- * closed curve b may run past the domain's end: the two stretches either side of its seam are joined. Other curves
- * are returned as they are.
+ * closed curve b may run past the domain's end: the two stretches either side of its seam are joined. An end within
+ * 1e-9 of the domain of a knot is that knot (a span a rounding error long would leave the curve undefined there).
+ * Other curves are returned as they are.
  */
 export function sliceCurve(def: CurveDef, a: number, b: number): CurveDef {
   if (def.kind !== 'spline') return def;
   const p = def.degrees[0],
     U0 = def.knots[0].flatMap((k, i) => Array<number>(def.multiplicities[0][i]).fill(k)),
     lo = U0[p],
-    hi = U0[U0.length - 1 - p];
+    hi = U0[U0.length - 1 - p],
+    snap = (t: number) => def.knots[0].find((k) => Math.abs(k - t) <= 1e-9 * (hi - lo)) ?? t;
   if (def.closed) {
     // On a closed curve the stretch may start a period off (a piece joined across the curve's start): moved to start
     // in the first period, it runs past the end at most once.
@@ -151,6 +153,8 @@ export function sliceCurve(def: CurveDef, a: number, b: number): CurveDef {
       return joinSplines(first, second);
     }
   }
+  a = snap(a);
+  b = snap(b);
   let U = [...U0],
     P = def.points.map((q, i) => {
       const w = def.weights?.[i] ?? 1;

@@ -40,8 +40,8 @@ Every item is done only when all of these hold:
       edge off its surface, 1 a probe sizing slip. Imported cones (a face covering or running through its apex) now cut.
       Later the same day (spline Booleans and tolerant edges, below): 127 of 145; then 144 of 145 after fixing curve
       crossings with every sheet of a spline, traces seeded on or past a spline's edge, and sampling of long rational
-      curves (the drill now sized from the mesh). Left: Jubilee 104, where the mesh-sized drill is within 0.34 nm
-      of grazing a 3 mm rib (near contact, 3.2); drilled at exactly 1.5 mm it now cuts.
+      curves (the drill now sized from the mesh); 145 of 145 once near contact (3.2) cut Jubilee 104, where the
+      mesh-sized drill is within 0.34 nm of grazing a 3 mm rib.
 - [ ] 1.3 Topology checker: Euler-Poincare (V - E + F - (L - F) - 2(S - G) = 0), every edge used twice and oppositely in
       a solid, consistent orientation, no face crossing another; run on every file read and every operation result.
       Written (claude/kernel): validateBody (Euler-Poincare, one piece per shell) on every operation and import;
@@ -68,7 +68,8 @@ Every item is done only when all of these hold:
 - [ ] 3.1 Booleans on spline surfaces: signed distance and projection, subdivision seeds, traced intersections.
       Written 2026-10-20 (claude/kernel-speed): signed distance by projection, seeds along iso lines, curves ended
       exactly at the spline's domain edge; a bicubic block cut by holes, a box and another spline block matches exact
-      integrals within 1e-7 (1e-6 spline on spline); Jubilee drills pass on 144 of 145 solids (78 before). Left:
+      integrals within 1e-7 (1e-6 spline on spline); Jubilee drills pass on 145 of 145 solids (78 before; the last
+      needed near contact, 3.2). Left:
       Codex's corpus check and OpenCascade comparison, speed against OpenCascade.
 - [ ] 3.2 Tangential contact inside faces, and coincident freeform patches.
       Written 2026-10-20 (claude/kernel-speed), exact contact: surfaces touching at a point (two equal cylinders
@@ -80,11 +81,21 @@ Every item is done only when all of these hold:
       solid (union, intersect, subtract), the tangent hole in three seam directions, a 3 mm drill through a 3 mm rib
       alone and on a base (all three operations, two seam directions, within 1e-9). Jubilee 104 drilled at exactly
       1.5 mm (its 3 mm rib) cuts in all three operations; its common part matches an independent integral over the
-      drill's section (203.2639 mm3 both). Left: near contact. The survey's drill, sized from the 32-bit mesh, misses
-      one rib wall by 0.34 nm and dips 0.28 nm into the other; there the drill's curves with the wall's 0.5 mm round
-      pass about 1 um apart instead of crossing, the tracer steps from one to the other, and the Boolean refuses
-      (an error, not a wrong result). Needs: the tracer to walk through a near touch as it does an exact one. Also
-      left: tangency along a circle or a traced curve, and coincident freeform patches.
+      drill's section (203.2639 mm3 both).
+      Near contact, written 2026-10-20 (claude/epic-torvalds-ee13dd): surfaces within the Booleans' tolerance (1e-6 of
+      the model) of touching are cut as if they touched. A walk heading into a point where the normals turn parallel
+      finds it (Newton's method on the curvature difference, midway between the surfaces) and goes straight through,
+      so curves passing a few micrometres apart there cross as at an exact touch; where the surfaces curve apart every
+      way (a kiss) the micrometre loop round the point is dropped. A plane or cylinder along a cylinder within the
+      tolerance gives one line, and an edge dipping into a face by less than it touches the face at one point. Tested
+      against closed forms: the rib, the tee and the tee with 3 mm fillets (kisses) with the drill 0.1 nm off centre
+      either way (all three operations, two seams, within 1e-9), and the slanted hole 1 and 10 nm either side of
+      touching (three seams, within 1e-6 of the quadrature). Jubilee 104 with the survey's drill (0.34 nm short of one
+      wall, 0.28 nm into the other): valid in all three operations, common part 203.263868 mm3, subtract + intersect
+      - part = 7.6e-5 mm3 (as with the exact 1.5 mm drill); the survey drills 145 of 145. Left: contact a little past
+      the tolerance (the hole 30 to 100 nm off, curves about 10 um apart: refused with a RangeError in 8 of 18 cases,
+      never cut wrongly; from 300 nm it traces), tangency along a circle or a traced curve, and coincident freeform
+      patches.
 
 ## Phase 4: blends
 
