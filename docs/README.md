@@ -129,7 +129,7 @@ node --test tests/catalog.test.js
 | Package | What it is |
 | --- | --- |
 | [`@margoengine/animation`](../packages/animation/README.md) | Storage-buffer skinning and compute morph targets for Margo Engine. |
-| [`@margoengine/animator`](../packages/animator/README.md) | Blend trees, additive layers, animation states and foot IK. |
+| [`@margoengine/animator`](../packages/animator/README.md) | Blend trees, additive layers, animation states, foot IK and CCD IK chains. |
 | [`@margoengine/kinematics-constraints`](../packages/kinematics-constraints/README.md) | Standalone analytical capsule and sphere constraints for IK target and arm clearance. |
 | [`@margoengine/tween`](../packages/tween/README.md) | Allocation-free numeric tween updates and easing timelines. |
 | [`@margoengine/cinematic`](../packages/cinematic/README.md) | Critically damped camera follow, look-at and screen shake. |

@@ -1369,13 +1369,15 @@
     "package": "@margoengine/animator",
     "version": "1.0.0",
     "published": false,
-    "description": "Blend trees, additive layers, animation states and foot IK.",
+    "description": "Blend trees, additive layers, animation states, foot IK and CCD IK chains.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "animator",
     "install": "npm install @margoengine/core@1.0.0 @margoengine/animator@1.0.0",
     "imports": "import { Animator } from '@margoengine/animator';",
     "exports": [
       "Animator",
+      "CCDSolver",
+      "addCCDChain",
       "blend1D",
       "blend2D",
       "solveTwoBoneIK"

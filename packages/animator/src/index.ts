@@ -3,10 +3,15 @@ import { type Animation, sampleTrackInto } from '@margoengine/animation';
 import type { Engine, EnginePlugin, Mesh, Vec3 } from '@margoengine/core/extension';
 import { finiteVector } from '@margoengine/math/validate';
 import { multiplyQuaternions as quaternionMultiply } from '@margoengine/math/quat';
+import { MargoError } from '@margoengine/math/errors';
 import { blend1D, blend2D, quaternionBlend } from './blend.js';
 import { solveTwoBoneIK, rotationBetween } from './ik.js';
 export { blend1D, blend2D } from './blend.js';
 export { solveTwoBoneIK } from './ik.js';
+export { CCDSolver } from './ccd.js';
+export type { CCDConeLimit, CCDEulerLimit, CCDHingeLimit, CCDJointLimit, CCDResult } from './ccd.js';
+export { addCCDChain } from './ccd-chain.js';
+export type { CCDChain } from './ccd-chain.js';
 export type BlendTree =
   | string
   | { parameter: string; samples: readonly { value: number; clip: string }[] }
@@ -113,6 +118,7 @@ export class Animator implements EnginePlugin {
   private layers = new Set<AdditiveLayer>();
   private readonly scratch = new Map<number, Float32Array>();
   private feet = new Set<FootIK>();
+  private readonly solvers: Array<() => void> = [];
   private disposed = false;
   private unsubscribe?: () => void;
   private previousPlaying: boolean;
@@ -242,6 +248,26 @@ export class Animator implements EnginePlugin {
     this.feet.add(foot);
     return () => this.feet.delete(foot);
   }
+  /**
+   * @internal A step run every frame after the pose, the additive layers and foot IK, with the skeleton's world matrices
+   * current ({@link addCCDChain} adds one per chain). Returns its remover.
+   */
+  addSolver(step: () => void): () => void {
+    if (this.disposed) throw new MargoError('disposed', 'Animator is disposed; attach a new Animator');
+    this.solvers.push(step);
+    return () => {
+      const index = this.solvers.indexOf(step);
+      if (index !== -1) this.solvers.splice(index, 1);
+    };
+  }
+  /** @internal Node `index`'s rest (loaded) rotation, x y z w; read-only. */
+  restRotation(index: number): readonly number[] {
+    return this.rest.rotation[index];
+  }
+  /** @internal Commits a node rotation through `writeRotation` (or `Mesh.setQuaternion`), as the pose and foot IK do. */
+  writeNodeRotation(node: Mesh, rotation: readonly number[]): void {
+    this.commitRotation(node, rotation);
+  }
   setup(engine: Engine): void {
     if (
       this.disposed ||
@@ -357,6 +383,11 @@ export class Animator implements EnginePlugin {
       if (weights && this.morphed.has(p.nodeIndex)) p.weights.set(weights);
     }
     if (this.feet.size) for (const foot of this.feet) this.foot(foot);
+    if (this.solvers.length) {
+      // World matrices of the posed skeleton: the solvers' parent frames.
+      this.engine!.store.tick(false);
+      for (let i = 0; i < this.solvers.length; i++) this.solvers[i]();
+    }
   }
   // Compare both the requested values and the exact stored result. External
   // edits (including Euler rotations and store growth) still force restoration;
@@ -554,6 +585,7 @@ export class Animator implements EnginePlugin {
     this.animation.playing = this.previousPlaying;
     this.layers.clear();
     this.feet.clear();
+    this.solvers.length = 0;
     this.engine = undefined;
   }
   declare [Symbol.dispose]: () => void;

@@ -27,6 +27,9 @@ export class Animator implements EnginePlugin {
     transition(state: string, duration?: number): this;
     addLayer(layer: AdditiveLayer): () => void;
     addFootIK(foot: FootIK): () => void;
+    addSolver(step: () => void): () => void;
+    restRotation(index: number): readonly number[];
+    writeNodeRotation(node: Mesh, rotation: readonly number[]): void;
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;
     onDeviceRestored(): void;
@@ -64,6 +67,74 @@ export type BlendTree = string | {
     }[];
 };
 
+export interface CCDChain {
+    joints: readonly number[];
+    target: Vec3;
+    tip?: Vec3;
+    rotation?: ArrayLike<number> | null;
+    pole?: Vec3 | null;
+    limits?: readonly (CCDJointLimit | null | undefined)[];
+    weight?: number;
+    iterations?: number;
+    tolerance?: number;
+    angleTolerance?: number;
+    maxAngle?: number;
+    onSolve?: (result: CCDResult) => void;
+}
+
+export interface CCDConeLimit {
+    type: 'cone';
+    angle: number;
+    axis?: Vec3;
+    twist?: readonly [number, number];
+}
+
+export interface CCDEulerLimit {
+    type: 'euler';
+    min: Vec3;
+    max: Vec3;
+}
+
+export interface CCDHingeLimit {
+    type: 'hinge';
+    axis: Vec3;
+    min?: number;
+    max?: number;
+}
+
+export type CCDJointLimit = CCDEulerLimit | CCDHingeLimit | CCDConeLimit;
+
+export interface CCDResult {
+    iterations: number;
+    distance: number;
+    angle: number;
+    reached: boolean;
+}
+
+export class CCDSolver {
+    readonly joints: number;
+    readonly offsets: Float64Array;
+    readonly rotations: Float64Array;
+    readonly scales: Float64Array;
+    readonly rest: Float64Array;
+    readonly tip: Float64Array;
+    readonly parentPosition: Float64Array;
+    readonly parentRotation: Float64Array;
+    readonly parentScale: Float64Array;
+    readonly positions: Float64Array;
+    readonly worldRotations: Float64Array;
+    iterations: number;
+    tolerance: number;
+    angleTolerance: number;
+    maxAngle: number;
+    constructor(offsets: readonly Vec3[], tip?: Vec3);
+    setLimit(index: number, limit: CCDJointLimit | null): void;
+    captureRest(): void;
+    setParentMatrix(m: ArrayLike<number>): void;
+    update(): void;
+    solve(target: Vec3, rotation?: ArrayLike<number> | null, pole?: Vec3 | null): CCDResult;
+}
+
 export interface FootIK {
     hip: number;
     knee: number;
@@ -78,6 +149,8 @@ export interface GroundHit {
     position: Vec3;
     normal?: Vec3;
 }
+
+export function addCCDChain(animator: Animator, chain: CCDChain): () => void;
 
 export function blend1D(samples: readonly number[], value: number): Float32Array;
 

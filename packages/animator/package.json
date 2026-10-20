@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
-  "description": "Blend trees, additive layers, animation states and foot IK.",
+  "description": "Blend trees, additive layers, animation states, foot IK and CCD IK chains.",
   "publishConfig": {
     "access": "public"
   },
