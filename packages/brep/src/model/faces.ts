@@ -146,11 +146,21 @@ function crossings(loop: UVLoop, period: number, u: number, v: number): number {
     lo = Math.min(lo, q[0]);
     hi = Math.max(hi, q[0]);
   }
-  const k0 = period ? Math.ceil((lo - u) / period) : 0,
-    k1 = period ? Math.floor((hi - u) / period) : 0;
+  // The line's whole-period copies that meet the loop. A loop round the period covers [lo, lo + |wrap| P) exactly,
+  // its segments half-open on it, so u is folded into that span once: copies counted from rounded bounds missed a loop
+  // that starts a rounding error past u (a seam cut through one of its vertices) by landing only on its open end.
+  const xs: number[] = [];
+  if (period && loop.wrap) {
+    let x = lo + ((((u - lo) % period) + period) % period);
+    if (x >= lo + period) x = lo;
+    for (let j = 0; j < Math.abs(loop.wrap); j++) xs.push(x + j * period);
+  } else {
+    const k0 = period ? Math.ceil((lo - u) / period) : 0,
+      k1 = period ? Math.floor((hi - u) / period) : 0;
+    for (let k = k0; k <= k1; k++) xs.push(u + k * period);
+  }
   let count = 0;
-  for (let k = k0; k <= k1; k++) {
-    const x = u + k * period;
+  for (const x of xs) {
     for (let i = 0; i < n; i++) {
       const a = pts[i],
         b = i + 1 < n ? pts[i + 1] : last;

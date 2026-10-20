@@ -54,6 +54,25 @@ test('STEP import: bodies built here come back from their STEP export valid, wit
   });
 });
 
+test('STEP import: hemispheres in turned frames keep their volume (a seam cut through an equator vertex)', () => {
+  // The export cuts each sphere's seam through a vertex of its equator, so the re-read loop can start a rounding error
+  // past u = 0; the pole test once missed such a loop and counted a hemisphere as covering both poles, or neither.
+  for (let k = 0; k < 16; k++)
+    for (const z of [0, -10]) {
+      const a = (k * Math.PI) / 8,
+        half = boolean(
+          'h',
+          'intersect',
+          sphere('s', 5 * mm, frameOf([0, 0, 0], [0, 0, 1], [Math.cos(a), Math.sin(a), 0])),
+          box('b', [20 * mm, 20 * mm, 10 * mm], up(-10, -10, z)),
+        ),
+        [back] = roundTrip([half]),
+        want = massProperties(half).volume,
+        got = massProperties(back).volume;
+      assert.ok(Math.abs(got - want) <= 1e-9 * want, `turned ${k} pi / 8, z ${z}: volume ${got} vs ${want}`);
+    }
+});
+
 test('STEP import: an imported part takes modeling operations (a hole drilled, its edges rounded)', () => {
   const [plate] = roundTrip([box('b', [20 * mm, 20 * mm, 10 * mm])]),
     drilled = boolean('d', 'subtract', plate, cylinder('h', 3 * mm, 20 * mm, up(10, 10, -5)));
