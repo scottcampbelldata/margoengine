@@ -132,10 +132,11 @@ Measured (RTX A6000, Edge headless, 960 x 800, `L-bg-off`: slab, two cubes, sun,
 | --- | --- | --- |
 | Noise at 1024 samples (8-bit RMS against a 16,384-sample reference) | 0.32 | 0.24 raw, 0.16 denoised |
 | Time to MagicaVoxel's 1024-sample quality | about 14 s (1024 samples) | 0.48 s (64 samples, denoised), about 29x faster |
-| Package | about 30 MB application | 55 KB gzip (168 KB raw, 40% shader source) |
+| Package | about 30 MB application | 59 KB gzip (gzip -9 of `dist/index.js`, 180 KB raw) |
 | First lit viewport frame after opening | (its viewport) | 0.36-0.44 s with the preview kernel (was 2.1-2.8 s: the full tracer's compile) |
 | Large world: 64 terrain models of 256 x 256 x 32 (2048 x 2048 voxels, 12.6 million voxels; `mv-calib/bigworld.cjs`) | (not rendered yet) | 256 samples in 1.5 s (about 6 ms each at 960 x 800), 93 MiB of GPU memory |
 | Viewport samples in 4 s at 60 fps | (its viewport) | 1,465 light scene, 540 glass board, 351 sun board with `samplesPerFrame: 'auto'` (238-240 at 1 per frame): 6x / 2.3x / 1.5x, 2-6% of frames late |
+| Moving camera, denoised, 1 sample per frame (8-bit RMS against a 2048-sample image; `pt-compare/v2` diffuse / glass / cloud, 30 frames) | (its viewport) | turning 0.001 degrees a frame 0.98 / 2.33 / 1.60 (2.40 / 6.08 / 5.22 before); 0.5 degrees a frame 2.13 / 2.78 / 2.32 (2.40 / 6.05 / 5.00) |
 
 Done:
 - Preview kernel: first hit lit by the sun (one shadow ray) and the sky, with edges, grid and the ground fade; the
@@ -145,13 +146,21 @@ Done:
   a late frame. A faster ramp (x1.5 after three) gave 40% more samples but twice the late frames and an 83 ms hitch.
 - `denoise: 'auto'`: every frame below 32 samples, then each time the samples grow by a quarter, and at convergence.
 - The MagicaVoxel helper sets `samplesPerFrame: 'auto'` for both looks and `denoise: 'auto'` for the Margo look.
+- Denoiser history in the viewport (the row above): the demodulated estimate reprojected onto surfaces seen again,
+  the displayed image blended with the last one (temporal antialiasing), dropped where a move uncovers a surface.
+  Found on the way: the viewport showed a stale denoised image while the camera moved at a constant sample count
+  (fixed), and this GPU converts floats to halves toward zero, which darkened stored history by 1% (now rounded).
+  Open: for a few frames after the camera stops the diffuse and cloud scenes are a little worse than without history
+  (1.10 and 2.28 against 0.96 and 2.03 at 8 frames); 63 MiB more GPU memory at 1920 x 1080.
+- Feature table: [magicavoxel-feature-table.md](magicavoxel-feature-table.md).
 
 Checked and dropped: kernels specialised to the scene's features. Stubbing out glass light sampling did not speed up
 a scene without glass (12.45 against 12.32 ms per frame at 1920 x 1080) and cut compile time by about 15% (noisy);
 the README's note that the larger shader is slower where there is no glass did not hold.
 
-Large worlds need no work (row above). Next candidates (value first): denoiser quality at 1-16 samples (moving
-camera); render the large world in MagicaVoxel for a speed comparison; a feature table for the product page.
+Large worlds need no work (row above). Next candidates (value first): render the large world in MagicaVoxel for a
+speed comparison; allocate the denoiser's caustic chain only for scenes with glass, metal or coats (a third of its
+memory).
 
 ## Finish the package (before it can be pushed or published)
 

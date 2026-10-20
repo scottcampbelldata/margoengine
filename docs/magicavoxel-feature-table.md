@@ -1,0 +1,105 @@
+# MagicaVoxel and Margo: feature table
+
+MagicaVoxel 0.99.7.2 against `@margoengine/voxel-pathtracer` (branch `worktree-agent-a63cac143225721f2`). Every
+number was measured on the same PC (RTX A6000, Windows 11; Margo in Edge, headless WebGPU) at 960 x 800 unless a row
+says otherwise. MagicaVoxel was used as a black box: we wrote scenes, it rendered them, we compared its PNGs with ours
+(method and scenes: [magicavoxel-parity.md](magicavoxel-parity.md)).
+
+Legend: **yes**, **no**, **open** (MagicaVoxel has it, Margo does not match it yet), **not checked** (not looked at).
+
+## At a glance
+
+| | MagicaVoxel | Margo |
+| --- | --- | --- |
+| What it is | Free desktop voxel editor with a built-in path tracer | Path-tracing renderer for web apps and games (WebGPU, in the browser) |
+| Size | about 30 MB application | 59 KB gzip (the whole renderer) |
+| 1024 samples (default scenes) | 14-15 s | 1.7-1.85 s, about 8x faster |
+| Time to MagicaVoxel's 1024-sample noise level | about 14 s | 0.48 s (64 samples, denoised), about 29x faster |
+| Noise at 1024 samples (8-bit RMS against a 16,384-sample reference) | 0.32 | 0.24 raw, 0.16 denoised |
+| First lit image after opening a scene | not measured | 0.36-0.44 s (preview while the full tracer compiles) |
+| Same image as MagicaVoxel from a `.vox` file | | 99.2-99.97% of pixels within 3 of 255 levels on six default-lit scenes |
+
+## Files
+
+| Feature | MagicaVoxel | Margo |
+| --- | --- | --- |
+| Open `.vox` models, palette, materials, scene graph | yes | yes |
+| Use the file's render settings (sky, sun, film, fog, display) and camera | yes | yes (`magicaVoxelLighting`, `magicaVoxelCamera`) |
+| MagicaVoxel's look, or the same scene lit physically | its look only | both (`look: 'margo'`: sun highlights on metal and glass, light through glass, rough metal keeps its energy) |
+
+## Materials
+
+| Material | MagicaVoxel | Margo |
+| --- | --- | --- |
+| Diffuse, metal, plastic, glass, emitter | yes | yes, each matched within 3 levels on the calibration boards |
+| Cloud (scattering medium) | yes | yes |
+| Subsurface | yes | yes; sun-lit within 6 levels, sky-lit tops 7-12 levels darker (open) |
+| Partly transparent glass | yes | yes, 64 of 64 calibration tiles within 3 levels |
+| Blend material | yes | yes, not compared yet |
+| Rough metal and rough glass that keep their energy | metal: no (measured); glass: not checked | yes (within 0.79% of white in a white sky) |
+| Glass dispersion (rainbow splitting) | not checked | yes |
+| Glowing media (fire, gas) | yes (emissive cloud) | yes |
+| Area lights (rectangle panels) | not checked | yes |
+
+## Light and sky
+
+| Feature | MagicaVoxel | Margo |
+| --- | --- | --- |
+| Uniform sky, sun with soft shadows, ground | yes | yes |
+| Atmosphere sky (sunrise, sunset) | yes | yes; 97.7-100% of pixels within 3 levels |
+| Image (HDR) sky | yes | yes; 99.76% on a lit scene |
+| Fog | yes | yes; 99.5-100% on 9 fog scenes |
+| Sun highlights on metal and glass | no (measured: the sun lights diffuse surfaces only) | yes in the Margo look |
+| Sunlight aimed through glass and off mirrors (clean caustics) | not checked | yes |
+
+## Camera
+
+| Feature | MagicaVoxel | Margo |
+| --- | --- | --- |
+| Perspective | yes | yes |
+| Orthographic, isometric | yes | mapped, not compared yet |
+| Depth of field | yes (no effect seen in its snapshots) | yes, round or polygon bokeh |
+| Panorama, fisheye, lens distortion | not checked | yes |
+| Motion blur (objects and camera) | not checked | yes |
+
+## Image
+
+| Feature | MagicaVoxel | Margo |
+| --- | --- | --- |
+| Exposure, gamma, ACES film curve | yes | yes, within 1 level |
+| Vignette | yes | yes, within 0.001 |
+| Voxel edges, grid, background colour | yes | yes; edges 99.0-99.5%, grid 86-88% (line borders), background 99.92% |
+| Transparent background PNG | yes | open |
+| Non-cubic voxels (`_scale`) | yes | open |
+| Bloom | in its viewport, not in saved snapshots | through `@margoengine/post` |
+| Denoiser | none in its render settings | yes |
+| Clean image while the camera moves | not measured | yes: history across frames; 2-3x less noise turning slowly, about 2x on glass and clouds turning 0.5 degrees a frame |
+
+## Output and scale
+
+| Feature | MagicaVoxel | Margo |
+| --- | --- | --- |
+| PNG snapshot | yes | yes, up to 16,384 pixels a side (tiled, cancellable) |
+| Float (HDR) image; albedo, normal, depth and object passes | not checked | yes |
+| Largest model | 256 x 256 x 256 | 256 x 256 x 256 |
+| Many models | yes (world editor) | up to 65,535 instances sharing models |
+| Large world: 64 terrain models, 12.6 million voxels | not rendered yet | 256 samples in 1.5 s, 93 MiB of GPU memory |
+
+## Editing and integration
+
+| Feature | MagicaVoxel | Margo |
+| --- | --- | --- |
+| Voxel modelling tools, palette editor | yes | no: Margo is the renderer (its voxel package stores and meshes worlds, without an editor UI) |
+| Mesh export | yes | no (not in this package) |
+| Runs inside your own web page, game or tool | no | yes |
+| Live scene updates from code | no | yes (only changed models re-upload) |
+| Ray picks, depth for overlays drawn on top | no API | yes |
+| Same input, same image | not checked | yes, bit for bit on the same GPU and driver |
+| Platforms measured | Windows | Windows, Edge (other GPUs and browsers untested) |
+
+## Where MagicaVoxel is ahead
+
+- It is a complete, free editor that artists already use; Margo renders, it does not edit.
+- Transparent-background PNGs, non-cubic voxels and its orthographic and isometric cameras are not matched yet; sky-lit
+  subsurface is 7-12 levels dark.
+- Margo is measured on one PC and one browser only.
