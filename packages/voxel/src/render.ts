@@ -16,6 +16,7 @@ import { Frustum } from '@margoengine/math/frustum';
 import { invertMatrix } from '@margoengine/math/mat4';
 import { neutralShader } from '../../shared/display.js';
 import { lightPBR, type PBRHooks } from '../../shared/pbr-hooks.js';
+import { uniformState } from './chunk.js';
 import { blockMaterials, type ChunkMesh, sortQuads, VoxelMesher } from './mesher.js';
 import { BlockTextures, blockTextureView } from './textures.js';
 import type { VoxelWorld } from './world.js';
@@ -32,6 +33,13 @@ declare const GPUBufferUsage: {
 };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
+// The mesh of an all-air chunk: no quads, every pair of its faces joined (as the mesher reports for one).
+const AIR: ChunkMesh = {
+  opaque: new Uint32Array(0),
+  cutout: new Uint32Array(0),
+  translucent: new Uint32Array(0),
+  visibility: 0x20c38f3e, // bit a * 6 + b for every pair of faces a < b
+};
 const PAGE = 64, // quads per page
   PAGE_BYTES = PAGE * 12,
   // Most quads one chunk layer can hold: two glass blocks in a 3D checkerboard show every face (mesher README).
@@ -793,8 +801,9 @@ export class VoxelRenderer implements EnginePlugin {
     const world = this.world;
     for (const key of world.dirty) {
       world.dirty.delete(key);
-      const [cx, cy, cz] = key.split(',').map(Number);
-      if (!world.getChunk(cx, cy, cz)) {
+      const [cx, cy, cz] = key.split(',').map(Number),
+        chunk = world.getChunk(cx, cy, cz);
+      if (!chunk) {
         this.#mesher.cancel(key);
         this.#drop(key);
         this.#finished.delete(key);
@@ -803,7 +812,14 @@ export class VoxelRenderer implements EnginePlugin {
       }
       this.#known.add(key);
       const priority = Math.hypot(cx * 32 + 16 - eye[0], cy * 32 + 16 - eye[1], cz * 32 + 16 - eye[2]),
-        generation = this.#generation;
+        generation = this.#generation,
+        state = uniformState(chunk);
+      // All air (an invisible block in every cell) has no faces whatever its neighbours hold: no shell, no worker.
+      if (state !== undefined && world.blocks.table[state & 0xffff]?.layer === 'invisible') {
+        this.#mesher.cancel(key);
+        this.#finished.set(key, { mesh: AIR, priority, eye });
+        continue;
+      }
       this.#mesher.mesh(world, key, priority, eye).then(
         (mesh) => {
           if (mesh && generation === this.#generation && !this.#disposed)

@@ -24,13 +24,13 @@ export interface NoiseTerrainOptions {
     };
 }
 
-export type VoxelGenerate = (chunk: VoxelChunk, cx: number, cy: number, cz: number, context: VoxelGenerateContext) => void | Promise<void>;
+export type VoxelGenerate = (chunk: VoxelChunk, cx: number, cy: number, cz: number, context: VoxelGenerateContext) => void | number | Promise<void | number>;
 
 export interface VoxelGenerateContext {
     readonly blocks: readonly BlockType[];
 }
 
-export function noiseTerrain(options?: NoiseTerrainOptions): VoxelGenerate;
+export function noiseTerrain(options?: NoiseTerrainOptions): (chunk: VoxelChunk, cx: number, cy: number, cz: number, context: VoxelGenerateContext) => number;
 
 export function serveVoxelGenerator(generate: VoxelGenerate): void;
 

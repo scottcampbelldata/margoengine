@@ -254,6 +254,8 @@ interface Held {
 // A finished load waiting to join the world: a generated chunk stays packed until then, so its unpack counts against
 // chunksPerFrame and frameBudget.
 type Ready = Omit<Held, 'chunk'> & { chunk: VoxelChunk | PackedChunk };
+// A generator's reply: the packed chunk, with its column's ceiling when the generator gave one (serveVoxelGenerator).
+type Generated = PackedChunk & { ceiling?: number };
 
 const streamed = new WeakSet<VoxelWorld>();
 let plugins = 0;
@@ -331,11 +333,14 @@ export class VoxelStreamer {
   #next = 0; // #order before it is loaded, loading, ready or failed (rewound when a chunk unloads)
   #tick = 0;
   #full = false;
+  #room = 0; // bytes left under memoryBudget at the last update
+  #mean = 0; // mean bytes of a loaded chunk at the last update (0 before any)
   #loaded = new Map<string, Held>();
   #loading = new Map<string, AbortController>();
   #ready = new Map<string, Ready>();
   #failed = new Map<string, { cx: number; cy: number; cz: number }>();
   #unsaved = new Map<string, Held>(); // edited chunks out of the world whose save has not succeeded yet
+  #ceilings = new Map<string, number>(); // by column "cx,cz": no generated chunk of it has a block above this cell y
   #last: Held | undefined; // the chunk of the last edit
   #lx = Number.NaN;
   #ly = 0;
@@ -591,11 +596,20 @@ export class VoxelStreamer {
     }
     for (const [key, held] of this.#ready) if (!this.#keeps(held.cx, held.cy, held.cz)) this.#ready.delete(key);
     for (const [key, spot] of this.#failed) if (!this.#keeps(spot.cx, spot.cy, spot.cz)) this.#failed.delete(key);
+    // Ceilings of columns past every viewer's unload range go (any height: a column holds every layer).
+    const far = (d + 1) * (d + 1);
+    for (const column of this.#ceilings.keys()) {
+      const [cx, cz] = column.split(',').map(Number);
+      let kept = false;
+      for (let i = 0; i < c.length && !kept; i += 3) kept = (cx - c[i]) ** 2 + (cz - c[i + 2]) ** 2 <= far;
+      if (!kept) this.#ceilings.delete(column);
+    }
   }
   // Over budget: unload the least recently used chunks outside the load ring; stop loading while still over.
   #evict(): void {
     let total = 0;
     for (const held of this.#loaded.values()) total += held.chunk.byteLength;
+    this.#mean = this.#loaded.size ? total / this.#loaded.size : 0;
     if (total > this.#budget)
       for (const [key, held] of [...this.#loaded]
         .filter(([key]) => !this.#ring.has(key))
@@ -605,6 +619,7 @@ export class VoxelStreamer {
         this.#unload(key, held);
       }
     this.#full = total > this.#budget;
+    this.#room = this.#budget - total;
   }
   #add(): void {
     if (!this.#ready.size) return;
@@ -631,11 +646,16 @@ export class VoxelStreamer {
       added++;
     }
   }
-  // Starts loads closest first, at most 4 per worker in flight or waiting to be added.
-  #start(): void {
-    if (this.#full) return;
+  // Starts loads closest first: at most 4 per worker running or queued, and none while as many finished chunks wait to
+  // join as one update adds (at least 4 per worker), so a slow join does not pile chunks up. It runs each update and,
+  // once chunks have joined, as each load finishes, so a worker never waits for the next frame; between updates only
+  // while the memory budget has room for every chunk on its way (at the loaded chunks' mean size).
+  #start(between = false): void {
+    if (this.#full || this.#disposed || (between && !this.#mean)) return;
+    const waiting = Math.max(4 * this.workers, Math.min(this.#perFrame, 64));
     for (const order = this.#order; this.#next < order.length; this.#next++) {
-      if (this.#loading.size + this.#ready.size >= 4 * this.workers) return;
+      if (this.#loading.size >= 4 * this.workers || this.#ready.size >= waiting) return;
+      if (between && (this.#loading.size + this.#ready.size + 1) * this.#mean > this.#room) return;
       const spot = order[this.#next],
         { key } = spot;
       if (this.#loaded.has(key) || this.#loading.has(key) || this.#ready.has(key) || this.#failed.has(key)) continue;
@@ -644,17 +664,18 @@ export class VoxelStreamer {
       else this.#load(spot);
     }
   }
-  // Store first, then the generator (air without one).
+  // Store first, then the generator (air without one, and above its column's ceiling once a chunk of it told it).
   #load(spot: Spot): void {
     const { key, cx, cy, cz, d } = spot,
       job = new AbortController(),
-      pool = this.#pool;
+      pool = this.#pool,
+      column = `${cx},${cz}`;
     this.#loading.set(key, job);
-    (async (): Promise<VoxelChunk | PackedChunk> => {
+    (async (): Promise<VoxelChunk | Generated> => {
       const stored = await this.store.get(cx, cy, cz);
-      if (stored || !pool) return stored ?? new VoxelChunk();
+      if (stored || !pool || cy * 32 > (this.#ceilings.get(column) ?? Infinity)) return stored ?? new VoxelChunk();
       job.signal.throwIfAborted();
-      return pool.run<PackedChunk>(() => ({ cx, cy, cz, blocks: this.world.blocks.table, terrain: this.#terrain }), {
+      return pool.run<Generated>(() => ({ cx, cy, cz, blocks: this.world.blocks.table, terrain: this.#terrain }), {
         priority: d,
         signal: job.signal,
       });
@@ -662,13 +683,17 @@ export class VoxelStreamer {
       (chunk) => {
         if (this.#loading.get(key) !== job) return;
         this.#loading.delete(key);
+        if (!(chunk instanceof VoxelChunk) && Number.isInteger(chunk.ceiling))
+          this.#ceilings.set(column, chunk.ceiling as number);
         this.#ready.set(key, { cx, cy, cz, chunk, edited: false, used: 0 });
+        this.#start(true);
       },
       (error) => {
         if (this.#loading.get(key) !== job) return;
         this.#loading.delete(key);
         this.#failed.set(key, spot);
         this.onError(error);
+        this.#start(true);
       },
     );
   }

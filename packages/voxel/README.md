@@ -439,6 +439,7 @@ import { serveVoxelGenerator } from '@margoengine/voxel/generate';
 serveVoxelGenerator((chunk, cx, cy, cz, { blocks }) => {
   const stone = blocks.find((type) => type.name === 'stone').id; // the world's BlockTypes table
   if (cy < 0) chunk.fill(stone); // chunk: a new air VoxelChunk; cell (x, y, z) is world (32 cx + x, ...)
+  return -1; // optional: no block above cell y -1 in this column, so its chunks with cy >= 0 load as air without a job
 });
 // Main thread: new VoxelStreamer({ world, generator: islands }) (or attach), then streamer.update() each frame.
 ```
@@ -447,12 +448,19 @@ serveVoxelGenerator((chunk, cx, cy, cz, { blocks }) => {
   `verticalDistance` in y, inside the world's minY..maxY. It unloads once it is more than one chunk past that for every
   viewer, so walking back and forth over a chunk border reloads nothing. `distance` and `verticalDistance` can change
   at run time.
-- **Order.** Loads start closest first, at most 4 per worker in flight; finished chunks join the world closest first,
-  and lighting and meshing follow through `world.onChunk` and `world.dirty`. A generated chunk is unpacked when it
-  joins (about 0.06-0.08 ms on the main thread of the desktop below, 0.15-0.19 ms on the laptop). Per `update()` at
-  most `chunksPerFrame` (default 8) join, and none after `frameBudget` milliseconds (default 0.5) of adding them,
-  listeners included; one always joins, so loading never stalls (0 means one per update). Behind a loading screen set
-  both to `Infinity`.
+- **Order.** Loads start closest first, at most 4 per worker running or queued, and the next one starts as each finishes
+  (not only once per `update()`) while the memory budget has room for every chunk on its way; finished chunks join the
+  world closest first, and lighting and meshing follow through `world.onChunk` and `world.dirty`. A generated chunk is
+  unpacked when it joins (about 0.06-0.08 ms on the main thread of the desktop below, 0.15-0.19 ms on the laptop). Per
+  `update()` at most `chunksPerFrame` (default 8) join, and none after `frameBudget` milliseconds (default 0.5) of
+  adding them, listeners included; one always joins, so loading never stalls (0 means one per update). Behind a loading
+  screen set both to `Infinity`, or raise them while the world first fills: the sandbox joins 2 ms of chunks a frame
+  then (render distance 16 ready in 3.6 s instead of 8.1-8.4 s at 0.5 ms) and goes back to 0.5 ms once ready.
+- **Air above the ground.** A generator can return its column's ceiling, a cell y that no chunk of that column has a
+  block above (`noiseTerrain` returns the highest ground, sea or tree crown that reaches the column). Once one chunk of
+  a column has come back with it, the column's chunks wholly above it load as air without a worker job (the store is
+  still read first, so built chunks up there load). In the sandbox at render distance 16, about 2,360 of 5,579 chunks
+  need no job. A ceiling too low loses blocks; return nothing when unsure.
 - **Saving.** Chunks edited through the world (`onChange`), and chunks someone else added, are saved to the store when
   they unload; chunks generated or read from the store and not edited are dropped and regenerate the same. A failed
   save is reported to `onError` and the chunk is kept in memory, where a reload finds it, until a save succeeds.
@@ -490,8 +498,9 @@ cost 1.2-1.5 ms.
 
 ## Rendering (`@margoengine/voxel/render`)
 
-`VoxelRenderer` draws a world with an engine (WebGPU): it meshes the world's dirty chunks in workers, keeps their quads
-on the GPU and draws every chunk layer with one indirect draw. `BlockTextures` holds the block textures.
+`VoxelRenderer` draws a world with an engine (WebGPU): it meshes the world's dirty chunks in workers (an all-air chunk
+needs no job: it has no faces whatever its neighbours hold), keeps their quads on the GPU and draws every chunk layer
+with one indirect draw. `BlockTextures` holds the block textures.
 
 ```ts
 import { BlockTextures, VoxelRenderer } from '@margoengine/voxel/render';

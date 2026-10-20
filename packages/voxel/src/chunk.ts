@@ -56,6 +56,10 @@ function reencode(bits: number, words: Uint32Array | null, to: number, remap: Ui
 export let reserveCells: (chunk: VoxelChunk, states: ArrayLike<number>, count: number) => void;
 /** Package-internal: after sets prepared by {@link reserveCells}, narrows indices the remaining states do not need. */
 export let settleCells: (chunk: VoxelChunk) => void;
+/** The state every cell of `chunk` holds when it is uniform (its palette alone), else undefined. */
+export let uniformState: (chunk: VoxelChunk) => number | undefined;
+/** The states `chunk`'s cells use, possibly with unused ones (as `pack` gives them), as a view: no copy. */
+export let paletteOf: (chunk: VoxelChunk) => Uint32Array;
 
 /**
  * The 32,768 block states and light bytes of one chunk. States are stored as indices into a palette of the distinct
@@ -85,6 +89,8 @@ export class VoxelChunk {
     settleCells = (chunk) => {
       if (chunk.bits && (chunk.live === 1 || widthFor(2 * chunk.live) < chunk.bits)) chunk.compact();
     };
+    uniformState = (chunk) => (chunk.bits ? undefined : chunk.palette[0]);
+    paletteOf = (chunk) => chunk.palette.subarray(0, chunk.size);
   }
   /**
    * A uniform chunk: every cell is `state` (default 0, air) and every light byte 0.

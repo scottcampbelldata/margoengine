@@ -314,6 +314,34 @@ test('VoxelStreamer reads the store before the generator; an app module worker g
   );
 });
 
+test('VoxelStreamer loads chunks above a column ceiling a generator gave as air, without a job; the store still first', async (t) => {
+  const { jobs } = useWorkers(t),
+    store = new MemoryChunkStore();
+  await store.put(0, 3, 0, new VoxelChunk(GLASS)); // built up there: the store's chunk loads, not air
+  const world = new VoxelWorld({ blocks }),
+    streamer = new VoxelStreamer({
+      world,
+      store,
+      generator: new URL('./ceiling.worker.js', import.meta.url),
+      distance: 0,
+      verticalDistance: 3,
+      workers: 1,
+      chunksPerFrame: Infinity,
+    });
+  t.after(() => streamer.dispose());
+  streamer.viewers = [[16, 16, 16]];
+  await run(streamer);
+  // Closest first with 4 loads in flight: chunks 0, -1, 1 and -2 start before the ceiling is known; chunk 0 comes back
+  // first (one worker, closest first) with ceiling 15, so 2 (and 3, in the store) need no job.
+  assert.ok(jobs.includes('0,-3,0') && jobs.includes('0,0,0'), `jobs ${jobs}`);
+  assert.ok(!jobs.includes('0,2,0') && !jobs.includes('0,3,0'), `no job above the ceiling: ${jobs}`);
+  assert.equal(world.getChunk(0, 2, 0).get(5, 5, 5), 0, 'air');
+  assert.equal(world.getChunk(0, 3, 0).get(5, 5, 5), GLASS, 'the stored chunk, not air');
+  assert.equal(world.getChunk(0, 0, 0).get(5, 15, 5), STONE);
+  assert.equal(world.getChunk(0, 0, 0).get(5, 16, 5), 0);
+  assert.equal(world.getChunk(0, -2, 0).get(5, 5, 5), STONE);
+});
+
 test('VoxelStreamer saves edited and adopted chunks when they unload, and they come back identical, not regenerated', async (t) => {
   const { started, jobs } = useWorkers(t),
     store = new MemoryChunkStore(),

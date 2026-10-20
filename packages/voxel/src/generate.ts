@@ -16,6 +16,10 @@ export interface VoxelGenerateContext {
  * (32 cx + x, 32 cy + y, 32 cz + z). It must give the same blocks for the same chunk every time and in any order, so
  * anything that crosses chunk borders (a tree) has to follow from the coordinates alone. Light can stay 0:
  * `@margoengine/voxel/light` recomputes it.
+ *
+ * It may return the column's ceiling: an integer cell y that no chunk of column (cx, cz) has a block above, whatever
+ * its cy. A streamer then loads that column's chunks wholly above it as air without a job. A ceiling too low loses
+ * blocks; return nothing when unsure.
  */
 export type VoxelGenerate = (
   chunk: VoxelChunk,
@@ -23,7 +27,7 @@ export type VoxelGenerate = (
   cy: number,
   cz: number,
   context: VoxelGenerateContext,
-) => void | Promise<void>;
+) => void | number | Promise<void | number>;
 
 /**
  * Serves `generate` from the module worker that calls it. A {@link VoxelStreamer} whose `generator` is this worker's
@@ -43,9 +47,9 @@ export function serveVoxelGenerator(generate: VoxelGenerate): void {
   if (typeof generate !== 'function')
     throw new TypeError('serveVoxelGenerator expects a function (chunk, cx, cy, cz, context)');
   serve(async ({ cx, cy, cz, blocks }: { cx: number; cy: number; cz: number; blocks: BlockType[] }) => {
-    const chunk = new VoxelChunk();
-    await generate(chunk, cx, cy, cz, { blocks });
-    return chunk.pack();
+    const chunk = new VoxelChunk(),
+      ceiling = await generate(chunk, cx, cy, cz, { blocks });
+    return Number.isInteger(ceiling) ? { ...chunk.pack(), ceiling } : chunk.pack();
   });
 }
 
@@ -118,13 +122,16 @@ const blend = (f: Float64Array, x: number, y: number, z: number): number => {
  * a column grows one when its hash says so and its whole crown is in the open air above the ground (no leaves in
  * hillsides or caves), so a crown that crosses a chunk border is the same in every chunk. Block types come by name
  * ({@link NoiseTerrainOptions.blocks}), so it works with any `BlockTypes`. Runs on any thread; VoxelStreamer runs it in
- * workers.
+ * workers. The function it returns gives the column's ceiling (see {@link VoxelGenerate}): the highest ground, sea or
+ * tree crown that reaches the column.
  * @throws TypeError for an option of the wrong type; the returned function throws TypeError for a context without
  * `blocks`.
  * @throws RangeError for an option out of range; the returned function throws RangeError for a block name the context
  * does not define.
  */
-export function noiseTerrain(options: NoiseTerrainOptions = {}): VoxelGenerate {
+export function noiseTerrain(
+  options: NoiseTerrainOptions = {},
+): (chunk: VoxelChunk, cx: number, cy: number, cz: number, context: VoxelGenerateContext) => number {
   if (!options || typeof options !== 'object') throw new TypeError('noiseTerrain options must be an object');
   const seed = option(options.seed, 'seed', 1, (v) => (v | 0) === v, 'an integer in -2^31..2^31-1'),
     seaLevel = option(options.seaLevel, 'seaLevel', 0, (v) => (v | 0) === v, 'an integer cell y'),
@@ -178,15 +185,20 @@ export function noiseTerrain(options: NoiseTerrainOptions = {}): VoxelGenerate {
         return heights[k];
       };
     let low = Infinity,
-      high = -Infinity;
+      high = -Infinity,
+      reach = -Infinity; // highest ground within R of the chunk: trees standing there reach into it
     for (let j = M - R; j < W - M + R; j++)
       for (let i = M - R; i < W - M + R; i++) {
         const h = heightAt(i, j);
+        reach = Math.max(reach, h);
         if (i >= M && j >= M && i < 32 + M && j < 32 + M) {
           low = Math.min(low, h);
           high = Math.max(high, h);
         }
       }
+    // Every chunk of this column lies under the ground, the sea and the crowns of trees (leaves up to 7 above their
+    // grass) of the columns within R: the same heights for any cy.
+    const ceiling = Math.max(treeCut > 0 ? reach + 7 : high, seaLevel);
 
     // Ground and sea.
     if (y1 < low - 3) chunk.fill(stone);
@@ -264,5 +276,6 @@ export function noiseTerrain(options: NoiseTerrainOptions = {}): VoxelGenerate {
                   put(lx + dx, top + dy - y0, lz + dz, leaves);
           for (let y = h + 1; y <= top; y++) put(lx, y - y0, lz, log);
         }
+    return ceiling;
   };
 }

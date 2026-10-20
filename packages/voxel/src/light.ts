@@ -1,7 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // @margoengine/voxel/light: sky and block light by breadth-first flood fill, on the main thread with a per-call budget.
 import { MargoError } from '@margoengine/math/errors';
-import type { VoxelChunk } from './chunk.js';
+import { paletteOf, type VoxelChunk } from './chunk.js';
 import { chunkKey, VoxelWorld } from './world.js';
 
 /** Brightest light level: sky light under open sky, and the most a block type can emit. */
@@ -403,7 +403,7 @@ export class VoxelLighting {
       emitting = false,
       cost = 1,
       scanned = 1024; // the column pass
-    for (const state of chunk.pack().palette) {
+    for (const state of paletteOf(chunk)) {
       blocking ||= (flags[state & 0xffff] & 15) > 0;
       emitting ||= flags[state & 0xffff] > 15;
     }

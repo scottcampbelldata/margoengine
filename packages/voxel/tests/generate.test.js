@@ -22,6 +22,7 @@ const generate = (fn, cx, cy, cz, table = blocks.table) => {
   fn(chunk, cx, cy, cz, { blocks: table });
   return chunk;
 };
+const generateCeiling = (fn, cx, cy, cz) => fn(new VoxelChunk(), cx, cy, cz, { blocks: blocks.table });
 const cells = (chunk) => {
   const out = new Uint32Array(32768);
   for (let y = 0; y < 32; y++)
@@ -256,6 +257,36 @@ test('noiseTerrain finds block types by name in any BlockTypes; errors name the 
   assert.throws(() => serveVoxelGenerator('generate'), TypeError);
 });
 
+test('noiseTerrain gives the column ceiling: the same for every chunk of a column, no block above it, sea and crowns under it', () => {
+  for (const options of [{ seed: 1 }, { seed: 11, trees: 0.2 }, { seed: 5, trees: 0, seaLevel: 30, amplitude: 8 }]) {
+    const fn = noiseTerrain(options);
+    for (let cz = 0; cz < 3; cz++)
+      for (let cx = 0; cx < 3; cx++) {
+        const ceilings = new Set();
+        let top = -Infinity;
+        for (let cy = -2; cy <= 4; cy++) {
+          const chunk = new VoxelChunk();
+          ceilings.add(fn(chunk, cx, cy, cz, { blocks: blocks.table }));
+          for (let y = 31; y >= 0; y--) {
+            let any = false;
+            for (let z = 0; z < 32 && !any; z++) for (let x = 0; x < 32 && !any; x++) any = chunk.get(x, y, z) !== 0;
+            if (any) {
+              top = Math.max(top, cy * 32 + y);
+              break;
+            }
+          }
+        }
+        assert.equal(ceilings.size, 1, `one ceiling for column ${cx},${cz}: ${[...ceilings]}`);
+        const [ceiling] = ceilings;
+        assert.ok(
+          Number.isInteger(ceiling) && top <= ceiling,
+          `column ${cx},${cz}: top block ${top}, ceiling ${ceiling}`,
+        );
+        assert.ok(ceiling >= (options.seaLevel ?? 0), 'the sea is under it');
+      }
+  }
+});
+
 test('the built terrain worker is a classic script without eval and serves noiseTerrain chunks with eval disabled', async () => {
   const code = readFileSync(new URL('../dist/workers/terrain.js', import.meta.url), 'utf8');
   assert.doesNotMatch(code, /\beval\s*\(|new Function|\bFunction\s*\(/);
@@ -279,6 +310,7 @@ test('the built terrain worker is a classic script without eval and serves noise
     const chunk = VoxelChunk.unpack(structuredClone(data.result));
     assert.deepEqual(cells(chunk), cells(generate(noiseTerrain(terrain), cx, cy, cz)));
     assert.ok(transfer.includes(data.result.palette.buffer), 'the packed arrays move back');
+    assert.equal(data.result.ceiling, generateCeiling(noiseTerrain(terrain), cx, cy, cz), 'with the column ceiling');
   }
   await scope.onmessage({ data: clone({ cx: 0, cy: 0, cz: 0, blocks: [], terrain }) });
   assert.equal(posted.at(-1).data.error.name, 'RangeError', 'a world without the block types gets an error reply');
