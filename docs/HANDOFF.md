@@ -149,8 +149,10 @@ Current parity work (2026-10-17): dispersion, depth/distance materials and back-
 (`aa2150c`, `e8befe7`, `95b4eae`). Polygon offset, stencil and color-write controls are on main (`156c4b8`).
 Material wireframe is on main (`80de63c`) in optional materials/gltf-pro and directional/local/contact shadows.
 Variable-size `.cube` LUTs are implemented in optional tonemap with the legacy 33³/no-LUT rendering retained;
-no core or stage feature is added. The matrix now counts 101 covered / 33 partial /
-25 missing of 159 rows. Core + stage measured 21,094 bytes gzip after upstream kernel and Euler lane-view
+no core or stage feature is added. The matrix now counts 109 covered / 29 partial /
+22 missing of 160 rows (2026-10-20: the lights and colour work, branch claude/musing-lamport-61b063: extra
+directional lights, IES, projectors and units in clustered; HemisphereLight/AmbientLight in environment; light
+helpers in lines; Display P3 input colours in math; Lambert/Phong and the shadow catcher recounted as covered). Core + stage measured 21,094 bytes gzip after upstream kernel and Euler lane-view
 maintenance, below the strict 25,000-byte ceiling in AGENTS.md. Wireframe adds no core or stage source changes.
 Nine stale current-proof references were reconciled against clean upstream `b3ed8ac`; all 15 current proofs and all
 nine affected historical proofs pass. The exact comparisons remain in place; evidence and intentional prior changes

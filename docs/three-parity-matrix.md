@@ -1,6 +1,6 @@
 # Reading the three.js parity counts
 
-Date: 2026-10-17. The table in [threejs-parity.md](threejs-parity.md) was recounted after the approved core hooks and optional dispersion, depth/distance material modes and back-side rendering, polygon offset and stencil: **159 features, 99 COVERED, 35 PARTIAL, 25 MISSING**. Viewport/scissor moved from MISSING to PARTIAL because it now works per core draw, while optional native passes and picking retain their own behavior. The camera and ambient hooks improve existing PARTIAL rows. Core + stage measured 21,094 bytes gzip on that date, after the separate performance and kernel maintenance updates on main, leaving 3,905 bytes below the strict 25,000-byte ceiling. The optional material changes add no core or stage bytes. [The matrix](threejs-parity.md#what-is-missing-or-partial-and-what-to-do) separates the implemented hooks from the remaining package work.
+Date: 2026-10-20. The table in [threejs-parity.md](threejs-parity.md) was recounted after the approved core hooks and optional dispersion, depth/distance material modes and back-side rendering, polygon offset and stencil: **160 features, 114 COVERED, 28 PARTIAL, 18 MISSING** (2026-10-20: the lights and colour rows moved: AmbientLight, HemisphereLight, DirectionalLight, ShadowMaterial to COVERED from PARTIAL; IESSpotLight/ProjectorLight, physical light units, Lambert/Phong to COVERED from MISSING; light helpers a new COVERED row; the post effects moved GTAOPass, SSGI, motion blur and Lensflare to COVERED from MISSING and SSRPass to COVERED from PARTIAL). Viewport/scissor moved from MISSING to PARTIAL because it now works per core draw, while optional native passes and picking retain their own behavior. The camera and ambient hooks improve existing PARTIAL rows. Core + stage measured 21,094 bytes gzip on that date, after the separate performance and kernel maintenance updates on main, leaving 3,905 bytes below the strict 25,000-byte ceiling. The optional material changes add no core or stage bytes. [The matrix](threejs-parity.md#what-is-missing-or-partial-and-what-to-do) separates the implemented hooks from the remaining package work.
 
 COVERED can still name a limit. PARTIAL means one common three.js use is absent. MISSING means no package `src/` implements that three.js name. A Margo feature with a different name can exist beside a MISSING row. SDF text does not make `TextGeometry` covered.
 
@@ -25,7 +25,7 @@ On that path, core meshes and anything that becomes a core mesh can draw. The ma
 
 The row stays PARTIAL because three.js's WebGLRenderer draws the whole scene. Closing it would mean a second renderer for every WebGPU package, inside the frozen core budget or as a parallel stack. v1 does not do that. The public line is: WebGPU is the renderer; WebGL2 is a flat preview of core meshes.
 
-## What the 25 MISSING rows are
+## What the 22 MISSING rows are
 
 | Row | How to treat it |
 | --- | --- |
@@ -33,11 +33,8 @@ The row stays PARTIAL because three.js's WebGLRenderer draws the whole scene. Cl
 | GTAOPass | COVERED since 2026-10-20: `GTAO` in `@margoengine/post/gtao` (`packages/post/src/gtao.ts`), on SSAO's G-buffer and ambient replay. |
 | SSGI, denoise | COVERED since 2026-10-20: `SSGI` in `@margoengine/post/ssgi` (`packages/post/src/ssgi.ts`), one diffuse bounce on SSR's Hi-Z march and SSAO's ambient replay, with a bilateral denoise. |
 | BatchedMesh | Left out. Distinct geometries stay separate draws. `mergeGeometries` can bake static meshes. |
-| IESSpotLight, ProjectorLight | Left out. |
 | Motion blur | COVERED since 2026-10-20: `MotionBlur` in `@margoengine/post/motion-blur` (`packages/post/src/motion-blur.ts`), fed by TAA's velocity buffer through `taa.velocity` (`packages/taa/src/index.ts`). |
 | TextGeometry, FontLoader, TTFLoader | `@margoengine/text` is SDF text. The three.js font extrude stays absent. |
-| MeshLambertMaterial, MeshPhongMaterial | FBX import converts these to PBR. There is no Lambert or Phong shader. |
-| Physical light units (candela, lux) | Intensities stay unitless radiance scales. |
 | StereoCamera, AnaglyphEffect, ParallaxBarrierEffect | Absent. XR is a separate partial path. |
 | ConvexGeometry, DecalGeometry, RoundedBoxGeometry, ParametricGeometry | Absent. Physics builds convex hulls for colliders only. |
 | MTLLoader | Absent. OBJ loading is geometry only. |
@@ -48,13 +45,13 @@ The row stays PARTIAL because three.js's WebGLRenderer draws the whole scene. Cl
 | SkeletonUtils, AnimationObjectGroup | Absent. |
 | GlitchPass, AfterimagePass, Lensflare | GlitchPass and AfterimagePass absent. Lensflare COVERED since 2026-10-20: `LensFlare` in `@margoengine/post/lens-flare` (`packages/post/src/lens-flare.ts`). |
 | ArcballControls | Absent. Orbit, map, trackball, fly, and first-person exist. |
-| Light helpers, SkeletonHelper | Absent. |
+| SkeletonHelper | Absent. Light helpers are in `@margoengine/lines` (`packages/lines/src/light-helpers.ts`). |
 | Reflector, Refractor | Absent. Water does its own refraction. |
 | XRControllerModelFactory, XRHandModelFactory | Absent. |
 
-The three-hook change does not implement these 25 missing rows. The optional add-ons and loaders remain separate package work; the specific core exception does not authorize more core features or relax the gzip gate.
+The three-hook change does not implement these 22 missing rows. The optional add-ons and loaders remain separate package work; the specific core exception does not authorize more core features or relax the gzip gate.
 
-## What the 35 PARTIAL rows are
+## What the 29 PARTIAL rows are
 
 One of them is the WebGL2 row above. It stays partial on purpose.
 
@@ -63,7 +60,7 @@ These limits remain after the three hooks:
 - One engine is one canvas and one implicit scene.
 - `Engine.render({camera})` supports sequential second-camera captures into the existing target path and restores primary culling before returning. It does not create another scene, permit nested rendering, or isolate temporal histories.
 - Core draw calls accept viewport and scissor rectangles. Optional native passes and picking do not inherit them; clears still cover the whole attachment.
-- One directional light per engine.
+- One directional light in core; more come from `@margoengine/clustered/directional` (`packages/clustered/src/directional.ts`), unshadowed.
 - Layers filter raycasts only.
 - Clipping caps apply to core meshes. A node material can discard fragments. Shadows still see the uncut surface.
 
@@ -74,13 +71,12 @@ These partials are narrower APIs that already have a Margo path. They are limits
 - KTX2 works for `KHR_texture_basisu` on a glTF. A standalone `.ktx2` is a raw `GPUTexture` that materials cannot take. Cube maps, arrays, and UASTC HDR are rejected.
 - Materials meshes accept independent `uvs1` coordinates and geometry groups with material arrays, including instancing and glTF export. UV1 falls back to UV0 when omitted. Arbitrary named vertex attributes remain absent, so the combined geometry-attributes row stays PARTIAL and the counts remain 99 / 35 / 25.
 - Toon shading applies to every core mesh at once, not to a glTF-pro or skinned material.
-- Contact shadows are a ground-plane helper, not a shadow-catcher material.
 - SSR reflects core meshes and models registered with `ssr.add`, terrain and water included since 2026-10-20 (`setCapture` in `packages/terrain/src/index.ts` and `packages/water/src/index.ts`); the SSRPass row is COVERED.
 - OBJ loading skips materials. USDZ export rejects textures, vertex colors, and alpha masks.
 - WebXR draws core meshes on WebGPU. It has no hit testing and no WebGL XR fallback.
 - Screen effects such as vignette are a `NodePass`, not built-in passes. SMAA is not provided. FXAA is.
 
-The remaining partials are the same kind of limit, spelled out on each row: core diffuse ambient now has RGB multipliers, while independent material models keep their own ambient APIs and glTF-pro's hemisphere remains fixed. Color management, cube and data textures, depth textures borrowed from a post pass, cache without a shared loading manager, code-authored clips, and two-bone IK retain their documented limits.
+The remaining partials are the same kind of limit, spelled out on each row: core diffuse ambient has RGB multipliers, and environment's `HemisphereLight` and `AmbientLight` (`packages/environment/src/hemisphere.ts`) replace both it and glTF-pro's fixed hemisphere. Color management, cube and data textures, depth textures borrowed from a post pass, cache without a shared loading manager, code-authored clips, and two-bone IK retain their documented limits.
 
 ## Sentence that was behind the table
 

@@ -114,6 +114,8 @@ before the core speed-ups (`0ed56b9`) re-run faster than recorded.
 | selection-xray-off | PKG-068 | `46f9484` -> `80d4cfb`: 10,586 calls | `b3ed8ac` |
 | clustered-local-shadows | PKG-096, PKG-097 | `0ed56b9` -> `590278e`: 482 calls, 8 params.z writes | `0ed56b9` |
 | clustered-area-lights | – | `67e0172` -> `dab9633`: 482 calls | `67e0172` |
+| clustered-light-hooks | – | `6c20076d` -> working tree until the series lands (pin it then): 482 calls without the directional, IES and projector entries and with each attached but empty | `6c20076d` |
+| environment-hemisphere | – | `6c20076d` -> working tree until the series lands (pin it then): 53 shader texts (IBL, Fog, LightProbes on six core variants, gltf-pro's four shader kinds) and 23 calls without a HemisphereLight | `6c20076d` |
 | color-output | – | `7dcc958` -> `225b1d6`: 6,174 calls | `2cd81c1`: 7,734 calls |
 | deformed-shadows | – | `38d448e` -> `282e751` | `2cd81c1` |
 | environment-volumetric | – | `7c47a09` -> `366ebff` | `2cd81c1`: 70 root calls; 344/533 isolated calls |
