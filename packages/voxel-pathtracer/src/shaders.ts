@@ -29,7 +29,7 @@
 //   (Schied et al. 2017, "Spatiotemporal Variance-Guided Filtering"), on albedo-demodulated radiance.
 // Material flags and record sizes must match scene.ts and layout.ts.
 import { displayShader } from '../../shared/display.js';
-import { ADDITIVE, DELTA_ALPHA, EMISSIVE, MATERIAL_FLOATS, MEDIA, SMOOTH, UNTINTED } from './scene.js';
+import { ADDITIVE, DELTA_ALPHA, EMISSIVE, MATERIAL_FLOATS, MEDIA, SMOOTH, SUNLIT, UNTINTED, VOXELWISE } from './scene.js';
 import { SPECTRUM } from './spectrum.js';
 import {
   FLAG_CLAMP,
@@ -213,6 +213,10 @@ const HIDE_SUN=${FLAG_HIDE_SUN}u;
 const NO_COMPENSATION=${FLAG_NO_COMPENSATION}u;
 const ADDITIVE=${ADDITIVE}u;
 const UNTINTED=${UNTINTED}u;
+const SUNLIT=${SUNLIT}u;
+const VOXELWISE=${VOXELWISE}u;
+// march's want for a voxelwise volume: stop at the next voxel face whatever lies behind it.
+const STEP=0xfffffffeu;
 const MODEL=${MODEL_WORDS}u;
 const INSTANCE=${INSTANCE_WORDS}u;
 @group(0) @binding(0) var<uniform> f:Frame;
@@ -277,7 +281,8 @@ fn found(h:ptr<function,Hit>,t:f32,v:u32,a:u32,stp:vec3i,d:vec3f,c:vec3i)->bool 
  return true;
 }
 // Two-level walk of model 'model' along o + t d (model space) for t in [tMin, tMax): the first boundary into a cell
-// whose palette index is not 'want'; with want != 0 also the exit through the model's box (value 0).
+// whose palette index is not 'want'; with want != 0 also the exit through the model's box (value 0). want == STEP:
+// the first boundary after the cell the ray starts in, whatever its index (voxelwise volumes).
 fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit>)->bool {
  let mb=f.scene.x+model*MODEL;
  let sz=vec3i(i32(scene[mb]),i32(scene[mb+1u]),i32(scene[mb+2u]));
@@ -298,21 +303,27 @@ fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit
  var bc=clamp(vec3i(floor((o+d*tEnter)*0.125)),vec3i(0),nb-1);
  var bn=((vec3f(bc)+up)*8.0-o)*inv;
  var t=tEnter;
+ let step=want==STEP;
+ // In STEP mode the cell the ray starts in (inside the box) is passed over.
+ var skip=step&&axis==3u;
  loop {
   let entry=voxels[grid+u32(bc.x+nb.x*(bc.z+nb.z*bc.y))];
   let tOut=min(min(bn.x,bn.y),min(bn.z,tExit));
   let lo=bc*8;let hi=min(lo+8,sz)-1;
-  if(entry==0u||entry>=0x80000000u){
+  if(entry==0u||(entry>=0x80000000u&&!step)){
    let u=select(0u,entry&255u,entry!=0u);
-   if(u!=want){return found(h,t,u,axis,stp,d,clamp(vec3i(floor(o+d*t)),lo,hi));}
+   if(step){if(!skip){return found(h,t,u,axis,stp,d,clamp(vec3i(floor(o+d*t)),lo,hi));}skip=false;}
+   else if(u!=want){return found(h,t,u,axis,stp,d,clamp(vec3i(floor(o+d*t)),lo,hi));}
   } else {
    var c=clamp(vec3i(floor(o+d*t)),lo,hi);
    var vn=(vec3f(c)+up-o)*inv;
    var vt=t;var va=axis;
+   let uniform=entry>=0x80000000u;
    loop {
     let l=vec3u(c-lo);let k=l.x+8u*(l.z+8u*l.y);
-    let v=(voxels[entry+(k>>2u)]>>((k&3u)*8u))&255u;
-    if(v!=want){return found(h,vt,v,va,stp,d,c);}
+    let v=select((voxels[entry+(k>>2u)]>>((k&3u)*8u))&255u,entry&255u,uniform);
+    if(step){if(!skip){return found(h,vt,v,va,stp,d,c);}skip=false;}
+    else if(v!=want){return found(h,vt,v,va,stp,d,c);}
     if(vn.x<vn.y&&vn.x<vn.z){va=0u;vt=vn.x;c.x+=stp.x;vn.x+=ad.x;}
     else if(vn.y<vn.z){va=1u;vt=vn.y;c.y+=stp.y;vn.y+=ad.y;}
     else{va=2u;vt=vn.z;c.z+=stp.z;vn.z+=ad.z;}
@@ -332,8 +343,8 @@ fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit
 // Extinction of a see-through cell for shadow rays, -1 when the cell blocks light (only media let it through, and
 // none with opaque shadows).
 fn extinction(v:u32)->f32 {
- let x=materials[v*MV+3u];
- return select(-1.0,x.x,(u32(x.w)&MEDIA)!=0u&&(f.config.z&OPAQUE_SHADOWS)==0u);
+ let x=materials[v*MV+3u];let fl=u32(x.w);
+ return select(-1.0,x.x,(fl&MEDIA)!=0u&&((f.config.z&OPAQUE_SHADOWS)==0u||(fl&SUNLIT)!=0u));
 }
 // Optical depth along a shadow ray through one model, -1 when blocked.
 fn marchShadow(model:u32,o:vec3f,d:vec3f,tMax:f32)->f32 {
@@ -390,7 +401,9 @@ fn traceInstance(i:u32,o:vec3f,d:vec3f,medium:u32,mInst:u32,h:ptr<function,Hit>)
  let own=i==mInst;
  let exitTie=!own&&(*h).inst==mInst&&(*h).value==0u;
  let tMax=select((*h).t,(*h).t*1.0001+1e-4,exitTie);
- if(march(scene[f.scene.y+i*INSTANCE+36u],xpoint(m,o),xdir(m,d),0.0,tMax,select(0u,medium,own),&r)){
+ var want=select(0u,medium,own);
+ if(own&&medium!=0u&&(u32(materials[medium*MV+3u].w)&VOXELWISE)!=0u){want=STEP;}
+ if(march(scene[f.scene.y+i*INSTANCE+36u],xpoint(m,o),xdir(m,d),0.0,tMax,want,&r)){
   if(exitTie){if(r.value!=0u||r.t<(*h).t){r.inst=i;*h=r;}return;}
   if(own&&r.value==0u&&(*h).inst!=NONE&&(*h).t<r.t*1.0001+1e-4){return;}
   r.inst=i;*h=r;
@@ -979,7 +992,7 @@ fn direct(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,medium:u32,mInst:u32,w:ptr<fun
  for(var q=0u;q<5u;q++){
   var wi=vec3f(0.0);var dist=INF;var radiance=vec3f(0.0);var lp=0.0;var far=false;
   if(q==0u){
-   if((f.config.z&SUN)==0u||(kind==1u&&(f.config.z&NO_SUN_MEDIA)!=0u)){continue;}
+   if((f.config.z&SUN)==0u||(kind==1u&&(f.config.z&NO_SUN_MEDIA)!=0u&&(m.flags&SUNLIT)==0u)){continue;}
    wi=f.sun.xyz;
    if(f.sunLight.w>0.0){wi=cone(f.sun.xyz,f.sun.w);}
    radiance=f.sunLight.xyz;lp=select(0.0,1.0/f.sunLight.w,f.sunLight.w>0.0);far=true;
@@ -1280,6 +1293,9 @@ fn radiance(px:vec2u)->Path {
   if(m.disp>0.0&&m.glass>0.0){collapse(&lambda,&thr);m.ior=iorAt(m,lambda);}
   let s=sampleSurface(m,n,wo,etaI);
   if(!s.ok){done=true;continue;}
+  // Straight through a voxel face inside a voxelwise volume: not a scattering event.
+  let through=s.lobe==3u&&s.transmit&&!inAir&&medium==h.value&&(m.flags&VOXELWISE)!=0u;
+  if(through){medium=h.value;mInst=h.inst;o=p-off;continue;}
   if(s.lobe==0u){if(nd>=f.limits.x){done=true;continue;}nd++;}
   else{if(ns>=f.limits.y){done=true;continue;}ns++;}
   if(s.lobe<=1u){

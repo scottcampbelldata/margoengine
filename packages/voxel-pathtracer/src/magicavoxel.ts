@@ -121,11 +121,15 @@ export function magicaVoxelMaterial(id: number, rgb: ArrayLike<number>, attribut
       };
     }
     case '_glass':
+      // Subsurface glass renders like the subsurface cloud (measured within 4 levels of it).
+      if (media === '_sss' && trans >= 1) return { id, type: 'media', color, density: 10 * density, anisotropy: g, sunlit: true };
       return {
         id,
         type: trans < 1 ? 'blend' : 'glass',
         color,
         transmission: trans,
+        // Partly transparent voxels pick glass or the rest again at every face inside the block.
+        voxelwise: trans < 1,
         metalness: 0,
         roughness: rough,
         ior,
@@ -142,6 +146,7 @@ export function magicaVoxelMaterial(id: number, rgb: ArrayLike<number>, attribut
         metalColor,
         metalness: clamp01(num(a, '_metal') ?? 0),
         transmission: Math.sqrt(clamp01(num(a, '_alpha') ?? num(a, '_trans') ?? 0)),
+        voxelwise: true,
         roughness: rough,
         ior,
         specular: 1,
@@ -169,6 +174,8 @@ export function magicaVoxelMaterial(id: number, rgb: ArrayLike<number>, attribut
       const d = num(a, '_d') ?? (weight === undefined ? 0 : Math.min(0.1, weight));
       if (media === '_absorb')
         return { id, type: 'glass', color, ior: 1, roughness: 0, density: d, tint: false, specular: 0 };
+      // Subsurface: a cloud of 10 x `_d` that the sun lights through itself (fitted sun-lit and sky-lit).
+      if (media === '_sss') return { id, type: 'media', color, density: 10 * d, anisotropy: g, sunlit: true };
       return {
         id,
         type: 'media',

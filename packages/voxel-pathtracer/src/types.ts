@@ -47,6 +47,17 @@ export interface TraceMaterial {
    * Default: `emission`. MagicaVoxel's emitter LDR setting l shows 1 + 3 l.
    */
   cameraEmission?: number;
+  /**
+   * Compatible addition: a medium the sun lights even with `sunInMedia` false, whose own cells shadow rays cross
+   * (attenuated) even with `transparentShadows` false: MagicaVoxel's subsurface media. Default false.
+   */
+  sunlit?: boolean;
+  /**
+   * Compatible addition: for a `blend` volume, every voxel face inside it picks a lobe again, so light passes straight
+   * through the glass share and the rest scatters at that face, as MagicaVoxel renders partly transparent voxels.
+   * Default false (the volume is one piece of material).
+   */
+  voxelwise?: boolean;
   /** Index of refraction, 1 to 3 (glass refraction and the plastic coat's Fresnel). Default 1.5. */
   ior?: number;
   /** Share of the glass lobe, 0 to 1 (`blend`; `glass` is 1). */

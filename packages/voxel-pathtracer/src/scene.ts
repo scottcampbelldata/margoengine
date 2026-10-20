@@ -31,7 +31,9 @@ export const MEDIA = 1,
   EMISSIVE = 4,
   SMOOTH = 8,
   ADDITIVE = 32,
-  UNTINTED = 64;
+  UNTINTED = 64,
+  SUNLIT = 128,
+  VOXELWISE = 256;
 /** Glass and mirror instances whose deflection of distant light is light-sampled, each (README, "Lighting"). */
 const MAX_DEFLECTORS = 8;
 const VOLUME = 2,
@@ -380,6 +382,10 @@ function packMaterial(m: TraceMaterial, name: string, out: Float32Array): void {
     throw new TypeError(`${where} ${name}.coat ${String(m.coat)} is unknown; pass 'layered' or 'additive'`);
   if (m.tint !== undefined && typeof m.tint !== 'boolean')
     throw new TypeError(`${where} ${name}.tint must be true or false`);
+  if (m.voxelwise !== undefined && typeof m.voxelwise !== 'boolean')
+    throw new TypeError(`${where} ${name}.voxelwise must be true or false`);
+  if (m.sunlit !== undefined && typeof m.sunlit !== 'boolean')
+    throw new TypeError(`${where} ${name}.sunlit must be true or false`);
   if (abbe > 0 && abbe < 5)
     throw new RangeError(`${where} ${name}.abbe ${abbe} is out of range; pass 0 (no dispersion) or 5 to 200`);
   const base = m.id * MATERIAL_FLOATS,
@@ -394,6 +400,8 @@ function packMaterial(m: TraceMaterial, name: string, out: Float32Array): void {
   if (alpha < DELTA_ALPHA) flags |= SMOOTH;
   if (m.coat === 'additive') flags |= ADDITIVE;
   if (m.tint === false) flags |= UNTINTED;
+  if (m.sunlit === true && media) flags |= SUNLIT;
+  if (m.voxelwise === true && pGlass > 0 && pGlass < 1) flags |= VOXELWISE;
   out.set(
     [
       Math.min(color[0], 1),

@@ -68,10 +68,14 @@ Everything here is on branch `worktree-agent-a63cac143225721f2` (not pushed, Cod
 
 ## Open: match MagicaVoxel
 
-1. Subsurface (`_media_type _sss`, cloud and glass): MagicaVoxel lights it with the sun (unlike its clouds) and it
-   looks like a cloud of about 10x the density. Ours renders it as a plain cloud: 59-156 levels off on those tiles.
-2. Partly transparent glass (`_trans` below 1) under sky: ours 13-16 levels too bright; MagicaVoxel seems to re-pick
-   glass or diffuse at every voxel face inside the block. Sun-lit it already matches.
+1. Subsurface (`_media_type _sss`): mapped to a cloud of 10 x `_d` that the sun lights through itself (material
+   `sunlit`): the cloud tile is within 2.5 levels sun-lit and 3 sky-lit, subsurface glass within 6-7. Open: a cloud
+   next to a sun-lit subsurface block comes out up to 20 levels brighter than in MagicaVoxel.
+2. Partly transparent glass (`_trans` below 1): glass share sqrt(`_trans`) per voxel face, re-picked at every face
+   inside the block (material `voxelwise`): `_trans` 0.25 within 3 levels sky- and sun-lit, 0.5 sun-lit within 3 but
+   sky-lit 10 levels too dark (was 13 too bright). The rule for faces inside the block is not pinned down yet.
+2b. Glass over a lit floor: MagicaVoxel is darker by a fixed factor per refractive index (0.997 at 1.1, 0.976 at 1.3,
+   0.959 at 1.5, 0.957 at 2), independent of its bounce caps (checked with specular 10 and diffuse 4): 1-2 levels.
 3. Fog `_fog_uni` (density, colour, phase): not implemented (no global medium in the tracer).
 4. Atmosphere sky (`_env _mode 1`, `_atm` Rayleigh / Mie / ozone): not implemented; needs its own calibration.
 5. Image sky (`_mode 2`, `_ibl`): the helper reports it; the caller must load the HDR file into `environment.map`
