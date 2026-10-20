@@ -114,8 +114,10 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
    from 4.9 to 4.5). Rendered by MagicaVoxel 2026-10-20: at scatter cap 10 (`G-sky-sc10`) 55 of 56 tiles within 3
    (the subsurface tiles unchanged, so its events ignore the scatter cap, as modelled); under the sun at diffuse cap
    4 (`G-sun60-d4`) 50 of 56, the subsurface block within 3.2 but the subsurface glass 9.2 levels too bright and the
-   neighbours too dark (blue cloud 16, absorbing cloud 9.9, emissive cloud 7.1). Open: those neighbours at cap 4, and
-   only `_d` 0.05 measured.
+   neighbours too dark (blue cloud 16, absorbing cloud 9.9, emissive cloud 7.1). Checked (2026-10-20): the
+   subsurface budget's weight for earlier diffuse events (2, 3 or 4) moves those tiles by under 1.5 levels, and our
+   render is converged by cap 4 (caps 6 and 12 give the same tiles), so MagicaVoxel's extra light there at cap 4 is
+   not more diffuse bounces of our kind. Open: those neighbours at cap 4, and only `_d` 0.05 measured.
 2. Partly transparent glass (`_trans` below 1): done (material `contactTransmission`): glass share sqrt(`_trans`) at
    the block's faces to the air, no picks inside, and what it rests on is reached with the share again. P boards
    (`_trans` 0.1-1, heights 1, 2, 3, 6, white and black base): 64 of 64 tiles within 3 levels sky-lit (mean 0.6) and
@@ -132,7 +134,10 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
    `G-sky-lin`, `B-sun60-lin`, `P-sun60-lin` unchanged; `P-sky-lin` 64 -> 61 of 64 (three 6-voxel blocks at 3.3-3.4,
    all within 6).
 2b. Glass over a lit floor: MagicaVoxel is darker by a fixed factor per refractive index (0.997 at 1.1, 0.976 at 1.3,
-   0.959 at 1.5, 0.957 at 2), independent of its bounce caps (checked with specular 10 and diffuse 4): 1-2 levels.
+   0.959 at 1.5, 0.957 at 2), independent of its bounce caps (checked with specular 10 and diffuse 4): 1-2.7 levels,
+   every tile within 3. Checked (2026-10-20): ending paths reflected back inside the glass (instead of following them)
+   makes the boards far worse (sky board 55 -> 41 of 56 tiles within 3, sun board 52 -> 28), so MagicaVoxel keeps
+   internal reflections; the factor's cause is open.
 3. Fog `_fog_uni`: done (`environment.fog`). MagicaVoxel's fog fades rays by exp(-0.001 x `_d` x distance) toward
    its glow, the glow being the sky and sun light it scatters without shadows; rays leaving the scene see only the
    glow and the sun reaches surfaces only through it; its colour is value / 255 (no 2.2 power); the ground's horizon
@@ -163,7 +168,8 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
    40.8 -> 2.4); worse only for the extreme settings ozone 1 (3.4 -> 5.1) and Rayleigh 0 (12.2 -> 15.5). The sky
    half is unchanged (98.1% of pixels within 3 on average, 99.04-99.94% for default-like air), and with the ground on
    the map is bit-identical (the ground fades into the horizon's light as before: `atm-sky-e5` and `atm-e20`
-   re-rendered byte-identical). The surface's albedo is fitted at the default ground colour only.
+   re-rendered byte-identical). The surface's albedo is fitted at the default ground colour only; at a 5-degree sun
+   the model is 5-10% too bright in green and blue 3-8 degrees down, in every azimuth (about 2 levels).
 5. Image sky (`_mode 2`, `_ibl`): done. The caller decodes the HDR file the helper names (`imageSky.path`) and
    passes it as the `imageSky` option; the helper sets intensity and turn. Panoramas of our own ramp image: 99.84%
    of pixels within 3 levels (the rest on the image's wrap seam); a scene lit by it: 99.76%.
