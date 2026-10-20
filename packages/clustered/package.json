@@ -28,6 +28,10 @@
     "./directional": {
       "types": "./dist/directional.d.ts",
       "import": "./dist/directional.js"
+    },
+    "./ies": {
+      "types": "./dist/ies.d.ts",
+      "import": "./dist/ies.js"
     }
   },
   "files": [

@@ -63,6 +63,31 @@ point lights' GGX and Lambert BRDF text, so materials' Lambert and Phong shade t
 shader's group) and the shader code exist only while the list is not empty: an empty or absent `DirectionalLights`
 leaves every GPU call unchanged. `lights.list` and `suns.list` return the lists last set (frozen copies).
 
+## IES profiles
+
+`@margoengine/clustered/ies` reads IES LM-63 photometric files (the 1986 to 2019 revisions, type C photometry) and
+shapes point and spot lights with them (three.js `IESSpotLight`, and point lights too):
+
+```ts
+import {IESLights, parseIES} from '@margoengine/clustered/ies';
+const profile = parseIES(await (await fetch('/downlight.ies')).text());
+const ies = IESLights.attach(engine, {lights});
+lights.setLights([{position: [0, 3, 0], range: 0, decay: 2, intensity: profile.peak}]);
+ies.setProfiles([profile]); // entry i shapes the light at index i of setLights
+```
+
+Entry i of `setProfiles` belongs to the light at index i of `lights.setLights` (a profile, `{profile, rotation}` or
+null); update both together when the list changes order. The profile, normalised to its peak, multiplies the light's
+cone term, so `intensity` is the candela of the brightest direction: `profile.peak` reproduces the file, and
+`profile.flux` (lumens, the distribution integrated over the sphere) converts a lumen rating. Vertical angle 0 points along
+a spot's `direction`, or straight down for a point light; horizontal angle 0 is world +x made perpendicular to that axis
+(+z when the axis is within 26° of x), turning counterclockwise seen from behind the light (from above, for a downlight),
+plus `rotation` radians. Mirrored files (last horizontal angle 90° or 180°, or 90° to 270°) are unfolded as LM-63
+describes; vertical angles outside the file emit nothing; lamp tilt data is read past and not applied; types A and B
+throw. The shader reads a 1° × 5° grid of each profile (one column when it is rotationally symmetric) from one storage
+buffer (binding 142), filtered bilinearly by hand: no textures. At most 16 distinct profiles at a time. Without profiles
+it adds nothing to the shaders or the GPU work.
+
 ## Point and spot shadows
 
 Opt into bounded local shadow maps when creating the effect, enable shadows on

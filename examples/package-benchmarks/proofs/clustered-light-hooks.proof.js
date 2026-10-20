@@ -17,7 +17,11 @@ import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 const { ref, pin } = refs('6c20076d', undefined, '6c20076d');
 const { baseline, candidate } = await versions('clustered', ref, undefined, pin);
 const gltf = await entryAt('gltf-pro', 'src/index.ts', pin),
-  { DirectionalLights } = await entryAt('clustered', 'src/directional.ts', pin);
+  { DirectionalLights } = await entryAt('clustered', 'src/directional.ts', pin),
+  { IESLights, parseIES } = await entryAt('clustered', 'src/ies.ts', pin);
+const downlight = parseIES(
+  ['IESNA:LM-63-2002', 'TILT=NONE', '1 -1 1 3 1 1 2 0 0 0', '1 1 10', '0 45 90', '0', '1000 600 0'].join('\n'),
+);
 const point = { position: [0, 2, 1], range: 6, color: [1, 0.5, 0.2], intensity: 9 },
   spot = { position: [1, 3, 0], range: 8, direction: [0, -1, 0.2], outerAngle: 0.6, innerAngle: 0.3, intensity: 20 };
 // Each hook: attach it to `lights`, and fill it (lit) or leave it empty; `marker` is WGSL its lit shaders must contain.
@@ -27,6 +31,12 @@ const hooks = [
     attach: (lights) => new DirectionalLights({ lights }),
     fill: (hook, lit) => hook.setLights(lit ? [{ direction: [0, -1, -0.5], intensity: 2 }] : []),
     marker: /clusterDirectional\.lights\[j\]/,
+  },
+  {
+    name: 'ies',
+    attach: (lights) => new IESLights({ lights }),
+    fill: (hook, lit) => hook.setProfiles(lit ? [downlight, downlight] : [null]),
+    marker: /\*clusterIes\(index,light,l\)/,
   },
 ];
 
