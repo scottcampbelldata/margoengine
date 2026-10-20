@@ -113,6 +113,30 @@ export interface SSAOSource {
     }): void;
 }
 
+export class SSGI implements EnginePlugin {
+    readonly options: SSGIOptions;
+    readonly name = "ssgi";
+    constructor(options?: SSGIOptions);
+    static attach(engine: EngineKernel, options?: SSGIOptions): SSGI;
+    add(model: SSRModel): () => void;
+    get enabled(): boolean;
+    set enabled(value: boolean);
+    setup(engine: Engine): void;
+    registerPasses(graph: FrameGraph): void;
+    onDeviceRestored(engine: Engine): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface SSGIOptions {
+    rays?: number;
+    maxDistance?: number;
+    thickness?: number;
+    steps?: number;
+    intensity?: number;
+    enabled?: boolean;
+}
+
 export class SSR implements EnginePlugin {
     readonly options: SSROptions;
     readonly name = "ssr";

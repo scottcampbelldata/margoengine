@@ -1,0 +1,544 @@
+{
+ "date": "2026-10-20T16:57:46.569Z",
+ "commit": "63d78ae9",
+ "gpu": {
+  "vendor": "nvidia",
+  "architecture": "ampere",
+  "device": "0x2230",
+  "description": "NVIDIA RTX A6000",
+  "fallback": false
+ },
+ "browser": "chromium 155.0.4283.62",
+ "checks": {
+  "core-4x": {
+   "floor": [
+    {
+     "x": -1,
+     "d": 0.05,
+     "expected": 0.484,
+     "measured": 0.469,
+     "red": 1
+    },
+    {
+     "x": -1,
+     "d": 0.1,
+     "expected": 0.467,
+     "measured": 0.465,
+     "red": 1
+    },
+    {
+     "x": -1,
+     "d": 0.25,
+     "expected": 0.419,
+     "measured": 0.408,
+     "red": 1
+    },
+    {
+     "x": -1,
+     "d": 0.5,
+     "expected": 0.345,
+     "measured": 0.335,
+     "red": 1
+    },
+    {
+     "x": -1,
+     "d": 1,
+     "expected": 0.228,
+     "measured": 0.212,
+     "red": 1
+    },
+    {
+     "x": -1,
+     "d": 2,
+     "expected": 0.1,
+     "measured": 0.1,
+     "red": 1
+    },
+    {
+     "x": 0,
+     "d": 0.05,
+     "expected": 0.486,
+     "measured": 0.471,
+     "red": 1
+    },
+    {
+     "x": 0,
+     "d": 0.1,
+     "expected": 0.472,
+     "measured": 0.468,
+     "red": 1
+    },
+    {
+     "x": 0,
+     "d": 0.25,
+     "expected": 0.43,
+     "measured": 0.414,
+     "red": 1
+    },
+    {
+     "x": 0,
+     "d": 0.5,
+     "expected": 0.363,
+     "measured": 0.359,
+     "red": 1
+    },
+    {
+     "x": 0,
+     "d": 1,
+     "expected": 0.249,
+     "measured": 0.234,
+     "red": 1
+    },
+    {
+     "x": 0,
+     "d": 2,
+     "expected": 0.111,
+     "measured": 0.11,
+     "red": 1
+    },
+    {
+     "x": 1,
+     "d": 0.05,
+     "expected": 0.484,
+     "measured": 0.469,
+     "red": 1
+    },
+    {
+     "x": 1,
+     "d": 0.1,
+     "expected": 0.467,
+     "measured": 0.461,
+     "red": 1
+    },
+    {
+     "x": 1,
+     "d": 0.25,
+     "expected": 0.419,
+     "measured": 0.402,
+     "red": 1
+    },
+    {
+     "x": 1,
+     "d": 0.5,
+     "expected": 0.345,
+     "measured": 0.344,
+     "red": 1
+    },
+    {
+     "x": 1,
+     "d": 1,
+     "expected": 0.228,
+     "measured": 0.213,
+     "red": 1
+    },
+    {
+     "x": 1,
+     "d": 2,
+     "expected": 0.1,
+     "measured": 0.099,
+     "red": 1
+    }
+   ],
+   "nan": 0
+  },
+  "core-1x": {
+   "floor": [
+    {
+     "x": -1,
+     "d": 0.05,
+     "expected": 0.484,
+     "measured": 0.469,
+     "red": 1
+    },
+    {
+     "x": -1,
+     "d": 0.1,
+     "expected": 0.467,
+     "measured": 0.465,
+     "red": 1
+    },
+    {
+     "x": -1,
+     "d": 0.25,
+     "expected": 0.419,
+     "measured": 0.408,
+     "red": 1
+    },
+    {
+     "x": -1,
+     "d": 0.5,
+     "expected": 0.345,
+     "measured": 0.335,
+     "red": 1
+    },
+    {
+     "x": -1,
+     "d": 1,
+     "expected": 0.228,
+     "measured": 0.212,
+     "red": 1
+    },
+    {
+     "x": -1,
+     "d": 2,
+     "expected": 0.1,
+     "measured": 0.1,
+     "red": 1
+    },
+    {
+     "x": 0,
+     "d": 0.05,
+     "expected": 0.486,
+     "measured": 0.471,
+     "red": 1
+    },
+    {
+     "x": 0,
+     "d": 0.1,
+     "expected": 0.472,
+     "measured": 0.468,
+     "red": 1
+    },
+    {
+     "x": 0,
+     "d": 0.25,
+     "expected": 0.43,
+     "measured": 0.414,
+     "red": 1
+    },
+    {
+     "x": 0,
+     "d": 0.5,
+     "expected": 0.363,
+     "measured": 0.359,
+     "red": 1
+    },
+    {
+     "x": 0,
+     "d": 1,
+     "expected": 0.249,
+     "measured": 0.234,
+     "red": 1
+    },
+    {
+     "x": 0,
+     "d": 2,
+     "expected": 0.111,
+     "measured": 0.11,
+     "red": 1
+    },
+    {
+     "x": 1,
+     "d": 0.05,
+     "expected": 0.484,
+     "measured": 0.469,
+     "red": 1
+    },
+    {
+     "x": 1,
+     "d": 0.1,
+     "expected": 0.467,
+     "measured": 0.461,
+     "red": 1
+    },
+    {
+     "x": 1,
+     "d": 0.25,
+     "expected": 0.419,
+     "measured": 0.402,
+     "red": 1
+    },
+    {
+     "x": 1,
+     "d": 0.5,
+     "expected": 0.345,
+     "measured": 0.344,
+     "red": 1
+    },
+    {
+     "x": 1,
+     "d": 1,
+     "expected": 0.228,
+     "measured": 0.213,
+     "red": 1
+    },
+    {
+     "x": 1,
+     "d": 2,
+     "expected": 0.1,
+     "measured": 0.099,
+     "red": 1
+    }
+   ],
+   "nan": 0
+  },
+  "gltf-floor": {
+   "floor": [
+    {
+     "x": -1,
+     "d": 0.05,
+     "expected": 0.484,
+     "measured": 0.469,
+     "red": 0.99
+    },
+    {
+     "x": -1,
+     "d": 0.1,
+     "expected": 0.467,
+     "measured": 0.465,
+     "red": 0.99
+    },
+    {
+     "x": -1,
+     "d": 0.25,
+     "expected": 0.419,
+     "measured": 0.408,
+     "red": 0.991
+    },
+    {
+     "x": -1,
+     "d": 0.5,
+     "expected": 0.345,
+     "measured": 0.335,
+     "red": 0.993
+    },
+    {
+     "x": -1,
+     "d": 1,
+     "expected": 0.228,
+     "measured": 0.211,
+     "red": 0.995
+    },
+    {
+     "x": -1,
+     "d": 2,
+     "expected": 0.1,
+     "measured": 0.1,
+     "red": 0.998
+    },
+    {
+     "x": 0,
+     "d": 0.05,
+     "expected": 0.486,
+     "measured": 0.471,
+     "red": 0.99
+    },
+    {
+     "x": 0,
+     "d": 0.1,
+     "expected": 0.472,
+     "measured": 0.468,
+     "red": 0.99
+    },
+    {
+     "x": 0,
+     "d": 0.25,
+     "expected": 0.43,
+     "measured": 0.414,
+     "red": 0.991
+    },
+    {
+     "x": 0,
+     "d": 0.5,
+     "expected": 0.363,
+     "measured": 0.359,
+     "red": 0.992
+    },
+    {
+     "x": 0,
+     "d": 1,
+     "expected": 0.249,
+     "measured": 0.234,
+     "red": 0.995
+    },
+    {
+     "x": 0,
+     "d": 2,
+     "expected": 0.111,
+     "measured": 0.11,
+     "red": 0.997
+    },
+    {
+     "x": 1,
+     "d": 0.05,
+     "expected": 0.484,
+     "measured": 0.469,
+     "red": 0.99
+    },
+    {
+     "x": 1,
+     "d": 0.1,
+     "expected": 0.467,
+     "measured": 0.461,
+     "red": 0.99
+    },
+    {
+     "x": 1,
+     "d": 0.25,
+     "expected": 0.419,
+     "measured": 0.402,
+     "red": 0.991
+    },
+    {
+     "x": 1,
+     "d": 0.5,
+     "expected": 0.345,
+     "measured": 0.344,
+     "red": 0.993
+    },
+    {
+     "x": 1,
+     "d": 1,
+     "expected": 0.228,
+     "measured": 0.213,
+     "red": 0.995
+    },
+    {
+     "x": 1,
+     "d": 2,
+     "expected": 0.1,
+     "measured": 0.099,
+     "red": 0.998
+    }
+   ],
+   "nan": 0
+  },
+  "ortho-4x": {
+   "floor": [
+    {
+     "x": -1,
+     "d": 0.05,
+     "expected": 0.484,
+     "measured": 0.469,
+     "red": 1
+    },
+    {
+     "x": -1,
+     "d": 0.1,
+     "expected": 0.467,
+     "measured": 0.458,
+     "red": 1
+    },
+    {
+     "x": -1,
+     "d": 0.25,
+     "expected": 0.419,
+     "measured": 0.414,
+     "red": 1
+    },
+    {
+     "x": -1,
+     "d": 0.5,
+     "expected": 0.345,
+     "measured": 0.329,
+     "red": 1
+    },
+    {
+     "x": -1,
+     "d": 1,
+     "expected": 0.228,
+     "measured": 0.218,
+     "red": 1
+    },
+    {
+     "x": -1,
+     "d": 2,
+     "expected": 0.1,
+     "measured": 0.102,
+     "red": 1
+    },
+    {
+     "x": 0,
+     "d": 0.05,
+     "expected": 0.486,
+     "measured": 0.469,
+     "red": 1
+    },
+    {
+     "x": 0,
+     "d": 0.1,
+     "expected": 0.472,
+     "measured": 0.462,
+     "red": 1
+    },
+    {
+     "x": 0,
+     "d": 0.25,
+     "expected": 0.43,
+     "measured": 0.418,
+     "red": 1
+    },
+    {
+     "x": 0,
+     "d": 0.5,
+     "expected": 0.363,
+     "measured": 0.357,
+     "red": 1
+    },
+    {
+     "x": 0,
+     "d": 1,
+     "expected": 0.249,
+     "measured": 0.243,
+     "red": 1
+    },
+    {
+     "x": 0,
+     "d": 2,
+     "expected": 0.111,
+     "measured": 0.109,
+     "red": 1
+    },
+    {
+     "x": 1,
+     "d": 0.05,
+     "expected": 0.484,
+     "measured": 0.463,
+     "red": 1
+    },
+    {
+     "x": 1,
+     "d": 0.1,
+     "expected": 0.467,
+     "measured": 0.458,
+     "red": 1
+    },
+    {
+     "x": 1,
+     "d": 0.25,
+     "expected": 0.419,
+     "measured": 0.404,
+     "red": 1
+    },
+    {
+     "x": 1,
+     "d": 0.5,
+     "expected": 0.345,
+     "measured": 0.341,
+     "red": 1
+    },
+    {
+     "x": 1,
+     "d": 1,
+     "expected": 0.228,
+     "measured": 0.221,
+     "red": 1
+    },
+    {
+     "x": 1,
+     "d": 2,
+     "expected": 0.1,
+     "measured": 0.098,
+     "red": 1
+    }
+   ],
+   "nan": 0
+  },
+  "gtao+ssgi+ssr+taa": {
+   "nan": 0
+  },
+  "alone": {
+   "errors": 0
+  }
+ }
+}

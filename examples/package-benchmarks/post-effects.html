@@ -5,9 +5,13 @@
 // it), so checks compare linear values, not tone-mapped bytes. Scenes:
 //   creases: a white floor (top at y = 0) and three 2.4 m long boxes standing on it, their +z faces meeting the floor at
 //            90, 60 and 120 degrees (rotated 0, +30 and -30 degrees about x). Returns each crease line and its angle.
+//   wall:    a white floor and a red 4 x 2 m wall (box 4 x 2 x 0.5, front face at z = 0.25) standing on it; floor: 'gltf'
+//            makes the floor a gltf-pro plane added to every effect that takes models (ssr.add, ssgi.add).
 import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
 import {PostStack} from '/packages/post/dist/stack.js';
 import {GTAO} from '/packages/post/dist/gtao.js';
+import {SSGI} from '/packages/post/dist/ssgi.js';
+import {parseGLTF} from '/packages/gltf-pro/dist/index.js';
 import {SSAO} from '/packages/post/dist/ssao.js';
 import {SSR} from '/packages/post/dist/ssr.js';
 import {Bloom} from '/packages/post/dist/bloom.js';
@@ -15,7 +19,7 @@ import {CameraProjection} from '/packages/cameras/dist/index.js';
 import {TAA} from '/packages/taa/dist/index.js';
 
 let state;
-const effects={gtao:o=>new GTAO(o),ssao:o=>new SSAO(o),ssr:o=>new SSR(o),bloom:o=>new Bloom(o)};
+const effects={ssgi:o=>new SSGI(o),gtao:o=>new GTAO(o),ssao:o=>new SSAO(o),ssr:o=>new SSR(o),bloom:o=>new Bloom(o)};
 const display=`fn pbrNeutral(input:vec3f)->vec3f {let x=min(input.r,min(input.g,input.b));let offset=select(0.04,x-6.25*x*x,x<0.08);var v=input-offset;let peak=max(v.r,max(v.g,v.b));if(peak<0.76){return v;}let newPeak=1.0-0.24*0.24/(peak+0.24-0.76);v*=newPeak/peak;return mix(v,vec3f(newPeak),1.0-1.0/(0.15*(peak-newPeak)+1.0));}
 fn toDisplay(c:vec3f)->vec3f {let x=pbrNeutral(max(c,vec3f(0)));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>=vec3f(0.0031308));}`;
 // A last HDR stage: copies its input into an rgba32float texture for read(), then passes it on (display-encoded when last).
@@ -36,14 +40,21 @@ function probe(){
   return p;
 }
 const white=()=>new PbrMaterial({color:'#ffffff',roughness:1,metalness:0});
+// A 40 x 40 glTF plane at y = 0 (normal +y), white, rough, not metal.
+function plane(){
+  const data=[new Float32Array([-20,0,-20,-20,0,20,20,0,20,20,0,-20]),new Float32Array([0,1,0,0,1,0,0,1,0,0,1,0]),new Uint16Array([0,1,2,0,2,3])];
+  const bytes=new Uint8Array(data.reduce((n,d)=>n+d.byteLength,0));let offset=0;const bufferViews=data.map(d=>{bytes.set(new Uint8Array(d.buffer),offset);const v={buffer:0,byteOffset:offset,byteLength:d.byteLength};offset+=d.byteLength;return v;});
+  return [{asset:{version:'2.0'},buffers:[{byteLength:bytes.byteLength}],bufferViews,accessors:[{bufferView:0,componentType:5126,count:4,type:'VEC3',min:[-20,0,-20],max:[20,0,20]},{bufferView:1,componentType:5126,count:4,type:'VEC3'},{bufferView:2,componentType:5123,count:6,type:'SCALAR'}],
+    meshes:[{primitives:[{attributes:{POSITION:0,NORMAL:1},indices:2,material:0}]}],nodes:[{mesh:0}],materials:[{pbrMetallicRoughness:{baseColorFactor:[1,1,1,1],metallicFactor:0,roughnessFactor:1}}]},bytes];
+}
 async function teardown(){if(!state)return;const s=state;state=undefined;await s.engine.gpu.queue.onSubmittedWorkDone();s.engine.dispose();s.canvas.remove();}
 async function frames(n){for(let i=0;i<n;i++){state.engine.render({delta:1/60});await state.engine.gpu.queue.onSubmittedWorkDone();}await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));}
 window.check={
-  async run({scene='creases',camera='persp',stack=[],alone=null,probe:withProbe=true,taa=false,samples=4,size=[1024,1024],frames:n=4,light=false}={}){
+  async run({scene='creases',camera='persp',floor='core',stack=[],alone=null,aloneEffect='gtao',probe:withProbe=true,taa=false,samples=4,size=[1024,1024],frames:n=4,light=false}={}){
     await teardown();
     if(samples===1)globalThis.margoLow=1;else delete globalThis.margoLow;
     const canvas=document.body.appendChild(document.createElement('canvas'));canvas.style.width=size[0]+'px';canvas.style.height=size[1]+'px';
-    const view={persp:{position:[0,6,8],target:[0,0,0.8]},ortho:{position:[0,6,8],target:[0,0,0.8]}}[camera];
+    const view=scene==='wall'?{position:[0,4.5,9],target:[0,0.8,1]}:{position:[0,6,8],target:[0,0,0.8]};
     const engine=await Engine.create(canvas,{backend:'webgpu',camera:{...view,near:0.1,far:200}}),errors=[];
     engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
     if(camera==='ortho')CameraProjection.attach(engine,{height:10});
@@ -54,10 +65,18 @@ window.check={
       engine.createMesh().setGeometry(box(40,0.02,40)).setPosition([0,-0.01,0]).setMaterial(white());
       info.boxes=[[-3.5,0],[0,Math.PI/6],[3.5,-Math.PI/6]].map(([x,angle])=>({x,angle,mesh:engine.createMesh().setGeometry(box(2.4,2,2)).setPosition([x,0,0]).setRotation([angle,0,0]).setMaterial(white())}));
     }
+    const models=[];
+    if(scene==='wall'){
+      if(floor==='gltf'){const [json,bytes]=plane();models.push(parseGLTF(engine,json,[bytes],[]));}
+      else engine.createMesh().setGeometry(box(40,0.02,40)).setPosition([0,-0.01,0]).setMaterial(white());
+      engine.createMesh().setGeometry(box(4,2,0.5)).setPosition([0,1,0]).setMaterial(new PbrMaterial({color:'#ff0000',roughness:1,metalness:0}));
+      info.wall={front:0.25,width:4,height:2};
+    }
     const made={},list=stack.map(([name,options])=>made[name]=effects[name](options));
+    for(const model of models)for(const effect of Object.values(made))effect.add?.(model);
     if(withProbe)list.push(made.probe=probe());
-    const owner=alone?GTAO.attach(engine,alone):PostStack.attach(engine,list);
-    if(alone)made.gtao=owner;
+    const owner=alone?{gtao:GTAO,ssgi:SSGI}[aloneEffect].attach(engine,alone):PostStack.attach(engine,list);
+    if(alone)made[aloneEffect]=owner;
     if(taa)TAA.attach(engine,{depth:()=>(alone?owner.depthTexture:owner.depthTexture)});
     state={engine,canvas,made,errors,owner};
     // Lift each box so the middle of its +z face (local z = 1) lies on the floor, whatever the rotation's handedness.
@@ -75,6 +94,7 @@ window.check={
         profile:[0.01,0.02,0.04,0.08,0.16,0.32,0.64].map(d=>({d,pixel:project([x,0,crease[2]+d])}))};
     });
     info.open=[[0,0,4.6],[-2.6,0,4.2],[2.6,0,4.2]].map(project);
+    if(info.wall)info.floor=[-1,0,1].flatMap(x=>[0.05,0.1,0.25,0.5,1,2].map(d=>({x,d,pixel:project([x,0,info.wall.front+d])})));
     return {errors:errors.splice(0),canvas:[canvas.width,canvas.height],...info,boxes:undefined};
   },
   async set(name,values){Object.assign(state.made[name].options??{},values.options??{});if('enabled' in values)state.made[name].enabled=values.enabled;await frames(values.frames??3);return {errors:state.errors.splice(0)};},

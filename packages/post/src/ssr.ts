@@ -9,6 +9,8 @@ import { margoError } from '../../shared/errors.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { PostStack } from './stack.js';
 import { displayShader } from '../../shared/display.js';
+import { vertex, reduceShader, downsampleShader, traceFunctions, march } from './hiz.js';
+import { shareCapture, drawCapture } from './capture.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; STORAGE_BINDING: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -36,8 +38,6 @@ export interface SSRModel {
   draw(context: Context, mode: 'capture', color: GPUTextureView, depth: GPUTextureView): void;
 }
 
-const vertex =
-  '@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {return vec4f(array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3))[i],0,1);}\n';
 // Material replay outputs: environment specular already in the scene (rgb) + roughness, split-sum weight F0*A+B (rgb) +
 // coverage, world normal. With `margoAmbient` from EnvironmentLighting the weight and specular come from its own LUT and
 // prefiltered cube, so the composite removes exactly the IBL specular it replaces; without IBL nothing is removed and
@@ -70,24 +70,6 @@ struct MargoCapture {@location(0) specular:vec4f,@location(1) weight:vec4f,@loca
 fn margoCapture(s:Surface,v:vec3f,k:vec3f)->MargoCapture {let m=margoSSR(s.n,v,s.base.rgb,s.metal,s.roughness);let o=k*s.occlusion;return MargoCapture(vec4f(m.specular.rgb*o,m.specular.a),vec4f(m.weight.rgb*o,1),m.normal);}
 `;
 const lit = (code: string) => code.includes('let margoAmbient=') && code.includes('fn iblBrdfTerms(');
-// Hierarchical depth (Hi-Z) level: each texel keeps the closest (largest reversed-Z) depth of its 2x2 source texels, and
-// the last row and column also take an odd source's remainder, so every texel bounds its whole cell.
-const reduceShader = (source: string, load: string) => `
-@group(0) @binding(0) var source:${source};
-@group(0) @binding(1) var reduced:texture_storage_2d<r32float,write>;
-@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u) {
-let size=vec2i(textureDimensions(reduced));let p=vec2i(id.xy);if(any(p>=size)){return;}
-let base=p*2;let end=select(base+1,vec2i(textureDimensions(source))-1,p==size-1);var m=0.0;
-for(var y=base.y;y<=end.y;y++){for(var x=base.x;x<=end.x;x++){m=max(m,textureLoad(source,vec2i(x,y),0)${load});}}
-textureStore(reduced,p,vec4f(m));
-}`;
-const downsampleShader =
-  vertex +
-  `
-@group(0) @binding(0) var source:texture_2d<f32>;
-@group(0) @binding(1) var bilinear:sampler;
-@fragment fn fragment(@builtin(position) p:vec4f)->@location(0) vec4f {return textureSampleLevel(source,bilinear,p.xy*2.0/vec2f(textureDimensions(source)),0.0);}
-`;
 // One ray per pixel along the mirror direction, marched over the Hi-Z pyramid in screen space (pixel x, y and NDC depth
 // are linear along a projected segment for perspective and orthographic cameras alike). Roughness widens the cone:
 // the hit colour comes from a blurred mip of the scene. Deterministic, so frames are stable without TAA.
@@ -104,13 +86,7 @@ struct U {inverse:mat4x4f,matrix:mat4x4f,a:vec4f,b:vec4f}
 @group(0) @binding(6) var specular:texture_2d<f32>;
 @group(0) @binding(7) var weight:texture_2d<f32>;
 @group(0) @binding(8) var normals:texture_2d<f32>;
-fn world(q:vec2f,d:f32)->vec3f {let w=u.inverse*vec4f(q.x/u.a.x*2.0-1.0,1.0-q.y/u.a.y*2.0,d,1.0);return w.xyz/w.w;}
-fn screen(p:vec4f)->vec3f {let n=p.xyz/p.w;return vec3f((n.x*0.5+0.5)*u.a.x,(0.5-n.y*0.5)*u.a.y,n.z);}
-fn closest(cell:vec2i,level:i32)->f32 {
-if(level==0){return textureLoad(depth,cell,0);}
-return textureLoad(hiz,min(cell,vec2i(textureDimensions(hiz,level-1))-1),level-1).r;
-}
-${displayShader}
+${traceFunctions}${displayShader}
 @fragment fn fragment(@builtin(position) frag:vec4f)->@location(0) vec4f {
 let q=vec2i(frag.xy);let s=textureLoad(scene,q,0);var c=s.rgb;
 let m=textureLoad(weight,q,0);let e=textureLoad(specular,q,0);let rough=e.a;let d=textureLoad(depth,q,0);
@@ -118,30 +94,7 @@ if(u.b.w>0.5&&m.a>0.5&&rough<=u.a.z&&d>0.0){
 let px=vec2f(q)+0.5;let p=world(px,d);let v=normalize(world(px,1.0)-p);
 let n=normalize(textureLoad(normals,q,0).xyz*2.0-1.0);let r=reflect(-v,n);let toward=dot(r,v);
 if(toward<0.5){
-let start=u.matrix*vec4f(p,1.0);var end=u.matrix*vec4f(p+r*u.b.x,1.0);
-// Clip to the near plane (reversed-Z: z<=w) and the far plane (z>=0), then to the screen.
-if(end.z>end.w){end=mix(start,end,0.999*(start.w-start.z)/((start.w-start.z)-(end.w-end.z)));}
-if(end.z<0.0){end=mix(start,end,start.z/(start.z-end.z));}
-let o=screen(start);var dir=screen(end)-o;
-let room=select(vec2f(0.5)-o.xy,u.a.xy-0.5-o.xy,dir.xy>vec2f(0));
-let fit=select(vec2f(1),room/dir.xy,abs(dir.xy)>vec2f(1e-6));dir*=clamp(min(fit.x,fit.y),0.0,1.0);
-let len=length(dir.xy);
-if(len>1.5){
-var t=1.5/len;var level=0;var hit=false;let top=i32(u.b.z);let nudge=0.01/max(abs(dir.x),abs(dir.y));
-for(var i=0;i<i32(u.b.y);i++){
-if(t>1.0){break;}
-let h=o+dir*t;let size=exp2(f32(level));let cell=floor(h.xy/size);let z=closest(vec2i(cell),level);
-let edge=(cell+select(vec2f(0),vec2f(1),dir.xy>vec2f(0)))*size;
-let across=select(vec2f(1e30),(edge-o.xy)/dir.xy,abs(dir.xy)>vec2f(1e-6));let exit=min(across.x,across.y)+nudge;
-if(h.z>z){
-// In front of everything in this cell: drop to its closest depth if the ray gets there inside the cell, else move on.
-let plane=select(2.0,(z-o.z)/dir.z,dir.z<0.0);
-if(plane<exit){t=max(t,plane);if(level==0){hit=z>0.0;break;}level--;}else{t=exit;level=min(level+1,top);}
-}else if(level>0){level--;}
-else if(z>0.0&&distance(world(h.xy,z),world(h.xy,h.z))<u.a.w){hit=true;break;}
-else{t=exit;}
-}
-if(hit){
+${march}if(hit){
 let h=o+dir*t;let hq=vec2i(h.xy);let hp=world(vec2f(hq)+0.5,textureLoad(depth,hq,0));let hn=textureLoad(normals,hq,0).xyz*2.0-1.0;
 // Fades: rays toward the camera, back faces, roughness, screen edges, distance.
 let f=(1.0-smoothstep(0.0,0.5,toward))*(1.0-smoothstep(0.0,0.3,dot(hn,r)))*(1.0-smoothstep(u.a.z*0.5,u.a.z,rough))
@@ -258,7 +211,7 @@ export class SSR implements EnginePlugin {
     if (this.disposed) throw new Error('SSR is disposed');
     let release = this.models.get(model);
     if (!release) {
-      const restore = model.setCapture(this.hook),
+      const restore = shareCapture(model, this.hook),
         forget = model.onDispose(() => this.models.delete(model));
       release = () => {
         if (this.models.get(model) === release) {
@@ -388,7 +341,7 @@ export class SSR implements EnginePlugin {
       // Added models draw their own materials on top, depth tested against (and, at 4x, into) the same depth.
       if (this.models.size) {
         this.context = c;
-        for (const model of this.models.keys()) model.draw(c, 'capture', c.color, c.depth);
+        for (const model of this.models.keys()) drawCapture(model, this.hook, c);
       }
     } finally {
       this.pass?.end();

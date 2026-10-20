@@ -32,6 +32,7 @@ test('native Bloom and SSAO imports exclude the other effects', async () => {
     ['fxaa', 'fxaa:capture', ['bloom:capture', 'ssao:capture', 'post:stack:capture']],
     ['ssr', 'ssr:gbuffer', ['bloom:capture', 'ssao:capture', 'fxaa:capture']],
     ['gtao', 'fn arc(', ['bloom:capture', 'fxaa:capture', 'ssr:gbuffer']],
+    ['ssgi', 'ssgi:gbuffer', ['bloom:capture', 'ssao:capture', 'fxaa:capture', 'ssr:gbuffer']],
   ]) {
     const code = await staticClosure('@margoengine/post/' + entry);
     assert.ok(code.includes(present), 'Effect implementation was omitted: ' + entry);
@@ -41,8 +42,8 @@ test('native Bloom and SSAO imports exclude the other effects', async () => {
 });
 
 test('Post root and feature subpaths preserve all runtime export identities', async () => {
-  const [root, bloom, ssao, fade, stack, fxaa, ssr, gtao] = await Promise.all(
-    ['', '/bloom', '/ssao', '/scene-fade', '/stack', '/fxaa', '/ssr', '/gtao'].map(
+  const [root, bloom, ssao, fade, stack, fxaa, ssr, gtao, ssgi] = await Promise.all(
+    ['', '/bloom', '/ssao', '/scene-fade', '/stack', '/fxaa', '/ssr', '/gtao', '/ssgi'].map(
       (path) => import('@margoengine/post' + path),
     ),
   );
@@ -52,6 +53,7 @@ test('Post root and feature subpaths preserve all runtime export identities', as
     'GTAO',
     'PostStack',
     'SSAO',
+    'SSGI',
     'SSR',
     'SceneFade',
     'bloomWeights',
@@ -71,4 +73,6 @@ test('Post root and feature subpaths preserve all runtime export identities', as
   assert.deepEqual(Object.keys(gtao), ['GTAO']);
   assert.equal(root.GTAO, gtao.GTAO);
   assert.ok(new gtao.GTAO() instanceof ssao.SSAO, 'GTAO is an SSAO');
+  assert.deepEqual(Object.keys(ssgi), ['SSGI']);
+  assert.equal(root.SSGI, ssgi.SSGI);
 });

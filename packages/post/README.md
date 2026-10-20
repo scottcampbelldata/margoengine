@@ -1,6 +1,6 @@
 # Margo Engine Post
 
-Optional WebGPU frame-graph SSAO and GTAO, bloom, FXAA and an effect stack, separate from the frozen core and stage.
+Optional WebGPU frame-graph SSAO, GTAO, SSR and SSGI, bloom, FXAA and an effect stack, separate from the frozen core and stage.
 
 ## Combining effects: `PostStack`
 
@@ -166,6 +166,56 @@ gtao.options.slices = 1;        // options and `enabled` are read every frame
   specular occlusion cone: the IBL specular is darkened by the same factor as the diffuse, as with SSAO. Up to 4 slices
   and 16 steps per side; options `radius` (0, 100], `slices` 1-4, `steps` 1-16 (`RangeError` otherwise). It runs only in
   a `PostStack` (`MargoError` code `state` when attached alone with `engine.use`). GPU cost not measured yet. WebGPU only.
+
+## Screen-space global illumination: `SSGI`
+
+`@margoengine/post/ssgi` (9,717 B min+gzip, its own entry; it carries the stack) adds one bounce of diffuse light: light
+that lit surfaces on screen throw onto their neighbours (a red wall tints the floor in front of it). It is an HDR
+`PostStack` effect; `SSGI.attach(engine, options)` runs it alone in its own one-effect stack.
+
+```ts
+import {PostStack} from '@margoengine/post/stack';
+import {SSGI} from '@margoengine/post/ssgi';
+import {SSR} from '@margoengine/post/ssr';
+const ssgi = new SSGI({rays: 4, maxDistance: 10, thickness: 0.5, steps: 32, intensity: 1});
+const ssr = new SSR();
+PostStack.attach(stage.engine, [ssgi, ssr]);
+ssgi.add(model); ssr.add(model);  // gltf-pro model or materials mesh: both may capture it (one shared capture hook)
+```
+
+- **Material replay.** At order 15 (after SSAO's and SSR's replays) core meshes are redrawn once at 1x with core's own
+  shader into three targets: the ambient light the scene added at the pixel (`rgba16float`; SSAO's ambient replay:
+  `margoAmbient` when a plugin such as `EnvironmentLighting` names it, else core's ambient term), the diffuse albedo
+  `base·(1−metal)` (`rgba8unorm`) and the normal (`rgb10a2unorm`). At 4x MSAA the replay writes its own 1x depth, as
+  SSR's does. Models added with `ssgi.add(model)` draw into the same targets through gltf-pro's capture hook (their
+  own `ambient(s)`, occlusion included, albedo and normal maps). A model takes one capture hook, so SSR and SSGI share
+  one per model (`packages/post/src/capture.ts`); with only SSR, SSR's calls are what they were
+  (`proofs/post-ssr-models.proof.js`).
+- **Rays.** `rays` cosine-weighted directions per pixel around its normal, from a set of `16 · rays` (Malley's method on
+  a golden-angle spiral) that the 4x4 pixel tile shares out, each marched over a hierarchical depth pyramid with SSR's
+  own march (`packages/post/src/hiz.ts`; `steps`, `thickness`, `maxDistance`). A hit takes the lit scene there (the
+  stack's input; a blurred mip for far hits). Hits on back faces and near `maxDistance` fade out.
+- **Replacing, not adding.** Where a share `h` of the rays hit, the composite writes `scene + intensity · (albedo ·
+  hitLight − ambient · h)`, `hitLight` being the hit light summed over all rays over their count: the ambient light is
+  replaced by the light the rays found, so geometry that blocks the sky also occludes (SSGI includes ambient occlusion;
+  with SSAO or GTAO before it, creases darken twice). A bilateral blur over 8 taps per axis (normal and plane aware)
+  averages the 4x4 tile. Deterministic, so frames are stable without TAA.
+- **Checked on a real GPU** against the form factor (NVIDIA RTX A6000, Edge 155; `post-effects-gpu.mjs --only=ssgi`,
+  [ssgi-gpu.json](../../examples/package-benchmarks/results/ssgi-gpu.json)): ambient light 1 only, a white floor before
+  a red 4 x 2 m wall. A ray that hits the wall swaps the floor's ambient light (1, 1, 1) for the wall's (1, 0, 0), so
+  the floor's green falls by the share of its cosine-weighted hemisphere the wall covers (the form factor from a
+  floor point to the rectangle, integrated numerically) and its red stays. At 18 floor points 5 cm to 2 m from the
+  wall the measured share is within 0.023 of it (0.471 against 0.486 at 5 cm, 0.234 against 0.249 at 1 m, 0.110
+  against 0.111 at 2 m) and red stays 1.000; the same at 1x MSAA, for a gltf-pro floor added to SSGI and SSR (red
+  0.990: gltf-pro's ambient also holds a specular term, removed and not re-added), and with an orthographic camera
+  (within 0.021). With GTAO, SSR and TAA in the same frame and alone: no errors, no NaN.
+- **Limits.** Only what is on screen bounces: light from off-screen or hidden surfaces is missing, and rays that leave
+  the screen keep the ambient light. One diffuse bounce (no specular, no second bounce); the bounce light is the
+  scene as lit before SSGI (emission included), so it does not see its own result. Water, terrain and other custom
+  shaders bounce light but take none (no albedo in the replay). Options: `rays` 1-16, `steps` 1-256, `maxDistance` and
+  `thickness` > 0, `intensity` 0-4 (`RangeError` otherwise); stack only (`MargoError` code `state` alone with
+  `engine.use`). Memory: three material targets, two `rgba16float` GI targets, a half-resolution Hi-Z and blur chain,
+  and its own 1x depth at 4x. GPU cost not measured yet. WebGPU only.
 
 ## Projected decals: `Decals`
 

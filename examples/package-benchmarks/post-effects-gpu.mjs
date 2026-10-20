@@ -7,6 +7,12 @@
 //   a wedge of angle b: (1 - cos b) / 2, so 0.5 at a 90-degree crease, 0.25 at 60 and 0.75 at 120 degrees, and 1 on the
 //   open floor. Perspective 4x and 1x, orthographic; GTAO.attach alone leaves the open floor unchanged; in a stack with
 //   SSR and Bloom and under TAA no errors and no NaN.
+// ssgi: one bounce, ambient light only (ambient 1, direct light off), a white floor before a red 4 x 2 m wall. Where a
+//   ray from the floor hits the wall, SSGI swaps the floor's ambient light (1, 1, 1) for the wall's (1, 0, 0), so the
+//   floor keeps red and loses green in proportion to the share of its cosine-weighted hemisphere the wall covers: the
+//   form factor F from a floor point to the wall rectangle, integrated here. Measured as 1 - green(on) / green(off),
+//   against F at 5 cm to 2 m from the wall; red stays (ratio 1). Core floor 4x and 1x, a gltf-pro floor added to SSGI
+//   and SSR (one capture hook, shared), orthographic; with GTAO, SSR and TAA no errors and no NaN.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
@@ -72,6 +78,21 @@ const median = (values) => {
   return s[s.length >> 1];
 };
 const round = (v, n = 3) => +v.toFixed(n);
+// Form factor from a floor point (normal +y) at distance d in front of a wall rectangle (normal +z) of the given width
+// (centred on x) and height: (1 / pi) * integral of cos * cos / r^2 over the rectangle, by the midpoint rule.
+function formFactor(x0, d, width, height, n = 400) {
+  let sum = 0;
+  const dx = width / n,
+    dy = height / n;
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < n; j++) {
+      const x = -width / 2 + (i + 0.5) * dx - x0,
+        y = (j + 0.5) * dy,
+        r2 = x * x + y * y + d * d;
+      sum += ((y * d) / (r2 * r2)) * dx * dy;
+    }
+  return sum / Math.PI;
+}
 const sections = {
   async gtao() {
     const report = { ...header(), checks: {} },
@@ -138,6 +159,71 @@ const sections = {
       const frame = await read();
       report.checks[name] = { nan: frame.nan() };
       assert.equal(frame.nan(), 0, `${name}: NaN`);
+    }
+    return report;
+  },
+  async ssgi() {
+    const report = { ...header(), checks: {} },
+      ssgi = { rays: 8, maxDistance: 20, steps: 64 };
+    for (const [name, config] of Object.entries({
+      'core-4x': {},
+      'core-1x': { samples: 1 },
+      'gltf-floor': {
+        floor: 'gltf',
+        stack: [
+          ['ssgi', ssgi],
+          ['ssr', {}],
+        ],
+      },
+      'ortho-4x': { camera: 'ortho' },
+    })) {
+      const info = await run({ scene: 'wall', stack: [['ssgi', ssgi]], ...config }),
+        on = await read();
+      await set('ssgi', { enabled: false });
+      const off = await read();
+      const rows = info.floor.map(({ x, d, pixel }) => {
+        const a = on.at(...pixel),
+          b = off.at(...pixel);
+        return {
+          x,
+          d,
+          expected: round(formFactor(x, d, info.wall.width, info.wall.height)),
+          measured: round(1 - a[1] / b[1]),
+          red: round(a[0] / b[0]),
+        };
+      });
+      report.checks[name] = { floor: rows, nan: on.nan() };
+      console.log(name, JSON.stringify(report.checks[name]));
+      assert.equal(on.nan(), 0, `${name}: NaN`);
+      for (const r of rows) {
+        assert.ok(
+          Math.abs(r.measured - r.expected) < 0.06,
+          `${name}: floor at x ${r.x}, ${r.d} m: ${r.measured}, form factor ${r.expected}`,
+        );
+        assert.ok(Math.abs(r.red - 1) < 0.03, `${name}: red changed (${r.red})`);
+      }
+    }
+    for (const [name, config] of Object.entries({
+      'gtao+ssgi+ssr+taa': {
+        scene: 'wall',
+        floor: 'gltf',
+        stack: [
+          ['gtao', {}],
+          ['ssgi', {}],
+          ['ssr', {}],
+        ],
+        taa: true,
+        frames: 12,
+        light: true,
+      },
+      'alone': { scene: 'wall', light: true, probe: false, alone: {}, aloneEffect: 'ssgi' },
+    })) {
+      await run(config);
+      if (config.probe !== false) {
+        const frame = await read();
+        report.checks[name] = { nan: frame.nan() };
+        assert.equal(frame.nan(), 0, `${name}: NaN`);
+      } else report.checks[name] = { errors: 0 };
     }
     return report;
   },
