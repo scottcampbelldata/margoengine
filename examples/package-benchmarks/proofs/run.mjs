@@ -27,6 +27,8 @@ const ongoing = [
   'quality-presets',
   'selection-xray-off',
   'taa-velocity',
+  'terrain-ssr',
+  'water-ssr',
 ];
 const current = process.argv.includes('--current'),
   only = process.argv

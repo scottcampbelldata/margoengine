@@ -12,6 +12,7 @@ import { acquireDepth, group } from '../../shared/gpu.js';
 import { CoastalFlow, waterFrame, oceanWaves } from './coastal.js';
 import { Spray } from './spray.js';
 import { displayShader } from '../../shared/display.js';
+import { margoError } from '../../shared/errors.js';
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; UNIFORM: number; COPY_DST: number; STORAGE: number };
 declare const GPUTextureUsage: {
   COPY_SRC: number;
@@ -40,6 +41,17 @@ export interface WaterLight {
 export interface WaterShadowSource {
   pbr(group: number): { readonly declarations: string };
   bindings(): GPUBindGroupEntry[];
+}
+/** What `setCapture` takes: `@margoengine/post` SSR's material capture hook (its `SSRCapture`), declared here so water
+ * does not import post. */
+export interface WaterCapture {
+  /** Module-scope WGSL for the water shader `code`: `struct MargoSSR` (specular to replace + roughness, weight + coverage,
+   * normal) among the rest. */
+  declarations(code: string): string;
+  /** Colour targets of the capture pass, in `MargoSSR` location order. */
+  readonly targets: readonly GPUColorTargetState[];
+  /** This frame's capture pass: these targets and a depth attachment of the context's format; ended by the owner. */
+  begin(): GPURenderPassEncoder;
 }
 export interface WaterOptions {
   size?: readonly [number, number];
@@ -209,6 +221,22 @@ ${displayShader}
  return Result(vec4f(color,1),vec4f(foam,0,0,1));
 }`;
 // With a shadow source its own filtered visibility (bind group 1) shades the surface; without one the light is unblocked.
+// SSR capture (`setCapture`): the same fragment, ending in what screen-space reflections replace: the sky reflection the
+// water added (times the Fresnel weight and the foam's share) and that weight, with the rippled normal and roughness.
+const captureHead = '@fragment fn fragment(i:Output)->Result{',
+  captureTail =
+    /var color=mix\(body,skyColor\(reflect\(-v,n\),rough\),reflection\)\+glint\*shade;[\s\S]*return Result\(vec4f\(color,1\),vec4f\(foam,0,0,1\)\);/;
+function captureShader(code: string, declarations: string): string {
+  const out = code
+    .replace(captureHead, '@fragment fn fragment(i:Output)->MargoSSR{')
+    .replace(
+      captureTail,
+      'let keep=reflection*(1.0-0.95*foam);_=body;_=glint*shade;return MargoSSR(vec4f(skyColor(reflect(-v,n),rough)*keep,rough),vec4f(vec3f(keep),1),vec4f(n*0.5+0.5,1));',
+    );
+  if (!out.includes('->MargoSSR{') || !out.includes('return MargoSSR('))
+    throw margoError('unsupported', 'Water capture needs the water fragment; its shader changed');
+  return declarations + out;
+}
 const unshadowed = '\nfn waterShadow(p:vec3f)->f32 {return 1.0;}';
 const shadowed = '\nfn waterShadow(p:vec3f)->f32 {return shadowVisibility(p,vec3f(0,1,0));}';
 const depthCopy = `
@@ -264,6 +292,18 @@ export class Water implements EnginePlugin {
   private readonly colorSize: GPUExtent3DDict = { width: 1, height: 1, depthOrArrayLayers: 1 };
   private foamViews: GPUTextureView[] = [];
   private groups: GPUBindGroup[] = [];
+  // Resources of each group 0 above (the capture pipeline has its own auto layout) and which one this frame drew with.
+  private resources: GPUBindingResource[][] = [];
+  private drawn = 0;
+  private shaderCode = '';
+  private capture?: WaterCapture;
+  private capturePipeline?: GPURenderPipeline;
+  private captureKey = '';
+  private captureSource?: GPUBindGroup[];
+  private captureGroups: GPUBindGroup[] = [];
+  private captureShadow?: GPUBindGroup;
+  private captureShadowEntries?: GPUBindGroupEntry[];
+  private readonly disposers = new Set<() => void>();
   private shadowGroup?: GPUBindGroup;
   private shadowEntries?: GPUBindGroupEntry[];
   private sampledDepth?: GPUTexture;
@@ -478,7 +518,7 @@ export class Water implements EnginePlugin {
       name: this.name + ':draw',
       order: 4,
       execute: (c) => {
-        if (c.backend === 'webgpu') this.draw(c);
+        if (c.backend === 'webgpu') this.drawSurface(c);
       },
     });
   }
@@ -502,7 +542,7 @@ export class Water implements EnginePlugin {
         throw new RangeError('Invalid water light');
     }
   }
-  private draw(c: Context): void {
+  private drawSurface(c: Context): void {
     resolveMSAA(c);
     const samples = c.descriptor.multisample?.count ?? 1;
     const depth = this.source!();
@@ -646,11 +686,10 @@ export class Water implements EnginePlugin {
     const format = c.format + ':' + samples + ':' + depth.format + ':' + !!shadows;
     if (this.format !== format) {
       // Shadow sampling goes after the surface functions, which GPU probes compile on their own.
-      const module = c.device.createShaderModule({
-        code:
-          shader.replace('const HORIZON=false;', `const HORIZON=${this.horizon};`) +
-          (shadows ? '\n' + shadows.pbr(1).declarations + shadowed : unshadowed),
-      });
+      this.shaderCode =
+        shader.replace('const HORIZON=false;', `const HORIZON=${this.horizon};`) +
+        (shadows ? '\n' + shadows.pbr(1).declarations + shadowed : unshadowed);
+      const module = c.device.createShaderModule({ code: this.shaderCode });
       this.pipeline = c.device.createRenderPipeline({
         layout: 'auto',
         vertex: {
@@ -739,20 +778,22 @@ export class Water implements EnginePlugin {
       const view = depth.createView({ aspect: 'depth-only' });
       this.copyGroup = group(c.device, this.copyPipeline!, [view]);
       this.groups = [];
+      this.resources = [];
       for (let i = 0; i < 2; i++)
-        for (let j = 0; j < (this.coastal ? 2 : 1); j++)
-          this.groups.push(
-            group(c.device, this.pipeline!, [
-              { buffer: this.uniform! },
-              view,
-              this.foamViews[i],
-              this.coastal?.views[j] ?? this.foamViews[i],
-              reflection?.createView() ?? this.foamViews[i],
-              this.skySampler!,
-              this.capturedView ?? this.foamViews[i],
-              { buffer: this.coastal?.connected ?? this.uniform! },
-            ]),
-          );
+        for (let j = 0; j < (this.coastal ? 2 : 1); j++) {
+          const resources: GPUBindingResource[] = [
+            { buffer: this.uniform! },
+            view,
+            this.foamViews[i],
+            this.coastal?.views[j] ?? this.foamViews[i],
+            reflection?.createView() ?? this.foamViews[i],
+            this.skySampler!,
+            this.capturedView ?? this.foamViews[i],
+            { buffer: this.coastal?.connected ?? this.uniform! },
+          ];
+          this.resources.push(resources);
+          this.groups.push(group(c.device, this.pipeline!, resources));
+        }
       this.sampledDepth = depth;
     }
     // The shadow source owns its entries; a new array (resize, restoration) rebuilds group 1.
@@ -773,7 +814,8 @@ export class Water implements EnginePlugin {
       copy.draw(3);
       copy.end();
     }
-    const bind = this.groups[this.current * (this.coastal ? 2 : 1) + (this.coastal?.current ?? 0)];
+    this.drawn = this.current * (this.coastal ? 2 : 1) + (this.coastal?.current ?? 0);
+    const bind = this.groups[this.drawn];
     this.current = 1 - this.current;
     this.attachment.view = c.color;
     this.foamAttachment.view = samples === 4 ? this.foamMSAAView! : this.foamViews[this.current];
@@ -790,7 +832,104 @@ export class Water implements EnginePlugin {
     pass.end();
     this.spray?.draw(c, this.surfaceDepth!, this.surfaceView!);
   }
+  /**
+   * Lets a capture hook (`@margoengine/post` SSR: `ssr.add(water)`) draw the water surface with `draw(c, 'capture', ...)`
+   * into its targets: the sky reflection the water added (so SSR replaces it where its ray hits instead of adding to it),
+   * the Fresnel weight, the rippled normal and roughness. Depth tested (greater-equal) and written, so SSR also traces
+   * against the water. Returns a remover. Without a hook the water draws exactly as before.
+   */
+  setCapture(hook: WaterCapture): () => void {
+    if (
+      this.disposed ||
+      !hook ||
+      typeof hook.declarations !== 'function' ||
+      typeof hook.begin !== 'function' ||
+      !Array.isArray(hook.targets)
+    )
+      throw new TypeError('Invalid water capture hook');
+    this.capture = hook;
+    return () => {
+      if (this.capture === hook) this.capture = undefined;
+    };
+  }
+  /** Calls `callback` once when the water is disposed; returns a remover. */
+  onDispose(callback: () => void): () => void {
+    if (typeof callback !== 'function') throw new TypeError('Water onDispose needs a function');
+    this.disposers.add(callback);
+    return () => this.disposers.delete(callback);
+  }
+  /** `mode` 'capture': draws this frame's surface into the capture hook's pass (`setCapture`); `color` and `depth` are
+   * unused (the hook's pass has its own). Does nothing before the water's first draw, without a hook or after disposal. */
+  draw(
+    c: Extract<PassContext, { backend: 'webgpu' }>,
+    mode: 'capture',
+    color?: GPUTextureView,
+    depth?: GPUTextureView,
+  ): void {
+    const hook = this.capture;
+    if (mode !== 'capture' || !hook || this.disposed || !this.groups.length || !this.shaderCode) return;
+    void color;
+    void depth;
+    const shadows = this.options.shadows,
+      key =
+        this.shaderCode +
+        hook.targets.map((t) => t.format).join(',') +
+        c.descriptor.multisample?.count +
+        c.descriptor.depthStencil!.format;
+    if (this.captureKey !== key) {
+      const module = c.device.createShaderModule({
+        code: captureShader(this.shaderCode, hook.declarations(this.shaderCode)),
+      });
+      this.capturePipeline = c.device.createRenderPipeline({
+        layout: 'auto',
+        vertex: {
+          module,
+          entryPoint: 'vertex',
+          buffers: [
+            {
+              arrayStride: 12,
+              attributes: [
+                { shaderLocation: 0, offset: 0, format: 'float32x2' },
+                { shaderLocation: 1, offset: 8, format: 'float32' },
+              ],
+            },
+          ],
+        },
+        fragment: { module, entryPoint: 'fragment', targets: hook.targets as GPUColorTargetState[] },
+        primitive: { cullMode: 'none' },
+        depthStencil: {
+          format: c.descriptor.depthStencil!.format,
+          depthCompare: 'greater-equal',
+          depthWriteEnabled: true,
+        },
+        multisample: c.descriptor.multisample,
+      });
+      this.captureKey = key;
+      this.captureSource = undefined;
+      this.captureShadowEntries = undefined;
+    }
+    if (this.captureSource !== this.groups) {
+      this.captureSource = this.groups;
+      this.captureGroups = this.resources.map((resources) => group(c.device, this.capturePipeline!, resources));
+    }
+    const entries = shadows?.bindings();
+    if (entries && this.captureShadowEntries !== entries) {
+      this.captureShadowEntries = entries;
+      this.captureShadow = c.device.createBindGroup({ layout: this.capturePipeline!.getBindGroupLayout(1), entries });
+    }
+    const pass = hook.begin();
+    pass.setPipeline(this.capturePipeline!);
+    pass.setBindGroup(0, this.captureGroups[this.drawn]);
+    if (entries) pass.setBindGroup(1, this.captureShadow!);
+    pass.setVertexBuffer(0, this.vertices!);
+    pass.setIndexBuffer(this.indices!, 'uint32');
+    pass.drawIndexed(this.count);
+  }
   private release(): void {
+    this.capturePipeline = this.captureSource = this.captureShadow = this.captureShadowEntries = undefined;
+    this.captureGroups = [];
+    this.resources = [];
+    this.captureKey = this.shaderCode = '';
     this.foamMSAA?.destroy();
     this.foamMSAA = undefined;
     this.foamMSAAView = undefined;
@@ -832,7 +971,11 @@ export class Water implements EnginePlugin {
     this.disposed = true;
     this.engine?.removePlugin(this.name);
     this.release();
+    this.capture = undefined;
     this.engine = undefined;
+    const disposers = [...this.disposers];
+    this.disposers.clear();
+    for (const callback of disposers) callback();
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

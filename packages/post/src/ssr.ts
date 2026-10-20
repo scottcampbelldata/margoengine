@@ -25,13 +25,17 @@ export interface SSROptions {
   steps?: number;
   enabled?: boolean;
 }
-/** gltf-pro's capture hook (its `PBRCapture`, declared here so post does not import gltf-pro). */
+/** The capture hook SSR gives models (gltf-pro's `PBRCapture`, terrain's `TerrainCapture`, water's `WaterCapture`;
+ * declared here so post imports none of them). For code with gltf-pro's PBR `Surface`, `declarations` holds
+ * `margoCapture(s, v, k)`; for any other code only `struct MargoSSR` and `margoSSR(n, v, base, metal, rough)`: return
+ * that, or `MargoSSR(vec4f(specularToReplace, roughness), vec4f(weight, 1), vec4f(n * 0.5 + 0.5, 1))` directly. */
 export interface SSRCapture {
   declarations(code: string): string;
   readonly targets: readonly GPUColorTargetState[];
   begin(): GPURenderPassEncoder;
 }
-/** What `ssr.add` takes: a gltf-pro `PBRModel` or `@margoengine/materials` mesh. */
+/** What `ssr.add` takes: a gltf-pro `PBRModel`, a `@margoengine/materials` mesh, a `Terrain` (@margoengine/terrain) or
+ * a `Water` (@margoengine/water). */
 export interface SSRModel {
   setCapture(hook: SSRCapture): () => void;
   onDispose(callback: () => void): () => void;
@@ -63,12 +67,16 @@ return MargoSSR(vec4f(e,rough),vec4f(w,1),vec4f(n*0.5+0.5,1));
 };
 // gltf-pro capture: the same targets from the model's Surface. Its environment ambient is iblShade(...)*s.occlusion, and
 // clearcoat/sheen scale it by k, so the specular to replace and the weight it is replaced with carry both factors.
+// Shaders without gltf-pro's PBR Surface (terrain, water) get margoSSR and the MargoSSR targets only, and return them.
+const pbrSurface = /struct Surface\s*\{\s*base:vec4f/;
 const modelTail = (code: string) =>
   replayTail(code) +
-  `
+  (pbrSurface.test(code)
+    ? `
 struct MargoCapture {@location(0) specular:vec4f,@location(1) weight:vec4f,@location(2) normal:vec4f}
 fn margoCapture(s:Surface,v:vec3f,k:vec3f)->MargoCapture {let m=margoSSR(s.n,v,s.base.rgb,s.metal,s.roughness);let o=k*s.occlusion;return MargoCapture(vec4f(m.specular.rgb*o,m.specular.a),vec4f(m.weight.rgb*o,1),m.normal);}
-`;
+`
+    : '');
 const lit = (code: string) => code.includes('let margoAmbient=') && code.includes('fn iblBrdfTerms(');
 // One ray per pixel along the mirror direction, marched over the Hi-Z pyramid in screen space (pixel x, y and NDC depth
 // are linear along a projected segment for perspective and orthographic cameras alike). Roughness widens the cone:
@@ -139,6 +147,7 @@ export class SSR implements EnginePlugin {
   private width = 0;
   private height = 0;
   private target?: SceneTarget;
+  private owned = false;
   private depthView?: GPUTextureView;
   private ownDepth?: GPUTextureView;
   private base?: GPURenderPipelineDescriptor;
@@ -397,12 +406,15 @@ export class SSR implements EnginePlugin {
     pass.end();
   }
   private resize(c: Context): void {
-    const target = this.host!.target!;
-    if (this.width === c.width && this.height === c.height && this.target === target) return;
+    const target = this.host!.target!,
+      // Own 1x depth at 4x, and at 1x once models are added: a capture writes depth, and water samples the stack's.
+      own = target.samples === 4 || this.models.size > 0;
+    if (this.width === c.width && this.height === c.height && this.target === target && this.owned === own) return;
     this.release();
     this.width = c.width;
     this.height = c.height;
     this.target = target;
+    this.owned = own;
     const device = c.device,
       sampled = GPUTextureUsage.TEXTURE_BINDING,
       texture = (size: number[], format: GPUTextureFormat, usage: number, mipLevelCount = 1) => {
@@ -411,10 +423,7 @@ export class SSR implements EnginePlugin {
         return t;
       };
     const scene = this.host!.depthTexture!,
-      depth =
-        target.samples === 4
-          ? texture([c.width, c.height], 'depth32float', sampled | GPUTextureUsage.RENDER_ATTACHMENT)
-          : scene;
+      depth = own ? texture([c.width, c.height], 'depth32float', sampled | GPUTextureUsage.RENDER_ATTACHMENT) : scene;
     this.depthView = depth.createView({ aspect: 'depth-only' });
     if (depth !== scene) this.ownDepth = depth.createView();
     // Hi-Z levels 1..n (level 0 is the depth itself), cells up to 64 px.

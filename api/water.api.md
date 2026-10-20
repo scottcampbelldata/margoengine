@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 
 export class Water implements EnginePlugin {
     readonly options: WaterOptions;
@@ -16,9 +16,20 @@ export class Water implements EnginePlugin {
     setWaveHeight(height: number): this;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    setCapture(hook: WaterCapture): () => void;
+    onDispose(callback: () => void): () => void;
+    draw(c: Extract<PassContext, {
+        backend: 'webgpu';
+    }>, mode: 'capture', color?: GPUTextureView, depth?: GPUTextureView): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
+}
+
+export interface WaterCapture {
+    declarations(code: string): string;
+    readonly targets: readonly GPUColorTargetState[];
+    begin(): GPURenderPassEncoder;
 }
 
 export interface WaterLight {

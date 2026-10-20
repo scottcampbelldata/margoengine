@@ -48,7 +48,8 @@ SSAO keep the canvas alpha; the last intentional change to an effect).
 ## Screen-space reflections: `SSR`
 
 `@margoengine/post/ssr` reflects what is on screen in glossy core meshes (floors, polished CAD metal) and in glTF-pro
-models and `@margoengine/materials` meshes added with `ssr.add(model)`. It is an HDR `PostStack` effect;
+models, `@margoengine/materials` meshes, `Terrain` (@margoengine/terrain) and `Water` (@margoengine/water) added with
+`ssr.add(model)`. It is an HDR `PostStack` effect;
 `SSR.attach(engine, options)` runs it alone in its own one-effect stack (tone mapped like SSAO alone).
 
 ```ts
@@ -75,16 +76,21 @@ ssr.enabled = false; // pass-through, no recompiles
   split-sum weight `F0·A+B` (`rgb10a2unorm`) and the shading normal (`rgb10a2unorm`). A 1x scene is replayed
   depth-`equal` against the stack's capture depth; a 4x scene into SSR's own 1x `depth32float` (pixel-centre
   materials and depth, so MSAA silhouettes never average two materials, and no multisampled targets). The Hi-Z is
-  built from that depth. Memory: 16 B/pixel of targets (+4 B depth at 4x), a half-resolution `r32float` Hi-Z and a
+  built from that depth. Memory: 16 B/pixel of targets (+4 B depth at 4x, or at 1x once models are added), a half-resolution `r32float` Hi-Z and a
   half-resolution `rgba16float` blur chain, about 45 MB at 1080p.
 - **Model capture.** Models added with `ssr.add(model)` (a gltf-pro `PBRModel` or a materials mesh; returns a remover,
   disposal of the model or of SSR detaches it) then draw into the same three targets in one more pass, through
   gltf-pro's declared capture hook (gltf-pro README "Capture hook"; no text search of its shader): their own base
   colour, metal/roughness, normal and occlusion maps, materials' maps, alpha mask, instances and skinned/morphed
-  vertices, depth tested against (and at 4x written into) the depth the Hi-Z is built from. BLEND, transmission and
+  vertices, depth tested against and written into SSR's own 1x depth, which the Hi-Z is built from (with models added
+  SSR keeps its own depth at 1x MSAA too, so a capture never writes the stack's depth, which water samples). BLEND, transmission and
   unlit primitives are skipped. Models not added are still reflected but do not reflect. With no model added SSR makes
   exactly the GPU calls it made before (`examples/package-benchmarks/proofs/post-ssr-models.proof.js`, against
-  `3cf1453`). At 4x, models not added are missing from SSR's own depth, so rays pass through them. With models
+  `3cf1453`). Models not added are missing from SSR's own depth, so rays pass through them. `Terrain` and `Water`
+  take the same hook: shaders without gltf-pro's PBR `Surface` get only `margoSSR` and the `MargoSSR` targets (the
+  `SSRCapture` TSDoc), terrain calls `margoSSR` with its layer colour and roughness, water returns its own sky
+  reflection as the specular to replace; their READMEs have the checks. One capture hook per model, shared with SSGI
+  (`packages/post/src/capture.ts`). With models
   added the composite also never removes more specular than a pixel holds (a 4x silhouette pixel is the resolve of
   both sides while its material is the centre sample's; on DamagedHelmet's part seams this turned 68 pixels black):
   removal and replacement are scaled by `min(1, scene / specular)`, which is 1, so exact, wherever they agree.
@@ -118,9 +124,9 @@ ssr.enabled = false; // pass-through, no recompiles
   The model capture pass adds 0.19-0.21 ms at 1280x720 and 0.44-0.46 ms at 1920x1080 for a glTF floor filling most
   of the view, 0.05-0.07 ms for DamagedHelmet (4x and 1x; diagnostic timings on a busy machine); the reflective model
   pixels then trace like core ones. `examples/package-benchmarks/ssr-models-gpu.mjs` (results/ssr-models-gpu.json).
-- **Limits.** Core meshes and added models show reflections; water, terrain and other custom shaders are reflected but
-  do not reflect (each draws with its own pipeline and would need its own capture into SSR's targets). Only what is
-  on screen is reflected; with reflection probes (`@margoengine/environment/probes`) SSR removes the probes' own specular
+- **Limits.** Core meshes and added models (gltf-pro, materials, terrain, water) show reflections; other custom shaders
+  are reflected but do not reflect (each would need its own capture into SSR's targets). Only what is on screen is
+  reflected; with reflection probes (`@margoengine/environment/probes`) SSR removes the probes' own specular
   where its ray hits and keeps the probe's reflection elsewhere, so off-screen reflections come from the probes
   ([probes-gpu.json](../../examples/package-benchmarks/results/probes-gpu.json)). A clearcoat's own (hemisphere) reflection is not replaced; fog is not applied to the replaced
   term (core meshes alike). Materials `basic`/`normal`/`matcap` meshes reflect by their roughness like `standard` ones. With SSAO before it, a creased pixel's IBL specular was already darkened by AO, so a hit

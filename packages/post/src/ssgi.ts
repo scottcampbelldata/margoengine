@@ -53,10 +53,19 @@ function coreReplay(shader: string): string {
 }
 // gltf-pro capture (SSR's hook contract): the model's own ambient (`ambient(s)`, occlusion included; clearcoat and sheen
 // scale it by k), albedo and normal.
-const modelTail = (code: string) => `
+const pbrSurface = /struct Surface\s*\{\s*base:vec4f/;
+const modelTail = (code: string) => {
+  // Terrain and water reach SSR's hook contract too, but have no albedo or ambient replay here.
+  if (!pbrSurface.test(code))
+    throw margoError(
+      'unsupported',
+      'SSGI captures gltf-pro models and materials meshes only; add terrain and water to SSR',
+    );
+  return `
 struct MargoCapture {@location(0) ambient:vec4f,@location(1) albedo:vec4f,@location(2) normal:vec4f}
 fn margoCapture(s:Surface,v:vec3f,k:vec3f)->MargoCapture {return MargoCapture(vec4f(${code.includes('fn ambient(s:Surface)') ? 'ambient(s)*k' : 'vec3f(0)'},1),vec4f(s.base.rgb*(1.0-s.metal),1),vec4f(s.n*0.5+0.5,1));}
 `;
+};
 const uniforms = `
 struct U {inverse:mat4x4f,matrix:mat4x4f,a:vec4f,b:vec4f,g:vec4f}
 @group(0) @binding(0) var<uniform> u:U;

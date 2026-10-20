@@ -992,7 +992,7 @@
     "package": "@margoengine/post",
     "version": "1.0.0",
     "published": false,
-    "description": "HDR bloom, frame-graph SSAO and SSR, and post-effect stacks for Margo Engine WebGPU.",
+    "description": "HDR bloom, frame-graph SSAO, GTAO, SSGI and SSR, motion blur, lens flare, and post-effect stacks for Margo Engine WebGPU.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "post",
     "install": "npm install @margoengine/core@1.0.0 @margoengine/post@1.0.0",
@@ -1000,8 +1000,12 @@
     "exports": [
       "Bloom",
       "FXAA",
+      "GTAO",
+      "LensFlare",
+      "MotionBlur",
       "PostStack",
       "SSAO",
+      "SSGI",
       "SSR",
       "SceneFade",
       "bloomWeights"

@@ -112,3 +112,16 @@ Physical WebGPU all-shore run-up/recession, deep isolated-basin retention, curve
 refraction and device-restoration checks: npm run test:gpu --workspace @margoengine/water
 (build core, post and terrain packages first).
 
+## Screen-space reflections
+
+`Water` takes SSR's capture hook (`@margoengine/post/ssr`): `ssr.add(water)` draws the surface again into SSR's
+material targets with the sky reflection it added (sky colour times Fresnel, less the foam's share) as the specular to
+replace, that Fresnel weight, its rippled normal and roughness. The capture writes the water's depth into what SSR
+traces, so rays start at the surface (not the seabed) and other rays stop at it. Where an SSR ray hits, the water's
+sky reflection is replaced by the screen, not added to; where it misses the water keeps its own sky. Without the hook
+the GPU calls are exactly as before (`examples/package-benchmarks/proofs/water-ssr.proof.js`, against `6c20076d`).
+Checked on a real GPU (NVIDIA RTX A6000, Edge 155; `examples/package-benchmarks/post-effects-gpu.mjs --only=ssr-surfaces`, [ssr-surfaces-gpu.json](../../examples/package-benchmarks/results/ssr-surfaces-gpu.json)): a red box above calm water (a uniform grey sky texture as `reflection`) appears in it within the
+box's planar mirror through the water plane (14,825 pixels at 4x, 12 outside the mirror bounds by more than 16 px,
+the ripples bending its edges) and at the mirrored centre its green falls (143 to 136/255: the box's light replaced
+the sky's, it could not have added green), at 4x and 1x MSAA. Limits: only the water's own reflection term is
+replaced (refraction, foam and glints stay); SSR's `maxRoughness` fades reflections on rough, rippled water.

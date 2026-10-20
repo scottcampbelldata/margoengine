@@ -26,6 +26,9 @@ export class Terrain implements EnginePlugin {
     invalidate(): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    setCapture(hook: TerrainCapture): () => void;
+    onDispose(callback: () => void): () => void;
+    draw(c: Context, mode: 'capture', color?: GPUTextureView, depth?: GPUTextureView): void;
     drawShadow({ context, pass, matrix, cascade }: {
         context: Context;
         pass: GPURenderPassEncoder;
@@ -36,6 +39,12 @@ export class Terrain implements EnginePlugin {
     dispose(): void;
     [Symbol.dispose]: () => void;
     destroy(): void;
+}
+
+export interface TerrainCapture {
+    declarations(code: string): string;
+    readonly targets: readonly GPUColorTargetState[];
+    begin(): GPURenderPassEncoder;
 }
 
 export interface TerrainColorOptions {
@@ -101,6 +110,7 @@ export interface TerrainOptions {
     cellSize?: number;
     resolution?: number;
     levels?: number;
+    roughness?: number;
 }
 
 export interface TerrainTextures {

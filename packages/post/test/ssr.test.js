@@ -258,9 +258,10 @@ for (const samples of [4, 1])
         ['rgba16float', 'rgb10a2unorm', 'rgb10a2unorm'],
       );
       assert.equal(p.multisample.count, 1);
+      // With models added SSR captures into its own 1x depth at 1x too: the stack's depth is never written.
       assert.deepEqual(
         [p.depthStencil.format, p.depthStencil.depthCompare, p.depthStencil.depthWriteEnabled],
-        [samples === 4 ? 'depth32float' : 'depth24plus-stencil8', 'greater-equal', true],
+        ['depth32float', 'greater-equal', true],
       );
     }
     assert.ok(
@@ -355,3 +356,29 @@ for (const samples of [4, 1])
     model.dispose();
     engine.dispose();
   });
+
+test("SSR's capture declarations: margoCapture for gltf-pro's PBR Surface, margoSSR alone for terrain and water code", () => {
+  const h = harness(),
+    ssr = new SSR(),
+    seen = [];
+  h.engine.use(new PostStack([ssr]));
+  const model = {
+    setCapture: (hook) => {
+      seen.push(
+        hook.declarations('struct Surface {base:vec4f, n:vec3f, roughness:f32}'),
+        hook.declarations('struct Surface {position:vec3f,normal:vec3f,crest:f32}'),
+        hook.declarations('fn terrainColor(position:vec3f,normal:vec3f)->vec3f {return vec3f(1);}'),
+      );
+      return () => {};
+    },
+    onDispose: () => () => {},
+    draw() {},
+  };
+  ssr.add(model);
+  assert.match(seen[0], /fn margoCapture\(s:Surface/);
+  for (const code of seen.slice(1)) {
+    assert.match(code, /fn margoSSR\(n:vec3f,v:vec3f,base:vec3f,metal:f32,rough:f32\)->MargoSSR/);
+    assert.doesNotMatch(code, /margoCapture/, 'no reference to a Surface the shader does not have');
+  }
+  h.engine.removePlugin('post:stack');
+});

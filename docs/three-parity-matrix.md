@@ -75,7 +75,7 @@ These partials are narrower APIs that already have a Margo path. They are limits
 - Materials meshes accept independent `uvs1` coordinates and geometry groups with material arrays, including instancing and glTF export. UV1 falls back to UV0 when omitted. Arbitrary named vertex attributes remain absent, so the combined geometry-attributes row stays PARTIAL and the counts remain 99 / 35 / 25.
 - Toon shading applies to every core mesh at once, not to a glTF-pro or skinned material.
 - Contact shadows are a ground-plane helper, not a shadow-catcher material.
-- SSR reflects core meshes and models registered with `ssr.add`. Water and terrain are reflected and do not reflect.
+- SSR reflects core meshes and models registered with `ssr.add`, terrain and water included since 2026-10-20 (`setCapture` in `packages/terrain/src/index.ts` and `packages/water/src/index.ts`); the SSRPass row is COVERED.
 - OBJ loading skips materials. USDZ export rejects textures, vertex colors, and alpha masks.
 - WebXR draws core meshes on WebGPU. It has no hit testing and no WebGL XR fallback.
 - Screen effects such as vignette are a `NodePass`, not built-in passes. SMAA is not provided. FXAA is.

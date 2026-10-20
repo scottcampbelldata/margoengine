@@ -135,7 +135,7 @@ Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. T
 
 | Package | What it is |
 | --- | --- |
-| [`@margoengine/post`](packages/post/README.md) | HDR bloom, frame-graph SSAO and SSR, and post-effect stacks for Margo Engine WebGPU. |
+| [`@margoengine/post`](packages/post/README.md) | HDR bloom, frame-graph SSAO, GTAO, SSGI and SSR, motion blur, lens flare, and post-effect stacks for Margo Engine WebGPU. |
 | [`@margoengine/tonemap`](packages/tonemap/README.md) | Optional color grading: Khronos PBR Neutral (the engine default), AgX and ACES fitted curves, 2-65 cube LUTs. |
 | [`@margoengine/dof`](packages/dof/README.md) | Optional two-pass WebGPU depth of field with circular bokeh. |
 | [`@margoengine/taa`](packages/taa/README.md) | Optional temporal anti-aliasing with motion vectors and YCoCg history clamping. |

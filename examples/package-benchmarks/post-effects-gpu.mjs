@@ -24,6 +24,10 @@
 //   hides it exactly (no change); a box whose edge splits the occlusion disc leaves exactly the share of the disc's
 //   depth samples that see past it (counted from the frame without the flare); behind the camera or with strength 0
 //   nothing; orthographic: the peak at the projected pixel; in a stack with SSR and Bloom and alone, no errors.
+// ssr-surfaces: SSR on terrain and water added with ssr.add. A red box above the surface appears in it inside the
+//   planar mirror of the box through y = 0 (the surface's own depth: water's in SSR's depth, not the seabed's) and at the
+//   mirrored centre (within 6 px; 16 px on water, whose ripples bend it); on water the reflection replaces the water's sky reflection instead of adding to it (green falls
+//   at the mirrored centre). 4x and 1x; no black (NaN) pixels.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
@@ -432,6 +436,61 @@ const sections = {
       ],
     });
     await run({ scene: 'sun', sunPixel, probe: false, alone: flare, aloneEffect: 'flare' });
+    return report;
+  },
+  async 'ssr-surfaces'() {
+    const report = { ...header(), checks: {} };
+    for (const [name, config] of Object.entries({
+      'terrain-4x': { surface: 'terrain' },
+      'terrain-1x': { surface: 'terrain', samples: 1 },
+      'water-4x': { surface: 'water' },
+      'water-1x': { surface: 'water', samples: 1 },
+    })) {
+      const info = await run({ scene: 'reflect', stack: [['ssr', {}]], probe: false, light: true, ...config }),
+        on = await grab(`ssr-${name}-on`);
+      await set('ssr', { enabled: false });
+      const off = await grab(`ssr-${name}-off`),
+        px = (img, x, y) => {
+          const i = (y * img.width + x) * 4;
+          return [img.data[i], img.data[i + 1], img.data[i + 2]];
+        };
+      let red = 0,
+        outside = 0,
+        black = 0;
+      // Water's ripples bend its reflection by up to a few pixels more than a flat mirror would.
+      const [x0, y0, x1, y1] = info.mirror,
+        margin = config.surface === 'water' ? 16 : 6;
+      for (let y = 0; y < on.height; y++)
+        for (let x = 0; x < on.width; x++) {
+          const a = px(on, x, y),
+            b = px(off, x, y);
+          if (a[0] + a[1] + a[2] === 0 && b[0] + b[1] + b[2] > 0) black++;
+          // Reflected red: red minus green grew by more than 20 with SSR.
+          if (a[0] - a[1] - (b[0] - b[1]) > 20) {
+            red++;
+            if (x < x0 - margin || x > x1 + margin || y < y0 - margin || y > y1 + margin) outside++;
+          }
+        }
+      const [cx, cy] = info.center,
+        centreOn = px(on, cx, cy),
+        centreOff = px(off, cx, cy);
+      report.checks[name] = {
+        mirror: info.mirror,
+        redPixels: red,
+        redOutsideMirror: outside,
+        black,
+        centreOn,
+        centreOff,
+      };
+      console.log(name, JSON.stringify(report.checks[name]));
+      assert.equal(black, 0, `${name}: SSR introduced black pixels`);
+      assert.ok(red > 200, `${name}: no reflection`);
+      assert.ok(outside <= Math.max(8, red * 0.02), `${name}: reflection outside the planar mirror (${outside})`);
+      assert.ok(centreOn[0] - centreOn[1] - (centreOff[0] - centreOff[1]) > 20, `${name}: mirrored centre not red`);
+      // Without replacement the box's light would add to the sky the water reflects: green could not fall.
+      if (config.surface === 'water')
+        assert.ok(centreOn[1] < centreOff[1] - 3, `${name}: the water's sky reflection was added to, not replaced`);
+    }
     return report;
   },
   async ssgi() {

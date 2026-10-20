@@ -1,0 +1,98 @@
+{
+ "date": "2026-10-20T17:31:31.464Z",
+ "commit": "af4d3aba",
+ "gpu": {
+  "vendor": "nvidia",
+  "architecture": "ampere",
+  "device": "0x2230",
+  "description": "NVIDIA RTX A6000",
+  "fallback": false
+ },
+ "browser": "chromium 155.0.4283.62",
+ "checks": {
+  "terrain-4x": {
+   "mirror": [
+    439,
+    626,
+    585,
+    811
+   ],
+   "redPixels": 24929,
+   "redOutsideMirror": 0,
+   "black": 0,
+   "centreOn": [
+    108,
+    45,
+    45
+   ],
+   "centreOff": [
+    45,
+    45,
+    45
+   ]
+  },
+  "terrain-1x": {
+   "mirror": [
+    439,
+    626,
+    585,
+    811
+   ],
+   "redPixels": 24929,
+   "redOutsideMirror": 0,
+   "black": 0,
+   "centreOn": [
+    108,
+    45,
+    45
+   ],
+   "centreOff": [
+    45,
+    45,
+    45
+   ]
+  },
+  "water-4x": {
+   "mirror": [
+    439,
+    626,
+    585,
+    811
+   ],
+   "redPixels": 14825,
+   "redOutsideMirror": 12,
+   "black": 0,
+   "centreOn": [
+    102,
+    136,
+    121
+   ],
+   "centreOff": [
+    79,
+    143,
+    128
+   ]
+  },
+  "water-1x": {
+   "mirror": [
+    439,
+    626,
+    585,
+    811
+   ],
+   "redPixels": 14851,
+   "redOutsideMirror": 13,
+   "black": 0,
+   "centreOn": [
+    102,
+    136,
+    121
+   ],
+   "centreOff": [
+    79,
+    143,
+    128
+   ]
+  }
+ }
+}

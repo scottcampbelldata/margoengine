@@ -8,6 +8,7 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { finiteVector } from '@margoengine/math/validate';
+import { margoError } from '../../shared/errors.js';
 import { clipmapGrid } from './grid.js';
 import { terrainVertex, terrainFragment } from './shader.js';
 export { clipmapGrid } from './grid.js';
@@ -37,6 +38,19 @@ export interface TerrainOptions {
   cellSize?: number;
   resolution?: number;
   levels?: number;
+  /** Surface roughness (GGX, 0-1), for the sun's highlight and screen-space reflections (`ssr.add(terrain)`). Default
+   * 0.9; leaving it out keeps the shader as it was. */
+  roughness?: number;
+}
+/** What `setCapture` takes: `@margoengine/post` SSR's material capture hook (its `SSRCapture`), declared here so terrain
+ * does not import post. */
+export interface TerrainCapture {
+  /** Module-scope WGSL for the lit shader `code`: `struct MargoSSR` and `fn margoSSR(n,v,base,metal,rough)->MargoSSR`. */
+  declarations(code: string): string;
+  /** Colour targets of the capture pass, in `MargoSSR` location order. */
+  readonly targets: readonly GPUColorTargetState[];
+  /** This frame's capture pass: these targets and a depth attachment of the context's format; ended by the owner. */
+  begin(): GPURenderPassEncoder;
 }
 export interface TerrainLighting {
   readonly owner?: Engine;
@@ -79,6 +93,9 @@ export class Terrain implements EnginePlugin {
   private readonly lightingEntries: GPUBindGroupEntry[] = [];
   private centerCount = 0;
   private ringCount = 0;
+  private capture?: TerrainCapture;
+  private captureCode = new Map<string, string>();
+  private readonly disposers = new Set<() => void>();
   constructor(readonly options: TerrainOptions) {
     this.validate();
   }
@@ -98,6 +115,7 @@ export class Terrain implements EnginePlugin {
       !Number.isInteger(o.levels ?? 6) ||
       (o.levels ?? 6) < 1 ||
       (o.levels ?? 6) > 12 ||
+      (o.roughness !== undefined && !(o.roughness >= 0 && o.roughness <= 1)) ||
       !Number.isFinite(Math.fround(o.cellSize ?? 1)) ||
       (o.cellSize ?? 1) <= 0 ||
       !Number.isFinite(Math.fround(o.heightScale ?? 100)) ||
@@ -263,7 +281,7 @@ export class Terrain implements EnginePlugin {
       name: this.name,
       order: 1,
       execute: (c) => {
-        if (c.backend === 'webgpu') this.draw(c);
+        if (c.backend === 'webgpu') this.drawRings(c);
       },
     });
   }
@@ -312,9 +330,42 @@ export class Terrain implements EnginePlugin {
     }
     if (changed) this.invalidate();
   }
-  private draw(c: Context): void {
-    let code = terrainVertex + terrainFragment;
+  /** The lit shader: terrain's own (with `roughness`, when given) through every lighting effect. */
+  private shader(): string {
+    const r = this.options.roughness;
+    let code =
+      (r === undefined
+        ? terrainVertex
+        : terrainVertex.replace('o.material=vec4f(0.9,0,1,1)', `o.material=vec4f(${r},0,1,1)`)) + terrainFragment;
     for (const effect of this.lighting) code = effect.shader(code, 1);
+    return code;
+  }
+  /** The lighting group's layout entries for `entries` (shadow maps, comparison samplers, buffers). */
+  private lightingLayout(device: GPUDevice, entries: GPUBindGroupEntry[]): GPUBindGroupLayout {
+    return device.createBindGroupLayout({
+      entries: entries.map((entry) => {
+        const binding = entry.binding,
+          visibility = GPUShaderStage.FRAGMENT;
+        if (binding === 2 || binding === 15 || binding === 29)
+          return {
+            binding,
+            visibility,
+            texture: { sampleType: 'depth' as const, viewDimension: '2d-array' as const },
+          };
+        if (binding === 3 || binding === 16 || binding === 30)
+          return { binding, visibility, sampler: { type: 'comparison' as const } };
+        return {
+          binding,
+          visibility,
+          buffer: {
+            type: binding >= 5 && binding !== 14 ? ('read-only-storage' as const) : ('uniform' as const),
+          },
+        };
+      }),
+    });
+  }
+  private drawRings(c: Context): void {
+    const code = this.shader();
     const key = c.descriptor.multisample?.count + ':' + c.format + ':' + c.descriptor.depthStencil!.format + code;
     let pipeline = this.pipelines.get(key);
     const entries = this.lightingEntries;
@@ -326,30 +377,7 @@ export class Terrain implements EnginePlugin {
     if (!pipeline) {
       const module = c.device.createShaderModule({ code }),
         layouts = [this.layout!];
-      if (entries.length)
-        layouts.push(
-          c.device.createBindGroupLayout({
-            entries: entries.map((entry) => {
-              const binding = entry.binding,
-                visibility = GPUShaderStage.FRAGMENT;
-              if (binding === 2 || binding === 15 || binding === 29)
-                return {
-                  binding,
-                  visibility,
-                  texture: { sampleType: 'depth' as const, viewDimension: '2d-array' as const },
-                };
-              if (binding === 3 || binding === 16 || binding === 30)
-                return { binding, visibility, sampler: { type: 'comparison' as const } };
-              return {
-                binding,
-                visibility,
-                buffer: {
-                  type: binding >= 5 && binding !== 14 ? ('read-only-storage' as const) : ('uniform' as const),
-                },
-              };
-            }),
-          }),
-        );
+      if (entries.length) layouts.push(this.lightingLayout(c.device, entries));
       pipeline = c.device.createRenderPipeline({
         layout: c.device.createPipelineLayout({ bindGroupLayouts: layouts }),
         vertex: {
@@ -388,6 +416,101 @@ export class Terrain implements EnginePlugin {
       this.engine!.stats.drawCalls++;
     }
     pass.end();
+  }
+  /**
+   * Lets a capture hook (`@margoengine/post` SSR: `ssr.add(terrain)`) draw the terrain's material with
+   * `draw(c, 'capture', ...)`: its normal, layer colour and roughness through the hook's `margoSSR`, depth tested
+   * (greater-equal) and written. Returns a remover. Without a hook the terrain draws exactly as before.
+   */
+  setCapture(hook: TerrainCapture): () => void {
+    if (
+      this.disposed ||
+      !hook ||
+      typeof hook.declarations !== 'function' ||
+      typeof hook.begin !== 'function' ||
+      !Array.isArray(hook.targets)
+    )
+      throw new TypeError('Invalid terrain capture hook');
+    this.capture = hook;
+    return () => {
+      if (this.capture === hook) this.capture = undefined;
+    };
+  }
+  /** Calls `callback` once when the terrain is disposed; returns a remover. */
+  onDispose(callback: () => void): () => void {
+    if (typeof callback !== 'function') throw new TypeError('Terrain onDispose needs a function');
+    this.disposers.add(callback);
+    return () => this.disposers.delete(callback);
+  }
+  /** `mode` 'capture': draws the terrain into the capture hook's pass (`setCapture`); `color` and `depth` are unused (the
+   * hook's pass has its own). Does nothing without a hook or after disposal. */
+  draw(c: Context, mode: 'capture', color?: GPUTextureView, depth?: GPUTextureView): void {
+    const hook = this.capture;
+    if (mode !== 'capture' || !hook || this.disposed || !this.rings.length) return;
+    void color;
+    void depth;
+    const lit = this.shader();
+    let code = this.captureCode.get(lit);
+    if (code === undefined) {
+      const declarations = hook.declarations(lit),
+        head = '@fragment fn fragment(i:Output)->@location(0) vec4f {';
+      if (lit.split(head).length !== 2)
+        throw margoError(
+          'unsupported',
+          'Terrain capture needs the terrain fragment entry point once; a lighting effect changed it',
+        );
+      code =
+        declarations +
+        lit.replace(head, 'fn margoShade(i:Output)->vec4f {') +
+        `\n@fragment fn capture(i:Output)->MargoSSR {let n=normalize(i.normal);let base=terrainColor(i.position,n);let v=normalize(frame.eye.xyz-i.position);${declarations.includes('var<private> margoPosition:') ? 'margoPosition=i.position;' : ''}return margoSSR(n,v,base,i.material.y,i.material.x);}\n`;
+      if (this.captureCode.size >= 16) this.captureCode.clear();
+      this.captureCode.set(lit, code);
+    }
+    const entries = this.lightingEntries;
+    entries.length = 0;
+    for (const effect of this.lighting) {
+      const bound = effect.bindings();
+      for (let i = 0; i < bound.length; i++) entries.push(bound[i]);
+    }
+    const key =
+      'capture:' +
+      hook.targets.map((t) => t.format).join(',') +
+      ':' +
+      c.descriptor.multisample?.count +
+      ':' +
+      c.descriptor.depthStencil!.format +
+      code;
+    let pipeline = this.pipelines.get(key);
+    if (!pipeline) {
+      const module = c.device.createShaderModule({ code }),
+        layouts = [this.layout!];
+      if (entries.length) layouts.push(this.lightingLayout(c.device, entries));
+      pipeline = c.device.createRenderPipeline({
+        layout: c.device.createPipelineLayout({ bindGroupLayouts: layouts }),
+        vertex: {
+          module,
+          entryPoint: 'vertex',
+          buffers: [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] }],
+        },
+        fragment: { module, entryPoint: 'capture', targets: hook.targets as GPUColorTargetState[] },
+        multisample: c.descriptor.multisample,
+        depthStencil: {
+          format: c.descriptor.depthStencil!.format,
+          depthWriteEnabled: true,
+          depthCompare: 'greater-equal',
+        },
+      });
+      this.pipelines.set(key, pipeline);
+    }
+    const pass = hook.begin();
+    pass.setPipeline(pipeline);
+    if (entries.length) pass.setBindGroup(1, this.lightingGroup(c.device, pipeline, entries));
+    pass.setVertexBuffer(0, this.vertex!);
+    for (let i = 0; i < this.rings.length; i++) {
+      pass.setBindGroup(0, this.rings[i].group);
+      pass.setIndexBuffer(i ? this.ring! : this.center!, 'uint32');
+      pass.drawIndexed(i ? this.ringCount : this.centerCount);
+    }
   }
   private lightingGroup(device: GPUDevice, pipeline: GPURenderPipeline, entries: GPUBindGroupEntry[]): GPUBindGroup {
     const cached = this.lightingGroups.get(pipeline);
@@ -470,7 +593,12 @@ export class Terrain implements EnginePlugin {
     this.engine?.removePlugin(this.name);
     this.release();
     this.lighting.clear();
+    this.capture = undefined;
+    this.captureCode.clear();
     this.engine = this.device = undefined;
+    const disposers = [...this.disposers];
+    this.disposers.clear();
+    for (const callback of disposers) callback();
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
