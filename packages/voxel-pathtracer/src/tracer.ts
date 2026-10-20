@@ -1229,11 +1229,11 @@ export class VoxelPathTracer implements EnginePlugin {
     if (!o.energyCompensation) flags |= FLAG_NO_COMPENSATION;
     u.set([o.maxBounces, seed >>> 0, flags, s.lightCount], 40);
     const caps = o.bounceLimits;
-    // Scatter in the low 16 bits of the third word, subsurface in the high 16.
+    // Specular and internal reflections in the second word, scatter and subsurface in the third (low and high 16 bits).
     u.set(
       caps
-        ? [caps.diffuse, caps.specular, caps.scatter + caps.subsurface * 0x10000]
-        : [BOUNCE_FREE, BOUNCE_FREE, BOUNCE_FREE * 0x10001],
+        ? [caps.diffuse, caps.specular + caps.internalReflections * 0x10000, caps.scatter + caps.subsurface * 0x10000]
+        : [BOUNCE_FREE, BOUNCE_FREE * 0x10001, BOUNCE_FREE * 0x10001],
       152,
     );
     f[155] = e.groundFade;

@@ -223,7 +223,7 @@ The engine camera is used as is: perspective by default, orthographic (or any af
 | `clamp` (largest luminance a path may add; biased firefly control) | Infinity | above 0 | yes |
 | `toneMapping` | `'neutral'` (Khronos PBR Neutral, Margo's display transform) | `'neutral'`, `'linear'`, `'aces-narkowicz'` (Narkowicz's ACES fit after x0.6) | no |
 | `gamma` (display encoding after tone mapping) | sRGB | 1-5 (power 1 / gamma), or undefined for sRGB | no |
-| `bounceLimits` (events per kind on top of `maxBounces`) | none | `{diffuse?, specular?, scatter?, subsurface?}` each 1-64, or null | yes |
+| `bounceLimits` (events per kind on top of `maxBounces`) | none | `{diffuse?, specular?, scatter?, subsurface?, internalReflections?}` each 1-64 (`internalReflections` 0-64: reflections inside glass kept in full, each later one goes on with probability 1/2), or null | yes |
 | `transparentShadows` (shadow rays through glass and media) | true | boolean; false: any voxel blocks them | yes |
 | `sunSpecular` (the sun lights glossy lobes, is seen in reflections) | true | boolean; false: diffuse lobes only | yes |
 | `sunInMedia` (the sun lights media directly) | true | boolean | yes |

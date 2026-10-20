@@ -493,7 +493,10 @@ export interface TraceGrid {
   onVoxels?: boolean;
 }
 
-/** Compatible addition: per-kind caps of {@link VoxelPathTracerOptions.bounceLimits}, each 1 to 64; absent: no cap. */
+/**
+ * Compatible addition: per-kind caps of {@link VoxelPathTracerOptions.bounceLimits}, each 1 to 64 (`internalReflections`
+ * 0 to 64); absent: no cap.
+ */
 export interface TraceBounceLimits {
   /** Diffuse scattering events (Lambert lobes, the ground). */
   diffuse?: number;
@@ -506,6 +509,11 @@ export interface TraceBounceLimits {
    * of them.
    */
   subsurface?: number;
+  /**
+   * Reflections inside glass (total internal and Fresnel) kept in full, 0 to 64; each one after continues with
+   * probability 1/2, its light lost otherwise (MagicaVoxel's glass: 2). Absent: all kept.
+   */
+  internalReflections?: number;
 }
 
 /**

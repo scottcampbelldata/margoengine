@@ -1287,9 +1287,10 @@ fn radiance(px:vec2u)->Path {
  var medium=0u;var mInst=NONE;
  var lastPdf=0.0;
  var bounces=0u;
- // Events per kind for the caps in f.limits: diffuse, specular, scatter (low 16 bits of z) and scattering in sun-lit
- // media (subsurface, high 16 bits of z).
- var nd=0u;var ns=0u;var nm=0u;var nu=0u;
+ // Events per kind for the caps in f.limits: diffuse, specular (low 16 bits of y), scatter (low 16 bits of z),
+ // scattering in sun-lit media (subsurface, high 16 bits of z); reflections inside glass (high 16 bits of y: kept in
+ // full up to that many, each one after continues with probability 1/2).
+ var nd=0u;var ns=0u;var nm=0u;var nu=0u;var nir=0u;
  var feature=true;var tint=vec3f(1.0);var primary=true;
  var diffuse=false;var focused=false;var C=vec3f(0.0);
  // Distant-light MIS: density of the last vertex that sampled distant lights, Jacobian of the refractions since,
@@ -1463,11 +1464,12 @@ fn radiance(px:vec2u)->Path {
       else if(!same(s.wi,entryDir)){deflections++;deflectOk=deflectOk&&prismAt(mInst);}
      } else if(!(clearGlass(mm)&&prismAt(mInst)&&fresnel(dot(n,-d),mm.ior)>=1.0)){chainOk=false;}
      thr*=s.w;
-     if(s.transmit){medium=0u;mInst=NONE;o=p-off;}else{o=p+off;}
+     if(s.transmit){medium=0u;mInst=NONE;o=p-off;}
+     else{nir++;if(nir>(f.limits.y>>16u)&&rand()<0.5){break;}o=p+off;}
      d=s.wi;lastPdf=0.0;
      if(feature){tint*=s.w;}
      bounces++;
-     if(bounces>f.config.x||ns>=f.limits.y){break;}
+     if(bounces>f.config.x||ns>=(f.limits.y&0xffffu)){break;}
      ns++;
      if(!roulette(&thr,bounces)){break;}
      continue;
@@ -1498,7 +1500,7 @@ fn radiance(px:vec2u)->Path {
   // Light sampled at a glossy metal seen from a diffuse vertex is a caustic too (light focused by the metal).
   if(soft){
    var walk:Walk;
-   let lobes=select(0u,1u,nd<f.limits.x)|select(0u,2u,ns<f.limits.y);
+   let lobes=select(0u,1u,nd<f.limits.x)|select(0u,2u,ns<(f.limits.y&0xffffu));
    let add=thr*direct(select(0u,1u,scatter),m,n,-d,p+off,medium,mInst,&walk,lobes);L+=add;
    let caustic=focused||(diffuse&&!scatter&&m.metal>0.5&&m.alpha<GLOSSY);
    if(caustic){C+=add;}
@@ -1530,7 +1532,7 @@ fn radiance(px:vec2u)->Path {
   let through=s.lobe==3u&&s.transmit&&!inAir&&medium==h.value&&(m.flags&VOXELWISE)!=0u;
   if(through){medium=h.value;mInst=h.inst;o=p-off;continue;}
   if(s.lobe==0u){if(nd>=f.limits.x){done=true;continue;}nd++;}
-  else{if(ns>=f.limits.y){done=true;continue;}ns++;}
+  else{if(ns>=(f.limits.y&0xffffu)){done=true;continue;}ns++;}
   if(s.lobe<=1u){
    // A new chain starts here; light sampling of distant lights ran unless the vertex is inside rough glass.
    let roughGlass=!inAir&&!clearGlass(material(medium));

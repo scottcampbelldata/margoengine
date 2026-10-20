@@ -74,7 +74,13 @@ test('resolveTraceOptions resolves over a base like setOptions; null returns foc
   const a = resolveTraceOptions({ focusDistance: 12, exposure: 1, bounceLimits: { diffuse: 2 } });
   assert.equal(a.focusDistance, 12);
   assert.equal(a.exposure, 1);
-  assert.deepEqual(a.bounceLimits, { diffuse: 2, specular: undefined, scatter: undefined, subsurface: undefined });
+  assert.deepEqual(a.bounceLimits, {
+    diffuse: 2,
+    specular: undefined,
+    scatter: undefined,
+    subsurface: undefined,
+    internalReflections: undefined,
+  });
   const b = resolveTraceOptions({ maxBounces: 4 }, a);
   assert.equal(b.focusDistance, 12, 'left out: kept from the base');
   assert.equal(b.maxBounces, 4);

@@ -311,6 +311,9 @@ export function magicaVoxelLighting(
       scatter: Math.min(64, Math.max(1, Math.round(num(bounce, '_scatter') ?? 5))),
       // Subsurface follows the diffuse cap: 2 d + 1 events (fitted at caps 2 and 4; the specular cap does nothing).
       subsurface: Math.min(64, 2 * diffuseCap + 1),
+      // Light trapped in glass: two reflections inside it in full, each further one half the time (clear glass on a
+      // lit floor, n 1.1-2, at every cap: MagicaVoxel 2-4% darker than full trapping, within 1.1% with this).
+      internalReflections: 2,
     };
   const sunMV = [Math.cos(elevation) * Math.cos(azimuth), Math.cos(elevation) * Math.sin(azimuth), Math.sin(elevation)],
     sunColor = colorOf(o('_inf'), '_k', [1, 1, 1]),

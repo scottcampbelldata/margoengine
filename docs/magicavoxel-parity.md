@@ -46,7 +46,7 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
 | Uniform sky `_uni` | radiance = `_i` x colour, reached only by scattered rays | white diffuse = 0.5 at `_i` 0.5 |
 | Sun `_inf` | irradiance 5 x `_i`; azimuth = yaw - 90 degrees; disk ~0.69 x `_area` rad across | penumbra fits at 0.07 and 0.2 |
 | Sun light | diffuse lobes only (no metal, coat or glass highlights); not in clouds; any voxel blocks it | sun boards |
-| Bounces | diffuse 2, specular 5, scatter 5 by default (`_bounce`) | glass-over-base tiles |
+| Bounces | diffuse 2, specular 5, scatter 5 by default (`_bounce`); inside glass, reflections after the second go on with probability 1/2 (fitted, item 2b) | glass-over-base tiles |
 | Ground | albedo `_color` at z = 0; camera rays fade it into the sky behind it by 1 - e^(-D `_hor` / 2030) at distance D (atmosphere sky: 2250, and the nearest 100 do not fade) | per pixel against our unfaded ground: `_hor` 0.1 and 0.5, cameras 60-180 from their focus, D 40-5000 |
 | Atmosphere sky `_env _mode 1` | single scattering, Rayleigh + Cornette-Shanks Mie (`_mie_g`) + ozone, top 8 km over a 25 000 km planet; densities scale by (e^(3.3 d) - 1) / (e^1.32 - 1); Mie extinction 1.29 - 0.2 d times its scattering; below the horizon the light comes along the horizon's path with the phase of the real direction (the ground fades into it); with the ground off that light fades into a dim surface (item 4b) | 16 panoramas (`test-results/mv-calib/A-pano-*`): mean 0.3-1.0 levels and 97-100% of directions within 3 for 13 of them |
 | Sun under the atmosphere | irradiance 10 x `_i` (not 5) times the air's transmittance along the sun's path | lit scenes at sun 50, 20, 5 degrees: regions within 0-1 level |
@@ -78,8 +78,9 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
 
 - Six perspective scenes with default lighting (`test-results/pt-compare/v2`: diffuse, metal 0.2 and 0.8, glass,
   emitter, cloud), ours at 8192 samples: 99.97, 99.94, 99.85, 99.23, 99.94 and 99.93% of pixels within 3 levels
-  (was 94-96% before the distance-based ground fade, no energy compensation and non-reflective emitters). Glass keeps
-  a 2.5% bias on the floor seen through it (ours brighter) plus MagicaVoxel's noise inside the glass.
+  (was 94-96% before the distance-based ground fade, no energy compensation and non-reflective emitters). Glass:
+  99.3% since the internal-reflection cap (item 2b); where the glass changes the picture (57,221 pixels) MagicaVoxel
+  over ours went 0.9927 -> 0.9988 in linear light; what is left is MagicaVoxel's noise inside the glass.
 - Close oblique view with the camera set exactly in MagicaVoxel and both at 8192 samples: 100.00% within 3 levels.
 - Calibration boards: diffuse, metal, plastic, sun, sky, exposure, ACES: every tile within 3 levels; emitters (with
   `_ldr`) every tile; sun penumbra 99.6-99.9% of pixels within 3; horizon 98-99.5%; metal reflections 96%.
@@ -133,11 +134,14 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
    `G-sky-d4` 53 -> 55 of 56 tiles within 3 (those two tiles 8.5/8.3 -> 2.8 and under), `B-sky-lin` 56 -> 60 of 64,
    `G-sky-lin`, `B-sun60-lin`, `P-sun60-lin` unchanged; `P-sky-lin` 64 -> 61 of 64 (three 6-voxel blocks at 3.3-3.4,
    all within 6).
-2b. Glass over a lit floor: MagicaVoxel is darker by a fixed factor per refractive index (0.997 at 1.1, 0.976 at 1.3,
-   0.959 at 1.5, 0.957 at 2), independent of its bounce caps (checked with specular 10 and diffuse 4): 1-2.7 levels,
-   every tile within 3. Checked (2026-10-20): ending paths reflected back inside the glass (instead of following them)
-   makes the boards far worse (sky board 55 -> 41 of 56 tiles within 3, sun board 52 -> 28), so MagicaVoxel keeps
-   internal reflections; the factor's cause is open.
+2b. Glass over a lit floor: done (2026-10-20, `bounceLimits.internalReflections`). MagicaVoxel was darker by a fixed
+   factor per refractive index (0.997 at 1.1, 0.976 at 1.3, 0.959 at 1.5, 0.957 at 2), independent of its bounce caps
+   (checked with specular 10 and diffuse 4). Ending paths reflected back inside the glass makes the boards far worse
+   (sky board 55 -> 41 of 56 tiles within 3, sun board 52 -> 28), so MagicaVoxel keeps internal reflections, but not
+   all of them: the first two in full and each one after with probability 1/2 fits every board. MagicaVoxel over ours
+   now 0.998 / 0.989 / 0.997 / 0.999 at 1.1 / 1.3 / 1.5 / 2, 0.991 and 0.992 on the white and red tinted glass; the
+   G-sky boards' mean level difference 0.77 -> 0.52; the perspective glass scene 99.2 -> 99.3% within 3, the diffuse
+   one unchanged at 100%.
 3. Fog `_fog_uni`: done (`environment.fog`). MagicaVoxel's fog fades rays by exp(-0.001 x `_d` x distance) toward
    its glow, the glow being the sky and sun light it scatters without shadows; rays leaving the scene see only the
    glow and the sun reaches surfaces only through it; its colour is value / 255 (no 2.2 power); the ground's horizon

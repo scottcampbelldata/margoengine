@@ -121,11 +121,22 @@ export const BOUNCE_FREE = 0xffff;
 function bounceLimits(value: unknown): Required<TraceBounceLimits> | undefined {
   if (value === null) return undefined;
   if (typeof value !== 'object')
-    throw new TypeError('VoxelPathTracer bounceLimits must be {diffuse?, specular?, scatter?, subsurface?} or null');
+    throw new TypeError(
+      'VoxelPathTracer bounceLimits must be {diffuse?, specular?, scatter?, subsurface?, internalReflections?} or null',
+    );
   const o = value as Record<string, unknown>,
     cap = (k: keyof TraceBounceLimits) =>
       o[k] === undefined ? BOUNCE_FREE : whole(o[k], `bounceLimits.${k}`, 1, 64, 'pass 1 to 64, or leave it out');
-  return { diffuse: cap('diffuse'), specular: cap('specular'), scatter: cap('scatter'), subsurface: cap('subsurface') };
+  return {
+    diffuse: cap('diffuse'),
+    specular: cap('specular'),
+    scatter: cap('scatter'),
+    subsurface: cap('subsurface'),
+    internalReflections:
+      o.internalReflections === undefined
+        ? BOUNCE_FREE
+        : whole(o.internalReflections, 'bounceLimits.internalReflections', 0, 64, 'pass 0 to 64, or leave it out'),
+  };
 }
 
 /** Edge bands, or undefined for null. */
@@ -288,6 +299,7 @@ export function publicSettings(s: Settings): ResolvedTraceOptions {
         specular: cap(caps.specular),
         scatter: cap(caps.scatter),
         subsurface: cap(caps.subsurface),
+        internalReflections: cap(caps.internalReflections),
       },
       edges: s.edges && { ...s.edges },
       grid: s.grid && { ...s.grid },

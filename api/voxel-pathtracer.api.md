@@ -79,6 +79,7 @@ export interface TraceBounceLimits {
     specular?: number;
     scatter?: number;
     subsurface?: number;
+    internalReflections?: number;
 }
 
 export interface TraceEdges {
