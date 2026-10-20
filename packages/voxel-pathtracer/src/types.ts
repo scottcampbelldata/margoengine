@@ -57,8 +57,7 @@ export interface TraceMaterial {
   sunlit?: boolean;
   /**
    * Compatible addition: for a `blend` volume, every voxel face inside it picks a lobe again, so light passes straight
-   * through the glass share and the rest scatters at that face, as MagicaVoxel renders partly transparent voxels.
-   * Default false (the volume is one piece of material).
+   * through the glass share and the rest scatters at that face. Default false (the volume is one piece of material).
    */
   voxelwise?: boolean;
   /**

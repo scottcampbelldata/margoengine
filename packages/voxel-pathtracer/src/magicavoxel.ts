@@ -224,7 +224,9 @@ export function magicaVoxelMaterial(id: number, rgb: ArrayLike<number>, attribut
         metalColor,
         metalness: clamp01(num(a, '_metal') ?? 0),
         transmission: Math.sqrt(clamp01(num(a, '_alpha') ?? num(a, '_trans') ?? 0)),
-        voxelwise: true,
+        // As partly transparent glass: picked at the block's faces to the air, what it rests on reached with the glass
+        // share again (B boards: a 3-voxel block looks like a 1-voxel one; sky-lit 34 -> 56 of 64 tiles within 3).
+        contactTransmission: true,
         roughness: rough,
         ior,
         specular: 1,

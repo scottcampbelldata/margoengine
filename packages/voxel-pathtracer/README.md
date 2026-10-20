@@ -562,9 +562,8 @@ PNG and float captures with cancellation; device-loss recovery.
 
 Not done or not verified, stated plainly:
 
-- **MagicaVoxel parity is not complete:** sky-lit blend materials (`_type _blend`) are up to 53 levels off (sun-lit
-  ones match); next to a subsurface block under the sun at diffuse cap 4 some tiles are 7-16 levels off; subsurface
-  is fitted at one density only;
+- **MagicaVoxel parity is not complete:** next to a subsurface block under the sun at diffuse cap 4 some tiles are
+  7-16 levels off; subsurface is fitted at one density only;
   glass over a lit floor is 1-2 levels brighter; under the atmosphere, a view into a low sun matches on 98.7% of
   pixels and very dense air settings by 2-3 levels on average; with the ground off its sky below the horizon is
   within 4.2 levels on average (2-degree blocks), not per pixel (docs/magicavoxel-parity.md).

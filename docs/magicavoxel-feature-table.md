@@ -35,7 +35,7 @@ Legend: **yes**, **no**, **open** (MagicaVoxel has it, Margo does not match it y
 | Cloud (scattering medium) | yes | yes |
 | Subsurface | yes | yes; sky- and sun-lit tops within 1.2-3.8 levels at diffuse caps 2 and 4 (one density measured) |
 | Partly transparent glass | yes | yes, 64 of 64 calibration tiles within 3 levels |
-| Blend material | yes | yes; sun-lit 62 of 64 tiles within 3 levels, sky-lit 34 of 64 (open) |
+| Blend material | yes | yes; 120 of 128 calibration tiles within 3 levels, all within 6 |
 | Rough metal and rough glass that keep their energy | metal: no (measured); glass: not checked | yes (within 0.79% of white in a white sky) |
 | Glass dispersion (rainbow splitting) | not checked | yes |
 | Glowing media (fire, gas) | yes (emissive cloud) | yes |
@@ -102,5 +102,4 @@ Legend: **yes**, **no**, **open** (MagicaVoxel has it, Margo does not match it y
 ## Where MagicaVoxel is ahead
 
 - It is a complete, free editor that artists already use; Margo renders, it does not edit.
-- Sky-lit blend materials are not reproduced yet (sun-lit ones are).
 - Margo is measured on one PC and one browser only.

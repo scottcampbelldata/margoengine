@@ -69,6 +69,11 @@ test('glass: _ior is n - 1, colour through _d absorption only, partial transpare
   near(half.transmission, 0.5);
   assert.equal(half.contactTransmission, true);
   assert.equal(half.voxelwise, undefined);
+  // Blends pick at the block's faces too (a 3-voxel block looks like a 1-voxel one in MagicaVoxel).
+  const blend = magicaVoxelMaterial(6, [255, 60, 60], { _type: '_blend', _trans: '0.5', _metal: '0.5', _ior: '0.3' });
+  assert.deepEqual([blend.type, blend.contactTransmission, blend.voxelwise], ['blend', true, undefined]);
+  near(blend.transmission, Math.SQRT1_2);
+  near(blend.metalness, 0.5);
   near(magicaVoxelMaterial(6, [255, 255, 255], { _type: '_glass', _weight: '1', _ior: '1.5' }).ior, 2.5);
   const scatter = magicaVoxelMaterial(6, [255, 255, 255], {
     _type: '_glass',

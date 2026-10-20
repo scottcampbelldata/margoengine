@@ -119,11 +119,11 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
 2. Partly transparent glass (`_trans` below 1): done (material `contactTransmission`): glass share sqrt(`_trans`) at
    the block's faces to the air, no picks inside, and what it rests on is reached with the share again. P boards
    (`_trans` 0.1-1, heights 1, 2, 3, 6, white and black base): 64 of 64 tiles within 3 levels sky-lit (mean 0.6) and
-   sun-lit (mean 0.4); the G board's `_trans` 0.5 tile from 10 levels to within 3. `_blend` materials (re-pick at
-   every face, `voxelwise`), compared 2026-10-20: sun-lit (`B-sun60-lin`) 62 of 64 tiles within 3 (mean 0.51), but
-   sky-lit (`B-sky-lin`) only 34 of 64 (mean 9.3): the red blends over a white base show far more white light in
-   MagicaVoxel (0.5 transparent: 154/118/118 against our 144/65/65) and the tiles over a black base are 25-29 levels
-   too bright in ours. Open: sky-lit blends.
+   sun-lit (mean 0.4); the G board's `_trans` 0.5 tile from 10 levels to within 3. `_blend` materials: done
+   (2026-10-20). They were re-picked at every voxel face (`voxelwise`); MagicaVoxel's B boards show a 3-voxel blend
+   block looking like a 1-voxel one, so blends now use the same contact rule as partly transparent glass. B boards:
+   sky-lit 34 -> 56 of 64 tiles within 3 (mean 9.3 -> 0.89, all 64 within 6), sun-lit 62 -> 64 of 64. Open: half
+   metal, half transparent blends over a white base are 4-5 levels too dark (8 tiles).
 2b. Glass over a lit floor: MagicaVoxel is darker by a fixed factor per refractive index (0.997 at 1.1, 0.976 at 1.3,
    0.959 at 1.5, 0.957 at 2), independent of its bounce caps (checked with specular 10 and diffuse 4): 1-2 levels.
 3. Fog `_fog_uni`: done (`environment.fog`). MagicaVoxel's fog fades rays by exp(-0.001 x `_d` x distance) toward
@@ -186,8 +186,8 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
 8. Sample-panel toggles with non-default values (MIS-Reflect, MIS-Scatter, TR-Shadow, Shadow, Pixelated, Stochastic,
    Anti-Aliasing) and the `_bounce _energy` value: not compared. The physical defaults of the tracer correspond to
    MIS on and transparent shadows on, but their MagicaVoxel images were never rendered.
-9. Blend materials (`_type _blend`): compared (item 2): sun-lit within 3 on 62 of 64 tiles, sky-lit open. Metal
-   Fresnel at grazing angles (rough red metal: 1-5 levels): not compared beyond the sky boards.
+9. Blend materials (`_type _blend`): done (item 2). Metal Fresnel at grazing angles (rough red metal: 1-5 levels): not
+   compared beyond the sky boards.
 10. Emitter light on the ground near emitters: done (2026-10-20, `pt-compare/v2/emissive`, both at 8192 samples): the
     glow on the ground is 1.0014 x MagicaVoxel's with 99.9% of values within 3 levels (whole image 100.0%); the 6%
     was gone with the non-reflective emitters.
@@ -205,8 +205,8 @@ checked unchanged afterwards). Snapshots in `test-results/mv-calib` (git-ignored
 | `C-proj1.vox` | 1 | 110 | 8192 | 100% |
 | `C-bga.vox` | 1 | 110 | 8192 | alpha identical, colours 99.9% |
 | `C-scale.vox` | 1 | 110 | 8192 | 100% |
-| `B-sky-lin.vox` | 1 | 190 | 1024 | 34 of 64 tiles within 3 (open) |
-| `B-sun60-lin.vox` | 1 | 190 | 1024 | 62 of 64 |
+| `B-sky-lin.vox` | 1 | 190 | 1024 | 56 of 64 tiles within 3 after the blend fix (was 34), all within 6 |
+| `B-sun60-lin.vox` | 1 | 190 | 1024 | 64 of 64 after the blend fix (was 62) |
 | `G-sun60-d4.vox` | 1 | 190 | 1024 | 50 of 56 (neighbours of the subsurface block open) |
 | `G-sky-sc10.vox` | 1 | 190 | 1024 | 55 of 56 |
 
