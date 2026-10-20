@@ -18,6 +18,7 @@
     "@margoengine/quality": "^1.0.0",
     "@margoengine/shadows": "^1.0.0",
     "@margoengine/sky": "^1.0.0",
-    "@margoengine/voxel": "^1.0.0"
+    "@margoengine/voxel": "^1.0.0",
+    "@margoengine/voxel-pathtracer": "^1.0.0"
   }
 }

@@ -29,6 +29,8 @@ The site build (`node scripts/build-site.js`) publishes it as `/voxel/`.
 | V | render distance 4, 8, 12, 16 chunks (128-512 blocks) |
 | T | time of day, in 3-hour steps |
 | H or F3 | hide or show the HUD |
+| P | photo mode on / off: the loaded world path traced |
+| Enter | in photo mode: save a PNG of the view (256 samples, denoised) |
 
 The HUD shows frames per second, position, chunk, render distance, chunks (with quads on the GPU, in view, loaded, still
 to load), quads, quad memory and draw calls (`voxels.stats`).
@@ -46,6 +48,7 @@ to load), quads, quad memory and draw calls (`voxels.stats`).
 | `view` | | Deterministic mode, see below. |
 | `pose` | | With `view`: `x,y,z,yaw,pitch` replaces the view's camera (y 0: eye height over the ground). |
 | `gpuTiming` | | Requests `timestamp-query` so `voxelSandbox.gpuTiming()` can time the voxel passes. |
+| `photo` | | Starts in photo mode (also with `view`). |
 
 ## How it is built
 
@@ -65,6 +68,13 @@ to load), quads, quad memory and draw calls (`voxels.stats`).
 - **Player**: `VoxelCharacter` (fixed 1/120 s steps, eye 1.62 above the feet). The body holds still while the chunk
   under it is not loaded. Breaking and placing use `raycastVoxels` (reach 6); a solid block is never placed inside the
   body, plants need a solid block under them, and breaking a block also breaks a plant or torch standing on it.
+- **Photo mode** (`src/photo.ts`, P): `@margoengine/voxel-pathtracer` traces the loaded world over the game's frame.
+  Each loaded chunk is one traced model (a chunk's cells are in the tracer's own order), sent again only when it
+  changes (at most every 0.3 s); the block textures are the tracer's textures, so faces tile as the game draws them.
+  Leaves let light through their cut-away texels, water and glass refract, glowstone and torches are lights (a torch
+  is a thin glowing stick; tall grass and flowers are left out), and the sky follows the clock: Preetham's daylight
+  and the sun by day, a dark sky and the moon by night, with fog thickening toward the view distance. The view
+  denoises while the camera moves and refines when it stops.
 - **Light, sky, fog and post** live in one function, `setupLighting` in `src/lighting.ts`: `Sky` (Preetham, clouds,
   sun and moon into `engine.lighting`), sun and moon shadows (`Shadows`, 2 cascades to 96 blocks, the voxels added
   with `{static: true}`), a `Clustered` point light on each of the 24 light-emitting blocks (torches, glowstone)

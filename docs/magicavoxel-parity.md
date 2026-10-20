@@ -188,8 +188,12 @@ MagicaVoxel parity work (parity is blocked while it needs the desktop, so this m
    branch (Scott's go-ahead) and then rebased onto it for main; `examples/voxel-sandbox/src/photo.ts` (P toggles, Enter
    saves a PNG, `?photo` starts in it).
 
-Status: 1 and 2 committed (b7d16afd); the texture GPU check passed on every pixel, the cut-out check is written and
-waits for the GPU. 3 builds and passes the sandbox's tests; its screenshots wait for the GPU.
+Status: 1 and 2 committed (b7d16afd); the texture and cut-out GPU checks pass. 3 builds and passes the sandbox's
+tests. Its first screenshots (2026-10-20) showed uniform fog greying out the whole sky (that fog replaces the sky by
+design), so photo mode fades the world into a clear sky as the game's fog does instead (from 60% of the view distance,
+e^-4 at 95%), through two new tracer options: `environment.fadeModels` (the ground fade applied to models) and
+`physicalSky.horizonBelow` (the baked sky keeps its horizon colour below the horizon, where the loaded world ends,
+instead of a black band). Ground, overview and night shots reach 256 samples in 3.6 to 4.1 s at 960 x 540.
 
 Not worth it yet: crossed-card plants (tall grass, flowers, torch shape): new non-cube geometry in the traversal for 4
 blocks. Photo mode leaves grass and flowers out and shows torches as small glowing blocks.

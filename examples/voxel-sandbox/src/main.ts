@@ -15,6 +15,7 @@ import { IndexedDBChunkStore, MemoryChunkStore, VoxelStreamer } from '@margoengi
 import { BLOCK_DEFINITIONS, defineBlocks, HOTBAR } from './blocks.ts';
 import generatorUrl from './generator.worker.ts?worker&url';
 import { type SceneLighting, setupLighting } from './lighting.ts';
+import { PhotoMode } from './photo.ts';
 import { buildShowcase, groundY, showcaseReady } from './showcase.ts';
 import { DEFAULT_SEED } from './terrain.ts';
 import { paintBlockTextures } from './textures.ts';
@@ -85,6 +86,8 @@ interface Sandbox {
   voxels: VoxelRenderer;
   /** The light: sky, shadows, local lights (lighting.ts). */
   scene: SceneLighting;
+  /** The path-traced photo mode (photo.ts; P toggles it). */
+  photo: PhotoMode;
   /** The block under the crosshair. */
   readonly target: VoxelHit | null;
   /** Milliseconds from the streamer's start: first voxel draw, every chunk in range loaded, ready (see README). */
@@ -174,6 +177,16 @@ async function boot(): Promise<void> {
     if (chunk) loaded.set(`${cx},${cy},${cz}`, chunk);
     else loaded.delete(`${cx},${cy},${cz}`);
   });
+  // Photo mode (P): the loaded world path-traced; `?photo` starts in it.
+  const photo = new PhotoMode(engine, {
+    world,
+    blocks,
+    images,
+    chunks: loaded,
+    hours: () => scene.hours,
+    distance: () => distance * 32,
+  });
+  if (params.has('photo')) photo.toggle();
 
   // Player, hotbar, saved state.
   const player = new VoxelCharacter(world),
@@ -290,6 +303,15 @@ async function boot(): Promise<void> {
         scene.hours = (Math.floor(scene.hours / 3) * 3 + 3) % 24;
         toast(`Time ${String(Math.floor(scene.hours)).padStart(2, '0')}:00`);
       } else if (e.code === 'KeyH' || e.code === 'F3') toggleHud();
+      else if (e.code === 'KeyP')
+        toast(photo.toggle() ? 'Photo mode: path traced (P leaves, Enter saves a PNG)' : 'Photo mode off');
+      else if (e.code === 'Enter' && photo.on) {
+        toast('Rendering a photo');
+        photo.save(canvas.width, canvas.height).then(
+          () => toast('Photo saved'),
+          (error) => toast(`The photo failed: ${error instanceof Error ? error.message : String(error)}`),
+        );
+      }
     });
     on('keyup', (e) => keys.delete(e.code));
     on('visibilitychange', () => {
@@ -481,6 +503,7 @@ async function boot(): Promise<void> {
       `chunks ${s.chunks} drawn, ${s.visible} visible, ${loaded.size} loaded, ${streamer.pending} to load`,
       `quads ${s.quads.toLocaleString()}  ${(s.bytes / 1048576).toFixed(1)} MiB  draws ${s.draws}`,
       `seed ${seed}  ${scene.hours.toFixed(1)} h${ready ? '' : '  loading'}`,
+      ...(photo.on ? [`photo mode  ${photo.samples} samples`] : []),
     ]);
     if (!spawned) setOverlay('loading', `Generating the world: ${streamer.pending} chunks to load`);
   }
@@ -518,6 +541,7 @@ async function boot(): Promise<void> {
     const start = performance.now();
     try {
       update(dt);
+      photo.update(dt);
       engine.render({ delta: deterministic ? 0 : dt });
     } catch (error) {
       engine.onError(error);
@@ -567,6 +591,7 @@ async function boot(): Promise<void> {
     streamer,
     voxels,
     scene,
+    photo,
     get target() {
       return hit;
     },
@@ -597,6 +622,7 @@ async function boot(): Promise<void> {
       running = false;
       events.abort();
       void streamer.dispose();
+      photo.dispose();
       scene.dispose();
       engine.dispose();
     });

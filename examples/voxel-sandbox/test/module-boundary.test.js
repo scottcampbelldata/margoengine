@@ -6,7 +6,7 @@ import test from 'node:test';
 test('the sandbox imports public package entries only', async () => {
   const source = new URL('../src/', import.meta.url),
     exported = new Set();
-  for (const name of ['clustered', 'core', 'lines', 'post', 'quality', 'shadows', 'sky', 'voxel']) {
+  for (const name of ['clustered', 'core', 'lines', 'post', 'quality', 'shadows', 'sky', 'voxel', 'voxel-pathtracer']) {
     const manifest = JSON.parse(await readFile(new URL(`../../../packages/${name}/package.json`, import.meta.url)));
     for (const entry of Object.keys(manifest.exports)) exported.add(manifest.name + entry.slice(1));
   }
