@@ -838,8 +838,10 @@ test('spline Booleans on coincident patches: a second copy, pieces of the patch,
   // The bump block against blocks whose tops lie on its own patch, each with its own control points (blossoming the
   // cubic in x over [a, b], which may run past [0, 1]: the same polynomial carried on): the faces on one surface overlap,
   // their edges lying in each other cut them, and kept faces on one patch merge where one patch holds them all. Lifted
-  // 0.1 nm (within the tolerance) the tops count as one surface; lifted 1 um they are cut apart. Volumes to the exact
-  // integrals of the polynomial (8 Gauss points).
+  // 0.1 nm (within the tolerance) the tops count as one surface; lifted 30 nm to 1 um they are cut apart, also within
+  // the corners' own tolerance (1e-7 m), the step between the tops a band as narrow as the lift (traced from finer
+  // samples where the spline edges' chords stray further than that). Volumes to the exact integrals of the polynomial
+  // (8 Gauss points).
   const mm = 0.001,
     volume = (b) => (b.faces.length ? model.massProperties(b).volume / mm ** 3 : 0),
     net = BUMP.map((row, i) => row.map((h, j) => [(10 * i) / 3, (10 * j) / 3, h])),
@@ -894,6 +896,22 @@ test('spline Booleans on coincident patches: a second copy, pieces of the patch,
       area(0, 5) + 50e-3,
       1e-10,
     ],
+    [
+      'carried on to x = 15, 30 nm up',
+      () => load(piece(0.5, 1.5, 3e-5)),
+      area(0, 15) + 100 * 3e-5,
+      area(5, 10),
+      area(0, 5),
+      1e-10,
+    ],
+    [
+      'carried on to x = 15, 100 nm down',
+      () => load(piece(0.5, 1.5, -1e-4)),
+      area(0, 15) - 50 * 1e-4,
+      area(5, 10) - 50 * 1e-4,
+      area(0, 5) + 50 * 1e-4,
+      1e-10,
+    ],
   ])
     for (const [op, want] of [
       ['union', union],
@@ -925,6 +943,22 @@ test('an imported edge a micrometre off its face keeps that gap as its tolerance
     model.box('b', [6 * mm, 5 * mm, 30 * mm], model.frameOf([6 * mm, -1 * mm, -5 * mm], [0, 0, 1], [1, 0, 0])),
   );
   assert.deepEqual(model.validateBody(cut), []);
+  // Lifted 50 and 100 nm, the edge lies 38 and 75 nm off its face: further than the Booleans' tolerance (about 15 nm
+  // here) but within the default tolerance, which it keeps. Where the box's sides cross it the vertices lie as far off
+  // the top, within their own tolerance of the face they bound: the curves the sides cut from the top end there.
+  for (const lift of [5e-5, 1e-4]) {
+    const [near] = model.bodiesFromSTEP(parseSTEP(bumpBlock({ lift }))).bodies;
+    assert.ok(near.edges.every((e) => e.tolerance === 1e-7));
+    for (const op of ['subtract', 'intersect', 'union']) {
+      const out = model.boolean(
+        'c',
+        op,
+        near,
+        model.box('b', [6 * mm, 5 * mm, 30 * mm], model.frameOf([6 * mm, -1 * mm, -5 * mm], [0, 0, 1], [1, 0, 0])),
+      );
+      assert.deepEqual(model.validateBody(out), [], `${lift} ${op}`);
+    }
+  }
 });
 
 test('circle edges a micrometre off their cylinder or plane keep that gap as their tolerance', () => {

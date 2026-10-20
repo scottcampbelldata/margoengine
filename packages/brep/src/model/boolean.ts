@@ -38,6 +38,9 @@ interface Piece {
   tolerance?: number;
   edge?: Edge;
   samples?: XYZ[];
+  /** The longest span between its samples, and how far their middles stray from its curve (strayOf). */
+  longest?: number;
+  stray?: number;
   /** A piece of the other solid lying along this one: the result keeps that one (flip: it runs the other way). */
   alias?: { piece: Piece; flip: boolean };
 }
@@ -90,11 +93,14 @@ const RAYS = [
 /**
  * `op` of solids `a` and `b` into a new solid `name`, with persistent names: faces and edges that come through keep
  * theirs, a face split into several kept pieces gives `<face>#k`, a split edge `<edge>#k`, and intersection edges
- * `<name>/edge:<face of a>|<face of b>#k`; `history` records splits as modifications, intersection edges as
- * generated from their two faces, and what was removed as deleted. Supported: faces on planes,
- * cylinders, cones, spheres, tori and spline surfaces in any position: faces on one surface, edges along edges and
- * vertices on faces meet within 1e-6 of the model (or an imported edge's own tolerance); faces left on one surface
- * facing the same way, and edges split along one curve, are joined. Surfaces touching at a point (two of their curves
+ * `<name>/edge:<face of a>|<face of b>#k`; `history` records splits as modifications, intersection edges as generated
+ * from their two faces, and what was removed as deleted. Supported: faces on planes, cylinders, cones, spheres, tori
+ * and spline surfaces in any position: faces on one surface, edges along edges and vertices on faces meet within 1e-6
+ * of the model, and a vertex lies on the faces it bounds within its own tolerance (an imported edge a little off its
+ * face) but on the other solid's within the 1e-6 alone: faces further apart than that, though within their vertices'
+ * tolerance (1e-7 m), are cut apart, a box 50 nm taller than another beside it keeping its 50 nm step. Faces left on
+ * one surface facing the same way, and edges split along one curve, are joined; a region thinner than its edges'
+ * samples stray from their curves is traced again from finer samples. Surfaces touching at a point (two of their curves
  * crossing there) or along a line (a plane along a cylinder) are cut there, and so are surfaces that come within the
  * 1e-6 of touching; where the result's surface touches itself, its sheets meet at a point or along a line without
  * sharing a vertex or edge there; where they come a little further than that from touching, the curves passing each
@@ -103,8 +109,8 @@ const RAYS = [
  * in a torus's tube, a pipe running on from an elbow) cut neither face along it, exactly or within the tolerance; the
  * curves crossing it cross it at a vertex. A torus is cut round its tube as well as round its axis, and spline faces
  * lying on one surface (copies, pieces of one patch with their own control points) overlap as planes do. Throws a
- * RangeError for what is not supported yet (faces further apart than the tolerance but within their vertices' and
- * edges' own, 1e-7 m) and when the result is not a valid solid.
+ * RangeError for what is not supported yet (a loop going round a torus both ways: a plane touching it twice cuts it
+ * along its Villarceau circles) and when the result is not a valid solid.
  */
 export function boolean(
   name: Name,
@@ -360,6 +366,21 @@ export function boolean(
     }
 
   // --- intersection curves of each pair of faces, kept where they lie inside both -----------------------------------
+  /** The vertices on a face's boundary: its own, and where its edges are cut. */
+  const corners = new Map<Face, Set<Vertex>>(),
+    cornersOf = (f: Face) => {
+      let set = corners.get(f);
+      if (!set) {
+        set = new Set();
+        for (const loop of f.loops)
+          for (const co of loop.coedges) {
+            set.add(original.get(co.start)!);
+            for (const s of splits.get(co.edge) ?? []) set.add(s.vertex);
+          }
+        corners.set(f, set);
+      }
+      return set;
+    };
   for (const { fa, fb, meet } of meets) {
     if (meet.kind === 'none') continue;
     // Faces on one surface: their edges lying in each other cut them (above), and no curve runs between them.
@@ -371,17 +392,27 @@ export function boolean(
         closed = period > 0,
         // Where either face's edges cross the other face, on this curve: the ends of its stretches inside both.
         stops: { t: number; vertex: Vertex }[] = [];
+      /**
+       * Stops at `v` where it lies on the curve: within its own tolerance (an imported edge's vertex a little off its
+       * face), but within the touch of a face it does not bound. A box's corner 50 nm above another box's top lies
+       * within its tolerance of the curve the top cuts from the box's side, but off the top: the curve stops where the
+       * box's edge crosses the top instead, 50 nm below the corner.
+       */
+      const stopAt = (v: Vertex) => {
+        const near = Math.max(touch, v.tolerance);
+        // Most vertices lie nowhere near the curve: a box round it rules them out before a costly projection.
+        if (stops.some((x) => x.vertex === v) || apart(curve, v.point, near)) return;
+        const t = c.parameter(v.point),
+          off = length(sub(c.at(t).slice(0, 3) as XYZ, v.point));
+        if (off > near) return;
+        if (off > touch)
+          for (const f of [fa, fb])
+            if (!cornersOf(f).has(v) && Math.abs(signedDistance(f.surface, v.point)) > touch) return;
+        stops.push({ t, vertex: v });
+      };
       for (const f of [fa, fb])
         for (const loop of f.loops)
-          for (const co of loop.coedges)
-            for (const s of splits.get(co.edge) ?? []) {
-              if (stops.some((x) => x.vertex === s.vertex)) continue;
-              // Most of these lie nowhere near the curve: a box round it rules them out before a costly projection.
-              const near = Math.max(touch, s.vertex.tolerance);
-              if (apart(curve, s.vertex.point, near)) continue;
-              const t = c.parameter(s.vertex.point);
-              if (length(sub(c.at(t).slice(0, 3) as XYZ, s.vertex.point)) <= near) stops.push({ t, vertex: s.vertex });
-            }
+          for (const co of loop.coedges) for (const s of splits.get(co.edge) ?? []) stopAt(s.vertex);
       // Where two curves cross (the surfaces touch tangentially there): a vertex on each, at every pass of a curve that
       // crosses itself. The regions the curves bound meet at that point (at a corner the faces share, fillets meeting;
       // inside both, a hole touching a drill wall from inside).
@@ -395,14 +426,7 @@ export function boolean(
       }
       // Vertices of either face on the curve (a corner touching the other face) break it too.
       for (const f of [fa, fb])
-        for (const loop of f.loops)
-          for (const co of loop.coedges) {
-            const v = original.get(co.start)!,
-              near = Math.max(touch, v.tolerance);
-            if (stops.some((x) => x.vertex === v) || apart(curve, v.point, near)) continue;
-            const t = c.parameter(v.point);
-            if (length(sub(c.at(t).slice(0, 3) as XYZ, v.point)) <= near) stops.push({ t, vertex: v });
-          }
+        for (const loop of f.loops) for (const co of loop.coedges) stopAt(original.get(co.start)!);
       stops.sort((x, y) => x.t - y.t);
       /**
        * A boundary piece of `f` between these vertices that the stretch runs along (its middle `m` on the piece: the
@@ -776,18 +800,65 @@ function splitPinches(faces: Face[]): void {
   }
 }
 
-/** Samples of a piece in 3D from its start to its end (ends exactly at its vertices), shared by both its uses. */
-function samplesOf(p: Piece): XYZ[] {
-  if (p.samples) return p.samples;
+/**
+ * Samples of a piece in 3D from its start to its end (ends exactly at its vertices): 128 spans of a curve, shared by both
+ * its uses; given `within`, its spans halved (six times at most) where their middles stray further than that from it.
+ */
+function samplesOf(p: Piece, within?: number): XYZ[] {
   const c = curveEvaluator(p.curve),
-    n = p.curve.kind === 'line' ? 1 : 128,
-    out: XYZ[] = [];
-  for (let k = 0; k <= n; k++)
-    out.push(
-      k === 0 ? p.start.point : k === n ? p.end.point : (c.at(p.t0 + ((p.t1 - p.t0) * k) / n).slice(0, 3) as XYZ),
-    );
-  p.samples = out;
+    at = (t: number) => c.at(t).slice(0, 3) as XYZ;
+  if (!p.samples) {
+    const n = p.curve.kind === 'line' ? 1 : 128;
+    p.samples = [];
+    for (let k = 0; k <= n; k++)
+      p.samples.push(k === 0 ? p.start.point : k === n ? p.end.point : at(p.t0 + ((p.t1 - p.t0) * k) / n));
+  }
+  if (within === undefined || p.curve.kind === 'line') return p.samples;
+  const s = p.samples,
+    n = s.length - 1,
+    out = [s[0]];
+  const halve = (t0: number, t1: number, a: XYZ, b: XYZ, depth: number) => {
+    const m = at((t0 + t1) / 2);
+    if (depth < 6 && distance(m, halfway(a, b)) > within) {
+      halve(t0, (t0 + t1) / 2, a, m, depth + 1);
+      halve((t0 + t1) / 2, t1, m, b, depth + 1);
+    } else out.push(b);
+  };
+  for (let k = 0; k < n; k++)
+    halve(p.t0 + ((p.t1 - p.t0) * k) / n, p.t0 + ((p.t1 - p.t0) * (k + 1)) / n, s[k], s[k + 1], 0);
   return out;
+}
+
+/** The point halfway between two points. */
+function halfway(a: XYZ, b: XYZ): XYZ {
+  return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
+}
+
+/** The longest span between a piece's samples. */
+function longestOf(p: Piece): number {
+  if (p.longest === undefined) {
+    const s = samplesOf(p);
+    p.longest = 0;
+    for (let k = 0; k + 1 < s.length; k++) p.longest = Math.max(p.longest, distance(s[k], s[k + 1]));
+  }
+  return p.longest;
+}
+
+/** How far the spans between a piece's samples stray from its curve: the most, at their middles. */
+function strayOf(p: Piece): number {
+  if (p.stray === undefined) {
+    const c = curveEvaluator(p.curve),
+      s = samplesOf(p),
+      n = s.length - 1;
+    p.stray = 0;
+    if (p.curve.kind !== 'line')
+      for (let k = 0; k < n; k++)
+        p.stray = Math.max(
+          p.stray,
+          distance(c.at(p.t0 + ((p.t1 - p.t0) * (k + 0.5)) / n).slice(0, 3) as XYZ, halfway(s[k], s[k + 1])),
+        );
+  }
+  return p.stray;
 }
 
 /** The unit direction of travel of a half at its start or its end. */
@@ -876,11 +947,42 @@ function splitFace(f: Face, fuv: FaceUV, halves: Half[]): Omit<Region, 'from'>[]
     if (x !== h) throw new RangeError(`splitting face ${f.name} left an open chain of edges`);
     cycles.push(cycle);
   }
+  // Where a region comes out thinner than its edges' samples stray from their curves (a band 50 nm wide between two
+  // splines, the middles of their 128 spans straying 60 nm), the spans cross and its points lie outside it: the loops
+  // are traced again, their spans halved where they stray more than an eighth of its width (three times at most). A
+  // span strays at most half its length (turning less than half a turn), so only pieces with spans longer than the
+  // region is wide are measured.
+  let within: number | undefined;
+  for (let k = 0; ; k++) {
+    const traced = regionsOf(f, fuv, cycles, within);
+    let next: number;
+    if (traced) {
+      const thin = traced.filter((r) => {
+        const c = r.inside[0].clearance,
+          stray = r.loops.flat().reduce((m, h) => (longestOf(h.piece) < c ? m : Math.max(m, strayOf(h.piece))), 0);
+        return c <= 2 * Math.min(within ?? Infinity, stray);
+      });
+      if (!thin.length) return traced;
+      next = Math.min(...thin.map((r) => r.inside[0].clearance)) / 8;
+    } else next = (within ?? cycles.flat().reduce((m, h) => Math.max(m, strayOf(h.piece)), 0)) / 16;
+    if (k === 3 || !(next > 0)) {
+      if (traced) return traced;
+      throw new RangeError(`splitting face ${f.name}: a loop does not bound a region on its left`);
+    }
+    within = next;
+  }
+}
+
+/**
+ * The regions a face's cycles bound, from samples of their pieces straying `within` of them where given (undefined where
+ * a loop's point inside comes out on its right).
+ */
+function regionsOf(f: Face, fuv: FaceUV, cycles: Half[][], within?: number): Omit<Region, 'from'>[] | undefined {
   // Each cycle in (u', v), continuous along it; with u and v swapped where the cycles go round a torus's tube.
   const cycleSamples = cycles.map((cycle) => {
     const samples: XYZ[] = [];
     for (const h of cycle) {
-      const s = samplesOf(h.piece),
+      const s = samplesOf(h.piece, within),
         seq = h.forward ? s : [...s].reverse();
       samples.push(...seq.slice(0, -1));
     }
@@ -900,13 +1002,12 @@ function splitFace(f: Face, fuv: FaceUV, halves: Half[]): Omit<Region, 'from'>[]
     sides = ([u, v]: UV) => open.map((l) => (leftOf(l, fuv.period, u, v) ? '1' : '0')).join('');
   // Cycles bound one region when a point inside next to each lies on the same side of every cycle.
   const probes = open.map((l) => probe(fuv, l, open, vBounds)),
-    points = probes.map((x) => x[0].point),
     groups = new Map<string, number[]>();
-  points.forEach((q, i) => {
-    const key = sides(q);
-    if (key[i] !== '1') throw new RangeError(`splitting face ${f.name}: a loop does not bound a region on its left`);
+  for (let i = 0; i < probes.length; i++) {
+    const key = sides(probes[i][0].point);
+    if (key[i] !== '1') return undefined;
     groups.set(key, [...(groups.get(key) ?? []), i]);
-  });
+  }
   if (cut !== undefined) {
     const u = open[0].points[0][0],
       low = sides([u, cut + 1e-9 * vPeriod]),

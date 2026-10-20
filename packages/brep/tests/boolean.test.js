@@ -881,19 +881,45 @@ test('Booleans where surfaces touch along a circle and curves cross it: a pipe i
     }
 });
 
+test("Booleans where faces come further apart than the tolerance but within their vertices' own: cut apart", () => {
+  // Two boxes side by side, one 20 nm to 1 um taller or shorter: past the Booleans' tolerance (1e-6 of the model, about
+  // 19 nm here) but within the corners' own (1e-7 m) for the nearer ones. A corner lies within its tolerance of the
+  // faces it bounds, but on the other box's faces only within the touch: the curve the lower top cuts from the taller
+  // box's side stops where that box's edges cross the top, 20-100 nm below its corners, and the step between the tops
+  // is a face of its own. Volumes to the closed forms.
+  for (const d of [2e-5, 3e-5, 5e-5, 1e-4, 1e-3, -3e-5, -1e-4])
+    for (const [op, want] of [
+      ['union', 250 + 50 * Math.max(5, 5 + d) + 50 * (5 + d)],
+      ['intersect', 50 * Math.min(5, 5 + d)],
+      ['subtract', 500 - 50 * Math.min(5, 5 + d)],
+    ]) {
+      const out = boolean(
+          'c',
+          op,
+          box('a', [10 * mm, 10 * mm, 5 * mm], at(0, 0, 0)),
+          box('b', [10 * mm, 10 * mm, (5 + d) * mm], at(5, 0, 0)),
+        ),
+        got = model.massProperties(out).volume / mm ** 3;
+      assert.deepEqual(validateBody(out), [], `${d} ${op}`);
+      assert.ok(Math.abs(got - want) <= 1e-12 * want, `${d} ${op}: ${got} vs ${want}`);
+      if (op === 'union') assert.equal(out.faces.length, 8, `${d} union faces`);
+    }
+});
+
 test('Booleans: what is not supported yet throws a RangeError', () => {
-  // Faces a little further apart than the tolerance (1e-6 of the model, 20 nm here) but within their vertices' and
-  // edges' own (1e-7 m): two boxes side by side, one 50 nm taller. Its top's edge along the other's side and the
-  // other's top corner are taken to meet at the corner but not along the edge. Not supported yet.
+  // A plane through a torus's centre, tilted to touch it twice (sine r / R), cuts it along its two Villarceau circles,
+  // each going round the axis and round the tube: no circle round the tube or the axis cuts the regions open.
+  const s = 5 / 20,
+    c = Math.sqrt(1 - s * s);
   assert.throws(
     () =>
       boolean(
         'c',
-        'union',
-        box('a', [10 * mm, 10 * mm, 5 * mm], at(0, 0, 0)),
-        box('b', [10 * mm, 10 * mm, 5.00005 * mm], at(5, 0, 0)),
+        'intersect',
+        torus('t', 20 * mm, 5 * mm),
+        box('b', [60 * mm, 60 * mm, 30 * mm], frameOf([-30 * mm, -30 * c * mm, -30 * s * mm], [0, -s, c], [1, 0, 0])),
       ),
-    { name: 'RangeError' },
+    { name: 'RangeError', message: /not supported yet/ },
   );
 });
 

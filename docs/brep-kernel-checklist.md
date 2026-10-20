@@ -136,9 +136,28 @@ Every item is done only when all of these hold:
       beyond (6e-10 before). Jubilee survey 145 of 145 (55 s; main 52 s); 84 drilled volumes moved, by 2.6e-7 at most.
       The five that moved most came nearer: subtract + intersect - part on bodies 83, 29, 31, 28 fell from 2.6e-7,
       1.9e-7, 1.2e-7, 5.7e-8 to 1.4e-8, 2e-14, 3e-9, 3e-12; body 121 stays 2e-5 off (its subtract larger than the part,
-      as before). Left: faces further apart than the tolerance but within their vertices' and edges' own 1e-7 m (two
-      boxes side by side, one 30-100 nm taller: refused with a RangeError, on main too), body 121, Codex's corpus check,
-      OpenCascade comparison.
+      as before).
+      Faces apart by more than the tolerance but within their vertices' own, written 2026-10-20
+      (claude/xenodochial-neumann-258b52): a vertex lies on the faces it bounds within its own tolerance (a vertex on an
+      imported edge a little off its face), on the other solid's faces within the Booleans' 1e-6 of the model alone.
+      Before, a curve stopped at any vertex within the vertex's tolerance (1e-7 m unless measured wider) while new
+      points merged only within 1e-6 of the model: two boxes side by side, one 30-100 nm taller, got two vertices 50 nm
+      apart at each end of the curve the lower top cuts from the taller box's side, and the split left an open chain.
+      Now that curve stops where the taller box's edges cross the lower top, and the step is a face of its own. Taking
+      the default tolerance as no gap at all instead (tried first) broke an imported edge 38-75 nm off its face, which
+      keeps the default. A region thinner than its edges' samples stray from their curves (the bump block against its
+      patch carried on and lifted 30-100 nm: a band that wide between two splines whose 128 spans stray 60 nm) is traced
+      again with the spans halved where they stray more than an eighth of its width; its point inside lay outside the
+      band before. Halving every span 4 to 64 times instead (tried first) cost Jubilee 30% (one body 9x: spline faces
+      whose 213 mm edges bend tightly, their spans straying 0.35 mm beside regions 20-100 um wide). Tested: the two
+      boxes 20 nm to 1 um apart either way, all three operations exact (within 1e-12, union 8 faces); the bump block
+      against its patch carried on to x = 15, 30 nm up and 100 nm down, within 1e-10 of the Gauss integrals (in probes,
+      30-100 nm either way on that patch, its middle and the one from x = -4, all within 1.3e-11); the bump block with
+      its front edge 38 and 75 nm off the top cut by a box in all three operations. The RangeError test is now a plane
+      touching a torus twice (its Villarceau circles go round both ways). Jubilee survey 145 of 145 (50 s), every
+      drilled volume identical to 7c0e1d6b's; the drills' Boolean time 5% more (30.4 s against 29.1 s, both in one
+      process).
+      Left: body 121, Codex's corpus check, OpenCascade comparison.
 
 ## Phase 4: blends
 

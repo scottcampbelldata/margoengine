@@ -90,7 +90,8 @@ Where OpenCascade still leads (freeform NURBS intersections, advanced blends, he
   sample the curve (a ray clipped to the control points' box first) and count a root only on the surface itself.
 - Imported edges keep the gap the file's geometry has as their tolerance (Jubilee: 469 edges up to 1.3 micrometres off
   their faces though the file declares 1e-5 mm), up to 10 micrometres or 1e-4 of the part; the Booleans keep an edge's
-  tolerance on its pieces and match crossings within it.
+  tolerance on its pieces and match crossings within it. A vertex lies on the faces it bounds within its own tolerance,
+  on the other solid's faces within the Booleans' 1e-6 of the model only (checklist 3.2).
 - Curves cross a spline surface on every sheet: the surface's parameter cells (two to a knot span, boxes padded by how
   far the surface strays inside them) are met by the curve's pieces and Newton's method runs from each (a ray between a
   thread's turns once saw one turn). Traces seeded on or past a spline's edge are dropped or end there; long rational
