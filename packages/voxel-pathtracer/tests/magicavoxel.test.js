@@ -346,47 +346,42 @@ test('cameras: rCAM focus, pitch, yaw and radius; the lens object gives the fiel
 test('camera modes and lens projections: orth, iso, Pano and stereographic', () => {
   const lens = (proj) => [{ _type: '_lens', _fov: '35', _proj: String(proj) }],
     rcam = (mode) => ({ _mode: mode, _focus: '0 0 4', _angle: '-12 30 0', _radius: '110' }),
-    pers = magicaVoxelCamera(rcam('pers'), lens(0));
-  // Orth: the same view, orthographic, as tall as the perspective view at the focus; the eye one height further back.
-  const orth = magicaVoxelCamera(rcam('orth'), lens(0)),
-    h = 2 * 110 * Math.tan((17.5 * Math.PI) / 180);
+    pers = magicaVoxelCamera(rcam('pers'), lens(0)),
+    back = (pitch) => 110 + 110 / Math.sin((pitch * Math.PI) / 180);
+  assert.deepEqual([pers.options, pers.environment, pers.orthographicHeight], [{}, {}, undefined]);
+  // Orth (measured): the same view, orthographic, as tall as the radius, the ground unfaded; the eye further back by
+  // the height over the sine of the pitch.
+  const orth = magicaVoxelCamera(rcam('orth'), lens(0));
   assert.equal(orth.projection, 'orthographic');
-  near(orth.orthographicHeight, h);
-  near(orth.distance, 110 + h);
+  near(orth.orthographicHeight, 110);
+  near(orth.distance, back(12));
   near3(
     orth.position,
-    [0, 1, 2].map((k) => pers.target[k] + ((pers.position[k] - pers.target[k]) * (110 + h)) / 110),
+    [0, 1, 2].map((k) => pers.target[k] + ((pers.position[k] - pers.target[k]) * back(12)) / 110),
     1e-9,
   );
   near3(orth.up, pers.up, 1e-9);
-  assert.deepEqual(orth.options, {});
-  // Iso: orthographic, looking down at atan(1 / sqrt 2) from the diagonal nearest the stored yaw (30 -> 45).
+  assert.deepEqual([orth.options, orth.environment], [{}, { groundFade: 0 }]);
+  // Iso (measured): orthographic, looking down at atan(1 / sqrt 2) from the stored yaw.
   const iso = magicaVoxelCamera(rcam('iso'), lens(0)),
     view = [0, 1, 2].map((k) => iso.target[k] - iso.position[k]),
-    flat = Math.hypot(view[0], view[2]);
+    flat = Math.hypot(view[0], view[2]),
+    persView = [0, 1, 2].map((k) => pers.target[k] - pers.position[k]);
   assert.equal(iso.projection, 'orthographic');
-  near(iso.orthographicHeight, orth.orthographicHeight);
+  near(iso.orthographicHeight, 110);
   near(Math.atan2(-view[1], flat), Math.atan(Math.SQRT1_2), 1e-9);
-  near(Math.abs(view[0]), Math.abs(view[2]), 1e-9);
-  near(Math.hypot(...view), 110 + h, 1e-9);
-  const isoYaw = (yaw) => {
-    const k = magicaVoxelCamera({ ...rcam('iso'), _angle: `-12 ${yaw} 0` }),
-      v = [0, 1, 2].map((i) => k.target[i] - k.position[i]);
-    return Math.round((Math.atan2(v[0], v[2]) * 180) / Math.PI);
-  };
-  // Stored yaws in one diagonal's quadrant give the same view; the next quadrant the next diagonal.
-  assert.equal(isoYaw(10), isoYaw(80));
-  assert.notEqual(isoYaw(10), isoYaw(100));
+  near(Math.atan2(view[0], view[2]), Math.atan2(persView[0], persView[2]), 1e-9);
+  near(Math.hypot(...view), back((Math.atan(Math.SQRT1_2) * 180) / Math.PI), 1e-9);
   // Lens projection 2 (Pano; also the pano camera mode): the equal-angle panorama, 180 degrees down the image.
   for (const k of [magicaVoxelCamera(rcam('pers'), lens(2)), magicaVoxelCamera(rcam('pano'), lens(0))]) {
     assert.equal(k.projection, 'panorama');
     assert.deepEqual(k.options, { projection: 'panorama', panoramaFit: 'height' });
   }
-  // Lens projection 1: stereographic with the lens field of view; it wins over orth.
+  // Lens projection 1 (SG): stereographic with the lens field of view; it wins over orth.
   const stereo = magicaVoxelCamera(rcam('orth'), lens(1));
   assert.equal(stereo.projection, 'stereographic');
   assert.deepEqual(stereo.options, { projection: 'fisheye', fisheye: { mapping: 'stereographic', fov: 35 } });
-  assert.equal(stereo.orthographicHeight, undefined);
+  assert.deepEqual([stereo.orthographicHeight, stereo.environment], [undefined, {}]);
 });
 
 test('models and placement: voxel (x, y, z) fills MagicaVoxel world t - floor(size / 2) + cell', () => {

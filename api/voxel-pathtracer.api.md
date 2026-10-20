@@ -27,6 +27,7 @@ export interface MagicaVoxelCamera {
     distance: number;
     orthographicHeight?: number;
     options: Partial<Pick<VoxelPathTracerOptions, 'projection' | 'panoramaFit' | 'fisheye'>>;
+    environment: Partial<Pick<TraceEnvironment, 'groundFade'>>;
 }
 
 export type MagicaVoxelDict = Readonly<Record<string, string>> | ReadonlyMap<string, string>;

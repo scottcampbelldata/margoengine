@@ -39,7 +39,7 @@ window.render=async(b64,opt)=>{
  if(cs){engine.camera.position=cam.position.map((v,k)=>cam.target[k]+(v-cam.target[k])*cs);}
  engine.gpu?.addEventListener?.('uncapturederror',(e)=>errors.push(e.error.message));
  const tAttach=performance.now();
- const tracer=PT.VoxelPathTracer.attach(engine,{scene:{revision:1,models:models.filter(Boolean),instances,materials,environment:{...light.environment,...(opt.environment??{})}},
+ const tracer=PT.VoxelPathTracer.attach(engine,{scene:{revision:1,models:models.filter(Boolean),instances,materials,environment:{...light.environment,...cam.environment,...(opt.environment??{})}},
   ...light.options,...cam.options,...(opt.options??{}),seed:1});
  if(opt.orbit){
   // Orbit: the camera turns opt.orbit.step degrees about the target's vertical per frame for opt.orbit.frames frames; the last

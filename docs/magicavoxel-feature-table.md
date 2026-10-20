@@ -35,7 +35,7 @@ Legend: **yes**, **no**, **open** (MagicaVoxel has it, Margo does not match it y
 | Cloud (scattering medium) | yes | yes |
 | Subsurface | yes | yes; sky- and sun-lit tops within 1.2-3.8 levels at diffuse caps 2 and 4 (one density measured) |
 | Partly transparent glass | yes | yes, 64 of 64 calibration tiles within 3 levels |
-| Blend material | yes | yes, not compared yet |
+| Blend material | yes | yes; sun-lit 62 of 64 tiles within 3 levels, sky-lit 34 of 64 (open) |
 | Rough metal and rough glass that keep their energy | metal: no (measured); glass: not checked | yes (within 0.79% of white in a white sky) |
 | Glass dispersion (rainbow splitting) | not checked | yes |
 | Glowing media (fire, gas) | yes (emissive cloud) | yes |
@@ -58,10 +58,10 @@ Legend: **yes**, **no**, **open** (MagicaVoxel has it, Margo does not match it y
 | Feature | MagicaVoxel | Margo |
 | --- | --- | --- |
 | Perspective | yes | yes |
-| Orthographic, isometric | yes | mapped, not compared yet |
+| Orthographic, isometric | yes | yes, 100% of pixels within 3 levels |
 | Panorama lens (Pano) | yes | yes; 99.5% of the sky within 3 levels |
 | Depth of field | yes (no effect seen in its snapshots) | yes, round or polygon bokeh |
-| Fisheye, lens distortion | stereographic (its release notes; not compared) | yes: equidistant, equal-area, stereographic; Brown-Conrady |
+| Fisheye, lens distortion | stereographic (SG; 100% within 3) | yes: equidistant, equal-area, stereographic; Brown-Conrady |
 | Motion blur (objects and camera) | not checked | yes |
 
 ## Image
@@ -71,8 +71,8 @@ Legend: **yes**, **no**, **open** (MagicaVoxel has it, Margo does not match it y
 | Exposure, gamma, ACES film curve | yes | yes, within 1 level |
 | Vignette | yes | yes, within 0.001 |
 | Voxel edges, grid, background colour | yes | yes; edges 99.0-99.8%, grid 92.7-94.6% (camera registered), background 99.92% |
-| Transparent background PNG | yes | yes, not compared yet |
-| Non-cubic voxels (`_scale`) | yes | yes, not compared yet |
+| Transparent background PNG | yes | yes; alpha identical, colours 99.9% within 3 levels |
+| Non-cubic voxels (`_scale`) | yes | yes, 100% within 3 levels |
 | Bloom | in its viewport, not in saved snapshots | through `@margoengine/post` |
 | Denoiser | none in its render settings | yes |
 | Clean image while the camera moves | not measured | yes: history across frames; 2-3x less noise turning slowly, about 2x on glass and clouds turning 0.5 degrees a frame |
@@ -102,6 +102,5 @@ Legend: **yes**, **no**, **open** (MagicaVoxel has it, Margo does not match it y
 ## Where MagicaVoxel is ahead
 
 - It is a complete, free editor that artists already use; Margo renders, it does not edit.
-- Transparent-background PNGs, non-cubic voxels, blend materials, its orthographic and isometric cameras and its
-  lens projection 1 are not compared with MagicaVoxel's images yet.
+- Sky-lit blend materials are not reproduced yet (sun-lit ones are).
 - Margo is measured on one PC and one browser only.

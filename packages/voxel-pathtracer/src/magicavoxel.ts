@@ -68,15 +68,20 @@ export interface MagicaVoxelCamera {
    * the tracer).
    */
   projection: 'perspective' | 'orthographic' | 'panorama' | 'stereographic';
-  /** Distance from the eye to the target (an orthographic eye sits `orthographicHeight` further back than the radius). */
-  distance: number;
   /**
-   * Orthographic projection: the view's height in world units, 2 x radius x tan(fov / 2) (what the perspective view
-   * shows at the focus).
+   * Distance from the eye to the target: the radius, or for an orthographic view further back by its height over the
+   * sine of the pitch (so the view starts above the ground).
    */
+  distance: number;
+  /** Orthographic projection: the view's height in world units, the radius (as MagicaVoxel shows it). */
   orthographicHeight?: number;
   /** Tracer options the projection needs (panorama and stereographic lenses); empty otherwise. */
   options: Partial<Pick<VoxelPathTracerOptions, 'projection' | 'panoramaFit' | 'fisheye'>>;
+  /**
+   * Environment settings the view changes: orthographic views show the ground unfaded (`groundFade` 0, measured);
+   * empty otherwise. Merge it over the lighting helper's environment.
+   */
+  environment: Partial<Pick<TraceEnvironment, 'groundFade'>>;
 }
 
 const get = (d: MagicaVoxelDict | undefined, key: string): string | undefined =>
@@ -474,11 +479,10 @@ const ISO_PITCH = -Math.atan(Math.SQRT1_2);
  * The camera of an rCAM dictionary (`_focus`, `_angle` pitch yaw roll in degrees, `_radius`, `_mode` pers, free,
  * orth, iso or pano). MagicaVoxel renders with the field of view and projection of its lens render object (`_fov`,
  * `_proj`), so pass the file's rOBJ dictionaries as `objects`; the camera's own `_fov` applies only without a `_lens`
- * object. Orth and iso are orthographic, `orthographicHeight` tall; iso looks down at the isometric angle (35.26
- * degrees) from the nearest diagonal (45 + 90 k degrees of yaw). Lens projection 2 (Pano, also `_mode pano`) is the
- * equal-angle panorama (measured: 180 degrees down the image, the same angle per pixel across); 1 is taken as
- * stereographic with the lens field of view (MagicaVoxel's release notes name a stereographic projection; not
- * compared yet).
+ * object. Orth and iso are orthographic, as tall as the radius (measured); iso looks down at the isometric angle
+ * (35.26 degrees) from the stored yaw (measured). Lens projection 2 (Pano, also `_mode pano`) is the equal-angle
+ * panorama (180 degrees down the image, the same angle per pixel across); 1 (SG) is stereographic with the lens field
+ * of view (measured: 100% of pixels within 3 levels at 35 degrees).
  */
 export function magicaVoxelCamera(camera: MagicaVoxelDict, objects: Iterable<MagicaVoxelDict> = []): MagicaVoxelCamera {
   let lens: MagicaVoxelDict | undefined;
@@ -491,15 +495,15 @@ export function magicaVoxelCamera(camera: MagicaVoxelDict, objects: Iterable<Mag
     lensProjection = mode === 'pano' ? 2 : Math.round(num(lens, '_proj') ?? 0),
     iso = mode === 'iso',
     orthographic = (mode === 'orth' || iso) && lensProjection === 0,
-    // Iso: the isometric pitch, the yaw snapped to the nearest diagonal.
-    angle = iso
-      ? [(ISO_PITCH * 180) / Math.PI, 45 + 90 * Math.round(((stored[1] ?? 0) - 45) / 90), stored[2] ?? 0]
-      : stored,
+    // Iso: the isometric pitch, the stored yaw and roll.
+    angle = iso ? [(ISO_PITCH * 180) / Math.PI, stored[1] ?? 0, stored[2] ?? 0] : stored,
     [p, y, r] = angle.map((v) => ((v ?? 0) * Math.PI) / 180),
     offset = [Math.cos(p) * Math.sin(y), -Math.cos(p) * Math.cos(y), -Math.sin(p)],
-    height = 2 * radius * Math.tan((fov * Math.PI) / 360),
-    // An orthographic eye sits one view height further back, so the image's lower edge starts above the ground.
-    distance = orthographic ? radius + height : radius,
+    // MagicaVoxel's orthographic view is as tall as the radius (measured at a 35-degree lens).
+    height = radius,
+    // An orthographic eye sits further back by the view height over the sine of the pitch, so the image's lower edge
+    // starts above the ground (orthographic views do not fade the ground, so the distance changes nothing else).
+    distance = orthographic ? radius + height / Math.max(0.05, Math.abs(Math.sin(p))) : radius,
     eye = [focus[0] + distance * offset[0], focus[1] + distance * offset[1], focus[2] + distance * offset[2]];
   // Screen up: world z made perpendicular to the view, then rolled about it (looking straight down: +y).
   const f = offset.map((v) => -v),
@@ -531,6 +535,7 @@ export function magicaVoxelCamera(camera: MagicaVoxelDict, objects: Iterable<Mag
         : lensProjection === 1
           ? { projection: 'fisheye', fisheye: { mapping: 'stereographic', fov } }
           : {},
+    environment: orthographic ? { groundFade: 0 } : {},
   };
 }
 

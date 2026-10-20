@@ -524,9 +524,10 @@ Numbers on other GPUs are not measured.
 renderObjects)`, `magicaVoxelModel(id, revision, size, xyzi)` and `magicaVoxelMatrix(size, translation, rotation)`
 turn a `.vox` file's palette, MATL materials, rOBJ render settings, rCAM camera and models into this tracer's inputs
 (MagicaVoxel is z-up; tracer = MagicaVoxel (x, z, -y)). `magicaVoxelCamera` reports the projection: orthographic for
-the orth and iso modes (`orthographicHeight` tall, 2 x radius x tan(fov / 2); iso at the isometric angle from the
-nearest diagonal), and for the lens projections tracer `options` (Pano: the panorama fitted to the height; lens
-projection 1: stereographic). `magicaVoxelLighting` also returns the tracer options that
+the orth and iso modes (`orthographicHeight` tall, the radius; iso at the isometric pitch with the stored yaw; merge
+its `environment`, which turns the ground fade off as MagicaVoxel does in these views), and for the lens projections
+tracer `options` (Pano: the panorama fitted to the height; lens projection 1, SG: stereographic); all measured against
+MagicaVoxel's renders (100% of pixels within 3 levels). `magicaVoxelLighting` also returns the tracer options that
 reproduce MagicaVoxel's choices (ACES with gamma 2.2, bounce caps 2/5/5, no transparent shadows, the sun on diffuse
 lobes only and not in media, no energy compensation) and lists the settings it does not reproduce yet. With
 `{look: 'margo'}` it keeps the file's film, colours, sky, sun and fog but traces light physically (sun highlights on
@@ -561,9 +562,9 @@ PNG and float captures with cancellation; device-loss recovery.
 
 Not done or not verified, stated plainly:
 
-- **MagicaVoxel parity is not complete:** a transparent background (`_bg_a`), non-cubic voxels (`_scale`), blend
-  materials, the orth and iso camera modes and lens projection 1 are reproduced but not yet compared with
-  MagicaVoxel's images (its Pano lens is: 99.5% of the sky within 3 levels); subsurface is fitted at one density only;
+- **MagicaVoxel parity is not complete:** sky-lit blend materials (`_type _blend`) are up to 53 levels off (sun-lit
+  ones match); next to a subsurface block under the sun at diffuse cap 4 some tiles are 7-16 levels off; subsurface
+  is fitted at one density only;
   glass over a lit floor is 1-2 levels brighter; under the atmosphere, a view into a low sun matches on 98.7% of
   pixels and very dense air settings by 2-3 levels on average; with the ground off its sky below the horizon is
   within 4.2 levels on average (2-degree blocks), not per pixel (docs/magicavoxel-parity.md).

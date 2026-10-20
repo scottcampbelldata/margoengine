@@ -51,6 +51,10 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
 | Atmosphere sky `_env _mode 1` | single scattering, Rayleigh + Cornette-Shanks Mie (`_mie_g`) + ozone, top 8 km over a 25 000 km planet; densities scale by (e^(3.3 d) - 1) / (e^1.32 - 1); Mie extinction 1.29 - 0.2 d times its scattering; below the horizon the light comes along the horizon's path with the phase of the real direction (the ground fades into it); with the ground off that light fades into a dim surface (item 4b) | 16 panoramas (`test-results/mv-calib/A-pano-*`): mean 0.3-1.0 levels and 97-100% of directions within 3 for 13 of them |
 | Sun under the atmosphere | irradiance 10 x `_i` (not 5) times the air's transmittance along the sun's path | lit scenes at sun 50, 20, 5 degrees: regions within 0-1 level |
 | Camera | rCAM focus, pitch, yaw, radius; field of view from rOBJ `_lens _fov`, not rCAM | camera scenes |
+| Camera `_mode orth` / `iso` | orthographic, the view as tall as the radius (the typed zoom), the ground unfaded; iso sets the pitch to the isometric 35.26 degrees and keeps the stored yaw | `C-orth`, `C-iso` (2026-10-20, 8192 samples): 100% of pixels within 3 levels |
+| Lens `_proj 1` (SG) | stereographic with the lens field of view | `C-proj1`: 100% within 3 |
+| Transparent background `_bg_a` | the sky's alpha 0, the ground opaque | `C-bga`: alpha identical to ours (124,800 transparent pixels each), colours 99.9% within 3 |
+| Voxel `_scale` | the scene scaled about the origin, the camera unchanged | `C-scale`: 100% within 3 |
 | Lens `_proj 2` (Pano) | equal-angle panorama: 180 degrees down the image and the same 0.225 degrees per pixel across at 960 x 800 (216 degrees; 360 on a 2:1 image) | `A-pano-e5`: a sun 90 degrees off the view lands 400 px from the centre; our render with `panoramaFit: 'height'`: 99.53% of the sky half within 3 levels |
 | Missing MATL keys | read as 0 (roughness 0, IOR 1, metal 0, emission 0), specular 1 | MagicaVoxel's own panel |
 | Legacy keys | `_weight` wins (metalness, transparency, emission); `_spec` = specular - 1; `_ior` is always n - 1; cloud `_weight` reads as density 0.1 | panel readings |
@@ -107,14 +111,19 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
    Every tile of the sky boards is within 6 except `G-sky-d4`'s partly transparent glass (`_trans` 0.5 and 0.25,
    8.5 levels, unchanged: MagicaVoxel brightens them with the diffuse cap). Cost: under the sun the absorbing cloud
    diagonal to the block went from 1.5 to 4.3 levels and the emissive cloud from 5.1 to 5.6 (the blue cloud beside it
-   from 4.9 to 4.5). Open: only `_d` 0.05 and a white block on a black base were measured; whether the extinction
-   scales linearly with `_d`, what the scatter cap does to `_sss`, and a sun-lit render at diffuse cap 4 need
-   MagicaVoxel renders (listed under "Renders needed").
+   from 4.9 to 4.5). Rendered by MagicaVoxel 2026-10-20: at scatter cap 10 (`G-sky-sc10`) 55 of 56 tiles within 3
+   (the subsurface tiles unchanged, so its events ignore the scatter cap, as modelled); under the sun at diffuse cap
+   4 (`G-sun60-d4`) 50 of 56, the subsurface block within 3.2 but the subsurface glass 9.2 levels too bright and the
+   neighbours too dark (blue cloud 16, absorbing cloud 9.9, emissive cloud 7.1). Open: those neighbours at cap 4, and
+   only `_d` 0.05 measured.
 2. Partly transparent glass (`_trans` below 1): done (material `contactTransmission`): glass share sqrt(`_trans`) at
    the block's faces to the air, no picks inside, and what it rests on is reached with the share again. P boards
    (`_trans` 0.1-1, heights 1, 2, 3, 6, white and black base): 64 of 64 tiles within 3 levels sky-lit (mean 0.6) and
-   sun-lit (mean 0.4); the G board's `_trans` 0.5 tile from 10 levels to within 3. Open: `_blend` materials still
-   re-pick at every face (`voxelwise`); not compared yet (B boards: our side rendered, MagicaVoxel's needed).
+   sun-lit (mean 0.4); the G board's `_trans` 0.5 tile from 10 levels to within 3. `_blend` materials (re-pick at
+   every face, `voxelwise`), compared 2026-10-20: sun-lit (`B-sun60-lin`) 62 of 64 tiles within 3 (mean 0.51), but
+   sky-lit (`B-sky-lin`) only 34 of 64 (mean 9.3): the red blends over a white base show far more white light in
+   MagicaVoxel (0.5 transparent: 154/118/118 against our 144/65/65) and the tiles over a black base are 25-29 levels
+   too bright in ours. Open: sky-lit blends.
 2b. Glass over a lit floor: MagicaVoxel is darker by a fixed factor per refractive index (0.997 at 1.1, 0.976 at 1.3,
    0.959 at 1.5, 0.957 at 2), independent of its bounce caps (checked with specular 10 and diffuse 4): 1-2 levels.
 3. Fog `_fog_uni`: done (`environment.fog`). MagicaVoxel's fog fades rays by exp(-0.001 x `_d` x distance) toward
@@ -158,48 +167,48 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
    about 0.05 voxels short of the typed radius), which moves 0.4-pixel lines by up to 0.2 px at the image's edges;
    the rest is the thin lines' sampling noise. Edges with the same correction: 99.1-99.8%. Transparent background (`_bg_a`): done
    as `capture({transparent: true})` (RGBA PNG; alpha = camera-ray coverage, the ground opaque); voxel `_scale`:
-   done as `voxelScale` for `magicaVoxelMatrix` (the scene scaled about the origin, the camera unchanged). Neither is
-   compared yet (scenes `C-bga`, `C-scale` in `mv-calib`; our side rendered 2026-10-20): whether MagicaVoxel's ground
-   stays opaque and whether its camera follows the scale are open.
-7. Camera modes (2026-10-20): mapped in `magicaVoxelCamera` and rendered by the harness (`mv-vox.html` now uses the
-   camera's projection; `C-orth`, `C-iso` and `C-proj1` were byte-identical before). Orth and iso: orthographic,
-   2 x radius x tan(fov / 2) tall (what the perspective view shows at the focus), the eye one view height further back
-   than the radius so the lower edge starts above the ground; iso looks down at the isometric angle (35.26 degrees)
-   from the diagonal nearest the stored yaw (`C-iso`: 45 degrees). Lens `_proj 2` (Pano; also `_mode pano`): the
-   tracer's panorama with `panoramaFit: 'height'` (new), measured on `A-pano-e5`. Lens `_proj 1`: stereographic with
-   the lens field of view (new fisheye mapping `'stereographic'`, filling the frame), taken from MagicaVoxel's release
-   notes, which name a stereographic projection. Unit tests in `tests/magicavoxel.test.js`; the GPU `projections`
-   check puts 3 height-fitted panorama and 4 stereographic markers within 0.08 px of their formulas. Open: the
-   orthographic extent, the iso angle and `_proj 1` are inferences until MagicaVoxel's renders of `C-orth`, `C-iso` and
-   `C-proj1` are compared (listed under "Renders needed"); depth of field (`_aperture`) never showed in MagicaVoxel
-   snapshots: find what enables it.
+   done as `voxelScale` for `magicaVoxelMatrix` (the scene scaled about the origin, the camera unchanged). Both
+   compared 2026-10-20: `C-bga` alpha identical (MagicaVoxel keeps the ground opaque too), colours 99.9% within 3;
+   `C-scale` 100%.
+7. Camera modes: done (2026-10-20, measured). `magicaVoxelCamera` maps them and the harness renders them
+   (`mv-vox.html` uses the camera's projection; `C-orth`, `C-iso` and `C-proj1` were byte-identical before). Orth and
+   iso: orthographic, as tall as the radius (registration of `C-orth`: best height 110 = the zoom, against our first
+   guess 2 x radius x tan(fov / 2) = 69.4), with the ground unfaded (MagicaVoxel's orthographic ground is one flat 73
+   from top to bottom; the camera result carries `environment.groundFade` 0), the eye pulled back by the height over the
+   sine of the pitch so the view starts above the ground. Iso: pitch -35.26 degrees, the stored yaw kept (MagicaVoxel's
+   panel showed -35.3 and the file's yaw; our first guess snapped it to a diagonal). Lens `_proj 1` is MagicaVoxel's
+   "SG" (Pers, SG, Pano in its lens panel): stereographic with the lens field of view, as guessed. Lens `_proj 2`
+   (Pano; also `_mode pano`): the tracer's panorama with `panoramaFit: 'height'`. Our renders against MagicaVoxel's
+   (8192 samples): `C-orth` 94.9% -> 100% within 3, `C-iso` 90.7% -> 100%, `C-proj1` 100%. Unit tests in
+   `tests/magicavoxel.test.js`; the GPU `projections` check puts 3 height-fitted panorama and 4 stereographic markers
+   within 0.08 px of their formulas. Open: the orthographic height is measured at a 35-degree lens only; depth of field
+   (`_aperture`) never showed in MagicaVoxel snapshots: find what enables it.
 8. Sample-panel toggles with non-default values (MIS-Reflect, MIS-Scatter, TR-Shadow, Shadow, Pixelated, Stochastic,
    Anti-Aliasing) and the `_bounce _energy` value: not compared. The physical defaults of the tracer correspond to
    MIS on and transparent shadows on, but their MagicaVoxel images were never rendered.
-9. Blend materials (`_type _blend`) and metal Fresnel at grazing angles (rough red metal: 1-5 levels): not compared
-   beyond the sky boards.
+9. Blend materials (`_type _blend`): compared (item 2): sun-lit within 3 on 62 of 64 tiles, sky-lit open. Metal
+   Fresnel at grazing angles (rough red metal: 1-5 levels): not compared beyond the sky boards.
 10. Emitter light on the ground near emitters: done (2026-10-20, `pt-compare/v2/emissive`, both at 8192 samples): the
     glow on the ground is 1.0014 x MagicaVoxel's with 99.9% of values within 3 levels (whole image 100.0%); the 6%
     was gone with the non-reflective emitters.
 
-## Renders needed from MagicaVoxel
+## MagicaVoxel renders, 2026-10-20
 
-Waiting for Scott's word that the desktop is free (MagicaVoxel is not driven while Codex may be using it). All scenes
-are in `test-results/mv-calib` (written by `boards.cjs` and `lookscenes.cjs` from the tools folder; our side of each is
-already rendered). Procedure as under "How to compare": image 960 x 800, open the file, camera slot 1, then L, then
-type the zoom distance; snapshot to `<name>-mv.png` in the same folder.
+Scott freed the desktop; all nine were rendered (MagicaVoxel 0.99.7.2, 960 x 800, open the file, camera slot 1, L,
+type the zoom; answer No when it asks to save the camera change, so it never writes our scene files; the files were
+checked unchanged afterwards). Snapshots in `test-results/mv-calib` (git-ignored).
 
-| File | What it settles | Slot | Zoom | Samples |
+| File | Slot | Zoom | Samples | Result (ours against it) |
 | --- | --- | --- | --- | --- |
-| `C-orth.vox` | orthographic extent (`_mode orth`) | 1 | 110 | 8192 |
-| `C-iso.vox` | iso angle and extent (`_mode iso`, stored angle -12 30) | 1 | 110 | 8192 |
-| `C-proj1.vox` | lens projection 1 (taken as stereographic) | 1 | 110 | 8192 |
-| `C-bga.vox` | transparent background (`_bg_a`): keep the snapshot's alpha | 1 | 110 | 8192 |
-| `C-scale.vox` | non-cubic voxels (`_scale 1 1 2`) and the camera under them | 1 | 110 | 8192 |
-| `B-sky-lin.vox` | blend materials, sky-lit | 1 | 190 | 1024 |
-| `B-sun60-lin.vox` | blend materials, sun-lit | 1 | 190 | 1024 |
-| `G-sun60-d4.vox` | subsurface under the sun at diffuse cap 4 | 1 | 190 | 1024 |
-| `G-sky-sc10.vox` | subsurface and clouds at scatter cap 10 | 1 | 190 | 1024 |
+| `C-orth.vox` | 1 | 110 | 8192 | 100% within 3 after the fix (was 94.9%) |
+| `C-iso.vox` | 1 | 110 | 8192 | 100% after the fix (was 90.7%) |
+| `C-proj1.vox` | 1 | 110 | 8192 | 100% |
+| `C-bga.vox` | 1 | 110 | 8192 | alpha identical, colours 99.9% |
+| `C-scale.vox` | 1 | 110 | 8192 | 100% |
+| `B-sky-lin.vox` | 1 | 190 | 1024 | 34 of 64 tiles within 3 (open) |
+| `B-sun60-lin.vox` | 1 | 190 | 1024 | 62 of 64 |
+| `G-sun60-d4.vox` | 1 | 190 | 1024 | 50 of 56 (neighbours of the subsurface block open) |
+| `G-sky-sc10.vox` | 1 | 190 | 1024 | 55 of 56 |
 
 ## Exceed MagicaVoxel
 
