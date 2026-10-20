@@ -135,7 +135,7 @@ ssr.enabled = false; // pass-through, no recompiles
 
 ## Ground-truth ambient occlusion: `GTAO`
 
-`@margoengine/post/gtao` (10,521 B min+gzip, its own entry; it carries SSAO and the stack) is GTAO, written from
+`@margoengine/post/gtao` (10,531 B min+gzip, its own entry; it carries SSAO and the stack) is GTAO, written from
 Jimenez, Wu, Pesce and Jarabo 2016 ("Practical Real-Time Strategies for Accurate Indirect Occlusion"). It is an HDR
 `PostStack` effect; `GTAO.attach(engine, options)` runs it alone in its own one-effect stack (tone mapped like SSAO alone).
 
@@ -175,7 +175,7 @@ gtao.options.slices = 1;        // options and `enabled` are read every frame
 
 ## Screen-space global illumination: `SSGI`
 
-`@margoengine/post/ssgi` (9,717 B min+gzip, its own entry; it carries the stack) adds one bounce of diffuse light: light
+`@margoengine/post/ssgi` (9,801 B min+gzip, its own entry; it carries the stack) adds one bounce of diffuse light: light
 that lit surfaces on screen throw onto their neighbours (a red wall tints the floor in front of it). It is an HDR
 `PostStack` effect; `SSGI.attach(engine, options)` runs it alone in its own one-effect stack.
 

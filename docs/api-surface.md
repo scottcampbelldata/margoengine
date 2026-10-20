@@ -57,7 +57,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/oit | `.` 2 |  |  | 2,210 |
 | @margoengine/physics | `.` 35 | 20 |  | 11,459 |
 | @margoengine/points | `.` 42 | 3 |  | 15,647 |
-| @margoengine/post | `.` 22, `./bloom` 3, `./ssao` 3, `./scene-fade` 4, `./stack` 1, `./fxaa` 1, `./decals` 4, `./ssr` 4, `./gtao` 2, `./ssgi` 2, `./motion-blur` 3, `./lens-flare` 2 | 11 |  | 18,471 |
+| @margoengine/post | `.` 22, `./bloom` 3, `./ssao` 3, `./scene-fade` 4, `./stack` 1, `./fxaa` 1, `./decals` 4, `./ssr` 4, `./gtao` 2, `./ssgi` 2, `./motion-blur` 3, `./lens-flare` 2 | 11 |  | 26,251 |
 | @margoengine/procedural | `.` 26, `./noise` 10, `./lsystem` 12, `./voronoi` 15 |  |  | 7,236 |
 | @margoengine/quality | `.` 17, `./warm` 3 | 1 |  | 1,623 |
 | @margoengine/react | `.` 102, `./kit` 29, `./post` 12, `./physics` 16, `./xr` 12 | 31 |  | 20,966 |
@@ -72,8 +72,8 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/splines | `.` 3 |  |  | 1,299 |
 | @margoengine/staging | `.` 4 |  |  | 4,890 |
 | @margoengine/stats | `.` 3 |  |  | 4,678 |
-| @margoengine/taa | `.` 7 |  |  | 8,241 |
-| @margoengine/terrain | `.` 13 | 3 |  | 8,880 |
+| @margoengine/taa | `.` 7 |  |  | 8,398 |
+| @margoengine/terrain | `.` 13 | 3 |  | 9,513 |
 | @margoengine/text | `.` 34 | 2 |  | 14,139 |
 | @margoengine/tonemap | `.` 5 |  |  | 7,009 |
 | @margoengine/toon | `.` 3 |  |  | 1,338 |
@@ -86,7 +86,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/viewcube | `.` 5 |  |  | 3,227 |
 | @margoengine/voxel | `.` 14, `./query` 7, `./codec` 8, `./stream` 5, `./generate` 5, `./mesher` 11, `./light` 3, `./vox` 9, `./physics` 2, `./render` 8 | 78 |  | 4,808 |
 | @margoengine/voxel-pathtracer | `.` 40 |  |  | 58,274 |
-| @margoengine/water | `.` 7 |  |  | 15,392 |
+| @margoengine/water | `.` 7 |  |  | 16,094 |
 | @margoengine/webgl | `.` 3 |  |  | 2,593 |
 | @margoengine/wfc | `.` 3, `./overlapping` 5 |  |  | 1,622 |
 | @margoengine/xr | `.` 19 |  |  | 4,879 |

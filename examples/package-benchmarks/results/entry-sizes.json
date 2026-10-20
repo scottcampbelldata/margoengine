@@ -1,6 +1,6 @@
 {
-  "commit": "85ea3a15",
-  "dirty": false,
+  "commit": "4732047b",
+  "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 50814,
@@ -578,16 +578,16 @@
     },
     "@margoengine/post": {
       ".": {
-        "raw": 65277,
-        "gzip": 18471
+        "raw": 99726,
+        "gzip": 26251
       },
       "./bloom": {
         "raw": 17273,
         "gzip": 5687
       },
       "./ssao": {
-        "raw": 26172,
-        "gzip": 8239
+        "raw": 26390,
+        "gzip": 8315
       },
       "./scene-fade": {
         "raw": 5816,
@@ -606,8 +606,24 @@
         "gzip": 4118
       },
       "./ssr": {
-        "raw": 25916,
-        "gzip": 8786
+        "raw": 26600,
+        "gzip": 9068
+      },
+      "./gtao": {
+        "raw": 34129,
+        "gzip": 10531
+      },
+      "./ssgi": {
+        "raw": 29343,
+        "gzip": 9801
+      },
+      "./motion-blur": {
+        "raw": 20198,
+        "gzip": 6861
+      },
+      "./lens-flare": {
+        "raw": 16257,
+        "gzip": 5776
       }
     },
     "@margoengine/procedural": {
@@ -772,14 +788,14 @@
     },
     "@margoengine/taa": {
       ".": {
-        "raw": 27706,
-        "gzip": 8241
+        "raw": 28359,
+        "gzip": 8398
       }
     },
     "@margoengine/terrain": {
       ".": {
-        "raw": 25757,
-        "gzip": 8880
+        "raw": 28601,
+        "gzip": 9513
       }
     },
     "@margoengine/text": {
@@ -928,8 +944,8 @@
     },
     "@margoengine/water": {
       ".": {
-        "raw": 49696,
-        "gzip": 15392
+        "raw": 52746,
+        "gzip": 16094
       }
     },
     "@margoengine/webgl": {
