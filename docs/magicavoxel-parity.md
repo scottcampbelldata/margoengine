@@ -15,7 +15,12 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
 - Calibration tools: `packages/voxel-pathtracer/tests/magicavoxel/` (copy them to `test-results/mv-calib` and run from
   there; that folder also holds the `.vox` scenes and both renderers' PNGs).
   - `boards.cjs` and `xboards.cjs` write the calibration scenes (top-down tile boards: diffuse, metal, plastic, glass,
-    clouds, emitters; sun penumbra, horizon, depth of field, bloom, metal roughness, LDR emitters, emissive media).
+    clouds, emitters, blend materials; sun penumbra, horizon, depth of field, bloom, metal roughness, LDR emitters,
+    emissive media) with `voxwrite.cjs`, our writer of the public .vox format. Every scene starts from `defaults.vox`,
+    which `node voxwrite.cjs` writes from its table of default render settings and cameras (`DEFAULT_RENDER`,
+    `DEFAULT_CAMERAS`; 2026-10-20, replacing a file MagicaVoxel had saved). Its default `_ibl _path` is empty
+    (MagicaVoxel's names an image it ships); otherwise the regenerated scenes equal the earlier ones chunk for chunk
+    (52 checked), so the MagicaVoxel renders on disk still match them.
   - MagicaVoxel side: set the sample count once (double-click the number right of the chart icon, End, Backspace,
     type 8192, Enter; 1024 leaves visible noise). Open the file (Ctrl+O), click camera slot 1 then L, then type the
     exact distance into the Zoom field (double-click, End, Backspace, value, Enter): its camera glides to a loaded slot
