@@ -69,6 +69,27 @@ function quad(f: (t: number) => Float64Array, a: number, b: number, pieces: numb
   }
 }
 
+/**
+ * Integral from a to b (either order) split at the knots between them, where a spline's derivatives may jump: at least
+ * `pieces` parts in all, as many to each knot span. Without knots (or with very many between), `pieces` equal parts.
+ */
+function quadKnots(
+  f: (t: number) => Float64Array,
+  a: number,
+  b: number,
+  knots: readonly number[],
+  pieces: number,
+  into: Float64Array,
+) {
+  const lo = Math.min(a, b),
+    hi = Math.max(a, b),
+    inside = knots.filter((k) => k > lo && k < hi);
+  if (knots.length < 2 || inside.length > 512) return quad(f, a, b, pieces, into);
+  const cuts = [a, ...(a < b ? inside : inside.reverse()), b],
+    per = Math.max(1, Math.ceil(pieces / (cuts.length - 1)));
+  for (let i = 0; i + 1 < cuts.length; i++) quad(f, cuts[i], cuts[i + 1], per, into);
+}
+
 /** Pieces for a parameter span: a sixteenth of a turn on an angle, one on a straight (linear) parameter. */
 const piecesOf = (span: number, angular: boolean) =>
   angular ? Math.max(1, Math.ceil(Math.abs(span) / (Math.PI / 8))) : 1;
@@ -139,28 +160,47 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
   const covered: { side: 1 | -1; v: number }[] = [];
   for (const side of [1, -1] as const) {
     const pv = s.pole(side);
-    if (pv === undefined) continue;
+    // A pole a loop runs through is on the face's boundary: its line is integrated along with the loop below.
+    if (pv === undefined || fuv.poleLines.some((l) => l.v === pv)) continue;
     if (fuv.contains(s.at(0, pv).slice(0, 3) as XYZ)) covered.push({ side, v: pv });
   }
   const vStar = covered.length ? covered[0].v : s.vPeriod ? fuv.vCut : fuv.box[2],
     inner = new Float64Array(K);
-  /** G(u', v): the integral of the integrands from v* to v at u'. */
+  // A spline's knots, in (u', v). One swept along many more spans of v than across u (a thread's flank: a ruling swept
+  // round dozens of turns) is integrated across u' inside and along v outside, the short way, when nothing about it
+  // wraps or collapses.
+  const [uKnots, vKnots] = s.breaks?.() ?? [[], []],
+    uKnotsP = fuv.flip ? uKnots.map((k) => -k).reverse() : uKnots,
+    across =
+      uKnots.length >= 2 &&
+      vKnots.length > uKnots.length &&
+      !s.uPeriod &&
+      !s.vPeriod &&
+      s.pole(1) === undefined &&
+      s.pole(-1) === undefined &&
+      s.uPole?.(1) === undefined &&
+      s.uPole?.(-1) === undefined,
+    uStar = fuv.box[0];
+  /** G(u', v): the integral of the integrands from v* to v at u' (across: from u* to u' at v). */
   const G = (up: number, v: number): Float64Array => {
     inner.fill(0);
-    quad((t) => integrand(up, t), vStar, v, vPieces(face, s, v - vStar), inner);
+    if (across) quadKnots((t) => integrand(t, v), uStar, up, uKnotsP, 4, inner);
+    else quadKnots((t) => integrand(up, t), vStar, v, vKnots, vPieces(face, s, v - vStar), inner);
     return inner;
   };
 
-  // Along every loop: - integral of G du', with (u', v) followed continuously from FaceUV's own start of the loop.
-  const step = new Float64Array(K);
+  // Along every loop: - integral of G du' (across: + integral of G dv), with (u', v) followed continuously from
+  // FaceUV's own start of the loop. Edges are cut where they turn a sixteenth of a turn: the sampler weighs turning only
+  // on pieces longer than a hundredth of its deflection, so the deflection is the face's size (finite), not infinite.
+  const size = faceSize(face),
+    step = new Float64Array(K);
   face.loops.forEach((loop, li) => {
     let hint: UV = fuv.loops[li].points[0] ?? fuv.near(loop.coedges[0].start.point);
     for (const co of loop.coedges) {
       const curve = curveEvaluator(co.edge.curve),
         [t0, t1] = edgeParameters(co.edge, 1),
         [a, b] = co.forward ? [t0, t1] : [t1, t0],
-        // Breaks where the curve turns a sixteenth of a turn (tiny deflection: only the turn matters here).
-        breaks = curve.sample(a, b, Number.POSITIVE_INFINITY, Math.PI / 8);
+        breaks = curve.sample(a, b, size, Math.PI / 8);
       for (let i = 0; i + 1 < breaks.length; i++) {
         step.fill(0);
         quad(
@@ -168,10 +208,11 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
             const p = curve.at(t),
               uv = fuv.near(p.slice(0, 3) as XYZ, hint);
             hint = uv;
-            const du = uDot(s, flip, uv, p),
+            const [du, dv] = rates(s, flip, uv, p),
               gv = G(uv[0], uv[1]),
-              r = new Float64Array(K);
-            for (let k = 0; k < K; k++) r[k] = -gv[k] * du;
+              r = new Float64Array(K),
+              w = across ? dv : -du;
+            for (let k = 0; k < K; k++) r[k] = gv[k] * w;
             return r;
           },
           breaks[i],
@@ -184,6 +225,16 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
     }
   });
 
+  // Where a loop runs through a pole: along its line from the u' it arrives with to the u' it leaves with.
+  for (const l of fuv.poleLines) {
+    const points = fuv.loops[l.loop].points,
+      from = points[l.at][0],
+      to = points[l.at + 1][0],
+      line = new Float64Array(K);
+    quad((up) => G(up, l.v), from, to, piecesOf(to - from, true), line);
+    for (let k = 0; k < K; k++) out[k] -= line[k];
+  }
+
   // A second covered pole: its line, run with the face on its left (towards -u' at the high pole, +u' at the low).
   for (const pole of covered.slice(1)) {
     const line = new Float64Array(K);
@@ -194,11 +245,11 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
 }
 
 /**
- * du'/dt along a curve on the surface at (u', v): the curve's tangent split into Su and Sv (least squares), u
- * mirrored where the face flips it. At a pole, where Su vanishes, du'/dt is taken as 0: the curve meets the pole's
- * line at a point.
+ * (du'/dt, dv/dt) along a curve on the surface at (u', v): the curve's tangent split into Su and Sv (least squares), u
+ * mirrored where the face flips it. At a pole, where Su vanishes, both are taken as 0: the curve meets the pole's line
+ * at a point.
  */
-function uDot(s: Surface, flip: boolean, uv: UV, p: number[]): number {
+function rates(s: Surface, flip: boolean, uv: UV, p: number[]): [number, number] {
   const d = s.at(flip ? -uv[0] : uv[0], uv[1]),
     su = [d[3], d[4], d[5]],
     sv = [d[6], d[7], d[8]],
@@ -209,9 +260,28 @@ function uDot(s: Surface, flip: boolean, uv: UV, p: number[]): number {
     ru = su[0] * tan[0] + su[1] * tan[1] + su[2] * tan[2],
     rv = sv[0] * tan[0] + sv[1] * tan[1] + sv[2] * tan[2],
     det = a * e - b * b;
-  if (!(Math.abs(det) > 1e-30 * (a * e + 1e-300))) return 0;
+  if (!(Math.abs(det) > 1e-30 * (a * e + 1e-300))) return [0, 0];
   const du = (ru * e - rv * b) / det;
-  return flip ? -du : du;
+  return [flip ? -du : du, (a * rv - b * ru) / det];
+}
+
+/** The diagonal of the box of points along a face's edges (9 per edge). */
+function faceSize(face: Face): number {
+  const lo = [Infinity, Infinity, Infinity],
+    hi = [-Infinity, -Infinity, -Infinity];
+  for (const loop of face.loops)
+    for (const co of loop.coedges) {
+      const curve = curveEvaluator(co.edge.curve),
+        [t0, t1] = edgeParameters(co.edge, 1);
+      for (let i = 0; i <= 8; i++) {
+        const p = curve.at(t0 + ((t1 - t0) * i) / 8);
+        for (let k = 0; k < 3; k++) {
+          lo[k] = Math.min(lo[k], p[k]);
+          hi[k] = Math.max(hi[k], p[k]);
+        }
+      }
+    }
+  return Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) || 1;
 }
 
 /** A point near some faces (the middle of their vertices' box): moments about it keep large coordinates from cancelling. */

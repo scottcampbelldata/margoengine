@@ -3,7 +3,7 @@
 // surface as the deflection asks, and enclose the solid's volume.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { parseSTEP, tessellateSTEP, validateSTEP } from '../dist/index.js';
+import { model, parseSTEP, tessellateSTEP, validateSTEP } from '../dist/index.js';
 
 const real = (x) => {
   if (Math.abs(x) < 1e-13) return '0.';
@@ -197,6 +197,36 @@ function cone(R) {
   ]);
 }
 
+/**
+ * A sector of angle a of that cone (apex at z = -R): its cone face runs down one edge to the apex and up another, closed
+ * by an arc of the base; a sector of the top disk and two triangles close it.
+ */
+function coneSector(R, a) {
+  const w = new Writer(),
+    O = [0, 0, 0],
+    A = [R, 0, 0],
+    B = [R * Math.cos(a), R * Math.sin(a), 0],
+    P = [0, 0, -R],
+    [o, va, vb, apex] = [O, A, B, P].map((q) => w.vertex(q)),
+    line = (e0, e1, p0, p1) => w.edge(e0, e1, w.line(p0, sub(p1, p0))),
+    arc = w.edge(va, vb, w.circle(O, Z, X, R)),
+    oa = line(o, va, O, A),
+    ob = line(o, vb, O, B),
+    ap = line(va, apex, A, P),
+    bp = line(vb, apex, B, P),
+    op = line(o, apex, O, P),
+    side = [-Math.sin(a), Math.cos(a), 0];
+  return w.file([
+    w.face([w.loop([oa, true], [arc, true], [ob, false])], w.add(`PLANE('',${w.axis(O)})`)),
+    w.face(
+      [w.loop([arc, false], [ap, true], [bp, false])],
+      w.add(`CONICAL_SURFACE('',${w.axis(O)},${real(R)},${real(Math.PI / 4)})`),
+    ),
+    w.face([w.loop([op, true], [ap, false], [oa, false])], w.add(`PLANE('',${w.axis(O, [0, -1, 0], X)})`)),
+    w.face([w.loop([ob, true], [bp, true], [op, false])], w.add(`PLANE('',${w.axis(O, side, [0, 0, 1])})`)),
+  ]);
+}
+
 /** A torus (major radius R, minor r) as one face bounded by its two seam circles. */
 function torus(R, r) {
   const w = new Writer(),
@@ -363,6 +393,29 @@ test('a cone: its side walks round the apex between the two passes of its seam',
   solid(mesh(cone(R)), (Math.PI * R * R * R) / 3, Math.PI * R * R + Math.PI * R * Math.hypot(R, R));
 });
 
+test("a cone's sector: its face runs through the apex, which its exact mass properties follow", () => {
+  // At the apex u has no meaning: the face's loop runs along the apex's line from one edge's u to the other's (it
+  // once threw "a loop through a pole or apex is not supported yet").
+  const R = 10;
+  for (const a of [Math.PI / 2, (3 * Math.PI) / 2]) {
+    const text = coneSector(R, a),
+      volume = (a * R ** 3) / 6,
+      area = (a * R * R) / 2 + (a * R * R * Math.SQRT2) / 2 + R * R;
+    solid(mesh(text), volume, area);
+    const { bodies, problems } = model.bodiesFromSTEP(parseSTEP(text)),
+      m = model.massProperties(bodies[0]);
+    assert.deepEqual(problems, []);
+    assert.ok(
+      Math.abs(m.volume / 1e-9 - volume) <= 1e-9 * volume,
+      `sector ${a}: volume ${m.volume / 1e-9} vs ${volume}`,
+    );
+    assert.ok(Math.abs(m.area / 1e-6 - area) <= 1e-9 * area, `sector ${a}: area ${m.area / 1e-6} vs ${area}`);
+  }
+  // The whole cone: its side runs up its seam to the apex and back down, so the apex's line spans a whole turn.
+  const whole = model.massProperties(model.bodiesFromSTEP(parseSTEP(cone(R))).bodies[0]);
+  assert.ok(Math.abs(whole.volume / 1e-9 - (Math.PI * R ** 3) / 3) <= (1e-9 * whole.volume) / 1e-9);
+});
+
 test('a torus: one face bounded by both seam circles', () => {
   const R = 20,
     r = 5,
@@ -410,6 +463,61 @@ test('a B-spline face collapsed to a point at one u end (v meaningless there) cl
   );
   const r = solid(mesh(text), 1000 / 6, 150 + (Math.sqrt(3) / 4) * 200);
   assert.ok(r.triangles >= 4);
+});
+
+/**
+ * A thread's flank as a sheet: a ruled B-spline from an outer to an inner, raised helix-like quadratic spline, swept
+ * `turns` turns, bounded by both splines and its two end rulings.
+ */
+function flank(turns, perTurn, outerRadius, innerRadius, pitch, lift) {
+  const n = turns * perTurn + 2,
+    helix = (radius, dz) =>
+      Array.from({ length: n }, (_, i) => {
+        const t = (2 * Math.PI * i) / perTurn;
+        return [radius * Math.cos(t), radius * Math.sin(t), (pitch * t) / (2 * Math.PI) + dz];
+      }),
+    outer = helix(outerRadius, 0),
+    inner = helix(innerRadius, lift),
+    knots = `(${Array.from({ length: n - 1 }, (_, i) => real(i)).join(',')})`,
+    mult = `(${Array.from({ length: n - 1 }, (_, i) => (i === 0 || i === n - 2 ? 3 : 1)).join(',')})`,
+    w = new Writer(),
+    row = (r) => `(${r.map((p) => w.point(p)).join(',')})`,
+    curve = (r) =>
+      w.add(`B_SPLINE_CURVE_WITH_KNOTS('',2,${row(r)},.UNSPECIFIED.,.F.,.F.,${mult},${knots},.UNSPECIFIED.)`),
+    surface = w.add(
+      `B_SPLINE_SURFACE_WITH_KNOTS('',1,2,(${row(outer)},${row(inner)}),.UNSPECIFIED.,.F.,.F.,.F.,(2,2),${mult},(0.,1.),${knots},.UNSPECIFIED.)`,
+    ),
+    [o0, o1, i0, i1] = [outer[0], outer[n - 1], inner[0], inner[n - 1]].map((p) => w.vertex(p)),
+    ruling = (a, b) => w.line(a, sub(b, a)),
+    along = w.edge(o0, o1, curve(outer)),
+    back = w.edge(i0, i1, curve(inner)),
+    end = w.edge(o1, i1, ruling(outer[n - 1], inner[n - 1])),
+    start = w.edge(i0, o0, ruling(inner[0], outer[0])),
+    // Counter-clockwise in (u, v) is (0, 0) (1, 0) (1, 1) (0, 1); this loop runs the other way, so the face is reversed.
+    face = w.face([w.loop([along, true], [end, true], [back, false], [start, true])], surface, false);
+  return w.part(
+    w.add(`SHELL_BASED_SURFACE_MODEL('',(${w.add(`OPEN_SHELL('',(${face}))`)}))`),
+    'MANIFOLD_SURFACE_SHAPE_REPRESENTATION',
+  );
+}
+
+test('a thread flank (a ruled B-spline round many turns) meshes, and its exact area matches the mesh', () => {
+  // A point's nearest place on such a surface, or on its edges, is easily on the next turn: that once cut the edges to
+  // a part of a span, crossed the mesh's boundary and left the exact area at 1% to 50% of the true one.
+  for (const args of [
+    [6, 8, 2, 1.4, 0.5, 0.15],
+    [10, 6, 2, 1.5, 0.4, 0.3],
+    [30, 8, 2, 1.6, 0.5, 0.2],
+  ]) {
+    const step = parseSTEP(flank(...args)),
+      m = tessellateSTEP(step, { relativeDeflection: 0.00005, angle: 0.05 })[0],
+      { bodies, problems } = model.bodiesFromSTEP(step);
+    assert.deepEqual(m.failures, []);
+    assert.deepEqual(problems, []);
+    const exact = model.massProperties(bodies[0]).area / m.unit ** 2,
+      meshed = measure(m).area;
+    assert.ok(Math.abs(meshed - exact) <= 5e-4 * exact, `flank ${args}: mesh ${meshed} vs exact ${exact} mm2`);
+  }
 });
 
 test('a tessellated solid (AP242): triangles, strips and fans through pnindex, read as written', () => {

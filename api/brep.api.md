@@ -632,6 +632,7 @@ interface Surface {
     pole(side: 1 | -1): number | undefined;
     uPole?(side: 1 | -1): number | undefined;
     singular(u: number, v: number): boolean;
+    breaks?(): readonly [readonly number[], readonly number[]];
 }
 
 type XYZ = [number, number, number];

@@ -122,5 +122,9 @@ Where OpenCascade still leads (freeform NURBS intersections, advanced blends, he
 - `model.massProperties`: exact volume, area, centroid and inertia from the faces (divergence theorem, Green's
   theorem over each trimmed face, Gauss-Legendre), not a mesh: box, cylinder, sphere, torus, a cone ring, a
   hemisphere over its pole, a holed block and the rounded box match their closed forms to 1e-9 (1e-8 for the hemisphere).
+  A cone's sector (its face running through the apex) matches to 1e-9; a thread's flank (a ruled spline round 6 to 30
+  turns) matches its fine mesh within 5e-4, integrated across the ruling and along the turns, split at the knots. On
+  Jubilee's 145 bodies every volume is within 0.17% of a fine mesh (that mesh's own chord error: its plain cylinder is
+  0.16% low) and every round trip through STEP keeps it.
 - Next: blends on curved faces and along traced edges, setbacks and variable radius, freeform (spline) Booleans,
   healing (docs/brep-occt-gaps.md); the operations benchmark against OpenCascade (Codex prompt 511d19d, step 9).

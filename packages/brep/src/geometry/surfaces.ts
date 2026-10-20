@@ -32,6 +32,8 @@ export interface Surface {
   uPole?(side: 1 | -1): number | undefined;
   /** Whether (u, v) is a pole or apex, where u has no meaning. */
   singular(u: number, v: number): boolean;
+  /** A spline's knots in u and in v where its derivatives may jump, ascending, ends included (integrals split there). */
+  breaks?(): readonly [readonly number[], readonly number[]];
 }
 
 /** Su x Sv made unit; at a degenerate point, the normal a little way into the domain. */
@@ -353,6 +355,9 @@ class Extrusion implements Surface {
   }
 }
 
+/** Starts a spline surface's projection tries, nearest sample first, before taking the closest it reached. */
+const TRIES = 32;
+
 class SplinePatch implements Surface {
   readonly uPeriod: number;
   readonly vPeriod: number;
@@ -361,6 +366,7 @@ class SplinePatch implements Surface {
   private readonly uBreaks: number[];
   private readonly vBreaks: number[];
   private seeds?: { u: number; v: number; p: number[] }[];
+  private cell = 0;
   private readonly size: number;
   constructor(
     private readonly s: SplineSurface,
@@ -394,32 +400,64 @@ class SplinePatch implements Surface {
     return normalOf(this, u, v);
   }
   parameters(p: readonly number[], hint?: readonly number[]): [number, number] {
-    let u: number, v: number;
-    if (hint) [u, v] = hint;
-    else {
-      // Seed from the nearest of 4 x 4 samples per knot span (at most 48 per direction).
-      const samples = (breaks: number[]) => {
-        const out: number[] = [],
-          per = Math.max(1, Math.min(4, Math.floor(48 / Math.max(1, breaks.length - 1))));
-        for (let i = 1; i < breaks.length; i++)
-          for (let k = 0; k < per; k++) out.push(breaks[i - 1] + ((breaks[i] - breaks[i - 1]) * (k + 0.5)) / per);
-        return out;
-      };
-      this.seeds ??= samples(this.uBreaks).flatMap((su) =>
-        samples(this.vBreaks).map((sv) => ({ u: su, v: sv, p: this.at(su, sv) })),
-      );
-      let best = Infinity;
-      [u, v] = [this.uDomain[0], this.vDomain[0]];
-      for (const seed of this.seeds) {
-        const d = distance(seed.p, p);
-        if (d < best) {
-          best = d;
-          u = seed.u;
-          v = seed.v;
-        }
-      }
+    // From the hint, kept when it lands within a millionth of the surface's size (a point of a tolerant edge may lie
+    // that far off). A start far from the point (the other end of a line edge) can settle on a wrong nearest place,
+    // such as the next turn of a helical sweep: then the samples decide.
+    if (hint) {
+      const r = this.newton(p, hint[0], hint[1]);
+      return r.miss <= 1e-6 * this.size ? r.uv : this.nearest(p, r).uv;
     }
-    // Gauss-Newton on |S(u, v) - p|^2.
+    return this.nearest(p).uv;
+  }
+  /**
+   * From the nearest of up to 4 x 4 samples per knot span (about 8192 in all, at least one per span); the nearest can lie
+   * on the wrong turn of a surface that comes back near itself, so the next nearest are tried, until one lands on the
+   * point or the rest lie farther than the best found plus a sample cell.
+   */
+  private nearest(
+    p: readonly number[],
+    best = { uv: [this.uDomain[0], this.vDomain[0]] as [number, number], miss: Infinity },
+  ): { uv: [number, number]; miss: number } {
+    if (!this.seeds) {
+      const spans = Math.max(1, this.uBreaks.length - 1) * Math.max(1, this.vBreaks.length - 1),
+        per = Math.max(1, Math.min(4, Math.floor(Math.sqrt(8192 / spans)))),
+        samples = (breaks: number[]) => {
+          const out: number[] = [];
+          for (let i = 1; i < breaks.length; i++)
+            for (let k = 0; k < per; k++) out.push(breaks[i - 1] + ((breaks[i] - breaks[i - 1]) * (k + 0.5)) / per);
+          return out;
+        },
+        us = samples(this.uBreaks),
+        vs = samples(this.vBreaks);
+      this.seeds = us.flatMap((su) => vs.map((sv) => ({ u: su, v: sv, p: this.at(su, sv) })));
+      // The farthest apart two neighbouring samples lie.
+      let cell = 0;
+      for (let i = 0; i < us.length; i++)
+        for (let j = 0; j < vs.length; j++) {
+          const q = this.seeds[i * vs.length + j].p;
+          if (i + 1 < us.length) cell = Math.max(cell, distance(q, this.seeds[(i + 1) * vs.length + j].p));
+          if (j + 1 < vs.length) cell = Math.max(cell, distance(q, this.seeds[i * vs.length + j + 1].p));
+        }
+      this.cell = cell;
+    }
+    const near: { seed: { u: number; v: number }; d: number }[] = [];
+    for (const seed of this.seeds) {
+      const d = distance(seed.p, p);
+      if (near.length === TRIES && d >= near[TRIES - 1].d) continue;
+      let k = Math.min(near.length, TRIES - 1);
+      while (k > 0 && near[k - 1].d > d) k--;
+      near.splice(k, 0, { seed, d });
+      if (near.length > TRIES) near.pop();
+    }
+    for (const { seed, d } of near) {
+      if (best.miss < 1e-9 * this.size || d > best.miss + this.cell) break;
+      const r = this.newton(p, seed.u, seed.v);
+      if (r.miss < best.miss) best = r;
+    }
+    return best;
+  }
+  /** Gauss-Newton on |S(u, v) - p|^2 from (u, v); where a step leaves the domain, along the bound alone. */
+  private newton(p: readonly number[], u: number, v: number): { uv: [number, number]; miss: number } {
     for (let i = 0; i < 50; i++) {
       const d = this.at(u, v),
         r = sub(d, p),
@@ -431,22 +469,27 @@ class SplinePatch implements Surface {
         g1 = dot(su, r),
         g2 = dot(sv, r),
         det = a * c - b * b;
+      if (length(r) < 1e-12 * this.size) break;
       if (!(det > 1e-30 * (a * c || 1))) {
         // Singular (a pole): move along whichever derivative exists.
-        if (a > 0) u -= g1 / a;
-        else if (c > 0) v -= g2 / c;
+        if (a > 0) u = this.fit(u - g1 / a, this.uDomain, this.uPeriod);
+        else if (c > 0) v = this.fit(v - g2 / c, this.vDomain, this.vPeriod);
         else break;
-      } else {
-        const du = (-c * g1 + b * g2) / det,
-          dv = (b * g1 - a * g2) / det;
-        u += du;
-        v += dv;
+        continue;
       }
-      u = this.fit(u, this.uDomain, this.uPeriod);
-      v = this.fit(v, this.vDomain, this.vPeriod);
-      if (length(r) < 1e-12 * this.size) break;
+      const nu = u + (-c * g1 + b * g2) / det,
+        nv = v + (b * g1 - a * g2) / det,
+        fu = this.fit(nu, this.uDomain, this.uPeriod),
+        fv = this.fit(nv, this.vDomain, this.vPeriod);
+      // Held by a bound in one parameter: the other moves alone (the joint step's share of it assumed the first moved).
+      if (fu !== nu && fv === nv) [u, v] = [fu, c > 0 ? this.fit(v - g2 / c, this.vDomain, this.vPeriod) : v];
+      else if (fv !== nv && fu === nu) [u, v] = [a > 0 ? this.fit(u - g1 / a, this.uDomain, this.uPeriod) : u, fv];
+      else [u, v] = [fu, fv];
     }
-    return [u, v];
+    return { uv: [u, v], miss: distance(this.at(u, v), p) };
+  }
+  breaks(): readonly [readonly number[], readonly number[]] {
+    return [this.uBreaks, this.vBreaks];
   }
   steps(box: readonly number[]): [number, number] {
     // Degree + 1 points per knot span to start with; the tessellator refines where the surface still strays.
@@ -525,6 +568,9 @@ class Offset implements Surface {
   }
   singular(u: number, v: number) {
     return this.basis.singular(u, v);
+  }
+  breaks() {
+    return this.basis.breaks?.() ?? [[], []];
   }
 }
 

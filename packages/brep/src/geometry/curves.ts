@@ -114,6 +114,9 @@ class Spline implements Curve {
   readonly domain: readonly [number, number];
   private readonly breaks: number[];
   private seeds?: { t: number; p: number[] }[];
+  private extent?: number;
+  /** The farthest apart two neighbouring samples lie. */
+  private step = 0;
   constructor(
     private readonly spline: SplineCurve,
     closed: boolean,
@@ -132,26 +135,61 @@ class Spline implements Curve {
     return curveAt(this.spline, this.clamp(t));
   }
   parameter(p: readonly number[], hint?: number) {
-    // Seed from the nearest of a few samples per knot span (or the hint), then Gauss-Newton on |C(t) - p|.
-    let t = hint;
-    if (t === undefined) {
-      this.seeds ??= this.breaks.slice(1).flatMap((b, i) => {
-        const a = this.breaks[i];
-        return Array.from({ length: 8 }, (_, k) => {
-          const s = a + ((b - a) * k) / 8;
-          return { t: s, p: this.at(s) };
-        });
-      });
-      let best = Infinity;
-      for (const seed of this.seeds) {
-        const d = distance(seed.p, p);
-        if (d < best) {
-          best = d;
-          t = seed.t;
-        }
-      }
+    // Newton on |C(t) - p| from the hint, kept when it lands within a millionth of the curve's size. Otherwise (no
+    // hint, or one far along a curve that comes back near itself, such as the other end of a helix) from the nearest of
+    // 8 samples per knot span, the next nearest tried until one lands or the rest lie farther than the best found plus
+    // a sample step.
+    let best = { t: this.domain[0], miss: Infinity };
+    if (hint !== undefined) {
+      best = this.newton(p, hint);
+      if (best.miss <= 1e-6 * this.size()) return best.t;
     }
-    t = this.clamp(t ?? this.domain[0]);
+    const seeds = this.samples(),
+      near: { t: number; d: number }[] = [];
+    for (const seed of seeds) {
+      const d = distance(seed.p, p);
+      if (near.length === 16 && d >= near[15].d) continue;
+      let k = Math.min(near.length, 15);
+      while (k > 0 && near[k - 1].d > d) k--;
+      near.splice(k, 0, { t: seed.t, d });
+      if (near.length > 16) near.pop();
+    }
+    for (const { t, d } of near) {
+      if (best.miss <= 1e-9 * this.size() || d > best.miss + this.step) break;
+      const r = this.newton(p, t);
+      if (r.miss < best.miss) best = r;
+    }
+    return best.t;
+  }
+  /** 8 samples per knot span and the domain's end. */
+  private samples(): { t: number; p: number[] }[] {
+    if (!this.seeds) {
+      this.seeds = [
+        ...this.breaks.slice(1).flatMap((b, i) => {
+          const a = this.breaks[i];
+          return Array.from({ length: 8 }, (_, k) => {
+            const s = a + ((b - a) * k) / 8;
+            return { t: s, p: this.at(s) };
+          });
+        }),
+        { t: this.domain[1], p: this.at(this.domain[1]) },
+      ];
+      for (let i = 1; i < this.seeds.length; i++)
+        this.step = Math.max(this.step, distance(this.seeds[i - 1].p, this.seeds[i].p));
+    }
+    return this.seeds;
+  }
+  /** The diagonal of the samples' box. */
+  private size(): number {
+    if (this.extent === undefined) {
+      const pts = this.samples().map((s) => s.p);
+      this.extent =
+        Math.hypot(...[0, 1, 2].map((k) => Math.max(...pts.map((q) => q[k])) - Math.min(...pts.map((q) => q[k])))) || 1;
+    }
+    return this.extent;
+  }
+  private newton(p: readonly number[], from: number): { t: number; miss: number } {
+    let t = this.clamp(from);
     for (let i = 0; i < 40; i++) {
       const c = this.at(t),
         d = c.slice(3),
@@ -159,10 +197,13 @@ class Spline implements Curve {
       if (!dd) break;
       const step = dot(sub(c, p), d) / dd,
         next = this.clamp(t - step);
-      if (Math.abs(next - t) < 1e-14 * Math.max(1, Math.abs(t))) return next;
+      if (Math.abs(next - t) < 1e-14 * Math.max(1, Math.abs(t))) {
+        t = next;
+        break;
+      }
       t = next;
     }
-    return t;
+    return { t, miss: distance(this.at(t), p) };
   }
   sample(a: number, b: number, deflection: number, turn: number) {
     return ordered(a, b, (lo, hi) => {

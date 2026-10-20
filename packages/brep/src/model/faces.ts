@@ -4,7 +4,7 @@
 // decided loop by loop, by signed crossings of a line up from the point, which works for loops round a cylinder or a
 // sphere's pole as well as for closed ones.
 import type { Surface } from '../geometry/surfaces.js';
-import type { XYZ } from '../geometry/vec.js';
+import { distance, type XYZ } from '../geometry/vec.js';
 import { curveEvaluator, surfaceEvaluator } from './geometry.js';
 import type { Edge, Face } from './topology.js';
 import { edgeParameters } from './validate.js';
@@ -35,26 +35,86 @@ export class FaceUV {
    * so v runs from here one period on and the face's loops and points lie in that range.
    */
   vCut = -Math.PI;
+  /** How far a projection may land from its point before the global search is asked (a millionth of the face's size). */
+  #miss = 0;
+  /**
+   * Where a loop runs through a pole or apex (a cone's sector, a sphere's lune): there u has no meaning, so the loop
+   * runs along the pole's line at v from the u' it arrives with to the u' it leaves with (its points `at` and `at + 1`).
+   */
+  readonly poleLines: { loop: number; at: number; v: number }[] = [];
 
   constructor(readonly face: Face) {
     this.surface = surfaceEvaluator(face.surface);
     this.flip = !face.sense;
     this.period = this.surface.uPeriod;
-    for (const loop of face.loops) {
-      const points: UV[] = [];
-      let hint: UV | undefined;
+    const corners = face.loops.flatMap((l) => l.coedges.map((c) => c.start.point));
+    if (corners.length)
+      this.#miss =
+        1e-6 *
+        Math.max(
+          ...[0, 1, 2].map((k) => Math.max(...corners.map((q) => q[k])) - Math.min(...corners.map((q) => q[k]))),
+          1e-9,
+        );
+    face.loops.forEach((loop, li) => {
+      const samples: XYZ[] = [];
       for (const c of loop.coedges) {
         const ts = edgeParameters(c.edge, edgeSamples(c.edge));
         if (!c.forward) ts.reverse();
         const curve = curveEvaluator(c.edge.curve);
-        for (let k = 0; k < ts.length - 1; k++) {
-          const uv = this.near(curve.at(ts[k]).slice(0, 3) as XYZ, hint);
+        for (let k = 0; k < ts.length - 1; k++) samples.push(curve.at(ts[k]).slice(0, 3) as XYZ);
+      }
+      // Start from a sample off the poles, so each pole is reached with a u'.
+      const first = Math.max(
+          0,
+          samples.findIndex((p) => this.poleOf(p) === undefined),
+        ),
+        points: UV[] = [],
+        lines: number[] = [],
+        uLines: number[] = [];
+      let hint: UV | undefined;
+      for (let j = 0; j < samples.length; j++) {
+        const p = samples[(first + j) % samples.length],
+          pole = hint && this.poleOf(p);
+        if (pole === undefined || !hint) {
+          const uv = this.near(p, hint);
           points.push(uv);
           hint = uv;
+          continue;
         }
+        // At a pole: along its line from the u' it arrives with to the u' of the next sample off it (at a pole where v has
+        // no meaning, along u' = pole from v to v).
+        let k = j + 1;
+        while (k < samples.length && this.poleOf(samples[(first + k) % samples.length]) !== undefined) k++;
+        const next = samples[(first + k) % samples.length];
+        if ('v' in pole) {
+          const out = this.near(next, [hint[0], pole.v]);
+          lines.push(points.length);
+          points.push([hint[0], pole.v], [out[0], pole.v]);
+          hint = [out[0], pole.v];
+        } else {
+          const out = this.near(next, [pole.u, hint[1]]);
+          uLines.push(points.length);
+          points.push([pole.u, hint[1]], [pole.u, out[1]]);
+          hint = [pole.u, out[1]];
+        }
+        j = k - 1;
       }
-      this.loops.push(this.close(points));
-    }
+      const closed = this.close(points, new Set([...lines, ...uLines].flatMap((i) => [i, i + 1])), false);
+      if (lines.length && closed.wrap) {
+        // A loop through a pole bounds a sector and does not go round: its first pole line takes up the turn.
+        for (let i = lines[0] + 1; i < points.length; i++)
+          points[i] = [points[i][0] - closed.wrap * this.period, points[i][1]];
+        closed.wrap = 0;
+      }
+      for (const [u, v] of points) {
+        this.box[0] = Math.min(this.box[0], u);
+        this.box[1] = Math.max(this.box[1], u);
+        this.box[2] = Math.min(this.box[2], v);
+        this.box[3] = Math.max(this.box[3], v);
+      }
+      for (const at of lines) this.poleLines.push({ loop: li, at, v: points[at][1] });
+      this.loops.push(closed);
+    });
     const vPeriod = this.surface.vPeriod;
     if (vPeriod && this.loops.length) {
       // The cut is a circle round the tube that no loop crosses, so it lies wholly inside or wholly outside the face.
@@ -76,19 +136,25 @@ export class FaceUV {
     }
   }
 
-  /** A loop from continuous (u', v) points: how many periods it goes round, from where its start falls when reached again. */
-  close(points: UV[]): UVLoop {
+  /**
+   * A loop from continuous (u', v) points: how many periods it goes round, from where its start falls when reached again.
+   * `onPoles` are the points of its pole lines; the face's box grows to take the points unless `grow` is false.
+   */
+  close(points: UV[], onPoles: ReadonlySet<number> = new Set(), grow = true): { points: UV[]; wrap: number } {
     points.forEach(([u, v], k) => {
-      this.box[0] = Math.min(this.box[0], u);
-      this.box[1] = Math.max(this.box[1], u);
-      this.box[2] = Math.min(this.box[2], v);
-      this.box[3] = Math.max(this.box[3], v);
-      // A loop over a pole jumps half a turn in u between neighbouring samples.
+      if (grow) {
+        this.box[0] = Math.min(this.box[0], u);
+        this.box[1] = Math.max(this.box[1], u);
+        this.box[2] = Math.min(this.box[2], v);
+        this.box[3] = Math.max(this.box[3], v);
+      }
+      if (onPoles.has(k)) return;
+      // A loop over a pole between samples (not through one of its vertices) jumps half a turn in u between them.
       if (
         this.surface.singular(this.flip ? -u : u, v) ||
-        (this.period && k && Math.abs(u - points[k - 1][0]) > this.period / 4)
+        (this.period && k && !onPoles.has(k - 1) && Math.abs(u - points[k - 1][0]) > this.period / 4)
       )
-        throw new RangeError(`face ${this.face.name}: a loop through a pole or apex is not supported yet`);
+        throw new RangeError(`face ${this.face.name}: a loop over a pole between its vertices is not supported yet`);
     });
     if (!points.length || !this.period) return { points, wrap: 0 };
     const back = this.near(this.at(points[0]), points[points.length - 1]);
@@ -97,10 +163,32 @@ export class FaceUV {
     return { points, wrap: Math.round((back[0] - points[0][0]) / this.period) };
   }
 
+  /** Where `p` is a pole or apex: the v of one where u has no meaning, or the u' of one where v has none. */
+  poleOf(p: XYZ): { v: number } | { u: number } | undefined {
+    const s = this.surface,
+      within = Math.max(this.#miss, 1e-12) * 100;
+    for (const side of [1, -1] as const) {
+      const v = s.pole(side),
+        u = s.uPole?.(side);
+      if (v !== undefined && distance(s.at(0, v), p) <= within) return { v };
+      if (u !== undefined && distance(s.at(u, 0), p) <= within) return { u: this.flip ? -u : u };
+    }
+    return undefined;
+  }
+
   /** (u', v) of a point on the surface, its u (and v) moved by whole periods next to `hint` when given. */
   near(p: XYZ, hint?: UV): UV {
-    const s = this.surface,
-      raw = s.parameters(p, hint ? [this.flip ? -hint[0] : hint[0], hint[1]] : undefined);
+    const s = this.surface;
+    let raw = s.parameters(p, hint ? [this.flip ? -hint[0] : hint[0], hint[1]] : undefined);
+    if (hint && this.#miss) {
+      // A search started far from the point (the other end of a line edge) can settle on a wrong nearest point, such as
+      // the next turn of a helical sweep: unless it lands on the point, the global search decides.
+      const miss = distance(s.at(raw[0], raw[1]), p);
+      if (miss > this.#miss) {
+        const global = s.parameters(p);
+        if (distance(s.at(global[0], global[1]), p) < miss) raw = global;
+      }
+    }
     let u = this.flip ? -raw[0] : raw[0],
       v = raw[1];
     if (hint) {

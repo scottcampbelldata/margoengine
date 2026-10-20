@@ -26,6 +26,11 @@ Every item is done only when all of these hold:
       negative signed volume on an imported body (Jubilee body 48), round trips that double it (CirPattern bodies 10,
       12, 14, 17), pole/apex errors on cone and sphere apex faces (Jubilee 70 and 90, Radial Engine JT part 10), up to
       4.7e-5 relative from GProp on the model tests. Fix these first.
+      Fixed 2026-10-20 (claude/kernel-fixes), measured against a fine mesh, not GProp: the round trips (a seam cut
+      through an equator vertex), the negative and 17x volumes (projections onto helical thread surfaces and their
+      edges settling on the next turn), and the pole/apex throws (loops through an apex or a collapsed spline row now
+      run along its line). Jubilee: 30 bodies threw, now none; every volume within 0.17% of the mesh (its own chord
+      error). Left: Codex's GProp comparison again, Radial Engine JT part 10, and the 4.7e-5 on the model tests.
 - [ ] 1.2 Import into the modeler: STEP, SAT, Parasolid and JT B-reps read as modeler bodies, so every operation (and
       mass properties, checking, healing, export) works on imported parts, not only on shapes built in Margo.
       Written and on main for STEP (model.bodiesFromSTEP; SAT, XT and JT through their readers' B-reps). On 200 imported
