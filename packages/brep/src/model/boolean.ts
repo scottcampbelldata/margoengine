@@ -1121,71 +1121,245 @@ function probe(
   all: UVLoop[],
   vBounds: readonly [number, number],
 ): { point: UV; clearance: number }[] {
+  // Segments, rays and distances in plain numbers, without temporary arrays: probe runs over every segment of every
+  // loop twice for each of up to eight starts, the most of a drill's time. Blocks of segments a ray or a distance cannot
+  // reach, by bounds that allow for rounding, are skipped whole: what is left is the same arithmetic as over them all.
   const period = fuv.period,
-    segment = (l: UVLoop, i: number): [UV, UV] => [
-      l.points[i],
-      i + 1 < l.points.length ? l.points[i + 1] : [l.points[0][0] + l.wrap * period, l.points[0][1]],
-    ],
-    lengths = loop.points.map((_, i) => {
-      const [p, q] = segment(loop, i);
-      return Math.hypot(q[0] - p[0], q[1] - p[1]);
-    }),
-    order = lengths.map((_, i) => i).sort((x, y) => lengths[y] - lengths[x] || x - y),
+    // A segment's end: the next point, or past the last the first moved by the loop's wrap.
+    endU = (l: UVLoop, i: number) => (i + 1 < l.points.length ? l.points[i + 1][0] : l.points[0][0] + l.wrap * period),
+    endV = (l: UVLoop, i: number) => (i + 1 < l.points.length ? l.points[i + 1] : l.points[0])[1],
+    lengths = loop.points.map((p, i) => Math.hypot(endU(loop, i) - p[0], endV(loop, i) - p[1])),
+    order = longest(lengths, 8),
     [v0, v1] = vBounds,
-    shifts = period ? [-2, -1, 0, 1, 2] : [0];
+    boxes = all.map((l) => blocks(l, period)),
+    live: number[] = [],
+    // Every block of every loop in turn: its loop, and where it starts in the loop's boxes.
+    blockLoop: number[] = [],
+    blockAt: number[] = [];
+  for (let n = 0; n < all.length; n++)
+    for (let b = 0; b < boxes[n].length; b += 5) {
+      blockLoop.push(n);
+      blockAt.push(b);
+    }
+  const own = blockLoop.indexOf(all.indexOf(loop));
   /** From the middle of segment i, a quarter, half and three quarters of the way to the next loop or surface end on its left. */
   const from = (i: number): UV[] => {
-    const [p0, q0] = segment(loop, i),
+    const pu = loop.points[i][0],
+      pv = loop.points[i][1],
+      qu = endU(loop, i),
+      qv = endV(loop, i),
       len = lengths[i],
-      m: UV = [(p0[0] + q0[0]) / 2, (p0[1] + q0[1]) / 2],
-      d: UV = [-(q0[1] - p0[1]) / len, (q0[0] - p0[0]) / len];
+      mu = (pu + qu) / 2,
+      mv = (pv + qv) / 2,
+      du = -(qv - pv) / len,
+      dv = (qu - pu) / len;
     let s = Infinity;
-    if (d[1] > 0 && Number.isFinite(v1)) s = (v1 - m[1]) / d[1];
-    if (d[1] < 0 && Number.isFinite(v0)) s = (v0 - m[1]) / d[1];
-    const eps = 1e-9 * len;
-    for (const l of all)
-      for (let j = 0; j < l.points.length; j++) {
-        const [p, q] = segment(l, j),
-          e: UV = [q[0] - p[0], q[1] - p[1]],
-          denom = d[0] * e[1] - d[1] * e[0];
-        if (Math.abs(denom) <= 1e-15 * Math.hypot(e[0], e[1])) continue;
-        for (const k of shifts) {
-          const w: UV = [p[0] - (m[0] + k * period), p[1] - m[1]],
-            hit = (w[0] * e[1] - w[1] * e[0]) / denom,
-            r = (w[0] * d[1] - w[1] * d[0]) / denom;
-          if (r >= 0 && r <= 1 && hit > eps && hit < s) s = hit;
+    if (dv > 0 && Number.isFinite(v1)) s = (v1 - mv) / dv;
+    if (dv < 0 && Number.isFinite(v0)) s = (v0 - mv) / dv;
+    const eps = 1e-9 * len,
+      // The ray's start at each whole-period shift tried.
+      starts = period ? [-2, -1, 0, 1, 2].map((k) => mu + k * period) : [mu + 0 * period];
+    for (let n = 0; n < all.length; n++) {
+      const pts = all[n].points,
+        box = boxes[n],
+        wrapU = all[n].wrap * period;
+      for (let b = 0; b < box.length; b += 5) {
+        // The shifts whose ray can pass the test below in this block: |across| <= 2 |denom| <= 2 (|eu| + |ev|) (1 + 8
+        // eps). across is linear in the segment's start, so over the block's box it lies between its values at the
+        // corners, give or take rounding, which 1e-12 of the coordinates covers.
+        const uLo = box[b],
+          uHi = box[b + 1],
+          vLo = (mv - box[b + 2]) * du,
+          vHi = (mv - box[b + 3]) * du,
+          rv = Math.abs(mv - box[b + 2]) + Math.abs(mv - box[b + 3]),
+          reach = 2 * box[b + 4] * (1 + 1e-9);
+        let count = 0;
+        for (let k = 0; k < starts.length; k++) {
+          const c = starts[k],
+            lo = (uLo - c) * dv,
+            hi = (uHi - c) * dv,
+            slack = reach + 1e-12 * (Math.abs(uLo - c) + Math.abs(uHi - c) + rv);
+          if (Math.min(lo, hi) + Math.min(vLo, vHi) > slack || Math.max(lo, hi) + Math.max(vLo, vHi) < -slack) continue;
+          live[count++] = k;
+        }
+        if (!count) continue;
+        for (let j = (b / 5) * BLOCK, end = Math.min(pts.length, j + BLOCK); j < end; j++) {
+          const p = pts[j],
+            last = j + 1 === pts.length,
+            q = last ? pts[0] : pts[j + 1],
+            eu = (last ? q[0] + wrapU : q[0]) - p[0],
+            ev = q[1] - p[1],
+            denom = du * ev - dv * eu,
+            size = Math.abs(denom);
+          // Parallel: |denom| <= 1e-15 |e|. The bound |e| <= |eu| + |ev| shows most are not without Math.hypot.
+          if (size <= 2e-15 * (Math.abs(eu) + Math.abs(ev)) && size <= 1e-15 * Math.hypot(eu, ev)) continue;
+          const wv = p[1] - mv,
+            wvEu = wv * eu,
+            wvDu = wv * du,
+            twice = 2 * size;
+          for (let x = 0; x < count; x++) {
+            const wu = p[0] - starts[live[x]],
+              across = wu * dv - wvDu;
+            // |r| > 2 is ruled out without dividing.
+            if (Math.abs(across) > twice) continue;
+            const r = across / denom;
+            if (!(r >= 0 && r <= 1)) continue;
+            const hit = (wu * ev - wvEu) / denom;
+            if (hit > eps && hit < s) s = hit;
+          }
         }
       }
+    }
     if (!Number.isFinite(s)) s = len;
-    return [0.5, 0.25, 0.75].map((k): UV => [m[0] + d[0] * s * k, m[1] + d[1] * s * k]);
+    return [0.5, 0.25, 0.75].map((k): UV => [mu + du * s * k, mv + dv * s * k]);
   };
   /** The distance from (u', v) to the nearest loop or surface end, each way scaled by the surface's stretch there. */
-  const clearance = ([u, v]: UV, h: number): number => {
+  const clearance = ([u, v]: UV, h: number, source: number): number => {
     const su = distance(fuv.at([u + h, v]), fuv.at([u - h, v])) / (2 * h),
       sv = distance(fuv.at([u, v + h]), fuv.at([u, v - h])) / (2 * h);
     let best = Infinity;
     if (Number.isFinite(v0)) best = Math.min(best, (v - v0) * sv);
     if (Number.isFinite(v1)) best = Math.min(best, (v1 - v) * sv);
-    for (const l of all)
-      for (let j = 0; j < l.points.length; j++) {
-        const [p, q] = segment(l, j),
-          k = period ? Math.round((u - (p[0] + q[0]) / 2) / period) * period : 0,
-          a: UV = [(p[0] + k - u) * su, (p[1] - v) * sv],
-          b: UV = [(q[0] + k - u) * su, (q[1] - v) * sv],
-          e: UV = [b[0] - a[0], b[1] - a[1]],
-          ee = e[0] * e[0] + e[1] * e[1],
-          t = ee > 0 ? Math.min(1, Math.max(0, -(a[0] * e[0] + a[1] * e[1]) / ee)) : 0;
-        best = Math.min(best, Math.hypot(a[0] + t * e[0], a[1] + t * e[1]));
+    let far = farOf(best);
+    // Round all the blocks from that of the segment the point came from: the distance found there rules out most others.
+    const start = own < 0 ? 0 : own + Math.floor(source / BLOCK);
+    for (let z = 0; z < blockLoop.length; z++) {
+      const w = start + z < blockLoop.length ? start + z : start + z - blockLoop.length,
+        n = blockLoop[w],
+        b = blockAt[w],
+        pts = all[n].points,
+        box = boxes[n],
+        wrapU = all[n].wrap * period;
+      if (far < Infinity && nearest(box, b, u, v, su, sv, period) * (1 - 1e-12) > far) continue;
+      for (let j = (b / 5) * BLOCK, end = Math.min(pts.length, j + BLOCK); j < end; j++) {
+        const p = pts[j],
+          last = j + 1 === pts.length,
+          q = last ? pts[0] : pts[j + 1],
+          pu = p[0],
+          qu = last ? q[0] + wrapU : q[0],
+          k = period ? Math.round((u - (pu + qu) / 2) / period) * period : 0,
+          au = (pu + k - u) * su,
+          av = (p[1] - v) * sv,
+          eu = (qu + k - u) * su - au,
+          ev = (q[1] - v) * sv - av,
+          ee = eu * eu + ev * ev,
+          t = ee > 0 ? Math.min(1, Math.max(0, -(au * eu + av * ev) / ee)) : 0,
+          x = au + t * eu,
+          y = av + t * ev;
+        // No nearer than the nearest so far: Math.hypot would leave `best` as it is.
+        if (x * x + y * y > far) continue;
+        best = Math.min(best, Math.hypot(x, y));
+        far = farOf(best);
       }
+    }
     return best;
   };
   const out: { point: UV; clearance: number }[] = [];
-  for (const i of order.slice(0, 8)) {
+  for (const i of order) {
     if (!(lengths[i] > 0)) break;
-    for (const q of from(i)) out.push({ point: q, clearance: Math.max(0, clearance(q, 1e-3 * lengths[order[0]])) });
+    for (const q of from(i)) out.push({ point: q, clearance: Math.max(0, clearance(q, 1e-3 * lengths[order[0]], i)) });
   }
   if (!out.length) out.push({ point: from(order[0])[0], clearance: 0 });
   return out.sort((x, y) => y.clearance - x.clearance);
+}
+
+/** Segments per block in `blocks`. */
+const BLOCK = 16;
+/** Each loop's blocks, found once for all of a split's probes: a traced loop does not change, nor its face's period. */
+const blockCache = new WeakMap<UVLoop, Float64Array>();
+
+/**
+ * A loop's segments BLOCK at a time, five numbers each: the (u', v) box of the block's segments (both ends of each,
+ * the last's end moved by the loop's wrap) and its largest |eu| + |ev|, a segment's run in u' and in v. NaN where a
+ * coordinate is.
+ */
+function blocks(l: UVLoop, period: number): Float64Array {
+  const cached = blockCache.get(l);
+  if (cached) return cached;
+  const pts = l.points,
+    n = pts.length,
+    out = new Float64Array(5 * Math.ceil(n / BLOCK));
+  blockCache.set(l, out);
+  for (let b = 0; b < out.length; b += 5) {
+    let uLo = Infinity,
+      uHi = -Infinity,
+      vLo = Infinity,
+      vHi = -Infinity,
+      run = 0;
+    for (let j = (b / 5) * BLOCK, end = Math.min(n, j + BLOCK); j < end; j++) {
+      const p = pts[j],
+        last = j + 1 === n,
+        q = last ? pts[0] : pts[j + 1],
+        qu = last ? q[0] + l.wrap * period : q[0];
+      uLo = Math.min(uLo, p[0], qu);
+      uHi = Math.max(uHi, p[0], qu);
+      vLo = Math.min(vLo, p[1], q[1]);
+      vHi = Math.max(vHi, p[1], q[1]);
+      run = Math.max(run, Math.abs(qu - p[0]) + Math.abs(q[1] - p[1]));
+    }
+    out[b] = uLo;
+    out[b + 1] = uHi;
+    out[b + 2] = vLo;
+    out[b + 3] = vHi;
+    out[b + 4] = run;
+  }
+  return out;
+}
+
+/** A squared distance past which a point is no nearer than `best`: 1e-12 past its square, far beyond rounding. */
+function farOf(best: number): number {
+  return best > 1e-100 && best < 1e100 ? best * best * (1 + 1e-12) : Infinity;
+}
+
+/**
+ * A lower bound on the squared distance probe's clearance finds from (u, v) to any segment in block b of a loop's
+ * `blocks`, short of it by more than rounding: each segment's u' moved by the whole periods that bring its middle
+ * nearest u, its ends scaled by (su, sv) as there, and the nearest point between them. NaN where it cannot tell.
+ */
+function nearest(box: Float64Array, b: number, u: number, v: number, su: number, sv: number, period: number): number {
+  // The segments' period moves lie between those of the box's ends (rounding keeps the order).
+  const ka = period ? Math.round((u - box[b + 1]) / period) : 0,
+    kb = period ? Math.round((u - box[b]) / period) : 0;
+  if (!(Math.abs(kb - ka) <= 4)) return Number.NaN;
+  const vLo = (box[b + 2] - v) * sv,
+    vHi = (box[b + 3] - v) * sv,
+    slackV = 1e-12 * (Math.abs(vLo) + Math.abs(vHi)),
+    gapV = Math.max(0, vLo - slackV, -vHi - slackV);
+  let out = Infinity;
+  for (let k = Math.min(ka, kb); k <= Math.max(ka, kb); k++) {
+    const uLo = (box[b] + k * period - u) * su,
+      uHi = (box[b + 1] + k * period - u) * su,
+      slackU = 1e-12 * (Math.abs(uLo) + Math.abs(uHi)),
+      gapU = Math.max(0, uLo - slackU, -uHi - slackU);
+    // Far from 1e100, so no square or product on the way overflows.
+    if (!(Math.max(Math.abs(uLo), Math.abs(uHi), Math.abs(vLo), Math.abs(vHi)) < 1e100)) return Number.NaN;
+    out = Math.min(out, gapU * gapU + gapV * gapV);
+  }
+  return out;
+}
+
+/**
+ * The indices of the n longest lengths, longest first and the earlier of equal ones first: the start of all of them
+ * sorted so, without sorting them all.
+ */
+function longest(lengths: readonly number[], n: number): number[] {
+  // The sort's comparison is a total order only on finite lengths.
+  if (!lengths.every(Number.isFinite))
+    return lengths
+      .map((_, i) => i)
+      .sort((x, y) => lengths[y] - lengths[x] || x - y)
+      .slice(0, n);
+  const out: number[] = [];
+  for (let i = 0; i < lengths.length; i++) {
+    let j = out.length;
+    if (j === n) {
+      if (!(lengths[i] > lengths[out[n - 1]])) continue;
+      j = n - 1;
+    }
+    for (; j > 0 && lengths[out[j - 1]] < lengths[i]; j--) out[j] = out[j - 1];
+    out[j] = i;
+  }
+  return out;
 }
 
 /**
