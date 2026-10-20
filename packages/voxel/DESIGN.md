@@ -254,7 +254,17 @@ Status: on main are phases 1 (storage), 2 (mesher), 3 (worker mesher), 4 (render
 - Example and benchmarks (phase 13): `examples/voxel-sandbox` (site page `/voxel/`; shadows, torch point lights, Sky,
   Bloom), visual references on the RTX A6000 profile only (other profiles skip them until recorded), benchmark
   `npm run bench:voxel` behind the quiet gate. Measured on the A6000 at 1920 x 1080, 4x MSAA (docs/limits.md): render
-  distance 8 fills in 2.45-2.50 s (1.18 M quads, 322 draws, 0.6 ms frame CPU), 16 in 8.8-9.2 s (4.84 M quads, 1,170
-  draws, 1.3 ms), over the 6 s target above; GPU time per frame is not yet measured reliably.
+  distance 8 fills in 1.06-1.22 s (1.18 M quads, 322 draws, 0.7 ms frame CPU still), 16 in 3.59-3.67 s (4.84 M quads,
+  1,170 draws; 1.1 ms still in a single-load run, settling from 2.4 ms over about 4 s after a fill); GPU time per
+  frame is not yet measured reliably. The sandbox's chunks are 32 blocks, so its render distance 16 is a 512-block
+  radius (5,579 chunks), four times the target's "RD16" above (its render distance 8); both fill under 6 s.
+- Fill speed (2026-10-20; it took 8.8-9.2 s at render distance 16 before): `VoxelStreamer` starts a load as each one
+  finishes (still at most 4 per worker queued, and between updates only while `memoryBudget` has room for every chunk
+  on its way at the loaded mean size); a generator may return its column's ceiling (`noiseTerrain` does: highest
+  ground, sea or tree crown within its crown radius), and the column's chunks wholly above it load as air without a
+  job once the store is read; the renderer gives an all-air chunk its empty mesh without `meshInput` or a worker; the
+  lighting reads a chunk's palette without packing it; the sandbox joins 2 ms of chunks a frame while it fills. The
+  join budget was the limit: at 0.5 ms the fill took 8.1-8.6 s even with the other changes, at 1 ms 4.1 s, at 2 and
+  4 ms 3.5 s, with 20,433, 7,932 and about 6,000 mesh jobs for 2,435 meshed chunks (bigger batches remesh less).
 - Extras: `AudioVoicePool` in @margoengine/audio; `ParticleAtlas` on @margoengine/vfx's texture option. The decoders
   pool was not moved onto `JobPool` (its per-worker queue and timeout semantics differ).

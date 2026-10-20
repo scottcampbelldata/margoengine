@@ -111,25 +111,36 @@ node examples/voxel-sandbox/bench.mjs   # or npm run bench:voxel; options --dist
 
 It holds the GPU lock, waits for `scripts/quiet-gate.mjs` (numbers from a busy machine are labelled DIAGNOSTIC), loads
 `?view=overview` at render distance 8 and 16 in headless Edge at 1920 x 1080 with the high tier (4x MSAA), and writes
-`test-results/voxel-sandbox-bench.json`: spawn time (median of 3 loads after a warm-up load), frame CPU median and p95
-over 300 still frames, voxel GPU time median and p95 over 100 frames, a 10 s flight at 11 blocks/s while chunks
-stream in, and chunks, quads, quad bytes, draws and chunk data bytes.
+`test-results/voxel-sandbox-bench.json`: spawn time (median of 3 loads after a warm-up load), frame CPU while the world
+fills (median, p95 and worst over the 3 loads), frame CPU median and p95 over 300 still frames, voxel GPU time median
+and p95 over 100 frames, a 10 s flight at 11 blocks/s while chunks stream in, and chunks, quads, quad bytes, draws and
+chunk data bytes.
 
-Measured 2026-10-19 on the RTX A6000 desktop, quiet-gated (copy in
+Measured 2026-10-20 on the RTX A6000 desktop, quiet-gated (copy in
 `examples/package-benchmarks/results/voxel-sandbox-bench.json`):
 
 | | Render distance 8 | Render distance 16 |
 | --- | --- | --- |
-| Spawn to every chunk in range drawn (3 loads) | 2.45-2.50 s | 8.8-9.2 s |
-| First voxel draw | 375 ms | 418 ms |
-| Frame CPU, still (median / p95) | 0.6 / 0.9 ms | 1.3 / 1.7 ms |
-| Frame CPU, flying 11 blocks/s (median / p95 / worst) | 0.7 / 2.9 / 5.5 ms | 1.6 / 4.4 / 8.4 ms |
+| Spawn to every chunk in range drawn (3 loads) | 1.06-1.22 s | 3.59-3.67 s |
+| First voxel draw | 427 ms | 463 ms |
+| Frame CPU while the world fills (median / p95 / worst) | 4.2 / 8.8 / 11.6 ms | 6.6 / 11.1 / 15.8 ms |
+| Frame CPU, still, right after the third load (median / p95) | 0.7 / 1.1 ms | 1.7 / 2.2 ms |
+| Frame CPU, flying 11 blocks/s (median / p95 / worst) | 0.9 / 3.7 / 6.8 ms | 2.3 / 5.0 / 10.2 ms |
 | Chunks loaded / with quads / visible | 1,379 / 602 / 206 | 5,579 / 2,435 / 772 |
 | Quads, quad bytes on the GPU | 1,182,034, 14.5 MB | 4,838,612, 59.5 MB |
 | Draws, chunk data on the CPU | 322, 15.9 MB | 1,170, 64.1 MB |
 
-Voxel GPU time from timestamps between passes is rough: 2.56 ms median at render distance 8 in this run and 0.39 ms in
-an earlier, busier one; 0.72 ms at 16 in both. Render distance 16 misses the design's 6 s spawn target.
+Until 2026-10-20 render distance 16 took 8.8-9.2 s (8.6-8.8 s that day): the streamer started at most 12 loads a frame
+and the sandbox joined 0.5 ms of chunks a frame. Now a load starts as each one finishes, chunks above their column's
+ceiling load as air without a generator job (about 2,360 of 5,579), all-air chunks need no mesh job, and the sandbox
+joins 2 ms of chunks a frame while the world fills (0.5 ms once ready). Back to back on the same quiet machine, one
+load each at render distance 16: 9.40 s before, 3.36 s after; still frames 1.0 / 1.5 ms before and 1.1 / 1.5 ms after;
+flying 1.4 / 4.2 / 8.1 ms before and 1.5 / 3.9 / 7.4 ms after. Frames while the world fills cost more (p95 4.4-5.3 ms
+before at render distance 16, 10.5-11.5 ms now) because about 2.6 times as much joins per frame; the worst stays under
+a 60 Hz frame. Right after a fill the still frames settle over about 4 s (2.4 ms median in the first 2 s, then 1.3 ms,
+p95 1.6-2.0 ms). The design's "RD16 < 6 s" meant a 256-block radius of 16-block chunks, the sandbox's render distance 8;
+both distances now fill well under 6 s. Voxel GPU time from timestamps between passes is rough: 0.39 ms median at
+render distance 8 and 1.51 ms at 16 in this run (2.56 and 0.72 ms in an earlier one).
 
 ### Visual checks
 

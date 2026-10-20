@@ -15,8 +15,9 @@ const hash = (x: number, z: number): number => {
   return (h ^ (h >>> 16)) >>> 0;
 };
 
+// The column's ceiling: the terrain's, one higher for a plant on its highest grass.
 serveVoxelGenerator((chunk, cx, cy, cz, context) => {
-  terrain(chunk, cx, cy, cz, context);
+  const ceiling = terrain(chunk, cx, cy, cz, context);
   const id = (name: string) => context.blocks.find((type) => type.name === name)?.id ?? 0,
     grass = id('grass'),
     plants = PLANTS.map(([name, chance]) => [id(name), chance] as const);
@@ -37,4 +38,5 @@ serveVoxelGenerator((chunk, cx, cy, cz, context) => {
           break;
         }
     }
+  return ceiling + 1;
 });

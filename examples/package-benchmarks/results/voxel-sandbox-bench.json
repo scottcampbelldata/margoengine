@@ -1,11 +1,11 @@
 {
  "benchmark": "voxel-sandbox",
- "recordedAt": "2026-10-19T13:24:58.167Z",
+ "recordedAt": "2026-10-20T17:04:59.931Z",
  "machine": {
   "ac": true,
-  "cpuLoadPercent": 16,
-  "waitedSeconds": 24,
-  "checkedAt": "2026-10-19T13:24:53.685Z",
+  "cpuLoadPercent": 18,
+  "waitedSeconds": 44,
+  "checkedAt": "2026-10-20T17:04:56.877Z",
   "topProcesses": [
    {
     "Name": "python",
@@ -30,22 +30,22 @@
    {
     "Name": "ChatGPT",
     "Id": 25824,
-    "cpuSeconds": 7314
-   },
-   {
-    "Name": "claude",
-    "Id": 19472,
-    "cpuSeconds": 3857
-   },
-   {
-    "Name": "codex",
-    "Id": 34076,
-    "cpuSeconds": 3581
+    "cpuSeconds": 17064
    },
    {
     "Name": "ChatGPT",
     "Id": 37500,
-    "cpuSeconds": 3463
+    "cpuSeconds": 8843
+   },
+   {
+    "Name": "codex",
+    "Id": 34076,
+    "cpuSeconds": 8250
+   },
+   {
+    "Name": "ChatGPT",
+    "Id": 68440,
+    "cpuSeconds": 6612
    }
   ]
  },
@@ -64,44 +64,50 @@
  "results": [
   {
    "distance": 8,
-   "spawnMs": 2488.5,
+   "spawnMs": 1179,
    "spawnRunsMs": [
-    2453,
-    2489,
-    2497
+    1063,
+    1179,
+    1219
    ],
-   "firstDrawMs": 375,
-   "allLoadedMs": 2432,
-   "pageToStreamerMs": 189,
+   "firstDrawMs": 427,
+   "allLoadedMs": 1155,
+   "fillFrameCpuMs": {
+    "median": 4.2,
+    "p95": 8.8,
+    "max": 11.6,
+    "samples": 242
+   },
+   "pageToStreamerMs": 204,
    "frameCpuMs": {
-    "median": 0.6,
-    "p95": 0.9,
-    "max": 1.2,
+    "median": 0.7,
+    "p95": 1.1,
+    "max": 1.5,
     "samples": 300
    },
    "voxelGpuMs": {
-    "median": 2.556,
-    "p95": 3.67,
-    "max": 4.26,
+    "median": 0.393,
+    "p95": 1.18,
+    "max": 2.097,
     "samples": 100
    },
    "flight": {
     "blocksPerSecond": 11,
     "frameCpuMs": {
-     "median": 0.7,
-     "p95": 2.9,
-     "max": 5.5,
+     "median": 0.9,
+     "p95": 3.7,
+     "max": 6.8,
      "samples": 600
     },
     "statsAfter": {
-     "chunks": 685,
+     "chunks": 686,
      "visible": 220,
-     "quads": 1319666,
-     "bytes": 16250112,
+     "quads": 1320396,
+     "bytes": 16259328,
      "draws": 351,
      "pending": 0,
-     "loaded": 1559,
-     "chunkBytes": 18167112,
+     "loaded": 1561,
+     "chunkBytes": 18171226,
      "lightQueue": 16384,
      "distance": 8,
      "seed": 1,
@@ -125,44 +131,50 @@
   },
   {
    "distance": 16,
-   "spawnMs": 8981.2,
+   "spawnMs": 3662.1,
    "spawnRunsMs": [
-    8792,
-    9188,
-    8981
+    3592,
+    3662,
+    3666
    ],
-   "firstDrawMs": 418,
-   "allLoadedMs": 8866,
-   "pageToStreamerMs": 277,
+   "firstDrawMs": 463,
+   "allLoadedMs": 3484,
+   "fillFrameCpuMs": {
+    "median": 6.6,
+    "p95": 11.1,
+    "max": 15.8,
+    "samples": 675
+   },
+   "pageToStreamerMs": 248,
    "frameCpuMs": {
-    "median": 1.3,
-    "p95": 1.7,
-    "max": 2.3,
+    "median": 1.7,
+    "p95": 2.2,
+    "max": 2.8,
     "samples": 300
    },
    "voxelGpuMs": {
-    "median": 0.721,
+    "median": 1.507,
     "p95": 2.687,
-    "max": 3.146,
+    "max": 3.736,
     "samples": 100
    },
    "flight": {
     "blocksPerSecond": 11,
     "frameCpuMs": {
-     "median": 1.6,
-     "p95": 4.4,
-     "max": 8.4,
+     "median": 2.3,
+     "p95": 5,
+     "max": 10.2,
      "samples": 600
     },
     "statsAfter": {
-     "chunks": 2506,
-     "visible": 734,
-     "quads": 4923227,
-     "bytes": 60613632,
-     "draws": 1120,
-     "pending": 87,
-     "loaded": 5828,
-     "chunkBytes": 68201738,
+     "chunks": 2507,
+     "visible": 733,
+     "quads": 4926824,
+     "bytes": 60656640,
+     "draws": 1118,
+     "pending": 82,
+     "loaded": 5833,
+     "chunkBytes": 68316726,
      "lightQueue": 16384,
      "distance": 16,
      "seed": 1,
@@ -185,6 +197,6 @@
    "streamerWorkers": 3
   }
  ],
- "cpuLoadAfterPercent": 10,
+ "cpuLoadAfterPercent": 23,
  "errors": []
 }

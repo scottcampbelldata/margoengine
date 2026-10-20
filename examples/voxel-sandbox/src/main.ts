@@ -94,6 +94,8 @@ interface Sandbox {
   timeline: { startedAt: number; firstDraw?: number; loaded?: number; spawn?: number };
   stats(): Record<string, number | string | boolean>;
   frames(count: number): Promise<number[]>;
+  /** Frame CPU milliseconds (update + render) of every frame from the streamer's start until ready. */
+  fillFrames: number[];
   fly(count: number, speed: number): Promise<{ cpu: number[]; stats: Record<string, number | string | boolean> }>;
   gpuTiming(count: number): Promise<number[] | null>;
 }
@@ -156,6 +158,7 @@ async function boot(): Promise<void> {
       distance,
       verticalDistance: VERTICAL,
       chunksPerFrame: 32, // loading: settle faster; 8 once ready
+      frameBudget: 2, // loading: join 2 ms of chunks a frame (rd 16 fills in half the time of 0.5 ms); 0.5 once ready
       memoryBudget: 512 << 20,
     });
   streamer.onError = (error) => {
@@ -442,6 +445,7 @@ async function boot(): Promise<void> {
 
   // Readiness: every chunk in range loaded, light current, meshes uploaded (the renderer's stats unchanged for 30
   // frames while nothing is dirty). `spawn` is the time of the last change, not of the check.
+  const fillFrames: number[] = [];
   let lastQuads = -1,
     lastChunks = -1,
     stable = 0,
@@ -474,6 +478,7 @@ async function boot(): Promise<void> {
     if (settled) return;
     settled = true;
     streamer.chunksPerFrame = 8;
+    streamer.frameBudget = 0.5;
     lighting.budget = 16384;
     if (!deterministic && tier === 'light') watchQuality();
   }
@@ -549,6 +554,7 @@ async function boot(): Promise<void> {
     }
     const now = performance.now(),
       cpu = now - start;
+    if (!ready) fillFrames.push(cpu);
     track(now);
     hud(now);
     if (sampler) {
@@ -597,6 +603,7 @@ async function boot(): Promise<void> {
     },
     timeline,
     stats,
+    fillFrames,
     frames: (count) =>
       new Promise((done) => {
         sampler = { left: count, out: [], done };

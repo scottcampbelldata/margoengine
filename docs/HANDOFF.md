@@ -54,7 +54,9 @@ shadows and torch point lights; site page `/voxel/`; `npm run dev:voxel`), its 7
 `nvidia-ampere-msedge-155` profile (the views carry `profiles: VOXEL` in scripts/visual-regression.js, so other
 profiles skip them; on the laptop record them with `npm run visual:update -- --only=voxel --runs=4` and add the
 Intel profile id to `VOXEL`), and the quiet-gated benchmark in docs/limits.md (render distance 8 fills in 2.5 s, 16 in
-8.8-9.2 s, over the 6 s target). The quiet gate now reads the processor-time counter: `Win32_Processor.LoadPercentage`
+8.8-9.2 s, over the 6 s target; since 2026-10-20 1.1-1.2 s and 3.6-3.7 s: loads refill as they finish, air above
+a column's ceiling needs no job, and the sandbox joins 2 ms of chunks a frame while it fills). The quiet gate now reads
+the processor-time counter: `Win32_Processor.LoadPercentage`
 read 18-97% on this idle desktop. Step 7 done: ball meshes and border crossings built within a per-step budget
 (`VoxelPhysics.budget`), voxel contacts raise `Physics` events (`voxels.body`), `.vox` paste by chunk (4-6x faster),
 `VoxelStreamer.frameBudget`, `noiseTerrain` without water beside caves or leaves in caves, the catalog clipboard test

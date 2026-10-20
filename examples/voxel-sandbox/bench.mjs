@@ -3,6 +3,7 @@
 // - spawn: ms from the streamer's start until every chunk in range is loaded, lit, meshed and uploaded (the renderer's
 //   stats then stay unchanged for 30 frames; the time is the last change, not the check), median of `--loads` loads
 //   after one warm-up load; also first voxel draw, all chunks loaded, and page time to the streamer's start;
+// - frame CPU during the fill (every frame from the streamer's start until ready, all loads): median, p95, max;
 // - frame CPU time (the sandbox's frame callback: update + engine.render), median and p95 of 300 frames, camera still;
 // - GPU time of the voxel passes (opaque + cutout, translucent) from timestamp queries, median and p95 of 100 frames
 //   (null when the adapter lacks timestamp-query);
@@ -60,7 +61,11 @@ try {
   const load = async (rd) => {
     await page.goto(url(rd));
     await page.waitForFunction(() => window.voxelSandbox?.ready, null, { timeout: 300_000, polling: 100 });
-    return page.evaluate(() => ({ timeline: window.voxelSandbox.timeline, stats: window.voxelSandbox.stats() }));
+    return page.evaluate(() => ({
+      timeline: window.voxelSandbox.timeline,
+      stats: window.voxelSandbox.stats(),
+      fillFrames: window.voxelSandbox.fillFrames,
+    }));
   };
   console.log('warm-up load (Vite transforms, shader cache)');
   await load(distances[0]);
@@ -81,7 +86,10 @@ try {
     for (let i = 0; i < loads; i++) {
       const r = await load(rd);
       runs.push(r);
-      console.log(`rd ${rd} load ${i + 1}: spawn ${r.timeline.spawn.toFixed(0)} ms, ${JSON.stringify(r.stats)}`);
+      const fill = stats(r.fillFrames);
+      console.log(
+        `rd ${rd} load ${i + 1}: spawn ${r.timeline.spawn.toFixed(0)} ms (all loaded ${r.timeline.loaded.toFixed(0)}), fill frame CPU median ${fill.median} p95 ${fill.p95} max ${fill.max} ms over ${fill.samples}, ${JSON.stringify(r.stats)}`,
+      );
     }
     const spawns = runs.map((r) => r.timeline.spawn),
       last = runs.at(-1);
@@ -94,6 +102,7 @@ try {
       spawnRunsMs: spawns.map((v) => Math.round(v)),
       firstDrawMs: Math.round(last.timeline.firstDraw),
       allLoadedMs: Math.round(last.timeline.loaded),
+      fillFrameCpuMs: stats(runs.flatMap((r) => r.fillFrames)),
       pageToStreamerMs: Math.round(last.timeline.startedAt),
       frameCpuMs: stats(cpu),
       voxelGpuMs: gpu ? stats(gpu) : null,

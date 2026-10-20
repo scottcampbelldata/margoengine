@@ -244,8 +244,9 @@ origin/main <branch>` (patch-level, so rebased copies do not count) and the hand
    - `7e2741db docs(studio)`: the engine gaps of the Crocotile-equivalent tile editor (docs only).
 2. Sky: `fix(night-citadel): water reflects the actual night sky` (one commit on `worktree-agent-aa8330c71e56a38e4`)
    never landed. It changes Night Citadel's look, so it needs Scott's look approval and Codex's re-recorded references.
-3. Voxel sandbox: render distance 16 fills in 8.8-9.2 s, over the 6 s target (docs/limits.md); visual references for
-   the Intel laptop profile (record there and add its profile id to `VOXEL` in `scripts/visual-regression.js`).
+3. Voxel sandbox: render distance 16 fill time, done 2026-10-20 (3.6-3.7 s, was 8.8-9.2 s; docs/limits.md); visual
+   references for the Intel laptop profile (record there and add its profile id to `VOXEL` in
+   `scripts/visual-regression.js`).
 4. Path tracer: light sampling through glass costs about 2x per sample in the glass scene; the denoiser on the caustic
    scene is just under 2x better than raw (target 2x).
 5. `C:\Development\Projects\margoengine\.claude\launch.json` (untracked, voxel-sandbox dev server): keep or delete;
