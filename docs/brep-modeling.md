@@ -14,7 +14,7 @@ features. Clean room as before: published standards, textbooks and papers only; 
 | Browser download | 40,030 B gzip worker (114,562 B raw; measured at 2469a93, the modeler is not in it) | 7,604,031 B Wasm (occt-import-js) |
 | Formats without paid add-ons | STEP, SAT, Parasolid XT, JT 9.5+ (structure and XT B-rep), DXF (loaders) | STEP, IGES |
 | Self-check | file's own volume, area, centre: 16 of 16 match | none |
-| Modeling | primitives, extrude, revolve; Booleans on planes, cylinders, cones, spheres and tori (any position, faces on one plane, edges along edges); fillets and chamfers on straight edges and full circles | Booleans on any surface, variable fillets, offsets, healing, ... (docs/brep-occt-gaps.md) |
+| Modeling | primitives, extrude, revolve; Booleans on planes, cylinders, cones, spheres, tori and spline surfaces (any position, faces on one plane, edges along edges, imported edges within their tolerance); fillets and chamfers on straight edges and full circles | tangential contact, variable fillets, offsets, healing, ... (docs/brep-occt-gaps.md) |
 
 Where OpenCascade still leads (freeform NURBS intersections, advanced blends, healing) and what matching it takes:
 `docs/brep-occt-gaps.md`.
@@ -80,6 +80,23 @@ Where OpenCascade still leads (freeform NURBS intersections, advanced blends, he
 - Mesher fixes it needed: a face that is a closed surface less its holes (a sphere less a cap), oriented shells and
   faces (`ORIENTED_CLOSED_SHELL .F.` of a void now turns its faces), and columns of interior points on curved faces with
   holes (a cylinder wall with a hole made up to 6x the triangles it needed).
+
+## Booleans on spline surfaces and imported parts (2026-10-20)
+
+- A spline surface's signed distance is the distance to its nearest place along the normal there, found by projection
+  from where the last point landed; its gradient is that normal. The tracer (march.ts) seeds from sign changes along
+  the spline's lines of constant u and v and ends a curve exactly where it meets the spline's edge (the domain's
+  bound, by a root along the edge curve), where the surface's continuation would kink. Curve crossings with a spline
+  sample the curve (a ray clipped to the control points' box first) and count a root only on the surface itself.
+- Imported edges keep the gap the file's geometry has as their tolerance (Jubilee: 469 edges up to 1.3 micrometres off
+  their faces though the file declares 1e-5 mm), up to 10 micrometres or 1e-4 of the part; the Booleans keep an edge's
+  tolerance on its pieces and match crossings within it.
+- Measured: a block with a bicubic top cut by two holes and a box matches the exact integrals within 1e-7, and by a
+  second spline block within 1e-6 (tests/step-tessellate.test.js). Jubilee, a hole drilled through the middle of each
+  of 145 solids: 127 valid (78 before this, 72 on 575f4efd); left: 14 results with an intersection edge in one face
+  only (one checked: a plane face whose existing hole the drill overlaps), 3 tangential contacts (3.2), 1 open chain,
+  1 probe slip. A drill through a spline part takes 0.5 to 1 s; the slowest part 31 s (one process each, the 1.5 s
+  file read included).
 
 ## Booleans, fillets and chamfers: second cut (2026-10-17, 511d19d)
 

@@ -1,8 +1,40 @@
-// Signed distances to the analytic surfaces and their gradients: the implicit form every intersection, crossing and
-// in/out decision of the Booleans works from. Each is the true Euclidean distance (or, for a cone, its exact local
-// form), so it changes no faster than the point moves.
+// Signed distances to the surfaces and their gradients: the implicit form every intersection, crossing and in/out
+// decision of the Booleans works from. Each is the true Euclidean distance (or, for a cone, its exact local form), so
+// it changes no faster than the point moves. A spline surface's is the distance to its nearest place along the normal
+// there (beyond its edges, to the surface continued along that normal), found by projection from where the last
+// point on it landed.
 import { cross, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
-import { curveEvaluator, type CurveDef, type SurfaceDef } from './geometry.js';
+import { curveEvaluator, surfaceEvaluator, type CurveDef, type SurfaceDef } from './geometry.js';
+
+/** A spline surface's control points' box, padded by a millionth of its size (the surface lies inside it). */
+const boxes = new WeakMap<SurfaceDef, { min: XYZ; max: XYZ }>();
+function controlBox(s: SurfaceDef & { kind: 'spline' }): { min: XYZ; max: XYZ } {
+  let box = boxes.get(s);
+  if (!box) {
+    const min: XYZ = [Infinity, Infinity, Infinity],
+      max: XYZ = [-Infinity, -Infinity, -Infinity];
+    for (const p of s.points)
+      for (let k = 0; k < 3; k++) {
+        min[k] = Math.min(min[k], p[k]);
+        max[k] = Math.max(max[k], p[k]);
+      }
+    const pad = 1e-6 * Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
+    box = { min: min.map((x) => x - pad) as XYZ, max: max.map((x) => x + pad) as XYZ };
+    boxes.set(s, box);
+  }
+  return box;
+}
+
+/** Where the last point projected onto each spline surface landed: the next projection starts there. */
+const lastFoot = new WeakMap<SurfaceDef, [number, number]>();
+
+/** The nearest place on a spline surface to `p`: its (u, v), point and unit normal. */
+export function splineFoot(s: SurfaceDef, p: XYZ): { uv: [number, number]; q: XYZ; n: XYZ } {
+  const e = surfaceEvaluator(s),
+    uv = e.parameters(p, lastFoot.get(s));
+  lastFoot.set(s, uv);
+  return { uv, q: e.at(uv[0], uv[1]).slice(0, 3) as XYZ, n: e.normal(uv[0], uv[1]) };
+}
 
 /** Signed distance from `p` to a surface along its natural normal (positive on the normal's side). */
 export function signedDistance(s: SurfaceDef, p: XYZ): number {
@@ -29,8 +61,10 @@ export function signedDistance(s: SurfaceDef, p: XYZ): number {
         rho = length(sub(d, scale(s.frame.z, h)));
       return Math.hypot(rho - s.major, h) - s.minor;
     }
-    default:
-      throw new RangeError(`Booleans on ${s.kind} surfaces are not supported yet`);
+    case 'spline': {
+      const { q, n } = splineFoot(s, p);
+      return dot(sub(p, q), n);
+    }
   }
 }
 
@@ -65,8 +99,8 @@ export function distanceGradient(s: SurfaceDef, p: XYZ): XYZ {
         ];
       return unit(sub(p, centre)) ?? s.frame.z;
     }
-    default:
-      throw new RangeError(`Booleans on ${s.kind} surfaces are not supported yet`);
+    case 'spline':
+      return splineFoot(s, p).n;
   }
 }
 
@@ -205,16 +239,49 @@ export function curveSurfaceCrossings(
     f = (t: number) => signedDistance(surface, c.at(t).slice(0, 3) as XYZ),
     out: number[] = [];
   if (!(t1 > t0)) return out;
+  if (surface.kind === 'spline' && curve.kind === 'line') {
+    // A spline surface lies inside its control points' box: only the stretch of the line inside it can cross.
+    const box = controlBox(surface),
+      o = curve.origin,
+      d = curve.direction;
+    for (let k = 0; k < 3; k++) {
+      if (Math.abs(d[k]) < 1e-300) {
+        if (o[k] < box.min[k] || o[k] > box.max[k]) return out;
+        continue;
+      }
+      const a = (box.min[k] - o[k]) / d[k],
+        b = (box.max[k] - o[k]) / d[k];
+      t0 = Math.max(t0, Math.min(a, b));
+      t1 = Math.min(t1, Math.max(a, b));
+    }
+    if (!(t1 > t0)) return out;
+  }
   const speed = speedBound(curve);
-  if (!Number.isFinite(speed)) {
-    // Splines: sign changes between dense samples.
-    const n = 256;
+  if (!Number.isFinite(speed) || surface.kind === 'spline') {
+    // A spline curve, or a spline surface (no bound on its bend): sign changes between dense samples. A spline
+    // surface's distance can also jump where the nearest place moves to another part of it: a root counts only where
+    // the distance is about zero.
+    const n = surface.kind === 'spline' ? 512 : 256;
     let a = t0,
-      fa = f(a);
+      fa = f(a),
+      pa = c.at(a),
+      length3 = 0;
+    for (let k = 1; k <= n; k++) {
+      const b = t0 + ((t1 - t0) * k) / n,
+        pb = c.at(b);
+      length3 += Math.hypot(pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2]);
+      pa = pb;
+    }
+    const zero = 1e-9 * length3 + 1e-15;
     for (let k = 1; k <= n; k++) {
       const b = t0 + ((t1 - t0) * k) / n,
         fb = f(b);
-      if (negative(fa) !== negative(fb)) out.push(bisect(f, a, fa, b, fb));
+      if (negative(fa) !== negative(fb)) {
+        const t = bisect(f, a, fa, b, fb),
+          p = c.at(t).slice(0, 3) as XYZ;
+        // On the surface itself, not where the distance jumps or on its continuation past its edges.
+        if (surface.kind !== 'spline' || length(sub(p, splineFoot(surface, p).q)) <= zero) out.push(t);
+      }
       a = b;
       fa = fb;
     }

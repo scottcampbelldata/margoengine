@@ -401,15 +401,16 @@ class SplinePatch implements Surface {
     return normalOf(this, u, v);
   }
   parameters(p: readonly number[], hint?: readonly number[]): [number, number] {
-    // From a hint within a quarter of a sample cell of the point, Gauss-Newton finds the nearest place there. From a far one (the
-    // other end of a line edge) it can settle on a wrong nearest place, such as the next turn of a helical sweep: it is
-    // kept only when it lands within a millionth of the surface's size, else the samples decide.
+    // From a hint whose place lies within a quarter of a sample cell of the point along the surface (the point may lie
+    // off it, as a ray or a traced curve does), Gauss-Newton finds the nearest place there. From a far one (the other
+    // end of a line edge) it can settle on a wrong nearest place, such as the next turn of a helical sweep: it is kept
+    // only when it lands within a millionth of the surface's size, else the samples decide.
     this.grid();
     if (hint) {
       const r = this.newton(p, hint[0], hint[1]);
-      return r.start <= this.cell / 4 || r.miss <= 1e-6 * this.size ? r.uv : this.nearest(p, r).uv;
+      return r.along <= this.cell / 4 || r.miss <= 1e-6 * this.size ? r.uv : this.nearest(p, r).uv;
     }
-    return this.nearest(p, { uv: [this.uDomain[0], this.vDomain[0]], miss: Infinity, start: Infinity }).uv;
+    return this.nearest(p, { uv: [this.uDomain[0], this.vDomain[0]], miss: Infinity, along: Infinity }).uv;
   }
   /**
    * Up to 4 samples per knot span in each direction (at most 48 a direction, at least one a span), u-major, and the
@@ -443,8 +444,8 @@ class SplinePatch implements Surface {
    */
   private nearest(
     p: readonly number[],
-    best: { uv: [number, number]; miss: number; start: number },
-  ): { uv: [number, number]; miss: number; start: number } {
+    best: { uv: [number, number]; miss: number; along: number },
+  ): { uv: [number, number]; miss: number; along: number } {
     this.grid();
     const seeds = this.seeds!,
       [nu, nv] = this.rows,
@@ -480,8 +481,8 @@ class SplinePatch implements Surface {
     return best;
   }
   /** Gauss-Newton on |S(u, v) - p|^2 from (u, v); where a step leaves the domain, along the bound alone. */
-  private newton(p: readonly number[], u: number, v: number): { uv: [number, number]; miss: number; start: number } {
-    let start = Infinity;
+  private newton(p: readonly number[], u: number, v: number): { uv: [number, number]; miss: number; along: number } {
+    let along = Infinity;
     for (let i = 0; i < 50; i++) {
       const d = this.at(u, v),
         r = sub(d, p),
@@ -493,7 +494,11 @@ class SplinePatch implements Surface {
         g1 = dot(su, r),
         g2 = dot(sv, r),
         det = a * c - b * b;
-      if (i === 0) start = length(r);
+      // How far the point lies from the start along the surface: its offset less the part along the normal.
+      if (i === 0) {
+        const n = unit(cross(su, sv));
+        along = n ? length(sub(r, scale(n, dot(r, n)))) : length(r);
+      }
       if (length(r) < 1e-12 * this.size) break;
       if (!(det > 1e-30 * (a * c || 1))) {
         // Singular (a pole): move along whichever derivative exists.
@@ -511,7 +516,7 @@ class SplinePatch implements Surface {
       else if (fv !== nv && fu === nu) [u, v] = [a > 0 ? this.fit(u - g1 / a, this.uDomain, this.uPeriod) : u, fv];
       else [u, v] = [fu, fv];
     }
-    return { uv: [u, v], miss: distance(this.at(u, v), p), start };
+    return { uv: [u, v], miss: distance(this.at(u, v), p), along };
   }
   breaks(): readonly [readonly number[], readonly number[]] {
     return [this.uBreaks, this.vBreaks];

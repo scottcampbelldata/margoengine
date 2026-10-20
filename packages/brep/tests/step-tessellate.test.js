@@ -551,6 +551,141 @@ test('a thread flank (a ruled B-spline round many turns) meshes, and its exact a
   }
 });
 
+/** Heights of the bicubic Bezier top of a 10 x 10 block (millimetres): control point (i, j) sits at x = 10 i / 3, y = 10 j / 3. */
+const BUMP = [
+  [5, 6, 6, 5],
+  [6, 8, 7, 6],
+  [6, 7, 8, 6],
+  [5, 6, 6, 5],
+];
+const bernstein = (t) => [(1 - t) ** 3, 3 * t * (1 - t) ** 2, 3 * t * t * (1 - t), t ** 3];
+/** The bump's height at (x, y) of the block's own square. */
+const bumpHeight = (x, y) => {
+  const bu = bernstein(x / 10),
+    bv = bernstein(y / 10);
+  let z = 0;
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) z += bu[i] * bv[j] * BUMP[i][j];
+  return z;
+};
+
+/**
+ * A 10 x 10 block on z = 0 (moved by `at`) whose top is the bicubic Bezier BUMP, its four top edges the net's border
+ * rows, four planar sides. `lift` raises the front top edge's curve (not the surface) by that much, as a writer's fit
+ * leaves an edge a little off its face.
+ */
+function bumpBlock({ at = [0, 0, 0], lift = 0 } = {}) {
+  const w = new Writer(),
+    P = (i, j) => [(10 * i) / 3 + at[0], (10 * j) / 3 + at[1], BUMP[i][j] + at[2]],
+    line = (a, b, pa, pb) => w.edge(a, b, w.line(pa, sub(pb, pa))),
+    bezier = (pts) =>
+      w.add(
+        `B_SPLINE_CURVE_WITH_KNOTS('',3,(${pts.map((p) => w.point(p)).join(',')}),.UNSPECIFIED.,.F.,.F.,(4,4),(0.,1.),.UNSPECIFIED.)`,
+      ),
+    B = [
+      [0, 0, 0],
+      [10, 0, 0],
+      [10, 10, 0],
+      [0, 10, 0],
+    ].map((q) => [q[0] + at[0], q[1] + at[1], q[2] + at[2]]),
+    T = [P(0, 0), P(3, 0), P(3, 3), P(0, 3)],
+    front = [0, 1, 2, 3].map((i) => P(i, 0)).map((p, i) => (i === 1 || i === 2 ? [p[0], p[1], p[2] + lift] : p)),
+    [b0, b1, b2, b3] = B.map((p) => w.vertex(p)),
+    [t0, t1, t2, t3] = T.map((p) => w.vertex(p)),
+    e01 = w.edge(t0, t1, bezier(front)),
+    e12 = w.edge(t1, t2, bezier([0, 1, 2, 3].map((j) => P(3, j)))),
+    e32 = w.edge(t3, t2, bezier([0, 1, 2, 3].map((i) => P(i, 3)))),
+    e03 = w.edge(t0, t3, bezier([0, 1, 2, 3].map((j) => P(0, j)))),
+    [v0, v1, v2, v3] = [0, 1, 2, 3].map((k) => line([b0, b1, b2, b3][k], [t0, t1, t2, t3][k], B[k], T[k])),
+    f01 = line(b0, b1, B[0], B[1]),
+    f12 = line(b1, b2, B[1], B[2]),
+    f32 = line(b3, b2, B[3], B[2]),
+    f03 = line(b0, b3, B[0], B[3]),
+    net = [0, 1, 2, 3].map((i) => `(${[0, 1, 2, 3].map((j) => w.point(P(i, j))).join(',')})`).join(','),
+    top = w.add(
+      `B_SPLINE_SURFACE_WITH_KNOTS('',3,3,(${net}),.UNSPECIFIED.,.F.,.F.,.F.,(4,4),(4,4),(0.,1.),(0.,1.),.UNSPECIFIED.)`,
+    ),
+    plane = (o, n, x) => w.add(`PLANE('',${w.axis(o, n, x)})`);
+  return w.file([
+    w.face([w.loop([e01, true], [e12, true], [e32, false], [e03, false])], top),
+    w.face([w.loop([f03, true], [f32, true], [f12, false], [f01, false])], plane(B[0], [0, 0, -1], X)),
+    w.face([w.loop([f01, true], [v1, true], [e01, false], [v0, false])], plane(B[0], [0, -1, 0], X)),
+    w.face([w.loop([f12, true], [v2, true], [e12, false], [v1, false])], plane(B[1], X, [0, 1, 0])),
+    w.face([w.loop([f32, false], [v3, true], [e32, true], [v2, false])], plane(B[3], [0, 1, 0], [-1, 0, 0])),
+    w.face([w.loop([f03, false], [v0, true], [e03, true], [v3, false])], plane(B[0], [-1, 0, 0], [0, -1, 0])),
+  ]);
+}
+
+/** Gauss-Legendre nodes and weights on [0, 1], 8 points (exact for the bump's polynomials). */
+const GAUSS8 = (() => {
+  const x = [0.1834346424956498, 0.525532409916329, 0.7966664774136267, 0.9602898564975363],
+    w = [0.362683783378362, 0.3137066458778873, 0.2223810344533745, 0.1012285362903763];
+  return [...x.map((v, i) => [(1 - v) / 2, w[i] / 2]), ...x.map((v, i) => [(1 + v) / 2, w[i] / 2])];
+})();
+
+test('spline Booleans: a hole, a corner box and another spline block cut a block with a bicubic top', () => {
+  const mm = 0.001,
+    [block] = model.bodiesFromSTEP(parseSTEP(bumpBlock())).bodies,
+    full = (100 * BUMP.flat().reduce((a, b) => a + b)) / 16,
+    volume = (b) => model.massProperties(b).volume / mm ** 3;
+  assert.ok(Math.abs(volume(block) - full) <= 1e-9 * full);
+  // The bump is a polynomial in x and y: over a disk it integrates exactly with 8 Gauss points in r and 16 in angle.
+  const disk = (cx, cy, a) => {
+    let sum = 0;
+    for (const [r, wr] of GAUSS8)
+      for (let k = 0; k < 16; k++) {
+        const t = (2 * Math.PI * k) / 16;
+        sum += bumpHeight(cx + a * r * Math.cos(t), cy + a * r * Math.sin(t)) * a * r * wr * a * ((2 * Math.PI) / 16);
+      }
+    return sum;
+  };
+  const rectangle = (x0, x1, y0, y1) => {
+    let sum = 0;
+    for (const [s, ws] of GAUSS8)
+      for (const [t, wt] of GAUSS8) sum += bumpHeight(x0 + s * (x1 - x0), y0 + t * (y1 - y0)) * ws * wt;
+    return sum * (x1 - x0) * (y1 - y0);
+  };
+  // Over the overlap [4, 10] x [3, 10], a copy moved by (4, 3, -1.5) removes up to the lower of the two tops.
+  let lower = 0;
+  const n = 400;
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < n; j++) {
+      const x = 4 + ((i + 0.5) * 6) / n,
+        y = 3 + ((j + 0.5) * 7) / n;
+      lower += Math.min(bumpHeight(x, y), bumpHeight(x - 4, y - 3) - 1.5) * (6 / n) * (7 / n);
+    }
+  const frame = (x, y, z) => model.frameOf([x * mm, y * mm, z * mm], [0, 0, 1], [1, 0, 0]),
+    [shifted] = model.bodiesFromSTEP(parseSTEP(bumpBlock({ at: [4, 3, -1.5] }))).bodies;
+  for (const [tool, want, tolerance] of [
+    [model.cylinder('h', 1 * mm, 30 * mm, frame(5, 5, -5)), full - disk(5, 5, 1), 1e-7],
+    [model.cylinder('h', 1.5 * mm, 30 * mm, frame(3, 6, -5)), full - disk(3, 6, 1.5), 1e-7],
+    [model.box('b', [6 * mm, 5 * mm, 30 * mm], frame(6, -1, -5)), full - rectangle(6, 10, 0, 4), 1e-7],
+    [shifted, full - lower, 1e-6],
+  ]) {
+    const cut = model.boolean('c', 'subtract', block, tool);
+    assert.deepEqual(model.validateBody(cut), []);
+    assert.ok(Math.abs(volume(cut) - want) <= tolerance * want, `volume ${volume(cut)} vs ${want}`);
+  }
+});
+
+test('an imported edge a micrometre off its face keeps that gap as its tolerance, and the part still cuts', () => {
+  const mm = 0.001,
+    { bodies, problems } = model.bodiesFromSTEP(parseSTEP(bumpBlock({ lift: 0.001 }))),
+    [block] = bodies,
+    edge = block.edges.find(
+      (e) => e.curve.kind === 'spline' && Math.abs(e.start.point[1]) < 1e-9 && Math.abs(e.end.point[1]) < 1e-9,
+    );
+  // Lifting the middle control points by 1 micrometre lifts the curve's middle by 3/4 of that.
+  assert.deepEqual(problems, []);
+  assert.ok(edge.tolerance >= 0.75e-6 && edge.tolerance <= 1.5 * 0.75e-6 * 1.01, `tolerance ${edge.tolerance}`);
+  const cut = model.boolean(
+    'c',
+    'subtract',
+    block,
+    model.box('b', [6 * mm, 5 * mm, 30 * mm], model.frameOf([6 * mm, -1 * mm, -5 * mm], [0, 0, 1], [1, 0, 0])),
+  );
+  assert.deepEqual(model.validateBody(cut), []);
+});
+
 test('a tessellated solid (AP242): triangles, strips and fans through pnindex, read as written', () => {
   // A unit tetrahedron (millimetres): two TRIANGULATED_FACEs and one COMPLEX_TRIANGULATED_FACE share one point list.
   for (const [strips, fans] of [

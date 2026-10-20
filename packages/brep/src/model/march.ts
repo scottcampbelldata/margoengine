@@ -7,8 +7,8 @@
 // tangents (deviation about 1e-11 of the step for that turn). A branch ends where it leaves the box or comes back to
 // its start. Where the surfaces touch tangentially the direction is undefined: that throws a RangeError.
 import { add, cross, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
-import { curveSurfaceCrossings, distanceGradient, meetDirection, signedDistance } from './distance.js';
-import { curveEvaluator, frameOf, type CurveDef, type SurfaceDef } from './geometry.js';
+import { curveSurfaceCrossings, distanceGradient, meetDirection, signedDistance, splineFoot } from './distance.js';
+import { curveEvaluator, frameOf, surfaceEvaluator, type CurveDef, type SurfaceDef } from './geometry.js';
 
 /** An axis-aligned box. */
 export interface Box3 {
@@ -221,6 +221,15 @@ function walk(
       if (h < 1e-12 * hmax) throw new RangeError('an intersection curve could not be followed (it turns too sharply)');
       continue;
     }
+    // Past a spline surface's edge (its domain's bound) the curve runs on that surface's continuation, with a kink at
+    // the edge: it ends on the edge instead, exactly.
+    const exit = edgeExit(a, b, q, scale0) ?? edgeExit(b, a, q, scale0);
+    if (exit) {
+      const te = meetDirection(a, b, exit);
+      points.push(exit);
+      tangents.push(te ? (dot(te, t) < 0 ? scale(te, -1) : te) : tq);
+      return { points, tangents, closed: false };
+    }
     points.push(q);
     tangents.push(tq);
     travelled += length(sub(q, p));
@@ -228,6 +237,40 @@ function walk(
     if (turn < MAX_TURN / 3) h = Math.min(hmax, h * 1.5);
   }
   throw new RangeError('an intersection curve did not end within 200,000 steps');
+}
+
+/**
+ * Where a curve on spline surface `s` and on `other` that has stepped past an edge of `s` (a bound of its domain, not
+ * a periodic seam) to `q` meets that edge: the root of `other`'s distance along the edge's boundary curve, from where
+ * `q`'s nearest place on `s` lies on it. Undefined when `s` is not a spline, `q` lies on it, or no root is found.
+ */
+function edgeExit(s: SurfaceDef, other: SurfaceDef, q: XYZ, scale0: number): XYZ | undefined {
+  if (s.kind !== 'spline') return undefined;
+  const foot = splineFoot(s, q);
+  if (length(sub(q, foot.q)) <= 1e-10 * scale0) return undefined;
+  const e = surfaceEvaluator(s),
+    [u, v] = foot.uv,
+    at = (lo: number, hi: number, x: number) =>
+      Math.abs(x - lo) <= 1e-9 * (hi - lo) || Math.abs(x - hi) <= 1e-9 * (hi - lo),
+    onU = !e.uPeriod && at(e.uDomain[0], e.uDomain[1], u),
+    onV = !e.vPeriod && at(e.vDomain[0], e.vDomain[1], v);
+  if (!onU && !onV) return undefined;
+  // Along the edge: v runs at fixed u (or u at fixed v).
+  const [lo, hi] = onU ? e.vDomain : e.uDomain,
+    point = (t: number) => (onU ? e.at(u, t) : e.at(t, v));
+  let t = onU ? v : u,
+    x: XYZ | undefined;
+  for (let i = 0; i < 40; i++) {
+    const d = point(t),
+      p = d.slice(0, 3) as XYZ,
+      g = signedDistance(other, p),
+      speed = dot(distanceGradient(other, p), onU ? [d[6], d[7], d[8]] : [d[3], d[4], d[5]]);
+    x = p;
+    if (Math.abs(g) <= 4e-16 * scale0) return x;
+    if (!speed) return undefined;
+    t = Math.min(hi, Math.max(lo, t - g / speed));
+  }
+  return x && Math.abs(signedDistance(other, x)) <= 1e-10 * scale0 ? x : undefined;
 }
 
 /** A C1 cubic B-spline (a chain of Bezier segments) through the points with the given unit tangents. */
@@ -333,6 +376,7 @@ function isoCurves(s: SurfaceDef, box: Box3, n: number): { curve: CurveDef; t0: 
 
 /** Points where curves lying on `s` cross `other`, inside the box. */
 function seeds(s: SurfaceDef, other: SurfaceDef, box: Box3): XYZ[] {
+  if (s.kind === 'spline') return splineSeeds(s, other, box);
   const margin = 1e-9 * length(sub(box.max, box.min)),
     out: XYZ[] = [];
   for (const { curve, t0, t1 } of isoCurves(s, box, 32))
@@ -348,4 +392,55 @@ function circlePoint(curve: CurveDef, t: number): XYZ {
   if (curve.kind !== 'circle') throw new TypeError('expected a circle');
   const { origin, x, y } = curve.frame;
   return add(origin, add(scale(x, curve.radius * Math.cos(t)), scale(y, curve.radius * Math.sin(t))));
+}
+
+/**
+ * Points where a spline surface's lines of constant u and of constant v cross `other`, inside the box: four lines to a
+ * knot span each way (16 to 256), each sampled eight times a span (64 to 1024), sign changes bisected along the line.
+ */
+function splineSeeds(s: SurfaceDef, other: SurfaceDef, box: Box3): XYZ[] {
+  const e = surfaceEvaluator(s),
+    [uBreaks, vBreaks] = e.breaks?.() ?? [[], []],
+    margin = 1e-9 * length(sub(box.max, box.min)),
+    out: XYZ[] = [],
+    params = (breaks: readonly number[], domain: readonly [number, number], per: number, lo: number, hi: number) => {
+      const spans = Math.max(1, breaks.length - 1),
+        n = Math.max(lo, Math.min(hi, spans * per)),
+        [a, b] = breaks.length >= 2 ? [breaks[0], breaks[breaks.length - 1]] : domain;
+      return Array.from({ length: n + 1 }, (_, k) => a + ((b - a) * k) / n);
+    },
+    us = params(uBreaks, e.uDomain, 4, 16, 256),
+    vs = params(vBreaks, e.vDomain, 4, 16, 256),
+    alongU = params(uBreaks, e.uDomain, 8, 64, 1024),
+    alongV = params(vBreaks, e.vDomain, 8, 64, 1024),
+    line = (point: (t: number) => XYZ, ts: number[]) => {
+      const f = (t: number) => signedDistance(other, point(t));
+      let a = ts[0],
+        fa = f(a);
+      for (let k = 1; k < ts.length; k++) {
+        const b = ts[k],
+          fb = f(b);
+        if (fa < 0 !== fb < 0) {
+          // Bisection to the last bit along the line, then onto both surfaces by the tracer's settle.
+          let lo = a,
+            hi = b,
+            flo = fa;
+          for (let i = 0; i < 80 && hi - lo > 1e-15 * (Math.abs(lo) + Math.abs(hi) + 1); i++) {
+            const m = (lo + hi) / 2,
+              fm = f(m);
+            if (fm < 0 === flo < 0) {
+              lo = m;
+              flo = fm;
+            } else hi = m;
+          }
+          const p = point((lo + hi) / 2);
+          if (inside(box, p, margin)) out.push(p);
+        }
+        a = b;
+        fa = fb;
+      }
+    };
+  for (const u of us) line((v) => e.at(u, v).slice(0, 3) as XYZ, alongV);
+  for (const v of vs) line((u) => e.at(u, v).slice(0, 3) as XYZ, alongU);
+  return out;
 }

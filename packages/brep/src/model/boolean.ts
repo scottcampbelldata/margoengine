@@ -26,6 +26,8 @@ interface Piece {
   name: Name;
   /** Names it came from, for the history: the edge it was split from, or the two faces it was cut along. */
   from: Name[];
+  /** The tolerance of the edge it was split from (an imported edge may lie a little off its faces). */
+  tolerance?: number;
   edge?: Edge;
   samples?: XYZ[];
   /** A piece of the other solid lying along this one: the result keeps that one (flip: it runs the other way). */
@@ -72,10 +74,10 @@ const RAYS = [
  * theirs, a face split into several kept pieces gives `<face>#k`, a split edge `<edge>#k`, and intersection edges
  * `<name>/edge:<face of a>|<face of b>#k`; `history` records splits as modifications, intersection edges as
  * generated from their two faces, and what was removed as deleted. Supported: faces on planes,
- * cylinders, cones, spheres and tori in any position: faces on one surface, edges along edges and vertices on faces
- * meet within 1e-6 of the model; faces left on one surface facing the same way, and edges split along one curve,
- * are joined. Throws a RangeError for what is not supported yet (tangential contact, loops through a pole, spline
- * surfaces) and when the result is not a valid solid.
+ * cylinders, cones, spheres, tori and spline surfaces in any position: faces on one surface, edges along edges and
+ * vertices on faces meet within 1e-6 of the model (or an imported edge's own tolerance); faces left on one surface
+ * facing the same way, and edges split along one curve, are joined. Throws a RangeError for what is not supported yet
+ * (tangential contact) and when the result is not a valid solid.
  */
 export function boolean(
   name: Name,
@@ -166,11 +168,17 @@ export function boolean(
               const th = onEdge(co.edge, p);
               if (th === undefined) continue;
               const v = vertexAt(p);
+              // On a tolerant edge (an imported one, a little off its faces), the vertex is as far off them.
+              v.tolerance = Math.max(v.tolerance, e.tolerance, co.edge.tolerance);
               split(e, t, v);
               split(co.edge, th, v);
               onBoundary = true;
             }
-          if (!onBoundary && uvOf.get(g)!.contains(p)) split(e, t, vertexAt(p));
+          if (!onBoundary && uvOf.get(g)!.contains(p)) {
+            const v = vertexAt(p);
+            v.tolerance = Math.max(v.tolerance, e.tolerance);
+            split(e, t, v);
+          }
         }
       }
       // The other solid's vertices on this edge cut it.
@@ -207,6 +215,7 @@ export function boolean(
         t1: stops[k + 1].t,
         name: unique.length ? `${e.name}#${k}` : e.name,
         from: [e.name],
+        tolerance: e.tolerance,
       })),
     );
   }
@@ -292,7 +301,7 @@ export function boolean(
               for (const s of splits.get(co.edge) ?? []) {
                 if (stops.some((x) => x.vertex === s.vertex)) continue;
                 const t = c.parameter(s.vertex.point);
-                if (length(sub(c.at(t).slice(0, 3) as XYZ, s.vertex.point)) <= touch)
+                if (length(sub(c.at(t).slice(0, 3) as XYZ, s.vertex.point)) <= Math.max(touch, s.vertex.tolerance))
                   stops.push({ t, vertex: s.vertex });
               }
         // Where two curves cross (the surfaces touch tangentially there): a vertex on each. At a corner the faces share
@@ -317,7 +326,8 @@ export function boolean(
               const v = original.get(co.start)!;
               if (stops.some((x) => x.vertex === v)) continue;
               const t = c.parameter(v.point);
-              if (length(sub(c.at(t).slice(0, 3) as XYZ, v.point)) <= touch) stops.push({ t, vertex: v });
+              if (length(sub(c.at(t).slice(0, 3) as XYZ, v.point)) <= Math.max(touch, v.tolerance))
+                stops.push({ t, vertex: v });
             }
         stops.sort((x, y) => x.t - y.t);
         /** A boundary piece of `f` between these vertices that the stretch runs along, if any. */
@@ -482,7 +492,7 @@ export function boolean(
   for (const { face } of outputs) counts.set(face, (counts.get(face) ?? 0) + 1);
   const edgeOf = (p: Piece) => {
     if (!p.edge) {
-      p.edge = new Edge(p.name, p.curve, p.start, p.end, p.t1 >= p.t0);
+      p.edge = new Edge(p.name, p.curve, p.start, p.end, p.t1 >= p.t0, p.tolerance);
       // A split edge continues as its pieces; an intersection edge is new, made from the two faces.
       if (p.from.length > 1) generated.push([p.name, p.from]);
       else if (p.name !== p.from[0]) modified.push([p.from[0], p.name]);

@@ -38,6 +38,8 @@ Every item is done only when all of these hold:
       Claude's drill check (2026-10-20, a hole through the middle of each Jubilee solid): 78 of 145 valid after the
       mass and apex fixes; of the 67 failures 62 are spline faces (3.1), 2 tangential contacts (3.2), 2 results with an
       edge off its surface, 1 a probe sizing slip. Imported cones (a face covering or running through its apex) now cut.
+      Later the same day (spline Booleans and tolerant edges, below): 127 of 145; left 14 results with an intersection
+      edge in one face only, 3 tangential contacts, 1 open chain, 1 probe slip.
 - [ ] 1.3 Topology checker: Euler-Poincare (V - E + F - (L - F) - 2(S - G) = 0), every edge used twice and oppositely in
       a solid, consistent orientation, no face crossing another; run on every file read and every operation result.
       Written (claude/kernel): validateBody (Euler-Poincare, one piece per shell) on every operation and import;
@@ -54,12 +56,18 @@ Every item is done only when all of these hold:
       no longer needs OpenCascade for any format.
 - [ ] 2.2 Healing: sew faces into shells within tolerance, close small gaps, refit curves that leave their surfaces,
       fix orientation, remove slivers and tiny edges; report every change.
+      Started 2026-10-20: imported edges keep their measured gap to their faces as tolerance (up to 10 micrometres or
+      1e-4 of the part); Jubilee's 469 such edges no longer count as problems.
 - [ ] 2.3 Parasolid transmit files before version 12.
 - [ ] 2.4 ABC 10,000-model slice: 0 crashes, 0 open edges on valid solids, Euler-Poincare on every solid.
 
 ## Phase 3: freeform modeling
 
 - [ ] 3.1 Booleans on spline surfaces: signed distance and projection, subdivision seeds, traced intersections.
+      Written 2026-10-20 (claude/kernel-speed): signed distance by projection, seeds along iso lines, curves ended
+      exactly at the spline's domain edge; a bicubic block cut by holes, a box and another spline block matches exact
+      integrals within 1e-7 (1e-6 spline on spline); Jubilee drills pass on 127 of 145 solids (78 before). Left:
+      Codex's corpus check and OpenCascade comparison, speed against OpenCascade.
 - [ ] 3.2 Tangential contact inside faces, and coincident freeform patches.
 
 ## Phase 4: blends

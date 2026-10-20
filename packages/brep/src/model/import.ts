@@ -12,7 +12,7 @@ import type { STEPModel } from '../index.js';
 import { type CurveDef, type Frame, frameOf, type SurfaceDef } from './geometry.js';
 import { enclosedVolume } from './mass.js';
 import { Body, Edge, Face, type Shell, Vertex } from './topology.js';
-import { validateBody } from './validate.js';
+import { measureTolerances, validateBody } from './validate.js';
 
 /** The bodies of `step`, one per STEP body (undefined for a tessellated or faceted-only one, or a failed one). */
 export interface ImportedBodies {
@@ -64,6 +64,15 @@ export function bodiesFromSTEP(step: STEPModel): ImportedBodies {
         b.faces,
         b.reversed ?? [],
       );
+      // Edges a writer left a little off their faces keep that gap as their tolerance (up to 10 micrometres, or 1e-4 of
+      // the body's size when larger).
+      const points = body.vertices.map((v) => v.point),
+        size = points.length
+          ? Math.hypot(
+              ...[0, 1, 2].map((k) => Math.max(...points.map((p) => p[k])) - Math.min(...points.map((p) => p[k]))),
+            )
+          : 0;
+      measureTolerances(body, Math.max(1e-5, 1e-4 * size));
       for (const p of validateBody(body)) problems.push({ body: index, problem: `${p.name}: ${p.problem}` });
       return body;
     } catch (e) {

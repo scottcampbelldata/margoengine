@@ -42,6 +42,32 @@ const ends = new WeakMap<
   { curve: Edge['curve']; start: XYZ; end: XYZ; sense: boolean; t0: number; t1: number }
 >();
 
+/**
+ * Raises edge and vertex tolerances to the gaps a file's geometry has (a writer's spline fits leave edges a micrometre
+ * off their faces, more than the accuracy it declares), half again for margin, where the gap is at most `cap` metres:
+ * the tolerant edges a kernel keeps for an imported part. Larger gaps stay for validateBody to report.
+ */
+export function measureTolerances(body: Body, cap: number): void {
+  for (const e of body.edges) {
+    const c = curveEvaluator(e.curve);
+    let gap = 0;
+    for (const co of e.coedges) {
+      const s = surfaceEvaluator(co.loop.face.surface);
+      let hint: [number, number] | undefined;
+      for (const t of edgeParameters(e, 16)) {
+        const p = c.at(t).slice(0, 3) as XYZ;
+        hint = s.parameters(p, hint);
+        gap = Math.max(gap, distance(s.at(hint[0], hint[1]).slice(0, 3) as XYZ, p));
+      }
+    }
+    if (gap > e.tolerance && gap <= cap) e.tolerance = 1.5 * gap;
+    for (const v of [e.start, e.end]) {
+      const off = distance(c.at(c.parameter(v.point)).slice(0, 3) as XYZ, v.point);
+      if (off > Math.max(v.tolerance, e.tolerance) && off <= cap) v.tolerance = 1.5 * off;
+    }
+  }
+}
+
 /** Problems with `body`, empty when it is valid. */
 export function validateBody(body: Body): ValidityProblem[] {
   const problems: ValidityProblem[] = [],

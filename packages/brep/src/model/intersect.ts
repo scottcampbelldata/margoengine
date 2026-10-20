@@ -1,6 +1,6 @@
 // Intersections for the Boolean operations: exact curves where a closed form exists (plane with plane, plane with
 // cylinder, parallel cylinders, and every pair of surfaces of revolution on one axis, which meet in circles), and
-// curves traced point by point inside a box for every other pair of analytic surfaces (march.ts).
+// curves traced point by point inside a box for every other pair, spline surfaces included (march.ts).
 import { add, cross, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
 import { frameOf, type CurveDef, type SurfaceDef } from './geometry.js';
 import { traceIntersections, type Box3 } from './march.js';
@@ -18,13 +18,12 @@ const parallel = (a: XYZ, b: XYZ) => length(cross(a, b)) <= 1e-12;
  * What two analytic surfaces share: curves, the same surface, or nothing. Exact where a closed form exists (plane with
  * plane, plane with cylinder, parallel cylinders, and surfaces of revolution on one axis: planes across it, spheres
  * centred on it, cylinders, cones and tori about it, which meet in circles); otherwise the curves are traced inside
- * `box` (march.ts), which those pairs need. Throws a RangeError for spline surfaces and for tangential contact.
+ * `box` (march.ts), which those pairs (and every pair with a spline surface) need. Throws a RangeError for tangential
+ * contact.
  */
 export function intersectSurfaces(a: SurfaceDef, b: SurfaceDef, box?: Box3): SurfaceIntersection {
   if (b.kind === 'plane' && a.kind !== 'plane') return intersectSurfaces(b, a, box);
   if (a.kind === 'plane' && b.kind === 'plane') return planePlane(a.frame.origin, a.frame.z, b.frame.origin, b.frame.z);
-  if (a.kind === 'spline' || b.kind === 'spline')
-    throw new RangeError(`Booleans between ${a.kind} and ${b.kind} faces are not supported yet`);
   const coaxial = revolutionPair(a, b);
   if (coaxial) return coaxial;
   if (a.kind === 'plane' && b.kind === 'cylinder')
