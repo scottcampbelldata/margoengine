@@ -738,7 +738,9 @@ function resolveEnvironment(environment: TraceEnvironment | undefined, cache: Sc
     if (!isObject(e.fog)) throw new TypeError(`${where} ${name}.fog must be {density, color?, anisotropy?}`);
     const density = optional(e.fog.density, 0, `${name}.fog.density`, 0, 1e6, 'pass an extinction per unit above 0'),
       fogColor =
-        e.fog.color === undefined ? ([1, 1, 1] as TraceVec3) : checkVec3(e.fog.color, `${name}.fog.color`, true, 'pass linear RGB 0 to 1'),
+        e.fog.color === undefined
+          ? ([1, 1, 1] as TraceVec3)
+          : checkVec3(e.fog.color, `${name}.fog.color`, true, 'pass linear RGB 0 to 1'),
       anisotropy = optional(e.fog.anisotropy, 0, `${name}.fog.anisotropy`, -0.95, 0.95, 'pass -0.95 to 0.95');
     if (density > 0)
       fog = {

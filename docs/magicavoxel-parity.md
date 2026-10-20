@@ -103,15 +103,15 @@ emissive media, area lights, HDR environment maps, a physical sky, motion blur, 
 a denoiser, AOVs (albedo, normal, depth, ids), PNG capture of any size, WebGPU in the browser. To do: a feature table
 with MagicaVoxel against Margo for the product page, once speed is measured.
 
-## Open: finish the package (before it can be pushed or published)
+## Finish the package (before it can be pushed or published)
 
-- README: document the new options (`bounceLimits`, `transparentShadows`, `sunSpecular`, `sunInMedia`,
-  `toneMapping: 'aces-narkowicz'`, `gamma`), environment `sunVisible` and `groundHorizon`, material `metalColor`,
-  `coat`, `tint`, `cameraEmission`, and the `magicaVoxel*` helpers with the table above.
-- Unit tests for the helpers and the new option validation; browser-check cases for bounce caps, opaque shadows, the
-  sun on diffuse lobes only, the horizon fade, ACES and gamma encoding, camera emission.
-- `npx biome format --write` on touched files, `npm run hygiene`, `npm run verify`, size entries.
-- Rebuild the three tarballs for Codex into `test-results` and report their SHA-256.
+- Done: README documents every new option, material field, `environment.fog`/`groundFade`/`sunVisible` and the
+  `magicaVoxel*` helpers; `tests/magicavoxel.test.js` (9 tests: materials with current, older and missing keys, render
+  objects, cameras, models and placement, options reaching the frame); the real-GPU `compat` check (closed forms for
+  energy compensation, metalColor, additive coat, untinted glass, voxelwise blend, camera emission, diffuse caps 1/2/3,
+  the sun on diffuse lobes only, opaque shadows, the sun in media and sunlit media, ground fade, fog, the ACES and gamma
+  byte); Biome format and lint clean; hygiene 10.0 on every gate for the package.
+- Open: `npm run verify` on the branch, size entries (measure:size), rebuild the tarballs for Codex.
 
 ## Open from before the parity work (do not lose)
 

@@ -114,6 +114,66 @@ const frames=async(n)=>{for(let i=0;i<n;i++){engine.render({delta:0});await devi
 // A finished frame read back in the task that rendered it (the canvas texture is only valid until the task ends).
 const shot=async()=>{await frames(2);engine.render({delta:0});return readCanvas();};
 window.check={
+ // Compatibility switches (MagicaVoxel's choices and the material additions), each against a closed form.
+ async compat(){
+  const out={},first=(image)=>(i)=>image.instance[i]===0,render=(t,samples=512,size=32)=>t.renderImage({width:size,height:size,samples,aovs:true,jitter:false});
+  // Energy compensation: a white rough metal cube in a white sky is white with it, darker without it.
+  look([14,10,18],[0,0,0],{fov:35});
+  for(const comp of [true,false]){out[`rough metal compensation ${comp}`]=await withTracer(furnace([{id:1,color:[1,1,1],type:'metal',roughness:0.7}]),{maxBounces:64,energyCompensation:comp},async(t)=>{const im=await render(t,512,64);return stats(im,first(im));});}
+  // Material additions in the furnace: metalColor 0.5 (smooth: Schlick from 0.5), additive against layered coat,
+  // untinted glass is clear, a voxelwise blend keeps its energy.
+  out['metalColor 0.5']=await withTracer(furnace([{id:1,color:[1,1,1],metalColor:[0.5,0.5,0.5],type:'metal',roughness:0}]),{maxBounces:64},async(t)=>{const im=await render(t,256,64);return stats(im,first(im));});
+  for(const coat of ['layered','additive']){out[`coat ${coat}`]=await withTracer(furnace([{id:1,color:[0.5,0.5,0.5],type:'plastic',roughness:0,ior:1.5,coat}]),{maxBounces:64},async(t)=>{const im=await render(t,512,64);return stats(im,first(im));});}
+  out['untinted glass']=await withTracer(furnace([{id:1,color:[0.5,0.5,0.5],type:'glass',tint:false}]),{maxBounces:64},async(t)=>{const im=await render(t,512,64);return stats(im,first(im));});
+  out['voxelwise blend']=await withTracer(furnace([{id:1,color:[1,1,1],type:'blend',metalness:0,transmission:0.5,roughness:0,voxelwise:true}]),{maxBounces:64},async(t)=>{const im=await render(t,512,64);return stats(im,first(im));});
+  // Camera emission: an emitter casting emission 3 shows 0.5 to the camera (black sky).
+  out['camera emission 0.5']=await withTracer(furnace([{id:1,color:[1,1,1],type:'emit',emission:3,cameraEmission:0.5}],{skyIntensity:0}),{maxBounces:8},async(t)=>{const im=await render(t,64,64);return stats(im,first(im));});
+  // Diffuse caps: floor (albedo 0.5) under an emissive ceiling (radiance 1, albedo 0.5): 0.5 with 1 or 2 diffuse
+  // events (the next term needs three), 0.625 with 3, 2/3 uncapped.
+  const slabs={revision:1,models:[model('f',[256,1,256],()=>1),model('c',[256,1,256],()=>2)],instances:[{id:'f',modelId:'f',matrix:translate(-128,-1,-128)},{id:'c',modelId:'c',matrix:translate(-128,2,-128)}],materials:[{id:1,color:[0.5,0.5,0.5],type:'diffuse'},{id:2,color:[0.5,0.5,0.5],type:'emit',emission:2}],environment:{skyIntensity:0}};
+  look([0,1.5,0.01],[0,0,0],{fov:20});
+  for(const cap of [1,2,3]){out[`diffuse cap ${cap}`]=await withTracer(slabs,{maxBounces:24,bounceLimits:{diffuse:cap}},async(t)=>{const im=await render(t,1024);return stats(im,first(im));});}
+  // The sun on diffuse lobes only: a diffuse floor keeps sun irradiance pi / pi x 0.5 = 0.5; a rough metal floor seen
+  // from above loses its highlight entirely (black sky).
+  const floor=(material)=>({revision:1,models:[model('p',[64,1,64],()=>1)],instances:[{id:'p',modelId:'p',matrix:translate(-32,-1,-32)}],materials:[{id:1,...material}],environment:{skyIntensity:0,sunDirection:[0.05,1,0],sunIntensity:Math.PI,sunAngularSize:0.02}});
+  look([0,10,0.01],[0,0,0],{fov:30});
+  for(const spec of [true,false]){
+   out[`diffuse sunSpecular ${spec}`]=await withTracer(floor({color:[0.5,0.5,0.5],type:'diffuse'}),{maxBounces:4,sunSpecular:spec},async(t)=>{const im=await render(t,256);return stats(im,first(im));});
+   out[`rough metal sunSpecular ${spec}`]=await withTracer(floor({color:[1,1,1],type:'metal',roughness:0.5}),{maxBounces:4,sunSpecular:spec},async(t)=>{const im=await render(t,256);return stats(im,first(im));});
+  }
+  // Opaque shadows: a glass slab between the sun and the floor shadows it fully; with transparent shadows light comes
+  // through.
+  const shaded={revision:1,models:[model('p',[64,1,64],()=>1),model('g',[64,2,64],()=>2)],instances:[{id:'p',modelId:'p',matrix:translate(-32,-1,-32)},{id:'g',modelId:'g',matrix:translate(-32,4,-32)}],materials:[{id:1,color:[0.5,0.5,0.5],type:'diffuse'},{id:2,color:[1,1,1],type:'glass',ior:1.5}],environment:{skyIntensity:0,sunDirection:[0,1,0],sunIntensity:Math.PI}};
+  look([0,3,0.01],[0,0,0],{fov:20});
+  // (Without sunSpecular a path cannot find the sun through the glass by chance either, as in MagicaVoxel.)
+  for(const ts of [true,false]){out[`floor under glass transparentShadows ${ts}`]=await withTracer(shaded,{maxBounces:8,transparentShadows:ts,sunSpecular:ts},async(t)=>{const im=await render(t,256);return stats(im,first(im));});}
+  // The sun in media: a white cloud lit only by the sun (black sky, no ground) is dark without sunInMedia and lit again
+  // when the medium is sunlit.
+  const cloud=(sunlit)=>({revision:1,models:[solid(8,1)],instances:[{id:'m',modelId:'cube',matrix:translate(-4,-4,-4)}],materials:[{id:1,color:[1,1,1],type:'media',density:0.3,sunlit}],environment:{skyIntensity:0,sunDirection:[0.3,1,0.2],sunIntensity:3}});
+  look([14,10,18],[0,0,0],{fov:35});
+  for(const [name,opts,sunlit] of [['cloud sunInMedia true',{},false],['cloud sunInMedia false',{sunInMedia:false,transparentShadows:false},false],['sunlit cloud sunInMedia false',{sunInMedia:false,transparentShadows:false},true]]){
+   out[name]=await withTracer(cloud(sunlit),{maxBounces:16,...opts},async(t)=>{const im=await render(t,512,64);return stats(im,first(im));});
+  }
+  // Ground fade: ground (albedo 0.5) under sky 1 seen 14.14 away, fade distance 14.14: half way to the sky, 0.75.
+  const empty={revision:1,models:[model('d',[1,1,1],()=>1)],instances:[{id:'d',modelId:'d',matrix:translate(500,500,500)}],materials:[{id:1,color:[0.5,0.5,0.5],type:'diffuse'}]};
+  look([0,10,0],[0,0,-10],{fov:2});
+  out['ground fade 0.75']=await withTracer({...empty,environment:{skyColor:[1,1,1],groundColor:[0.5,0.5,0.5],groundHeight:0,groundFade:Math.hypot(10,10)}},{maxBounces:8},async(t)=>{const im=await render(t,256,8);return stats(im,()=>true);});
+  // Uniform fog (white, isotropic, extinction 0.05): a floor (albedo 0.5) under sky 1 is lit by the glow 0.5 (half the
+  // sky) to 0.25 and seen 10 away: 0.25 exp(-0.5) + 0.5 (1 - exp(-0.5)); a ray to the sky sees 0.5.
+  look([0,10,0.01],[0,0,0],{fov:10});
+  const fogScene={...empty,models:[model('p',[64,1,64],()=>1)],instances:[{id:'p',modelId:'p',matrix:translate(-32,-1,-32)}],environment:{skyColor:[1,1,1],fog:{density:0.05}}};
+  out['fog floor']=await withTracer(fogScene,{maxBounces:8},async(t)=>{const im=await render(t,1024,8);return stats(im,first(im));});
+  look([0,10,0],[0,30,0.01],{fov:10});
+  out['fog sky 0.5']=await withTracer(fogScene,{maxBounces:8},async(t)=>{const im=await render(t,64,8);return stats(im,()=>true);});
+  // ACES (Narkowicz) and gamma 2.2: a sky of radiance 0.5 encodes to round(255 x aces(0.6 x 0.5)^(1 / 2.2)) = 175.
+  look([0,0,0],[0,0,-1],{fov:30});
+  out['aces gamma byte']=await withTracer({...empty,environment:{skyColor:[1,1,1],skyIntensity:0.5}},{toneMapping:'aces-narkowicz',gamma:2.2,maxBounces:2},async(t)=>{
+   const blob=await t.capture({width:8,height:8,samples:4}),bitmap=await createImageBitmap(blob),c=new OffscreenCanvas(8,8).getContext('2d');
+   c.drawImage(bitmap,0,0);const d=c.getImageData(0,0,8,8).data;return {byte:d[4*36],green:d[4*36+1]};
+  });
+  look([20,14,24],[4,3,4]);
+  return {...out,errors:errors.splice(0)};
+ },
  async compile(){
   const scene=scenes.materials();
   const r=await withTracer(scene,{denoise:true},async(tracer)=>{await frames(4);await new Promise((r)=>setTimeout(r,300));await frames(4);return {status:tracer.status,stats:tracer.stats};});

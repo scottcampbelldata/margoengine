@@ -58,6 +58,38 @@ const near = (actual, expected, tolerance, label) =>
 try {
   console.log('adapter', JSON.stringify(hardware.webgpu), hardware.userAgent);
   await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
+  if (wanted('compat')) {
+    const c = await run('compat');
+    near(c['rough metal compensation true'].mean, 1, 0.01, 'compensated rough metal');
+    assert.ok(c['rough metal compensation false'].mean < 0.985, 'uncompensated rough metal loses energy');
+    near(c['metalColor 0.5'].mean, 0.53, 0.04, 'metalColor');
+    const gain = c['coat additive'].mean - c['coat layered'].mean;
+    assert.ok(gain > 0.01 && gain < 0.06, `additive coat adds the base's share of the Fresnel: ${gain}`);
+    near(c['untinted glass'].mean, 1, 0.02, 'untinted glass is clear');
+    near(c['voxelwise blend'].mean, 1, 0.03, 'voxelwise blend keeps its energy');
+    near(c['camera emission 0.5'].mean, 0.5, 0.005, 'camera emission');
+    near(c['diffuse cap 1'].mean, 0.5, 0.01, 'diffuse cap 1');
+    near(c['diffuse cap 2'].mean, 0.5, 0.01, 'diffuse cap 2');
+    near(c['diffuse cap 3'].mean, 0.625, 0.012, 'diffuse cap 3');
+    near(c['diffuse sunSpecular true'].mean, 0.5, 0.01, 'diffuse floor, sun on every lobe');
+    near(c['diffuse sunSpecular false'].mean, 0.5, 0.01, 'diffuse floor, sun on diffuse lobes only');
+    assert.ok(c['rough metal sunSpecular true'].mean > 0.05, 'rough metal shows the sun');
+    near(c['rough metal sunSpecular false'].mean, 0, 1e-6, 'no sun on the metal lobe');
+    near(c['floor under glass transparentShadows false'].mean, 0, 1e-6, 'glass blocks the sun');
+    assert.ok(c['floor under glass transparentShadows true'].mean > 0.3, 'light through glass');
+    assert.ok(c['cloud sunInMedia true'].mean > 0.05, 'sun-lit cloud');
+    near(c['cloud sunInMedia false'].mean, 0, 1e-6, 'no sun in media');
+    near(
+      c['sunlit cloud sunInMedia false'].mean,
+      c['cloud sunInMedia true'].mean,
+      0.15 * c['cloud sunInMedia true'].mean,
+      'sunlit medium',
+    );
+    near(c['ground fade 0.75'].mean, 0.75, 0.01, 'ground fade');
+    near(c['fog floor'].mean, 0.25 * Math.exp(-0.5) + 0.5 * (1 - Math.exp(-0.5)), 0.008, 'fog floor');
+    near(c['fog sky 0.5'].mean, 0.5, 0.002, 'fog glow');
+    assert.equal(c['aces gamma byte'].byte, 175, 'ACES and gamma 2.2');
+  }
   if (wanted('compile')) {
     const r = await run('compile');
     assert.deepEqual(r.messages, [], 'shader compilation messages');

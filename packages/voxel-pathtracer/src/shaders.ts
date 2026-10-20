@@ -29,7 +29,17 @@
 //   (Schied et al. 2017, "Spatiotemporal Variance-Guided Filtering"), on albedo-demodulated radiance.
 // Material flags and record sizes must match scene.ts and layout.ts.
 import { displayShader } from '../../shared/display.js';
-import { ADDITIVE, DELTA_ALPHA, EMISSIVE, MATERIAL_FLOATS, MEDIA, SMOOTH, SUNLIT, UNTINTED, VOXELWISE } from './scene.js';
+import {
+  ADDITIVE,
+  DELTA_ALPHA,
+  EMISSIVE,
+  MATERIAL_FLOATS,
+  MEDIA,
+  SMOOTH,
+  SUNLIT,
+  UNTINTED,
+  VOXELWISE,
+} from './scene.js';
 import { SPECTRUM } from './spectrum.js';
 import {
   FLAG_CLAMP,

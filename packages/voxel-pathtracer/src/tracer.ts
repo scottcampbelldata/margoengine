@@ -230,7 +230,8 @@ function settings(input: Partial<Omit<VoxelPathTracerOptions, 'scene'>>, base: S
     s.toneMapping = o.toneMapping;
   }
   if ('gamma' in o)
-    s.gamma = o.gamma === undefined ? undefined : checkNumber(o.gamma, 'gamma', 1, 5, 'pass 1 to 5, or undefined for sRGB');
+    s.gamma =
+      o.gamma === undefined ? undefined : checkNumber(o.gamma, 'gamma', 1, 5, 'pass 1 to 5, or undefined for sRGB');
   if (o.bounceLimits !== undefined) s.bounceLimits = bounceLimits(o.bounceLimits);
   if (o.transparentShadows !== undefined) s.transparentShadows = flag(o.transparentShadows, 'transparentShadows');
   if (o.sunSpecular !== undefined) s.sunSpecular = flag(o.sunSpecular, 'sunSpecular');

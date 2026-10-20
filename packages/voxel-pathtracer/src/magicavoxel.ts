@@ -63,8 +63,12 @@ const nums = (d: MagicaVoxelDict | undefined, key: string): number[] | undefined
 };
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 /** MagicaVoxel's 8-bit colour to linear: a pure 2.2 power (not the sRGB curve). */
-export const magicaVoxelLinear = (value: number): number => (clamp01(value / 255)) ** 2.2;
-const linear3 = (c: ArrayLike<number>): TraceVec3 => [magicaVoxelLinear(c[0]), magicaVoxelLinear(c[1]), magicaVoxelLinear(c[2])];
+export const magicaVoxelLinear = (value: number): number => clamp01(value / 255) ** 2.2;
+const linear3 = (c: ArrayLike<number>): TraceVec3 => [
+  magicaVoxelLinear(c[0]),
+  magicaVoxelLinear(c[1]),
+  magicaVoxelLinear(c[2]),
+];
 const colorOf = (d: MagicaVoxelDict | undefined, key: string, fallback: TraceVec3): TraceVec3 => {
   const c = nums(d, key);
   return c && c.length >= 3 ? linear3(c) : fallback;
@@ -125,7 +129,8 @@ export function magicaVoxelMaterial(id: number, rgb: ArrayLike<number>, attribut
     }
     case '_glass':
       // Subsurface glass renders like the subsurface cloud (measured within 4 levels of it).
-      if (media === '_sss' && trans >= 1) return { id, type: 'media', color, density: 10 * density, anisotropy: g, sunlit: true };
+      if (media === '_sss' && trans >= 1)
+        return { id, type: 'media', color, density: 10 * density, anisotropy: g, sunlit: true };
       return {
         id,
         type: trans < 1 ? 'blend' : 'glass',
@@ -258,7 +263,8 @@ export function magicaVoxelLighting(objects: Iterable<MagicaVoxelDict>): MagicaV
   if (mode === 1) unsupported.push('atmosphere sky (_atm): a uniform sky stands in');
   if (mode === 2) unsupported.push('image sky (_ibl): pass the HDR image as environment.map');
 
-  if ((num(o('_bloom'), '_mix') ?? 0.5) > 0 && (num(o('_bloom'), '_scale') ?? 0) > 0) unsupported.push('bloom (_bloom)');
+  if ((num(o('_bloom'), '_mix') ?? 0.5) > 0 && (num(o('_bloom'), '_scale') ?? 0) > 0)
+    unsupported.push('bloom (_bloom)');
   if ((num(setting, '_edge') ?? 0) !== 0) unsupported.push('edges (_edge)');
   if ((num(setting, '_grid') ?? 0) !== 0) unsupported.push('grid (_grid)');
   if ((num(film, '_vig') ?? 0) > 0) unsupported.push('vignette (_film _vig)');
@@ -323,10 +329,17 @@ export function magicaVoxelCamera(camera: MagicaVoxelDict, objects: Iterable<Mag
  * 4 bytes). Place it with {@link magicaVoxelMatrix}.
  * @throws RangeError for a size outside 1 to 256.
  */
-export function magicaVoxelModel(id: string, revision: number, size: ArrayLike<number>, voxels: Uint8Array): TraceModel {
+export function magicaVoxelModel(
+  id: string,
+  revision: number,
+  size: ArrayLike<number>,
+  voxels: Uint8Array,
+): TraceModel {
   const [sx, sy, sz] = [size[0], size[1], size[2]];
   if (![sx, sy, sz].every((v) => Number.isInteger(v) && v >= 1 && v <= 256))
-    throw new RangeError(`magicaVoxelModel size ${Array.from(size).join(' x ')} is out of range; pass 1 to 256 per axis`);
+    throw new RangeError(
+      `magicaVoxelModel size ${Array.from(size).join(' x ')} is out of range; pass 1 to 256 per axis`,
+    );
   const dense = new Uint8Array(sx * sy * sz);
   for (let i = 0; i + 3 < voxels.length; i += 4) {
     const x = voxels[i],
@@ -364,5 +377,22 @@ export function magicaVoxelMatrix(
     // C applied to rows: tracer x = mv x, y = mv z, z = -mv y.
     M = [A[0], A[2], A[1].map((v) => -v)],
     t = [b[0], b[2], -b[1]];
-  return [M[0][0], M[1][0], M[2][0], 0, M[0][1], M[1][1], M[2][1], 0, M[0][2], M[1][2], M[2][2], 0, t[0], t[1], t[2], 1];
+  return [
+    M[0][0],
+    M[1][0],
+    M[2][0],
+    0,
+    M[0][1],
+    M[1][1],
+    M[2][1],
+    0,
+    M[0][2],
+    M[1][2],
+    M[2][2],
+    0,
+    t[0],
+    t[1],
+    t[2],
+    1,
+  ];
 }

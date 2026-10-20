@@ -95,6 +95,16 @@ except `id`, `color` and `type` are optional.
   sampled through.
 - Media voxels of one index form one volume; light entering it is attenuated and scattered, and next-event estimation
   works from inside it (shadow rays are attenuated through media, blocked by anything else).
+- Compatible additions for other renderers' material models (the MagicaVoxel mapping below sets them):
+  - `metalColor`: the metal lobe's reflectance at normal incidence, when it differs from `color` (default `color`).
+  - `coat: 'additive'`: the coat adds to the whole diffuse base instead of taking its reflection out of it (default
+    `'layered'`).
+  - `tint: false`: glass colour acts only through `density` absorption, not at its faces (default true).
+  - `cameraEmission`: the emission multiplier camera rays see on the surface, while lighting keeps `emission` (a light
+    that shows dimmer than it shines).
+  - `sunlit` (media): the sun lights the medium through itself even when `sunInMedia` and `transparentShadows` are off.
+  - `voxelwise` (blend): every voxel face inside the volume picks a lobe again; light passes straight through the
+    glass share and the rest scatters there (MagicaVoxel's partly transparent voxels).
 
 ## Lighting
 
@@ -106,7 +116,12 @@ except `id`, `color` and `type` are optional.
 | Physical sky (addition) | `environment.physicalSky`: `{turbidity (1.7-10, default 3), intensity (radiance per kcd/m^2, default 0.1)}` | Preetham, Shirley and Smits' daylight model for `sunDirection`, baked to a 1024 x 512 map and importance sampled like one; black below the horizon (a sun below it is taken on the horizon). The sun disk stays the `sun*` light. Not together with `map`. |
 | Environment map (addition) | `environment.map`: equirectangular linear RGB(A) floats, `intensity`, `rotation` about +Y | Replaces the constant sky; importance sampled by luminance x sin(theta). Its centre column faces -Z, three quarters +X. |
 | Emissive voxels | Any material with `emission > 0` | Faces sampled by emitted power, instances by power x area. |
+| Uniform fog (addition) | `environment.fog`: `{density (extinction per world unit), color?, anisotropy?}` | Rays outside volumes fade over distance toward the fog's glow, the sky and sun light it scatters (Henyey-Greenstein, no shadows); rays leaving the scene see only the glow; the sun reaches surfaces only through it; emissive voxels and area lights are attenuated by distance. |
 | Area lights (addition) | `scene.lights`: rectangles `position + s * edgeU + t * edgeV`, radiance `color * intensity`, `twoSided`, `opaque` | Facing `cross(edgeU, edgeV)`. Solid panels by default: seen, reflected and casting shadows (from the sun, the sky, emissive voxels and each other); a one-sided light's back is black. `opaque: false` keeps the earlier see-through light (no shadows, no back face). Dark (`intensity` 0) solid panels stay as occluders. At most 256. |
+
+Lighting additions: `environment.sunVisible: false` hides the sun disk from camera rays (it still lights and
+reflects); `environment.groundFade` (a distance) fades the ground camera rays see into the horizon's sky by
+D / (D + groundFade) at distance D.
 
 Sun and environment light that reaches a surface through smooth glass or off a mirror is sampled directly too, not only
 found by chance: voxel faces are planes, so the shadow ray refracts (exact Fresnel, tint, absorption) and reflects
@@ -165,7 +180,13 @@ The engine camera is used as is: perspective by default, orthographic (or any af
 | `fisheye` | `{mapping: 'equidistant', fov: 180}` | mapping `'equidistant'` or `'equisolid'`, fov above 0 to 360 | yes |
 | `distortion` | none | `{k1, k2, p1, p2}`, each -1 to 1, or null | yes |
 | `clamp` (largest luminance a path may add; biased firefly control) | Infinity | above 0 | yes |
-| `toneMapping` | `'neutral'` (Khronos PBR Neutral, Margo's display transform) | `'neutral'`, `'linear'` | no |
+| `toneMapping` | `'neutral'` (Khronos PBR Neutral, Margo's display transform) | `'neutral'`, `'linear'`, `'aces-narkowicz'` (Narkowicz's ACES fit after x0.6) | no |
+| `gamma` (display encoding after tone mapping) | sRGB | 1-5 (power 1 / gamma), or undefined for sRGB | no |
+| `bounceLimits` (events per kind on top of `maxBounces`) | none | `{diffuse?, specular?, scatter?}` each 1-64, or null | yes |
+| `transparentShadows` (shadow rays through glass and media) | true | boolean; false: any voxel blocks them | yes |
+| `sunSpecular` (the sun lights glossy lobes, is seen in reflections) | true | boolean; false: diffuse lobes only | yes |
+| `sunInMedia` (the sun lights media directly) | true | boolean | yes |
+| `energyCompensation` (rough metal and glass keep their energy) | true | boolean | yes |
 | `order` (frame-graph order of the pass) | 20 | finite | no |
 
 Accumulation also restarts on any change of the camera (matrix, position, target, up, projection), the drawing-buffer
@@ -352,6 +373,24 @@ Numbers on other GPUs are not measured.
   rejects bright, noisy neighbours more than dark ones, which darkened images by about 1.5% (measured).
 - PNG output written from the W3C PNG specification over the platform's zlib `CompressionStream`.
 
+## MagicaVoxel files
+
+`magicaVoxelMaterial(id, rgb, attributes)`, `magicaVoxelLighting(renderObjects)`, `magicaVoxelCamera(camera,
+renderObjects)`, `magicaVoxelModel(id, revision, size, xyzi)` and `magicaVoxelMatrix(size, translation, rotation)`
+turn a `.vox` file's palette, MATL materials, rOBJ render settings, rCAM camera and models into this tracer's inputs
+(MagicaVoxel is z-up; tracer = MagicaVoxel (x, z, -y)). `magicaVoxelLighting` also returns the tracer options that
+reproduce MagicaVoxel's choices (ACES with gamma 2.2, bounce caps 2/5/5, no transparent shadows, the sun on diffuse
+lobes only and not in media, no energy compensation) and lists the settings it does not reproduce yet.
+
+The mapping was measured from MagicaVoxel 0.99.7's own renders of calibration scenes (a black box: its code was not
+read): palette colours are linear by a pure 2.2 power, sky radiance is its intensity, sun irradiance 5 x intensity,
+emitters `colour x (1 + 3 x emission x 10^power)`, metal reflectance `min(1, specular x colour)` with GGX width
+0.13 x roughness, glass colour through `_d` absorption only, media extinction `_d` per voxel, fog extinction
+0.001 x `_d`. Six default-lit scenes (diffuse, metal at roughness 0.2 and 0.8, glass, emitter, cloud) match
+MagicaVoxel's images within 3 of 255 levels on 99.2-99.97% of pixels; the measured mapping, the calibration procedure
+and the open items are in docs/magicavoxel-parity.md. Same scenes, same GPU (RTX A6000), 960 x 800 at 1024 samples:
+MagicaVoxel about 14-15 s, this tracer 1.7-1.85 s.
+
 ## Parity status and known gaps
 
 Implemented and verified as above: voxel traversal with shared transformed instances; diffuse, plastic, metal, glass,
@@ -362,9 +401,9 @@ PNG and float captures with cancellation; device-loss recovery.
 
 Not done or not verified, stated plainly:
 
-- **No comparison against MagicaVoxel's renderer.** Images were not compared side by side; matching its exact look
-  would need its proprietary material and lighting equations, which are not public. Mapping `.vox` render/material
-  settings onto these inputs is the editor's job and is approximate.
+- **MagicaVoxel parity is not complete:** its atmosphere sky, image sky, edges, grid, background colour and vignette
+  are not reproduced; partly transparent glass under an open sky and subsurface next to clouds differ by up to 10-20
+  levels; glass over a lit floor is 1-2 levels brighter (docs/magicavoxel-parity.md).
 - **Denoiser:** a classical filter, not a learned one. Averaged over four seeds against 131,072-sample references
   (noise removed in quadrature) it lowers the error x2.46, x2.32, x2.24 at 4, 16, 64 samples on the material scene and
   x2.20, x2.09, x2.03 on the caustic scene (whose undenoised error rose a little when the glass walks became one per
