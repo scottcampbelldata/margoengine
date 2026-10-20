@@ -416,6 +416,37 @@ test("a cone's sector: its face runs through the apex, which its exact mass prop
   assert.ok(Math.abs(whole.volume / 1e-9 - (Math.PI * R ** 3) / 3) <= (1e-9 * whole.volume) / 1e-9);
 });
 
+test('a hole drilled through imported cones: a face covering its apex, and one whose loop runs through it', () => {
+  // The whole cone's face is its base circle alone, covering the apex: the Boolean's box round it once stopped at the
+  // base, so the hole's curve on it was dropped and the result was not a solid. A sector's face runs through the apex:
+  // the Boolean re-traces that loop along the apex's line. The hole (radius a, its axis at d from the cone's, inside
+  // both) removes the integral of R - rho over its disk, rho the distance from the cone's axis.
+  const R = 10,
+    a = 1,
+    d = 5,
+    mm = 0.001,
+    n = 200;
+  let removed = 0;
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < 2 * n; j++) {
+      const r = ((i + 0.5) * a) / n,
+        t = ((j + 0.5) * Math.PI) / n;
+      removed += (R - Math.hypot(d + r * Math.cos(t), r * Math.sin(t))) * r * (a / n) * (Math.PI / n);
+    }
+  for (const [text, volume] of [
+    [cone(R), (Math.PI * R ** 3) / 3],
+    [coneSector(R, (3 * Math.PI) / 2), (Math.PI * R ** 3) / 4],
+  ]) {
+    const [body] = model.bodiesFromSTEP(parseSTEP(text)).bodies,
+      hole = model.cylinder('h', a * mm, 20 * mm, model.frameOf([0, d * mm, -15 * mm], [0, 0, 1], [1, 0, 0])),
+      drilled = model.boolean('d', 'subtract', body, hole),
+      got = model.massProperties(drilled).volume / mm ** 3,
+      want = volume - removed;
+    assert.deepEqual(model.validateBody(drilled), []);
+    assert.ok(Math.abs(got - want) <= 1e-6 * want, `volume ${got} vs ${want}`);
+  }
+});
+
 test('a torus: one face bounded by both seam circles', () => {
   const R = 20,
     r = 5,

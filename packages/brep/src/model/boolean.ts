@@ -641,18 +641,13 @@ function splitFace(f: Face, fuv: FaceUV, halves: Half[]): Omit<Region, 'from'>[]
   }
   // Each cycle in (u', v), continuous along it.
   const loops = cycles.map((cycle) => {
-    const points: UV[] = [];
-    let hint: UV | undefined;
+    const samples: XYZ[] = [];
     for (const h of cycle) {
       const s = samplesOf(h.piece),
         seq = h.forward ? s : [...s].reverse();
-      for (let k = 0; k < seq.length - 1; k++) {
-        const uv = fuv.near(seq[k], hint);
-        points.push(uv);
-        hint = uv;
-      }
+      samples.push(...seq.slice(0, -1));
     }
-    return fuv.close(points);
+    return fuv.trace(samples).loop;
   });
   // A torus is cut open round its tube where no cycle crosses, so v runs over one period from the cut; the region
   // the cut runs through is then in two parts, joined below.
@@ -876,7 +871,16 @@ export function faceBox(fuv: FaceUV, merge: number): Box3 {
   }
   for (const l of fuv.loops) for (const q of l.points) points.push(fuv.at(q));
   if (s.kind !== 'plane') {
-    const [u0, u1, v0, v1] = fuv.box;
+    const [u0, u1] = fuv.box;
+    let [, , v0, v1] = fuv.box;
+    // A pole or apex the face covers lies past its loops in v (a cone face bounded by its base circle alone).
+    for (const side of [1, -1] as const) {
+      const pv = fuv.surface.pole(side);
+      if (pv !== undefined && fuv.contains(fuv.surface.at(0, pv).slice(0, 3) as XYZ)) {
+        v0 = Math.min(v0, pv);
+        v1 = Math.max(v1, pv);
+      }
+    }
     for (let i = 0; i <= 16; i++)
       for (let j = 0; j <= 16; j++) points.push(fuv.at([u0 + ((u1 - u0) * i) / 16, v0 + ((v1 - v0) * j) / 16]));
   }

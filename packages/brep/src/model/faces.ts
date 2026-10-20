@@ -63,57 +63,9 @@ export class FaceUV {
         const curve = curveEvaluator(c.edge.curve);
         for (let k = 0; k < ts.length - 1; k++) samples.push(curve.at(ts[k]).slice(0, 3) as XYZ);
       }
-      // Start from a sample off the poles, so each pole is reached with a u'.
-      const first = Math.max(
-          0,
-          samples.findIndex((p) => this.poleOf(p) === undefined),
-        ),
-        points: UV[] = [],
-        lines: number[] = [],
-        uLines: number[] = [];
-      let hint: UV | undefined;
-      for (let j = 0; j < samples.length; j++) {
-        const p = samples[(first + j) % samples.length],
-          pole = hint && this.poleOf(p);
-        if (pole === undefined || !hint) {
-          const uv = this.near(p, hint);
-          points.push(uv);
-          hint = uv;
-          continue;
-        }
-        // At a pole: along its line from the u' it arrives with to the u' of the next sample off it (at a pole where v has
-        // no meaning, along u' = pole from v to v).
-        let k = j + 1;
-        while (k < samples.length && this.poleOf(samples[(first + k) % samples.length]) !== undefined) k++;
-        const next = samples[(first + k) % samples.length];
-        if ('v' in pole) {
-          const out = this.near(next, [hint[0], pole.v]);
-          lines.push(points.length);
-          points.push([hint[0], pole.v], [out[0], pole.v]);
-          hint = [out[0], pole.v];
-        } else {
-          const out = this.near(next, [pole.u, hint[1]]);
-          uLines.push(points.length);
-          points.push([pole.u, hint[1]], [pole.u, out[1]]);
-          hint = [pole.u, out[1]];
-        }
-        j = k - 1;
-      }
-      const closed = this.close(points, new Set([...lines, ...uLines].flatMap((i) => [i, i + 1])), false);
-      if (lines.length && closed.wrap) {
-        // A loop through a pole bounds a sector and does not go round: its first pole line takes up the turn.
-        for (let i = lines[0] + 1; i < points.length; i++)
-          points[i] = [points[i][0] - closed.wrap * this.period, points[i][1]];
-        closed.wrap = 0;
-      }
-      for (const [u, v] of points) {
-        this.box[0] = Math.min(this.box[0], u);
-        this.box[1] = Math.max(this.box[1], u);
-        this.box[2] = Math.min(this.box[2], v);
-        this.box[3] = Math.max(this.box[3], v);
-      }
-      for (const at of lines) this.poleLines.push({ loop: li, at, v: points[at][1] });
-      this.loops.push(closed);
+      const { loop: traced, lines } = this.trace(samples);
+      for (const at of lines) this.poleLines.push({ loop: li, at, v: traced.points[at][1] });
+      this.loops.push(traced);
     });
     const vPeriod = this.surface.vPeriod;
     if (vPeriod && this.loops.length) {
@@ -134,6 +86,63 @@ export class FaceUV {
       this.box[2] = Math.min(...this.loops.map((l) => vRange(l)[0]));
       this.box[3] = Math.max(...this.loops.map((l) => vRange(l)[1]));
     }
+  }
+
+  /**
+   * A loop through points of the surface, in order: continuous (u', v) points, running along a pole's line where it
+   * passes through a pole or apex (`lines`: the first point of each such line), and growing the face's box.
+   */
+  trace(samples: readonly XYZ[]): { loop: UVLoop; lines: number[] } {
+    // Start from a sample off the poles, so each pole is reached with a u'.
+    const first = Math.max(
+        0,
+        samples.findIndex((p) => this.poleOf(p) === undefined),
+      ),
+      points: UV[] = [],
+      lines: number[] = [],
+      uLines: number[] = [];
+    let hint: UV | undefined;
+    for (let j = 0; j < samples.length; j++) {
+      const p = samples[(first + j) % samples.length],
+        pole = hint && this.poleOf(p);
+      if (pole === undefined || !hint) {
+        const uv = this.near(p, hint);
+        points.push(uv);
+        hint = uv;
+        continue;
+      }
+      // At a pole: along its line from the u' it arrives with to the u' of the next sample off it (at a pole where v has
+      // no meaning, along u' = pole from v to v).
+      let k = j + 1;
+      while (k < samples.length && this.poleOf(samples[(first + k) % samples.length]) !== undefined) k++;
+      const next = samples[(first + k) % samples.length];
+      if ('v' in pole) {
+        const out = this.near(next, [hint[0], pole.v]);
+        lines.push(points.length);
+        points.push([hint[0], pole.v], [out[0], pole.v]);
+        hint = [out[0], pole.v];
+      } else {
+        const out = this.near(next, [pole.u, hint[1]]);
+        uLines.push(points.length);
+        points.push([pole.u, hint[1]], [pole.u, out[1]]);
+        hint = [pole.u, out[1]];
+      }
+      j = k - 1;
+    }
+    const closed = this.close(points, new Set([...lines, ...uLines].flatMap((i) => [i, i + 1])), false);
+    if (lines.length && closed.wrap) {
+      // A loop through a pole bounds a sector and does not go round: its first pole line takes up the turn.
+      for (let i = lines[0] + 1; i < points.length; i++)
+        points[i] = [points[i][0] - closed.wrap * this.period, points[i][1]];
+      closed.wrap = 0;
+    }
+    for (const [u, v] of points) {
+      this.box[0] = Math.min(this.box[0], u);
+      this.box[1] = Math.max(this.box[1], u);
+      this.box[2] = Math.min(this.box[2], v);
+      this.box[3] = Math.max(this.box[3], v);
+    }
+    return { loop: closed, lines };
   }
 
   /**

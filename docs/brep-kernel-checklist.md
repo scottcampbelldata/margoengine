@@ -35,6 +35,9 @@ Every item is done only when all of these hold:
       mass properties, checking, healing, export) works on imported parts, not only on shapes built in Margo.
       Written and on main for STEP (model.bodiesFromSTEP; SAT, XT and JT through their readers' B-reps). On 200 imported
       corpus parts Codex measured cuts valid on 84 (OpenCascade 200) and fillets on 4 (OpenCascade 67), 304 throws.
+      Claude's drill check (2026-10-20, a hole through the middle of each Jubilee solid): 78 of 145 valid after the
+      mass and apex fixes; of the 67 failures 62 are spline faces (3.1), 2 tangential contacts (3.2), 2 results with an
+      edge off its surface, 1 a probe sizing slip. Imported cones (a face covering or running through its apex) now cut.
 - [ ] 1.3 Topology checker: Euler-Poincare (V - E + F - (L - F) - 2(S - G) = 0), every edge used twice and oppositely in
       a solid, consistent orientation, no face crossing another; run on every file read and every operation result.
       Written (claude/kernel): validateBody (Euler-Poincare, one piece per shell) on every operation and import;
