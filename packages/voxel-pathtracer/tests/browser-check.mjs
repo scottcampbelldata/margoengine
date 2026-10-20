@@ -85,7 +85,7 @@ try {
       c['contact transmission true'].mean / c['contact transmission false'].mean,
       0.5,
       0.02,
-      'contact transmission halves what the blend rests on',
+      'contact transmission halves what is seen through the blend',
     );
     near(c['camera emission 0.5'].mean, 0.5, 0.005, 'camera emission');
     near(c['diffuse cap 1'].mean, 0.5, 0.01, 'diffuse cap 1');

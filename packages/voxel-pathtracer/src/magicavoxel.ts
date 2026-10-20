@@ -205,8 +205,9 @@ export function magicaVoxelMaterial(id: number, rgb: ArrayLike<number>, attribut
         type: trans < 1 ? 'blend' : 'glass',
         color,
         transmission: trans,
-        // Partly transparent voxels pick glass or the rest at the block's faces to the air (sqrt(_trans) glass), and
-        // what they rest on shows through with that share again (P boards: 64 tiles, heights 1-6, _trans 0.1-1).
+        // Partly transparent voxels pick glass or the rest at the block's faces to the air, in and out (sqrt(_trans)
+        // glass; the rest scatters back inside: P boards, 64 tiles, heights 1-6, _trans 0.1-1; at diffuse cap 4 those
+        // inner bounces add light as in MagicaVoxel).
         contactTransmission: trans < 1,
         metalness: 0,
         roughness: rough,
@@ -224,8 +225,8 @@ export function magicaVoxelMaterial(id: number, rgb: ArrayLike<number>, attribut
         metalColor,
         metalness: clamp01(num(a, '_metal') ?? 0),
         transmission: Math.sqrt(clamp01(num(a, '_alpha') ?? num(a, '_trans') ?? 0)),
-        // As partly transparent glass: picked at the block's faces to the air, what it rests on reached with the glass
-        // share again (B boards: a 3-voxel block looks like a 1-voxel one; sky-lit 34 -> 56 of 64 tiles within 3).
+        // As partly transparent glass: picked at the block's faces to the air, in and out (B boards: a 3-voxel block
+        // looks like a 1-voxel one in MagicaVoxel).
         contactTransmission: true,
         roughness: rough,
         ior,

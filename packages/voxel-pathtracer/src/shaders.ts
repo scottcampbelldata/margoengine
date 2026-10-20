@@ -1444,9 +1444,11 @@ fn radiance(px:vec2u)->Path {
     let lx=localX(h.inst);
     n=h.sgn*normalize(rowOf(lx,h.axis));
     off=h.sgn*EPS*colOf(worldX(h.inst),h.axis);
-    // From inside a contact-transmitting blend, another voxel's surface is reached only with the glass share.
-    if(medium!=0u&&h.value!=0u&&h.value!=medium){let mc=material(medium);if((mc.flags&CONTACT)!=0u&&rand()>=mc.glass){break;}}
-    if(h.value==0u){
+    // Leaving a contact-transmitting blend into the air: the glass share passes, the rest scatters back inside off the
+    // blend's other lobes (a diffuse event).
+    var inner=false;
+    if(h.value==0u&&medium!=0u){let mc=material(medium);if((mc.flags&CONTACT)!=0u&&rand()>=mc.glass){inner=true;}}
+    if(h.value==0u&&!inner){
      // Leaving a volume into empty space: media end without a surface, glass refracts out or reflects back in.
      var mm=material(medium);
      if((mm.flags&MEDIA)!=0u){medium=0u;mInst=NONE;o=p-off;continue;}
@@ -1471,12 +1473,13 @@ fn radiance(px:vec2u)->Path {
      continue;
     }
     m=material(h.value);
-    if((m.flags&MEDIA)!=0u){
+    if(inner){m=material(medium);m.glass=0.0;}
+    else if((m.flags&MEDIA)!=0u){
      if(medium!=0u&&(material(medium).flags&MEDIA)==0u){chainOk=false;}
      sunFace=dot(n,f.sun.xyz)>0.0;
      medium=h.value;mInst=h.inst;o=p-off;continue;
     }
-    let tex=faceTexel(h,p).rgb;m.color*=tex;m.metalColor*=tex;
+    if(!inner){let tex=faceTexel(h,p).rgb;m.color*=tex;m.metalColor*=tex;}
     // Edge bands and grid lines on what the camera sees (MagicaVoxel's display settings): the line colour, lit.
     if(bounces==0u&&medium==0u){
      if(f.edges.w>0.0&&edgeBand(h,p)){m=lineMat(f.edges.xyz);}

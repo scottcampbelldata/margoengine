@@ -131,8 +131,8 @@ except `id`, `color` and `type` are optional.
     sun glow.
   - `voxelwise` (blend): every voxel face inside the volume picks a lobe again; light passes straight through the
     glass share and the rest scatters there.
-  - `contactTransmission` (blend): a ray inside the volume reaches another voxel's surface only with the glass share's
-    probability, else the path ends (MagicaVoxel's partly transparent glass over what it rests on).
+  - `contactTransmission` (blend): a ray leaving the volume into the air passes only with the glass share's
+    probability, else it scatters back inside off the other lobes (MagicaVoxel's partly transparent glass and blends).
 - Block textures (addition): `scene.textures` lists RGBA8 images (`{width, height, data}`, 1-1024 texels a side, sRGB
   colour, linear alpha, rows from the top; at most 4096); a material's `texture` is one index for every face or six for
   +x, -x, +y, -y, +z, -z in model axes. A face's texel (nearest) multiplies `color` and `metalColor`; emission stays

@@ -61,9 +61,10 @@ export interface TraceMaterial {
    */
   voxelwise?: boolean;
   /**
-   * Compatible addition: for a `blend` volume, a ray inside it reaches another voxel's surface through the face they
-   * share only with the glass share's probability (otherwise the path ends), as MagicaVoxel's partly transparent glass
-   * shows what it rests on. Default false.
+   * Compatible addition: for a `blend` volume, a ray leaving it into the air passes only with the glass share's
+   * probability; otherwise it scatters back inside off the volume's other lobes (a diffuse event). With the pick on
+   * the way in, what the volume rests on is seen with the share twice, as MagicaVoxel's partly transparent glass and
+   * blends show it. Default false.
    */
   contactTransmission?: boolean;
   /**

@@ -108,8 +108,8 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
    | `G-sky-d4` (4/5/5) | 25.2, 15.8 | 1.6, 1.2 | 51 -> 53 | 1.80 -> 0.96 |
    | `G-sun60-lin` (2/5/5) | 5.4, 3.2 | 1.9, 3.8 | 51 -> 52 | 0.89 -> 0.78 |
 
-   Every tile of the sky boards is within 6 except `G-sky-d4`'s partly transparent glass (`_trans` 0.5 and 0.25,
-   8.5 levels, unchanged: MagicaVoxel brightens them with the diffuse cap). Cost: under the sun the absorbing cloud
+   Every tile of the sky boards is within 6 (`G-sky-d4`'s partly transparent glass, 8.5 levels then, fixed under
+   item 2). Cost: under the sun the absorbing cloud
    diagonal to the block went from 1.5 to 4.3 levels and the emissive cloud from 5.1 to 5.6 (the blue cloud beside it
    from 4.9 to 4.5). Rendered by MagicaVoxel 2026-10-20: at scatter cap 10 (`G-sky-sc10`) 55 of 56 tiles within 3
    (the subsurface tiles unchanged, so its events ignore the scatter cap, as modelled); under the sun at diffuse cap
@@ -123,7 +123,14 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
    (2026-10-20). They were re-picked at every voxel face (`voxelwise`); MagicaVoxel's B boards show a 3-voxel blend
    block looking like a 1-voxel one, so blends now use the same contact rule as partly transparent glass. B boards:
    sky-lit 34 -> 56 of 64 tiles within 3 (mean 9.3 -> 0.89, all 64 within 6), sun-lit 62 -> 64 of 64. Open: half
-   metal, half transparent blends over a white base are 4-5 levels too dark (8 tiles).
+   metal, half transparent blends over a white base are 4-5 levels too dark (4 tiles).
+   At diffuse cap 4 (2026-10-20): MagicaVoxel brightens partly transparent glass by 7.5 levels (`G-sky-d4` (4,0) and
+   (5,0)) while ours stayed put. The pick now happens where a ray leaves the block into the air, in and out, and the
+   rest scatters back inside as a diffuse event (it ended the path before, and the second pick was where the ray
+   reached what the block rests on). At cap 2 the two rules give the same light; at cap 4 the inner bounces add it.
+   `G-sky-d4` 53 -> 55 of 56 tiles within 3 (those two tiles 8.5/8.3 -> 2.8 and under), `B-sky-lin` 56 -> 60 of 64,
+   `G-sky-lin`, `B-sun60-lin`, `P-sun60-lin` unchanged; `P-sky-lin` 64 -> 61 of 64 (three 6-voxel blocks at 3.3-3.4,
+   all within 6).
 2b. Glass over a lit floor: MagicaVoxel is darker by a fixed factor per refractive index (0.997 at 1.1, 0.976 at 1.3,
    0.959 at 1.5, 0.957 at 2), independent of its bounce caps (checked with specular 10 and diffuse 4): 1-2 levels.
 3. Fog `_fog_uni`: done (`environment.fog`). MagicaVoxel's fog fades rays by exp(-0.001 x `_d` x distance) toward
@@ -205,7 +212,7 @@ checked unchanged afterwards). Snapshots in `test-results/mv-calib` (git-ignored
 | `C-proj1.vox` | 1 | 110 | 8192 | 100% |
 | `C-bga.vox` | 1 | 110 | 8192 | alpha identical, colours 99.9% |
 | `C-scale.vox` | 1 | 110 | 8192 | 100% |
-| `B-sky-lin.vox` | 1 | 190 | 1024 | 56 of 64 tiles within 3 after the blend fix (was 34), all within 6 |
+| `B-sky-lin.vox` | 1 | 190 | 1024 | 60 of 64 tiles within 3 after the blend fixes (was 34), all within 6 |
 | `B-sun60-lin.vox` | 1 | 190 | 1024 | 64 of 64 after the blend fix (was 62) |
 | `G-sun60-d4.vox` | 1 | 190 | 1024 | 50 of 56 (neighbours of the subsurface block open) |
 | `G-sky-sc10.vox` | 1 | 190 | 1024 | 55 of 56 |
