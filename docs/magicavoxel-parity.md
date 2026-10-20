@@ -16,8 +16,12 @@ Everything here is on branch `worktree-agent-a63cac143225721f2` (not pushed, Cod
   there; that folder also holds the `.vox` scenes and both renderers' PNGs).
   - `boards.cjs` and `xboards.cjs` write the calibration scenes (top-down tile boards: diffuse, metal, plastic, glass,
     clouds, emitters; sun penumbra, horizon, depth of field, bloom, metal roughness, LDR emitters, emissive media).
-  - MagicaVoxel side: open the file (Ctrl+O), click camera slot 1 then L, wait until the progress bar is full,
-    snapshot (camera icon by the console) to `<name>-mv.png`. The camera's field of view comes from the file's `_lens`.
+  - MagicaVoxel side: set the sample count once (double-click the number right of the chart icon, End, Backspace,
+    type 8192, Enter; 1024 leaves visible noise). Open the file (Ctrl+O), click camera slot 1 then L, then type the
+    exact distance into the Zoom field (double-click, End, Backspace, value, Enter): its camera glides to a loaded slot
+    and stops about 0.05 voxels short, from whichever side it came (measured both ways; with the typed zoom our render
+    registers at zero offset). Wait until the progress bar is full (about 2 min at 8192), snapshot (camera icon by the
+    console) to `<name>-mv.png`. The field of view comes from the file's `_lens`, not the slot.
   - Our side, from the branch root under the GPU lock:
     `node scripts/gpu-lock.mjs run --owner=<you> -- node test-results/mv-vox.mjs <dir> 1024 <files.vox>`
     (`test-results/mv-vox.{html,mjs}`, also kept in the tools folder) writes `<name>-ours.png` through
@@ -37,14 +41,14 @@ Everything here is on branch `worktree-agent-a63cac143225721f2` (not pushed, Cod
 | Sun `_inf` | irradiance 5 x `_i`; azimuth = yaw - 90 degrees; disk ~0.69 x `_area` rad across | penumbra fits at 0.07 and 0.2 |
 | Sun light | diffuse lobes only (no metal, coat or glass highlights); not in clouds; any voxel blocks it | sun boards |
 | Bounces | diffuse 2, specular 5, scatter 5 by default (`_bounce`) | glass-over-base tiles |
-| Ground | albedo `_color` at z = 0; camera rays fade it into the sky by a / (a + sin depression), a = 0.007 x `_hor` | `_hor` 0.1 and 0.5 |
+| Ground | albedo `_color` at z = 0; camera rays fade it into the sky by D / (D + 2040 / `_hor`) at distance D | `_hor` 0.1 and 0.5, camera heights 14 and 66 |
 | Camera | rCAM focus, pitch, yaw, radius; field of view from rOBJ `_lens _fov`, not rCAM | camera scenes |
 | Missing MATL keys | read as 0 (roughness 0, IOR 1, metal 0, emission 0), specular 1 | MagicaVoxel's own panel |
 | Legacy keys | `_weight` wins (metalness, transparency, emission); `_spec` = specular - 1; `_ior` is always n - 1; cloud `_weight` reads as density 0.1 | panel readings |
-| Metal | reflectance min(1, `_sp` x colour); GGX width ~0.13 x `_rough` | sky boards, reflection blur fit |
+| Metal | reflectance min(1, `_sp` x colour); GGX width ~0.13 x `_rough`; no multiple-scattering energy compensation | sky boards, reflection blur fit, rough gold sphere |
 | Plastic coat | diffuse colour + Fresnel (added, not energy-conserving) | `_ior` 0, 0.3, 0.6 |
 | Glass | Fresnel reflection of the sky exact; colour only through `_d` absorption = -ln(colour) x `_d` per voxel; glass share sqrt(`_trans`) | glass rows |
-| Emitter | radiance colour x (1 + 3 x `_emit` x 10^`_flux`); a non-zero `_ldr` l shows 1 + 3 l to the camera only | 4 decades of exposure |
+| Emitter | radiance colour x (1 + 3 x `_emit` x 10^`_flux`); a non-zero `_ldr` l shows 1 + 3 l to the camera only; emitters reflect no light | 4 decades of exposure, glow between neighbouring tiles |
 | Cloud | extinction `_d` per voxel, colour = scattering albedo, HG `_g` | cloud rows |
 | Emissive cloud | 0.93 x `_d` x colour per voxel, no self-absorption | isolated blocks |
 | Bloom | not in saved snapshots (default and scale 0.5 identical) | bloom scenes |
@@ -53,7 +57,10 @@ Everything here is on branch `worktree-agent-a63cac143225721f2` (not pushed, Cod
 ## Current scores (ours vs MagicaVoxel, 1024 samples each, 960 x 800)
 
 - Six perspective scenes with default lighting (`test-results/pt-compare/v2`: diffuse, metal 0.2 and 0.8, glass,
-  emitter, cloud): 94-96% of pixels within 3 levels, 99.5-100% within 6, mean 1.3-1.5 levels (noise level).
+  emitter, cloud), ours at 8192 samples: 99.97, 99.94, 99.85, 99.23, 99.94 and 99.93% of pixels within 3 levels
+  (was 94-96% before the distance-based ground fade, no energy compensation and non-reflective emitters). Glass keeps
+  a 2.5% bias on the floor seen through it (ours brighter) plus MagicaVoxel's noise inside the glass.
+- Close oblique view with the camera set exactly in MagicaVoxel and both at 8192 samples: 100.00% within 3 levels.
 - Calibration boards: diffuse, metal, plastic, sun, sky, exposure, ACES: every tile within 3 levels; emitters (with
   `_ldr`) every tile; sun penumbra 99.6-99.9% of pixels within 3; horizon 98-99.5%; metal reflections 96%.
 - Speed, same A6000, 960 x 800 at 1024 samples: MagicaVoxel about 14 s (glass) and 15 s (diffuse) by stopwatch on
