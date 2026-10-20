@@ -551,6 +551,48 @@ test('Booleans where the surfaces come within the tolerance of touching: cut as 
             `${op} ${off} seam ${seam}: ${volume(out)} vs ${want}`,
           );
         }
+  // 30 and 100 nm off centre, past the tolerance: the circles the drill leaves in the rib's top and bottom faces pass
+  // that far inside the edges along the wall it falls short of, and it cuts a sliver that deep out of the other wall (a
+  // circular segment of height |off|). The faces' points inside are taken away from their edges, and a point of the
+  // base's sliver, no thicker than the tolerance, is settled by rays. On the base the drill is whole; with the fillets,
+  // the sliver below z = 3 lies in the fillet but for sqrt(6 d - d^2) under the fillet at depth d (quadrature).
+  const r = 1.5,
+    segment = (h) => r * r * Math.acos((r - h) / r) - (r - h) * Math.sqrt(2 * r * h - h * h),
+    under = (h) => {
+      let sum = 0;
+      for (let k = 0; k < 2000; k++) {
+        const f = ((k + 0.5) / 2000) * (Math.PI / 2),
+          [s, c] = [Math.sin(f), Math.cos(f)],
+          d = h * s * s;
+        sum += 4 * h * s * c * Math.sqrt(2 * r * h * c * c - (h * c * c) ** 2) * Math.sqrt(6 * d - d * d);
+      }
+      return (sum * Math.PI) / 2 / 2000;
+    };
+  for (const off of [3e-5, -3e-5, 1e-4, -1e-4])
+    for (const seam of [
+      [1, 0, 0],
+      [0.6, 0.8, 0],
+    ])
+      for (const [part, size, base, filleted] of [
+        [rib, 600, 0, false],
+        [tee, 4600, 10, false],
+        [rounded, 4600 + 360 * (1 - Math.PI / 4), 10, true],
+      ]) {
+        const h = Math.abs(off),
+          common = base * disk + 10 * (disk - segment(h)) + (filleted ? 3 * segment(h) - under(h) : 0);
+        for (const [op, want] of [
+          ['union', size + 40 * disk - common],
+          ['intersect', common],
+          ['subtract', size - common],
+        ]) {
+          const out = boolean('c', op, part(), cylinder('h', 1.5 * mm, 40 * mm, at(off, 0, -20, [0, 0, 1], seam)));
+          assert.deepEqual(validateBody(out), []);
+          assert.ok(
+            Math.abs(volume(out) - want) <= 1e-9 * want,
+            `${op} ${off} seam ${seam}: ${volume(out)} vs ${want}`,
+          );
+        }
+      }
   // The slanted hole 1 nm and 10 nm either side of touching the drill wall: the two windows it cuts in the wall, or the
   // one window they make, pass a few micrometres from crossing at the touch, and are cut as if they crossed there. 30,
   // 50 and 100 nm either side, past the tolerance, their curves are followed round where they turn, about 10 um apart
@@ -593,18 +635,12 @@ test('Booleans where the surfaces come within the tolerance of touching: cut as 
 });
 
 test('Booleans: what is not supported yet throws a RangeError', () => {
-  // A drill as wide as a rib, 30 nm off centre, beyond the tolerance (about 21 nm here): 30 nm into one wall and 30 nm
-  // short of the other. In their union the circles the drill leaves in the rib's top and bottom faces pass 30 nm inside
-  // those faces' edges along the wall it falls short of, and the faces are lost. Not supported yet.
+  // A box whose face runs through a torus's axis cuts the torus round its tube, in two circles: a loop round a torus's
+  // tube is not supported yet.
   assert.throws(
     () =>
-      boolean(
-        'c',
-        'union',
-        box('r', [3 * mm, 20 * mm, 10 * mm], at(-1.5, -10, 0)),
-        cylinder('h', 1.5 * mm, 40 * mm, at(3e-5, 0, -20)),
-      ),
-    { name: 'RangeError', message: /not a valid solid/ },
+      boolean('h', 'intersect', torus('t', 20 * mm, 5 * mm), box('b', [60 * mm, 60 * mm, 60 * mm], at(0, -30, -30))),
+    { name: 'RangeError', message: /round a torus's tube/ },
   );
 });
 

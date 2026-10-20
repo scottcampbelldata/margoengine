@@ -100,10 +100,18 @@ Every item is done only when all of these hold:
       found one is redone knowing it. Before, a seed 5.6 um from the point started a walk that hopped between the two
       windows' curves and went round eight times. The slanted hole 30, 50 and 100 nm either side of touching (three
       seams) now cuts within 1e-6 of the quadrature (was refused in 8 of 18 cases), and every offset tried from 0.1 nm
-      to 10 um either side cuts within 6.1e-10 of it (90 cuts). Left: a curve a little further than the tolerance inside
-      a face's edge (the drill as wide as the rib 30 nm off centre: the union loses the rib's top and bottom faces and
-      is refused with a RangeError; the rib, tee and rounded tee 30 and 100 nm off refuse 27 of 72 cuts, as before,
-      never cutting wrongly), tangency along a circle or a traced curve, and coincident freeform patches.
+      to 10 um either side cuts within 6.1e-10 of it (90 cuts).
+      Near misses at face edges, written 2026-10-20 (claude/charming-clarke-5e6c76): a face split where a curve passes
+      a little further than the tolerance inside its edge keeps its regions. Each region's point inside is now the one
+      furthest from every loop (from the middles of each loop's eight longest segments), not the middle of the longest
+      segment, which for the rib's top face lay 15 nm from the drill and was taken to lie on the drill's face. A point
+      within the tolerance of the other solid's face counts as on it only where the faces run along each other (normals
+      within a milliradian); a sliver thinner than the tolerance next to where a surface crosses it (the base's top
+      under the drill's 30 nm bite out of the rib's wall) is settled by the rays. The rib, tee and rounded tee with the
+      drill 30 and 100 nm off centre now cut in all 72 cases (27 refused before) within 1.4e-11 of closed forms with
+      the sliver (a circular segment of height |off|, the part in the fillet by quadrature); offsets from 0.01 nm to
+      10 um either side all cut. Jubilee survey 145 of 145, every drilled volume identical to before. Left: tangency
+      along a circle or a traced curve, coincident freeform patches, loops round a torus's tube.
 
 ## Phase 4: blends
 

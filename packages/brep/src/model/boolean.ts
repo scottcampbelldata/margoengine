@@ -4,7 +4,7 @@
 // is the sharpest left turn about the face normal), so seams and periodic surfaces need no special cases; loops are
 // grouped into faces by which side of every loop a point inside each lies. Inside/outside comes from rays cast
 // against the other solid's exact faces (three directions, majority), not from a mesh.
-import { cross, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
+import { cross, distance, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
 import { curveEvaluator, frameOf, sliceCurve, surfaceEvaluator, type CurveDef, type SurfaceDef } from './geometry.js';
 import { FaceUV, gaps, leftOf, shiftV, vRange, type UV, type UVLoop } from './faces.js';
 import { curveSurfaceCrossings, intersectSurfaces, signedDistance } from './intersect.js';
@@ -80,8 +80,9 @@ const RAYS = [
  * crossing there) or along a line (a plane along a cylinder) are cut there, and so are surfaces that come within the
  * 1e-6 of touching; where the result's surface touches itself, its sheets meet at a point or along a line without
  * sharing a vertex or edge there; where they come a little further than that from touching, the curves passing each
- * other there a few micrometres apart are cut apart. Throws a RangeError for what is not supported yet (a curve passing
- * a little further than the tolerance inside a face's edge can lose the face) and when the result is not a valid solid.
+ * other there a few micrometres apart are cut apart, and a curve passing that far inside a face's edge (or cutting a
+ * sliver that thin off a face) splits the face there. Throws a RangeError for what is not supported yet (a loop round a
+ * torus's tube) and when the result is not a valid solid.
  */
 export function boolean(
   name: Name,
@@ -816,7 +817,8 @@ function splitFace(f: Face, fuv: FaceUV, halves: Half[]): Omit<Region, 'from'>[]
     vBounds: readonly [number, number] = cut === undefined ? fuv.surface.vDomain : [cut, cut + vPeriod],
     sides = ([u, v]: UV) => open.map((l) => (leftOf(l, fuv.period, u, v) ? '1' : '0')).join('');
   // Cycles bound one region when a point inside next to each lies on the same side of every cycle.
-  const points = open.map((l) => probe(fuv, l, open, vBounds)),
+  const probes = open.map((l) => probe(fuv, l, open, vBounds)),
+    points = probes.map((x) => x.point),
     groups = new Map<string, number[]>();
   points.forEach((q, i) => {
     const key = sides(q);
@@ -832,10 +834,11 @@ function splitFace(f: Face, fuv: FaceUV, halves: Half[]): Omit<Region, 'from'>[]
       groups.delete(high);
     }
   }
+  // Of the region's loops' points, the one furthest from every loop.
   return [...groups.values()].map((group) => ({
     face: f,
     loops: group.map((i) => cycles[i]),
-    point: fuv.at(points[group[0]]),
+    point: fuv.at(points[group.reduce((x, y) => (probes[y].clearance > probes[x].clearance ? y : x))]),
   }));
 }
 
@@ -920,47 +923,86 @@ function passes(c: ReturnType<typeof curveEvaluator>, p: XYZ, near: number): num
   return out;
 }
 
-/** A point inside the region left of a loop: halfway from the middle of the loop's longest segment to the next loop (or surface end) on its left. */
-function probe(fuv: FaceUV, loop: UVLoop, all: UVLoop[], vBounds: readonly [number, number]): UV {
+/**
+ * A point inside the region left of a loop, and how far it lies from the nearest loop (in the surface's own measure
+ * there): from the middles of the loop's longest segments, halfway to the next loop (or surface end) on their left,
+ * the one furthest from every loop. The middle of the longest alone can lie a hair from another loop (a drill's circle
+ * passing 30 nm inside a face's edge), within the Booleans' tolerance of the other solid, which would take it to lie
+ * on the other solid's face.
+ */
+function probe(
+  fuv: FaceUV,
+  loop: UVLoop,
+  all: UVLoop[],
+  vBounds: readonly [number, number],
+): { point: UV; clearance: number } {
   const period = fuv.period,
     segment = (l: UVLoop, i: number): [UV, UV] => [
       l.points[i],
       i + 1 < l.points.length ? l.points[i + 1] : [l.points[0][0] + l.wrap * period, l.points[0][1]],
-    ];
-  let best = 0,
-    len = -1;
-  for (let i = 0; i < loop.points.length; i++) {
-    const [p, q] = segment(loop, i),
-      l = Math.hypot(q[0] - p[0], q[1] - p[1]);
-    if (l > len) {
-      len = l;
-      best = i;
-    }
-  }
-  const [p0, q0] = segment(loop, best),
-    m: UV = [(p0[0] + q0[0]) / 2, (p0[1] + q0[1]) / 2],
-    d: UV = [-(q0[1] - p0[1]) / len, (q0[0] - p0[0]) / len],
-    [v0, v1] = vBounds;
-  let s = Infinity;
-  if (d[1] > 0 && Number.isFinite(v1)) s = (v1 - m[1]) / d[1];
-  if (d[1] < 0 && Number.isFinite(v0)) s = (v0 - m[1]) / d[1];
-  const eps = 1e-9 * len,
+    ],
+    lengths = loop.points.map((_, i) => {
+      const [p, q] = segment(loop, i);
+      return Math.hypot(q[0] - p[0], q[1] - p[1]);
+    }),
+    order = lengths.map((_, i) => i).sort((x, y) => lengths[y] - lengths[x] || x - y),
+    [v0, v1] = vBounds,
     shifts = period ? [-2, -1, 0, 1, 2] : [0];
-  for (const l of all)
-    for (let i = 0; i < l.points.length; i++) {
-      const [p, q] = segment(l, i),
-        e: UV = [q[0] - p[0], q[1] - p[1]],
-        denom = d[0] * e[1] - d[1] * e[0];
-      if (Math.abs(denom) <= 1e-15 * Math.hypot(e[0], e[1])) continue;
-      for (const k of shifts) {
-        const w: UV = [p[0] - (m[0] + k * period), p[1] - m[1]],
-          hit = (w[0] * e[1] - w[1] * e[0]) / denom,
-          r = (w[0] * d[1] - w[1] * d[0]) / denom;
-        if (r >= 0 && r <= 1 && hit > eps && hit < s) s = hit;
+  /** Halfway from the middle of segment i to the next loop or surface end on its left. */
+  const from = (i: number): UV => {
+    const [p0, q0] = segment(loop, i),
+      len = lengths[i],
+      m: UV = [(p0[0] + q0[0]) / 2, (p0[1] + q0[1]) / 2],
+      d: UV = [-(q0[1] - p0[1]) / len, (q0[0] - p0[0]) / len];
+    let s = Infinity;
+    if (d[1] > 0 && Number.isFinite(v1)) s = (v1 - m[1]) / d[1];
+    if (d[1] < 0 && Number.isFinite(v0)) s = (v0 - m[1]) / d[1];
+    const eps = 1e-9 * len;
+    for (const l of all)
+      for (let j = 0; j < l.points.length; j++) {
+        const [p, q] = segment(l, j),
+          e: UV = [q[0] - p[0], q[1] - p[1]],
+          denom = d[0] * e[1] - d[1] * e[0];
+        if (Math.abs(denom) <= 1e-15 * Math.hypot(e[0], e[1])) continue;
+        for (const k of shifts) {
+          const w: UV = [p[0] - (m[0] + k * period), p[1] - m[1]],
+            hit = (w[0] * e[1] - w[1] * e[0]) / denom,
+            r = (w[0] * d[1] - w[1] * d[0]) / denom;
+          if (r >= 0 && r <= 1 && hit > eps && hit < s) s = hit;
+        }
       }
-    }
-  if (!Number.isFinite(s)) s = len;
-  return [m[0] + (d[0] * s) / 2, m[1] + (d[1] * s) / 2];
+    if (!Number.isFinite(s)) s = len;
+    return [m[0] + (d[0] * s) / 2, m[1] + (d[1] * s) / 2];
+  };
+  /** The distance from (u', v) to the nearest loop or surface end, each way scaled by the surface's stretch there. */
+  const clearance = ([u, v]: UV, h: number): number => {
+    const su = distance(fuv.at([u + h, v]), fuv.at([u - h, v])) / (2 * h),
+      sv = distance(fuv.at([u, v + h]), fuv.at([u, v - h])) / (2 * h);
+    let best = Infinity;
+    if (Number.isFinite(v0)) best = Math.min(best, (v - v0) * sv);
+    if (Number.isFinite(v1)) best = Math.min(best, (v1 - v) * sv);
+    for (const l of all)
+      for (let j = 0; j < l.points.length; j++) {
+        const [p, q] = segment(l, j),
+          k = period ? Math.round((u - (p[0] + q[0]) / 2) / period) * period : 0,
+          a: UV = [(p[0] + k - u) * su, (p[1] - v) * sv],
+          b: UV = [(q[0] + k - u) * su, (q[1] - v) * sv],
+          e: UV = [b[0] - a[0], b[1] - a[1]],
+          ee = e[0] * e[0] + e[1] * e[1],
+          t = ee > 0 ? Math.min(1, Math.max(0, -(a[0] * e[0] + a[1] * e[1]) / ee)) : 0;
+        best = Math.min(best, Math.hypot(a[0] + t * e[0], a[1] + t * e[1]));
+      }
+    return best;
+  };
+  let point: UV = from(order[0]),
+    clear = -1;
+  for (const i of order.slice(0, 8)) {
+    if (!(lengths[i] > 0)) break;
+    const q = from(i),
+      c = clearance(q, 1e-3 * lengths[order[0]]);
+    if (c > clear) [point, clear] = [q, c];
+  }
+  return { point, clearance: Math.max(clear, 0) };
 }
 
 /**
@@ -975,11 +1017,16 @@ function classify(
   merge: number,
   reach: number,
 ): 'in' | 'out' | 'same' | 'opposite' {
+  const n = fuv.normal(p);
   for (const g of others) {
     if (Math.abs(signedDistance(g.surface, p)) > 1e3 * merge) continue;
     const guv = uvOf.get(g)!;
     if (!guv.contains(p)) continue;
-    return dot(fuv.normal(p), guv.normal(p)) > 0 ? 'same' : 'opposite';
+    // On g only where g runs along the face there (within a milliradian): a point of a sliver no wider than the
+    // tolerance, next to where g crosses the face, lies that close to g without being on it, and the rays settle it.
+    const along = dot(n, guv.normal(p));
+    if (Math.abs(along) < 1 - 5e-7) continue;
+    return along > 0 ? 'same' : 'opposite';
   }
   let inside = 0;
   for (const direction of RAYS) {
