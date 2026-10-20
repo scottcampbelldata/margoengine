@@ -678,6 +678,91 @@ test('spline Booleans: a hole, a corner box and another spline block cut a block
   }
 });
 
+/**
+ * A 10 x 8 prism 4 tall whose front side bulges out along the cubic y = -9u(1 - u), x = 10u, extruded up: a ruled
+ * spline face (u along the profile, v up). Base area 80 + 15, volume 380.
+ */
+function curvedWall() {
+  const w = new Writer(),
+    h = 4,
+    profile = (z) => [
+      [0, 0, z],
+      [10 / 3, -3, z],
+      [20 / 3, -3, z],
+      [10, 0, z],
+    ],
+    low = [
+      [0, 0, 0],
+      [10, 0, 0],
+      [10, 8, 0],
+      [0, 8, 0],
+    ],
+    high = low.map((p) => [p[0], p[1], h]),
+    [a, b, c, d] = low.map((p) => w.vertex(p)),
+    [a2, b2, c2, d2] = high.map((p) => w.vertex(p)),
+    line = (v1, v2, p1, p2) => w.edge(v1, v2, w.line(p1, sub(p2, p1))),
+    bezier = (pts) =>
+      w.add(
+        `B_SPLINE_CURVE_WITH_KNOTS('',3,(${pts.map((p) => w.point(p)).join(',')}),.UNSPECIFIED.,.F.,.F.,(4,4),(0.,1.),.UNSPECIFIED.)`,
+      ),
+    eAB = w.edge(a, b, bezier(profile(0))),
+    eAB2 = w.edge(a2, b2, bezier(profile(h))),
+    [vA, vB, vC, vD] = [0, 1, 2, 3].map((k) => line([a, b, c, d][k], [a2, b2, c2, d2][k], low[k], high[k])),
+    eBC = line(b, c, low[1], low[2]),
+    eCD = line(c, d, low[2], low[3]),
+    eDA = line(d, a, low[3], low[0]),
+    eBC2 = line(b2, c2, high[1], high[2]),
+    eCD2 = line(c2, d2, high[2], high[3]),
+    eDA2 = line(d2, a2, high[3], high[0]),
+    rows = [0, 1, 2, 3].map((i) => `(${w.point(profile(0)[i])},${w.point(profile(h)[i])})`).join(','),
+    side = w.add(
+      `B_SPLINE_SURFACE_WITH_KNOTS('',3,1,(${rows}),.UNSPECIFIED.,.F.,.F.,.F.,(4,4),(2,2),(0.,1.),(0.,1.),.UNSPECIFIED.)`,
+    ),
+    plane = (o, n, x) => w.add(`PLANE('',${w.axis(o, n, x)})`);
+  return w.file([
+    w.face([w.loop([eAB, true], [vB, true], [eAB2, false], [vA, false])], side),
+    w.face([w.loop([eBC, true], [vC, true], [eBC2, false], [vB, false])], plane(low[1], X, [0, 1, 0])),
+    w.face([w.loop([eCD, true], [vD, true], [eCD2, false], [vC, false])], plane(low[2], [0, 1, 0], [-1, 0, 0])),
+    w.face([w.loop([eDA, true], [vA, true], [eDA2, false], [vD, false])], plane(low[3], [-1, 0, 0], [0, -1, 0])),
+    w.face([w.loop([eDA, false], [eCD, false], [eBC, false], [eAB, false])], plane(low[0], [0, 0, -1], X)),
+    w.face([w.loop([eAB2, true], [eBC2, true], [eCD2, true], [eDA2, true])], plane(high[0], Z, X)),
+  ]);
+}
+
+test('a drill through a thin spline wall: curves from one edge of its domain to the other', () => {
+  // The drill meets the curved side in lines running from the spline's v = 0 edge to its v = 1 edge. A trace seeded on
+  // an edge once stepped out and straight back, leaving a segment of zero length that broke the curve (Jubilee bodies
+  // 38 and 79: a 0.4 mm extruded spline step). The volume removed is 4 x the drill's area above the profile.
+  const mm = 0.001,
+    [body] = model.bodiesFromSTEP(parseSTEP(curvedWall())).bodies;
+  assert.ok(Math.abs(model.massProperties(body).volume / mm ** 3 - 380) <= 1e-9 * 380);
+  for (const [cx, cy, r] of [
+    [5, -1.8, 1],
+    [2, -1.2, 0.6],
+  ]) {
+    const n = 20000;
+    let area = 0;
+    for (let k = 0; k <= n; k++) {
+      const x = cx - r + (2 * r * k) / n,
+        half = Math.sqrt(Math.max(0, r * r - (x - cx) ** 2)),
+        u = x / 10,
+        profile = u >= 0 && u <= 1 ? -9 * u * (1 - u) : 0,
+        weight = k === 0 || k === n ? 1 : k % 2 ? 4 : 2;
+      area += (weight * Math.max(0, cy + half - Math.max(cy - half, profile)) * 2 * r) / (3 * n);
+    }
+    const drilled = model.boolean(
+        'd',
+        'subtract',
+        body,
+        model.cylinder('h', r * mm, 20 * mm, model.frameOf([cx * mm, cy * mm, -5 * mm], Z, X)),
+      ),
+      got = model.massProperties(drilled).volume / mm ** 3,
+      want = 380 - 4 * area;
+    assert.deepEqual(model.validateBody(drilled), []);
+    assert.ok(Math.abs(got - want) <= 1e-7 * want, `volume ${got} vs ${want}`);
+  }
+});
+
 test('an imported edge a micrometre off its face keeps that gap as its tolerance, and the part still cuts', () => {
   const mm = 0.001,
     { bodies, problems } = model.bodiesFromSTEP(parseSTEP(bumpBlock({ lift: 0.001 }))),

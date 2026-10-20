@@ -63,7 +63,7 @@ export function traceIntersections(a: SurfaceDef, b: SurfaceDef, box: Box3): { c
         ...tangents,
       ];
     }
-    if (points.length < 2) continue;
+    if (points.length < 2 || points.every((p) => length(sub(p, points[0])) === 0)) continue;
     branches.push({ points, tangents });
     curves.push(hermite(points, tangents, forward.closed));
   }
@@ -225,9 +225,12 @@ function walk(
     // the edge: it ends on the edge instead, exactly.
     const exit = edgeExit(a, b, q, scale0) ?? edgeExit(b, a, q, scale0);
     if (exit) {
-      const te = meetDirection(a, b, exit);
-      points.push(exit);
-      tangents.push(te ? (dot(te, t) < 0 ? scale(te, -1) : te) : tq);
+      // From a start on the edge itself, the first step out comes back to it: nothing to add.
+      if (length(sub(exit, p)) > 1e-12 * scale0) {
+        const te = meetDirection(a, b, exit);
+        points.push(exit);
+        tangents.push(te ? (dot(te, t) < 0 ? scale(te, -1) : te) : tq);
+      }
       return { points, tangents, closed: false };
     }
     points.push(q);
@@ -274,7 +277,11 @@ function edgeExit(s: SurfaceDef, other: SurfaceDef, q: XYZ, scale0: number): XYZ
 }
 
 /** A C1 cubic B-spline (a chain of Bezier segments) through the points with the given unit tangents. */
-function hermite(points: XYZ[], tangents: XYZ[], closed: boolean): CurveDef {
+function hermite(allPoints: XYZ[], allTangents: XYZ[], closed: boolean): CurveDef {
+  // Points a rounding error apart would make a knot span of zero length.
+  const keep = allPoints.map((p, i) => i === 0 || length(sub(p, allPoints[i - 1])) > 0),
+    points = allPoints.filter((_, i) => keep[i]),
+    tangents = allTangents.filter((_, i) => keep[i]);
   const control: XYZ[] = [points[0]],
     knots = [0],
     multiplicities = [4];
