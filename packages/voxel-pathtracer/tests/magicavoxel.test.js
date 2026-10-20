@@ -220,6 +220,16 @@ test('render objects: sky, sun, ground fade, film, bounces and fog', () => {
   assert.throws(() => magicaVoxelLighting([], { look: 'cycles' }), TypeError);
 });
 
+const defaultAtmosphere = {
+  rayleigh: 0.4,
+  rayleighColor: [45 / 255, 104 / 255, 1],
+  mie: 0.4,
+  mieColor: [1, 1, 1],
+  mieG: 0.85,
+  ozone: 0,
+  ozoneColor: [0, 0, 0],
+};
+
 test('atmosphere sky: a baked map, the sun dimmed by the air at 10 x _i, its own ground fade', () => {
   const objects = (elevation) => [
     { _type: '_env', _mode: '1' },
@@ -271,6 +281,23 @@ test('atmosphere sky: a baked map, the sun dimmed by the air at 10 x _i, its own
     at = (x, y) => baked.data[3 * (y * 16 + x)];
   assert.ok(Math.abs(at(3, 32) / at(3, 31) - 1) < 0.3, `horizon ${at(3, 31)} ${at(3, 32)}`);
   assert.ok(at(12, 34) > at(12, 44) && at(12, 44) > 0, `toward the sun ${at(12, 34)} ${at(12, 44)}`);
+  // A tall map integrates the rows within 3 degrees of the horizon and every height / 256-th above, the rest
+  // interpolated (within 0.1% of the model); toward a low sun the sky keeps reddening right down to the horizon.
+  const settings = defaultAtmosphere,
+    sun5 = [Math.cos(0.087), 0, Math.sin(0.087)],
+    tall = bakeAtmosphere(sun5, settings, [1, 1, 1], 8, 1024),
+    dir = (x, y) => {
+      const phi = ((x + 0.5) / 8 - 0.5) * 2 * Math.PI,
+        theta = ((y + 0.5) / 1024) * Math.PI;
+      return [Math.sin(theta) * Math.sin(phi), Math.sin(theta) * Math.cos(phi), Math.cos(theta)];
+    },
+    texel = (x, y) => [0, 1, 2].map((k) => tall.data[3 * (y * 8 + x) + k]);
+  for (const y of [1, 101, 250, 509, 511]) {
+    const exact = atmosphereRadiance(dir(6, y), sun5, settings);
+    texel(6, y).forEach((v, k) => near(v / exact[k], 1, 1e-3));
+  }
+  const blueness = (y) => texel(6, y)[2] / texel(6, y)[0];
+  assert.ok(blueness(511) < blueness(510) && blueness(510) < blueness(509), 'reddening down to the horizon');
 });
 
 test('cameras: rCAM focus, pitch, yaw and radius; the lens object gives the field of view', () => {

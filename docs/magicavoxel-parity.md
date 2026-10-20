@@ -73,8 +73,8 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
 - Calibration boards: diffuse, metal, plastic, sun, sky, exposure, ACES: every tile within 3 levels; emitters (with
   `_ldr`) every tile; sun penumbra 99.6-99.9% of pixels within 3; horizon 98-99.5%; metal reflections 96%.
 - Atmosphere sky (`test-results/pt-compare/atm`, 4096 samples each): the diffuse scene lit at sun 50, 20 and 5
-  degrees 99.99, 99.91 and 99.79% within 3; views with the sky and horizon in frame 99.5% (sun 20, away from it) and
-  97.7% (sun 5, toward it). Ground-fade scenes under the uniform sky (`X-hor-1`, `X-hor-5`, `H-r60`, `H-r180`,
+  degrees 99.98, 99.89 and 99.81% within 3; views with the sky and horizon in frame 99.54% (sun 20, away from it)
+  and 98.66% (sun 5, toward it; 100% within 6). Ground-fade scenes under the uniform sky (`X-hor-1`, `X-hor-5`, `H-r60`, `H-r180`,
   `H-corners`): 99.77-99.99%.
 - Speed, same A6000, 960 x 800 at 1024 samples: MagicaVoxel about 14 s (glass) and 15 s (diffuse) by stopwatch on
   its progress bar (+-1 s); ours 1.85 s and 1.70 s (`capture`), about 8x faster. Ours 1.7-2.2 s on all six scenes.
@@ -115,12 +115,18 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
    glow and the sun reaches surfaces only through it; its colour is value / 255 (no 2.2 power); the ground's horizon
    fade is off under fog. 9 fog scenes (densities 0.002 to 5, sky, sun, coloured fog with anisotropy, camera 190 and
    400 away) within 3 levels on 99.5-100% of pixels.
-4. Atmosphere sky (`_env _mode 1`, `_atm`): done (`src/atmosphere.ts`, baked to a 256 x 256 map in 0.5 s; the
-   lighting helper bakes it and dims and reddens the sun through the air). Open: the view into a low sun is 97.7%
-   (the half degree above the horizon is up to 8 levels bluer than MagicaVoxel; the ground fade prefers a scale of
-   2400 there and 2100 looking away from the sun); dense air (`_ray_d` 0.8-1, `_mie_d` 1) is 2.4-3.1 levels off on
-   average; ozone is fitted at `_o3_d` 1 only (linear assumed); `_bounce`-style sky light on objects is unchecked for
-   non-default `_atm` settings.
+4. Atmosphere sky (`_env _mode 1`, `_atm`): done (`src/atmosphere.ts`, baked to a 256 x 512 map in 0.55 s; the
+   lighting helper bakes it and dims and reddens the sun through the air). The view into a low sun (2026-10-20, 4096
+   samples): 97.74% -> 98.66% within 3 levels, 99.90% -> 100% within 6. The half degree above the horizon was bluer
+   for two reasons: the light path was held 0.115 degrees up (MagicaVoxel keeps reddening down to the horizon: now
+   the view's own path down to 0 degrees), and the 256-row map's rows are 0.7 degrees apart, the last one above the
+   horizon 0.35 degrees up (now 512 rows, those within 3 degrees of the horizon integrated, every second above, the
+   rest interpolated within 0.01% of the model; bake 0.53 -> 0.55 s, GPU memory +1.3 MiB). Other scenes unchanged:
+   lit at sun 50, 20, 5 degrees 99.98, 99.89, 99.81%; the view away from the sun 99.49 -> 99.54%. Open: in the low-sun
+   view the ground 1-4 degrees down is 2-3 levels too bright in red and green (the ground's own light, not the fade:
+   the fade is 1-3% there) and the far ground just below the horizon 2-3 levels too dark in red; dense air (`_ray_d`
+   0.8-1, `_mie_d` 1) is 2.4-3.1 levels off on average; ozone is fitted at `_o3_d` 1 only (linear assumed);
+   `_bounce`-style sky light on objects is unchecked for non-default `_atm` settings.
 5. Image sky (`_mode 2`, `_ibl`): done. The caller decodes the HDR file the helper names (`imageSky.path`) and
    passes it as the `imageSky` option; the helper sets intensity and turn. Panoramas of our own ramp image: 99.84%
    of pixels within 3 levels (the rest on the image's wrap seam); a scene lit by it: 99.76%.

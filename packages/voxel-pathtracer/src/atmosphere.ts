@@ -117,11 +117,14 @@ function phases(mu: number, g: number): [number, number] {
   ];
 }
 
-/** The path a view direction's light comes along: the view itself, held at the horizon when it points lower. */
+/**
+ * The path a view direction's light comes along: the view itself, held at the horizon when it points lower (the sky
+ * keeps reddening right down to the horizon: MagicaVoxel's view into a low sun, 0.03-0.4 degrees up).
+ */
 function pathOf(view: number[]): number[] {
-  if (view[2] >= 0.002) return view;
+  if (view[2] >= 0) return view;
   const n = Math.hypot(view[0], view[1]) || 1;
-  return [(view[0] / n) * 0.999998, (view[1] / n) * 0.999998, 0.002];
+  return [view[0] / n, view[1] / n, 0];
 }
 
 /**
@@ -145,7 +148,9 @@ export function atmosphereTransmittance(sun: number[], s: AtmosphereSettings): T
 
 /**
  * The sky baked into an equirectangular map in tracer axes (y up; MagicaVoxel (x, y, z) = tracer (x, -z, y)). `scale`
- * multiplies each channel (the sun's `_i` times its colour). Below the horizon it follows `atmosphereRadiance` (each
+ * multiplies each channel (the sun's `_i` times its colour). Above the horizon every row within 3 degrees of it is
+ * integrated and, higher up, every `height / 256`-th, the rows between interpolated (a tall map resolves the band just
+ * above the horizon at about the cost of a 256-row one). Below the horizon it follows `atmosphereRadiance` (each
  * column's horizon path, integrated once).
  */
 export function bakeAtmosphere(
@@ -156,25 +161,45 @@ export function bakeAtmosphere(
   height = 128,
 ): TraceEnvironmentMap {
   const data = new Float32Array(width * height * 3),
-    sun = sunMagicaVoxel;
+    sun = sunMagicaVoxel,
+    above = Math.ceil(height / 2),
+    step = Math.max(1, Math.round(height / 256)),
+    elevation = (y: number) => Math.PI / 2 - ((y + 0.5) / height) * Math.PI,
+    // Rows integrated: the top one, every step-th, all within 3 degrees of the horizon and the last above it.
+    exact = (y: number) => y === 0 || y % step === 0 || y === above - 1 || elevation(y) < (3 * Math.PI) / 180,
+    rows = Array.from({ length: above }, (_, y) => y).filter(exact);
   // The map's centre column faces -Z and its three-quarter column +X (TraceEnvironmentMap): tracer direction
   // (sin phi, 0, -cos phi) at the horizon, which is MagicaVoxel (sin phi, cos phi, 0).
   for (let x = 0; x < width; x++) {
     const phi = ((x + 0.5) / width - 0.5) * 2 * Math.PI,
       sp = Math.sin(phi),
-      cp = Math.cos(phi);
-    let low: { r: number[]; m: number[] } | undefined;
-    for (let y = 0; y < height; y++) {
-      const theta = ((y + 0.5) / height) * Math.PI,
-        view = [Math.sin(theta) * sp, Math.sin(theta) * cp, Math.cos(theta)];
-      let L: readonly number[];
-      if (view[2] >= 0.002) L = atmosphereRadiance(view, sun, s);
-      else {
-        const path = (low ??= inScatter(pathOf(view), sun, s)),
-          [pR, pM] = phases(view[0] * sun[0] + view[1] * sun[1] + view[2] * sun[2], s.mieG);
-        L = [0, 1, 2].map((k) => path.r[k] * pR + path.m[k] * pM);
+      cp = Math.cos(phi),
+      put = (y: number, L: readonly number[]) =>
+        data.set([L[0] * scale[0], L[1] * scale[1], L[2] * scale[2]], 3 * (y * width + x)),
+      view = (y: number) => {
+        const theta = ((y + 0.5) / height) * Math.PI;
+        return [Math.sin(theta) * sp, Math.sin(theta) * cp, Math.cos(theta)];
+      };
+    let prev = -1;
+    for (const y of rows) {
+      put(y, atmosphereRadiance(view(y), sun, s));
+      // Rows skipped since the last integrated one: linear in elevation between the two.
+      for (let k = prev + 1; prev >= 0 && k < y; k++) {
+        const t = (elevation(prev) - elevation(k)) / (elevation(prev) - elevation(y));
+        for (let c = 0; c < 3; c++)
+          data[3 * (k * width + x) + c] =
+            data[3 * (prev * width + x) + c] * (1 - t) + data[3 * (y * width + x) + c] * t;
       }
-      data.set([L[0] * scale[0], L[1] * scale[1], L[2] * scale[2]], 3 * (y * width + x));
+      prev = y;
+    }
+    const low = inScatter(pathOf(view(height - 1)), sun, s);
+    for (let y = above; y < height; y++) {
+      const v = view(y),
+        [pR, pM] = phases(v[0] * sun[0] + v[1] * sun[1] + v[2] * sun[2], s.mieG);
+      put(
+        y,
+        [0, 1, 2].map((k) => low.r[k] * pR + low.m[k] * pM),
+      );
     }
   }
   return { width, height, data };

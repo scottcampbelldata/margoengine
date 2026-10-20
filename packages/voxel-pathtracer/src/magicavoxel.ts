@@ -320,7 +320,8 @@ export function magicaVoxelLighting(
       : sunColor,
     // Measured: 5 x `_i` under the uniform sky; 10 x `_i` (before the air dims it) under the atmosphere sky.
     sunIntensity: (atmosphere ? 10 : 5) * Math.max(0, sunI),
-    // Atmosphere sky (`_env _mode 1`): single scattering fitted to MagicaVoxel's panoramas, baked to a map.
+    // Atmosphere sky (`_env _mode 1`): single scattering fitted to MagicaVoxel's panoramas, baked to a map (512 rows:
+    // 0.35 degrees each, so the reddening in the half degree above the horizon shows).
     ...(atmosphere
       ? {
           map: bakeAtmosphere(
@@ -328,7 +329,7 @@ export function magicaVoxelLighting(
             atmosphere,
             [sunColor[0] * Math.max(0, sunI), sunColor[1] * Math.max(0, sunI), sunColor[2] * Math.max(0, sunI)],
             256,
-            256,
+            512,
           ),
         }
       : {}),
