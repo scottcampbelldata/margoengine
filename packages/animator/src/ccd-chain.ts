@@ -33,6 +33,8 @@ export interface CCDChain {
   angleTolerance?: number;
   /** Largest turn of one joint per sweep, radians (default π). */
   maxAngle?: number;
+  /** The solver's reach step after each sweep ({@link CCDSolver.reach}, default true); false runs plain CCD. */
+  reach?: boolean;
   /** Called after each frame's solve with the solver's reused result (read it before the next frame). */
   onSolve?: (result: CCDResult) => void;
 }
@@ -86,6 +88,7 @@ export function addCCDChain(animator: Animator, chain: CCDChain): () => void {
     solver.tolerance = chain.tolerance ?? 0.001;
     solver.angleTolerance = chain.angleTolerance ?? 0.001;
     solver.maxAngle = chain.maxAngle ?? Math.PI;
+    solver.reach = chain.reach ?? true;
     return weight;
   };
   // Validate the per-frame fields now, so a bad chain fails here rather than in the frame loop.

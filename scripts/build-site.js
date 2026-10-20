@@ -81,7 +81,7 @@ await site({
   plugins: [noCAD],
   build: { outDir: `${out}/demos/earth`, target: 'es2022' },
 });
-for (const name of ['dof', 'tonemap'])
+for (const name of ['dof', 'tonemap', 'animator'])
   await site({
     configFile: false,
     root: `packages/${name}/examples`,

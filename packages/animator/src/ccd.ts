@@ -4,6 +4,10 @@
 // effector toward the target (for a hinge: the angle about its axis), then its limit is applied and the joints after it
 // are moved with it. With an orientation target, a joint also turns about its joint-to-effector line, which keeps the
 // effector where it is, by the part of the orientation error that line can remove (the twist of the error about it).
+// Plain CCD is slow when the target is near full reach: there every joint's best single turn barely changes the chain's
+// length, so the chain straightens over hundreds of sweeps. After each sweep a reach step therefore scales every
+// joint's bend by one factor (keeping the chain's shape), found by bisection so the root-to-effector distance equals the
+// root-to-target distance, and the first joint re-aims; a step that ends farther away is undone.
 //
 // No allocation per solve: every number lives in a preallocated Float64Array. Helpers take arrays and offsets, never
 // numbers, because a number passed to or returned from a call that the optimizer does not inline is boxed on the heap.
@@ -76,6 +80,8 @@ const DELTA = 0,
   TOLERANCE = 46,
   ANGLE_TOLERANCE = 47,
   MAX_ANGLE = 48,
+  PHI = 49,
+  CHORD = 50,
   SLOTS = 52;
 const finiteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const finiteArray = (v: ArrayLike<number> | null | undefined, size: number): boolean => {
@@ -250,6 +256,14 @@ export class CCDSolver {
   angleTolerance = 0.001;
   /** Largest turn of one joint in one sweep, radians (default π: unlimited). Smaller steps spread the bend over the chain. */
   maxAngle = PI;
+  /**
+   * After each sweep, scale every joint's bend by one factor so the root-to-effector distance matches the target's, then
+   * re-aim the first joint (default true). This makes targets near full reach, and unreachable ones, converge in a few
+   * sweeps; false runs plain CCD.
+   */
+  reach = true;
+  private readonly saved: Float64Array;
+  private readonly bends: Float64Array;
 
   /**
    * One joint per entry of `offsets` (1-256): its translation in the previous joint's frame (the first joint's in the
@@ -270,6 +284,8 @@ export class CCDSolver {
     this.worldScales = new Float64Array(n);
     this.types = new Uint8Array(n);
     this.limits = new Float64Array(n * 8);
+    this.saved = new Float64Array(n * 4);
+    this.bends = new Float64Array(n * 4);
     this.tip = new Float64Array(3);
     this.parentPosition = new Float64Array(3);
     this.parentRotation = new Float64Array([0, 0, 0, 1]);
@@ -420,6 +436,7 @@ export class CCDSolver {
     if (!finiteNumber(tolerance) || tolerance < 0 || !finiteNumber(angleTolerance) || angleTolerance < 0)
       throw new RangeError('CCD tolerances must be finite and >= 0');
     if (!finiteNumber(maxAngle) || maxAngle <= 0) throw new RangeError('CCD maxAngle must be > 0 radians');
+    if (typeof this.reach !== 'boolean') throw new TypeError('CCD reach must be a boolean');
     if (pole !== null && pole !== undefined && !finiteArray(pole, 3))
       throw new TypeError('CCD pole must be 3 finite numbers or null');
     if (rotation !== null && rotation !== undefined) {
@@ -450,10 +467,14 @@ export class CCDSolver {
     }
     this.forward(0);
     const oriented = rotation !== null && rotation !== undefined,
-      bend = pole !== null && pole !== undefined;
-    let done = 0;
+      bend = pole !== null && pole !== undefined,
+      reach = this.reach;
+    let done = 0,
+      undone = 0;
     while (!this.measure(oriented) && done < iterations) {
       for (let i = this.joints - 1; i >= 0; i--) this.step(i, oriented);
+      // Two undone reach steps in a row (limits in the way): plain CCD for the rest of this solve.
+      if (reach && undone < 2) undone = this.reachStep(oriented) ? 0 : undone + 1;
       if (bend) this.bendToward();
       done++;
     }
@@ -590,6 +611,254 @@ export class CCDSolver {
     normalize(this.rotations, i * 4);
     this.constrain(i);
     this.forward(i);
+  }
+
+  // The reach step. Each joint j in 1..last bends its bone away from its parent bone's direction by a swing B_j (in the
+  // parent's frame). Scaling every bend by one factor keeps the chain's shape and twists: q_j(t) = R(axis_j,
+  // -t·angle_j) * q_j removes the fraction t of each bend (t = 1: straight, the longest the chain gets; t < 0: bent
+  // more). f(t), the root-to-effector distance, then comes from one forward pass, and a bisection on f(t) = d always
+  // brackets a reachable target from a shorter chain (f(0) < d <= f(1)); an unreachable one takes t = 1. A chain with no
+  // bend to scale that is too long bends all its joints by one shared angle about one axis instead. The first joint then
+  // re-aims; the step is undone if the effector ends farther from the target.
+  private reachStep(oriented: boolean): boolean {
+    const p = this.positions,
+      s = this.scratch,
+      n = this.joints,
+      e = n * 3,
+      tipLength = Math.sqrt(this.tip[0] * this.tip[0] + this.tip[1] * this.tip[1] + this.tip[2] * this.tip[2]),
+      last = tipLength > EPSILON ? n - 1 : n - 2;
+    if (last < 1) return true;
+    const tx = s[TARGET] - p[0],
+      ty = s[TARGET + 1] - p[1],
+      tz = s[TARGET + 2] - p[2],
+      d = Math.sqrt(tx * tx + ty * ty + tz * tz),
+      cx = p[e] - p[0],
+      cy = p[e + 1] - p[1],
+      cz = p[e + 2] - p[2],
+      r = Math.sqrt(cx * cx + cy * cy + cz * cz);
+    if (r < EPSILON || Math.abs(r - d) <= 0.25 * s[TOLERANCE]) return true;
+    // Each joint's bend: the swing from its parent bone's direction (its own offset) to its bone's direction (the next
+    // offset, or the tip, turned by its rotation), as axis and angle in this.bends.
+    const b = this.bends,
+      off = this.offsets;
+    let total = 0;
+    for (let j = 1; j <= last; j++) {
+      const o = j * 4,
+        child = j < n - 1 ? off : this.tip,
+        co = j < n - 1 ? (j + 1) * 3 : 0;
+      b[o + 3] = 0;
+      const pl = Math.sqrt(off[j * 3] * off[j * 3] + off[j * 3 + 1] * off[j * 3 + 1] + off[j * 3 + 2] * off[j * 3 + 2]),
+        cl = Math.sqrt(child[co] * child[co] + child[co + 1] * child[co + 1] + child[co + 2] * child[co + 2]);
+      if (pl < EPSILON || cl < EPSILON) continue;
+      rotate(s, DIRECTION, this.rotations, o, child, co);
+      const ux = off[j * 3] / pl,
+        uy = off[j * 3 + 1] / pl,
+        uz = off[j * 3 + 2] / pl,
+        vx = s[DIRECTION] / cl,
+        vy = s[DIRECTION + 1] / cl,
+        vz = s[DIRECTION + 2] / cl;
+      let ax = uy * vz - uz * vy,
+        ay = uz * vx - ux * vz,
+        az = ux * vy - uy * vx;
+      const sin = Math.sqrt(ax * ax + ay * ay + az * az),
+        cos = ux * vx + uy * vy + uz * vz;
+      if (sin < 1e-12) continue;
+      ax /= sin;
+      ay /= sin;
+      az /= sin;
+      b[o] = ax;
+      b[o + 1] = ay;
+      b[o + 2] = az;
+      b[o + 3] = Math.atan2(sin, cos);
+      total += b[o + 3];
+    }
+    let mode = 0;
+    if (total > 1e-9) mode = 1;
+    else if (r > d) mode = 2;
+    else return true; // Straight already: the first joint's aim does the rest.
+    if (mode === 2) this.bendAxis(last);
+    // Search the factor (or, without bends, the shared angle) for f = d.
+    const g0 = r - d;
+    let lo = 0,
+      glo = g0,
+      hi = 0,
+      ghi = g0,
+      bracket = false;
+    if (mode === 1 && g0 < 0) {
+      // Too short: straighten. f(1) is the straight chain's length.
+      s[PHI] = 1;
+      this.chordAt(mode, last);
+      ghi = s[CHORD] - d;
+      hi = 1;
+      bracket = ghi >= 0;
+      if (!bracket) lo = 1;
+    } else {
+      // Too long: bend more (mode 1: t < 0, doubling down to -8; mode 2: a growing shared angle in the bent direction).
+      const most = mode === 1 ? 8 : PI / last;
+      let step = mode === 1 ? 0.25 : 0.02 < most ? 0.02 : most;
+      for (let k = 0; k < 16; k++) {
+        s[PHI] = mode === 1 ? -step : step;
+        this.chordAt(mode, last);
+        const g = s[CHORD] - d;
+        if (g <= 0) {
+          hi = s[PHI];
+          ghi = g;
+          bracket = true;
+          break;
+        }
+        if (g >= glo) break;
+        lo = s[PHI];
+        glo = g;
+        if (step >= most) break;
+        step = step * 2 < most ? step * 2 : most;
+      }
+    }
+    // Bisect until within 1% of the tolerance (to rounding with a zero tolerance).
+    const close = 0.01 * s[TOLERANCE];
+    if (bracket)
+      for (let k = 0; k < 60 && Math.abs(ghi) > close && Math.abs(hi - lo) > 1e-13; k++) {
+        s[PHI] = 0.5 * (lo + hi);
+        this.chordAt(mode, last);
+        const g = s[CHORD] - d;
+        if (g < 0 === glo < 0) {
+          lo = s[PHI];
+          glo = g;
+        } else {
+          hi = s[PHI];
+          ghi = g;
+        }
+      }
+    s[PHI] = bracket && Math.abs(ghi) < Math.abs(glo) ? hi : lo;
+    if (s[PHI] === 0) return false;
+    const before = Math.sqrt(
+      (p[e] - s[TARGET]) * (p[e] - s[TARGET]) +
+        (p[e + 1] - s[TARGET + 1]) * (p[e + 1] - s[TARGET + 1]) +
+        (p[e + 2] - s[TARGET + 2]) * (p[e + 2] - s[TARGET + 2]),
+    );
+    this.saved.set(this.rotations);
+    const w = this.worldRotations;
+    if (mode === 2) {
+      // local'_j = conj(world_{j-1}) * R(axis, φ) * world_j, from the worlds before the step.
+      s[ANGLE] = s[PHI];
+      axisAngle(s, DELTA, s, AXIS, s, ANGLE);
+      for (let j = 1; j <= last; j++) {
+        multiply(s, WORLD, s, DELTA, w, j * 4);
+        multiplyConjugate(this.rotations, j * 4, w, (j - 1) * 4, s, WORLD);
+      }
+    } else
+      for (let j = 1; j <= last; j++) {
+        if (b[j * 4 + 3] === 0) continue;
+        s[ANGLE] = -s[PHI] * b[j * 4 + 3];
+        axisAngle(s, TURN, b, j * 4, s, ANGLE);
+        multiply(this.rotations, j * 4, s, TURN, this.rotations, j * 4);
+      }
+    for (let j = 1; j <= last; j++) {
+      normalize(this.rotations, j * 4);
+      this.constrain(j);
+    }
+    this.forward(1);
+    this.step(0, oriented);
+    const after = Math.sqrt(
+      (p[e] - s[TARGET]) * (p[e] - s[TARGET]) +
+        (p[e + 1] - s[TARGET + 1]) * (p[e + 1] - s[TARGET + 1]) +
+        (p[e + 2] - s[TARGET + 2]) * (p[e + 2] - s[TARGET + 2]),
+    );
+    if (after <= before) return true;
+    this.rotations.set(this.saved);
+    this.forward(0);
+    return false;
+  }
+  // Mode 2's axis in s[AXIS]: perpendicular to the chord and to the target's direction off it (or any perpendicular).
+  private bendAxis(last: number): void {
+    const p = this.positions,
+      s = this.scratch,
+      e = this.joints * 3,
+      r = Math.sqrt((p[e] - p[0]) ** 2 + (p[e + 1] - p[1]) ** 2 + (p[e + 2] - p[2]) ** 2),
+      d = Math.sqrt((s[TARGET] - p[0]) ** 2 + (s[TARGET + 1] - p[1]) ** 2 + (s[TARGET + 2] - p[2]) ** 2),
+      ax = (p[e] - p[0]) / r,
+      ay = (p[e + 1] - p[1]) / r,
+      az = (p[e + 2] - p[2]) / r;
+    let bx = s[TARGET] - p[0],
+      by = s[TARGET + 1] - p[1],
+      bz = s[TARGET + 2] - p[2];
+    const dt = bx * ax + by * ay + bz * az;
+    bx -= dt * ax;
+    by -= dt * ay;
+    bz -= dt * az;
+    if (Math.sqrt(bx * bx + by * by + bz * bz) < 1e-6 * (d > r ? d : r) + EPSILON * last) {
+      bx = Math.abs(ax) < 0.9 ? 1 : 0;
+      by = Math.abs(ax) < 0.9 ? 0 : 1;
+      bz = 0;
+      const dp = bx * ax + by * ay + bz * az;
+      bx -= dp * ax;
+      by -= dp * ay;
+      bz -= dp * az;
+    }
+    // Bending about chord x bulge moves the effector toward the bulge side; the search picks the angle.
+    let nx = ay * bz - az * by,
+      ny = az * bx - ax * bz,
+      nz = ax * by - ay * bx;
+    const nl = Math.sqrt(nx * nx + ny * ny + nz * nz);
+    nx /= nl;
+    ny /= nl;
+    nz /= nl;
+    s[AXIS] = nx;
+    s[AXIS + 1] = ny;
+    s[AXIS + 2] = nz;
+  }
+  // s[CHORD]: the root-to-effector distance for parameter s[PHI]. Mode 1: every bend scaled by (1 - φ), by one forward
+  // pass over the joints. Mode 2: joints 1..last turned by φ about s[AXIS], so bone k turns by min(k, last)·φ
+  // (Rodrigues on the current bone vectors).
+  private chordAt(mode: number, last: number): void {
+    const p = this.positions,
+      s = this.scratch,
+      n = this.joints,
+      phi = s[PHI];
+    let sx = 0,
+      sy = 0,
+      sz = 0;
+    if (mode === 2) {
+      const nx = s[AXIS],
+        ny = s[AXIS + 1],
+        nz = s[AXIS + 2];
+      for (let k = 0; k < n; k++) {
+        const vx = p[k * 3 + 3] - p[k * 3],
+          vy = p[k * 3 + 4] - p[k * 3 + 1],
+          vz = p[k * 3 + 5] - p[k * 3 + 2],
+          a = (k < last ? k : last) * phi,
+          c = Math.cos(a),
+          sn = Math.sin(a),
+          dot = (nx * vx + ny * vy + nz * vz) * (1 - c);
+        sx += vx * c + (ny * vz - nz * vy) * sn + nx * dot;
+        sy += vy * c + (nz * vx - nx * vz) * sn + ny * dot;
+        sz += vz * c + (nx * vy - ny * vx) * sn + nz * dot;
+      }
+    } else {
+      // Forward pass from joint 0's world rotation: bone k = scale_k * world_k * (next offset or tip).
+      const b = this.bends,
+        ws = this.worldScales,
+        off = this.offsets;
+      s[WORLD] = this.worldRotations[0];
+      s[WORLD + 1] = this.worldRotations[1];
+      s[WORLD + 2] = this.worldRotations[2];
+      s[WORLD + 3] = this.worldRotations[3];
+      for (let k = 0; k < n; k++) {
+        if (k > 0) {
+          if (k <= last && b[k * 4 + 3] !== 0) {
+            s[ANGLE] = -phi * b[k * 4 + 3];
+            axisAngle(s, TURN, b, k * 4, s, ANGLE);
+            multiply(s, TURN, s, TURN, this.rotations, k * 4);
+            multiply(s, WORLD, s, WORLD, s, TURN);
+          } else multiply(s, WORLD, s, WORLD, this.rotations, k * 4);
+        }
+        if (k < n - 1) rotate(s, DIRECTION, s, WORLD, off, (k + 1) * 3);
+        else rotate(s, DIRECTION, s, WORLD, this.tip, 0);
+        sx += s[DIRECTION] * ws[k];
+        sy += s[DIRECTION + 1] * ws[k];
+        sz += s[DIRECTION + 2] * ws[k];
+      }
+    }
+    s[CHORD] = Math.sqrt(sx * sx + sy * sy + sz * sz);
   }
 
   // Turns the first joint about the root-to-effector line so the chain's bend faces the pole (the effector stays put).

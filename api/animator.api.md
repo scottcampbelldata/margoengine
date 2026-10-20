@@ -79,6 +79,7 @@ export interface CCDChain {
     tolerance?: number;
     angleTolerance?: number;
     maxAngle?: number;
+    reach?: boolean;
     onSolve?: (result: CCDResult) => void;
 }
 
@@ -127,6 +128,7 @@ export class CCDSolver {
     tolerance: number;
     angleTolerance: number;
     maxAngle: number;
+    reach: boolean;
     constructor(offsets: readonly Vec3[], tip?: Vec3);
     setLimit(index: number, limit: CCDJointLimit | null): void;
     captureRest(): void;

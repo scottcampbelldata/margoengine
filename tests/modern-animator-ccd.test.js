@@ -31,6 +31,7 @@ const solveWith = (solver, target, o = {}) => {
   solver.tolerance = o.tolerance ?? 1e-3;
   solver.angleTolerance = o.angleTolerance ?? 1e-3;
   solver.maxAngle = o.maxAngle ?? Math.PI;
+  solver.reach = o.reach ?? true;
   return solver.solve(target, o.rotation ?? null, o.pole ?? null);
 };
 const effector = (solver) => Array.from(solver.positions.subarray(solver.joints * 3));
@@ -91,8 +92,8 @@ test('CCD reaches reachable targets within tolerance and reports its convergence
     report[joints] = { median: counts[30], p90: counts[54], max: counts[59] };
   }
   console.log('CCD sweeps to 1 mm (60 random reachable targets per chain length):', JSON.stringify(report));
-  // Measured on this seed; generous bounds so a regression in the sweep shows, not noise.
-  for (const { median } of Object.values(report)) assert.ok(median <= 40, JSON.stringify(report));
+  // With the reach step a reachable target is met in one sweep, as a rule (measured: every median 1).
+  for (const { median } of Object.values(report)) assert.ok(median <= 2, JSON.stringify(report));
 });
 
 test('CCD stretches the chain straight toward an unreachable target', () => {
@@ -103,7 +104,7 @@ test('CCD stretches the chain straight toward an unreachable target', () => {
       l = Math.hypot(...direction),
       root = Array.from(solver.positions.subarray(0, 3)),
       target = direction.map((v, i) => root[i] + (v / l) * length * (1.5 + next()));
-    const result = solveWith(solver, target, { iterations: 128 });
+    const result = solveWith(solver, target, { iterations: 4 });
     assert.equal(result.reached, false);
     const end = effector(solver),
       toTarget = distance(target, root);
@@ -125,27 +126,36 @@ test('CCD stretches the chain straight toward an unreachable target', () => {
   }
 });
 
-test('CCD convergence: distance never grows from sweep to sweep, and tighter tolerances take more sweeps', () => {
+test('plain CCD never ends farther away with more sweeps, and tighter tolerances take it more sweeps', () => {
   const solver = chainOf([1, 1, 1]),
     target = [1.5, 1.2, 0.4],
     sweeps = [];
   for (let k = 0; k <= 12; k++) {
     identity(solver);
-    sweeps.push(solveWith(solver, target, { iterations: k, tolerance: 0 }).distance);
+    sweeps.push(solveWith(solver, target, { iterations: k, tolerance: 0, reach: false }).distance);
   }
   for (let k = 1; k < sweeps.length; k++) assert.ok(sweeps[k] <= sweeps[k - 1] + 1e-12, `sweep ${k}: ${sweeps}`);
   identity(solver);
   const none = solveWith(solver, target, { iterations: 0 });
   assert.equal(none.iterations, 0);
   assert.equal(none.distance, sweeps[0], 'zero sweeps only measure');
-  const counts = [1e-1, 1e-3, 1e-6].map((tolerance) => {
-    identity(solver);
-    const result = solveWith(solver, target, { tolerance, iterations: 500 });
-    assert.ok(result.reached && result.distance <= tolerance);
-    return result.iterations;
-  });
-  assert.ok(counts[0] <= counts[1] && counts[1] <= counts[2] && counts[2] > counts[0], JSON.stringify(counts));
-  console.log('CCD sweeps for a 3-joint chain at 10 cm, 1 mm, 1 um:', JSON.stringify(counts));
+  const counts = (reach) =>
+    [1e-1, 1e-3, 1e-6].map((tolerance) => {
+      identity(solver);
+      const result = solveWith(solver, target, { tolerance, iterations: 500, reach });
+      assert.ok(result.reached && result.distance <= tolerance);
+      return result.iterations;
+    });
+  const plain = counts(false),
+    reached = counts(true);
+  assert.ok(plain[0] <= plain[1] && plain[1] <= plain[2] && plain[2] > plain[0], JSON.stringify(plain));
+  assert.deepEqual(reached, [1, 1, 1], 'the reach step meets each tolerance in one sweep');
+  console.log(
+    'CCD sweeps for a 3-joint chain at 10 cm, 1 mm, 1 um: plain',
+    JSON.stringify(plain),
+    'reach step',
+    JSON.stringify(reached),
+  );
   // Already there: no sweep.
   const again = solveWith(solver, target, { tolerance: 1e-3 });
   assert.equal(again.iterations, 0);
@@ -187,7 +197,9 @@ test('CCD hinge limits keep each joint turning about its axis within its range',
 test('CCD Euler and cone limits hold on every joint, and the solve still gets as close as they allow', () => {
   const next = random(11),
     min = [-0.3, -0.5, -1],
-    max = [0.3, 0.5, 1];
+    max = [0.3, 0.5, 1],
+    plainErrors = [],
+    reachErrors = [];
   for (const kind of ['euler', 'cone']) {
     const solver = chainOf([1, 1, 1, 1]);
     for (let i = 0; i < 4; i++)
@@ -201,6 +213,13 @@ test('CCD Euler and cone limits hold on every joint, and the solve still gets as
         start = distance(effector(solver), target),
         limited = solveWith(solver, target, { iterations: 48 });
       assert.ok(limited.distance <= start + 1e-9, 'the limited solve still gets closer');
+      const reached = limited.distance,
+        rotations = solver.rotations.slice();
+      identity(solver);
+      plainErrors.push(solveWith(solver, target, { iterations: 48, reach: false }).distance);
+      reachErrors.push(reached);
+      solver.rotations.set(rotations);
+      solver.update();
       for (let i = 0; i < 4; i++) {
         const [x, y, z, w] = relative(joint(solver, i, solver.rest), joint(solver, i));
         if (kind === 'euler') {
@@ -222,6 +241,15 @@ test('CCD Euler and cone limits hold on every joint, and the solve still gets as
       }
     }
   }
+  // Limits can undo a reach step (it is then dropped); over these targets it still ends no worse than plain CCD.
+  const median = (values) => [...values].sort((a, b) => a - b)[values.length >> 1];
+  console.log(
+    'CCD with Euler/cone limits, median final distance: plain',
+    median(plainErrors).toFixed(4),
+    'reach step',
+    median(reachErrors).toFixed(4),
+  );
+  assert.ok(median(reachErrors) <= median(plainErrors) + 1e-9);
 });
 
 test('limits are measured from the rest rotations, and joints start inside their limits', () => {
@@ -271,31 +299,47 @@ test('CCD meets an end-effector orientation target as well as its position', () 
   assert.throws(() => new CCDSolver([[0, 0, 0]]).solve([0, 0, 0], [0, 0, 0, 0]), RangeError);
 });
 
-test('targets at the very edge of reach converge slowly, but never move away', () => {
-  // Wang and Chen's sweep needs many small turns to straighten a chain: measured, not hidden.
+test('targets at the very edge of reach converge in one sweep with the reach step, where plain CCD stays short', () => {
+  // Plain CCD (Wang and Chen's sweep alone) needs many small turns to straighten a chain; the reach step scales the
+  // chain's bends to the target's distance instead.
   const next = random(23),
-    report = [];
+    plain = [],
+    reach = [];
   for (let trial = 0; trial < 20; trial++) {
-    const { solver, length } = randomChain(next, 3),
+    const joints = [2, 3, 6, 12][trial % 4],
+      { solver, length } = randomChain(next, joints),
       direction = randomRotation(next).slice(0, 3),
       l = Math.hypot(...direction),
-      target = direction.map((v) => (v / l) * length * 0.995);
+      target = direction.map((v) => (v / l) * length * (trial % 2 ? 0.995 : 0.9999));
     let previous = Infinity;
-    const errors = [16, 64, 256].map((iterations) => {
-      identity(solver);
-      const { distance: error } = solveWith(solver, target, { iterations, tolerance: 0 });
-      assert.ok(error <= previous + 1e-12, 'more sweeps never end farther away');
-      previous = error;
-      return error;
-    });
-    report.push(errors);
+    plain.push(
+      [16, 64, 256].map((iterations) => {
+        identity(solver);
+        const { distance: error } = solveWith(solver, target, { iterations, tolerance: 0, reach: false });
+        assert.ok(error <= previous + 1e-12, 'more plain sweeps never end farther away');
+        previous = error;
+        return error;
+      }),
+    );
+    identity(solver);
+    const result = solveWith(solver, target, { iterations: 16 });
+    assert.ok(
+      result.reached && result.iterations === 1,
+      `${joints} joints: ${result.distance} after ${result.iterations}`,
+    );
+    identity(solver);
+    reach.push(solveWith(solver, target, { iterations: 16, tolerance: 0 }).distance);
   }
-  const median = (k) => report.map((r) => r[k]).sort((a, b) => a - b)[10];
+  const median = (values) => [...values].sort((a, b) => a - b)[10];
   console.log(
-    'CCD at 99.5% of full reach, median error after 16 / 64 / 256 sweeps (m, chain about 2 m):',
-    [0, 1, 2].map((k) => median(k).toExponential(2)).join(' / '),
+    'CCD at 99.5-99.99% of full reach (2-12 joints, chains about 1-8 m), median error: plain after 16 / 64 / 256 sweeps',
+    [0, 1, 2].map((k) => median(plain.map((r) => r[k])).toExponential(2)).join(' / '),
+    'm; with the reach step after 16',
+    median(reach).toExponential(2),
+    'm',
   );
-  assert.ok(median(2) < median(0));
+  assert.ok(reach.every((error) => error < 1e-9));
+  assert.ok(median(plain.map((r) => r[0])) > 1e-3, 'plain CCD is still short after 16 sweeps');
 });
 
 test('a pole decides which way the chain bends without moving the reached effector', () => {
@@ -352,6 +396,9 @@ test('CCD validates its inputs with typed errors that name the fix', () => {
   solver.iterations = 2.5;
   assert.throws(() => solver.solve([0, 1, 0]), /iterations must be an integer/);
   solver.iterations = 16;
+  solver.reach = 'yes';
+  assert.throws(() => solver.solve([0, 1, 0]), /reach must be a boolean/);
+  solver.reach = true;
   solver.scales[1] = 0;
   assert.throws(() => solver.solve([0, 1, 0]), /scale must be finite and > 0/);
 });
