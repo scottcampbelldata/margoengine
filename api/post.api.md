@@ -38,6 +38,28 @@ export class FXAA implements EnginePlugin {
     destroy(): void;
 }
 
+export class GTAO extends SSAO {
+    readonly name: string;
+    protected static readonly presetKey: string;
+    protected readonly label: string;
+    readonly options: GTAOOptions;
+    constructor(options?: GTAOOptions);
+    static attach(engine: EngineKernel, options?: GTAOOptions): GTAO;
+    protected validate(): void;
+    protected occlusionShader(): string;
+    protected kernel(): Float32Array;
+    protected pack(v: Float32Array): void;
+    setup(engine: Engine): void;
+    dispose(): void;
+}
+
+export interface GTAOOptions {
+    radius?: number;
+    slices?: number;
+    steps?: number;
+    enabled?: boolean;
+}
+
 export class PostStack implements EnginePlugin {
     readonly effects: readonly EnginePlugin[];
     readonly name = "post:stack";
@@ -54,13 +76,20 @@ export class PostStack implements EnginePlugin {
 
 export class SSAO implements EnginePlugin {
     readonly options: SSAOOptions;
-    readonly name = "ssao";
+    readonly name: string;
+    protected static readonly presetKey: string;
+    protected readonly label: string;
     constructor(options?: SSAOOptions);
     static attach(instance: EngineKernel, options?: SSAOOptions): SSAO;
     get enabled(): boolean;
+    protected get stacked(): boolean;
     get depthTexture(): GPUTexture | undefined;
     set enabled(value: boolean);
     add(source: SSAOSource): () => void;
+    protected validate(): void;
+    protected occlusionShader(): string;
+    protected kernel(): Float32Array;
+    protected pack(v: Float32Array): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;

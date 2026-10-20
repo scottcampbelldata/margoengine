@@ -44,7 +44,7 @@ export interface SSAOSource {
     external?: { pass: GPURenderPassEncoder; view: ArrayLike<number>; depthCompare: GPUCompareFunction },
   ): void;
 }
-function kernel(): Float32Array {
+function hemisphere(): Float32Array {
   const values = new Float32Array(128);
   for (let i = 0; i < 32; i++) {
     const z = (i + 0.5) / 32,
@@ -56,7 +56,11 @@ function kernel(): Float32Array {
   return values;
 }
 export class SSAO implements EnginePlugin {
-  readonly name = 'ssao';
+  readonly name: string = 'ssao';
+  /** Tier-preset key (@margoengine/quality) read by the constructor; GTAO reads its own. */
+  protected static readonly presetKey: string = 'ssao';
+  /** Name in error messages. */
+  protected readonly label: string = 'SSAO';
   private engine?: Engine;
   private device?: GPUDevice;
   private uniform?: GPUBuffer;
@@ -131,7 +135,7 @@ export class SSAO implements EnginePlugin {
   private readonly projection = this.values.subarray(32, 48);
   private readonly directionValues = [new Float32Array([1, 0, 0.5, 0]), new Float32Array([0, 1, 0.5, 0])];
   constructor(readonly options: SSAOOptions = {}) {
-    this.options = preset('ssao', options);
+    this.options = preset((new.target as typeof SSAO).presetKey, options);
     this.validate();
   }
   static attach(instance: EngineKernel, options: SSAOOptions = {}): SSAO {
@@ -142,16 +146,20 @@ export class SSAO implements EnginePlugin {
   get enabled(): boolean {
     return this.options.enabled ?? true;
   }
+  /** True once a PostStack has taken this effect (joinStack). */
+  protected get stacked(): boolean {
+    return !!this.host;
+  }
   get depthTexture(): GPUTexture | undefined {
     return this.host ? this.host.depthTexture : this.textures[1];
   }
   private joinStack(host: StackHost): StackStage {
-    if (this.engine || this.host || this.disposed) throw new Error('SSAO is already attached');
+    if (this.engine || this.host || this.disposed) throw new Error(`${this.label} is already attached`);
     this.host = host;
     return { kind: 'hdr', render: (c, input, output) => this.stage(c, input, output) };
   }
   set enabled(value: boolean) {
-    if (typeof value !== 'boolean') throw new TypeError('SSAO enabled must be boolean');
+    if (typeof value !== 'boolean') throw new TypeError(`${this.label} enabled must be boolean`);
     this.options.enabled = value;
   }
   add(source: SSAOSource): () => void {
@@ -159,7 +167,7 @@ export class SSAO implements EnginePlugin {
     this.sources.add(source);
     return () => this.sources.delete(source);
   }
-  private validate(): void {
+  protected validate(): void {
     const o = this.options,
       r = o.radius ?? 0.5,
       b = o.bias ?? 0.025,
@@ -178,23 +186,38 @@ export class SSAO implements EnginePlugin {
     )
       throw new RangeError('Invalid SSAO options');
   }
+  /** The occlusion kernel (compute, bindings: frame, depth, gbuffer, 4x4 noise, the `kernel()` buffer, r32float output). */
+  protected occlusionShader(): string {
+    return ssaoShader;
+  }
+  /** 512 bytes for the kernel's storage buffer, written once at setup. */
+  protected kernel(): Float32Array {
+    return hemisphere();
+  }
+  /** The kernel's settings in the frame uniform: `params.xyz` (values 48-50) and `size.zw` (54-55). */
+  protected pack(v: Float32Array): void {
+    v[48] = this.options.radius ?? 0.5;
+    v[49] = this.options.bias ?? 0.025;
+    v[50] = this.options.samples ?? 32;
+    v[54] = v[55] = 0;
+  }
   setup(engine: Engine): void {
-    if (this.disposed) throw new Error('SSAO is disposed');
-    if (!engine.gpu) throw new Error('SSAO requires WebGPU');
+    if (this.disposed) throw new Error(`${this.label} is disposed`);
+    if (!engine.gpu) throw new Error(`${this.label} requires WebGPU`);
     if (!this.host && (engine.hasPlugin('post-processing') || engine.hasPlugin('bloom')))
       throw new Error('SSAO owns the output target; remove the other post effect first');
     this.engine = engine;
     this.device = engine.gpu;
     this.uniform = this.device.createBuffer({ size: 224, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.samples = this.device.createBuffer({ size: 512, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
-    this.device.queue.writeBuffer(this.samples, 0, kernel() as Float32Array<ArrayBuffer>);
+    this.device.queue.writeBuffer(this.samples, 0, this.kernel() as Float32Array<ArrayBuffer>);
     const create = (code: string) =>
       this.device!.createComputePipeline({
         layout: 'auto',
         compute: { module: this.device!.createShaderModule({ code }), entryPoint: 'main' },
       });
     this.extract = create(extractShader);
-    this.occlusion = create(ssaoShader);
+    this.occlusion = create(this.occlusionShader());
     this.blur = create(blurShader);
     this.noise = this.device.createTexture({
       size: [4, 4],
@@ -266,13 +289,10 @@ export class SSAO implements EnginePlugin {
           p[14] = (far * near) / (far - near);
         }
         const v = this.values;
-        v[48] = this.options.radius ?? 0.5;
-        v[49] = this.options.bias ?? 0.025;
-        v[50] = this.options.samples ?? 32;
+        this.pack(v);
         v[51] = +this.enabled;
         v[52] = c.width;
         v[53] = c.height;
-        v[54] = v[55] = 0;
         c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
         for (let i = 0; i < 2; i++) {
           this.directionValues[i][2] = this.options.radius ?? 0.5;

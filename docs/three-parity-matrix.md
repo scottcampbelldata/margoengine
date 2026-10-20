@@ -30,7 +30,7 @@ The row stays PARTIAL because three.js's WebGLRenderer draws the whole scene. Cl
 | Row | How to treat it |
 | --- | --- |
 | CubeCamera | `Engine.render({camera})` supplies its camera prerequisite. A dynamic environment capture helper is still absent and belongs in `@margoengine/environment`. |
-| GTAOPass | Left out of the parity push. `@margoengine/post` has SSAO. |
+| GTAOPass | COVERED since 2026-10-20: `GTAO` in `@margoengine/post/gtao` (`packages/post/src/gtao.ts`), on SSAO's G-buffer and ambient replay. |
 | SSGI, denoise | Left out. |
 | BatchedMesh | Left out. Distinct geometries stay separate draws. `mergeGeometries` can bake static meshes. |
 | IESSpotLight, ProjectorLight | Left out. |

@@ -1,6 +1,6 @@
 # Margo Engine Post
 
-Optional WebGPU frame-graph SSAO, bloom, FXAA and an effect stack, separate from the frozen core and stage.
+Optional WebGPU frame-graph SSAO and GTAO, bloom, FXAA and an effect stack, separate from the frozen core and stage.
 
 ## Combining effects: `PostStack`
 
@@ -126,6 +126,46 @@ ssr.enabled = false; // pass-through, no recompiles
   term (core meshes alike). Materials `basic`/`normal`/`matcap` meshes reflect by their roughness like `standard` ones. With SSAO before it, a creased pixel's IBL specular was already darkened by AO, so a hit
   removes slightly more than was left (clamped at zero). Specular from other ambient plugins (sky's ambient patch) is
   not replaced.
+
+## Ground-truth ambient occlusion: `GTAO`
+
+`@margoengine/post/gtao` (10,521 B min+gzip, its own entry; it carries SSAO and the stack) is GTAO, written from
+Jimenez, Wu, Pesce and Jarabo 2016 ("Practical Real-Time Strategies for Accurate Indirect Occlusion"). It is an HDR
+`PostStack` effect; `GTAO.attach(engine, options)` runs it alone in its own one-effect stack (tone mapped like SSAO alone).
+
+```ts
+import {PostStack} from '@margoengine/post/stack';
+import {GTAO} from '@margoengine/post/gtao';
+import {SSR} from '@margoengine/post/ssr';
+const gtao = new GTAO({radius: 0.5, slices: 2, steps: 6});
+PostStack.attach(stage.engine, [gtao, new SSR()]); // or GTAO.attach(stage.engine)
+gtao.add(model);                // gltf-pro model: its normal maps feed the horizon search, as with SSAO
+gtao.options.slices = 1;        // options and `enabled` are read every frame
+```
+
+- **Method.** Per pixel, `slices` planes through the view vector, each along a screen direction. On each side of the
+  pixel `steps` depth samples within `radius` give the horizon (the highest sample, as an angle from the view vector),
+  clamped to the hemisphere around the normal projected into the slice. The paper's closed form (its eq. 10) gives the
+  cosine-weighted visibility of the open arc, weighted by the projected normal's length; the slices average to the
+  visible share of the cosine-weighted hemisphere. Occluders fade out between 60% and 100% of `radius`. The 4x4 pixel
+  tile rotates the slices and offsets the steps (both 4x4 Bayer orders), and SSAO's bilateral blur averages the tile.
+- **Shared with SSAO.** The normal G-buffer (with `gtao.add(source)` material normals), the blur, the ambient replay and
+  the composite are SSAO's, so GTAO darkens exactly the ambient and image-based light (`margoAmbient`), not direct light
+  or emission, under perspective and orthographic cameras. GTAO is a subclass of `SSAO`; with no GTAO, SSAO makes the
+  same GPU calls as before (`examples/package-benchmarks/proofs/post-stack.proof.js`, `--current`).
+- **Checked on a real GPU** against closed forms (NVIDIA RTX A6000, Edge 155; `examples/package-benchmarks/post-effects-gpu.mjs
+  --only=gtao`, [gtao-gpu.json](../../examples/package-benchmarks/results/gtao-gpu.json)): ambient light only, the
+  frame with GTAO over the frame with it disabled. A point on a floor where a plane through it closes the hemisphere to
+  a wedge of angle b keeps `(1 - cos b) / 2` of its ambient light. Next to the crease GTAO measures 0.525, 0.267 and
+  0.783 for 90, 60 and 120 degree wedges (closed form 0.5, 0.25, 0.75; the blur mixes in floor up to a few cm out),
+  rising to 0.85-0.96 at 0.64 m with `radius: 2`; the open floor measures 0.995-1.009. The same at 1x MSAA and with
+  an orthographic camera (0.533, 0.270, 0.779). Alone, the open floor is unchanged (0/255) and the crease darker; in
+  a stack with SSR and Bloom and under TAA, no errors and no NaN.
+- **Limits.** Screen-space: occluders off screen or hidden behind nearer surfaces do not occlude, and thin objects
+  occlude as if infinitely thick (no thickness heuristic). No multi-bounce colour approximation, no bent normals and no
+  specular occlusion cone: the IBL specular is darkened by the same factor as the diffuse, as with SSAO. Up to 4 slices
+  and 16 steps per side; options `radius` (0, 100], `slices` 1-4, `steps` 1-16 (`RangeError` otherwise). It runs only in
+  a `PostStack` (`MargoError` code `state` when attached alone with `engine.use`). GPU cost not measured yet. WebGPU only.
 
 ## Projected decals: `Decals`
 

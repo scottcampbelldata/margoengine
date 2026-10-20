@@ -8,13 +8,20 @@ import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core
 
 export class SSAO implements EnginePlugin {
     readonly options: SSAOOptions;
-    readonly name = "ssao";
+    readonly name: string;
+    protected static readonly presetKey: string;
+    protected readonly label: string;
     constructor(options?: SSAOOptions);
     static attach(instance: EngineKernel, options?: SSAOOptions): SSAO;
     get enabled(): boolean;
+    protected get stacked(): boolean;
     get depthTexture(): GPUTexture | undefined;
     set enabled(value: boolean);
     add(source: SSAOSource): () => void;
+    protected validate(): void;
+    protected occlusionShader(): string;
+    protected kernel(): Float32Array;
+    protected pack(v: Float32Array): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;

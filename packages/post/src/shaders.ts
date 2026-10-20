@@ -1,6 +1,6 @@
 // The gbuffer's w is the signed view depth -z (negative behind an orthographic eye); exactly 0 marks no surface.
 import { displayShader } from '../../shared/display.js';
-const frame = /* wgsl */ `
+export const frame = /* wgsl */ `
 struct Frame {inverse:mat4x4f,view:mat4x4f,projection:mat4x4f,params:vec4f,size:vec4f}
 @group(0) @binding(0) var<uniform> f:Frame;
 fn viewPosition(p:vec2i,d:f32)->vec3f {

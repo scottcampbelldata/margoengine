@@ -205,7 +205,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | EffectComposer, or the WebGPU PostProcessing node chain | COVERED † | post `PostStack` (`packages/post/src/stack.ts`, entry `@margoengine/post/stack`) | One linear-HDR scene capture shared by its effects, run in array order: HDR effects (`SSAO`, `DOF`, `Bloom`, HDR `NodePass`), at most one display effect (`Tonemap` or creative `PostProcessing`), then LDR effects (`FXAA`, LDR `NodePass`); any other order throws. TAA wraps the stack. Alone, each effect still owns its capture and refuses the others. WebGPU only. |
 | UnrealBloomPass | COVERED † | post `Bloom` (`packages/post/src/bloom.ts`) | One implementation since the dedupe: creative `PostProcessing` has no bloom; stack `Bloom` before it in a `PostStack`. Half-resolution 9-tap Gaussian with a hard threshold (no soft knee, no mip chain). |
 | SSAOPass, SAOPass | COVERED † | post `SSAO` (`packages/post/src/ssao.ts`) | Normal-aware bilateral blur. Works under orthographic cameras and occludes environment IBL (diffuse and specular, same AO factor). |
-| GTAOPass | MISSING | — | |
+| GTAOPass | COVERED | post `GTAO` (`packages/post/src/gtao.ts`, entry `@margoengine/post/gtao`) | Ground-truth AO from Jimenez et al. 2016: per-slice horizon search with the paper's closed-form cosine-weighted visibility, on SSAO's G-buffer, blur, ambient replay and composite (darkens ambient and IBL light only). HDR `PostStack` effect or `GTAO.attach` alone; perspective and orthographic. Checked on a real GPU against the closed form `(1 - cos b) / 2` for a floor point in a wedge of angle b (0.525 / 0.267 / 0.783 for 0.5 / 0.25 / 0.75). No multi-bounce or bent normals. WebGPU only. |
 | SSRPass | PARTIAL | post `SSR` (`packages/post/src/ssr.ts`, entry `@margoengine/post/ssr`) | HDR `PostStack` effect (or `SSR.attach` alone): Hi-Z ray march, roughness blur and fade, replaces `EnvironmentLighting`'s specular where rays hit and keeps it where they miss; perspective and orthographic; works with TAA. Core meshes (`PbrMaterial`) and glTF-pro models / materials meshes added with `ssr.add(model)` (their own maps, alpha mask, instances, skinning, through gltf-pro's capture hook) show reflections; water, terrain and other custom shaders are reflected but do not reflect. WebGPU only. |
 | SSGI, denoise | MISSING | — | |
 | TAA (TAARenderPass, TRAA node) | COVERED † | taa `TAA` (`packages/taa/src/index.ts`) | Uses a velocity buffer and YCoCg clamping. |
@@ -370,7 +370,6 @@ These rows stay MISSING or PARTIAL. The action is the sentence a caller can rely
 | ColladaLoader | MISSING. | Do not add it. |
 | Long-tail loaders | MISSING. LDraw, VRML, 3DS, LWO, AMF, MD2, VOX, PDB, GCode, BVH motion capture, 3DM, KMZ, TDS. | Add one loader when a project brings that file. |
 | DRACOExporter, EXRExporter, KTX2Exporter | MISSING. | glTF export is `@margoengine/exporters`. Do not add these three. |
-| GTAOPass | MISSING. | Use SSAO in `@margoengine/post`. |
 | SSGI, denoise | MISSING. | Do not add them. |
 | GlitchPass, AfterimagePass | MISSING. | A `NodePass` in the shot that needs one. |
 | BatchedMesh | MISSING. | Bake static meshes with `mergeGeometries`. Do not change core batching with this room. |

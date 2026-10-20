@@ -1,0 +1,92 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Post effects GPU check</title><style>body{margin:0;background:#000}canvas{display:block}</style></head><body>
+<script type="module">
+// Driven by post-effects-gpu.mjs. window.check.run(config) builds a fresh engine and scene, a PostStack of the named
+// effects and, with probe: true, a last HDR stage that keeps a float copy of the linear light it receives (read() returns
+// it), so checks compare linear values, not tone-mapped bytes. Scenes:
+//   creases: a white floor (top at y = 0) and three 2.4 m long boxes standing on it, their +z faces meeting the floor at
+//            90, 60 and 120 degrees (rotated 0, +30 and -30 degrees about x). Returns each crease line and its angle.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {PostStack} from '/packages/post/dist/stack.js';
+import {GTAO} from '/packages/post/dist/gtao.js';
+import {SSAO} from '/packages/post/dist/ssao.js';
+import {SSR} from '/packages/post/dist/ssr.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {CameraProjection} from '/packages/cameras/dist/index.js';
+import {TAA} from '/packages/taa/dist/index.js';
+
+let state;
+const effects={gtao:o=>new GTAO(o),ssao:o=>new SSAO(o),ssr:o=>new SSR(o),bloom:o=>new Bloom(o)};
+const display=`fn pbrNeutral(input:vec3f)->vec3f {let x=min(input.r,min(input.g,input.b));let offset=select(0.04,x-6.25*x*x,x<0.08);var v=input-offset;let peak=max(v.r,max(v.g,v.b));if(peak<0.76){return v;}let newPeak=1.0-0.24*0.24/(peak+0.24-0.76);v*=newPeak/peak;return mix(v,vec3f(newPeak),1.0-1.0/(0.15*(peak-newPeak)+1.0));}
+fn toDisplay(c:vec3f)->vec3f {let x=pbrNeutral(max(c,vec3f(0)));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>=vec3f(0.0031308));}`;
+// A last HDR stage: copies its input into an rgba32float texture for read(), then passes it on (display-encoded when last).
+function probe(){
+  const p={name:'probe',setup(){},registerPasses(){},dispose(){p.texture?.destroy();},joinStack(){return {kind:'hdr',render(c,input,output){
+    const d=c.device,code=`@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {return vec4f(array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3))[i],0,1);}
+@group(0) @binding(0) var image:texture_2d<f32>;${display}
+@fragment fn keep(@builtin(position) q:vec4f)->@location(0) vec4f {return textureLoad(image,vec2i(q.xy),0);}
+@fragment fn show(@builtin(position) q:vec4f)->@location(0) vec4f {let s=textureLoad(image,vec2i(q.xy),0);return vec4f(select(toDisplay(s.rgb),s.rgb,HDR),s.a);}`;
+    if(p.texture?.width!==c.width||p.texture?.height!==c.height){p.texture?.destroy();p.texture=d.createTexture({size:[c.width,c.height],format:'rgba32float',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC});p.view=p.texture.createView();}
+    const key=output.format+output.multisample.count+output.hdr;
+    if(p.key!==key){p.key=key;const m=d.createShaderModule({code:`const HDR=${output.hdr};`+code});
+      p.keep=d.createRenderPipeline({layout:'auto',vertex:{module:m,entryPoint:'vertex'},fragment:{module:m,entryPoint:'keep',targets:[{format:'rgba32float'}]}});
+      p.pass=d.createRenderPipeline({layout:'auto',vertex:{module:m,entryPoint:'vertex'},fragment:{module:m,entryPoint:'show',targets:[{format:output.format}]},multisample:output.multisample});p.input=undefined;}
+    if(p.input!==input){p.input=input;p.groups=[p.keep,p.pass].map(q=>d.createBindGroup({layout:q.getBindGroupLayout(0),entries:[{binding:0,resource:input}]}));}
+    for(const [pipeline,group,view] of [[p.keep,p.groups[0],p.view],[p.pass,p.groups[1],output.view]]){const pass=c.encoder.beginRenderPass({colorAttachments:[{view,loadOp:'clear',storeOp:'store'}]});pass.setPipeline(pipeline);pass.setBindGroup(0,group);pass.draw(3);pass.end();}
+  }};}};
+  return p;
+}
+const white=()=>new PbrMaterial({color:'#ffffff',roughness:1,metalness:0});
+async function teardown(){if(!state)return;const s=state;state=undefined;await s.engine.gpu.queue.onSubmittedWorkDone();s.engine.dispose();s.canvas.remove();}
+async function frames(n){for(let i=0;i<n;i++){state.engine.render({delta:1/60});await state.engine.gpu.queue.onSubmittedWorkDone();}await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));}
+window.check={
+  async run({scene='creases',camera='persp',stack=[],alone=null,probe:withProbe=true,taa=false,samples=4,size=[1024,1024],frames:n=4,light=false}={}){
+    await teardown();
+    if(samples===1)globalThis.margoLow=1;else delete globalThis.margoLow;
+    const canvas=document.body.appendChild(document.createElement('canvas'));canvas.style.width=size[0]+'px';canvas.style.height=size[1]+'px';
+    const view={persp:{position:[0,6,8],target:[0,0,0.8]},ortho:{position:[0,6,8],target:[0,0,0.8]}}[camera];
+    const engine=await Engine.create(canvas,{backend:'webgpu',camera:{...view,near:0.1,far:200}}),errors=[];
+    engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+    if(camera==='ortho')CameraProjection.attach(engine,{height:10});
+    // Ambient light only, unless asked: the linear result is then the ambient term times the occlusion.
+    engine.lighting.direction[3]=light?3:0;engine.lighting.radiance[3]=1;
+    const info={};
+    if(scene==='creases'){
+      engine.createMesh().setGeometry(box(40,0.02,40)).setPosition([0,-0.01,0]).setMaterial(white());
+      info.boxes=[[-3.5,0],[0,Math.PI/6],[3.5,-Math.PI/6]].map(([x,angle])=>({x,angle,mesh:engine.createMesh().setGeometry(box(2.4,2,2)).setPosition([x,0,0]).setRotation([angle,0,0]).setMaterial(white())}));
+    }
+    const made={},list=stack.map(([name,options])=>made[name]=effects[name](options));
+    if(withProbe)list.push(made.probe=probe());
+    const owner=alone?GTAO.attach(engine,alone):PostStack.attach(engine,list);
+    if(alone)made.gtao=owner;
+    if(taa)TAA.attach(engine,{depth:()=>(alone?owner.depthTexture:owner.depthTexture)});
+    state={engine,canvas,made,errors,owner};
+    // Lift each box so the middle of its +z face (local z = 1) lies on the floor, whatever the rotation's handedness.
+    if(info.boxes){await frames(1);for(const b of info.boxes)b.mesh.setPosition([b.x,-b.mesh.matrix[9],0]);}
+    await frames(n);
+    const m=engine.camera.matrix,project=([x,y,z])=>{const w=m[3]*x+m[7]*y+m[11]*z+m[15];return [((m[0]*x+m[4]*y+m[8]*z+m[12])/w*0.5+0.5)*canvas.width,(0.5-(m[1]*x+m[5]*y+m[9]*z+m[13])/w*0.5)*canvas.height];};
+    if(info.boxes)info.creases=info.boxes.map(({x,angle,mesh})=>{
+      // The +z face (local z = 1) meets the floor where its world y is 0; the open wedge angle is between +z and the face's local +y.
+      const M=mesh.matrix,world=(p)=>[0,1,2].map(r=>M[r]*p[0]+M[4+r]*p[1]+M[8+r]*p[2]+M[12+r]);
+      const y0=world([0,0,1])[1],y1=world([0,1,1])[1],t=-y0/(y1-y0),crease=world([0,t,1]),up=[M[4],M[5],M[6]],len=Math.hypot(...up);
+      const wedge=Math.acos(up[2]/len);
+      const along=[-0.6,-0.4,-0.2,0,0.2,0.4,0.6].map(dx=>[x+dx,0,crease[2]]);
+      return {x,angle,wedge,expected:(1-Math.cos(wedge))/2,crease:crease.map(v=>+v.toFixed(4)),pixels:along.map(p=>project(p)),
+        // Floor points 1, 2, 4, 8, 16 cm in front of the crease (middle of the box), for the profile.
+        profile:[0.01,0.02,0.04,0.08,0.16,0.32,0.64].map(d=>({d,pixel:project([x,0,crease[2]+d])}))};
+    });
+    info.open=[[0,0,4.6],[-2.6,0,4.2],[2.6,0,4.2]].map(project);
+    return {errors:errors.splice(0),canvas:[canvas.width,canvas.height],...info,boxes:undefined};
+  },
+  async set(name,values){Object.assign(state.made[name].options??{},values.options??{});if('enabled' in values)state.made[name].enabled=values.enabled;await frames(values.frames??3);return {errors:state.errors.splice(0)};},
+  // The probe's float copy of the last frame, base64 rgba32float rows (bytesPerRow padded to 256).
+  async read(){
+    const {engine,made}=state,t=made.probe.texture,row=Math.ceil(t.width*16/256)*256,buffer=engine.gpu.createBuffer({size:row*t.height,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+    const e=engine.gpu.createCommandEncoder();e.copyTextureToBuffer({texture:t},{buffer,bytesPerRow:row},[t.width,t.height]);engine.gpu.queue.submit([e.finish()]);
+    await buffer.mapAsync(GPUMapMode.READ);const bytes=new Uint8Array(buffer.getMappedRange()).slice();buffer.unmap();buffer.destroy();
+    let s='';for(let i=0;i<bytes.length;i+=0x8000)s+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000));
+    return {width:t.width,height:t.height,row,data:btoa(s),errors:state.errors.splice(0)};
+  },
+  teardown,
+};
+window.ready=true;
+</script></body></html>
