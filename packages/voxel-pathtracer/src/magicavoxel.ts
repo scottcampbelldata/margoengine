@@ -18,6 +18,13 @@ import type {
 /** A MagicaVoxel attribute dictionary (MATL, rOBJ, rCAM): keys with their underscore, string values. */
 export type MagicaVoxelDict = Readonly<Record<string, string>> | ReadonlyMap<string, string>;
 
+/**
+ * How {@link magicaVoxelLighting} renders a file: 'magicavoxel' reproduces MagicaVoxel 0.99.7's image (its light-transport
+ * shortcuts included); 'margo' keeps the file's film, colours, sky, sun and fog but lights them physically (sun
+ * highlights on metal and glass, light through glass, sun-lit clouds, rough metal keeps its energy, no bounce caps).
+ */
+export type MagicaVoxelLook = 'magicavoxel' | 'margo';
+
 /** Lighting and render options of a MagicaVoxel file, from {@link magicaVoxelLighting}. */
 export interface MagicaVoxelLighting {
   /** Sky, sun and ground. */
@@ -201,9 +208,16 @@ export function magicaVoxelMaterial(id: number, rgb: ArrayLike<number>, attribut
 
 /**
  * Environment, options and the unsupported settings of a file's render objects (rOBJ dictionaries, each with its
- * `_type`). Missing objects take MagicaVoxel's defaults.
+ * `_type`). Missing objects take MagicaVoxel's defaults. `look` (default 'magicavoxel') picks MagicaVoxel's light
+ * transport or Margo's physical one; both keep the file's film, colours and lights.
+ * @throws TypeError for an unknown look.
  */
-export function magicaVoxelLighting(objects: Iterable<MagicaVoxelDict>): MagicaVoxelLighting {
+export function magicaVoxelLighting(
+  objects: Iterable<MagicaVoxelDict>,
+  { look = 'magicavoxel' }: { look?: MagicaVoxelLook } = {},
+): MagicaVoxelLighting {
+  if (look !== 'magicavoxel' && look !== 'margo')
+    throw new TypeError(`magicaVoxelLighting look ${String(look)} is unknown; pass 'magicavoxel' or 'margo'`);
   const by = new Map<string, MagicaVoxelDict>();
   for (const o of objects) {
     const t = get(o, '_type');
@@ -276,12 +290,23 @@ export function magicaVoxelLighting(objects: Iterable<MagicaVoxelDict>): MagicaV
       toneMapping: (num(film, '_aces') ?? 1) !== 0 ? 'aces-narkowicz' : 'linear',
       gamma: Math.min(5, Math.max(1, num(film, '_gam') ?? 2.2)),
       exposure: Math.min(20, Math.max(-20, Math.log2(Math.max(expo, 2 ** -20)))),
-      bounceLimits: caps,
-      maxBounces: Math.min(64, caps.diffuse! + caps.specular! + caps.scatter!),
-      transparentShadows: false,
-      sunSpecular: false,
-      sunInMedia: false,
-      energyCompensation: false,
+      ...(look === 'magicavoxel'
+        ? {
+            bounceLimits: caps,
+            maxBounces: Math.min(64, caps.diffuse! + caps.specular! + caps.scatter!),
+            transparentShadows: false,
+            sunSpecular: false,
+            sunInMedia: false,
+            energyCompensation: false,
+          }
+        : {
+            bounceLimits: null,
+            maxBounces: 12,
+            transparentShadows: true,
+            sunSpecular: true,
+            sunInMedia: true,
+            energyCompensation: true,
+          }),
       lensBlades: blades >= 3 && blades <= 16 ? blades : 0,
       lensRotation: ((num(lens, '_blade_r') ?? 0) * Math.PI) / 180,
     },

@@ -9,7 +9,7 @@ export {
   magicaVoxelMatrix,
   magicaVoxelModel,
 } from './magicavoxel.js';
-export type { MagicaVoxelCamera, MagicaVoxelDict, MagicaVoxelLighting } from './magicavoxel.js';
+export type { MagicaVoxelCamera, MagicaVoxelDict, MagicaVoxelLighting, MagicaVoxelLook } from './magicavoxel.js';
 export type {
   TraceAreaLight,
   TraceEnvironment,

@@ -149,6 +149,21 @@ test('render objects: sky, sun, ground fade, film, bounces and fog', () => {
   assert.ok(unsupported.some((u) => u.includes('_edge')));
   assert.equal(magicaVoxelLighting([{ _type: '_setting', _ground: '0' }]).environment.groundColor, undefined);
   assert.equal(magicaVoxelLighting([{ _type: '_film', _aces: '0' }]).options.toneMapping, 'linear');
+  // The 'margo' look keeps the film and lights but traces light physically.
+  const margo = magicaVoxelLighting([{ _type: '_film', _expo: '0.5', _aces: '1', _gam: '2.2' }], { look: 'margo' });
+  assert.equal(margo.options.toneMapping, 'aces-narkowicz');
+  near(margo.options.exposure, -1);
+  assert.deepEqual(
+    [
+      margo.options.bounceLimits,
+      margo.options.transparentShadows,
+      margo.options.sunSpecular,
+      margo.options.sunInMedia,
+      margo.options.energyCompensation,
+    ],
+    [null, true, true, true, true],
+  );
+  assert.throws(() => magicaVoxelLighting([], { look: 'cycles' }), TypeError);
 });
 
 test('cameras: rCAM focus, pitch, yaw and radius; the lens object gives the field of view', () => {

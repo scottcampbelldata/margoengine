@@ -380,7 +380,10 @@ renderObjects)`, `magicaVoxelModel(id, revision, size, xyzi)` and `magicaVoxelMa
 turn a `.vox` file's palette, MATL materials, rOBJ render settings, rCAM camera and models into this tracer's inputs
 (MagicaVoxel is z-up; tracer = MagicaVoxel (x, z, -y)). `magicaVoxelLighting` also returns the tracer options that
 reproduce MagicaVoxel's choices (ACES with gamma 2.2, bounce caps 2/5/5, no transparent shadows, the sun on diffuse
-lobes only and not in media, no energy compensation) and lists the settings it does not reproduce yet.
+lobes only and not in media, no energy compensation) and lists the settings it does not reproduce yet. With
+`{look: 'margo'}` it keeps the file's film, colours, sky, sun and fog but traces light physically (sun highlights on
+metal and glass, light through glass, sun-lit clouds, rough metal keeping its energy, no bounce caps): MagicaVoxel's
+look, lit correctly.
 
 The mapping was measured from MagicaVoxel 0.99.7's own renders of calibration scenes (a black box: its code was not
 read): palette colours are linear by a pure 2.2 power, sky radiance is its intensity, sun irradiance 5 x intensity,
