@@ -14,6 +14,13 @@ export class Clustered implements EnginePlugin {
     set shadow(hook: ClusteredShadow | undefined);
     get area(): ClusteredArea | undefined;
     set area(hook: ClusteredArea | undefined);
+    get directional(): ClusteredDirectional | undefined;
+    set directional(hook: ClusteredDirectional | undefined);
+    get ies(): ClusteredLightTerm | undefined;
+    set ies(hook: ClusteredLightTerm | undefined);
+    get projector(): ClusteredLightTerm | undefined;
+    set projector(hook: ClusteredLightTerm | undefined);
+    get list(): readonly (PointLight | SpotLight)[];
     constructor(options?: ClusteredOptions);
     get owner(): Engine | undefined;
     static attach(instance: EngineKernel, options?: ClusteredOptions): Clustered;
@@ -45,6 +52,17 @@ export interface ClusteredArea {
     bindings(): GPUBindGroupEntry[];
 }
 
+export interface ClusteredDirectional {
+    declarations(group: number): string;
+    bindings(): GPUBindGroupEntry[];
+}
+
+export interface ClusteredLightTerm {
+    declarations(group: number): string;
+    bindings(): GPUBindGroupEntry[];
+    readonly term: string;
+}
+
 export interface ClusteredLighting {
     readonly owner?: Engine;
     pbr(group: number): {
@@ -62,6 +80,16 @@ export interface ClusteredOptions {
 
 export interface ClusteredReceiver {
     addLighting(effect: ClusteredLighting): () => void;
+}
+
+export interface ClusteredSamplingHooks {
+    directional?: {
+        declarations(group: number): string;
+    };
+    terms?: readonly {
+        declarations(group: number): string;
+        readonly term: string;
+    }[];
 }
 
 export interface ClusteredShadow {
@@ -135,5 +163,5 @@ export function clusteredSampling(group: number, shadow?: boolean | {
     declarations(group: number): string;
 }, area?: {
     declarations(group: number): string;
-}, integratedShadows?: boolean, decay?: boolean, receive?: boolean): string;
+}, integratedShadows?: boolean, decay?: boolean, receive?: boolean, { directional, terms }?: ClusteredSamplingHooks): string;
 ```

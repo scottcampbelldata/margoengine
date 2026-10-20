@@ -44,6 +44,25 @@ lists; authored intensities remain unchanged. The setting survives restoration.
 
 Core meshes receive local lighting automatically. Call `lights.add(pbrModel)` or `lights.add(terrain)` for optional renderers; the returned function unregisters the receiver. `lights.add(model, {receiveShadow: false})` lights it without any local-light shadow (integrated maps or `LocalShadows`); casting stays per object through `addShadowCaster` / `LocalShadows.add`. A core mesh with `mesh.receiveShadow = false` (core) is lit without local-light shadows too; the core shader patch carries that test only while some mesh opts out. Directional shadows compose with local lighting in either registration order.
 
+## Directional lights
+
+`@margoengine/clustered/directional` adds up to 16 directional lights beside core's one sun (three.js
+`DirectionalLight`), shaded in the same light loop as the point lights:
+
+```ts
+import {Clustered} from '@margoengine/clustered';
+import {DirectionalLights} from '@margoengine/clustered/directional';
+const lights = Clustered.attach(engine), suns = DirectionalLights.attach(engine, {lights});
+suns.setLights([{direction: [-1, -2, 0.5], color: [1, 0.9, 0.8], intensity: 3}]); // direction: the way the light travels
+```
+
+`intensity` is the illuminance on a surface facing the light (lux in physical units), as core's sun. The lights use the
+point lights' GGX and Lambert BRDF text, so materials' Lambert and Phong shade them with their own BRDF and a
+`ShadowCatcherMaterial` counts them; `intensityScale` scales them. Every fragment evaluates every directional light
+(they reach everywhere, so they are not culled). They cast no shadows. The storage buffer (binding 141 of the lit
+shader's group) and the shader code exist only while the list is not empty: an empty or absent `DirectionalLights`
+leaves every GPU call unchanged. `lights.list` and `suns.list` return the lists last set (frozen copies).
+
 ## Point and spot shadows
 
 Opt into bounded local shadow maps when creating the effect, enable shadows on

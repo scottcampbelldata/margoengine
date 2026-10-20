@@ -38,6 +38,27 @@ export const cullingShader =
   }
   clusterCounts[id]=count;
 }`;
+// Extra directional lights (Clustered.directional): the point loop's BRDF text, so materials' Lambert and Phong (litShader)
+// and the shadow catcher (catcherLit) rewrite and measure them too. `toLight` is the unit vector toward the light.
+const directionalLoop = /* wgsl */ `
+  for(var j=0u;j<clusterDirectional.count.x;j++){
+    let light=clusterDirectional.lights[j];let l=light.toLight.xyz;let h=(v+l)/max(length(v+l),0.0001);
+    let nl=clamp(dot(n,l),0.0,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
+    let d=a2/(3.14159265*pow(nh*nh*(a2-1)+1,2.0));
+    let g=2*nv/(nv+sqrt(a2+(1-a2)*nv*nv))*2*nl/max(nl+sqrt(a2+(1-a2)*nl*nl),0.0001);
+    let f0=mix(vec3f(0.04),base,metal);let fresnel=f0+(1-f0)*pow(1-vh,5.0);
+    result+=${clusterBrdf}*nl*light.color.rgb;
+  }`;
+/** Light-loop hooks beyond shadows and area lights: `Clustered.directional`, `Clustered.ies` and `Clustered.projector`. */
+export interface ClusteredSamplingHooks {
+  /** WGSL defining `clusterDirectional` (`count:vec4u`, `lights` of `toLight:vec4f`, `color:vec4f`), lit in the light loop. */
+  directional?: { declarations(group: number): string };
+  /**
+   * Per-light factors: each declares a WGSL function and gives `term`, a vec3f or f32 expression in the point and spot
+   * loop's `index` (the light's position in the `setLights` list), `light`, `l` (unit, to the light) and `position`.
+   */
+  terms?: readonly { declarations(group: number): string; readonly term: string }[];
+}
 export function clusteredSampling(
   group: number,
   shadow?: boolean | { declarations(group: number): string },
@@ -45,6 +66,7 @@ export function clusteredSampling(
   integratedShadows = false,
   decay = false,
   receive = false,
+  { directional, terms = [] }: ClusteredSamplingHooks = {},
 ): string {
   const shadows = shadow === true || integratedShadows,
     hook = typeof shadow === 'object' ? shadow : undefined,
@@ -54,6 +76,8 @@ export function clusteredSampling(
     declarations(group) +
     (hook ? hook.declarations(group) : '') +
     (area ? area.declarations(group) : '') +
+    (directional ? directional.declarations(group) : '') +
+    terms.map((t) => t.declarations(group)).join('') +
     /* wgsl */ `
 @group(${group}) @binding(6) var<storage,read> clusterCounts:array<u32>;
 @group(${group}) @binding(7) var<storage,read> clusterIndices:array<u32>;${receive ? '\nvar<private> clusterReceive=true;' : ''}
@@ -67,15 +91,15 @@ fn clusterLighting(pixel:vec2f,position:vec3f,n:vec3f,eye:vec3f,base:vec3f,rough
   let cell=xy.x+grid.x*(xy.y+grid.y*z);let count=clusterCounts[cell];var result=vec3f(0);
   let v=normalize(eye-position);let nv=clamp(dot(n,v),0.0001,1.0);let a=max(roughness,0.045)*max(roughness,0.045);let a2=a*a;
   for(var j=0u;j<count;j++){
-    let light=clusterLights[clusterIndices[cell*1024u+j]];let delta=light.positionRange.xyz-position;let distance=length(delta);
+    ${terms.length ? 'let index=clusterIndices[cell*1024u+j];let light=clusterLights[index];' : 'let light=clusterLights[clusterIndices[cell*1024u+j]];'}let delta=light.positionRange.xyz-position;let distance=length(delta);
     if(distance>=light.positionRange.w){continue;}let l=delta/max(distance,0.0001);let h=(v+l)/max(length(v+l),0.0001);
     let nl=clamp(dot(n,l),0.0,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
     let d=a2/(3.14159265*pow(nh*nh*(a2-1)+1,2.0));
     let g=2*nv/(nv+sqrt(a2+(1-a2)*nv*nv))*2*nl/max(nl+sqrt(a2+(1-a2)*nl*nl),0.0001);
     let f0=mix(vec3f(0.04),base,metal);let fresnel=f0+(1-f0)*pow(1-vh,5.0);
     ${decay ? decayTerms : legacyTerms}
-    result+=${clusterBrdf}*nl*light.colorIntensity.rgb*light.colorIntensity.w*falloff*cone${hook ? term('clusterShadow(light,position,n)') : ''}${shadows ? term('clusterShadowVisibility(light,position,n)') : ''};
-  }
+    result+=${clusterBrdf}*nl*light.colorIntensity.rgb*light.colorIntensity.w*falloff*cone${terms.map((t) => '*' + t.term).join('')}${hook ? term('clusterShadow(light,position,n)') : ''}${shadows ? term('clusterShadowVisibility(light,position,n)') : ''};
+  }${directional ? directionalLoop : ''}
   return ${area ? '(result+clusterAreaLighting(position,n,v,nv,base,roughness,metal))' : 'result'}*clusterFrame.intensity.x;
 }`;
   return shadows ? localShadowSampling(group) + code : code;

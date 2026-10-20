@@ -12,6 +12,7 @@ import { resolve } from 'node:path';
 // Proofs whose claim is a standing guarantee ("feature off: identical GPU calls"); the others record a one-time change.
 const ongoing = [
   'clustered-area-lights',
+  'clustered-light-hooks',
   'clustered-local-shadows',
   'color-output',
   'deformed-shadows',

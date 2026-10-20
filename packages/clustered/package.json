@@ -24,6 +24,10 @@
     "./area": {
       "types": "./dist/area.d.ts",
       "import": "./dist/area.js"
+    },
+    "./directional": {
+      "types": "./dist/directional.d.ts",
+      "import": "./dist/directional.js"
     }
   },
   "files": [

@@ -7,6 +7,7 @@ import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { wgsl } from '../../core/dist/shaders.js';
 import { Clustered } from '../../clustered/dist/index.js';
 import { LocalShadows } from '../../clustered/dist/shadows.js';
+import { DirectionalLights } from '../../clustered/dist/directional.js';
 import { Shadows } from '../../shadows/dist/index.js';
 import {
   LambertMaterial,
@@ -102,6 +103,41 @@ test('clustered point and spot lights shade Lambert and Phong with their own BRD
     'the same Blinn-Phong lobe as the directional light',
   );
   for (const mesh of meshes) mesh.destroy();
+  lights.dispose();
+  s.engine.dispose();
+});
+
+test('extra directional lights (clustered/directional) shade Lambert and Phong with their BRDF and count in a catcher', async () => {
+  const s = await scene(),
+    lights = Clustered.attach(s.engine),
+    suns = DirectionalLights.attach(s.engine, { lights });
+  suns.setLights([{ direction: [0, -1, -1], intensity: 2 }]);
+  const meshes = [new PbrMaterial(), new LambertMaterial(), new PhongMaterial(), new ShadowCatcherMaterial()].map(
+    (m) => {
+      const mesh = createMesh(s.engine, quad, m);
+      lights.add(mesh);
+      return mesh;
+    },
+  );
+  const lit = codes(s.frame()).filter((code) => code.includes('clusterDirectional.lights[j]')),
+    ggx = 'result+=((1-fresnel)*(1-metal)*base/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl*';
+  const loops = lit.map((code) => lightLoop(code));
+  assert.ok(
+    loops.some((loop) => loop.split(ggx).length === 3),
+    'standard: GGX in the point and directional loops',
+  );
+  assert.ok(
+    loops.filter((loop) => !loop.includes(ggx) && loop.split('result+=margoLocalBrdf(n,v,l,base)*nl*').length === 3)
+      .length >= 2,
+    'Lambert and Phong: their BRDF in both loops',
+  );
+  const catcher = lit.find((code) => code.includes('fn margoCatcher('));
+  assert.ok(
+    catcher.includes('let margoLocal=dot(clusterLighting('),
+    'unshadowed: lights the shadow of the sun as the rest',
+  );
+  for (const mesh of meshes) mesh.destroy();
+  suns.dispose();
   lights.dispose();
   s.engine.dispose();
 });

@@ -13,7 +13,7 @@ import {
   type LocalLightShadow,
   type LocalShadowSource,
 } from './local-shadows.js';
-export { clusteredSampling } from './shader.js';
+export { clusteredSampling, type ClusteredSamplingHooks } from './shader.js';
 export type { LocalShadowOptions, LocalLightShadow, LocalShadowSource, LocalShadowPrimitive } from './local-shadows.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number; COPY_SRC: number };
 export interface PointLight {
@@ -74,6 +74,20 @@ export interface ClusteredArea {
   declarations(group: number): string;
   bindings(): GPUBindGroupEntry[];
 }
+/** The `Clustered.directional` hook (`DirectionalLights`): WGSL defining `clusterDirectional` and its bindings. */
+export interface ClusteredDirectional {
+  declarations(group: number): string;
+  bindings(): GPUBindGroupEntry[];
+}
+/**
+ * A per-light factor of the point and spot loop (`Clustered.ies`, `Clustered.projector`): WGSL declarations, their
+ * bindings and `term`, an f32 or vec3f expression in the loop's `index`, `light`, `l` and `position`.
+ */
+export interface ClusteredLightTerm {
+  declarations(group: number): string;
+  bindings(): GPUBindGroupEntry[];
+  readonly term: string;
+}
 export interface ClusteredReceiver {
   addLighting(effect: ClusteredLighting): () => void;
 }
@@ -119,26 +133,59 @@ export class Clustered implements EnginePlugin {
   private readonly hooks = new Map<number, { declarations: string; light: string }>();
   private shadowHook?: ClusteredShadow;
   private areaHook?: ClusteredArea;
-  /** Joined bindings without (0) and with (1) shadows: the parts they were joined from, then the result. */
-  private readonly joined: (
-    | [GPUBindGroupEntry[] | undefined, GPUBindGroupEntry[] | undefined, GPUBindGroupEntry[], GPUBindGroupEntry[]]
-    | undefined
-  )[] = [];
+  private directionalHook?: ClusteredDirectional;
+  private iesHook?: ClusteredLightTerm;
+  private projectorHook?: ClusteredLightTerm;
+  private listValue: readonly (PointLight | SpotLight)[] = Object.freeze([]);
+  /** This frame's binding parts: own entries, then the shadow, area, directional, IES and projector hooks' (or undefined). */
+  private readonly parts: (GPUBindGroupEntry[] | undefined)[] = [];
+  /** Joined bindings without (0) and with (1) shadows: the parts they were joined from, then the result last. */
+  private readonly joined: ((GPUBindGroupEntry[] | undefined)[] | undefined)[] = [];
+  private reset(): void {
+    this.shaders.clear();
+    this.hooks.clear();
+  }
   get shadow(): ClusteredShadow | undefined {
     return this.shadowHook;
   }
   set shadow(hook: ClusteredShadow | undefined) {
     this.shadowHook = hook;
-    this.shaders.clear();
-    this.hooks.clear();
+    this.reset();
   }
   get area(): ClusteredArea | undefined {
     return this.areaHook;
   }
   set area(hook: ClusteredArea | undefined) {
     this.areaHook = hook;
-    this.shaders.clear();
-    this.hooks.clear();
+    this.reset();
+  }
+  /** Extra directional lights (`@margoengine/clustered/directional`), evaluated per fragment beside the point and spot lights. */
+  get directional(): ClusteredDirectional | undefined {
+    return this.directionalHook;
+  }
+  set directional(hook: ClusteredDirectional | undefined) {
+    this.directionalHook = hook;
+    this.reset();
+  }
+  /** Photometric (IES) profiles of the point and spot lights (`@margoengine/clustered/ies`). */
+  get ies(): ClusteredLightTerm | undefined {
+    return this.iesHook;
+  }
+  set ies(hook: ClusteredLightTerm | undefined) {
+    this.iesHook = hook;
+    this.reset();
+  }
+  /** Images projected by spot lights (`@margoengine/clustered/projector`). */
+  get projector(): ClusteredLightTerm | undefined {
+    return this.projectorHook;
+  }
+  set projector(hook: ClusteredLightTerm | undefined) {
+    this.projectorHook = hook;
+    this.reset();
+  }
+  /** The point and spot lights last given to `setLights`, in order (a frozen copy of the list; the light objects are the caller's). */
+  get list(): readonly (PointLight | SpotLight)[] {
+    return this.listValue;
   }
   constructor(options: ClusteredOptions = {}) {
     const grid = options.grid ?? [16, 9, 24];
@@ -270,9 +317,9 @@ export class Clustered implements EnginePlugin {
     const decay = lights.some(fresh);
     if (decay !== this.decay) {
       this.decay = decay;
-      this.shaders.clear();
-      this.hooks.clear();
+      this.reset();
     }
+    this.listValue = Object.freeze([...lights]);
     this.lightCount = lights.length;
     this.dirty = true;
     return this;
@@ -308,13 +355,19 @@ export class Clustered implements EnginePlugin {
   bindings(shadows = true): GPUBindGroupEntry[] {
     if (!this.uniform || this.disposed) throw new Error('Clustered lighting is not attached');
     const own = shadows ? this.entries : this.lightEntries,
-      shadow = shadows ? this.shadowHook?.bindings() : undefined,
-      area = this.areaHook?.bindings();
-    if (!shadow && !area) return own;
-    let joined = this.joined[+shadows];
-    if (!joined || joined[0] !== shadow || joined[1] !== area || joined[2] !== own)
-      this.joined[+shadows] = joined = [shadow, area, own, [...own, ...(shadow ?? []), ...(area ?? [])]];
-    return joined[3];
+      parts = this.parts;
+    parts[0] = own;
+    parts[1] = shadows ? this.shadowHook?.bindings() : undefined;
+    parts[2] = this.areaHook?.bindings();
+    parts[3] = this.directionalHook?.bindings();
+    parts[4] = this.iesHook?.bindings();
+    parts[5] = this.projectorHook?.bindings();
+    if (!parts[1] && !parts[2] && !parts[3] && !parts[4] && !parts[5]) return own;
+    let joined = this.joined[+shadows],
+      same = !!joined;
+    for (let i = 0; same && i < 6; i++) same = joined![i] === parts[i];
+    if (!same) this.joined[+shadows] = joined = [...parts, parts.flatMap((part) => part ?? [])];
+    return joined![6]!;
   }
   /** gltf-pro lighting hooks in bind group `group`; `shadows: false` leaves out local-light shadows (see `add`). */
   pbr(group: number, shadows = true): { declarations: string; light: string } {
@@ -331,9 +384,13 @@ export class Clustered implements EnginePlugin {
     return hook;
   }
   private sampling(group: number, shadows: boolean, receive = false): string {
+    const more = {
+      directional: this.directionalHook,
+      terms: [this.iesHook, this.projectorHook].filter((hook) => hook !== undefined),
+    };
     return shadows
-      ? clusteredSampling(group, this.shadowHook, this.areaHook, !!this.localShadows, this.decay, receive)
-      : clusteredSampling(group, undefined, this.areaHook, false, this.decay);
+      ? clusteredSampling(group, this.shadowHook, this.areaHook, !!this.localShadows, this.decay, receive, more)
+      : clusteredSampling(group, undefined, this.areaHook, false, this.decay, false, more);
   }
   /**
    * Patches a core-style lit shader with the clustered light loop; `shadows: false` without local-light shadows. Core
