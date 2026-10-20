@@ -13,6 +13,12 @@
 //   form factor F from a floor point to the wall rectangle, integrated here. Measured as 1 - green(on) / green(off),
 //   against F at 5 cm to 2 m from the wall; red stays (ratio 1). Core floor 4x and 1x, a gltf-pro floor added to SSGI
 //   and SSR (one capture hook, shared), orthographic; with GTAO, SSR and TAA no errors and no NaN.
+// motion: a white box before a dark wall, ambient light only. A rigid motion of r pixels of blur radius (half the motion
+//   over the open shutter) turns the frame into its box average along the motion, 2r wide: measured as coverage of the
+//   box along its centre row (linear light) against the unblurred frame filtered with that box. Uniform 40 px/frame
+//   motion from a velocity texture (HDR stage, 4x and 1x); a box moving 40 px/frame under TAA (taa.velocity, blurred
+//   after TAA's resolve); TAA's resolved frame is identical with and without MotionBlur (no blurred frame in its history);
+//   at rest under TAA the velocity texture equals taa.velocity.jitter everywhere and MotionBlur changes nothing.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
@@ -93,6 +99,39 @@ function formFactor(x0, d, width, height, n = 400) {
     }
   return sum / Math.PI;
 }
+const srgb = (v) => {
+  const x = v / 255;
+  return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+};
+/** Coverage of the white box along a row: (v - background) / (box - background). */
+const coverage = (row) => {
+  const lo = Math.min(...row),
+    hi = Math.max(...row);
+  return row.map((v) => (v - lo) / (hi - lo));
+};
+/** A row filtered with a box of radius r pixels (pixel u overlaps [-r, r] by clamp(r + 0.5 - |u|, 0, 1)). */
+const boxFilter = (row, r) =>
+  row.map((_, x) => {
+    let sum = 0,
+      total = 0;
+    for (let u = -Math.ceil(r + 0.5); u <= Math.ceil(r + 0.5); u++) {
+      const w = Math.max(0, Math.min(1, r + 0.5 - Math.abs(u)));
+      sum += row[Math.min(row.length - 1, Math.max(0, x + u))] * w;
+      total += w;
+    }
+    return sum / total;
+  });
+/** Largest |measured - expected| over the pixels where either is between 0.02 and 0.98 (the ramps). */
+function rampError(measured, expected) {
+  let worst = 0,
+    count = 0;
+  for (let x = 0; x < measured.length; x++)
+    if (Math.max(measured[x], expected[x]) > 0.02 && Math.min(measured[x], expected[x]) < 0.98) {
+      worst = Math.max(worst, Math.abs(measured[x] - expected[x]));
+      count++;
+    }
+  return { worst: round(worst), pixels: count };
+}
 const sections = {
   async gtao() {
     const report = { ...header(), checks: {} },
@@ -160,6 +199,113 @@ const sections = {
       report.checks[name] = { nan: frame.nan() };
       assert.equal(frame.nan(), 0, `${name}: NaN`);
     }
+    return report;
+  },
+  async motion() {
+    const report = { ...header(), checks: {} },
+      blur = { shutter: 0.5, samples: 32, maxBlur: 32 },
+      radius = (40 * blur.shutter) / 2;
+    // 1. Uniform motion from a velocity texture: the HDR stage in the stack.
+    for (const [name, config] of Object.entries({ 'uniform-4x': {}, 'uniform-1x': { samples: 1 } })) {
+      const info = await run({ scene: 'moving', vectors: [40, 0], stack: [['motion', blur]], ...config }),
+        on = await read();
+      await set('motion', { enabled: false });
+      const off = await read(),
+        row = (f) => Array.from({ length: f.width }, (_, x) => f.at(x, info.boxRow)[1]);
+      const measured = coverage(row(on)),
+        expected = boxFilter(coverage(row(off)), radius);
+      report.checks[name] = { radius, ...rampError(measured, expected), nan: on.nan() };
+      console.log(name, JSON.stringify(report.checks[name]));
+      assert.equal(on.nan(), 0);
+      assert.ok(report.checks[name].pixels >= 3 * radius, `${name}: no ramp`);
+      assert.ok(
+        report.checks[name].worst < 0.08,
+        `${name}: blur is not the shutter's box (${report.checks[name].worst})`,
+      );
+    }
+    // 2. A box moving 40 px per frame under TAA: blurred after TAA, TAA's history untouched.
+    const probe = await run({ scene: 'moving' }),
+      speed = 40 / probe.pixelsPerMetre,
+      moving = (enabled) => ({
+        scene: 'moving',
+        speed,
+        taa: true,
+        vectors: 'taa',
+        probe: false,
+        frames: 12,
+        stack: [['motion', { ...blur, enabled }]],
+      });
+    const decode = async (texture) => {
+      const r = await page.evaluate((w) => window.check.texture(w), texture);
+      assert.deepEqual(r.errors, []);
+      const b = Buffer.from(r.data, 'base64');
+      return { ...r, values: new Float32Array(b.buffer, b.byteOffset, b.byteLength / 4) };
+    };
+    const blurred = await run(moving(true)),
+      shot = await grab('motion-taa-on'),
+      resolvedOn = await decode('resolved');
+    await run(moving(false));
+    const sharp = await grab('motion-taa-off'),
+      resolvedOff = await decode('resolved');
+    let history = 0;
+    for (let i = 0; i < resolvedOn.values.length; i++)
+      history = Math.max(history, Math.abs(resolvedOn.values[i] - resolvedOff.values[i]));
+    const line = (img) =>
+      Array.from({ length: img.width }, (_, x) => srgb(img.data[(blurred.boxRow * img.width + x) * 4 + 1]));
+    const taaRamp = rampError(coverage(line(shot)), boxFilter(coverage(line(sharp)), radius));
+    report.checks['taa-moving'] = { pixelsPerFrame: 40, radius, ...taaRamp, historyMaxDiff: history };
+    console.log('taa-moving', JSON.stringify(report.checks['taa-moving']));
+    assert.equal(history, 0, "MotionBlur changed TAA's resolved frame (history)");
+    assert.ok(taaRamp.pixels >= 3 * radius && taaRamp.worst < 0.12, `taa-moving: blur ramp off (${taaRamp.worst})`);
+    // 3. At rest under TAA: velocity = jitter everywhere, so nothing blurs.
+    // Two runs to the same frame: TAA's own edge pixels change from frame to frame.
+    const rest = (enabled) => ({
+      scene: 'moving',
+      taa: true,
+      vectors: 'taa',
+      probe: false,
+      frames: 12,
+      stack: [['motion', { ...blur, enabled }]],
+    });
+    await run(rest(true));
+    const still = await grab('motion-rest-on'),
+      velocity = await decode('velocity');
+    await run(rest(false));
+    const plain = await grab('motion-rest-off');
+    let residual = 0,
+      diff = 0;
+    for (let i = 0; i < velocity.width * velocity.height; i++)
+      for (let c = 0; c < 2; c++)
+        residual = Math.max(residual, Math.abs(velocity.values[i * 4 + c] - velocity.jitter[c]));
+    for (let i = 0; i < still.data.length; i++) diff = Math.max(diff, Math.abs(still.data[i] - plain.data[i]));
+    report.checks.rest = {
+      jitterPixels: velocity.jitter.map((v, i) => round(v * [velocity.width, velocity.height][i], 3)),
+      velocityMinusJitter: residual,
+      frameDiff: diff,
+    };
+    console.log('rest', JSON.stringify(report.checks.rest));
+    assert.ok(Math.hypot(...velocity.jitter) > 0, 'the jitter difference is zero: the check proves nothing');
+    assert.ok(residual < 2e-5, `velocity at rest is not the published jitter (${residual})`);
+    assert.ok(diff <= 1, `MotionBlur changed a frame at rest (${diff})`);
+    // 4. Alone (its own stack) and with GTAO, SSR, Bloom under TAA.
+    await run({ scene: 'moving', vectors: [40, 0], probe: false, alone: blur, aloneEffect: 'motion' });
+    await run({
+      scene: 'moving',
+      speed,
+      taa: true,
+      vectors: 'taa',
+      frames: 12,
+      light: true,
+      stack: [
+        ['gtao', {}],
+        ['ssr', {}],
+        ['motion', blur],
+        ['bloom', { strength: 0.3 }],
+      ],
+    });
+    const all = await read();
+    report.checks.combined = { nan: all.nan() };
+    assert.equal(all.nan(), 0);
     return report;
   },
   async ssgi() {

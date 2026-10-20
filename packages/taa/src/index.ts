@@ -11,7 +11,7 @@ import {
 } from '@margoengine/core/extension';
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { meshTriangles } from '../../shared/mesh-source.js';
-import { jitterProjection } from './jitter.js';
+import { halton, jitterProjection } from './jitter.js';
 import { fullscreen, cameraVelocity, objectVelocity, snapshot, resolve, present } from './shader.js';
 export { halton, jitterProjection } from './jitter.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; COPY_SRC: number; STORAGE: number };
@@ -41,6 +41,19 @@ export interface VelocityPrimitive {
   texCoord?: number;
   alphaTransform?: Float32Array;
   instances?: unknown;
+}
+/** TAA's motion vectors and resolved frame ({@link TAA.velocity}), for effects such as `MotionBlur` (@margoengine/post). */
+export interface TAAVelocity {
+  /** `rg16float`: current minus previous position per pixel, in uv (0..1 across the viewport), written at frame-graph
+   * order 9. Both frames' projections carry TAA's Halton jitter, so every vector also holds the jitter difference
+   * `jitter`; subtract it for the scene's own motion. Replaced on resize and device restoration. */
+  readonly texture: GPUTexture;
+  /** This frame's jitter offset minus the previous frame's, in uv (x, y): the part of each vector that is not motion.
+   * Zero on a frame without history (first frame, reset, resize). Updated in place every frame. */
+  readonly jitter: Float32Array;
+  /** The resolved frame TAA presented last (linear `rgba16float`, the frame graph's order 40); after order 40 it is this
+   * frame's. History reads it next frame, so an effect that changes the picture after TAA writes elsewhere. */
+  readonly resolved: GPUTexture;
 }
 export interface VelocitySource {
   readonly shadowPrimitives: readonly VelocityPrimitive[];
@@ -74,7 +87,7 @@ export class TAA implements EnginePlugin {
   private textures: GPUTexture[] = [];
   private scene?: GPUTexture;
   private depth?: GPUTexture;
-  private velocity?: GPUTexture;
+  private velocityTarget?: GPUTexture;
   private expected?: GPUTexture;
   private histories: GPUTexture[] = [];
   private historyDepths: GPUTexture[] = [];
@@ -99,6 +112,14 @@ export class TAA implements EnginePlugin {
   private readonly jittered = new Float32Array(16);
   private readonly previous = new Float32Array(16);
   private readonly workspace = new Float64Array(52);
+  // Halton offsets in uv of this frame and of the last resolved one; `vectors.jitter` is their difference.
+  private readonly offset = new Float32Array(2);
+  private readonly lastOffset = new Float32Array(2);
+  private readonly vectors: { texture: GPUTexture; jitter: Float32Array; resolved: GPUTexture } = {
+    texture: undefined!,
+    jitter: new Float32Array(2),
+    resolved: undefined!,
+  };
   private originalCamera?: Context['camera'];
   private cameraView?: Context['camera'];
   private frame = 0;
@@ -201,6 +222,9 @@ export class TAA implements EnginePlugin {
     try {
       jitterProjection(this.jittered, camera.matrix, this.frame, c.width, c.height);
       c.camera = this.cameraView!;
+      // jitterProjection's NDC offset in uv; the velocity passes see it in both matrices only with history.
+      this.offset[0] = (halton((this.frame % 8) + 1, 2) - 0.5) / c.width;
+      this.offset[1] = (halton((this.frame % 8) + 1, 3) - 0.5) / c.height;
       const projection = [c.camera.fov, c.camera.near, c.camera.far].join(':');
       if (projection !== this.projection) {
         this.reset();
@@ -211,6 +235,9 @@ export class TAA implements EnginePlugin {
       if (!invertMatrixStable(c.camera.matrix, this.values.subarray(32, 48), this.workspace))
         throw new Error('Invalid TAA camera');
       this.values.set([this.options.historyWeight ?? 0.9, this.options.depthThreshold ?? 0.01, +this.valid, 0], 48);
+      const jitter = this.vectors.jitter;
+      jitter[0] = this.valid ? this.offset[0] - this.lastOffset[0] : 0;
+      jitter[1] = this.valid ? this.offset[1] - this.lastOffset[1] : 0;
       c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
       // Core uploads its frame before extension passes; use the jittered matrix through an existing shader binding.
       c.shader =
@@ -262,7 +289,7 @@ export class TAA implements EnginePlugin {
     };
     this.scene = texture(c.format, GPUTextureUsage.RENDER_ATTACHMENT);
     this.depth = texture(c.descriptor.depthStencil!.format, GPUTextureUsage.RENDER_ATTACHMENT);
-    this.velocity = texture('rg16float', GPUTextureUsage.RENDER_ATTACHMENT);
+    this.velocityTarget = texture('rg16float', GPUTextureUsage.RENDER_ATTACHMENT);
     this.expected = texture('r32float', GPUTextureUsage.RENDER_ATTACHMENT);
     for (let i = 0; i < 2; i++) {
       this.histories.push(texture('rgba16float', GPUTextureUsage.STORAGE_BINDING));
@@ -271,7 +298,7 @@ export class TAA implements EnginePlugin {
     this.captureTarget = new SceneTarget(c.device, this.scene, this.depth, c.descriptor.multisample?.count ?? 4);
     this.colorView = this.scene.createView();
     this.depthView = this.depth.createView();
-    this.velocityView = this.velocity.createView();
+    this.velocityView = this.velocityTarget.createView();
     this.expectedView = this.expected.createView();
     this.motionViews = [];
     this.motionResolve = undefined;
@@ -623,6 +650,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       pass.draw(3);
       pass.end();
       this.previous.set(c.camera.matrix);
+      this.lastOffset.set(this.offset);
       this.valid = true;
       this.frame++;
       this.captureTarget!.restore(c);
@@ -630,9 +658,21 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       this.restoreCamera(c);
     }
   }
+  /** The velocity texture with its jitter offset and the resolved frame ({@link TAAVelocity}); undefined before the
+   * first resolved frame and after disposal. One object, updated in place. */
+  get velocity(): TAAVelocity | undefined {
+    if (!this.velocityTarget || !this.histories.length || !this.frame) return undefined;
+    this.vectors.texture = this.velocityTarget;
+    this.vectors.resolved = this.histories[this.front];
+    return this.vectors;
+  }
   get gpuState(): { velocity: GPUTexture; history: GPUTexture; depth: GPUTexture } {
-    if (!this.velocity || !this.histories.length) throw new Error('TAA is not rendered');
-    return { velocity: this.velocity, history: this.histories[this.front], depth: this.historyDepths[this.front] };
+    if (!this.velocityTarget || !this.histories.length) throw new Error('TAA is not rendered');
+    return {
+      velocity: this.velocityTarget,
+      history: this.histories[this.front],
+      depth: this.historyDepths[this.front],
+    };
   }
   private release(): void {
     this.motionViews = [];
@@ -654,7 +694,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     this.historyDepths = [];
     this.draws.clear();
     this.objectPipelines.clear();
-    this.scene = this.depth = this.velocity = this.expected = undefined;
+    this.scene = this.depth = this.velocityTarget = this.expected = undefined;
     this.uniform = undefined;
     this.cameraBinding = undefined;
     this.depthSource = undefined;

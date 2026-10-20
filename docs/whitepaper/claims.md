@@ -120,6 +120,7 @@ before the core speed-ups (`0ed56b9`) re-run faster than recorded.
 | oit-detached | – | `b803d56` -> `0e02ead`: 2,864 calls (2,964 until 5w.f replaced the story's transmission material with a plain BLEND one: transmission now draws twice by design) | `8199756`: 2,732 calls |
 | post-ssr | – | `7c47a09` -> `3cf1453`: 9,269 calls | `de93aa5`: 12,431 calls (AgX normalised for older refs, see below) |
 | post-ssr-models | LIM-016 | `3cf1453` -> `838ae6e`: 30,858 calls | `de93aa5`: 37,182 calls |
+| taa-velocity | – | `6c20076d` (before the `taa.velocity` getter) -> the motion-blur commit: 16,923 calls at 1x and 4x, the getter read every frame | `6c20076d` |
 | quality-presets | – | `96daac7` -> `01e5e35` | `8199756` |
 | post-ssao-perspective | – | `9c761d5` -> `9702e57`: 3,282 calls | – |
 | probes-decals | – | `ecdcb31` -> `7d144fb`: 15 identical entry bundles, 135 + 12,320 calls | – |

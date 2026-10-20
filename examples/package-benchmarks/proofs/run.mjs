@@ -26,6 +26,7 @@ const ongoing = [
   'post-stack',
   'quality-presets',
   'selection-xray-off',
+  'taa-velocity',
 ];
 const current = process.argv.includes('--current'),
   only = process.argv

@@ -20,4 +20,14 @@ Other opaque renderers get camera-motion reprojection from scene depth. Custom d
 
 TAA captures the final display color before main and resolves at frame-graph order 40, after SSAO or creative post-processing at 30. For another plugin that replaces scene depth, provide `depth:()=>sourceTexture` in the options: `SSAO.depthTexture` or `PostProcessing.target?.depth`. Attachments must be sampleable, match the viewport and use the scene's depth format. SSAO and creative PostProcessing continue to own their respective HDR passes; TAA converts their final sRGB output to linear RGB before accumulation.
 
+`taa.velocity` (undefined before the first resolved frame) is for effects that use the motion vectors, such as
+`MotionBlur` from `@margoengine/post/motion-blur` (`new MotionBlur({velocity: () => taa.velocity})`): `texture` is the
+`rg16float` velocity buffer (current minus previous uv, written at order 9), `jitter` the uv difference between this
+frame's Halton offset and the last one, which every vector holds because both matrices are jittered (subtract it for
+the scene's own motion; zero on a frame without history), and `resolved` the frame TAA presented (`rgba16float`, this
+frame's after order 40). The getter adds no GPU work: with it TAA makes exactly the GPU calls it made before
+(`examples/package-benchmarks/proofs/taa-velocity.proof.js`, against `6c20076d`); checked on a real GPU, at rest the
+velocity texture equals `jitter` within 2e-6 uv (`post-effects-gpu.mjs --only=motion`). An effect that changes the
+picture after TAA must not write `resolved`: TAA reads it as history next frame.
+
 `gpuState` exposes velocity, current history color and history depth textures after rendering. `dispose()`/`destroy()` releases owned buffers, textures and source records. Device restoration recreates everything and discards stale history. The package is independent of PBR, animation, shadows, clustered lighting, particles and stage; helper-only imports discard the renderer. It follows the workspace's `@margoengine/*` naming convention.

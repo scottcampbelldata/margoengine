@@ -15,6 +15,7 @@ export class TAA implements EnginePlugin {
     reset(): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    get velocity(): TAAVelocity | undefined;
     get gpuState(): {
         velocity: GPUTexture;
         history: GPUTexture;
@@ -30,6 +31,12 @@ export interface TAAOptions {
     historyWeight?: number;
     depthThreshold?: number;
     depth?: () => GPUTexture | undefined;
+}
+
+export interface TAAVelocity {
+    readonly texture: GPUTexture;
+    readonly jitter: Float32Array;
+    readonly resolved: GPUTexture;
 }
 
 export interface VelocityPrimitive {

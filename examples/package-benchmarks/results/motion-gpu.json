@@ -1,0 +1,44 @@
+{
+ "date": "2026-10-20T17:12:30.256Z",
+ "commit": "94be0c24",
+ "gpu": {
+  "vendor": "nvidia",
+  "architecture": "ampere",
+  "device": "0x2230",
+  "description": "NVIDIA RTX A6000",
+  "fallback": false
+ },
+ "browser": "chromium 155.0.4283.62",
+ "checks": {
+  "uniform-4x": {
+   "radius": 10,
+   "worst": 0.022,
+   "pixels": 38,
+   "nan": 0
+  },
+  "uniform-1x": {
+   "radius": 10,
+   "worst": 0.025,
+   "pixels": 40,
+   "nan": 0
+  },
+  "taa-moving": {
+   "pixelsPerFrame": 40,
+   "radius": 10,
+   "worst": 0.057,
+   "pixels": 39,
+   "historyMaxDiff": 0
+  },
+  "rest": {
+   "jitterPixels": [
+    -0.625,
+    0.333
+   ],
+   "velocityMinusJitter": 0.0000019868311937898397,
+   "frameDiff": 0
+  },
+  "combined": {
+   "nan": 0
+  }
+ }
+}

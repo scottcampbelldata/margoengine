@@ -60,6 +60,34 @@ export interface GTAOOptions {
     enabled?: boolean;
 }
 
+export class MotionBlur implements EnginePlugin {
+    readonly options: MotionBlurOptions;
+    readonly name = "motion-blur";
+    constructor(options: MotionBlurOptions);
+    static attach(engine: EngineKernel, options: MotionBlurOptions): MotionBlur;
+    get enabled(): boolean;
+    set enabled(value: boolean);
+    setup(engine: Engine): void;
+    registerPasses(graph: FrameGraph): void;
+    onDeviceRestored(engine: Engine): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface MotionBlurOptions {
+    velocity: () => MotionVectors | undefined;
+    shutter?: number;
+    maxBlur?: number;
+    samples?: number;
+    enabled?: boolean;
+}
+
+export interface MotionVectors {
+    readonly texture: GPUTexture;
+    readonly jitter?: ArrayLike<number>;
+    readonly resolved?: GPUTexture;
+}
+
 export class PostStack implements EnginePlugin {
     readonly effects: readonly EnginePlugin[];
     readonly name = "post:stack";

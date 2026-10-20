@@ -218,7 +218,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | LUTPass | COVERED † | tonemap `setLUT` | 2³–65³ `.cube` files; eight-load trilinear interpolation, domains, SDR and HDR/P3 excess paths, private snapshots and device restoration. |
 | OutputPass, tone mapping | COVERED † | tonemap `Tonemap` | |
 | God rays | COVERED | environment `VolumetricFog` with `shadows` (`packages/environment/src/volumetric.ts`); creative `atmosphere.godRays` (`packages/creative/src/post.ts`) | World-space shafts through real occluders from the sun's cascades (and from clustered spot and point lights). creative's screen-space version stays inside its `PostProcessing`. WebGPU only. |
-| Motion blur | MISSING | — | taa already produces a velocity buffer. |
+| Motion blur | COVERED | post `MotionBlur` (`packages/post/src/motion-blur.ts`, entry `@margoengine/post/motion-blur`); taa `taa.velocity` (`packages/taa/src/index.ts`) | HDR `PostStack` effect fed by a velocity callback (`velocity: () => taa.velocity`): tile and neighbour maximum velocities and a depth-classified gather after McGuire et al. 2012; subtracts TAA's jitter difference; with TAA it blurs TAA's resolved frame after its resolve so TAA's history stays sharp. Checked on a real GPU against the shutter's box (worst coverage error 0.022-0.057). Straight-line blur over one frame. WebGPU only. |
 | Color correction, grading | COVERED † | creative `lift`, `gain`, `saturation`, `contrast`; tonemap `contrast` | |
 | Simple screen effects (vignette, RGB shift or chromatic aberration, pixelation, halftone, dot screen, Sobel) | PARTIAL | shader `NodePass` with `inputColor`, `inputDepth`, `screenUV` (`packages/shader/src/post.ts`) | None is built in. Each is a few nodes in a `NodePass` (the shader README shows a vignette). transitions has chromatic displacement, but only as a scene-change wipe. |
 | Lensflare | MISSING | — | |
@@ -344,7 +344,6 @@ implementation tasks.
 | RoundedBoxGeometry | MISSING, grouped with the other extra geometries. | Add it in `@margoengine/geometry` when a mesh needs it. |
 | ArcballControls | MISSING. | Add it in `@margoengine/controls`. `camera.up` already rolls. |
 | Light helpers, SkeletonHelper | MISSING. | Draw them with `@margoengine/lines` or `@margoengine/inspector` when a debug view needs them. |
-| Motion blur | MISSING. TAA already has a velocity buffer. | A pass in `@margoengine/post` that blurs with that buffer, when a shot needs it. |
 | Lensflare | MISSING. | A sprite in `@margoengine/post` or `@margoengine/sky`. |
 | Reflector, Refractor | MISSING. Water refracts on its own. | A planar mirror in `@margoengine/environment` can use sequential camera captures; the mirror itself is not implemented. |
 | XRControllerModelFactory, XRHandModelFactory | MISSING. Poses and 25 joints already exist. | Models in `@margoengine/xr` after the headset test. |

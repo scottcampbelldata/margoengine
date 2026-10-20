@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
-  "description": "HDR bloom, frame-graph SSAO, GTAO, SSGI and SSR, and post-effect stacks for Margo Engine WebGPU.",
+  "description": "HDR bloom, frame-graph SSAO, GTAO, SSGI and SSR, motion blur, and post-effect stacks for Margo Engine WebGPU.",
   "publishConfig": {
     "access": "public"
   },
@@ -52,6 +52,10 @@
     "./ssgi": {
       "types": "./dist/ssgi.d.ts",
       "import": "./dist/ssgi.js"
+    },
+    "./motion-blur": {
+      "types": "./dist/motion-blur.d.ts",
+      "import": "./dist/motion-blur.js"
     }
   },
   "files": [

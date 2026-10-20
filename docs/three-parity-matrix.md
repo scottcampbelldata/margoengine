@@ -34,7 +34,7 @@ The row stays PARTIAL because three.js's WebGLRenderer draws the whole scene. Cl
 | SSGI, denoise | COVERED since 2026-10-20: `SSGI` in `@margoengine/post/ssgi` (`packages/post/src/ssgi.ts`), one diffuse bounce on SSR's Hi-Z march and SSAO's ambient replay, with a bilateral denoise. |
 | BatchedMesh | Left out. Distinct geometries stay separate draws. `mergeGeometries` can bake static meshes. |
 | IESSpotLight, ProjectorLight | Left out. |
-| Motion blur | Left out. TAA already builds a velocity buffer and does not blur with it. |
+| Motion blur | COVERED since 2026-10-20: `MotionBlur` in `@margoengine/post/motion-blur` (`packages/post/src/motion-blur.ts`), fed by TAA's velocity buffer through `taa.velocity` (`packages/taa/src/index.ts`). |
 | TextGeometry, FontLoader, TTFLoader | `@margoengine/text` is SDF text. The three.js font extrude stays absent. |
 | MeshLambertMaterial, MeshPhongMaterial | FBX import converts these to PBR. There is no Lambert or Phong shader. |
 | Physical light units (candela, lux) | Intensities stay unitless radiance scales. |

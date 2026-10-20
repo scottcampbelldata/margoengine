@@ -1,6 +1,6 @@
 # Margo Engine Post
 
-Optional WebGPU frame-graph SSAO, GTAO, SSR and SSGI, bloom, FXAA and an effect stack, separate from the frozen core and stage.
+Optional WebGPU frame-graph SSAO, GTAO, SSR and SSGI, bloom, motion blur, FXAA and an effect stack, separate from the frozen core and stage.
 
 ## Combining effects: `PostStack`
 
@@ -216,6 +216,51 @@ ssgi.add(model); ssr.add(model);  // gltf-pro model or materials mesh: both may 
   `thickness` > 0, `intensity` 0-4 (`RangeError` otherwise); stack only (`MargoError` code `state` alone with
   `engine.use`). Memory: three material targets, two `rgba16float` GI targets, a half-resolution Hi-Z and blur chain,
   and its own 1x depth at 4x. GPU cost not measured yet. WebGPU only.
+
+## Motion blur: `MotionBlur`
+
+`@margoengine/post/motion-blur` (6,861 B min+gzip, its own entry; it carries the stack) blurs along per-pixel motion
+vectors. It is an HDR `PostStack` effect fed by a velocity callback, like `TAA({depth})`: with `@margoengine/taa`,
+`new MotionBlur({velocity: () => taa.velocity})`; any viewport-sized two-channel float texture of uv motion works too.
+
+```ts
+import {TAA} from '@margoengine/taa';
+import {PostStack} from '@margoengine/post/stack';
+import {MotionBlur} from '@margoengine/post/motion-blur';
+import {Bloom} from '@margoengine/post/bloom';
+let taa: TAA;
+const stack = PostStack.attach(stage.engine, [new MotionBlur({velocity: () => taa.velocity, shutter: 0.5}), new Bloom()]);
+taa = TAA.attach(stage.engine, {depth: () => stack.depthTexture});
+```
+
+- **Method** (after McGuire, Hennessy, Bukowski and Osman 2012, "A Reconstruction Filter for Plausible Motion Blur"):
+  each pixel's blur radius is half its motion over the open shutter (`shutter` share of the frame), at most `maxBlur`
+  pixels; the largest radius per `maxBlur`-sized tile, then the largest over each tile's 3x3 neighbourhood; then
+  `samples` taps along that neighbourhood maximum. A tap shows when it is in front and its own blur reaches the pixel,
+  or behind while the pixel's blur reaches it (soft depth test at 1% of distance); every other share stays the pixel's
+  own colour. So a rigidly moving surface over a still one gets exactly the shutter's box: the share of taps on it.
+  Taps are staggered per pixel by interleaved gradient noise that does not change between frames.
+- **TAA's jitter.** Both of TAA's matrices carry its Halton jitter, so its vectors also hold the jitter difference.
+  `taa.velocity.jitter` is that difference in uv, and MotionBlur subtracts it: a still scene does not blur.
+- **TAA's history stays sharp.** TAA resolves at order 40, after the stack composes at 30, so blurring in the stack
+  would put blurred frames in TAA's history. With TAA's vectors (they carry `resolved`) MotionBlur copies the stack's
+  frame through unchanged and blurs TAA's resolved frame after it, at order 41, into the canvas (sRGB-encoded like
+  TAA's own output). The blur then runs on TAA's display-referred frame, not linear HDR. Without TAA it blurs the
+  stack's linear HDR frame in place.
+- **Checked on a real GPU** (NVIDIA RTX A6000, Edge 155; `post-effects-gpu.mjs --only=motion`,
+  [motion-gpu.json](../../examples/package-benchmarks/results/motion-gpu.json)), a white box before a dark wall,
+  ambient light only, against the unblurred frame filtered with the shutter's box (radius 10 px): uniform 40 px/frame
+  motion from a velocity texture, worst error in box coverage 0.022 (4x) and 0.025 (1x) along the ramps; a box moving 40
+  px/frame under TAA, worst error 0.057, and TAA's resolved frame identical to the run without MotionBlur (largest
+  difference 0). At rest under TAA every pixel of TAA's velocity texture equals `taa.velocity.jitter` within 2e-6 uv
+  (jitter difference that frame -0.625, 0.333 px) and the frame equals the frame without MotionBlur (0/255). Alone and
+  with GTAO, SSR and Bloom under TAA: no errors, no NaN.
+- **Limits.** Straight-line blur along each pixel's motion over one frame (no rotation arcs, no curved paths); motion
+  over `maxBlur` pixels is clamped; areas the motion uncovers show only what is on screen now. Under TAA the blur is
+  applied after tone mapping, and a canvas format other than `rgba8unorm`/`bgra8unorm` gets the resolved values as
+  is. Options: `shutter` 0-1, `maxBlur` 1-128 px, `samples` 2-64 (`RangeError`); a velocity texture of another size
+  throws `MargoError` code `state`. With no vectors for a frame (TAA's first frame) the frame is copied unblurred.
+  GPU cost not measured yet. WebGPU only.
 
 ## Projected decals: `Decals`
 
