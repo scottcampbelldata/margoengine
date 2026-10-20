@@ -20,6 +20,7 @@
 // - dispersion: a line's shift through a tilted slab per wavelength against Snell with Cauchy's index; colour order over
 //   the spectrum; a dispersive white furnace per channel;
 // - environment: the equirectangular map's orientation; determinism: equal seeds give identical images;
+// - transparent: alpha is the camera rays' coverage, covered pixels match the opaque render, escapes add nothing;
 // - convergence: error against a 4096-sample reference falls about as 1/sqrt(samples), both projections;
 // - denoise: error with and without the wavelet denoiser, overall and at object edges, also on two caustic scenes;
 // - lens: depth of field blurs out-of-focus edges only; motion blur spreads a moving cube along its path; camera motion
@@ -305,6 +306,19 @@ try {
     assert.deepEqual(r['+x'], [1, 1, 0]);
     assert.deepEqual(r['-x'], [0, 1, 0]);
     assert.deepEqual(r['+z'], [1, 0, 0]);
+  }
+  if (wanted('transparent')) {
+    const r = await run('transparent');
+    console.log(' ', JSON.stringify(r));
+    assert.deepEqual(r.errors, []);
+    assert.equal(r.centre.alpha, 1);
+    assert.deepEqual(r.centre.color, r.centre.opaque, 'covered pixels: the opaque render exactly');
+    assert.equal(r.corner.alpha, 0);
+    assert.deepEqual(r.corner.color, [0, 0, 0], 'escaping camera rays add nothing');
+    assert.ok(r.corner.opaque[2] > 0.5, 'the opaque render shows the sky there');
+    assert.ok(r.partial > 20, 'the outline is partly covered');
+    assert.deepEqual([r.denoised.centre, r.denoised.corner], [1, 0]);
+    assert.deepEqual(r.denoised.cornerColor, [0, 0, 0]);
   }
   if (wanted('determinism')) {
     const r = await run('determinism');

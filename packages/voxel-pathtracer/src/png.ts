@@ -1,4 +1,4 @@
-// A streaming PNG writer for 8-bit RGB images, written from the W3C PNG specification (third edition): signature,
+// A streaming PNG writer for 8-bit RGB or RGBA images, written from the W3C PNG specification (third edition): signature,
 // IHDR, one IDAT holding the zlib stream (the platform's CompressionStream('deflate') is RFC 1950 zlib), IEND, each
 // chunk with its CRC-32. Rows are filtered per row with the type of smallest sum of absolute differences, the
 // specification's suggested heuristic. Rows go in as they are rendered, so a large capture never holds its raw image.
@@ -22,10 +22,12 @@ function chunk(type: string, data: Uint8Array): Uint8Array[] {
   return [u32(data.length), name, data, u32((crc(crc(0xffffffff, name), data) ^ 0xffffffff) >>> 0)];
 }
 
-/** Streams an RGB8 image into a PNG Blob row by row. */
+/** Streams an RGB8 (or, with `alpha`, RGBA8 with straight alpha) image into a PNG Blob row by row. */
 export class PngWriter {
   readonly width: number;
   readonly height: number;
+  /** Bytes per pixel: 3, or 4 with alpha. */
+  readonly channels: 3 | 4;
   #rows = 0;
   #writer: WritableStreamDefaultWriter<BufferSource>;
   #output: Promise<Uint8Array[]>;
@@ -33,9 +35,10 @@ export class PngWriter {
   #line: Uint8Array;
   #candidates: Uint8Array[];
 
-  constructor(width: number, height: number) {
+  constructor(width: number, height: number, alpha = false) {
     this.width = width;
     this.height = height;
+    this.channels = alpha ? 4 : 3;
     const stream = new CompressionStream('deflate');
     this.#writer = stream.writable.getWriter();
     const reader = stream.readable.getReader(),
@@ -48,15 +51,16 @@ export class PngWriter {
       }
     })();
     this.#output.catch(() => {});
-    const stride = width * 3;
+    const stride = width * this.channels;
     this.#previous = new Uint8Array(stride);
     this.#line = new Uint8Array(stride);
     this.#candidates = Array.from({ length: 5 }, () => new Uint8Array(stride + 1));
   }
 
-  /** Appends `count` rows of tightly packed RGB bytes. */
+  /** Appends `count` rows of tightly packed RGB (RGBA) bytes. */
   async write(rgb: Uint8Array, count: number): Promise<void> {
-    const stride = this.width * 3;
+    const bpp = this.channels,
+      stride = this.width * bpp;
     for (let r = 0; r < count; r++) {
       const line = rgb.subarray(r * stride, (r + 1) * stride),
         up = this.#previous;
@@ -67,9 +71,9 @@ export class PngWriter {
         out[0] = type;
         let score = 0;
         for (let i = 0; i < stride; i++) {
-          const a = i >= 3 ? line[i - 3] : 0,
+          const a = i >= bpp ? line[i - bpp] : 0,
             b = up[i],
-            c = i >= 3 ? up[i - 3] : 0,
+            c = i >= bpp ? up[i - bpp] : 0,
             x = line[i];
           let predictor = 0;
           if (type === 1) predictor = a;
@@ -115,7 +119,7 @@ export class PngWriter {
     const header = new Uint8Array(13);
     header.set(u32(this.width), 0);
     header.set(u32(this.height), 4);
-    header.set([8, 2, 0, 0, 0], 8); // 8 bits, RGB, deflate, adaptive filtering, no interlace
+    header.set([8, this.channels === 4 ? 6 : 2, 0, 0, 0], 8); // 8 bits, RGB (6: RGBA), deflate, adaptive, no interlace
     const signature = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
     return new Blob(
       [signature, ...chunk('IHDR', header), ...chunk('IDAT', data), ...chunk('IEND', new Uint8Array(0))] as BlobPart[],

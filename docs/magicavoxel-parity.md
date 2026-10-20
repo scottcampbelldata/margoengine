@@ -110,8 +110,11 @@ Everything here is on branch `worktree-agent-a63cac143225721f2` (not pushed, Cod
    of pixels within 3 levels (the rest on the image's wrap seam); a scene lit by it: 99.76%.
 6. Display settings: done. Background colour (`environment.background`): 99.92%; vignette (`vignette`): 100% at
    two strengths and two fields of view; edges (`edges`): 99.0-99.5%; grid (`grid`): 86-88% (positions and widths
-   within a pixel; MagicaVoxel's line borders are filtered differently). Open: transparent background (`_bg_a`,
-   a PNG with alpha) and voxel `_scale` (non-cubic voxels).
+   within a pixel; MagicaVoxel's line borders are filtered differently). Transparent background (`_bg_a`): done
+   as `capture({transparent: true})` (RGBA PNG; alpha = camera-ray coverage, the ground opaque); voxel `_scale`:
+   done as `voxelScale` for `magicaVoxelMatrix` (the scene scaled about the origin, the camera unchanged). Neither is
+   compared yet (scenes `C-bga`, `C-scale` in `mv-calib`): whether MagicaVoxel's ground stays opaque and whether its
+   camera follows the scale are open.
 7. Camera modes: orthographic and iso (`_mode orth/iso`) and `_lens _proj` are mapped but not compared; depth of field
    (`_aperture`) never showed in MagicaVoxel snapshots: find what enables it.
 8. Sample-panel toggles with non-default values (MIS-Reflect, MIS-Scatter, TR-Shadow, Shadow, Pixelated, Stochastic,

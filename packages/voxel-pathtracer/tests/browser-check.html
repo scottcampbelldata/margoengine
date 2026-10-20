@@ -663,6 +663,20 @@ window.check={
   look([20,14,24],[4,3,4]);
   return {...out,errors:errors.splice(0)};
  },
+ // Transparent renders: alpha is the camera rays' coverage (0 off the cube, 1 on it, between on its outline); where
+ // every camera ray hits, the colour is the opaque render's exactly (the same paths); escaping camera rays add nothing.
+ async transparent(){
+  look([0,0,30],[0,0,0]);
+  const scene={revision:1,models:[model('c',[8,8,8],()=>1)],instances:[{id:'c',modelId:'c',matrix:translate(-4,-4,-4)}],materials:[{id:1,color:[0.8,0.5,0.3],type:'diffuse'}],environment:{skyColor:[0.6,0.7,1],sunIntensity:2,sunDirection:[0.3,0.8,0.5]}};
+  const out=await withTracer(scene,{},async(t)=>{
+   const W=64,H=48,o={width:W,height:H,samples:64,seed:3},opaque=await t.renderImage(o),clear=await t.renderImage({...o,transparent:true}),den=await t.renderImage({...o,samples:16,transparent:true,denoise:true});
+   const c=(H/2)*W+W/2,k=W+1,rgb=(im,i)=>[...im.color.subarray(3*i,3*i+3)];
+   let partial=0;for(const a of clear.alpha)if(a>0&&a<1)partial++;
+   return {centre:{alpha:clear.alpha[c],color:rgb(clear,c),opaque:rgb(opaque,c)},corner:{alpha:clear.alpha[k],color:rgb(clear,k),opaque:rgb(opaque,k)},partial,denoised:{centre:den.alpha[c],corner:den.alpha[k],cornerColor:rgb(den,k)}};
+  });
+  look([20,14,24],[4,3,4]);
+  return {...out,errors:errors.splice(0)};
+ },
  // Same seed: the same image twice; another seed: a different one.
  async determinism(){
   look([18,14,26],[-3,3,-2]);

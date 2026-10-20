@@ -236,16 +236,22 @@ by floating-point rounding, which changes individual paths, not the converged im
 
 ## Captures, float images and picks
 
-- `capture({width, height, samples, signal?, denoise?})` renders a PNG (8-bit RGB, exposure and tone mapping applied)
+- `capture({width, height, samples, signal?, denoise?, transparent?})` renders a PNG (8-bit RGB, exposure and tone
+  mapping applied)
   at exactly that size and sample count, from the engine camera with its aspect set to the image's. It renders in
   1024-pixel tiles on separate GPU buffers and private copies of the scene buffers, so it neither disturbs the viewport
   nor sees later `setScene` calls; the viewport pauses tracing meanwhile and keeps its image. Denoised tiles overlap by
   64 pixels so there are no seams. Rows are encoded as they arrive (`CompressionStream`), so a large capture never holds
-  its whole raw image. Up to 16384 per side and 67,108,864 pixels.
+  its whole raw image. Up to 16384 per side and 67,108,864 pixels. With `transparent: true` (addition) the PNG is RGBA:
+  camera rays that leave the scene add nothing, alpha is the share of each pixel's camera rays (8 x 8 strata through
+  the lens) that hit a voxel, the ground or an area light, and colours are stored unpremultiplied; rays that bounce
+  still see the sky and are lit by it. Measured on the RTX A6000: pixels every camera ray covers equal the opaque
+  render exactly, pixels off the scene are alpha 0 and black.
 - `renderImage(options)` (addition) returns the linear float image (3 floats per pixel), and with `aovs: true` the
   first-hit albedo, normal, distance and the instance (index into `scene.instances`) and palette index under each
   pixel centre. `jitter: false` traces pixel centres only; `wavelength` (380-780 nm) traces dispersive glass at that one
-  wavelength with weight 1 (a monochromatic check). Up to 16,777,216 pixels.
+  wavelength with weight 1 (a monochromatic check); `transparent: true` adds `alpha` (the colour is then premultiplied
+  by it). Up to 16,777,216 pixels.
 - Both reject with the signal's reason when aborted (checked between GPU submissions, at most 4 in flight), with
   `MargoError` `failed` when the device is lost, with `MargoError` `disposed` when the tracer is disposed meanwhile, and
   with `TypeError`/`RangeError` for invalid options. Jobs run one at a time in call order.
@@ -429,7 +435,9 @@ emitters `colour x (1 + 3 x emission x 10^power)`, metal reflectance `min(1, spe
 `atmosphereRadiance` and `atmosphereTransmittance`): single scattering with Rayleigh, Cornette-Shanks Mie and ozone
 terms fitted to 16 of MagicaVoxel's panoramas (0.3-1 levels mean for the default and singly changed settings), baked
 to a 256 x 256 map in about 0.5 s; the sun then lights at 10 x intensity through the air's transmittance. Its display settings
-map to `environment.background`, `vignette`, `edges` and `grid`; its image sky (`_env _mode 2`) needs the decoded HDR
+map to `environment.background`, `vignette`, `edges` and `grid`; a transparent background (`_setting _bg_a`) is
+reported as `transparentBackground` (pass `transparent: true` to `capture`) and non-cubic voxels (`_setting _scale`)
+as `voxelScale`, which `magicaVoxelMatrix` takes as its fourth argument (the scene scaled about the origin); its image sky (`_env _mode 2`) needs the decoded HDR
 file passed as `magicaVoxelLighting(objects, { imageSky })` (the result's `imageSky.path` names it). Six default-lit scenes (diffuse, metal at roughness 0.2 and 0.8, glass, emitter, cloud) match
 MagicaVoxel's images within 3 of 255 levels on 99.2-99.97% of pixels; the measured mapping, the calibration procedure
 and the open items are in docs/magicavoxel-parity.md. Same scenes, same GPU (RTX A6000), 960 x 800 at 1024 samples:
@@ -446,7 +454,7 @@ PNG and float captures with cancellation; device-loss recovery.
 Not done or not verified, stated plainly:
 
 - **MagicaVoxel parity is not complete:** a transparent background (`_bg_a`) and non-cubic voxels (`_scale`) are
-  not reproduced; sky-lit subsurface blocks are 7-12 levels too dark; glass over a lit floor is 1-2 levels brighter; under the atmosphere, a view into a low sun matches on 97.7% of
+  reproduced but not yet compared with MagicaVoxel's images; sky-lit subsurface blocks are 7-12 levels too dark; glass over a lit floor is 1-2 levels brighter; under the atmosphere, a view into a low sun matches on 97.7% of
   pixels and very dense air settings by 2-3 levels on average (docs/magicavoxel-parity.md).
 - **Denoiser:** a classical filter, not a learned one. While the camera moves, surfaces it uncovers are noisy for a
   few frames, and for a few frames after it stops the history makes diffuse and cloud scenes slightly worse than

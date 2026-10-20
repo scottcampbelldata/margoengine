@@ -385,6 +385,9 @@ interface Gpu {
   pipelines?: Pipelines;
   /** The preview kernel, ready long before the full pipelines. */
   preview?: GPUComputePipeline;
+  /** The trace module, and its coverage kernel compiled at the first transparent render. */
+  traceModule?: GPUShaderModule;
+  coverage?: Promise<GPUComputePipeline>;
   display: Map<string, { pipeline?: GPURenderPipeline }>;
   buffers: SceneBuffers;
   /** Energy-compensation albedo tables (uniform) and the storage buffer the GPU integrates them into. */
@@ -719,13 +722,16 @@ export class VoxelPathTracer implements EnginePlugin {
         tone = toneCurve(this.#settings.toneMapping),
         gamma = this.#settings.gamma,
         vignette = this.#settings.vignette,
-        writer = new PngWriter(o.width, o.height);
+        writer = new PngWriter(o.width, o.height, o.transparent),
+        channels = writer.channels;
       try {
         await this.#render(o, false, async (y0, rows, band) => {
-          const bytes = new Uint8Array(o.width * rows * 3),
+          const bytes = new Uint8Array(o.width * rows * channels),
             c = [0, 0, 0];
           for (let i = 0; i < o.width * rows; i++) {
-            let gain = exposure;
+            // Transparent: the colour of what the pixel's rays hit (premultiplied by coverage in the render).
+            const alpha = band.alpha ? band.alpha[i] : 1;
+            let gain = alpha > 0 ? exposure / alpha : 0;
             if (vignette > 0) {
               const x = (i % o.width) + 0.5 - o.width / 2,
                 y = y0 + Math.floor(i / o.width) + 0.5 - o.height / 2,
@@ -734,7 +740,8 @@ export class VoxelPathTracer implements EnginePlugin {
             }
             for (let k = 0; k < 3; k++) c[k] = Math.max(0, band.color[i * 3 + k] * gain);
             const v = tone(c);
-            for (let k = 0; k < 3; k++) bytes[i * 3 + k] = encode(v[k], gamma);
+            for (let k = 0; k < 3; k++) bytes[i * channels + k] = encode(v[k], gamma);
+            if (channels === 4) bytes[i * 4 + 3] = Math.round(255 * Math.min(1, Math.max(0, alpha)));
           }
           await writer.write(bytes, rows);
         });
@@ -762,10 +769,12 @@ export class VoxelPathTracer implements EnginePlugin {
         depth = aovs ? new Float32Array(n) : undefined,
         instance = aovs ? new Int32Array(n) : undefined,
         palette = aovs ? new Uint8Array(n) : undefined,
+        alpha = o.transparent ? new Float32Array(n) : undefined,
         sources = this.#snapshot.instances.map((v) => v.source);
       await this.#render(o, aovs, async (y0, rows, band) => {
         const at = y0 * o.width;
         color.set(band.color, at * 3);
+        if (alpha) alpha.set(band.alpha!, at);
         if (!aovs) return;
         albedo!.set(band.albedo!, at * 3);
         normal!.set(band.normal!, at * 3);
@@ -778,7 +787,18 @@ export class VoxelPathTracer implements EnginePlugin {
           } else instance![at + i] = id === -2 ? -2 : id === -3 ? -3 : -1;
         }
       });
-      return { width: o.width, height: o.height, samples: o.samples, color, albedo, normal, depth, instance, palette };
+      return {
+        width: o.width,
+        height: o.height,
+        samples: o.samples,
+        color,
+        albedo,
+        normal,
+        depth,
+        instance,
+        palette,
+        ...(alpha ? { alpha } : {}),
+      };
     });
   }
 
@@ -953,7 +973,7 @@ export class VoxelPathTracer implements EnginePlugin {
     this.#samples = 0;
     if (this.#status !== 'compiling') this.#newReady();
     this.#status = 'compiling';
-    const trace = device.createShaderModule({ code: TRACE }),
+    const trace = (gpu.traceModule = device.createShaderModule({ code: TRACE })),
       denoise = device.createShaderModule({ code: DENOISE }),
       tables = device.createShaderModule({ code: TABLES }),
       layout = (l: GPUBindGroupLayout) => device.createPipelineLayout({ bindGroupLayouts: [l] }),
@@ -1264,6 +1284,7 @@ export class VoxelPathTracer implements EnginePlugin {
     layout: { scene: SceneLayout; lights: LightLayout },
     s: SceneSnapshot,
     wavelength = 0,
+    transparent = false,
   ): boolean {
     const o = this.#settings,
       f = new Float32Array(this.#frame),
@@ -1342,7 +1363,8 @@ export class VoxelPathTracer implements EnginePlugin {
     f.set(fog ? fog.hemisphere : new Float32Array(16), 164);
     f.set([e.groundFadeStart, 0, 0, 0], 180);
     // Background, edge bands, grid lines (MagicaVoxel's display settings).
-    const bg = e.background,
+    // A transparent render's camera rays that leave the scene add nothing (alpha comes from the coverage kernel).
+    const bg = transparent ? [0, 0, 0] : e.background,
       ed = o.edges,
       gr = o.grid;
     f.set(bg ? [bg[0], bg[1], bg[2], 1] : [0, 0, 0, 0], 184);
@@ -1684,6 +1706,7 @@ export class VoxelPathTracer implements EnginePlugin {
     jitter: boolean;
     seed: number;
     wavelength: number;
+    transparent: boolean;
     signal?: AbortSignal;
   } {
     this.#alive();
@@ -1698,6 +1721,7 @@ export class VoxelPathTracer implements EnginePlugin {
       denoise = r.denoise === undefined ? this.#settings.denoise !== false : flag(r.denoise, 'denoise'),
       jitter = r.jitter === undefined ? true : flag(r.jitter, 'jitter'),
       seed = r.seed === undefined ? this.#settings.seed : whole(r.seed, 'seed', 0, 0xffffffff, 'pass an integer seed'),
+      transparent = r.transparent === undefined ? false : flag(r.transparent, 'transparent'),
       wavelength =
         r.wavelength === undefined
           ? 0
@@ -1705,7 +1729,7 @@ export class VoxelPathTracer implements EnginePlugin {
     if (r.signal !== undefined && !(r.signal instanceof AbortSignal))
       throw new TypeError('VoxelPathTracer signal must be an AbortSignal');
     aborted(r.signal);
-    return { width, height, samples, denoise, jitter, seed, wavelength, signal: r.signal };
+    return { width, height, samples, denoise, jitter, seed, wavelength, transparent, signal: r.signal };
   }
 
   // Renders tiles band by band and hands each band (rows y0..y0+rows) to `consume`.
@@ -1718,6 +1742,7 @@ export class VoxelPathTracer implements EnginePlugin {
       jitter: boolean;
       seed: number;
       wavelength: number;
+      transparent: boolean;
       signal?: AbortSignal;
     },
     aovs: boolean,
@@ -1730,6 +1755,7 @@ export class VoxelPathTracer implements EnginePlugin {
         normal?: Float32Array;
         depth?: Float32Array;
         ids?: Float32Array;
+        alpha?: Float32Array;
       },
     ) => Promise<void>,
   ): Promise<void> {
@@ -1780,7 +1806,16 @@ export class VoxelPathTracer implements EnginePlugin {
         th = Math.min(o.height, TILE) + 2 * apron,
         frame = make(FRAME_BYTES, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST),
         bytes = tw * th * 16,
-        staging = (aovs ? [0, 1, 2] : [0]).map(() => make(bytes, GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST));
+        // Colour; with AOVs albedo and normals; with a transparent denoised render the accumulation (alpha in w).
+        staging = [0, ...(aovs ? [1, 2] : []), ...(o.transparent && o.denoise ? [3] : [])].map(() =>
+          make(bytes, GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST),
+        ),
+        coverage = o.transparent
+          ? await (gpu.coverage ??= device.createComputePipelineAsync({
+              layout: device.createPipelineLayout({ bindGroupLayouts: [gpu.traceLayout] }),
+              compute: { module: gpu.traceModule!, entryPoint: 'coverage' },
+            }))
+          : undefined;
       let group: GPUBindGroup | undefined,
         submitted = 0;
       const check = () => {
@@ -1797,6 +1832,7 @@ export class VoxelPathTracer implements EnginePlugin {
             normal: aovs ? new Float32Array(o.width * rows * 3) : undefined,
             depth: aovs ? new Float32Array(o.width * rows) : undefined,
             ids: aovs ? new Float32Array(o.width * rows) : undefined,
+            alpha: o.transparent ? new Float32Array(o.width * rows) : undefined,
           };
         for (let x0 = 0; x0 < o.width; x0 += TILE) {
           const cols = Math.min(TILE, o.width - x0),
@@ -1827,6 +1863,7 @@ export class VoxelPathTracer implements EnginePlugin {
               layout,
               snapshot,
               o.wavelength,
+              o.transparent,
             );
             const e = device.createCommandEncoder(),
               pass = e.beginComputePass();
@@ -1844,7 +1881,7 @@ export class VoxelPathTracer implements EnginePlugin {
             this.#denoiseParams(device, targets, o.samples, [rx0, ry0, o.width, o.height]);
             this.#encodeDenoise(gpu, e, targets);
           }
-          if (aovs) {
+          if (aovs || coverage) {
             this.#writeFrame(
               device,
               frame,
@@ -1856,12 +1893,17 @@ export class VoxelPathTracer implements EnginePlugin {
               targets.caustics !== undefined,
               layout,
               snapshot,
+              0,
+              o.transparent,
             );
-            const pass = e.beginComputePass();
-            pass.setPipeline(gpu.pipelines.ids);
-            pass.setBindGroup(0, group!);
-            pass.dispatchWorkgroups(Math.ceil(w / 8), Math.ceil(h / 8));
-            pass.end();
+            for (const pipeline of [aovs ? gpu.pipelines.ids : undefined, coverage]) {
+              if (!pipeline) continue;
+              const pass = e.beginComputePass();
+              pass.setPipeline(pipeline);
+              pass.setBindGroup(0, group!);
+              pass.dispatchWorkgroups(Math.ceil(w / 8), Math.ceil(h / 8));
+              pass.end();
+            }
           }
           const size = w * h * 16;
           e.copyBufferToBuffer(o.denoise ? targets.pong! : targets.accum, 0, staging[0], 0, size);
@@ -1869,6 +1911,7 @@ export class VoxelPathTracer implements EnginePlugin {
             e.copyBufferToBuffer(targets.albedo, 0, staging[1], 0, size);
             e.copyBufferToBuffer(targets.normals, 0, staging[2], 0, size);
           }
+          if (o.transparent && o.denoise) e.copyBufferToBuffer(targets.accum, 0, staging[staging.length - 1], 0, size);
           device.queue.submit([e.finish()]);
           const maps = staging.map((b) => b.mapAsync(GPUMapMode.READ, 0, size));
           try {
@@ -1883,7 +1926,8 @@ export class VoxelPathTracer implements EnginePlugin {
           const read = (b: GPUBuffer) => new Float32Array(b.getMappedRange(0, size).slice(0)),
             c = read(staging[0]),
             a = aovs ? read(staging[1]) : undefined,
-            n = aovs ? read(staging[2]) : undefined;
+            n = aovs ? read(staging[2]) : undefined,
+            coverageOf = o.transparent ? (o.denoise ? read(staging[staging.length - 1]) : c) : undefined;
           for (const b of staging) b.unmap();
           const scale = o.denoise ? 1 : 1 / o.samples;
           for (let y = 0; y < rows; y++)
@@ -1891,6 +1935,7 @@ export class VoxelPathTracer implements EnginePlugin {
               const src = (y0 + y - ry0) * w + (x0 + x - rx0),
                 dst = y * o.width + x0 + x;
               for (let k = 0; k < 3; k++) band.color[dst * 3 + k] = c[src * 4 + k] * scale;
+              if (coverageOf) band.alpha![dst] = coverageOf[src * 4 + 3];
               if (a && n) {
                 for (let k = 0; k < 3; k++) {
                   band.albedo![dst * 3 + k] = a[src * 4 + k] / o.samples;

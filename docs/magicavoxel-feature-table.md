@@ -69,8 +69,8 @@ Legend: **yes**, **no**, **open** (MagicaVoxel has it, Margo does not match it y
 | Exposure, gamma, ACES film curve | yes | yes, within 1 level |
 | Vignette | yes | yes, within 0.001 |
 | Voxel edges, grid, background colour | yes | yes; edges 99.0-99.5%, grid 86-88% (line borders), background 99.92% |
-| Transparent background PNG | yes | open |
-| Non-cubic voxels (`_scale`) | yes | open |
+| Transparent background PNG | yes | yes, not compared yet |
+| Non-cubic voxels (`_scale`) | yes | yes, not compared yet |
 | Bloom | in its viewport, not in saved snapshots | through `@margoengine/post` |
 | Denoiser | none in its render settings | yes |
 | Clean image while the camera moves | not measured | yes: history across frames; 2-3x less noise turning slowly, about 2x on glass and clouds turning 0.5 degrees a frame |
@@ -100,6 +100,6 @@ Legend: **yes**, **no**, **open** (MagicaVoxel has it, Margo does not match it y
 ## Where MagicaVoxel is ahead
 
 - It is a complete, free editor that artists already use; Margo renders, it does not edit.
-- Transparent-background PNGs, non-cubic voxels and its orthographic and isometric cameras are not matched yet; sky-lit
-  subsurface is 7-12 levels dark.
+- Transparent-background PNGs, non-cubic voxels and its orthographic and isometric cameras are not compared with
+  MagicaVoxel's images yet; sky-lit subsurface is 7-12 levels dark.
 - Margo is measured on one PC and one browser only.

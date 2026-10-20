@@ -500,6 +500,12 @@ export interface VoxelTraceRenderOptions {
    * a monochromatic image for checking refraction per wavelength. Default: the whole spectrum.
    */
   wavelength?: number;
+  /**
+   * A transparent background: camera rays that leave the scene add nothing (rays that bounce still see the sky and
+   * are lit by it), and `alpha` gives each pixel's share of camera rays that hit the scene. `color` is then
+   * premultiplied by it. Default false.
+   */
+  transparent?: boolean;
 }
 
 /** Compatible addition: a rendered linear image from {@link VoxelPathTracer.renderImage}. */
@@ -522,6 +528,11 @@ export interface VoxelTraceImage {
   readonly instance?: Int32Array;
   /** With `aovs`: palette index hit by the pixel-centre ray, 0 when no voxel was hit. */
   readonly palette?: Uint8Array;
+  /**
+   * With `transparent`: the share of the pixel's camera rays (8 x 8 strata, through the lens) that hit a voxel, the
+   * ground or an area light, 0 to 1.
+   */
+  readonly alpha?: Float32Array;
 }
 
 /** Compatible addition: options of {@link VoxelPathTracer.capture}. */
@@ -536,6 +547,12 @@ export interface VoxelTraceCaptureOptions {
   signal?: AbortSignal;
   /** Compatible addition: denoise the capture. Default: the tracer's `denoise` option. */
   denoise?: boolean;
+  /**
+   * Compatible addition: a transparent background. The PNG gets an alpha channel, the share of each pixel's camera
+   * rays that hit the scene (voxels, the ground, area lights); camera rays that leave it add nothing, and colours are
+   * stored unpremultiplied. Rays that bounce still see the sky and are lit by it. Default false.
+   */
+  transparent?: boolean;
 }
 
 /** Compatible addition: a voxel found by {@link VoxelPathTracer.raycast}. */

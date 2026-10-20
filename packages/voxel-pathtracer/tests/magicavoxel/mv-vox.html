@@ -13,34 +13,84 @@ window.render=async(b64,opt)=>{
  const robj=[],cams=new Map();
  for(const c of vox.chunks??[]){if(c.id==='rOBJ')robj.push(dict(c.content,0));if(c.id==='rCAM'){const dv=new DataView(c.content.buffer,c.content.byteOffset);cams.set(dv.getInt32(0,true),dict(c.content,4));}}
  // Scene graph: transforms (translation, rotation) down to shapes.
- const nodes=new Map(vox.nodes.map((n)=>[n.id,n])),models=[],instances=[];
+ const nodes=new Map(vox.nodes.map((n)=>[n.id,n])),models=[],instances=[],vs=PT.magicaVoxelLighting(robj).voxelScale;
  const mul=(A,B)=>[0,1,2].flatMap((i)=>[0,1,2].map((j)=>A[3*i]*B[j]+A[3*i+1]*B[3+j]+A[3*i+2]*B[6+j]));
  const walk=(id,R,t)=>{const n=nodes.get(id);if(!n)return;
   if(n.type==='transform'){const f=n.frames[0]??{};const r=f.rotation??[1,0,0,0,1,0,0,0,1],tr=f.translation??[0,0,0];
    const t2=[0,1,2].map((i)=>t[i]+R[3*i]*tr[0]+R[3*i+1]*tr[1]+R[3*i+2]*tr[2]);walk(n.child,mul(R,r),t2);}
   else if(n.type==='group'){for(const c of n.children)walk(c,R,t);}
   else{const m=n.models[0].model,mv=vox.models[m];if(!models[m])models[m]=PT.magicaVoxelModel('m'+m,1,mv.size,mv.voxels);
-   instances.push({id:'i'+instances.length,modelId:'m'+m,matrix:PT.magicaVoxelMatrix(mv.size,t,R)});}};
+   instances.push({id:'i'+instances.length,modelId:'m'+m,matrix:PT.magicaVoxelMatrix(mv.size,t,R,vs)});}};
  if(vox.nodes.length)walk(0,[1,0,0,0,1,0,0,0,1],[0,0,0]);
- else vox.models.forEach((mv,m)=>{models[m]=PT.magicaVoxelModel('m'+m,1,mv.size,mv.voxels);instances.push({id:'i'+m,modelId:'m'+m,matrix:PT.magicaVoxelMatrix(mv.size,[0,0,Math.floor(mv.size[2]/2)])});});
+ else vox.models.forEach((mv,m)=>{models[m]=PT.magicaVoxelModel('m'+m,1,mv.size,mv.voxels);instances.push({id:'i'+m,modelId:'m'+m,matrix:PT.magicaVoxelMatrix(mv.size,[0,0,Math.floor(mv.size[2]/2)],undefined,vs)});});
  const used=new Set();for(const mv of vox.models)for(let i=3;i<mv.voxels.length;i+=4)used.add(mv.voxels[i]);
  const attrs=new Map(vox.materials.map((m)=>[m.id,m.attributes]));
  const tweak=opt.tweak?new Function('m',opt.tweak):(m)=>m;
  const materials=[...used].map((id)=>tweak(PT.magicaVoxelMaterial(id,vox.palette.subarray(4*id,4*id+3),attrs.get(id))));
- const light=PT.magicaVoxelLighting(robj),cam=PT.magicaVoxelCamera(cams.get(opt.camera??1),robj);
+ const light=PT.magicaVoxelLighting(robj,opt.hdr?{imageSky:{width:opt.hdr.width,height:opt.hdr.height,data:new Float32Array(opt.hdr.data)}}:{}),cam=PT.magicaVoxelCamera(cams.get(opt.camera??1),robj);
  const canvas=document.querySelector('canvas');canvas.width=opt.width;canvas.height=opt.height;
  const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:cam.position,target:cam.target,fov:cam.fov,near:0.5,far:4000}});
  engine.camera.up=cam.up;
  engine.gpu?.addEventListener?.('uncapturederror',(e)=>errors.push(e.error.message));
+ const tAttach=performance.now();
  const tracer=PT.VoxelPathTracer.attach(engine,{scene:{revision:1,models:models.filter(Boolean),instances,materials,environment:{...light.environment,...(opt.environment??{})}},
   ...light.options,...(opt.options??{}),seed:1});
+ if(opt.orbit){
+  // Orbit: the camera turns opt.orbit.step degrees about the target's vertical per frame for opt.orbit.frames frames; the last
+  // viewport frame (as displayed) and a reference capture from that camera.
+  await tracer.ready;
+  const p0=[...cam.position],tg=[...cam.target],rot=(a)=>{const dx=p0[0]-tg[0],dz=p0[2]-tg[2],c=Math.cos(a),s=Math.sin(a);return [tg[0]+dx*c-dz*s,p0[1],tg[2]+dx*s+dz*c];};
+  const read=()=>{const c=new OffscreenCanvas(canvas.width,canvas.height).getContext('2d');c.drawImage(canvas,0,0);return c;};
+  // Warm-up until the display pipeline (compiled on first use) draws.
+  const tw=performance.now();while(performance.now()-tw<300){engine.render({delta:0});await engine.gpu?.device?.queue?.onSubmittedWorkDone?.();await new Promise((r)=>setTimeout(r,10));}
+  let last;
+  // One frame per task (the canvas presents between tasks), read in the task that rendered it.
+  const hold=opt.orbit.hold??0;
+  for(let k=0;k<=opt.orbit.frames+hold;k++){engine.camera.position=rot(Math.min(k,opt.orbit.frames)*opt.orbit.step*Math.PI/180);engine.camera.target=tg;engine.render({delta:0});if(k===opt.orbit.frames+hold){last=read();globalThis.__posLast=[...engine.camera.position].map((v)=>+v.toFixed(3));globalThis.__set=rot(k*opt.orbit.step*Math.PI/180).map((v)=>+v.toFixed(3));}await engine.gpu?.device?.queue?.onSubmittedWorkDone?.();await new Promise((r)=>setTimeout(r,0));}
+  const enc=async(c)=>{const blob=await c.canvas.convertToBlob();const u=new Uint8Array(await blob.arrayBuffer());let s='';for(let i=0;i<u.length;i+=32768)s+=String.fromCharCode(...u.subarray(i,i+32768));return btoa(s);};
+  const frame=await enc(last);
+  // Reference: the same viewport held still, accumulated without denoising.
+  engine.camera.position=rot(opt.orbit.frames*opt.orbit.step*Math.PI/180);
+  tracer.setOptions({denoise:false,samplesPerFrame:64,maxSamples:opt.samples});
+  let refCtx;
+  while(true){engine.render({delta:0});const done=tracer.stats.samples>=opt.samples;if(done){refCtx=read();}await engine.gpu?.device?.queue?.onSubmittedWorkDone?.();if(done)break;}
+  const ref=await enc(refCtx);const posRef=[...engine.camera.position].map((v)=>+v.toFixed(3));
+  tracer.dispose();engine.dispose();
+  return {png:frame,ref,debug:{set:globalThis.__set,last:globalThis.__posLast,posRef,p0:p0.map((v)=>+v.toFixed(3))},errors:errors.splice(0),ms:0,readyMs:0,unsupported:light.unsupported,options:light.options};
+ }
+ if(opt.paced){
+  // Display-paced viewport: requestAnimationFrame for opt.paced ms after the full tracer is ready; samples reached and frame times.
+  await tracer.ready;
+  const t0=performance.now();let n=0;const ms=[];let last=t0;
+  await new Promise((done)=>{const tick=()=>{engine.render({delta:0});n++;const t=performance.now();ms.push(t-last);last=t;if(t-t0<opt.paced)requestAnimationFrame(tick);else done();};requestAnimationFrame(tick);});
+  await engine.gpu?.device?.queue?.onSubmittedWorkDone?.();
+  const st=tracer.stats;ms.sort((a,b)=>a-b);tracer.dispose();engine.dispose();
+  return {png:'',errors:errors.splice(0),ms:performance.now()-t0,readyMs:0,first:undefined,paced:{frames:n,samples:st.samples,medianFrame:+ms[ms.length>>1].toFixed(2),p90Frame:+ms[Math.floor(ms.length*0.9)].toFixed(2),over20:ms.filter((x)=>x>20).length,max:+ms[ms.length-1].toFixed(1)},unsupported:light.unsupported,options:light.options};
+ }
+ if(opt.viewport){
+  // Viewport timeline: frames drawn from attach on; the first with lit pixels, and when the full tracer took over.
+  const read=()=>{const c=new OffscreenCanvas(canvas.width,canvas.height).getContext('2d');c.drawImage(canvas,0,0);return c.getImageData(0,0,canvas.width,canvas.height).data;};
+  let first=-1,full=-1,frames=0,firstPng='';
+  while(performance.now()-tAttach<8000&&(full<0||frames<3)){
+   engine.render({delta:0});const d=read();await engine.gpu?.device?.queue?.onSubmittedWorkDone?.();
+   let lit=0;for(let i=0;i<d.length;i+=4*97){if(d[i]+d[i+1]+d[i+2]>30)lit++;}
+   const t=performance.now()-tAttach;
+   if(first<0&&lit>50){first=t;const oc=new OffscreenCanvas(canvas.width,canvas.height);oc.getContext('2d').drawImage(canvas,0,0);const blob=await oc.convertToBlob();const u=new Uint8Array(await blob.arrayBuffer());let s='';for(let i=0;i<u.length;i+=32768)s+=String.fromCharCode(...u.subarray(i,i+32768));firstPng=btoa(s);}
+   if(full<0&&tracer.status==='ready'&&tracer.stats.samples>0)full=t;
+   if(full>=0)frames++;
+   await new Promise((r)=>setTimeout(r,0));
+  }
+  const st=tracer.stats;tracer.dispose();engine.dispose();
+  return {png:firstPng,errors:errors.splice(0),ms:0,readyMs:full,first,samples:st.samples,unsupported:light.unsupported,options:light.options};
+ }
  await tracer.ready;
+ const readyMs=performance.now()-tAttach;
  const t0=performance.now();
  const blob=await tracer.capture({width:opt.width,height:opt.height,samples:opt.samples});
  const ms=performance.now()-t0;
  const out=new Uint8Array(await blob.arrayBuffer());let s='';for(let i=0;i<out.length;i+=32768)s+=String.fromCharCode(...out.subarray(i,i+32768));
- tracer.dispose();engine.dispose();
- return {png:btoa(s),errors:errors.splice(0),ms,unsupported:light.unsupported,options:light.options};
+ const gpuBytes=tracer.stats.gpuBytes;tracer.dispose();engine.dispose();
+ return {png:btoa(s),errors:errors.splice(0),ms,readyMs,times:globalThis.__ptTimes,gpuMiB:+(gpuBytes/2**20).toFixed(1),unsupported:light.unsupported,options:light.options};
 };
 window.ready=true;
 </script></body></html>

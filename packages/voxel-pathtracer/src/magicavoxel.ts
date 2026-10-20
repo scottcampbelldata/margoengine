@@ -36,13 +36,20 @@ export interface MagicaVoxelLighting {
    * shadows, the sun on diffuse lobes only and not in media) and the lens.
    */
   options: Partial<Omit<VoxelPathTracerOptions, 'scene'>>;
-  /** Settings found in the file that the tracer does not reproduce (bloom, a transparent background). */
+  /** Settings found in the file that the tracer does not reproduce (bloom). */
   unsupported: string[];
   /**
    * The image sky (`_env _mode 2`): the HDR file `_ibl _path` names and how it is shown (3 x `_i`, turned by the
    * second `_angle`). Pass the decoded image as the `imageSky` option to have it set as `environment.map`.
    */
   imageSky?: { path: string; intensity: number; rotation: number };
+  /**
+   * Non-cubic voxels (`_setting _scale`, MagicaVoxel x y z), when not 1 1 1: pass it to {@link magicaVoxelMatrix},
+   * which scales the whole scene about the origin by it.
+   */
+  voxelScale?: [number, number, number];
+  /** A transparent background (`_setting _bg_a`): pass `transparent: true` to `capture`. */
+  transparentBackground?: boolean;
 }
 
 /** A camera from {@link magicaVoxelCamera}, in tracer world coordinates. */
@@ -362,7 +369,6 @@ export function magicaVoxelLighting(
 
   if ((num(o('_bloom'), '_mix') ?? 0.5) > 0 && (num(o('_bloom'), '_scale') ?? 0) > 0)
     unsupported.push('bloom (_bloom)');
-  if ((num(setting, '_bg_a') ?? 0) !== 0) unsupported.push('transparent background (_setting _bg_a)');
   const edge = o('_edge'),
     grid = o('_grid'),
     display = {
@@ -388,7 +394,12 @@ export function magicaVoxelLighting(
           : null,
     };
   const expo = num(film, '_expo') ?? 1,
-    blades = Math.round(num(lens, '_blade_n') ?? 0);
+    blades = Math.round(num(lens, '_blade_n') ?? 0),
+    scaled = nums(setting, '_scale'),
+    scale: [number, number, number] = [0, 1, 2].map((i) => {
+      const v = scaled?.[i] ?? 1;
+      return Number.isFinite(v) && v > 0 ? v : 1;
+    }) as [number, number, number];
   return {
     environment,
     options: {
@@ -422,6 +433,8 @@ export function magicaVoxelLighting(
     },
     unsupported,
     ...(sky ? { imageSky: sky } : {}),
+    ...(scale.some((v) => v !== 1) ? { voxelScale: scale } : {}),
+    ...((num(setting, '_bg_a') ?? 0) !== 0 ? { transparentBackground: true } : {}),
   };
 }
 
@@ -489,12 +502,14 @@ export function magicaVoxelModel(
 /**
  * Column-major tracer matrix of a MagicaVoxel model placed by a transform node: `translation` (`_t`, where the
  * model's centre voxel corner floor(size / 2) lands) and `rotation` (`_r` as a row-major 3 x 3 signed permutation,
- * identity by default), for the model built by {@link magicaVoxelModel}.
+ * identity by default), for the model built by {@link magicaVoxelModel}; `scale` (the lighting helper's `voxelScale`,
+ * MagicaVoxel axes) stretches the placed model about the world origin.
  */
 export function magicaVoxelMatrix(
   size: ArrayLike<number>,
   translation: ArrayLike<number> = [0, 0, 0],
   rotation: ArrayLike<number> = [1, 0, 0, 0, 1, 0, 0, 0, 1],
+  scale: ArrayLike<number> = [1, 1, 1],
 ): number[] {
   // MagicaVoxel world = t + R (local - pivot); local = (X, sy - Z, Y) for the tracer model point (X, Y, Z); tracer
   // world = C(MagicaVoxel world) with C(x, y, z) = (x, z, -y).
@@ -507,9 +522,9 @@ export function magicaVoxelMatrix(
       [0, 1, 0],
     ],
     lo = [-pivot[0], size[1] - pivot[1], -pivot[2]],
-    // MagicaVoxel world = A P + b.
-    A = L.map((_, i) => [0, 1, 2].map((j) => R(i, 0) * L[0][j] + R(i, 1) * L[1][j] + R(i, 2) * L[2][j])),
-    b = [0, 1, 2].map((i) => translation[i] + R(i, 0) * lo[0] + R(i, 1) * lo[1] + R(i, 2) * lo[2]),
+    // MagicaVoxel world = A P + b (scaled about the origin).
+    A = L.map((_, i) => [0, 1, 2].map((j) => scale[i] * (R(i, 0) * L[0][j] + R(i, 1) * L[1][j] + R(i, 2) * L[2][j]))),
+    b = [0, 1, 2].map((i) => scale[i] * (translation[i] + R(i, 0) * lo[0] + R(i, 1) * lo[1] + R(i, 2) * lo[2])),
     // C applied to rows: tracer x = mv x, y = mv z, z = -mv y.
     M = [A[0], A[2], A[1].map((v) => -v)],
     t = [b[0], b[2], -b[1]];

@@ -164,7 +164,8 @@ test('render objects: sky, sun, ground fade, film, bounces and fog', () => {
   assert.equal(shown.environment.groundFade, undefined);
   near(shown.options.vignette, 0.5);
   assert.deepEqual(shown.options.grid, { color: [0, 0, 1], spacing: 4, width: 0.1, onVoxels: false });
-  assert.ok(shown.unsupported.some((u) => u.includes('_bg_a')));
+  assert.equal(shown.transparentBackground, true);
+  assert.ok(!shown.unsupported.some((u) => u.includes('_bg_a')));
   // Image sky: 3 x _i, turned by the second _angle (MagicaVoxel +x at the image centre), no ground fade.
   const imageSky = { width: 2, height: 1, data: new Float32Array(6) };
   const ibl = [
@@ -295,6 +296,13 @@ test('models and placement: voxel (x, y, z) fills MagicaVoxel world t - floor(si
   // centre (10.5, 21.5, 31.5) is the image of the tracer cell's centre.
   near3(at([1.5, 3.5, 0.5]), fromMagicaVoxel([10.5, 21.5, 31.5]), 1e-9);
   assert.throws(() => magicaVoxelModel('m', 1, [0, 1, 1], new Uint8Array()), RangeError);
+  // Non-cubic voxels (_setting _scale): the placed model scaled about the MagicaVoxel origin.
+  const scale = magicaVoxelLighting([{ _type: '_setting', _scale: '1 1 2' }]).voxelScale;
+  assert.deepEqual(scale, [1, 1, 2]);
+  assert.equal(magicaVoxelLighting([{ _type: '_setting', _scale: '1 1 1' }]).voxelScale, undefined);
+  const S = magicaVoxelMatrix(size, [10, 20, 30], undefined, scale),
+    sat = (p) => [0, 1, 2].map((r) => S[r] * p[0] + S[4 + r] * p[1] + S[8 + r] * p[2] + S[12 + r]);
+  near3(sat([1.5, 3.5, 0.5]), fromMagicaVoxel([10.5, 21.5, 63]), 1e-9);
 });
 
 test('MagicaVoxel options and environment reach the frame uniform; invalid ones are refused', async () => {

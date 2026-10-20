@@ -326,13 +326,14 @@ test('order changes move the pass; the pass leaves with the plugin', async () =>
   );
 });
 
-// Decodes an 8-bit RGB PNG (filters 0-4) into rows of bytes.
+// Decodes an 8-bit RGB or RGBA PNG (filters 0-4) into rows of bytes.
 function decodePNG(bytes) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   assert.deepEqual([...bytes.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
   let at = 8,
     width = 0,
-    height = 0;
+    height = 0,
+    bpp = 3;
   const idat = [];
   for (;;) {
     const length = view.getUint32(at),
@@ -341,22 +342,24 @@ function decodePNG(bytes) {
     if (type === 'IHDR') {
       width = view.getUint32(at + 8);
       height = view.getUint32(at + 12);
-      assert.deepEqual([...data.subarray(8)], [8, 2, 0, 0, 0]);
+      assert.ok(data[9] === 2 || data[9] === 6, 'RGB or RGBA');
+      bpp = data[9] === 6 ? 4 : 3;
+      assert.deepEqual([...data.subarray(8)], [8, data[9], 0, 0, 0]);
     }
     if (type === 'IDAT') idat.push(data);
     at += 12 + length;
     if (type === 'IEND') break;
   }
   const raw = inflateSync(Buffer.concat(idat)),
-    stride = width * 3,
-    out = new Uint8Array(width * height * 3);
+    stride = width * bpp,
+    out = new Uint8Array(width * height * bpp);
   for (let y = 0; y < height; y++) {
     const type = raw[y * (stride + 1)],
       line = raw.subarray(y * (stride + 1) + 1, (y + 1) * (stride + 1));
     for (let i = 0; i < stride; i++) {
-      const a = i >= 3 ? out[y * stride + i - 3] : 0,
+      const a = i >= bpp ? out[y * stride + i - bpp] : 0,
         b = y ? out[(y - 1) * stride + i] : 0,
-        c = i >= 3 && y ? out[(y - 1) * stride + i - 3] : 0;
+        c = i >= bpp && y ? out[(y - 1) * stride + i - bpp] : 0;
       let p = 0;
       if (type === 1) p = a;
       else if (type === 2) p = b;
@@ -371,8 +374,32 @@ function decodePNG(bytes) {
       out[y * stride + i] = (line[i] + p) & 255;
     }
   }
-  return { width, height, pixels: out };
+  return { width, height, channels: bpp, pixels: out };
 }
+
+test('a transparent capture writes RGBA: alpha is the coverage, colours unpremultiplied', async () => {
+  const { tracer, device } = await ready({ toneMapping: 'linear' });
+  // Read-backs: colour sums premultiplied by coverage 0.5 on even pixels; odd pixels miss everything.
+  device.onMap = (b) => {
+    const f = new Float32Array(b.data);
+    for (let i = 0; i < f.length / 4; i++)
+      f.set(i % 2 ? [0, 0, 0, 0] : [0.2 * 0.5 * 3, 0.4 * 0.5 * 3, 0.6 * 0.5 * 3, 0.5], i * 4);
+  };
+  const png = decodePNG(
+    new Uint8Array(await (await tracer.capture({ width: 8, height: 4, samples: 3, transparent: true })).arrayBuffer()),
+  );
+  assert.equal(png.channels, 4);
+  const srgb = (v) => Math.round(255 * (1.055 * v ** (1 / 2.4) - 0.055));
+  assert.deepEqual([...png.pixels.subarray(0, 8)], [srgb(0.2), srgb(0.4), srgb(0.6), 128, 0, 0, 0, 0]);
+  assert.ok(
+    device.passes.some((p) =>
+      p.commands.some((c) => c[0] === 'setPipeline' && c[1].compute?.entryPoint === 'coverage'),
+    ),
+    'the coverage kernel ran',
+  );
+  await assert.rejects(tracer.capture({ width: 8, height: 4, samples: 1, transparent: 'yes' }), TypeError);
+  tracer.dispose();
+});
 
 test('capture renders the requested size in tiles and encodes a PNG of the tone-mapped image', async () => {
   const h = fakeEngine(),
