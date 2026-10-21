@@ -4,6 +4,7 @@
 // scene leaves the current one untouched (README, "Scenes"). Pure CPU code; the GPU layout is in layout.ts.
 import type {
   ResolvedTraceMaterial,
+  TraceModelBlock,
   TraceAreaLight,
   TraceTexture,
   TraceEnvironment,
@@ -36,6 +37,8 @@ export const MODEL_WORDS = 12;
 export const INSTANCE_WORDS = 40;
 /** Words per hierarchy node. */
 export const NODE_WORDS = 8;
+/** Model cells per axis at most (emissive faces store each coordinate in 16 bits). */
+const MAX_AXIS = 2048;
 /** Material tables at most (`scene.materials` and distinct model tables): a slot (table << 8 | palette) fits 20 bits. */
 const MAX_TABLES = 4096;
 /** Material flags (float 15 of a packed material). */
@@ -83,7 +86,7 @@ export interface PackedModel {
 /** Emissive faces of one model for one material set. */
 interface ModelEmitters {
   key: string;
-  /** Packed `x | y << 8 | z << 16 | face << 24` (face 0..5 = +x -x +y -y +z -z). */
+  /** Two words per face: `x | y << 16`, `z | face << 16` (face 0..5 = +x -x +y -y +z -z). */
   faces: Uint32Array;
   /** Palette index of each face's voxel. */
   ids: Uint8Array;
@@ -174,7 +177,7 @@ export interface SceneSnapshot {
   readonly lights: Float32Array;
   readonly lightCount: number;
   readonly lightPower: number;
-  /** Emissive faces per model (same order as `models`), empty for models without any. */
+  /** Emissive faces per model (same order as `models`; two words each, see ModelEmitters), empty without any. */
   readonly emitters: readonly { faces: Uint32Array; cdf: Float32Array; total: number }[];
   /** Instances with emissive faces, by GPU instance index, and their cumulative pick probabilities. */
   readonly emissiveInstances: Uint32Array;
@@ -297,27 +300,46 @@ function invertRows(r: ArrayLike<number>): Float64Array {
   return out;
 }
 
-/** Packs a dense model into bricks (throws for a wrong shape before reading voxels). */
-function packModel(model: TraceModel, name: string): PackedModel {
-  const size = checkVec3(model.size, `${name}.size`, true, 'pass integer dimensions 1 to 256');
-  if (!size.every((v) => Number.isInteger(v) && v >= 1 && v <= 256))
+/** Whether a model's contents have the shape `packModel` reads: dense voxels of its size, or a list of blocks. */
+function contentsFit(model: TraceModel, size: readonly number[]): boolean {
+  return model.blocks === undefined
+    ? model.voxels instanceof Uint8Array && model.voxels.length === size[0] * size[1] * size[2]
+    : Array.isArray(model.blocks) && model.voxels === undefined;
+}
+
+/** Packs a model into bricks (throws for a wrong shape before reading voxels). */
+function packModel(model: TraceModel, name: string, maxWords: number): PackedModel {
+  const size = checkVec3(model.size, `${name}.size`, true, `pass integer dimensions 1 to ${MAX_AXIS}`);
+  if (!size.every((v) => Number.isInteger(v) && v >= 1 && v <= MAX_AXIS))
     throw new RangeError(
-      `${where} ${name}.size [${size}] must be integers 1 to 256; pass the model's voxel dimensions`,
+      `${where} ${name}.size [${size}] must be integers 1 to ${MAX_AXIS}; pass the model's voxel dimensions`,
     );
   if (typeof model.revision !== 'number' || !Number.isFinite(model.revision))
     throw new TypeError(`${where} ${name}.revision must be a finite number; bump it when the voxels change`);
+  const [sx, sy, sz] = size,
+    bx = Math.ceil(sx / BRICK),
+    by = Math.ceil(sy / BRICK),
+    bz = Math.ceil(sz / BRICK);
+  // The brick grid alone must fit the voxel binding (a sparse model's grid is dense).
+  if (bx * by * bz + 4 > maxWords)
+    throw new RangeError(
+      `${where} ${name} of ${sx}x${sy}x${sz} needs a ${bx * by * bz * 4}-byte brick grid; this device binds at most ${maxWords * 4}; split it into smaller models`,
+    );
+  if (model.blocks !== undefined) {
+    if (model.voxels !== undefined)
+      throw new TypeError(`${where} ${name} has both voxels and blocks; pass one of them`);
+    if (!Array.isArray(model.blocks))
+      throw new TypeError(`${where} ${name}.blocks must be an array of {origin, size, voxels}`);
+    return packBlocks(model, name, [sx, sy, sz]);
+  }
   const voxels = model.voxels;
   if (!(voxels instanceof Uint8Array))
-    throw new TypeError(`${where} ${name}.voxels must be a Uint8Array of palette indices`);
-  const [sx, sy, sz] = size;
+    throw new TypeError(`${where} ${name}.voxels must be a Uint8Array of palette indices (or pass blocks)`);
   if (voxels.length !== sx * sy * sz)
     throw new TypeError(
       `${where} ${name}.voxels has ${voxels.length} entries; a ${sx}x${sy}x${sz} model needs ${sx * sy * sz} (index = x + sx * (z + sz * y))`,
     );
-  const bx = Math.ceil(sx / BRICK),
-    by = Math.ceil(sy / BRICK),
-    bz = Math.ceil(sz / BRICK),
-    grid = new Uint32Array(bx * by * bz),
+  const grid = new Uint32Array(bx * by * bz),
     counts = new Uint32Array(256),
     scratch = new Uint8Array(BRICK * BRICK * BRICK);
   let payload = new Uint32Array(BRICK_WORDS * Math.min(grid.length, 64)),
@@ -366,6 +388,91 @@ function packModel(model: TraceModel, name: string): PackedModel {
         new Uint8Array(payload.buffer, bricks * BRICK_WORDS * 4, 512).set(scratch);
         grid[index] = ++bricks;
       }
+  counts[0] = 0;
+  return {
+    id: model.id,
+    revision: model.revision,
+    key: model.contentKey,
+    size: [sx, sy, sz],
+    bricks: [bx, by, bz],
+    grid,
+    payload: payload.slice(0, bricks * BRICK_WORDS),
+    counts,
+  };
+}
+
+/**
+ * Packs a model given as blocks: dense windows at offsets inside it (cells no block covers are empty; where blocks
+ * overlap, the later one's cells win, its zeros included). Only bricks a block touches are visited.
+ */
+function packBlocks(model: TraceModel, name: string, size: readonly [number, number, number]): PackedModel {
+  const [sx, sy, sz] = size,
+    bx = Math.ceil(sx / BRICK),
+    by = Math.ceil(sy / BRICK),
+    bz = Math.ceil(sz / BRICK),
+    touched = new Map<number, Uint8Array>();
+  for (const [i, block] of (model.blocks as readonly TraceModelBlock[]).entries()) {
+    const at = `${name}.blocks[${i}]`;
+    if (!isObject(block)) throw new TypeError(`${where} ${at} must be {origin, size, voxels}`);
+    const o = checkVec3(block.origin, `${at}.origin`, true, 'pass integer cell coordinates inside the model'),
+      n = checkVec3(block.size, `${at}.size`, true, 'pass integer dimensions of 1 or more');
+    if (!o.every(Number.isInteger) || !n.every((v) => Number.isInteger(v) && v >= 1))
+      throw new RangeError(`${where} ${at} origin and size must be whole numbers (size 1 or more)`);
+    if (o.some((v, k) => v + n[k] > size[k]))
+      throw new RangeError(
+        `${where} ${at} spans [${o}] to [${o.map((v, k) => v + n[k])}], outside the ${sx}x${sy}x${sz} model; move or crop it`,
+      );
+    const v = block.voxels;
+    if (!(v instanceof Uint8Array))
+      throw new TypeError(`${where} ${at}.voxels must be a Uint8Array of palette indices`);
+    if (v.length !== n[0] * n[1] * n[2])
+      throw new TypeError(
+        `${where} ${at}.voxels has ${v.length} entries; a ${n[0]}x${n[1]}x${n[2]} block needs ${n[0] * n[1] * n[2]} (index = x + sx * (z + sz * y))`,
+      );
+    for (let y = 0; y < n[1]; y++)
+      for (let z = 0; z < n[2]; z++) {
+        const gy = o[1] + y,
+          gz = o[2] + z,
+          row = n[0] * (z + n[2] * y);
+        for (let x = 0; x < n[0]; x++) {
+          const gx = o[0] + x,
+            key = (gx >> 3) + bx * ((gz >> 3) + bz * (gy >> 3));
+          let brick = touched.get(key);
+          if (!brick) touched.set(key, (brick = new Uint8Array(BRICK * BRICK * BRICK)));
+          brick[(gx & 7) + 8 * ((gz & 7) + 8 * (gy & 7))] = v[row + x];
+        }
+      }
+  }
+  const grid = new Uint32Array(bx * by * bz),
+    counts = new Uint32Array(256),
+    keys = [...touched.keys()].sort((a, b) => a - b);
+  let payload = new Uint32Array(BRICK_WORDS * Math.min(keys.length, 64)),
+    bricks = 0;
+  for (const key of keys) {
+    const cells = touched.get(key)!,
+      cx = key % bx,
+      cz = Math.floor(key / bx) % bz,
+      cy = Math.floor(key / (bx * bz)),
+      partial = cx * 8 + 8 > sx || cy * 8 + 8 > sy || cz * 8 + 8 > sz;
+    let first = cells[0],
+      uniform = !partial;
+    for (let k = 0; k < cells.length; k++) {
+      counts[cells[k]]++;
+      if (cells[k] !== first) uniform = false;
+    }
+    if (uniform) {
+      grid[key] = first === 0 ? 0 : (UNIFORM | first) >>> 0;
+      continue;
+    }
+    if (cells.every((c) => c === 0)) continue;
+    if ((bricks + 1) * BRICK_WORDS > payload.length) {
+      const grown = new Uint32Array(Math.min(keys.length, bricks * 2 + 1) * BRICK_WORDS);
+      grown.set(payload);
+      payload = grown;
+    }
+    new Uint8Array(payload.buffer, bricks * BRICK_WORDS * 4, 512).set(cells);
+    grid[key] = ++bricks;
+  }
   counts[0] = 0;
   return {
     id: model.id,
@@ -638,7 +745,7 @@ function modelEmitters(m: PackedModel, materials: Float32Array, cache: SceneCach
               for (let f = 0; f < 6; f++) {
                 const s = steps[f];
                 if (!see[voxelAt(m, x + s[0], y + s[1], z + s[2])]) continue;
-                faces.push((x | (y << 8) | (z << 16) | (f << 24)) >>> 0);
+                faces.push((x | (y << 16)) >>> 0, (z | (f << 16)) >>> 0);
                 ids.push(v);
               }
             }
@@ -1190,12 +1297,11 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
       (key !== undefined || previous.revision === model.revision) &&
       size?.length === 3 &&
       previous.size.every((v, k) => v === size[k]) &&
-      model.voxels instanceof Uint8Array &&
-      model.voxels.length === previous.size[0] * previous.size[1] * previous.size[2]
+      contentsFit(model, previous.size)
     )
       p = previous;
     else {
-      p = packModel(model, name);
+      p = packModel(model, name, maxWords);
       fresh++;
     }
     modelIndex.set(id, packed.length);
@@ -1283,9 +1389,9 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
     const table = modelTable(index),
       e = modelEmitters(m, table, cache);
     if (!e) return { faces: new Uint32Array(0), cdf: new Float32Array(0), total: 0 };
-    const cdf = new Float32Array(e.faces.length);
+    const cdf = new Float32Array(e.ids.length);
     let total = 0;
-    for (let k = 0; k < e.faces.length; k++) {
+    for (let k = 0; k < e.ids.length; k++) {
       const b = e.ids[k] * MATERIAL_FLOATS + 8;
       total += luminance(table[b], table[b + 1], table[b + 2]);
       cdf[k] = total;
@@ -1313,7 +1419,7 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
   // The environment texels and the scene buffer (records, block textures, then the lights: emissive tables, area
   // lights, environment CDFs) must fit too.
   const env = environment.map,
-    faces = emitters.reduce((n, e) => n + e.faces.length, 0),
+    faces = emitters.reduce((n, e) => n + e.cdf.length, 0),
     records =
       4 +
       packed.length * MODEL_WORDS +
@@ -1325,7 +1431,7 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
       4 +
       2 * MAX_DEFLECTORS * 2 +
       picks.length * 2 +
-      faces * 2 +
+      faces * 3 +
       lightCount * 16 +
       (env ? env.height + env.width * env.height : 0);
   if (env && env.width * env.height * 4 > maxWords)

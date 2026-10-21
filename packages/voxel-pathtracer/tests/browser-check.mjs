@@ -33,6 +33,7 @@
 // - capture: PNG dimensions, cancellation, whenIdle after it; `--timing` adds GPU time per frame at 1920x1080 and upload
 //   costs;
 // - materialtables: model material tables render as one shared table does (bit for bit); 300 models with 300 colours;
+// - largemodels: a 400-cell glass bar has no interface where 200-cell tiles would meet; a 2048 x 64 x 2048 sparse world;
 // - native4k: a 3840 x 2160 viewport traced at its native size with the default limits, raw and denoised (moving camera).
 // Results go to test-results/voxel-pathtracer-browser-check.json; `pictures` writes PNGs to test-results/voxel-pathtracer.
 import assert from 'node:assert/strict';
@@ -497,6 +498,18 @@ try {
     assert.ok(r.wall.seen >= 290, 'the wall of 300 models is in view');
     assert.ok(r.wall.worst < 1e-5, "every model shows its own table's colour");
     assert.deepEqual(r.wall.palettes, [1], 'picks report palette indices');
+    assert.deepEqual(r.errors, []);
+  }
+  if (wanted('largemodels')) {
+    const r = await run('largemodels');
+    console.log(
+      `  400-cell glass bar against a 200-cell one stretched 2x: RMS ${r.glass.one.band.toFixed(5)} at the middle (${r.glass.one.all.toFixed(5)} overall); two 200-cell tiles ${r.glass.tiles.band.toFixed(5)} (${r.glass.tiles.all.toFixed(5)})`,
+    );
+    console.log(
+      `  2048 x 64 x 2048 sparse world (lamp past cell 255) against a 64^3 model at the same place: relative RMS ${r.world.relativeRms.toExponential(2)}, max ${r.world.max.toExponential(2)} (mean ${r.world.mean.toFixed(4)}); attach ${r.world.packMs.toFixed(0)} ms`,
+    );
+    assert.ok(r.glass.one.band < r.glass.tiles.band / 2, 'one model has no interface where tiles meet');
+    assert.ok(r.world.relativeRms < 1e-3, 'emitters past cell 255 light as in a small model');
     assert.deepEqual(r.errors, []);
   }
   if (wanted('native4k')) {

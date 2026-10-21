@@ -133,10 +133,22 @@ export interface TraceModel {
    * key or without one. Without it, id, revision and size decide as above, and only among models packed without a key.
    */
   contentKey?: string | number | symbol | object;
-  /** Integer dimensions `[x, y, z]`, each 1 to 256 (y is up). */
+  /**
+   * Integer dimensions `[x, y, z]`, each 1 to 2048 (y is up; compatible addition: 256 before). The brick grid (one
+   * word per 8^3 cells, even where empty) and the mixed bricks must fit the device's storage binding.
+   */
   size: TraceVec3;
-  /** Dense palette indices, `index = x + size[0] * (z + size[2] * y)`; 0 is empty. Read, never kept or changed. */
-  voxels: Uint8Array;
+  /**
+   * Dense palette indices, `index = x + size[0] * (z + size[2] * y)`; 0 is empty. Read, never kept or changed. Leave
+   * it out when `blocks` gives the contents.
+   */
+  voxels?: Uint8Array;
+  /**
+   * Compatible addition: sparse contents instead of `voxels`: dense blocks at offsets inside the model. Cells no block
+   * covers are empty; where blocks overlap, the later block's cells win (its zeros included). Only the bricks a block
+   * touches are read, so a large, mostly empty model costs what its blocks hold plus its brick grid.
+   */
+  blocks?: readonly TraceModelBlock[];
   /**
    * Compatible addition: this model's own material table (one material per palette index it uses, ids 1 to 255 and
    * unique), used instead of `scene.materials`: a scene may then hold any number of distinct materials, up to 255 per
@@ -144,6 +156,16 @@ export interface TraceModel {
    * the device's storage binding size (32 KiB each). Instances, `raycast` and the AOVs still report palette indices.
    */
   materials?: readonly TraceMaterial[];
+}
+
+/** Compatible addition: a dense window of a model's cells ({@link TraceModel.blocks}). */
+export interface TraceModelBlock {
+  /** The model cell of the block's cell (0, 0, 0): whole numbers, 0 or more, with `origin + size` inside the model. */
+  origin: TraceVec3;
+  /** Integer dimensions of the block, each 1 or more. */
+  size: TraceVec3;
+  /** Dense palette indices, `index = x + size[0] * (z + size[2] * y)`; 0 is empty. Read, never kept or changed. */
+  voxels: Uint8Array;
 }
 
 /** One placement of a model. */

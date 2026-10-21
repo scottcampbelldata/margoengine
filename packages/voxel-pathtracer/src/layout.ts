@@ -72,10 +72,11 @@ export function lightLayout(s: SceneSnapshot): LightLayout {
   size += s.deflectors.length;
   const emissiveBase = size;
   size += s.emissiveInstances.length * 2;
+  // Emissive faces, three words each: x | y << 16, z | face << 16, cumulative pick probability.
   const emitters = s.emitters.map((e) => {
     const first = size;
-    size += e.faces.length * 2;
-    return { first, count: e.faces.length, total: e.total };
+    size += e.cdf.length * 3;
+    return { first, count: e.cdf.length, total: e.total };
   });
   const areaBase = size;
   size += s.lightCount * 16;
@@ -100,9 +101,10 @@ export function lightLayout(s: SceneSnapshot): LightLayout {
     floats[emissiveBase + k * 2 + 1] = s.emissiveCdf[k];
   }
   for (const [m, e] of s.emitters.entries())
-    for (let k = 0; k < e.faces.length; k++) {
-      words[emitters[m].first + k * 2] = e.faces[k];
-      floats[emitters[m].first + k * 2 + 1] = e.cdf[k];
+    for (let k = 0; k < e.cdf.length; k++) {
+      words[emitters[m].first + k * 3] = e.faces[k * 2];
+      words[emitters[m].first + k * 3 + 1] = e.faces[k * 2 + 1];
+      floats[emitters[m].first + k * 3 + 2] = e.cdf[k];
     }
   floats.set(s.lights, areaBase);
   if (env) {

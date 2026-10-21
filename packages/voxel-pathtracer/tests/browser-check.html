@@ -875,6 +875,38 @@ window.check={
   const palettes=new Set();for(let p=0;p<img.width*img.height;p++)if(img.instance[p]>=0)palettes.add(img.palette[p]);
   return {identical:{differ,max,values:a.color.length},wall:{models:n,seen:seen.size,worst,palettes:[...palettes]},errors:errors.splice(0)};
  },
+ // Large and sparse models. A 400-cell glass bar as one model against the same bar as a 200-cell model stretched 2x
+ // (the reference) and as two 200-cell tiles, whose shared face is an interface inside the glass. And a 2048 x 64 x 2048
+ // sparse world whose lamp lies past cell 255, against the same lamp and floor in a small model at the same place.
+ async largemodels(){
+  const env={skyColor:[0.6,0.7,1],skyIntensity:0.7,sunDirection:[0.3,0.9,0.2],sunIntensity:3,groundColor:[0.5,0.5,0.5],groundHeight:0};
+  const glassMat=[{id:1,type:'glass',color:[0.9,0.95,1],ior:1.5,density:0.05}];
+  const bar=(n,id)=>model(id,[n,6,6],()=>1);
+  const one={revision:1,models:[bar(400,'bar')],instances:[{id:'b',modelId:'bar',matrix:translate(-200,1,-3)}],materials:glassMat,environment:env};
+  const stretched={...one,models:[bar(200,'half')],instances:[{id:'b',modelId:'half',matrix:[2,0,0,0,0,1,0,0,0,0,1,0,-200,1,-3,1]}]};
+  const tiles={...one,models:[bar(200,'t')],instances:[{id:'a',modelId:'t',matrix:translate(-200,1,-3)},{id:'c',modelId:'t',matrix:translate(0,1,-3)}]};
+  look([0,9,26],[0,3,0]);
+  const r=(scene)=>withTracer(scene,{},(t)=>t.renderImage({width:256,height:128,samples:256,seed:3}));
+  const [A,B,C]=[await r(one),await r(stretched),await r(tiles)];
+  // RMS over a band of columns around the seam (x = 0 projects to the image centre) and over the whole image.
+  const rms=(p,q,band)=>{let s=0,n=0;for(let y=0;y<128;y++)for(let x=0;x<256;x++){if(band&&Math.abs(x-127.5)>6)continue;for(let k=0;k<3;k++){const i=(y*256+x)*3+k;s+=(p.color[i]-q.color[i])**2;n++;}}return Math.sqrt(s/n);};
+  const glass={one:{band:rms(A,B,true),all:rms(A,B,false)},tiles:{band:rms(C,B,true),all:rms(C,B,false)}};
+  // The sparse world: a floor patch and a lamp at cells 1490-1553 x, 1790-1853 z.
+  const patch=new Uint8Array(64*64).fill(1),lampVox=new Uint8Array(8).fill(2);
+  const mats=[{id:1,type:'diffuse',color:[0.6,0.6,0.6]},{id:2,type:'emit',color:[1,0.8,0.5],emission:8}];
+  const dark={skyColor:[0.05,0.05,0.08],skyIntensity:1};
+  const t0=performance.now();
+  const big={revision:1,models:[{id:'w',revision:1,size:[2048,64,2048],blocks:[{origin:[1490,0,1790],size:[64,1,64],voxels:patch},{origin:[1500,3,1800],size:[2,2,2],voxels:lampVox}]}],instances:[{id:'w',modelId:'w',matrix:translate(-1522,0,-1822)}],materials:mats,environment:dark};
+  const small={...big,models:[{id:'s',revision:1,size:[64,64,64],blocks:[{origin:[0,0,0],size:[64,1,64],voxels:patch},{origin:[10,3,10],size:[2,2,2],voxels:lampVox}]}],instances:[{id:'s',modelId:'s',matrix:translate(-32,0,-32)}]};
+  look([12,14,20],[-20,0,-20]);
+  let packMs=0;
+  const D=await withTracer(big,{},async(t)=>{packMs=performance.now()-t0;return t.renderImage({width:192,height:128,samples:128,seed:4});});
+  const E=await r2(small);
+  async function r2(scene){return withTracer(scene,{},(t)=>t.renderImage({width:192,height:128,samples:128,seed:4}));}
+  let s1=0,s2=0,m=0;for(let i=0;i<D.color.length;i++){s1+=(D.color[i]-E.color[i])**2;s2+=E.color[i]**2;m=Math.max(m,Math.abs(D.color[i]-E.color[i]));}
+  look([20,14,24],[4,3,4]);
+  return {glass,world:{relativeRms:Math.sqrt(s1/Math.max(s2,1e-30)),max:m,mean:Math.sqrt(s2/E.color.length),packMs},errors:errors.splice(0)};
+ },
  async denoisepeak(){
   look([6,7,20],[4,8,0]);
   const scene={revision:1,models:[model('wall',[24,14,1],()=>1),model('floor',[24,1,12],()=>1),model('lamp',[2,3,2],()=>2)],

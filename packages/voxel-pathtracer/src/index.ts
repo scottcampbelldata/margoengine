@@ -35,6 +35,7 @@ export type {
   TraceMaterial,
   TraceMaterialType,
   TraceModel,
+  TraceModelBlock,
   TraceVec3,
   VoxelPathTracerOptions,
   VoxelPathTracerStats,

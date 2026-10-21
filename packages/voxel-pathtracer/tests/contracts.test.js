@@ -459,3 +459,155 @@ test('model material tables are validated and named in errors; a scene without t
   );
   t2.dispose();
 });
+
+// The voxel buffer and the scene buffer a tracer uploads for `scene` (first frame).
+async function uploads(scene) {
+  const h = fakeEngine(),
+    tracer = VoxelPathTracer.attach(h.engine, { scene });
+  await tracer.ready;
+  h.frame();
+  await settle();
+  h.frame();
+  const storage = h.device.buffers.filter((x) => !x.destroyed && x.usage & 128).sort((x, y) => y.size - x.size);
+  return { tracer, voxels: new Uint32Array(storage[0].data), device: h.device };
+}
+
+test('blocks: sparse contents pack exactly as the same voxels given densely', async () => {
+  let seed = 7;
+  const random = () => ((seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) >>> 8) / 16777216,
+    size = [40, 20, 30],
+    dense = model('m', size, (x, y, z) => (y < 6 + 4 * Math.sin(x * 0.3) ? 1 : random() < 0.02 ? 2 : 0)),
+    // The same cells as three blocks (the last overlapping the second, with the same values) and empty gaps.
+    block = (o, n) => {
+      const voxels = new Uint8Array(n[0] * n[1] * n[2]);
+      for (let y = 0; y < n[1]; y++)
+        for (let z = 0; z < n[2]; z++)
+          for (let x = 0; x < n[0]; x++)
+            voxels[x + n[0] * (z + n[2] * y)] = dense.voxels[o[0] + x + size[0] * (o[2] + z + size[2] * (o[1] + y))];
+      return { origin: o, size: n, voxels };
+    },
+    sparse = {
+      id: 'm',
+      revision: 1,
+      size,
+      blocks: [block([0, 0, 0], [40, 10, 30]), block([0, 10, 0], [40, 10, 15]), block([0, 10, 10], [40, 10, 20])],
+    },
+    mats = materials([1, 2]),
+    a = await uploads(simpleScene({ models: [dense], materials: mats })),
+    b = await uploads(simpleScene({ models: [sparse], materials: mats }));
+  assert.deepEqual(b.voxels, a.voxels, 'identical voxel buffers');
+  for (const [o, d] of [
+    [
+      [5.5, 30, 5.5],
+      [0, -1, 0],
+    ],
+    [
+      [-5, 3.5, 12.2],
+      [1, 0, 0.01],
+    ],
+    [
+      [20, 12, -9],
+      [0.1, -0.2, 1],
+    ],
+  ])
+    assert.deepEqual(b.tracer.raycast(o, d), a.tracer.raycast(o, d));
+  a.tracer.dispose();
+  b.tracer.dispose();
+});
+
+test('models up to 2048 per axis: a sparse 2048 x 64 x 2048 world, emitters past cell 255, limits', async () => {
+  const lamp = { origin: [1500, 40, 1800], size: [2, 2, 2], voxels: new Uint8Array(8).fill(2) },
+    floor = { origin: [0, 0, 0], size: [64, 1, 64], voxels: new Uint8Array(64 * 64).fill(1) },
+    world = { id: 'w', revision: 1, size: [2048, 64, 2048], blocks: [floor, lamp] },
+    scene = simpleScene({
+      models: [world],
+      instances: [{ id: 'w', modelId: 'w', matrix: translate(0, 0, 0) }],
+      materials: [...materials([1]), { id: 2, type: 'emit', color: [1, 0.9, 0.7], emission: 4 }],
+    }),
+    { tracer, voxels, device } = await uploads(scene);
+  // The brick grid (256 x 8 x 256 words) and a few bricks, in a buffer with room to spare (twice the words): what the
+  // blocks hold, not 2048^2 x 64 cells (67 million words of bricks).
+  assert.ok(voxels.length <= 2 * (256 * 8 * 256 + 64 * 128) + (1 << 16), `${voxels.length} words`);
+  const hit = tracer.raycast([1500.5, 60, 1800.5], [0, -1, 0]);
+  assert.deepEqual([hit.cell, hit.paletteIndex], [[1500, 41, 1800], 2]);
+  assert.equal(tracer.raycast([30.5, 10, 30.5], [0, -1, 0]).paletteIndex, 1);
+  // Emissive faces store x | y << 16 and z | face << 16: the lamp's faces keep their coordinates past 255.
+  const scene0 = device.buffers.find((x) => !x.destroyed && x.usage & 128 && new Uint32Array(x.data)[4] === 2048),
+    w = new Uint32Array(scene0.data),
+    first = w[4 + 8],
+    count = w[4 + 9];
+  assert.equal(count, 24, 'a 2 x 2 x 2 lamp has 24 outer faces');
+  const cells = new Set();
+  for (let k = 0; k < count; k++) {
+    const c0 = w[first + k * 3],
+      c1 = w[first + k * 3 + 1];
+    cells.add(`${c0 & 0xffff},${c0 >>> 16},${c1 & 0xffff}`);
+    assert.ok(c1 >>> 16 < 6);
+  }
+  assert.deepEqual([...cells].sort(), [
+    '1500,40,1800',
+    '1500,40,1801',
+    '1500,41,1800',
+    '1500,41,1801',
+    '1501,40,1800',
+    '1501,40,1801',
+    '1501,41,1800',
+    '1501,41,1801',
+  ]);
+  tracer.dispose();
+  // Over 2048, a brick grid over the binding, blocks outside the model or of the wrong length: refused.
+  const t = attach().tracer,
+    one = (m) => simpleScene({ models: [m], instances: [{ id: 'i', modelId: m.id, matrix: translate(0, 0, 0) }] });
+  assert.throws(() => t.setScene(one({ id: 'x', revision: 1, size: [2049, 1, 1], blocks: [] })), RangeError);
+  assert.throws(
+    () =>
+      t.setScene(
+        one({
+          id: 'x',
+          revision: 1,
+          size: [8, 8, 8],
+          blocks: [{ origin: [4, 0, 0], size: [5, 1, 1], voxels: new Uint8Array(5) }],
+        }),
+      ),
+    (e) => e instanceof RangeError && /outside the 8x8x8 model/.test(e.message),
+  );
+  assert.throws(
+    () =>
+      t.setScene(
+        one({
+          id: 'x',
+          revision: 1,
+          size: [8, 8, 8],
+          blocks: [{ origin: [0, 0, 0], size: [2, 2, 2], voxels: new Uint8Array(7) }],
+        }),
+      ),
+    (e) => e instanceof TypeError && /blocks\[0\]\.voxels has 7 entries/.test(e.message),
+  );
+  assert.throws(
+    () => t.setScene(one({ id: 'x', revision: 1, size: [8, 8, 8], voxels: new Uint8Array(512), blocks: [] })),
+    (e) => e instanceof TypeError && /both voxels and blocks/.test(e.message),
+  );
+  assert.throws(() => t.setScene(one({ id: 'x', revision: 1, size: [8, 8, 8], blocks: 'none' })), TypeError);
+  // Later blocks win where they overlap, zeros included.
+  t.setScene(
+    one({
+      id: 'x',
+      revision: 1,
+      size: [8, 8, 8],
+      blocks: [
+        { origin: [0, 0, 0], size: [8, 2, 8], voxels: new Uint8Array(128).fill(1) },
+        { origin: [0, 1, 0], size: [4, 1, 8], voxels: new Uint8Array(32) },
+      ],
+    }),
+  );
+  assert.equal(t.raycast([1.5, 9, 1.5], [0, -1, 0]).cell[1], 0, 'cleared by the later block');
+  assert.equal(t.raycast([6.5, 9, 1.5], [0, -1, 0]).cell[1], 1);
+  t.dispose();
+  const small = fakeEngine(fakeDevice({ maxStorageBufferBindingSize: 1 << 20 })),
+    t2 = VoxelPathTracer.attach(small.engine, { scene: simpleScene() });
+  assert.throws(
+    () => t2.setScene(one({ id: 'x', revision: 1, size: [2048, 64, 2048], blocks: [] })),
+    (e) => e instanceof RangeError && /brick grid/.test(e.message),
+  );
+  t2.dispose();
+});

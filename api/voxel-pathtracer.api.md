@@ -173,8 +173,15 @@ export interface TraceModel {
     revision: number;
     contentKey?: string | number | symbol | object;
     size: TraceVec3;
-    voxels: Uint8Array;
+    voxels?: Uint8Array;
+    blocks?: readonly TraceModelBlock[];
     materials?: readonly TraceMaterial[];
+}
+
+export interface TraceModelBlock {
+    origin: TraceVec3;
+    size: TraceVec3;
+    voxels: Uint8Array;
 }
 
 export interface TracePhysicalSky {

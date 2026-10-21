@@ -976,10 +976,11 @@ fn sampleEmitter()->LightPoint {
  if(count==0u||total<=0.0){return r;}
  let u2=rand();
  lo=0u;hi=count-1u;
- while(lo<hi){let mid=(lo+hi)/2u;if(ll(faces+mid*2u+1u)<u2){lo=mid+1u;}else{hi=mid;}}
- let code=scene[faces+lo*2u];
- let cell=vec3i(i32(code&255u),i32((code>>8u)&255u),i32((code>>16u)&255u));
- let face=code>>24u;let axis=face>>1u;let sg=select(-1.0,1.0,(face&1u)==0u);
+ while(lo<hi){let mid=(lo+hi)/2u;if(ll(faces+mid*3u+2u)<u2){lo=mid+1u;}else{hi=mid;}}
+ // Three words per face: x | y << 16, z | face << 16, cumulative probability.
+ let c0=scene[faces+lo*3u];let c1=scene[faces+lo*3u+1u];
+ let cell=vec3i(i32(c0&0xffffu),i32(c0>>16u),i32(c1&0xffffu));
+ let face=c1>>16u;let axis=face>>1u;let sg=select(-1.0,1.0,(face&1u)==0u);
  var lp=vec3f(cell)+vec3f(rand(),rand(),rand());
  lp[axis]=f32(cell[axis])+select(0.0,1.0,sg>0.0)+sg*EPS;
  let w=worldX(inst);let l=localX(inst);

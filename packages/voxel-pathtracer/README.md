@@ -44,6 +44,13 @@ Everything is in Margo's **Y-up** world. Convert MagicaVoxel's Z-up `.vox` data 
   translation, rotation, non-uniform scale, shear and mirroring all work). Any number of instances share one model's
   data; each keeps its id (`raycast`, AOVs). `visible: false` hides one.
 - **Materials** are keyed by palette index. Every index any model uses needs one.
+- **Large and sparse models** (addition). A model may be up to 2048 cells per axis, and may give its contents as
+  `blocks` instead of `voxels`: dense windows (`origin`, `size`, `voxels`) inside it, cells no block covers empty,
+  later blocks winning where they overlap. Only the bricks a block touches are read: a 2048 x 64 x 2048 world with
+  two small blocks attaches in 9 ms (RTX A6000 machine) and holds its 2 MiB brick grid plus those bricks. One model
+  instead of tiles also keeps volumes whole: glass or media cut into tiles get an interface wherever two tiles meet
+  (measured: a 400-cell glass bar as one model renders exactly like a 200-cell bar stretched 2x; as two 200-cell tiles
+  the image differs by RMS 0.85). Dense `voxels` and the same cells as `blocks` pack identically.
 - **Model material tables** (addition). A model's own `materials` replace `scene.materials` for its voxels, so a scene
   holds any number of distinct materials (255 per table), as model banks of an editor do: two models may give palette 1
   different materials. Tables equal in content are stored once; at most 4096 per scene, 32 KiB each, within the
@@ -306,7 +313,7 @@ by floating-point rounding, which changes individual paths, not the converged im
 
 | Limit | Value |
 | --- | --- |
-| Model size | 1-256 per axis |
+| Model size | 1-2048 per axis (256 before); its brick grid (4 bytes per 8^3 cells, empty ones included) and mixed bricks within the binding size |
 | Instances | 65,535 |
 | Area lights | 256 |
 | Block textures | 4096, each 1-1024 texels a side (in the scene buffer, within the binding size) |
@@ -314,7 +321,7 @@ by floating-point rounding, which changes individual paths, not the converged im
 | Light-sampled glass and mirror instances | 8 of each (others are path sampled) |
 | Voxel data | grids plus 512-byte mixed bricks within the device's `maxStorageBufferBindingSize` (WebGPU default 128 MiB: about 262,000 mixed bricks; uniform bricks cost one word) |
 | Environment map | 8192 x 4096, and width x height x 16 bytes within the binding size (4096 x 2048 at the default) |
-| Emissive faces | their tables (8 bytes each), with the scene records, block textures and other light tables in one binding (about 16 million at the default) |
+| Emissive faces | their tables (12 bytes each), with the scene records, block textures and other light tables in one binding (about 11 million at the default) |
 | Viewport | every image 16 bytes per pixel within the binding size (8.3 million pixels at the default, so 3840 x 2160 is traced at its native size, denoised or not); the denoiser's two history images are textures within `maxTextureDimension2D` (8192 at the default). Larger canvases are traced at a lower resolution, keeping the aspect: `stats.requestedWidth`/`requestedHeight` give the size asked for, `stats.limitedBy` the limit that reduced it, and `traceViewportSize(width, height, device.limits, options)` predicts it |
 | Accumulation | float32 sums: refinement is expected to slow past about a million samples per pixel (not measured) |
 
@@ -366,7 +373,7 @@ Numbers on other GPUs are not measured.
 
 ## Verification
 
-- `tests/*.test.js` (Node, 67 tests, about 1.3 s; part of `npm run verify`): validation and atomic failure, dense
+- `tests/*.test.js` (Node, 69 tests, about 1.4 s; part of `npm run verify`): validation and atomic failure, dense
   indexing, all 255 palette identities, transformed/mirrored/hidden instances, model reuse by revision, voxel traversal
   against a brute-force slab test (2,000 random rays over 5 models whose sizes are not multiples of 8), resets for each
   camera/size/scene/option change, enable/disable, `maxSamples`, the denoiser's passes (the caustic chain only for
@@ -380,7 +387,9 @@ Numbers on other GPUs are not measured.
   (every storage buffer one image within the binding limit, history textures within the texture limit, 3840 x 2160
   native with the default limits, `traceViewportSize`); model material tables (more than 255 distinct materials, equal
   tables stored once, table numbers in the model records, the TABLES kernels used only for scenes with them, errors
-  naming the model's table). A recording fake device stands in for WebGPU.
+  naming the model's table); large and sparse models (dense voxels and the same cells as blocks give identical
+  voxel buffers and picks, a sparse 2048 x 64 x 2048 world, emissive faces past cell 255, block and size errors). A
+  recording fake device stands in for WebGPU.
 - `tests/browser-check.mjs` (real WebGPU, run under `scripts/gpu-lock.mjs`) on the RTX A6000:
   - shaders compile with no diagnostics; no WebGPU validation errors anywhere;
   - GPU first hits equal `raycast` on all 19,200 pixels of a scene of rotated, scaled, sheared and mirrored instances,
@@ -445,7 +454,10 @@ Numbers on other GPUs are not measured.
   - a 3840 x 2160 canvas is traced at 3840 x 2160 with the default limits, raw and denoised, while the camera moves;
   - model material tables: the material scene with each model's palette moved to its own index in a table of its own
     renders bit for bit as with one shared table (0 of 57,600 values differ); 300 models whose own tables give palette
-    1 300 colours each show their colour (worst albedo error 2.9e-8), picks reporting palette 1.
+    1 300 colours each show their colour (worst albedo error 2.9e-8), picks reporting palette 1;
+  - large models: a 400-cell glass bar as one model renders bit for bit as a 200-cell bar stretched 2x (two 200-cell
+    tiles: RMS 0.85 against it); a 2048 x 64 x 2048 sparse world whose lamp lies past cell 255 renders as the same lamp
+    and floor in a 64^3 model at the same place (relative RMS 1.5e-5, float rounding).
 
 ## How it works
 
