@@ -29,7 +29,7 @@ export function decodeAudio(context: BaseAudioContext, bytes: ArrayBuffer): Prom
 }
 
 /**
- * Fetches and decodes an audio file into an AudioBuffer (THREE.AudioLoader counterpart). Concurrent and repeated
+ * Fetches and decodes an audio file into an AudioBuffer. Concurrent and repeated
  * requests for the same URL on the same context share one download and one decoded buffer.
  */
 export function loadAudioBuffer(

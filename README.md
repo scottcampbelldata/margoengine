@@ -175,7 +175,7 @@ Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. T
 | [`@margoengine/gizmo`](packages/gizmo/README.md) | Transform manipulators using the existing controls implementation. |
 | [`@margoengine/viewcube`](packages/viewcube/README.md) | CAD view cube: shows the camera orientation and animates to top, front, side and isometric views, with a perspective/orthographic toggle. |
 | [`@margoengine/selection`](packages/selection/README.md) | GPU picking and visible mesh selection outlines. |
-| [`@margoengine/audio`](packages/audio/README.md) | Web Audio listener, global and positional sounds and an analyser for Margo Engine (THREE.AudioListener, Audio, PositionalAudio and AudioAnalyser counterparts). |
+| [`@margoengine/audio`](packages/audio/README.md) | Web Audio listener, global and positional sounds and a frequency analyser for Margo Engine. |
 
 ### Simulation and games (6)
 

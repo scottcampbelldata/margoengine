@@ -11,8 +11,8 @@ export interface AudioAnalyserOptions {
 }
 
 /**
- * Taps the output of a sound (after its volume stage and panner) with an AnalyserNode (THREE.AudioAnalyser
- * counterpart). The tap is a side branch and does not change what reaches the speakers.
+ * Taps the output of a sound (after its volume stage and panner) with an AnalyserNode.
+ * The tap is a side branch and does not change what reaches the speakers.
  */
 export class AudioAnalyser {
   readonly analyser: AnalyserNode;

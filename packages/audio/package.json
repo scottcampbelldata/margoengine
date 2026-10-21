@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
-  "description": "Web Audio listener, global and positional sounds and an analyser for Margo Engine (THREE.AudioListener, Audio, PositionalAudio and AudioAnalyser counterparts).",
+  "description": "Web Audio listener, global and positional sounds and a frequency analyser for Margo Engine.",
   "publishConfig": {
     "access": "public"
   },

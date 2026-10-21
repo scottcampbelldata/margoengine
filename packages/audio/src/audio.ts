@@ -41,7 +41,7 @@ export interface PositionalAudioOptions extends AudioOptions {
   coneOuterGain?: number;
   /** Mesh to follow. Position comes from its world matrix; orientation from its local `direction` axis. */
   mesh?: Mesh | null;
-  /** Local axis the cone points along, default +Z (THREE.Object3D.getWorldDirection). */
+  /** Local axis the cone points along, default +Z. */
   direction?: Vec3;
   /** Silence the sound (smoothly) while the mesh or any ancestor is hidden. Default false. */
   muteWhenHidden?: boolean;
@@ -66,7 +66,7 @@ const checkFinite = (value: number, name: string, min = -Infinity): number => {
 };
 
 /**
- * A non-positional sound routed straight to the listener's master gain (THREE.Audio counterpart).
+ * A non-positional sound routed straight to the listener's master gain.
  * Graph: source -> filters -> fade gain -> volume gain -> [panner] -> listener.input.
  */
 export class Audio implements ListenerSource {
@@ -589,7 +589,7 @@ export class Audio implements ListenerSource {
 }
 
 /**
- * A sound placed in the world through a PannerNode (THREE.PositionalAudio counterpart). Attach it to a core Mesh
+ * A sound placed in the world through a PannerNode. Attach it to a core Mesh
  * and the listener reads the mesh world matrix from the engine every frame, or place it with setPosition.
  */
 export class PositionalAudio extends Audio {
