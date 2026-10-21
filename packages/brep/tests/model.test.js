@@ -241,6 +241,39 @@ test('modeler: a spline projection converges where the surface partials nearly a
   assert.ok(Math.hypot(...point.map((x, k) => x - at[k])) < 1e-9);
 });
 
+test('modeler: a spline projection past both bounds reaches the nearest place along one edge', () => {
+  // A leaning bilinear patch, S = u (1, 0, 0) + v (1, 1, 0): past the corner (1, 0) the free step leaves both bounds
+  // from anywhere, so a foot clamped to both stayed at the corner though the nearest place lies along v = 0. Jubilee
+  // body 128's edge runs 5.8 nm past a spline's corner, where its foot lies 4e-7 in u from the corner.
+  const surface = model.surfaceEvaluator({
+    kind: 'spline',
+    degrees: [1, 1],
+    counts: [2, 2],
+    points: [
+      [0, 0, 0],
+      [1, 0, 0],
+      [1, 1, 0],
+      [2, 1, 0],
+    ],
+    knots: [
+      [0, 1],
+      [0, 1],
+    ],
+    multiplicities: [
+      [2, 2],
+      [2, 2],
+    ],
+  });
+  for (const [point, u] of [
+    [[0.8, -0.5, 0], 0.8],
+    [[1 - 4e-7, -5.8e-7, 0], 1 - 4e-7],
+  ])
+    for (const hint of [[0.5, 0.5], [1, 0], undefined]) {
+      const uv = surface.parameters(point, hint);
+      assert.ok(Math.abs(uv[0] - u) < 1e-12 && uv[1] === 0, `${point} from ${hint}: ${uv}`);
+    }
+});
+
 test('modeler: frames from axes of any finite size', () => {
   // Directions are dimensionless: lengths square without overflow or underflow at any finite size.
   for (const size of [1e200, 1e-200, 1e-160, 1e160]) {

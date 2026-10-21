@@ -530,7 +530,10 @@ class SplinePatch implements Surface {
     }
     return best;
   }
-  /** Gauss-Newton on |S(u, v) - p|^2 from (u, v); where a step leaves the domain, along the bound alone. */
+  /**
+   * Gauss-Newton on |S(u, v) - p|^2 from (u, v); where a step leaves the domain, along the bound alone (both bounds:
+   * along the nearer).
+   */
   private newton(p: readonly number[], u: number, v: number): { uv: [number, number]; miss: number; along: number } {
     let along = Infinity,
       last: number[] | undefined;
@@ -566,10 +569,17 @@ class SplinePatch implements Surface {
       const nu = u + (-c * g1 + b * g2) / det,
         nv = v + (b * g1 - a * g2) / det,
         fu = this.fit(nu, this.uDomain, this.uPeriod),
-        fv = this.fit(nv, this.vDomain, this.vPeriod);
-      // Held by a bound in one parameter: the other moves alone (the joint step's share of it assumed the first moved).
-      if (fu !== nu && fv === nv) [u, v] = [fu, c > 0 ? this.fit(v - g2 / c, this.vDomain, this.vPeriod) : v];
-      else if (fv !== nv && fu === nu) [u, v] = [a > 0 ? this.fit(u - g1 / a, this.uDomain, this.uPeriod) : u, fv];
+        fv = this.fit(nv, this.vDomain, this.vPeriod),
+        // Each parameter moving alone (the joint step's share of one assumed the other moved).
+        mu = a > 0 ? this.fit(u - g1 / a, this.uDomain, this.uPeriod) : u,
+        mv = c > 0 ? this.fit(v - g2 / c, this.vDomain, this.vPeriod) : v;
+      // Held by a bound in one parameter: the other moves alone.
+      if (fu !== nu && fv === nv) [u, v] = [fu, mv];
+      else if (fv !== nv && fu === nu) [u, v] = [mu, fv];
+      // Held by both: along whichever bound comes nearer. The corner is nearest only when neither does; where the
+      // partials lean, the joint step leaves both bounds again from a foot partway along one edge.
+      else if (fu !== nu && fv !== nv && !this.uPeriod && !this.vPeriod)
+        [u, v] = distance(this.at(fu, mv), p) <= distance(this.at(mu, fv), p) ? [fu, mv] : [mu, fv];
       else [u, v] = [fu, fv];
     }
     return { uv: [u, v], miss: distance(this.at(u, v), p), along };
