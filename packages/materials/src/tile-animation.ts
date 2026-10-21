@@ -36,7 +36,8 @@ export function tileAnimationFrame(animation: TileAnimation, time: number, start
   } else if (start) offset = start.seconds;
   const local = time + offset;
   if (!Number.isFinite(local)) throw new RangeError('Tile animation time and start seconds must be finite');
-  const t = ((local % total) + total) % total;
+  let t = local % total;
+  if (t < 0) t += total;
   for (let i = 0, end = 0; i < frames.length; i++) if (t < (end += frames[i].duration)) return i;
   return frames.length - 1;
 }

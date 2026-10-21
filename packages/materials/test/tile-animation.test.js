@@ -35,6 +35,86 @@ test('tileAnimationFrame switches on frame boundaries, loops both ways and honou
   assert.throws(() => tileAnimationFrame({}, 0), TypeError);
 });
 
+// Literal first-cycle prefixes catch normalization that rounds a boundary back into the previous frame.
+// Fractional negative boundaries and arbitrary huge elapsed times are not exact-phase promises here.
+for (const { count, fps, times, want, starts } of [
+  { count: 4, fps: 4, times: [0, 0.25, 0.5, 0.75, 1], want: [0, 1, 2, 3, 0], starts: [0, 1, 2, 3] },
+  {
+    count: 6,
+    fps: 4,
+    times: [0, 0.25, 0.5, 0.75, 1, 1.25, 1.5],
+    want: [0, 1, 2, 3, 4, 5, 0],
+    starts: [0, 1, 2, 3, 4, 5],
+  },
+  { count: 4, fps: 8, times: [0, 0.125, 0.25, 0.375, 0.5], want: [0, 1, 2, 3, 0], starts: [0, 1, 2, 3] },
+  {
+    count: 6,
+    fps: 8,
+    times: [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75],
+    want: [0, 1, 2, 3, 4, 5, 0],
+    starts: [0, 1, 2, 3, 4, 5],
+  },
+  {
+    count: 4,
+    fps: 12,
+    times: [0, 0.08333333333333333, 0.16666666666666666, 0.25, 0.3333333333333333],
+    want: [0, 1, 2, 3, 0],
+    starts: [0, 1, 2, 3],
+  },
+  {
+    count: 6,
+    fps: 12,
+    times: [
+      0, 0.08333333333333333, 0.16666666666666666, 0.25, 0.3333333333333333, 0.41666666666666663, 0.49999999999999994,
+    ],
+    want: [0, 1, 2, 3, 4, 5, 0],
+    starts: [0, 1, 2, 3, 4, 5],
+  },
+  {
+    count: 4,
+    fps: 7.5,
+    times: [0, 0.13333333333333333, 0.26666666666666666, 0.4, 0.5333333333333333],
+    want: [0, 1, 2, 3, 0],
+    starts: [0, 1, 2, 3],
+  },
+  {
+    count: 6,
+    fps: 7.5,
+    times: [
+      0, 0.13333333333333333, 0.26666666666666666, 0.4, 0.5333333333333333, 0.6666666666666666, 0.7999999999999999,
+    ],
+    want: [0, 1, 2, 3, 4, 5, 0],
+    starts: [0, 1, 2, 3, 4, 5],
+  },
+]) {
+  const animation = { frames: Array.from({ length: count }, (_, i) => ({ duration: 1 / fps, uvs: corners(i / 8) })) };
+  test(`tileAnimationFrame advances on ${count}-frame ${fps} FPS first-cycle prefixes`, () => {
+    assert.deepEqual(
+      times.map((time) => tileAnimationFrame(animation, time)),
+      want,
+    );
+  });
+  test(`tileAnimationFrame honours every authored start in ${count} frames at ${fps} FPS`, () => {
+    assert.deepEqual(
+      starts.map((frame) => tileAnimationFrame(animation, 0, { frame })),
+      starts,
+    );
+  });
+}
+
+test('tileAnimationFrame preserves exact eight FPS starts through repeated and backward seeks', () => {
+  const animation = { frames: [0, 1, 2, 3].map((i) => ({ duration: 0.125, uvs: corners(i / 4) })) };
+  const times = [0, 0.124999, 0.125, 0.25, 0.375, 0.5, 0.375, 0.125, 0];
+  assert.deepEqual(
+    times.map((time) => tileAnimationFrame(animation, time)),
+    [0, 0, 1, 2, 3, 0, 3, 1, 0],
+  );
+  assert.deepEqual(
+    times.map((time) => tileAnimationFrame(animation, time, { frame: 2 })),
+    [2, 2, 3, 0, 1, 2, 1, 3, 2],
+  );
+});
+
 test('tileAnimator uploads only the vertices of tiles whose frame changed, merging neighbouring tiles', async () => {
   const h = optionalGPU(),
     device = h.engine.gpu,
@@ -82,6 +162,28 @@ test('tileAnimator uploads only the vertices of tiles whose frame changed, mergi
     writes.length = 0;
     assert.equal(play(1), 3, 'blink loops to frame 0 while slow reaches frame 1');
     assert.deepEqual(writes, [[0, 12 * 80]]);
+    const fractional = { frames: [0, 1, 2, 3].map((i) => ({ duration: 1 / 12, uvs: corners(i / 4) })) },
+      staticUVs = [...geometry.uvs.slice(8, 16)],
+      fractionalPlay = tileAnimator(mesh, geometry, [
+        { vertex: 0, animation: fractional, start: { frame: 1 } },
+        { vertex: 8, animation: fractional, start: { frame: 3 } },
+      ]);
+    writes.length = 0;
+    assert.equal(fractionalPlay(0), 2);
+    assert.deepEqual([...geometry.uvs.slice(0, 8)], [...new Float32Array(corners(0.25))], 'authored start frame 1');
+    assert.deepEqual([...geometry.uvs.slice(16, 24)], [...new Float32Array(corners(0.75))], 'authored start frame 3');
+    assert.deepEqual([...geometry.uvs.slice(8, 16)], staticUVs, 'the intervening static tile keeps its UVs');
+    assert.deepEqual(writes, [
+      [0, 320],
+      [8 * 80, 320],
+    ]);
+    writes.length = 0;
+    assert.equal(fractionalPlay(0), 0);
+    assert.deepEqual(writes, [], 'repeating the same fractional frame does not upload');
+    assert.equal(fractionalPlay(1 / 12), 2);
+    assert.deepEqual([...geometry.uvs.slice(0, 8)], [...new Float32Array(corners(0.5))]);
+    assert.deepEqual([...geometry.uvs.slice(16, 24)], [...new Float32Array(corners(0))]);
+    assert.deepEqual([...geometry.uvs.slice(8, 16)], staticUVs);
     assert.throws(() => tileAnimator(mesh, geometry, [{ vertex: 9, animation: blink }]), RangeError);
     assert.throws(
       () => tileAnimator(mesh, geometry, [{ vertex: 0, animation: { frames: [{ duration: 1, uvs: [0, 0] }] } }]),
