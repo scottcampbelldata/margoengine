@@ -2,6 +2,15 @@ import { finite, type Skeleton } from './skin.js';
 
 /** How a key moves to the next key: hold then jump, straight, or a cubic ease in, out, or in and out. */
 export type KeyInterpolation = 'discrete' | 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+/**
+ * The arithmetic {@link sampleKeyframes} blends two keys with, at eased factor f between key values a and b.
+ * - `'delta'` (the default): `a + (b - a) * f`. f = 0 still computes; when b - a overflows (keys near ±1.8e308 of
+ *   opposite sign) the sample is NaN.
+ * - `'weighted'`: a held sample (f = 0 or 1, including before the first key, after the last and through discrete
+ *   segments) copies the key's value before any arithmetic; between keys translation and scale are
+ *   `(1 - f) * a + f * b`, which stays finite for all finite keys. Rotations slerp as in `'delta'`.
+ */
+export type KeyframeBlend = 'delta' | 'weighted';
 /** One key of a keyframe track. */
 export interface Keyframe {
   /** Seconds, >= 0, strictly increasing within a track. */
@@ -17,6 +26,8 @@ export interface KeyframeTrackData {
   target: string;
   path: 'translation' | 'rotation' | 'scale';
   keys: readonly Keyframe[];
+  /** How samples between and at keys are computed; default `'delta'`. See {@link KeyframeBlend}. */
+  blend?: KeyframeBlend;
 }
 /** Raw clip input for {@link createKeyframeClip}. */
 export interface KeyframeClipData {
@@ -30,6 +41,8 @@ export interface KeyframeTrack {
   readonly times: Float64Array;
   readonly values: Float64Array;
   readonly interpolations: readonly KeyInterpolation[];
+  /** Set when the track data chose a blend; undefined means `'delta'`. */
+  readonly blend?: KeyframeBlend;
 }
 /** A validated clip; `duration` is its last key time. */
 export interface KeyframeClip {
@@ -70,9 +83,11 @@ export function createKeyframeClip(data: KeyframeClipData): KeyframeClip {
     const label = `Keyframe track ${t}`;
     if (!track || typeof track.target !== 'string' || !track.target)
       throw new TypeError(`${label} needs a nonempty string target`);
-    const { target, path, keys } = track;
+    const { target, path, keys, blend } = track;
     if (path !== 'translation' && path !== 'rotation' && path !== 'scale')
       throw new TypeError(`${label} path ${path} is invalid; use translation, rotation or scale`);
+    if (blend !== undefined && blend !== 'delta' && blend !== 'weighted')
+      throw new TypeError(`${label} blend ${blend} is invalid; use delta or weighted`);
     if (seen.has(target + ':' + path)) throw new TypeError(`${label} repeats ${target} ${path}; merge the keys`);
     seen.add(target + ':' + path);
     if (!Array.isArray(keys) || !keys.length) throw new TypeError(`${label} needs a nonempty keys array`);
@@ -95,7 +110,9 @@ export function createKeyframeClip(data: KeyframeClipData): KeyframeClip {
       times[k] = time;
       return interpolation;
     });
-    return { target, path, times, values, interpolations };
+    return blend === undefined
+      ? { target, path, times, values, interpolations }
+      : { target, path, times, values, interpolations, blend };
   });
   return {
     name: data.name ?? '',
@@ -106,7 +123,8 @@ export function createKeyframeClip(data: KeyframeClipData): KeyframeClip {
 
 /**
  * A track's value at `time` seconds: the first key's before it, the last key's after it, else the two surrounding keys
- * blended by the earlier key's interpolation (rotations by shortest-path slerp). Deterministic for any frame rate.
+ * blended by the earlier key's interpolation (rotations by shortest-path slerp) with the track's
+ * {@link KeyframeBlend} arithmetic. Deterministic for any frame rate.
  */
 export function sampleKeyframes(track: KeyframeTrack, time: number, out?: Float64Array): Float64Array {
   if (typeof time !== 'number' || !Number.isFinite(time))
@@ -129,7 +147,22 @@ export function sampleKeyframes(track: KeyframeTrack, time: number, out?: Float6
     a === last || time <= times[a] ? 0 : ease(track.interpolations[a], (time - times[a]) / (times[a + 1] - times[a]));
   const i = a * width,
     j = Math.min(a + 1, last) * width;
-  if (width === 3 || f === 0 || f === 1) {
+  if (track.blend === 'weighted') {
+    if (f === 0 || f === 1) {
+      out.set(values.subarray(f ? j : i, (f ? j : i) + width));
+      return out;
+    }
+    if (width === 3) {
+      for (let c = 0; c < 3; c++) {
+        const p = values[i + c],
+          q = values[j + c],
+          v = (1 - f) * p + f * q;
+        // Only a rounding step past ±Number.MAX_VALUE overflows; the exact value lies between p and q.
+        out[c] = Number.isFinite(v) ? v : v > 0 ? Math.max(p, q) : Math.min(p, q);
+      }
+      return out;
+    }
+  } else if (width === 3 || f === 0 || f === 1) {
     for (let c = 0; c < width; c++)
       out[c] = f === 1 ? values[j + c] : values[i + c] + (values[j + c] - values[i + c]) * f;
     return out;

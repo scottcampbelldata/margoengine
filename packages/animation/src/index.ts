@@ -28,6 +28,7 @@ export {
   segmentTime,
   bakeKeyframeClip,
   type KeyInterpolation,
+  type KeyframeBlend,
   type Keyframe,
   type KeyframeTrackData,
   type KeyframeClipData,

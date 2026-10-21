@@ -64,6 +64,8 @@ export interface Keyframe {
     interpolation?: KeyInterpolation;
 }
 
+export type KeyframeBlend = 'delta' | 'weighted';
+
 export interface KeyframeClip {
     readonly name: string;
     readonly duration: number;
@@ -81,12 +83,14 @@ export interface KeyframeTrack {
     readonly times: Float64Array;
     readonly values: Float64Array;
     readonly interpolations: readonly KeyInterpolation[];
+    readonly blend?: KeyframeBlend;
 }
 
 export interface KeyframeTrackData {
     target: string;
     path: 'translation' | 'rotation' | 'scale';
     keys: readonly Keyframe[];
+    blend?: KeyframeBlend;
 }
 
 export class Skeleton {

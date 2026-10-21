@@ -99,6 +99,13 @@ LINEAR, both at their keys and exact everywhere; other tracks are LINEAR at the 
 eased segments, exact at those times. Pass the result to `@margoengine/exporters` as an `ExportScene` animation; tracks
 whose target `resolve` maps to undefined are left out.
 
+A track's `blend` picks the arithmetic between keys a and b at eased factor f. The default, `'delta'`, is
+`a + (b - a) * f`. `'weighted'` is for saved data that needs a finite, exactly held result: a sample at a key, before
+the first, after the last or inside a discrete segment copies the key's value before any arithmetic, and translation
+and scale between keys are `(1 - f) * a + f * b`, finite for all finite keys (keys of ±1e308 included, where
+`'delta'`'s b - a overflows to NaN). Rotations slerp the same way in both. `'weighted'` reproduces Margo Voxel Studio's
+saved vector-track evaluation bit for bit (`tests/keyframes-blend.test.js`).
+
 `skin.pose()` runs the GPU pass's maths on the CPU (linear blend of the four bone matrices; normals by the cofactor
 matrix, flipped under mirroring scales) and returns Float32 positions and normals in the mesh's space.
 `tests/raw-rig-roundtrip.test.js` writes a raw rig and clip with `@margoengine/exporters` `exportGLB` (bones as export
