@@ -256,9 +256,39 @@ export interface GainMapMetadata {
     hdrCapacityMax: number;
 }
 
+export interface HDRDiagnostics {
+    format: string;
+    orientation: string;
+    scanAxis: 'X' | 'Y';
+    scanlines: {
+        flat: number;
+        legacyRLE: number;
+        planarRLE: number;
+    };
+    headerBytes: number;
+    trailingBytes: number;
+}
+
 export interface HDRImage extends FloatImage {
     exposure: number;
     gamma: number;
+    channels: 3 | 4;
+    diagnostics: HDRDiagnostics;
+}
+
+export interface HDRLimits {
+    maxBytes?: number;
+    maxWidth?: number;
+    maxHeight?: number;
+    maxPixels?: number;
+    maxHeaderBytes?: number;
+}
+
+export interface HDRParseOptions {
+    channels?: 3 | 4;
+    orientation?: 'standard' | 'all';
+    requireFormat?: boolean;
+    limits?: HDRLimits;
 }
 
 export const HEMISPHERE_BINDING = 144;
@@ -408,7 +438,7 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage;
 
 export function parseEnvironmentImage(source: ArrayBuffer | ArrayBufferView): FloatImage;
 
-export function parseHDR(source: ArrayBuffer | ArrayBufferView): HDRImage;
+export function parseHDR(source: ArrayBuffer | ArrayBufferView, options?: HDRParseOptions): HDRImage;
 
 export function parseUltraHDR(source: ArrayBuffer | ArrayBufferView): UltraHDRParts;
 
