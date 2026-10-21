@@ -24,6 +24,8 @@ export type {
   SkinData,
   AnimationChannelData,
   AnimationData,
+  MaterialAnimationChannelData,
+  MaterialAnimationData,
   ExportPrimitive,
   Extras,
   LightmapData,

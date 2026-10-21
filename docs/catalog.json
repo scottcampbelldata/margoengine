@@ -1449,6 +1449,7 @@
       "applyKeyframeClip",
       "bakeKeyframeClip",
       "createKeyframeClip",
+      "createMaterialAnimation",
       "multiplyMatrices",
       "sampleKeyframes",
       "sampleTrack",

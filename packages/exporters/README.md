@@ -106,6 +106,7 @@ Engine export entrypoints also bake back-only optional PBR triangles by reversin
 - A mesh node's `skin` is `{name?, joints, inverseBindMatrices}`. `joints` references the actual `ExportNode` objects in the scene, with no duplicates and a common hierarchy root. `inverseBindMatrices` supplies sixteen finite, column-major affine values per joint. A joint skipped by `onlyVisible` or missing from the scene throws.
 - Geometry `morphs` contain `{name?, positions, normals?, tangents?}`. Each array holds dense xyz deltas per base vertex; these deltas are not normalized. Morph tangents require base tangents, whose handedness remains unchanged. Names become `extras.targetNames`. Node `morphWeights` sets finite default weights and must match the target count; omitted weights default to zero.
 - Scene `animations` contain `{name?, channels}`. Each channel is `{node, path, times, values, interpolation?}`, where `node` references an exported node and `path` is `translation`, `rotation`, `scale` or `weights`. Times are nonnegative seconds, strictly increasing after Float32 conversion. Values have three components for translation/scale, four for unit quaternion rotation, or one component per morph target for weights. Interpolation defaults to `LINEAR`; `STEP` and `CUBICSPLINE` are supported. Cubic channels need at least two keys and use in-tangent, value, out-tangent per key; only quaternion values must have unit length, not their tangents. Two channels in a clip cannot target the same node/path.
+- Scene `materialAnimations` contain `{name?, channels}` and animate base-color UVs (a tile atlas cel, a scrolling texture) through `KHR_animation_pointer`. Each channel is `{material, texture: 'baseColorTexture', property: 'offset' | 'scale', times, values, interpolation: 'STEP'}`: `material` is the `MaterialData` object of an exported textured material that sets `baseColorTextureTransform: {offset, scale}` (written as a required `KHR_texture_transform`), and `values` hold two Float32 values per key. Material clips follow the node clips; a clip cannot target one material property twice, and `flatten: true` rejects them. `createMaterialAnimation(model)` in `@margoengine/animation` plays them back.
 
 ```ts
 const joint = {name: 'joint'};
@@ -353,9 +354,10 @@ before it, outside these limits). `exportGLTF` and `exportModel` take no limits.
 ## Limits
 
 The engine/data-scene `exportGLTF` and `exportGLB` entrypoints write cameras, lights, extras and
-`KHR_materials_unlit`, `KHR_materials_transmission`, `KHR_materials_ior` and `KHR_materials_emissive_strength` only
-from data-scene nodes and materials, and no instancing or other KHR material extensions; use `exportModel` for loaded
-glTF-pro camera/light attachments and PBR metadata. Export does not produce Draco or meshopt compression, sparse
+`KHR_materials_unlit`, `KHR_materials_transmission`, `KHR_materials_ior`, `KHR_materials_emissive_strength`, and
+base-color `KHR_texture_transform` with its `KHR_animation_pointer` clips only from data-scene nodes and materials, and no
+instancing or other KHR material extensions; use `exportModel` for loaded glTF-pro camera/light attachments and PBR
+metadata. Export does not produce Draco or meshopt compression, sparse
 accessors or interleaved buffers. Engine/data-scene skins support four influences per vertex. `exportGLTF` puts images
 in the buffer rather than separate image files. PLY writes every vertex as given; OBJ welds only whole
 corners (`mergeVertices`), never `v`, `vt` and `vn` separately. Node names are not made unique. The existing `@margoengine/gltf` loader accepts what these exporters write from

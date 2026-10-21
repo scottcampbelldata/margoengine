@@ -4,6 +4,7 @@
 
 ```ts
 import { EngineKernel, Geometry, Mesh, PbrMaterial } from "@margoengine/core";
+import { Vec2 } from "@margoengine/math";
 
 export interface DAEOptions extends SceneOptions {
     colorSpace?: 'srgb' | 'linear';
@@ -81,6 +82,7 @@ interface ExportPrimitive {
 interface ExportScene {
     nodes: readonly ExportNode[];
     animations?: readonly AnimationData[];
+    materialAnimations?: readonly MaterialAnimationData[];
     extras?: Extras;
     scene?: {
         name?: string;
@@ -135,6 +137,20 @@ interface Lookup<K, V> {
     get(key: K): V | undefined;
 }
 
+interface MaterialAnimationChannelData {
+    material: MaterialData;
+    texture: 'baseColorTexture';
+    property: 'offset' | 'scale';
+    times: ArrayLike<number>;
+    values: ArrayLike<number>;
+    interpolation: 'STEP';
+}
+
+interface MaterialAnimationData {
+    name?: string;
+    channels: readonly MaterialAnimationChannelData[];
+}
+
 interface MaterialData {
     name?: string;
     color?: readonly number[];
@@ -145,6 +161,10 @@ interface MaterialData {
     alphaMode?: 'OPAQUE' | 'MASK' | 'BLEND';
     alphaCutoff?: number;
     baseColorTexture?: TextureData;
+    baseColorTextureTransform?: {
+        offset: Vec2;
+        scale: Vec2;
+    };
     metallicRoughnessTexture?: TextureData;
     normalTexture?: TextureData;
     unlit?: boolean;

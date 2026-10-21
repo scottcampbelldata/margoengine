@@ -6,6 +6,8 @@ import { ordinaryWeightBuffer } from './weight-buffer.js';
 import { multiplyMatrices } from '@margoengine/math/mat4';
 import { sampleTrackInto, type Interpolation } from './sampling.js';
 import { deformationShader, deformationShader8 } from './shader.js';
+import { materialTracks } from './material-animation.js';
+export { createMaterialAnimation } from './material-animation.js';
 import {
   animationDocument,
   animationDefinition,
@@ -182,8 +184,9 @@ export class Animation implements EnginePlugin {
     const doc = animationDocument(model.asset.doc);
     this.clips = doc.animations.map((value, id) => {
       const def = animationDefinition(value);
+      const material = materialTracks(model, def);
       const destinations = new Set<string>();
-      const tracks: Track[] = def.channels.map((value) => {
+      const tracks: Track[] = material.nodeChannels.map((value) => {
         const channel = animationChannel(value),
           node = animationIndex(channel.target.node, model.nodes.length, 'node'),
           path = animationPath(channel.target.path);
@@ -223,7 +226,7 @@ export class Animation implements EnginePlugin {
       });
       return {
         name: def.name ?? 'Animation ' + id,
-        duration: Math.max(0, ...tracks.map((t) => t.times.at(-1)!)),
+        duration: Math.max(material.duration, ...tracks.map((t) => t.times.at(-1)!)),
         tracks,
       };
     });

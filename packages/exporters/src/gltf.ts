@@ -12,6 +12,7 @@ import {
   samplerOf,
   type AnimationData,
   type AnimationChannelData,
+  type MaterialAnimationData,
   type CameraData,
   type ExportNode,
   type ExportScene,
@@ -150,6 +151,7 @@ class Writer {
     { attributes: Record<string, number>; targets?: Record<string, number>[] }
   >();
   private readonly materialCache = new Map<Mat, number>();
+  private readonly materialSources = new Map<object, { index: number; material: Mat }>();
   private readonly meshCache = new Map<Geo, Map<Mat | null, number>>();
   private readonly namedMeshes = new Map<
     object,
@@ -160,6 +162,7 @@ class Writer {
   private readonly skinCache = new Map<SkinData, number>();
   private readonly cache = new Map<unknown, number>();
   readonly used = new Set<string>();
+  readonly required = new Set<string>();
 
   private memo(key: unknown, make: () => number): number {
     let index = this.cache.get(key);
@@ -316,7 +319,16 @@ class Writer {
       metallicFactor: mat.metalness,
       roughnessFactor: mat.roughness,
     };
-    if (mat.baseColorTexture) pbr.baseColorTexture = this.info(mat.baseColorTexture);
+    if (mat.baseColorTexture) {
+      pbr.baseColorTexture = this.info(mat.baseColorTexture);
+      if (mat.baseColorTextureTransform) {
+        (pbr.baseColorTexture as Record<string, unknown>).extensions = {
+          KHR_texture_transform: mat.baseColorTextureTransform,
+        };
+        this.used.add('KHR_texture_transform');
+        this.required.add('KHR_texture_transform');
+      }
+    }
     if (mat.metallicRoughnessTexture) pbr.metallicRoughnessTexture = this.info(mat.metallicRoughnessTexture);
     const out: Record<string, unknown> = {};
     if (mat.name) out.name = mat.name;
@@ -345,6 +357,7 @@ class Writer {
     if (extras) out.extras = extras;
     index = this.list('materials', out);
     this.materialCache.set(mat, index);
+    if (mat.source) this.materialSources.set(mat.source, { index, material: mat });
     return index;
   }
 
@@ -493,6 +506,55 @@ class Writer {
     return index;
   }
 
+  /** A clip of KHR_animation_pointer channels on the base-color texture transforms of emitted materials. */
+  materialAnimation(animation: MaterialAnimationData): void {
+    if (!isObject(animation) || !Array.isArray(animation.channels) || !animation.channels.length)
+      throw new TypeError('Material animation needs nonempty channels');
+    if (animation.name !== undefined && typeof animation.name !== 'string')
+      throw new TypeError('Material animation name must be a string');
+    const samplers: Record<string, unknown>[] = [],
+      channels: Record<string, unknown>[] = [],
+      destinations = new Set<string>();
+    for (const channel of animation.channels) {
+      if (
+        !isObject(channel) ||
+        channel.texture !== 'baseColorTexture' ||
+        (channel.property !== 'offset' && channel.property !== 'scale') ||
+        channel.interpolation !== 'STEP'
+      )
+        throw new TypeError('Material animation requires baseColorTexture offset/scale STEP tracks');
+      const target = this.materialSources.get(channel.material);
+      if (!target || !target.material.baseColorTexture || !target.material.baseColorTextureTransform)
+        throw new TypeError('Material animation target needs an emitted textured material with an explicit transform');
+      const key = target.index + ':' + channel.property;
+      if (destinations.has(key)) throw new TypeError('Duplicate material animation target; use one track per property');
+      destinations.add(key);
+      const count = channel.times?.length;
+      if (!Number.isSafeInteger(count) || count < 1) throw new TypeError('Material animation times must be nonempty');
+      this.fits(align4(this.length + count * 4) + count * 8);
+      const times = floatData(channel.times, count, 'Material animation times');
+      if (times.some((time, i) => time < 0 || (i > 0 && time <= times[i - 1])))
+        throw new RangeError('Material animation times must be nonnegative and strictly increasing Float32 values');
+      const values = floatData(channel.values, count * 2, 'Material animation values'),
+        input = this.floatAccessor(times, 1, 'SCALAR', true, null),
+        output = this.floatAccessor(values, 2, 'VEC2', false, null);
+      channels.push({
+        sampler: samplers.length,
+        target: {
+          path: 'pointer',
+          extensions: {
+            KHR_animation_pointer: {
+              pointer: `/materials/${target.index}/pbrMetallicRoughness/baseColorTexture/extensions/KHR_texture_transform/${channel.property}`,
+            },
+          },
+        },
+      });
+      samplers.push({ input, output, interpolation: 'STEP' });
+    }
+    this.used.add('KHR_animation_pointer');
+    this.list('animations', { samplers, channels, ...(animation.name ? { name: animation.name } : {}) });
+  }
+
   animation(animation: AnimationData, resolve: (node: ExportNode) => number, lookup: Map<ExportNode, Node>): void {
     if (!isObject(animation) || !Array.isArray(animation.channels) || !animation.channels.length)
       throw new TypeError('Animation needs nonempty channels');
@@ -608,6 +670,11 @@ function document(source: ExportSource, options: GLTFOptions, writer = new Write
     sceneNodes: number[] = [];
   const animations = Array.isArray((source as ExportScene).nodes) ? (source as ExportScene).animations : undefined;
   if (animations !== undefined && !Array.isArray(animations)) throw new TypeError('Animations must be an array');
+  const materialAnimations = Array.isArray((source as ExportScene).nodes)
+    ? (source as ExportScene).materialAnimations
+    : undefined;
+  if (materialAnimations !== undefined && !Array.isArray(materialAnimations))
+    throw new TypeError('Material animations must be an array');
   const nodeIndices = new Map<ExportNode, number>(),
     nodeData = new Map<ExportNode, Node>();
   const resolve = (node: ExportNode): number => {
@@ -626,7 +693,8 @@ function document(source: ExportSource, options: GLTFOptions, writer = new Write
       node.children.forEach(check);
     };
     roots.forEach(check);
-    if (animations?.length) throw new TypeError('Flatten does not support skins, morphs or animation');
+    if (animations?.length || materialAnimations?.length)
+      throw new TypeError('Flatten does not support skins, morphs or animation');
     for (const item of drawables(roots)) {
       const parts = decompose(item.world);
       const node = parts
@@ -675,6 +743,7 @@ function document(source: ExportSource, options: GLTFOptions, writer = new Write
       } else if (node.geometry?.joints) throw new TypeError('Joint attributes need a skin on the same node');
     }
     for (const animation of animations ?? []) writer.animation(animation, resolve, nodeData);
+    for (const animation of materialAnimations ?? []) writer.materialAnimation(animation);
   }
   const data = Array.isArray((source as ExportScene).nodes) ? (source as ExportScene) : undefined,
     scene: Record<string, unknown> = {};
@@ -701,11 +770,13 @@ function document(source: ExportSource, options: GLTFOptions, writer = new Write
   if (data?.lightmap !== undefined) lightmap(writer, data.lightmap, roots, extras);
   if (Object.keys(extras).length) (json as Record<string, unknown>).extras = extras;
   if (writer.used.size) json.extensionsUsed = [...writer.used];
+  if (writer.required.size) json.extensionsRequired = [...writer.required];
   if (writer.length) json.buffers = [{ byteLength: writer.length }];
   // Stable key order: asset first, buffers last.
   const order = [
     'asset',
     'extensionsUsed',
+    'extensionsRequired',
     'extensions',
     'scene',
     'scenes',

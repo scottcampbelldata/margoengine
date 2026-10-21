@@ -25,6 +25,8 @@ Four-influence primitives keep their existing 32-byte influence records and exac
 
 Single-clip playback reuses sample buffers, quaternion arrays, palette matrices, and inverse-bind views. The animation hot path allocates no new typed arrays, quaternion copies, or GPU resources. Device restoration recreates both pipeline variants and their owned buffers. `sampleTrack()` retains its independently owned return value by default; an optional seventh `target: Float32Array` argument lets other consumers reuse their own output storage.
 
+`createMaterialAnimation(model, {clip?, loop?})` plays a clip's `KHR_animation_pointer` STEP tracks on base-color `KHR_texture_transform` offset and scale (what `@margoengine/exporters` writes from `materialAnimations`): `seek(seconds)` writes the sampled UV transform into every primitive material of the targeted glTF material, and `dispose()` releases its claim on those properties. `Animation.attach` skips those pointer channels and counts them in the clip's duration.
+
 The separate `@margoengine/animator` package adds gameplay states, blend trees, additive masks and foot IK while reusing this pass's palette buffers. `sampleTrack()` and `multiplyMatrices()` are exported for animation consumers.
 
 Animation installs an optional `model.prepareDeformation` encoding hook. GPU

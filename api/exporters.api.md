@@ -5,6 +5,7 @@
 ```ts
 import { EngineKernel, Geometry, Mesh, PbrMaterial } from "@margoengine/core";
 import { PBRModel } from "@margoengine/gltf-pro";
+import { Vec2 } from "@margoengine/math";
 
 export interface AnimationChannelData {
     node: ExportNode;
@@ -97,6 +98,7 @@ export interface ExportPrimitive {
 export interface ExportScene {
     nodes: readonly ExportNode[];
     animations?: readonly AnimationData[];
+    materialAnimations?: readonly MaterialAnimationData[];
     extras?: Extras;
     scene?: {
         name?: string;
@@ -200,6 +202,20 @@ export interface LightmapData {
     extras?: Extras;
 }
 
+export interface MaterialAnimationChannelData {
+    material: MaterialData;
+    texture: 'baseColorTexture';
+    property: 'offset' | 'scale';
+    times: ArrayLike<number>;
+    values: ArrayLike<number>;
+    interpolation: 'STEP';
+}
+
+export interface MaterialAnimationData {
+    name?: string;
+    channels: readonly MaterialAnimationChannelData[];
+}
+
 export interface MaterialData {
     name?: string;
     color?: readonly number[];
@@ -210,6 +226,10 @@ export interface MaterialData {
     alphaMode?: 'OPAQUE' | 'MASK' | 'BLEND';
     alphaCutoff?: number;
     baseColorTexture?: TextureData;
+    baseColorTextureTransform?: {
+        offset: Vec2;
+        scale: Vec2;
+    };
     metallicRoughnessTexture?: TextureData;
     normalTexture?: TextureData;
     unlit?: boolean;

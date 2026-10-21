@@ -2,6 +2,7 @@
 // normalizes geometry and materials, and computes local and world transforms in double precision.
 import { engineRuntime, meshRuntime } from '@margoengine/core/extension';
 import type { EngineKernel, Mesh, Geometry, PbrMaterial } from '@margoengine/core';
+import type { Vec2 } from '@margoengine/math';
 import type { PBRSource } from '../../shared/pbr-source.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 
@@ -75,6 +76,24 @@ export interface AnimationData {
   extras?: Extras;
 }
 
+/** One STEP track addressing an explicitly authored base-color texture transform on an emitted material object. */
+export interface MaterialAnimationChannelData {
+  material: MaterialData;
+  texture: 'baseColorTexture';
+  property: 'offset' | 'scale';
+  /** Nonempty, nonnegative and strictly increasing after Float32 conversion. */
+  times: ArrayLike<number>;
+  /** Two finite Float32 values per key. */
+  values: ArrayLike<number>;
+  interpolation: 'STEP';
+}
+
+/** An ordered material clip, appended after ordinary node clips by the glTF writers. */
+export interface MaterialAnimationData {
+  name?: string;
+  channels: readonly MaterialAnimationChannelData[];
+}
+
 /** An encoded PNG or JPEG image referenced by a material, with its sampler. */
 export interface TextureData {
   image: Uint8Array;
@@ -108,6 +127,11 @@ export interface MaterialData {
   alphaMode?: 'OPAQUE' | 'MASK' | 'BLEND';
   alphaCutoff?: number;
   baseColorTexture?: TextureData;
+  /**
+   * KHR_texture_transform offset and scale of `baseColorTexture` (required by the file), Float32 values. A target of
+   * `materialAnimations`. glTF writers only.
+   */
+  baseColorTextureTransform?: { offset: Vec2; scale: Vec2 };
   metallicRoughnessTexture?: TextureData;
   normalTexture?: TextureData;
   /** Shade with base color only, ignoring lights: KHR_materials_unlit in glTF. Default false. */
@@ -236,6 +260,8 @@ export interface LightmapData {
 export interface ExportScene {
   nodes: readonly ExportNode[];
   animations?: readonly AnimationData[];
+  /** STEP base-color texture clips written by the glTF writers only; unsupported with flatten. */
+  materialAnimations?: readonly MaterialAnimationData[];
   /** Root `extras` of the glTF document. glTF writers only, as are `scene`, `asset` and `lightmap`. */
   extras?: Extras;
   /** The glTF scene's name and extras. */
@@ -283,6 +309,8 @@ export interface Geo {
 }
 /** @internal Normalized material. */
 export interface Mat {
+  /** Original collector identity, resolved only if this material is actually emitted. */
+  source?: object;
   name?: string;
   color: number[];
   roughness: number;
@@ -292,6 +320,7 @@ export interface Mat {
   alphaMode: 'OPAQUE' | 'MASK' | 'BLEND';
   alphaCutoff?: number;
   baseColorTexture?: TextureData;
+  baseColorTextureTransform?: { offset: Vec2; scale: Vec2 };
   metallicRoughnessTexture?: TextureData;
   normalTexture?: TextureData;
   occlusionTexture?: TextureData;
@@ -646,6 +675,16 @@ export function normalizeMaterial(data: PbrMaterial | MaterialData): Mat {
   if (specular.some((v) => v < 0 || v > 1)) throw new RangeError('Material specular must be linear rgb in [0, 1]');
   if (!(shininess >= 0 && shininess < Infinity)) throw new RangeError('Material shininess must be finite and >= 0');
   const lit = shading !== 'standard';
+  const baseColorTexture = checkTexture(m.baseColorTexture, 'baseColorTexture');
+  let baseColorTextureTransform: Mat['baseColorTextureTransform'];
+  if (m.baseColorTextureTransform !== undefined) {
+    const transform = m.baseColorTextureTransform;
+    if (!baseColorTexture || !isObject(transform) || Array.isArray(transform))
+      fail('baseColorTextureTransform needs an object with offset/scale and a baseColorTexture');
+    const offset = floats(transform.offset, 2, 'Texture transform offset'),
+      scale = floats(transform.scale, 2, 'Texture transform scale');
+    baseColorTextureTransform = { offset: [offset[0], offset[1]], scale: [scale[0], scale[1]] };
+  }
   return {
     name: m.name,
     color,
@@ -655,7 +694,8 @@ export function normalizeMaterial(data: PbrMaterial | MaterialData): Mat {
     doubleSided: m.doubleSided ?? false,
     roughness: shading === 'phong' ? (2 / (shininess + 2)) ** 0.25 : lit ? 1 : unit(m.roughness, 'Roughness', 1),
     metalness: lit ? 0 : unit(m.metalness, 'Metalness', 0),
-    baseColorTexture: checkTexture(m.baseColorTexture, 'baseColorTexture'),
+    baseColorTexture,
+    baseColorTextureTransform,
     metallicRoughnessTexture: checkTexture(m.metallicRoughnessTexture, 'metallicRoughnessTexture'),
     normalTexture: checkTexture(m.normalTexture, 'normalTexture'),
     occlusionTexture: checkTexture(m.occlusionTexture, 'occlusionTexture'),
@@ -890,6 +930,7 @@ export function collect(source: ExportSource, options: SceneOptions = {}, plan?:
     let mat = materials.get(value);
     if (!mat) {
       mat = normalizeMaterial((isCoreMaterial(value) && options.materialData?.get(value)) || value);
+      mat.source = value;
       materials.set(value, mat);
       for (const slot of TEXTURE_SLOTS) {
         const image = mat[slot]?.image;

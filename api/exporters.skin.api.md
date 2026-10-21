@@ -4,6 +4,7 @@
 
 ```ts
 import { Geometry, PbrMaterial, Vec3 } from "@margoengine/core";
+import { Vec2 } from "@margoengine/math";
 
 export interface SkinBindMatrices {
     local: Float32Array;
@@ -130,6 +131,10 @@ interface MaterialData {
     alphaMode?: 'OPAQUE' | 'MASK' | 'BLEND';
     alphaCutoff?: number;
     baseColorTexture?: TextureData;
+    baseColorTextureTransform?: {
+        offset: Vec2;
+        scale: Vec2;
+    };
     metallicRoughnessTexture?: TextureData;
     normalTexture?: TextureData;
     unlit?: boolean;

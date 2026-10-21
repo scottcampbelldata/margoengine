@@ -143,6 +143,14 @@ export function bakeKeyframeClip<N>(clip: KeyframeClip, fps: number, resolve: (t
 
 export function createKeyframeClip(data: KeyframeClipData): KeyframeClip;
 
+export function createMaterialAnimation(model: PBRModel, options?: {
+    clip?: number;
+    loop?: boolean;
+}): {
+    seek(seconds: number): void;
+    dispose(): void;
+};
+
 export function multiplyMatrices(out: Float32Array, a: ArrayLike<number>, b: ArrayLike<number>): void;
 
 export function sampleKeyframes(track: KeyframeTrack, time: number, out?: Float64Array): Float64Array;
