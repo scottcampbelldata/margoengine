@@ -40,7 +40,7 @@ export {
   generateMaze,
 } from './model.js';
 export {
-  type LayoutOptions,
+  type GridLayoutOptions,
   type GridLayout,
   type FlipOptions,
   flipGrid,

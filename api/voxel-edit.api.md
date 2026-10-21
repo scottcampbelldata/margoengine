@@ -33,7 +33,7 @@ export interface CombineOptions extends GridLimits {
     overlap?: 'base' | 'tool';
 }
 
-export interface CropOptions extends LayoutOptions {
+export interface CropOptions extends GridLayoutOptions {
     origin: Vec3;
     size: Vec3;
 }
@@ -53,7 +53,7 @@ export interface FillOptions extends GridLimits {
     color: number;
 }
 
-export interface FlipOptions extends LayoutOptions {
+export interface FlipOptions extends GridLayoutOptions {
     axis: 'x' | 'y' | 'z';
 }
 
@@ -76,16 +76,16 @@ export interface GridLayout extends GridEdit {
     mapPoint(point: Vec3): MutableVec3;
 }
 
+export interface GridLayoutOptions extends GridLimits {
+    selection?: Iterable<number>;
+}
+
 export interface GridLimits {
     maxCells?: number;
 }
 
 export interface InvertOptions extends GridLimits {
     color: number;
-}
-
-export interface LayoutOptions extends GridLimits {
-    selection?: Iterable<number>;
 }
 
 export interface Maze {
@@ -150,7 +150,7 @@ export interface ShearOptions extends GridLimits {
     pivot?: number;
 }
 
-export interface ShiftOptions extends LayoutOptions {
+export interface ShiftOptions extends GridLayoutOptions {
     offset: Vec3;
 }
 
@@ -192,7 +192,7 @@ export interface SliceStack {
     layout: SliceLayout;
 }
 
-export interface TurnOptions extends LayoutOptions {
+export interface TurnOptions extends GridLayoutOptions {
     axis: 'x' | 'y' | 'z';
     turns?: number;
 }
@@ -220,7 +220,7 @@ export function erodeGrid(grid: VoxelGrid, options?: MorphologyOptions): GridEdi
 
 export function fillEnclosed(grid: VoxelGrid, options: FillOptions): GridEdit;
 
-export function fitGrid(grid: VoxelGrid, options?: LayoutOptions): GridLayout & {
+export function fitGrid(grid: VoxelGrid, options?: GridLayoutOptions): GridLayout & {
     origin: MutableVec3;
 };
 

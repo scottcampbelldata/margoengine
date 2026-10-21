@@ -17,7 +17,7 @@ import {
 } from './grid.js';
 
 /** Options every layout operation takes. */
-export interface LayoutOptions extends GridLimits {
+export interface GridLayoutOptions extends GridLimits {
   /** Selected cells of the input, as cell indexes; the result maps them too, selected air included. */
   selection?: Iterable<number>;
 }
@@ -34,13 +34,13 @@ export interface GridLayout extends GridEdit {
 }
 
 /** Options of {@link flipGrid}. */
-export interface FlipOptions extends LayoutOptions {
+export interface FlipOptions extends GridLayoutOptions {
   /** The axis to reverse: cell `c` moves to `size - 1 - c`. */
   axis: 'x' | 'y' | 'z';
 }
 
 /** Options of {@link turnGrid}. */
-export interface TurnOptions extends LayoutOptions {
+export interface TurnOptions extends GridLayoutOptions {
   /** The axis to turn about. */
   axis: 'x' | 'y' | 'z';
   /** Right-handed quarter turns, any whole number (negative turns the other way). Default 1. */
@@ -48,13 +48,13 @@ export interface TurnOptions extends LayoutOptions {
 }
 
 /** Options of {@link shiftGrid}. */
-export interface ShiftOptions extends LayoutOptions {
+export interface ShiftOptions extends GridLayoutOptions {
   /** Whole cells to move along x, y and z; cells leaving the box are dropped. */
   offset: Vec3;
 }
 
 /** Options of {@link cropGrid}. */
-export interface CropOptions extends LayoutOptions {
+export interface CropOptions extends GridLayoutOptions {
   /** The input cell that becomes the result's (0, 0, 0); it may lie outside the input (the new cells are air). */
   origin: Vec3;
   /** Cells of the result along x, y and z, each at least 1. */
@@ -72,7 +72,7 @@ type CellMap = (x: number, y: number, z: number, out: number[]) => void;
 /** Moves every filled or selected cell of `grid` through `map` into a new grid of `size`. */
 function layout(
   grid: VoxelGrid,
-  options: LayoutOptions,
+  options: GridLayoutOptions,
   size: Vec3,
   map: CellMap,
   mapPoint: (point: Vec3) => MutableVec3,
@@ -260,7 +260,7 @@ export function cropGrid(grid: VoxelGrid, options: CropOptions): GridLayout {
  * Shrinks a grid to the box of its filled cells ({@link occupiedBounds}); `origin` is that box's lower corner, the
  * input cell now at (0, 0, 0). An empty grid keeps its whole box, origin [0, 0, 0].
  */
-export function fitGrid(grid: VoxelGrid, options: LayoutOptions = {}): GridLayout & { origin: MutableVec3 } {
+export function fitGrid(grid: VoxelGrid, options: GridLayoutOptions = {}): GridLayout & { origin: MutableVec3 } {
   checkOptions(options, 'fitGrid');
   const bounds = occupiedBounds(grid, { maxCells: options.maxCells }),
     origin: MutableVec3 = bounds ? bounds.min : [0, 0, 0],
