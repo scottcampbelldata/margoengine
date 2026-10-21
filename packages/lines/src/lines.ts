@@ -4,7 +4,8 @@ import type { EngineKernel } from '@margoengine/core';
 import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { CAPS, JOINS, MODES, VERTICES_PER_SEGMENT } from './geometry.js';
 import { Line } from './line.js';
-import { lineShader } from './shader.js';
+import { foggedLineShader, lineShader } from './shader.js';
+import { checkFog, FOG_BYTES, writeFog, type FogLike } from './fog.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -67,6 +68,15 @@ export class Lines implements EnginePlugin {
     colorAttachments: [this.colorAttachment],
     depthStencilAttachment: this.depthAttachment,
   };
+  private fogSource: FogLike | null = null;
+  private fogGpu?: {
+    layout: GPUBindGroupLayout;
+    pipeline: GPUPipelineLayout;
+    module: GPUShaderModule;
+    buffer: GPUBuffer;
+    group: GPUBindGroup;
+  };
+  private readonly fogData = new Float32Array(12);
 
   /** Same as `engine.use(new Lines(...))`; returns the Lines. */
   static attach(engine: EngineKernel, options?: LinesOptions): Lines {
@@ -84,6 +94,23 @@ export class Lines implements EnginePlugin {
   /** Lines currently drawn by this plugin. */
   get lines(): ReadonlySet<Line> {
     return this.members;
+  }
+
+  /** The fog lines are drawn in (see `setFog`), or null. */
+  get fog(): FogLike | null {
+    return this.fogSource;
+  }
+
+  /**
+   * Fogs every line whose material has `fog` true (the default): `fog` is `@margoengine/environment`'s `Fog` or any
+   * object with its fields, read every frame, with Fog's maths (linear near/far, exp2 density, height falloff). A line
+   * fades toward the fog colour by the distance of its centre line. `null` (the default) draws exactly as without fog.
+   * The first fogged frame compiles a second shader; changing the fog or its `enabled` flag never does.
+   * @throws TypeError when `fog` is neither an object nor null; RangeError or TypeError for an invalid field.
+   */
+  setFog(fog: FogLike | null): this {
+    this.fogSource = checkFog(fog);
+    return this;
   }
 
   add<T extends Line>(line: T): T {
@@ -146,13 +173,15 @@ export class Lines implements EnginePlugin {
     depthFormat: GPUTextureFormat,
     onTop: boolean,
     count: number,
+    fogged = false,
   ): GPURenderPipeline {
-    const key = `${format}|${depthFormat}|${onTop}|${count}`;
+    const key = `${format}|${depthFormat}|${onTop}|${count}${fogged ? '|fog' : ''}`;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
-      const module = this.module!;
+      const fog = fogged ? this.fogResources() : undefined,
+        module = fog?.module ?? this.module!;
       pipeline = this.device!.createRenderPipeline({
-        layout: this.layouts!.pipeline,
+        layout: fog?.pipeline ?? this.layouts!.pipeline,
         vertex: { module, entryPoint: 'vertex' },
         fragment: {
           module,
@@ -178,6 +207,27 @@ export class Lines implements EnginePlugin {
       this.pipelines.set(key, pipeline);
     }
     return pipeline;
+  }
+
+  /** The fog uniform, its group 2 and the fogged shader, made on the first fogged frame. */
+  private fogResources(): NonNullable<Lines['fogGpu']> {
+    if (this.fogGpu) return this.fogGpu;
+    const device = this.device!,
+      layouts = this.layouts!,
+      layout = device.createBindGroupLayout({
+        entries: [
+          { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform', minBindingSize: FOG_BYTES } },
+        ],
+      }),
+      module = device.createShaderModule({ code: foggedLineShader() }),
+      buffer = device.createBuffer({ size: FOG_BYTES, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    return (this.fogGpu = {
+      layout,
+      module,
+      buffer,
+      pipeline: device.createPipelineLayout({ bindGroupLayouts: [layouts.frame, layouts.style, layout] }),
+      group: device.createBindGroup({ layout, entries: [{ binding: 0, resource: { buffer } }] }),
+    });
   }
 
   private ensure(line: Line): Resources {
@@ -314,18 +364,34 @@ export class Lines implements EnginePlugin {
         : 0.5 * context.height * Math.hypot(m[1], m[5], m[9]);
     data[20] = context.format.endsWith('-srgb') || context.format.includes('float') ? 0 : 1;
     device.queue.writeBuffer(this.frameBuffer!, 0, data);
+    const fog = this.fogSource;
+    let fogged = false;
+    if (fog)
+      for (const list of [this.depthLines, this.topLines]) for (const [line] of list) fogged ||= line.material.fog;
+    if (fogged) {
+      writeFog(fog!, camera.position, this.fogData);
+      device.queue.writeBuffer(this.fogResources().buffer, 0, this.fogData);
+    }
     this.colorAttachment.view = context.color;
     this.depthAttachment.view = context.depth;
-    const depthFormat = context.descriptor.depthStencil!.format;
+    const depthFormat = context.descriptor.depthStencil!.format,
+      count = context.descriptor.multisample?.count ?? 1;
     const pass = context.encoder.beginRenderPass(this.descriptor);
     pass.setBindGroup(0, this.frameGroup!);
+    if (fogged) pass.setBindGroup(2, this.fogGpu!.group);
     for (const [list, onTop] of [
       [this.depthLines, false],
       [this.topLines, true],
     ] as const) {
       if (!list.length) continue;
-      pass.setPipeline(this.pipeline(context.format, depthFormat, onTop, context.descriptor.multisample?.count ?? 1));
+      const plain = this.pipeline(context.format, depthFormat, onTop, count);
+      let current = plain;
+      pass.setPipeline(plain);
       for (const [line, r] of list) {
+        if (fogged) {
+          const next = line.material.fog ? this.pipeline(context.format, depthFormat, onTop, count, true) : plain;
+          if (next !== current) pass.setPipeline((current = next));
+        }
         pass.setBindGroup(1, r.group);
         pass.draw(VERTICES_PER_SEGMENT, line.segmentCount);
         this.stats.drawCalls++;
@@ -343,7 +409,8 @@ export class Lines implements EnginePlugin {
   private releaseGpu(): void {
     for (const line of [...this.resources.keys()]) this.release(line);
     this.frameBuffer?.destroy();
-    this.frameBuffer = this.frameGroup = this.module = this.layouts = this.device = undefined;
+    this.fogGpu?.buffer.destroy();
+    this.frameBuffer = this.frameGroup = this.module = this.layouts = this.device = this.fogGpu = undefined;
     this.pipelines.clear();
   }
 

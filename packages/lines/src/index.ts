@@ -34,6 +34,9 @@ export type {
   HemisphereLightShape,
   LightHelperOptions,
 } from './light-helpers.js';
+export { SkeletonHelper } from './skeleton-helper.js';
+export type { SkeletonShape, JointsShape, GLTFSkinSource, SkeletonHelperOptions } from './skeleton-helper.js';
+export type { FogLike } from './fog.js';
 export {
   computeLineDistances,
   expandLine,

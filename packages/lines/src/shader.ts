@@ -1,4 +1,6 @@
+import { MargoError } from '@margoengine/math/errors';
 import { BLOCK, FAN } from './geometry.js';
+import { fogWgsl } from './fog.js';
 
 /** Fat line shader. The expansion mirrors `expandLine` in geometry.ts; keep the two in step. */
 export const lineShader: string = /* wgsl */ `
@@ -171,3 +173,30 @@ fn encode(c:vec3f)->vec3f{return select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.05
   return vec4f(rgb,alpha);
 }
 `;
+
+const fogEdits: Array<[string, string]> = [
+  ['@location(2) dist:f32,', '@location(2) dist:f32,@location(3) world:vec3f,'],
+  // The centre line's world point: each end of the quad takes its segment end, so fragments interpolate along it.
+  [
+    'o.dist=mix(dA,dB,select(ta,tb,cr.atB));',
+    'o.dist=mix(dA,dB,select(ta,tb,cr.atB));let wa=style.model*vec4f(points[ia].xyz,1.0);let wb=style.model*vec4f(points[ib].xyz,1.0);o.world=mix(wa.xyz/wa.w,wb.xyz/wb.w,select(ta,tb,cr.atB));',
+  ],
+  // Lines blend alpha over the scene, so a fogged line fades toward the fog colour, in linear before any encoding.
+  [
+    'var rgb=max(i.color.rgb,vec3f(0.0));',
+    'var rgb=max(i.color.rgb,vec3f(0.0));rgb=mix(rgb,margoFog.color.rgb,fogAmount(i.world));',
+  ],
+];
+/** The line shader with scene fog (fog uniform at group 2); `lineShader` itself stays unchanged. */
+export function foggedLineShader(): string {
+  let code = lineShader;
+  for (const [from, to] of fogEdits) {
+    if (!code.includes(from))
+      throw new MargoError(
+        'unsupported',
+        'Line fog needs the line shader it was written for; update the fog edits with it',
+      );
+    code = code.replace(from, to);
+  }
+  return code + fogWgsl(2, 0);
+}

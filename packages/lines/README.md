@@ -4,7 +4,7 @@ Fat lines with joins, caps, dashes and antialiasing, plus the debug helpers, as 
 
 Build from source with `npm run build` in `packages/lines`.
 
-Replaces the three.js `Line2`, `LineSegments2`, `LineGeometry`, `LineSegmentsGeometry` and `LineMaterial` add-ons, and `GridHelper`, `PolarGridHelper`, `AxesHelper`, `BoxHelper`, `Box3Helper`, `ArrowHelper`, `CameraHelper`, `PlaneHelper`, `VertexNormalsHelper` and the light helpers (`PointLightHelper`, `SpotLightHelper`, `DirectionalLightHelper`, `HemisphereLightHelper`, `RectAreaLightHelper`).
+Replaces the three.js `Line2`, `LineSegments2`, `LineGeometry`, `LineSegmentsGeometry` and `LineMaterial` add-ons, and `GridHelper`, `PolarGridHelper`, `AxesHelper`, `BoxHelper`, `Box3Helper`, `ArrowHelper`, `CameraHelper`, `PlaneHelper`, `VertexNormalsHelper`, `SkeletonHelper` and the light helpers (`PointLightHelper`, `SpotLightHelper`, `DirectionalLightHelper`, `HemisphereLightHelper`, `RectAreaLightHelper`).
 
 ```ts
 import {Engine, box} from '@margoengine/core';
@@ -72,6 +72,7 @@ dashed.dashOffset += 0.01;
 | `vertexColors` | when colors exist | |
 | `onTop` | `false` | Skip the depth test |
 | `antialias` | `true` | |
+| `fog` | `true` | Fogged by the plugin's `setFog`; `false` keeps the line clear, like three.js `material.fog` |
 
 `new Lines({name, order})` sets the plugin name (default `'lines'`) and pass order (default `20`). `lines.stats` reports lines, segments and draw calls of the last frame.
 
@@ -95,6 +96,39 @@ and normals, transformed by the current world matrix. They perform no GPU readba
 and create no core `Geometry`. Hidden ancestors and disposed models suppress the
 helper; animation deformation is not reflected in these synchronous helpers.
 
+## Fog
+
+`lines.setFog(fog)` fogs every line whose material has `fog: true` (the default) with `@margoengine/environment`'s `Fog`
+or any object with its fields (`color`, `near`, `far`, `density`, `heightFalloff`, `height`, `enabled`), read every
+frame with Fog's maths: linear near/far, exp2 when `density` is above 0, thinner above `height`. A line fades toward the
+fog colour by the distance of its centre line, in linear before the canvas sRGB encoding. Lines does not import
+environment. `fog.enabled = false` clears it without recompiling; `lines.setFog(null)` (the default) draws exactly as
+before.
+
+```ts
+import {Fog} from '@margoengine/environment';
+const fog = Fog.attach(engine, {color: '#8090a0', near: 5, far: 40});
+lines.setFog(fog);
+```
+
+## SkeletonHelper
+
+`SkeletonHelper` draws a skinned model's bones as lines from each parent joint to its child joint, like three.js
+`SkeletonHelper`, and follows the pose every frame. It takes `@margoengine/animation`'s `Skeleton` (any object with
+`parents` and 16 `matrices` numbers per bone; `mesh` places the skeleton with the skinned mesh's world matrix) or, through
+`SkeletonHelper.fromGLTF(model, skin)`, a glTF skin's joint nodes (each joined to its parent node when that is a joint).
+Lines does not import animation. Colours run from `parentColor` (default green) to `color` (default blue), as three.js;
+`setColors(color, parentColor)` changes them. It draws over the scene (`onTop`) and is not fogged unless asked.
+
+```ts
+import {Lines, SkeletonHelper} from '@margoengine/lines';
+const lines = Lines.attach(engine);
+// An @margoengine/animation Skeleton, placed by the skinned mesh it deforms:
+const bones = lines.add(new SkeletonHelper(skeleton, {mesh: model.primitives[0].node, width: 2}));
+const skin = lines.add(SkeletonHelper.fromGLTF(model)); // a loaded, animated glTF
+bones.dispose(); // removes it from the plugin and frees its buffers
+```
+
 ## Limits
 
 - WebGPU only. On the WebGL2 backend the plugin warns once and draws nothing.
@@ -104,6 +138,10 @@ helper; animation deformation is not reflected in these synchronous helpers.
 - No line picking (`Line2.raycast`) yet; `expandLine` gives the screen-space triangles for a CPU hit test.
 
 ## Tests
+
+`node scripts/gpu-lock.mjs run --owner=fog-all -- node scripts/fog-all-gpu-check.js` (repository root, real GPU) checks
+fog on lines against the analytic fog amount and draws a `SkeletonHelper` over a posed rig (lines present, following a
+new pose, gone when removed).
 
 `npm test` in `packages/lines` runs Node checks on the CPU geometry: segment counts and neighbors per mode, dash distances in world space, exact quad areas for every cap, exact join areas with zero overlap for miter, bevel and round in both turn directions, miter-limit fallback, collinear points, loops, buffer reuse on same-size updates, validation, every helper's geometry (including the normal matrix under non-uniform scale and a reversed-Z frustum unprojection), SSR-safe import and the single WebGL2 warning.
 

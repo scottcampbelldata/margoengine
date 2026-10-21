@@ -47,6 +47,8 @@ export interface LineMaterialOptions {
   onTop?: boolean;
   /** One-pixel coverage ramp on edges, caps and dash ends. Default true. */
   antialias?: boolean;
+  /** Fogged by the `Lines` plugin's fog (`setFog`); false keeps this material clear, like three.js `material.fog`. Default true. */
+  fog?: boolean;
 }
 
 /** Style shared by any number of lines, like three.js `LineMaterial`. Fields may be changed at any time. */
@@ -65,6 +67,7 @@ export class LineMaterial {
   vertexColors?: boolean;
   onTop = false;
   antialias = true;
+  fog = true;
   constructor(options: LineMaterialOptions = {}) {
     this.set(options);
   }
@@ -92,7 +95,7 @@ export class LineMaterial {
     if (this.dashSize <= 0 || this.gapSize < 0)
       throw new RangeError('Dash size must be positive and gap size non-negative');
     if (!JOINS.includes(this.join) || !CAPS.includes(this.cap)) throw new TypeError('Unknown line join or cap');
-    for (const flag of [this.worldUnits, this.dashed, this.onTop, this.antialias])
+    for (const flag of [this.worldUnits, this.dashed, this.onTop, this.antialias, this.fog])
       if (typeof flag !== 'boolean') throw new TypeError('Line flags must be boolean');
   }
 }
