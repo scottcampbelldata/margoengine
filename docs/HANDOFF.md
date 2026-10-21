@@ -89,6 +89,20 @@ dark. Margo Voxel Studio's 34 engine gaps (2026-10-21): all implemented and veri
 the Studio yet; status, commits, the denoiser's 72-gate result (72/72, was 60/72) and the migration guide for Codex
 are in `docs/studio-engine-gaps.md`.
 
+Early tracer line (checked 2026-10-21; kept only as `refs/backup/unlanded-early-tracer`, tip f345dad5): two commits
+on a copy of the tracer forked at 09805e10 (main's 0fcce6cc), d0e85c30 and f345dad5, compared with main behaviour by
+behaviour. Ported, each shown failing on main first by a new test in `tests/tracer.test.js`: the viewport drops its
+denoised image on every restart, not only camera and scene changes (after `reset()`, a sampling option or
+`resetOptions`, an image that converged in one frame kept showing the old denoised picture); the scene,
+material-table and environment buffers stop doubling at the storage binding limit (a scene just over half the limit
+got a buffer WebGPU refuses to bind). Superseded: per-model material banks (main's model material tables, ca109363),
+`focusDistance: null` (on main), the caustic chain and light through glass (4990213b, 7254d631), the denoiser changes
+(main's denoiser weighs edges against the raw mean without identity guides and passes the Studio's 72 gates,
+bb841e87), and continuous glass and media across touching or overlapping model tiles: main keeps volumes whole by
+taking models up to 2048 per axis and sparse blocks instead of tiles (65be98fc; two 200-cell glass tiles still differ
+from one 400-cell bar by RMS 0.85, so the Studio tiles only past 2048), and separate instances keep their own
+interfaces.
+
 Tile editor engine work (Scott, 2026-10-18/19): Scott started `tile-asset-editor` (a Crocotile 3D 2.7.4 equivalent,
 own repository `scottcampbelldata/tile-asset-editor`) as the base of his own 3D modeller and game engine, and
 approved the engine gaps it needs; the 2026-10-17 "no further parity work is authorized" line below is superseded for
@@ -2496,6 +2510,15 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    timeout (high/light views; phone took 53 s) while three agents built and tested in parallel; alone it loads in 4-7 s
    and passes (twice). No page errors logged. Before launch: reproduce under a bounded load (half the cores) and find
    what the load event waits on (preview server starved vs the app's own init); a visitor's busy laptop must not hang.
+   Status 2026-10-21: the three causes found on the old WIP branch for this gate (382ca278 / e179fb80, now only
+   `refs/backup/unlanded-gate9-wip`) are fixed on main. The hang was the harness: the Vite dev server's file watcher
+   crawled every worktree and blocked the process serving the pages (a5d08397: `watch: null` in every Vite server our
+   scripts start). The sandbox scattered its particles differently each run (aa8e8e94: respawn seeds by slot and frame,
+   not GPU thread order). Shots caught mid-raster under load (a5d08397: shoot until two in a row match). Baselines
+   re-recorded at 80aa5c9a: four-run noise of the six sandbox and citadel views is now at most 0.0000564 changed (was up
+   to 0.0518). The WIP's Oct-15 PNGs, tolerances and quality-presets proof edit are not landed (stale; the proof's
+   readers already cover the seed change, claims.md). Still open: the gate's own proof, verify 5 times in a row under a
+   bounded load; the WIP's run of it was never recorded.
 10. **claims.md:** 0 OVERCLAIM and 0 UNPROVEN rows for anything on public pages.
    Status 2026-10-15 (proofs): every row resting on a proof now cites the proof and its pinned commits (claims.md
    "Proofs": one table of all 46 with baseline -> pin and the --current ref). H-04 (STALE) became PROVEN: `npm run
