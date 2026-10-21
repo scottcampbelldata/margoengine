@@ -11,6 +11,19 @@ export interface BoxOptions {
     hollow?: boolean;
 }
 
+export interface CylinderOptions extends RasterOptions {
+    axis: 'x' | 'y' | 'z';
+    center: Vec3;
+    radius: number;
+    length: number;
+    inner?: number;
+}
+
+export interface EllipsoidOptions extends RasterOptions {
+    center: Vec3;
+    radii: Vec3;
+}
+
 export type GridSource = VoxelGrid | SparseGrid;
 
 export interface MirrorOptions extends GridLimits {
@@ -47,6 +60,17 @@ export interface PastePlan {
     clipped: number;
 }
 
+export interface RasterOptions extends GridLimits {
+    outside?: 'refuse' | 'clip';
+}
+
+export interface RingOptions extends RasterOptions {
+    center: Vec3;
+    outer: number;
+    inner: number;
+    thickness: number;
+}
+
 export interface StampOptions {
     operation: 'fill' | 'paint' | 'erase';
     color?: number;
@@ -56,9 +80,29 @@ export interface StampOptions {
     };
 }
 
+export interface TaperedLineOptions extends RasterOptions {
+    from: Vec3;
+    to: Vec3;
+    radius?: number;
+    endRadius?: number;
+    minRadius?: number;
+    samplesPerCell?: number;
+}
+
+export interface ThickLineOptions extends RasterOptions {
+    from: Vec3;
+    to: Vec3;
+    halfWidth?: number;
+    steps?: 'ceil' | 'span';
+}
+
 export function boxCells(a: Vec3, b: Vec3, options?: BoxOptions): MutableVec3[];
 
 export function connectedCells(source: GridSource, seed: Vec3, limits?: GridLimits): Float64Array;
+
+export function cylinderCells(size: Vec3, options: CylinderOptions): Float64Array;
+
+export function ellipsoidCells(size: Vec3, options: EllipsoidOptions): Float64Array;
 
 export function faceCells(source: GridSource, seed: Vec3, normal: Vec3, limits?: GridLimits): Float64Array;
 
@@ -71,10 +115,16 @@ export function mirrorCells(samples: Iterable<readonly number[]>, options: Mirro
 export function pasteCells(target: VoxelGrid, clip: Iterable<readonly number[]>, options: PasteOptions): (PastePlan & GridEdit) | PasteOverflow;
 export function pasteCells(target: SparseGrid, clip: Iterable<readonly number[]>, options: PasteOptions): (PastePlan & SparseEdit) | PasteOverflow;
 
+export function ringCells(size: Vec3, options: RingOptions): Float64Array;
+
 export function sphereCells(center: Vec3, radius: number): MutableVec3[];
 
 export function stampCells(target: VoxelGrid, cells: ArrayLike<number>, options: StampOptions): GridEdit;
 export function stampCells(target: SparseGrid, cells: ArrayLike<number>, options: StampOptions): SparseEdit;
+
+export function taperedLineCells(size: Vec3, options: TaperedLineOptions): Float64Array;
+
+export function thickLineCells(size: Vec3, options: ThickLineOptions): Float64Array;
 
 // Not exported from this entry, but used by the exports above:
 

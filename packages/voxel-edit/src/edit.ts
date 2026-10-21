@@ -1,9 +1,10 @@
 // Brushes (line, box, sphere footprints) and selections (flood, connected, face) on dense or sparse grids; mirrored
-// stamps and clipboard paste are in stamp.ts.
+// stamps and clipboard paste are in stamp.ts, ellipsoid, cylinder, ring and line rasterizers in raster.ts.
 import type { MutableVec3, Vec3 } from '@margoengine/math';
 import { cellLimit, checkCell, checkGrid, checkPoint, type GridLimits, type VoxelGrid } from './grid.js';
 import { SparseGrid } from './sparse.js';
 
+export * from './raster.js';
 export * from './stamp.js';
 
 /** A dense grid or a sparse one; selections and picking take either. */
