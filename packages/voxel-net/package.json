@@ -1,0 +1,41 @@
+{
+  "name": "@margoengine/voxel-net",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Multiplayer voxel worlds: an authoritative Node server on a hand-written WebSocket, a browser client with prediction and correction, and headless bots for load tests.",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
+    },
+    "./bot": {
+      "types": "./dist/bot.d.ts",
+      "import": "./dist/bot.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@margoengine/math": "^1.0.0",
+    "@margoengine/net": "^1.0.0",
+    "@margoengine/voxel": "^1.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js voxel-net",
+    "test": "npm run build && node --test tests/*.test.js",
+    "bench": "node bench/run.mjs",
+    "prepack": "npm run build"
+  },
+  "homepage": "https://margoengine.com"
+}

@@ -42,7 +42,10 @@ await build({
     emptyOutDir: true,
     target: 'es2022',
     lib: { entry: entries, formats: ['es'], fileName: (_format, name) => name + '.js' },
-    rollupOptions: { external: (id) => peers.some((peer) => id === peer || id.startsWith(peer + '/')) },
+    // Node built-ins stay imports too (voxel-net's server entry runs in Node).
+    rollupOptions: {
+      external: (id) => id.startsWith('node:') || peers.some((peer) => id === peer || id.startsWith(peer + '/')),
+    },
   },
 });
 await buildWorkers(root);
