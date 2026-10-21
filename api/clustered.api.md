@@ -6,6 +6,19 @@
 import { EngineKernel, Mesh, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, Mesh } from "@margoengine/core/extension";
 
+export interface AreaShadowLight {
+    readonly index: number;
+    readonly center: Vec3;
+    readonly normal: readonly [number, number, number];
+    readonly right: readonly [number, number, number];
+    readonly up: readonly [number, number, number];
+    readonly twoSided: boolean;
+    readonly width: number;
+    readonly height: number;
+    readonly near: number;
+    readonly far: number;
+}
+
 export class Clustered implements EnginePlugin {
     readonly name = "clustered";
     readonly grid: readonly [number, number, number];
@@ -48,13 +61,15 @@ export class Clustered implements EnginePlugin {
 }
 
 export interface ClusteredArea {
-    declarations(group: number): string;
+    declarations(group: number, shadow?: string): string;
     bindings(): GPUBindGroupEntry[];
+    shadowLights?(): readonly AreaShadowLight[];
 }
 
 export interface ClusteredDirectional {
     declarations(group: number): string;
     bindings(): GPUBindGroupEntry[];
+    shadowLights?(): readonly DirectionalShadowLight[];
 }
 
 export interface ClusteredLightTerm {
@@ -95,6 +110,21 @@ export interface ClusteredSamplingHooks {
 export interface ClusteredShadow {
     declarations(group: number): string;
     bindings(): GPUBindGroupEntry[];
+    readonly directionalShadow?: string;
+    readonly areaShadow?: string;
+}
+
+export interface DirectionalShadowLight {
+    readonly index: number;
+    readonly direction: readonly [number, number, number];
+    readonly bounds?: {
+        readonly min: Vec3;
+        readonly max: Vec3;
+    };
+    readonly cascades: number;
+    readonly distance: number;
+    readonly width: number;
+    readonly height: number;
 }
 
 export interface LocalLightShadow {
@@ -161,7 +191,9 @@ export interface SpotLight extends PointLight {
 
 export function clusteredSampling(group: number, shadow?: boolean | {
     declarations(group: number): string;
+    readonly directionalShadow?: string;
+    readonly areaShadow?: string;
 }, area?: {
-    declarations(group: number): string;
+    declarations(group: number, shadow?: string): string;
 }, integratedShadows?: boolean, decay?: boolean, receive?: boolean, { directional, terms }?: ClusteredSamplingHooks): string;
 ```

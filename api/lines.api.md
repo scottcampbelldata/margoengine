@@ -72,6 +72,30 @@ export interface ExpandLineOptions {
     antialias?: boolean;
 }
 
+export interface FogLike {
+    readonly color?: ColorInput;
+    readonly near?: number;
+    readonly far?: number;
+    readonly density?: number;
+    readonly heightFalloff?: number;
+    readonly height?: number;
+    readonly enabled?: boolean;
+}
+
+export interface GLTFSkinSource {
+    readonly asset: {
+        readonly doc: {
+            readonly skins?: readonly {
+                readonly joints: readonly number[];
+            }[];
+            readonly nodes?: readonly {
+                readonly children?: readonly number[];
+            }[];
+        };
+    };
+    readonly nodes: readonly Mesh[];
+}
+
 export class GridHelper extends Line {
     constructor({ size, divisions, color1, color2, ...options }?: {
         size?: number;
@@ -90,6 +114,11 @@ export class HemisphereLightHelper extends OneLightHelper<HemisphereLightShape> 
 export interface HemisphereLightShape {
     readonly sky: ColorInput;
     readonly ground?: ColorInput;
+}
+
+export interface JointsShape {
+    readonly joints: readonly Mesh[];
+    readonly parents: readonly number[];
 }
 
 export interface LightHelperOptions extends HelperOptions {
@@ -152,6 +181,7 @@ export class LineMaterial {
     vertexColors?: boolean;
     onTop: boolean;
     antialias: boolean;
+    fog: boolean;
     constructor(options?: LineMaterialOptions);
     set(options: LineMaterialOptions): this;
     setColor(color: ColorInput): this;
@@ -173,6 +203,7 @@ export interface LineMaterialOptions {
     vertexColors?: boolean;
     onTop?: boolean;
     antialias?: boolean;
+    fog?: boolean;
 }
 
 export type LineMode = 'segments' | 'strip' | 'loop';
@@ -198,6 +229,8 @@ export class Lines implements EnginePlugin {
     static attach(engine: EngineKernel, options?: LinesOptions): Lines;
     constructor(options?: LinesOptions);
     get lines(): ReadonlySet<Line>;
+    get fog(): FogLike | null;
+    setFog(fog: FogLike | null): this;
     add<T extends Line>(line: T): T;
     remove(line: Line): void;
     clear(): void;
@@ -262,6 +295,27 @@ export interface SegmentIndices {
     b: number;
     prev: number;
     next: number;
+}
+
+export class SkeletonHelper extends Line {
+    readonly skeleton: SkeletonShape | JointsShape;
+    constructor(skeleton: SkeletonShape | JointsShape, options?: SkeletonHelperOptions);
+    static fromGLTF(model: GLTFSkinSource, skin?: number, options?: SkeletonHelperOptions): SkeletonHelper;
+    setColors(color: ColorInput | ArrayLike<number> | null, parentColor?: ColorInput): this;
+    update(engine: EngineKernel): boolean;
+}
+
+export interface SkeletonHelperOptions extends HelperOptions {
+    color?: ColorInput;
+    parentColor?: ColorInput;
+    mesh?: Mesh | null;
+    matrix?: Mat4;
+}
+
+export interface SkeletonShape {
+    readonly parents: readonly number[];
+    readonly matrices: ArrayLike<number>;
+    readonly revision?: number;
 }
 
 export class SpotLightHelper extends OneLightHelper<SpotLightShape> {

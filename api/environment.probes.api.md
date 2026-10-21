@@ -85,6 +85,10 @@ interface CubeFaces {
     faces: readonly Float32Array[];
 }
 
+interface CubeTextureSource {
+    readonly texture: GPUTexture;
+}
+
 class Environment implements EnginePlugin {
     readonly name: string;
     version: number;
@@ -120,6 +124,7 @@ class Environment implements EnginePlugin {
     irradianceAt(normal: readonly [number, number, number]): [number, number, number];
     onChange(listener: (environment: Environment) => void): () => void;
     restore(target: GPUDevice | EngineKernel): Promise<void>;
+    refresh(): Promise<void>;
     setup(engine: EngineKernel): void;
     onDeviceRestored(engine: EngineKernel): void;
     dispose(): void;
@@ -142,7 +147,7 @@ interface EnvironmentOptions {
     name?: string;
 }
 
-type EnvironmentSource = FloatImage | CubeFaces;
+type EnvironmentSource = FloatImage | CubeFaces | CubeTextureSource;
 
 interface FloatImage {
     width: number;

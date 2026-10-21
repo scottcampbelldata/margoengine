@@ -10,10 +10,22 @@ export interface DirectionalLight {
     direction: Vec3;
     color?: Vec3;
     intensity?: number;
+    castShadow?: boolean;
+    shadow?: DirectionalLightShadow;
 }
 
 export interface DirectionalLightOptions {
     lights: Clustered;
+}
+
+export interface DirectionalLightShadow {
+    bounds?: {
+        min: Vec3;
+        max: Vec3;
+    };
+    cascades?: number;
+    distance?: number;
+    resolution?: number | readonly [number, number];
 }
 
 export class DirectionalLights implements EnginePlugin, ClusteredDirectional {
@@ -24,6 +36,7 @@ export class DirectionalLights implements EnginePlugin, ClusteredDirectional {
     static attach(instance: EngineKernel, options: DirectionalLightOptions): DirectionalLights;
     get list(): readonly DirectionalLight[];
     setLights(lights: readonly DirectionalLight[]): this;
+    shadowLights(): readonly DirectionalShadowLight[];
     declarations(group: number): string;
     bindings(): GPUBindGroupEntry[];
     setup(engine: Engine): void;
@@ -35,7 +48,22 @@ export class DirectionalLights implements EnginePlugin, ClusteredDirectional {
 
 export const MAX_DIRECTIONAL_LIGHTS = 16;
 
+export const MAX_DIRECTIONAL_SHADOWS = 4;
+
 // Not exported from this entry, but used by the exports above:
+
+interface AreaShadowLight {
+    readonly index: number;
+    readonly center: Vec3;
+    readonly normal: readonly [number, number, number];
+    readonly right: readonly [number, number, number];
+    readonly up: readonly [number, number, number];
+    readonly twoSided: boolean;
+    readonly width: number;
+    readonly height: number;
+    readonly near: number;
+    readonly far: number;
+}
 
 class Clustered implements EnginePlugin {
     readonly name = "clustered";
@@ -79,13 +107,15 @@ class Clustered implements EnginePlugin {
 }
 
 interface ClusteredArea {
-    declarations(group: number): string;
+    declarations(group: number, shadow?: string): string;
     bindings(): GPUBindGroupEntry[];
+    shadowLights?(): readonly AreaShadowLight[];
 }
 
 interface ClusteredDirectional {
     declarations(group: number): string;
     bindings(): GPUBindGroupEntry[];
+    shadowLights?(): readonly DirectionalShadowLight[];
 }
 
 interface ClusteredLightTerm {
@@ -116,6 +146,21 @@ interface ClusteredReceiver {
 interface ClusteredShadow {
     declarations(group: number): string;
     bindings(): GPUBindGroupEntry[];
+    readonly directionalShadow?: string;
+    readonly areaShadow?: string;
+}
+
+interface DirectionalShadowLight {
+    readonly index: number;
+    readonly direction: readonly [number, number, number];
+    readonly bounds?: {
+        readonly min: Vec3;
+        readonly max: Vec3;
+    };
+    readonly cascades: number;
+    readonly distance: number;
+    readonly width: number;
+    readonly height: number;
 }
 
 interface LocalLightShadow {

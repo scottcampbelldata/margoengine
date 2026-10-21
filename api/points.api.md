@@ -16,9 +16,20 @@ export interface BaseMaterialOptions {
     blending?: PointsBlending;
     depthTest?: boolean;
     depthWrite?: boolean;
+    fog?: boolean;
 }
 
 export { ColorInput } from "@margoengine/math";
+
+export interface FogLike {
+    readonly color?: ColorInput;
+    readonly near?: number;
+    readonly far?: number;
+    readonly density?: number;
+    readonly heightFalloff?: number;
+    readonly height?: number;
+    readonly enabled?: boolean;
+}
 
 export const NO_BLOCK = 4294967295;
 
@@ -169,6 +180,8 @@ export class PointsPlugin implements EnginePlugin {
     constructor(options?: PointsPluginOptions);
     get pointClouds(): ReadonlySet<PointCloud>;
     get spriteBatches(): ReadonlySet<SpriteBatch>;
+    get fog(): FogLike | null;
+    setFog(fog: FogLike | null): this;
     add<T extends PointCloud | SpriteBatch>(item: T): T;
     remove(item: unknown): void;
     clear(): void;
@@ -293,6 +306,7 @@ abstract class BaseMaterial {
     blending: PointsBlending;
     depthTest: boolean;
     depthWrite: boolean | null;
+    fog: boolean;
     mapVersion: number;
     protected constructor(transparent: boolean);
     get map(): PointsTextureSource | null;

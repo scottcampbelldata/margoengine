@@ -5,6 +5,17 @@
 ```ts
 import { EngineKernel, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
+import { ColorInput } from "@margoengine/math";
+
+export interface FogLike {
+    readonly color?: ColorInput;
+    readonly near?: number;
+    readonly far?: number;
+    readonly density?: number;
+    readonly heightFalloff?: number;
+    readonly height?: number;
+    readonly enabled?: boolean;
+}
 
 export interface ParticleAtlas {
     columns: number;
@@ -91,6 +102,8 @@ class VFX implements EnginePlugin {
     readonly capacity: number;
     constructor(options?: VFXOptions, features?: VFXFeatures);
     static attach(instance: EngineKernel, options?: VFXOptions, features?: VFXFeatures): VFX;
+    get fog(): FogLike | null;
+    setFog(fog: FogLike | null): this;
     burst(count: number): this;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;

@@ -63,7 +63,7 @@ node --test tests/catalog.test.js
 | --- | --- |
 | [`@margoengine/gltf`](../packages/gltf/README.md) | Lazy static glTF/GLB loading for Margo Engine. |
 | [`@margoengine/gltf-pro`](../packages/gltf-pro/README.md) | Opt-in glTF 2.0 metallic-roughness rendering for Margo Engine WebGPU. |
-| [`@margoengine/loaders`](../packages/loaders/README.md) | PLY, 3MF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, legacy VTK and static USDA/USDZ loaders for Margo Engine. |
+| [`@margoengine/loaders`](../packages/loaders/README.md) | PLY, 3MF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, legacy VTK, static USDA/USDZ, SVG and TrueType font loaders for Margo Engine. |
 | [`@margoengine/decoders`](../packages/decoders/README.md) | Worker-pooled Draco geometry and KTX2/Basis texture decoding for Margo Engine. |
 | [`@margoengine/fbx`](../packages/fbx/README.md) | Binary and ASCII FBX conversion into the optional Margo glTF animation pipeline. |
 | [`@margoengine/usdz`](../packages/usdz/README.md) | Optional static USDA, USDC and USDZ ingestion through Margo glTF PBR. |
@@ -102,7 +102,7 @@ node --test tests/catalog.test.js
 
 | Package | What it is |
 | --- | --- |
-| [`@margoengine/post`](../packages/post/README.md) | HDR bloom, frame-graph SSAO, GTAO, SSGI and SSR, motion blur, lens flare, and post-effect stacks for Margo Engine WebGPU. |
+| [`@margoengine/post`](../packages/post/README.md) | HDR bloom, frame-graph SSAO, GTAO, SSGI and SSR, motion blur, lens flare, SMAA and FXAA, glitch and afterimage, and post-effect stacks for Margo Engine WebGPU. |
 | [`@margoengine/tonemap`](../packages/tonemap/README.md) | Optional color grading: Khronos PBR Neutral (the engine default), AgX and ACES fitted curves, 2-65 cube LUTs. |
 | [`@margoengine/dof`](../packages/dof/README.md) | Optional two-pass WebGPU depth of field with circular bokeh. |
 | [`@margoengine/taa`](../packages/taa/README.md) | Optional temporal anti-aliasing with motion vectors and YCoCg history clamping. |

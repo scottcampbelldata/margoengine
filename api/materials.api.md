@@ -5,7 +5,7 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
-import { MaterialExtension, MaterialExtensionTexture, PBRModel, PreparedGeometry } from "@margoengine/gltf-pro";
+import { MaterialExtension, MaterialExtensionTexture, PBRModel, PBRPrimitive, PreparedGeometry } from "@margoengine/gltf-pro";
 import { PBRInstances } from "@margoengine/gltf-pro/instancing";
 import { ColorInput } from "@margoengine/math";
 
@@ -69,14 +69,45 @@ export interface ColorNode {
     value: readonly [number, number, number, number];
 }
 
+export type CubeSource = {
+    faces: readonly (ImageSource | ImageData | RawImage | DataImage)[];
+} | {
+    equirect: Texture;
+    size?: number;
+};
+
+export interface CubeTarget {
+    readonly texture: GPUTexture;
+    readonly view: GPUTextureView;
+}
+
+export class CubeTexture extends Texture {
+    constructor(source: readonly (ImageSource | ImageData | RawImage | DataImage)[] | Texture, options?: CubeTextureOptions, owned?: boolean);
+    dispose(): void;
+}
+
+export interface CubeTextureOptions extends Omit<TextureOptions, 'dimension'> {
+    size?: number;
+}
+
+export type DataFormat = 'rgba8unorm' | 'rg8unorm' | 'r8unorm' | 'rgba16float' | 'rg16float' | 'r16float' | 'rgba32float' | 'rg32float' | 'r32float';
+
+export interface DataImage {
+    data: Uint8Array | Uint8ClampedArray | Uint16Array | Float32Array;
+    width: number;
+    height: number;
+    depth?: number;
+    format?: DataFormat;
+}
+
 export class DepthMaterial extends Material {
-    constructor(options?: Omit<MaterialOptions, Exclude<ModelKeys, 'depthPacking'> | MetalKeys | LightKeys | 'normalMap' | 'normalScale'>);
+    constructor(options?: Omit<MaterialOptions, Exclude<ModelKeys, 'depthPacking'> | MetalKeys | LightKeys | EnvKeys | 'normalMap' | 'normalScale'>);
 }
 
 export type DepthPacking = 'basic' | 'rgba';
 
 export class DistanceMaterial extends Material {
-    constructor(options?: Omit<MaterialOptions, Exclude<ModelKeys, DistanceKeys> | MetalKeys | LightKeys | 'normalMap' | 'normalScale'>);
+    constructor(options?: Omit<MaterialOptions, Exclude<ModelKeys, DistanceKeys> | MetalKeys | LightKeys | EnvKeys | 'normalMap' | 'normalScale'>);
 }
 
 export interface EmitNode {
@@ -88,12 +119,29 @@ export interface EmitNode {
     transmission?: TransmissionNode;
 }
 
+export type EnvCombine = 'multiply' | 'mix' | 'add';
+
+export type EnvMapSource = Texture | EnvironmentMap | CubeTarget | GPUTexture;
+
+export interface EnvironmentMap {
+    readonly specularView: GPUTextureView;
+    readonly specularMips: number;
+    readonly sampler: GPUSampler;
+    readonly sh: {
+        readonly irradiance: ArrayLike<number>;
+    };
+    readonly rotation: number;
+    readonly intensity: number;
+}
+
 export type Filter = 'linear' | 'nearest';
 
 export interface GeometryRange {
     start: number;
     count: number;
 }
+
+export type ImageSource = ImageBitmap | HTMLImageElement | HTMLCanvasElement | OffscreenCanvas | HTMLVideoElement | VideoFrame;
 
 export type InstancedMesh<M extends Material | readonly Material[] = Material> = MaterialMesh<M> & {
     readonly instances: PBRInstances;
@@ -108,6 +156,12 @@ export interface IridescenceOptions {
     iridescenceThicknessTexture?: ClearcoatTexture;
 }
 
+export interface KTX2Transcoder {
+    transcode(data: ArrayBuffer | ArrayBufferView, options?: {
+        signal?: AbortSignal;
+    }): Promise<TranscodedTexture>;
+}
+
 export class LambertMaterial extends Material {
     constructor(options?: Omit<MaterialOptions, ModelKeys | MetalKeys>);
 }
@@ -115,7 +169,7 @@ export class LambertMaterial extends Material {
 export type MapSlot = (typeof mapSlots)[number];
 
 export class MatcapMaterial extends Material {
-    constructor(options?: Omit<MaterialOptions, Exclude<ModelKeys, 'matcap'> | MetalKeys | LightKeys>);
+    constructor(options?: Omit<MaterialOptions, Exclude<ModelKeys, 'matcap'> | MetalKeys | LightKeys | EnvKeys>);
 }
 
 export class Material {
@@ -278,6 +332,24 @@ export class Material {
     set normalScale(v: number);
     get aoMapIntensity(): number;
     set aoMapIntensity(v: number);
+    get steps(): number;
+    set steps(v: number);
+    get gradientMap(): Texture | null;
+    set gradientMap(v: Texture | null);
+    get envMap(): EnvMapSource | null;
+    set envMap(v: EnvMapSource | null);
+    get envMapIntensity(): number;
+    set envMapIntensity(v: number);
+    get envMapRotation(): number;
+    set envMapRotation(v: number);
+    get envMapMode(): 'reflection' | 'refraction';
+    set envMapMode(v: 'reflection' | 'refraction');
+    get refractionRatio(): number;
+    set refractionRatio(v: number);
+    get combine(): EnvCombine;
+    set combine(v: EnvCombine);
+    get reflectivity(): number;
+    set reflectivity(v: number);
     get shininess(): number;
     set shininess(v: number);
     get opacity(): number;
@@ -359,6 +431,15 @@ export interface MaterialOptions extends PhysicalOptions {
     aoMapIntensity?: number;
     emissiveMap?: Texture | null;
     matcap?: Texture | null;
+    gradientMap?: Texture | null;
+    steps?: number;
+    envMap?: EnvMapSource | null;
+    envMapIntensity?: number;
+    envMapRotation?: number;
+    envMapMode?: 'reflection' | 'refraction';
+    refractionRatio?: number;
+    combine?: EnvCombine;
+    reflectivity?: number;
     alphaMap?: Texture | null;
     bumpMap?: Texture | null;
     bumpScale?: number;
@@ -460,11 +541,11 @@ export interface NormalMapNode {
 }
 
 export class NormalMaterial extends Material {
-    constructor(options?: Omit<MaterialOptions, ModelKeys | MetalKeys | LightKeys>);
+    constructor(options?: Omit<MaterialOptions, ModelKeys | MetalKeys | LightKeys | EnvKeys>);
 }
 
 export class PbrMaterial extends Material {
-    constructor(options?: Omit<MaterialOptions, Exclude<ModelKeys, keyof PhysicalOptions>>);
+    constructor(options?: Omit<MaterialOptions, Exclude<ModelKeys, keyof PhysicalOptions> | 'combine' | 'reflectivity'>);
 }
 
 export class PhongMaterial extends Material {
@@ -515,7 +596,7 @@ export interface ScalarNode {
     value: number;
 }
 
-export type Shading = 'standard' | 'basic' | 'normal' | 'matcap' | 'depth' | 'distance' | 'lambert' | 'phong';
+export type Shading = 'standard' | 'basic' | 'normal' | 'matcap' | 'depth' | 'distance' | 'lambert' | 'phong' | 'toon';
 
 export class ShadowCatcherMaterial extends Material {
     constructor(options?: {
@@ -551,10 +632,14 @@ export class StencilBuffer implements EnginePlugin {
 
 export class Texture {
     readonly source: TextureSource;
+    protected readonly owned: boolean;
     readonly options: TextureOptions;
     constructor(source: TextureSource, options?: TextureOptions, owned?: boolean);
     get width(): number;
     get height(): number;
+    get depth(): number;
+    get dimension(): TextureDimension;
+    get unfilterable(): boolean;
     get isVideo(): boolean;
     get magFilter(): Filter;
     set magFilter(v: Filter);
@@ -568,15 +653,19 @@ export class Texture {
     set anisotropy(v: number);
     get flipY(): boolean;
     set flipY(v: boolean);
-    get colorSpace(): 'srgb' | 'linear' | undefined;
-    set colorSpace(v: 'srgb' | 'linear' | undefined);
+    get colorSpace(): 'srgb' | 'linear' | 'display-p3' | undefined;
+    set colorSpace(v: 'srgb' | 'linear' | 'display-p3' | undefined);
     get mipmaps(): boolean;
     set mipmaps(v: boolean);
     update(region?: TextureRegion): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
+    gpuTexture(device: GPUDevice): GPUTexture | undefined;
+    sampled(device: GPUDevice, srgb: boolean, slot: string): [GPUTextureView, GPUSampler] | undefined;
     bind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined;
 }
+
+export type TextureDimension = '2d' | '2d-array' | '3d' | 'cube';
 
 export interface TextureNode {
     type: 'texture';
@@ -585,7 +674,7 @@ export interface TextureNode {
 }
 
 export interface TextureOptions {
-    colorSpace?: 'srgb' | 'linear';
+    colorSpace?: 'srgb' | 'linear' | 'display-p3';
     wrapS?: Wrap;
     wrapT?: Wrap;
     magFilter?: Filter;
@@ -593,6 +682,7 @@ export interface TextureOptions {
     mipmaps?: boolean;
     anisotropy?: number;
     flipY?: boolean;
+    dimension?: TextureDimension;
 }
 
 export interface TextureRegion {
@@ -600,9 +690,11 @@ export interface TextureRegion {
     y: number;
     width: number;
     height: number;
+    z?: number;
+    depth?: number;
 }
 
-export type TextureSource = ImageBitmap | HTMLImageElement | HTMLCanvasElement | OffscreenCanvas | HTMLVideoElement | VideoFrame | ImageData | RawImage;
+export type TextureSource = ImageSource | ImageData | RawImage | DataImage | GPUTexture | CubeTarget | TranscodedTexture | CubeSource;
 
 export { TextureTransform } from "@margoengine/gltf-pro";
 
@@ -619,6 +711,44 @@ export type TileAnimationStart = {
 export interface TileFrame {
     duration: number;
     uvs: ArrayLike<number>;
+}
+
+export class ToonMaterial extends Material {
+    constructor(options?: Omit<MaterialOptions, Exclude<ModelKeys, 'steps' | 'gradientMap'> | MetalKeys | EnvKeys>);
+}
+
+export class ToonModel {
+    readonly model: PBRModel;
+    disposed: boolean;
+    constructor(model: PBRModel, options?: ToonModelOptions);
+    get steps(): number;
+    set steps(v: number);
+    get gradientMap(): Texture | null;
+    set gradientMap(v: Texture | null);
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface ToonModelOptions {
+    gradientMap?: Texture | null;
+    steps?: number;
+    primitives?: readonly (number | PBRPrimitive)[];
+}
+
+export interface TranscodedMip {
+    data: Uint8Array;
+    width: number;
+    height: number;
+}
+
+export interface TranscodedTexture {
+    width: number;
+    height: number;
+    mipmaps: readonly TranscodedMip[];
+    format: string;
+    target: string;
+    srgb: boolean;
+    hasAlpha?: boolean;
 }
 
 export interface TransmissionNode {
@@ -686,6 +816,15 @@ export function installNodeMaterial(model: PBRModel, graph: MaterialGraph): Node
 
 export function iridescence(options?: IridescenceOptions, base?: MaterialExtension): MaterialExtension;
 
+export function loadCubeTexture(urls: string | URL | readonly (string | URL)[], { signal, ...options }?: CubeTextureOptions & {
+    signal?: AbortSignal;
+}): Promise<CubeTexture>;
+
+export function loadKTX2Texture(url: string | URL, { decoder, signal, ...options }: TextureOptions & {
+    decoder: KTX2Transcoder;
+    signal?: AbortSignal;
+}): Promise<Texture>;
+
 export function loadTexture(url: string | URL, { signal, ...options }?: TextureOptions & {
     signal?: AbortSignal;
 }): Promise<Texture>;
@@ -710,6 +849,8 @@ export function tileAnimator(mesh: MaterialMesh<Material | readonly Material[]>,
     uvs: number[] | Float32Array;
 }, tiles: readonly AnimatedTile[]): (time: number) => number;
 
+export function toonModel(model: PBRModel, options?: ToonModelOptions): ToonModel;
+
 export function transformUVs(uvs: ArrayLike<number>, { offset, scale, rotation }: TextureTransform): Float32Array;
 
 export function transmission(options?: TransmissionOptions): MaterialExtension;
@@ -717,6 +858,8 @@ export function transmission(options?: TransmissionOptions): MaterialExtension;
 // Not exported from this entry, but used by the exports above:
 
 type DistanceKeys = 'depthPacking' | 'referencePosition' | 'nearDistance' | 'farDistance';
+
+type EnvKeys = 'envMap' | 'envMapIntensity' | 'envMapRotation' | 'envMapMode' | 'refractionRatio' | 'combine' | 'reflectivity';
 
 type LightKeys = 'emissive' | 'emissiveMap' | 'aoMap' | 'aoMapIntensity';
 
@@ -726,7 +869,7 @@ type LiveColor = number[] & {
 
 type MetalKeys = 'roughness' | 'metalness' | 'metalRoughnessMap';
 
-type ModelKeys = 'shading' | 'matcap' | 'specular' | 'shininess' | DistanceKeys | keyof PhysicalOptions;
+type ModelKeys = 'shading' | 'matcap' | 'specular' | 'shininess' | 'steps' | 'gradientMap' | DistanceKeys | keyof PhysicalOptions;
 
 type Pixels = {
     data: ArrayLike<number>;

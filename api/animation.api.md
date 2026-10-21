@@ -30,6 +30,48 @@ export class Animation implements EnginePlugin {
     destroy(): void;
 }
 
+export class AnimationGroup implements EnginePlugin {
+    readonly clip: string | number | KeyframeClip;
+    readonly options: AnimationGroupOptions;
+    readonly name: string;
+    time: number;
+    playing: boolean;
+    constructor(clip: string | number | KeyframeClip, options?: AnimationGroupOptions);
+    get size(): number;
+    has(target: AnimationGroupMember): boolean;
+    add(target: AnimationGroupMember, offset?: number): this;
+    remove(target: AnimationGroupMember): this;
+    setOffset(target: AnimationGroupMember, offset: number): this;
+    seek(time: number): this;
+    update(delta: number): this;
+    setup(engine: Engine): void;
+    onPreUpdate(delta: number): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export type AnimationGroupMember = AnimationGroupPlayer | Skeleton;
+
+export interface AnimationGroupOptions {
+    loop?: boolean;
+    speed?: number;
+}
+
+export interface AnimationGroupPlayer {
+    readonly model: PBRModel;
+    readonly clips: readonly {
+        readonly name: string;
+        readonly duration: number;
+    }[];
+    readonly options: {
+        readonly loop?: boolean;
+    };
+    clip: number;
+    playing: boolean;
+    seek(time: number): unknown;
+    setMorph(node: number, target: number, weight: number): void;
+}
+
 export interface AnimationOptions {
     loop?: boolean;
     speed?: number;
@@ -37,7 +79,7 @@ export interface AnimationOptions {
 
 export interface BakedChannel<N> {
     node: N;
-    path: 'translation' | 'rotation' | 'scale';
+    path: KeyframePath;
     interpolation: 'STEP' | 'LINEAR';
     times: Float32Array;
     values: Float32Array;
@@ -77,9 +119,16 @@ export interface KeyframeClipData {
     tracks: readonly KeyframeTrackData[];
 }
 
+export interface KeyframeModelTarget {
+    readonly model: PBRModel;
+    setMorph(node: number, target: number, weight: number): void;
+}
+
+export type KeyframePath = 'translation' | 'rotation' | 'scale' | 'weights';
+
 export interface KeyframeTrack {
     readonly target: string;
-    readonly path: 'translation' | 'rotation' | 'scale';
+    readonly path: KeyframePath;
     readonly times: Float64Array;
     readonly values: Float64Array;
     readonly interpolations: readonly KeyInterpolation[];
@@ -88,7 +137,7 @@ export interface KeyframeTrack {
 
 export interface KeyframeTrackData {
     target: string;
-    path: 'translation' | 'rotation' | 'scale';
+    path: KeyframePath;
     keys: readonly Keyframe[];
     blend?: KeyframeBlend;
 }
@@ -134,7 +183,7 @@ export class Skin implements EnginePlugin {
     [Symbol.dispose]: () => void;
 }
 
-export function applyKeyframeClip(clip: KeyframeClip, skeleton: Skeleton, time: number): void;
+export function applyKeyframeClip(clip: KeyframeClip, target: Skeleton | KeyframeModelTarget, time: number): void;
 
 export function bakeKeyframeClip<N>(clip: KeyframeClip, fps: number, resolve: (target: string) => N | undefined): {
     name: string;

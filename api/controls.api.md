@@ -217,6 +217,8 @@ export interface LocomotionOptions {
     runSpeed?: number;
 }
 
+export const MARGO: NavigationProfile;
+
 export const MAYA: NavigationProfile;
 
 export const MOUSE: {
@@ -252,8 +254,6 @@ export interface NavigationProfile {
 }
 
 export const ONSHAPE: NavigationProfile;
-
-export const MARGO: NavigationProfile;
 
 export class OrbitControls extends Controls {
     enableDamping: boolean;
@@ -315,7 +315,7 @@ export class OrbitControls extends Controls {
 }
 
 export const PROFILES: {
-    readonly orbit: NavigationProfile;
+    readonly margo: NavigationProfile;
     readonly solidworks: NavigationProfile;
     readonly autocad: NavigationProfile;
     readonly inventor: NavigationProfile;

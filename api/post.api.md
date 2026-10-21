@@ -6,6 +6,27 @@
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 
+export class Afterimage implements EnginePlugin {
+    readonly options: AfterimageOptions;
+    readonly name = "afterimage";
+    constructor(options?: AfterimageOptions);
+    static attach(engine: EngineKernel, options?: AfterimageOptions): Afterimage;
+    get enabled(): boolean;
+    set enabled(value: boolean);
+    get damp(): number;
+    set damp(value: number);
+    reset(): void;
+    setup(engine: Engine): void;
+    onDeviceRestored(engine: Engine): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface AfterimageOptions {
+    damp?: number;
+    enabled?: boolean;
+}
+
 export class Bloom implements EnginePlugin {
     readonly options: BloomOptions;
     readonly name = "bloom";
@@ -58,6 +79,27 @@ export interface GTAOOptions {
     radius?: number;
     slices?: number;
     steps?: number;
+    enabled?: boolean;
+}
+
+export class Glitch implements EnginePlugin {
+    readonly options: GlitchOptions;
+    readonly name = "glitch";
+    constructor(options?: GlitchOptions);
+    static attach(engine: EngineKernel, options?: GlitchOptions): Glitch;
+    get enabled(): boolean;
+    set enabled(value: boolean);
+    get active(): boolean;
+    setup(engine: Engine): void;
+    onDeviceRestored(engine: Engine): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface GlitchOptions {
+    intensity?: number;
+    wild?: boolean;
+    seed?: number;
     enabled?: boolean;
 }
 
@@ -163,6 +205,31 @@ export class PostStack implements EnginePlugin {
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
+
+export class SMAA implements EnginePlugin {
+    readonly options: SMAAOptions;
+    readonly name = "smaa";
+    constructor(options?: SMAAOptions);
+    static attach(instance: EngineKernel, options?: SMAAOptions): SMAA;
+    get enabled(): boolean;
+    set enabled(value: boolean);
+    setup(engine: Engine): void;
+    registerPasses(graph: FrameGraph): void;
+    onDeviceRestored(engine: Engine): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface SMAAOptions {
+    quality?: SMAAQuality;
+    edgeDetection?: 'luma' | 'color';
+    threshold?: number;
+    maxSearchSteps?: number;
+    cornerRounding?: number;
+    enabled?: boolean;
+}
+
+export type SMAAQuality = 'low' | 'medium' | 'high' | 'ultra';
 
 export class SSAO implements EnginePlugin {
     readonly options: SSAOOptions;

@@ -74,6 +74,10 @@ export interface CubeFaces {
     faces: readonly Float32Array[];
 }
 
+export interface CubeTextureSource {
+    readonly texture: GPUTexture;
+}
+
 export interface EXRChannel {
     name: string;
     type: 'UINT' | 'HALF' | 'FLOAT';
@@ -126,6 +130,7 @@ export class Environment implements EnginePlugin {
     irradianceAt(normal: readonly [number, number, number]): [number, number, number];
     onChange(listener: (environment: Environment) => void): () => void;
     restore(target: GPUDevice | EngineKernel): Promise<void>;
+    refresh(): Promise<void>;
     setup(engine: EngineKernel): void;
     onDeviceRestored(engine: EngineKernel): void;
     dispose(): void;
@@ -200,7 +205,7 @@ export interface EnvironmentOptions {
     name?: string;
 }
 
-export type EnvironmentSource = FloatImage | CubeFaces;
+export type EnvironmentSource = FloatImage | CubeFaces | CubeTextureSource;
 
 export const FOG_BINDING = 25;
 

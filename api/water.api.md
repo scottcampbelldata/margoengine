@@ -5,6 +5,17 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
+import { ColorInput } from "@margoengine/math";
+
+export interface FogLike {
+    readonly color?: ColorInput;
+    readonly near?: number;
+    readonly far?: number;
+    readonly density?: number;
+    readonly heightFalloff?: number;
+    readonly height?: number;
+    readonly enabled?: boolean;
+}
 
 export class Water implements EnginePlugin {
     readonly options: WaterOptions;
@@ -13,6 +24,8 @@ export class Water implements EnginePlugin {
     static attach(engine: EngineKernel, options?: WaterOptions): Water;
     get coastalDepthTexture(): GPUTexture | undefined;
     get depthTexture(): GPUTexture | undefined;
+    get fog(): FogLike | null;
+    setFog(fog: FogLike | null): this;
     setWaveHeight(height: number): this;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
