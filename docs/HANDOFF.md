@@ -2,6 +2,12 @@
 
 Last updated 2026-10-19. Read this first when starting a new session. Update it whenever work lands.
 
+## Next up (Scott, 2026-10-21)
+
+Multiple views and scenes are the very next work after the visual-parity pass: the plan, measured prototype
+sizes, milestones and the decisions Scott still has to make are in [multi-view-roadmap.md](multi-view-roadmap.md).
+The full WebGL2 fallback follows in the next version: [webgl2-compat-roadmap.md](webgl2-compat-roadmap.md).
+
 ## Resume here (2026-10-19, moving from the laptop to scott dev)
 
 State on GitHub: `main` has everything finished (see the next two paragraphs). Branch `wip/voxel-phase4-renderer`
