@@ -392,3 +392,4 @@ export * from './built-material.js';
 export * from './material-classes.js';
 export * from './tile-animation.js';
 export * from './wgsl-material.js';
+export { toonModel, ToonModel, type ToonModelOptions } from './toon.js';

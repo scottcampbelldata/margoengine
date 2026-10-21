@@ -591,11 +591,11 @@ leaves.alphaMap = null; // live: the next frame draws without it
 
 ## Shadow catcher
 
-`ShadowCatcherMaterial` is invisible except for the shadows it receives, for ground planes under product shots
-(three.js ShadowMaterial). Where a shadow falls it draws `color` (default black) at alpha `opacity` (default 1) times
-the share of the light that the shadow takes: received / unshadowed luminance of a white Lambert surface, over the sun
-(`@margoengine/shadows`) and clustered point and spot lights (integrated maps or `LocalShadows`). An unshadowed light
-lightens the shadows of the others; ambient and environment light do not count. Register the plane with those
+`ShadowCatcherMaterial` is invisible except for the shadows it receives, for ground planes under product shots.
+Where a shadow falls it draws `color` (default black) at alpha `opacity` (default 1) times the share of the light that
+the shadow takes: received / unshadowed luminance of a white Lambert surface, over the sun (`@margoengine/shadows`) and
+clustered point, spot, directional and area lights (integrated maps or `LocalShadows`, `castShadow` directional and
+area lights included). An unshadowed light lightens the shadows of the others; ambient and environment light do not count. Register the plane with those
 effects like any receiver. It is transparent (drawn after opaque meshes, no depth write) and so casts no shadow.
 `color` and `opacity` are live, and `clone()` keeps it a catcher.
 
@@ -623,7 +623,8 @@ lights the surface your code returns.
   `uniforms.name`. `material.uniforms.name = value` (same component count) or writing an array uniform's elements in
   place changes them from the next frame.
 - `textures: {name: texture}`: read `name` with its sampler `nameSampler`; sRGB unless the Texture says otherwise.
-  Assign another Texture to the same name to swap it live.
+  Each is declared by its `dimension`: `texture_2d<f32>`, `texture_2d_array<f32>`, `texture_3d<f32>` or
+  `texture_cube<f32>`. Assign another Texture of the same dimension to the same name to swap it live.
 
 The WGSL, uniform names and texture names are fixed at construction. The constructor throws `TypeError` for a
 missing or misdeclared entry point, a name that is not a WGSL identifier or that the PBR shader already uses (`f`,
@@ -649,3 +650,119 @@ engine.onFrame((_, delta) => {
   water.uniforms.time = time += delta; // live from the next frame
 });
 ```
+
+## Toon materials
+
+`ToonMaterial` (or `shading: 'toon'`) is Lambert's diffuse light read through a ramp instead of `n.l`: the
+`gradientMap` texture, sampled across at `u = n.l * 0.5 + 0.5` (its left texel is the side away from the light, its
+right texel the side facing it; RGB, so a ramp may be coloured), or without one `steps` flat bands (an integer 2
+through 256, default 3; band `k` of `n` is `k / (n - 1)`, the same as a nearest-filtered gradient of `n` texels). Both
+are live. The engine's light, clustered point, spot and extra directional lights and their shadows go through the ramp;
+the hemisphere ambient, an environment's diffuse light and light maps light it as Lambert; area lights shade it as a
+rough dielectric. There is no highlight. Use `magFilter: 'nearest'` on a gradient for hard steps.
+
+```ts
+import {ToonMaterial, Texture, createMesh, toonModel} from '@margoengine/materials';
+const bands = new Texture({data: new Uint8Array([40, 40, 40, 255, 140, 140, 140, 255, 255, 255, 255, 255]), width: 3, height: 1},
+  {colorSpace: 'linear', magFilter: 'nearest', minFilter: 'nearest', mipmaps: false});
+createMesh(engine, geometry, new ToonMaterial({color: '#e07040', gradientMap: bands}));
+createMesh(engine, geometry, new ToonMaterial({color: '#4080e0', steps: 4}));
+// A loaded glTF model, or some of its primitives (skinned, morphed and instanced ones keep their deformation):
+const toon = toonModel(model, {steps: 3}); // or {gradientMap, primitives: [0, 2]}
+toon.steps = 5; // live
+toon.dispose(); // the model's own materials again
+```
+
+`toonModel` gives each chosen primitive a copy of its glTF material with the toon lighting; colours, factors and maps
+stay shared and live. Physical layers (clearcoat, sheen, transmission, iridescence) and material extensions are left
+out of the toon primitives. `selectVariant` replaces the toon copies (call `toonModel` again after it), and a
+`createMesh` mesh takes a `ToonMaterial` instead. Outlines stay `@margoengine/toon`'s whole-scene `Toon` pass.
+
+## Environment maps
+
+`envMap` gives one material its own cube of surroundings: a `CubeTexture`, an `@margoengine/environment`
+`Environment`, a cube render target `{texture, view}` (the shape of environment's `CubeCamera`) or a six-layer
+GPUTexture. Live, with `envMapIntensity` (default 1), `envMapRotation` (radians about +Y, added to an Environment's own
+rotation) and `envMapMode: 'refraction'` with `refractionRatio` (default 0.98) to sample along the bent view ray
+instead of the mirrored one.
+
+- **Standard shading** lights itself with the map in place of its ambient light: specular radiance from the mip level
+  of its roughness (`roughness * (levels - 1)`) weighted by an analytic split-sum environment BRDF (Karis 2014), plus
+  diffuse irradiance from the Environment's spherical harmonics or, for other cubes, a level about four texels across.
+  It overrides the built-in hemisphere and an attached scene IBL for this material (their bindings stay). Physical
+  clearcoat and sheen layers read it too; the thin film and anisotropy do not.
+- **Basic, Lambert and Phong** combine the sharp reflection with their colour by `combine` (`'multiply'`, default:
+  colour x reflection; `'mix'`: toward the reflection; `'add'`) and `reflectivity` (0-1, default 1).
+
+Other shadings refuse an envMap. A `CubeTexture`'s mips are box filtered per face, not GGX prefiltered: rough
+surfaces blur toward the face averages; an `Environment` is prefiltered. Bindings 188-190 of the material's group.
+
+```ts
+import {CubeTexture, PbrMaterial, UnlitMaterial, loadCubeTexture} from '@margoengine/materials';
+const sky = await loadCubeTexture(['px.jpg', 'nx.jpg', 'py.jpg', 'ny.jpg', 'pz.jpg', 'nz.jpg']);
+const chrome = new PbrMaterial({metalness: 1, roughness: 0.1, envMap: sky});
+const glass = new UnlitMaterial({envMap: sky, envMapMode: 'refraction', refractionRatio: 0.66, combine: 'mix'});
+chrome.envMap = environment; // an @margoengine/environment Environment, or a CubeCamera target
+```
+
+## Cube textures
+
+`new CubeTexture(faces)` takes six images (or raw RGBA8, or float `DataImage`s) in WebGPU layer order +X, -X, +Y, -Y,
++Z, -Z: square, one size, row 0 at the top (`flipY` defaults to false), the orientation of environment's `CubeFaces`.
+`new CubeTexture(texture, {size})` resamples an equirectangular 2D Texture (centre facing -Z, +X to its right, top row
+straight up, environment's convention) into rgba16float faces on the GPU, again whenever that texture updates.
+`loadCubeTexture(urls)` loads six image URLs, or one equirect URL. Faces get per-face mip chains (`mipmaps`, default
+true). A CubeTexture is a `Texture` with `dimension: 'cube'`: use it as an `envMap` or a WgslMaterial
+`texture_cube<f32>`, sampled with world directions.
+
+## Data, 3D and array textures
+
+A `DataImage` source `{data, width, height, depth?, format?}` uploads raw texels, row 0 first, then each layer or
+slice: `rgba8unorm`, `rg8unorm` and `r8unorm` take bytes; `rgba16float`, `rg16float` and `r16float` take a
+Uint16Array of half-float bits or a Float32Array (converted on upload); `rgba32float`, `rg32float` and `r32float` take
+a Float32Array. The `dimension` option makes `depth > 1` a `'2d-array'` (layers) or `'3d'` (slices) texture.
+`texture.update({x, y, z, width, height, depth})` re-uploads just that box on the next frame; `update()` all of it.
+Data defaults to no mip chain (2D and array data may set `mipmaps: true`, not 3D or 32-bit floats) and is linear
+(`colorSpace: 'srgb'` only for `rgba8unorm`).
+
+```ts
+const field = new Float32Array(32 * 32 * 32);
+const volume = new Texture({data: field, width: 32, height: 32, depth: 32, format: 'r32float'}, {dimension: '3d'});
+const material = new WgslMaterial({
+  wgsl: `fn shade(i: Out, s: Surface) -> Surface {
+  var o = s; o.emissive = vec3f(textureLoad(volume, vec3i(i.position * 8.0 + 16.0), 0).r); return o;
+}`,
+  textures: {volume},
+});
+field[0] = 1;
+volume.update({x: 0, y: 0, z: 0, width: 1, height: 1, depth: 1}); // live
+```
+
+Material map slots take 2D textures (a 3D, array or cube one throws a `TypeError`), floats included; 32-bit floats
+filter only on a device with `float32-filterable` (request it in `Engine.create({features})`), so map slots refuse them
+elsewhere with a `MargoError('unsupported')` and a WgslMaterial reads them with `textureLoad`. A borrowed GPUTexture
+source (`new Texture(gpuTexture, {dimension})`) binds as it is and stays its owner's.
+
+## KTX2 textures
+
+A `.ktx2` file goes on any map through `@margoengine/decoders`' `KTX2Decoder`: `loadKTX2Texture(url, {decoder})`
+fetches and transcodes it, and `new Texture(await decoder.transcode(bytes))` takes a transcode result. Each device gets
+its own upload of every mip level, in the compressed format the decoder chose (BC7, ASTC 4x4, ETC2 or RGBA8); a device
+without that format's feature throws `MargoError('unsupported')`, so create the decoder with the engine's device. Colour
+slots decode sRGB unless `colorSpace` says otherwise. `new Texture(await decoder.createTexture(bytes))` borrows the
+decoder's GPUTexture instead (one device, its own format). The decoder rejects KTX2 cube maps, arrays and UASTC HDR.
+
+```ts
+import {KTX2Decoder} from '@margoengine/decoders';
+const decoder = new KTX2Decoder({device: engine.gpu});
+const albedo = await loadKTX2Texture('/textures/albedo.ktx2', {decoder});
+createMesh(engine, geometry, new PbrMaterial({map: albedo}));
+```
+
+## Display P3 textures
+
+`colorSpace: 'display-p3'` on an 8-bit RGBA image or raw RGBA8 data reads its pixels as Display P3 (sRGB transfer
+curve, P3 primaries) and converts them once on the GPU, after each upload, into an rgba16float copy in the linear sRGB
+working space, with `@margoengine/math`'s `P3_TO_SRGB`: colours outside sRGB keep negative channels, as
+`color(display-p3 ...)` colours do, so an environment `ColorOutput` P3 canvas shows them. Load images with `loadTexture`
+(no browser colour conversion). Float data takes linear sRGB values instead (`linearP3ToLinearSRGB`).

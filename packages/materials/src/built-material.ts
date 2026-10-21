@@ -19,29 +19,84 @@ import { physicalMapsShader } from './physical-maps.js';
 import { depthDistanceShader } from './depth-distance.js';
 import { featureMaps, featureShader } from './features.js';
 import { catcherLit } from './catcher.js';
+import { toonDeclarations, toonEdits, toonLit } from './toon-shader.js';
+import { envFloats, envMapLit, envMapShader, packEnv, type EnvCombine, type EnvironmentMap } from './env-map.js';
 import { readResponse } from '../../shared/loading.js';
 import { clusterBrdf } from '../../shared/light-terms.js';
 import { MargoError } from '@margoengine/math/errors';
 import { parseColor, type ColorInput } from '@margoengine/math/color';
+import {
+  convertP3,
+  dataGPUFormat,
+  equirectToCube,
+  gpuDimension,
+  unfilterable,
+  uploadTranscoded,
+  validateData,
+  validateTranscoded,
+  writeData,
+  type CubeTarget,
+  type DataFormat,
+  type DataImage,
+  type TextureDimension,
+  type TranscodedTexture,
+} from './texture-kinds.js';
 export type { TextureTransform, MaterialSide } from '@margoengine/gltf-pro';
 export { packAtlas, transformUVs, type Atlas, type AtlasOptions } from './atlas.js';
+export type { EnvCombine, EnvironmentMap } from './env-map.js';
+export type {
+  CubeTarget,
+  DataFormat,
+  DataImage,
+  TextureDimension,
+  TranscodedMip,
+  TranscodedTexture,
+} from './texture-kinds.js';
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 export type RawImage = { data: Uint8Array | Uint8ClampedArray; width: number; height: number };
-/** ImageData and `{data,width,height}` upload as raw RGBA8 rows (row 0 at UV v=0); other sources use copyExternalImageToTexture. */
-export type TextureSource =
+/** What `Material.envMap` takes: a cube Texture (CubeTexture), an Environment, a cube render target or a six-layer GPUTexture. */
+export type EnvMapSource = Texture | EnvironmentMap | CubeTarget | GPUTexture;
+/** A browser image a texture or cube face uploads with copyExternalImageToTexture. */
+export type ImageSource =
   | ImageBitmap
   | HTMLImageElement
   | HTMLCanvasElement
   | OffscreenCanvas
   | HTMLVideoElement
-  | VideoFrame
+  | VideoFrame;
+/**
+ * A cube map's source (`CubeTexture` builds these): six faces in WebGPU layer order +X, -X, +Y, -Y, +Z, -Z (square,
+ * equal sizes, row 0 at the top), or an equirectangular 2D Texture resampled into `size`-texel faces.
+ */
+export type CubeSource =
+  | { faces: readonly (ImageSource | ImageData | RawImage | DataImage)[] }
+  | { equirect: Texture; size?: number };
+/**
+ * ImageData and `{data,width,height}` upload as raw RGBA8 rows (row 0 at UV v=0); other images use
+ * copyExternalImageToTexture. A `DataImage` with a `format` or `depth` uploads float, one- or two-channel, 3D or array
+ * texels. A GPUTexture (such as `KTX2Decoder.createTexture` output) or a `CubeTarget` is borrowed as is; a
+ * `TranscodedTexture` (`KTX2Decoder.transcode` output) uploads its compressed mips on each device; a `CubeSource` makes
+ * a cube map.
+ */
+export type TextureSource =
+  | ImageSource
   | ImageData
-  | RawImage;
+  | RawImage
+  | DataImage
+  | GPUTexture
+  | CubeTarget
+  | TranscodedTexture
+  | CubeSource;
 export type Wrap = 'repeat' | 'clamp' | 'mirror';
 export type Filter = 'linear' | 'nearest';
 export interface TextureOptions {
-  colorSpace?: 'srgb' | 'linear';
+  /**
+   * How colour values are stored: `'srgb'` (decoded on sampling), `'linear'`, or `'display-p3'` (8-bit Display P3
+   * pixels, converted once on the GPU to the linear sRGB working space, colours outside sRGB as negative channels).
+   * Undefined: the slot's default (sRGB for colour slots).
+   */
+  colorSpace?: 'srgb' | 'linear' | 'display-p3';
   wrapS?: Wrap;
   wrapT?: Wrap;
   magFilter?: Filter;
@@ -49,13 +104,23 @@ export interface TextureOptions {
   mipmaps?: boolean;
   anisotropy?: number;
   flipY?: boolean;
+  /**
+   * How the texture is sampled, fixed at construction: `'2d'` (default), `'2d-array'` and `'3d'` for a `DataImage`
+   * with `depth` layers or slices, `'cube'` for a six-layer GPUTexture (CubeTexture sets it for its sources).
+   */
+  dimension?: TextureDimension;
 }
-/** A pixel rectangle of a texture source, `x` and `y` from its top-left corner (raw data: its first row). */
+/**
+ * A pixel rectangle of a texture source, `x` and `y` from its top-left corner (raw data: its first row); for 3D and
+ * array data, `z` and `depth` (defaults 0 and 1) pick the slices or layers.
+ */
 export interface TextureRegion {
   x: number;
   y: number;
   width: number;
   height: number;
+  z?: number;
+  depth?: number;
 }
 interface Slot {
   texture?: GPUTexture;
@@ -68,15 +133,30 @@ interface Slot {
   samplerMips: boolean;
   version: number;
   time?: number;
-  /** Union [x0, y0, x1, y1] of `update(region)` calls since this up-to-date copy was last uploaded. */
+  /** Union [x0, y0, x1, y1] of `update(region)` calls since this up-to-date copy was last uploaded ([x0, y0, z0, x1, y1, z1] for data). */
   region?: number[];
+  /** Display P3 only: the linear sRGB rgba16float copy `texture` (the sRGB-decoded staging upload) converts into. */
+  p3?: GPUTexture;
+  /** Equirect cube only: the source Texture's version the faces were rendered from. */
+  source?: number;
 }
+/** What a non-image source is, fixed at construction (absent for images and raw RGBA8, the original path). */
+type Kind =
+  | { type: 'data'; format: DataFormat; dimension: '2d' | '2d-array' | '3d' }
+  | { type: 'gpu'; texture: GPUTexture; view?: GPUTextureView; dimension: TextureDimension }
+  | { type: 'ktx2'; base: string }
+  | { type: 'faces'; format?: DataFormat }
+  | { type: 'equirect'; source: Texture; size: number };
 const wraps = { repeat: 'repeat', clamp: 'clamp-to-edge', mirror: 'mirror-repeat' } as const,
   maxPixels = 16_777_216;
 const optional = (list: readonly unknown[]) => (v: unknown) => v === undefined || list.includes(v);
 /** Valid values of each texture option, and how the fix reads when one is not. */
 const textureOptions: Record<keyof TextureOptions, [(v: unknown) => boolean, string]> = {
-  colorSpace: [optional(['srgb', 'linear']), "'srgb', 'linear' or undefined (the slot's default)"],
+  colorSpace: [
+    optional(['srgb', 'linear', 'display-p3']),
+    "'srgb', 'linear', 'display-p3' or undefined (the slot's default)",
+  ],
+  dimension: [optional(['2d', '2d-array', '3d', 'cube']), "'2d', '2d-array', '3d' or 'cube'"],
   wrapS: [optional(['repeat', 'clamp', 'mirror']), "'repeat', 'clamp' or 'mirror'"],
   wrapT: [optional(['repeat', 'clamp', 'mirror']), "'repeat', 'clamp' or 'mirror'"],
   magFilter: [optional(['linear', 'nearest']), "'linear' or 'nearest'"],
@@ -170,6 +250,102 @@ const dimensions = (s: ImageDimensions): [number, number] => [
 ];
 const raw = (s: unknown): s is RawImage =>
   !!s && typeof s === 'object' && 'data' in s && (s.data instanceof Uint8Array || s.data instanceof Uint8ClampedArray);
+const gpuTexture = (s: unknown): s is GPUTexture =>
+  !!s &&
+  typeof (s as GPUTexture).createView === 'function' &&
+  typeof (s as GPUTexture).mipLevelCount === 'number' &&
+  typeof (s as GPUTexture).depthOrArrayLayers === 'number';
+/** The kind of a non-image `source` (validated), or undefined for images and raw RGBA8 data (the original path). */
+function kindOf(source: TextureSource, o: TextureOptions): Kind | undefined {
+  const s = source as Partial<DataImage & CubeTarget & TranscodedTexture> & {
+    faces?: unknown;
+    equirect?: unknown;
+    size?: number;
+  };
+  if (gpuTexture(source)) return { type: 'gpu', texture: source, dimension: gpuDimension(source, o.dimension) };
+  if (gpuTexture(s.texture) && s.view) {
+    if (o.dimension !== undefined && o.dimension !== 'cube')
+      throw new TypeError("Texture CubeTarget is a cube; omit dimension or pass 'cube'");
+    if (s.texture.depthOrArrayLayers !== 6) throw new TypeError('Texture CubeTarget texture must have six layers');
+    return { type: 'gpu', texture: s.texture, view: s.view, dimension: 'cube' };
+  }
+  if (Array.isArray(s.mipmaps) && typeof s.target === 'string') {
+    if (o.dimension !== undefined && o.dimension !== '2d')
+      throw new TypeError("Texture KTX2 results are 2D; omit dimension or pass '2d'");
+    return { type: 'ktx2', base: validateTranscoded(source as TranscodedTexture) };
+  }
+  if (Array.isArray(s.faces)) {
+    const faces = s.faces as unknown[],
+      format = (faces[0] as Partial<DataImage> | undefined)?.format;
+    if (faces.length !== 6 || faces.some((f) => !f || typeof f !== 'object'))
+      throw new TypeError('Texture cube faces must be six images in the order +X, -X, +Y, -Y, +Z, -Z; pass six');
+    if (o.dimension !== undefined && o.dimension !== 'cube')
+      throw new TypeError("Texture cube faces make a cube; omit dimension or pass 'cube'");
+    for (const face of faces as DataImage[])
+      if ('data' in face && (face.format !== undefined || !raw(face))) validateData(face, '2d');
+      else if (raw(face) && face.data.length < face.width * face.height * 4)
+        throw new RangeError('Raw texture data must be RGBA8 of width*height*4 bytes');
+    const sizes = faces.map((f) => dimensions(f as ImageDimensions));
+    if (sizes.some(([w, h]) => w !== sizes[0][0] || h !== sizes[0][1] || (w && w !== h)))
+      throw new RangeError('Texture cube faces must be square and the same size; resize them to one edge length');
+    if (faces.some((f) => ((f as DataImage).format ?? 'rgba8unorm') !== (format ?? 'rgba8unorm')))
+      throw new TypeError('Texture cube faces must share one format; convert them to the same one');
+    return { type: 'faces', ...(format && format !== 'rgba8unorm' ? { format } : {}) };
+  }
+  if (s.equirect !== undefined) {
+    if (!(s.equirect instanceof Texture) || s.equirect.dimension !== '2d')
+      throw new TypeError('Texture equirect source must be a 2D Texture; pass new Texture(image)');
+    if (o.dimension !== undefined && o.dimension !== 'cube')
+      throw new TypeError("Texture equirect source makes a cube; omit dimension or pass 'cube'");
+    const size = s.size ?? 2 ** Math.max(4, Math.round(Math.log2(Math.max(1, s.equirect.width / 4))));
+    if (!Number.isSafeInteger(size) || size < 1 || size > 8192)
+      throw new RangeError('Texture equirect cube size must be an integer from 1 through 8192; pass a face edge');
+    return { type: 'equirect', source: s.equirect, size };
+  }
+  const data = s as DataImage,
+    bytes = raw(source);
+  // Plain RGBA8 2D data keeps the original raw path; any other format, depth or dimension is a data texture.
+  if (
+    'data' in data &&
+    (!bytes ||
+      (data.format ?? 'rgba8unorm') !== 'rgba8unorm' ||
+      (data.depth ?? 1) !== 1 ||
+      (o.dimension ?? '2d') !== '2d')
+  ) {
+    const dimension = o.dimension ?? ((data.depth ?? 1) > 1 ? undefined : '2d');
+    if (dimension === undefined)
+      throw new TypeError("Texture data with depth > 1 needs dimension '2d-array' or '3d'; set the dimension option");
+    const { format } = validateData(data, dimension);
+    return { type: 'data', format, dimension: dimension as '2d' | '2d-array' | '3d' };
+  }
+  if (o.dimension !== undefined && o.dimension !== '2d')
+    throw new TypeError(`Texture dimension '${o.dimension}' needs a DataImage, GPUTexture or cube source; omit it`);
+  return undefined;
+}
+/** Why option `key` set to `v` does not suit a texture of `kind`, or undefined when it does. */
+function kindOption(kind: Kind | undefined, key: keyof TextureOptions, v: unknown): string | undefined {
+  if (key === 'colorSpace' && v === 'display-p3' && kind)
+    return "Texture colorSpace 'display-p3' needs an 8-bit RGBA image or raw RGBA8 data; convert other data to linear sRGB with @margoengine/math linearP3ToLinearSRGB";
+  if (key === 'colorSpace' && v === 'srgb') {
+    const format = kind?.type === 'data' || kind?.type === 'faces' ? kind.format : undefined;
+    if (format && format !== 'rgba8unorm')
+      return `Texture colorSpace 'srgb' needs 8-bit RGBA texels, not ${format}; store linear values or use rgba8unorm`;
+  }
+  if (key === 'colorSpace' && v !== undefined && (kind?.type === 'gpu' || kind?.type === 'equirect'))
+    return kind.type === 'gpu'
+      ? 'Texture colorSpace does not apply to a borrowed GPUTexture; its own format decides, so omit colorSpace'
+      : 'Texture colorSpace of an equirect cube comes from its source Texture; set it there';
+  if (key === 'mipmaps' && v === true && kind?.type === 'data' && kind.dimension === '3d')
+    return 'Texture mipmaps are not generated for 3D data; set mipmaps: false';
+  if (
+    key === 'mipmaps' &&
+    v === true &&
+    (kind?.type === 'data' || kind?.type === 'faces') &&
+    unfilterable(kind.format ?? '')
+  )
+    return `Texture mipmaps are not generated for ${kind.format} texels; use a 16-bit float format or mipmaps: false`;
+  return undefined;
+}
 /** A shareable texture. GPU copies are made lazily per device; video sources re-upload whenever `currentTime` changes, other sources on `update()`. */
 export class Texture {
   private version = 0;
@@ -177,15 +353,17 @@ export class Texture {
   /** A flipY, colorSpace or mipmaps change makes the next `update()` a full one. */
   private reshaped = false;
   private readonly slots = new Map<GPUDevice, Slot>();
+  /** What a non-image source is (undefined for images and raw RGBA8 data). */
+  private readonly kind?: Kind;
   /** The options in effect (a copy of the constructor's); the accessors below change them. */
   readonly options: TextureOptions;
   constructor(
     readonly source: TextureSource,
     options: TextureOptions = {},
-    private readonly owned = false,
+    protected readonly owned = false,
   ) {
     const o = options,
-      [w, h] = dimensions(source);
+      [w, h] = dimensions(source as ImageDimensions);
     if (
       !source ||
       typeof source !== 'object' ||
@@ -193,7 +371,13 @@ export class Texture {
     )
       throw new TypeError('Invalid texture source or options');
     this.options = { ...o };
+    this.kind = kindOf(source, o);
+    for (const key of Object.keys(o) as (keyof TextureOptions)[]) {
+      const problem = kindOption(this.kind, key, o[key]);
+      if (problem) throw new TypeError(problem);
+    }
     if (
+      !this.kind &&
       raw(source) &&
       (!Number.isInteger(w) ||
         !Number.isInteger(h) ||
@@ -204,11 +388,37 @@ export class Texture {
     )
       throw new RangeError('Raw texture data must be RGBA8 of width*height*4 bytes');
   }
+  /** Width, height and depth (layers or slices; 6 for a cube) of the current source. */
+  private size(): [number, number, number] {
+    const k = this.kind,
+      s = this.source as DataImage & CubeTarget & { faces: ImageDimensions[] };
+    if (!k) return [...dimensions(s as ImageDimensions), 1];
+    if (k.type === 'gpu') return [k.texture.width, k.texture.height, k.texture.depthOrArrayLayers];
+    if (k.type === 'faces') return [...dimensions(s.faces[0]), 6];
+    if (k.type === 'equirect') return [k.size, k.size, 6];
+    return [s.width, s.height, k.type === 'data' ? (s.depth ?? 1) : 1];
+  }
   get width(): number {
-    return dimensions(this.source)[0];
+    return this.kind ? this.size()[0] : dimensions(this.source as ImageDimensions)[0];
   }
   get height(): number {
-    return dimensions(this.source)[1];
+    return this.kind ? this.size()[1] : dimensions(this.source as ImageDimensions)[1];
+  }
+  /** Layers of a `'2d-array'` texture, slices of a `'3d'` one, 6 for a cube, else 1. */
+  get depth(): number {
+    return this.size()[2];
+  }
+  /** How shaders sample it (`'2d'` unless constructed as an array, 3D or cube texture). */
+  get dimension(): TextureDimension {
+    const k = this.kind;
+    return !k || k.type === 'ktx2' ? '2d' : k.type === 'faces' || k.type === 'equirect' ? 'cube' : k.dimension;
+  }
+  /** @internal True for 32-bit float texels, which filter only on devices with the `float32-filterable` feature. */
+  get unfilterable(): boolean {
+    const k = this.kind;
+    return k?.type === 'data' || k?.type === 'faces'
+      ? unfilterable(k.format ?? '')
+      : k?.type === 'gpu' && unfilterable(k.texture.format);
   }
   get isVideo(): boolean {
     return typeof (this.source as HTMLVideoElement).videoWidth === 'number';
@@ -247,30 +457,41 @@ export class Texture {
   }
   /** Upload options: a change takes effect on the next `update()`, which then uploads the whole source. */
   get flipY(): boolean {
-    return this.options.flipY ?? true;
+    return this.options.flipY ?? this.kind?.type !== 'faces';
   }
   set flipY(v: boolean) {
     this.setOption('flipY', v);
   }
-  /** Undefined: sRGB for colour slots (map, emissive, sheen and specular colour), linear for the others. */
-  get colorSpace(): 'srgb' | 'linear' | undefined {
+  /**
+   * Undefined: sRGB for colour slots (map, emissive, sheen and specular colour), linear for the others.
+   * `'display-p3'` converts 8-bit Display P3 pixels to the linear sRGB working space.
+   */
+  get colorSpace(): 'srgb' | 'linear' | 'display-p3' | undefined {
     return this.options.colorSpace;
   }
-  set colorSpace(v: 'srgb' | 'linear' | undefined) {
+  set colorSpace(v: 'srgb' | 'linear' | 'display-p3' | undefined) {
     this.setOption('colorSpace', v);
   }
+  /** Default: true for images and cubes, false for videos and data; a GPUTexture or KTX2 file keeps its own levels. */
   get mipmaps(): boolean {
-    return this.options.mipmaps ?? !this.isVideo;
+    const k = this.kind;
+    if (k?.type === 'gpu') return k.texture.mipLevelCount > 1;
+    if (k?.type === 'ktx2') return (this.source as TranscodedTexture).mipmaps.length > 1;
+    if (k?.type === 'faces' && unfilterable(k.format ?? '')) return this.options.mipmaps ?? false;
+    return this.options.mipmaps ?? (k ? k.type !== 'data' : !this.isVideo);
   }
   set mipmaps(v: boolean) {
     this.setOption('mipmaps', v);
   }
   private setOption<K extends keyof TextureOptions>(key: K, v: TextureOptions[K]): void {
     const [valid, fix] = textureOptions[key];
+    if (key === 'dimension') throw new TypeError('Texture dimension is fixed at construction; create a new Texture');
     if (!valid(v))
       throw new (key === 'anisotropy' && typeof v === 'number' ? RangeError : TypeError)(
         'Texture ' + key + ' is invalid; set ' + fix,
       );
+    const problem = kindOption(this.kind, key, v);
+    if (problem) throw new TypeError(problem);
     this.options[key] = v;
     if (key === 'flipY' || key === 'colorSpace' || key === 'mipmaps') this.reshaped = true;
     else this.samplerVersion++;
@@ -291,8 +512,9 @@ export class Texture {
     }
     if (!region || typeof region !== 'object')
       throw new TypeError('Texture update region must be an object; pass {x, y, width, height} or nothing');
+    if (this.kind) return this.updateData(region);
     const { x, y, width, height } = region,
-      [w, h] = dimensions(this.source);
+      [w, h] = dimensions(this.source as ImageDimensions);
     if (
       ![x, y, width, height].every(Number.isSafeInteger) ||
       x < 0 ||
@@ -312,22 +534,252 @@ export class Texture {
         r.splice(0, 4, Math.min(r[0], x), Math.min(r[1], y), Math.max(r[2], x + width), Math.max(r[3], y + height));
       }
   }
-  /** Frees GPU copies and closes an ImageBitmap created by `loadTexture`. A later use of a still-open source uploads again. */
+  /** `update(region)` of a data texture: a box of texels (and layers or slices) uploads on next use. */
+  private updateData(region: TextureRegion): void {
+    if (this.kind?.type !== 'data')
+      throw new TypeError(
+        'Texture update region needs an image or data source; call update() without a region to upload it all',
+      );
+    const { x, y, width, height, z = 0, depth = 1 } = region,
+      [w, h, d] = this.size();
+    if (
+      ![x, y, z, width, height, depth].every(Number.isSafeInteger) ||
+      x < 0 ||
+      y < 0 ||
+      z < 0 ||
+      width < 1 ||
+      height < 1 ||
+      depth < 1 ||
+      x + width > w ||
+      y + height > h ||
+      z + depth > d
+    )
+      throw new RangeError(
+        `Texture update region must be whole texels inside the ${w}x${h}x${d} data; pass integers with width, height, depth >= 1`,
+      );
+    for (const slot of this.slots.values())
+      if (slot.version === this.version) {
+        const r = (slot.region ??= [x, y, z, x + width, y + height, z + depth]);
+        r.splice(
+          0,
+          6,
+          Math.min(r[0], x),
+          Math.min(r[1], y),
+          Math.min(r[2], z),
+          Math.max(r[3], x + width),
+          Math.max(r[4], y + height),
+          Math.max(r[5], z + depth),
+        );
+      }
+  }
+  /**
+   * Frees GPU copies and closes an ImageBitmap created by `loadTexture`. A later use of a still-open source uploads
+   * again. A borrowed GPUTexture or CubeTarget stays its owner's.
+   */
   dispose(): void {
-    for (const slot of this.slots.values()) slot.texture?.destroy();
+    for (const slot of this.slots.values()) {
+      slot.texture?.destroy();
+      slot.p3?.destroy();
+    }
     this.slots.clear();
-    if (this.owned) (this.source as ImageBitmap).close();
+    if (this.owned) {
+      const s = this.source as { faces?: ImageBitmap[]; close?: () => void };
+      if (s.faces) for (const face of s.faces) face.close();
+      else s.close?.();
+    }
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
     this.dispose();
   }
+  /** @internal The GPU copy on `device` after a `bind` (the borrowed texture for a GPUTexture source). */
+  gpuTexture(device: GPUDevice): GPUTexture | undefined {
+    return this.kind?.type === 'gpu'
+      ? this.kind.texture
+      : (this.slots.get(device)?.p3 ?? this.slots.get(device)?.texture);
+  }
+  /** The per-device slot, made on first use, with its sampler rebuilt after a sampler option or mip chain change. */
+  private slotFor(device: GPUDevice, mips: boolean): Slot {
+    let slot = this.slots.get(device);
+    if (!slot) {
+      slot = {
+        views: new Map(),
+        version: -1,
+        sampler: this.sampler(device, mips),
+        samplerVersion: this.samplerVersion,
+        samplerMips: mips,
+      };
+      this.slots.set(device, slot);
+      device.lost?.then(() => this.slots.delete(device));
+    }
+    if (slot.samplerVersion !== this.samplerVersion || slot.samplerMips !== mips) {
+      slot.sampler = this.sampler(device, mips);
+      slot.samplerVersion = this.samplerVersion;
+      slot.samplerMips = mips;
+    }
+    return slot;
+  }
+  /** A view of `texture` (cached in `slot` by format and dimension). */
+  private viewOf(slot: Slot, texture: GPUTexture, format: GPUTextureFormat, dimension: TextureDimension) {
+    const key = format + ':' + dimension;
+    let view = slot.views.get(key);
+    if (!view) slot.views.set(key, (view = texture.createView({ format, dimension })));
+    return view;
+  }
+  /** `bind` for data, borrowed, KTX2 and cube sources. */
+  private bindKind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined {
+    const k = this.kind!,
+      o = this.options,
+      [w, h, d] = this.size();
+    if (k.type === 'gpu') {
+      const slot = this.slotFor(device, k.texture.mipLevelCount > 1);
+      return [k.view ?? this.viewOf(slot, k.texture, k.texture.format, k.dimension), slot.sampler];
+    }
+    const levels = Math.floor(Math.log2(Math.max(w, h, 1))) + 1,
+      mips = this.mipmaps,
+      // The sampler follows the mip chain of the GPU copy in use until a new one replaces it.
+      slot = this.slotFor(device, this.slots.get(device)?.mips ?? mips),
+      sRGB = o.colorSpace ? o.colorSpace === 'srgb' : srgb,
+      refit = () => {
+        if (slot.samplerMips !== slot.mips) {
+          slot.sampler = this.sampler(device, slot.mips!);
+          slot.samplerMips = slot.mips!;
+        }
+      };
+    if (k.type === 'ktx2') {
+      if (!slot.texture || slot.version !== this.version) {
+        slot.texture?.destroy();
+        slot.texture = uploadTranscoded(device, this.source as TranscodedTexture, k.base);
+        slot.mips = mips;
+        slot.views.clear();
+        slot.version = this.version;
+        refit();
+      }
+      const format = (sRGB ? k.base + '-srgb' : k.base) as GPUTextureFormat;
+      return [this.viewOf(slot, slot.texture, format, '2d'), slot.sampler];
+    }
+    if (k.type === 'equirect') {
+      const source = k.source.sampled(device, true, 'equirect source');
+      if (!source)
+        return slot.texture ? [this.viewOf(slot, slot.texture, slot.texture.format, 'cube'), slot.sampler] : undefined;
+      let t = slot.texture;
+      if (!t || slot.mips !== mips) {
+        t?.destroy();
+        t = slot.texture = device.createTexture({
+          size: [k.size, k.size, 6],
+          format: 'rgba16float',
+          mipLevelCount: mips ? levels : 1,
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+        });
+        slot.mips = mips;
+        slot.views.clear();
+        slot.version = -1;
+        refit();
+      }
+      if (slot.version !== this.version || slot.source !== k.source.version) {
+        // An image uploaded with flipY has its top row at v = 1; raw data and unflipped images keep it at v = 0.
+        const flipped = !k.source.kind && !raw(k.source.source) && k.source.flipY;
+        equirectToCube(device, source[0], source[1], k.source.width, t, flipped);
+        mipmaps(device, t);
+        slot.version = this.version;
+        slot.source = k.source.version;
+      }
+      return [this.viewOf(slot, t, t.format, 'cube'), slot.sampler];
+    }
+    const faces = k.type === 'faces' ? ((this.source as { faces: TextureSource[] }).faces as ImageDimensions[]) : [],
+      ready = faces.every((f) => {
+        const [fw, fh] = dimensions(f);
+        return fw && fh && !('readyState' in f && (f as HTMLVideoElement).readyState < 2);
+      });
+    if (!w || !h || !ready) return slot.texture ? [this.view3(slot, sRGB, k), slot.sampler] : undefined;
+    const format = k.format ?? 'rgba8unorm',
+      dimension: TextureDimension = k.type === 'faces' ? 'cube' : k.dimension,
+      limit = dimension === '3d' ? device.limits.maxTextureDimension3D : device.limits.maxTextureDimension2D;
+    if (w > limit || h > limit || (dimension === '3d' ? d > limit : d > device.limits.maxTextureArrayLayers))
+      throw new RangeError('Texture exceeds device limit');
+    let t = slot.texture;
+    const pending = slot.version !== this.version;
+    if (
+      !t ||
+      t.width !== w ||
+      t.height !== h ||
+      t.depthOrArrayLayers !== d ||
+      (pending &&
+        (slot.mips !== mips ||
+          (format === 'rgba8unorm' && o.colorSpace !== undefined && t.format !== dataGPUFormat(format, sRGB))))
+    ) {
+      t?.destroy();
+      const count = mips && dimension !== '3d' ? levels : 1;
+      t = slot.texture = device.createTexture({
+        size: [w, h, d],
+        dimension: dimension === '3d' ? '3d' : '2d',
+        format: dataGPUFormat(format, sRGB),
+        ...(format === 'rgba8unorm' ? { viewFormats: [dataGPUFormat(format, !sRGB)] } : {}),
+        mipLevelCount: count,
+        usage:
+          GPUTextureUsage.TEXTURE_BINDING |
+          GPUTextureUsage.COPY_DST |
+          (count > 1 || k.type === 'faces' ? GPUTextureUsage.RENDER_ATTACHMENT : 0),
+      });
+      slot.mips = mips;
+      slot.views.clear();
+      slot.version = -1;
+      refit();
+    }
+    if (slot.version !== this.version || slot.region) {
+      if (k.type === 'faces')
+        faces.forEach((face, layer) => {
+          if ('data' in face) writeData(device, t, face as DataImage, format, undefined, layer);
+          else
+            device.queue.copyExternalImageToTexture(
+              { source: face as ImageSource, flipY: o.flipY ?? false },
+              { texture: t, origin: [0, 0, layer] },
+              [w, h],
+            );
+        });
+      else
+        writeData(device, t, this.source as DataImage, format, slot.version === this.version ? slot.region : undefined);
+      slot.version = this.version;
+      slot.region = undefined;
+      mipmaps(device, t);
+    }
+    return [this.view3(slot, sRGB, k), slot.sampler];
+  }
+  /** The data or faces view: an 8-bit RGBA copy decodes sRGB per colour space, other formats read as stored. */
+  private view3(slot: Slot, srgb: boolean, k: Kind): GPUTextureView {
+    const t = slot.texture!,
+      format = (k as { format?: DataFormat }).format ?? 'rgba8unorm';
+    return this.viewOf(
+      slot,
+      t,
+      format === 'rgba8unorm' && !this.options.colorSpace ? dataGPUFormat(format, srgb) : t.format,
+      k.type === 'faces' ? 'cube' : (k as { dimension: TextureDimension }).dimension,
+    );
+  }
+  /**
+   * @internal `bind` for a material map slot, which samples a filtered 2D texture: a 3D, array or cube texture, or
+   * 32-bit float texels on a device without `float32-filterable`, throws instead of failing WebGPU validation.
+   */
+  sampled(device: GPUDevice, srgb: boolean, slot: string): [GPUTextureView, GPUSampler] | undefined {
+    if (this.dimension !== '2d')
+      throw new TypeError(
+        `Material ${slot} needs a 2D Texture, not a ${this.dimension} one; sample it from a WgslMaterial texture instead`,
+      );
+    if (this.unfilterable && !device.features.has('float32-filterable'))
+      throw new MargoError(
+        'unsupported',
+        `Material ${slot} samples 32-bit float texels, which needs the device feature float32-filterable; request it in Engine.create features or use a 16-bit float format`,
+      );
+    return this.bind(device, srgb);
+  }
   /** @internal View and sampler for a material slot, or undefined while the source has no pixels (unloaded image or video). */
   bind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined {
-    const s = this.source,
+    if (this.kind) return this.bindKind(device, srgb);
+    const s = this.source as ImageSource | ImageData | RawImage,
       o = this.options,
       [w, h] = dimensions(s),
-      video = this.isVideo;
+      video = this.isVideo,
+      p3 = o.colorSpace === 'display-p3';
     let slot = this.slots.get(device);
     if (!slot) {
       const mips = o.mipmaps ?? !video;
@@ -354,26 +806,37 @@ export class Texture {
       throw new RangeError('Texture exceeds device limit');
     let t = slot.texture;
     const pending = slot.version !== this.version;
-    // A new colour space or mip setting needs a new GPU copy; it is made on the upload after `update()`.
+    // A new colour space or mip setting needs a new GPU copy; it is made on the upload after `update()`. Display P3
+    // uploads into an sRGB-decoding staging copy (one level) that converts into the rgba16float `slot.p3`.
     if (
       !t ||
       t.width !== w ||
       t.height !== h ||
       (pending &&
         (slot.mips !== (o.mipmaps ?? !video) ||
-          (o.colorSpace !== undefined && t.format !== (o.colorSpace === 'srgb' ? 'rgba8unorm-srgb' : 'rgba8unorm'))))
+          p3 !== !!slot.p3 ||
+          (o.colorSpace !== undefined && t.format !== (o.colorSpace === 'linear' ? 'rgba8unorm' : 'rgba8unorm-srgb'))))
     ) {
       t?.destroy();
-      const format = o.colorSpace ? o.colorSpace === 'srgb' : srgb,
+      slot.p3?.destroy();
+      slot.p3 = undefined;
+      const format = p3 || (o.colorSpace ? o.colorSpace === 'srgb' : srgb),
         levels = (o.mipmaps ?? !video) ? Math.floor(Math.log2(Math.max(w, h))) + 1 : 1;
       slot.mips = o.mipmaps ?? !video;
       t = slot.texture = device.createTexture({
         size: [w, h],
         format: format ? 'rgba8unorm-srgb' : 'rgba8unorm',
         viewFormats: [format ? 'rgba8unorm' : 'rgba8unorm-srgb'],
-        mipLevelCount: levels,
+        mipLevelCount: p3 ? 1 : levels,
         usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
       });
+      if (p3)
+        slot.p3 = device.createTexture({
+          size: [w, h],
+          format: 'rgba16float',
+          mipLevelCount: levels,
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+        });
       slot.views.clear();
       slot.version = -1;
       if (slot.samplerMips !== slot.mips) {
@@ -388,7 +851,10 @@ export class Texture {
       slot.version = this.version;
       slot.time = currentTime;
       slot.region = undefined;
-      mipmaps(device, t);
+      if (slot.p3) {
+        convertP3(device, t, slot.p3);
+        mipmaps(device, slot.p3);
+      } else mipmaps(device, t);
     } else if (slot.region) {
       const [x, y, x1, y1] = slot.region,
         size = [x1 - x, y1 - y],
@@ -408,7 +874,10 @@ export class Texture {
           { texture: t, origin: [x, flip ? h - y1 : y] },
           size,
         );
-      mipmaps(device, t);
+      if (slot.p3) {
+        convertP3(device, t, slot.p3);
+        mipmaps(device, slot.p3);
+      } else mipmaps(device, t);
     }
     return [this.view(slot, srgb), slot.sampler];
   }
@@ -427,7 +896,7 @@ export class Texture {
     });
   }
   private view(slot: Slot, srgb: boolean): GPUTextureView {
-    const t = slot.texture!,
+    const t = slot.p3 ?? slot.texture!,
       format = this.options.colorSpace ? t.format : srgb ? 'rgba8unorm-srgb' : 'rgba8unorm';
     let view = slot.views.get(format);
     if (!view) {
@@ -451,52 +920,173 @@ function mipmaps(device: GPUDevice, texture: GPUTexture): void {
     });
     d.pipelines.set(format, pipeline);
   }
-  const encoder = device.createCommandEncoder(),
-    level = (baseMipLevel: number) => texture.createView({ format, baseMipLevel, mipLevelCount: 1 });
-  for (let i = 1; i < texture.mipLevelCount; i++) {
-    const group = device.createBindGroup({
-      layout: pipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: level(i - 1) },
-        { binding: 1, resource: d.sampler },
-      ],
-    });
-    const pass = encoder.beginRenderPass({
-      colorAttachments: [{ view: level(i), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 0 } }],
-    });
-    pass.setPipeline(pipeline);
-    pass.setBindGroup(0, group);
-    pass.draw(3);
-    pass.end();
+  // Array and cube layers each get their own chain (2D views of one layer); a single-layer texture keeps its plain views.
+  const layers = texture.dimension === '2d' ? (texture.depthOrArrayLayers ?? 1) : 1,
+    encoder = device.createCommandEncoder();
+  for (let layer = 0; layer < layers; layer++) {
+    const level = (baseMipLevel: number) =>
+      layers > 1
+        ? texture.createView({
+            format,
+            dimension: '2d',
+            baseMipLevel,
+            mipLevelCount: 1,
+            baseArrayLayer: layer,
+            arrayLayerCount: 1,
+          })
+        : texture.createView({ format, baseMipLevel, mipLevelCount: 1 });
+    for (let i = 1; i < texture.mipLevelCount; i++) {
+      const group = device.createBindGroup({
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: level(i - 1) },
+          { binding: 1, resource: d.sampler },
+        ],
+      });
+      const pass = encoder.beginRenderPass({
+        colorAttachments: [
+          { view: level(i), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 0 } },
+        ],
+      });
+      pass.setPipeline(pipeline);
+      pass.setBindGroup(0, group);
+      pass.draw(3);
+      pass.end();
+    }
   }
   device.queue.submit([encoder.finish()]);
 }
-/** Fetches http(s), blob: or data: image bytes (64 MiB, 4096x4096 pixels at most) into an ImageBitmap the texture owns. */
-export async function loadTexture(
-  url: string | URL,
-  { signal, ...options }: TextureOptions & { signal?: AbortSignal } = {},
-): Promise<Texture> {
+/** The bytes at an http(s), blob: or data: `url` (64 MiB at most) and the response's content type. */
+async function download(url: string | URL, signal?: AbortSignal): Promise<[Uint8Array, string]> {
   const target = new URL(url, globalThis.location?.href);
   if (!['http:', 'https:', 'blob:', 'data:'].includes(target.protocol))
     throw new TypeError('Texture URL must use HTTP(S), blob: or data:');
   const response = await fetch(target, { signal }),
     bytes = await readResponse(response, { maxBytes: 64 * 1024 * 1024, signal, label: 'Texture download' });
-  const bitmap = await createImageBitmap(new Blob([bytes], { type: response.headers.get('content-type') ?? '' }), {
+  return [bytes, response.headers.get('content-type') ?? ''];
+}
+/** The image at `url` as an ImageBitmap (4096x4096 pixels at most), pixels as stored (no colour or alpha conversion). */
+async function fetchBitmap(url: string | URL, signal?: AbortSignal): Promise<ImageBitmap> {
+  const [bytes, type] = await download(url, signal);
+  const bitmap = await createImageBitmap(new Blob([bytes as Uint8Array<ArrayBuffer>], { type }), {
     colorSpaceConversion: 'none',
     premultiplyAlpha: 'none',
   });
   try {
     signal?.throwIfAborted();
     if (bitmap.width * bitmap.height > maxPixels) throw new RangeError('Texture exceeds decoded size limit');
+    return bitmap;
+  } catch (error) {
+    bitmap.close();
+    throw error;
+  }
+}
+/** Fetches http(s), blob: or data: image bytes (64 MiB, 4096x4096 pixels at most) into an ImageBitmap the texture owns. */
+export async function loadTexture(
+  url: string | URL,
+  { signal, ...options }: TextureOptions & { signal?: AbortSignal } = {},
+): Promise<Texture> {
+  const bitmap = await fetchBitmap(url, signal);
+  try {
     return new Texture(bitmap, options, true);
   } catch (error) {
     bitmap.close();
     throw error;
   }
 }
+/** What `loadKTX2Texture` needs of `@margoengine/decoders`' `KTX2Decoder`: its `transcode`. */
+export interface KTX2Transcoder {
+  transcode(data: ArrayBuffer | ArrayBufferView, options?: { signal?: AbortSignal }): Promise<TranscodedTexture>;
+}
+/**
+ * Fetches a `.ktx2` file (64 MiB at most) and transcodes it with `decoder` (a `KTX2Decoder` from
+ * `@margoengine/decoders`, created with the engine's device so it picks a compressed format the device has) into a
+ * Texture for any material map. 2D only: the decoder rejects cube maps, arrays and UASTC HDR files.
+ * @throws TypeError without a decoder; the decoder's own errors for unsupported or corrupt files.
+ */
+export async function loadKTX2Texture(
+  url: string | URL,
+  { decoder, signal, ...options }: TextureOptions & { decoder: KTX2Transcoder; signal?: AbortSignal },
+): Promise<Texture> {
+  if (typeof decoder?.transcode !== 'function')
+    throw new TypeError('loadKTX2Texture needs a decoder; pass {decoder: new KTX2Decoder({device: engine.gpu})}');
+  const [bytes] = await download(url, signal),
+    result = await decoder.transcode(bytes, { signal });
+  signal?.throwIfAborted();
+  return new Texture(result, options);
+}
+/** `CubeTexture` options: those of `Texture` (the dimension is always `'cube'`) and an equirect source's face size. */
+export interface CubeTextureOptions extends Omit<TextureOptions, 'dimension'> {
+  /** Equirectangular sources only: each face's edge in texels (default a power of two near the image width / 4, at least 16). */
+  size?: number;
+}
+/**
+ * A cube map for `Material.envMap` or a WgslMaterial `texture_cube<f32>`, sampled with world
+ * directions. Six faces in WebGPU layer order +X, -X, +Y, -Y, +Z, -Z (square, one size, row 0 at the top, so `flipY`
+ * defaults to false; @margoengine/environment's CubeFaces convention): images, raw RGBA8 or float `DataImage`s. Or one
+ * equirectangular 2D Texture (centre facing -Z, +X to its right, top row straight up; @margoengine/environment's
+ * convention), resampled on the GPU into rgba16float faces whenever the source updates. Mip chains are generated per
+ * face (`mipmaps`, default true): rough materials read lower levels.
+ */
+export class CubeTexture extends Texture {
+  constructor(
+    source: readonly (ImageSource | ImageData | RawImage | DataImage)[] | Texture,
+    options: CubeTextureOptions = {},
+    owned = false,
+  ) {
+    if (!(source instanceof Texture) && !Array.isArray(source))
+      throw new TypeError('CubeTexture needs six face images or an equirectangular Texture; pass one of those');
+    const { size, ...rest } = options ?? {};
+    super(
+      source instanceof Texture ? { equirect: source, ...(size !== undefined ? { size } : {}) } : { faces: source },
+      { ...rest, dimension: 'cube' },
+      owned,
+    );
+  }
+  /** Frees the GPU copies (and, for `loadCubeTexture`, the images or equirect Texture it loaded). */
+  override dispose(): void {
+    super.dispose();
+    const source = this.source as { equirect?: Texture };
+    if (this.owned && source.equirect) source.equirect.dispose();
+  }
+}
+/**
+ * Loads a cube map: six image URLs in the order +X, -X, +Y, -Y, +Z, -Z, or one
+ * equirectangular image URL. Images download as `loadTexture` does; the CubeTexture owns them.
+ */
+export async function loadCubeTexture(
+  urls: string | URL | readonly (string | URL)[],
+  { signal, ...options }: CubeTextureOptions & { signal?: AbortSignal } = {},
+): Promise<CubeTexture> {
+  if (!Array.isArray(urls)) {
+    const { size, ...rest } = options,
+      image = await loadTexture(urls as string | URL, { signal, colorSpace: rest.colorSpace });
+    try {
+      return new CubeTexture(image, { ...rest, colorSpace: undefined, ...(size !== undefined ? { size } : {}) }, true);
+    } catch (error) {
+      image.dispose();
+      throw error;
+    }
+  }
+  if (urls.length !== 6)
+    throw new TypeError('loadCubeTexture needs six face URLs (+X, -X, +Y, -Y, +Z, -Z) or one equirect URL');
+  const settled = await Promise.allSettled(urls.map((url) => fetchBitmap(url, signal))),
+    bitmaps = settled.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
+  try {
+    const failed = settled.find((r) => r.status === 'rejected');
+    if (failed) throw (failed as PromiseRejectedResult).reason;
+    return new CubeTexture(bitmaps, options, true);
+  } catch (error) {
+    for (const bitmap of bitmaps) bitmap.close();
+    throw error;
+  }
+}
 
-/** `lambert` is diffuse only; `phong` adds a Blinn-Phong highlight (`specular`, `shininess`); `basic` is unlit. */
-export type Shading = 'standard' | 'basic' | 'normal' | 'matcap' | 'depth' | 'distance' | 'lambert' | 'phong';
+/**
+ * `lambert` is diffuse only; `phong` adds a Blinn-Phong highlight (`specular`, `shininess`); `toon` bands the diffuse
+ * light through a ramp (`gradientMap` or `steps`); `basic` is unlit.
+ */
+export type Shading = 'standard' | 'basic' | 'normal' | 'matcap' | 'depth' | 'distance' | 'lambert' | 'phong' | 'toon';
 export type DepthPacking = 'basic' | 'rgba';
 export type Blending = 'normal' | 'additive' | 'multiply' | 'none';
 /** A live linear colour array (what gltf-pro reads every frame) whose `set` takes any colour input, like the option. */
@@ -591,6 +1181,33 @@ export interface MaterialOptions extends PhysicalOptions {
   aoMapIntensity?: number;
   emissiveMap?: Texture | null;
   matcap?: Texture | null;
+  /**
+   * Toon only: the gradient ramp the diffuse light is read through, its RGB at u = n.l * 0.5 + 0.5 (left
+   * texel unlit, right texel facing the light). Linear by default; use `magFilter: 'nearest'` for hard bands. Live.
+   */
+  gradientMap?: Texture | null;
+  /** Toon only, without a gradientMap: the number of flat light bands, an integer 2 through 256 (default 3). Live. */
+  steps?: number;
+  /**
+   * A cube map the material reflects: a `CubeTexture`, an `@margoengine/environment` Environment, a
+   * cube render target `{texture, view}` (environment's CubeCamera) or a six-layer GPUTexture. Standard shading lights
+   * itself with it in place of its ambient light (specular by roughness from the mip chain, diffuse from coarse mips or
+   * the Environment's harmonics); basic, Lambert and Phong shading `combine` its sharp reflection with their colour.
+   * Other shadings refuse it. Live.
+   */
+  envMap?: EnvMapSource | null;
+  /** Scales the envMap's light, finite and >= 0 (default 1). Live. */
+  envMapIntensity?: number;
+  /** Turns the envMap about +Y, in radians (default 0; added to an Environment's own rotation). Live. */
+  envMapRotation?: number;
+  /** `'reflection'` (default) samples along the mirrored view ray, `'refraction'` along the ray bent by `refractionRatio`. Live. */
+  envMapMode?: 'reflection' | 'refraction';
+  /** Refraction only: the ratio of the indices of refraction, finite and > 0 (default 0.98). Live. */
+  refractionRatio?: number;
+  /** Basic, Lambert and Phong: how the reflection meets the colour (default 'multiply'). Live. */
+  combine?: EnvCombine;
+  /** Basic, Lambert and Phong: the reflection's weight, 0 through 1 (default 1). Live. */
+  reflectivity?: number;
   /** Opacity map: its green channel (linear) multiplies opacity, before `alphaTest` and blending. Live. */
   alphaMap?: Texture | null;
   /** Height map (red, linear) that tilts the shading normal by its screen-space slope, after `normalMap`. Live. */
@@ -885,7 +1502,7 @@ fn margoAmbientLayers(i:Out,s:Surface,v:vec3f)->vec3f {var o=margoFront(s); let 
       ]
     : []),
 ];
-const outputs: Record<Exclude<Shading, 'standard' | 'depth' | 'distance' | 'lambert' | 'phong'>, string> = {
+const outputs: Record<Exclude<Shading, 'standard' | 'depth' | 'distance' | 'lambert' | 'phong' | 'toon'>, string> = {
   basic: 'return vec4f(mat_out(s.base.rgb+s.emissive),alpha);',
   normal: 'return vec4f(normalize((f.view*vec4f(s.n,0)).xyz)*0.5+0.5,alpha);',
   matcap:
@@ -902,6 +1519,9 @@ type MapState = {
   values?: Float32Array;
   features?: GPUBuffer;
   featureData?: Float32Array;
+  /** The envMap uniform (env-map.ts MargoEnv) and its values. */
+  env?: GPUBuffer;
+  envData?: Float32Array;
   displacement?: { buffer: GPUBuffer; view: GPUTextureView; sampler: GPUSampler };
 };
 const mapStates = new WeakMap<Material, Map<object, MapState>>(),
@@ -929,6 +1549,7 @@ function retainMaps(m: Material, engine: Engine): () => void {
     if (--state.refs) return;
     state.buffer?.destroy();
     state.features?.destroy();
+    state.env?.destroy();
     mapStates.get(m)?.delete(engine);
   };
 }
@@ -937,7 +1558,7 @@ function materialBuffer(
   device: GPUDevice,
   owner: object,
   size: number,
-  field: 'buffer' | 'features' = 'buffer',
+  field: 'buffer' | 'features' | 'env' = 'buffer',
 ): GPUBuffer {
   const state = mapState(m, owner);
   if (state.device !== device || !state[field]) {
@@ -956,7 +1577,7 @@ function materialBuffer(
   }
   return state[field];
 }
-const lit: readonly Shading[] = ['standard', 'lambert', 'phong'];
+const lit: readonly Shading[] = ['standard', 'lambert', 'phong', 'toon'];
 /** The feature maps `m` draws now; a lightMap means nothing to normal, matcap, depth and distance output. */
 function featureMapsUsed(m: Material): boolean[] {
   const maps = m['featureTextures'];
@@ -992,7 +1613,7 @@ function featureUniform(m: Material, device: GPUDevice, owner: object): GPUBuffe
 }
 /** Feature map `k`'s view and sampler; a map still loading reads white (alpha, bump) or black (displacement, light). */
 const featureTexture = (m: Material, k: number, device: GPUDevice) =>
-  m['featureTextures'][k]!.bind(device, k === 3) ?? fallback(device, k < 2 ? 0 : 3);
+  m['featureTextures'][k]!.sampled(device, k === 3, featureMaps[k]) ?? fallback(device, k < 2 ? 0 : 3);
 /** `entries` plus the feature uniform and maps `m` uses now (none for a material without features). */
 function featureBindings(m: Material, device: GPUDevice, owner: object, entries: GPUBindGroupEntry[]) {
   const maps = featureMapsUsed(m);
@@ -1069,8 +1690,8 @@ export function materialShader(source: string, group: number, shading: Shading):
       count++;
       return `textureSample(mat_normalMap,mat_normalMapS,${uv}).xyz*2-1+0*textureSample(normalMap,normalSampler,${uv}).xyz`;
     });
-  const lit = shading === 'lambert' || shading === 'phong',
-    edits = lit ? litEdits(shading === 'phong') : [];
+  const lit = shading === 'lambert' || shading === 'phong' || shading === 'toon',
+    edits = shading === 'toon' ? toonEdits : lit ? litEdits(shading === 'phong') : [];
   if (shading !== 'standard' && !lit)
     code = code.replace(/@fragment fn fragment\([^{]*\{\s*let s=surface\(i,front\);/, (head) => {
       count++;
@@ -1097,6 +1718,7 @@ export function materialShader(source: string, group: number, shading: Shading):
     declarations +
     '\n' +
     (shading === 'phong' ? `@group(${group}) @binding(197) var<uniform> mat_phong:vec4f;\n` : '') +
+    (shading === 'toon' ? toonDeclarations(group) : '') +
     (shading === 'basic' || shading === 'matcap' ? encode + '\n' : '') +
     code;
   if (!cache) patched.set(source, (cache = new Map()));
@@ -1112,6 +1734,7 @@ const localTerm = 'result+=' + clusterBrdf + '*nl*',
  * unchanged.
  */
 function litShader(m: Material, code: string): string {
+  if (m.shading === 'toon') return toonLit(code);
   const phong = m.shading === 'phong';
   if (!phong && m.shading !== 'lambert') return code;
   const cache = composed[m.shading as 'lambert' | 'phong'];
@@ -1138,6 +1761,19 @@ export class Material {
   private readonly glow: LiveColor;
   private readonly highlight: LiveColor;
   private gloss = 30;
+  /** Toon: the band count and gradient ramp. */
+  private toonSteps = 3;
+  private toonMap: Texture | null = null;
+  /** The environment map and how it is read (env-map.ts). */
+  private readonly env: {
+    map: EnvMapSource | null;
+    intensity: number;
+    rotation: number;
+    mode: 'reflection' | 'refraction';
+    ratio: number;
+    combine: EnvCombine;
+    reflectivity: number;
+  } = { map: null, intensity: 1, rotation: 0, mode: 'reflection', ratio: 0.98, combine: 'multiply', reflectivity: 1 };
   private glowScale = 1;
   /** On/off features (features.ts letters f...). */
   private readonly switches = { flatShading: false, vertexColors: true, fog: true, toneMapped: true };
@@ -1318,7 +1954,7 @@ export class Material {
     for (const key of Object.keys(rasterDefaults) as (keyof Raster)[])
       if (o[key] !== undefined) this.setRaster(key, o[key]);
     if (
-      !['standard', 'basic', 'normal', 'matcap', 'depth', 'distance', 'lambert', 'phong'].includes(shading) ||
+      !['standard', 'basic', 'normal', 'matcap', 'depth', 'distance', 'lambert', 'phong', 'toon'].includes(shading) ||
       (o.side !== undefined && !['front', 'back', 'double'].includes(o.side)) ||
       [o.transparent, o.doubleSided].some((v) => v !== undefined && typeof v !== 'boolean') ||
       (o.normalScale !== undefined && !Number.isFinite(o.normalScale))
@@ -1345,6 +1981,20 @@ export class Material {
       throw new TypeError("Material specular and shininess need phong shading; set shading: 'phong'");
     this.highlight = liveColor(linear(o.specular ?? '#111111', 'specular').slice(0, 3), 'specular');
     this.shininess = o.shininess ?? 30;
+    if ((o.steps !== undefined || o.gradientMap != null) && shading !== 'toon')
+      throw new TypeError("Material steps and gradientMap need toon shading; set shading: 'toon'");
+    if (o.steps !== undefined) this.steps = o.steps;
+    if (o.gradientMap != null) this.gradientMap = o.gradientMap;
+    for (const key of [
+      'envMapIntensity',
+      'envMapRotation',
+      'envMapMode',
+      'refractionRatio',
+      'combine',
+      'reflectivity',
+      'envMap',
+    ] as const)
+      if (o[key] !== undefined) this[key] = o[key] as never;
     this.factors = [
       unit(o.roughness ?? 1, 'roughness'),
       unit(o.metalness ?? 0, 'metalness'),
@@ -1800,6 +2450,84 @@ export class Material {
   set aoMapIntensity(v: number) {
     this.factors[3] = unit(v, 'aoMapIntensity');
   }
+  /** Toon's band count without a gradientMap, an integer 2 through 256 (default 3); band k of n is k / (n - 1). */
+  get steps(): number {
+    return this.toonSteps;
+  }
+  set steps(v: number) {
+    if (typeof v !== 'number') throw new TypeError('Material steps must be a number; set an integer 2 through 256');
+    if (!Number.isInteger(v) || v < 2 || v > 256)
+      throw new RangeError('Material steps is out of range; set an integer 2 through 256');
+    this.toonSteps = v;
+  }
+  /** Toon's ramp texture, or null for `steps` bands. */
+  get gradientMap(): Texture | null {
+    return this.toonMap;
+  }
+  set gradientMap(v: Texture | null) {
+    if (v != null && !(v instanceof Texture))
+      throw new TypeError('Material gradientMap must be a Texture; pass a Texture or null');
+    if (v != null && this.shading !== 'toon')
+      throw new TypeError("Material gradientMap needs toon shading; set shading: 'toon'");
+    this.toonMap = v ?? null;
+  }
+  /** The environment map, or null (default): see `MaterialOptions.envMap`. */
+  get envMap(): EnvMapSource | null {
+    return this.env.map;
+  }
+  set envMap(v: EnvMapSource | null) {
+    if (v != null && !['standard', 'basic', 'lambert', 'phong'].includes(this.shading))
+      throw new TypeError(`Material envMap needs standard, basic, lambert or phong shading, not '${this.shading}'`);
+    this.env.map = v == null ? null : envSource(v);
+  }
+  /** Scales the envMap's light, finite and >= 0 (default 1). */
+  get envMapIntensity(): number {
+    return this.env.intensity;
+  }
+  set envMapIntensity(v: number) {
+    if (typeof v !== 'number' || !(v >= 0 && Number.isFinite(Math.fround(v))))
+      throw new RangeError('Material envMapIntensity must be a finite number >= 0; set one (default 1)');
+    this.env.intensity = v;
+  }
+  /** Turns the envMap about +Y, in radians (default 0). */
+  get envMapRotation(): number {
+    return this.env.rotation;
+  }
+  set envMapRotation(v: number) {
+    this.env.rotation = finiteFloat(v, 'envMapRotation');
+  }
+  /** Samples the envMap along the mirrored (`'reflection'`, default) or bent (`'refraction'`) view ray. */
+  get envMapMode(): 'reflection' | 'refraction' {
+    return this.env.mode;
+  }
+  set envMapMode(v: 'reflection' | 'refraction') {
+    this.env.mode = oneOf(['reflection', 'refraction'], "'reflection' or 'refraction'")(v, 'envMapMode') as
+      | 'reflection'
+      | 'refraction';
+  }
+  /** The ratio of indices of refraction for `envMapMode: 'refraction'`, finite and > 0 (default 0.98). */
+  get refractionRatio(): number {
+    return this.env.ratio;
+  }
+  set refractionRatio(v: number) {
+    if (typeof v !== 'number' || !(v > 0 && Number.isFinite(Math.fround(v))))
+      throw new RangeError('Material refractionRatio must be a finite number > 0; set one (default 0.98)');
+    this.env.ratio = v;
+  }
+  /** Basic, Lambert and Phong: how the reflection meets the colour (default 'multiply'). */
+  get combine(): EnvCombine {
+    return this.env.combine;
+  }
+  set combine(v: EnvCombine) {
+    this.env.combine = oneOf(['multiply', 'mix', 'add'], "'multiply', 'mix' or 'add'")(v, 'combine') as EnvCombine;
+  }
+  /** Basic, Lambert and Phong: the reflection's weight, 0 through 1 (default 1). */
+  get reflectivity(): number {
+    return this.env.reflectivity;
+  }
+  set reflectivity(v: number) {
+    this.env.reflectivity = unit(v, 'reflectivity');
+  }
   /** Phong's Blinn-Phong exponent, finite and >= 0: higher is a smaller, sharper highlight. */
   get shininess(): number {
     return this.gloss;
@@ -1930,6 +2658,7 @@ export class Material {
       if (!state.refs) {
         state.buffer?.destroy();
         state.features?.destroy();
+        state.env?.destroy();
         states!.delete(owner);
       }
   }
@@ -1954,7 +2683,7 @@ export class Material {
       device.queue.writeBuffer(buffer, 0, values);
       const entries: GPUBindGroupEntry[] = [{ binding: 200, resource: { buffer } }];
       const bound = plan.textures.map(({ texture, srgb, fallback: role }) => {
-        const pair = texture.bind(device, srgb);
+        const pair = texture.sampled(device, srgb, 'map');
         if (pair) return pair;
         return fallback(device, role);
       });
@@ -1967,7 +2696,8 @@ export class Material {
     const d = defaults(device),
       entries: GPUBindGroupEntry[] = [];
     for (let i = 0; i < (this.shading === 'matcap' ? 6 : 5); i++) {
-      const bound = this[slots[i]]?.bind(device, i === 0 || i >= 4) ?? [i === 2 ? d.normal : d.white, d.sampler];
+      const texture = this[slots[i]],
+        bound = texture?.sampled(device, i === 0 || i >= 4, slots[i]) ?? [i === 2 ? d.normal : d.white, d.sampler];
       entries.push({ binding: 32 + i * 2, resource: bound[0] }, { binding: 33 + i * 2, resource: bound[1] });
     }
     if (this.shading === 'depth' || this.shading === 'distance') {
@@ -1981,6 +2711,20 @@ export class Material {
       values[6] = +(this.packing === 'rgba');
       device.queue.writeBuffer(buffer, 0, values);
       entries.push({ binding: 196, resource: { buffer } });
+    }
+    if (this.shading === 'toon') {
+      const owner = engine ?? device,
+        state = mapState(this, owner),
+        buffer = materialBuffer(this, device, owner, 16),
+        values = (state.values ??= new Float32Array(4)),
+        [view, sampler] = this.toonMap?.sampled(device, false, 'gradientMap') ?? fallback(device, 0);
+      values.set([+!!this.toonMap, this.toonSteps, 0, 0]);
+      device.queue.writeBuffer(buffer, 0, values);
+      entries.push(
+        { binding: 191, resource: { buffer } },
+        { binding: 192, resource: view },
+        { binding: 193, resource: sampler },
+      );
     }
     if (this.shading === 'phong') {
       const owner = engine ?? device,
@@ -2303,6 +3047,101 @@ function extensionsOf(m: Material): Record<string, object> | undefined {
     named.set(m, (record = { key, value: Object.fromEntries(m.extensions.map((e) => ['KHR_materials_' + e, {}])) }));
   return record.value;
 }
+/** Which envMap shader `m` takes: standard image-based light, basic output, or Lambert and Phong lit colour. */
+const envKind = (m: Material) => (m.shading === 'standard' ? 'standard' : m.shading === 'basic' ? 'basic' : 'lit');
+const envSamplers = new WeakMap<GPUDevice, GPUSampler>(),
+  envViews = new WeakMap<GPUTexture, GPUTextureView>(),
+  blackCubes = new WeakMap<GPUDevice, GPUTextureView>();
+/** Checks an envMap value: a cube Texture, an Environment, a cube render target or a six-layer GPUTexture. */
+function envSource(v: unknown): EnvMapSource {
+  if (v instanceof Texture) {
+    if (v.dimension !== 'cube')
+      throw new TypeError(`Material envMap must be a cube Texture, not a ${v.dimension} one; use a CubeTexture`);
+    return v;
+  }
+  const o = v as Partial<EnvironmentMap & CubeTarget & GPUTexture> | null;
+  if (o && typeof o === 'object') {
+    if (o.specularView && typeof o.specularMips === 'number' && o.sampler && o.sh) return o as EnvironmentMap;
+    if (o.texture && o.view && o.texture.depthOrArrayLayers === 6) return o as CubeTarget;
+    if (typeof o.createView === 'function' && o.depthOrArrayLayers === 6 && o.dimension === '2d')
+      return o as GPUTexture;
+  }
+  throw new TypeError(
+    'Material envMap must be a CubeTexture, an Environment, a cube render target {texture, view} or a six-layer GPUTexture; pass one of those or null',
+  );
+}
+/** The envMap's cube, sampler and uniform for `m` on `device` (188-190). */
+function envBindings(m: Material, device: GPUDevice, owner: object): GPUBindGroupEntry[] {
+  const e = m['env'],
+    map = e.map!;
+  let view: GPUTextureView,
+    sampler: GPUSampler | undefined,
+    levels = 1,
+    sh: ArrayLike<number> | undefined,
+    rotation = e.rotation,
+    intensity = e.intensity;
+  if (map instanceof Texture) {
+    const pair = map.bind(device, true);
+    levels = map.gpuTexture(device)?.mipLevelCount ?? 1;
+    if (pair) [view, sampler] = pair;
+    else {
+      // A cube whose face images are still loading reflects black.
+      let black = blackCubes.get(device);
+      if (!black) {
+        const texture = device.createTexture({
+          size: [1, 1, 6],
+          format: 'rgba8unorm',
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        });
+        device.queue.writeTexture({ texture }, new Uint8Array(24), { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1, 6]);
+        blackCubes.set(device, (black = texture.createView({ dimension: 'cube' })));
+      }
+      view = black;
+    }
+  } else if ('specularView' in map) {
+    view = map.specularView;
+    sampler = map.sampler;
+    levels = map.specularMips;
+    sh = map.sh.irradiance;
+    rotation += map.rotation;
+    intensity *= map.intensity;
+  } else {
+    const texture = 'view' in map ? map.texture : map;
+    levels = texture.mipLevelCount;
+    if ('view' in map) view = map.view;
+    else {
+      let cached = envViews.get(texture);
+      if (!cached) envViews.set(texture, (cached = texture.createView({ dimension: 'cube' })));
+      view = cached;
+    }
+  }
+  if (!sampler) {
+    sampler = envSamplers.get(device);
+    if (!sampler)
+      envSamplers.set(
+        device,
+        (sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' })),
+      );
+  }
+  const state = mapState(m, owner),
+    buffer = materialBuffer(m, device, owner, envFloats * 4, 'env'),
+    values = packEnv(
+      (state.envData ??= new Float32Array(envFloats)),
+      rotation,
+      levels,
+      intensity,
+      sh,
+      e.mode === 'refraction' ? e.ratio : 0,
+      e.reflectivity,
+      e.combine,
+    );
+  device.queue.writeBuffer(buffer, 0, values as Float32Array<ArrayBuffer>);
+  return [
+    { binding: 188, resource: view },
+    { binding: 189, resource: sampler },
+    { binding: 190, resource: { buffer } },
+  ];
+}
 /**
  * Points gltf-pro material record `g` at `current()`, read on every draw: values, maps (through the shading hook),
  * physical rows, render state and wireframe all follow a material swap or a live edit from the next frame.
@@ -2352,13 +3191,19 @@ function surface(g: PBRMaterial, current: () => Material, runtime: Engine): void
         shader: (code: string, group: number) => {
           const m = current(),
             key = featureKey(m, code),
-            own = m.shader(code, group);
-          return key ? featureShader(own, group, key) : own;
+            own = m.shader(code, group),
+            out = key ? featureShader(own, group, key) : own;
+          return m.envMap ? envMapShader(out, group, envKind(m)) : out;
         },
-        lit: (code: string) => litShader(current(), code),
+        lit: (code: string) => {
+          const m = current(),
+            out = litShader(m, code);
+          return m.envMap ? envMapLit(out, envKind(m)) : out;
+        },
         bindings: () => {
-          const m = current();
-          return featureBindings(m, runtime.gpu!, runtime, m.bindings(runtime.gpu!, runtime));
+          const m = current(),
+            entries = featureBindings(m, runtime.gpu!, runtime, m.bindings(runtime.gpu!, runtime));
+          return m.envMap ? [...entries, ...envBindings(m, runtime.gpu!, runtime)] : entries;
         },
       } satisfies PBRMaterialShading,
     },

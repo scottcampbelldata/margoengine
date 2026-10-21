@@ -127,7 +127,7 @@ test('Material converts colors, validates options and keeps live gltf-pro arrays
   assert.throws(() => new Material({ roughness: 2 }), RangeError);
   assert.throws(() => new Material({ color: 'red' }), TypeError);
   assert.throws(() => new Material({ map: {} }), TypeError);
-  assert.throws(() => new Material({ shading: 'toon' }), TypeError);
+  assert.throws(() => new Material({ shading: 'cel' }), TypeError);
   assert.throws(() => {
     m.metalness = -1;
   }, RangeError);

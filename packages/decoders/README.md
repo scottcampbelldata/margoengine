@@ -22,6 +22,9 @@ const texture = await ktx2.createTexture(await (await fetch('/albedo.ktx2')).arr
 draco.dispose(); ktx2.dispose();
 ```
 
+A standalone `.ktx2` goes on a material map through `@margoengine/materials`: `loadKTX2Texture(url, {decoder: ktx2})`,
+or `new Texture(await ktx2.transcode(bytes))`, which uploads the transcoded mips on each device that draws it.
+
 ## Meshopt
 
 `decodeMeshoptBuffer(source, count, stride, mode, filter)` decodes one `EXT_meshopt_compression` bufferView (ATTRIBUTES, TRIANGLES or INDICES, with the OCTAHEDRAL, QUATERNION and EXPONENTIAL filters) and returns a `Uint8Array`. It is pure TypeScript, synchronous and needs no Wasm. Output matches the meshoptimizer reference decoder bit for bit. `MeshoptDecoder` exposes the same `decodeGltfBuffer` signature as the object three.js loaders expect. The extension only allows vertex codec version 0, so version 1 streams are rejected with a clear error.

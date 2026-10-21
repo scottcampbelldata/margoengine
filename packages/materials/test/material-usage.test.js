@@ -486,7 +486,7 @@ test('texture sampler options rebuild the sampler next frame; upload options wai
     ['anisotropy', 32, 'RangeError'],
     ['anisotropy', 1.5, 'RangeError'],
     ['flipY', 1, 'TypeError'],
-    ['colorSpace', 'display-p3', 'TypeError'],
+    ['colorSpace', 'rec2020', 'TypeError'],
   ]) {
     const before = t[key];
     assert.throws(

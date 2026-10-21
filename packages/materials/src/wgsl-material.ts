@@ -2,7 +2,7 @@
 // @margoengine/shader's NodeMaterial is (same sites), with the caller's uniforms and textures in group 2.
 import type { Engine } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
-import { Material, Texture, type MaterialOptions } from './built-material.js';
+import { Material, Texture, type MaterialOptions, type TextureDimension } from './built-material.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 
@@ -16,7 +16,12 @@ export interface WgslMaterialOptions extends MaterialOptions {
   wgsl: string;
   /** Live values by name: a number is an `f32`, 2 to 4 numbers a `vec2f` to `vec4f`. */
   uniforms?: Readonly<Record<string, number | readonly number[]>>;
-  /** Textures by name (a Texture's own colour space wins; sRGB otherwise), live: assign another Texture to swap. */
+  /**
+   * Textures by name (a Texture's own colour space wins; sRGB otherwise), live: assign another Texture of the same
+   * dimension to swap. Each is declared by its `dimension`: `texture_2d<f32>`, `texture_2d_array<f32>`,
+   * `texture_3d<f32>` or `texture_cube<f32>`. 32-bit float textures filter only on devices with `float32-filterable`;
+   * elsewhere read them with `textureLoad`.
+   */
   textures?: Readonly<Record<string, Texture>>;
 }
 const identifier = /^[A-Za-z][A-Za-z0-9_]*$/,
@@ -25,18 +30,42 @@ const identifier = /^[A-Za-z][A-Za-z0-9_]*$/,
     /^(?:f|uv|surface|ambient|hemisphere_ambient|direct_light|layers|ggx|uniforms|shade|displace|fragment|gbuffer|vertex|(?:base|mr|normal|ao|emissive)(?:Map|Sampler)|margo\w*|mat_\w*|nd\w*|cluster\w*|shadow\w*)$/,
   fragmentSite = /if\((?:margoFaceTest&&)?!facing&&f\.settings\.z<0\.5\)\{discard;\}/,
   vertexSite = /let p=f\.model\*vec4f\(([^;]*),1\);/;
-const whites = new WeakMap<GPUDevice, [GPUTextureView, GPUSampler]>();
-/** Opaque white until a texture source has pixels (an unloaded image or video). */
-function white(device: GPUDevice): [GPUTextureView, GPUSampler] {
-  let w = whites.get(device);
-  if (!w) {
+const whites = new WeakMap<GPUDevice, Map<TextureDimension, [GPUTextureView, GPUSampler]>>();
+/** WGSL texture type of each dimension. */
+const types: Record<TextureDimension, string> = {
+  '2d': 'texture_2d<f32>',
+  '2d-array': 'texture_2d_array<f32>',
+  '3d': 'texture_3d<f32>',
+  cube: 'texture_cube<f32>',
+};
+/** Opaque white of `dimension` until a texture source has pixels (an unloaded image, video or cube face). */
+function white(device: GPUDevice, dimension: TextureDimension = '2d'): [GPUTextureView, GPUSampler] {
+  let cache = whites.get(device);
+  if (!cache) whites.set(device, (cache = new Map()));
+  let w = cache.get(dimension);
+  if (!w && dimension === '2d') {
     const texture = device.createTexture({
       size: [1, 1],
       format: 'rgba8unorm',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
     device.queue.writeTexture({ texture }, new Uint8Array([255, 255, 255, 255]), { bytesPerRow: 4 }, [1, 1]);
-    whites.set(device, (w = [texture.createView(), device.createSampler()]));
+    cache.set(dimension, (w = [texture.createView(), device.createSampler()]));
+  }
+  if (!w) {
+    const layers = dimension === 'cube' ? 6 : 1,
+      texture = device.createTexture({
+        size: [1, 1, layers],
+        dimension: dimension === '3d' ? '3d' : '2d',
+        format: 'rgba8unorm',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      });
+    device.queue.writeTexture({ texture }, new Uint8Array(4 * layers).fill(255), { bytesPerRow: 4, rowsPerImage: 1 }, [
+      1,
+      1,
+      layers,
+    ]);
+    cache.set(dimension, (w = [texture.createView({ dimension }), device.createSampler()]));
   }
   return w;
 }
@@ -120,6 +149,11 @@ export class WgslMaterial extends Material {
         get: () => store[key],
         set: (v: Texture) => {
           if (!(v instanceof Texture)) throw new TypeError(`WgslMaterial texture '${key}' must be a Texture; pass one`);
+          // The WGSL declares each texture by its dimension, fixed at construction.
+          if (store[key] && v.dimension !== store[key].dimension)
+            throw new TypeError(
+              `WgslMaterial texture '${key}' is a ${store[key].dimension} texture; assign a ${store[key].dimension} Texture`,
+            );
           store[key] = v;
         },
       });
@@ -174,7 +208,7 @@ export class WgslMaterial extends Material {
         names
           .map(
             (n, k) =>
-              `@group(${group}) @binding(${50 + k * 2}) var ${n}:texture_2d<f32>;\n@group(${group}) @binding(${51 + k * 2}) var ${n}Sampler:sampler;\n`,
+              `@group(${group}) @binding(${50 + k * 2}) var ${n}:${types[this.textures[n].dimension]};\n@group(${group}) @binding(${51 + k * 2}) var ${n}Sampler:sampler;\n`,
           )
           .join('');
     code = `${declarations}${code}\n${this.wgsl}\n`;
@@ -198,7 +232,7 @@ export class WgslMaterial extends Material {
       entries.push({ binding: 48, resource: { buffer } });
     }
     Object.values(this.textures).forEach((texture, k) => {
-      const [view, sampler] = texture.bind(device, true) ?? white(device);
+      const [view, sampler] = texture.bind(device, true) ?? white(device, texture.dimension);
       entries.push({ binding: 50 + k * 2, resource: view }, { binding: 51 + k * 2, resource: sampler });
     });
     return entries;
