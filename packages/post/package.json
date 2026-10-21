@@ -60,6 +60,10 @@
     "./lens-flare": {
       "types": "./dist/lens-flare.d.ts",
       "import": "./dist/lens-flare.js"
+    },
+    "./image": {
+      "types": "./dist/image.d.ts",
+      "import": "./dist/image.js"
     }
   },
   "files": [

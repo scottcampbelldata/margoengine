@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 
 export class Bloom implements EnginePlugin {
     readonly options: BloomOptions;
@@ -14,11 +14,14 @@ export class Bloom implements EnginePlugin {
     get depthTexture(): GPUTexture | undefined;
     get sceneTexture(): GPUTexture | undefined;
     setup(engine: Engine): void;
+    encodeImage(context: BloomImageContext, input: GPUTextureView, output: GPUTextureView): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
+
+export type BloomImageContext = Pick<Context, 'device' | 'encoder' | 'width' | 'height'>;
 
 export interface BloomOptions {
     strength?: number;
@@ -28,4 +31,10 @@ export interface BloomOptions {
 }
 
 export function bloomWeights(radius: number, levels: number): number[];
+
+// Not exported from this entry, but used by the exports above:
+
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
 ```

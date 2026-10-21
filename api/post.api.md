@@ -14,6 +14,7 @@ export class Bloom implements EnginePlugin {
     get depthTexture(): GPUTexture | undefined;
     get sceneTexture(): GPUTexture | undefined;
     setup(engine: Engine): void;
+    encodeImage(context: BloomImageContext, input: GPUTextureView, output: GPUTextureView): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
@@ -60,6 +61,33 @@ export interface GTAOOptions {
     enabled?: boolean;
 }
 
+export class ImagePost implements EnginePlugin {
+    readonly name = "post:image";
+    constructor(options?: ImagePostOptions);
+    static attach(engine: EngineKernel, options?: ImagePostOptions): ImagePost;
+    get options(): ImagePostOptions;
+    setOptions(options: ImagePostOptions): void;
+    setup(engine: Engine): void;
+    registerPasses(_graph: FrameGraph): void;
+    renderImage(image: LinearPostImage, controls?: {
+        signal?: AbortSignal;
+    }): Promise<PostImagePixels>;
+    capture(image: LinearPostImage, controls?: {
+        signal?: AbortSignal;
+    }): Promise<Blob>;
+    onDeviceRestored(_engine: Engine): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface ImagePostOptions {
+    bloom?: Pick<BloomOptions, 'strength' | 'threshold' | 'radius'>;
+    toneMapping?: 'neutral' | 'linear' | 'aces-narkowicz';
+    exposure?: number;
+    gamma?: number;
+    vignette?: number;
+}
+
 export class LensFlare implements EnginePlugin {
     readonly options: LensFlareOptions;
     readonly name = "lens-flare";
@@ -79,6 +107,13 @@ export interface LensFlareOptions {
     intensity?: number;
     occlusionRadius?: number;
     enabled?: boolean;
+}
+
+export interface LinearPostImage {
+    width: number;
+    height: number;
+    color: Float32Array;
+    alpha?: Float32Array;
 }
 
 export class MotionBlur implements EnginePlugin {
@@ -107,6 +142,12 @@ export interface MotionVectors {
     readonly texture: GPUTexture;
     readonly jitter?: ArrayLike<number>;
     readonly resolved?: GPUTexture;
+}
+
+export interface PostImagePixels {
+    width: number;
+    height: number;
+    data: Uint8ClampedArray<ArrayBuffer>;
 }
 
 export class PostStack implements EnginePlugin {
@@ -240,6 +281,12 @@ export class SceneFade implements EnginePlugin {
 export function bloomWeights(radius: number, levels: number): number[];
 
 // Not exported from this entry, but used by the exports above:
+
+type BloomImageContext = Pick<Context, 'device' | 'encoder' | 'width' | 'height'>;
+
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
 
 type Context = Extract<PassContext, {
     backend: 'webgpu';

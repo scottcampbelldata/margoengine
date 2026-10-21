@@ -44,7 +44,7 @@ test('native Bloom and SSAO imports exclude the other effects', async () => {
 });
 
 test('Post root and feature subpaths preserve all runtime export identities', async () => {
-  const [root, bloom, ssao, fade, stack, fxaa, ssr, gtao, ssgi, motion, flare] = await Promise.all(
+  const [root, bloom, ssao, fade, stack, fxaa, ssr, gtao, ssgi, motion, flare, image] = await Promise.all(
     [
       '',
       '/bloom',
@@ -57,12 +57,14 @@ test('Post root and feature subpaths preserve all runtime export identities', as
       '/ssgi',
       '/motion-blur',
       '/lens-flare',
+      '/image',
     ].map((path) => import('@margoengine/post' + path)),
   );
   assert.deepEqual(Object.keys(root).sort(), [
     'Bloom',
     'FXAA',
     'GTAO',
+    'ImagePost',
     'LensFlare',
     'MotionBlur',
     'PostStack',
@@ -93,4 +95,6 @@ test('Post root and feature subpaths preserve all runtime export identities', as
   assert.equal(root.MotionBlur, motion.MotionBlur);
   assert.deepEqual(Object.keys(flare), ['LensFlare']);
   assert.equal(root.LensFlare, flare.LensFlare);
+  assert.deepEqual(Object.keys(image), ['ImagePost']);
+  assert.equal(root.ImagePost, image.ImagePost);
 });

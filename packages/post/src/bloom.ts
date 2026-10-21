@@ -22,6 +22,8 @@ declare const GPUTextureUsage: {
 };
 
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+/** Device, command encoder and exact image dimensions for an isolated HDR bloom dispatch. */
+export type BloomImageContext = Pick<Context, 'device' | 'encoder' | 'width' | 'height'>;
 /** Glow settings. They are read every frame, so they may be changed while the effect runs. */
 export interface BloomOptions {
   /** Share of the light above `threshold` that is spread back as glow, 0 to 4 (default 0.8). */
@@ -186,6 +188,7 @@ export class Bloom implements EnginePlugin {
   private disposed = false;
   private host?: StackHost;
   private key = '';
+  private imageDevice?: GPUDevice;
 
   constructor(readonly options: BloomOptions = {}) {
     this.validate();
@@ -238,13 +241,46 @@ export class Bloom implements EnginePlugin {
     )
       throw new Error('Bloom owns the output target; remove the other post effect first');
     this.engine = engine;
-    const device = engine.gpu;
+    this.initialize(engine.gpu);
+  }
+  private initialize(device: GPUDevice): void {
     this.uniform = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
     const module = device.createShaderModule({ code: chain });
     this.passes = ['prefilter', 'down', 'up'].map((entryPoint) =>
       device.createComputePipeline({ layout: 'auto', compute: { module, entryPoint } }),
     );
+  }
+  /**
+   * Encode the same bloom kernel as the viewport into a caller-owned linear rgba16float target. Use an unattached
+   * Bloom instance; this owns only its intermediate textures, never an engine plugin or the input/output. Submit the
+   * encoder before disposing the instance. Both views must match width/height; exposure is applied to the HDR output.
+   */
+  encodeImage(context: BloomImageContext, input: GPUTextureView, output: GPUTextureView): void {
+    if (this.disposed) throw margoError('disposed', 'Bloom.encodeImage: create a new Bloom after disposal');
+    if (this.engine || this.host)
+      throw margoError(
+        'state',
+        'Bloom.encodeImage: this Bloom is attached to an engine; use a separate unattached Bloom',
+      );
+    this.validate();
+    for (const value of [context.width, context.height])
+      if (!Number.isInteger(value) || value < 1 || value > (context.device.limits.maxTextureDimension2D ?? 16384))
+        throw new RangeError(
+          'Bloom.encodeImage: image dimensions must be positive integers within the device texture limit',
+        );
+    if (this.imageDevice && this.imageDevice !== context.device)
+      throw margoError('state', 'Bloom.encodeImage: the GPU device changed; use a new Bloom for the new device');
+    if (!this.imageDevice) {
+      this.initialize(context.device);
+      this.imageDevice = context.device;
+    }
+    this.stage(context as Context, input, {
+      view: output,
+      format: 'rgba16float',
+      multisample: { count: 1 },
+      hdr: true,
+    });
   }
   registerPasses(graph: FrameGraph): void {
     if (this.host) return;
@@ -502,6 +538,7 @@ export class Bloom implements EnginePlugin {
     this.scenePipelines.clear();
     this.sceneOptions.pipeline = undefined;
     this.originalDraw = undefined;
+    this.imageDevice = undefined;
   }
   onDeviceRestored(engine: Engine): void {
     this.release();
