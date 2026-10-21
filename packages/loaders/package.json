@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test tests/loaders.test.js tests/dxf.test.js tests/obj.test.js tests/dae.test.js tests/tmx.test.js",
+    "test": "npm run build && node --test tests/loaders.test.js tests/dxf.test.js tests/obj.test.js tests/dae.test.js tests/tmx.test.js tests/font.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "fixtures": "node scripts/fetch-fixtures.js",
     "prepack": "npm run build"
@@ -23,6 +23,10 @@
     "./worker": {
       "types": "./dist/worker.d.ts",
       "import": "./dist/worker.js"
+    },
+    "./font": {
+      "types": "./dist/font.d.ts",
+      "import": "./dist/font.js"
     }
   },
   "files": [
@@ -33,6 +37,7 @@
   },
   "homepage": "https://margoengine.com",
   "dependencies": {
+    "@margoengine/geometry": "^1.0.0",
     "@margoengine/math": "^1.0.0"
   }
 }
