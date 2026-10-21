@@ -1,7 +1,8 @@
 # @margoengine/webgl
 
 WebGL2 fallback renderer for browsers without WebGPU. It draws core meshes with core's PBR
-material as flat-shaded geometry (one directional light, no textures, effects or picking);
+material, shaded per pixel (GGX metallic-roughness from each mesh's constant colour and factors, one directional
+light plus ambient, no textures, effects or picking);
 optional packages that need WebGPU stay unavailable on this path.
 
 ```ts

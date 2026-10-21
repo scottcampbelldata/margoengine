@@ -1186,20 +1186,19 @@ features add no core or stage functionality.
 
 | three.js | Status in Margo |
 | --- | --- |
-| Multiple scenes, general multi-view rendering, `CubeCamera` | One implicit scene per engine. `Engine.render({camera})` supports sequential second-camera captures; dynamic cube captures, nested rendering and independent temporal histories remain absent |
+| Multiple scenes, general multi-view rendering, `CubeCamera` | One implicit scene per engine. `Engine.render({camera})` supports sequential second-camera captures, and live reflection probes (`LightProbes.setLive`) capture cube views for reflections; a general cube render target, nested rendering and independent temporal histories remain absent |
 | General viewport/scissor support | Core draws accept viewport/scissor rectangles; optional native passes and picking do not inherit them, and camera aspect remains caller-controlled |
 | WebGL2 for optional packages | Closed v1 limit: core meshes, controls, labels, viewcube, bvh, LOD distance levels and the small glTF loader run on WebGL2; the rest needs WebGPU |
-| More than one directional light, configurable `HemisphereLight`, IES lights | One directional light; core diffuse ambient has RGB multipliers. Point, spot and rectangle area lights use clustered; glTF-pro keeps a fixed hemisphere fill |
-| glTF `KHR_animation_pointer` | Files that require it are rejected. Dispersion, iridescence, anisotropy and diffuse transmission use the documented `@margoengine/gltf-pro/extended` material path; material variants (`selectVariant`) and glTF cameras (`viewGLTFCamera`) are supported |
+| glTF `KHR_animation_pointer` | Files that require it are rejected; when only used, animation `createMaterialAnimation` plays base-colour UV offset and scale tracks, and exporters write those tracks from data scenes. Dispersion, iridescence, anisotropy and diffuse transmission use the documented `@margoengine/gltf-pro/extended` material path; material variants (`selectVariant`) and glTF cameras (`viewGLTFCamera`) are supported |
 | Custom attributes on your own meshes | Arbitrary named attributes remain missing; independent `uvs1` and geometry groups with material arrays are supported by materials, including instancing and glTF export |
 | Standalone KTX2 or float/3D/array data textures on your own meshes | Missing (KTX2 works inside glTF; materials takes RGBA8 data) |
-| SMAA, GTAO, SSGI, motion blur, lens flare, glitch, afterimage | Missing (FXAA, TAA, SSAO, SSR, bloom, DOF are there) |
+| SMAA, glitch, afterimage | Missing (FXAA, TAA, SSAO, GTAO, SSR, SSGI, bloom, DOF, motion blur and a lens flare are there) |
 | Built-in screen effects (vignette, RGB shift, pixelation, halftone, Sobel) | Not built in; a few nodes in a shader `NodePass` |
-| Clipping planes on glTF-pro models and textured meshes | Missing (machinery sections cap core meshes; shader `discard` slices without caps or shadows) |
-| `BatchedMesh`, render layers | Missing (bvh has raycast layers only) |
-| Reflector, Refractor, decals | Missing (water has its own refraction) |
-| `TextGeometry`, SVGLoader, Collada, MTL, LDraw and other long-tail loaders | Missing |
-| Clips authored in code, `SkeletonUtils`, CCD IK | Missing (two-bone IK only) |
-| `ArcballControls`, roll in the controls, light and skeleton helpers | Missing (core `camera.up` can roll; no control drives it) |
-| glTF export of cameras and lights, Draco/KTX2/EXR export, USDZ export with textures | Missing (glTF export with animation, skins, morphs and textures exists, plus OBJ, STL, PLY and static USDZ) |
-| WebXR hit test, controller and hand models, glTF-pro models in XR | Missing (VR sessions and controller poses exist) |
+| Stencil caps for clipped glTF-pro models, per-material clipping planes | Missing (machinery `SectionPlanes` clip core and native glTF-pro primitives and their directional shadows, but cap core meshes only; shader `discard` slices without caps or shadows) |
+| `BatchedMesh`, render layers | Missing (bvh has raycast layers only; machinery `PartPacks` packs static parts into one draw) |
+| Reflector, Refractor, mesh decals | Missing (water has its own refraction; post `Decals` are screen-space decals) |
+| `TextGeometry`, SVGLoader, LDraw and other long-tail loaders; materials built from MTL; COLLADA skins and animation | Missing (loaders read OBJ with MTL data and COLLADA geometry and materials; voxel reads and writes VOX) |
+| `SkeletonUtils`, morph-weight and property tracks | Missing (node TRS clips are authored with animation `createKeyframeClip`; CCD chains with animator `CCDSolver`) |
+| `ArcballControls`, roll in the controls, skeleton helper | Missing (core `camera.up` can roll; no control drives it; light helpers are in lines) |
+| Cameras and lights from engine-scene glTF export, Draco/KTX2/EXR export, USDZ export with textures | Missing (`exportModel` and the data-scene writers write cameras and lights; glTF export with animation, skins, morphs and textures exists, plus OBJ, STL, PLY, DAE and static USDZ) |
+| WebXR hit test, controller and hand models, other plugin passes in XR | Missing (VR sessions, controller poses and loader-owned glTF-pro models in XR exist) |
