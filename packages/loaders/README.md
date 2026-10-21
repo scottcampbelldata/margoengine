@@ -1,6 +1,6 @@
 # @margoengine/loaders
 
-PLY, 3MF, DXF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, legacy VTK and static USDA/USDZ loaders for Margo Engine, each tree-shakable on its own.
+PLY, 3MF, DXF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, legacy VTK and static USDA/USDZ loaders for Margo Engine, each tree-shakable on its own, plus three optional entries: TrueType fonts and extruded 3D text (`@margoengine/loaders/font`), SVG (`@margoengine/loaders/svg`) and OBJ meshes with their MTL materials and textures (`@margoengine/loaders/mtl`).
 
 Build from source with `npm run build` in `packages/loaders`.
 
@@ -38,12 +38,15 @@ Every parser returns the same `LoadedGeometry`:
 | `parseOBJ` (async), `parseMTL` | `OBJLoader`, `MTLLoader` | See [OBJ and MTL](#obj-and-mtl) |
 | `parseDAE`, `flattenDAE` | `ColladaLoader` | See [COLLADA](#collada) |
 | `parseTMX` (async), `tmxLayerQuads` | none | See [Tiled TMX](#tiled-tmx) |
+| `parseTTF`, `parseTypefaceJSON`, `textGeometry` (`/font`) | `TTFLoader`, `FontLoader`, `TextGeometry` | See [Fonts and 3D text](#fonts-and-3d-text) |
+| `parseSVG` (`/svg`) | `SVGLoader` | See [SVG](#svg) |
+| `loadOBJ`, `createMTLMaterials`, `createOBJMesh` (`/mtl`) | `OBJLoader` + `MTLLoader` | See [Textured OBJ meshes](#textured-obj-meshes) |
 
 Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per group), `pointsToGeometry` (octahedron markers for clouds), `createMeshes` (engine meshes with `PbrMaterial` colors), `load` / `fetchBytes`, `detectFormat` / `parseAny`, `computeVertexNormals`, `decompressLZF`, `readZipDirectory` / `readZipEntry` / `crc32`, `parsePLYHeader`, `parsePCDHeader`.
 
 ## How it works
 
-- **One module per format.** The build is a plain TypeScript emit with `"sideEffects": false`, so importing `parsePLY` pulls in only the PLY reader and its helpers, not the 3MF, ZIP or XML code. Only `toGeometry`, `pointsToGeometry` and `createMeshes` import core.
+- **One module per format.** The build is a plain TypeScript emit with `"sideEffects": false`, so importing `parsePLY` pulls in only the PLY reader and its helpers, not the 3MF, ZIP or XML code. In the main entry only `toGeometry`, `pointsToGeometry` and `createMeshes` import core; `/font` and `/svg` import `@margoengine/geometry` (a dependency), and `/mtl` imports `@margoengine/materials` (an optional peer: install it to use that entry).
 - **Defensive parsing.** Headers are length-capped, every count is checked against `maxVertices` (default 8,000,000) and `maxTriangles` (default 16,000,000) before allocation, binary reads are bounds-checked before the loop, face and cell indices are validated, and ZIP entries are checked against their declared size while inflating (zip-bomb safe) and against CRC-32 afterwards. Every failure is a `LoaderError` with `format` and a `code` of `header`, `truncated`, `limit`, `range`, `syntax`, `unsupported`, `zip`, `aborted` or `fetch`.
 - **3MF builds are baked.** Component and build item transforms are multiplied into the positions (Margo Engine meshes take position, rotation and scale only, not arbitrary 3x4 matrices). Mirroring transforms flip the winding back. Triangles are grouped by build item, object and color so `createMeshes` gives each its own material. When a `colorgroup` gives one triangle different corner colors, those objects are split per corner and `colors` is filled.
 - **Colors.** Vertex colors are sRGB in [0,1]. `createMeshes` converts group colors to linear for `PbrMaterial`; since core has no vertex colors, meshes with only vertex colors get their average (`vertexColors: 'ignore'` turns that off).
@@ -76,7 +79,7 @@ Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per
 
 ## Tests
 
-`npm test` in `packages/loaders` runs Node tests for: OBJ/MTL fixtures covering every statement, map option and error line (and a Crocotile-style file checked against three.js `OBJLoader` as an oracle), COLLADA Y-up and Z-up fixtures (polylist quads, textured phong, TRS stacks, symbol-bound materials, trifans, tristrips, holes, errors; world-space corners checked against three.js `ColladaLoader` under jsdom), TMX/TSX fixtures (csv, base64 plain, zlib and gzip written with `node:zlib`, legacy tiles, flips and their UVs, external and merged tilesets, infinite chunks, group offsets, errors), every PLY encoding and attribute naming generated in the test, PLY point clouds, OFF and XYZ variants, LZF round trips against an independent compressor, PCD ascii, binary and binary_compressed fixtures, VTK ASCII, big-endian BINARY and 5.1 polydata, ZIP archives with stored and deflate entries (written with `node:zlib`), 3MF components, mirrored transforms, colors, units and production parts, error cases for every format (bad headers, truncation, out-of-range indices, limits, zip bombs, CRC failures, cycles, aborts), `fetchBytes` limits against a local HTTP server, an SSR import check with throwing browser globals, and real files from three.js, PCL, libigl and PyVista (`npm run fixtures` re-downloads them; see `tests/fixtures/SOURCES.txt`) compared with independent reads. `npm run test:browser` (a real-GPU script, not in CI) loads `facecolors.3mf` in Chromium, creates engine meshes, checks five face colors in the rendered pixels, a GPU pick, `maxBytes`, disposal, and zero WebGPU validation errors.
+`npm test` in `packages/loaders` runs Node tests for: OBJ/MTL fixtures covering every statement, map option and error line (and a Crocotile-style file checked against three.js `OBJLoader` as an oracle), COLLADA Y-up and Z-up fixtures (polylist quads, textured phong, TRS stacks, symbol-bound materials, trifans, tristrips, holes, errors; world-space corners checked against three.js `ColladaLoader` under jsdom), TMX/TSX fixtures (csv, base64 plain, zlib and gzip written with `node:zlib`, legacy tiles, flips and their UVs, external and merged tilesets, infinite chunks, group offsets, errors), every PLY encoding and attribute naming generated in the test, PLY point clouds, OFF and XYZ variants, LZF round trips against an independent compressor, PCD ascii, binary and binary_compressed fixtures, VTK ASCII, big-endian BINARY and 5.1 polydata, ZIP archives with stored and deflate entries (written with `node:zlib`), 3MF components, mirrored transforms, colors, units and production parts, error cases for every format (bad headers, truncation, out-of-range indices, limits, zip bombs, CRC failures, cycles, aborts), `fetchBytes` limits against a local HTTP server, an SSR import check with throwing browser globals, and real files from three.js, PCL, libigl and PyVista (`npm run fixtures` re-downloads them; see `tests/fixtures/SOURCES.txt`) compared with independent reads. `tests/font.test.js` assembles TrueType fonts in the test from the specification's table layouts (cmap 4 and 12, composites with scale and point matching, kern pairs, collections, both winding conventions); `tests/svg.test.js` covers every path command, arcs, shapes, transforms, fill rules, styles and stroke areas; `tests/mtl.test.js` checks the MTL to material mapping, texture URLs, OBJ groups and `loadOBJ`'s fetches with a stand-in fetch. `npm run test:browser` (a real-GPU script, not in CI) loads `facecolors.3mf` in Chromium, creates engine meshes, checks five face colors in the rendered pixels, a GPU pick, `maxBytes`, disposal, and zero WebGPU validation errors.
 
 MIT licensed.
 
@@ -112,25 +115,82 @@ const resolve = async (path) => new Uint8Array(await (await fetch(new URL(path, 
 
 `parseMTL(textOrBytes, {path})` returns `{name, Ka, Kd, Ks, Ke, Ns, d, Tr, illum, maps, extras}[]`. `maps` holds `map_Kd`, `map_Ka`, `map_Ks`, `map_Ke`, `map_Ns`, `map_d`, `bump` (also written `map_Bump`), `disp`, `decal`, `refl` and any other `map_*` as `{file, path, options}`, where `options` uses the spec's names (`o`, `s`, `t` as three numbers, `clamp`, `blendu`, `blendv`, `cc` as booleans, `bm`, `boost`, `texres`, `mm`, `imfchan`, `type`). Statements it does not interpret, and maps with unknown options, stay in `extras`.
 
-Textured meshes: `createMeshes` gives core `PbrMaterial` colors only. For textures, hand the data to `createMesh` from `@margoengine/materials` (not a dependency of this package). `createMesh` takes three.js UVs (v = 0 at the bottom of a `flipY` texture), so turn Margo's v back with `1 - v`; passed as they are, the texture draws upside down:
+### Textured OBJ meshes
+
+`createMeshes` gives core `PbrMaterial` colours only. For textures, `@margoengine/loaders/mtl` builds `@margoengine/materials` meshes (an optional peer dependency: install it to use this entry). One call fetches the .obj, its `mtllib` files next to it and every texture relative to its .mtl file, and draws each `usemtl` group with its material:
 
 ```ts
-import {Material, createMesh, loadTexture} from '@margoengine/materials';
-import {SRGBToLinear} from '@margoengine/math/color';
+import {loadOBJ} from '@margoengine/loaders/mtl';
+
+const {mesh, warnings, dispose} = await loadOBJ(engine, 'https://example.com/models/chair.obj', {signal});
+// mesh is a materials mesh (a gltf-pro model): move it with mesh.root, add it to shadows, clustered, ...
+dispose(); // destroys the mesh, its materials and its textures
+```
+
+Or step by step, with your own bytes and texture loader:
+
+```ts
+import {parseMTL, parseOBJ} from '@margoengine/loaders';
+import {createMTLMaterials, createOBJMesh} from '@margoengine/loaders/mtl';
 
 const obj = await parseOBJ(bytes, {resolve});
-const byName = new Map(obj.materials.map((m) => [m.name, m]));
-const materials = await Promise.all(obj.groups.map(async (g) => {
-  const map = byName.get(g.material)?.maps.map_Kd;
-  return new Material({map: map ? await loadTexture(new URL(map.path, modelUrl)) : null});
-}));
-createMesh(engine, {
-  positions: obj.positions, indices: obj.indices, uvs: obj.uvs?.map((v, i) => (i % 2 ? 1 - v : v)),
-  colors: obj.colors?.map(SRGBToLinear),
-  normals: obj.normals ?? computeVertexNormals(obj.positions, obj.indices),
-  groups: obj.groups.map((g, i) => ({start: g.start, count: g.count, materialIndex: i})),
-}, materials);
+const set = await createMTLMaterials(obj.materials, {baseUrl: objUrl, bump: 'normal'});
+const mesh = createOBJMesh(engine, obj, set); // one mesh, one material slot per usemtl material
+// parseMTL output resolves against the .mtl URL instead: createMTLMaterials(parseMTL(text), {baseUrl: mtlUrl}).
 ```
+
+- Each `newmtl` becomes a metallic-roughness `Material`: `Kd` colour (sRGB to linear), `d` or `1 - Tr` opacity (transparent below 1 or with `map_d`), `Ke` emission (values over 1 go to `emissiveIntensity`), roughness from `Ns` as `(2 / (Ns + 2))^(1/4)` (Ns 10 gives 0.64, 100 gives 0.37, 1000 gives 0.21; 1 with `illum 1` or a black `Ks`), and the PBR extension's `Pr` and `Pm` when present. `illum 0` is unlit.
+- Maps: `map_Kd` (colour), `map_Ke` (emission), `bump`/`map_Bump` (bump map scaled by `-bm`, or a normal map with `bump: 'normal'`, as many exporters write them), `norm` (normal map) and `map_d` (opacity). `-o` and `-s` become the slot's UV transform, `-clamp on` clamped wrapping. Each file loads once per colour space.
+- `Ka`, the `Ks` colour, `Ni`, `Tf`, `map_Ka`, `map_Ks`, `map_Ns`, `disp`, `decal`, `refl` and other statements have no Margo equivalent; they and any texture that fails to load are listed in `warnings` instead of throwing.
+- The mesh gets the OBJ's UVs back in three.js orientation (v up, for `flipY` textures), vertex colours in linear, and smooth normals shared across UV seams when the file has none. Groups without a known material use `fallback` (default a white `Material`). `prepareOBJMesh` returns the geometry and material array without creating the mesh. At most 1,000,000 vertices (a materials mesh limit). Front faces only unless `doubleSided: true`. Textures load with materials' `loadTexture` (http(s), blob: and data: URLs) unless you pass `loadTexture`.
+
+## Fonts and 3D text
+
+`@margoengine/loaders/font` reads TrueType fonts and typeface JSON fonts into an `OutlineFont` and extrudes text with `@margoengine/geometry`:
+
+```ts
+import {parseTTF, parseTypefaceJSON, textGeometry} from '@margoengine/loaders/font';
+import {createMesh, Material} from '@margoengine/materials';
+
+const font = parseTTF(await (await fetch('/fonts/Inter.ttf')).arrayBuffer());
+const geometry = textGeometry('Margo\nEngine', {font, size: 1, depth: 0.2, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.01});
+createMesh(engine, geometry, [new Material({color: '#ffffff'}), new Material({color: '#3355ff'})]); // caps, sides
+
+const shapes = font.generateShapes('Logo', 10, {letterSpacing: 0.05, align: 'center'}); // geometry Shapes with holes
+const typeface = parseTypefaceJSON(await (await fetch('/fonts/helvetiker_regular.typeface.json')).text());
+```
+
+- `parseTTF(bytes, {fontIndex})` follows the OpenType specification: `head`, `hhea`, `maxp`, `hmtx`, `loca` (short and long), `glyf` simple and composite glyphs (offsets, scale, x/y scale, 2x2 transforms, point matching, nesting), `cmap` formats 4 and 12 (Unicode, and symbol fonts at U+F000), `kern` format 0 pairs (Microsoft and Apple headers) and the family and style names. `fontIndex` picks one font of a `.ttc` collection. Glyphs decode on first use.
+- `font.generateShapes(text, size, {letterSpacing, lineHeight, align, kerning})` lays out text with one em = `size` (three.js `Font.generateShapes`): baseline at y = 0, `\n` for new lines, kerning on by default, `letterSpacing` in ems. Holes come from nesting and the winding rule, not from one fixed contour direction, so fonts written either way round work. Missing characters draw the font's `.notdef` glyph (typeface fonts: `?`).
+- `textGeometry(text, {font, size, depth, curveSegments, bevelEnabled, bevelThickness, bevelSize, bevelOffset, bevelSegments, steps})` takes three.js `TextGeometry`'s parameters and defaults (size 100, depth 50, bevel off) and returns `GeometryData` with groups 0 (caps) and 1 (sides).
+- `parseTypefaceJSON(jsonOrText)` reads the typeface JSON fonts three.js `FontLoader` uses (`glyphs` with `ha` and `o` outlines, `resolution`), with three.js's line height (bounding box height plus underline thickness).
+- Limits: CFF outlines (`.otf` files starting `OTTO`), WOFF and WOFF2 throw a `LoaderError` with code `unsupported` (convert them to `.ttf`); kerning comes from the `kern` table only (GPOS kerning is not applied); no hinting, ligatures, right-to-left or complex-script shaping (`@margoengine/text` draws screen text).
+
+## SVG
+
+`@margoengine/loaders/svg` turns SVG drawings into geometry `Shape`s and stroke triangles (three.js `SVGLoader`):
+
+```ts
+import {parseSVG} from '@margoengine/loaders/svg';
+import {extrudeGeometry} from '@margoengine/geometry';
+import {SRGBToLinear} from '@margoengine/math/color';
+
+const {paths, viewBox, warnings} = parseSVG(await (await fetch('/logo.svg')).text());
+for (const path of paths) {
+  if (path.fill) {
+    const geometry = extrudeGeometry(path.toShapes({flipY: true}), {depth: 2, bevelEnabled: false});
+    createMesh(engine, geometry, new Material({color: path.fill.map(SRGBToLinear), opacity: path.fillOpacity}));
+  }
+  if (path.stroke)
+    createMesh(engine, path.toStrokeGeometry({flipY: true}), new Material({color: path.stroke.map(SRGBToLinear)}));
+}
+```
+
+- Elements: `path` (M L H V C S Q T A Z, absolute and relative, packed numbers and arc flags), `rect` (rounded), `circle`, `ellipse`, `line`, `polyline`, `polygon`, inside `g`, `a`, nested `svg` viewports (`viewBox`, `preserveAspectRatio`) and `use` of `defs` content or `symbol`s. `transform` lists with `matrix`, `translate`, `scale`, `rotate` (with a centre), `skewX` and `skewY` compose through every level.
+- Each path has `commands` (M L Q C Z in root user units, arcs as cubic Béziers), `fill` and `stroke` (sRGB 0..1 or null), `fillOpacity` and `strokeOpacity` (including the colour's alpha and group `opacity`), `fillRule`, `strokeWidth`, `strokeLineJoin`, `strokeLineCap` and `strokeMiterLimit`. Styles come from attributes, `style` and `<style>` rules with type, class and id selectors, inherited as SVG does, with `currentColor`, named colours, `#rgb[a]`, `#rrggbb[aa]`, `rgb()` and `hsl()`.
+- `toShapes({flipY})` applies the path's fill rule (`nonzero` or `evenodd`) to find holes. `toStrokeGeometry({flipY, width, divisions})` returns the stroke as flat triangles on z = 0 facing +z, with miter (and miter limit), round or bevel joins and butt, round or square caps, built in the element's units and then transformed. Its triangles may overlap, so a transparent stroke darkens where they do.
+- Coordinates stay in root user units with y down, as in the file (the root `viewBox` is reported, not applied): `flipY` makes the drawing upright in a y-up scene.
+- Not drawn, each listed in `warnings`: `text`, `image`, clip paths, masks, markers, patterns, filters and dashes; gradients fill with the average of their stop colours. CSS beyond simple selectors, and `@` rules, are skipped.
 
 ## COLLADA
 

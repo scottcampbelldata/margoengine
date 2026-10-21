@@ -3,13 +3,13 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
-  "description": "PLY, 3MF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, legacy VTK and static USDA/USDZ loaders for Margo Engine.",
+  "description": "PLY, 3MF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, legacy VTK, static USDA/USDZ, SVG and TrueType font loaders for Margo Engine.",
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test tests/loaders.test.js tests/dxf.test.js tests/obj.test.js tests/dae.test.js tests/tmx.test.js tests/font.test.js tests/svg.test.js",
+    "test": "npm run build && node --test tests/loaders.test.js tests/dxf.test.js tests/obj.test.js tests/dae.test.js tests/tmx.test.js tests/font.test.js tests/svg.test.js tests/mtl.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "fixtures": "node scripts/fetch-fixtures.js",
     "prepack": "npm run build"
@@ -31,13 +31,23 @@
     "./svg": {
       "types": "./dist/svg.d.ts",
       "import": "./dist/svg.js"
+    },
+    "./mtl": {
+      "types": "./dist/mtl.d.ts",
+      "import": "./dist/mtl.js"
     }
   },
   "files": [
     "dist"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/materials": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/materials": {
+      "optional": true
+    }
   },
   "homepage": "https://margoengine.com",
   "dependencies": {
