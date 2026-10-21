@@ -17,7 +17,7 @@ Hardware for every GPU measurement: RTX A6000 (Ampere), Windows 11, Edge 155 hea
 | --- | --- | --- | --- | --- |
 | A | 1-7 | voxel-pathtracer | main, after `f5019cf8`: `bb841e87` (1), `d97f9571` (5, 6, 7), `1ad7761a` (4), `ca109363` (2), `65be98fc` (3), `d2ddb275` (records), then this document | yes, 2026-10-21 |
 | B | 8, 9, 10, 12, 23, 27-34 | voxel-edit | `claude/pensive-albattani-f68586`, on `e1c7aefa`: `2af9a0b3`, `b795b0bc`, `745627da`, `92118a83`, `7729f040`, `b6d3ef26`, `996d9a3a`, `d801ce44`, `3e53d978`, `ad195a33` | no |
-| C | 11, 13, 14, 15, 16 | voxel (`./vox`), math, animation | `claude/frosty-cerf-0df80c`, on `e1c7aefa`: `5554bbc0`, `d2e947ed`, `88c0d0cd`, `c9e2d3fe` | no |
+| C | 11, 13, 14, 15, 16 | voxel (`./vox`), math, animation | main, after `a958b756`: `fde39a4f` (13, 14, 16), `12a6b907` (15), `77848821` (11), `2a9d3dc0` (records), then this row | yes, 2026-10-21 |
 | D | 17-21, 25 | exporters | main: `e11bd16e`, `cf9e57d2`, `a1463c77`, `cd9ffe72`, `aefcdfd7`, `3f89ce28` | yes, 2026-10-21 |
 | E | 22, 24, 26 | environment, shader, procedural | main: `71b95fd1`, `d55f1b41`, `ed7c1ba6`, `0ceb970a` | yes, 2026-10-21 |
 
@@ -40,12 +40,12 @@ api:update`. Core + stage stays 21,343 B gzip on every branch (limit 25,000).
 | 8 | Sparse coordinate envelope | voxel-edit `./sparse` | Verified (node; live check against the Studio's code) | `2af9a0b3` | `SparseOptions.envelope: 'wide'`, `SparseGridData.version 2` | pending |
 | 9 | Sparse worker transfer | voxel-edit `./sparse` | Verified (node) | `2af9a0b3` | `snapshot`, `fromSnapshot`, `deltaSnapshot`, `applyDeltaSnapshot`, `restoreSnapshots`, `snapshotBuffers` | pending |
 | 10 | Raster geometry batch ceiling | voxel-edit `./mesh` | Verified (node; identical to the Studio's batches incl. a 200,000 + 131,776 split) | `b795b0bc` | `partitionMesh` | pending |
-| 11 | Typed VOX render dictionaries | voxel `./vox` | Verified (node; 300+ corrupted variants) | `88c0d0cd` | `readVoxRenderDictionaries` | pending |
+| 11 | Typed VOX render dictionaries | voxel `./vox` | Verified (node; 300+ corrupted variants) | `77848821` | `readVoxRenderDictionaries` | pending |
 | 12 | Odd rotated VOX box centering, frame instances | voxel-edit `./vox` | Verified (node; 1,230 instances identical to the Studio's resolver; [3,5,7] box X = 2) | `745627da` | `resolveVoxScene` (`'box-v1'`, `'pivot-v1'`), `voxFrameRange` | pending |
-| 13 | Affine decomposition with shear | math `./affine` | Verified (node; 1,000 matrices) | `5554bbc0` | `decomposeAffine` | pending |
-| 14 | Saved quaternion interpolation | math `./quat` | Verified (node; bit for bit, 2,000 pairs + the close-angle fixture) | `5554bbc0` | `interpolateQuaternions(a, b, t, 0.9995)` | pending |
-| 15 | Saved vector-track arithmetic | animation | Verified (node; bit for bit, ±1e308 keys) | `d2e947ed` | `KeyframeTrackData.blend: 'weighted'` | pending |
-| 16 | Homogeneous projection validation | math `./mat4` | Verified (node; 2,000 matrices) | `5554bbc0` | `transformPointChecked` | pending |
+| 13 | Affine decomposition with shear | math `./affine` | Verified (node; 1,000 matrices) | `fde39a4f` | `decomposeAffine` | pending |
+| 14 | Saved quaternion interpolation | math `./quat` | Verified (node; bit for bit, 2,000 pairs + the close-angle fixture) | `fde39a4f` | `interpolateQuaternions(a, b, t, 0.9995)` | pending |
+| 15 | Saved vector-track arithmetic | animation | Verified (node; bit for bit, ±1e308 keys) | `12a6b907` | `KeyframeTrackData.blend: 'weighted'` | pending |
+| 16 | Homogeneous projection validation | math `./mat4` | Verified (node; 2,000 matrices) | `fde39a4f` | `transformPointChecked` | pending |
 | 17 | Static GLB writer | exporters | Verified (Godot headless 85/85 configured, 83/85 vanilla, as the Studio's baseline; Khronos validator 0 errors) | `e11bd16e` | `ExportNode.primitives`, extras, occlusion/emissive textures, transmission, IOR, emissive strength, `paletteTexture` | pending |
 | 18 | Animated GLB writer | exporters | Verified (Godot 62/62 compatibility, 46/62 standard as baseline; 5 cel frames) | `cf9e57d2` | `frameTimes`, `sampleFrames`, `animateTransforms`, `animateCels`, `animatePlacements` | pending |
 | 19 | Collision augmentation writer | exporters | Verified (1,562/1,562 imported, 770/770 saved) | `a1463c77` | `splitGLB`, `joinGLB`, `appendGLBMeshes` | pending |
@@ -187,7 +187,7 @@ What changed in the filter (`packages/voxel-pathtracer/src/shaders.ts`, `DENOISE
 | --- | --- |
 | A main, after `f5019cf8` | `npm run verify` exit 0 on this tree: 3,359/3,359 node tests, API reports match (209 entries, 2,380 names), core + stage 21,343 B, proofs `--current` 20/20. `npm run check:merge` exit 0 (3,348/3,348, site build, visual check 62/62 views) on the same commits over `0ceb970a`, before main's four exporter fixes. voxel-pathtracer: 69/69 node tests (17 new); real-GPU browser check passed (every scenario, including the new `denoisepeak`, `denoisehistory`, `materialtables`, `largemodels`, `native4k`); hygiene 10.0 on all eight gates. Studio denoiser benchmark 72/72 on this tracer build (`75dac655`, unchanged by the rebase). |
 | B `claude/pensive-albattani-f68586` | `npm run verify` exit 0: 3,317/3,317, proofs 20/20; voxel-edit 108/108 (was 67); hygiene voxel-edit 0 violations; live checks against the Studio's own files (read only). |
-| C `claude/frosty-cerf-0df80c` | `npm run verify` exit 0: 3,288/3,288, proofs 20/20; math, animation and voxel hygiene unchanged. |
+| C main, after `a958b756` | `npm run check:merge` exit 0 on `2a9d3dc0`: 3,416/3,416 node tests, API reports match (210 entries, 2,451 names), core + stage 21,343 B, proofs `--current` 20/20, site build, visual check 62/62 views. The first run had 3,415/3,416: voxel `physics.test.js` "a chunk that comes back after edits made out of range" (collider builds are time-budgeted per step, so heavy load can defer one; untouched by this branch, 6/6 alone), clean on the rerun. Hygiene: no new name in any violation; math, animation and voxel counts unchanged. |
 | D main `3f89ce28` | `npm run verify` exit 0: 3,300/3,300, proofs 20/20; Godot (headless) and Khronos validator results in the table above; 75/84 of the app's own unit tests for the replaced files pass on the candidates, the 9 others assert exact JSON representations (listed in the guide). |
 | E (main `0ceb970a`; branch `claude/agitated-saha-b701b2`) | `npm run verify` exit 0: 3,305/3,305, proofs 20/20; `build:site`; visual check 62/62; readback real-GPU check passed. |
 
