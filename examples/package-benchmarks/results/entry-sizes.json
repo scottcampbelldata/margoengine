@@ -1010,8 +1010,8 @@
     },
     "@margoengine/voxel-pathtracer": {
       ".": {
-        "raw": 164652,
-        "gzip": 58290
+        "raw": 181345,
+        "gzip": 63890
       }
     },
     "@margoengine/water": {
