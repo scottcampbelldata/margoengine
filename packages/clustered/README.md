@@ -59,9 +59,61 @@ suns.setLights([{direction: [-1, -2, 0.5], color: [1, 0.9, 0.8], intensity: 3}])
 `intensity` is the illuminance on a surface facing the light (lux in physical units), as core's sun. The lights use the
 point lights' GGX and Lambert BRDF text, so materials' Lambert and Phong shade them with their own BRDF and a
 `ShadowCatcherMaterial` counts them; `intensityScale` scales them. Every fragment evaluates every directional light
-(they reach everywhere, so they are not culled). They cast no shadows. The storage buffer (binding 141 of the lit
+(they reach everywhere, so they are not culled). With `castShadow` they are shadowed by `LocalShadows` (see
+[Directional and area light shadows](#directional-and-area-light-shadows)). The storage buffer (binding 141 of the lit
 shader's group) and the shader code exist only while the list is not empty: an empty or absent `DirectionalLights`
 leaves every GPU call unchanged. `lights.list` and `suns.list` return the lists last set (frozen copies).
+
+## Directional and area light shadows
+
+`DirectionalLights` and `AreaLights` (`@margoengine/clustered/area`, three.js `RectAreaLight`) lights with
+`castShadow: true` are shadowed by the `LocalShadows` attached to the same lights: the same casters (`local.add`: core
+meshes, glTF-pro models, materials and instanced meshes, `{dynamic: true}` for skinned ones), `bias` and `normalBias`,
+and the same depth map array, after the point and spot layers. No binding is added.
+
+```ts
+import {Clustered} from '@margoengine/clustered';
+import {LocalShadows} from '@margoengine/clustered/shadows';
+import {DirectionalLights} from '@margoengine/clustered/directional';
+import {AreaLights} from '@margoengine/clustered/area';
+const lights = Clustered.attach(engine), local = LocalShadows.attach(engine, {lights, resolution: 1024});
+const suns = DirectionalLights.attach(engine, {lights}), panels = AreaLights.attach(engine, {lights});
+suns.setLights([
+  {direction: [1, -2, 0], intensity: 2, castShadow: true, shadow: {bounds: {min: [-10, 0, -10], max: [10, 5, 10]}}},
+  {direction: [-1, -3, 1], intensity: 1, castShadow: true, shadow: {cascades: 3, distance: 60}},
+]);
+panels.setLights([{position: [0, 3, 0], direction: [0, -1, 0], width: 1.2, height: 0.4, intensity: 5, castShadow: true}]);
+local.add(floor);
+local.add(table);
+```
+
+- **Directional.** `shadow.bounds` renders one orthographic map over that world box, independent of the camera: it
+  re-renders only when the light or a caster changes. Casters and receivers must be inside the box. Without `bounds`,
+  `cascades` (1 to 4, default 3) maps are fitted to the camera's view out to `distance` (default 100, or the camera's
+  far plane), split half logarithmically and half uniformly, each a bounding sphere snapped to whole texels. These
+  re-render when the camera moves. Casters up to `distance` past a cascade toward the light still cast into it. A
+  receiver uses the finest cascade that holds it, and is lit outside them all. Filtering is the point lights' 3x3 PCF,
+  with the bias and normal offset in texels of the cascade.
+- **Area.** Cube faces around the light's centre in its own frame: five (the side it lights and the four sides) or six
+  when `twoSided`. Each face covers 45 degrees plus a 0.1 UV guard band. The penumbra is PCSS (Fernando 2005). 16 depth
+  reads around the receiver find the blockers, and their mean depth sets the filter radius: the light's half
+  `width` and `height` at the receiver times (receiver - blocker) / blocker depth. 24 comparisons filter that radius,
+  each against the receiver's tangent plane, so wide filters do not shadow the surface they sit on. Wider or taller
+  lights give wider penumbrae. On a real GPU a 1.2-wide light gave a 10-90% penumbra 2.9 times wider than a 0.4-wide
+  one (analytic 3), each within 15% of the exact uniform-light width
+  (`scripts/clustered-shadow-gpu-check.js`). `shadow.near` (default far / 1000) and `shadow.far` (default 100) bound
+  the faces; past `far` a receiver is unshadowed.
+- Both take `shadow.resolution` (16 up to LocalShadows' `resolution`, one integer or `[width, height]`; a smaller map
+  uses its layers' corner, as a local light's). At most 4 directional and 4 area lights of a list cast
+  (`MAX_DIRECTIONAL_SHADOWS`, `MAX_AREA_SHADOWS`); a fifth throws RangeError from `setLights`. Layers: one per
+  cascade, five or six per area light, `resolution² × 4` bytes each.
+- Limits: the filter radius stops at the guard band (0.1 UV, about 50 texels at 512), so very wide penumbrae are
+  clipped. Blockers nearer the light than a quarter of the receiver's distance can fall outside the search. The 24-tap
+  filter can band on very wide penumbrae. Without `LocalShadows` the lights stay unshadowed. `ShadowCatcherMaterial`
+  does not yet count these shadows. A receiver added with `receiveShadow: false`, or a core mesh with
+  `mesh.receiveShadow = false`, is not darkened.
+- Off is exact: while no directional or area light casts, the shaders, bindings, buffers and uploads are byte for byte
+  what they were before these shadows existed (unit-tested by hash; images and probe radiance compared on a real GPU).
 
 ## IES profiles
 
@@ -222,7 +274,7 @@ Local depth passes run before clustered culling and main shading, redraw active
 faces each frame, and use a fixed 3×3 comparison filter. Shadows multiply only
 their own light's contribution. Ambient, unshadowed local lights and directional
 cascades retain their responses. Bias and resolution control acne and detached
-edges; this filter does not model area-light penumbrae. Device restoration
+edges; this filter does not model area-light penumbrae (area lights' own shadows do, below). Device restoration
 recreates the maps and caster bindings; disposal releases owned resources.
 
 Without `ClusteredOptions.shadows`, the original shader, four lighting bindings

@@ -5,7 +5,24 @@ import { finiteVector } from '@margoengine/math/validate';
 import { MargoError } from '@margoengine/math/errors';
 import type { Clustered, ClusteredArea } from './index.js';
 import { ltcSize, ltcTable } from './ltc.js';
+import { areaShadowSettings, MAX_AREA_SHADOWS, type AreaShadowLight } from './light-shadow-math.js';
+export { MAX_AREA_SHADOWS } from './light-shadow-math.js';
 declare const GPUBufferUsage: { STORAGE: number; COPY_DST: number };
+/**
+ * Shadow map settings of a castShadow {@link RectAreaLight}. Invalid values throw TypeError or RangeError from
+ * `setLights`; a `resolution` above LocalShadows' throws RangeError when the maps render.
+ */
+export interface AreaLightShadow {
+  /**
+   * Map size in texels per cube face: one integer (square) or `[width, height]`, each from 16 up to LocalShadows'
+   * `resolution` (the default). A smaller map renders into its layers' top-left corner, as a local light's.
+   */
+  resolution?: number | readonly [number, number];
+  /** Shadow-camera near distance from the light's centre (default far / 1000); nearer casters are not drawn. */
+  near?: number;
+  /** Shadow-camera far distance (default 100 world units); receivers past it are unshadowed. */
+  far?: number;
+}
 /** A rectangular area light (three.js `RectAreaLight`). It emits from one face, toward `direction`, unless `twoSided`. */
 export interface RectAreaLight {
   /** World-space centre. */
@@ -24,6 +41,15 @@ export interface RectAreaLight {
   intensity?: number;
   /** Emit from both faces (default false). */
   twoSided?: boolean;
+  /**
+   * Shadowed (default false) by the `LocalShadows` (`@margoengine/clustered/shadows`) attached to the same lights: its
+   * casters, `resolution`, `bias` and `normalBias`, and its map array. Cube faces around the light's centre (five, six
+   * when `twoSided`) and a soft penumbra that widens with `width` and `height` (a PCSS blocker search). Without
+   * LocalShadows the light stays unshadowed. At most {@link MAX_AREA_SHADOWS} lights of a list cast.
+   */
+  castShadow?: boolean;
+  /** Shadow map settings of a castShadow light. */
+  shadow?: AreaLightShadow;
 }
 /** Options of {@link AreaLights}. */
 export interface AreaLightOptions {
@@ -38,7 +64,8 @@ const LIGHT_FLOATS = 16,
 // One storage buffer, no textures: a count, the lights (centre + twoSided, half-width and half-height vectors, radiance) and the
 // LTC table as pack2x16float pairs, three u32 per cell, filtered bilinearly by hand (environment's BRDF LUT does the same).
 // Each light integrates the quad, clipped to the horizon, under the GGX LTC (specular) and the cosine (diffuse).
-const sampling = (group: number) => /* wgsl */ `
+// `shadow` (LocalShadows' clusterAreaShadow factor, from Clustered) darkens each light; absent, the text is unchanged.
+const sampling = (group: number, shadow?: string) => /* wgsl */ `
 struct AreaLight {center:vec4f,right:vec4f,up:vec4f,color:vec4f}
 struct AreaLightData {count:vec4u,lights:array<AreaLight,${MAX_AREA_LIGHTS}>,lut:array<u32>}
 @group(${group}) @binding(17) var<storage,read> areaLights:AreaLightData;
@@ -71,8 +98,8 @@ fn clusterAreaLighting(position:vec3f,n:vec3f,v:vec3f,nv:f32,base:vec3f,roughnes
   for(var j=0u;j<areaLights.count.x;j++){
     let light=areaLights.lights[j];let c=light.center.xyz-position;let r=light.right.xyz;let u=light.up.xyz;
     var side=1.0;if(dot(cross(r,u),c)>0){if(light.center.w<0.5){continue;}side=-1.0;}
-    let a=c-r-u;let b=c-r+u;let e=c+r+u;let d=c+r-u;
-    specular+=light.color.rgb*max(side*areaIntegral(lobe,a,b,e,d),0.0);diffuse+=light.color.rgb*max(side*areaIntegral(local,a,b,e,d),0.0);
+    let a=c-r-u;let b=c-r+u;let e=c+r+u;let d=c+r-u;${shadow ? `let radiance=light.color.rgb${shadow};` : ''}
+    specular+=${shadow ? 'radiance' : 'light.color.rgb'}*max(side*areaIntegral(lobe,a,b,e,d),0.0);diffuse+=${shadow ? 'radiance' : 'light.color.rgb'}*max(side*areaIntegral(local,a,b,e,d),0.0);
   }
   let f0=mix(vec3f(0.04),base,metal);
   return (f0*t2.x+(1-f0)*t2.y)*specular+(1-metal)*base*diffuse;
@@ -82,8 +109,10 @@ fn clusterAreaLighting(position:vec3f,n:vec3f,v:vec3f,nv:f32,base:vec3f,roughnes
  * Rectangular area lights for clustered lighting (three.js `RectAreaLight`), shaded with Linearly Transformed Cosines (Heitz
  * et al. 2016): GGX specular and Lambert diffuse, the quad clipped exactly to each surface's horizon. Core meshes and every
  * receiver of the `lights` (gltf-pro models, materials meshes, terrain) are lit. Every fragment evaluates every area light
- * (no cluster culling: the lights have no range). Without lights it adds nothing to the shaders or the GPU work.
- * @throws TypeError without the Clustered lights; RangeError for an invalid light or more than `MAX_AREA_LIGHTS`.
+ * (no cluster culling: the lights have no range). Lights with `castShadow` are shadowed by `LocalShadows` (cube faces,
+ * PCSS penumbrae scaled by the light's size). Without lights it adds nothing to the shaders or the GPU work.
+ * @throws TypeError without the Clustered lights or for a malformed `castShadow` or `shadow`; RangeError for an invalid
+ * light or shadow setting, more than `MAX_AREA_LIGHTS` lights or more than `MAX_AREA_SHADOWS` castShadow lights.
  * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`.
  */
 export class AreaLights implements EnginePlugin, ClusteredArea {
@@ -96,6 +125,7 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
   private readonly data = new Float32Array(HEADER + MAX_AREA_LIGHTS * LIGHT_FLOATS);
   private readonly count = new Uint32Array(this.data.buffer, 0, 1);
   private listValue: readonly RectAreaLight[] = Object.freeze([]);
+  private shadowList: readonly AreaShadowLight[] = Object.freeze([]);
   private dirty = true;
   private disposed = false;
   constructor(options: AreaLightOptions) {
@@ -115,11 +145,15 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
   get list(): readonly RectAreaLight[] {
     return this.listValue;
   }
-  /** Replaces the area lights (at most {@link MAX_AREA_LIGHTS}); validates every entry before changing anything. An empty list removes the shader code. */
+  /**
+   * Replaces the area lights (at most {@link MAX_AREA_LIGHTS}, {@link MAX_AREA_SHADOWS} of them with `castShadow`);
+   * validates every entry before changing anything. An empty list removes the shader code.
+   */
   setLights(lights: readonly RectAreaLight[]): this {
     if (this.disposed || !Array.isArray(lights) || lights.length > MAX_AREA_LIGHTS)
       throw new RangeError(`Expected at most ${MAX_AREA_LIGHTS} area lights`);
-    const packed = lights.map((light) => {
+    const shadows: AreaShadowLight[] = [];
+    const packed = lights.map((light, index) => {
       finiteVector(light.position, 3, 'Area light position');
       finiteVector(light.direction, 3, 'Area light direction');
       finiteVector(light.color ?? [1, 1, 1], 3, 'Area light color');
@@ -146,6 +180,23 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
       const right = r.map((v: number) => v / rl),
         up = [n[1] * right[2] - n[2] * right[1], n[2] * right[0] - n[0] * right[2], n[0] * right[1] - n[1] * right[0]],
         color: ArrayLike<number> = light.color ?? [1, 1, 1];
+      if (light.castShadow !== undefined && typeof light.castShadow !== 'boolean')
+        throw new TypeError('Area light castShadow must be a boolean');
+      if (light.castShadow) {
+        if (shadows.length === MAX_AREA_SHADOWS)
+          throw new RangeError(
+            `At most ${MAX_AREA_SHADOWS} area lights may cast shadows; set castShadow false on the others`,
+          );
+        shadows.push({
+          index,
+          center: [light.position[0], light.position[1], light.position[2]],
+          normal: n as [number, number, number],
+          right: right as [number, number, number],
+          up: up as [number, number, number],
+          twoSided: !!light.twoSided,
+          ...areaShadowSettings(light.shadow),
+        });
+      } else if (light.shadow !== undefined) areaShadowSettings(light.shadow);
       return [
         ...light.position,
         light.twoSided ? 1 : 0,
@@ -160,13 +211,18 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
     packed.forEach((values, i) => this.data.set(values, HEADER + i * LIGHT_FLOATS));
     this.count[0] = lights.length;
     this.listValue = Object.freeze([...lights]);
+    this.shadowList = Object.freeze(shadows);
     this.dirty = true;
     this.sync();
     return this;
   }
-  /** @internal ClusteredArea: WGSL defining `clusterAreaLighting`. */
-  declarations(group: number): string {
-    return sampling(group);
+  /** @internal ClusteredArea: the castShadow lights, in list order, for LocalShadows. */
+  shadowLights(): readonly AreaShadowLight[] {
+    return this.shadowList;
+  }
+  /** @internal ClusteredArea: WGSL defining `clusterAreaLighting`; `shadow` multiplies each light (a `*` factor in `j`). */
+  declarations(group: number, shadow?: string): string {
+    return sampling(group, shadow);
   }
   /** @internal ClusteredArea: binding 17 of the lit shader's group. */
   bindings(): GPUBindGroupEntry[] {

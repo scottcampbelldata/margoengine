@@ -40,14 +40,15 @@ export const cullingShader =
 }`;
 // Extra directional lights (Clustered.directional): the point loop's BRDF text, so materials' Lambert and Phong (litShader)
 // and the shadow catcher (catcherLit) rewrite and measure them too. `toLight` is the unit vector toward the light.
-const directionalLoop = /* wgsl */ `
+// `shadow` (LocalShadows' clusterDirectionalShadow factor) darkens each light; empty, the text is the original.
+const directionalLoop = (shadow: string) => /* wgsl */ `
   for(var j=0u;j<clusterDirectional.count.x;j++){
     let light=clusterDirectional.lights[j];let l=light.toLight.xyz;let h=(v+l)/max(length(v+l),0.0001);
     let nl=clamp(dot(n,l),0.0,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
     let d=a2/(3.14159265*pow(nh*nh*(a2-1)+1,2.0));
     let g=2*nv/(nv+sqrt(a2+(1-a2)*nv*nv))*2*nl/max(nl+sqrt(a2+(1-a2)*nl*nl),0.0001);
     let f0=mix(vec3f(0.04),base,metal);let fresnel=f0+(1-f0)*pow(1-vh,5.0);
-    result+=${clusterBrdf}*nl*light.color.rgb;
+    result+=${clusterBrdf}*nl*light.color.rgb${shadow};
   }`;
 /** Light-loop hooks beyond shadows and area lights: `Clustered.directional`, `Clustered.ies` and `Clustered.projector`. */
 export interface ClusteredSamplingHooks {
@@ -63,7 +64,8 @@ export interface ClusteredSamplingHooks {
  * WGSL for the clustered light loop in bind group `group`, for custom forward materials (`Clustered.pbr` and
  * `Clustered.shader` call it): the cluster bindings 4-7 and `clusterLighting(pixel, position, n, eye, base, roughness,
  * metal)`, which returns the summed radiance of the fragment's point and spot lights (times `intensityScale`).
- * @param shadow A `ClusteredShadow` hook (its `clusterShadow` darkens each light), or `true` for the integrated maps.
+ * @param shadow A `ClusteredShadow` hook (its `clusterShadow` darkens each light, and its `directionalShadow` and
+ * `areaShadow` calls, when given, the directional and area lights), or `true` for the integrated maps.
  * @param area A `ClusteredArea` hook; its `clusterAreaLighting` is added to the result.
  * @param integratedShadows Also sample the integrated maps of `ClusteredOptions.shadows` (bindings 28-30).
  * @param decay Use the `decay`/`angle` light terms (some light set them) instead of the inverse-square ones.
@@ -71,8 +73,10 @@ export interface ClusteredSamplingHooks {
  */
 export function clusteredSampling(
   group: number,
-  shadow?: boolean | { declarations(group: number): string },
-  area?: { declarations(group: number): string },
+  shadow?:
+    | boolean
+    | { declarations(group: number): string; readonly directionalShadow?: string; readonly areaShadow?: string },
+  area?: { declarations(group: number, shadow?: string): string },
   integratedShadows = false,
   decay = false,
   receive = false,
@@ -81,11 +85,13 @@ export function clusteredSampling(
   const shadows = shadow === true || integratedShadows,
     hook = typeof shadow === 'object' ? shadow : undefined,
     // A core mesh with receiveShadow false sets clusterReceive false before calling clusterLighting.
-    term = (call: string) => (receive ? `*select(1.0,${call},clusterReceive)` : '*' + call);
+    term = (call: string) => (receive ? `*select(1.0,${call},clusterReceive)` : '*' + call),
+    directionalShadow = hook?.directionalShadow,
+    areaShadow = hook?.areaShadow;
   const code =
     declarations(group) +
     (hook ? hook.declarations(group) : '') +
-    (area ? area.declarations(group) : '') +
+    (area ? (areaShadow ? area.declarations(group, term(areaShadow)) : area.declarations(group)) : '') +
     (directional ? directional.declarations(group) : '') +
     terms.map((t) => t.declarations(group)).join('') +
     /* wgsl */ `
@@ -109,7 +115,7 @@ fn clusterLighting(pixel:vec2f,position:vec3f,n:vec3f,eye:vec3f,base:vec3f,rough
     let f0=mix(vec3f(0.04),base,metal);let fresnel=f0+(1-f0)*pow(1-vh,5.0);
     ${decay ? decayTerms : legacyTerms}
     result+=${clusterBrdf}*nl*light.colorIntensity.rgb*light.colorIntensity.w*falloff*cone${terms.map((t) => '*' + t.term).join('')}${hook ? term('clusterShadow(light,position,n)') : ''}${shadows ? term('clusterShadowVisibility(light,position,n)') : ''};
-  }${directional ? directionalLoop : ''}
+  }${directional ? directionalLoop(directionalShadow ? term(directionalShadow) : '') : ''}
   return ${area ? '(result+clusterAreaLighting(position,n,v,nv,base,roughness,metal))' : 'result'}*clusterFrame.intensity.x;
 }`;
   return shadows ? localShadowSampling(group) + code : code;

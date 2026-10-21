@@ -15,6 +15,8 @@ import {
   type LocalShadowSource,
 } from './local-shadows.js';
 export { clusteredSampling, type ClusteredSamplingHooks } from './shader.js';
+export type { DirectionalShadowLight, AreaShadowLight } from './light-shadow-math.js';
+import type { DirectionalShadowLight, AreaShadowLight } from './light-shadow-math.js';
 export type { LocalShadowOptions, LocalLightShadow, LocalShadowSource, LocalShadowPrimitive } from './local-shadows.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number; COPY_SRC: number };
 /** A local point light for `setLights`. Invalid values throw RangeError or TypeError (the list is unchanged). */
@@ -83,18 +85,34 @@ export interface ClusteredShadow {
   declarations(group: number): string;
   /** Bind group entries matching `declarations`. */
   bindings(): GPUBindGroupEntry[];
+  /**
+   * While some directional light casts: a WGSL f32 call in the directional loop's `j`, `position`, `n` and `l` (unit,
+   * toward the light) that the loop multiplies each directional light by. Undefined otherwise.
+   */
+  readonly directionalShadow?: string;
+  /**
+   * While some area light casts: a WGSL f32 call in `clusterAreaLighting`'s `j`, `position`, `n`, `c` (receiver to
+   * light centre), `r` and `u` (half extents) that multiplies each area light. Undefined otherwise.
+   */
+  readonly areaShadow?: string;
 }
 /** The `Clustered.area` hook (`AreaLights` from `@margoengine/clustered/area`): WGSL defining `clusterAreaLighting`, and its bindings. */
 export interface ClusteredArea {
+  /** WGSL declarations in bind group `group`; `shadow`, when given, is a `*` factor applied to each light. */
+  declarations(group: number, shadow?: string): string;
+  /** Bind group entries matching `declarations`. */
+  bindings(): GPUBindGroupEntry[];
+  /** The castShadow area lights, for the `shadow` hook's maps. */
+  shadowLights?(): readonly AreaShadowLight[];
+}
+/** The `Clustered.directional` hook (`DirectionalLights`): WGSL defining `clusterDirectional` and its bindings. */
+export interface ClusteredDirectional {
   /** WGSL declarations in bind group `group`. */
   declarations(group: number): string;
   /** Bind group entries matching `declarations`. */
   bindings(): GPUBindGroupEntry[];
-}
-/** The `Clustered.directional` hook (`DirectionalLights`): WGSL defining `clusterDirectional` and its bindings. */
-export interface ClusteredDirectional {
-  declarations(group: number): string;
-  bindings(): GPUBindGroupEntry[];
+  /** The castShadow directional lights, for the `shadow` hook's maps. */
+  shadowLights?(): readonly DirectionalShadowLight[];
 }
 /**
  * A per-light factor of the point and spot loop (`Clustered.ies`, `Clustered.projector`): WGSL declarations, their

@@ -14,6 +14,17 @@ import { displacedDepth } from '../../shared/displacement.js';
 import { preset } from '../../shared/preset.js';
 import type { Clustered, ClusteredShadow } from './index.js';
 import { hemisphere, viewportMatrix } from './local-shadow-math.js';
+import {
+  AREA_FACE_TAN,
+  boundsBox,
+  cascadeBoxes,
+  lightBasis,
+  MAX_AREA_SHADOWS,
+  MAX_DIRECTIONAL_SHADOWS,
+  orthographicShadow,
+  type AreaShadowLight,
+  type DirectionalShadowLight,
+} from './light-shadow-math.js';
 import { MargoError } from '@margoengine/math/errors';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
@@ -23,7 +34,12 @@ type Context = Extract<PassContext, { backend: 'webgpu' }>;
 export interface LocalShadowOptions {
   /** The clustered lights whose `castShadow` lights get shadow maps. */
   lights: Clustered;
-  /** Shadowed lights with maps (1-16, default 4); further `castShadow` lights stay unshadowed. A point light uses six layers, a spot light one (six for a pi / 2 hemisphere). */
+  /**
+   * Shadowed point and spot lights with maps (1-16, default 4); further `castShadow` lights stay unshadowed. A point
+   * light uses six layers, a spot light one (six for a pi / 2 hemisphere). Directional and area lights with
+   * `castShadow` (up to four each, limited by their own lists) take layers after these: one per cascade, and five cube
+   * faces per area light (six when two-sided).
+   */
   maxLights?: number;
   /**
    * Square size of each layer in texels (default 512), and the largest map a castShadow light's `shadow.resolution`
@@ -93,10 +109,27 @@ const MAX_LIGHTS = 16,
   LAYERS = MAX_LIGHTS * 6,
   FRAME_FLOATS = 4 + MAX_LIGHTS * 4 + LAYERS * 16,
   SLOT_FLOATS = 16;
+// While some directional or area light casts, the frame continues after the point and spot data: per directional light
+// of the list (MAX_DIRECTIONAL_LIGHTS) and area light (MAX_AREA_LIGHTS) its first layer, slot and settings, then per
+// shadowed slot its cascades' or cube faces' data and sampling matrices. Their layers follow the point and spot ones.
+const SUN_LIST = 16,
+  AREA_LIST = 64,
+  SUN = FRAME_FLOATS,
+  SUN_CASCADES = SUN + SUN_LIST * 4,
+  SUN_MATRICES = SUN_CASCADES + MAX_DIRECTIONAL_SHADOWS * 4 * 4,
+  AREA = SUN_MATRICES + MAX_DIRECTIONAL_SHADOWS * 4 * 16,
+  AREA_SLOTS = AREA + AREA_LIST * 4,
+  AREA_MATRICES = AREA_SLOTS + MAX_AREA_SHADOWS * 4,
+  EXTENDED_FLOATS = AREA_MATRICES + MAX_AREA_SHADOWS * 6 * 16,
+  TOTAL_LAYERS = LAYERS + MAX_DIRECTIONAL_SHADOWS * 4 + MAX_AREA_SHADOWS * 6,
+  SIGNATURE = 18,
+  noSuns: readonly DirectionalShadowLight[] = [],
+  noAreas: readonly AreaShadowLight[] = [];
 // Reversed depth (near 1, far 0) for float precision. lights[k]: first layer, point (1) or spot (0), texel size per unit distance.
 // A point light picks the cube face by the major axis of the offset receiver, so faces need no seam filtering.
-const sampling = (group: number) => /* wgsl */ `
-struct LocalShadowFrame {settings:vec4f,lights:array<vec4f,${MAX_LIGHTS}>,matrices:array<mat4x4f,${LAYERS}>}
+const sampling = (group: number, sun = false, area = false) =>
+  /* wgsl */ `
+struct LocalShadowFrame {settings:vec4f,lights:array<vec4f,${MAX_LIGHTS}>,matrices:array<mat4x4f,${LAYERS}>${sun || area ? extendedFrame : ''}}
 @group(${group}) @binding(14) var<uniform> localShadowFrame:LocalShadowFrame;
 @group(${group}) @binding(15) var localShadowMap:texture_depth_2d_array;
 @group(${group}) @binding(16) var localShadowSampler:sampler_comparison;
@@ -112,6 +145,61 @@ fn clusterShadow(light:ClusterLight,position:vec3f,n:vec3f)->f32 {
   var lit=0.0;
   for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){lit+=textureSampleCompareLevel(localShadowMap,localShadowSampler,uv+vec2f(f32(x),f32(y))*localShadowFrame.settings.w,i32(layer),ndc.z);}}
   return lit/9.0;
+}
+` +
+  (sun ? sunShadow : '') +
+  (area ? areaShadow : '');
+const extendedFrame = `,sun:array<vec4f,${SUN_LIST}>,sunCascades:array<vec4f,${MAX_DIRECTIONAL_SHADOWS * 4}>,sunMatrices:array<mat4x4f,${MAX_DIRECTIONAL_SHADOWS * 4}>,area:array<vec4f,${AREA_LIST}>,areaSlots:array<vec4f,${MAX_AREA_SHADOWS}>,areaMatrices:array<mat4x4f,${MAX_AREA_SHADOWS * 6}>`;
+// Directional light j: sun[j] is (first layer, slot + 1, cascades); per cascade, the world size of a texel and the UV box
+// whose 3x3 filter stays inside the map. The finest cascade holding the receiver shades it; outside all of them it is lit.
+const sunShadow = /* wgsl */ `fn clusterDirectionalShadow(j:u32,position:vec3f,n:vec3f,l:vec3f)->f32 {
+  let info=localShadowFrame.sun[j];if(info.y<0.5){return 1.0;}
+  let first=(u32(info.y)-1u)*4u;
+  for(var k=0u;k<u32(info.z);k++){
+    let cascade=localShadowFrame.sunCascades[first+k];
+    let p=position+n*(cascade.x*localShadowFrame.settings.z)+l*(cascade.x*localShadowFrame.settings.y);
+    let clip=localShadowFrame.sunMatrices[first+k]*vec4f(p,1);let uv=clip.xy*vec2f(0.5,-0.5)+0.5;
+    if(any(uv<vec2f(cascade.w))||any(uv>cascade.yz)||clip.z<=0||clip.z>1){continue;}
+    var lit=0.0;
+    for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){lit+=textureSampleCompareLevel(localShadowMap,localShadowSampler,uv+vec2f(f32(x),f32(y))*localShadowFrame.settings.w,i32(info.x)+i32(k),clip.z);}}
+    return lit/9.0;
+  }
+  return 1.0;
+}
+`;
+// Area light j: area[j] is (first layer, slot + 1, near, far); areaSlots: texel size per unit distance, the guard band
+// (largest filter radius, UV), the smallest radius and two-sided. Cube faces in the light's frame (+n, +r, -r, +u, -u,
+// -n). PCSS (Fernando 2005): blockers found within the light's footprint give the penumbra, the light's half extents
+// at the receiver times (receiver - blocker) / blocker depth, filtered over a disk of comparisons. The receiver's
+// tangent plane mapped into the face (planes stay planes under a projection) is the reference depth at every tap.
+const areaShadow = /* wgsl */ `fn localShadowTap(i:u32,count:u32)->vec2f {let a=f32(i)*2.39996323;return vec2f(cos(a),sin(a))*sqrt(f32(i)/f32(count));}
+fn clusterAreaShadow(j:u32,position:vec3f,n:vec3f,c:vec3f,r:vec3f,u:vec3f)->f32 {
+  let info=localShadowFrame.area[j];if(info.y<0.5){return 1.0;}
+  let slot=u32(info.y)-1u;let s=localShadowFrame.areaSlots[slot];let distance=length(c);let texel=s.x*distance;
+  let p=position+n*(texel*localShadowFrame.settings.z)+c/max(distance,0.0001)*(texel*localShadowFrame.settings.y);
+  let rn=normalize(r);let un=normalize(u);let q=p-position-c;let a=vec3f(dot(q,cross(rn,un)),dot(q,rn),dot(q,un));let b=abs(a);
+  var face=select(5u,0u,a.x>=0);if(b.y>b.x&&b.y>=b.z){face=select(2u,1u,a.y>=0);}else if(b.z>b.x&&b.z>b.y){face=select(4u,3u,a.z>=0);}
+  if(face==5u&&s.w<0.5){return 1.0;}
+  let m=localShadowFrame.areaMatrices[slot*6u+face];let clip=m*vec4f(p,1);if(clip.w<=0){return 1.0;}
+  let z=clip.z/clip.w;if(z<=0||z>1){return 1.0;}
+  let uv=clip.xy/clip.w*vec2f(0.5,-0.5)+0.5;let layer=i32(info.x)+i32(face);
+  let t1=normalize(cross(n,select(vec3f(1,0,0),vec3f(0,1,0),abs(n.x)>0.9)))*(distance*0.01);let t2=cross(n,t1);
+  let c1=m*vec4f(p+t1,1);let c2=m*vec4f(p+t2,1);
+  let d1=vec3f(c1.xy/c1.w*vec2f(0.5,-0.5)+0.5-uv,c1.z/c1.w-z);let d2=vec3f(c2.xy/c2.w*vec2f(0.5,-0.5)+0.5-uv,c2.z/c2.w-z);
+  let det=d1.x*d2.y-d1.y*d2.x;
+  let slope=select(vec2f(0),vec2f(d1.z*d2.y-d2.z*d1.y,d1.x*d2.z-d2.x*d1.z)/det,abs(det)>1e-12);
+  let extent=(abs((m*vec4f(r,0)).xy)+abs((m*vec4f(u,0)).xy))*0.5/clip.w;
+  let size=vec2f(textureDimensions(localShadowMap));let reach=min(extent*3.0,vec2f(s.y));
+  var blockers=0.0;var depth=0.0;
+  for(var i=0u;i<16u;i++){
+    let o=localShadowTap(i,16u)*reach;let stored=textureLoad(localShadowMap,vec2i(clamp((uv+o)*size,vec2f(0),size-1)),layer,0);
+    if(stored>z+dot(slope,o)){blockers+=1.0;depth+=info.z*info.w/(stored*(info.w-info.z)+info.z);}
+  }
+  if(blockers<0.5){return 1.0;}
+  let blocker=depth/blockers;let radius=clamp(extent*max(clip.w-blocker,0.0)/blocker,vec2f(s.z),vec2f(s.y));
+  var lit=0.0;
+  for(var i=0u;i<24u;i++){let o=localShadowTap(i,24u)*radius;lit+=textureSampleCompareLevel(localShadowMap,localShadowSampler,uv+o,layer,z+dot(slope,o));}
+  return lit/24.0;
 }
 `;
 // Same text shape as @margoengine/shadows' depth shader, so shared/instances.js instancedDepth applies.
@@ -162,10 +250,19 @@ function lightMatrix(
   out[o + 14] = k * far + k * dot(f);
   out[o + 15] = -dot(f);
 }
+function fits(width: number, height: number, size: number, kind: string): void {
+  if (width > size || height > size)
+    throw new RangeError(
+      `A castShadow ${kind} light's shadow.resolution exceeds LocalShadows resolution ${size}; lower it or raise resolution`,
+    );
+}
 /**
  * Shadows for clustered point lights (six cube faces) and spot lights (one perspective map) in one depth texture array.
- * Lights with `castShadow` take slots in list order up to `maxLights`. Maps re-render only when their light changes or a
- * caster moves, shows/hides, changes instances or `shadowVersion`, or was added with `{dynamic:true}`.
+ * Lights with `castShadow` take slots in list order up to `maxLights`. The same array, casters and biases shadow
+ * `DirectionalLights` with `castShadow` (orthographic maps: a `bounds` box or one to four camera-fitted cascades, 3x3
+ * PCF) and `AreaLights` with `castShadow` (cube faces around the light, PCSS penumbrae scaled by its size), without
+ * adding bindings. Maps re-render only when their light changes (or the camera, for cascades) or a caster moves,
+ * shows/hides, changes instances or `shadowVersion`, or was added with `{dynamic:true}`.
  * `LocalShadows.attach(engine, {lights})`; WebGPU only.
  * @throws TypeError without the Clustered lights or for an invalid caster; RangeError for invalid options or a map
  * larger than the device allows.
@@ -195,15 +292,27 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   private pipelines = new Map<string, GPURenderPipeline>();
   private draws = new Map<Mesh, Map<object, Draw>>();
   private sources: Source[] = [];
-  private readonly values = new Float32Array(FRAME_FLOATS);
-  private readonly matrices = new Float32Array(LAYERS * 64);
+  /** The frame with the directional and area data; `values` is its point and spot part, uploaded alone otherwise. */
+  private readonly all = new Float32Array(EXTENDED_FLOATS);
+  private readonly values = this.all.subarray(0, FRAME_FLOATS);
+  private readonly matrices = new Float32Array(TOTAL_LAYERS * 64);
   /** Receivers' matrices per layer: the depth pass's, or for a smaller map the same mapped into its corner. */
-  private readonly sampled = new Float32Array(LAYERS * 16);
+  private readonly sampled = new Float32Array(TOTAL_LAYERS * 16);
   /** Per layer: a smaller map's viewport width and height, 0 for the whole layer. */
-  private readonly viewports = new Uint32Array(LAYERS * 2);
+  private readonly viewports = new Uint32Array(TOTAL_LAYERS * 2);
   private readonly slots = new Float32Array(MAX_LIGHTS * SLOT_FLOATS).fill(NaN);
-  private readonly dirtyLayers = new Uint8Array(LAYERS);
+  private readonly dirtyLayers = new Uint8Array(TOTAL_LAYERS);
   private readonly bases = new Int32Array(MAX_LIGHTS);
+  /** First layer of each shadowed directional and area light (after the point and spot layers). */
+  private readonly sunBases = new Int32Array(MAX_DIRECTIONAL_SHADOWS);
+  private readonly areaBases = new Int32Array(MAX_AREA_SHADOWS);
+  /** Per layer last drawn for a directional or area light: its depth-pass matrix and viewport (NaN: drawn for another). */
+  private readonly signatures = new Float32Array(TOTAL_LAYERS * SIGNATURE).fill(NaN);
+  /** Some directional (area) light casts: the WGSL and the frame carry their data. */
+  private sunShadows = false;
+  private areaShadows = false;
+  /** Layers the depth-pass camera buffer holds; it grows past the point and spot layers only for directional and area maps. */
+  private cameraLayers = 0;
   private readonly list: Draw[] = [];
   private layers = 0;
   private changed = true;
@@ -279,9 +388,17 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   invalidate(): void {
     this.changed = true;
   }
+  /** ClusteredShadow: while a directional light casts, the directional loop's shadow call (`clusterDirectionalShadow`). */
+  get directionalShadow(): string | undefined {
+    return this.sunShadows ? 'clusterDirectionalShadow(j,position,n,l)' : undefined;
+  }
+  /** ClusteredShadow: while an area light casts, `clusterAreaLighting`'s shadow call (`clusterAreaShadow`). */
+  get areaShadow(): string | undefined {
+    return this.areaShadows ? 'clusterAreaShadow(j,position,n,c,r,u)' : undefined;
+  }
   /** @internal ClusteredShadow: WGSL for the light loop. */
   declarations(group: number): string {
-    return sampling(group);
+    return sampling(group, this.sunShadows, this.areaShadows);
   }
   /** @internal ClusteredShadow: bindings 14-16 of the lit shader's group. */
   bindings(): GPUBindGroupEntry[] {
@@ -311,6 +428,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     this.cameras = device.createBuffer({ size: LAYERS * 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.cameraLayers = LAYERS;
     this.sampler = device.createSampler({ compare: 'greater-equal', magFilter: 'linear', minFilter: 'linear' });
     this.alphaSampler = device.createSampler();
     this.white = device.createTexture({
@@ -356,12 +474,46 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     this.layerViews = Array.from({ length: layers }, (_, baseArrayLayer) =>
       this.map!.createView({ dimension: '2d', baseArrayLayer, arrayLayerCount: 1 }),
     );
+    if (layers > this.cameraLayers) {
+      this.cameras!.destroy();
+      this.cameraLayers = TOTAL_LAYERS;
+      this.cameras = this.device!.createBuffer({
+        size: TOTAL_LAYERS * 256,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+      this.cameraGroup = this.device!.createBindGroup({
+        layout: this.cameraLayout!,
+        entries: [{ binding: 0, resource: { buffer: this.cameras, size: 64 } }],
+      });
+    }
+    this.bind();
+    this.changed = true;
+  }
+  private bind(): void {
     this.entries = [
       { binding: 14, resource: { buffer: this.frame! } },
-      { binding: 15, resource: this.map.createView({ dimension: '2d-array' }) },
+      { binding: 15, resource: this.map!.createView({ dimension: '2d-array' }) },
       { binding: 16, resource: this.sampler! },
     ];
-    this.changed = true;
+  }
+  /**
+   * Turns the directional and area parts of the frame and WGSL on or off: a larger frame buffer while either casts, and
+   * Clustered rebuilds its shaders with the new declarations.
+   */
+  private extend(sun: boolean, area: boolean): void {
+    if (sun === this.sunShadows && area === this.areaShadows) return;
+    const resize = sun || area ? !(this.sunShadows || this.areaShadows) : true;
+    this.sunShadows = sun;
+    this.areaShadows = area;
+    if (resize) {
+      this.frame!.destroy();
+      this.frame = this.device!.createBuffer({
+        size: (sun || area ? EXTENDED_FLOATS : FRAME_FLOATS) * 4,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+      this.bind();
+    }
+    if (this.lights.shadow === this) this.lights.shadow = this;
   }
   // Runs after skinning (-10) and before directional shadows (-5), which upload pending instance rows.
   registerPasses(graph: FrameGraph): void {
@@ -402,6 +554,21 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       layers += n;
     }
     for (let s = used; s < MAX_LIGHTS; s++) slots[s * SLOT_FLOATS + 11] = NaN;
+    // Directional and area lights with castShadow take the layers after the point and spot ones.
+    const pointLayers = layers,
+      suns = this.lights.directional?.shadowLights?.() ?? noSuns,
+      areas = this.lights.area?.shadowLights?.() ?? noAreas,
+      sunCount = Math.min(suns.length, MAX_DIRECTIONAL_SHADOWS),
+      areaCount = Math.min(areas.length, MAX_AREA_SHADOWS);
+    for (let s = 0; s < sunCount; s++) {
+      this.sunBases[s] = layers;
+      layers += suns[s].bounds ? 1 : suns[s].cascades;
+    }
+    for (let s = 0; s < areaCount; s++) {
+      this.areaBases[s] = layers;
+      layers += areas[s].twoSided ? 6 : 5;
+    }
+    this.extend(sunCount > 0, areaCount > 0);
     if (layers > this.layers) this.allocate(layers);
     for (let j = 0; j < count; j++) {
       const at = j * 16,
@@ -456,19 +623,22 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
         this.viewports[layer * 2] = scaled ? width : 0;
         this.viewports[layer * 2 + 1] = scaled ? height : 0;
         this.dirtyLayers[layer] = 1;
+        this.signatures[layer * SIGNATURE] = NaN;
       }
     }
+    const extended = this.sunShadows || this.areaShadows;
+    if (extended) this.extras(c, suns, sunCount, areas, areaCount, size);
     values[0] = used;
     values[1] = o.bias ?? 1;
     values[2] = o.normalBias ?? 1.5;
     values[3] = 1 / size;
-    values.set(this.sampled.subarray(0, layers * 16), 4 + MAX_LIGHTS * 4);
+    values.set(this.sampled.subarray(0, pointLayers * 16), 4 + MAX_LIGHTS * 4);
     c.device.queue.writeBuffer(
       this.frame!,
       0,
-      values as Float32Array<ArrayBuffer>,
+      (extended ? this.all : values) as Float32Array<ArrayBuffer>,
       0,
-      4 + MAX_LIGHTS * 4 + layers * 16,
+      extended ? EXTENDED_FLOATS : 4 + MAX_LIGHTS * 4 + pointLayers * 16,
     );
     // Casters: any change re-renders every layer (ponytail: per-light caster bounds would limit it to the lights it reaches).
     const engine = this.engine!;
@@ -553,7 +723,11 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
         }
       if (!records.size) this.draws.delete(node);
     }
-    if (casters) this.dirtyLayers.fill(1, 0, layers);
+    if (casters) {
+      this.dirtyLayers.fill(1, 0, layers);
+      // Layers out of use now hold stale depth for whichever directional or area light takes them next.
+      this.signatures.fill(NaN, layers * SIGNATURE);
+    }
     this.changed = false;
     this.stats.layers = this.stats.draws = 0;
     let any = false;
@@ -562,7 +736,9 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       this.stats.cacheHits++;
       return;
     }
-    c.device.queue.writeBuffer(this.cameras!, 0, this.matrices as Float32Array<ArrayBuffer>, 0, layers * 64);
+    // The view matches the buffer: the point and spot layers, or every layer once directional or area maps grew it.
+    const upload = this.matrices.subarray(0, this.cameraLayers * 64) as Float32Array<ArrayBuffer>;
+    c.device.queue.writeBuffer(this.cameras!, 0, upload, 0, layers * 64);
     for (const d of list) {
       const p = d.p!;
       d.values.set(p.node.matrix);
@@ -604,6 +780,102 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       }
       pass.end();
     }
+  }
+  /** Matrices and frame data of the directional and area lights' layers; marks the layers whose camera changed. */
+  private extras(
+    c: Context,
+    suns: readonly DirectionalShadowLight[],
+    sunCount: number,
+    areas: readonly AreaShadowLight[],
+    areaCount: number,
+    size: number,
+  ): void {
+    const values = this.all;
+    values.fill(0, SUN, SUN + SUN_LIST * 4);
+    values.fill(0, AREA, AREA + AREA_LIST * 4);
+    for (let s = 0; s < sunCount; s++) {
+      const light = suns[s],
+        f = light.direction,
+        [x, y] = lightBasis(f),
+        width = light.width || size,
+        height = light.height || size,
+        base = this.sunBases[s],
+        scaled = width !== size || height !== size;
+      fits(width, height, size, 'directional');
+      const boxes = light.bounds
+        ? [boundsBox(f, x, y, light.bounds.min, light.bounds.max)]
+        : cascadeBoxes(c.camera, f, x, y, light.cascades, light.distance, width, height);
+      boxes.forEach((box, k) => {
+        const layer = base + k,
+          cascade = s * 4 + k;
+        // A full-size map widens its box by two texels a side for the 3x3 filter; a smaller one narrows its viewport.
+        orthographicShadow(
+          this.matrices,
+          layer * 64,
+          f,
+          x,
+          y,
+          box,
+          scaled ? box.hx : (box.hx * size) / (size - 4),
+          scaled ? box.hy : (box.hy * size) / (size - 4),
+        );
+        this.place(layer, SUN_MATRICES + cascade * 16, width, height, size);
+        values[SUN_CASCADES + cascade * 4] = Math.max((2 * box.hx) / (width - 4), (2 * box.hy) / (height - 4));
+        values[SUN_CASCADES + cascade * 4 + 1] = (width - 2) / size;
+        values[SUN_CASCADES + cascade * 4 + 2] = (height - 2) / size;
+        values[SUN_CASCADES + cascade * 4 + 3] = 2 / size;
+      });
+      values.set([base, s + 1, boxes.length, 0], SUN + light.index * 4);
+    }
+    for (let s = 0; s < areaCount; s++) {
+      const light = areas[s],
+        width = light.width || size,
+        height = light.height || size,
+        base = this.areaBases[s],
+        scaled = width !== size || height !== size,
+        { normal: n, right: r, up: u } = light,
+        axes = [n, r, r.map((v) => -v), u, u.map((v) => -v), n.map((v) => -v)];
+      fits(width, height, size, 'area');
+      for (let face = 0; face < (light.twoSided ? 6 : 5); face++) {
+        const layer = base + face;
+        lightMatrix(this.matrices, layer * 64, light.center, axes[face], AREA_FACE_TAN, light.near, light.far);
+        this.place(layer, AREA_MATRICES + (s * 6 + face) * 16, width, height, size);
+      }
+      // The guard band: UV between the 45-degree face and its map's edge, less the bilinear filter's reach.
+      const small = Math.min(width, height),
+        inner = scaled ? (small - 4) / small : 1,
+        smallest = 1.5 / size;
+      values[AREA_SLOTS + s * 4] = (2 * AREA_FACE_TAN) / (small - (scaled ? 4 : 0));
+      values[AREA_SLOTS + s * 4 + 1] = Math.max(
+        ((0.5 - (0.5 * inner) / AREA_FACE_TAN) * small) / size - smallest,
+        smallest,
+      );
+      values[AREA_SLOTS + s * 4 + 2] = smallest;
+      values[AREA_SLOTS + s * 4 + 3] = light.twoSided ? 1 : 0;
+      values.set([base, s + 1, light.near, light.far], AREA + light.index * 4);
+    }
+  }
+  /**
+   * Writes layer `layer`'s sampling matrix into the frame at `at` (mapped into its corner for a smaller map) and marks
+   * the layer for re-rendering when its depth-pass matrix or viewport changed.
+   */
+  private place(layer: number, at: number, width: number, height: number, size: number): void {
+    const o = layer * 64,
+      v = layer * 2,
+      k = layer * SIGNATURE,
+      scaled = width !== size || height !== size,
+      signature = this.signatures;
+    if (scaled) viewportMatrix(this.matrices, o, this.all, at, width, height, size);
+    else this.all.set(this.matrices.subarray(o, o + 16), at);
+    this.viewports[v] = scaled ? width : 0;
+    this.viewports[v + 1] = scaled ? height : 0;
+    let same = signature[k + 16] === this.viewports[v] && signature[k + 17] === this.viewports[v + 1];
+    for (let i = 0; i < 16; i++) if (signature[k + i] !== this.matrices[o + i]) same = false;
+    if (same) return;
+    signature.set(this.matrices.subarray(o, o + 16), k);
+    signature[k + 16] = this.viewports[v];
+    signature[k + 17] = this.viewports[v + 1];
+    this.dirtyLayers[layer] = 1;
   }
   private record(p: LocalShadowPrimitive): Draw {
     if (![24, 80].includes(p.stride) || (p.instances && p.stride !== 80))
@@ -750,6 +1022,9 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     this.pipelines.clear();
     this.layers = 0;
     this.slots.fill(NaN);
+    this.signatures.fill(NaN);
+    this.sunShadows = this.areaShadows = false;
+    this.cameraLayers = 0;
     this.changed = true;
   }
   onDeviceRestored(engine: Engine): void {
