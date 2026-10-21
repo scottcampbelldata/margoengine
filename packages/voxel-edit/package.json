@@ -1,0 +1,55 @@
+{
+  "name": "@margoengine/voxel-edit",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Editing voxel models for editors and tools: dense and sparse grids, modeling operations, brushes and selections, picking, export meshing, .vox scene editing and frame animation.",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./edit": {
+      "types": "./dist/edit.d.ts",
+      "import": "./dist/edit.js"
+    },
+    "./pick": {
+      "types": "./dist/pick.d.ts",
+      "import": "./dist/pick.js"
+    },
+    "./sparse": {
+      "types": "./dist/sparse.d.ts",
+      "import": "./dist/sparse.js"
+    },
+    "./mesh": {
+      "types": "./dist/mesh.d.ts",
+      "import": "./dist/mesh.js"
+    },
+    "./vox": {
+      "types": "./dist/vox.d.ts",
+      "import": "./dist/vox.js"
+    },
+    "./animation": {
+      "types": "./dist/animation.d.ts",
+      "import": "./dist/animation.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@margoengine/math": "^1.0.0",
+    "@margoengine/voxel": "^1.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js voxel-edit",
+    "test": "npm run build && node --test tests/*.test.js",
+    "prepack": "npm run build"
+  },
+  "homepage": "https://margoengine.com"
+}

@@ -1,0 +1,40 @@
+// @margoengine/voxel-edit: editing voxel models for editors and tools. The root holds grids and modeling operations;
+// brushes and selections are in ./edit, picking in ./pick, sparse grids in ./sparse, export meshing in ./mesh, .vox
+// interop in ./vox and frame animation in ./animation.
+export {
+  type VoxelGrid,
+  type GridLimits,
+  type GridEdit,
+  type GridHit,
+  cellIndex,
+  cellAt,
+  insideGrid,
+} from './grid.js';
+export {
+  type CombineOptions,
+  combineGrids,
+  type ShearOptions,
+  shearGrid,
+  type DiagonalOptions,
+  reflectDiagonal,
+  type WrapOptions,
+  wrapGrid,
+  type RepeatOptions,
+  repeatGrid,
+  type ResampleOptions,
+  resampleGrid,
+  type RotateOptions,
+  rotateGrid,
+  type MorphologyOptions,
+  type DilateOptions,
+  dilateGrid,
+  erodeGrid,
+  type FillOptions,
+  fillEnclosed,
+  type PaletteMergeOptions,
+  type PaletteMerge,
+  mergePalettes,
+  type MazeOptions,
+  type Maze,
+  generateMaze,
+} from './model.js';
