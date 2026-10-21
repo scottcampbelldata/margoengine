@@ -38,6 +38,30 @@ const index = (i: Index) =>
       ? i
       : cast(i, 'u32', 'storage index')
     : cast(i, 'u32', 'storage index');
+// Keep only live storage listeners under one device promise. A promise callback directly closing over
+// StorageBuffer would retain its CPU array after dispose(), until that GPU device eventually disappeared.
+const deviceLoss = new WeakMap<GPUDevice, Set<() => void>>();
+function deviceLossListeners(device: GPUDevice): Set<() => void> {
+  let listeners = deviceLoss.get(device);
+  if (!listeners) {
+    listeners = new Set();
+    deviceLoss.set(device, listeners);
+    const shared = listeners;
+    void device.lost.then(() => {
+      const callbacks = [...shared];
+      shared.clear();
+      deviceLoss.delete(device);
+      for (const callback of callbacks) callback();
+    });
+  }
+  return listeners;
+}
+function observeDeviceLoss(device: GPUDevice, listener: () => void): () => void {
+  if (!device.lost) return () => {};
+  const listeners = deviceLossListeners(device);
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
 /** One write `buffer[index] = value`, made by `StorageBuffer.store` inside a ComputePass body. */
 export interface Store {
   readonly buffer: StorageBuffer;
@@ -52,6 +76,7 @@ export class StorageBuffer<T extends StorageType = StorageType> implements Resou
   private readonly id = unique();
   private version = 0;
   private readonly buffers = new Map<GPUDevice, { buffer: GPUBuffer; version: number }>();
+  private readonly lossSubscriptions = new Map<GPUDevice, () => void>();
   /** `atomic: true` (u32 or i32 only) declares `array<atomic<T>>` in compute passes so `atomicAdd`/`atomicMax`/`atomicMin` work. */
   constructor(
     readonly data: Float32Array | Int32Array | Uint32Array,
@@ -76,7 +101,6 @@ export class StorageBuffer<T extends StorageType = StorageType> implements Resou
   buffer(device: GPUDevice): GPUBuffer {
     let b = this.buffers.get(device);
     if (!b) {
-      device.lost?.then(() => this.buffers.delete(device));
       b = {
         buffer: device.createBuffer({
           label: 'shader:storage',
@@ -86,6 +110,13 @@ export class StorageBuffer<T extends StorageType = StorageType> implements Resou
         version: -1,
       };
       this.buffers.set(device, b);
+      this.lossSubscriptions.set(
+        device,
+        observeDeviceLoss(device, () => {
+          this.buffers.delete(device);
+          this.lossSubscriptions.delete(device);
+        }),
+      );
     }
     if (b.version !== this.version) {
       device.queue.writeBuffer(b.buffer, 0, this.data as Float32Array<ArrayBuffer>);
@@ -148,6 +179,8 @@ export class StorageBuffer<T extends StorageType = StorageType> implements Resou
   }
   /** Destroys the GPU copies; a later use uploads `data` again. */
   dispose(): void {
+    for (const remove of this.lossSubscriptions.values()) remove();
+    this.lossSubscriptions.clear();
     for (const b of this.buffers.values()) b.buffer.destroy();
     this.buffers.clear();
   }
