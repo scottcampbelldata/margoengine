@@ -686,7 +686,9 @@ function document(source: ExportSource, options: GLTFOptions, writer = new Write
   json.scene = 0;
   if (flatten) {
     const check = (node: Node): void => {
-      if (node.skin || node.geometry?.joints || node.geometry?.morphs || node.morphWeights)
+      const geometries =
+        node.primitives?.map((primitive) => primitive.geometry) ?? (node.geometry ? [node.geometry] : []);
+      if (node.skin || node.morphWeights || geometries.some((geometry) => geometry.joints || geometry.morphs))
         throw new TypeError('Flatten does not support skins, morphs or animation');
       if (node.camera || node.light)
         throw new TypeError('Flatten does not support cameras or lights; keep the hierarchy');

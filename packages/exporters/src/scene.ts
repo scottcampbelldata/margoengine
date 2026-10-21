@@ -652,7 +652,7 @@ export function normalizeMaterial(data: PbrMaterial | MaterialData): Mat {
       ...MATERIAL_DEFAULTS,
     };
   }
-  if (!isObject(data)) fail('Expected PbrMaterial or material data');
+  if (!isObject(data) || Array.isArray(data)) fail('Expected PbrMaterial or material data');
   const m = data as MaterialData;
   // Factors are JSON numbers in glTF, so they keep their exact values (Float32 only where a format needs it).
   const color =

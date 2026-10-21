@@ -302,6 +302,18 @@ test('extras must be JSON; invalid rich fields are refused with the fix in the m
   const { json } = readGLB(exportGLB(node({ extras: JSON.parse('{"a":1,"__proto__":{"b":2}}') })));
   assert.deepEqual(Object.keys(json.nodes[0].extras), ['a', '__proto__']);
   assert.throws(() => exportGLB(node({ primitives: [{ geometry: quad }] })), /primitives or geometry/);
+  assert.throws(() => exportGLB(node({ material: [] })), /material data/);
+  assert.throws(() => exportGLB({ nodes: [{ primitives: [{ geometry: quad, material: [] }] }] }), /material data/);
+  // Flatten writes no skins, so joint attributes on any primitive (not only the first) are refused.
+  const jointed = {
+    ...quad,
+    joints: new Array(32).fill(0),
+    weights: Array.from({ length: 8 }, () => [1, 0, 0, 0]).flat(),
+  };
+  assert.throws(
+    () => exportGLB({ nodes: [{ primitives: [{ geometry: quad }, { geometry: jointed }] }] }, { flatten: true }),
+    /Flatten does not support skins/,
+  );
   assert.throws(
     () => exportGLB({ nodes: [{ primitives: [{ geometry: quad, indices: [0, 1] }] }] }),
     /complete triangles/,
