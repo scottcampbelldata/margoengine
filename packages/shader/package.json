@@ -13,6 +13,10 @@
     "./noise": {
       "types": "./dist/noise.d.ts",
       "import": "./dist/noise.js"
+    },
+    "./graph": {
+      "types": "./dist/graph.d.ts",
+      "import": "./dist/graph.js"
     }
   },
   "files": [
