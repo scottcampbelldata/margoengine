@@ -378,12 +378,12 @@ Numbers on other GPUs are not measured.
 
 ## Verification
 
-- `tests/*.test.js` (Node, 71 tests, about 1.4 s; part of `npm run verify`): validation and atomic failure, dense
+- `tests/*.test.js` (Node, 72 tests, about 1.4 s; part of `npm run verify`): validation and atomic failure, dense
   indexing, all 255 palette identities, transformed/mirrored/hidden instances, model reuse by revision, voxel traversal
   against a brute-force slab test (2,000 random rays over 5 models whose sizes are not multiples of 8), resets for each
   camera/size/scene/option change, enable/disable, `maxSamples`, the denoiser's passes (the caustic chain only for
   materials that focus light), a new denoised image after every restart (also one that converges in a single frame)
-  and when the viewport's history is kept, used or dropped, upload reuse, disposal, device
+  and when the viewport's history is kept, used or dropped, upload reuse, growth to the binding limit, disposal, device
   restore and device switch, pass order, PNG encoding with tile placement, AOV mapping, cancellation, pausing, device
   loss during a capture, and the frame uniform's lighting values; the exported defaults, `resolveTraceOptions` and
   `validateTraceOptions` against `setOptions`' own errors, `resetOptions` and automatic focus, `resolveTraceMaterial`

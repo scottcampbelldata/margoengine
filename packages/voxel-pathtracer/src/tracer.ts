@@ -954,7 +954,9 @@ export class VoxelPathTracer implements EnginePlugin {
     const upload = (key: 'materials' | 'scene' | 'env', data: ArrayBufferView) => {
       if (gpu.buffers[key].size < data.byteLength) {
         this.#destroy(gpu.buffers[key]);
-        gpu.buffers[key] = this.#buffer(gpu, Math.max(data.byteLength, gpu.buffers[key].size * 2), storage);
+        // Room to grow, but never past what one storage binding may hold (the snapshot was checked against it).
+        const size = Math.max(data.byteLength, Math.min(gpu.buffers[key].size * 2, limit * 4));
+        gpu.buffers[key] = this.#buffer(gpu, size, storage);
         gpu.resources++;
       }
       if (data.byteLength) device.queue.writeBuffer(gpu.buffers[key], 0, data as Uint32Array<ArrayBuffer>);

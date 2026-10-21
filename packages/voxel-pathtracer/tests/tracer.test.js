@@ -254,6 +254,36 @@ test('voxel uploads are kept for unchanged models and released for removed ones'
   tracer.dispose();
 });
 
+test('growing scene buffers double, but never past the device binding limit', async () => {
+  const limit = 1 << 20,
+    harness = fakeEngine(fakeDevice({ maxStorageBufferBindingSize: limit })),
+    scene = (n) =>
+      simpleScene({
+        revision: n,
+        instances: Array.from({ length: n }, (_, i) => ({
+          id: `i${i}`,
+          modelId: 'm',
+          matrix: translate((i % 64) * 9, 0, Math.floor(i / 64) * 9),
+        })),
+      }),
+    { tracer, frame, device } = await ready({ scene: scene(2700) }, harness);
+  frame();
+  // Above half the limit: doubling the buffer would make it larger than any storage binding may be.
+  tracer.setScene(scene(2900));
+  frame();
+  const storage = device.buffers.filter((b) => !b.destroyed && b.usage & 128);
+  assert.ok(
+    storage.some((b) => b.size > limit / 2),
+    'a scene buffer above half the limit',
+  );
+  assert.deepEqual(
+    storage.filter((b) => b.size > limit).map((b) => b.size),
+    [],
+    'no storage buffer larger than maxStorageBufferBindingSize',
+  );
+  tracer.dispose();
+});
+
 test('dispose frees every GPU buffer, removes the pass and plugin, and rejects later work', async () => {
   const { tracer, frame, device, engine } = await ready({ denoise: true });
   frame();
