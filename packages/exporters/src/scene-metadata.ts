@@ -3,6 +3,7 @@
 import type { GLTFCamera, GLTFLight, PBRModel } from '@margoengine/gltf-pro';
 import type { GLTFCameraDefinition, GLTFLightDefinition } from '../../shared/gltf.js';
 import type { Bin } from './container.js';
+import { copyExtras } from './extras.js';
 import type { CameraData, LightData } from './scene.js';
 
 function numeric(value: number, subject: string, valid: (value: number) => boolean): number {
@@ -12,17 +13,19 @@ function numeric(value: number, subject: string, valid: (value: number) => boole
   return value;
 }
 
-function named<T extends { name?: string }>(out: T, name?: string): T {
+function named<T extends { name?: string; extras?: unknown }>(out: T, name?: string, extras?: unknown): T {
   if (name !== undefined) {
     if (typeof name !== 'string') throw new TypeError('Camera or light name must be a string; update its name');
     out.name = name;
   }
+  const copy = copyExtras(extras, 'Camera or light extras');
+  if (copy) out.extras = copy;
   return out;
 }
 
 /** @internal */
 export function cameraDefinition(camera: CameraData): GLTFCameraDefinition {
-  const out = named<GLTFCameraDefinition>({ type: camera.type }, camera.name);
+  const out = named<GLTFCameraDefinition>({ type: camera.type }, camera.name, (camera as CameraData).extras);
   if (camera.type !== 'perspective' && camera.type !== 'orthographic')
     throw new TypeError('Camera type is unsupported; use perspective or orthographic');
   const p = camera[camera.type];
@@ -63,6 +66,7 @@ export function lightDefinition(light: LightData): GLTFLightDefinition {
       intensity: numeric(light.intensity, 'Light intensity', (v) => v >= 0),
     },
     light.name,
+    (light as LightData).extras,
   );
   if (light.type !== 'directional' && light.range !== undefined)
     out.range = numeric(light.range, 'Light range', (v) => v > 0);

@@ -41,12 +41,22 @@ export interface MorphData {
   tangents?: ArrayLike<number>;
 }
 
+/**
+ * Application data written as a glTF `extras` object (provenance, roles, source ids). JSON only: plain objects,
+ * arrays, strings, finite numbers, booleans and null; `undefined` members are left out, as JSON.stringify does.
+ * Copied when the scene is exported. Written by the glTF writers only.
+ */
+export type Extras = { readonly [key: string]: unknown };
+
 export interface SkinData {
   name?: string;
   /** References to nodes included in this scene. */
   joints: readonly ExportNode[];
   /** Sixteen column-major values per joint. */
   inverseBindMatrices: ArrayLike<number>;
+  /** The skeleton root: the joints' closest common root or one of its ancestors. Default none. */
+  skeleton?: ExportNode;
+  extras?: Extras;
 }
 
 export interface AnimationChannelData {
@@ -62,6 +72,7 @@ export interface AnimationChannelData {
 export interface AnimationData {
   name?: string;
   channels: readonly AnimationChannelData[];
+  extras?: Extras;
 }
 
 /** An encoded PNG or JPEG image referenced by a material, with its sampler. */
@@ -79,6 +90,9 @@ export interface TextureData {
   wrapS?: 'repeat' | 'clamp' | 'mirror';
   /** Wrap mode across v. Default 'repeat'. */
   wrapT?: 'repeat' | 'clamp' | 'mirror';
+  /** UV set the material samples it with: 0 (`uvs`, default) or 1 (`uvs1`). glTF writers only. */
+  texCoord?: 0 | 1;
+  extras?: Extras;
 }
 
 /** A glTF metallic-roughness material described as data. */
@@ -109,6 +123,21 @@ export interface MaterialData {
   specular?: readonly number[];
   /** Phong highlight exponent, finite and >= 0. Default 30. */
   shininess?: number;
+  /** Scale of `normalTexture`'s xy, finite. Default 1. glTF writers only. */
+  normalScale?: number;
+  /** Ambient occlusion in its red channel. glTF writers only. */
+  occlusionTexture?: TextureData;
+  /** How much `occlusionTexture` darkens, 0 to 1. Default 1. */
+  occlusionStrength?: number;
+  /** Emitted color in its rgb, multiplied by `emissive` (so set `emissive`, e.g. [1, 1, 1]). glTF writers only. */
+  emissiveTexture?: TextureData;
+  /** Multiplier on the emitted color, finite and >= 0, for emission brighter than 1: KHR_materials_emissive_strength. Default 1. */
+  emissiveStrength?: number;
+  /** Fraction of light transmitted through the surface, 0 to 1: KHR_materials_transmission. Default 0. */
+  transmission?: number;
+  /** Index of refraction, 0 or >= 1: KHR_materials_ior. Default 1.5. */
+  ior?: number;
+  extras?: Extras;
 }
 
 /** A glTF camera on a data-scene node, looking down the node's -Z; a gltf-pro `GLTFCamera` record fits as it is. */
@@ -118,6 +147,7 @@ export interface CameraData {
   /** Angles in radians; omitted `zfar` is an infinite projection. */
   perspective?: { yfov: number; znear: number; zfar?: number; aspectRatio?: number };
   orthographic?: { xmag: number; ymag: number; znear: number; zfar: number };
+  extras?: Extras;
 }
 
 /** A KHR_lights_punctual light on a data-scene node, pointing down the node's -Z; a gltf-pro `GLTFLight` record fits as it is. */
@@ -133,16 +163,42 @@ export interface LightData {
   /** Spot cone angles in radians. Defaults 0 and PI / 4. */
   innerConeAngle?: number;
   outerConeAngle?: number;
+  extras?: Extras;
 }
 
-/** A node of a plain data scene. Rotation is a quaternion [x, y, z, w]. */
+/**
+ * One primitive of a multi-material mesh: its triangles and the material they use. Primitives that share one
+ * `geometry` object and give their own `indices` write its vertex attributes once (shared glTF accessors), each with
+ * its own index list, as one palette-colored model split by material.
+ */
+export interface ExportPrimitive {
+  geometry: Geometry | GeometryData;
+  material?: PbrMaterial | MaterialData;
+  /** Triangle list into `geometry`'s vertices, used instead of its `indices`. Nonempty, whole triangles. */
+  indices?: ArrayLike<number>;
+  /** glTF writers only. */
+  extras?: Extras;
+}
+
+/**
+ * A node of a plain data scene. Rotation is a quaternion [x, y, z, w]. A scale of [0, 0, 0] collapses the node: the
+ * glTF writers keep it (a hidden geometry cel, shown later by a scale channel), the mesh-only formats leave it and its
+ * descendants out.
+ */
 export interface ExportNode {
   name?: string;
   translation?: readonly number[];
   rotation?: readonly number[];
   scale?: readonly number[];
+  /**
+   * Column-major local transform, instead of translation, rotation and scale. It must be affine and free of shear
+   * (glTF forbids sheared node matrices), and the node cannot be an animation target.
+   */
+  matrix?: readonly number[];
   geometry?: Geometry | GeometryData;
   material?: PbrMaterial | MaterialData;
+  /** A multi-material mesh, instead of `geometry` and `material`. */
+  primitives?: readonly ExportPrimitive[];
   visible?: boolean;
   children?: readonly ExportNode[];
   skin?: SkinData;
@@ -151,12 +207,40 @@ export interface ExportNode {
   camera?: CameraData;
   /** Written by the glTF writers only. */
   light?: LightData;
+  /** glTF writers only. */
+  extras?: Extras;
+  /** Name of the glTF mesh. Default the node's name. */
+  meshName?: string;
+  /** `extras` of the glTF mesh. */
+  meshExtras?: Extras;
+}
+
+/**
+ * A baked lightmap. glTF has no standard lightmap material slot, so the glTF writers put `texture` into the
+ * document's textures and record it under the root `extras[key]` as `{ texture: <index>, texCoord, ...extras }`.
+ * Standard viewers ignore it; an import script binds it (a Godot post-import script, for example).
+ */
+export interface LightmapData {
+  texture: TextureData;
+  /** UV set the lightmap uses: 1 (`uvs1`, default) or 0. Every drawn geometry needs that set. */
+  texCoord?: 0 | 1;
+  /** Root `extras` member holding the record. Default 'lightmap'. */
+  key?: string;
+  /** Further members of the record: encoding, scale, padding. */
+  extras?: Extras;
 }
 
 /** A plain data scene; geometry and material objects shared between nodes are written once. */
 export interface ExportScene {
   nodes: readonly ExportNode[];
   animations?: readonly AnimationData[];
+  /** Root `extras` of the glTF document. glTF writers only, as are `scene`, `asset` and `lightmap`. */
+  extras?: Extras;
+  /** The glTF scene's name and extras. */
+  scene?: { name?: string; extras?: Extras };
+  /** The glTF asset's copyright and extras (`asset.generator` is an option of the writer). */
+  asset?: { copyright?: string; extras?: Extras };
+  lightmap?: LightmapData;
 }
 
 /** Either a Margo Engine engine (from `Engine.create`) or a plain data scene. */
@@ -192,6 +276,8 @@ export interface Geo {
   joints?: Uint16Array;
   weights?: Float32Array;
   morphs?: { name?: string; positions: Float32Array; normals?: Float32Array; tangents?: Float32Array }[];
+  /** The geometry whose vertex attributes this primitive shares, with its own `indices`. */
+  base?: Geo;
 }
 /** @internal Normalized material. */
 export interface Mat {
@@ -206,10 +292,19 @@ export interface Mat {
   baseColorTexture?: TextureData;
   metallicRoughnessTexture?: TextureData;
   normalTexture?: TextureData;
+  occlusionTexture?: TextureData;
+  emissiveTexture?: TextureData;
   unlit?: boolean;
   shading: 'standard' | 'lambert' | 'phong';
   specular: number[];
   shininess: number;
+  normalScale: number;
+  occlusionStrength: number;
+  emissiveStrength: number;
+  transmission: number;
+  ior: number;
+  /** Copied by the glTF writers, which alone write extras. */
+  extras?: Extras;
 }
 /** @internal Normalized node. */
 export interface Node {
@@ -225,10 +320,17 @@ export interface Node {
   source?: ExportNode;
   skin?: SkinData;
   morphWeights?: Float32Array;
-  /** Optional-package primitives retained on their original scene node. */
-  primitives?: { geometry: Geo; material: Mat }[];
+  /** Multi-material primitives: optional-package meshes, or a data node's `primitives`. */
+  primitives?: { geometry: Geo; material?: Mat; extras?: Extras }[];
+  /** The data node's `primitives` array, so nodes sharing it share one glTF mesh. */
+  primitivesKey?: object;
   camera?: CameraData;
   light?: LightData;
+  /** Column-major local matrix, written instead of TRS. */
+  matrix?: number[];
+  extras?: Extras;
+  meshName?: string;
+  meshExtras?: Extras;
 }
 
 /** @internal Map slots of an @margoengine/materials Material, in gltf-pro's map order. */
@@ -291,6 +393,19 @@ function unit(value: unknown, label: string, fallback: number): number {
   return value;
 }
 
+/** A validated triangle list into `count` vertices. */
+function triangleIndices(source: unknown, count: number, label: string): Uint32Array {
+  if (!isObject(source) || typeof source.length !== 'number' || source.length === 0 || source.length % 3)
+    throw new RangeError(`${label} must hold complete triangles`);
+  const indices = new Uint32Array(source.length);
+  for (let i = 0; i < indices.length; i++) {
+    const index = (source as unknown as ArrayLike<number>)[i];
+    if (!Number.isInteger(index) || index < 0 || index >= count) throw new RangeError('Index exceeds vertices');
+    indices[i] = index;
+  }
+  return indices;
+}
+
 /** Validates and normalizes geometry data. Normals and tangents become unit length, tangent w becomes +1 or -1. */
 export function normalizeGeometry(data: Geometry | GeometryData): Geo {
   if (isCoreGeometry(data)) {
@@ -314,17 +429,7 @@ export function normalizeGeometry(data: Geometry | GeometryData): Geo {
   if (data.indices === undefined) {
     if (count % 3) throw new RangeError('Non-indexed geometry needs complete triangles');
     indices = Uint32Array.from({ length: count }, (_, i) => i);
-  } else {
-    const source = data.indices;
-    if (!isObject(source) || typeof source.length !== 'number' || source.length === 0 || source.length % 3)
-      throw new RangeError('Indices must hold complete triangles');
-    indices = new Uint32Array(source.length);
-    for (let i = 0; i < source.length; i++) {
-      const index = source[i];
-      if (!Number.isInteger(index) || index < 0 || index >= count) throw new RangeError('Index exceeds vertices');
-      indices[i] = index;
-    }
-  }
+  } else indices = triangleIndices(data.indices, count, 'Indices');
   // Area-weighted fallback normals for zero-length inputs.
   let fallback: Float64Array | null = null;
   for (let i = 0; i < count; i++) {
@@ -441,7 +546,8 @@ function faceNormals(positions: Float32Array, indices: Uint32Array, count: numbe
   return out;
 }
 
-function checkTexture(texture: unknown, label: string): TextureData | undefined {
+/** @internal A validated texture, or undefined. */
+export function checkTexture(texture: unknown, label: string): TextureData | undefined {
   if (texture === undefined) return undefined;
   if (!isObject(texture) || !(texture.image instanceof Uint8Array)) fail(`${label} needs an image Uint8Array`);
   const { image, mimeType } = texture as unknown as TextureData;
@@ -458,6 +564,8 @@ function checkTexture(texture: unknown, label: string): TextureData | undefined 
     if (texture[key] !== undefined && !(values as readonly unknown[]).includes(texture[key]))
       fail(`${label} ${key} must be ${values.join(' or ')}`);
   if (texture.mipmaps !== undefined && typeof texture.mipmaps !== 'boolean') fail(`${label} mipmaps must be boolean`);
+  if (texture.texCoord !== undefined && texture.texCoord !== 0 && texture.texCoord !== 1)
+    throw new RangeError(`${label} texCoord must be 0 or 1`);
   return texture as unknown as TextureData;
 }
 const filters = ['nearest', 'linear'] as const,
@@ -493,6 +601,7 @@ export function normalizeMaterial(data: PbrMaterial | MaterialData): Mat {
       shading: 'standard',
       specular: [...PHONG_SPECULAR],
       shininess: 30,
+      ...MATERIAL_DEFAULTS,
     };
   }
   if (!isObject(data)) fail('Expected PbrMaterial or material data');
@@ -529,11 +638,28 @@ export function normalizeMaterial(data: PbrMaterial | MaterialData): Mat {
     baseColorTexture: checkTexture(m.baseColorTexture, 'baseColorTexture'),
     metallicRoughnessTexture: checkTexture(m.metallicRoughnessTexture, 'metallicRoughnessTexture'),
     normalTexture: checkTexture(m.normalTexture, 'normalTexture'),
+    occlusionTexture: checkTexture(m.occlusionTexture, 'occlusionTexture'),
+    emissiveTexture: checkTexture(m.emissiveTexture, 'emissiveTexture'),
     unlit: m.unlit,
     shading,
     specular,
     shininess,
+    normalScale: factor(m.normalScale, 'normalScale', 1, () => true),
+    occlusionStrength: unit(m.occlusionStrength, 'occlusionStrength', 1),
+    emissiveStrength: factor(m.emissiveStrength, 'emissiveStrength', 1, (v) => v >= 0),
+    transmission: unit(m.transmission, 'transmission', 0),
+    ior: factor(m.ior, 'ior', 1.5, (v) => v === 0 || v >= 1),
+    extras: m.extras,
   };
+}
+
+const MATERIAL_DEFAULTS = { normalScale: 1, occlusionStrength: 1, emissiveStrength: 1, transmission: 0, ior: 1.5 };
+function factor(value: unknown, label: string, fallback: number, valid: (value: number) => boolean): number {
+  if (value === undefined) return fallback;
+  if (typeof value !== 'number') fail(`Material ${label} must be a number`);
+  if (!Number.isFinite(value) || !valid(value))
+    throw new RangeError(`Material ${label} ${value} is outside its glTF range`);
+  return value;
 }
 
 // --- column-major 4x4 math in double precision ---
@@ -636,7 +762,8 @@ export function unitQuaternion(q: number[]): number[] {
 // --- collection ---
 
 function makeNode(name: unknown, t: number[], r: number[], s: number[], parent: Float64Array | null): Node {
-  if (s.some((v) => Math.fround(v) === 0)) throw new RangeError('Scale must be nonzero');
+  if (s.some((v) => Math.fround(v) === 0) && !collapsed(s))
+    throw new RangeError('Scale must be nonzero on every axis, or [0, 0, 0] to collapse a hidden node');
   const local = compose(t, r, s);
   return {
     name: typeof name === 'string' && name ? name : undefined,
@@ -861,27 +988,71 @@ export function collect(source: ExportSource, options: SceneOptions = {}): Node[
     if (data.visible !== undefined && typeof data.visible !== 'boolean') fail('visible must be boolean');
     if (onlyVisible && data.visible === false) return null;
     if (data.name !== undefined && typeof data.name !== 'string') fail('Node name must be a string');
-    const node = makeNode(
-      data.name,
-      vector(data.translation, [0, 0, 0], 'Translation'),
-      unitQuaternion(vector(data.rotation, [0, 0, 0, 1], 'Rotation')),
-      vector(data.scale, [1, 1, 1], 'Scale'),
-      parent,
-    );
+    let node: Node;
+    if (data.matrix !== undefined) {
+      if (data.translation !== undefined || data.rotation !== undefined || data.scale !== undefined)
+        fail('A node takes matrix or translation, rotation and scale, not both');
+      const m = Float64Array.from(floats(data.matrix, 16, 'Matrix'));
+      if (m[3] || m[7] || m[11] || m[15] !== 1) throw new RangeError('Matrix must be affine: its last row 0, 0, 0, 1');
+      const parts = decompose(m);
+      if (!parts)
+        throw new RangeError('Matrix must split into translation, rotation and nonzero scale; glTF forbids shear');
+      node = makeNode(data.name, parts.t, parts.r, parts.s, parent);
+      node.local = m;
+      node.world = parent ? multiply(parent, m) : m;
+      node.matrix = Array.from(m);
+    } else
+      node = makeNode(
+        data.name,
+        vector(data.translation, [0, 0, 0], 'Translation'),
+        unitQuaternion(vector(data.rotation, [0, 0, 0, 1], 'Rotation')),
+        vector(data.scale, [1, 1, 1], 'Scale'),
+        parent,
+      );
     node.source = data;
     for (const key of ['camera', 'light'] as const)
       if (data[key] !== undefined) {
         if (!isObject(data[key])) fail(`${key} must be an object`);
         node[key] = data[key] as never;
       }
+    node.extras = data.extras;
     if (data.skin !== undefined) {
       if (!isObject(data.skin)) fail('Skin must be an object');
       node.skin = data.skin;
     }
-    if (data.geometry !== undefined) {
+    if (data.primitives !== undefined) {
+      if (data.geometry !== undefined || data.material !== undefined)
+        fail('A node takes primitives or geometry and material, not both');
+      if (!Array.isArray(data.primitives) || !data.primitives.length) fail('primitives must be a nonempty array');
+      node.primitives = data.primitives.map((primitive: ExportPrimitive, i: number) => {
+        if (!isObject(primitive) || primitive.geometry === undefined) fail(`primitives[${i}] needs geometry`);
+        let geo = geometry(primitive.geometry);
+        if (primitive.indices !== undefined)
+          geo = {
+            ...geo,
+            indices: triangleIndices(primitive.indices, geo.count, `primitives[${i}] indices`),
+            faceSizes: undefined,
+            base: geo,
+          };
+        return {
+          geometry: geo,
+          material: primitive.material === undefined ? undefined : material(primitive.material),
+          extras: primitive.extras,
+        };
+      });
+      const targets = node.primitives[0].geometry.morphs?.length ?? 0;
+      if (node.primitives.some((primitive) => (primitive.geometry.morphs?.length ?? 0) !== targets))
+        fail('Every primitive of a mesh needs the same number of morph targets');
+      node.primitivesKey = data.primitives;
+      node.geometry = node.primitives[0].geometry;
+      node.material = node.primitives[0].material;
+    } else if (data.geometry !== undefined) {
       node.geometry = geometry(data.geometry);
       if (data.material !== undefined) node.material = material(data.material);
     } else if (data.material !== undefined) fail('A material needs geometry on the same node');
+    if (data.meshName !== undefined && typeof data.meshName !== 'string') fail('meshName must be a string');
+    node.meshName = data.meshName;
+    node.meshExtras = data.meshExtras;
     if (data.skin !== undefined && !node.geometry) fail('A skin needs geometry on the same node');
     if (data.morphWeights !== undefined) {
       const count = node.geometry?.morphs?.length;
@@ -962,9 +1133,13 @@ export interface Drawable {
   world: Float64Array;
 }
 
+/** A [0, 0, 0] scale: the node and its descendants are hidden. */
+const collapsed = (s: readonly number[]): boolean => s.every((v) => Math.fround(v) === 0);
+
 export function drawables(nodes: Node[]): Drawable[] {
   const out: Drawable[] = [];
   const walk = (node: Node) => {
+    if (collapsed(node.s)) return;
     if (node.primitives)
       for (const primitive of node.primitives)
         out.push({ name: node.name, geometry: primitive.geometry, material: primitive.material, world: node.world });

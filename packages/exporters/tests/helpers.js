@@ -1,5 +1,6 @@
 // Test helpers: the Khronos validator loader, a headless engine, a GLB reader and small reference parsers.
 import { createRequire } from 'node:module';
+import { crc32, inflateSync } from 'node:zlib';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -212,3 +213,68 @@ export function parseASCIISTL(text) {
 /** Applies a column-major 4x4 matrix to a point. */
 export const transformPoint = (m, p) =>
   [0, 1, 2].map((r) => m[r] * p[0] + m[4 + r] * p[1] + m[8 + r] * p[2] + m[12 + r]);
+
+/** RGBA8 pixels of a PNG written by the exporters' encoder (8-bit RGBA, Sub or None filters), checking chunk CRCs. */
+export function decodePNG(bytes) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
+    chunks = {};
+  if ([137, 80, 78, 71, 13, 10, 26, 10].some((v, i) => bytes[i] !== v)) throw new Error('not a PNG');
+  for (let p = 8; p < bytes.length; ) {
+    const length = view.getUint32(p),
+      type = String.fromCharCode(...bytes.subarray(p + 4, p + 8));
+    if (view.getUint32(p + 8 + length) !== crc32(bytes.subarray(p + 4, p + 8 + length))) throw new Error(`${type} CRC`);
+    chunks[type] = Buffer.concat([chunks[type] ?? Buffer.alloc(0), bytes.subarray(p + 8, p + 8 + length)]);
+    p += 12 + length;
+  }
+  const width = chunks.IHDR.readUInt32BE(0),
+    height = chunks.IHDR.readUInt32BE(4);
+  if (chunks.IHDR[8] !== 8 || chunks.IHDR[9] !== 6) throw new Error('not RGBA8');
+  const rows = inflateSync(chunks.IDAT),
+    stride = width * 4,
+    data = new Uint8Array(stride * height);
+  for (let y = 0; y < height; y++) {
+    const filter = rows[y * (stride + 1)];
+    if (filter > 1) throw new Error(`filter ${filter}`);
+    for (let x = 0; x < stride; x++) {
+      const raw = rows[y * (stride + 1) + 1 + x];
+      data[y * stride + x] = filter === 1 && x >= 4 ? (raw + data[y * stride + x - 4]) & 255 : raw;
+    }
+  }
+  return { width, height, data };
+}
+
+/** Entries of a stored (method 0) ZIP, read from the central directory and checked against the local headers. */
+export function readZIP(bytes) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
+    end = bytes.length - 22;
+  if (view.getUint32(end, true) !== 0x06054b50) throw new Error('no end of central directory');
+  const count = view.getUint16(end + 10, true),
+    entries = [];
+  let at = view.getUint32(end + 16, true);
+  for (let i = 0; i < count; i++) {
+    if (view.getUint32(at, true) !== 0x02014b50) throw new Error('bad central header');
+    const method = view.getUint16(at + 10, true),
+      crc = view.getUint32(at + 16, true),
+      size = view.getUint32(at + 20, true),
+      nameLength = view.getUint16(at + 28, true),
+      extra = view.getUint16(at + 30, true),
+      comment = view.getUint16(at + 32, true),
+      local = view.getUint32(at + 42, true),
+      name = new TextDecoder().decode(bytes.subarray(at + 46, at + 46 + nameLength));
+    if (view.getUint32(local, true) !== 0x04034b50) throw new Error('bad local header');
+    const localName = view.getUint16(local + 26, true),
+      localExtra = view.getUint16(local + 28, true),
+      data = bytes.subarray(local + 30 + localName + localExtra, local + 30 + localName + localExtra + size);
+    if (method !== 0) throw new Error('not stored');
+    if (crc32(data) >>> 0 !== crc) throw new Error(`${name} CRC`);
+    entries.push({
+      name,
+      data,
+      flags: view.getUint16(at + 8, true),
+      date: view.getUint16(at + 14, true),
+      time: view.getUint16(at + 12, true),
+    });
+    at += 46 + nameLength + extra + comment;
+  }
+  return entries;
+}

@@ -24,7 +24,13 @@ export type {
   SkinData,
   AnimationChannelData,
   AnimationData,
+  ExportPrimitive,
+  Extras,
+  LightmapData,
 } from './scene.js';
+
+export { paletteTexture } from './palette.js';
+export type { PaletteTexture } from './palette.js';
 
 export { exportModel } from './model.js';
 export type { ModelExportOptions, ExportAnimation, ExportClip, ExportTrack } from './model.js';

@@ -43,7 +43,13 @@ export function exportUSDZ(source: ExportSource, options: USDZOptions = {}): Uin
     const item = items[i],
       { positions, normals, indices } = toWorld(item),
       material = item.material ?? normalizeMaterial({});
-    if (material.baseColorTexture || material.metallicRoughnessTexture || material.normalTexture)
+    if (
+      material.baseColorTexture ||
+      material.metallicRoughnessTexture ||
+      material.normalTexture ||
+      material.occlusionTexture ||
+      material.emissiveTexture
+    )
       throw new TypeError('USDZ texture export is unsupported');
     if (item.geometry.colors) throw new TypeError('USDZ vertex color export is unsupported');
     if (material.alphaMode === 'MASK') throw new TypeError('USDZ alpha-mask export is unsupported');

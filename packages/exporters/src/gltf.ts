@@ -1,6 +1,8 @@
 // glTF 2.0 writer: the Margo Engine counterpart of Three.js GLTFExporter.
 import type { GLTFDocument } from '../../shared/gltf.js';
+import { copyExtras } from './extras.js';
 import {
+  checkTexture,
   collect,
   decompose,
   determinant3,
@@ -16,6 +18,7 @@ import {
   type ExportSource,
   type Geo,
   type LightData,
+  type LightmapData,
   type Mat,
   type Node,
   type SceneOptions,
@@ -25,7 +28,10 @@ import {
 import { cameraDefinition, lightDefinition } from './scene-metadata.js';
 
 export interface GLTFOptions extends SceneOptions {
-  /** Write every mesh as a root node with its world transform instead of keeping the hierarchy. Default false. */
+  /**
+   * Write every mesh as a root node with its world transform instead of keeping the hierarchy, one node per
+   * primitive; node and mesh extras, empty nodes and collapsed nodes are left out. Default false.
+   */
   flatten?: boolean;
   /** `asset.generator`. Default 'Margo Engine exporters'. */
   generator?: string;
@@ -74,13 +80,30 @@ function floatData(values: ArrayLike<number>, count: number, label: string): Flo
   return out;
 }
 
+type MeshItem = { geometry: Geo; material?: Mat; extras?: object };
+const textureSlots = [
+  'baseColorTexture',
+  'metallicRoughnessTexture',
+  'normalTexture',
+  'occlusionTexture',
+  'emissiveTexture',
+] as const;
+
 class Writer {
   readonly parts: Uint8Array[] = [];
   length = 0;
   readonly json = {} as Required<GLTFDocument>;
   private readonly geometryCache = new Map<Geo, PrimitiveData>();
+  private readonly attributeCache = new Map<
+    Geo,
+    { attributes: Record<string, number>; targets?: Record<string, number>[] }
+  >();
   private readonly materialCache = new Map<Mat, number>();
   private readonly meshCache = new Map<Geo, Map<Mat | null, number>>();
+  private readonly namedMeshes = new Map<
+    object,
+    { material: Mat | null; name?: string; extras?: object; index: number }[]
+  >();
   private readonly textureCache = new Map<TextureData, number>();
   private readonly imageCache = new Map<Uint8Array, number>();
   private readonly skinCache = new Map<SkinData, number>();
@@ -144,24 +167,32 @@ class Writer {
   private primitive(geo: Geo): PrimitiveData {
     let cached = this.geometryCache.get(geo);
     if (cached) return cached;
-    const attributes: Record<string, number> = {
-      POSITION: this.floatAccessor(geo.positions, 3, 'VEC3', true),
-      NORMAL: this.floatAccessor(geo.normals, 3, 'VEC3'),
-    };
-    if (geo.tangents) attributes.TANGENT = this.floatAccessor(geo.tangents, 4, 'VEC4');
-    if (geo.uvs) attributes.TEXCOORD_0 = this.floatAccessor(geo.uvs, 2, 'VEC2');
-    if (geo.uvs1) attributes.TEXCOORD_1 = this.floatAccessor(geo.uvs1, 2, 'VEC2');
-    if (geo.colors)
-      attributes.COLOR_0 = this.floatAccessor(geo.colors, geo.colorSize, geo.colorSize === 3 ? 'VEC3' : 'VEC4');
-    if (geo.joints) {
-      const data = geo.joints;
-      attributes.JOINTS_0 = this.list('accessors', {
-        bufferView: this.view(new Uint8Array(data.buffer, data.byteOffset, data.byteLength).slice(), ARRAY_BUFFER),
-        componentType: UNSIGNED_SHORT,
-        count: geo.count,
-        type: 'VEC4',
-      });
-      attributes.WEIGHTS_0 = this.floatAccessor(geo.weights!, 4, 'VEC4');
+    // Primitives cut from one geometry share its vertex attributes and morph targets; each has its own indices.
+    const owner = geo.base ?? geo;
+    let shared = this.attributeCache.get(owner);
+    const fresh = !shared;
+    if (!shared) {
+      const attributes: Record<string, number> = {
+        POSITION: this.floatAccessor(owner.positions, 3, 'VEC3', true),
+        NORMAL: this.floatAccessor(owner.normals, 3, 'VEC3'),
+      };
+      if (owner.tangents) attributes.TANGENT = this.floatAccessor(owner.tangents, 4, 'VEC4');
+      if (owner.uvs) attributes.TEXCOORD_0 = this.floatAccessor(owner.uvs, 2, 'VEC2');
+      if (owner.uvs1) attributes.TEXCOORD_1 = this.floatAccessor(owner.uvs1, 2, 'VEC2');
+      if (owner.colors)
+        attributes.COLOR_0 = this.floatAccessor(owner.colors, owner.colorSize, owner.colorSize === 3 ? 'VEC3' : 'VEC4');
+      if (owner.joints) {
+        const data = owner.joints;
+        attributes.JOINTS_0 = this.list('accessors', {
+          bufferView: this.view(new Uint8Array(data.buffer, data.byteOffset, data.byteLength).slice(), ARRAY_BUFFER),
+          componentType: UNSIGNED_SHORT,
+          count: owner.count,
+          type: 'VEC4',
+        });
+        attributes.WEIGHTS_0 = this.floatAccessor(owner.weights!, 4, 'VEC4');
+      }
+      shared = { attributes };
+      this.attributeCache.set(owner, shared);
     }
     // 65535 is the primitive restart value for 16-bit indices, so it forces 32-bit indices.
     const short = geo.count <= 65535,
@@ -175,19 +206,27 @@ class Writer {
       count: data.length,
       type: 'SCALAR',
     });
-    cached = { attributes, indices };
-    if (geo.morphs)
-      cached.targets = geo.morphs.map((morph) => {
+    if (fresh && owner.morphs)
+      shared.targets = owner.morphs.map((morph) => {
         const target: Record<string, number> = { POSITION: this.floatAccessor(morph.positions, 3, 'VEC3', true) };
         if (morph.normals) target.NORMAL = this.floatAccessor(morph.normals, 3, 'VEC3');
         if (morph.tangents) target.TANGENT = this.floatAccessor(morph.tangents, 3, 'VEC3');
         return target;
       });
+    cached = { attributes: shared.attributes, indices };
+    if (shared.targets) cached.targets = shared.targets;
     this.geometryCache.set(geo, cached);
     return cached;
   }
 
-  private texture(texture: TextureData): number {
+  /** A textureInfo: the texture, its UV set and `more` (scale, strength) when given. */
+  private info(texture: TextureData, more?: Record<string, number>): Record<string, unknown> {
+    const out: Record<string, unknown> = { index: this.texture(texture) };
+    if (texture.texCoord) out.texCoord = texture.texCoord;
+    return more ? { ...out, ...more } : out;
+  }
+
+  texture(texture: TextureData): number {
     let index = this.textureCache.get(texture);
     if (index !== undefined) return index;
     let source = this.imageCache.get(texture.image);
@@ -208,10 +247,13 @@ class Writer {
         wrapS: wraps[s.wrapS],
         wrapT: wraps[s.wrapT],
       };
-    index = this.list('textures', {
-      sampler: this.memo(JSON.stringify(sampler), () => this.list('samplers', sampler)),
-      source,
-    });
+    const definition: Record<string, unknown> = {
+        sampler: this.memo(JSON.stringify(sampler), () => this.list('samplers', sampler)),
+        source,
+      },
+      extras = copyExtras(texture.extras, 'Texture extras');
+    if (extras) definition.extras = extras;
+    index = this.list('textures', definition);
     this.textureCache.set(texture, index);
     return index;
   }
@@ -224,29 +266,39 @@ class Writer {
       metallicFactor: Math.fround(mat.metalness),
       roughnessFactor: Math.fround(mat.roughness),
     };
-    if (mat.baseColorTexture) pbr.baseColorTexture = { index: this.texture(mat.baseColorTexture) };
-    if (mat.metallicRoughnessTexture)
-      pbr.metallicRoughnessTexture = { index: this.texture(mat.metallicRoughnessTexture) };
+    if (mat.baseColorTexture) pbr.baseColorTexture = this.info(mat.baseColorTexture);
+    if (mat.metallicRoughnessTexture) pbr.metallicRoughnessTexture = this.info(mat.metallicRoughnessTexture);
     const out: Record<string, unknown> = {};
     if (mat.name) out.name = mat.name;
     out.pbrMetallicRoughness = pbr;
-    if (mat.normalTexture) out.normalTexture = { index: this.texture(mat.normalTexture) };
+    if (mat.normalTexture)
+      out.normalTexture = this.info(mat.normalTexture, mat.normalScale !== 1 ? { scale: mat.normalScale } : undefined);
+    if (mat.occlusionTexture)
+      out.occlusionTexture = this.info(
+        mat.occlusionTexture,
+        mat.occlusionStrength !== 1 ? { strength: mat.occlusionStrength } : undefined,
+      );
+    if (mat.emissiveTexture) out.emissiveTexture = this.info(mat.emissiveTexture);
     if (mat.emissive.some((v) => v !== 0)) out.emissiveFactor = mat.emissive.map(Math.fround);
     if (mat.alphaMode !== 'OPAQUE') out.alphaMode = mat.alphaMode;
     if (mat.alphaCutoff !== undefined) out.alphaCutoff = mat.alphaCutoff;
     if (mat.doubleSided) out.doubleSided = true;
-    if (mat.unlit) {
-      out.extensions = { KHR_materials_unlit: {} };
-      this.used.add('KHR_materials_unlit');
-    }
+    const extensions: Record<string, unknown> = {};
+    if (mat.unlit) extensions.KHR_materials_unlit = {};
+    if (mat.transmission > 0) extensions.KHR_materials_transmission = { transmissionFactor: mat.transmission };
+    if (mat.ior !== 1.5) extensions.KHR_materials_ior = { ior: mat.ior };
+    if (mat.emissiveStrength !== 1)
+      extensions.KHR_materials_emissive_strength = { emissiveStrength: mat.emissiveStrength };
+    for (const name in extensions) this.used.add(name);
+    if (Object.keys(extensions).length) out.extensions = extensions;
+    const extras = copyExtras(mat.extras, 'Material extras');
+    if (extras) out.extras = extras;
     index = this.list('materials', out);
     this.materialCache.set(mat, index);
     return index;
   }
 
   mesh(geo: Geo, mat: Mat | undefined, name: string | undefined): number {
-    if ((mat?.baseColorTexture || mat?.metallicRoughnessTexture || mat?.normalTexture) && !geo.uvs)
-      throw new TypeError('Textured materials need geometry with uvs');
     let byMaterial = this.meshCache.get(geo);
     if (!byMaterial) this.meshCache.set(geo, (byMaterial = new Map()));
     let index = byMaterial.get(mat ?? null);
@@ -256,18 +308,52 @@ class Writer {
     return index;
   }
 
-  meshPrimitives(items: { geometry: Geo; material?: Mat }[], name: string | undefined): number {
-    const primitives = items.map(({ geometry, material }) => {
+  /** The mesh of a hierarchy node: shared by nodes with the same geometry or primitives, name and mesh extras. */
+  nodeMesh(node: Node): number | undefined {
+    const items: MeshItem[] | undefined =
+      node.primitives ?? (node.geometry ? [{ geometry: node.geometry, material: node.material }] : undefined);
+    if (!items) return undefined;
+    const key = node.primitivesKey ?? (node.primitives ? undefined : node.geometry);
+    if (!key) return this.meshPrimitives(items, node.name);
+    if (!node.primitivesKey && node.meshName === undefined && !node.meshExtras)
+      return this.mesh(node.geometry!, node.material, node.name);
+    const material = node.primitivesKey ? null : (node.material ?? null),
+      entries = this.namedMeshes.get(key) ?? [],
+      found = entries.find(
+        (entry) => entry.material === material && entry.name === node.meshName && entry.extras === node.meshExtras,
+      );
+    if (found) return found.index;
+    const index = this.meshPrimitives(items, node.meshName ?? node.name, node.meshExtras);
+    entries.push({ material, name: node.meshName, extras: node.meshExtras, index });
+    this.namedMeshes.set(key, entries);
+    return index;
+  }
+
+  meshPrimitives(items: MeshItem[], name: string | undefined, meshExtras?: object): number {
+    const primitives = items.map(({ geometry, material, extras: source }) => {
+      for (const slot of textureSlots) {
+        const texture = material?.[slot];
+        if (texture && !(texture.texCoord === 1 ? geometry.uvs1 : geometry.uvs))
+          throw new TypeError(
+            texture.texCoord === 1
+              ? 'Textures sampled with texCoord 1 need geometry with uvs1'
+              : 'Textured materials need geometry with uvs',
+          );
+      }
       const { attributes, indices, targets } = this.primitive(geometry),
         primitive: Record<string, unknown> = { attributes, indices, mode: 4 };
       if (targets) primitive.targets = targets;
       if (material) primitive.material = this.material(material);
+      const extras = copyExtras(source, 'Primitive extras');
+      if (extras) primitive.extras = extras;
       return primitive;
     });
     const mesh: Record<string, unknown> = { primitives },
       geo = items[0].geometry;
     if (geo.morphs?.some((morph) => morph.name !== undefined))
       mesh.extras = { targetNames: geo.morphs.map((morph, i) => morph.name ?? 'Target ' + i) };
+    const extras = copyExtras(meshExtras, 'Mesh extras');
+    if (extras) mesh.extras = { ...(mesh.extras as object), ...extras };
     if (name) mesh.name = name;
     return this.list('meshes', mesh);
   }
@@ -287,10 +373,21 @@ class Writer {
     });
   }
 
-  node(name: string | undefined, t: number[], r: number[], s: number[], mesh?: number): Record<string, unknown> {
+  node(
+    name: string | undefined,
+    t: number[],
+    r: number[],
+    s: number[],
+    mesh?: number,
+    matrix?: number[],
+  ): Record<string, unknown> {
     const out: Record<string, unknown> = {};
     if (name) out.name = name;
     if (mesh !== undefined) out.mesh = mesh;
+    if (matrix) {
+      if (!same(matrix, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])) out.matrix = matrix.slice();
+      return out;
+    }
     if (!same(t, [0, 0, 0])) out.translation = t.slice();
     if (!same(r, [0, 0, 0, 1])) out.rotation = r.slice();
     if (!same(s, [1, 1, 1])) out.scale = s.slice();
@@ -328,6 +425,17 @@ class Writer {
       inverseBindMatrices: this.floatAccessor(matrices, 16, 'MAT4', false, null),
     };
     if (skin.name) out.name = skin.name;
+    if (skin.skeleton !== undefined) {
+      const skeleton = resolve(skin.skeleton);
+      const above = (joint: number): boolean => {
+        for (let at = joint; at !== -1; at = parents[at]) if (at === skeleton) return true;
+        return false;
+      };
+      if (!joints.every(above)) throw new TypeError('Skin skeleton must be an ancestor of (or one of) its joints');
+      out.skeleton = skeleton;
+    }
+    const extras = copyExtras(skin.extras, 'Skin extras');
+    if (extras) out.extras = extras;
     const index = this.list('skins', out);
     this.skinCache.set(skin, index);
     return index;
@@ -346,6 +454,8 @@ class Writer {
       const node = resolve(channel.node),
         path = channel.path,
         interpolation = channel.interpolation ?? 'LINEAR';
+      if (lookup.get(channel.node)?.matrix && path !== 'weights')
+        throw new TypeError('An animated node needs translation, rotation and scale, not matrix');
       if (
         !['translation', 'rotation', 'scale', 'weights'].includes(path) ||
         !['STEP', 'LINEAR', 'CUBICSPLINE'].includes(interpolation)
@@ -384,6 +494,8 @@ class Writer {
     }
     const out: Record<string, unknown> = { samplers, channels };
     if (animation.name) out.name = animation.name;
+    const extras = copyExtras(animation.extras, 'Animation extras');
+    if (extras) out.extras = extras;
     this.list('animations', out);
   }
 }
@@ -482,12 +594,7 @@ function document(source: ExportSource, options: GLTFOptions): Writer {
         throw new TypeError('Joint attributes need a skin on the same node');
       if (node.skin && (!geometries.length || geometries.some((geometry) => !geometry.joints)))
         throw new TypeError('Skinned geometry needs joint indices and weights');
-      const mesh = node.primitives
-        ? writer.meshPrimitives(node.primitives, node.name)
-        : node.geometry
-          ? writer.mesh(node.geometry, node.material, node.name)
-          : undefined;
-      const out = writer.node(node.name, node.t, node.r, node.s, mesh);
+      const out = writer.node(node.name, node.t, node.r, node.s, writer.nodeMesh(node), node.matrix);
       const index = (json.nodes ??= []).push(out) - 1;
       if (node.source) {
         nodeIndices.set(node.source, index);
@@ -496,6 +603,8 @@ function document(source: ExportSource, options: GLTFOptions): Writer {
       if (node.morphWeights) out.weights = Array.from(node.morphWeights);
       if (node.camera) out.camera = writer.camera(node.camera);
       if (node.light) out.extensions = { KHR_lights_punctual: { light: writer.light(node.light) } };
+      const extras = copyExtras(node.extras, 'Node extras');
+      if (extras) out.extras = extras;
       if (node.children.length) out.children = node.children.map(visit);
       return index;
     };
@@ -512,7 +621,30 @@ function document(source: ExportSource, options: GLTFOptions): Writer {
     }
     for (const animation of animations ?? []) writer.animation(animation, resolve, nodeData);
   }
-  json.scenes = [sceneNodes.length ? { nodes: sceneNodes } : {}];
+  const data = Array.isArray((source as ExportScene).nodes) ? (source as ExportScene) : undefined,
+    scene: Record<string, unknown> = {};
+  if (data?.scene !== undefined) {
+    if (!isObject(data.scene)) throw new TypeError('scene must be an object');
+    if (data.scene.name !== undefined && typeof data.scene.name !== 'string')
+      throw new TypeError('Scene name must be a string');
+    if (data.scene.name) scene.name = data.scene.name;
+  }
+  if (sceneNodes.length) scene.nodes = sceneNodes;
+  const sceneExtras = copyExtras(data?.scene?.extras, 'Scene extras');
+  if (sceneExtras) scene.extras = sceneExtras;
+  json.scenes = [scene];
+  if (data?.asset !== undefined) {
+    if (!isObject(data.asset)) throw new TypeError('asset must be an object');
+    const { copyright } = data.asset;
+    if (copyright !== undefined && typeof copyright !== 'string')
+      throw new TypeError('Asset copyright must be a string');
+    if (copyright) json.asset.copyright = copyright;
+    const extras = copyExtras(data.asset.extras, 'Asset extras');
+    if (extras) json.asset.extras = extras;
+  }
+  const extras = copyExtras(data?.extras, 'Scene root extras') ?? {};
+  if (data?.lightmap !== undefined) lightmap(writer, data.lightmap, roots, extras);
+  if (Object.keys(extras).length) (json as Record<string, unknown>).extras = extras;
   if (writer.used.size) json.extensionsUsed = [...writer.used];
   if (writer.length) json.buffers = [{ byteLength: writer.length }];
   // Stable key order: asset first, buffers last.
@@ -534,12 +666,32 @@ function document(source: ExportSource, options: GLTFOptions): Writer {
     'accessors',
     'bufferViews',
     'buffers',
+    'extras',
   ];
   const sorted: Record<string, unknown> = {};
   for (const key of order) if (json[key] !== undefined) sorted[key] = json[key];
   for (const key of Object.keys(json)) delete json[key];
   Object.assign(json, sorted);
   return writer;
+}
+
+/** Writes the lightmap texture and its record under the root `extras[key]`. */
+function lightmap(writer: Writer, data: LightmapData, roots: Node[], extras: Record<string, unknown>): void {
+  if (!isObject(data)) throw new TypeError('lightmap must be an object');
+  const texture = checkTexture(data.texture, 'Lightmap texture'),
+    texCoord = data.texCoord ?? 1,
+    key = data.key ?? 'lightmap',
+    more = copyExtras(data.extras, 'Lightmap extras') ?? {};
+  if (!texture) throw new TypeError('Lightmap needs a texture');
+  if (texCoord !== 0 && texCoord !== 1) throw new RangeError('Lightmap texCoord must be 0 or 1');
+  if (typeof key !== 'string' || !key) throw new TypeError('Lightmap key must be a nonempty string');
+  if (key in extras) throw new TypeError(`Root extras already hold ${key}; give the lightmap another key`);
+  if ('texture' in more || 'texCoord' in more)
+    throw new TypeError('Lightmap extras cannot set texture or texCoord; the writer records them');
+  for (const { geometry } of drawables(roots))
+    if (!(texCoord ? geometry.uvs1 : geometry.uvs))
+      throw new TypeError(`Lightmap texCoord ${texCoord} needs ${texCoord ? 'uvs1' : 'uvs'} on every mesh`);
+  extras[key] = { texture: writer.texture(texture), texCoord, ...more };
 }
 
 function concat(parts: Uint8Array[], length: number): Uint8Array {
