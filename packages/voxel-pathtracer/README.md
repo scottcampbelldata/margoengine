@@ -44,6 +44,12 @@ Everything is in Margo's **Y-up** world. Convert MagicaVoxel's Z-up `.vox` data 
   translation, rotation, non-uniform scale, shear and mirroring all work). Any number of instances share one model's
   data; each keeps its id (`raycast`, AOVs). `visible: false` hides one.
 - **Materials** are keyed by palette index. Every index any model uses needs one.
+- **Model material tables** (addition). A model's own `materials` replace `scene.materials` for its voxels, so a scene
+  holds any number of distinct materials (255 per table), as model banks of an editor do: two models may give palette 1
+  different materials. Tables equal in content are stored once; at most 4096 per scene, 32 KiB each, within the
+  storage binding size. Picks and AOVs still report palette indices. Scenes without model tables read `scene.materials`
+  from a uniform buffer as before; the first scene with them compiles a second variant of the tracing kernels that
+  reads every table from storage (the viewport shows the raster frame until it is ready, captures wait for it).
 - **Revisions.** `setScene` packs each model into 8^3 bricks and uploads it. A model whose `id`, `revision` and `size`
   equal the previous scene's is reused without reading `voxels` again: bump `revision` whenever voxels change. Only
   changed models are re-uploaded; the others keep their GPU memory.
@@ -304,10 +310,11 @@ by floating-point rounding, which changes individual paths, not the converged im
 | Instances | 65,535 |
 | Area lights | 256 |
 | Block textures | 4096, each 1-1024 texels a side (in the scene buffer, within the binding size) |
+| Material tables | 4096 per scene (`scene.materials` and distinct model tables), 32 KiB each, within the binding size |
 | Light-sampled glass and mirror instances | 8 of each (others are path sampled) |
 | Voxel data | grids plus 512-byte mixed bricks within the device's `maxStorageBufferBindingSize` (WebGPU default 128 MiB: about 262,000 mixed bricks; uniform bricks cost one word) |
 | Environment map | 8192 x 4096, and width x height x 16 bytes within the binding size (4096 x 2048 at the default) |
-| Emissive faces | their tables (8 bytes each) within the binding size (about 16 million at the default) |
+| Emissive faces | their tables (8 bytes each), with the scene records, block textures and other light tables in one binding (about 16 million at the default) |
 | Viewport | every image 16 bytes per pixel within the binding size (8.3 million pixels at the default, so 3840 x 2160 is traced at its native size, denoised or not); the denoiser's two history images are textures within `maxTextureDimension2D` (8192 at the default). Larger canvases are traced at a lower resolution, keeping the aspect: `stats.requestedWidth`/`requestedHeight` give the size asked for, `stats.limitedBy` the limit that reduced it, and `traceViewportSize(width, height, device.limits, options)` predicts it |
 | Accumulation | float32 sums: refinement is expected to slow past about a million samples per pixel (not measured) |
 
@@ -331,6 +338,12 @@ day only. On 2026-10-21, when every row ran slower (material scene 17.43-17.50 m
 ratio stop cost 0.2-0.6 ms per denoised frame against the previous denoiser in the same session (material scene
 27.39-27.46 against 26.87-27.20 ms, dense scene 18.02-18.42 against 17.83-17.89 ms) and no memory.
 
+Model material tables, 2026-10-21, against the previous commit in one session: scenes without them run as before
+(material scene 17.30-17.50 against 17.50-17.56 ms, denoised 26.94-27.39 against 27.53-27.79 ms, dense 4 samples
+57.93-58.39 against 56.62-56.95 ms, every other row within 0.3 ms). Reading every table from storage instead cost the
+material scene about 1 ms (5%); reading `scene.materials` from the uniform and the rest from storage in one kernel
+cost 2 ms; hence the second kernel variant.
+
 Native 4K (`tests/browser-check.mjs native4k`, 2026-10-21, the same slower day): the material scene in a 3840 x 2160
 canvas with the default device limits is traced at 3840 x 2160, 1 sample per frame while the camera moves: 68.81 ms
 and 380.0 MiB raw, 113.44 ms and 1,392.5 MiB denoised (history in textures). Before the history moved into textures
@@ -353,7 +366,7 @@ Numbers on other GPUs are not measured.
 
 ## Verification
 
-- `tests/*.test.js` (Node, 65 tests, about 1.2 s; part of `npm run verify`): validation and atomic failure, dense
+- `tests/*.test.js` (Node, 67 tests, about 1.3 s; part of `npm run verify`): validation and atomic failure, dense
   indexing, all 255 palette identities, transformed/mirrored/hidden instances, model reuse by revision, voxel traversal
   against a brute-force slab test (2,000 random rays over 5 models whose sizes are not multiples of 8), resets for each
   camera/size/scene/option change, enable/disable, `maxSamples`, the denoiser's passes (the caustic chain only for
@@ -365,7 +378,9 @@ Numbers on other GPUs are not measured.
   across keys, one packing for two models with one key, `invalidateModels`; `stats.renders`, buffers released before an
   aborted render rejects, and `whenIdle` waiting for the GPU queue and resolving after `dispose`; the viewport's size
   (every storage buffer one image within the binding limit, history textures within the texture limit, 3840 x 2160
-  native with the default limits, `traceViewportSize`). A recording fake device stands in for WebGPU.
+  native with the default limits, `traceViewportSize`); model material tables (more than 255 distinct materials, equal
+  tables stored once, table numbers in the model records, the TABLES kernels used only for scenes with them, errors
+  naming the model's table). A recording fake device stands in for WebGPU.
 - `tests/browser-check.mjs` (real WebGPU, run under `scripts/gpu-lock.mjs`) on the RTX A6000:
   - shaders compile with no diagnostics; no WebGPU validation errors anywhere;
   - GPU first hits equal `raycast` on all 19,200 pixels of a scene of rotated, scaled, sheared and mirrored instances,
@@ -427,7 +442,10 @@ Numbers on other GPUs are not measured.
     converged image bit for bit; resize restarts accumulation; Bloom composes with the HDR output;
   - a 1500 x 1100 denoised PNG decodes to that size; a 2048^2 x 4096-sample capture cancels within 0.33 s, its buffers
     released when it rejects, and `whenIdle` drains the GPU 0.4 ms later;
-  - a 3840 x 2160 canvas is traced at 3840 x 2160 with the default limits, raw and denoised, while the camera moves.
+  - a 3840 x 2160 canvas is traced at 3840 x 2160 with the default limits, raw and denoised, while the camera moves;
+  - model material tables: the material scene with each model's palette moved to its own index in a table of its own
+    renders bit for bit as with one shared table (0 of 57,600 values differ); 300 models whose own tables give palette
+    1 300 colours each show their colour (worst albedo error 2.9e-8), picks reporting palette 1.
 
 ## How it works
 

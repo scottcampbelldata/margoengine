@@ -29,6 +29,15 @@ const MAX_INSTANCES = 65535;
 /** Area lights at most. */
 const MAX_LIGHTS = 256;
 const MAX_TEXTURES = 4096;
+/** Words per model record: size xyz, grid offset, bricks xyz, material table << 8, first emitter word, emitters,
+ * emitter total, 0. */
+export const MODEL_WORDS = 12;
+/** Words per instance record: to-local rows, to-world rows, previous to-world rows, model, flags, light pick, 0. */
+export const INSTANCE_WORDS = 40;
+/** Words per hierarchy node. */
+export const NODE_WORDS = 8;
+/** Material tables at most (`scene.materials` and distinct model tables): a slot (table << 8 | palette) fits 20 bits. */
+const MAX_TABLES = 4096;
 /** Material flags (float 15 of a packed material). */
 export const MEDIA = 1,
   EMISSIVE = 4,
@@ -156,7 +165,10 @@ export interface SceneSnapshot {
   readonly instances: readonly SnapshotInstance[];
   /** BVH nodes, 8 words each: min xyz (f32), first child or first instance, max xyz (f32), instance count (0 inner). */
   readonly nodes: Uint32Array;
+  /** Material tables, 256 x MATERIAL_FLOATS floats each: `scene.materials` first, then distinct model tables. */
   readonly materials: Float32Array;
+  /** The table of each model (same order as `models`). */
+  readonly modelTables: Uint32Array;
   readonly environment: ResolvedEnvironment;
   /** Area lights, 16 floats each: corner, cdf, edge u, two-sided, edge v, area, radiance, pad. */
   readonly lights: Float32Array;
@@ -1033,9 +1045,10 @@ function orthogonalFaces(r: Float64Array): boolean {
 function deflectorTable(
   instances: SnapshotInstance[],
   models: readonly PackedModel[],
-  table: Float32Array,
+  tables: readonly Float32Array[],
 ): Float32Array {
-  const iorOf = models.map((m) => {
+  const iorOf = models.map((m, i) => {
+    const table = tables[i];
     let ior = 0;
     for (let id = 1; id < 256; id++) {
       if (!m.counts[id]) continue;
@@ -1047,7 +1060,8 @@ function deflectorTable(
     }
     return ior;
   });
-  const mirrors = models.map((m) => {
+  const mirrors = models.map((m, i) => {
+    const table = tables[i];
     for (let id = 1; id < 256; id++) {
       const b = id * MATERIAL_FLOATS;
       if (m.counts[id] && table[b + 15] & SMOOTH && table[b + 4] === 1) return true;
@@ -1077,6 +1091,37 @@ function deflectorTable(
  * Validates `scene` and builds its snapshot. Throws TypeError/RangeError naming the first problem; never changes
  * `cache` unless it succeeds. `maxWords` is the voxel buffer's word limit (the device's storage binding size / 4).
  */
+/** Packs a list of materials into one table (256 entries), validating ids and duplicates. */
+function packTable(list: readonly TraceMaterial[], name: string, textures: number): Float32Array {
+  const table = new Float32Array(256 * MATERIAL_FLOATS);
+  for (const [i, m] of list.entries()) {
+    const at = `${name}[${i}]`;
+    if (!isObject(m)) throw new TypeError(`${where} ${at} must be an object {id, color, type}`);
+    if (typeof m.id !== 'number' || !Number.isInteger(m.id))
+      throw new TypeError(`${where} ${at}.id must be an integer palette index 1 to 255`);
+    if (m.id < 1 || m.id > 255) throw new RangeError(`${where} ${at}.id ${m.id} is outside 1 to 255 (0 is empty)`);
+    if (table[m.id * MATERIAL_FLOATS + 15])
+      throw new TypeError(`${where} ${at}.id ${m.id} is used twice; give each palette index one material`);
+    packMaterial(m, at, table, textures);
+  }
+  return table;
+}
+
+/** Whether two packed tables hold the same bits. */
+function sameTable(a: Float32Array, b: Float32Array): boolean {
+  const x = new Uint32Array(a.buffer, a.byteOffset, a.length),
+    y = new Uint32Array(b.buffer, b.byteOffset, b.length);
+  for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return false;
+  return true;
+}
+/** FNV-1a over a packed table's bits (to find equal tables). */
+function tableHash(t: Float32Array): number {
+  const x = new Uint32Array(t.buffer, t.byteOffset, t.length);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < x.length; i++) h = Math.imul(h ^ x[i], 0x01000193);
+  return h >>> 0;
+}
+
 export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWords: number): SceneSnapshot {
   if (!isObject(scene)) throw new TypeError(`${where} scene must be {revision, models, instances, materials}`);
   if (typeof scene.revision !== 'number' || !Number.isFinite(scene.revision))
@@ -1086,19 +1131,13 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
     materials = checkList<TraceMaterial>(scene.materials, 'materials');
   if (instances.length > MAX_INSTANCES)
     throw new RangeError(`${where} scene.instances has ${instances.length}; at most ${MAX_INSTANCES} are supported`);
-  // Textures and materials.
+  // Textures and material tables: scene.materials is table 0; models with their own tables add theirs (equal tables are
+  // stored once).
   const textures = packTextures(scene.textures),
-    table = new Float32Array(256 * MATERIAL_FLOATS);
-  for (const [i, m] of materials.entries()) {
-    const name = `scene.materials[${i}]`;
-    if (!isObject(m)) throw new TypeError(`${where} ${name} must be an object {id, color, type}`);
-    if (typeof m.id !== 'number' || !Number.isInteger(m.id))
-      throw new TypeError(`${where} ${name}.id must be an integer palette index 1 to 255`);
-    if (m.id < 1 || m.id > 255) throw new RangeError(`${where} ${name}.id ${m.id} is outside 1 to 255 (0 is empty)`);
-    if (table[m.id * MATERIAL_FLOATS + 15])
-      throw new TypeError(`${where} ${name}.id ${m.id} is used twice; give each palette index one material`);
-    packMaterial(m, name, table, textures.length);
-  }
+    tables: Float32Array[] = [packTable(materials, 'scene.materials', textures.length)],
+    byHash = new Map<number, number[]>(),
+    byList = new Map<readonly TraceMaterial[], number>(),
+    tableOf: number[] = [];
   // Models: packed, or reused by content key (from the previous scene or an earlier model of this one), or without a
   // key by id, revision and size from a previous model packed without one.
   const packed: PackedModel[] = [],
@@ -1112,6 +1151,29 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
     const id = checkId(model.id, `${name}.id`);
     if (modelIndex.has(id))
       throw new TypeError(`${where} ${name}.id '${id}' is used twice; give every model its own id`);
+    if (model.materials === undefined) tableOf.push(0);
+    else {
+      const list = model.materials as unknown;
+      if (!Array.isArray(list)) throw new TypeError(`${where} ${name}.materials must be an array of materials`);
+      let t = byList.get(list);
+      if (t === undefined) {
+        const packedTable = packTable(list, `${name}.materials`, textures.length),
+          h = tableHash(packedTable),
+          same = byHash.get(h)?.find((k) => sameTable(tables[k], packedTable));
+        if (same !== undefined) t = same;
+        else {
+          t = tables.length;
+          if (t >= MAX_TABLES)
+            throw new RangeError(
+              `${where} scene needs more than ${MAX_TABLES} material tables; share tables between models`,
+            );
+          tables.push(packedTable);
+          byHash.set(h, [...(byHash.get(h) ?? []), t]);
+        }
+        byList.set(list, t);
+      }
+      tableOf.push(t);
+    }
     const key = model.contentKey;
     if (key === null)
       throw new TypeError(`${where} ${name}.contentKey is null; pass a key of the voxel contents, or leave it out`);
@@ -1186,13 +1248,16 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
       mirror: false,
     });
   }
-  // Every palette index a model uses needs a material.
+  // Every palette index a model uses needs a material in its table.
+  const modelTable = (index: number) => tables[tableOf[index]];
   for (const [id, index] of modelIndex) {
-    const m = packed[index];
+    const m = packed[index],
+      t = modelTable(index),
+      owner = tableOf[index] ? `model '${id}'.materials has` : 'scene.materials has';
     for (let v = 1; v < 256; v++)
-      if (m.counts[v] && !table[v * MATERIAL_FLOATS + 15])
+      if (m.counts[v] && !t[v * MATERIAL_FLOATS + 15])
         throw new TypeError(
-          `${where} model '${id}' uses palette index ${v} (${m.counts[v]} voxels) but scene.materials has no material with id ${v}; add one`,
+          `${where} model '${id}' uses palette index ${v} (${m.counts[v]} voxels) but ${owner} no material with id ${v}; add one`,
         );
   }
   const environment = resolveEnvironment(scene.environment, cache),
@@ -1204,14 +1269,19 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
     throw new RangeError(
       `${where} scene needs ${voxelWords * 4} bytes of voxel bricks; this device binds at most ${maxWords * 4}; use fewer or smaller models`,
     );
+  if (tables.length * 256 * MATERIAL_FLOATS > maxWords)
+    throw new RangeError(
+      `${where} scene's ${tables.length} material tables need ${tables.length * 256 * MATERIAL_FLOATS * 4} bytes; this device binds at most ${maxWords * 4}; share tables between models`,
+    );
   // Hierarchy over the visible instances; GPU order = leaf order.
   const boxes = new Float64Array(visible.length * 6);
   for (const [i, v] of visible.entries()) boxes.set(v.box, i * 6);
   const { nodes, order } = buildHierarchy(boxes, visible.length),
     ordered = Array.from(order, (i) => visible[i]);
   // Emissive faces per model, then instances picked by emitted power times face area.
-  const emitters = packed.map((m) => {
-    const e = modelEmitters(m, table, cache);
+  const emitters = packed.map((m, index) => {
+    const table = modelTable(index),
+      e = modelEmitters(m, table, cache);
     if (!e) return { faces: new Uint32Array(0), cdf: new Float32Array(0), total: 0 };
     const cdf = new Float32Array(e.faces.length);
     let total = 0;
@@ -1240,17 +1310,31 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
     emissiveCdf[k] = k === weights.length - 1 ? 1 : run / sum;
     ordered[picks[k]].lightPick = weights[k] / sum;
   }
-  // The environment texels and the lights buffer (emissive tables, area lights, environment CDFs) must fit too.
+  // The environment texels and the scene buffer (records, block textures, then the lights: emissive tables, area
+  // lights, environment CDFs) must fit too.
   const env = environment.map,
     faces = emitters.reduce((n, e) => n + e.faces.length, 0),
-    lightWords = 4 + picks.length * 2 + faces * 2 + lightCount * 16 + (env ? env.height + env.width * env.height : 0);
+    records =
+      4 +
+      packed.length * MODEL_WORDS +
+      ordered.length * INSTANCE_WORDS +
+      nodes.length +
+      textures.reduce((n, t) => n + 4 + t.texels.length, 0),
+    lightWords =
+      records +
+      4 +
+      2 * MAX_DEFLECTORS * 2 +
+      picks.length * 2 +
+      faces * 2 +
+      lightCount * 16 +
+      (env ? env.height + env.width * env.height : 0);
   if (env && env.width * env.height * 4 > maxWords)
     throw new RangeError(
       `${where} scene.environment.map ${env.width}x${env.height} needs ${env.width * env.height * 16} bytes; this device binds at most ${maxWords * 4}; pass a smaller map`,
     );
   if (lightWords > maxWords)
     throw new RangeError(
-      `${where} scene has ${faces} emissive voxel faces; their tables need ${lightWords * 4} bytes and this device binds at most ${maxWords * 4}; use fewer emissive voxels`,
+      `${where} scene's records, textures and light tables (${faces} emissive voxel faces) need ${lightWords * 4} bytes and this device binds at most ${maxWords * 4}; use fewer emissive voxels, instances or textures`,
     );
   // Success: keep the packed models (and only those) and the environment tables for the next scene.
   cache.models = reused;
@@ -1266,7 +1350,8 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
     reusedModels: packed.length - fresh,
     instances: ordered,
     nodes,
-    materials: table,
+    materials: concatTables(tables),
+    modelTables: Uint32Array.from(tableOf),
     environment,
     lights,
     lightCount,
@@ -1275,10 +1360,15 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
     emissiveInstances: Uint32Array.from(picks),
     emissiveCdf,
     moving,
-    deflectors: deflectorTable(ordered, packed, table),
-    clearGlass: packed.some((m) =>
+    deflectors: deflectorTable(
+      ordered,
+      packed,
+      packed.map((_, index) => modelTable(index)),
+    ),
+    clearGlass: packed.some((m, index) =>
       m.counts.some((n, id) => {
-        const b = id * MATERIAL_FLOATS;
+        const b = id * MATERIAL_FLOATS,
+          table = modelTable(index);
         return (
           id > 0 &&
           n > 0 &&
@@ -1289,9 +1379,10 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
         );
       }),
     ),
-    focusing: packed.some((m) =>
+    focusing: packed.some((m, index) =>
       m.counts.some((n, id) => {
-        const b = id * MATERIAL_FLOATS;
+        const b = id * MATERIAL_FLOATS,
+          table = modelTable(index);
         return (
           id > 0 &&
           n > 0 &&
@@ -1302,4 +1393,23 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
     voxelWords,
     textures,
   };
+}
+
+/** The material tables one after another. */
+function concatTables(tables: readonly Float32Array[]): Float32Array {
+  if (tables.length === 1) return tables[0];
+  const out = new Float32Array(tables.length * 256 * MATERIAL_FLOATS);
+  for (const [k, t] of tables.entries()) out.set(t, k * 256 * MATERIAL_FLOATS);
+  return out;
+}
+
+/** Words of the scene buffer before the lights: header, models, instances, hierarchy nodes, block textures. */
+export function sceneRecordWords(s: SceneSnapshot): number {
+  return (
+    4 +
+    s.models.length * MODEL_WORDS +
+    s.instances.length * INSTANCE_WORDS +
+    s.nodes.length +
+    s.textures.reduce((n, t) => n + 4 + t.texels.length, 0)
+  );
 }

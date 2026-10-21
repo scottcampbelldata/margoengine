@@ -174,6 +174,7 @@ export interface TraceModel {
     contentKey?: string | number | symbol | object;
     size: TraceVec3;
     voxels: Uint8Array;
+    materials?: readonly TraceMaterial[];
 }
 
 export interface TracePhysicalSky {

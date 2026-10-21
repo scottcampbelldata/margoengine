@@ -139,12 +139,13 @@ interface Pipelines {
   atrous: GPUComputePipeline;
   combine: GPUComputePipeline;
 }
-/** Scene buffers on one device. */
+/** Scene buffers on one device: material tables, voxel regions, scene records and lights, environment texels. */
 interface SceneBuffers {
+  /** Table 0 (`scene.materials`), uniform: the shader reads it there, faster than from storage. */
+  table0: GPUBuffer;
   materials: GPUBuffer;
   voxels: GPUBuffer;
   scene: GPUBuffer;
-  lights: GPUBuffer;
   env: GPUBuffer;
 }
 interface Gpu {
@@ -159,6 +160,13 @@ interface Gpu {
   /** The trace module, and its coverage kernel compiled at the first transparent render. */
   traceModule?: GPUShaderModule;
   coverage?: Promise<GPUComputePipeline>;
+  /**
+   * The tracing kernels that read model material tables (TABLES), compiled when a scene first has them, and their
+   * coverage kernel.
+   */
+  tableKernelsPending?: Promise<{ trace: GPUComputePipeline; ids: GPUComputePipeline }>;
+  tableKernels?: { trace: GPUComputePipeline; ids: GPUComputePipeline };
+  tableCoverage?: Promise<GPUComputePipeline>;
   display: Map<string, { pipeline?: GPURenderPipeline }>;
   buffers: SceneBuffers;
   /** Energy-compensation albedo tables (uniform) and the storage buffer the GPU integrates them into. */
@@ -799,14 +807,14 @@ export class VoxelPathTracer implements EnginePlugin {
       };
     this.#gpu = gpu;
     gpu.buffers = {
-      materials: this.#buffer(
+      table0: this.#buffer(
         gpu,
         256 * MATERIAL_FLOATS * 4,
         GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
       ),
+      materials: this.#buffer(gpu, 16, storage),
       voxels: this.#buffer(gpu, 16, storage),
       scene: this.#buffer(gpu, 16, storage),
-      lights: this.#buffer(gpu, 16, storage),
       env: this.#buffer(gpu, 16, storage),
     };
     gpu.tables = this.#buffer(gpu, TABLE_VEC4 * 16, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
@@ -902,7 +910,8 @@ export class VoxelPathTracer implements EnginePlugin {
     t.denoiseGroups = undefined;
   }
 
-  // Uploads the snapshot when it changed: voxel regions (kept for unchanged models), scene, lights, environment.
+  // Uploads the snapshot when it changed: voxel regions (kept for unchanged models), material tables, scene records and
+  // lights, environment.
   #syncScene(gpu: Gpu): void {
     if (gpu.version === this.#version) return;
     const s = this.#snapshot,
@@ -942,7 +951,7 @@ export class VoxelPathTracer implements EnginePlugin {
         s.models.map((m) => gpu.regions.get(m)!),
         lights,
       );
-    const upload = (key: 'scene' | 'lights' | 'env', data: ArrayBufferView) => {
+    const upload = (key: 'materials' | 'scene' | 'env', data: ArrayBufferView) => {
       if (gpu.buffers[key].size < data.byteLength) {
         this.#destroy(gpu.buffers[key]);
         gpu.buffers[key] = this.#buffer(gpu, Math.max(data.byteLength, gpu.buffers[key].size * 2), storage);
@@ -951,13 +960,14 @@ export class VoxelPathTracer implements EnginePlugin {
       if (data.byteLength) device.queue.writeBuffer(gpu.buffers[key], 0, data as Uint32Array<ArrayBuffer>);
     };
     upload('scene', scene.words);
-    upload('lights', lights.words);
     const env = s.environment.map;
     if (env && env !== gpu.envSource) {
       upload('env', env.texels);
       gpu.envSource = env;
     }
-    device.queue.writeBuffer(gpu.buffers.materials, 0, s.materials as Float32Array<ArrayBuffer>);
+    // Model tables (the TABLES kernels read every table there); without them table 0 is enough.
+    if (s.materials.length > 256 * MATERIAL_FLOATS) upload('materials', s.materials);
+    device.queue.writeBuffer(gpu.buffers.table0, 0, s.materials as Float32Array<ArrayBuffer>, 0, 256 * MATERIAL_FLOATS);
     gpu.layout = { scene, lights };
     gpu.version = this.#version;
   }
@@ -1075,10 +1085,10 @@ export class VoxelPathTracer implements EnginePlugin {
       layout: gpu.traceLayout,
       entries: [
         { binding: 0, resource: { buffer: frame } },
-        { binding: 1, resource: { buffer: buffers.materials } },
+        { binding: 1, resource: { buffer: buffers.table0 } },
         { binding: 2, resource: { buffer: buffers.voxels } },
         { binding: 3, resource: { buffer: buffers.scene } },
-        { binding: 4, resource: { buffer: buffers.lights } },
+        { binding: 4, resource: { buffer: buffers.materials } },
         { binding: 5, resource: { buffer: buffers.env } },
         { binding: 6, resource: { buffer: t.accum } },
         { binding: 7, resource: { buffer: t.albedo } },
@@ -1382,9 +1392,48 @@ export class VoxelPathTracer implements EnginePlugin {
     return changed;
   }
 
+  // A pipeline of the trace module; `tables` reads model material tables from storage (TABLES).
+  #traceKernel(gpu: Gpu, entryPoint: string, tables: boolean): Promise<GPUComputePipeline> {
+    return gpu.device.createComputePipelineAsync({
+      layout: gpu.device.createPipelineLayout({ bindGroupLayouts: [gpu.traceLayout] }),
+      compute: { module: gpu.traceModule!, entryPoint, ...(tables ? { constants: { TABLES: 1 } } : {}) },
+    });
+  }
+
+  // The trace and id kernels for the current scene: the base ones, or (a scene with model material tables) the TABLES
+  // ones, compiled the first time they are needed.
+  #tableKernels(gpu: Gpu): Promise<{ trace: GPUComputePipeline; ids: GPUComputePipeline }> {
+    gpu.tableKernelsPending ??= Promise.all([
+      this.#traceKernel(gpu, 'trace', true),
+      this.#traceKernel(gpu, 'ids', true),
+    ]).then(
+      ([trace, ids]) => {
+        if (this.#gpu === gpu) gpu.tableKernels = { trace, ids };
+        return { trace, ids };
+      },
+      (error) => {
+        if (this.#gpu === gpu && !this.#disposed) {
+          this.#status = 'failed';
+          this.#error = error;
+          this.#engine?.onError(error);
+        }
+        throw error;
+      },
+    );
+    return gpu.tableKernelsPending;
+  }
+  #tablesNeeded(): boolean {
+    return this.#snapshot.materials.length > 256 * MATERIAL_FLOATS;
+  }
+
   #execute(c: Context): void {
     const gpu = this.#state(c.device);
     if ((!gpu.pipelines && !gpu.preview) || gpu.lost) return;
+    // A scene with model material tables waits for its kernels (the raster frame shows meanwhile).
+    if (this.#tablesNeeded() && !gpu.tableKernels) {
+      if (gpu.pipelines) this.#tableKernels(gpu).catch(() => {});
+      return;
+    }
     this.#syncScene(gpu);
     const o = this.#settings,
       // Every storage buffer holds one image (16 bytes per pixel); the denoiser's history is in textures.
@@ -1485,7 +1534,7 @@ export class VoxelPathTracer implements EnginePlugin {
       )
         return;
       const pass = c.encoder.beginComputePass();
-      pass.setPipeline(gpu.pipelines!.trace);
+      pass.setPipeline((this.#tablesNeeded() ? gpu.tableKernels : gpu.pipelines)!.trace);
       pass.setBindGroup(0, view.traceGroup!);
       pass.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(height / 8));
       pass.end();
@@ -1652,6 +1701,9 @@ export class VoxelPathTracer implements EnginePlugin {
     camera.up = engineCamera.up;
     camera.project = engineCamera.project;
     camera.update(o.width / o.height, true);
+    const tables = this.#tablesNeeded(),
+      kernels = tables ? await this.#tableKernels(gpu) : gpu.pipelines;
+    this.#alive();
     this.#syncScene(gpu);
     const snapshot = this.#snapshot,
       layout = gpu.layout!,
@@ -1668,10 +1720,9 @@ export class VoxelPathTracer implements EnginePlugin {
       // Private copies of the scene buffers: setScene during the render cannot change what it traces.
       const copies = {} as SceneBuffers,
         encoder = device.createCommandEncoder();
-      for (const key of ['materials', 'voxels', 'scene', 'lights', 'env'] as const) {
-        const source = gpu.buffers[key],
-          usage = key === 'materials' ? GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST : storage;
-        copies[key] = make(source.size, usage);
+      for (const key of ['table0', 'materials', 'voxels', 'scene', 'env'] as const) {
+        const source = gpu.buffers[key];
+        copies[key] = make(source.size, key === 'table0' ? GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST : storage);
         encoder.copyBufferToBuffer(source, 0, copies[key], 0, source.size);
       }
       device.queue.submit([encoder.finish()]);
@@ -1686,10 +1737,9 @@ export class VoxelPathTracer implements EnginePlugin {
           make(bytes, GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST),
         ),
         coverage = o.transparent
-          ? await (gpu.coverage ??= device.createComputePipelineAsync({
-              layout: device.createPipelineLayout({ bindGroupLayouts: [gpu.traceLayout] }),
-              compute: { module: gpu.traceModule!, entryPoint: 'coverage' },
-            }))
+          ? await (tables
+              ? (gpu.tableCoverage ??= this.#traceKernel(gpu, 'coverage', true))
+              : (gpu.coverage ??= this.#traceKernel(gpu, 'coverage', false)))
           : undefined;
       let group: GPUBindGroup | undefined,
         submitted = 0;
@@ -1742,7 +1792,7 @@ export class VoxelPathTracer implements EnginePlugin {
             );
             const e = device.createCommandEncoder(),
               pass = e.beginComputePass();
-            pass.setPipeline(gpu.pipelines.trace);
+            pass.setPipeline(kernels.trace);
             pass.setBindGroup(0, group!);
             pass.dispatchWorkgroups(Math.ceil(w / 8), Math.ceil(h / 8));
             pass.end();
@@ -1771,7 +1821,7 @@ export class VoxelPathTracer implements EnginePlugin {
               0,
               o.transparent,
             );
-            for (const pipeline of [aovs ? gpu.pipelines.ids : undefined, coverage]) {
+            for (const pipeline of [aovs ? kernels.ids : undefined, coverage]) {
               if (!pipeline) continue;
               const pass = e.beginComputePass();
               pass.setPipeline(pipeline);

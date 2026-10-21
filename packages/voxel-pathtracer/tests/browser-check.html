@@ -843,6 +843,38 @@ window.check={
  // restore draws the same traced image again (fixed seed, converged).
  // A lamp beside a wall in a dark room: the stretch of wall it lights (a peak far brighter than the wall around it) keeps
  // its level through the denoiser, against a converged reference, instead of being averaged down with the darker wall.
+ // Model material tables. The material scene with every model's palette moved to its own index (200 + model) in a
+ // table of its own renders bit-identically to the scene with one shared table; and 300 models, each with its own
+ // table giving palette 1 another colour, show 300 distinct albedos.
+ async materialtables(){
+  look([18,14,26],[-3,3,-2]);
+  const base=scenes.materials(),
+   own={...base,materials:[],models:base.models.map((m,k)=>{
+    const used=[...new Set(m.voxels)].filter((v)=>v),voxels=m.voxels.map((v)=>v?200+k:0);
+    return {...m,voxels,materials:base.materials.filter((x)=>used.includes(x.id)).map((x)=>({...x,id:200+k}))};
+   })};
+  const render=(scene)=>withTracer(scene,{},(t)=>t.renderImage({width:160,height:120,samples:32,seed:5}));
+  const a=await render(base),b=await render(own);
+  let differ=0,max=0;for(let i=0;i<a.color.length;i++){const d=Math.abs(a.color[i]-b.color[i]);if(d>0)differ++;max=Math.max(max,d);}
+  // 300 models of 2^3 voxels of palette 1 in a 20 x 15 wall, each with its own colour.
+  const n=300,models=[],instances=[],colour=(k)=>[((k*37)%101)/100,((k*53)%97)/96,((k*71)%89)/88];
+  for(let k=0;k<n;k++){
+   models.push({...model(`m${k}`,[2,2,2],()=>1),materials:[{id:1,type:'diffuse',color:colour(k)}]});
+   instances.push({id:`i${k}`,modelId:`m${k}`,matrix:translate((k%20)*3-30,Math.floor(k/20)*3-22,0)});
+  }
+  look([0,0,60],[0,0,0]);
+  const wall={revision:1,models,instances,materials:[],environment:{skyColor:[1,1,1],skyIntensity:1}};
+  const img=await withTracer(wall,{},(t)=>t.renderImage({width:400,height:300,samples:4,aovs:true,jitter:false}));
+  const seen=new Map();
+  for(let p=0;p<img.width*img.height;p++){
+   const k=img.instance[p];if(k<0)continue;
+   const c=colour(k),e=Math.max(...[0,1,2].map((j)=>Math.abs(img.albedo[p*3+j]-c[j])));
+   const s=seen.get(k)??{pixels:0,worst:0};s.pixels++;s.worst=Math.max(s.worst,e);seen.set(k,s);
+  }
+  let worst=0;for(const s of seen.values())worst=Math.max(worst,s.worst);
+  const palettes=new Set();for(let p=0;p<img.width*img.height;p++)if(img.instance[p]>=0)palettes.add(img.palette[p]);
+  return {identical:{differ,max,values:a.color.length},wall:{models:n,seen:seen.size,worst,palettes:[...palettes]},errors:errors.splice(0)};
+ },
  async denoisepeak(){
   look([6,7,20],[4,8,0]);
   const scene={revision:1,models:[model('wall',[24,14,1],()=>1),model('floor',[24,1,12],()=>1),model('lamp',[2,3,2],()=>2)],

@@ -11,7 +11,7 @@ import {
   validateTraceOptions,
   VoxelPathTracer,
 } from '../dist/index.js';
-import { fakeEngine, materials, model, settle, simpleScene, translate } from './support.js';
+import { fakeDevice, fakeEngine, materials, model, settle, simpleScene, translate } from './support.js';
 
 const attach = (options = {}, harness = fakeEngine()) => ({
   tracer: VoxelPathTracer.attach(harness.engine, { scene: simpleScene(), ...options }),
@@ -350,4 +350,112 @@ test('whenIdle never rejects: after dispose it resolves once pending captures ha
   await assert.rejects(job, (e) => e.name === 'MargoError' && e.code === 'disposed');
   await tracer.whenIdle();
   assert.equal(tracer.stats.renders, 0);
+});
+
+test('model material tables: a scene holds more than 255 distinct materials; equal tables are stored once', async () => {
+  const h = fakeEngine(),
+    palette = (shift) =>
+      Array.from({ length: 255 }, (_, k) => ({ id: k + 1, type: 'diffuse', color: [(k + shift) / 600, 0.5, 0.25] })),
+    a = { ...model('a', [8, 8, 8], (x, y, z) => 1 + ((x + 8 * z) % 255)), materials: palette(0) },
+    b = { ...model('b', [8, 8, 8], (x, y, z) => 1 + ((x + 8 * z) % 255)), materials: palette(300) },
+    // Equal in content to a's table, another array: stored once.
+    c = { ...model('c', [8, 8, 8], () => 7), materials: palette(0) },
+    // No table of its own: scene.materials.
+    d = model('d', [8, 8, 8], () => 1),
+    scene = simpleScene({
+      models: [a, b, c, d],
+      instances: ['a', 'b', 'c', 'd'].map((id, i) => ({ id, modelId: id, matrix: translate(i * 10, 0, 0) })),
+    }),
+    tracer = VoxelPathTracer.attach(h.engine, { scene });
+  await tracer.ready;
+  // The first frame starts compiling the kernels that read model tables (TABLES) and traces nothing meanwhile.
+  assert.deepEqual(h.frame(), []);
+  let passes = [];
+  for (let k = 0; k < 5 && !passes.length; k++) {
+    await settle();
+    passes = h.frame();
+  }
+  const pipeline = passes[0].commands.find((c) => c[0] === 'setPipeline')[1];
+  assert.equal(pipeline.compute.entryPoint, 'trace');
+  assert.deepEqual(pipeline.compute.constants, { TABLES: 1 }, 'traced with the TABLES kernel');
+  // A scene without model tables goes back to the base kernel.
+  tracer.setScene(simpleScene());
+  const base = h.frame()[0].commands.find((c) => c[0] === 'setPipeline')[1];
+  assert.equal(base.compute.constants, undefined);
+  tracer.setScene(scene);
+  h.frame();
+  const FLOATS = 32,
+    storage = h.device.buffers.filter((x) => !x.destroyed && x.usage & 128),
+    tables = storage.find((x) => x.size === 3 * 256 * FLOATS * 4);
+  assert.ok(tables, 'three tables: scene.materials, a (and c), b');
+  const f = new Float32Array(tables.data);
+  // Slot = table << 8 | palette index; colour in the first three floats.
+  assert.ok(Math.abs(f[(1 * 256 + 5) * FLOATS] - 4 / 600) < 1e-6, "a's palette 5");
+  assert.ok(Math.abs(f[(2 * 256 + 5) * FLOATS] - 304 / 600) < 1e-6, "b's palette 5");
+  assert.ok(Math.abs(f[(0 * 256 + 1) * FLOATS] - 0.5) < 1e-6, 'scene.materials palette 1');
+  // Model records carry their table (word 7, as table << 8): a 1, b 2, c 1 (shared with a), d 0.
+  const scene4 = storage.find((x) => {
+    const w = new Uint32Array(x.data);
+    return w.length > 4 + 4 * 12 && [8, 8, 8].every((v, k) => w[4 + k] === v) && w[4 + 7] === 1 << 8;
+  });
+  assert.ok(scene4, 'scene buffer');
+  const w = new Uint32Array(scene4.data);
+  assert.deepEqual(
+    [0, 1, 2, 3].map((i) => w[4 + i * 12 + 7] >> 8),
+    [1, 2, 1, 0],
+  );
+  // Picks still name palette indices.
+  assert.equal(tracer.raycast([10.5, 20, 0.5], [0, -1, 0]).paletteIndex, 1);
+  tracer.dispose();
+});
+
+test('model material tables are validated and named in errors; a scene without them packs as before', () => {
+  const { tracer } = attach(),
+    // A new id: 'm' with its revision and size would reuse the attached scene's packing (the caller's promise).
+    m = (materials) =>
+      simpleScene({
+        models: [{ ...model('p', [8, 8, 8], () => 2), materials }],
+        instances: [{ id: 'i', modelId: 'p', matrix: translate(0, 0, 0) }],
+      });
+  assert.throws(
+    () => tracer.setScene(m('red')),
+    (e) => e instanceof TypeError && /models\[0\]\.materials must be/.test(e.message),
+  );
+  assert.throws(
+    () =>
+      tracer.setScene(
+        m([
+          { id: 2, type: 'diffuse', color: [1, 1, 1] },
+          { id: 2, type: 'diffuse', color: [1, 1, 1] },
+        ]),
+      ),
+    (e) => e instanceof TypeError && /scene\.models\[0\]\.materials\[1\]\.id 2 is used twice/.test(e.message),
+  );
+  assert.throws(
+    () => tracer.setScene(m([{ id: 3, type: 'diffuse', color: [1, 1, 1] }])),
+    (e) => e instanceof TypeError && /model 'p'\.materials has no material with id 2/.test(e.message),
+  );
+  assert.throws(
+    () => tracer.setScene(m([{ id: 2, type: 'glass', color: [1, 1, 1], ior: 9 }])),
+    (e) => e instanceof RangeError && /scene\.models\[0\]\.materials\[0\]\.ior/.test(e.message),
+  );
+  // The failed scenes changed nothing.
+  assert.equal(tracer.stats.sceneRevision, 1);
+  tracer.dispose();
+  // Tables over the binding size are refused before anything changes.
+  const small = fakeEngine(fakeDevice({ maxStorageBufferBindingSize: 64 << 10 })),
+    t2 = VoxelPathTracer.attach(small.engine, { scene: simpleScene() }),
+    two = (k) => ({ ...model(`m${k}`, [8, 8, 8], () => 1), materials: materials([1], { color: [k / 10, 0, 0] }) });
+  t2.setScene(simpleScene({ models: [two(1)], instances: [{ id: 'i', modelId: 'm1', matrix: translate(0, 0, 0) }] }));
+  assert.throws(
+    () =>
+      t2.setScene(
+        simpleScene({
+          models: [two(1), two(2)],
+          instances: [{ id: 'i', modelId: 'm1', matrix: translate(0, 0, 0) }],
+        }),
+      ),
+    (e) => e instanceof RangeError && /3 material tables need 98304 bytes/.test(e.message),
+  );
+  t2.dispose();
 });

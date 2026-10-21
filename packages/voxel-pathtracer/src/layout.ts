@@ -1,13 +1,17 @@
-// GPU layout of a SceneSnapshot: the word arrays the WGSL in shaders.ts reads (scene, lights, voxels) and the frame
-// uniform. Offsets here and in the shader's constants must agree; tests/layout.test.js checks them from the outside.
-import { BRICK_WORDS, type PackedModel, type SceneSnapshot, UNIFORM } from './scene.js';
+// GPU layout of a SceneSnapshot: the word arrays the WGSL in shaders.ts reads (the scene buffer: scene records, then the
+// lights; voxels) and the frame uniform. Offsets here and in the shader's constants must agree.
+import {
+  BRICK_WORDS,
+  INSTANCE_WORDS,
+  MODEL_WORDS,
+  NODE_WORDS,
+  type PackedModel,
+  type SceneSnapshot,
+  sceneRecordWords,
+  UNIFORM,
+} from './scene.js';
 
-/** Words per model record: size xyz, grid offset, bricks xyz, 0, first emitter word, emitters, emitter total, 0. */
-export const MODEL_WORDS = 12;
-/** Words per instance record: to-local rows, to-world rows, previous to-world rows, model, flags, light pick, 0. */
-export const INSTANCE_WORDS = 40;
-/** Words per hierarchy node. */
-const NODE_WORDS = 8;
+export { INSTANCE_WORDS, MODEL_WORDS };
 /** Bytes of the frame uniform. */
 export const FRAME_BYTES = 800;
 /** Frame uniform flag bits (config.z). */
@@ -46,7 +50,10 @@ export function modelWords(m: PackedModel, offset: number): Uint32Array {
   return out;
 }
 
-/** The lights buffer: emissive instance table, emissive faces per model, area lights, environment tables. */
+/**
+ * The lights, after the scene records in the scene buffer (every offset absolute in it): emissive instance table,
+ * emissive faces per model, area lights, environment tables.
+ */
 export interface LightLayout {
   words: Uint32Array;
   emissiveBase: number;
@@ -58,8 +65,9 @@ export interface LightLayout {
 }
 
 export function lightLayout(s: SceneSnapshot): LightLayout {
-  const env = s.environment.map;
-  let size = 4;
+  const env = s.environment.map,
+    start = sceneRecordWords(s);
+  let size = start + 4;
   const deflectorBase = size;
   size += s.deflectors.length;
   const emissiveBase = size;
@@ -75,12 +83,14 @@ export function lightLayout(s: SceneSnapshot): LightLayout {
   size += env ? env.height : 0;
   const conditionalBase = size;
   size += env ? env.width * env.height : 0;
+  // The scene buffer's words: the records (sceneLayout fills them in), then these.
   const words = new Uint32Array(size),
     floats = new Float32Array(words.buffer);
-  // Header: where the light-sampled glass and mirror instances are and how many (pairs of GPU index and IOR, 0 for a
-  // mirror).
-  words[0] = deflectorBase;
-  words[1] = s.deflectors.length / 2;
+  // Header (scene word 1 points at it): where the light-sampled glass and mirror instances are and how many (pairs of
+  // GPU index and IOR, 0 for a mirror).
+  words[1] = start;
+  words[start] = deflectorBase;
+  words[start + 1] = s.deflectors.length / 2;
   for (let k = 0; k < s.deflectors.length; k += 2) {
     words[deflectorBase + k] = s.deflectors[k];
     floats[deflectorBase + k + 1] = s.deflectors[k + 1];
@@ -102,7 +112,7 @@ export function lightLayout(s: SceneSnapshot): LightLayout {
   return { words, emissiveBase, areaBase, marginalBase, conditionalBase, emitters };
 }
 
-/** The scene buffer: models, instances, hierarchy nodes. */
+/** The scene buffer: models, instances, hierarchy nodes, block textures, then the lights (`lightLayout`). */
 export interface SceneLayout {
   words: Uint32Array;
   modelBase: number;
@@ -118,8 +128,7 @@ export function sceneLayout(s: SceneSnapshot, gridOffsets: ArrayLike<number>, li
     nodeCount = s.nodes.length / NODE_WORDS,
     // Block textures after the nodes: word 0 holds the table's start; per texture first texel word, width, height.
     textureBase = nodeBase + s.nodes.length,
-    texelWords = s.textures.reduce((n, t) => n + t.texels.length, 0),
-    words = new Uint32Array(textureBase + 4 * s.textures.length + texelWords),
+    words = lights.words,
     floats = new Float32Array(words.buffer);
   words[0] = s.textures.length ? textureBase : 0;
   let texel = textureBase + 4 * s.textures.length;
@@ -131,7 +140,11 @@ export function sceneLayout(s: SceneSnapshot, gridOffsets: ArrayLike<number>, li
   for (const [i, m] of s.models.entries()) {
     const b = modelBase + i * MODEL_WORDS,
       e = lights.emitters[i];
-    words.set([m.size[0], m.size[1], m.size[2], gridOffsets[i], m.bricks[0], m.bricks[1], m.bricks[2], 0], b);
+    // Word 7: the model's material table, as the slot bits above the palette index (table << 8).
+    words.set(
+      [m.size[0], m.size[1], m.size[2], gridOffsets[i], m.bricks[0], m.bricks[1], m.bricks[2], s.modelTables[i] << 8],
+      b,
+    );
     words[b + 8] = e.first;
     words[b + 9] = e.count;
     words[b + 10] = bits(e.total);

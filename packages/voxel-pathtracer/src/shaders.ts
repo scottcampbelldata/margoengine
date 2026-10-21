@@ -250,10 +250,18 @@ const MODEL=${MODEL_WORDS}u;
 const INSTANCE=${INSTANCE_WORDS}u;
 @group(0) @binding(0) var<uniform> f:Frame;
 const MV=${MATERIAL_FLOATS / 4}u;
-@group(0) @binding(1) var<uniform> materials:array<vec4f,${(256 * MATERIAL_FLOATS) / 4}>;
+// Table 0 (scene.materials) in a uniform buffer: scenes without model tables read their materials there, faster than
+// from storage (measured 5% of a frame of the material scene on an RTX A6000). Pipelines with TABLES (compiled when a
+// scene has model tables) read every table from storage instead.
+override TABLES:bool=false;
+@group(0) @binding(1) var<uniform> table0:array<vec4f,${(256 * MATERIAL_FLOATS) / 4}>;
 @group(0) @binding(2) var<storage,read> voxels:array<u32>;
+// The scene records, then the lights (scene word 1 is where their header starts; every offset is absolute).
 @group(0) @binding(3) var<storage,read> scene:array<u32>;
-@group(0) @binding(4) var<storage,read> lights:array<u32>;
+// Material tables, MV vec4f per entry, indexed by slot: the model's table << 8 | the palette index (0 stays empty).
+@group(0) @binding(4) var<storage,read> materials:array<vec4f>;
+// Vec4 i of the material tables (slot x MV + field): table 0 from the uniform copy.
+fn mat(i:u32)->vec4f {if(TABLES){return materials[i];}return table0[i];}
 @group(0) @binding(5) var<storage,read> envmap:array<vec4f>;
 @group(0) @binding(6) var<storage,read_write> accum:array<vec4f>;
 @group(0) @binding(7) var<storage,read_write> albedo:array<vec4f>;
@@ -268,7 +276,7 @@ fn hash(v:u32)->u32 {let s=v*747796405u+2891336453u;let w=((s>>((s>>28u)+4u))^s)
 fn rand()->f32 {rng=rng*747796405u+2891336453u;let w=((rng>>((rng>>28u)+4u))^rng)*277803737u;return f32(((w>>22u)^w)>>8u)*5.960464477539063e-8;}
 fn power2(a:f32,b:f32)->f32 {let a2=a*a;let b2=b*b;return select(1.0,a2/(a2+b2),a2+b2>0.0);}
 fn fl(i:u32)->f32 {return bitcast<f32>(scene[i]);}
-fn ll(i:u32)->f32 {return bitcast<f32>(lights[i]);}
+fn ll(i:u32)->f32 {return bitcast<f32>(scene[i]);}
 
 // Affine transforms as three rows.
 struct Xform {r0:vec4f,r1:vec4f,r2:vec4f}
@@ -314,6 +322,8 @@ fn found(h:ptr<function,Hit>,t:f32,v:u32,a:u32,stp:vec3i,d:vec3f,c:vec3i)->bool 
 // the first boundary after the cell the ray starts in, whatever its index (voxelwise volumes).
 fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit>)->bool {
  let mb=f.scene.x+model*MODEL;
+ // The model's material table: hits carry slots (table << 8 | palette index), as want does.
+ let base=scene[mb+7u];
  let sz=vec3i(i32(scene[mb]),i32(scene[mb+1u]),i32(scene[mb+2u]));
  let grid=scene[mb+3u];
  let nb=vec3i(i32(scene[mb+4u]),i32(scene[mb+5u]),i32(scene[mb+6u]));
@@ -339,8 +349,9 @@ fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit
   let entry=voxels[grid+u32(bc.x+nb.x*(bc.z+nb.z*bc.y))];
   let tOut=min(min(bn.x,bn.y),min(bn.z,tExit));
   let lo=bc*8;let hi=min(lo+8,sz)-1;
-  if(entry==0u||(entry>=0x80000000u&&!step&&!cutMat(entry&255u))){
-   let u=select(0u,entry&255u,entry!=0u);
+  let ue=select(0u,base|(entry&255u),entry!=0u);
+  if(entry==0u||(entry>=0x80000000u&&!step&&!cutMat(ue))){
+   let u=ue;
    if(step){if(!skip){return found(h,t,u,axis,stp,d,clamp(vec3i(floor(o+d*t)),lo,hi));}skip=false;}
    else if(u!=want){return found(h,t,u,axis,stp,d,clamp(vec3i(floor(o+d*t)),lo,hi));}
   } else {
@@ -350,7 +361,8 @@ fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit
    let uniform=entry>=0x80000000u;
    loop {
     let l=vec3u(c-lo);let k=l.x+8u*(l.z+8u*l.y);
-    let v=select((voxels[entry+(k>>2u)]>>((k&3u)*8u))&255u,entry&255u,uniform);
+    let pv=select((voxels[entry+(k>>2u)]>>((k&3u)*8u))&255u,entry&255u,uniform);
+    let v=select(0u,base|pv,pv!=0u);
     if(step){if(!skip){return found(h,vt,v,va,stp,d,c);}skip=false;}
     else if(v!=want){
      if(!cutMat(v)){return found(h,vt,v,va,stp,d,c);}
@@ -381,12 +393,13 @@ fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit
 // opaque shadows none, except a sun-lit medium in the cell the shadow ray starts in: as in MagicaVoxel, light reaches
 // a sun-lit volume only through its own cell, so only its faces toward the light glow).
 fn extinction(v:u32,start:bool)->f32 {
- let x=materials[v*MV+3u];let fl=u32(x.w);
+ let x=mat(v*MV+3u);let fl=u32(x.w);
  return select(-1.0,x.x,(fl&MEDIA)!=0u&&((f.config.z&OPAQUE_SHADOWS)==0u||((fl&SUNLIT)!=0u&&start)));
 }
 // Optical depth along a shadow ray through one model, -1 when blocked.
 fn marchShadow(model:u32,o:vec3f,d:vec3f,tMax:f32)->f32 {
  let mb=f.scene.x+model*MODEL;
+ let base=scene[mb+7u];
  let sz=vec3i(i32(scene[mb]),i32(scene[mb+1u]),i32(scene[mb+2u]));
  let grid=scene[mb+3u];
  let nb=vec3i(i32(scene[mb+4u]),i32(scene[mb+5u]),i32(scene[mb+6u]));
@@ -408,15 +421,16 @@ fn marchShadow(model:u32,o:vec3f,d:vec3f,tMax:f32)->f32 {
   let entry=voxels[grid+u32(bc.x+nb.x*(bc.z+nb.z*bc.y))];
   let tOut=min(min(bn.x,bn.y),min(bn.z,tExit));
   let lo=bc*8;let hi=min(lo+8,sz)-1;
-  if(entry>=0x80000000u&&!cutMat(entry&255u)){
+  let ue=base|(entry&255u);
+  if(entry>=0x80000000u&&!cutMat(ue)){
    // A uniform brick: the start cell's share, then the rest of the brick.
    if(start){
     let c0=floor(o+d*t);let cn=(c0+up-o)*inv;let tc=min(min(min(cn.x,cn.y),cn.z),tOut);
-    let k=extinction(entry&255u,true);if(k<0.0){return -1.0;}depth+=k*(tc-t);
+    let k=extinction(ue,true);if(k<0.0){return -1.0;}depth+=k*(tc-t);
     start=false;
-    if(tc<tOut){let k2=extinction(entry&255u,false);if(k2<0.0){return -1.0;}depth+=k2*(tOut-tc);}
+    if(tc<tOut){let k2=extinction(ue,false);if(k2<0.0){return -1.0;}depth+=k2*(tOut-tc);}
    } else {
-    let k=extinction(entry&255u,false);if(k<0.0){return -1.0;}depth+=k*(tOut-t);
+    let k=extinction(ue,false);if(k<0.0){return -1.0;}depth+=k*(tOut-t);
    }
   } else if(entry!=0u){
    var c=clamp(vec3i(floor(o+d*t)),lo,hi);
@@ -425,7 +439,8 @@ fn marchShadow(model:u32,o:vec3f,d:vec3f,tMax:f32)->f32 {
    let uniform=entry>=0x80000000u;
    loop {
     let l=vec3u(c-lo);let k=l.x+8u*(l.z+8u*l.y);
-    let v=select((voxels[entry+(k>>2u)]>>((k&3u)*8u))&255u,entry&255u,uniform);
+    let pv=select((voxels[entry+(k>>2u)]>>((k&3u)*8u))&255u,entry&255u,uniform);
+    let v=select(0u,base|pv,pv!=0u);
     let next=min(min(vn.x,vn.y),min(vn.z,tOut));
     // A cut-out cell lets the shadow through where both its texels on the ray are cut away.
     if(cutMat(v)){if(cutThrough(v,o,d,vt,start&&vt==0.0,c,vn)!=1u){return -1.0;}}
@@ -455,7 +470,7 @@ fn traceInstance(i:u32,o:vec3f,d:vec3f,medium:u32,mInst:u32,h:ptr<function,Hit>)
  let exitTie=!own&&(*h).inst==mInst&&(*h).value==0u;
  let tMax=select((*h).t,(*h).t*1.0001+1e-4,exitTie);
  var want=select(0u,medium,own);
- if(own&&medium!=0u&&(u32(materials[medium*MV+3u].w)&VOXELWISE)!=0u){want=STEP;}
+ if(own&&medium!=0u&&(u32(mat(medium*MV+3u).w)&VOXELWISE)!=0u){want=STEP;}
  if(march(scene[f.scene.y+i*INSTANCE+36u],xpoint(m,o),xdir(m,d),0.0,tMax,want,&r)){
   if(exitTie){if(r.value!=0u||r.t<(*h).t){r.inst=i;*h=r;}return;}
   if(own&&r.value==0u&&(*h).inst!=NONE&&(*h).t<r.t*1.0001+1e-4){return;}
@@ -582,7 +597,7 @@ fn gridLine(p:vec3f,n:vec3f)->bool {
 fn texelAt(v:u32,face:u32,l:vec3f)->vec4f {
  let base=scene[0];
  if(base==0u){return vec4f(1.0);}
- let slot=materials[v*MV+6u+face/4u][face%4u];
+ let slot=mat(v*MV+6u+face/4u)[face%4u];
  if(slot<0.5){return vec4f(1.0);}
  var uv=vec2f(-l.x,-l.y);
  switch face {
@@ -605,12 +620,12 @@ fn faceTexel(h:Hit,p:vec3f)->vec4f {
  let l=xpoint(localX(h.inst),p);
  return texelAt(h.value,faceOf(h.axis,l,h.cell),l);
 }
-fn cutMat(v:u32)->bool {return v!=0u&&(u32(materials[v*MV+3u].w)&CUTOUT)!=0u;}
+fn cutMat(v:u32)->bool {return v!=0u&&(u32(mat(v*MV+3u).w)&CUTOUT)!=0u;}
 // A ray (model space o + t d) through cut-out cell c of palette v, entering at t0 (inside: it starts in the cell), next
 // boundaries vn: 0 when the texel where it enters is solid, 1 when that and the one where it leaves are both cut away
 // (it goes on), 2 when only the one where it leaves is solid (the voxel's inner face).
 fn cutThrough(v:u32,o:vec3f,d:vec3f,t0:f32,inside:bool,c:vec3i,vn:vec3f)->u32 {
- let cut=materials[v*MV+7u].z;
+ let cut=mat(v*MV+7u).z;
  if(!inside){
   // The face it enters by: the axis whose cell plane the entry point lies nearest.
   let l=o+d*t0;let e=min(abs(l-vec3f(c)),abs(l-vec3f(c+1)));
@@ -726,9 +741,9 @@ fn cameraRay(px:vec2f)->Ray {
 // disp: Cauchy coefficient B (square micrometres; 0 without dispersion), ior the index at the d line.
 struct Mat {color:vec3f,alpha:f32,metal:f32,glass:f32,spec:f32,f0:f32,emission:vec3f,ior:f32,density:f32,scatter:f32,g:f32,flags:u32,disp:f32,metalColor:vec3f,seen:vec4f}
 fn material(id:u32)->Mat {
- let a=materials[id*MV];let b=materials[id*MV+1u];let c=materials[id*MV+2u];let e=materials[id*MV+3u];
- let x=materials[id*MV+4u];
- return Mat(a.xyz,a.w,b.x,b.y,b.z,b.w,c.xyz,c.w,e.x,e.y,e.z,u32(e.w),x.x,x.yzw,materials[id*MV+5u]);
+ let a=mat(id*MV);let b=mat(id*MV+1u);let c=mat(id*MV+2u);let e=mat(id*MV+3u);
+ let x=mat(id*MV+4u);
+ return Mat(a.xyz,a.w,b.x,b.y,b.z,b.w,c.xyz,c.w,e.x,e.y,e.z,u32(e.w),x.x,x.yzw,mat(id*MV+5u));
 }
 // Index of a dispersive material at wavelength l (nanometres).
 fn iorAt(m:Mat,l:f32)->f32 {let x=l*0.001;return m.ior+m.disp*(1.0/(x*x)-1.0/(LAMBDA_D*LAMBDA_D));}
@@ -954,7 +969,7 @@ fn sampleEmitter()->LightPoint {
  let u=rand();
  var lo=0u;var hi=f.lights.x-1u;
  while(lo<hi){let mid=(lo+hi)/2u;if(ll(f.lights.y+mid*2u+1u)<u){lo=mid+1u;}else{hi=mid;}}
- let inst=lights[f.lights.y+lo*2u];
+ let inst=scene[f.lights.y+lo*2u];
  let ib=f.scene.y+inst*INSTANCE;
  let model=scene[ib+36u];let mb=f.scene.x+model*MODEL;
  let faces=scene[mb+8u];let count=scene[mb+9u];let total=fl(mb+10u);
@@ -962,7 +977,7 @@ fn sampleEmitter()->LightPoint {
  let u2=rand();
  lo=0u;hi=count-1u;
  while(lo<hi){let mid=(lo+hi)/2u;if(ll(faces+mid*2u+1u)<u2){lo=mid+1u;}else{hi=mid;}}
- let code=lights[faces+lo*2u];
+ let code=scene[faces+lo*2u];
  let cell=vec3i(i32(code&255u),i32((code>>8u)&255u),i32((code>>16u)&255u));
  let face=code>>24u;let axis=face>>1u;let sg=select(-1.0,1.0,(face&1u)==0u);
  var lp=vec3f(cell)+vec3f(rand(),rand(),rand());
@@ -970,7 +985,7 @@ fn sampleEmitter()->LightPoint {
  let w=worldX(inst);let l=localX(inst);
  let a1=(axis+1u)%3u;let a2=(axis+2u)%3u;
  let area=length(cross(colOf(w,a1),colOf(w,a2)));
- let m=material(voxelAt(model,cell));
+ let m=material(scene[mb+7u]|voxelAt(model,cell));
  r.p=xpoint(w,lp);
  r.n=sg*normalize(rowOf(l,axis));
  r.radiance=m.emission;
@@ -1061,13 +1076,13 @@ fn glassCandidates(kind:u32,m:Mat,n:vec3f,o:vec3f,medium:u32,mInst:u32,s:vec3f,l
  let inGlass=medium!=0u&&(material(medium).flags&MEDIA)==0u;
  var ior=1.0;
  if(inGlass){let mm=material(medium);if(!clearGlass(mm)){return;}ior=mm.ior;}
- let gb=lights[0];
- let groups=select(1u+lights[1],1u,inGlass);
+ let gb=scene[scene[1]];
+ let groups=select(1u+scene[scene[1]+1u],1u,inGlass);
  for(var g=select(1u,0u,inGlass);g<groups;g++){
   var inst=mInst;var eta=ior;var per=48u;var want=NONE;
   if(!inGlass){
    per=1u;
-   if(g>0u){inst=lights[gb+g*2u-2u];eta=ll(gb+g*2u-1u);want=inst;per=select(select(55u,7u,eta*eta>=2.0),6u,eta==0.0);}
+   if(g>0u){inst=scene[gb+g*2u-2u];eta=ll(gb+g*2u-1u);want=inst;per=select(select(55u,7u,eta*eta>=2.0),6u,eta==0.0);}
   }
   // The instance's frame (unit face normals) and box, read once per group (none for the straight direction).
   var u0=vec3f(1.0,0.0,0.0);var u1=vec3f(0.0,1.0,0.0);var u2=vec3f(0.0,0.0,1.0);
@@ -1605,7 +1620,7 @@ fn radiance(px:vec2u)->Path {
  var h:Hit;h.inst=NONE;
  if(dot(ray.d,ray.d)>0.0){h=closest(ray.o,ray.d,0u,NONE);}
  var v=-1.0;
- if(h.inst==GROUND){v=-2.0;}else if(h.inst==AREA){v=-3.0;}else if(h.inst!=NONE){v=f32(h.inst+1u)*256.0+f32(h.value);}
+ if(h.inst==GROUND){v=-2.0;}else if(h.inst==AREA){v=-3.0;}else if(h.inst!=NONE){v=f32(h.inst+1u)*256.0+f32(h.value&255u);}
  normals[gid.y*f.tile.x+gid.x].w=v;
 }
 `;

@@ -32,6 +32,7 @@
 // - viewport: disabled is bit-identical to raster, dispose restores raster, a device restore redraws the same image;
 // - capture: PNG dimensions, cancellation, whenIdle after it; `--timing` adds GPU time per frame at 1920x1080 and upload
 //   costs;
+// - materialtables: model material tables render as one shared table does (bit for bit); 300 models with 300 colours;
 // - native4k: a 3840 x 2160 viewport traced at its native size with the default limits, raw and denoised (moving camera).
 // Results go to test-results/voxel-pathtracer-browser-check.json; `pictures` writes PNGs to test-results/voxel-pathtracer.
 import assert from 'node:assert/strict';
@@ -486,6 +487,17 @@ try {
     assert.deepEqual(r.errors, []);
     await mkdir('test-results/voxel-pathtracer', { recursive: true });
     await writeFile('test-results/voxel-pathtracer/capture-1500x1100.png', Buffer.from(r.png, 'base64'));
+  }
+  if (wanted('materialtables')) {
+    const r = await run('materialtables');
+    console.log(
+      `  own tables vs one table: ${r.identical.differ} of ${r.identical.values} values differ (max ${r.identical.max}); ${r.wall.models} models with their own colour: ${r.wall.seen} seen, worst albedo error ${r.wall.worst.toExponential(2)}, palettes ${r.wall.palettes}`,
+    );
+    assert.equal(r.identical.differ, 0, 'model tables render as one shared table does');
+    assert.ok(r.wall.seen >= 290, 'the wall of 300 models is in view');
+    assert.ok(r.wall.worst < 1e-5, "every model shows its own table's colour");
+    assert.deepEqual(r.wall.palettes, [1], 'picks report palette indices');
+    assert.deepEqual(r.errors, []);
   }
   if (wanted('native4k')) {
     const r = await run('native4k');

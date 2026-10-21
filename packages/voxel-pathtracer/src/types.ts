@@ -137,6 +137,13 @@ export interface TraceModel {
   size: TraceVec3;
   /** Dense palette indices, `index = x + size[0] * (z + size[2] * y)`; 0 is empty. Read, never kept or changed. */
   voxels: Uint8Array;
+  /**
+   * Compatible addition: this model's own material table (one material per palette index it uses, ids 1 to 255 and
+   * unique), used instead of `scene.materials`: a scene may then hold any number of distinct materials, up to 255 per
+   * table. Tables equal in content are stored once; a scene holds at most 4096 (`scene.materials` included), within
+   * the device's storage binding size (32 KiB each). Instances, `raycast` and the AOVs still report palette indices.
+   */
+  materials?: readonly TraceMaterial[];
 }
 
 /** One placement of a model. */
@@ -301,7 +308,7 @@ export interface VoxelTraceScene {
   models: readonly TraceModel[];
   /** Instances of the models; ids unique. */
   instances: readonly TraceInstance[];
-  /** One material per palette index that any instanced model uses; ids unique. */
+  /** One material per palette index that any model without its own `materials` uses; ids unique. */
   materials: readonly TraceMaterial[];
   /** Sky, sun and ground. */
   environment?: TraceEnvironment;
