@@ -1,5 +1,5 @@
 // Typed shader nodes and the WGSL builder shared by the material, post and compute hosts.
-import { nested } from './effects.js';
+import { nested } from './scope.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 type N = 2 | 3 | 4;
 /** WGSL scalar types a node can have. */

@@ -129,6 +129,36 @@ read back exactly (65 ms on an NVIDIA Ampere GPU in Edge), a job on an engine th
 submit and while mapping, engine disposal and `device.destroy()` at both points, and a pipeline over the storage-binding
 limit; every job destroyed its buffers and no GPU error escaped.
 
+## Screen effects (`@margoengine/shader/effects`, +1.1 kB min+gzip over the root entry)
+
+Ready-made `NodePass` effects for a PostStack, each with live `uniforms` (`effect.uniforms.darkness.value = 0.5`). LDR by
+default (after tonemapping, on display colour); `{kind: 'hdr'}` runs one on linear light before the display effect.
+
+```ts
+import {PostStack} from '@margoengine/post';
+import {Tonemap} from '@margoengine/tonemap';
+import {vignette, rgbShift} from '@margoengine/shader/effects';
+const look = vignette({darkness: 0.6}), shift = rgbShift({amount: 0.004});
+PostStack.attach(stage.engine, [new Tonemap(), shift, look]);
+look.uniforms.darkness.value = 0.9;                   // live
+```
+
+| Preset (three.js counterpart) | Parameters (default) |
+| --- | --- |
+| `vignette` (VignetteShader) | `darkness` 0.8, `radius` 0.4 (0 centre, 1 corner), `softness` 0.6 |
+| `rgbShift` (RGBShiftShader) | `amount` 0.005 (UV units), `angle` 0 (radians; red moves right, blue left) |
+| `chromaticAberration` | `strength` 0.01 (red and blue scaled about the centre by 1 -/+ strength) |
+| `pixelate` (RenderPixelatedPass look) | `size` 8 pixels; each block is the input pixel at its centre |
+| `halftone` (HalftonePass) | `size` 8 pixels, `angle` 0.26; `greyscale` (construction only) |
+| `dotScreen` (DotScreenShader) | `size` 6 pixels, `angle` 0.785; black dots on white |
+| `sobel` (SobelOperatorShader) | `strength` 1, `overlay` 0 (1 draws black edges over the image) |
+| `sepia` (SepiaShader) | `amount` 1 (W3C Filter Effects matrix) |
+| `posterize` | `levels` 4 |
+
+The same GPU check feeds known images through them: Sobel gives exactly 4 x the luma step beside a step and 0 elsewhere,
+pixelate copies each block's centre pixel exactly, and posterize, sepia, vignette, RGB shift and chromatic aberration
+match their formulas within 0.6 of 255; halftone and dot screen compile and draw.
+
 ## Coming from TSL
 
 | three.js TSL | @margoengine/shader |

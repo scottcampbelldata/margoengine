@@ -24,7 +24,7 @@ import {
   type Resource,
   type ShaderStage,
 } from './node.js';
-import { effects } from './effects.js';
+import { effects } from './scope.js';
 declare const GPUBufferUsage: { STORAGE: number; COPY_DST: number; COPY_SRC: number; VERTEX: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 /** Element types with a 4-byte-aligned array stride (vec3 would pad; use vec4). */
