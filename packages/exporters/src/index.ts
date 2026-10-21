@@ -29,6 +29,8 @@ export type {
   LightmapData,
 } from './scene.js';
 
+export { animateCels, animatePlacements, animateTransforms, frameTimes, sampleFrames } from './keyframes.js';
+export type { FrameClip, FramePose } from './keyframes.js';
 export { paletteTexture } from './palette.js';
 export type { PaletteTexture } from './palette.js';
 

@@ -103,6 +103,9 @@ async function buildScene() {
 
 test('public API exposes exporter functions and module evaluation is SSR-safe', () => {
   assert.deepEqual(Object.keys(exporters).sort(), [
+    'animateCels',
+    'animatePlacements',
+    'animateTransforms',
     'exportDAE',
     'exportGLB',
     'exportGLTF',
@@ -111,7 +114,9 @@ test('public API exposes exporter functions and module evaluation is SSR-safe', 
     'exportPLY',
     'exportSTL',
     'exportUSDZ',
+    'frameTimes',
     'paletteTexture',
+    'sampleFrames',
   ]);
   // A fresh process where touching any browser or GPU global throws, then import and export.
   const script = `for (const name of ['window', 'document', 'navigator', 'Worker', 'GPUBufferUsage', 'requestAnimationFrame']) Object.defineProperty(globalThis, name, {get() {throw new Error('touched ' + name);}, configurable: true});
@@ -119,7 +124,7 @@ test('public API exposes exporter functions and module evaluation is SSR-safe', 
     const geometry = {positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], normals: [0, 0, 1, 0, 0, 1, 0, 0, 1], indices: [0, 1, 2]};
     const scene = {nodes: [{geometry}]};
     m.exportGLB(scene); m.exportGLTF(scene); m.exportSTL(scene); m.exportOBJ(scene); m.exportPLY(scene); m.exportDAE(scene);
-    await m.paletteTexture([1, 2, 3, 4]);`;
+    m.frameTimes({fps: 24, frames: [0]}); await m.paletteTexture([1, 2, 3, 4]);`;
   execFileSync(process.execPath, ['--input-type=module', '-e', script], { stdio: 'pipe' });
 });
 
