@@ -9,6 +9,7 @@ import {
 } from '@margoengine/core/extension';
 import { fullscreen, group, compute, dispatch } from '../../shared/gpu.js';
 import { invertMatrixStable } from '@margoengine/math/mat4';
+import { margoError } from '../../shared/errors.js';
 import { celestialShader } from './celestial.js';
 import { head, mid, transmittance, sunlight } from './atmosphere.js';
 import { displayShader } from '../../shared/display.js';
@@ -68,6 +69,8 @@ export interface SkyNightOptions {
   hazeDensity?: number;
 }
 export interface SkyOptions {
+  /** Explicit world-space direction toward the sun; normalized each frame and overrides the clock's direction. */
+  sunDirection?: readonly [number, number, number];
   night?: SkyNightOptions;
   clouds?: SkyCloudOptions;
   fog?: SkyFogOptions;
@@ -85,6 +88,25 @@ export function sunDirection(hours: number, out = new Float32Array(3)): Float32A
   out[1] = Math.sin(angle);
   out[2] = 0;
   return out;
+}
+/** Direction toward the sun from azimuth (+Z toward +X) and elevation, in degrees. Elevation is -90..90. */
+export function sunDirectionFromAngles(azimuth: number, elevation: number, out = new Float32Array(3)): Float32Array {
+  if (!Number.isFinite(azimuth) || !Number.isFinite(elevation) || Math.abs(elevation) > 90 || out.length !== 3)
+    throw new RangeError('Sun angles need a finite azimuth and elevation from -90 to 90 degrees');
+  const az = (azimuth * Math.PI) / 180,
+    el = (elevation * Math.PI) / 180;
+  out[0] = Math.sin(az) * Math.cos(el);
+  out[1] = Math.sin(el);
+  out[2] = Math.cos(az) * Math.cos(el);
+  return out;
+}
+
+/** A native PBR renderer accepting optional sky ambient lighting (materials meshes, gltf-pro and VoxelRenderer). */
+export interface SkyLightingTarget {
+  addLighting(effect: {
+    pbr(group: number): { readonly declarations: string; readonly ambient?: string } | undefined;
+    bindings(): GPUBindGroupEntry[];
+  }): () => void;
 }
 /** Bruneton's precomputed tables: the view the sky samples and the passes that refill them. */
 export interface SkyTables {
@@ -133,6 +155,8 @@ export interface SkyFeatures {
     ): {
       update(target: Lights, sky: Sky, lighting: SkyLightingOptions, night: number): void;
       pass(c: Context): void;
+      pbr(group: number): { readonly declarations: string; readonly ambient: string } | undefined;
+      bindings(): GPUBindGroupEntry[];
     };
   };
 }
@@ -233,6 +257,7 @@ export class Sky implements EnginePlugin {
   private reflection?: ReturnType<NonNullable<SkyFeatures['reflection']>['create']>;
   private fogPass?: ReturnType<NonNullable<SkyFeatures['fog']>['create']>;
   private lit?: ReturnType<NonNullable<SkyFeatures['lighting']>['create']>;
+  private targets = new Map<SkyLightingTarget, () => void>();
   /** Borrowed linear HDR sky environment (needs the reflection feature); rebuilt on device restoration. */
   get reflectionTexture(): GPUTexture | undefined {
     this.reflectionRequested = true;
@@ -254,10 +279,44 @@ export class Sky implements EnginePlugin {
     [this.atmosphere, this.code] = compose(features);
     this.validate();
   }
+  /** Adds this sky's native diffuse and specular ambient to a PBR model or VoxelRenderer; returns a remover. */
+  add(target: SkyLightingTarget): () => void {
+    if (this.disposed) throw margoError('disposed', 'Sky is disposed; create a new Sky');
+    if (!target || typeof target.addLighting !== 'function')
+      throw new TypeError('Sky lighting target needs addLighting; pass a native PBR model or VoxelRenderer');
+    let release = this.targets.get(target);
+    if (!release) {
+      const remove = target.addLighting(this);
+      release = () => {
+        if (this.targets.get(target) === release) {
+          this.targets.delete(target);
+          remove();
+        }
+      };
+      this.targets.set(target, release);
+    }
+    return release;
+  }
+  /** Native PBR hook for optional surface renderers; undefined until this sky's ambient resources are ready. */
+  pbr(group: number): { readonly declarations: string; readonly ambient: string } | undefined {
+    return this.options.lighting?.ambient ? this.lit?.pbr(group) : undefined;
+  }
+  /** Bindings of the native PBR sky ambient hook, borrowed until device restoration. */
+  bindings(): GPUBindGroupEntry[] {
+    return this.options.lighting?.ambient ? (this.lit?.bindings() ?? []) : [];
+  }
   private validate(): void {
     const o = this.options,
       f = this.features,
       model = o.model ?? 'preetham';
+    if (
+      o.sunDirection !== undefined &&
+      (!Array.isArray(o.sunDirection) ||
+        o.sunDirection.length !== 3 ||
+        o.sunDirection.some((v) => !Number.isFinite(Math.fround(v))) ||
+        !(Math.hypot(...o.sunDirection) > 0))
+    )
+      throw new RangeError('Sky sun direction needs three finite components and nonzero length');
     if (
       (o.model !== undefined && o.model !== 'preetham' && o.model !== 'bruneton') ||
       !Number.isFinite(o.hours ?? 12) ||
@@ -341,7 +400,10 @@ export class Sky implements EnginePlugin {
     this.cloudTime += delta * (this.options.clouds?.speed ?? 8);
     this.time += delta;
     this.options.hours = ((((this.options.hours ?? 12) + delta * (this.options.timeScale ?? 1 / 3600)) % 24) + 24) % 24;
-    sunDirection(this.options.hours, this.sun);
+    if (this.options.sunDirection) {
+      const length = Math.hypot(...this.options.sunDirection);
+      for (let i = 0; i < 3; i++) this.sun[i] = this.options.sunDirection[i] / length;
+    } else sunDirection(this.options.hours, this.sun);
     const l = this.options.lighting,
       t = Math.max(0, Math.min(1, (this.sun[1] + 0.12) / 0.2)),
       night = 1 - t * t * (3 - 2 * t);
@@ -445,6 +507,7 @@ export class Sky implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    for (const release of [...this.targets.values()]) release();
     this.engine?.removePlugin(this.name);
     this.release();
     this.engine = undefined;

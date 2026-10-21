@@ -53,6 +53,11 @@ export interface SkyFeatures {
         create(device: GPUDevice, code: string, entries: GPUBindGroupEntry[], owned: Owned): {
             update(target: Lights, sky: Sky, lighting: SkyLightingOptions, night: number): void;
             pass(c: Context): void;
+            pbr(group: number): {
+                readonly declarations: string;
+                readonly ambient: string;
+            } | undefined;
+            bindings(): GPUBindGroupEntry[];
         };
     };
 }
@@ -81,6 +86,16 @@ export interface SkyLightingOptions {
     };
 }
 
+export interface SkyLightingTarget {
+    addLighting(effect: {
+        pbr(group: number): {
+            readonly declarations: string;
+            readonly ambient?: string;
+        } | undefined;
+        bindings(): GPUBindGroupEntry[];
+    }): () => void;
+}
+
 export interface SkyNightOptions {
     zenithColor?: Color;
     horizonColor?: Color;
@@ -95,6 +110,7 @@ export interface SkyNightOptions {
 }
 
 export interface SkyOptions {
+    sunDirection?: readonly [number, number, number];
     night?: SkyNightOptions;
     clouds?: SkyCloudOptions;
     fog?: SkyFogOptions;
@@ -107,6 +123,8 @@ export interface SkyOptions {
 }
 
 export function sunDirection(hours: number, out?: Float32Array<ArrayBuffer>): Float32Array;
+
+export function sunDirectionFromAngles(azimuth: number, elevation: number, out?: Float32Array<ArrayBuffer>): Float32Array;
 
 export function sunlight(mu: number, altitude: number, turbidity: number, out?: Float32Array<ArrayBuffer>): Float32Array;
 
@@ -143,6 +161,12 @@ class Sky implements EnginePlugin {
         readonly radiance: Float32Array<ArrayBuffer>;
     }];
     constructor(options?: SkyOptions, features?: SkyFeatures);
+    add(target: SkyLightingTarget): () => void;
+    pbr(group: number): {
+        readonly declarations: string;
+        readonly ambient: string;
+    } | undefined;
+    bindings(): GPUBindGroupEntry[];
     static attach(engine: EngineKernel, options?: SkyOptions, features?: SkyFeatures): Sky;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;

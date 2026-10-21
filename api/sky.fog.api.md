@@ -40,6 +40,12 @@ class Sky implements EnginePlugin {
         readonly radiance: Float32Array<ArrayBuffer>;
     }];
     constructor(options?: SkyOptions, features?: SkyFeatures);
+    add(target: SkyLightingTarget): () => void;
+    pbr(group: number): {
+        readonly declarations: string;
+        readonly ambient: string;
+    } | undefined;
+    bindings(): GPUBindGroupEntry[];
     static attach(engine: EngineKernel, options?: SkyOptions, features?: SkyFeatures): Sky;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
@@ -91,6 +97,11 @@ interface SkyFeatures {
         create(device: GPUDevice, code: string, entries: GPUBindGroupEntry[], owned: Owned): {
             update(target: Lights, sky: Sky, lighting: SkyLightingOptions, night: number): void;
             pass(c: Context): void;
+            pbr(group: number): {
+                readonly declarations: string;
+                readonly ambient: string;
+            } | undefined;
+            bindings(): GPUBindGroupEntry[];
         };
     };
 }
@@ -119,6 +130,16 @@ interface SkyLightingOptions {
     };
 }
 
+interface SkyLightingTarget {
+    addLighting(effect: {
+        pbr(group: number): {
+            readonly declarations: string;
+            readonly ambient?: string;
+        } | undefined;
+        bindings(): GPUBindGroupEntry[];
+    }): () => void;
+}
+
 interface SkyNightOptions {
     zenithColor?: Color;
     horizonColor?: Color;
@@ -133,6 +154,7 @@ interface SkyNightOptions {
 }
 
 interface SkyOptions {
+    sunDirection?: readonly [number, number, number];
     night?: SkyNightOptions;
     clouds?: SkyCloudOptions;
     fog?: SkyFogOptions;

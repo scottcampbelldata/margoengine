@@ -144,7 +144,23 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
       };
     };
     let gpu: ReturnType<typeof build> | undefined;
+    const hooks = new Map<number, { readonly declarations: string; readonly ambient: string }>();
     return {
+      pbr(group) {
+        if (!gpu) return undefined;
+        let value = hooks.get(group);
+        if (!value) {
+          value = {
+            declarations: declarations.replaceAll('@group(0)', `@group(${group})`),
+            ambient: 'skyLighting(s.n,v,s.base.rgb,s.metal,s.roughness)*s.occlusion',
+          };
+          hooks.set(group, value);
+        }
+        return value;
+      },
+      bindings() {
+        return gpu?.bindings ?? [];
+      },
       update({ direction, radiance }, sky, l, night) {
         // shortcut: one directional source shares PCSS, use separate shadow maps for simultaneous sun/moon shadows.
         // The engine light is whichever of sun and moon is stronger. The sun fades out through its own transmittance

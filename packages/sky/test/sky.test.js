@@ -43,6 +43,57 @@ test('retained reflection lights track actual sun and moon directions through du
   unlit.onPreUpdate(0);
   assert.ok(unlit.lights.every((l) => l.direction[3] === 0));
 });
+
+test('authored sun direction is normalized and shared by visible sky and scene lighting', () => {
+  const h = optionalGPU();
+  h.engine.lighting = { direction: new Float32Array(4), radiance: new Float32Array([1, 1, 1, 0.15]) };
+  const sky = new Sky({ sunDirection: [3, 4, 12], timeScale: 0, lighting: { intensity: 2 } });
+  h.engine.use(sky);
+  try {
+    h.frame();
+    for (let i = 0; i < 3; i++) assert.ok(Math.abs(sky.sun[i] - [3 / 13, 4 / 13, 12 / 13][i]) < 1e-6);
+    assert.deepEqual(h.engine.lighting.direction.slice(0, 3), sky.sun);
+    sky.options.sunDirection = [-1, 1, -1];
+    h.frame();
+    assert.ok(sky.sun[0] < 0 && sky.sun[2] < 0);
+    sky.options.sunDirection = [0, 0, 0];
+    assert.throws(() => h.frame(), /direction/i);
+  } finally {
+    sky.dispose();
+  }
+});
+
+test('sky lighting registration uses native PBR hooks and restores target on disposal', () => {
+  const h = optionalGPU(),
+    sky = new Sky({ timeScale: 0, lighting: { ambient: { day: [0.1, 0.1, 0.1], night: [0.01, 0.01, 0.01] } } });
+  h.engine.lighting = { direction: new Float32Array(4), radiance: new Float32Array(4) };
+  h.engine.use(sky);
+  let effect,
+    released = 0;
+  const target = {
+    addLighting(value) {
+      effect = value;
+      return () => released++;
+    },
+  };
+  h.frame = () => {
+    sky.onPreUpdate(h.context.delta);
+    h.context.shader = wgsl;
+    h.context.bindings = [];
+    h.engine.frameGraph.execute(h.context);
+  };
+  const detach = sky.add(target);
+  h.frame();
+  assert.ok(effect.pbr(2).declarations.includes('@group(2)'));
+  assert.match(effect.pbr(2).ambient, /skyLighting\(s.n,v,s.base.rgb,s.metal,s.roughness\)/);
+  assert.equal(effect.bindings().length, 3);
+  detach();
+  detach();
+  assert.equal(released, 1);
+  sky.add(target);
+  sky.dispose();
+  assert.equal(released, 2);
+});
 test('clock and sky models reuse four-order scattering tables until turbidity changes', () => {
   const h = optionalGPU(),
     effect = new Sky({ model: 'bruneton', hours: 12, timeScale: 1 }),
