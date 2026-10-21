@@ -2,6 +2,7 @@
 import type { MutableVec3, Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
 import { VoxelChunk, type VoxelWorld } from '@margoengine/voxel';
+import type { OwnedBuffer } from './bytes.js';
 import { checkCell, checkPalette, checkPoint, type GridHit, type VoxelGrid } from './grid.js';
 
 /** One cell change: local x, y, z and the new palette index (0 empties the cell). */
@@ -130,6 +131,13 @@ type Entry = { position: MutableVec3; chunk: VoxelChunk; filled: number };
 type Limits = Required<SparseLimits>;
 const DEFAULTS: Limits = { maxChunks: 4096, maxBytes: 134_217_728, maxEdits: 1_048_576, maxWindowCells: 16_777_216 };
 const history = new WeakMap<SparseDelta, { before: SparseGrid; after: SparseGrid }>();
+// One opaque token per chunk: snapshots that share a chunk share its token (ownedBuffers).
+const tokens = new WeakMap<VoxelChunk, object>();
+const owned = (chunk: VoxelChunk): OwnedBuffer => {
+  let token = tokens.get(chunk);
+  if (!token) tokens.set(chunk, (token = Object.freeze({})));
+  return { token, bytes: chunk.byteLength };
+};
 const chunkKey = (x: number, y: number, z: number) => `${x},${y},${z}`;
 // Local cells may pass 2^31 on x and z, so no bit shifts.
 const chunkOf = (v: number) => Math.floor(v / 32);
@@ -276,6 +284,31 @@ export class SparseGrid {
       before: packTable(touched.map(([position, chunk]) => [position, chunk] as const)),
       after: packTable(touched.map(([position, , chunk]) => [position, chunk] as const)),
     };
+  }
+
+  /**
+   * The chunk storage the edit that returned `delta` added or replaced, on both sides: what an undo step keeps alive
+   * beyond the snapshots it shares chunks with. Pass the result to a `ByteLedger` from the package root.
+   */
+  static deltaBuffers(delta: SparseDelta): OwnedBuffer[] {
+    const pair = history.get(delta);
+    if (!pair) throw new MargoError('state', 'SparseGrid.deltaBuffers got an unknown delta; pass one an edit returned');
+    const { before, after } = pair,
+      out: OwnedBuffer[] = [];
+    for (const [a, b] of [
+      [before, after],
+      [after, before],
+    ])
+      for (const [address, entry] of a.#chunks) if (b.#chunks.get(address) !== entry) out.push(owned(entry.chunk));
+    return out;
+  }
+
+  /**
+   * Each held chunk's storage, with a token every snapshot sharing that chunk reports too; the bytes add up to
+   * `stats.bytes`. A `ByteLedger` from the package root counts shared chunks once.
+   */
+  ownedBuffers(): OwnedBuffer[] {
+    return [...this.#chunks.values()].map((entry) => owned(entry.chunk));
   }
 
   /** Filled cells, chunks and bytes. */

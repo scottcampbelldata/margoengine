@@ -105,6 +105,11 @@ interface GridWindow extends VoxelGrid {
     readonly origin: Vec3;
 }
 
+interface OwnedBuffer {
+    readonly token: object;
+    readonly bytes: number;
+}
+
 interface SparseChunkTable {
     positions: Float64Array;
     bits: Uint8Array;
@@ -142,6 +147,8 @@ class SparseGrid {
     static deserialize(data: unknown, limits?: SparseLimits): SparseGrid;
     static fromSnapshot(snapshot: SparseSnapshot, limits?: SparseLimits): SparseGrid;
     static deltaSnapshot(delta: SparseDelta): SparseDeltaSnapshot;
+    static deltaBuffers(delta: SparseDelta): OwnedBuffer[];
+    ownedBuffers(): OwnedBuffer[];
     get stats(): SparseStats;
     get bounds(): {
         min: MutableVec3;

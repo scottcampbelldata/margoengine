@@ -48,6 +48,8 @@ export class SparseGrid {
     static deserialize(data: unknown, limits?: SparseLimits): SparseGrid;
     static fromSnapshot(snapshot: SparseSnapshot, limits?: SparseLimits): SparseGrid;
     static deltaSnapshot(delta: SparseDelta): SparseDeltaSnapshot;
+    static deltaBuffers(delta: SparseDelta): OwnedBuffer[];
+    ownedBuffers(): OwnedBuffer[];
     get stats(): SparseStats;
     get bounds(): {
         min: MutableVec3;
@@ -129,6 +131,11 @@ interface GridHit {
     normal: MutableVec3;
     value: number;
     distance: number;
+}
+
+interface OwnedBuffer {
+    readonly token: object;
+    readonly bytes: number;
 }
 
 interface VoxelGrid {

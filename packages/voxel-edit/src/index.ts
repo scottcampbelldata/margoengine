@@ -1,6 +1,7 @@
 // @margoengine/voxel-edit: editing voxel models for editors and tools. The root holds grids and modeling operations;
 // brushes and selections are in ./edit, picking in ./pick, sparse grids in ./sparse, export meshing in ./mesh, .vox
-// interop in ./vox and frame animation in ./animation.
+// interop in ./vox and frame animation in ./animation. Byte accounting (bytes.ts) is here so dense and sparse values
+// share one ledger.
 export {
   type VoxelGrid,
   type GridLimits,
@@ -38,3 +39,11 @@ export {
   type Maze,
   generateMaze,
 } from './model.js';
+export {
+  type OwnedBuffer,
+  type BufferOwner,
+  type ByteSource,
+  ownedBuffers,
+  retainedBytes,
+  ByteLedger,
+} from './bytes.js';

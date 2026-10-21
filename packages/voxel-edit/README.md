@@ -36,6 +36,7 @@ air) and the filled cells pushed out of bounds. Every operation checks its argum
 | `repeatGrid`, `resampleGrid` | tile, or scale by nearest-cell sampling (indexes are never blended) |
 | `dilateGrid`, `erodeGrid`, `fillEnclosed` | grow or shrink along chosen axis directions, fill closed cavities |
 | `generateMaze` | a seeded perfect maze, one-cell walls and corridors |
+| `ByteLedger`, `ownedBuffers`, `retainedBytes` | bytes of the storage grids, cels, packed frames, images and sparse snapshots keep alive, each buffer counted once through its token (`SparseGrid.ownedBuffers`, `SparseGrid.deltaBuffers`); the ledger retains and releases values for an undo budget |
 
 ## Entries
 
