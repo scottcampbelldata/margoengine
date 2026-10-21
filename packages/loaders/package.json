@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test tests/loaders.test.js tests/dxf.test.js tests/obj.test.js tests/dae.test.js tests/tmx.test.js tests/font.test.js",
+    "test": "npm run build && node --test tests/loaders.test.js tests/dxf.test.js tests/obj.test.js tests/dae.test.js tests/tmx.test.js tests/font.test.js tests/svg.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "fixtures": "node scripts/fetch-fixtures.js",
     "prepack": "npm run build"
@@ -27,6 +27,10 @@
     "./font": {
       "types": "./dist/font.d.ts",
       "import": "./dist/font.js"
+    },
+    "./svg": {
+      "types": "./dist/svg.d.ts",
+      "import": "./dist/svg.js"
     }
   },
   "files": [
