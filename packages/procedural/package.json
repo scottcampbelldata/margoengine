@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
-  "description": "Procedural cabins, foliage, grass, humanoids, Marching Cubes surfaces, seeded 2D/3D/4D noise, L-systems and Voronoi fracture.",
+  "description": "Procedural cabins, foliage, grass, humanoids, Marching Cubes surfaces, seeded 2D/3D/4D noise, L-systems, Voronoi fracture and a bounded voxel expression language.",
   "sideEffects": false,
   "exports": {
     ".": {
@@ -21,6 +21,10 @@
     "./voronoi": {
       "types": "./dist/voronoi.d.ts",
       "import": "./dist/voronoi.js"
+    },
+    "./expression": {
+      "types": "./dist/expression.d.ts",
+      "import": "./dist/expression.js"
     }
   },
   "files": [

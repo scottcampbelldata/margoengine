@@ -1352,7 +1352,7 @@
     "package": "@margoengine/procedural",
     "version": "1.0.0",
     "published": false,
-    "description": "Procedural cabins, foliage, grass, humanoids, Marching Cubes surfaces, seeded 2D/3D/4D noise, L-systems and Voronoi fracture.",
+    "description": "Procedural cabins, foliage, grass, humanoids, Marching Cubes surfaces, seeded 2D/3D/4D noise, L-systems, Voronoi fracture and a bounded voxel expression language.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "procedural",
     "install": "npm install @margoengine/core@1.0.0 @margoengine/procedural@1.0.0",

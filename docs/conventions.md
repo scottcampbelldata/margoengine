@@ -55,6 +55,8 @@ Branch on `error.code`, not on the message. Messages name the subject, the probl
 `'Input is disposed; create a new Input'`. Packages bundle their own copy of the class, so `MargoError` matches by
 name (`static [Symbol.hasInstance]`): `error instanceof MargoError` holds for any package's copy. Do not subclass it.
 `@margoengine/loaders` has its own `LoaderError` (format plus code) for malformed input.
+Likewise `@margoengine/procedural/expression` throws `VoxelExpressionError` (code `syntax`, `limit` or `evaluation`, with
+the 1-based line and column) for faults in the expression text; its arguments follow the table above.
 
 `packages/shared` is copied into packages that may not depend on math, so it cannot import the class: it throws
 `margoError(code, message)` from `packages/shared/errors.js`, which builds the same shape (name `MargoError`, `code`).

@@ -140,6 +140,55 @@ the bisectors of the Delaunay neighbours, each edge/face tagged with the site ac
 tests; 240 fractures of a box, icosphere, UV sphere and torus checked closed). Needs a closed mesh; chunks are non-indexed;
 caps get flat normals and no UVs; all CPU work, meant for load time or a loading step, not per frame.
 
+## Voxel expressions (`@margoengine/procedural/expression`, 4.5 kB min+gzip)
+
+A small, bounded expression language evaluated for every cell of an indexed voxel grid: Margo Voxel Studio's original
+expression language (version 1), so its saved expression text gives the same grids. It is not GLSL, WGSL or a
+JavaScript runtime: it evaluates only its own syntax tree, with no host access.
+
+```ts
+import {runVoxelExpression, VoxelExpressionError} from '@margoengine/procedural/expression';
+const {voxels} = runVoxelExpression({
+  source: 'noise(x * f, y * f, z * f) > 0.5 ? tone : color', // one expression per cell
+  size: [64, 32, 64], voxels: grid.voxels,                    // voxel-edit layout: x + sx * (z + sz * y), Y up
+  parameters: {f: 0.2, tone: 24}, seed: 7, iterations: 1,
+}, signal);                                                  // checked every 1,024 cells
+```
+
+- **Values.** Numbers (`12`, `1.5`, `.5`, `1e3`); variables `x y z` (the cell), `sx sy sz` (grid size), `color` (the
+  cell's palette index), `frame`, `iteration`, `seed`, `pi`, `e`, `true` (1), `false` (0) and up to 32 named
+  parameters (finite, within ±1e9). `//` comments run to the end of the line.
+- **Operators**, loosest first: `a ? b : c`, `||`, `&&`, `== !=`, `< <= > >=`, `+ -`, `* / %`, `**` (right to left);
+  unary `+ - !` bind tighter than `**` (`-2**2` is 4). `&&`, `||` and `?:` evaluate only the branch they need;
+  comparisons and logic give 0 or 1.
+- **Functions** (`VOXEL_EXPRESSION_FUNCTIONS` lists arity and cost): `abs floor ceil round sqrt sin cos tan pow`,
+  `min max` (2-8 arguments), `clamp(v, a, b)`, `mix(a, b, t)`, `smoothstep(e0, e1, v)`, `length(x, y, z)`, signed
+  distances `sphere(x, y, z, r)`, `box(x, y, z, hx, hy, hz)`, `torus(x, y, z, R, r)`; `hash(x, y, z)` and
+  `noise(x, y, z)` (seeded by `seed`); `voxel(x, y, z)` reads the current iteration's input and `prev(x, y, z)` the
+  `previous` frame (integer cells; outside the grid, or without `previous`, they read 0).
+- **Results.** Each cell's value must be an integer palette index 0-255. `iterations` (1-32) run the expression
+  again on the previous pass's output; every pass reads an immutable snapshot, and the input arrays are never changed.
+- **Exact noise.** `voxelHash(x, y, z, seed)` and `voxelNoise(x, y, z, seed)` are exported with their formulas in the
+  TSDoc: a 32-bit integer lattice hash in [0, 1] and smoothstep-blended value noise over it. They are not
+  `@margoengine/procedural/noise`'s hash, whose constants differ; that module and its defaults are unchanged.
+- **Bounds**, all checked before output is allocated (`VOXEL_EXPRESSION_LIMITS`): 8,192 source characters, 4,096
+  tokens, 2,048 syntax nodes, depth 64, 32 parameters, 32 iterations, 1024 per axis and 16,777,216 cells, 64 MiB of
+  buffers and 67,108,864 work units (`cells * iterations * workPerCell`; a node costs 1, `noise` 32 more).
+- **Errors.** Text that does not parse, names an unknown variable or function, or exceeds a token, node or depth
+  bound throws `VoxelExpressionError` (`code` `'syntax'` or `'limit'`, 1-based `line` and `column`, `detail` without
+  the location); a non-finite value, an invalid function argument or a bad output throws it with `code: 'evaluation'`
+  at the operator. Inputs of the wrong shape throw TypeError, values out of range or over a budget RangeError.
+  `compileVoxelExpression` and `validateVoxelExpressionInput` check without evaluating.
+
+Compatibility with Studio (`test/expression.test.js`): its own tests and presets, and a generated corpus of 400
+programs whose grids and error locations hash to the digest Studio's interpreter produced. In a differential run,
+15,000 random programs gave identical grids or identical errors (line, column and message), and 90,000 random token
+sequences parsed identically with one deliberate difference: a JavaScript object-prototype name used as an infix
+operator (`x toString 1`) was accepted by Studio's parser and failed only when evaluated, and is now a syntax error.
+`sin`, `cos`, `tan`, `pow`, `**` and the distance functions (`Math.hypot`) use the host's `Math`, which JavaScript
+engines may round differently in the last bit; every other operation, `hash` and `noise` included, is exact. Closure compilation makes it 1.7 to 3.3 times faster than
+Studio's tree walker (96 x 96 x 96 cells: sphere 162 ms, noise 177 ms, recolor 26 ms in Node 26).
+
 ## Examples
 
 `examples/lsystem.html` and `examples/voronoi.html` (Vite at the repository root after `npm run build:packages`).
