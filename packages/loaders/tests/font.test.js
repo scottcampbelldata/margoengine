@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { LoaderError } from '../dist/index.js';
-import { OutlineFont, parseTTF, parseTypefaceJSON, textGeometry } from '../dist/font.js';
+import { OutlineFont, parseTTF, textGeometry } from '../dist/font.js';
 
 // A tiny TrueType font assembled from the OpenType specification's table layouts (no font file is read or committed).
 
@@ -484,40 +484,4 @@ test('TTF: collections, unsupported flavours and malformed files throw LoaderErr
   const broken = parseTTF(font);
   assert.equal(broken.generateShapes('O', 10).length, 1);
   assert.throws(() => broken.generateShapes('H', 10), isLoaderError('range'));
-});
-
-test('typeface JSON: m l q b z outlines (end point first), holes either way round, line height, missing glyph', () => {
-  const font = parseTypefaceJSON(
-    JSON.stringify({
-      resolution: 1000,
-      familyName: 'Typeface Test',
-      boundingBox: { xMin: 0, xMax: 600, yMin: -200, yMax: 800 },
-      underlineThickness: 50,
-      glyphs: {
-        // Outer counter-clockwise, hole clockwise: the opposite of TrueType.
-        o: { ha: 600, o: 'm 0 0 l 600 0 l 600 700 l 0 700 z m 100 100 l 100 600 l 500 600 l 500 100 z' },
-        q: { ha: 500, o: 'm 0 0 q 400 0 200 300 z' },
-        b: { ha: 500, o: 'm 0 0 b 300 0 0 300 300 300 z' },
-        '?': { ha: 300, o: 'm 0 0 l 100 0 l 100 100 z' },
-        ' ': { ha: 250 },
-      },
-    }),
-  );
-  assert.equal(font.familyName, 'Typeface Test');
-  assert.equal(font.lineHeight, 1050);
-  const [o] = font.generateShapes('o', 1000);
-  assert.equal(o.holes.length, 1);
-  assert.deepEqual(bounds(o.holes[0]), [100, 100, 500, 600]);
-  assert.deepEqual(font.glyph('q').commands, [['M', 0, 0], ['Q', 200, 300, 400, 0], ['Z']]);
-  assert.deepEqual(font.glyph('b').commands, [['M', 0, 0], ['C', 0, 300, 300, 300, 300, 0], ['Z']]);
-  // Unknown characters draw '?'; the second line sits one line height lower.
-  const shapes = font.generateShapes('x\no', 1000);
-  assert.deepEqual(bounds(shapes[0]), [0, 0, 100, 100]);
-  assert.deepEqual(bounds(shapes[1]), [0, -1050, 600, -350]);
-  assert.throws(() => parseTypefaceJSON('{'), isLoaderError('syntax'));
-  assert.throws(() => parseTypefaceJSON({ resolution: 1000 }), TypeError);
-  assert.throws(
-    () => parseTypefaceJSON({ resolution: 1000, glyphs: { a: { ha: 1, o: 'm 0 x' } } }).glyph('a'),
-    isLoaderError('syntax'),
-  );
 });

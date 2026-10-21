@@ -38,7 +38,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parseOBJ` (async), `parseMTL` | `OBJLoader`, `MTLLoader` | See [OBJ and MTL](#obj-and-mtl) |
 | `parseDAE`, `flattenDAE` | `ColladaLoader` | See [COLLADA](#collada) |
 | `parseTMX` (async), `tmxLayerQuads` | none | See [Tiled TMX](#tiled-tmx) |
-| `parseTTF`, `parseTypefaceJSON`, `textGeometry` (`/font`) | `TTFLoader`, `FontLoader`, `TextGeometry` | See [Fonts and 3D text](#fonts-and-3d-text) |
+| `parseTTF`, `textGeometry` (`/font`) | `TTFLoader`, `FontLoader`, `TextGeometry` | See [Fonts and 3D text](#fonts-and-3d-text) |
 | `parseSVG` (`/svg`) | `SVGLoader` | See [SVG](#svg) |
 | `loadOBJ`, `createMTLMaterials`, `createOBJMesh` (`/mtl`) | `OBJLoader` + `MTLLoader` | See [Textured OBJ meshes](#textured-obj-meshes) |
 
@@ -146,10 +146,10 @@ const mesh = createOBJMesh(engine, obj, set); // one mesh, one material slot per
 
 ## Fonts and 3D text
 
-`@margoengine/loaders/font` reads TrueType fonts and typeface JSON fonts into an `OutlineFont` and extrudes text with `@margoengine/geometry`:
+`@margoengine/loaders/font` reads TrueType fonts into an `OutlineFont` and extrudes text with `@margoengine/geometry`:
 
 ```ts
-import {parseTTF, parseTypefaceJSON, textGeometry} from '@margoengine/loaders/font';
+import {parseTTF, textGeometry} from '@margoengine/loaders/font';
 import {createMesh, Material} from '@margoengine/materials';
 
 const font = parseTTF(await (await fetch('/fonts/Inter.ttf')).arrayBuffer());
@@ -157,13 +157,11 @@ const geometry = textGeometry('Margo\nEngine', {font, size: 1, depth: 0.2, bevel
 createMesh(engine, geometry, [new Material({color: '#ffffff'}), new Material({color: '#3355ff'})]); // caps, sides
 
 const shapes = font.generateShapes('Logo', 10, {letterSpacing: 0.05, align: 'center'}); // geometry Shapes with holes
-const typeface = parseTypefaceJSON(await (await fetch('/fonts/helvetiker_regular.typeface.json')).text());
 ```
 
 - `parseTTF(bytes, {fontIndex})` follows the OpenType specification: `head`, `hhea`, `maxp`, `hmtx`, `loca` (short and long), `glyf` simple and composite glyphs (offsets, scale, x/y scale, 2x2 transforms, point matching, nesting), `cmap` formats 4 and 12 (Unicode, and symbol fonts at U+F000), `kern` format 0 pairs (Microsoft and Apple headers) and the family and style names. `fontIndex` picks one font of a `.ttc` collection. Glyphs decode on first use.
-- `font.generateShapes(text, size, {letterSpacing, lineHeight, align, kerning})` lays out text with one em = `size` (three.js `Font.generateShapes`): baseline at y = 0, `\n` for new lines, kerning on by default, `letterSpacing` in ems. Holes come from nesting and the winding rule, not from one fixed contour direction, so fonts written either way round work. Missing characters draw the font's `.notdef` glyph (typeface fonts: `?`).
-- `textGeometry(text, {font, size, depth, curveSegments, bevelEnabled, bevelThickness, bevelSize, bevelOffset, bevelSegments, steps})` takes three.js `TextGeometry`'s parameters and defaults (size 100, depth 50, bevel off) and returns `GeometryData` with groups 0 (caps) and 1 (sides).
-- `parseTypefaceJSON(jsonOrText)` reads the typeface JSON fonts three.js `FontLoader` uses (`glyphs` with `ha` and `o` outlines, `resolution`), with three.js's line height (bounding box height plus underline thickness).
+- `font.generateShapes(text, size, {letterSpacing, lineHeight, align, kerning})` lays out text with one em = `size`: baseline at y = 0, `\n` for new lines, kerning on by default, `letterSpacing` in ems. Holes come from nesting and the winding rule, not from one fixed contour direction, so fonts written either way round work. Missing characters draw the font's `.notdef` glyph.
+- `textGeometry(text, {font, size, depth, curveSegments, bevelEnabled, bevelThickness, bevelSize, bevelOffset, bevelSegments, steps})` defaults to size 100, depth 50 and no bevel, and returns `GeometryData` with groups 0 (caps) and 1 (sides).
 - Limits: CFF outlines (`.otf` files starting `OTTO`), WOFF and WOFF2 throw a `LoaderError` with code `unsupported` (convert them to `.ttf`); kerning comes from the `kern` table only (GPOS kerning is not applied); no hinting, ligatures, right-to-left or complex-script shaping (`@margoengine/text` draws screen text).
 
 ## SVG

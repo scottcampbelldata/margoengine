@@ -6,12 +6,10 @@ export type { OutlineFontSource, OutlineGlyph, TextShapeOptions } from './outlin
 export type { OutlineCommand, OutlineFillRule } from './outline.js';
 export { parseTTF } from './ttf.js';
 export type { TTFParseOptions } from './ttf.js';
-export { parseTypefaceJSON } from './typeface.js';
-export type { TypefaceJSON, TypefaceGlyph } from './typeface.js';
 
-/** Options of `textGeometry` (three.js `TextGeometry` parameters, same defaults). Lengths are in `size` units. */
+/** Options of `textGeometry`. Lengths are in `size` units. */
 export interface TextGeometryOptions extends TextShapeOptions {
-  /** The font, from `parseTTF` or `parseTypefaceJSON`. */
+  /** The font, from `parseTTF`. */
   font: OutlineFont;
   /** One em. Default 100. */
   size?: number;
@@ -34,16 +32,14 @@ export interface TextGeometryOptions extends TextShapeOptions {
 }
 
 /**
- * Extruded 3D text (three.js `TextGeometry`): `font.generateShapes(text, size, options)` through geometry's
+ * Extruded 3D text: `font.generateShapes(text, size, options)` through geometry's
  * `extrudeGeometry`. The first baseline lies on y = 0 and the text runs from z = 0 to z = `depth` (a bevel adds
  * `bevelThickness` beyond both). Groups follow `extrudeGeometry`: material 0 for the front and back caps, 1 for the
  * sides, per glyph shape. Use the result with materials `createMesh`, or geometry's `toGeometry` for a core mesh.
  */
 export function textGeometry(text: string, options: TextGeometryOptions): GeometryData {
   if (!options || !(options.font instanceof OutlineFont))
-    throw new TypeError(
-      'textGeometry font is not an OutlineFont; pass {font: parseTTF(bytes)} or parseTypefaceJSON(json)',
-    );
+    throw new TypeError('textGeometry font is not an OutlineFont; pass {font: parseTTF(bytes)}');
   const shapes = options.font.generateShapes(text, options.size ?? 100, options);
   return extrudeGeometry(shapes, {
     depth: options.depth ?? 50,

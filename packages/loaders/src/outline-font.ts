@@ -7,12 +7,12 @@ export interface OutlineGlyph {
   index: number;
   /** Horizontal advance to the next pen position. */
   advance: number;
-  /** The outline: quadratic curves for TrueType, whatever the typeface JSON wrote for typeface fonts. */
+  /** The outline: quadratic curves for TrueType; any outline commands for other sources. */
   commands: readonly OutlineCommand[];
 }
 
 /**
- * What an `OutlineFont` reads its glyphs from. `parseTTF` and `parseTypefaceJSON` build one; implement it to lay out
+ * What an `OutlineFont` reads its glyphs from. `parseTTF` builds one; implement it to lay out
  * outlines from another source. Lengths are font units, y up.
  */
 export interface OutlineFontSource {
@@ -60,8 +60,8 @@ const codePoint = (char: string | number, what: string): number => {
 };
 
 /**
- * A font of glyph outlines (TrueType through `parseTTF`, typeface JSON through `parseTypefaceJSON`) that lays out text
- * as geometry `Shape`s, three.js `Font` style. Glyphs decode on first use and are cached.
+ * A font of glyph outlines (TrueType through `parseTTF`) that lays out text as geometry `Shape`s. Glyphs decode on
+ * first use and are cached.
  */
 export class OutlineFont {
   /** Font units per em. */
