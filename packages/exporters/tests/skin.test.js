@@ -187,3 +187,23 @@ test('the skin subpath loads only its own module', async () => {
   const root = await import('@margoengine/exporters');
   assert.equal(root.skinWeights, undefined, 'not in the root entry');
 });
+
+test('skinWeights gives positive weights summing to 1 for any finite point, however far away', () => {
+  for (const point of [
+    [1.7e308, 0, 0],
+    [Number.MAX_VALUE, -Number.MAX_VALUE, Number.MAX_VALUE],
+    [-1e300, 1e300, 0],
+    [1e-300, 3, 0.5],
+  ]) {
+    const { joints, weights } = skinWeights(point, chain),
+      used = [...weights].filter((w) => w > 0);
+    assert.ok(used.length >= 1, `${point}: some weight`);
+    assert.ok([...weights].every(Number.isFinite), `${point}: finite`);
+    assert.ok(Math.abs(used.reduce((s, w) => s + w, 0) - 1) < 1e-6, `${point}: sums to 1`);
+    assert.ok([...joints].every((j) => j < chain.length));
+  }
+  // Joints are Float32-bounded, so from 1.7e308 they are all equidistant in double precision: ties go to index order.
+  assert.deepEqual([...skinWeights([1.7e308, 2, 0.5], chain).joints], [0, 1, 2, 3]);
+  // A nonfinite point is refused, not given zero weights.
+  assert.throws(() => skinWeights([Number.POSITIVE_INFINITY, 0, 0], chain), /not finite/);
+});

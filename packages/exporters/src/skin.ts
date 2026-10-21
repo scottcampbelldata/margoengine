@@ -90,6 +90,8 @@ function vec3(value: unknown, label: string): [number, number, number] {
  * default 4) joints whose bone segments lie nearest (a joint's segment runs from its parent's position to its own;
  * the root's is its point), weighted by inverse distance (distances below 1e-6 count as 1e-6) and normalized to sum
  * to 1. Ties go to the lower joint index, so equal input gives equal output. Unused influences are joint 0, weight 0.
+ * Points so far from the joints that distances overflow (or their inverses underflow) are measured in a scaled space
+ * and weighted by distance ratios, so every finite input gets positive weights that sum to 1.
  * @param origin The joint-space point at the mesh origin. Default [0, 0, 0].
  * @throws RangeError for invalid joints or positions, or more than 2^28 vertex-joint pairs.
  */
@@ -120,23 +122,28 @@ export function skinWeights(
     }
     dd[j] = d[j * 3] ** 2 + d[j * 3 + 1] ** 2 + d[j * 3 + 2] ** 2;
   });
+  let reach = 0;
+  for (let i = 0; i < n * 3; i++) reach = Math.max(reach, Math.abs(a[i]), Math.abs(a[i] + d[i]));
   const out: SkinWeights = { joints: new Uint16Array(count * 4), weights: new Float32Array(count * 4) },
     bestJoint = new Int32Array(4),
     bestDistance = new Float64Array(4);
-  for (let v = 0; v < count; v++) {
-    const px = positions[v * 3] + ox,
-      py = positions[v * 3 + 1] + oy,
-      pz = positions[v * 3 + 2] + oz;
-    if (!Number.isFinite(px) || !Number.isFinite(py) || !Number.isFinite(pz))
-      throw new RangeError(`Skin position ${v} is not finite`);
+  // The nearest `influences` bone segments to (px, py, pz), all coordinates divided by `scale`.
+  const nearest = (px: number, py: number, pz: number, scale: number): void => {
     bestDistance.fill(Infinity);
     bestJoint.fill(-1);
     for (let j = 0; j < n; j++) {
-      const rx = px - a[j * 3],
-        ry = py - a[j * 3 + 1],
-        rz = pz - a[j * 3 + 2],
-        t = dd[j] ? Math.min(1, Math.max(0, (rx * d[j * 3] + ry * d[j * 3 + 1] + rz * d[j * 3 + 2]) / dd[j])) : 0,
-        distance = Math.hypot(rx - d[j * 3] * t, ry - d[j * 3 + 1] * t, rz - d[j * 3 + 2] * t);
+      const ax = a[j * 3] / scale,
+        ay = a[j * 3 + 1] / scale,
+        az = a[j * 3 + 2] / scale,
+        dx = d[j * 3] / scale,
+        dy = d[j * 3 + 1] / scale,
+        dz = d[j * 3 + 2] / scale,
+        length = scale === 1 ? dd[j] : dx * dx + dy * dy + dz * dz,
+        rx = px / scale - ax,
+        ry = py / scale - ay,
+        rz = pz / scale - az,
+        t = length ? Math.min(1, Math.max(0, (rx * dx + ry * dy + rz * dz) / length)) : 0,
+        distance = Math.hypot(rx - dx * t, ry - dy * t, rz - dz * t);
       // Insertion into the sorted best list; a later joint with an equal distance goes after (lower index wins).
       let slot = influences;
       while (slot > 0 && distance < bestDistance[slot - 1]) slot--;
@@ -148,11 +155,34 @@ export function skinWeights(
       bestDistance[slot] = distance;
       bestJoint[slot] = j;
     }
+  };
+  for (let v = 0; v < count; v++) {
+    const px = positions[v * 3] + ox,
+      py = positions[v * 3 + 1] + oy,
+      pz = positions[v * 3 + 2] + oz;
+    if (!Number.isFinite(px) || !Number.isFinite(py) || !Number.isFinite(pz))
+      throw new RangeError(`Skin position ${v} is not finite`);
+    nearest(px, py, pz, 1);
+    if (bestDistance[0] < 1e290) {
+      let total = 0;
+      for (let k = 0; k < influences && bestJoint[k] >= 0; k++) total += 1 / Math.max(1e-6, bestDistance[k]);
+      for (let k = 0; k < influences && bestJoint[k] >= 0; k++) {
+        out.joints[v * 4 + k] = bestJoint[k];
+        out.weights[v * 4 + k] = 1 / Math.max(1e-6, bestDistance[k]) / total;
+      }
+      continue;
+    }
+    // Coordinates so far apart that distances overflow or their inverses underflow: measure in a space scaled into
+    // [-1, 1], where the same segments are nearest, and weight by distance ratios to the nearest one.
+    const scale = Math.max(reach, Math.abs(px), Math.abs(py), Math.abs(pz)),
+      floor = Math.max(1e-6 / scale, Number.MIN_VALUE);
+    nearest(px, py, pz, scale);
+    const closest = Math.max(floor, bestDistance[0]);
     let total = 0;
-    for (let k = 0; k < influences && bestJoint[k] >= 0; k++) total += 1 / Math.max(1e-6, bestDistance[k]);
+    for (let k = 0; k < influences && bestJoint[k] >= 0; k++) total += closest / Math.max(floor, bestDistance[k]);
     for (let k = 0; k < influences && bestJoint[k] >= 0; k++) {
       out.joints[v * 4 + k] = bestJoint[k];
-      out.weights[v * 4 + k] = 1 / Math.max(1e-6, bestDistance[k]) / total;
+      out.weights[v * 4 + k] = closest / Math.max(floor, bestDistance[k]) / total;
     }
   }
   return out;
