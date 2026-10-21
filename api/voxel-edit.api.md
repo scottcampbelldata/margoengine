@@ -154,6 +154,44 @@ export interface ShiftOptions extends LayoutOptions {
     offset: Vec3;
 }
 
+export interface SliceLayout {
+    frameWidth: number;
+    frameHeight: number;
+    columns: number;
+    rows: number;
+    frameCount: number;
+    availableFrames: number;
+    axis: 'x' | 'y' | 'z';
+    topToBottom: boolean;
+    alphaThreshold: number;
+    size: MutableVec3;
+    cells: number;
+}
+
+export interface SliceOptions extends GridLimits {
+    frameWidth: number;
+    frameHeight: number;
+    columns?: number;
+    frameCount?: number;
+    axis?: 'x' | 'y' | 'z';
+    topToBottom?: boolean;
+    alphaThreshold?: number;
+    palette?: Uint8Array;
+}
+
+export interface SlicePixels {
+    width: number;
+    height: number;
+    data: Uint8Array | Uint8ClampedArray;
+}
+
+export interface SliceStack {
+    grid: VoxelGrid;
+    palette: Uint8Array;
+    colors: number;
+    layout: SliceLayout;
+}
+
 export interface TurnOptions extends LayoutOptions {
     axis: 'x' | 'y' | 'z';
     turns?: number;
@@ -216,6 +254,10 @@ export function rotateGrid(grid: VoxelGrid, options: RotateOptions): GridEdit;
 export function shearGrid(grid: VoxelGrid, options: ShearOptions): GridEdit;
 
 export function shiftGrid(grid: VoxelGrid, options: ShiftOptions): GridLayout;
+
+export function sliceLayout(width: number, height: number, options: SliceOptions): SliceLayout;
+
+export function stackSlices(pixels: SlicePixels, options: SliceOptions): SliceStack;
 
 export function turnGrid(grid: VoxelGrid, options: TurnOptions): GridLayout;
 

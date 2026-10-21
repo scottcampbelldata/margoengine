@@ -41,6 +41,7 @@ corner coordinates.
 | `flipGrid`, `turnGrid`, `shiftGrid` | exact whole-cell layout: mirror along a principal axis, right-handed quarter turns that swap the other two sizes (so nothing clips; `rotateGrid` turns inside the same box instead), move by an offset with the cells that leave counted in `clipped` |
 | `occupiedBounds`, `cropGrid`, `fitGrid` | the filled box; crop or extend to a size anchored at a caller's origin (a resize keeping the corner is origin [0, 0, 0]); shrink to the filled box |
 | `invertGrid` | swap filled and empty cells, air taking an explicit palette index |
+| `sliceLayout`, `stackSlices` | sprite-sheet RGBA frames (explicit frame size, columns, count, stack axis, order and alpha threshold) stacked into an indexed Y-up grid, each RGBA colour exact: indexes in reading order up to 255, or the first exact index of a palette you pass; anything else refuses |
 | `ByteLedger`, `ownedBuffers`, `retainedBytes` | bytes of the storage grids, cels, packed frames, images and sparse snapshots keep alive, each buffer counted once through its token (`SparseGrid.ownedBuffers`, `SparseGrid.deltaBuffers`); the ledger retains and releases values for an undo budget |
 
 ## Entries

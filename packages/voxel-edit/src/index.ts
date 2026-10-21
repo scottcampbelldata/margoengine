@@ -63,3 +63,11 @@ export {
   retainedBytes,
   ByteLedger,
 } from './bytes.js';
+export {
+  type SlicePixels,
+  type SliceOptions,
+  type SliceLayout,
+  type SliceStack,
+  sliceLayout,
+  stackSlices,
+} from './slices.js';
