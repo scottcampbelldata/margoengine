@@ -72,7 +72,7 @@ Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. T
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-79 packages in 10 layers, the same as the [catalog](https://margoengine.com/catalog/).
+80 packages in 10 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (2)
 
@@ -177,7 +177,7 @@ Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. T
 | [`@margoengine/selection`](packages/selection/README.md) | GPU picking and visible mesh selection outlines. |
 | [`@margoengine/audio`](packages/audio/README.md) | Web Audio listener, global and positional sounds and a frequency analyser for Margo Engine. |
 
-### Simulation and games (6)
+### Simulation and games (7)
 
 | Package | What it is |
 | --- | --- |
@@ -187,6 +187,7 @@ Libraries use the npm scope `@margoengine`; the stage facade is `margoengine`. T
 | [`@margoengine/ecs`](packages/ecs/README.md) | Typed-array packed sparse-set entity component storage. |
 | [`@margoengine/fsm`](packages/fsm/README.md) | Hierarchical state transitions with cross-fade progress. |
 | [`@margoengine/net`](packages/net/README.md) | Hermite and quaternion snapshot interpolation with bounded prediction. |
+| [`@margoengine/voxel-net`](packages/voxel-net/README.md) | Multiplayer voxel worlds: an authoritative Node server on a hand-written WebSocket, a browser client with prediction and correction, and headless bots for load tests. |
 
 ### CAD and engineering (4)
 

@@ -8,7 +8,8 @@ import { ColorInput, Quat } from "@margoengine/math";
 
 export class EntityCodec<const S extends Readonly<Record<string, EntityField>>> {
     constructor(schema: S);
-    encode(entities: ReadonlyMap<number, EntityState<S>>, baseline?: ReadonlyMap<number, EntityState<S>>): Uint8Array;
+    prepare(entity: EntityState<S>, id?: number): PreparedEntity;
+    encode(entities: ReadonlyMap<number, EntityState<S> | PreparedEntity>, baseline?: ReadonlyMap<number, EntityState<S> | PreparedEntity>): Uint8Array;
     decode(bytes: Uint8Array, baseline?: ReadonlyMap<number, EntityState<S>>): Map<number, EntityState<S>>;
 }
 
@@ -17,6 +18,10 @@ export type EntityField = 'position' | 'rotation' | 'u8' | 'u16' | 'f32';
 export type EntityState<S extends Readonly<Record<string, EntityField>>> = {
     [K in keyof S]: S[K] extends 'position' ? Vec3 : S[K] extends 'rotation' ? Quat : number;
 };
+
+export interface PreparedEntity {
+    readonly [preparedBrand]: true;
+}
 
 export function applyBlockChanges(world: VoxelWorld, bytes: Uint8Array): number;
 

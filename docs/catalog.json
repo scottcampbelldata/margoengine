@@ -1793,6 +1793,35 @@
     "category": "Simulation and games"
   },
   {
+    "id": "voxel-net",
+    "title": "Voxel-net",
+    "category": "Simulation and games",
+    "package": "@margoengine/voxel-net",
+    "version": "1.0.0",
+    "published": false,
+    "description": "Multiplayer voxel worlds: an authoritative Node server on a hand-written WebSocket, a browser client with prediction and correction, and headless bots for load tests.",
+    "requirements": "See the package guide for requirements",
+    "keywords": "voxel net",
+    "install": "npm install @margoengine/voxel-net@1.0.0",
+    "imports": "import { Keys } from '@margoengine/voxel-net';",
+    "exports": [
+      "Keys",
+      "PLAYER_SCHEMA",
+      "PROTOCOL_VERSION",
+      "STEP_SECONDS",
+      "VoxelNetClient",
+      "blockTableHash",
+      "connectVoxelNet",
+      "decodeClientMessage",
+      "decodeServerMessage",
+      "encodeClientMessage",
+      "encodeServerMessage",
+      "moveIntent",
+      "quantizePitch",
+      "quantizeYaw"
+    ]
+  },
+  {
     "id": "machinery",
     "title": "Machinery & CAD",
     "package": "@margoengine/machinery",
