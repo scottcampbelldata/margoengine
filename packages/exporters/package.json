@@ -34,6 +34,10 @@
     "./capture": {
       "types": "./dist/capture.d.ts",
       "import": "./dist/capture.js"
+    },
+    "./skin": {
+      "types": "./dist/skin.d.ts",
+      "import": "./dist/skin.js"
     }
   },
   "files": [
