@@ -1,4 +1,5 @@
-import { finite, type Skeleton } from './skin.js';
+import type { PBRModel } from '@margoengine/gltf-pro';
+import { finite, Skeleton } from './skin.js';
 
 /** How a key moves to the next key: hold then jump, straight, or a cubic ease in, out, or in and out. */
 export type KeyInterpolation = 'discrete' | 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
@@ -11,20 +12,25 @@ export type KeyInterpolation = 'discrete' | 'linear' | 'easeIn' | 'easeOut' | 'e
  *   `(1 - f) * a + f * b`, which stays finite for all finite keys. Rotations slerp as in `'delta'`.
  */
 export type KeyframeBlend = 'delta' | 'weighted';
+/** The property a keyframe track animates: a bone's or node's transform, or a mesh node's morph target weights. */
+export type KeyframePath = 'translation' | 'rotation' | 'scale' | 'weights';
 /** One key of a keyframe track. */
 export interface Keyframe {
   /** Seconds, >= 0, strictly increasing within a track. */
   time: number;
-  /** [x, y, z] for translation and scale, a quaternion [x, y, z, w] for rotation (normalised on input). */
+  /**
+   * [x, y, z] for translation and scale, a quaternion [x, y, z, w] for rotation (normalised on input), and one weight
+   * per morph target for weights (the same count in every key, not normalised).
+   */
   value: readonly number[];
   /** Shapes the time from this key to the next one (rotations slerp by the eased factor). Default 'linear'. */
   interpolation?: KeyInterpolation;
 }
 /** Keys for one property of one bone or node. */
 export interface KeyframeTrackData {
-  /** Stable id of the animated bone (its name) or of the caller's own node. */
+  /** Stable id of the animated bone (its name) or of the caller's own node; for weights, the mesh node's name. */
   target: string;
-  path: 'translation' | 'rotation' | 'scale';
+  path: KeyframePath;
   keys: readonly Keyframe[];
   /** How samples between and at keys are computed; default `'delta'`. See {@link KeyframeBlend}. */
   blend?: KeyframeBlend;
@@ -34,10 +40,10 @@ export interface KeyframeClipData {
   name?: string;
   tracks: readonly KeyframeTrackData[];
 }
-/** A validated track: key times, 3 or 4 values per key, and each key's interpolation. */
+/** A validated track: key times, 3 or 4 values per key (weights: one per morph target), and each key's interpolation. */
 export interface KeyframeTrack {
   readonly target: string;
-  readonly path: 'translation' | 'rotation' | 'scale';
+  readonly path: KeyframePath;
   readonly times: Float64Array;
   readonly values: Float64Array;
   readonly interpolations: readonly KeyInterpolation[];
@@ -53,7 +59,7 @@ export interface KeyframeClip {
 /** One glTF animation channel from {@link bakeKeyframeClip}: the shape of exporters' `AnimationChannelData`. */
 export interface BakedChannel<N> {
   node: N;
-  path: 'translation' | 'rotation' | 'scale';
+  path: KeyframePath;
   interpolation: 'STEP' | 'LINEAR';
   times: Float32Array;
   values: Float32Array;
@@ -84,15 +90,18 @@ export function createKeyframeClip(data: KeyframeClipData): KeyframeClip {
     if (!track || typeof track.target !== 'string' || !track.target)
       throw new TypeError(`${label} needs a nonempty string target`);
     const { target, path, keys, blend } = track;
-    if (path !== 'translation' && path !== 'rotation' && path !== 'scale')
-      throw new TypeError(`${label} path ${path} is invalid; use translation, rotation or scale`);
+    if (path !== 'translation' && path !== 'rotation' && path !== 'scale' && path !== 'weights')
+      throw new TypeError(`${label} path ${path} is invalid; use translation, rotation, scale or weights`);
     if (blend !== undefined && blend !== 'delta' && blend !== 'weighted')
       throw new TypeError(`${label} blend ${blend} is invalid; use delta or weighted`);
     if (seen.has(target + ':' + path)) throw new TypeError(`${label} repeats ${target} ${path}; merge the keys`);
     seen.add(target + ':' + path);
     if (!Array.isArray(keys) || !keys.length) throw new TypeError(`${label} needs a nonempty keys array`);
-    const width = path === 'rotation' ? 4 : 3,
-      times = new Float64Array(keys.length),
+    // A weights track is as wide as its first key; every key must match it.
+    const width = path === 'rotation' ? 4 : path === 'weights' ? Number(keys[0]?.value?.length) : 3;
+    if (!(Number.isInteger(width) && width > 0))
+      throw new TypeError(`${label} weights keys need one number per morph target; pass a nonempty array`);
+    const times = new Float64Array(keys.length),
       values = new Float64Array(keys.length * width);
     const interpolations = keys.map((key, k) => {
       const time = key?.time,
@@ -104,7 +113,7 @@ export function createKeyframeClip(data: KeyframeClipData): KeyframeClip {
           `${label} key ${k} interpolation ${interpolation} is invalid; use one of ${kinds.join(', ')}`,
         );
       const value = finite(key.value, width, `${label} key ${k} value`),
-        length = width === 4 ? Math.hypot(value[0], value[1], value[2], value[3]) : 1;
+        length = path === 'rotation' ? Math.hypot(value[0], value[1], value[2], value[3]) : 1;
       if (!length) throw new RangeError(`${label} key ${k} is a zero quaternion; pass a unit quaternion`);
       for (let c = 0; c < width; c++) values[k * width + c] = value[c] / length;
       times[k] = time;
@@ -130,7 +139,8 @@ export function sampleKeyframes(track: KeyframeTrack, time: number, out?: Float6
   if (typeof time !== 'number' || !Number.isFinite(time))
     throw new RangeError(`Keyframe sample time ${time} is invalid; pass finite seconds`);
   const { times, values } = track,
-    width = track.path === 'rotation' ? 4 : 3,
+    linear = track.path !== 'rotation',
+    width = linear ? values.length / times.length : 4,
     last = times.length - 1;
   if (out !== undefined && !(out instanceof Float64Array && out.length >= width))
     throw new TypeError(`Keyframe sample target must be a Float64Array of at least ${width} numbers`);
@@ -152,8 +162,8 @@ export function sampleKeyframes(track: KeyframeTrack, time: number, out?: Float6
       out.set(values.subarray(f ? j : i, (f ? j : i) + width));
       return out;
     }
-    if (width === 3) {
-      for (let c = 0; c < 3; c++) {
+    if (linear) {
+      for (let c = 0; c < width; c++) {
         const p = values[i + c],
           q = values[j + c],
           v = (1 - f) * p + f * q;
@@ -162,7 +172,7 @@ export function sampleKeyframes(track: KeyframeTrack, time: number, out?: Float6
       }
       return out;
     }
-  } else if (width === 3 || f === 0 || f === 1) {
+  } else if (linear || f === 0 || f === 1) {
     for (let c = 0; c < width; c++)
       out[c] = f === 1 ? values[j + c] : values[i + c] + (values[j + c] - values[i + c]) * f;
     return out;
@@ -180,11 +190,50 @@ export function sampleKeyframes(track: KeyframeTrack, time: number, out?: Float6
   return out;
 }
 
-/** Poses `skeleton` at `time`: every track whose target names one of its bones sets that bone's property. */
-export function applyKeyframeClip(clip: KeyframeClip, skeleton: Skeleton, time: number): void {
+/**
+ * What {@link applyKeyframeClip} drives on a glTF-pro model: an `Animation` (`Animation.attach(model)`) fits, so morph
+ * weights go through its `setMorph`.
+ */
+export interface KeyframeModelTarget {
+  readonly model: PBRModel;
+  setMorph(node: number, target: number, weight: number): void;
+}
+
+/**
+ * Poses `target` at `time`. On a `Skeleton`, every translation, rotation or scale track whose target names one of its
+ * bones sets that bone's property (weights tracks are skipped: bones have no morphs). On a glTF-pro model's
+ * `Animation`, tracks name model nodes (the first node with that name): transform tracks set the node's local
+ * transform and weights tracks set every morph weight through `setMorph`. Pause the Animation's own clip
+ * (`animation.playing = false`) while a code clip drives the model, or the two overwrite each other.
+ */
+export function applyKeyframeClip(clip: KeyframeClip, target: Skeleton | KeyframeModelTarget, time: number): void {
+  if (target instanceof Skeleton) {
+    for (const track of clip.tracks) {
+      const bone = track.path === 'weights' ? -1 : target.index(track.target);
+      if (bone >= 0) target.setPose(bone, { [track.path]: sampleKeyframes(track, time) });
+    }
+    return;
+  }
+  if (!target || typeof target.setMorph !== 'function' || !Array.isArray(target.model?.nodes))
+    throw new TypeError(
+      'applyKeyframeClip needs a Skeleton or an Animation; pass a skeleton or Animation.attach(model)',
+    );
+  const { nodes, primitives } = target.model;
   for (const track of clip.tracks) {
-    const bone = skeleton.index(track.target);
-    if (bone >= 0) skeleton.setPose(bone, { [track.path]: sampleKeyframes(track, time) });
+    const index = nodes.findIndex((node) => node.name === track.target);
+    if (index < 0) continue;
+    const value = sampleKeyframes(track, time),
+      node = nodes[index];
+    if (track.path === 'weights') {
+      const count = primitives.find((p) => p.nodeIndex === index)?.weights.length ?? 0;
+      if (count !== value.length)
+        throw new RangeError(
+          `Keyframe track ${track.target} weights has ${value.length} values but the node has ${count} morph targets; key one weight per target`,
+        );
+      for (let k = 0; k < count; k++) target.setMorph(index, k, value[k]);
+    } else if (track.path === 'translation') node.setPosition(value as unknown as [number, number, number]);
+    else if (track.path === 'scale') node.setScale(value as unknown as [number, number, number]);
+    else node.setQuaternion(value as unknown as number[]);
   }
 }
 
@@ -229,8 +278,7 @@ export function bakeKeyframeClip<N>(
   for (const track of clip.tracks) {
     const node = resolve(track.target);
     if (node === undefined) continue;
-    const width = track.path === 'rotation' ? 4 : 3,
-      { times: keys, interpolations } = track,
+    const { times: keys, interpolations } = track,
       used = new Set(interpolations.slice(0, -1)),
       plain = used.size === 0 || (used.size === 1 && (used.has('discrete') || used.has('linear'))),
       times: number[] = [],
@@ -254,7 +302,7 @@ export function bakeKeyframeClip<N>(
         for (let n = Math.floor(keys[k] * fps) + 1; n / fps < keys[k + 1]; n++)
           if (Math.fround(n / fps) < end) add(n / fps, Math.fround(n / fps));
     }
-    if (width === 4)
+    if (track.path === 'rotation')
       for (let i = 4; i < values.length; i += 4)
         if (
           values[i] * values[i - 4] +

@@ -31,6 +31,8 @@ export {
   bakeKeyframeClip,
   type KeyInterpolation,
   type KeyframeBlend,
+  type KeyframePath,
+  type KeyframeModelTarget,
   type Keyframe,
   type KeyframeTrackData,
   type KeyframeClipData,
@@ -38,6 +40,12 @@ export {
   type KeyframeClip,
   type BakedChannel,
 } from './keyframes.js';
+export {
+  AnimationGroup,
+  type AnimationGroupMember,
+  type AnimationGroupOptions,
+  type AnimationGroupPlayer,
+} from './group.js';
 declare const GPUBufferUsage: { STORAGE: number; VERTEX: number; COPY_DST: number; COPY_SRC: number; UNIFORM: number };
 interface Track {
   node: number;
@@ -270,17 +278,19 @@ export class Animation implements EnginePlugin {
     return this;
   }
   setMorph(node: number, target: number, weight: number): void {
-    const primitives = this.model.primitives.filter((p) => p.nodeIndex === node);
-    if (
-      !primitives.length ||
-      !Number.isInteger(target) ||
-      target < 0 ||
-      primitives.some((p) => target >= p.weights.length) ||
-      !Number.isFinite(Math.fround(weight)) ||
-      this.disposed
-    )
+    // Index loops, no filtered copy: keyframe and group playback call this per weight per frame.
+    const primitives = this.model.primitives;
+    let found = false,
+      fits = Number.isInteger(target) && target >= 0;
+    for (let i = 0; i < primitives.length; i++)
+      if (primitives[i].nodeIndex === node) {
+        found = true;
+        if (target >= primitives[i].weights.length) fits = false;
+      }
+    if (!found || !fits || !Number.isFinite(Math.fround(weight)) || this.disposed)
       throw new RangeError('Invalid morph target/weight');
-    for (const p of primitives) p.weights[target] = weight;
+    for (let i = 0; i < primitives.length; i++)
+      if (primitives[i].nodeIndex === node) primitives[i].weights[target] = weight;
   }
   private apply(time: number): void {
     const clip = this.clips[this.clip];

@@ -88,7 +88,7 @@ test('clip input is validated', () => {
   bad({ target: 'a', path: 'scale', keys: [key(0, [0, Number.NaN, 0])] }, /non-finite/, 'RangeError');
   bad({ target: 'a', path: 'rotation', keys: [key(0, [0, 0, 0, 0])] }, /zero quaternion/, 'RangeError');
   bad({ target: 'a', path: 'translation', keys: [key(0, undefined, 'cubic')] }, /interpolation cubic/, 'TypeError');
-  bad({ target: 'a', path: 'weights', keys: [key(0)] }, /path weights/, 'TypeError');
+  bad({ target: 'a', path: 'colour', keys: [key(0)] }, /path colour/, 'TypeError'); // weights is a path now
   bad({ target: '', path: 'scale', keys: [key(0)] }, /target/, 'TypeError');
   bad({ target: 'a', path: 'scale', keys: [] }, /nonempty keys/, 'TypeError');
   const twice = { target: 'a', path: 'scale', keys: [key(0)] };
