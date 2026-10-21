@@ -890,3 +890,72 @@ test('voice pool stopAll and dispose release every voice; play after dispose thr
   assert.equal(listener.sources.size, 0);
   listener.dispose();
 });
+
+test('sync starts short 20 ms and 50 ms buffers and a first entry inside the final 50 ms', () => {
+  for (const duration of [0.02, 0.05]) {
+    const context = new FakeAudioContext({ state: 'running' }),
+      listener = new AudioListener({ context, smoothing: 0 }),
+      audio = new Audio(listener).setBuffer(buffer(duration));
+    audio.sync(0, true);
+    assert.equal(audio.isPlaying, true, `${duration} s starts at its beginning`);
+    assert.equal(context.bufferSources.length, 1);
+    assert.equal(audio.source.started.offset, 0);
+    listener.dispose();
+  }
+  const context = new FakeAudioContext({ state: 'running' }),
+    listener = new AudioListener({ context, smoothing: 0 }),
+    audio = new Audio(listener).setBuffer(buffer(1));
+  audio.sync(0.975, true);
+  assert.equal(audio.isPlaying, true, 'late entry is not confused with a naturally completed sound');
+  assert.equal(audio.source.started.offset, 0.975);
+  listener.dispose();
+});
+
+test('natural completion suppresses only playing end jitter; paused scrubbing and seek allow the short tail again', () => {
+  const context = new FakeAudioContext({ state: 'running' }),
+    listener = new AudioListener({ context, smoothing: 0 }),
+    audio = new Audio(listener).setBuffer(buffer(1));
+  audio.sync(0, true);
+  context.currentTime = 1;
+  audio.source.end();
+  for (const time of [0.97, 0.98, 0.999, 1, 1.01]) audio.sync(time, true);
+  assert.equal(context.bufferSources.length, 1, 'all end-jitter frames stay silent');
+  audio.sync(0.985, false);
+  assert.equal(audio.isPlaying, false);
+  audio.sync(0.985, true);
+  assert.equal(context.bufferSources.length, 2, 'an explicit paused scrub can replay a 15 ms tail');
+  assert.equal(audio.source.started.offset, 0.985);
+  audio.source.end();
+  audio.seek(0.99).sync(0.99, true);
+  assert.equal(context.bufferSources.length, 3, 'explicit seek clears natural-end suppression');
+  assert.equal(audio.source.started.offset, 0.99);
+  listener.dispose();
+});
+
+test('natural completion resets for Stop, buffer replacement, loop playback and an earlier timeline position', () => {
+  const context = new FakeAudioContext({ state: 'running' }),
+    listener = new AudioListener({ context, smoothing: 0 }),
+    audio = new Audio(listener).setBuffer(buffer(0.02));
+  for (const reset of [
+    () => audio.stop(),
+    () => audio.setBuffer(buffer(0.02)),
+    () => {
+      audio.loop = true;
+    },
+  ]) {
+    audio.sync(0, true);
+    assert.equal(audio.isPlaying, true);
+    audio.source.end();
+    reset();
+    audio.sync(0, true);
+    assert.equal(audio.isPlaying, true, 'explicit lifecycle reset can play a short sound');
+    audio.stop();
+  }
+  audio.loop = false;
+  audio.setBuffer(buffer(1)).sync(0, true);
+  audio.source.end();
+  audio.sync(0.8, true);
+  assert.equal(audio.isPlaying, true, 'an earlier timeline point outside jitter range plays');
+  assert.equal(audio.source.started.offset, 0.8);
+  listener.dispose();
+});

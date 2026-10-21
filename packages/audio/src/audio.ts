@@ -89,6 +89,7 @@ export class Audio implements ListenerSource {
   private kind: SourceKind = null;
   private media: HTMLMediaElement | null = null;
   private playing = false;
+  private endedNaturally = false;
   private startedAt = 0;
   private progress = 0;
   private filterList: AudioNode[] = [];
@@ -201,6 +202,7 @@ export class Audio implements ListenerSource {
     this.assertLive();
     checkFinite(delay, 'delay', 0);
     if (this.playing) return this;
+    this.endedNaturally = false;
     if (!this.fading) this.setFade(1);
     if (this.kind === 'buffer') this.startBuffer(this.context.currentTime + delay);
     else if (this.kind === 'media') {
@@ -240,6 +242,7 @@ export class Audio implements ListenerSource {
     checkFinite(delay, 'delay', 0);
     this.playing = false;
     this.progress = 0;
+    this.endedNaturally = false;
     this.clearTimer();
     if (this.kind === 'buffer') this.stopNode(delay);
     else if (delay > 0)
@@ -260,6 +263,7 @@ export class Audio implements ListenerSource {
    */
   seek(seconds: number): this {
     checkFinite(seconds, 'seconds', 0);
+    this.endedNaturally = false;
     if (this.media) this.media.currentTime = seconds;
     else if (this.buffer) {
       this.progress = seconds - this.offsetValue;
@@ -287,8 +291,9 @@ export class Audio implements ListenerSource {
       length = Math.min(buffer.duration - this.offsetValue, this.durationValue ?? Infinity),
       // A clip that ended on its own stays ended through the last frames of clock jitter before the timeline does.
       left = this.loopValue ? Infinity : length - local;
-    if (!playing || rate <= 0 || local < 0 || left <= (this.playing ? 0 : Audio.syncTolerance)) {
+    if (!playing || rate <= 0 || local < 0 || left <= (this.endedNaturally ? Audio.syncTolerance : 0)) {
       this.pause();
+      if (!playing || rate <= 0 || local < 0) this.endedNaturally = false;
       this.progress = Math.max(0, this.loopValue ? local : Math.min(local, length));
       return this;
     }
@@ -533,6 +538,7 @@ export class Audio implements ListenerSource {
       this.source = null;
       if (!this.playing) return;
       this.playing = false;
+      this.endedNaturally = true;
       this.progress = 0;
       this.onEnded?.(this);
     };
@@ -580,6 +586,7 @@ export class Audio implements ListenerSource {
       disconnect(this.source, this.head);
     } else if (this.source) disconnect(this.source, this.head);
     this.playing = false;
+    this.endedNaturally = false;
     this.kind = null;
     this.source = null;
     this.media = null;
