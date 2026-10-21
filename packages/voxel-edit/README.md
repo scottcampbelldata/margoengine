@@ -43,7 +43,7 @@ air) and the filled cells pushed out of bounds. Every operation checks its argum
 | --- | --- |
 | `./edit` | brush footprints `lineCells`, `boxCells`, `sphereCells`; selections `floodCells` (same index), `connectedCells` (any filled), `faceCells` (an exposed layer), returned as cell indexes in a `Float64Array` |
 | `./pick` | `pickRay` (pointer ray from the camera matrix, reverse depth), `raycastGrid` (first filled cell, the face and the cell in front of it), `groundCell` |
-| `./sparse` | `SparseGrid`: models far larger than memory holds densely (a 1,000,000-wide grid with two cells holds two chunks), stored as `@margoengine/voxel` chunks, edited by copy-on-write snapshots with `restore` undo; `editWindow` fills, erases, paints, dilates or erodes a box; `serialize` / `deserialize`; `toWorld` writes into a `VoxelWorld` |
+| `./sparse` | `SparseGrid`: models far larger than memory holds densely (a 1,000,000-wide grid with two cells holds two chunks), stored as `@margoengine/voxel` chunks, edited by copy-on-write snapshots with `restore` undo; `editWindow` fills, erases, paints, dilates or erodes a box; `serialize` / `deserialize`; `snapshot` / `fromSnapshot` / `restoreSnapshots` and `deltaSnapshot` / `applyDeltaSnapshot` for workers (`snapshotBuffers` is the transfer list); `toWorld` writes into a `VoxelWorld` |
 | `./mesh` | `meshGrid`: greedy quads per palette index with optional corner ambient occlusion and crease-limited smooth normals; dense or sparse, chunk seams leave no inner faces |
 | `./vox` | `gridFromVox` / `voxFromGrid` (MagicaVoxel's Z up to Y up and back; an unedited model is returned as it was) and scene-graph edits: layers, names, transform and shape keys, groups, instances, `moveVoxNode` (keeps world poses), `deleteVoxNode` |
 | `./animation` | `packFrames` / `unpackFrames` (each distinct model stored once) and `localFrame` (a clip's clock: offset, speed, loop or hold) |
@@ -57,3 +57,21 @@ structure refuses (the last key of a track, the root, a cycle, moving a visible 
 
 `SparseGrid.serialize` writes `{format: 'margo-sparse-volume', version: 1, ...}` and `packFrames` writes
 `{version: 1, banks, keys}`: plain JSON, read back with full validation, so untrusted files are safe to load.
+
+A sparse grid's engine cells (`origin + cell`) stay in one of two envelopes, chosen by `SparseGrid.empty`'s
+`envelope` option. `'world'` (the default) is a `VoxelWorld`'s range: Y from -32,768 to 32,767, X and Z 32-bit; such
+grids save as version 1, as before. `'wide'` allows any whole number up to 2^53 - 1 in size on every axis; a grid past
+the world range saves as version 2 with the same fields (older readers refuse it rather than misplace it), and
+`toWorld` refuses cells a world cannot hold. Either way a grid holds at most 2^53 - 1 cells, so a cell index
+(`x + size[0] * (z + size[2] * y)`, the selections of `./edit`) is an exact double. Mesh positions are float32, exact
+within 2^24 cells of the pivot.
+
+## Workers
+
+`grid.snapshot()` packs a sparse grid into five typed arrays on new buffers that nothing else refers to; post it with
+`snapshotBuffers(snapshot)` as the transfer list, which moves the bytes instead of copying them and leaves the grid
+unchanged. `SparseGrid.fromSnapshot` (one grid) and `restoreSnapshots` (several, one `maxBytes` budget across them)
+check everything before decoding and copy what they keep, so the receiver may drop or reuse the buffers.
+`SparseGrid.deltaSnapshot(delta)` packs only the chunks one edit touched, before and after; a worker holding the grid
+before the edit replays it with `applyDeltaSnapshot` (or undoes it with side `'before'`), which refuses with a
+`MargoError` code `state` unless the worker's grid holds exactly the chunks the delta starts from.

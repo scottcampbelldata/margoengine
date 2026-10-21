@@ -21,8 +21,16 @@ export interface SparseLimits {
 
 /** Options of {@link SparseGrid.empty}. */
 export interface SparseOptions extends SparseLimits {
-  /** Engine cell of local cell (0, 0, 0), for {@link SparseGrid.toWorld}. Y must stay within -32768 to 32767. Default [0, 0, 0]. */
+  /** Engine cell of local cell (0, 0, 0), for {@link SparseGrid.toWorld}. Default [0, 0, 0]. */
   origin?: Vec3;
+  /**
+   * The cells `origin + local cell` may reach. `'world'` (the default) is a `VoxelWorld`'s range: Y from -32,768 to
+   * 32,767, X and Z within 32-bit integers; such a grid saves as version 1. `'wide'` allows any engine cell from
+   * -(2^53 - 1) to 2^53 - 1 on every axis (whole numbers stay exact); a grid that leaves the world range saves as
+   * version 2. Either way the cell count must be a safe integer, so a cell index (`x + size[0] * (z + size[2] * y)`,
+   * the Float64Array selections of `./edit`) is exact.
+   */
+  envelope?: 'world' | 'wide';
 }
 
 /** A dense copy of part of a sparse grid. */
@@ -58,16 +66,64 @@ export interface SparseStats {
 }
 
 /**
- * The saved form of a sparse grid ({@link SparseGrid.serialize}): plain JSON. `format` and `version` stay
- * `'margo-sparse-volume'` and 1 so files written before the rename still load.
+ * The saved form of a sparse grid ({@link SparseGrid.serialize}): plain JSON. `format` stays `'margo-sparse-volume'`
+ * so files written before the rename still load. `version` is 1 while the grid's cells stay in the `'world'`
+ * envelope ({@link SparseOptions.envelope}) and 2 past it; the fields are the same, and readers before version 2
+ * refuse such a file instead of misplacing it.
  */
 export interface SparseGridData {
   format: 'margo-sparse-volume';
-  version: 1;
+  version: 1 | 2;
   size: MutableVec3;
   origin: MutableVec3;
   /** Packed chunks in @margoengine/voxel's palette layout. */
   chunks: { position: MutableVec3; palette: number[]; bits: 0 | 1 | 2 | 4 | 8; words: number[] }[];
+}
+
+/**
+ * Packed chunks as typed arrays, chunk `i`'s parts in order: its position (chunk coordinates, cell / 32) at
+ * `positions[3 i ...]`, its `bits` per cell, `paletteSizes[i]` palette entries and `1024 * bits[i]` words, the layout
+ * of {@link SparseGridData} chunks.
+ */
+export interface SparseChunkTable {
+  positions: Float64Array;
+  /** 0, 1, 2, 4 or 8 per chunk. */
+  bits: Uint8Array;
+  /** 1 to 2^bits (at most 256) per chunk. */
+  paletteSizes: Uint16Array;
+  /** Every chunk's palette entries (0 to 255), one after another. */
+  palettes: Uint8Array;
+  /** Every chunk's cell words, one after another. */
+  words: Uint32Array;
+}
+
+/**
+ * A sparse grid as transferable typed arrays ({@link SparseGrid.snapshot}): each array owns its whole buffer and
+ * nothing else refers to it, so `postMessage(snapshot, snapshotBuffers(snapshot))` moves it to a worker without a
+ * copy. {@link SparseGrid.fromSnapshot} rebuilds the grid.
+ */
+export interface SparseSnapshot {
+  format: 'margo-sparse-snapshot';
+  version: 1;
+  size: MutableVec3;
+  origin: MutableVec3;
+  chunks: SparseChunkTable;
+}
+
+/**
+ * The chunks one edit touched, before and after it ({@link SparseGrid.deltaSnapshot}), as transferable typed arrays:
+ * `before` and `after` list the same positions in the same order, and a chunk that is absent on one side is listed
+ * there with bits 0 and the single palette entry 0. {@link SparseGrid.applyDeltaSnapshot} replays it.
+ */
+export interface SparseDeltaSnapshot {
+  format: 'margo-sparse-delta';
+  version: 1;
+  size: MutableVec3;
+  origin: MutableVec3;
+  /** Cells the edit changed. */
+  changed: number;
+  before: SparseChunkTable;
+  after: SparseChunkTable;
 }
 
 type Entry = { position: MutableVec3; chunk: VoxelChunk; filled: number };
@@ -111,8 +167,11 @@ export class SparseGrid {
   /** An empty grid of `size`; allocates no chunks, however large. */
   static empty(size: Vec3, options: SparseOptions = {}): SparseGrid {
     const limits = checkLimits(options),
-      origin = options.origin ?? [0, 0, 0];
-    checkExtent(size, origin);
+      origin = options.origin ?? [0, 0, 0],
+      envelope = options.envelope ?? 'world';
+    if (envelope !== 'world' && envelope !== 'wide')
+      throw new TypeError("SparseGrid envelope is unknown; pass 'world' or 'wide'");
+    checkExtent(size, origin, envelope === 'wide');
     return new SparseGrid(size, origin, limits, new Map());
   }
 
@@ -147,67 +206,76 @@ export class SparseGrid {
     return new SparseGrid(empty.size, empty.origin, empty.#limits, chunks);
   }
 
-  /** Decodes {@link SparseGridData} (untrusted input is fine: every count, word and index is checked first). */
+  /**
+   * Decodes {@link SparseGridData} (untrusted input is fine: every count, word and index is checked first). Version 1
+   * data must keep its cells in the `'world'` envelope and version 2 data must leave it, as `serialize` writes them.
+   */
   static deserialize(data: unknown, limits: SparseLimits = {}): SparseGrid {
     if (typeof data !== 'object' || data === null)
       throw new TypeError('SparseGrid data is missing; pass the object serialize() returned');
     const value = data as SparseGridData;
-    if (value.format !== 'margo-sparse-volume' || value.version !== 1)
-      throw new RangeError("SparseGrid data has an unknown format; expect 'margo-sparse-volume' version 1");
-    const empty = SparseGrid.empty(value.size, { ...limits, origin: value.origin }),
+    if (
+      value.format !== 'margo-sparse-volume' ||
+      (value.version !== 1 && value.version !== 2) ||
+      (value.version === 2 && inWorld(value.size, value.origin))
+    )
+      throw new RangeError(
+        "SparseGrid data has an unknown format; expect 'margo-sparse-volume' version 1, or 2 past the world envelope",
+      );
+    const empty = SparseGrid.empty(value.size, {
+        ...limits,
+        origin: value.origin,
+        envelope: value.version === 1 ? 'world' : 'wide',
+      }),
       checked = empty.#limits;
     if (!Array.isArray(value.chunks) || value.chunks.length > checked.maxChunks)
       throw new RangeError('SparseGrid data exceeds maxChunks; raise it or load a smaller grid');
-    const seen = new Set<string>();
-    let bytes = 0;
-    for (const item of value.chunks) {
-      if (typeof item !== 'object' || item === null)
-        throw new TypeError('SparseGrid chunk is not an object; pass packed chunks');
-      checkCell(item.position, 'SparseGrid chunk position');
-      if (item.position.some((p, axis) => p < 0 || p * 32 >= value.size[axis]))
-        throw new RangeError('SparseGrid chunk lies outside the grid bounds; drop it');
-      const address = chunkKey(...item.position);
-      if (seen.has(address)) throw new RangeError('SparseGrid data has a duplicate chunk; keep one per position');
-      seen.add(address);
-      if (
-        ![0, 1, 2, 4, 8].includes(item.bits) ||
-        !Array.isArray(item.palette) ||
-        item.palette.length < 1 ||
-        item.palette.length > Math.min(256, 2 ** item.bits) ||
-        !Array.isArray(item.words) ||
-        item.words.length !== 1024 * item.bits
-      )
-        throw new RangeError('SparseGrid chunk palette or word length is wrong; use the packed chunk layout');
-      for (const index of item.palette) checkPalette(index, 'SparseGrid chunk palette entry', 0);
-      for (const word of item.words)
-        if (!Number.isInteger(word) || word < 0 || word > 0xffffffff)
-          throw new RangeError('SparseGrid chunk word is not an unsigned 32-bit integer; fix the data');
-      bytes += 4 * (item.palette.length + item.words.length);
-      if (bytes > checked.maxBytes) throw new RangeError('SparseGrid data exceeds maxBytes; raise it or load less');
+    return empty.#with(decodeChunks(empty.size, value.chunks, checked, false) as Entry[], checked);
+  }
+
+  /**
+   * Rebuilds a grid from {@link SparseSnapshot} (untrusted input is fine, as for {@link SparseGrid.deserialize}). The
+   * grid copies what it keeps, so the snapshot's buffers may be reused, transferred again or dropped afterwards.
+   */
+  static fromSnapshot(snapshot: SparseSnapshot, limits: SparseLimits = {}): SparseGrid {
+    if (typeof snapshot !== 'object' || snapshot === null)
+      throw new TypeError('SparseGrid snapshot is missing; pass the object snapshot() returned');
+    if (snapshot.format !== 'margo-sparse-snapshot' || snapshot.version !== 1)
+      throw new RangeError("SparseGrid snapshot has an unknown format; expect 'margo-sparse-snapshot' version 1");
+    const empty = SparseGrid.empty(snapshot.size, { ...limits, origin: snapshot.origin, envelope: 'wide' }),
+      checked = empty.#limits;
+    return empty.#with(
+      decodeChunks(empty.size, tableRecords(snapshot.chunks, checked), checked, false) as Entry[],
+      checked,
+    );
+  }
+
+  /**
+   * The chunks the edit that returned `delta` touched, before and after it, as a transferable
+   * {@link SparseDeltaSnapshot} (new buffers nothing else refers to). A worker holding the grid before the edit
+   * replays it with {@link SparseGrid.applyDeltaSnapshot}.
+   */
+  static deltaSnapshot(delta: SparseDelta): SparseDeltaSnapshot {
+    const pair = history.get(delta);
+    if (!pair)
+      throw new MargoError('state', 'SparseGrid.deltaSnapshot got an unknown delta; pass one an edit returned');
+    const { before, after } = pair,
+      touched: [position: MutableVec3, before: VoxelChunk | null, after: VoxelChunk | null][] = [];
+    for (const address of new Set([...before.#chunks.keys(), ...after.#chunks.keys()])) {
+      const a = before.#chunks.get(address),
+        b = after.#chunks.get(address);
+      if (a !== b) touched.push([tuple((a ?? b)!.position), a?.chunk ?? null, b?.chunk ?? null]);
     }
-    const chunks = new Map<string, Entry>();
-    for (const item of value.chunks) {
-      const chunk = VoxelChunk.unpack({
-          palette: Uint32Array.from(item.palette),
-          bits: item.bits,
-          words: Uint32Array.from(item.words),
-          light: 0,
-        }),
-        [cx, cy, cz] = item.position;
-      let filled = 0;
-      for (let y = 0; y < 32; y++)
-        for (let z = 0; z < 32; z++)
-          for (let x = 0; x < 32; x++)
-            if (chunk.get(x, y, z)) {
-              if (cx * 32 + x >= value.size[0] || cy * 32 + y >= value.size[1] || cz * 32 + z >= value.size[2])
-                throw new RangeError('SparseGrid chunk fills a cell outside the grid bounds; empty it');
-              filled++;
-            }
-      if (!filled) throw new RangeError('SparseGrid chunk is empty; leave empty chunks out');
-      chunks.set(chunkKey(cx, cy, cz), { position: tuple(item.position), chunk, filled });
-    }
-    checkStorage(chunks, checked);
-    return new SparseGrid(empty.size, empty.origin, checked, chunks);
+    touched.sort(([a], [b]) => a[1] - b[1] || a[2] - b[2] || a[0] - b[0]);
+    return {
+      format: 'margo-sparse-delta',
+      version: 1,
+      size: tuple(before.size),
+      origin: tuple(before.origin),
+      changed: delta.changed,
+      before: packTable(touched.map(([position, chunk]) => [position, chunk] as const)),
+      after: packTable(touched.map(([position, , chunk]) => [position, chunk] as const)),
+    };
   }
 
   /** Filled cells, chunks and bytes. */
@@ -444,12 +512,93 @@ export class SparseGrid {
     return best;
   }
 
-  /** The grid as {@link SparseGridData}: plain arrays, safe to `JSON.stringify`. */
+  /**
+   * The grid as a transferable {@link SparseSnapshot}: new buffers that nothing else refers to, owned by the caller.
+   * Transferring them (see {@link snapshotBuffers}) leaves this grid unchanged.
+   */
+  snapshot(): SparseSnapshot {
+    return {
+      format: 'margo-sparse-snapshot',
+      version: 1,
+      size: tuple(this.size),
+      origin: tuple(this.origin),
+      chunks: packTable(this.#sorted().map(({ position, chunk }) => [position, chunk] as const)),
+    };
+  }
+
+  /**
+   * Replays a {@link SparseDeltaSnapshot} on this grid as one undoable edit: `'after'` (the default) moves this grid
+   * from the delta's before chunks to its after chunks, `'before'` undoes it. This grid must hold exactly the chunks
+   * the delta starts from (a MargoError with code `state` otherwise: apply deltas in order); nothing changes when a
+   * check fails. The result copies what it keeps, as {@link SparseGrid.fromSnapshot} does.
+   */
+  applyDeltaSnapshot(
+    data: SparseDeltaSnapshot,
+    side: 'before' | 'after' = 'after',
+    limits: SparseLimits = {},
+  ): SparseEdit {
+    if (typeof data !== 'object' || data === null)
+      throw new TypeError('SparseGrid delta snapshot is missing; pass the object deltaSnapshot() returned');
+    if (data.format !== 'margo-sparse-delta' || data.version !== 1)
+      throw new RangeError("SparseGrid delta snapshot has an unknown format; expect 'margo-sparse-delta' version 1");
+    if (side !== 'before' && side !== 'after')
+      throw new TypeError("SparseGrid.applyDeltaSnapshot side is unknown; pass 'before' or 'after'");
+    const checked = checkLimits({ ...this.#limits, ...limits });
+    checkCell(data.size, 'SparseGrid delta size');
+    checkCell(data.origin, 'SparseGrid delta origin');
+    if (data.size.some((v, axis) => v !== this.size[axis]) || data.origin.some((v, axis) => v !== this.origin[axis]))
+      throw new MargoError(
+        'state',
+        'SparseGrid delta belongs to a grid of another size or origin; apply it to its own',
+      );
+    const from = tableRecords(side === 'after' ? data.before : data.after, checked),
+      to = tableRecords(side === 'after' ? data.after : data.before, checked);
+    if (
+      from.length !== to.length ||
+      from.some((item, i) => item.position.some((v, axis) => v !== to[i].position[axis]))
+    )
+      throw new RangeError('SparseGrid delta sides list different chunks; pass what deltaSnapshot() returned');
+    const start = decodeChunks(this.size, from, checked, true),
+      end = decodeChunks(this.size, to, checked, true),
+      next = new Map(this.#chunks);
+    let changed = 0,
+      bytes = 0;
+    for (let i = 0; i < start.length; i++) {
+      const address = chunkKey(...from[i].position),
+        current = this.#chunks.get(address)?.chunk,
+        a = start[i]?.chunk,
+        b = end[i]?.chunk;
+      for (let y = 0; y < 32; y++)
+        for (let z = 0; z < 32; z++)
+          for (let x = 0; x < 32; x++) {
+            const value = a?.get(x, y, z) ?? 0;
+            if ((current?.get(x, y, z) ?? 0) !== value)
+              throw new MargoError(
+                'state',
+                'SparseGrid does not hold the chunks this delta starts from; apply deltas in order',
+              );
+            if ((b?.get(x, y, z) ?? 0) !== value) changed++;
+          }
+      bytes += (current?.byteLength ?? 0) + (b?.byteLength ?? 0);
+      if (end[i]) next.set(address, end[i]!);
+      else next.delete(address);
+    }
+    checkStorage(next, checked);
+    const grid = changed ? new SparseGrid(this.size, this.origin, this.#limits, next) : this,
+      delta: SparseDelta = Object.freeze({ changed, bytes: changed ? bytes : 0 });
+    history.set(delta, { before: this, after: grid });
+    return { grid, delta };
+  }
+
+  /**
+   * The grid as {@link SparseGridData}: plain arrays, safe to `JSON.stringify`. Version 1 while every cell stays in the
+   * `'world'` envelope, version 2 past it.
+   */
   serialize(limits: SparseLimits = {}): SparseGridData {
     checkStorage(this.#chunks, checkLimits({ ...this.#limits, ...limits }));
     return {
       format: 'margo-sparse-volume',
-      version: 1,
+      version: inWorld(this.size, this.origin) ? 1 : 2,
       size: tuple(this.size),
       origin: tuple(this.origin),
       chunks: this.#sorted().map(({ position, chunk }) => {
@@ -475,10 +624,19 @@ export class SparseGrid {
       world.blocks.get(value);
       if (y + oy < world.minY || y + oy > world.maxY)
         throw new RangeError('SparseGrid.toWorld cells fall outside the world Y range; widen it or move the origin');
+      if ((x + ox) >> 0 !== x + ox || (z + oz) >> 0 !== z + oz)
+        throw new RangeError('SparseGrid.toWorld cells fall outside 32-bit X or Z; move the origin');
       if (world.getBlock(x + ox, y + oy, z + oz))
         throw new MargoError('state', 'SparseGrid.toWorld target cells are not empty; write into an empty world');
     }
     for (const [x, y, z, value] of this.filled()) world.setBlock(x + ox, y + oy, z + oz, value);
+  }
+
+  /** A grid of this size and origin holding `entries`, checked against `limits`. */
+  #with(entries: readonly Entry[], limits: Limits): SparseGrid {
+    const chunks = new Map(entries.map((entry) => [chunkKey(...entry.position), entry]));
+    checkStorage(chunks, limits);
+    return new SparseGrid(this.size, this.origin, limits, chunks);
   }
 
   #inside(x: number, y: number, z: number): boolean {
@@ -564,17 +722,210 @@ function checkLimits(value: SparseLimits): Limits {
   return result;
 }
 
-function checkExtent(size: Vec3, origin: Vec3): void {
+/**
+ * {@link SparseGrid.fromSnapshot} for several snapshots with one `maxBytes` budget across all of them (each grid's
+ * chunk bytes count against what the next may use); the other limits apply to each grid.
+ */
+export function restoreSnapshots(snapshots: readonly SparseSnapshot[], limits: SparseLimits = {}): SparseGrid[] {
+  if (!Array.isArray(snapshots)) throw new TypeError('restoreSnapshots takes an array of snapshots; pass one');
+  const total = checkLimits(limits).maxBytes;
+  let used = 0;
+  return snapshots.map((snapshot) => {
+    if (used >= total)
+      throw new RangeError('restoreSnapshots exceeds maxBytes across its snapshots; raise it or restore fewer');
+    const grid = SparseGrid.fromSnapshot(snapshot, { ...limits, maxBytes: total - used });
+    used += grid.stats.bytes;
+    return grid;
+  });
+}
+
+/** The distinct buffers of a snapshot or delta snapshot: the transfer list for `postMessage`. */
+export function snapshotBuffers(data: SparseSnapshot | SparseDeltaSnapshot): ArrayBuffer[] {
+  if (typeof data !== 'object' || data === null)
+    throw new TypeError('snapshotBuffers takes a snapshot or delta snapshot; pass one');
+  const tables = 'chunks' in data ? [data.chunks] : [data.before, data.after],
+    buffers = new Set<ArrayBuffer>();
+  for (const table of tables)
+    for (const key of ['positions', 'bits', 'paletteSizes', 'palettes', 'words'] as const) {
+      const array = table?.[key];
+      if (!ArrayBuffer.isView(array) || !(array.buffer instanceof ArrayBuffer))
+        throw new TypeError(`snapshotBuffers ${key} is not a typed array on an ArrayBuffer; pass snapshot output`);
+      buffers.add(array.buffer);
+    }
+  return [...buffers];
+}
+
+/** One packed chunk as decodeChunks reads it: JSON arrays or typed-array views. */
+interface ChunkRecord {
+  position: Vec3;
+  palette: ArrayLike<number>;
+  bits: number;
+  words: ArrayLike<number>;
+}
+
+/**
+ * Checks packed chunks against a grid of `size` and `limits` before decoding any, then decodes them. An all-air chunk
+ * is refused, or with `air` decoded as null (an absent chunk of a delta).
+ */
+function decodeChunks(size: Vec3, records: readonly ChunkRecord[], limits: Limits, air: boolean): (Entry | null)[] {
+  const seen = new Set<string>(),
+    list = (v: unknown) => Array.isArray(v) || v instanceof Uint8Array || v instanceof Uint32Array;
+  let bytes = 0;
+  for (const item of records) {
+    if (typeof item !== 'object' || item === null)
+      throw new TypeError('SparseGrid chunk is not an object; pass packed chunks');
+    checkCell(item.position, 'SparseGrid chunk position');
+    if (item.position.some((p, axis) => p < 0 || p * 32 >= size[axis]))
+      throw new RangeError('SparseGrid chunk lies outside the grid bounds; drop it');
+    const address = chunkKey(...item.position);
+    if (seen.has(address)) throw new RangeError('SparseGrid data has a duplicate chunk; keep one per position');
+    seen.add(address);
+    const { bits, palette, words } = item;
+    if (
+      ![0, 1, 2, 4, 8].includes(bits) ||
+      !list(palette) ||
+      palette.length < 1 ||
+      palette.length > Math.min(256, 2 ** bits) ||
+      !list(words) ||
+      words.length !== 1024 * bits
+    )
+      throw new RangeError('SparseGrid chunk palette or word length is wrong; use the packed chunk layout');
+    for (let i = 0; i < palette.length; i++) checkPalette(palette[i], 'SparseGrid chunk palette entry', 0);
+    if (!(words instanceof Uint32Array))
+      for (let i = 0; i < words.length; i++) {
+        const word = words[i];
+        if (!Number.isInteger(word) || word < 0 || word > 0xffffffff)
+          throw new RangeError('SparseGrid chunk word is not an unsigned 32-bit integer; fix the data');
+      }
+    bytes += 4 * (palette.length + words.length);
+    if (bytes > limits.maxBytes) throw new RangeError('SparseGrid data exceeds maxBytes; raise it or load less');
+  }
+  return records.map((item) => {
+    const chunk = VoxelChunk.unpack({
+        palette: Uint32Array.from(item.palette),
+        bits: item.bits as 0 | 1 | 2 | 4 | 8,
+        words: item.words instanceof Uint32Array ? item.words : Uint32Array.from(item.words),
+        light: 0,
+      }),
+      [cx, cy, cz] = item.position;
+    let filled = 0;
+    for (let y = 0; y < 32; y++)
+      for (let z = 0; z < 32; z++)
+        for (let x = 0; x < 32; x++)
+          if (chunk.get(x, y, z)) {
+            if (cx * 32 + x >= size[0] || cy * 32 + y >= size[1] || cz * 32 + z >= size[2])
+              throw new RangeError('SparseGrid chunk fills a cell outside the grid bounds; empty it');
+            filled++;
+          }
+    if (filled) return { position: tuple(item.position), chunk, filled };
+    if (air) return null;
+    throw new RangeError('SparseGrid chunk is empty; leave empty chunks out');
+  });
+}
+
+/** The chunk records of a {@link SparseChunkTable}, its array types and lengths checked; views, not copies. */
+function tableRecords(table: SparseChunkTable, limits: Limits): ChunkRecord[] {
+  if (typeof table !== 'object' || table === null)
+    throw new TypeError('SparseGrid chunk table is missing; pass snapshot output');
+  const { positions, bits, paletteSizes, palettes, words } = table;
+  if (
+    !(positions instanceof Float64Array) ||
+    !(bits instanceof Uint8Array) ||
+    !(paletteSizes instanceof Uint16Array) ||
+    !(palettes instanceof Uint8Array) ||
+    !(words instanceof Uint32Array)
+  )
+    throw new TypeError(
+      'SparseGrid chunk table needs Float64Array positions, Uint8Array bits and palettes, Uint16Array paletteSizes and Uint32Array words',
+    );
+  const count = bits.length;
+  if (count > limits.maxChunks)
+    throw new RangeError('SparseGrid data exceeds maxChunks; raise it or load a smaller grid');
+  let entries = 0,
+    cells = 0;
+  for (let i = 0; i < count; i++) {
+    if (![0, 1, 2, 4, 8].includes(bits[i]))
+      throw new RangeError('SparseGrid chunk palette or word length is wrong; use the packed chunk layout');
+    entries += paletteSizes[i];
+    cells += 1024 * bits[i];
+  }
+  if (
+    positions.length !== 3 * count ||
+    paletteSizes.length !== count ||
+    palettes.length !== entries ||
+    words.length !== cells
+  )
+    throw new RangeError('SparseGrid chunk table lengths disagree; pass snapshot output');
+  const records: ChunkRecord[] = [];
+  for (let i = 0, p = 0, w = 0; i < count; i++) {
+    const n = paletteSizes[i],
+      m = 1024 * bits[i];
+    records.push({
+      position: [positions[3 * i], positions[3 * i + 1], positions[3 * i + 2]],
+      palette: palettes.subarray(p, p + n),
+      bits: bits[i],
+      words: words.subarray(w, w + m),
+    });
+    p += n;
+    w += m;
+  }
+  return records;
+}
+
+/** Packs chunks (null: an absent chunk, bits 0 with palette [0]) into a new {@link SparseChunkTable}. */
+function packTable(list: readonly (readonly [position: Vec3, chunk: VoxelChunk | null])[]): SparseChunkTable {
+  const packed = list.map(([, chunk]) => {
+      const value = chunk?.pack() ?? { palette: new Uint32Array(1), bits: 0, words: new Uint32Array(0) };
+      if (value.bits === 16) throw new RangeError('SparseGrid chunk holds an index above 255; fix the grid');
+      return value;
+    }),
+    table: SparseChunkTable = {
+      positions: new Float64Array(3 * list.length),
+      bits: new Uint8Array(list.length),
+      paletteSizes: new Uint16Array(list.length),
+      palettes: new Uint8Array(packed.reduce((n, p) => n + p.palette.length, 0)),
+      words: new Uint32Array(packed.reduce((n, p) => n + p.words.length, 0)),
+    };
+  let p = 0,
+    w = 0;
+  packed.forEach((value, i) => {
+    table.positions.set(list[i][0], 3 * i);
+    table.bits[i] = value.bits;
+    table.paletteSizes[i] = value.palette.length;
+    table.palettes.set(value.palette, p);
+    table.words.set(value.words, w);
+    p += value.palette.length;
+    w += value.words.length;
+  });
+  return table;
+}
+
+/** Whether every cell of a grid at `origin` of `size` lies in the `'world'` envelope (version 1 data). */
+function inWorld(size: Vec3, origin: Vec3): boolean {
+  for (let axis = 0; axis < 3; axis++) {
+    const low = axis === 1 ? -32768 : -2147483648,
+      high = axis === 1 ? 32767 : 2147483647;
+    if (!(origin?.[axis] >= low && origin[axis] + size?.[axis] - 1 <= high)) return false;
+  }
+  return true;
+}
+
+function checkExtent(size: Vec3, origin: Vec3, wide: boolean): void {
   checkCell(size, 'SparseGrid size');
   checkCell(origin, 'SparseGrid origin');
   if (size.some((v) => v < 1) || !Number.isSafeInteger(size[0] * size[1] * size[2]))
     throw new RangeError('SparseGrid size must be positive with a safe-integer cell count; pass a smaller size');
   for (let axis = 0; axis < 3; axis++) {
+    if (wide) {
+      if (!Number.isSafeInteger(origin[axis] + (size[axis] - 1)))
+        throw new RangeError('SparseGrid extent passes 2^53 - 1; move the origin or shrink the size');
+      continue;
+    }
     const low = axis === 1 ? -32768 : -2147483648,
       high = axis === 1 ? 32767 : 2147483647;
     if (origin[axis] < low || origin[axis] + size[axis] - 1 > high)
       throw new RangeError(
-        `SparseGrid ${axis === 1 ? 'Y' : 'X/Z'} extent leaves the engine's cell range; move the origin or shrink the size`,
+        `SparseGrid ${axis === 1 ? 'Y' : 'X/Z'} extent leaves the engine's cell range; move the origin or shrink the size, or pass envelope 'wide'`,
       );
   }
 }

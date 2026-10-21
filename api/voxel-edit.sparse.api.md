@@ -11,9 +11,27 @@ export interface GridWindow extends VoxelGrid {
     readonly origin: Vec3;
 }
 
+export interface SparseChunkTable {
+    positions: Float64Array;
+    bits: Uint8Array;
+    paletteSizes: Uint16Array;
+    palettes: Uint8Array;
+    words: Uint32Array;
+}
+
 export interface SparseDelta {
     readonly changed: number;
     readonly bytes: number;
+}
+
+export interface SparseDeltaSnapshot {
+    format: 'margo-sparse-delta';
+    version: 1;
+    size: MutableVec3;
+    origin: MutableVec3;
+    changed: number;
+    before: SparseChunkTable;
+    after: SparseChunkTable;
 }
 
 export interface SparseEdit {
@@ -28,6 +46,8 @@ export class SparseGrid {
     static empty(size: Vec3, options?: SparseOptions): SparseGrid;
     static fromGrid(grid: VoxelGrid, options?: SparseOptions): SparseGrid;
     static deserialize(data: unknown, limits?: SparseLimits): SparseGrid;
+    static fromSnapshot(snapshot: SparseSnapshot, limits?: SparseLimits): SparseGrid;
+    static deltaSnapshot(delta: SparseDelta): SparseDeltaSnapshot;
     get stats(): SparseStats;
     get bounds(): {
         min: MutableVec3;
@@ -41,13 +61,15 @@ export class SparseGrid {
     readWindow(origin: Vec3, size: Vec3, limits?: SparseLimits): GridWindow;
     writeWindow(window: GridWindow, limits?: SparseLimits): SparseEdit;
     raycast(origin: Vec3, direction: Vec3, maxDistance?: number): GridHit | null;
+    snapshot(): SparseSnapshot;
+    applyDeltaSnapshot(data: SparseDeltaSnapshot, side?: 'before' | 'after', limits?: SparseLimits): SparseEdit;
     serialize(limits?: SparseLimits): SparseGridData;
     toWorld(world: VoxelWorld): void;
 }
 
 export interface SparseGridData {
     format: 'margo-sparse-volume';
-    version: 1;
+    version: 1 | 2;
     size: MutableVec3;
     origin: MutableVec3;
     chunks: {
@@ -67,6 +89,15 @@ export interface SparseLimits {
 
 export interface SparseOptions extends SparseLimits {
     origin?: Vec3;
+    envelope?: 'world' | 'wide';
+}
+
+export interface SparseSnapshot {
+    format: 'margo-sparse-snapshot';
+    version: 1;
+    size: MutableVec3;
+    origin: MutableVec3;
+    chunks: SparseChunkTable;
 }
 
 export interface SparseStats {
@@ -85,6 +116,10 @@ export interface WindowEditOptions extends SparseLimits {
 }
 
 export function editWindow(grid: SparseGrid, options: WindowEditOptions): SparseEdit;
+
+export function restoreSnapshots(snapshots: readonly SparseSnapshot[], limits?: SparseLimits): SparseGrid[];
+
+export function snapshotBuffers(data: SparseSnapshot | SparseDeltaSnapshot): ArrayBuffer[];
 
 // Not exported from this entry, but used by the exports above:
 

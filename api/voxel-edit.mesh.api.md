@@ -52,9 +52,27 @@ interface GridWindow extends VoxelGrid {
     readonly origin: Vec3;
 }
 
+interface SparseChunkTable {
+    positions: Float64Array;
+    bits: Uint8Array;
+    paletteSizes: Uint16Array;
+    palettes: Uint8Array;
+    words: Uint32Array;
+}
+
 interface SparseDelta {
     readonly changed: number;
     readonly bytes: number;
+}
+
+interface SparseDeltaSnapshot {
+    format: 'margo-sparse-delta';
+    version: 1;
+    size: MutableVec3;
+    origin: MutableVec3;
+    changed: number;
+    before: SparseChunkTable;
+    after: SparseChunkTable;
 }
 
 interface SparseEdit {
@@ -69,6 +87,8 @@ class SparseGrid {
     static empty(size: Vec3, options?: SparseOptions): SparseGrid;
     static fromGrid(grid: VoxelGrid, options?: SparseOptions): SparseGrid;
     static deserialize(data: unknown, limits?: SparseLimits): SparseGrid;
+    static fromSnapshot(snapshot: SparseSnapshot, limits?: SparseLimits): SparseGrid;
+    static deltaSnapshot(delta: SparseDelta): SparseDeltaSnapshot;
     get stats(): SparseStats;
     get bounds(): {
         min: MutableVec3;
@@ -82,13 +102,15 @@ class SparseGrid {
     readWindow(origin: Vec3, size: Vec3, limits?: SparseLimits): GridWindow;
     writeWindow(window: GridWindow, limits?: SparseLimits): SparseEdit;
     raycast(origin: Vec3, direction: Vec3, maxDistance?: number): GridHit | null;
+    snapshot(): SparseSnapshot;
+    applyDeltaSnapshot(data: SparseDeltaSnapshot, side?: 'before' | 'after', limits?: SparseLimits): SparseEdit;
     serialize(limits?: SparseLimits): SparseGridData;
     toWorld(world: VoxelWorld): void;
 }
 
 interface SparseGridData {
     format: 'margo-sparse-volume';
-    version: 1;
+    version: 1 | 2;
     size: MutableVec3;
     origin: MutableVec3;
     chunks: {
@@ -108,6 +130,15 @@ interface SparseLimits {
 
 interface SparseOptions extends SparseLimits {
     origin?: Vec3;
+    envelope?: 'world' | 'wide';
+}
+
+interface SparseSnapshot {
+    format: 'margo-sparse-snapshot';
+    version: 1;
+    size: MutableVec3;
+    origin: MutableVec3;
+    chunks: SparseChunkTable;
 }
 
 interface SparseStats {
