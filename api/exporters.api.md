@@ -140,6 +140,11 @@ export interface GLBChunk {
     data: Uint8Array;
 }
 
+export interface GLBOptions extends GLTFOptions {
+    maxBinaryBytes?: number;
+    maxBytes?: number;
+}
+
 export interface GLBParts {
     json: Record<string, unknown>;
     bin: Uint8Array | null;
@@ -317,7 +322,7 @@ export function appendGLBMeshes(bytes: Uint8Array, meshes: readonly AppendedMesh
 
 export function exportDAE(source: ExportSource, options?: DAEOptions): DAEResult;
 
-export function exportGLB(source: ExportSource, options?: GLTFOptions): Uint8Array;
+export function exportGLB(source: ExportSource, options?: GLBOptions): Uint8Array;
 
 export function exportGLTF(source: ExportSource, options?: GLTFJsonOptions): GLTFJsonResult;
 

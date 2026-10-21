@@ -83,6 +83,7 @@ Engine export entrypoints also bake back-only optional PBR triangles by reversin
 | `materialData` | all, engine source | None. A `Map`/`WeakMap` from `PbrMaterial` to `MaterialData` |
 | `flatten` | glTF | `false`. World transforms on root nodes instead of the hierarchy |
 | `generator` | glTF | `'Margo Engine exporters'`, written to `asset.generator` |
+| `maxBinaryBytes`, `maxBytes` | `exportGLB` | 4,294,967,295 (the GLB format limit). Output limits; see [GLB size limits](#glb-size-limits) |
 | `embed` | `exportGLTF` | `true`, base64 data URI. `false` returns `bin` for a separate file |
 | `binUri` | `exportGLTF` | `'scene.bin'`, a relative file name |
 | `binary` | STL, PLY | STL `true`, PLY `false` (ASCII, as in Three.js) |
@@ -208,9 +209,17 @@ validator in the tests:
 - **Indexed palette textures.** `await paletteTexture(rgba)` lays out RGBA8 palette entries one per texel in the
   smallest square power-of-two PNG, sampled NEAREST without mipmaps and clamped, and returns each entry's texel-centre
   UV, so a face picks its exact palette colour.
+- **Exact JSON numbers.** Node translations, rotations, scales and matrices, and material factors
+  (`baseColorFactor`, `metallicFactor`, `roughnessFactor`, `emissiveFactor`), are JSON numbers in glTF, so the writer
+  keeps every finite JavaScript number as given: `[16777217, -16777217, 0.1]` and a scale of `1e-50` come out as they
+  went in (no Float32 rounding, underflow or range limit). A rotation is written as given when it is a unit quaternion
+  to within 1e-5 and otherwise scaled to unit length, its sign kept. Transform fields a data node sets are written even
+  when they equal glTF's default. Vertex data, indices, inverse bind matrices and animation keys stay Float32 (or
+  integer) accessors, as glTF requires.
 - **Node matrices and collapsed nodes.** `matrix` (column-major, affine, without shear: glTF forbids sheared node
-  matrices) replaces translation, rotation and scale on a node that is not animated. A scale of [0, 0, 0] collapses a
-  node: glTF keeps it (a hidden cel, shown later by a scale channel), the mesh-only formats leave it out.
+  matrices) replaces translation, rotation and scale on a node that is not animated; it is written exactly as given.
+  A scale of [0, 0, 0] collapses a node: glTF keeps it (a hidden cel, shown later by a scale channel), the mesh-only
+  formats leave it out. Any other scale with a 0 component is refused; tiny nonzero and negative scales are kept.
 - **Skins** name their `skeleton` root (checked to be an ancestor of every joint).
 - **Lightmaps.** glTF has no standard lightmap material slot, and this writer does not invent an extension. A scene's
   `lightmap: {texture, texCoord?, key?, extras?}` writes the texture into the document and records it under the root
@@ -238,6 +247,8 @@ const glb = exportGLB({
 
 Helpers in the main entry turn document frames into standard glTF channels for an `ExportScene` animation. Each sets
 the nodes it animates to their first key (what a viewer that does not play the clip shows) and returns the channels.
+The rest pose keeps the exact numbers given (a placement matrix's translation included); the channel keys are Float32
+accessors, so for example 16,777,217 is a key of 16,777,216.
 
 | Function | Writes |
 | --- | --- |
@@ -263,7 +274,9 @@ writes them back (a round trip is byte-identical). `appendGLBMeshes(bytes, meshe
 volume?, extras?, meshExtras?}` triangle meshes as root nodes of the active scene and keeps everything else: existing
 JSON members, extensions and extras, the BIN bytes, and every further chunk. Names must not clash with an existing node
 (importers match them); every triangle needs area, and `volume: true` requires points off one plane, as convex
-collision hulls do. The naming convention (a Godot `-colonly` suffix, for example) is the caller's.
+collision hulls do. Existing scene roots, node children and the active scene index must resolve to distinct existing
+nodes, checked even when nothing is appended, so a malformed file is refused rather than passed on. The naming
+convention (a Godot `-colonly` suffix, for example) is the caller's.
 
 ```ts
 const withColliders = appendGLBMeshes(glb, [
@@ -278,7 +291,7 @@ An optional subpath (nothing else imports it) that skins a mesh to an authored r
 | Function | Result |
 | --- | --- |
 | `checkJoints(joints)` | Throws unless 1 to 1024 joints `{name, parent, position}` form one tree with one root (`parent: -1`) |
-| `skinWeights(positions, joints, {origin?, influences?})` | `{joints: Uint16Array, weights: Float32Array}`, four per vertex: the `influences` (default 4) nearest bone segments (parent to joint; the root's is its point), inverse-distance weights summing to 1, ties to the lower joint index |
+| `skinWeights(positions, joints, {origin?, influences?})` | `{joints: Uint16Array, weights: Float32Array}`, four per vertex: the `influences` (default 4) nearest bone segments (parent to joint; the root's is its point), inverse-distance weights summing to 1, ties to the lower joint index. Points so far away that distances overflow are measured in a scaled space, so every finite point gets positive weights |
 | `skinBindMatrices(joints, origin?)` | Column-major `local`, `world` and `inverseBind` rest matrices, 16 values per joint |
 | `skinHierarchy(joints, {origin?, name?})` | Joint `ExportNode`s (`root`, `nodes`) and the `SkinData` for the mesh node, skeleton set |
 | `humanoidJoints(min, max)` | An 18-joint upright humanoid rest skeleton fitted to a box (y up, facing +z), to refine by hand |
@@ -298,6 +311,44 @@ const {root, skin} = skinHierarchy(joints, {origin, name: 'Rig'});
 const mesh = {name: 'Figure', geometry: {positions, normals, indices, ...skinWeights(positions, joints, {origin})}, skin};
 const glb = exportGLB({nodes: [{name: 'Model', children: [mesh, root]}]});
 ```
+
+## GLB size limits
+
+`exportGLB(source, {maxBinaryBytes, maxBytes})` bounds the output:
+
+| Option | Counts | Matches |
+| --- | --- | --- |
+| `maxBinaryBytes` | The BIN chunk payload: every buffer view (vertex attributes, indices, inverse bind matrices, animation keys, embedded images) with the zero padding that starts each on a 4-byte boundary | The BIN chunk header's length |
+| `maxBytes` | The whole file: the 12-byte header, the JSON chunk (8-byte header, JSON as UTF-8, space padding) and the BIN chunk (8-byte header, payload) | The GLB header's length (`glb.length`) |
+
+Both take a whole number of bytes from 0 to 4,294,967,295 (the GLB format's own limit, also the default); another
+number throws a RangeError, a non-number a TypeError. An export over a limit throws a RangeError naming the limit and
+the bytes needed. A limit equal to the exact output size passes; one byte less refuses. With neither option the output
+is unchanged, except that a GLB the format cannot describe (over 4 GiB) now throws instead of being written with a
+wrapped length.
+
+The checks run before the work they protect, with sizes kept as safe integers:
+
+- each new geometry's vertex attributes, each index list that will be written (16- or 32-bit as the vertex count
+  decides) and each new image are counted when the scene is collected, before the geometry is normalized (copied) or
+  anything is written;
+- every buffer view (and each 16-bit index copy) is checked against both limits before it is placed;
+- the JSON's UTF-8 size is computed from the serialized text, and the whole file checked, before the JSON is encoded
+  and the GLB is allocated.
+
+So an over-limit export does not allocate the GLB or the BIN payload, and vertex-, index-, image- and JSON-heavy
+exports are refused before any buffer near the limit's size is allocated (the tests wrap the typed-array
+constructors and `TextEncoder.encode` to check this). One copy is not counted first: a geometry used only through
+primitives that bring their own `indices` still has its own index list copied when it is normalized. Measured on a 4.5 million vertex scene with a
+32 MiB image (a 177,555,716-byte GLB, 213 ms to export in full): a 128 MiB `maxBinaryBytes` or `maxBytes` refuses it
+in 0.2 to 1.0 ms.
+
+These are output limits, not a bound on peak memory. While exporting, the writer also holds: the caller's inputs
+(images are embedded as given, by reference, and copied once into the GLB; caller arrays are never changed);
+normalized Float32 copies of each geometry's vertex data and indices, and Float32 copies of animation keys and inverse
+bind matrices; copies of extras; the JSON text, which is built before its size is known; and finally the GLB itself.
+PNG encoding is not part of `exportGLB`: textures arrive as encoded bytes (`paletteTexture` and `encodePNG` run
+before it, outside these limits). `exportGLTF` and `exportModel` take no limits.
 
 ## Limits
 

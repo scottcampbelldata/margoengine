@@ -198,28 +198,28 @@
     },
     "@margoengine/exporters": {
       ".": {
-        "raw": 86811,
-        "gzip": 30050
+        "raw": 90542,
+        "gzip": 31183
       },
       "./usdz": {
-        "raw": 22894,
-        "gzip": 8409
+        "raw": 24643,
+        "gzip": 8914
       },
       "./model": {
         "raw": 23362,
         "gzip": 9094
       },
       "./dae": {
-        "raw": 24888,
-        "gzip": 9342
+        "raw": 26637,
+        "gzip": 9825
       },
       "./capture": {
         "raw": 16912,
         "gzip": 6539
       },
       "./skin": {
-        "raw": 4393,
-        "gzip": 1936
+        "raw": 4832,
+        "gzip": 2138
       }
     },
     "@margoengine/fbx": {
