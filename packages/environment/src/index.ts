@@ -19,7 +19,13 @@ export {
 } from './ultrahdr.js';
 export { halfToFloat, floatToHalf } from './half.js';
 export { SH_BASIS, SH_IRRADIANCE_BANDS, shBasis, evaluateSH, projectEquirectSH, radianceToIrradianceSH } from './sh.js';
-export { Environment, type EnvironmentOptions, type EnvironmentSource, type CubeFaces } from './environment.js';
+export {
+  Environment,
+  type EnvironmentOptions,
+  type EnvironmentSource,
+  type CubeFaces,
+  type CubeTextureSource,
+} from './environment.js';
 export {
   EnvironmentBackground,
   EnvironmentBackground as Skybox,

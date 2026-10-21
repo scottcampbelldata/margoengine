@@ -6,6 +6,8 @@ Build from source with `npm run build` in `packages/environment`.
 
 Covers the common cases of Three.js `RGBELoader`, `EXRLoader` (single-part scanline EXR with NONE, RLE, ZIPS, ZIP or PIZ; no PXR24, B44 or DWAA/DWAB, see Limits), `UltraHDRLoader`, `PMREMGenerator`, `scene.environment`, `scene.background` (texture with `backgroundIntensity`, `backgroundRotation` and `backgroundBlurriness`, or a color) and `scene.fog` (`Fog`, `FogExp2`), plus froxel volumetric fog with light shafts (the `webgpu_volume_lighting` example's job) in the optional `/volumetric` entry.
 
+The optional `/reflector`, `/refractor` and `/cube-camera` entries add a planar mirror, a planar see-through surface (glass, water) and a cube render target (see "Mirrors, glass and cube cameras").
+
 ```ts
 import {Engine} from '@margoengine/core';
 import {loadGLTF} from '@margoengine/gltf-pro';
@@ -233,6 +235,85 @@ light (terrain takes the core-style patch like EnvironmentLighting); core meshes
 environment fills in where nothing was drawn); GPU-culled
 (`CulledMeshes`) parts use the main camera's culling in the capture. WebGPU only.
 
+## Mirrors, glass and cube cameras
+
+Optional entries that render the scene a second time through another camera, into their own HDR target, before the
+frame: `Reflector` (`@margoengine/environment/reflector`, a planar mirror), `Refractor` (`/refractor`, a planar
+see-through surface such as glass or water) and `CubeCamera` (`/cube-camera`, a cube render target). The root entry
+does not change.
+
+```ts
+import {Reflector} from '@margoengine/environment/reflector';
+import {Refractor} from '@margoengine/environment/refractor';
+import {CubeCamera} from '@margoengine/environment/cube-camera';
+import {Environment, EnvironmentLighting} from '@margoengine/environment';
+
+const mirror = Reflector.attach(engine, {width: 4, height: 3, color: '#e8e8e8'});
+mirror.node.setPosition([0, 1.5, -2]);           // the mirror is a core mesh node: move, rotate, scale, parent it
+mirror.roughness = 0.2;                           // blur; normalMap + distortion ripple it
+
+const water = Refractor.attach(engine, {width: 20, height: 20, normalMap: ripples, normalScroll: [0.02, 0.01]});
+water.node.setRotation([-Math.PI / 2, 0, 0]);     // local XY plane, facing +Z: lay it flat facing up
+
+const cube = CubeCamera.attach(engine, {size: 128, position: [0, 1, 0], mips: true});
+cube.update();                                    // six faces now; or {facesPerFrame: 1..6} to keep it current
+// cube.texture (rgba16float, 6 layers) and cube.view (dimension 'cube') are standard cube maps.
+const environment = await Environment.create(engine, cube);   // image-based lighting from the capture
+EnvironmentLighting.attach(engine, environment);
+cube.update();
+await environment.refresh();                      // later: capture again and reprocess in place
+```
+
+- **How a capture runs.** `engine.render({camera, delta: 0})` through the capture camera, with a filtered copy of the
+  frame graph: only the scene passes run (`scenePasses`: order below -110, or from -25 up to 9: GPU culling, sky, shadow
+  maps, clustered light lists, shader patches, core's main draw, glTF-pro, terrain, water, decals, transmission).
+  Post-processing (TAA, PostStack, SSAO, bloom, DOF, tone mapping, FXAA), overlays and labels do not run, so TAA's
+  history and auto exposure never see the capture camera. The output is linear radiance (core's display transform is
+  removed for the capture, as post effects do). Each capture is culled against its own camera, so meshes the main
+  camera culls (behind it, say) still appear. Pass `passes: (pass) => boolean` to choose differently.
+- **Reflector**: a `width` x `height` rectangle in its `node`'s local XY plane, reflecting on the +Z side. The capture
+  camera is the main camera mirrored in the plane (position, target and up), with the main camera's projection
+  (perspective, or `CameraProjection`'s orthographic) made oblique so that its near plane is the mirror plane (Lengyel,
+  "Modifying the Projection Matrix to Perform Oblique Near-Plane Clipping", JGT 2005): nothing behind the mirror shows.
+  The surface samples the image with projective texture coordinates from the capture camera's matrix, so TAA's jitter
+  and MSAA apply to the surface like any mesh. Seen from behind, it draws nothing (put a box behind it as its back).
+- **Refractor**: the same rectangle seen through: the capture camera is the main camera with the near plane on the
+  surface, keeping only what lies beyond it (from either side). Tint and normal-map distortion; no IOR bending.
+- **Options** (both, all live properties except `parent`, `order`, `name`): `width`, `height` (1), `color` (tint, white),
+  `resolution` (capture size as a fraction of the canvas, 1), `clipBias` (world distance the clip plane moves into the
+  captured side, 0), `roughness` (0..1, a box-filtered mip chain of the capture, 0), `normalMap` (a `GPUTexture` or RGBA8
+  pixels), `distortion` (0.03 screen fractions per unit normal), `normalRepeat` ([1, 1]), `normalScroll` ([0, 0] repeats
+  per second), `layers` (every layer), `exclude` (meshes), `autoUpdate` (true: captures in an `engine.onFrame` callback
+  before every `engine.start()` frame; with your own `engine.render()` loop call `update()` first), `passes`, `order`
+  (surface draw order, 1). `texture` is the latest capture, `camera` the capture camera.
+- **CubeCamera**: six 90-degree face cameras at `position` render into `texture` (`rgba16float`, `size` x `size`, 6
+  layers, all mips with `mips: true`) in the standard WebGPU face layout (a face is captured, then copied into its layer
+  flipped in x, since cube faces are mirror images of a right-handed camera's view). `update(faces = 6)` renders the
+  next `faces` faces now; `facesPerFrame` (0..6) renders that many before every `engine.start()` frame. `near`, `far`,
+  `layers`, `exclude` and `passes` as above. `version` changes when a device restore replaces `texture`. Structurally a
+  `{texture, view}` cube map. `Environment.create(engine, cube)` copies its level 0 and processes it like `CubeFaces`
+  (mips, prefiltered specular, SH, BRDF LUT); `environment.refresh()` reprocesses an updated capture into the same
+  textures, so bind groups stay valid (`version` unchanged).
+- **Layers**: `layers` is a 32-bit mask read from `@margoengine/cameras/layers` (`setRenderLayers`); meshes outside it,
+  and `exclude`d meshes, are hidden (`mesh.visible`) for the capture only. Without that module every mesh is on layer 0.
+- **Cost**: each capture is a full scene render (shadow maps included) at the capture size; a cube camera is six.
+- **Limits**: WebGPU only. Captures are sequential renders before the frame, not nested passes: `update()` from inside a
+  frame pass throws (core rejects nested renders). Scene passes that keep canvas-sized targets (transmission's opaque
+  copy, selection's 1x ID buffer) are re-sized by captures of another size; keep `resolution: 1` with them. Another
+  mirror seen in a capture shows its previous frame's image (one bounce per frame). A cube capture of a mirror shows the
+  mirror's image for the main camera. The capture camera follows the main camera at the moment of capture: an
+  `onFrame` callback registered after the surface that moves the camera shows one frame late (register it first, or
+  call `update()` yourself). `Environment.refresh()` needs the environment created from the GPU cube with `keepSource`
+  (default) and the same size; after a device loss, update the cube camera and refresh again.
+- **Checked on a real GPU** (`scripts/env-mirror-gpu-check.js`, NVIDIA Ampere, Edge/Chromium 155, 1x and 4x MSAA): mirror
+  pixels against core drawing the scene reflected in the mirror plane (light reflected too, no mirror): mean 0.15 and
+  99th percentile 4 of 255 at 4x (edges inside the reflection resolve MSAA before tone mapping), max 1 at 1x; same for an
+  orthographic camera; a box behind the mirror changes no capture texel (control: `clipBias: -1` lets it in); glass
+  against the scene drawn without it: mean 0.06 and 99th percentile 1 at 4x, max 1 at 1x; a box between eye and glass
+  changes no capture texel; with TAA, a box moved under accumulated history converges to the image of a fresh history
+  (mean 0.07, max 6 of 255); hidden surfaces leave the frame byte-identical; cube faces hold the expected linear colours (within 0.0003) in the
+  standard orientation; an `Environment` from the cube follows the box colours and `refresh()` updates it in place.
+
 ## Display P3 and HDR output
 
 Input colours can be Display P3 too: every environment colour (`Fog`, `ColorBackground`, `HemisphereLight`...) takes CSS `'color(display-p3 r g b)'` (math's `parseColor`), whose linear sRGB channels stay negative outside sRGB, so materials and lights carry the wide-gamut colour through Tonemap's excess output to a P3 canvas. A background colour outside sRGB is clipped on an sRGB canvas.
@@ -421,6 +502,8 @@ Five bindings, any group and binding numbers. `iblLayoutEntries(firstBinding)` a
 | `TransparentCanvas(options)` | `order` (0.5), `name` (`'transparent-canvas'`) |
 | `VolumetricFog(options)` (`/volumetric`) | `density` (0.02 per m), `heightFalloff` (0), `height` (0), `color` (albedo, [1, 1, 1]), `anisotropy` (0.5), `ambient` (engine ambient), `noise` (0), `noiseScale` (8 m), `wind` ([0, 0, 0] m/s), `range` (100 m), `grid` ([160, 90, 64]), `temporal` (0.9), `shadows`, `lights`, `depth` |
 | `ColorOutput(options)` | `gamut` (`'p3'`), `hdr` (true), `peak` (4, 1..16), `force` (false); name `'color-output'` |
+| `Reflector(options)`, `Refractor(options)` (`/reflector`, `/refractor`) | `width`, `height` (1), `parent`, `color` (white), `resolution` (1), `clipBias` (0), `roughness` (0), `normalMap`, `distortion` (0.03), `normalRepeat` ([1, 1]), `normalScroll` ([0, 0]), `layers` (all), `exclude`, `autoUpdate` (true), `passes` (`scenePasses`), `order` (1), `name` (`'reflector-N'`, `'refractor-N'`) |
+| `CubeCamera(options)` (`/cube-camera`) | `size` (256, power of two 8..2048), `position` ([0, 0, 0]), `near` (0.05), `far` (1000), `mips` (false), `facesPerFrame` (0), `layers` (all), `exclude`, `passes` (`scenePasses`), `name` (`'cube-camera-N'`) |
 
 ## Limits
 
@@ -433,6 +516,8 @@ Two portability measures are deliberate: the specular prefilter samples the cube
 `npm test` in `packages/environment` runs Node checks: every binary16 value round trip; 20 EXR fixtures written by the reference OpenEXR library (NONE, RLE, ZIPS, ZIP and PIZ, each with HALF RGBA, FLOAT RGB, HALF Y and a mixed HALF/FLOAT/UINT layout) decoding bit-exactly; an independent in-test EXR writer (including raw-fallback chunks, decreasing Y and stored, fixed and dynamic deflate blocks); real files `BrightRings.exr` (ZIP) and `AllHalfValues.exr` (PIZ, every half value) from the OpenEXR test images and `spot1Lux.hdr` from the Three.js examples, matched against reference digests; HDR adaptive, flat and old-style runs in both orientations; truncation and random-corruption fuzzing; `tests/hdr.test.js`: all eight Radiance scan orders, RGB output, bounds before allocation, FORMAT and XYZE refusals, located damage, Margo Voxel Studio's own HDR fixtures and a 600-file generated corpus whose SHA-256 digest Studio's decoder produced; CPU SH; and SSR safety. `tests/scene.test.js` checks the scene pieces on a mock GPU: `EnvironmentLighting` and `Fog` patch core's shader as left by shadows, sky, clustered and the HDR captures, leave it untouched when not ready, on another device or disposed, follow device restores and rebuild bind entries on `environment.version`; a real glTF-pro model gets lit and fogged pipelines for opaque and blended primitives and returns to the unpatched pipelines when removed; `ColorBackground` writes exact sRGB or linear values, allocates nothing in steady frames or on resize and releases its uniform; and UltraHDR parsing (attribute and element metadata, corruption fuzzing) and gain-map math against the formula.
 
 `tests/probes.test.js` checks LightProbes on a mock GPU: validation and buffer layout, the ambient patch on core's shader variants (with and without an environment, terrain, clustered) and on a glTF-pro model, the bake's capture shader (rebound frame, linear output, no fog, every clustered light), its submits and dispatches, the opt-in bounded filter's bindings and atomic validation, and the CPU irradiance mirror. `npm run test:probes:browser` checks the bounded filter on a real GPU: constant HDR energy, an independent spherical integral for a directional environment including every cube seam, a rendered colored room against full-source GGX, and byte-identical sharp level 0 / volume SH. It writes `test-results/probe-samples-browser.json`. The broader real-GPU checks are `examples/package-benchmarks/probes-gpu.mjs` (README section above). `tests/probes-live.test.js` checks live capture on the mock GPU: validation, one face per frame with the prefilter on the sixth, the face budget across probes, both priorities, `refresh()` promises, a bake during live capture, pooled resources and device restoration; `examples/package-benchmarks/probes-live-gpu.mjs` measures its latency and GPU cost on a real GPU (Live capture, above).
+
+`tests/mirror.test.js` checks Reflector, Refractor and CubeCamera on a mock GPU: captures run only the scene passes and the full frame graph comes back, the mirror camera lands mirror points x-flipped on its near plane and clips what is behind, the glass clips what is in front, excluded and off-layer meshes are hidden only during a capture, and every cube face matches the standard WebGPU addressing after its x flip, culled against its own face. The real-GPU check is `scripts/env-mirror-gpu-check.js` (above).
 
 `npm run test:browser` (a real-GPU script, not in CI) runs Chromium WebGPU checks (set `BROWSER_CHANNEL`, `BROWSER_EXECUTABLE` and `BROWSER_ARGS` as in the repository brief): a constant environment gives constant values at every prefiltered mip and L0-only SH; a single bright direction gives SH matching both a CPU projection and the analytic delta projection, with no fireflies in the prefiltered mips; prefiltered mip 0 equals the source; the cube follows the documented face convention; GPU SH matches a CPU projection of the same cube texels; six `CubeFaces` give the same SH as the equirect; the BRDF LUT matches brute-force quadrature, the smooth-surface analytic limit and Karis's published mobile fit; the background renders the expected color in each direction (equirect, cube, rotation, exposure, blur, HDR and tone-mapped targets) and never draws over non-cleared depth; `ImageBackground` shows the predicted texel of an 8-bit image at every sampled pixel for the box (three views), the sphere (rotated, looking up) and the cylinder (default and clamped height), decoded to linear on HDR targets and returned byte for byte on the canvas, with live filter switching; `IBL_WGSL` compiles against `iblLayoutEntries` and passes a white furnace test; a real `.hdr` goes through the whole pipeline; and in a real engine the background leaves every pixel of a core mesh untouched, matches core's tone mapping elsewhere, allocates nothing in steady frames and comes back after `engine.rebootDevice()`; in a real engine `ColorBackground` writes exact bytes on cleared depth only, `EnvironmentLighting` lights a core mesh and a glTF-pro triangle with direct and ambient light off, full `Fog` turns the whole frame (including the blended triangle) into its color, and removing all three restores the original frame byte for byte; and an UltraHDR file assembled from two browser-encoded JPEGs decodes through `createImageBitmap`. Every check runs under WebGPU error scopes with zero validation errors. `tests/fixtures/generate.py` regenerates the synthetic fixtures (`pip install OpenEXR numpy`).
 

@@ -29,8 +29,15 @@ export interface CubeFaces {
   size: number;
   faces: readonly Float32Array[];
 }
-/** An equirectangular FloatImage (from parseHDR or parseEXR) or six cube faces. */
-export type EnvironmentSource = FloatImage | CubeFaces;
+/**
+ * A cube map already on the GPU, such as a `CubeCamera`: `texture` is `rgba16float`, square with a power-of-two edge,
+ * 6 array layers and `COPY_SRC` usage, on the environment's device. Its level 0 is copied, then processed as CubeFaces.
+ */
+export interface CubeTextureSource {
+  readonly texture: GPUTexture;
+}
+/** An equirectangular FloatImage (from parseHDR or parseEXR), six cube faces, or a GPU cube map. */
+export type EnvironmentSource = FloatImage | CubeFaces | CubeTextureSource;
 
 /** How `Environment.create` processes its source; sizes are texels per edge, invalid values throw RangeError. */
 export interface EnvironmentOptions {
@@ -122,6 +129,7 @@ const prefilterPipeline = (device: GPUDevice): GPURenderPipeline =>
 const isPowerOfTwo = (n: number) => Number.isInteger(n) && n > 0 && (n & (n - 1)) === 0;
 const floorPowerOfTwo = (n: number) => 2 ** Math.floor(Math.log2(Math.max(1, n)));
 const isCube = (source: EnvironmentSource): source is CubeFaces => 'faces' in source;
+const isTexture = (source: EnvironmentSource): source is CubeTextureSource => 'texture' in source;
 const isDevice = (target: GPUDevice | EngineKernel): target is GPUDevice =>
   typeof (target as GPUDevice).createTexture === 'function';
 
@@ -135,7 +143,20 @@ function deviceOf(target: GPUDevice | EngineKernel): GPUDevice {
 
 function validateSource(source: EnvironmentSource): void {
   if (!source || typeof source !== 'object') throw new TypeError('Expected an equirect FloatImage or CubeFaces');
-  if (isCube(source)) {
+  if (isTexture(source)) {
+    const texture = source.texture;
+    if (
+      typeof texture?.createView !== 'function' ||
+      texture.format !== 'rgba16float' ||
+      texture.width !== texture.height ||
+      !isPowerOfTwo(texture.width) ||
+      texture.depthOrArrayLayers !== 6 ||
+      !(texture.usage & GPUTextureUsage.COPY_SRC)
+    )
+      throw new TypeError(
+        'A GPU cube source needs a square power-of-two rgba16float texture with 6 layers and COPY_SRC usage; pass a CubeCamera',
+      );
+  } else if (isCube(source)) {
     if (
       !isPowerOfTwo(source.size) ||
       source.faces.length !== 6 ||
@@ -154,11 +175,11 @@ function validateSource(source: EnvironmentSource): void {
 
 function resolveSettings(device: GPUDevice, source: EnvironmentSource, options: EnvironmentOptions): Settings {
   const limit = floorPowerOfTwo(device.limits.maxTextureDimension2D);
-  if (isCube(source) && options.size !== undefined && options.size !== source.size)
+  const cubeSize = isTexture(source) ? source.texture.width : isCube(source) ? source.size : undefined;
+  if (cubeSize !== undefined && options.size !== undefined && options.size !== cubeSize)
     throw new RangeError('CubeFaces size must equal the environment size');
-  const size = isCube(source)
-    ? source.size
-    : (options.size ?? Math.min(1024, limit, Math.max(16, floorPowerOfTwo(source.width / 4))));
+  const size =
+    cubeSize ?? options.size ?? Math.min(1024, limit, Math.max(16, floorPowerOfTwo((source as FloatImage).width / 4)));
   if (!isPowerOfTwo(size) || size > limit)
     throw new RangeError(`Environment size must be a power of two up to ${limit}`);
   const specularSize = options.specularSize ?? Math.min(256, size);
@@ -227,12 +248,14 @@ async function guarded(device: GPUDevice, encode: () => void): Promise<void> {
   if (failure) throw new MargoError('failed', `Environment processing failed: ${failure.message}`);
 }
 
+// `reuse`: process into these resources (same settings) instead of new ones; the BRDF LUT is kept.
 async function build(
   device: GPUDevice,
   source: EnvironmentSource,
   settings: Settings,
   rotation: number,
   intensity: number,
+  reuse?: Resources,
 ): Promise<Resources> {
   const created: Array<GPUTexture | GPUBuffer> = [];
   const track = <T extends GPUTexture | GPUBuffer>(resource: T): T => {
@@ -287,51 +310,54 @@ async function build(
   try {
     // Phase 1: upload and build the source cube with its mip chain.
     await guarded(device, () => {
-      sampler = device.createSampler({
-        label: 'environment',
-        magFilter: 'linear',
-        minFilter: 'linear',
-        mipmapFilter: 'linear',
-      });
-      cube = track(
-        device.createTexture({
-          label: 'environment source cube',
-          size: [size, size, 6],
-          mipLevelCount: cubeMips,
-          format: 'rgba16float',
-          usage: storageUsage,
-        }),
-      );
-      specular = track(
-        device.createTexture({
-          label: 'environment specular',
-          size: [specularSize, specularSize, 6],
-          mipLevelCount: specularMips,
-          format: 'rgba16float',
-          usage: renderUsage,
-        }),
-      );
-      brdf = track(
-        device.createBuffer({
-          label: 'environment BRDF LUT',
-          size: settings.brdfSize * settings.brdfSize * 4,
-          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
-        }),
-      );
-      sh = track(
-        device.createBuffer({
-          label: 'environment SH',
-          size: 512,
-          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_SRC,
-        }),
-      );
-      params = track(
-        device.createBuffer({
-          label: 'environment params',
-          size: 16,
-          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        }),
-      );
+      if (reuse) ({ sampler, cube, specular, brdf, sh, params } = reuse);
+      else {
+        sampler = device.createSampler({
+          label: 'environment',
+          magFilter: 'linear',
+          minFilter: 'linear',
+          mipmapFilter: 'linear',
+        });
+        cube = track(
+          device.createTexture({
+            label: 'environment source cube',
+            size: [size, size, 6],
+            mipLevelCount: cubeMips,
+            format: 'rgba16float',
+            usage: storageUsage,
+          }),
+        );
+        specular = track(
+          device.createTexture({
+            label: 'environment specular',
+            size: [specularSize, specularSize, 6],
+            mipLevelCount: specularMips,
+            format: 'rgba16float',
+            usage: renderUsage,
+          }),
+        );
+        brdf = track(
+          device.createBuffer({
+            label: 'environment BRDF LUT',
+            size: settings.brdfSize * settings.brdfSize * 4,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+          }),
+        );
+        sh = track(
+          device.createBuffer({
+            label: 'environment SH',
+            size: 512,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_SRC,
+          }),
+        );
+        params = track(
+          device.createBuffer({
+            label: 'environment params',
+            size: 16,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+          }),
+        );
+      }
       readback = track(device.createBuffer({ size: 512, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }));
       device.queue.writeBuffer(
         params,
@@ -339,7 +365,13 @@ async function build(
         new Float32Array([Math.cos(rotation), Math.sin(rotation), specularMips - 1, intensity]),
       );
       const encoder = device.createCommandEncoder({ label: 'environment source cube' });
-      if (isCube(source)) {
+      if (isTexture(source))
+        encoder.copyTextureToTexture({ texture: source.texture, mipLevel: 0 }, { texture: cube, mipLevel: 0 }, [
+          size,
+          size,
+          6,
+        ]);
+      else if (isCube(source)) {
         for (let face = 0; face < 6; face++)
           device.queue.writeTexture(
             { texture: cube, origin: { x: 0, y: 0, z: face } },
@@ -474,19 +506,21 @@ async function build(
         1,
         1,
       );
-      const brdfUnit = uniform(new Uint32Array([settings.brdfSamples, settings.brdfSize, 0, 0]));
-      temporary.push(brdfUnit);
-      dispatch(
-        encoder,
-        'brdfLut',
-        [
-          { binding: 0, resource: { buffer: brdf } },
-          { binding: 1, resource: { buffer: brdfUnit } },
-        ],
-        groups(settings.brdfSize),
-        groups(settings.brdfSize),
-        1,
-      );
+      if (!reuse) {
+        const brdfUnit = uniform(new Uint32Array([settings.brdfSamples, settings.brdfSize, 0, 0]));
+        temporary.push(brdfUnit);
+        dispatch(
+          encoder,
+          'brdfLut',
+          [
+            { binding: 0, resource: { buffer: brdf } },
+            { binding: 1, resource: { buffer: brdfUnit } },
+          ],
+          groups(settings.brdfSize),
+          groups(settings.brdfSize),
+          1,
+        );
+      }
       encoder.copyBufferToBuffer(sh, 0, readback, 0, 512);
       device.queue.submit([encoder.finish()]);
     });
@@ -512,6 +546,11 @@ async function build(
         'failed',
         'Environment processing produced non-finite SH; check the source image for NaN or infinite texels',
       );
+    if (reuse) {
+      reuse.radiance.set(radiance);
+      reuse.irradiance.set(irradiance);
+      return reuse;
+    }
     return {
       device,
       cube,
@@ -555,6 +594,7 @@ export class Environment implements EnginePlugin {
   private readonly settings: Settings;
   private source?: EnvironmentSource;
   private restoring?: { device: GPUDevice; promise: Promise<void> };
+  private refreshing?: Promise<void>;
   private readonly listeners = new Set<(environment: Environment) => void>();
   private rotationValue: number;
   private intensityValue: number;
@@ -770,6 +810,45 @@ export class Environment implements EnginePlugin {
     );
     this.restoring = { device, promise };
     return promise;
+  }
+
+  /**
+   * Processes a GPU cube source (a `CubeCamera` after its `update()`) again into this environment's own textures and
+   * SH buffer: mips, prefiltered specular and irradiance. Bind groups stay valid (`version` is unchanged); `sh` and
+   * `irradianceAt` follow when the promise resolves. Concurrent calls share one refresh.
+   * Rejects with MargoError `state` when the environment was not created from a GPU cube with keepSource, or is
+   * restoring, and with RangeError when the source changed size.
+   */
+  refresh(): Promise<void> {
+    if (this.refreshing) return this.refreshing;
+    try {
+      const resources = this.live,
+        source = this.source;
+      if (!source || !isTexture(source))
+        throw new MargoError(
+          'state',
+          'Environment refresh needs a GPU cube source; create the environment from a CubeCamera with keepSource true',
+        );
+      validateSource(source);
+      if (source.texture.width !== this.settings.size)
+        throw new RangeError('Environment refresh source changed size; create a new Environment for the new size');
+      const promise: Promise<void> = build(
+        resources.device,
+        source,
+        this.settings,
+        this.rotationValue,
+        this.intensityValue,
+        resources,
+      )
+        .then(() => undefined)
+        .finally(() => {
+          if (this.refreshing === promise) this.refreshing = undefined;
+        });
+      this.refreshing = promise;
+      return promise;
+    } catch (error) {
+      return Promise.reject(error);
+    }
   }
 
   setup(engine: EngineKernel): void {

@@ -7,11 +7,14 @@ import { build } from 'vite';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
 await copyFile(resolve(repository, 'LICENSE'), resolve(root, 'LICENSE'));
-// One self-contained build per entry, so the optional volumetric and probes entries share no chunk with (and never changes) the root.
+// One self-contained build per entry, so the optional entries share no chunk with (and never change) the root.
 for (const [entry, emptyOutDir] of [
   ['index', true],
   ['volumetric', false],
   ['probes', false],
+  ['reflector', false],
+  ['refractor', false],
+  ['cube-camera', false],
 ])
   await build({
     root,
