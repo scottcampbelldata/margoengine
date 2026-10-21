@@ -17,6 +17,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./extras": {
+      "types": "./dist/extras.d.ts",
+      "import": "./dist/extras.js"
     }
   },
   "files": [

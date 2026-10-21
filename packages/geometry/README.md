@@ -49,6 +49,46 @@ Every function returns a plain `GeometryData` (`positions`, `normals`, `uvs`, `i
 | `computeVertexNormals`, `toNonIndexed`, `applyMatrix4`, `center`, `computeBoundingBox`, `computeBoundingSphere` | same names, pure functions returning new data |
 | `EdgesGeometry`, `WireframeGeometry` | `edgesGeometry`, `wireframe` (line index pairs) |
 | `LoopSubdivision` (three-subdivide) | `loopSubdivide` |
+| `RoundedBoxGeometry`, `ConvexGeometry`, `ParametricGeometry`, `DecalGeometry` (addons) | `roundedBoxGeometry`, `convexGeometry`, `parametricGeometry`, `decalGeometry` from `@margoengine/geometry/extras` |
+
+## Extras
+
+`@margoengine/geometry/extras` holds four more generators, in their own entry so the main one keeps its size. Each
+returns the same `GeometryData` with unit normals and UVs.
+
+```ts
+import {convexGeometry, decalGeometry, parametricGeometry, roundedBoxGeometry} from '@margoengine/geometry/extras';
+
+// Width, height, depth, facets per rounded edge, radius. Six groups like boxGeometry; radius 0 is the plain box.
+const button = roundedBoxGeometry(2, 1, 0.4, 4, 0.15);
+
+// The convex hull of any points ([x, y, z] arrays or flat numbers): only the corners become vertices.
+const rock = convexGeometry(points);
+
+// Any surface (u, v) in [0, 1]: normals come from the surface, UVs are (u, v).
+const wave = parametricGeometry((u, v) => [u * 4 - 2, Math.sin(u * 6) * 0.2, v * 4 - 2], 64, 64);
+
+// A decal: the part of `wall` (geometry plus its world matrix) inside a 0.5 x 0.5 x 0.2 box at `hit`, projected along
+// the box's -z. The result is in world space; draw it with an identity transform and the decal texture.
+const sticker = decalGeometry(wallGeometry, wallMesh.matrix, hit, [0, 0, 0, 1], [0.5, 0.5, 0.2]);
+```
+
+- `roundedBoxGeometry(width, height, depth, segments = 2, radius = 0.1)`: every edge and corner is rounded; the radius
+  is clamped to half the smallest side, and half of every side gives a sphere. Each rounded edge is split between the
+  two faces that meet there and both compute their shared vertices from the same numbers, so there are no cracks. An
+  odd `segments` gets one extra facet so a vertex sits on the 45-degree seam.
+- `convexGeometry(points)`: quickhull (Barber, Dobkin and Huhdanpaa 1996) with a tolerance scaled to the coordinates.
+  Duplicates and points inside or on a face or edge are dropped; coplanar triangles merge into one flat face with one
+  normal. UVs project each face onto the bounding-box side it faces. Fewer than four points, or points that do not
+  span a volume, throw `RangeError`.
+- `parametricGeometry(fn, slices = 8, stacks = 8)`: `fn(u, v)` returns `[x, y, z]` or writes its third argument.
+  Normals are `dP/du x dP/dv` by central differences, so a surface whose parameters turn counter-clockwise seen from
+  outside faces out; at poles the normal is taken a small step inside the parameter square. Seams are not welded.
+- `decalGeometry(target, matrix, position, orientation, size, {offset, backfaces})`: `orientation` is a quaternion
+  or Euler XYZ radians. Triangles facing the projector are clipped to the box's six planes (Sutherland-Hodgman) and
+  fanned back, keeping the target's winding (also under a mirroring matrix). UVs are `x / size.x + 0.5` and
+  `y / size.y + 0.5`, so 0 to 1 across the box. Vertices lift `offset` along their normal (default 1/1000 of the
+  smaller side) to avoid depth fighting; `backfaces: true` keeps triangles facing away from the projector.
 
 ## How it works
 
@@ -98,6 +138,8 @@ tiles.normals = creasedNormals(tiles.positions, {angle: 45, groups: tileGroups})
 
 ## Limits
 
+- `parametricGeometry` does not weld seams or poles and `decalGeometry` does not share vertices between clipped
+  triangles; run `mergeVertices` when a caller needs an indexed, welded mesh.
 - Three.js `LatheGeometry` leaves its last profile normal unnormalized; here every normal is unit length. Otherwise output matches Three.js r180.
 - `computeTangents` does not split vertices where the tangent frame is discontinuous. It matches MikkTSpace on meshes already split at UV seams and mirror lines (glTF assets and all primitives here), not bit for bit on arbitrary meshes.
 - Like Three.js, a shape with collinear points on its outline can leave T-junctions between the extruded caps and walls, because the triangulator drops those points.
@@ -107,6 +149,12 @@ tiles.normals = creasedNormals(tiles.positions, {angle: 45, groups: tileGroups})
 
 ## Tests
 
-`npm test` in `packages/geometry` runs Node checks for: vertex and index counts against the Three.js formulas for every primitive and segment setting; vertex-for-vertex agreement with Three.js r180 (`tests/fixtures/three-reference.json`, regenerated with `scripts/three-fixture.js` from any Three.js install); watertight, consistently wound, outward solids with the right Euler characteristic and analytic volumes for box, sphere, cylinder, cone, capsule, torus, torus knot, all polyhedra at several details, beveled and path extrusions with holes, closed tubes and Loop-subdivided meshes; unit normals that agree with the winding; UV ranges; triangulated area equal to polygon minus holes across reversed, mixed, collinear, duplicate, touching and 420-point noisy inputs; tangent orthogonality and handedness including mirrored UVs; area-preserving merge and weld; analytic curve lengths (line, circle, arc, ellipse, parabola); orthonormal right-handed Frenet frames; core `Geometry` interop; and a Vite bundle check that consumers tree-shake.
+`npm test` in `packages/geometry` runs Node checks for: vertex and index counts against the Three.js formulas for every primitive and segment setting; vertex-for-vertex agreement with Three.js r180 (`tests/fixtures/three-reference.json`, regenerated with `scripts/three-fixture.js` from any Three.js install); watertight, consistently wound, outward solids with the right Euler characteristic and analytic volumes for box, sphere, cylinder, cone, capsule, torus, torus knot, all polyhedra at several details, beveled and path extrusions with holes, closed tubes and Loop-subdivided meshes; unit normals that agree with the winding; UV ranges; triangulated area equal to polygon minus holes across reversed, mixed, collinear, duplicate, touching and 420-point noisy inputs; tangent orthogonality and handedness including mirrored UVs; area-preserving merge and weld; analytic curve lengths (line, circle, arc, ellipse, parabola); orthonormal right-handed Frenet frames; core `Geometry` interop; and a Vite bundle check that consumers tree-shake. The extras tests check rounded boxes
+(closed, genus 0, bit-identical seams, second-order convergence to the analytic area and volume, the radius-0 box and
+the sphere limit), convex hulls (cube lattices with duplicates, edge and face points keep only corners; stacked rings
+keep only the end circles; 2,000 sphere points all become vertices with F = 2V - 4; random clouds contain every input
+point), parametric spheres and tori (area, volume, Euler characteristic 2 and 0, radial normals) and decals (every
+vertex inside the box, UVs 0 to 1 matching the box coordinates, footprint area x * y on planes, turned and mirrored
+world matrices).
 
 MIT licensed.
