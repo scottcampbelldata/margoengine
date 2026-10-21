@@ -49,7 +49,7 @@ fn luma(uv:vec2f)->f32 {return dot(textureSampleLevel(image,bilinear,uv,0).rgb,v
 /** Fast approximate anti-aliasing for single-sampled (phone or light-tier) output. Alone it captures the finished frame
  * outside every other effect; in a PostStack it runs after the display effect.
  * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`, `'attached'` when attached
- * twice. */
+ * twice or next to SMAA. */
 export class FXAA implements EnginePlugin {
   readonly name = 'fxaa';
   private engine?: Engine;
@@ -88,6 +88,8 @@ export class FXAA implements EnginePlugin {
         this.disposed ? 'disposed' : 'unsupported',
         'FXAA requires WebGPU and a live effect; attach a new FXAA to a WebGPU engine',
       );
+    if (engine.hasPlugin('smaa'))
+      throw margoError('attached', 'FXAA cannot run next to SMAA; remove SMAA or keep it instead of FXAA');
     this.engine = engine;
     this.sampler = engine.gpu.createSampler({ magFilter: 'linear', minFilter: 'linear' });
   }

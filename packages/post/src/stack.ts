@@ -16,13 +16,13 @@ const owners = ['bloom', 'ssao', 'dof', 'tonemap', 'post-processing'],
   rank = { hdr: 0, display: 1, ldr: 2 },
   single = { count: 1 };
 
-/** One HDR scene capture shared by several effects, applied in array order: HDR effects (SSAO, DOF, Bloom), at most one
- * display effect (Tonemap or creative PostProcessing), then LDR effects (FXAA). Without a display effect the last HDR
- * effect tonemaps as it does alone. The stack attaches, restores and disposes its effects.
- * @throws TypeError when `effects` is empty, repeats a name or holds an effect that cannot join; RangeError when they
- * are out of order (HDR, display, LDR); MargoError `'attached'` when an effect is already attached or a capture owner
- * is attached alone, `'unsupported'` on a WebGL engine or when another plugin replaced core's lighting shader,
- * `'disposed'` after `dispose()`. */
+/** One HDR scene capture shared by several effects, applied in array order: HDR effects (SSAO, DOF, Bloom, Afterimage),
+ * at most one display effect (Tonemap or creative PostProcessing), then LDR effects (SMAA or FXAA, Glitch). Without a
+ * display effect the last HDR effect tonemaps as it does alone. The stack attaches, restores and disposes its effects.
+ * @throws TypeError when `effects` is empty, repeats a name, holds an effect that cannot join or holds both SMAA and
+ * FXAA; RangeError when they are out of order (HDR, display, LDR); MargoError `'attached'` when an effect is already
+ * attached or a capture owner is attached alone, `'unsupported'` on a WebGL engine or when another plugin replaced
+ * core's lighting shader, `'disposed'` after `dispose()`. */
 export class PostStack implements EnginePlugin {
   readonly name = 'post:stack';
   private engine?: Engine;
@@ -48,6 +48,8 @@ export class PostStack implements EnginePlugin {
       new Set(effects.map((effect) => effect?.name)).size !== effects.length
     )
       throw new TypeError('PostStack needs distinct effects');
+    if (effects.some((effect) => effect?.name === 'smaa') && effects.some((effect) => effect?.name === 'fxaa'))
+      throw new TypeError('PostStack takes one anti-aliasing effect; keep SMAA or FXAA, not both');
     let last = 0,
       displays = 0;
     this.stages = effects.map((effect) => {

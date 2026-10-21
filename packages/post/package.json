@@ -64,6 +64,10 @@
     "./image": {
       "types": "./dist/image.d.ts",
       "import": "./dist/image.js"
+    },
+    "./smaa": {
+      "types": "./dist/smaa.d.ts",
+      "import": "./dist/smaa.js"
     }
   },
   "files": [
