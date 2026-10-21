@@ -2,6 +2,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, PassContext, Vec3 } from '@margoengine/core/extension';
 import { invertMatrixStable } from '@margoengine/math/mat4';
+import { MargoError } from '@margoengine/math/errors';
 import { HDRRenderTarget } from './targets.js';
 import type { StackHost, StackStage } from '../../shared/stack.js';
 import { displayShader } from '../../shared/display.js';
@@ -45,24 +46,48 @@ const present =
   `@group(0) @binding(0) var image:texture_2d<f32>;@fragment fn fragment(i:Out)->@location(0) vec4f{return textureLoad(image,clamp(vec2i(i.uv*vec2f(textureDimensions(image))),vec2i(0),vec2i(textureDimensions(image))-1),0);}`;
 /** Height fog and god rays. For a sky backdrop use `Sky` from `@margoengine/sky`. */
 export interface AtmosphereOptions {
+  /** Exponential fog density, 0-10. Default 0 (no fog). */
   density?: number;
+  /** How fast the fog thins with height, 0-10. Default 0. */
   heightFalloff?: number;
+  /** Fog colour, linear RGB 0..1. Default [0.45, 0.62, 0.8]. */
   color?: Vec3;
+  /** World direction towards the sun (nonzero) for god rays. Default [0.3, 0.6, -0.7]. */
   sun?: Vec3;
+  /** God-ray strength, 0-4. Default 0 (off). */
   godRays?: number;
 }
 /** For bloom, put `Bloom` from `@margoengine/post/bloom` before this effect in a `PostStack`. */
 export interface PostOptions {
+  /** Exposure in stops, -10 to 10. Default 0. */
   exposure?: number;
+  /** Contrast around mid grey, 0-4. Default 1. */
   contrast?: number;
+  /** Saturation, 0-4 (0 is greyscale). Default 1. */
   saturation?: number;
+  /** Per-channel multiplier, 0-16. Default [1, 1, 1]. */
   gain?: Vec3;
+  /** Per-channel offset added after gain, -4 to 4. Default [0, 0, 0]. */
   lift?: Vec3;
+  /** Focus distance in world units, 0.01-10,000. Default 5. */
   focus?: number;
+  /** Focus blur strength, 0-64. Default 0 (no blur). */
   aperture?: number;
+  /** Film grain amount, 0..1. Default 0. */
   grain?: number;
+  /** Height fog and god rays. */
   atmosphere?: AtmosphereOptions;
 }
+/**
+ * Grades the HDR scene: exponential height fog, screen-space god rays, a depth-of-field focus blur,
+ * exposure/contrast/saturation/gain/lift, the PBR Neutral display transform and grain; reads `post.options` each
+ * frame. Alone it owns the scene capture; in a `PostStack` it is the display effect (put `Bloom` before it for bloom).
+ * WebGPU only.
+ * @throws RangeError when an option is out of range; TypeError for removed options (`bloom`, `threshold`,
+ * `atmosphere.sky`), naming the replacement.
+ * @throws MargoError `'unsupported'` on a WebGL engine, `'attached'` when attached twice, `'state'` when the camera
+ * matrix is not invertible.
+ */
 export class PostProcessing implements EnginePlugin {
   readonly name = 'post-processing';
   target?: HDRRenderTarget;
@@ -98,7 +123,8 @@ export class PostProcessing implements EnginePlugin {
   }
   /** In a PostStack, grades (fog, focus blur, ACES, grain) the stack's HDR result as its display effect. */
   private joinStack(host: StackHost): StackStage {
-    if (this.device || this.host) throw new Error('PostProcessing is already attached');
+    if (this.device || this.host)
+      throw new MargoError('attached', 'PostProcessing is already attached; create a new PostProcessing');
     this.host = host;
     return {
       kind: 'display',
@@ -151,7 +177,7 @@ export class PostProcessing implements EnginePlugin {
     if (!Math.hypot(...s)) throw new RangeError('Sun direction must be nonzero');
   }
   setup(engine: Engine): void {
-    if (!engine.gpu) throw new Error('PostProcessing requires WebGPU');
+    if (!engine.gpu) throw new MargoError('unsupported', 'PostProcessing requires WebGPU; use a WebGPU engine');
     this.device = engine.gpu;
     this.uniform = this.device.createBuffer({ size: 272, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.resolve = this.device.createComputePipeline({
@@ -260,7 +286,7 @@ export class PostProcessing implements EnginePlugin {
       a = o.atmosphere ?? atmosphere,
       v = this.values;
     if (!invertMatrixStable(c.camera.matrix, this.inverse, this.inverseWorkspace))
-      throw new Error('Invalid post camera');
+      throw new MargoError('state', 'Invalid post camera; give the camera a finite, invertible projection');
     this.time += c.delta;
     v.set(c.camera.position, 16);
     v.set(a.sun ?? sun, 20);

@@ -10,6 +10,7 @@ import { loadEnvironmentImage } from './load.js';
 import type { UltraHDROptions } from './ultrahdr.js';
 import { IBL_WGSL, iblBindGroupEntries } from './ibl.js';
 import { linearColor, type ColorInput } from './color.js';
+import { MargoError } from '@margoengine/math/errors';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 
@@ -74,7 +75,11 @@ export abstract class ShaderEffect {
       code = cache?.get(source);
     if (code === undefined) {
       code = this.patch(source, group);
-      if (code === source) throw new Error(`${this.name} requires the standard core PBR shader`);
+      if (code === source)
+        throw new MargoError(
+          'unsupported',
+          `${this.name} requires the standard core PBR shader; remove the plugin that replaced core's shader`,
+        );
       if (!cache) this.shaders.set(group, (cache = new Map()));
       if (cache.size >= 64) cache.clear();
       cache.set(source, code);
@@ -83,7 +88,7 @@ export abstract class ShaderEffect {
   }
   /** Adds the effect to a glTF-pro model. Returns a remover; `dispose()` removes it from every model. */
   add(model: LightingTarget): () => void {
-    if (this.disposed) throw new Error(`${this.name} is disposed`);
+    if (this.disposed) throw new MargoError('disposed', `${this.name} is disposed; create a new one`);
     let release = this.models.get(model);
     if (!release) {
       const remove = model.addLighting(this);
@@ -102,8 +107,12 @@ export abstract class ShaderEffect {
     return this.add(model);
   }
   setup(engine: EngineKernel): void {
-    if (this.disposed) throw new Error(`${this.name} is disposed`);
-    if (engine.backend === 'webgl2') throw new Error(`${this.name} requires the WebGPU backend`);
+    if (this.disposed) throw new MargoError('disposed', `${this.name} is disposed; create a new one`);
+    if (engine.backend === 'webgl2')
+      throw new MargoError(
+        'unsupported',
+        `${this.name} requires the WebGPU backend; use an engine on the WebGPU backend`,
+      );
     this.engine = engine;
   }
   /** Patches core's mesh shader just before the main pass, after shadows, sky, clustered and capture passes. */
@@ -138,6 +147,7 @@ const iblCall = (n: string, v: string, base: string, metal: string, roughness: s
 /** `EnvironmentLighting.load` options: the Environment's, UltraHDR decoding for `.jpg` URLs and a cancellation signal. */
 export type EnvironmentLoadOptions = EnvironmentOptions & UltraHDROptions & { signal?: AbortSignal };
 
+/** `EnvironmentLighting` settings. */
 export interface EnvironmentLightingOptions {
   /** Plugin and pass name. Default 'environment:lighting'. */
   name?: string;
@@ -259,14 +269,16 @@ export class EnvironmentLighting extends ShaderEffect {
   }
 }
 
+/** `Fog` settings (Three.js `Fog` / `FogExp2` plus height fog); bad values throw RangeError, a malformed color TypeError. */
 export interface FogOptions {
   /**
    * Fog color: hex is sRGB, `[r, g, b]` linear (as everywhere in Margo); fully fogged pixels show exactly this color on
    * the canvas. Default '#ffffff'.
    */
   color?: ColorInput;
-  /** Linear fog start and end distance from the camera (Three.js Fog). Defaults 1 and 1000. */
+  /** Linear fog start distance from the camera (Three.js Fog). Default 1. */
   near?: number;
+  /** Linear fog end distance from the camera, where fog is full. Default 1000. */
   far?: number;
   /** Above 0 selects exponential-squared fog `1 - exp(-(density * distance)^2)` (Three.js FogExp2). Default 0. */
   density?: number;
@@ -404,7 +416,8 @@ export class Fog extends ShaderEffect {
   override setup(engine: EngineKernel): void {
     super.setup(engine);
     const device = engineRuntime(engine).gpu;
-    if (!device) throw new Error('Fog requires the WebGPU backend');
+    if (!device)
+      throw new MargoError('unsupported', 'Fog requires the WebGPU backend; use an engine on the WebGPU backend');
     this.release();
     this.allocate(device);
   }

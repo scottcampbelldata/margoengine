@@ -13,6 +13,7 @@ import { invertMatrixStable } from '@margoengine/math/mat4';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { halton, jitterProjection } from './jitter.js';
 import { fullscreen, cameraVelocity, objectVelocity, snapshot, resolve, present } from './shader.js';
+import { MargoError } from '@margoengine/math/errors';
 export { halton, jitterProjection } from './jitter.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; COPY_SRC: number; STORAGE: number };
 declare const GPUTextureUsage: {
@@ -22,24 +23,42 @@ declare const GPUTextureUsage: {
   COPY_SRC: number;
 };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+/** TAA settings, read every frame from `taa.options`; out of range throws RangeError before any GPU command. */
 export interface TAAOptions {
+  /** Share of the reprojected history in each frame, 0 <= w < 1 (0 disables accumulation). Default 0.9. */
   historyWeight?: number;
+  /** Relative reversed-depth difference that rejects history, 0..1. Default 0.01. */
   depthThreshold?: number;
+  /** Scene depth when another plugin replaces it, e.g. `() => dof.depthTexture`; sampleable and viewport-sized. */
   depth?: () => GPUTexture | undefined;
 }
+/** A drawable whose per-vertex motion TAA tracks: the `shadowPrimitives` contract of core and gltf-pro meshes. */
 export interface VelocityPrimitive {
+  /** The source primitive: keys TAA's per-draw record; static PBR sources keep their CPU `vertices` on it. */
   primitive?: object;
+  /** The mesh whose world matrix (current and previous) moves the primitive. */
   node: Mesh;
+  /** Current vertex buffer: 24-byte core or 80-byte PBR vertices (PBR: STORAGE or COPY_SRC usage, or CPU vertices). */
   vertex: GPUBuffer;
+  /** Uint32 triangle indices. */
   index: GPUBuffer;
+  /** Index count. */
   count: number;
+  /** Vertex stride in bytes: 24 (core) or 80 (PBR). */
   stride: number;
+  /** Base-colour texture for alpha masking (PBR). */
   alphaTexture?: GPUTextureView;
+  /** Sampler of `alphaTexture`. */
   alphaSampler?: GPUSampler;
+  /** Base-colour alpha factor. */
   alpha?: number;
+  /** Alpha-mask cutoff, 0..1. Default 0 (nothing masked). */
   cutoff?: number;
+  /** UV set of `alphaTexture`, 0 or 1. */
   texCoord?: number;
+  /** UV transform of `alphaTexture` (PBR only): 8 finite floats, rows (a, b, offset, unused) for u and then v. */
   alphaTransform?: Float32Array;
+  /** Instanced (gltf-pro PBRInstances) primitives get no object motion: camera reprojection covers static instances. */
   instances?: unknown;
 }
 /** TAA's motion vectors and resolved frame ({@link TAA.velocity}), for effects such as `MotionBlur` (@margoengine/post). */
@@ -55,8 +74,11 @@ export interface TAAVelocity {
    * frame's. History reads it next frame, so an effect that changes the picture after TAA writes elsewhere. */
   readonly resolved: GPUTexture;
 }
+/** What `taa.add` takes: a model exposing its primitives (a gltf-pro `PBRModel`); dropped once `disposed` is true. */
 export interface VelocitySource {
+  /** Primitives read every frame (after skinning and morphing). */
   readonly shadowPrimitives: readonly VelocityPrimitive[];
+  /** True once the source is disposed; TAA then forgets it. */
   readonly disposed?: boolean;
 }
 interface Draw {
@@ -73,6 +95,16 @@ interface Draw {
   sampler?: GPUSampler;
   frame: number;
 }
+/**
+ * Temporal anti-aliasing: Halton (2,3) sub-pixel jitter, a velocity buffer (core meshes automatic, gltf-pro models via
+ * `taa.add`), depth-tested history reprojection with YCoCg neighbourhood clamping; resolves at frame-graph order 40.
+ * `TAA.attach(engine, options)`; call `reset()` after a camera cut. WebGPU only.
+ * @throws RangeError when an option is out of range; TypeError for an invalid velocity source or primitive (wrong
+ * engine or stride, bad alpha transform, missing PBR alpha bindings or buffer usage).
+ * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`, `'attached'` for a source of
+ * another engine or one added twice, `'state'` when the camera is not invertible, the scene depth it needs is missing
+ * or not sampleable, or `gpuState` is read before a frame.
+ */
 export class TAA implements EnginePlugin {
   readonly name = 'taa';
   private engine?: Engine;
@@ -153,8 +185,8 @@ export class TAA implements EnginePlugin {
     if (this.disposed || !source || source.disposed || !Array.isArray(source.shadowPrimitives))
       throw new TypeError('Invalid TAA velocity source');
     if (source.shadowPrimitives.some((p) => p.node.engine !== this.engine))
-      throw new Error('TAA source belongs to another engine');
-    if (this.sources.has(source)) throw new Error('Duplicate TAA source');
+      throw new MargoError('attached', 'TAA source belongs to another engine; use objects created by the same engine');
+    if (this.sources.has(source)) throw new MargoError('attached', 'Duplicate TAA source; add each source once');
     this.sources.add(source);
     this.reset();
     return () => {
@@ -166,7 +198,11 @@ export class TAA implements EnginePlugin {
     this.valid = false;
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('TAA requires WebGPU and a live effect');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'TAA requires WebGPU and a live effect; attach a new TAA to a WebGPU engine',
+      );
     this.engine = engine;
     this.device = engine.gpu;
     this.uniform = this.device.createBuffer({ size: 208, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
@@ -233,7 +269,7 @@ export class TAA implements EnginePlugin {
       this.values.set(c.camera.matrix);
       this.values.set(this.valid ? this.previous : c.camera.matrix, 16);
       if (!invertMatrixStable(c.camera.matrix, this.values.subarray(32, 48), this.workspace))
-        throw new Error('Invalid TAA camera');
+        throw new MargoError('state', 'Invalid TAA camera; give the camera a finite, invertible projection');
       this.values.set([this.options.historyWeight ?? 0.9, this.options.depthThreshold ?? 0.01, +this.valid, 0], 48);
       const jitter = this.vectors.jitter;
       jitter[0] = this.valid ? this.offset[0] - this.lastOffset[0] : 0;
@@ -370,7 +406,10 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       !(depth.usage & GPUTextureUsage.TEXTURE_BINDING) ||
       !depth.format.startsWith('depth')
     )
-      throw new Error('TAA needs the current sampleable scene depth; provide options.depth for an HDR/SSAO capture');
+      throw new MargoError(
+        'state',
+        'TAA needs the current sampleable scene depth; provide options.depth for an HDR/SSAO capture',
+      );
     if (depth !== this.depthSource) {
       this.sampledDepth = depth.createView({ aspect: 'depth-only' });
       const group = (p: GPUComputePipeline | GPURenderPipeline, resources: (GPUTextureView | GPUBufferBinding)[]) =>
@@ -463,7 +502,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     if (p.instances) return;
     p.node.check();
     if (p.node.engine !== this.engine || ![24, 80].includes(p.stride))
-      throw new Error('Invalid TAA velocity primitive');
+      throw new TypeError('Invalid TAA velocity primitive; use a mesh of this engine with stride 24 or 80');
     for (let id = p.node.id; id !== -1; id = this.engine!.store.parents[id]) if (this.engine!.store.hidden[id]) return;
     const transform = p.alphaTransform;
     if (
@@ -541,7 +580,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       records.set(identity, r);
       if (pbr) {
         if (!p.alphaTexture || !p.alphaSampler || p.vertex.size > c.device.limits.maxStorageBufferBindingSize)
-          throw new Error('TAA PBR source needs alpha bindings and a storage-sized vertex buffer');
+          throw new TypeError('TAA PBR source needs alpha bindings and a storage-sized vertex buffer');
         let source = p.vertex;
         if (p.vertex.usage !== undefined && !(p.vertex.usage & GPUBufferUsage.STORAGE)) {
           const primitive = p.primitive as { vertices?: Float32Array; deformed?: GPUBuffer } | undefined,
@@ -552,7 +591,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
               !(vertices instanceof Float32Array) ||
               vertices.byteLength !== p.vertex.size)
           )
-            throw new Error(
+            throw new TypeError(
               'TAA deformed sources require STORAGE or COPY_SRC; static PBR sources need retained CPU vertices',
             );
           r.source = c.device.createBuffer({
@@ -667,7 +706,8 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     return this.vectors;
   }
   get gpuState(): { velocity: GPUTexture; history: GPUTexture; depth: GPUTexture } {
-    if (!this.velocityTarget || !this.histories.length) throw new Error('TAA is not rendered');
+    if (!this.velocityTarget || !this.histories.length)
+      throw new MargoError('state', 'TAA is not rendered; render a frame first');
     return {
       velocity: this.velocityTarget,
       history: this.histories[this.front],

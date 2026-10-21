@@ -192,7 +192,10 @@ window.runStress = async (profile, options) => {
       await wait(() => expected.length === 1);
       const before = ticks;
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      assert(ticks === before && expected[0] === 'Error: WebGL context lost', 'WebGL loss failed to stop/report once');
+      assert(
+        ticks === before && expected[0] === 'MargoError: WebGL context lost; create a new engine',
+        'WebGL loss failed to stop/report once',
+      );
       app.dispose();
       app = await createStage(host, { backend: 'webgl2', fallback: webglRenderer, autoStart: false });
       app.box();

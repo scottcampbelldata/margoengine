@@ -20,6 +20,10 @@ follows when moving an earlier checkout to the consolidated tree:
 | Procedural `SurfaceOptions` | `MarchingCubesOptions` |
 | Tween `smoothstep` | `easeSmoothstep` |
 | Shader `Input`, `Stage`, `TextureSource` | `NodeInput`, `ShaderStage`, `BindableTexture` |
+| VFX `texture` feature (`@margoengine/vfx/texture`) | `textureFeature`; pass it as `new VFX(options, { texture: textureFeature })` |
+| LOD `Vec3` | `MutableVec3` for results (`octDecode`, `frameDirection`, `frameBasis`, `Imposter.center`) and `Vec3` for inputs, from `@margoengine/math` |
+| Sky and terrain colour type `Color` | `Vec3` from `@margoengine/math` (same tuple shape) |
+| Terrain `HeightField` | `HeightField` from `@margoengine/math`, re-exported by terrain (same shape) |
 
 Math is the shared home for vector, quaternion, matrix, color and geometric
 shape types. Core's `Vec3` remains available and is re-exported by math. Lines,
@@ -27,6 +31,23 @@ points and text continue to re-export their color and mesh-world helpers from
 math. Optional packages use `MargoError` with a stable `code`; core and stage
 retain their frozen error contract. Shader operations carry typed result nodes
 instead of public `Node<any>` results.
+
+The lighting, post and environment packages (environment, post, creative,
+clustered, tonemap, shadows, taa, sky, water, terrain, dof, oit, toon,
+transitions, splats, vfx, scatter, lod, webgl, culling) now follow the same
+conventions: every former bare `Error` is a `MargoError` with a `code`, or a
+`TypeError` / `RangeError` for malformed input, and keeps its old text as the
+start of the message. Environment's EXR, inflate and UltraHDR decoders throw
+`MargoError` `'failed'` for damaged files and `'unsupported'` for features
+they do not decode, as its HDR decoder already did. A lost WebGL context now
+reports `MargoError: WebGL context lost; create a new engine`. Private
+pass-context aliases visible in the published types are named per package
+(`PostPassContext`, `ShadowPassContext`, `SkyPassContext`,
+`TerrainPassContext`, `ScatterPassContext`); vfx's `Owned` is
+`OwnedResources`. Environment, sky, water, terrain, oit, toon, transitions,
+vfx, scatter, lod, webgl and culling list `@margoengine/math` under
+`dependencies`; dof and tonemap list it under `devDependencies`, as post,
+clustered, shadows, taa, splats and creative already did.
 
 The scenery `sky-moon` implementation was deliberately replaced by the
 `SkyMoon` preset over `@margoengine/sky`. Keep that single implementation rather

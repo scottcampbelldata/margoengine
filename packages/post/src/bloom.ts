@@ -21,9 +21,9 @@ declare const GPUTextureUsage: {
   STORAGE_BINDING: number;
 };
 
-type Context = Extract<PassContext, { backend: 'webgpu' }>;
+type PostPassContext = Extract<PassContext, { backend: 'webgpu' }>;
 /** Device, command encoder and exact image dimensions for an isolated HDR bloom dispatch. */
-export type BloomImageContext = Pick<Context, 'device' | 'encoder' | 'width' | 'height'>;
+export type BloomImageContext = Pick<PostPassContext, 'device' | 'encoder' | 'width' | 'height'>;
 /** Glow settings. They are read every frame, so they may be changed while the effect runs. */
 export interface BloomOptions {
   /** Share of the light above `threshold` that is spread back as glow, 0 to 4 (default 0.8). */
@@ -149,7 +149,13 @@ function bind(
   });
 }
 
-/** Owns linear HDR scene capture, a glow chain from half resolution down to 1/64 and a single dithered AgX presentation. */
+/**
+ * Owns linear HDR scene capture, a glow chain from half resolution down to 1/64 and a single dithered AgX presentation.
+ * @throws RangeError when an option or an `encodeImage` size is out of range.
+ * @throws MargoError `'unsupported'` on a WebGL engine or when another plugin replaced core's lighting shader,
+ * `'disposed'` after `dispose()`, `'attached'` when attached twice, `'state'` when another post effect owns the output
+ * target, or `encodeImage` runs on an attached Bloom or a new device.
+ */
 export class Bloom implements EnginePlugin {
   readonly name = 'bloom';
   private engine?: Engine;
@@ -206,7 +212,8 @@ export class Bloom implements EnginePlugin {
     return this.host ? undefined : this.textures[0];
   }
   private joinStack(host: StackHost): StackStage {
-    if (this.engine || this.host || this.disposed) throw new Error('Bloom is already attached');
+    if (this.engine || this.host || this.disposed)
+      throw margoError('attached', 'Bloom is already attached; create a new Bloom');
     this.host = host;
     return { kind: 'hdr', render: (c, input, output) => this.stage(c, input, output) };
   }
@@ -231,7 +238,11 @@ export class Bloom implements EnginePlugin {
       throw new RangeError('Invalid bloom options');
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Bloom requires WebGPU and a live effect');
+    if (this.disposed || !engine.gpu)
+      throw margoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'Bloom requires WebGPU and a live effect; attach a new Bloom to a WebGPU engine',
+      );
     if (
       !this.host &&
       (engine.hasPlugin('ssao') ||
@@ -239,7 +250,7 @@ export class Bloom implements EnginePlugin {
         engine.hasPlugin('tonemap') ||
         engine.hasPlugin('dof'))
     )
-      throw new Error('Bloom owns the output target; remove the other post effect first');
+      throw margoError('state', 'Bloom owns the output target; remove the other post effect first');
     this.engine = engine;
     this.initialize(engine.gpu);
   }
@@ -275,7 +286,7 @@ export class Bloom implements EnginePlugin {
       this.initialize(context.device);
       this.imageDevice = context.device;
     }
-    this.stage(context as Context, input, {
+    this.stage(context as PostPassContext, input, {
       view: output,
       format: 'rgba16float',
       multisample: { count: 1 },
@@ -296,7 +307,7 @@ export class Bloom implements EnginePlugin {
           this.engine!.hasPlugin('tonemap') ||
           this.engine!.hasPlugin('dof')
         )
-          throw new Error('Bloom cannot share its output target');
+          throw margoError('state', 'Bloom cannot share its output target; put both effects in one PostStack');
         this.resize(c);
         this.original = c.color;
         this.originalDepth = c.depth;
@@ -306,7 +317,11 @@ export class Bloom implements EnginePlugin {
             /let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/,
             'return vec4f(linear,1);',
           );
-          if (linearShader === c.shader) throw new Error('Bloom requires the standard core lighting shader');
+          if (linearShader === c.shader)
+            throw margoError(
+              'unsupported',
+              "Bloom requires the standard core lighting shader; remove the plugin that replaced core's shader",
+            );
           this.sourceShader = c.shader;
           this.linearShader = linearShader;
         }
@@ -344,7 +359,7 @@ export class Bloom implements EnginePlugin {
       },
     });
   }
-  private resize(c: Context): void {
+  private resize(c: PostPassContext): void {
     if (
       this.textures[0]?.width === c.width &&
       this.textures[0]?.height === c.height &&
@@ -460,14 +475,14 @@ export class Bloom implements EnginePlugin {
     this.steps = steps;
     return ups[0] ?? downs[0];
   }
-  private draw(c: Context): void {
+  private draw(c: PostPassContext): void {
     this.capture!.resolve(c.encoder, true);
     this.apply(c, this.original!, this.originalFormat!);
     this.capture!.restore(c);
     c.draw = this.originalDraw!;
   }
   /** Stacked: run the chain on `input` and composite into `output`, AgX-encoded only as the display output. */
-  private stage(c: Context, input: GPUTextureView, output: StageOutput): void {
+  private stage(c: PostPassContext, input: GPUTextureView, output: StageOutput): void {
     this.validate();
     const device = c.device,
       width = Math.max(1, Math.ceil(c.width / 2)),
@@ -489,7 +504,7 @@ export class Bloom implements EnginePlugin {
     if (this.source !== input) this.link(device, input);
     this.apply(c, output.view, output.format);
   }
-  private apply(c: Context, view: GPUTextureView, format: GPUTextureFormat): void {
+  private apply(c: PostPassContext, view: GPUTextureView, format: GPUTextureFormat): void {
     // Every level carries all of the thresholded light, so the summed chain is averaged over its levels.
     this.values[0] = (this.options.strength ?? 0.8) / this.levels;
     this.values[1] = this.options.exposure ?? 0;

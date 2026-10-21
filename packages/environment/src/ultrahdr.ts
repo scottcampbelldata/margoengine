@@ -25,6 +25,7 @@ export interface RGBA8Image {
   height: number;
   data: Uint8Array | Uint8ClampedArray;
 }
+/** How `decodeUltraHDR` decodes the two JPEGs and how much of the gain map it applies. */
 export interface UltraHDROptions {
   /** JPEG decoder; default uses createImageBitmap and OffscreenCanvas (browsers and workers). Supply one in Node. */
   decode?: (jpeg: Uint8Array) => Promise<RGBA8Image> | RGBA8Image;
@@ -34,13 +35,15 @@ export interface UltraHDROptions {
 
 const XMP = 'http://ns.adobe.com/xap/1.0/\0',
   text = /* @__PURE__ */ new TextDecoder();
+// Damaged JPEG streams and gain-map metadata: MargoError 'failed', as parseHDR and parseEXR.
+const damaged = (problem: string) => new MargoError('failed', `${problem}; the file is damaged, export it again`);
 
 // Returns the offset just past the EOI of the JPEG starting at `start`, collecting its XMP packets.
 function jpegEnd(b: Uint8Array, start: number, xmp: string[]): number {
-  if (b[start] !== 0xff || b[start + 1] !== 0xd8) throw new Error('Invalid JPEG stream');
+  if (b[start] !== 0xff || b[start + 1] !== 0xd8) throw new TypeError('Invalid JPEG stream; pass a gain-map JPEG');
   let p = start + 2;
   while (p + 1 < b.length) {
-    if (b[p] !== 0xff) throw new Error('Corrupt JPEG marker');
+    if (b[p] !== 0xff) throw damaged('Corrupt JPEG marker');
     const marker = b[p + 1];
     if (marker === 0xff) {
       p++;
@@ -62,7 +65,7 @@ function jpegEnd(b: Uint8Array, start: number, xmp: string[]): number {
     if (marker === 0xda)
       while (p + 1 < b.length && !(b[p] === 0xff && b[p + 1] !== 0 && (b[p + 1] < 0xd0 || b[p + 1] > 0xd7))) p++;
   }
-  throw new Error('Truncated JPEG stream');
+  throw damaged('Truncated JPEG stream');
 }
 
 function metadata(xmp: string): GainMapMetadata {
@@ -76,11 +79,14 @@ function metadata(xmp: string): GainMapMetadata {
         ? []
         : [fallback];
     if ((values.length !== 1 && values.length !== 3) || !values.every(Number.isFinite))
-      throw new Error(`Invalid or missing hdrgm:${name}`);
+      throw damaged(`Invalid or missing hdrgm:${name}`);
     return values.length === 1 ? [values[0], values[0], values[0]] : values;
   };
   if (/hdrgm:BaseRenditionIsHDR(="|>)\s*True/i.test(xmp))
-    throw new Error('UltraHDR files with an HDR base rendition are not supported');
+    throw new MargoError(
+      'unsupported',
+      'UltraHDR files with an HDR base rendition are not supported; export it with an SDR base image',
+    );
   const rgb = (name: string, fallback?: number) => field(name, fallback) as [number, number, number];
   const result = {
     gainMapMin: rgb('GainMapMin', 0),
@@ -91,13 +97,15 @@ function metadata(xmp: string): GainMapMetadata {
     hdrCapacityMin: field('HDRCapacityMin', 0)[0],
     hdrCapacityMax: field('HDRCapacityMax')[0],
   };
-  if (result.gamma.some((g) => g <= 0)) throw new Error('Invalid hdrgm:Gamma');
+  if (result.gamma.some((g) => g <= 0)) throw damaged('Invalid hdrgm:Gamma');
   return result;
 }
 
 /**
  * Splits an UltraHDR JPEG into its primary (SDR) JPEG, its gain-map JPEG (the next JPEG stream after the primary,
  * as listed by MPF) and the hdrgm gain-map metadata from either image's XMP. ISO 21496-1 binary-only metadata is not read.
+ * @throws TypeError for bytes that are not a gain-map JPEG with hdrgm XMP; MargoError `'failed'` for a damaged stream or
+ * metadata, `'unsupported'` for an HDR base rendition.
  */
 export function parseUltraHDR(source: ArrayBuffer | ArrayBufferView): UltraHDRParts {
   const bytes = toBytes(source),
@@ -106,10 +114,11 @@ export function parseUltraHDR(source: ArrayBuffer | ArrayBufferView): UltraHDRPa
   let start = primaryEnd;
   while (start + 2 < bytes.length && !(bytes[start] === 0xff && bytes[start + 1] === 0xd8 && bytes[start + 2] === 0xff))
     start++;
-  if (start + 2 >= bytes.length) throw new Error('Not an UltraHDR JPEG: no gain-map image');
+  if (start + 2 >= bytes.length) throw new TypeError('Not an UltraHDR JPEG: no gain-map image; pass a gain-map JPEG');
   const gainEnd = jpegEnd(bytes, start, xmp);
   const packet = xmp.find((value) => /hdrgm:GainMapMax/.test(value));
-  if (!packet) throw new Error('Not an UltraHDR JPEG: no hdrgm gain-map metadata');
+  if (!packet)
+    throw new TypeError('Not an UltraHDR JPEG: no hdrgm gain-map metadata; pass a gain-map JPEG with hdrgm XMP');
   return {
     primary: bytes.subarray(0, primaryEnd),
     gainMap: bytes.subarray(start, gainEnd),
@@ -120,6 +129,7 @@ export function parseUltraHDR(source: ArrayBuffer | ArrayBufferView): UltraHDRPa
 /**
  * Recovers linear HDR radiance: `(sdr + offsetSdr) * 2^(weight * mix(min, max, gain^(1/gamma))) - offsetHdr` with the
  * base image decoded from sRGB and the gain map bilinearly upsampled. Returns float RGBA with alpha 1.
+ * @throws TypeError for a malformed RGBA8Image; RangeError for an image over 2^26 pixels or a weight outside 0..1.
  */
 export function applyGainMap(sdr: RGBA8Image, gain: RGBA8Image, meta: GainMapMetadata, weight = 1): FloatImage {
   const { width, height } = sdr,
@@ -193,7 +203,8 @@ async function decodeJPEG(jpeg: Uint8Array): Promise<RGBA8Image> {
   });
   try {
     const context = new OffscreenCanvas(bitmap.width, bitmap.height).getContext('2d');
-    if (!context) throw new Error('UltraHDR decoding needs a 2D OffscreenCanvas');
+    if (!context)
+      throw new MargoError('unsupported', 'UltraHDR decoding needs a 2D OffscreenCanvas; pass options.decode');
     context.drawImage(bitmap, 0, 0);
     return context.getImageData(0, 0, bitmap.width, bitmap.height);
   } finally {
@@ -201,7 +212,11 @@ async function decodeJPEG(jpeg: Uint8Array): Promise<RGBA8Image> {
   }
 }
 
-/** Decodes an UltraHDR JPEG into a linear FloatImage for `Environment.create`. */
+/**
+ * Decodes an UltraHDR JPEG into a linear FloatImage for `Environment.create`.
+ * @throws What `parseUltraHDR` and `applyGainMap` throw; MargoError `'failed'` when the browser cannot decode a JPEG,
+ * `'unsupported'` without a 2D OffscreenCanvas (pass `decode`).
+ */
 export async function decodeUltraHDR(
   source: ArrayBuffer | ArrayBufferView,
   { decode = decodeJPEG, weight = 1 }: UltraHDROptions = {},

@@ -1428,11 +1428,8 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
         `ExportGeometryData`) or accept geometry's; loaders `computeVertexNormals(positions, indices)` and
         `toGeometry(loaded)` (different from geometry's) -> rename; plus B's own `loadGLTF`/`parseGLTF` (gltf vs
         gltf-pro) and `parseUSDA`/`parseUSDZ`/`USDOptions` (loaders vs usdz).
-     C: lod `Vec3` (mutable) -> math `MutableVec3`; environment `ColorInput` (`readonly [n, n, n]` arrays only) ->
-        math `ColorInput` (keep the 3-component runtime check); sky local `type Color` (9 entries) and terrain local
-        `type Color` -> math `Vec3`; terrain `HeightField` -> re-export math's; vfx exported `texture` feature
-        object clashes with shader's `texture()` node -> rename vfx's (e.g. `textureFeature`) or allowlist with a
-        reason.
+     C: [DONE, group C below] lod `Vec3` (mutable) -> math `MutableVec3`; environment `ColorInput` -> math's; sky and
+        terrain local `type Color` -> math `Vec3`; terrain `HeightField` -> math's; vfx `texture` -> `textureFeature`.
      D: bvh `Vec3` (mutable) -> math `MutableVec3`, bvh `Ray` interface -> rename `BVHRay` (math `Ray` is the
         class); labels `Vec3` -> math `Vec3`, labels `composeMatrix(position, quaternion?, scale?, out?)` -> rename
         (e.g. `composeTransform`) or use math's `composeMatrix(t, q, s, out)`; physics `Vec3`, `Quat` -> math's;
@@ -1440,6 +1437,36 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
         components vs core's classes -> rename or allowlist (core is frozen); react tsconfig needs the two strict
         flags. Non-math duplicates in the scorecard (`Context`, `GeometryLike`, `ModelLike`, `PickProxy`, ...) are the
         owning group's own.
+   GROUP C [DONE 2026-10-21, redone on current main; the 2026-10-15 pass (584dec69) never landed and no longer
+   applied]. Environment, post, creative, clustered, tonemap, shadows, taa, sky, water, terrain, dof, oit, toon,
+   transitions, splats, vfx, scatter, lod, webgl, culling. API changes: CHANGELOG.md; rules: docs/conventions.md.
+   - Types (gate 5): the C duplicates above switched to math (lod `Vec3` export removed). Private
+     `type Context = Extract<PassContext, {backend: 'webgpu'}>` aliases that leak into a published .d.ts got package
+     names (`PostPassContext`, `ShadowPassContext`, `SkyPassContext`, `TerrainPassContext`, `ScatterPassContext`); vfx
+     `Owned` -> `OwnedResources`. Allowlisted in `names`: `Environment`, `Sky`, `Bloom`, `SSAO`, `TAA`, `Tonemap` (the
+     class and react's JSX component that adds it).
+   - TSDoc (gate 6): all 105 undocumented C exports documented from the code.
+   - Errors (gate 7): 267 bare Errors converted, environment's EXR/inflate/UltraHDR decoders included (deferred on
+     2026-10-15 while gate 11 owned them; they now follow environment's HDR decoder: MargoError `'failed'` for damaged
+     files, `'unsupported'` for features not decoded, RangeError for decoder bounds). post uses its existing shared
+     `margoError` helper. Old text kept as the prefix, fix appended. Pins updated:
+     `tests/fuzz-formats-regressions.test.js` (EXR part type), `tests/modern-stress.js` and
+     `scripts/modern-wrapper-tests.js` (WebGL context lost is now `MargoError: WebGL context lost; create a new engine`).
+   - Dead (gate 9): environment `HALF_MAX` and `inflateRaw`, taa/splats shader `frame`, lod `octWGSL` un-exported.
+   - Manifests: math under `dependencies` for environment, sky, water, terrain, oit, toon, transitions, vfx, scatter,
+     lod, webgl, culling (`build-optional` now keeps it external in sky, terrain, vfx and scatter); `devDependencies`
+     for dof and tonemap (their builds inline it), as post, clustered, shadows, taa, splats, creative already had.
+     No WGSL change; core and stage untouched (core + stage 21,343 B gzip). Entry min+gzip, measured by
+     `npm run build:site` on this change against the committed record (99ed7335; no group C source change between;
+     the record itself was not re-committed): error text adds up to 304 B per entry (environment +304, creative +262,
+     clustered +241, taa +203, shadows +193, post +104; terrain +34 with math now external); 13 entries unchanged;
+     math now external: sky 14,958 -> 14,630, sky/base 6,253 -> 6,006, vfx/obstacles 1,218 -> 1,129, vfx 8,060 ->
+     8,059.
+   - Scorecard (`npm run hygiene`, d4829ec9 vs this change), group C (20 packages) before -> after: types 18/312 4.2 ->
+     0/308 10.0; tsdoc 105/301 0.0 -> 0/299 10.0; errors 267/712 0.0 -> 0/607 10.0; dead 5/678 9.3 -> 0/671 10.0;
+     format, lint, any, strict already 10.0. Every C package 10.0 (was 5.6-7.5). No package's gate got worse; react
+     types 18 -> 12, math 8 -> 7, shader 3 -> 2 (shared names). Overall: types 155 -> 129 (3.3 -> 4.4), tsdoc 474 ->
+     369 (0.0), errors 560 -> 293 (0.0 -> 2.1), dead 69 -> 64 (8.6 -> 8.7); hygiene 6.4 -> 6.8.
 5l. Raise CAD performance and general 3D rendering to 9/10 (Scott, 2026-10-14 night). Measurable targets (Intel Arc
    laptop, quiet PC):
    CAD: 100k parts + feature edges orbit >= 60 FPS; 1M parts >= 30 FPS; pick < 10 ms at 100k; 100k-part model
@@ -2500,6 +2527,8 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    | flight-helmet-high/light/phone (goggle lenses, max 159) | NOT TRIAGED | - | - | compare with docs/flight-helmet-transmission.md | - |
    | Night Citadel load timeouts | known, NOT TRIAGED here | - | - | - | - |
 6. **Code hygiene >= 9** (5k), including zero `any` in public APIs and TSDoc on every export (autocomplete with docs).
+   Status 2026-10-21: NOT MET, `npm run hygiene` 6.8 / 10. 5k phase 2 groups A and C done (every group C package
+   10.0); groups B and D open, then verify switches to `--strict`.
 7. **Docs + playground** (item 8): quickstart, three.js migration, two flagship tutorials, cookbook, generated API
    reference, live-editable examples.
 8. **Humble, exact scope on the landing page:** a small, fast WebGPU engine for high-part-count CAD/engineering

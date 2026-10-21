@@ -10,6 +10,7 @@ import {
 } from '@margoengine/core/extension';
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { sceneTarget } from '../../shared/msaa.js';
+import { margoError } from '../../shared/errors.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -99,6 +100,10 @@ const over: GPUBlendState = {
  * texture atlas): they land on everything that writes depth before order 1.9 (core meshes, gltf-pro and materials models,
  * terrain), after the opaque scene and before sky, water and transparent effects. Needs scene depth: attach a post
  * capture (Tonemap, Bloom, PostStack, SSAO, TAA) first. With no decals it records nothing.
+ * @throws TypeError when `atlas` is not a sampled 2D GPUTexture; RangeError from `setDecals` for an invalid decal or
+ * more than {@link MAX_DECALS}.
+ * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`, `'state'` when no post capture
+ * provides scene depth.
  */
 export class Decals implements EnginePlugin {
   readonly name = 'post:decals';
@@ -212,7 +217,11 @@ export class Decals implements EnginePlugin {
     return this.counts[0] + this.counts[1];
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Decals require WebGPU and a live effect');
+    if (this.disposed || !engine.gpu)
+      throw margoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'Decals require WebGPU and a live effect; attach new Decals to a WebGPU engine',
+      );
     this.engine = engine;
     this.device = engine.gpu;
     this.uniform = this.device.createBuffer({
@@ -250,7 +259,10 @@ export class Decals implements EnginePlugin {
     const device = c.device,
       target = sceneTarget(c);
     if (!target)
-      throw new Error('Decals need scene depth: attach a post capture (Tonemap, Bloom, PostStack, SSAO, TAA) first');
+      throw margoError(
+        'state',
+        'Decals need scene depth: attach a post capture (Tonemap, Bloom, PostStack, SSAO, TAA) first',
+      );
     const multisampled = target.samples > 1,
       depth = multisampled ? target.depthSource : this.depthView(target.resolvedDepth);
     if (this.dirty || !this.storage) {

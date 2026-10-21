@@ -13,7 +13,8 @@ import { vertex, reduceShader, downsampleShader, traceFunctions, march } from '.
 import { shareCapture, drawCapture } from './capture.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; STORAGE_BINDING: number };
-type Context = Extract<PassContext, { backend: 'webgpu' }>;
+type PostPassContext = Extract<PassContext, { backend: 'webgpu' }>;
+/** SSR settings, read every frame from `ssr.options`; out of range throws RangeError. */
 export interface SSROptions {
   /** Surfaces rougher than this (perceptual, 0..1) get no screen-space reflection; fades out from half of it. Default 0.6. */
   maxRoughness?: number;
@@ -23,6 +24,7 @@ export interface SSROptions {
   maxDistance?: number;
   /** Hierarchical-depth march iterations per pixel (1-256). Default 64. */
   steps?: number;
+  /** False skips the reflection passes. Default true; also `ssr.enabled`. */
   enabled?: boolean;
 }
 /** The capture hook SSR gives models (gltf-pro's `PBRCapture`, terrain's `TerrainCapture`, water's `WaterCapture`;
@@ -39,7 +41,7 @@ export interface SSRCapture {
 export interface SSRModel {
   setCapture(hook: SSRCapture): () => void;
   onDispose(callback: () => void): () => void;
-  draw(context: Context, mode: 'capture', color: GPUTextureView, depth: GPUTextureView): void;
+  draw(context: PostPassContext, mode: 'capture', color: GPUTextureView, depth: GPUTextureView): void;
 }
 
 // Material replay outputs: environment specular already in the scene (rgb) + roughness, split-sum weight F0*A+B (rgb) +
@@ -131,7 +133,11 @@ const formats: GPUTextureFormat[] = ['rgba16float', 'rgb10a2unorm', 'rgb10a2unor
 
 /** Screen-space reflections in a PostStack (HDR effect): a material replay of core meshes and of models added with
  * `add(model)` (roughness, split-sum weight, normal, and the IBL specular to replace), a Hi-Z ray march per pixel, and a
- * composite that swaps the environment specular for the reflected scene where a ray hits; misses keep the IBL. */
+ * composite that swaps the environment specular for the reflected scene where a ray hits; misses keep the IBL.
+ * @throws RangeError when an option is out of range; TypeError when `enabled` is not a boolean.
+ * @throws MargoError `'unsupported'` on a WebGL engine or when another plugin replaced core's lighting shader,
+ * `'disposed'` after `dispose()`, `'attached'` when attached twice, `'state'` outside a PostStack or when the camera
+ * matrix is not invertible. */
 export class SSR implements EnginePlugin {
   readonly name = 'ssr';
   private engine?: Engine;
@@ -176,7 +182,7 @@ export class SSR implements EnginePlugin {
   private readonly compositePass: GPURenderPassDescriptor = { colorAttachments: [this.compositeAttachment] };
   private readonly models = new Map<SSRModel, () => void>();
   private readonly modelCode = new Map<string, string>();
-  private context?: Context;
+  private context?: PostPassContext;
   private pass?: GPURenderPassEncoder;
   // gltf-pro capture hook: model materials into the same three targets, after the core replay.
   private readonly hook: SSRCapture = {
@@ -217,7 +223,7 @@ export class SSR implements EnginePlugin {
   /** Makes a gltf-pro model or materials mesh reflect: its own materials (maps, alpha mask, instances, skinning) are drawn
    * into SSR's material targets. Returns a remover; models not added are still reflected but do not reflect. */
   add(model: SSRModel): () => void {
-    if (this.disposed) throw new Error('SSR is disposed');
+    if (this.disposed) throw margoError('disposed', 'SSR is disposed; create a new SSR');
     let release = this.models.get(model);
     if (!release) {
       const restore = shareCapture(model, this.hook),
@@ -241,7 +247,8 @@ export class SSR implements EnginePlugin {
     this.options.enabled = value;
   }
   private joinStack(host: StackHost): StackStage {
-    if (this.engine || this.host || this.disposed) throw new Error('SSR is already attached');
+    if (this.engine || this.host || this.disposed)
+      throw margoError('attached', 'SSR is already attached; create a new SSR');
     this.host = host;
     return { kind: 'hdr', render: (c, input, output) => this.stage(c, input, output) };
   }
@@ -263,10 +270,13 @@ export class SSR implements EnginePlugin {
       throw new RangeError('Invalid SSR options');
   }
   setup(engine: Engine): void {
-    if (this.disposed) throw new Error('SSR is disposed');
+    if (this.disposed) throw margoError('disposed', 'SSR is disposed; create a new SSR');
     if (!this.host)
-      throw new Error('SSR runs in a PostStack: SSR.attach(engine) or PostStack.attach(engine, [..., new SSR(), ...])');
-    if (!engine.gpu) throw new Error('SSR requires WebGPU');
+      throw margoError(
+        'state',
+        'SSR runs in a PostStack: SSR.attach(engine) or PostStack.attach(engine, [..., new SSR(), ...])',
+      );
+    if (!engine.gpu) throw margoError('unsupported', 'SSR requires WebGPU; use a WebGPU engine');
     this.engine = engine;
     const device = engine.gpu;
     this.uniform = device.createBuffer({ size: 160, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
@@ -285,13 +295,14 @@ export class SSR implements EnginePlugin {
       },
     });
   }
-  private prepare(c: Context): void {
+  private prepare(c: PostPassContext): void {
     this.validate();
     this.resize(c);
     const v = this.values,
       o = this.options,
       own = this.ownDepth;
-    if (!invertMatrixStable(c.camera.matrix, this.inverse, this.workspace)) throw new Error('Invalid SSR camera');
+    if (!invertMatrixStable(c.camera.matrix, this.inverse, this.workspace))
+      throw margoError('state', 'Invalid SSR camera; give the camera a finite, invertible projection');
     v.set(c.camera.matrix, 16);
     v[32] = c.width;
     v[33] = c.height;
@@ -326,7 +337,10 @@ export class SSR implements EnginePlugin {
             : 'if(false){$1_=$2;}return margoSSR(n,v,i.color,i.material.y,i.material.x);',
         );
       if (!code.includes('->MargoSSR') || !code.includes('return margoSSR('))
-        throw new Error('SSR requires the standard core lighting shader');
+        throw margoError(
+          'unsupported',
+          "SSR requires the standard core lighting shader; remove the plugin that replaced core's shader",
+        );
       const module = c.device.createShaderModule({ code: code + replayTail(code) });
       this.replay = c.device.createRenderPipeline({
         ...this.single!,
@@ -366,7 +380,7 @@ export class SSR implements EnginePlugin {
     }
     pass.end();
   }
-  private stage(c: Context, input: GPUTextureView, output: StageOutput): void {
+  private stage(c: PostPassContext, input: GPUTextureView, output: StageOutput): void {
     const models = this.models.size > 0,
       key = output.format + output.multisample.count + output.hdr + models,
       code = output.hdr ? linearComposite : compositeShader;
@@ -405,7 +419,7 @@ export class SSR implements EnginePlugin {
     pass.draw(3);
     pass.end();
   }
-  private resize(c: Context): void {
+  private resize(c: PostPassContext): void {
     const target = this.host!.target!,
       // Own 1x depth at 4x, and at 1x once models are added: a capture writes depth, and water samples the stack's.
       own = target.samples === 4 || this.models.size > 0;

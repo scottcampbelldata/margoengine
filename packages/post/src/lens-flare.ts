@@ -21,6 +21,7 @@ export interface LensFlareOptions {
   intensity?: number;
   /** Radius in pixels of the disc of depth samples around the sun that decides how much of it is visible, 1-64. Default 12. */
   occlusionRadius?: number;
+  /** False skips the effect (the scene passes through). Default true; also `lensFlare.enabled`. */
   enabled?: boolean;
 }
 

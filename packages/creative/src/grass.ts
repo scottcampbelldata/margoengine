@@ -9,6 +9,7 @@ import {
 } from '@margoengine/core/extension';
 import { finiteVector } from '@margoengine/math/validate';
 import { createLcgRandom } from '@margoengine/math/mathutils';
+import { MargoError } from '@margoengine/math/errors';
 import { sceneSamples } from '../../shared/quality.js';
 import frameShader from './shaders/grass-frame.wgsl?raw';
 import cullShader from './shaders/grass-cull.wgsl?raw';
@@ -33,17 +34,33 @@ type Variant = {
 };
 let fields = 0;
 
+/** Grass field settings, fixed at construction except the wind ones; invalid values throw RangeError. */
 export interface GrassOptions {
+  /** Blade count, an integer 1-16,777,216 (bounded by device limits). Default 100,000. */
   blades?: number;
+  /** X/Z extent centred on the origin at Y = 0, world units, each 0-100,000 (exclusive of 0). Default [50, 50]. */
   area?: readonly [number, number];
+  /** Blade height in world units, 0-100 (exclusive of 0); instances vary 0.7x-1.25x. Default 1.2. */
   bladeHeight?: number;
+  /** Noise scroll and spore drift speed, 0-100; also `field.windSpeed`. Default 1.2. */
   windSpeed?: number;
+  /** Bend strength, 0-2; also `field.windStrength`. Default 0.45. */
   windStrength?: number;
+  /** X/Z wind direction (nonzero, normalised). Default [1, 0.35]. */
   windDirection?: readonly [number, number];
+  /** Distance from the camera beyond which blades are culled, world units, 0-100,000 (exclusive of 0). Default 100. */
   drawDistance?: number;
+  /** Also draw 240 drifting dandelion spores. Default false. */
   spores?: boolean;
 }
 
+/**
+ * GPU grass: blades culled against the camera frustum and distance by a compute pass every frame, drawn with
+ * indirect near (7-vertex) and far (3-vertex) blades, bent by scrolling wind noise. `GrassField.attach(engine,
+ * options)`; WebGPU only. Not a core mesh (no picking, clipping or shadows).
+ * @throws RangeError when an option is out of range or the blades exceed GPU limits.
+ * @throws MargoError `'unsupported'` on a WebGL engine or an unsupported target format, `'attached'` when attached twice.
+ */
 export class GrassField implements EnginePlugin {
   readonly name = `grass-field:${++fields}`;
   readonly blades: number;
@@ -156,9 +173,9 @@ export class GrassField implements EnginePlugin {
   }
 
   setup(engine: Engine): void {
-    if (this.device) throw new Error('Grass field already attached');
+    if (this.device) throw new MargoError('attached', 'Grass field already attached; create a new GrassField');
     const device = engine.gpu;
-    if (!device) throw new Error('GrassField requires WebGPU');
+    if (!device) throw new MargoError('unsupported', 'GrassField requires WebGPU; use a WebGPU engine');
     if (
       this.blades * 24 > Math.min(device.limits.maxStorageBufferBindingSize, device.limits.maxBufferSize) ||
       Math.ceil(this.blades / 64) > device.limits.maxComputeWorkgroupsPerDimension
@@ -299,7 +316,7 @@ export class GrassField implements EnginePlugin {
     if (this.spores) graph.add({ name: this.name + ':spores', order: 11, execute: this.drawSpores });
   }
   private readonly update = (c: PassContext): void => {
-    if (c.backend !== 'webgpu') throw new Error('GrassField requires WebGPU');
+    if (c.backend !== 'webgpu') throw new MargoError('unsupported', 'GrassField requires WebGPU; use a WebGPU engine');
     this.windTime = this.time + c.delta;
     const f = this.frame,
       camera = c.camera;
@@ -367,7 +384,10 @@ export class GrassField implements EnginePlugin {
       (format !== this.canvasFormat && format !== 'rgba16float') ||
       (count !== 1 && (count !== 4 || sceneSamples() === 1))
     )
-      throw new Error('Unsupported grass target format');
+      throw new MargoError(
+        'unsupported',
+        'Unsupported grass target format; draw into the canvas format or rgba16float, at 1 or 4 samples',
+      );
     const key = format + ':' + count + ':' + depthFormat;
     let variant = this.variants.get(key);
     if (variant) return variant;

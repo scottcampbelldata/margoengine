@@ -1,5 +1,6 @@
 import type { PassContext, Vec3 } from '@margoengine/core/extension';
 import { finiteVector } from '@margoengine/math/validate';
+import { MargoError } from '@margoengine/math/errors';
 import { sceneSamples } from '../../shared/quality.js';
 import surfaceSource from './shaders/planet_surface.wgsl?raw';
 import atmosphereSource from './shaders/planet_atmosphere.wgsl?raw';
@@ -179,7 +180,10 @@ export class PlanetPass {
 
   private variant(target: GPUTextureFormat, count: number, depthFormat: GPUTextureFormat): Variant {
     if ((target !== this.format && target !== 'rgba16float') || (count !== 1 && count !== this.samples))
-      throw new Error('Unsupported planet target or device');
+      throw new MargoError(
+        'unsupported',
+        'Unsupported planet target or device; draw into the canvas format or rgba16float on the attached device',
+      );
     const key = target + ':' + count + ':' + depthFormat,
       cached = this.variants.get(key);
     if (cached) return cached;
@@ -241,7 +245,7 @@ export class PlanetPass {
     sunDirection: ArrayLike<number>,
     cloudOffsetU: number,
   ): void {
-    if (this.disposed) throw new Error('Planet pass is disposed');
+    if (this.disposed) throw new MargoError('disposed', 'Planet pass is disposed; create a new Planet');
     finiteVector(cameraMatrix, 16, 'Planet camera matrix');
     finiteVector(modelMatrix, 16, 'Planet model matrix');
     finiteVector(cameraPosition, 3, 'Planet camera position');
@@ -261,8 +265,12 @@ export class PlanetPass {
   }
 
   record(context: Context, shell: boolean): void {
-    if (this.disposed) throw new Error('Planet pass is disposed');
-    if (context.device !== this.device) throw new Error('Unsupported planet target or device');
+    if (this.disposed) throw new MargoError('disposed', 'Planet pass is disposed; create a new Planet');
+    if (context.device !== this.device)
+      throw new MargoError(
+        'unsupported',
+        'Unsupported planet target or device; draw into the canvas format or rgba16float on the attached device',
+      );
     const depthFormat = context.descriptor.depthStencil?.format ?? this.depthFormat,
       variant = this.variant(context.format, context.descriptor.multisample?.count ?? 1, depthFormat);
     this.surfaceDepth.stencilReadOnly = this.shellDepth.stencilReadOnly = depthFormat.includes('stencil') || undefined;

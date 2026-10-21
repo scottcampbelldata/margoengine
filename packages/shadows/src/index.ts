@@ -19,6 +19,7 @@ import { viewMatrix } from '../../shared/view.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { sectionState, sectionShader } from '../../shared/section.js';
 import { finiteVector } from '@margoengine/math/validate';
+import { MargoError } from '@margoengine/math/errors';
 import { cascadeSplits, fitCascades } from './cascades.js';
 import { shadowSampling, shadowDepth, type ShadowFilter } from './shader.js';
 export { cascadeSplits, fitCascades } from './cascades.js';
@@ -30,7 +31,9 @@ declare const GPUTextureUsage: {
   COPY_SRC: number;
   COPY_DST: number;
 };
-type Context = Extract<PassContext, { backend: 'webgpu' }>;
+/** The WebGPU pass context a custom caster's `drawShadow` receives (`ShadowContext.context`). */
+type ShadowPassContext = Extract<PassContext, { backend: 'webgpu' }>;
+/** Directional shadow settings, read every frame from `shadows.options`; invalid values throw RangeError or TypeError. */
 export interface ShadowOptions {
   /**
    * Map size in texels (default 2048): one integer of 16 or more for a square map, or `[width, height]`, each a power of
@@ -40,11 +43,20 @@ export interface ShadowOptions {
    * extents. Live: a new size reallocates the maps next frame (only then).
    */
   resolution?: number | readonly [number, number];
+  /**
+   * Farthest shadowed distance from the camera, world units, > 0. Default 500; when unset and every caster is a core
+   * mesh, the cascades also tighten to the casters' bounds.
+   */
   distance?: number;
+  /** Cascade split blend, 0 (uniform) to 1 (logarithmic). Default 0.5. */
   lambda?: number;
+  /** Light size for the `'soft'` filter's penumbra width, 0 or more. Default 0.02. */
   lightSize?: number;
+  /** Constant depth bias, 0 or more. Default 0.0005. */
   bias?: number;
+  /** Receiver offset along its normal, world units, 0 or more. Default 0.02. */
   normalBias?: number;
+  /** World units each cascade extends towards the light for off-screen casters, 0 or more. Default 100. */
   casterMargin?: number;
   /** Fixed world-space caster and receiver bounds, rendered in one camera-independent map. */
   bounds?: { min: Vec3; max: Vec3; points?: readonly Vec3[] };
@@ -70,25 +82,42 @@ export interface ShadowOptions {
    */
   cascades?: number;
 }
+/** What a custom `ShadowSource.drawShadow` receives for one cascade. Borrowed: use it synchronously. */
 export interface ShadowContext {
-  context: Context;
+  /** The frame's WebGPU pass context. */
+  context: ShadowPassContext;
+  /** The open depth-only pass of this cascade. */
   pass: GPURenderPassEncoder;
+  /** The cascade's light view-projection matrix (16 floats, column-major). */
   matrix: Float32Array;
+  /** Cascade index, 0-3. */
   cascade: number;
 }
+/** One drawable shadow caster (the contract gltf-pro models, materials meshes and terrain expose as `shadowPrimitives`). */
 export interface ShadowPrimitive {
+  /** Identity of the primitive's cached draw (default: its index buffer). */
   primitive?: object;
+  /** The mesh whose world matrix, visibility and engine the caster follows. */
   node: Mesh;
+  /** Vertex buffer: 24-byte core or 80-byte PBR vertices. */
   vertex: GPUBuffer;
+  /** Uint32 indices. */
   index: GPUBuffer;
+  /** Index count. */
   count: number;
+  /** Vertex stride in bytes: 24 (core) or 80 (PBR). */
   stride: number;
   /** Index topology; omitted for triangle casters. Wireframe casters supply triangle-edge line indices. */
   topology?: 'triangle-list' | 'line-list';
+  /** Base-colour texture for alpha-masked casters. */
   alphaTexture?: GPUTextureView;
+  /** Sampler of `alphaTexture`. */
   alphaSampler?: GPUSampler;
+  /** Base-colour alpha factor. */
   alpha?: number;
+  /** Alpha-mask cutoff, 0..1. Default 0 (nothing masked). */
   cutoff?: number;
+  /** UV set of `alphaTexture`, 0 or 1. */
   texCoord?: number /** Two packed vec4 affine rows applied after UV selection. */;
   alphaTransform?: Float32Array;
   instances?: { readonly count: number; upload(device: GPUDevice): GPUBuffer };
@@ -97,11 +126,20 @@ export interface ShadowPrimitive {
   /** Skinned, morphed, instanced, or deformed casters redraw every frame. Unset casters are cached while they stay put. */
   dynamic?: boolean;
 }
+/**
+ * Anything `shadows.add` takes besides a core mesh: a gltf-pro model, materials mesh, `Terrain`, `ScatterInstances`, or
+ * a custom caster with `drawShadow`. It needs `shadowPrimitives` or `drawShadow`.
+ */
 export interface ShadowSource {
+  /** Casters drawn by the standard depth pipeline, read every shadow frame. */
   shadowPrimitives?: readonly ShadowPrimitive[];
+  /** Bumped by a static source when its casters change, so the cached still map re-renders. */
   shadowVersion?: number;
+  /** Custom depth drawing for one cascade. */
   drawShadow?(context: ShadowContext): void;
+  /** Lets the source receive shadows (patches its shader); returns the remover. */
   addLighting?(effect: Shadows): () => void;
+  /** True once disposed; such a source is rejected, or dropped once added. */
   disposed?: boolean;
 }
 interface Source {
@@ -129,6 +167,18 @@ interface Draw {
 }
 const emptyPrimitives: readonly ShadowPrimitive[] = [];
 const powerOfTwo = (v: number) => Number.isInteger(v) && v >= 16 && Number.isInteger(Math.log2(v));
+/**
+ * Directional shadows from the engine's light: up to four cascades (practical splits, stable texel-snapped
+ * extents) in a `depth32float` array, or one camera-independent map for `bounds` or an explicit `frustum`, filtered
+ * `'soft'` (PCSS), `'pcf'` or `'hard'`. Casts from core meshes and any {@link ShadowSource}; static casters render
+ * into a still map that re-renders only when they change. `Shadows.attach(engine, options)`, then
+ * `shadows.add(mesh, {static: true})` per caster. WebGPU only.
+ * @throws RangeError when an option is out of range or a map exceeds the device limits; TypeError for an invalid
+ * source or conflicting options.
+ * @throws MargoError `'unsupported'` on a WebGL engine or when another plugin replaced the core PBR shader,
+ * `'disposed'` for a disposed effect or source, `'attached'` for a source of another engine or one added twice,
+ * `'state'` when used before attaching.
+ */
 export class Shadows implements EnginePlugin {
   readonly name = 'shadows';
   readonly matrices = new Float32Array(64);
@@ -338,11 +388,16 @@ export class Shadows implements EnginePlugin {
       typeof receiveShadow !== 'boolean'
     )
       throw new TypeError('Invalid shadow source');
-    if ('disposed' in source && source.disposed) throw new Error('Shadow source is disposed');
+    if ('disposed' in source && source.disposed)
+      throw new MargoError('disposed', 'Shadow source is disposed; add a live mesh');
     const runtime = 'id' in source ? meshRuntime(source as MeshHandle) : (source as ShadowSource);
     if ('id' in runtime) {
       runtime.check();
-      if (this.engine && runtime.engine !== this.engine) throw new Error('Shadow mesh belongs to another engine');
+      if (this.engine && runtime.engine !== this.engine)
+        throw new MargoError(
+          'attached',
+          'Shadow mesh belongs to another engine; use objects created by the same engine',
+        );
     } else if (!('shadowPrimitives' in runtime) && typeof runtime.drawShadow !== 'function')
       throw new TypeError('Invalid shadow source');
     if (
@@ -350,8 +405,12 @@ export class Shadows implements EnginePlugin {
       'shadowPrimitives' in runtime &&
       runtime.shadowPrimitives?.some((p) => p.node.engine !== this.engine)
     )
-      throw new Error('Shadow source belongs to another engine');
-    if (this.sources.some((r) => r.source === runtime)) throw new Error('Duplicate shadow source');
+      throw new MargoError(
+        'attached',
+        'Shadow source belongs to another engine; use objects created by the same engine',
+      );
+    if (this.sources.some((r) => r.source === runtime))
+      throw new MargoError('attached', 'Duplicate shadow source; add each source once');
     const triangles = 'id' in runtime ? meshTriangles(runtime) : undefined,
       lightingSource = triangles?.kind === 'pbr' ? (triangles.source.model as ShadowSource) : (runtime as ShadowSource);
     let removeLighting: (() => void) | undefined;
@@ -392,7 +451,8 @@ export class Shadows implements EnginePlugin {
     this.dirty = true;
   }
   bindings(): GPUBindGroupEntry[] {
-    if (!this.uniform || this.disposed) throw new Error('Shadows are not attached');
+    if (!this.uniform || this.disposed)
+      throw new MargoError('state', 'Shadows are not attached; attach them to an engine first');
     return this.entries;
   }
   shader(source: string, group = 0): string {
@@ -410,7 +470,11 @@ export class Shadows implements EnginePlugin {
         : 'let linear=shadowLit(direct,i.position,i.normal)*',
     );
     if (code === source) code = source.replace('direct+ambient(s)', 'shadowLit(direct,i.position,s.n)+ambient(s)');
-    if (code === source) throw new Error('Shadows require the standard PBR lighting shader');
+    if (code === source)
+      throw new MargoError(
+        'unsupported',
+        "Shadows require the standard PBR lighting shader; remove the plugin that replaced core's shader",
+      );
     const output = shadowSampling(group, filter, anisotropic) + code;
     if (!cache) {
       cache = new Map();
@@ -435,13 +499,21 @@ export class Shadows implements EnginePlugin {
     return hooks;
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Shadows require WebGPU and a live effect');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'Shadows require WebGPU and a live effect; attach a new Shadows to a WebGPU engine',
+      );
     this.engine = engine;
     this.device = engine.gpu;
     this.validate();
     this.checkLimits();
     for (const r of this.sources)
-      if ('id' in r.source && r.source.engine !== engine) throw new Error('Shadow mesh belongs to another engine');
+      if ('id' in r.source && r.source.engine !== engine)
+        throw new MargoError(
+          'attached',
+          'Shadow mesh belongs to another engine; use objects created by the same engine',
+        );
     this.textures();
     this.uniform = this.device.createBuffer({ size: 368, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.sampler = this.device.createSampler({ compare: 'less-equal', magFilter: 'linear', minFilter: 'linear' });
@@ -586,7 +658,7 @@ export class Shadows implements EnginePlugin {
     if (near > fit.near && near < fit.far) fit.near = near;
     return fit;
   }
-  private render(c: Context): void {
+  private render(c: ShadowPassContext): void {
     this.validate();
     if (this.width !== this.mapWidth || this.height !== this.mapHeight) {
       this.checkLimits();
@@ -856,7 +928,7 @@ export class Shadows implements EnginePlugin {
     }
     return source.shadowPrimitives ?? emptyPrimitives;
   }
-  private depth(c: Context, cascade: number, cached: boolean): void {
+  private depth(c: ShadowPassContext, cascade: number, cached: boolean): void {
     this.depthAttachment.view = (cached ? this.cachedViews : this.views)[cascade];
     this.depthAttachment.depthLoadOp = cached ? 'clear' : 'load';
     const pass = c.encoder.beginRenderPass(this.depthPass),
@@ -903,7 +975,11 @@ export class Shadows implements EnginePlugin {
           const primitive = primitives[i],
             node = primitive.node;
           node.check();
-          if (node.engine !== this.engine) throw new Error('Shadow source belongs to another engine');
+          if (node.engine !== this.engine)
+            throw new MargoError(
+              'attached',
+              'Shadow source belongs to another engine; use objects created by the same engine',
+            );
           let visible = true;
           for (let id = node.id; id !== -1; id = this.engine!.store.parents[id])
             if (this.engine!.store.hidden[id]) visible = false;

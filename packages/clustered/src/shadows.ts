@@ -14,10 +14,12 @@ import { displacedDepth } from '../../shared/displacement.js';
 import { preset } from '../../shared/preset.js';
 import type { Clustered, ClusteredShadow } from './index.js';
 import { hemisphere, viewportMatrix } from './local-shadow-math.js';
+import { MargoError } from '@margoengine/math/errors';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+/** `LocalShadows` settings, fixed at construction; invalid values throw RangeError. */
 export interface LocalShadowOptions {
   /** The clustered lights whose `castShadow` lights get shadow maps. */
   lights: Clustered;
@@ -54,9 +56,13 @@ export interface LocalShadowPrimitive {
   /** Vertex displacement along the normal (materials `displacementMap`, 80-byte vertices), bound at group 2. */
   displacement?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
 }
+/** A caster `LocalShadows.add` takes besides a core mesh, such as a gltf-pro model or materials mesh. */
 export interface LocalShadowSource {
+  /** Casters drawn into each shadowed light's maps. */
   readonly shadowPrimitives: readonly LocalShadowPrimitive[];
+  /** Bumped when the casters change, so cached maps re-render. */
   readonly shadowVersion?: number;
+  /** True once disposed; such a source is rejected, or dropped once added. */
   readonly disposed?: boolean;
 }
 interface Source {
@@ -160,6 +166,11 @@ function lightMatrix(
  * Shadows for clustered point lights (six cube faces) and spot lights (one perspective map) in one depth texture array.
  * Lights with `castShadow` take slots in list order up to `maxLights`. Maps re-render only when their light changes or a
  * caster moves, shows/hides, changes instances or `shadowVersion`, or was added with `{dynamic:true}`.
+ * `LocalShadows.attach(engine, {lights})`; WebGPU only.
+ * @throws TypeError without the Clustered lights or for an invalid caster; RangeError for invalid options or a map
+ * larger than the device allows.
+ * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`, `'attached'` for a caster
+ * added twice or from another engine, `'state'` when used before attaching.
  */
 export class LocalShadows implements EnginePlugin, ClusteredShadow {
   readonly name = 'clustered:shadows';
@@ -240,13 +251,19 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   /** Adds a caster: a core mesh, or a gltf-pro model / materials mesh (`shadowPrimitives`). `dynamic` re-renders its lights every frame (skinned or morphing geometry). */
   add(source: LocalShadowSource | MeshHandle, { dynamic = false }: { dynamic?: boolean } = {}): () => void {
     if (this.disposed || !source || typeof dynamic !== 'boolean') throw new TypeError('Invalid shadow caster');
-    if ('disposed' in source && source.disposed) throw new Error('Shadow caster is disposed');
+    if ('disposed' in source && source.disposed)
+      throw new MargoError('disposed', 'Shadow caster is disposed; add a live mesh');
     const runtime = 'id' in source ? meshRuntime(source as MeshHandle) : (source as LocalShadowSource);
     if ('id' in runtime) {
       runtime.check();
-      if (this.engine && runtime.engine !== this.engine) throw new Error('Shadow mesh belongs to another engine');
+      if (this.engine && runtime.engine !== this.engine)
+        throw new MargoError(
+          'attached',
+          'Shadow mesh belongs to another engine; use objects created by the same engine',
+        );
     } else if (!('shadowPrimitives' in runtime)) throw new TypeError('Invalid shadow caster');
-    if (this.sources.some((r) => r.source === runtime)) throw new Error('Duplicate shadow caster');
+    if (this.sources.some((r) => r.source === runtime))
+      throw new MargoError('attached', 'Duplicate shadow caster; add each caster once');
     const r: Source = { source: runtime, dynamic };
     this.sources.push(r);
     this.invalidate();
@@ -268,18 +285,27 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   }
   /** @internal ClusteredShadow: bindings 14-16 of the lit shader's group. */
   bindings(): GPUBindGroupEntry[] {
-    if (!this.frame || this.disposed) throw new Error('Local shadows are not attached');
+    if (!this.frame || this.disposed)
+      throw new MargoError('state', 'Local shadows are not attached; attach them to an engine first');
     return this.entries;
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Local shadows require WebGPU and a live effect');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'Local shadows require WebGPU and a live effect; attach a new LocalShadows to a WebGPU engine',
+      );
     this.validate();
     this.engine = engine;
     const device = (this.device = engine.gpu);
     if ((this.options.resolution ?? 512) > device.limits.maxTextureDimension2D)
       throw new RangeError('Shadow map exceeds device limit');
     for (const r of this.sources)
-      if ('id' in r.source && r.source.engine !== engine) throw new Error('Shadow mesh belongs to another engine');
+      if ('id' in r.source && r.source.engine !== engine)
+        throw new MargoError(
+          'attached',
+          'Shadow mesh belongs to another engine; use objects created by the same engine',
+        );
     this.frame = device.createBuffer({
       size: FRAME_FLOATS * 4,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -482,7 +508,11 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       for (const p of primitives) {
         const node = p.node;
         node.check();
-        if (node.engine !== engine) throw new Error('Shadow caster belongs to another engine');
+        if (node.engine !== engine)
+          throw new MargoError(
+            'attached',
+            'Shadow caster belongs to another engine; use objects created by the same engine',
+          );
         let visible = true;
         for (let id = node.id; id !== -1; id = engine.store.parents[id]) if (engine.store.hidden[id]) visible = false;
         const inst = p.instances,

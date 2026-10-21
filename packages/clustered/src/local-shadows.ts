@@ -1,6 +1,7 @@
 import type { Mesh as MeshHandle } from '@margoengine/core';
 import { meshRuntime, type Engine, type Mesh, type PassContext } from '@margoengine/core/extension';
 import { finiteVector } from '@margoengine/math/validate';
+import { MargoError } from '@margoengine/math/errors';
 import { instanceLayout, instancedDepth } from '../../shared/instances.js';
 import { displacedDepth } from '../../shared/displacement.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
@@ -13,6 +14,10 @@ declare const GPUTextureUsage: {
   COPY_SRC: number;
 };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+/**
+ * Integrated local-light shadow maps (`ClusteredOptions.shadows`), fixed at construction; invalid values throw
+ * TypeError or RangeError.
+ */
 export interface LocalShadowOptions {
   /**
    * Size of every shadow layer in texels (default 512), and the largest map a light's `shadow.resolution` may ask for.
@@ -20,6 +25,7 @@ export interface LocalShadowOptions {
    * `maxLights × 6 × resolution² × 4` bytes (four slots at 512: 24 MiB; one slot at 2048: 96 MiB).
    */
   resolution?: number;
+  /** Lights with a `shadow` that get maps, an integer 1-32 (default 4); `setLights` with more throws RangeError. */
   maxLights?: number;
 }
 /**
@@ -34,7 +40,9 @@ export interface LocalLightShadow {
    * receivers past it are unshadowed.
    */
   far?: number;
+  /** Depth bias of the integrated maps, 0 or more (default 0.0005). */
   bias?: number;
+  /** Receiver offset along its normal for the integrated maps, world units, 0 or more (default 0.02). */
   normalBias?: number;
   /**
    * This light's map size in texels: one integer (square) or `[width, height]`, each from 16 up to the `resolution`
@@ -46,12 +54,22 @@ export interface LocalLightShadow {
    */
   resolution?: number | readonly [number, number];
 }
+/**
+ * A caster primitive of a `LocalShadowSource` (gltf-pro and materials `shadowPrimitives`): vertex and index buffers of
+ * a mesh node, with an optional alpha mask, instances and displacement.
+ */
 export interface LocalShadowPrimitive {
+  /** Identity of the primitive's cached draw (default: its index buffer). */
   primitive?: object;
+  /** The core mesh whose world matrix, visibility and engine the caster follows. */
   node: Mesh;
+  /** Vertex buffer, position first in each vertex. */
   vertex: GPUBuffer;
+  /** Index buffer (uint32). */
   index: GPUBuffer;
+  /** Index count. */
   count: number;
+  /** Vertex stride in bytes: 24 (core) or 80 (PBR vertices, with UVs; needed for instances, displacement and `alphaTransform`). */
   stride: number;
   /** Index topology; omitted for triangle casters. Wireframe casters supply triangle-edge line indices. */
   topology?: 'triangle-list' | 'line-list';
@@ -65,9 +83,16 @@ export interface LocalShadowPrimitive {
   /** Vertex displacement along the normal (materials `displacementMap`, 80-byte vertices), bound at group 1. */
   displacement?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
 }
+/**
+ * A caster `Clustered.addShadowCaster` takes besides a core mesh: an object with `shadowPrimitives` (gltf-pro models,
+ * materials meshes). A source with only a custom `drawShadow` is rejected with TypeError.
+ */
 export interface LocalShadowSource {
+  /** Casters drawn into each shadowed light's maps. */
   shadowPrimitives?: readonly LocalShadowPrimitive[];
+  /** True once disposed; such a source is rejected, or dropped once added. */
   disposed?: boolean;
+  /** Another shadow system's draw hook; not supported here. */
   drawShadow?: unknown;
 }
 interface ShadowLight {
@@ -290,7 +315,8 @@ export class LocalShadowMaps {
     if (this.disposed || !source || typeof source !== 'object') throw new TypeError('Invalid local shadow source');
     const runtime = 'id' in source ? meshRuntime(source as MeshHandle) : (source as LocalShadowSource);
     this.validateSource(runtime, this.engine);
-    if (this.sources.some((record) => record.source === runtime)) throw new Error('Duplicate local shadow source');
+    if (this.sources.some((record) => record.source === runtime))
+      throw new MargoError('attached', 'Duplicate local shadow source; add each caster once');
     const record: Source = { source: runtime };
     this.sources.push(record);
     return () => {
@@ -302,10 +328,15 @@ export class LocalShadowMaps {
     };
   }
   private validateSource(source: Mesh | LocalShadowSource, engine?: Engine): void {
-    if ('disposed' in source && source.disposed) throw new Error('Local shadow source is disposed');
+    if ('disposed' in source && source.disposed)
+      throw new MargoError('disposed', 'Local shadow source is disposed; add a live mesh');
     if ('id' in source) {
       source.check();
-      if (engine && source.engine !== engine) throw new Error('Local shadow mesh belongs to another engine');
+      if (engine && source.engine !== engine)
+        throw new MargoError(
+          'attached',
+          'Local shadow mesh belongs to another engine; use objects created by the same engine',
+        );
       return;
     }
     if (!Array.isArray(source.shadowPrimitives))
@@ -314,11 +345,19 @@ export class LocalShadowMaps {
       if (!primitive?.node || typeof primitive.node.check !== 'function')
         throw new TypeError('Invalid local shadow primitive');
       primitive.node.check();
-      if (engine && primitive.node.engine !== engine) throw new Error('Local shadow source belongs to another engine');
+      if (engine && primitive.node.engine !== engine)
+        throw new MargoError(
+          'attached',
+          'Local shadow source belongs to another engine; use objects created by the same engine',
+        );
     }
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu || this.device) throw new Error('Local shadows require WebGPU and a live effect');
+    if (this.disposed || !engine.gpu || this.device)
+      throw new MargoError(
+        this.disposed ? 'disposed' : this.device ? 'attached' : 'unsupported',
+        'Local shadows require WebGPU and a live effect; attach a new Clustered to a WebGPU engine',
+      );
     const device = engine.gpu,
       size = this.resolution,
       layers = this.maxLights * 6,
@@ -379,11 +418,13 @@ export class LocalShadowMaps {
     }
   }
   bindings(): GPUBindGroupEntry[] {
-    if (!this.device || this.disposed) throw new Error('Local shadows are not attached');
+    if (!this.device || this.disposed)
+      throw new MargoError('state', 'Local shadows are not attached; attach the Clustered effect first');
     return this.entries;
   }
   render(context: Context): void {
-    if (!this.device || this.disposed) throw new Error('Local shadows are not attached');
+    if (!this.device || this.disposed)
+      throw new MargoError('state', 'Local shadows are not attached; attach the Clustered effect first');
     this.stats.passes = this.stats.draws = 0;
     this.epoch++;
     for (let i = this.sources.length - 1; i >= 0; i--) {
@@ -440,7 +481,11 @@ export class LocalShadowMaps {
               const node = primitive.node;
               if (this.engine!.meshes.get(node.id) !== node) continue;
               node.check();
-              if (node.engine !== this.engine) throw new Error('Local shadow source belongs to another engine');
+              if (node.engine !== this.engine)
+                throw new MargoError(
+                  'attached',
+                  'Local shadow source belongs to another engine; use objects created by the same engine',
+                );
               let visible = true;
               for (let id = node.id; id !== -1; id = this.engine!.store.parents[id])
                 if (this.engine!.store.hidden[id]) {

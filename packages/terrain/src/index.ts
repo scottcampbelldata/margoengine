@@ -9,6 +9,7 @@ import {
 } from '@margoengine/core/extension';
 import { finiteVector } from '@margoengine/math/validate';
 import { margoError } from '../../shared/errors.js';
+import { MargoError } from '@margoengine/math/errors';
 import { clipmapGrid } from './grid.js';
 import { terrainVertex, terrainFragment } from './shader.js';
 export { clipmapGrid } from './grid.js';
@@ -17,26 +18,44 @@ export { heightfieldGeometry, TerrainHeightmap, type HeightField, type Heightfie
 declare const GPUBufferUsage: { UNIFORM: number; VERTEX: number; INDEX: number; STORAGE: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
-type Context = Extract<PassContext, { backend: 'webgpu' }>;
+type TerrainPassContext = Extract<PassContext, { backend: 'webgpu' }>;
+/** The textures `TerrainOptions.textures` returns; Terrain owns and destroys them. All sampled, single-sample 2D. */
 export interface TerrainTextures {
+  /** Heights in the R channel: `r32float`, `rgba16float` or `rgba8unorm`, one layer. */
   heightmap: GPUTexture;
+  /** Optional XYZ normals encoded 0..1: `rgba8unorm` or `rgba16float`. Default: from neighbouring heights. */
   normalmap?: GPUTexture;
+  /** Layer colours, one array layer per `TerrainLayer`: `rgba8unorm-srgb`, `rgba8unorm` or `rgba16float`. */
   layers: GPUTexture;
 }
+/** A splat rule: where layer i's texture shows. Rules blend smoothly around their bounds; layer 0 is the fallback. */
 export interface TerrainLayer {
+  /** World Y range [min, max), min < max. */
   height: readonly [number, number];
+  /** Slope range (1 - normal.y), 0 <= min < max <= 1. */
   slope: readonly [number, number];
+  /** Texture repeats per world unit, > 0. */
   scale: number;
 }
+/** Clipmap terrain settings, fixed at construction. Invalid values throw RangeError. */
 export interface TerrainOptions {
+  /** Creates the textures, at attach and again after device restoration (recreate them from retained data). */
   textures: (device: GPUDevice) => TerrainTextures;
+  /** 4-8 splat rules, one per `layers` texture layer. */
   layers: readonly TerrainLayer[];
+  /** World XZ of the heightmap's minimum corner. Default [0, 0]. */
   origin?: readonly [number, number];
+  /** World XZ extent the heightmap covers, each > 0. */
   size: readonly [number, number];
+  /** World Y per height sample unit. Default 100. */
   heightScale?: number;
+  /** World Y added to every height. Default 0. */
   heightOffset?: number;
+  /** Finest grid spacing in world units, > 0; doubles per level. Default 1. */
   cellSize?: number;
+  /** Cells per ring side, a multiple of 4 from 8 to 256. Default 64. */
   resolution?: number;
+  /** Clipmap rings, 1-12. Default 6. */
   levels?: number;
   /** Surface roughness (GGX, 0-1), for the sun's highlight and screen-space reflections (`ssr.add(terrain)`). Default
    * 0.9; leaving it out keeps the shader as it was. */
@@ -52,9 +71,16 @@ export interface TerrainCapture {
   /** This frame's capture pass: these targets and a depth attachment of the context's format; ended by the owner. */
   begin(): GPURenderPassEncoder;
 }
+/**
+ * A lighting effect patched into the terrain shader, such as shadows or clustered lights (`terrain.addLighting`).
+ * Its bindings live in group 1.
+ */
 export interface TerrainLighting {
+  /** The engine the effect belongs to; a different engine is rejected. */
   readonly owner?: Engine;
+  /** Returns `source` with the effect's WGSL added, using bind group `group`. */
   shader(source: string, group: number): string;
+  /** The group-1 entries the patched shader reads, asked every frame. */
   bindings(): GPUBindGroupEntry[];
 }
 interface Ring {
@@ -71,6 +97,15 @@ interface LightingGroup {
   group: GPUBindGroup;
 }
 let nextId = 0;
+/**
+ * Geometry-clipmap terrain: concentric rings that follow the camera, heights sampled from a texture in the vertex
+ * shader, 4-8 slope/height texture layers with triplanar cliffs, GGX sun lighting. Works with `Shadows` and
+ * `Clustered` (`shadows.add(terrain)`, `clustered.add(terrain)`). `Terrain.attach(engine, options)`; WebGPU only.
+ * @throws RangeError from the constructor when an option is out of range.
+ * @throws TypeError when the textures have the wrong dimension, format, usage or layer count.
+ * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`, `'attached'` when a lighting
+ * effect belongs to another engine.
+ */
 export class Terrain implements EnginePlugin {
   readonly name = 'terrain:' + nextId++;
   shadowVersion = 0;
@@ -146,7 +181,10 @@ export class Terrain implements EnginePlugin {
     if (this.disposed || !effect || typeof effect.shader !== 'function' || typeof effect.bindings !== 'function')
       throw new TypeError('Invalid terrain lighting');
     if (effect.owner && this.engine && effect.owner !== this.engine)
-      throw new Error('Terrain lighting belongs to another engine');
+      throw new MargoError(
+        'attached',
+        'Terrain lighting belongs to another engine; use objects created by the same engine',
+      );
     this.lighting.add(effect);
     return () => this.lighting.delete(effect);
   }
@@ -154,7 +192,11 @@ export class Terrain implements EnginePlugin {
     this.shadowVersion++;
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Terrain requires WebGPU and a live module');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'Terrain requires WebGPU and a live module; attach a new Terrain to a WebGPU engine',
+      );
     this.engine = engine;
     this.device = engine.gpu;
     this.textures = this.options.textures(this.device);
@@ -285,7 +327,7 @@ export class Terrain implements EnginePlugin {
       },
     });
   }
-  private prepare(c: Context): void {
+  private prepare(c: TerrainPassContext): void {
     const origin = this.options.origin,
       size = this.options.size,
       resolution = this.options.resolution ?? 64,
@@ -364,7 +406,7 @@ export class Terrain implements EnginePlugin {
       }),
     });
   }
-  private drawRings(c: Context): void {
+  private drawRings(c: TerrainPassContext): void {
     const code = this.shader();
     const key = c.descriptor.multisample?.count + ':' + c.format + ':' + c.descriptor.depthStencil!.format + code;
     let pipeline = this.pipelines.get(key);
@@ -444,7 +486,7 @@ export class Terrain implements EnginePlugin {
   }
   /** `mode` 'capture': draws the terrain into the capture hook's pass (`setCapture`); `color` and `depth` are unused (the
    * hook's pass has its own). Does nothing without a hook or after disposal. */
-  draw(c: Context, mode: 'capture', color?: GPUTextureView, depth?: GPUTextureView): void {
+  draw(c: TerrainPassContext, mode: 'capture', color?: GPUTextureView, depth?: GPUTextureView): void {
     const hook = this.capture;
     if (mode !== 'capture' || !hook || this.disposed || !this.rings.length) return;
     void color;
@@ -549,7 +591,7 @@ export class Terrain implements EnginePlugin {
     matrix,
     cascade,
   }: {
-    context: Context;
+    context: TerrainPassContext;
     pass: GPURenderPassEncoder;
     matrix: Float32Array;
     cascade: number;

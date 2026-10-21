@@ -9,19 +9,25 @@ import {
 } from '@margoengine/core/extension';
 import { windShader, validateWind, type ScatterWind } from './wind.js';
 import { sameBindings, snapshotBindings } from './bindings.js';
+import { MargoError } from '@margoengine/math/errors';
 
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; INDIRECT: number; UNIFORM: number; COPY_DST: number };
-type Context = Extract<PassContext, { backend: 'webgpu' }>;
+type ScatterPassContext = Extract<PassContext, { backend: 'webgpu' }>;
+/** One material batch of fixed PBR instances for `ScatterInstances`, drawn with one indexed indirect draw. */
 export interface ScatterBatch {
+  /** Diagnostic label. */
   name: string;
   /** Position, normal, tangent, UV0/UV1 and color, five vec4s (80 bytes). */
   vertices: Float32Array;
+  /** Triangle indices into `vertices`. */
   indices: Uint32Array;
   /** Column-major affine matrices, 16 floats per instance. */
   transforms: Float32Array;
+  /** Core PBR material shared by the batch; values are re-uploaded every frame. */
   material: PbrMaterial;
   /** Linear HDR emission, added after lighting and baked occlusion. */
   emissive?: readonly [number, number, number];
+  /** Rooted wind bend `[directionX, directionZ, strength]`. Omitted: static. */
   wind?: ScatterWind;
   /** Branch/foliage ripple, 0–1, layered over rooted wind. Defaults to 0. */
   windDetail?: number;
@@ -89,7 +95,11 @@ struct Input {@location(0) p:vec3f,@location(2) a:vec4f,@location(3) b:vec4f,@lo
 `;
 let serial = 0;
 
-/** Fixed, indirect PBR instances. The factory runs only at upload/device restoration; CPU geometry is not retained. */
+/**
+ * Fixed, indirect PBR instances. The factory runs only at upload/device restoration; CPU geometry is not retained.
+ * @throws TypeError when the factory is not a function; RangeError when a batch is invalid or exceeds GPU limits.
+ * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`.
+ */
 export class ScatterInstances implements EnginePlugin {
   readonly name = 'scatter:instances:' + ++serial;
   readonly batches: { name: string; vertices: number; indices: number; instances: number }[] = [];
@@ -133,7 +143,11 @@ export class ScatterInstances implements EnginePlugin {
     return effect;
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('PBR scatter requires WebGPU');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'PBR scatter requires WebGPU; attach a new ScatterInstances to a WebGPU engine',
+      );
     this.engine = engine;
     const d = engine.gpu;
     const upload = (data: Float32Array | Uint32Array, usage: number): GPUBuffer => {
@@ -253,7 +267,7 @@ export class ScatterInstances implements EnginePlugin {
     if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Invalid scatter delta');
     this.time = this.time + delta;
   }
-  private draw(c: Context): void {
+  private draw(c: ScatterPassContext): void {
     const intensity = typeof this.emissiveIntensity === 'function' ? this.emissiveIntensity() : this.emissiveIntensity;
     if (typeof intensity !== 'number' || !Number.isFinite(Math.fround(intensity)) || intensity < 0)
       throw new RangeError('Invalid scatter emissive intensity');
@@ -341,7 +355,7 @@ export class ScatterInstances implements EnginePlugin {
     matrix,
     cascade,
   }: {
-    context: Context;
+    context: ScatterPassContext;
     pass: GPURenderPassEncoder;
     matrix: Float32Array;
     cascade: number;

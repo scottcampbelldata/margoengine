@@ -14,6 +14,7 @@ export interface GTAOOptions {
   slices?: number;
   /** Depth samples per side of each slice, 1-16. Default 6. */
   steps?: number;
+  /** False skips the effect (the scene passes through). Default true; also `gtao.enabled`. */
   enabled?: boolean;
 }
 

@@ -1,12 +1,22 @@
+/** A parsed 3D LUT (2³ to 65³ samples), as `parseCube` returns it and `Tonemap.setLUT` takes it. */
 export interface CubeLUT {
   /** Samples per axis (integer 2–65). Omitted on legacy manually constructed LUTs means 33. */
   size?: number;
+  /** size³ RGBA samples (A = 1), red index varying fastest; display-linear RGB applied after the curve and contrast. */
   data: Float32Array;
+  /** Input value mapped to the first sample per channel (RGB). Default [0, 0, 0]. */
   domainMin: Float32Array;
+  /** Input value mapped to the last sample per channel (RGB); each above its `domainMin`. Default [1, 1, 1]. */
   domainMax: Float32Array;
 }
 
-/** Parse a 2³–65³ RGB .cube LUT, red index varying fastest. Text is capped at 32 × 1024² JavaScript characters. */
+/**
+ * Parse a 2³–65³ RGB .cube LUT, red index varying fastest. Text is capped at 32 × 1024² JavaScript characters.
+ * @throws TypeError when `text` is not a string, or on a malformed TITLE, size or domain header, sample row, number or
+ * sample count.
+ * @throws RangeError when the text is over the cap, the size is outside 2–65, a value is not a finite Float32, or a
+ * domain minimum is not below its maximum.
+ */
 export function parseCube(text: string): CubeLUT {
   if (typeof text !== 'string') throw new TypeError('.cube text must be a string; supply the file contents');
   if (text.length > 32 * 1024 * 1024)

@@ -27,16 +27,26 @@ declare const GPUTextureUsage: {
   STORAGE_BINDING: number;
   COPY_DST: number;
 };
-type Context = Extract<PassContext, { backend: 'webgpu' }>;
+type PostPassContext = Extract<PassContext, { backend: 'webgpu' }>;
+/** SSAO settings, read every frame from `ssao.options`; out of range throws RangeError before any GPU command. */
 export interface SSAOOptions {
+  /** Sampling hemisphere radius in world units, (0, 100]. Default 0.5. */
   radius?: number;
+  /** Depth bias against self-occlusion, world units, 0..radius. Default 0.025. */
   bias?: number;
+  /** Kernel points per pixel, an integer 1-32. Default 32. */
   samples?: number;
+  /** False skips occlusion (the scene still passes through). Default true; also `ssao.enabled`. */
   enabled?: boolean;
 }
+/**
+ * A renderer whose own surfaces SSAO should see and darken, such as a gltf-pro model; registered with `ssao.add`.
+ * Each frame SSAO calls `draw(context, 'occlusion', gbuffer, depth, 'all', external)` inside its open G-buffer pass.
+ * Core meshes need no source.
+ */
 export interface SSAOSource {
   draw(
-    context: Context,
+    context: PostPassContext,
     mode: 'gbuffer' | 'ambient' | 'occlusion',
     color: GPUTextureView,
     depth: GPUTextureView,
@@ -55,6 +65,15 @@ function hemisphere(): Float32Array {
   }
   return values;
 }
+/**
+ * Screen-space ambient occlusion: a 32-point hemisphere kernel over reconstructed normals and depth, two bilateral
+ * blur passes, then it darkens only the captured ambient light (direct light and emission stay). `SSAO.attach(engine,
+ * options)` alone, or first in a `PostStack`. WebGPU only.
+ * @throws RangeError when an option is out of range; TypeError for an invalid `add` source or a non-boolean `enabled`.
+ * @throws MargoError `'unsupported'` on a WebGL engine or when another plugin replaced core's lighting shader,
+ * `'disposed'` after `dispose()`, `'attached'` when attached twice, `'state'` when another post effect owns the output
+ * target or the camera matrix is not invertible.
+ */
 export class SSAO implements EnginePlugin {
   readonly name: string = 'ssao';
   /** Tier-preset key (@margoengine/quality) read by the constructor; GTAO reads its own. */
@@ -154,7 +173,8 @@ export class SSAO implements EnginePlugin {
     return this.host ? this.host.depthTexture : this.textures[1];
   }
   private joinStack(host: StackHost): StackStage {
-    if (this.engine || this.host || this.disposed) throw new Error(`${this.label} is already attached`);
+    if (this.engine || this.host || this.disposed)
+      throw margoError('attached', `${this.label} is already attached; create a new ${this.label}`);
     this.host = host;
     return { kind: 'hdr', render: (c, input, output) => this.stage(c, input, output) };
   }
@@ -202,10 +222,10 @@ export class SSAO implements EnginePlugin {
     v[54] = v[55] = 0;
   }
   setup(engine: Engine): void {
-    if (this.disposed) throw new Error(`${this.label} is disposed`);
-    if (!engine.gpu) throw new Error(`${this.label} requires WebGPU`);
+    if (this.disposed) throw margoError('disposed', `${this.label} is disposed; create a new ${this.label}`);
+    if (!engine.gpu) throw margoError('unsupported', `${this.label} requires WebGPU; use a WebGPU engine`);
     if (!this.host && (engine.hasPlugin('post-processing') || engine.hasPlugin('bloom')))
-      throw new Error('SSAO owns the output target; remove the other post effect first');
+      throw margoError('state', 'SSAO owns the output target; remove the other post effect first');
     this.engine = engine;
     this.device = engine.gpu;
     this.uniform = this.device.createBuffer({ size: 224, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
@@ -248,7 +268,10 @@ export class SSAO implements EnginePlugin {
         if (c.backend !== 'webgpu') return;
         this.validate();
         if (!this.host && (this.engine!.hasPlugin('post-processing') || this.engine!.hasPlugin('bloom')))
-          throw new Error('SSAO cannot share the output target with another post effect');
+          throw margoError(
+            'state',
+            'SSAO cannot share the output target with another post effect; put both effects in one PostStack',
+          );
         this.resize(c);
         if (!this.host) {
           this.original = c.color;
@@ -264,7 +287,7 @@ export class SSAO implements EnginePlugin {
           c.shader = this.captureShader;
         }
         if (!invertMatrixStable(c.camera.matrix, this.inverse, this.inverseWorkspace))
-          throw new Error('Invalid SSAO camera');
+          throw margoError('state', 'Invalid SSAO camera; give the camera a finite, invertible projection');
         viewMatrix(this.view, c.camera);
         // View-space projection for the samples: the camera's own when it is orthographic (constant clip w, signed near/far), else core's perspective.
         const p = this.projection,
@@ -344,7 +367,7 @@ export class SSAO implements EnginePlugin {
       },
     });
   }
-  private present(c: Context, view: GPUTextureView): void {
+  private present(c: PostPassContext, view: GPUTextureView): void {
     this.compositeAttachment.view = view;
     const pass = c.encoder.beginRenderPass(this.compositePass);
     pass.setPipeline(this.composite!);
@@ -353,7 +376,7 @@ export class SSAO implements EnginePlugin {
     pass.end();
   }
   /** Stacked: darken the ambient term of `input`; Reinhard-encoded only as the display output. */
-  private stage(c: Context, input: GPUTextureView, output: StageOutput): void {
+  private stage(c: PostPassContext, input: GPUTextureView, output: StageOutput): void {
     const key = output.format + output.multisample.count + output.hdr;
     if (this.key !== key) {
       this.key = key;
@@ -368,7 +391,7 @@ export class SSAO implements EnginePlugin {
     }
     this.present(c, output.view);
   }
-  private resize(c: Context): void {
+  private resize(c: PostPassContext): void {
     const host = this.host;
     if (
       this.width === c.width &&
@@ -495,14 +518,14 @@ export class SSAO implements EnginePlugin {
     this.geometryColors[0].view = this.replayViews[0] ?? this.gbuffer!;
     this.geometryColors[1].view = this.replayViews[1] ?? this.ambient!;
   }
-  private dispatch(c: Context, pipeline: GPUComputePipeline, group: GPUBindGroup): void {
+  private dispatch(c: PostPassContext, pipeline: GPUComputePipeline, group: GPUBindGroup): void {
     const pass = c.encoder.beginComputePass();
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, group);
     pass.dispatchWorkgroups(Math.ceil(c.width / 8), Math.ceil(c.height / 8));
     pass.end();
   }
-  private extractScene(c: Context): void {
+  private extractScene(c: PostPassContext): void {
     this.captureTarget!.resolve(c.encoder);
     this.dispatch(c, this.extract!, this.groups[0]);
     const gbuffer = this.replayViews[0] ?? this.gbuffer!,
@@ -556,7 +579,11 @@ export class SSAO implements EnginePlugin {
     }
     const code = this.ambientCode;
     if (!this.ambientPipeline || this.ambientShader !== code) {
-      if (code === c.shader) throw new Error('SSAO requires the standard core lighting shader');
+      if (code === c.shader)
+        throw margoError(
+          'unsupported',
+          "SSAO requires the standard core lighting shader; remove the plugin that replaced core's shader",
+        );
       const module = c.device.createShaderModule({ code });
       this.ambientPipeline = c.device.createRenderPipeline({
         ...c.descriptor,

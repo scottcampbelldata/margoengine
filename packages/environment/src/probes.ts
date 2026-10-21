@@ -369,7 +369,10 @@ const captureCore = (shader: string): string => {
     !code.includes('_=margoMainFrame') ||
     !code.includes('return vec4f(linear,1);')
   )
-    throw new Error('Light probe capture requires the standard core lighting shader');
+    throw new MargoError(
+      'unsupported',
+      "Light probe capture requires the standard core lighting shader; remove the plugin that replaced core's shader",
+    );
   return captureLights(code);
 };
 const captureLights = (code: string): string => {
@@ -391,11 +394,17 @@ const captureLights = (code: string): string => {
       ).length !== 3 ||
       out.includes('clusterLights[clusterIndices')
     )
-      throw new Error('Light probe capture does not recognise the clustered lighting shader');
+      throw new MargoError(
+        'unsupported',
+        'Light probe capture does not recognise the clustered lighting shader; update @margoengine/clustered and @margoengine/environment together',
+      );
   }
   return out;
 };
 
+// A bake whose probes were disposed, or whose device was lost, while it waited for the GPU.
+const interrupted = (disposed: boolean) =>
+  new MargoError(disposed ? 'disposed' : 'state', 'Light probe bake interrupted; bake again on live probes');
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const vector = (v: unknown): v is Vec3 => Array.isArray(v) && v.length === 3 && v.every(finite);
 const powerOfTwo = (v: number | undefined, fallback: number, min: number, max: number, label: string): number => {
@@ -643,7 +652,8 @@ export class LightProbes extends ShaderEffect {
   }
   protected patch(source: string, group: number): string {
     if (source.includes('let margoAmbient='))
-      throw new Error(
+      throw new MargoError(
+        'state',
         `${this.name} replaces EnvironmentLighting: pass {environment} to LightProbes instead of attaching both`,
       );
     const base = source.includes('let base=terrainColor') ? 'base' : 'i.color',
@@ -683,7 +693,11 @@ export class LightProbes extends ShaderEffect {
   override setup(engine: EngineKernel): void {
     super.setup(engine);
     const device = engineRuntime(engine).gpu;
-    if (!device) throw new Error('LightProbes require the WebGPU backend');
+    if (!device)
+      throw new MargoError(
+        'unsupported',
+        'LightProbes require the WebGPU backend; use an engine on the WebGPU backend',
+      );
     this.allocate(device);
   }
   onDeviceRestored(engine: EngineKernel): void {
@@ -771,9 +785,16 @@ export class LightProbes extends ShaderEffect {
       throw new RangeError('Light probe bounces must be an integer from 1 to 8');
     const samples = options.samples === undefined ? 0 : powerOfTwo(options.samples, 0, 64, 4096, 'bake samples');
     if (this.disposed || !this.engine || !this.gpu)
-      throw new Error(`${this.name} is not attached: engine.use(probes) first`);
-    if (this.baking) throw new Error('Light probe bake pending');
-    if (this.environment?.device === null) throw new Error('Light probe environment is not ready');
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'state',
+        `${this.name} is not attached: engine.use(probes) first`,
+      );
+    if (this.baking) throw new MargoError('state', 'Light probe bake pending; await the running bake() first');
+    if (this.environment?.device === null)
+      throw new MargoError(
+        'state',
+        'Light probe environment is not ready; wait for its restore or pass a live Environment',
+      );
     this.baking = true;
     this.bakeSamples = samples;
     try {
@@ -781,7 +802,7 @@ export class LightProbes extends ShaderEffect {
         device = this.gpu;
       // One ordinary frame first: shadow maps and other per-frame inputs the capture samples come from the previous frame.
       engine.render({ culling: false });
-      if (this.disposed || this.gpu !== device) throw new Error('Light probe bake interrupted');
+      if (this.disposed || this.gpu !== device) throw interrupted(this.disposed);
       for (let b = 0; b < bounces; b++) {
         this.pending = true;
         device.pushErrorScope('validation');
@@ -797,9 +818,9 @@ export class LightProbes extends ShaderEffect {
           throw error;
         }
         const error = await device.popErrorScope();
-        if (error) throw new Error(`Light probe bake failed: ${error.message}`);
-        if (this.pending) throw new Error('Light probe capture did not run (the engine did not render)');
-        if (this.disposed || this.gpu !== device) throw new Error('Light probe bake interrupted');
+        if (error) throw new MargoError('failed', `Light probe bake failed: ${error.message}`);
+        if (this.pending) throw new MargoError('failed', 'Light probe capture did not run (the engine did not render)');
+        if (this.disposed || this.gpu !== device) throw interrupted(this.disposed);
         this.writeHeader(true);
       }
       const resources = this.captureResources!;
@@ -820,7 +841,7 @@ export class LightProbes extends ShaderEffect {
         device.queue.submit(resources.commands);
         await read.mapAsync(GPUMapMode.READ);
         mapped = true;
-        if (this.disposed || this.gpu !== device) throw new Error('Light probe bake interrupted');
+        if (this.disposed || this.gpu !== device) throw interrupted(this.disposed);
         const words = new Uint32Array(read.getMappedRange());
         // Public texels have snapshot lifetime. An unobserved private result can
         // reuse its large backing store until the getter actually publishes it.
@@ -1244,7 +1265,7 @@ export class LightProbes extends ShaderEffect {
       c.depth = savedDepth;
       c.descriptor = savedDescriptor;
     }
-    if (this.disposed || this.gpu !== device) throw new Error('Light probe bake interrupted');
+    if (this.disposed || this.gpu !== device) throw interrupted(this.disposed);
     for (const key in view)
       if (!Object.prototype.hasOwnProperty.call(c, key)) delete (view as unknown as Record<string, unknown>)[key];
     Object.assign(view, c);
@@ -1258,7 +1279,7 @@ export class LightProbes extends ShaderEffect {
     view.width = view.height = size;
     for (const model of this.captured) {
       model.draw(view, 'beauty', color, depth);
-      if (this.disposed || this.gpu !== device) throw new Error('Light probe bake interrupted');
+      if (this.disposed || this.gpu !== device) throw interrupted(this.disposed);
     }
     if (face === 5) this.filterProbe(resources, target, bake, encoder, volumeIndex, reflectionIndex, samples);
     resources.commands[0] = encoder.finish();

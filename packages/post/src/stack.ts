@@ -9,6 +9,7 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
+import { margoError } from '../../shared/errors.js';
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_SRC: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 const owners = ['bloom', 'ssao', 'dof', 'tonemap', 'post-processing'],
@@ -17,7 +18,11 @@ const owners = ['bloom', 'ssao', 'dof', 'tonemap', 'post-processing'],
 
 /** One HDR scene capture shared by several effects, applied in array order: HDR effects (SSAO, DOF, Bloom), at most one
  * display effect (Tonemap or creative PostProcessing), then LDR effects (FXAA). Without a display effect the last HDR
- * effect tonemaps as it does alone. The stack attaches, restores and disposes its effects. */
+ * effect tonemaps as it does alone. The stack attaches, restores and disposes its effects.
+ * @throws TypeError when `effects` is empty, repeats a name or holds an effect that cannot join; RangeError when they
+ * are out of order (HDR, display, LDR); MargoError `'attached'` when an effect is already attached or a capture owner
+ * is attached alone, `'unsupported'` on a WebGL engine or when another plugin replaced core's lighting shader,
+ * `'disposed'` after `dispose()`. */
 export class PostStack implements EnginePlugin {
   readonly name = 'post:stack';
   private engine?: Engine;
@@ -70,9 +75,14 @@ export class PostStack implements EnginePlugin {
     return this.color?.format === 'rgba16float' ? this.color : undefined;
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('PostStack requires WebGPU and a live stack');
+    if (this.disposed || !engine.gpu)
+      throw margoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'PostStack requires WebGPU and a live stack; attach a new PostStack to a WebGPU engine',
+      );
     for (const name of owners)
-      if (engine.hasPlugin(name)) throw new Error(`Add ${name} to the PostStack instead of attaching it alone`);
+      if (engine.hasPlugin(name))
+        throw margoError('attached', `Add ${name} to the PostStack instead of attaching it alone`);
     this.engine = engine;
     for (const effect of this.effects) {
       engine.use(effect);
@@ -109,7 +119,11 @@ export class PostStack implements EnginePlugin {
         /let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/,
         'return vec4f(linear,1);',
       );
-      if (linear === c.shader) throw new Error('PostStack requires the standard core lighting shader');
+      if (linear === c.shader)
+        throw margoError(
+          'unsupported',
+          "PostStack requires the standard core lighting shader; remove the plugin that replaced core's shader",
+        );
       this.source = c.shader;
       this.linear = linear;
     }

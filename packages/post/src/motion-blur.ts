@@ -32,6 +32,7 @@ export interface MotionBlurOptions {
   maxBlur?: number;
   /** Samples per pixel along the motion, 2-64. Default 16. */
   samples?: number;
+  /** False skips the effect (the scene passes through). Default true; also `motionBlur.enabled`. */
   enabled?: boolean;
 }
 

@@ -13,6 +13,7 @@ declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
 
+/** `EnvironmentBackground` (alias `Skybox`) settings; out-of-range values throw RangeError. */
 export interface EnvironmentBackgroundOptions {
   /** Linear multiplier before tone mapping (Three.js backgroundIntensity). Default 1. */
   exposure?: number;
@@ -129,8 +130,13 @@ export class EnvironmentBackground {
   }
 
   setup(engine: EngineKernel): void {
-    if (this.disposed) throw new Error('EnvironmentBackground is disposed');
-    if (engine.backend !== 'webgpu') throw new Error('EnvironmentBackground requires the WebGPU backend');
+    if (this.disposed)
+      throw new MargoError('disposed', 'EnvironmentBackground is disposed; create a new EnvironmentBackground');
+    if (engine.backend !== 'webgpu')
+      throw new MargoError(
+        'unsupported',
+        'EnvironmentBackground requires the WebGPU backend; use an engine on the WebGPU backend',
+      );
     const device = engineRuntime(engine).gpu;
     if (device && this.environment.device !== device && !this.environment.disposed)
       this.environment.restore(device).catch((error) => engine.onError(error));

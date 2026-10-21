@@ -38,7 +38,7 @@ export function floatToHalf(value: number): number {
 }
 
 /** Largest finite binary16 value. */
-export const HALF_MAX = 65504;
+const HALF_MAX = 65504;
 
 /**
  * Converts RGBA float texels to binary16 for an rgba16float upload. Lighting data must be finite and

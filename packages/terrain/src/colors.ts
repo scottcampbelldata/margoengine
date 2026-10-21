@@ -7,18 +7,19 @@ import {
   type EnginePlugin,
   type FrameGraph,
 } from '@margoengine/core/extension';
+import type { Vec3 } from '@margoengine/math';
+import { MargoError } from '@margoengine/math/errors';
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; COPY_SRC: number };
 
-type Color = readonly [number, number, number];
 type Range = readonly [number, number];
 /** Height/slope material bands for {@link TerrainColors}. Colors are linear RGB in 0..1; ranges increase. */
 export interface TerrainColorOptions {
   /** Beach color below `shore`. */
-  sand: Color;
+  sand: Vec3;
   /** Low and high meadow colors, blended over `meadowHeight`. */
-  meadow: readonly [Color, Color];
+  meadow: readonly [Vec3, Vec3];
   /** Rock color above `stoneHeight` and on steep slopes. */
-  stone: Color;
+  stone: Vec3;
   /** World heights over which sand gives way to meadow and stone. */
   shore: Range;
   /** World heights over which the low meadow color gives way to the high one. */
@@ -138,7 +139,7 @@ export class TerrainColors implements EnginePlugin {
     )
       throw new RangeError('Invalid terrain wetness map');
     this.wetness = wetness;
-    const rgb = (color: Color) => `vec3f(${color.join(',')})`;
+    const rgb = (color: Vec3) => `vec3f(${color.join(',')})`;
     const variation = options.variation ?? 0,
       dark = options.wetDarkening;
     // Noise moves a band's border by up to 30% of its range at the 14 m scale, so borders wander like real ones.
@@ -209,10 +210,13 @@ fn terrainWet(position:vec3f)->f32 {
     const mesh = meshRuntime(this.mesh);
     mesh.check();
     if (this.engine || this.disposed || mesh.engine !== engine)
-      throw new Error('Terrain color mesh belongs to another engine or is already attached');
+      throw new MargoError(
+        'attached',
+        "Terrain color mesh belongs to another engine or is already attached; attach one TerrainColors per mesh, to the mesh's engine",
+      );
     this.engine = engine;
     if (this.wetness) {
-      if (!engine.gpu) throw new Error('Terrain wetness requires WebGPU');
+      if (!engine.gpu) throw new MargoError('unsupported', 'Terrain wetness requires WebGPU; use a WebGPU engine');
       this.dry = engine.gpu.createTexture({
         size: [1, 1],
         format: 'r32float',

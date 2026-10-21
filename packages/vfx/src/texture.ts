@@ -36,10 +36,12 @@ const atlas = (billboard: string, { width, height, atlas }: VFXTexture): string 
     );
 };
 /**
- * `texture` option: an RGBA8 sRGB sprite multiplied by the particle colour instead of the soft disc, or with `atlas` a
- * grid of frames, one per particle (random at spawn, or stepped through over its life).
+ * The `texture` feature: draws each particle as the RGBA8 sRGB sprite in `options.texture` (at most 4096 px per side)
+ * multiplied by the particle colour instead of the soft disc, or with `atlas` a grid of frames, one per particle
+ * (random at spawn, or stepped through over its life). Pass it as `{texture: textureFeature}` to `VFX` from
+ * `@margoengine/vfx/base`. Named `textureFeature` so it does not clash with `@margoengine/shader`'s `texture()` node.
  */
-export const texture: NonNullable<VFXFeatures['texture']> = {
+export const textureFeature: NonNullable<VFXFeatures['texture']> = {
   copy(t) {
     if (
       !Number.isSafeInteger(t.width) ||

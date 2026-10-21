@@ -458,7 +458,10 @@ test('EXR attributes: an empty compression value and a long part type are named 
     attribute = new Uint8Array([...encode('type\0string\0'), 0, 0, 0, 0, ...value]);
   new DataView(attribute.buffer).setInt32(12, value.length, true);
   const long = new Uint8Array([...file.subarray(0, 8), ...attribute, ...file.subarray(8)]);
-  await named(() => parseEXR(long), /^Error: Unsupported EXR part type \(too long\)$/);
+  await named(
+    () => parseEXR(long),
+    /^MargoError: Unsupported EXR part type \(too long\); export it as a single-part scanline EXR$/,
+  );
 });
 
 test('UltraHDR with the test JPEG decoder still parses (the stubs above are restored)', async () => {

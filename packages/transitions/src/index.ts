@@ -3,6 +3,7 @@ import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph } from '@margoengine/core/extension';
 import { fullscreen, group, render, draw } from '../../shared/gpu.js';
 import { SceneTarget } from '../../shared/msaa.js';
+import { MargoError } from '@margoengine/math/errors';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: {
   RENDER_ATTACHMENT: number;
@@ -10,6 +11,10 @@ declare const GPUTextureUsage: {
   COPY_SRC: number;
   COPY_DST: number;
 };
+/**
+ * How `start()` reveals the new scene over the frozen frame: `'wipe'` left to right, `'dissolve'` per-pixel random,
+ * `'radial'` a clockwise sweep around the centre, `'chromatic'` a cross-fade with red/blue split by `displacement`.
+ */
 export type TransitionKind = 'wipe' | 'dissolve' | 'radial' | 'chromatic';
 const kinds = ['wipe', 'dissolve', 'radial', 'chromatic'];
 const shader =
@@ -27,7 +32,11 @@ fn sample(t:texture_2d<f32>,uv:vec2f)->vec4f {let size=vec2i(textureDimensions(t
  if(settings.y==3.0){let shift=vec2f(sin(p*3.14159265)*settings.z,0);let a=sample(after,i.uv+shift);let b=sample(after,i.uv-shift);return mix(sample(before,i.uv),vec4f(a.r,sample(after,i.uv).g,b.b,1),p);}
  return mix(sample(before,i.uv),sample(after,i.uv),1.0-smoothstep(p-0.01,p+0.01,edge));
 }`;
-/** start() freezes the last rendered frame while the scene underneath changes. */
+/**
+ * start() freezes the last rendered frame while the scene underneath changes. WebGPU only.
+ * @throws RangeError from `start` for an unknown kind, `seconds` outside (0, 60] or `displacement` outside 0-0.25.
+ * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`.
+ */
 export class Transitions implements EnginePlugin {
   readonly name = 'transitions';
   private engine?: Engine;
@@ -54,7 +63,7 @@ export class Transitions implements EnginePlugin {
     return Math.min(1, this.elapsed / this.duration);
   }
   start(kind: TransitionKind = 'wipe', seconds = 1, displacement = 0.02): void {
-    if (this.disposed) throw new Error('Transitions is disposed');
+    if (this.disposed) throw new MargoError('disposed', 'Transitions is disposed; create a new Transitions');
     if (
       !kinds.includes(kind) ||
       !Number.isFinite(seconds) ||
@@ -72,7 +81,11 @@ export class Transitions implements EnginePlugin {
     this.request = true;
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Transitions requires WebGPU');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'Transitions requires WebGPU; attach a new Transitions to a WebGPU engine',
+      );
     this.engine = engine;
     this.uniform = engine.gpu.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   }

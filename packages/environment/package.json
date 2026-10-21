@@ -7,6 +7,9 @@
   "publishConfig": {
     "access": "public"
   },
+  "dependencies": {
+    "@margoengine/math": "^1.0.0"
+  },
   "scripts": {
     "build": "node scripts/build.js",
     "test": "npm run build && node --test tests/environment.test.js tests/hdr.test.js tests/scene.test.js tests/volumetric.test.js tests/probes.test.js tests/probes-live.test.js",
@@ -35,8 +38,5 @@
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"
   },
-  "homepage": "https://margoengine.com",
-  "devDependencies": {
-    "@margoengine/math": "^1.0.0"
-  }
+  "homepage": "https://margoengine.com"
 }

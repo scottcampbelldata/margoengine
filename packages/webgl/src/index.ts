@@ -9,6 +9,7 @@ import type {
   PassContext,
   DrawOptions,
 } from '@margoengine/core/extension';
+import { MargoError } from '@margoengine/math/errors';
 import { sceneSamples } from '../../shared/quality.js';
 
 const defaultDraw: DrawOptions = {};
@@ -28,6 +29,13 @@ precision highp float;layout(location=0) in vec3 p;layout(location=1) in vec3 n;
 const glFragment = `#version 300 es
 precision highp float;in vec3 w;in vec3 wn;in vec3 b;in vec4 m;uniform vec3 eye;uniform vec4 light;uniform vec4 radiance;uniform vec3 ambient;out vec4 o;vec3 pbrNeutral(vec3 c){float x=min(c.r,min(c.g,c.b));float offset=x<0.08?x-6.25*x*x:0.04;c-=offset;float peak=max(c.r,max(c.g,c.b));if(peak<0.76)return c;float newPeak=1.0-0.24*0.24/(peak+0.24-0.76);c*=newPeak/peak;return mix(c,vec3(newPeak),1.0-1.0/(0.15*(peak-newPeak)+1.0));}void main(){bool front=gl_FrontFacing==(m.w>0.0);if(!front&&m.z<0.5)discard;vec3 n=normalize(wn);if(!front)n=-n;vec3 v=normalize(eye-w),l=normalize(light.xyz),h=(v+l)/max(length(v+l),0.0001);float nl=clamp(dot(n,l),0.0,1.0),nv=clamp(dot(n,v),0.0001,1.0),nh=clamp(dot(n,h),0.0,1.0),vh=clamp(dot(v,h),0.0,1.0);float a=m.x*m.x,a2=a*a,d=a2/(3.14159265*pow(nh*nh*(a2-1.0)+1.0,2.0));float g=2.0*nv/(nv+sqrt(a2+(1.0-a2)*nv*nv))*2.0*nl/max(nl+sqrt(a2+(1.0-a2)*nl*nl),0.0001);vec3 f0=mix(vec3(0.04),b,m.y),f=f0+(1.0-f0)*pow(1.0-vh,5.0);vec3 direct=((1.0-f)*(1.0-m.y)*b/3.14159265+d*g*f/max(4.0*nl*nv,0.0001))*nl;vec3 linear=direct*radiance.rgb*light.w+b*(1.0-m.y)*radiance.w*ambient;vec3 mapped=pbrNeutral(max(linear,vec3(0.0)));o=vec4(mix(mapped*12.92,1.055*pow(mapped,vec3(1.0/2.4))-0.055,step(vec3(0.0031308),mapped)),1);}`;
 
+/**
+ * The WebGL2 fallback renderer core uses when WebGPU is missing: core meshes with core's PBR material, shaded per pixel
+ * (GGX metallic-roughness, one directional light plus ambient; no textures, effects or picking). Create it through
+ * `webglRenderer` as `Engine.create`'s `fallback`, not directly.
+ * @throws MargoError `'unsupported'` when the canvas has no WebGL2 context; `'failed'` when a GL object cannot be
+ * created, a shader does not compile or link (the GL info log is the message), or the context is lost.
+ */
 export class GLRenderer implements Renderer {
   readonly backend = 'webgl2';
   private readonly gl: WebGL2RenderingContext;
@@ -54,27 +62,32 @@ export class GLRenderer implements Renderer {
       antialias: sceneSamples() > 1,
       powerPreference: 'high-performance',
     });
-    if (!gl) throw new Error('No WebGL2 canvas');
+    if (!gl)
+      throw new MargoError(
+        'unsupported',
+        'No WebGL2 canvas; use a browser with WebGL2 and a canvas without another context',
+      );
     this.gl = gl;
     const shaders: WebGLShader[] = [];
     const program = gl.createProgram();
-    if (!program) throw new Error('GL program');
+    if (!program) throw new MargoError('failed', 'GL program; the WebGL context may be lost');
     try {
       for (const [type, code] of [
         [gl.VERTEX_SHADER, glVertex],
         [gl.FRAGMENT_SHADER, glFragment],
       ] as const) {
         const shader = gl.createShader(type);
-        if (!shader) throw new Error('GL shader');
+        if (!shader) throw new MargoError('failed', 'GL shader; the WebGL context may be lost');
         shaders.push(shader);
         gl.shaderSource(shader, code);
         gl.compileShader(shader);
         if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
-          throw new Error(gl.getShaderInfoLog(shader) ?? 'GL compile');
+          throw new MargoError('failed', gl.getShaderInfoLog(shader) ?? 'GL compile');
         gl.attachShader(program, shader);
       }
       gl.linkProgram(program);
-      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program) ?? 'GL link');
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS))
+        throw new MargoError('failed', gl.getProgramInfoLog(program) ?? 'GL link');
     } catch (error) {
       gl.deleteProgram(program);
       throw error;
@@ -92,12 +105,12 @@ export class GLRenderer implements Renderer {
     const gl = this.gl,
       buffers: WebGLBuffer[] = [];
     const vao = gl.createVertexArray();
-    if (!vao) throw new Error('GL VAO');
+    if (!vao) throw new MargoError('failed', 'GL VAO; the WebGL context may be lost');
     try {
       gl.bindVertexArray(vao);
       const upload = (target: number, data: Float32Array | Uint32Array | number) => {
         const buffer = gl.createBuffer();
-        if (!buffer) throw new Error('GL buffer');
+        if (!buffer) throw new MargoError('failed', 'GL buffer; the WebGL context may be lost');
         buffers.push(buffer);
         gl.bindBuffer(target, buffer);
         if (typeof data === 'number') gl.bufferData(target, data, gl.DYNAMIC_DRAW);
@@ -117,7 +130,7 @@ export class GLRenderer implements Renderer {
         gl.vertexAttribDivisor(i + 2, 1);
       }
       const error = gl.getError();
-      if (error !== gl.NO_ERROR) throw new Error(`GL buffer (${error})`);
+      if (error !== gl.NO_ERROR) throw new MargoError('failed', `GL buffer (${error})`);
       this.resources.set(geometry, { vao, buffers, instance });
     } catch (error) {
       for (const buffer of buffers) gl.deleteBuffer(buffer);
@@ -137,7 +150,7 @@ export class GLRenderer implements Renderer {
   }
   render(camera: Camera, lighting: Lighting, batches: Iterable<Batch>, graph: FrameGraph, delta: number): void {
     const gl = this.gl;
-    if (gl.isContextLost()) throw new Error('WebGL context lost');
+    if (gl.isContextLost()) throw new MargoError('failed', 'WebGL context lost; create a new engine');
     const context: PassContext = {
       backend: 'webgl2',
       gl,

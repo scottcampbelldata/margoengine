@@ -67,6 +67,30 @@
       "packages": ["procedural", "shader"],
       "reason": "CPU noise in @margoengine/procedural and its GPU twin in @margoengine/shader/noise share names on purpose. Decision in docs/conventions.md."
     },
+    "Environment": {
+      "packages": ["environment", "react"],
+      "reason": "One thing, two forms: @margoengine/environment's Environment class and @margoengine/react's <Environment> JSX component that creates it (React names components after what they render). Decision in docs/conventions.md."
+    },
+    "Sky": {
+      "packages": ["react", "sky"],
+      "reason": "One thing, two forms: @margoengine/sky's Sky plugin and @margoengine/react's <Sky> JSX component that attaches it with the same options. Decision in docs/conventions.md."
+    },
+    "Bloom": {
+      "packages": ["post", "react"],
+      "reason": "One thing, two forms: @margoengine/post's Bloom pass and @margoengine/react's <Bloom> JSX component that adds it with the same options. Decision in docs/conventions.md."
+    },
+    "SSAO": {
+      "packages": ["post", "react"],
+      "reason": "One thing, two forms: @margoengine/post's SSAO pass and @margoengine/react's <SSAO> JSX component that adds it with the same options. Decision in docs/conventions.md."
+    },
+    "TAA": {
+      "packages": ["react", "taa"],
+      "reason": "One thing, two forms: @margoengine/taa's TAA plugin and @margoengine/react's <TAA> JSX component that adds it with the same options. Decision in docs/conventions.md."
+    },
+    "Tonemap": {
+      "packages": ["react", "tonemap"],
+      "reason": "One thing, two forms: @margoengine/tonemap's Tonemap pass and @margoengine/react's <Tonemap> JSX component that adds it with the same options. Decision in docs/conventions.md."
+    },
     "PbrMaterial": {
       "packages": ["core", "materials", "react"],
       "reason": "One meaning: core's constant-colour material, react's JSX element that builds it (same options and defaults), and materials' PbrMaterial, which takes every core option with the same meaning and defaults plus maps and physical options (Scott's naming). Decision in docs/conventions.md."

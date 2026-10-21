@@ -295,7 +295,12 @@ try {
     state.app.onTick(() => state.frames++);
     return { stopped, position, detached, errors: state.errors };
   });
-  assert.deepEqual(loss, { stopped: true, position: [1, 2, 3], detached: true, errors: ['Error: WebGL context lost'] });
+  assert.deepEqual(loss, {
+    stopped: true,
+    position: [1, 2, 3],
+    detached: true,
+    errors: ['MargoError: WebGL context lost; create a new engine'],
+  });
   await page.waitForFunction(() => window.loss.frames >= 2);
   const recreated = await decodePNG(
     await page.locator('canvas').screenshot({ path: 'test-results/modern-wrapper-webgl2-recreated.png' }),

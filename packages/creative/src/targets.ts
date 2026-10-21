@@ -7,6 +7,12 @@ declare const GPUTextureUsage: {
   STORAGE_BINDING: number;
   COPY_SRC: number;
 };
+/**
+ * A linear HDR scene target: an `rgba16float` colour texture and a depth texture (`depth32float-stencil8` when the
+ * device has it), multisampled at `samples` with a resolve, for effects that render the scene off-screen
+ * (`PostProcessing.target`). Sizes are pixels, 1-4096 within the device limit.
+ * @throws RangeError when a size exceeds the limits.
+ */
 export class HDRRenderTarget {
   scene!: {
     readonly color: GPUTextureView;

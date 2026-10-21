@@ -38,7 +38,7 @@ export interface SSAOOptions {
 }
 
 export interface SSAOSource {
-    draw(context: Context, mode: 'gbuffer' | 'ambient' | 'occlusion', color: GPUTextureView, depth: GPUTextureView, phase?: 'all' | 'opaque' | 'blend', external?: {
+    draw(context: PostPassContext, mode: 'gbuffer' | 'ambient' | 'occlusion', color: GPUTextureView, depth: GPUTextureView, phase?: 'all' | 'opaque' | 'blend', external?: {
         pass: GPURenderPassEncoder;
         view: ArrayLike<number>;
         depthCompare: GPUCompareFunction;
@@ -47,7 +47,7 @@ export interface SSAOSource {
 
 // Not exported from this entry, but used by the exports above:
 
-type Context = Extract<PassContext, {
+type PostPassContext = Extract<PassContext, {
     backend: 'webgpu';
 }>;
 ```

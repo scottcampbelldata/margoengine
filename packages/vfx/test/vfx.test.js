@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { VFX } from '../dist/index.js';
-import { texture as textureFeature } from '../dist/texture.js';
+import { textureFeature } from '../dist/texture.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
 test('initial population is emitted once at attachment and again after device restoration', () => {

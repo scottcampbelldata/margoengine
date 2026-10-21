@@ -28,6 +28,7 @@ export interface SSGIOptions {
   steps?: number;
   /** Scale of the change, 0-4: 1 replaces the ambient light where rays hit with the light they hit. Default 1. */
   intensity?: number;
+  /** False skips the effect (the scene passes through). Default true; also `ssgi.enabled`. */
   enabled?: boolean;
 }
 

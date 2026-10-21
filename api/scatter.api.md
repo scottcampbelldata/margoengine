@@ -66,7 +66,7 @@ export class ScatterInstances implements EnginePlugin {
     registerPasses(graph: FrameGraph): void;
     onPreUpdate(delta: number): void;
     drawShadow({ context, pass, matrix, cascade }: {
-        context: Context;
+        context: ScatterPassContext;
         pass: GPURenderPassEncoder;
         matrix: Float32Array;
         cascade: number;
@@ -117,7 +117,7 @@ export function spacePlacements(candidates: readonly GroundPlacement[], radius: 
 
 // Not exported from this entry, but used by the exports above:
 
-type Context = Extract<PassContext, {
+type ScatterPassContext = Extract<PassContext, {
     backend: 'webgpu';
 }>;
 ```

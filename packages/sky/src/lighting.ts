@@ -1,6 +1,7 @@
 import { finiteVector } from '@margoengine/math/validate';
 import { compute, group } from '../../shared/gpu.js';
 import type { SkyFeatures } from './base.js';
+import { MargoError } from '@margoengine/math/errors';
 import { environment } from './environment.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUTextureUsage: { STORAGE_BINDING: number; TEXTURE_BINDING: number };
@@ -192,7 +193,10 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
         if (source !== c.shader) {
           const anchor = /let linear=([^;]+);/.exec(c.shader);
           if (!anchor?.[1].includes('frame.radiance.w'))
-            throw new Error('Sky ambient requires the standard PBR shader');
+            throw new MargoError(
+              'unsupported',
+              "Sky ambient requires the standard PBR shader; remove the plugin that replaced core's shader",
+            );
           // Core's constant ambient term drops out; margoAmbient carries the sky's diffuse and specular light.
           const linear = `let margoAmbient=skyLighting(n,v,i.color,i.material.y,i.material.x);let linear=${anchor[1].replace('frame.radiance.w', '0.0')}+margoAmbient;`;
           source = c.shader;

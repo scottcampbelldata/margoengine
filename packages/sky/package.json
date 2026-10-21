@@ -52,14 +52,14 @@
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"
   },
+  "dependencies": {
+    "@margoengine/math": "^1.0.0"
+  },
   "scripts": {
     "build": "node ../../scripts/build-optional.js sky",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build"
   },
   "homepage": "https://margoengine.com",
-  "description": "Procedural atmospheric skies, clouds, sun, moon and stars.",
-  "devDependencies": {
-    "@margoengine/math": "^1.0.0"
-  }
+  "description": "Procedural atmospheric skies, clouds, sun, moon and stars."
 }

@@ -30,7 +30,13 @@ Rules:
 - A package whose public `.d.ts` uses a math type, or that throws `MargoError`, lists `@margoengine/math` under
   `dependencies` (consumers need it for the types). Bundling is the build script's choice: `scripts/build-optional.js`
   keeps dependencies external (one shared copy at runtime); packages with their own build scripts (lines, points,
-  text, geometry) bundle the math helpers they use, as before.
+  text, geometry) bundle the math helpers they use, as before. Exception: a package whose build inlines math (the
+  default `build-modern` pipeline, `build-postfx.js`, creative's script) and whose `.d.ts` uses no math type keeps math
+  under `devDependencies` (build order only; consumers never load it): post, clustered, shadows, taa, splats, creative,
+  dof, tonemap. The tonemap test pins "no `dependencies`".
+- A private alias that shows up in a published `.d.ts` (`type Context = Extract<PassContext, {backend: 'webgpu'}>`)
+  is still a declaration there: give it a package-specific name (`SkyPassContext`, `PostPassContext`, ...) rather
+  than the same name in many packages. Core (frozen) cannot host a shared one.
 
 ## Errors
 
@@ -81,4 +87,7 @@ A name declared and exported by two packages must mean the same thing, or be ren
 | `SurfaceOptions` | procedural, machinery | procedural's renamed `MarchingCubesOptions`. |
 | `Vector3` (navigation) | math | Navigation takes math's `Vec3Like`; math's `Vector3` is the class. |
 | `loadGLTF`, `parseGLTF` | gltf, gltf-pro | Open, group B (HANDOFF "API rough edges" item 7). |
+| `texture` (vfx) | shader | vfx's `@margoengine/vfx/texture` feature object renamed `textureFeature` (pass `{texture: textureFeature}`); shader's `texture()` node keeps the name. |
+| `Environment`, `Sky`, `Bloom`, `SSAO`, `TAA`, `Tonemap` | environment, sky, post, taa, tonemap; react | Kept: the plugin or pass class and react's JSX component that adds it with the same options (React names components after what they render). Allowlisted. |
+| `Vec3` (lod), `Color` (sky, terrain), `HeightField` (terrain) | math | Math's: lod uses `MutableVec3` / `Vec3`, sky and terrain colours are `Vec3`, terrain re-exports math's `HeightField`. |
 | `PbrMaterial` | core, materials, react | Kept, one meaning (Scott's naming): materials' `PbrMaterial` takes every core `PbrMaterial` option with the same meaning and adds maps and physical options, with a textured material's defaults (white, roughness 1, metalness 0, front side) rather than core's indigo double-sided placeholder; core's stays the constant-colour material of core meshes, and react's is the JSX element that builds core's. Allowlisted. |

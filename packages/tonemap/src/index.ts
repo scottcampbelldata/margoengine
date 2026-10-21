@@ -11,6 +11,7 @@ import {
 import { parseCube, validateLUT, type CubeLUT } from './cube.js';
 import { outputShader, tonemapShader, sizedLUTShader } from './shaders.js';
 import type { StackHost, StackStage } from '../../shared/stack.js';
+import { MargoError } from '@margoengine/math/errors';
 export { parseCube };
 export type { CubeLUT };
 
@@ -20,7 +21,12 @@ type Context = Extract<PassContext, { backend: 'webgpu' }>;
 // Set on the pass context by @margoengine/environment's ColorOutput while a P3 or HDR canvas is active.
 const OUTPUT = Symbol.for('margoengine.color-output');
 type Output = { peak: number; p3: boolean; excess?: (width: number, height: number) => GPUTextureView };
+/**
+ * Display transform: `'neutral'` (Khronos PBR Neutral, core's own curve), `'agx'` (Rec.2020 AgX, analytic sigmoid) or
+ * `'acescg'` (ACES fitted RRT/ODT with AP1 handling).
+ */
 export type TonemapCurve = 'agx' | 'acescg' | 'neutral';
+/** Tonemap settings. Every field except `source` is read each frame, so change them on `tonemap.options`. */
 export interface TonemapOptions {
   /**
    * Display curve: 'neutral' (default; Khronos PBR Neutral, the curve core and every package end with, so attaching
@@ -37,6 +43,16 @@ export interface TonemapOptions {
   source?: () => GPUTexture | undefined;
 }
 
+/**
+ * HDR presentation and colour grading: captures the scene as linear HDR (order -50), then applies exposure, the curve,
+ * contrast and an optional 3D LUT and writes sRGB (order 31). `Tonemap.attach(engine, options)`, or the display effect
+ * of a `PostStack` (before FXAA). WebGPU only.
+ * @throws RangeError from the constructor and each frame when an option is out of range (see {@link TonemapOptions}),
+ * or when a LUT exceeds the device's 3D texture limit; `setLUT` also throws what `parseCube` throws.
+ * @throws MargoError `'unsupported'` on a WebGL engine or when another plugin replaced core's lighting shader,
+ * `'disposed'` after `dispose()`, `'attached'` when attached twice, `'state'` for ACEScg input without a `source`, a
+ * scene capture shared without a `source`, or a `source` texture that is not viewport-sized linear HDR.
+ */
 export class Tonemap implements EnginePlugin {
   readonly name = 'tonemap';
   private engine?: Engine;
@@ -70,7 +86,10 @@ export class Tonemap implements EnginePlugin {
   /** In a PostStack, grades the stack's HDR result as its display effect. */
   private joinStack(_host: StackHost): StackStage {
     if (this.engine || this.stacked || this.disposed || this.source)
-      throw new Error('Tonemap is already attached or has its own source');
+      throw new MargoError(
+        'attached',
+        'Tonemap is already attached or has its own source; stack a new Tonemap without options.source',
+      );
     this.stacked = true;
     return {
       kind: 'display',
@@ -98,10 +117,14 @@ export class Tonemap implements EnginePlugin {
     )
       throw new RangeError('Invalid Tonemap options');
     if (!this.source && o.inputColorSpace === 'acescg')
-      throw new Error('ACEScg input requires an external ACEScg source');
+      throw new MargoError('state', 'ACEScg input requires an external ACEScg source; pass options.source');
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Tonemap requires WebGPU and a live effect');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'Tonemap requires WebGPU and a live effect; attach a new Tonemap to a WebGPU engine',
+      );
     if (
       !this.source &&
       !this.stacked &&
@@ -110,7 +133,10 @@ export class Tonemap implements EnginePlugin {
         engine.hasPlugin('post-processing') ||
         engine.hasPlugin('bloom'))
     )
-      throw new Error('Tonemap needs an explicit HDR source when another effect owns scene capture');
+      throw new MargoError(
+        'state',
+        'Tonemap needs an explicit HDR source when another effect owns scene capture; pass options.source',
+      );
     this.checkLUTSize(engine.gpu, this.lut);
     const previousEngine = this.engine;
     this.engine = engine;
@@ -126,7 +152,7 @@ export class Tonemap implements EnginePlugin {
   }
   /** Replace or clear the grading LUT; upload happens only here and on device restoration. */
   setLUT(lut: CubeLUT | string | null): void {
-    if (this.disposed) throw new Error('Tonemap is disposed');
+    if (this.disposed) throw new MargoError('disposed', 'Tonemap is disposed; create a new Tonemap');
     const parsed = typeof lut === 'string' ? parseCube(lut) : lut;
     if (parsed !== null) validateLUT(parsed);
     const next = parsed
@@ -200,7 +226,7 @@ export class Tonemap implements EnginePlugin {
       this.engine!.hasPlugin('post-processing') ||
       this.engine!.hasPlugin('bloom')
     )
-      throw new Error('Tonemap cannot share scene capture without an HDR source');
+      throw new MargoError('state', 'Tonemap cannot share scene capture without an HDR source; pass options.source');
     this.original = c.color;
     if (
       this.scene?.width !== c.width ||
@@ -227,7 +253,11 @@ export class Tonemap implements EnginePlugin {
     let shader = this.shaders.get(c.shader);
     if (shader === undefined) {
       shader = c.shader.replace(/let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/, 'return vec4f(linear,1);');
-      if (shader === c.shader) throw new Error('Tonemap requires the standard core lighting shader');
+      if (shader === c.shader)
+        throw new MargoError(
+          'unsupported',
+          "Tonemap requires the standard core lighting shader; remove the plugin that replaced core's shader",
+        );
       this.shaders.set(c.shader, shader);
     }
     c.shader = shader;
@@ -246,7 +276,10 @@ export class Tonemap implements EnginePlugin {
       (texture.format !== 'rgba16float' && texture.format !== 'rgba32float') ||
       !(texture.usage & GPUTextureUsage.TEXTURE_BINDING)
     )
-      throw new Error('Tonemap requires a viewport-sized, sampleable linear HDR texture');
+      throw new MargoError(
+        'state',
+        'Tonemap requires a viewport-sized, sampleable linear HDR texture; return one from options.source',
+      );
     this.paint(
       c,
       texture,

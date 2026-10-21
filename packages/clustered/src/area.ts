@@ -2,6 +2,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type Vec3 } from '@margoengine/core/extension';
 import { finiteVector } from '@margoengine/math/validate';
+import { MargoError } from '@margoengine/math/errors';
 import type { Clustered, ClusteredArea } from './index.js';
 import { ltcSize, ltcTable } from './ltc.js';
 declare const GPUBufferUsage: { STORAGE: number; COPY_DST: number };
@@ -82,6 +83,8 @@ fn clusterAreaLighting(position:vec3f,n:vec3f,v:vec3f,nv:f32,base:vec3f,roughnes
  * et al. 2016): GGX specular and Lambert diffuse, the quad clipped exactly to each surface's horizon. Core meshes and every
  * receiver of the `lights` (gltf-pro models, materials meshes, terrain) are lit. Every fragment evaluates every area light
  * (no cluster culling: the lights have no range). Without lights it adds nothing to the shaders or the GPU work.
+ * @throws TypeError without the Clustered lights; RangeError for an invalid light or more than `MAX_AREA_LIGHTS`.
+ * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`.
  */
 export class AreaLights implements EnginePlugin, ClusteredArea {
   readonly name = 'clustered:area';
@@ -167,11 +170,16 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
   }
   /** @internal ClusteredArea: binding 17 of the lit shader's group. */
   bindings(): GPUBindGroupEntry[] {
-    if (!this.buffer || this.disposed) throw new Error('Area lights are not attached');
+    if (!this.buffer || this.disposed)
+      throw new MargoError('state', 'Area lights are not attached; attach them to an engine first');
     return this.entries;
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Area lights require WebGPU and a live effect');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'Area lights require WebGPU and a live effect; attach a new AreaLights to a WebGPU engine',
+      );
     this.engine = engine;
     this.device = engine.gpu;
     this.dirty = true;

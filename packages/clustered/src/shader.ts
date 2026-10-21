@@ -59,6 +59,16 @@ export interface ClusteredSamplingHooks {
    */
   terms?: readonly { declarations(group: number): string; readonly term: string }[];
 }
+/**
+ * WGSL for the clustered light loop in bind group `group`, for custom forward materials (`Clustered.pbr` and
+ * `Clustered.shader` call it): the cluster bindings 4-7 and `clusterLighting(pixel, position, n, eye, base, roughness,
+ * metal)`, which returns the summed radiance of the fragment's point and spot lights (times `intensityScale`).
+ * @param shadow A `ClusteredShadow` hook (its `clusterShadow` darkens each light), or `true` for the integrated maps.
+ * @param area A `ClusteredArea` hook; its `clusterAreaLighting` is added to the result.
+ * @param integratedShadows Also sample the integrated maps of `ClusteredOptions.shadows` (bindings 28-30).
+ * @param decay Use the `decay`/`angle` light terms (some light set them) instead of the inverse-square ones.
+ * @param receive Declare `clusterReceive`, which a core mesh with `receiveShadow` false sets to skip shadows.
+ */
 export function clusteredSampling(
   group: number,
   shadow?: boolean | { declarations(group: number): string },

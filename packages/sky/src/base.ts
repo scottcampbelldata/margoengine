@@ -10,53 +10,73 @@ import {
 import { fullscreen, group, compute, dispatch } from '../../shared/gpu.js';
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { margoError } from '../../shared/errors.js';
+import type { Vec3 } from '@margoengine/math';
+import { MargoError } from '@margoengine/math/errors';
 import { celestialShader } from './celestial.js';
 import { head, mid, transmittance, sunlight } from './atmosphere.js';
 import { displayShader } from '../../shared/display.js';
 export { sunlight } from './atmosphere.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { STORAGE_BINDING: number; TEXTURE_BINDING: number };
-type Color = readonly [number, number, number];
-type Context = Extract<PassContext, { backend: 'webgpu' }>;
-const moonColor: Color = [0.25, 0.45, 0.75];
+type SkyPassContext = Extract<PassContext, { backend: 'webgpu' }>;
+const moonColor: Vec3 = [0.25, 0.45, 0.75];
+/**
+ * `lighting` option (needs the `lighting` feature): the sky drives the engine's directional light from the sun and
+ * moon and, with `ambient`, lights PBR meshes from the sky. Colours are linear RGB. Invalid values throw RangeError.
+ */
 export interface SkyLightingOptions {
   /** Direct sun strength with the sun overhead (default 1); the atmosphere's transmittance dims and warms it lower down. */
   intensity?: number;
   /** Floor for the engine light's strength (default 0). */
   minimum?: number;
   /** Sun colour with the sun overhead, linear RGB (default white); the transmittance tints it toward the horizon. */
-  color?: Color;
+  color?: Vec3;
   /** @deprecated Ignored: the atmosphere's transmittance now colours the low sun. Still validated. */
-  sunset?: Color;
-  moon?: { intensity?: number; color?: Color };
+  sunset?: Vec3;
+  /**
+   * Moonlight; omitted means no moon light. `intensity` (>= 0) defaults to a tenth of the sun's, `color` to
+   * [0.25, 0.45, 0.75].
+   */
+  moon?: { intensity?: number; color?: Vec3 };
   /**
    * Lights core's PBR meshes from the sky itself (directional diffuse from spherical harmonics and sky reflections),
    * with this RGB floor by day and by night, blended by `nightFactor`, as the least diffuse light any side receives.
    */
-  ambient?: { day: Color; night: Color };
+  ambient?: { day: Vec3; night: Vec3 };
 }
+/** `clouds` option (needs the `clouds` feature): an animated procedural cloud sheet. Invalid values throw RangeError. */
 export interface SkyCloudOptions {
+  /** Sky fraction covered, 0..1. Default 0.45. */
   coverage?: number;
+  /** Drift in metres per second along a fixed XZ direction, -100..100 (signed). Default 8. */
   speed?: number;
+  /** Sheet height in metres, 100-10,000. Default 1500. */
   height?: number;
 }
+/**
+ * `fog` option (needs the `fog` feature): distance and height fog over the scene, coloured by the sky. Invalid values
+ * throw RangeError.
+ */
 export interface SkyFogOptions {
+  /** Returns the scene's sampleable depth texture each frame (no fog while it returns undefined). */
   depth: () => GPUTexture | undefined;
+  /** Density per metre, 0..1 (0 turns fog off). Default 0.01. */
   density?: number;
+  /** Distance from the camera, in metres, where fog starts, >= 0. Default 40. */
   start?: number;
   /** 'exp2' (default): 1 - exp(-(d * density)^2); 'exp': 1 - exp(-d * density). */
   falloff?: 'exp' | 'exp2';
   /** Extra density per metre below y = 0, as a fraction (default 0). */
   height?: number;
   /** Fixed linear fog colour instead of the sky's radiance in the view direction. */
-  color?: Color;
+  color?: Vec3;
 }
 /** Stylized night: gradient, twinkling stars and a phased moon. Replaces the default night gradient when set; read every frame. */
 export interface SkyNightOptions {
-  zenithColor?: Color;
-  horizonColor?: Color;
-  moonColor?: Color;
-  moonDirection?: Color;
+  zenithColor?: Vec3;
+  horizonColor?: Vec3;
+  moonColor?: Vec3;
+  moonDirection?: Vec3;
   /** Angular radius in radians, between 0 and PI / 2 (exclusive). Default 0.038. */
   moonSize?: number;
   /** -1 new, 0 half, 1 full; clamped. Default 0.85. */
@@ -68,19 +88,37 @@ export interface SkyNightOptions {
   /** Horizon haze thickness; zero removes the gradient. Default 1. */
   hazeDensity?: number;
 }
+/**
+ * Sky settings, read every frame from `sky.options`. An option whose feature entry is missing (`night`, `clouds`,
+ * `fog`, `lighting`, `model`) throws a TypeError naming the entry to import; a value out of range throws RangeError.
+ */
 export interface SkyOptions {
   /** Explicit world-space direction toward the sun; normalized each frame and overrides the clock's direction. */
   sunDirection?: readonly [number, number, number];
+  /** Stylized night (needs `night`). Omitted: the default night gradient. */
   night?: SkyNightOptions;
+  /** Cloud sheet (needs `clouds`). Omitted: no clouds. */
   clouds?: SkyCloudOptions;
+  /** Scene fog (needs `fog`). Omitted: no fog. */
   fog?: SkyFogOptions;
+  /** Day model (needs the entry of the same name). Default `'preetham'`. */
   model?: 'preetham' | 'bruneton';
+  /** Clock, hours 0-24 (12 is noon, 6 sunrise); advanced by `timeScale` and wrapped into 0..24. Default 12. */
   hours?: number;
+  /** Clock hours per real second, -24..24. Default 1 / 3600 (real time). */
   timeScale?: number;
+  /** Atmospheric haze, 1-10. Default 2. */
   turbidity?: number;
+  /** Exposure in stops, -16..16. Default 0. */
   exposure?: number;
+  /** Sun/moon scene lighting (needs `lighting`). Omitted: the sky does not drive engine lighting. */
   lighting?: SkyLightingOptions;
 }
+/**
+ * Unit sun direction for a clock time: rises at 6 (+x), zenith at 12 (+y), sets at 18 (-x), in the XY plane. Writes
+ * into `out` (3 elements) and returns it.
+ * @throws RangeError when `hours` is not finite or `out` does not have 3 elements.
+ */
 export function sunDirection(hours: number, out = new Float32Array(3)): Float32Array {
   if (!Number.isFinite(hours) || out.length !== 3) throw new RangeError('Invalid sun clock');
   const angle = (((hours % 24) - 6) * Math.PI) / 12;
@@ -111,7 +149,7 @@ export interface SkyLightingTarget {
 /** Bruneton's precomputed tables: the view the sky samples and the passes that refill them. */
 export interface SkyTables {
   view: GPUTextureView;
-  run(c: Context): void;
+  run(c: SkyPassContext): void;
 }
 /** Features add each GPU object they create here at once, so a setup that fails part-way still releases it. */
 type Owned = { destroy(): void }[];
@@ -135,7 +173,10 @@ export interface SkyFeatures {
   };
   fog?: {
     validate(fog: SkyFogOptions): void;
-    create(code: string): { draw(c: Context, fog: SkyFogOptions, entries: GPUBindGroupEntry[]): void; release(): void };
+    create(code: string): {
+      draw(c: SkyPassContext, fog: SkyFogOptions, entries: GPUBindGroupEntry[]): void;
+      release(): void;
+    };
   };
   reflection?: {
     create(
@@ -143,7 +184,7 @@ export interface SkyFeatures {
       code: string,
       entries: GPUBindGroupEntry[],
       owned: Owned,
-    ): { texture: GPUTexture; run(c: Context): void };
+    ): { texture: GPUTexture; run(c: SkyPassContext): void };
   };
   lighting?: {
     validate(lighting: SkyLightingOptions): void;
@@ -154,7 +195,7 @@ export interface SkyFeatures {
       owned: Owned,
     ): {
       update(target: Lights, sky: Sky, lighting: SkyLightingOptions, night: number): void;
-      pass(c: Context): void;
+      pass(c: SkyPassContext): void;
       pbr(group: number): { readonly declarations: string; readonly ambient: string } | undefined;
       bindings(): GPUBindGroupEntry[];
     };
@@ -216,6 +257,9 @@ ${displayShader}
 /**
  * A sky built from the features given: `new Sky(options, {bruneton, clouds})`. Without a day model (Preetham or
  * Bruneton) the sun must stay below the horizon. `Sky` from `@margoengine/sky` is this class with every feature.
+ * @throws TypeError when an option needs a feature entry that was not given; RangeError when a value is out of range.
+ * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`, `'state'` when the camera
+ * matrix is not invertible.
  */
 export class Sky implements EnginePlugin {
   private readonly attachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' };
@@ -345,7 +389,11 @@ export class Sky implements EnginePlugin {
     return effect;
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Sky requires WebGPU');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'Sky requires WebGPU; attach a new Sky to a WebGPU engine',
+      );
     this.engine = engine;
     const d = engine.gpu,
       f = this.features;
@@ -430,9 +478,10 @@ export class Sky implements EnginePlugin {
     if (l && this.lit) this.lit.update(this.engine!.lighting, this, l, night);
   }
   /** Uploads this frame's uniform and refreshes the tables; idempotent within a frame (lighting runs it earlier). */
-  private prepare(c: Context): void {
+  private prepare(c: SkyPassContext): void {
     this.validate();
-    if (!invertMatrixStable(c.camera.matrix, this.inverse, this.scratch)) throw new Error('Invalid sky camera');
+    if (!invertMatrixStable(c.camera.matrix, this.inverse, this.scratch))
+      throw new MargoError('state', 'Invalid sky camera; give the camera a finite, invertible projection');
     this.values.set(c.camera.position, 16);
     this.values[19] = Math.max(0.001, c.camera.position[1] / 1000);
     this.values.set(this.sun, 20);
@@ -456,7 +505,7 @@ export class Sky implements EnginePlugin {
     }
     this.computedT = turbidity;
   }
-  private draw(c: Context): void {
+  private draw(c: SkyPassContext): void {
     this.prepare(c);
     if (this.reflectionRequested) this.reflection?.run(c);
     const format = c.format + ':' + c.descriptor.multisample?.count + ':' + c.descriptor.depthStencil!.format;

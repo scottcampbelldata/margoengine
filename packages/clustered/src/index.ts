@@ -2,6 +2,7 @@
 import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type Vec3 } from '@margoengine/core/extension';
 import { finiteVector } from '@margoengine/math/validate';
+import { MargoError } from '@margoengine/math/errors';
 import { viewMatrix } from '../../shared/view.js';
 import { orthographic } from '../../shared/projection.js';
 import { coreReceives, unshadowedCore } from '../../shared/shadow-source.js';
@@ -16,14 +17,18 @@ import {
 export { clusteredSampling, type ClusteredSamplingHooks } from './shader.js';
 export type { LocalShadowOptions, LocalLightShadow, LocalShadowSource, LocalShadowPrimitive } from './local-shadows.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number; COPY_SRC: number };
+/** A local point light for `setLights`. Invalid values throw RangeError or TypeError (the list is unchanged). */
 export interface PointLight {
+  /** World position. */
   position: Vec3;
   /**
    * Distance where the light ends, windowed smoothly: `clamp(1 - (d / range)^4, 0, 1)^2`. 0 is unlimited (window 1;
    * the light reaches every cluster), not allowed for a light with a shadow map unless its `shadow` sets `far`.
    */
   range: number;
+  /** Linear RGB; a channel may be negative (Display P3) while the luminance is 0 or more. Default [1, 1, 1]. */
   color?: Vec3;
+  /** Radiance multiplier, 0 or more. Default 1. */
   intensity?: number;
   /**
    * Distance falloff exponent, 0 or more: attenuation is `window / max(d^decay, 0.01)` (2 is inverse-square, 0 none).
@@ -38,13 +43,16 @@ export interface PointLight {
   /** Shadowed by `LocalShadows` (`@margoengine/clustered/shadows`), with `shadow`'s map size and near/far if given. */
   castShadow?: boolean;
 }
+/** A local spot light: a point light limited to a cone, set by `outerAngle`/`innerAngle` or `angle`/`penumbra`. */
 export interface SpotLight extends PointLight {
+  /** World direction the cone points along (nonzero). */
   direction: Vec3;
   /**
    * Cone half-angle in radians, up to pi / 2 (a hemisphere), with `innerAngle` (0 to outer) where the smooth edge
    * starts. A hemisphere's local shadow map is the six cube faces of a point light.
    */
   outerAngle?: number;
+  /** Half-angle in radians where the smooth edge starts, 0 to `outerAngle`. Default 0. */
   innerAngle?: number;
   /**
    * Instead of outer/inner: cone half-angle in radians, up to pi / 2 (a hemisphere). The cone is
@@ -62,16 +70,25 @@ export interface ClusteredLighting {
   shader(source: string, group?: number): string;
   bindings(): GPUBindGroupEntry[];
 }
+/** `Clustered` settings, fixed at construction. */
 export interface ClusteredOptions {
+  /** Clusters along screen X, Y and log depth, each an integer 1-128, product <= 32,768. Default [16, 9, 24]. */
   grid?: readonly [number, number, number];
+  /** Integrated shadow maps for lights with a `shadow` (and `addShadowCaster`). Omitted: none. */
   shadows?: LocalShadowOptions;
 }
+/** The `Clustered.shadow` hook (`LocalShadows` from `@margoengine/clustered/shadows`): WGSL defining `clusterShadow`, and its bindings. */
 export interface ClusteredShadow {
+  /** WGSL declarations in bind group `group`. */
   declarations(group: number): string;
+  /** Bind group entries matching `declarations`. */
   bindings(): GPUBindGroupEntry[];
 }
+/** The `Clustered.area` hook (`AreaLights` from `@margoengine/clustered/area`): WGSL defining `clusterAreaLighting`, and its bindings. */
 export interface ClusteredArea {
+  /** WGSL declarations in bind group `group`. */
   declarations(group: number): string;
+  /** Bind group entries matching `declarations`. */
   bindings(): GPUBindGroupEntry[];
 }
 /** The `Clustered.directional` hook (`DirectionalLights`): WGSL defining `clusterDirectional` and its bindings. */
@@ -88,9 +105,22 @@ export interface ClusteredLightTerm {
   bindings(): GPUBindGroupEntry[];
   readonly term: string;
 }
+/** A renderer that receives clustered lights in its own shader (gltf-pro models, materials meshes, `Terrain`); see `lights.add`. */
 export interface ClusteredReceiver {
+  /** Patches the receiver's shader with `effect`'s light loop; returns the remover. */
   addLighting(effect: ClusteredLighting): () => void;
 }
+/**
+ * Clustered forward GGX lighting for up to 1,024 point and spot lights: a compute pass bins lights into view-space
+ * clusters, and fragments evaluate only their cluster's list. Core meshes receive it automatically; add gltf-pro
+ * models, materials meshes or terrain with `lights.add(receiver)`. Optional integrated shadow maps (`shadows`) and
+ * hooks for area, directional, IES and projector lights. `Clustered.attach(engine, options)`, then
+ * `lights.setLights([...])`. WebGPU only.
+ * @throws RangeError for an invalid grid or light, or a cluster list larger than the device allows; TypeError for an
+ * invalid receiver or conflicting light options.
+ * @throws MargoError `'unsupported'` on a WebGL engine or when the lit shader is not the standard PBR one,
+ * `'disposed'` after `dispose()`, `'state'` when used before attaching or `addShadowCaster` without `shadows`.
+ */
 export class Clustered implements EnginePlugin {
   readonly name = 'clustered';
   readonly grid: readonly [number, number, number];
@@ -350,12 +380,16 @@ export class Clustered implements EnginePlugin {
   /** Register an opaque or alpha-masked caster for opted-in local-light shadows. */
   addShadowCaster(source: MeshHandle | LocalShadowSource): () => void {
     if (this.disposed || !this.localShadows)
-      throw new Error('Light shadows require a live ClusteredOptions.shadows effect');
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'state',
+        'Light shadows require a live ClusteredOptions.shadows effect; create a Clustered with the shadows option',
+      );
     return this.localShadows.add(source);
   }
   /** The lit shader's bindings; `shadows: false` leaves out the local shadow maps (see `add`). */
   bindings(shadows = true): GPUBindGroupEntry[] {
-    if (!this.uniform || this.disposed) throw new Error('Clustered lighting is not attached');
+    if (!this.uniform || this.disposed)
+      throw new MargoError('state', 'Clustered lighting is not attached; attach it to an engine first');
     const own = shadows ? this.entries : this.lightEntries,
       parts = this.parts;
     parts[0] = own;
@@ -414,7 +448,11 @@ export class Clustered implements EnginePlugin {
         'var color=',
         'var color=clusterLighting(i.clip.xy,i.position,s.n,f.eye.xyz,s.base.rgb,s.roughness,s.metal)+',
       );
-    if (code === source) throw new Error('Clustered lighting requires the standard PBR shader');
+    if (code === source)
+      throw new MargoError(
+        'unsupported',
+        "Clustered lighting requires the standard PBR shader; remove the plugin that replaced core's shader",
+      );
     const output = this.sampling(group, shadows, receive) + code;
     if (!cache) {
       cache = new Map();
@@ -424,7 +462,11 @@ export class Clustered implements EnginePlugin {
     return output;
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Clustered lighting requires WebGPU and a live effect');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'Clustered lighting requires WebGPU and a live effect; attach a new Clustered to a WebGPU engine',
+      );
     this.engine = engine;
     this.device = engine.gpu;
     const count = this.grid[0] * this.grid[1] * this.grid[2],
@@ -527,7 +569,8 @@ export class Clustered implements EnginePlugin {
   }
   /** GPU buffers for diagnostics and custom forward materials; no production readback. */
   get lightLists(): { counts: GPUBuffer; indices: GPUBuffer } {
-    if (!this.counts || !this.indices) throw new Error('Clustered lighting is not attached');
+    if (!this.counts || !this.indices)
+      throw new MargoError('state', 'Clustered lighting is not attached; attach it to an engine first');
     return { counts: this.counts, indices: this.indices };
   }
   private release(): void {

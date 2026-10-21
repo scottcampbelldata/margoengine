@@ -1,6 +1,7 @@
 // Minimal synchronous zlib/DEFLATE (RFC 1950/1951) decoder for EXR ZIP and ZIPS blocks.
 // The output size is always known up front in EXR, so decoding writes into a fixed buffer and
 // every read and write is bounds checked.
+import { MargoError } from '@margoengine/math/errors';
 
 const LENGTH_BASE = new Uint16Array([
   3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258,
@@ -16,6 +17,8 @@ const DIST_EXTRA = new Uint8Array([
   0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13,
 ]);
 const CODE_ORDER = new Uint8Array([16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15]);
+// Damaged compressed data: MargoError 'failed', as the EXR decoder that calls this.
+const corrupt = (message: string) => new MargoError('failed', `${message}; the file is damaged, export it again`);
 
 interface Huffman {
   counts: Uint16Array;
@@ -31,7 +34,7 @@ function buildHuffman(lengths: Uint8Array, offset: number, count: number): Huffm
   let left = 1;
   for (let len = 1; len < 16; len++) {
     left = (left << 1) - counts[len];
-    if (left < 0) throw new Error('Corrupt deflate stream: oversubscribed code');
+    if (left < 0) throw corrupt('Corrupt deflate stream: oversubscribed code');
   }
   for (let len = 1; len < 15; len++) offsets[len + 1] = offsets[len] + counts[len];
   for (let i = 0; i < count; i++) if (lengths[offset + i]) symbols[offsets[lengths[offset + i]]++] = i;
@@ -55,17 +58,17 @@ function fixedTables(): [Huffman, Huffman] {
 
 /**
  * Inflates a zlib stream (2 byte header, DEFLATE data, Adler-32 trailer is not verified) into exactly
- * `size` bytes. Throws on malformed data or when the stream does not produce exactly `size` bytes.
+ * `size` bytes. Throws MargoError `'failed'` on malformed data or when the stream does not produce exactly `size` bytes.
  */
 export function inflateZlib(input: Uint8Array, size: number): Uint8Array {
-  if (input.length < 2) throw new Error('Corrupt zlib stream: too short');
+  if (input.length < 2) throw corrupt('Corrupt zlib stream: too short');
   const cmf = input[0],
     flg = input[1];
-  if ((cmf & 15) !== 8 || ((cmf << 8) | flg) % 31 !== 0 || flg & 32) throw new Error('Corrupt zlib stream header');
+  if ((cmf & 15) !== 8 || ((cmf << 8) | flg) % 31 !== 0 || flg & 32) throw corrupt('Corrupt zlib stream header');
   return inflateRaw(input.subarray(2), size);
 }
 
-export function inflateRaw(input: Uint8Array, size: number): Uint8Array {
+function inflateRaw(input: Uint8Array, size: number): Uint8Array {
   const out = new Uint8Array(size);
   let position = 0,
     bitBuffer = 0,
@@ -73,7 +76,7 @@ export function inflateRaw(input: Uint8Array, size: number): Uint8Array {
     written = 0;
   const bits = (n: number): number => {
     while (bitCount < n) {
-      if (position >= input.length) throw new Error('Corrupt deflate stream: unexpected end');
+      if (position >= input.length) throw corrupt('Corrupt deflate stream: unexpected end');
       bitBuffer |= input[position++] << bitCount;
       bitCount += 8;
     }
@@ -95,7 +98,7 @@ export function inflateRaw(input: Uint8Array, size: number): Uint8Array {
       first <<= 1;
       code <<= 1;
     }
-    throw new Error('Corrupt deflate stream: invalid code');
+    throw corrupt('Corrupt deflate stream: invalid code');
   };
   const lengths = new Uint8Array(320);
   let last = 0;
@@ -105,13 +108,13 @@ export function inflateRaw(input: Uint8Array, size: number): Uint8Array {
     if (type === 0) {
       bitBuffer = 0;
       bitCount = 0;
-      if (position + 4 > input.length) throw new Error('Corrupt deflate stream: unexpected end');
+      if (position + 4 > input.length) throw corrupt('Corrupt deflate stream: unexpected end');
       const length = input[position] | (input[position + 1] << 8),
         check = input[position + 2] | (input[position + 3] << 8);
       position += 4;
-      if ((length ^ 0xffff) !== check) throw new Error('Corrupt deflate stream: stored length mismatch');
+      if ((length ^ 0xffff) !== check) throw corrupt('Corrupt deflate stream: stored length mismatch');
       if (position + length > input.length || written + length > size)
-        throw new Error('Corrupt deflate stream: stored block out of bounds');
+        throw corrupt('Corrupt deflate stream: stored block out of bounds');
       out.set(input.subarray(position, position + length), written);
       position += length;
       written += length;
@@ -123,7 +126,7 @@ export function inflateRaw(input: Uint8Array, size: number): Uint8Array {
       const nLiteral = bits(5) + 257,
         nDistance = bits(5) + 1,
         nCode = bits(4) + 4;
-      if (nLiteral > 286 || nDistance > 30) throw new Error('Corrupt deflate stream: bad table sizes');
+      if (nLiteral > 286 || nDistance > 30) throw corrupt('Corrupt deflate stream: bad table sizes');
       lengths.fill(0);
       for (let i = 0; i < nCode; i++) lengths[CODE_ORDER[i]] = bits(3);
       const codeTable = buildHuffman(lengths, 0, 19);
@@ -137,37 +140,37 @@ export function inflateRaw(input: Uint8Array, size: number): Uint8Array {
         let repeat = 0,
           value = 0;
         if (symbol === 16) {
-          if (i === 0) throw new Error('Corrupt deflate stream: repeat with no previous length');
+          if (i === 0) throw corrupt('Corrupt deflate stream: repeat with no previous length');
           value = lengths[i - 1];
           repeat = 3 + bits(2);
         } else if (symbol === 17) repeat = 3 + bits(3);
         else repeat = 11 + bits(7);
-        if (i + repeat > nLiteral + nDistance) throw new Error('Corrupt deflate stream: too many lengths');
+        if (i + repeat > nLiteral + nDistance) throw corrupt('Corrupt deflate stream: too many lengths');
         while (repeat--) lengths[i++] = value;
       }
-      if (!lengths[256]) throw new Error('Corrupt deflate stream: missing end-of-block code');
+      if (!lengths[256]) throw corrupt('Corrupt deflate stream: missing end-of-block code');
       literal = buildHuffman(lengths, 0, nLiteral);
       distance = buildHuffman(lengths, nLiteral, nDistance);
-    } else throw new Error('Corrupt deflate stream: invalid block type');
+    } else throw corrupt('Corrupt deflate stream: invalid block type');
     for (;;) {
       const symbol = decode(literal);
       if (symbol < 256) {
-        if (written >= size) throw new Error('Corrupt deflate stream: output overflow');
+        if (written >= size) throw corrupt('Corrupt deflate stream: output overflow');
         out[written++] = symbol;
       } else if (symbol === 256) break;
       else {
         const lengthIndex = symbol - 257;
-        if (lengthIndex >= 29) throw new Error('Corrupt deflate stream: invalid length symbol');
+        if (lengthIndex >= 29) throw corrupt('Corrupt deflate stream: invalid length symbol');
         const length = LENGTH_BASE[lengthIndex] + bits(LENGTH_EXTRA[lengthIndex]);
         const distanceSymbol = decode(distance);
-        if (distanceSymbol >= 30) throw new Error('Corrupt deflate stream: invalid distance symbol');
+        if (distanceSymbol >= 30) throw corrupt('Corrupt deflate stream: invalid distance symbol');
         const back = DIST_BASE[distanceSymbol] + bits(DIST_EXTRA[distanceSymbol]);
-        if (back > written) throw new Error('Corrupt deflate stream: distance before start');
-        if (written + length > size) throw new Error('Corrupt deflate stream: output overflow');
+        if (back > written) throw corrupt('Corrupt deflate stream: distance before start');
+        if (written + length > size) throw corrupt('Corrupt deflate stream: output overflow');
         for (let k = 0; k < length; k++, written++) out[written] = out[written - back];
       }
     }
   }
-  if (written !== size) throw new Error(`Corrupt deflate stream: produced ${written} of ${size} bytes`);
+  if (written !== size) throw corrupt(`Corrupt deflate stream: produced ${written} of ${size} bytes`);
   return out;
 }

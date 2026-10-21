@@ -20,8 +20,8 @@ export {
   type ImposterData,
   type ImposterOptions,
   type ImposterSource,
-  type Vec3,
 } from './imposter.js';
+import { MargoError } from '@margoengine/math/errors';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
@@ -35,9 +35,11 @@ export interface LODLevel {
   /** Fraction the switch distance shrinks by while this level is shown (three.js LOD semantics). */
   hysteresis?: number;
 }
+/** Per-object settings of `LODSystem.add`. */
 export interface LODOptions {
   /** Local bounding radius for `screen` levels and imposter culling. Default: from a Geometry, Mesh or Imposter level. */ radius?: number;
 }
+/** `LODSystem` settings shared by every object it manages. */
 export interface LODSystemOptions {
   /** Default hysteresis per level. Default 0.1. */ hysteresis?: number;
   /** Multiplies every evaluated distance: above 1 switches to coarser levels sooner (a quality knob). Default 1. */
@@ -88,6 +90,8 @@ let serial = 0;
  * Level of detail for many objects at once. Every frame (before the transform tick) one loop over packed arrays picks
  * each object's level from its anchor's world position, with hysteresis, and only touches objects whose level changed;
  * it allocates nothing. Imposter levels draw as one instanced call per atlas after the opaque passes.
+ * @throws RangeError / TypeError from `add` and the constructor when options or levels are invalid.
+ * @throws MargoError `'state'` from `add` before the system is used on an engine.
  */
 export class LODSystem implements EnginePlugin {
   readonly name = 'lod:' + serial++;
@@ -164,7 +168,7 @@ export class LODSystem implements EnginePlugin {
   /** Registers an object. `anchor` gives the world transform (and receives Geometry levels); level objects are usually its children. */
   add(anchor: Mesh, levels: readonly LODLevel[], { radius }: LODOptions = {}): LOD {
     const e = this.engine;
-    if (!e) throw new Error('Use the LOD system on an engine first');
+    if (!e) throw new MargoError('state', 'Use the LOD system on an engine first');
     const mesh = meshRuntime(anchor);
     mesh.check();
     if (mesh.engine !== e) throw new TypeError('Anchor belongs to another engine');

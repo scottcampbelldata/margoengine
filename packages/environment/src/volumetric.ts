@@ -13,6 +13,7 @@ import {
   type Vec3,
 } from '@margoengine/core/extension';
 import { invertMatrix } from '@margoengine/math/mat4';
+import { MargoError } from '@margoengine/math/errors';
 import { sceneTarget } from '../../shared/msaa.js';
 import { preset } from '../../shared/preset.js';
 import { displayShader } from '../../shared/display.js';
@@ -28,6 +29,7 @@ export interface VolumetricLightSource {
   bindings(): GPUBindGroupEntry[];
 }
 
+/** `VolumetricFog` settings (froxel-grid scattering with shadowed light shafts); invalid values throw RangeError. */
 export interface VolumetricFogOptions {
   /** Whether to register the fog pass (default true). Set false to skip volumetric fog. */
   enabled?: boolean;
@@ -285,7 +287,11 @@ export class VolumetricFog implements EnginePlugin {
       throw new RangeError('Invalid volumetric fog options');
   }
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('VolumetricFog requires WebGPU and a live effect');
+    if (this.disposed || !engine.gpu)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'unsupported',
+        'VolumetricFog requires WebGPU and a live effect; attach a new VolumetricFog to a WebGPU engine',
+      );
     this.engine = engine;
     this.device = engine.gpu;
     this.uniform = this.device.createBuffer({
@@ -314,14 +320,16 @@ export class VolumetricFog implements EnginePlugin {
         options?: { fog?: { density?: number; depth?: unknown }; atmosphere?: { density?: number } };
       };
       if ('heightFalloff' in p && p.enabled === true)
-        throw new Error(
+        throw new MargoError(
+          'state',
           `VolumetricFog replaces environment Fog '${plugin.name}': set its enabled = false or remove it`,
         );
       const fog = p.options?.fog;
       if (fog && typeof fog.depth === 'function' && (fog.density ?? 0.01) > 0)
-        throw new Error(`VolumetricFog replaces sky fog: remove ${plugin.name}.options.fog`);
+        throw new MargoError('state', `VolumetricFog replaces sky fog: remove ${plugin.name}.options.fog`);
       if ((p.options?.atmosphere?.density ?? 0) > 0)
-        throw new Error(
+        throw new MargoError(
+          'state',
           `VolumetricFog replaces creative atmosphere fog: set ${plugin.name}.options.atmosphere.density to 0`,
         );
     }
@@ -374,7 +382,8 @@ export class VolumetricFog implements EnginePlugin {
       depth = multisampled ? target.depthSource : this.depthView(target.resolvedDepth);
     }
     if (!depth)
-      throw new Error(
+      throw new MargoError(
+        'state',
         'VolumetricFog needs scene depth: attach a post capture (Tonemap, Bloom, PostStack, SSAO, TAA) first or pass options.depth',
       );
     if (!invertMatrix(c.camera.matrix, this.inverse)) return;

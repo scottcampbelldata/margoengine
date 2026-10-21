@@ -21,6 +21,9 @@
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"
   },
+  "devDependencies": {
+    "@margoengine/math": "^1.0.0"
+  },
   "scripts": {
     "build": "node ../../scripts/build-postfx.js dof",
     "prepack": "npm run build",

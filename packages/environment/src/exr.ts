@@ -3,21 +3,32 @@
 import { halfToFloat } from './half.js';
 import { inflateZlib } from './inflate.js';
 import { MAX_PIXELS, toBytes, type FloatImage } from './hdr.js';
+import { MargoError } from '@margoengine/math/errors';
 
+/** OpenEXR compressions `parseEXR` decodes (PXR24, B44, DWA and HTJ2K are rejected). */
 export type EXRCompression = 'NONE' | 'RLE' | 'ZIPS' | 'ZIP' | 'PIZ';
+/** One channel of an OpenEXR file, as listed in its header. */
 export interface EXRChannel {
+  /** Channel name, e.g. 'R', 'G', 'B', 'A', 'Y'. */
   name: string;
+  /** Sample type in the file. */
   type: 'UINT' | 'HALF' | 'FLOAT';
+  /** Horizontal subsampling (only 1 decodes). */
   xSampling: number;
+  /** Vertical subsampling (only 1 decodes). */
   ySampling: number;
 }
+/** A decoded single-part scanline OpenEXR image: linear float RGBA, row 0 at the top, plus its header facts. */
 export interface EXRImage extends FloatImage {
+  /** Compression of the file's scanline chunks. */
   compression: EXRCompression;
   /** All channels in the file, in file (alphabetical) order. */
   channels: EXRChannel[];
   /** Which source channels filled RGBA: 'RGBA', 'RGB' or 'Y' (luminance replicated to RGB). */
   layout: 'RGBA' | 'RGB' | 'Y';
+  /** Pixel bounds of the stored data, inclusive: [xMin, yMin, xMax, yMax]. */
   dataWindow: [number, number, number, number];
+  /** Pixel bounds of the intended display area, inclusive: [xMin, yMin, xMax, yMax] (the data window when absent). */
   displayWindow: [number, number, number, number];
 }
 
@@ -25,18 +36,26 @@ const COMPRESSION_NAMES = ['NONE', 'RLE', 'ZIPS', 'ZIP', 'PIZ', 'PXR24', 'B44', 
 const LINES_PER_BLOCK: Record<EXRCompression, number> = { NONE: 1, RLE: 1, ZIPS: 1, ZIP: 16, PIZ: 32 };
 const TYPE_NAMES = ['UINT', 'HALF', 'FLOAT'] as const;
 const TYPE_SIZE = [4, 2, 4];
+// Damaged data throws MargoError 'failed' (as parseHDR), a valid file this decoder does not read 'unsupported', and a
+// decoder bound RangeError.
+const invalid = (problem: string) =>
+  new MargoError('failed', `Invalid EXR: ${problem}; the file is damaged or not OpenEXR, export it again`);
+const unsupported = (message: string, fix = 'export it as a single-part scanline EXR') =>
+  new MargoError('unsupported', `${message}; ${fix}`);
 
 /**
  * Parses a single-part scanline OpenEXR file into linear float RGBA. Picks the R, G, B and A channels
  * (or Y for luminance-only files); other channels are decoded and ignored. Tiled, multi-part, deep and
  * subsampled files and PXR24, B44 and DWA compression are rejected with a descriptive error.
+ * @throws MargoError `'failed'` for damaged data, `'unsupported'` for a file feature it does not decode; RangeError for an
+ * image or chunk over its bounds; TypeError for a source that is not bytes or an empty compression or lineOrder value.
  */
 export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
   const bytes = toBytes(source);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let position = 0;
   const need = (n: number) => {
-    if (n < 0 || position + n > bytes.length) throw new Error('Invalid EXR: unexpected end of file');
+    if (n < 0 || position + n > bytes.length) throw invalid('unexpected end of file');
   };
   const _u8 = () => {
     need(1);
@@ -51,7 +70,7 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
   const string = (limit: number): string => {
     const start = position;
     while (position < bytes.length && bytes[position] !== 0) {
-      if (position - start >= limit) throw new Error('Invalid EXR: header name too long');
+      if (position - start >= limit) throw invalid('header name too long');
       position++;
     }
     need(1);
@@ -61,12 +80,12 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
     return text;
   };
 
-  if (bytes.length < 8 || view.getUint32(0, true) !== 20000630) throw new Error('Invalid EXR: bad magic number');
+  if (bytes.length < 8 || view.getUint32(0, true) !== 20000630) throw invalid('bad magic number');
   const version = view.getUint32(4, true);
-  if ((version & 255) !== 2) throw new Error(`Unsupported EXR version ${version & 255}`);
-  if (version & 0x200) throw new Error('Unsupported EXR: tiled images');
-  if (version & 0x800) throw new Error('Unsupported EXR: deep data');
-  if (version & 0x1000) throw new Error('Unsupported EXR: multi-part files');
+  if ((version & 255) !== 2) throw unsupported(`Unsupported EXR version ${version & 255}`);
+  if (version & 0x200) throw unsupported('Unsupported EXR: tiled images');
+  if (version & 0x800) throw unsupported('Unsupported EXR: deep data');
+  if (version & 0x1000) throw unsupported('Unsupported EXR: multi-part files');
   const nameLimit = version & 0x400 ? 255 : 31;
   position = 8;
 
@@ -75,7 +94,8 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
     displayWindow: [number, number, number, number] | undefined;
   let lineOrder = 0;
   for (let attributes = 0; ; attributes++) {
-    if (attributes > 1024) throw new Error('Invalid EXR: too many header attributes');
+    if (attributes > 1024)
+      throw new RangeError('Invalid EXR: too many header attributes; the decoder reads at most 1024');
     const name = string(nameLimit);
     if (name === '') break;
     const type = string(nameLimit),
@@ -85,27 +105,28 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
     if (name === 'channels' && type === 'chlist') {
       channels = [];
       for (;;) {
-        if (position >= end) throw new Error('Invalid EXR: unterminated channel list');
+        if (position >= end) throw invalid('unterminated channel list');
         const channelName = string(nameLimit);
         if (channelName === '') break;
-        if (position + 16 > end) throw new Error('Invalid EXR: truncated channel list');
+        if (position + 16 > end) throw invalid('truncated channel list');
         const pixelType = i32();
         position += 4;
         const xSampling = i32(),
           ySampling = i32();
-        if (pixelType < 0 || pixelType > 2)
-          throw new Error(`Invalid EXR: channel ${channelName} has pixel type ${pixelType}`);
+        if (pixelType < 0 || pixelType > 2) throw invalid(`channel ${channelName} has pixel type ${pixelType}`);
         channels.push({ name: channelName, type: TYPE_NAMES[pixelType], xSampling, ySampling });
       }
-      if (channels.length > 1024) throw new Error('Invalid EXR: too many channels');
+      if (channels.length > 1024)
+        throw new RangeError('Invalid EXR: too many channels; the decoder reads at most 1024');
     } else if (name === 'compression' && type === 'compression') {
       if (size < 1) throw new TypeError('Invalid EXR: bad compression');
       const value = bytes[position],
         label = COMPRESSION_NAMES[value] ?? `#${value}`;
-      if (!(label in LINES_PER_BLOCK)) throw new Error(`Unsupported EXR compression ${label}`);
+      if (!(label in LINES_PER_BLOCK))
+        throw unsupported(`Unsupported EXR compression ${label}`, 'export it with NONE, RLE, ZIPS, ZIP or PIZ');
       compression = label as EXRCompression;
     } else if ((name === 'dataWindow' || name === 'displayWindow') && type === 'box2i') {
-      if (size !== 16) throw new Error(`Invalid EXR: bad ${name}`);
+      if (size !== 16) throw invalid(`bad ${name}`);
       const box: [number, number, number, number] = [
         view.getInt32(position, true),
         view.getInt32(position + 4, true),
@@ -120,21 +141,23 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
     } else if (name === 'type' && type === 'string') {
       // Spread only a short value: a long one would overflow the call stack (and cannot be 'scanlineimage').
       const value = size <= 64 ? String.fromCharCode(...bytes.subarray(position, end)) : '(too long)';
-      if (value !== 'scanlineimage') throw new Error(`Unsupported EXR part type ${value}`);
+      if (value !== 'scanlineimage') throw unsupported(`Unsupported EXR part type ${value}`);
     }
     position = end;
   }
   if (!channels || !channels.length || !compression || !dataWindow)
-    throw new Error('Invalid EXR: missing channels, compression or dataWindow');
-  if (lineOrder > 2) throw new Error('Invalid EXR: bad lineOrder');
+    throw invalid('missing channels, compression or dataWindow');
+  if (lineOrder > 2) throw invalid('bad lineOrder');
   for (const channel of channels)
     if (channel.xSampling !== 1 || channel.ySampling !== 1)
-      throw new Error(`Unsupported EXR: subsampled channel ${channel.name}`);
+      throw unsupported(`Unsupported EXR: subsampled channel ${channel.name}`, 'export full-resolution channels');
   const [xMin, yMin, xMax, yMax] = dataWindow;
   const width = xMax - xMin + 1,
     height = yMax - yMin + 1;
   if (!(width > 0 && height > 0) || width > 1 << 24 || height > 1 << 24 || width * height > MAX_PIXELS)
-    throw new Error(`Invalid EXR size ${width}x${height}`);
+    throw new RangeError(
+      `Invalid EXR size ${width}x${height}; 1 to ${1 << 24} a side and at most ${MAX_PIXELS} pixels decode`,
+    );
 
   const pick = (name: string) => channels!.findIndex((c) => c.name === name);
   let indices: number[], layout: EXRImage['layout'];
@@ -145,7 +168,11 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
   } else if (y >= 0) {
     indices = [y, y, y, a];
     layout = 'Y';
-  } else throw new Error(`Unsupported EXR channels: ${channels.map((c) => c.name).join(', ')} (need R, G, B or Y)`);
+  } else
+    throw new MargoError(
+      'unsupported',
+      `Unsupported EXR channels: ${channels.map((c) => c.name).join(', ')} (need R, G, B or Y)`,
+    );
 
   const linesPerBlock = LINES_PER_BLOCK[compression];
   const blocks = Math.ceil(height / linesPerBlock);
@@ -194,7 +221,7 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
       dataSize = view.getInt32(offset + 4, true);
     const index = (blockY - yMin) / linesPerBlock;
     if (!Number.isInteger(index) || index < 0 || index >= blocks || filled[index])
-      throw new Error(`Invalid EXR: chunk ${block} has bad y ${blockY}`);
+      throw invalid(`chunk ${block} has bad y ${blockY}`);
     filled[index] = 1;
     const lines = Math.min(linesPerBlock, height - index * linesPerBlock);
     const expected = lines * lineBytes;
@@ -202,8 +229,7 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
     let raw: Uint8Array;
     if (dataSize === expected)
       raw = packed; // Writers store a chunk raw when compression does not shrink it.
-    else if (compression === 'NONE')
-      throw new Error(`Invalid EXR: chunk ${block} has ${dataSize} bytes, expected ${expected}`);
+    else if (compression === 'NONE') throw invalid(`chunk ${block} has ${dataSize} bytes, expected ${expected}`);
     else if (compression === 'RLE') raw = unpredict(rleDecode(packed, expected));
     else if (compression === 'ZIP' || compression === 'ZIPS') raw = unpredict(inflateZlib(packed, expected));
     else raw = pizDecode(packed, expected, channels, width, lines);
@@ -237,18 +263,18 @@ function rleDecode(input: Uint8Array, size: number): Uint8Array {
     const count = (input[i++] << 24) >> 24;
     if (count < 0) {
       const n = -count;
-      if (i + n > input.length || o + n > size) throw new Error('Invalid EXR: RLE literal out of bounds');
+      if (i + n > input.length || o + n > size) throw invalid('RLE literal out of bounds');
       out.set(input.subarray(i, i + n), o);
       i += n;
       o += n;
     } else {
       const n = count + 1;
-      if (i >= input.length || o + n > size) throw new Error('Invalid EXR: RLE run out of bounds');
+      if (i >= input.length || o + n > size) throw invalid('RLE run out of bounds');
       out.fill(input[i++], o, o + n);
       o += n;
     }
   }
-  if (o !== size) throw new Error('Invalid EXR: RLE chunk size mismatch');
+  if (o !== size) throw invalid('RLE chunk size mismatch');
   return out;
 }
 
@@ -280,15 +306,15 @@ const MAX_CODE_LENGTH = 44;
 
 function pizDecode(input: Uint8Array, size: number, channels: EXRChannel[], width: number, lines: number): Uint8Array {
   const view = new DataView(input.buffer, input.byteOffset, input.byteLength);
-  if (input.length < 4) throw new Error('Invalid EXR: truncated PIZ chunk');
+  if (input.length < 4) throw invalid('truncated PIZ chunk');
   const minNonZero = view.getUint16(0, true),
     maxNonZero = view.getUint16(2, true);
   let position = 4;
-  if (maxNonZero >= BITMAP_SIZE) throw new Error('Invalid EXR: PIZ bitmap out of range');
+  if (maxNonZero >= BITMAP_SIZE) throw invalid('PIZ bitmap out of range');
   const bitmap = new Uint8Array(BITMAP_SIZE);
   if (minNonZero <= maxNonZero) {
     const n = maxNonZero - minNonZero + 1;
-    if (position + n > input.length) throw new Error('Invalid EXR: truncated PIZ bitmap');
+    if (position + n > input.length) throw invalid('truncated PIZ bitmap');
     bitmap.set(input.subarray(position, position + n), minNonZero);
     position += n;
   }
@@ -296,11 +322,11 @@ function pizDecode(input: Uint8Array, size: number, channels: EXRChannel[], widt
   let k = 0;
   for (let i = 0; i < USHORT_RANGE; i++) if (i === 0 || bitmap[i >> 3] & (1 << (i & 7))) lut[k++] = i;
   const maxValue = k - 1;
-  if (position + 4 > input.length) throw new Error('Invalid EXR: truncated PIZ chunk');
+  if (position + 4 > input.length) throw invalid('truncated PIZ chunk');
   const length = view.getInt32(position, true);
   position += 4;
-  if (length < 0 || position + length > input.length) throw new Error('Invalid EXR: PIZ Huffman data out of bounds');
-  if (size & 1) throw new Error('Invalid EXR: PIZ chunk size is odd');
+  if (length < 0 || position + length > input.length) throw invalid('PIZ Huffman data out of bounds');
+  if (size & 1) throw invalid('PIZ chunk size is odd');
   const buffer = new Uint16Array(size >> 1);
   hufUncompress(input.subarray(position, position + length), buffer);
 
@@ -330,12 +356,12 @@ function pizDecode(input: Uint8Array, size: number, channels: EXRChannel[], widt
 }
 
 function hufUncompress(input: Uint8Array, out: Uint16Array): void {
-  if (input.length < 20) throw new Error('Invalid EXR: truncated PIZ Huffman header');
+  if (input.length < 20) throw invalid('truncated PIZ Huffman header');
   const view = new DataView(input.buffer, input.byteOffset, input.byteLength);
   const im = view.getUint32(0, true),
     iM = view.getUint32(4, true),
     nBits = view.getUint32(12, true);
-  if (im >= HUF_ENCSIZE || iM >= HUF_ENCSIZE || im > iM) throw new Error('Invalid EXR: bad Huffman symbol range');
+  if (im >= HUF_ENCSIZE || iM >= HUF_ENCSIZE || im > iM) throw invalid('bad Huffman symbol range');
   const codes = new Float64Array(HUF_ENCSIZE); // (code << 6) | length, may exceed 32 bits
   let position = 20;
   // Unpack the code length table.
@@ -344,7 +370,7 @@ function hufUncompress(input: Uint8Array, out: Uint16Array): void {
       lc = 0;
     const getBits = (n: number): number => {
       while (lc < n) {
-        if (position >= input.length) throw new Error('Invalid EXR: truncated Huffman table');
+        if (position >= input.length) throw invalid('truncated Huffman table');
         c = ((c << 8) | input[position++]) & 0xffffff;
         lc += 8;
       }
@@ -356,12 +382,12 @@ function hufUncompress(input: Uint8Array, out: Uint16Array): void {
       codes[i] = l;
       if (l === LONG_ZEROCODE_RUN) {
         let run = getBits(8) + SHORTEST_LONG_RUN;
-        if (i + run > iM + 1) throw new Error('Invalid EXR: Huffman table overrun');
+        if (i + run > iM + 1) throw invalid('Huffman table overrun');
         while (run--) codes[i++] = 0;
         i--;
       } else if (l >= SHORT_ZEROCODE_RUN) {
         let run = l - SHORT_ZEROCODE_RUN + 2;
-        if (i + run > iM + 1) throw new Error('Invalid EXR: Huffman table overrun');
+        if (i + run > iM + 1) throw invalid('Huffman table overrun');
         while (run--) codes[i++] = 0;
         i--;
       }
@@ -393,17 +419,18 @@ function hufUncompress(input: Uint8Array, out: Uint16Array): void {
     const l = lengths[i],
       c = values[i];
     if (!l) continue;
-    if (l > MAX_CODE_LENGTH) throw new Error('Unsupported EXR: Huffman code too long');
-    if (c >= 2 ** l) throw new Error('Invalid EXR: bad Huffman code');
+    if (l > MAX_CODE_LENGTH)
+      throw unsupported('Unsupported EXR: Huffman code too long', 'export it with ZIP compression');
+    if (c >= 2 ** l) throw invalid('bad Huffman code');
     if (l > HUF_DECBITS) {
       const prefix = Math.floor(c / 2 ** (l - HUF_DECBITS));
-      if (decodeLength[prefix]) throw new Error('Invalid EXR: bad Huffman table');
+      if (decodeLength[prefix]) throw invalid('bad Huffman table');
       (longCodes[prefix] ??= []).push(i);
     } else {
       const first = c * 2 ** (HUF_DECBITS - l),
         count = 1 << (HUF_DECBITS - l);
       for (let j = first; j < first + count; j++) {
-        if (decodeLength[j] || longCodes[j]) throw new Error('Invalid EXR: bad Huffman table');
+        if (decodeLength[j] || longCodes[j]) throw invalid('bad Huffman table');
         decodeLength[j] = l;
         decodeLiteral[j] = i;
       }
@@ -411,7 +438,7 @@ function hufUncompress(input: Uint8Array, out: Uint16Array): void {
   }
   // Decode the bit stream. `c` holds the `lc` unread bits, kept below 2^53.
   const available = input.length - position;
-  if (nBits > available * 8) throw new Error('Invalid EXR: Huffman bit count exceeds data');
+  if (nBits > available * 8) throw invalid('Huffman bit count exceeds data');
   const end = position + Math.ceil(nBits / 8),
     rlc = iM,
     size = out.length;
@@ -427,17 +454,17 @@ function hufUncompress(input: Uint8Array, out: Uint16Array): void {
   const emit = (symbol: number) => {
     if (symbol === rlc) {
       if (lc < 8) {
-        if (position >= end) throw new Error('Invalid EXR: truncated Huffman run');
+        if (position >= end) throw invalid('truncated Huffman run');
         c = c * 256 + input[position++];
         lc += 8;
       }
       const run = top(8);
       consume(8);
-      if (o + run > size || o < 1) throw new Error('Invalid EXR: Huffman run out of bounds');
+      if (o + run > size || o < 1) throw invalid('Huffman run out of bounds');
       out.fill(out[o - 1], o, o + run);
       o += run;
     } else {
-      if (o >= size) throw new Error('Invalid EXR: Huffman output overflow');
+      if (o >= size) throw invalid('Huffman output overflow');
       out[o++] = symbol;
     }
   };
@@ -452,7 +479,7 @@ function hufUncompress(input: Uint8Array, out: Uint16Array): void {
         continue;
       }
       const candidates = longCodes[index];
-      if (!candidates) throw new Error('Invalid EXR: bad Huffman code in data');
+      if (!candidates) throw invalid('bad Huffman code in data');
       let matched = false;
       for (const symbol of candidates) {
         const l = lengths[symbol];
@@ -467,7 +494,7 @@ function hufUncompress(input: Uint8Array, out: Uint16Array): void {
           break;
         }
       }
-      if (!matched) throw new Error('Invalid EXR: bad Huffman code in data');
+      if (!matched) throw invalid('bad Huffman code in data');
     }
   }
   const pad = (8 - nBits) & 7;
@@ -475,11 +502,11 @@ function hufUncompress(input: Uint8Array, out: Uint16Array): void {
   lc -= pad;
   while (lc > 0) {
     const index = (c * 2 ** (HUF_DECBITS - lc)) % HUF_DECSIZE;
-    if (!decodeLength[index] || decodeLength[index] > lc) throw new Error('Invalid EXR: bad Huffman tail');
+    if (!decodeLength[index] || decodeLength[index] > lc) throw invalid('bad Huffman tail');
     consume(decodeLength[index]);
     emit(decodeLiteral[index]);
   }
-  if (o !== size) throw new Error(`Invalid EXR: Huffman produced ${o} of ${size} values`);
+  if (o !== size) throw invalid(`Huffman produced ${o} of ${size} values`);
 }
 
 function wav2Decode(

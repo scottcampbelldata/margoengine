@@ -21,7 +21,7 @@ export class Bloom implements EnginePlugin {
     [Symbol.dispose]: () => void;
 }
 
-export type BloomImageContext = Pick<Context, 'device' | 'encoder' | 'width' | 'height'>;
+export type BloomImageContext = Pick<PostPassContext, 'device' | 'encoder' | 'width' | 'height'>;
 
 export interface BloomOptions {
     strength?: number;
@@ -34,7 +34,7 @@ export function bloomWeights(radius: number, levels: number): number[];
 
 // Not exported from this entry, but used by the exports above:
 
-type Context = Extract<PassContext, {
+type PostPassContext = Extract<PassContext, {
     backend: 'webgpu';
 }>;
 ```

@@ -20,6 +20,9 @@
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"
   },
+  "dependencies": {
+    "@margoengine/math": "^1.0.0"
+  },
   "scripts": {
     "build": "node ../../scripts/build-optional.js scatter",
     "test": "npm run build && node --test test/*.test.js",
@@ -27,8 +30,5 @@
     "prepack": "npm run build"
   },
   "homepage": "https://margoengine.com",
-  "description": "Seeded instancing, distance-based LOD and procedural wind.",
-  "devDependencies": {
-    "@margoengine/math": "^1.0.0"
-  }
+  "description": "Seeded instancing, distance-based LOD and procedural wind."
 }
