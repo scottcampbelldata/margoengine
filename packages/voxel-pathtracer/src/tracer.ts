@@ -1522,7 +1522,10 @@ export class VoxelPathTracer implements EnginePlugin {
     if ((!gpu.pipelines && !gpu.preview) || gpu.lost) return;
     this.#syncScene(gpu);
     const o = this.#settings,
-      limit = Math.floor(gpu.device.limits.maxStorageBufferBindingSize / 16);
+      // Temporal guides contain the guide and two history images in one storage binding.
+      // Offscreen capture keeps its separate non-temporal 16-byte-per-pixel budget.
+      bytesPerPixel = o.denoise !== false ? 48 : 16,
+      limit = Math.floor(gpu.device.limits.maxStorageBufferBindingSize / bytesPerPixel);
     let width = Math.max(1, Math.round(c.width * o.resolutionScale)),
       height = Math.max(1, Math.round(c.height * o.resolutionScale));
     if (width * height > limit) {
