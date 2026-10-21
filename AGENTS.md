@@ -35,3 +35,9 @@ mixed up.
 - If the work cannot land yet, rebase it onto current `main` anyway and say in your final report, in one line, what
   blocks it. Never leave a branch that is behind `main`.
 - Never delete or rewrite another chat's or Codex's branch or uncommitted work without Scott's say-so.
+- This applies to Codex as well. Codex: rebase your own branches and worktree commits onto current `main` and land
+  them the same way; a `codex/*` branch, a commit in a `~/.codex/worktrees` checkout or a `refs/codex/snapshots` entry
+  that is not on `main` is unlanded work.
+- Claude: when you find Codex work that is not on `main`, do not leave it behind. Either tell Scott in your report so
+  he can have Codex rebase and land it, or, with his go-ahead, rebase it onto `main` yourself, run the checks and land
+  it (keep Codex's authorship and say where it came from in the commit message). Report which one you did.
