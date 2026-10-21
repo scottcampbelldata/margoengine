@@ -1,0 +1,36 @@
+{
+  "name": "@margoengine/lightmap",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Bakes lightmaps on the CPU: one padded UV atlas for a quad mesh with direct light, ambient occlusion and matching albedo, emission, normal and ORM textures.",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/gltf-pro": "^1.0.0"
+  },
+  "dependencies": {
+    "@margoengine/bvh": "^1.0.0",
+    "@margoengine/materials": "^1.0.0",
+    "@margoengine/math": "^1.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js lightmap",
+    "test": "npm run build && node --test tests/*.test.js",
+    "prepack": "npm run build"
+  },
+  "homepage": "https://margoengine.com"
+}
