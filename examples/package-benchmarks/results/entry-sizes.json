@@ -1,5 +1,5 @@
 {
-  "commit": "7a4ce603",
+  "commit": "99ed7335",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -942,8 +942,8 @@
         "gzip": 3020
       },
       "./codec": {
-        "raw": 24285,
-        "gzip": 8486
+        "raw": 24645,
+        "gzip": 8616
       },
       "./stream": {
         "raw": 35250,
@@ -1010,6 +1010,20 @@
       "./animation": {
         "raw": 4251,
         "gzip": 1639
+      }
+    },
+    "@margoengine/voxel-net": {
+      ".": {
+        "raw": 14022,
+        "gzip": 5276
+      },
+      "./server": {
+        "raw": 27284,
+        "gzip": 10483
+      },
+      "./bot": {
+        "raw": 17675,
+        "gzip": 7047
       }
     },
     "@margoengine/voxel-pathtracer": {
