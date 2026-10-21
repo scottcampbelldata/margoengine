@@ -11,6 +11,11 @@ import { buildWorkers, restoreWorkerUrls } from './build-workers.js';
 import { staticEmbind } from './static-embind.js';
 import { packageDeclarations } from './package-declarations.js';
 const precompiled = process.argv.includes('--precompiled');
+// --only=post,lines rebuilds just those packages (their dependencies must already be built) and skips the size records.
+const only = process.argv
+  .find((arg) => arg.startsWith('--only='))
+  ?.slice('--only='.length)
+  .split(',');
 const wasmPath = 'packages/kernel/target/wasm32-unknown-unknown/release/margoengine_kernel.wasm',
   optimizedPath = wasmPath.replace('.wasm', '.optimized.wasm');
 if (!precompiled)
@@ -125,6 +130,7 @@ for (const dir of JSON.parse(await readFile('package.json', 'utf8')).workspaces.
 ))
   manifests.set(dir.slice('packages/'.length), JSON.parse(await readFile(`${dir}/package.json`, 'utf8')));
 for (const name of packageOrder(manifests)) {
+  if (only && !only.includes(name)) continue;
   const manifest = manifests.get(name);
   if (manifest.scripts?.build) {
     execSync(manifest.scripts.build, { cwd: `packages/${name}`, stdio: 'inherit' });
@@ -239,6 +245,7 @@ for (const name of packageOrder(manifests)) {
   await tsc(name);
   await restoreWorkerUrls(output);
 }
+if (only) process.exit(0);
 // Size records and leak checks only; build order comes from package.json above.
 const featurePackages = [
   'gltf-pro',
