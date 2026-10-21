@@ -95,6 +95,11 @@ export interface ExportPrimitive {
     extras?: Extras;
 }
 
+export interface ExportPrimitiveData extends ExportPrimitive {
+    geometry: GeometryData;
+    material: MaterialData;
+}
+
 export interface ExportScene {
     nodes: readonly ExportNode[];
     animations?: readonly AnimationData[];

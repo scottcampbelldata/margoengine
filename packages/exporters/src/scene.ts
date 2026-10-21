@@ -204,6 +204,12 @@ export interface ExportPrimitive {
   extras?: Extras;
 }
 
+/** An {@link ExportPrimitive} as plain data with its material, the form an application's own mesh builder hands over. */
+export interface ExportPrimitiveData extends ExportPrimitive {
+  geometry: GeometryData;
+  material: MaterialData;
+}
+
 /**
  * A node of a plain data scene. Rotation is a quaternion [x, y, z, w]. A scale of [0, 0, 0] collapses the node: the
  * glTF writers keep it (a hidden geometry cel, shown later by a scale channel), the mesh-only formats leave it and its

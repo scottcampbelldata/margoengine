@@ -27,6 +27,7 @@ export type {
   MaterialAnimationChannelData,
   MaterialAnimationData,
   ExportPrimitive,
+  ExportPrimitiveData,
   Extras,
   LightmapData,
 } from './scene.js';
