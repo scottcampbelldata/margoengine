@@ -198,8 +198,8 @@ function checkMesh(
  * buffer 0, and returns the new file. Everything else is kept: the existing JSON (extensions, extras and unknown
  * members included), the BIN bytes, and every further chunk in order. Nodes are named exactly `mesh.name`, so an
  * importer's naming convention (a Godot `-colonly` suffix, for example) is the caller's choice.
- * @throws TypeError for an invalid GLB or one whose buffer 0 is external; RangeError for bad geometry or a name
- * already used by a node.
+ * @throws TypeError for an invalid GLB, scene or node references that do not resolve (checked even when `meshes` is
+ * empty), or a buffer 0 that is external; RangeError for bad geometry or a name already used by a node.
  */
 export function appendGLBMeshes(bytes: Uint8Array, meshes: readonly AppendedMesh[]): Uint8Array {
   const { json, bin, chunks } = splitGLB(bytes);
@@ -209,6 +209,21 @@ export function appendGLBMeshes(bytes: Uint8Array, meshes: readonly AppendedMesh
       throw new TypeError(`glTF ${key} must be an array of objects`);
   const lists = json as Record<string, Record<string, unknown>[]>,
     names = new Set((lists.nodes ?? []).map((node) => node.name).filter((name) => typeof name === 'string'));
+  // Existing references are checked even when nothing is appended, so a malformed file is never returned as valid.
+  const nodeCount = lists.nodes?.length ?? 0,
+    index = (value: unknown, count: number): boolean =>
+      Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) < count,
+    references = (list: unknown, what: string): void => {
+      if (
+        list !== undefined &&
+        (!Array.isArray(list) || !list.every((i) => index(i, nodeCount)) || new Set(list).size !== list.length)
+      )
+        throw new TypeError(`glTF ${what} must list distinct existing node indices`);
+    };
+  (lists.scenes ?? []).forEach((scene, i) => references(scene.nodes, `scene ${i} nodes`));
+  (lists.nodes ?? []).forEach((node, i) => references(node.children, `node ${i} children`));
+  if (json.scene !== undefined && !index(json.scene, lists.scenes?.length ?? 0))
+    throw new TypeError('glTF scene index is out of range');
   const prepared = meshes.map((mesh, i) => {
     if (!isObject(mesh)) throw new TypeError(`meshes[${i}] must be an object`);
     if (typeof mesh.name !== 'string' || !mesh.name || /[\u0000-\u001f]/.test(mesh.name))

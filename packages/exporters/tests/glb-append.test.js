@@ -165,3 +165,22 @@ test('appendGLBMeshes refuses clashing names, flat hulls, degenerate triangles a
   external.bin = null;
   assert.throws(() => appendGLBMeshes(joinGLB(external), [{ name: 'X', ...cube(1) }]), /external/);
 });
+
+test('appendGLBMeshes refuses unresolved scene and node references, even with nothing to append', () => {
+  const broken = (edit) => {
+    const parts = splitGLB(visual());
+    edit(parts.json);
+    return joinGLB(parts);
+  };
+  for (const [edit, message] of [
+    [(json) => (json.scenes[0].nodes = [5]), /scene 0 nodes/],
+    [(json) => (json.scenes[0].nodes = [0, 0]), /scene 0 nodes/],
+    [(json) => json.scenes.push({ nodes: [-1] }), /scene 1 nodes/],
+    [(json) => (json.nodes[0].children = [9]), /node 0 children/],
+    [(json) => (json.scene = 3), /scene index/],
+  ]) {
+    const bytes = broken(edit);
+    assert.throws(() => appendGLBMeshes(bytes, []), message);
+    assert.throws(() => appendGLBMeshes(bytes, [{ name: 'Box', ...cube(1) }]), message);
+  }
+});
