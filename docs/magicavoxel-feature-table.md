@@ -1,6 +1,7 @@
 # MagicaVoxel and Margo: feature table
 
-MagicaVoxel 0.99.7.2 against `@margoengine/voxel-pathtracer` (on main since 2026-10-20). Every
+MagicaVoxel 0.99.7.2 against `@margoengine/voxel-pathtracer` (on main since 2026-10-20; rows re-checked against the
+packages on main `da95929c`, 2026-10-21). Every
 number was measured on the same PC (RTX A6000, Windows 11; Margo in Edge, headless WebGPU) at 960 x 800 unless a row
 says otherwise. MagicaVoxel was used as a black box: we wrote scenes, it rendered them, we compared its PNGs with ours
 (method and scenes: [magicavoxel-parity.md](magicavoxel-parity.md)).
@@ -12,12 +13,12 @@ Legend: **yes**, **no**, **open** (MagicaVoxel has it, Margo does not match it y
 | | MagicaVoxel | Margo |
 | --- | --- | --- |
 | What it is | Free desktop voxel editor with a built-in path tracer | Path-tracing renderer for web apps and games (WebGPU, in the browser) |
-| Size | about 30 MB application | 63 KB gzip (the whole renderer) |
+| Size | about 30 MB application | 70 KB gzip (the whole renderer: 69,634 B, gzip -9 of `dist/index.js`, 2026-10-21) |
 | 1024 samples (default scenes) | 14-15 s | 1.7-1.85 s, about 8x faster |
 | Time to MagicaVoxel's 1024-sample noise level | about 14 s | 0.48 s (64 samples, denoised), about 29x faster |
 | Noise at 1024 samples (8-bit RMS against a 16,384-sample reference) | 0.32 | 0.24 raw, 0.16 denoised |
 | First lit image after opening a scene | not measured | 0.36-0.44 s (preview while the full tracer compiles) |
-| Same image as MagicaVoxel from a `.vox` file | | 99.2-99.97% of pixels within 3 of 255 levels on six default-lit scenes |
+| Same image as MagicaVoxel from a `.vox` file | | 99.3-99.97% of pixels within 3 of 255 levels on six default-lit scenes |
 
 ## Files
 
@@ -83,7 +84,8 @@ Legend: **yes**, **no**, **open** (MagicaVoxel has it, Margo does not match it y
 | --- | --- | --- |
 | PNG snapshot | yes | yes, up to 16,384 pixels a side (tiled, cancellable) |
 | Float (HDR) image; albedo, normal, depth and object passes | not checked | yes |
-| Largest model | 256 x 256 x 256 | 256 x 256 x 256 |
+| Largest model | 256 x 256 x 256 | 2048 per axis (dense voxels, or sparse `blocks`) |
+| Materials in one scene | 255 (one palette) | more than 255 (a material table per model) |
 | Many models | yes (world editor) | up to 65,535 instances sharing models |
 | Large world: 64 terrain models, 12.6 million voxels | not rendered yet | 256 samples in 1.5 s, 93 MiB of GPU memory |
 
@@ -91,8 +93,8 @@ Legend: **yes**, **no**, **open** (MagicaVoxel has it, Margo does not match it y
 
 | Feature | MagicaVoxel | Margo |
 | --- | --- | --- |
-| Voxel modelling tools, palette editor | yes | no: Margo is the renderer (its voxel package stores and meshes worlds, without an editor UI) |
-| Mesh export | yes | no (not in this package) |
+| Voxel modelling tools, palette editor | yes | no editor UI; the editing operations (dense and sparse grids, modelling operations, brushes, selections, picking, `.vox` scene editing) are in `@margoengine/voxel-edit` |
+| Mesh export | yes | not in this package: `@margoengine/voxel-edit/mesh` meshes models for export and `@margoengine/exporters` writes GLB |
 | Runs inside your own web page, game or tool | no | yes |
 | Live scene updates from code | no | yes (only changed models re-upload) |
 | Ray picks, depth for overlays drawn on top | no API | yes |
@@ -101,5 +103,5 @@ Legend: **yes**, **no**, **open** (MagicaVoxel has it, Margo does not match it y
 
 ## Where MagicaVoxel is ahead
 
-- It is a complete, free editor that artists already use; Margo renders, it does not edit.
+- It is a complete, free editor that artists already use; Margo's engine has the editing operations but no editor UI.
 - Margo is measured on one PC and one browser only.

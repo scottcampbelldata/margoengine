@@ -77,9 +77,9 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
 ## Current scores (ours vs MagicaVoxel, 1024 samples each, 960 x 800)
 
 - Six perspective scenes with default lighting (`test-results/pt-compare/v2`: diffuse, metal 0.2 and 0.8, glass,
-  emitter, cloud), ours at 8192 samples: 99.97, 99.94, 99.85, 99.23, 99.94 and 99.93% of pixels within 3 levels
+  emitter, cloud), ours at 8192 samples: 99.97, 99.94, 99.85, 99.3, 99.94 and 99.93% of pixels within 3 levels
   (was 94-96% before the distance-based ground fade, no energy compensation and non-reflective emitters). Glass:
-  99.3% since the internal-reflection cap (item 2b); where the glass changes the picture (57,221 pixels) MagicaVoxel
+  99.23% before the internal-reflection cap (item 2b); where the glass changes the picture (57,221 pixels) MagicaVoxel
   over ours went 0.9927 -> 0.9988 in linear light; what is left is MagicaVoxel's noise inside the glass.
 - Close oblique view with the camera set exactly in MagicaVoxel and both at 8192 samples: 100.00% within 3 levels.
 - Calibration boards: diffuse, metal, plastic, sun, sky, exposure, ACES: every tile within 3 levels; emitters (with
@@ -238,7 +238,7 @@ Measured (RTX A6000, Edge headless, 960 x 800, `L-bg-off`: slab, two cubes, sun,
 | --- | --- | --- |
 | Noise at 1024 samples (8-bit RMS against a 16,384-sample reference) | 0.32 | 0.24 raw, 0.16 denoised |
 | Time to MagicaVoxel's 1024-sample quality | about 14 s (1024 samples) | 0.48 s (64 samples, denoised), about 29x faster |
-| Package | about 30 MB application | 63 KB gzip (gzip -9 of `dist/index.js`, 192 KB raw; 2026-10-20) |
+| Package | about 30 MB application | 70 KB gzip (gzip -9 of `dist/index.js`: 69,634 B, 213 KB raw; 2026-10-21 at main `da95929c`, after the model material tables, 2048-voxel models, native 4K viewport and this parity work; 63 KB and 192 KB on 2026-10-20) |
 | First lit viewport frame after opening | (its viewport) | 0.36-0.44 s with the preview kernel (was 2.1-2.8 s: the full tracer's compile) |
 | Large world: 64 terrain models of 256 x 256 x 32 (2048 x 2048 voxels, 12.6 million voxels; `mv-calib/bigworld.cjs`) | (not rendered yet) | 256 samples in 1.5 s (about 6 ms each at 960 x 800), 93 MiB of GPU memory |
 | Viewport samples in 4 s at 60 fps | (its viewport) | 1,465 light scene, 540 glass board, 351 sun board with `samplesPerFrame: 'auto'` (238-240 at 1 per frame): 6x / 2.3x / 1.5x, 2-6% of frames late |
@@ -314,40 +314,23 @@ blocks. Photo mode leaves grass and flowers out and shows torches as small glowi
 - 2026-10-21: that branch's 12 commits landed on main, ported onto main's model material tables and `options.ts`. Our
   renders of 74 MagicaVoxel scenes (1,024 samples) and the six perspective scenes (8,192) are byte-identical to the
   branch's, so every score above holds; the GPU browser check passed.
-- Open: size entries (measure:size), rebuild the tarballs for Codex.
+- 2026-10-21: re-checked against the package on main `da95929c`: every option, material and helper a done item
+  names exists in `packages/voxel-pathtracer/src` (`bounceLimits.subsurface` and `internalReflections`, `sunlit`,
+  `contactTransmission`, `environment.fog`, `groundFade`, `background`, `vignette`, `edges`, `grid`, `capture({transparent})`,
+  `voxelScale`, `panoramaFit`, the stereographic lens, `bakeAtmosphere(..., 'surface')` and its 512-row map).
+- Open: size entries (`entry-sizes.json` still records the build before the port, `99ed7335`), rebuild the tarballs
+  for Codex.
 
 ## Paused when the voxel and path tracer work began (do not lose)
 
 Scott (2026-10-20): list what was set aside on 2026-10-19 and continue it. Checked with `git worktree list`, `git cherry
 origin/main <branch>` (patch-level, so rebased copies do not count) and the handoff files.
 
-1. CAD kernel, `@margoengine/brep` (the standing goal: replace OpenCascade; `docs/brep-kernel-checklist.md` on the
-   branch). Branch `claude/kernel` (worktree `C:\Development\Projects\margoengine-claude`), 17 commits on top of main
-   431222c0, none on main yet:
-   - Phase 0 work (13 commits): real JT 9.5 and JT 10 meshes, JT MultiXT segments, Parasolid cliff-edge and
-     charted-spine blends, tolerant edges along fin SP-curves, torus bands, STEP export cutting closed surfaces at
-     their seam and B-spline edges in pieces; the branches `claude/integration-2026-10-18`, `claude/jt-real-files`,
-     `claude/step-seam-edges`, `claude/smooth-trace-curves`, `claude/vibrant-satoshi-2c802e` and
-     `claude/confident-proskuriakova-8da001` are subsets of it.
-   - Checklist 1.1-1.3: `model.massProperties` (exact, from the faces), `model.bodiesFromSTEP` (STEP solids into the
-     modeler), `model.checkBody` (Euler-Poincare, connected shells, outward faces, no crossing edges).
-   - Codex validated the tip dc5d3f50 (branch `codex/test-dc5d3f50`, with its API and size records): check:merge
-     passed (2,709/2,709 tests, proofs 15/15, visuals 55/55, brep 81/81, brep hygiene 10). Its comparison with
-     OpenCascade over the corpus was paused by Scott on 2026-10-19 11:11 UTC to free the CPU (interim report:
-     `C:\Development\Projects\margoengine-split\test-results\kernel-dc5d3f50\RESULTS-FOR-CLAUDE-IN-PROGRESS.md`).
-     Its findings, the next kernel work:
-     - a negative signed volume and area on an imported body (Jubilee body 48), and a round trip that changes it;
-     - round-trip mass exactly doubled on a circular pattern (Jubilee CirPattern bodies 10, 12, 14, 17);
-     - mass and the checker throwing a pole/apex error on cone and sphere apex faces (Jubilee bodies 70, 90; Radial
-       Engine JT part 10);
-     - mass differences from OpenCascade up to 4.7e-5 relative on the model tests, and a tiny sheet's round trip at
-       1e-2;
-     - operations on imported parts: Margo's cuts valid on 84 of 200 parts (OpenCascade 200), fillets on 4 (OpenCascade
-       67), 304 Margo throws.
-   - Then the checklist goes on at 1.4 (crash immunity) and 1.5 (harnesses).
-   - `7e2741db docs(studio)`: the engine gaps of the Crocotile-equivalent tile editor (docs only).
-2. Sky: `fix(night-citadel): water reflects the actual night sky` (one commit on `worktree-agent-aa8330c71e56a38e4`)
-   never landed. It changes Night Citadel's look, so it needs Scott's look approval and Codex's re-recorded references.
+1. CAD kernel, `@margoengine/brep`: landed. Checklist 1.1-1.3 (`massProperties`, `bodiesFromSTEP`, `checkBody`, in
+   `packages/brep/src/model/`) are on main and the branch `claude/kernel` no longer exists. Codex's corpus findings
+   (Jubilee and Radial Engine bodies) and the work after them are tracked in `docs/brep-kernel-checklist.md`. The
+   tile editor's engine-gap notes are on main (`9dad7b9e docs(studio)`).
+2. Sky: `fix(night-citadel): water reflects the actual night sky` landed on main (`f2df8fcc`).
 3. Voxel sandbox: render distance 16 fill time, done 2026-10-20 (3.6-3.7 s, was 8.8-9.2 s; docs/limits.md); visual
    references for the Intel laptop profile (record there and add its profile id to `VOXEL` in
    `scripts/visual-regression.js`).
