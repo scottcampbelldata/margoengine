@@ -16,15 +16,14 @@ Hardware for every GPU measurement: RTX A6000 (Ampere), Windows 11, Edge 155 hea
 | Group | Families | Packages | Branch and commits | Pushed |
 | --- | --- | --- | --- | --- |
 | A | 1-7 | voxel-pathtracer | main, after `f5019cf8`: `bb841e87` (1), `d97f9571` (5, 6, 7), `1ad7761a` (4), `ca109363` (2), `65be98fc` (3), `d2ddb275` (records), then this document | yes, 2026-10-21 |
-| B | 8, 9, 10, 12, 23, 27-34 | voxel-edit | `claude/pensive-albattani-f68586`, on `e1c7aefa`: `2af9a0b3`, `b795b0bc`, `745627da`, `92118a83`, `7729f040`, `b6d3ef26`, `996d9a3a`, `d801ce44`, `3e53d978`, `ad195a33` | no |
+| B | 8, 9, 10, 12, 23, 27-34 | voxel-edit | main, after `107af4d6`: `af79f560` (8, 9), `bdfccdf0` (10, 34), `0c0bc957` (12), `b8a6263a` (23), `9cfa137a` (27, 28, 29), `439cf667` (30, 31), `9eff5127` (32), `4b29b689` (33), `6ca07c25` (records), `a958b756` (`GridLayoutOptions` name) | yes, 2026-10-21 |
 | C | 11, 13, 14, 15, 16 | voxel (`./vox`), math, animation | main, after `a958b756`: `fde39a4f` (13, 14, 16), `12a6b907` (15), `77848821` (11), `2a9d3dc0` (records), then this row | yes, 2026-10-21 |
 | D | 17-21, 25 | exporters | main: `e11bd16e`, `cf9e57d2`, `a1463c77`, `cd9ffe72`, `aefcdfd7`, `3f89ce28` | yes, 2026-10-21 |
 | E | 22, 24, 26 | environment, shader, procedural | main: `71b95fd1`, `d55f1b41`, `ed7c1ba6`, `0ceb970a` | yes, 2026-10-21 |
 
-Every commit is authored and committed as the noreply address. Branches B and C are based on `e1c7aefa`; when they
-land they conflict only in the shared records (`docs/api-surface.md` totals, `docs/catalog.json`,
-`examples/package-benchmarks/results/entry-sizes.json`): keep both sides' rows and regenerate with `npm run
-api:update`. Core + stage stays 21,343 B gzip on every branch (limit 25,000).
+Every commit is authored and committed as the noreply address. All five groups are on main (2026-10-21), each rebased
+on the one before it and checked with `npm run check:merge` before its push. Core + stage stays 21,343 B gzip (limit
+25,000).
 
 ## Status of the 34 families
 
@@ -37,11 +36,11 @@ api:update`. Core + stage stays 21,343 B gzip on every branch (limit 25,000).
 | 5 | Defaults, validation and reset | voxel-pathtracer | Verified (node) | `d97f9571` | `VOXEL_PATHTRACER_DEFAULTS`, `resolveTraceOptions`, `validateTraceOptions`, `resolveTraceMaterial`, `validateTraceMaterial`, `tracer.resetOptions`, `focusDistance: null`, types `ResolvedTraceOptions`, `ResolvedTraceMaterial`, `TraceValidation`, `TraceProblem` | pending |
 | 6 | Geometry cache identity | voxel-pathtracer | Verified (node) | `d97f9571` | `TraceModel.contentKey`, `tracer.invalidateModels`, `stats.packedModels/reusedModels` | pending |
 | 7 | Capture abort and GPU drain | voxel-pathtracer | Verified (node + GPU: drained 0.4 ms after an abort) | `d97f9571` | `tracer.whenIdle()`, `stats.renders` | pending |
-| 8 | Sparse coordinate envelope | voxel-edit `./sparse` | Verified (node; live check against the Studio's code) | `2af9a0b3` | `SparseOptions.envelope: 'wide'`, `SparseGridData.version 2` | pending |
-| 9 | Sparse worker transfer | voxel-edit `./sparse` | Verified (node) | `2af9a0b3` | `snapshot`, `fromSnapshot`, `deltaSnapshot`, `applyDeltaSnapshot`, `restoreSnapshots`, `snapshotBuffers` | pending |
-| 10 | Raster geometry batch ceiling | voxel-edit `./mesh` | Verified (node; identical to the Studio's batches incl. a 200,000 + 131,776 split) | `b795b0bc` | `partitionMesh` | pending |
+| 8 | Sparse coordinate envelope | voxel-edit `./sparse` | Verified (node; live check against the Studio's code) | `af79f560` | `SparseOptions.envelope: 'wide'`, `SparseGridData.version 2` | pending |
+| 9 | Sparse worker transfer | voxel-edit `./sparse` | Verified (node) | `af79f560` | `snapshot`, `fromSnapshot`, `deltaSnapshot`, `applyDeltaSnapshot`, `restoreSnapshots`, `snapshotBuffers` | pending |
+| 10 | Raster geometry batch ceiling | voxel-edit `./mesh` | Verified (node; identical to the Studio's batches incl. a 200,000 + 131,776 split) | `bdfccdf0` | `partitionMesh` | pending |
 | 11 | Typed VOX render dictionaries | voxel `./vox` | Verified (node; 300+ corrupted variants) | `77848821` | `readVoxRenderDictionaries` | pending |
-| 12 | Odd rotated VOX box centering, frame instances | voxel-edit `./vox` | Verified (node; 1,230 instances identical to the Studio's resolver; [3,5,7] box X = 2) | `745627da` | `resolveVoxScene` (`'box-v1'`, `'pivot-v1'`), `voxFrameRange` | pending |
+| 12 | Odd rotated VOX box centering, frame instances | voxel-edit `./vox` | Verified (node; 1,230 instances identical to the Studio's resolver; [3,5,7] box X = 2) | `0c0bc957` | `resolveVoxScene` (`'box-v1'`, `'pivot-v1'`), `voxFrameRange` | pending |
 | 13 | Affine decomposition with shear | math `./affine` | Verified (node; 1,000 matrices) | `fde39a4f` | `decomposeAffine` | pending |
 | 14 | Saved quaternion interpolation | math `./quat` | Verified (node; bit for bit, 2,000 pairs + the close-angle fixture) | `fde39a4f` | `interpolateQuaternions(a, b, t, 0.9995)` | pending |
 | 15 | Saved vector-track arithmetic | animation | Verified (node; bit for bit, ±1e308 keys) | `12a6b907` | `KeyframeTrackData.blend: 'weighted'` | pending |
@@ -52,18 +51,18 @@ api:update`. Core + stage stays 21,343 B gzip on every branch (limit 25,000).
 | 20 | Baked PBR/lightmap writer | exporters | Verified (Godot 13/13 bindings) | `e11bd16e` | `ExportScene.lightmap` (`LightmapData`) | pending |
 | 21 | Sprite atlases, sequences, ZIP | exporters `./capture` | Verified (node) | `cd9ffe72` | `spriteAtlasLayout`, `packSpriteAtlas`, `encodeZIP`, `encodeSequenceZIP`, `encodeAtlasZIP` | pending |
 | 22 | Radiance HDR decoding | environment | Verified (node; 42,000 files, 0 differ) | `71b95fd1` | `parseHDR(bytes, {channels, orientation, requireFormat, limits})` | pending |
-| 23 | Owned grid/delta byte estimates | voxel-edit | Verified (node) | `92118a83` | `ByteLedger`, `ownedBuffers`, `retainedBytes`, `grid.ownedBuffers`, `SparseGrid.deltaBuffers` | pending |
+| 23 | Owned grid/delta byte estimates | voxel-edit | Verified (node) | `b8a6263a` | `ByteLedger`, `ownedBuffers`, `retainedBytes`, `grid.ownedBuffers`, `SparseGrid.deltaBuffers` | pending |
 | 24 | Compute readback, device-loss lifecycle | shader `./readback` | Verified (node + GPU: 4,194,304 values exact; abort, disposal, device loss) | `d55f1b41` | `computeReadback` | pending |
 | 25 | Skin weights and bind matrices | exporters `./skin` | Verified (node; Godot rig checks) | `aefcdfd7` | `checkJoints`, `skinWeights`, `skinBindMatrices`, `skinHierarchy`, `humanoidJoints` | pending |
 | 26 | Voxel expression/noise interpreter | procedural `./expression` | Verified (node; 15,000 programs identical) | `ed7c1ba6` | `runVoxelExpression`, `compileVoxelExpression`, `validateVoxelExpressionInput`, `VoxelExpressionError`, limits | pending |
-| 27 | Flips, quarter turns, clipped translation | voxel-edit | Verified (node; the Studio's kernel as oracle) | `7729f040`, `b6d3ef26` | `flipGrid`, `turnGrid`, `shiftGrid`, `GridLayout` | pending |
-| 28 | Crop, resize, shrink, occupied bounds | voxel-edit | Verified (node) | `7729f040` | `cropGrid`, `fitGrid`, `occupiedBounds` | pending |
-| 29 | Indexed occupancy inversion | voxel-edit | Verified (node) | `7729f040` | `invertGrid` | pending |
-| 30 | Clipboard palette remapping | voxel-edit `./edit` | Verified (node) | `996d9a3a` | `pasteCells` (`PastePlan`, `PasteOverflow`) | pending |
-| 31 | Mirrored brush stamping | voxel-edit `./edit` | Verified (node) | `996d9a3a` | `mirrorCells`, `stampCells` | pending |
-| 32 | Sprite-slice stacking | voxel-edit | Verified (node; 120 sheets identical to the Studio's) | `d801ce44` | `sliceLayout`, `stackSlices` | pending |
-| 33 | Indexed procedural rasterizers | voxel-edit `./edit` | Verified (node) | `3e53d978` | `ellipsoidCells`, `cylinderCells`, `ringCells`, `thickLineCells`, `taperedLineCells` | pending |
-| 34 | Large VOX scene partitioning | voxel-edit `./vox` | Verified (node; 9 dense + 6 sparse tiles identical) | `b795b0bc` | `voxTiles` | pending |
+| 27 | Flips, quarter turns, clipped translation | voxel-edit | Verified (node; the Studio's kernel as oracle) | `9cfa137a`, `a958b756` | `flipGrid`, `turnGrid`, `shiftGrid`, `GridLayout` | pending |
+| 28 | Crop, resize, shrink, occupied bounds | voxel-edit | Verified (node) | `9cfa137a` | `cropGrid`, `fitGrid`, `occupiedBounds` | pending |
+| 29 | Indexed occupancy inversion | voxel-edit | Verified (node) | `9cfa137a` | `invertGrid` | pending |
+| 30 | Clipboard palette remapping | voxel-edit `./edit` | Verified (node) | `439cf667` | `pasteCells` (`PastePlan`, `PasteOverflow`) | pending |
+| 31 | Mirrored brush stamping | voxel-edit `./edit` | Verified (node) | `439cf667` | `mirrorCells`, `stampCells` | pending |
+| 32 | Sprite-slice stacking | voxel-edit | Verified (node; 120 sheets identical to the Studio's) | `9eff5127` | `sliceLayout`, `stackSlices` | pending |
+| 33 | Indexed procedural rasterizers | voxel-edit `./edit` | Verified (node) | `4b29b689` | `ellipsoidCells`, `cylinderCells`, `ringCells`, `thickLineCells`, `taperedLineCells` | pending |
+| 34 | Large VOX scene partitioning | voxel-edit `./vox` | Verified (node; 9 dense + 6 sparse tiles identical) | `bdfccdf0` | `voxTiles` | pending |
 
 Exporter checks in Godot are headless imports (scene, resource and animation checks), not rendered-pixel proof.
 
@@ -186,7 +185,7 @@ What changed in the filter (`packages/voxel-pathtracer/src/shaders.ts`, `DENOISE
 | Branch | Checks (measured on that branch) |
 | --- | --- |
 | A main, after `f5019cf8` | `npm run verify` exit 0 on this tree: 3,359/3,359 node tests, API reports match (209 entries, 2,380 names), core + stage 21,343 B, proofs `--current` 20/20. `npm run check:merge` exit 0 (3,348/3,348, site build, visual check 62/62 views) on the same commits over `0ceb970a`, before main's four exporter fixes. voxel-pathtracer: 69/69 node tests (17 new); real-GPU browser check passed (every scenario, including the new `denoisepeak`, `denoisehistory`, `materialtables`, `largemodels`, `native4k`); hygiene 10.0 on all eight gates. Studio denoiser benchmark 72/72 on this tracer build (`75dac655`, unchanged by the rebase). |
-| B `claude/pensive-albattani-f68586` | `npm run verify` exit 0: 3,317/3,317, proofs 20/20; voxel-edit 108/108 (was 67); hygiene voxel-edit 0 violations; live checks against the Studio's own files (read only). |
+| B (main `a958b756`) | `npm run check:merge` exit 0 at `a958b756`: 3,402/3,402 node tests, proofs 20/20, visual check 62/62 views, core + stage 21,343 B; voxel-edit 108/108 (was 67); hygiene voxel-edit 0 violations; live checks against the Studio's own files (read only). |
 | C main, after `a958b756` | `npm run check:merge` exit 0 on `2a9d3dc0`: 3,416/3,416 node tests, API reports match (210 entries, 2,451 names), core + stage 21,343 B, proofs `--current` 20/20, site build, visual check 62/62 views. The first run had 3,415/3,416: voxel `physics.test.js` "a chunk that comes back after edits made out of range" (collider builds are time-budgeted per step, so heavy load can defer one; untouched by this branch, 6/6 alone), clean on the rerun. Hygiene: no new name in any violation; math, animation and voxel counts unchanged. |
 | D main `3f89ce28` | `npm run verify` exit 0: 3,300/3,300, proofs 20/20; Godot (headless) and Khronos validator results in the table above; 75/84 of the app's own unit tests for the replaced files pass on the candidates, the 9 others assert exact JSON representations (listed in the guide). |
 | E (main `0ceb970a`; branch `claude/agitated-saha-b701b2`) | `npm run verify` exit 0: 3,305/3,305, proofs 20/20; `build:site`; visual check 62/62; readback real-GPU check passed. |
