@@ -1,5 +1,5 @@
 {
-  "commit": "ed7c1ba6",
+  "commit": "77848821",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -10,8 +10,8 @@
   "packages": {
     "@margoengine/animation": {
       ".": {
-        "raw": 34574,
-        "gzip": 11235
+        "raw": 34995,
+        "gzip": 11368
       },
       "./vat": {
         "raw": 18955,
@@ -232,8 +232,8 @@
         "gzip": 17466
       },
       "dist/workers/fbx.js": {
-        "raw": 142251,
-        "gzip": 45948
+        "raw": 145519,
+        "gzip": 47017
       }
     },
     "@margoengine/fsm": {
@@ -538,16 +538,16 @@
         "gzip": 882
       },
       "./mat4": {
-        "raw": 2170,
-        "gzip": 1074
+        "raw": 2829,
+        "gzip": 1375
       },
       "./validate": {
         "raw": 279,
         "gzip": 210
       },
       "./quat": {
-        "raw": 405,
-        "gzip": 226
+        "raw": 917,
+        "gzip": 502
       },
       "./vec3": {
         "raw": 402,
@@ -564,6 +564,10 @@
       "./billboard": {
         "raw": 5235,
         "gzip": 2265
+      },
+      "./affine": {
+        "raw": 8537,
+        "gzip": 3509
       }
     },
     "@margoengine/navigation": {
@@ -958,8 +962,8 @@
         "gzip": 7545
       },
       "./vox": {
-        "raw": 32360,
-        "gzip": 11603
+        "raw": 34213,
+        "gzip": 12229
       },
       "./physics": {
         "raw": 24753,
@@ -1135,9 +1139,9 @@
       "brotli": 12864
     },
     "packages/fbx/dist/workers/fbx.js": {
-      "raw": 141176,
-      "gzip": 45870,
-      "brotli": 40101
+      "raw": 144412,
+      "gzip": 46927,
+      "brotli": 41022
     },
     "packages/usdz/dist/workers/usdz.js": {
       "raw": 148697,
