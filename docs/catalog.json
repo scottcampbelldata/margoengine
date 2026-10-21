@@ -697,6 +697,22 @@
     "category": "Rendering and lighting"
   },
   {
+    "id": "lightmap",
+    "title": "Lightmap",
+    "category": "Rendering and lighting",
+    "package": "@margoengine/lightmap",
+    "version": "1.0.0",
+    "published": false,
+    "description": "Bakes lightmaps on the CPU: one padded UV atlas for a quad mesh with direct light, ambient occlusion and matching albedo, emission, normal and ORM textures.",
+    "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
+    "keywords": "lightmap",
+    "install": "npm install @margoengine/core@1.0.0 @margoengine/lightmap@1.0.0",
+    "imports": "import { bakeLightmap } from '@margoengine/lightmap';",
+    "exports": [
+      "bakeLightmap"
+    ]
+  },
+  {
     "id": "sky",
     "title": "Sky",
     "package": "@margoengine/sky",
@@ -710,6 +726,7 @@
     "exports": [
       "Sky",
       "sunDirection",
+      "sunDirectionFromAngles",
       "sunlight"
     ],
     "category": "Rendering and lighting"
@@ -1016,6 +1033,7 @@
       "Bloom",
       "FXAA",
       "GTAO",
+      "ImagePost",
       "LensFlare",
       "MotionBlur",
       "PostStack",
@@ -1173,6 +1191,36 @@
       "magicaVoxelMaterial",
       "magicaVoxelMatrix",
       "magicaVoxelModel"
+    ]
+  },
+  {
+    "id": "voxel-edit",
+    "title": "Voxel-edit",
+    "category": "World and effects",
+    "package": "@margoengine/voxel-edit",
+    "version": "1.0.0",
+    "published": false,
+    "description": "Editing voxel models for editors and tools: dense and sparse grids, modeling operations, brushes and selections, picking, export meshing, .vox scene editing and frame animation.",
+    "requirements": "See the package guide for requirements",
+    "keywords": "voxel edit",
+    "install": "npm install @margoengine/voxel-edit@1.0.0",
+    "imports": "import { cellAt } from '@margoengine/voxel-edit';",
+    "exports": [
+      "cellAt",
+      "cellIndex",
+      "combineGrids",
+      "dilateGrid",
+      "erodeGrid",
+      "fillEnclosed",
+      "generateMaze",
+      "insideGrid",
+      "mergePalettes",
+      "reflectDiagonal",
+      "repeatGrid",
+      "resampleGrid",
+      "rotateGrid",
+      "shearGrid",
+      "wrapGrid"
     ]
   },
   {

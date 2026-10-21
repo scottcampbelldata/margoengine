@@ -91,7 +91,9 @@
     "examples/voxel-sandbox",
     "examples/react-viewer",
     "examples/next",
-    "apps/showcase-night-citadel"
+    "apps/showcase-night-citadel",
+    "packages/voxel-edit",
+    "packages/lightmap"
   ],
   "scripts": {
     "catalog": "node scripts/serve-catalog.js",

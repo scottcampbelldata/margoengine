@@ -1,5 +1,5 @@
 {
-  "commit": "b35efb47",
+  "commit": "b83521b3",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -346,6 +346,12 @@
         "gzip": 4449
       }
     },
+    "@margoengine/lightmap": {
+      ".": {
+        "raw": 7442,
+        "gzip": 3167
+      }
+    },
     "@margoengine/lines": {
       ".": {
         "raw": 38674,
@@ -594,12 +600,12 @@
     },
     "@margoengine/post": {
       ".": {
-        "raw": 99996,
-        "gzip": 26340
+        "raw": 110473,
+        "gzip": 29701
       },
       "./bloom": {
-        "raw": 17273,
-        "gzip": 5687
+        "raw": 18095,
+        "gzip": 5951
       },
       "./ssao": {
         "raw": 26660,
@@ -640,6 +646,10 @@
       "./lens-flare": {
         "raw": 16257,
         "gzip": 5776
+      },
+      "./image": {
+        "raw": 31786,
+        "gzip": 9849
       }
     },
     "@margoengine/procedural": {
@@ -722,12 +732,16 @@
     },
     "@margoengine/shader": {
       ".": {
-        "raw": 30964,
-        "gzip": 11893
+        "raw": 31429,
+        "gzip": 12032
       },
       "./noise": {
         "raw": 10651,
         "gzip": 4497
+      },
+      "./graph": {
+        "raw": 27894,
+        "gzip": 10734
       }
     },
     "@margoengine/shadows": {
@@ -738,12 +752,12 @@
     },
     "@margoengine/sky": {
       ".": {
-        "raw": 40377,
-        "gzip": 14373
+        "raw": 42068,
+        "gzip": 14958
       },
       "./base": {
-        "raw": 14711,
-        "gzip": 5770
+        "raw": 16150,
+        "gzip": 6253
       },
       "./preetham": {
         "raw": 1621,
@@ -770,8 +784,8 @@
         "gzip": 1069
       },
       "./lighting": {
-        "raw": 7239,
-        "gzip": 3230
+        "raw": 7491,
+        "gzip": 3349
       }
     },
     "@margoengine/splats": {
@@ -940,8 +954,8 @@
         "gzip": 9019
       },
       "./render": {
-        "raw": 46177,
-        "gzip": 17098
+        "raw": 52299,
+        "gzip": 18931
       },
       "dist/workers/mesher.js": {
         "raw": 9126,
@@ -952,10 +966,40 @@
         "gzip": 5692
       }
     },
+    "@margoengine/voxel-edit": {
+      ".": {
+        "raw": 12379,
+        "gzip": 4798
+      },
+      "./edit": {
+        "raw": 15492,
+        "gzip": 5747
+      },
+      "./pick": {
+        "raw": 14635,
+        "gzip": 5314
+      },
+      "./sparse": {
+        "raw": 12439,
+        "gzip": 4684
+      },
+      "./mesh": {
+        "raw": 17365,
+        "gzip": 6564
+      },
+      "./vox": {
+        "raw": 24677,
+        "gzip": 8316
+      },
+      "./animation": {
+        "raw": 4251,
+        "gzip": 1639
+      }
+    },
     "@margoengine/voxel-pathtracer": {
       ".": {
-        "raw": 164630,
-        "gzip": 58274
+        "raw": 164652,
+        "gzip": 58290
       }
     },
     "@margoengine/water": {
@@ -999,9 +1043,9 @@
       "brotli": 13129
     },
     "packages/scenery/dist/sky.js": {
-      "raw": 19166,
-      "gzip": 7612,
-      "brotli": 6819
+      "raw": 20239,
+      "gzip": 7969,
+      "brotli": 7147
     },
     "packages/creative/dist/particles.js": {
       "raw": 23571,
