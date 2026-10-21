@@ -44,11 +44,11 @@ Every item is done only when all of these hold:
       body: subtract + intersect - part over 1e-9 on none (worst 6.7e-10; main: 32, worst 2.0e-5). Drill survey 145 of
       145 as on main (46 s both); 106 drilled volumes moved, 25 by more than 1e-6 (at most 1.75e-5, body 121), and 61
       imported volumes, 25 by more than 1e-6 (at most 1.1e-5), all on bodies with tolerant edges; mass of all 145
-      solids as fast as before (32 s). Left: where an edge lies off both its faces their boundaries part, so an imported
-      shell does not quite close and its volume moves with the point moments are taken about (body 142: 1.2e-5 per mm,
-      as on main); lines and conics on spline faces take one Gauss piece, and no piece is split where an edge's foot
-      crosses the surface's knots, so a spline face's integrals still depend on v* (body 142's volume moves 1.9e-5 with
-      it, 15 other bodies by 1e-9 to 1.3e-8).
+      solids as fast as before (32 s). Left then (both done below): where an edge lies off both its faces their
+      boundaries part, so an imported shell does not quite close and its volume moves with the point moments are taken
+      about (body 142: 1.2e-5 per mm, as on main); lines and conics on spline faces take one Gauss piece, and no piece is
+      split where an edge's foot crosses the surface's knots, so a spline face's integrals still depend on v* (body
+      142's volume moves 1.9e-5 with it, 15 other bodies by 1e-9 to 1.3e-8).
       Spline faces' v* fixed 2026-10-20 (claude/zealous-bouman-290363): on a spline face an edge's rates now integrate
       to the change of (u', v) between its ends. Each Gauss piece is cut where the edge's foot crosses a knot line
       (found by regula falsi), where the derivatives kink; the foot of an edge running a little past the surface's edge
@@ -66,6 +66,41 @@ Every item is done only when all of these hold:
       unheld rates gave that edge a v-rate in the across integral; each face's area moved 2.6e-5, now equal to an
       independent integration in the other order to 1e-13). Mass of all 145 solids as fast as on main (6 runs each,
       alternating processes on a busy machine: median 51.2 s, main 51.6 s); 0.8% more nodes. brep tests 104/104.
+      Imported shells closed, 2026-10-20 (claude/keen-burnell-9bd60b): an edge lying off both its faces has a different
+      foot on each, so the faces parted along it, the integral of n dA over the shell was not zero and the volume moved
+      with the point moments are taken about (main: 49 of Jubilee's 145 solids over 1e-10 of their area, worst 1.4e-5 on
+      body 63; volume per mm of that point over 1e-9 on 47, worst 1.9e-5). Each face now also takes the ruled strip from
+      its edges' feet out to the edges themselves (in volume and moments, not area), so an edge's two faces meet on the
+      edge; and on a cone the foot's v follows the edge's height (the cone's projection keeps it), not the nearest
+      point's. The branch cut spline faces' Gauss pieces at knot lines and domain ends its own way; joined with the v*
+      fix above (2026-10-21) those cuts are pieceNodes', with each node adding its strip. Measured on the branch alone
+      first. Jubilee: n dA under 1e-10 of the area on 144 of 145 solids, and volume per mm of the reference point under
+      1e-9 on all 145 (worst 1.5e-10). Body 103 reads
+      1.6e-9: four spline faces whose edges run along the surface's first and last rows, 0.1-0.3 um off, their feet
+      coming to and leaving the domain's end 15 and 32 times along an edge, each a kink inside a Gauss piece (its volume
+      moves 1.5e-10 per mm). Volume moved by v* over 1e-9 on body 142 only (5.7e-9; main 16 bodies, 142 by 1.9e-5).
+      Subtract + intersect - part of the drill survey, each body's moments about its own point: none over 1e-9 (worst
+      -4.6e-11, body 142; main 24, worst -1.3e-6). A hand-built box whose top edges sit 0.1 um off both their faces
+      matches its closed form (abc less the slivers the strips enclose) within 4e-16, and its volume beside a far cube
+      within 7e-16 (main: 1.2e-5 and 1.3e-5). Drill survey 145 of 145 (48.6 s both). Volumes against main: 31 of 145
+      imported solids moved by more than 1e-6, 20 by more than 1e-5 (drilled: 31 and 21), all with tolerant edges; the
+      largest, body 47 (-1.5e-4), is a revolved part whose cone faces' feet keep the edge's height and sit up to 1.8 um
+      from it all round the axis: a ring of slits whose n dA cancels but whose volume does not. Closed, its volume is the
+      same within 6e-8 whether a cone's feet keep the height or lie nearest (open, 2.3e-4 apart). Mass of all 145
+      solids: 4.5% more surface points in the inner integrals than main; a build with 3.9% more ran 32.9 s against
+      main's 32.8 s (median of 5 rounds, two passes each, quiet machine); this one not timed cleanly (the machine was
+      busy: rounds alternating with main's read 0.83 to 1.37 of them). Left: a clean timing of it; body
+      103's feet flipping at the domain's end (catching every flip means sampling every edge along a spline's end rows,
+      too slow); a spline's projection stuck at a corner of its domain when both parameters run past it (Jubilee 128: 4e-7
+      of u at one vertex; the cuts absorb it here, but surfaces.ts should move each parameter alone there).
+      OpenCascade, from its reference manual only (not run): BRepGProp needs a shape with no free boundary and does not
+      check it; BRepGProp_Face takes each face's boundary from the edge's P-curve on that face, so a tolerant shell parts
+      along its edges as Margo's did; GProp_GProps advises putting its reference point near the shape, for accuracy.
+      Codex can measure whether GProp's volume of body 142 moves with that point.
+      Joined on main (2026-10-21, both fixes and the strips at pieceNodes' nodes): n dA under 1e-10 of the area on all
+      145 Jubilee solids (worst 3.2e-11, body 103), volume per mm of the reference point under 1e-9 on all (worst
+      1.4e-11, body 142), and moving v* to the top of every face moves no volume by more than 2.0e-11 (body 142) and no
+      area by more than 1.4e-11. brep tests 107/107.
 - [ ] 1.2 Import into the modeler: STEP, SAT, Parasolid and JT B-reps read as modeler bodies, so every operation (and
       mass properties, checking, healing, export) works on imported parts, not only on shapes built in Margo.
       Written and on main for STEP (model.bodiesFromSTEP; SAT, XT and JT through their readers' B-reps). On 200 imported

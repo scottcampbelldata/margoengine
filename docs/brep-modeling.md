@@ -154,6 +154,10 @@ Where OpenCascade still leads (freeform NURBS intersections, advanced blends, he
   crosses a knot line or runs past the surface's edge (held there), and halved until the nodes follow the foot: a
   wedge whose slanted face is a plane as an unevenly parametrized spline, its long edges lines across five knot spans,
   matches its closed-form area and centroid to 1e-12 (1.4e-2 off before), and no Jubilee body's volume moves by more
-  than 2e-11 with where a face's inner integral starts (1.9e-5 before).
+  than 2e-11 with where a face's inner integral starts (1.9e-5 before). Where an edge lies off both its faces, each
+  face also takes the thin strip from its boundary out to the edge (volume and moments, not area), so the shell closes
+  and the volume does not depend on the point moments are taken about: a box whose top edges sit 0.1 um off both faces
+  matches its closed form to 4e-16, and on Jubilee the volume moves at most 1.4e-11 per mm of that point (before, up to
+  1.9e-5).
 - Next: blends on curved faces and along traced edges, setbacks and variable radius, freeform (spline) Booleans,
   healing (docs/brep-occt-gaps.md); the operations benchmark against OpenCascade (Codex prompt 511d19d, step 9).

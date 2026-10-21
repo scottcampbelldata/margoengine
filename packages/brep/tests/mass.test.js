@@ -278,6 +278,119 @@ function imported(r, h, off, miss) {
   return body;
 }
 
+/**
+ * An a x b x c box at `o` built face by face into `shell`, as an importer may hand it over: its bottom exact, its top
+ * edges `off` above the top and `off` outside the sides (each within its tolerance), so its four upright edges lean out
+ * to them. Every face is integrated inside its edges' feet on it, and an edge's two faces part along it: the top face
+ * runs `off` past the sides, the sides `off` above the top.
+ */
+function leaningBox(shell, o, [a, b, c], off) {
+  const tolerance = 2 * off || 1e-7,
+    at = (x, y, z) => new Vertex('v', [o[0] + x, o[1] + y, o[2] + z], tolerance),
+    [B00, B10, B11, B01] = [at(0, 0, 0), at(a, 0, 0), at(a, b, 0), at(0, b, 0)],
+    [T00, T10, T11, T01] = [
+      at(-off, -off, c + off),
+      at(a + off, -off, c + off),
+      at(a + off, b + off, c + off),
+      at(-off, b + off, c + off),
+    ],
+    line = (from, to) => {
+      const d = to.point.map((x, k) => x - from.point[k]),
+        l = Math.hypot(...d);
+      return new Edge(
+        'e',
+        { kind: 'line', origin: from.point, direction: d.map((x) => x / l) },
+        from,
+        to,
+        true,
+        tolerance,
+      );
+    },
+    [front, right, back, left] = [line(B00, B10), line(B10, B11), line(B11, B01), line(B01, B00)],
+    [top0, top1, top2, top3] = [line(T00, T10), line(T10, T11), line(T11, T01), line(T01, T00)],
+    [up00, up10, up11, up01] = [line(B00, T00), line(B10, T10), line(B11, T11), line(B01, T01)],
+    face = (normal, x, origin, uses) => {
+      const loop = shell.add(new Face('f', { kind: 'plane', frame: frameOf(origin, normal, x) }, true)).loop();
+      for (const [e, forward] of uses) loop.use(e, forward);
+    };
+  face([0, 0, -1], [1, 0, 0], o, [
+    [left, false],
+    [back, false],
+    [right, false],
+    [front, false],
+  ]);
+  face(
+    [0, 0, 1],
+    [1, 0, 0],
+    [o[0], o[1], o[2] + c],
+    [
+      [top0, true],
+      [top1, true],
+      [top2, true],
+      [top3, true],
+    ],
+  );
+  face([0, -1, 0], [1, 0, 0], o, [
+    [front, true],
+    [up10, true],
+    [top0, false],
+    [up00, false],
+  ]);
+  face(
+    [1, 0, 0],
+    [0, 1, 0],
+    [o[0] + a, o[1], o[2]],
+    [
+      [right, true],
+      [up11, true],
+      [top1, false],
+      [up10, false],
+    ],
+  );
+  face(
+    [0, 1, 0],
+    [-1, 0, 0],
+    [o[0], o[1] + b, o[2]],
+    [
+      [back, true],
+      [up01, true],
+      [top2, false],
+      [up11, false],
+    ],
+  );
+  face([-1, 0, 0], [0, -1, 0], o, [
+    [left, true],
+    [up00, true],
+    [top3, false],
+    [up01, false],
+  ]);
+}
+
+test('mass properties: a shell whose edges lie off both their faces closes along its edges', () => {
+  // Each face also takes the thin strip from its boundary (the edges' feet on it) out to the edges themselves (volume
+  // and moments, not area), so the faces either side of an edge meet at the edge and the shell closes. Where the faces
+  // overrun each other the strips enclose a sliver, counted once against the solid: off^2 along each top edge and,
+  // narrowing to nothing at the bottom, round each upright edge. Before, the shell was open along the top edges (the
+  // top face 2 off (a + b) larger than the bottom) and the volume moved with the point moments are taken about.
+  const [a, b, c] = [10 * mm, 20 * mm, 30 * mm],
+    o = [5 * mm, -7 * mm, 2 * mm],
+    off = 1e-7,
+    part = new Body('part', 'solid');
+  leaningBox(part.shell(), o, [a, b, c], off);
+  assert.deepEqual(validateBody(part), []);
+  const m = massProperties(part),
+    volume = a * b * c - 2 * off * off * (a + b) - (4 / 3) * off * off * c;
+  close(m.volume, volume, 'volume', 1e-13);
+  // The area is the faces' own: the top (a + 2 off)(b + 2 off), the sides trapezoids up to c + off.
+  close(m.area, a * b + (a + 2 * off) * (b + 2 * off) + 2 * (a + b + 2 * off) * (c + off), 'area', 1e-13);
+  // A second, exact cube 100 mm above moves the point moments are taken about (the middle of all vertices) by about
+  // 50 mm: the part's share of the volume stays (1.3e-5 of it apart before).
+  const pair = new Body('pair', 'solid');
+  leaningBox(pair.shell(), o, [a, b, c], off);
+  leaningBox(pair.shell(), [o[0], o[1], o[2] + 100 * mm], [a, a, a], 0);
+  close(massProperties(pair).volume - a ** 3, m.volume, 'volume beside a far cube', 1e-13);
+});
+
 test('mass properties: imported edges a little off their faces, however the faces are split', () => {
   // The middle arc 0.1 um outside the side moves round it faster than its foot, and the top vertex 10 nm off its line
   // leaves the front and back-high loops open there. Both once made a face's integrals depend on where its inner

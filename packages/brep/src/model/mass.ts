@@ -7,6 +7,11 @@
 // integrated over their full parameter rectangle. Quadrature is Gauss-Legendre of order 16 on pieces short enough
 // for the integrands (a sixteenth of a turn on circles and angular parameters, knot spans on splines; along an edge on
 // a spline face, split where its foot crosses a knot line and halved until the nodes follow it).
+// A face is integrated inside its edges' feet on its surface. An imported edge lies a little off its faces (within its
+// tolerance), and its feet on its two faces are two different curves: the shell would part along it, the integral of
+// n dA over it would not vanish, and its volume would move with the point moments are taken about. So each face also
+// takes the ruled strip from its edges' feet out to the edges themselves (in the volume and moments, not the area): the
+// faces either side of an edge then meet along the edge, and the shell closes.
 import type { Curve } from '../geometry/curves.js';
 import type { XYZ } from '../geometry/vec.js';
 import type { Surface } from '../geometry/surfaces.js';
@@ -54,8 +59,28 @@ const GAUSS = (() => {
   return { x, w };
 })();
 
+/** Gauss-Legendre nodes on [0, 1] and weights, order 3 (exact to degree 5): across an edge's strip. */
+const STRIP = { x: [0.5 - Math.sqrt(0.15), 0.5, 0.5 + Math.sqrt(0.15)], w: [5 / 18, 8 / 18, 5 / 18] };
+
 /** Components integrated per face: area, volume, three first moments, six second moments. */
 const K = 11;
+
+/**
+ * The volume and moment integrands (components 1 to K - 1) at (x, y, z), relative to the point moments are taken
+ * about, for the area-weighted normal n.
+ */
+function moments(g: Float64Array, x: number, y: number, z: number, nx: number, ny: number, nz: number) {
+  g[1] = (x * nx + y * ny + z * nz) / 3;
+  g[2] = (x * x * nx) / 2;
+  g[3] = (y * y * ny) / 2;
+  g[4] = (z * z * nz) / 2;
+  g[5] = (x * x * x * nx) / 3;
+  g[6] = (y * y * y * ny) / 3;
+  g[7] = (z * z * z * nz) / 3;
+  g[8] = (x * x * y * nx) / 2;
+  g[9] = (y * y * z * ny) / 2;
+  g[10] = (z * z * x * nz) / 2;
+}
 
 /** Integral over [a, b] (either order) of a vector function, split into `pieces` equal parts. */
 function quad(f: (t: number) => Float64Array, a: number, b: number, pieces: number, into: Float64Array) {
@@ -124,6 +149,7 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
       sx = sign * nx,
       sy = sign * ny,
       sz = sign * nz;
+    // moments(), written out: every point of every inner integral comes here (2.2e8 times for Jubilee's 145 solids).
     g[0] = Math.sqrt(nx * nx + ny * ny + nz * nz);
     g[1] = (x * sx + y * sy + z * sz) / 3;
     g[2] = (x * x * sx) / 2;
@@ -136,6 +162,42 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
     g[9] = (y * y * z * sy) / 2;
     g[10] = (z * z * x * sz) / 2;
     return g;
+  };
+  /**
+   * The strip from an edge's foot on the face to the edge, at one point of a coedge, added to r (all but the area):
+   * X = q + s (p - q) for s from 0 to 1, with q and its rates (du, dv) the foot's and p the edge's, and n dA = (p - q) x
+   * X' ds, so that the strip runs back along the face's boundary at q and on along the edge at p. Its integrands are
+   * polynomials of degree 4 in s: three Gauss points are exact.
+   */
+  const ms = new Float64Array(K);
+  const strip = (r: Float64Array, d: readonly number[], p: readonly number[], du: number, dv: number) => {
+    const wx = p[0] - d[0],
+      wy = p[1] - d[1],
+      wz = p[2] - d[2];
+    if (wx === 0 && wy === 0 && wz === 0) return;
+    // The foot's velocity, and the edge's less it.
+    const qx = d[3] * du + d[6] * dv,
+      qy = d[4] * du + d[7] * dv,
+      qz = d[5] * du + d[8] * dv,
+      ex = p[3] - qx,
+      ey = p[4] - qy,
+      ez = p[5] - qz;
+    for (let j = 0; j < 3; j++) {
+      const at = STRIP.x[j],
+        tx = qx + at * ex,
+        ty = qy + at * ey,
+        tz = qz + at * ez;
+      moments(
+        ms,
+        d[0] + at * wx - c[0],
+        d[1] + at * wy - c[1],
+        d[2] + at * wz - c[2],
+        wy * tz - wz * ty,
+        wz * tx - wx * tz,
+        wx * ty - wy * tx,
+      );
+      for (let k = 1; k < K; k++) r[k] += STRIP.w[j] * ms[k];
+    }
   };
 
   // A face with no loops covers its whole surface: integrate the parameter rectangle directly.
@@ -198,10 +260,18 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
   // the face's size. Lines and conics keep one piece per span, exact on analytic faces. On a spline face every piece
   // is cut again where the edge's foot crosses a knot line, and halved where its nodes still miss (pieceNodes). The
   // rates are the edge's foot's (an imported edge may lie a little off the face, or run a little past its surface's
-  // edge).
+  // edge), and each point adds its share of the strip out to the edge.
   const size = face.loops.some((l) => l.coedges.some((co) => co.edge.curve.kind === 'spline')) ? faceSize(face) : 1,
     step = new Float64Array(K),
-    walk: Walk = { fuv, lines: knotLines(fuv), bend: bendSteps(face, s), axis: across ? 1 : 0 },
+    // One point's integrands along a loop.
+    point = new Float64Array(K),
+    walk: Walk = {
+      fuv,
+      lines: knotLines(fuv),
+      bend: bendSteps(face, s),
+      axis: across ? 1 : 0,
+      height: face.surface.kind === 'cone' && face.surface.angle && !fuv.swapped ? face.surface.frame.z : undefined,
+    },
     // Gaps under a millionth of a millionth of the face's extent change its integrals by less than that.
     small = 1e-12 * (across ? fuv.box[3] - fuv.box[2] : fuv.box[1] - fuv.box[0]);
   /**
@@ -240,7 +310,9 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
         for (const n of piece.nodes) {
           const gv = G(n.uv[0], n.uv[1]),
             w = across ? n.rates[1] : -n.rates[0];
-          for (let k = 0; k < K; k++) step[k] += n.w * (gv[k] * w);
+          for (let k = 0; k < K; k++) point[k] = gv[k] * w;
+          strip(point, n.d, n.p, flip ? -n.rates[0] : n.rates[0], n.rates[1]);
+          for (let k = 0; k < K; k++) step[k] += n.w * point[k];
         }
         hint = piece.end;
         for (let k = 0; k < K; k++) out[k] += step[k];
@@ -301,12 +373,21 @@ function bendSteps(face: Face, s: Surface): [number, number] | undefined {
  * second derivatives found from one step of Su and Sv (`steps`, when the offset is large enough to matter). Where p
  * lies past an end of an open parameter (an imported edge may run a little past its surface's edge, within its
  * tolerance), its foot is held at that end and moves along it only: Su.(p - S) = 0 alone, (a - W_uu) du = Su.p' (or
- * the same in v). At a pole, where Su vanishes, both are taken as 0: the curve meets the pole's line at a point.
+ * the same in v). On a cone the foot keeps p's height along the axis (`height`, Cone.parameters) rather than lying
+ * nearest p: its v moves with that height, its u as the nearest point's does. At a pole, where Su vanishes, both are
+ * taken as 0: the curve meets the pole's line at a point. d is the surface at the foot: S(u, v) and its derivatives.
  */
-function rates(s: Surface, flip: boolean, uv: UV, p: number[], steps?: [number, number]): [number, number] {
+function rates(
+  s: Surface,
+  flip: boolean,
+  uv: UV,
+  d: readonly number[],
+  p: number[],
+  steps?: [number, number],
+  height?: XYZ,
+): [number, number] {
   const u = flip ? -uv[0] : uv[0],
     v = uv[1],
-    d = s.at(u, v),
     su = [d[3], d[4], d[5]],
     sv = [d[6], d[7], d[8]],
     tan = [p[3], p[4], p[5]],
@@ -343,7 +424,10 @@ function rates(s: Surface, flip: boolean, uv: UV, p: number[], steps?: [number, 
   if (holdU) return [0, rv / e];
   const det = a * e - b * b,
     du = (ru * e - rv * b) / det;
-  return [flip ? -du : du, (a * rv - b * ru) / det];
+  return [
+    flip ? -du : du,
+    height ? height[0] * tan[0] + height[1] * tan[1] + height[2] * tan[2] : (a * rv - b * ru) / det,
+  ];
 }
 
 /**
@@ -461,21 +545,29 @@ function linesBetween(knots: readonly number[], period: number, lo: number, hi: 
   return out;
 }
 
-/** A Gauss node along an edge: its parameter t and weight, the edge's point and tangent, its foot and their rates. */
+/**
+ * A Gauss node along an edge: its parameter t and weight, the edge's point and tangent, its foot, the surface there
+ * (S(u, v) and its derivatives) and the foot's rates.
+ */
 interface EdgeNode {
   readonly t: number;
   readonly w: number;
   readonly p: number[];
   readonly uv: UV;
+  readonly d: number[];
   readonly rates: [number, number];
 }
 
-/** What pieceNodes needs of a face: its (u', v), knot lines, bend steps, and the coordinate its loop runs along. */
+/**
+ * What pieceNodes needs of a face: its (u', v), knot lines, bend steps, the coordinate its loop runs along, and on a
+ * cone its axis (rates' `height`).
+ */
 interface Walk {
   readonly fuv: FaceUV;
   readonly lines?: KnotLines;
   readonly bend?: [number, number];
   readonly axis: 0 | 1;
+  readonly height?: XYZ;
 }
 
 /**
@@ -491,7 +583,7 @@ interface Walk {
  */
 function pieceNodes(walk: Walk, curve: Curve, t0: number, t1: number, hint: UV): { nodes: EdgeNode[]; end: UV } {
   type Foot = { t: number; p: number[]; uv: UV; x?: UV };
-  const { fuv, lines, bend, axis } = walk,
+  const { fuv, lines, bend, axis, height } = walk,
     s = fuv.surface,
     foot = (t: number, near: UV): Foot => {
       const p = curve.at(t),
@@ -507,7 +599,15 @@ function pieceNodes(walk: Walk, curve: Curve, t0: number, t1: number, hint: UV):
         const f = foot(mid + (h / 2) * GAUSS.x[i], from);
         from = f.uv;
         feet?.push(f);
-        out.push({ t: f.t, w: (h / 2) * GAUSS.w[i], p: f.p, uv: f.uv, rates: rates(s, fuv.flip, f.uv, f.p, bend) });
+        const d = s.at(fuv.flip ? -f.uv[0] : f.uv[0], f.uv[1]);
+        out.push({
+          t: f.t,
+          w: (h / 2) * GAUSS.w[i],
+          p: f.p,
+          uv: f.uv,
+          d,
+          rates: rates(s, fuv.flip, f.uv, d, f.p, bend, height),
+        });
       }
       return out;
     };
