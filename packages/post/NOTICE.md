@@ -19,3 +19,16 @@ Bloom references (our own code, written from the published talks)
   Advances in Real-Time Rendering.
 - Triangular dither of up to one step before 8-bit output: Mikkel Gjøl and Mikkel Svendsen, "Low Complexity, High
   Fidelity: INSIDE Rendering", GDC 2016.
+
+Anti-aliasing and screen-look references (our own code, written from the papers and three.js's documentation)
+
+- SMAA: Jorge Jimenez, Jose I. Echevarria, Tiago Sousa and Diego Gutierrez, "SMAA: Enhanced Subpixel Morphological
+  Antialiasing", Computer Graphics Forum 31(2), Eurographics 2012. Its morphological model: Alexander Reshetov,
+  "Morphological Antialiasing", High Performance Graphics 2009, and Jorge Jimenez et al., "Practical Morphological
+  Antialiasing", GPU Pro 2, 2011. The area and search lookup tables are computed in code from those definitions; no
+  published texture data or reference shader code is used. The quality presets' thresholds and search step counts
+  follow the presets the SMAA authors publish.
+- Glitch: behaviour as three.js documents GlitchPass (bursts at random intervals, `goWild`). Random numbers: xorshift32,
+  George Marsaglia, "Xorshift RNGs", Journal of Statistical Software 8(14), 2003. Per-pixel hash: PCG hash from Mark
+  Jarzynski and Marc Olano, "Hash Functions for GPU Rendering", Journal of Computer Graphics Techniques 9(3), 2020.
+- Afterimage: behaviour as three.js documents AfterimagePass (`damp`, default 0.96).

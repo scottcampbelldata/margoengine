@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
-  "description": "HDR bloom, frame-graph SSAO, GTAO, SSGI and SSR, motion blur, lens flare, and post-effect stacks for Margo Engine WebGPU.",
+  "description": "HDR bloom, frame-graph SSAO, GTAO, SSGI and SSR, motion blur, lens flare, SMAA and FXAA, glitch and afterimage, and post-effect stacks for Margo Engine WebGPU.",
   "publishConfig": {
     "access": "public"
   },
@@ -72,6 +72,10 @@
     "./glitch": {
       "types": "./dist/glitch.d.ts",
       "import": "./dist/glitch.js"
+    },
+    "./afterimage": {
+      "types": "./dist/afterimage.d.ts",
+      "import": "./dist/afterimage.js"
     }
   },
   "files": [

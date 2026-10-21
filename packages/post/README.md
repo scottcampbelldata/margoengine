@@ -1,6 +1,6 @@
 # Margo Engine Post
 
-Optional WebGPU frame-graph SSAO, GTAO, SSR and SSGI, bloom, motion blur, lens flare, FXAA and an effect stack, separate from the frozen core and stage.
+Optional WebGPU frame-graph SSAO, GTAO, SSR and SSGI, bloom, motion blur, lens flare, afterimage trails, SMAA and FXAA, a glitch and an effect stack, separate from the frozen core and stage.
 
 ## Combining effects: `PostStack`
 
@@ -22,8 +22,9 @@ const stack = PostStack.attach(stage.engine, [new SSAO(), new DOF({focalDistance
 stack.dispose(); // also disposes its effects
 ```
 
-- Order is HDR effects (`SSAO`, `SSR`, `DOF`, `Bloom`), then at most one display effect (`Tonemap` or
-  creative `PostProcessing`), then LDR effects (`FXAA`). Anything else throws. Put SSAO first: it
+- Order is HDR effects (`SSAO`, `SSR`, `DOF`, `Bloom`, `Afterimage`), then at most one display effect (`Tonemap` or
+  creative `PostProcessing`), then LDR effects (`SMAA` or `FXAA`, then `Glitch`). Anything else throws, and so does a
+  stack holding both `SMAA` and `FXAA` (`TypeError`: keep one anti-aliasing effect). Put SSAO first: it
   darkens the captured ambient light. Put SSR before DOF and Bloom so reflections are blurred and glow too.
 - HDR effects hand linear light to the next effect. Without a display effect, the last HDR effect
   tonemaps exactly as it does alone, with Margo's display curve (Khronos PBR Neutral, then sRGB), as core does.
@@ -304,6 +305,101 @@ PostStack.attach(stage.engine, [new LensFlare({intensity: 0.1}), new Bloom()]); 
   `color` three finite values >= 0 (`RangeError`); a zero direction throws `MargoError` code `state`. GPU cost not
   measured yet. WebGPU only.
 
+## SMAA
+
+`@margoengine/post/smaa` (5,630 B min+gzip, its own entry) is enhanced subpixel morphological anti-aliasing after
+Jimenez et al., "SMAA: Enhanced Subpixel Morphological Antialiasing" (Eurographics 2012). Like FXAA it smooths the
+stair steps of single-sampled output, but it rebuilds each edge's line from its staircase, so it blurs less and leaves
+flat areas and straight, pixel-aligned shapes alone.
+
+```ts
+import {SMAA} from '@margoengine/post/smaa';
+SMAA.attach(stage.engine, {quality: 'high'});   // alone: wraps the finished frame, like FXAA
+// or in a stack, after the display effect and before Glitch:
+PostStack.attach(stage.engine, [new Bloom(), new Tonemap(), new SMAA({quality: 'ultra'}), new Glitch()]);
+```
+
+- **How.** Three passes. Edges: where the luma of the display-encoded colour (or, with `edgeDetection: 'color'`, the
+  largest channel), or alpha, differs from the left or top neighbour by `threshold` or more and by at least half the
+  strongest contrast around it. Weights: from each edge pixel a walk along the edge, two pixels per bilinear fetch,
+  finds both ends and the crossing edges there; the silhouette is rebuilt as a line from the middle of each crossing
+  edge to the middle of the edge (Z, L and U shapes), and the area it cuts from each pixel is looked up. Blend: each
+  pixel mixes with its neighbours by those areas, along the stronger direction. The area (260 x 260) and search
+  (33 x 33) lookup textures are computed in code from these definitions on first use; no published texture data or
+  shader code is used.
+- **Presets.** `quality`: `'low'` (threshold 0.15, 4 search steps, so 8 px each way), `'medium'` (0.1, 8 steps),
+  `'high'` (default: 0.1, 16 steps, corners) or `'ultra'` (0.05, 32 steps, corners). `threshold` (0.01-0.5),
+  `maxSearchSteps` (1-32) and `cornerRounding` (0-1) override the preset; all options may change per frame. Corners:
+  where the crossing edge at an end runs on (the corner of a shape, not a step of a slanted line), only
+  `cornerRounding` of the blending is kept: 0.25 in high and ultra, 0 keeps corners sharp, 1 rounds them (low, medium).
+- **SMAA or FXAA.** Use one: a stack holding both throws `TypeError`; attaching one next to the other throws
+  `MargoError` code `attached`. Put SMAA first among the LDR effects so later ones (Glitch) stay sharp. With TAA it is
+  usually unnecessary.
+- **Checked on a real GPU** (NVIDIA RTX A6000, Edge 155; `scripts/post-looks-gpu-check.js`, results in
+  `test-results/post-looks/gpu.json`): black/white edges of slope 1/8 and 8, each mirrored, drawn aliased so the true
+  line passes through the middle of each step, come out equal to the exact pixel coverage of the line within 0.0027
+  (8-bit output) in the low, high and ultra presets, against 0.4375 aliased; a red/blue edge with colour edges alike; a
+  pixel-aligned rectangle is unchanged with `cornerRounding: 0`; disabled, the frame passes through unchanged; alone on
+  a core scene at 4x and 1x only pixels next to an edge change; no validation errors.
+- **Limits.** No diagonal-pattern search (the paper's diagonal patterns), so edges near 45 degrees get the orthogonal
+  result (blends of 1/8); no temporal (T2x) or multisample (S2x, 4x) modes and no predication. An edge end more than
+  2 x `maxSearchSteps` pixels away counts as open, so very long, nearly horizontal or vertical runs are smoothed only
+  within that reach of their steps. Blending is in display-encoded values, as FXAA, not in linear light. GPU cost not
+  measured yet. WebGPU only.
+
+## Glitch
+
+`@margoengine/post/glitch` (5,295 B min+gzip, its own entry; it carries the stack) is a digital glitch like three.js's
+GlitchPass: after a random wait of 120-240 frames a burst of 4-16 glitched frames, the first at full strength. Each
+glitched frame draws new random block displacement (cells of a grid slide sideways), an RGB split (red and blue read a
+few pixels apart) and scanline tearing (up to three bands of rows slide sideways, each line jittered). It is an LDR
+`PostStack` effect; `Glitch.attach` runs it alone.
+
+```ts
+import {Glitch} from '@margoengine/post/glitch';
+const glitch = Glitch.attach(stage.engine, {seed: 7});
+glitch.options.wild = true;        // three.js goWild: glitch every frame
+glitch.options.intensity = 0.4;    // 0-1, scales displacement, split and tearing
+```
+
+- **Determinism.** `seed` (an integer below 2^32) fixes the sequence: the same seed glitches the same enabled frames
+  the same way, and changing it restarts. Without one the seed is random. Disabled frames pass through and pause the
+  sequence. `glitch.active` tells whether the last frame was glitched. Waits and bursts count rendered frames.
+- **Placement.** After the display effect, and after SMAA or FXAA. Displaced reads wrap horizontally; alpha is the
+  largest of the three reads, so a transparent canvas stays valid.
+- **Checked on a real GPU** (same run): idle frames and `intensity: 0` pass the frame through exactly (also alone on
+  a core scene, 4x and 1x); wild frames move pixels but keep every row's content in its row; the same seed replays
+  exactly and another seed differs.
+- **Limits.** Sizes follow the canvas (split up to 2% of its height, shifts up to 30% of its width); the wait and burst
+  lengths are fixed; no colour noise. GPU cost not measured yet. WebGPU only.
+
+## Afterimage
+
+`@margoengine/post/afterimage` (4,825 B min+gzip, its own entry; it carries the stack) leaves trails like three.js's
+AfterimagePass: each channel of the output is `max(current, history x damp)`, and the output becomes the next frame's
+history. `damp` defaults to 0.96, as three.js documents.
+
+```ts
+import {Afterimage} from '@margoengine/post/afterimage';
+const trails = Afterimage.attach(stage.engine, {damp: 0.9});
+trails.damp = 0.96;   // any frame
+trails.reset();       // drop the trail, e.g. on a camera cut
+```
+
+- **HDR placement.** An HDR `PostStack` effect: the history is linear `rgba16float`, so trails fade smoothly to black
+  (an 8-bit history stops fading once `damp` cannot lower a value by a whole step: about 12/255 at 0.96), and Bloom
+  after it makes bright trails glow. Put it among the HDR effects, before Bloom; alone or last it presents through
+  Margo's display curve.
+- **Resets.** The trail starts empty on the first frame, after a resize, after a device restore, after `reset()` and
+  while disabled (disabled frames pass through).
+- **Checked on a real GPU** (same run): a bright square (linear 3.0) moving 20 px per frame leaves exactly
+  `max(current, history x damp)` within the float16 rounding of the stored history (0.0022 relative after six frames);
+  `damp: 0` and disabled equal the frame without Afterimage; the first frame after a resize or a device restore has
+  no trail; premultiplied alpha trails with its colour; the presented frame is the display curve of the expected trail
+  within 2/255.
+- **Limits.** Screen-space trails: a moving camera smears the whole frame. Two full-size `rgba16float` history
+  textures. GPU cost not measured yet. WebGPU only.
+
 ## Projected decals: `Decals`
 
 `@margoengine/post/decals` (4,118 B min+gzip, its own entry) projects textured boxes onto whatever is already drawn,
@@ -365,7 +461,7 @@ captures the finished frame outside every other effect (order −80, presented a
 works around a standalone Bloom, SSAO, DOF or Tonemap, and costs one fullscreen pass plus a
 canvas-format colour and depth target. In a `PostStack` it runs last, on the display-encoded
 result. Luma is taken from display-encoded colour; edges below 1/32 contrast (or 1/8 of the local
-maximum) are left untouched. SMAA is not provided.
+maximum) are left untouched. `SMAA` (below) is the sharper alternative; an engine takes one of the two.
 
 Import `Bloom` from `@margoengine/post/bloom` and `SSAO` from
 `@margoengine/post/ssao` to load each effect independently in native ESM or a
@@ -445,6 +541,9 @@ and after the alpha changes (it writes frames only, no committed result yet).
   premultiplied colour of partly covered silhouette pixels, so a 1 px rim can be up to ~45/255
   brighter than its alpha allows (shows as a faint light edge on dark pages).
 - **PostStack** adds no pass of its own; its last effect writes the canvas.
+- **SMAA** blends the stored premultiplied colour (alpha valid) and finds edges in alpha too; **Glitch** takes the
+  largest alpha of its three reads; **Afterimage** applies its max to alpha too, so trails fade as a premultiplied
+  veil. Checked through the stack's values (`scripts/post-looks-gpu-check.js`), not by the TransparentCanvas script.
 - **DOF** (`@margoengine/dof`) keeps the sharp alpha: out-of-focus silhouettes spill colour onto
   transparent pixels. **TAA** (`@margoengine/taa`) writes opaque alpha. **SceneFade** darkens empty
   pixels while it fades. Use these on opaque canvases.

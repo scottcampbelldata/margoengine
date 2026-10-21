@@ -10,5 +10,6 @@ export { MotionBlur, type MotionBlurOptions, type MotionVectors } from './motion
 export { LensFlare, type LensFlareOptions } from './lens-flare.js';
 export { SMAA, type SMAAOptions, type SMAAQuality } from './smaa.js';
 export { Glitch, type GlitchOptions } from './glitch.js';
+export { Afterimage, type AfterimageOptions } from './afterimage.js';
 
 export { ImagePost, type ImagePostOptions, type LinearPostImage, type PostImagePixels } from './image.js';

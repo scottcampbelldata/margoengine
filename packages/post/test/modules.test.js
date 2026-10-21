@@ -35,6 +35,9 @@ test('native Bloom and SSAO imports exclude the other effects', async () => {
     ['ssgi', 'ssgi:gbuffer', ['bloom:capture', 'ssao:capture', 'fxaa:capture', 'ssr:gbuffer']],
     ['motion-blur', 'motion-blur:after-taa', ['bloom:capture', 'ssao:capture', 'ssr:gbuffer', 'ssgi:gbuffer']],
     ['lens-flare', 'const GHOSTS', ['bloom:capture', 'ssao:capture', 'ssr:gbuffer', 'motion-blur:after-taa']],
+    ['smaa', 'smaa:capture', ['bloom:capture', 'ssao:capture', 'fxaa:capture', 'post:stack:capture']],
+    ['glitch', 'bands:array<vec4f,3>', ['bloom:capture', 'ssao:capture', 'fxaa:capture', 'smaa:capture']],
+    ['afterimage', 'textureLoad(previous', ['bloom:capture', 'ssao:capture', 'smaa:capture', 'bands:array']],
   ]) {
     const code = await staticClosure('@margoengine/post/' + entry);
     assert.ok(code.includes(present), 'Effect implementation was omitted: ' + entry);
@@ -44,30 +47,37 @@ test('native Bloom and SSAO imports exclude the other effects', async () => {
 });
 
 test('Post root and feature subpaths preserve all runtime export identities', async () => {
-  const [root, bloom, ssao, fade, stack, fxaa, ssr, gtao, ssgi, motion, flare, image] = await Promise.all(
-    [
-      '',
-      '/bloom',
-      '/ssao',
-      '/scene-fade',
-      '/stack',
-      '/fxaa',
-      '/ssr',
-      '/gtao',
-      '/ssgi',
-      '/motion-blur',
-      '/lens-flare',
-      '/image',
-    ].map((path) => import('@margoengine/post' + path)),
-  );
+  const [root, bloom, ssao, fade, stack, fxaa, ssr, gtao, ssgi, motion, flare, image, smaa, glitch, afterimage] =
+    await Promise.all(
+      [
+        '',
+        '/bloom',
+        '/ssao',
+        '/scene-fade',
+        '/stack',
+        '/fxaa',
+        '/ssr',
+        '/gtao',
+        '/ssgi',
+        '/motion-blur',
+        '/lens-flare',
+        '/image',
+        '/smaa',
+        '/glitch',
+        '/afterimage',
+      ].map((path) => import('@margoengine/post' + path)),
+    );
   assert.deepEqual(Object.keys(root).sort(), [
+    'Afterimage',
     'Bloom',
     'FXAA',
     'GTAO',
+    'Glitch',
     'ImagePost',
     'LensFlare',
     'MotionBlur',
     'PostStack',
+    'SMAA',
     'SSAO',
     'SSGI',
     'SSR',
@@ -97,4 +107,10 @@ test('Post root and feature subpaths preserve all runtime export identities', as
   assert.equal(root.LensFlare, flare.LensFlare);
   assert.deepEqual(Object.keys(image), ['ImagePost']);
   assert.equal(root.ImagePost, image.ImagePost);
+  assert.deepEqual(Object.keys(smaa), ['SMAA']);
+  assert.equal(root.SMAA, smaa.SMAA);
+  assert.deepEqual(Object.keys(glitch), ['Glitch']);
+  assert.equal(root.Glitch, glitch.Glitch);
+  assert.deepEqual(Object.keys(afterimage), ['Afterimage']);
+  assert.equal(root.Afterimage, afterimage.Afterimage);
 });
