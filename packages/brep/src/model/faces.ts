@@ -4,8 +4,9 @@
 // decided loop by loop, by signed crossings of a line up from the point, which works for loops round a cylinder or a
 // sphere's pole as well as for closed ones. On a torus the loops of a face that go round it all go the same way (two
 // that went different ways would cross): round its axis, in u; or round its tube, in v, and then u and v are swapped.
+import type { Curve } from '../geometry/curves.js';
 import type { Surface } from '../geometry/surfaces.js';
-import { distance, scale, type XYZ } from '../geometry/vec.js';
+import { distance, length, scale, type XYZ } from '../geometry/vec.js';
 import { curveEvaluator, surfaceEvaluator } from './geometry.js';
 import type { Edge, Face } from './topology.js';
 import { edgeParameters } from './validate.js';
@@ -122,9 +123,11 @@ export class FaceUV {
   #poles?: { at: { v: number } | { u: number }; point: number[] }[];
   /**
    * Where a loop runs through a pole or apex (a cone's sector, a sphere's lune): there u has no meaning, so the loop
-   * runs along the pole's line at v from the u' it arrives with to the u' it leaves with (its points `at` and `at + 1`).
+   * runs along the pole's line at v (its points `at` and `at + 1`) from the u' it arrives with to the u' it leaves with.
+   * `from` and `to` are those exactly: the meridians its edges run along into and out of the pole, where the loop's
+   * points take the samples beside it (an edge that is not a meridian drifts off its meridian on the way).
    */
-  readonly poleLines: { loop: number; at: number; v: number }[] = [];
+  readonly poleLines: { loop: number; at: number; v: number; from: number; to: number }[] = [];
 
   /** `swapped` takes u and v swapped or not (for loops traced later); by default, as the face's own loops need. */
   constructor(
@@ -132,14 +135,21 @@ export class FaceUV {
     swapped?: boolean,
   ) {
     this.raw = surfaceEvaluator(face.surface);
+    // Each sample's curve and its parameter there and at the next sample along the loop.
+    const spansOf: { curve: Curve; t: number; next: number }[][] = [];
     const samplesOf = face.loops.map((loop) => {
-      const samples: XYZ[] = [];
+      const samples: XYZ[] = [],
+        spans: { curve: Curve; t: number; next: number }[] = [];
       for (const c of loop.coedges) {
         const ts = edgeParameters(c.edge, edgeSamples(c.edge));
         if (!c.forward) ts.reverse();
         const curve = curveEvaluator(c.edge.curve);
-        for (let k = 0; k < ts.length - 1; k++) samples.push(curve.at(ts[k]).slice(0, 3) as XYZ);
+        for (let k = 0; k < ts.length - 1; k++) {
+          samples.push(curve.at(ts[k]).slice(0, 3) as XYZ);
+          spans.push({ curve, t: ts[k], next: ts[k + 1] });
+        }
       }
+      spansOf.push(spans);
       return samples;
     });
     this.swapped = swapped ?? roundV(this.raw, samplesOf, face.name);
@@ -156,8 +166,18 @@ export class FaceUV {
           1e-9,
         );
     samplesOf.forEach((samples, li) => {
-      const { loop: traced, lines } = this.trace(samples);
-      for (const at of lines) this.poleLines.push({ loop: li, at, v: traced.points[at][1] });
+      const { loop: traced, lines } = this.trace(samples),
+        spans = spansOf[li];
+      for (const { at, before, after } of lines) {
+        // In along the curve from the sample before the line, which meets the pole at the next sample's parameter; out
+        // along the curve of the last sample at the pole, from its parameter on.
+        const v = traced.points[at][1],
+          a = spans[before],
+          b = spans[(after + spans.length - 1) % spans.length],
+          from = this.meridian(a.curve, a.next, a.t, traced.points[at]),
+          to = this.lineEnd(v, from, this.meridian(b.curve, b.t, b.next, traced.points[at + 1]));
+        this.poleLines.push({ loop: li, at, v, from, to });
+      }
       this.loops.push(traced);
     });
     const vPeriod = this.surface.vPeriod;
@@ -194,16 +214,17 @@ export class FaceUV {
 
   /**
    * A loop through points of the surface, in order: continuous (u', v) points, running along a pole's line where it
-   * passes through a pole or apex (`lines`: the first point of each such line), and growing the face's box.
+   * passes through a pole or apex (`lines`: the first point of each such line, and the samples just before and just
+   * after the line), and growing the face's box.
    */
-  trace(samples: readonly XYZ[]): { loop: UVLoop; lines: number[] } {
+  trace(samples: readonly XYZ[]): { loop: UVLoop; lines: { at: number; before: number; after: number }[] } {
     // Start from a sample off the poles, so each pole is reached with a u'.
     const first = Math.max(
         0,
         samples.findIndex((p) => this.poleOf(p) === undefined),
       ),
       points: UV[] = [],
-      lines: number[] = [],
+      lines: { at: number; before: number; after: number }[] = [],
       uLines: number[] = [];
     let hint: UV | undefined;
     for (let j = 0; j < samples.length; j++) {
@@ -221,17 +242,12 @@ export class FaceUV {
       while (k < samples.length && this.poleOf(samples[(first + k) % samples.length]) !== undefined) k++;
       const next = samples[(first + k) % samples.length];
       if ('v' in pole) {
-        // The face lies below the line at the high pole and above it at the low one, and on the left of the loop, so the
-        // line runs towards -u' at the high pole and +u' at the low, by more than none and at most a whole turn (a loop
-        // up a seam to an apex and back down runs a whole turn round it). Rounding to the nearer u' would pick a side at
-        // random for half a turn (a hemisphere cut through both poles) and the wrong one beyond it.
-        let out = this.near(next, [hint[0], pole.v])[0];
-        if (this.period) {
-          const turn = pole.v === this.surface.pole(1) ? -1 : 1,
-            gap = 1e-9 * this.period;
-          out -= turn * this.period * (Math.ceil((turn * (out - hint[0]) - gap) / this.period) - 1);
-        }
-        lines.push(points.length);
+        const out = this.lineEnd(pole.v, hint[0], this.near(next, [hint[0], pole.v])[0]);
+        lines.push({
+          at: points.length,
+          before: (first + j - 1) % samples.length,
+          after: (first + k) % samples.length,
+        });
         points.push([hint[0], pole.v], [out, pole.v]);
         hint = [out, pole.v];
       } else {
@@ -243,7 +259,11 @@ export class FaceUV {
       j = k - 1;
     }
     // A loop through a pole bounds a sector (wrap 0), or goes round once more where the face holds the other pole too.
-    const closed = this.close(points, new Set([...lines, ...uLines].flatMap((i) => [i, i + 1])), false);
+    const closed = this.close(
+      points,
+      new Set([...lines.map((l) => l.at), ...uLines].flatMap((i) => [i, i + 1])),
+      false,
+    );
     for (const [u, v] of points) {
       this.box[0] = Math.min(this.box[0], u);
       this.box[1] = Math.max(this.box[1], u);
@@ -278,6 +298,42 @@ export class FaceUV {
     if (this.surface.vPeriod && Math.abs(back[1] - points[0][1]) > this.surface.vPeriod / 2)
       throw new RangeError(`face ${this.face.name}: a loop goes round a torus both ways: not supported yet`);
     return { points, wrap: Math.round((back[0] - points[0][0]) / this.period) };
+  }
+
+  /**
+   * `out` moved by whole turns so a pole's line at v from `from` runs the way the face lies. The face lies below the line
+   * at the high pole and above it at the low one, and on the left of the loop, so the line runs towards -u' at the high
+   * pole and +u' at the low, by more than none and at most a whole turn (a loop up a seam to an apex and back down runs a
+   * whole turn round it). Rounding to the nearer u' would pick a side at random for half a turn (a hemisphere cut
+   * through both poles) and the wrong one beyond it.
+   */
+  lineEnd(v: number, from: number, out: number): number {
+    if (!this.period) return out;
+    const turn = v === this.surface.pole(1) ? -1 : 1,
+      gap = 1e-9 * this.period;
+    return out - turn * this.period * (Math.ceil((turn * (out - from) - gap) / this.period) - 1);
+  }
+
+  /**
+   * The u' of the meridian along which a curve meets the pole at `hint`'s v, at its parameter t, coming from or going
+   * on to parameter `toward`: the limit there, moved by whole periods next to `hint`. Where u is the angle about an axis
+   * through the pole (a sphere, a cone's apex), that is the angle of the curve's tangent itself. Elsewhere, u' from two
+   * short steps along the curve, extrapolated to the pole (it drifts in proportion to the step).
+   */
+  meridian(curve: Curve, t: number, toward: number, hint: UV): number {
+    const kind = this.face.surface.kind;
+    if (!this.swapped && (kind === 'sphere' || kind === 'cone')) {
+      const d = curve.at(t),
+        pole = this.surface.at(0, hint[1]),
+        reach = (Math.sign(toward - t) * distance(pole, curve.at(toward))) / length([d[3], d[4], d[5]]);
+      if (Number.isFinite(reach) && reach)
+        return this.near([pole[0] + reach * d[3], pole[1] + reach * d[4], pole[2] + reach * d[5]], hint)[0];
+    }
+    const h = (toward - t) / 64,
+      near = this.near(curve.at(t + h).slice(0, 3) as XYZ, hint)[0],
+      far = this.near(curve.at(t + 2 * h).slice(0, 3) as XYZ, hint)[0],
+      u = 2 * near - far;
+    return h && Number.isFinite(u) ? u : hint[0];
   }
 
   /** Where `p` is a pole or apex: the v of one where u has no meaning, or the u' of one where v has none. */

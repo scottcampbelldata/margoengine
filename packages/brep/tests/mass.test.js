@@ -178,6 +178,38 @@ test('mass properties: a sphere cut through its poles, its loop along both pole 
   for (const z of [5, -25]) expect(cut('subtract', [20, 20, 20], at(0, 0, z)), { volume: V - corner }, 1e-12);
 });
 
+test('mass properties: a sphere cut through one pole at a slant, its loop meeting the pole off a meridian', () => {
+  // A ball of radius 10 cut by a plane through its north pole, the plane's normal n tilted t from the axis: the sphere
+  // face's loop is a circle from the pole round to it again, so its u' drifts on the way in and out, and the pole's line
+  // runs between the meridians the circle leaves and reaches the pole along, not those of the samples beside it. The cap
+  // on the +n side has height h = r (1 - cos t), volume pi h^2 (3r - h) / 3, its centroid 3 (2r - h)^2 / (4 (3r - h))
+  // along n.
+  const r = 10,
+    V = (4 / 3) * Math.PI * r ** 3;
+  for (const t of [0.3, 0.785, 1.047]) {
+    const n = [Math.sin(t), 0, Math.cos(t)],
+      x = [Math.cos(t), 0, -Math.sin(t)],
+      o = [0, 0, r].map((p, k) => (p - 20 * x[k] - 20 * [0, 1, 0][k]) * mm),
+      cut = (op) => boolean('c', op, sphere('s', r * mm), box('b', [40 * mm, 40 * mm, 40 * mm], frameOf(o, n, x))),
+      h = r * (1 - Math.cos(t)),
+      cap = (Math.PI * h * h * (3 * r - h)) / 3,
+      along = (3 * (2 * r - h) ** 2) / (4 * (3 * r - h)),
+      disc = Math.PI * h * (2 * r - h),
+      top = cut('intersect');
+    assert.deepEqual(validateBody(top), []);
+    expect(top, { volume: cap, area: 2 * Math.PI * r * h + disc, centroid: n.map((c) => c * along) }, 1e-12);
+    expect(
+      cut('subtract'),
+      {
+        volume: V - cap,
+        area: 4 * Math.PI * r * r - 2 * Math.PI * r * h + disc,
+        centroid: n.map((c) => (-c * along * cap) / (V - cap)),
+      },
+      1e-12,
+    );
+  }
+});
+
 /**
  * A cylinder of radius r, height h as an importer may hand it over: its side in three faces (the front half; the back
  * half below and above a middle arc), that arc `off` outside the side and the top vertex at u = pi `miss` along the top

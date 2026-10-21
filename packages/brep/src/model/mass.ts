@@ -258,13 +258,11 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
     if (first && last && fuv.poleOf(loop.coedges[0].start.point) === undefined) bridge(last, fuv.near(first, last));
   });
 
-  // Where a loop runs through a pole: along its line from the u' it arrives with to the u' it leaves with.
+  // Where a loop runs through a pole: along its line from the u' it arrives with to the u' it leaves with, the meridians
+  // its edges run along into and out of the pole, as the walk along them reaches them.
   for (const l of fuv.poleLines) {
-    const points = fuv.loops[l.loop].points,
-      from = points[l.at][0],
-      to = points[l.at + 1][0],
-      line = new Float64Array(K);
-    quad((up) => G(up, l.v), from, to, piecesOf(to - from, true), line);
+    const line = new Float64Array(K);
+    quad((up) => G(up, l.v), l.from, l.to, piecesOf(l.to - l.from, true), line);
     for (let k = 0; k < K; k++) out[k] -= line[k];
   }
 
