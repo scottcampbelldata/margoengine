@@ -152,6 +152,23 @@ test('denoising adds a prepare, five regular wavelet levels and a combine when n
   tracer.dispose();
 });
 
+test('a restarted image is denoised even when its first frame reaches the sample count of the last one', async () => {
+  // maxSamples 1: every new image converges in one frame, at the count the previous image was denoised at.
+  const { tracer, frame } = await ready({ denoise: true, maxSamples: 1 });
+  assert.deepEqual(kinds(frame()), ['1 dispatch', '7 dispatch', 'draw3']);
+  assert.deepEqual(kinds(frame()), ['draw3'], 'converged');
+  for (const [name, change] of [
+    ['reset', () => tracer.reset()],
+    ['a sampling option', () => tracer.setOptions({ seed: 3 })],
+    ['resetOptions', () => tracer.resetOptions(['seed'])],
+  ]) {
+    change();
+    assert.deepEqual(kinds(frame()), ['1 dispatch', '7 dispatch', 'draw3'], `${name}: the new samples are denoised`);
+    assert.deepEqual(kinds(frame()), ['draw3'], `${name}: converged`);
+  }
+  tracer.dispose();
+});
+
 test('materials that focus light add six caustic levels and their buffers; a diffuse scene drops them', async () => {
   const glass = simpleScene({ materials: [{ id: 1, color: [0.9, 0.9, 0.9], type: 'glass' }] }),
     { tracer, frame, device } = await ready({ denoise: true, scene: glass });

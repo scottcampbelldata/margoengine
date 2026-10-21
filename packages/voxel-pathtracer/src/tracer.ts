@@ -1471,9 +1471,10 @@ export class VoxelPathTracer implements EnginePlugin {
     if (this.#moved(c, width, height) || (gpu.pipelines && this.#previewing)) {
       this.#samples = 0;
       this.#restarted = true;
-      // The denoised image is stale even when the new accumulation reaches the same sample count.
-      view.denoisedAt = -1;
     }
+    // A new image (camera, scene, sampling options, reset, enable): the denoised one is stale even when the new
+    // accumulation reaches the same sample count in one frame.
+    if (!this.#samples) view.denoisedAt = -1;
     this.#previewing = !gpu.pipelines;
     this.#width = width;
     this.#height = height;
