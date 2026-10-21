@@ -521,3 +521,46 @@ test('entity codec validation and malformed entity data', async () => {
   }
   assert.ok(seen.threw > 1000 && seen.ok > 50, JSON.stringify(seen));
 });
+
+test('prepared entities encode to the same bytes as their states, for any receiver', () => {
+  const codec = new EntityCodec({ p: 'position', r: 'rotation', h: 'u8', s: 'u16', f: 'f32' }),
+    state = (id, t) => {
+      const i = id % 1000;
+      return {
+        p: [i * 1.5 + t * 0.21, 64 - i / 7, -i * 3 + t],
+        r: [0, Math.sin(i + t), 0, Math.cos(i + t)],
+        h: (i * 13 + t) & 255,
+        s: i * 50,
+        f: i / 3,
+      };
+    },
+    states = (t, ids) => new Map(ids.map((i) => [i, state(i, t)])),
+    prepare = (map) => new Map([...map].map(([id, s]) => [id, codec.prepare(s, id)]));
+  for (const [before, after] of [
+    [[], [1, 2, 3]],
+    [
+      [1, 2, 3],
+      [2, 3, 900, 4294967295],
+    ],
+    [
+      [5, 6],
+      [5, 6],
+    ],
+  ]) {
+    const a = states(0, before),
+      b = states(1, after),
+      expected = codec.encode(b, before.length ? a : undefined);
+    assert.deepEqual(codec.encode(prepare(b), before.length ? prepare(a) : undefined), expected);
+    assert.deepEqual(codec.encode(prepare(b), before.length ? a : undefined), expected);
+    assert.deepEqual(codec.decode(expected, before.length ? a : undefined).size, after.length);
+  }
+  // A prepared entity holds the values it had; it belongs to its codec; it checks like encode.
+  const s = state(1, 0),
+    p = codec.prepare(s, 1);
+  s.h = 99;
+  assert.deepEqual(codec.encode(new Map([[1, p]])), codec.encode(new Map([[1, state(1, 0)]])));
+  const other = new EntityCodec({ p: 'position', r: 'rotation', h: 'u8', s: 'u16', f: 'f32' });
+  assert.throws(() => other.encode(new Map([[1, p]])), TypeError);
+  assert.throws(() => codec.prepare({ ...state(1, 0), h: 256 }), RangeError);
+  assert.throws(() => codec.prepare(null), TypeError);
+});

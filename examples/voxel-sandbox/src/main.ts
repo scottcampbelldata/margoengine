@@ -1,8 +1,9 @@
 // Margo voxel sandbox: a small Minecraft-style game on @margoengine/voxel. Streamed noise terrain with plants, sky and
 // block light, a first-person body that walks, sprints, jumps, swims and flies, block breaking and placing with an
 // outline, a hotbar, and saves in IndexedDB. `?view=<name>` is the deterministic mode for screenshots and benchmarks
-// (fixed seed, camera, time; no input; `window.voxelSandbox` reports readiness and stats). README.md lists the controls
-// and URL parameters.
+// (fixed seed, camera, time; no input; `window.voxelSandbox` reports readiness and stats). `?server=ws://host:port` joins a
+// multiplayer server (server.mjs, multiplayer.ts) instead of streaming the world here. README.md lists the controls and
+// URL parameters.
 import { Engine, type EngineKernel } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { Line, Lines } from '@margoengine/lines';
@@ -16,6 +17,7 @@ import { BLOCK_DEFINITIONS, defineBlocks, HOTBAR } from './blocks.ts';
 import generatorUrl from './generator.worker.ts?worker&url';
 import { type SceneLighting, setupLighting } from './lighting.ts';
 import { PhotoMode } from './photo.ts';
+import { joinServer, keyBits, type Online } from './multiplayer.ts';
 import { buildShowcase, groundY, showcaseReady } from './showcase.ts';
 import { DEFAULT_SEED } from './terrain.ts';
 import { paintBlockTextures } from './textures.ts';
@@ -61,6 +63,8 @@ const params = new URLSearchParams(location.search),
         : { ...VIEWS[viewName] }
       : undefined,
   deterministic = viewName !== null,
+  // A multiplayer server to join (not in the deterministic mode).
+  serverUrl = viewName === null ? params.get('server') : null,
   seed = integer('seed', DEFAULT_SEED, -(2 ** 31), 2 ** 31 - 1),
   DISTANCES = [4, 8, 12, 16],
   VERTICAL = 3, // chunks loaded above and below the camera's chunk
@@ -82,7 +86,10 @@ interface Sandbox {
   readonly spawned: boolean;
   world: VoxelWorld;
   player: VoxelCharacter;
-  streamer: VoxelStreamer;
+  /** The local streamer; undefined when playing on a server (`online`). */
+  streamer: VoxelStreamer | undefined;
+  /** The joined server (`?server=`). */
+  online: Online | undefined;
   voxels: VoxelRenderer;
   /** The light: sky, shadows, local lights (lighting.ts). */
   scene: SceneLighting;
@@ -146,12 +153,17 @@ async function boot(): Promise<void> {
   outline.material.opacity = 0.55;
   outline.visible = false;
 
-  // Streaming: the generator worker gets the seed in its URL; a deterministic view keeps nothing.
-  const store = deterministic ? new MemoryChunkStore() : openStore(),
-    generator = new URL(generatorUrl, location.href);
-  generator.searchParams.set('seed', String(seed));
+  // Streaming: the generator worker gets the seed in its URL; a deterministic view keeps nothing. On a server, the
+  // server sends the chunks instead.
   const timeline: Sandbox['timeline'] = { startedAt: performance.now() },
-    streamer = VoxelStreamer.attach(engine, {
+    online = serverUrl ? joinServer(engine, world, serverUrl, distance) : undefined,
+    streamer = online ? undefined : startStreamer(),
+    pending = () => streamer?.pending ?? (online?.client.loaded ? 0 : 1);
+  function startStreamer(): VoxelStreamer {
+    const store = deterministic ? new MemoryChunkStore() : openStore(),
+      generator = new URL(generatorUrl, location.href);
+    generator.searchParams.set('seed', String(seed));
+    const s = VoxelStreamer.attach(engine, {
       world,
       generator,
       store,
@@ -161,10 +173,17 @@ async function boot(): Promise<void> {
       frameBudget: 2, // loading: join 2 ms of chunks a frame (rd 16 fills in half the time of 0.5 ms); 0.5 once ready
       memoryBudget: 512 << 20,
     });
-  streamer.onError = (error) => {
-    console.warn(error);
-    toast(`A chunk failed to load or save: ${error instanceof Error ? error.message : String(error)}`);
-  };
+    s.onError = (error) => {
+      console.warn(error);
+      toast(`A chunk failed to load or save: ${error instanceof Error ? error.message : String(error)}`);
+    };
+    return s;
+  }
+  if (online)
+    online.client.onError = (error) => {
+      console.warn(error);
+      toast(`Multiplayer: ${error instanceof Error ? error.message : String(error)}`);
+    };
   // Light after the streamer each frame (plugins update in the order they were added), so a chunk that joins the world
   // is lit in the same frame and meshed once, with its light.
   let lightWork = 0;
@@ -191,8 +210,8 @@ async function boot(): Promise<void> {
   });
   if (params.has('photo')) photo.toggle();
 
-  // Player, hotbar, saved state.
-  const player = new VoxelCharacter(world),
+  // Player, hotbar, saved state (none on a server: it places the player).
+  const player = online ? online.client.player : new VoxelCharacter(world),
     labelOf = new Map(BLOCK_DEFINITIONS.map(([name], i) => [name, labels[i + 1]])),
     hotbar = new Hotbar(HOTBAR, (name) => {
       const type = blocks.get(blocks.id(name));
@@ -200,9 +219,10 @@ async function boot(): Promise<void> {
     });
   let yaw = 0,
     pitch = 0,
+    flyWanted = false, // fly mode on a server: sent with each step
     spawned = false,
     showcase = view?.showcase ? 'waiting' : 'none';
-  const saved = deterministic ? undefined : loadPlayer();
+  const saved = deterministic || online ? undefined : loadPlayer();
   if (saved) {
     player.position = [...saved.position];
     player.flying = saved.flying;
@@ -324,10 +344,12 @@ async function boot(): Promise<void> {
     setInterval(() => save(), 15000);
   }
   function toggleFly(): void {
-    player.flying = !player.flying;
-    toast(player.flying ? 'Flying (Space up, Shift down)' : 'Walking');
+    if (online && !online.client.welcome?.flight) return toast('This server does not allow flying');
+    const on = online ? (flyWanted = !flyWanted) : (player.flying = !player.flying);
+    toast(on ? 'Flying (Space up, Shift down)' : 'Walking');
   }
   function setDistance(chunks: number): void {
+    if (!streamer) return toast('On a server the render distance is set when joining (?rd=)');
     distance = chunks;
     streamer.distance = chunks;
     camera.far = farFor(chunks);
@@ -342,7 +364,8 @@ async function boot(): Promise<void> {
     if (button === 0) {
       const [x, y, z] = hit.cell,
         above = blocks.get(blockId(world.getBlock(x, y + 1, z)));
-      world.setBlocks(above.shape === 'cross' ? [x, y, z, 0, x, y + 1, z, 0] : [x, y, z, 0]);
+      if (!online) world.setBlocks(above.shape === 'cross' ? [x, y, z, 0, x, y + 1, z, 0] : [x, y, z, 0]);
+      else if (online.client.edit(x, y, z, 0) && above.shape === 'cross') online.client.edit(x, y + 1, z, 0);
     } else if (button === 2) {
       const id = blocks.id(hotbar.block),
         type = blocks.get(id),
@@ -352,7 +375,8 @@ async function boot(): Promise<void> {
       if (there.id && !there.liquid && there.name !== 'tall_grass') return;
       if (type.solid && touchesPlayer(x, y, z)) return;
       if (type.shape === 'cross' && type.name !== 'torch' && !(below.solid && below.shape === 'cube')) return;
-      world.setBlock(x, y, z, id);
+      if (online) online.client.edit(x, y, z, id);
+      else world.setBlock(x, y, z, id);
     } else if (button === 1) {
       const type = blocks.get(blockId(hit.state));
       hotbar.pick(type.name);
@@ -367,6 +391,13 @@ async function boot(): Promise<void> {
   // Spawn: a saved position, else the first dry ground in a spiral around the origin, once that ground is loaded and lit.
   function trySpawn(): void {
     if (spawned || lightWork) return;
+    if (online) {
+      if (online.client.spawned) {
+        spawned = true;
+        setOverlay('paused');
+      }
+      return;
+    }
     if (saved) {
       const [x, y, z] = saved.position;
       if (world.getChunk(Math.floor(x) >> 5, Math.floor(y) >> 5, Math.floor(z) >> 5)) spawned = true;
@@ -410,7 +441,8 @@ async function boot(): Promise<void> {
       ready = (y: number) => world.getChunk(Math.floor(px) >> 5, Math.floor(y) >> 5, Math.floor(pz) >> 5);
     // Hold the body still while the ground under it is not loaded (fast flight, a far teleport).
     const frozen = !ready(py) || !ready(py - 2);
-    if (!frozen) {
+    if (online) online.client.update(dt, { keys: keyBits(isLocked() ? keys : new Set(), flyWanted), yaw, pitch });
+    else if (!frozen) {
       const move = isLocked() ? axis('KeyD', 'ArrowRight') - axis('KeyA', 'ArrowLeft') : 0,
         ahead = isLocked() ? axis('KeyW', 'ArrowUp') - axis('KeyS', 'ArrowDown') : 0,
         sin = Math.sin(yaw),
@@ -424,9 +456,10 @@ async function boot(): Promise<void> {
         sprint: !player.flying && shift,
       });
     }
-    const [x, y, z] = frozen ? player.position : player.renderPosition,
+    const [x, y, z] = online ? online.client.renderPosition : frozen ? player.position : player.renderPosition,
       eye: Vec3 = [x, y + EYE, z];
     aim(eye);
+    online?.drawPlayers();
     hit = raycastVoxels(world, eye, forward(), REACH);
     const target = hit ? `${hit.cell}|${hit.state}` : '';
     if (hit && target !== outlined) {
@@ -453,9 +486,9 @@ async function boot(): Promise<void> {
     ready = false;
   function track(now: number): void {
     const s = voxels.stats,
-      idle = streamer.pending === 0 && !lightWork && !world.dirty.size && showcase !== 'waiting' && (spawned || !!view);
+      idle = pending() === 0 && !lightWork && !world.dirty.size && showcase !== 'waiting' && (spawned || !!view);
     if (timeline.firstDraw === undefined && s.draws > 0) timeline.firstDraw = now - timeline.startedAt;
-    if (timeline.loaded === undefined && streamer.pending === 0 && (spawned || view))
+    if (timeline.loaded === undefined && pending() === 0 && (spawned || view))
       timeline.loaded = now - timeline.startedAt;
     if (s.quads !== lastQuads || s.chunks !== lastChunks || !idle || !s.draws) {
       lastQuads = s.quads;
@@ -477,8 +510,10 @@ async function boot(): Promise<void> {
   function playing(): void {
     if (settled) return;
     settled = true;
-    streamer.chunksPerFrame = 8;
-    streamer.frameBudget = 0.5;
+    if (streamer) {
+      streamer.chunksPerFrame = 8;
+      streamer.frameBudget = 0.5;
+    }
     lighting.budget = 16384;
     if (!deterministic && tier === 'light') watchQuality();
   }
@@ -505,16 +540,27 @@ async function boot(): Promise<void> {
       `${fps.toFixed(0)} FPS  ${tier} tier`,
       `XYZ ${x.toFixed(1)} ${y.toFixed(1)} ${z.toFixed(1)}  facing ${facing}  ${mode}`,
       `chunk ${Math.floor(x) >> 5} ${Math.floor(y) >> 5} ${Math.floor(z) >> 5}  render distance ${distance}`,
-      `chunks ${s.chunks} drawn, ${s.visible} visible, ${loaded.size} loaded, ${streamer.pending} to load`,
+      `chunks ${s.chunks} drawn, ${s.visible} visible, ${loaded.size} loaded, ${streamer ? `${streamer.pending} to load` : online?.client.loaded ? 'all received' : 'receiving'}`,
+      ...(online
+        ? [
+            `server ${serverUrl}  ${online.client.players.size} players near  ${online.client.stats.corrections} corrections`,
+          ]
+        : []),
       `quads ${s.quads.toLocaleString()}  ${(s.bytes / 1048576).toFixed(1)} MiB  draws ${s.draws}`,
       `seed ${seed}  ${scene.hours.toFixed(1)} h${ready ? '' : '  loading'}`,
       ...(photo.on ? [`photo mode  ${photo.samples} samples`] : []),
     ]);
-    if (!spawned) setOverlay('loading', `Generating the world: ${streamer.pending} chunks to load`);
+    if (!spawned)
+      setOverlay(
+        'loading',
+        streamer
+          ? `Generating the world: ${streamer.pending} chunks to load`
+          : `Joining ${serverUrl}: ${loaded.size} chunks received`,
+      );
   }
 
   function save(): void {
-    if (deterministic || !spawned) return;
+    if (deterministic || !spawned || !streamer) return;
     streamer.save().catch((error) => streamer.onError(error));
     try {
       localStorage.setItem(
@@ -571,11 +617,11 @@ async function boot(): Promise<void> {
     }
   };
   requestAnimationFrame(frame);
-  setOverlay(deterministic ? 'hidden' : 'loading', 'Generating the world');
+  setOverlay(deterministic ? 'hidden' : 'loading', online ? `Joining ${serverUrl}` : 'Generating the world');
 
   const stats = () => ({
     ...voxels.stats,
-    pending: streamer.pending,
+    pending: pending(),
     loaded: loaded.size,
     chunkBytes: [...loaded.values()].reduce((sum, chunk) => sum + chunk.byteLength, 0),
     lightQueue: lightWork,
@@ -584,7 +630,7 @@ async function boot(): Promise<void> {
     tier,
     canvas: `${canvas.width}x${canvas.height}`,
     mesherWorkers: workers || 'default',
-    streamerWorkers: streamer.workers,
+    streamerWorkers: streamer?.workers ?? 0,
     timestampQuery: !!runtime.gpu?.features.has('timestamp-query'),
   });
   const sandbox: Sandbox = {
@@ -595,6 +641,7 @@ async function boot(): Promise<void> {
     world,
     player,
     streamer,
+    online,
     voxels,
     scene,
     photo,
@@ -628,7 +675,8 @@ async function boot(): Promise<void> {
     import.meta.hot.dispose(() => {
       running = false;
       events.abort();
-      void streamer.dispose();
+      void streamer?.dispose();
+      online?.dispose();
       photo.dispose();
       scene.dispose();
       engine.dispose();

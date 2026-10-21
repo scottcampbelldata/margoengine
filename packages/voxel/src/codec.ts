@@ -382,6 +382,18 @@ const FIELDS: readonly EntityField[] = ['position', 'rotation', 'u8', 'u16', 'f3
   STEPS = 512, // position steps per block
   LIMIT = 2 ** 30; // |position steps| stays below this, so a change from the baseline is a 32-bit zigzag varint
 type Entity = Record<string, unknown>;
+type Quantized = (number | number[])[];
+
+declare const preparedBrand: unique symbol;
+/**
+ * An entity state quantized once by {@link EntityCodec.prepare}: pass it to {@link EntityCodec.encode} in place of the
+ * state for any number of receivers. Opaque; it holds the values as they were when prepared.
+ */
+export interface PreparedEntity {
+  readonly [preparedBrand]: true;
+}
+// Each prepared entity's codec and quantized fields.
+const prepared = new WeakMap<object, { codec: object; fields: Quantized }>();
 
 // A unit quaternion as 2 bits (its largest component) and the other three in [-1/sqrt 2, 1/sqrt 2], 10 bits each
 // (511 + round(c * sqrt 2 * 511): 0..1022, so 0 is exact), negated so the largest is positive (q and -q are one
@@ -452,15 +464,29 @@ export class EntityCodec<const S extends Readonly<Record<string, EntityField>>> 
     });
   }
   /**
+   * `entity` checked and quantized once, for a server that sends the same entity to many receivers: each
+   * {@link EntityCodec.encode} that is given the result skips that work and writes the same bytes as for `entity`.
+   * Later changes to `entity` do not reach the result; prepare again for a new state.
+   * @throws as {@link EntityCodec.encode} for a malformed entity (`id` only names it in the message).
+   */
+  prepare(entity: EntityState<S>, id = 0): PreparedEntity {
+    const token = Object.freeze({}) as PreparedEntity;
+    prepared.set(token, { codec: this, fields: this.quantize(id, entity) });
+    return token;
+  }
+  /**
    * The entities of `entities` that are new or differ from `baseline` (same id) in any field after quantizing,
    * with only their changed fields, plus the removal of each `baseline` entity `entities` lacks. Without a
-   * baseline every entity is sent in full.
-   * @throws TypeError when `entities` or `baseline` is not a Map, an entity is not an object, or a field has the
-   * wrong type.
+   * baseline every entity is sent in full. Either Map may hold {@link EntityCodec.prepare} results instead of states.
+   * @throws TypeError when `entities` or `baseline` is not a Map, an entity is not an object, a field has the
+   * wrong type, or a prepared entity comes from another codec.
    * @throws RangeError for an id that is not a u32, a non-finite value, a position coordinate of 2,097,152 or more
    * in size, a zero-length rotation, or an integer out of its range.
    */
-  encode(entities: ReadonlyMap<number, EntityState<S>>, baseline?: ReadonlyMap<number, EntityState<S>>): Uint8Array {
+  encode(
+    entities: ReadonlyMap<number, EntityState<S> | PreparedEntity>,
+    baseline?: ReadonlyMap<number, EntityState<S> | PreparedEntity>,
+  ): Uint8Array {
     if (!(entities instanceof Map) || (baseline !== undefined && !(baseline instanceof Map)))
       throw new TypeError('EntityCodec.encode expects Maps of entity id -> entity');
     const ids = new Set(entities.keys());
@@ -473,15 +499,20 @@ export class EntityCodec<const S extends Readonly<Record<string, EntityField>>> 
     const body = new Writer();
     let previous = -1,
       count = 0;
-    for (const id of [...ids].sort((a, b) => a - b)) {
-      const now = entities.has(id) ? this.quantize(id, entities.get(id)) : undefined,
-        then = baseline?.has(id) ? this.quantize(id, baseline.get(id)) : undefined;
+    // Ids are u32s here, so a Uint32Array sorts them numerically.
+    for (const id of new Uint32Array(ids).sort()) {
+      const now = entities.has(id) ? this.fields(id, entities.get(id)) : undefined,
+        then = baseline?.has(id) ? this.fields(id, baseline.get(id)) : undefined;
       let mask = 0;
       if (now)
         for (let f = 0; f < now.length; f++) {
           const a = now[f],
-            b = then?.[f],
-            differs = Array.isArray(a) ? !b || a.some((v: number, i: number) => v !== (b as number[])[i]) : a !== b;
+            b = then?.[f];
+          let differs: boolean;
+          if (Array.isArray(a)) {
+            const c = b as number[] | undefined;
+            differs = !c || a[0] !== c[0] || a[1] !== c[1] || a[2] !== c[2];
+          } else differs = a !== b;
           if (differs) mask += 2 ** f;
         }
       if (now && !mask) continue;
@@ -565,7 +596,15 @@ export class EntityCodec<const S extends Readonly<Record<string, EntityField>>> 
     return out;
   }
   // Each field as it travels: position steps [x, y, z], the rotation word, or the number.
-  private quantize(id: number, entity: unknown): (number | number[])[] {
+  // A prepared entity's fields, or the state quantized now.
+  private fields(id: number, entity: unknown): Quantized {
+    const ready = prepared.get(entity as object);
+    if (!ready) return this.quantize(id, entity);
+    if (ready.codec !== this)
+      throw new TypeError(`Entity ${id} was prepared by another EntityCodec; prepare it with the one that encodes`);
+    return ready.fields;
+  }
+  private quantize(id: number, entity: unknown): Quantized {
     if (!entity || typeof entity !== 'object') throw new TypeError(`Entity ${id} must be an object of its fields`);
     return this.names.map((name, f) => this.value(id, name, this.types[f], (entity as Entity)[name]));
   }

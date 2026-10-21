@@ -11,7 +11,7 @@ import { pathToFileURL } from 'node:url';
 import { isMainThread, parentPort, Worker, workerData } from 'node:worker_threads';
 import { MargoError } from '@margoengine/math/errors';
 import { type BlockType, BlockTypes, chunkKey, type PackedChunk, VoxelChunk, VoxelWorld } from '@margoengine/voxel';
-import { encodeBlockChanges, encodeChunk, EntityCodec } from '@margoengine/voxel/codec';
+import { encodeBlockChanges, encodeChunk, EntityCodec, type PreparedEntity } from '@margoengine/voxel/codec';
 import { type NoiseTerrainOptions, noiseTerrain, type VoxelGenerate } from '@margoengine/voxel/generate';
 import { VoxelCharacter, type VoxelCharacterOptions } from '@margoengine/voxel/query';
 import {
@@ -22,7 +22,6 @@ import {
   Keys,
   moveIntent,
   PLAYER_SCHEMA,
-  type PlayerState,
   PROTOCOL_VERSION,
   STEP_SECONDS,
   type ServerMessage,
@@ -151,7 +150,7 @@ interface Client extends VoxelServerPlayer {
   loadedSent: boolean;
   out: Uint8Array[];
   denied: number[];
-  baseline: Map<number, PlayerState>;
+  baseline: Map<number, PreparedEntity>;
   tokens: number;
   tokenTime: number;
   bytesIn: number;
@@ -777,14 +776,15 @@ export class VoxelServer {
     for (const c of clients) if (c.phase === 'playing') this.#process(c, now);
     for (const c of clients) if (c.phase === 'playing' || c.phase === 'spawning') this.#recenter(c);
     for (const c of clients) if (c.phase === 'spawning') this.#trySpawn(c, now);
-    // One state per player per tick, shared by every client's message; the grid finds players near a column.
-    const states = new Map<number, PlayerState>(),
+    // One prepared (quantized) state per player per tick, shared by every client's players message; the grid finds
+    // players near a column.
+    const states = new Map<number, PreparedEntity>(),
       grid = new Map<string, Client[]>();
     for (const c of clients) {
       if (c.phase !== 'playing') continue;
       const p = c.character.position,
         column = `${Math.floor(p[0]) >> 5},${Math.floor(p[2]) >> 5}`;
-      states.set(c.id, { position: [p[0], p[1], p[2]], rotation: rotation(c.yaw, c.pitch) });
+      states.set(c.id, this.#codec.prepare({ position: [p[0], p[1], p[2]], rotation: rotation(c.yaw, c.pitch) }, c.id));
       const list = grid.get(column);
       if (list) list.push(c);
       else grid.set(column, [c]);
@@ -816,7 +816,7 @@ export class VoxelServer {
         const p = c.character.position,
           px = Math.floor(p[0]) >> 5,
           pz = Math.floor(p[2]) >> 5,
-          nearby = new Map<number, PlayerState>();
+          nearby = new Map<number, PreparedEntity>();
         for (let dz = -reach; dz <= reach; dz++)
           for (let dx = -reach; dx <= reach; dx++) {
             const list = grid.get(`${px + dx},${pz + dz}`);
@@ -825,7 +825,7 @@ export class VoxelServer {
                 if (other === c) continue;
                 const q = other.character.position;
                 if ((q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2 + (q[2] - p[2]) ** 2 <= d2)
-                  nearby.set(other.id, states.get(other.id) as PlayerState);
+                  nearby.set(other.id, states.get(other.id) as PreparedEntity);
               }
           }
         const data = this.#codec.encode(nearby, c.baseline);

@@ -49,6 +49,7 @@ to load), quads, quad memory and draw calls (`voxels.stats`).
 | `pose` | | With `view`: `x,y,z,yaw,pitch` replaces the view's camera (y 0: eye height over the ground). |
 | `gpuTiming` | | Requests `timestamp-query` so `voxelSandbox.gpuTiming()` can time the voxel passes. |
 | `photo` | | Starts in photo mode (also with `view`). |
+| `server` | | `ws://host:port` of a multiplayer server (see below): play there instead of in a local world. |
 
 ## How it is built
 
@@ -149,6 +150,21 @@ render distance 8 and 1.51 ms at 16 in this run (2.56 and 0.72 ms in an earlier 
 (`nvidia-ampere-msedge-155`, recorded 2026-10-19 with shadows and torch lights; four runs each, pixel-identical). On
 hardware whose profile is not in the views' `profiles` list they are captured but skipped: record them there with
 `npm run visual:update -- --only=voxel --runs=4` and add the profile to `VOXEL` in that script.
+
+## Multiplayer
+
+```sh
+npm run build:packages
+node examples/voxel-sandbox/server.mjs            # ws://127.0.0.1:8787; --host=0.0.0.0 for other machines, --seed=N
+npm run dev:voxel                                  # then open http://127.0.0.1:5173/?server=ws://127.0.0.1:8787
+```
+
+Every tab that opens the sandbox with `?server=` joins one shared world on
+[`@margoengine/voxel-net`](../../packages/voxel-net/README.md). The server generates the same terrain and plants as
+single player (`src/plants.ts` runs in both), holds the world and checks every edit; the page draws what it is sent,
+moves its own player at once and is corrected if the server disagrees, and shows the other players as coloured boxes
+(`src/multiplayer.ts`). Flying is allowed. Nothing is saved: the world lasts as long as the server process, and the
+render distance (`rd`, 2-8 on the server) is fixed when joining.
 
 ## Tests
 

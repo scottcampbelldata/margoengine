@@ -8,6 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "test": "node --test test/*.test.js",
     "test:browser": "node test/play.browser.mjs",
+    "server": "node server.mjs",
     "bench": "node bench.mjs"
   },
   "dependencies": {
@@ -19,6 +20,7 @@
     "@margoengine/shadows": "^1.0.0",
     "@margoengine/sky": "^1.0.0",
     "@margoengine/voxel": "^1.0.0",
+    "@margoengine/voxel-net": "^1.0.0",
     "@margoengine/voxel-pathtracer": "^1.0.0"
   }
 }

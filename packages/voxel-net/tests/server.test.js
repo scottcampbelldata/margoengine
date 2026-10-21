@@ -10,9 +10,11 @@ const blocks = testBlocks(),
   STONE = blocks.id('stone'),
   wait = (ms) => new Promise((done) => setTimeout(done, ms));
 
-async function start(options = {}) {
+// A server on a free port, closed after the test `t` even when it fails (an open server keeps the file running).
+async function start(t, options = {}) {
   const server = new VoxelServer({ blocks, workers: 2, spawn: (id) => [id * 4, 8], ...options }),
     { port } = await server.listen(0);
+  t.after(() => server.close());
   return { server, url: `ws://127.0.0.1:${port}` };
 }
 // A VoxelNetClient over the Node WebSocket; `closed` resolves with the close code.
@@ -49,8 +51,8 @@ const under = (c) => {
   return [x, y - 1, z];
 };
 
-test('two players join, see each other, and an edit reaches the other one', async () => {
-  const { server, url } = await start(),
+test('two players join, see each other, and an edit reaches the other one', async (t) => {
+  const { server, url } = await start(t),
     a = await join(url, { name: 'a' }),
     b = await join(url, { name: 'b' }),
     clients = [a.client, b.client];
@@ -80,8 +82,8 @@ test('two players join, see each other, and an edit reaches the other one', asyn
   await server.close();
 });
 
-test('edits out of reach, too fast, or into a body are refused and undone', async () => {
-  const { server, url } = await start({ editRate: 1, editBurst: 2 }),
+test('edits out of reach, too fast, or into a body are refused and undone', async (t) => {
+  const { server, url } = await start(t, { editRate: 1, editBurst: 2 }),
     a = await join(url),
     c = a.client;
   await drive([c], 10_000, undefined, spawned([c]));
@@ -112,8 +114,8 @@ test('edits out of reach, too fast, or into a body are refused and undone', asyn
   await server.close();
 });
 
-test('a matching prediction is never corrected; a cheat is corrected and replayed', async () => {
-  const { server, url } = await start(),
+test('a matching prediction is never corrected; a cheat is corrected and replayed', async (t) => {
+  const { server, url } = await start(t),
     a = await join(url),
     c = a.client;
   await drive([c], 10_000, undefined, spawned([c]));
@@ -128,16 +130,23 @@ test('a matching prediction is never corrected; a cheat is corrected and replaye
     () => ({ keys: 0, yaw: 0, pitch: 0 }),
     () => c.stats.corrections > 0,
   );
-  await drive([c], 500);
+  // Stand still until any jump has landed, then let the server run the last inputs before comparing.
+  await drive([c], 1500);
+  c.flush();
+  await wait(200);
   assert.ok(c.stats.corrections >= 1);
   const truth = server.players[0].character.position;
-  for (let i = 0; i < 3; i++) assert.ok(Math.abs(c.player.position[i] - truth[i]) < 0.02, `axis ${i}`);
+  for (let i = 0; i < 3; i++)
+    assert.ok(
+      Math.abs(c.player.position[i] - truth[i]) < 0.02,
+      `axis ${i}: client ${c.player.position} server ${truth} v ${c.player.velocity} corrections ${c.stats.corrections} liquid ${c.player.inLiquid}`,
+    );
   c.close();
   await server.close();
 });
 
-test('moving the player away unloads chunks past the view and sends the new ones', async () => {
-  const { server, url } = await start({ view: 2 }),
+test('moving the player away unloads chunks past the view and sends the new ones', async (t) => {
+  const { server, url } = await start(t, { view: 2 }),
     a = await join(url),
     c = a.client;
   await drive([c], 10_000, undefined, () => c.loaded);
@@ -153,8 +162,8 @@ test('moving the player away unloads chunks past the view and sends the new ones
   await server.close();
 });
 
-test('protocol violations close the connection', async () => {
-  const { server, url } = await start(),
+test('protocol violations close the connection', async (t) => {
+  const { server, url } = await start(t),
     wrong = await connectWebSocket(url),
     early = await connectWebSocket(url),
     codes = [];
@@ -166,8 +175,8 @@ test('protocol violations close the connection', async () => {
   await server.close();
 });
 
-test('four bots walk and build for two seconds without errors', async () => {
-  const { server, url } = await start(),
+test('four bots walk and build for two seconds without errors', async (t) => {
+  const { server, url } = await start(t),
     bots = await Promise.all(
       [0, 1, 2, 3].map((i) => VoxelBot.connect({ url, blocks, editInterval: 0.25, players: i === 0 })),
     ),

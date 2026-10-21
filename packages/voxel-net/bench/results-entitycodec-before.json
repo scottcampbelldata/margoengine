@@ -1,0 +1,1510 @@
+{
+ "date": "2026-10-21T05:52:52.147Z",
+ "machine": {
+  "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+  "logicalCores": 32,
+  "memoryGB": 93.7,
+  "node": "v26.12.0",
+  "platform": "win32"
+ },
+ "settings": {
+  "scenarios": [
+   "spread",
+   "crowd"
+  ],
+  "counts": [
+   50,
+   100,
+   200,
+   400
+  ],
+  "window": 30,
+  "joinRate": 25,
+  "untilBreak": true,
+  "max": 3000,
+  "observerEvery": 8,
+  "editInterval": 2,
+  "botsPerProcess": 50,
+  "maxProcesses": 12,
+  "tickRate": 20,
+  "view": "6 chunks across (a circle), 3 up and down",
+  "simulation": "3 chunks across, 2 up and down",
+  "playerDistance": 96,
+  "terrain": "noiseTerrain seed 1, the sandbox settings without plants",
+  "spread": "spawn uniformly over a disc of 1,024 blocks radius, wander freely",
+  "crowd": "spawn within 32 blocks of the origin, walk back once past 64 blocks",
+  "bots": "walk, jump when blocked, swim up; edit every 2 s alternating break and place; decode chunks within 1 chunk; 1 in 8 decode player updates (observers)"
+ },
+ "caveats": [
+  "Server and bots share one PC and talk over loopback: no network latency, loss or bandwidth limit; bots compete with the server for CPU.",
+  "Bytes out and in are counted by the server per WebSocket message (frame headers included, TCP/IP not).",
+  "Edit-to-other-client delay is measured from the sending bot to observer bots on one machine clock (performance.timeOrigin + now); it includes waiting for the next tick.",
+  "Join times are measured while the other bots are still joining (25 per second)."
+ ],
+ "runs": [
+  {
+   "scenario": "spread",
+   "bots": 50,
+   "playersInWindow": 50,
+   "withinBudget": true,
+   "join": {
+    "secondsForAll": 4.1,
+    "joined": 50,
+    "spawned": 50,
+    "loaded": 50,
+    "failed": 0,
+    "welcomeMs": {
+     "n": 50,
+     "median": 3.33,
+     "p95": 14.09,
+     "p99": 16.76,
+     "max": 16.76
+    },
+    "spawnMs": {
+     "n": 50,
+     "median": 131.32,
+     "p95": 361.71,
+     "p99": 370.23,
+     "max": 370.23
+    },
+    "fullViewMs": {
+     "n": 50,
+     "median": 1072.65,
+     "p95": 1430.96,
+     "p99": 1564.19,
+     "max": 1564.19
+    },
+    "tickMsDuringJoin": {
+     "n": 82,
+     "median": 4.75,
+     "p95": 7.23,
+     "p99": 9.02,
+     "max": 9.02
+    }
+   },
+   "window": {
+    "seconds": 30,
+    "ticksPerSecond": 19.99,
+    "skippedCatchUps": 0,
+    "tickWorkMs": {
+     "n": 600,
+     "median": 1.91,
+     "p95": 3.53,
+     "p99": 4.6,
+     "max": 5.57
+    },
+    "tickIntervalMs": {
+     "n": 599,
+     "median": 46.56,
+     "p95": 62.34,
+     "p99": 63.31,
+     "max": 64.13
+    },
+    "mainThreadBusy": 0.068,
+    "mainThreadBusyMsPerTick": 3.4,
+    "eventLoopDelayP99Ms": 18.84,
+    "processCpuCores": 0.18,
+    "memory": {
+     "rssMB": 517.7,
+     "peakRssMB": 666.4,
+     "heapUsedMB": 29.7,
+     "players": 50,
+     "worldChunks": 5869,
+     "cachedChunks": 22148,
+     "cacheBytes": 8752578,
+     "editedChunks": 118,
+     "queuedJobs": 0,
+     "cacheMB": 8.3
+    },
+    "bytesOutPerSecond": 81976,
+    "bytesOutPerClientPerSecond": 1640,
+    "bytesOutByTypePerSecond": {
+     "welcome": 0,
+     "chunk": 77466,
+     "unload": 241,
+     "state": 0,
+     "blocks": 467,
+     "players": 3802,
+     "loaded": 0
+    },
+    "bytesInPerSecond": 40723,
+    "bytesInPerClientPerSecond": 814,
+    "receivedPerBotPerSecond": {
+     "n": 50,
+     "median": 1303.25,
+     "p95": 3366.99,
+     "p99": 5703.12,
+     "max": 5703.12
+    },
+    "editToOtherClientMs": {
+     "n": 105,
+     "median": 45.14,
+     "p95": 61.46,
+     "p99": 62.56,
+     "max": 64.14
+    },
+    "editsAcceptedPerSecond": 15.7,
+    "editsDeniedPerSecond": 0,
+    "correctionsPerPlayerPerMinute": 0,
+    "chunksGeneratedPerSecond": 98.8,
+    "serverErrors": 0,
+    "botClosed": 0,
+    "botProcesses": 1,
+    "botProcessBusyMax": 0.061,
+    "botProcessCpuCores": 0.06
+   }
+  },
+  {
+   "scenario": "spread",
+   "bots": 100,
+   "playersInWindow": 100,
+   "withinBudget": true,
+   "join": {
+    "secondsForAll": 6.1,
+    "joined": 100,
+    "spawned": 100,
+    "loaded": 100,
+    "failed": 0,
+    "welcomeMs": {
+     "n": 100,
+     "median": 3.63,
+     "p95": 11.53,
+     "p99": 14.26,
+     "max": 14.26
+    },
+    "spawnMs": {
+     "n": 100,
+     "median": 112.74,
+     "p95": 306.87,
+     "p99": 365.37,
+     "max": 365.37
+    },
+    "fullViewMs": {
+     "n": 100,
+     "median": 775.08,
+     "p95": 1360.32,
+     "p99": 1431.95,
+     "max": 1431.95
+    },
+    "tickMsDuringJoin": {
+     "n": 122,
+     "median": 5.5,
+     "p95": 8.18,
+     "p99": 8.68,
+     "max": 10.67
+    }
+   },
+   "window": {
+    "seconds": 30,
+    "ticksPerSecond": 20,
+    "skippedCatchUps": 0,
+    "tickWorkMs": {
+     "n": 600,
+     "median": 3.69,
+     "p95": 5.73,
+     "p99": 7.06,
+     "max": 8.63
+    },
+    "tickIntervalMs": {
+     "n": 599,
+     "median": 46.68,
+     "p95": 62.1,
+     "p99": 63.03,
+     "max": 63.69
+    },
+    "mainThreadBusy": 0.111,
+    "mainThreadBusyMsPerTick": 5.54,
+    "eventLoopDelayP99Ms": 20.53,
+    "processCpuCores": 0.28,
+    "memory": {
+     "rssMB": 581.5,
+     "peakRssMB": 753.5,
+     "heapUsedMB": 66.3,
+     "players": 100,
+     "worldChunks": 9495,
+     "cachedChunks": 27378,
+     "cacheBytes": 10790735,
+     "editedChunks": 228,
+     "queuedJobs": 0,
+     "cacheMB": 10.3
+    },
+    "bytesOutPerSecond": 160843,
+    "bytesOutPerClientPerSecond": 1608,
+    "bytesOutByTypePerSecond": {
+     "welcome": 0,
+     "chunk": 142994,
+     "unload": 565,
+     "state": 0,
+     "blocks": 1528,
+     "players": 15756,
+     "loaded": 0
+    },
+    "bytesInPerSecond": 81488,
+    "bytesInPerClientPerSecond": 815,
+    "receivedPerBotPerSecond": {
+     "n": 100,
+     "median": 1389.38,
+     "p95": 3406.76,
+     "p99": 5684.12,
+     "max": 5684.12
+    },
+    "editToOtherClientMs": {
+     "n": 390,
+     "median": 33.6,
+     "p95": 62.24,
+     "p99": 65.13,
+     "max": 65.88
+    },
+    "editsAcceptedPerSecond": 30.9,
+    "editsDeniedPerSecond": 0,
+    "correctionsPerPlayerPerMinute": 0,
+    "chunksGeneratedPerSecond": 119.4,
+    "serverErrors": 0,
+    "botClosed": 0,
+    "botProcesses": 2,
+    "botProcessBusyMax": 0.061,
+    "botProcessCpuCores": 0.14
+   }
+  },
+  {
+   "scenario": "spread",
+   "bots": 200,
+   "playersInWindow": 200,
+   "withinBudget": true,
+   "join": {
+    "secondsForAll": 9.6,
+    "joined": 200,
+    "spawned": 200,
+    "loaded": 200,
+    "failed": 0,
+    "welcomeMs": {
+     "n": 200,
+     "median": 3.22,
+     "p95": 12.14,
+     "p99": 13.46,
+     "max": 15.17
+    },
+    "spawnMs": {
+     "n": 200,
+     "median": 102.84,
+     "p95": 202.54,
+     "p99": 316.71,
+     "max": 327.83
+    },
+    "fullViewMs": {
+     "n": 200,
+     "median": 685.78,
+     "p95": 1258.65,
+     "p99": 1352.09,
+     "max": 1421.48
+    },
+    "tickMsDuringJoin": {
+     "n": 194,
+     "median": 7.22,
+     "p95": 10.56,
+     "p99": 11.75,
+     "max": 12.52
+    }
+   },
+   "window": {
+    "seconds": 30,
+    "ticksPerSecond": 19.99,
+    "skippedCatchUps": 0,
+    "tickWorkMs": {
+     "n": 600,
+     "median": 7.07,
+     "p95": 9.64,
+     "p99": 11.3,
+     "max": 12.84
+    },
+    "tickIntervalMs": {
+     "n": 599,
+     "median": 46.52,
+     "p95": 61.92,
+     "p99": 62.58,
+     "max": 63.04
+    },
+    "mainThreadBusy": 0.191,
+    "mainThreadBusyMsPerTick": 9.55,
+    "eventLoopDelayP99Ms": 23.97,
+    "processCpuCores": 0.35,
+    "memory": {
+     "rssMB": 614.3,
+     "peakRssMB": 789.3,
+     "heapUsedMB": 80.1,
+     "players": 200,
+     "worldChunks": 13568,
+     "cachedChunks": 30791,
+     "cacheBytes": 12024111,
+     "editedChunks": 451,
+     "queuedJobs": 0,
+     "cacheMB": 11.5
+    },
+    "bytesOutPerSecond": 367057,
+    "bytesOutPerClientPerSecond": 1835,
+    "bytesOutByTypePerSecond": {
+     "welcome": 0,
+     "chunk": 307528,
+     "unload": 1351,
+     "state": 0,
+     "blocks": 5382,
+     "players": 52796,
+     "loaded": 0
+    },
+    "bytesInPerSecond": 162817,
+    "bytesInPerClientPerSecond": 814,
+    "receivedPerBotPerSecond": {
+     "n": 200,
+     "median": 1593.01,
+     "p95": 3926.31,
+     "p99": 5141.13,
+     "max": 5666.2
+    },
+    "editToOtherClientMs": {
+     "n": 1774,
+     "median": 34.1,
+     "p95": 63.58,
+     "p99": 67.04,
+     "max": 70.49
+    },
+    "editsAcceptedPerSecond": 61.2,
+    "editsDeniedPerSecond": 0,
+    "correctionsPerPlayerPerMinute": 0,
+    "chunksGeneratedPerSecond": 161.9,
+    "serverErrors": 0,
+    "botClosed": 0,
+    "botProcesses": 4,
+    "botProcessBusyMax": 0.062,
+    "botProcessCpuCores": 0.29
+   }
+  },
+  {
+   "scenario": "spread",
+   "bots": 400,
+   "playersInWindow": 400,
+   "withinBudget": true,
+   "join": {
+    "secondsForAll": 17.7,
+    "joined": 400,
+    "spawned": 400,
+    "loaded": 400,
+    "failed": 0,
+    "welcomeMs": {
+     "n": 400,
+     "median": 2.67,
+     "p95": 18.63,
+     "p99": 20.36,
+     "max": 25.42
+    },
+    "spawnMs": {
+     "n": 400,
+     "median": 101.95,
+     "p95": 171.07,
+     "p99": 328.2,
+     "max": 428.65
+    },
+    "fullViewMs": {
+     "n": 400,
+     "median": 663,
+     "p95": 1145.06,
+     "p99": 1484.7,
+     "max": 1569.38
+    },
+    "tickMsDuringJoin": {
+     "n": 356,
+     "median": 9.8,
+     "p95": 19.06,
+     "p99": 22.53,
+     "max": 25.67
+    }
+   },
+   "window": {
+    "seconds": 30,
+    "ticksPerSecond": 19.99,
+    "skippedCatchUps": 0,
+    "tickWorkMs": {
+     "n": 600,
+     "median": 15.8,
+     "p95": 20.27,
+     "p99": 23.15,
+     "max": 28.67
+    },
+    "tickIntervalMs": {
+     "n": 599,
+     "median": 46.66,
+     "p95": 61.98,
+     "p99": 62.75,
+     "max": 63.41
+    },
+    "mainThreadBusy": 0.4,
+    "mainThreadBusyMsPerTick": 20,
+    "eventLoopDelayP99Ms": 35.78,
+    "processCpuCores": 0.64,
+    "memory": {
+     "rssMB": 674.1,
+     "peakRssMB": 961.9,
+     "heapUsedMB": 108.5,
+     "players": 400,
+     "worldChunks": 17484,
+     "cachedChunks": 33590,
+     "cacheBytes": 13027073,
+     "editedChunks": 897,
+     "queuedJobs": 0,
+     "cacheMB": 12.4
+    },
+    "bytesOutPerSecond": 686527,
+    "bytesOutPerClientPerSecond": 1716,
+    "bytesOutByTypePerSecond": {
+     "welcome": 0,
+     "chunk": 492016,
+     "unload": 2750,
+     "state": 1,
+     "blocks": 18615,
+     "players": 173145,
+     "loaded": 0
+    },
+    "bytesInPerSecond": 326033,
+    "bytesInPerClientPerSecond": 815,
+    "receivedPerBotPerSecond": {
+     "n": 400,
+     "median": 1586.63,
+     "p95": 3288.64,
+     "p99": 4214.69,
+     "max": 5599.86
+    },
+    "editToOtherClientMs": {
+     "n": 6462,
+     "median": 47.64,
+     "p95": 69.6,
+     "p99": 76.06,
+     "max": 89.83
+    },
+    "editsAcceptedPerSecond": 122.8,
+    "editsDeniedPerSecond": 0,
+    "correctionsPerPlayerPerMinute": 0.005,
+    "chunksGeneratedPerSecond": 140.8,
+    "serverErrors": 0,
+    "botClosed": 0,
+    "botProcesses": 8,
+    "botProcessBusyMax": 0.07,
+    "botProcessCpuCores": 0.64
+   }
+  },
+  {
+   "scenario": "spread",
+   "bots": 600,
+   "playersInWindow": 600,
+   "withinBudget": true,
+   "join": {
+    "secondsForAll": 25.1,
+    "joined": 600,
+    "spawned": 600,
+    "loaded": 600,
+    "failed": 0,
+    "welcomeMs": {
+     "n": 600,
+     "median": 6.97,
+     "p95": 27.59,
+     "p99": 60.12,
+     "max": 61.19
+    },
+    "spawnMs": {
+     "n": 600,
+     "median": 110.57,
+     "p95": 176.88,
+     "p99": 341.29,
+     "max": 475.63
+    },
+    "fullViewMs": {
+     "n": 600,
+     "median": 663.55,
+     "p95": 1040.3,
+     "p99": 1553.92,
+     "max": 1667.41
+    },
+    "tickMsDuringJoin": {
+     "n": 505,
+     "median": 14.14,
+     "p95": 27.33,
+     "p99": 33.8,
+     "max": 39.8
+    }
+   },
+   "window": {
+    "seconds": 30,
+    "ticksPerSecond": 19.99,
+    "skippedCatchUps": 0,
+    "tickWorkMs": {
+     "n": 600,
+     "median": 24.25,
+     "p95": 29.08,
+     "p99": 33.33,
+     "max": 37.02
+    },
+    "tickIntervalMs": {
+     "n": 599,
+     "median": 46.96,
+     "p95": 61.7,
+     "p99": 62.71,
+     "max": 63.21
+    },
+    "mainThreadBusy": 0.587,
+    "mainThreadBusyMsPerTick": 29.38,
+    "eventLoopDelayP99Ms": 43.68,
+    "processCpuCores": 0.81,
+    "memory": {
+     "rssMB": 743,
+     "peakRssMB": 923.9,
+     "heapUsedMB": 160.9,
+     "players": 600,
+     "worldChunks": 18689,
+     "cachedChunks": 34376,
+     "cacheBytes": 13255459,
+     "editedChunks": 1357,
+     "queuedJobs": 0,
+     "cacheMB": 12.6
+    },
+    "bytesOutPerSecond": 1160544,
+    "bytesOutPerClientPerSecond": 1934,
+    "bytesOutByTypePerSecond": {
+     "welcome": 0,
+     "chunk": 752058,
+     "unload": 4525,
+     "state": 0,
+     "blocks": 39633,
+     "players": 364328,
+     "loaded": 0
+    },
+    "bytesInPerSecond": 489184,
+    "bytesInPerClientPerSecond": 815,
+    "receivedPerBotPerSecond": {
+     "n": 600,
+     "median": 1804.41,
+     "p95": 3611.22,
+     "p99": 4769.24,
+     "max": 6830.84
+    },
+    "editToOtherClientMs": {
+     "n": 13660,
+     "median": 52.14,
+     "p95": 75.35,
+     "p99": 84.49,
+     "max": 92.71
+    },
+    "editsAcceptedPerSecond": 179.7,
+    "editsDeniedPerSecond": 0,
+    "correctionsPerPlayerPerMinute": 0,
+    "chunksGeneratedPerSecond": 135.2,
+    "serverErrors": 0,
+    "botClosed": 0,
+    "botProcesses": 12,
+    "botProcessBusyMax": 0.073,
+    "botProcessCpuCores": 0.88
+   }
+  },
+  {
+   "scenario": "spread",
+   "bots": 800,
+   "playersInWindow": 800,
+   "withinBudget": true,
+   "join": {
+    "secondsForAll": 33.6,
+    "joined": 800,
+    "spawned": 800,
+    "loaded": 800,
+    "failed": 0,
+    "welcomeMs": {
+     "n": 800,
+     "median": 10.2,
+     "p95": 44.21,
+     "p99": 71.16,
+     "max": 85.32
+    },
+    "spawnMs": {
+     "n": 800,
+     "median": 119.76,
+     "p95": 210.15,
+     "p99": 322.59,
+     "max": 415.07
+    },
+    "fullViewMs": {
+     "n": 800,
+     "median": 668.21,
+     "p95": 893.26,
+     "p99": 1381.34,
+     "max": 1507.42
+    },
+    "tickMsDuringJoin": {
+     "n": 675,
+     "median": 17.19,
+     "p95": 36.77,
+     "p99": 42.14,
+     "max": 47.51
+    }
+   },
+   "window": {
+    "seconds": 30,
+    "ticksPerSecond": 19.99,
+    "skippedCatchUps": 0,
+    "tickWorkMs": {
+     "n": 600,
+     "median": 33.16,
+     "p95": 40.78,
+     "p99": 45.46,
+     "max": 58.87
+    },
+    "tickIntervalMs": {
+     "n": 599,
+     "median": 47.46,
+     "p95": 61.98,
+     "p99": 62.72,
+     "max": 64.25
+    },
+    "mainThreadBusy": 0.77,
+    "mainThreadBusyMsPerTick": 38.51,
+    "eventLoopDelayP99Ms": 55.64,
+    "processCpuCores": 1.05,
+    "memory": {
+     "rssMB": 769.1,
+     "peakRssMB": 1082.2,
+     "heapUsedMB": 194.2,
+     "players": 800,
+     "worldChunks": 19195,
+     "cachedChunks": 35137,
+     "cacheBytes": 13492607,
+     "editedChunks": 1689,
+     "queuedJobs": 0,
+     "cacheMB": 12.9
+    },
+    "bytesOutPerSecond": 1528819,
+    "bytesOutPerClientPerSecond": 1911,
+    "bytesOutByTypePerSecond": {
+     "welcome": 0,
+     "chunk": 874400,
+     "unload": 6386,
+     "state": 4,
+     "blocks": 65843,
+     "players": 582185,
+     "loaded": 0
+    },
+    "bytesInPerSecond": 653322,
+    "bytesInPerClientPerSecond": 817,
+    "receivedPerBotPerSecond": {
+     "n": 800,
+     "median": 1769.23,
+     "p95": 3608.43,
+     "p99": 4908.78,
+     "max": 6423.95
+    },
+    "editToOtherClientMs": {
+     "n": 24358,
+     "median": 57.05,
+     "p95": 99.91,
+     "p99": 121.96,
+     "max": 152.81
+    },
+    "editsAcceptedPerSecond": 227.6,
+    "editsDeniedPerSecond": 0,
+    "correctionsPerPlayerPerMinute": 0.007,
+    "chunksGeneratedPerSecond": 137.7,
+    "serverErrors": 0,
+    "botClosed": 0,
+    "botProcesses": 12,
+    "botProcessBusyMax": 0.086,
+    "botProcessCpuCores": 1.08
+   }
+  },
+  {
+   "scenario": "spread",
+   "bots": 1000,
+   "playersInWindow": 1000,
+   "withinBudget": false,
+   "join": {
+    "secondsForAll": 41.7,
+    "joined": 1000,
+    "spawned": 1000,
+    "loaded": 1000,
+    "failed": 0,
+    "welcomeMs": {
+     "n": 1000,
+     "median": 13.04,
+     "p95": 126.53,
+     "p99": 511.5,
+     "max": 564.59
+    },
+    "spawnMs": {
+     "n": 1000,
+     "median": 126.31,
+     "p95": 313.05,
+     "p99": 667.69,
+     "max": 1163.24
+    },
+    "fullViewMs": {
+     "n": 1000,
+     "median": 672.48,
+     "p95": 1052.57,
+     "p99": 1398.51,
+     "max": 2750.31
+    },
+    "tickMsDuringJoin": {
+     "n": 838,
+     "median": 21.8,
+     "p95": 49.87,
+     "p99": 60.25,
+     "max": 68.51
+    }
+   },
+   "window": {
+    "seconds": 30.1,
+    "ticksPerSecond": 19.99,
+    "skippedCatchUps": 0,
+    "tickWorkMs": {
+     "n": 601,
+     "median": 40,
+     "p95": 62.63,
+     "p99": 68.35,
+     "max": 73.41
+    },
+    "tickIntervalMs": {
+     "n": 600,
+     "median": 50.97,
+     "p95": 64.64,
+     "p99": 70.21,
+     "max": 74.59
+    },
+    "mainThreadBusy": 0.939,
+    "mainThreadBusyMsPerTick": 47,
+    "eventLoopDelayP99Ms": 74.91,
+    "processCpuCores": 1.24,
+    "memory": {
+     "rssMB": 997.5,
+     "peakRssMB": 1090.8,
+     "heapUsedMB": 234.6,
+     "players": 1000,
+     "worldChunks": 20182,
+     "cachedChunks": 35840,
+     "cacheBytes": 13633304,
+     "editedChunks": 2077,
+     "queuedJobs": 0,
+     "cacheMB": 13
+    },
+    "bytesOutPerSecond": 1745877,
+    "bytesOutPerClientPerSecond": 1746,
+    "bytesOutByTypePerSecond": {
+     "welcome": 0,
+     "chunk": 1061697,
+     "unload": 7840,
+     "state": 7,
+     "blocks": 95353,
+     "players": 580980,
+     "loaded": 0
+    },
+    "bytesInPerSecond": 815523,
+    "bytesInPerClientPerSecond": 816,
+    "receivedPerBotPerSecond": {
+     "n": 1000,
+     "median": 1573.35,
+     "p95": 3467.52,
+     "p99": 4707.73,
+     "max": 5516.84
+    },
+    "editToOtherClientMs": {
+     "n": 36902,
+     "median": 88.82,
+     "p95": 164.54,
+     "p99": 200.35,
+     "max": 279.36
+    },
+    "editsAcceptedPerSecond": 278.2,
+    "editsDeniedPerSecond": 0,
+    "correctionsPerPlayerPerMinute": 0.01,
+    "chunksGeneratedPerSecond": 182.3,
+    "serverErrors": 0,
+    "botClosed": 0,
+    "botProcesses": 12,
+    "botProcessBusyMax": 0.098,
+    "botProcessCpuCores": 1.2
+   }
+  },
+  {
+   "scenario": "spread",
+   "bots": 900,
+   "playersInWindow": 900,
+   "withinBudget": false,
+   "join": {
+    "secondsForAll": 37.6,
+    "joined": 900,
+    "spawned": 900,
+    "loaded": 900,
+    "failed": 0,
+    "welcomeMs": {
+     "n": 900,
+     "median": 12.99,
+     "p95": 63.81,
+     "p99": 80.01,
+     "max": 120.8
+    },
+    "spawnMs": {
+     "n": 900,
+     "median": 120.63,
+     "p95": 241.93,
+     "p99": 346.23,
+     "max": 428.55
+    },
+    "fullViewMs": {
+     "n": 900,
+     "median": 671.07,
+     "p95": 897.3,
+     "p99": 1396.99,
+     "max": 1616.22
+    },
+    "tickMsDuringJoin": {
+     "n": 755,
+     "median": 19.83,
+     "p95": 44.09,
+     "p99": 51.36,
+     "max": 72.83
+    }
+   },
+   "window": {
+    "seconds": 30,
+    "ticksPerSecond": 19.99,
+    "skippedCatchUps": 0,
+    "tickWorkMs": {
+     "n": 600,
+     "median": 39.26,
+     "p95": 50.33,
+     "p99": 56.39,
+     "max": 69.41
+    },
+    "tickIntervalMs": {
+     "n": 599,
+     "median": 49.39,
+     "p95": 61.64,
+     "p99": 62.64,
+     "max": 70.48
+    },
+    "mainThreadBusy": 0.852,
+    "mainThreadBusyMsPerTick": 42.63,
+    "eventLoopDelayP99Ms": 64.23,
+    "processCpuCores": 1.14,
+    "memory": {
+     "rssMB": 903.9,
+     "peakRssMB": 1088,
+     "heapUsedMB": 217.8,
+     "players": 900,
+     "worldChunks": 19856,
+     "cachedChunks": 35354,
+     "cacheBytes": 13429456,
+     "editedChunks": 1930,
+     "queuedJobs": 0,
+     "cacheMB": 12.8
+    },
+    "bytesOutPerSecond": 1727808,
+    "bytesOutPerClientPerSecond": 1920,
+    "bytesOutByTypePerSecond": {
+     "welcome": 0,
+     "chunk": 1018847,
+     "unload": 7263,
+     "state": 0,
+     "blocks": 82697,
+     "players": 619002,
+     "loaded": 0
+    },
+    "bytesInPerSecond": 735501,
+    "bytesInPerClientPerSecond": 817,
+    "receivedPerBotPerSecond": {
+     "n": 900,
+     "median": 1756.47,
+     "p95": 3721.39,
+     "p99": 4583.91,
+     "max": 7686.56
+    },
+    "editToOtherClientMs": {
+     "n": 32220,
+     "median": 70.06,
+     "p95": 126.53,
+     "p99": 141.34,
+     "max": 190.79
+    },
+    "editsAcceptedPerSecond": 262.8,
+    "editsDeniedPerSecond": 0.1,
+    "correctionsPerPlayerPerMinute": 0,
+    "chunksGeneratedPerSecond": 160.2,
+    "serverErrors": 0,
+    "botClosed": 0,
+    "botProcesses": 12,
+    "botProcessBusyMax": 0.093,
+    "botProcessCpuCores": 1.31
+   }
+  },
+  {
+   "scenario": "crowd",
+   "bots": 50,
+   "playersInWindow": 50,
+   "withinBudget": true,
+   "join": {
+    "secondsForAll": 3.6,
+    "joined": 50,
+    "spawned": 50,
+    "loaded": 50,
+    "failed": 0,
+    "welcomeMs": {
+     "n": 50,
+     "median": 1.86,
+     "p95": 10.32,
+     "p99": 16.78,
+     "max": 16.78
+    },
+    "spawnMs": {
+     "n": 50,
+     "median": 96.65,
+     "p95": 156.08,
+     "p99": 248.62,
+     "max": 248.62
+    },
+    "fullViewMs": {
+     "n": 50,
+     "median": 639.3,
+     "p95": 934.21,
+     "p99": 1039.27,
+     "max": 1039.27
+    },
+    "tickMsDuringJoin": {
+     "n": 72,
+     "median": 3.55,
+     "p95": 5.96,
+     "p99": 7.28,
+     "max": 7.28
+    }
+   },
+   "window": {
+    "seconds": 30,
+    "ticksPerSecond": 20,
+    "skippedCatchUps": 0,
+    "tickWorkMs": {
+     "n": 600,
+     "median": 2.91,
+     "p95": 4.24,
+     "p99": 5,
+     "max": 5.3
+    },
+    "tickIntervalMs": {
+     "n": 599,
+     "median": 46.83,
+     "p95": 62.37,
+     "p99": 63.26,
+     "max": 63.69
+    },
+    "mainThreadBusy": 0.075,
+    "mainThreadBusyMsPerTick": 3.78,
+    "eventLoopDelayP99Ms": 19.38,
+    "processCpuCores": 0.11,
+    "memory": {
+     "rssMB": 312.5,
+     "peakRssMB": 343.2,
+     "heapUsedMB": 44.5,
+     "players": 50,
+     "worldChunks": 409,
+     "cachedChunks": 1584,
+     "cacheBytes": 628969,
+     "editedChunks": 16,
+     "queuedJobs": 0,
+     "cacheMB": 0.6
+    },
+    "bytesOutPerSecond": 322831,
+    "bytesOutPerClientPerSecond": 6457,
+    "bytesOutByTypePerSecond": {
+     "welcome": 0,
+     "chunk": 75891,
+     "unload": 205,
+     "state": 4,
+     "blocks": 4756,
+     "players": 241975,
+     "loaded": 0
+    },
+    "bytesInPerSecond": 40698,
+    "bytesInPerClientPerSecond": 814,
+    "receivedPerBotPerSecond": {
+     "n": 50,
+     "median": 6101.96,
+     "p95": 7938.91,
+     "p99": 9021.31,
+     "max": 9021.31
+    },
+    "editToOtherClientMs": {
+     "n": 1794,
+     "median": 31.64,
+     "p95": 60.62,
+     "p99": 64.38,
+     "max": 65.65
+    },
+    "editsAcceptedPerSecond": 10.1,
+    "editsDeniedPerSecond": 0.1,
+    "correctionsPerPlayerPerMinute": 0.12,
+    "chunksGeneratedPerSecond": 13,
+    "serverErrors": 0,
+    "botClosed": 0,
+    "botProcesses": 1,
+    "botProcessBusyMax": 0.058,
+    "botProcessCpuCores": 0.07
+   }
+  },
+  {
+   "scenario": "crowd",
+   "bots": 100,
+   "playersInWindow": 100,
+   "withinBudget": true,
+   "join": {
+    "secondsForAll": 6.1,
+    "joined": 100,
+    "spawned": 100,
+    "loaded": 100,
+    "failed": 0,
+    "welcomeMs": {
+     "n": 100,
+     "median": 2.44,
+     "p95": 9.45,
+     "p99": 13.23,
+     "max": 13.23
+    },
+    "spawnMs": {
+     "n": 100,
+     "median": 106.66,
+     "p95": 176.98,
+     "p99": 292.78,
+     "max": 292.78
+    },
+    "fullViewMs": {
+     "n": 100,
+     "median": 643.63,
+     "p95": 865.93,
+     "p99": 1076.41,
+     "max": 1076.41
+    },
+    "tickMsDuringJoin": {
+     "n": 123,
+     "median": 6.35,
+     "p95": 10.95,
+     "p99": 13.37,
+     "max": 13.62
+    }
+   },
+   "window": {
+    "seconds": 30,
+    "ticksPerSecond": 19.99,
+    "skippedCatchUps": 0,
+    "tickWorkMs": {
+     "n": 600,
+     "median": 8.01,
+     "p95": 11.78,
+     "p99": 13.65,
+     "max": 14.8
+    },
+    "tickIntervalMs": {
+     "n": 599,
+     "median": 46.77,
+     "p95": 62.11,
+     "p99": 62.97,
+     "max": 63.82
+    },
+    "mainThreadBusy": 0.19,
+    "mainThreadBusyMsPerTick": 9.5,
+    "eventLoopDelayP99Ms": 25.94,
+    "processCpuCores": 0.21,
+    "memory": {
+     "rssMB": 323.4,
+     "peakRssMB": 379.8,
+     "heapUsedMB": 45.3,
+     "players": 100,
+     "worldChunks": 397,
+     "cachedChunks": 1543,
+     "cacheBytes": 612689,
+     "editedChunks": 20,
+     "queuedJobs": 0,
+     "cacheMB": 0.6
+    },
+    "bytesOutPerSecond": 1119603,
+    "bytesOutPerClientPerSecond": 11196,
+    "bytesOutByTypePerSecond": {
+     "welcome": 0,
+     "chunk": 146261,
+     "unload": 421,
+     "state": 10,
+     "blocks": 16874,
+     "players": 956036,
+     "loaded": 0
+    },
+    "bytesInPerSecond": 81336,
+    "bytesInPerClientPerSecond": 813,
+    "receivedPerBotPerSecond": {
+     "n": 100,
+     "median": 10910.82,
+     "p95": 12775.54,
+     "p99": 14017.75,
+     "max": 14017.75
+    },
+    "editToOtherClientMs": {
+     "n": 6570,
+     "median": 34.76,
+     "p95": 54.94,
+     "p99": 67.28,
+     "max": 73.7
+    },
+    "editsAcceptedPerSecond": 18.4,
+    "editsDeniedPerSecond": 0.1,
+    "correctionsPerPlayerPerMinute": 0.14,
+    "chunksGeneratedPerSecond": 9.2,
+    "serverErrors": 0,
+    "botClosed": 0,
+    "botProcesses": 2,
+    "botProcessBusyMax": 0.069,
+    "botProcessCpuCores": 0.14
+   }
+  },
+  {
+   "scenario": "crowd",
+   "bots": 200,
+   "playersInWindow": 200,
+   "withinBudget": true,
+   "join": {
+    "secondsForAll": 9.6,
+    "joined": 200,
+    "spawned": 200,
+    "loaded": 200,
+    "failed": 0,
+    "welcomeMs": {
+     "n": 200,
+     "median": 4.01,
+     "p95": 22.43,
+     "p99": 23.82,
+     "max": 23.9
+    },
+    "spawnMs": {
+     "n": 200,
+     "median": 153.44,
+     "p95": 283.08,
+     "p99": 397.59,
+     "max": 397.81
+    },
+    "fullViewMs": {
+     "n": 200,
+     "median": 651.69,
+     "p95": 699.87,
+     "p99": 986.72,
+     "max": 1027.06
+    },
+    "tickMsDuringJoin": {
+     "n": 194,
+     "median": 11.49,
+     "p95": 28.16,
+     "p99": 30.04,
+     "max": 31.14
+    }
+   },
+   "window": {
+    "seconds": 30,
+    "ticksPerSecond": 19.99,
+    "skippedCatchUps": 0,
+    "tickWorkMs": {
+     "n": 600,
+     "median": 26.05,
+     "p95": 30.13,
+     "p99": 33.03,
+     "max": 35.94
+    },
+    "tickIntervalMs": {
+     "n": 599,
+     "median": 46.66,
+     "p95": 62.23,
+     "p99": 62.87,
+     "max": 64.05
+    },
+    "mainThreadBusy": 0.557,
+    "mainThreadBusyMsPerTick": 27.86,
+    "eventLoopDelayP99Ms": 44.6,
+    "processCpuCores": 0.61,
+    "memory": {
+     "rssMB": 471.2,
+     "peakRssMB": 471.8,
+     "heapUsedMB": 133,
+     "players": 200,
+     "worldChunks": 399,
+     "cachedChunks": 1496,
+     "cacheBytes": 592528,
+     "editedChunks": 23,
+     "queuedJobs": 0,
+     "cacheMB": 0.6
+    },
+    "bytesOutPerSecond": 4126191,
+    "bytesOutPerClientPerSecond": 20631,
+    "bytesOutByTypePerSecond": {
+     "welcome": 0,
+     "chunk": 294905,
+     "unload": 966,
+     "state": 24,
+     "blocks": 56440,
+     "players": 3773857,
+     "loaded": 0
+    },
+    "bytesInPerSecond": 162993,
+    "bytesInPerClientPerSecond": 815,
+    "receivedPerBotPerSecond": {
+     "n": 200,
+     "median": 20386.97,
+     "p95": 22313.5,
+     "p99": 23424.52,
+     "max": 23624.4
+    },
+    "editToOtherClientMs": {
+     "n": 26270,
+     "median": 53.84,
+     "p95": 77.85,
+     "p99": 86.49,
+     "max": 1473.07
+    },
+    "editsAcceptedPerSecond": 35.2,
+    "editsDeniedPerSecond": 0.6,
+    "correctionsPerPlayerPerMinute": 0.17,
+    "chunksGeneratedPerSecond": 6.6,
+    "serverErrors": 0,
+    "botClosed": 0,
+    "botProcesses": 4,
+    "botProcessBusyMax": 0.085,
+    "botProcessCpuCores": 0.37
+   }
+  },
+  {
+   "scenario": "crowd",
+   "bots": 400,
+   "playersInWindow": 400,
+   "withinBudget": false,
+   "join": {
+    "secondsForAll": 33.6,
+    "joined": 400,
+    "spawned": 400,
+    "loaded": 400,
+    "failed": 0,
+    "welcomeMs": {
+     "n": 400,
+     "median": 17.03,
+     "p95": 259.68,
+     "p99": 280.38,
+     "max": 298.53
+    },
+    "spawnMs": {
+     "n": 400,
+     "median": 214.13,
+     "p95": 18606.57,
+     "p99": 19242.43,
+     "max": 19323.16
+    },
+    "fullViewMs": {
+     "n": 400,
+     "median": 676.13,
+     "p95": 18606.59,
+     "p99": 19242.45,
+     "max": 19323.17
+    },
+    "tickMsDuringJoin": {
+     "n": 571,
+     "median": 58.35,
+     "p95": 72.72,
+     "p99": 95.56,
+     "max": 106.06
+    }
+   },
+   "window": {
+    "seconds": 30.3,
+    "ticksPerSecond": 10.74,
+    "skippedCatchUps": 52,
+    "tickWorkMs": {
+     "n": 325,
+     "median": 91.99,
+     "p95": 96.18,
+     "p99": 100.9,
+     "max": 104.89
+    },
+    "tickIntervalMs": {
+     "n": 324,
+     "median": 93.45,
+     "p95": 97.7,
+     "p99": 102.7,
+     "max": 106.39
+    },
+    "mainThreadBusy": 1,
+    "mainThreadBusyMsPerTick": 93.13,
+    "eventLoopDelayP99Ms": 102.76,
+    "processCpuCores": 1.07,
+    "memory": {
+     "rssMB": 714.6,
+     "peakRssMB": 714.6,
+     "heapUsedMB": 169.8,
+     "players": 400,
+     "worldChunks": 497,
+     "cachedChunks": 1835,
+     "cacheBytes": 679273,
+     "editedChunks": 34,
+     "queuedJobs": 0,
+     "cacheMB": 0.6
+    },
+    "bytesOutPerSecond": 4195664,
+    "bytesOutPerClientPerSecond": 10489,
+    "bytesOutByTypePerSecond": {
+     "welcome": 0,
+     "chunk": 432731,
+     "unload": 2263,
+     "state": 175,
+     "blocks": 166180,
+     "players": 3594314,
+     "loaded": 0
+    },
+    "bytesInPerSecond": 329606,
+    "bytesInPerClientPerSecond": 824,
+    "receivedPerBotPerSecond": {
+     "n": 400,
+     "median": 10204.98,
+     "p95": 12434.22,
+     "p99": 13675.85,
+     "max": 14032.3
+    },
+    "editToOtherClientMs": {
+     "n": 95686,
+     "median": 196,
+     "p95": 337.56,
+     "p99": 375.01,
+     "max": 4619.93
+    },
+    "editsAcceptedPerSecond": 64.1,
+    "editsDeniedPerSecond": 2.4,
+    "correctionsPerPlayerPerMinute": 0.61,
+    "chunksGeneratedPerSecond": 10.4,
+    "serverErrors": 0,
+    "botClosed": 0,
+    "botProcesses": 8,
+    "botProcessBusyMax": 0.078,
+    "botProcessCpuCores": 0.66
+   }
+  },
+  {
+   "scenario": "crowd",
+   "bots": 300,
+   "playersInWindow": 300,
+   "withinBudget": false,
+   "join": {
+    "secondsForAll": 16.6,
+    "joined": 300,
+    "spawned": 300,
+    "loaded": 300,
+    "failed": 0,
+    "welcomeMs": {
+     "n": 300,
+     "median": 7.93,
+     "p95": 124.61,
+     "p99": 196.85,
+     "max": 199.35
+    },
+    "spawnMs": {
+     "n": 300,
+     "median": 167.99,
+     "p95": 4139.16,
+     "p99": 4614.45,
+     "max": 4615.97
+    },
+    "fullViewMs": {
+     "n": 300,
+     "median": 660.18,
+     "p95": 4139.17,
+     "p99": 4614.46,
+     "max": 4616.44
+    },
+    "tickMsDuringJoin": {
+     "n": 332,
+     "median": 27.68,
+     "p95": 54.06,
+     "p99": 59.83,
+     "max": 81.59
+    }
+   },
+   "window": {
+    "seconds": 30.1,
+    "ticksPerSecond": 17.97,
+    "skippedCatchUps": 12,
+    "tickWorkMs": {
+     "n": 541,
+     "median": 54.1,
+     "p95": 57.53,
+     "p99": 64.85,
+     "max": 83.52
+    },
+    "tickIntervalMs": {
+     "n": 540,
+     "median": 55.44,
+     "p95": 58.87,
+     "p99": 65.89,
+     "max": 84.56
+    },
+    "mainThreadBusy": 1,
+    "mainThreadBusyMsPerTick": 55.66,
+    "eventLoopDelayP99Ms": 65.9,
+    "processCpuCores": 1.09,
+    "memory": {
+     "rssMB": 618.9,
+     "peakRssMB": 681.6,
+     "heapUsedMB": 224.1,
+     "players": 300,
+     "worldChunks": 466,
+     "cachedChunks": 1786,
+     "cacheBytes": 663482,
+     "editedChunks": 26,
+     "queuedJobs": 0,
+     "cacheMB": 0.6
+    },
+    "bytesOutPerSecond": 4632241,
+    "bytesOutPerClientPerSecond": 15441,
+    "bytesOutByTypePerSecond": {
+     "welcome": 0,
+     "chunk": 372885,
+     "unload": 1618,
+     "state": 83,
+     "blocks": 112014,
+     "players": 4145641,
+     "loaded": 0
+    },
+    "bytesInPerSecond": 246185,
+    "bytesInPerClientPerSecond": 821,
+    "receivedPerBotPerSecond": {
+     "n": 300,
+     "median": 15305.15,
+     "p95": 17056.18,
+     "p99": 17848.95,
+     "max": 18162.14
+    },
+    "editToOtherClientMs": {
+     "n": 54923,
+     "median": 92.76,
+     "p95": 160.02,
+     "p99": 180.23,
+     "max": 210.91
+    },
+    "editsAcceptedPerSecond": 49.9,
+    "editsDeniedPerSecond": 1.4,
+    "correctionsPerPlayerPerMinute": 0.385,
+    "chunksGeneratedPerSecond": 12.4,
+    "serverErrors": 0,
+    "botClosed": 0,
+    "botProcesses": 6,
+    "botProcessBusyMax": 0.09,
+    "botProcessCpuCores": 0.58
+   }
+  }
+ ],
+ "spreadLimit": {
+  "lastWithinBudget": 800,
+  "firstOverBudget": 900
+ },
+ "crowdLimit": {
+  "lastWithinBudget": 200,
+  "firstOverBudget": 300
+ }
+}

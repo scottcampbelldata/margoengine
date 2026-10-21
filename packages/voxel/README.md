@@ -130,6 +130,9 @@ applyBlockChanges(otherWorld, message); // all or nothing, through setBlocks (di
 const codec = new EntityCodec({ position: 'position', rotation: 'rotation', health: 'u8', anim: 'u16' });
 socket.send(codec.encode(players, acked)); // Maps of u32 id -> entity; only what changed since `acked`
 const state = codec.decode(message, received); // `received`: the receiver's copy of `acked`
+// A server sending one tick to many receivers quantizes each entity once; encode writes the same bytes from it.
+const ready = new Map([...players].map(([id, p]) => [id, codec.prepare(p, id)]));
+for (const client of clients) client.send(codec.encode(nearby(client, ready), client.lastSent));
 
 const store = new IndexedDBChunkStore('world-1'); // or new MemoryChunkStore()
 store.put(cx, cy, cz, chunk); // copies the chunk now; puts in one task share one transaction
