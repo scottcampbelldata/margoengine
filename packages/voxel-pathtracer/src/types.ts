@@ -512,7 +512,7 @@ export interface VoxelPathTracerStats {
   samples: number;
   /** Wall-clock milliseconds between the last two traced viewport frames (includes waiting for the display). */
   frameMs: number;
-  /** Bytes of GPU buffers the tracer holds (scene, accumulation, denoiser, captures in progress). */
+  /** Bytes of GPU buffers and textures the tracer holds (scene, accumulation, denoiser, captures in progress). */
   gpuBytes: number;
   /** True once `samples` reached `maxSamples`; tracing pauses until something changes. */
   converged: boolean;
@@ -520,6 +520,16 @@ export interface VoxelPathTracerStats {
   width: number;
   /** Compatible addition: traced viewport height in pixels. */
   height: number;
+  /** Compatible addition: the width `resolutionScale` asked for (drawing buffer x scale; 0 before the first frame). */
+  requestedWidth: number;
+  /** Compatible addition: the height it asked for. */
+  requestedHeight: number;
+  /**
+   * Compatible addition: why `width` x `height` is below the requested size: 'storage-binding' (an image of 16 bytes
+   * per pixel would not fit the device's `maxStorageBufferBindingSize`) or 'texture-dimension' (the denoiser's history
+   * textures would exceed `maxTextureDimension2D`). Absent at the requested size. See `traceViewportSize`.
+   */
+  limitedBy?: 'storage-binding' | 'texture-dimension';
   /** Compatible addition: revision of the scene being traced. */
   sceneRevision: number;
   /** Compatible addition: models the last `attach` or `setScene` packed from their voxels. */
@@ -672,4 +682,26 @@ export interface TraceValidation {
   readonly problems: readonly TraceProblem[];
   /** Fields the tracer does not know (it ignores them; they do not make `ok` false). */
   readonly unknown: readonly string[];
+}
+
+/** Compatible addition: the device limits `traceViewportSize` reads (a `GPUSupportedLimits` has them). */
+export interface TraceViewportLimits {
+  /** Bytes one storage buffer binding may span. */
+  readonly maxStorageBufferBindingSize: number;
+  /** Largest texture side in texels. Default 8192 (WebGPU's default). */
+  readonly maxTextureDimension2D?: number;
+}
+
+/** Compatible addition: the viewport size `traceViewportSize` returns (and `stats` reports). */
+export interface TraceViewportSize {
+  /** Traced width in pixels. */
+  readonly width: number;
+  /** Traced height in pixels. */
+  readonly height: number;
+  /** Width the drawing buffer and `resolutionScale` asked for. */
+  readonly requestedWidth: number;
+  /** Height they asked for. */
+  readonly requestedHeight: number;
+  /** The device limit that reduced the size; absent at the requested size. */
+  readonly limitedBy?: 'storage-binding' | 'texture-dimension';
 }

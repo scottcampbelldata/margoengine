@@ -208,6 +208,19 @@ export interface TraceValidation {
 
 export type TraceVec3 = readonly [number, number, number];
 
+export interface TraceViewportLimits {
+    readonly maxStorageBufferBindingSize: number;
+    readonly maxTextureDimension2D?: number;
+}
+
+export interface TraceViewportSize {
+    readonly width: number;
+    readonly height: number;
+    readonly requestedWidth: number;
+    readonly requestedHeight: number;
+    readonly limitedBy?: 'storage-binding' | 'texture-dimension';
+}
+
 export const VOXEL_PATHTRACER_DEFAULTS: Readonly<ResolvedTraceOptions>;
 
 export class VoxelPathTracer implements EnginePlugin {
@@ -276,6 +289,9 @@ export interface VoxelPathTracerStats {
     converged: boolean;
     width: number;
     height: number;
+    requestedWidth: number;
+    requestedHeight: number;
+    limitedBy?: 'storage-binding' | 'texture-dimension';
     sceneRevision: number;
     packedModels: number;
     reusedModels: number;
@@ -364,6 +380,11 @@ export function magicaVoxelModel(id: string, revision: number, size: ArrayLike<n
 export function resolveTraceMaterial(material: TraceMaterial, textures?: number): ResolvedTraceMaterial;
 
 export function resolveTraceOptions(options: Partial<Omit<VoxelPathTracerOptions, 'scene'>>, base?: Readonly<ResolvedTraceOptions>): ResolvedTraceOptions;
+
+export function traceViewportSize(width: number, height: number, limits: TraceViewportLimits, options?: {
+    resolutionScale?: number;
+    denoise?: boolean | 'auto';
+}): TraceViewportSize;
 
 export function validateTraceMaterial(material: unknown, textures?: number): TraceValidation;
 

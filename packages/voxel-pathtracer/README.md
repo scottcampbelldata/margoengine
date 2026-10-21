@@ -250,7 +250,7 @@ by floating-point rounding, which changes individual paths, not the converged im
   frames; 8 frames after the camera stops the diffuse and cloud scenes are 1.10 and 2.28 against 0.96 and 2.03 without
   history (the glass scene 1.95 against 2.03). A camera that never moves gives the same image as before. Every camera
   pose draws its own sample sequence, so equal inputs still give equal images. Cost at 1920 x 1080: two more images of
-  history (348 against 285 MiB for the denoised material scene) and about 0.6 ms per frame; scenes without glass,
+  history, kept in two textures (348 against 285 MiB for the denoised material scene) and about 0.6 ms per frame; scenes without glass,
   metal or glossy coats skip the caustic chain, which more than makes up for it (256 MiB for the dense scene).
 - `enabled = false` leaves ordinary rendering unchanged (measured bit-identical); the tracer then encodes nothing.
 - Until then the viewport shows a preview: a small kernel (compiled in a fraction of the full tracer's time, about 0.15
@@ -308,7 +308,7 @@ by floating-point rounding, which changes individual paths, not the converged im
 | Voxel data | grids plus 512-byte mixed bricks within the device's `maxStorageBufferBindingSize` (WebGPU default 128 MiB: about 262,000 mixed bricks; uniform bricks cost one word) |
 | Environment map | 8192 x 4096, and width x height x 16 bytes within the binding size (4096 x 2048 at the default) |
 | Emissive faces | their tables (8 bytes each) within the binding size (about 16 million at the default) |
-| Viewport | traced pixels x 16 bytes within the binding size (8.3 million pixels at the default; larger canvases are traced at a lower resolution) |
+| Viewport | every image 16 bytes per pixel within the binding size (8.3 million pixels at the default, so 3840 x 2160 is traced at its native size, denoised or not); the denoiser's two history images are textures within `maxTextureDimension2D` (8192 at the default). Larger canvases are traced at a lower resolution, keeping the aspect: `stats.requestedWidth`/`requestedHeight` give the size asked for, `stats.limitedBy` the limit that reduced it, and `traceViewportSize(width, height, device.limits, options)` predicts it |
 | Accumulation | float32 sums: refinement is expected to slow past about a million samples per pixel (not measured) |
 
 ## Measured performance
@@ -331,6 +331,12 @@ day only. On 2026-10-21, when every row ran slower (material scene 17.43-17.50 m
 ratio stop cost 0.2-0.6 ms per denoised frame against the previous denoiser in the same session (material scene
 27.39-27.46 against 26.87-27.20 ms, dense scene 18.02-18.42 against 17.83-17.89 ms) and no memory.
 
+Native 4K (`tests/browser-check.mjs native4k`, 2026-10-21, the same slower day): the material scene in a 3840 x 2160
+canvas with the default device limits is traced at 3840 x 2160, 1 sample per frame while the camera moves: 68.81 ms
+and 380.0 MiB raw, 113.44 ms and 1,392.5 MiB denoised (history in textures). Before the history moved into textures
+the budget of 48 bytes per pixel in one 128 MiB binding traced a denoised 4K canvas at 2229 x 1254 (a third of the
+pixels).
+
 Light sampling through glass and mirrors made a sample dearer than before it (measured the same day on the same
 machine: 6.09 ms for the material scene, 8.45 ms for the dense one, 9.11 ms denoised): glass and mirror candidates need
 walks, and the larger shader is slower even where there is no glass. Noise per sample fell (two renders' difference at
@@ -347,7 +353,7 @@ Numbers on other GPUs are not measured.
 
 ## Verification
 
-- `tests/*.test.js` (Node, 62 tests, about 1.2 s; part of `npm run verify`): validation and atomic failure, dense
+- `tests/*.test.js` (Node, 65 tests, about 1.2 s; part of `npm run verify`): validation and atomic failure, dense
   indexing, all 255 palette identities, transformed/mirrored/hidden instances, model reuse by revision, voxel traversal
   against a brute-force slab test (2,000 random rays over 5 models whose sizes are not multiples of 8), resets for each
   camera/size/scene/option change, enable/disable, `maxSamples`, the denoiser's passes (the caustic chain only for
@@ -357,8 +363,9 @@ Numbers on other GPUs are not measured.
   `validateTraceOptions` against `setOptions`' own errors, `resetOptions` and automatic focus, `resolveTraceMaterial`
   defaults per type and `validateTraceMaterial` against `setScene`'s errors; reuse by `contentKey` across ids, never
   across keys, one packing for two models with one key, `invalidateModels`; `stats.renders`, buffers released before an
-  aborted render rejects, and `whenIdle` waiting for the GPU queue and resolving after `dispose`. A recording fake device
-  stands in for WebGPU.
+  aborted render rejects, and `whenIdle` waiting for the GPU queue and resolving after `dispose`; the viewport's size
+  (every storage buffer one image within the binding limit, history textures within the texture limit, 3840 x 2160
+  native with the default limits, `traceViewportSize`). A recording fake device stands in for WebGPU.
 - `tests/browser-check.mjs` (real WebGPU, run under `scripts/gpu-lock.mjs`) on the RTX A6000:
   - shaders compile with no diagnostics; no WebGPU validation errors anywhere;
   - GPU first hits equal `raycast` on all 19,200 pixels of a scene of rotated, scaled, sheared and mirrored instances,
@@ -418,7 +425,9 @@ Numbers on other GPUs are not measured.
     deviation of 0.6455 units (the box convolution's sqrt(5/12) = 0.6455);
   - viewport: disabled and disposed frames equal the raster frame bit for bit; a device restore redraws the same
     converged image bit for bit; resize restarts accumulation; Bloom composes with the HDR output;
-  - a 1500 x 1100 denoised PNG decodes to that size; a 2048^2 x 4096-sample capture cancels within 0.32 s.
+  - a 1500 x 1100 denoised PNG decodes to that size; a 2048^2 x 4096-sample capture cancels within 0.33 s, its buffers
+    released when it rejects, and `whenIdle` drains the GPU 0.4 ms later;
+  - a 3840 x 2160 canvas is traced at 3840 x 2160 with the default limits, raw and denoised, while the camera moves.
 
 ## How it works
 

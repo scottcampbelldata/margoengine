@@ -1638,10 +1638,13 @@ struct Params {size:vec4u,sigma:vec4f,tile:vec4u,origins:array<vec4f,4>,directio
 @group(0) @binding(6) var<storage,read_write> guide:array<vec4f>;
 @group(0) @binding(7) var<storage,read> caustics:array<vec4f>;
 @group(0) @binding(8) var<storage,read_write> dst2:array<vec4f>;
-// The viewport's guide holds its history after the guide itself (n = width x height), as halves: at n + i the
-// demodulated estimate and sample weight of the last frame after a restart and its guide (the distance as f32 bits); at
-// 2n + i this frame's estimate and weight, then the previously displayed colour (prepare copies it from dst, where
-// combine left it) and its weight in samples, at most 8, plus 16 x prepare's mask of the bilinear taps to read it from.
+// The viewport's history, as halves in two textures: H1 holds the demodulated estimate and sample weight of the last
+// frame after a restart and its guide (the distance as f32 bits); H2 this frame's estimate and weight, then the
+// previously displayed colour (prepare copies it from dst, where combine left it) and its weight in samples, at most 8,
+// plus 16 x prepare's mask of the bilinear taps to read it from. prepare reads H1 (hin) and writes H2 (hout); combine
+// reads H2 (hin) and writes H1 (hout). Other passes bind 1 x 1 stand-ins.
+@group(0) @binding(9) var hin:texture_2d<u32>;
+@group(0) @binding(10) var hout:texture_storage_2d<rgba32uint,write>;
 fn lum(c:vec3f)->f32 {return dot(c,vec3f(0.2126,0.7152,0.0722));}
 // pack2x16float rounded to the nearest half: some GPUs truncate toward zero (measured on an RTX A6000: every value
 // lower), which history stored every frame compounds into a darker image (1% over 32 frames).
@@ -1732,11 +1735,10 @@ fn variance(i:u32,c:vec3f,m2:f32,caustic:bool,g:vec2u)->f32 {
  // from the last restart (flag 64), so while the camera holds still the samples it adds are not counted twice.
  if((p.size.w&8u)!=0u){
   var nh=0.0;var mask=0u;
-  let m=w*h;
   if((p.size.w&16u)!=0u){
    let P=hitPoint(x,y,t);let q=select(previousPixel(vec4f(viewDir(x,y),0.0)),previousPixel(vec4f(P,1.0)),t>0.0);
    if(t>0.0&&len>1e-6&&all(q>=vec2f(0.0))&&q.x<f32(w)&&q.y<f32(h)){
-    let pg=bitcast<vec4u>(guide[m+u32(q.y)*w+u32(q.x)]);let tp=bitcast<f32>(pg.w);
+    let pg=textureLoad(hin,vec2u(q),0);let tp=bitcast<f32>(pg.w);
     let onSurface=length(prevHitPoint(floor(q.x)+0.5,floor(q.y)+0.5,tp)-P)<2.0*foot+1e-3*t;
     if(tp>0.0&&onSurface&&dot(unoct(unpack2x16float(pg.z)),nrm)>0.9){
      let h0=unpack2x16float(pg.x);let h1=unpack2x16float(pg.y);
@@ -1752,13 +1754,13 @@ fn variance(i:u32,c:vec3f,m2:f32,caustic:bool,g:vec2u)->f32 {
    for(var k=0u;k<4u;k++){
     let at=b+vec2f(f32(k&1u),f32(k>>1u));
     if(at.x<0.0||at.y<0.0||at.x>=f32(w)||at.y>=f32(h)){continue;}
-    let tp=bitcast<f32>(bitcast<vec4u>(guide[m+u32(at.y)*w+u32(at.x)]).w);
+    let tp=bitcast<f32>(textureLoad(hin,vec2u(at),0).w);
     let d=length(P-prevHitPoint(at.x+0.5,at.y+0.5,0.0));
     if(tp<=0.0||(t>0.0&&tp>0.98*d-2.0*foot)){mask|=1u<<k;}
    }
   }
   let shown=dst[i];
-  guide[2u*m+i]=bitcast<vec4f>(vec4u(packHalves(e.xy),packHalves(vec2f(e.z,min(select(32.0,8.0,through),n+nh))),
+  textureStore(hout,g.xy,vec4u(packHalves(e.xy),packHalves(vec2f(e.z,min(select(32.0,8.0,through),n+nh))),
    packHalves(shown.xy),packHalves(vec2f(shown.z,clamp(shown.w,0.0,8.0)+16.0*f32(mask)))));
  }
  dst[i]=vec4f(e,ev);
@@ -1876,11 +1878,11 @@ fn weighed(i:u32,g:vec2u,split:bool)->vec3f {
  if((p.size.w&8u)==0u){
   dst2[i]=vec4f(weighed(i,g.xy,split),1.0);return;
  }
- let m=w*h;let gi=guide[i];let n=1.0/p.sigma.w;
+ let gi=guide[i];let n=1.0/p.sigma.w;
  // The denoiser's history for the next frame, from a restart or where there was none.
- let est=bitcast<vec4u>(guide[2u*m+i]);let mask=u32(unpack2x16float(est.w).y/16.0);
+ let est=textureLoad(hin,g.xy,0);let mask=u32(unpack2x16float(est.w).y/16.0);
  if((p.size.w&64u)!=0u||(p.size.w&16u)==0u){
-  guide[m+i]=bitcast<vec4f>(vec4u(est.x,est.y,pack2x16float(gi.xy),bitcast<u32>(gi.z)));
+  textureStore(hout,g.xy,vec4u(est.x,est.y,pack2x16float(gi.xy),bitcast<u32>(gi.z)));
  }
  var c=weighed(i,g.xy,split);
  var nh=0.0;var hc=vec3f(0.0);
@@ -1893,7 +1895,7 @@ fn weighed(i:u32,g:vec2u,split:bool)->vec3f {
    let at=b+vec2f(f32(k&1u),f32(k>>1u));
    if(at.x<0.0||at.y<0.0||at.x>=f32(w)||at.y>=f32(h)){continue;}
    let wk=select(1.0-fr.x,fr.x,(k&1u)!=0u)*select(1.0-fr.y,fr.y,(k>>1u)!=0u);
-   let v=bitcast<vec4u>(guide[2u*m+u32(at.y)*w+u32(at.x)]);
+   let v=textureLoad(hin,vec2u(at),0);
    let b2=unpack2x16float(v.w);
    s+=vec4f(unpack2x16float(v.z),b2.x,b2.y-16.0*floor(b2.y/16.0))*wk;
    sw+=wk;

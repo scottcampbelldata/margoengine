@@ -30,7 +30,9 @@
 // - lens: depth of field blurs out-of-focus edges only; motion blur spreads a moving cube along its path; camera motion
 //   blur widens a line's profile to the box-convolution width;
 // - viewport: disabled is bit-identical to raster, dispose restores raster, a device restore redraws the same image;
-// - capture: PNG dimensions, cancellation; `--timing` adds GPU time per frame at 1920x1080 and upload costs.
+// - capture: PNG dimensions, cancellation, whenIdle after it; `--timing` adds GPU time per frame at 1920x1080 and upload
+//   costs;
+// - native4k: a 3840 x 2160 viewport traced at its native size with the default limits, raw and denoised (moving camera).
 // Results go to test-results/voxel-pathtracer-browser-check.json; `pictures` writes PNGs to test-results/voxel-pathtracer.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -474,13 +476,30 @@ try {
   if (wanted('capture')) {
     const r = await run('capture');
     console.log(
-      `  1500x1100 64 spp denoised PNG ${r.bytes} bytes in ${r.ms.toFixed(0)} ms; cancelled 2048^2 x 4096 after ${r.cancelledAfterMs.toFixed(0)} ms (${r.reason})`,
+      `  1500x1100 64 spp denoised PNG ${r.bytes} bytes in ${r.ms.toFixed(0)} ms; cancelled 2048^2 x 4096 after ${r.cancelledAfterMs.toFixed(0)} ms (${r.reason}); whenIdle drained in ${r.drainMs.toFixed(1)} ms`,
     );
     assert.deepEqual(r.size, [1500, 1100]);
     assert.equal(r.reason, 'AbortError');
     assert.ok(r.cancelledAfterMs < 5000, 'cancellation is prompt');
+    assert.equal(r.renders, 0, 'no render left after whenIdle');
+    assert.equal(r.gpuBytesAtRejection, r.gpuBytesAfter, 'the aborted capture released its buffers before rejecting');
+    assert.deepEqual(r.errors, []);
     await mkdir('test-results/voxel-pathtracer', { recursive: true });
     await writeFile('test-results/voxel-pathtracer/capture-1500x1100.png', Buffer.from(r.png, 'base64'));
+  }
+  if (wanted('native4k')) {
+    const r = await run('native4k');
+    for (const [name, v] of Object.entries(r.results))
+      console.log(
+        `  ${name} 3840x2160: traced ${v.traced.join('x')} (requested ${v.requested.join('x')}${v.limitedBy ? `, limited by ${v.limitedBy}` : ''}), GPU ${v.gpuMs.toFixed(2)} ms/frame, ${(v.gpuBytes / 2 ** 20).toFixed(1)} MiB; binding limit ${v.limits.binding}, texture ${v.limits.texture}`,
+      );
+    for (const [name, v] of Object.entries(r.results)) {
+      assert.deepEqual(v.canvas, [3840, 2160], `${name}: the canvas is 4K`);
+      assert.deepEqual(v.traced, [3840, 2160], `${name}: traced at the native size`);
+      assert.equal(v.limitedBy, null);
+    }
+    assert.deepEqual(r.errors, []);
+    assert.deepEqual(r.messages, []);
   }
   if (wanted('pictures')) {
     await mkdir('test-results/voxel-pathtracer', { recursive: true });

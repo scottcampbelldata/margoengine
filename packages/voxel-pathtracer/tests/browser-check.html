@@ -927,8 +927,36 @@ window.check={
    const controller=new AbortController(),t1=performance.now(),job=t.capture({width:2048,height:2048,samples:4096,signal:controller.signal});
    setTimeout(()=>controller.abort(),300);
    let reason;try{await job;}catch(e){reason=e.name;}
-   return {size:[bitmap.width,bitmap.height],bytes:png.size,ms,cancelledAfterMs:performance.now()-t1,reason,png:await toBase64(png),gpuBytesAfter:t.stats.gpuBytes,errors:errors.splice(0)};
+   const cancelledAfterMs=performance.now()-t1,gpuBytesAtRejection=t.stats.gpuBytes;
+   // whenIdle: the GPU has drained what the aborted capture submitted.
+   const t2=performance.now();await t.whenIdle();const drainMs=performance.now()-t2;
+   return {size:[bitmap.width,bitmap.height],bytes:png.size,ms,cancelledAfterMs,reason,drainMs,renders:t.stats.renders,gpuBytesAtRejection,png:await toBase64(png),gpuBytesAfter:t.stats.gpuBytes,errors:errors.splice(0)};
   });
+ },
+ // A 3840 x 2160 viewport with the default device limits: traced at its native size, denoised (history in textures)
+ // and not; GPU time per frame (timestamp queries around the tracer's pass), memory, and the moving camera's history.
+ async native4k(){
+  const results={};
+  const d=device(),query=d.createQuerySet({type:'timestamp',count:2}),resolve=d.createBuffer({size:16,usage:GPUBufferUsage.QUERY_RESOLVE|GPUBufferUsage.COPY_SRC}),read=d.createBuffer({size:16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+  const stamp=(name,order,index)=>runtime().frameGraph.add({name,order,execute:(c)=>c.encoder.beginComputePass({timestampWrites:{querySet:query,beginningOfPassWriteIndex:index}}).end()});
+  const off=[stamp('t0',19.999,0),stamp('t1',20.001,1),runtime().frameGraph.add({name:'t-resolve',order:99,execute:(c)=>{c.encoder.resolveQuerySet(query,0,2,resolve,0);c.encoder.copyBufferToBuffer(resolve,0,read,0,16);}})];
+  canvas.style.width='3840px';canvas.style.height='2160px';
+  for(const [name,options] of [['raw',{}],['denoised',{denoise:true}]]){
+   look([18,14,26],[-3,3,-2]);
+   const tracer=VoxelPathTracer.attach(engine,{scene:scenes.materials(),maxSamples:Infinity,...options});
+   await tracer.ready;
+   for(let i=0;i<5;i++){engine.render({delta:0});await d.queue.onSubmittedWorkDone();}
+   const gpu=[];
+   // The camera moves a little every frame: the denoiser reprojects its history each time.
+   for(let i=0;i<20;i++){look([18+0.05*i,14,26-0.04*i],[-3,3,-2]);engine.render({delta:0});await read.mapAsync(GPUMapMode.READ);const s=new BigInt64Array(read.getMappedRange().slice(0));read.unmap();gpu.push(Number(s[1]-s[0])/1e6);}
+   const st=tracer.stats;
+   results[name]={canvas:[canvas.width,canvas.height],traced:[st.width,st.height],requested:[st.requestedWidth,st.requestedHeight],limitedBy:st.limitedBy??null,gpuMs:[...gpu].sort((x,y)=>x-y)[gpu.length>>1],gpuBytes:st.gpuBytes,limits:{binding:d.limits.maxStorageBufferBindingSize,texture:d.limits.maxTextureDimension2D}};
+   tracer.dispose();
+  }
+  for(const f of off)f();
+  canvas.style.width='320px';canvas.style.height='240px';
+  look([20,14,24],[4,3,4]);
+  return {results,errors:errors.splice(0),messages:messages.splice(0)};
  },
  async picture(name,width,height,samples,camera,options={}){
   look(...camera);

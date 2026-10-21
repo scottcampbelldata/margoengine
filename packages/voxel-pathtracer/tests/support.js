@@ -16,6 +16,7 @@ Object.assign(globalThis, {
   },
   GPUShaderStage: { VERTEX: 1, FRAGMENT: 2, COMPUTE: 4 },
   GPUMapMode: { READ: 1, WRITE: 2 },
+  GPUTextureUsage: { COPY_SRC: 1, COPY_DST: 2, TEXTURE_BINDING: 4, STORAGE_BINDING: 8, RENDER_ATTACHMENT: 16 },
 });
 
 const recorder = (commands) =>
@@ -30,11 +31,12 @@ const recorder = (commands) =>
   );
 
 /** A device that records what the tracer asks of it. `onMap(buffer)` may fill a staging buffer before it is read. */
-export function fakeDevice({ maxStorageBufferBindingSize = 128 << 20 } = {}) {
+export function fakeDevice({ maxStorageBufferBindingSize = 128 << 20, maxTextureDimension2D = 8192 } = {}) {
   let lose;
   const device = {
-    limits: { maxStorageBufferBindingSize, maxBufferSize: 256 << 20 },
+    limits: { maxStorageBufferBindingSize, maxBufferSize: 256 << 20, maxTextureDimension2D },
     buffers: [],
+    textures: [],
     passes: [],
     submits: 0,
     onMap: undefined,
@@ -67,14 +69,35 @@ export function fakeDevice({ maxStorageBufferBindingSize = 128 << 20 } = {}) {
       device.buffers.push(b);
       return b;
     },
+    createTexture({ size: [width, height], format, usage }) {
+      assert.ok(width <= maxTextureDimension2D && height <= maxTextureDimension2D, 'texture over the dimension limit');
+      const t = {
+        width,
+        height,
+        format,
+        usage,
+        destroyed: false,
+        createView: () => ({ texture: t }),
+        destroy: () => {
+          t.destroyed = true;
+        },
+      };
+      device.textures.push(t);
+      return t;
+    },
     createBindGroupLayout: (d) => ({ ...d }),
     createPipelineLayout: (d) => ({ ...d }),
     createShaderModule: (d) => ({ ...d, getCompilationInfo: async () => ({ messages: [] }) }),
     createComputePipelineAsync: async (d) => ({ ...d, kind: 'compute' }),
     createRenderPipelineAsync: async (d) => ({ ...d, kind: 'render' }),
     createBindGroup: (d) => {
-      for (const e of d.entries)
+      for (const e of d.entries) {
         if (e.resource.buffer) assert.ok(!e.resource.buffer.destroyed, 'bind group of a destroyed buffer');
+        if (e.resource.texture) assert.ok(!e.resource.texture.destroyed, 'bind group of a destroyed texture');
+      }
+      // A texture may not be read and written by one dispatch.
+      const textures = d.entries.filter((e) => e.resource.texture).map((e) => e.resource.texture);
+      assert.equal(new Set(textures).size, textures.length, 'one texture bound twice in a bind group');
       return { ...d };
     },
     createCommandEncoder: () => {

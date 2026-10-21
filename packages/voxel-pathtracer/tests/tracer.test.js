@@ -447,7 +447,8 @@ test('capture renders the requested size in tiles and encodes a PNG of the tone-
   assert.ok(device.submits > 4, 'four tiles traced');
   assert.equal(
     tracer.stats.gpuBytes,
-    h.device.buffers.filter((b) => !b.destroyed).reduce((n, b) => n + b.size, 0),
+    h.device.buffers.filter((b) => !b.destroyed).reduce((n, b) => n + b.size, 0) +
+      h.device.textures.filter((t) => !t.destroyed).reduce((n, t) => n + t.width * t.height * 16, 0),
   );
   tracer.dispose();
 });

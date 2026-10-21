@@ -1,6 +1,7 @@
 // @margoengine/voxel-pathtracer: a progressive WebGPU path tracer for instanced voxel models (README.md).
 export { VoxelPathTracer } from './tracer.js';
 export { atmosphereRadiance, atmosphereTransmittance, bakeAtmosphere } from './atmosphere.js';
+export { traceViewportSize } from './viewport.js';
 export {
   resolveTraceMaterial,
   resolveTraceOptions,
@@ -24,6 +25,8 @@ export type {
   ResolvedTraceOptions,
   TraceProblem,
   TraceValidation,
+  TraceViewportLimits,
+  TraceViewportSize,
   TraceAreaLight,
   TraceTexture,
   TraceEnvironment,
