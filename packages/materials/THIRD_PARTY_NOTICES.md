@@ -1,10 +1,9 @@
 # Shader attribution and licenses
 
-Margo-authored material code is MIT licensed. The thin-film Fresnel port follows the Khronos glTF Sample Renderer (Apache-2.0), and the Charlie sheen directional-albedo fit follows three.js (MIT). These optional WGSL implementations have been translated, combined, and modified for the isolated material slot, including bounded optical limits and baseline parity branches. Neither renderer is a runtime dependency.
+Margo-authored material code is MIT licensed. The thin-film Fresnel port follows the Khronos glTF Sample Renderer (Apache-2.0). This optional WGSL implementation has been translated and modified for the isolated material slot, including bounded optical limits and baseline parity branches. The renderer is not a runtime dependency. The Charlie sheen directional-albedo fit is Margo's own, fitted to Margo's sheen BRDF by `scripts/sheen-albedo-fit.mjs`.
 
 Sources:
 - https://github.com/KhronosGroup/glTF-Sample-Renderer/blob/main/source/Renderer/shaders/iridescence.glsl
-- https://github.com/mrdoob/three.js/blob/dev/src/renderers/shaders/ShaderChunk/lights_physical_pars_fragment.glsl.js
 
 ## Khronos glTF Sample Renderer contributors — Apache-2.0
 
@@ -210,28 +209,3 @@ Sources:
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
-
-
-## three.js authors — MIT
-
-The MIT License
-
-Copyright © 2010-2026 three.js authors
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.

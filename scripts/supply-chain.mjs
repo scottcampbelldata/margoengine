@@ -44,8 +44,8 @@ const WHY = {
 export const BUNDLED = [
   {
     package: '@margoengine/materials',
-    component: 'Khronos thin-film Fresnel and three.js Charlie sheen directional-albedo fit',
-    licence: 'Apache-2.0 AND MIT',
+    component: 'Khronos thin-film Fresnel',
+    licence: 'Apache-2.0',
     files: 'dist material-lobe shaders',
     source: 'packages/materials/src/lobe-shader.ts; upstream references in THIRD_PARTY_NOTICES.md',
     modified: 'translated to WGSL and adapted to the isolated material extension slot',

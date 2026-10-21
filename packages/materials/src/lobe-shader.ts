@@ -122,13 +122,11 @@ fn materialLobesSheenBRDF(roughness:f32,nl:f32,nv:f32,nh:f32)->f32 {
   let materialVisibility=min(1.0,1.0/max(4.0*(nl+nv-nl*nv),0.000001));
   return materialDistribution*materialVisibility;
 }
-// Analytic directional-albedo fit to integrated Charlie/Neubelt sheen.
-// https://github.com/mrdoob/three.js/blob/dev/src/renderers/shaders/ShaderChunk/lights_physical_pars_fragment.glsl.js
+// Albedo of the KHR_materials_sheen BRDF above (Estevez & Kulla 2017), fit by scripts/sheen-albedo-fit.mjs.
 fn materialLobesSheenAlbedo(mu:f32,roughness:f32)->f32 {
-  let materialR2=roughness*roughness;let materialInverse=1.0/(roughness+0.1);
-  let materialA=-1.9362+1.0678*roughness+0.4573*materialR2-0.8469*materialInverse;
-  let materialB=-0.6014+0.5538*roughness-0.4670*materialR2-0.1255*materialInverse;
-  return clamp(exp(materialA*mu+materialB),0.0,1.0);
+  let materialR2=roughness*roughness;let materialQ=materialR2/(materialR2+0.046698);
+  let materialBasis=vec4f(1.0,materialQ,roughness,materialQ*roughness);let materialX=mu/max(roughness,0.0001);
+  return clamp(exp(dot(materialBasis,vec4f(0.67486,-1.0569,1.2955,-1.6596))-materialX*(dot(materialBasis,vec4f(0.78851,0.09914,-0.27042,0.61309))+materialX*dot(materialBasis,vec4f(0.072685,0.29184,-0.084342,-0.10518)))),0.0,1.0);
 }
 fn materialLobesDirect(i:Out,s:Surface,baseline:vec3f,material:MaterialLobeInputs)->vec3f {
   let materialSpecularActive=materialLobesSpecularActive(s,material);

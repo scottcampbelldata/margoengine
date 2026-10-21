@@ -33,7 +33,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 
 | Package | Component | Licence | Shipped files | Modified | Notices in the tarball |
 | --- | --- | --- | --- | --- | --- |
-| @margoengine/materials | Khronos thin-film Fresnel and three.js Charlie sheen directional-albedo fit | Apache-2.0 AND MIT | dist material-lobe shaders | translated to WGSL and adapted to the isolated material extension slot | THIRD_PARTY_NOTICES.md |
+| @margoengine/materials | Khronos thin-film Fresnel | Apache-2.0 | dist material-lobe shaders | translated to WGSL and adapted to the isolated material extension slot | THIRD_PARTY_NOTICES.md |
 | @margoengine/decoders | Draco 3D decoder (Google) | Apache-2.0 | dist/draco/draco_decoder.wasm, dist/draco/draco_wasm_wrapper.js | no | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
 | @margoengine/decoders | Basis Universal transcoder (Binomial LLC) | Apache-2.0 | dist/basis/basis_transcoder.wasm, dist/basis/basis_transcoder.js | the .js glue only: scripts/static-embind.js swaps two `new Function` generators for closures; the file states it in its first line | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
 | @margoengine/decoders | meshoptimizer vertex/index decoder (Arseny Kapoulkine) | MIT | dist/meshopt.js | ported to TypeScript | dist/THIRD-PARTY-NOTICE.md |
@@ -113,7 +113,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/lod` | none | none | LICENSE |
 | `@margoengine/machinery` | none | occt-import-js 0.0.23 with OpenCascade (LGPL-2.1) | LICENSE, dist/workers/OCCT-NOTICE.txt, dist/workers/OCCT-LICENSE.txt |
 | `margoengine` | none | none | LICENSE |
-| `@margoengine/materials` | none | Khronos thin-film Fresnel and three.js Charlie sheen directional-albedo fit (Apache-2.0) | LICENSE, THIRD_PARTY_NOTICES.md |
+| `@margoengine/materials` | none | Khronos thin-film Fresnel (Apache-2.0) | LICENSE, THIRD_PARTY_NOTICES.md |
 | `@margoengine/math` | none | none | LICENSE |
 | `@margoengine/navigation` | recast-navigation 0.43.1 (dependency) | none | LICENSE |
 | `@margoengine/navmesh` | none | none | LICENSE |
