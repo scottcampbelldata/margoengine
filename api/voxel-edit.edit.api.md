@@ -13,6 +13,49 @@ export interface BoxOptions {
 
 export type GridSource = VoxelGrid | SparseGrid;
 
+export interface MirrorOptions extends GridLimits {
+    size: Vec3;
+    mirror: readonly [boolean, boolean, boolean];
+    side?: number;
+}
+
+export interface MirrorStamp {
+    cells: Float64Array;
+    values?: Uint8Array;
+}
+
+export interface PasteOptions extends GridLimits {
+    offset: Vec3;
+    targetKeys: readonly string[];
+    clipKeys: readonly string[];
+}
+
+export interface PasteOverflow {
+    status: 'overflow';
+    needed: number;
+    free: number;
+}
+
+export interface PastePlan {
+    status: 'pasted';
+    paletteMap: Uint8Array;
+    assignments: {
+        from: number;
+        to: number;
+    }[];
+    selection: Float64Array;
+    clipped: number;
+}
+
+export interface StampOptions {
+    operation: 'fill' | 'paint' | 'erase';
+    color?: number;
+    values?: Uint8Array;
+    selection?: {
+        has(index: number): boolean;
+    };
+}
+
 export function boxCells(a: Vec3, b: Vec3, options?: BoxOptions): MutableVec3[];
 
 export function connectedCells(source: GridSource, seed: Vec3, limits?: GridLimits): Float64Array;
@@ -23,9 +66,23 @@ export function floodCells(source: GridSource, seed: Vec3, limits?: GridLimits):
 
 export function lineCells(a: Vec3, b: Vec3): MutableVec3[];
 
+export function mirrorCells(samples: Iterable<readonly number[]>, options: MirrorOptions): MirrorStamp;
+
+export function pasteCells(target: VoxelGrid, clip: Iterable<readonly number[]>, options: PasteOptions): (PastePlan & GridEdit) | PasteOverflow;
+export function pasteCells(target: SparseGrid, clip: Iterable<readonly number[]>, options: PasteOptions): (PastePlan & SparseEdit) | PasteOverflow;
+
 export function sphereCells(center: Vec3, radius: number): MutableVec3[];
 
+export function stampCells(target: VoxelGrid, cells: ArrayLike<number>, options: StampOptions): GridEdit;
+export function stampCells(target: SparseGrid, cells: ArrayLike<number>, options: StampOptions): SparseEdit;
+
 // Not exported from this entry, but used by the exports above:
+
+interface GridEdit {
+    grid: VoxelGrid;
+    changed: number;
+    clipped: number;
+}
 
 interface GridHit {
     cell: MutableVec3;
