@@ -1,6 +1,8 @@
-# @margoengine/voxel-net: design draft for Scott's review (2026-10-21)
+# @margoengine/voxel-net: design (approved 2026-10-21)
 
-The name is a proposal; Scott picks it (questions at the end). Nothing here is built yet.
+Scott approved this design and the four questions at the end on 2026-10-21 ("all thats fine"): the name, the
+distances, the bench scenarios, and the faster `EntityCodec` path. It is built: README.md, `bench/`, and the measured
+results in `docs/voxel-net-capacity-2026-10-21.md`.
 
 Goal: the smallest real multiplayer layer for a Margo voxel world, then headless bots that load it, so we can say,
 with measured numbers, how many players one server process on this PC can serve at 20 ticks per second.
@@ -185,7 +187,7 @@ Bots: four bots for two seconds with no errors.
 
 Accounts and login, saving to disk, mobs, chat, inventories, TLS, several server processes for one world.
 
-## Questions for Scott
+## Questions for Scott (all answered yes)
 
 1. **Name**: `@margoengine/voxel-net` (proposed), `@margoengine/voxel-server` or `@margoengine/voxel-multiplayer`?
 2. **Distances**: view 6 chunks (192 blocks, a client may ask 2 to 8), simulation 3 chunks, players within 96 blocks.
