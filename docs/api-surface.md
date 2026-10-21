@@ -13,11 +13,11 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 
 | Package | Exports per entry | Unexported | `any` | Gzip |
 | --- | --- | ---: | ---: | ---: |
-| @margoengine/animation | `.` 24, `./vat` 14 | 8 |  | 11,368 |
+| @margoengine/animation | `.` 24, `./vat` 14 | 8 |  | 13,446 |
 | @margoengine/animator | `.` 18 |  |  | 11,345 |
-| @margoengine/audio | `.` 19 | 2 |  | 7,431 |
+| @margoengine/audio | `.` 19 | 2 |  | 7,473 |
 | @margoengine/blender | `.` 5 |  |  | 2,890 |
-| @margoengine/brep | `.` 58 | 5 |  | 102,537 |
+| @margoengine/brep | `.` 58 | 5 |  | 104,764 |
 | @margoengine/bvh | `.` 58 |  |  | 17,457 |
 | @margoengine/cache | `.` 5 |  |  | 2,421 |
 | @margoengine/cameras | `.` 3, `./origin` 3 |  |  | 1,674 |
@@ -31,7 +31,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/dof | `.` 2 |  |  | 6,283 |
 | @margoengine/ecs | `.` 6 |  |  | 1,350 |
 | @margoengine/environment | `.` 61, `./probes` 8, `./volumetric` 3 | 13 |  | 28,010 |
-| @margoengine/exporters | `.` 57, `./usdz` 2, `./model` 6, `./dae` 3, `./capture` 29, `./skin` 9 | 52 |  | 31,183 |
+| @margoengine/exporters | `.` 57, `./usdz` 2, `./model` 6, `./dae` 3, `./capture` 29, `./skin` 9 | 52 |  | 31,824 |
 | @margoengine/fbx | `.` 4, `./worker` 2 | 1 |  | 16,674 |
 | @margoengine/fsm | `.` 3 |  |  | 875 |
 | @margoengine/geometry | `.` 64 |  |  | 16,079 |
@@ -50,7 +50,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/lod | `.` 18 |  |  | 10,250 |
 | @margoengine/machinery | `.` 49, `./cad` 8, `./cad-async` 3, `./kinematics` 7, `./surface` 4, `./telemetry` 2, `./section` 3, `./assembly` 1, `./metrology` 7, `./spatial` 2, `./clearance` 2, `./materials` 2, `./overlays` 7, `./exploded` 2, `./edges` 3, `./dimensions` 7 | 14 |  | 42,810 |
 | margoengine | `.` 22 | 1 |  | 2,790 |
-| @margoengine/materials | `.` 84, `./transmission` 8 | 9 |  | 40,317 |
+| @margoengine/materials | `.` 84, `./transmission` 8 | 9 |  | 40,321 |
 | @margoengine/math | `.` 45, `./vector2` 1, `./vector3` 1, `./vector4` 1, `./quaternion` 1, `./euler` 1, `./matrix3` 1, `./matrix4` 1, `./color` 12, `./box3` 1, `./sphere` 1, `./plane` 1, `./ray` 1, `./frustum` 1, `./spherical` 1, `./mathutils` 21, `./mat4` 6, `./validate` 1, `./quat` 3, `./vec3` 7, `./errors` 2, `./mesh` 1, `./billboard` 4, `./affine` 2 | 84 |  | 11,389 |
 | @margoengine/navigation | `.` 2 |  |  | 989 |
 | @margoengine/navmesh | `.` 4 |  |  | 3,140 |
