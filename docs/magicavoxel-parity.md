@@ -311,6 +311,9 @@ blocks. Photo mode leaves grass and flowers out and shows torches as small glowi
 - 2026-10-20 (branch `claude/quizzical-northcutt-b56ae0`, after the subsurface, horizon, camera and defaults work):
   `npm run verify` passed (3,116 of 3,116 tests, API reports match, core + stage 21,343 bytes gzip, proofs 15 of 15);
   the package bundle grew by 1,030 bytes gzip (esbuild, minified: 59,281 -> 60,311).
+- 2026-10-21: that branch's 12 commits landed on main, ported onto main's model material tables and `options.ts`. Our
+  renders of 74 MagicaVoxel scenes (1,024 samples) and the six perspective scenes (8,192) are byte-identical to the
+  branch's, so every score above holds; the GPU browser check passed.
 - Open: size entries (measure:size), rebuild the tarballs for Codex.
 
 ## Paused when the voxel and path tracer work began (do not lose)
