@@ -1,5 +1,5 @@
 {
-  "commit": "b35efb47",
+  "commit": "c365b54a",
   "dirty": false,
   "browser": "msedge 155.0.4283.62 headless",
   "adapter": "nvidia ampere",
@@ -11,17 +11,17 @@
       "encoding": "identity",
       "transferred": 808,
       "raw": 558,
-      "gzip": 366,
-      "brotli": 227
+      "gzip": 367,
+      "brotli": 226
     },
     {
-      "path": "assets/index-CTz-vgjb.js",
+      "path": "assets/index-Bt0zWemq.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 22210,
+      "transferred": 22215,
       "raw": 51548,
-      "gzip": 21829,
-      "brotli": 19256
+      "gzip": 21834,
+      "brotli": 19263
     },
     {
       "path": "assets/geometry-CAWt7Gfm.js",
@@ -62,10 +62,10 @@
   ],
   "total": {
     "requests": 6,
-    "transferred": 31775,
+    "transferred": 31780,
     "raw": 67902,
-    "gzip": 28754,
-    "brotli": 25359
+    "gzip": 28760,
+    "brotli": 25365
   },
   "notFetched": [
     {
@@ -89,10 +89,6 @@
       "raw": 83198
     },
     {
-      "path": "assets/dist-CjV6EXMB.js",
-      "raw": 44
-    },
-    {
       "path": "assets/dist-CjVGX7OB.js",
       "raw": 61245
     },
@@ -103,6 +99,10 @@
     {
       "path": "assets/dist-DGHKO0qm.js",
       "raw": 32308
+    },
+    {
+      "path": "assets/dist-DQuF1mWl.js",
+      "raw": 44
     },
     {
       "path": "assets/occt-import-js-BhHfLpto.wasm",
@@ -129,12 +129,12 @@
       "raw": 52
     },
     {
-      "path": "assets/sky-B7mgz2W2.js",
-      "raw": 18984
+      "path": "assets/sky-DQuF1mWl.js",
+      "raw": 44
     },
     {
-      "path": "assets/sky-CjV6EXMB.js",
-      "raw": 44
+      "path": "assets/sky-IQ7yrLkn.js",
+      "raw": 20041
     }
   ]
 }
