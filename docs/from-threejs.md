@@ -605,8 +605,8 @@ const scan = createMeshes(engine, parsePLY(await (await fetch('/scan.ply')).arra
 ```
 
 The stage facade loads by extension: `await app.load('/part.step')` handles glTF (constant colours), STL, OBJ, STEP and
-IGES and frames the result. `@margoengine/loaders` also parses 3MF, PCD, XYZ, OFF and legacy VTK. OBJ materials and UVs
-(MTL) and Collada are not supported. For STEP/IGES files you ship yourself, convert them once with
+IGES and frames the result. `@margoengine/loaders` also parses 3MF, PCD, XYZ, OFF and legacy VTK. Textured OBJ with its MTL loads in one call with `loadOBJ` from `@margoengine/loaders/mtl`; Collada reads geometry,
+materials and the hierarchy (`parseDAE`). For STEP/IGES files you ship yourself, convert them once with
 `npx margo-convert part.step part.glb` ([tools/margo-convert](../tools/margo-convert/README.md)) and load the GLB:
 the page then skips the 3.1 MB OCCT download.
 
@@ -673,8 +673,9 @@ for (let i = 0; i < 1000; i++) {
 }
 ```
 
-Skins and clips come from glTF (or FBX). There are no clips authored in code (`KeyframeTrack`), no `SkeletonUtils`
-retargeting and no general CCD IK (animator has two-bone foot IK).
+Skins and clips come from glTF (or FBX). Clips authored in code (`createKeyframeClip`) take node TRS and morph-weight tracks;
+`@margoengine/animation/skeleton-utils` clones and retargets (`cloneModel`, `Retarget`), `AnimationGroup` drives many
+models with one clip, and animator has CCD chains and two-bone foot IK.
 
 ### Exporting glTF
 
@@ -946,7 +947,9 @@ ssr.enabled = false;                        // toggles without recompiling; SSR.
 - A single effect can also be attached alone, for example `Bloom.attach(engine, {strength: 0.8})`.
 - Custom full-screen effects are `NodePass`es from `@margoengine/shader` (next section).
 - `Tonemap` curves are `'agx'`, `'acescg'` and `'neutral'`, with exposure in stops and `.cube` LUTs (`setLUT`).
-- Not available: SMAA, GTAO, motion blur, glitch and the simple screen-effect passes (write them as a `NodePass`).
+- SMAA (`@margoengine/post/smaa`), GTAO, motion blur, glitch (`/glitch`) and afterimage (`/afterimage`) are in post;
+  vignette, RGB shift, chromatic aberration, pixelation, halftone, dot screen, Sobel, sepia and posterize are ready-made
+  `NodePass` effects in `@margoengine/shader/effects`.
 
 ## TSL and node materials
 
@@ -1072,7 +1075,8 @@ labels.add(element, {mesh, offset: [0, 0.8, 0]});
 ```
 
 Lines, points and text are WebGPU only. Lines are not pickable. `labels.add3D(element, {mesh})` replaces
-`CSS3DObject`. Extruded 3D text (`TextGeometry`) is not available.
+`CSS3DObject`. Extruded 3D text comes from TrueType fonts through `textGeometry` in `@margoengine/loaders/font` (typeface JSON
+fonts are not read).
 
 ## Math
 
@@ -1186,19 +1190,14 @@ features add no core or stage functionality.
 
 | three.js | Status in Margo |
 | --- | --- |
-| Multiple scenes, general multi-view rendering, `CubeCamera` | One implicit scene per engine. `Engine.render({camera})` supports sequential second-camera captures, and live reflection probes (`LightProbes.setLive`) capture cube views for reflections; a general cube render target, nested rendering and independent temporal histories remain absent |
+| Multiple scenes, general multi-view rendering | One implicit scene per engine; `SceneSwitch` (`@margoengine/cameras/layers`) swaps mesh sets. Mirrors, glass and `CubeCamera` (`@margoengine/environment`) capture other views; nested rendering and independent temporal histories remain absent. Planned next: [multi-view-roadmap.md](multi-view-roadmap.md) |
 | General viewport/scissor support | Core draws accept viewport/scissor rectangles; optional native passes and picking do not inherit them, and camera aspect remains caller-controlled |
 | WebGL2 for optional packages | Closed v1 limit: core meshes, controls, labels, viewcube, bvh, LOD distance levels and the small glTF loader run on WebGL2; the rest needs WebGPU |
 | glTF `KHR_animation_pointer` | Files that require it are rejected; when only used, animation `createMaterialAnimation` plays base-colour UV offset and scale tracks, and exporters write those tracks from data scenes. Dispersion, iridescence, anisotropy and diffuse transmission use the documented `@margoengine/gltf-pro/extended` material path; material variants (`selectVariant`) and glTF cameras (`viewGLTFCamera`) are supported |
-| Custom attributes on your own meshes | Arbitrary named attributes remain missing; independent `uvs1` and geometry groups with material arrays are supported by materials, including instancing and glTF export |
-| Standalone KTX2 or float/3D/array data textures on your own meshes | Missing (KTX2 works inside glTF; materials takes RGBA8 data) |
-| SMAA, glitch, afterimage | Missing (FXAA, TAA, SSAO, GTAO, SSR, SSGI, bloom, DOF, motion blur and a lens flare are there) |
-| Built-in screen effects (vignette, RGB shift, pixelation, halftone, Sobel) | Not built in; a few nodes in a shader `NodePass` |
 | Stencil caps for clipped glTF-pro models, per-material clipping planes | Missing (machinery `SectionPlanes` clip core and native glTF-pro primitives and their directional shadows, but cap core meshes only; shader `discard` slices without caps or shadows) |
-| `BatchedMesh`, render layers | Missing (bvh has raycast layers only; machinery `PartPacks` packs static parts into one draw) |
-| Reflector, Refractor, mesh decals | Missing (water has its own refraction; post `Decals` are screen-space decals) |
-| `TextGeometry`, SVGLoader, LDraw and other long-tail loaders; materials built from MTL; COLLADA skins and animation | Missing (loaders read OBJ with MTL data and COLLADA geometry and materials; voxel reads and writes VOX) |
-| `SkeletonUtils`, morph-weight and property tracks | Missing (node TRS clips are authored with animation `createKeyframeClip`; CCD chains with animator `CCDSolver`) |
-| `ArcballControls`, roll in the controls, skeleton helper | Missing (core `camera.up` can roll; no control drives it; light helpers are in lines) |
+| `BatchedMesh` | Missing (machinery `PartPacks` packs static parts into one draw; render layers are in `@margoengine/cameras/layers`) |
+| LDraw and other long-tail loaders; COLLADA skins and animation | Missing (loaders read OBJ with MTL materials, SVG, TrueType fonts and COLLADA geometry and materials; voxel reads and writes VOX) |
+| Arbitrary property tracks (`PropertyBinding`) | Missing (node TRS and morph-weight clips are authored with animation `createKeyframeClip`) |
+| `ArcballControls`, roll in the controls | Missing (core `camera.up` can roll; no control drives it) |
 | Cameras and lights from engine-scene glTF export, Draco/KTX2/EXR export, USDZ export with textures | Missing (`exportModel` and the data-scene writers write cameras and lights; glTF export with animation, skins, morphs and textures exists, plus OBJ, STL, PLY, DAE and static USDZ) |
 | WebXR hit test, controller and hand models, other plugin passes in XR | Missing (VR sessions, controller poses and loader-owned glTF-pro models in XR exist) |
