@@ -85,7 +85,9 @@ MagicaVoxel helpers (`magicaVoxelMaterial`, `magicaVoxelLighting`, `magicaVoxelC
 viewport denoiser that keeps history while the camera moves, transparent captures, block textures with cut-out texels,
 and the voxel sandbox's photo mode (P) on top of them. Open (in the parity doc): six MagicaVoxel renders that need the
 desktop (blend, transparent background, `_scale`, orthographic, isometric, `_proj`), sky-lit subsurface 7-12 levels
-dark.
+dark. Margo Voxel Studio's 34 engine gaps (2026-10-21): all implemented and verified in the engine, none integrated in
+the Studio yet; status, commits, the denoiser's 72-gate result (72/72, was 60/72) and the migration guide for Codex
+are in `docs/studio-engine-gaps.md`.
 
 Tile editor engine work (Scott, 2026-10-18/19): Scott started `tile-asset-editor` (a Crocotile 3D 2.7.4 equivalent,
 own repository `scottcampbelldata/tile-asset-editor`) as the base of his own 3D modeller and game engine, and
