@@ -97,6 +97,10 @@
     "./billboard": {
       "types": "./dist/billboard.d.ts",
       "import": "./dist/billboard.js"
+    },
+    "./affine": {
+      "types": "./dist/affine.d.ts",
+      "import": "./dist/affine.js"
     }
   },
   "files": [

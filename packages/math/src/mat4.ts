@@ -1,4 +1,4 @@
-import type { NumberArray } from './types.js';
+import type { MutableVec3, NumberArray } from './types.js';
 
 // Column-major 4x4 matrices as plain arrays (number[], Float32Array, Float64Array: the layout of core `camera.matrix`
 // and mesh world matrices). Arithmetic is float64; a Float32Array `out` rounds once on store. Nothing allocates.
@@ -155,4 +155,48 @@ export function invertMatrixStable<T extends Float32Array | Float64Array>(
   }
   for (let i = 0; i < 16; i++) out[i] = a[36 + i];
   return out;
+}
+
+/**
+ * Result of {@link transformPointChecked}: the projected point, or why there is none. `w` is the homogeneous
+ * coordinate the point was divided by (or would have been).
+ */
+export type CheckedPoint =
+  | { ok: true; point: MutableVec3; w: number }
+  | {
+      ok: false;
+      /**
+       * `'w-nonfinite'`: w is NaN or infinite; `'w-small'`: |w| is below the tolerance (a point at or near infinity);
+       * `'point-nonfinite'`: the divided point overflowed or is NaN.
+       */
+      reason: 'w-nonfinite' | 'w-small' | 'point-nonfinite';
+      w: number;
+    };
+
+/**
+ * Transforms point `p` by the column-major 4x4 `m` with the perspective divide, like `Vector3.applyMatrix4`, but returns
+ * a failure instead of a non-finite or near-infinite point: w = m[3] p.x + m[7] p.y + m[11] p.z + m[15] must be finite
+ * with |w| >= `minW`, and the point `(m[r] p.x + m[4 + r] p.y + m[8 + r] p.z + m[12 + r]) / w` finite. Divides by w
+ * (no reciprocal), so for accepted points it matches that expression bit for bit.
+ * @param minW Smallest accepted |w|, finite and >= 0; default 1e-12.
+ * @throws TypeError when `m` has fewer than 16 numbers or `p` fewer than 3.
+ * @throws RangeError when `minW` is negative or not finite.
+ */
+export function transformPointChecked(m: ArrayLike<number>, p: ArrayLike<number>, minW = 1e-12): CheckedPoint {
+  if (!m || !(m.length >= 16) || !p || !(p.length >= 3))
+    throw new TypeError('transformPointChecked needs a 16-number column-major matrix and an [x, y, z] point');
+  if (!(minW >= 0 && minW < Number.POSITIVE_INFINITY))
+    throw new RangeError(`transformPointChecked minW ${minW} is invalid; pass a finite tolerance >= 0, e.g. 1e-12`);
+  const x = p[0],
+    y = p[1],
+    z = p[2],
+    w = m[3] * x + m[7] * y + m[11] * z + m[15];
+  if (!Number.isFinite(w)) return { ok: false, reason: 'w-nonfinite', w };
+  if (Math.abs(w) < minW) return { ok: false, reason: 'w-small', w };
+  const point: MutableVec3 = [0, 0, 0];
+  for (let r = 0; r < 3; r++) {
+    point[r] = (m[r] * x + m[4 + r] * y + m[8 + r] * z + m[12 + r]) / w;
+    if (!Number.isFinite(point[r])) return { ok: false, reason: 'point-nonfinite', w };
+  }
+  return { ok: true, point, w };
 }

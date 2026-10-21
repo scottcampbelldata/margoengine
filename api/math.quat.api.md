@@ -5,5 +5,7 @@
 ```ts
 export function eulerToQuaternion(x: number, y: number, z: number): [number, number, number, number];
 
+export function interpolateQuaternions(a: ArrayLike<number>, b: ArrayLike<number>, t: number, linearAbove: number): [number, number, number, number];
+
 export const multiplyQuaternions: (a: ArrayLike<number>, b: ArrayLike<number>) => [number, number, number, number];
 ```
