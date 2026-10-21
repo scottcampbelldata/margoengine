@@ -221,10 +221,19 @@ export class FaceUV {
       while (k < samples.length && this.poleOf(samples[(first + k) % samples.length]) !== undefined) k++;
       const next = samples[(first + k) % samples.length];
       if ('v' in pole) {
-        const out = this.near(next, [hint[0], pole.v]);
+        // The face lies below the line at the high pole and above it at the low one, and on the left of the loop, so the
+        // line runs towards -u' at the high pole and +u' at the low, by more than none and at most a whole turn (a loop
+        // up a seam to an apex and back down runs a whole turn round it). Rounding to the nearer u' would pick a side at
+        // random for half a turn (a hemisphere cut through both poles) and the wrong one beyond it.
+        let out = this.near(next, [hint[0], pole.v])[0];
+        if (this.period) {
+          const turn = pole.v === this.surface.pole(1) ? -1 : 1,
+            gap = 1e-9 * this.period;
+          out -= turn * this.period * (Math.ceil((turn * (out - hint[0]) - gap) / this.period) - 1);
+        }
         lines.push(points.length);
-        points.push([hint[0], pole.v], [out[0], pole.v]);
-        hint = [out[0], pole.v];
+        points.push([hint[0], pole.v], [out, pole.v]);
+        hint = [out, pole.v];
       } else {
         const out = this.near(next, [pole.u, hint[1]]);
         uLines.push(points.length);
@@ -233,13 +242,8 @@ export class FaceUV {
       }
       j = k - 1;
     }
+    // A loop through a pole bounds a sector (wrap 0), or goes round once more where the face holds the other pole too.
     const closed = this.close(points, new Set([...lines, ...uLines].flatMap((i) => [i, i + 1])), false);
-    if (lines.length && closed.wrap) {
-      // A loop through a pole bounds a sector and does not go round: its first pole line takes up the turn.
-      for (let i = lines[0] + 1; i < points.length; i++)
-        points[i] = [points[i][0] - closed.wrap * this.period, points[i][1]];
-      closed.wrap = 0;
-    }
     for (const [u, v] of points) {
       this.box[0] = Math.min(this.box[0], u);
       this.box[1] = Math.max(this.box[1], u);

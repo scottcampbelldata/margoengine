@@ -137,6 +137,47 @@ test('mass properties: a cone ring, a hemisphere over its pole, a box with a hol
   );
 });
 
+test('mass properties: a sphere cut through its poles, its loop along both pole lines or round past one', () => {
+  // A ball of radius 10 cut by planes through its axis: the sphere face's loop runs along the line of each pole, towards
+  // -u' at the north and +u' at the south, by the wedge between the meridians (half a turn for a hemisphere).
+  const r = 10,
+    V = (4 / 3) * Math.PI * r ** 3,
+    at = (x, y, z) => frameOf([x * mm, y * mm, z * mm], [0, 0, 1], [1, 0, 0]),
+    cut = (op, size, frame) =>
+      boolean(
+        'c',
+        op,
+        sphere('s', r * mm),
+        box(
+          'b',
+          size.map((x) => x * mm),
+          frame,
+        ),
+      );
+  for (const [side, x] of [
+    [1, 0],
+    [-1, -20],
+  ]) {
+    const half = cut('intersect', [20, 30, 30], at(x, -15, -15));
+    assert.deepEqual(validateBody(half), []);
+    expect(half, { volume: V / 2, area: 3 * Math.PI * r * r, centroid: [(side * 3 * r) / 8, 0, 0] }, 1e-12);
+    // The same half as a pocket in the block, its sphere face reversed (u mirrored).
+    const block = box('b', [20 * mm, 30 * mm, 30 * mm], at(x, -15, -15));
+    expect(boolean('p', 'subtract', block, sphere('s', r * mm)), { volume: 18000 - V / 2 }, 1e-12);
+  }
+  // A quarter (two planes through the poles) and the three quarters left when it is taken away.
+  expect(
+    cut('intersect', [20, 20, 30], at(0, 0, -15)),
+    { volume: V / 4, area: 2 * Math.PI * r * r, centroid: [(3 * r) / 8, (3 * r) / 8, 0] },
+    1e-12,
+  );
+  expect(cut('subtract', [20, 20, 30], at(0, 0, -15)), { volume: (3 * V) / 4, area: 4 * Math.PI * r * r }, 1e-12);
+  // A corner off the top (x, y >= 0 above z = 5) or the bottom: the loop runs through one pole and round the sphere
+  // once, the face keeping the other pole.
+  const corner = (Math.PI * 25 * (3 * r - 5)) / 3 / 4;
+  for (const z of [5, -25]) expect(cut('subtract', [20, 20, 20], at(0, 0, z)), { volume: V - corner }, 1e-12);
+});
+
 /**
  * A cylinder of radius r, height h as an importer may hand it over: its side in three faces (the front half; the back
  * half below and above a middle arc), that arc `off` outside the side and the top vertex at u = pi `miss` along the top
