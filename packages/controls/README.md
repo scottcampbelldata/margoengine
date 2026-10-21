@@ -196,6 +196,10 @@ Under an orthographic `@margoengine/cameras` projection the wheel and dolly drag
 about the cursor when the projection's `height` is left at its default (perspective height at the target); with an
 explicit `height` they change only the distance.
 
+SolidWorks, AutoCAD, Inventor, Fusion, Blender, Maya, Onshape and Rhino are trademarks of their respective owners. They
+are named here only to say whose mouse mapping a profile follows; Margo Engine is not affiliated with or endorsed by
+any of them.
+
 ## How it works
 
 - **Camera model.** The Margo Engine `Camera` is a position, a target, `fov`, `near`, `far` and an `up` vector (default world +Y). All controls write `camera.position` and `camera.target` and nothing else. `OrbitControls.target` reads and writes `camera.target`. The core camera rejects a view parallel to its `up`, so with the default +Y every control keeps the view at least a hair off the poles (orbit uses an epsilon on the polar angle, the walk controls cap pitch just under 90 degrees).
