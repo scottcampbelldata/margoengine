@@ -174,7 +174,6 @@ class WebSocketConnection {
     cork(): void;
     uncork(): void;
     close(code?: number, reason?: string): void;
-    destroy(): void;
 }
 
 interface WebSocketOptions {

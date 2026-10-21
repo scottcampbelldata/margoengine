@@ -106,11 +106,6 @@ export class WebSocketConnection {
     this.#socket.end();
     this.#end(code, reason);
   }
-  /** Ends the socket at once, without a closing handshake. */
-  destroy(): void {
-    this.#socket.destroy();
-    this.#end(1006, 'destroyed');
-  }
   #end(code: number, reason: string): void {
     if (this.#closed) return;
     this.#closed = true;
