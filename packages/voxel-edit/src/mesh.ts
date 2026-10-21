@@ -137,6 +137,97 @@ export function meshGrid(
   };
 }
 
+/** Options of {@link partitionMesh}. */
+export interface PartitionOptions {
+  /** Most quads per part, 1 to 250,000 (core `Geometry` takes at most 1,000,000 vertices). Default 250,000. */
+  maxQuads?: number;
+}
+
+/** One upload-sized part of a {@link GridMesh}: quads of one palette index, in mesh order, 4 vertices each. */
+export interface MeshPart {
+  /** Palette index of every quad in the part. */
+  paletteIndex: number;
+  /** xyz per vertex, copied from the mesh. */
+  positions: Float32Array;
+  /** Unit xyz per vertex. */
+  normals: Float32Array;
+  /** Per-vertex ambient light; empty when the mesh has none. */
+  ao: Float32Array;
+  /** Triangle vertex indexes into this part's vertices. */
+  indices: Uint32Array;
+  /** The mesh's index of each quad in the part, in order. */
+  quads: Uint32Array;
+}
+
+const MAX_PART_QUADS = 250_000;
+
+/**
+ * Splits a mesh from {@link meshGrid} into parts a core `Geometry` (at most 1,000,000 vertices) and one material
+ * each can take: quads are visited in mesh order and each goes to its palette index's open part, which closes once it
+ * holds `maxQuads`. Parts come in the order of their first quad; every attribute is copied, never recomputed.
+ */
+export function partitionMesh(mesh: GridMesh, options: PartitionOptions = {}): MeshPart[] {
+  if (typeof options !== 'object' || options === null)
+    throw new TypeError('partitionMesh options are not an object; pass them');
+  const maxQuads = options.maxQuads ?? MAX_PART_QUADS;
+  if (!Number.isInteger(maxQuads) || maxQuads < 1 || maxQuads > MAX_PART_QUADS)
+    throw new RangeError(`partitionMesh maxQuads must be an integer from 1 to ${MAX_PART_QUADS}; pass one`);
+  if (typeof mesh !== 'object' || mesh === null || !(mesh.paletteIndexes instanceof Uint8Array))
+    throw new TypeError('partitionMesh mesh is not a GridMesh; pass what meshGrid returned');
+  const { positions, normals, ao, indices, paletteIndexes } = mesh,
+    quads = paletteIndexes.length;
+  if (
+    !(positions instanceof Float32Array) ||
+    !(normals instanceof Float32Array) ||
+    !(ao instanceof Float32Array) ||
+    !(indices instanceof Uint32Array) ||
+    positions.length !== 12 * quads ||
+    normals.length !== 12 * quads ||
+    (ao.length !== 0 && ao.length !== 4 * quads) ||
+    indices.length !== 6 * quads
+  )
+    throw new RangeError(
+      'partitionMesh mesh arrays do not hold 4 vertices and 6 indexes per quad; pass meshGrid output',
+    );
+  for (let quad = 0; quad < quads; quad++)
+    for (let k = 0; k < 6; k++) {
+      const index = indices[quad * 6 + k];
+      if (index < quad * 4 || index >= quad * 4 + 4)
+        throw new RangeError(`partitionMesh quad ${quad} uses another quad's vertex; pass meshGrid output`);
+    }
+  const order: number[][] = [],
+    open = new Map<number, number[]>();
+  for (let quad = 0; quad < quads; quad++) {
+    const palette = paletteIndexes[quad];
+    let part = open.get(palette);
+    if (!part) {
+      part = [];
+      order.push(part);
+      open.set(palette, part);
+    }
+    part.push(quad);
+    if (part.length >= maxQuads) open.delete(palette);
+  }
+  return order.map((list) => {
+    const count = list.length,
+      part: MeshPart = {
+        paletteIndex: paletteIndexes[list[0]],
+        positions: new Float32Array(12 * count),
+        normals: new Float32Array(12 * count),
+        ao: new Float32Array(ao.length ? 4 * count : 0),
+        indices: new Uint32Array(6 * count),
+        quads: Uint32Array.from(list),
+      };
+    list.forEach((quad, i) => {
+      part.positions.set(positions.subarray(quad * 12, quad * 12 + 12), i * 12);
+      part.normals.set(normals.subarray(quad * 12, quad * 12 + 12), i * 12);
+      if (ao.length) part.ao.set(ao.subarray(quad * 4, quad * 4 + 4), i * 4);
+      for (let k = 0; k < 6; k++) part.indices[i * 6 + k] = indices[quad * 6 + k] - quad * 4 + i * 4;
+    });
+    return part;
+  });
+}
+
 /** Corner orders of a quad, counterclockwise for a face toward +axis and toward -axis. */
 const FRONT = [
     [0, 0],

@@ -13,6 +13,11 @@ export interface VoxNodePatch {
     hidden?: boolean;
 }
 
+export interface VoxTileOptions extends GridLimits {
+    tileSize?: number;
+    maxTiles?: number;
+}
+
 export interface VoxTransformPatch {
     translation?: Vec3;
     rotation?: readonly number[];
@@ -53,6 +58,8 @@ export function updateVoxLayer(scene: VoxScene, id: number, patch: VoxNodePatch)
 export function updateVoxNode(scene: VoxScene, id: number, patch: VoxNodePatch): VoxScene;
 
 export function voxFromGrid(source: VoxelGrid | SparseGrid, original?: VoxModel, limits?: GridLimits): VoxModel;
+
+export function voxTiles(source: VoxelGrid | SparseGrid, options?: VoxTileOptions): GridWindow[];
 
 // Not exported from this entry, but used by the exports above:
 

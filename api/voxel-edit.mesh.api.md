@@ -26,6 +26,15 @@ export interface GridMeshOptions {
     maxCells?: number;
 }
 
+export interface MeshPart {
+    paletteIndex: number;
+    positions: Float32Array;
+    normals: Float32Array;
+    ao: Float32Array;
+    indices: Uint32Array;
+    quads: Uint32Array;
+}
+
 export interface MeshStats {
     voxels: number;
     quads: number;
@@ -33,10 +42,16 @@ export interface MeshStats {
     vertices: number;
 }
 
+export interface PartitionOptions {
+    maxQuads?: number;
+}
+
 export function meshGrid(source: VoxelGrid | SparseGrid, options?: GridMeshOptions): {
     mesh: GridMesh;
     stats: MeshStats;
 };
+
+export function partitionMesh(mesh: GridMesh, options?: PartitionOptions): MeshPart[];
 
 // Not exported from this entry, but used by the exports above:
 
