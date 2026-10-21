@@ -118,15 +118,26 @@ This work landed on main on 2026-10-20 (Scott's request; it had been held on bra
    neighbours too dark (blue cloud 16, absorbing cloud 9.9, emissive cloud 7.1). Checked (2026-10-20): the
    subsurface budget's weight for earlier diffuse events (2, 3 or 4) moves those tiles by under 1.5 levels, and our
    render is converged by cap 4 (caps 6 and 12 give the same tiles), so MagicaVoxel's extra light there at cap 4 is
-   not more diffuse bounces of our kind. Open: those neighbours at cap 4, and only `_d` 0.05 measured.
+   not more diffuse bounces of our kind. Measured 2026-10-21, MagicaVoxel's change from diffuse cap 2 to 4 under the
+   sun (`G-sun60-lin` -> `G-sun60-d4`, 1024 samples, RGB levels): the blue scattering cloud beside the block +21 +23
+   +22 (ours +5 +6 +6), the red one +7 +9 +9 (ours +3 +2 +2), the absorbing one +8 +9 +11 (ours +4 +4 +6). The blue
+   cloud's added light is neutral, not its blue scattering colour, so it is not light the cloud scattered; what
+   carries it is still open. Open: those neighbours at cap 4, and only `_d` 0.05 measured.
 2. Partly transparent glass (`_trans` below 1): done (material `contactTransmission`): glass share sqrt(`_trans`) at
    the block's faces to the air, no picks inside, and what it rests on is reached with the share again. P boards
    (`_trans` 0.1-1, heights 1, 2, 3, 6, white and black base): 64 of 64 tiles within 3 levels sky-lit (mean 0.6) and
    sun-lit (mean 0.4); the G board's `_trans` 0.5 tile from 10 levels to within 3. `_blend` materials: done
    (2026-10-20). They were re-picked at every voxel face (`voxelwise`); MagicaVoxel's B boards show a 3-voxel blend
    block looking like a 1-voxel one, so blends now use the same contact rule as partly transparent glass. B boards:
-   sky-lit 34 -> 56 of 64 tiles within 3 (mean 9.3 -> 0.89, all 64 within 6), sun-lit 62 -> 64 of 64. Open: half
-   metal, half transparent blends over a white base are 4-5 levels too dark (4 tiles).
+   sky-lit 34 -> 56 of 64 tiles within 3 (mean 9.3 -> 0.89, all 64 within 6), sun-lit 62 -> 64 of 64. Half metal,
+   half transparent blends over a white base (2026-10-21): every tile that missed sat on the white base and the same
+   blends over black matched exactly, so the light lost was light from below coming back out through the block. A ray
+   leaving such a block into the air now passes with the glass share over (1 - 0.4 x metal), not the glass share
+   alone (0.35 at `_metal` 0.5 and `_trans` 0.5, what the metal leaves of sqrt(`_trans`)). Giving metal the last
+   word instead (glass sqrt(`_trans`), metal its share of the rest) broke the tiles over black by up to 45 levels;
+   passing the full glass-to-non-metal ratio overshot by up to 14; 1 - 0.5 x metal left two thick red blocks at 4.8
+   and 5.1. With 0.4: `B-sky-lin` 60 -> 62 of 64 tiles within 3 (mean 0.80 -> 0.60, worst 5.8 -> 3.4),
+   `B-sun60-lin` 64 of 64 (mean 0.35). Blends without metal, including partly transparent glass, are unchanged.
    At diffuse cap 4 (2026-10-20): MagicaVoxel brightens partly transparent glass by 7.5 levels (`G-sky-d4` (4,0) and
    (5,0)) while ours stayed put. The pick now happens where a ray leaves the block into the air, in and out, and the
    rest scatters back inside as a diffuse event (it ended the path before, and the second pick was where the ray
@@ -222,7 +233,7 @@ checked unchanged afterwards). Snapshots in `test-results/mv-calib` (git-ignored
 | `C-proj1.vox` | 1 | 110 | 8192 | 100% |
 | `C-bga.vox` | 1 | 110 | 8192 | alpha identical, colours 99.9% |
 | `C-scale.vox` | 1 | 110 | 8192 | 100% |
-| `B-sky-lin.vox` | 1 | 190 | 1024 | 60 of 64 tiles within 3 after the blend fixes (was 34), all within 6 |
+| `B-sky-lin.vox` | 1 | 190 | 1024 | 62 of 64 tiles within 3 after the blend fixes (was 34; 60 before the 2026-10-21 exit rule), all within 6 |
 | `B-sun60-lin.vox` | 1 | 190 | 1024 | 64 of 64 after the blend fix (was 62) |
 | `G-sun60-d4.vox` | 1 | 190 | 1024 | 50 of 56 (neighbours of the subsurface block open) |
 | `G-sky-sc10.vox` | 1 | 190 | 1024 | 55 of 56 |

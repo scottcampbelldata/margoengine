@@ -1445,10 +1445,11 @@ fn radiance(px:vec2u)->Path {
     let lx=localX(h.inst);
     n=h.sgn*normalize(rowOf(lx,h.axis));
     off=h.sgn*EPS*colOf(worldX(h.inst),h.axis);
-    // Leaving a contact-transmitting blend into the air: the glass share passes, the rest scatters back inside off the
-    // blend's other lobes (a diffuse event).
+    // Leaving a contact-transmitting blend into the air: the glass share over (1 - 0.4 metal) passes, the rest scatters
+    // back inside off the blend's other lobes (a diffuse event). Without metal that is the glass share itself; with it,
+    // MagicaVoxel lets more light out than the share its metal leaves (B boards: half metal, half glass over white).
     var inner=false;
-    if(h.value==0u&&medium!=0u){let mc=material(medium);if((mc.flags&CONTACT)!=0u&&rand()>=mc.glass){inner=true;}}
+    if(h.value==0u&&medium!=0u){let mc=material(medium);if((mc.flags&CONTACT)!=0u&&rand()>=mc.glass/max(1e-6,1.0-0.4*mc.metal)){inner=true;}}
     if(h.value==0u&&!inner){
      // Leaving a volume into empty space: media end without a surface, glass refracts out or reflects back in.
      var mm=material(medium);
