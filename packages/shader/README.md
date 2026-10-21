@@ -90,6 +90,45 @@ real adapter by `node packages/shader/test/noise-check.mjs` (under the GPU lock)
 reseeds without recompiling. Fractal sums unroll at graph build time (`octaves` 1..16). Not included: 4D simplex and
 Worley on the GPU. Example: `examples/noise.html` (terrain with CPU-placed markers resting on the GPU surface).
 
+## Read back one dispatch (`@margoengine/shader/readback`, +1.0 kB min+gzip over the root entry)
+
+`ComputePass` runs every frame while attached. For a one-off result on the CPU (an editor tool, a bake, a test),
+`computeReadback` runs a body once and resolves with a copy of a storage buffer:
+
+```ts
+import {storage, uint} from '@margoengine/shader';
+import {computeReadback} from '@margoengine/shader/readback';
+const source = storage(Uint32Array.from(cells), 'u32'), output = storage(cells.length, 'u32');
+const controller = new AbortController();
+const {data} = await computeReadback(stage.engine, cells.length, i => output.store(i, source.element(i).add(uint(1))), output, {
+  signal: controller.signal, // cancel button: rejects with signal.reason
+  timeout: 30_000,           // default; Infinity waits
+});
+source.dispose(); output.dispose(); // storage stays yours; `data` is a Uint32Array you own
+```
+
+`target` is a GPUDevice or an engine (its current device; no frame needs to render). The job records one dispatch and a
+copy into its own command buffer, submits it, maps a private readback buffer and copies the bytes out, so `data` is
+neither `output.data` nor GPU memory. It settles exactly once:
+
+| Outcome | Settles with |
+| --- | --- |
+| GPU finished | `{data, type, count}`: Float32Array, Int32Array or Uint32Array by element type |
+| `signal` aborted (before the call: the GPU is never touched) | rejects with `signal.reason` |
+| engine disposed during the job, or already disposed | MargoError `'disposed'` |
+| device lost during the job, or already lost | MargoError `'failed'` naming the loss reason |
+| WGSL or a GPU call failed validation or memory (inside the job's error scopes; the device stays usable) | MargoError `'failed'` with the GPU message |
+| `timeout` elapsed | MargoError `'failed'` |
+| engine without WebGPU | MargoError `'unsupported'` |
+
+Whatever the outcome, the job's readback and uniform buffers are destroyed and its abort listener, device-loss
+observer and timer removed as it settles (a pending map is cancelled by the destroy); storage the body uses is never
+disposed for you. Frame values read a 1 x 1 resolution and deltaTime 0. `test/readback.test.js` checks every row on a
+scripted device; `node packages/shader/test/readback-check.mjs` (under the GPU lock) on a real adapter: 4,194,304 u32
+read back exactly (65 ms on an NVIDIA Ampere GPU in Edge), a job on an engine that never rendered, abort right after
+submit and while mapping, engine disposal and `device.destroy()` at both points, and a pipeline over the storage-binding
+limit; every job destroyed its buffers and no GPU error escaped.
+
 ## Coming from TSL
 
 | three.js TSL | @margoengine/shader |
@@ -119,7 +158,7 @@ Worley on the GPU. Example: `examples/noise.html` (terrain with CPU-placed marke
 - NodeMaterial patches gltf-pro's beauty shader (standard and KHR physical variants): shadows, SSAO's G-buffer and depth-equal passes see neither `positionNode` nor `normalNode`; normals are not re-derived after a vertex offset; at most 8 varyings. Its bindings start at group 2, binding 48, and node textures count against WebGPU's 16 sampled textures per stage: a `NodeMaterial` on a materials mesh fits 6 texture nodes alone, 5 with directional shadows and 3 with shadows, IBL and LocalShadows; past that, gltf-pro throws a `RangeError` naming the combination.
 - `uv()` is the raw first UV set (no texture transform). `select` evaluates both branches; there is no statement-level `If`, `Break`, assignment to variables or `switch`. `discard` in a NodeMaterial affects the beauty pass only: shadows still see the whole surface, and a NodePass's discarded pixels stay the cleared transparent black. Fn bodies cannot read stage inputs such as `uv()`; pass them as arguments. No automatic derivative-safe sampling: `textureSample` inside a loop with a non-uniform bound is a WGSL uniformity error.
 - NodePass runs only inside a PostStack (a stack of one is fine). An `hdr` pass that ends the chain tonemaps with ACES.
-- ComputePass is one-dimensional (up to 65535 workgroups), runs every frame while attached (an atomic counter keeps counting unless `update()` resets it), and has no workgroup memory, barriers or atomics on workgroup variables, and no `atomicSub`/`And`/`Or`/`Xor`/`Exchange`/`CompareExchange` yet. Storage elements are 4- or 8- or 16-byte types (no vec3). A device loss re-uploads the CPU `data`, not what the GPU computed.
+- ComputePass is one-dimensional (up to 65535 workgroups), runs every frame while attached (`computeReadback` runs once) (an atomic counter keeps counting unless `update()` resets it), and has no workgroup memory, barriers or atomics on workgroup variables, and no `atomicSub`/`And`/`Or`/`Xor`/`Exchange`/`CompareExchange` yet. Storage elements are 4- or 8- or 16-byte types (no vec3). A device loss re-uploads the CPU `data`, not what the GPU computed.
 - No GLSL/WebGL2 output, no node editor, no built-in noise library (write it with `Fn` or `wgslFn`), no light, shadow or environment nodes, no skinning or morph nodes, no MRT outputs.
 
 Size (min + gzip, Rolldown, peers external): whole package 11.8 kB (11.2 kB before `discard` and atomics); `NodeMaterial` with colour nodes only, 5.8 kB, unchanged (post, compute and texture code tree-shake away; the test enforces this).

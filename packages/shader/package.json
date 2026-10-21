@@ -17,6 +17,10 @@
     "./graph": {
       "types": "./dist/graph.d.ts",
       "import": "./dist/graph.js"
+    },
+    "./readback": {
+      "types": "./dist/readback.d.ts",
+      "import": "./dist/readback.js"
     }
   },
   "files": [

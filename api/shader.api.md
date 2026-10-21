@@ -56,6 +56,7 @@ export class ComputePass implements EnginePlugin {
     static attach(engine: EngineKernel, count: number, body: (index: Node<'u32'>) => ComputeBody, options?: ComputeOptions): ComputePass;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    encode(device: GPUDevice, encoder: GPUCommandEncoder, host: Host): void;
     onDeviceRestored(): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -222,6 +223,7 @@ export class Program {
     };
     declare(group: number): string;
     entries(device: GPUDevice, host: Host): GPUBindGroupEntry[];
+    release(device: GPUDevice): void;
     name(): string;
     canon(n: Node): Node;
     count(n: Node): void;

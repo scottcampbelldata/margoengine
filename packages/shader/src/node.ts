@@ -874,6 +874,11 @@ export class Program {
       ),
     );
   }
+  /** @internal Destroys the uniform buffer made for `device`; the next `entries` call makes a new one. */
+  release(device: GPUDevice): void {
+    this.buffers.get(device)?.buffer.destroy();
+    this.buffers.delete(device);
+  }
   private upload(device: GPUDevice, host: Host): GPUBuffer {
     let u = this.buffers.get(device);
     const now = performance.now() / 1000;

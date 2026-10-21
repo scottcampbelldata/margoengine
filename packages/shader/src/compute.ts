@@ -19,6 +19,7 @@ import {
   scalarOf,
   sizeOf,
   unique,
+  type Host,
   type NodeInput,
   type Resource,
   type ShaderStage,
@@ -40,23 +41,25 @@ const index = (i: Index) =>
     : cast(i, 'u32', 'storage index');
 // Keep only live storage listeners under one device promise. A promise callback directly closing over
 // StorageBuffer would retain its CPU array after dispose(), until that GPU device eventually disappeared.
-const deviceLoss = new WeakMap<GPUDevice, Set<() => void>>();
-function deviceLossListeners(device: GPUDevice): Set<() => void> {
+type LossListener = (info: GPUDeviceLostInfo) => void;
+const deviceLoss = new WeakMap<GPUDevice, Set<LossListener>>();
+function deviceLossListeners(device: GPUDevice): Set<LossListener> {
   let listeners = deviceLoss.get(device);
   if (!listeners) {
     listeners = new Set();
     deviceLoss.set(device, listeners);
     const shared = listeners;
-    void device.lost.then(() => {
+    void device.lost.then((info) => {
       const callbacks = [...shared];
       shared.clear();
       deviceLoss.delete(device);
-      for (const callback of callbacks) callback();
+      for (const callback of callbacks) callback(info);
     });
   }
   return listeners;
 }
-function observeDeviceLoss(device: GPUDevice, listener: () => void): () => void {
+/** @internal Calls `listener` once when `device` is lost; returns the unsubscribe. Keeps no closure alive after it. */
+export function observeDeviceLoss(device: GPUDevice, listener: LossListener): () => void {
   if (!device.lost) return () => {};
   const listeners = deviceLossListeners(device);
   listeners.add(listener);
@@ -300,13 +303,17 @@ export class ComputePass implements EnginePlugin {
     });
   }
   private dispatch(c: Context): void {
-    this.pipeline ??= compute(c.device, this.code, 'main');
-    const entries = this.program.entries(c.device, { width: c.width, height: c.height, delta: c.delta });
+    this.encode(c.device, c.encoder, { width: c.width, height: c.height, delta: c.delta });
+  }
+  /** @internal Records one dispatch of every invocation into `encoder`, uploading uniforms and storage first. */
+  encode(device: GPUDevice, encoder: GPUCommandEncoder, host: Host): void {
+    this.pipeline ??= compute(device, this.code, 'main');
+    const entries = this.program.entries(device, host);
     if (!this.group || !sameEntries(entries, this.last)) {
       this.last = entries;
-      this.group = c.device.createBindGroup({ layout: this.pipeline.getBindGroupLayout(0), entries });
+      this.group = device.createBindGroup({ layout: this.pipeline.getBindGroupLayout(0), entries });
     }
-    const pass = c.encoder.beginComputePass();
+    const pass = encoder.beginComputePass();
     pass.setPipeline(this.pipeline);
     pass.setBindGroup(0, this.group);
     pass.dispatchWorkgroups(Math.ceil(this.count / this.size));

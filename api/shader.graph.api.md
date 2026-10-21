@@ -253,6 +253,7 @@ class Program {
     };
     declare(group: number): string;
     entries(device: GPUDevice, host: Host): GPUBindGroupEntry[];
+    release(device: GPUDevice): void;
     name(): string;
     canon(n: Node): Node;
     count(n: Node): void;

@@ -1,0 +1,107 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Compute readback GPU check</title><style>body{margin:0}#host{width:64px;height:64px}</style></head><body><div id="host"></div>
+<script type="module">
+import {createStage} from '/packages/margoengine/dist/index.js';
+import {storage,uniform,uint,vec4} from '/packages/shader/dist/index.js';
+import {computeReadback} from '/packages/shader/dist/readback.js';
+const errors=[];
+// Records every buffer a device makes and whether it was destroyed; `onMap(buffer)` runs right after mapAsync starts.
+function track(device){
+  const made=[],create=device.createBuffer.bind(device);
+  const state={made,onMap:null};
+  device.createBuffer=(descriptor)=>{
+    const buffer=create(descriptor),entry={label:descriptor.label,destroyed:false};made.push(entry);
+    const destroy=buffer.destroy.bind(buffer),mapAsync=buffer.mapAsync.bind(buffer);
+    buffer.destroy=()=>{entry.destroyed=true;destroy();};
+    buffer.mapAsync=(...args)=>{const pending=mapAsync(...args);const hook=state.onMap;state.onMap=null;hook?.(buffer);return pending;};
+    return buffer;
+  };
+  device.addEventListener('uncapturederror',(e)=>errors.push(e.error.message));
+  return state;
+}
+const released=(state,name)=>state.made.filter((b)=>b.label===name+':readback'||b.label==='shader:uniforms').map((b)=>[b.label,b.destroyed]);
+async function standalone(){
+  const adapter=await navigator.gpu.requestAdapter({powerPreference:'high-performance'});
+  const device=await adapter.requestDevice();
+  return {device,state:track(device)};
+}
+const describe=(error)=>({name:error?.name,code:error?.code,message:String(error?.message??error)});
+const settle=async(job)=>{try{const r=await job;return {ok:true,result:r};}catch(error){return {ok:false,error:describe(error)};}};
+// value(i) = i * 3 + offset (offset is a uniform, so every job also owns a uniform buffer).
+const tripled=(output,offset)=>(i)=>output.store(i,i.mul(uint(3)).add(offset));
+window.check={
+  async correct(){
+    const {device,state}=await standalone(),n=4_194_304,output=storage(n,'u32'),offset=uniform(7,{type:'u32'});
+    const t0=performance.now(),r=await computeReadback(device,n,tripled(output,offset),output,{name:'big',workgroupSize:128});
+    const ms=performance.now()-t0;
+    let wrong=0;for(let i=0;i<n;i++)if(r.data[i]!==(i*3+7)>>>0)wrong++;
+    // Owned: changing the copy changes nothing on the GPU, and a second job reads the GPU again.
+    r.data.fill(1);
+    const again=await computeReadback(device,16,(i)=>output.store(i,output.element(i)),output,{name:'again'});
+    const floats=storage(8,'vec4f'),f=await computeReadback(device,8,(i)=>floats.store(i,vec4(i.toFloat().mul(0.5),1,2,3)),floats,{name:'floats'});
+    output.dispose();floats.dispose();
+    return {wrong,ms:Math.round(ms),again:[...again.data.slice(0,4)],floats:[...f.data.slice(4,8)],floatsType:f.data.constructor.name,released:[...released(state,'big'),...released(state,'again')],errors:[...errors]};
+  },
+  async engine(){
+    const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false});
+    const state=track(stage.engine.gpu),output=storage(1024,'u32'),offset=uniform(1,{type:'u32'});
+    const r=await computeReadback(stage.engine,1024,tripled(output,offset),output,{name:'engine'});
+    let wrong=0;for(let i=0;i<1024;i++)if(r.data[i]!==i*3+1)wrong++;
+    output.dispose();stage.dispose();
+    return {wrong,released:released(state,'engine'),errors:[...errors]};
+  },
+  async abort(){
+    const {device,state}=await standalone(),output=storage(1<<20,'u32'),offset=uniform(2,{type:'u32'});
+    // Right after submit.
+    const early=new AbortController(),j1=computeReadback(device,1<<20,tripled(output,offset),output,{name:'abort1',signal:early.signal});
+    early.abort();
+    const a=await settle(j1);
+    // While the readback is mapping.
+    const late=new AbortController();state.onMap=()=>late.abort(new DOMException('stop while mapping','AbortError'));
+    const b=await settle(computeReadback(device,1<<20,tripled(output,offset),output,{name:'abort2',signal:late.signal}));
+    // The device stays usable and error scopes stay balanced.
+    const c=await computeReadback(device,1<<20,tripled(output,offset),output,{name:'after'});
+    let wrong=0;for(let i=0;i<c.data.length;i++)if(c.data[i]!==i*3+2)wrong++;
+    output.dispose();device.destroy();
+    return {early:a.error,mapping:b.error,wrong,released:[...released(state,'abort1'),...released(state,'abort2'),...released(state,'after')],errors:[...errors]};
+  },
+  async disposal(){
+    const out=[];
+    for(const when of ['submit','mapping']){
+      const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false});
+      const state=track(stage.engine.gpu),output=storage(1<<20,'u32'),offset=uniform(3,{type:'u32'});
+      if(when==='mapping')state.onMap=()=>stage.dispose();
+      const job=computeReadback(stage.engine,1<<20,tripled(output,offset),output,{name:'dispose-'+when});
+      if(when==='submit')stage.dispose();
+      const r=await settle(job);
+      const lateJob=await settle(computeReadback(stage.engine,4,tripled(output,offset),output));
+      out.push({when,error:r.error,afterwards:lateJob.error,released:released(state,'dispose-'+when)});
+      output.dispose();
+    }
+    return {out,errors:[...errors]};
+  },
+  async loss(){
+    const out=[];
+    for(const when of ['submit','mapping']){
+      const {device,state}=await standalone(),output=storage(1<<20,'u32'),offset=uniform(4,{type:'u32'});
+      if(when==='mapping')state.onMap=()=>device.destroy();
+      const job=computeReadback(device,1<<20,tripled(output,offset),output,{name:'loss-'+when});
+      if(when==='submit')device.destroy();
+      const r=await settle(job);
+      const t0=performance.now(),lateJob=await settle(computeReadback(device,4,tripled(output,offset),output,{name:'late-'+when}));
+      out.push({when,error:r.error,lostDevice:lateJob.error,lostDeviceMs:Math.round(performance.now()-t0),released:released(state,'loss-'+when)});
+      output.dispose();
+    }
+    return {out,errors:[...errors]};
+  },
+  async validation(){
+    const {device,state}=await standalone(),limit=device.limits.maxStorageBuffersPerShaderStage;
+    // More storage bindings than the stage allows: the pipeline fails validation inside the job's error scope.
+    const inputs=Array.from({length:limit+1},()=>storage(4,'u32')),output=storage(4,'u32');
+    const r=await settle(computeReadback(device,4,(i)=>output.store(i,inputs.reduce((sum,input)=>sum.add(input.element(i)),uint(0))),output,{name:'invalid'}));
+    const ok=await computeReadback(device,4,(i)=>output.store(i,i.add(uint(5))),output,{name:'valid'});
+    for(const s of inputs)s.dispose();output.dispose();device.destroy();
+    return {limit,error:r.error,recovered:[...ok.data],released:released(state,'invalid'),errors:[...errors]};
+  },
+};
+window.ready=true;
+</script></body></html>
