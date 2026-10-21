@@ -150,6 +150,10 @@ Where OpenCascade still leads (freeform NURBS intersections, advanced blends, he
   0.16% low) and every round trip through STEP keeps it. Imported edges a little off their faces and vertices a little
   off their edges (within their tolerances) are integrated as their feet on the face, with each loop closed at its
   corners, so the pieces of a face add up to it: a cylinder whose side is in three faces, one arc 0.1 um off it and one
-  vertex 10 nm off its line, matches pi r^2 h to 1e-12.
+  vertex 10 nm off its line, matches pi r^2 h to 1e-12. On a spline face an edge's Gauss pieces are cut where its foot
+  crosses a knot line or runs past the surface's edge (held there), and halved until the nodes follow the foot: a
+  wedge whose slanted face is a plane as an unevenly parametrized spline, its long edges lines across five knot spans,
+  matches its closed-form area and centroid to 1e-12 (1.4e-2 off before), and no Jubilee body's volume moves by more
+  than 2e-11 with where a face's inner integral starts (1.9e-5 before).
 - Next: blends on curved faces and along traced edges, setbacks and variable radius, freeform (spline) Booleans,
   healing (docs/brep-occt-gaps.md); the operations benchmark against OpenCascade (Codex prompt 511d19d, step 9).

@@ -49,6 +49,23 @@ Every item is done only when all of these hold:
       as on main); lines and conics on spline faces take one Gauss piece, and no piece is split where an edge's foot
       crosses the surface's knots, so a spline face's integrals still depend on v* (body 142's volume moves 1.9e-5 with
       it, 15 other bodies by 1e-9 to 1.3e-8).
+      Spline faces' v* fixed 2026-10-20 (claude/zealous-bouman-290363): on a spline face an edge's rates now integrate
+      to the change of (u', v) between its ends. Each Gauss piece is cut where the edge's foot crosses a knot line
+      (found by regula falsi), where the derivatives kink; the foot of an edge running a little past the surface's edge
+      is held on it as the projection holds it, moving along it only, and the piece is cut where it gets there; and a
+      part whose nodes still miss the exact integrals of z^k dz (k = 0, 1, 2, z each coordinate) by over 1e-12 of the
+      face is halved while that helps (a span where the foot's speed changes sixfold). Analytic faces are as before, bit
+      for bit. Body 142, face #381175: lines #330740 and #442299 missed their change of u' by 1.5e-4 and 3.4e-5 of the
+      face box, now 1.8e-11 and 9e-14; every edge of body 142's spline faces under 5.4e-10 (was up to 1.5e-4). Moving v*
+      to the top of every face moves no Jubilee body's volume by more than 2.0e-11 (body 142; 3 over 1e-12) and no area
+      by more than 1.4e-11 (base: 16 bodies over 1e-9, worst 1.9e-5; area 1.1e-5). New test: a wedge whose slanted face
+      is a plane as a cubic-by-linear spline, its long edges lines across five knot spans with the foot's speed changing
+      fifteenfold in a span, matches its closed-form area and centroid to 2.7e-13 (base: area 1.4e-2 off). Drill survey
+      145 of 145 as on base; drilled volumes moved on 40 bodies, 18 by over 1e-9, two by over 1e-7: body 142 (1.6e-5)
+      and body 60 (9.8e-7: its Cut-Revolve1 spline faces run along the surface's edge 0.18 um past it, and the old
+      unheld rates gave that edge a v-rate in the across integral; each face's area moved 2.6e-5, now equal to an
+      independent integration in the other order to 1e-13). Mass of all 145 solids as fast as on main (6 runs each,
+      alternating processes on a busy machine: median 51.2 s, main 51.6 s); 0.8% more nodes. brep tests 104/104.
 - [ ] 1.2 Import into the modeler: STEP, SAT, Parasolid and JT B-reps read as modeler bodies, so every operation (and
       mass properties, checking, healing, export) works on imported parts, not only on shapes built in Margo.
       Written and on main for STEP (model.bodiesFromSTEP; SAT, XT and JT through their readers' B-reps). On 200 imported

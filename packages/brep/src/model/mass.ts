@@ -5,7 +5,9 @@
 // Seam lines (u' constant) then add nothing; a pole the face covers is taken as v*, so the line it collapses to adds
 // nothing either (a second pole is added as its own line). Faces with no loops (a whole sphere or torus) are
 // integrated over their full parameter rectangle. Quadrature is Gauss-Legendre of order 16 on pieces short enough
-// for the integrands (a sixteenth of a turn on circles and angular parameters, knot spans on splines).
+// for the integrands (a sixteenth of a turn on circles and angular parameters, knot spans on splines; along an edge on
+// a spline face, split where its foot crosses a knot line and halved until the nodes follow it).
+import type { Curve } from '../geometry/curves.js';
 import type { XYZ } from '../geometry/vec.js';
 import type { Surface } from '../geometry/surfaces.js';
 import { FaceUV, type UV } from './faces.js';
@@ -193,11 +195,13 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
   // Along every loop: - integral of G du' (across: + integral of G dv), with (u', v) followed continuously from
   // FaceUV's own start of the loop. A spline edge is cut where it turns a sixteenth of a turn (a helix runs dozens of
   // turns): the sampler weighs turning only on pieces longer than a hundredth of its deflection, so that deflection is
-  // the face's size. Lines and conics keep one piece per span, exact already. The rates are the edge's foot's (an
-  // imported edge may lie a little off the face).
+  // the face's size. Lines and conics keep one piece per span, exact on analytic faces. On a spline face every piece
+  // is cut again where the edge's foot crosses a knot line, and halved where its nodes still miss (pieceNodes). The
+  // rates are the edge's foot's (an imported edge may lie a little off the face, or run a little past its surface's
+  // edge).
   const size = face.loops.some((l) => l.coedges.some((co) => co.edge.curve.kind === 'spline')) ? faceSize(face) : 1,
     step = new Float64Array(K),
-    bend = bendSteps(face, s),
+    walk: Walk = { fuv, lines: knotLines(fuv), bend: bendSteps(face, s), axis: across ? 1 : 0 },
     // Gaps under a millionth of a millionth of the face's extent change its integrals by less than that.
     small = 1e-12 * (across ? fuv.box[3] - fuv.box[2] : fuv.box[1] - fuv.box[0]);
   /**
@@ -232,23 +236,13 @@ function faceIntegrals(face: Face, c: XYZ): Float64Array {
       }
       for (let i = 0; i + 1 < breaks.length; i++) {
         step.fill(0);
-        quad(
-          (t) => {
-            const p = curve.at(t),
-              uv = fuv.near(p.slice(0, 3) as XYZ, hint);
-            hint = uv;
-            const [du, dv] = rates(s, flip, uv, p, bend),
-              gv = G(uv[0], uv[1]),
-              r = new Float64Array(K),
-              w = across ? dv : -du;
-            for (let k = 0; k < K; k++) r[k] = gv[k] * w;
-            return r;
-          },
-          breaks[i],
-          breaks[i + 1],
-          1,
-          step,
-        );
+        const piece = pieceNodes(walk, curve, breaks[i], breaks[i + 1], hint);
+        for (const n of piece.nodes) {
+          const gv = G(n.uv[0], n.uv[1]),
+            w = across ? n.rates[1] : -n.rates[0];
+          for (let k = 0; k < K; k++) step[k] += n.w * (gv[k] * w);
+        }
+        hint = piece.end;
         for (let k = 0; k < K; k++) out[k] += step[k];
       }
       last = undefined;
@@ -304,8 +298,10 @@ function bendSteps(face: Face, s: Surface): [number, number] | undefined {
  * a cylinder, by its distance from the axis over the radius), and its tangent's rates then add up to the wrong change
  * of u' along it: the face's integrals come out depending on where v* lies. So, with w = p - S the curve's offset, the
  * foot's rates solve (A - W)(du, dv) = (Su.p', Sv.p'), A the surface's first fundamental form and W_ij = w.S_ij, its
- * second derivatives found from one step of Su and Sv (`steps`, when the offset is large enough to matter). At a pole,
- * where Su vanishes, both are taken as 0: the curve meets the pole's line at a point.
+ * second derivatives found from one step of Su and Sv (`steps`, when the offset is large enough to matter). Where p
+ * lies past an end of an open parameter (an imported edge may run a little past its surface's edge, within its
+ * tolerance), its foot is held at that end and moves along it only: Su.(p - S) = 0 alone, (a - W_uu) du = Su.p' (or
+ * the same in v). At a pole, where Su vanishes, both are taken as 0: the curve meets the pole's line at a point.
  */
 function rates(s: Surface, flip: boolean, uv: UV, p: number[], steps?: [number, number]): [number, number] {
   const u = flip ? -uv[0] : uv[0],
@@ -320,6 +316,8 @@ function rates(s: Surface, flip: boolean, uv: UV, p: number[], steps?: [number, 
     b = su[0] * sv[0] + su[1] * sv[1] + su[2] * sv[2],
     e = sv[0] * sv[0] + sv[1] * sv[1] + sv[2] * sv[2];
   if (!(Math.abs(a * e - b * b) > 1e-30 * (a * e + 1e-300))) return [0, 0];
+  const [holdU, holdV] = holds(s, u, v, d, p, a, b, e);
+  if (holdU && holdV) return [0, 0];
   if (steps) {
     const w = [p[0] - d[0], p[1] - d[1], p[2] - d[2]],
       // A step's length on the surface is a millionth of the distance over which it bends: an offset under a millionth
@@ -338,9 +336,286 @@ function rates(s: Surface, flip: boolean, uv: UV, p: number[], steps?: [number, 
       e -= along(dv, 6) / hv;
     }
   }
+  if (holdV) {
+    const du = ru / a;
+    return [flip ? -du : du, 0];
+  }
+  if (holdU) return [0, rv / e];
   const det = a * e - b * b,
     du = (ru * e - rv * b) / det;
   return [flip ? -du : du, (a * rv - b * ru) / det];
+}
+
+/**
+ * One Gauss-Newton step (du, dv) from the surface point d = [S, Su, Sv] towards the foot of p, a, b and e the first
+ * fundamental form there: zero where d is p's own foot; past the surface's edge, as far again as p lies beyond it.
+ */
+function stepTowards(d: readonly number[], p: readonly number[], a: number, b: number, e: number): [number, number] {
+  const w0 = p[0] - d[0],
+    w1 = p[1] - d[1],
+    w2 = p[2] - d[2],
+    gu = d[3] * w0 + d[4] * w1 + d[5] * w2,
+    gv = d[6] * w0 + d[7] * w1 + d[8] * w2,
+    det = a * e - b * b;
+  return [(gu * e - gv * b) / det, (a * gv - b * gu) / det];
+}
+
+/**
+ * Whether the foot d = S(u, v) of p is held at an end of u, of v, as the projection holds it: where its step towards
+ * p's foot (stepTowards) leads out past an end it sits on, it stays there and the other parameter moves alone; at a
+ * corner it stays when both steps lead out, or one does and the other's own way, Su.(p - S) or Sv.(p - S), does too.
+ */
+function holds(
+  s: Surface,
+  u: number,
+  v: number,
+  d: readonly number[],
+  p: readonly number[],
+  a: number,
+  b: number,
+  e: number,
+): [boolean, boolean] {
+  // +1 at the high end of an open range, -1 at the low end: the way out.
+  const eu = s.uPeriod ? 0 : u <= s.uDomain[0] ? -1 : u >= s.uDomain[1] ? 1 : 0,
+    ev = s.vPeriod ? 0 : v <= s.vDomain[0] ? -1 : v >= s.vDomain[1] ? 1 : 0;
+  if (!eu && !ev) return [false, false];
+  const [ou, ov] = stepTowards(d, p, a, b, e),
+    outU = eu * ou > 0,
+    outV = ev * ov > 0;
+  if (!eu || !ev) return [outU, outV];
+  const w0 = p[0] - d[0],
+    w1 = p[1] - d[1],
+    w2 = p[2] - d[2],
+    wayU = eu * (d[3] * w0 + d[4] * w1 + d[5] * w2) > 0,
+    wayV = ev * (d[6] * w0 + d[7] * w1 + d[8] * w2) > 0,
+    both = (outU && outV) || (outU && wayV) || (outV && wayU);
+  return both ? [true, true] : [outU, outV];
+}
+
+/**
+ * Where the foot uv of p stands for crossing knot lines and the surface's edges: the foot itself, carried on past an
+ * open parameter's end as far as p lies beyond it (stepTowards; zero inside, where the foot is p's own). Undefined at
+ * a pole, where u has no meaning.
+ */
+function past(s: Surface, flip: boolean, uv: UV, p: readonly number[]): UV | undefined {
+  const d = s.at(flip ? -uv[0] : uv[0], uv[1]),
+    a = d[3] * d[3] + d[4] * d[4] + d[5] * d[5],
+    b = d[3] * d[6] + d[4] * d[7] + d[5] * d[8],
+    e = d[6] * d[6] + d[7] * d[7] + d[8] * d[8];
+  if (!(Math.abs(a * e - b * b) > 1e-30 * (a * e + 1e-300))) return undefined;
+  const [ou, ov] = stepTowards(d, p, a, b, e);
+  return [uv[0] + (flip ? -ou : ou), uv[1] + ov];
+}
+
+/**
+ * A spline face's knot lines in (u', v), where its integrands' derivatives may jump, ascending, with the ends of each
+ * parameter's range (where an edge running past the surface's edge has its foot held, and its rates kink); on a closed
+ * direction they repeat every period. `extent`: the face's extent in u' and v (its box's, or the knots' where that is
+ * none). A foot within a ten-billionth of it of a line is on it: an edge along a line, or along the surface's edge
+ * with its foot in and out of it by 1e-13, is not cut at each wobble.
+ */
+interface KnotLines {
+  readonly u: readonly number[];
+  readonly v: readonly number[];
+  readonly periods: readonly [number, number];
+  readonly extent: readonly [number, number];
+}
+
+/** The face's knot lines, or none on a surface without knots. */
+function knotLines(fuv: FaceUV): KnotLines | undefined {
+  const s = fuv.surface,
+    [uKnots, vKnots] = s.breaks?.() ?? [[], []];
+  if (uKnots.length < 2 && vKnots.length < 2) return undefined;
+  const extent = (lo: number, hi: number, knots: readonly number[]) =>
+    hi - lo || (knots.length >= 2 ? knots[knots.length - 1] - knots[0] : 1);
+  return {
+    u: fuv.flip ? uKnots.map((k) => -k).reverse() : uKnots,
+    v: vKnots,
+    periods: [s.uPeriod, s.vPeriod],
+    extent: [extent(fuv.box[0], fuv.box[1], uKnots), extent(fuv.box[2], fuv.box[3], vKnots)],
+  };
+}
+
+/** The lines among ascending `knots` (repeated every `period` when it is not 0) strictly between lo and hi. */
+function linesBetween(knots: readonly number[], period: number, lo: number, hi: number): number[] {
+  const out: number[] = [];
+  if (knots.length < 2 || !(hi > lo)) return out;
+  if (!period) {
+    // The first knot past lo by bisection (a thread's flank has hundreds), then on to hi.
+    let i = 0,
+      j = knots.length;
+    while (i < j) {
+      const m = (i + j) >> 1;
+      if (knots[m] > lo) j = m;
+      else i = m + 1;
+    }
+    for (; i < knots.length && knots[i] < hi; i++) out.push(knots[i]);
+    return out;
+  }
+  // One period's knots (the last is the first a period on), shifted by whole periods to cover lo..hi.
+  for (let m = Math.floor((lo - knots[0]) / period); knots[0] + m * period < hi; m++)
+    for (let i = 0; i + 1 < knots.length; i++) {
+      const k = knots[i] + m * period;
+      if (k > lo && k < hi) out.push(k);
+    }
+  return out;
+}
+
+/** A Gauss node along an edge: its parameter t and weight, the edge's point and tangent, its foot and their rates. */
+interface EdgeNode {
+  readonly t: number;
+  readonly w: number;
+  readonly p: number[];
+  readonly uv: UV;
+  readonly rates: [number, number];
+}
+
+/** What pieceNodes needs of a face: its (u', v), knot lines, bend steps, and the coordinate its loop runs along. */
+interface Walk {
+  readonly fuv: FaceUV;
+  readonly lines?: KnotLines;
+  readonly bend?: [number, number];
+  readonly axis: 0 | 1;
+}
+
+/**
+ * The Gauss nodes of an edge's piece from t0 to t1, `hint` a foot near t0's, and the foot at t1: 16 nodes, with their
+ * feet's rates. On a spline face (`lines`) the integrands' derivatives jump where the edge's foot crosses a knot line,
+ * and the foot's rates where it passes the surface's edge and is held there: one Gauss piece across such kinks makes
+ * the rates' integral miss the change of u' along the edge (by 2e-4 of the face on a line across 8 knot spans), and the
+ * face's integrals then depend on v*. So wherever two consecutive feet (the piece's ends and nodes) lie either side of
+ * a line, the crossing is found (regula falsi, Illinois) and the piece is split there. And a part whose nodes still
+ * miss the change of its coordinates by over a millionth of a millionth of the face (`miss`: a span where the foot's
+ * speed changes sixfold or more) is halved, up to 8 times, while that cuts its miss fourfold. Elsewhere the nodes are
+ * one piece's.
+ */
+function pieceNodes(walk: Walk, curve: Curve, t0: number, t1: number, hint: UV): { nodes: EdgeNode[]; end: UV } {
+  type Foot = { t: number; p: number[]; uv: UV; x?: UV };
+  const { fuv, lines, bend, axis } = walk,
+    s = fuv.surface,
+    foot = (t: number, near: UV): Foot => {
+      const p = curve.at(t),
+        uv = fuv.near(p.slice(0, 3) as XYZ, near);
+      // Right after the projection, which leaves the surface evaluated there.
+      return { t, p, uv, x: lines && past(s, fuv.flip, uv, p) };
+    },
+    gauss = (a: number, b: number, from: UV, feet?: Foot[]): EdgeNode[] => {
+      const h = b - a,
+        mid = a + h / 2,
+        out: EdgeNode[] = [];
+      for (let i = 0; i < GAUSS.x.length; i++) {
+        const f = foot(mid + (h / 2) * GAUSS.x[i], from);
+        from = f.uv;
+        feet?.push(f);
+        out.push({ t: f.t, w: (h / 2) * GAUSS.w[i], p: f.p, uv: f.uv, rates: rates(s, fuv.flip, f.uv, f.p, bend) });
+      }
+      return out;
+    };
+  if (!lines) {
+    const nodes = gauss(t0, t1, hint);
+    return { nodes, end: nodes[nodes.length - 1].uv };
+  }
+  const start = foot(t0, hint),
+    feet: Foot[] = [start],
+    nodes = gauss(t0, t1, start.uv, feet),
+    end = foot(t1, nodes[nodes.length - 1].uv),
+    extent = lines.extent,
+    on = [1e-10 * extent[0], 1e-10 * extent[1]];
+  feet.push(end);
+  /** The foot between feet a and b where coordinate `along` of `past` meets the line k, fa and fb their misses. */
+  const crossing = (along: 0 | 1, k: number, a: Foot, b: Foot, fa: number, fb: number): Foot => {
+    let f = a,
+      side = 0;
+    for (let i = 0; i < 40; i++) {
+      let t = (a.t * fb - b.t * fa) / (fb - fa);
+      if (!(t > Math.min(a.t, b.t) && t < Math.max(a.t, b.t))) t = (a.t + b.t) / 2;
+      f = foot(t, Math.abs(t - a.t) < Math.abs(t - b.t) ? a.uv : b.uv);
+      if (!f.x) break;
+      const miss = f.x[along] - k;
+      if (Math.abs(miss) <= 1e-4 * on[along] || Math.abs(b.t - a.t) <= 1e-14 * Math.abs(t1 - t0)) break;
+      // Illinois: the end kept twice running has its miss halved, so the other end moves too.
+      if (miss * fa > 0) {
+        [a, fa] = [f, miss];
+        if (side < 0) fb /= 2;
+        side = -1;
+      } else {
+        [b, fb] = [f, miss];
+        if (side > 0) fa /= 2;
+        side = 1;
+      }
+    }
+    return f;
+  };
+  const cuts: Foot[] = [];
+  for (let i = 0; i + 1 < feet.length; i++) {
+    const xa = feet[i].x,
+      xb = feet[i + 1].x;
+    if (!xa || !xb) continue;
+    for (const along of [0, 1] as const) {
+      const lo = Math.min(xa[along], xb[along]),
+        hi = Math.max(xa[along], xb[along]);
+      for (const k of linesBetween(along ? lines.v : lines.u, lines.periods[along], lo, hi))
+        if (Math.max(k - lo, hi - k) > on[along])
+          cuts.push(crossing(along, k, feet[i], feet[i + 1], xa[along] - k, xb[along] - k));
+    }
+  }
+  // Ascending from t0; cuts within a billionth of the piece of another or of an end are one.
+  const at = (f: Foot) => (f.t - t0) / (t1 - t0),
+    parts = [start];
+  for (const c of cuts.sort((x, y) => at(x) - at(y)))
+    if (at(c) > at(parts[parts.length - 1]) + 1e-9 && at(c) < 1 - 1e-9) parts.push(c);
+  parts.push(end);
+  /**
+   * How far the nodes miss integrating z^k dz exactly, k = 0, 1, 2, z each coordinate about its middle between feet a
+   * and b (z^(k+1) / (k + 1) between them, a part of the face's extent to the k + 1): k = 0 is the rates' closure, and
+   * the rest whether the nodes follow the coordinate closely enough for an integrand varying along it (along a line
+   * where the foot's speed varies fifteenfold in a span, G times the rate). The other coordinate counts in proportion
+   * to how far the loop's coordinate changes (along u' constant, G du' is zero however v moves).
+   */
+  const miss = (ns: EdgeNode[], a: Foot, b: Foot) => {
+      let worst = 0;
+      for (const along of [axis, 1 - axis]) {
+        const c = (a.uv[along] + b.uv[along]) / 2,
+          h = (b.uv[along] - a.uv[along]) / 2,
+          e = extent[along];
+        let m0 = 0,
+          m1 = 0,
+          m2 = 0;
+        for (const n of ns) {
+          const z = n.uv[along] - c,
+            r = n.w * n.rates[along];
+          m0 += r;
+          m1 += r * z;
+          m2 += r * z * z;
+        }
+        const off = Math.max(
+          Math.abs(m0 - 2 * h) / e,
+          Math.abs(m1) / (e * e),
+          Math.abs(m2 - (2 * h * h * h) / 3) / e ** 3,
+        );
+        worst = Math.max(
+          worst,
+          along === axis ? off : off * Math.min(1, Math.abs(b.uv[axis] - a.uv[axis]) / extent[axis]),
+        );
+      }
+      return worst;
+    },
+    refine = (a: Foot, b: Foot, ns: EdgeNode[], depth: number): EdgeNode[] => {
+      const m0 = miss(ns, a, b);
+      if (m0 <= 1e-12 || depth >= 8 || !a.x || !b.x) return ns;
+      const m = foot((a.t + b.t) / 2, ns[7].uv),
+        left = gauss(a.t, m.t, a.uv),
+        right = gauss(m.t, b.t, m.uv);
+      // Halving a part the rule resolves cuts its miss several times over; where it does not, the miss is the feet's
+      // own (found to about a millionth of a millionth of the surface's size), and the one part is kept.
+      if (!(miss(left, a, m) + miss(right, m, b) < m0 / 4)) return ns;
+      return [...refine(a, m, left, depth + 1), ...refine(m, b, right, depth + 1)];
+    };
+  if (parts.length === 2) return { nodes: refine(start, end, nodes, 0), end: end.uv };
+  const split: EdgeNode[] = [];
+  for (let i = 0; i + 1 < parts.length; i++)
+    split.push(...refine(parts[i], parts[i + 1], gauss(parts[i].t, parts[i + 1].t, parts[i].uv), 0));
+  return { nodes: split, end: end.uv };
 }
 
 /** The diagonal of the box of points along a face's edges (9 per edge). */

@@ -304,3 +304,108 @@ test('mass properties: imported edges a little off their faces, however the face
     expect(drilled, { volume }, 1e-12);
   }
 });
+
+/**
+ * A wedge of length l along x over the triangle (y, z) = (0, 0), (w, 0), (w, h): its slanted face a plane as a spline,
+ * cubic along x (knots 0, 0.2 ... 1) and ruled across, between its two long edges, lines that cross every knot span.
+ * Each runs along x as one control row unevenly spaced (`xa` at y = 0, `xb` at y = w, fractions of l), so along each
+ * line the foot moves at a speed that changes many times over within a span and kinks at every knot.
+ */
+function wedge(l, w, h, xa, xb) {
+  const body = new Body('wedge', 'solid'),
+    shell = body.shell(),
+    o = new Vertex('o', [0, 0, 0]),
+    p = new Vertex('p', [l, 0, 0]),
+    q = new Vertex('q', [l, w, 0]),
+    r = new Vertex('r', [0, w, 0]),
+    q1 = new Vertex('q1', [l, w, h]),
+    r1 = new Vertex('r1', [0, w, h]),
+    line = (name, a, b) => {
+      const d = b.point.map((x, k) => x - a.point[k]),
+        n = Math.hypot(...d);
+      return new Edge(name, { kind: 'line', origin: a.point, direction: d.map((x) => x / n) }, a, b);
+    },
+    low = line('low', o, p),
+    high = line('high', r1, q1),
+    rule0 = line('rule0', o, r1),
+    rule1 = line('rule1', p, q1),
+    back = line('back', r, q),
+    up0 = line('up0', r, r1),
+    up1 = line('up1', q, q1),
+    end0 = line('end0', o, r),
+    end1 = line('end1', p, q),
+    face = (name, surface, uses) => {
+      const loop = shell.add(new Face(name, surface, true)).loop();
+      for (const [e, forward] of uses) loop.use(e, forward);
+    },
+    plane = (origin, normal, x) => ({ kind: 'plane', frame: frameOf(origin, normal, x) });
+  const slant = {
+    kind: 'spline',
+    degrees: [3, 1],
+    counts: [xa.length, 2],
+    points: [...xa.map((x) => [x * l, 0, 0]), ...xb.map((x) => [x * l, w, h])],
+    knots: [
+      [0, 0.2, 0.4, 0.6, 0.8, 1],
+      [0, 1],
+    ],
+    multiplicities: [
+      [4, 1, 1, 1, 1, 4],
+      [2, 2],
+    ],
+  };
+  face('slant', slant, [
+    [low, true],
+    [rule1, true],
+    [high, false],
+    [rule0, false],
+  ]);
+  face('bottom', plane([0, 0, 0], [0, 0, -1], [1, 0, 0]), [
+    [end0, true],
+    [back, true],
+    [end1, false],
+    [low, false],
+  ]);
+  face('back', plane([0, w, 0], [0, 1, 0], [1, 0, 0]), [
+    [up0, true],
+    [high, true],
+    [up1, false],
+    [back, false],
+  ]);
+  face('end0', plane([0, 0, 0], [-1, 0, 0], [0, 1, 0]), [
+    [rule0, true],
+    [up0, false],
+    [end0, false],
+  ]);
+  face('end1', plane([l, 0, 0], [1, 0, 0], [0, 1, 0]), [
+    [end1, true],
+    [up1, true],
+    [rule1, false],
+  ]);
+  return body;
+}
+
+test('mass properties: a spline face with line edges across its knot spans', () => {
+  // Along each long edge the foot's speed changes fifteenfold within a span and kinks at each knot. One 16-point piece
+  // per line made the integral of its rates miss the change of u' along it (3e-5 of the face), so the slanted face's
+  // integrals depended on where the inner integral starts: the area came out 1.4e-2 off, the centroid 1e-3 of the
+  // length. Each line is now cut where it crosses a knot line, and halved where its nodes still miss.
+  const [l, w, h] = [30, 10, 6],
+    row0 = [0, 0.02, 0.1, 0.15, 0.5, 0.6, 0.9, 1],
+    row1 = [0, 0.3, 0.35, 0.4, 0.45, 0.7, 0.98, 1];
+  for (const [xa, xb] of [
+    [row0, row1],
+    [row1, row0],
+  ]) {
+    const part = wedge(l * mm, w * mm, h * mm, xa, xb);
+    assert.deepEqual(validateBody(part), []);
+    expect(
+      part,
+      {
+        volume: (l * w * h) / 2,
+        area: l * w + l * h + l * Math.hypot(w, h) + w * h,
+        centroid: [l / 2, (2 * w) / 3, h / 3],
+      },
+      1e-11,
+    );
+  }
+});
