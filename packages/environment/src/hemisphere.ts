@@ -1,10 +1,10 @@
-// Hemisphere and ambient light (three.js HemisphereLight and AmbientLight), a ShaderEffect like Fog: sky colour above,
+// Hemisphere and ambient light, a ShaderEffect like Fog: sky colour above,
 // ground colour below, mixed by the surface normal's height, times an intensity. It takes the place of the built-in
 // ambient: core's flat `lighting.ambient` x `lighting.radiance[3]` on core meshes and terrain, and gltf-pro's fixed
 // sky gradient (its hemisphere ambient, clearcoat and sheen defaults and a light probe's fallback, through gltf-pro's
 // `sky` lighting hook) on models, materials meshes and VAT crowds. Where image-based light (EnvironmentLighting, an
-// environment behind LightProbes, sky ambient) replaces the built-in ambient, the hemisphere adds to it, as three.js adds
-// a HemisphereLight to scene.environment; LightProbes without an environment use it outside their volumes.
+// environment behind LightProbes, sky ambient) replaces the built-in ambient, the hemisphere adds to it;
+// LightProbes without an environment use it outside their volumes.
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
@@ -39,7 +39,7 @@ const builtIn = /\*frame\.radiance\.w(?:\*frame\.ambient\.rgb)?|\*skyAmbient\.rg
   zeroed = /(i\.color\*\(1\.0-i\.material\.y\)|base)\*0\.0(?:\*frame\.ambient\.rgb)?/;
 
 /**
- * Hemisphere light (three.js `HemisphereLight`): ambient light of `sky` colour from above and `ground` colour from below,
+ * Hemisphere light: ambient light of `sky` colour from above and `ground` colour from below,
  * blended by `0.5 + 0.5 n.y` and scaled by `intensity`. `engine.use(light)` lights core meshes and terrain and owns the
  * GPU uniform; `light.add(model)` adds gltf-pro models, materials meshes and VAT crowds. It replaces the built-in
  * ambient (core's `lighting.ambient` x `radiance[3]`, gltf-pro's fixed sky gradient); with EnvironmentLighting, an
@@ -172,7 +172,7 @@ export interface AmbientLightOptions {
   name?: string;
 }
 /**
- * Ambient light (three.js `AmbientLight`): the same light from every direction, a {@link HemisphereLight} whose sky and
+ * Ambient light: the same light from every direction, a {@link HemisphereLight} whose sky and
  * ground are one colour. A surface of albedo `a` reflects `a x color x intensity`.
  */
 export class AmbientLight extends HemisphereLight {

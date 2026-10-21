@@ -478,7 +478,7 @@ test('flatShading shades with the face normal for lit, normal and matcap shading
   s.engine.dispose();
 });
 
-test('tangent-space maps and anisotropy point the derived frame up three.js UVs (+b); other materials keep the text', async () => {
+test('tangent-space maps and anisotropy point the derived frame up bottom-left-origin UVs (+b); other materials keep the text', async () => {
   const s = await scene(),
     tilt = solid(128, 200, 200),
     materials = [

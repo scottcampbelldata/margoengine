@@ -1,6 +1,6 @@
 # Third-party decoders
 
-These files are official WebAssembly builds, as redistributed by the `three` package (0.181.0, `examples/jsm/libs`).
+These files are official WebAssembly builds of the two projects listed below.
 Both `.wasm` files and `draco_wasm_wrapper.js` are unmodified. `basis/basis_transcoder.js` is modified by Margo
 Engine's build (`scripts/static-embind.js`, stated with the date of the change in the file's first line): its two
 embind wrapper generators, which used `new Function`, are replaced by equivalent closures so it runs under a Content

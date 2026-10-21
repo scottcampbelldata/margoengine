@@ -1,4 +1,4 @@
-// UltraHDR (gain-map JPEG, Adobe/Google hdrgm XMP) decoding: the Three.js UltraHDRLoader equivalent.
+// UltraHDR (gain-map JPEG, Adobe/Google hdrgm XMP) decoding.
 import { MAX_PIXELS, toBytes, type FloatImage } from './hdr.js';
 import { SRGBToLinear as srgbToLinear } from '@margoengine/math/color';
 import { MargoError } from '@margoengine/math/errors';

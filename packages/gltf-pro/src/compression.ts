@@ -105,7 +105,7 @@ export async function decompressPrimitives(asset: GLTFAsset, { signal, draco }: 
           throw new RangeError('Invalid glTF Draco triangle indices');
         // The index accessor's componentType does not bound decoded Draco indices: they are stored as Float32 (exact
         // to 2^24) and each is checked against the vertex count above. Blender's exporter (4.2) declares UNSIGNED_SHORT
-        // for Draco primitives of up to 94,965 vertices (NASA's ISS GLB); three.js and Babylon load those files.
+        // for Draco primitives of up to 94,965 vertices (NASA's ISS GLB), and other glTF viewers load those files.
         for (const semantic of Object.keys(attributeIds)) {
           const id = p.attributes![semantic],
             def = entry(asset.doc.accessors, id, 'Draco attribute');

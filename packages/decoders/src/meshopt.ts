@@ -509,7 +509,7 @@ export function meshoptDecodeGltfBuffer(
   return out;
 }
 
-/** Drop-in for three's `MeshoptDecoder` object, so glTF loaders written against that interface work unchanged. */
+/** Matches the meshoptimizer project's own `MeshoptDecoder` interface (`supported`, `ready`, `decodeGltfBuffer`), so glTF loaders written against it work unchanged. */
 export const MeshoptDecoder = {
   supported: true,
   ready: Promise.resolve(),

@@ -1,6 +1,6 @@
 // Decoded Draco indices load whatever componentType the index accessor declares. Blender's glTF exporter (4.2.57)
 // declares UNSIGNED_SHORT on Draco primitives of 75,744 to 94,965 vertices; NASA's ISS GLB has four, and gltf-pro
-// rejected the whole file ("Draco indices exceed accessor component type") where three.js and Babylon load it.
+// rejected the whole file ("Draco indices exceed accessor component type") where other glTF viewers load it.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { GLTFAsset } from '../dist/index.js';

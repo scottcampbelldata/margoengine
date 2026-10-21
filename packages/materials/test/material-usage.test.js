@@ -1,4 +1,4 @@
-// three.js-style live material use on createMesh meshes: swapping mesh.material, with what it keeps and frees.
+// Live material use on createMesh meshes: swapping mesh.material, with what it keeps and frees.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';

@@ -39,19 +39,16 @@ const element = () => ({
   },
 });
 
-test('orthographic projection matches three.js OrthographicCamera, including zoom and an off-centre frustum', () => {
+test('orthographic projection honours explicit bounds and zoom, including an off-centre frustum', () => {
   const { camera, p } = ortho({ left: -4, right: 2, top: 3, bottom: -1, near: 1, far: 21, zoom: 2 });
   camera.update(1.5, true);
   const m = camera.matrix;
   assert.ok(!m[3] && !m[7] && !m[11] && m[15] === 1, 'w row is constant');
-  // three.js: dx=(r-l)/(2 zoom), cx=(r+l)/2 â†’ visible x in [cx-dx,cx+dx] = [-2.5,0.5], y in [0,2]; aspect ignored.
+  // dx=(r-l)/(2 zoom), cx=(r+l)/2 â†’ visible x in [cx-dx,cx+dx] = [-2.5,0.5], y in [0,2]; aspect ignored.
   assert.ok(near(ndc(m, [-2.5, 0, 0]).slice(0, 2), [-1, -1]) && near(ndc(m, [0.5, 2, 5]).slice(0, 2), [1, 1]));
   p.zoom = 1;
   camera.update(0.3, true);
-  assert.ok(
-    near(ndc(camera.matrix, [2, 3, -7]).slice(0, 2), [1, 1]),
-    'explicit bounds keep three.js semantics on resize',
-  );
+  assert.ok(near(ndc(camera.matrix, [2, 3, -7]).slice(0, 2), [1, 1]), 'explicit bounds ignore the aspect on resize');
 });
 
 test('reversed-Z depth: near maps to 1 and far to 0 on WebGPU, -1..1 on WebGL', () => {

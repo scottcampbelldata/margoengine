@@ -56,7 +56,7 @@ test('raster argument errors distinguish types from numeric ranges and name the 
     assert.throws(() => new Material({ [key]: 1 }), { name: 'TypeError', message: new RegExp(key + '.*; set') });
 });
 
-test('constructed meshes map Three-style polygon offset to reverse-Z and preserve stencil semantics', async () => {
+test('constructed meshes map forward-Z polygon offset values to reverse-Z and preserve stencil semantics', async () => {
   const h = optionalGPU(),
     engine = new Engine(
       { width: 64, height: 64 },

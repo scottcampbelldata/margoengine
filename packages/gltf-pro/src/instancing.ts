@@ -9,7 +9,7 @@ import type { GLTFAsset } from './asset.js';
 declare const GPUBufferUsage: { VERTEX: number; COPY_DST: number };
 const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0];
 /**
- * Per-instance data for gltf-pro primitives, the counterpart of three.js InstancedMesh's `instanceMatrix`/`instanceColor`:
+ * Per-instance data for gltf-pro primitives (a matrix, a tint and a UV transform per instance):
  * assign one to `primitive.instances` and that primitive draws `count` instances in one instanced draw. Matrices are in the
  * primitive's node space (world = node matrix x instance matrix, as glTF EXT_mesh_gpu_instancing). Each instance also has
  * an RGBA tint (multiplies base colour, like vertex colour) and a UV scale + offset applied to both UV sets before the

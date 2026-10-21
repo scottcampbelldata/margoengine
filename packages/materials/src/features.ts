@@ -71,7 +71,7 @@ export function featureShader(code: string, group: number, key: string): string 
     );
   // A normal map's +Y is up the image (glTF 2.0 material.schema.json normalTexture: "+X is right and +Y is up").
   // gltf-pro's derived frame (shared/tangent-frame.js) sends B toward decreasing v, up the image for glTF's upper-left
-  // texture origin. Materials meshes have three.js UV orientation and flipY uploads, so up the image is increasing v,
+  // texture origin. Materials meshes have a bottom-left UV origin and flipY uploads, so up the image is increasing v,
   // where MikkTSpace tangents of these UVs put B too (mikktspace.c: vOt along increasing t; bitangent = fSign *
   // cross(vN, tangent)). Authored tangents keep b = cross(n, t) * w: this only changes the frame drawn without them.
   // One definition serves every caller: the base surface and extension lobes (clearcoat(), lobes, node normalMap).

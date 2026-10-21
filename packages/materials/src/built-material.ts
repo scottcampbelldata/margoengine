@@ -1092,7 +1092,7 @@ export type Blending = 'normal' | 'additive' | 'multiply' | 'none';
 /** A live linear colour array (what gltf-pro reads every frame) whose `set` takes any colour input, like the option. */
 type LiveColor = number[] & { set(value: ColorInput): number[] };
 /**
- * Physical options (three.js MeshPhysicalMaterial names, glTF KHR_materials_* meaning; gltf-pro's physical shader draws
+ * Physical options (glTF KHR_materials_* meaning; gltf-pro's physical shader draws
  * them, so a mesh and the same glTF material render alike). Any of them, at construction or set later, makes the
  * material physical (standard shading only); `transmission` and its maps make it transmissive (drawn after opaque
  * meshes). Values stay live.
@@ -2740,7 +2740,7 @@ export class Material {
   }
 }
 
-/** Any CPU geometry with three.js UV orientation; `@margoengine/geometry` output fits directly. Colors are RGB or RGBA, floats 0-1 or bytes. */
+/** Any CPU geometry with a bottom-left UV origin (v increases up the image); `@margoengine/geometry` output fits directly. Colors are RGB or RGBA, floats 0-1 or bytes. */
 export interface MeshGeometry {
   positions: ArrayLike<number>;
   normals: ArrayLike<number>;
@@ -3377,7 +3377,7 @@ export function createMesh<M extends Material | readonly Material[]>(
     setGeometry: { value: setGeometry },
   }) as MaterialMesh<M>;
 }
-/** A materials mesh drawn as `instances.count` instances in one draw call (three.js InstancedMesh); `instances` holds each one's matrix, tint and UV transform. */
+/** A materials mesh drawn as `instances.count` instances in one draw call; `instances` holds each one's matrix, tint and UV transform. */
 export type InstancedMesh<M extends Material | readonly Material[] = Material> = MaterialMesh<M> & {
   readonly instances: PBRInstances;
 };

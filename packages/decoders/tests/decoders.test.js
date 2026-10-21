@@ -991,7 +991,7 @@ test('meshopt decoding is bit-exact with the meshoptimizer reference decoder', a
     assert.deepEqual(decoded, bytes(c.expected), c.name);
     const target = new Uint8Array(c.count * c.stride);
     decoders.MeshoptDecoder.decodeGltfBuffer(target, c.count, c.stride, bytes(c.encoded), c.mode, c.filter);
-    assert.deepEqual(target, bytes(c.expected), `${c.name} via the three-compatible MeshoptDecoder`);
+    assert.deepEqual(target, bytes(c.expected), `${c.name} via MeshoptDecoder.decodeGltfBuffer`);
   }
   // 8 EXT_meshopt_compression cases plus KHR_meshopt_compression's vertex codec v1 and COLOR filter (8- and 16-bit, in and out of range).
   assert.deepEqual(

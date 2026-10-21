@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-// Environment background: the scene.background = texture (equirect or cube) equivalent, with
-// backgroundIntensity (exposure), backgroundRotation and backgroundBlurriness (blur).
+// Environment background: draws an environment's equirect or cube texture behind the scene, with
+// exposure, rotation and blur.
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type FrameGraph, type PassContext } from '@margoengine/core/extension';
 import type { Environment } from './environment.js';
@@ -15,9 +15,9 @@ declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
 
 /** `EnvironmentBackground` (alias `Skybox`) settings; out-of-range values throw RangeError. */
 export interface EnvironmentBackgroundOptions {
-  /** Linear multiplier before tone mapping (Three.js backgroundIntensity). Default 1. */
+  /** Linear multiplier before tone mapping. Default 1. */
   exposure?: number;
-  /** 0 = sharp source, 1 = the roughest prefiltered mip (Three.js backgroundBlurriness). Default 0. */
+  /** 0 = sharp source, 1 = the roughest prefiltered mip. Default 0. */
   blur?: number;
   /**
    * What to sample when `blur` is 0: 'equirect' (the original image, sharpest), 'cube' (the source cube map),

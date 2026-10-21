@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-// Solid or vertical-gradient background: the scene.background = color equivalent.
+// Solid or vertical-gradient background color.
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type FrameGraph, type PassContext } from '@margoengine/core/extension';
 import {
@@ -80,7 +80,7 @@ export interface ColorBackgroundOptions {
 
 /**
  * Fills every pixel the scene left empty (depth still at the cleared reversed-Z 0) with a color or a vertical
- * gradient. On the canvas the color is shown exactly (no tone mapping, like Three.js `scene.background = color`);
+ * gradient. On the canvas the color is shown exactly (no tone mapping);
  * on an rgba16float pass target (tonemap, creative PostProcessing) it writes the linear value so the post chain
  * treats it like scene radiance. The canvas stays opaque; `TransparentCanvas` (below) clears to alpha 0 instead.
  */
@@ -242,7 +242,7 @@ export class ColorBackground {
 }
 
 /**
- * Transparent canvas over HTML/CSS (three.js `alpha: true` with a clear alpha of 0) without a core change: switches the
+ * Transparent canvas over HTML/CSS (cleared to alpha 0) without a core change: switches the
  * canvas context to `alphaMode: 'premultiplied'` and overwrites every pixel the scene left empty with alpha 0 (the
  * `ColorBackground` pass, so multisampled silhouettes resolve to valid premultiplied edges). Reapplied after
  * `engine.rebootDevice()`; `dispose()` restores the opaque canvas. On the WebGL2 fallback it does nothing: create that

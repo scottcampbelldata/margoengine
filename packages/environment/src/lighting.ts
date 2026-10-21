@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-// Scene-wide shading from outside core: image-based lighting from an Environment (scene.environment) and distance/height
-// fog (scene.fog). Each effect is an engine plugin that patches core's frozen mesh shader through PassContext.shader (text
+// Scene-wide shading from outside core: image-based lighting from an Environment and distance/height
+// fog. Each effect is an engine plugin that patches core's frozen mesh shader through PassContext.shader (text
 // anchors, tests/shader-contracts.test.js) and a glTF-pro LightingEffect (`add(model)`) through glTF-pro's declared
 // lighting hooks, so opaque and blended glTF primitives are lit and fogged in their own shader.
 import type { EngineKernel } from '@margoengine/core';
@@ -155,8 +155,8 @@ export interface EnvironmentLightingOptions {
 
 /**
  * Lights core meshes (`engine.use(lighting)`) and glTF-pro models (`lighting.add(model)`) with an Environment:
- * split-sum specular from the prefiltered cube plus SH irradiance, scaled by `environment.intensity` (Three.js
- * `scene.environment`). It replaces the constant ambient term (core's `lighting.radiance[3]`, glTF-pro's hemisphere
+ * split-sum specular from the prefiltered cube plus SH irradiance, scaled by `environment.intensity`.
+ * It replaces the constant ambient term (core's `lighting.radiance[3]`, glTF-pro's hemisphere
  * ambient); direct lights, shadows and clustered lights still add on top. glTF occlusion maps scale the IBL term.
  */
 export class EnvironmentLighting extends ShaderEffect {
@@ -269,18 +269,18 @@ export class EnvironmentLighting extends ShaderEffect {
   }
 }
 
-/** `Fog` settings (Three.js `Fog` / `FogExp2` plus height fog); bad values throw RangeError, a malformed color TypeError. */
+/** `Fog` settings (linear, exponential-squared and height fog); bad values throw RangeError, a malformed color TypeError. */
 export interface FogOptions {
   /**
    * Fog color: hex is sRGB, `[r, g, b]` linear (as everywhere in Margo); fully fogged pixels show exactly this color on
    * the canvas. Default '#ffffff'.
    */
   color?: ColorInput;
-  /** Linear fog start distance from the camera (Three.js Fog). Default 1. */
+  /** Linear fog start distance from the camera. Default 1. */
   near?: number;
   /** Linear fog end distance from the camera, where fog is full. Default 1000. */
   far?: number;
-  /** Above 0 selects exponential-squared fog `1 - exp(-(density * distance)^2)` (Three.js FogExp2). Default 0. */
+  /** Above 0 selects exponential-squared fog `1 - exp(-(density * distance)^2)`. Default 0. */
   density?: number;
   /** Height fog: fog thins by `exp(-heightFalloff * (y - height))` above world height `height`. Default 0 (off). */
   heightFalloff?: number;

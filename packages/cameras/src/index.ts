@@ -7,12 +7,12 @@ export interface ProjectionOptions {
   mode?: 'orthographic' | 'perspective';
   /** Visible world height at zoom 1. Default: the perspective height at the target, 2·distance·tan(fov/2), so dolly controls zoom. */
   height?: number;
-  /** three.js OrthographicCamera frustum in view units. When all four are set they replace height and the canvas aspect. */
+  /** Orthographic frustum bounds in view units. When all four are set they replace height and the canvas aspect. */
   left?: number;
   right?: number;
   top?: number;
   bottom?: number;
-  /** three.js zoom: divides the frustum about its centre. */
+  /** Zoom factor: divides the frustum about its centre. */
   zoom?: number;
   /** Eye-space clip distances, may be negative. Default: camera.far deep, centred on the target. */
   near?: number;

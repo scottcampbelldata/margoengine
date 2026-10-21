@@ -48,7 +48,7 @@ const shader = /* wgsl */ `
 }`;
 
 /**
- * Display P3 and/or HDR canvas output (three.js `renderer.outputColorSpace` / WebGPU `toneMapping: 'extended'`) as one
+ * Display P3 and/or HDR canvas output (WebGPU `colorSpace` / `toneMapping: 'extended'`) as one
  * plugin with zero core bytes. Where the display supports it, the canvas is reconfigured (`colorSpace: 'display-p3'`;
  * HDR: `rgba16float` with `toneMapping: {mode: 'extended'}`), core's frame is redirected into an offscreen copy of the
  * canvas texture, and a final pass writes the real canvas: sRGB content converted exactly to P3 (it looks the same),

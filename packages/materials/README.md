@@ -174,7 +174,7 @@ The supported nodes are a closed set:
 
 For lobe inputs, a vec4 factor uses R, roughness and thickness use G, and metal uses B. Scalar inputs use their single value. `volume` accepts `thickness`, `attenuationColor`, and `attenuationDistance`, with the same defaults and restrictions as glTF volume. A texture without a sampler uses the existing nearest, clamped sampling path. Select UV0 or UV1 explicitly for a normal map when its input graph samples that UV set.
 
-An output can reference nested nodes absent from the root list. All listed nodes are validated, including disconnected ones. Reuse an object to share a node. Cycles, multiple or missing outputs, unknown node types, incompatible input types, arbitrary WGSL, and requests for custom vertex attributes throw. The vertex format remains position, normal, tangent, UV, and color. This graph is a TypeScript authoring API; it does not load Three.js TSL or node JSON.
+An output can reference nested nodes absent from the root list. All listed nodes are validated, including disconnected ones. Reuse an object to share a node. Cycles, multiple or missing outputs, unknown node types, incompatible input types, arbitrary WGSL, and requests for custom vertex attributes throw. The vertex format remains position, normal, tangent, UV, and color. This graph is a TypeScript authoring API; it does not import shader graphs saved by other tools.
 
 `installNodeMaterial(model, graph)` installs one graph on the model and automatically registers a plugin. Graph transmission acquires the same shared opaque-color capture as glTF transmission and sets the affected primitives to the existing blend path:
 
@@ -284,11 +284,11 @@ mesh.root.setPosition([0, 1, 0]);
 `setUVTransform(transform, slot?)` selects UV0 or UV1 with `texCoord` as well as offset, scale and rotation. Without a
 slot it updates every map except `matcap`, including maps assigned later; `null` restores UV0 and the identity transform. Updates take effect next frame.
 Normal maps selected from UV1 or transformed UVs derive their tangent frame from those coordinates. Without `tangents`
-the derived frame follows three.js UV orientation: a normal map's +Y (green) points toward increasing v, up a `flipY`
+the derived frame assumes a bottom-left UV origin: a normal map's +Y (green) points toward increasing v, up a `flipY`
 image, as it does with tangents whose bitangent `cross(normal, tangent) * w` runs along increasing v. glTF assets keep
 glTF's convention (decreasing v, texture origin at the image's top-left). An extension assigned to a materials mesh's
 `primitives[i].extension` follows the mesh: a `clearcoat()` normal texture, a `materialLobes()` anisotropy direction
-and a `nodeMaterial()` / `installNodeMaterial()` normalMap take the three.js orientation there (upload their views with
+and a `nodeMaterial()` / `installNodeMaterial()` normalMap take that bottom-left orientation there (upload their views with
 `flipY`, as `Texture` does) and glTF's on a loaded glTF model.
 
 A material array requires at least one group. Each group has a nonnegative integer `materialIndex` into that array,

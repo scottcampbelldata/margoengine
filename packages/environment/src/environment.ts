@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-// GPU image-based lighting: the PMREMGenerator + scene.environment equivalent for WebGPU.
+// GPU image-based lighting for WebGPU: prefiltered environment cube, SH irradiance and BRDF LUT.
 import type { EngineKernel, EnginePlugin } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import type { FloatImage } from './hdr.js';
@@ -585,8 +585,8 @@ function destroy(resources: Resources | undefined): void {
 /**
  * Processed image-based lighting for one environment: the source cube map with a box-filtered mip chain,
  * a GGX-prefiltered specular cube (roughness 0..1 across its mips), L2 spherical-harmonic irradiance and a
- * split-sum BRDF LUT. All textures are rgba16float. Replaces Three.js PMREMGenerator output plus
- * `scene.environment`. Pass it to `engine.use` to rebuild automatically after a device loss.
+ * split-sum BRDF LUT. All textures are rgba16float; `EnvironmentLighting` lights a scene with it.
+ * Pass it to `engine.use` to rebuild automatically after a device loss.
  */
 export class Environment implements EnginePlugin {
   readonly name: string;

@@ -26,7 +26,7 @@ type EnvKeys =
 type MetalKeys = 'roughness' | 'metalness' | 'metalRoughnessMap';
 type LightKeys = 'emissive' | 'emissiveMap' | 'aoMap' | 'aoMapIntensity';
 
-/** Unlit (`shading: 'basic'`, three.js MeshBasicMaterial): colour, maps and emissive, no lighting. */
+/** Unlit (`shading: 'basic'`): colour, maps and emissive, no lighting. */
 export class UnlitMaterial extends Material {
   constructor(
     options: Omit<

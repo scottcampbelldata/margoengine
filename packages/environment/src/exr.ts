@@ -1,4 +1,4 @@
-// OpenEXR scanline decoder: the Three.js EXRLoader equivalent for single-part scanline files with
+// OpenEXR scanline decoder for single-part scanline files with
 // NONE, RLE, ZIPS, ZIP or PIZ compression and HALF, FLOAT or UINT channels.
 import { halfToFloat } from './half.js';
 import { inflateZlib } from './inflate.js';

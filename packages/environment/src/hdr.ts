@@ -1,4 +1,4 @@
-// Radiance RGBE (.hdr) decoder: the Three.js RGBELoader equivalent, written from the public picture-format notes
+// Radiance RGBE (.hdr) decoder, written from the public picture-format notes
 // (radsite.lbl.gov/radiance/refer/Notes/picture_format.html).
 import { MargoError } from '@margoengine/math/errors';
 

@@ -27,7 +27,7 @@ or `new Texture(await ktx2.transcode(bytes))`, which uploads the transcoded mips
 
 ## Meshopt
 
-`decodeMeshoptBuffer(source, count, stride, mode, filter)` decodes one `EXT_meshopt_compression` bufferView (ATTRIBUTES, TRIANGLES or INDICES, with the OCTAHEDRAL, QUATERNION and EXPONENTIAL filters) and returns a `Uint8Array`. It is pure TypeScript, synchronous and needs no Wasm. Output matches the meshoptimizer reference decoder bit for bit. `MeshoptDecoder` exposes the same `decodeGltfBuffer` signature as the object three.js loaders expect. The extension only allows vertex codec version 0, so version 1 streams are rejected with a clear error.
+`decodeMeshoptBuffer(source, count, stride, mode, filter)` decodes one `EXT_meshopt_compression` bufferView (ATTRIBUTES, TRIANGLES or INDICES, with the OCTAHEDRAL, QUATERNION and EXPONENTIAL filters) and returns a `Uint8Array`. It is pure TypeScript, synchronous and needs no Wasm. Output matches the meshoptimizer reference decoder bit for bit. `MeshoptDecoder` has the members of the meshoptimizer project's own decoder object (`supported`, `ready`, `decodeGltfBuffer`), so glTF loaders written against that interface work unchanged. The extension only allows vertex codec version 0, so version 1 streams are rejected with a clear error.
 
 ## How it works
 
