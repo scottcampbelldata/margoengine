@@ -122,7 +122,7 @@ before the core speed-ups (`0ed56b9`) re-run faster than recorded.
 | oit-detached | – | `b803d56` -> `0e02ead`: 2,864 calls (2,964 until 5w.f replaced the story's transmission material with a plain BLEND one: transmission now draws twice by design) | `8199756`: 2,732 calls |
 | post-ssr | – | `7c47a09` -> `3cf1453`: 9,269 calls | `de93aa5`: 12,431 calls (AgX normalised for older refs, see below) |
 | post-ssr-models | LIM-016 | `3cf1453` -> `838ae6e`: 30,858 calls | `de93aa5`: 37,182 calls |
-| taa-velocity | – | `6c20076d` (before the `taa.velocity` getter) -> the motion-blur commit: 16,923 calls at 1x and 4x, the getter read every frame | `6c20076d` |
+| taa-velocity | – | `6c20076d` (before the `taa.velocity` getter) -> `e1a20e13` (the motion-blur commit): 16,923 calls at 1x and 4x, the getter read every frame | `d41cdafd` |
 | terrain-ssr | – | `6c20076d` (before terrain's capture hook) -> the water/terrain SSR commit: terrain.proof.js's story, 6,458 calls in two of its three terrains | `6c20076d` |
 | water-ssr | – | `6c20076d` (before water's capture hook) -> the water/terrain SSR commit: 2,762 calls in 3 stories | `6c20076d` |
 | quality-presets | – | `96daac7` -> `01e5e35` | `8199756` |
@@ -164,6 +164,13 @@ additional approved fixes. Historical baseline/claim pins, assertions and the ex
 - **post-stack:** `5c047b2` replaced the old two-dispatch Bloom with its downsample/upsample mip chain, bilinear sampler, Karis weighting, averaged strength and output dither. PBR Neutral capture/display and the implicit Tonemap curve also changed intentionally. Its 12 stories now match `8199756` at 14,610 calls; creative's historical `5b1fe66^` -> `3319317` pair is unchanged.
 - **post-ssr and post-ssr-models:** the same Bloom/display changes apply, and `de93aa5` makes intermediate SSAO/SSR composites return linear colour instead of `toDisplay(c)`. Full traces match `de93aa5` at 12,431 and 37,182 calls. Relative to the earlier display snapshot, all other calls, resource descriptors and buffer bytes are unchanged. Bloom's HDR replacement was source-audited in that fix; these specific stacks place Bloom directly before FXAA and do not exercise a later HDR consumer of Bloom.
 - **terrain/scatter varying allocation:** `957c58b` was checked separately because none of these seven proofs imports those packages. Core's locations 0-3 stay unchanged; terrainId changes 6 -> 4; scatter alone retains 4/5/6, while terrain plus translucent scatter now uses terrainId/emissive/occlusion/translucency at 4/5/6/7 instead of declaring location 6 twice. Complete generated shader diffs contain only those varying-number changes.
+
+**taa-velocity, advanced to `d41cdafd` on 2026-10-21:** hygiene group C (HANDOFF 5k) converted TAA's bare Errors.
+The story records each thrown error as a `throw` entry (class and message), and exactly three per run changed: the
+singular-camera frame now throws MargoError `'state'` (`Invalid TAA camera; give the camera a finite, invertible
+projection`), and the two replaced-vertex-buffer frames throw TypeError with the same text. All 7,900 (1x) and 9,023
+(4x) entries match `6c20076d` apart from those three; every GPU call, descriptor and buffer write is unchanged. The
+pinned pair now names its claim commit `e1a20e13` instead of the working tree.
 
 These current checks still compare every recorded call, descriptor, shader and buffer write exactly against the
 committed reference, without normalizing away render-state changes. Pinned baseline/claim pairs are unchanged.
