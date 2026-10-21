@@ -16,10 +16,12 @@ import { Frustum } from '@margoengine/math/frustum';
 import { invertMatrix } from '@margoengine/math/mat4';
 import { neutralShader } from '../../shared/display.js';
 import { lightPBR, type PBRHooks } from '../../shared/pbr-hooks.js';
+import { viewMatrix } from '../../shared/view.js';
 import { uniformState } from './chunk.js';
 import { blockMaterials, type ChunkMesh, sortQuads, VoxelMesher } from './mesher.js';
 import { BlockTextures, blockTextureView } from './textures.js';
 import type { VoxelWorld } from './world.js';
+import { voxelPostShader } from './render-post.js';
 
 export { type BlockPixels, BlockTextures, type BlockTexturesOptions } from './textures.js';
 
@@ -257,6 +259,16 @@ export interface VoxelRendererEffect {
   bindings(): GPUBindGroupEntry[];
 }
 
+/** Material capture contract shared with SSR and SSGI from `@margoengine/post`; neither package is required. */
+export interface VoxelCapture {
+  /** PBR Surface capture declarations, including `MargoCapture` and `margoCapture(s,v,k)`. */
+  declarations(code: string): string;
+  /** Capture color targets in declaration location order. */
+  readonly targets: readonly GPUColorTargetState[];
+  /** Begins the owner's shared pass; the owner ends it after all registered sources draw. */
+  begin(): GPURenderPassEncoder;
+}
+
 /** What `Shadows` hands {@link VoxelRenderer.drawShadow}: one cascade's depth pass and light matrix. */
 export interface VoxelShadowContext {
   /** The frame's pass context; the renderer reads its `device`. */
@@ -380,6 +392,7 @@ interface Gpu {
   view?: GPUTextureView;
   pipelines: Map<string, { ready?: Pipelines }>;
   shadow?: ShadowState;
+  post?: { view: GPUBuffer; states: Map<string, { ready?: Pipelines }> };
 }
 
 let serial = 0;
@@ -435,10 +448,13 @@ export class VoxelRenderer implements EnginePlugin {
   #translucent: Chunk[] = [];
   #frame = new Float32Array(60);
   #inverse = new Float64Array(16);
+  #postView = new Float32Array(16);
   #frustum = new Frustum();
   #box = { min: { x: 0, y: 0, z: 0 }, max: { x: 0, y: 0, z: 0 } };
   #stats = { chunks: 0, visible: 0, quads: 0, bytes: 0, draws: 0 };
   #effects = new Set<VoxelRendererEffect>();
+  #capture?: VoxelCapture;
+  #disposeListeners = new Set<() => void>();
   #composed = { from: '', code: SHADER };
   #lightVersion = 0;
   #shadowVersion = 0;
@@ -518,6 +534,169 @@ export class VoxelRenderer implements EnginePlugin {
   /** Chunks, quads, bytes and draw calls of the last frame. */
   get stats(): VoxelRendererStats {
     return this.#stats;
+  }
+
+  /** True after disposal, for optional post and lighting hosts. */
+  get disposed(): boolean {
+    return this.#disposed;
+  }
+
+  /** Notifies an optional host when this renderer leaves; the returned unsubscribe and disposal are idempotent. */
+  onDispose(callback: () => void): () => void {
+    if (typeof callback !== 'function') throw new TypeError('VoxelRenderer onDispose needs a callback');
+    if (this.#disposed) {
+      callback();
+      return () => {};
+    }
+    this.#disposeListeners.add(callback);
+    return () => {
+      this.#disposeListeners.delete(callback);
+    };
+  }
+
+  /** Sets the native PBR material capture hook used by SSR/SSGI. Returns an identity-safe remover. */
+  setCapture(hook: VoxelCapture): () => void {
+    if (this.#disposed) throw new MargoError('disposed', 'VoxelRenderer is disposed; attach a new one');
+    if (
+      !hook ||
+      typeof hook.declarations !== 'function' ||
+      typeof hook.begin !== 'function' ||
+      !Array.isArray(hook.targets) ||
+      !hook.targets.length
+    )
+      throw new TypeError('VoxelRenderer capture needs declarations, targets and begin; pass a post capture hook');
+    this.#capture = hook;
+    return () => {
+      if (this.#capture === hook) this.#capture = undefined;
+    };
+  }
+
+  /**
+   * Replays native quad materials for GTAO/SSAO (`gbuffer`, `ambient`, `occlusion`) or SSR/SSGI (`capture`). Opaque and
+   * cutout geometry keep the beauty shader's texture, alpha, liquid normals and lighting hooks. Capture excludes
+   * translucent surfaces. `occlusion` needs the post owner's two-target external pass; external/capture passes remain
+   * open for their owner. GPU state is allocated only on the first replay, and pipelines compile asynchronously.
+   */
+  draw(
+    c: Extract<PassContext, { backend: 'webgpu' }>,
+    mode: 'gbuffer' | 'ambient' | 'occlusion' | 'capture',
+    color: GPUTextureView,
+    depth: GPUTextureView,
+    phase: 'all' | 'opaque' | 'blend' = 'all',
+    external?: { pass: GPURenderPassEncoder; view: ArrayLike<number>; depthCompare: GPUCompareFunction },
+  ): void {
+    const gpu = this.#gpu,
+      hook = mode === 'capture' ? this.#capture : undefined;
+    if (this.#disposed || !gpu || gpu.device !== c.device || !this.#chunks.size || (mode === 'capture' && !hook))
+      return;
+    if (mode === 'occlusion' && !external)
+      throw new TypeError("VoxelRenderer occlusion needs the post owner's two-target external pass");
+    const { code: beauty, effects } = this.#composition(),
+      code = voxelPostShader(beauty, mode, hook?.declarations(beauty)),
+      samples = c.descriptor.multisample?.count ?? 1,
+      targets: GPUColorTargetState[] = hook
+        ? [...hook.targets]
+        : Array.from({ length: mode === 'occlusion' ? 2 : 1 }, () => ({ format: 'rgba16float' })),
+      compare = external?.depthCompare ?? 'greater-equal',
+      target = `${mode}|${samples}|${c.descriptor.depthStencil!.format}|${compare}|${targets.map((t) => t.format).join(',')}`,
+      key = `${target}|${code}`,
+      post: NonNullable<Gpu['post']> = (gpu.post ??= {
+        view: c.device.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+        states: new Map(),
+      });
+    let state = post.states.get(key);
+    if (!state) {
+      state = {};
+      post.states.set(key, state);
+      const pending = state,
+        module = c.device.createShaderModule({ code });
+      const create = (layer: number) =>
+        c.device.createRenderPipelineAsync({
+          layout: 'auto',
+          vertex: { module, entryPoint: 'vertex', constants: { EDGE: layer === 2 ? 0 : EDGE_PIXELS } },
+          fragment: {
+            module,
+            entryPoint: 'fragment',
+            constants: { MODE: layer === 0 ? 0 : layer === 2 ? 3 : samples > 1 && compare === 'equal' ? 2 : 1 },
+            targets: targets.map((t, index) => ({
+              ...t,
+              ...(layer === 2 && mode !== 'gbuffer' && index === (mode === 'occlusion' ? 1 : 0)
+                ? {
+                    blend: {
+                      color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+                      alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+                    },
+                  }
+                : {}),
+            })),
+          },
+          primitive: { cullMode: layer === 0 ? 'back' : 'none' },
+          depthStencil: {
+            format: c.descriptor.depthStencil!.format,
+            depthWriteEnabled: mode === 'capture',
+            depthCompare: compare,
+          },
+          multisample: { count: samples },
+        });
+      Promise.all([create(0), create(1), ...(mode === 'capture' ? [] : [create(2)])])
+        .then((layers) => {
+          if (this.#gpu !== gpu) return;
+          pending.ready = { target, layers, effects };
+          for (const [old, value] of post.states)
+            if (old !== key && value.ready?.target === target) post.states.delete(old);
+        })
+        .catch((error) => this.#engine?.onError(error));
+    }
+    const p = state.ready;
+    if (!p) return;
+    const view = external?.view ?? viewMatrix(this.#postView, c.camera);
+    if (mode === 'gbuffer' || mode === 'occlusion') gpu.device.queue.writeBuffer(post.view, 0, Float32Array.from(view));
+    if (p.groupVersion !== this.#resources) {
+      const entries: GPUBindGroupEntry[] = [
+        { binding: 0, resource: { buffer: gpu.frame } },
+        { binding: 1, resource: { buffer: gpu.pool } },
+        { binding: 2, resource: { buffer: gpu.pageTable } },
+        { binding: 3, resource: { buffer: gpu.origins } },
+        { binding: 4, resource: { buffer: gpu.materials } },
+        { binding: 5, resource: gpu.view! },
+        { binding: 6, resource: gpu.sampler },
+        ...(mode === 'gbuffer' || mode === 'occlusion' ? [{ binding: 7, resource: { buffer: post.view } }] : []),
+      ];
+      p.groups = p.layers.map((pipeline) =>
+        gpu.device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries }),
+      );
+      p.groupVersion = this.#resources;
+    }
+    if (effects.length) {
+      const entries = effects.flatMap((e) => e.bindings()),
+        bound = entries.map((e) => ('buffer' in e.resource ? e.resource.buffer : e.resource));
+      if (!p.lights || bound.length !== p.lightBound!.length || bound.some((v, i) => v !== p.lightBound![i])) {
+        p.lights = p.layers.map((pipeline) =>
+          gpu.device.createBindGroup({ layout: pipeline.getBindGroupLayout(1), entries }),
+        );
+        p.lightBound = bound;
+      }
+    }
+    const pass = hook
+      ? hook.begin()
+      : (external?.pass ??
+        c.encoder.beginRenderPass({
+          colorAttachments: [{ view: color, loadOp: 'load', storeOp: 'store' }],
+          depthStencilAttachment: { view: depth, depthReadOnly: true, stencilReadOnly: true },
+        }));
+    pass.setIndexBuffer(gpu.index, 'uint32');
+    for (let layer = 0; layer < p.layers.length; layer++) {
+      if ((phase === 'blend' && layer < 2) || (phase === 'opaque' && layer === 2)) continue;
+      pass.setPipeline(p.layers[layer]);
+      pass.setBindGroup(0, p.groups![layer]);
+      if (p.lights) pass.setBindGroup(1, p.lights[layer]);
+      if (layer < 2) {
+        for (const chunk of this.#chunks.values())
+          if (chunk.quads[layer]) pass.drawIndexedIndirect(gpu.args, chunk.slot * 40 + layer * 20);
+      } else
+        for (const chunk of this.#translucent) pass.drawIndexed(chunk.quads[2] * 6, 1, 0, chunk.start[2] * PAGE * 4, 0);
+    }
+    if (!hook && !external) pass.end();
   }
 
   /**
@@ -635,6 +814,9 @@ export class VoxelRenderer implements EnginePlugin {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
+    for (const callback of this.#disposeListeners) callback();
+    this.#disposeListeners.clear();
+    this.#capture = undefined;
     this.#engine?.removePlugin(this.name);
     this.#mesher.dispose();
     this.#release();
@@ -703,7 +885,17 @@ export class VoxelRenderer implements EnginePlugin {
   #release(): void {
     const g = this.#gpu;
     if (g)
-      for (const b of [g.frame, g.pool, g.pageTable, g.origins, g.args, g.materials, g.index, g.shadow?.uniform])
+      for (const b of [
+        g.frame,
+        g.pool,
+        g.pageTable,
+        g.origins,
+        g.args,
+        g.materials,
+        g.index,
+        g.shadow?.uniform,
+        g.post?.view,
+      ])
         b?.destroy();
     this.#gpu = this.#ready = undefined;
     this.#shadowVersion++;

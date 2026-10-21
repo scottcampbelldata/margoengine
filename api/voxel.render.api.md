@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel, Vec3 } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 import { ColorInput } from "@margoengine/math";
 
 export interface BlockPixels {
@@ -29,6 +29,12 @@ export interface BlockTexturesOptions {
     images?: readonly (CanvasImageSource | ImageData | BlockPixels)[];
 }
 
+export interface VoxelCapture {
+    declarations(code: string): string;
+    readonly targets: readonly GPUColorTargetState[];
+    begin(): GPURenderPassEncoder;
+}
+
 export class VoxelRenderer implements EnginePlugin {
     readonly name: string;
     readonly world: VoxelWorld;
@@ -40,6 +46,16 @@ export class VoxelRenderer implements EnginePlugin {
     get blockLightColor(): Vec3;
     set blockLightColor(value: Vec3);
     get stats(): VoxelRendererStats;
+    get disposed(): boolean;
+    onDispose(callback: () => void): () => void;
+    setCapture(hook: VoxelCapture): () => void;
+    draw(c: Extract<PassContext, {
+        backend: 'webgpu';
+    }>, mode: 'gbuffer' | 'ambient' | 'occlusion' | 'capture', color: GPUTextureView, depth: GPUTextureView, phase?: 'all' | 'opaque' | 'blend', external?: {
+        pass: GPURenderPassEncoder;
+        view: ArrayLike<number>;
+        depthCompare: GPUCompareFunction;
+    }): void;
     get shadowVersion(): number;
     addLighting(effect: VoxelRendererEffect): () => void;
     drawShadow({ context, pass, matrix, cascade }: VoxelShadowContext): void;

@@ -770,3 +770,78 @@ test('blockLightColor: live in the frame uniform, validated', async () => {
     renderer.dispose();
   }
 });
+
+test('post replay: shared capture lifecycle and opaque/cutout native quad material outputs', async () => {
+  const h = setup();
+  const { renderer, world, STONE, LEAVES, GLASS, frame, context, passes } = h;
+  try {
+    assert.equal(typeof renderer.setCapture, 'function');
+    assert.equal(typeof renderer.onDispose, 'function');
+    assert.equal(typeof renderer.draw, 'function');
+    world.setBlock(4, 4, 4, STONE);
+    world.setBlock(5, 4, 4, LEAVES);
+    world.setBlock(6, 4, 4, GLASS);
+    await settle(frame, () => renderer.stats.draws === 3);
+    const captured = [],
+      hook = {
+        declarations: () =>
+          'struct MargoCapture {@location(0) color:vec4f}\nfn margoCapture(s:Surface,v:vec3f,k:vec3f)->MargoCapture {return MargoCapture(vec4f(s.base.rgb,1));}',
+        targets: [{ format: 'rgba16float' }],
+        begin: () => recorder(captured),
+      };
+    const detach = renderer.setCapture(hook);
+    renderer.draw(context, 'capture', {}, {});
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    renderer.draw(context, 'capture', {}, {});
+    assert.equal(
+      captured.filter((c) => c[0] === 'drawIndexedIndirect').length,
+      2,
+      'translucent surfaces do not become solid reflectors',
+    );
+    const pipelines = captured.filter((c) => c[0] === 'setPipeline').map((c) => c[1]);
+    assert.ok(pipelines.every((p) => p.fragment.module.code.includes('margoCapture(s,v,vec3f(1))')));
+    assert.equal(pipelines[1].fragment.constants.MODE, 1, 'single sample capture repeats cutout alpha testing');
+    assert.equal(
+      captured.some((c) => c[0] === 'end'),
+      false,
+      'capture owner ends the shared pass',
+    );
+    detach();
+    captured.length = 0;
+    renderer.draw(context, 'capture', {}, {});
+    assert.equal(captured.length, 0);
+
+    const replay = [],
+      external = {
+        pass: recorder(replay),
+        view: Float32Array.of(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1),
+        depthCompare: 'equal',
+      };
+    renderer.draw(context, 'occlusion', {}, {}, 'all', external);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    renderer.draw(context, 'occlusion', {}, {}, 'all', external);
+    const rp = replay.find((c) => c[0] === 'setPipeline')[1];
+    assert.equal(rp.fragment.targets.length, 2);
+    assert.equal(rp.depthStencil.depthWriteEnabled, false);
+    assert.equal(rp.depthStencil.depthCompare, 'equal');
+    assert.ok(rp.fragment.module.code.includes('voxelPostView*vec4f(s.n,0)'));
+    assert.ok(rp.fragment.module.code.includes('MargoVoxelOcclusion'));
+    assert.equal(
+      replay.some((c) => c[0] === 'end'),
+      false,
+    );
+    assert.equal(passes.length, 2, 'external replay does not open another render pass');
+
+    let disposed = 0;
+    const off = renderer.onDispose(() => disposed++);
+    off();
+    renderer.onDispose(() => disposed++);
+    renderer.dispose();
+    renderer.dispose();
+    assert.equal(disposed, 1);
+    assert.equal(renderer.disposed, true);
+    assert.throws(() => renderer.setCapture(hook), /disposed/i);
+  } finally {
+    renderer.dispose();
+  }
+});
