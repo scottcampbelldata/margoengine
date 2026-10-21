@@ -223,6 +223,10 @@ export class SceneSwitch {
   private readonly scenes = new Map<string, Set<Mesh>>();
   private readonly saved = new WeakMap<Mesh, boolean>();
   private current: string | null = null;
+  /** A scene switch over `engine`'s meshes (it adds no plugin; `attach` is the same as `new SceneSwitch(engine)`). */
+  static attach(engine: EngineKernel): SceneSwitch {
+    return new SceneSwitch(engine);
+  }
   constructor(readonly engine: EngineKernel) {}
   /** The shown scene, or null when every scene is shown. */
   get active(): string | null {

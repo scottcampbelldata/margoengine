@@ -3,7 +3,7 @@ import type { EngineKernel } from '@margoengine/core';
 import type { Camera, Vec3 } from '@margoengine/core/extension';
 import { PlanarSurface, type PlanarOptions } from './planar.js';
 
-export { PlanarSurface, type PlanarOptions, type NormalMapImage } from './planar.js';
+export type { PlanarSurface, PlanarOptions, NormalMapImage } from './planar.js';
 export { scenePasses, type CapturePassFilter } from './capture.js';
 
 /** Options of {@link Refractor}; see {@link PlanarOptions}. */

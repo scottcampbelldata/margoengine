@@ -33,6 +33,7 @@ export interface RenderViewOptions {
 
 export class SceneSwitch {
     readonly engine: EngineKernel;
+    static attach(engine: EngineKernel): SceneSwitch;
     constructor(engine: EngineKernel);
     get active(): string | null;
     get names(): string[];

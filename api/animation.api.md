@@ -36,6 +36,7 @@ export class AnimationGroup implements EnginePlugin {
     readonly name: string;
     time: number;
     playing: boolean;
+    static attach(engine: Engine, clip: string | number | KeyframeClip, options?: AnimationGroupOptions): AnimationGroup;
     constructor(clip: string | number | KeyframeClip, options?: AnimationGroupOptions);
     get size(): number;
     has(target: AnimationGroupMember): boolean;

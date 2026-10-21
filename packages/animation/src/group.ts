@@ -66,6 +66,12 @@ export class AnimationGroup implements EnginePlugin {
   private readonly members: Member[] = [];
   private engine?: Engine;
   private disposed = false;
+  /** Creates a group and adds it to `engine` as a plugin, so it advances every frame. */
+  static attach(engine: Engine, clip: string | number | KeyframeClip, options?: AnimationGroupOptions): AnimationGroup {
+    const group = new AnimationGroup(clip, options);
+    engine.use(group);
+    return group;
+  }
   /**
    * @param clip A glTF clip name or index that every member Animation has, or a code-authored `KeyframeClip`.
    * @param options `loop` (code clips) and `speed`.
