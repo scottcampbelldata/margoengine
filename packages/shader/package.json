@@ -22,6 +22,10 @@
       "types": "./dist/readback.d.ts",
       "import": "./dist/readback.js"
     },
+    "./raw": {
+      "types": "./dist/raw.d.ts",
+      "import": "./dist/raw.js"
+    },
     "./effects": {
       "types": "./dist/effects.d.ts",
       "import": "./dist/effects.js"

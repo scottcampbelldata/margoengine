@@ -1,6 +1,6 @@
 # @margoengine/shader
 
-Typed shader nodes that compile to readable WGSL: the Margo counterpart of three.js TSL and node materials. One graph API drives three hosts: `NodeMaterial` (a `@margoengine/materials` Material whose colour, normal, roughness, metalness, emissive, opacity and vertex position come from nodes), `NodePass` (a full-screen effect inside `@margoengine/post`'s PostStack) and `ComputePass` (a compute shader over a storage buffer, dispatched by the frame graph). WebGPU only.
+Typed shader nodes that compile to readable WGSL: the Margo counterpart of three.js TSL and node materials. One graph API drives three hosts: `NodeMaterial` (a `@margoengine/materials` Material whose colour, normal, roughness, metalness, emissive, opacity and vertex position come from nodes), `NodePass` (a full-screen effect inside `@margoengine/post`'s PostStack) and `ComputePass` (a compute shader over a storage buffer, dispatched by the frame graph). Two more entries skip the graph: `@margoengine/shader/raw` draws your own WGSL with your own vertex layout (three.js `RawShaderMaterial`), and `@margoengine/shader/effects` has ready-made screen effects. WebGPU only.
 
 ```ts
 import {createMesh, loadTexture} from '@margoengine/materials';
@@ -129,6 +129,80 @@ read back exactly (65 ms on an NVIDIA Ampere GPU in Edge), a job on an engine th
 submit and while mapping, engine disposal and `device.destroy()` at both points, and a pipeline over the storage-binding
 limit; every job destroyed its buffers and no GPU error escaped.
 
+## Raw shaders (`@margoengine/shader/raw`, 9.6 kB min+gzip)
+
+three.js `RawShaderMaterial` / `ShaderMaterial` with `BufferGeometry` custom attributes: your own WGSL vertex and fragment
+entry points, any named attributes per vertex or per instance, live uniforms and textures, drawn into the scene's colour
+and depth.
+
+```ts
+import {RawShaders, RawShaderMaterial, RawMesh} from '@margoengine/shader/raw';
+const raw = RawShaders.attach(stage.engine);
+const material = new RawShaderMaterial({
+  vertexShader: `
+struct Out { @builtin(position) clip:vec4f, @location(0) color:vec3f, @location(1) uv:vec2f }
+@vertex fn vertex(a:Attributes)->Out {
+  let lift = sin(camera.time + a.offset.x) * uniforms.wave;
+  return Out(camera.viewProjection * mesh.world * vec4f(a.position + a.offset + vec3f(0.0, lift, 0.0), 1.0), a.color, a.uv);
+}
+@fragment fn fragment(i:Out)->@location(0) vec4f {
+  return margoDisplay(vec4f(i.color * uniforms.tint * textureSample(map, mapSampler, i.uv).rgb, 1.0));   // lit like the scene
+}`,
+  uniforms: {wave: {value: 0.2}, tint: {value: '#ff8800'}},   // f32 to vec4f, i32/u32 variants, mat3x3f, mat4x4f
+  textures: {map: texture},                                   // a materials Texture, GPUTexture or GPUTextureView
+});
+const mesh = raw.add(new RawMesh({
+  material,
+  attributes: {
+    position: {data: positions, type: 'vec3f'},
+    color: {data: colors, type: 'vec3f'},
+    uv: {data: uvs, type: 'vec2f'},
+    offset: {data: offsets, type: 'vec3f', step: 'instance'},   // one per instance; the instance count follows it
+  },
+  index: indices,
+}));
+material.uniforms.wave.value = 0.5;              // live, never recompiles
+mesh.setAttribute('offset', offsets, [10, 5]);    // uploads instances 10..14 only
+material.transparent = true;                      // render state is live too (a new pipeline compiles once)
+```
+
+- **The prelude.** Each stage's module is a short prelude, then your code (`material.code('vertex', mesh)` shows it). It
+  declares `camera` (`view`, `projection`, `viewProjection`, `position`, `time`, `resolution`, `deltaTime`), `mesh`
+  (`world`, and `normal`, the inverse transpose of its 3x3), `struct Attributes` with one `@location` per attribute in
+  the order given, `uniforms.<name>` (the WGSL layout is computed for you), each texture as `<name>` plus
+  `<name>Sampler`, and two colour helpers. Fragment output is written exactly as returned (raw); `margoDisplay(c)`
+  applies the scene's display transform (PBR Neutral and sRGB on a display target, nothing inside an HDR PostStack
+  capture, which tonemaps later) and `margoEncode(c)` only the sRGB encoding, for unlit colour as lines and points write
+  it. With a separate `fragmentShader` each stage is its own module, so both may use `main`.
+- **Geometry.** Attribute types are `f32`, `vec2f` to `vec4f` and the `i32`/`u32` variants, up to 16 attributes;
+  per-vertex and per-instance attributes are each interleaved into one buffer. `setAttribute(name, data, [first,
+  count])` uploads only that element range; new lengths grow the buffer; `{data, type, step}` adds or retypes an
+  attribute (new layout, new pipeline). Optional index (`Uint16Array`, `Uint32Array` or numbers), `instanceCount`,
+  `vertexCount` (no attributes: vertex pulling), `topology`, `drawRange`. `matrix` is the model matrix; `mesh: coreMesh`
+  follows a core mesh (world = its world matrix x `matrix`) and hides with it.
+- **Render state.** `transparent` (drawn after the opaque scene, sorted back to front by distance), `blending`
+  (`'normal'` blends only when transparent, as in three.js; `'additive'`, `'multiply'`, `'premultiplied'`, `'none'` or a
+  `GPUBlendState`), `depthTest` (reversed-Z `greater-equal`), `depthWrite`, `cull` (`'back'`, `'front'`, `'none'`),
+  `colorWrite`; per mesh `renderOrder` and `visible`.
+- **The pass.** Opaque raw meshes draw at frame-graph order 0.5 (after core meshes, before gltf-pro and materials meshes
+  at 1), transparent ones at 7 (after water, sky and particles, before OIT at 8 and lines at 20);
+  `new RawShaders({opaqueOrder, transparentOrder})` moves them. Each draws into the pass's own colour and depth targets
+  with their format and MSAA sample count, so 1x/4x and a PostStack's HDR capture just work.
+- **Compiling and errors.** Pipelines compile asynchronously and draw from the next frame on (`await raw.ready()` before a
+  one-off `engine.render()`). A WGSL error is a MargoError `'failed'` naming the stage and line in your code, set on
+  `material.error` and passed to `material.onError` (default `console.error`); only that draw is skipped. Assigning
+  `vertexShader` or `fragmentShader` recompiles.
+- **Lifecycle.** `mesh.dispose()` frees its buffers and leaves the plugin; `material.dispose()` frees its uniforms and
+  pipelines (rebuilt if drawn again); `engine.removePlugin('shader:raw')` frees everything and keeps the meshes. Device
+  restoration rebuilds everything from the CPU copies; a materials Texture rebinds itself, a GPUTexture from the lost
+  device draws white with a warning until you assign a new one.
+
+Measured on an NVIDIA Ampere GPU (Edge, 4x and 1x MSAA) by `node scripts/shader-raw-gpu-check.js` (under the GPU lock):
+a quad with a per-vertex colour attribute and a per-instance offset and `u32` id matches its analytic colours within 0.55
+of 255 over 5,225 pixels, is hidden pixel for pixel behind a core box and drawn in front of it, live uniforms and a ranged
+`setAttribute` update it, device restoration redraws identical pixels, and an attached plugin with nothing visible or a
+removed one leaves every pixel unchanged.
+
 ## Screen effects (`@margoengine/shader/effects`, +1.1 kB min+gzip over the root entry)
 
 Ready-made `NodePass` effects for a PostStack, each with live `uniforms` (`effect.uniforms.darkness.value = 0.5`). LDR by
@@ -187,6 +261,7 @@ match their formulas within 0.6 of 255; halftone and dot screen compile and draw
 - Nodes are fixed when a NodeMaterial, NodePass or ComputePass is constructed; build a new one to change the graph. Only uniform values, textures' pixels and storage contents change live.
 - NodeMaterial patches gltf-pro's beauty shader (standard and KHR physical variants): shadows, SSAO's G-buffer and depth-equal passes see neither `positionNode` nor `normalNode`; normals are not re-derived after a vertex offset; at most 8 varyings. Its bindings start at group 2, binding 48, and node textures count against WebGPU's 16 sampled textures per stage: a `NodeMaterial` on a materials mesh fits 6 texture nodes alone, 5 with directional shadows and 3 with shadows, IBL and LocalShadows; past that, gltf-pro throws a `RangeError` naming the combination.
 - `uv()` is the raw first UV set (no texture transform). `select` evaluates both branches; there is no statement-level `If`, `Break`, assignment to variables or `switch`. `discard` in a NodeMaterial affects the beauty pass only: shadows still see the whole surface, and a NodePass's discarded pixels stay the cleared transparent black. Fn bodies cannot read stage inputs such as `uv()`; pass them as arguments. No automatic derivative-safe sampling: `textureSample` inside a loop with a non-uniform bound is a WGSL uniformity error.
+- Raw meshes are not picked by `engine.pick`, are not culled, and draw only into the main colour and depth: shadows, SSAO and SSR G-buffers and depth prepasses do not see them. Raw uniforms are scalars, vectors, mat3x3f and mat4x4f (no arrays or structs); no storage buffers or extra bind groups; one colour target; 32-bit attribute formats only.
 - NodePass runs only inside a PostStack (a stack of one is fine). An `hdr` pass that ends the chain tonemaps with ACES.
 - ComputePass is one-dimensional (up to 65535 workgroups), runs every frame while attached (`computeReadback` runs once) (an atomic counter keeps counting unless `update()` resets it), and has no workgroup memory, barriers or atomics on workgroup variables, and no `atomicSub`/`And`/`Or`/`Xor`/`Exchange`/`CompareExchange` yet. Storage elements are 4- or 8- or 16-byte types (no vec3). A device loss re-uploads the CPU `data`, not what the GPU computed.
 - No GLSL/WebGL2 output, no node editor, no built-in noise library (write it with `Fn` or `wgslFn`), no light, shadow or environment nodes, no skinning or morph nodes, no MRT outputs.
