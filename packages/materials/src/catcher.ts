@@ -1,7 +1,7 @@
 // ShadowCatcherMaterial's shader: a Lambert surface (lit for nothing but its shadows) whose colour is its own `color`
 // and whose alpha is opacity x (1 - light received / light it would receive unshadowed), in luminance, over the sun
-// (Shadows) and clustered point and spot lights (integrated maps, LocalShadows). Ambient and environment light do not
-// count: they cast no shadow here.
+// (Shadows) and clustered point, spot, directional and area lights (integrated maps, LocalShadows). Ambient and
+// environment light do not count: they cast no shadow here.
 import { MargoError } from '@margoengine/math/errors';
 // The pre-lighting shader marks itself with this placeholder, which catcherLit replaces (so clones are catchers too).
 const placeholder = 'fn margoCatcher(i:Out,s:Surface)->f32 {return 0.0;}',
@@ -32,7 +32,8 @@ export function catcherShader(code: string): string {
 }
 /**
  * The composed shader `code` (lighting effects in) with margoCatcher measuring what shadows it holds: the sun through
- * `shadowVisibility` and clustered lights through `clusterLighting` against a copy of it without its shadow terms.
+ * `shadowVisibility` and clustered lights through `clusterLighting` against a copy of it without its shadow terms
+ * (point, spot and directional factors removed; area lights through an unshadowed copy of `clusterAreaLighting`).
  * Code that is not a catcher's comes back unchanged.
  */
 export function catcherLit(code: string): string {
@@ -43,9 +44,22 @@ export function catcherLit(code: string): string {
     composedCode.set(code, code);
     return code;
   }
+  // Area lights shadow inside clusterAreaLighting (LocalShadows' clusterAreaShadow factor): the unshadowed copy of the
+  // light loop calls an unshadowed copy of it. Directional lights' factor sits in the loop itself, as point lights' do.
+  const area = /fn clusterAreaLighting\([\s\S]*?\n\}/.exec(code)?.[0],
+    areaShadowed = !!area?.includes('*clusterAreaShadow(j,position,n,c,r,u)'),
+    openArea = areaShadowed
+      ? area!
+          .replace(/\*clusterAreaShadow\(j,position,n,c,r,u\)/g, '')
+          .replace('fn clusterAreaLighting(', 'fn margoCatcherArea(')
+      : '';
   const sun = code.includes('fn shadowVisibility(') ? '*shadowVisibility(i.position,n)' : '',
     loop = /fn clusterLighting\([\s\S]*?\n\}/.exec(code)?.[0]?.replace('fn clusterLighting(', 'fn margoCatcherLights('),
-    unshadowed = loop?.replace(/\*clusterShadow(?:Visibility)?\(light,position,n\)/g, ''),
+    stripped = loop?.replace(
+      /\*clusterShadow(?:Visibility)?\(light,position,n\)|\*clusterDirectionalShadow\(j,position,n,l\)/g,
+      '',
+    ),
+    unshadowed = areaShadowed ? stripped?.replace('clusterAreaLighting(', 'margoCatcherArea(') : stripped,
     shadowed = unshadowed !== loop,
     args = '(i.clip.xy,i.position,n,f.eye.xyz,vec3f(1),1.0,0.0),w)',
     // Unshadowed local lights count too: they make a shadow of the others lighter.
@@ -61,7 +75,7 @@ export function catcherLit(code: string): string {
   let w=vec3f(0.2126,0.7152,0.0722); let n=s.n; let sun=clamp(dot(n,normalize(f.light.xyz)),0.0,1.0)*dot(f.radiance.rgb,w)*f.light.w;
   var lit=sun${sun}; var all=sun;${local}
   return f.base.a*select(0.0,clamp(1.0-lit/all,0.0,1.0),all>0.000001);
-}${shadowed ? `\n${unshadowed}` : ''}`,
+}${shadowed ? `\n${unshadowed}` : ''}${areaShadowed ? `\n${openArea}` : ''}`,
   );
   composedCode.set(code, out);
   return out;
