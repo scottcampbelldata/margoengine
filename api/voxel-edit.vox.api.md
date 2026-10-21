@@ -8,9 +8,28 @@ import { MutableVec3 } from "@margoengine/math";
 import { VoxelWorld } from "@margoengine/voxel";
 import { VoxModel, VoxScene } from "@margoengine/voxel/vox";
 
+export type VoxCentering = 'box-v1' | 'pivot-v1';
+
+export interface VoxInstance {
+    shapeId: number;
+    model: number;
+    name?: string;
+    visible: boolean;
+    transformIds: number[];
+    layerIds: number[];
+    rotation: number[];
+    translation: MutableVec3;
+    matrix: number[];
+}
+
 export interface VoxNodePatch {
     name?: string;
     hidden?: boolean;
+}
+
+export interface VoxResolveOptions {
+    frame?: number;
+    centering: VoxCentering;
 }
 
 export interface VoxTileOptions extends GridLimits {
@@ -47,6 +66,8 @@ export function gridFromVox(model: VoxModel, limits?: GridLimits): VoxelGrid;
 
 export function moveVoxNode(scene: VoxScene, transformId: number, parentId: number): VoxScene;
 
+export function resolveVoxScene(scene: VoxScene, options: VoxResolveOptions): VoxInstance[];
+
 export function setVoxNodeLayer(scene: VoxScene, transformId: number, layerId: number): VoxScene;
 
 export function setVoxShapeKey(scene: VoxScene, shapeId: number, frame: number, model: number): VoxScene;
@@ -56,6 +77,11 @@ export function setVoxTransformKey(scene: VoxScene, transformId: number, frame: 
 export function updateVoxLayer(scene: VoxScene, id: number, patch: VoxNodePatch): VoxScene;
 
 export function updateVoxNode(scene: VoxScene, id: number, patch: VoxNodePatch): VoxScene;
+
+export function voxFrameRange(scene: VoxScene): {
+    startFrame: number;
+    endFrame: number;
+} | undefined;
 
 export function voxFromGrid(source: VoxelGrid | SparseGrid, original?: VoxModel, limits?: GridLimits): VoxModel;
 

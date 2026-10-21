@@ -45,13 +45,23 @@ air) and the filled cells pushed out of bounds. Every operation checks its argum
 | `./pick` | `pickRay` (pointer ray from the camera matrix, reverse depth), `raycastGrid` (first filled cell, the face and the cell in front of it), `groundCell` |
 | `./sparse` | `SparseGrid`: models far larger than memory holds densely (a 1,000,000-wide grid with two cells holds two chunks), stored as `@margoengine/voxel` chunks, edited by copy-on-write snapshots with `restore` undo; `editWindow` fills, erases, paints, dilates or erodes a box; `serialize` / `deserialize`; `snapshot` / `fromSnapshot` / `restoreSnapshots` and `deltaSnapshot` / `applyDeltaSnapshot` for workers (`snapshotBuffers` is the transfer list); `toWorld` writes into a `VoxelWorld` |
 | `./mesh` | `meshGrid`: greedy quads per palette index with optional corner ambient occlusion and crease-limited smooth normals; dense or sparse, chunk seams leave no inner faces; `partitionMesh` splits a mesh into one-palette parts of at most 250,000 quads (one million vertices, core `Geometry`'s limit), attributes copied |
-| `./vox` | `gridFromVox` / `voxFromGrid` (MagicaVoxel's Z up to Y up and back; an unedited model is returned as it was) and scene-graph edits: layers, names, transform and shape keys, groups, instances, `moveVoxNode` (keeps world poses), `deleteVoxNode`; `voxTiles` splits a large dense or sparse grid into filled tiles of at most 256 cells per axis, each with its exact cell offset and no axis turned |
+| `./vox` | `gridFromVox` / `voxFromGrid` (MagicaVoxel's Z up to Y up and back; an unedited model is returned as it was) and scene-graph edits: layers, names, transform and shape keys, groups, instances, `moveVoxNode` (keeps world poses), `deleteVoxNode`; `resolveVoxScene` places every shape instance at a frame (held keys, visibility, names, layers, matrix) under an explicit centering, and `voxFrameRange` gives the key span; `voxTiles` splits a large dense or sparse grid into filled tiles of at most 256 cells per axis, each with its exact cell offset and no axis turned |
 | `./animation` | `packFrames` / `unpackFrames` (each distinct model stored once) and `localFrame` (a clip's clock: offset, speed, loop or hold) |
 
 Selections, picking and meshing take a dense or a sparse grid. Errors follow
 [docs/conventions.md](../../docs/conventions.md): `TypeError` and `RangeError` for arguments and budgets,
 `MargoError` with code `state` for a stale undo token, a non-empty target world, or a `.vox` edit the scene's
 structure refuses (the last key of a track, the root, a cycle, moving a visible node into a hidden group).
+
+## .vox placement
+
+`resolveVoxScene(scene, {frame, centering})` needs a centering, because two placements are in use and they differ by
+one cell along a flipped axis of odd size. `'box-v1'` keeps a turned box on the span `t - floor(s / 2)` to
+`t - floor(s / 2) + s` on every axis and mirrors cells inside it: `@margoengine/voxel/vox` `pasteVoxModel`'s placement,
+and the one Margo Voxel Studio saves. `'pivot-v1'` turns the model about its corner `floor(size / 2)`:
+`@margoengine/voxel-pathtracer` `magicaVoxelMatrix`. Each name is a fixed contract; a new convention gets a new name.
+The resolver uses the key in force at the frame (the latest at or before it, else the earliest; the first listed
+among keys of one frame), while `pasteVoxModel` uses each track's first-listed key.
 
 ## Saved formats
 

@@ -12,6 +12,7 @@ import {
 } from './grid.js';
 import { type GridWindow, SparseGrid } from './sparse.js';
 
+export * from './vox-resolve.js';
 export * from './vox-scene.js';
 
 function voxSize(size: unknown, limits: GridLimits, subject: string): MutableVec3 {
