@@ -2,7 +2,7 @@
 // continuity, topology-changing geometry cels shown one at a time by STEP scale channels, and retained instance
 // placements sampled per key. Each helper sets the nodes' rest pose to the first key (what a viewer that does not play
 // the animation shows) and returns the channels to put in an ExportScene animation.
-import { decompose, isObject, unitQuaternion, type AnimationChannelData, type ExportNode } from './scene.js';
+import { decompose, isObject, savedRotation, type AnimationChannelData, type ExportNode } from './scene.js';
 
 /** Document frames of a held-key clip: `frames` are the keys, played at `fps`, the last held until `end`. */
 export interface FrameClip {
@@ -131,7 +131,8 @@ export function animateTransforms(
       const values = poses.map((pose, i) => {
         if (!isObject(pose) || pose[path] === undefined) throw new TypeError(`poses[${i}] has no ${path}`);
         const value = vector(pose[path], path === 'rotation' ? 4 : 3, `poses[${i}].${path}`);
-        return path === 'rotation' ? unitQuaternion(value) : value;
+        // The rest pose keeps the saved numbers; only the channel keys are Float32 accessor data.
+        return path === 'rotation' ? savedRotation(value) : value;
       });
       return { path, values };
     });

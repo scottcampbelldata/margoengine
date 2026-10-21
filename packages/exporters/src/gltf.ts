@@ -37,6 +37,25 @@ export interface GLTFOptions extends SceneOptions {
   generator?: string;
 }
 
+/**
+ * Options for {@link exportGLB}: the glTF options plus output limits, checked while the binary data is planned and
+ * assembled, so an export over a limit throws a RangeError before the GLB (or any oversized buffer) is allocated.
+ */
+export interface GLBOptions extends GLTFOptions {
+  /**
+   * Largest BIN chunk payload in bytes: every buffer view (vertex attributes, indices, inverse bind matrices,
+   * animation keys, embedded images) with the zero padding that starts each on a 4-byte boundary, as the BIN chunk
+   * header's length records it. A whole number from 0 to 4,294,967,295. Default 4,294,967,295 (the GLB format limit).
+   */
+  maxBinaryBytes?: number;
+  /**
+   * Largest complete GLB in bytes: the 12-byte header, the JSON chunk (8-byte header and space-padded JSON) and the
+   * BIN chunk (8-byte header and payload), as the GLB header's length records it. A whole number from 0 to
+   * 4,294,967,295. Default 4,294,967,295 (the GLB format limit).
+   */
+  maxBytes?: number;
+}
+
 export interface GLTFJsonOptions extends GLTFOptions {
   /** Embed the binary buffer as a base64 data URI (default) or return it separately. */
   embed?: boolean;
@@ -60,7 +79,12 @@ const FLOAT = 5126,
   UNSIGNED_INT = 5125,
   ARRAY_BUFFER = 34962,
   ELEMENT_ARRAY_BUFFER = 34963;
-const same = (a: number[], b: number[]) => a.every((v, i) => Math.fround(v) === b[i]);
+const GLB_LIMIT = 0xffffffff,
+  // The 12-byte GLB header plus the JSON and BIN chunk headers: the least a GLB with binary data adds to its BIN.
+  HEADERS = 28;
+const align4 = (bytes: number): number => bytes + ((4 - (bytes % 4)) % 4);
+// Exact: node transforms are JSON numbers, so 1e-50 is not a default 0.
+const same = (a: number[], b: number[]) => a.every((v, i) => v === b[i]);
 const wraps = { repeat: 10497, clamp: 33071, mirror: 33648 };
 interface PrimitiveData {
   attributes: Record<string, number>;
@@ -90,8 +114,35 @@ const textureSlots = [
 ] as const;
 
 class Writer {
-  readonly parts: Uint8Array[] = [];
+  /** Binary data by BIN offset, copied once, into the output. Padding between parts stays zero. */
+  readonly parts: { bytes: Uint8Array; offset: number }[] = [];
   length = 0;
+  /** BIN bytes the collected scene is known to need (vertex attributes, images) before they are written. */
+  private planned = 0;
+
+  constructor(
+    private readonly maxBinary = Infinity,
+    private readonly maxFile = Infinity,
+  ) {}
+
+  /** Throws unless a BIN payload of `bytes` (already aligned) and the GLB around it fit the limits. */
+  fits(bytes: number): void {
+    if (!Number.isSafeInteger(bytes)) throw new RangeError('GLB binary size overflows; split the scene');
+    if (bytes > this.maxBinary)
+      throw new RangeError(
+        `GLB binary data needs at least ${bytes} bytes, over maxBinaryBytes ${this.maxBinary}; export less geometry or smaller textures, or raise the limit`,
+      );
+    if (bytes + HEADERS > this.maxFile)
+      throw new RangeError(
+        `GLB needs at least ${bytes + HEADERS} bytes with its headers, over maxBytes ${this.maxFile}; export less geometry or smaller textures, or raise the limit`,
+      );
+  }
+
+  /** Counts `bytes` the scene will write (whole buffer views), before the data is normalized or copied. */
+  plan(bytes: number): void {
+    this.planned = align4(this.planned + bytes);
+    this.fits(this.planned);
+  }
   readonly json = {} as Required<GLTFDocument>;
   private readonly geometryCache = new Map<Geo, PrimitiveData>();
   private readonly attributeCache = new Map<
@@ -122,16 +173,16 @@ class Writer {
     return list.length - 1;
   }
 
-  /** Appends bytes on a 4-byte boundary and returns a bufferView index. */
+  /**
+   * Places bytes on a 4-byte boundary and returns a bufferView index. The bytes are kept by reference (the writer's
+   * own arrays, or a caller's image for the length of this synchronous export) and copied once into the output.
+   */
   private view(bytes: Uint8Array, target?: number): number {
-    const byteOffset = this.length;
-    this.parts.push(bytes);
-    this.length += bytes.length;
-    const pad = (4 - (this.length % 4)) % 4;
-    if (pad) {
-      this.parts.push(new Uint8Array(pad));
-      this.length += pad;
-    }
+    const byteOffset = this.length,
+      end = align4(byteOffset + bytes.length);
+    this.fits(end);
+    this.parts.push({ bytes, offset: byteOffset });
+    this.length = end;
     const view: Record<string, number> = { buffer: 0, byteOffset, byteLength: bytes.length };
     if (target) view.target = target;
     return this.list('bufferViews', view);
@@ -145,7 +196,7 @@ class Writer {
     target: number | null = ARRAY_BUFFER,
   ): number {
     const accessor: Record<string, unknown> = {
-      bufferView: this.view(new Uint8Array(data.buffer, data.byteOffset, data.byteLength).slice(), target ?? undefined),
+      bufferView: this.view(new Uint8Array(data.buffer, data.byteOffset, data.byteLength), target ?? undefined),
       componentType: FLOAT,
       count: data.length / size,
       type,
@@ -184,7 +235,7 @@ class Writer {
       if (owner.joints) {
         const data = owner.joints;
         attributes.JOINTS_0 = this.list('accessors', {
-          bufferView: this.view(new Uint8Array(data.buffer, data.byteOffset, data.byteLength).slice(), ARRAY_BUFFER),
+          bufferView: this.view(new Uint8Array(data.buffer, data.byteOffset, data.byteLength), ARRAY_BUFFER),
           componentType: UNSIGNED_SHORT,
           count: owner.count,
           type: 'VEC4',
@@ -195,13 +246,12 @@ class Writer {
       this.attributeCache.set(owner, shared);
     }
     // 65535 is the primitive restart value for 16-bit indices, so it forces 32-bit indices.
-    const short = geo.count <= 65535,
-      data = short ? Uint16Array.from(geo.indices) : geo.indices;
+    const short = geo.count <= 65535;
+    // Checked before the 16-bit copy is made.
+    this.fits(align4(this.length + geo.indices.length * (short ? 2 : 4)));
+    const data = short ? Uint16Array.from(geo.indices) : geo.indices;
     const indices = this.list('accessors', {
-      bufferView: this.view(
-        new Uint8Array(data.buffer, data.byteOffset, data.byteLength).slice(),
-        ELEMENT_ARRAY_BUFFER,
-      ),
+      bufferView: this.view(new Uint8Array(data.buffer, data.byteOffset, data.byteLength), ELEMENT_ARRAY_BUFFER),
       componentType: short ? UNSIGNED_SHORT : UNSIGNED_INT,
       count: data.length,
       type: 'SCALAR',
@@ -232,7 +282,7 @@ class Writer {
     let source = this.imageCache.get(texture.image);
     if (source === undefined) {
       const image: Record<string, unknown> = {
-        bufferView: this.view(texture.image.slice()),
+        bufferView: this.view(texture.image),
         mimeType: texture.mimeType,
       };
       if (texture.name) image.name = texture.name;
@@ -262,9 +312,9 @@ class Writer {
     let index = this.materialCache.get(mat);
     if (index !== undefined) return index;
     const pbr: Record<string, unknown> = {
-      baseColorFactor: mat.color.map(Math.fround),
-      metallicFactor: Math.fround(mat.metalness),
-      roughnessFactor: Math.fround(mat.roughness),
+      baseColorFactor: mat.color.slice(),
+      metallicFactor: mat.metalness,
+      roughnessFactor: mat.roughness,
     };
     if (mat.baseColorTexture) pbr.baseColorTexture = this.info(mat.baseColorTexture);
     if (mat.metallicRoughnessTexture) pbr.metallicRoughnessTexture = this.info(mat.metallicRoughnessTexture);
@@ -279,7 +329,7 @@ class Writer {
         mat.occlusionStrength !== 1 ? { strength: mat.occlusionStrength } : undefined,
       );
     if (mat.emissiveTexture) out.emissiveTexture = this.info(mat.emissiveTexture);
-    if (mat.emissive.some((v) => v !== 0)) out.emissiveFactor = mat.emissive.map(Math.fround);
+    if (mat.emissive.some((v) => v !== 0)) out.emissiveFactor = mat.emissive.slice();
     if (mat.alphaMode !== 'OPAQUE') out.alphaMode = mat.alphaMode;
     if (mat.alphaCutoff !== undefined) out.alphaCutoff = mat.alphaCutoff;
     if (mat.doubleSided) out.doubleSided = true;
@@ -380,6 +430,7 @@ class Writer {
     s: number[],
     mesh?: number,
     matrix?: number[],
+    given?: Node['given'],
   ): Record<string, unknown> {
     const out: Record<string, unknown> = {};
     if (name) out.name = name;
@@ -388,9 +439,9 @@ class Writer {
       if (!same(matrix, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])) out.matrix = matrix.slice();
       return out;
     }
-    if (!same(t, [0, 0, 0])) out.translation = t.slice();
-    if (!same(r, [0, 0, 0, 1])) out.rotation = r.slice();
-    if (!same(s, [1, 1, 1])) out.scale = s.slice();
+    if (given?.t || !same(t, [0, 0, 0])) out.translation = t.slice();
+    if (given?.r || !same(r, [0, 0, 0, 1])) out.rotation = r.slice();
+    if (given?.s || !same(s, [1, 1, 1])) out.scale = s.slice();
     return out;
   }
 
@@ -405,8 +456,9 @@ class Writer {
       new Set(skin.joints).size !== skin.joints.length
     )
       throw new TypeError('Skin joints must be distinct scene nodes');
-    const joints = skin.joints.map(resolve),
-      matrices = floatData(skin.inverseBindMatrices, joints.length * 16, 'Inverse bind matrices');
+    const joints = skin.joints.map(resolve);
+    this.fits(align4(this.length + joints.length * 64));
+    const matrices = floatData(skin.inverseBindMatrices, joints.length * 16, 'Inverse bind matrices');
     const parents = new Int32Array(this.json.nodes.length).fill(-1);
     this.json.nodes.forEach((node: { children?: number[] }, parent: number) => {
       for (const child of node.children ?? []) parents[child] = parent;
@@ -467,6 +519,10 @@ class Writer {
       const count = channel.times?.length;
       if (!Number.isSafeInteger(count) || count < 1) throw new TypeError('Animation times must be nonempty');
       if (interpolation === 'CUBICSPLINE' && count < 2) throw new TypeError('Cubic animation needs at least two keys');
+      // Times and values become two Float32 buffer views; checked before they are converted.
+      const width0 =
+        path === 'rotation' ? 4 : path === 'weights' ? (lookup.get(channel.node)?.geometry?.morphs?.length ?? 0) : 3;
+      this.fits(align4(this.length + count * 4) + count * width0 * (interpolation === 'CUBICSPLINE' ? 3 : 1) * 4);
       const times = floatData(channel.times, count, 'Animation times');
       if (times.some((time, i) => time < 0 || (i > 0 && time <= times[i - 1])))
         throw new RangeError('Animation times must be nonnegative and strictly increasing Float32 values');
@@ -542,13 +598,12 @@ function bake(geo: Geo, m: Float64Array): Geo {
   return out;
 }
 
-function document(source: ExportSource, options: GLTFOptions): Writer {
+function document(source: ExportSource, options: GLTFOptions, writer = new Writer()): Writer {
   const flatten = options.flatten ?? false,
     generator = options.generator ?? 'Margo Engine exporters';
   if (typeof flatten !== 'boolean') throw new TypeError('flatten must be boolean');
   if (typeof generator !== 'string') throw new TypeError('generator must be a string');
-  const roots = collect(source, options),
-    writer = new Writer(),
+  const roots = collect(source, options, (bytes) => writer.plan(bytes)),
     json = writer.json,
     sceneNodes: number[] = [];
   const animations = Array.isArray((source as ExportScene).nodes) ? (source as ExportScene).animations : undefined;
@@ -594,7 +649,7 @@ function document(source: ExportSource, options: GLTFOptions): Writer {
         throw new TypeError('Joint attributes need a skin on the same node');
       if (node.skin && (!geometries.length || geometries.some((geometry) => !geometry.joints)))
         throw new TypeError('Skinned geometry needs joint indices and weights');
-      const out = writer.node(node.name, node.t, node.r, node.s, writer.nodeMesh(node), node.matrix);
+      const out = writer.node(node.name, node.t, node.r, node.s, writer.nodeMesh(node), node.matrix, node.given);
       const index = (json.nodes ??= []).push(out) - 1;
       if (node.source) {
         nodeIndices.set(node.source, index);
@@ -694,14 +749,34 @@ function lightmap(writer: Writer, data: LightmapData, roots: Node[], extras: Rec
   extras[key] = { texture: writer.texture(texture), texCoord, ...more };
 }
 
-function concat(parts: Uint8Array[], length: number): Uint8Array {
+function concat(parts: Writer['parts'], length: number): Uint8Array {
   const out = new Uint8Array(length);
-  let offset = 0;
-  for (const part of parts) {
-    out.set(part, offset);
-    offset += part.length;
-  }
+  for (const { bytes, offset } of parts) out.set(bytes, offset);
   return out;
+}
+
+/** A GLB byte limit option: undefined is the format's own 4 GiB. */
+function limit(value: unknown, name: string): number {
+  if (value === undefined) return GLB_LIMIT;
+  if (typeof value !== 'number') throw new TypeError(`${name} must be a number of bytes`);
+  if (!Number.isSafeInteger(value) || value < 0 || value > GLB_LIMIT)
+    throw new RangeError(`${name} ${value} must be a whole number of bytes from 0 to ${GLB_LIMIT}`);
+  return value;
+}
+
+/** UTF-8 length of well-formed text (JSON.stringify escapes lone surrogates), without encoding it. */
+function utf8Length(text: string): number {
+  let bytes = text.length;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    if (c < 0x80) continue;
+    if (c < 0x800) bytes += 1;
+    else if (c >= 0xd800 && c < 0xdc00 && i + 1 < text.length && (text.charCodeAt(i + 1) & 0xfc00) === 0xdc00) {
+      bytes += 2;
+      i++;
+    } else bytes += 2;
+  }
+  return bytes;
 }
 
 const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -751,14 +826,30 @@ export function exportGLTF(source: ExportSource, options: GLTFJsonOptions = {}):
   return { json, text: JSON.stringify(json), bin, binUri: uri };
 }
 
-/** Exports a binary glTF (`.glb`): 12-byte header, a space-padded JSON chunk and a zero-padded BIN chunk. */
-export function exportGLB(source: ExportSource, options: GLTFOptions = {}): Uint8Array {
-  const writer = document(source, options);
-  const text = new TextEncoder().encode(JSON.stringify(writer.json)),
-    jsonLength = Math.ceil(text.length / 4) * 4;
-  const binLength = writer.length,
-    total = 12 + 8 + jsonLength + (binLength ? 8 + binLength : 0);
-  const out = new Uint8Array(total),
+/**
+ * Exports a binary glTF (`.glb`): 12-byte header, a space-padded JSON chunk and a zero-padded BIN chunk.
+ * `maxBinaryBytes` and `maxBytes` bound the BIN payload and the whole file: the scene's vertex attributes and images
+ * are counted before they are normalized, every buffer view before it is placed, and the JSON's UTF-8 size before it
+ * is encoded, so an export over a limit throws before the GLB is allocated. Without them, the GLB format's 4 GiB
+ * limit applies.
+ * @throws RangeError for a limit that is not a whole number from 0 to 4,294,967,295, or an export over a limit (the
+ * message gives the bytes needed); TypeError for a limit that is not a number.
+ */
+export function exportGLB(source: ExportSource, options: GLBOptions = {}): Uint8Array {
+  const maxBinary = limit(options.maxBinaryBytes, 'maxBinaryBytes'),
+    maxFile = limit(options.maxBytes, 'maxBytes'),
+    writer = document(source, options, new Writer(maxBinary, maxFile));
+  const json = JSON.stringify(writer.json),
+    jsonLength = align4(utf8Length(json)),
+    binLength = writer.length,
+    total = 20 + jsonLength + (binLength ? 8 + binLength : 0);
+  // Checked before the JSON is encoded and the GLB allocated.
+  if (total > maxFile)
+    throw new RangeError(
+      `GLB needs ${total} bytes (JSON chunk ${jsonLength}, binary chunk ${binLength}), over ${options.maxBytes === undefined ? "the GLB format's limit" : 'maxBytes'} ${maxFile}; export less data or raise the limit`,
+    );
+  const text = new TextEncoder().encode(json),
+    out = new Uint8Array(total),
     view = new DataView(out.buffer);
   view.setUint32(0, 0x46546c67, true);
   view.setUint32(4, 2, true);
@@ -771,11 +862,7 @@ export function exportGLB(source: ExportSource, options: GLTFOptions = {}): Uint
     const at = 20 + jsonLength;
     view.setUint32(at, binLength, true);
     view.setUint32(at + 4, 0x004e4942, true);
-    let offset = at + 8;
-    for (const part of writer.parts) {
-      out.set(part, offset);
-      offset += part.length;
-    }
+    for (const { bytes, offset } of writer.parts) out.set(bytes, at + 8 + offset);
   }
   return out;
 }

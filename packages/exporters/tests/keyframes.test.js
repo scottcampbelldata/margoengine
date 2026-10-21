@@ -92,7 +92,11 @@ test(
     // Rest pose is the first key: cels other than bank 0 start collapsed; the empty cel has no mesh.
     assert.deepEqual(
       ['Walker_Cel1', 'Walker_Cel2', 'Walker_Cel3'].map((name) => json.nodes[index(name)].scale),
-      [undefined, [0, 0, 0], [0, 0, 0]],
+      [
+        [1, 1, 1],
+        [0, 0, 0],
+        [0, 0, 0],
+      ],
     );
     assert.equal(json.nodes[index('Walker_Cel3')].mesh, undefined);
     assert.deepEqual(json.nodes[index('Walker_Cel1')].extras, { margo: { role: 'geometryCel', bank: 0 } });

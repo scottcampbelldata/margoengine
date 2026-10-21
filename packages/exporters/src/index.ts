@@ -1,5 +1,5 @@
 export { exportGLTF, exportGLB } from './gltf.js';
-export type { GLTFOptions, GLTFJsonOptions, GLTFJsonResult } from './gltf.js';
+export type { GLBOptions, GLTFOptions, GLTFJsonOptions, GLTFJsonResult } from './gltf.js';
 export { exportSTL } from './stl.js';
 export type { STLOptions } from './stl.js';
 export { exportOBJ } from './obj.js';

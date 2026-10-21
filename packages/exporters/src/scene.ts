@@ -95,7 +95,7 @@ export interface TextureData {
   extras?: Extras;
 }
 
-/** A glTF metallic-roughness material described as data. */
+/** A glTF metallic-roughness material described as data. Its factors are written as the exact numbers given. */
 export interface MaterialData {
   name?: string;
   /** Linear rgb or rgba, default [1, 1, 1, 1]. */
@@ -183,7 +183,9 @@ export interface ExportPrimitive {
 /**
  * A node of a plain data scene. Rotation is a quaternion [x, y, z, w]. A scale of [0, 0, 0] collapses the node: the
  * glTF writers keep it (a hidden geometry cel, shown later by a scale channel), the mesh-only formats leave it and its
- * descendants out.
+ * descendants out. Translation, rotation, scale and matrix are JSON numbers: the glTF writers keep each finite value
+ * exactly (no Float32 rounding), write the fields given even when they equal glTF's defaults, and scale a rotation to
+ * unit length only when it is more than 1e-5 off.
  */
 export interface ExportNode {
   name?: string;
@@ -328,6 +330,8 @@ export interface Node {
   light?: LightData;
   /** Column-major local matrix, written instead of TRS. */
   matrix?: number[];
+  /** Transform fields a data node gave: written even when they equal glTF's default. */
+  given?: { t: boolean; r: boolean; s: boolean };
   extras?: Extras;
   meshName?: string;
   meshExtras?: Extras;
@@ -378,6 +382,21 @@ function floats(values: ArrayLike<number> | undefined, size: number, label: stri
     out[i] = value;
   }
   return out;
+}
+
+/**
+ * Finite JavaScript numbers, copied exactly: node translations, rotations, scales and matrices are JSON numbers, never
+ * Float32 accessor data, so no Float32 rounding, underflow or range limit applies to them.
+ */
+function exact(values: unknown, fallback: number[], label: string): number[] {
+  if (values === undefined) return fallback.slice();
+  if (!Array.isArray(values) && !ArrayBuffer.isView(values)) fail(`${label} must be an array`);
+  const list = values as unknown as ArrayLike<unknown>;
+  if (list.length !== fallback.length) fail(`${label} needs ${fallback.length} values`);
+  const out = Array.from(list);
+  if (out.some((v) => typeof v !== 'number' || !Number.isFinite(v)))
+    throw new RangeError(`${label} must be finite numbers`);
+  return out as number[];
 }
 
 function vector(values: readonly number[] | undefined, fallback: number[], label: string): number[] {
@@ -606,10 +625,11 @@ export function normalizeMaterial(data: PbrMaterial | MaterialData): Mat {
   }
   if (!isObject(data)) fail('Expected PbrMaterial or material data');
   const m = data as MaterialData;
+  // Factors are JSON numbers in glTF, so they keep their exact values (Float32 only where a format needs it).
   const color =
-    m.color === undefined ? [1, 1, 1, 1] : vector(m.color, m.color.length === 3 ? [0, 0, 0] : [0, 0, 0, 0], 'Color');
+    m.color === undefined ? [1, 1, 1, 1] : exact(m.color, m.color.length === 3 ? [0, 0, 0] : [0, 0, 0, 0], 'Color');
   if (color.length === 3) color.push(1);
-  const emissive = vector(m.emissive, [0, 0, 0], 'Emissive');
+  const emissive = exact(m.emissive, [0, 0, 0], 'Emissive');
   if ([...color, ...emissive].some((v) => v < 0 || v > 1)) throw new RangeError('Material colors must be in [0, 1]');
   if (m.name !== undefined && typeof m.name !== 'string') fail('Material name must be a string');
   if (m.doubleSided !== undefined && typeof m.doubleSided !== 'boolean') fail('doubleSided must be boolean');
@@ -660,6 +680,39 @@ function factor(value: unknown, label: string, fallback: number, valid: (value: 
   if (!Number.isFinite(value) || !valid(value))
     throw new RangeError(`Material ${label} ${value} is outside its glTF range`);
   return value;
+}
+
+const TEXTURE_SLOTS = [
+  'baseColorTexture',
+  'metallicRoughnessTexture',
+  'normalTexture',
+  'occlusionTexture',
+  'emissiveTexture',
+] as const;
+
+/**
+ * Buffer bytes of a geometry's vertex attributes as the glTF writers store them (POSITION, NORMAL, optional TANGENT,
+ * TEXCOORD_0/1, COLOR_0, JOINTS_0 as 16-bit, WEIGHTS_0, morph targets), all Float32 and 4-byte multiples, from its
+ * vertex count alone. Indices are counted when written, since primitives may replace them.
+ */
+function vertexCount(data: Geometry | GeometryData): number {
+  if (isCoreGeometry(data)) return data.vertices.length / 6;
+  const length = isObject(data) && isObject(data.positions) ? data.positions.length : 0;
+  return typeof length === 'number' ? Math.floor(length / 3) : 0;
+}
+
+function attributeBytes(data: Geometry | GeometryData): number {
+  if (isCoreGeometry(data)) return (data.vertices.length / 6) * 24;
+  const count = vertexCount(data);
+  let perVertex = 24;
+  if (data.uvs !== undefined) perVertex += 8;
+  if (data.uvs1 !== undefined) perVertex += 8;
+  if (data.tangents !== undefined) perVertex += 16;
+  if (data.colors !== undefined) perVertex += data.colors?.length === count * 3 ? 12 : 16;
+  if (data.joints !== undefined) perVertex += 24;
+  for (const morph of Array.isArray(data.morphs) ? data.morphs : [])
+    perVertex += 12 + (morph?.normals !== undefined ? 12 : 0) + (morph?.tangents !== undefined ? 12 : 0);
+  return count * perVertex;
 }
 
 // --- column-major 4x4 math in double precision ---
@@ -752,7 +805,17 @@ export function decompose(m: Float64Array): { t: number[]; r: number[]; s: numbe
   return { t: [m[12], m[13], m[14]], r: unitQuaternion(q), s: [sx, sy, sz] };
 }
 
-export function unitQuaternion(q: number[]): number[] {
+/**
+ * @internal A saved rotation: kept exactly when it is a unit quaternion to within 1e-5 (the glTF validator's own
+ * tolerance is wider), else scaled to unit length. Its sign is kept either way.
+ */
+export function savedRotation(q: number[]): number[] {
+  const length = Math.hypot(q[0], q[1], q[2], q[3]);
+  if (!length || !Number.isFinite(length)) throw new RangeError('Quaternion must be nonzero');
+  return Math.abs(length - 1) <= 1e-5 ? q : q.map((v) => v / length);
+}
+
+function unitQuaternion(q: number[]): number[] {
   const length = Math.hypot(q[0], q[1], q[2], q[3]);
   if (!length || !Number.isFinite(length)) throw new RangeError('Quaternion must be nonzero');
   const out = q.map((v) => v / length);
@@ -762,9 +825,16 @@ export function unitQuaternion(q: number[]): number[] {
 // --- collection ---
 
 function makeNode(name: unknown, t: number[], r: number[], s: number[], parent: Float64Array | null): Node {
-  if (s.some((v) => Math.fround(v) === 0) && !collapsed(s))
+  // Checked on the given numbers: a tiny nonzero scale such as 1e-50 is valid, only an exact 0 is zero.
+  if (s.some((v) => v === 0) && !collapsed(s))
     throw new RangeError('Scale must be nonzero on every axis, or [0, 0, 0] to collapse a hidden node');
-  const local = compose(t, r, s);
+  // The written rotation keeps its saved value; the matrices use it at unit length.
+  const length = Math.hypot(r[0], r[1], r[2], r[3]),
+    local = compose(
+      t,
+      r.map((v) => v / length),
+      s,
+    );
   return {
     name: typeof name === 'string' && name ? name : undefined,
     t,
@@ -785,17 +855,33 @@ function isEngine(source: unknown): source is EngineKernel {
   );
 }
 
-/** @internal Collects the exported node forest. */
-export function collect(source: ExportSource, options: SceneOptions = {}): Node[] {
+/**
+ * @internal Collects the exported node forest. `plan`, when given, receives the buffer bytes each new geometry's
+ * vertex attributes and each new image will take, before the data is normalized, so a size limit can refuse early.
+ */
+export function collect(source: ExportSource, options: SceneOptions = {}, plan?: (bytes: number) => void): Node[] {
   if (!isObject(options)) fail('Options must be an object');
   const onlyVisible = options.onlyVisible ?? true;
   if (typeof onlyVisible !== 'boolean') fail('onlyVisible must be boolean');
   const geometries = new Map<object, Geo>(),
-    materials = new Map<object, Mat>();
+    materials = new Map<object, Mat>(),
+    images = new Set<Uint8Array>(),
+    planned = new Set<object>();
+  // Index lists that will be written (a geometry's own, once; a primitives array's, once), counted before any copy.
+  const planIndices = (key: object, value: Geometry | GeometryData, count?: number): void => {
+    if (!plan || planned.has(key)) return;
+    planned.add(key);
+    const data = (isCoreGeometry(value) && options.geometryData?.get(value)) || value,
+      vertices = vertexCount(data),
+      indices = count ?? (isObject(data.indices) ? data.indices.length : vertices);
+    if (typeof indices === 'number') plan(indices * (vertices <= 65535 ? 2 : 4));
+  };
   const geometry = (value: Geometry | GeometryData): Geo => {
     let geo = geometries.get(value);
     if (!geo) {
-      geo = normalizeGeometry((isCoreGeometry(value) && options.geometryData?.get(value)) || value);
+      const data = (isCoreGeometry(value) && options.geometryData?.get(value)) || value;
+      plan?.(attributeBytes(data));
+      geo = normalizeGeometry(data);
       geometries.set(value, geo);
     }
     return geo;
@@ -805,6 +891,13 @@ export function collect(source: ExportSource, options: SceneOptions = {}): Node[
     if (!mat) {
       mat = normalizeMaterial((isCoreMaterial(value) && options.materialData?.get(value)) || value);
       materials.set(value, mat);
+      for (const slot of TEXTURE_SLOTS) {
+        const image = mat[slot]?.image;
+        if (plan && image && !images.has(image)) {
+          images.add(image);
+          plan(image.length);
+        }
+      }
     }
     return mat;
   };
@@ -992,7 +1085,9 @@ export function collect(source: ExportSource, options: SceneOptions = {}): Node[
     if (data.matrix !== undefined) {
       if (data.translation !== undefined || data.rotation !== undefined || data.scale !== undefined)
         fail('A node takes matrix or translation, rotation and scale, not both');
-      const m = Float64Array.from(floats(data.matrix, 16, 'Matrix'));
+      // Written as given; the decomposition only checks it and serves the formats that need TRS.
+      const values = exact(data.matrix, new Array(16).fill(0), 'Matrix'),
+        m = Float64Array.from(values);
       if (m[3] || m[7] || m[11] || m[15] !== 1) throw new RangeError('Matrix must be affine: its last row 0, 0, 0, 1');
       const parts = decompose(m);
       if (!parts)
@@ -1000,16 +1095,18 @@ export function collect(source: ExportSource, options: SceneOptions = {}): Node[
       node = makeNode(data.name, parts.t, parts.r, parts.s, parent);
       node.local = m;
       node.world = parent ? multiply(parent, m) : m;
-      node.matrix = Array.from(m);
+      node.matrix = values;
     } else
       node = makeNode(
         data.name,
-        vector(data.translation, [0, 0, 0], 'Translation'),
-        unitQuaternion(vector(data.rotation, [0, 0, 0, 1], 'Rotation')),
-        vector(data.scale, [1, 1, 1], 'Scale'),
+        exact(data.translation, [0, 0, 0], 'Translation'),
+        savedRotation(exact(data.rotation, [0, 0, 0, 1], 'Rotation')),
+        exact(data.scale, [1, 1, 1], 'Scale'),
         parent,
       );
     node.source = data;
+    if (data.matrix === undefined)
+      node.given = { t: data.translation !== undefined, r: data.rotation !== undefined, s: data.scale !== undefined };
     for (const key of ['camera', 'light'] as const)
       if (data[key] !== undefined) {
         if (!isObject(data[key])) fail(`${key} must be an object`);
@@ -1024,6 +1121,13 @@ export function collect(source: ExportSource, options: SceneOptions = {}): Node[
       if (data.geometry !== undefined || data.material !== undefined)
         fail('A node takes primitives or geometry and material, not both');
       if (!Array.isArray(data.primitives) || !data.primitives.length) fail('primitives must be a nonempty array');
+      if (plan && !planned.has(data.primitives)) {
+        planned.add(data.primitives);
+        for (const primitive of data.primitives)
+          if (isObject(primitive) && isObject(primitive.geometry))
+            if (primitive.indices === undefined) planIndices(primitive.geometry, primitive.geometry);
+            else planIndices(primitive, primitive.geometry, isObject(primitive.indices) ? primitive.indices.length : 0);
+      }
       node.primitives = data.primitives.map((primitive: ExportPrimitive, i: number) => {
         if (!isObject(primitive) || primitive.geometry === undefined) fail(`primitives[${i}] needs geometry`);
         let geo = geometry(primitive.geometry);
@@ -1047,6 +1151,7 @@ export function collect(source: ExportSource, options: SceneOptions = {}): Node[
       node.geometry = node.primitives[0].geometry;
       node.material = node.primitives[0].material;
     } else if (data.geometry !== undefined) {
+      if (isObject(data.geometry)) planIndices(data.geometry, data.geometry);
       node.geometry = geometry(data.geometry);
       if (data.material !== undefined) node.material = material(data.material);
     } else if (data.material !== undefined) fail('A material needs geometry on the same node');
@@ -1134,7 +1239,7 @@ export interface Drawable {
 }
 
 /** A [0, 0, 0] scale: the node and its descendants are hidden. */
-const collapsed = (s: readonly number[]): boolean => s.every((v) => Math.fround(v) === 0);
+const collapsed = (s: readonly number[]): boolean => s.every((v) => v === 0);
 
 export function drawables(nodes: Node[]): Drawable[] {
   const out: Drawable[] = [];
