@@ -68,6 +68,10 @@
     "./smaa": {
       "types": "./dist/smaa.d.ts",
       "import": "./dist/smaa.js"
+    },
+    "./glitch": {
+      "types": "./dist/glitch.d.ts",
+      "import": "./dist/glitch.js"
     }
   },
   "files": [

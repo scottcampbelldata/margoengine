@@ -9,5 +9,6 @@ export { SSGI, type SSGIOptions } from './ssgi.js';
 export { MotionBlur, type MotionBlurOptions, type MotionVectors } from './motion-blur.js';
 export { LensFlare, type LensFlareOptions } from './lens-flare.js';
 export { SMAA, type SMAAOptions, type SMAAQuality } from './smaa.js';
+export { Glitch, type GlitchOptions } from './glitch.js';
 
 export { ImagePost, type ImagePostOptions, type LinearPostImage, type PostImagePixels } from './image.js';
