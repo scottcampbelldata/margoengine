@@ -980,28 +980,28 @@
     },
     "@margoengine/voxel-edit": {
       ".": {
-        "raw": 12379,
-        "gzip": 4798
+        "raw": 20294,
+        "gzip": 7533
       },
       "./edit": {
-        "raw": 15492,
-        "gzip": 5747
+        "raw": 30619,
+        "gzip": 10297
       },
       "./pick": {
-        "raw": 14635,
-        "gzip": 5314
+        "raw": 20513,
+        "gzip": 6903
       },
       "./sparse": {
-        "raw": 12439,
-        "gzip": 4684
+        "raw": 19180,
+        "gzip": 6497
       },
       "./mesh": {
-        "raw": 17365,
-        "gzip": 6564
+        "raw": 24817,
+        "gzip": 8575
       },
       "./vox": {
-        "raw": 24677,
-        "gzip": 8316
+        "raw": 36995,
+        "gzip": 11717
       },
       "./animation": {
         "raw": 4251,
