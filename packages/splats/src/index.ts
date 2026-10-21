@@ -10,7 +10,9 @@ import {
 import { viewMatrix } from '../../shared/view.js';
 import { orthographic } from '../../shared/projection.js';
 import { validateSplats, type SplatData } from './data.js';
-import { project, render } from './shader.js';
+import { foggedProject, project, render } from './shader.js';
+import { checkFog, FOG_BYTES, writeFog, type FogLike } from './fog.js';
+export type { FogLike } from './fog.js';
 import { histogram, scan, scanTotals, scatter } from './sort.js';
 import { MargoError } from '@margoengine/math/errors';
 export { parseSplat, validateSplats, type SplatData } from './data.js';
@@ -42,6 +44,10 @@ export class Splats implements EnginePlugin {
   private keys: GPUBuffer[] = [];
   private projection?: GPUComputePipeline;
   private projectionGroup?: GPUBindGroup;
+  private projectionBuffers: GPUBuffer[] = [];
+  private fogSource: FogLike | null = null;
+  private fogged?: { buffer: GPUBuffer; pipeline: GPUComputePipeline; group: GPUBindGroup };
+  private readonly fogData = new Float32Array(12);
   private sortPipelines: GPUComputePipeline[] = [];
   private sortGroups: GPUBindGroup[][] = [];
   private renders = new Map<string, { pipeline: GPURenderPipeline; group: GPUBindGroup }>();
@@ -76,6 +82,22 @@ export class Splats implements EnginePlugin {
       this.positions[i * 4 + 3] = data.colors[i * 4 + 3];
       this.covariances.set(data.covariances.subarray(i * 6, i * 6 + 6), i * 8);
     }
+  }
+  /** The fog the splats are drawn in (see `setFog`), or null. */
+  get fog(): FogLike | null {
+    return this.fogSource;
+  }
+  /**
+   * Fogs the cloud: `fog` is `@margoengine/environment`'s `Fog` or any object with its fields, read every frame, with
+   * Fog's maths (linear near/far, exp2 density, height falloff). Each splat's colour fades toward the fog colour by the
+   * fog at its centre, in the projection pass (so `gpuState.colors` holds fogged colours); its opacity is unchanged.
+   * `null` (the default) draws exactly as without fog. The first fogged frame compiles a second projection shader;
+   * changing the fog or its `enabled` flag never does.
+   * @throws TypeError when `fog` is neither an object nor null; RangeError or TypeError for an invalid field.
+   */
+  setFog(fog: FogLike | null): this {
+    this.fogSource = checkFog(fog);
+    return this;
   }
   static attach(instance: EngineKernel, data: SplatData): Splats {
     const effect = new Splats(data);
@@ -143,7 +165,7 @@ export class Splats implements EnginePlugin {
           entries: list.map((b, binding) => ({ binding, resource: { buffer: b } })),
         });
     this.projection = compute(project);
-    this.projectionGroup = bind(this.projection, [
+    this.projectionBuffers = [
       this.uniform,
       positions,
       covariances,
@@ -152,7 +174,8 @@ export class Splats implements EnginePlugin {
       this.projected,
       this.evaluated,
       this.keys[0],
-    ]);
+    ];
+    this.projectionGroup = bind(this.projection, this.projectionBuffers);
     this.sortPipelines = [histogram, scan, scanTotals, scatter].map(compute);
     for (let pass = 0; pass < 8; pass++) {
       const parameters = buffer(16, GPUBufferUsage.UNIFORM, new Uint32Array([this.count, groups, blocks, pass * 4])),
@@ -209,12 +232,18 @@ export class Splats implements EnginePlugin {
     n[45] = this.sh.length === 4 ? 0 : this.sh.length / this.count / 3;
     n[46] = n[47] = 0;
     c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
+    const fog = this.fogSource && this.fogResources(c.device);
+    if (fog) {
+      writeFog(this.fogSource!, c.camera.position, this.fogData);
+      c.device.queue.writeBuffer(fog.buffer, 0, this.fogData);
+    }
     const groups = Math.ceil(this.count / 256),
       blocks = Math.ceil(groups / 256);
     // Storage writes are visible to later dispatches in the same compute pass, so the radix stages share one pass.
     const pass = e.beginComputePass();
     try {
-      this.dispatch(pass, this.projection!, this.projectionGroup!, groups, 1);
+      if (fog) this.dispatch(pass, fog.pipeline, fog.group, groups, 1);
+      else this.dispatch(pass, this.projection!, this.projectionGroup!, groups, 1);
       for (let stage = 0; stage < 8; stage++) {
         const binds = this.sortGroups[stage];
         this.dispatch(pass, this.sortPipelines[0], binds[0], groups, 1);
@@ -225,6 +254,24 @@ export class Splats implements EnginePlugin {
     } finally {
       pass.end();
     }
+  }
+  /** The fog uniform and the fogged projection pipeline and group, made on the first fogged frame. */
+  private fogResources(d: GPUDevice): NonNullable<Splats['fogged']> {
+    if (this.fogged) return this.fogged;
+    const buffer = d.createBuffer({ size: FOG_BYTES, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.buffers.push(buffer);
+    const pipeline = d.createComputePipeline({
+      layout: 'auto',
+      compute: { module: d.createShaderModule({ code: foggedProject() }), entryPoint: 'main' },
+    });
+    return (this.fogged = {
+      buffer,
+      pipeline,
+      group: d.createBindGroup({
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [...this.projectionBuffers, buffer].map((b, i) => ({ binding: i, resource: { buffer: b } })),
+      }),
+    });
   }
   private dispatch(
     pass: GPUComputePassEncoder,
@@ -319,6 +366,8 @@ export class Splats implements EnginePlugin {
     this.uniform = this.index = this.projected = this.evaluated = undefined;
     this.projection = undefined;
     this.projectionGroup = undefined;
+    this.projectionBuffers = [];
+    this.fogged = undefined;
   }
   onDeviceRestored(engine: Engine): void {
     this.release();

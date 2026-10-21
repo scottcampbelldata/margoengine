@@ -1,3 +1,5 @@
+import { MargoError } from '@margoengine/math/errors';
+import { fogWgsl } from './fog.js';
 const frame = `struct Frame {camera:mat4x4f,view:mat4x4f,eye:vec4f,viewport:vec4f,settings:vec4f,counts:vec4u}
 @group(0) @binding(0) var<uniform> f:Frame;
 struct Ellipse {center:vec4f,axes:vec4f}`;
@@ -38,6 +40,24 @@ fn color(index:u32)->vec3f {
     if(all(abs(ndc.xy)<=vec2f(1)+extent)) {ellipse.center=vec4f(ndc,world.w);ellipse.axes=vec4f(first,second);keys[index]=vec2u(~bitcast<u32>(select(depth,depth-f.settings.x,f.settings.w>0.5)),index);}
   }ellipses[index]=ellipse;evaluated[index]=vec4f(color(index),world.w);
 }`;
+/**
+ * The projection pass with scene fog (`setFog`, uniform at binding 8): each splat's evaluated colour fades toward the
+ * fog colour by the fog at its centre, in linear before the render pass clamps and encodes it. `project` is unchanged.
+ */
+export function foggedProject(): string {
+  const from = 'evaluated[index]=vec4f(color(index),world.w);';
+  if (project.split(from).length !== 2)
+    throw new MargoError(
+      'unsupported',
+      'Splat fog needs the projection shader it was written for; update its fog edit',
+    );
+  return (
+    project.replace(
+      from,
+      'evaluated[index]=vec4f(mix(color(index),margoFog.color.rgb,fogAmount(world.xyz)),world.w);',
+    ) + fogWgsl(0, 8)
+  );
+}
 export const render =
   frame +
   `
