@@ -147,7 +147,7 @@ A profile is plain data (`NavigationProfile`): a `drag` table keyed by modifiers
 middle; Meta counts as Ctrl; modifiers must match exactly), wheel direction, zoom to cursor, `touches`, an optional
 double-click `fitClick` button and `keys` keyed by modifiers + `KeyboardEvent.code`. `setProfile` copies it onto the
 existing OrbitControls fields (`touches`, `zoomToCursor`, and `mouseButtons` for table-less profiles) and returns the
-controls, so options set afterwards (`enableDamping`, `zoomSpeed`, `zoomToCursor`) still win. `THREE_ORBIT` (the default,
+controls, so options set afterwards (`enableDamping`, `zoomSpeed`, `zoomToCursor`) still win. `MARGO` (the default,
 also what a fresh OrbitControls does) restores the default behaviour. Each profile is its own export, so an app bundles only
 the one it imports (OrbitControls + one profile: +171 B gzip); `PROFILES` (all nine by name, for a preferences menu,
 +427 B) is there when you want the choice at run time. Write your own the same way: `orbit.setProfile({...BLENDER,
@@ -160,7 +160,7 @@ whole model, a CameraProjection or a perspective `camera.fitToBoundingBox`).
 
 | Profile | Rotate | Pan | Zoom drag | Wheel (forward = away from you) | Fit | Touch (1 finger / 2) | Keys | Source |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `THREE_ORBIT` (default) | Left; Ctrl/Meta/Shift + right | Right; Ctrl/Meta/Shift + left | Middle | In, toward the target | - | Rotate / pinch + pan | Arrows pan, Ctrl/Shift + arrows rotate | `OrbitControls` defaults |
+| `MARGO` (default) | Left; Ctrl/Meta/Shift + right | Right; Ctrl/Meta/Shift + left | Middle | In, toward the target | - | Rotate / pinch + pan | Arrows pan, Ctrl/Shift + arrows rotate | `OrbitControls` defaults |
 | `SOLIDWORKS` | Middle | Ctrl + middle | Shift + middle | **Out**\*, at the cursor | Double middle click, F | Rotate / pinch + pan | Ctrl+1..7 front, back, left, right, top, bottom, iso\* | SOLIDWORKS Help: Middle Mouse Button, Keyboard Shortcuts; Options > View "Reverse mouse wheel zoom direction" |
 | `AUTOCAD` | Shift + middle (3DORBIT) | Middle (MBUTTONPAN=1) | - | In, at the cursor (ZOOMWHEEL=0) | Double middle click (zoom extents) | **Pan**\* / pinch + pan | - | AutoCAD Help: Pan or Zoom with the Wheel Mouse, 3DORBIT |
 | `INVENTOR` = `FUSION` | Shift + middle | Middle | - | In\*, at the cursor\* | Double middle click | Rotate / pinch + pan | - | Inventor Help: Navigate with the mouse; Fusion Help: Preferences > General "Pan, Zoom, Orbit shortcuts: Fusion" |
@@ -220,7 +220,7 @@ explicit `height` they change only the distance.
 | `zoomToCursor`, `screenSpacePanning`, `keyPanSpeed` | Orbit, Map | `false`, `true` (`false` for Map), `7` px |
 | `autoRotate`, `autoRotateSpeed` | Orbit, Map | `false`, `2` (one turn per 30 s) |
 | `mouseButtons`, `touches`, `keys` | Orbit, Map, Trackball | Left rotates, middle dollies, right pans (Map: left pans, right rotates); one finger rotates, two dolly and pan (Map: pan, dolly and rotate); arrow keys (Trackball: A, S, D), using the exported `MOUSE` and `TOUCH` |
-| `setProfile(profile)`, `profile` | Orbit, Map | `null` (same as `THREE_ORBIT`); see Navigation profiles |
+| `setProfile(profile)`, `profile` | Orbit, Map | `null` (same as `MARGO`); see Navigation profiles |
 | `rotateSpeed`, `zoomSpeed`, `panSpeed`, `staticMoving`, `dynamicDampingFactor`, `noRotate`, `noZoom`, `noPan` | Trackball | `1`, `1.2`, `0.3`, `false`, `0.2`, `false` |
 | `movementSpeed`, `rollSpeed`, `dragToLook`, `autoForward` | Fly | `1`, `0.005`, `false`, `false` |
 | `movementSpeed`, `lookSpeed`, `lookVertical`, `activeLook`, `heightSpeed`, `constrainVertical`, `verticalMin`, `verticalMax` | FirstPerson | `1`, `0.005`, `true`, `true`, `false`, `false`, `0`, `PI` |
@@ -261,7 +261,7 @@ thumbstick on a 390 × 844 phone viewport.
 `tests/profiles.test.js` covers navigation profiles: a recorded sequence of mouse drags (every button and modifier),
 wheel notches (pixel, line, page, Ctrl pinch, Shift, Alt), a double middle click, one- and two-finger touch and keys
 (`tests/orbit-replay.json`, recorded from OrbitControls before profiles existed) replays to bit-identical camera
-positions, targets, `preventDefault` flags, states and events with no profile, with `setProfile(THREE_ORBIT)` and after
+positions, targets, `preventDefault` flags, states and events with no profile, with `setProfile(MARGO)` and after
 switching from Blender back to it, plain, damped and with zoom to cursor; per profile, every bound and unbound
 button/modifier gives the expected motion (rotate, pan, dolly in or none), the wheel direction, zoom to cursor, one finger
 and pinch; double clicks (and not slow or moved ones) and fit keys dispatch `fit`; view keys snap (eased with damping);

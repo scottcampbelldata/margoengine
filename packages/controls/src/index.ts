@@ -2,7 +2,7 @@ export { Controls, EventDispatcher } from './controls.js';
 export type { ControlElement, ControlEvent, ControlListener, EventTargetLike } from './controls.js';
 export { OrbitControls, MapControls, MOUSE, TOUCH } from './orbit.js';
 export {
-  THREE_ORBIT,
+  MARGO,
   SOLIDWORKS,
   AUTOCAD,
   INVENTOR,

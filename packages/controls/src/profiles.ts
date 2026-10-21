@@ -28,9 +28,9 @@ export interface NavigationProfile {
   readonly viewCube?: { readonly flip?: boolean };
 }
 
-/** OrbitControls defaults: left rotates, middle dollies, right pans; Ctrl/Meta/Shift + left pans. */
-export const THREE_ORBIT: NavigationProfile = {
-  name: 'three',
+/** Margo's own mapping, the default: left rotates, middle dollies, right pans; Ctrl/Meta/Shift + left pans. */
+export const MARGO: NavigationProfile = {
+  name: 'margo',
   mouseButtons: { LEFT: MOUSE.ROTATE, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.PAN },
   touches: { ONE: TOUCH.ROTATE, TWO: TOUCH.DOLLY_PAN },
   wheel: 1,
@@ -140,7 +140,7 @@ export const RHINO: NavigationProfile = {
 
 /** Every profile by name, for a preferences menu (`orbit.setProfile(PROFILES[choice])`). Importing it bundles them all. */
 export const PROFILES = {
-  three: THREE_ORBIT,
+  margo: MARGO,
   solidworks: SOLIDWORKS,
   autocad: AUTOCAD,
   inventor: INVENTOR,

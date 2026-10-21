@@ -725,7 +725,7 @@ gizmo.addEventListener('dragging-changed', event => { orbit.enabled = !event.val
 ```
 
 three.js has no CAD navigation presets. Margo's OrbitControls takes one in a call (SolidWorks, AutoCAD, Inventor/Fusion,
-Blender, Maya, Onshape, Rhino; `THREE_ORBIT` is the default), each a separate tree-shakable export; bindings table in
+Blender, Maya, Onshape, Rhino; `MARGO` is the default), each a separate tree-shakable export; bindings table in
 the `@margoengine/controls` README:
 
 ```ts

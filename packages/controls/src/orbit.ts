@@ -149,7 +149,7 @@ export class OrbitControls extends Controls {
   }
   /**
    * Uses a CAD tool's mouse, wheel, touch and key bindings: `orbit.setProfile(SOLIDWORKS)`. Sets `mouseButtons` (when the
-   * profile has no `drag` table), `touches` and `zoomToCursor`; `THREE_ORBIT` restores the defaults. Returns the controls.
+   * profile has no `drag` table), `touches` and `zoomToCursor`; `MARGO` restores the defaults. Returns the controls.
    */
   setProfile(profile: NavigationProfile): this {
     this.nav = profile;

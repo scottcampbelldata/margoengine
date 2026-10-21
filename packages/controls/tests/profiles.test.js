@@ -174,8 +174,8 @@ test('default unchanged: the recorded pointer/wheel/touch/key sequence replays t
   // Exact equality: JSON round-trips doubles, so any change in the arithmetic fails.
   const setups = {
     'no profile': null,
-    'setProfile(THREE_ORBIT)': (o) => o.setProfile(controls.THREE_ORBIT),
-    'BLENDER then THREE_ORBIT': (o) => o.setProfile(controls.BLENDER).setProfile(controls.THREE_ORBIT),
+    'setProfile(MARGO)': (o) => o.setProfile(controls.MARGO),
+    'BLENDER then MARGO': (o) => o.setProfile(controls.BLENDER).setProfile(controls.MARGO),
   };
   for (const [label, setup] of Object.entries(setups))
     for (const variant of Object.keys(VARIANTS))
@@ -247,7 +247,7 @@ const L = 0,
 // [profile, [button, modifiers, expected motion][], wheel forward, zoom to cursor, one finger]. 'in' is a dolly (drag up).
 const TABLE = [
   [
-    'THREE_ORBIT',
+    'MARGO',
     [
       [L, {}, 'rotate'],
       [M, {}, 'in'],
@@ -395,7 +395,7 @@ test('profiles: double click of the fit button and fit keys dispatch fit; others
     ['MAYA', null, ['KeyF', 'KeyA']],
     ['ONSHAPE', null, ['KeyF']],
     ['RHINO', null, []],
-    ['THREE_ORBIT', null, []],
+    ['MARGO', null, []],
   ];
   for (const [name, button, keys] of cases) {
     const { el, orbit, key } = rig(controls[name]);
@@ -621,7 +621,7 @@ test('conflicts: Alt drags eat the Alt keyup (menu bar), plain Alt presses and t
 });
 
 test('conflicts: context menu suppressed for right-button profiles, middle press cannot autoscroll, unbound buttons pass through', () => {
-  for (const name of ['ONSHAPE', 'RHINO', 'MAYA', 'THREE_ORBIT']) {
+  for (const name of ['ONSHAPE', 'RHINO', 'MAYA', 'MARGO']) {
     const { el, orbit } = rig(controls[name]),
       mods = name === 'MAYA' ? { altKey: true } : {};
     el.dispatch('pointerdown', { ...mouse(R, mods), clientX: 400, clientY: 300 });
@@ -686,7 +686,7 @@ test('conflicts: Ctrl + wheel (trackpad pinch) is never inverted and never zooms
   }
 });
 
-test('setProfile returns the controls, applies touches and zoomToCursor, and THREE_ORBIT restores mouseButtons', () => {
+test('setProfile returns the controls, applies touches and zoomToCursor, and MARGO restores mouseButtons', () => {
   const { orbit } = rig(null);
   assert.equal(orbit.profile, null);
   assert.equal(orbit.setProfile(controls.AUTOCAD), orbit);
@@ -694,12 +694,12 @@ test('setProfile returns the controls, applies touches and zoomToCursor, and THR
   assert.equal(orbit.zoomToCursor, true);
   assert.deepEqual(orbit.touches, { ONE: controls.TOUCH.PAN, TWO: controls.TOUCH.DOLLY_PAN });
   orbit.mouseButtons = { LEFT: null, MIDDLE: null, RIGHT: null };
-  orbit.setProfile(controls.THREE_ORBIT);
+  orbit.setProfile(controls.MARGO);
   assert.deepEqual(orbit.mouseButtons, { LEFT: 0, MIDDLE: 1, RIGHT: 2 });
   assert.equal(orbit.zoomToCursor, false);
   assert.notEqual(
     orbit.touches,
-    controls.THREE_ORBIT.touches,
+    controls.MARGO.touches,
     'copied, so editing the controls never edits the shared profile',
   );
   orbit.dispose();

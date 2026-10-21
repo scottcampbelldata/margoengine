@@ -1100,7 +1100,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       needs Access-Control-Expose-Headers; a cold range miss costs range bytes + whole file; `@margoengine/gltf` (light
       loader) has no `fetch` option (size-gated with core).
    b. [DONE, branch worktree-agent-a97e430da9ad32b46] CAD navigation profiles: `OrbitControls.attach(engine)
-      .setProfile(SOLIDWORKS)` (also AUTOCAD, INVENTOR = FUSION, BLENDER, MAYA, ONSHAPE, RHINO, THREE_ORBIT = default;
+      .setProfile(SOLIDWORKS)` (also AUTOCAD, INVENTOR = FUSION, BLENDER, MAYA, ONSHAPE, RHINO, MARGO = default;
       `PROFILES` by name). Profiles are data (`NavigationProfile`: drag table keyed `'shift+1'` = Shift + middle, wheel
       direction, zoom to cursor, touches, double-click fit button, keys keyed by modifiers + `KeyboardEvent.code`) that
       OrbitControls/MapControls read; each is a separate export (OrbitControls + one profile +171 B gzip, all nine
@@ -1111,7 +1111,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       projection changes (viewcube 3,227 B, budget 3,500). Default proof: `packages/controls/tests/orbit-replay.json`, a
       113-event pointer/mousedown/contextmenu/wheel/touch/key sequence recorded from the pre-profile build (659038f),
       replays bit-identically (positions, targets, preventDefault flags, states, events; plain, damped, zoom to cursor)
-      with no profile, `setProfile(THREE_ORBIT)` and Blender -> THREE_ORBIT. Conflicts handled: context menu, middle
+      with no profile, `setProfile(MARGO)` and Blender -> MARGO. Conflicts handled: context menu, middle
       `mousedown` (autoscroll/paste), Alt keyup after an Alt drag (Firefox menu bar), Ctrl + wheel pinch never inverted,
       only bound keys cancelled. Bindings table, sources and uncertain defaults (SolidWorks/Onshape/Inventor wheel
       direction, some zoom-to-cursor defaults, touch rows, Maya dolly axis, Onshape Shift+digit) in the controls README.

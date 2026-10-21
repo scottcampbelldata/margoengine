@@ -253,6 +253,8 @@ export interface NavigationProfile {
 
 export const ONSHAPE: NavigationProfile;
 
+export const MARGO: NavigationProfile;
+
 export class OrbitControls extends Controls {
     enableDamping: boolean;
     dampingFactor: number;
@@ -313,7 +315,7 @@ export class OrbitControls extends Controls {
 }
 
 export const PROFILES: {
-    readonly three: NavigationProfile;
+    readonly orbit: NavigationProfile;
     readonly solidworks: NavigationProfile;
     readonly autocad: NavigationProfile;
     readonly inventor: NavigationProfile;
@@ -362,8 +364,6 @@ export type Prim = LinePrim | TrianglePrim;
 export const RHINO: NavigationProfile;
 
 export const SOLIDWORKS: NavigationProfile;
-
-export const THREE_ORBIT: NavigationProfile;
 
 export const TOUCH: {
     readonly ROTATE: 0;
