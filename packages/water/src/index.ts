@@ -14,6 +14,8 @@ import { Spray } from './spray.js';
 import { displayShader } from '../../shared/display.js';
 import { margoError } from '../../shared/errors.js';
 import { MargoError } from '@margoengine/math/errors';
+import { checkFog, FOG_BYTES, fogWgsl, writeFog, type FogLike } from './fog.js';
+export type { FogLike } from './fog.js';
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; UNIFORM: number; COPY_DST: number; STORAGE: number };
 declare const GPUTextureUsage: {
   COPY_SRC: number;
@@ -265,6 +267,16 @@ function captureShader(code: string, declarations: string): string {
     throw margoError('unsupported', 'Water capture needs the water fragment; its shader changed');
   return declarations + out;
 }
+// Scene fog (`setFog`): the same place environment's Fog mixes on meshes, after the display tone mapping and before the
+// sRGB encoding on an 8-bit target, in linear radiance on an HDR one. The SSR capture replaces this tail, so it is unfogged.
+const fogFrom = 'if(frame.cameraData.w<0.5){color=toDisplay(color);}',
+  fogTo =
+    'let fogA=fogAmount(i.world);if(frame.cameraData.w<0.5){let mapped=mix(pbrNeutral(max(color,vec3f(0))),margoFog.color.rgb,fogA);color=select(mapped*12.92,1.055*pow(mapped,vec3f(1.0/2.4))-0.055,mapped>=vec3f(0.0031308));}else{color=mix(color,margoFog.color.rgb,fogA);}';
+function foggedShader(code: string): string {
+  if (code.split(fogFrom).length !== 2)
+    throw margoError('unsupported', 'Water fog needs the water fragment it was written for; update its fog edit');
+  return code.replace(fogFrom, fogTo) + fogWgsl(0, 8);
+}
 const unshadowed = '\nfn waterShadow(p:vec3f)->f32 {return 1.0;}';
 const shadowed = '\nfn waterShadow(p:vec3f)->f32 {return shadowVisibility(p,vec3f(0,1,0));}';
 const depthCopy = `
@@ -358,6 +370,9 @@ export class Water implements EnginePlugin {
   private current = 0;
   private time = 0;
   private readonly values = new Float32Array(128);
+  private fogSource: FogLike | null = null;
+  private fogBuffer?: GPUBuffer;
+  private readonly fogData = new Float32Array(12);
   private readonly waveHeights = new Float32Array(8);
   private maxWaveHeight = 0;
   private disposed = false;
@@ -507,6 +522,22 @@ export class Water implements EnginePlugin {
   /** Borrowed scene depth including the water surface; changes on resize/restoration. */
   get depthTexture(): GPUTexture | undefined {
     return this.surfaceDepth;
+  }
+  /** The fog the water is drawn in (see `setFog`), or null. */
+  get fog(): FogLike | null {
+    return this.fogSource;
+  }
+  /**
+   * Fogs the surface and its spray: `fog` is `@margoengine/environment`'s `Fog` or any object with its fields, read every
+   * frame, with Fog's maths (linear near/far, exp2 density, height falloff) and mixed where Fog mixes on meshes (after
+   * the display tone mapping on the canvas, in linear radiance on an HDR target), so fogged water matches fogged
+   * terrain and a fully fogged surface shows the fog colour. `null` (the default) draws exactly as without fog. Setting
+   * or clearing it recompiles the surface shader once; changing the fog or its `enabled` flag never does.
+   * @throws TypeError when `fog` is neither an object nor null; RangeError or TypeError for an invalid field.
+   */
+  setFog(fog: FogLike | null): this {
+    this.fogSource = checkFog(fog);
+    return this;
   }
   /** Scales the wave spectrum so its largest configured train has this amplitude in meters. */
   setWaveHeight(height: number): this {
@@ -728,13 +759,23 @@ export class Water implements EnginePlugin {
       this.groups = [];
       this.current = 0;
     }
-    const shadows = this.options.shadows;
-    const format = c.format + ':' + samples + ':' + depth.format + ':' + !!shadows;
+    const shadows = this.options.shadows,
+      fog = this.fogSource;
+    if (fog) {
+      writeFog(fog, c.camera.position, this.fogData);
+      this.fogBuffer ??= c.device.createBuffer({
+        size: FOG_BYTES,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+      c.device.queue.writeBuffer(this.fogBuffer, 0, this.fogData);
+    }
+    const format = c.format + ':' + samples + ':' + depth.format + ':' + !!shadows + (fog ? ':fog' : '');
     if (this.format !== format) {
       // Shadow sampling goes after the surface functions, which GPU probes compile on their own.
-      this.shaderCode =
+      const code =
         shader.replace('const HORIZON=false;', `const HORIZON=${this.horizon};`) +
         (shadows ? '\n' + shadows.pbr(1).declarations + shadowed : unshadowed);
+      this.shaderCode = fog ? foggedShader(code) : code;
       const module = c.device.createShaderModule({ code: this.shaderCode });
       this.pipeline = c.device.createRenderPipeline({
         layout: 'auto',
@@ -840,6 +881,7 @@ export class Water implements EnginePlugin {
             this.capturedView ?? this.foamViews[i],
             { buffer: this.coastal?.connected ?? this.uniform! },
           ];
+          if (fog) resources.push({ buffer: this.fogBuffer! });
           this.resources.push(resources);
           this.groups.push(group(c.device, this.pipeline!, resources));
         }
@@ -879,7 +921,7 @@ export class Water implements EnginePlugin {
     pass.setIndexBuffer(this.indices!, 'uint32');
     pass.drawIndexed(this.count);
     pass.end();
-    this.spray?.draw(c, this.surfaceDepth!, this.surfaceView!);
+    this.spray?.draw(c, this.surfaceDepth!, this.surfaceView!, fog ? this.fogBuffer : undefined);
   }
   /**
    * Lets a capture hook (`@margoengine/post` SSR: `ssr.add(water)`) draw the water surface with `draw(c, 'capture', ...)`
@@ -959,7 +1001,10 @@ export class Water implements EnginePlugin {
     }
     if (this.captureSource !== this.groups) {
       this.captureSource = this.groups;
-      this.captureGroups = this.resources.map((resources) => group(c.device, this.capturePipeline!, resources));
+      // The capture fragment ends before the fog mix, so its layout has no fog binding (resource 8).
+      this.captureGroups = this.resources.map((resources) =>
+        group(c.device, this.capturePipeline!, resources.slice(0, 8)),
+      );
     }
     const entries = shadows?.bindings();
     if (entries && this.captureShadowEntries !== entries) {
@@ -1001,6 +1046,8 @@ export class Water implements EnginePlugin {
     this.uniform?.destroy();
     this.vertices?.destroy();
     this.indices?.destroy();
+    this.fogBuffer?.destroy();
+    this.fogBuffer = undefined;
     for (const t of this.foam) t.destroy();
     this.foam = [];
     this.foamViews = [];

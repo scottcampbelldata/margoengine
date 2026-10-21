@@ -112,6 +112,26 @@ Physical WebGPU all-shore run-up/recession, deep isolated-basin retention, curve
 refraction and device-restoration checks: npm run test:gpu --workspace @margoengine/water
 (build core, post and terrain packages first).
 
+## Fog
+
+`water.setFog(fog)` fogs the surface and its spray with `@margoengine/environment`'s `Fog` or any object with its fields
+(`color`, `near`, `far`, `density`, `heightFalloff`, `height`, `enabled`), read every frame with Fog's maths. The surface
+mixes where Fog mixes on meshes: after the display tone mapping on the canvas and in linear radiance on an HDR target,
+so fogged water matches fogged terrain and a fully fogged surface shows exactly the fog colour. Spray fades toward the
+same colour. Water does not import environment. `fog.enabled = false` clears it without recompiling;
+`water.setFog(null)` (the default) draws exactly as before. The SSR capture keeps the unfogged reflection term.
+
+```ts
+import {Fog} from '@margoengine/environment';
+const fog = Fog.attach(engine, {color: '#8090a0', density: 0.02});
+water.setFog(fog);
+```
+
+Checked on a real GPU (NVIDIA RTX A6000, Edge 155; `node scripts/gpu-lock.mjs run --owner=fog-all -- node
+scripts/fog-all-gpu-check.js`): fogged pixels equal unfogged + a x (fully fogged - unfogged), with a the analytic fog
+amount, within 0.00022 in HDR and 1/255 on the canvas, for linear-with-height and exp2 fog at 4x and 1x MSAA; without fog
+and with `enabled: false` the pixels equal the pre-fog build bit for bit.
+
 ## Screen-space reflections
 
 `Water` takes SSR's capture hook (`@margoengine/post/ssr`): `ssr.add(water)` draws the surface again into SSR's

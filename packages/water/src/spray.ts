@@ -1,6 +1,8 @@
 import type { PassContext } from '@margoengine/core/extension';
 import { compute, group } from '../../shared/gpu.js';
 import { waterFrame, type CoastalFlow } from './coastal.js';
+import { fogWgsl } from './fog.js';
+import { margoError } from '../../shared/errors.js';
 declare const GPUBufferUsage: { STORAGE: number; COPY_SRC: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 const particles = `struct Particle {position:vec4f,velocity:vec4f}
@@ -55,6 +57,32 @@ fn linear(d:f32)->f32{return frame.cameraData.x*frame.cameraData.y/(frame.camera
  let color=vec3f(0.78,0.84,0.85)*(vec3f(0.05)+frame.radiance.rgb*min(1.0,frame.sun.w));
  return vec4f(color*alpha,alpha);
 }`;
+// Scene fog (Water.setFog), uniform at binding 3: droplets blend over the water like the surface's own colour and are
+// written as they are, so they fade toward the fog colour in the target's terms (sRGB-encoded on an 8-bit target).
+const fogEdits: Array<[string, string]> = [
+  ['@location(1) alpha:f32}', '@location(1) alpha:f32,@location(2) world:vec3f}'],
+  ['return Output(vec4f(-2,-2,0,1),vec2f(0),0);', 'return Output(vec4f(-2,-2,0,1),vec2f(0),0,vec3f(0));'],
+  [
+    'return Output(frame.camera*vec4f(world,1),uv,min(1.0,p.position.w*5.0));',
+    'return Output(frame.camera*vec4f(world,1),uv,min(1.0,p.position.w*5.0),world);',
+  ],
+  [
+    'return vec4f(color*alpha,alpha);',
+    'let fogColor=select(select(margoFog.color.rgb*12.92,1.055*pow(margoFog.color.rgb,vec3f(1.0/2.4))-0.055,margoFog.color.rgb>=vec3f(0.0031308)),margoFog.color.rgb,frame.cameraData.w>0.5);return vec4f(mix(color,fogColor,fogAmount(i.world))*alpha,alpha);',
+  ],
+];
+function foggedRender(): string {
+  let code = render;
+  for (const [from, to] of fogEdits) {
+    if (code.split(from).length !== 2)
+      throw margoError(
+        'unsupported',
+        'Water spray fog needs the spray shader it was written for; update its fog edits',
+      );
+    code = code.replace(from, to);
+  }
+  return code + fogWgsl(0, 3);
+}
 
 /** Fixed GPU pool, born only where shallow flow is actively breaking. */
 export class Spray {
@@ -77,6 +105,7 @@ export class Spray {
   private format = '';
   private depthFormat = '';
   private sampled?: GPUTexture;
+  private sampledFog?: GPUBuffer;
   constructor(
     device: GPUDevice,
     private readonly uniform: GPUBuffer,
@@ -106,16 +135,18 @@ export class Spray {
     pass.dispatchWorkgroups(32);
     pass.end();
   }
-  draw(c: Context, surface: GPUTexture, view: GPUTextureView): void {
-    const key = c.format + ':' + surface.sampleCount;
+  /** Draws the droplets over the water; `fog` is Water's fog uniform while it has a fog. */
+  draw(c: Context, surface: GPUTexture, view: GPUTextureView, fog?: GPUBuffer): void {
+    const key = c.format + ':' + surface.sampleCount + (fog ? ':fog' : '');
     if (this.format !== key || this.depthFormat !== surface.format) {
+      const source = fog ? foggedRender() : render;
       const code =
         surface.sampleCount === 4
-          ? render
+          ? source
               .replace('surface:texture_depth_2d', 'surface:texture_depth_multisampled_2d')
               .replace('fragment(i:Output)', 'fragment(i:Output,@builtin(sample_index) sample:u32)')
               .replace('textureLoad(surface,vec2i(i.clip.xy),0)', 'textureLoad(surface,vec2i(i.clip.xy),i32(sample))')
-          : render;
+          : source;
       const module = c.device.createShaderModule({ code });
       this.render = c.device.createRenderPipeline({
         layout: 'auto',
@@ -140,13 +171,15 @@ export class Spray {
       this.depthFormat = surface.format;
       this.sampled = undefined;
     }
-    if (this.sampled !== surface) {
+    if (this.sampled !== surface || this.sampledFog !== fog) {
       this.renderGroup = group(c.device, this.render!, [
         { buffer: this.uniform },
         { buffer: this.buffer },
         surface.createView({ aspect: 'depth-only' }),
+        ...(fog ? [{ buffer: fog }] : []),
       ]);
       this.sampled = surface;
+      this.sampledFog = fog;
     }
     this.color.view = c.color;
     this.depth.view = view;
