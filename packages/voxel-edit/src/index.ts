@@ -40,6 +40,22 @@ export {
   generateMaze,
 } from './model.js';
 export {
+  type LayoutOptions,
+  type GridLayout,
+  type FlipOptions,
+  flipGrid,
+  type TurnOptions,
+  turnGrid,
+  type ShiftOptions,
+  shiftGrid,
+  occupiedBounds,
+  type CropOptions,
+  cropGrid,
+  fitGrid,
+  type InvertOptions,
+  invertGrid,
+} from './layout.js';
+export {
   type OwnedBuffer,
   type BufferOwner,
   type ByteSource,

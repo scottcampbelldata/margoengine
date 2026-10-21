@@ -6,11 +6,36 @@
 import { Vec3 } from "@margoengine/core";
 import { MutableVec3 } from "@margoengine/math";
 
+export interface BufferOwner {
+    ownedBuffers(): readonly OwnedBuffer[];
+}
+
+export class ByteLedger {
+    get bytes(): number;
+    get buffers(): number;
+    has(token: object): boolean;
+    retain(value: ByteSource): number;
+    release(value: ByteSource): number;
+}
+
+export type ByteSource = ArrayBufferLike | ArrayBufferView | {
+    readonly voxels: ArrayBufferView;
+} | {
+    readonly banks: readonly ByteSource[];
+} | {
+    readonly data: ArrayBufferView;
+} | BufferOwner | OwnedBuffer | readonly ByteSource[];
+
 export interface CombineOptions extends GridLimits {
     operation: 'union' | 'intersect' | 'subtract';
     offset?: Vec3;
     paletteMap?: Uint8Array;
     overlap?: 'base' | 'tool';
+}
+
+export interface CropOptions extends LayoutOptions {
+    origin: Vec3;
+    size: Vec3;
 }
 
 export interface DiagonalOptions extends GridLimits {
@@ -28,6 +53,10 @@ export interface FillOptions extends GridLimits {
     color: number;
 }
 
+export interface FlipOptions extends LayoutOptions {
+    axis: 'x' | 'y' | 'z';
+}
+
 export interface GridEdit {
     grid: VoxelGrid;
     changed: number;
@@ -42,8 +71,21 @@ export interface GridHit {
     distance: number;
 }
 
+export interface GridLayout extends GridEdit {
+    selection: Float64Array;
+    mapPoint(point: Vec3): MutableVec3;
+}
+
 export interface GridLimits {
     maxCells?: number;
+}
+
+export interface InvertOptions extends GridLimits {
+    color: number;
+}
+
+export interface LayoutOptions extends GridLimits {
+    selection?: Iterable<number>;
 }
 
 export interface Maze {
@@ -66,6 +108,11 @@ export interface MazeOptions extends GridLimits {
 export interface MorphologyOptions extends GridLimits {
     iterations?: number;
     directions?: readonly Vec3[];
+}
+
+export interface OwnedBuffer {
+    readonly token: object;
+    readonly bytes: number;
 }
 
 export interface PaletteMerge {
@@ -103,6 +150,15 @@ export interface ShearOptions extends GridLimits {
     pivot?: number;
 }
 
+export interface ShiftOptions extends LayoutOptions {
+    offset: Vec3;
+}
+
+export interface TurnOptions extends LayoutOptions {
+    axis: 'x' | 'y' | 'z';
+    turns?: number;
+}
+
 export interface VoxelGrid {
     readonly size: Vec3;
     readonly voxels: Uint8Array;
@@ -118,17 +174,34 @@ export function cellIndex(size: Vec3, x: number, y: number, z: number): number;
 
 export function combineGrids(base: VoxelGrid, tool: VoxelGrid, options: CombineOptions): GridEdit;
 
+export function cropGrid(grid: VoxelGrid, options: CropOptions): GridLayout;
+
 export function dilateGrid(grid: VoxelGrid, options?: DilateOptions): GridEdit;
 
 export function erodeGrid(grid: VoxelGrid, options?: MorphologyOptions): GridEdit;
 
 export function fillEnclosed(grid: VoxelGrid, options: FillOptions): GridEdit;
 
+export function fitGrid(grid: VoxelGrid, options?: LayoutOptions): GridLayout & {
+    origin: MutableVec3;
+};
+
+export function flipGrid(grid: VoxelGrid, options: FlipOptions): GridLayout;
+
 export function generateMaze(options: MazeOptions): Maze;
 
 export function insideGrid(size: Vec3, x: number, y: number, z: number): boolean;
 
+export function invertGrid(grid: VoxelGrid, options: InvertOptions): GridEdit;
+
 export function mergePalettes(options: PaletteMergeOptions): PaletteMerge;
+
+export function occupiedBounds(grid: VoxelGrid, limits?: GridLimits): {
+    min: MutableVec3;
+    max: MutableVec3;
+} | null;
+
+export function ownedBuffers(value: ByteSource): OwnedBuffer[];
 
 export function reflectDiagonal(grid: VoxelGrid, options: DiagonalOptions): GridEdit;
 
@@ -136,9 +209,15 @@ export function repeatGrid(grid: VoxelGrid, options: RepeatOptions): GridEdit;
 
 export function resampleGrid(grid: VoxelGrid, options: ResampleOptions): GridEdit;
 
+export function retainedBytes(...values: ByteSource[]): number;
+
 export function rotateGrid(grid: VoxelGrid, options: RotateOptions): GridEdit;
 
 export function shearGrid(grid: VoxelGrid, options: ShearOptions): GridEdit;
+
+export function shiftGrid(grid: VoxelGrid, options: ShiftOptions): GridLayout;
+
+export function turnGrid(grid: VoxelGrid, options: TurnOptions): GridLayout;
 
 export function wrapGrid(grid: VoxelGrid, options: WrapOptions): GridEdit;
 ```

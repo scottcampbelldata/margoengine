@@ -26,7 +26,9 @@ A `VoxelGrid` is `{size, voxels}`: one palette index per cell, 0 for air and 1-2
 (x, y, z) at `x + size[0] * (z + size[2] * y)` (`cellIndex`, `cellAt`, `insideGrid`). Operations never change their
 input; each returns `{grid, changed, clipped}`: a new grid, the cells that differ (cells outside either grid read as
 air) and the filled cells pushed out of bounds. Every operation checks its arguments and its `maxCells` budget
-(default 16,777,216 cells, at most 67,108,864) before allocating anything.
+(default 16,777,216 cells, at most 67,108,864) before allocating anything. The layout operations (`flipGrid` to
+`fitGrid`) also take a `selection` of cell indexes and return it mapped, with `mapPoint` for pivots and joints in
+corner coordinates.
 
 | Root entry | Does |
 | --- | --- |
@@ -36,6 +38,9 @@ air) and the filled cells pushed out of bounds. Every operation checks its argum
 | `repeatGrid`, `resampleGrid` | tile, or scale by nearest-cell sampling (indexes are never blended) |
 | `dilateGrid`, `erodeGrid`, `fillEnclosed` | grow or shrink along chosen axis directions, fill closed cavities |
 | `generateMaze` | a seeded perfect maze, one-cell walls and corridors |
+| `flipGrid`, `turnGrid`, `shiftGrid` | exact whole-cell layout: mirror along a principal axis, right-handed quarter turns that swap the other two sizes (so nothing clips; `rotateGrid` turns inside the same box instead), move by an offset with the cells that leave counted in `clipped` |
+| `occupiedBounds`, `cropGrid`, `fitGrid` | the filled box; crop or extend to a size anchored at a caller's origin (a resize keeping the corner is origin [0, 0, 0]); shrink to the filled box |
+| `invertGrid` | swap filled and empty cells, air taking an explicit palette index |
 | `ByteLedger`, `ownedBuffers`, `retainedBytes` | bytes of the storage grids, cels, packed frames, images and sparse snapshots keep alive, each buffer counted once through its token (`SparseGrid.ownedBuffers`, `SparseGrid.deltaBuffers`); the ledger retains and releases values for an undo budget |
 
 ## Entries
