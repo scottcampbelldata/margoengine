@@ -8,7 +8,7 @@ interface SphericalLike {
 }
 
 /**
- * A 3D vector `(x, y, z)` with three.js `Vector3` method names (default (0, 0, 0)). Methods write into `this` and
+ * A 3D vector `(x, y, z)` (default (0, 0, 0)). Methods write into `this` and
  * return it for chaining; `copy()` reads any `{x, y, z}` such as core `mesh.position`, and `toArray()` gives the
  * `[x, y, z]` tuple core setters take. No input validation: NaN propagates.
  */

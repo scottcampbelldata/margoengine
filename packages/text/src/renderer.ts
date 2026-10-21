@@ -55,7 +55,7 @@ export interface TextRendererOptions {
 /**
  * Engine plugin that draws `Text` blocks: one instanced draw call per block over the scene color and
  * depth, reversed-Z depth test without depth writes, premultiplied alpha blending, blocks sorted back to
- * front. Replaces troika-three-text's `Text` and the label use cases of three.js `TextGeometry`.
+ * front.
  * WebGPU only; on the WebGL2 backend it warns once and draws nothing.
  */
 export class TextRenderer implements EnginePlugin {

@@ -10,7 +10,7 @@ async function own(image: GLTFImage): Promise<GLTFImage> {
 }
 
 /**
- * Three.js `SkeletonUtils.clone`: a second, independent copy of a glTF-pro model, with its own nodes (so its own
+ * A second, independent copy of a glTF-pro model, with its own nodes (so its own
  * skeleton) that an `Animation` from this package can play apart from the source (`Animation.attach(clone)`). The
  * clone starts in the source's current local node transforms, visibility and morph weights, with its root unparented
  * at the source root's local transform, and is registered with the engine when the source is (as `loadGLTF` does).

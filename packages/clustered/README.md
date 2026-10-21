@@ -17,7 +17,7 @@ engine.start();
 
 Positions and directions are world space; cone angles are radians up to π/2 (a hemisphere: everything in front of the light). Light radiance uses smooth range attenuation, inverse-square distance attenuation, and smooth inner/outer spot cones.
 
-Crocotile's (three.js-style) light parameters map one to one, with the falloff `@margoengine/bvh`'s vertex-light bake uses:
+Crocotile's light parameters map one to one, with the falloff `@margoengine/bvh`'s vertex-light bake uses:
 
 ```ts
 lights.setLights([
@@ -46,8 +46,8 @@ Core meshes receive local lighting automatically. Call `lights.add(pbrModel)` or
 
 ## Directional lights
 
-`@margoengine/clustered/directional` adds up to 16 directional lights beside core's one sun (three.js
-`DirectionalLight`), shaded in the same light loop as the point lights:
+`@margoengine/clustered/directional` adds up to 16 directional lights beside core's one sun,
+shaded in the same light loop as the point lights:
 
 ```ts
 import {Clustered} from '@margoengine/clustered';
@@ -66,7 +66,7 @@ leaves every GPU call unchanged. `lights.list` and `suns.list` return the lists 
 
 ## Directional and area light shadows
 
-`DirectionalLights` and `AreaLights` (`@margoengine/clustered/area`, three.js `RectAreaLight`) lights with
+`DirectionalLights` and `AreaLights` (`@margoengine/clustered/area`) lights with
 `castShadow: true` are shadowed by the `LocalShadows` attached to the same lights: the same casters (`local.add`: core
 meshes, glTF-pro models, materials and instanced meshes, `{dynamic: true}` for skinned ones), `bias` and `normalBias`,
 and the same depth map array, after the point and spot layers. No binding is added.
@@ -118,7 +118,7 @@ local.add(table);
 ## IES profiles
 
 `@margoengine/clustered/ies` reads IES LM-63 photometric files (the 1986 to 2019 revisions, type C photometry) and
-shapes point and spot lights with them (three.js `IESSpotLight`, and point lights too):
+shapes point and spot lights with them:
 
 ```ts
 import {IESLights, parseIES} from '@margoengine/clustered/ies';
@@ -142,7 +142,7 @@ it adds nothing to the shaders or the GPU work.
 
 ## Projector lights
 
-`@margoengine/clustered/projector` makes spot lights project an image (three.js `SpotLight.map`):
+`@margoengine/clustered/projector` makes spot lights project an image:
 
 ```ts
 import {ProjectorLights} from '@margoengine/clustered/projector';

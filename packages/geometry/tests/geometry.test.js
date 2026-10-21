@@ -175,9 +175,9 @@ const triArea2D = (pts, idx) => {
   return s;
 };
 
-// ---------- vertex and index counts against the Three.js formulas ----------
+// ---------- vertex and index counts against closed-form formulas ----------
 
-test('box counts match Three.js for segmented boxes, with six groups', () => {
+test('box counts match the formulas for segmented boxes, with six groups', () => {
   for (const [w, h, d] of [
     [1, 1, 1],
     [2, 3, 4],
@@ -211,7 +211,7 @@ test('box counts match Three.js for segmented boxes, with six groups', () => {
   }
 });
 
-test('plane, circle and ring counts match Three.js', () => {
+test('plane, circle and ring counts match the formulas', () => {
   const p = planeGeometry(2, 3, 4, 5);
   assert.equal(vcount(p), 5 * 6);
   assert.equal(p.indices.length, 4 * 5 * 6);
@@ -224,7 +224,7 @@ test('plane, circle and ring counts match Three.js', () => {
   assert.equal(r.indices.length, 20 * 3 * 6);
 });
 
-test('cylinder and cone counts match Three.js including open ends and the cone apex', () => {
+test('cylinder and cone counts match the formulas including open ends and the cone apex', () => {
   const r = 16,
     h = 3,
     cyl = cylinderGeometry(1, 2, 3, r, h);
@@ -244,7 +244,7 @@ test('cylinder and cone counts match Three.js including open ends and the cone a
   assert.equal(vcount(partial), 9 * 2 + 2 * 17);
 });
 
-test('sphere counts match Three.js, including partial theta ranges', () => {
+test('sphere counts match the formulas, including partial theta ranges', () => {
   const full = sphereGeometry(1, 32, 16);
   assert.equal(vcount(full), 33 * 17);
   assert.equal(full.indices.length, 32 * 16 * 6 - 2 * 32 * 3, 'poles have one triangle per quad');
@@ -255,7 +255,7 @@ test('sphere counts match Three.js, including partial theta ranges', () => {
   assert.equal(vcount(sphereGeometry(1, 1, 1)), 4 * 3, 'clamps to 3 x 2 segments');
 });
 
-test('capsule, torus and torus knot counts match Three.js', () => {
+test('capsule, torus and torus knot counts match the formulas', () => {
   const cap = capsuleGeometry(0.5, 2, 5, 12, 3);
   assert.equal(vcount(cap), (2 * 5 + 3 + 1) * 13);
   assert.equal(cap.indices.length, (2 * 5 + 3) * 12 * 6);
@@ -305,7 +305,7 @@ test('polyhedron LODs can share smooth normals while preserving default shading 
   }
 });
 
-test('lathe and tube counts match Three.js', () => {
+test('lathe and tube counts match the formulas', () => {
   const pts = Array.from({ length: 7 }, (_, i) => [Math.sin((i / 6) * Math.PI) + 0.1, i / 6 - 0.5]);
   const l = latheGeometry(pts, 20);
   assert.equal(vcount(l), 21 * 7);
@@ -321,7 +321,7 @@ test('lathe and tube counts match Three.js', () => {
   assert.equal(tube.indices.length, 40 * 6 * 6);
 });
 
-test('shape and extrude counts match Three.js formulas', () => {
+test('shape and extrude counts match the formulas', () => {
   const sh = shapeFrom(square(2), [square(0.5, -1, -1), square(0.5, 1, 1)]);
   const flat = shapeGeometry(sh);
   assert.equal(vcount(flat), 12);
@@ -339,7 +339,7 @@ test('shape and extrude counts match Three.js formulas', () => {
   assert.equal(bevel.groups[0].count, 2 * F * 3);
 });
 
-// ---------- exact agreement with a real Three.js build (tests/fixtures/three-reference.json) ----------
+// ---------- exact agreement with the reference fixture ----------
 
 const reference = JSON.parse(await readFile(new URL('./fixtures/three-reference.json', import.meta.url), 'utf8'));
 const refShape = () => {
@@ -383,7 +383,7 @@ const assertArrayClose = (actual, expected, tol, label) => {
   assert.ok(worst <= tol, `${label}: max difference ${worst} at ${at}`);
 };
 
-test(`primitives match Three.js r${reference.three} vertex for vertex`, () => {
+test('primitives match the reference fixture vertex for vertex', () => {
   const ours = {
     box: boxGeometry(1, 2, 3, 2, 1, 3),
     plane: planeGeometry(2, 3, 2, 3),
@@ -435,7 +435,7 @@ test(`primitives match Three.js r${reference.three} vertex for vertex`, () => {
       `${name} groups`,
     );
     if (name === 'lathe') {
-      // Three.js leaves the last profile normal unnormalized; directions must still agree.
+      // The reference leaves the last profile normal unnormalized; directions must still agree.
       for (let i = 0; i < r.vertices; i++) {
         const a = [g.normals[i * 3], g.normals[i * 3 + 1], g.normals[i * 3 + 2]],
           b = r.normals.slice(i * 3, i * 3 + 3);
@@ -445,7 +445,7 @@ test(`primitives match Three.js r${reference.three} vertex for vertex`, () => {
   }
 });
 
-test(`curves and Frenet frames match Three.js r${reference.three}`, () => {
+test('curves and Frenet frames match the reference fixture', () => {
   const c = (closed, type) => new CatmullRomCurve3(refPoints, closed, type);
   const flat = (list) => list.flat();
   assertArrayClose(
@@ -674,7 +674,7 @@ test('sphere normals are radial and lathe normals face outward from the axis', (
   }
 });
 
-test('UVs are in [0, 1] where Three.js normalizes them', () => {
+test('UVs are in [0, 1] where the layout normalizes them', () => {
   for (const [name, g] of [
     ['box', boxGeometry(1, 1, 1, 2, 3, 4)],
     ['plane', planeGeometry(3, 1, 2, 2)],
@@ -687,10 +687,10 @@ test('UVs are in [0, 1] where Three.js normalizes them', () => {
     ['tube', tubeGeometry(new LineCurve3([0, 0, 0], [0, 0, 1]), 4, 0.1, 5)],
   ])
     assertUVRange(g, name);
-  // Sphere and capsule shift the pole row by half a segment, exactly like Three.js.
+  // Sphere and capsule shift the pole row by half a segment.
   assertUVRange(sphereGeometry(1, 16, 8), 'sphere', -0.5 / 16, 1 + 0.5 / 16);
   assertUVRange(capsuleGeometry(1, 1, 4, 10), 'capsule', -0.5 / 10, 1 + 0.5 / 10);
-  // Polyhedra: v in [0, 1], u in [0, 1.2] after the Three.js seam correction.
+  // Polyhedra: v in [0, 1], u in [0, 1.2] after the seam correction.
   for (const g of [icosahedronGeometry(1, 2), dodecahedronGeometry(1, 0), octahedronGeometry(1, 1)]) {
     for (let i = 0; i < vcount(g); i++) {
       assert.ok(g.uvs[i * 2 + 1] >= -1e-6 && g.uvs[i * 2 + 1] <= 1 + 1e-6);
@@ -699,12 +699,12 @@ test('UVs are in [0, 1] where Three.js normalizes them', () => {
   }
 });
 
-test('box and plane UVs follow the Three.js layout', () => {
+test('box and plane UVs follow the reference layout', () => {
   const p = planeGeometry(2, 2, 1, 1);
   assert.deepEqual([...p.positions.slice(0, 3)], [-1, 1, 0]);
   assert.deepEqual([...p.uvs.slice(0, 2)], [0, 1]);
   const b = boxGeometry(2, 2, 2);
-  assert.deepEqual([...b.positions.slice(0, 3)], [1, 1, 1], '+x face starts at (1, 1, 1) like Three.js');
+  assert.deepEqual([...b.positions.slice(0, 3)], [1, 1, 1], '+x face starts at (1, 1, 1)');
   assert.deepEqual([...b.normals.slice(0, 3)], [1, 0, 0]);
 });
 
@@ -878,7 +878,7 @@ test('triangulation of a large noisy polygon with holes stays exact', () => {
   assert.equal(triangulateShape(outer, holes).indices.length / 3, n - 2 + 2 * 6);
 });
 
-test('isClockWise and shapeArea follow Three.js ShapeUtils', () => {
+test('isClockWise and shapeArea follow the signed-area convention', () => {
   close(shapeArea(square(1)), 4, 0);
   assert.equal(isClockWise(square(1)), false);
   assert.equal(isClockWise(square(1).reverse()), true);
@@ -1029,7 +1029,7 @@ test('Frenet frames are orthonormal and right-handed, and closed frames meet', (
   }
 });
 
-test('Path builders match Three.js point sampling', () => {
+test('Path builders match the reference point sampling', () => {
   const p = new Path();
   p.moveTo(0, 0)
     .lineTo(1, 0)
@@ -1047,7 +1047,7 @@ test('Path builders match Three.js point sampling', () => {
   assert.equal(
     new Path().moveTo(5, 0).absarc(0, 0, 1, 0, Math.PI, false).curves.length,
     1,
-    'a bare moveTo adds no curve, as in Three.js',
+    'a bare moveTo adds no curve',
   );
   const arc = new Path().moveTo(4, 0).lineTo(5, 0).absarc(0, 0, 1, 0, Math.PI, false);
   assert.equal(arc.curves.length, 3, 'absarc adds a connecting line when the pen is elsewhere');

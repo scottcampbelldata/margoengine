@@ -1,7 +1,7 @@
 # @margoengine/lod
 
-Level of detail for scenes with thousands of objects (CAD assemblies, simulators, forests, cities), the counterpart of
-three.js `LOD`, plus GPU-baked octahedral imposters for the farthest level. Core is unchanged.
+Level of detail for scenes with thousands of objects (CAD assemblies, simulators, forests, cities), plus
+GPU-baked octahedral imposters for the farthest level. Core is unchanged.
 
 ```ts
 import {Engine, PbrMaterial} from '@margoengine/core';
@@ -30,7 +30,7 @@ const cached = Imposter.fromData(engine, data); // ... and skip the bake next lo
   (set on the anchor), an `Imposter`, or `null`. Up to 8 per object. Each object picks by `distance` (world units from
   the camera to the anchor) or by `screen` (bounding-sphere height as a fraction of the viewport height, using the
   object's world scale and the camera's fov); `bias` multiplies every distance, a quality knob for tiers.
-- **Hysteresis** follows three.js: while a level is shown its switch distance shrinks by its `hysteresis` fraction, so
+- **Hysteresis**: while a level is shown its switch distance shrinks by its `hysteresis` fraction, so
   the camera has to come back further before the finer level returns. No flicker at a boundary.
 - **Cost**: one loop over packed typed arrays before the transform tick, reading last frame's world matrices; only
   objects whose level changed are touched; no measurable heap growth (under 64 KB over 1,000 frames with 3,000

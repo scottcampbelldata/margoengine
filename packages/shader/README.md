@@ -1,6 +1,6 @@
 # @margoengine/shader
 
-Typed shader nodes that compile to readable WGSL: the Margo counterpart of three.js TSL and node materials. One graph API drives three hosts: `NodeMaterial` (a `@margoengine/materials` Material whose colour, normal, roughness, metalness, emissive, opacity and vertex position come from nodes), `NodePass` (a full-screen effect inside `@margoengine/post`'s PostStack) and `ComputePass` (a compute shader over a storage buffer, dispatched by the frame graph). Two more entries skip the graph: `@margoengine/shader/raw` draws your own WGSL with your own vertex layout (three.js `RawShaderMaterial`), and `@margoengine/shader/effects` has ready-made screen effects. WebGPU only.
+Typed shader nodes that compile to readable WGSL. One graph API drives three hosts: `NodeMaterial` (a `@margoengine/materials` Material whose colour, normal, roughness, metalness, emissive, opacity and vertex position come from nodes), `NodePass` (a full-screen effect inside `@margoengine/post`'s PostStack) and `ComputePass` (a compute shader over a storage buffer, dispatched by the frame graph). Two more entries skip the graph: `@margoengine/shader/raw` draws your own WGSL with your own vertex layout, and `@margoengine/shader/effects` has ready-made screen effects. WebGPU only.
 
 ```ts
 import {createMesh, loadTexture} from '@margoengine/materials';
@@ -131,7 +131,7 @@ limit; every job destroyed its buffers and no GPU error escaped.
 
 ## Raw shaders (`@margoengine/shader/raw`, 9.6 kB min+gzip)
 
-three.js `RawShaderMaterial` / `ShaderMaterial` with `BufferGeometry` custom attributes: your own WGSL vertex and fragment
+Your own WGSL vertex and fragment
 entry points, any named attributes per vertex or per instance, live uniforms and textures, drawn into the scene's colour
 and depth.
 
@@ -181,7 +181,7 @@ material.transparent = true;                      // render state is live too (a
   `vertexCount` (no attributes: vertex pulling), `topology`, `drawRange`. `matrix` is the model matrix; `mesh: coreMesh`
   follows a core mesh (world = its world matrix x `matrix`) and hides with it.
 - **Render state.** `transparent` (drawn after the opaque scene, sorted back to front by distance), `blending`
-  (`'normal'` blends only when transparent, as in three.js; `'additive'`, `'multiply'`, `'premultiplied'`, `'none'` or a
+  (`'normal'` blends only when transparent; `'additive'`, `'multiply'`, `'premultiplied'`, `'none'` or a
   `GPUBlendState`), `depthTest` (reversed-Z `greater-equal`), `depthWrite`, `cull` (`'back'`, `'front'`, `'none'`),
   `colorWrite`; per mesh `renderOrder` and `visible`.
 - **The pass.** Opaque raw meshes draw at frame-graph order 0.5 (after core meshes, before gltf-pro and materials meshes
@@ -217,44 +217,21 @@ PostStack.attach(stage.engine, [new Tonemap(), shift, look]);
 look.uniforms.darkness.value = 0.9;                   // live
 ```
 
-| Preset (three.js counterpart) | Parameters (default) |
+| Preset | Parameters (default) |
 | --- | --- |
-| `vignette` (VignetteShader) | `darkness` 0.8, `radius` 0.4 (0 centre, 1 corner), `softness` 0.6 |
-| `rgbShift` (RGBShiftShader) | `amount` 0.005 (UV units), `angle` 0 (radians; red moves right, blue left) |
+| `vignette` | `darkness` 0.8, `radius` 0.4 (0 centre, 1 corner), `softness` 0.6 |
+| `rgbShift` | `amount` 0.005 (UV units), `angle` 0 (radians; red moves right, blue left) |
 | `chromaticAberration` | `strength` 0.01 (red and blue scaled about the centre by 1 -/+ strength) |
-| `pixelate` (RenderPixelatedPass look) | `size` 8 pixels; each block is the input pixel at its centre |
-| `halftone` (HalftonePass) | `size` 8 pixels, `angle` 0.26; `greyscale` (construction only) |
-| `dotScreen` (DotScreenShader) | `size` 6 pixels, `angle` 0.785; black dots on white |
-| `sobel` (SobelOperatorShader) | `strength` 1, `overlay` 0 (1 draws black edges over the image) |
-| `sepia` (SepiaShader) | `amount` 1 (W3C Filter Effects matrix) |
+| `pixelate` | `size` 8 pixels; each block is the input pixel at its centre |
+| `halftone` | `size` 8 pixels, `angle` 0.26; `greyscale` (construction only) |
+| `dotScreen` | `size` 6 pixels, `angle` 0.785; black dots on white |
+| `sobel` | `strength` 1, `overlay` 0 (1 draws black edges over the image) |
+| `sepia` | `amount` 1 (W3C Filter Effects matrix) |
 | `posterize` | `levels` 4 |
 
 The same GPU check feeds known images through them: Sobel gives exactly 4 x the luma step beside a step and 0 elsewhere,
 pixelate copies each block's centre pixel exactly, and posterize, sepia, vignette, RGB shift and chromatic aberration
 match their formulas within 0.6 of 255; halftone and dot screen compile and draw.
-
-## Coming from TSL
-
-| three.js TSL | @margoengine/shader |
-| --- | --- |
-| `new MeshStandardNodeMaterial()` + `.colorNode = ...` | `new NodeMaterial({colorNode, roughnessNode, metalnessNode, emissiveNode, normalNode, opacityNode, positionNode})` |
-| `material.positionNode = positionLocal.add(...)` | `positionNode: positionLocal.add(...)` |
-| `uniform(0.5)`, `u.value = 1` | same |
-| `texture(map, uv())` | `texture(map, uv())` with a `@margoengine/materials` Texture |
-| `time`, `uv()`, `positionWorld`, `normalWorld`, `cameraPosition`, `screenUV` | same names |
-| `positionViewDirection` | `viewDirection` (world space, surface to camera) |
-| `vec3(...)`, `.mul()`, `.add()`, `mix`, `smoothstep`, `.xyz` | same |
-| `select(cond, a, b)` | same |
-| `If(cond, () => ...).Else(...)` | `select(cond, a, b)` (both sides evaluate) |
-| `Loop(n, ({i}) => { acc.addAssign(...) })` | `loop(n, init, (i, acc) => acc.add(...))` |
-| `Fn(([a, b]) => ...)` | `Fn((a: Node<'vec3f'>, b: Node<'f32'>) => ...)` (positional, typed) |
-| `wgslFn('fn f(...) -> T {...}')` | same |
-| `varying(node)` / `vertexStage(node)` | `varying(node)` |
-| `pass(scene, camera)` + `postProcessing.outputNode` | `new NodePass(node)` in a `PostStack` (or `NodePass.attach(engine, node)` alone); `inputColor()`, `inputDepth()` |
-| `storage(attribute, 'vec4', n)`, `Fn(...)().compute(n)`, `renderer.compute(...)` | `storage(array, 'vec4f')`, `ComputePass.attach(engine, n, i => buf.store(i, value))` |
-| `instanceIndex` | `instanceIndex` (compute only) |
-| `Discard(cond)` inside `Fn` | `discard(cond, value)` around the value it guards |
-| `atomicAdd(buf.element(i), v)`, `atomicMax`, `atomicMin`, `atomicLoad`, `atomicStore` | `buf.atomicAdd(i, v)` ... on `storage(data, 'u32', {atomic: true})` |
 
 ## Limits
 

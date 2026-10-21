@@ -12,7 +12,7 @@ type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
 /** Options of {@link Afterimage}; all may change per frame. */
 export interface AfterimageOptions {
-  /** Share of the trail kept each frame, 0-1 (three.js AfterimagePass `damp`). Default 0.96; 0 shows no trail. */
+  /** Share of the trail kept each frame, 0-1. Default 0.96; 0 shows no trail. */
   damp?: number;
   /** False passes the frame through and drops the trail. Default true; also `afterimage.enabled`. */
   enabled?: boolean;
@@ -40,7 +40,7 @@ const presentShader =
 @fragment fn fragment(@builtin(position) p:vec4f)->@location(0) vec4f {let h=textureLoad(history,vec2i(p.xy),0);return vec4f(toDisplay(h.rgb),h.a);}`;
 
 /**
- * Motion trails in a {@link PostStack} (HDR effect), like three.js's AfterimagePass: each channel of the output is
+ * Motion trails in a {@link PostStack} (HDR effect): each channel of the output is
  * `max(current, history * damp)`, and the output becomes the next frame's history. The history is linear HDR
  * (`rgba16float`), so trails fade smoothly to black instead of sticking at a low 8-bit level, and later HDR effects
  * (Bloom) and the display effect see them. It starts empty, and again after a resize, a device restore or `reset()`.
@@ -87,7 +87,7 @@ export class Afterimage implements EnginePlugin {
     if (typeof value !== 'boolean') throw new TypeError('Afterimage enabled must be boolean');
     this.options.enabled = value;
   }
-  /** Share of the trail kept each frame, 0-1 (three.js `damp`). */
+  /** Share of the trail kept each frame, 0-1. */
   get damp(): number {
     return this.options.damp ?? 0.96;
   }

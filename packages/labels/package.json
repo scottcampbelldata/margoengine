@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
-  "description": "HTML labels and CSS 3D objects positioned over a Margo Engine canvas (THREE.CSS2DRenderer and CSS3DRenderer counterparts).",
+  "description": "HTML labels and CSS 3D objects positioned over a Margo Engine canvas.",
   "publishConfig": {
     "access": "public"
   },

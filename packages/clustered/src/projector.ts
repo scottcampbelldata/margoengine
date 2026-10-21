@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-// Projector lights: spot lights that project an image (three.js `SpotLight.map`). The image goes into a storage buffer as
+// Projector lights: spot lights that project an image. The image goes into a storage buffer as
 // packed rgba8 texels, not a texture: a physical material with shadows, IBL and LocalShadows already binds all 16 sampled
 // textures a shader stage may have (docs/shader-contracts.md). Its UVs are those of the spot's local shadow map
 // (`localShadowMatrix`: a perspective from the light along its direction, a full field of view of twice the outer cone
@@ -72,7 +72,7 @@ fn clusterProjector(index:u32,light:ClusterLight,position:vec3f)->vec3f {
 }
 `;
 /**
- * Projector lights for clustered lighting (three.js `SpotLight.map`): each spot at index i of `Clustered.setLights` with
+ * Projector lights for clustered lighting: each spot at index i of `Clustered.setLights` with
  * entry i of {@link setProjectors} projects that image, filtered bilinearly (edges clamped), multiplied into its light
  * (alpha too: transparent texels project nothing); the light stays dark outside the image. Point lights and lights
  * without an entry are unchanged. The UVs are those of the spot's local shadow map, so a shadowed projector's image and

@@ -10,7 +10,7 @@ import { basis, intersectPlane } from './view.js';
 /** A core mesh, or a gltf-pro `PBRModel` (also @margoengine/materials meshes), which moves by its `root`. */
 export type DragObject = Mesh | ModelLike;
 export interface DragControlsOptions {
-  /** World normal of the drag plane through the grab point. Default 'view': the plane facing the camera, as in three.js. */
+  /** World normal of the drag plane through the grab point. Default 'view': the plane facing the camera. */
   plane?: 'view' | readonly [number, number, number];
   /** Move only along this world axis; the drag plane then contains the axis and faces the camera as far as it can. */
   axis?: readonly [number, number, number] | null;
@@ -30,7 +30,7 @@ interface Drag {
 }
 
 /**
- * Drags core meshes and gltf-pro models with the pointer, mouse or touch (three.js `DragControls`). Objects are grabbed with
+ * Drags core meshes and gltf-pro models with the pointer, mouse or touch. Objects are grabbed with
  * the bvh Raycaster, so orthographic cameras from @margoengine/cameras work, and moved on a plane or along an axis in world space.
  * Events: `dragstart` (`object`, `hit`), `drag` (`object`), `dragend` (`object`), `hoveron` and `hoveroff` (`object`).
  * Pointer-down on an object stops other listeners on the element registered after this one; otherwise disable camera

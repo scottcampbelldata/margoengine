@@ -237,7 +237,7 @@ function quickhull(points: Float64Array): { faces: Face[]; tolerance: number } {
 }
 
 /**
- * Three.js `ConvexGeometry`: the convex hull of `points` (an array of `[x, y, z]`, or flat x, y, z numbers), built by
+ * The convex hull of `points` (an array of `[x, y, z]`, or flat x, y, z numbers), built by
  * quickhull. Duplicate points and points inside the hull or on one of its faces or edges are dropped, so only
  * corners become vertices; coplanar hull triangles merge into one flat face that shares its vertices and normal. Triangles
  * are counter-clockwise seen from outside, normals are flat per face, and UVs project each face onto the bounding box

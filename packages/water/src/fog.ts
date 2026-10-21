@@ -12,11 +12,11 @@ import { LinearToSRGB, parseColor, type ColorInput } from '@margoengine/math/col
 export interface FogLike {
   /** Fog colour: hex is sRGB, `[r, g, b]` linear. Default '#ffffff'. */
   readonly color?: ColorInput;
-  /** Linear fog start distance from the camera (three.js `Fog.near`). Default 1. */
+  /** Linear fog start distance from the camera. Default 1. */
   readonly near?: number;
-  /** Linear fog end distance, where fog is full (three.js `Fog.far`). Default 1000. */
+  /** Linear fog end distance, where fog is full. Default 1000. */
   readonly far?: number;
-  /** Above 0 selects exponential-squared fog `1 - exp(-(density * distance)^2)` (three.js `FogExp2`). Default 0. */
+  /** Above 0 selects exponential-squared fog `1 - exp(-(density * distance)^2)`. Default 0. */
   readonly density?: number;
   /** Height fog: fog thins by `exp(-heightFalloff * (y - height))` above world height `height`. Default 0 (off). */
   readonly heightFalloff?: number;

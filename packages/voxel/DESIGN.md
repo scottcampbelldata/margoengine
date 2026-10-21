@@ -4,8 +4,7 @@ Goal: a Minecraft-style voxel game on Margo, and later a MagicaVoxel-style edito
 building Margo as the base of his own 3D modeller and game engine: it must look good and run well. Core and stage
 are frozen (gzip gate 25,000; 21,343 now). Never one core entity per block, never vertex colours on core Geometry,
 keep buffers within default WebGPU limits (128 MiB per storage binding, 256 MiB per buffer). Clean-room code (no
-three.js or other engine code; three.js only as a test oracle). No new runtime dependency. Margo names, three.js-style
-usage flow. Errors per docs/conventions.md, TSDoc on every public export, tree-shakable subpath entries.
+other engine code). No new runtime dependency. Margo names. Errors per docs/conventions.md, TSDoc on every public export, tree-shakable subpath entries.
 
 ## Extension points (cited by the design review; verify as you go)
 - Own pipelines: `EnginePlugin` setup/registerPasses/onDeviceRestored/dispose (packages/core/src/plugin.ts:69-77);

@@ -112,7 +112,7 @@ const number = (value: number): string => {
 
 /**
  * Transform for the CSS3D camera element: move by the perspective distance, apply the view matrix with Y flipped
- * into CSS (Y down), and center the origin in the viewport. Same construction as THREE.CSS3DRenderer.
+ * into CSS (Y down), and center the origin in the viewport.
  */
 export function cameraCSSTransform(
   view: ArrayLike<number>,
@@ -127,8 +127,7 @@ export function cameraCSSTransform(
 /**
  * Transform for the CSS3D camera element under an orthographic view-projection (clip w independent of position, e.g.
  * @margoengine/cameras), read from the clip matrix itself: world to CSS pixels from the viewport centre, Y down, with
- * Z scaled like Y so that CSS depth sorting follows the camera. Use it with `perspective: none` on the viewer, as
- * THREE.CSS3DRenderer does for an OrthographicCamera.
+ * Z scaled like Y so that CSS depth sorting follows the camera. Use it with `perspective: none` on the viewer.
  */
 export function orthographicCSSTransform(
   matrix: ArrayLike<number>,

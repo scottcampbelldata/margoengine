@@ -421,7 +421,7 @@ test('generateShapes: holes by containment for both winding conventions, scale, 
   assert.throws(() => font.generateShapes(42), TypeError);
 });
 
-test('textGeometry: extruded text through extrudeGeometry with three.js defaults and groups', () => {
+test('textGeometry: extruded text through extrudeGeometry with default options and groups', () => {
   const font = parseTTF(buildFont()),
     data = textGeometry('IO', { font, size: 100, depth: 5 });
   const min = [Infinity, Infinity, Infinity],

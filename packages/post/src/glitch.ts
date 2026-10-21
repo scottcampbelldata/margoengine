@@ -12,7 +12,7 @@ type Context = Extract<PassContext, { backend: 'webgpu' }>;
 export interface GlitchOptions {
   /** Scale of the block displacement, colour split and tearing, 0-1. Default 1; 0 passes every frame through. */
   intensity?: number;
-  /** True glitches every frame (three.js GlitchPass `goWild`). Default false: a burst after every 120-240 frames. */
+  /** True glitches every frame. Default false: a burst after every 120-240 frames. */
   wild?: boolean;
   /** A non-negative integer below 2^32: the same seed gives the same glitches on the same enabled frames. Default a
    * random seed. Changing it restarts the sequence. */
@@ -44,7 +44,7 @@ fn pixel(p:vec2f)->vec4f {let size=vec2i(textureDimensions(image));let q=vec2i(f
 }`;
 
 /**
- * A digital glitch in a {@link PostStack} (LDR effect, after the display effect), like three.js's GlitchPass: after a
+ * A digital glitch in a {@link PostStack} (LDR effect, after the display effect): after a
  * random wait of 120-240 frames a burst of 4-16 glitched frames, the first the strongest, each with new random block
  * displacement, an RGB channel split and scanline tearing. `wild` glitches every frame. `Glitch.attach` runs it alone.
  * @throws RangeError or TypeError for invalid options; MargoError `'state'` outside a PostStack, `'unsupported'` on a

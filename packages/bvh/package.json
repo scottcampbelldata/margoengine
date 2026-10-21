@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
-  "description": "Triangle BVH, spatial queries and an engine Raycaster for Margo Engine (three-mesh-bvh and THREE.Raycaster counterparts).",
+  "description": "Triangle BVH, spatial queries and an engine Raycaster for Margo Engine.",
   "publishConfig": {
     "access": "public"
   },

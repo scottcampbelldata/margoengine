@@ -53,7 +53,7 @@ export function segmentIndices(mode: LineMode, count: number, i: number): Segmen
 /**
  * Cumulative distance along the line, written into the w component of `points` (stride 4: x, y, z, distance).
  * Distances are measured after applying `matrix` (world space) when given. Segment lists accumulate across
- * segments like three.js `LineSegments2.computeLineDistances`. Returns the total length, which for a loop
+ * segments. Returns the total length, which for a loop
  * includes the closing segment.
  */
 export function computeLineDistances(

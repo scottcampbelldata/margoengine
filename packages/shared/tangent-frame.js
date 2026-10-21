@@ -3,7 +3,7 @@
 // det with R1 = dP/dy x N, R2 = N x dP/dx, det = dP/dx . R1 (Mikkelsen 2010, "Bump Mapping Unparametrized Surfaces on
 // the GPU"). glTF puts texture (0, 0) at the image's upper-left corner (glTF 2.0, "Textures") and a normal map's +Y up
 // the image ("+X is right and +Y is up", material.schema.json normalTexture), so B follows decreasing v (b =
-// cross(n, t) * w for glTF tangents). Materials meshes (three.js UVs, flipY uploads) draw this with +b instead
+// cross(n, t) * w for glTF tangents). Materials meshes (v-up UVs, flipY uploads) draw this with +b instead
 // (materials/src/features.ts, letter n). The sign of n . (dp1 x dp2) is det's: it undoes WebGPU's downward screen Y,
 // back faces and mirrored UVs. Scaling by the largest component first keeps distant (tiny-derivative) surfaces at full
 // normal-map strength.

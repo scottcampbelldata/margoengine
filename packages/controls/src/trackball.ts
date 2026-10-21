@@ -16,10 +16,10 @@ type Mode = 'none' | 'rotate' | 'zoom' | 'pan' | 'touch-rotate' | 'touch-zoom-pa
 type Point = { x: number; y: number };
 
 /**
- * Free trackball rotation around `camera.target` (three.js `TrackballControls`).
+ * Free trackball rotation around `camera.target`.
  *
  * Roll: the Margo Engine camera is defined by position and target and always renders with world +Y up, so it cannot
- * roll. three.js rotates `camera.up` along with the eye; here the screen axes are re-derived from +Y every
+ * roll. The screen axes are re-derived from +Y every
  * frame, the roll component is dropped, and the eye stops just short of the poles instead of tumbling over
  * them (crossing a pole would flip the image 180 degrees).
  */
@@ -114,7 +114,7 @@ export class TrackballControls extends Controls {
   update(delta = 1 / 60): boolean {
     const c = this.camera,
       before = [...c.position, ...c.target];
-    // three.js applies its damping once per frame; scale the exponent so it is frame-rate independent.
+    // Damping is defined per 60 Hz frame; scale the exponent so it is frame-rate independent.
     const frames = Math.max(0, delta) * 60;
     let eye = sub(c.position, c.target);
     if (!this.noRotate) eye = this.rotate(eye, frames);

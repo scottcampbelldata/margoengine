@@ -387,7 +387,7 @@ test('PLY: malformed headers, truncated data and limits', () => {
   rejects(() => parsePLY('not bytes'), 'range');
 });
 
-test('PLY: real three.js dolphins (ascii, big-endian binary, colored) agree with an independent read', (t) => {
+test('PLY: real dolphin samples (ascii, big-endian binary, colored) agree with an independent read', (t) => {
   const ascii = fixture('dolphins.ply'),
     big = fixture('dolphins_be.ply'),
     colored = fixture('dolphins_colored.ply');
@@ -774,7 +774,7 @@ test('PCD: malformed headers, truncated and corrupt data, limits', () => {
   rejects(() => parsePCD(binary, { maxVertices: 19 }), 'limit');
 });
 
-test('PCD: real PCL and three.js clouds (ascii packed rgb, binary_compressed)', (t) => {
+test('PCD: real PCL sample clouds (ascii packed rgb, binary_compressed)', (t) => {
   const simple = fixture('simple.pcd'),
     logo = fixture('pcl_logo.pcd'),
     bunny = fixture('bunny.pcd');
@@ -1352,7 +1352,7 @@ test('3MF: invalid component depth budgets reject without bypassing traversal li
   );
 });
 
-test('3MF: real three.js packages agree with an independent zlib + regex read', async (t) => {
+test('3MF: real sample packages agree with an independent zlib + regex read', async (t) => {
   const gears = fixture('cube_gears.3mf'),
     faces = fixture('facecolors.3mf'),
     vertex = fixture('vertexcolors.3mf');

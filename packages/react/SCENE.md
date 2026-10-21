@@ -14,7 +14,7 @@ physics world, pointer lock or XR session. `sideEffects` remains `false`.
 | `@margoengine/react/physics` | `Physics`, `RigidBody`, `CuboidCollider`, `BallCollider`, `usePhysics` | `@margoengine/physics`, `@dimforge/rapier3d-compat` |
 | `@margoengine/react/xr` | `XR`, `Controller`, `useXR` | `@margoengine/xr` |
 
-These are Margo components and native plugins. There is no Three.js or
+These are Margo components and native plugins. There is no
 `react-reconciler` dependency. The core and stage source and size ceiling remain
 unchanged. PascalCase names and namespace members invoke React components;
 bare lowercase JSX still denotes DOM elements.

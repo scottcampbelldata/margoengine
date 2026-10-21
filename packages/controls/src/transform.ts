@@ -35,7 +35,7 @@ export type { TransformMode, HandleName };
 export interface TransformControlsOptions {
   mode?: TransformMode;
   space?: TransformSpace;
-  /** Gizmo size multiplier. 1 matches three.js. */
+  /** Gizmo size multiplier. Default 1. */
   size?: number;
   translationSnap?: number | null;
   /** Radians. */
@@ -78,7 +78,7 @@ interface DragStart {
 let counter = 0;
 
 /**
- * Interactive translate, rotate and scale gizmo for a core `Mesh` (three.js `TransformControls`).
+ * Interactive translate, rotate and scale gizmo for a core `Mesh`.
  *
  * The gizmo is drawn by a frame graph pass on top of the scene (WebGPU, with a WebGL2 fallback) and is hit-tested
  * in screen space with ray math. Drags are applied in the parent's space using the world matrices in

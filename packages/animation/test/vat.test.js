@@ -66,7 +66,7 @@ test('bakeVAT samples skinning on the CPU into rows that match the analytic pose
     // lift moves joint 0 (and its child) up by t/2; the skinned strip follows.
     for (let v = 0; v < n; v++)
       near(read(vat, 9 + 8, v, 0), [positions[v * 3], positions[v * 3 + 1] + 0.5, 0], 'lift at 1 s');
-    assert.deepEqual([...vat.uvs.subarray(0, 4)], [0, 1, 0, 0], 'UVs flip to three.js orientation (v up)');
+    assert.deepEqual([...vat.uvs.subarray(0, 4)], [0, 1, 0, 0], 'UVs flip to v up');
     assert.deepEqual([vat.indices.length, vat.indices[0], vat.indices[1]], [24, 0, 2]);
     assert.deepEqual(
       [animation.clip, animation.time, animation.playing],

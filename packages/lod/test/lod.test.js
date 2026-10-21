@@ -183,7 +183,7 @@ test('octahedral atlas maths: round trip, grid poles and folded edges, right-han
   assert.ok(Math.abs(frameDirection(0, 6, 13)[0] + 1) < 1e-12, 'left edge centre looks from -x');
 });
 
-test('selection: distance levels with three.js hysteresis toggle Mesh and model-root visibility only on change', async () => {
+test('selection: distance levels with hysteresis toggle Mesh and model-root visibility only on change', async () => {
   const e = await plain(),
     lods = new LODSystem({ hysteresis: 0.2 });
   e.use(lods);

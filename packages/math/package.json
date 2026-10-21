@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
-  "description": "Vector, quaternion, matrix, Euler, color, bounds, ray, plane and frustum math with three.js-style names, one module per type.",
+  "description": "Vector, quaternion, matrix, Euler, color, bounds, ray, plane and frustum math, one module per type.",
   "sideEffects": false,
   "exports": {
     ".": {

@@ -19,7 +19,7 @@ export interface FrenetFrames {
 }
 
 /**
- * Base class for 2D and 3D parametric curves (Three.js `Curve`). `t` is the raw parameter, `u` is normalized arc
+ * Base class for 2D and 3D parametric curves. `t` is the raw parameter, `u` is normalized arc
  * length. Arc lengths are cached; call `updateArcLengths()` after mutating a curve's control points.
  */
 export abstract class Curve<V extends Vec> {
@@ -113,7 +113,7 @@ export abstract class Curve<V extends Vec> {
   }
 
   /**
-   * Parallel-transport frames (Three.js `computeFrenetFrames`), sampled at `segments + 1` arc-length positions.
+   * Parallel-transport (Frenet) frames, sampled at `segments + 1` arc-length positions.
    * `closed` spreads the twist between the first and last frame over the whole curve so a closed tube meets itself.
    */
   computeFrenetFrames(segments: number, closed = false): FrenetFrames {

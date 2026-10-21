@@ -1,4 +1,4 @@
-// Three.js SkeletonUtils: cloning skinned models and retargeting poses and clips between skeletons.
+// Skeleton utilities: cloning skinned models and retargeting poses and clips between skeletons.
 export { cloneModel } from './clone.js';
 export {
   Retarget,

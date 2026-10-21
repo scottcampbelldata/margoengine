@@ -235,7 +235,7 @@ fn clusterIes(index:u32,light:ClusterLight,l:vec3f)->f32 {
 }
 `;
 /**
- * IES photometric profiles for clustered point and spot lights (three.js `IESSpotLight`, for point lights too): each light
+ * IES photometric profiles for clustered point and spot lights: each light
  * at index i of `Clustered.setLights` takes entry i of {@link setProfiles}. The profile, normalised to its peak, multiplies
  * the light's cone term, so `intensity` is the luminous intensity of the brightest direction (`profile.peak` for the file's
  * own candela; `@margoengine/clustered/units` converts lumens). Its vertical angle 0 points along a spot's `direction`, or

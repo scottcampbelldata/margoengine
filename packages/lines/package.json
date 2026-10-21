@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
-  "description": "Fat lines (Line2, LineSegments2, LineMaterial) and debug helpers for Margo Engine, WebGPU.",
+  "description": "Fat lines (Line, LineMaterial) and debug helpers for Margo Engine, WebGPU.",
   "publishConfig": {
     "access": "public"
   },

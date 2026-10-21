@@ -220,7 +220,7 @@ export function retargetRig(from: Skeleton | PBRModel): RetargetRig {
 }
 
 /**
- * Three.js `SkeletonUtils.retarget` and `retargetClip`: moves one skeleton the way another moves, bone by bone. Each
+ * Retargeting: moves one skeleton the way another moves, bone by bone. Each
  * mapped target bone turns in model space by the same rotation its source bone has turned from rest, which absorbs
  * different bone axes and rest orientations: target world rotation = source world rotation x inverse(source rest
  * world rotation) x target rest world rotation. Unmapped target bones keep their rest local rotation, every bone keeps

@@ -36,7 +36,7 @@ do not advance playback time. The hook survives device restoration; disposal
 removes only the animation instance's own hook. No CPU skinning copy is added to
 the playback path.
 
-Run the character demo at `/examples/robot-expressive.html` (also `character-animation.html`). RobotExpressive comes from the Three.js sample assets, by Tomás Laulhé with morphs by Don McCurdy, [CC0 credits](https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/RobotExpressive/README.md). It is not a Khronos sample.
+Run the character demo at `/examples/robot-expressive.html` (also `character-animation.html`). RobotExpressive is by Tomás Laulhé with morphs by Don McCurdy (CC0). It is not a Khronos sample.
 
 The demo leaves facial weights under the sliders' control by removing weight tracks from its clips. Expressions persist while playing, pausing and switching clips. Presets include a neutral reset; playback speed and a reset-view button accompany touch-enabled orbit controls. The studio floor uses the optional shadows and tone-mapping packages.
 
@@ -137,7 +137,7 @@ ranged `setInfluences` and a device restore, with no validation errors.
 
 ## Groups: one clip for many models
 
-`AnimationGroup` is three.js `AnimationObjectGroup`: one clip and one clock for a crowd. Members are glTF-pro models'
+`AnimationGroup` is one clip and one clock for a crowd. Members are glTF-pro models'
 `Animation`s playing a glTF clip they all have (by name or index), or, for a code-authored `KeyframeClip`, `Skeleton`s
 and `Animation`s whose bones or nodes the tracks name. Each member can run ahead or behind by an offset in seconds.
 
@@ -158,7 +158,7 @@ nodes and morph weights once, in `add`, and group playback creates no typed arra
 
 ## Cloning and retargeting (`@margoengine/animation/skeleton-utils`)
 
-three.js `SkeletonUtils.clone`, `retarget` and `retargetClip`, in their own entry:
+Cloning skinned models and retargeting poses and clips between skeletons, in their own entry:
 
 ```ts
 import {Animation, AnimationGroup, applyKeyframeClip} from '@margoengine/animation';

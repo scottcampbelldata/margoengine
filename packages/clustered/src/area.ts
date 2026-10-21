@@ -23,7 +23,7 @@ export interface AreaLightShadow {
   /** Shadow-camera far distance (default 100 world units); receivers past it are unshadowed. */
   far?: number;
 }
-/** A rectangular area light (three.js `RectAreaLight`). It emits from one face, toward `direction`, unless `twoSided`. */
+/** A rectangular area light. It emits from one face, toward `direction`, unless `twoSided`. */
 export interface RectAreaLight {
   /** World-space centre. */
   position: Vec3;
@@ -37,7 +37,7 @@ export interface RectAreaLight {
   up?: Vec3;
   /** Linear RGB, multiplied by `intensity` (default [1, 1, 1]). */
   color?: Vec3;
-  /** Emitted radiance (luminance, as three.js `RectAreaLight`; default 1). A light of area A matches a clustered point light of intensity `intensity Ã— A` facing the surface. */
+  /** Emitted radiance (luminance; default 1). A light of area A matches a clustered point light of intensity `intensity Ã— A` facing the surface. */
   intensity?: number;
   /** Emit from both faces (default false). */
   twoSided?: boolean;
@@ -106,7 +106,7 @@ fn clusterAreaLighting(position:vec3f,n:vec3f,v:vec3f,nv:f32,base:vec3f,roughnes
 }
 `;
 /**
- * Rectangular area lights for clustered lighting (three.js `RectAreaLight`), shaded with Linearly Transformed Cosines (Heitz
+ * Rectangular area lights for clustered lighting, shaded with Linearly Transformed Cosines (Heitz
  * et al. 2016): GGX specular and Lambert diffuse, the quad clipped exactly to each surface's horizon. Core meshes and every
  * receiver of the `lights` (gltf-pro models, materials meshes, terrain) are lit. Every fragment evaluates every area light
  * (no cluster culling: the lights have no range). Lights with `castShadow` are shadowed by `LocalShadows` (cube faces,

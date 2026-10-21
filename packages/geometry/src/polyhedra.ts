@@ -4,8 +4,8 @@ import { finiteNumber } from './math.js';
 type V3 = [number, number, number];
 
 /**
- * Three.js `PolyhedronGeometry`: projects the faces onto a sphere of `radius`, splitting each triangle into
- * `(detail + 1)^2` triangles. Non-indexed like Three.js (indices are sequential). Flat normals at detail 0, smooth
+ * Polyhedron: projects the faces onto a sphere of `radius`, splitting each triangle into
+ * `(detail + 1)^2` triangles. Non-indexed (indices are sequential). Flat normals at detail 0, smooth
  * (radial) normals above. Pass `smooth` explicitly to keep the same shading across LODs.
  * Faces are oriented outward even if the input winding is not.
  */
@@ -69,7 +69,7 @@ export function polyhedronGeometry(
     uvs[i * 2 + 1] = 1 - (Math.atan2(-y, Math.hypot(x, z)) / Math.PI + 0.5);
   }
   for (let t = 0; t < count; t += 3) {
-    // Three.js correctUVs: fix the seam and pole vertices using the triangle centroid's azimuth.
+    // Correct UVs: fix the seam and pole vertices using the triangle centroid's azimuth.
     const cx = (out[t * 3] + out[t * 3 + 3] + out[t * 3 + 6]) / 3,
       cz = (out[t * 3 + 2] + out[t * 3 + 5] + out[t * 3 + 8]) / 3,
       azi = azimuth(cx, cz);
@@ -78,7 +78,7 @@ export function polyhedronGeometry(
       if (azi < 0 && uvs[vi * 2] === 1) uvs[vi * 2] -= 1;
       if (out[vi * 3] === 0 && out[vi * 3 + 2] === 0) uvs[vi * 2] = azi / 2 / Math.PI + 0.5;
     }
-    // Three.js correctSeam: wrap triangles that straddle u = 0/1.
+    // Correct the seam: wrap triangles that straddle u = 0/1.
     const u0 = uvs[t * 2],
       u1 = uvs[t * 2 + 2],
       u2 = uvs[t * 2 + 4];
@@ -123,7 +123,7 @@ export function polyhedronGeometry(
 const PHI = (1 + Math.sqrt(5)) / 2,
   R = 1 / PHI;
 
-/** Three.js `TetrahedronGeometry`. */
+/** Tetrahedron. */
 export function tetrahedronGeometry(radius = 1, detail = 0, smooth = detail >= 1): GeometryData {
   return polyhedronGeometry(
     [1, 1, 1, -1, -1, 1, -1, 1, -1, 1, -1, -1],
@@ -134,7 +134,7 @@ export function tetrahedronGeometry(radius = 1, detail = 0, smooth = detail >= 1
   );
 }
 
-/** Three.js `OctahedronGeometry`. */
+/** Octahedron. */
 export function octahedronGeometry(radius = 1, detail = 0, smooth = detail >= 1): GeometryData {
   return polyhedronGeometry(
     [1, 0, 0, -1, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 1, 0, 0, -1],
@@ -145,7 +145,7 @@ export function octahedronGeometry(radius = 1, detail = 0, smooth = detail >= 1)
   );
 }
 
-/** Three.js `IcosahedronGeometry`. Detail above 1 approximates a sphere well. */
+/** Icosahedron. Detail above 1 approximates a sphere well. */
 export function icosahedronGeometry(radius = 1, detail = 0, smooth = detail >= 1): GeometryData {
   const t = PHI;
   return polyhedronGeometry(
@@ -197,7 +197,7 @@ export function icosahedronGeometry(radius = 1, detail = 0, smooth = detail >= 1
   );
 }
 
-/** Three.js `DodecahedronGeometry` (12 pentagons as 36 triangles). */
+/** Dodecahedron (12 pentagons as 36 triangles). */
 export function dodecahedronGeometry(radius = 1, detail = 0, smooth = detail >= 1): GeometryData {
   const t = PHI,
     r = R;

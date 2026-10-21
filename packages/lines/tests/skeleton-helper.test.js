@@ -19,7 +19,7 @@ test("SkeletonHelper draws an animation Skeleton's bones parent to child and fol
   assert.ok(helper instanceof Line);
   assert.equal(helper.mode, 'segments');
   assert.equal(helper.count, 6, 'one segment per bone with a parent');
-  assert.equal(helper.material.onTop, true, 'drawn over the scene, as three.js');
+  assert.equal(helper.material.onTop, true, 'drawn over the scene');
   assert.equal(helper.material.fog, false, 'debug lines stay clear of fog');
   assert.deepEqual(color(helper, 0), [0, 1, 0], 'parent end green');
   assert.deepEqual(color(helper, 1), [0, 0, 1], 'child end blue');

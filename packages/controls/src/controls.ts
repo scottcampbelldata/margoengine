@@ -39,7 +39,7 @@ export interface ControlEvent {
 }
 export type ControlListener = (event: ControlEvent) => void;
 
-/** Minimal three.js-style `EventDispatcher`. */
+/** Minimal `EventDispatcher`. */
 export class EventDispatcher {
   private readonly handlers = new Map<string, Set<ControlListener>>();
   addEventListener(type: string, listener: ControlListener): void {
@@ -72,7 +72,7 @@ const isEngine = (value: unknown): value is EngineKernel =>
   typeof (value as EngineKernel).use === 'function';
 
 /**
- * Shared base, mirroring three.js `Controls`: `connect`, `disconnect`, `enabled`, `update` and `dispose`.
+ * Shared base for every control: `connect`, `disconnect`, `enabled`, `update` and `dispose`.
  * Pass the engine to attach to its canvas and update automatically before each render, or pass a `Camera`
  * and an element and call `update(delta)` yourself.
  */

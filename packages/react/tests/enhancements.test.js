@@ -397,7 +397,7 @@ afterEach(async () => {
   assert.ok(observers.every((observer) => observer.disconnected));
 });
 
-test('the exact R3F target snippet renders Canvas, Stage, clickable Mesh and suspended Model', async () => {
+test('the exact target snippet renders Canvas, Stage, clickable Mesh and suspended Model', async () => {
   const documentation = await readFile(new URL('../../../docs/react-r3f.md', import.meta.url), 'utf8');
   const source = /```tsx\r?\n([\s\S]*?)```/.exec(documentation)?.[1];
   assert.ok(source);

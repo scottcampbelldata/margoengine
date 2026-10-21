@@ -35,7 +35,7 @@ export interface MTLMaterialsOptions {
    * (a tangent-space normal map, as many exporters write it). Default `'height'`.
    */
   bump?: 'height' | 'normal';
-  /** Draws both faces. Default false (front faces, like three.js `MTLLoader`). */
+  /** Draws both faces. Default false (front faces). */
   doubleSided?: boolean;
   signal?: AbortSignal;
 }
@@ -138,7 +138,7 @@ function materialOptions(m: MTLMaterial, doubleSided: boolean): MaterialOptions 
 }
 
 /**
- * Builds materials `Material`s from MTL data (three.js `MTLLoader.MaterialCreator`): metallic-roughness materials with
+ * Builds materials `Material`s from MTL data: metallic-roughness materials with
  * `Kd`, `d`/`Tr`, `Ke`, `Ns` (see `MTLMaterialsOptions`) and the maps `map_Kd` (colour), `map_Ke` (emission),
  * `bump`/`map_Bump` (bump or normal map, `-bm` as the bump scale), `norm` (normal map) and `map_d` (opacity, makes the
  * material transparent), each with its `-o`/`-s` offset and scale as the slot's UV transform and `-clamp` as clamped
@@ -259,7 +259,7 @@ export interface OBJMeshOptions {
 
 /**
  * The materials mesh input for an OBJ: geometry with `groups` (one slot per distinct material) and the material array
- * in slot order. UVs go back to OBJ/three.js orientation (v up, for `flipY` textures, materials' default), vertex
+ * in slot order. UVs go back to OBJ orientation (v up, for `flipY` textures, materials' default), vertex
  * colours from sRGB to linear, and missing normals become smooth normals shared across UV seams (by `positionIndices`).
  * Groups whose `usemtl` names no material use `options.fallback`.
  */
@@ -365,7 +365,7 @@ export interface LoadedOBJMesh {
 }
 
 /**
- * Loads an OBJ with its MTL libraries and textures in one call (three.js `OBJLoader` with `MTLLoader`): fetches the
+ * Loads an OBJ with its MTL libraries and textures in one call: fetches the
  * .obj, every `mtllib` next to it, every texture relative to its .mtl file, builds the materials with
  * `createMTLMaterials` and one materials mesh with `createOBJMesh`, each `usemtl` group drawn with its material.
  * A library or texture that fails to load becomes a warning; the OBJ itself failing to load or parse throws a

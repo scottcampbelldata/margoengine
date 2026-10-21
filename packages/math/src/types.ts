@@ -64,15 +64,15 @@ export interface BoxLike {
   min: Vec3Like;
   max: Vec3Like;
 }
-/** Column-major 3x3 (9) or 4x4 (16) elements, as in WGSL/WebGPU and three.js. */
+/** Column-major 3x3 (9) or 4x4 (16) elements, as in WGSL/WebGPU. */
 export interface MatrixLike {
   readonly elements: ArrayLike<number>;
 }
 /** Anything indexable that can receive numbers: `number[]`, `Float32Array`, `Float64Array`, a GPU staging buffer view. */
 export type NumberArray = { [index: number]: number };
 /**
- * Color space tags, spelled like three.js (`SRGBColorSpace`, `LinearSRGBColorSpace`, `DisplayP3ColorSpace`,
- * `LinearDisplayP3ColorSpace`) and CSS `color()`. Display P3 has the DCI-P3 primaries with the D65 white point and the
+ * Color space tags (`SRGBColorSpace`, `LinearSRGBColorSpace`, `DisplayP3ColorSpace`,
+ * `LinearDisplayP3ColorSpace`), spelled like CSS `color()`. Display P3 has the DCI-P3 primaries with the D65 white point and the
  * sRGB transfer function; Margo's working space stays linear sRGB, where P3 colours outside sRGB have negative channels.
  */
 export type ColorSpace = 'srgb' | 'srgb-linear' | 'display-p3' | 'display-p3-linear';

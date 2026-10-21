@@ -1,6 +1,6 @@
 # @margoengine/fbx
 
-Native binary and ASCII FBX import through Margo's first-party glTF exporter and optional PBR/animation pipeline. The package has no Three.js runtime dependency. Core, stage, and the animation runtime are unchanged.
+Native binary and ASCII FBX import through Margo's first-party glTF exporter and optional PBR/animation pipeline. Core, stage, and the animation runtime are unchanged.
 
 ```ts
 import {loadFBX} from '@margoengine/fbx';
@@ -33,7 +33,7 @@ Array decompression requires platform `DecompressionStream('deflate')`. Image de
 
 ## Verification and progress
 
-Run `npm test --workspace @margoengine/fbx`. The 53 tests include the original 52 synthetic binary/ASCII, malformed-stream, numeric geometry/bind, and loading regressions, plus a [CC0 Blender-exported rig](test/fixtures/README.md). Its headless test pins three joints, all sixteen inverse-bind values, the clip name, quaternion endpoints, and the runtime bind pose. Tests also use Khronos GLB validation and real `PBRModel`/`Animation` attachment and seek checks. They do not require Three.js or a test-only decompressor.
+Run `npm test --workspace @margoengine/fbx`. The 53 tests include the original 52 synthetic binary/ASCII, malformed-stream, numeric geometry/bind, and loading regressions, plus a [CC0 Blender-exported rig](test/fixtures/README.md). Its headless test pins three joints, all sixteen inverse-bind values, the clip name, quaternion endpoints, and the runtime bind pose. Tests also use Khronos GLB validation and real `PBRModel`/`Animation` attachment and seek checks. They do not require a test-only decompressor.
 
 `npm run test:modules:browser` requires the checked-in Blender rig by default; the primary CI job explicitly selects that same file. It checks retained skin attributes/deformation buffers, clip playback, changed pixels after playback and seek, and a repeatable first frame. `MARGOENGINE_FBX_FIXTURE` can override its Vite-served URL. The asset's documented export settings exercise the existing subset and do not certify every Blender/Maya/Max convention.
 

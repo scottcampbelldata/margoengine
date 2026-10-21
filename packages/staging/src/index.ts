@@ -108,7 +108,7 @@ struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f}
 `;
 
 /**
- * Soft ground-contact shadow for product shots (three.js's ContactShadows pattern): the added meshes are drawn from
+ * Soft ground-contact shadow for product shots: the added meshes are drawn from
  * the ground looking up into a small texture (darker the closer to the ground), blurred, and laid on the ground as a
  * shadow-catcher plane over whatever is there. No light direction, no shadow map; independent of `@margoengine/shadows`.
  */
@@ -265,7 +265,7 @@ export class ContactShadows implements EnginePlugin {
       }),
     );
     this.views = this.textures.map((t) => t.createView());
-    // Blur A→B (x), B→A (y), then again at 0.4× radius, as three.js does, to hide the tap pattern.
+    // Blur A→B (x), B→A (y), then again at 0.4× radius to hide the tap pattern.
     this.blurGroups = [0, 1, 0, 1].map((from, i) =>
       device.createBindGroup({
         layout: this.blurPipeline!.getBindGroupLayout(0),

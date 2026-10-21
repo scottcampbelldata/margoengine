@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
-  "description": "Large point clouds (Points, PointsMaterial) and instanced sprites (Sprite, SpriteMaterial) for Margo Engine, WebGPU.",
+  "description": "Large point clouds (PointCloud, PointsMaterial) and instanced sprites (SpriteBatch, SpriteMaterial) for Margo Engine, WebGPU.",
   "publishConfig": {
     "access": "public"
   },

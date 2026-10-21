@@ -65,7 +65,7 @@ const PLANES: Array<[HandleName, number, number, number]> = [
   ['YZ', 1, 2, 0],
   ['XZ', 0, 2, 1],
 ];
-/** three.js hides an axis that points at the camera and a plane seen edge-on. */
+/** Thresholds that hide an axis that points at the camera and a plane seen edge-on. */
 export const AXIS_HIDE_THRESHOLD = 0.99,
   PLANE_HIDE_THRESHOLD = 0.2;
 /** Gizmo-unit layout. */

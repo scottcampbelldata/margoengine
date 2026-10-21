@@ -44,7 +44,7 @@ function quaternion(value: ArrayLike<number>): number[] {
 }
 
 /**
- * Three.js `DecalGeometry`: the part of a mesh inside a box, ready to draw a decal texture on. The box is centred on
+ * The part of a mesh inside a box, ready to draw a decal texture on. The box is centred on
  * `position`, turned by `orientation` (a quaternion [x, y, z, w], or Euler XYZ radians) and `size` across in its own
  * x, y and z; it projects along its own -z, so its +z side faces the surface. `target` is the mesh's geometry and
  * `matrix` its world matrix (column-major, as `mesh.matrix`). Every triangle that faces the projector is clipped to

@@ -1,6 +1,6 @@
 # @margoengine/bvh
 
-Triangle bounding volume hierarchy, spatial queries and a CPU `Raycaster` for Margo Engine. It covers what three-mesh-bvh (`MeshBVH`, `shapecast`, `intersectsGeometry`) and `THREE.Raycaster` do for Three.js.
+Triangle bounding volume hierarchy (`MeshBVH`, `shapecast`, `intersectsGeometry`), spatial queries and a CPU `Raycaster` for Margo Engine.
 
 Build from source with `npm run build` in `packages/bvh`.
 
@@ -126,7 +126,7 @@ That is roughly 3,000 to 4,200 times the brute-force ray rate. The tree takes ab
 ## Limits
 
 - Triangles only: no lines or points. Synchronous `intersectMeshes` and `intersectEngine` discover static glTF Pro/FBX triangles as well as core `Geometry`, including several primitives on one node. Once a GPU deformation buffer is active they throw with a direction to use `await raycaster.intersectModel(model)`, which reads the current pose. They never silently test a deformed mesh's bind pose. Hits carry barycentric weights but no `uv`.
-- `collectFrustum` with `'triangles'` is the conservative culling test (a triangle is dropped only when all three vertices are outside one plane), like three-mesh-bvh's frustum examples, not exact clipping.
+- `collectFrustum` with `'triangles'` is the conservative culling test (a triangle is dropped only when all three vertices are outside one plane), not exact clipping.
 - `refit()` keeps the tree topology; rebuild after large deformations for good query speed.
 - Hits on a shared edge report every triangle that contains the point (the tests account for ties).
 - The Raycaster reads engine internals through the same structural fields `engineRuntime` exposes (`store`, `meshes`, `camera`, `canvas`, `backend`). CPU queries test geometric triangles without evaluating fragment alpha masks or custom vertex-shader deformation. Use gltf-pro's GPU picking for rendered coverage and scene occlusion.

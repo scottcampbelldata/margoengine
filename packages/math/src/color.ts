@@ -181,8 +181,8 @@ const hue = (p: number, q: number, t: number): number => {
 const unit = (value: number): number => Math.max(0, Math.min(1, value));
 
 /**
- * RGB color stored in linear sRGB (the working space of core `PbrMaterial` and three.js).
- * Hex, CSS and HSL inputs are treated as sRGB and decoded, as three.js does by default.
+ * RGB color stored in linear sRGB (the working space of core `PbrMaterial`).
+ * Hex, CSS and HSL inputs are treated as sRGB and decoded.
  * `toArray()` gives linear `[r, g, b]` for `new PbrMaterial({color})`, and `toArray(mesh.material.data)` recolors a material in place.
  */
 export class Color {

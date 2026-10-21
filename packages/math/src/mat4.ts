@@ -65,7 +65,7 @@ export function invertMatrix<T extends NumberArray>(m: ArrayLike<number>, out: T
   return out;
 }
 
-/** out = T(t) * R(q) * S(s), the order core and three.js use; `q` = [x, y, z, w] must already be a unit quaternion. */
+/** out = T(t) * R(q) * S(s), the order core uses; `q` = [x, y, z, w] must already be a unit quaternion. */
 export function composeMatrix<T extends Float32Array | Float64Array>(
   t: ArrayLike<number>,
   q: ArrayLike<number>,

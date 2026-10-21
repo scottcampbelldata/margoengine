@@ -238,7 +238,7 @@ const normalizePath = (path: string): string => path.replace(/\\/g, '/').replace
 
 /**
  * Parses a 3MF package (core specification, plus basematerials and the materials extension colorgroup, and
- * production extension `p:path` components). Replaces Three.js `ThreeMFLoader`. Build item and component
+ * production extension `p:path` components). Build item and component
  * transforms are baked into the positions, which are converted to meters by default. The result has one
  * group per build item object and color; `colors` is present only when some triangle has per-corner colors.
  */

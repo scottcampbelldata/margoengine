@@ -14,7 +14,7 @@ import { basis } from './view.js';
 import { MAX_PITCH, translate, turn } from './fly.js';
 
 /**
- * Mouse-look with the pointer locked to the canvas (three.js `PointerLockControls`), plus WASD movement helpers.
+ * Mouse-look with the pointer locked to the canvas, plus WASD movement helpers.
  * `lock()` must be called from a user gesture. While locked, mouse movement turns the view; `update(delta)` moves
  * at `movementSpeed` while movement keys are held.
  */

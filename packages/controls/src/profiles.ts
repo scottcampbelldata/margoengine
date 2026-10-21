@@ -12,23 +12,23 @@ export type KeyAction = 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom' |
  */
 export interface NavigationProfile {
   readonly name: string;
-  /** Drag bindings. Absent: three.js `mouseButtons` with its Ctrl/Meta/Shift swap (the default). */
+  /** Drag bindings. Absent: `mouseButtons` with its Ctrl/Meta/Shift swap (the default). */
   readonly drag?: Readonly<Record<string, DragAction>>;
   /** Copied to `mouseButtons` when there is no `drag` table. */
   readonly mouseButtons?: { LEFT: number | null; MIDDLE: number | null; RIGHT: number | null };
   readonly touches: { ONE: number | null; TWO: number | null };
-  /** 1: wheel forward (away from you) zooms in, as in three.js. -1: forward zooms out. */
+  /** 1: wheel forward (away from you) zooms in (the default). -1: forward zooms out. */
   readonly wheel: 1 | -1;
   readonly zoomToCursor: boolean;
   /** A double click of this button dispatches `fit`. */
   readonly fitClick?: 0 | 1 | 2;
-  /** Keyboard bindings, active after `listenToKeyEvents(target)`. Arrow keys keep their three.js meaning. */
+  /** Keyboard bindings, active after `listenToKeyEvents(target)`. Arrow keys keep their default meaning. */
   readonly keys?: Readonly<Record<string, KeyAction>>;
   /** For `@margoengine/viewcube`: `flip` makes a click on the current view turn to the opposite one. */
   readonly viewCube?: { readonly flip?: boolean };
 }
 
-/** three.js OrbitControls, the default: left rotates, middle dollies, right pans; Ctrl/Meta/Shift + left pans. */
+/** OrbitControls defaults: left rotates, middle dollies, right pans; Ctrl/Meta/Shift + left pans. */
 export const THREE_ORBIT: NavigationProfile = {
   name: 'three',
   mouseButtons: { LEFT: MOUSE.ROTATE, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.PAN },

@@ -47,11 +47,11 @@ export interface LineMaterialOptions {
   onTop?: boolean;
   /** One-pixel coverage ramp on edges, caps and dash ends. Default true. */
   antialias?: boolean;
-  /** Fogged by the `Lines` plugin's fog (`setFog`); false keeps this material clear, like three.js `material.fog`. Default true. */
+  /** Fogged by the `Lines` plugin's fog (`setFog`); false keeps this material clear. Default true. */
   fog?: boolean;
 }
 
-/** Style shared by any number of lines, like three.js `LineMaterial`. Fields may be changed at any time. */
+/** Style shared by any number of lines. Fields may be changed at any time. */
 export class LineMaterial {
   readonly color = new Float32Array([1, 1, 1]);
   opacity = 1;
@@ -109,7 +109,7 @@ export interface LineOptions extends LineMaterialOptions {
   positions?: ArrayLike<number>;
   /** r, g, b or r, g, b, a per point, linear 0..1. */
   colors?: ArrayLike<number> | null;
-  /** 'segments' draws pairs like LineSegments2, 'strip' a polyline like Line2, 'loop' a closed polyline. Default 'strip'. */
+  /** 'segments' draws pairs, 'strip' a polyline, 'loop' a closed polyline. Default 'strip'. */
   mode?: LineMode;
   /** Share a material between lines; material options on this object are applied to it. */
   material?: LineMaterial;
@@ -127,7 +127,6 @@ interface LineOwner {
 
 /**
  * A fat line: segments or a polyline drawn as screen-space quads with joins, caps, dashes and antialiasing.
- * Replaces three.js `Line2`, `LineSegments2`, `LineGeometry` and `LineSegmentsGeometry`.
  */
 export class Line {
   readonly material: LineMaterial;

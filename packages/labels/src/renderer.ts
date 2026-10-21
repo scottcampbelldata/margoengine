@@ -35,7 +35,7 @@ export interface LabelOptions {
   mesh?: Mesh | null;
   /** World position when not following a mesh. */
   position?: Vec3;
-  /** Offset from the mesh origin, in the mesh's local space (like a THREE child object) or world space. */
+  /** Offset from the mesh origin, in the mesh's local space (like a child object) or world space. */
   offset?: Vec3;
   offsetSpace?: 'local' | 'world';
   /** Which point of the element sits on the anchor, as fractions of its size. Default [0.5, 0.5] (center). */
@@ -130,7 +130,7 @@ abstract class Item {
   }
 }
 
-/** A 2D HTML label pinned to a projected world point (THREE.CSS2DObject counterpart). */
+/** A 2D HTML label pinned to a projected world point. */
 export class Label extends Item {
   anchor: [number, number];
   frustumCulling: boolean;
@@ -180,7 +180,7 @@ export class Label extends Item {
   }
 }
 
-/** An HTML element placed in world space with a CSS matrix3d transform (THREE.CSS3DObject counterpart). */
+/** An HTML element placed in world space with a CSS matrix3d transform. */
 export class CSS3DObject extends Item {
   pixelScale: number;
   /** World matrix used at the last update (column-major). */
@@ -223,8 +223,8 @@ export class CSS3DObject extends Item {
 }
 
 /**
- * Engine plugin that keeps HTML labels and CSS 3D objects registered over the canvas every frame
- * (THREE.CSS2DRenderer plus CSS3DRenderer counterpart). DOM writes happen only when a value changes.
+ * Engine plugin that keeps HTML labels and CSS 3D objects registered over the canvas every frame.
+ * DOM writes happen only when a value changes.
  */
 export class LabelRenderer implements EnginePlugin {
   readonly name: string;

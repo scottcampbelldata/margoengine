@@ -4,7 +4,7 @@ import { finiteNumber, type MutableVec2, type MutableVec3 } from './math.js';
 import type { Shape } from './path.js';
 import { isClockWise, mergeOverlappingPoints, triangulateShape } from './triangulate.js';
 
-/** Three.js `ShapeGeometry`: flat, front-facing +z, UVs are the raw shape coordinates. One group per shape when given an array. */
+/** Flat shape geometry, front-facing +z, UVs are the raw shape coordinates. One group per shape when given an array. */
 export function shapeGeometry(shapes: Shape | readonly Shape[], curveSegments = 12): GeometryData {
   const list = (Array.isArray(shapes) ? shapes : [shapes]) as readonly Shape[];
   const p: number[] = [],
@@ -28,11 +28,11 @@ export function shapeGeometry(shapes: Shape | readonly Shape[], curveSegments = 
     for (const i of result.indices) idx.push(base + i);
     groups.push({ start, count: idx.length - start, materialIndex: s });
   }
-  // Like Three.js, a single shape (not an array) gets no groups.
+  // A single shape (not an array) gets no groups.
   return geometryData(p, n, uv, idx, Array.isArray(shapes) ? groups : undefined);
 }
 
-/** Options for `extrudeGeometry` (Three.js `ExtrudeGeometry` parameters). Lengths are in shape units. */
+/** Options for `extrudeGeometry`. Lengths are in shape units. */
 export interface ExtrudeOptions {
   /** Points per curve segment of the shape. Default 12. */
   curveSegments?: number;
@@ -40,7 +40,7 @@ export interface ExtrudeOptions {
   steps?: number;
   /** Extrusion depth along +z. Default 1. Ignored with `extrudePath`. */
   depth?: number;
-  /** Default true. Forced off with `extrudePath`, like Three.js. */
+  /** Default true. Forced off with `extrudePath`. */
   bevelEnabled?: boolean;
   /** How deep the bevel goes into the shape. Default 0.2. */
   bevelThickness?: number;
@@ -54,7 +54,7 @@ export interface ExtrudeOptions {
   extrudePath?: Curve<MutableVec3>;
 }
 
-/** Three.js bevel offset direction for a contour vertex (`getBevelVec`). */
+/** Bevel offset direction for a contour vertex. */
 function bevelVector(pt: MutableVec2, prev: MutableVec2, next: MutableVec2): MutableVec2 {
   let tx: number, ty: number, shrink: number;
   const px = pt[0] - prev[0],
@@ -100,9 +100,9 @@ const movements = (ring: MutableVec2[]) =>
   ring.map((p, i) => bevelVector(p, ring[(i + ring.length - 1) % ring.length], ring[(i + 1) % ring.length]));
 
 /**
- * Three.js `ExtrudeGeometry`: extrudes shapes (with holes) along +z or along a 3D path, with an optional rounded
- * bevel. Non-indexed like Three.js with flat normals. Groups: 0 for the caps, 1 for the side walls, per shape.
- * UVs follow Three.js `WorldUVGenerator` (raw coordinates).
+ * Extrudes shapes (with holes) along +z or along a 3D path, with an optional rounded
+ * bevel. Non-indexed with flat normals. Groups: 0 for the caps, 1 for the side walls, per shape.
+ * UVs are the raw shape coordinates.
  */
 export function extrudeGeometry(shapes: Shape | readonly Shape[], options: ExtrudeOptions = {}): GeometryData {
   const list = (Array.isArray(shapes) ? shapes : [shapes]) as readonly Shape[];
@@ -160,8 +160,8 @@ function build(
   finiteNumber(bevelSegments);
 
   const extracted = shape.extractPoints(curveSegments);
-  // Three.js convention: outer contour clockwise, holes counter-clockwise. Normalized for any input orientation.
-  // Orient first, then merge overlapping points, in the same order as Three.js so the vertex order matches.
+  // Convention: outer contour clockwise, holes counter-clockwise. Normalized for any input orientation.
+  // Orient first, then merge overlapping points, in this order so the vertex order matches the reference fixtures.
   const outer = mergeOverlappingPoints(
     isClockWise(extracted.shape) ? extracted.shape : extracted.shape.slice().reverse(),
   );
@@ -234,7 +234,7 @@ function build(
     cap(faces[f + 2] + top);
   }
   groups.push({ start, count: out.length / 3 - start, materialIndex: 0 });
-  // Side walls, Three.js `sidewalls`: quad (a, b, c, d) as triangles (a, b, d) and (b, c, d).
+  // Side walls: quad (a, b, c, d) as triangles (a, b, d) and (b, c, d).
   start = out.length / 3;
   let offset = 0;
   for (const ring of [contour, ...holes]) {

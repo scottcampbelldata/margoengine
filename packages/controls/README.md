@@ -109,19 +109,19 @@ Without an engine, pass a `Camera` and an element and drive the controls yoursel
 
 ## Controls
 
-| Class | Replaces (three.js) | Input |
-| --- | --- | --- |
-| `OrbitControls` | `OrbitControls` | Left drag rotates, middle drag or wheel dollies, right drag (or shift/ctrl + left) pans, arrows pan after `listenToKeyEvents(target)`. One finger rotates, two fingers dolly and pan. |
-| `MapControls` | `MapControls` | Left drag pans along the ground, right drag rotates, two fingers dolly and rotate. |
-| `TrackballControls` | `TrackballControls` | Left rotates freely, middle zooms, right pans; hold A, S or D to switch the left button. Coasts with `dynamicDampingFactor`. |
-| `FlyControls` | `FlyControls` | WASD moves, R/F up and down, arrows yaw and pitch, pointer offset from center steers (or `dragToLook`). |
-| `FirstPersonControls` | `FirstPersonControls` | Pointer offset from center turns, WASD or arrows move, R/F up and down, left/right button walks. |
-| `PointerLockControls` | `PointerLockControls` | `lock()` from a click, mouse look while locked, WASD/arrows/R/F through `update(delta)`, plus `moveForward`, `moveRight`, `moveUp`. |
-| `TransformControls` | `TransformControls` | Translate (axis arrows, plane squares, center screen-plane handle), rotate (axis rings, view ring, free trackball disc), scale (axis handles, uniform center). |
-| `WalkControls` (`/walk`) | (three.js has none; its examples use Octree capsules) | WASD/arrows, mouse look (pointer lock or drag), gamepad sticks, touch thumbstick + drag-look; collides with the scene, holds eye height, climbs stairs. |
-| `DragControls` | `DragControls` | Left button or one finger grabs the nearest listed core mesh or gltf-pro model and moves it on the view plane, a world plane (`plane`) or a world axis (`axis`). Mouse hover reports the object under the pointer. |
+| Class | Input |
+| --- | --- |
+| `OrbitControls` | Left drag rotates, middle drag or wheel dollies, right drag (or shift/ctrl + left) pans, arrows pan after `listenToKeyEvents(target)`. One finger rotates, two fingers dolly and pan. |
+| `MapControls` | Left drag pans along the ground, right drag rotates, two fingers dolly and rotate. |
+| `TrackballControls` | Left rotates freely, middle zooms, right pans; hold A, S or D to switch the left button. Coasts with `dynamicDampingFactor`. |
+| `FlyControls` | WASD moves, R/F up and down, arrows yaw and pitch, pointer offset from center steers (or `dragToLook`). |
+| `FirstPersonControls` | Pointer offset from center turns, WASD or arrows move, R/F up and down, left/right button walks. |
+| `PointerLockControls` | `lock()` from a click, mouse look while locked, WASD/arrows/R/F through `update(delta)`, plus `moveForward`, `moveRight`, `moveUp`. |
+| `TransformControls` | Translate (axis arrows, plane squares, center screen-plane handle), rotate (axis rings, view ring, free trackball disc), scale (axis handles, uniform center). |
+| `WalkControls` (`/walk`) | WASD/arrows, mouse look (pointer lock or drag), gamepad sticks, touch thumbstick + drag-look; collides with the scene, holds eye height, climbs stairs. |
+| `DragControls` | Left button or one finger grabs the nearest listed core mesh or gltf-pro model and moves it on the view plane, a world plane (`plane`) or a world axis (`axis`). Mouse hover reports the object under the pointer. |
 
-Every control has `enabled`, `connect(element)`, `disconnect()`, `update(delta)` (returns true when the camera moved), `dispose()` and three.js-style `addEventListener`. Camera controls emit `change`, and the drag-based ones `start` and `end`. `PointerLockControls` emits `lock` and `unlock`. `TransformControls` emits `change`, `mouseDown`, `mouseUp`, `objectChange`, `dragging-changed` (`value`), `axis-changed` (`value`), `mode-changed` and `space-changed`. `DragControls` emits `dragstart` (`object`, `hit`), `drag`, `dragend`, `hoveron` and `hoveroff` (each with `object`).
+Every control has `enabled`, `connect(element)`, `disconnect()`, `update(delta)` (returns true when the camera moved), `dispose()` and `addEventListener`. Camera controls emit `change`, and the drag-based ones `start` and `end`. `PointerLockControls` emits `lock` and `unlock`. `TransformControls` emits `change`, `mouseDown`, `mouseUp`, `objectChange`, `dragging-changed` (`value`), `axis-changed` (`value`), `mode-changed` and `space-changed`. `DragControls` emits `dragstart` (`object`, `hit`), `drag`, `dragend`, `hoveron` and `hoveroff` (each with `object`).
 
 `DragControls` casts the pointer ray with a bvh `Raycaster` (`setFromEngine`, then `intersectObjects` on its `objects`), so it follows layers, `filter` and material sides, and works with orthographic cameras from @margoengine/cameras, whose rays start on the near plane. The drag plane passes through the grabbed point; with `axis` it contains the axis and faces the camera as far as it can. Each move intersects the new pointer ray with that plane and sets the object's position in its parent's space, so parented meshes follow the pointer. A grab stops later pointer-down listeners on the element and captures the pointer; touch uses the primary pointer and ignores other fingers. Pass your own `raycaster` to share layers and filters.
 
@@ -148,7 +148,7 @@ middle; Meta counts as Ctrl; modifiers must match exactly), wheel direction, zoo
 double-click `fitClick` button and `keys` keyed by modifiers + `KeyboardEvent.code`. `setProfile` copies it onto the
 existing OrbitControls fields (`touches`, `zoomToCursor`, and `mouseButtons` for table-less profiles) and returns the
 controls, so options set afterwards (`enableDamping`, `zoomSpeed`, `zoomToCursor`) still win. `THREE_ORBIT` (the default,
-also what a fresh OrbitControls does) restores three.js behaviour. Each profile is its own export, so an app bundles only
+also what a fresh OrbitControls does) restores the default behaviour. Each profile is its own export, so an app bundles only
 the one it imports (OrbitControls + one profile: +171 B gzip); `PROFILES` (all nine by name, for a preferences menu,
 +427 B) is there when you want the choice at run time. Write your own the same way: `orbit.setProfile({...BLENDER,
 zoomToCursor: true})`.
@@ -160,7 +160,7 @@ whole model, a CameraProjection or a perspective `camera.fitToBoundingBox`).
 
 | Profile | Rotate | Pan | Zoom drag | Wheel (forward = away from you) | Fit | Touch (1 finger / 2) | Keys | Source |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `THREE_ORBIT` (default) | Left; Ctrl/Meta/Shift + right | Right; Ctrl/Meta/Shift + left | Middle | In, toward the target | - | Rotate / pinch + pan | Arrows pan, Ctrl/Shift + arrows rotate | three.js docs and source, `OrbitControls` |
+| `THREE_ORBIT` (default) | Left; Ctrl/Meta/Shift + right | Right; Ctrl/Meta/Shift + left | Middle | In, toward the target | - | Rotate / pinch + pan | Arrows pan, Ctrl/Shift + arrows rotate | `OrbitControls` defaults |
 | `SOLIDWORKS` | Middle | Ctrl + middle | Shift + middle | **Out**\*, at the cursor | Double middle click, F | Rotate / pinch + pan | Ctrl+1..7 front, back, left, right, top, bottom, iso\* | SOLIDWORKS Help: Middle Mouse Button, Keyboard Shortcuts; Options > View "Reverse mouse wheel zoom direction" |
 | `AUTOCAD` | Shift + middle (3DORBIT) | Middle (MBUTTONPAN=1) | - | In, at the cursor (ZOOMWHEEL=0) | Double middle click (zoom extents) | **Pan**\* / pinch + pan | - | AutoCAD Help: Pan or Zoom with the Wheel Mouse, 3DORBIT |
 | `INVENTOR` = `FUSION` | Shift + middle | Middle | - | In\*, at the cursor\* | Double middle click | Rotate / pinch + pan | - | Inventor Help: Navigate with the mouse; Fusion Help: Preferences > General "Pan, Zoom, Orbit shortcuts: Fusion" |
@@ -174,8 +174,8 @@ SolidWorks and Onshape wheel direction (both have a reverse option; set `{...SOL
 forward), Inventor's wheel direction and zoom-to-cursor default, Rhino's zoom-to-cursor, Maya's dolly axis (Maya also
 reads horizontal motion; here vertical drag dollies, up = in), Onshape's Shift + digit view keys, and the touch rows:
 SolidWorks and Fusion use one finger to rotate and two to pan and pinch; AutoCAD's web and mobile apps pan with one
-finger; Blender, Maya, Onshape and Rhino have no first-party touch defaults here, so they use the three.js one.
-Every profile keeps three.js arrow keys and `TOUCH` constants; mouse buttons a profile leaves unbound (left in most CAD
+finger; Blender, Maya, Onshape and Rhino have no first-party touch defaults here, so they use the default one.
+Every profile keeps the default arrow keys and `TOUCH` constants; mouse buttons a profile leaves unbound (left in most CAD
 tools, which is selection) do nothing, so the app's own click handling keeps them.
 
 Browser gesture conflicts handled: the context menu is suppressed while the controls are enabled (right drags in Onshape,
@@ -199,14 +199,14 @@ explicit `height` they change only the distance.
 ## How it works
 
 - **Camera model.** The Margo Engine `Camera` is a position, a target, `fov`, `near`, `far` and an `up` vector (default world +Y). All controls write `camera.position` and `camera.target` and nothing else. `OrbitControls.target` reads and writes `camera.target`. The core camera rejects a view parallel to its `up`, so with the default +Y every control keeps the view at least a hair off the poles (orbit uses an epsilon on the polar angle, the walk controls cap pitch just under 90 degrees).
-- **Roll.** These controls keep world +Y up and do not roll (core's `camera.up` exists, but they don't drive it; on an exact pole, such as a ViewCube top view, OrbitControls reads its heading from `camera.up`). `TrackballControls` computes its rotation axis from the rendered frame (screen right and up derived from +Y), drops the roll that three.js would apply to `camera.up`, and stops the eye just short of a pole instead of tumbling over it, which would flip the image. `FlyControls` ignores Q and E (roll) and yaws around world +Y. Roll could be built on `camera.up`; not done yet.
-- **Damping.** three.js damps per frame. Here the factors are applied per 1/60 s (`1 - (1 - factor)^(delta * 60)`), so 30 and 60 fps settle identically. Without damping, pointer input is applied immediately.
+- **Roll.** These controls keep world +Y up and do not roll (core's `camera.up` exists, but they don't drive it; on an exact pole, such as a ViewCube top view, OrbitControls reads its heading from `camera.up`). `TrackballControls` computes its rotation axis from the rendered frame (screen right and up derived from +Y), drops any roll of `camera.up`, and stops the eye just short of a pole instead of tumbling over it, which would flip the image. `FlyControls` ignores Q and E (roll) and yaws around world +Y. Roll could be built on `camera.up`; not done yet.
+- **Damping.** The factors are applied per 1/60 s (`1 - (1 - factor)^(delta * 60)`), so 30 and 60 fps settle identically. Without damping, pointer input is applied immediately.
 - **Zoom to cursor.** The dolly is a scaling about the point under the cursor on the plane through the target facing the camera, so the view direction is unchanged and that point keeps its pixel exactly.
 - **Engine integration.** Constructed with an engine, a control registers a small plugin whose `onPreUpdate` calls `update(delta)` before each render, and `engine.dispose()` disposes it. Rendering manually with `engine.render()` passes `delta = 0`, which still applies direct input but does not advance damping, auto-rotate or key movement; pass `{delta}` to advance them.
 - **Listeners.** Pointer listeners go on the canvas (or the element you pass), using pointer capture. Keyboard listeners for the trackball, fly, first-person and pointer-lock controls go on the element's `ownerDocument` unless you pass `{keyTarget}`. Nothing is touched at import time and construction only touches the element you give it, so modules are SSR-safe. `dispose()` removes every listener and restores `touch-action`.
-- **Gizmo rendering.** `TransformControls` builds its handles on the CPU each frame (lines, cones, cubes, squares, rings), keeping a constant screen size with the three.js formula (under an orthographic camera from @margoengine/cameras: the same fraction of the view height at any `zoom` or `height`, with parallel-ray picking and drags). A frame graph pass (order 1000) turns lines into screen-space quads, sorts triangles back to front and draws them with alpha blending over the finished frame, with no depth test against the scene. It uses WebGPU when the engine does, and a tiny WebGL2 program on the fallback backend.
-- **Gizmo picking.** Hit tests are CPU-only in CSS pixels: arrows, scale axes and rings by pixel distance to their projection (back halves of rings lose ties), plane squares by a ray-plane intersection, center and view-ring handles by projected circles. Axes pointing at the camera and planes seen edge-on are hidden and unpickable, as in three.js.
-- **Gizmo dragging.** Translate intersects the cursor ray with a plane through the handle (the axis plane most facing the camera, the handle plane, or the view plane), projects the offset onto the axis, and writes `inverse(parentWorld) x newWorld` as the local position, so parented meshes follow the cursor exactly. Rotation is the signed angle between the grab and current points on the ring plane (falling back to a screen tangent drag when the ring is edge-on), applied as `P^-1 R P` to the local quaternion, where P is the parent's world rotation. Scale is always local, as in three.js: the ratio of current to grab distance along the handle axis, or one handle length of drag up or right doubles the uniform scale. World matrices come from `engineRuntime(engine).store.matrices`. The gizmo stops the pointerdown event from reaching later listeners when it grabs a handle, and emits `dragging-changed` so you can disable `OrbitControls`.
+- **Gizmo rendering.** `TransformControls` builds its handles on the CPU each frame (lines, cones, cubes, squares, rings), keeping a constant screen size (under an orthographic camera from @margoengine/cameras: the same fraction of the view height at any `zoom` or `height`, with parallel-ray picking and drags). A frame graph pass (order 1000) turns lines into screen-space quads, sorts triangles back to front and draws them with alpha blending over the finished frame, with no depth test against the scene. It uses WebGPU when the engine does, and a tiny WebGL2 program on the fallback backend.
+- **Gizmo picking.** Hit tests are CPU-only in CSS pixels: arrows, scale axes and rings by pixel distance to their projection (back halves of rings lose ties), plane squares by a ray-plane intersection, center and view-ring handles by projected circles. Axes pointing at the camera and planes seen edge-on are hidden and unpickable.
+- **Gizmo dragging.** Translate intersects the cursor ray with a plane through the handle (the axis plane most facing the camera, the handle plane, or the view plane), projects the offset onto the axis, and writes `inverse(parentWorld) x newWorld` as the local position, so parented meshes follow the cursor exactly. Rotation is the signed angle between the grab and current points on the ring plane (falling back to a screen tangent drag when the ring is edge-on), applied as `P^-1 R P` to the local quaternion, where P is the parent's world rotation. Scale is always local: the ratio of current to grab distance along the handle axis, or one handle length of drag up or right doubles the uniform scale. World matrices come from `engineRuntime(engine).store.matrices`. The gizmo stops the pointerdown event from reaching later listeners when it grabs a handle, and emits `dragging-changed` so you can disable `OrbitControls`.
 
 ## Options
 
@@ -219,11 +219,11 @@ explicit `height` they change only the distance.
 | `minAzimuthAngle`, `maxAzimuthAngle` | Orbit, Map | `-Infinity`, `Infinity` |
 | `zoomToCursor`, `screenSpacePanning`, `keyPanSpeed` | Orbit, Map | `false`, `true` (`false` for Map), `7` px |
 | `autoRotate`, `autoRotateSpeed` | Orbit, Map | `false`, `2` (one turn per 30 s) |
-| `mouseButtons`, `touches`, `keys` | Orbit, Map, Trackball | three.js defaults, using the exported `MOUSE` and `TOUCH` |
-| `setProfile(profile)`, `profile` | Orbit, Map | `null` (three.js, same as `THREE_ORBIT`); see Navigation profiles |
+| `mouseButtons`, `touches`, `keys` | Orbit, Map, Trackball | Left rotates, middle dollies, right pans (Map: left pans, right rotates); one finger rotates, two dolly and pan (Map: pan, dolly and rotate); arrow keys (Trackball: A, S, D), using the exported `MOUSE` and `TOUCH` |
+| `setProfile(profile)`, `profile` | Orbit, Map | `null` (same as `THREE_ORBIT`); see Navigation profiles |
 | `rotateSpeed`, `zoomSpeed`, `panSpeed`, `staticMoving`, `dynamicDampingFactor`, `noRotate`, `noZoom`, `noPan` | Trackball | `1`, `1.2`, `0.3`, `false`, `0.2`, `false` |
 | `movementSpeed`, `rollSpeed`, `dragToLook`, `autoForward` | Fly | `1`, `0.005`, `false`, `false` |
-| `movementSpeed`, `lookSpeed`, `lookVertical`, `activeLook`, `heightSpeed`, `constrainVertical`, `verticalMin`, `verticalMax` | FirstPerson | three.js defaults |
+| `movementSpeed`, `lookSpeed`, `lookVertical`, `activeLook`, `heightSpeed`, `constrainVertical`, `verticalMin`, `verticalMax` | FirstPerson | `1`, `0.005`, `true`, `true`, `false`, `false`, `0`, `PI` |
 | `pointerSpeed`, `movementSpeed`, `requireLock`, `keys` | PointerLock | `1`, `1`, `true`, WASD/arrows/R/F |
 | `mode`, `space`, `size` | Transform | `'translate'`, `'world'`, `1` |
 | `translationSnap`, `rotationSnap` (radians), `scaleSnap` | Transform | `null` |
@@ -233,9 +233,9 @@ explicit `height` they change only the distance.
 ## Limits
 
 - No roll anywhere (see above). Trackball rotation therefore cannot pass over the poles.
-- Orthographic cameras come from @margoengine/cameras (dolly becomes ortho zoom there; pan and the gizmo read the orthographic height from `camera.matrix`); orbit `zoom` of three.js is not implemented. `minTargetRadius`, `maxTargetRadius` and `cursor` from recent three.js `OrbitControls` are not implemented.
+- Orthographic cameras come from @margoengine/cameras (dolly becomes ortho zoom there; pan and the gizmo read the orthographic height from `camera.matrix`); an orbit `zoom` property is not implemented. `minTargetRadius`, `maxTargetRadius` and `cursor` are not implemented.
 - `TransformControls` has no plane scale handles, does not flip arrows toward the camera, draws no start-to-current delta helper lines, and does not snap free (trackball) rotation. A parent with non-uniform scale and rotation shears its children; drags use the parent's rotation without the shear.
-- The gizmo is always on top of the scene (no occlusion by scene geometry), like three.js by default.
+- The gizmo is always on top of the scene (no occlusion by scene geometry).
 - `ArcballControls` is not included. `DragControls` has no rotate mode, `recursive` or `transformGroup` options; pass a model to drag the whole model, or a core mesh to drag that mesh. Skinned models are grabbed in their bind pose (see @margoengine/bvh).
 
 ## Tests

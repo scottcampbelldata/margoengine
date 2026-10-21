@@ -45,7 +45,7 @@ const size = (value: number, label: string): number => {
 };
 
 /**
- * Three.js `RoundedBoxGeometry`: a `width` x `height` x `depth` box centred on the origin with every edge and corner
+ * A `width` x `height` x `depth` box centred on the origin with every edge and corner
  * rounded to `radius` (clamped to half the smallest side; 0 gives a plain box). Each rounded 90-degree edge has
  * `segments` facets (at least 1; one more when odd, so a vertex sits on the 45-degree seam), and each flat side is one
  * span. Faces are laid out and grouped like `boxGeometry` (six groups: +x, -x, +y, -y, +z, -z), with smooth unit normals

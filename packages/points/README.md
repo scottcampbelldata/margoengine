@@ -1,6 +1,6 @@
 # @margoengine/points
 
-Large point clouds and instanced sprites for Margo Engine, WebGPU: the counterparts of Three.js `Points`, `PointsMaterial`, `Sprite` and `SpriteMaterial`, built for big scans: the browser test culls and draws a 2,000,000-point cloud under a 500,000-point budget.
+Large point clouds and instanced sprites for Margo Engine, WebGPU, built for big scans: the browser test culls and draws a 2,000,000-point cloud under a 500,000-point budget.
 
 Build from source with `npm run build` in `packages/points`.
 
@@ -41,7 +41,7 @@ canvas.addEventListener('click', event => {
 - **Shapes and shading.** Square points cover exactly `size x size` pixels. Round points are an antialiased disc with an extra pixel of quad. A `map` (any `GPUTexture`, or an `ImageBitmap`, canvas, image, video or `ImageData` that the plugin uploads as `rgba8unorm-srgb`) is sampled across the point, with `alphaTest` or blending. `shading: 'sphere'` lights each point as a sphere impostor and writes its curved depth with `frag_depth`. `edl: true` adds eye-dome lighting: points also write their view depth into an `r32float` target and a full-screen pass multiplies the color by `exp(-300 * strength * mean(max(0, log2 d - log2 d_neighbor)))` over 8 neighbors.
 - **Depth.** Points test against the scene with reversed-Z `greater-equal` and opaque points write depth, so they hide behind meshes and occlude each other. Transparent materials blend without writing depth.
 - **Orthographic cameras.** Everything is read from `camera.matrix`, so any projection whose clip w is constant (such as `CameraProjection` from `@margoengine/cameras`) works without a dependency on it: world-unit sizes use the matrix's pixels per world unit and stay the same at every depth, sphere impostors write linear depth, eye-dome lighting shades linear depth steps (scaled like the log steps a perspective camera with the same zoom would give), block budgets ignore distance, and picking breaks ties by distance from the near plane (`depth` is then measured from the near plane).
-- **Sprites.** A `SpriteBatch` keeps 16 floats per sprite (position, rotation, size, pivot, atlas UV rectangle, color) in one storage buffer and draws every sprite with one instanced call. Quads face the camera using the camera's right and up vectors; with `sizeUnits: 'pixels'` (Three.js `sizeAttenuation: false`) they are expanded in screen space instead.
+- **Sprites.** A `SpriteBatch` keeps 16 floats per sprite (position, rotation, size, pivot, atlas UV rectangle, color) in one storage buffer and draws every sprite with one instanced call. Quads face the camera using the camera's right and up vectors; with `sizeUnits: 'pixels'` (`sizeAttenuation: false`) they are expanded in screen space instead.
 - **Colors.** Material and sprite colors take `'#rrggbb'` (sRGB) or linear `[r, g, b]`, like `PbrMaterial`. Per-point colors are sRGB by default, which matches the loaders package and 8-bit scanner data; set `colorSpace: 'linear'` otherwise. Output is sRGB-encoded in the shader on non `-srgb` canvas formats, the same way core does it.
 - **Device loss.** `onDeviceRestored` rebuilds every buffer, pipeline and uploaded texture from the CPU copies. `dispose` (and `engine.removePlugin`) destroys them all. Clouds and batches stay registered, so a plugin can be reused.
 - **SSR.** Nothing touches `window`, `navigator` or GPU globals at import or construction time.
@@ -90,7 +90,7 @@ canvas.addEventListener('click', event => {
 | `vertexColors` | true | |
 | `shading` | `'flat'` | or `'sphere'` |
 | `edl` | false | |
-| `fog` | true | Fogged by the plugin's `setFog` (sprites too); false keeps the material clear, like three.js `material.fog` |
+| `fog` | true | Fogged by the plugin's `setFog` (sprites too); false keeps the material clear |
 
 Sprites: `add({position, size, rotation, center, color, opacity, uv})`, `set(index, ...)`, `remove(index)` (moves the last sprite into the slot), `clear()`. `SpriteMaterial.rotation` adds to every sprite.
 

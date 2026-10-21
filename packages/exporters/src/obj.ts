@@ -1,5 +1,5 @@
 import { LinearToSRGB as toSrgb } from '@margoengine/math/color';
-// Wavefront OBJ writer: the Margo Engine counterpart of Three.js OBJExporter, plus an optional MTL file and textures.
+// Wavefront OBJ writer, plus an optional MTL file and textures.
 import {
   collect,
   drawables,

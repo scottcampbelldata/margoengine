@@ -112,7 +112,7 @@ const integerOf = (token: string | undefined, what: string): number => {
 
 /**
  * Parses a legacy VTK file (`# vtk DataFile Version` 1.0 to 5.1, ASCII or BINARY) holding `DATASET POLYDATA`.
- * Replaces the legacy part of Three.js `VTKLoader`. POLYGONS are fan-triangulated, TRIANGLE_STRIPS unrolled
+ * POLYGONS are fan-triangulated, TRIANGLE_STRIPS unrolled
  * with alternating winding, VERTICES and LINES ignored (a file with only those is returned as a point cloud).
  * Point NORMALS, COLOR_SCALARS, TEXTURE_COORDINATES and single-component SCALARS are read; cell data is skipped.
  */

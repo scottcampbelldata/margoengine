@@ -17,7 +17,7 @@ declare const GPUBufferUsage: { STORAGE: number; COPY_DST: number };
  */
 export interface DirectionalLightShadow {
   /**
-   * World-space box one orthographic map covers (three.js' shadow camera box): casters and receivers inside it.
+   * World-space box one orthographic map covers (the shadow camera box): casters and receivers inside it.
    * Camera-independent, so the map re-renders only when the light or a caster changes. Omitted: cascades fitted to the
    * camera's view (`cascades`, `distance`), which re-render when the camera moves.
    */
@@ -35,7 +35,7 @@ export interface DirectionalLightShadow {
    */
   resolution?: number | readonly [number, number];
 }
-/** A directional light beside core's sun (three.js `DirectionalLight`): parallel rays, no position or falloff. */
+/** A directional light beside core's sun: parallel rays, no position or falloff. */
 export interface DirectionalLight {
   /** The direction the light travels, world space (from the light toward the scene, as a spot's `direction`); need not be unit length. */
   direction: Vec3;
@@ -68,7 +68,7 @@ struct ClusterDirectionalData {count:vec4u,lights:array<ClusterDirectionalLight,
 @group(${group}) @binding(${BINDING}) var<storage,read> clusterDirectional:ClusterDirectionalData;
 `;
 /**
- * Directional lights for clustered lighting, beyond core's one sun (three.js `DirectionalLight`): GGX specular and
+ * Directional lights for clustered lighting, beyond core's one sun: GGX specular and
  * Lambert diffuse with the point lights' BRDF, so materials' Lambert and Phong shade them as they shade point lights and
  * a shadow catcher counts them. Core meshes and every receiver of the `lights` (gltf-pro models, materials meshes,
  * terrain) are lit; `Clustered.intensityScale` scales them too. Every fragment evaluates every light (no culling: the

@@ -32,7 +32,7 @@ export interface LODLevel {
   object: LODObject;
   distance?: number;
   screen?: number;
-  /** Fraction the switch distance shrinks by while this level is shown (three.js LOD semantics). */
+  /** Fraction the switch distance shrinks by while this level is shown. */
   hysteresis?: number;
 }
 /** Per-object settings of `LODSystem.add`. */
@@ -360,7 +360,7 @@ export class LODSystem implements EnginePlugin {
             : v / bias;
         v = (bias * w) / (yScale * this.radius[i] * Math.sqrt(Math.max(sx, sy, sz)));
       }
-      // three.js LOD: the shown level's threshold drops by its hysteresis, so small camera moves never flip levels back and forth.
+      // Hysteresis: the shown level's threshold drops by its hysteresis, so small camera moves never flip levels back and forth.
       const n = counts[i],
         shown = current[i],
         b = i * MAX_LEVELS;

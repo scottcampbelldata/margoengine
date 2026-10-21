@@ -1,6 +1,6 @@
 # @margoengine/labels
 
-HTML labels and CSS 3D objects kept in register with a Margo Engine canvas. Replaces THREE.CSS2DRenderer/CSS2DObject and THREE.CSS3DRenderer/CSS3DObject.
+HTML labels and CSS 3D objects kept in register with a Margo Engine canvas.
 
 Build from source with `npm run build` in `packages/labels`.
 
@@ -9,7 +9,7 @@ import {LabelRenderer} from '@margoengine/labels';
 
 const labels = LabelRenderer.attach(engine);
 
-// A 2D label 0.8 units above a mesh origin (mesh-local offset, like a THREE child object).
+// A 2D label 0.8 units above a mesh origin (mesh-local offset, like a child object).
 const name = document.createElement('div');
 name.textContent = 'Pump 3';
 const label = labels.add(name, {mesh: pump, offset: [0, 0.8, 0], anchor: [0.5, 1], distanceScale: {reference: 6, min: 0.5, max: 1.5}});
@@ -33,8 +33,8 @@ engine.removePlugin(labels.name); // or engine.dispose(): removes every element 
 - **Projection.** A frame pass (order 1000, after the scene) projects every label with `camera.matrix`: reversed-Z WebGPU clip space (z from 0 to w) or WebGL2 clip space (z from -w to w), chosen from `engine.backend`. Labels behind the camera are always hidden; labels outside the frustum are hidden unless `frustumCulling: false`. Mesh labels read `engineRuntime(engine).store.matrices`, so they follow parents, rotation and scale, and hide while the mesh or an ancestor is hidden (`followVisibility`) or once the mesh is disposed.
 - **Placement.** `transform: translate(x, y) [scale(s)] translate(-anchorX%, -anchorY%)` with `transform-origin: 0 0`, so the anchor point of the element sits exactly on the projected point, with or without distance scaling.
 - **Depth order.** Visible labels are sorted by distance to the camera every frame and get `z-index` 1..n, nearest on top. `sort: false` leaves a label's z-index alone.
-- **CSS 3D.** As in CSS3DRenderer, a viewer element gets `perspective: (height / 2) / tan(fov / 2)` and a `preserve-3d` camera element gets `translateZ(perspective) matrix3d(view with Y flipped) translate(width / 2, height / 2)`. Each object gets `translate(-50%, -50%) matrix3d(world * scale(pixelScale) with Y flipped)`. The view matrix is rebuilt from `camera.position` and `camera.target` with the same Y-up look-at the core camera uses. Objects whose origin is at or behind the near plane are hidden, since CSS cannot clip them.
-- **Orthographic cameras.** When `camera.matrix` has a constant clip w (for example with `CameraProjection` from `@margoengine/cameras`, which the package does not depend on), the viewer gets `perspective: none` and the camera element `orthographicCSSTransform(matrix, width, height, backend)`: the clip matrix scaled to CSS pixels around the viewport centre, Y flipped, with Z scaled like Y so CSS depth sorting follows the camera (as THREE.CSS3DRenderer does for an OrthographicCamera). Objects in front of the near plane are hidden. 2D labels need nothing special; `distanceScale` uses the distance at which a perspective camera with the same fov shows the same zoom, so labels grow when zooming in and do not change with depth. `isOrthographic(matrix)` is exported.
+- **CSS 3D.** A viewer element gets `perspective: (height / 2) / tan(fov / 2)` and a `preserve-3d` camera element gets `translateZ(perspective) matrix3d(view with Y flipped) translate(width / 2, height / 2)`. Each object gets `translate(-50%, -50%) matrix3d(world * scale(pixelScale) with Y flipped)`. The view matrix is rebuilt from `camera.position` and `camera.target` with the same Y-up look-at the core camera uses. Objects whose origin is at or behind the near plane are hidden, since CSS cannot clip them.
+- **Orthographic cameras.** When `camera.matrix` has a constant clip w (for example with `CameraProjection` from `@margoengine/cameras`, which the package does not depend on), the viewer gets `perspective: none` and the camera element `orthographicCSSTransform(matrix, width, height, backend)`: the clip matrix scaled to CSS pixels around the viewport centre, Y flipped, with Z scaled like Y so CSS depth sorting follows the camera. Objects in front of the near plane are hidden. 2D labels need nothing special; `distanceScale` uses the distance at which a perspective camera with the same fov shows the same zoom, so labels grow when zooming in and do not change with depth. `isOrthographic(matrix)` is exported.
 - **Minimal DOM writes.** Every style property is cached per element and written only when its string changes; `renderer.writes` reports how many writes the last update made (0 on a static frame).
 - **Occlusion hook.** Depth-buffer occlusion is not built in. `occlude(label, {x, y, depth, distance, world})` on the renderer or a label returns true to hide that label this frame; the per-label hook overrides the renderer one.
 
@@ -64,7 +64,7 @@ engine.removePlugin(labels.name); // or engine.dispose(): removes every element 
 | `distanceScale` | label | none; a number or `{reference, min, max}` gives `reference / distance` |
 | `sort` | label | true |
 | `matrix`, `quaternion` | CSS 3D | identity |
-| `pixelScale` | CSS 3D | 0.01 world units per CSS pixel (THREE uses 1) |
+| `pixelScale` | CSS 3D | 0.01 world units per CSS pixel |
 
 ## Limits
 

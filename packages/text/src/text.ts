@@ -94,7 +94,7 @@ const LAYOUT_KEYS = [
 ] as const;
 
 /**
- * A block of SDF text in 3D, like troika-three-text's `Text`. Every field may be changed at any time; the
+ * A block of SDF text in 3D. Every field may be changed at any time; the
  * layout is recomputed on the next frame (or the next `layout` read) only when a layout field changed.
  */
 export class Text {

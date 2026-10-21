@@ -570,7 +570,7 @@ test('transform: dragging the X arrow moves the mesh by the dragged world distan
   engine.render();
   const f = gizmo.frame(),
     s = f.size;
-  close(s, (10 * 1.9 * Math.tan(Math.PI / 6)) / 4, 1e-9, 'three.js constant screen size');
+  close(s, (10 * 1.9 * Math.tan(Math.PI / 6)) / 4, 1e-9, 'constant screen size');
   const pixelsPerUnit = 600 / (2 * 10 * Math.tan(Math.PI / 6));
   const grab = [400 + 0.5 * s * pixelsPerUnit, 300];
   assert.equal(gizmo.pick(grab[0], grab[1]), 'X');

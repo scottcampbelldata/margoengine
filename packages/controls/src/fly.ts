@@ -32,17 +32,17 @@ export function translate(camera: Pick<Camera, 'position' | 'target'>, offset: r
 }
 
 /**
- * Six-degree-of-freedom flight (three.js `FlyControls`): WASD moves, R/F moves up and down, arrows yaw and pitch,
+ * Six-degree-of-freedom flight: WASD moves, R/F moves up and down, arrows yaw and pitch,
  * the mouse offset from the canvas center steers (or drag to look with `dragToLook`). Left button flies forward
  * and right button backward unless `dragToLook` is set.
  *
- * Roll: Q and E roll in three.js. The Margo Engine camera has no up vector and always renders with world +Y up, so roll
+ * Roll: Q and E are the usual roll keys. The Margo Engine camera has no up vector and always renders with world +Y up, so roll
  * is not supported and those keys do nothing; yaw turns around world +Y and pitch stops short of the poles.
  */
 export class FlyControls extends Controls {
   /** World units per second. */
   movementSpeed = 1;
-  /** Radians per second per unit of steering input, as in three.js (the turn rate is about twice this value). */
+  /** Radians per second per unit of steering input (the turn rate is about twice this value). */
   rollSpeed = 0.005;
   dragToLook = false;
   autoForward = false;

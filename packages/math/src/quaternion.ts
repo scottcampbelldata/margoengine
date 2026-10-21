@@ -38,7 +38,7 @@ export class Quaternion {
     const s = Math.sin(angle / 2);
     return this.set(axis.x * s, axis.y * s, axis.z * s, Math.cos(angle / 2));
   }
-  /** Intrinsic rotation in `euler.order`: for 'XYZ' the result is qX * qY * qZ, the convention of core and three.js. */
+  /** Intrinsic rotation in `euler.order`: for 'XYZ' the result is qX * qY * qZ, the convention of core. */
   setFromEuler(euler: EulerLike): this {
     this.identity();
     for (let i = 0; i < 3; i++) {

@@ -1,7 +1,7 @@
 # @margoengine/staging
 
-Product-shot staging. `ContactShadows`: the soft ground-contact shadow three.js users build from the ContactShadows
-example. The added meshes are drawn from the ground looking up into a small texture (darker the closer to the
+Product-shot staging. `ContactShadows`: a soft ground-contact shadow.
+The added meshes are drawn from the ground looking up into a small texture (darker the closer to the
 ground), blurred twice, and laid on the ground as a shadow-catcher plane over whatever is there (a floor mesh, a
 background, nothing). No light direction and no shadow map, so it works with or without `@margoengine/shadows`.
 
@@ -39,7 +39,7 @@ casts, fading linearly to nothing at it, default 1), `blur` (world units, defaul
   `@margoengine/shadows`; alpha-masked materials honour their cutout, blended ones are skipped. Instanced primitives (gltf-pro `PBRInstances`) draw every instance in one occluder draw. Hidden meshes and
   disposed sources drop out.
 
-Limits: Y-up ground only; the blur is uniform (three.js's pattern), so the shadow does not get softer with height
+Limits: Y-up ground only; the blur is uniform, so the shadow does not get softer with height
 like a real penumbra; `size` should cover the footprint plus the blur, or the shadow is cut at the plane edge; WebGPU
 only (nothing is drawn on the WebGL2 fallback); the plane is not in SSAO's G-buffer or picking.
 

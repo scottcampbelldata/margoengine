@@ -25,7 +25,7 @@ export interface VATData {
   width: number;
   texels: Float32Array;
   indices: Uint32Array;
-  /** UV0 in three.js orientation (v up), like `@margoengine/materials` textures. */
+  /** UV0 with v up, like `@margoengine/materials` textures. */
   uvs: Float32Array;
   clips: VATClip[];
 }

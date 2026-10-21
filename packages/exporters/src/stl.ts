@@ -1,4 +1,4 @@
-// STL writer: the Margo Engine counterpart of Three.js STLExporter. World-space triangles with face normals.
+// STL writer: world-space triangles with face normals.
 import { collect, drawables, num, toWorld, type ExportSource, type SceneOptions } from './scene.js';
 
 export interface STLOptions extends SceneOptions {

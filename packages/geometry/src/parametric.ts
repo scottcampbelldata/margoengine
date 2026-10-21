@@ -2,7 +2,7 @@ import type { GeometryData } from './data.js';
 
 /**
  * A surface point for parameters `u` and `v` in [0, 1]: return `[x, y, z]`, or write the point into `target` and return
- * nothing (Three.js `ParametricGeometry` functions write into their target the same way).
+ * nothing.
  */
 export type ParametricFunction = (u: number, v: number, target: [number, number, number]) => ArrayLike<number> | void;
 
@@ -11,7 +11,7 @@ const step = 1e-5,
   inset = 1e-4;
 
 /**
- * Three.js `ParametricGeometry`: samples `fn(u, v)` on a `(slices + 1) x (stacks + 1)` grid, `u = i / slices` across
+ * Parametric surface: samples `fn(u, v)` on a `(slices + 1) x (stacks + 1)` grid, `u = i / slices` across
  * and `v = j / stacks` up, with UVs `(u, v)`. Normals come from the surface, `dP/du x dP/dv` by central differences
  * (one-sided at the borders), so a surface whose parameters run counter-clockwise seen from outside gets outward
  * normals, matching the winding. Where both derivatives cannot span a plane (a sphere's poles), the normal is taken a

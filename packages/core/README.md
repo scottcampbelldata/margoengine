@@ -28,9 +28,9 @@ Materials are live: `material.set({ color: '#ff8800', roughness: 0.2, metalness:
 
 Back faces of single-sided materials (`doubleSided: false`) are culled by the GPU: core draws a geometry batch with a second, back-culled pipeline whose shader has no `discard` (so early depth testing stays on) when every drawn instance of that geometry is single-sided and not mirrored (negative-determinant transform). One double-sided or mirrored instance puts the whole batch on the cull-none pipeline, which drops back faces in the shader as before; pixels are the same either way. Flipping `doubleSided` with `material.set`, assigning a material, or mirroring a mesh takes effect on the next frame; un-mirroring a moved mesh moves its batch back to the culled pipeline at the next full re-collection. Passes that replace core's shader text (fog, clipping, clustered lights...) or draw with extra bindings keep the cull-none pipeline. Instance records carry `Batch.mask` for packages: nonzero when the batch needs back faces.
 
-`mesh.receiveShadow = false` (default true, three.js style) keeps a mesh's direct light unshadowed by `@margoengine/shadows` and clustered local shadows while it still casts; the next frame re-collects instances. Core marks it by adding 0.25 to the instance's doubleSided factor (float 22), so every `< 0.5` single-sided test reads it unchanged; the shadow packages patch core's shader for it only while some mesh opts out.
+`mesh.receiveShadow = false` (default true) keeps a mesh's direct light unshadowed by `@margoengine/shadows` and clustered local shadows while it still casts; the next frame re-collects instances. Core marks it by adding 0.25 to the instance's doubleSided factor (float 22), so every `< 0.5` single-sided test reads it unchanged; the shadow packages patch core's shader for it only while some mesh opts out.
 
-The canvas is opaque. For a transparent canvas over HTML and CSS (three.js `alpha: true`), attach `TransparentCanvas` from `@margoengine/environment`; core needs no option.
+The canvas is opaque. For a transparent canvas over HTML and CSS, attach `TransparentCanvas` from `@margoengine/environment`; core needs no option.
 
 ## Camera for one render
 

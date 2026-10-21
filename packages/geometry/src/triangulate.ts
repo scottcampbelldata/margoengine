@@ -341,7 +341,7 @@ export function triangulate(data: ArrayLike<number>, holeIndices: ArrayLike<numb
   return triangles;
 }
 
-/** Signed area of a 2D contour, positive when counter-clockwise (Three.js `ShapeUtils.area`). */
+/** Signed area of a 2D contour, positive when counter-clockwise. */
 export function shapeArea(contour: readonly MutableVec2[]): number {
   let a = 0;
   for (let p = contour.length - 1, q = 0; q < contour.length; p = q++)
@@ -349,7 +349,7 @@ export function shapeArea(contour: readonly MutableVec2[]): number {
   return a * 0.5;
 }
 
-/** Three.js `ShapeUtils.isClockWise`: negative signed area. */
+/** True for a clockwise contour: negative signed area. */
 export const isClockWise = (points: readonly MutableVec2[]): boolean => shapeArea(points) < 0;
 
 function withoutClosingDuplicate(points: readonly MutableVec2[]): MutableVec2[] {
@@ -359,8 +359,8 @@ function withoutClosingDuplicate(points: readonly MutableVec2[]): MutableVec2[] 
 }
 
 /**
- * Removes consecutive points (including last-to-first) closer than 1e-10 relative to their magnitude, as Three.js
- * `ExtrudeGeometry` does. A full arc ends at (cos 2pi, sin 2pi), which is not exactly its start.
+ * Removes consecutive points (including last-to-first) closer than 1e-10 relative to their magnitude.
+ * A full arc ends at (cos 2pi, sin 2pi), which is not exactly its start.
  */
 export function mergeOverlappingPoints(points: readonly MutableVec2[]): MutableVec2[] {
   const out = points.slice();
@@ -383,7 +383,7 @@ export function mergeOverlappingPoints(points: readonly MutableVec2[]): MutableV
 }
 
 /**
- * Three.js `ShapeUtils.triangulateShape`: drops exactly repeated closing points, then triangulates. Returns flat index
+ * Shape triangulation: drops exactly repeated closing points, then triangulates. Returns flat index
  * triples into `[...contour, ...holes.flat()]` (after the closing duplicates are removed, which is done in place
  * on copies returned as `contour` and `holes`).
  */

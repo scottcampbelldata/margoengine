@@ -9,7 +9,7 @@ const cubic = (t: number, p0: number, p1: number, p2: number, p3: number) => {
   const k = 1 - t;
   return k * k * k * p0 + 3 * k * k * t * p1 + 3 * k * t * t * p2 + t * t * t * p3;
 };
-/** Uniform Catmull-Rom segment between p1 and p2 (Three.js `Interpolations.CatmullRom`). */
+/** Uniform Catmull-Rom segment between p1 and p2. */
 const catmullRom = (t: number, p0: number, p1: number, p2: number, p3: number) => {
   const v0 = (p2 - p0) * 0.5,
     v1 = (p3 - p1) * 0.5,
@@ -18,7 +18,7 @@ const catmullRom = (t: number, p0: number, p1: number, p2: number, p3: number) =
   return (2 * p1 - 2 * p2 + v0 + v1) * t3 + (-3 * p1 + 3 * p2 - 2 * v0 - v1) * t2 + v0 * t + p1;
 };
 
-/** Straight segment (Three.js `LineCurve` / `LineCurve3`). Arc length is exact. */
+/** Straight segment. Arc length is exact. */
 export class LineCurve<V extends Vec = MutableVec2> extends Curve<V> {
   constructor(
     public v1: V,
@@ -39,10 +39,10 @@ export class LineCurve<V extends Vec = MutableVec2> extends Curve<V> {
     return this.getTangent();
   }
 }
-/** 3D straight segment (Three.js `LineCurve3`). */
+/** 3D straight segment. */
 export class LineCurve3 extends LineCurve<MutableVec3> {}
 
-/** Quadratic Bezier (Three.js `QuadraticBezierCurve` / `QuadraticBezierCurve3`). */
+/** Quadratic Bezier. */
 export class QuadraticBezierCurve<V extends Vec = MutableVec2> extends Curve<V> {
   constructor(
     public v0: V,
@@ -63,10 +63,10 @@ export class QuadraticBezierCurve<V extends Vec = MutableVec2> extends Curve<V> 
     return this.v0.map((_, i) => quadratic(t, this.v0[i], this.v1[i], this.v2[i])) as V;
   }
 }
-/** 3D quadratic Bezier (Three.js `QuadraticBezierCurve3`). */
+/** 3D quadratic Bezier. */
 export class QuadraticBezierCurve3 extends QuadraticBezierCurve<MutableVec3> {}
 
-/** Cubic Bezier (Three.js `CubicBezierCurve` / `CubicBezierCurve3`). */
+/** Cubic Bezier. */
 export class CubicBezierCurve<V extends Vec = MutableVec2> extends Curve<V> {
   constructor(
     public v0: V,
@@ -92,10 +92,10 @@ export class CubicBezierCurve<V extends Vec = MutableVec2> extends Curve<V> {
     return this.v0.map((_, i) => cubic(t, this.v0[i], this.v1[i], this.v2[i], this.v3[i])) as V;
   }
 }
-/** 3D cubic Bezier (Three.js `CubicBezierCurve3`). */
+/** 3D cubic Bezier. */
 export class CubicBezierCurve3 extends CubicBezierCurve<MutableVec3> {}
 
-/** 2D uniform Catmull-Rom spline through points, clamped at the ends (Three.js `SplineCurve`). */
+/** 2D uniform Catmull-Rom spline through points, clamped at the ends. */
 export class SplineCurve extends Curve<MutableVec2> {
   constructor(public points: MutableVec2[] = []) {
     super();
@@ -114,7 +114,7 @@ export class SplineCurve extends Curve<MutableVec2> {
   }
 }
 
-/** Ellipse or elliptical arc in 2D (Three.js `EllipseCurve`). Angles in radians. */
+/** Ellipse or elliptical arc in 2D. Angles in radians. */
 export class EllipseCurve extends Curve<MutableVec2> {
   constructor(
     public aX = 0,
@@ -152,7 +152,7 @@ export class EllipseCurve extends Curve<MutableVec2> {
   }
 }
 
-/** Circular arc (Three.js `ArcCurve`). */
+/** Circular arc. */
 export class ArcCurve extends EllipseCurve {
   constructor(aX = 0, aY = 0, aRadius = 1, aStartAngle = 0, aEndAngle = Math.PI * 2, aClockwise = false) {
     super(aX, aY, aRadius, aRadius, aStartAngle, aEndAngle, aClockwise);
@@ -171,7 +171,7 @@ function hermite(x0: number, x1: number, t0: number, t1: number, t: number): num
 const squaredDistance = (a: MutableVec3, b: MutableVec3) =>
   (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
 
-/** 3D Catmull-Rom spline (Three.js `CatmullRomCurve3`), centripetal by default, optionally closed. */
+/** 3D Catmull-Rom spline, centripetal by default, optionally closed. */
 export class CatmullRomCurve3 extends Curve<MutableVec3> {
   constructor(
     public points: MutableVec3[] = [],

@@ -1,5 +1,5 @@
-// glTF 2.0 / GLB export of gltf-pro models (loaded glTF and @margoengine/materials meshes): the Margo Engine counterpart
-// of three.js GLTFExporter for PBR content. Writes the live node transforms, visibility, materials and morph weights,
+// glTF 2.0 / GLB export of gltf-pro models (loaded glTF and @margoengine/materials meshes) for PBR
+// content. Writes the live node transforms, visibility, materials and morph weights,
 // with skins, morph targets, animation clips, EXT_mesh_gpu_instancing, textures and the KHR material extensions
 // gltf-pro renders. Accessors are re-written from the decoded data gltf-pro uses, so a re-import reads the same values.
 import type { PBRModel, PBRMaterial, PBRPrimitive as ModelPrimitive } from '@margoengine/gltf-pro';
@@ -38,7 +38,7 @@ export interface ExportAnimation {
 }
 
 export interface ModelExportOptions {
-  /** Return GLB bytes (true) or a `.gltf` result (false, default), as three.js GLTFExporter. */
+  /** Return GLB bytes (true) or a `.gltf` result (false, default). */
   binary?: boolean;
   /** Clips to write, e.g. `[animation]` for an @margoengine/animation `Animation`. Default none. */
   animations?: readonly ExportAnimation[];
@@ -64,7 +64,7 @@ const clean = <T extends Json>(o: T): T => {
 const scaled = (info: Json | undefined, key: string, value: number) =>
   info && value !== 1 ? { ...info, [key]: value } : info;
 // Constructed Material slots (scene.ts). Loaded glTF uses slots 16/17 for diffuse transmission, never thickness.
-// Materials meshes sample three.js UVs (v up) from flipY uploads; glTF puts v = 0 at the image's top. The writer maps
+// Materials meshes sample v-up UVs from flipY uploads; glTF puts v = 0 at the image's top. The writer maps
 // one onto the other: v -> 1 - v for both UV sets, each image written with its GPU rows bottom first, and each UV
 // transform conjugated by that flip. Tangents keep their direction: their bitangent, toward increasing v, is up the
 // image in glTF too, as a derived frame's is.
@@ -504,7 +504,7 @@ class Writer extends Bin {
     });
   }
 
-  /** EXT_mesh_gpu_instancing: each drawn instance's node-space matrix as TRS, and its tint as `_COLOR_0` (three.js convention). */
+  /** EXT_mesh_gpu_instancing: each drawn instance's node-space matrix as TRS, and its tint as `_COLOR_0`. */
   instances(inst: NonNullable<PBRPrimitive['instances']>): GLTFInstancing {
     const n = inst.count,
       t = new Float32Array(n * 3),

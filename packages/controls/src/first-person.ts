@@ -15,7 +15,7 @@ import { translate } from './fly.js';
 const DEG = Math.PI / 180;
 
 /**
- * First-person walk-through (three.js `FirstPersonControls`): the pointer offset from the canvas center keeps
+ * First-person walk-through: the pointer offset from the canvas center keeps
  * turning the view, WASD or arrows move, R/F move up and down, left button walks forward and right button back.
  * Latitude is limited to +/-85 degrees, so the Y-up camera never looks straight up or down.
  */

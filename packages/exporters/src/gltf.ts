@@ -1,4 +1,4 @@
-// glTF 2.0 writer: the Margo Engine counterpart of Three.js GLTFExporter.
+// glTF 2.0 writer.
 import type { GLTFDocument } from '../../shared/gltf.js';
 import { copyExtras } from './extras.js';
 import {

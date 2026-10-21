@@ -17,7 +17,7 @@ const clone = (data: GeometryData, changes: Partial<GeometryData>): GeometryData
 };
 
 /**
- * Concatenates geometries (Three.js `BufferGeometryUtils.mergeGeometries`). Tangents survive only when every input
+ * Concatenates geometries. Tangents survive only when every input
  * has them. With `useGroups`, each input becomes one group whose `materialIndex` is its position in the list;
  * otherwise input groups are kept with their offsets shifted.
  */
@@ -65,7 +65,7 @@ export interface MergeVerticesOptions {
 }
 
 /**
- * Welds vertices that are within `tolerance` (Three.js `BufferGeometryUtils.mergeVertices`). Uses a spatial hash with
+ * Welds vertices that are within `tolerance`. Uses a spatial hash with
  * neighbor-cell lookup, so vertices on either side of a cell boundary still merge. Triangle order is preserved.
  */
 export function mergeVertices(data: GeometryData, options: MergeVerticesOptions = {}): GeometryData {
@@ -248,7 +248,7 @@ function corners(P: ArrayLike<number>, a: number, b: number, c: number): void {
 
 /**
  * Smooth vertex normals, each face normal weighted by the triangle's angle at that corner (less sensitive to
- * tessellation than Three.js area weighting). Vertices are not welded first; weld with `mergeVertices` for smooth
+ * tessellation than area weighting). Vertices are not welded first; weld with `mergeVertices` for smooth
  * shading across UV seams.
  */
 export function computeVertexNormals(data: GeometryData): GeometryData {
@@ -311,8 +311,8 @@ export interface CreasedNormalsOptions {
 }
 
 /**
- * Vertex normals with a crease angle and smoothing groups (Crocotile's Flat/Smooth vertex normals; three.js
- * `toCreasedNormals`). Each triangle corner averages, weighted by corner angle like `computeVertexNormals`, the face
+ * Vertex normals with a crease angle and smoothing groups (Crocotile's Flat/Smooth vertex normals).
+ * Each triangle corner averages, weighted by corner angle like `computeVertexNormals`, the face
  * normals of the triangles that touch the same position (within `tolerance`), are in the same smoothing group and are
  * within `angle` degrees of its own face. Made for meshes that store one vertex per corner (tiles); a vertex shared by
  * several triangles gets the average of its corners. Zero-area triangles add nothing, and a vertex used only by them
@@ -534,7 +534,7 @@ export function computeTangents(data: GeometryData): GeometryData {
 /**
  * Transforms by a column-major 4x4 matrix. Normals use the inverse-transpose of the upper 3x3 and are renormalized;
  * tangents use the upper 3x3. A mirroring matrix (negative determinant) also flips triangle winding and the tangent
- * sign so faces stay outward-facing (Three.js leaves the winding inverted).
+ * sign so faces stay outward-facing.
  */
 export function applyMatrix4(data: GeometryData, m: ArrayLike<number>): GeometryData {
   if (m.length !== 16) throw new RangeError('Expected a 4x4 matrix with 16 values');
@@ -634,7 +634,7 @@ export function computeBoundingBox(data: GeometryData): { min: MutableVec3; max:
   return { min, max };
 }
 
-/** Bounding sphere centered on the box center (Three.js `computeBoundingSphere`). */
+/** Bounding sphere centered on the box center. */
 export function computeBoundingSphere(data: GeometryData): { center: MutableVec3; radius: number } {
   const { min, max } = computeBoundingBox(data),
     P = data.positions;
@@ -646,7 +646,7 @@ export function computeBoundingSphere(data: GeometryData): { center: MutableVec3
   return { center, radius: Math.sqrt(r2) };
 }
 
-/** Translates so the bounding box center is at the origin (Three.js `center()`); returns new data. */
+/** Translates so the bounding box center is at the origin; returns new data. */
 export function center(data: GeometryData): GeometryData {
   const { min, max } = computeBoundingBox(data),
     c = [0, 1, 2].map((k) => (min[k] + max[k]) / 2),
@@ -657,7 +657,7 @@ export function center(data: GeometryData): GeometryData {
 }
 
 /**
- * Three.js `EdgesGeometry`: edges whose two faces meet at more than `thresholdAngle` degrees, plus boundary edges.
+ * Edges whose two faces meet at more than `thresholdAngle` degrees, plus boundary edges.
  * Positions are matched at 1e-4 precision, so split vertices along seams still pair up. Returns line index pairs
  * into `data.positions`.
  */
@@ -722,7 +722,7 @@ export function edgesGeometry(data: GeometryData, thresholdAngle = 1): Uint32Arr
   return Uint32Array.from(out);
 }
 
-/** Three.js `WireframeGeometry`: every distinct triangle edge once, as line index pairs into `data.positions`. */
+/** Every distinct triangle edge once, as line index pairs into `data.positions`. */
 export function wireframe(data: GeometryData): Uint32Array {
   const seen = new Set<number>(),
     out: number[] = [],

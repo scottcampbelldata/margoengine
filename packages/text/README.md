@@ -4,7 +4,7 @@ Crisp GPU text for Margo Engine: signed distance field glyphs generated at runti
 
 Build from source with `npm run build` in `packages/text`.
 
-Covers troika-three-text's `Text` for Latin, Greek, Cyrillic, CJK, Hebrew and emoji (no Arabic or Indic shaping and no ligatures; see Limits), and the label and signage use cases of the three.js `TextGeometry` add-on. CAD dimension callouts with constant-pixel labels are built on it in `@margoengine/machinery/dimensions`.
+SDF `Text` for Latin, Greek, Cyrillic, CJK, Hebrew and emoji (no Arabic or Indic shaping and no ligatures; see Limits), for labels and signage. CAD dimension callouts with constant-pixel labels are built on it in `@margoengine/machinery/dimensions`.
 
 ```ts
 import {Engine, box} from '@margoengine/core';
@@ -80,7 +80,7 @@ title.layout.bounds;                  // {left, right, top, bottom}
 - Each cluster is rasterized in isolation, so scripts that need contextual shaping (Arabic joining, Indic conjuncts) render as isolated forms, and ligatures are not formed. Hebrew and other non-joining right-to-left scripts work. Bidi is simplified: no explicit embeddings, isolates or weak-type rules beyond digits staying left to right.
 - Outlines plus shadow blur are limited by the field range to about 0.14 em together. Very small text (under about 6 px) loses thin strokes, as with any SDF text.
 - Emoji are bitmaps scaled from 48 px, so they soften when magnified far beyond that.
-- No extruded 3D glyph geometry (three.js `TextGeometry` meshes); that needs vector outlines a browser canvas does not expose.
+- No extruded 3D glyph geometry; that needs vector outlines a browser canvas does not expose.
 - A FontFace that is still loading delays its text; text drawn with a CSS web font before it loads uses the fallback, so call `await font.load(sample)` first.
 - The atlas never evicts. It throws once `maxPages` pages are full.
 

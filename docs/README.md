@@ -51,7 +51,7 @@ node --test tests/catalog.test.js
 
 | Package | What it is |
 | --- | --- |
-| [`@margoengine/math`](../packages/math/README.md) | Vector, quaternion, matrix, Euler, color, bounds, ray, plane and frustum math with three.js-style names, one module per type. |
+| [`@margoengine/math`](../packages/math/README.md) | Vector, quaternion, matrix, Euler, color, bounds, ray, plane and frustum math, one module per type. |
 | [`@margoengine/quality`](../packages/quality/README.md) | Measured quality tiers: start light, time the GPU, remember full 4x quality only where it has headroom. |
 | [`@margoengine/webgl`](../packages/webgl/README.md) | WebGL2 fallback renderer for browsers without WebGPU: flat-shaded PBR core meshes, opt in with Engine.create(canvas, {fallback: webglRenderer}). |
 | [`@margoengine/stats`](../packages/stats/README.md) | Allocation-free frame samples, DOM performance overlay and optional WebGPU timestamp profiling. |
@@ -89,10 +89,10 @@ node --test tests/catalog.test.js
 | [`@margoengine/oit`](../packages/oit/README.md) | Weighted blended order-independent transparency for gltf-pro BLEND primitives and materials transparent meshes: no popping between overlapping transparent parts. |
 | [`@margoengine/lod`](../packages/lod/README.md) | Level of detail with hysteresis and screen-size switching for thousands of instances, plus GPU-baked octahedral imposters drawn in one instanced call per atlas. |
 | [`@margoengine/culling`](../packages/culling/README.md) | GPU-driven static instances: frustum and Hi-Z occlusion culling in compute, order-preserving compaction and indirect draws, no per-part CPU work per frame. |
-| [`@margoengine/points`](../packages/points/README.md) | Large point clouds (Points, PointsMaterial) and instanced sprites (Sprite, SpriteMaterial) for Margo Engine, WebGPU. |
-| [`@margoengine/lines`](../packages/lines/README.md) | Fat lines (Line2, LineSegments2, LineMaterial) and debug helpers for Margo Engine, WebGPU. |
+| [`@margoengine/points`](../packages/points/README.md) | Large point clouds (PointCloud, PointsMaterial) and instanced sprites (SpriteBatch, SpriteMaterial) for Margo Engine, WebGPU. |
+| [`@margoengine/lines`](../packages/lines/README.md) | Fat lines (Line, LineMaterial) and debug helpers for Margo Engine, WebGPU. |
 | [`@margoengine/text`](../packages/text/README.md) | GPU signed distance field text for Margo Engine: runtime glyph atlases from any browser font, wrapping, alignment, outlines and shadows, WebGPU. |
-| [`@margoengine/labels`](../packages/labels/README.md) | HTML labels and CSS 3D objects positioned over a Margo Engine canvas (THREE.CSS2DRenderer and CSS3DRenderer counterparts). |
+| [`@margoengine/labels`](../packages/labels/README.md) | HTML labels and CSS 3D objects positioned over a Margo Engine canvas. |
 | [`@margoengine/html`](../packages/html/README.md) | World-space DOM anchors, CSS3D placement and scene-depth occlusion. |
 | [`@margoengine/video`](../packages/video/README.md) | WebGPU external video textures and optional Web Audio sampling. |
 | [`@margoengine/xr`](../packages/xr/README.md) | Optional WebGPU WebXR sessions, input poses and stereo rendering for Margo Engine. |
@@ -161,8 +161,8 @@ node --test tests/catalog.test.js
 | --- | --- |
 | [`@margoengine/machinery`](../packages/machinery/README.md) | Kinematics, polygonal CAD ingestion, sections and metrology for Margo Engine. |
 | [`@margoengine/brep`](../packages/brep/README.md) | Margo's own CAD kernel: STEP (ISO 10303-21) reading, product structure, units and colours, exact B-rep geometry (analytic surfaces and NURBS) and crack-free tessellation. |
-| [`@margoengine/bvh`](../packages/bvh/README.md) | Triangle BVH, spatial queries and an engine Raycaster for Margo Engine (three-mesh-bvh and THREE.Raycaster counterparts). |
-| [`@margoengine/geometry`](../packages/geometry/README.md) | Pure-CPU, tree-shakable geometry for Margo Engine: Three.js-compatible primitives, curves, shapes, extrusion, triangulation and mesh utilities. |
+| [`@margoengine/bvh`](../packages/bvh/README.md) | Triangle BVH, spatial queries and an engine Raycaster for Margo Engine. |
+| [`@margoengine/geometry`](../packages/geometry/README.md) | Pure-CPU, tree-shakable geometry for Margo Engine: primitives, curves, shapes, extrusion, triangulation and mesh utilities. |
 
 ### Frameworks (1)
 

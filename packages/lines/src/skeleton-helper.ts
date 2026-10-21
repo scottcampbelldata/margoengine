@@ -1,4 +1,4 @@
-// SkeletonHelper (three.js SkeletonHelper): a skinned model's bones as lines from each parent joint to its child joint,
+// SkeletonHelper: a skinned model's bones as lines from each parent joint to its child joint,
 // following the pose every frame. The skeleton is a structural type, so lines does not import @margoengine/animation:
 // pass its `Skeleton` (parents and skeleton-space matrices) or a glTF skin's joint meshes (`SkeletonHelper.fromGLTF`).
 // Each frame the helper re-reads the joint positions and rewrites its points only when one moved, into arrays it keeps.
@@ -37,13 +37,13 @@ export interface GLTFSkinSource {
   readonly nodes: readonly Mesh[];
 }
 /**
- * Look and placement of a {@link SkeletonHelper}. Like three.js's, it draws over the scene (`onTop`, default true) and
+ * Look and placement of a {@link SkeletonHelper}. It draws over the scene (`onTop`, default true) and
  * is not fogged (`fog`, default false).
  */
 export interface SkeletonHelperOptions extends HelperOptions {
-  /** Colour at each bone's own (child) end. Default blue '#0000ff', as three.js. */
+  /** Colour at each bone's own (child) end. Default blue '#0000ff'. */
   color?: ColorInput;
-  /** Colour at the parent end. Default green '#00ff00', as three.js. */
+  /** Colour at the parent end. Default green '#00ff00'. */
   parentColor?: ColorInput;
   /** With a `SkeletonShape`: the skinned mesh whose world matrix places the skeleton (e.g. `model.primitives[0].node`). */
   mesh?: Mesh | null;
@@ -55,7 +55,7 @@ const isJoints = (value: SkeletonShape | JointsShape): value is JointsShape => '
 const label = 'SkeletonHelper';
 
 /**
- * A skeleton as lines from each parent joint to its child joint, like three.js `SkeletonHelper`, coloured from
+ * A skeleton as lines from each parent joint to its child joint, coloured from
  * `parentColor` at the parent end to `color` at the child end. Pass `@margoengine/animation`'s `Skeleton` (with
  * `mesh`, the skinned mesh that places it) or joint meshes (`fromGLTF` builds them from a gltf-pro model's skin); it
  * follows the current pose every frame. Add it to a `Lines` plugin; `dispose()` removes it and frees its GPU buffers.

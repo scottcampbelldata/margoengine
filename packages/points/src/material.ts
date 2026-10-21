@@ -40,7 +40,7 @@ export interface BaseMaterialOptions {
   depthTest?: boolean;
   /** Write depth. Default `!transparent`. */
   depthWrite?: boolean;
-  /** Fogged by the plugin's fog (`PointsPlugin.setFog`); false keeps this material clear, like three.js `material.fog`. Default true. */
+  /** Fogged by the plugin's fog (`PointsPlugin.setFog`); false keeps this material clear. Default true. */
   fog?: boolean;
 }
 
@@ -140,7 +140,7 @@ export interface PointsMaterialOptions extends BaseMaterialOptions {
   size?: number;
   /** 'pixels' keeps a constant screen size; 'world' attenuates with distance. Default 'pixels'. */
   sizeUnits?: 'pixels' | 'world';
-  /** Three.js alias: true is `sizeUnits: 'world'`, false is 'pixels'. */
+  /** Alias: true is `sizeUnits: 'world'`, false is 'pixels'. */
   sizeAttenuation?: boolean;
   /** Clamp of the final diameter in pixels. Defaults 1 and 256. */
   minPixelSize?: number;
@@ -156,7 +156,7 @@ export interface PointsMaterialOptions extends BaseMaterialOptions {
   edl?: boolean;
 }
 
-/** Point cloud material, the counterpart of Three.js `PointsMaterial`. Read every frame; change fields freely. */
+/** Point cloud material. Read every frame; change fields freely. */
 export class PointsMaterial extends BaseMaterial {
   size = 4;
   sizeUnits: 'pixels' | 'world' = 'pixels';
@@ -213,11 +213,11 @@ export interface SpriteMaterialOptions extends BaseMaterialOptions {
   rotation?: number;
   /** 'world' sizes attenuate with distance; 'pixels' keeps a constant screen size. Default 'world'. */
   sizeUnits?: 'world' | 'pixels';
-  /** Three.js alias: false is `sizeUnits: 'pixels'`. */
+  /** Alias: false is `sizeUnits: 'pixels'`. */
   sizeAttenuation?: boolean;
 }
 
-/** Sprite material, the counterpart of Three.js `SpriteMaterial`. Transparent by default. */
+/** Sprite material. Transparent by default. */
 export class SpriteMaterial extends BaseMaterial {
   rotation = 0;
   sizeUnits: 'world' | 'pixels' = 'world';

@@ -457,7 +457,7 @@ test('failed sprite additions preserve the active instances and next index', () 
   assert.deepEqual([...batch.data.subarray(0, 3)], [4, 5, 6]);
 });
 
-test('materials validate and expose Three.js aliases', () => {
+test('materials validate and expose the sizeAttenuation aliases', () => {
   const m = new PointsMaterial({ size: 3, sizeAttenuation: true, color: '#ff0000' });
   assert.equal(m.sizeUnits, 'world');
   assert.ok(Math.abs(m.color[0] - 1) < 1e-6 && m.color[1] === 0);

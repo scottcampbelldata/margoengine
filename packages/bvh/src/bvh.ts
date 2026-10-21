@@ -82,7 +82,7 @@ export interface ShapecastTriangle {
 export const NOT_INTERSECTED = 0,
   INTERSECTED = 1,
   CONTAINED = 2;
-/** Generic traversal callbacks in the style of three-mesh-bvh's shapecast. The query returns true when a callback stops it. */
+/** Generic traversal callbacks for shapecast. The query returns true when a callback stops it. */
 export interface ShapecastCallbacks {
   /** Return NOT_INTERSECTED (or false) to skip the node, INTERSECTED (or true) to descend, CONTAINED to accept the subtree without more bounds tests. */
   intersectsBounds(
@@ -170,7 +170,7 @@ function sourceIndices(source: GeometryLike | TriangleSource): Uint32Array | nul
 }
 
 /**
- * Bounding volume hierarchy over triangles (the equivalent of three-mesh-bvh's MeshBVH), stored in flat typed arrays
+ * Bounding volume hierarchy over triangles, stored in flat typed arrays
  * that serialize and transfer to workers without copying.
  */
 export class MeshBVH {

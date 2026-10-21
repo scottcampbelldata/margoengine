@@ -610,7 +610,7 @@ test('conflicts: Alt drags eat the Alt keyup (menu bar), plain Alt presses and t
   assert.equal(doc.dispatch('keyup', { key: 'Shift' }).defaultPrevented, false);
   maya.orbit.dispose();
   assert.equal(doc.count + maya.el.count, 0, 'document listener removed');
-  // Default: Alt is ignored (three.js), so Alt + left still rotates and nothing listens on the document.
+  // Default: Alt is ignored, so Alt + left still rotates and nothing listens on the document.
   const def = rig(null),
     doc2 = new FakeElement();
   def.el.ownerDocument = doc2;
@@ -647,7 +647,7 @@ test('conflicts: context menu suppressed for right-button profiles, middle press
     el.dispatch('pointerup', { ...mouse(L), clientX: 400, clientY: 300 });
     orbit.dispose();
   }
-  // Default (three.js): middle dollies and the mousedown is untouched, as before profiles.
+  // Default: middle dollies and the mousedown is untouched, as before profiles.
   const { el, orbit } = rig(null);
   el.dispatch('pointerdown', { ...mouse(M), clientX: 400, clientY: 300 });
   assert.equal(orbit.state, 'dolly');

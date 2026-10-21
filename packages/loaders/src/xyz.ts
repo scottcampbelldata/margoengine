@@ -37,7 +37,7 @@ const numeric = (token: string): boolean => !Number.isNaN(Number(token)) || /^[+
 
 /**
  * Parses an ASCII XYZ point cloud (one point per line, separated by spaces, tabs, commas or semicolons).
- * Replaces Three.js `XYZLoader`. Auto layout: 3 columns xyz, 4 xyz+intensity, 6 xyz+rgb (xyz+normal when any
+ * Auto layout: 3 columns xyz, 4 xyz+intensity, 6 xyz+rgb (xyz+normal when any
  * extra value is negative), 7 xyz+intensity+rgb (PTS), 9 xyz+normal+rgb; other counts keep xyz only.
  * A leading count line (PTS, chemistry XYZ) and a leading element label per row are skipped. Colors given
  * as 0..255 integers are scaled to [0,1].

@@ -1,4 +1,4 @@
-// Ready-made screen effects (the three.js ShaderPass looks: vignette, RGB shift, pixelation, halftone, dot screen, Sobel,
+// Ready-made screen effects (vignette, RGB shift, pixelation, halftone, dot screen, Sobel,
 // sepia, posterize), each one NodePass built from this package's nodes. Parameters are uniforms: `effect.uniforms.x.value`
 // changes them live without recompiling. Formulas: Rec. 709 luma, the W3C Filter Effects sepia matrix, the 3x3 Sobel kernels.
 import { NodePass, inputColor, type NodePassOptions } from './post.js';
@@ -69,7 +69,7 @@ export interface VignetteOptions extends NodePassOptions {
   /** Width of the falloff, in the same units. Default 0.6. */
   softness?: number;
 }
-/** Darkens towards the corners (three.js VignetteShader). The centre inside `radius` is unchanged. */
+/** Darkens towards the corners. The centre inside `radius` is unchanged. */
 export function vignette(options: VignetteOptions = {}): ScreenEffect<{
   darkness: UniformNode<'f32'>;
   radius: UniformNode<'f32'>;
@@ -94,7 +94,7 @@ export interface RGBShiftOptions extends NodePassOptions {
   /** Direction in radians; 0 moves red right and blue left. Default 0. */
   angle?: number;
 }
-/** Shifts red and blue apart along one direction (three.js RGBShiftShader). */
+/** Shifts red and blue apart along one direction. */
 export function rgbShift(options: RGBShiftOptions = {}): ScreenEffect<{
   amount: UniformNode<'f32'>;
   angle: UniformNode<'f32'>;
@@ -136,7 +136,7 @@ export interface PixelateOptions extends NodePassOptions {
   /** Block size in pixels (whole pixels, at least 1). Default 8. */
   size?: number;
 }
-/** Square blocks of `size` pixels, each the input colour at the block's centre pixel (three.js RenderPixelatedPass look). */
+/** Square blocks of `size` pixels, each the input colour at the block's centre pixel. */
 export function pixelate(options: PixelateOptions = {}): ScreenEffect<{ size: UniformNode<'f32'> }> {
   const size = param(options.size, 8, 'size'),
     s = max(floor(size), 1),
@@ -161,7 +161,7 @@ export interface HalftoneOptions extends NodePassOptions {
   /** One luminance screen instead of three colour screens (fixed at construction). Default false. */
   greyscale?: boolean;
 }
-/** Print-style halftone: per channel, dots on rotated grids whose area follows the colour (three.js HalftonePass look). */
+/** Print-style halftone: per channel, dots on rotated grids whose area follows the colour. */
 export function halftone(options: HalftoneOptions = {}): ScreenEffect<{
   size: UniformNode<'f32'>;
   angle: UniformNode<'f32'>;
@@ -190,7 +190,7 @@ export interface DotScreenOptions extends NodePassOptions {
   /** Grid angle in radians. Default 0.785 (45 degrees). */
   angle?: number;
 }
-/** Black newspaper dots on white, sized by each pixel's darkness (three.js DotScreenShader look). */
+/** Black newspaper dots on white, sized by each pixel's darkness. */
 export function dotScreen(options: DotScreenOptions = {}): ScreenEffect<{
   size: UniformNode<'f32'>;
   angle: UniformNode<'f32'>;
@@ -215,7 +215,7 @@ export interface SobelOptions extends NodePassOptions {
   overlay?: number;
 }
 /**
- * Sobel edge detection on Rec. 709 luma (three.js SobelOperatorShader): the 3x3 gradient magnitude
+ * Sobel edge detection on Rec. 709 luma: the 3x3 gradient magnitude
  * `sqrt(gx^2 + gy^2) * strength`, clamped; a step of luma `d` gives `4 d` next to the step.
  */
 export function sobel(options: SobelOptions = {}): ScreenEffect<{
@@ -258,7 +258,7 @@ export interface SepiaOptions extends NodePassOptions {
   /** 0 unchanged, 1 full sepia. Default 1. */
   amount?: number;
 }
-/** Sepia tone with the W3C Filter Effects `sepia()` matrix (three.js SepiaShader). */
+/** Sepia tone with the W3C Filter Effects `sepia()` matrix. */
 export function sepia(options: SepiaOptions = {}): ScreenEffect<{ amount: UniformNode<'f32'> }> {
   const amount = param(options.amount, 1, 'amount'),
     c = inputColor(),

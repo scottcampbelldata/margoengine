@@ -1,6 +1,6 @@
 import type { MatrixLike, NumberArray } from './types.js';
 
-/** 3x3 matrix. `elements` is column-major (WGSL `mat3x3` order); `set()` takes row-major arguments like three.js. */
+/** 3x3 matrix. `elements` is column-major (WGSL `mat3x3` order); `set()` takes row-major arguments. */
 export class Matrix3 {
   readonly elements = new Float64Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
 

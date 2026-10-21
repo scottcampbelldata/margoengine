@@ -33,7 +33,7 @@ class Builder {
   }
 }
 
-/** Three.js `BoxGeometry`. Six groups, one per face (+x, -x, +y, -y, +z, -z). */
+/** Box. Six groups, one per face (+x, -x, +y, -y, +z, -z). */
 export function boxGeometry(
   width = 1,
   height = 1,
@@ -94,7 +94,7 @@ export function boxGeometry(
   return b.build(true);
 }
 
-/** Three.js `PlaneGeometry`, in the XY plane facing +z. */
+/** Plane in the XY plane, facing +z. */
 export function planeGeometry(width = 1, height = 1, widthSegments = 1, heightSegments = 1): GeometryData {
   const b = new Builder(),
     gridX = segments(widthSegments, 1),
@@ -116,7 +116,7 @@ export function planeGeometry(width = 1, height = 1, widthSegments = 1, heightSe
   return b.build();
 }
 
-/** Three.js `CircleGeometry`: a center vertex plus `segments + 1` rim vertices, facing +z. */
+/** Circle: a center vertex plus `segments + 1` rim vertices, facing +z. */
 export function circleGeometry(radius = 1, segmentCount = 32, thetaStart = 0, thetaLength = TAU): GeometryData {
   const b = new Builder(),
     n = segments(segmentCount, 3);
@@ -131,7 +131,7 @@ export function circleGeometry(radius = 1, segmentCount = 32, thetaStart = 0, th
   return b.build();
 }
 
-/** Three.js `RingGeometry`, facing +z. */
+/** Flat ring, facing +z. */
 export function ringGeometry(
   innerRadius = 0.5,
   outerRadius = 1,
@@ -167,7 +167,7 @@ export function ringGeometry(
 }
 
 /**
- * Three.js `CylinderGeometry` along +y. Groups: 0 side, 1 top cap, 2 bottom cap. A zero radius drops that cap and
+ * Cylinder along +y. Groups: 0 side, 1 top cap, 2 bottom cap. A zero radius drops that cap and
  * the degenerate side triangles, so a cone has a single apex row of triangles.
  */
 export function cylinderGeometry(
@@ -240,7 +240,7 @@ export function cylinderGeometry(
   return b.build(true);
 }
 
-/** Three.js `ConeGeometry`: a cylinder with a zero top radius. */
+/** Cone: a cylinder with a zero top radius. */
 export function coneGeometry(
   radius = 1,
   height = 1,
@@ -253,7 +253,7 @@ export function coneGeometry(
   return cylinderGeometry(0, radius, height, radialSegments, heightSegments, openEnded, thetaStart, thetaLength);
 }
 
-/** Three.js `SphereGeometry`. Pole rows emit one triangle per quad, so the full sphere has no degenerate triangles. */
+/** UV sphere. Pole rows emit one triangle per quad, so the full sphere has no degenerate triangles. */
 export function sphereGeometry(
   radius = 1,
   widthSegments = 32,
@@ -299,7 +299,7 @@ export function sphereGeometry(
 }
 
 /**
- * Three.js `CapsuleGeometry` (r170 layout): hemispherical caps of `capSegments` rows joined by a cylinder of
+ * Capsule: hemispherical caps of `capSegments` rows joined by a cylinder of
  * `heightSegments` rows, along +y. `height` is the length of the middle section. UVs follow arc length.
  */
 export function capsuleGeometry(
@@ -365,7 +365,7 @@ export function capsuleGeometry(
   return b.build();
 }
 
-/** Three.js `TorusGeometry` in the XY plane. */
+/** Torus in the XY plane. */
 export function torusGeometry(
   radius = 1,
   tube = 0.4,
@@ -397,7 +397,7 @@ export function torusGeometry(
   return b.build();
 }
 
-/** Three.js `TorusKnotGeometry` for a (p, q) torus knot. */
+/** Tube along a (p, q) torus knot. */
 export function torusKnotGeometry(
   radius = 1,
   tube = 0.4,
@@ -449,8 +449,8 @@ export function torusKnotGeometry(
 }
 
 /**
- * Three.js `LatheGeometry`: revolves 2D points (x is the radius, y the height) around +y. Normals come from the
- * profile like Three.js, but every normal is unit length.
+ * Lathe: revolves 2D points (x is the radius, y the height) around +y. Normals come from the
+ * profile, and every normal is unit length.
  */
 export function latheGeometry(
   points: readonly MutableVec2[] = [
@@ -513,7 +513,7 @@ export function latheGeometry(
 }
 
 /**
- * Three.js `TubeGeometry`: a tube of `radius` swept along a 3D (or 2D, z = 0) curve using its Frenet frames.
+ * A tube of `radius` swept along a 3D (or 2D, z = 0) curve using its Frenet frames.
  * `closed` reuses the first ring as the last so a closed curve gives a seamless tube.
  */
 export function tubeGeometry(

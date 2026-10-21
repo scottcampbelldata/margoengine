@@ -48,7 +48,7 @@ const finiteNumber = (value: number, label: string): number => {
 let serial = 0;
 
 /**
- * Three.js `AnimationObjectGroup`: one clip and one clock driving many models, for crowds of clones. Members are
+ * One clip and one clock driving many models, for crowds of clones. Members are
  * glTF-pro models' `Animation`s playing a clip they all have (by name or index), or, for a code-authored
  * `KeyframeClip`, `Skeleton`s and `Animation`s whose bones or nodes the tracks name. Each member may run `offset`
  * seconds ahead (negative: behind) of the group. A glTF clip plays through each member's own sampling path

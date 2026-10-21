@@ -123,8 +123,8 @@ export class OutlineFont {
   }
 
   /**
-   * Lays out `text` with one em = `size` units and returns its glyph outlines as geometry `Shape`s, holes assigned
-   * (three.js `Font.generateShapes`). The first baseline is y = 0 and lines go down by the line height; `\n` breaks a
+   * Lays out `text` with one em = `size` units and returns its glyph outlines as geometry `Shape`s, holes assigned.
+   * The first baseline is y = 0 and lines go down by the line height; `\n` breaks a
    * line. Characters the font lacks draw its missing glyph. Feed the result to `extrudeGeometry` or `shapeGeometry`.
    */
   generateShapes(text: string, size = 100, options: TextShapeOptions = {}): Shape[] {

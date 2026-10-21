@@ -6,7 +6,7 @@ Optional WebGPU frame-graph SSAO, GTAO, SSR and SSGI, bloom, motion blur, lens f
 
 Each effect alone owns its own scene capture, so alone they reject each other. `PostStack`
 (`@margoengine/post/stack`) captures the scene once in linear HDR and runs its effects on that
-capture in array order, like three.js's EffectComposer:
+capture in array order:
 
 ```ts
 import {createStage} from 'margoengine';
@@ -349,8 +349,8 @@ PostStack.attach(stage.engine, [new Bloom(), new Tonemap(), new SMAA({quality: '
 
 ## Glitch
 
-`@margoengine/post/glitch` (5,295 B min+gzip, its own entry; it carries the stack) is a digital glitch like three.js's
-GlitchPass: after a random wait of 120-240 frames a burst of 4-16 glitched frames, the first at full strength. Each
+`@margoengine/post/glitch` (5,295 B min+gzip, its own entry; it carries the stack) is a digital glitch:
+after a random wait of 120-240 frames a burst of 4-16 glitched frames, the first at full strength. Each
 glitched frame draws new random block displacement (cells of a grid slide sideways), an RGB split (red and blue read a
 few pixels apart) and scanline tearing (up to three bands of rows slide sideways, each line jittered). It is an LDR
 `PostStack` effect; `Glitch.attach` runs it alone.
@@ -358,7 +358,7 @@ few pixels apart) and scanline tearing (up to three bands of rows slide sideways
 ```ts
 import {Glitch} from '@margoengine/post/glitch';
 const glitch = Glitch.attach(stage.engine, {seed: 7});
-glitch.options.wild = true;        // three.js goWild: glitch every frame
+glitch.options.wild = true;        // glitch every frame
 glitch.options.intensity = 0.4;    // 0-1, scales displacement, split and tearing
 ```
 
@@ -375,9 +375,9 @@ glitch.options.intensity = 0.4;    // 0-1, scales displacement, split and tearin
 
 ## Afterimage
 
-`@margoengine/post/afterimage` (4,825 B min+gzip, its own entry; it carries the stack) leaves trails like three.js's
-AfterimagePass: each channel of the output is `max(current, history x damp)`, and the output becomes the next frame's
-history. `damp` defaults to 0.96, as three.js documents.
+`@margoengine/post/afterimage` (4,825 B min+gzip, its own entry; it carries the stack) leaves trails:
+each channel of the output is `max(current, history x damp)`, and the output becomes the next frame's
+history. `damp` defaults to 0.96.
 
 ```ts
 import {Afterimage} from '@margoengine/post/afterimage';

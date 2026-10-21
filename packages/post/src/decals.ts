@@ -16,7 +16,7 @@ declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
-/** A projected decal: a box projector along `direction` whose footprint is `width` x `height` (three.js DecalGeometry, as a screen-space pass). */
+/** A projected decal: a box projector along `direction` whose footprint is `width` x `height`, drawn as a screen-space pass. */
 export interface Decal {
   /** World-space centre of the projector box. */
   position: Vec3;

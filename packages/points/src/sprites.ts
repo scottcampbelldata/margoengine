@@ -39,8 +39,8 @@ export interface SpriteBatchOptions {
 }
 
 /**
- * Camera-facing textured quads drawn with one instanced draw call: the counterpart of many Three.js `Sprite`
- * objects sharing a `SpriteMaterial`. Sprites are addressed by index.
+ * Camera-facing textured quads drawn with one instanced draw call, all sharing a
+ * `SpriteMaterial`. Sprites are addressed by index.
  */
 export class SpriteBatch {
   name: string;

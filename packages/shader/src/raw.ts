@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // RawShaderMaterial and RawMesh: the caller's own WGSL stages, vertex layout, uniforms and textures, drawn by the RawShaders
-// plugin in the scene's colour and depth pass (three.js RawShaderMaterial / ShaderMaterial with BufferGeometry). What a
+// plugin in the scene's colour and depth pass. What a
 // shader can read is declared by a prelude in front of the caller's code; `material.code(stage, mesh)` shows the module.
 import { MargoError } from '@margoengine/math/errors';
 import { parseColor } from '@margoengine/math/color';
@@ -39,7 +39,7 @@ export interface RawAttribute {
   step?: 'vertex' | 'instance';
 }
 /**
- * A live uniform, three.js style: assign `material.uniforms.name.value` any time. A number is an f32 (or the scalar of
+ * A live uniform: assign `material.uniforms.name.value` any time. A number is an f32 (or the scalar of
  * `type`), 2/3/4/9/16 numbers a vecNf/mat3x3f/mat4x4f, and `'#rrggbb'`/`0xrrggbb` with a vec3f type an sRGB colour
  * decoded to linear. `type` is fixed at construction.
  */
@@ -60,7 +60,7 @@ export interface RawTexture {
   /** Default `'float'` (filterable). Integer textures read with textureLoad. */
   sampleType?: 'float' | 'unfilterable-float' | 'sint' | 'uint';
 }
-/** Colour blending of a {@link RawShaderMaterial}: a three.js-style preset or a WebGPU blend state. */
+/** Colour blending of a {@link RawShaderMaterial}: a named preset or a WebGPU blend state. */
 export type RawBlending = 'none' | 'normal' | 'additive' | 'multiply' | 'premultiplied' | GPUBlendState;
 /** Options for `new RawShaderMaterial(options)`. Render state fields stay live on the material. */
 export interface RawShaderMaterialOptions {
@@ -78,7 +78,7 @@ export interface RawShaderMaterialOptions {
   textures?: Record<string, RawTextureSource | RawTexture | null>;
   /** Draw after the opaque scene, sorted back to front, with blending. Default false. */
   transparent?: boolean;
-  /** Default `'normal'`, which (as in three.js) blends only when `transparent`. */
+  /** Default `'normal'`, which blends only when `transparent`. */
   blending?: RawBlending;
   /** Reversed-Z `greater-equal` test against the scene depth. Default true. */
   depthTest?: boolean;
@@ -258,7 +258,7 @@ const blends: Record<string, GPUBlendState | undefined> = {
 
 let materials = 0;
 /**
- * three.js RawShaderMaterial for WebGPU: your own WGSL vertex and fragment entry points, drawn by {@link RawShaders} in
+ * Raw shader material for WebGPU: your own WGSL vertex and fragment entry points, drawn by {@link RawShaders} in
  * the scene's colour and depth pass. A prelude in front of your code declares what you can read: `camera` (view,
  * projection, viewProjection, position, time, resolution, deltaTime), `mesh` (world, normal), `uniforms.<name>`, each
  * texture `<name>` with `<name>Sampler`, the `Attributes` struct of the drawn RawMesh, and `margoDisplay(c)` /
@@ -739,7 +739,7 @@ export interface RawMeshOptions {
 const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 /**
  * Geometry for a {@link RawShaderMaterial}: any named attributes (per vertex or per instance), an optional index buffer and
- * an instance count, three.js BufferGeometry + InstancedBufferAttribute. Add it to a {@link RawShaders} plugin to draw it.
+ * an instance count. Add it to a {@link RawShaders} plugin to draw it.
  * Per-vertex and per-instance attributes are each interleaved into one vertex buffer; `setAttribute` updates are live.
  */
 export class RawMesh {

@@ -17,7 +17,7 @@ export const damp = (x: number, y: number, lambda: number, dt: number): number =
   lerp(x, y, 1 - Math.exp(-lambda * dt));
 /**
  * Hermite smoothstep of `x` between `min` and `max`: 0 at or below min, 1 at or above max, `3t² - 2t³` between
- * (three.js `MathUtils.smoothstep` argument order; WGSL's and `@margoengine/shader`'s take the edges first).
+ * (value first; WGSL's and `@margoengine/shader`'s take the edges first).
  */
 export const smoothstep = (x: number, min: number, max: number): number => {
   if (x <= min) return 0;
@@ -62,7 +62,7 @@ export const createLcgRandom =
   () =>
     (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
 let shared = 1234567;
-/** three.js-style shared seeded random in [0, 1). Passing `seed` restarts the shared sequence. Prefer `createRandom` for isolated streams. */
+/** Shared seeded random in [0, 1). Passing `seed` restarts the shared sequence. Prefer `createRandom` for isolated streams. */
 export function seededRandom(seed?: number): number {
   if (seed !== undefined) shared = seed | 0;
   return step((shared = (shared + 0x6d2b79f5) | 0));

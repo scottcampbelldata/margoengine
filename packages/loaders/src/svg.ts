@@ -809,7 +809,7 @@ class Drawn implements SVGPath {
 }
 
 /**
- * Parses an SVG document (three.js `SVGLoader`): `path` with every command (M L H V C S Q T A Z, absolute and
+ * Parses an SVG document: `path` with every command (M L H V C S Q T A Z, absolute and
  * relative), `rect` (rounded too), `circle`, `ellipse`, `line`, `polyline` and `polygon`, inside nested `g`, `a`,
  * `svg` viewports and `use` copies of `defs` or `symbol` content, with `transform` lists (matrix, translate, scale,
  * rotate, skewX, skewY). Styles come from presentation attributes, `style` attributes and simple `<style>` rules, with

@@ -5,7 +5,7 @@ let scratch: Float64Array | undefined;
 /**
  * 4x4 matrix. `elements` is a column-major Float64Array, the same layout as core `camera.matrix` and the world matrices
  * from `meshRuntime(mesh).matrix` (`@margoengine/core/extension`, Float32Array), so `fromArray` and `toArray(float32Buffer)` copy straight across.
- * `set()` takes row-major arguments like three.js.
+ * `set()` takes row-major arguments.
  */
 export class Matrix4 {
   readonly elements = new Float64Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
@@ -222,7 +222,7 @@ export class Matrix4 {
   makeRotationFromQuaternion(q: Vec4Like): this {
     return this.composeComponents(0, 0, 0, q.x, q.y, q.z, q.w, 1, 1, 1);
   }
-  /** this = T(position) * R(quaternion) * S(scale), the order core and three.js use. */
+  /** this = T(position) * R(quaternion) * S(scale), the order core uses. */
   compose(position: Vec3Like, quaternion: Vec4Like, scale: Vec3Like): this {
     return this.composeComponents(
       position.x,

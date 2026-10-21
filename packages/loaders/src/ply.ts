@@ -160,7 +160,7 @@ const find = (properties: PLYProperty[], names: string[]): number => {
 };
 
 /**
- * Parses an ASCII or binary (little or big endian) PLY file. Replaces Three.js `PLYLoader`.
+ * Parses an ASCII or binary (little or big endian) PLY file.
  * Faces become a triangle fan; a file without faces is returned as a point cloud.
  */
 export function parsePLY(input: BinaryInput, options: PLYOptions = {}): LoadedGeometry {

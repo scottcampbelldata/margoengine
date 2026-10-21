@@ -1,4 +1,4 @@
-// Light helpers (three.js PointLightHelper, SpotLightHelper, DirectionalLightHelper, HemisphereLightHelper and
+// Light helpers (PointLightHelper, SpotLightHelper, DirectionalLightHelper, HemisphereLightHelper and
 // RectAreaLightHelper) and LightsHelper, which draws every light of a list in one Line. The lights are structural types,
 // so lines does not import @margoengine/clustered or @margoengine/environment: pass their light objects or their `list`
 // getters (Clustered.list, DirectionalLights.list, AreaLights.list) and a HemisphereLight. Each frame a helper re-reads
@@ -270,31 +270,31 @@ class OneLightHelper<T extends LightShape> extends LightsHelper {
     if (lightKind(light) !== expected) throw new TypeError(`Expected a ${expected} light`);
   }
 }
-/** A point light as three circles of radius `size` (default 0.25), like three.js `PointLightHelper`. */
+/** A point light as three circles of radius `size` (default 0.25). */
 export class PointLightHelper extends OneLightHelper<PointLightShape> {
   constructor(light: PointLightShape, options: LightHelperOptions = {}) {
     super(light, options, 'point');
   }
 }
-/** A spot light's outer cone to its range (or `length`) and the inner cone's rim, like three.js `SpotLightHelper`. */
+/** A spot light's outer cone to its range (or `length`) and the inner cone's rim. */
 export class SpotLightHelper extends OneLightHelper<SpotLightShape> {
   constructor(light: SpotLightShape, options: LightHelperOptions = {}) {
     super(light, options, 'spot');
   }
 }
-/** A directional light as a square of side `size` at `position` and a line the way it travels, like three.js `DirectionalLightHelper`. */
+/** A directional light as a square of side `size` at `position` and a line the way it travels. */
 export class DirectionalLightHelper extends OneLightHelper<DirectionalLightShape> {
   constructor(light: DirectionalLightShape, options: LightHelperOptions = {}) {
     super(light, options, 'directional');
   }
 }
-/** A hemisphere light as a sphere of radius `size` at `position`, sky colour above, ground below, like three.js `HemisphereLightHelper`. */
+/** A hemisphere light as a sphere of radius `size` at `position`, sky colour above, ground below. */
 export class HemisphereLightHelper extends OneLightHelper<HemisphereLightShape> {
   constructor(light: HemisphereLightShape, options: LightHelperOptions = {}) {
     super(light, options, 'hemisphere');
   }
 }
-/** A rectangle area light's outline and normal, like three.js `RectAreaLightHelper`. */
+/** A rectangle area light's outline and normal. */
 export class RectAreaLightHelper extends OneLightHelper<RectAreaLightShape> {
   constructor(light: RectAreaLightShape, options: LightHelperOptions = {}) {
     super(light, options, 'rect');

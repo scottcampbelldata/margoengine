@@ -1,7 +1,7 @@
 import type { MatrixLike, NumberArray, Vec4Like } from './types.js';
 
 /**
- * A 4D vector `(x, y, z, w)` with three.js `Vector4` method names (default (0, 0, 0, 1), as in three.js). Methods
+ * A 4D vector `(x, y, z, w)` (default (0, 0, 0, 1)). Methods
  * write into `this` and return it for chaining. No input validation: NaN propagates.
  */
 export class Vector4 {

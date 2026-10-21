@@ -4,7 +4,7 @@ Fat lines with joins, caps, dashes and antialiasing, plus the debug helpers, as 
 
 Build from source with `npm run build` in `packages/lines`.
 
-Replaces the three.js `Line2`, `LineSegments2`, `LineGeometry`, `LineSegmentsGeometry` and `LineMaterial` add-ons, and `GridHelper`, `PolarGridHelper`, `AxesHelper`, `BoxHelper`, `Box3Helper`, `ArrowHelper`, `CameraHelper`, `PlaneHelper`, `VertexNormalsHelper`, `SkeletonHelper` and the light helpers (`PointLightHelper`, `SpotLightHelper`, `DirectionalLightHelper`, `HemisphereLightHelper`, `RectAreaLightHelper`).
+Exports `Line` and `LineMaterial`, and `GridHelper`, `PolarGridHelper`, `AxesHelper`, `BoxHelper`, `Box3Helper`, `ArrowHelper`, `CameraHelper`, `PlaneHelper`, `VertexNormalsHelper`, `SkeletonHelper` and the light helpers (`PointLightHelper`, `SpotLightHelper`, `DirectionalLightHelper`, `HemisphereLightHelper`, `RectAreaLightHelper`).
 
 ```ts
 import {Engine, box} from '@margoengine/core';
@@ -42,7 +42,7 @@ dashed.dashOffset += 0.01;
 - **Instanced screen-space quads.** Each segment is one instance of 78 vertices drawn from a storage buffer of points; there is one draw call per line. The vertex shader projects the segment and its neighbors, then builds the body quad, the join on its end (owned by the incoming segment) and the cap on its start. Miter joins share their corner points with the next segment, so translucent lines have no double-blended overlap; bevel and round joins add a wedge and a 10-triangle fan on the outer side. A miter longer than `miterLimit` times the width falls back to bevel. `expandLine` in this package is the same algorithm on the CPU, in pixels, and the Node tests check it for exact areas and zero overlap.
 - **Widths.** Pixel widths are CSS pixels, scaled by the ratio of the render target to the canvas client size. World-unit widths are converted per endpoint from the camera's focal length and the clip w, so thick lines taper with perspective. Lines thinner than one pixel are drawn one pixel wide with proportionally lower alpha.
 - **Antialiasing.** Geometry grows by one pixel and the fragment shader ramps coverage over the last pixel of every edge, butt or square cap end and dash end (dash ends use `fwidth` of the distance). This coverage ramp works alongside 4× MSAA on the WebGPU canvas path.
-- **Dashes.** Distances accumulate along the line in world space (after the model or mesh matrix) on the CPU, are recomputed only when the points or the matrix change, and are interpolated perspective-correctly. Segment lists accumulate across segments like `LineSegments2.computeLineDistances`.
+- **Dashes.** Distances accumulate along the line in world space (after the model or mesh matrix) on the CPU, are recomputed only when the points or the matrix change, and are interpolated perspective-correctly. Segment lists accumulate across segments.
 - **Depth.** Lines test against the scene depth with reversed-Z `greater-equal` and do not write depth. `onTop` lines use `always` and draw after the depth-tested ones. Endpoints behind the near plane are clipped in clip space, so a line passing beside the camera is cut, not mirrored.
 - **Color.** Colors are linear RGB (`'#rrggbb'` and `0xrrggbb` are sRGB and converted, like `PbrMaterial`). Output is sRGB-encoded for unorm canvas formats and left linear for `-srgb` and float targets such as the `rgba16float` target of the post-processing packages. Blending is straight alpha (`src-alpha, one-minus-src-alpha`).
 - **Plugin lifecycle.** The pass is `lines:draw` at frame-graph order 20, after the scene, sky and particles and before post-processing resolves at 30. GPU buffers are created lazily per line and rebuilt from the CPU copies in `onDeviceRestored`. `dispose()` (and `engine.removePlugin`) destroys every buffer and the pass; the lines stay registered with the plugin object, so it can be attached again.
@@ -57,7 +57,7 @@ dashed.dashOffset += 0.01;
 | --- | --- | --- |
 | `positions` | none | x, y, z per point |
 | `colors` | none | r, g, b or r, g, b, a per point, linear |
-| `mode` | `'strip'` | `'segments'` (pairs, `LineSegments2`), `'strip'` (`Line2`), `'loop'` (closed) |
+| `mode` | `'strip'` | `'segments'` (pairs), `'strip'` (polyline), `'loop'` (closed) |
 | `mesh` | `null` | Follow a core mesh's world matrix |
 | `matrix` | identity | Model matrix when not attached |
 | `material` | new | Share a `LineMaterial` between lines |
@@ -72,13 +72,13 @@ dashed.dashOffset += 0.01;
 | `vertexColors` | when colors exist | |
 | `onTop` | `false` | Skip the depth test |
 | `antialias` | `true` | |
-| `fog` | `true` | Fogged by the plugin's `setFog`; `false` keeps the line clear, like three.js `material.fog` |
+| `fog` | `true` | Fogged by the plugin's `setFog`; `false` keeps the line clear |
 
 `new Lines({name, order})` sets the plugin name (default `'lines'`) and pass order (default `20`). `lines.stats` reports lines, segments and draw calls of the last frame.
 
 Helpers are `Line` subclasses and take the material options too (they default to butt caps and miter joins): `GridHelper({size, divisions, color1, color2})`, `PolarGridHelper({radius, sectors, rings, divisions, color1, color2})`, `AxesHelper({size})`, `Box3Helper(min, max, {color})`, `BoxHelper(mesh, {color})` (world bounds every frame), `ArrowHelper({direction, origin, length, color, headLength, headWidth})`, `CameraHelper(camera, {aspect})` (unprojects `camera.matrix`), `PlaneHelper({normal, constant, size, color})` and `VertexNormalsHelper(mesh, {size, color})` (world space with the normal matrix).
 
-Light helpers (three.js `PointLightHelper`, `SpotLightHelper`, `DirectionalLightHelper`, `HemisphereLightHelper`,
+Light helpers (`PointLightHelper`, `SpotLightHelper`, `DirectionalLightHelper`, `HemisphereLightHelper`,
 `RectAreaLightHelper`) take the light objects themselves, typed by shape so lines imports neither
 `@margoengine/clustered` nor `@margoengine/environment`, and follow their changes each frame:
 `PointLightHelper(light, {size})` (three circles), `SpotLightHelper(light, {length})` (the outer cone to the range, or
@@ -113,11 +113,11 @@ lines.setFog(fog);
 
 ## SkeletonHelper
 
-`SkeletonHelper` draws a skinned model's bones as lines from each parent joint to its child joint, like three.js
-`SkeletonHelper`, and follows the pose every frame. It takes `@margoengine/animation`'s `Skeleton` (any object with
+`SkeletonHelper` draws a skinned model's bones as lines from each parent joint to its child joint,
+and follows the pose every frame. It takes `@margoengine/animation`'s `Skeleton` (any object with
 `parents` and 16 `matrices` numbers per bone; `mesh` places the skeleton with the skinned mesh's world matrix) or, through
 `SkeletonHelper.fromGLTF(model, skin)`, a glTF skin's joint nodes (each joined to its parent node when that is a joint).
-Lines does not import animation. Colours run from `parentColor` (default green) to `color` (default blue), as three.js;
+Lines does not import animation. Colours run from `parentColor` (default green) to `color` (default blue);
 `setColors(color, parentColor)` changes them. It draws over the scene (`onTop`) and is not fogged unless asked.
 
 ```ts
@@ -135,7 +135,7 @@ bones.dispose(); // removes it from the plugin and frees its buffers
 - Lines do not write depth, so crossing lines do not occlude each other and are not pickable through `engine.pick`. Round joins of translucent lines overlap on the inner side only when a segment is shorter than the join (the inner miter would overshoot).
 - Dashes run continuously through joins, and caps apply to line ends only, not to each dash. World-unit widths ignore the mesh scale.
 - `ArrowHelper` draws its head as a wire cone, and `PlaneHelper` draws an outline with diagonals; there are no filled meshes. `CameraHelper` expects a WebGPU (reversed-Z) camera matrix.
-- No line picking (`Line2.raycast`) yet; `expandLine` gives the screen-space triangles for a CPU hit test.
+- No line picking yet; `expandLine` gives the screen-space triangles for a CPU hit test.
 
 ## Tests
 

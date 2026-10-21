@@ -261,7 +261,7 @@ interface PoseBVH {
 }
 const poseCache = new WeakMap<DeformedPickingSource, PoseBVH[]>();
 /**
- * CPU picking against engine meshes, the Margo Engine counterpart of THREE.Raycaster. Each geometry gets a cached MeshBVH,
+ * CPU picking against engine meshes. Each geometry gets a cached MeshBVH,
  * meshes are rejected by their world bounding sphere, and the ray is tested in each mesh's local space.
  */
 export class Raycaster {

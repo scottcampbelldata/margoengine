@@ -12,9 +12,9 @@ import { clamp } from '@margoengine/math/mathutils';
 import { basis, intersectPlane, ray } from './view.js';
 import type { KeyAction, NavigationProfile } from './profiles.js';
 
-/** Mouse button actions, as in three.js `MOUSE`. */
+/** Mouse button actions. */
 export const MOUSE = { ROTATE: 0, DOLLY: 1, PAN: 2 } as const;
-/** Touch gesture actions, as in three.js `TOUCH`. */
+/** Touch gesture actions. */
 export const TOUCH = { ROTATE: 0, PAN: 1, DOLLY_PAN: 2, DOLLY_ROTATE: 3 } as const;
 
 type Action =
@@ -42,7 +42,7 @@ const VIEWS: Record<string, V3> = {
 };
 
 /**
- * Orbits the camera around `camera.target` (three.js `OrbitControls`). Left drag rotates, middle drag or wheel
+ * Orbits the camera around `camera.target`. Left drag rotates, middle drag or wheel
  * dollies, right drag (or shift/ctrl + left) pans; one finger rotates, two fingers dolly and pan.
  */
 export class OrbitControls extends Controls {
@@ -143,7 +143,7 @@ export class OrbitControls extends Controls {
     this.keyTarget = null;
   }
 
-  /** The CAD navigation profile set with `setProfile`, or null for the three.js defaults. */
+  /** The CAD navigation profile set with `setProfile`, or null for the defaults. */
   get profile(): NavigationProfile | null {
     return this.nav;
   }
@@ -590,7 +590,7 @@ const mid = (a: Point, b: Point): Point => ({ x: (a.x + b.x) / 2, y: (a.y + b.y)
 const spread = (a: Point, b: Point): number => Math.hypot(a.x - b.x, a.y - b.y);
 
 /**
- * Map-style orbit (three.js `MapControls`): left drag pans along the ground plane, right drag rotates,
+ * Map-style orbit: left drag pans along the ground plane, right drag rotates,
  * two fingers dolly and rotate.
  */
 export class MapControls extends OrbitControls {

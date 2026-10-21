@@ -1,6 +1,6 @@
 import { Geometry } from '@margoengine/core';
 
-/** A draw range sharing one material, in index units (same meaning as Three.js `BufferGeometry.groups`). */
+/** A draw range sharing one material, in index units. */
 export interface GeometryGroup {
   start: number;
   count: number;
@@ -8,8 +8,8 @@ export interface GeometryGroup {
 }
 
 /**
- * Plain CPU geometry. Every primitive returns this shape. `indices` is always present: Three.js primitives that are
- * non-indexed (polyhedra, extrude) get sequential indices so vertex counts still match Three.js.
+ * Plain CPU geometry. Every primitive returns this shape. `indices` is always present: primitives built
+ * non-indexed (polyhedra, extrude) get sequential indices.
  */
 export interface GeometryData {
   positions: Float32Array;

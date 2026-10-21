@@ -1,7 +1,7 @@
 import type { MatrixLike, NumberArray, Vec2Like } from './types.js';
 
 /**
- * A 2D vector `(x, y)` with three.js `Vector2` method names (default (0, 0)). Methods write into `this` and return it
+ * A 2D vector `(x, y)` (default (0, 0)). Methods write into `this` and return it
  * for chaining; `toArray()` gives `[x, y]`. No input validation: NaN propagates.
  */
 export class Vector2 {

@@ -136,7 +136,7 @@ function read(view: DataView, offset: number, kind: number): number {
 }
 
 /**
- * Parses a PCD point cloud with `DATA ascii`, `binary` or `binary_compressed` (LZF). Replaces Three.js `PCDLoader`.
+ * Parses a PCD point cloud with `DATA ascii`, `binary` or `binary_compressed` (LZF).
  * Reads x/y/z, normal_x/y/z, packed rgb or rgba, and intensity (as `attributes.intensity`).
  */
 export function parsePCD(input: BinaryInput, options: PCDOptions = {}): LoadedGeometry {

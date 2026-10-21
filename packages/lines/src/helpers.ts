@@ -34,7 +34,7 @@ function basis(normal: Vec3): [number[], number[], number[]] {
   return [n, u, [n[1] * u[2] - n[2] * u[1], n[2] * u[0] - n[0] * u[2], n[0] * u[1] - n[1] * u[0]]];
 }
 
-/** Grid in the XZ plane, like three.js `GridHelper`. The two center lines use `color1`. */
+/** Grid in the XZ plane. The two center lines use `color1`. */
 export class GridHelper extends Line {
   constructor({
     size = 10,
@@ -61,7 +61,7 @@ export class GridHelper extends Line {
   }
 }
 
-/** Polar grid in the XZ plane, like three.js `PolarGridHelper`. Sectors and rings alternate between the two colors. */
+/** Polar grid in the XZ plane. Sectors and rings alternate between the two colors. */
 export class PolarGridHelper extends Line {
   constructor({
     radius = 10,
@@ -109,7 +109,7 @@ export class PolarGridHelper extends Line {
   }
 }
 
-/** X, Y and Z axes in red, green and blue, like three.js `AxesHelper`. */
+/** X, Y and Z axes in red, green and blue. */
 export class AxesHelper extends Line {
   constructor({ size = 1, ...options }: { size?: number } & HelperOptions = {}) {
     if (!(size > 0)) throw new RangeError('Axes size must be positive');
@@ -138,7 +138,7 @@ function boxPositions(min: ArrayLike<number>, max: ArrayLike<number>, out: numbe
   return out;
 }
 
-/** Edges of an axis-aligned box given by min and max corners, like three.js `Box3Helper`. */
+/** Edges of an axis-aligned box given by min and max corners. */
 export class Box3Helper extends Line {
   constructor(
     min: Vec3 = [-0.5, -0.5, -0.5],
@@ -246,7 +246,7 @@ export class BoxHelper extends Line {
   }
 }
 
-/** An arrow from `origin` along `direction`, like three.js `ArrowHelper`; the head is drawn as a wire cone. */
+/** An arrow from `origin` along `direction`; the head is drawn as a wire cone. */
 export class ArrowHelper extends Line {
   private dir: Vec3;
   private origin: Vec3;
@@ -371,7 +371,7 @@ const cameraPairs: Array<[string, string, keyof typeof cameraColors]> = [
 ];
 
 /**
- * Frustum, cone, up marker and center cross of a Margo Engine `Camera`, like three.js `CameraHelper`.
+ * Frustum, cone, up marker and center cross of a Margo Engine `Camera`.
  * Each frame the camera is updated with `aspect` (default: the engine canvas aspect) unless it is the engine's own camera.
  */
 export class CameraHelper extends Line {
@@ -414,7 +414,7 @@ export class CameraHelper extends Line {
   }
 }
 
-/** Outline and diagonals of the plane `normal . p + constant = 0`, like three.js `PlaneHelper`. */
+/** Outline and diagonals of the plane `normal . p + constant = 0`. */
 export class PlaneHelper extends Line {
   constructor({
     normal = [0, 1, 0],

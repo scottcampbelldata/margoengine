@@ -44,7 +44,7 @@ output. `exportModel` writes live perspective/orthographic projections, light co
 with node attachments, hierarchy and live transforms. Hidden nodes follow `onlyVisible`; a model with no cameras or
 lights exports without camera arrays or punctual-light declarations. No additional light type is introduced.
 
-Materials meshes use three.js UV orientation (v = 0 at the bottom of a `flipY` texture); glTF puts v = 0 at the
+Materials meshes use v-up UV orientation (v = 0 at the bottom of a `flipY` texture); glTF puts v = 0 at the
 image's top. `exportModel` writes their UVs as `1 - v`, each texture's PNG with its GPU rows bottom first (a `flipY`
 image as it is, raw pixel rows and `flipY: false` sources reversed) and each UV transform rewritten for the flipped v
 (rotation negated, offset moved). Tangents are kept: their bitangent runs up the image in both conventions. So a
@@ -78,7 +78,7 @@ Engine export entrypoints also bake back-only optional PBR triangles by reversin
 | Option | Exporters | Default |
 | --- | --- | --- |
 | `onlyVisible` | all | `true`. Skip hidden meshes (or nodes with `visible: false`) and their descendants |
-| `root` | all, engine source | Whole scene. A live mesh; it and its descendants are exported. In hierarchy mode the root keeps its local transform, as in Three.js |
+| `root` | all, engine source | Whole scene. A live mesh; it and its descendants are exported. In hierarchy mode the root keeps its local transform |
 | `geometryData` | all, engine source | None. A `Map`/`WeakMap` from core `Geometry` to richer `GeometryData` |
 | `materialData` | all, engine source | None. A `Map`/`WeakMap` from `PbrMaterial` to `MaterialData` |
 | `flatten` | glTF | `false`. World transforms on root nodes instead of the hierarchy |
@@ -86,7 +86,7 @@ Engine export entrypoints also bake back-only optional PBR triangles by reversin
 | `maxBinaryBytes`, `maxBytes` | `exportGLB` | 4,294,967,295 (the GLB format limit). Output limits; see [GLB size limits](#glb-size-limits) |
 | `embed` | `exportGLTF` | `true`, base64 data URI. `false` returns `bin` for a separate file |
 | `binUri` | `exportGLTF` | `'scene.bin'`, a relative file name |
-| `binary` | STL, PLY | STL `true`, PLY `false` (ASCII, as in Three.js) |
+| `binary` | STL, PLY | STL `true`, PLY `false` (ASCII) |
 | `name` | STL | ASCII `solid` name, or the 80-byte binary header (must not start with `solid`) |
 | `materials`, `mtlName` | OBJ | `false`, `'scene.mtl'` |
 | `colors` | OBJ, PLY | `false`. OBJ appends sRGB vertex colors to `v` lines; PLY writes uchar `red green blue` |
@@ -96,7 +96,7 @@ Engine export entrypoints also bake back-only optional PBR triangles by reversin
 | `mergeVertices` | OBJ | `false`. Welds a mesh's corners whose position, uv, normal and written color agree within 1e-5 |
 | `scale` | OBJ | `1`. Multiplies every position |
 
-`GeometryData` is `{positions, normals, uvs?, tangents?, colors?, indices?, faceSizes?, joints?, weights?, morphs?}` with xyz, xyz, uv, xyzw and linear rgb or rgba per vertex. `uvs` follow glTF (v = 0 at the image's top, images as encoded): a materials mesh's three.js UVs go in as `1 - v`. `faceSizes` lists corners per face in index order: 3 for a triangle, 4 for the next two triangles when they form a quad (sharing an edge, as (a, b, c), (a, c, d)); OBJ and DAE write those quads as 4-corner faces, the other formats write the triangles. Inputs are validated: finite Float32 values, matching lengths, complete triangles, indices in range, colors in [0, 1], nonzero scales (or [0, 0, 0], below) and quaternions, PNG or JPEG bytes that match `mimeType`, and textured materials only on geometry with the UV set they sample.
+`GeometryData` is `{positions, normals, uvs?, tangents?, colors?, indices?, faceSizes?, joints?, weights?, morphs?}` with xyz, xyz, uv, xyzw and linear rgb or rgba per vertex. `uvs` follow glTF (v = 0 at the image's top, images as encoded): a materials mesh's v-up UVs go in as `1 - v`. `faceSizes` lists corners per face in index order: 3 for a triangle, 4 for the next two triangles when they form a quad (sharing an edge, as (a, b, c), (a, c, d)); OBJ and DAE write those quads as 4-corner faces, the other formats write the triangles. Inputs are validated: finite Float32 values, matching lengths, complete triangles, indices in range, colors in [0, 1], nonzero scales (or [0, 0, 0], below) and quaternions, PNG or JPEG bytes that match `mimeType`, and textured materials only on geometry with the UV set they sample.
 
 ## Data-scene skin, morph and animation export
 

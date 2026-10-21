@@ -54,7 +54,7 @@ export interface PointOwner {
 }
 
 /**
- * A chunked, GPU-resident point cloud: the counterpart of Three.js `Points` with a `PointsMaterial`.
+ * A chunked, GPU-resident point cloud drawn with a `PointsMaterial`.
  * Add it to a `PointsPlugin` to draw it.
  */
 export class PointCloud {

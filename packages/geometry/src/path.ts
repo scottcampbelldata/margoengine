@@ -2,7 +2,7 @@ import { Curve } from './curve.js';
 import { CubicBezierCurve, EllipseCurve, LineCurve, QuadraticBezierCurve, SplineCurve } from './curves.js';
 import { equals, finiteNumber, type Vec, type MutableVec2 } from './math.js';
 
-/** A chain of curves treated as one curve by arc length (Three.js `CurvePath`). */
+/** A chain of curves treated as one curve by arc length. */
 export class CurvePath<V extends Vec = MutableVec2> extends Curve<V> {
   curves: Curve<V>[] = [];
   autoClose = false;
@@ -65,7 +65,7 @@ export class CurvePath<V extends Vec = MutableVec2> extends Curve<V> {
   }
 
   /**
-   * Samples each sub-curve at its own resolution like Three.js: lines once, ellipses at `2 * divisions`, splines at
+   * Samples each sub-curve at its own resolution: lines once, ellipses at `2 * divisions`, splines at
    * `divisions * points`, everything else at `divisions`. Consecutive duplicates are dropped.
    */
   override getPoints(divisions = 12): V[] {
@@ -92,7 +92,7 @@ export class CurvePath<V extends Vec = MutableVec2> extends Curve<V> {
   }
 }
 
-/** 2D path builder with a pen position (Three.js `Path`). */
+/** 2D path builder with a pen position. */
 export class Path extends CurvePath<MutableVec2> {
   currentPoint: MutableVec2 = [0, 0];
 
@@ -178,7 +178,7 @@ export class Path extends CurvePath<MutableVec2> {
   }
 }
 
-/** A closed 2D outline with optional holes (Three.js `Shape`). */
+/** A closed 2D outline with optional holes. */
 export class Shape extends Path {
   holes: Path[] = [];
   getPointsHoles(divisions = 12): MutableVec2[][] {
