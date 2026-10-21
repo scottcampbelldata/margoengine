@@ -12,7 +12,9 @@ import { finiteVector } from '@margoengine/math/validate';
 import { MargoError } from '@margoengine/math/errors';
 import { viewMatrix } from '../../shared/view.js';
 import { preset } from '../../shared/preset.js';
-import { simulationShader, billboardShader, multisampled } from './shader.js';
+import { simulationShader, billboardShader, multisampled, foggedBillboard } from './shader.js';
+import { checkFog, FOG_BYTES, writeFog, type FogLike } from './fog.js';
+export type { FogLike } from './fog.js';
 declare const GPUBufferUsage: {
   UNIFORM: number;
   STORAGE: number;
@@ -170,6 +172,9 @@ export class VFX implements EnginePlugin {
   private spriteEntries: GPUBindGroupEntry[] = [];
   private sorter?: ReturnType<NonNullable<VFXFeatures['sort']>['create']>;
   private owned: OwnedResources = [];
+  private fogSource: FogLike | null = null;
+  private fogBuffer?: GPUBuffer;
+  private readonly fogData = new Float32Array(12);
   private readonly values = new Float32Array(56);
   private readonly ints = new Uint32Array(this.values.buffer);
   private readonly view = new Float32Array(16);
@@ -250,6 +255,22 @@ export class VFX implements EnginePlugin {
     for (const key of ['obstacles', 'wrap', 'sort'] as const)
       if (o[key] && !this.features[key]) throw new TypeError(`VFX ${key} needs ${key} from @margoengine/vfx/${key}`);
     if (o.obstacles) this.features.obstacles!.write(o.obstacles, this.extraValues);
+  }
+  /** The fog the particles are drawn in (see `setFog`), or null. */
+  get fog(): FogLike | null {
+    return this.fogSource;
+  }
+  /**
+   * Fogs the particles: `fog` is `@margoengine/environment`'s `Fog` or any object with its fields, read every frame,
+   * with Fog's maths (linear near/far, exp2 density, height falloff). Each pixel of a particle fades toward the fog
+   * colour by the fog at its world position (particles blend alpha over the scene, so fog covers them as it covers
+   * meshes). `null` (the default) draws exactly as without fog. The first fogged frame compiles a second billboard
+   * shader; changing the fog or its `enabled` flag never does.
+   * @throws TypeError when `fog` is neither an object nor null; RangeError or TypeError for an invalid field.
+   */
+  setFog(fog: FogLike | null): this {
+    this.fogSource = checkFog(fog);
+    return this;
   }
   burst(count: number): this {
     if (this.disposed || !Number.isInteger(count) || count < 0 || count > this.capacity)
@@ -398,11 +419,22 @@ export class VFX implements EnginePlugin {
       this.renderDepth = c.descriptor.depthStencil!.format;
       this.renderKey = this.renderFormat + ':' + this.renderDepth;
     }
-    const key = this.renderKey + ':' + c.descriptor.multisample?.count;
+    const fog = this.fogSource;
+    if (fog) {
+      // The billboard writes its colour as it is, so on an 8-bit (non -srgb) target the fog colour goes in encoded.
+      writeFog(fog, c.camera.position, this.fogData, !c.format.includes('float') && !c.format.endsWith('-srgb'));
+      this.fogBuffer ??= c.device.createBuffer({
+        size: FOG_BYTES,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+      c.device.queue.writeBuffer(this.fogBuffer, 0, this.fogData);
+    }
+    const key = this.renderKey + ':' + c.descriptor.multisample?.count + (fog ? ':fog' : '');
     let pipeline = this.renders.get(key);
     if (!pipeline) {
+      const billboard = fog ? foggedBillboard(this.billboard) : this.billboard;
       const module = c.device.createShaderModule({
-        code: (c.descriptor.multisample?.count ?? 1) > 1 ? multisampled(this.billboard) : this.billboard,
+        code: (c.descriptor.multisample?.count ?? 1) > 1 ? multisampled(billboard) : billboard,
       });
       pipeline = c.device.createRenderPipeline({
         layout: 'auto',
@@ -440,6 +472,7 @@ export class VFX implements EnginePlugin {
             resource: { buffer },
           })),
           ...this.spriteEntries,
+          ...(fog ? [{ binding: 5, resource: { buffer: this.fogBuffer! } }] : []),
         ],
       });
       this.renderGroups.set(pipeline, group);
@@ -468,9 +501,11 @@ export class VFX implements EnginePlugin {
       this.visible,
       this.respawn,
       this.extra,
+      this.fogBuffer,
       ...this.owned,
     ])
       buffer?.destroy();
+    this.fogBuffer = undefined;
     this.owned = [];
     this.spriteEntries = [];
     this.extra = this.sorter = undefined;

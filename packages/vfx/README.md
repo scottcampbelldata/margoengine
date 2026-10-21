@@ -61,6 +61,21 @@ the frame it must show (the shader's hash of its birth angle for `'random'`, its
 
 `obstacles`, `wrap`, `sort` and `texture` are read when the effect attaches.
 
+### Fog
+
+`effect.setFog(fog)` fogs the particles with `@margoengine/environment`'s `Fog` or any object with its fields (`color`,
+`near`, `far`, `density`, `heightFalloff`, `height`, `enabled`), read every frame with Fog's maths. Each pixel of a
+particle fades toward the fog colour by the fog at its world position (particles blend alpha over the scene, so fog
+covers them as it covers meshes). Particles write their colour as it is, so on an 8-bit canvas the fog colour goes in
+sRGB-encoded and a fully fogged particle matches the fogged background. VFX does not import environment.
+`fog.enabled = false` clears it without recompiling; `effect.setFog(null)` (the default) draws exactly as before.
+
+```ts
+import {Fog} from '@margoengine/environment';
+const fog = Fog.attach(engine, {color: '#8090a0', near: 5, far: 60});
+sparks.setFog(fog);
+```
+
 ### GPU cost
 
 Each billboard is one triangle around the soft disc (half the primitives and 3/4 of the vertex work of a quad), and

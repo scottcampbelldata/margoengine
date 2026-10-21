@@ -1,3 +1,5 @@
+import { MargoError } from '@margoengine/math/errors';
+import { fogWgsl } from './fog.js';
 /** right and up: the camera's axes; up.w: pixels per world unit at clip w = 1 (for the billboard's minimum size). */
 export const frame = /* wgsl */ `
 struct Particle {positionLife:vec4f,velocitySize:vec4f,color:vec4f,rotation:vec4f}
@@ -98,5 +100,34 @@ export const multisampled = (billboard: string) =>
 }
 fn shade(i:Out)->vec4f {`,
   );
+const fogEdits: Array<[string, string]> = [
+  ['@location(0) uv:vec2f,', '@location(0) uv:vec2f,@location(7) fogWorld:vec3f,'],
+  ['o.clip=f.camera*vec4f(position,1);', 'o.clip=f.camera*vec4f(position,1);o.fogWorld=position;'],
+  [
+    '@fragment fn fragment(i:Out)->@location(0) vec4f {',
+    '@fragment fn fragment(i:Out)->@location(0) vec4f {return fogged(i,unfogged(i));}\nfn unfogged(i:Out)->vec4f {',
+  ],
+];
+/**
+ * Scene fog (`setFog`) on a billboard shader, plain or textured, before `multisampled`: each fragment fades toward the
+ * fog colour by the fog at its world position. Particles blend alpha over the scene and write their colour as it is, so
+ * the fog colour in the uniform is in the target's terms (sRGB-encoded for an 8-bit canvas). Fog uniform at binding 5.
+ */
+export const foggedBillboard = (billboard: string): string => {
+  let code = billboard;
+  for (const [from, to] of fogEdits) {
+    if (code.split(from).length !== 2)
+      throw new MargoError(
+        'unsupported',
+        'VFX fog needs the billboard shader it was written for; update the fog edits',
+      );
+    code = code.replace(from, to);
+  }
+  return (
+    code +
+    fogWgsl(0, 5) +
+    'fn fogged(i:Out,c:vec4f)->vec4f {return vec4f(mix(c.rgb,margoFog.color.rgb,fogAmount(i.fogWorld)),c.a);}\n'
+  );
+};
 /** Statement the obstacle and wrap features insert their per-particle work before. */
 export const settle = 'particles[at]=p.positionLife;';

@@ -5,7 +5,7 @@ import { obstacles } from './obstacles.js';
 import { wrap } from './wrap.js';
 import { sort } from './sort.js';
 import { textureFeature } from './texture.js';
-export type { VFXOptions, VFXObstacle, VFXTexture, ParticleAtlas, VFXFeatures } from './base.js';
+export type { VFXOptions, VFXObstacle, VFXTexture, ParticleAtlas, VFXFeatures, FogLike } from './base.js';
 const features = { obstacles, wrap, sort, texture: textureFeature };
 /**
  * GPU particles with every optional feature (obstacles, wrap, sort, texture). Effects that use none of them load
