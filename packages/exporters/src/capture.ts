@@ -5,6 +5,26 @@ import type { Camera, EngineKernel } from '@margoengine/core';
 import { LinearToSRGB, parseColor, type ColorInput } from '@margoengine/math/color';
 import { MargoError } from '@margoengine/math/errors';
 import { png } from './png.js';
+export {
+  encodeAtlasZIP,
+  encodeSequenceZIP,
+  encodeZIP,
+  packSpriteAtlas,
+  spriteAtlasLayout,
+} from './archive.js';
+export type {
+  ArchiveProgress,
+  AtlasFrame,
+  AtlasLayout,
+  AtlasManifest,
+  SpriteAtlasOptions,
+  AtlasZIPOptions,
+  SequenceManifest,
+  SequenceZIPOptions,
+  SpriteAtlas,
+  ZIPEntry,
+  ZIPOptions,
+} from './archive.js';
 
 /** RGBA8 pixels, 4 bytes per pixel, top row first, not premultiplied: an `ImageData` or a {@link capture} result. */
 export interface Pixels {
