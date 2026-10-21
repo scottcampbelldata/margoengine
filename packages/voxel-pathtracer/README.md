@@ -299,7 +299,9 @@ RTX A6000 (Ampere), Windows 11, Edge 155 (headless, WebGPU, D3D12), 2026-10-20, 
 The same day, before the viewport denoiser kept history, the denoised material scene took 20.97-21.23 ms and 285 MiB;
 before the caustic chain was skipped for scenes without focusing materials, the denoised dense scene took 18.74-19.01
 ms and 351 MiB. The previous day's run gave 12.39, 19.92, 9.90 and 36.96 ms for the other rows: compare rows from one
-day only.
+day only. On 2026-10-21, when every row ran slower (material scene 17.43-17.50 ms), the denoiser's edge weighing and
+ratio stop cost 0.2-0.6 ms per denoised frame against the previous denoiser in the same session (material scene
+27.39-27.46 against 26.87-27.20 ms, dense scene 18.02-18.42 against 17.83-17.89 ms) and no memory.
 
 Light sampling through glass and mirrors made a sample dearer than before it (measured the same day on the same
 machine: 6.09 ms for the material scene, 8.45 ms for the dense one, 9.11 ms denoised): glass and mirror candidates need
@@ -317,7 +319,7 @@ Numbers on other GPUs are not measured.
 
 ## Verification
 
-- `tests/*.test.js` (Node, 47 tests, about 1.1 s; part of `npm run verify`): validation and atomic failure, dense
+- `tests/*.test.js` (Node, 52 tests, about 1.1 s; part of `npm run verify`): validation and atomic failure, dense
   indexing, all 255 palette identities, transformed/mirrored/hidden instances, model reuse by revision, voxel traversal
   against a brute-force slab test (2,000 random rays over 5 models whose sizes are not multiples of 8), resets for each
   camera/size/scene/option change, enable/disable, `maxSamples`, the denoiser's passes (the caustic chain only for
@@ -368,10 +370,16 @@ Numbers on other GPUs are not measured.
   - convergence: error against a 16,384-sample reference falls 0.0216, 0.0114, 0.0058, 0.0030 at 16, 64, 256, 1024
     samples (1/sqrt(N)), both projections;
   - denoiser (480 x 300, against a 16,384-sample reference; two halves of 32,768 for the glass scenes, whose own noise
-    is removed in quadrature): RMSE of the diffuse scene x2.78 lower at 4 samples, x2.53 at 16, x2.15 at 64, x1.61 at
-    1024, object edges no worse except at 64 samples (8% higher); the material scene (glass, gold, plastic, cloud)
-    x2.42, x2.30, x2.29; a caustic scene (strong sun through a glass block and a low-IOR slab, a mirror panel, rough gold;
-    dim sky) x2.22, x2.10, x2.08 (asserted: at least x2 and x1.6);
+    is removed in quadrature): RMSE of the diffuse scene x2.79 lower at 4 samples, x2.64 at 16, x2.32 at 64, x1.62 at
+    1024, object edges lower at every count (at 64 samples 7% lower; 8% higher before the edge weighing); the material
+    scene (glass, gold, plastic, cloud) x2.44, x2.31, x2.30; a caustic scene (strong sun through a glass block and a
+    low-IOR slab, a mirror panel, rough gold; dim sky) x2.23, x2.10, x2.08 (asserted: at least x2 and x1.6; edges of all
+    four scenes no worse than raw at 16 and 64 samples, within 2% at 1024);
+  - a lamp beside a wall (160 x 120, against 16,384 samples): the lit stretch keeps 0.912 of its level at 16 samples and
+    0.967 at 64 (0.883 and 0.958 before the wide levels' ratio stop), RMSE x1.99 and x1.38 below raw (it was worse than
+    raw at 64 before);
+  - the viewport denoiser while the camera moves (30 frames, 1 sample each): RMS 5.31 against the converged image,
+    raw frames 16.00, a still camera 2.78;
   - depth of field blurs only out-of-focus edges; motion blur spreads a moving cube over its path; camera motion of 2
     units with the shutter open moves a 1-unit line's centroid by 0.9977 (1) and widens its profile to a standard
     deviation of 0.6455 units (the box convolution's sqrt(5/12) = 0.6455);
@@ -423,7 +431,13 @@ Numbers on other GPUs are not measured.
   (some GPUs convert toward zero, which compounds into a darker image). Light focused by glass,
   mirrors and glossy metal onto diffuse surfaces is filtered separately, more widely. The luminance stop compares a
   difference with the variance of that difference (both pixels' variances): against the centre's variance alone it
-  rejects bright, noisy neighbours more than dark ones, which darkened images by about 1.5% (measured).
+  rejects bright, noisy neighbours more than dark ones, which darkened images by about 1.5% (measured). The wide
+  levels also stop on the ratio of two pixels' luminances, so the peak of a steep gradient (a wall beside a light)
+  keeps its level. At object, material and texture edges, from 16 samples on, the filtered estimate is weighed against
+  the raw mean by their estimated squared errors, the filtered one's including the bias that its difference from the
+  raw means shows over a 3 x 3 neighbourhood (selecting among filters per pixel by estimated error, as in Rousselle et
+  al. 2012, "Adaptive Rendering with Non-Local Means Filtering"): where the samples already resolve detail, filtering
+  does not blur it.
 - PNG output written from the W3C PNG specification over the platform's zlib `CompressionStream`.
 
 ## MagicaVoxel files

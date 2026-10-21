@@ -1159,7 +1159,8 @@ export class VoxelPathTracer implements EnginePlugin {
         o = out,
         read = (b: GPUBuffer | undefined) => b ?? gpu.dummyRead;
       // Pass k: 0 prepare (regular -> ping, caustic -> cping), 1..ATROUS the regular chain ending in pong, then the
-      // caustic chain ending in cping, last combine (pong += cping; the viewport's, blended with its history, to ping).
+      // caustic chain ending in cping, last combine (pong + cping weighed against the raw mean, to ping; the viewport's
+      // blended with its history there too).
       for (let k = 0; k < DENOISE_PASSES; k++) {
         const j = k - ATROUS;
         if (!caustic && k > ATROUS && j <= CAUSTIC_LEVELS) {
@@ -1193,7 +1194,7 @@ export class VoxelPathTracer implements EnginePlugin {
               {
                 binding: 8,
                 resource: {
-                  buffer: k === 0 ? (o.cping ?? gpu.dummy) : temporal && k === DENOISE_PASSES - 1 ? o.ping! : gpu.dummy,
+                  buffer: k === 0 ? (o.cping ?? gpu.dummy) : k === DENOISE_PASSES - 1 ? o.ping! : gpu.dummy,
                 },
               },
             ],
@@ -1407,7 +1408,7 @@ export class VoxelPathTracer implements EnginePlugin {
         level = caustic ? k - ATROUS : k,
         last = k === ATROUS || k === ATROUS + CAUSTIC_LEVELS;
       // Flags: 1 last level, 2 a caustic chain (prepare splits it off, combine adds it), 4 no plane test (rays not the
-      // camera's corner-ray interpolation).
+      // camera's corner-ray interpolation), 32 a level of the caustic chain.
       const flat = this.#settings.projection !== 'camera' || this.#settings.distortion !== undefined;
       // 8 and up: the viewport's history (prepare and combine), never with flat rays.
       const keep = flat ? 0 : history;
@@ -1419,6 +1420,7 @@ export class VoxelPathTracer implements EnginePlugin {
           (last ? 1 : 0) |
             (t.caustics && (k === 0 || k === DENOISE_PASSES - 1) ? 2 : 0) |
             (flat ? 4 : 0) |
+            (caustic && k < DENOISE_PASSES - 1 ? 32 : 0) |
             (k === 0 || k === DENOISE_PASSES - 1 ? keep : 0),
         ],
         at,
@@ -1570,7 +1572,7 @@ export class VoxelPathTracer implements EnginePlugin {
           ],
         });
       view.displayRaw = group(view.accum);
-      view.displayDenoised = view.pong ? group(view.pong) : undefined;
+      view.displayDenoised = view.ping ? group(view.ping) : undefined;
       view.displayResolved = view.ping ? group(view.ping) : undefined;
       view.traceKey = key;
       view.denoisedAt = -1;
@@ -1909,7 +1911,7 @@ export class VoxelPathTracer implements EnginePlugin {
             }
           }
           const size = w * h * 16;
-          e.copyBufferToBuffer(o.denoise ? targets.pong! : targets.accum, 0, staging[0], 0, size);
+          e.copyBufferToBuffer(o.denoise ? targets.ping! : targets.accum, 0, staging[0], 0, size);
           if (aovs) {
             e.copyBufferToBuffer(targets.albedo, 0, staging[1], 0, size);
             e.copyBufferToBuffer(targets.normals, 0, staging[2], 0, size);

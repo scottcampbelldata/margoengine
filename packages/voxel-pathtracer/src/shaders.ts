@@ -1614,12 +1614,15 @@ fn radiance(px:vec2u)->Path {
  * Denoiser: `prepare` splits the accumulated radiance into its regular and caustic parts, demodulates both by albedo,
  * estimates the variance of each pixel's mean and writes the guide (normal, first-hit distance, pixel footprint);
  * `atrous` runs one wavelet level of either chain (remodulating at its last); `combine` adds the filtered caustics to the
- * filtered rest. Edges stop on normals, on the distance of a neighbour's first hit from the pixel's tangent plane (in
+ * filtered rest and, at edges from 16 samples on, weighs that against the raw mean by their estimated errors (see
+ * `weighed`), writing the result to the ping buffer. Edges stop on normals, on the distance of a neighbour's first hit from the pixel's tangent plane (in
  * pixel footprints, so coplanar voxel faces blend and parallel ones at other heights do not; skipped for pixels whose
  * features are seen through glass or a mirror, which blend only with each other) and on the luminance difference
  * against its standard deviation, from both pixels' variances: a test against the centre's alone rejects bright,
  * high-variance neighbours more than dark ones and darkens the image (the median of a skewed distribution is below its
- * mean). The stop widens at low sample counts, where the variance itself is uncertain. The caustic chain has more
+ * mean). The stop widens at low sample counts, where the variance itself is uncertain. The regular chain's wide levels
+ * (steps of 4 pixels and more) also stop on the ratio of luminances, so a neighbour several times brighter or darker
+ * (another part of a steep gradient, such as a wall beside a light) is not averaged into the pixel. The caustic chain has more
  * levels and a looser stop, because focused light is found by rare, strong samples (separate filtering of such
  * components as in Zimmer et al. 2015, "Path-space Motion Estimation and Decomposition for Robust Animation
  * Filtering", and Schied et al.).
@@ -1788,13 +1791,74 @@ fn tap(x:i32)->f32 {return select(select(0.0625,0.25,abs(x)==1),0.375,x==0);}
   var wg=select(0.0,1.0,(gp.z>0.0)==(gq.z>0.0)&&(gp.w<0.0)==(gq.w<0.0));
   if(gp.z>0.0&&gq.z>0.0&&gp.w>=0.0&&gq.w>=0.0){wg=exp(-abs(dot(np,hitPoint(f32(qx)+0.5,f32(qy)+0.5,gq.z)-pp))/plane);}
   let wn=pow(max(0.0,dot(np,unoct(gq.xy))),p.sigma.y);
-  let wl=exp(-abs(lum(cq.xyz)-lp)/(sl*sqrt(vp+max(cq.w,0.0))+1e-6));
+  var wl=exp(-abs(lum(cq.xyz)-lp)/(sl*sqrt(vp+max(cq.w,0.0))+1e-6));
+  // Wide levels (steps 4 and up, whose input is already smoothed): a neighbour several times brighter or darker is
+  // another part of a steep gradient (a wall beside a light), not noise; averaging it in would flatten the peak. Not
+  // in the caustic chain (flag 32), whose focused light is rare, strong samples that it must spread widely.
+  if(st>=4&&(p.size.w&32u)==0u){let lr=log((lum(cq.xyz)+1e-3)/(lp+1e-3));wl*=exp(-lr*lr/(0.96*(1.0+4.0*sqrt(p.sigma.w))));}
   let wt=tap(x)*tap(y)*wn*wg*wl;
   sum+=cq.xyz*wt;vs+=cq.w*wt*wt;ws+=wt;
  }}
  var r=vec4f(sum/ws,vs/(ws*ws));
- if((p.size.w&1u)!=0u){r=vec4f(r.xyz*albedoAt(i),1.0);}
+ // Last level: remodulated, with the variance of its luminance (combine weighs it against the raw mean's).
+ if((p.size.w&1u)!=0u){let a=albedoAt(i);let la=max(lum(a),0.02);r=vec4f(r.xyz*a,r.w*la*la);}
  dst[i]=r;
+}
+// The filtered estimate of pixel q (both chains, remodulated) and the variance of its luminance.
+fn filteredAt(q:u32,split:bool)->vec4f {var f=dst[q];if(split){f+=src[q];}return vec4f(f.xyz,max(f.w,0.0));}
+// The raw mean of pixel q and the variance of its luminance (regular and caustic parts, as prepare estimates them).
+fn rawAt(q:u32,split:bool,g:vec2u)->vec4f {
+ let k=p.sigma.w;var cc=vec3f(0.0);var v=0.0;
+ if(split){cc=caustics[q].xyz*k;v=variance(q,cc,caustics[q].w*k,true,g);}
+ let r=accum[q].xyz*k;
+ return vec4f(r,v+variance(q,r-cc,accum[q].w*k,false,g));
+}
+// Whether pixel i lies on an edge of the image's features: within one pixel of another surface (sky or geometry, a
+// normal turned more than about 25 degrees, a first hit off its plane by more than two footprints), of a different
+// albedo (a texture or material boundary) or of features seen through glass or a mirror on one side only.
+fn edgeAt(i:u32,g:vec2u)->bool {
+ let w=p.size.x;let h=p.size.y;let gp=guide[i];let np=unoct(gp.xy);let ap=albedoAt(i);
+ let pp=hitPoint(f32(g.x)+0.5,f32(g.y)+0.5,gp.z);
+ for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){
+  let qx=clamp(i32(g.x)+x,0,i32(w)-1);let qy=clamp(i32(g.y)+y,0,i32(h)-1);
+  let q=u32(qy)*w+u32(qx);let gq=guide[q];
+  if((gp.z>0.0)!=(gq.z>0.0)||(gp.w<0.0)!=(gq.w<0.0)){return true;}
+  if(dot(np,unoct(gq.xy))<0.9){return true;}
+  if(gp.z>0.0&&gp.w>0.0&&abs(dot(np,hitPoint(f32(qx)+0.5,f32(qy)+0.5,gq.z)-pp))>2.0*gp.w){return true;}
+  let aq=albedoAt(q);
+  if(length(aq-ap)>0.1*max(lum(ap),lum(aq))+0.02){return true;}
+ }}
+ return false;
+}
+// Per pixel at an edge, from 16 samples on, the raw mean and the filtered estimate weighed by their expected squared
+// errors. The raw mean's is its variance (at least its neighbourhood's: a pixel whose samples missed a rare bright path
+// looks quieter than it is); the filtered estimate's is its own variance plus its squared bias, the difference from the
+// raw mean that noise does not explain. Two estimates of that bias over the 3x3 neighbourhood, the larger counts: the
+// square of the mean signed difference less its variance (a filter that darkens a bright stretch or lightens a dark one
+// errs the same way at every pixel there, which shows even where the raw mean is noisy), and the mean squared
+// difference beyond two to four times the variances (more with fewer samples; detail blurred across an edge errs both
+// ways, which shows where the raw mean is clean). Where filtering added more error than it removed the raw mean takes
+// over; elsewhere the filtered estimate stands. Selecting among filters by estimated error per pixel follows Rousselle
+// et al. 2012, "Adaptive Rendering with Non-Local Means Filtering". Away from edges, and below 16 samples (whose
+// variances cannot tell bias from noise), the filtered estimate stands: smooth shading is what filtering is for.
+fn weighed(i:u32,g:vec2u,split:bool)->vec3f {
+ if(p.sigma.w>1.0/16.0||!edgeAt(i,g)){return filteredAt(i,split).xyz;}
+ let w=p.size.x;let h=p.size.y;
+ var d1=0.0;var d2=0.0;var vr=0.0;var vf=0.0;var ws=0.0;var ww=0.0;
+ for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){
+  let qx=u32(clamp(i32(g.x)+x,0,i32(w)-1));let qy=u32(clamp(i32(g.y)+y,0,i32(h)-1));
+  let q=qy*w+qx;let f=filteredAt(q,split);let r=rawAt(q,split,vec2u(qx,qy));
+  let wq=select(0.5,1.0,x==0)*select(0.5,1.0,y==0);
+  let dl=lum(f.xyz)-lum(r.xyz);d1+=dl*wq;d2+=dl*dl*wq;vr+=r.w*wq;vf+=f.w*wq;ws+=wq;ww+=wq*wq;
+ }}
+ d1/=ws;d2/=ws;vr/=ws;vf/=ws;
+ let f=filteredAt(i,split);let r=rawAt(i,split,g);
+ // The mean difference's variance is the pixels' over the kernel's effective count (ws^2 / sum of squared weights).
+ // The squared difference must exceed the variances by more where they come from few samples (and are unsure).
+ let ef=f.w+max(0.0,max(d1*d1-(vr+vf)*ww/(ws*ws),d2-(2.0+8.0*p.sigma.w)*(vr+vf)));
+ let er=max(r.w,vr);
+ // Clamped: WGSL division may be off by 2.5 ulp, which pushes a weight just above 1 and a black pixel below 0.
+ return mix(f.xyz,r.xyz,clamp(ef/(ef+er+1e-20),0.0,1.0));
 }
 // The filtered caustics (src) added to the filtered rest (dst), both remodulated. The viewport (flag 8) blends that with
 // its previous displayed colour, reprojected and bilinearly read, into dst2: the frames' jittered samples average into
@@ -1810,9 +1874,7 @@ fn tap(x:i32)->f32 {return select(select(0.0625,0.25,abs(x)==1),0.375,x==0);}
  // Flag 2: there is a caustic chain (src) to add.
  let split=(p.size.w&2u)!=0u;
  if((p.size.w&8u)==0u){
-  var cs=vec3f(0.0);
-  if(split){cs=src[i].xyz;}
-  dst[i]=vec4f(dst[i].xyz+cs,1.0);return;
+  dst2[i]=vec4f(weighed(i,g.xy,split),1.0);return;
  }
  let m=w*h;let gi=guide[i];let n=1.0/p.sigma.w;
  // The denoiser's history for the next frame, from a restart or where there was none.
@@ -1820,8 +1882,7 @@ fn tap(x:i32)->f32 {return select(select(0.0625,0.25,abs(x)==1),0.375,x==0);}
  if((p.size.w&64u)!=0u||(p.size.w&16u)==0u){
   guide[m+i]=bitcast<vec4f>(vec4u(est.x,est.y,pack2x16float(gi.xy),bitcast<u32>(gi.z)));
  }
- var c=dst[i].xyz;
- if(split){c+=src[i].xyz;}
+ var c=weighed(i,g.xy,split);
  var nh=0.0;var hc=vec3f(0.0);
  if((p.size.w&16u)!=0u&&mask!=0u){
   let x=f32(g.x)+0.5;let y=f32(g.y)+0.5;

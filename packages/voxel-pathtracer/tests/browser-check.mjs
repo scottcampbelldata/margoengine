@@ -25,6 +25,8 @@
 // - transparent: alpha is the camera rays' coverage, covered pixels match the opaque render, escapes add nothing;
 // - convergence: error against a 4096-sample reference falls about as 1/sqrt(samples), both projections;
 // - denoise: error with and without the wavelet denoiser, overall and at object edges, also on two caustic scenes;
+// - denoisepeak: a lamp-lit stretch of wall keeps its level and loses error through the denoiser (16, 64 samples);
+// - denoisehistory: the viewport's denoiser while the camera moves, against the converged image and a still camera;
 // - lens: depth of field blurs out-of-focus edges only; motion blur spreads a moving cube along its path; camera motion
 //   blur widens a line's profile to the box-convolution width;
 // - viewport: disabled is bit-identical to raster, dispose restores raster, a device restore redraws the same image;
@@ -392,7 +394,12 @@ try {
             clean(d[n].denoised) * (name === 'materials' ? 2 : 1.6) <= clean(d[n].raw),
             `${name} ${n} spp: denoising reduces error enough`,
           );
-      // Edges asserted on the diffuse scene.
+      // Edges: from 16 samples on the denoised image is no worse than the raw one at object edges (where filtering
+      // blurred detail the samples already resolve, it gives way to the raw mean), within 2% at 1024.
+      for (const n of [16, 64])
+        assert.ok(d[n].denoisedEdges <= d[n].rawEdges, `${name} ${n} spp: edges are not blurred`);
+      assert.ok(d[1024].denoisedEdges <= d[1024].rawEdges * 1.02, `${name} 1024 spp: edges are not blurred`);
+      // More asserted on the diffuse scene.
       if (name !== 'diffuse') continue;
       for (const n of [4, 16]) assert.ok(d[n].denoised < d[n].raw * 0.6, `${name} ${n} spp: denoising reduces error`);
       assert.ok(d[64].denoised < d[64].raw * 0.75, `${name} 64 spp: denoising reduces error`);
@@ -403,6 +410,27 @@ try {
       for (const n of [4, 16, 64, 1024])
         assert.ok(d[n].denoisedEdges < d[n].rawEdges * 1.25, `${name} ${n} spp: edges are not blurred`);
     }
+  }
+  if (wanted('denoisepeak')) {
+    const r = await run('denoisepeak');
+    for (const n of [16, 64])
+      console.log(
+        `  lamp-lit wall (${r.pixels} px) ${n} spp: level ${r[n].level.toFixed(3)} of the reference; RMSE raw ${r[n].raw.toFixed(5)} denoised ${r[n].denoised.toFixed(5)}`,
+      );
+    // Before the wide levels' ratio stop the wall's peak lost 12% of its level at 16 samples and came out worse than the
+    // raw frames at 64 (RMSE 0.0569 against 0.0514).
+    assert.ok(r[16].level >= 0.9, 'lamp-lit wall, 16 spp: the peak keeps its level');
+    assert.ok(r[16].denoised <= r[16].raw * 0.6, 'lamp-lit wall, 16 spp: denoising reduces error');
+    assert.ok(r[64].denoised <= r[64].raw * 0.8, 'lamp-lit wall, 64 spp: denoising reduces error');
+  }
+  if (wanted('denoisehistory')) {
+    const r = await run('denoisehistory');
+    console.log(
+      `  moving camera, 1 sample a frame for 30 frames: RMS ${r.moving.toFixed(2)} (raw frames ${r.raw.toFixed(2)}, still camera ${r.still.toFixed(2)})`,
+    );
+    assert.deepEqual(r.errors, []);
+    assert.ok(r.moving <= r.raw / 2.5, 'moving camera: the denoised history stays well below one raw sample');
+    assert.ok(r.moving <= r.still * 2.5, 'moving camera: within reach of the still camera (no ghosting)');
   }
   if (wanted('lens')) {
     const r = await run('lens');

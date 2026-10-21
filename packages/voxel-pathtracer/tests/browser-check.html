@@ -841,6 +841,50 @@ window.check={
  },
  // Viewport: disabled leaves the raster frame bit for bit, enabled replaces it, dispose restores it, and a device
  // restore draws the same traced image again (fixed seed, converged).
+ // A lamp beside a wall in a dark room: the stretch of wall it lights (a peak far brighter than the wall around it) keeps
+ // its level through the denoiser, against a converged reference, instead of being averaged down with the darker wall.
+ async denoisepeak(){
+  look([6,7,20],[4,8,0]);
+  const scene={revision:1,models:[model('wall',[24,14,1],()=>1),model('floor',[24,1,12],()=>1),model('lamp',[2,3,2],()=>2)],
+   instances:[{id:'wall',modelId:'wall',matrix:translate(-8,0,-1)},{id:'floor',modelId:'floor',matrix:translate(-8,-1,-1)},
+    {id:'lamp',modelId:'lamp',matrix:translate(1,10,0)}],
+   materials:[{id:1,color:[0.58,0.58,0.58],type:'diffuse'},{id:2,color:[1,0.5,0.18],type:'emit',emission:12}],
+   environment:{skyColor:[0.65,0.78,1],skyIntensity:0.025,sunIntensity:0,groundColor:[0.3,0.32,0.35],groundHeight:-1}};
+  return withTracer(scene,{},async(t)=>{
+   const W=160,H=120,ref=await t.renderImage({width:W,height:H,samples:16384,seed:99,aovs:true});
+   let peak=0;for(let i=0;i<W*H;i++)if(ref.instance[i]===0)peak=Math.max(peak,lum(ref.color,i));
+   const region=(i)=>ref.instance[i]===0&&lum(ref.color,i)>=0.25*peak,out={peak,pixels:0};
+   for(let i=0;i<W*H;i++)if(region(i))out.pixels++;
+   for(const n of [16,64]){
+    let level=0,raw=0,den=0;
+    for(const seed of [1,2,3]){
+     const a=await t.renderImage({width:W,height:H,samples:n,seed}),b=await t.renderImage({width:W,height:H,samples:n,seed,denoise:true});
+     let sr=0,sb=0,ea=0,eb=0,m=0;
+     for(let i=0;i<W*H;i++){if(!region(i))continue;const r=lum(ref.color,i),la=lum(a.color,i),lb=lum(b.color,i);sr+=r;sb+=lb;ea+=(neutral(la)-neutral(r))**2;eb+=(neutral(lb)-neutral(r))**2;m++;}
+     level+=sb/sr/3;raw+=Math.sqrt(ea/m)/3;den+=Math.sqrt(eb/m)/3;
+    }
+    out[n]={level,raw,denoised:den};
+   }
+   return out;
+  });
+ },
+ // The viewport's denoiser while the camera moves one sample a frame (its history reprojected) for 30 frames, against
+ // the converged image at the last position (8-bit RGB RMS), beside the raw frames and a still camera's.
+ async denoisehistory(){
+  const scene=scenes.opaque(),steps=30,at=(k)=>[[18+0.2*k,14,26-0.15*k],[-3,3,-2]];
+  look(...at(steps-1));
+  const ref=await withTracer(scene,{maxSamples:2048,samplesPerFrame:64},async(t)=>{
+   for(let i=0;i<64&&!t.stats.converged;i++)await frames(1);
+   engine.render({delta:0});return readCanvas();
+  });
+  const rms=(a)=>{let s=0,n=0;for(let i=0;i<a.length;i+=4)for(let k=0;k<3;k++){s+=(a[i+k]-ref[i+k])**2;n++;}return Math.sqrt(s/n);};
+  const run=(options,move)=>withTracer(scene,{samplesPerFrame:1,...options},async()=>{
+   for(let k=0;k<steps-1;k++){look(...at(move?k:steps-1));await frames(1);}
+   look(...at(steps-1));engine.render({delta:0});return readCanvas();
+  });
+  const moving=await run({denoise:true},true),raw=await run({denoise:false},true),still=await run({denoise:true},false);
+  return {moving:rms(moving),raw:rms(raw),still:rms(still),errors:errors.splice(0)};
+ },
  async viewport(){
   const mesh=engine.createMesh();mesh.setGeometry(box());mesh.setScale([3,3,3]);
   look([18,14,26],[-3,3,-2]);
