@@ -47,6 +47,15 @@ Everything is in Margo's **Y-up** world. Convert MagicaVoxel's Z-up `.vox` data 
 - **Revisions.** `setScene` packs each model into 8^3 bricks and uploads it. A model whose `id`, `revision` and `size`
   equal the previous scene's is reused without reading `voxels` again: bump `revision` whenever voxels change. Only
   changed models are re-uploaded; the others keep their GPU memory.
+- **Content keys** (addition). Ids and revisions belong to the caller's documents: a reopened document may reuse an id
+  and revision for other voxels, and the tracer, which does not hash voxels, would keep the stale bricks. A model's
+  `contentKey` is an identity of its voxel contents instead (a content hash, a serial given to one immutable buffer, or
+  the buffer object; compared as a `Map` compares keys) that must never stand for two different contents. A keyed
+  model reuses the packing of any model of the previous scene, or an earlier model of the same scene, with the same key
+  and size, whatever its id or revision, and never one packed under another key or without a key; models without a
+  key keep the id, revision and size rule among themselves. `invalidateModels(ids?)` forgets the packing of the named
+  models (all when omitted), so the next `setScene` packs and uploads them again whatever their revision or key.
+  `stats.packedModels` and `stats.reusedModels` count what the last `attach` or `setScene` did.
 
 `setScene` validates the whole scene and builds the new snapshot before anything changes: on any error the current scene,
 its uploads and its accumulated image stay. Caller arrays are read, never kept or modified.
@@ -185,7 +194,7 @@ The engine camera is used as is: perspective by default, orthographic (or any af
 | `resolutionScale` | 1 | 0.1-2 | yes |
 | `exposure` (EV) | 0 | -20-20 | no |
 | `aperture` | 0 | 0+ | yes |
-| `focusDistance` | camera to target | above 0 | yes |
+| `focusDistance` | camera to target (automatic) | above 0; `null` returns to automatic focus | yes |
 | `denoise` | false | boolean, or `'auto'` (viewport: every frame below 32 samples, then as the samples grow by a quarter; captures denoise); the viewport's denoiser keeps a history across camera moves (see below) | no |
 | `lensBlades`, `lensRotation` | 0, 0 | 0 or 3-16; radians | yes |
 | `shutter` | 0 | 0-1 | yes |
@@ -205,6 +214,20 @@ The engine camera is used as is: perspective by default, orthographic (or any af
 | `edges` (camera rays see a band `width` voxels wide along turning voxel edges, in `color`, lit) | null | `{color, width}` | yes |
 | `grid` (camera rays see lines every `spacing`, `2 x width` wide, on the ground and with `onVoxels` on voxels) | null | `{color, spacing, width, onVoxels?}` | yes |
 | `order` (frame-graph order of the pass) | 20 | finite | no |
+
+Options left out of `setOptions` (or `undefined`) keep their current value; `null` clears `previousCamera`,
+`distortion`, `bounceLimits`, `edges` and `grid` and makes `focusDistance` automatic again. `resetOptions(names?)`
+(addition) returns the named options, or all of them, to their defaults. `tracer.options` is a copy of the options in
+effect, every default filled in.
+
+Without an engine or GPU (additions): `VOXEL_PATHTRACER_DEFAULTS` holds every option's default (frozen);
+`resolveTraceOptions(options, base?)` returns what `setOptions` would leave in effect over `base` (default: the
+defaults) and throws exactly its errors; `validateTraceOptions(options)` returns `{ok, problems, unknown}` without
+throwing: every invalid option with the error `setOptions` would throw for it, and names it ignores. For materials,
+`resolveTraceMaterial(material, textures?)` returns the material with the defaults of its type filled in
+(`emissionColor` and `metalColor` default to `color`, `cameraEmission` to `emission`, `texture` as six face indices), and
+`validateTraceMaterial(material, textures?)` lists every invalid field; both match `setScene`'s checks (texture indices
+against `textures` when given).
 
 Accumulation also restarts on any change of the camera (matrix, position, target, up, projection), the drawing-buffer
 size, the scene (`setScene`), `reset()`, turning `enabled` back on, and a GPU device change. Equal seed, scene, camera and
@@ -265,6 +288,11 @@ by floating-point rounding, which changes individual paths, not the converged im
 - Both reject with the signal's reason when aborted (checked between GPU submissions, at most 4 in flight), with
   `MargoError` `failed` when the device is lost, with `MargoError` `disposed` when the tracer is disposed meanwhile, and
   with `TypeError`/`RangeError` for invalid options. Jobs run one at a time in call order.
+- Lifecycle (addition): when a capture or render promise settles, aborted ones included, its GPU buffers are already
+  released (`stats.gpuBytes` no longer counts them) and the viewport traces again; dispatches it had already submitted
+  may still be running on the GPU. `stats.renders` counts captures and renders queued or running. `whenIdle()`
+  resolves once every capture and render called before it has settled and the GPU has finished the work submitted so
+  far; it never rejects (after `dispose` or a lost device it resolves once the queued promises have settled).
 - `raycast(origin, direction, maxDistance?)` (addition) returns the closest visible voxel on the CPU: instance and model
   ids, model-local cell, face normal and the adjacent cell, palette index, distance and world point.
 
@@ -319,13 +347,18 @@ Numbers on other GPUs are not measured.
 
 ## Verification
 
-- `tests/*.test.js` (Node, 52 tests, about 1.1 s; part of `npm run verify`): validation and atomic failure, dense
+- `tests/*.test.js` (Node, 62 tests, about 1.2 s; part of `npm run verify`): validation and atomic failure, dense
   indexing, all 255 palette identities, transformed/mirrored/hidden instances, model reuse by revision, voxel traversal
   against a brute-force slab test (2,000 random rays over 5 models whose sizes are not multiples of 8), resets for each
   camera/size/scene/option change, enable/disable, `maxSamples`, the denoiser's passes (the caustic chain only for
   materials that focus light) and when the viewport's history is kept, used or dropped, upload reuse, disposal, device
   restore and device switch, pass order, PNG encoding with tile placement, AOV mapping, cancellation, pausing, device
-  loss during a capture, and the frame uniform's lighting values. A recording fake device stands in for WebGPU.
+  loss during a capture, and the frame uniform's lighting values; the exported defaults, `resolveTraceOptions` and
+  `validateTraceOptions` against `setOptions`' own errors, `resetOptions` and automatic focus, `resolveTraceMaterial`
+  defaults per type and `validateTraceMaterial` against `setScene`'s errors; reuse by `contentKey` across ids, never
+  across keys, one packing for two models with one key, `invalidateModels`; `stats.renders`, buffers released before an
+  aborted render rejects, and `whenIdle` waiting for the GPU queue and resolving after `dispose`. A recording fake device
+  stands in for WebGPU.
 - `tests/browser-check.mjs` (real WebGPU, run under `scripts/gpu-lock.mjs`) on the RTX A6000:
   - shaders compile with no diagnostics; no WebGPU validation errors anywhere;
   - GPU first hits equal `raycast` on all 19,200 pixels of a scene of rotated, scaled, sheared and mirrored instances,

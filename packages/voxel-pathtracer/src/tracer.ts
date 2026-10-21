@@ -37,6 +37,17 @@ import {
   type SceneLayout,
   sceneLayout,
 } from './layout.js';
+import {
+  BOUNCE_FREE,
+  DEFAULTS,
+  flag,
+  publicSettings,
+  RESETS,
+  resetSettings,
+  type Settings,
+  settings,
+  whole,
+} from './options.js';
 import { PngWriter } from './png.js';
 import {
   buildSnapshot,
@@ -52,12 +63,7 @@ import { DENOISE, DISPLAY, TABLE_VEC4, TABLES, TRACE } from './shaders.js';
 import { LAMBDA_MAX, LAMBDA_MIN } from './spectrum.js';
 import { raycastSnapshot } from './traverse.js';
 import type {
-  TraceBounceLimits,
-  TraceEdges,
-  TraceFisheye,
-  TraceGrid,
-  TraceLensDistortion,
-  TracePreviousCamera,
+  ResolvedTraceOptions,
   TraceVec3,
   VoxelPathTracerOptions,
   VoxelPathTracerStats,
@@ -90,243 +96,6 @@ const DEFAULT_WORDS = (128 << 20) / 4, // WebGPU's default maxStorageBufferBindi
   VIEW_BYTES = 176,
   PARAM_STRIDE = 512,
   PARAM_BYTES = 368;
-
-/** Resolved tracer options (every field set). */
-interface Settings {
-  samplesPerFrame: number | 'auto';
-  maxBounces: number;
-  maxSamples: number;
-  seed: number;
-  resolutionScale: number;
-  exposure: number;
-  aperture: number;
-  focusDistance: number | undefined;
-  denoise: boolean | 'auto';
-  lensBlades: number;
-  lensRotation: number;
-  shutter: number;
-  clamp: number;
-  toneMapping: 'neutral' | 'linear' | 'aces-narkowicz';
-  gamma: number | undefined;
-  bounceLimits: Required<TraceBounceLimits> | undefined;
-  transparentShadows: boolean;
-  sunSpecular: boolean;
-  sunInMedia: boolean;
-  energyCompensation: boolean;
-  vignette: number;
-  edges: TraceEdges | undefined;
-  grid: Required<TraceGrid> | undefined;
-  order: number;
-  previousCamera: TracePreviousCamera | undefined;
-  projection: 'camera' | 'panorama' | 'fisheye';
-  fisheye: Required<TraceFisheye>;
-  distortion: Required<TraceLensDistortion> | undefined;
-}
-const DEFAULTS: Settings = {
-  samplesPerFrame: 1,
-  maxBounces: 8,
-  maxSamples: 1024,
-  seed: 0,
-  resolutionScale: 1,
-  exposure: 0,
-  aperture: 0,
-  focusDistance: undefined,
-  denoise: false,
-  lensBlades: 0,
-  lensRotation: 0,
-  shutter: 0,
-  clamp: Infinity,
-  toneMapping: 'neutral',
-  gamma: undefined,
-  bounceLimits: undefined,
-  transparentShadows: true,
-  sunSpecular: true,
-  sunInMedia: true,
-  energyCompensation: true,
-  vignette: 0,
-  edges: undefined,
-  grid: undefined,
-  order: 20,
-  previousCamera: undefined,
-  projection: 'camera',
-  fisheye: { mapping: 'equidistant', fov: 180 },
-  distortion: undefined,
-};
-// Options whose change invalidates the accumulated samples (the others only change how they are shown or paced).
-const RESETS: readonly (keyof Settings)[] = [
-  'maxBounces',
-  'seed',
-  'resolutionScale',
-  'aperture',
-  'focusDistance',
-  'lensBlades',
-  'lensRotation',
-  'shutter',
-  'previousCamera',
-  'projection',
-  'fisheye',
-  'distortion',
-  'clamp',
-  'bounceLimits',
-  'transparentShadows',
-  'sunSpecular',
-  'sunInMedia',
-  'energyCompensation',
-  'edges',
-  'grid',
-];
-
-const whole = (value: unknown, name: string, min: number, max: number, fix: string) => {
-  const v = checkNumber(value, name, min, max, fix);
-  if (!Number.isInteger(v)) throw new RangeError(`VoxelPathTracer ${name} ${v} must be a whole number; ${fix}`);
-  return v;
-};
-const flag = (value: unknown, name: string) => {
-  if (typeof value !== 'boolean') throw new TypeError(`VoxelPathTracer ${name} must be true or false`);
-  return value;
-};
-
-/** Per-kind bounce caps with absent kinds uncapped (BOUNCE_FREE); null clears them. */
-const BOUNCE_FREE = 0xffff;
-function bounceLimits(value: unknown): Required<TraceBounceLimits> | undefined {
-  if (value === null) return undefined;
-  if (typeof value !== 'object')
-    throw new TypeError('VoxelPathTracer bounceLimits must be {diffuse?, specular?, scatter?} or null');
-  const o = value as Record<string, unknown>,
-    cap = (k: 'diffuse' | 'specular' | 'scatter') =>
-      o[k] === undefined ? BOUNCE_FREE : whole(o[k], `bounceLimits.${k}`, 1, 64, 'pass 1 to 64, or leave it out');
-  return { diffuse: cap('diffuse'), specular: cap('specular'), scatter: cap('scatter') };
-}
-
-/** Edge bands, or undefined for null. */
-function edges(value: unknown): TraceEdges | undefined {
-  if (value === null) return undefined;
-  if (typeof value !== 'object') throw new TypeError('VoxelPathTracer edges must be {color, width} or null');
-  const o = value as Record<string, unknown>;
-  return {
-    color: checkVec3(o.color, 'VoxelPathTracer edges.color', true, 'pass linear RGB, 0 or more'),
-    width: checkNumber(o.width, 'edges.width', 0, 0.5, 'pass 0 to 0.5 voxels'),
-  };
-}
-/** Grid lines, or undefined for null. */
-function grid(value: unknown): Required<TraceGrid> | undefined {
-  if (value === null) return undefined;
-  if (typeof value !== 'object')
-    throw new TypeError('VoxelPathTracer grid must be {color, spacing, width, onVoxels?} or null');
-  const o = value as Record<string, unknown>;
-  return {
-    color: checkVec3(o.color, 'VoxelPathTracer grid.color', true, 'pass linear RGB, 0 or more'),
-    spacing: checkNumber(o.spacing, 'grid.spacing', 1e-3, 1e6, 'pass a distance above 0'),
-    width: checkNumber(o.width, 'grid.width', 0, 1e6, 'pass a half width, 0 or more'),
-    onVoxels: o.onVoxels === undefined ? false : flag(o.onVoxels, 'grid.onVoxels'),
-  };
-}
-
-/** Validates `input` over `base`; throws before returning anything. */
-function settings(input: Partial<Omit<VoxelPathTracerOptions, 'scene'>>, base: Settings): Settings {
-  if (!input || typeof input !== 'object') throw new TypeError('VoxelPathTracer options must be an object');
-  const s = { ...base },
-    o = input as Record<string, unknown>;
-  if (o.samplesPerFrame !== undefined)
-    s.samplesPerFrame =
-      o.samplesPerFrame === 'auto'
-        ? 'auto'
-        : whole(o.samplesPerFrame, 'samplesPerFrame', 1, 64, "pass 1 to 64 or 'auto'");
-  if (o.maxBounces !== undefined) s.maxBounces = whole(o.maxBounces, 'maxBounces', 1, 64, 'pass 1 to 64');
-  if (o.maxSamples !== undefined) {
-    const v = checkNumber(o.maxSamples, 'maxSamples', 1, Infinity, 'pass 1 or more, or Infinity');
-    if (v !== Infinity && !Number.isInteger(v))
-      throw new RangeError(`VoxelPathTracer maxSamples ${v} must be a whole number or Infinity`);
-    s.maxSamples = v;
-  }
-  if (o.seed !== undefined) s.seed = whole(o.seed, 'seed', 0, 0xffffffff, 'pass an integer 0 to 4294967295');
-  if (o.resolutionScale !== undefined)
-    s.resolutionScale = checkNumber(o.resolutionScale, 'resolutionScale', 0.1, 2, 'pass 0.1 to 2');
-  if (o.exposure !== undefined) s.exposure = checkNumber(o.exposure, 'exposure', -20, 20, 'pass EV stops, -20 to 20');
-  if (o.aperture !== undefined) s.aperture = checkNumber(o.aperture, 'aperture', 0, 1e6, 'pass a diameter, 0 or more');
-  if (o.focusDistance !== undefined)
-    s.focusDistance = checkNumber(o.focusDistance, 'focusDistance', 1e-6, 1e9, 'pass a distance above 0');
-  if (o.denoise !== undefined) s.denoise = o.denoise === 'auto' ? 'auto' : flag(o.denoise, 'denoise');
-  if (o.lensBlades !== undefined) {
-    const v = whole(o.lensBlades, 'lensBlades', 0, 16, 'pass 0 (round) or 3 to 16');
-    if (v === 1 || v === 2) throw new RangeError('VoxelPathTracer lensBlades must be 0 (round) or 3 to 16');
-    s.lensBlades = v;
-  }
-  if (o.lensRotation !== undefined)
-    s.lensRotation = checkNumber(o.lensRotation, 'lensRotation', -1e6, 1e6, 'pass radians');
-  if (o.shutter !== undefined) s.shutter = checkNumber(o.shutter, 'shutter', 0, 1, 'pass 0 (off) to 1');
-  if (o.clamp !== undefined) {
-    const v = checkNumber(o.clamp, 'clamp', 0, Infinity, 'pass a luminance above 0, or Infinity');
-    if (!(v > 0)) throw new RangeError('VoxelPathTracer clamp must be above 0 (Infinity turns it off)');
-    s.clamp = v;
-  }
-  if (o.toneMapping !== undefined) {
-    if (o.toneMapping !== 'neutral' && o.toneMapping !== 'linear' && o.toneMapping !== 'aces-narkowicz')
-      throw new TypeError(
-        `VoxelPathTracer toneMapping ${String(o.toneMapping)} is unknown; pass 'neutral', 'linear' or 'aces-narkowicz'`,
-      );
-    s.toneMapping = o.toneMapping;
-  }
-  if ('gamma' in o)
-    s.gamma =
-      o.gamma === undefined ? undefined : checkNumber(o.gamma, 'gamma', 1, 5, 'pass 1 to 5, or undefined for sRGB');
-  if (o.bounceLimits !== undefined) s.bounceLimits = bounceLimits(o.bounceLimits);
-  if (o.transparentShadows !== undefined) s.transparentShadows = flag(o.transparentShadows, 'transparentShadows');
-  if (o.sunSpecular !== undefined) s.sunSpecular = flag(o.sunSpecular, 'sunSpecular');
-  if (o.sunInMedia !== undefined) s.sunInMedia = flag(o.sunInMedia, 'sunInMedia');
-  if (o.energyCompensation !== undefined) s.energyCompensation = flag(o.energyCompensation, 'energyCompensation');
-  if (o.vignette !== undefined) s.vignette = checkNumber(o.vignette, 'vignette', 0, 100, 'pass 0 (off) or more');
-  if (o.edges !== undefined) s.edges = edges(o.edges);
-  if (o.grid !== undefined) s.grid = grid(o.grid);
-  if (o.order !== undefined) s.order = checkNumber(o.order, 'order', -1e9, 1e9, 'pass a finite frame-graph order');
-  if (o.previousCamera !== undefined) s.previousCamera = previousCamera(o.previousCamera);
-  if (o.projection !== undefined) {
-    if (o.projection !== 'camera' && o.projection !== 'panorama' && o.projection !== 'fisheye')
-      throw new TypeError(
-        `VoxelPathTracer projection ${String(o.projection)} is unknown; pass 'camera', 'panorama' or 'fisheye'`,
-      );
-    s.projection = o.projection;
-  }
-  if (o.fisheye !== undefined) {
-    if (!o.fisheye || typeof o.fisheye !== 'object')
-      throw new TypeError('VoxelPathTracer fisheye must be {mapping?, fov?}');
-    const e = o.fisheye as Record<string, unknown>;
-    if (e.mapping !== undefined && e.mapping !== 'equidistant' && e.mapping !== 'equisolid')
-      throw new TypeError(
-        `VoxelPathTracer fisheye.mapping ${String(e.mapping)} is unknown; pass 'equidistant' or 'equisolid'`,
-      );
-    s.fisheye = {
-      mapping: (e.mapping as 'equidistant' | 'equisolid' | undefined) ?? 'equidistant',
-      fov: e.fov === undefined ? 180 : checkNumber(e.fov, 'fisheye.fov', 1e-3, 360, 'pass degrees above 0 to 360'),
-    };
-  }
-  if (o.distortion !== undefined) {
-    if (o.distortion === null) s.distortion = undefined;
-    else {
-      if (typeof o.distortion !== 'object')
-        throw new TypeError('VoxelPathTracer distortion must be {k1?, k2?, p1?, p2?} or null');
-      const d = o.distortion as Record<string, unknown>,
-        c = (k: string) => (d[k] === undefined ? 0 : checkNumber(d[k], `distortion.${k}`, -1, 1, 'pass -1 to 1'));
-      s.distortion = { k1: c('k1'), k2: c('k2'), p1: c('p1'), p2: c('p2') };
-    }
-  }
-  return s;
-}
-
-// A validated copy of a previous camera pose (undefined for null).
-function previousCamera(value: unknown): TracePreviousCamera | undefined {
-  if (value === null) return undefined;
-  if (!value || typeof value !== 'object')
-    throw new TypeError('VoxelPathTracer previousCamera must be {position, target, up?, fov?} or null');
-  const c = value as Record<string, unknown>,
-    position = checkVec3(c.position, 'previousCamera.position', false, 'pass a world point'),
-    target = checkVec3(c.target, 'previousCamera.target', false, 'pass a world point'),
-    up = c.up === undefined ? undefined : checkVec3(c.up, 'previousCamera.up', false, 'pass a direction'),
-    fov = c.fov === undefined ? undefined : checkNumber(c.fov, 'previousCamera.fov', 1e-3, 179.999, 'pass degrees');
-  if (position.every((v, i) => v === target[i]))
-    throw new RangeError('VoxelPathTracer previousCamera.position equals its target; pass a distinct target');
-  return { position, target, up, fov };
-}
 
 // First-fit allocator over runs of free words: [start, length] pairs sorted by start, neighbours merged.
 class Runs {
@@ -531,6 +300,8 @@ export class VoxelPathTracer implements EnginePlugin {
   #height = 0;
   #capturing = 0;
   #job: Promise<unknown> = Promise.resolve();
+  /** Captures and renders queued or running. */
+  #pending = 0;
   #frame = new ArrayBuffer(FRAME_BYTES);
   #view = new Float32Array(VIEW_BYTES / 4);
   #inverse = new Float64Array(16);
@@ -583,6 +354,9 @@ export class VoxelPathTracer implements EnginePlugin {
       width: this.#width,
       height: this.#height,
       sceneRevision: this.#snapshot.revision,
+      packedModels: this.#snapshot.packedModels,
+      reusedModels: this.#snapshot.reusedModels,
+      renders: this.#pending,
     };
   }
 
@@ -604,36 +378,12 @@ export class VoxelPathTracer implements EnginePlugin {
     return this.#error;
   }
 
-  /** Compatible addition: the options in effect (scene excluded), defaults filled in. */
-  get options(): Readonly<
-    Omit<
-      Required<VoxelPathTracerOptions>,
-      | 'scene'
-      | 'focusDistance'
-      | 'previousCamera'
-      | 'distortion'
-      | 'fisheye'
-      | 'gamma'
-      | 'bounceLimits'
-      | 'edges'
-      | 'grid'
-    > & {
-      focusDistance?: number;
-      previousCamera?: TracePreviousCamera;
-      fisheye: Required<TraceFisheye>;
-      distortion?: Required<TraceLensDistortion>;
-      gamma?: number;
-      bounceLimits?: TraceBounceLimits;
-      edges?: TraceEdges;
-      grid?: Required<TraceGrid>;
-    }
-  > {
-    const caps = this.#settings.bounceLimits,
-      cap = (v: number) => (v === BOUNCE_FREE ? undefined : v);
-    return {
-      ...this.#settings,
-      bounceLimits: caps && { diffuse: cap(caps.diffuse), specular: cap(caps.specular), scatter: cap(caps.scatter) },
-    };
+  /**
+   * Compatible addition: a copy of the options in effect (scene excluded), defaults filled in; the same shape as
+   * `resolveTraceOptions` returns and `VOXEL_PATHTRACER_DEFAULTS` holds.
+   */
+  get options(): Readonly<ResolvedTraceOptions> {
+    return publicSettings(this.#settings);
   }
 
   /**
@@ -658,11 +408,72 @@ export class VoxelPathTracer implements EnginePlugin {
     this.#alive();
     if (options && typeof options === 'object' && 'scene' in options)
       throw new TypeError('VoxelPathTracer setOptions does not take a scene; call setScene');
-    const next = settings(options, this.#settings),
-      previous = this.#settings;
+    this.#apply(settings(options, this.#settings));
+  }
+
+  /**
+   * Compatible addition: returns the named options (every option when `names` is omitted) to their defaults
+   * (`VOXEL_PATHTRACER_DEFAULTS`), which leaving an option out of `setOptions` never does: `focusDistance` becomes
+   * automatic again, `previousCamera`, `distortion`, `bounceLimits`, `edges`, `grid` and `gamma` unset. Accumulation
+   * restarts when a sampling option changes, as with `setOptions`.
+   * @throws TypeError for a name that is not an option (nothing changes); MargoError `disposed`.
+   */
+  resetOptions(names?: Iterable<keyof Omit<VoxelPathTracerOptions, 'scene'>>): void {
+    this.#alive();
+    this.#apply(resetSettings(this.#settings, names));
+  }
+
+  #apply(next: Settings): void {
+    const previous = this.#settings;
     this.#settings = next;
     if (RESETS.some((k) => !Object.is(previous[k], next[k]))) this.#restart();
     if (next.order !== previous.order && this.#graph) this.#register(this.#graph);
+  }
+
+  /**
+   * Compatible addition: forgets the packed voxels of the named models of the current scene (all of them when `ids` is
+   * omitted), so the next `setScene` packs and uploads them again from their voxels, whatever their revision or
+   * `contentKey`. The image being traced is unchanged until then. Ids that name no model are ignored.
+   * @throws TypeError when `ids` is not a list of strings; MargoError `disposed`.
+   */
+  invalidateModels(ids?: Iterable<string>): void {
+    this.#alive();
+    if (ids !== undefined && (ids === null || typeof ids !== 'object' || !(Symbol.iterator in ids)))
+      throw new TypeError('VoxelPathTracer invalidateModels takes a list of model ids, or nothing for all of them');
+    const list = ids === undefined ? undefined : [...ids];
+    if (list?.some((id) => typeof id !== 'string'))
+      throw new TypeError('VoxelPathTracer invalidateModels takes model ids (strings)');
+    const cache = this.#cache;
+    if (!list) {
+      cache.models.clear();
+      cache.keys?.clear();
+      return;
+    }
+    for (const id of list) {
+      const p = cache.models.get(id);
+      if (!p) continue;
+      cache.models.delete(id);
+      if (cache.keys) for (const [key, q] of cache.keys) if (q === p) cache.keys.delete(key);
+      for (const [other, q] of cache.models) if (q === p) cache.models.delete(other);
+    }
+  }
+
+  /**
+   * Compatible addition: resolves once every capture and `renderImage` call made before it has settled (resolved or
+   * rejected, aborted ones included), and the GPU has finished the work they submitted. Their buffers are released by
+   * the time each promise settles (`stats.gpuBytes` no longer counts them); this also waits for dispatches already
+   * queued on the GPU when an abort stopped one. Never rejects: after `dispose` or a lost device it resolves once
+   * the queued promises have settled.
+   */
+  async whenIdle(): Promise<void> {
+    await this.#job;
+    const gpu = this.#gpu;
+    if (gpu && !gpu.lost && !this.#disposed)
+      try {
+        await gpu.device.queue.onSubmittedWorkDone();
+      } catch {
+        // A device lost meanwhile has no work left.
+      }
   }
 
   /** Discards the accumulated samples; the next frame starts a new image. */
@@ -698,7 +509,7 @@ export class VoxelPathTracer implements EnginePlugin {
     normal[hit.axis] = hit.sign;
     return {
       instanceId: instance.id,
-      modelId: s.models[instance.model].id,
+      modelId: s.modelIds[instance.model],
       cell: hit.cell,
       normal,
       adjacent: [hit.cell[0] + normal[0], hit.cell[1] + normal[1], hit.cell[2] + normal[2]],
@@ -1692,11 +1503,19 @@ export class VoxelPathTracer implements EnginePlugin {
   }
 
   #enqueue<T>(run: () => Promise<T>): Promise<T> {
+    this.#pending++;
     const job = this.#job.then(
       () => run(),
       () => run(),
     );
-    this.#job = job.catch(() => {});
+    this.#job = job.then(
+      () => {
+        this.#pending--;
+      },
+      () => {
+        this.#pending--;
+      },
+    );
     return job;
   }
 

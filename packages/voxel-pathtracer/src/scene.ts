@@ -3,6 +3,7 @@
 // environment map's sampling tables. Everything is checked and built before the tracer swaps snapshots, so an invalid
 // scene leaves the current one untouched (README, "Scenes"). Pure CPU code; the GPU layout is in layout.ts.
 import type {
+  ResolvedTraceMaterial,
   TraceAreaLight,
   TraceTexture,
   TraceEnvironment,
@@ -54,8 +55,11 @@ const where = 'VoxelPathTracer';
 
 /** A model in bricks: what the GPU traverses and `raycast` reads. */
 export interface PackedModel {
+  /** The id it was packed for (models reused by `contentKey` may carry another id). */
   readonly id: string;
   readonly revision: number;
+  /** The model's `contentKey` when it was packed (undefined: reused by id, revision and size only). */
+  readonly key?: unknown;
   readonly size: readonly [number, number, number];
   /** Bricks per axis. */
   readonly bricks: readonly [number, number, number];
@@ -142,7 +146,12 @@ export interface PackedEnvironment {
 export interface SceneSnapshot {
   readonly revision: number;
   readonly models: readonly PackedModel[];
+  /** The scene's model ids, in the order of `models`. */
+  readonly modelIds: readonly string[];
   readonly modelIndex: ReadonlyMap<string, number>;
+  /** Models this snapshot packed, and models it took packed from the previous one (or an earlier model of its own). */
+  readonly packedModels: number;
+  readonly reusedModels: number;
   /** Visible instances in BVH leaf order (the GPU instance order). */
   readonly instances: readonly SnapshotInstance[];
   /** BVH nodes, 8 words each: min xyz (f32), first child or first instance, max xyz (f32), instance count (0 inner). */
@@ -178,9 +187,11 @@ export interface SceneSnapshot {
   readonly textures: readonly { width: number; height: number; texels: Uint32Array }[];
 }
 
-/** Caches of the previous snapshot, reused by id and revision. */
+/** Caches of the previous snapshot, reused by id and revision, or by content key. */
 export interface SceneCache {
   models: Map<string, PackedModel>;
+  /** Packed models by `contentKey`. */
+  keys?: Map<unknown, PackedModel>;
   emitters: WeakMap<PackedModel, ModelEmitters>;
   environment?: PackedEnvironment;
   /** The last baked physical sky and the parameters it was baked for. */
@@ -347,6 +358,7 @@ function packModel(model: TraceModel, name: string): PackedModel {
   return {
     id: model.id,
     revision: model.revision,
+    key: model.contentKey,
     size: [sx, sy, sz],
     bricks: [bx, by, bz],
     grid,
@@ -397,13 +409,19 @@ function packTextures(list: unknown): { width: number; height: number; texels: U
   });
 }
 
-/** Packs one material (MATERIAL_FLOATS floats) after validating it; returns its flags. */
-function packMaterial(m: TraceMaterial, name: string, out: Float32Array, textures: number): void {
+/**
+ * A material with every field resolved (validated; defaults per type filled in). `textures` is the scene's texture
+ * count, or undefined to check only the shape of texture indices.
+ */
+export function resolveMaterial(m: TraceMaterial, name: string, textures?: number): ResolvedTraceMaterial {
   if (!isObject(m)) throw new TypeError(`${where} ${name} must be an object {id, color, type}`);
+  if (typeof m.id !== 'number' || !Number.isInteger(m.id))
+    throw new TypeError(`${where} ${name}.id must be an integer palette index 1 to 255`);
+  if (m.id < 1 || m.id > 255) throw new RangeError(`${where} ${name}.id ${m.id} is outside 1 to 255 (0 is empty)`);
   if (!TYPES.includes(m.type as TraceMaterialType))
     throw new TypeError(`${where} ${name}.type ${String(m.type)} is unknown; pass one of ${TYPES.join(', ')}`);
   const color = checkVec3(m.color, `${name}.color`, true, 'pass linear RGB, 0 or more'),
-    glow =
+    emissionColor =
       m.emissionColor === undefined
         ? color
         : checkVec3(m.emissionColor, `${name}.emissionColor`, true, 'pass linear RGB, 0 or more'),
@@ -415,7 +433,7 @@ function packMaterial(m: TraceMaterial, name: string, out: Float32Array, texture
     transmission = unit(m.transmission, type === 'glass' ? 1 : 0, 'transmission'),
     specular = unit(m.specular, type === 'diffuse' || type === 'emit' ? 0 : 1, 'specular'),
     emission = optional(m.emission, type === 'emit' ? 1 : 0, `${name}.emission`, 0, 1e6, 'pass 0 or more'),
-    cameraEmission = optional(m.cameraEmission, -1, `${name}.cameraEmission`, 0, 1e6, 'pass 0 or more'),
+    cameraEmission = optional(m.cameraEmission, emission, `${name}.cameraEmission`, 0, 1e6, 'pass 0 or more'),
     ior = optional(m.ior, 1.5, `${name}.ior`, 1, 3, 'pass 1 to 3 (glass is about 1.5)'),
     density = optional(m.density, type === 'media' ? 1 : 0, `${name}.density`, 0, 1e6, 'pass 0 or more per world unit'),
     scatter = optional(m.scatter, 0, `${name}.scatter`, 0, 1e6, 'pass 0 or more per world unit'),
@@ -428,14 +446,15 @@ function packMaterial(m: TraceMaterial, name: string, out: Float32Array, texture
         : checkVec3(m.metalColor, `${name}.metalColor`, true, 'pass linear RGB, each 0 to 1');
   if (m.coat !== undefined && m.coat !== 'layered' && m.coat !== 'additive')
     throw new TypeError(`${where} ${name}.coat ${String(m.coat)} is unknown; pass 'layered' or 'additive'`);
-  if (m.tint !== undefined && typeof m.tint !== 'boolean')
-    throw new TypeError(`${where} ${name}.tint must be true or false`);
-  if (m.voxelwise !== undefined && typeof m.voxelwise !== 'boolean')
-    throw new TypeError(`${where} ${name}.voxelwise must be true or false`);
-  if (m.sunlit !== undefined && typeof m.sunlit !== 'boolean')
-    throw new TypeError(`${where} ${name}.sunlit must be true or false`);
-  if (m.contactTransmission !== undefined && typeof m.contactTransmission !== 'boolean')
-    throw new TypeError(`${where} ${name}.contactTransmission must be true or false`);
+  const bool = (value: unknown, field: string) => {
+    if (value !== undefined && typeof value !== 'boolean')
+      throw new TypeError(`${where} ${name}.${field} must be true or false`);
+    return value === true;
+  };
+  const tint = m.tint === undefined ? true : bool(m.tint, 'tint'),
+    voxelwise = bool(m.voxelwise, 'voxelwise'),
+    sunlit = bool(m.sunlit, 'sunlit'),
+    contactTransmission = bool(m.contactTransmission, 'contactTransmission');
   const faces =
     m.texture === undefined ? undefined : typeof m.texture === 'number' ? Array(6).fill(m.texture) : m.texture;
   if (faces !== undefined) {
@@ -448,11 +467,63 @@ function packMaterial(m: TraceMaterial, name: string, out: Float32Array, texture
         `${where} ${name}.texture must be a texture index or six (+x, -x, +y, -y, +z, -z) into scene.textures`,
       );
     for (const v of faces)
-      if (v < 0 || v >= textures)
-        throw new RangeError(`${where} ${name}.texture ${v} is not an index into scene.textures (${textures})`);
+      if (v < 0 || (textures !== undefined && v >= textures))
+        throw new RangeError(
+          `${where} ${name}.texture ${v} is not an index into scene.textures${textures === undefined ? '' : ` (${textures})`}`,
+        );
   }
   if (abbe > 0 && abbe < 5)
     throw new RangeError(`${where} ${name}.abbe ${abbe} is out of range; pass 0 (no dispersion) or 5 to 200`);
+  return {
+    id: m.id,
+    color,
+    type,
+    roughness,
+    metalness,
+    emission,
+    emissionColor,
+    cameraEmission,
+    sunlit,
+    voxelwise,
+    contactTransmission,
+    ...(faces === undefined ? {} : { texture: faces as unknown as ResolvedTraceMaterial['texture'] }),
+    cutout,
+    ior,
+    transmission,
+    density,
+    specular,
+    scatter,
+    anisotropy,
+    abbe,
+    metalColor,
+    coat: m.coat ?? 'layered',
+    tint,
+  };
+}
+
+/** Packs one material (MATERIAL_FLOATS floats) after validating it. */
+function packMaterial(material: TraceMaterial, name: string, out: Float32Array, textures: number): void {
+  const m = resolveMaterial(material, name, textures),
+    {
+      type,
+      color,
+      emissionColor: glow,
+      roughness,
+      metalness,
+      transmission,
+      specular,
+      emission,
+      ior,
+      density,
+      scatter,
+      anisotropy,
+      abbe,
+      cutout,
+      metalColor,
+    } = m,
+    // The packed table marks an unset camera emission (-1: the same as emission) apart from an equal one.
+    cameraEmission = material.cameraEmission === undefined ? -1 : m.cameraEmission,
+    faces = m.texture as readonly number[] | undefined;
   const base = m.id * MATERIAL_FLOATS,
     alpha = roughness * roughness,
     media = type === 'media',
@@ -464,10 +535,10 @@ function packMaterial(m: TraceMaterial, name: string, out: Float32Array, texture
   if (!media && emission > 0 && luminance(glow[0], glow[1], glow[2]) * emission > 0) flags |= EMISSIVE;
   if (alpha < DELTA_ALPHA) flags |= SMOOTH;
   if (m.coat === 'additive') flags |= ADDITIVE;
-  if (m.tint === false) flags |= UNTINTED;
-  if (m.sunlit === true && media) flags |= SUNLIT;
-  if (m.voxelwise === true && pGlass > 0 && pGlass < 1) flags |= VOXELWISE;
-  if (m.contactTransmission === true && pGlass > 0 && pGlass < 1) flags |= CONTACT;
+  if (!m.tint) flags |= UNTINTED;
+  if (m.sunlit && media) flags |= SUNLIT;
+  if (m.voxelwise && pGlass > 0 && pGlass < 1) flags |= VOXELWISE;
+  if (m.contactTransmission && pGlass > 0 && pGlass < 1) flags |= CONTACT;
   if (cutout > 0 && faces !== undefined && !media) flags |= CUTOUT;
   out.set(
     [
@@ -1028,32 +1099,47 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
       throw new TypeError(`${where} ${name}.id ${m.id} is used twice; give each palette index one material`);
     packMaterial(m, name, table, textures.length);
   }
-  // Models (packed or reused by id, revision and size).
+  // Models: packed, or reused by content key (from the previous scene or an earlier model of this one), or without a
+  // key by id, revision and size from a previous model packed without one.
   const packed: PackedModel[] = [],
     modelIndex = new Map<string, number>(),
-    reused = new Map<string, PackedModel>();
+    reused = new Map<string, PackedModel>(),
+    keys = new Map<unknown, PackedModel>();
+  let fresh = 0;
   for (const [i, model] of models.entries()) {
     const name = `scene.models[${i}]`;
     if (!isObject(model)) throw new TypeError(`${where} ${name} must be {id, revision, size, voxels}`);
     const id = checkId(model.id, `${name}.id`);
     if (modelIndex.has(id))
       throw new TypeError(`${where} ${name}.id '${id}' is used twice; give every model its own id`);
-    const previous = cache.models.get(id),
+    const key = model.contentKey;
+    if (key === null)
+      throw new TypeError(`${where} ${name}.contentKey is null; pass a key of the voxel contents, or leave it out`);
+    const previous =
+        key === undefined
+          ? cache.models.get(id)?.key === undefined
+            ? cache.models.get(id)
+            : undefined
+          : (keys.get(key) ?? cache.keys?.get(key)),
       size = model.size as ArrayLike<number> | undefined;
     let p: PackedModel;
     if (
       previous &&
-      previous.revision === model.revision &&
+      (key !== undefined || previous.revision === model.revision) &&
       size?.length === 3 &&
       previous.size.every((v, k) => v === size[k]) &&
       model.voxels instanceof Uint8Array &&
       model.voxels.length === previous.size[0] * previous.size[1] * previous.size[2]
     )
       p = previous;
-    else p = packModel(model, name);
+    else {
+      p = packModel(model, name);
+      fresh++;
+    }
     modelIndex.set(id, packed.length);
     packed.push(p);
     reused.set(id, p);
+    if (key !== undefined) keys.set(key, p);
   }
   // Instances.
   const visible: SnapshotInstance[] = [],
@@ -1113,7 +1199,7 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
     { lights, count: lightCount, power: lightPower } = packLights(scene.lights);
   // Memory: grids and mixed bricks must fit one storage binding.
   let voxelWords = 4;
-  for (const m of packed) voxelWords += m.grid.length + m.payload.length;
+  for (const m of new Set(packed)) voxelWords += m.grid.length + m.payload.length;
   if (voxelWords > maxWords)
     throw new RangeError(
       `${where} scene needs ${voxelWords * 4} bytes of voxel bricks; this device binds at most ${maxWords * 4}; use fewer or smaller models`,
@@ -1168,12 +1254,16 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
     );
   // Success: keep the packed models (and only those) and the environment tables for the next scene.
   cache.models = reused;
+  cache.keys = keys;
   if (environment.map) cache.environment = environment.map;
   if (environment.skyCache) cache.sky = environment.skyCache;
   return {
     revision: scene.revision,
     models: packed,
+    modelIds: [...modelIndex.keys()],
     modelIndex,
+    packedModels: fresh,
+    reusedModels: packed.length - fresh,
     instances: ordered,
     nodes,
     materials: table,

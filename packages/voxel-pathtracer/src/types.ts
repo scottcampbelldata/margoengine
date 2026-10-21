@@ -121,9 +121,18 @@ export interface TraceModel {
   id: string;
   /**
    * Content revision: a model whose id, revision and size match the previous scene's reuses its packed and uploaded
-   * data without reading `voxels` again. Change it whenever the voxels change.
+   * data without reading `voxels` again. Change it whenever the voxels change. Ignored for reuse when `contentKey` is
+   * set.
    */
   revision: number;
+  /**
+   * Compatible addition: an identity of the voxel contents that never stands for two different contents (a content
+   * hash, a serial given to one immutable buffer, or the buffer object itself). With it, the model reuses the packed
+   * and uploaded data of a model of the previous scene, or an earlier model of this scene, with the same key (compared
+   * as a Map compares keys) and size, whatever its id or revision; it never reuses a model's data packed under another
+   * key or without one. Without it, id, revision and size decide as above, and only among models packed without a key.
+   */
+  contentKey?: string | number | symbol | object;
   /** Integer dimensions `[x, y, z]`, each 1 to 256 (y is up). */
   size: TraceVec3;
   /** Dense palette indices, `index = x + size[0] * (z + size[2] * y)`; 0 is empty. Read, never kept or changed. */
@@ -323,8 +332,12 @@ export interface VoxelPathTracerOptions {
   exposure?: number;
   /** Thin-lens aperture diameter in world units, 0 or more; 0 is a pinhole. Default 0. */
   aperture?: number;
-  /** Distance from the camera to the plane in focus, world units, above 0. Default: camera position to target. */
-  focusDistance?: number;
+  /**
+   * Distance from the camera to the plane in focus, world units, above 0. Default: camera position to target
+   * (automatic). Compatible addition: null returns to automatic focus (leaving it out of `setOptions` keeps the
+   * current distance).
+   */
+  focusDistance?: number | null;
   /**
    * Edge-avoiding wavelet denoising of the viewport and captures. Default false. Compatible addition: 'auto' denoises
    * the viewport every frame below 32 samples, then each time its samples grow by a quarter and at convergence
@@ -509,6 +522,12 @@ export interface VoxelPathTracerStats {
   height: number;
   /** Compatible addition: revision of the scene being traced. */
   sceneRevision: number;
+  /** Compatible addition: models the last `attach` or `setScene` packed from their voxels. */
+  packedModels: number;
+  /** Compatible addition: models it reused already packed (by `contentKey`, or by id, revision and size). */
+  reusedModels: number;
+  /** Compatible addition: captures and `renderImage` calls queued or running (see `whenIdle`). */
+  renders: number;
 }
 
 /** Compatible addition: options of {@link VoxelPathTracer.renderImage} (and the base of `capture`). */
@@ -607,4 +626,50 @@ export interface VoxelTraceHit {
   readonly distance: number;
   /** World point hit. */
   readonly point: TraceVec3;
+}
+
+/**
+ * Compatible addition: the options a tracer runs with, every default filled in: {@link VoxelPathTracer.options},
+ * `resolveTraceOptions` and `VOXEL_PATHTRACER_DEFAULTS`. Fields that may be absent are off (`previousCamera`,
+ * `distortion`, `bounceLimits`, `edges`, `grid`), automatic (`focusDistance`) or sRGB (`gamma`) when absent.
+ */
+export type ResolvedTraceOptions = Omit<
+  Required<VoxelPathTracerOptions>,
+  'scene' | 'focusDistance' | 'previousCamera' | 'distortion' | 'fisheye' | 'gamma' | 'bounceLimits' | 'edges' | 'grid'
+> & {
+  focusDistance?: number;
+  previousCamera?: TracePreviousCamera;
+  fisheye: Required<TraceFisheye>;
+  distortion?: Required<TraceLensDistortion>;
+  gamma?: number;
+  bounceLimits?: TraceBounceLimits;
+  edges?: TraceEdges;
+  grid?: Required<TraceGrid>;
+};
+
+/**
+ * Compatible addition: a material with every field resolved by `resolveTraceMaterial`: the defaults of its type filled
+ * in (`emissionColor` and `metalColor` default to `color`, `cameraEmission` to `emission`), `texture` as six face
+ * indices when set.
+ */
+export type ResolvedTraceMaterial = Required<Omit<TraceMaterial, 'texture'>> & {
+  texture?: readonly [number, number, number, number, number, number];
+};
+
+/** Compatible addition: one invalid field found by `validateTraceOptions` or `validateTraceMaterial`. */
+export interface TraceProblem {
+  /** The option or material field (empty for the object as a whole). */
+  readonly field: string;
+  /** The error the tracer would throw for it, naming the fix. */
+  readonly error: TypeError | RangeError;
+}
+
+/** Compatible addition: what `validateTraceOptions` and `validateTraceMaterial` report. */
+export interface TraceValidation {
+  /** True exactly when the tracer would accept the input. */
+  readonly ok: boolean;
+  /** Every invalid field, in the input's order. */
+  readonly problems: readonly TraceProblem[];
+  /** Fields the tracer does not know (it ignores them; they do not make `ok` false). */
+  readonly unknown: readonly string[];
 }

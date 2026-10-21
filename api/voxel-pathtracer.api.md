@@ -42,6 +42,21 @@ export interface MagicaVoxelLighting {
 
 export type MagicaVoxelLook = 'magicavoxel' | 'margo';
 
+export type ResolvedTraceMaterial = Required<Omit<TraceMaterial, 'texture'>> & {
+    texture?: readonly [number, number, number, number, number, number];
+};
+
+export type ResolvedTraceOptions = Omit<Required<VoxelPathTracerOptions>, 'scene' | 'focusDistance' | 'previousCamera' | 'distortion' | 'fisheye' | 'gamma' | 'bounceLimits' | 'edges' | 'grid'> & {
+    focusDistance?: number;
+    previousCamera?: TracePreviousCamera;
+    fisheye: Required<TraceFisheye>;
+    distortion?: Required<TraceLensDistortion>;
+    gamma?: number;
+    bounceLimits?: TraceBounceLimits;
+    edges?: TraceEdges;
+    grid?: Required<TraceGrid>;
+};
+
 export interface TraceAreaLight {
     id: string;
     position: TraceVec3;
@@ -156,6 +171,7 @@ export type TraceMaterialType = 'diffuse' | 'plastic' | 'metal' | 'glass' | 'emi
 export interface TraceModel {
     id: string;
     revision: number;
+    contentKey?: string | number | symbol | object;
     size: TraceVec3;
     voxels: Uint8Array;
 }
@@ -173,13 +189,26 @@ export interface TracePreviousCamera {
     fov?: number;
 }
 
+export interface TraceProblem {
+    readonly field: string;
+    readonly error: TypeError | RangeError;
+}
+
 export interface TraceTexture {
     width: number;
     height: number;
     data: Uint8Array | Uint8ClampedArray;
 }
 
+export interface TraceValidation {
+    readonly ok: boolean;
+    readonly problems: readonly TraceProblem[];
+    readonly unknown: readonly string[];
+}
+
 export type TraceVec3 = readonly [number, number, number];
+
+export const VOXEL_PATHTRACER_DEFAULTS: Readonly<ResolvedTraceOptions>;
 
 export class VoxelPathTracer implements EnginePlugin {
     readonly name: string;
@@ -191,18 +220,12 @@ export class VoxelPathTracer implements EnginePlugin {
     get ready(): Promise<void>;
     get status(): 'compiling' | 'ready' | 'failed' | 'disposed';
     get error(): unknown;
-    get options(): Readonly<Omit<Required<VoxelPathTracerOptions>, 'scene' | 'focusDistance' | 'previousCamera' | 'distortion' | 'fisheye' | 'gamma' | 'bounceLimits' | 'edges' | 'grid'> & {
-        focusDistance?: number;
-        previousCamera?: TracePreviousCamera;
-        fisheye: Required<TraceFisheye>;
-        distortion?: Required<TraceLensDistortion>;
-        gamma?: number;
-        bounceLimits?: TraceBounceLimits;
-        edges?: TraceEdges;
-        grid?: Required<TraceGrid>;
-    }>;
+    get options(): Readonly<ResolvedTraceOptions>;
     setScene(scene: VoxelTraceScene): void;
     setOptions(options: Partial<Omit<VoxelPathTracerOptions, 'scene'>>): void;
+    resetOptions(names?: Iterable<keyof Omit<VoxelPathTracerOptions, 'scene'>>): void;
+    invalidateModels(ids?: Iterable<string>): void;
+    whenIdle(): Promise<void>;
     reset(): void;
     raycast(origin: TraceVec3, direction: TraceVec3, maxDistance?: number): VoxelTraceHit | null;
     capture(options: VoxelTraceCaptureOptions): Promise<Blob>;
@@ -223,7 +246,7 @@ export interface VoxelPathTracerOptions {
     resolutionScale?: number;
     exposure?: number;
     aperture?: number;
-    focusDistance?: number;
+    focusDistance?: number | null;
     denoise?: boolean | 'auto';
     lensBlades?: number;
     lensRotation?: number;
@@ -254,6 +277,9 @@ export interface VoxelPathTracerStats {
     width: number;
     height: number;
     sceneRevision: number;
+    packedModels: number;
+    reusedModels: number;
+    renders: number;
 }
 
 export interface VoxelTraceCaptureOptions {
@@ -334,4 +360,12 @@ export function magicaVoxelMaterial(id: number, rgb: ArrayLike<number>, attribut
 export function magicaVoxelMatrix(size: ArrayLike<number>, translation?: ArrayLike<number>, rotation?: ArrayLike<number>, scale?: ArrayLike<number>): number[];
 
 export function magicaVoxelModel(id: string, revision: number, size: ArrayLike<number>, voxels: Uint8Array): TraceModel;
+
+export function resolveTraceMaterial(material: TraceMaterial, textures?: number): ResolvedTraceMaterial;
+
+export function resolveTraceOptions(options: Partial<Omit<VoxelPathTracerOptions, 'scene'>>, base?: Readonly<ResolvedTraceOptions>): ResolvedTraceOptions;
+
+export function validateTraceMaterial(material: unknown, textures?: number): TraceValidation;
+
+export function validateTraceOptions(options: unknown): TraceValidation;
 ```
