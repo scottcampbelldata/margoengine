@@ -6,6 +6,40 @@
 import { Camera, EngineKernel } from "@margoengine/core";
 import { ColorInput } from "@margoengine/math";
 
+export interface ArchiveProgress {
+    signal?: AbortSignal;
+    onProgress?: (done: number, total: number) => void;
+}
+
+export interface AtlasFrame {
+    index: number;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
+export interface AtlasLayout {
+    columns: number;
+    rows: number;
+    width: number;
+    height: number;
+}
+
+export interface AtlasManifest extends AtlasLayout {
+    format: 'sprite-atlas';
+    image: string;
+    frameWidth: number;
+    frameHeight: number;
+    frames: AtlasFrame[];
+}
+
+export interface AtlasZIPOptions extends ArchiveZIPOptions<AtlasManifest> {
+    columns?: number;
+    maxSize?: number;
+    image?: string;
+}
+
 export interface CaptureOptions {
     width: number;
     height: number;
@@ -32,6 +66,16 @@ export interface SequenceFile {
     data: Uint8Array;
 }
 
+export interface SequenceManifest {
+    format: 'png-sequence';
+    width: number;
+    height: number;
+    frames: {
+        index: number;
+        file: string;
+    }[];
+}
+
 export interface SequenceOptions {
     name?: string;
     format?: 'png' | 'jpg';
@@ -39,9 +83,36 @@ export interface SequenceOptions {
     quality?: number;
 }
 
+export interface SequenceZIPOptions extends ArchiveZIPOptions<SequenceManifest> {
+    name?: string;
+    pad?: number;
+    folder?: string;
+}
+
+export interface SpriteAtlas extends AtlasLayout {
+    pixels: Pixels;
+    frameWidth: number;
+    frameHeight: number;
+    frames: AtlasFrame[];
+}
+
+export interface SpriteAtlasOptions extends ArchiveProgress {
+    columns?: number;
+    maxSize?: number;
+}
+
 export interface WEBMOptions {
     fps?: number;
     bitsPerSecond?: number;
+}
+
+export interface ZIPEntry {
+    name: string;
+    data: Uint8Array | Blob | string;
+}
+
+export interface ZIPOptions extends ArchiveProgress {
+    maxBytes?: number;
 }
 
 export function capture(engine: EngineKernel, { width, height, camera, background, backgroundAlpha }: CaptureOptions): {
@@ -49,6 +120,8 @@ export function capture(engine: EngineKernel, { width, height, camera, backgroun
     width: number;
     height: number;
 };
+
+export function encodeAtlasZIP(count: number, frame: FrameSource, { columns, maxSize, image, manifest, entries, maxBytes, signal, onProgress }?: AtlasZIPOptions): Promise<Uint8Array>;
 
 export function encodeGIF(count: number, frame: FrameSource, { fps, dither }?: GIFOptions): Promise<Uint8Array>;
 
@@ -58,5 +131,21 @@ export function encodePNG(pixels: Pixels): Promise<Uint8Array>;
 
 export function encodeSequence(count: number, frame: FrameSource, { name, format, pad, quality }?: SequenceOptions): AsyncGenerator<SequenceFile, void, undefined>;
 
+export function encodeSequenceZIP(count: number, frame: FrameSource, { name, pad, folder, manifest, entries, maxBytes, signal, onProgress }?: SequenceZIPOptions): Promise<Uint8Array>;
+
 export function encodeWEBM(count: number, frame: FrameSource, { fps, bitsPerSecond }?: WEBMOptions): Promise<Uint8Array>;
+
+export function encodeZIP(entries: readonly ZIPEntry[], { signal, onProgress, maxBytes }?: ZIPOptions): Promise<Uint8Array>;
+
+export function packSpriteAtlas(count: number, frame: FrameSource, { columns, maxSize, signal, onProgress }?: SpriteAtlasOptions): Promise<SpriteAtlas>;
+
+export function spriteAtlasLayout(count: number, frameWidth: number, frameHeight: number, columns?: number, maxSize?: number): AtlasLayout;
+
+// Not exported from this entry, but used by the exports above:
+
+interface ArchiveZIPOptions<M> extends ArchiveProgress {
+    manifest?: false | ((manifest: M) => unknown);
+    entries?: readonly ZIPEntry[];
+    maxBytes?: number;
+}
 ```

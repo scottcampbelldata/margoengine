@@ -17,6 +17,16 @@ export interface AnimationChannelData {
 export interface AnimationData {
     name?: string;
     channels: readonly AnimationChannelData[];
+    extras?: Extras;
+}
+
+export interface AppendedMesh {
+    name: string;
+    positions: ArrayLike<number>;
+    indices: ArrayLike<number>;
+    volume?: boolean;
+    extras?: Extras;
+    meshExtras?: Extras;
 }
 
 export interface CameraData {
@@ -34,6 +44,7 @@ export interface CameraData {
         znear: number;
         zfar: number;
     };
+    extras?: Extras;
 }
 
 export interface DAEOptions extends SceneOptions {
@@ -61,19 +72,41 @@ export interface ExportNode {
     translation?: readonly number[];
     rotation?: readonly number[];
     scale?: readonly number[];
+    matrix?: readonly number[];
     geometry?: Geometry | GeometryData;
     material?: PbrMaterial | MaterialData;
+    primitives?: readonly ExportPrimitive[];
     visible?: boolean;
     children?: readonly ExportNode[];
     skin?: SkinData;
     morphWeights?: readonly number[];
     camera?: CameraData;
     light?: LightData;
+    extras?: Extras;
+    meshName?: string;
+    meshExtras?: Extras;
+}
+
+export interface ExportPrimitive {
+    geometry: Geometry | GeometryData;
+    material?: PbrMaterial | MaterialData;
+    indices?: ArrayLike<number>;
+    extras?: Extras;
 }
 
 export interface ExportScene {
     nodes: readonly ExportNode[];
     animations?: readonly AnimationData[];
+    extras?: Extras;
+    scene?: {
+        name?: string;
+        extras?: Extras;
+    };
+    asset?: {
+        copyright?: string;
+        extras?: Extras;
+    };
+    lightmap?: LightmapData;
 }
 
 export type ExportSource = EngineKernel | ExportScene;
@@ -84,6 +117,33 @@ export interface ExportTrack {
     times: ArrayLike<number>;
     values: ArrayLike<number>;
     interpolation?: 'STEP' | 'LINEAR' | 'CUBICSPLINE';
+}
+
+export type Extras = {
+    readonly [key: string]: unknown;
+};
+
+export interface FrameClip {
+    fps: number;
+    frames: readonly number[];
+    end?: number;
+}
+
+export interface FramePose {
+    translation?: readonly number[];
+    rotation?: readonly number[];
+    scale?: readonly number[];
+}
+
+export interface GLBChunk {
+    type: number;
+    data: Uint8Array;
+}
+
+export interface GLBParts {
+    json: Record<string, unknown>;
+    bin: Uint8Array | null;
+    chunks: GLBChunk[];
 }
 
 export interface GLTFJsonOptions extends GLTFOptions {
@@ -125,6 +185,14 @@ export interface LightData {
     range?: number;
     innerConeAngle?: number;
     outerConeAngle?: number;
+    extras?: Extras;
+}
+
+export interface LightmapData {
+    texture: TextureData;
+    texCoord?: 0 | 1;
+    key?: string;
+    extras?: Extras;
 }
 
 export interface MaterialData {
@@ -143,6 +211,14 @@ export interface MaterialData {
     shading?: 'standard' | 'lambert' | 'phong';
     specular?: readonly number[];
     shininess?: number;
+    normalScale?: number;
+    occlusionTexture?: TextureData;
+    occlusionStrength?: number;
+    emissiveTexture?: TextureData;
+    emissiveStrength?: number;
+    transmission?: number;
+    ior?: number;
+    extras?: Extras;
 }
 
 export interface ModelExportOptions {
@@ -186,6 +262,12 @@ export interface PLYOptions extends SceneOptions {
     colors?: boolean;
 }
 
+export interface PaletteTexture {
+    texture: TextureData;
+    size: number;
+    uvs: Float32Array;
+}
+
 export interface STLOptions extends SceneOptions {
     binary?: boolean;
     name?: string;
@@ -202,6 +284,8 @@ export interface SkinData {
     name?: string;
     joints: readonly ExportNode[];
     inverseBindMatrices: ArrayLike<number>;
+    skeleton?: ExportNode;
+    extras?: Extras;
 }
 
 export interface TextureData {
@@ -213,10 +297,23 @@ export interface TextureData {
     mipmaps?: boolean;
     wrapS?: 'repeat' | 'clamp' | 'mirror';
     wrapT?: 'repeat' | 'clamp' | 'mirror';
+    texCoord?: 0 | 1;
+    extras?: Extras;
 }
 
 export interface USDZOptions extends SceneOptions {
 }
+
+export function animateCels(cels: readonly ExportNode[], clip: FrameClip, shown: ArrayLike<number>): AnimationChannelData[];
+
+export function animatePlacements(node: ExportNode, clip: FrameClip, matrices: readonly (ArrayLike<number> | null)[]): AnimationChannelData[];
+
+export function animateTransforms(node: ExportNode, clip: FrameClip, poses: readonly FramePose[], { interpolation, paths }?: {
+    interpolation?: 'STEP' | 'LINEAR';
+    paths?: readonly Path[];
+}): AnimationChannelData[];
+
+export function appendGLBMeshes(bytes: Uint8Array, meshes: readonly AppendedMesh[]): Uint8Array;
 
 export function exportDAE(source: ExportSource, options?: DAEOptions): DAEResult;
 
@@ -250,6 +347,18 @@ export function exportSTL(source: ExportSource, options: STLOptions & {
 
 export function exportUSDZ(source: ExportSource, options?: USDZOptions): Uint8Array;
 
+export function frameTimes(clip: FrameClip): Float32Array;
+
+export function joinGLB({ json, bin, chunks }: GLBParts): Uint8Array;
+
+export function paletteTexture(colors: ArrayLike<number>, options?: {
+    name?: string;
+}): Promise<PaletteTexture>;
+
+export function sampleFrames(first: number, last: number, fps: number, maxFrames?: number): FrameClip;
+
+export function splitGLB(bytes: Uint8Array): GLBParts;
+
 // Not exported from this entry, but used by the exports above:
 
 interface GLTFJsonResult {
@@ -262,4 +371,6 @@ interface GLTFJsonResult {
 interface Lookup<K, V> {
     get(key: K): V | undefined;
 }
+
+type Path = 'translation' | 'rotation' | 'scale';
 ```

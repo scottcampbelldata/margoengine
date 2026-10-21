@@ -351,6 +351,10 @@
     "install": "npm install @margoengine/core@1.0.0 @margoengine/exporters@1.0.0",
     "imports": "import { exportGLB } from '@margoengine/exporters';",
     "exports": [
+      "animateCels",
+      "animatePlacements",
+      "animateTransforms",
+      "appendGLBMeshes",
       "exportDAE",
       "exportGLB",
       "exportGLTF",
@@ -358,7 +362,12 @@
       "exportOBJ",
       "exportPLY",
       "exportSTL",
-      "exportUSDZ"
+      "exportUSDZ",
+      "frameTimes",
+      "joinGLB",
+      "paletteTexture",
+      "sampleFrames",
+      "splitGLB"
     ],
     "category": "Loading and formats"
   },

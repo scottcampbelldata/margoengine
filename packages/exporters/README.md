@@ -68,7 +68,7 @@ Engine export entrypoints also bake back-only optional PBR triangles by reversin
 - **Scene walk.** An engine source is walked through `engineRuntime(engine)`: `meshes`, `store.parents`, `store.hidden` and the local transforms in `store.transforms` (translation, quaternion, scale). World matrices are recomputed in double precision from the parent chain, so export does not depend on a `render()` having run. Hidden meshes hide their descendants, as in the kernel.
 - **Every Margo Engine mesh is a glTF node.** Transform-only meshes become empty nodes, so the hierarchy survives. With `flatten`, each drawable mesh is a root node with its world transform; when a parent chain with non-uniform scale produces shear, which glTF TRS cannot hold, that mesh's world transform is baked into its vertices (and winding is flipped for mirrors).
 - **Deduplication.** One `Geometry` (or geometry data object) is written once: POSITION (with exact Float32 `min`/`max`), NORMAL, optional TANGENT, TEXCOORD_0 and COLOR_0, and indices. One glTF mesh is written per geometry and material pair, and one glTF material per `PbrMaterial`. Images are deduplicated by byte array.
-- **Materials.** `PbrMaterial.data` maps to `pbrMetallicRoughness`: `baseColorFactor` is already linear, then `roughnessFactor`, `metallicFactor` and `doubleSided`. Material data adds emission, alpha mode and base color, metallic-roughness and normal textures.
+- **Materials.** `PbrMaterial.data` maps to `pbrMetallicRoughness`: `baseColorFactor` is already linear, then `roughnessFactor`, `metallicFactor` and `doubleSided`. Material data adds emission, alpha mode, base color, metallic-roughness, normal, occlusion and emissive textures, and `KHR_materials_transmission`, `KHR_materials_ior` and `KHR_materials_emissive_strength`.
 - **Binary layout.** Each bufferView starts on a 4-byte boundary, the buffer length is a multiple of 4, GLB JSON is padded with spaces and BIN with zeros. Indices are 16-bit up to 65535 vertices (65535 itself is the restart value) and 32-bit above. Normals and tangents are normalized and tangent `w` is forced to +1 or -1, as the validator requires.
 - **STL, OBJ, PLY** write world-space data. STL uses face normals from the transformed triangle. OBJ writes one `g` group (or `o` object) per mesh, `v`/`vt`/`vn` and 1-based `f v/vt/vn` faces, with `vt` flipped to OBJ's v-up. The MTL has `Kd` and `Ke` in sRGB plus `Pr`, `Pm`, `d` and optional `map_Kd`/`map_d`. PLY merges all meshes into one vertex and face list, with optional 8-bit sRGB colors from vertex colors or the material.
 - **Tree-shaking and SSR.** Each format is its own module and `sideEffects` is false, so importing only `exportSTL` leaves out the glTF writer. Nothing touches `window`, `document`, `navigator` or GPU globals, and base64 is done without `btoa` or `Buffer`.
@@ -95,7 +95,7 @@ Engine export entrypoints also bake back-only optional PBR triangles by reversin
 | `mergeVertices` | OBJ | `false`. Welds a mesh's corners whose position, uv, normal and written color agree within 1e-5 |
 | `scale` | OBJ | `1`. Multiplies every position |
 
-`GeometryData` is `{positions, normals, uvs?, tangents?, colors?, indices?, faceSizes?, joints?, weights?, morphs?}` with xyz, xyz, uv, xyzw and linear rgb or rgba per vertex. `uvs` follow glTF (v = 0 at the image's top, images as encoded): a materials mesh's three.js UVs go in as `1 - v`. `faceSizes` lists corners per face in index order: 3 for a triangle, 4 for the next two triangles when they form a quad (sharing an edge, as (a, b, c), (a, c, d)); OBJ and DAE write those quads as 4-corner faces, the other formats write the triangles. Inputs are validated: finite Float32 values, matching lengths, complete triangles, indices in range, colors in [0, 1], nonzero scales and quaternions, PNG or JPEG bytes that match `mimeType`, and textured materials only on geometry with UVs.
+`GeometryData` is `{positions, normals, uvs?, tangents?, colors?, indices?, faceSizes?, joints?, weights?, morphs?}` with xyz, xyz, uv, xyzw and linear rgb or rgba per vertex. `uvs` follow glTF (v = 0 at the image's top, images as encoded): a materials mesh's three.js UVs go in as `1 - v`. `faceSizes` lists corners per face in index order: 3 for a triangle, 4 for the next two triangles when they form a quad (sharing an edge, as (a, b, c), (a, c, d)); OBJ and DAE write those quads as 4-corner faces, the other formats write the triangles. Inputs are validated: finite Float32 values, matching lengths, complete triangles, indices in range, colors in [0, 1], nonzero scales (or [0, 0, 0], below) and quaternions, PNG or JPEG bytes that match `mimeType`, and textured materials only on geometry with the UV set they sample.
 
 ## Data-scene skin, morph and animation export
 
@@ -188,9 +188,121 @@ const glb = exportGLB({nodes: [
 ]});
 ```
 
+## Rich data scenes: multi-material meshes, extras, PBR textures and lightmaps
+
+Plain data scenes carry what a voxel or game-asset pipeline writes into a standard glTF, all checked by the Khronos
+validator in the tests:
+
+- **Multi-material meshes.** A node's `primitives` (instead of `geometry` and `material`) is a list of
+  `{geometry, material?, indices?, extras?}`. Primitives that share one geometry object and give their own `indices`
+  write its vertex attributes once and an index list each: one palette model split by material is one mesh, one vertex
+  set. Nodes that share a `primitives` array share the glTF mesh; `meshName` and `meshExtras` name and annotate it.
+- **Extras at every scope.** `extras` on the scene (the document root), `scene` (`{name, extras}`), `asset`
+  (`{copyright, extras}`), nodes, meshes (`meshExtras`), primitives, materials, textures, skins, animations, cameras
+  and lights. Extras are JSON: plain objects, arrays, strings, finite numbers, booleans and null, copied at export;
+  typed arrays, class instances, non-finite numbers and cycles throw instead of changing silently.
+- **Textures and extensions.** `MaterialData` adds `occlusionTexture` (with `occlusionStrength`), `emissiveTexture`
+  (multiplied by `emissive`, so set it to [1, 1, 1]), `normalScale`, and `transmission`, `ior` and `emissiveStrength`,
+  written as `KHR_materials_transmission`, `KHR_materials_ior` and `KHR_materials_emissive_strength` when they differ
+  from glTF's defaults. A texture's `texCoord: 1` samples `uvs1` (`TEXCOORD_1`).
+- **Indexed palette textures.** `await paletteTexture(rgba)` lays out RGBA8 palette entries one per texel in the
+  smallest square power-of-two PNG, sampled NEAREST without mipmaps and clamped, and returns each entry's texel-centre
+  UV, so a face picks its exact palette colour.
+- **Node matrices and collapsed nodes.** `matrix` (column-major, affine, without shear: glTF forbids sheared node
+  matrices) replaces translation, rotation and scale on a node that is not animated. A scale of [0, 0, 0] collapses a
+  node: glTF keeps it (a hidden cel, shown later by a scale channel), the mesh-only formats leave it out.
+- **Skins** name their `skeleton` root (checked to be an ancestor of every joint).
+- **Lightmaps.** glTF has no standard lightmap material slot, and this writer does not invent an extension. A scene's
+  `lightmap: {texture, texCoord?, key?, extras?}` writes the texture into the document and records it under the root
+  `extras[key]` (default `'lightmap'`) as `{texture: <index>, texCoord, ...extras}`; every drawn mesh needs that UV
+  set (default `uvs1`). Standard viewers ignore it; an import script binds it.
+
+```ts
+import {exportGLB, paletteTexture} from '@margoengine/exporters';
+
+const palette = await paletteTexture(rgbaBytes);             // {texture, size, uvs}
+const geometry = {positions, normals, uvs, uvs1, colors, indices};
+const glb = exportGLB({
+  nodes: [{name: 'Body', extras: {app: {modelId: 'body'}}, meshName: 'Body_Mesh', primitives: [
+    {geometry, indices: solidTriangles, material: {baseColorTexture: palette.texture, emissive: [1, 1, 1],
+      emissiveTexture: palette.texture, emissiveStrength: 4}},
+    {geometry, indices: glassTriangles, material: {baseColorTexture: palette.texture, alphaMode: 'BLEND',
+      transmission: 0.8, ior: 1.33}},
+  ]}],
+  extras: {app: {source: 'studio'}},
+  lightmap: {texture: lightmapPNG, key: 'appLightmap', extras: {encoding: 'linear', scale: 2}},
+});
+```
+
+## Held-key animation: cels, instances and sampled clocks
+
+Helpers in the main entry turn document frames into standard glTF channels for an `ExportScene` animation. Each sets
+the nodes it animates to their first key (what a viewer that does not play the clip shows) and returns the channels.
+
+| Function | Writes |
+| --- | --- |
+| `frameTimes({fps, frames, end?})` | Float32 key times: `(frame - frames[0]) / fps` per key, then `end` (default last + 1), so the last key holds until the clip ends. Throws when two times collapse in Float32 |
+| `sampleFrames(first, last, fps, maxFrames = 4096)` | A clip of every whole frame, for motion that changes between keys (local object clocks) |
+| `animateTransforms(node, clip, poses, {interpolation?, paths?})` | Translation, rotation and scale channels (or the `paths` given, e.g. a translation-only parent over a rotation-and-scale child); quaternions normalized and kept on one hemisphere |
+| `animateCels(cels, clip, shown)` | Held topology-changing geometry: `cels` are the distinct banks (`@margoengine/voxel-edit`'s `packFrames` gives them), `shown[k]` the bank visible from key `k` or -1; STEP scale channels show one child at a time, so a bank used at many keys is written once |
+| `animatePlacements(node, clip, matrices)` | A retained instance's placement per key from its local matrix, or `null` where it is hidden (scale 0); STEP channels; throws on shear |
+
+```ts
+const clip = {fps: 12, frames: [0, 4, 8], end: 12};
+const cels = [{name: 'Prop_Cel1', primitives: bank0}, {name: 'Prop_Cel2', primitives: bank1}];
+const prop = {name: 'Prop', children: cels};
+const channels = [...animateCels(cels, clip, [0, 1, 0]), ...animateTransforms(prop, clip, poses)];
+const glb = exportGLB({nodes: [prop], animations: [{name: 'Clip', channels, extras: {fps: 12}}]});
+```
+
+## Appending to an existing GLB
+
+`splitGLB(bytes)` checks a GLB (header, chunk order and alignment, UTF-8 JSON, buffer 0 against the BIN chunk) and
+returns `{json, bin, chunks}`, where `chunks` are the chunks glTF 2.0 does not define, in order; `joinGLB(parts)`
+writes them back (a round trip is byte-identical). `appendGLBMeshes(bytes, meshes)` adds `{name, positions, indices,
+volume?, extras?, meshExtras?}` triangle meshes as root nodes of the active scene and keeps everything else: existing
+JSON members, extensions and extras, the BIN bytes, and every further chunk. Names must not clash with an existing node
+(importers match them); every triangle needs area, and `volume: true` requires points off one plane, as convex
+collision hulls do. The naming convention (a Godot `-colonly` suffix, for example) is the caller's.
+
+```ts
+const withColliders = appendGLBMeshes(glb, [
+  {name: 'Body-colonly', positions: hull, indices, volume: true, extras: {role: 'collision'}},
+]);
+```
+
+## Skin authoring (`@margoengine/exporters/skin`)
+
+An optional subpath (nothing else imports it) that skins a mesh to an authored rest skeleton:
+
+| Function | Result |
+| --- | --- |
+| `checkJoints(joints)` | Throws unless 1 to 1024 joints `{name, parent, position}` form one tree with one root (`parent: -1`) |
+| `skinWeights(positions, joints, {origin?, influences?})` | `{joints: Uint16Array, weights: Float32Array}`, four per vertex: the `influences` (default 4) nearest bone segments (parent to joint; the root's is its point), inverse-distance weights summing to 1, ties to the lower joint index |
+| `skinBindMatrices(joints, origin?)` | Column-major `local`, `world` and `inverseBind` rest matrices, 16 values per joint |
+| `skinHierarchy(joints, {origin?, name?})` | Joint `ExportNode`s (`root`, `nodes`) and the `SkinData` for the mesh node, skeleton set |
+| `humanoidJoints(min, max)` | An 18-joint upright humanoid rest skeleton fitted to a box (y up, facing +z), to refine by hand |
+
+Coordinate conventions: joint positions are in joint space, the mesh's vertices in mesh space, and `origin` is the
+joint-space point at the mesh's origin (joint = mesh + origin; a voxel model's pivot when joints are grid
+coordinates). Matrices are column-major. Joints have no rest rotation: each local rest transform is the translation
+from its parent (the root's from the mesh origin) and each inverse bind matrix the translation by minus the joint's
+mesh-space position, so the rest pose leaves every vertex in place. Put `root` beside the mesh node, under the same
+parent.
+
+```ts
+import {humanoidJoints, skinHierarchy, skinWeights} from '@margoengine/exporters/skin';
+
+const joints = humanoidJoints(min, max), origin = pivot;
+const {root, skin} = skinHierarchy(joints, {origin, name: 'Rig'});
+const mesh = {name: 'Figure', geometry: {positions, normals, indices, ...skinWeights(positions, joints, {origin})}, skin};
+const glb = exportGLB({nodes: [{name: 'Model', children: [mesh, root]}]});
+```
+
 ## Limits
 
-The engine/data-scene `exportGLTF` and `exportGLB` entrypoints write cameras, lights and `KHR_materials_unlit` only
+The engine/data-scene `exportGLTF` and `exportGLB` entrypoints write cameras, lights, extras and
+`KHR_materials_unlit`, `KHR_materials_transmission`, `KHR_materials_ior` and `KHR_materials_emissive_strength` only
 from data-scene nodes and materials, and no instancing or other KHR material extensions; use `exportModel` for loaded
 glTF-pro camera/light attachments and PBR metadata. Export does not produce Draco or meshopt compression, sparse
 accessors or interleaved buffers. Engine/data-scene skins support four influences per vertex. `exportGLTF` puts images
@@ -275,6 +387,33 @@ const webm = await encodeWEBM(120, frame, {fps: 30});    // browser only
   1/fps s of wall time and pausing while the next is produced. A throwaway one-frame recording warms the browser's
   media pipeline first (cold, it starts about 1 s late and keeps paused time). Durations follow timers, so they are
   close to 1/fps, and the codec (VP8/VP9) and bit rate are the browser's. Keep the window visible while recording.
+
+### Sprite atlases and ZIP archives
+
+The capture subpath also packs frames for game engines and downloads. Each takes `signal` (an `AbortSignal`: the call
+stops between frames or entries and rejects with its reason, returning nothing partial) and `onProgress(done, total)`.
+
+| Function | Result |
+| --- | --- |
+| `spriteAtlasLayout(count, frameWidth, frameHeight, columns?, maxSize = 8192)` | `{columns, rows, width, height}`, checked before any frame renders: at most `maxSize` (up to 16384) per side and 8192 x 8192 pixels in all |
+| `packSpriteAtlas(count, frame, {columns?, maxSize?})` | The atlas pixels and every frame's rectangle; frame `i` at column `i % columns`, row `floor(i / columns)`, copied exactly at full size (no trimming or filtering), anywhere (no canvas) |
+| `encodeZIP(entries, {maxBytes?})` | A stored (uncompressed) ZIP of `{name, data}` (Uint8Array, Blob or UTF-8 string), UTF-8 names, dated 1980-01-01 so the same files give the same bytes; safe relative names only, size checked against `maxBytes` (default 256 MiB, ZIP32 limit 4 GiB) before any entry is read |
+| `encodeSequenceZIP(count, frame, {name?, pad?, folder?, manifest?, entries?})` | Numbered lossless PNGs (`frames/frame07.png`) and `manifest.json`; stops as soon as `maxBytes` is spent |
+| `encodeAtlasZIP(count, frame, {columns?, image?, manifest?, entries?})` | One atlas PNG and `manifest.json` with each frame's rectangle |
+
+`manifest` is a hook: it receives the base manifest (`format`, sizes, frames) and returns the JSON to write (add clip,
+camera or naming fields), or is `false` to leave the file out; `entries` adds files such as a README.
+
+```ts
+const zip = await encodeAtlasZIP(24, frame, {
+  columns: 6, image: 'walk.png', signal: controller.signal,
+  manifest: (base) => ({...base, fps: 12, clip: 'walk'}),
+  onProgress: (done, total) => bar.set(done / total),
+});
+```
+
+`node --test packages/exporters/tests/archive.test.js` reads every ZIP back with an independent reader (CRCs, local and
+central headers) and decodes the PNGs.
 
 `node --test packages/exporters/tests/capture.test.js` decodes every GIF with an independent GIF89a decoder (exact
 pixels, delays, loop, transparency, LZW resets and the end-code width, quantisation error), round-trips PNG through

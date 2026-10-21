@@ -30,6 +30,7 @@ interface AnimationChannelData {
 interface AnimationData {
     name?: string;
     channels: readonly AnimationChannelData[];
+    extras?: Extras;
 }
 
 interface CameraData {
@@ -47,6 +48,7 @@ interface CameraData {
         znear: number;
         zfar: number;
     };
+    extras?: Extras;
 }
 
 interface ExportNode {
@@ -54,22 +56,48 @@ interface ExportNode {
     translation?: readonly number[];
     rotation?: readonly number[];
     scale?: readonly number[];
+    matrix?: readonly number[];
     geometry?: Geometry | GeometryData;
     material?: PbrMaterial | MaterialData;
+    primitives?: readonly ExportPrimitive[];
     visible?: boolean;
     children?: readonly ExportNode[];
     skin?: SkinData;
     morphWeights?: readonly number[];
     camera?: CameraData;
     light?: LightData;
+    extras?: Extras;
+    meshName?: string;
+    meshExtras?: Extras;
+}
+
+interface ExportPrimitive {
+    geometry: Geometry | GeometryData;
+    material?: PbrMaterial | MaterialData;
+    indices?: ArrayLike<number>;
+    extras?: Extras;
 }
 
 interface ExportScene {
     nodes: readonly ExportNode[];
     animations?: readonly AnimationData[];
+    extras?: Extras;
+    scene?: {
+        name?: string;
+        extras?: Extras;
+    };
+    asset?: {
+        copyright?: string;
+        extras?: Extras;
+    };
+    lightmap?: LightmapData;
 }
 
 type ExportSource = EngineKernel | ExportScene;
+
+type Extras = {
+    readonly [key: string]: unknown;
+};
 
 interface GeometryData {
     positions: ArrayLike<number>;
@@ -93,6 +121,14 @@ interface LightData {
     range?: number;
     innerConeAngle?: number;
     outerConeAngle?: number;
+    extras?: Extras;
+}
+
+interface LightmapData {
+    texture: TextureData;
+    texCoord?: 0 | 1;
+    key?: string;
+    extras?: Extras;
 }
 
 interface Lookup<K, V> {
@@ -115,6 +151,14 @@ interface MaterialData {
     shading?: 'standard' | 'lambert' | 'phong';
     specular?: readonly number[];
     shininess?: number;
+    normalScale?: number;
+    occlusionTexture?: TextureData;
+    occlusionStrength?: number;
+    emissiveTexture?: TextureData;
+    emissiveStrength?: number;
+    transmission?: number;
+    ior?: number;
+    extras?: Extras;
 }
 
 interface MorphData {
@@ -135,6 +179,8 @@ interface SkinData {
     name?: string;
     joints: readonly ExportNode[];
     inverseBindMatrices: ArrayLike<number>;
+    skeleton?: ExportNode;
+    extras?: Extras;
 }
 
 interface TextureData {
@@ -146,5 +192,7 @@ interface TextureData {
     mipmaps?: boolean;
     wrapS?: 'repeat' | 'clamp' | 'mirror';
     wrapT?: 'repeat' | 'clamp' | 'mirror';
+    texCoord?: 0 | 1;
+    extras?: Extras;
 }
 ```
