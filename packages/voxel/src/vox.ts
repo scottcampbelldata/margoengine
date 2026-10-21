@@ -538,6 +538,118 @@ function checkGraph(nodes: readonly VoxNode[], models: number, fail: (problem: s
   }
 }
 
+// --- Render dictionaries --------------------------------------------------------------------------------------------
+
+/** One problem {@link readVoxRenderDictionaries} found in a render chunk. The chunk itself is never changed. */
+export interface VoxRenderDiagnostic {
+  /**
+   * `'malformed'`: the content does not follow the format's encoding (truncated, a count or string past the content,
+   * trailing bytes, a repeated key), so the chunk gives no dictionary. `'unsupported'`: well-formed data this reader
+   * leaves alone: a chunk over `maxBytes`, a dictionary over `maxEntries` (neither read), or child chunks (the content
+   * is still read; the children are kept, not interpreted).
+   */
+  kind: 'malformed' | 'unsupported';
+  /** The chunk id. */
+  id: 'rOBJ' | 'rCAM';
+  /** The chunk's index in {@link VoxScene.chunks}. */
+  chunk: number;
+  /** What is wrong, with the byte offset inside the content where it applies. */
+  message: string;
+}
+
+/** The render settings a parsed scene keeps as bytes, decoded by {@link readVoxRenderDictionaries}. */
+export interface VoxRenderDictionaries {
+  /** Each readable `rOBJ` (render object: one group of renderer settings, keyed by its `_type`), in file order. */
+  objects: Map<string, string>[];
+  /** Each readable `rCAM` (render camera) with its camera id, in file order. */
+  cameras: { id: number; attributes: Map<string, string> }[];
+  /** Every chunk that gave no dictionary, or gave one with a caveat, in file order. */
+  diagnostics: VoxRenderDiagnostic[];
+}
+
+/** Bounds for {@link readVoxRenderDictionaries}. */
+export interface VoxRenderLimits {
+  /** Largest chunk content read, in bytes; default 1,048,576 (MagicaVoxel writes well under 1 KiB). */
+  maxBytes?: number;
+  /** Most key/value pairs read from one dictionary; default 4096. */
+  maxEntries?: number;
+}
+
+/**
+ * Decodes the render settings a parsed scene keeps as raw chunks: each `rOBJ` is a DICT and each `rCAM` an int32
+ * camera id then a DICT, per the published format notes. Strings decode as {@link parseVox} decodes the dictionaries it
+ * types (UTF-8, else windows-1252) and a repeated key is malformed, as there. A chunk that cannot be read is reported
+ * in `diagnostics` and skipped, never thrown; `scene` is not modified, so {@link writeVox} still writes every chunk back
+ * byte for byte. The result is the input the voxel path tracer's `magicaVoxelLighting(objects)` and
+ * `magicaVoxelCamera(camera.attributes, objects)` take.
+ * @throws TypeError when `scene` is not an object, or `scene.chunks` is present but not an array.
+ * @throws RangeError when a limit is not an integer >= 0.
+ */
+export function readVoxRenderDictionaries(scene: VoxScene, limits: VoxRenderLimits = {}): VoxRenderDictionaries {
+  const { maxBytes = 1_048_576, maxEntries = 4096 } = limits;
+  for (const [name, value] of [
+    ['maxBytes', maxBytes],
+    ['maxEntries', maxEntries],
+  ] as const)
+    if (!Number.isSafeInteger(value) || value < 0)
+      throw new RangeError(`Vox render limit ${name} ${value} is invalid; pass an integer >= 0`);
+  if (!scene || typeof scene !== 'object')
+    throw new TypeError('readVoxRenderDictionaries needs the scene parseVox returns');
+  const chunks = scene.chunks ?? [];
+  if (!Array.isArray(chunks)) throw new TypeError('Vox scene chunks must be an array, as parseVox returns');
+  const result: VoxRenderDictionaries = { objects: [], cameras: [], diagnostics: [] };
+  chunks.forEach((chunk, index) => {
+    const id = chunk?.id;
+    if (id !== 'rOBJ' && id !== 'rCAM') return;
+    const note = (kind: VoxRenderDiagnostic['kind'], message: string) =>
+      result.diagnostics.push({ kind, id, chunk: index, message: `${id} chunk ${index} ${message}` });
+    const bytes = chunk.content instanceof Uint8Array ? chunk.content : EMPTY;
+    if (bytes.length > maxBytes) {
+      note('unsupported', `has ${bytes.length} bytes, over maxBytes ${maxBytes}; it is kept, not read`);
+      return;
+    }
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let p = 0;
+    const fail = (problem: string) => new RangeError(`${problem} at byte ${p}`),
+      int = () => {
+        if (bytes.length - p < 4) throw fail('is truncated');
+        p += 4;
+        return view.getInt32(p - 4, true);
+      },
+      text = () => {
+        const length = int();
+        if (length < 0 || length > bytes.length - p) throw fail(`has a string of ${length} bytes past its content`);
+        p += length;
+        return decodeText(bytes.subarray(p - length, p));
+      };
+    try {
+      const camera = id === 'rCAM' ? int() : 0,
+        count = int();
+      if (count < 0 || count > (bytes.length - p) / 8)
+        throw fail(`counts ${count} attributes, more than its bytes hold`);
+      if (count > maxEntries) {
+        note('unsupported', `counts ${count} attributes, over maxEntries ${maxEntries}; it is kept, not read`);
+        return;
+      }
+      const attributes = new Map<string, string>();
+      for (let pairs = count; pairs--; ) {
+        const key = text();
+        if (attributes.has(key)) throw fail(`has attribute ${quote(key)} twice`);
+        attributes.set(key, text());
+      }
+      if (p !== bytes.length) throw fail(`has ${bytes.length - p} bytes after its dictionary`);
+      if (id === 'rOBJ') result.objects.push(attributes);
+      else result.cameras.push({ id: camera, attributes });
+      if (chunk.children?.length)
+        note('unsupported', `has ${chunk.children.length} bytes of child chunks; they are kept, not read`);
+    } catch (error) {
+      if (!(error instanceof RangeError)) throw error;
+      note('malformed', `${error.message}; it is kept and gives no dictionary`);
+    }
+  });
+  return result;
+}
+
 // --- Writing --------------------------------------------------------------------------------------------------------
 
 /** Little-endian output into one growing buffer. */

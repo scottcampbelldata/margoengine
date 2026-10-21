@@ -244,7 +244,7 @@ removed over a 30-deep room (70,000 cells) about 5,400-7,600 cells/ms, put back 
 ## MagicaVoxel `.vox` files (`@margoengine/voxel/vox`)
 
 ```ts
-import { parseVox, writeVox, pasteVoxModel } from '@margoengine/voxel/vox';
+import { parseVox, writeVox, pasteVoxModel, readVoxRenderDictionaries } from '@margoengine/voxel/vox';
 
 const scene = parseVox(new Uint8Array(await (await fetch('castle.vox')).arrayBuffer()));
 scene.models[0].size; // [x, y, z], MagicaVoxel z up; voxels: Uint8Array of x, y, z, palette index
@@ -257,6 +257,11 @@ pasteVoxModel(world, scene.models[2], [10, 64, 0], mapping); // one model: mappi
 
 scene.nodes[2].frames[0].translation = [0, 0, 8];
 const bytes = writeVox(scene); // the same bytes as the file, except what you changed
+
+const render = readVoxRenderDictionaries(scene); // rOBJ / rCAM decoded; scene.chunks untouched
+render.objects; // Map per rOBJ: '_type' => '_setting', '_sun', '_lens', ...
+render.cameras; // { id, attributes } per rCAM
+render.diagnostics; // { kind: 'malformed' | 'unsupported', id, chunk, message } for what gave no dictionary
 ```
 
 - **Format.** Versions 150 and 200, from MagicaVoxel's published notes: SIZE + XYZI models, PACK, RGBA (file colour k
@@ -265,6 +270,13 @@ const bytes = writeVox(scene); // the same bytes as the file, except what you ch
   NOTE, IMAP, META, MATT, future ones) stays as bytes in `scene.chunks`, which also records the file's chunk order, so
   `writeVox(parseVox(file))` is the file byte for byte. Typed fields are decoded from each dictionary's `attributes`;
   on write a typed field replaces its key only when its value changed, so untouched text keeps its exact form.
+- **Render settings.** `readVoxRenderDictionaries(scene, {maxBytes, maxEntries})` decodes the kept rOBJ chunks (a
+  DICT each) and rCAM chunks (an int32 camera id, then a DICT) without changing them, so `writeVox` still gives the
+  file back byte for byte. Strings decode like the typed dictionaries (UTF-8, else windows-1252) and a repeated key is
+  malformed, as in `parseVox`. A chunk over `maxBytes` (default 1 MiB) or a dictionary over `maxEntries` (default
+  4096) is reported `'unsupported'` and not read; truncated or inconsistent content is `'malformed'`; child chunks are
+  kept, reported and not read. Nothing throws for chunk content. The result feeds the path tracer's
+  `magicaVoxelLighting(objects)` and `magicaVoxelCamera(camera.attributes, objects)`.
 - **Pasting.** MagicaVoxel's z (up) becomes world y and its y becomes world -z (right-handed, not mirrored); the pasted
   box has its minimum corner at `at`. A scene pastes frame 0 of every shape not hidden by its node or layer, each
   model centred on its transform's translation. A bare model has no palette, so it needs a mapping. Voxels are

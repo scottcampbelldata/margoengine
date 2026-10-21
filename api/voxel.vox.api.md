@@ -64,6 +64,27 @@ export type VoxNode = {
     }[];
 });
 
+export interface VoxRenderDiagnostic {
+    kind: 'malformed' | 'unsupported';
+    id: 'rOBJ' | 'rCAM';
+    chunk: number;
+    message: string;
+}
+
+export interface VoxRenderDictionaries {
+    objects: Map<string, string>[];
+    cameras: {
+        id: number;
+        attributes: Map<string, string>;
+    }[];
+    diagnostics: VoxRenderDiagnostic[];
+}
+
+export interface VoxRenderLimits {
+    maxBytes?: number;
+    maxEntries?: number;
+}
+
 export interface VoxScene {
     version: number;
     models: VoxModel[];
@@ -77,6 +98,8 @@ export interface VoxScene {
 export function parseVox(bytes: Uint8Array | ArrayBuffer): VoxScene;
 
 export function pasteVoxModel(world: VoxelWorld, model: VoxModel | VoxScene, at: Vec3, mapping?: ArrayLike<number>): number;
+
+export function readVoxRenderDictionaries(scene: VoxScene, limits?: VoxRenderLimits): VoxRenderDictionaries;
 
 export function writeVox(scene: VoxScene): Uint8Array;
 
