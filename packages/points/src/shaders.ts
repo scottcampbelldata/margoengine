@@ -1,3 +1,6 @@
+import { MargoError } from '@margoengine/math/errors';
+import { fogWgsl } from './fog.js';
+
 /** Flag bits of `Cloud.flags.x`, shared by the plugin and the point shader. */
 export const FLAG = {
   colors: 1,
@@ -157,6 +160,51 @@ struct VOut{@builtin(position) clip:vec4f,@location(0) color:vec4f,@location(1) 
   return encode(color);
 }
 `;
+
+// Scene fog (PointsPlugin.setFog), patched into copies so the shaders above stay unchanged. Points take the fog of their
+// centre (flat per point); sprites of each fragment's world position. Alpha-blended colours fade toward the fog colour,
+// additive ones toward no contribution (fog hides a glow rather than painting it in the fog colour). Both mix in linear,
+// before the shaders' own sRGB encoding.
+const fogEdits = {
+  point: [
+    [
+      '@location(2) @interpolate(flat) info:vec4f,',
+      '@location(2) @interpolate(flat) info:vec4f,@location(3) @interpolate(flat) fog:f32,',
+    ],
+    [
+      'out.clip=clip;out.color=color;out.quad=corner*extent;',
+      'out.clip=clip;out.color=color;out.quad=corner*extent;out.fog=fogAmount(world.xyz);',
+    ],
+    ['s.color=encode(color);', 's.color=encode(fogged(color,i.fog));'],
+  ],
+  sprite: [
+    ['@location(1) uv:vec2f}', '@location(1) uv:vec2f,@location(2) world:vec3f}'],
+    [
+      'out.clip=clip;',
+      'out.clip=clip;out.world=select(world.xyz+frame.right.xyz*offset.x+frame.up.xyz*offset.y,world.xyz,batch.params.z>0.5);',
+    ],
+    ['return encode(color);', 'return encode(fogged(color,fogAmount(i.world)));'],
+  ],
+} as const;
+/** The point (`kind` 'point') or sprite shader with scene fog at group 2, for normal or additive blending. */
+export function foggedShader(kind: 'point' | 'sprite', additive: boolean): string {
+  let code = kind === 'point' ? pointShader : spriteShader;
+  for (const [from, to] of fogEdits[kind]) {
+    if (code.split(from).length !== 2)
+      throw new MargoError(
+        'unsupported',
+        'Points fog needs the shaders it was written for; update the fog edits with them',
+      );
+    code = code.replace(from, to);
+  }
+  return (
+    code +
+    fogWgsl(2, 0) +
+    (additive
+      ? 'fn fogged(c:vec4f,a:f32)->vec4f{return vec4f(c.rgb*(1.0-a),c.a);}'
+      : 'fn fogged(c:vec4f,a:f32)->vec4f{return vec4f(mix(c.rgb,margoFog.color.rgb,a),c.a);}')
+  );
+}
 
 /** Eye-dome lighting: multiplies the color by a shade from log-depth differences to 8 neighbors. */
 export const edlShader: string = /* wgsl */ `

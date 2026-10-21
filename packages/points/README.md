@@ -90,8 +90,24 @@ canvas.addEventListener('click', event => {
 | `vertexColors` | true | |
 | `shading` | `'flat'` | or `'sphere'` |
 | `edl` | false | |
+| `fog` | true | Fogged by the plugin's `setFog` (sprites too); false keeps the material clear, like three.js `material.fog` |
 
 Sprites: `add({position, size, rotation, center, color, opacity, uv})`, `set(index, ...)`, `remove(index)` (moves the last sprite into the slot), `clear()`. `SpriteMaterial.rotation` adds to every sprite.
+
+## Fog
+
+`points.setFog(fog)` fogs every cloud and sprite batch whose material has `fog: true` (the default) with
+`@margoengine/environment`'s `Fog` or any object with its fields (`color`, `near`, `far`, `density`, `heightFalloff`,
+`height`, `enabled`), read every frame with Fog's maths. A point takes the fog at its centre, a sprite at each pixel.
+`'normal'` blending fades toward the fog colour; `'additive'` fades toward adding nothing, so fog hides a glow instead of
+painting it in the fog colour. Points does not import environment. `fog.enabled = false` clears it without recompiling;
+`points.setFog(null)` (the default) draws exactly as before.
+
+```ts
+import {Fog} from '@margoengine/environment';
+points.setFog(Fog.attach(engine, {color: '#8090a0', density: 0.03}));
+labels.material.fog = false; // keep this batch clear
+```
 
 ## Limits
 

@@ -17,7 +17,17 @@ import {
   worldBox,
   type PickRange,
 } from './math.js';
-import { CLOUD_BYTES, FLAG, FRAME_BYTES, SPRITE_BYTES, edlShader, pointShader, spriteShader } from './shaders.js';
+import {
+  CLOUD_BYTES,
+  FLAG,
+  FRAME_BYTES,
+  SPRITE_BYTES,
+  edlShader,
+  foggedShader,
+  pointShader,
+  spriteShader,
+} from './shaders.js';
+import { checkFog, FOG_BYTES, writeFog, type FogLike } from './fog.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -191,6 +201,16 @@ export class PointsPlugin implements EnginePlugin {
     height: number;
   };
   private readonly frameData = new Float32Array(FRAME_BYTES / 4);
+  private fogSource: FogLike | null = null;
+  private fogGpu?: {
+    buffer: GPUBuffer;
+    group: GPUBindGroup;
+    pointLayout: GPUPipelineLayout;
+    spriteLayout: GPUPipelineLayout;
+    modules: Map<string, GPUShaderModule>;
+  };
+  private fogUsed = false;
+  private readonly fogData = new Float32Array(12);
   private readonly edlData = new Float32Array(4);
   private orthographic = false;
   private readonly lastViewProj = new Float32Array(16);
@@ -249,6 +269,25 @@ export class PointsPlugin implements EnginePlugin {
   }
   get spriteBatches(): ReadonlySet<SpriteBatch> {
     return this.batches;
+  }
+
+  /** The fog clouds and sprites are drawn in (see `setFog`), or null. */
+  get fog(): FogLike | null {
+    return this.fogSource;
+  }
+
+  /**
+   * Fogs every cloud and sprite batch whose material has `fog` true (the default): `fog` is `@margoengine/environment`'s
+   * `Fog` or any object with its fields, read every frame, with Fog's maths (linear near/far, exp2 density, height
+   * falloff). A point takes the fog at its centre, a sprite at each pixel. 'normal' blending fades toward the fog colour;
+   * 'additive' fades toward adding nothing, so fog hides a glow instead of painting it in the fog colour. `null` (the
+   * default) draws exactly as without fog. The first fogged frame compiles the fogged shaders; changing the fog or its
+   * `enabled` flag never does.
+   * @throws TypeError when `fog` is neither an object nor null; RangeError or TypeError for an invalid field.
+   */
+  setFog(fog: FogLike | null): this {
+    this.fogSource = checkFog(fog);
+    return this;
   }
 
   /** Adds a cloud or a sprite batch and returns it. */
@@ -697,6 +736,8 @@ export class PointsPlugin implements EnginePlugin {
       this.gpu.white.destroy();
       this.gpu.edlParams.destroy();
     }
+    this.fogGpu?.buffer.destroy();
+    this.fogGpu = undefined;
     this.gpu = undefined;
     this.device = undefined;
     this.hasFrame = false;
@@ -715,18 +756,60 @@ export class PointsPlugin implements EnginePlugin {
         };
   }
 
+  /** Whether `material` draws with the fogged shaders this frame. */
+  private fogged(material: AnyMaterial): boolean {
+    return this.fogSource !== null && material.fog;
+  }
+
+  /** The fog uniform, its group 2 and the fogged pipeline layouts, made on the first fogged frame. */
+  private fogResources(): NonNullable<PointsPlugin['fogGpu']> {
+    if (this.fogGpu) return this.fogGpu;
+    const device = this.device!,
+      gpu = this.gpu!,
+      layout = device.createBindGroupLayout({
+        entries: [
+          {
+            binding: 0,
+            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+            buffer: { type: 'uniform', minBindingSize: FOG_BYTES },
+          },
+        ],
+      }),
+      buffer = device.createBuffer({ size: FOG_BYTES, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    return (this.fogGpu = {
+      buffer,
+      group: device.createBindGroup({ layout, entries: [{ binding: 0, resource: { buffer } }] }),
+      pointLayout: device.createPipelineLayout({ bindGroupLayouts: [gpu.frameLayout, gpu.cloudLayout, layout] }),
+      spriteLayout: device.createPipelineLayout({ bindGroupLayouts: [gpu.frameLayout, gpu.spriteLayout, layout] }),
+      modules: new Map(),
+    });
+  }
+
+  /** The fogged point or sprite module for this blending, compiled once. */
+  private fogModule(kind: 'point' | 'sprite', material: AnyMaterial): GPUShaderModule {
+    const modules = this.fogResources().modules,
+      key = kind + material.blending;
+    let module = modules.get(key);
+    if (!module) {
+      module = this.device!.createShaderModule({ code: foggedShader(kind, material.blending === 'additive') });
+      modules.set(key, module);
+    }
+    return module;
+  }
+
   private pointPipeline(context: GpuContext, material: PointsMaterial, edl: boolean): GPURenderPipeline {
     const depthFormat = context.descriptor.depthStencil!.format,
-      sphere = material.shading === 'sphere';
-    const key = `p|${context.descriptor.multisample?.count}|${context.format}|${depthFormat}|${edl}|${sphere}|${material.writesDepth}|${material.depthTest}|${material.blending}`;
+      sphere = material.shading === 'sphere',
+      fogged = this.fogged(material);
+    const key = `p|${context.descriptor.multisample?.count}|${context.format}|${depthFormat}|${edl}|${sphere}|${material.writesDepth}|${material.depthTest}|${material.blending}${fogged ? '|fog' : ''}`;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const gpu = this.gpu!,
-        module = gpu.pointModule;
+        module = fogged ? this.fogModule('point', material) : gpu.pointModule;
       const targets: GPUColorTargetState[] = [{ format: context.format, blend: this.blend(material.blending) }];
       if (edl) targets.push({ format: 'r32float' });
       pipeline = this.device!.createRenderPipeline({
-        layout: gpu.pointPipelineLayout,
+        layout: fogged ? this.fogResources().pointLayout : gpu.pointPipelineLayout,
         vertex: { module, entryPoint: 'vertex' },
         fragment: { module, entryPoint: `fragment${sphere ? 'Sphere' : ''}${edl ? 'Edl' : ''}`, targets },
         primitive: { topology: 'triangle-strip', cullMode: 'none' },
@@ -743,14 +826,15 @@ export class PointsPlugin implements EnginePlugin {
   }
 
   private spritePipeline(context: GpuContext, material: SpriteMaterial): GPURenderPipeline {
-    const depthFormat = context.descriptor.depthStencil!.format;
-    const key = `s|${context.descriptor.multisample?.count}|${context.format}|${depthFormat}|${material.writesDepth}|${material.depthTest}|${material.blending}`;
+    const depthFormat = context.descriptor.depthStencil!.format,
+      fogged = this.fogged(material);
+    const key = `s|${context.descriptor.multisample?.count}|${context.format}|${depthFormat}|${material.writesDepth}|${material.depthTest}|${material.blending}${fogged ? '|fog' : ''}`;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const gpu = this.gpu!,
-        module = gpu.spriteModule;
+        module = fogged ? this.fogModule('sprite', material) : gpu.spriteModule;
       pipeline = this.device!.createRenderPipeline({
-        layout: gpu.spritePipelineLayout,
+        layout: fogged ? this.fogResources().spriteLayout : gpu.spritePipelineLayout,
         vertex: { module, entryPoint: 'vertex' },
         fragment: {
           module,
@@ -979,6 +1063,16 @@ export class PointsPlugin implements EnginePlugin {
       camera = context.camera;
     this.writeFrame(context);
     const projScale = this.frameData[18];
+    // Fog: one uniform write per frame when a drawn material uses it, bound as group 2 in both passes.
+    this.fogUsed = false;
+    if (this.fogSource) {
+      for (const item of this.clouds) this.fogUsed ||= item.visible && item.material.fog;
+      for (const item of this.batches) this.fogUsed ||= item.visible && item.material.fog;
+      if (this.fogUsed) {
+        writeFog(this.fogSource, camera.position, this.fogData);
+        device.queue.writeBuffer(this.fogResources().buffer, 0, this.fogData);
+      }
+    }
 
     // 1. Upload changes, cull blocks and collect candidates.
     const entryBlock = this.entryBlock,
@@ -1073,6 +1167,7 @@ export class PointsPlugin implements EnginePlugin {
       else delete depthAttachment.stencilReadOnly;
       const pass = context.encoder.beginRenderPass({ colorAttachments, depthStencilAttachment: depthAttachment });
       pass.setBindGroup(0, gpu.frameGroup);
+      if (this.fogUsed) pass.setBindGroup(2, this.fogGpu!.group);
       const order = this.blockOrder;
       for (let i = 0; i < cloudDrawCount; i++) {
         const a = draws[i],
@@ -1187,6 +1282,7 @@ export class PointsPlugin implements EnginePlugin {
         depthStencilAttachment: depthAttachment,
       });
       pass.setBindGroup(0, gpu.frameGroup);
+      if (this.fogUsed) pass.setBindGroup(2, this.fogGpu!.group);
       for (let i = 0; i < spriteCount; i++) {
         const { batch, group } = this.spriteDraws[i];
         pass.setPipeline(this.spritePipeline(context as GpuContext, batch.material));

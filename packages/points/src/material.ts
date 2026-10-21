@@ -40,6 +40,8 @@ export interface BaseMaterialOptions {
   depthTest?: boolean;
   /** Write depth. Default `!transparent`. */
   depthWrite?: boolean;
+  /** Fogged by the plugin's fog (`PointsPlugin.setFog`); false keeps this material clear, like three.js `material.fog`. Default true. */
+  fog?: boolean;
 }
 
 const checkUnit = (value: number, label: string) => {
@@ -57,6 +59,7 @@ abstract class BaseMaterial {
   depthTest = true;
   /** null means `!transparent`. */
   depthWrite: boolean | null = null;
+  fog = true;
   /** Bumped when `map` changes or `needsUpdate()` is called; the plugin re-uploads image sources. */
   mapVersion = 0;
   private source: PointsTextureSource | null = null;
@@ -101,6 +104,7 @@ abstract class BaseMaterial {
     if (options.blending !== undefined) this.blending = options.blending;
     if (options.depthTest !== undefined) this.depthTest = options.depthTest;
     if (options.depthWrite !== undefined) this.depthWrite = options.depthWrite;
+    if (options.fog !== undefined) this.fog = options.fog;
   }
 
   validate(): void {
@@ -113,9 +117,10 @@ abstract class BaseMaterial {
     if (
       typeof this.transparent !== 'boolean' ||
       typeof this.depthTest !== 'boolean' ||
+      typeof this.fog !== 'boolean' ||
       (this.depthWrite !== null && typeof this.depthWrite !== 'boolean')
     )
-      throw new TypeError('transparent, depthTest and depthWrite must be booleans');
+      throw new TypeError('transparent, depthTest, depthWrite and fog must be booleans');
     for (const v of this.color)
       if (!Number.isFinite(v) || v < 0) throw new RangeError('color must be finite and non-negative');
   }
