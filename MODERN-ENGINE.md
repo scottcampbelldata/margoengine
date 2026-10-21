@@ -164,9 +164,8 @@ checks counts, widths and remaining decoded-byte limits before extracting arrays
 Draco's internal Wasm geometry decode still has its own allocations.
 
 `@margoengine/usdz` is an ancillary optional package outside the six core launch
-packages. It supports static USDA, binary USDC and USDZ archives through vendored
-standalone Three.js 0.186.1 grammar/file parsers. The parsers use plain data and
-typed arrays, and ship their MIT notice in `THIRD-PARTY-NOTICES.txt`. Builds and
+packages. It supports static USDA, binary USDC and USDZ archives through its own parsers
+(`src/crate.ts` and the shared `readUSDA`), on plain data and typed arrays. Builds and
 runtime imports need no `three` or `@types/three` dependency. Benchmark and parity
 tools retain a pinned reference through `scripts/three-reference.js`.
 

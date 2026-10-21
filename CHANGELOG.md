@@ -56,9 +56,9 @@ lists all 74 public packages, preserved optional entries and audit decisions.
 
 ### USDZ dependency cleanup
 
-- `@margoengine/usdz` vendors the standalone USDA and USDC parsers from Three.js
-  0.186.1 in `src/vendor/`, with the MIT attribution retained in the distributed
-  `THIRD-PARTY-NOTICES.txt`. Source builds no longer read installed Three.js files.
+- `@margoengine/usdz` reads USDA and USDC with its own parsers (`src/crate.ts` and
+  the shared `readUSDA`). The unused vendored Three.js parsers and their
+  `THIRD-PARTY-NOTICES.txt` were removed on 2026-10-21; the package ships only `dist`.
 - Removed `three` and `@types/three` from the root development dependencies and
   lockfile. Benchmark and visual-parity tooling uses a separately cached,
   integrity-checked Three.js 0.186.1 reference.

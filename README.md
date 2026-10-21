@@ -245,7 +245,7 @@ Run `npm run modern:dev:extensions`, then open `/examples/damaged-helmet.html` f
 
 The six core launch packages are the stage facade, `core`, `react`, `gltf`,
 `gltf-pro` and `machinery`. USDZ remains an ancillary optional format outside
-that launch set. Its USDA/USDC parsers are vendored with MIT attribution; the
+that launch set. Its USDA/USDC parsers are Margo's own; the
 root and package manifests require neither `three` nor `@types/three`.
 Benchmark and visual-parity tools use a separately cached, pinned Three.js
 0.186.1 reference.

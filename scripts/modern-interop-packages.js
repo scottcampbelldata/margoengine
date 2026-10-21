@@ -48,12 +48,10 @@ for (const name of names) {
           'package.json',
           'README.md',
           'LICENSE',
-          ...(name === 'usdz' ? ['THIRD-PARTY-NOTICES.txt'] : []),
           ...(name === 'blender' ? ['FORMAT.md'] : []),
         ].includes(file.path) || file.path.startsWith('dist/'),
     ),
   );
-  if (name === 'usdz') assert.ok(files.has('THIRD-PARTY-NOTICES.txt'));
   dependencies[`@margoengine/${name}`] = `file:${join(archives, pack.filename).replaceAll('\\', '/')}`;
 }
 await writeFile(join(fixture, 'package.json'), JSON.stringify({ private: true, type: 'module', dependencies }));

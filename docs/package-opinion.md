@@ -34,7 +34,7 @@ Several jobs are also split across packages that a caller has to reconcile:
 | IK | `animator` foot IK, `machinery` bounded IK, and `kinematics-constraints` |
 | Screen anchors | `labels` and `html` |
 
-`fbx` now uses a native parser and the existing Margo glTF exporter. USDZ vendors standalone Three.js-derived parsers; its package build needs no Three.js installation or renderer.
+`fbx` now uses a native parser and the existing Margo glTF exporter. USDZ reads USDA and USDC with its own parsers; its package build needs no Three.js installation or renderer.
 
 ## How it feels overall
 
@@ -98,7 +98,7 @@ Publish `margoengine`, `@margoengine/core`, and `@margoengine/react`, then make 
 
 Put three things above the catalog: the live demo, the five-line `createStage` example, and one gzip number from `npm run measure:size`. The verified run on 2026-10-16 reported **19,999 bytes gzip**, limit 20,000, raw 47,983. Use that figure for the current release. Earlier benchmark reports cite 19,874 bytes, and sandbox notes describe an older 20,480-byte gate; those historical figures belong to their recorded builds. One command, one number, one commit.
 
-Call the release 0.1.0. Say in one sentence that FBX import is native, USDZ vendors standalone parsers, and Three.js rendering remains a pinned benchmark and visual parity reference in `scripts/three-reference.js`.
+Call the release 0.1.0. Say in one sentence that FBX import is native, USDZ uses its own parsers, and Three.js rendering remains a pinned benchmark and visual parity reference in `scripts/three-reference.js`.
 
 ### 8 to 9: the claim survives outside this repo
 
