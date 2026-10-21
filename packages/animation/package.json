@@ -20,6 +20,10 @@
     "./vat": {
       "types": "./dist/vat.d.ts",
       "import": "./dist/vat.js"
+    },
+    "./skeleton-utils": {
+      "types": "./dist/skeleton-utils.d.ts",
+      "import": "./dist/skeleton-utils.js"
     }
   },
   "files": [

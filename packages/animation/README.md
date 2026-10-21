@@ -92,7 +92,8 @@ const door = sampleKeyframes(wave.tracks[1], t); // any other target: sample it 
 const animation = bakeKeyframeClip(wave, 30, (target) => exportNodes.get(target)); // exporters AnimationData
 ```
 
-Tracks target a bone (by name) or the caller's node by a stable string id, for translation, rotation and scale. Each
+Tracks target a bone (by name) or the caller's node by a stable string id, for translation, rotation, scale and morph
+`weights` (one number per morph target in every key, blended per component and never normalised). Each
 key carries its own interpolation for the time until the next key: `discrete` (hold, then jump at the next key),
 `linear`, `easeIn`, `easeOut` or `easeInOut` (cubic); rotations slerp along the shortest path by the eased factor.
 Sampling is a pure function of time, so editing, scrubbing, playback and offline rendering agree at any frame rate.
@@ -108,6 +109,23 @@ and scale between keys are `(1 - f) * a + f * b`, finite for all finite keys (ke
 `'delta'`'s b - a overflows to NaN). Rotations slerp the same way in both. `'weighted'` reproduces Margo Voxel Studio's
 saved vector-track evaluation bit for bit (`tests/keyframes-blend.test.js`).
 
+Code clips also drive glTF-pro models: pass the model's `Animation` instead of a skeleton. Tracks then name model nodes
+(the first node with that name); transform tracks set the node's local transform and `weights` tracks set every morph
+weight through `animation.setMorph`, so expressions authored in code play on loaded characters. Pause the model's own
+clip (`animation.playing = false`) while a code clip drives it. A `weights` track whose width differs from the node's
+morph target count throws `RangeError`; a `Skeleton` skips `weights` tracks. `bakeKeyframeClip` writes `weights`
+tracks as glTF `weights` channels, which gltf-pro and `Animation` play back (`tests/keyframes-weights.test.js` checks
+the round trip through `exportGLB`).
+
+```ts
+const blink = createKeyframeClip({name: 'Blink', tracks: [
+  {target: 'Face', path: 'weights', keys: [{time: 0, value: [0, 0]}, {time: 0.1, value: [1, 0]}, {time: 0.2, value: [0, 0]}]},
+]});
+const animation = Animation.attach(model);
+animation.playing = false;
+applyKeyframeClip(blink, animation, t); // node 'Face' has two morph targets
+```
+
 `skin.pose()` runs the GPU pass's maths on the CPU (linear blend of the four bone matrices; normals by the cofactor
 matrix, flipped under mirroring scales) and returns Float32 positions and normals in the mesh's space.
 `tests/raw-rig-roundtrip.test.js` writes a raw rig and clip with `@margoengine/exporters` `exportGLB` (bones as export
@@ -116,3 +134,67 @@ nodes under the mesh node, `skeleton.inverseBindMatrices`, `bakeKeyframeClip`), 
 `node scripts/animation-skin-browser-tests.js` (real WebGPU, after building the packages) reads back the deformed
 buffer of a skinned `createMesh` strip and matches `skin.pose()` positions and normals within 1e-5 after posing, a
 ranged `setInfluences` and a device restore, with no validation errors.
+
+## Groups: one clip for many models
+
+`AnimationGroup` is three.js `AnimationObjectGroup`: one clip and one clock for a crowd. Members are glTF-pro models'
+`Animation`s playing a glTF clip they all have (by name or index), or, for a code-authored `KeyframeClip`, `Skeleton`s
+and `Animation`s whose bones or nodes the tracks name. Each member can run ahead or behind by an offset in seconds.
+
+```ts
+import {Animation, AnimationGroup} from '@margoengine/animation';
+const crowd = new AnimationGroup('Walking', {speed: 1});
+for (const [i, model] of walkers.entries()) crowd.add(Animation.attach(model), i * 0.37); // offset per walker
+stage.engine.use(crowd); // advances in onPreUpdate; or call crowd.update(delta) yourself
+crowd.seek(2); crowd.playing = false; crowd.setOffset(walkerAnimation, 0.5); crowd.remove(walkerAnimation);
+```
+
+Adding an `Animation` pauses its own playback; the group seeks it each frame through its usual sampling path. A glTF
+clip loops as each member's own `loop` option says (a negative member time wraps back from the end); code clips take
+the group's `loop` option (default true; false holds the first and last frames). Code-clip tracks are bound to bones,
+nodes and morph weights once, in `add`, and group playback creates no typed arrays per frame
+(`tests/group.test.js` traps the constructors over 120 frames). Each member still deforms on the GPU through its own
+`Animation`; the group adds no GPU work.
+
+## Cloning and retargeting (`@margoengine/animation/skeleton-utils`)
+
+three.js `SkeletonUtils.clone`, `retarget` and `retargetClip`, in their own entry:
+
+```ts
+import {Animation, AnimationGroup, applyKeyframeClip} from '@margoengine/animation';
+import {Retarget, cloneModel, retargetRig} from '@margoengine/animation/skeleton-utils';
+
+const second = await cloneModel(robot); // own nodes and skeleton; shares the parsed asset
+Animation.attach(second).play('Dance'); // animates apart from `robot`
+
+// Both characters stand in the same reference pose (T-pose, say) when their rigs are made.
+const retarget = new Retarget(retargetRig(mixamoModel), retargetRig(hero), {
+  names: {Hips: 'mixamorig:Hips', Spine: 'mixamorig:Spine', LeftArm: 'mixamorig:LeftArm'}, // others map by equal name
+  hip: 'Hips', // follows the source hips' movement, scaled by the rest hip heights unless hipScale is given
+});
+retarget.apply(mixamoModel, hero); // live: pose hero as mixamoModel is posed now
+const walk = retarget.clip({animation: mixamoAnimation, clip: 'Walk'}, {fps: 30}); // or a source KeyframeClip
+applyKeyframeClip(walk, Animation.attach(hero), t); // or new AnimationGroup(walk) for many heroes
+```
+
+`cloneModel(model)` resolves to a new `PBRModel` with its own root and nodes, starting in the source's current local
+transforms, visibility and morph weights, and registered with the engine when the source is. It shares the source's
+parsed asset (document, buffers, accessors), compressed textures, and packed vertex arrays where gltf-pro cached them
+(worker and progressive loads, prepared static scenes; otherwise it packs its own from the shared accessors). Decoded
+bitmaps are copied with `createImageBitmap`, because disposing a model closes its own. Disposing either model leaves
+the other working. gltf-pro uploads vertex buffers and textures per model, so each clone costs its own GPU
+memory; materials are rebuilt from the document, so runtime material edits on the source are not copied.
+
+`retargetRig(skeletonOrModel)` reads a bone hierarchy and its current local pose, which becomes the rig's rest pose; a
+model's rig is every node, so armature and mesh nodes count toward bone orientations. `new Retarget(source, target,
+options)` maps target bones to source bones by name (`names` overrides, `''` leaves a bone at rest; unnamed glTF nodes
+map only through `names`). Each mapped target bone turns in model space by the rotation its source bone has turned
+from rest, which absorbs different bone axes and rest orientations; bones keep their own lengths and scales, unmapped
+bones keep their rest local pose, and the `hip` bone's position follows the source hip's movement times `hipScale`.
+`pose(sourceLocal, out?)` does this on raw arrays (10 numbers per bone: translation, quaternion, scale) without
+allocating, `apply(source, target)` reads and writes Skeletons or models, and `clip(source, {fps, name})` samples a
+source `KeyframeClip`, or a glTF clip through the source model's `Animation` (restoring its clip, time and playing
+state), into a target `KeyframeClip` with a rotation track per mapped bone and a translation track for the hip. Both
+characters' model spaces must face the same way; morph weight tracks are not carried over.
+`tests/retarget.test.js` checks analytic poses (bone directions, lengths, scaled hip motion, unmapped bones) across
+renamed rigs with different bone axes, and models driven by their `Animation`.
