@@ -52,13 +52,10 @@ export const partialRect = (rect, width, height) =>
 /** Checks a pixel rectangle [x, y, width, height] (or undefined) against a target of `width` x `height`. */
 export function validateRectangle(rectangle, width, height) {
   if (rectangle === undefined) return;
-  if (!Array.isArray(rectangle) || rectangle.length !== 4)
-    throw new RangeError('Invalid draw rectangle; pass [x, y, width, height] as safe integers, size 1 or more');
-  for (let i = 0; i < 4; i++)
-    if (!Number.isSafeInteger(rectangle[i]) || rectangle[i] < (i < 2 ? 0 : 1))
-      throw new RangeError('Invalid draw rectangle; pass [x, y, width, height] as safe integers, size 1 or more');
-  if (rectangle[0] + rectangle[2] > width || rectangle[1] + rectangle[3] > height)
-    throw new RangeError('Draw rectangle exceeds target; keep x + width and y + height inside it');
+  const bad = () => new RangeError('Invalid draw rectangle; pass integer [x, y, width, height] inside the target');
+  if (!Array.isArray(rectangle) || rectangle.length !== 4) throw bad();
+  for (let i = 0; i < 4; i++) if (!Number.isSafeInteger(rectangle[i]) || rectangle[i] < (i < 2 ? 0 : 1)) throw bad();
+  if (rectangle[0] + rectangle[2] > width || rectangle[1] + rectangle[3] > height) throw bad();
 }
 
 /** Checks a 32-bit layer mask; `subject` names it in the message. */

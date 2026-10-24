@@ -43,7 +43,7 @@ fn terrainColor(position:vec3f,normal:vec3f)->vec3f {
 @fragment fn fragment(i:Output)->@location(0) vec4f {
   let n=normalize(i.normal);let base=terrainColor(i.position,n);let v=normalize(frame.eye.xyz-i.position);let l=normalize(frame.light.xyz);let h=(v+l)/max(length(v+l),0.0001);
   let nl=clamp(dot(n,l),0.0,1.0);let nv=clamp(dot(n,v),0.0001,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);let a=i.material.x*i.material.x;let a2=a*a;
-  let d=${ggxD('a2', 'nh')};let g=${smithG('a2', 'nv', 'nl')};let fresnel=vec3f(0.04)+vec3f(0.96)*pow(1-vh,5.0);
+  let d=${ggxD};let g=${smithG};let fresnel=vec3f(0.04)+vec3f(0.96)*pow(1-vh,5.0);
   let direct=((1-fresnel)*base/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl;
   let linear=direct*frame.radiance.xyz*frame.light.w+base*frame.radiance.w;
   if(frame.heights.w>0.5){return vec4f(linear,1);}

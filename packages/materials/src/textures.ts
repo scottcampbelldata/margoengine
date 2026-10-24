@@ -76,6 +76,7 @@ export class MaterialTextures {
   private readonly images = new Map<string, ImageTexture>();
   private readonly samplers = new Map<number, GPUSampler>();
   private readonly owned = new Set<GPUTexture>();
+  private readonly mipPipelines = new Map<unknown, unknown>();
   private disposed = false;
   constructor(
     private readonly model: PBRModel,
@@ -140,7 +141,7 @@ export class MaterialTextures {
   }
 
   private generateMips(image: ImageTexture): void {
-    generateMipmaps(this.device, image.texture, image.levels);
+    generateMipmaps(this.device, image.texture, image.levels, this.mipPipelines);
     image.mipsReady = true;
   }
 

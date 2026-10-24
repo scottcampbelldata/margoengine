@@ -2,7 +2,6 @@
 import type { EngineKernel } from '@margoengine/core';
 import type { Batch, Engine, EnginePlugin, FrameGraph, Geometry, PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
-import { webgpuPass } from '../../shared/pass.js';
 
 declare const GPUBufferUsage: {
   COPY_DST: number;
@@ -131,7 +130,13 @@ export class CulledMeshes implements EnginePlugin {
   }
   registerPasses(graph: FrameGraph): void {
     // First in the frame, so every core draw of these batches (main pass and replays) sees this frame's culled lists.
-    graph.add(webgpuPass(this.name, -1e6, (c) => this.cull(c)));
+    graph.add({
+      name: this.name,
+      order: -1e6,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.cull(c);
+      },
+    });
   }
   /** Instances drawn per redirected batch in the latest submitted frame, keyed by geometry (a GPU readback; for tests and tools). */
   async readCounts(): Promise<Map<Geometry, number>> {

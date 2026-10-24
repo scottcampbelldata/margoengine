@@ -13,7 +13,6 @@ export class ByteWriter {
   u16(v: number): void;
   u32(v: number): void;
   f32(v: number): void;
-  f64(v: number): void;
   varint(v: number): void;
   raw(b: Uint8Array): void;
   done(): Uint8Array;
@@ -32,8 +31,6 @@ export class ByteReader {
   u16(): number;
   u32(): number;
   f32(): number;
-  f64(): number;
   varint(): number;
-  rest(): Uint8Array;
   end(): void;
 }

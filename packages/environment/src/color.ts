@@ -10,7 +10,6 @@ import {
   SRGBToLinear as srgbToLinear,
 } from '@margoengine/math/color';
 import { MargoError } from '@margoengine/math/errors';
-import { webgpuPass } from '../../shared/pass.js';
 
 export type { ColorInput } from '@margoengine/math/color';
 
@@ -22,16 +21,16 @@ type RGB = [number, number, number];
 // A ColorInput as sRGB components and linear RGB, each exact for its own kind of input: hex strings and numbers are
 // sRGB bytes, `[r, g, b]` arrays linear (docs/conventions.md).
 function colorPair(value: ColorInput): { srgb: RGB; linear: RGB } {
-  let hex = typeof value === 'number' ? value : undefined;
+  const hex = typeof value === 'number' ? value : undefined;
   // CSS color(display-p3 r g b) and friends: linear sRGB, negative outside sRGB (math's parseColor).
   if (typeof value === 'string' && /^\s*color\(/i.test(value)) {
     const linear = parseColor(value, [0, 0, 0]) as RGB;
     return { srgb: [linearToSrgb(linear[0]), linearToSrgb(linear[1]), linearToSrgb(linear[2])], linear };
   }
   if (typeof value === 'string') {
-    const rgb = hexColor(value[0] === '#' ? value : '#' + value);
-    if (!rgb) throw new TypeError(`Color '${value}' is not '#rgb' or '#rrggbb'; pass a hex color or linear [r, g, b]`);
-    hex = (Math.round(rgb[0] * 255) << 16) | (Math.round(rgb[1] * 255) << 8) | Math.round(rgb[2] * 255);
+    const srgb = hexColor(value[0] === '#' ? value : '#' + value)?.slice(0, 3) as RGB | undefined;
+    if (!srgb) throw new TypeError(`Color '${value}' is not '#rgb' or '#rrggbb'; pass a hex color or linear [r, g, b]`);
+    return { srgb, linear: srgb.map(srgbToLinear) as RGB };
   }
   if (hex !== undefined) {
     if (!Number.isInteger(hex) || hex < 0 || hex > 0xffffff)
@@ -153,7 +152,13 @@ export class ColorBackground {
       );
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add(webgpuPass(this.name, this.order, (c) => this.record(c)));
+    graph.add({
+      name: this.name,
+      order: this.order,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.record(c);
+      },
+    });
   }
   onDeviceRestored(): void {
     this.release();

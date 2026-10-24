@@ -9,7 +9,6 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { acquireDepth, group } from '../../shared/gpu.js';
-import { webgpuPass } from '../../shared/pass.js';
 import { CoastalFlow, waterFrame, oceanWaves } from './coastal.js';
 import { Spray } from './spray.js';
 import { displayShader } from '../../shared/display.js';
@@ -193,7 +192,7 @@ fn directionalGlint(light:Light,n:vec3f,v:vec3f,rough:f32)->vec3f {
  if(light.direction.w<=0.0){return vec3f(0);}
  let l=normalize(light.direction.xyz);let nl=clamp(dot(n,l),0.0,1.0);let nv=clamp(dot(n,v),0.001,1.0);
  let h=(v+l)/max(0.0001,length(v+l));let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
- let alpha=rough*rough;let a2=alpha*alpha;let denominator=${ggxDenominator('a2', 'nh', true)};let d=a2/(3.14159265*denominator*denominator);let k=(rough+1.0)*(rough+1.0)*0.125;
+ let alpha=rough*rough;let a2=alpha*alpha;let denominator=${/* @__PURE__ */ ggxDenominator()};let d=a2/(3.14159265*denominator*denominator);let k=(rough+1.0)*(rough+1.0)*0.125;
  let g=nv/(nv*(1.0-k)+k)*nl/max(0.001,nl*(1.0-k)+k);
  return light.radiance.rgb*light.direction.w*d*g*fresnel(vh)/max(0.004,4.0*nv);
 }
@@ -603,7 +602,13 @@ export class Water implements EnginePlugin {
     engine.gpu.queue.writeBuffer(this.indices, 0, this.triangles as Uint32Array<ArrayBuffer>);
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add(webgpuPass(this.name + ':draw', 4, (c) => this.drawSurface(c)));
+    graph.add({
+      name: this.name + ':draw',
+      order: 4,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.drawSurface(c);
+      },
+    });
   }
   private validateLights(): void {
     const lights = this.options.lights;

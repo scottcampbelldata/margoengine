@@ -13,8 +13,7 @@ import { outputShader, tonemapShader, sizedLUTShader } from './shaders.js';
 import type { StackHost, StackStage } from '../../shared/stack.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
-import { linearShader } from '../../shared/display.js';
-import { webgpuPass } from '../../shared/pass.js';
+import { coreShaderRequired, linearShader } from '../../shared/display.js';
 export { parseCube };
 export type { CubeLUT };
 
@@ -205,8 +204,20 @@ export class Tonemap implements EnginePlugin {
   }
   registerPasses(graph: FrameGraph): void {
     if (this.stacked) return;
-    graph.add(webgpuPass('tonemap:capture', -50, (c) => this.capture(c)));
-    graph.add(webgpuPass('tonemap:grade', 31, (c) => this.grade(c)));
+    graph.add({
+      name: 'tonemap:capture',
+      order: -50,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.capture(c);
+      },
+    });
+    graph.add({
+      name: 'tonemap:grade',
+      order: 31,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.grade(c);
+      },
+    });
   }
   private capture(c: Context): void {
     this.validate();
@@ -243,7 +254,8 @@ export class Tonemap implements EnginePlugin {
     }
     let shader = this.shaders.get(c.shader);
     if (shader === undefined) {
-      shader = linearShader(c.shader, 'Tonemap');
+      shader = linearShader(c.shader);
+      if (shader === c.shader) throw new MargoError('unsupported', coreShaderRequired('Tonemap'));
       this.shaders.set(c.shader, shader);
     }
     c.shader = shader;

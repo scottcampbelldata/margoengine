@@ -16,7 +16,6 @@ import { simulationShader, billboardShader, multisampled, foggedBillboard } from
 import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js';
 export type { FogLike } from '../../shared/fog.js';
 import { applyView } from '../../shared/view-rect.js';
-import { webgpuPass } from '../../shared/pass.js';
 declare const GPUBufferUsage: {
   UNIFORM: number;
   STORAGE: number;
@@ -342,8 +341,20 @@ export class VFX implements EnginePlugin {
     this.burst(this.options.initialCount ?? 0);
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add(webgpuPass(this.name + ':simulate', -8, (c) => this.simulate(c)));
-    graph.add(webgpuPass(this.name + ':draw', 6, (c) => this.draw(c)));
+    graph.add({
+      name: this.name + ':simulate',
+      order: -8,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.simulate(c);
+      },
+    });
+    graph.add({
+      name: this.name + ':draw',
+      order: 6,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.draw(c);
+      },
+    });
   }
   private simulate(c: Context): void {
     this.validate();

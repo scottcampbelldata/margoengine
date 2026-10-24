@@ -4,7 +4,6 @@ import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type FrameGraph, type PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView } from '../../shared/view-rect.js';
-import { webgpuPass } from '../../shared/pass.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_SRC: number };
@@ -169,7 +168,13 @@ export class ColorOutput {
         }
       },
     });
-    graph.add(webgpuPass('color-output', 1e5, (c) => this.present(c)));
+    graph.add({
+      name: 'color-output',
+      order: 1e5,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.present(c);
+      },
+    });
   }
   onDeviceRestored(): void {
     this.release();

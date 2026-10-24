@@ -2,7 +2,8 @@ import type { MaterialExtension } from '@margoengine/gltf-pro';
 import type { ClearcoatTextureSlot } from './shader.js';
 import { coordinateExpression, coordinateWGSL } from './coordinates.js';
 import { iridescenceWGSL } from './iridescence.js';
-import { ggxD, smithG } from '../../shared/light-terms.js';
+import { ggxNamed } from '../../shared/light-terms.js';
+const materialGgx = /* @__PURE__ */ ggxNamed('materialA2', 'materialNH', 'materialNV', 'materialNL');
 
 export interface LobeShaderConfig {
   /** [linear color RGB, roughness]. */
@@ -140,8 +141,8 @@ fn materialLobesDirect(i:Out,s:Surface,baseline:vec3f,material:MaterialLobeInput
   var materialResult=baseline;
   if(materialSpecularActive||materialFilmActive||material.anisotropy>0.0){
     let materialA=s.roughness*s.roughness;let materialA2=materialA*materialA;
-    let materialD=${ggxD('materialA2', 'materialNH')};
-    let materialG=${smithG('materialA2', 'materialNV', 'materialNL')};
+    let materialD=${materialGgx[0]};
+    let materialG=${materialGgx[1]};
     var materialSpecularBRDF=materialD*materialG/max(4*materialNL*materialNV,0.0001);
     if(material.anisotropy>0.0){
       let materialAT=mix(materialA,1.0,material.anisotropy*material.anisotropy);let materialAB=materialA;let materialProduct=materialAT*materialAB;

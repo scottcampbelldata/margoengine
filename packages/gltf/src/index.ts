@@ -7,7 +7,7 @@ import { checkCount, countLimit } from '../../shared/limits.js';
 import { parseJSON } from '../../shared/json.js';
 import { assetURL } from '../../shared/asset-url.js';
 import { GLB_BIN, glbChunks, isGLB } from '../../shared/glb.js';
-import { COMPONENT_BYTES, readComponent } from '../../shared/accessor.js';
+import { readComponent } from '../../shared/accessor.js';
 
 const limit = 64 * 1024 * 1024;
 import type { GLTFDocument as Document, GLTFNode } from '../../shared/gltf.js';
@@ -106,11 +106,11 @@ function transform(mesh: Mesh, node: GLTFNode): void {
     const m = node.matrix;
     if (m[3] !== 0 || m[7] !== 0 || m[11] !== 0 || m[15] !== 1) throw new TypeError('glTF matrix must be affine');
     const trs = splitTRS(m);
-    if (!trs.ok)
-      throw trs.reason === 'singular'
+    if (typeof trs === 'string')
+      throw trs === 'singular'
         ? new RangeError('Singular glTF matrix')
         : new Error('Sheared glTF matrices are unsupported');
-    mesh.setPosition(trs.position).setScale(trs.scale).setQuaternion(trs.rotation);
+    mesh.setPosition(trs[0]).setScale(trs[2]).setQuaternion(trs[1]);
   } else {
     mesh
       .setPosition((node.translation ?? [0, 0, 0]) as [number, number, number])
@@ -172,7 +172,7 @@ export function parseGLTF(
       !(index ? [5121, 5123, 5125] : [5126]).includes(a.componentType)
     )
       throw new Error('Unsupported glTF accessor');
-    const size = COMPONENT_BYTES[a.componentType],
+    const size = a.componentType === 5121 ? 1 : a.componentType === 5123 ? 2 : 4,
       components = index ? 1 : 3,
       count = integer(a.count, 'accessor count', 1),
       offset = integer(a.byteOffset ?? 0, 'accessor offset'),

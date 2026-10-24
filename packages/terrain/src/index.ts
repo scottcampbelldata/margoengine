@@ -13,7 +13,6 @@ import { MargoError } from '@margoengine/math/errors';
 import { clipmapGrid } from './grid.js';
 import { terrainVertex, terrainFragment } from './shader.js';
 import { applyView } from '../../shared/view-rect.js';
-import { webgpuPass } from '../../shared/pass.js';
 export { clipmapGrid } from './grid.js';
 export { TerrainColors, type TerrainColorOptions } from './colors.js';
 export { heightfieldGeometry, TerrainHeightmap, type HeightField, type HeightfieldOptions } from './heightfield.js';
@@ -314,8 +313,20 @@ export class Terrain implements EnginePlugin {
     this.invalidate();
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add(webgpuPass(this.name + ':prepare', -6, (c) => this.prepare(c)));
-    graph.add(webgpuPass(this.name, 1, (c) => this.drawRings(c)));
+    graph.add({
+      name: this.name + ':prepare',
+      order: -6,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.prepare(c);
+      },
+    });
+    graph.add({
+      name: this.name,
+      order: 1,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.drawRings(c);
+      },
+    });
   }
   private prepare(c: TerrainPassContext): void {
     const origin = this.options.origin,

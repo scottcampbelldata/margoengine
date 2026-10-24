@@ -9,7 +9,6 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { fullscreen, render, group } from '../../shared/gpu.js';
-import { webgpuPass } from '../../shared/pass.js';
 import type { StackStage } from '../../shared/stack.js';
 import { margoError } from '../../shared/errors.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
@@ -97,7 +96,13 @@ export class FXAA implements EnginePlugin {
   }
   registerPasses(graph: FrameGraph): void {
     if (this.stacked) return;
-    graph.add(webgpuPass('fxaa:capture', -80, (c) => this.capture(c)));
+    graph.add({
+      name: 'fxaa:capture',
+      order: -80,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.capture(c);
+      },
+    });
     graph.add({
       name: 'fxaa:resolve',
       order: 50,

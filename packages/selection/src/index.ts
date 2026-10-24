@@ -16,7 +16,7 @@ import {
   type DrawOptions,
 } from '@margoengine/core/extension';
 import { fullscreen, meshVertex, group, compute, render, dispatch, draw } from '../../shared/gpu.js';
-import { alphaBlend, webgpuPass } from '../../shared/pass.js';
+import { alphaBlend } from '../../shared/pass.js';
 import { applyView } from '../../shared/view-rect.js';
 import { currentFrame, retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
 import {
@@ -231,7 +231,13 @@ export class Selection implements EnginePlugin {
     this.sources.setup(engine);
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add(webgpuPass(this.name + ':outline', 40, (c) => this.draw(c)));
+    graph.add({
+      name: this.name + ':outline',
+      order: 40,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.draw(c);
+      },
+    });
   }
   private resize(c: Context): void {
     if (

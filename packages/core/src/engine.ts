@@ -1,10 +1,17 @@
 import { TransformStore, syncStoredRotation } from './kernel.js';
 import { Camera, type CameraOptions, type Vec3 } from './camera.js';
 import { Geometry, PbrMaterial, finite } from './geometry.js';
-import { GPURenderer, type Renderer, type Batch, type GeometryBuffers, type RenderView } from './renderer.js';
+import {
+  GPURenderer,
+  validateRectangle,
+  type Renderer,
+  type Batch,
+  type GeometryBuffers,
+  type RenderView,
+} from './renderer.js';
 import { FrameGraph, type EnginePlugin } from './plugin.js';
 import { sceneSamples } from './quality.js';
-import { checkLayers, layerRegistry, meshLayers, validateRectangle } from '../../shared/view-rect.js';
+import { checkLayers, layerRegistry, meshLayers } from '../../shared/view-rect.js';
 
 /** `fallback` supplies a renderer when WebGPU is unavailable or `backend` is 'webgl2', for example `webglRenderer` from @margoengine/webgl. */
 export interface EngineOptions {

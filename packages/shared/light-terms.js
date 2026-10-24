@@ -28,17 +28,21 @@ export const clusterCell = (
   let z=min(u32(max(0.0,select(log(depth/near)/log(far/near),(depth-near)/(far-near),clusterFrame.intensity.w>0.5)*f32(grid.z))),grid.z-1);
   let cell=xy.x+grid.x*(xy.y+grid.y*z);let count=clusterCounts[cell];var result=vec3f(0);`;
 
-// The GGX (Trowbridge-Reitz) microfacet terms every PBR shader in the engine writes, as source text over the caller's
-// variable names (WGSL; GLSL takes the same text with `float`). `float` writes 1.0 and 2.0 instead of 1 and 2, the
-// spelling GLSL needs and some shaders use, so each shader's text stays as it was.
-const one = (float) => (float ? '1.0' : '1');
-/** GGX distribution denominator `nh^2 (a2 - 1) + 1` (`a2` = roughness^4). */
-export const ggxDenominator = (a2, nh, float = false) => `${nh}*${nh}*(${a2}-${one(float)})+${one(float)}`;
+// The GGX (Trowbridge-Reitz) microfacet terms every PBR shader in the engine writes, as source text over the names a2
+// (roughness^4), nh, nv and nl. The Float forms spell 1.0 and 2.0 (as GLSL needs and some shaders write), so each
+// shader's text stays as it was.
 /** GGX normal distribution `a2 / (pi (nh^2 (a2 - 1) + 1)^2)`. */
-export const ggxD = (a2, nh, float = false) => `${a2}/(3.14159265*pow(${ggxDenominator(a2, nh, float)},2.0))`;
+export const ggxD = 'a2/(3.14159265*pow(nh*nh*(a2-1)+1,2.0))';
+/** {@link ggxD} with float literals. */
+export const ggxDFloat = 'a2/(3.14159265*pow(nh*nh*(a2-1.0)+1.0,2.0))';
 /** Smith-GGX geometry term (uncorrelated, both directions). */
-export const smithG = (a2, nv, nl, float = false) => {
-  const o = one(float),
-    t = float ? '2.0' : '2';
-  return `${t}*${nv}/(${nv}+sqrt(${a2}+(${o}-${a2})*${nv}*${nv}))*${t}*${nl}/max(${nl}+sqrt(${a2}+(${o}-${a2})*${nl}*${nl}),0.0001)`;
-};
+export const smithG = '2*nv/(nv+sqrt(a2+(1-a2)*nv*nv))*2*nl/max(nl+sqrt(a2+(1-a2)*nl*nl),0.0001)';
+/** {@link smithG} with float literals. */
+export const smithGFloat = '2.0*nv/(nv+sqrt(a2+(1.0-a2)*nv*nv))*2.0*nl/max(nl+sqrt(a2+(1.0-a2)*nl*nl),0.0001)';
+/** GGX distribution denominator `nh^2 (a2 - 1) + 1` (float literals) over the name `nh` (default 'nh'). */
+export const ggxDenominator = (nh = 'nh') => `${nh}*${nh}*(a2-1.0)+1.0`;
+/** {@link ggxD} and {@link smithG} over other names, for shaders whose locals are prefixed. */
+export const ggxNamed = (a2, nh, nv, nl) => [
+  `${a2}/(3.14159265*pow(${nh}*${nh}*(${a2}-1)+1,2.0))`,
+  `2*${nv}/(${nv}+sqrt(${a2}+(1-${a2})*${nv}*${nv}))*2*${nl}/max(${nl}+sqrt(${a2}+(1-${a2})*${nl}*${nl}),0.0001)`,
+];

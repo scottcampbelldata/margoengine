@@ -827,7 +827,7 @@ export function normalMatrix(m: Float64Array): Float64Array {
 /** Splits an affine matrix into translation, unit quaternion and scale, or returns null when it has shear. */
 export function decompose(m: Float64Array): { t: number[]; r: number[]; s: number[] } | null {
   const trs = splitTRS(m, 1e-6);
-  return trs.ok ? { t: trs.position, r: unitQuaternion(trs.rotation), s: trs.scale } : null;
+  return typeof trs === 'string' ? null : { t: trs[0], r: unitQuaternion(trs[1]), s: trs[2] };
 }
 
 /**

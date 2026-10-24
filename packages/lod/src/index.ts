@@ -22,7 +22,7 @@ export {
   type ImposterSource,
 } from './imposter.js';
 import { MargoError } from '@margoengine/math/errors';
-import { overlayPass, webgpuPass } from '../../shared/pass.js';
+import { overlayDepthPass } from '../../shared/pass.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
@@ -124,7 +124,7 @@ export class LODSystem implements EnginePlugin {
   private samples = 0;
   private depthFormat?: string;
   private readonly frame = new Float32Array(32);
-  private readonly descriptor = overlayPass(true);
+  private readonly descriptor = overlayDepthPass();
   private readonly color = this.descriptor.colorAttachments[0];
   private readonly depth = this.descriptor.depthStencilAttachment;
   /** Same as `engine.use(new LODSystem(...))`; returns the LODSystem. */
@@ -143,7 +143,13 @@ export class LODSystem implements EnginePlugin {
     this.engine = engine;
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add(webgpuPass(this.name, 1.5, (c) => this.draw(c)));
+    graph.add({
+      name: this.name,
+      order: 1.5,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.draw(c);
+      },
+    });
   }
   onPreUpdate(): void {
     this.update();

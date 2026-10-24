@@ -28,7 +28,7 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { group, compute, dispatch } from '../../shared/gpu.js';
-import { overlayPass, webgpuPass } from '../../shared/pass.js';
+import { overlayDepthPass } from '../../shared/pass.js';
 import { preset } from '../../shared/preset.js';
 import { displayShader } from '../../shared/display.js';
 import { MargoError } from '@margoengine/math/errors';
@@ -256,7 +256,7 @@ export class Scatter implements EnginePlugin {
   private pbrShader = '';
   private pbrBindings: GPUBindGroupEntry[] = [];
   private readonly pbrGroups = new Map<GPURenderPipeline, GPUBindGroup>();
-  private readonly presentation = overlayPass(true);
+  private readonly presentation = overlayDepthPass();
   private readonly attachment = this.presentation.colorAttachments[0];
   private readonly depthAttachment = this.presentation.depthStencilAttachment;
   private readonly options: ScatterOptions;
@@ -492,7 +492,13 @@ export class Scatter implements EnginePlugin {
         dispatch(c, this.compute!, this.computeGroup, Math.ceil(this.count / 64));
       },
     });
-    graph.add(webgpuPass(this.name + ':lod', 1.5, (c) => this.draw(c)));
+    graph.add({
+      name: this.name + ':lod',
+      order: 1.5,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.draw(c);
+      },
+    });
   }
   private draw(c: ScatterPassContext): void {
     const lit = !!this.options.material;

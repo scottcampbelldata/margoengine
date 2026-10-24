@@ -17,7 +17,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { sceneTarget } from '../../shared/msaa.js';
 import { preset } from '../../shared/preset.js';
 import { displayShader } from '../../shared/display.js';
-import { legacyTerms, decayTerms, clusterCell } from '../../shared/light-terms.js';
+import { clusterCell, decayTerms, legacyTerms } from '../../shared/light-terms.js';
 import { applyView, viewRect, ViewStates } from '../../shared/view-rect.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
@@ -111,7 +111,7 @@ ${
 ${
   lights
     ? `fn localLight(pixel:vec2f,p:vec3f,v:vec3f,g:f32)->vec3f {
-${clusterCell('p')}
+${/* @__PURE__ */ clusterCell('p')}
   for(var j=0u;j<count;j++){
     let light=clusterLights[clusterIndices[cell*1024u+j]];let delta=light.positionRange.xyz-p;let distance=length(delta);
     if(distance>=light.positionRange.w){continue;}let l=delta/max(distance,0.0001);

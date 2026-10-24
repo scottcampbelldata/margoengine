@@ -9,13 +9,12 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { render, group, compute } from '../../shared/gpu.js';
-import { webgpuPass } from '../../shared/pass.js';
 import { orthographic } from '../../shared/projection.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { cocShader, coarseShader, bokehShader, presentShader } from './shaders.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView, viewLoadOp, viewSize } from '../../shared/view-rect.js';
-import { linearShader } from '../../shared/display.js';
+import { coreShaderRequired, linearShader } from '../../shared/display.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: {
@@ -157,7 +156,13 @@ export class DOF implements EnginePlugin {
     this.coarsePipeline = compute(engine.gpu, coarseShader);
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add(webgpuPass('dof:capture', -55, (c) => this.capture(c)));
+    graph.add({
+      name: 'dof:capture',
+      order: -55,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.capture(c);
+      },
+    });
     if (this.host) return;
     graph.add({
       name: 'dof:coc',
@@ -166,8 +171,20 @@ export class DOF implements EnginePlugin {
         if (c.backend === 'webgpu') this.dispatch(c, this.cocPipeline!, this.groups[0]);
       },
     });
-    graph.add(webgpuPass('dof:bokeh', 21, (c) => this.blur(c)));
-    graph.add(webgpuPass('dof:present', 30, (c) => this.present(c)));
+    graph.add({
+      name: 'dof:bokeh',
+      order: 21,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.blur(c);
+      },
+    });
+    graph.add({
+      name: 'dof:present',
+      order: 30,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.present(c);
+      },
+    });
   }
   private capture(c: Context): void {
     this.validate();
@@ -208,7 +225,8 @@ export class DOF implements EnginePlugin {
       this.originalDepth = c.depth;
       let shader = this.shaders.get(c.shader);
       if (shader === undefined) {
-        shader = linearShader(c.shader, 'DOF');
+        shader = linearShader(c.shader);
+        if (shader === c.shader) throw new MargoError('unsupported', coreShaderRequired('DOF'));
         this.shaders.set(c.shader, shader);
       }
       c.shader = shader;

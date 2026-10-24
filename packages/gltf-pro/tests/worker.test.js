@@ -59,7 +59,7 @@ test('worker errors keep their type; without Worker the entry falls back to the 
         url: 'https://example.test/',
         input: new Uint8Array([0x67, 0x6c, 0x54, 0x46, 2, 0, 0, 0, 9, 0, 0, 0]).buffer,
       }),
-      { name: 'TypeError', message: /^Invalid GLB size/ },
+      { name: 'TypeError', message: /^GLB is shorter than its header/ },
     );
     assert.equal(typeof Worker, 'undefined');
     const model = await parseGLTFInWorker(await headless(), bigGLB({ segments: 2, meshes: 1 }));

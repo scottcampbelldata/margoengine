@@ -879,11 +879,9 @@ function transform(node: Mesh, def: GLTFNode): void {
     if (def.translation || def.rotation || def.scale || m[3] || m[7] || m[11] || m[15] !== 1)
       throw new TypeError('Invalid glTF affine matrix');
     const trs = splitTRS(m);
-    if (!trs.ok)
-      throw trs.reason === 'singular'
-        ? new RangeError('Singular glTF matrix')
-        : new Error('Sheared matrices are unsupported');
-    node.setPosition(trs.position).setScale(trs.scale).setQuaternion(trs.rotation);
+    if (typeof trs === 'string')
+      throw trs === 'singular' ? new RangeError('Singular glTF matrix') : new Error('Sheared matrices are unsupported');
+    node.setPosition(trs[0]).setScale(trs[2]).setQuaternion(trs[1]);
   } else
     node
       .setPosition((def.translation ?? [0, 0, 0]) as [number, number, number])
@@ -1589,7 +1587,7 @@ export class PBRModel implements EnginePlugin {
             { bytesPerRow: 4 },
             [1, 1],
           );
-        if (!compressed) generateMipmaps(device, texture, levels, mipSampler);
+        if (!compressed) generateMipmaps(device, texture, levels, cache, mipSampler);
       }
       r.views.push(texture.createView());
       const s = def?.sampler === undefined ? {} : entry(this.asset.doc.samplers, def.sampler, 'sampler');

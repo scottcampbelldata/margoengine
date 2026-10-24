@@ -39,11 +39,6 @@ export class ByteWriter {
     this.view.setFloat32(this.at, v, true);
     this.at += 4;
   }
-  f64(v) {
-    this.room(8);
-    this.view.setFloat64(this.at, v, true);
-    this.at += 8;
-  }
   /** LEB128 of an unsigned 32-bit integer: 7 bits per byte, low first, 1-5 bytes. */
   varint(v) {
     this.room(5);
@@ -97,11 +92,6 @@ export class ByteReader {
     this.at += 4;
     return this.view.getFloat32(this.at - 4, true);
   }
-  f64() {
-    this.need(8);
-    this.at += 8;
-    return this.view.getFloat64(this.at - 8, true);
-  }
   varint() {
     const bytes = this.bytes;
     let value = 0,
@@ -113,12 +103,6 @@ export class ByteReader {
       value += (b & 127) * scale;
       if (b < 128) return value;
     }
-  }
-  /** The unread bytes, copied; the reader is then at the end. */
-  rest() {
-    const out = this.bytes.slice(this.at);
-    this.at = this.bytes.length;
-    return out;
   }
   end() {
     if (this.at !== this.bytes.length) throw this.fail(`has ${this.bytes.length - this.at} bytes past its end`);

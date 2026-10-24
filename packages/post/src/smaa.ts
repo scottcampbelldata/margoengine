@@ -9,7 +9,6 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { fullscreen, render, group } from '../../shared/gpu.js';
-import { webgpuPass } from '../../shared/pass.js';
 import type { StackStage } from '../../shared/stack.js';
 import { margoError } from '../../shared/errors.js';
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
@@ -289,7 +288,13 @@ export class SMAA implements EnginePlugin {
   }
   registerPasses(graph: FrameGraph): void {
     if (this.stacked) return;
-    graph.add(webgpuPass('smaa:capture', -80, (c) => this.capture(c)));
+    graph.add({
+      name: 'smaa:capture',
+      order: -80,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.capture(c);
+      },
+    });
     graph.add({
       name: 'smaa:resolve',
       order: 50,

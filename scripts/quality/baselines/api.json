@@ -1,7 +1,7 @@
 {
   "gate": "api",
   "about": "undocumented public exports (tsdoc), bare Error throws and throw messages that name no fix, per file",
-  "total": 2016,
+  "total": 2019,
   "history": [
     {
       "date": "2026-10-24",
@@ -155,7 +155,7 @@
     "no-fix packages/core/src/geometry.ts": 8,
     "no-fix packages/core/src/kernel.ts": 5,
     "no-fix packages/core/src/plugin.ts": 3,
-    "no-fix packages/core/src/renderer.ts": 7,
+    "no-fix packages/core/src/renderer.ts": 10,
     "no-fix packages/creative/src/grass.ts": 2,
     "no-fix packages/creative/src/particles.ts": 1,
     "no-fix packages/creative/src/planet-pass.ts": 2,

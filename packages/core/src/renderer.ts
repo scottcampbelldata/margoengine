@@ -5,8 +5,6 @@ import { wgsl } from './shaders.js';
 import type { FrameGraph, PassContext, DrawOptions } from './plugin.js';
 import { sceneSamples } from './quality.js';
 import { defaultClear, clearColorValue, clearDraw } from '../../shared/clear-color.js';
-import { partialRect, validateRectangle } from '../../shared/view-rect.js';
-import { cachedBindGroup, coreMeshBuffers } from '../../shared/draw-cache.js';
 // TypeScript's DOM library omits WebGPU flag namespaces and the canvas overload.
 declare const GPUBufferUsage: {
   COPY_DST: number;
@@ -33,10 +31,22 @@ export function rectangleClear(
   extraAttachments: number,
 ): 'draw' | 'attachment' | 'none' {
   if (!clearColor && !clearDepth) return 'none';
-  if (!partialRect(rect, width, height)) return 'attachment';
+  const partial = !!rect && (rect[0] !== 0 || rect[1] !== 0 || rect[2] !== width || rect[3] !== height);
+  if (!partial) return 'attachment';
   if (extraAttachments)
     throw new TypeError('A partial-view clear cannot cover extra colour attachments; draw them with clear: false');
   return 'draw';
+}
+
+/** @internal Checks a pixel rectangle [x, y, width, height] against a target of `width` x `height`. */
+export function validateRectangle(rectangle: readonly number[] | undefined, width: number, height: number): void {
+  if (rectangle === undefined) return;
+  if (!Array.isArray(rectangle) || rectangle.length !== 4) throw new RangeError('Invalid draw rectangle');
+  for (let i = 0; i < 4; i++)
+    if (!Number.isSafeInteger(rectangle[i]) || rectangle[i] < (i < 2 ? 0 : 1))
+      throw new RangeError('Invalid draw rectangle');
+  if (rectangle[0] + rectangle[2] > width || rectangle[1] + rectangle[3] > height)
+    throw new RangeError('Draw rectangle exceeds target');
 }
 
 /** `start`/`end`: float range of `instances` changed since the WebGPU renderer last uploaded it (absent: upload all).
@@ -221,7 +231,24 @@ export class GPURenderer implements Renderer {
         vertex: {
           module,
           entryPoint: 'vertex',
-          buffers: coreMeshBuffers,
+          buffers: [
+            {
+              arrayStride: 24,
+              attributes: [
+                { shaderLocation: 0, offset: 0, format: 'float32x3' },
+                { shaderLocation: 1, offset: 12, format: 'float32x3' },
+              ],
+            },
+            {
+              arrayStride: 96,
+              stepMode: 'instance',
+              attributes: Array.from({ length: 6 }, (_, i) => ({
+                shaderLocation: i + 2,
+                offset: i * 16,
+                format: 'float32x4' as const,
+              })),
+            },
+          ],
         },
         fragment: { module, entryPoint: 'fragment', targets: [{ format }] },
         depthStencil: {
@@ -424,13 +451,36 @@ export class GPURenderer implements Renderer {
         }
         let group = this.bindGroup;
         if (pipeline !== this.pipeline || bindings.length) {
-          group = cachedBindGroup(
-            this.groups,
-            this.device,
-            pipeline,
-            { binding: 0, resource: { buffer: this.uniform } },
-            bindings,
-          );
+          let cached = this.groups.get(pipeline);
+          if (
+            !cached ||
+            cached.bindings.length !== bindings.length ||
+            bindings.some((entry, i) => {
+              const previous = cached!.bindings[i],
+                resource = entry.resource as GPUBufferBinding,
+                old = previous.resource as GPUBufferBinding;
+              return (
+                entry.binding !== previous.binding ||
+                (resource.buffer
+                  ? resource.buffer !== old.buffer || resource.offset !== old.offset || resource.size !== old.size
+                  : resource !== old)
+              );
+            })
+          ) {
+            const group = this.device.createBindGroup({
+              layout: pipeline.getBindGroupLayout(0),
+              entries: [{ binding: 0, resource: { buffer: this.uniform } }, ...bindings],
+            });
+            cached = {
+              bindings: bindings.map(({ binding, resource }) => ({
+                binding,
+                resource: (resource as GPUBufferBinding).buffer ? { ...resource } : resource,
+              })),
+              group,
+            };
+            this.groups.set(pipeline, cached);
+          }
+          group = cached.group;
         }
         const named = context.view?.clear?.color;
         const explicit = typeof named === 'string';

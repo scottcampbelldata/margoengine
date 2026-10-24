@@ -8,7 +8,6 @@ import {
   type FrameGraph,
   type PassContext,
 } from '@margoengine/core/extension';
-import { webgpuPass } from '../../shared/pass.js';
 
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -51,8 +50,20 @@ export class StencilBuffer implements EnginePlugin {
 
   /** Register attachment promotion before scene captures and restoration after scene rendering. */
   registerPasses(graph: FrameGraph): void {
-    graph.add(webgpuPass(this.name + ':begin', -110, (c) => this.begin(c)));
-    graph.add(webgpuPass(this.name + ':restore', 10001, (c) => this.restore(c)));
+    graph.add({
+      name: this.name + ':begin',
+      order: -110,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.begin(c);
+      },
+    });
+    graph.add({
+      name: this.name + ':restore',
+      order: 10001,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.restore(c);
+      },
+    });
   }
 
   private begin(c: Context): void {

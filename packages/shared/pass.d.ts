@@ -1,7 +1,10 @@
-import type { PassContext } from '@margoengine/core/extension';
-type Context = Extract<PassContext, { backend: 'webgpu' }>;
-/** A reusable pass descriptor drawing over the frame (colour load/store; depth read only, or load/store with `depthWrites`). */
-export function overlayPass(depthWrites?: boolean): GPURenderPassDescriptor & {
+/** A reusable pass descriptor drawing over the frame: colour load/store, depth and stencil read only. */
+export function overlayPass(): GPURenderPassDescriptor & {
+  colorAttachments: [GPURenderPassColorAttachment];
+  depthStencilAttachment: GPURenderPassDepthStencilAttachment;
+};
+/** {@link overlayPass} that also loads and stores depth. */
+export function overlayDepthPass(): GPURenderPassDescriptor & {
   colorAttachments: [GPURenderPassColorAttachment];
   depthStencilAttachment: GPURenderPassDepthStencilAttachment;
 };
@@ -9,11 +12,5 @@ export function overlayPass(depthWrites?: boolean): GPURenderPassDescriptor & {
 export const alphaBlend: GPUBlendState;
 /** `mesh` when it is null or a core mesh handle (checked live); else a TypeError. */
 export function attachableMesh<M extends { check(): void } | null>(mesh: M): M;
-/** A frame-graph pass `name` at `order` that runs `run(context)` on WebGPU frames only. */
-export function webgpuPass(
-  name: string,
-  order: number,
-  run: (context: Context) => void,
-): { name: string; order: number; execute(context: PassContext): void };
 /** The WGSL `make(group)` builds for bind group `group`, made once per group and kept in `cache`. */
 export function groupCode(cache: Map<number, string>, group: number, make: (group: number) => string): string;

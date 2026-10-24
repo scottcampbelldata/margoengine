@@ -140,11 +140,12 @@ function cssColor(text: string): { rgb: number[]; space: ColorSpace } | null {
  */
 export function hexColor(text: string): [number, number, number, number] | undefined {
   const digits = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(text)?.[1];
-  if (!digits) return undefined;
-  const full = digits.length === 3 ? digits.replace(/./g, '$&$&') : digits,
-    out: [number, number, number, number] = [0, 0, 0, 1];
-  for (let i = 0; i < full.length / 2; i++) out[i] = parseInt(full.slice(2 * i, 2 * i + 2), 16) / 255;
-  return out;
+  return digits
+    ? ((digits.length < 4 ? digits.replace(/./g, '$&$&') : digits)
+        .padEnd(8, 'f')
+        .match(/../g)!
+        .map((h) => parseInt(h, 16) / 255) as [number, number, number, number])
+    : undefined;
 }
 
 /**
@@ -174,7 +175,7 @@ export function parseColor(
   } else if (typeof value === 'string') {
     const hex = hexColor(value);
     if (!hex) throw new TypeError('Color strings must be #rrggbb or #rgb');
-    rgb = [SRGBToLinear(hex[0]), SRGBToLinear(hex[1]), SRGBToLinear(hex[2])];
+    rgb = hex.slice(0, 3).map(SRGBToLinear);
   } else if (value && typeof value === 'object' && value.length === 3) {
     rgb = [value[0], value[1], value[2]];
     if (rgb.some((v) => typeof v !== 'number' || !Number.isFinite(v) || v < 0))

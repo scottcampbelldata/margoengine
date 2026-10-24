@@ -1,5 +1,5 @@
 // Mip chain generation by repeated linear downsampling with a fullscreen triangle, for the textures gltf-pro and
-// materials upload. Pipelines (one per format) and the sampler are cached per device.
+// materials upload. Callers keep one pipeline per format in their own `cache`.
 
 const mipShader = /* wgsl */ `
 struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f}
@@ -10,55 +10,48 @@ struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f}
 @group(0) @binding(1) var imageSampler:sampler;
 @fragment fn fragment(i:Out)->@location(0) vec4f {return textureSample(image,imageSampler,i.uv);}
 `;
-const states = new WeakMap();
 
 /**
- * Fills mip levels 1 to `levels - 1` (default all) of `texture` from level 0, each from the one above; array and cube
- * layers each get their own chain, read through the linear `sampler` (default: one cached per device). The texture
- * needs RENDER_ATTACHMENT and TEXTURE_BINDING usage.
+ * Fills mip levels 1 to `levels - 1` of each of the first `layers` (default 1) layers of 2D or array texture `texture`
+ * from level 0, each level from the one above, read through the linear `sampler` (default: one kept as
+ * `cache.sampler`). The caller's `cache` keeps one pipeline per format. The texture needs RENDER_ATTACHMENT and
+ * TEXTURE_BINDING usage.
  */
-export function generateMipmaps(device, texture, levels = texture.mipLevelCount, sampler) {
+export function generateMipmaps(device, texture, levels, cache, sampler, layers = 1) {
   if (levels < 2) return;
-  let state = states.get(device);
-  if (!state) states.set(device, (state = { pipelines: new Map(), sampler: undefined }));
   const format = texture.format;
-  let pipeline = state.pipelines.get(format);
+  let pipeline = cache.get(format);
   if (!pipeline) {
     const module = device.createShaderModule({ code: mipShader });
-    pipeline = device.createRenderPipeline({
-      layout: 'auto',
-      vertex: { module, entryPoint: 'vertex' },
-      fragment: { module, entryPoint: 'fragment', targets: [{ format }] },
-    });
-    state.pipelines.set(format, pipeline);
+    cache.set(
+      format,
+      (pipeline = device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module, entryPoint: 'vertex' },
+        fragment: { module, entryPoint: 'fragment', targets: [{ format }] },
+      })),
+    );
   }
-  if (!sampler) sampler = state.sampler ??= device.createSampler({ minFilter: 'linear', magFilter: 'linear' });
-  // Array and cube layers each get their own chain (2D views of one layer); a single-layer texture keeps plain views.
-  const layers = texture.dimension === '2d' ? (texture.depthOrArrayLayers ?? 1) : 1,
-    encoder = device.createCommandEncoder();
-  for (let layer = 0; layer < layers; layer++) {
-    const level = (baseMipLevel) =>
-      layers > 1
-        ? texture.createView({
-            format,
-            dimension: '2d',
-            baseMipLevel,
-            mipLevelCount: 1,
-            baseArrayLayer: layer,
-            arrayLayerCount: 1,
-          })
-        : texture.createView({ baseMipLevel, mipLevelCount: 1 });
-    for (let i = 1; i < levels; i++) {
+  sampler ??= cache.sampler ??= device.createSampler({ minFilter: 'linear', magFilter: 'linear' });
+  const encoder = device.createCommandEncoder();
+  for (let layer = 0; layer < layers; layer++)
+    for (let level = 1; level < levels; level++) {
+      const view = (baseMipLevel) =>
+        texture.createView(
+          layers > 1
+            ? { format, dimension: '2d', baseMipLevel, mipLevelCount: 1, baseArrayLayer: layer, arrayLayerCount: 1 }
+            : { baseMipLevel, mipLevelCount: 1 },
+        );
       const group = device.createBindGroup({
         layout: pipeline.getBindGroupLayout(0),
         entries: [
-          { binding: 0, resource: level(i - 1) },
+          { binding: 0, resource: view(level - 1) },
           { binding: 1, resource: sampler },
         ],
       });
       const pass = encoder.beginRenderPass({
         colorAttachments: [
-          { view: level(i), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 0 } },
+          { view: view(level), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 0 } },
         ],
       });
       pass.setPipeline(pipeline);
@@ -66,6 +59,5 @@ export function generateMipmaps(device, texture, levels = texture.mipLevelCount,
       pass.draw(3);
       pass.end();
     }
-  }
   device.queue.submit([encoder.finish()]);
 }

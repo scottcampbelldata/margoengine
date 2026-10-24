@@ -10,8 +10,7 @@ import {
 } from '@margoengine/core/extension';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { margoError } from '../../shared/errors.js';
-import { linearShader } from '../../shared/display.js';
-import { webgpuPass } from '../../shared/pass.js';
+import { coreShaderRequired, linearShader } from '../../shared/display.js';
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_SRC: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 const owners = ['bloom', 'ssao', 'dof', 'tonemap', 'post-processing'],
@@ -94,8 +93,20 @@ export class PostStack implements EnginePlugin {
     }
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add(webgpuPass('post:stack:capture', -65, (c) => this.capture(c)));
-    graph.add(webgpuPass('post:stack:compose', 30, (c) => this.compose(c)));
+    graph.add({
+      name: 'post:stack:capture',
+      order: -65,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.capture(c);
+      },
+    });
+    graph.add({
+      name: 'post:stack:compose',
+      order: 30,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.compose(c);
+      },
+    });
   }
   private capture(c: Context): void {
     let hdr = false;
@@ -107,7 +118,8 @@ export class PostStack implements EnginePlugin {
       }
     if (!this.count) return;
     if (hdr && this.source !== c.shader) {
-      const linear = linearShader(c.shader, 'PostStack');
+      const linear = linearShader(c.shader);
+      if (linear === c.shader) throw margoError('unsupported', coreShaderRequired('PostStack'));
       this.source = c.shader;
       this.linear = linear;
     }

@@ -3,7 +3,7 @@
 // (24-byte) and gltf-pro (80-byte) geometry, the displacement bind group, the per-draw uniform and the draw itself.
 import { instanceLayout } from './instances.js';
 import { meshRuntime } from '@margoengine/core/extension';
-import { margoError } from './errors.js';
+import { MargoError } from '@margoengine/math/errors';
 
 /**
  * Vertex buffers of a caster with `stride` 24 (core: position) or 80 (gltf-pro: position, uv for `displaced`,
@@ -49,12 +49,12 @@ export function nodeRecords(draws, node) {
  * MargoError 'disposed' (`noun` names it in the message), a core mesh of another engine than `engine` 'attached'.
  */
 export function casterRuntime(source, engine, noun) {
-  if ('disposed' in source && source.disposed) throw margoError('disposed', `${noun} is disposed; add a live mesh`);
+  if ('disposed' in source && source.disposed) throw new MargoError('disposed', `${noun} is disposed; add a live mesh`);
   const runtime = 'id' in source ? meshRuntime(source) : source;
   if ('id' in runtime) {
     runtime.check();
     if (engine && runtime.engine !== engine)
-      throw margoError('attached', 'Shadow mesh belongs to another engine; use objects created by the same engine');
+      throw new MargoError('attached', 'Shadow mesh belongs to another engine; use objects created by the same engine');
   }
   return runtime;
 }

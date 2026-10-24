@@ -179,6 +179,7 @@ const shared = new WeakMap<
     anisotropy?: GPUTextureView;
     black?: GPUTextureView;
     sampler: GPUSampler;
+    pipelines: Map<unknown, unknown>;
   }
 >();
 function defaults(device: GPUDevice) {
@@ -199,6 +200,7 @@ function defaults(device: GPUDevice) {
     // Binary16 stores 0.5 exactly, so an absent normal map cannot tilt the surface.
     normal: pixel([0x3800, 0x3800, 0x3c00, 0x3c00], 'rgba16float'),
     sampler: device.createSampler({ magFilter: 'linear', minFilter: 'linear' }),
+    pipelines: new Map(),
   };
   shared.set(device, d);
   return d;
@@ -904,13 +906,18 @@ export class Texture {
   }
 }
 // Mip chains read through the materials sampler (made only when a texture has mips to fill).
-const mipmaps = (device: GPUDevice, texture: GPUTexture): void =>
+function mipmaps(device: GPUDevice, texture: GPUTexture): void {
+  if (texture.mipLevelCount < 2) return;
+  const d = defaults(device);
   generateMipmaps(
     device,
     texture,
     texture.mipLevelCount,
-    texture.mipLevelCount > 1 ? defaults(device).sampler : undefined,
+    d.pipelines,
+    d.sampler,
+    texture.dimension === '2d' ? (texture.depthOrArrayLayers ?? 1) : 1,
   );
+}
 /** The bytes at an http(s), blob: or data: `url` (64 MiB at most) and the response's content type. */
 async function download(url: string | URL, signal?: AbortSignal): Promise<[Uint8Array, string]> {
   const target = new URL(url, globalThis.location?.href);

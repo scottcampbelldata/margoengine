@@ -116,14 +116,15 @@ export const rotateByQuaternion = <T extends NumberArray = [number, number, numb
   out: T = [0, 0, 0] as unknown as T,
 ): T => rotated(v[0], v[1], v[2], q[0], q[1], q[2], q[3], out, toVector);
 
-/** Result of {@link splitTRS}: translation, rotation and scale, or why the matrix has none. */
+/** Result of {@link splitTRS}: `[translation, rotation, scale]`, or why the matrix has none. */
 export type TRSSplit =
-  | { ok: true; position: MutableVec3; rotation: [number, number, number, number]; scale: MutableVec3 }
-  | { ok: false; reason: 'singular' | 'shear' };
+  | [position: MutableVec3, rotation: [number, number, number, number], scale: MutableVec3]
+  | 'singular'
+  | 'shear';
 
 /**
  * Splits a column-major affine matrix into translation, rotation (quaternion `[x, y, z, w]`) and scale, a mirror going
- * into a negative x scale. `'singular'` when a column or the determinant is zero (or not finite), `'shear'` when the
+ * into a negative x scale, as `[translation, rotation, scale]`. `'singular'` when a column or the determinant is zero (or not finite), `'shear'` when the
  * scaled columns are not perpendicular within `tolerance` (default 1e-5, as dot products of the unit columns).
  */
 export function splitTRS(m: ArrayLike<number>, tolerance = 1e-5): TRSSplit {
@@ -133,14 +134,13 @@ export function splitTRS(m: ArrayLike<number>, tolerance = 1e-5): TRSSplit {
     det =
       m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]),
     scale: MutableVec3 = [sx * Math.sign(det), sy, sz];
-  if (!scale[0] || !sy || !sz) return { ok: false, reason: 'singular' };
+  if (!scale[0] || !sy || !sz) return 'singular';
   const r = Array.from({ length: 9 }, (_, i) => m[Math.floor(i / 3) * 4 + (i % 3)] / scale[Math.floor(i / 3)]);
   for (const [a, b] of [
     [0, 3],
     [0, 6],
     [3, 6],
   ])
-    if (Math.abs(r[a] * r[b] + r[a + 1] * r[b + 1] + r[a + 2] * r[b + 2]) > tolerance)
-      return { ok: false, reason: 'shear' };
-  return { ok: true, position: [m[12], m[13], m[14]], rotation: rotationToQuaternion(r), scale };
+    if (Math.abs(r[a] * r[b] + r[a + 1] * r[b + 1] + r[a + 2] * r[b + 2]) > tolerance) return 'shear';
+  return [[m[12], m[13], m[14]], rotationToQuaternion(r), scale];
 }

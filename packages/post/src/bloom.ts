@@ -9,10 +9,9 @@ import {
   type PassContext,
   type DrawOptions,
 } from '@margoengine/core/extension';
-import { displayShader, linearShader } from '../../shared/display.js';
+import { coreShaderRequired, displayShader, linearShader } from '../../shared/display.js';
 import { margoError } from '../../shared/errors.js';
 import { render } from '../../shared/gpu.js';
-import { webgpuPass } from '../../shared/pass.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
@@ -315,7 +314,8 @@ export class Bloom implements EnginePlugin {
         this.originalDepth = c.depth;
         this.originalFormat = c.format;
         if (this.sourceShader !== c.shader) {
-          const linear = linearShader(c.shader, 'Bloom');
+          const linear = linearShader(c.shader);
+          if (linear === c.shader) throw margoError('unsupported', coreShaderRequired('Bloom'));
           this.sourceShader = c.shader;
           this.linearShader = linear;
         }
@@ -345,7 +345,13 @@ export class Bloom implements EnginePlugin {
         c.draw = this.drawScene;
       },
     });
-    graph.add(webgpuPass('bloom:present', 30, (c) => this.draw(c)));
+    graph.add({
+      name: 'bloom:present',
+      order: 30,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.draw(c);
+      },
+    });
   }
   private resize(c: PostPassContext): void {
     if (

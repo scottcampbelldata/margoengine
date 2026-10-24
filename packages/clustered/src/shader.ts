@@ -1,4 +1,4 @@
-import { legacyTerms, decayTerms, clusterBrdf, clusterCell, ggxD, smithG } from '../../shared/light-terms.js';
+import { clusterBrdf, clusterCell, decayTerms, ggxD, legacyTerms, smithG } from '../../shared/light-terms.js';
 const declarations = (group: number) => /* wgsl */ `
 struct ClusterFrame {view:mat4x4f,grid:vec4u,screen:vec4f,depth:vec4f,intensity:vec4f}
 struct ClusterLight {positionRange:vec4f,colorIntensity:vec4f,directionOuter:vec4f,params:vec4f}
@@ -45,8 +45,8 @@ const directionalLoop = (shadow: string) => /* wgsl */ `
   for(var j=0u;j<clusterDirectional.count.x;j++){
     let light=clusterDirectional.lights[j];let l=light.toLight.xyz;let h=(v+l)/max(length(v+l),0.0001);
     let nl=clamp(dot(n,l),0.0,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
-    let d=${ggxD('a2', 'nh')};
-    let g=${smithG('a2', 'nv', 'nl')};
+    let d=${ggxD};
+    let g=${smithG};
     let f0=mix(vec3f(0.04),base,metal);let fresnel=f0+(1-f0)*pow(1-vh,5.0);
     result+=${clusterBrdf}*nl*light.color.rgb${shadow};
   }`;
@@ -98,14 +98,14 @@ export function clusteredSampling(
 @group(${group}) @binding(6) var<storage,read> clusterCounts:array<u32>;
 @group(${group}) @binding(7) var<storage,read> clusterIndices:array<u32>;${receive ? '\nvar<private> clusterReceive=true;' : ''}
 fn clusterLighting(pixel:vec2f,position:vec3f,n:vec3f,eye:vec3f,base:vec3f,roughness:f32,metal:f32)->vec3f {
-${clusterCell('position')}
+${/* @__PURE__ */ clusterCell('position')}
   let v=normalize(eye-position);let nv=clamp(dot(n,v),0.0001,1.0);let a=max(roughness,0.045)*max(roughness,0.045);let a2=a*a;
   for(var j=0u;j<count;j++){
     ${terms.length ? 'let index=clusterIndices[cell*1024u+j];let light=clusterLights[index];' : 'let light=clusterLights[clusterIndices[cell*1024u+j]];'}let delta=light.positionRange.xyz-position;let distance=length(delta);
     if(distance>=light.positionRange.w){continue;}let l=delta/max(distance,0.0001);let h=(v+l)/max(length(v+l),0.0001);
     let nl=clamp(dot(n,l),0.0,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
-    let d=${ggxD('a2', 'nh')};
-    let g=${smithG('a2', 'nv', 'nl')};
+    let d=${ggxD};
+    let g=${smithG};
     let f0=mix(vec3f(0.04),base,metal);let fresnel=f0+(1-f0)*pow(1-vh,5.0);
     ${decay ? decayTerms : legacyTerms}
     result+=${clusterBrdf}*nl*light.colorIntensity.rgb*light.colorIntensity.w*falloff*cone${terms.map((t) => '*' + t.term).join('')}${hook ? term('clusterShadow(light,position,n)') : ''}${shadows ? term('clusterShadowVisibility(light,position,n)') : ''};

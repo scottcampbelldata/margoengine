@@ -8,7 +8,7 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { fullscreen, group, compute, dispatch } from '../../shared/gpu.js';
-import { overlayPass, webgpuPass } from '../../shared/pass.js';
+import { overlayPass } from '../../shared/pass.js';
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { margoError } from '../../shared/errors.js';
 import type { Vec3 } from '@margoengine/math';
@@ -420,7 +420,13 @@ export class Sky implements EnginePlugin {
           }
         },
       });
-    graph.add(webgpuPass('sky:atmosphere', 2, (c) => this.draw(c)));
+    graph.add({
+      name: 'sky:atmosphere',
+      order: 2,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.draw(c);
+      },
+    });
     if (this.features.fog)
       graph.add({
         name: 'sky:fog',

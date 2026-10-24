@@ -5,7 +5,6 @@ import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine
 import { MargoError } from '@margoengine/math/errors';
 import { computeShader, depthShader } from './shaders.js';
 import { viewSize } from '../../shared/view-rect.js';
-import { webgpuPass } from '../../shared/pass.js';
 export { CulledMeshes } from './meshes.js';
 export type { CulledMeshesOptions } from './meshes.js';
 
@@ -274,7 +273,13 @@ export class CulledInstances implements EnginePlugin {
     }
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add(webgpuPass(this.name, 1, (c) => this.draw(c)));
+    graph.add({
+      name: this.name,
+      order: 1,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.draw(c);
+      },
+    });
   }
 
   private index(batch: number, index: number): number {

@@ -10,7 +10,7 @@ import {
 import { windShader, validateWind, type ScatterWind } from './wind.js';
 import { sameBindings, snapshotBindings } from './bindings.js';
 import { MargoError } from '@margoengine/math/errors';
-import { overlayPass, webgpuPass } from '../../shared/pass.js';
+import { overlayDepthPass } from '../../shared/pass.js';
 
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; INDIRECT: number; UNIFORM: number; COPY_DST: number };
 type ScatterPassContext = Extract<PassContext, { backend: 'webgpu' }>;
@@ -123,7 +123,7 @@ export class ScatterInstances implements EnginePlugin {
   private bindings: GPUBindGroupEntry[] = [];
   /** Whether any batch sets `translucency`; otherwise the shader and layout stay as they were without it. */
   private translucent = false;
-  private readonly presentation = overlayPass(true);
+  private readonly presentation = overlayDepthPass();
   private readonly color = this.presentation.colorAttachments[0];
   private readonly depth = this.presentation.depthStencilAttachment;
 
@@ -248,7 +248,13 @@ export class ScatterInstances implements EnginePlugin {
     }
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add(webgpuPass(this.name, 1, (c) => this.draw(c)));
+    graph.add({
+      name: this.name,
+      order: 1,
+      execute: (c) => {
+        if (c.backend === 'webgpu') this.draw(c);
+      },
+    });
   }
   onPreUpdate(delta: number): void {
     if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Invalid scatter delta');

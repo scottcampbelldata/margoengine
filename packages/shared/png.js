@@ -21,23 +21,6 @@ export function pngPredict(type, a, b, c) {
   return 0;
 }
 
-/** The IHDR fields of `bytes` when they start with the PNG signature and a 13-byte IHDR chunk, else undefined. The CRC is
- * not checked. */
-export function pngHeader(bytes) {
-  if (bytes.length < 33 || PNG_SIGNATURE.some((v, i) => bytes[i] !== v)) return undefined;
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  if (view.getUint32(8) !== 13 || view.getUint32(12) !== 0x49484452) return undefined;
-  return {
-    width: view.getUint32(16),
-    height: view.getUint32(20),
-    depth: bytes[24],
-    colour: bytes[25],
-    compression: bytes[26],
-    filter: bytes[27],
-    interlace: bytes[28],
-  };
-}
-
 const chunk = (type, data) => {
   const out = new Uint8Array(data.length + 12),
     view = new DataView(out.buffer);

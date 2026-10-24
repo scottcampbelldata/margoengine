@@ -77,8 +77,8 @@ ${normalShader}
   let nl=clamp(dot(coatNormal,l),0.0,1.0); let nv=clamp(dot(coatNormal,v),0.0001,1.0);
   let nh=clamp(dot(coatNormal,h),0.0,1.0); let vh=clamp(dot(v,h),0.0,1.0);
   let a=roughness*roughness; let a2=a*a;
-  let d=${ggxD('a2', 'nh')};
-  let g=${smithG('a2', 'nv', 'nl')};
+  let d=${ggxD};
+  let g=${smithG};
   let fresnel=0.04+(1-0.04)*pow(1-vh,5.0);
   return factor*d*g*fresnel/max(4*nl*nv,0.0001)*nl*f.radiance.rgb*f.light.w;
 }

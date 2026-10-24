@@ -104,6 +104,15 @@ const HELLO = 1,
   encoder = new TextEncoder(),
   decoder = new TextDecoder('utf-8', { fatal: true });
 
+// voxel-net also writes doubles.
+class Writer extends ByteWriter {
+  f64(v: number): void {
+    this.room(8);
+    this.view.setFloat64(this.at, v, true);
+    this.at += 8;
+  }
+}
+
 // voxel-net messages start after their kind byte; floats must be finite.
 class Reader extends ByteReader {
   constructor(bytes: Uint8Array) {
@@ -112,8 +121,15 @@ class Reader extends ByteReader {
   override f32(): number {
     return this.finite(super.f32());
   }
-  override f64(): number {
-    return this.finite(super.f64());
+  f64(): number {
+    this.need(8);
+    this.at += 8;
+    return this.finite(this.view.getFloat64(this.at - 8, true));
+  }
+  rest(): Uint8Array {
+    const out = this.bytes.slice(this.at);
+    this.at = this.bytes.length;
+    return out;
   }
   finite(v: number): number {
     if (!Number.isFinite(v)) throw this.fail(`holds a non-finite number at byte ${this.at}`);
@@ -157,7 +173,7 @@ const bytesOf = (what: string, v: unknown): Uint8Array => {
  * position, a cell outside the 32-bit cells.
  */
 export function encodeClientMessage(message: ClientMessage): Uint8Array {
-  const w = new ByteWriter();
+  const w = new Writer();
   switch (message?.type) {
     case 'hello': {
       const name = encoder.encode(String(message.name ?? ''));
@@ -253,7 +269,7 @@ export function decodeClientMessage(bytes: Uint8Array): ClientMessage {
  * @throws RangeError for a field out of range.
  */
 export function encodeServerMessage(message: ServerMessage): Uint8Array {
-  const w = new ByteWriter();
+  const w = new Writer();
   switch (message?.type) {
     case 'welcome':
       w.u8(WELCOME);
