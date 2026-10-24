@@ -295,3 +295,51 @@ test('typed arrays and plain arrays give the same triangles', () => {
   const { data, holes } = noisyPolygon();
   assert.deepEqual(triangulate(Float64Array.from(data), Uint32Array.from(holes)), triangulate(data, holes));
 });
+
+/** Best of three wall-clock runs, in ms. */
+function bestTime(data) {
+  let best = Infinity,
+    out;
+  for (let k = 0; k < 3; k++) {
+    const start = performance.now();
+    out = triangulate(data);
+    best = Math.min(best, performance.now() - start);
+  }
+  return { ms: best, out };
+}
+/** n points on the unit circle, starting at angle `phase`. */
+function circle(n, phase = 0) {
+  const data = [];
+  for (let i = 0; i < n; i++)
+    data.push(Math.cos(phase + (i / n) * 2 * Math.PI), Math.sin(phase + (i / n) * 2 * Math.PI));
+  return data;
+}
+
+test('a 100k-point circle and a 65,536-gon cut as fast as a noisy 100k ring (no fan of slivers)', () => {
+  const n = 100_000,
+    noisy = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2,
+      r = 1 + (0.3 * Math.sin(i * 0.7) * ((i * 7919) % 13)) / 13;
+    noisy.push(Math.cos(a) * r, Math.sin(a) * r);
+  }
+  const reference = bestTime(noisy).ms;
+  for (const data of [circle(n), circle(65_536, 0.3)]) {
+    const { ms, out } = bestTime(data),
+      count = data.length / 2;
+    assert.equal(out.length / 3, count - 2);
+    let area = 0;
+    for (let t = 0; t < out.length; t += 3) {
+      const c = cross(point(data, 2, out[t]), point(data, 2, out[t + 1]), point(data, 2, out[t + 2]));
+      assert.ok(c > 0);
+      area += c / 2;
+    }
+    const expected = (count / 2) * Math.sin((2 * Math.PI) / count);
+    assert.ok(Math.abs(area - expected) < 1e-9, `area ${area} vs ${expected}`);
+    // Was about 12x the noisy ring (5.2 s against 0.42 s) when ears were ranked by shape alone.
+    assert.ok(
+      ms < 2.5 * reference + 50,
+      `${count} points: ${ms.toFixed(0)} ms vs noisy ring ${reference.toFixed(0)} ms`,
+    );
+  }
+});

@@ -5,10 +5,10 @@ import type { MutableVec2 } from './math.js';
 // Method: D. Eberly, "Triangulation by Ear Clipping" (Geometric Tools, 2002). Each hole is joined to the boundary by a
 // two-way bridge to a mutually visible vertex (§5: cast a ray from the hole's rightmost vertex, take the nearest edge
 // hit, then the visible vertex of smallest angle inside the hit triangle), so the region becomes one weakly simple
-// ring. Ears (a convex corner whose triangle holds no other ring vertex) are then cut off, best-shaped first. G.
-// Meisters, "Polygons have ears" (Amer. Math. Monthly 82, 1975) guarantees that a simple polygon with more than three
-// corners has at least two ears, and cutting an ear changes the ear status of its two neighbours only, so a correct
-// ear test always makes progress. A uniform grid over the ring vertices keeps each ear test local.
+// ring. Ears (a convex corner whose triangle holds no other ring vertex) are then cut off, small well-shaped ones
+// first. G. Meisters, "Polygons have ears" (Amer. Math. Monthly 82, 1975) guarantees that a simple polygon with more
+// than three corners has at least two ears, and cutting an ear changes the ear status of its two neighbours only, so
+// a correct ear test always makes progress. A uniform grid over the ring vertices keeps each ear test local.
 //
 // Touching rings: before bridging, edges are split where another ring's vertex lies inside them and pairs of opposite
 // edges are removed, so holes sharing a side merge into one hole and a hole on the outer side becomes a notch. A hole
@@ -360,7 +360,7 @@ class Grid {
   }
 }
 
-/** Max-heap of candidate ears keyed by shape quality (drops first), with stale entries skipped on pop. */
+/** Max-heap of candidate ears keyed by priority (drops first), with stale entries skipped on pop. */
 class EarHeap {
   private keys: number[] = [];
   private ids: number[] = [];
@@ -443,7 +443,7 @@ interface Context {
   untangles: number;
 }
 
-/** Ear priority of a node: -1 not an ear, Infinity a zero-area corner to drop, else a quality in (0, 1]. */
+/** Ear priority of a node: -1 not an ear, Infinity a zero-area corner to drop, else a positive key (higher first). */
 function classify(ctx: Context, i: number, level: Level): number {
   const { nodes } = ctx,
     X = nodes.x,
@@ -453,11 +453,17 @@ function classify(ctx: Context, i: number, level: Level): number {
   const o = orient(X[p], Y[p], X[i], Y[i], X[n], Y[n]);
   if (o > 0) {
     if (ctx.grid.occupied(p, i, n, level < Level.Relaxed)) return -1;
-    // Area over the sum of squared sides, scaled so an equilateral triangle scores 1.
+    // Shape (area over the sum of squared sides) divided by size (the root of that sum), so small well-shaped ears go
+    // first. Shape alone favours a fan on convex rings: on a circle each cut makes its neighbours' ears a little
+    // better shaped than the untouched ones, so one fan of ever longer slivers grows across the ring, and every ear
+    // test scans the wide box of a long sliver. Dividing by size makes equal-shape ears of all sizes tie and the fan's
+    // longer ears lose, so a circle is cut level by level into short triangles. Scaling the ring scales every key
+    // alike, so the order does not depend on units.
     const ab = (X[i] - X[p]) ** 2 + (Y[i] - Y[p]) ** 2,
       bc = (X[n] - X[i]) ** 2 + (Y[n] - Y[i]) ** 2,
-      ca = (X[p] - X[n]) ** 2 + (Y[p] - Y[n]) ** 2;
-    return (o * 2 * Math.sqrt(3)) / (ab + bc + ca);
+      ca = (X[p] - X[n]) ** 2 + (Y[p] - Y[n]) ** 2,
+      sides = ab + bc + ca;
+    return o / (sides * Math.sqrt(sides));
   }
   if (o < 0) return -1;
   // Zero (or NaN) area. A straight corner is kept at first (it can still be a triangle corner); spikes go.
