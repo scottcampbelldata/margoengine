@@ -1,6 +1,7 @@
 // Public input and output shapes of @margoengine/voxel-pathtracer. Everything is in Margo's Y-up world coordinates
 // (convert MagicaVoxel's Z-up .vox data at the caller's boundary). The names and shapes up to "Compatible additions"
 // are the integration contract agreed with the voxel editor; the rest are optional additions.
+import type { RectAreaLight } from '@margoengine/math';
 
 /** Three components `[x, y, z]` or `[r, g, b]`. Colours are linear RGB (not sRGB). */
 export type TraceVec3 = readonly [number, number, number];
@@ -188,6 +189,13 @@ export interface TraceInstance {
    * at shutter close). Used when `VoxelPathTracerOptions.shutter` is above 0.
    */
   previousMatrix?: readonly number[];
+  /**
+   * How the transform moves from `previousMatrix` to `matrix` during the shutter. 'matrix' (default) blends the matrix
+   * entries; 'trs' blends translation and scale linearly and rotation along the shortest arc, so spinning objects keep
+   * their size. With a shutter above 0, an interval that becomes singular ('matrix'), or has shear or changes
+   * handedness ('trs'), throws RangeError from `attach`, `setScene` or `setOptions`.
+   */
+  motionInterpolation?: 'matrix' | 'trs';
 }
 
 /** Compatible addition: an equirectangular high-dynamic-range environment image. */
@@ -298,32 +306,6 @@ export interface TraceTexture {
   data: Uint8Array | Uint8ClampedArray;
 }
 
-/** Compatible addition: a rectangular area light. */
-export interface TraceAreaLight {
-  /** Unique, non-empty id. */
-  id: string;
-  /** One corner of the rectangle, world units. */
-  position: TraceVec3;
-  /** First edge from `position` (the rectangle is `position + s * edgeU + t * edgeV`, s and t in 0..1). */
-  edgeU: TraceVec3;
-  /** Second edge; must not be parallel to `edgeU`. The light faces `cross(edgeU, edgeV)`. */
-  edgeV: TraceVec3;
-  /** Emitted colour, linear RGB. Default [1, 1, 1]. */
-  color?: TraceVec3;
-  /** Emitted radiance multiplier, 0 or more. Default 1. */
-  intensity?: number;
-  /** Emit from both faces. Default false (the back face is dark). */
-  twoSided?: boolean;
-  /**
-   * Compatible addition: the light is a solid panel: it casts shadows (blocks shadow rays and paths from both faces)
-   * and a one-sided light shows a black back face. Default true. false restores the earlier behaviour: no shadows,
-   * and the back face of a one-sided light is invisible (rays pass through it).
-   */
-  opaque?: boolean;
-  /** Hidden lights neither emit nor show. Default true. */
-  visible?: boolean;
-}
-
 /** Everything {@link VoxelPathTracer} draws. Validated and copied as a whole by `setScene`. */
 export interface VoxelTraceScene {
   /** Caller's revision of the whole scene, reported back in stats. */
@@ -336,8 +318,14 @@ export interface VoxelTraceScene {
   materials: readonly TraceMaterial[];
   /** Sky, sun and ground. */
   environment?: TraceEnvironment;
-  /** Compatible addition: rectangular area lights (at most 256). */
-  lights?: readonly TraceAreaLight[];
+  /**
+   * Rectangular area lights (at most 256): `RectAreaLight` from `@margoengine/math`, as clustered draws them, so one light
+   * list drives raster and traced images. `castShadow` and `shadow` are raster settings; traced lights always shade
+   * physically. Two traced-only fields: `opaque` (default true): the panel is solid, blocking shadow rays and paths
+   * from both faces, a one-sided light showing a black back; false: no shadows and an invisible back. `visible` false
+   * hides the light (no emission, nothing to hit).
+   */
+  lights?: readonly (RectAreaLight & { opaque?: boolean; visible?: boolean })[];
   /** Compatible addition: block textures that materials index (at most 4096). */
   textures?: readonly TraceTexture[];
 }
@@ -415,9 +403,9 @@ export interface VoxelPathTracerOptions {
   /**
    * Compatible addition: 'neutral' (Khronos PBR Neutral, Margo's display transform), 'linear' (clipped) or
    * 'aces-narkowicz' (Krzysztof Narkowicz's per-channel fit of the ACES film curve after a 0.6 pre-scale, MagicaVoxel's
-   * film). Default 'neutral'.
+   * film) or 'agx' (the shared AgX display transform). Default 'neutral'.
    */
-  toneMapping?: 'neutral' | 'linear' | 'aces-narkowicz';
+  toneMapping?: 'neutral' | 'linear' | 'aces-narkowicz' | 'agx';
   /**
    * Compatible addition: display encoding after tone mapping: undefined (default) encodes sRGB; a number from 1 to 5
    * raises to the power 1 / gamma (MagicaVoxel encodes with 2.2).

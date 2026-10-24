@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { BlockTypes, VoxelWorld } from '../dist/index.js';
-import { parseVox, pasteVoxModel, writeVox } from '../dist/vox.js';
+import { parseVox, pasteVoxModel, voxBlockOptions, writeVox } from '../dist/vox.js';
 
 const random = (seed) => () => {
   seed = (seed + 0x6d2b79f5) | 0;
@@ -709,6 +709,48 @@ test("pasteVoxModel: a scene's colours become vox:rrggbb block types, reused on 
   assert.throws(() => pasteVoxModel(fresh, scene, [0, 11, 0]), RangeError);
   assert.equal(fresh.blocks.table.length, 1);
   assert.equal(fresh.dirty.size, 0);
+});
+
+test('pasteVoxModel: metal, glass, emit and media materials become block options; diffuse stays plain', () => {
+  const scene = parseVox(
+      vox(
+        200,
+        size(4, 1, 1),
+        xyzi([0, 0, 0, 1], [1, 0, 0, 2], [2, 0, 0, 3], [3, 0, 0, 4]),
+        rgba(fileColour),
+        matl(1, [
+          ['_type', '_metal'],
+          ['_weight', '0.5'],
+          ['_rough', '0.25'],
+        ]),
+        matl(2, [
+          ['_type', '_glass'],
+          ['_weight', '1'],
+          ['_alpha', '0.6'],
+        ]),
+        matl(3, [
+          ['_type', '_emit'],
+          ['_weight', '0.5'],
+          ['_flux', '2'],
+        ]),
+        matl(4, [['_type', '_diffuse']]),
+      ),
+    ),
+    blocks = new BlockTypes(),
+    world = new VoxelWorld({ blocks });
+  assert.equal(pasteVoxModel(world, scene, [0, 0, 0]), 4);
+  const [metal, glass, emit, plain] = [0, 1, 2, 3].map((x) => blocks.get(world.getBlock(x, 0, 0)));
+  assert.equal(metal.name, 'vox:00ff00:roughness=0.25:metalness=0.5');
+  assert.deepEqual([metal.metalness, metal.roughness, metal.layer], [0.5, 0.25, 'opaque']);
+  assert.deepEqual([glass.layer, glass.transmission], ['translucent', 0.6]);
+  assert.equal(emit.emissive, 1.5);
+  assert.equal(plain.name, 'vox:03fc15');
+  assert.deepEqual(voxBlockOptions({ id: 5, type: 'media', weight: 0.4 }), { layer: 'translucent', scatter: 0.4 });
+  assert.deepEqual(
+    voxBlockOptions({ id: 5, type: 'blend', weight: 0.3 }),
+    { metalness: 0.3 },
+    'blend: no glass without _trans',
+  );
 });
 
 test('pasteVoxModel: scene transforms, groups and hidden nodes match a brute-force oracle', () => {

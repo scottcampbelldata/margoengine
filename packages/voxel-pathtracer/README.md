@@ -155,7 +155,7 @@ except `id`, `color` and `type` are optional.
 | Environment map (addition) | `environment.map`: equirectangular linear RGB(A) floats, `intensity`, `rotation` about +Y | Replaces the constant sky; filtered bilinearly; importance sampled by luminance x sin(theta). Its centre column faces -Z, three quarters +X. |
 | Emissive voxels | Any material with `emission > 0` | Faces sampled by emitted power, instances by power x area. |
 | Uniform fog (addition) | `environment.fog`: `{density (extinction per world unit), color?, anisotropy?}` | Rays outside volumes fade over distance toward the fog's glow, the sky and sun light it scatters (Henyey-Greenstein, no shadows); rays leaving the scene see only the glow; the sun reaches surfaces only through it; emissive voxels and area lights are attenuated by distance. |
-| Area lights (addition) | `scene.lights`: rectangles `position + s * edgeU + t * edgeV`, radiance `color * intensity`, `twoSided`, `opaque` | Facing `cross(edgeU, edgeV)`. Solid panels by default: seen, reflected and casting shadows (from the sun, the sky, emissive voxels and each other); a one-sided light's back is black. `opaque: false` keeps the earlier see-through light (no shadows, no back face). Dark (`intensity` 0) solid panels stay as occluders. At most 256. |
+| Area lights (addition) | `scene.lights`: `RectAreaLight` from `@margoengine/math` (`position` centre, `direction`, `width`, `height`, `up`), radiance `color * intensity`, `twoSided`, plus traced-only `opaque` and `visible` | The same light list as raster area lights (`castShadow` is raster only). Solid panels by default: seen, reflected and casting shadows (from the sun, the sky, emissive voxels and each other); a one-sided light's back is black. `opaque: false` keeps the earlier see-through light (no shadows, no back face). Dark (`intensity` 0) solid panels stay as occluders. At most 256. |
 
 Lighting additions: `environment.sunVisible: false` hides the sun disk from camera rays (it still lights and
 reflects); `environment.groundFade` (a distance) fades the ground camera rays see into the sky behind it by
@@ -183,7 +183,11 @@ The engine camera is used as is: perspective by default, orthographic (or any af
   focus (default: camera position to target). Addition: `lensBlades` (0 round, 3-16 polygon bokeh) and `lensRotation`.
 - **Motion blur (addition):** give an instance `previousMatrix` (shutter open) and set `shutter` (0-1, the share of the
   move from `previousMatrix` to `matrix` the shutter is open for, ending at `matrix`). Matrices are interpolated
-  linearly per sample.
+  linearly per sample by default (`motionInterpolation: 'matrix'`). With `motionInterpolation: 'trs'` translation and
+  scale move linearly and rotation along the shortest arc, so spinning objects keep their shape (no shear; the
+  handedness must not change). With `shutter` above 0, an interval that becomes singular, has shear or flips handedness
+  throws `RangeError` (from `attach`, `setScene` or `setOptions`; the old scene stays). Instance records are 160 bytes,
+  plus 64 for each 'trs' instance.
 - **Camera motion blur (addition):** `previousCamera` (`{position, target, up?, fov?}`, the pose at shutter open) with
   `shutter` above 0 blurs the camera's own move toward the engine camera (shutter close), sharing the instances' time
   per sample. Projection, near and far are the engine camera's; the corner rays and lens axes are interpolated
@@ -221,7 +225,7 @@ The engine camera is used as is: perspective by default, orthographic (or any af
 | `fisheye` | `{mapping: 'equidistant', fov: 180}` | mapping `'equidistant'`, `'equisolid'` or `'stereographic'`, fov above 0 to 360 | yes |
 | `distortion` | none | `{k1, k2, p1, p2}`, each -1 to 1, or null | yes |
 | `clamp` (largest luminance a path may add; biased firefly control) | Infinity | above 0 | yes |
-| `toneMapping` | `'neutral'` (Khronos PBR Neutral, Margo's display transform) | `'neutral'`, `'linear'`, `'aces-narkowicz'` (Narkowicz's ACES fit after x0.6) | no |
+| `toneMapping` | `'neutral'` (Khronos PBR Neutral, Margo's display transform) | `'neutral'`, `'linear'`, `'aces-narkowicz'` (Narkowicz's ACES fit after x0.6), `'agx'` (AgX, the same transform as Tonemap and ImagePost) | no |
 | `gamma` (display encoding after tone mapping) | sRGB | 1-5 (power 1 / gamma), or undefined for sRGB | no |
 | `bounceLimits` (events per kind on top of `maxBounces`) | none | `{diffuse?, specular?, scatter?, subsurface?, internalReflections?}` each 1-64 (`internalReflections` 0-64: reflections inside glass kept in full, each later one goes on with probability 1/2), or null | yes |
 | `transparentShadows` (shadow rays through glass and media) | true | boolean; false: any voxel blocks them | yes |
@@ -253,6 +257,11 @@ options give the same image on the same GPU and driver (measured bit-identical o
 by floating-point rounding, which changes individual paths, not the converged image.
 
 ## Viewport, readiness, devices, disposal
+
+`toneMapping:'agx'` runs the engine's shared AgX transform (`packages/shared/agx.js`) in the display shader, and the
+same math on the CPU for `capture`; it needs no extra data or textures. HDR viewport output stays linear for a
+following ImagePost or Tonemap pass, so the transform runs once. Device replacement recreates owned GPU resources, and
+disposal releases them.
 
 - The pass (order 20) traces `samplesPerFrame` samples into float32 accumulation buffers, optionally denoises, and
   draws over the frame with exposure and tone mapping, writing each pixel's first-hit depth (so overlays drawn later
@@ -580,8 +589,15 @@ Not done or not verified, stated plainly:
   noise for bias.
 - **Simplifications:** RGB everywhere except dispersive glass, which samples one wavelength per path (no hero-wavelength
   sharing, so dispersion converges with colour noise); refracted radiance is not scaled by the squared
-  index ratio; media are homogeneous per palette index with grey extinction; the ground is a plain diffuse plane; motion blur interpolates matrices and the camera's corner rays linearly (fast rotations shrink
-  a little); no chromatic aberration; the physical sky is Preetham's (no multiple scattering, ozone or night sky);
+  index ratio; media are homogeneous per palette index with grey extinction; the ground is a plain diffuse plane;
+  default matrix motion and the camera's corner rays interpolate linearly (matrix rotations can shrink; explicit TRS
+  motion preserves rigid shape); no chromatic aberration; the physical sky is Preetham's (no multiple scattering, ozone or night sky);
   bloom comes from `@margoengine/post`.
 - **Measured only on one machine** (RTX A6000, Edge 155, Windows). Other GPUs, browsers and the editor's own scenes are
   untested.
+
+## Editor helpers (`@margoengine/voxel-pathtracer/studio`)
+
+Outside the root entry: `studioPresets()` / `studioPreset(name)` (lighting presets as a `TraceEnvironment`),
+`PreviewBudget` (samples per frame while the view changes and after it settles), and material builders (`diffuse`,
+`metal`, `glass`, `emit`, `blend`, `media`, `materialBuilders`, `paletteFromMaterials`).

@@ -29,6 +29,8 @@
 //   (Schied et al. 2017, "Spatiotemporal Variance-Guided Filtering"), on albedo-demodulated radiance.
 // Material flags and record sizes must match scene.ts and layout.ts.
 import { displayShader } from '../../shared/display.js';
+import { agxShader } from '../../shared/agx.js';
+import { acesNarkowiczShader } from '../../shared/aces.js';
 import {
   ADDITIVE,
   CONTACT,
@@ -290,23 +292,46 @@ fn xdir(m:Xform,d:vec3f)->vec3f {return vec3f(dot(m.r0.xyz,d),dot(m.r1.xyz,d),do
 fn rowOf(m:Xform,k:u32)->vec3f {return select(select(m.r2.xyz,m.r1.xyz,k==1u),m.r0.xyz,k==0u);}
 fn colOf(m:Xform,k:u32)->vec3f {return vec3f(m.r0[k],m.r1[k],m.r2[k]);}
 fn invertX(m:Xform)->Xform {
- let a=m.r0.xyz;let b=m.r1.xyz;let c=m.r2.xyz;
- let c0=cross(b,c);let c1=cross(c,a);let c2=cross(a,b);let k=1.0/dot(a,c0);
+ // Normalize before the cross products so very large or small scales stay in Float32 range.
+ let h=max(max(max(abs(m.r0.x),abs(m.r0.y)),max(abs(m.r0.z),abs(m.r1.x))),max(max(abs(m.r1.y),abs(m.r1.z)),max(max(abs(m.r2.x),abs(m.r2.y)),abs(m.r2.z))));
+ let a=m.r0.xyz/h;let b=m.r1.xyz/h;let c=m.r2.xyz/h;
+ let c0=cross(b,c);let c1=cross(c,a);let c2=cross(a,b);let k=(1.0/h)/dot(a,c0);
  let r0=vec3f(c0.x,c1.x,c2.x)*k;let r1=vec3f(c0.y,c1.y,c2.y)*k;let r2=vec3f(c0.z,c1.z,c2.z)*k;
  let t=vec3f(m.r0.w,m.r1.w,m.r2.w);
  return Xform(vec4f(r0,-dot(r0,t)),vec4f(r1,-dot(r1,t)),vec4f(r2,-dot(r2,t)));
 }
+// Canonical CPU quaternion convention: [x,y,z,w], shortest arc, normalized-linear only above dot 0.9995.
+// Instance word 39 points at its 16-word TRS packet: q0, q1, scale0 + angle, scale1 + 1/sin(angle).
+fn motionRotation(p:u32)->mat3x3f {
+ let a=normalize(rowAt(p));let q=normalize(rowAt(p+4u));let angle=fl(p+11u);let inv=fl(p+15u);
+ var v=a*(1.0-motion)+q*motion;
+ if(inv>0.0){v=a*(sin((1.0-motion)*angle)*inv)+q*(sin(motion*angle)*inv);}
+ v=normalize(v);let x=v.x;let y=v.y;let z=v.z;let w=v.w;
+ return mat3x3f(vec3f(1.0-2.0*(y*y+z*z),2.0*(x*y+w*z),2.0*(x*z-w*y)),vec3f(2.0*(x*y-w*z),1.0-2.0*(x*x+z*z),2.0*(y*z+w*x)),vec3f(2.0*(x*z+w*y),2.0*(y*z-w*x),1.0-2.0*(x*x+y*y)));
+}
+fn motionScale(p:u32)->vec3f {return mix(vec3f(fl(p+8u),fl(p+9u),fl(p+10u)),vec3f(fl(p+12u),fl(p+13u),fl(p+14u)),motion);}
+fn motionTranslation(b:u32)->vec3f {return mix(vec3f(fl(b+27u),fl(b+31u),fl(b+35u)),vec3f(fl(b+15u),fl(b+19u),fl(b+23u)),motion);}
 // Instance transforms at this path's shutter time (motion 1 = matrix, 0 = previousMatrix).
 fn worldX(i:u32)->Xform {
  let b=f.scene.y+i*INSTANCE;
  let m=Xform(rowAt(b+12u),rowAt(b+16u),rowAt(b+20u));
  if((scene[b+37u]&1u)==0u||motion>=1.0){return m;}
  let q=Xform(rowAt(b+24u),rowAt(b+28u),rowAt(b+32u));
+ if(motion<=0.0){return q;}
+ if((scene[b+37u]&8u)!=0u){
+  let p=scene[b+39u];let r=motionRotation(p);let s=motionScale(p);let t=motionTranslation(b);
+  return Xform(vec4f(vec3f(r[0].x,r[1].x,r[2].x)*s,t.x),vec4f(vec3f(r[0].y,r[1].y,r[2].y)*s,t.y),vec4f(vec3f(r[0].z,r[1].z,r[2].z)*s,t.z));
+ }
  return Xform(mix(q.r0,m.r0,motion),mix(q.r1,m.r1,motion),mix(q.r2,m.r2,motion));
 }
 fn localX(i:u32)->Xform {
  let b=f.scene.y+i*INSTANCE;
  if((scene[b+37u]&1u)==0u||motion>=1.0){return Xform(rowAt(b),rowAt(b+4u),rowAt(b+8u));}
+ if((scene[b+37u]&8u)!=0u&&motion>0.0){
+  let p=scene[b+39u];let r=motionRotation(p);let s=motionScale(p);let t=motionTranslation(b);
+  let a=r[0]/s.x;let c=r[1]/s.y;let d=r[2]/s.z;
+  return Xform(vec4f(a,-dot(a,t)),vec4f(c,-dot(c,t)),vec4f(d,-dot(d,t)));
+ }
  return invertX(worldX(i));
 }
 
@@ -1437,6 +1462,9 @@ fn radiance(px:vec2u)->Path {
     let add=thr*w*skyBehind(d);L+=add;thr*=1.0-w;
    }
    if(h.inst==GROUND){
+    // The plane coordinate is known exactly. An orthographic near plane can be thousands of units away: the
+    // cancellation in o + d*t can leave p below ground by more than off, making its own outgoing rays hit it again.
+    p.y=f.ground.w;
     n=vec3f(0.0,select(-1.0,1.0,d.y<0.0),0.0);
     off=n*max(1e-4,1e-6*length(p));
     m=groundMat();
@@ -1598,9 +1626,9 @@ fn radiance(px:vec2u)->Path {
   if(h.inst==NONE){c=select(environment(ray.d,0.0,1.0,true),f.background.xyz,f.background.w>0.0);}
   else if(h.inst==AREA){c=areaHit(h.value,ray.d,h.t,0.0);}
   else {
-   let p=ray.o+ray.d*h.t;
+   var p=ray.o+ray.d*h.t;
    var n=vec3f(0.0,1.0,0.0);var m:Mat;
-   if(h.inst==GROUND){m=groundMat();if(f.grid2.y>0.0&&gridLine(p,n)){m=lineMat(f.grid.xyz);}}
+   if(h.inst==GROUND){p.y=f.ground.w;m=groundMat();if(f.grid2.y>0.0&&gridLine(p,n)){m=lineMat(f.grid.xyz);}}
    else{
     n=normalize(h.sgn*rowOf(localX(h.inst),h.axis));m=material(h.value);
     let tex=faceTexel(h,p).rgb;m.color*=tex;m.metalColor*=tex;
@@ -1962,6 +1990,7 @@ fn weighed(i:u32,g:vec2u,split:bool)->vec3f {
 
 /** Draws the accumulated (or denoised) image: bilinear upsampling, exposure, tone mapping, first-hit depth. */
 export const DISPLAY: string = /* wgsl */ `${displayShader}
+${agxShader}
 struct View {matrix:mat4x4f,inverse:mat4x4f,size:vec4f,params:vec4f,encoding:vec4f}
 @group(0) @binding(0) var<uniform> v:View;
 @group(0) @binding(1) var<storage,read> color:array<vec4f>;
@@ -1973,9 +2002,7 @@ struct VOut {@builtin(position) pos:vec4f}
 }
 struct FOut {@location(0) color:vec4f,@builtin(frag_depth) depth:f32}
 fn srgb(c:vec3f)->vec3f {return select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.055,c>=vec3f(0.0031308));}
-// Krzysztof Narkowicz's fit of the ACES film curve (2016), after the 0.6 pre-scale of his reference.
-fn acesNarkowicz(c:vec3f)->vec3f {let x=0.6*c;return clamp(x*(2.51*x+0.03)/(x*(2.43*x+0.59)+0.14),vec3f(0.0),vec3f(1.0));}
-// Display encoding: sRGB, or the power 1 / gamma when v.encoding.x is set.
+${acesNarkowiczShader}// Display encoding: sRGB, or the power 1 / gamma when v.encoding.x is set.
 fn encodeOut(c:vec3f)->vec3f {
  let x=clamp(c,vec3f(0.0),vec3f(1.0));
  return select(srgb(x),pow(x,vec3f(1.0/max(v.encoding.x,1.0))),v.encoding.x>0.0);
@@ -1994,6 +2021,7 @@ fn encodeOut(c:vec3f)->vec3f {
  if((mode&1u)==0u){
   if((mode&2u)!=0u){rgb=encodeOut(rgb);}
   else if((mode&4u)!=0u){rgb=encodeOut(acesNarkowicz(rgb));}
+  else if((mode&8u)!=0u){rgb=encodeOut(agx(rgb));}
   else if(v.encoding.x>0.0){rgb=encodeOut(pbrNeutral(rgb));}
   else{rgb=toDisplay(rgb);}
  }

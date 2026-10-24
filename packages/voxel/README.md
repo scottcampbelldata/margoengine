@@ -48,7 +48,8 @@ worker.onmessage = ({ data }) => world.addChunk(0, 1, 0, VoxelChunk.unpack(data)
   loaded chunks through the world (`chunk.set` on a loaded chunk bypasses dirty tracking and events).
 - **Block types.** Options: `textures`, `layer` (`'opaque'`, `'cutout'`, `'translucent'`, `'invisible'`), `shape`
   (`'cube'`, `'cross'`, `'liquid'`), `solid`, `liquid`, `light` and `opacity` (0-15), `color`, `roughness`,
-  `metalness`, `emissive`, `animation: {frames, fps}`. `blocks.table` is the resolved list, plain data for workers.
+  `metalness`, `emissive`, `animation: {frames, fps}`, `maps: {normal, roughness, emissive}` (texture layers),
+  `transmission` and `scatter`. `blocks.table` is the resolved list, plain data for workers.
   Ids follow definition order, so define types in the same order wherever saved states are read back.
 - **Errors.** `TypeError` for wrong types, `RangeError` for values out of range (cells, states, ids, options),
   `MargoError` `'state'` for a duplicate block name or a chunk that is already loaded.
@@ -282,7 +283,11 @@ render.diagnostics; // { kind: 'malformed' | 'unsupported', id, chunk, message }
   `magicaVoxelLighting(objects)` and `magicaVoxelCamera(camera.attributes, objects)`.
 - **Pasting.** MagicaVoxel's z (up) becomes world y and its y becomes world -z (right-handed, not mirrored); the pasted
   box has its minimum corner at `at`. A scene pastes frame 0 of every shape not hidden by its node or layer, each
-  model centred on its transform's translation. A bare model has no palette, so it needs a mapping. Voxels are
+  model centred on its transform's translation. A bare model has no palette, so it needs a mapping. Without one, a
+  colour whose MATL is metal, glass, blend, emit or media gets `voxBlockOptions(material)`: metalness, a translucent
+  layer with transmission (`_trans`, `_alpha`, or a glass's `_weight`), `emissive = _weight * (1 + _flux)` (a starting
+  point: MagicaVoxel's power steps are not linear), scatter for media; its options go in the type name
+  (`vox:rrggbb:metalness=0.5`). Plain diffuse colours stay `vox:rrggbb`. Voxels are
   written chunk by chunk (a stable sort keeps each chunk's voxels in file order, and each chunk's palette widens once),
   with the results of one `setBlock` per voxel: the same cells, return count and dirty keys, and `onChange` once per
   changed cell right after it is written. Only the order across chunks differs.
@@ -517,6 +522,12 @@ cost 1.2-1.5 ms.
 needs no job: it has no faces whatever its neighbours hold), keeps their quads on the GPU and draws every chunk layer
 with one indirect draw. `BlockTextures` holds the block textures.
 
+Size: `./render` is 21,798 B gzip (18,931 before bevels and maps). The extra bytes are the parts every world can
+use: about 1.0 KB draws beveled blocks (quad split, glass and liquid triangles sorted together, the triangle pipelines
+in the beauty, shadow and post passes), about 0.6 KB the material table with normal, roughness and emissive maps,
+transmission and texture layers up to 2,047, about 0.3 KB the lightmap hooks, and the rest multi-view. The bevel
+builder and shader are in `./bevel` (2,201 B) and baked light in `./lightmap` (2,506 B), so plain worlds do not load them.
+
 ```ts
 import { BlockTextures, VoxelRenderer } from '@margoengine/voxel/render';
 import { VoxelLighting } from '@margoengine/voxel/light';
@@ -529,7 +540,7 @@ engine.onFrame(() => lighting.update());
 world.setBlock(x, y, z, stone); // drawn two frames later
 textures.set(3, canvas); // live
 voxels.daylight = 0.3; // dusk: sky light dims, block light (torches) does not
-voxels.stats; // {chunks, visible, quads, bytes, draws} of the last frame
+voxels.stats; // {chunks, visible, quads, triangles, bytes, draws} of the last frame
 voxels.dispose(); // workers and GPU buffers; textures.dispose() separately
 ```
 
@@ -555,10 +566,15 @@ voxels.dispose(); // workers and GPU buffers; textures.dispose() separately
   `daylight`, block light as emission in `blockLightColor`, and each type's `emissive`. Without light bytes every face
   sits in the dark: attach `VoxelLighting`, or fill them (`chunk.fillLight(0xf0)` is open sky). rgba16float targets get
   linear colour; others PBR Neutral and sRGB.
-- **Materials.** One 16-byte entry per `blockMaterials` id: texture layer, animation frames and fps (up to 255.99,
-  1/256 steps), tint, roughness, metalness, emissive. `fancyLeaves: false` draws cutout cubes solid; cross blocks
+- **Materials.** One 32-byte entry per `blockMaterials` id: texture layer, animation frames and fps (up to 255.99,
+  1/256 steps), tint, roughness, metalness, emissive, the normal, roughness and emissive map layers, transmission and
+  scatter. Normal maps are tangent space with +y up the image (glTF): u runs along the face's tile coordinates. A
+  roughness map replaces `roughness` (red channel), an emissive map scales `emissive` (red). On translucent blocks
+  `transmission` lowers alpha by up to 85% and shows the block's own colour through it, softened by `scatter`: a cheap
+  look, not refraction. Opaque blocks ignore texture alpha. `fancyLeaves: false` draws cutout cubes solid; cross blocks
   always cut out.
-- **Textures.** An `rgba8unorm-srgb` 2D array: up to 256 layers of `size` x `size` texels (a power of two; default the
+- **Textures.** An `rgba8unorm-srgb` 2D array: up to 2,048 layers of `size` x `size` texels (over 256 needs a device
+  created with a higher `maxTextureArrayLayers`; the renderer throws `MargoError` `'unsupported'` otherwise) (a power of two; default the
   first image's width, or 16; other sizes are drawn at it, nearest-neighbour). Mips are made once on the CPU per layer:
   colour averaged in linear light weighted by alpha; for cutout textures (alpha only 0 and 255) alpha is rescaled so an
   alpha test keeps the level-0 coverage (Castano 2010), so leaves stay dense in the distance; other alpha is averaged.
@@ -644,3 +660,29 @@ hemisphere ambient at daylight 0 are 0.02914 of daylight 1 (0.03 / 1.03 = 0.0291
 A water cell's side top edge moves 6 rows at 4x and 5 at 1x between crest and trough (5.54 expected). Greedy against
 one-quad-per-face with soft shadows, a point light, fog and the waving pool: 141-267 differing edge pixels of 76,800 at
 4x, 34-74 at 1x, never a 2 x 2 block. No validation errors.
+
+## Bevels and baked light (`./render`)
+
+`VoxelRenderer.attach(engine, { world, textures, bevel: voxelBevel(0.15) })` (`voxelBevel` from `./bevel`, its own
+entry: worlds without a bevel carry none of it) chamfers exposed cube faces by 0.15 blocks: each chunk layer's cube
+faces become a triangle mesh (`bevelQuads`, one 48-byte vertex buffer and an index buffer per layer), lit by the same shader end as the quads (sky light, sun, AO, block light, maps and lighting
+effects), cast into shadow maps and replayed by post (gbuffer, ambient, occlusion, capture). Crosses and liquids stay
+quads (a chamfer has no lowered liquid top). Translucent chamfers and quads of a chunk are sorted together, back to
+front, within the same distance and per-frame budget as quads. Without `bevel` nothing changes.
+
+```ts
+import { voxelLightmap } from '@margoengine/voxel/lightmap';
+
+voxels.lightmap = voxelLightmap({ texture, positions, uv: atlas.uv, scale: atlas.lightmapScale, radiometry: 'physical' });
+voxels.lightmap = undefined; // live lighting again
+```
+
+`voxelLightmap` (its own entry: worlds without baked light carry none of it) takes an atlas from
+`@margoengine/lightmap` and the world-space quads it was baked for (integer, axis-aligned rectangles; at most 32,768
+covering 1,048,576 cell faces). Fragments on a chart use the atlas's light times the diffuse
+colour instead of the sun and ambient terms; emission still adds and the rest stay live. `radiometry: 'physical'`
+(the bake's physical irradiance) divides by pi once. Positions and UVs are copied; the texture is borrowed, never
+destroyed (upload it again on a new device). A hash index finds a fragment's chart in at most 16 probes per cell.
+
+GPU check (physical GPU, under the shared lock): `node packages/voxel/tests/bevel-browser-check.mjs`: bevel silhouettes,
+texture layers 256 and 2047, maps, glass and liquid sorting, four views, lightmaps, bevel replay, shadows and AO.

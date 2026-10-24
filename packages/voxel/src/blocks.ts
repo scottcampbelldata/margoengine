@@ -13,7 +13,7 @@ export type BlockShape = 'cube' | 'cross' | 'liquid';
 /** Options of {@link BlockTypes.define}. Every field is optional. */
 export interface BlockTypeOptions {
   /**
-   * Texture layer (0-255) of every face, or one per face in the order +x, -x, +y, -y, +z, -z (`[side, side, top,
+   * Texture layer (0-2047) of every face, or one per face in the order +x, -x, +y, -y, +z, -z (`[side, side, top,
    * bottom, side, side]`). Default 0.
    */
   textures?: number | readonly [number, number, number, number, number, number];
@@ -37,8 +37,20 @@ export interface BlockTypeOptions {
   metalness?: number;
   /** Emitted light as a multiple of the textured colour, >= 0. Default 0. */
   emissive?: number;
-  /** Animated texture: `frames` consecutive layers from each face's layer (1-256), played at `fps` (>= 0). */
+  /** Animated texture: `frames` consecutive layers from each face's layer (1-2048), played at `fps` (>= 0). */
   animation?: { frames: number; fps: number };
+  /**
+   * Texture layers (1-2047) of a tangent-space normal map (glTF convention: +y up the image), a roughness map (red)
+   * and an emissive map (red, times `emissive`). 0 or absent: none, the scalar values apply. Default none.
+   */
+  maps?: { normal?: number; roughness?: number; emissive?: number };
+  /**
+   * Translucent blocks only: how much of the block's own colour shows through, 0-1. It lowers alpha by up to 85% and
+   * mixes in the base colour: a cheap look, not refraction. Default 0.
+   */
+  transmission?: number;
+  /** Translucent blocks only: interior scatter, 0-1; 1 halves the see-through part of `transmission`. Default 0. */
+  scatter?: number;
 }
 
 /** A defined block type with every option resolved; `color` is linear RGB. Plain, structured-cloneable data. */
@@ -71,6 +83,12 @@ export interface BlockType {
   readonly emissive: number;
   /** Texture animation; `frames` 1 means none. */
   readonly animation: { readonly frames: number; readonly fps: number };
+  /** Normal, roughness and emissive map layers; 0 is none. */
+  readonly maps: { readonly normal: number; readonly roughness: number; readonly emissive: number };
+  /** See-through part of a translucent block, 0-1. */
+  readonly transmission: number;
+  /** Interior scatter of a translucent block, 0-1. */
+  readonly scatter: number;
 }
 
 const LAYERS: readonly BlockLayer[] = ['opaque', 'cutout', 'translucent', 'invisible'],
@@ -115,6 +133,12 @@ const flag = (value: unknown, name: string, fallback: boolean): boolean => {
   if (typeof value !== 'boolean') throw new TypeError(`Block type ${name} must be true or false`);
   return value;
 };
+const mapLayer = (value: unknown): number => {
+  if (value === undefined) return 0;
+  if (!Number.isInteger(value) || (value as number) < 0 || (value as number) > 2047)
+    throw integerError('Block type map layer', value, 2047, 'pass a texture layer');
+  return value as number;
+};
 const choice = <T extends string>(value: unknown, name: string, values: readonly T[]): T => {
   if (value === undefined) return values[0];
   if (!values.includes(value as T))
@@ -155,15 +179,15 @@ export class BlockTypes {
       animation = o.animation ?? { frames: 1, fps: 0 };
     if (!animation || typeof animation !== 'object') throw new TypeError('Block type animation must be {frames, fps}');
     const frames = animation.frames;
-    if (!Number.isInteger(frames) || frames < 1 || frames > 256)
-      throw integerError('Block type animation.frames', frames, 256, 'pass 1..256 texture layers');
+    if (!Number.isInteger(frames) || frames < 1 || frames > 2048)
+      throw integerError('Block type animation.frames', frames, 2048, 'pass 1..2048 texture layers');
     const given = o.textures ?? 0,
       faces = typeof given === 'number' ? [given, given, given, given, given, given] : given;
     if (!Array.isArray(faces) || faces.length !== 6)
       throw new TypeError('Block type textures must be a layer or 6 layers (+x, -x, +y, -y, +z, -z)');
     for (const t of faces)
-      if ((t & 255) !== t || t + frames > 256)
-        throw integerError('Block type texture layer', t, 256 - frames, `${frames} frame(s) must fit 256 layers`);
+      if (!Number.isInteger(t) || t < 0 || t + frames > 2048)
+        throw integerError('Block type texture layer', t, 2048 - frames, `${frames} frame(s) must fit 2048 layers`);
     const color: [number, number, number] = [1, 1, 1];
     if (o.color !== undefined) parseColor(o.color, color);
     const id = this.types.length;
@@ -182,6 +206,13 @@ export class BlockTypes {
       metalness: amount(o.metalness, 'metalness', 0, 1),
       emissive: amount(o.emissive, 'emissive', 0),
       animation: { frames, fps: amount(animation.fps, 'animation.fps', 0) },
+      maps: {
+        normal: mapLayer(o.maps?.normal),
+        roughness: mapLayer(o.maps?.roughness),
+        emissive: mapLayer(o.maps?.emissive),
+      },
+      transmission: amount(o.transmission, 'transmission', 0, 1),
+      scatter: amount(o.scatter, 'scatter', 0, 1),
     });
     this.names.set(name, id);
     return id;

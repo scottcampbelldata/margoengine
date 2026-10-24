@@ -68,6 +68,48 @@ const near = (actual, expected, tolerance, label) =>
 try {
   console.log('adapter', JSON.stringify(hardware.webgpu), hardware.userAgent);
   await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
+  if (wanted('agx')) {
+    const r = await run('agx');
+    console.log(JSON.stringify(r));
+    for (const mode of [
+      'capture',
+      'viewport',
+      'restored',
+      'combinedHDR',
+      'tonemap',
+      'imagePost',
+      ...[-4, 0, 3].flatMap((ev) => ['tonemapEV' + ev, 'imagePostEV' + ev]),
+    ]) {
+      assert.ok(r[mode].max <= 2, `${mode}: maximum error <=2 sRGB levels`);
+      assert.ok(r[mode].within1 >= 0.99, `${mode}: >=99% of pixels within one sRGB level of the CPU agx()`);
+    }
+    assert.equal(r.restored.replaced, true, 'AgX still matches on a replacement device');
+    near(r.alpha[3], 128, 1, 'AgX preserves half coverage');
+    r.alpha.slice(0, 3).forEach((x) => near(x, 118, 1, 'straight-alpha 18% grey stays 0.18'));
+  }
+  if (wanted('groundprecision')) {
+    const r = await run('groundprecision');
+    console.log(JSON.stringify(r));
+    assert.ok(r.control.dim > 1000, 'old ground-point control reproduces the ellipse');
+    assert.ok(r.sun.dark > 5 && r.sun.lit > 1000, 'the corrected ground still receives a separate sun shadow');
+    for (const mode of ['raw', 'denoised']) {
+      assert.equal(r[mode].badGuide, 0, `${mode}: all first-hit guides describe the ground plane`);
+      assert.equal(r[mode].dim, 0, `${mode}: no ground self-shadow ellipse`);
+      assert.ok(r[mode].worst < 0.00001, `${mode}: Lambert ground under unit sky equals its albedo`);
+    }
+  }
+  if (wanted('denoiseholdout')) {
+    const r = await run('denoiseholdout');
+    console.log(JSON.stringify(r));
+    assert.ok(r.analyticDetail.raw.max < 0.00001, 'analytic stripe raw equals its known albedo');
+    assert.ok(r.analyticDetail.denoised.max < 0.00001, 'denoising preserves exact one-cell palette detail');
+    for (const samples of [4, 16, 64]) {
+      const group = r.glassFireflyEdges[samples];
+      const mean = (mode, key) => group[mode].reduce((sum, s) => sum + s[key], 0) / group[mode].length;
+      assert.ok(mean('denoised', 'rmse') < mean('raw', 'rmse'), `heldout ${samples}: overall error improves`);
+      assert.ok(mean('denoised', 'edgeRMSE') < mean('raw', 'edgeRMSE'), `heldout ${samples}: edge error improves`);
+    }
+  }
   if (wanted('compat')) {
     const c = await run('compat');
     near(c['rough metal compensation true'].mean, 1, 0.01, 'compensated rough metal');
@@ -442,6 +484,22 @@ try {
     assert.deepEqual(r.errors, []);
     assert.ok(r.moving <= r.raw / 2.5, 'moving camera: the denoised history stays well below one raw sample');
     assert.ok(r.moving <= r.still * 2.5, 'moving camera: within reach of the still camera (no ghosting)');
+  }
+  if (wanted('motion')) {
+    const r = await run('motion');
+    console.log('  ', JSON.stringify(r));
+    assert.deepEqual(r.errors, []);
+    assert.equal(r.cases.length, 3);
+    for (const result of r.cases) {
+      assert.equal(result.nonfinite, 0, result.name + ': finite raw image');
+      assert.ok(result.rms < 0.02, result.name + ': raw coverage agrees with independent time-integrated slabs');
+      assert.ok(result.maximum < 0.12, result.name + ': bounded 1024-sample per-pixel coverage error');
+      near(result.energyRatio, 1, 0.05, result.name + ': integrated silhouette energy');
+      if (result.name !== 'quarter-turn') {
+        assert.ok(result.arcPixels > 50, result.name + ': independent oracle tests pixels outside endpoint bounds');
+        near(result.arcRatio, 1, 0.1, result.name + ': swept arc remains visible outside endpoint bounds');
+      }
+    }
   }
   if (wanted('lens')) {
     const r = await run('lens');

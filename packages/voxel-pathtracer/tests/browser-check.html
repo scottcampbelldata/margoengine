@@ -5,6 +5,7 @@
 import {Engine} from '/packages/core/dist/index.js';
 import {Camera,box,engineRuntime} from '/packages/core/dist/extension.js';
 import {VoxelPathTracer} from '/packages/voxel-pathtracer/dist/index.js';
+import {motionCheck} from './motion-browser.js';
 const canvas=document.querySelector('canvas'),errors=[],messages=[];
 const runtime=()=>engineRuntime(engine);
 const device=()=>runtime().gpu;
@@ -114,6 +115,102 @@ const frames=async(n)=>{for(let i=0;i<n;i++){engine.render({delta:0});await devi
 // A finished frame read back in the task that rendered it (the canvas texture is only valid until the task ends).
 const shot=async()=>{await frames(2);engine.render({delta:0});return readCanvas();};
 window.check={
+ async motion(){return motionCheck({model,look,ortho,rays,withTracer,errors});},
+ // The shared AgX shader in the tracer viewport, its PNG capture, Tonemap and ImagePost, against the CPU agx() of
+ // packages/shared/agx.js: greys from -10 to +6 stops and seeded HDR colours.
+ async agx(){
+  const {agx}=await import('/packages/shared/agx.js');let seed=7;const rand=()=>(seed=(seed*16807)%2147483647)/2147483647;
+  const samples=[];for(let s=-10;s<=6;s+=0.5)samples.push(0.18*2**s);
+  for(let i=0;i<600;i++)samples.push([0,1,2].map(()=>2**(rand()*14-9)));
+  for(let i=0;i<samples.length;i++){const input=Array.isArray(samples[i])?samples[i]:[samples[i],samples[i],samples[i]];samples[i]={input,linear:agx(input)};}
+  const {Tonemap}=await import('/packages/tonemap/dist/index.js'),{ImagePost}=await import('/packages/post/dist/image.js');
+  const W=48,H=Math.ceil(samples.length/W),surface=document.createElement('canvas');surface.width=W;surface.height=H;surface.style.width=W+'px';surface.style.height=H+'px';document.body.append(surface);
+  const en=await Engine.create(surface,{backend:'webgpu',camera:{position:[0,0,20],target:[0,0,0]}});let gpu=engineRuntime(en).gpu;watch(gpu);
+  const srgb=x=>x<=.0031308?12.92*x:1.055*x**(1/2.4)-.055;
+  const measure=bytes=>{let max=0,within1=0;for(let i=0;i<samples.length;i++){let error=0;for(let k=0;k<3;k++)error=Math.max(error,Math.abs(bytes[i*4+k]-Math.round(255*srgb(samples[i].linear[k]))));max=Math.max(max,error);if(error<=1)within1++;}return {max,within1:within1/samples.length,pixels:samples.length};};
+  const pixels=()=>{const ctx=new OffscreenCanvas(W,H).getContext('2d');ctx.drawImage(surface,0,0);return ctx.getImageData(0,0,W,H).data;};
+  const readPNG=async blob=>{const bitmap=await createImageBitmap(blob),ctx=new OffscreenCanvas(W,H).getContext('2d');ctx.drawImage(bitmap,0,0);bitmap.close();return ctx.getImageData(0,0,W,H).data;};
+  const out={};let tracer,tone,post,source;
+  try{
+   const models=[],instances=[];for(let i=0;i<samples.length;i++){
+    const v=samples[i].input,m=Math.max(...v,1e-20),id='patch'+i;
+    models.push({id,revision:1,size:[1,1,1],voxels:new Uint8Array([1]),materials:[{id:1,type:'emit',color:v.map(x=>x/m),emission:m}]});
+    instances.push({id,modelId:id,matrix:translate(i%W-W/2,H/2-1-Math.floor(i/W),0)});
+   }
+   en.camera.project=ortho(H);en.render();
+   tracer=VoxelPathTracer.attach(en,{scene:{revision:1,models,instances,materials:[],environment:{skyIntensity:0}},toneMapping:'agx',maxSamples:1,denoise:false});
+   out.capture=measure(await readPNG(await tracer.capture({width:W,height:H,samples:1,jitter:false})));
+   await tracer.ready;for(let i=0;i<300&&!tracer.stats.converged;i++){en.render();await new Promise(r=>setTimeout(r,10));}en.render();out.viewport=measure(pixels());out.viewport.samples=tracer.stats.samples;
+   const old=gpu;await en.rebootDevice();gpu=engineRuntime(en).gpu;watch(gpu);await tracer.ready;
+   for(let i=0;i<300&&!tracer.stats.converged;i++){en.render();await new Promise(r=>setTimeout(r,10));}en.render();out.restored=measure(pixels());out.restored.replaced=gpu!==old;
+   post=ImagePost.attach(en,{toneMapping:'agx',bloom:{strength:0}});for(let i=0;i<20;i++){en.render();await new Promise(r=>setTimeout(r,10));}en.render();out.combinedHDR=measure(pixels());post.dispose();post=undefined;
+   tracer.dispose();tracer=undefined;
+   source=gpu.createTexture({size:[W,H],format:'rgba32float',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST});
+   const rgba=new Float32Array(W*H*4);for(let i=0;i<samples.length;i++){rgba.set(samples[i].input.map(x=>x/2),i*4);rgba[i*4+3]=1;}
+   gpu.queue.writeTexture({texture:source},rgba,{bytesPerRow:W*16,rowsPerImage:H},[W,H]);
+   tone=Tonemap.attach(en,{curve:'agx',exposure:1,source:()=>source});en.render();out.tonemap=measure(pixels());tone.dispose();tone=undefined;
+   post=ImagePost.attach(en,{toneMapping:'agx',exposure:1,bloom:{strength:0}});
+   const rgb=new Float32Array(W*H*3);for(let i=0;i<samples.length;i++)rgb.set(samples[i].input.map(x=>x/2),i*3);
+   out.imagePost=measure((await post.renderImage({width:W,height:H,color:rgb})).data);
+   for(const exposure of [-4,0,3]){
+    for(let i=0;i<samples.length;i++){rgba.set(samples[i].input.map(x=>x/2**exposure),i*4);rgb.set(samples[i].input.map(x=>x/2**exposure),i*3);}
+    gpu.queue.writeTexture({texture:source},rgba,{bytesPerRow:W*16,rowsPerImage:H},[W,H]);
+    post.dispose();post=undefined;tone=Tonemap.attach(en,{curve:'agx',exposure,source:()=>source});en.render();out['tonemapEV'+exposure]=measure(pixels());tone.dispose();tone=undefined;
+    post=ImagePost.attach(en,{toneMapping:'agx',exposure,bloom:{strength:0}});out['imagePostEV'+exposure]=measure((await post.renderImage({width:W,height:H,color:rgb})).data);
+   }
+   post.setOptions({toneMapping:'agx',bloom:{strength:0}});
+   const alpha=await post.renderImage({width:1,height:1,color:new Float32Array([.09,.09,.09]),alpha:new Float32Array([.5])});out.alpha=Array.from(alpha.data);
+  }finally{tracer?.dispose();tone?.dispose();post?.dispose();source?.destroy();en.dispose();surface.remove();}
+  return {...out,errors:errors.splice(0)};
+ },
+ // E37: the pinned Studio orthographic camera starts rays thousands of units before the ground. Ground hit
+ // cancellation must not leave points below their analytic plane, where outgoing rays hit the ground again.
+ async groundprecision(){
+  const position=[291.6978849131287,256.21883450901646,388.61379920845457],target=[86,73.80000066757202,78.31902379915118],height=249.34432832390647;
+  const distance=Math.hypot(...position.map((v,k)=>v-target[k]));
+  look(position,target,{far:5000,project:(out,aspect)=>{out.fill(0);out[0]=2/(height*aspect);out[5]=2/height;out[10]=1/5000;out[14]=(distance+2500)/5000;out[15]=1;}});
+  const scene={revision:1,models:[],instances:[],materials:[],environment:{skyColor:[1,1,1],skyIntensity:1,groundColor:[.2,.2,.2],groundHeight:0}};
+  const result=await withTracer(scene,{},async(t)=>{
+   // CameraProjection's viewport projection is copied by renderImage after a frame updates the source camera.
+   engine.render();await new Promise(r=>setTimeout(r,30));
+   const out={};for(const denoise of [false,true]){
+    const im=await t.renderImage({width:384,height:190,samples:128,seed:0,aovs:true,jitter:false,denoise});
+    let worst=0,dim=0,badGuide=0;for(let i=0;i<384*190;i++){
+     worst=Math.max(worst,Math.abs(im.color[i*3]-.2));if(im.color[i*3]<.19)dim++;
+     if(im.instance[i]!==-2||Math.abs(im.albedo[i*3]-.2)>1e-6||Math.abs(im.normal[i*3+1]-1)>1e-6)badGuide++;
+    }out[denoise?'denoised':'raw']={worst,dim,badGuide};
+   }return out;
+  });
+  const create=device().createShaderModule;
+  try{
+   device().createShaderModule=(desc)=>create.call(device(),{...desc,code:desc.code.replaceAll('p.y=f.ground.w;','')});
+   result.control=await withTracer(scene,{},async(t)=>{const im=await t.renderImage({width:384,height:190,samples:128,seed:0,jitter:false});let dim=0;for(let i=0;i<384*190;i++)if(im.color[i*3]<.19)dim++;return {dim};});
+  }finally{device().createShaderModule=create;}
+  const sunScene={...scene,models:[model('block',[8,8,8],()=>1)],instances:[{id:'block',modelId:'block',matrix:translate(78,0,70)}],materials:[{id:1,type:'diffuse',color:[.2,.2,.2]}],environment:{skyIntensity:0,groundColor:[.2,.2,.2],sunDirection:[1,1,0],sunIntensity:Math.PI,sunAngularSize:0}};
+  result.sun=await withTracer(sunScene,{},async(t)=>{const im=await t.renderImage({width:384,height:190,samples:128,seed:0,jitter:false,aovs:true});let dark=0,lit=0;for(let i=0;i<384*190;i++)if(im.instance[i]===-2){if(im.color[i*3]<.001)dark++;if(im.color[i*3]>.13)lit++;}return {dark,lit};});
+  look([20,14,24],[4,3,4]);return {...result,errors:errors.splice(0)};
+ },
+ // Held-out geometry and seeds, independent from the four scenes used by the original denoiser gate.
+ async denoiseholdout(){
+  const out={};
+  const stripe={revision:1,models:[model('stripes',[32,24,1],(x,y)=>1+(x+y)%2)],instances:[{id:'stripes',modelId:'stripes',matrix:translate(-16,-12,0)}],materials:[{id:1,type:'diffuse',color:[.05,.5,.1]},{id:2,type:'diffuse',color:[.8,.02,.4]}],environment:{skyIntensity:1,skyColor:[1,1,1]}};
+  look([0,0,40],[0,0,0],{project:ortho(28)});
+  out.analyticDetail=await withTracer(stripe,{},async(t)=>{const r={};for(const denoise of [false,true]){const im=await t.renderImage({width:160,height:112,samples:16,seed:17,jitter:false,aovs:true,denoise});let n=0,se=0,max=0;for(let i=0;i<160*112;i++)if(im.instance[i]===0)for(let k=0;k<3;k++){const d=im.color[i*3+k]-im.albedo[i*3+k];se+=d*d;max=Math.max(max,Math.abs(d));n++;}r[denoise?'denoised':'raw']={rmse:Math.sqrt(se/n),max,channels:n};}return r;});
+  const difficult={revision:1,models:[model('floor',[28,1,24],(x,y,z)=>1+(x+z)%2),model('bars',[24,18,1],(x,y)=>x%3===0?3:0),model('glass',[4,7,4],()=>4),model('metal',[5,5,5],()=>5)],
+   instances:[{id:'floor',modelId:'floor',matrix:translate(-14,-1,-12)},{id:'bars',modelId:'bars',matrix:translate(-12,0,-7)},{id:'glass',modelId:'glass',matrix:translate(-6,0,0)},{id:'metal',modelId:'metal',matrix:translate(3,0,-2)}],
+   materials:[{id:1,type:'diffuse',color:[.5,.1,.02]},{id:2,type:'diffuse',color:[.03,.4,.6]},{id:3,type:'diffuse',color:[.6,.6,.6]},{id:4,type:'glass',color:[.7,.9,1],ior:1.5},{id:5,type:'metal',color:[.9,.7,.2],roughness:.12}],
+   lights:[{position:[-.75,12,1.25],direction:[0,-1,0],width:.5,height:.5,color:[1,.6,.2],intensity:150,twoSided:true}],environment:{skyIntensity:.02,skyColor:[.5,.7,1],sunIntensity:0}};
+  look([20,16,28],[0,4,-1]);
+  out.glassFireflyEdges=await withTracer(difficult,{maxBounces:16,clamp:Infinity},async(t)=>{
+   const W=160,H=112,base={width:W,height:H},a=await t.renderImage({...base,samples:8192,seed:271,aovs:true}),b=await t.renderImage({...base,samples:8192,seed:811});
+   let noise=0;for(let k=0;k<a.color.length;k++){noise+=(neutral(a.color[k])-neutral(b.color[k]))**2;a.color[k]=(a.color[k]+b.color[k])/2;}
+   const mask=new Uint8Array(W*H);for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++)for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const i=y*W+x,j=(y+dy)*W+x+dx;if(a.instance[i]!==a.instance[j]||a.palette[i]!==a.palette[j])mask[i]=1;}
+   const r={referenceNoise:Math.sqrt(noise/a.color.length)/2,edgePixels:mask.reduce((s,v)=>s+v,0)};
+   const measure=im=>{let se=0,edge=0,n=0,linear=0,bias=0;for(let i=0;i<W*H;i++)for(let k=0;k<3;k++){const d=im.color[i*3+k]-a.color[i*3+k],e=neutral(im.color[i*3+k])-neutral(a.color[i*3+k]);se+=e*e;linear+=d*d;bias+=d;if(mask[i]){edge+=e*e;n++;}}return {rmse:Math.sqrt(se/(W*H*3)),edgeRMSE:Math.sqrt(edge/n),linearRMSE:Math.sqrt(linear/(W*H*3)),bias:bias/(W*H*3)};};
+   for(const samples of [4,16,64]){const accum={raw:[],denoised:[]};for(const seed of [17,31,97])for(const denoise of [false,true])accum[denoise?'denoised':'raw'].push(measure(await t.renderImage({...base,samples,seed,denoise})));r[samples]=accum;}return r;
+  });
+  look([20,14,24],[4,3,4]);return {...out,errors:errors.splice(0)};
+ },
  // Compatibility switches (MagicaVoxel's choices and the material additions), each against a closed form.
  async compat(){
   const out={},first=(image)=>(i)=>image.instance[i]===0,render=(t,samples=512,size=32)=>t.renderImage({width:size,height:size,samples,aovs:true,jitter:false});
@@ -371,7 +468,7 @@ window.check={
   look([0,1.5,0.01],[0,0,0],{fov:20});
   out['emissive ceiling 2/3']=await withTracer(slabs,{maxBounces:24},async(t)=>{const image=await t.renderImage({width:32,height:32,samples:1024,aovs:true,jitter:false});return stats(image,(i)=>image.instance[i]===0);});
   // A large area light (radiance 2, 2000 units square, 1 unit up) over the same floor: radiance 0.5 x 2.
-  const lit={revision:1,models:[model('f',[64,1,64],()=>1)],instances:[{id:'f',modelId:'f',matrix:translate(-32,-1,-32)}],materials:[{id:1,color:[0.5,0.5,0.5],type:'diffuse'}],environment:{skyIntensity:0},lights:[{id:'l',position:[-1000,1,-1000],edgeU:[2000,0,0],edgeV:[0,0,2000],intensity:2}]};
+  const lit={revision:1,models:[model('f',[64,1,64],()=>1)],instances:[{id:'f',modelId:'f',matrix:translate(-32,-1,-32)}],materials:[{id:1,color:[0.5,0.5,0.5],type:'diffuse'}],environment:{skyIntensity:0},lights:[{position:[0,1,0],direction:[0,-1,0],width:2000,height:2000,intensity:2}]};
   look([0,0.5,0.01],[0,0,0],{fov:20});
   out['area light 1']=await withTracer(lit,{maxBounces:4},async(t)=>{const image=await t.renderImage({width:32,height:32,samples:512,aovs:true,jitter:false});return stats(image,(i)=>image.instance[i]===0);});
   // Subsurface random walk: a clear glass cube with interior scattering 0.5 per unit (optical depth 4 across) loses
@@ -587,8 +684,8 @@ window.check={
  // a lit ceiling leaves the floor rho L (F_ceiling - F_panel), F the view factors of parallel rectangles centred above.
  async arealight(){
   const out={},floor=model('f',[64,1,64],()=>1),mat=[{id:1,color:[0.5,0.5,0.5],type:'diffuse'}];
-  // Square panels centred over the origin facing down (cross(edgeU, edgeV) = -y).
-  const panel=(id,y,size,intensity,extra={})=>({id,position:[-size/2,y,-size/2],edgeU:[size,0,0],edgeV:[0,0,size],intensity,color:[1,1,1],...extra});
+  // Square panels centred over the origin facing down.
+  const panel=(id,y,size,intensity,extra={})=>({position:[0,y,0],direction:[0,-1,0],width:size,height:size,intensity,color:[1,1,1],...extra});
   const base=(lights,env)=>({revision:1,models:[floor],instances:[{id:'f',modelId:'f',matrix:translate(-32,-1,-32)}],materials:mat,lights,environment:env});
   // Shadow area: the floor 8 units along -x from the panel (away from the sun), seen straight down (0.125 units per
   // pixel).

@@ -95,22 +95,7 @@ test('scene validation names the problem: shapes are TypeError, values RangeErro
       RangeError,
       /negative or not finite/,
     ],
-    [
-      { ...base, lights: [{ id: 'l', position: [0, 0, 0], edgeU: [1, 0, 0], edgeV: [2, 0, 0] }] },
-      RangeError,
-      /no area/,
-    ],
-    [
-      {
-        ...base,
-        lights: [
-          { id: 'l', position: [0, 0, 0], edgeU: [1, 0, 0], edgeV: [0, 0, 1] },
-          { id: 'l', position: [0, 0, 0], edgeU: [1, 0, 0], edgeV: [0, 0, 1] },
-        ],
-      },
-      TypeError,
-      /'l' is used twice/,
-    ],
+    [{ ...base, lights: [{ position: [0, 0, 0], direction: [0, -1, 0], width: 0, height: 1 }] }, RangeError, /no area/],
   ];
   const { tracer } = attach(base);
   for (const [scene, type, message] of bad) {

@@ -9,6 +9,24 @@ import { VoxelPathTracer } from '../dist/index.js';
 import { fakeDevice, fakeEngine, materials, model, settle, simpleScene, translate } from './support.js';
 
 const FRAME = 800;
+test('agx tone mapping is computed in the display shader: same bindings as neutral, no extra GPU memory', async () => {
+  const h = await ready({ toneMapping: 'agx', denoise: false });
+  h.frame();
+  await settle();
+  h.frame();
+  const used = h.tracer.stats.gpuBytes,
+    display = () => h.device.groups.findLast((g) => g.entries?.some((e) => e.binding === 2 && e.resource.buffer));
+  assert.equal(display().entries.length, 3);
+  assert.ok(!h.device.textures.some((t) => t.dimension === '3d'));
+  h.tracer.setOptions({ toneMapping: 'neutral' });
+  h.frame();
+  await settle();
+  h.frame();
+  assert.equal(display().entries.length, 3);
+  assert.equal(h.tracer.stats.gpuBytes, used);
+  h.tracer.dispose();
+  assert.equal(h.tracer.stats.gpuBytes, 0);
+});
 const isMargo = (code) => (error) => error.name === 'MargoError' && error.code === code;
 
 // Attaches and runs frames until the trace and display pipelines are compiled.
@@ -660,7 +678,7 @@ test('the frame uniform carries the environment, lights and options the shader r
         groundColor: [0.3, 0.3, 0.3],
         groundHeight: -1,
       },
-      lights: [{ id: 'l', position: [0, 5, 0], edgeU: [1, 0, 0], edgeV: [0, 0, 1], intensity: 4 }],
+      lights: [{ position: [0.5, 5, 0.5], direction: [0, -1, 0], width: 1, height: 1, intensity: 4 }],
     }),
     { tracer, frame, device } = await ready({ scene, clamp: 20, aperture: 0.4, lensBlades: 5 });
   frame();
@@ -786,11 +804,12 @@ test('a physical sky is black below the horizon, or keeps its horizon colour the
 });
 
 test('area lights cast shadows unless opaque is false; dark solid lights stay as occluders only', async () => {
+  // Corner [0, 5, 0], edges +x and +z, facing down.
   const light = (id, intensity, extra = {}) => ({
-      id,
-      position: [0, 5, 0],
-      edgeU: [1, 0, 0],
-      edgeV: [0, 0, 1],
+      position: [0.5, 5, 0.5],
+      direction: [0, -1, 0],
+      width: 1,
+      height: 1,
       intensity,
       ...extra,
     }),
@@ -806,5 +825,32 @@ test('area lights cast shadows unless opaque is false; dark solid lights stay as
   const v = new Uint32Array(device.buffers.findLast((b) => b.size === FRAME && !b.destroyed).data);
   assert.equal(v[43], 1);
   assert.equal(v[42] & 128, 0, 'nothing to sample when every light is dark');
+  tracer.dispose();
+});
+
+test('area lights are clustered RectAreaLights, packed as a corner and two edges facing their direction', async () => {
+  // Centre (0.5, 5, 0.5) facing down, 1 x 1: corner (0, 5, 0), edges +x and +z (cross(+x, +z) = -y). A wall light
+  // with an up hint: right = up x direction, as clustered frames it.
+  const lights = [
+      { position: [0.5, 5, 0.5], direction: [0, -1, 0], width: 1, height: 1, intensity: 4 },
+      { position: [0, 1, 0], direction: [0, 0, 2], up: [0, 1, 0], width: 2, height: 1 },
+    ],
+    { tracer, frame, device } = await ready({ scene: simpleScene({ lights }) });
+  frame();
+  // The two 16-float light records, wherever the scene buffer holds them.
+  let f;
+  for (const buffer of device.buffers) {
+    const data = new Float32Array(buffer.data);
+    for (let i = 0; !f && i + 32 <= data.length; i++)
+      if (data[i + 1] === 5 && data[i + 4] === 1 && data[i + 10] === 1 && data[i + 12] === 4)
+        f = [...data.subarray(i, i + 32)].map((x) => x + 0);
+  }
+  assert.ok(f, 'light records uploaded');
+  assert.deepEqual(f.slice(0, 3), [0, 5, 0]);
+  assert.deepEqual(f.slice(4, 7), [1, 0, 0]);
+  assert.deepEqual(f.slice(8, 16), [0, 0, 1, 1, 4, 4, 4, 1]);
+  assert.deepEqual(f.slice(16, 19), [-1, 0.5, 0]);
+  assert.deepEqual(f.slice(20, 23), [2, 0, 0]);
+  assert.deepEqual(f.slice(24, 28), [0, 1, 0, 2]);
   tracer.dispose();
 });

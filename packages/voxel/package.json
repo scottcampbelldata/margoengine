@@ -26,6 +26,10 @@
       "types": "./dist/generate.d.ts",
       "import": "./dist/generate.js"
     },
+    "./bevel": {
+      "types": "./dist/bevel.d.ts",
+      "import": "./dist/bevel.js"
+    },
     "./mesher": {
       "types": "./dist/mesher.d.ts",
       "import": "./dist/mesher.js"
@@ -45,6 +49,10 @@
     "./render": {
       "types": "./dist/render.d.ts",
       "import": "./dist/render.js"
+    },
+    "./lightmap": {
+      "types": "./dist/lightmap.d.ts",
+      "import": "./dist/lightmap.js"
     }
   },
   "files": [

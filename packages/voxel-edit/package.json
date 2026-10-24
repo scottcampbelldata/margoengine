@@ -33,6 +33,22 @@
     "./animation": {
       "types": "./dist/animation.d.ts",
       "import": "./dist/animation.js"
+    },
+    "./history": {
+      "types": "./dist/history.d.ts",
+      "import": "./dist/history.js"
+    },
+    "./export": {
+      "types": "./dist/export.d.ts",
+      "import": "./dist/export.js"
+    },
+    "./assist": {
+      "types": "./dist/assist.d.ts",
+      "import": "./dist/assist.js"
+    },
+    "./library": {
+      "types": "./dist/library.d.ts",
+      "import": "./dist/library.js"
     }
   },
   "files": [

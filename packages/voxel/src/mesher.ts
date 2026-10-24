@@ -618,6 +618,31 @@ export function meshInput(world: VoxelWorld, key: string): MeshInput | undefined
 }
 
 /**
+ * Centre of every quad of a layer array, three numbers per quad in the chunk's local blocks: the point
+ * {@link sortQuads} measures from. Cross quads (faces 6 and 7) use their cell's centre.
+ */
+export function quadCenters(words: Uint32Array): Float32Array {
+  const out = new Float32Array((words.length / QUAD_WORDS) * 3);
+  for (let i = 0; i < out.length; i += 3) {
+    const w0 = words[i],
+      face = (w0 >>> 15) & 7,
+      u = ((w0 >>> 18) & 31) / 2, // half the size along u and v, less half a cell
+      v = ((w0 >>> 23) & 31) / 2;
+    // The cell centre moved half a cell toward the normal and spread over the quad (see ChunkMesh).
+    let x = (w0 & 31) + 0.5,
+      y = ((w0 >>> 5) & 31) + 0.5,
+      z = ((w0 >>> 10) & 31) + 0.5;
+    if (face < 2) (x += face ? -0.5 : 0.5), (z += u), (y += v);
+    else if (face < 4) (y += face === 2 ? 0.5 : -0.5), (x += u), (z += v);
+    else if (face < 6) (z += face === 4 ? 0.5 : -0.5), (x += u), (y += v);
+    out[i] = x;
+    out[i + 1] = y;
+    out[i + 2] = z;
+  }
+  return out;
+}
+
+/**
  * Sorts the quads of a layer array back to front from `eye`, in place: farthest quad centre first, equal distances in
  * their current order. The translucent pass draws a chunk's quads in this order; {@link VoxelMesher.mesh} sorts in its
  * worker when given an eye, and a renderer can re-sort a near chunk's quads after the camera moves.
@@ -635,22 +660,12 @@ export function sortQuads(words: Uint32Array, eye: Vec3): Uint32Array {
       `sortQuads got ${words.length} words, not whole quads of ${QUAD_WORDS}; pass a ChunkMesh layer`,
     );
   const n = words.length / QUAD_WORDS,
+    centers = quadCenters(words),
     distance = new Float64Array(n),
     order = new Uint32Array(n),
     [ex, ey, ez] = eye;
   for (let i = 0; i < n; i++) {
-    const w0 = words[i * 3],
-      face = (w0 >>> 15) & 7,
-      u = ((w0 >>> 18) & 31) / 2, // half the size along u and v, less half a cell
-      v = ((w0 >>> 23) & 31) / 2;
-    // The centre: the cell centre moved half a cell toward the normal and spread over the quad (see ChunkMesh).
-    let x = (w0 & 31) + 0.5,
-      y = ((w0 >>> 5) & 31) + 0.5,
-      z = ((w0 >>> 10) & 31) + 0.5;
-    if (face < 2) (x += face ? -0.5 : 0.5), (z += u), (y += v);
-    else if (face < 4) (y += face === 2 ? 0.5 : -0.5), (x += u), (z += v);
-    else if (face < 6) (z += face === 4 ? 0.5 : -0.5), (x += u), (y += v);
-    distance[i] = (x - ex) ** 2 + (y - ey) ** 2 + (z - ez) ** 2;
+    distance[i] = (centers[i * 3] - ex) ** 2 + (centers[i * 3 + 1] - ey) ** 2 + (centers[i * 3 + 2] - ez) ** 2;
     order[i] = i;
   }
   // ponytail: centre distance (Minecraft's order) can misorder a large merged quad against a small one beside it; a

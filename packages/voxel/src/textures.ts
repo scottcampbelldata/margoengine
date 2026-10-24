@@ -21,7 +21,7 @@ export interface BlockTexturesOptions {
    */
   size?: number;
   /**
-   * One image per texture layer, layer 0 first, at most 256: anything `drawImage` takes, or raw `ImageData`-shaped
+   * One image per texture layer, layer 0 first, at most 2048: anything `drawImage` takes, or raw `ImageData`-shaped
    * `{width, height, data}` RGBA8 pixels (top row first) of exactly `size` x `size`. Default: one white layer.
    */
   images?: readonly (CanvasImageSource | ImageData | BlockPixels)[];
@@ -35,7 +35,7 @@ interface State {
   gpu?: { device: GPUDevice; texture: GPUTexture; view: GPUTextureView; layers: number };
 }
 const states = new WeakMap<BlockTextures, State>(),
-  MAX_LAYERS = 256,
+  MAX_LAYERS = 2048,
   // sRGB byte -> linear, and back (IEC 61966-2-1).
   LINEAR = Float32Array.from({ length: 256 }, (_, i) =>
     i <= 10 ? i / 255 / 12.92 : ((i / 255 + 0.055) / 1.055) ** 2.4,
@@ -152,9 +152,12 @@ function checkSize(size: unknown): number {
 }
 
 function checkLayer(layer: unknown): number {
-  if (typeof layer !== 'number') throw new TypeError('Block texture layer must be a number from 0 to 255');
+  if (typeof layer !== 'number')
+    throw new TypeError(`Block texture layer must be a number from 0 to ${MAX_LAYERS - 1}`);
   if (!Number.isInteger(layer) || layer < 0 || layer >= MAX_LAYERS)
-    throw new RangeError(`Block texture layer ${layer} is not an integer from 0 to 255; pass a layer index`);
+    throw new RangeError(
+      `Block texture layer ${layer} is not an integer from 0 to ${MAX_LAYERS - 1}; pass a layer index`,
+    );
   return layer;
 }
 
@@ -175,7 +178,7 @@ export class BlockTextures {
 
   /**
    * @throws TypeError when an option or image has the wrong type.
-   * @throws RangeError for a size that is not a power of two up to 4,096, more than 256 images, or raw pixels of
+   * @throws RangeError for a size that is not a power of two up to 4,096, more than 2048 images, or raw pixels of
    * another size.
    * @throws MargoError `unsupported` for an image to scale or draw without OffscreenCanvas (raw pixels work anywhere).
    */
@@ -184,7 +187,7 @@ export class BlockTextures {
     const images = options.images ?? [];
     if (!Array.isArray(images)) throw new TypeError('BlockTextures images must be an array of images');
     if (images.length > MAX_LAYERS)
-      throw new RangeError(`BlockTextures got ${images.length} images; a texture array holds at most 256 layers`);
+      throw new RangeError(`BlockTextures got ${images.length} images; a texture array holds at most 2048 layers`);
     this.size = checkSize(options.size ?? (images.length ? dimensions(images[0])[0] : 16));
     states.set(this, { levels: [], dirty: new Set(), disposed: false });
     for (let i = 0; i < images.length; i++) this.#put(i, images[i]);
@@ -192,7 +195,7 @@ export class BlockTextures {
 
   /**
    * Fetches one image per URL (layer i from `urls[i]`) and makes the textures from them.
-   * @throws TypeError when `urls` is not an array of 1 to 256 URLs (in the promise, like every failure).
+   * @throws TypeError when `urls` is not an array of 1 to 2048 URLs (in the promise, like every failure).
    * @throws MargoError `failed` when an image does not load.
    */
   static async load(
@@ -200,7 +203,7 @@ export class BlockTextures {
     options: Omit<BlockTexturesOptions, 'images'> = {},
   ): Promise<BlockTextures> {
     if (!Array.isArray(urls) || !urls.length || urls.length > MAX_LAYERS)
-      throw new TypeError('BlockTextures.load expects an array of 1 to 256 image URLs');
+      throw new TypeError('BlockTextures.load expects an array of 1 to 2048 image URLs');
     const images = await Promise.all(
       urls.map(async (url) => {
         const response = await fetch(url);
@@ -248,7 +251,7 @@ export class BlockTextures {
   }
 
   /**
-   * Replaces layer `layer` (0-255) with `image`, drawn at `size` x `size`; a layer past the current count adds layers
+   * Replaces layer `layer` (0-2047) with `image`, drawn at `size` x `size`; a layer past the current count adds layers
    * (white up to it). Live: renderers upload it before their next frame.
    * @throws TypeError or RangeError for a bad layer or image (as the constructor).
    * @throws MargoError `disposed` after {@link BlockTextures.dispose}.
@@ -302,6 +305,12 @@ export function blockTextureView(textures: BlockTextures, device: GPUDevice): GP
     throw new MargoError('disposed', 'VoxelRenderer textures are disposed; pass live BlockTextures to the renderer');
   const layers = textures.layers,
     size = textures.size;
+  if (layers > device.limits.maxTextureArrayLayers)
+    throw new MargoError(
+      'unsupported',
+      `BlockTextures needs ${layers} array layers but this device allows ${device.limits.maxTextureArrayLayers}; ` +
+        'reduce the texture layers or request a device with a sufficient maxTextureArrayLayers limit',
+    );
   let gpu = state.gpu;
   if (gpu?.device !== device || gpu.layers !== layers) {
     gpu?.texture.destroy();

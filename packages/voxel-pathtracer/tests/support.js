@@ -41,6 +41,7 @@ export function fakeDevice({
     limits: { maxStorageBufferBindingSize, maxBufferSize, maxTextureDimension2D },
     buffers: [],
     textures: [],
+    groups: [],
     passes: [],
     submits: 0,
     onMap: undefined,
@@ -74,11 +75,13 @@ export function fakeDevice({
       device.buffers.push(b);
       return b;
     },
-    createTexture({ size: [width, height], format, usage }) {
+    createTexture({ size: [width, height, depthOrArrayLayers = 1], format, usage, dimension = '2d' }) {
       assert.ok(width <= maxTextureDimension2D && height <= maxTextureDimension2D, 'texture over the dimension limit');
       const t = {
         width,
         height,
+        depthOrArrayLayers,
+        dimension,
         format,
         usage,
         destroyed: false,
@@ -96,6 +99,7 @@ export function fakeDevice({
     createComputePipelineAsync: async (d) => ({ ...d, kind: 'compute' }),
     createRenderPipelineAsync: async (d) => ({ ...d, kind: 'render' }),
     createBindGroup: (d) => {
+      device.groups.push(d);
       for (const e of d.entries) {
         if (e.resource.buffer) {
           const { buffer, offset = 0, size = buffer.size - offset } = e.resource;
@@ -132,6 +136,10 @@ export function fakeDevice({
       };
     },
     queue: {
+      writeTexture({ texture }, data) {
+        assert.ok(!texture.destroyed, 'upload to a destroyed texture');
+        texture.uploadedBytes = data.byteLength;
+      },
       writeBuffer(b, offset, data, start = 0, length) {
         assert.ok(!b.destroyed, 'write to a destroyed buffer');
         const view = ArrayBuffer.isView(data) ? data : new Uint8Array(data),

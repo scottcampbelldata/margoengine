@@ -104,6 +104,44 @@ export function checkPoint(value: unknown, subject: string): asserts value is Ve
     throw new RangeError(`${subject} is not finite; pass three finite numbers`);
 }
 
+/** @internal Unit direction without overflowing or underflowing its length. The vector is already finite. */
+export function unitDirection(direction: Vec3, subject: string): MutableVec3 {
+  const scale = Math.max(Math.abs(direction[0]), Math.abs(direction[1]), Math.abs(direction[2]));
+  if (!scale) throw new RangeError(`${subject} direction is zero; pass a nonzero direction`);
+  const x = direction[0] / scale,
+    y = direction[1] / scale,
+    z = direction[2] / scale,
+    length = Math.hypot(x, y, z);
+  return [x / length, y / length, z / length];
+}
+
+/**
+ * @internal Outward normal of the face a ray crossed to enter `cell` along unit `dir`. `tied` lists the axes crossed
+ * at once: on an edge or corner the face whose neighbour is empty (`filled` false) wins, then the face most head-on
+ * to the ray. No tied axis gives a zero normal.
+ */
+export function exposedNormal(
+  cell: readonly number[],
+  tied: readonly number[],
+  dir: readonly number[],
+  filled: (x: number, y: number, z: number) => boolean,
+): MutableVec3 {
+  const normal: MutableVec3 = [0, 0, 0];
+  let best = -1,
+    bestScore = -Infinity;
+  for (const axis of tied) {
+    const adj = [cell[0], cell[1], cell[2]];
+    adj[axis] -= Math.sign(dir[axis]);
+    const score = (filled(adj[0], adj[1], adj[2]) ? 0 : 2) + Math.abs(dir[axis]);
+    if (score > bestScore) {
+      bestScore = score;
+      best = axis;
+    }
+  }
+  if (best >= 0) normal[best] = -Math.sign(dir[best]);
+  return normal;
+}
+
 /** @internal The cell count of a grid of `size`, checked against `limit` before anything is allocated. */
 export function sizeCells(size: unknown, limit: number, subject = 'Grid size'): number {
   checkCell(size, subject);

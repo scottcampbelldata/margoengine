@@ -1,6 +1,7 @@
 // MagicaVoxel .vox read/write, from the published format notes (github.com/ephtracy/voxel-model:
 // MagicaVoxel-file-format-vox.txt and MagicaVoxel-file-format-vox-extension.txt), versions 150 and 200.
 import type { Vec3 } from '@margoengine/math';
+import type { BlockTypeOptions } from './blocks.js';
 import { VoxelWorld, writeChunkCells } from './world.js';
 
 /** One model of a {@link VoxScene}: a SIZE chunk and the XYZI chunk after it. */
@@ -986,7 +987,9 @@ function placements(scene: VoxScene): Placement[] {
  * each model centred on its translation (a scene without nodes pastes its first model). MagicaVoxel's z (up) becomes
  * world y and its y becomes world -z, and the pasted box (the models' sizes) has its minimum corner at cell `at`.
  * `mapping[i]` is the block state for palette index i (0 skips those voxels). Without a mapping a scene's colours
- * become block types named `vox:rrggbb` with that colour, defined in `world.blocks` unless already there; a bare model
+ * become block types named `vox:rrggbb` with that colour, defined in `world.blocks` unless already there; a colour
+ * with a metal, glass, blend, emit or media material gets {@link voxBlockOptions} and its options in the name
+ * (`vox:rrggbb:metalness=1`). A bare model
  * has no palette, so it needs a mapping. Empty cells of a model leave the world as it was. Nothing is written when a
  * check fails. Voxels are written chunk by chunk (each chunk's in file order), with the results of one
  * {@link VoxelWorld.setBlock} per voxel: the same cells, dirty keys and count, and `onChange` once per changed cell
@@ -1051,12 +1054,16 @@ export function pasteVoxModel(
   }
   if (mapping === undefined) {
     const palette = (scene as VoxScene).palette,
-      names = new Map(world.blocks.table.map((t) => [t.name, t.id]));
+      names = new Map(world.blocks.table.map((t) => [t.name, t.id])),
+      materials = new Map((scene as VoxScene).materials?.map((m) => [m.id, m]));
     for (let i = 1; i < 256; i++) {
       if (!used[i]) continue;
       const hex = Array.from(palette.subarray(4 * i, 4 * i + 3), (c) => c.toString(16).padStart(2, '0')).join(''),
-        name = `vox:${hex}`;
-      states[i] = names.get(name) ?? world.blocks.define(name, { color: `#${hex}` });
+        material = materials.get(i),
+        options = material ? voxBlockOptions(material) : {},
+        // Same colour, other material: its own type, named after its options.
+        name = [`vox:${hex}`, ...Object.entries(options).map(([k, v]) => `${k}=${v}`)].join(':');
+      states[i] = names.get(name) ?? world.blocks.define(name, { ...options, color: `#${hex}` });
       names.set(name, states[i]);
     }
   }
@@ -1156,4 +1163,39 @@ function paste(world: VoxelWorld, placed: readonly Placement[], shift: readonly 
     );
   }
   return changed;
+}
+
+/**
+ * Block-type options for a MagicaVoxel material, as {@link pasteVoxModel} defines its `vox:` types:
+ * - `metal` and `blend`: `metalness` = `_metal` if stored, else `_weight`.
+ * - `glass` (and `blend` with `_trans` or `_alpha`): a translucent block, `transmission` = `_trans`, else `_alpha`,
+ *   else `_weight` for glass.
+ * - `emit`: `emissive` = `_weight * (1 + _flux)`. MagicaVoxel's power steps are not linear, so this is a starting
+ *   point to tune.
+ * - `media`: a translucent block with `scatter` = `_weight`.
+ * - `metal`, `glass` and `blend`: `roughness` = `_rough` when stored.
+ * A plain diffuse material gives `{}`.
+ */
+export function voxBlockOptions(material: VoxMaterial): BlockTypeOptions {
+  const type = material.type ?? 'diffuse',
+    weight = material.weight ?? 1,
+    stored = (key: string) => {
+      const value = Number(material.attributes?.get(key));
+      return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : undefined;
+    },
+    see = stored('_trans') ?? stored('_alpha') ?? (type === 'glass' ? weight : undefined),
+    options: BlockTypeOptions = {};
+  if (material.rough !== undefined && (type === 'metal' || type === 'glass' || type === 'blend'))
+    options.roughness = Math.min(1, Math.max(0, material.rough));
+  if (type === 'metal' || type === 'blend') options.metalness = stored('_metal') ?? weight;
+  if (type === 'emit') options.emissive = weight * (1 + Math.max(0, material.flux ?? 0));
+  if ((type === 'glass' || type === 'blend') && see) {
+    options.layer = 'translucent';
+    options.transmission = see;
+  }
+  if (type === 'media') {
+    options.layer = 'translucent';
+    options.scatter = weight;
+  }
+  return options;
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { meshGrid } from '../dist/mesh.js';
+import { chamferGrid, meshGrid } from '../dist/mesh.js';
 import { SparseGrid } from '../dist/sparse.js';
 
 const grid = (size, voxels) => ({ size, voxels: Uint8Array.from(voxels) });
@@ -101,4 +101,91 @@ test('meshGrid checks storage and budgets before scanning, and empty grids give 
       [0, 0, 0],
     ],
   );
+});
+
+test('chamferGrid insets a cube, keeps the opening, and does not replace the hard mesh', () => {
+  const hard = meshGrid(grid([1, 1, 1], [4]));
+  assert.equal(hard.stats.quads, 6);
+  const { mesh, stats } = chamferGrid(grid([1, 1, 1], [4]), { bevel: 0.2, pivot: [0, 0, 0] });
+  assert.equal(stats.quads, 6);
+  assert.equal(stats.triangles, 60);
+  assert.equal(stats.clamped, 0);
+  assert.ok(mesh.min[0] >= 0 && mesh.max[0] <= 1);
+  let inside = 0;
+  for (let i = 0; i < mesh.positions.length; i += 3) {
+    const x = mesh.positions[i],
+      y = mesh.positions[i + 1],
+      z = mesh.positions[i + 2];
+    if (x > 0.05 && x < 0.95 && y > 0.05 && y < 0.95 && z > 0.05 && z < 0.95) inside++;
+  }
+  assert.ok(inside >= 8, 'welded corners move inside the cube');
+  assert.ok(mesh.trianglePalette.every((index) => index === 4));
+  assert.equal(chamferGrid(grid([1, 1, 1], [4]), { bevel: 0.4 }).stats.clamped, 6);
+  const hole = grid([3, 1, 1], [1, 0, 1]);
+  const open = chamferGrid(hole, { bevel: 0.1 });
+  const solid = chamferGrid(grid([3, 1, 1], [1, 1, 1]), { bevel: 0.1 });
+  assert.ok(open.stats.quads > solid.stats.quads, 'the gap keeps the faces the solid merges away');
+  assert.throws(() => chamferGrid(grid([1, 1, 1], [1]), { bevel: 0 }), /bevel/);
+  assert.throws(() => chamferGrid(grid([1, 1, 1], [1]), { bevel: 0.5 }), /bevel/);
+});
+
+test('chamferGrid keeps a non-square solid inside its own extents', () => {
+  const size = [2, 3, 5];
+  const hard = meshGrid(grid(size, new Array(2 * 3 * 5).fill(1)));
+  const { mesh } = chamferGrid(grid(size, new Array(2 * 3 * 5).fill(1)), { bevel: 0.15 });
+  assert.deepEqual(hard.mesh.max, [2, 3, 5]);
+  for (let axis = 0; axis < 3; axis++) {
+    assert.ok(mesh.min[axis] >= -1e-4, `min ${axis}`);
+    assert.ok(mesh.max[axis] <= size[axis] + 1e-4, `max ${axis} ${mesh.max}`);
+  }
+  const center = [1, 1.5, 2.5];
+  for (let t = 0; t < mesh.indices.length; t += 3) {
+    const a = mesh.indices[t],
+      b = mesh.indices[t + 1],
+      c = mesh.indices[t + 2],
+      p = (i) => [mesh.positions[i * 3], mesh.positions[i * 3 + 1], mesh.positions[i * 3 + 2]],
+      pa = p(a),
+      pb = p(b),
+      pc = p(c),
+      ux = pb[0] - pa[0],
+      uy = pb[1] - pa[1],
+      uz = pb[2] - pa[2],
+      vx = pc[0] - pa[0],
+      vy = pc[1] - pa[1],
+      vz = pc[2] - pa[2],
+      nx = uy * vz - uz * vy,
+      ny = uz * vx - ux * vz,
+      nz = ux * vy - uy * vx,
+      cx = (pa[0] + pb[0] + pc[0]) / 3 - center[0],
+      cy = (pa[1] + pb[1] + pc[1]) / 3 - center[1],
+      cz = (pa[2] + pb[2] + pc[2]) / 3 - center[2];
+    assert.ok(nx * cx + ny * cy + nz * cz > 0, 'triangle faces out of the solid');
+  }
+});
+
+test('chamferGrid keeps distinct palettes on adjacent cells', () => {
+  const { mesh } = chamferGrid(grid([2, 1, 1], [2, 9]), { bevel: 0.15 });
+  const used = new Set(mesh.trianglePalette);
+  assert.deepEqual([...used].sort(), [2, 9]);
+});
+
+test('chamferGrid on a translated rectangle stays inside that rectangle', () => {
+  const cells = [];
+  for (let y = 0; y < 3; y++)
+    for (let z = 0; z < 5; z++) for (let x = 0; x < 2; x++) cells.push([10 + x, 4 + y, 7 + z, x === 0 ? 2 : 9]);
+  const sparse = SparseGrid.empty([40, 40, 40]).edit(cells).grid;
+  const { mesh } = chamferGrid(sparse, { bevel: 0.12 });
+  assert.ok(mesh.min[0] >= 10 && mesh.max[0] <= 12);
+  assert.ok(mesh.min[1] >= 4 && mesh.max[1] <= 7);
+  assert.ok(mesh.min[2] >= 7 && mesh.max[2] <= 12);
+  assert.deepEqual([...new Set(mesh.trianglePalette)].sort(), [2, 9]);
+});
+
+test('chamferGrid on a sparse cell stays on that cell', () => {
+  const sparse = SparseGrid.empty([40, 40, 40]).edit([[5, 6, 7, 3]]).grid;
+  const { mesh, stats } = chamferGrid(sparse, { bevel: 0.2 });
+  assert.equal(stats.quads, 6);
+  assert.ok(mesh.min[0] >= 5 && mesh.max[0] <= 6);
+  assert.ok(mesh.min[1] >= 6 && mesh.max[1] <= 7);
+  assert.ok(mesh.min[2] >= 7 && mesh.max[2] <= 8);
 });

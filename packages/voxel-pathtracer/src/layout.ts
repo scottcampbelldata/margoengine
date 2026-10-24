@@ -4,6 +4,7 @@ import {
   BRICK_WORDS,
   INSTANCE_WORDS,
   MODEL_WORDS,
+  MOTION_WORDS,
   NODE_WORDS,
   type PackedModel,
   type SceneSnapshot,
@@ -128,10 +129,13 @@ export function sceneLayout(s: SceneSnapshot, gridOffsets: ArrayLike<number>, li
     instanceBase = modelBase + s.models.length * MODEL_WORDS,
     nodeBase = instanceBase + s.instances.length * INSTANCE_WORDS,
     nodeCount = s.nodes.length / NODE_WORDS,
-    // Block textures after the nodes: word 0 holds the table's start; per texture first texel word, width, height.
-    textureBase = nodeBase + s.nodes.length,
+    // TRS motion packets after the nodes, then the block textures: word 0 holds the texture table's start; per
+    // texture first texel word, width, height.
+    motionBase = nodeBase + s.nodes.length,
+    textureBase = motionBase + s.instances.reduce((n, v) => n + (v.motion ? MOTION_WORDS : 0), 0),
     words = lights.words,
     floats = new Float32Array(words.buffer);
+  let packet = motionBase;
   words[0] = s.textures.length ? textureBase : 0;
   let texel = textureBase + 4 * s.textures.length;
   for (const [k, t] of s.textures.entries()) {
@@ -157,8 +161,13 @@ export function sceneLayout(s: SceneSnapshot, gridOffsets: ArrayLike<number>, li
     floats.set(v.toWorld, b + 12);
     floats.set(v.previous ?? v.toWorld, b + 24);
     words[b + 36] = v.model;
-    words[b + 37] = (v.previous ? 1 : 0) | (v.prism ? 2 : 0) | (v.mirror ? 4 : 0);
+    words[b + 37] = (v.previous ? 1 : 0) | (v.prism ? 2 : 0) | (v.mirror ? 4 : 0) | (v.motion ? 8 : 0);
     floats[b + 38] = v.lightPick;
+    if (v.motion) {
+      words[b + 39] = packet;
+      floats.set(v.motion, packet);
+      packet += MOTION_WORDS;
+    }
   }
   words.set(s.nodes, nodeBase);
   return { words, modelBase, instanceBase, nodeBase, nodeCount };

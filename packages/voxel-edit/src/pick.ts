@@ -2,7 +2,7 @@
 import type { MutableVec3, Vec3 } from '@margoengine/math';
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import type { GridSource } from './edit.js';
-import { checkGrid, checkPoint, type GridHit, MAX_CELLS } from './grid.js';
+import { checkGrid, checkPoint, type GridHit, MAX_CELLS, exposedNormal, unitDirection } from './grid.js';
 import { SparseGrid } from './sparse.js';
 
 /** A ray in a grid's local cells. */
@@ -41,7 +41,9 @@ export function pickRay(matrix: ArrayLike<number>, x: number, y: number): GridRa
 
 /**
  * The first filled cell along `ray` within `maxDistance` (measured along the normalized direction), or null. A ray
- * that only touches a cell's edge or corner misses it. Sparse grids visit only chunks the ray crosses.
+ * that only touches a cell's edge or corner misses it. Where a ray crosses an edge or corner of a filled cell, the
+ * reported normal is the exposed face (the neighbour is empty), so Face Attach and faceCells see that surface;
+ * among exposed faces, the one most head-on to the ray. Sparse grids visit only chunks the ray crosses.
  */
 export function raycastGrid(source: GridSource, ray: GridRay, maxDistance = Infinity): GridHit | null {
   if (typeof ray !== 'object' || ray === null)
@@ -51,12 +53,10 @@ export function raycastGrid(source: GridSource, ray: GridRay, maxDistance = Infi
   checkPoint(ray.origin, 'raycastGrid origin');
   checkPoint(ray.direction, 'raycastGrid direction');
   if (!(maxDistance >= 0)) throw new RangeError('raycastGrid maxDistance is negative; pass 0 or more');
-  const length = Math.hypot(ray.direction[0], ray.direction[1], ray.direction[2]);
-  if (!length) throw new RangeError('raycastGrid direction is zero; pass a nonzero direction');
   const size = source.size,
     [sx, , sz] = size,
     o = ray.origin,
-    d = [ray.direction[0] / length, ray.direction[1] / length, ray.direction[2] / length],
+    d = unitDirection(ray.direction, 'raycastGrid'),
     at = (c: number[]) => source.voxels[c[0] + sx * (c[2] + sz * c[1])],
     inside = (c: number[]) => c[0] >= 0 && c[1] >= 0 && c[2] >= 0 && c[0] < size[0] && c[1] < size[1] && c[2] < size[2],
     start: MutableVec3 = [Math.floor(o[0]), Math.floor(o[1]), Math.floor(o[2])];
@@ -100,17 +100,14 @@ export function raycastGrid(source: GridSource, ray: GridRay, maxDistance = Infi
     const t = Math.min(next[0], next[1], next[2]);
     if (t > exit) break;
     distance = t;
-    normal = [0, 0, 0];
-    let first = true;
+    const tied: number[] = [];
     for (let axis = 0; axis < 3; axis++) {
       if (next[axis] > t + 1e-8) continue;
       cell[axis] += step[axis];
       next[axis] += span[axis];
-      if (first) {
-        normal[axis] = -step[axis];
-        first = false;
-      }
+      tied.push(axis);
     }
+    normal = exposedNormal(cell, tied, d, (x, y, z) => inside([x, y, z]) && at([x, y, z]) > 0);
   }
   return null;
 }

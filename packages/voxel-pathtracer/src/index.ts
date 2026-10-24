@@ -27,7 +27,6 @@ export type {
   TraceValidation,
   TraceViewportLimits,
   TraceViewportSize,
-  TraceAreaLight,
   TraceTexture,
   TraceEnvironment,
   TraceEnvironmentMap,

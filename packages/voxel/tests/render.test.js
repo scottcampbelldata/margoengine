@@ -4,14 +4,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Camera, FrameGraph } from '@margoengine/core/extension';
-import { BlockTypes, VoxelChunk, VoxelWorld, chunkKey } from '../dist/index.js';
-import { blockMaterials, meshChunk, meshInput, sortQuads } from '../dist/mesher.js';
+import { BlockTypes, VoxelChunk, VoxelWorld, blockState, chunkKey } from '../dist/index.js';
+import { blockMaterials, decodeQuad, meshChunk, meshInput, quadCenters, sortQuads } from '../dist/mesher.js';
+import { voxelBevel } from '../dist/bevel.js';
+import { voxelLightmap } from '../dist/lightmap.js';
 import { BlockTextures, VoxelRenderer } from '../dist/render.js';
 import { NodeWebWorker } from './worker-support.js';
 
 globalThis.Worker = NodeWebWorker;
 Object.assign(globalThis, {
-  GPUBufferUsage: { MAP_READ: 1, COPY_SRC: 4, COPY_DST: 8, INDEX: 16, UNIFORM: 64, STORAGE: 128, INDIRECT: 256 },
+  GPUBufferUsage: {
+    MAP_READ: 1,
+    COPY_SRC: 4,
+    COPY_DST: 8,
+    INDEX: 16,
+    VERTEX: 32,
+    UNIFORM: 64,
+    STORAGE: 128,
+    INDIRECT: 256,
+  },
   GPUTextureUsage: { COPY_DST: 2, TEXTURE_BINDING: 4 },
 });
 
@@ -23,7 +34,7 @@ const recorder = (commands) =>
   );
 function fakeDevice() {
   const device = {
-    limits: { maxStorageBufferBindingSize: 128 << 20 },
+    limits: { maxStorageBufferBindingSize: 128 << 20, maxTextureArrayLayers: 2048 },
     buffers: [],
     textures: [],
     textureWrites: [],
@@ -55,6 +66,7 @@ function fakeDevice() {
     },
     createSampler: (d) => ({ ...d }),
     createShaderModule: (d) => d,
+    createRenderPipeline: (d) => ({ ...d, getBindGroupLayout: () => ({}) }),
     createRenderPipelineAsync: async (d) => ({ ...d, getBindGroupLayout: () => ({}) }),
     createBindGroup: (d) => (device.groups.push(d), d),
     createRenderBundleEncoder: (d) => {
@@ -166,7 +178,9 @@ async function settle(frame, done, label = 'renderer') {
 // The buffers the renderer binds now: from its newest beauty bind group (the 240-byte frame uniform at binding 0; not
 // a lighting group 1 or a shadow group), and the newest live indirect buffer.
 function bound(device) {
-  const entries = device.groups.findLast((g) => g.entries[0]?.resource.buffer?.size === 240).entries,
+  const entries = device.groups.findLast(
+      (g) => g.entries.length >= 7 && g.entries[0]?.resource.buffer?.size === 240,
+    ).entries,
     buffer = (i) => entries[i].resource.buffer;
   return {
     frame: new Float32Array(buffer(0).data),
@@ -419,7 +433,7 @@ test('translucent chunks draw back to front; near ones re-sort after the camera 
   }
 });
 
-test('material table: 16 bytes per blockMaterials id (layer, frames, flags, sRGB tint, roughness, metalness, fps, emissive)', async () => {
+test('material table: 32 bytes per blockMaterials id (layer, frames, solid, tint, roughness, metal, emission, maps, transmission)', async () => {
   const types = new BlockTypes(),
     blocks = {
       types,
@@ -432,6 +446,13 @@ test('material table: 16 bytes per blockMaterials id (layer, frames, flags, sRGB
       LAVA: types.define('lava', { textures: 10, emissive: 2.5, animation: { frames: 4, fps: 7.5 } }),
       LEAVES: types.define('leaves', { layer: 'cutout', textures: 7 }),
       FLOWER: types.define('flower', { layer: 'cutout', shape: 'cross', textures: 8 }),
+      ICE: types.define('ice', {
+        layer: 'translucent',
+        textures: 2047,
+        maps: { normal: 2047, roughness: 256, emissive: 255 },
+        transmission: 0.5,
+        scatter: 0.25,
+      }),
     };
   for (const fancyLeaves of [true, false]) {
     const { renderer, frame, device } = setup({ fancyLeaves }, { blocks });
@@ -441,31 +462,40 @@ test('material table: 16 bytes per blockMaterials id (layer, frames, flags, sRGB
         { materials } = bound(device),
         words = new Uint32Array(materials.data),
         floats = new Float32Array(materials.data),
-        entry = (id, face) => {
-          const m = ids[id * 6 + face];
-          return [
-            words[m * 4] & 255,
-            (words[m * 4] >> 8) & 255,
-            words[m * 4] >>> 16,
-            words[m * 4 + 1],
-            words[m * 4 + 2],
-            floats[m * 4 + 3],
-          ];
-        },
+        at = (id, face) => ids[id * 6 + face] * 8,
         srgb = (v) => Math.round(255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055)),
         tint = (r, g, b) => (srgb(r) | (srgb(g) << 8) | (srgb(b) << 16) | (255 << 24)) >>> 0;
-      assert.equal(materials.size, (Math.max(...ids.filter((m) => m !== 0xffff)) + 1) * 16);
-      assert.deepEqual(entry(blocks.GRASS, 0), [4, 0, 0, tint(0.2, 0.5, 0.1), 64 | (255 << 8), 0]);
-      assert.deepEqual(entry(blocks.GRASS, 2)[0], 5, 'top');
-      assert.deepEqual(entry(blocks.GRASS, 3)[0], 6, 'bottom');
-      assert.deepEqual(entry(blocks.LAVA, 1), [10, 3, 0, 0xffffffff, 255 | ((7.5 * 256) << 16), 2.5]);
-      assert.deepEqual(entry(blocks.LEAVES, 0).slice(0, 3), [7, 0, +!fancyLeaves], 'solid leaves without fancyLeaves');
-      assert.deepEqual(entry(blocks.FLOWER, 0).slice(0, 3), [8, 0, 0], 'cross blocks always cut out');
-      // Block types defined later grow the table.
+      assert.equal(materials.size, (Math.max(...ids.filter((m) => m !== 0xffff)) + 1) * 32);
+      const grass = at(blocks.GRASS, 0);
+      assert.equal(words[grass] & 2047, 4, 'base layer');
+      assert.equal((words[grass] >> 11) & 2047, 0, 'frames - 1');
+      assert.equal((words[grass] >> 22) & 1, 1, 'opaque cube is solid');
+      assert.equal(words[grass + 1], tint(0.2, 0.5, 0.1));
+      assert.equal(words[grass + 2], 64 | (255 << 8), 'roughness 0.25, metal 1, fps 0');
+      assert.equal(floats[grass + 3], 0);
+      assert.equal(words[grass + 4], 0, 'no normal or roughness map');
+      assert.equal(words[grass + 6], 0, 'no emissive map or transmission');
+      assert.equal(words[at(blocks.GRASS, 2)] & 2047, 5, 'top');
+      assert.equal(words[at(blocks.GRASS, 3)] & 2047, 6, 'bottom');
+      const lava = at(blocks.LAVA, 1);
+      assert.equal(words[lava] & 2047, 10);
+      assert.equal((words[lava] >> 11) & 2047, 3);
+      assert.equal(words[lava + 1], 0xffffffff);
+      assert.equal(words[lava + 2], 255 | ((7.5 * 256) << 16));
+      assert.equal(floats[lava + 3], 2.5);
+      assert.equal((words[at(blocks.LEAVES, 0)] >> 22) & 1, +!fancyLeaves, 'solid leaves without fancyLeaves');
+      const flower = words[at(blocks.FLOWER, 0)];
+      assert.equal(flower & 2047, 8);
+      assert.equal((flower >> 22) & 1, 0, 'cross blocks stay cut out');
+      const ice = at(blocks.ICE, 0);
+      assert.equal(words[ice] & 2047, 2047, 'layer 2047 does not alias');
+      assert.equal(words[ice + 4], 2047 | (256 << 11), 'normal and roughness map layers');
+      assert.equal(floats[ice + 5], 0.25, 'scatter');
+      assert.equal(words[ice + 6], 255 | (128 << 11), 'emissive map layer and transmission');
       const late = types.define(`late ${fancyLeaves}`, { textures: 12 });
       frame();
       const after = blockMaterials(types.table);
-      assert.equal(new Uint32Array(bound(device).materials.data)[after[late * 6] * 4] & 255, 12);
+      assert.equal(new Uint32Array(bound(device).materials.data)[after[late * 6] * 8] & 2047, 12);
     } finally {
       renderer.dispose();
     }
@@ -564,7 +594,15 @@ test('BlockTextures: rgba8unorm-srgb array with every mip, linear box filter, al
     () => new BlockTextures({ images: [{ width: 8, height: 8, data: new Uint8Array(256) }], size: 16 }),
     RangeError,
   );
-  assert.throws(() => textures.set(256, stripes), RangeError);
+  assert.throws(() => textures.set(2048, stripes), RangeError);
+  const pixel = { width: 1, height: 1, data: new Uint8Array([9, 8, 7, 255]) },
+    bounds = new BlockTextures({ size: 1, images: [pixel] });
+  bounds.set(255, pixel);
+  bounds.set(256, pixel);
+  bounds.set(2047, pixel);
+  assert.equal(bounds.layers, 2048, 'layers 255, 256 and 2047 are valid');
+  assert.throws(() => bounds.set(2048, pixel), RangeError);
+  bounds.dispose();
   assert.throws(() => textures.set(0, 5), TypeError);
   assert.throws(
     () => new BlockTextures({ images: [{ width: 16, height: 16 }] }),
@@ -576,6 +614,25 @@ test('BlockTextures: rgba8unorm-srgb array with every mip, linear box filter, al
     () => textures.set(0, stripes),
     (e) => e.name === 'MargoError' && e.code === 'disposed',
   );
+});
+
+test('BlockTextures rejects layers above the device limit before allocating or uploading an invalid texture', () => {
+  const pixel = { width: 1, height: 1, data: new Uint8Array([255, 255, 255, 255]) },
+    textures = new BlockTextures({ images: [pixel] });
+  textures.set(256, pixel);
+  const { device, engine, context, renderer } = setup({}, { textures });
+  try {
+    device.limits.maxTextureArrayLayers = 256;
+    assert.throws(
+      () => engine.frameGraph.execute(context),
+      (error) => error.code === 'unsupported' && /257.*256.*reduce|257.*256.*request/i.test(error.message),
+    );
+    assert.equal(device.textures.length, 0);
+    assert.equal(device.textureWrites.length, 0);
+  } finally {
+    renderer.dispose();
+    textures.dispose();
+  }
 });
 
 test('device restore: every chunk meshed again into the new device', async () => {
@@ -841,6 +898,347 @@ test('post replay: shared capture lifecycle and opaque/cutout native quad materi
     assert.equal(disposed, 1);
     assert.equal(renderer.disposed, true);
     assert.throws(() => renderer.setCapture(hook), /disposed/i);
+  } finally {
+    renderer.dispose();
+  }
+});
+
+// Bevel: a stone cube is 6 panels of 2 triangles plus 4 strips of 2 triangles per face.
+const CUBE_TRIANGLES = 60;
+const isBevel = (pipeline) => pipeline.vertex.buffers?.length === 1;
+// Every primitive the passes drew, in order, with its chunk and its centre's squared distance from `eye`: bevel
+// triangles from the bound vertex and index buffers, quads from the bound pool and page table.
+function drawOrder(passes, device, eye) {
+  const { pool, pageTable, origins } = bound(device),
+    words = new Uint32Array(pool.data),
+    out = [];
+  let pipeline, vertices, indices;
+  for (const p of passes)
+    for (const command of p.commands) {
+      const [name] = command;
+      if (name === 'setPipeline') pipeline = command[1];
+      else if (name === 'setVertexBuffer') vertices = new Float32Array(command[2].data);
+      else if (name === 'setIndexBuffer') indices = new Uint32Array(command[1].data);
+      else if (name === 'drawIndexed') {
+        const [, count, , first = 0, base = 0] = command;
+        if (isBevel(pipeline))
+          for (let i = first; i < first + count; i += 3) {
+            const c = [0, 1, 2].map(
+              (a) => [0, 1, 2].reduce((sum, k) => sum + vertices[indices[i + k] * 12 + a], 0) / 3,
+            );
+            out.push({ kind: 'triangle', chunk: c.map((x) => Math.floor(x / 32)).join(), c });
+          }
+        else
+          for (let i = first; i < first + count; i += 6) {
+            const q = base / 4 + i / 6,
+              slot = pageTable[q >> 6],
+              origin = [...origins.subarray(slot * 4, slot * 4 + 3)],
+              local = quadCenters(words.subarray(q * 3, q * 3 + 3));
+            out.push({
+              kind: 'quad',
+              chunk: origin.map((x) => x / 32).join(),
+              c: [...local].map((x, a) => x + origin[a]),
+            });
+          }
+      }
+    }
+  for (const d of out) d.distance = d.c.reduce((sum, x, a) => sum + (x - eye[a]) ** 2, 0);
+  return out;
+}
+// Primitives drawn nearer than the one before them in the same chunk (none when sorted back to front).
+const misordered = (draws) =>
+  draws.filter((d, i) => i && d.chunk === draws[i - 1].chunk && d.distance > draws[i - 1].distance + 1e-3);
+
+test('bevel: cube faces become chamfer triangles; lowered liquids and crosses stay quads', async () => {
+  const types = new BlockTypes(),
+    STONE = types.define('stone', { textures: 1 }),
+    FLOWER = types.define('flower', { layer: 'cutout', shape: 'cross' }),
+    WATER = types.define('water', { layer: 'translucent', shape: 'liquid', liquid: true, solid: false, textures: 4 }),
+    { world, frame, device, renderer } = setup({ bevel: voxelBevel(0.2) }, { blocks: { types, STONE, WATER, FLOWER } });
+  try {
+    const chunk = new VoxelChunk();
+    chunk.set(8, 8, 8, blockState(WATER, 3));
+    chunk.set(2, 2, 2, STONE);
+    chunk.set(20, 2, 2, FLOWER);
+    replace(world, 0, 0, 0, chunk);
+    await settle(frame, () => renderer.stats.triangles === CUBE_TRIANGLES && device.groups.length > 0);
+    assert.equal(renderer.stats.quads, 6 + 2, 'six water faces and two cross quads');
+    const words = new Uint32Array(bound(device).pool.data),
+      kept = [];
+    for (let i = 0; i < words.length / 3; i++) if (words[i * 3] || words[i * 3 + 1]) kept.push(decodeQuad(words, i));
+    assert.equal(kept.length, 8);
+    assert.ok(kept.some((q) => q.face >= 6));
+    assert.ok(kept.filter((q) => q.face < 6).every((q) => q.x === 8 && (q.face === 3 || q.liquidDrop === 3)));
+    const vertices = device.buffers.filter((b) => b.usage & 32 && !b.destroyed);
+    assert.equal(vertices.length, 1, 'one interleaved vertex buffer');
+    const data = new Float32Array(vertices[0].data);
+    for (let v = 0; v < data.length; v += 12) {
+      for (let a = 0; a < 3; a++) assert.ok(data[v + a] >= 2 && data[v + a] <= 3, 'only the stone is chamfered');
+      assert.equal(new Uint32Array(vertices[0].data)[v + 11] >>> 12 < 6, true, 'face in the material word');
+    }
+    renderer.dispose();
+    assert.ok(vertices[0].destroyed, 'freed on dispose');
+  } finally {
+    renderer.dispose();
+  }
+});
+
+test('bevel: glass triangles and liquid quads blend back to front together, re-sorted within the budget', async () => {
+  const types = new BlockTypes(),
+    GLASS = types.define('glass', { layer: 'translucent', textures: 2 }),
+    WATER = types.define('water', { layer: 'translucent', shape: 'liquid', liquid: true, solid: false });
+  const { world, frame, renderer, camera, device, passes } = setup(
+    { bevel: voxelBevel(0.15) },
+    { blocks: { types, GLASS, WATER } },
+  );
+  const writes = new Map(),
+    write = device.queue.writeBuffer;
+  device.queue.writeBuffer = (b, ...rest) => {
+    writes.set(b, (writes.get(b) ?? 0) + 1);
+    write(b, ...rest);
+  };
+  try {
+    world.setBlocks([1, 1, 1, blockState(WATER, 3), 1, 1, 5, GLASS]);
+    camera.position = [1.5, 1.5, 10];
+    camera.target = [1.5, 1.5, 0];
+    await settle(frame, () => renderer.stats.triangles === CUBE_TRIANGLES && device.groups.length > 0);
+    frame();
+    const translucent = () => passes.filter((p) => p.commands.some(([n, x]) => n === 'setPipeline' && isBevel(x)));
+    let draws = drawOrder(translucent(), device, camera.position);
+    assert.deepEqual(misordered(draws), []);
+    assert.equal(draws[0].kind, 'quad', 'the far water first from +z');
+    assert.ok(draws.some((d) => d.kind === 'triangle'));
+    const index = device.buffers.find((b) => b.usage & 16 && b.size === CUBE_TRIANGLES * 12),
+      sorts = writes.get(index);
+    camera.position = [1.5, 1.5, 9]; // under RESORT blocks: no new sort
+    frame();
+    assert.equal(writes.get(index), sorts);
+    camera.position = [1.5, 1.5, -4];
+    camera.target = [1.5, 1.5, 5];
+    frame();
+    assert.equal(writes.get(index), sorts + 1);
+    draws = drawOrder(translucent(), device, camera.position);
+    assert.deepEqual(misordered(draws), []);
+    assert.equal(draws.at(-1).kind, 'quad', 'the near water last from -z');
+    const words = new Uint32Array(bound(device).pool.data);
+    assert.equal(decodeQuad(words, 0).liquidDrop, 3, 'the lowered surface survives sorting');
+  } finally {
+    renderer.dispose();
+  }
+});
+
+test('bevel: translucent chunks draw back to front for each view', async () => {
+  const { world, frame, renderer, camera, passes, device, GLASS } = setup({ bevel: voxelBevel(0.15) });
+  try {
+    world.setBlocks([1, 1, 1, GLASS, 1, 1, 37, GLASS]);
+    camera.position = [1.5, 1.5, 42];
+    camera.target = [1.5, 1.5, 0];
+    await settle(frame, () => renderer.stats.triangles === 2 * CUBE_TRIANGLES && device.groups.length > 0);
+    const chunks = () =>
+      passes.flatMap((p) =>
+        p.commands
+          .filter(([name]) => name === 'setVertexBuffer')
+          .map(([, , buffer]) => Math.floor(new Float32Array(buffer.data)[2] / 32)),
+      );
+    assert.deepEqual(chunks(), [0, 1], 'far chunk before near chunk from +z');
+    camera.position = [1.5, 1.5, -4];
+    camera.target = [1.5, 1.5, 40];
+    frame();
+    assert.deepEqual(chunks(), [1, 0], 'chunk order reverses with the camera');
+  } finally {
+    renderer.dispose();
+  }
+});
+
+test('bevel: post replay and shadows draw the chamfer triangles; cutout replay alpha-tests', async () => {
+  const { world, frame, renderer, context, STONE, LEAVES } = setup({ bevel: voxelBevel(0.2) });
+  try {
+    world.addChunk(0, 0, 0);
+    world.setBlocks([16, 16, 0, STONE, 20, 16, 0, LEAVES]);
+    await settle(frame, () => renderer.stats.triangles === 2 * CUBE_TRIANGLES);
+    assert.equal(renderer.stats.quads, 0);
+    const matrix = new Float32Array([1 / 32, 0, 0, 0, 0, 1 / 32, 0, 0, 0, 0, 1 / 200, 0, -0.5, -0.5, 0.5, 1]);
+    let post = [],
+      shadow = [];
+    for (let i = 0; i < 3; i++) {
+      post = [];
+      shadow = [];
+      renderer.draw(context, 'gbuffer', {}, {}, 'all', {
+        pass: recorder(post),
+        view: new Float32Array(16),
+        depthCompare: 'equal',
+      });
+      renderer.drawShadow({ context, pass: recorder(shadow), matrix, cascade: 0 });
+      await new Promise((resolve) => setTimeout(resolve, 2));
+    }
+    for (const [name, commands] of [
+      ['post', post],
+      ['shadow', shadow],
+    ])
+      assert.equal(
+        commands.filter((c) => c[0] === 'drawIndexed' && c[1] === CUBE_TRIANGLES * 3).length,
+        2,
+        `${name} draws both chamfered blocks`,
+      );
+    const cutout = post.findLast((c) => c[0] === 'setPipeline' && isBevel(c[1]) && c[1].fragment.constants.MODE)[1];
+    assert.equal(cutout.fragment.constants.MODE, 2, 'cutout replay at 4x with an equal depth test');
+    assert.ok(!cutout.multisample.alphaToCoverageEnabled, 'replay alpha holds depth, not coverage');
+    const caster = shadow.findLast((c) => c[0] === 'setPipeline' && isBevel(c[1]))[1];
+    assert.equal(caster.fragment.entryPoint, 'bevelCutout');
+  } finally {
+    renderer.dispose();
+  }
+});
+
+test('bevel: quads and triangles share one lit shader end; shaders and pipelines are built once, not per frame', async () => {
+  const { world, frame, device, renderer, context, camera, STONE, GLASS } = setup({ bevel: voxelBevel(0.2) });
+  const modules = [],
+    create = device.createShaderModule;
+  device.createShaderModule = (d) => (modules.push(d.code), create(d));
+  device.createRenderPipeline = () => assert.fail('no synchronous pipeline compile');
+  try {
+    renderer.addLighting({
+      pbr: () => ({ declarations: '', direct: (d) => `(${d})*0.5`, output: (c) => `(${c})*0.75` }),
+      bindings: () => [],
+    });
+    renderer.lightmap = voxelLightmap({
+      texture: device.createTexture({ format: 'rgba8unorm' }),
+      positions: [16, 16, 1, 17, 16, 1, 17, 17, 1, 16, 17, 1],
+      uv: [0, 0, 1, 0, 1, 1, 0, 1],
+    });
+    world.addChunk(0, 0, 0);
+    world.setBlocks([16, 16, 0, STONE, 18, 16, 0, GLASS]);
+    await settle(frame, () => renderer.stats.triangles === 2 * CUBE_TRIANGLES && device.groups.length > 0);
+    const replay = () =>
+      renderer.draw(context, 'ambient', {}, {}, 'all', {
+        pass: recorder([]),
+        view: new Float32Array(16),
+        depthCompare: 'always',
+      });
+    for (let i = 0; i < 2; i++) {
+      replay();
+      await new Promise((resolve) => setTimeout(resolve, 2));
+      frame();
+    }
+    replay();
+    const built = modules.length,
+      groups = device.groups.length;
+    for (let i = 0; i < 20; i++) {
+      camera.position = [16 + i, 16, -40];
+      frame();
+      replay();
+    }
+    assert.equal(modules.length, built, 'no shader module after the first frames');
+    assert.equal(device.groups.length, groups, 'bind groups reused');
+    const beauty = modules.filter(
+      (code) => code.includes('@fragment fn fragment(o:Out') && !code.includes('if(false){'),
+    );
+    const quads = beauty.find((code) => code.includes('voxelHit')),
+      bevel = beauty.find((code) => code.includes('fn vertex(v:In)')),
+      end = (code) => code.slice(code.indexOf(' let tc=unpack4x8unorm'));
+    assert.ok(quads && bevel);
+    assert.equal(end(bevel), end(quads), 'the same surface, sky light, sun and lightmap code');
+    assert.ok(end(quads).includes('voxelBaked') && end(quads).includes('*0.5'), 'effects and lightmap in both');
+    assert.ok(
+      end(quads).includes(
+        '*0.75;if(f.settings.w<0.5) {color=select(color*12.92,1.055*pow(color,vec3f(1.0/2.4))-0.055,color>=vec3f(0.0031308));}',
+      ),
+      'output hook on toDisplay',
+    );
+  } finally {
+    renderer.dispose();
+  }
+});
+
+test('live lightmap binds a copied atlas mapping and can be cleared without owning its texture', async () => {
+  const { renderer, device, frame, world, STONE } = setup();
+  const texture = device.createTexture({ format: 'rgba8unorm', width: 4, height: 4 });
+  try {
+    const positions = new Float32Array([16, 16, 1, 17, 16, 1, 17, 17, 1, 16, 17, 1]);
+    renderer.lightmap = voxelLightmap({ texture, positions, uv: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), scale: 2 });
+    positions.fill(999);
+    world.addChunk(0, 0, 0);
+    world.setBlock(16, 16, 0, blockState(STONE));
+    await settle(frame, () => device.groups.some((g) => g.entries.some((e) => e.binding === 8)));
+    const group = device.groups.findLast((g) => g.entries.some((e) => e.binding === 8));
+    assert.equal(group.entries.find((e) => e.binding === 8).resource.texture, texture);
+    const charts = new Float32Array(group.entries.find((e) => e.binding === 9).resource.buffer.data);
+    assert.equal(charts[1], 2);
+    assert.equal(charts[4], 16, 'mapping copied before caller mutation');
+    renderer.lightmap = undefined;
+    await settle(
+      frame,
+      () => device.groups.findLast((g) => g.entries[0]?.resource.buffer?.size === 240)?.entries.length === 7,
+    );
+    assert.equal(texture.destroyed, false);
+    const quad = [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0],
+      uv = [0, 0, 1, 0, 1, 1, 0, 1];
+    for (const [atlas, error] of [
+      [{ positions: [0, 0, 0], uv: [] }, /quads/],
+      [{ positions: [0, 0, 0, 1, 1, 0, 1, 1, 1, 0, 0, 1], uv }, /axis-aligned/],
+      [{ positions: [...quad, ...quad], uv: [...uv, ...uv] }, /overlap/],
+      [{ positions: quad.map((x) => x + 0.5), uv }, /integer/],
+      [{ positions: quad, uv: [0, 0, 2, 0, 1, 1, 0, 1] }, /uv/],
+      [{ positions: quad, uv, scale: Infinity }, /scale/],
+      [{ positions: quad, uv, scale: 1 / Math.PI }, /scale/],
+      [{ positions: quad, uv, radiometry: 'lambertian' }, /radiometry/],
+    ])
+      assert.throws(() => voxelLightmap({ texture, ...atlas }), error);
+    assert.throws(() => {
+      renderer.lightmap = { texture, positions: quad, uv };
+    }, /voxelLightmap/);
+  } finally {
+    renderer.dispose();
+  }
+});
+
+test('lightmap: physical irradiance is divided by pi once; every chart is found within 16 probes', async () => {
+  const { renderer, device, frame, world, STONE } = setup();
+  try {
+    const count = 32768,
+      positions = new Float32Array(count * 12),
+      uv = new Float32Array(count * 8),
+      texture = device.createTexture({ format: 'rgba8unorm' });
+    for (let q = 0; q < count; q++) {
+      const x = q % 256,
+        y = q >> 8;
+      positions.set([x, y, 1, x + 1, y, 1, x + 1, y + 1, 1, x, y + 1, 1], q * 12);
+      uv.set([0, 0, 1, 0, 1, 1, 0, 1], q * 8);
+    }
+    renderer.lightmap = voxelLightmap({ texture, positions, uv, scale: 12, radiometry: 'physical' });
+    world.addChunk(0, 0, 0);
+    world.setBlock(16, 16, 0, blockState(STONE));
+    await settle(frame, () => device.groups.some((g) => g.entries.some((e) => e.binding === 10)));
+    const group = device.groups.findLast((g) => g.entries.some((e) => e.binding === 10)),
+      table = new Int32Array(group.entries.find((e) => e.binding === 10).resource.buffer.data),
+      charts = new Float32Array(group.entries.find((e) => e.binding === 9).resource.buffer.data),
+      mask = charts[2],
+      seed = charts[3];
+    assert.equal(charts[1], Math.fround(12 / Math.PI));
+    const hash = (x, y, z, face) => {
+      let h =
+        (Math.imul(x, 73856093) ^
+          Math.imul(y, 19349663) ^
+          Math.imul(z, 83492791) ^
+          Math.imul(face, 2654435761) ^
+          seed) >>>
+        0;
+      h = Math.imul(h ^ (h >>> 16), 0x7feb352d) >>> 0;
+      h = Math.imul(h ^ (h >>> 15), 0x846ca68b) >>> 0;
+      return (h ^ (h >>> 16)) & mask;
+    };
+    for (let q = 0; q < count; q++) {
+      const x = q % 256,
+        y = q >> 8,
+        start = hash(x, y, 1, 4);
+      let found = false;
+      for (let probe = 0; probe < 16 && !found; probe++) {
+        const i = ((start + probe) & mask) * 4;
+        found = table[i] === x && table[i + 1] === y && table[i + 2] === 1 && table[i + 3] === (((q + 1) << 3) | 4);
+      }
+      assert.ok(found, `chart ${q} found within 16 probes`);
+    }
+    assert.ok(table.byteLength <= 64 * 1024 * 1024);
   } finally {
     renderer.dispose();
   }

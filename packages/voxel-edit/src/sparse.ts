@@ -3,7 +3,15 @@ import type { MutableVec3, Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
 import { VoxelChunk, type VoxelWorld } from '@margoengine/voxel';
 import type { OwnedBuffer } from './bytes.js';
-import { checkCell, checkPalette, checkPoint, type GridHit, type VoxelGrid } from './grid.js';
+import {
+  checkCell,
+  checkPalette,
+  checkPoint,
+  exposedNormal,
+  type GridHit,
+  unitDirection,
+  type VoxelGrid,
+} from './grid.js';
 
 /** One cell change: local x, y, z and the new palette index (0 empties the cell). */
 export type VoxelEdit = readonly [x: number, y: number, z: number, index: number];
@@ -494,11 +502,9 @@ export class SparseGrid {
   raycast(origin: Vec3, direction: Vec3, maxDistance = Infinity): GridHit | null {
     checkPoint(origin, 'SparseGrid.raycast origin');
     checkPoint(direction, 'SparseGrid.raycast direction');
-    const length = Math.hypot(direction[0], direction[1], direction[2]);
-    if (!length) throw new RangeError('SparseGrid.raycast direction is zero; pass a nonzero direction');
+    const dir = unitDirection(direction, 'SparseGrid.raycast');
     if (!(maxDistance >= 0)) throw new RangeError('SparseGrid.raycast maxDistance is negative; pass 0 or more');
-    const dir: MutableVec3 = [direction[0] / length, direction[1] / length, direction[2] / length],
-      start: MutableVec3 = [Math.floor(origin[0]), Math.floor(origin[1]), Math.floor(origin[2])],
+    const start: MutableVec3 = [Math.floor(origin[0]), Math.floor(origin[1]), Math.floor(origin[2])],
       startValue = Number.isSafeInteger(start[0]) ? this.get(...start) : 0;
     if (startValue) return { cell: start, adjacent: tuple(start), normal: [0, 0, 0], value: startValue, distance: 0 };
     let best: GridHit | null = null;
@@ -529,16 +535,13 @@ export class SparseGrid {
         const crossing = dir.map((d, axis) => (d ? (cell[axis] + (d > 0 ? 1 : 0) - origin[axis]) / d : Infinity)),
           next = Math.min(...crossing);
         distance = next;
-        normal = [0, 0, 0];
-        let first = true;
+        const tied: number[] = [];
         for (let axis = 0; axis < 3; axis++)
           if (crossing[axis] <= next + 1e-8) {
             cell[axis] += dir[axis] > 0 ? 1 : -1;
-            if (first) {
-              normal[axis] = dir[axis] > 0 ? -1 : 1;
-              first = false;
-            }
+            tied.push(axis);
           }
+        normal = exposedNormal(cell, tied, dir, (x, y, z) => this.get(x, y, z) > 0);
         if (cell.some((v, axis) => v < low[axis] || v >= high[axis])) break;
       }
     }

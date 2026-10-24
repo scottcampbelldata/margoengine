@@ -8,6 +8,20 @@ import { SparseGrid } from '../dist/sparse.js';
 const empty = (size) => ({ size, voxels: new Uint8Array(size[0] * size[1] * size[2]) });
 const cells = (grid, indexes) => [...indexes].map((i) => cellAt(grid.size, i).join()).sort();
 
+test('raycastGrid normalizes finite directions at extreme magnitudes, dense and sparse', () => {
+  const dense = { size: [2, 1, 2], voxels: Uint8Array.from([0, 0, 0, 1]) };
+  const origin = [-0.5, 0.5, -0.5];
+  for (const grid of [dense, SparseGrid.fromGrid(dense)]) {
+    const expected = raycastGrid(grid, { origin, direction: [1, 0, 1] });
+    assert.ok(expected);
+    for (const magnitude of [Number.MAX_VALUE, Number.MIN_VALUE]) {
+      const ray = { origin, direction: [magnitude, 0, magnitude] };
+      assert.deepEqual(raycastGrid(grid, ray), expected);
+      assert.equal(raycastGrid(grid, ray, 2), null, 'maxDistance uses a unit direction');
+    }
+  }
+});
+
 test('lineCells includes both ends and handles reversed and zero-length lines', () => {
   assert.deepEqual(lineCells([0, 0, 0], [3, 1, 0]), [
     [0, 0, 0],
@@ -167,4 +181,55 @@ test('raycastGrid on a sparse grid skips empty chunks and matches the dense rule
   ]).grid;
   assert.deepEqual(raycastGrid(small, { origin: [1, 0.5, 0.5], direction: [-1, 0, 0] })?.normal, [0, 0, 0]);
   assert.deepEqual(raycastGrid(small, { origin: [4, 0.5, 0.5], direction: [-1, 0, 0] })?.normal, [1, 0, 0]);
+});
+
+test('raycastGrid on a top edge reports the exposed face, not the occupied side', () => {
+  // 5 wide x 24 tall x 2 deep solid curtain. The top edge of cell [3,23,0] has an occupied
+  // neighbour on +X and air above. A ray that crosses that edge must report the top normal
+  // so faceCells can select the face (E36).
+  const size = [6, 25, 4];
+  const grid = empty(size);
+  for (let y = 0; y < 24; y++)
+    for (let z = 0; z < 2; z++) for (let x = 0; x < 5; x++) grid.voxels[x + size[0] * (z + size[2] * y)] = 1;
+  const hit = raycastGrid(grid, { origin: [5, 26, 0.5], direction: [-1, -2, 0] });
+  assert.ok(hit, 'ray hits the curtain');
+  assert.deepEqual(hit.normal, [0, 1, 0]);
+  assert.equal(grid.voxels[hit.adjacent[0] + size[0] * (hit.adjacent[2] + size[2] * hit.adjacent[1])] ?? 0, 0);
+  assert.ok(faceCells(grid, hit.cell, hit.normal).length > 0);
+});
+
+test('exposed-face ties cover sparse grids, reversed axes and corners', () => {
+  const size = [6, 25, 4];
+  const fill = [];
+  for (let y = 0; y < 24; y++) for (let z = 0; z < 2; z++) for (let x = 0; x < 5; x++) fill.push([x, y, z, 1]);
+  const sparse = SparseGrid.empty(size).edit(fill).grid;
+  const top = raycastGrid(sparse, { origin: [5, 26, 0.5], direction: [-1, -2, 0] });
+  assert.deepEqual(top.normal, [0, 1, 0]);
+  assert.equal(sparse.get(...top.adjacent), 0);
+
+  // Bottom edge, side neighbour occupied, steeper in X than in Y: the empty face still wins.
+  const bottom = empty(size);
+  for (let y = 1; y < 24; y++)
+    for (let z = 0; z < 2; z++) for (let x = 0; x < 5; x++) bottom.voxels[x + size[0] * (z + size[2] * y)] = 1;
+  const under = raycastGrid(bottom, { origin: [7, -0.5, 0.5], direction: [-3, 1.5, 0] });
+  assert.ok(under);
+  assert.deepEqual(under.normal, [0, -1, 0]);
+  assert.equal(bottom.voxels[under.adjacent[0] + size[0] * (under.adjacent[2] + size[2] * under.adjacent[1])] ?? 0, 0);
+
+  // Corner of a box. The ray is steepest in Y, so the exposed top wins over the two sides.
+  const box = empty([8, 28, 8]);
+  for (let y = 0; y < 24; y++)
+    for (let z = 0; z < 4; z++) for (let x = 0; x < 5; x++) box.voxels[x + 8 * (z + 8 * y)] = 1;
+  const corner = raycastGrid(box, { origin: [8, 30, 7], direction: [-1, -2, -1] });
+  assert.deepEqual(corner.normal, [0, 1, 0]);
+  assert.equal(box.voxels[corner.adjacent[0] + 8 * (corner.adjacent[2] + 8 * corner.adjacent[1])] ?? 0, 0);
+  assert.ok(faceCells(box, corner.cell, corner.normal).length > 0);
+
+  // Orthographic parallel ray, and a slanted (perspective) ray, both through the exposed top.
+  const ortho = raycastGrid(box, { origin: [2.5, 40, 2.5], direction: [0, -1, 0] });
+  assert.deepEqual(ortho.normal, [0, 1, 0]);
+  const view = pickRay([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], 0.2, 0.4);
+  assert.ok(view && view.direction[2] !== 0);
+  const perspective = raycastGrid(box, { origin: [2.2, 40, 1.8], direction: [0.15, -1, 0.05] });
+  assert.deepEqual(perspective.normal, [0, 1, 0]);
 });

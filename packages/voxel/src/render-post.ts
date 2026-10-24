@@ -1,4 +1,8 @@
-/** Native compact-quad material replay. Beauty text stays byte-for-byte unchanged until a post source requests it. */
+/**
+ * A voxel beauty shader (quads or bevel triangles) turned into a post replay: the same surface, written out as view
+ * normal and depth (`gbuffer`), ambient light (`ambient`), both (`occlusion`) or a material capture (`capture`). With a
+ * lightmap, charted surfaces replay their baked ambient.
+ */
 export function voxelPostShader(
   source: string,
   mode: 'gbuffer' | 'ambient' | 'occlusion' | 'capture',
@@ -9,6 +13,9 @@ export function voxelPostShader(
     tail = source.indexOf('var color=', start),
     end = source.indexOf('\n}', tail),
     ambient = source.includes('let margoAmbient=') ? 'margoAmbient' : 'ambient(s)',
+    bakedAmbient = source.includes('var<private> voxelBaked:')
+      ? `select(${ambient},s.base.rgb*(1.0-s.metal)*voxelBaked.rgb,voxelBaked.a>0.0)`
+      : ambient,
     normal = 'vec4f(normalize((voxelPostView*vec4f(s.n,0)).xyz),-(voxelPostView*vec4f(i.position,1)).z)',
     alpha = 'select(1.0,s.base.a,MODE==3u)',
     dead = source.slice(tail, end).replace(/return (vec4f\([^\n]+?\));/g, '_=$1;');
@@ -25,19 +32,19 @@ export function voxelPostShader(
     if (ambient === 'margoAmbient') {
       declarations =
         declarations.replace(/ambient\(s\)/g, 'voxelCaptureAmbient') + '\nvar<private> voxelCaptureAmbient:vec3f;\n';
-      result += 'voxelCaptureAmbient=margoAmbient;';
+      result += `voxelCaptureAmbient=${bakedAmbient};`;
     }
     if (declarations.includes('var<private> margoPosition:')) result += 'margoPosition=i.position;';
     result += 'return margoCapture(s,v,vec3f(1));';
     output = 'MargoCapture';
-  } else if (mode === 'ambient') result = `return vec4f(${ambient},${alpha});`;
+  } else if (mode === 'ambient') result = `return vec4f(${bakedAmbient},${alpha});`;
   else {
     declarations = '@group(0) @binding(7) var<uniform> voxelPostView:mat4x4f;\n';
     if (mode === 'gbuffer') result = `return ${normal};`;
     else {
       declarations += 'struct MargoVoxelOcclusion {@location(0) normal:vec4f,@location(1) ambient:vec4f}\n';
       output = 'MargoVoxelOcclusion';
-      result = `return MargoVoxelOcclusion(${normal},vec4f(${ambient},${alpha}));`;
+      result = `return MargoVoxelOcclusion(${normal},vec4f(${bakedAmbient},${alpha}));`;
     }
   }
   return (

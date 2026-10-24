@@ -1,4 +1,5 @@
 // Export meshing: greedy quads per palette index with optional corner ambient occlusion and smoothed normals.
+import { bevelQuads } from '@margoengine/voxel/bevel';
 import type { MutableVec3, Vec3 } from '@margoengine/math';
 import { checkGrid, checkPoint, type VoxelGrid } from './grid.js';
 import { SparseGrid } from './sparse.js';
@@ -56,6 +57,55 @@ interface Parts {
 
 const MAX_QUADS = 1_000_000,
   MAX_SCAN = 134_217_728;
+
+/** One exposed cube face, in the parameterization {@link bevelQuads} expects. */
+interface RecordedFace {
+  x: number;
+  y: number;
+  z: number;
+  face: number;
+  w: number;
+  h: number;
+  palette: number;
+}
+
+/** Options of {@link chamferGrid}. */
+export interface ChamferOptions {
+  /** Chamfer width in cells, in (0, 0.5). */
+  bevel: number;
+  /** Point subtracted from every vertex, in cells. Default [0, 0, 0]. */
+  pivot?: Vec3;
+  /** Most quads, 0 to 1,000,000. Default 1,000,000. */
+  maxQuads?: number;
+  /** Most cells scanned, 1 to 134,217,728. Default 134,217,728. */
+  maxCells?: number;
+}
+
+/** Triangle mesh from {@link chamferGrid}. Not a quad mesh: do not pass it to {@link partitionMesh}. */
+export interface ChamferMesh {
+  /** xyz per vertex, in cells, minus the pivot. */
+  positions: Float32Array;
+  /** Unit xyz per vertex. Face panels keep their cube normal; corners are shared. */
+  normals: Float32Array;
+  /** Triangle vertex indexes. */
+  indices: Uint32Array;
+  /** Palette index of the source face for each triangle, in triangle order. */
+  trianglePalette: Uint8Array;
+  /** Bounds of `positions`. */
+  min: MutableVec3;
+  max: MutableVec3;
+}
+
+/** Counts of a {@link chamferGrid} call. */
+export interface ChamferStats {
+  /** Filled cells scanned. */
+  voxels: number;
+  /** Exposed faces before chamfering. */
+  quads: number;
+  triangles: number;
+  /** Faces whose inset was shortened so the panel would not cross itself. */
+  clamped: number;
+}
 
 /**
  * Meshes the faces between filled cells and air, merging same-index faces into rectangles (greedy meshing). Faces
@@ -134,6 +184,80 @@ export function meshGrid(
       max,
     },
     stats,
+  };
+}
+
+/**
+ * Chamfers the exposed faces of a grid by `bevel` cells. The hard cubic mesh stays available from {@link meshGrid}
+ * (omit a chamfer). Faces between two filled cells are not emitted, so openings stay open. A face shared by several
+ * cube corners moves once, and each triangle keeps the palette of its source face.
+ * @throws RangeError when `bevel` is outside (0, 0.5) or a budget is exceeded.
+ */
+export function chamferGrid(
+  source: VoxelGrid | SparseGrid,
+  options: ChamferOptions,
+): { mesh: ChamferMesh; stats: ChamferStats } {
+  if (typeof options !== 'object' || options === null)
+    throw new TypeError('chamferGrid options are not an object; pass {bevel}');
+  const bevel = options.bevel,
+    pivot = options.pivot ?? [0, 0, 0],
+    maxQuads = options.maxQuads ?? MAX_QUADS,
+    maxCells = options.maxCells ?? MAX_SCAN;
+  if (!(bevel > 0 && bevel < 0.5)) throw new RangeError('chamferGrid bevel must be in (0, 0.5) cells');
+  checkPoint(pivot, 'chamferGrid pivot');
+  if (!Number.isInteger(maxQuads) || maxQuads < 0 || maxQuads > MAX_QUADS)
+    throw new RangeError(`chamferGrid maxQuads must be an integer from 0 to ${MAX_QUADS}; pass one`);
+  if (!Number.isInteger(maxCells) || maxCells < 1 || maxCells > MAX_SCAN)
+    throw new RangeError(`chamferGrid maxCells must be an integer from 1 to ${MAX_SCAN}; pass one`);
+  const sparse = source instanceof SparseGrid;
+  if (!sparse) checkGrid(source, MAX_SCAN);
+  const [sx, sy, sz] = source.size,
+    sample: Sample = sparse
+      ? (x, y, z) => (x < 0 || y < 0 || z < 0 || x >= sx || y >= sy || z >= sz ? 0 : source.get(x, y, z))
+      : (x, y, z) =>
+          x < 0 || y < 0 || z < 0 || x >= sx || y >= sy || z >= sz ? 0 : source.voxels[x + sx * (z + sz * y)],
+    regions: Iterable<{ origin: Vec3; size: Vec3; voxels: Uint8Array }> = sparse
+      ? source.windows()
+      : [{ origin: [0, 0, 0], size: source.size, voxels: source.voxels }],
+    faces: RecordedFace[] = [],
+    quadStats: MeshStats = { voxels: 0, quads: 0, triangles: 0, vertices: 0 };
+  let scanned = 0;
+  for (const region of regions) {
+    scanned += region.voxels.length;
+    if (scanned > maxCells) throw new RangeError('chamferGrid scans more than maxCells; mesh less or raise maxCells');
+    greedy(sample, pivot, region.origin, region.size, region.voxels, false, maxQuads, null, quadStats, faces);
+  }
+  const built = bevelQuads(faces, bevel);
+  const positions = built.positions,
+    count = positions.length / 3;
+  for (let i = 0; i < count; i++) {
+    positions[i * 3] -= pivot[0];
+    positions[i * 3 + 1] -= pivot[1];
+    positions[i * 3 + 2] -= pivot[2];
+  }
+  const triangles = built.indices.length / 3,
+    trianglePalette = new Uint8Array(triangles);
+  // bevelQuads emits 10 triangles per face, in face order.
+  for (let face = 0; face < faces.length; face++) trianglePalette.fill(faces[face].palette, face * 10, face * 10 + 10);
+  let clamped = 0;
+  for (const face of faces) {
+    const reach = Math.hypot(face.w, face.h) / 2;
+    if (bevel > reach * 0.49) clamped++;
+  }
+  const min: MutableVec3 = [0, 0, 0],
+    max: MutableVec3 = [0, 0, 0];
+  if (positions.length) {
+    min.fill(Infinity);
+    max.fill(-Infinity);
+    for (let i = 0; i < positions.length; i++) {
+      const axis = i % 3;
+      if (positions[i] < min[axis]) min[axis] = positions[i];
+      if (positions[i] > max[axis]) max[axis] = positions[i];
+    }
+  }
+  return {
+    mesh: { positions, normals: built.normals, indices: built.indices, trianglePalette, min, max },
+    stats: { voxels: quadStats.voxels, quads: faces.length, triangles, clamped },
   };
 }
 
@@ -251,8 +375,9 @@ function greedy(
   owned: Uint8Array,
   ambientOcclusion: boolean,
   maxQuads: number,
-  out: Parts,
+  out: Parts | null,
   stats: MeshStats,
+  record?: RecordedFace[],
 ): void {
   for (const value of owned) if (value) stats.voxels++;
   const at = (p: number[]) => sample(p[0] + offset[0], p[1] + offset[1], p[2] + offset[2]),
@@ -316,24 +441,45 @@ function greedy(
           }
           if (++stats.quads > maxQuads)
             throw new RangeError('meshGrid exceeds maxQuads; mesh a smaller grid or raise maxQuads');
-          const base = out.positions.length / 3;
-          for (const [a, b] of face > 0 ? FRONT : BACK) {
-            const corner = [0, 0, 0];
-            corner[axis] = plane;
-            corner[u] = i + a * w;
-            corner[v] = j + b * h;
-            for (let d = 0; d < 3; d++) out.positions.push(Math.fround(offset[d] + corner[d] - pivot[d]));
-            out.normals.push(
-              axis === 0 ? Math.sign(face) : 0,
-              axis === 1 ? Math.sign(face) : 0,
-              axis === 2 ? Math.sign(face) : 0,
-            );
-            if (shade) out.ao.push(0.4 + ((corners >>> ((a ? (b ? 2 : 1) : b ? 3 : 0) * 2)) & 3) * 0.2);
+          if (record) {
+            const positive = face > 0,
+              uAxis = (axis + 1) % 3,
+              vAxis = (axis + 2) % 3,
+              origin = [0, 0, 0];
+            origin[axis] = positive ? plane - 1 : plane;
+            origin[uAxis] = i;
+            origin[vAxis] = j;
+            record.push({
+              x: origin[0] + offset[0],
+              y: origin[1] + offset[1],
+              z: origin[2] + offset[2],
+              face: axis * 2 + (positive ? 0 : 1),
+              // bevel u/v: ±x is (z, y), ±y is (x, z), ±z is (x, y).
+              w: axis === 2 ? w : h,
+              h: axis === 2 ? h : w,
+              palette: Math.abs(face),
+            });
           }
-          out.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
-          out.palette.push(Math.abs(face));
-          stats.triangles += 2;
-          stats.vertices += 4;
+          if (out) {
+            const base = out.positions.length / 3;
+            for (const [a, b] of face > 0 ? FRONT : BACK) {
+              const corner = [0, 0, 0];
+              corner[axis] = plane;
+              corner[u] = i + a * w;
+              corner[v] = j + b * h;
+              for (let d = 0; d < 3; d++) out.positions.push(Math.fround(offset[d] + corner[d] - pivot[d]));
+              out.normals.push(
+                axis === 0 ? Math.sign(face) : 0,
+                axis === 1 ? Math.sign(face) : 0,
+                axis === 2 ? Math.sign(face) : 0,
+              );
+              if (shade) out.ao.push(0.4 + ((corners >>> ((a ? (b ? 2 : 1) : b ? 3 : 0) * 2)) & 3) * 0.2);
+            }
+            out.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+            out.palette.push(Math.abs(face));
+            stats.triangles += 2;
+            stats.vertices += 4;
+          }
           for (let y = 0; y < h; y++) mask.fill(0, i + (j + y) * width, i + w + (j + y) * width);
           i += w;
         }

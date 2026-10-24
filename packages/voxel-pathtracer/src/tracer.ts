@@ -14,6 +14,8 @@ import {
 } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { invertMatrix } from '@margoengine/math/mat4';
+import { agx } from '../../shared/agx.js';
+import { acesNarkowicz } from '../../shared/aces.js';
 import {
   FLAG_CLAMP,
   FLAG_ENV,
@@ -54,6 +56,7 @@ import {
   buildSnapshot,
   checkNumber,
   checkVec3,
+  checkSceneStorage,
   type PackedEnvironment,
   type PackedModel,
   type SceneCache,
@@ -63,6 +66,7 @@ import {
 import { DENOISE, DISPLAY, TABLE_VEC4, TABLES, TRACE } from './shaders.js';
 import { LAMBDA_MAX, LAMBDA_MIN } from './spectrum.js';
 import { raycastSnapshot } from './traverse.js';
+import { applyView } from '../../shared/view-rect.js';
 import type {
   ResolvedTraceOptions,
   TraceVec3,
@@ -234,14 +238,13 @@ const neutral = (c: number[]) => {
     t = 1 - 1 / (0.15 * (peak - top) + 1);
   return v.map((y) => (y * top) / peak + (top - (y * top) / peak) * t);
 };
-// Narkowicz's fit after the 0.6 pre-scale his reference applies (the shader's acesNarkowicz).
-const acesNarkowicz = (c: number[]) =>
-  c.map((y) => {
-    const x = 0.6 * y;
-    return Math.min(1, Math.max(0, (x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14)));
-  });
 const toneCurve = (mode: Settings['toneMapping']) =>
-  mode === 'linear' ? (c: number[]) => c : mode === 'aces-narkowicz' ? acesNarkowicz : neutral;
+  mode === 'linear' ? (c: number[]) => c : mode === 'aces-narkowicz' ? acesNarkowicz : mode === 'agx' ? agx : neutral;
+/** Returns `s`, or throws its motion interval error when `o` opens the shutter. */
+const moving = (s: SceneSnapshot, o: Settings): SceneSnapshot => {
+  if (o.shutter > 0 && s.motionError) throw s.motionError;
+  return s;
+};
 /** 8-bit display value: sRGB, or the power 1 / gamma. */
 const encode = (v: number, gamma?: number) => {
   const x = Math.min(1, Math.max(0, v));
@@ -331,7 +334,7 @@ export class VoxelPathTracer implements EnginePlugin {
       throw new TypeError('VoxelPathTracer.attach expects (engine, {scene, ...options})');
     const { scene, ...rest } = options;
     this.#settings = settings(rest, DEFAULTS);
-    this.#snapshot = buildSnapshot(scene, this.#cache, DEFAULT_WORDS);
+    this.#snapshot = moving(buildSnapshot(scene, this.#cache, DEFAULT_WORDS), this.#settings);
     this.#newReady();
   }
 
@@ -416,7 +419,7 @@ export class VoxelPathTracer implements EnginePlugin {
   setScene(scene: VoxelTraceScene): void {
     this.#alive();
     const limit = this.#gpu ? Math.floor(this.#gpu.device.limits.maxStorageBufferBindingSize / 4) : DEFAULT_WORDS;
-    this.#snapshot = buildSnapshot(scene, this.#cache, limit);
+    this.#snapshot = moving(buildSnapshot(scene, this.#cache, limit), this.#settings);
     this.#version++;
     this.#samples = 0;
   }
@@ -446,6 +449,7 @@ export class VoxelPathTracer implements EnginePlugin {
   }
 
   #apply(next: Settings): void {
+    moving(this.#snapshot, next);
     const previous = this.#settings;
     this.#settings = next;
     if (RESETS.some((k) => !Object.is(previous[k], next[k]))) this.#restart();
@@ -641,11 +645,6 @@ export class VoxelPathTracer implements EnginePlugin {
     const device = engine.gpu;
     if (!device)
       throw new MargoError('unsupported', 'VoxelPathTracer needs the WebGPU backend; create the engine with WebGPU');
-    const limit = Math.floor(device.limits.maxStorageBufferBindingSize / 4);
-    if (this.#snapshot.voxelWords > limit)
-      throw new RangeError(
-        `VoxelPathTracer scene needs ${this.#snapshot.voxelWords * 4} bytes of voxel bricks; this device binds at most ${limit * 4}`,
-      );
     this.#engine = engine;
     this.#state(device);
   }
@@ -735,6 +734,7 @@ export class VoxelPathTracer implements EnginePlugin {
   // GPU state for `device`: layouts, empty scene buffers, pipelines compiling in the background.
   #state(device: GPUDevice): Gpu {
     if (this.#gpu?.device === device) return this.#gpu;
+    checkSceneStorage(this.#snapshot, Math.floor(device.limits.maxStorageBufferBindingSize / 4));
     if (this.#gpu) this.#release();
     const C = GPUShaderStage.COMPUTE,
       F = GPUShaderStage.FRAGMENT,
@@ -1596,7 +1596,8 @@ export class VoxelPathTracer implements EnginePlugin {
     const mode =
       (c.format === 'rgba16float' ? 1 : 0) |
       (o.toneMapping === 'linear' ? 2 : 0) |
-      (o.toneMapping === 'aces-narkowicz' ? 4 : 0);
+      (o.toneMapping === 'aces-narkowicz' ? 4 : 0) |
+      (o.toneMapping === 'agx' ? 8 : 0);
     // First-hit depth only where pixels are the camera's own perspective rays (far otherwise).
     const depth = o.projection === 'camera' && !o.distortion ? 1 / this.#samples : 0;
     v.set([denoised ? 1 : 1 / this.#samples, 2 ** o.exposure, mode, depth], 36);
@@ -1606,6 +1607,7 @@ export class VoxelPathTracer implements EnginePlugin {
       colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
       depthStencilAttachment: { view: c.depth, depthLoadOp: 'load', depthStoreOp: 'store', stencilReadOnly: true },
     });
+    applyView(pass, c);
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, denoised ? (view.resolved ? view.displayResolved! : view.displayDenoised!) : view.displayRaw!);
     pass.draw(3);

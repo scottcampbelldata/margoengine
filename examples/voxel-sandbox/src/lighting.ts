@@ -188,16 +188,14 @@ function blockLights(
       const d = (a: readonly number[]) => (a[0] - p[0]) ** 2 + (a[1] - p[1]) ** 2 + (a[2] - p[2]) ** 2;
       near.sort((a, b) => d(a) - d(b));
       clustered.setLights(
-        near
-          .slice(0, LAMPS)
-          .map(
-            (at): PointLight => ({
-              position: [at[0], at[1] + 0.2, at[2]],
-              range: 9,
-              color: [1, 0.66, 0.36],
-              intensity: 3,
-            }),
-          ),
+        near.slice(0, LAMPS).map(
+          (at): PointLight => ({
+            position: [at[0], at[1] + 0.2, at[2]],
+            range: 9,
+            color: [1, 0.66, 0.36],
+            intensity: 3,
+          }),
+        ),
       );
       last[0] = p[0];
       last[1] = p[1];

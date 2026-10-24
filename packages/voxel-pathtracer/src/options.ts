@@ -31,7 +31,7 @@ export interface Settings {
   lensRotation: number;
   shutter: number;
   clamp: number;
-  toneMapping: 'neutral' | 'linear' | 'aces-narkowicz';
+  toneMapping: 'neutral' | 'linear' | 'aces-narkowicz' | 'agx';
   gamma: number | undefined;
   bounceLimits: Required<TraceBounceLimits> | undefined;
   transparentShadows: boolean;
@@ -210,9 +210,14 @@ export function settings(input: Partial<Omit<VoxelPathTracerOptions, 'scene'>>, 
     s.clamp = v;
   }
   if (o.toneMapping !== undefined) {
-    if (o.toneMapping !== 'neutral' && o.toneMapping !== 'linear' && o.toneMapping !== 'aces-narkowicz')
+    if (
+      o.toneMapping !== 'neutral' &&
+      o.toneMapping !== 'linear' &&
+      o.toneMapping !== 'aces-narkowicz' &&
+      o.toneMapping !== 'agx'
+    )
       throw new TypeError(
-        `VoxelPathTracer toneMapping ${String(o.toneMapping)} is unknown; pass 'neutral', 'linear' or 'aces-narkowicz'`,
+        `VoxelPathTracer toneMapping ${String(o.toneMapping)} is unknown; pass 'neutral', 'linear', 'aces-narkowicz' or 'agx'`,
       );
     s.toneMapping = o.toneMapping;
   }

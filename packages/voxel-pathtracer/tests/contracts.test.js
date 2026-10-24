@@ -61,6 +61,7 @@ test('defaults: exported, frozen, and what a new tracer runs with', () => {
   assert.equal(d.maxSamples, 1024);
   assert.equal(d.denoise, false);
   assert.equal(d.toneMapping, 'neutral');
+  assert.equal(resolveTraceOptions({ toneMapping: 'agx' }).toneMapping, 'agx');
   assert.equal(d.order, 20);
   assert.equal(d.focusDistance, undefined, 'automatic focus');
   assert.deepEqual(d.fisheye, { mapping: 'equidistant', fov: 180 });

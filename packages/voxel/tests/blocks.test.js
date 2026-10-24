@@ -53,6 +53,9 @@ test('BlockTypes assigns ids in order after air and resolves every option', () =
     metalness: 0,
     emissive: 0,
     animation: { frames: 1, fps: 0 },
+    maps: { normal: 0, roughness: 0, emissive: 0 },
+    transmission: 0,
+    scatter: 0,
   });
   assert.deepEqual(blocks.get(grass).textures, [2, 2, 0, 1, 2, 2]);
   assert.deepEqual(blocks.get(grass).color, [1, 0, 0]);
@@ -81,8 +84,8 @@ test('BlockTypes validates names and options', () => {
   assert.throws(() => blocks.define('a', { metalness: Number.NaN }), RangeError);
   assert.throws(() => blocks.define('a', { emissive: Number.POSITIVE_INFINITY }), RangeError);
   assert.throws(() => blocks.define('a', { textures: [1, 2, 3, 4, 5] }), TypeError);
-  assert.throws(() => blocks.define('a', { textures: 256 }), RangeError);
-  assert.throws(() => blocks.define('a', { textures: 253, animation: { frames: 4, fps: 1 } }), RangeError);
+  assert.throws(() => blocks.define('a', { textures: 2048 }), RangeError);
+  assert.throws(() => blocks.define('a', { textures: 2045, animation: { frames: 4, fps: 1 } }), RangeError);
   assert.throws(() => blocks.define('a', { animation: { frames: 0, fps: 1 } }), RangeError);
   assert.throws(() => blocks.define('a', { animation: { frames: 2, fps: -1 } }), RangeError);
   assert.throws(() => blocks.define('a', { color: 'red' }), TypeError);
@@ -92,6 +95,12 @@ test('BlockTypes validates names and options', () => {
   // Nothing was defined by the failed calls.
   assert.equal(blocks.table.length, 2);
   assert.equal(blocks.define('a'), 2);
+  assert.throws(() => blocks.define('b', { maps: { normal: 2048 } }), RangeError);
+  assert.throws(() => blocks.define('b', { transmission: 2 }), RangeError);
+  const glass = blocks.define('glass', { maps: { normal: 1 }, transmission: 0.5, scatter: 0.25 });
+  assert.deepEqual(blocks.get(glass).maps, { normal: 1, roughness: 0, emissive: 0 });
+  assert.equal(blocks.get(glass).transmission, 0.5);
+  assert.equal(blocks.get(glass).scatter, 0.25);
 });
 
 test('BlockTypes holds 65,536 ids, the 16 bits of a block state', () => {

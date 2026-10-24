@@ -5,7 +5,6 @@
 import type {
   ResolvedTraceMaterial,
   TraceModelBlock,
-  TraceAreaLight,
   TraceTexture,
   TraceEnvironment,
   TraceEnvironmentMap,
@@ -16,8 +15,10 @@ import type {
   TraceVec3,
   VoxelTraceScene,
 } from './types.js';
+import { rectFrame } from '../../shared/rect-frame.js';
 import { bakeSky, SKY_HEIGHT, SKY_WIDTH } from './sky.js';
 import { cauchyB } from './spectrum.js';
+import { type InstanceMotion, instanceMotion } from './motion.js';
 
 /** Voxels per brick edge. Bricks are the coarse traversal level. */
 const BRICK = 8;
@@ -33,8 +34,11 @@ const MAX_TEXTURES = 4096;
 /** Words per model record: size xyz, grid offset, bricks xyz, material table << 8, first emitter word, emitters,
  * emitter total, 0. */
 export const MODEL_WORDS = 12;
-/** Words per instance record: to-local rows, to-world rows, previous to-world rows, model, flags, light pick, 0. */
+/** Words per instance record: to-local rows, to-world rows, previous to-world rows, model, flags, light pick, TRS
+ * packet word (16 words after the hierarchy nodes, for motionInterpolation 'trs'). */
 export const INSTANCE_WORDS = 40;
+/** Words per TRS motion packet. */
+export const MOTION_WORDS = 16;
 /** Words per hierarchy node. */
 export const NODE_WORDS = 8;
 /** Model cells per axis at most (emissive faces store each coordinate in 16 bits). */
@@ -103,6 +107,8 @@ interface SnapshotInstance {
   readonly toLocal: Float64Array;
   /** Shutter-open transform rows, when the instance moves. */
   readonly previous?: Float64Array;
+  /** Explicit TRS temporal payload; undefined for default matrix interpolation. */
+  readonly motion?: Float32Array;
   /** World bounds `[minX, minY, minZ, maxX, maxY, maxZ]` over both transforms. */
   readonly box: Float64Array;
   /** Probability that light sampling picks this instance (0 without emissive faces). */
@@ -184,6 +190,8 @@ export interface SceneSnapshot {
   readonly emissiveCdf: Float32Array;
   /** Whether any instance has a previous transform (motion blur). */
   readonly moving: boolean;
+  /** The first visible instance whose motion interval failed its check; the tracer refuses it when shutter > 0. */
+  readonly motionError?: RangeError;
   /**
    * Instances whose deflection of distant light is light-sampled, pairs of GPU index and IOR: up to MAX_DEFLECTORS
    * glass instances (IOR) and as many mirror instances (IOR 0).
@@ -1090,32 +1098,36 @@ function fogHemisphere(g: number): Float32Array {
 
 function packLights(list: unknown): { lights: Float32Array; count: number; power: number } {
   if (list === undefined) return { lights: new Float32Array(0), count: 0, power: 0 };
-  const lights = checkList<TraceAreaLight>(list, 'lights');
+  const lights = checkList<NonNullable<VoxelTraceScene['lights']>[number]>(list, 'lights');
   if (lights.length > MAX_LIGHTS)
     throw new RangeError(`${where} scene.lights has ${lights.length} lights; at most ${MAX_LIGHTS} are supported`);
   const out: number[] = [],
-    ids = new Set<string>(),
     weights: number[] = [];
   for (const [i, light] of lights.entries()) {
     const name = `scene.lights[${i}]`;
-    if (!isObject(light)) throw new TypeError(`${where} ${name} must be {id, position, edgeU, edgeV}`);
-    const id = checkId(light.id, `${name}.id`);
-    if (ids.has(id)) throw new TypeError(`${where} ${name}.id '${id}' is used twice; give every light its own id`);
-    ids.add(id);
-    const p = checkVec3(light.position, `${name}.position`, false, 'pass a world point'),
-      u = checkVec3(light.edgeU, `${name}.edgeU`, false, 'pass an edge vector'),
-      v = checkVec3(light.edgeV, `${name}.edgeV`, false, 'pass an edge vector'),
+    if (!isObject(light)) throw new TypeError(`${where} ${name} must be {position, direction, width, height}`);
+    const c = checkVec3(light.position, `${name}.position`, false, 'pass a world point'),
+      d = checkVec3(light.direction, `${name}.direction`, false, 'pass the side the light faces'),
+      width = checkNumber(light.width, `${name}.width`, 0, 1e9, 'pass a size above 0'),
+      height = checkNumber(light.height, `${name}.height`, 0, 1e9, 'pass a size above 0'),
+      hint = light.up === undefined ? undefined : checkVec3(light.up, `${name}.up`, false, 'pass an up hint'),
       color = light.color === undefined ? [1, 1, 1] : checkVec3(light.color, `${name}.color`, true, 'pass linear RGB'),
       intensity = optional(light.intensity, 1, `${name}.intensity`, 0, 1e6, 'pass 0 or more');
+    if (!(width > 0 && height > 0 && Math.hypot(d[0], d[1], d[2]) > 0))
+      throw new RangeError(`${where} ${name} has no area; pass width and height above 0 and a nonzero direction`);
     if (light.twoSided !== undefined && typeof light.twoSided !== 'boolean')
       throw new TypeError(`${where} ${name}.twoSided must be true or false`);
     if (light.visible !== undefined && typeof light.visible !== 'boolean')
       throw new TypeError(`${where} ${name}.visible must be true or false`);
     if (light.opaque !== undefined && typeof light.opaque !== 'boolean')
       throw new TypeError(`${where} ${name}.opaque must be true or false`);
+    // The rectangle as a corner and two edges, framed as clustered frames it: it faces cross(u, v) = direction.
+    const { right, up } = rectFrame(d, hint, `${where} ${name}`),
+      u = right.map((x) => x * width),
+      v = up.map((x) => x * height),
+      p = c.map((x, a) => x - u[a] / 2 - v[a] / 2);
     const opaque = light.opaque !== false;
-    const area = Math.hypot(u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]);
-    if (!(area > 1e-12)) throw new RangeError(`${where} ${name} has no area (edges zero or parallel); pass two edges`);
+    const area = width * height;
     if (light.visible === false) continue;
     const radiance = [color[0] * intensity, color[1] * intensity, color[2] * intensity],
       power = luminance(radiance[0], radiance[1], radiance[2]) * area * (light.twoSided ? 2 : 1);
@@ -1312,7 +1324,8 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
   // Instances.
   const visible: SnapshotInstance[] = [],
     instanceIds = new Set<string>();
-  let moving = false;
+  let moving = false,
+    motionError: RangeError | undefined;
   for (const [i, instance] of instances.entries()) {
     const name = `scene.instances[${i}]`;
     if (!isObject(instance)) throw new TypeError(`${where} ${name} must be {id, modelId, matrix}`);
@@ -1331,23 +1344,34 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
         instance.previousMatrix === undefined
           ? undefined
           : affineRows(instance.previousMatrix, `${name}.previousMatrix`);
+    const interpolation = instance.motionInterpolation === undefined ? 'matrix' : instance.motionInterpolation;
+    if (interpolation !== 'matrix' && interpolation !== 'trs')
+      throw new TypeError(`${where} ${name}.motionInterpolation must be 'matrix' or 'trs'`);
     if (instance.visible !== undefined && typeof instance.visible !== 'boolean')
       throw new TypeError(`${where} ${name}.visible must be true or false`);
     if (instance.visible === false) continue;
     const box = new Float64Array([Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity]),
       size = packed[model].size;
-    growBox(box, toWorld, size);
-    if (previous) {
-      growBox(box, previous, size);
+    let temporal: InstanceMotion | undefined;
+    if (previous)
+      try {
+        temporal = instanceMotion(previous, toWorld, size, interpolation, name);
+      } catch (error) {
+        // Only a shutter above 0 uses the interval: the tracer refuses this scene then (see SceneSnapshot.motionError).
+        motionError ??= error as RangeError;
+      }
+    if (temporal) {
+      box.set(temporal.bounds);
       moving = true;
-    }
+    } else growBox(box, toWorld, size);
     visible.push({
       id,
       source: i,
       model,
       toWorld,
       toLocal: invertRows(toWorld),
-      previous,
+      previous: temporal && previous,
+      motion: temporal?.payload,
       box,
       lightPick: 0,
       prism: false,
@@ -1418,30 +1442,21 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
   }
   // The environment texels and the scene buffer (records, block textures, then the lights: emissive tables, area
   // lights, environment CDFs) must fit too.
-  const env = environment.map,
-    faces = emitters.reduce((n, e) => n + e.cdf.length, 0),
-    records =
-      4 +
-      packed.length * MODEL_WORDS +
-      ordered.length * INSTANCE_WORDS +
-      nodes.length +
-      textures.reduce((n, t) => n + 4 + t.texels.length, 0),
-    lightWords =
-      records +
-      4 +
-      2 * MAX_DEFLECTORS * 2 +
-      picks.length * 2 +
-      faces * 3 +
-      lightCount * 16 +
-      (env ? env.height + env.width * env.height : 0);
-  if (env && env.width * env.height * 4 > maxWords)
-    throw new RangeError(
-      `${where} scene.environment.map ${env.width}x${env.height} needs ${env.width * env.height * 16} bytes; this device binds at most ${maxWords * 4}; pass a smaller map`,
-    );
-  if (lightWords > maxWords)
-    throw new RangeError(
-      `${where} scene's records, textures and light tables (${faces} emissive voxel faces) need ${lightWords * 4} bytes and this device binds at most ${maxWords * 4}; use fewer emissive voxels, instances or textures`,
-    );
+  checkSceneStorage(
+    {
+      models: packed,
+      instances: ordered,
+      nodes,
+      textures,
+      environment,
+      emitters,
+      emissiveInstances: { length: picks.length },
+      lightCount,
+      voxelWords,
+      materials: { length: tables.length * 256 * MATERIAL_FLOATS },
+    },
+    maxWords,
+  );
   // Success: keep the packed models (and only those) and the environment tables for the next scene.
   cache.models = reused;
   cache.keys = keys;
@@ -1466,6 +1481,7 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
     emissiveInstances: Uint32Array.from(picks),
     emissiveCdf,
     moving,
+    motionError,
     deflectors: deflectorTable(
       ordered,
       packed,
@@ -1509,13 +1525,57 @@ function concatTables(tables: readonly Float32Array[]): Float32Array {
   return out;
 }
 
-/** Words of the scene buffer before the lights: header, models, instances, hierarchy nodes, block textures. */
-export function sceneRecordWords(s: SceneSnapshot): number {
+/** What the storage check reads from a snapshot. */
+interface SceneStorage {
+  readonly models: { readonly length: number };
+  readonly instances: readonly { readonly motion?: Float32Array }[];
+  readonly nodes: { readonly length: number };
+  readonly textures: SceneSnapshot['textures'];
+  readonly environment: Pick<ResolvedEnvironment, 'map'>;
+  readonly emitters: readonly { readonly cdf: { readonly length: number } }[];
+  readonly emissiveInstances: { readonly length: number };
+  readonly lightCount: number;
+  readonly voxelWords: number;
+  readonly materials: { readonly length: number };
+}
+
+/** Words of the scene buffer before the lights: header, models, instances, TRS packets, nodes, block textures. */
+export function sceneRecordWords(s: Pick<SceneStorage, 'models' | 'instances' | 'nodes' | 'textures'>): number {
   return (
     4 +
     s.models.length * MODEL_WORDS +
-    s.instances.length * INSTANCE_WORDS +
+    s.instances.reduce((n, v) => n + INSTANCE_WORDS + (v.motion ? MOTION_WORDS : 0), 0) +
     s.nodes.length +
     s.textures.reduce((n, t) => n + 4 + t.texels.length, 0)
   );
+}
+
+/** Throws RangeError when the scene's buffers exceed `maxWords` (checked again on attach and device restore). */
+export function checkSceneStorage(s: SceneStorage, maxWords: number): void {
+  if (s.voxelWords > maxWords)
+    throw new RangeError(
+      `${where} scene needs ${s.voxelWords * 4} bytes of voxel bricks; this device binds at most ${maxWords * 4}; use fewer or smaller models`,
+    );
+  if (s.materials.length > maxWords)
+    throw new RangeError(
+      `${where} scene's material tables need ${s.materials.length * 4} bytes; this device binds at most ${maxWords * 4}; share tables between models`,
+    );
+  const env = s.environment.map,
+    faces = s.emitters.reduce((n, e) => n + e.cdf.length, 0),
+    lightWords =
+      sceneRecordWords(s) +
+      4 +
+      2 * MAX_DEFLECTORS * 2 +
+      s.emissiveInstances.length * 2 +
+      faces * 3 +
+      s.lightCount * 16 +
+      (env ? env.height + env.width * env.height : 0);
+  if (env && env.width * env.height * 4 > maxWords)
+    throw new RangeError(
+      `${where} scene.environment.map ${env.width}x${env.height} needs ${env.width * env.height * 16} bytes; this device binds at most ${maxWords * 4}; pass a smaller map`,
+    );
+  if (lightWords > maxWords)
+    throw new RangeError(
+      `${where} scene's records, textures and light tables (${faces} emissive voxel faces) need ${lightWords * 4} bytes and this device binds at most ${maxWords * 4}; use fewer emissive voxels, instances or textures`,
+    );
 }
