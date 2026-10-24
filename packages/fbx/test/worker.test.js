@@ -108,3 +108,11 @@ test('FBX worker preserves unsupported inheritance errors from the native parser
       /unsupported InheritType/,
     );
   }));
+
+test('without Workers, parseFBXInWorker loads the converter lazily and builds the same model as parseFBX', () =>
+  headlessModels(async () => {
+    const { parseFBXInWorker } = await import('../dist/worker.js');
+    const bytes = new TextEncoder().encode(rigFixture());
+    const main = await parseFBX(await headless(), bytes.slice());
+    assertSameBytes(snapshot(await parseFBXInWorker(await headless(), bytes.slice())), snapshot(main));
+  }));

@@ -2,7 +2,8 @@ import type { EngineKernel } from '@margoengine/core';
 import type { PBRModel } from '@margoengine/gltf-pro';
 import { modelFromPrepared, type PreparedGLTF } from '@margoengine/gltf-pro/worker';
 import { canUseWorker, movable, runWorker } from '../../shared/worker.js';
-import { loadFBX, parseFBX, type FBXOptions } from './index.js';
+import type { FBXOptions } from './index.js';
+// The main-thread fallback loads the converter lazily, so the worker entry stays small.
 const workerURL = () => new URL(/* @vite-ignore */ './workers/fbx.js?no-inline', import.meta.url);
 // Texture paths resolve against the page here, so the worker gets them absolute ('' is the page's folder).
 const absolute = (path: string | undefined) =>
@@ -17,7 +18,7 @@ export async function parseFBXInWorker(
   input: ArrayBuffer | ArrayBufferView,
   options: FBXOptions = {},
 ): Promise<PBRModel> {
-  if (!canUseWorker() || options.fetch) return parseFBX(engine, input, options);
+  if (!canUseWorker() || options.fetch) return (await import('./index.js')).parseFBX(engine, input, options);
   const prepared = await runWorker<PreparedGLTF>(
     workerURL(),
     { input: movable(input), resourcePath: absolute(options.resourcePath ?? ''), allowedURLs: options.allowedURLs },
@@ -31,7 +32,7 @@ export async function loadFBXInWorker(
   url: string | URL,
   options: FBXOptions = {},
 ): Promise<PBRModel> {
-  if (!canUseWorker() || options.fetch) return loadFBX(engine, url, options);
+  if (!canUseWorker() || options.fetch) return (await import('./index.js')).loadFBX(engine, url, options);
   const target = new URL(url, globalThis.location.href);
   if (!['http:', 'https:'].includes(target.protocol)) throw new TypeError('FBX URL needs HTTP(S)');
   const prepared = await runWorker<PreparedGLTF>(

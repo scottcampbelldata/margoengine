@@ -139,6 +139,11 @@ installation. The opaque snapshot is shared per engine and released with its fin
 recreates installation-owned glTF texture uploads and capture resources. Caller-owned views and samplers require fresh
 GPU resources and extension reassignment or reinstallation after device restoration.
 
+## Atlas (`@margoengine/materials/atlas`)
+
+`packAtlas` and `transformUVs` (also on the root) without the material classes or gltf-pro, for bakers that only pack
+images (`@margoengine/lightmap` does).
+
 ## Node materials
 
 `nodeMaterial(graph, options?)` compiles a small TypeScript object graph into one `MaterialExtension`. Connect nodes by object reference, list at least the output in `graph.nodes`, then assign the result to a primitive or material's extension slot:

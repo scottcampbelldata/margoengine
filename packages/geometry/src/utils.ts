@@ -755,3 +755,6 @@ export function wireframePositions(data: GeometryData, offsetY = 0): Float32Arra
   }
   return positions;
 }
+// `@margoengine/geometry/utils` serves this module, so it carries the geometry data helpers too.
+export type { GeometryData, GeometryGroup } from './data.js';
+export { geometryData, toGeometry, pbrVertexStream, footprintRadius } from './data.js';

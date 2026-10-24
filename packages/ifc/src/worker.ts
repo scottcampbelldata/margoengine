@@ -1,4 +1,4 @@
-import { LoaderError } from '@margoengine/loaders';
+import { LoaderError } from '@margoengine/loaders/common';
 import { movable, runWorker } from '../../shared/worker.js';
 import type { IFCOptions, IFCResult } from './index.js';
 

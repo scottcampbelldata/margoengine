@@ -2,7 +2,7 @@
 // AO, then HDR encoding. Optional passes plug in through `Extension`, so the plain entry carries none of their code.
 import { type BakeLight, bakeVertexColors } from '@margoengine/bvh/bake';
 import { MeshBVH } from '@margoengine/bvh/tree';
-import { packAtlas } from '@margoengine/materials';
+import { packAtlas } from '@margoengine/materials/atlas';
 import type { MutableVec3 } from '@margoengine/math';
 import { cross, dot, length, normalize } from '@margoengine/math/vec3';
 import type { Lightmap, LightmapChart, LightmapOptions, LightmapQuads, LightmapSurface } from './index.js';

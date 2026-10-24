@@ -1,4 +1,4 @@
-import { textureCoordinates, type TextureTransform } from '@margoengine/gltf-pro';
+import { textureCoordinates, type TextureTransform } from '@margoengine/gltf-pro/coordinates';
 import type { ClearcoatTextureSlot } from './shader.js';
 
 export const coordinateWGSL =

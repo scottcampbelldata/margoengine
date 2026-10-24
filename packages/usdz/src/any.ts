@@ -1,4 +1,4 @@
-import type { BinaryInput } from '@margoengine/loaders';
+import type { BinaryInput } from '@margoengine/loaders/common';
 import { parseUSDA, parseUSDC, parseUSDZ, type USDAsset, type USDOptions } from './index.js';
 /** USDZ, USDC or USDA by content (ZIP magic, Crate magic, else text). */
 export async function parseUSD(input: string | BinaryInput, options: USDOptions): Promise<USDAsset> {

@@ -21,6 +21,10 @@
       "types": "./dist/vat.d.ts",
       "import": "./dist/vat.js"
     },
+    "./sampling": {
+      "types": "./dist/sampling.d.ts",
+      "import": "./dist/sampling.js"
+    },
     "./skeleton-utils": {
       "types": "./dist/skeleton-utils.d.ts",
       "import": "./dist/skeleton-utils.js"

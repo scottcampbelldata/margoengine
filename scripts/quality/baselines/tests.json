@@ -1,7 +1,7 @@
 {
   "gate": "tests",
   "about": "packages with no test in verify; public entries no test imports",
-  "total": 51,
+  "total": 49,
   "history": [
     {
       "date": "2026-10-24",
@@ -15,7 +15,6 @@
     "unimported @margoengine/creative/planet": 1,
     "unimported @margoengine/creative/stars": 1,
     "unimported @margoengine/creative/targets": 1,
-    "unimported @margoengine/fbx/worker": 1,
     "unimported @margoengine/machinery/assembly": 1,
     "unimported @margoengine/machinery/cad-async": 1,
     "unimported @margoengine/machinery/clearance": 1,
@@ -58,7 +57,6 @@
     "unimported @margoengine/sky/night": 1,
     "unimported @margoengine/sky/preetham": 1,
     "unimported @margoengine/sky/reflection": 1,
-    "unimported @margoengine/usdz/worker": 1,
     "unimported @margoengine/vfx/obstacles": 1,
     "unimported @margoengine/vfx/sort": 1,
     "unimported @margoengine/vfx/wrap": 1

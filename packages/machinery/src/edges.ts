@@ -8,7 +8,7 @@ import {
   type PassContext,
   type Geometry,
 } from '@margoengine/core/extension';
-import { edgesGeometry } from '@margoengine/geometry';
+import { edgesGeometry } from '@margoengine/geometry/utils';
 import { declaration } from './section-uniform.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number; INDIRECT: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };

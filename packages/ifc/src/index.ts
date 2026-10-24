@@ -5,7 +5,7 @@ import {
   type LoadedGeometry,
   type LoadedGroup,
   type ParseLimits,
-} from '@margoengine/loaders';
+} from '@margoengine/loaders/common';
 import { checkStep } from './step.js';
 
 export interface IFCOptions extends ParseLimits {

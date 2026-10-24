@@ -1,7 +1,8 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin } from '@margoengine/core/extension';
-import { planeGeometry, computeVertexNormals, type GeometryData } from '@margoengine/geometry';
+import { planeGeometry } from '@margoengine/geometry/primitives';
+import { computeVertexNormals, type GeometryData } from '@margoengine/geometry/utils';
 import type { HeightField } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
 

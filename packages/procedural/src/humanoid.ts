@@ -1,5 +1,6 @@
 import { PbrMaterial, type EngineKernel, type Mesh, type Geometry } from '@margoengine/core';
-import { toGeometry, capsuleGeometry, sphereGeometry } from '@margoengine/geometry';
+import { capsuleGeometry, sphereGeometry } from '@margoengine/geometry/primitives';
+import { toGeometry } from '@margoengine/geometry/utils';
 
 /**
  * Builds a simple capsule-and-sphere humanoid rig under a new root mesh. `materials` dress, in order, the torso, head

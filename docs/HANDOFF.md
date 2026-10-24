@@ -2,6 +2,17 @@
 
 Last updated 2026-10-24. Read this first when starting a new session. Update it whenever work lands.
 
+## Landed 2026-10-24: modularity (static leaks 78 -> 28)
+
+gltf-pro imported two KTX2 helpers from the decoders root statically while also `import()`ing it, so bundlers put
+the whole decoders module into every gltf-pro user's startup. The helpers now come from `@margoengine/decoders/texture`
+(startup gzip: gltf-pro 525,254 -> 49,465 B, materials 577,486 -> 102,178 B, fbx/worker 553,075 -> 44,092 B). Nine
+small entries let packages skip heavy roots (decoders/texture, gltf-pro/coordinates, materials/atlas,
+animation/sampling, loaders/common, loaders/usd, geometry/shapes, geometry/primitives, geometry/utils); the fbx and
+usdz worker entries load their main-thread fallback with `import()`. No renames; list in
+[renames-2026-10-24.md](renames-2026-10-24.md). The 28 leaks left are real layering (entries that build a gltf-pro
+`PBRModel`, raycast with bvh, or draw lines and text); making them lazy would make synchronous APIs async.
+
 ## Landed 2026-10-24: quality gate (`npm run quality`, in verify and CI)
 
 Five ratchets, rules in [conventions.md](conventions.md#quality-gate), baselines in `scripts/quality/baselines/`.

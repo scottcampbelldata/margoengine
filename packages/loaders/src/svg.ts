@@ -1,4 +1,5 @@
-import { geometryData, type GeometryData, type Shape } from '@margoengine/geometry';
+import { geometryData, type GeometryData } from '@margoengine/geometry/utils';
+import type { Shape } from '@margoengine/geometry/shapes';
 import { LoaderError } from './types.js';
 import { toBytes, type BinaryInput } from './util.js';
 import { decodeXML, readXMLTree, type XMLElement } from './xml.js';

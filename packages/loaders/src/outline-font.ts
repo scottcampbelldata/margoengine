@@ -1,4 +1,4 @@
-import type { Shape } from '@margoengine/geometry';
+import type { Shape } from '@margoengine/geometry/shapes';
 import { outlineShapes, type OutlineCommand, type OutlineFillRule } from './outline.js';
 
 /** One glyph of an `OutlineFont`, in font units: y up, origin on the baseline at the pen position. */

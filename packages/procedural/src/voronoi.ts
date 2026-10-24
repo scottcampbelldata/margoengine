@@ -1,7 +1,7 @@
 // Delaunay triangulation (2D) and tetrahedralization (3D) by Bowyer-Watson, Voronoi cells clipped from the bounds by the
 // bisectors of each site's Delaunay neighbours, and mesh fracture along the 3D cells.
 import { Geometry } from '@margoengine/core';
-import { triangulate } from '@margoengine/geometry';
+import { triangulate } from '@margoengine/geometry/shapes';
 
 /** minX, minY, maxX, maxY. */
 export type Bounds2 = readonly [number, number, number, number];

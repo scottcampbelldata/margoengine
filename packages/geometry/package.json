@@ -18,6 +18,18 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./shapes": {
+      "types": "./dist/shapes.d.ts",
+      "import": "./dist/shapes.js"
+    },
+    "./primitives": {
+      "types": "./dist/primitives.d.ts",
+      "import": "./dist/primitives.js"
+    },
+    "./utils": {
+      "types": "./dist/utils.d.ts",
+      "import": "./dist/utils.js"
+    },
     "./extras": {
       "types": "./dist/extras.d.ts",
       "import": "./dist/extras.js"

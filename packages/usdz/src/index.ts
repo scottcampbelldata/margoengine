@@ -5,11 +5,9 @@ import {
   readZipEntry,
   fetchBytes,
   computeVertexNormals,
-  readUSDA,
-  type USDPrim,
-  type USDValue,
   type BinaryInput,
-} from '@margoengine/loaders';
+} from '@margoengine/loaders/common';
+import { readUSDA, type USDPrim, type USDValue } from '@margoengine/loaders/usd';
 import { parseCrate, type Specs } from './crate.js';
 import type { GLTFDocument, GLTFMaterial, GLTFNode } from '../../shared/gltf.js';
 

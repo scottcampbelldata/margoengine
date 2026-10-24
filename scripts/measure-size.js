@@ -24,6 +24,7 @@ export const external = [
   '@margoengine/shadows',
   '@margoengine/decoders',
   '@margoengine/decoders/meshopt',
+  '@margoengine/decoders/texture',
   'margoengine',
   'react',
   'react/jsx-runtime',

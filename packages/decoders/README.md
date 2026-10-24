@@ -29,6 +29,12 @@ or `new Texture(await ktx2.transcode(bytes))`, which uploads the transcoded mips
 
 `decodeMeshoptBuffer(source, count, stride, mode, filter)` decodes one `EXT_meshopt_compression` bufferView (ATTRIBUTES, TRIANGLES or INDICES, with the OCTAHEDRAL, QUATERNION and EXPONENTIAL filters) and returns a `Uint8Array`. It is pure TypeScript, synchronous and needs no Wasm. Output matches the meshoptimizer reference decoder bit for bit. `MeshoptDecoder` has the members of the meshoptimizer project's own decoder object (`supported`, `ready`, `decodeGltfBuffer`), so glTF loaders written against that interface work unchanged. The extension only allows vertex codec version 0, so version 1 streams are rejected with a clear error.
 
+## Texture upload (`@margoengine/decoders/texture`)
+
+`getSupportedTranscodeFormat`, `getBytesPerRow` and `createKTX2Texture` (also on the root) without the transcoder or the
+Draco and meshopt modules, for code that uploads textures a `KTX2Decoder` already transcoded. gltf-pro imports these
+from here and loads the root only when a file needs decoding.
+
 ## PNG (`@margoengine/decoders/png`)
 
 `decodePNG(bytes, {maxPixels?})` reads any valid PNG (W3C PNG Specification, Third Edition) to

@@ -1,13 +1,6 @@
-import {
-  boxGeometry,
-  cylinderGeometry,
-  extrudeGeometry,
-  Shape,
-  mergeGeometries,
-  computeTangents,
-  applyMatrix4,
-  type GeometryData,
-} from '@margoengine/geometry';
+import { boxGeometry, cylinderGeometry } from '@margoengine/geometry/primitives';
+import { extrudeGeometry, Shape } from '@margoengine/geometry/shapes';
+import { mergeGeometries, computeTangents, applyMatrix4, type GeometryData } from '@margoengine/geometry/utils';
 
 import type { HeightField } from '@margoengine/math';
 

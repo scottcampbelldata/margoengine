@@ -1,8 +1,5 @@
+import { coneGeometry, cylinderGeometry, sphereGeometry, icosahedronGeometry } from '@margoengine/geometry/primitives';
 import {
-  coneGeometry,
-  cylinderGeometry,
-  sphereGeometry,
-  icosahedronGeometry,
   geometryData,
   mergeGeometries,
   mergeVertices,
@@ -11,7 +8,7 @@ import {
   toNonIndexed,
   applyMatrix4,
   type GeometryData,
-} from '@margoengine/geometry';
+} from '@margoengine/geometry/utils';
 
 function placed(
   data: GeometryData,

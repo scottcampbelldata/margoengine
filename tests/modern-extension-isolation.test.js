@@ -7,6 +7,7 @@ test('optional packages stay isolated and an accessor-only import discards rende
     '@margoengine/core',
     '@margoengine/core/extension',
     '@margoengine/animation',
+    '@margoengine/animation/sampling',
     '@margoengine/gltf-pro',
     '@margoengine/blender',
   ];

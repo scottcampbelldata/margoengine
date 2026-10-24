@@ -1,4 +1,4 @@
-import { Path, Shape } from '@margoengine/geometry';
+import { Path, Shape } from '@margoengine/geometry/shapes';
 
 /**
  * One drawing command of a 2D outline, in absolute coordinates: move, line, quadratic Bézier (control, end), cubic

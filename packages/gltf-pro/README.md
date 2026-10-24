@@ -22,6 +22,8 @@ buffers. Caller-provided deformation buffers need `COPY_SRC` for CPU snapshots.
 Use `import {GLTFAsset} from '@margoengine/gltf-pro/asset'` for accessor decoding
 without loading PBR rendering or its shaders. The root export retains the same
 constructor; `GLTFDocument` is available as a type from either entry.
+`@margoengine/gltf-pro/coordinates` exports `textureCoordinates` and the `TextureTransform` type (also on the root)
+for material extensions that read texture coordinates without loading the renderer.
 
 Optional WebGPU glTF 2.0 metallic-roughness rendering, separate from the frozen core and stage. The public npm name follows this repository's scope: `@margoengine/gltf-pro`.
 

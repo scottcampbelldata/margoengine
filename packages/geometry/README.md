@@ -51,6 +51,13 @@ Every function returns a plain `GeometryData` (`positions`, `normals`, `uvs`, `i
 | `loopSubdivide` |
 | `roundedBoxGeometry`, `convexGeometry`, `parametricGeometry`, `decalGeometry` from `@margoengine/geometry/extras` |
 
+## Smaller entries
+
+The root exports everything. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
+shapes, triangulation, `extrudeGeometry`, `shapeGeometry`), `@margoengine/geometry/primitives` (the solids and
+polyhedra) and `@margoengine/geometry/utils` (`geometryData`, `toGeometry`, merging, normals, tangents, edges and
+the other helpers). They are the same functions as the root's.
+
 ## Extras
 
 `@margoengine/geometry/extras` holds four more generators, in their own entry so the main one keeps its size. Each

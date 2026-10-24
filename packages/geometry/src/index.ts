@@ -1,5 +1,4 @@
 export type { GeometryData, GeometryGroup } from './data.js';
-export { geometryData, toGeometry, pbrVertexStream, footprintRadius } from './data.js';
 export type { Vec } from './math.js';
 export { Curve, type FrenetFrames } from './curve.js';
 export {
@@ -30,14 +29,12 @@ export {
   torusGeometry,
   torusKnotGeometry,
   tubeGeometry,
-} from './primitives.js';
-export {
   dodecahedronGeometry,
   icosahedronGeometry,
   octahedronGeometry,
   polyhedronGeometry,
   tetrahedronGeometry,
-} from './polyhedra.js';
+} from './primitives.js';
 export { extrudeGeometry, shapeGeometry, type ExtrudeOptions } from './extrude.js';
 export {
   applyMatrix4,
@@ -55,5 +52,9 @@ export {
   wireframePositions,
   type CreasedNormalsOptions,
   type MergeVerticesOptions,
+  geometryData,
+  toGeometry,
+  pbrVertexStream,
+  footprintRadius,
 } from './utils.js';
 export { loopSubdivide } from './subdivide.js';

@@ -156,6 +156,11 @@ nodes and morph weights once, in `add`, and group playback creates no typed arra
 (`tests/group.test.js` traps the constructors over 120 frames). Each member still deforms on the GPU through its own
 `Animation`; the group adds no GPU work.
 
+## Sampling (`@margoengine/animation/sampling`)
+
+`sampleTrack`, `sampleTrackInto` and `multiplyMatrices` (also on the root) without the deformation pipeline or
+gltf-pro, for code that samples tracks itself (`@margoengine/animator` does).
+
 ## Cloning and retargeting (`@margoengine/animation/skeleton-utils`)
 
 Cloning skinned models and retargeting poses and clips between skeletons, in their own entry:

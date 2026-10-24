@@ -1,6 +1,7 @@
 import type { TransmissionPassOptions } from './transmission-pass.js';
 export { Transmission, type TransmissionPassOptions } from './transmission-pass.js';
-import { textureCoordinates, type MaterialExtension } from '@margoengine/gltf-pro';
+import type { MaterialExtension } from '@margoengine/gltf-pro';
+import { textureCoordinates } from '@margoengine/gltf-pro/coordinates';
 import { coordinateSlot, coordinateWGSL } from './coordinates.js';
 import type { ClearcoatTexture } from './index.js';
 import { transmissionShader } from './transmission-shader.js';

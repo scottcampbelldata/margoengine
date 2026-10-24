@@ -18,6 +18,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./atlas": {
+      "types": "./dist/atlas.d.ts",
+      "import": "./dist/atlas.js"
+    },
     "./transmission": {
       "types": "./dist/transmission.d.ts",
       "import": "./dist/transmission.js"

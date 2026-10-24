@@ -25,6 +25,14 @@
       "types": "./dist/worker.d.ts",
       "import": "./dist/worker.js"
     },
+    "./common": {
+      "types": "./dist/common.d.ts",
+      "import": "./dist/common.js"
+    },
+    "./usd": {
+      "types": "./dist/usd.d.ts",
+      "import": "./dist/usd.js"
+    },
     "./font": {
       "types": "./dist/font.d.ts",
       "import": "./dist/font.js"

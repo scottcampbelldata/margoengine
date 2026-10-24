@@ -1,4 +1,5 @@
-import { textureCoordinates, type PBRModel, type TextureTransform } from '@margoengine/gltf-pro';
+import type { PBRModel } from '@margoengine/gltf-pro';
+import { textureCoordinates, type TextureTransform } from '@margoengine/gltf-pro/coordinates';
 import type { ClearcoatTexture } from './index.js';
 import type { GLTFTexture, GLTFSampler, GLTFTextureInfo } from '../../shared/gltf.js';
 

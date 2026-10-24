@@ -2,6 +2,10 @@
 
 PLY, 3MF, DXF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, legacy VTK and static USDA/USDZ loaders for Margo Engine, each tree-shakable on its own, plus three optional entries: TrueType fonts and extruded 3D text (`@margoengine/loaders/font`), SVG (`@margoengine/loaders/svg`) and OBJ meshes with their MTL materials and textures (`@margoengine/loaders/mtl`).
 
+Packages that read their own formats import the shared parts without the other parsers: `@margoengine/loaders/common`
+(`LoaderError`, `fetchBytes`, `readZipDirectory`, `readZipEntry`, `crc32`, `computeVertexNormals`, `faceNormal` and
+the shared types) and `@margoengine/loaders/usd` (`parseUSDA`, `parseUSDZ`, `readUSDA`). Both are also on the root.
+
 Build from source with `npm run build` in `packages/loaders`.
 
 ```ts

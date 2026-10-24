@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import { type Animation, sampleTrackInto } from '@margoengine/animation';
+import type { Animation } from '@margoengine/animation';
+import { sampleTrackInto } from '@margoengine/animation/sampling';
 import type { Engine, EnginePlugin, Mesh, Vec3 } from '@margoengine/core/extension';
 import { finiteVector } from '@margoengine/math/validate';
 import { multiplyQuaternions as quaternionMultiply } from '@margoengine/math/quat';

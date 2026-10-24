@@ -566,3 +566,11 @@ export function tubeGeometry(
     }
   return b.build();
 }
+// `@margoengine/geometry/primitives` serves this module, so it carries the polyhedra too.
+export {
+  dodecahedronGeometry,
+  icosahedronGeometry,
+  octahedronGeometry,
+  polyhedronGeometry,
+  tetrahedronGeometry,
+} from './polyhedra.js';

@@ -2,8 +2,10 @@
 // and adds nothing to @margoengine/core.
 export { DracoDecoder } from './draco.js';
 export type { DracoOptions, DracoDecodeOptions } from './draco.js';
-export { KTX2Decoder, getSupportedTranscodeFormat, getBytesPerRow, createKTX2Texture } from './ktx2.js';
-export type { KTX2Options, KTX2DecodeOptions, KTX2TextureOptions } from './ktx2.js';
+export { KTX2Decoder } from './ktx2.js';
+export { getSupportedTranscodeFormat, getBytesPerRow, createKTX2Texture } from './texture.js';
+export type { KTX2Options, KTX2DecodeOptions } from './ktx2.js';
+export type { KTX2TextureOptions } from './texture.js';
 export {
   meshoptDecodeGltfBuffer as decodeMeshoptBuffer,
   meshoptDecodeVertexBuffer,

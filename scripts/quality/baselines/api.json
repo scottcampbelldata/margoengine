@@ -1,7 +1,7 @@
 {
   "gate": "api",
   "about": "undocumented public exports (tsdoc), bare Error throws and throw messages that name no fix, per file",
-  "total": 2049,
+  "total": 2047,
   "history": [
     {
       "date": "2026-10-24",
@@ -162,7 +162,7 @@
     "no-fix packages/culling/src/meshes.ts": 1,
     "no-fix packages/decoders/src/codec.ts": 30,
     "no-fix packages/decoders/src/decoder.worker.ts": 1,
-    "no-fix packages/decoders/src/ktx2.ts": 2,
+    "no-fix packages/decoders/src/ktx2.ts": 1,
     "no-fix packages/decoders/src/meshopt.ts": 27,
     "no-fix packages/decoders/src/protocol.ts": 1,
     "no-fix packages/dof/src/index.ts": 2,
@@ -487,7 +487,6 @@
     "tsdoc gltf-pro SceneQueryOptions": 1,
     "tsdoc gltf-pro instancedShader": 1,
     "tsdoc gltf-pro loadGLTF": 1,
-    "tsdoc gltf-pro textureCoordinates": 1,
     "tsdoc html HTMLOptions": 1,
     "tsdoc ifc IFCOptions": 1,
     "tsdoc ifc IFCProduct": 1,

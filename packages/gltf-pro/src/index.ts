@@ -59,7 +59,8 @@ import {
 } from './shader.js';
 import { lightPBR } from '../../shared/pbr-hooks.js';
 export type { PBRLighting, PBRTransparency, PBRCapture, PBRTransmission, ExtendedPlan } from './shader.js';
-import { createKTX2Texture, getBytesPerRow, type TranscodedKTX2Result } from '@margoengine/decoders';
+import { createKTX2Texture, getBytesPerRow } from '@margoengine/decoders/texture';
+import type { TranscodedKTX2Result } from '@margoengine/decoders';
 import { mipShader } from './mip.js';
 import {
   prepareMaterialExtension,

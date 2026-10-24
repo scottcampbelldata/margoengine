@@ -1,5 +1,5 @@
 import type { MaterialExtension, MaterialExtensionTexture } from '@margoengine/gltf-pro';
-import { textureCoordinates } from '@margoengine/gltf-pro';
+import { textureCoordinates } from '@margoengine/gltf-pro/coordinates';
 import type { ClearcoatTexture } from './index.js';
 import { coordinateSlot, coordinateWGSL } from './coordinates.js';
 import { lobeShader, type LobeShaderConfig } from './lobe-shader.js';

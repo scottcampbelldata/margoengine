@@ -8,6 +8,7 @@ export interface TextureTransform {
   scale?: readonly [number, number];
   texCoord?: 0 | 1;
 }
+/** A texture's UV set and, with KHR_texture_transform, its affine rows; throws on invalid values or a third UV set. */
 export function textureCoordinates(info: Pick<GLTFTextureInfo, 'texCoord' | 'extensions'>): {
   texCoord: 0 | 1;
   transform?: Float32Array;

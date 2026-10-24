@@ -97,3 +97,11 @@ test('USD worker errors keep their message', () =>
       /budget/,
     );
   }));
+
+test('without Workers, parseUSDInWorker loads the parser lazily and builds the same model as parseUSDA + create', () =>
+  headlessModels(async () => {
+    const { parseUSDInWorker } = await import('../dist/worker.js');
+    const text = await usda();
+    const main = await parseUSDA(text).create(await headless());
+    assertSameBytes(snapshot(await parseUSDInWorker(await headless(), text)), snapshot(main));
+  }));
