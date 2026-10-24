@@ -10,18 +10,11 @@ import { mkdirSync, rmdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
+import { acPower } from '../../../examples/package-benchmarks/cad/power.mjs';
 
 const root = resolve(import.meta.dirname, '../../..');
-const power = () =>
-  execFileSync(
-    'powershell',
-    [
-      '-NoProfile',
-      '-Command',
-      '(Get-CimInstance -Namespace root/wmi -ClassName BatteryStatus | Select-Object -First 1).PowerOnline',
-    ],
-    { encoding: 'utf8' },
-  ).trim() === 'True';
+// Desktops without a battery report AC power (true); only a laptop on battery (false) refuses.
+const power = () => acPower() !== false;
 const lock = resolve(
   dirname(
     execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8' }).trim(),
