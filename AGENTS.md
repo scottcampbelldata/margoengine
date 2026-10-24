@@ -25,6 +25,18 @@ Scott's rule (2026-10-24): Margo never uses files from other repositories, whate
 - The one exception is large standard files that every engine uses, such as standard sample models, test assets and
   prebuilt decoders. Record each one's source and licence in `THIRD-PARTY-NOTICES.md`.
 
+## Bugs: fix the cause, properly
+
+Scott's rule (2026-10-24): as few bugs as possible at release, and every fix is a proper one.
+
+- Find and fix the root cause in the package that owns it, core included (the freeze blocks features, not bug
+  fixes). No band-aids: no try/catch that hides an error, no retry loops, no special cases for one input, no
+  loosened tests or tolerances, no skipped tests, no "left as is" notes.
+- Every fix ships with a regression test that fails without it. When a whole class of bug slipped through, add a
+  check to `check:merge` that catches the class.
+- A bug you cannot fix now goes into `docs/known-bugs.md` with a repro and its cause. That list must be empty
+  before release.
+
 ## Before every push to main
 
 Several agents push to `main`. Each push must leave it at least as clean as it found it:
