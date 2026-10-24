@@ -77,6 +77,11 @@ interface DragStart {
 
 let counter = 0;
 
+/** Share of the viewport height covered by one gizmo unit (the translate arrow length): a fifth of the view. */
+const GIZMO_SCREEN_FRACTION = 0.2;
+/** Largest tan(fov / 2) used for the gizmo size (a 135 degree lens); wider lenses keep that world size. */
+const GIZMO_TAN_CAP = Math.tan((3 * Math.PI) / 8);
+
 /**
  * Interactive translate, rotate and scale gizmo for a core `Mesh`.
  *
@@ -87,11 +92,6 @@ let counter = 0;
  * Events: `change`, `mouseDown`, `mouseUp`, `objectChange`, `dragging-changed` (`value`), `axis-changed` (`value`),
  * `mode-changed` and `space-changed`.
  */
-/** Share of the viewport height covered by one gizmo unit (the translate arrow length): a fifth of the view. */
-const GIZMO_SCREEN_FRACTION = 0.2;
-/** Largest tan(fov / 2) used for the gizmo size (a 135 degree lens); wider lenses keep that world size. */
-const GIZMO_TAN_CAP = Math.tan((3 * Math.PI) / 8);
-
 export class TransformControls extends EventDispatcher {
   readonly engine: EngineKernel;
   element: ControlElement | null = null;
