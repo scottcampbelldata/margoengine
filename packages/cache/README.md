@@ -40,6 +40,63 @@ of files available offline ahead of time, fetch them once and wait for the write
 
 The cache itself also works inside your own worker (`new AssetCache(...)` there opens the same database).
 
+## Loading manager
+
+`@margoengine/cache/manager` is a separate entry (about 2 kB gzip, no IndexedDB code) with `LoadingManager`: one
+progress, error and abort source for every loader. `manager.fetch` is fetch-compatible, so it goes in the same `fetch`
+option as `cache.fetch`, and every file a loader requests through it counts as one item: the model and also the
+external buffers, `mtllib` files and textures the loader resolves next to it.
+
+```ts
+import type {EngineKernel} from '@margoengine/core';
+import {AssetCache} from '@margoengine/cache';
+import {LoadingManager} from '@margoengine/cache/manager';
+import {loadGLTF} from '@margoengine/gltf-pro';
+import {loadOBJ} from '@margoengine/loaders/mtl';
+
+declare const engine: EngineKernel;
+declare const dropped: Map<string, File>; // files dropped on the page, by name
+
+const cache = new AssetCache({name: 'plant-viewer'});
+const manager = new LoadingManager({
+  fetch: cache.fetch, // optional: count cache hits too (default globalThis.fetch)
+  onStart: (url, loaded, total) => console.log(`start ${url} (${loaded}/${total})`),
+  onProgress: (url, loaded, total, bytes) =>
+    console.log(`${loaded}/${total} files, ${bytes.loaded} of ${bytes.total ?? '?'} bytes`),
+  onLoad: () => console.log('all loaded'),
+  onError: (url, error) => console.warn(url, error),
+});
+// Every requested URL, siblings included, goes through the modifier: here a dropped folder's files as blob: URLs.
+manager.setURLModifier((url) => {
+  const file = dropped.get(new URL(url).pathname.split('/').pop() ?? '');
+  return file ? URL.createObjectURL(file) : url;
+});
+const [model, chair] = await Promise.all([
+  loadGLTF(engine, 'https://example.com/models/line-4.gltf', {fetch: manager.fetch}),
+  loadOBJ(engine, 'https://example.com/models/chair.obj', {fetch: manager.fetch}),
+]);
+
+// Work that does not fetch counts too; manager.signal aborts with the manager.
+manager.itemStart('bake');
+manager.itemEnd('bake'); // or manager.itemError('bake', error)
+manager.abort(); // cancels every request in flight (each reports onError); the manager stays usable
+```
+
+- Items and batches: a batch starts when an item starts while none is pending; `onStart` and `onProgress` get the
+  batch's finished and started item counts, and `onLoad` fires once when the last one finishes. A failed item (network
+  error, HTTP error status, abort, a loader's byte cap) calls `onError` and then counts as done. `manager.loaded`,
+  `total`, `pending`, `bytesLoaded` and `bytesTotal` read the same counts.
+- Bytes: the response body is passed through one chunk at a time as the loader reads it (no copy, no read-ahead), so
+  `onProgress` reports bytes as they stream and every loader's own byte cap still applies. `bytes.itemTotal` and
+  `bytes.total` come from Content-Length and are undefined when a response has none (or a compressed body).
+- URL modifier: callbacks report the requested URL. When the modifier changes a URL, the response's `url` is the
+  requested one, so a loader resolves sibling files against the model's own URL and not against the blob: URL.
+  `manager.resolveURL(url)` applies it for your own requests.
+- Cache order: `new LoadingManager({fetch: cache.fetch})` counts every request, hits included;
+  `new AssetCache({fetch: manager.fetch})` counts only what reaches the network (and the cache's background fills).
+- Loaders that run in a worker cannot take a function: with `fetch` they load on the main thread (see the table above).
+  `loadOBJ` and `createMTLMaterials` hand their `fetch` to the texture loader, so textures are counted too.
+
 ## How a request is answered
 
 - GET over HTTP(S) only; anything else goes straight to the network. Keyed by URL (fragment dropped).

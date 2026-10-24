@@ -345,17 +345,26 @@ export function parseGLTF(
   }
 }
 
+/**
+ * Fetches a .gltf or .glb over HTTP(S), and its external buffers relative to it, through `fetch` (default
+ * `globalThis.fetch`; for example an AssetCache's or a LoadingManager's `fetch`), then parses it like parseGLTF.
+ */
 export async function loadGLTF(
   engine: EngineKernel,
   url: string | URL,
-  { signal, maxNodes, allowedURLs }: GLTFOptions & { signal?: AbortSignal } = {},
+  {
+    signal,
+    maxNodes,
+    allowedURLs,
+    fetch: get = globalThis.fetch,
+  }: GLTFOptions & { signal?: AbortSignal; fetch?: typeof fetch } = {},
 ): Promise<Model> {
   signal?.throwIfAborted();
   let base = new URL(url, globalThis.location?.href),
     total = 0;
   async function fetchBytes(target: URL, root = false) {
     if (!['http:', 'https:'].includes(target.protocol)) throw new TypeError('glTF URL must use HTTP(S)');
-    const response = await fetch(target, { signal });
+    const response = await get(target, { signal });
     if (root && response.url) base = new URL(response.url);
     const data = await readResponse(response, { maxBytes: limit - total, signal, label: 'glTF download' });
     total += data.byteLength;

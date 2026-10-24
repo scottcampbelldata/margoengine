@@ -38,9 +38,10 @@ export interface PlanetOptions {
         intensity?: number;
     };
     signal?: AbortSignal;
+    fetch?: typeof fetch;
 }
 
 // Not exported from this entry, but used by the exports above:
 
-type MapOptions = Pick<PlanetOptions, 'dayMap' | 'nightMap' | 'specularRoughnessMap' | 'normalMap' | 'clouds' | 'signal'>;
+type MapOptions = Pick<PlanetOptions, 'dayMap' | 'nightMap' | 'specularRoughnessMap' | 'normalMap' | 'clouds' | 'signal' | 'fetch'>;
 ```

@@ -27,6 +27,8 @@ export interface LibraryIndex {
 
 /** Options of {@link fetchLibrary} and {@link fetchAsset}. */
 export interface LibraryFetchOptions {
+  /** Fetch for the index and assets, for example an AssetCache's or a LoadingManager's `fetch`. Default `globalThis.fetch`. */
+  fetch?: typeof fetch;
   /** Aborts the request. */
   signal?: AbortSignal;
   /** Largest response body, in bytes. Default 32 MiB. */
@@ -78,7 +80,7 @@ export async function fetchLibrary(indexUrl: string, options: LibraryFetchOption
  */
 export async function fetchAsset(entry: LibraryEntry, options: LibraryFetchOptions = {}): Promise<ArrayBuffer> {
   const maxBytes = options.maxBytes ?? MAX_BYTES;
-  const res = await fetch(entry.url, { signal: options.signal });
+  const res = await (options.fetch ?? fetch)(entry.url, { signal: options.signal });
   if (!res.ok) throw new MargoError('failed', `Library asset ${entry.id} returned ${res.status}; check its URL`);
   return limitedBuffer(res, maxBytes, entry.url);
 }
@@ -100,7 +102,7 @@ function checkAsset(value: unknown, index: number, indexUrl: string): LibraryEnt
 }
 
 async function readJson(url: string, options: LibraryFetchOptions): Promise<{ json: unknown; base: string }> {
-  const res = await fetch(url, { signal: options.signal });
+  const res = await (options.fetch ?? fetch)(url, { signal: options.signal });
   if (!res.ok) throw new MargoError('failed', `Library index ${url} returned ${res.status}; check the URL`);
   const bytes = await limitedBuffer(res, options.maxBytes ?? MAX_BYTES, url);
   const base = hasScheme(res.url) ? res.url : url;

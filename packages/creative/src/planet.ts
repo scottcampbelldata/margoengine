@@ -31,16 +31,20 @@ export interface PlanetOptions {
   atmosphere?: { color?: Vec3; intensity?: number };
   /** Cancels loading and attachment. */
   signal?: AbortSignal;
+  /** Fetch for the maps, for example an AssetCache's or a LoadingManager's `fetch`. Default `globalThis.fetch`. */
+  fetch?: typeof fetch;
 }
 
 type MapOptions = Pick<
   PlanetOptions,
-  'dayMap' | 'nightMap' | 'specularRoughnessMap' | 'normalMap' | 'clouds' | 'signal'
+  'dayMap' | 'nightMap' | 'specularRoughnessMap' | 'normalMap' | 'clouds' | 'signal' | 'fetch'
 >;
 function mapSources(options: MapOptions): Array<[keyof PlanetImages, string]> {
   if (!options || typeof options !== 'object') throw new TypeError('Expected planet map options');
   if (options.signal !== undefined && !(options.signal instanceof AbortSignal))
     throw new TypeError('Expected AbortSignal');
+  if (options.fetch !== undefined && typeof options.fetch !== 'function')
+    throw new TypeError('Planet fetch is not a function; pass a fetch-compatible function or leave it out');
   const sources: Array<[keyof PlanetImages, string]> = [];
   for (const [name, source] of [
     ['day', options.dayMap],
@@ -74,6 +78,7 @@ export class Planet implements EnginePlugin {
   private disposed = false;
   private offset = 0;
   private upgrading?: AbortController;
+  private readonly fetcher: typeof fetch;
 
   private constructor(options: PlanetOptions) {
     if (!options || typeof options !== 'object') throw new TypeError('Expected planet options');
@@ -100,6 +105,7 @@ export class Planet implements EnginePlugin {
     this.tilt = (tilt * Math.PI) / 180;
     this.setSunDirection(options.sunDirection ?? [-1, 0.2, 0.5]);
     this.sources.push(...mapSources(options));
+    this.fetcher = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
     const planet = this;
     this.clouds = {
       get offsetU() {
@@ -140,7 +146,7 @@ export class Planet implements EnginePlugin {
     return this.spin.rotation;
   }
 
-  /** Replace the complete map set after loading/validation; the current planet stays visible on failure. */
+  /** Replace the complete map set after loading/validation; the current planet stays visible on failure. `fetch` defaults to the planet's. */
   async updateMaps(options: MapOptions): Promise<void> {
     this.check();
     if (!this.pass || !this.engine)
@@ -160,7 +166,7 @@ export class Planet implements EnginePlugin {
     let pass: PlanetPass | undefined,
       committed = false;
     try {
-      await this.readMaps(sources, next, signal, controller, this.images);
+      await this.readMaps(sources, next, signal, controller, this.images, options.fetch);
       for (;;) {
         signal.throwIfAborted();
         this.check();
@@ -270,12 +276,13 @@ export class Planet implements EnginePlugin {
     signal: AbortSignal,
     controller: AbortController,
     retained?: PlanetImages,
+    get: typeof fetch = this.fetcher,
   ): Promise<void> {
     const decoded = new Set<ImageBitmap>(Object.values(retained ?? {}).filter(Boolean));
     let decodedBytes = [...decoded].reduce((bytes, image) => bytes + image.width * image.height * 4, 0);
     const loading = sources.map(async ([name, url]) => {
       signal.throwIfAborted();
-      const response = await fetch(url, { signal });
+      const response = await get(url, { signal });
       const bytes = await readResponse(response, { maxBytes: 32 * 1024 * 1024, signal, label: `Planet ${name} map` });
       const image = await createImageBitmap(new Blob([bytes]), {
         colorSpaceConversion: 'none',

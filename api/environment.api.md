@@ -332,7 +332,9 @@ export class ImageBackground {
     readonly order: number;
     readonly shape: ImageBackgroundShape;
     static attach(engine: EngineKernel, options: ImageBackgroundOptions): ImageBackground;
-    static load(options: ImageBackgroundOptions<ImageBackgroundSource>): Promise<ImageBackground>;
+    static load(options: ImageBackgroundOptions<ImageBackgroundSource> & {
+        fetch?: typeof fetch;
+    }): Promise<ImageBackground>;
     constructor(options: ImageBackgroundOptions);
     get filter(): 'nearest' | 'linear';
     set filter(value: 'nearest' | 'linear');
@@ -435,8 +437,9 @@ export function iblBindGroupEntries(environment: Environment, firstBinding?: num
 
 export function iblLayoutEntries(firstBinding?: number, visibility?: number): GPUBindGroupLayoutEntry[];
 
-export function loadEnvironmentImage(url: string | URL, { signal, ...options }?: {
+export function loadEnvironmentImage(url: string | URL, { signal, fetch: get, ...options }?: {
     signal?: AbortSignal;
+    fetch?: typeof fetch;
 } & UltraHDROptions): Promise<FloatImage>;
 
 export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage;

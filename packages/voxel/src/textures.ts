@@ -194,19 +194,20 @@ export class BlockTextures {
   }
 
   /**
-   * Fetches one image per URL (layer i from `urls[i]`) and makes the textures from them.
+   * Fetches one image per URL (layer i from `urls[i]`) through `options.fetch` (default `globalThis.fetch`; for
+   * example a LoadingManager's `fetch`) and makes the textures from them.
    * @throws TypeError when `urls` is not an array of 1 to 2048 URLs (in the promise, like every failure).
    * @throws MargoError `failed` when an image does not load.
    */
   static async load(
     urls: readonly (string | URL)[],
-    options: Omit<BlockTexturesOptions, 'images'> = {},
+    { fetch: get = globalThis.fetch, ...options }: Omit<BlockTexturesOptions, 'images'> & { fetch?: typeof fetch } = {},
   ): Promise<BlockTextures> {
     if (!Array.isArray(urls) || !urls.length || urls.length > MAX_LAYERS)
       throw new TypeError('BlockTextures.load expects an array of 1 to 2048 image URLs');
     const images = await Promise.all(
       urls.map(async (url) => {
-        const response = await fetch(url);
+        const response = await get(url);
         if (!response.ok)
           throw new MargoError('failed', `Block texture ${url} answered HTTP ${response.status}; check the URL`);
         return createImageBitmap(await response.blob(), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });

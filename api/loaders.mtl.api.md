@@ -31,10 +31,12 @@ export interface MTLMaterialsOptions {
     bump?: 'height' | 'normal';
     doubleSided?: boolean;
     signal?: AbortSignal;
+    fetch?: typeof fetch;
 }
 
 export type MTLTextureLoader = (url: string, options: TextureOptions & {
     signal?: AbortSignal;
+    fetch?: typeof fetch;
 }) => Promise<Texture>;
 
 export interface OBJMeshOptions {

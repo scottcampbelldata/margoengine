@@ -17,8 +17,9 @@ export interface Model {
     dispose(): void;
 }
 
-export function loadGLTF(engine: EngineKernel, url: string | URL, { signal, maxNodes, allowedURLs }?: GLTFOptions & {
+export function loadGLTF(engine: EngineKernel, url: string | URL, { signal, maxNodes, allowedURLs, fetch: get }?: GLTFOptions & {
     signal?: AbortSignal;
+    fetch?: typeof fetch;
 }): Promise<Model>;
 
 export function parseGLTF(instance: EngineKernel, input: string | object | ArrayBuffer | ArrayBufferView, suppliedBuffers?: Array<ArrayBuffer | ArrayBufferView>, { maxNodes }?: GLTFOptions): Model;

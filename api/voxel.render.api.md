@@ -16,7 +16,9 @@ export interface BlockPixels {
 export class BlockTextures {
     readonly size: number;
     constructor(options?: BlockTexturesOptions);
-    static load(urls: readonly (string | URL)[], options?: Omit<BlockTexturesOptions, 'images'>): Promise<BlockTextures>;
+    static load(urls: readonly (string | URL)[], { fetch: get, ...options }?: Omit<BlockTexturesOptions, 'images'> & {
+        fetch?: typeof fetch;
+    }): Promise<BlockTextures>;
     static fromAtlas(atlas: CanvasImageSource | ImageData | BlockPixels, options?: Omit<BlockTexturesOptions, 'images'>): BlockTextures;
     get layers(): number;
     set(layer: number, image: CanvasImageSource | ImageData | BlockPixels): void;

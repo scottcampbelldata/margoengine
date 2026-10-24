@@ -38,8 +38,9 @@ export async function fetchBytes(url: string | URL, options: FetchOptions = {}):
     throw new LoaderError(F, 'fetch', `request for ${String(url).slice(0, 200)} returned HTTP ${response.status}`);
   const declared = Number(response.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > maxBytes) {
-    void response.body?.cancel().catch(() => {});
-    throw new LoaderError(F, 'limit', `response is ${declared} bytes, more than the limit of ${maxBytes}`);
+    const error = new LoaderError(F, 'limit', `response is ${declared} bytes, more than the limit of ${maxBytes}`);
+    void response.body?.cancel(error).catch(() => {});
+    throw error;
   }
   if (!response.body) {
     const buffer = new Uint8Array(await response.arrayBuffer());
@@ -59,7 +60,7 @@ export async function fetchBytes(url: string | URL, options: FetchOptions = {}):
       chunks.push(value);
     }
   } catch (error) {
-    void reader.cancel().catch(() => {});
+    void reader.cancel(error).catch(() => {});
     if (error instanceof LoaderError) throw error;
     if (options.signal?.aborted)
       throw new LoaderError(F, 'aborted', `aborted while reading ${String(url).slice(0, 200)}`);

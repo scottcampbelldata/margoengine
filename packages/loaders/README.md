@@ -146,6 +146,8 @@ const resolve = async (path) => new Uint8Array(await (await fetch(new URL(path, 
 
 ### Textured OBJ meshes
 
+Pass `fetch: manager.fetch` from `@margoengine/cache/manager`'s `LoadingManager` to `load`, `fetchBytes` or `loadOBJ` for shared progress, errors, abort and a URL modifier across loaders (loadOBJ's `mtllib` files and textures included).
+
 `createMeshes` gives core `PbrMaterial` colours only. For textures, `@margoengine/loaders/mtl` builds `@margoengine/materials` meshes (an optional peer dependency: install it to use this entry). One call fetches the .obj, its `mtllib` files next to it and every texture relative to its .mtl file, and draws each `usemtl` group with its material:
 
 ```ts

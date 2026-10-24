@@ -771,6 +771,10 @@ const albedo = await loadKTX2Texture('/textures/albedo.ktx2', {decoder});
 createMesh(engine, geometry, new PbrMaterial({map: albedo}));
 ```
 
+`loadTexture`, `loadKTX2Texture` and `loadCubeTexture` take a `fetch` option (default `globalThis.fetch`): pass a
+`LoadingManager`'s (`@margoengine/cache/manager`) or an `AssetCache`'s `fetch` to count the download or serve it from
+the cache.
+
 ## Display P3 textures
 
 `colorSpace: 'display-p3'` on an 8-bit RGBA image or raw RGBA8 data reads its pixels as Display P3 (sRGB transfer

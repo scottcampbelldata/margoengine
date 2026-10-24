@@ -20,14 +20,19 @@ export function parseEnvironmentImage(source: ArrayBuffer | ArrayBufferView): Fl
 }
 
 /**
- * Fetches and decodes an `.hdr`, `.exr` or UltraHDR (gain-map) `.jpg` file, picked by signature.
+ * Fetches and decodes an `.hdr`, `.exr` or UltraHDR (gain-map) `.jpg` file, picked by signature, through `fetch`
+ * (default `globalThis.fetch`; for example an AssetCache's or a LoadingManager's `fetch`).
  * @throws MargoError `'failed'` when the server answers with an HTTP error; otherwise what the decoder throws.
  */
 export async function loadEnvironmentImage(
   url: string | URL,
-  { signal, ...options }: { signal?: AbortSignal } & UltraHDROptions = {},
+  {
+    signal,
+    fetch: get = globalThis.fetch,
+    ...options
+  }: { signal?: AbortSignal; fetch?: typeof fetch } & UltraHDROptions = {},
 ): Promise<FloatImage> {
-  const response = await fetch(url, { signal });
+  const response = await get(url, { signal });
   if (!response.ok) throw new MargoError('failed', `Failed to load ${url}: HTTP ${response.status}; check the URL`);
   const bytes = new Uint8Array(await response.arrayBuffer());
   return isJPEG(bytes) ? decodeUltraHDR(bytes, options) : parseEnvironmentImage(bytes);

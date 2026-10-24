@@ -828,17 +828,20 @@ export function installNodeMaterial(model: PBRModel, graph: MaterialGraph): Node
 
 export function iridescence(options?: IridescenceOptions, base?: MaterialExtension): MaterialExtension;
 
-export function loadCubeTexture(urls: string | URL | readonly (string | URL)[], { signal, ...options }?: CubeTextureOptions & {
+export function loadCubeTexture(urls: string | URL | readonly (string | URL)[], { signal, fetch: get, ...options }?: CubeTextureOptions & {
     signal?: AbortSignal;
+    fetch?: typeof fetch;
 }): Promise<CubeTexture>;
 
-export function loadKTX2Texture(url: string | URL, { decoder, signal, ...options }: TextureOptions & {
+export function loadKTX2Texture(url: string | URL, { decoder, signal, fetch: get, ...options }: TextureOptions & {
     decoder: KTX2Transcoder;
     signal?: AbortSignal;
+    fetch?: typeof fetch;
 }): Promise<Texture>;
 
-export function loadTexture(url: string | URL, { signal, ...options }?: TextureOptions & {
+export function loadTexture(url: string | URL, { signal, fetch: get, ...options }?: TextureOptions & {
     signal?: AbortSignal;
+    fetch?: typeof fetch;
 }): Promise<Texture>;
 
 export function materialGraphOutput(graph: MaterialGraph, options?: NodeMaterialOptions): MaterialGraphOutput;

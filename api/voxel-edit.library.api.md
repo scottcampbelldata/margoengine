@@ -13,6 +13,7 @@ export interface LibraryEntry {
 }
 
 export interface LibraryFetchOptions {
+    fetch?: typeof fetch;
     signal?: AbortSignal;
     maxBytes?: number;
 }

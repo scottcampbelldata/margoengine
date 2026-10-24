@@ -18,8 +18,9 @@ export interface MargoOptions {
 
 export function decodeMargo(input: ArrayBuffer | ArrayBufferView, { maxNodes }?: MargoOptions): MargoAsset;
 
-export function loadMargo(engine: EngineKernel, url: string | URL, { signal, maxNodes }?: MargoOptions & {
+export function loadMargo(engine: EngineKernel, url: string | URL, { signal, maxNodes, fetch: get }?: MargoOptions & {
     signal?: AbortSignal;
+    fetch?: typeof fetch;
 }): Promise<PBRModel>;
 
 export function parseMargo(engine: EngineKernel, input: ArrayBuffer | ArrayBufferView, { signal, maxNodes }?: MargoOptions & {

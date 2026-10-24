@@ -15,8 +15,14 @@ import { type LoadedOBJ, type MTLMapOptions, type MTLMaterial, parseOBJ } from '
 import { LoaderError, type ParseLimits } from './types.js';
 import { resolvePath } from './util.js';
 
-/** Loads one texture for `createMTLMaterials`: the URL and the texture options the map needs. */
-export type MTLTextureLoader = (url: string, options: TextureOptions & { signal?: AbortSignal }) => Promise<Texture>;
+/**
+ * Loads one texture for `createMTLMaterials`: the URL and the texture options the map needs, with the `signal` and
+ * `fetch` given to createMTLMaterials (`fetch` only when one was given).
+ */
+export type MTLTextureLoader = (
+  url: string,
+  options: TextureOptions & { signal?: AbortSignal; fetch?: typeof fetch },
+) => Promise<Texture>;
 
 /** Options of `createMTLMaterials`. */
 export interface MTLMaterialsOptions {
@@ -36,6 +42,11 @@ export interface MTLMaterialsOptions {
   doubleSided?: boolean;
   /** Aborts texture loading; the promise then rejects with a `LoaderError` with code `'aborted'`. */
   signal?: AbortSignal;
+  /**
+   * Fetch handed to the texture loader for every map, for example an AssetCache's or a LoadingManager's `fetch`
+   * (loadOBJ passes its own). Default: the loader's own (`globalThis.fetch` for materials' `loadTexture`).
+   */
+  fetch?: typeof fetch;
 }
 
 /** The materials `createMTLMaterials` built, and the textures they use. */
@@ -214,6 +225,7 @@ export async function createMTLMaterials(
     throw new TypeError('createMTLMaterials loadTexture is not a function; pass (url, options) => Promise<Texture>');
   const load: MTLTextureLoader = opts.loadTexture ?? loadMaterialTexture,
     signal = opts.signal,
+    get = opts.fetch,
     doubleSided = opts.doubleSided ?? false;
 
   const materials = new Map<string, Material>(),
@@ -258,7 +270,7 @@ export async function createMTLMaterials(
     if (requests.has(key)) return key;
     const entry: { promise: Promise<Texture | undefined>; texture?: Texture } = {
       promise: Promise.resolve()
-        .then(() => load(url, { colorSpace, wrapS: wrap, wrapT: wrap, signal }))
+        .then(() => load(url, { colorSpace, wrapS: wrap, wrapT: wrap, signal, ...(get ? { fetch: get } : {}) }))
         .then(
           (texture) => {
             if (disposed) {

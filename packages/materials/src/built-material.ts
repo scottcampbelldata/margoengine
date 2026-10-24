@@ -919,17 +919,21 @@ function mipmaps(device: GPUDevice, texture: GPUTexture): void {
   );
 }
 /** The bytes at an http(s), blob: or data: `url` (64 MiB at most) and the response's content type. */
-async function download(url: string | URL, signal?: AbortSignal): Promise<[Uint8Array, string]> {
+async function download(
+  url: string | URL,
+  signal?: AbortSignal,
+  get: typeof fetch = globalThis.fetch,
+): Promise<[Uint8Array, string]> {
   const target = new URL(url, globalThis.location?.href);
   if (!['http:', 'https:', 'blob:', 'data:'].includes(target.protocol))
     throw new TypeError('Texture URL must use HTTP(S), blob: or data:');
-  const response = await fetch(target, { signal }),
+  const response = await get(target, { signal }),
     bytes = await readResponse(response, { maxBytes: 64 * 1024 * 1024, signal, label: 'Texture download' });
   return [bytes, response.headers.get('content-type') ?? ''];
 }
 /** The image at `url` as an ImageBitmap (4096x4096 pixels at most), pixels as stored (no colour or alpha conversion). */
-async function fetchBitmap(url: string | URL, signal?: AbortSignal): Promise<ImageBitmap> {
-  const [bytes, type] = await download(url, signal);
+async function fetchBitmap(url: string | URL, signal?: AbortSignal, get?: typeof fetch): Promise<ImageBitmap> {
+  const [bytes, type] = await download(url, signal, get);
   const bitmap = await createImageBitmap(new Blob([bytes as Uint8Array<ArrayBuffer>], { type }), {
     colorSpaceConversion: 'none',
     premultiplyAlpha: 'none',
@@ -943,12 +947,15 @@ async function fetchBitmap(url: string | URL, signal?: AbortSignal): Promise<Ima
     throw error;
   }
 }
-/** Fetches http(s), blob: or data: image bytes (64 MiB, 4096x4096 pixels at most) into an ImageBitmap the texture owns. */
+/**
+ * Fetches http(s), blob: or data: image bytes (64 MiB, 4096x4096 pixels at most) into an ImageBitmap the texture owns.
+ * `fetch`: default `globalThis.fetch`, e.g. a LoadingManager's or AssetCache's `fetch`.
+ */
 export async function loadTexture(
   url: string | URL,
-  { signal, ...options }: TextureOptions & { signal?: AbortSignal } = {},
+  { signal, fetch: get, ...options }: TextureOptions & { signal?: AbortSignal; fetch?: typeof fetch } = {},
 ): Promise<Texture> {
-  const bitmap = await fetchBitmap(url, signal);
+  const bitmap = await fetchBitmap(url, signal, get);
   try {
     return new Texture(bitmap, options, true);
   } catch (error) {
@@ -964,15 +971,21 @@ export interface KTX2Transcoder {
  * Fetches a `.ktx2` file (64 MiB at most) and transcodes it with `decoder` (a `KTX2Decoder` from
  * `@margoengine/decoders`, created with the engine's device so it picks a compressed format the device has) into a
  * Texture for any material map. 2D only: the decoder rejects cube maps, arrays and UASTC HDR files.
+ * `fetch`: default `globalThis.fetch`, e.g. a LoadingManager's or AssetCache's `fetch`.
  * @throws TypeError without a decoder; the decoder's own errors for unsupported or corrupt files.
  */
 export async function loadKTX2Texture(
   url: string | URL,
-  { decoder, signal, ...options }: TextureOptions & { decoder: KTX2Transcoder; signal?: AbortSignal },
+  {
+    decoder,
+    signal,
+    fetch: get,
+    ...options
+  }: TextureOptions & { decoder: KTX2Transcoder; signal?: AbortSignal; fetch?: typeof fetch },
 ): Promise<Texture> {
   if (typeof decoder?.transcode !== 'function')
     throw new TypeError('loadKTX2Texture needs a decoder; pass {decoder: new KTX2Decoder({device: engine.gpu})}');
-  const [bytes] = await download(url, signal),
+  const [bytes] = await download(url, signal, get),
     result = await decoder.transcode(bytes, { signal });
   signal?.throwIfAborted();
   return new Texture(result, options);
@@ -1014,15 +1027,16 @@ export class CubeTexture extends Texture {
 }
 /**
  * Loads a cube map: six image URLs in the order +X, -X, +Y, -Y, +Z, -Z, or one
- * equirectangular image URL. Images download as `loadTexture` does; the CubeTexture owns them.
+ * equirectangular image URL. Images download as `loadTexture` does (through `fetch`, default `globalThis.fetch`); the
+ * CubeTexture owns them.
  */
 export async function loadCubeTexture(
   urls: string | URL | readonly (string | URL)[],
-  { signal, ...options }: CubeTextureOptions & { signal?: AbortSignal } = {},
+  { signal, fetch: get, ...options }: CubeTextureOptions & { signal?: AbortSignal; fetch?: typeof fetch } = {},
 ): Promise<CubeTexture> {
   if (!Array.isArray(urls)) {
     const { size, ...rest } = options,
-      image = await loadTexture(urls as string | URL, { signal, colorSpace: rest.colorSpace });
+      image = await loadTexture(urls as string | URL, { signal, fetch: get, colorSpace: rest.colorSpace });
     try {
       return new CubeTexture(image, { ...rest, colorSpace: undefined, ...(size !== undefined ? { size } : {}) }, true);
     } catch (error) {
@@ -1032,7 +1046,7 @@ export async function loadCubeTexture(
   }
   if (urls.length !== 6)
     throw new TypeError('loadCubeTexture needs six face URLs (+X, -X, +Y, -Y, +Z, -Z) or one equirect URL');
-  const settled = await Promise.allSettled(urls.map((url) => fetchBitmap(url, signal))),
+  const settled = await Promise.allSettled(urls.map((url) => fetchBitmap(url, signal, get))),
     bitmaps = settled.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
   try {
     const failed = settled.find((r) => r.status === 'rejected');

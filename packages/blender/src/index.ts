@@ -222,14 +222,19 @@ export async function parseMargo(
   }
 }
 
+/** Fetches a .margo file over HTTP(S) through `fetch` (default `globalThis.fetch`) and parses it like parseMargo. */
 export async function loadMargo(
   engine: EngineKernel,
   url: string | URL,
-  { signal, maxNodes }: MargoOptions & { signal?: AbortSignal } = {},
+  {
+    signal,
+    maxNodes,
+    fetch: get = globalThis.fetch,
+  }: MargoOptions & { signal?: AbortSignal; fetch?: typeof fetch } = {},
 ): Promise<PBRModel> {
   signal?.throwIfAborted();
   const target = new URL(url, globalThis.location?.href);
   if (!['http:', 'https:'].includes(target.protocol)) throw new TypeError('.margo URL must use HTTP(S)');
-  const bytes = await readResponse(await fetch(target, { signal }), { maxBytes, signal, label: '.margo download' });
+  const bytes = await readResponse(await get(target, { signal }), { maxBytes, signal, label: '.margo download' });
   return parseMargo(engine, bytes, { signal, maxNodes });
 }

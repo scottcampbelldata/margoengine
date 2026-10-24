@@ -345,10 +345,10 @@ const isPixels = (value: unknown): value is RGBA8Image =>
   typeof value === 'object' && value !== null && ArrayBuffer.isView((value as RGBA8Image).data);
 
 /** Decodes one `ImageBackgroundSource` to 8-bit RGBA through createImageBitmap and a 2D OffscreenCanvas. */
-async function decodeImage(source: ImageBackgroundSource): Promise<RGBA8Image> {
+async function decodeImage(source: ImageBackgroundSource, get: typeof fetch = globalThis.fetch): Promise<RGBA8Image> {
   if (isPixels(source)) return source;
   if (typeof source === 'string' || source instanceof URL) {
-    const response = await fetch(source);
+    const response = await get(source);
     if (!response.ok)
       throw new MargoError('failed', `ImageBackground: ${source} answered HTTP ${response.status}; check the URL`);
     source = await response.blob();
@@ -417,9 +417,18 @@ export class ImageBackground {
     engine.use(value);
     return value;
   }
-  /** Decodes `options.images` (URLs, blobs, image elements, bitmaps, canvases or ImageData), then constructs. */
-  static async load(options: ImageBackgroundOptions<ImageBackgroundSource>): Promise<ImageBackground> {
-    return new ImageBackground({ ...options, images: await Promise.all([...(options.images ?? [])].map(decodeImage)) });
+  /**
+   * Decodes `options.images` (URLs, blobs, image elements, bitmaps, canvases or ImageData), then constructs. URLs are
+   * fetched through `options.fetch` (default `globalThis.fetch`; for example a LoadingManager's `fetch`).
+   */
+  static async load(
+    options: ImageBackgroundOptions<ImageBackgroundSource> & { fetch?: typeof fetch },
+  ): Promise<ImageBackground> {
+    const { fetch: get, ...rest } = options;
+    return new ImageBackground({
+      ...rest,
+      images: await Promise.all([...(options.images ?? [])].map((image) => decodeImage(image, get))),
+    });
   }
   constructor(options: ImageBackgroundOptions) {
     const { shape, images } = options;
