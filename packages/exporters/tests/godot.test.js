@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { exportGLB, exportOBJ, paletteTexture, splitGLB, joinGLB } from '../dist/index.js';
 import { createGodotImportBundle } from '../dist/godot.js';
+import { createGodotImportAddon } from '../dist/godot-addon.js';
 import { encodeZIP } from '../dist/capture.js';
 
 const geometry = {
@@ -408,4 +409,28 @@ test('Godot refuses external image payloads and unavailable SHA-256 instead of p
   } finally {
     Object.defineProperty(globalThis, 'crypto', descriptor);
   }
+});
+
+test('the import add-on binds linear vertex colors and applies extras.loop', async () => {
+  const entries = createGodotImportAddon(),
+    files = Object.fromEntries(entries.map(({ name, data }) => [name, new TextDecoder().decode(data)])),
+    extension = files['addons/gltf_import/extension.gd'];
+  assert.deepEqual(Object.keys(files), [
+    'addons/gltf_import/plugin.cfg',
+    'addons/gltf_import/plugin.gd',
+    'addons/gltf_import/extension.gd',
+  ]);
+  assert.match(files['addons/gltf_import/plugin.cfg'], /name="glTF vertex colors and loops"\n[^]*script="plugin.gd"/);
+  assert.match(files['addons/gltf_import/plugin.gd'], /register_gltf_document_extension\(extension\)/);
+  assert.match(extension, /^@tool\nextends GLTFDocumentExtension\n/);
+  assert.match(extension, /func _import_post_parse\(state: GLTFState\) -> Error:/);
+  assert.match(extension, /attributes\.has\("COLOR_0"\)/);
+  assert.match(extension, /vertex_color_is_srgb = false/);
+  assert.match(extension, /extras\.get\("loop"\) is bool/);
+  assert.match(extension, /animations\[i\]\.loop = extras\.loop/);
+  assert.ok(
+    extension.split('\n').every((line) => !line.startsWith(' ')),
+    'GDScript indents with tabs only',
+  );
+  assert.ok((await encodeZIP(entries)) instanceof Uint8Array);
 });

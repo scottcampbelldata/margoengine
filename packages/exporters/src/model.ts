@@ -44,6 +44,12 @@ export interface ModelExportOptions {
   animations?: readonly ExportAnimation[];
   /** Skip hidden nodes and their descendants. Default true. */
   onlyVisible?: boolean;
+  /**
+   * Copy each written node's `KHR_node_visibility` from its source document, as
+   * `retainedVisibility` on data-scene nodes. Runtime visibility is not read; a node the source hides is kept only with
+   * `onlyVisible: false`. Default false.
+   */
+  retainedVisibility?: boolean;
   /** false keeps a loaded image's external `uri` instead of embedding it. Default true. */
   embedImages?: boolean;
   /** Re-encode larger images (as PNG) to fit this size; needs OffscreenCanvas. Default Infinity. */
@@ -580,12 +586,13 @@ export async function exportModel(
     binary = false,
     animations = [],
     onlyVisible = true,
+    retainedVisibility = false,
     embedImages = true,
     maxTextureSize = Infinity,
     generator = 'Margo Engine exporters',
   } = options;
   if (
-    [binary, onlyVisible, embedImages].some((v) => typeof v !== 'boolean') ||
+    [binary, onlyVisible, retainedVisibility, embedImages].some((v) => typeof v !== 'boolean') ||
     typeof generator !== 'string' ||
     !Array.isArray(animations)
   )
@@ -625,6 +632,11 @@ export async function exportModel(
         out = trs(node);
       if (node.name) out.name = node.name;
       if (defs[i].extras) out.extras = defs[i].extras;
+      const visible = defs[i].extensions?.KHR_node_visibility?.visible;
+      if (retainedVisibility && typeof visible === 'boolean') {
+        out.extensions = { KHR_node_visibility: { visible } };
+        w.used.add('KHR_node_visibility');
+      }
       map[i] = w.list('nodes', out);
     }
     for (const i of kept) {
@@ -645,7 +657,7 @@ export async function exportModel(
       out.mesh = w.mesh(model, doc.meshes![def.mesh!], primitives);
       if (primitives[0].weights.length) out.weights = Array.from(primitives[0].weights);
       if (def.skin !== undefined) out.skin = w.skin(model, doc.skins![def.skin], map);
-      if (inst) out.extensions = { EXT_mesh_gpu_instancing: w.instances(inst) };
+      if (inst) (out.extensions ??= {}).EXT_mesh_gpu_instancing = w.instances(inst);
     }
     if (writeSceneMetadata(w, model, map)) {
       w.used.add('KHR_lights_punctual');

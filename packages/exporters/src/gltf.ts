@@ -661,13 +661,19 @@ function bake(geo: Geo, m: Float64Array): Geo {
   return out;
 }
 
-function document(source: ExportSource, options: GLTFOptions, writer = new Writer()): Writer {
+function document(
+  source: ExportSource,
+  options: GLTFOptions,
+  writer = new Writer(),
+  prepare?: (roots: Node[]) => void,
+): Writer {
   const flatten = options.flatten ?? false,
     generator = options.generator ?? 'Margo Engine exporters';
   if (typeof flatten !== 'boolean') throw new TypeError('flatten must be boolean');
   if (typeof generator !== 'string') throw new TypeError('generator must be a string');
-  const roots = collect(source, options, (bytes) => writer.plan(bytes)),
-    json = writer.json,
+  const roots = collect(source, options, (bytes) => writer.plan(bytes));
+  prepare?.(roots);
+  const json = writer.json,
     sceneNodes: number[] = [];
   const animations = Array.isArray((source as ExportScene).nodes) ? (source as ExportScene).animations : undefined;
   if (animations !== undefined && !Array.isArray(animations)) throw new TypeError('Animations must be an array');
@@ -715,6 +721,7 @@ function document(source: ExportSource, options: GLTFOptions, writer = new Write
       sceneNodes.push(json.nodes.length - 1);
     }
   } else {
+    // Depth first, each node before its children: exportRobloxGLB counts glTF node indices in this order.
     const visit = (node: Node): number => {
       const geometries =
         node.primitives?.map((primitive) => primitive.geometry) ?? (node.geometry ? [node.geometry] : []);
@@ -822,12 +829,22 @@ function lightmap(writer: Writer, data: LightmapData, roots: Node[], extras: Rec
   if (texCoord !== 0 && texCoord !== 1) throw new RangeError('Lightmap texCoord must be 0 or 1');
   if (typeof key !== 'string' || !key) throw new TypeError('Lightmap key must be a nonempty string');
   if (key in extras) throw new TypeError(`Root extras already hold ${key}; give the lightmap another key`);
-  if ('texture' in more || 'texCoord' in more)
-    throw new TypeError('Lightmap extras cannot set texture or texCoord; the writer records them');
+  for (const name of ['texture', 'texCoord', 'emission', 'lightmapScale', 'emissionScale'])
+    if (name in more) throw new TypeError(`Lightmap extras cannot set ${name}; the writer records it`);
   for (const { geometry } of drawables(roots))
     if (!(texCoord ? geometry.uvs1 : geometry.uvs))
       throw new TypeError(`Lightmap texCoord ${texCoord} needs ${texCoord ? 'uvs1' : 'uvs'} on every mesh`);
-  extras[key] = { texture: writer.texture(texture), texCoord, ...more };
+  const record: Record<string, unknown> = { texture: writer.texture(texture), texCoord, ...more },
+    emission = checkTexture(data.emission, 'Lightmap emission');
+  if (emission) record.emission = writer.texture(emission);
+  for (const name of ['lightmapScale', 'emissionScale'] as const) {
+    const scale = data[name];
+    if (scale === undefined) continue;
+    if (typeof scale !== 'number') throw new TypeError(`Lightmap ${name} must be a number`);
+    if (!(scale >= 1 && scale < Infinity)) throw new RangeError(`Lightmap ${name} must be finite and at least 1`);
+    record[name] = scale;
+  }
+  extras[key] = record;
 }
 
 function concat(parts: Writer['parts'], length: number): Uint8Array {
@@ -917,9 +934,14 @@ export function exportGLTF(source: ExportSource, options: GLTFJsonOptions = {}):
  * message gives the bytes needed); TypeError for a limit that is not a number.
  */
 export function exportGLB(source: ExportSource, options: GLBOptions = {}): Uint8Array {
+  return writeGLB(source, options);
+}
+
+/** @internal {@link exportGLB}, running `prepare` on the collected nodes before they are written (Roblox splits meshes). */
+export function writeGLB(source: ExportSource, options: GLBOptions, prepare?: (roots: Node[]) => void): Uint8Array {
   const maxBinary = limit(options.maxBinaryBytes, 'maxBinaryBytes'),
     maxFile = limit(options.maxBytes, 'maxBytes'),
-    writer = document(source, options, new Writer(maxBinary, maxFile));
+    writer = document(source, options, new Writer(maxBinary, maxFile), prepare);
   const json = JSON.stringify(writer.json),
     jsonLength = align4(utf8Length(json)),
     binLength = writer.length,

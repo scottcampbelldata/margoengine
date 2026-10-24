@@ -4,8 +4,12 @@ import { engineRuntime, meshRuntime } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import type { EngineKernel, Mesh, Geometry, PbrMaterial } from '@margoengine/core';
 import type { Vec2 } from '@margoengine/math';
+import { rotationToQuaternion } from '@margoengine/math/quat';
 import type { PBRSource } from '../../shared/pbr-source.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
+
+/** Deepest node chain an export walks; one level deeper throws before any node is written. */
+const MAX_HIERARCHY_DEPTH = 1024;
 
 /** Plain geometry with optional UVs, tangents and vertex colors, for data that core `Geometry` cannot hold. */
 export interface GeometryData {
@@ -267,6 +271,12 @@ export interface LightmapData {
   key?: string;
   /** Further members of the record: encoding, scale, padding. */
   extras?: Extras;
+  /** Baked emission atlas, written as `emission: <texture index>` so a game can reload the finished lighting. */
+  emission?: TextureData;
+  /** Multiplier that restores the lightmap texture's linear values, at least 1 (as @margoengine/lightmap returns it). */
+  lightmapScale?: number;
+  /** Multiplier that restores the emission texture's linear values, at least 1. */
+  emissionScale?: number;
 }
 
 /** A plain data scene; geometry and material objects shared between nodes are written once. */
@@ -516,6 +526,8 @@ export function normalizeGeometry(data: Geometry | GeometryData): Geo {
   if (data.faceSizes !== undefined) {
     const sizes = data.faceSizes;
     if (!isObject(sizes) || typeof sizes.length !== 'number') fail('faceSizes must be an array of 3s and 4s');
+    if (sizes.length > indices.length / 3)
+      throw new RangeError('faceSizes must cover every triangle once: a 3 per triangle, a 4 per triangle pair');
     let at = 0;
     for (let f = 0; f < sizes.length; f++) {
       if (sizes[f] !== 3 && sizes[f] !== 4) throw new RangeError('faceSizes values must be 3 or 4');
@@ -612,7 +624,8 @@ function faceNormals(positions: Float32Array, indices: Uint32Array, count: numbe
 export function checkTexture(texture: unknown, label: string): TextureData | undefined {
   if (texture === undefined) return undefined;
   if (!isObject(texture) || !(texture.image instanceof Uint8Array)) fail(`${label} needs an image Uint8Array`);
-  const { image, mimeType } = texture as unknown as TextureData;
+  const { image, mimeType, name } = texture as unknown as TextureData;
+  if (name !== undefined && typeof name !== 'string') fail(`${label} name must be a string`);
   const png = image.length > 8 && image[0] === 0x89 && image[1] === 0x50 && image[2] === 0x4e && image[3] === 0x47;
   const jpeg = image.length > 3 && image[0] === 0xff && image[1] === 0xd8 && image[2] === 0xff;
   if (mimeType === 'image/png' ? !png : mimeType === 'image/jpeg' ? !jpeg : true)
@@ -841,21 +854,7 @@ export function decompose(m: Float64Array): { t: number[]; r: number[]; s: numbe
   const r = [m[0] / sx, m[1] / sx, m[2] / sx, m[4] / sy, m[5] / sy, m[6] / sy, m[8] / sz, m[9] / sz, m[10] / sz];
   const dot = (a: number, b: number) => r[a] * r[b] + r[a + 1] * r[b + 1] + r[a + 2] * r[b + 2];
   if (Math.abs(dot(0, 3)) > 1e-6 || Math.abs(dot(0, 6)) > 1e-6 || Math.abs(dot(3, 6)) > 1e-6) return null;
-  const trace = r[0] + r[4] + r[8];
-  let q: number[];
-  if (trace > 0) {
-    const s = 2 * Math.sqrt(trace + 1);
-    q = [(r[5] - r[7]) / s, (r[6] - r[2]) / s, (r[1] - r[3]) / s, s / 4];
-  } else if (r[0] > r[4] && r[0] > r[8]) {
-    const s = 2 * Math.sqrt(1 + r[0] - r[4] - r[8]);
-    q = [s / 4, (r[3] + r[1]) / s, (r[6] + r[2]) / s, (r[5] - r[7]) / s];
-  } else if (r[4] > r[8]) {
-    const s = 2 * Math.sqrt(1 + r[4] - r[0] - r[8]);
-    q = [(r[3] + r[1]) / s, s / 4, (r[7] + r[5]) / s, (r[6] - r[2]) / s];
-  } else {
-    const s = 2 * Math.sqrt(1 + r[8] - r[0] - r[4]);
-    q = [(r[6] + r[2]) / s, (r[7] + r[5]) / s, s / 4, (r[1] - r[3]) / s];
-  }
+  const q = rotationToQuaternion(r);
   return { t: [m[12], m[13], m[14]], r: unitQuaternion(q), s: [sx, sy, sz] };
 }
 
@@ -1081,7 +1080,7 @@ export function collect(source: ExportSource, options: SceneOptions = {}, plan?:
       const mesh = meshRuntime(handle),
         id = mesh.id,
         t = store.transforms;
-      if (depth > 64) throw new RangeError('Hierarchy is too deep');
+      if (depth > MAX_HIERARCHY_DEPTH) throw new RangeError('Hierarchy is too deep');
       if (onlyVisible && store.hidden[id]) return null;
       const node = makeNode(
         mesh.name,
@@ -1132,7 +1131,7 @@ export function collect(source: ExportSource, options: SceneOptions = {}, plan?:
   const visit = (data: ExportNode, parent: Float64Array | null, depth: number): Node | null => {
     if (!isObject(data)) fail('Scene nodes must be objects');
     if (seen.has(data)) fail('A scene node appears twice');
-    if (depth > 64) throw new RangeError('Hierarchy is too deep');
+    if (depth > MAX_HIERARCHY_DEPTH) throw new RangeError('Hierarchy is too deep');
     seen.add(data);
     if (data.visible !== undefined && typeof data.visible !== 'boolean') fail('visible must be boolean');
     if (onlyVisible && data.visible === false) return null;

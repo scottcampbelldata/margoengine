@@ -43,6 +43,9 @@ Loaded glTF-pro models retain their scene cameras and existing directional, poin
 output. `exportModel` writes live perspective/orthographic projections, light color/intensity/range and spot cones,
 with node attachments, hierarchy and live transforms. Hidden nodes follow `onlyVisible`; a model with no cameras or
 lights exports without camera arrays or punctual-light declarations. No additional light type is introduced.
+`retainedVisibility: true` copies each written node's source `KHR_node_visibility`, as data-scene nodes'
+`retainedVisibility` writes it (listed in `extensionsUsed`); runtime visibility is not read, so pass
+`onlyVisible: false` to keep nodes the source hides.
 
 Materials meshes use v-up UV orientation (v = 0 at the bottom of a `flipY` texture); glTF puts v = 0 at the
 image's top. `exportModel` writes their UVs as `1 - v`, each texture's PNG with its GPU rows bottom first (a `flipY`
@@ -233,7 +236,9 @@ validator in the tests:
 - **Lightmaps.** glTF has no standard lightmap material slot, and this writer does not invent an extension. A scene's
   `lightmap: {texture, texCoord?, key?, extras?}` writes the texture into the document and records it under the root
   `extras[key]` (default `'lightmap'`) as `{texture: <index>, texCoord, ...extras}`; every drawn mesh needs that UV
-  set (default `uvs1`). Standard viewers ignore it; an import script binds it.
+  set (default `uvs1`). Standard viewers ignore it; an import script binds it. `emission` (a second texture),
+  `lightmapScale` and `emissionScale` (each at least 1, as `@margoengine/lightmap` returns them) are added to the
+  record, so a game can reload the finished lighting.
 
 ```ts
 import {exportGLB, paletteTexture} from '@margoengine/exporters';
@@ -349,6 +354,12 @@ normals, UVs, animation holds/loops, collision surfaces and physics require acce
 version. Fresh Godot 4.7.2 tests established the seed, embedded-image and static-helper mechanisms; relocation,
 open-editor copy ordering and other versions remain separately tested behavior. CPU coverage is
 `node --test packages/exporters/tests/godot.test.js packages/exporters/tests/subpaths.test.js`.
+
+Godot's glTF import reads `COLOR_0` as sRGB, ignores it unless the material opts in, and has no clip loop flag.
+`createGodotImportAddon()` (from `@margoengine/exporters/godot-addon`) returns an editor add-on (`addons/gltf_import/plugin.cfg`, `plugin.gd`, `extension.gd`)
+that fixes both for any GLB: materials of primitives with `COLOR_0` use it as linear albedo (a material shared with
+uncolored primitives is cloned once), and each clip's `extras.loop` boolean sets its loop. Write the entries into the
+project, enable "glTF vertex colors and loops" under Project Settings > Plugins, then reimport.
 
 ## Skin authoring (`@margoengine/exporters/skin`)
 
@@ -470,7 +481,29 @@ Import `exportUSDZ` from `@margoengine/exporters/usdz` to load only USDZ seriali
 
 Save as `.usdz`. A supported Apple device can open `<a rel="ar" href="model.usdz"><img src="preview.png" alt="View the model in AR"></a>`. No headset is required to generate or validate the file.
 
-Hierarchy is baked into world-space meshes. Textures, vertex colors and alpha masks are rejected; animation, skins and morphs are not exported. Quick Look presentation remains untested on Apple hardware. `node --test tests/usdz.test.js` checks ZIP layout and loader round trips. Install the official `usd-core` wheel and run `python tests/validate-usdz.py model.usdz` for independent metadata, topology and available OpenUSD package/material validators.
+Hierarchy is baked into world-space meshes. Vertex colors (RGB or RGBA, baked AO included) multiply the base color and are written as vertex `displayColor` (and, for BLEND materials, `displayOpacity`) primvars that the surface reads through `UsdPrimvarReader` shaders. Textures and alpha masks are rejected; animation, skins and morphs are not exported. Quick Look presentation remains untested on Apple hardware. `node --test tests/usdz.test.js` checks ZIP layout and loader round trips. Install the official `usd-core` wheel and run `python tests/validate-usdz.py model.usdz` for independent metadata, topology, vertex-color wiring and available OpenUSD package/material validators.
+
+## Roblox GLB (`@margoengine/exporters/roblox`)
+
+Roblox Studio refuses a MeshPart over 20,000 triangles. `exportRobloxGLB` writes the ordinary GLB with every mesh
+primitive split into parts of at most `maxTrianglesPerPart` (default 20,000) triangles; each part keeps its triangles
+and exact vertex values and copies only the vertices it uses. Parts of shared geometry are written once.
+
+```ts
+import {exportRobloxGLB} from '@margoengine/exporters/roblox';
+
+const {glb, mapping} = exportRobloxGLB(sceneOrEngine, {animations: true});
+save('model.glb', glb);
+save('model.roblox.json', JSON.stringify(mapping));
+```
+
+`mapping.parts` lists each part's first source triangle, triangle count and source vertex indices; `mapping.uses`
+places every part at a glTF node and primitive; `mapping.importSettings` gives the 3D Importer settings that keep the
+parts apart (merge meshes off, imported pivots, vertex colors on, `collision: 'none'` or `'studio'`). Node
+translation, rotation and scale clips are kept with `animations: true`. Features a MeshPart cannot hold throw with the
+fix: skins, morph targets, cameras, lights, `uvs1`, lightmaps, material clips, layered-clothing cage names and
+collision or cage roles. `materialPolicy: 'strict'` (default) also refuses material fields beyond base color,
+roughness, metalness and emissive color; `'preserve'` writes them. Studio import is not tested here.
 
 ## Render to file
 
@@ -487,6 +520,7 @@ const jpg = await encodeJPEG(shot, 0.9);                 // browser encoder, qua
 
 // Transparent background: attach TransparentCanvas (@margoengine/environment) first.
 const sprite = capture(engine, {width: 256, height: 256, background: '#203040', backgroundAlpha: 0.5});
+const topView = capture(engine, {view: engine.views[1]}); // one engine view: its camera, scene and layers, at its rectangle's size
 
 // Movie as numbered files: walk_000.png, walk_001.png ...
 const frame = (i) => (timeline.seek(i / 30), capture(engine, {width: 640, height: 360}));

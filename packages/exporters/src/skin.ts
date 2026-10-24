@@ -50,20 +50,16 @@ export function checkJoints(joints: readonly SkinJoint[]): void {
     throw new RangeError(`A skeleton needs 1 to ${MAX_JOINTS} joints`);
   const names = new Set<string>();
   let roots = 0;
-  joints.forEach((joint, i) => {
+  for (let i = 0; i < joints.length; i++) {
+    const joint = joints[i];
     if (!joint || typeof joint.name !== 'string' || !joint.name || names.has(joint.name))
       throw new TypeError(`Joint ${i} needs a unique, nonempty name`);
     names.add(joint.name);
     if (!Number.isInteger(joint.parent) || joint.parent < -1 || joint.parent >= joints.length || joint.parent === i)
       throw new RangeError(`Joint ${joint.name} parent must be another joint's index or -1`);
     if (joint.parent === -1) roots++;
-    if (
-      !Array.isArray(joint.position) ||
-      joint.position.length !== 3 ||
-      !(joint.position as readonly unknown[]).every((v) => typeof v === 'number' && Number.isFinite(Math.fround(v)))
-    )
-      throw new RangeError(`Joint ${joint.name} position must be three finite Float32 numbers`);
-  });
+    vec3(joint.position, `Joint ${joint.name} position`);
+  }
   if (roots !== 1) throw new RangeError(`A skeleton needs exactly one root joint (parent -1), not ${roots}`);
   // With one root and every other joint naming a parent, the tree has no cycle iff every joint reaches the root.
   joints.forEach((joint, i) => {
@@ -79,7 +75,7 @@ function vec3(value: unknown, label: string): [number, number, number] {
   if (
     !Array.isArray(value) ||
     value.length !== 3 ||
-    !value.every((v) => typeof v === 'number' && Number.isFinite(Math.fround(v)))
+    ![0, 1, 2].every((i) => typeof value[i] === 'number' && Number.isFinite(Math.fround(value[i])))
   )
     throw new RangeError(`${label} must be three finite Float32 numbers`);
   return [value[0], value[1], value[2]];
@@ -105,7 +101,7 @@ export function skinWeights(
   if (!Number.isInteger(influences) || influences < 1 || influences > 4)
     throw new RangeError('Skin influences must be 1, 2, 3 or 4');
   const length = positions?.length;
-  if (typeof length !== 'number' || length % 3 || length / 3 > MAX_VERTICES)
+  if (!Number.isSafeInteger(length) || length < 0 || length % 3 || length / 3 > MAX_VERTICES)
     throw new RangeError(`Skin positions need xyz per vertex, at most ${MAX_VERTICES} vertices`);
   const count = length / 3,
     n = joints.length;
@@ -196,6 +192,7 @@ const translation = (out: Float32Array, at: number, x: number, y: number, z: num
  * Rest matrices of `joints`: local (from the parent joint, the root's from the mesh origin), world (mesh space) and
  * inverse bind, all translations (see the module's coordinate conventions).
  * @param origin The joint-space point at the mesh origin. Default [0, 0, 0].
+ * @throws RangeError when a local or mesh-space rest translation is not finite as Float32; scale the skeleton or move its origin.
  */
 export function skinBindMatrices(joints: readonly SkinJoint[], origin: Vec3 = [0, 0, 0]): SkinBindMatrices {
   checkJoints(joints);
@@ -212,6 +209,11 @@ export function skinBindMatrices(joints: readonly SkinJoint[], origin: Vec3 = [0
     translation(out.local, j, p[0] - base[0], p[1] - base[1], p[2] - base[2]);
     translation(out.world, j, p[0] - o[0], p[1] - o[1], p[2] - o[2]);
     translation(out.inverseBind, j, o[0] - p[0], o[1] - p[1], o[2] - p[2]);
+    for (let c = j * 16 + 12; c < j * 16 + 15; c++)
+      if (!Number.isFinite(out.local[c] + out.world[c]))
+        throw new RangeError(
+          `Joint ${joint.name} rest translation exceeds finite Float32; scale the skeleton or move its origin`,
+        );
   });
   return out;
 }

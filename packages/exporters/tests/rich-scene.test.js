@@ -377,3 +377,27 @@ test('a lightmap is a texture recorded under root extras, not a material slot', 
     /cannot set texture/,
   );
 });
+
+test('a lightmap record can carry the emission atlas and both scales', needsValidator, async () => {
+  const { texture } = await paletteTexture([10, 20, 30, 255, 40, 50, 60, 255]),
+    lightmap = { texture, emission: { ...texture, name: 'emission' }, lightmapScale: 2.5, emissionScale: 4 },
+    scene = { nodes: [{ geometry: twoQuads() }], lightmap },
+    glb = exportGLB(scene),
+    report = await validate(glb);
+  assert.equal(report.errors + report.warnings, 0, JSON.stringify(report.messages));
+  const { json } = readGLB(glb);
+  assert.deepEqual(json.extras.lightmap, {
+    texture: 0,
+    texCoord: 1,
+    emission: 1,
+    lightmapScale: 2.5,
+    emissionScale: 4,
+  });
+  for (const lightmapScale of [0.5, Infinity, NaN])
+    assert.throws(() => exportGLB({ ...scene, lightmap: { ...lightmap, lightmapScale } }), RangeError);
+  assert.throws(() => exportGLB({ ...scene, lightmap: { ...lightmap, emissionScale: '2' } }), TypeError);
+  assert.throws(
+    () => exportGLB({ ...scene, lightmap: { ...lightmap, extras: { emissionScale: 1 } } }),
+    /cannot set emissionScale/,
+  );
+});

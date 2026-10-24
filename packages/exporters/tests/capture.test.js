@@ -332,15 +332,16 @@ function mockEngine({ cssWidth = 300, cssHeight = 200, dpr = 1.5, fail = false }
   const engine = {
     canvas,
     camera,
-    render({ camera: view = camera, delta = 0 } = {}) {
+    render({ camera: view = camera, delta = 0, views } = {}) {
       if (fail) throw new Error('device lost');
+      if (views) view = views[0].camera;
       const width = Math.max(1, Math.min(4096, Math.round(canvas.clientWidth * dpr) || canvas.width)),
         height = Math.max(1, Math.min(4096, Math.round(canvas.clientHeight * dpr) || canvas.height));
       canvas.width = width;
       canvas.height = height;
       const projection = new Float64Array(16);
       view.project?.(projection, width / height, true);
-      renders.push({ width, height, view, delta, projection, display: style.getPropertyValue('display') });
+      renders.push({ width, height, view, views, delta, projection, display: style.getPropertyValue('display') });
       canvas.frame = renders.length - 1;
     },
   };
@@ -379,6 +380,28 @@ test('capture renders at an exact size regardless of CSS size and DPR, then rest
   assert.deepEqual(mock.log[fill + 1], ['draw', 20, 10], 'scene drawn over the background');
   capture(engine, { width: 1, height: 1, background: [0.5, 0.5, 0.5] });
   assert.equal(mock.log.findLast(([op]) => op === 'fill')[1], 'rgb(188 188 188 / 1)', 'linear 0.5 is sRGB 188');
+});
+
+test('capture with a view renders its camera, scene and layers at the size of its rectangle', (t) => {
+  const mock = mockCanvasGlobals();
+  t.after(mock.restore);
+  const { engine, canvas, camera, renders } = mockEngine(),
+    top = { fov: 40, near: 0.1, far: 50 },
+    scene = { name: 'hud' };
+  engine.render();
+  const view = { camera: top, viewport: [0.5, 0, 0.5, 0.5], scene, layers: 2, scissor: [0.5, 0, 0.25, 0.5] },
+    shot = capture(engine, { view });
+  assert.deepEqual([shot.width, shot.height], [225, 150], 'default size: the view rectangle at the canvas size');
+  const drawn = renders.at(-2);
+  assert.deepEqual([drawn.width, drawn.height, drawn.view], [225, 150, top]);
+  assert.deepEqual(drawn.views, [
+    { camera: top, viewport: [0, 0, 1, 1], pixels: false, scissor: undefined, target: undefined, scene, layers: 2 },
+  ]);
+  engine.views = [{ camera, viewport: [0, 0, 1, 1] }];
+  capture(engine, { view: { camera: top, viewport: [10, 20, 64, 32], pixels: true }, width: 128 });
+  assert.deepEqual([renders.at(-2).width, renders.at(-2).height], [128, 32], 'pixels give the default height');
+  assert.equal(renders.at(-1).views, engine.views, 'the page redraws its own views afterwards');
+  assert.deepEqual([canvas.width, canvas.height], [450, 300]);
 });
 
 test('capture tiles sizes above 4096 through a view offset on the full projection', (t) => {

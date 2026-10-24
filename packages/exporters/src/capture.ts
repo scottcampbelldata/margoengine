@@ -1,7 +1,7 @@
 // Render to file. capture() renders one frame at an exact pixel size and returns its RGBA pixels; the encoders turn
 // frames into PNG/JPG files, numbered image sequences, an animated GIF or a WebM video. Time is the caller's: every
 // encoder asks frame(i) for frame i, so a deterministic timeline sets the scene state for i there and captures.
-import type { Camera, EngineKernel } from '@margoengine/core';
+import type { Camera, EngineKernel, RenderView } from '@margoengine/core';
 import { LinearToSRGB, parseColor, type ColorInput } from '@margoengine/math/color';
 import { MargoError } from '@margoengine/math/errors';
 import { png } from './png.js';
@@ -37,12 +37,20 @@ export type FrameSource = (index: number) => Pixels | Promise<Pixels>;
 
 /** Options for {@link capture}. */
 export interface CaptureOptions {
-  /** Output width in pixels, a whole number >= 1, independent of the canvas size and device pixel ratio. */
-  width: number;
-  /** Output height in pixels, a whole number >= 1. */
-  height: number;
+  /**
+   * Output width in pixels, a whole number >= 1, independent of the canvas size and device pixel ratio. Default with
+   * `view`: the view rectangle's width in drawing-buffer pixels; required without.
+   */
+  width?: number;
+  /** Output height in pixels, a whole number >= 1. Default with `view`: the view rectangle's height. */
+  height?: number;
   /** Camera to render through (a selected scene camera). Default `engine.camera`. */
   camera?: Camera;
+  /**
+   * An engine view to capture: its camera, scene, layers and clear, cropped to its rectangle (fractions of the canvas
+   * unless `pixels`) and rendered at `width` x `height`. Overrides `camera`.
+   */
+  view?: RenderView;
   /**
    * Colour under the scene: `'#rrggbb'`, `0xrrggbb` (sRGB) or linear `[r, g, b]`. It shows only where the canvas is
    * transparent (`TransparentCanvas` from @margoengine/environment, or a WebGL2 renderer made with
@@ -69,8 +77,14 @@ const LIMIT = 4096;
  */
 export function capture(
   engine: EngineKernel,
-  { width, height, camera = engine.camera, background, backgroundAlpha = 1 }: CaptureOptions,
+  options: CaptureOptions,
 ): { data: Uint8ClampedArray; width: number; height: number } {
+  const { view, background, backgroundAlpha = 1 } = options,
+    camera = view?.camera ?? options.camera ?? engine.camera,
+    // With a view, its rectangle in drawing-buffer pixels gives the default size; the capture fills the output with it.
+    scale = view?.pixels ? [1, 1] : [engine.canvas.width, engine.canvas.height],
+    width = options.width ?? (view ? Math.max(1, Math.round(view.viewport[2] * scale[0])) : Number.NaN),
+    height = options.height ?? (view ? Math.max(1, Math.round(view.viewport[3] * scale[1])) : Number.NaN);
   if (!(Number.isInteger(width) && Number.isInteger(height) && width >= 1 && height >= 1))
     throw new RangeError(`Capture size ${width}x${height} is invalid; pass whole numbers of pixels >= 1`);
   if (!(backgroundAlpha >= 0 && backgroundAlpha <= 1))
@@ -103,7 +117,12 @@ export function capture(
         canvas.width = w;
         canvas.height = h;
         if (columns * rows > 1) camera.project = tile(camera, project, width, height, x, y, w, h);
-        engine.render({ camera, delta: 0 });
+        if (view)
+          engine.render({
+            views: [{ ...view, camera, viewport: [0, 0, 1, 1], pixels: false, scissor: undefined, target: undefined }],
+            delta: 0,
+          });
+        else engine.render({ camera, delta: 0 });
         context.clearRect(0, 0, w, h);
         if (fill) {
           context.fillStyle = fill;
@@ -121,7 +140,8 @@ export function capture(
     else style.removeProperty('display');
     [canvas.width, canvas.height] = saved;
   }
-  engine.render();
+  // Draw the page's own frame again: its views when it has them.
+  engine.render(engine.views?.length ? { views: engine.views } : {});
   return { data: out, width, height };
 }
 

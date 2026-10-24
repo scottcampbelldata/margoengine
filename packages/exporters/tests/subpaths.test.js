@@ -30,6 +30,13 @@ test('Godot delivery subpath exposes only its pure generator and does not import
   assert.doesNotMatch(entry, /from ['"]node:|(?:globalThis|window)\.(?:document|navigator)|requestAdapter\(/);
 });
 
+test('Godot add-on subpath exposes only the add-on generator, apart from the import bundle', async () => {
+  const isolated = await import('@margoengine/exporters/godot-addon');
+  assert.deepEqual(Object.keys(isolated), ['createGodotImportAddon']);
+  const entry = await readFile(new URL('../dist/godot-addon.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(entry, /from ['"]\.\/(?:index|gltf|glb|godot|capture|model|scene)\.js['"]/);
+});
+
 test('Unity delivery subpath exposes only file generators and never loads a renderer or native launcher', async () => {
   const isolated = await import('@margoengine/exporters/unity');
   assert.deepEqual(Object.keys(isolated), ['createUnityImportBundle', 'createUnityImportSupportPackage']);

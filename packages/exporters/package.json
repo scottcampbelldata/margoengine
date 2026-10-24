@@ -35,6 +35,10 @@
       "types": "./dist/capture.d.ts",
       "import": "./dist/capture.js"
     },
+    "./roblox": {
+      "types": "./dist/roblox.d.ts",
+      "import": "./dist/roblox.js"
+    },
     "./skin": {
       "types": "./dist/skin.d.ts",
       "import": "./dist/skin.js"
@@ -42,6 +46,10 @@
     "./godot": {
       "types": "./dist/godot.d.ts",
       "import": "./dist/godot.js"
+    },
+    "./godot-addon": {
+      "types": "./dist/godot-addon.d.ts",
+      "import": "./dist/godot-addon.js"
     },
     "./unity": {
       "types": "./dist/unity.d.ts",

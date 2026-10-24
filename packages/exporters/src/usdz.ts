@@ -12,6 +12,16 @@ const tuples = (values: ArrayLike<number>, size: number): string => {
   return `[${result.join(', ')}]`;
 };
 
+/** A UsdPrimvarReader feeding the surface from the mesh's `display<name>` primvar. */
+const reader = (name: string, type: string, fallback: string): string[] => [
+  `    def Shader "${name}" {`,
+  `        uniform token info:id = "UsdPrimvarReader_${type}"`,
+  `        string inputs:varname = "display${name}"`,
+  `        ${type} inputs:fallback = ${fallback}`,
+  `        ${type} outputs:result`,
+  '    }',
+];
+
 /** Static, world-space USD meshes with UsdPreviewSurface materials in a stored, 64-byte-aligned USDZ archive. */
 export function exportUSDZ(source: ExportSource, options: USDZOptions = {}): Uint8Array {
   const items = drawables(collect(source, options));
@@ -37,8 +47,20 @@ export function exportUSDZ(source: ExportSource, options: USDZOptions = {}): Uin
       material.emissiveTexture
     )
       throw new TypeError('USDZ texture export is unsupported');
-    if (item.geometry.colors) throw new TypeError('USDZ vertex color export is unsupported');
     if (material.alphaMode === 'MASK') throw new TypeError('USDZ alpha-mask export is unsupported');
+    const colors = item.geometry.colors,
+      displayColor = colors ? new Float32Array(item.geometry.count * 3) : material.color.slice(0, 3),
+      opacity = material.alphaMode === 'OPAQUE' ? 1 : material.color[3],
+      displayOpacity =
+        colors && item.geometry.colorSize === 4 && material.alphaMode !== 'OPAQUE'
+          ? new Float32Array(item.geometry.count)
+          : undefined;
+    if (colors)
+      for (let v = 0; v < item.geometry.count; v++) {
+        for (let c = 0; c < 3; c++)
+          displayColor[v * 3 + c] = colors[v * item.geometry.colorSize + c] * material.color[c];
+        if (displayOpacity) displayOpacity[v] = colors[v * 4 + 3] * opacity;
+      }
     for (let v = 0; v < positions.length; v++)
       if (!Number.isFinite(Math.fround(positions[v])))
         throw new RangeError('USDZ world position exceeds Float32 range');
@@ -59,20 +81,31 @@ export function exportUSDZ(source: ExportSource, options: USDZOptions = {}): Uin
       `    int[] faceVertexIndices = [${indices.join(', ')}]`,
       '    uniform token subdivisionScheme = "none"',
       `    uniform bool doubleSided = ${material.doubleSided}`,
-      `    color3f[] primvars:displayColor = ${tuples(material.color.slice(0, 3), 3)}`,
+      `    color3f[] primvars:displayColor = ${tuples(displayColor, 3)}${colors ? ' (interpolation = "vertex")' : ''}`,
+      ...(displayOpacity
+        ? [
+            `    float[] primvars:displayOpacity = [${Array.from(displayOpacity, num).join(', ')}] (interpolation = "vertex")`,
+          ]
+        : []),
       `    rel material:binding = </Margo/Material_${i}>`,
       '}',
       `def Material "Material_${i}" {`,
       `    token outputs:surface.connect = </Margo/Material_${i}/Surface.outputs:surface>`,
       '    def Shader "Surface" {',
       '        uniform token info:id = "UsdPreviewSurface"',
-      `        color3f inputs:diffuseColor = (${material.color.slice(0, 3).map(num).join(', ')})`,
+      colors
+        ? `        color3f inputs:diffuseColor.connect = </Margo/Material_${i}/Color.outputs:result>`
+        : `        color3f inputs:diffuseColor = (${material.color.slice(0, 3).map(num).join(', ')})`,
       `        color3f inputs:emissiveColor = (${material.emissive.map(num).join(', ')})`,
       `        float inputs:roughness = ${num(material.roughness)}`,
       `        float inputs:metallic = ${num(material.metalness)}`,
-      `        float inputs:opacity = ${num(material.alphaMode === 'OPAQUE' ? 1 : material.color[3])}`,
+      displayOpacity
+        ? `        float inputs:opacity.connect = </Margo/Material_${i}/Opacity.outputs:result>`
+        : `        float inputs:opacity = ${num(opacity)}`,
       '        token outputs:surface',
       '    }',
+      ...(colors ? reader('Color', 'float3', '(1, 1, 1)') : []),
+      ...(displayOpacity ? reader('Opacity', 'float', '1') : []),
       '}',
     );
   }

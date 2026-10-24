@@ -991,3 +991,15 @@ test('deformation export rejects invalid weights, references, morphs and animati
   tip.visible = false;
   assert.doesNotThrow(() => exportGLB(scene, { onlyVisible: false }));
 });
+
+test('a 70-node parent chain exports and a chain past the depth limit refuses', () => {
+  const geometry = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], normals: [0, 0, 1, 0, 0, 1, 0, 0, 1], indices: [0, 1, 2] };
+  const chain = (depth) => {
+    let node = { name: 'leaf', geometry };
+    for (let i = 0; i < depth; i++) node = { name: 'p' + i, children: [node] };
+    return { nodes: [node] };
+  };
+  const deep = exportGLTF(chain(70));
+  assert.ok(deep.json.nodes.length > 70);
+  assert.throws(() => exportGLTF(chain(1100)), /Hierarchy is too deep/);
+});
