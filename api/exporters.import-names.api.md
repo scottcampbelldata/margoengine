@@ -5,11 +5,15 @@
 ```ts
 export type CollisionTag = 'col' | 'convcol' | 'colonly' | 'convcolonly';
 
+export const GODOT_SUFFIX_IMPORT_SETTINGS = "[remap]\nimporter=\"scene\"\ntype=\"PackedScene\"\n\n[params]\nnodes/use_name_suffixes=true\nnodes/use_node_type_suffixes=true\nmeshes/force_disable_compression=true\n";
+
 export function clipImportName(name: string, loop: boolean, fallback?: string): string;
 
 export function collisionBase(name: string): string;
 
 export function collisionTag(name: string): CollisionTag | null;
+
+export function godotImportedNodeName(name: string, hasMesh: boolean): string;
 
 export function withCollisionTag(name: string, tag: CollisionTag | null): string;
 ```

@@ -6,6 +6,11 @@
 import { EngineKernel, Geometry, Mesh, PbrMaterial } from "@margoengine/core";
 import { Vec2 } from "@margoengine/math";
 
+export interface RobloxChunk extends RobloxPrimitiveInput {
+    readonly sourcePrimitiveIndex: number;
+    readonly chunkIndex: number;
+}
+
 export interface RobloxGLBOptions extends SceneOptions {
     maxTrianglesPerPart?: number;
     materialPolicy?: 'strict' | 'preserve';
@@ -53,7 +58,39 @@ export interface RobloxPartUse {
     part: number;
 }
 
+export type RobloxPartitionStrategy = 'fixed' | 'balanced';
+
+export interface RobloxPrimitiveInput {
+    readonly primitive: RobloxSourcePrimitive;
+    readonly triangles: readonly RobloxTriangleIdentity[];
+}
+
+export interface RobloxSourceCorner {
+    readonly faceId: string;
+    readonly corner: number;
+}
+
+export interface RobloxSourcePrimitive {
+    readonly objectId: string;
+    readonly materialId: string | null;
+    readonly animationBinding: string | null;
+    readonly positions: readonly number[];
+    readonly normals: readonly number[];
+    readonly uvs: readonly number[];
+    readonly colors: readonly number[];
+    readonly indices: readonly number[];
+    readonly sourceCorners: readonly (readonly RobloxSourceCorner[])[];
+}
+
+export type RobloxTriangleIdentity = readonly [sourceObjectId: string, faceId: string, triangleOrdinal: number];
+
 export function exportRobloxGLB(source: ExportSource, options?: RobloxGLBOptions): RobloxGLBResult;
+
+export function robloxChunkTriangleCounts(triangles: number, triangleBudget?: number, strategy?: RobloxPartitionStrategy): readonly number[];
+
+export function splitRobloxPrimitives(input: readonly RobloxPrimitiveInput[], triangleBudget?: number, strategy?: RobloxPartitionStrategy): readonly RobloxChunk[];
+
+export function validateRobloxPrimitiveInput(input: RobloxPrimitiveInput): void;
 
 // Not exported from this entry, but used by the exports above:
 

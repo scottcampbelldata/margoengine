@@ -39,6 +39,10 @@
       "types": "./dist/roblox.d.ts",
       "import": "./dist/roblox.js"
     },
+    "./roblox-chunks": {
+      "types": "./dist/roblox-chunks.d.ts",
+      "import": "./dist/roblox-chunks.js"
+    },
     "./skin": {
       "types": "./dist/skin.d.ts",
       "import": "./dist/skin.js"
@@ -66,6 +70,42 @@
     "./godot-lightmap": {
       "types": "./dist/godot-lightmap.d.ts",
       "import": "./dist/godot-lightmap.js"
+    },
+    "./unity-precision": {
+      "types": "./dist/unity-precision.d.ts",
+      "import": "./dist/unity-precision.js"
+    },
+    "./unity-precision-importer": {
+      "types": "./dist/unity-precision-importer.d.ts",
+      "import": "./dist/unity-precision-importer.js"
+    },
+    "./unreal-precision": {
+      "types": "./dist/unreal-precision.d.ts",
+      "import": "./dist/unreal-precision.js"
+    },
+    "./unreal-precision-importer": {
+      "types": "./dist/unreal-precision-importer.d.ts",
+      "import": "./dist/unreal-precision-importer.js"
+    },
+    "./godot-precision-addon": {
+      "types": "./dist/godot-precision-addon.d.ts",
+      "import": "./dist/godot-precision-addon.js"
+    },
+    "./godot-precision": {
+      "types": "./dist/godot-precision.d.ts",
+      "import": "./dist/godot-precision.js"
+    },
+    "./godot-flipbook": {
+      "types": "./dist/godot-flipbook.d.ts",
+      "import": "./dist/godot-flipbook.js"
+    },
+    "./roblox-runtime": {
+      "types": "./dist/roblox-runtime.d.ts",
+      "import": "./dist/roblox-runtime.js"
+    },
+    "./roblox-runtime-restore": {
+      "types": "./dist/roblox-runtime-restore.d.ts",
+      "import": "./dist/roblox-runtime-restore.js"
     }
   },
   "files": [
@@ -73,10 +113,14 @@
   ],
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0"
+    "@margoengine/gltf-pro": "^1.0.0",
+    "@margoengine/decoders": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/gltf-pro": {
+      "optional": true
+    },
+    "@margoengine/decoders": {
       "optional": true
     }
   },

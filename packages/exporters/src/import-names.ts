@@ -54,3 +54,26 @@ export function clipImportName(name: string, loop: boolean, fallback = 'Animatio
   base ||= text(fallback, 'fallback');
   return loop ? `${base}-loop` : base;
 }
+
+/**
+ * The node name Godot gives a node it imports with suffix import on: a mesh node named `base-col` or `base-convcol`
+ * becomes `base` (plus a collision body). Accepts only an ASCII identifier base with no collision word at its end
+ * and at most one lower-case `-col` or `-convcol` suffix.
+ * @throws TypeError for any other name, or for a collision suffix on a node without a mesh.
+ */
+export function godotImportedNodeName(name: string, hasMesh: boolean): string {
+  const match = /^([A-Za-z][A-Za-z0-9_]*?)(-(?:col|convcol))?$/.exec(text(name, 'Node name'));
+  if (!match || /_(?:col|convcol|colonly|convcolonly)$/i.test(match[1]!))
+    throw new TypeError(
+      'Godot node name must use a safe ASCII base and only an authorized lowercase collision suffix.',
+    );
+  if (match[2] && !hasMesh) throw new TypeError('Godot collision suffix requires an emitted mesh node.');
+  return match[1]!;
+}
+
+/**
+ * A GLB's `.import` file for Godot 4 that turns on name suffixes (`-col`, `-convcol`, ...) and node type suffixes
+ * and keeps mesh data uncompressed. Godot adds its own UID and cache paths on first import.
+ */
+export const GODOT_SUFFIX_IMPORT_SETTINGS =
+  '[remap]\nimporter="scene"\ntype="PackedScene"\n\n[params]\nnodes/use_name_suffixes=true\nnodes/use_node_type_suffixes=true\nmeshes/force_disable_compression=true\n';

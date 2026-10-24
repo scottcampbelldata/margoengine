@@ -311,7 +311,9 @@ Godot reads collision roles from node name suffixes (`-col`, `-convcol`, `-colon
 import profile reads the same ones) and loops clips whose names end in `-loop`. `collisionTag(name)` returns a
 name's suffix or null, `collisionBase(name)` strips every suffix, and `withCollisionTag(name, tag)` replaces them
 with one (or none for null). `clipImportName(name, loop)` removes leading and trailing `loop`/`cycle` tokens and adds
-`-loop` when `loop` is true, so a clip loops exactly when asked.
+`-loop` when `loop` is true, so a clip loops exactly when asked. `godotImportedNodeName(name, hasMesh)` gives the node name
+Godot keeps after suffix import (`Wall-col` becomes `Wall`), and `GODOT_SUFFIX_IMPORT_SETTINGS` is a GLB `.import` file
+that turns suffix import on and keeps meshes uncompressed.
 
 ## Godot import bundle (`@margoengine/exporters/godot`)
 
@@ -528,6 +530,47 @@ custom-rig rules: every root joint rests at the origin and no vertex is weighted
 about Y (named `rootName`, default `Roblox_Studs`, with `rootExtras`); skinned mesh nodes stay roots, posed through
 their joints. `materialPolicy: 'strict'` (default) also refuses material fields beyond base color,
 roughness, metalness and emissive color; `'preserve'` writes them. Studio import is not tested here.
+
+The same entry splits an application's own flat surfaces: `splitRobloxPrimitives(inputs, budget, strategy)` cuts each
+surface (streams plus one source identity per triangle) into parts per `robloxChunkTriangleCounts` (`'fixed'` fills
+parts to the budget, `'balanced'` evens them out), copying only used vertices in first-use order. `exportRobloxGLB`
+uses the same fixed rule.
+
+`@margoengine/exporters/roblox-chunks` checks a GLB written from those parts: `robloxPreflight` (layout, static,
+qualified capability profile, appearance signatures, texture limits and 64-deep emitted hierarchy, with the
+application's own material plans as hooks), `robloxChunkPreflight` (open, closed or zero-volume geometry per part) and
+`verifyRobloxChunkGLB`, an independent reader of every node, material, texel and triangle corner against the
+captured scene.
+
+`@margoengine/exporters/roblox-runtime` writes a source bundle instead of a GLB: every surface in balanced parts of at
+most 19,998 triangles, Float32 vertices in studs about each part's centre, the original RGBA8 images, a canonical
+manifest, and a source Folder (place `.rbxlx` and model `.rbxmx`) whose `Restore` ModuleScript
+(`@margoengine/exporters/roblox-runtime-restore`) rebuilds the geometry live with EditableMesh and EditableImage.
+`robloxRuntimePreflight` is its policy and `verifyRobloxRuntimeBundle` re-reads the whole package. Restore runs in
+Studio; it is not run here.
+
+## Precision bundles for Unity, Unreal and Godot
+
+A precision bundle carries a static scene to an engine with every source value it can store: the application's
+complete source master, a hash-bound canonical manifest, the original atlas pixels and a native helper that imports
+the geometry, binds the atlas with nearest/clamp sampling and checks every triangle corner, node and texel after
+save and reopen. Each entry has a preflight (`unityPrecisionPreflight`, `unrealPrecisionPreflight`,
+`godotPrecisionPreflight`), an assembler (`create...PrecisionBundle`) and an independent verifier
+(`verify...PrecisionBundle`):
+
+| Entry | Geometry | Native helper |
+| --- | --- | --- |
+| `unity-precision` | the application's exact static GLB | C# for the unmodified glTFast importer (`unity-precision-importer`) |
+| `unreal-precision` | the application's exact static GLB | Python for Interchange (`unreal-precision-importer`) |
+| `godot-precision` | raw Float32 streams per surface, normals in CUSTOM0 | an EditorImportPlugin addon (`godot-precision-addon`) |
+
+The scene is a structural `PrecisionScene` (objects, faces with object-space, world and output corners, effective UVs
+and corner colours, materials and images), so an application passes its own export snapshot without copying it.
+What only the application knows stays its own: `PrecisionSourceChecks` hooks judge its record schema and material
+metadata, it supplies the master bytes and its scene hash, and for Unreal the Python that reads its master format.
+`appName` names the helper, folders, metadata keys and log lines (`<APPNAME>_UNITY_PRECISION_PASS`, ...), so the text
+is the same for the same name. `createGodotFlipbookPlayer` (`godot-flipbook`) is the runtime script that plays UV
+flipbooks on an imported scene. Native imports are run by the application's own acceptance checks, not here.
 
 ## Render to file
 

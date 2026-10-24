@@ -1,13 +1,19 @@
 {
   "gate": "api",
   "about": "undocumented public exports (tsdoc), bare Error throws and throw messages that name no fix, per file",
-  "total": 2047,
+  "total": 2054,
   "history": [
     {
       "date": "2026-10-24",
       "commit": "5c34c002",
       "reason": "Initial baseline: what main held at 5c34c002 when the quality gate landed",
       "grew": 728
+    },
+    {
+      "date": "2026-10-24",
+      "commit": "b8e88643",
+      "reason": "Precision and Roblox runtime verifier messages moved from MargoTile word for word (prefix plus the differing part); its tests and native evidence logs match them",
+      "grew": 4
     }
   ],
   "items": {
@@ -181,13 +187,17 @@
     "no-fix packages/exporters/src/archive.ts": 2,
     "no-fix packages/exporters/src/glb.ts": 10,
     "no-fix packages/exporters/src/gltf.ts": 6,
+    "no-fix packages/exporters/src/godot-precision.ts": 2,
     "no-fix packages/exporters/src/import-data.ts": 1,
     "no-fix packages/exporters/src/keyframes.ts": 1,
     "no-fix packages/exporters/src/model.ts": 1,
+    "no-fix packages/exporters/src/roblox-runtime.ts": 3,
     "no-fix packages/exporters/src/roblox.ts": 3,
     "no-fix packages/exporters/src/scene.ts": 6,
     "no-fix packages/exporters/src/skin.ts": 2,
     "no-fix packages/exporters/src/stl.ts": 1,
+    "no-fix packages/exporters/src/unity-precision.ts": 1,
+    "no-fix packages/exporters/src/unreal-precision.ts": 1,
     "no-fix packages/exporters/src/usdz.ts": 4,
     "no-fix packages/fbx/src/animation.ts": 27,
     "no-fix packages/fbx/src/convert.ts": 1,
