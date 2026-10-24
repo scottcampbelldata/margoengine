@@ -95,7 +95,7 @@ in the counts above yet; until they are, this table gives the status of each gro
 
 | Page | Figures | Evidence | Status |
 | --- | --- | --- | --- |
-| engine | Sizes (core, core + stage, packages, brep), the six-request basic page | `entry-sizes.json`, `basic-scene-network.json` at `5eb44eca` | PROVEN |
+| engine | Sizes (core, core + stage, packages, brep), the six-request basic page | `entry-sizes.json`, `basic-scene-network.json` at `2ac118cb` | PROVEN |
 | engine | three.js r186 size table | `threejs-size.json` at `80b4a1f`, Margo's side shown at both commits | PROVEN (dated) |
 | engine | Kernel scaling, CAD orbit before/after, culling, BVH picks, large coordinates, design-envelope rows | `cad/results-*.json`, `results-scale-node.json`, `large-coordinates-gpu.json`, LIM-001 to LIM-030, DOC-059 | PROVEN (dated) |
 | engine | 51 proofs, 20 ongoing | `proofs/*.proof.js`, the `ongoing` list in `proofs/run.mjs` (the Proofs paragraph below still says 46 and 15) | PROVEN (file counts) |
