@@ -1957,18 +1957,11 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-24T21:51:04.348Z",
-    "commit": "3491447ac1894f7b25df2d7b265cd810d6ada540",
+    "date": "2026-10-24T23:35:29.197Z",
+    "commit": "7f1ab1921c2681a3977a74d49311f7a748d06bcf",
     "packagesDirty": false,
-    "renderedInputsDirty": true,
-    "renderedInputChanges": [
-     "examples/animation-formats.html",
-     "examples/animation-formats.ts",
-     "examples/texture-formats.html",
-     "examples/texture-formats.ts",
-     "site/index.html",
-     "site/sitemap.xml"
-    ]
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "clipping-planes-phone": {
@@ -1990,18 +1983,11 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-24T21:51:04.348Z",
-    "commit": "3491447ac1894f7b25df2d7b265cd810d6ada540",
+    "date": "2026-10-24T23:35:29.197Z",
+    "commit": "7f1ab1921c2681a3977a74d49311f7a748d06bcf",
     "packagesDirty": false,
-    "renderedInputsDirty": true,
-    "renderedInputChanges": [
-     "examples/animation-formats.html",
-     "examples/animation-formats.ts",
-     "examples/texture-formats.html",
-     "examples/texture-formats.ts",
-     "site/index.html",
-     "site/sitemap.xml"
-    ]
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
    }
   },
   "scene-targets-high": {
@@ -2275,8 +2261,8 @@
   "gpu": "nvidia ampere",
   "acPowerBefore": true,
   "acPowerAfter": true,
-  "date": "2026-10-24T22:36:46.608Z",
-  "commit": "c385b2ceae0446459fe31274eba46d704e5ee96a",
+  "date": "2026-10-24T23:35:29.197Z",
+  "commit": "7f1ab1921c2681a3977a74d49311f7a748d06bcf",
   "packagesDirty": false,
   "renderedInputsDirty": false,
   "renderedInputChanges": []
