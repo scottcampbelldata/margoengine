@@ -24,6 +24,7 @@ import { cascadeSplits, fitCascades } from './cascades.js';
 import { shadowSampling, shadowDepth, type ShadowFilter } from './shader.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 import {
+  casterBuffers,
   casterPipeline,
   casterRuntime,
   nodeRecords,
@@ -34,7 +35,7 @@ import {
 } from '../../shared/caster.js';
 export { cascadeSplits, fitCascades } from './cascades.js';
 export type { ShadowFilter } from './shader.js';
-declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
+declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number };
 declare const GPUTextureUsage: {
   RENDER_ATTACHMENT: number;
   TEXTURE_BINDING: number;
@@ -175,6 +176,21 @@ interface Draw {
   displacement?: ShadowPrimitive['displacement'];
   displaced?: GPUBindGroup;
 }
+/** Core-mesh casters sharing one geometry, drawn as one instanced draw per cascade (see Shadows.batchable). */
+interface Batch {
+  primitives: ShadowPrimitive[];
+  matrices: Float32Array;
+  buffer?: GPUBuffer;
+  groups: GPUBindGroup[];
+  packed: number;
+}
+// Below this many casters sharing a geometry, each keeps its own draw: the instanced path pays a storage upload and
+// its own pipeline, which only pays off for many copies (a field of identical boxes, rocks, parts).
+const BATCH_MIN = 8;
+// Depth-only, no fragment stage: core casters have no alpha. One world matrix per instance from a storage array.
+const batchDepth = /* wgsl */ `@group(0) @binding(0) var<uniform> camera:mat4x4f;
+@group(0) @binding(1) var<storage,read> models:array<mat4x4f>;
+@vertex fn vertex(@location(0) position:vec3f,@builtin(instance_index) k:u32)->@builtin(position) vec4f {return camera*models[k]*vec4f(position,1);}`;
 const emptyPrimitives: readonly ShadowPrimitive[] = [];
 const powerOfTwo = (v: number) => Number.isInteger(v) && v >= 16 && Number.isInteger(Math.log2(v));
 /**
@@ -207,6 +223,11 @@ export class Shadows implements EnginePlugin {
   private entries: GPUBindGroupEntry[] = [];
   private pipelines = new Map<number, GPURenderPipeline>();
   private draws = new Map<Mesh, Map<object, Draw>>();
+  /** Per nesting level and pass kind (level * 2 + cached): vertex buffer, then index buffer, to its batch. */
+  private readonly batches: Map<GPUBuffer, Map<GPUBuffer, Batch>>[] = [];
+  private batchPipeline?: GPURenderPipeline;
+  private batchCameras: GPUBuffer[] = [];
+  private frameSerial = 0;
   private sources: Source[] = [];
   private primitiveDepth = 0;
   private readonly frames: {
@@ -657,6 +678,7 @@ export class Shadows implements EnginePlugin {
   }
   private render(c: ShadowPassContext): void {
     this.validate();
+    this.frameSerial++;
     if (this.width !== this.mapWidth || this.height !== this.mapHeight) {
       this.checkLimits();
       this.textures();
@@ -927,7 +949,10 @@ export class Shadows implements EnginePlugin {
       matrix = this.cascadeMatrices[cascade];
     const level = this.primitiveDepth++;
     const frame = (this.frames[level] ??= { primitives: new Map(), owners: new Map(), submitted: new Map() });
-    const submitted = frame.submitted;
+    const submitted = frame.submitted,
+      section = sectionState(c),
+      batches = (this.batches[level * 2 + (cached ? 1 : 0)] ??= new Map()),
+      pending: Batch[] = [];
     try {
       frame.primitives.clear();
       frame.owners.clear();
@@ -982,12 +1007,30 @@ export class Shadows implements EnginePlugin {
             submitted.set(node, indices);
           }
           indices.add(key);
-          this.draw(pass, primitive, matrix, cascade, sectionState(c));
+          if (!section && this.batchable(primitive)) {
+            let byIndex = batches.get(primitive.vertex);
+            if (!byIndex) batches.set(primitive.vertex, (byIndex = new Map()));
+            let batch = byIndex.get(primitive.index);
+            if (!batch)
+              byIndex.set(
+                primitive.index,
+                (batch = { primitives: [], matrices: new Float32Array(0), groups: [], packed: 0 }),
+              );
+            if (!batch.primitives.length) pending.push(batch);
+            batch.primitives.push(primitive);
+          } else this.draw(pass, primitive, matrix, cascade, section);
           if (cached) this.stats.staticDraws++;
           else this.stats.dynamicDraws++;
         }
       }
+      for (const batch of pending) {
+        if (batch.primitives.length < BATCH_MIN)
+          for (const primitive of batch.primitives) this.draw(pass, primitive, matrix, cascade, section);
+        else this.drawBatch(pass, batch, matrix, cascade);
+        batch.primitives.length = 0;
+      }
     } catch (error) {
+      for (const batch of pending) batch.primitives.length = 0;
       try {
         pass.end();
       } catch {}
@@ -996,6 +1039,74 @@ export class Shadows implements EnginePlugin {
       this.primitiveDepth--;
     }
     pass.end();
+  }
+  /** A plain core-mesh caster: 24-byte triangles, no alpha mask, displacement or instances. */
+  private batchable(p: ShadowPrimitive): boolean {
+    return (
+      p.stride === 24 &&
+      !p.instances &&
+      !p.displacement &&
+      !p.alphaTexture &&
+      p.alphaTransform === undefined &&
+      p.topology !== 'line-list' &&
+      (p.alpha ?? 1) === 1 &&
+      (p.cutoff ?? 0) === 0
+    );
+  }
+  /** One instanced draw for every caster of `batch` (one geometry): world matrices packed once per frame and pass. */
+  private drawBatch(pass: GPURenderPassEncoder, batch: Batch, matrix: Float32Array, cascade: number): void {
+    const device = this.device!,
+      n = batch.primitives.length;
+    if (!this.batchPipeline) {
+      const module = device.createShaderModule({ code: batchDepth });
+      this.batchPipeline = device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module, entryPoint: 'vertex', buffers: casterBuffers(24) },
+        depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less-equal' },
+      });
+    }
+    if (!this.batchCameras.length)
+      for (let i = 0; i < 4; i++)
+        this.batchCameras.push(
+          device.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+        );
+    if (batch.packed !== this.frameSerial) {
+      if (batch.matrices.length < n * 16) batch.matrices = new Float32Array(2 ** Math.ceil(Math.log2(n)) * 16);
+      for (let i = 0; i < n; i++) batch.matrices.set(batch.primitives[i].node.matrix, i * 16);
+      if (!batch.buffer || batch.buffer.size < batch.matrices.byteLength) {
+        batch.buffer?.destroy();
+        batch.buffer = device.createBuffer({
+          size: batch.matrices.byteLength,
+          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        });
+        batch.groups.length = 0;
+      }
+      device.queue.writeBuffer(batch.buffer, 0, batch.matrices as Float32Array<ArrayBuffer>, 0, n * 16);
+      batch.packed = this.frameSerial;
+    }
+    const camera = this.batchCameras[cascade];
+    device.queue.writeBuffer(camera, 0, matrix as Float32Array<ArrayBuffer>);
+    const group = (batch.groups[cascade] ??= device.createBindGroup({
+      layout: this.batchPipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: camera } },
+        { binding: 1, resource: { buffer: batch.buffer! } },
+      ],
+    }));
+    const first = batch.primitives[0];
+    pass.setPipeline(this.batchPipeline);
+    pass.setBindGroup(0, group);
+    pass.setVertexBuffer(0, first.vertex);
+    pass.setIndexBuffer(first.index, 'uint32');
+    pass.drawIndexed(first.count, n);
+  }
+  private clearBatches(): void {
+    for (const level of this.batches)
+      for (const byIndex of level?.values() ?? []) for (const batch of byIndex.values()) batch.buffer?.destroy();
+    this.batches.length = 0;
+    for (const buffer of this.batchCameras) buffer.destroy();
+    this.batchCameras = [];
+    this.batchPipeline = undefined;
   }
   private draw(
     pass: GPURenderPassEncoder,
@@ -1102,6 +1213,8 @@ export class Shadows implements EnginePlugin {
     for (const records of this.draws.values())
       for (const r of records.values()) for (const b of r.uniforms) b.destroy();
     this.draws.clear();
+    // Batches hold a geometry's buffers as keys: drop them with the casters they were built for.
+    this.clearBatches();
   }
   private release(): void {
     this.clearDraws();

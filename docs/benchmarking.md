@@ -77,7 +77,7 @@ The tool takes the lock itself when it is not wrapped, so both forms are safe.
 | `startup` | browser | Time to the first finished frame of a one-box scene in a fresh browser per run. Then every site demo loaded cold under a phone profile (`LOAD_PROFILE`, default `phone-layout-cold`) when `site/dist` is built. |
 | `render` | browser | 10,000 boxes, 256 materials, 64 moving point lights, a 2048 shadow map, and SSAO + bloom + tone mapping + FXAA. |
 | `objects` | browser | 10,000 objects as static meshes, moving meshes, instances and moving instances. |
-| `scaling` | browser | 1, 100, 1,000, 10,000 and 100,000 meshes, then 100,000 and 250,000 instances. |
+| `scaling` | browser | 1, 100, 1,000, 10,000 and 100,000 meshes, then 100,000 and 250,000 instances, then 400, 5,000 and 10,000 shadow casters. |
 | `math` | Node | Kernel world matrices and frustum culling for 100,000 meshes, 100,000 matrix compositions, BVH build and rays on 500,000 triangles, rays against a 500-part assembly. |
 | `gltf` | browser | Load and draw DamagedHelmet, FlightHelmet and RobotExpressive, then the helmet with image-based lighting and shadows. |
 | `loaders` | Node | PLY, 3MF, OFF, VTK and PCD files from the loaders tests, and a generated 500,000-triangle OBJ. |

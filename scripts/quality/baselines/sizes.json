@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 2994104,
+  "total": 2994943,
   "history": [
     {
       "date": "2026-10-24",
@@ -49,6 +49,12 @@
       "date": "2026-10-24",
       "commit": "2513c34c",
       "reason": "Duplicate cleanup: math/mat4 gains projectPoint, createScreenPoint and isOrthographic (moved from labels and bvh) and an optional out on multiplyMatrices/invertMatrix (+303 B); the packages that held the copies shrink. Core and core + stage are unchanged; root entries total 30 B less than before.",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-24",
+      "commit": "63df28b9",
+      "reason": "shadows: instanced batch path for 8+ core casters sharing a geometry (1,000 casters 7.2 -> 0.9 ms CPU/frame)",
       "grew": 1
     }
   ],
@@ -264,7 +270,7 @@
     "@margoengine/shader/noise": 4753,
     "@margoengine/shader/raw": 9906,
     "@margoengine/shader/readback": 7620,
-    "@margoengine/shadows": 12260,
+    "@margoengine/shadows": 13099,
     "@margoengine/sky": 15211,
     "@margoengine/sky/base": 6395,
     "@margoengine/sky/bruneton": 2627,

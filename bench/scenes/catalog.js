@@ -304,6 +304,8 @@ export const STANDARD = {
   scaling: [
     ...[1, 100, 1000, 10_000, 100_000].map((n) => ({ scene: 'boxes', params: { n } })),
     ...[100_000, 250_000].map((n) => ({ scene: 'boxes', params: { n, mode: 'instanced' } })),
+    // Shadow casters (render has 1,000): every caster is drawn into each of the 4 cascades.
+    ...[400, 5000, 10_000].map((n) => ({ scene: 'shadows', params: { n } })),
   ],
   gltf: [
     { scene: 'gltf', params: { model: 'damaged-helmet' } },
