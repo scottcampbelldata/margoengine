@@ -3,7 +3,7 @@
   "night-citadel-high": {
    "url": "night-citadel/?quality=high",
    "size": "640x360",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -19,8 +19,8 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-18T11:28:16.572Z",
-    "commit": "079df9fa2963afadeb522a267a9f32ecff7498d4",
+    "date": "2026-10-24T17:44:58.040Z",
+    "commit": "f710857b74fa351e6ca1abbeb751e5d4031a4b99",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -29,7 +29,7 @@
   "night-citadel-light": {
    "url": "night-citadel/?quality=low",
    "size": "640x360",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -45,8 +45,8 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-18T11:28:16.572Z",
-    "commit": "079df9fa2963afadeb522a267a9f32ecff7498d4",
+    "date": "2026-10-24T17:44:58.040Z",
+    "commit": "f710857b74fa351e6ca1abbeb751e5d4031a4b99",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -55,7 +55,7 @@
   "night-citadel-phone": {
    "url": "night-citadel/",
    "size": "195x422",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -71,8 +71,8 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-18T11:28:16.572Z",
-    "commit": "079df9fa2963afadeb522a267a9f32ecff7498d4",
+    "date": "2026-10-24T17:44:58.040Z",
+    "commit": "f710857b74fa351e6ca1abbeb751e5d4031a4b99",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -81,24 +81,24 @@
   "gameplay-sandbox-high": {
    "url": "gameplay-sandbox/?quality=high",
    "size": "640x360",
-   "runs": 4,
+   "runs": 3,
    "noise": {
-    "changed": 0.0000651,
+    "changed": 0.0000521,
     "hot": 0,
-    "mean": 0.0000651,
+    "mean": 0.0000521,
     "max": 1
    },
    "tolerance": {
-    "changed": 0.000695,
+    "changed": 0.000656,
     "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 155.0.4283.60",
+    "browser": "msedge 155.0.4283.62",
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-18T09:23:53.336Z",
-    "commit": "121a67a689a34006125784c32c2cc07e56c2f600",
+    "date": "2026-10-24T17:44:58.040Z",
+    "commit": "f710857b74fa351e6ca1abbeb751e5d4031a4b99",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -107,24 +107,24 @@
   "gameplay-sandbox-light": {
    "url": "gameplay-sandbox/?quality=low",
    "size": "640x360",
-   "runs": 4,
+   "runs": 3,
    "noise": {
-    "changed": 0.00000434,
+    "changed": 0.0000434,
     "hot": 0,
-    "mean": 0.00000434,
-    "max": 1
+    "mean": 0.000239,
+    "max": 8
    },
    "tolerance": {
-    "changed": 0.000513,
+    "changed": 0.00063,
     "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 155.0.4283.60",
+    "browser": "msedge 155.0.4283.62",
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-18T09:23:53.336Z",
-    "commit": "121a67a689a34006125784c32c2cc07e56c2f600",
+    "date": "2026-10-24T17:44:58.040Z",
+    "commit": "f710857b74fa351e6ca1abbeb751e5d4031a4b99",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -133,7 +133,7 @@
   "gameplay-sandbox-phone": {
    "url": "gameplay-sandbox/",
    "size": "195x422",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -145,12 +145,12 @@
     "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 155.0.4283.60",
+    "browser": "msedge 155.0.4283.62",
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-18T09:23:53.336Z",
-    "commit": "121a67a689a34006125784c32c2cc07e56c2f600",
+    "date": "2026-10-24T17:44:58.040Z",
+    "commit": "f710857b74fa351e6ca1abbeb751e5d4031a4b99",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -315,7 +315,7 @@
   "windy-meadow-high": {
    "url": "demos/windy-meadow.html?quality=high",
    "size": "640x360",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -327,12 +327,12 @@
     "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 155.0.4283.60",
+    "browser": "msedge 155.0.4283.62",
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-18T09:23:53.336Z",
-    "commit": "121a67a689a34006125784c32c2cc07e56c2f600",
+    "date": "2026-10-24T17:44:58.040Z",
+    "commit": "f710857b74fa351e6ca1abbeb751e5d4031a4b99",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -341,7 +341,7 @@
   "windy-meadow-light": {
    "url": "demos/windy-meadow.html?quality=low",
    "size": "640x360",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -353,12 +353,12 @@
     "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 155.0.4283.60",
+    "browser": "msedge 155.0.4283.62",
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-18T09:23:53.336Z",
-    "commit": "121a67a689a34006125784c32c2cc07e56c2f600",
+    "date": "2026-10-24T17:44:58.040Z",
+    "commit": "f710857b74fa351e6ca1abbeb751e5d4031a4b99",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -367,7 +367,7 @@
   "windy-meadow-phone": {
    "url": "demos/windy-meadow.html",
    "size": "195x422",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -379,12 +379,12 @@
     "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 155.0.4283.60",
+    "browser": "msedge 155.0.4283.62",
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-18T09:23:53.336Z",
-    "commit": "121a67a689a34006125784c32c2cc07e56c2f600",
+    "date": "2026-10-24T17:44:58.040Z",
+    "commit": "f710857b74fa351e6ca1abbeb751e5d4031a4b99",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -393,7 +393,7 @@
   "earth-high": {
    "url": "demos/earth/?quality=high",
    "size": "640x360",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -405,12 +405,12 @@
     "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 155.0.4283.60",
+    "browser": "msedge 155.0.4283.62",
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-18T09:23:53.336Z",
-    "commit": "121a67a689a34006125784c32c2cc07e56c2f600",
+    "date": "2026-10-24T17:44:58.040Z",
+    "commit": "f710857b74fa351e6ca1abbeb751e5d4031a4b99",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -419,7 +419,7 @@
   "earth-light": {
    "url": "demos/earth/?quality=low",
    "size": "640x360",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -431,12 +431,12 @@
     "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 155.0.4283.60",
+    "browser": "msedge 155.0.4283.62",
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-18T09:23:53.336Z",
-    "commit": "121a67a689a34006125784c32c2cc07e56c2f600",
+    "date": "2026-10-24T17:44:58.040Z",
+    "commit": "f710857b74fa351e6ca1abbeb751e5d4031a4b99",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -445,7 +445,7 @@
   "earth-phone": {
    "url": "demos/earth/",
    "size": "195x422",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -457,12 +457,12 @@
     "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 155.0.4283.60",
+    "browser": "msedge 155.0.4283.62",
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-18T09:23:53.336Z",
-    "commit": "121a67a689a34006125784c32c2cc07e56c2f600",
+    "date": "2026-10-24T17:44:58.040Z",
+    "commit": "f710857b74fa351e6ca1abbeb751e5d4031a4b99",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -1121,24 +1121,24 @@
   "khronos-ToyCar-model": {
    "url": "examples/khronos-gallery.html?model=ToyCar",
    "size": "320x240",
-   "runs": 4,
+   "runs": 3,
    "noise": {
-    "changed": 0.000716,
+    "changed": 0.000807,
     "hot": 0,
-    "mean": 0.000716,
+    "mean": 0.000807,
     "max": 1
    },
    "tolerance": {
-    "changed": 0.00265,
+    "changed": 0.00292,
     "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 155.0.4283.60",
+    "browser": "msedge 155.0.4283.62",
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-18T09:23:53.336Z",
-    "commit": "121a67a689a34006125784c32c2cc07e56c2f600",
+    "date": "2026-10-24T17:44:58.040Z",
+    "commit": "f710857b74fa351e6ca1abbeb751e5d4031a4b99",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -1147,7 +1147,7 @@
   "khronos-SheenChair-model": {
    "url": "examples/khronos-gallery.html?model=SheenChair",
    "size": "320x240",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -1159,12 +1159,12 @@
     "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 155.0.4283.60",
+    "browser": "msedge 155.0.4283.62",
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-18T09:23:53.336Z",
-    "commit": "121a67a689a34006125784c32c2cc07e56c2f600",
+    "date": "2026-10-24T17:44:58.040Z",
+    "commit": "f710857b74fa351e6ca1abbeb751e5d4031a4b99",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -1433,7 +1433,7 @@
   "voxel-overview-high": {
    "url": "voxel/?view=overview&quality=high",
    "size": "640x360",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -1449,8 +1449,8 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-19T12:36:35.938Z",
-    "commit": "c22e1ff584b6199cc68bb4fca7b0448d4e15fe93",
+    "date": "2026-10-24T17:44:58.040Z",
+    "commit": "f710857b74fa351e6ca1abbeb751e5d4031a4b99",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -1459,7 +1459,7 @@
   "voxel-overview-light": {
    "url": "voxel/?view=overview&quality=low",
    "size": "640x360",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -1475,8 +1475,8 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-19T12:36:35.938Z",
-    "commit": "c22e1ff584b6199cc68bb4fca7b0448d4e15fe93",
+    "date": "2026-10-24T17:44:58.040Z",
+    "commit": "f710857b74fa351e6ca1abbeb751e5d4031a4b99",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -1485,7 +1485,7 @@
   "voxel-overview-phone": {
    "url": "voxel/?view=overview",
    "size": "195x422",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -1501,8 +1501,8 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-19T12:36:35.938Z",
-    "commit": "c22e1ff584b6199cc68bb4fca7b0448d4e15fe93",
+    "date": "2026-10-24T17:44:58.040Z",
+    "commit": "f710857b74fa351e6ca1abbeb751e5d4031a4b99",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -1511,7 +1511,7 @@
   "voxel-ground-high": {
    "url": "voxel/?view=ground&quality=high",
    "size": "640x360",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -1527,8 +1527,8 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-19T12:36:35.938Z",
-    "commit": "c22e1ff584b6199cc68bb4fca7b0448d4e15fe93",
+    "date": "2026-10-24T17:44:58.040Z",
+    "commit": "f710857b74fa351e6ca1abbeb751e5d4031a4b99",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -1537,7 +1537,7 @@
   "voxel-ground-light": {
    "url": "voxel/?view=ground&quality=low",
    "size": "640x360",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -1553,8 +1553,8 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-19T12:36:35.938Z",
-    "commit": "c22e1ff584b6199cc68bb4fca7b0448d4e15fe93",
+    "date": "2026-10-24T17:44:58.040Z",
+    "commit": "f710857b74fa351e6ca1abbeb751e5d4031a4b99",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -1563,7 +1563,7 @@
   "voxel-ground-phone": {
    "url": "voxel/?view=ground",
    "size": "195x422",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -1579,8 +1579,8 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-19T12:36:35.938Z",
-    "commit": "c22e1ff584b6199cc68bb4fca7b0448d4e15fe93",
+    "date": "2026-10-24T17:44:58.040Z",
+    "commit": "f710857b74fa351e6ca1abbeb751e5d4031a4b99",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -1589,7 +1589,7 @@
   "voxel-night-high": {
    "url": "voxel/?view=night&quality=high",
    "size": "640x360",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -1605,8 +1605,8 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-19T12:36:35.938Z",
-    "commit": "c22e1ff584b6199cc68bb4fca7b0448d4e15fe93",
+    "date": "2026-10-24T17:44:58.040Z",
+    "commit": "f710857b74fa351e6ca1abbeb751e5d4031a4b99",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -1619,8 +1619,8 @@
   "gpu": "nvidia ampere",
   "acPowerBefore": true,
   "acPowerAfter": true,
-  "date": "2026-10-24T07:34:49.792Z",
-  "commit": "eef3132feef0099946eba90d744c578470873478",
+  "date": "2026-10-24T17:44:58.040Z",
+  "commit": "f710857b74fa351e6ca1abbeb751e5d4031a4b99",
   "packagesDirty": false,
   "renderedInputsDirty": false,
   "renderedInputChanges": []
