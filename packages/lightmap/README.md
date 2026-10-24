@@ -25,8 +25,10 @@ atlas.textures.lightmap; // RGBA8, irradiance / atlas.lightmapScale
   texels a side, packed by `@margoengine/materials`' `packAtlas` with `padding` gutter texels copied from the chart's
   edge so filtering never bleeds between charts. Mip levels need gutters to match.
 - **Lighting.** Ambient, directional, point and spot lights with shadows, and cosine-weighted ambient occlusion, traced
-  through `@margoengine/bvh`. The lightmap is irradiance times occlusion, independent of albedo. Not included: indirect
-  bounces, emissive surfaces as lights, area lights, transmission.
+  through `@margoengine/bvh`. Point and spot shadows test the segment to the light, so blockers beyond the light or
+  right at the surface are handled without a bias. The lightmap is irradiance times occlusion, independent of albedo.
+  `radiometry: 'physical'` stores irradiance without occlusion instead (the AO texture holds it), for a consumer that
+  applies `albedo * (1 - metalness) / pi`; albedo must then be 0 to 1.
 - **Textures.** Albedo is sRGB; emission, normal (tangent space, the quad's frame), ORM and AO are linear. Lightmap and
   emission store values divided by `lightmapScale` and `emissionScale` (each at least 1), so HDR light survives RGBA8.
 - **Materials.** Per-quad `albedo`, `emission` and `roughnessMetalness`, or a `surface` callback that returns them per
@@ -34,3 +36,26 @@ atlas.textures.lightmap; // RGBA8, irradiance / atlas.lightmapScale
 - **Budgets.** Quads (32,768), texels (262,144 by default, up to 1,048,576), rays (16,777,216, up to 67,108,864), an
   estimate of bytes (192 MiB, up to 256 MiB) and the atlas side (2,048) are checked before any texture is allocated.
   Inputs are copied before the first await; `signal` and `onProgress` run every 256 texels.
+- **Asset record.** `lightingAsset(lightmap, terms)` returns a small record (scales, size, radiometry, baked terms) to
+  store next to the textures, for example in glTF extras.
+
+## More light: `@margoengine/lightmap/global`
+
+`bakeGlobalLightmap(quads, options)` takes every `bakeLightmap` option and adds:
+
+- `areaLights`: rectangle lights, the same `RectAreaLight` objects as `@margoengine/clustered/area`, with
+  `areaSamples` shadow rays per texel.
+- `emissiveLights`: emissive quads light the others; with a `surface` callback, each emitting texel is its own light.
+- `bounces` (0 to 2) and `bounceRays`: diffuse indirect light, as per-quad averages (coarse radiosity).
+- `transmission`: quads with albedo alpha below 1 cast no shadows.
+- `glassVolumes`: closed convex volumes made of bake quads cast coloured shadows (Fresnel at each boundary, Beer
+  absorption inside). Light goes straight through: no refraction or caustics.
+
+## Caustics: `@margoengine/lightmap/refracted`
+
+`bakeRefractedLightmap(quads, {glassVolumes, emitters})` traces photons from point lights, finite directional beams and
+rectangle lights through ideal smooth convex glass (Snell refraction, Fresnel reflection, total internal reflection,
+Beer absorption, nested volumes) and deposits them at the first receiver they reach after touching glass. It returns
+the native atlas with physical irradiance in its lightmap, the irradiance and hit counts per pixel, and `diagnostics`
+that account for every emitted watt (deposited, escaped, absorbed, truncated, unrefracted, blocked). Receivers are
+opaque; there is no diffuse bounce, rough glass or dispersion.

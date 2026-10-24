@@ -3,12 +3,20 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
-  "description": "Bakes lightmaps on the CPU: one padded UV atlas for a quad mesh with direct light, ambient occlusion and matching albedo, emission, normal and ORM textures.",
+  "description": "CPU lightmap atlases with native albedo, emission, normal and ORM textures; optional area lights, emissive surfaces, bounces and glass (./global) and caustics (./refracted).",
   "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./global": {
+      "types": "./dist/global.d.ts",
+      "import": "./dist/global.js"
+    },
+    "./refracted": {
+      "types": "./dist/refracted.d.ts",
+      "import": "./dist/refracted.js"
     }
   },
   "files": [

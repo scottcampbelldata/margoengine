@@ -81,3 +81,57 @@ test('budgets, malformed quads and cancellation fail before any texel is baked',
   );
   assert.equal(calls, 1);
 });
+
+test('surface colors with missing channels are refused', async () => {
+  for (const [field, value] of [
+    ['albedo', [, , , 1]],
+    ['emission', new Array(3)],
+  ])
+    await assert.rejects(
+      () => bakeLightmap(floor, { ...options, surface: () => ({ [field]: value }) }),
+      new RegExp(`surface ${field} must be`),
+    );
+});
+
+test('HDR emission keeps its channel ratios; lighting overflow is refused', async () => {
+  const out = await bakeLightmap(floor, { ...options, lights: [], surface: () => ({ emission: [1e300, 5e299, 0] }) }),
+    c = out.charts[0],
+    at = (c.y * out.width + c.x) * 4;
+  assert.equal(out.emissionScale, 1e300);
+  assert.deepEqual([...out.textures.emission.subarray(at, at + 4)], [255, 128, 0, 255]);
+  await assert.rejects(
+    () => bakeLightmap(floor, { ...options, lights: [{ type: 'ambient', intensity: Number.MAX_VALUE }] }),
+    /lighting overflow/,
+  );
+});
+
+test('physical radiometry stores irradiance without AO and needs albedo of at most 1', async () => {
+  const covered = {
+      positions: new Float32Array([...floor.positions, 2, 0.5, 0, 3, 0.5, 0, 3, 0.5, 1, 2, 0.5, 1]),
+    },
+    ambient = { ...options, lights: [{ type: 'ambient', intensity: 1 }] },
+    legacy = await bakeLightmap(covered, ambient),
+    physical = await bakeLightmap(covered, { ...ambient, radiometry: 'physical' });
+  assert.equal(physical.radiometry, 'physical');
+  assert.equal(legacy.radiometry, undefined);
+  assert.equal(texel(physical, 'lightmap') * physical.lightmapScale, 255, 'irradiance is not darkened by AO');
+  assert.ok(texel(physical, 'ao') < 255 && texel(legacy, 'ao') < 255);
+  assert.ok(texel(legacy, 'lightmap') * legacy.lightmapScale < 255);
+  await assert.rejects(
+    () => bakeLightmap(floor, { ...options, radiometry: 'physical', surface: () => ({ albedo: [2, 1, 1, 1] }) }),
+    /albedo RGB must be 0 to 1/,
+  );
+  await assert.rejects(() => bakeLightmap(floor, { ...options, radiometry: 'linear' }), TypeError);
+});
+
+test('point-light shadows test the whole segment to the light, even closer than the ray bias', async () => {
+  // A cover 0.0005 above the floor (below the 0.001 bias) and a point light at 0.01, above it.
+  const cover = [0, 0.0005, 0, 1, 0.0005, 0, 1, 0.0005, 1, 0, 0.0005, 1],
+    bake = (positions) =>
+      bakeLightmap(
+        { positions: new Float32Array(positions) },
+        { ...options, radiometry: 'physical', lights: [{ type: 'point', position: [0.5, 0.01, 0.5], decay: 0 }] },
+      );
+  assert.ok(texel(await bake(floor.positions), 'lightmap') > 0);
+  assert.equal(texel(await bake([...floor.positions, ...cover]), 'lightmap'), 0);
+});

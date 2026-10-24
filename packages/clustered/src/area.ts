@@ -1,56 +1,17 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
-import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type Vec3 } from '@margoengine/core/extension';
+import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph } from '@margoengine/core/extension';
+import type { RectAreaLight } from '@margoengine/math';
 import { finiteVector } from '@margoengine/math/validate';
 import { MargoError } from '@margoengine/math/errors';
 import type { Clustered, ClusteredArea } from './index.js';
 import { ltcSize, ltcTable } from './ltc.js';
 import { areaShadowSettings, MAX_AREA_SHADOWS, type AreaShadowLight } from './light-shadow-math.js';
+import { rectFrame } from '../../shared/rect-frame.js';
 export { MAX_AREA_SHADOWS } from './light-shadow-math.js';
 declare const GPUBufferUsage: { STORAGE: number; COPY_DST: number };
-/**
- * Shadow map settings of a castShadow {@link RectAreaLight}. Invalid values throw TypeError or RangeError from
- * `setLights`; a `resolution` above LocalShadows' throws RangeError when the maps render.
- */
-export interface AreaLightShadow {
-  /**
-   * Map size in texels per cube face: one integer (square) or `[width, height]`, each from 16 up to LocalShadows'
-   * `resolution` (the default). A smaller map renders into its layers' top-left corner, as a local light's.
-   */
-  resolution?: number | readonly [number, number];
-  /** Shadow-camera near distance from the light's centre (default far / 1000); nearer casters are not drawn. */
-  near?: number;
-  /** Shadow-camera far distance (default 100 world units); receivers past it are unshadowed. */
-  far?: number;
-}
-/** A rectangular area light. It emits from one face, toward `direction`, unless `twoSided`. */
-export interface RectAreaLight {
-  /** World-space centre. */
-  position: Vec3;
-  /** The side the light faces (its normal), world space; need not be unit length. */
-  direction: Vec3;
-  /** Size along the light's right axis, `direction Ã— up` (world units). */
-  width: number;
-  /** Size along the light's up axis, `up` made perpendicular to `direction` (world units). */
-  height: number;
-  /** Orientation hint (default [0, 1, 0], or [0, 0, 1] when `direction` is vertical); must not be parallel to `direction`. */
-  up?: Vec3;
-  /** Linear RGB, multiplied by `intensity` (default [1, 1, 1]). */
-  color?: Vec3;
-  /** Emitted radiance (luminance; default 1). A light of area A matches a clustered point light of intensity `intensity Ã— A` facing the surface. */
-  intensity?: number;
-  /** Emit from both faces (default false). */
-  twoSided?: boolean;
-  /**
-   * Shadowed (default false) by the `LocalShadows` (`@margoengine/clustered/shadows`) attached to the same lights: its
-   * casters, `resolution`, `bias` and `normalBias`, and its map array. Cube faces around the light's centre (five, six
-   * when `twoSided`) and a soft penumbra that widens with `width` and `height` (a PCSS blocker search). Without
-   * LocalShadows the light stays unshadowed. At most {@link MAX_AREA_SHADOWS} lights of a list cast.
-   */
-  castShadow?: boolean;
-  /** Shadow map settings of a castShadow light. */
-  shadow?: AreaLightShadow;
-}
+// The light shapes live in @margoengine/math (shared with the voxel path tracer); re-exported here unchanged.
+export type { AreaLightShadow, RectAreaLight } from '@margoengine/math';
 /** Options of {@link AreaLights}. */
 export interface AreaLightOptions {
   /** The clustered lighting whose light loop also evaluates the area lights (core meshes and every `lights.add()` receiver). */
@@ -171,14 +132,8 @@ export class AreaLights implements EnginePlugin, ClusteredArea {
         typeof (light.twoSided ?? false) !== 'boolean'
       )
         throw new RangeError('Invalid area light size/color/intensity/direction');
-      const n = f.map((v: number) => v / length),
-        hint = light.up ?? (Math.abs(n[1]) > 0.999 ? [0, 0, 1] : [0, 1, 0]);
       if (light.up) finiteVector(light.up, 3, 'Area light up');
-      const r = [hint[1] * n[2] - hint[2] * n[1], hint[2] * n[0] - hint[0] * n[2], hint[0] * n[1] - hint[1] * n[0]],
-        rl = Math.hypot(...r);
-      if (!(rl > 1e-6 * Math.hypot(...hint))) throw new RangeError('Area light up is parallel to its direction');
-      const right = r.map((v: number) => v / rl),
-        up = [n[1] * right[2] - n[2] * right[1], n[2] * right[0] - n[0] * right[2], n[0] * right[1] - n[1] * right[0]],
+      const { normal: n, right, up } = rectFrame(f, light.up, 'Area light'),
         color: ArrayLike<number> = light.color ?? [1, 1, 1];
       if (light.castShadow !== undefined && typeof light.castShadow !== 'boolean')
         throw new TypeError('Area light castShadow must be a boolean');

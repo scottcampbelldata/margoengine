@@ -44,5 +44,7 @@ export type {
   NumberArray,
   ColorSpace,
   EulerOrder,
+  AreaLightShadow,
+  RectAreaLight,
 } from './types.js';
 // meshWorldMatrix lives only in the ./mesh entry: it imports @margoengine/core/extension at runtime.
