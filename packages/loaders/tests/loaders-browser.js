@@ -29,7 +29,7 @@ window.runLoaderTests = async () => {
   device.pushErrorScope('validation');
 
   const empty = snapshot(engine);
-  const result = await load('/tests/fixtures/facecolors.3mf', parse3MF, { maxBytes: 1 << 20 });
+  const result = await load('/tests/fixtures/face_colors.3mf', parse3MF, { maxBytes: 1 << 20 });
   assert(result.groups.length === 5, `expected 5 color groups, got ${result.groups.length}`);
   checks.push('load() + parse3MF in the browser (DecompressionStream deflate-raw)');
 
@@ -87,7 +87,7 @@ window.runLoaderTests = async () => {
 
   let rejected = false;
   try {
-    await load('/tests/fixtures/facecolors.3mf', parse3MF, { maxBytes: 100 });
+    await load('/tests/fixtures/face_colors.3mf', parse3MF, { maxBytes: 100 });
   } catch (error) {
     rejected = error instanceof LoaderError && error.code === 'limit';
   }

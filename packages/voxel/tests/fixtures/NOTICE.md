@@ -2,28 +2,6 @@
 
 Fixtures are used only by the tests and are not part of the published package (`files` is `dist`).
 
-- `chr_knight.vox` (2,688 bytes, git blob `3ec10066ed65dc189a86b0f093fcacf74c588ff2`) is MagicaVoxel's sample
-  `vox/character/chr_knight.vox` from https://github.com/ephtracy/voxel-model, downloaded 2026-10-19 with Scott's
-  approval, under this license:
-
-  > MIT License
-  >
-  > Copyright (c) 2026 ephtracy
-  >
-  > Permission is hereby granted, free of charge, to any person obtaining a copy
-  > of this software and associated documentation files (the "Software"), to deal
-  > in the Software without restriction, including without limitation the rights
-  > to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-  > copies of the Software, and to permit persons to whom the Software is
-  > furnished to do so, subject to the following conditions:
-  >
-  > The above copyright notice and this permission notice shall be included in all
-  > copies or substantial portions of the Software.
-  >
-  > THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-  > IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-  > FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-  > AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-  > LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-  > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-  > SOFTWARE.
+- `tree.vox` is Margo-made: `scripts/make-vox-fixture.js` builds a small tree model and writes the minimal
+  single-model layout (MAIN > SIZE, XYZI, RGBA, version 150) chunk by chunk from the public .vox description. It
+  contains no third-party data.

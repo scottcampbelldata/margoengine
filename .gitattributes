@@ -10,3 +10,9 @@ packages/exporters/src/unity-support.generated.ts text eol=lf
 packages/exporters/scripts/generate-unity-support.js text eol=lf
 examples/assets/kaykit/**/*.bin filter=lfs diff=lfs merge=lfs -text
 examples/assets/kaykit/**/*.png filter=lfs diff=lfs merge=lfs -text
+
+# Margo-made fixtures whose CRLF line endings are part of what the tests exercise
+packages/loaders/tests/fixtures/*.ply -text
+packages/loaders/tests/fixtures/*.pcd -text
+packages/loaders/tests/fixtures/*.xyz -text
+packages/bvh/tests/fixtures/*.obj -text

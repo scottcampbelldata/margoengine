@@ -41,11 +41,11 @@ const random = rng(1234);
 const meshes = {
   soup: soup(random, 3000),
   sphere: bumpySphere(random, 48, 32),
-  suzanne: fixture('suzanne.obj'),
-  cow: fixture('cow.obj'),
+  bean: fixture('bean.obj'),
+  peanut: fixture('peanut.obj'),
 };
 // Scale real-world fixtures into the random-ray volume.
-for (const name of ['suzanne', 'cow']) {
+for (const name of ['bean', 'peanut']) {
   const p = meshes[name].positions,
     min = [Infinity, Infinity, Infinity],
     max = [-Infinity, -Infinity, -Infinity];
@@ -371,7 +371,7 @@ test('frustum collection matches brute force for triangles and leaves', () => {
 });
 
 test('shapecast drives custom queries, honors CONTAINED, traversal order and early exit', () => {
-  const bvh = MeshBVH.build(meshes.cow),
+  const bvh = MeshBVH.build(meshes.peanut),
     r = rng(3);
   for (let i = 0; i < 100; i++) {
     const p = [r() * 2 - 1, r() * 2 - 1, r() * 2 - 1];
@@ -402,7 +402,7 @@ test('shapecast drives custom queries, honors CONTAINED, traversal order and ear
       if (bruteBox({ positions: P }, box).length) faces.push(face);
     },
   });
-  assert.deepEqual(sorted(faces), bruteBox(meshes.cow, box));
+  assert.deepEqual(sorted(faces), bruteBox(meshes.peanut, box));
   assert.ok(containedCalls > 0);
   let ranges = 0;
   assert.equal(bvh.shapecast({ intersectsBounds: () => true, intersectsRange: () => ++ranges === 3 }), true);
@@ -502,14 +502,14 @@ test('core Geometry input: stride-6 vertices, interpolated normals, cached BVH',
 
 test('buildAsync falls back to a synchronous build without Worker and validates options', async () => {
   assert.equal(typeof Worker, 'undefined');
-  const bvh = await buildAsync(meshes.cow, { maxLeafTriangles: 4 });
+  const bvh = await buildAsync(meshes.peanut, { maxLeafTriangles: 4 });
   checkStructure(bvh, { maxLeafTriangles: 4 });
-  await assert.rejects(buildAsync(meshes.cow, { maxDepth: 0 }), RangeError);
+  await assert.rejects(buildAsync(meshes.peanut, { maxDepth: 0 }), RangeError);
   const controller = new AbortController();
   controller.abort();
-  await assert.rejects(buildAsync(meshes.cow, { signal: controller.signal }));
+  await assert.rejects(buildAsync(meshes.peanut, { signal: controller.signal }));
   // The raw builder output is plain transferable data.
-  const data = buildBVH(meshes.cow.positions, 3, meshes.cow.indices);
+  const data = buildBVH(meshes.peanut.positions, 3, meshes.peanut.indices);
   assert.ok(
     data.nodes instanceof ArrayBuffer && data.index instanceof Uint32Array && data.triangles instanceof Uint32Array,
   );
@@ -523,9 +523,9 @@ test('buildAsync cancellation before the SSR microtask avoids reading or buildin
   const source = {
     get positions() {
       reads++;
-      return meshes.cow.positions;
+      return meshes.peanut.positions;
     },
-    indices: meshes.cow.indices,
+    indices: meshes.peanut.indices,
   };
   const pending = buildAsync(source, { signal: controller.signal });
   controller.abort(reason);
@@ -578,17 +578,17 @@ test('Raycaster: world-space hits match brute force over transformed meshes, wit
     engine = mockEngine(),
     s = meshes.sphere,
     geometry = new Geometry(s.positions, s.normals, s.indices);
-  const cow = fixture('cow.obj'),
-    cowGeometry = new Geometry(
-      cow.positions.map((v) => v * 0.2),
-      new Float32Array(cow.positions.length).fill(0).map((_, i) => (i % 3 === 1 ? 1 : 0)),
-      cow.indices,
+  const peanut = fixture('peanut.obj'),
+    peanutGeometry = new Geometry(
+      peanut.positions.map((v) => v * 0.2),
+      new Float32Array(peanut.positions.length).fill(0).map((_, i) => (i % 3 === 1 ? 1 : 0)),
+      peanut.indices,
     );
   const transforms = [];
   for (let i = 0; i < 8; i++) {
     const matrix = Float32Array.from(randomMatrix(r, { translate: 2.5, mirror: i % 3 === 1 }));
-    const mesh = engine.add(i % 2 ? cowGeometry : geometry, matrix, { doubleSided: i % 4 !== 3 });
-    transforms.push({ mesh, matrix, geometry: i % 2 ? cowGeometry : geometry });
+    const mesh = engine.add(i % 2 ? peanutGeometry : geometry, matrix, { doubleSided: i % 4 !== 3 });
+    transforms.push({ mesh, matrix, geometry: i % 2 ? peanutGeometry : geometry });
   }
   // World-space reference: transform every vertex and brute-force the ray in world space.
   const worldMeshes = transforms.map(({ mesh, matrix, geometry: g }) => {

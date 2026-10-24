@@ -12,7 +12,7 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test tests/environment.test.js tests/hdr.test.js tests/scene.test.js tests/volumetric.test.js tests/probes.test.js tests/probes-live.test.js tests/mirror.test.js tests/exr-write.test.js",
+    "test": "npm run build && node --test tests/environment.test.js tests/hdr.test.js tests/scene.test.js tests/volumetric.test.js tests/probes.test.js tests/probes-live.test.js tests/mirror.test.js tests/exr-write.test.js tests/exr-piz.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "prepack": "npm run build",
     "test:probes:browser": "npm run build && node scripts/test-browser.js --probe-samples"

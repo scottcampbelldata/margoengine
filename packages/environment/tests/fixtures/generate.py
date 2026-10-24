@@ -1,5 +1,5 @@
 # Regenerates the synthetic EXR fixtures with the reference OpenEXR library (pip install OpenEXR numpy)
-# and records reference digests for the downloaded real-world files.
+# and records reference digests for the downloaded real-world files and the Margo-made sun_sky.hdr.
 #   python generate.py [folder-with-downloads]
 import hashlib, json, os, struct, sys
 import numpy as np
@@ -85,10 +85,10 @@ for name in ['BrightRings.exr', 'AllHalfValues.exr']:
     hgt, wid = rgb.shape[:2]
     full = np.concatenate([rgb, np.ones((hgt, wid, 1), np.float32)], axis=-1)
     reference[name] = {'width': wid, 'height': hgt, 'compression': str(f.header()['compression']).split('.')[-1].replace('_COMPRESSION', ''), 'sha256': digest(full)}
-path = os.path.join(downloads, 'spot1Lux.hdr')
+path = os.path.join(here, 'sun_sky.hdr')
 if os.path.exists(path):
   img = rgbe_decode(path)
-  reference['spot1Lux.hdr'] = {'width': img.shape[1], 'height': img.shape[0], 'sha256': digest(img), 'max': float(img[..., :3].max())}
+  reference['sun_sky.hdr'] = {'width': img.shape[1], 'height': img.shape[0], 'sha256': digest(img), 'max': float(img[..., :3].max())}
 if reference:
   json.dump(reference, open(os.path.join(here, 'reference.json'), 'w'), indent=2)
 print('ok', sorted(os.listdir(here)))

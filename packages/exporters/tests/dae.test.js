@@ -1,8 +1,11 @@
 // COLLADA 1.4.1 writer: well-formed XML read back by a minimal reader written here, references, accessor counts and
-// strides, index ranges, effects and the node hierarchy; then three.js ColladaLoader (a test oracle only) reads it.
+// strides, index ranges, effects and the node hierarchy; then the shading models and transforms are checked against
+// the COLLADA 1.4.1 rules by hand, and the loaders package's own COLLADA reader (a dev-only cross-package read) places
+// every corner where the node transforms say.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { exportDAE } from '../dist/index.js';
+import { flattenDAE, parseDAE } from '@margoengine/loaders';
 
 /** A non-validating XML reader: elements with attributes, text and children; throws on bad nesting or syntax. */
 function readXML(xml) {
@@ -281,35 +284,142 @@ test('DAE options: linear vertex colors, triangles without faceSizes, and invali
   );
 });
 
-test('three.js ColladaLoader (test oracle) reads the hierarchy, polygons and shading models', async () => {
-  const { JSDOM } = await import('jsdom');
-  globalThis.DOMParser = new JSDOM('').window.DOMParser;
-  const { ColladaLoader } = await import('three/examples/jsm/loaders/ColladaLoader.js');
+test('hierarchy, polygons and shading models follow the COLLADA rules; a COLLADA reader places every corner', () => {
   const data = scene();
-  data.nodes[0].material = { name: 'grass' }; // untextured: the oracle would fetch image files
-  const { log, warn, debug } = console;
-  console.log = console.warn = console.debug = () => {};
-  let result;
-  try {
-    result = new ColladaLoader().parse(exportDAE(data).dae, '');
-  } finally {
-    Object.assign(console, { log, warn, debug });
-  }
-  const level = result.scene.getObjectByName('level_1'),
-    own = level.children.find((o) => o.isMesh && !o.name),
-    pane = result.scene.getObjectByName('pane'),
-    marker = result.scene.getObjectByName('marker');
-  assert.deepEqual(
-    level.position.toArray().map((v) => Math.round(v * 1e6) / 1e6),
-    [1, 2, 3],
+  data.nodes[0].material = { name: 'grass' }; // untextured, so no image references
+  const dae = exportDAE(data).dae,
+    collada = readXML(dae),
+    byId = new Map();
+  const index = (element) => {
+    if (element.attributes.id) byId.set(element.attributes.id, element);
+    element.children.forEach(index);
+  };
+  index(collada);
+  const ref = (url) => byId.get(url.replace(/^#/, ''));
+  const nodes = all(collada, 'node'),
+    named = (name) => {
+      const found = nodes.filter((n) => n.attributes.name === name);
+      assert.equal(found.length, 1, `one node named ${name}`);
+      return found[0];
+    };
+  // A node's local matrix: its <matrix> (row-major, column vectors) or translate/rotate/scale elements in order.
+  const local = (node) => {
+    let m = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+    const times = (a, b) =>
+      Array.from({ length: 16 }, (_, k) => {
+        const r = k >> 2,
+          c = k & 3;
+        return a[r * 4] * b[c] + a[r * 4 + 1] * b[4 + c] + a[r * 4 + 2] * b[8 + c] + a[r * 4 + 3] * b[12 + c];
+      });
+    for (const child of node.children) {
+      const v =
+        child.name === 'matrix' || child.name === 'translate' || child.name === 'scale' || child.name === 'rotate'
+          ? numbers(child)
+          : null;
+      if (child.name === 'matrix') m = times(m, v);
+      else if (child.name === 'translate') m = times(m, [1, 0, 0, v[0], 0, 1, 0, v[1], 0, 0, 1, v[2], 0, 0, 0, 1]);
+      else if (child.name === 'scale') m = times(m, [v[0], 0, 0, 0, 0, v[1], 0, 0, 0, 0, v[2], 0, 0, 0, 0, 1]);
+      else if (child.name === 'rotate') {
+        const [x, y, z] = v,
+          a = (v[3] * Math.PI) / 180,
+          c = Math.cos(a),
+          s = Math.sin(a),
+          t = 1 - c;
+        m = times(m, [
+          t * x * x + c,
+          t * x * y - s * z,
+          t * x * z + s * y,
+          0,
+          t * x * y + s * z,
+          t * y * y + c,
+          t * y * z - s * x,
+          0,
+          t * x * z - s * y,
+          t * y * z + s * x,
+          t * z * z + c,
+          0,
+          0,
+          0,
+          0,
+          1,
+        ]);
+      }
+    }
+    return m;
+  };
+  const level = named('level_1'),
+    pane = named('pane'),
+    marker = named('marker'),
+    empty = named('empty'),
+    loose = named('loose');
+  // level 1: translation (1, 2, 3) and the quaternion's rotation, 90 degrees about +Y ((x, y, z) -> (z, y, -x)).
+  const m = local(level);
+  [0, 0, 1, 1, 0, 1, 0, 2, -1, 0, 0, 3, 0, 0, 0, 1].forEach((v, k) =>
+    assert.ok(Math.abs(m[k] - v) < 1e-9, `level_1 matrix[${k}] ${m[k]} != ${v}`),
   );
-  assert.equal(own.material.type, 'MeshLambertMaterial');
-  assert.equal(own.geometry.attributes.position.count, 9, 'the quad and the triangle become three triangles');
-  assert.deepEqual(Object.keys(own.geometry.attributes).sort(), ['color', 'normal', 'position', 'uv']);
-  assert.equal(pane.material.type, 'MeshPhongMaterial');
-  assert.ok(pane.material.transparent);
-  assert.deepEqual(pane.scale.toArray(), [2, 2, 2]);
-  assert.equal(marker.children.find((o) => o.isMesh).material.type, 'MeshBasicMaterial');
-  assert.equal(result.scene.getObjectByName('empty').parent, marker);
-  assert.equal(result.scene.getObjectByName('loose').geometry.attributes.position.count, 3);
+  // Shading models: the rough dielectric becomes <lambert>, the blended glass <phong> with opacity below 1 (A_ONE:
+  // transparent alpha x transparency), the unlit material <constant>.
+  const technique = (node) => {
+    const geometry = one(node, 'instance_geometry'),
+      material = all(geometry, 'instance_material')[0],
+      effect = ref(one(ref(material.attributes.target), 'instance_effect').attributes.url);
+    return all(effect, 'technique')[0].children[0];
+  };
+  assert.equal(technique(level).name, 'lambert');
+  const phong = technique(pane);
+  assert.equal(phong.name, 'phong');
+  const transparent = one(phong, 'transparent'),
+    alpha = numbers(one(transparent, 'color'))[3],
+    transparency = numbers(one(one(phong, 'transparency'), 'float'))[0];
+  assert.equal(transparent.attributes.opaque, 'A_ONE');
+  assert.ok(alpha * transparency < 1, `pane opacity ${alpha * transparency}`);
+  assert.deepEqual(local(pane), [2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1]);
+  assert.equal(technique(marker).name, 'constant');
+  assert.equal(empty.parent, marker, 'empty is nested in marker');
+  assert.equal(pane.parent, level);
+  assert.equal(marker.parent, level);
+  // level 1's own mesh: one quad and one triangle (7 corners, 3 triangles) with every attribute.
+  const mesh = one(ref(one(level, 'instance_geometry').attributes.url), 'mesh'),
+    polylist = one(mesh, 'polylist');
+  assert.deepEqual(numbers(one(polylist, 'vcount')), [4, 3]);
+  assert.equal(
+    numbers(one(polylist, 'vcount')).reduce((n, k) => n + k - 2, 0),
+    3,
+  );
+  assert.deepEqual(
+    all(polylist, 'input')
+      .map((i) => i.attributes.semantic)
+      .sort(),
+    ['COLOR', 'NORMAL', 'TEXCOORD', 'VERTEX'],
+  );
+  const looseMesh = one(ref(one(loose, 'instance_geometry').attributes.url), 'mesh'),
+    looseCorners = [...all(looseMesh, 'triangles'), ...all(looseMesh, 'polylist')];
+  assert.equal(looseCorners.length, 1);
+  // Indices per corner = largest input offset + 1 (COLLADA 1.4.1 <p>).
+  const stride = 1 + Math.max(...all(looseCorners[0], 'input').map((i) => Number(i.attributes.offset ?? 0)));
+  assert.equal(numbers(one(looseCorners[0], 'p')).length / stride, 3, 'loose has 3 corners');
+
+  // Read back with the loaders package: world corners after the node transforms (Y up, metres).
+  const flat = flattenDAE(parseDAE(dae)),
+    key = (p) => p.map((v) => (Math.abs(v) < 5e-7 ? 0 : v).toFixed(5)).join(' ');
+  assert.equal(flat.indices.length / 3, 3 + 3 + 1 + 1, 'tile, pane tile, marker and loose triangles');
+  const seen = new Set();
+  for (const i of flat.indices) seen.add(key([...flat.positions.subarray(i * 3, i * 3 + 3)]));
+  const tilePoints = [
+      [0, 0, 0],
+      [1, 0, 0],
+      [1, 1, 0],
+      [0, 1, 0],
+      [2, 0, 0],
+    ],
+    parent = ([x, y, z]) => [z + 1, y + 2, -x + 3],
+    expected = new Set(
+      [
+        ...tilePoints.map(parent),
+        ...tilePoints.map((p) => parent(p.map((v) => 2 * v))),
+        ...tilePoints.slice(0, 3).map(parent),
+        ...tilePoints.slice(0, 3),
+      ].map(key),
+    );
+  assert.deepEqual([...seen].sort(), [...expected].sort());
 });

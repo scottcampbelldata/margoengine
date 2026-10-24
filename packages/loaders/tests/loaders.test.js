@@ -29,6 +29,21 @@ import {
   parseAny,
   THREEMF_UNITS,
 } from '../dist/index.js';
+import { lzfCompress } from './lzf-compress.js';
+import {
+  CORNER_COLORS,
+  FACE_COLORS,
+  GEARS,
+  TORUS,
+  cornerTetrahedron,
+  facePrism,
+  gear,
+  gearTransform,
+  helixPoints,
+  rosePoints,
+  spiralPoints,
+  torus,
+} from '../scripts/make-fixtures.js';
 
 const fixtures = fileURLToPath(new URL('./fixtures/', import.meta.url));
 const fixture = (name) => (existsSync(fixtures + name) ? new Uint8Array(readFileSync(fixtures + name)) : null);
@@ -387,38 +402,53 @@ test('PLY: malformed headers, truncated data and limits', () => {
   rejects(() => parsePLY('not bytes'), 'range');
 });
 
-test('PLY: real dolphin samples (ascii, big-endian binary, colored) agree with an independent read', (t) => {
-  const ascii = fixture('dolphins.ply'),
-    big = fixture('dolphins_be.ply'),
-    colored = fixture('dolphins_colored.ply');
-  if (!ascii || !big || !colored) return t.skip('fixtures missing');
+test('PLY: torus fixtures (ascii, both binary byte orders, colored) agree with the generator and an independent read', (t) => {
+  const ascii = fixture('torus.ply'),
+    big = fixture('torus_be.ply'),
+    little = fixture('torus_le.ply'),
+    colored = fixture('torus_colored.ply');
+  if (!ascii || !big || !little || !colored) return t.skip('fixtures missing');
   const a = parsePLY(ascii),
     b = parsePLY(big),
-    c = parsePLY(colored);
-  assert.equal(a.positions.length / 3, 855);
-  assert.equal(a.indices.length / 3, 1689);
-  // Independent read of the ascii body.
+    le = parsePLY(little),
+    c = parsePLY(colored),
+    source = torus(),
+    vertexCount = TORUS.ring * TORUS.tube,
+    faceCount = 2 * vertexCount;
+  assert.equal(a.positions.length / 3, vertexCount);
+  assert.equal(a.indices.length / 3, faceCount);
+  closeArray(a.positions, source.positions.flat(), 1e-6, 'torus vs generator');
+  assert.deepEqual([...a.indices], source.triangles.flat());
+  // Independent read of the ascii body (CRLF lines with a trailing space).
   const lines = new TextDecoder().decode(ascii).split(/\r?\n/),
     start = lines.indexOf('end_header') + 1;
-  const expected = lines.slice(start, start + 855).flatMap((line) => line.trim().split(/\s+/).map(Number));
-  closeArray(a.positions, expected, 1e-6, 'dolphins ascii');
+  const expected = lines.slice(start, start + vertexCount).flatMap((line) => line.trim().split(/\s+/).map(Number));
+  closeArray(a.positions, expected, 1e-6, 'torus ascii');
   const faces = lines
-    .slice(start + 855, start + 855 + 1689)
+    .slice(start + vertexCount, start + vertexCount + faceCount)
     .flatMap((line) => line.trim().split(/\s+/).slice(1).map(Number));
   assert.deepEqual([...a.indices], faces);
   closeArray(b.positions, a.positions, 1e-6, 'big-endian vs ascii');
   assert.deepEqual([...b.indices], [...a.indices]);
+  closeArray(le.positions, a.positions, 1e-6, 'little-endian vs ascii');
+  assert.deepEqual([...le.indices], [...a.indices]);
   closeArray(c.positions, a.positions, 1e-6, 'colored positions');
+  closeArray(
+    c.colors,
+    source.colors.flat().map((v) => v / 255),
+    1e-6,
+    'colors vs generator',
+  );
   const coloredLines = new TextDecoder().decode(colored).split(/\r?\n/),
     colorStart = coloredLines.indexOf('end_header') + 1;
-  const expectedColors = coloredLines.slice(colorStart, colorStart + 855).flatMap((line) =>
+  const expectedColors = coloredLines.slice(colorStart, colorStart + vertexCount).flatMap((line) =>
     line
       .trim()
       .split(/\s+/)
       .slice(3, 6)
       .map((v) => Number(v) / 255),
   );
-  closeArray(c.colors, expectedColors, 1e-6, 'dolphin colors');
+  closeArray(c.colors, expectedColors, 1e-6, 'torus colors');
   assert.ok(new Set(expectedColors).size > 2, 'fixture has several colors');
   const geometry = toGeometry(a),
     box = bounds(a.positions);
@@ -518,14 +548,19 @@ test('XYZ: layouts, separators, labels, count lines and errors', (t) => {
   rejects(() => parseXYZ(text('# nothing\n')), 'syntax');
   rejects(() => parseXYZ(text('1 2 3\n4 5 6\n'), { maxVertices: 1 }), 'limit');
   rejects(() => parseXYZ(text('1 2 3\n'), { layout: 'xyz-rgb' }), 'syntax');
-  const helix = fixture('helix_201.xyz');
+  const helix = fixture('helix.xyz');
   if (!helix) return t.skip('fixture missing');
   const h = parseXYZ(helix),
     rows = new TextDecoder()
       .decode(helix)
       .split('\n')
       .filter((l) => l.trim() && !l.startsWith('#'));
-  assert.equal(h.positions.length / 3, 201);
+  assert.equal(h.positions.length / 3, helixPoints().length);
+  closeArray(h.positions, helixPoints().flat(), 1e-6, 'helix vs generator');
+  assert.ok(
+    rows.some((l) => /\dE-\d/.test(l)),
+    'fixture has capital-E exponents',
+  );
   closeArray(
     h.positions,
     rows.flatMap((l) => l.trim().split(/\s+/).map(Number)),
@@ -536,62 +571,8 @@ test('XYZ: layouts, separators, labels, count lines and errors', (t) => {
 
 // ---------------------------------------------------------------- PCD and LZF
 
-function lzfCompress(input) {
-  const out = [],
-    hash = new Map(),
-    literal = [];
-  const flush = () => {
-    while (literal.length) {
-      const n = Math.min(32, literal.length);
-      out.push(n - 1, ...literal.splice(0, n));
-    }
-  };
-  let i = 0;
-  while (i < input.length) {
-    if (i + 2 < input.length) {
-      const key = input[i] | (input[i + 1] << 8) | (input[i + 2] << 16),
-        reference = hash.get(key);
-      hash.set(key, i);
-      if (reference !== undefined && i - reference - 1 < 8192) {
-        let length = 0;
-        const max = Math.min(264, input.length - i);
-        while (length < max && input[reference + length] === input[i + length]) length++;
-        if (length >= 3) {
-          flush();
-          const offset = i - reference - 1,
-            l = length - 2;
-          if (l < 7) out.push((l << 5) | (offset >> 8), offset & 255);
-          else out.push((7 << 5) | (offset >> 8), l - 7, offset & 255);
-          i += length;
-          continue;
-        }
-      }
-    }
-    literal.push(input[i++]);
-  }
-  flush();
-  return Uint8Array.from(out);
-}
-
-test('LZF: round trips literal runs, short and long back references; rejects corrupt streams', () => {
-  const random = new Uint8Array(5000);
-  let seed = 7;
-  for (let i = 0; i < random.length; i++) {
-    seed = (seed * 1103515245 + 12345) >>> 0;
-    random[i] = seed >>> 16;
-  }
-  const repetitive = new Uint8Array(20000).map((_, i) => (i % 97 < 50 ? 1 : i % 7));
-  for (const input of [random, repetitive, new Uint8Array(0), Uint8Array.of(9)]) {
-    const packed = lzfCompress(input);
-    assert.deepEqual(decompressLZF(packed, input.length), input);
-  }
-  assert.ok(lzfCompress(repetitive).length < repetitive.length / 4, 'test compressor emitted back references');
-  rejects(() => decompressLZF(Uint8Array.of(1 << 5, 0), 3), 'range', /before the output/);
-  rejects(() => decompressLZF(Uint8Array.of(4, 1, 2), 5), 'truncated');
-  rejects(() => decompressLZF(Uint8Array.of(0, 1, 1 << 5, 0), 2), 'range', /overflows the output/);
-  rejects(() => decompressLZF(Uint8Array.of(0, 1, 7 << 5), 10), 'truncated');
-  rejects(() => decompressLZF(Uint8Array.of(0, 1), 4), 'truncated', /expected 4/);
-});
+// lzfCompress (tests/lzf-compress.js) packs the binary_compressed bodies written by writePCD below; the format vectors
+// and the compressor's own round trips are in tests/lzf.test.js.
 
 const packRGB = (r, g, b) => {
   const view = new DataView(new ArrayBuffer(4));
@@ -774,21 +755,38 @@ test('PCD: malformed headers, truncated and corrupt data, limits', () => {
   rejects(() => parsePCD(binary, { maxVertices: 19 }), 'limit');
 });
 
-test('PCD: real PCL sample clouds (ascii packed rgb, binary_compressed)', (t) => {
-  const simple = fixture('simple.pcd'),
-    logo = fixture('pcl_logo.pcd'),
+test('PCD: Margo clouds (ascii packed rgb, binary_compressed) and the real PCL bunny', (t) => {
+  const simple = fixture('rose.pcd'),
+    logo = fixture('spiral.pcd'),
     bunny = fixture('bunny.pcd');
   if (!simple || !logo || !bunny) return t.skip('fixtures missing');
-  const s = parsePCD(simple);
-  assert.equal(s.positions.length / 3, 213);
-  const packed = new DataView(new ArrayBuffer(4));
-  packed.setFloat32(0, 4.2108e6, true);
+  const s = parsePCD(simple),
+    rose = rosePoints();
+  assert.equal(s.positions.length / 3, rose.length);
+  closeArray(
+    s.positions,
+    rose.flatMap((p) => p.position),
+    1e-6,
+    'rose positions',
+  );
+  // The first row's rgb token is a decimal float; its float32 bits are the packed 0x00RRGGBB colour.
+  const roseRows = new TextDecoder().decode(simple).split(/\r?\n/),
+    token = roseRows[roseRows.indexOf('DATA ascii') + 1].trim().split(/\s+/)[3],
+    packed = new DataView(new ArrayBuffer(4));
+  assert.match(token, /e-/, 'rgb is written in exponent form');
+  packed.setFloat32(0, Number(token), true);
   const value = packed.getUint32(0, true);
   closeArray(
     s.colors.subarray(0, 3),
     [((value >>> 16) & 255) / 255, ((value >>> 8) & 255) / 255, (value & 255) / 255],
     1e-7,
-    'simple rgb',
+    'rose rgb',
+  );
+  closeArray(
+    s.colors,
+    rose.flatMap((p) => p.rgb.map((v) => v / 255)),
+    1e-7,
+    'rose colors vs generator',
   );
   const b = parsePCD(bunny),
     rows = new TextDecoder().decode(bunny).split('\n');
@@ -802,9 +800,22 @@ test('PCD: real PCL sample clouds (ascii packed rgb, binary_compressed)', (t) =>
     1e-6,
     'bunny',
   );
-  const l = parsePCD(logo);
+  const l = parsePCD(logo),
+    spiral = spiralPoints();
   assert.equal(parsePCDHeader(logo).data, 'binary_compressed');
-  assert.equal(l.positions.length / 3, 12909);
+  assert.equal(l.positions.length / 3, spiral.length);
+  closeArray(
+    l.positions,
+    spiral.flatMap((p) => p.position),
+    0,
+    'spiral positions',
+  );
+  closeArray(
+    l.colors,
+    spiral.flatMap((p) => p.rgb.map((v) => v / 255)),
+    1e-7,
+    'spiral colors',
+  );
   for (const v of l.positions) assert.ok(Number.isFinite(v) && Math.abs(v) < 10);
   for (const v of l.colors) assert.ok(v >= 0 && v <= 1);
   const distinct = new Set();
@@ -1346,10 +1357,10 @@ test('3MF: invalid component depth budgets reject without bypassing traversal li
   );
 });
 
-test('3MF: real sample packages agree with an independent zlib + regex read', async (t) => {
-  const gears = fixture('cube_gears.3mf'),
-    faces = fixture('facecolors.3mf'),
-    vertex = fixture('vertexcolors.3mf');
+test('3MF: Margo sample packages agree with the generator and an independent zlib + regex read', async (t) => {
+  const gears = fixture('gears.3mf'),
+    faces = fixture('face_colors.3mf'),
+    vertex = fixture('corner_colors.3mf');
   if (!gears || !faces || !vertex) return t.skip('fixtures missing');
   const readModel = (bytes) => {
     const entry = readZipDirectory(bytes).find((e) => e.name.endsWith('.model'));
@@ -1393,13 +1404,33 @@ test('3MF: real sample packages agree with an independent zlib + regex read', as
   }
   assert.equal(result.positions.length / 3, vertices);
   assert.equal(result.indices.length / 3, triangles);
+  assert.equal(objects.size, GEARS.length);
+  assert.equal(
+    vertices,
+    GEARS.reduce((n, g) => n + gear(g).vertices.length, 0),
+  );
+  assert.equal(
+    triangles,
+    GEARS.reduce((n, g) => n + gear(g).triangles.length, 0),
+  );
+  for (const [k, [, , transform]] of items.entries())
+    assert.deepEqual(transform.split(' ').map(Number), gearTransform(GEARS[k]));
   const box = bounds(result.positions);
   closeArray(box.min, min, 1e-5, 'gears min');
   closeArray(box.max, max, 1e-5, 'gears max');
   assert.equal(result.groups.length, items.length);
   const f = await parse3MF(faces),
     colorsXML = [...readModel(faces).matchAll(/<m:color color="#(\w{8})"/g)].map((m) => m[1].toLowerCase());
-  assert.equal(f.groups.length, 5);
+  assert.equal(f.groups.length, FACE_COLORS.length);
+  assert.deepEqual(
+    colorsXML,
+    FACE_COLORS.map((c) => c.slice(1).toLowerCase()),
+  );
+  const prism = facePrism();
+  assert.deepEqual(
+    f.groups.map((g) => g.count / 3),
+    FACE_COLORS.map((_, k) => prism.colors.filter((c) => c === k).length),
+  );
   assert.deepEqual(
     f.groups.map((g) =>
       g.color
@@ -1418,8 +1449,21 @@ test('3MF: real sample packages agree with an independent zlib + regex read', as
   );
   const v = await parse3MF(vertex);
   assert.ok(v.colors);
-  assert.equal(v.positions.length / 3, 12);
-  closeArray(v.colors.subarray(0, 9), [1, 0, 0, 0, 0, 1, 0, 1, 0], 1e-6, 'vertexcolors.3mf first triangle');
+  const tetra = cornerTetrahedron(),
+    hex = (c) => [1, 3, 5].map((i) => Number.parseInt(c.slice(i, i + 2), 16) / 255);
+  assert.equal(v.positions.length / 3, tetra.triangles.length * 3);
+  closeArray(
+    v.colors,
+    tetra.corners.flat().flatMap((k) => hex(CORNER_COLORS[k])),
+    1e-6,
+    'corner_colors.3mf corners',
+  );
+  closeArray(
+    v.positions,
+    tetra.triangles.flat().flatMap((i) => tetra.vertices[i].map((x) => x * 1e-3)),
+    1e-6,
+    'corner_colors.3mf positions (mm to m)',
+  );
 });
 
 // ---------------------------------------------------------------- geometry, detection, fetch

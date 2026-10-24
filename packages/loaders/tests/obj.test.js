@@ -1,7 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
-import { SRGBToLinear } from '@margoengine/math/color';
 import { LoaderError, parseMTL, parseOBJ, toGeometry } from '../dist/index.js';
 
 const text = (value) => new TextEncoder().encode(value);
@@ -155,7 +153,7 @@ f 1/1/1 4/4/1 3/3/1 2/2/1
 f 2/2/1 3/3/1 6/6/1 5/5/1
 `;
 
-test('OBJ: Crocotile-style vertex colors and quads agree with an independent read (three.js OBJLoader)', async () => {
+test('OBJ: Crocotile-style vertex colors and quads give the corners read by hand from the text', async () => {
   const obj = await parseOBJ(CROCOTILE);
   assert.deepEqual([...obj.faceSizes], [4, 4]);
   assert.deepEqual(
@@ -167,28 +165,38 @@ test('OBJ: Crocotile-style vertex colors and quads agree with an independent rea
   );
   assert.equal(obj.groups.length, 1);
   assert.equal(obj.groups[0].material, 'tileset');
-  // Compare every triangle corner with three.js, which keeps OBJ's v up (so ours is 1 - v).
-  const oracle = new OBJLoader().parse(CROCOTILE).children[0].geometry.attributes;
+  // Expected triangle corners, read by hand from the text: each quad c0 c1 c2 c3 fans into (c0, c1, c2) and
+  // (c0, c2, c3); a corner takes the v line's position and colour (as written), its vt line (OBJ orientation, so ours
+  // is 1 - v) and the single vn (0, 1, 0).
+  const corner = {
+    1: { p: [-0.5, 0, -0.5], c: [1, 1, 1], t: [0, 1] },
+    2: { p: [0.5, 0, -0.5], c: [0.5, 0.25, 1], t: [0.25, 1] },
+    3: { p: [0.5, 0, 0.5], c: [1, 1, 1], t: [0.25, 0.75] },
+    4: { p: [-0.5, 0, 0.5], c: [0, 0, 0], t: [0, 0.75] },
+    5: { p: [1.5, 0, -0.5], c: [1, 0, 0], t: [0.5, 1] },
+    6: { p: [1.5, 0, 0.5], c: [1, 0, 0], t: [0.5, 0.75] },
+  };
+  const expected = [1, 4, 3, 1, 3, 2, 2, 3, 6, 2, 6, 5].map((k) => corner[k]);
   const corners = [...obj.indices];
+  assert.equal(corners.length, 12, 'two quads give four triangles');
   close(
     corners.flatMap((v) => [...obj.positions.subarray(v * 3, v * 3 + 3)]),
-    oracle.position.array,
+    expected.flatMap((e) => e.p),
     'position',
   );
-  // three.js stores vertex colors linear; ours stay sRGB as written.
   close(
-    corners.flatMap((v) => [...obj.colors.subarray(v * 3, v * 3 + 3)].map(SRGBToLinear)),
-    oracle.color.array,
+    corners.flatMap((v) => [...obj.colors.subarray(v * 3, v * 3 + 3)]),
+    expected.flatMap((e) => e.c),
     'color',
   );
   close(
     corners.flatMap((v) => [...obj.normals.subarray(v * 3, v * 3 + 3)]),
-    oracle.normal.array,
+    expected.flatMap(() => [0, 1, 0]),
     'normal',
   );
   close(
     corners.flatMap((v) => [obj.uvs[v * 2], 1 - obj.uvs[v * 2 + 1]]),
-    oracle.uv.array,
+    expected.flatMap((e) => e.t),
     'uv',
   );
 });

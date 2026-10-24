@@ -776,7 +776,7 @@ window.runEnvironmentTests = async () => {
 
   // 7. A real Radiance file through the whole pipeline.
   {
-    const image = await loadEnvironmentImage('/tests/fixtures/spot1Lux.hdr');
+    const image = await loadEnvironmentImage('/tests/fixtures/sun_sky.hdr');
     const environment = await Environment.create(device, image, { size: 64, specularSize: 32, ...small });
     assert(environment.sh.radiance.every(Number.isFinite) && environment.sh.radiance[0] > 0, 'real HDR SH');
     const cpu = projectEquirectSH(image);
@@ -786,7 +786,7 @@ window.runEnvironmentTests = async () => {
     );
     report.realHdr = { width: image.width, height: image.height, gpuL0: environment.sh.radiance[0], cpuL0: cpu[0] };
     environment.dispose();
-    report.checks.push('real spot1Lux.hdr processed; GPU L0 matches CPU projection');
+    report.checks.push('Margo sun_sky.hdr processed; GPU L0 matches CPU projection');
   }
 
   const diagnostics = (await Promise.all(modules.map((module) => module.getCompilationInfo())))

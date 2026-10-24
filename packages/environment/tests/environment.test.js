@@ -21,6 +21,7 @@ import {
   IBL_WGSL,
   iblLayoutEntries,
 } from '../dist/index.js';
+import { SKY, decodeRGBE, skyRGBE } from '../scripts/make-hdr-fixture.js';
 
 const fixtures = fileURLToPath(new URL('./fixtures/', import.meta.url));
 const fixture = (name) => readFileSync(fixtures + name);
@@ -459,18 +460,50 @@ test('Radiance HDR decodes adaptive RLE, flat and old-style run scanlines and bo
   }
 });
 
-test('real Radiance file spot1Lux.hdr matches an independent reference decoder', {
-  skip: !existsSync(fixtures + 'spot1Lux.hdr') && 'fixture missing',
+test('Margo Radiance file sun_sky.hdr matches the RGBE bytes it was written from', {
+  skip: !existsSync(fixtures + 'sun_sky.hdr') && 'fixture missing',
 }, () => {
-  const image = parseHDR(fixture('spot1Lux.hdr'));
-  assert.equal(image.width, 1024);
-  assert.equal(image.height, 512);
-  assert.equal(digest(image.data), reference['spot1Lux.hdr'].sha256);
+  const bytes = fixture('sun_sky.hdr'),
+    image = parseHDR(bytes);
+  assert.equal(image.width, SKY.width);
+  assert.equal(image.height, SKY.height);
+  // Expected floats come from the generator's RGBE bytes (mantissa x 2^(e - 136), e = 0 is black), not the file.
+  const expected = decodeRGBE(skyRGBE());
+  assert.equal(image.data.length, expected.length);
+  for (let i = 0; i < expected.length; i++)
+    if (image.data[i] !== expected[i])
+      assert.fail(`pixel ${i >> 2} channel ${i & 3}: ${image.data[i]} != ${expected[i]}`);
+  assert.equal(digest(image.data), reference['sun_sky.hdr'].sha256);
   let max = 0;
   for (let i = 0; i < image.data.length; i += 4)
     max = Math.max(max, image.data[i], image.data[i + 1], image.data[i + 2]);
-  assert.equal(max, reference['spot1Lux.hdr'].max);
-  assert.equal(parseEnvironmentImage(fixture('spot1Lux.hdr')).width, 1024);
+  assert.equal(max, reference['sun_sky.hdr'].max);
+  assert.ok(max > 256, 'peak needs an RGBE exponent byte above 136');
+  // Every scanline uses new-style adaptive RLE with both run and literal packets.
+  let at = bytes.indexOf('\n\n') + 2;
+  at = bytes.indexOf('\n', at) + 1;
+  for (let y = 0; y < SKY.height; y++) {
+    assert.deepEqual([...bytes.subarray(at, at + 4)], [2, 2, SKY.width >> 8, SKY.width & 255], `row ${y} header`);
+    at += 4;
+    let runs = 0,
+      literals = 0;
+    for (let c = 0; c < 4; c++)
+      for (let x = 0; x < SKY.width; ) {
+        const n = bytes[at++];
+        if (n > 128) {
+          runs++;
+          at++;
+          x += n - 128;
+        } else {
+          literals++;
+          at += n;
+          x += n;
+        }
+      }
+    assert.ok(runs > 0 && literals > 0, `row ${y} has ${runs} runs and ${literals} literals`);
+  }
+  assert.equal(at, bytes.length);
+  assert.equal(parseEnvironmentImage(bytes).width, SKY.width);
   assert.equal(parseEnvironmentImage(fixture('synthetic-half-y-zip.exr')).width, 37);
   assert.throws(() => parseEnvironmentImage(Buffer.from('GIF89a')), /Unrecognized/);
 });

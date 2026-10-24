@@ -298,8 +298,9 @@ render.diagnostics; // { kind: 'malformed' | 'unsupported', id, chunk, message }
 Measured with Node on the development laptop (2026-10-19; `node --test packages/voxel/tests/vox.test.js` prints
 yours): a 1M-voxel model writes in about 10 ms and parses in about 6 ms (4 MiB). Pasting, measured with Node 26 on
 the RTX A6000 desktop (32 logical cores) while other jobs kept it at 36-72% CPU (2026-10-19, best of 3): 1M random
-cells in a 256-cubed box 43-57 ms (one `setBlock` per voxel, as pasting did before: 261-282 ms), and MagicaVoxel's
-`chr_knight.vox` tiled 2,635 times (1,048,730 voxels) 45-52 ms (113-142 ms).
+cells in a 256-cubed box 43-57 ms (one `setBlock` per voxel, as pasting did before: 261-282 ms), and a 398-voxel model
+tiled 2,635 times (1,048,730 voxels; measured with the former sample model, which the Margo-made `tests/fixtures/tree.vox`
+replaced at the same voxel count) 45-52 ms (113-142 ms).
 
 ## Physics (`@margoengine/voxel/physics`)
 

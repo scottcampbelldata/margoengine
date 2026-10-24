@@ -887,7 +887,7 @@ test('EnvironmentLighting.load attaches an Environment and its lighting from a d
   assert.equal(engine.plugins.size, 0);
   assert.equal(lighting.environment.disposed, true);
 
-  const bytes = readFileSync(new URL('./fixtures/spot1Lux.hdr', import.meta.url)),
+  const bytes = readFileSync(new URL('./fixtures/sun_sky.hdr', import.meta.url)),
     fetched = [];
   t.mock.method(globalThis, 'fetch', async (url, init) => {
     fetched.push({ url, init });

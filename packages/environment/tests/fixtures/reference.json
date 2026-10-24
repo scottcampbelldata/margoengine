@@ -11,10 +11,10 @@
     "compression": "PIZ",
     "sha256": "2bc183e65c8146294457b6bf5a840e90576ddd41d1dc90971a6ff156b03061bc"
   },
-  "spot1Lux.hdr": {
+  "sun_sky.hdr": {
     "width": 1024,
     "height": 512,
-    "sha256": "607f9db9d5753519ca0c08599786938f1f8f07b62f33c2db0db22051f715e85b",
-    "max": 26368.0
+    "sha256": "bc2772e428443ab4a095653a9ee5ab1f0824f3f7e2e6525fc2e6c7f830e109e6",
+    "max": 1000
   }
 }

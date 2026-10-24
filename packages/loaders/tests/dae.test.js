@@ -1,8 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { JSDOM } from 'jsdom';
-import { Vector3 } from 'three';
-import { ColladaLoader } from 'three/examples/jsm/loaders/ColladaLoader.js';
 import { LoaderError, createMeshes, flattenDAE, parseDAE } from '../dist/index.js';
 
 const close = (actual, expected, label) => {
@@ -294,14 +291,10 @@ test('flattenDAE bakes the hierarchy for createMeshes; mirrored nodes keep outwa
   assert.ok(face[0] * n[0] + face[1] * n[1] + face[2] * n[2] > 0, 'winding agrees with the transformed normal');
 });
 
-test('DAE: world-space corners agree with an independent read (three.js ColladaLoader under jsdom)', () => {
-  const { log, warn, debug } = console;
-  globalThis.DOMParser = new JSDOM('').window.DOMParser;
-  console.log = console.warn = console.debug = () => {};
-  try {
-    // three.js skips unknown controllers badly and loads textures through the DOM: give it the plain scenes.
+test('DAE: world-space corners match the document transforms worked out by hand', () => {
+  {
     const plain = (xml) => xml.replace('<node id="rig"><instance_controller url="#skin"/></node>', '');
-    // three.js splits quads on the other diagonal, so compare the triangle count and the world-space corners.
+    // A quad splits into two triangles on either diagonal, so compare the triangle count and the set of corners.
     const corners = (triangles) =>
       [
         ...new Set(
@@ -315,34 +308,73 @@ test('DAE: world-space corners agree with an independent read (three.js ColladaL
           ),
         ),
       ].sort();
-    for (const xml of [plain(YUP), YUP.replace('Y_UP', 'Z_UP').replace('meter="1"', 'meter="0.5"')].map(plain)) {
+    // The mesh's five points; the polylist quad uses 0-3 and the triangle 1, 4, 2 (the line adds no triangles).
+    const points = [
+      [0, 0, 0],
+      [1, 0, 0],
+      [1, 1, 0],
+      [0, 1, 0],
+      [2, 0, 0],
+    ];
+    // Node "parent": translate (1, 2, 3), rotate 90 degrees about +Y ((x, y, z) -> (z, y, -x)), scale 2. Its child
+    // node's matrix translates +10 in x; the instanced node "shared" translates (0, 0, 5).
+    const parent = ([x, y, z]) => [2 * z + 1, 2 * y + 2, -2 * x + 3];
+    const file = [
+      ...points.map(([x, y, z]) => parent([x + 10, y, z])),
+      ...points.map(([x, y, z]) => parent([x, y, z + 5])),
+    ];
+    const documents = [
+      // Y_UP, meter 1: file coordinates are world coordinates.
+      [plain(YUP), file, 'yup'],
+      // Z_UP, meter 0.5: COLLADA's up_axis rule maps file (x, y, z) to Y-up (x, z, -y), then lengths scale by 0.5.
+      [
+        plain(YUP.replace('Y_UP', 'Z_UP').replace('meter="1"', 'meter="0.5"')),
+        file.map(([x, y, z]) => [0.5 * x, 0.5 * z, -0.5 * y]),
+        'zupHalfMeter',
+      ],
+    ];
+    // The same corner sets, written out (spec vectors oracles.daeWorldCorners).
+    const written = {
+      yup: [
+        '1.0000 2.0000 -17.0000',
+        '1.0000 2.0000 -19.0000',
+        '1.0000 2.0000 -21.0000',
+        '1.0000 4.0000 -17.0000',
+        '1.0000 4.0000 -19.0000',
+        '11.0000 2.0000 -1.0000',
+        '11.0000 2.0000 1.0000',
+        '11.0000 2.0000 3.0000',
+        '11.0000 4.0000 1.0000',
+        '11.0000 4.0000 3.0000',
+      ],
+      zupHalfMeter: [
+        '0.5000 -10.5000 -1.0000',
+        '0.5000 -8.5000 -1.0000',
+        '0.5000 -8.5000 -2.0000',
+        '0.5000 -9.5000 -1.0000',
+        '0.5000 -9.5000 -2.0000',
+        '5.5000 -0.5000 -1.0000',
+        '5.5000 0.5000 -1.0000',
+        '5.5000 0.5000 -2.0000',
+        '5.5000 1.5000 -1.0000',
+        '5.5000 1.5000 -2.0000',
+      ],
+    };
+    for (const [xml, expected, name] of documents) {
       const ours = flattenDAE(parseDAE(xml)),
         mine = [];
       for (let t = 0; t < ours.indices.length; t += 3)
         mine.push(
           [0, 1, 2].flatMap((k) => [...ours.positions.subarray(ours.indices[t + k] * 3, ours.indices[t + k] * 3 + 3)]),
         );
-      const scene = new ColladaLoader().parse(xml.replace(/<library_images>[\s\S]*<\/library_images>/, ''), '').scene,
-        theirs = [];
-      scene.updateMatrixWorld(true);
-      scene.traverse((object) => {
-        if (!object.isMesh) return;
-        const position = object.geometry.attributes.position,
-          index = object.geometry.index;
-        const corner = (i) =>
-          new Vector3()
-            .fromBufferAttribute(position, index ? index.getX(i) : i)
-            .applyMatrix4(object.matrixWorld)
-            .toArray();
-        for (let i = 0; i < (index ?? position).count; i += 3)
-          theirs.push([...corner(i), ...corner(i + 1), ...corner(i + 2)]);
-      });
-      assert.equal(mine.length, theirs.length);
-      assert.deepEqual(corners(mine), corners(theirs));
+      assert.equal(mine.length, 6, `${name}: two instances of a quad and a triangle`);
+      assert.deepEqual(
+        corners(mine),
+        [...new Set(expected.map((p) => p.map((v) => v.toFixed(4)).join(' ')))].sort(),
+        name,
+      );
+      assert.deepEqual(corners(mine), written[name], name);
     }
-  } finally {
-    Object.assign(console, { log, warn, debug });
-    delete globalThis.DOMParser;
   }
 });
 

@@ -287,7 +287,7 @@ function EnvironmentScene() {
     <>
       <Box ref={box} position={[-1, 0.6, 0]} />
       <Suspense fallback={<span data-loading="environment" />}>
-        <Environment src="/packages/environment/tests/fixtures/spot1Lux.hdr" />
+        <Environment src="/packages/environment/tests/fixtures/sun_sky.hdr" />
         <Gltf
           src={fixture}
           position={[1, 0.6, 0]}

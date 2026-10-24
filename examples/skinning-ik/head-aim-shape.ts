@@ -1,6 +1,6 @@
 // Exact convex hull of authored Head vertices above model Y=1.185 (bonded neck seat excluded).
 // Head-local coordinates from examples/assets/skinning-ik.glb; asset SHA256 b9b1a0655a2d728d27db23e1ff54dbdeaf1d9e404e210262e798c88d329e37b8.
-// Generated with Three ConvexHull from the CPU skin bind positions, not a collision-width approximation.
+// Hull corners (quickhull) of the CPU skin bind positions, not a collision-width approximation.
 export const cowlingHull = new Float64Array([
   0.07400000095367432, 0.1239999532699585, -0.20299990475177765, 0.08750000596046448, 0.05868387222290039,
   -0.09745736420154572, 0, 0.03600013256072998, -0.06499999761581421, 0.11858375370502472, 0.06711900234222412,

@@ -1,8 +1,10 @@
-Real-world fixtures, downloaded by scripts/fetch-fixtures.js (each under 1 MB).
+Fixtures for tests/loaders.test.js (each under 1 MB).
 
-three.js examples/models (MIT, https://github.com/mrdoob/three.js):
-  dolphins.ply, dolphins_be.ply, dolphins_colored.ply, cube_gears.3mf (model CC BY-SA, Emmett Lalish),
-  facecolors.3mf, vertexcolors.3mf (3MF Consortium samples), simple.pcd, pcl_logo.pcd, helix_201.xyz
+Margo-made, written by scripts/make-fixtures.js (procedural shapes, deterministic bytes, no third-party data):
+  torus.ply, torus_be.ply, torus_le.ply, torus_colored.ply, gears.3mf, face_colors.3mf, corner_colors.3mf,
+  rose.pcd, spiral.pcd, helix.xyz
+
+Third-party, downloaded by scripts/fetch-fixtures.js:
 Point Cloud Library test data (BSD-3-Clause, https://github.com/PointCloudLibrary/pcl): bunny.pcd
 libigl tutorial data (https://github.com/libigl/libigl-tutorial-data): cube.off, decimated-knight.off
 PyVista vtk-data (https://github.com/pyvista/vtk-data): fran_cut.vtk, polyEx.vtk

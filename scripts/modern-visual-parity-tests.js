@@ -1,14 +1,40 @@
 import assert from 'node:assert/strict';
 import { openBrowser } from './browser.js';
-import { prepareThreeReference, THREE_REFERENCE_VERSION } from './three-reference.js';
 
-const reference = await prepareThreeReference();
+// ACES check: the GPU result of packages/shared/aces.js `aces()` against rows of the behaviour table its fit targets
+// (packages/tonemap/tests/aces.test.js: GREY[20] and GREY[24] are greys of 0.18 and 0.72, plus rows of its COLOUR table),
+// display-linear values compared in 8-bit sRGB codes, within 1 code as that table's CPU test allows.
+const ACES_REFERENCE = [
+  [
+    [0, 0, 0],
+    [0, 0, 0],
+  ],
+  [
+    [0.18, 0.18, 0.18],
+    [0.1055912, 0.1055912, 0.1055912],
+  ],
+  [
+    [0.72, 0.72, 0.72],
+    [0.5057754, 0.5057754, 0.5057754],
+  ],
+  [
+    [4, 0.25, 0.1],
+    [1, 0.3526466, 0.1306049],
+  ],
+  [
+    [0.01, 3, 0.3],
+    [0.543927, 0.883515, 0.4416677],
+  ],
+  [
+    [10, 0, 0],
+    [1, 0.4842714, 0.1726098],
+  ],
+];
 const browser = await openBrowser({ startPath: '/tests/modern-extension.html' }),
   errors = [];
 browser.page.on('pageerror', (e) => errors.push(e.message));
 try {
-  const result = await browser.page.evaluate(async (referenceModule) => {
-    const THREE = await import(referenceModule);
+  const result = await browser.page.evaluate(async (acesReference) => {
     const { acesShader } = await import('/packages/shared/aces.js');
     const { pbrShader } = await import('/packages/gltf-pro/src/shader.ts');
     const { Engine } = await import('/packages/core/dist/index.js');
@@ -68,14 +94,7 @@ try {
     const validation = await device.popErrorScope();
     assert(!validation, validation?.message);
 
-    const colors = [
-      [0, 0, 0],
-      [0.18, 0.18, 0.18],
-      [1, 1, 1],
-      [4, 0.25, 0.1],
-      [0.01, 3, 0.3],
-      [100, 100, 100],
-    ];
+    const colors = acesReference.map(([input]) => input);
     const surface = /struct Surface \{[^}]+\}/.exec(pbrShader)[0];
     const ambient =
       /fn hemisphere_ambient\(s:Surface\)->vec3f \{[\s\S]*?\n\}/.exec(pbrShader)[0] +
@@ -85,7 +104,7 @@ try {
       @group(0) @binding(1) var<storage,read_write> output:array<vec4f>;
       @compute @workgroup_size(1) fn main(@builtin(global_invocation_id) id:vec3u) {
         let colors=array<vec3f,6>(${colors.map((c) => `vec3f(${c.join(',')})`).join(',')});
-        if(id.x<6){output[id.x]=vec4f(aces(colors[id.x]/0.6),1);return;}
+        if(id.x<6){output[id.x]=vec4f(aces(colors[id.x]),1);return;}
         var s:Surface;s.base=vec4f(0.5,0.5,0.5,1);s.metal=select(0.0,1.0,id.x==9);s.occlusion=1;
         s.n=vec3f(0,1.0-f32(min(id.x-6,2u)),0);output[id.x]=vec4f(ambient(s),1);
       }`;
@@ -122,46 +141,32 @@ try {
       values[24] > values[28] && values[28] > values[32] && values[32] > 0 && values[36] > 0,
       'Hemispherical fill must illuminate side, ground and metallic surfaces',
     );
-    const reference = new THREE.WebGLRenderer({ preserveDrawingBuffer: true });
-    reference.setSize(1, 1);
-    reference.toneMapping = THREE.ACESFilmicToneMapping;
-    const scene = new THREE.Scene(),
-      camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
-    camera.position.z = 1;
-    const material = new THREE.MeshBasicMaterial(),
-      plane = new THREE.PlaneGeometry(2, 2);
-    scene.add(new THREE.Mesh(plane, material));
-    const gl = reference.getContext(),
-      pixel = new Uint8Array(4),
-      matches = [];
+    const matches = [];
     const srgb = (x) => Math.round(255 * (x <= 0.0031308 ? x * 12.92 : 1.055 * x ** (1 / 2.4) - 0.055));
     for (let i = 0; i < colors.length; i++) {
-      material.color.setRGB(...colors[i]);
-      reference.render(scene, camera);
-      gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
-      const margo = [...values.slice(i * 4, i * 4 + 3)].map(srgb);
+      const gpu = [...values.slice(i * 4, i * 4 + 3)].map(srgb),
+        table = acesReference[i][1].map(srgb);
       assert(
-        margo.every((v, c) => Math.abs(v - pixel[c]) <= 1),
-        `ACES differs from Three.js for ${colors[i]}: ${margo} vs ${pixel}`,
+        gpu.every((v, c) => Math.abs(v - table[c]) <= 1),
+        `ACES differs from its behaviour table for ${colors[i]}: ${gpu} vs ${table}`,
       );
-      matches.push({ input: colors[i], margo, three: [...pixel.slice(0, 3)] });
+      matches.push({ input: colors[i], gpu, table });
     }
-    material.dispose();
-    plane.dispose();
-    reference.dispose();
     uniform.destroy();
     output.destroy();
     read.destroy();
     engine.dispose();
     canvas.remove();
     return matches;
-  }, reference.moduleUrl);
+  }, ACES_REFERENCE);
   assert.deepEqual(errors, []);
   console.log(
     JSON.stringify(
       {
         hardware: browser.hardware,
-        reference: { three: THREE_REFERENCE_VERSION },
+        reference: {
+          aces: 'own ACES 1.x RRT + sRGB ODT style fit (packages/shared/aces.js) vs the behaviour table in packages/tonemap/tests/aces.test.js',
+        },
         checks: [
           'MSAA CAD + resize',
           'points + EDL',

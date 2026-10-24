@@ -966,7 +966,7 @@ test('benchmark: parse, write and paste a 1M-voxel model (printed)', (t) => {
   t.diagnostic(
     `1,048,576 voxels (${(bytes.length / 2 ** 20).toFixed(1)} MiB): write ${write.toFixed(1)} ms, parse ${parse.toFixed(1)} ms`,
   );
-  // Pasting, best of 3, against one setBlock per voxel: random cells, and MagicaVoxel's knight tiled 2,635 times.
+  // Pasting, best of 3, against one setBlock per voxel: random cells, and the tree.vox fixture tiled 2,635 times.
   const mapping = Uint32Array.from({ length: 256 }, (_, i) => (i ? 1 + (i % 8) : 0)),
     world = () => {
       const blocks = new BlockTypes();
@@ -985,12 +985,15 @@ test('benchmark: parse, write and paste a 1M-voxel model (printed)', (t) => {
       }
       return { ms, w, changed };
     },
-    tile = (k) => [21 * (k % 52), 21 * Math.floor(k / 52), 0],
     tiles = 2635,
-    knight = parseVox(new Uint8Array(readFileSync(new URL('./fixtures/chr_knight.vox', import.meta.url)))),
-    [model] = knight.models,
+    source = parseVox(new Uint8Array(readFileSync(new URL('./fixtures/tree.vox', import.meta.url)))),
+    [model] = source.models,
+    [, sizeY] = model.size,
+    step = Math.max(model.size[0], sizeY),
+    tile = (k) => [step * (k % 52), step * Math.floor(k / 52), 0],
+    lastRow = step * Math.floor((tiles - 1) / 52),
     tiled = {
-      ...knight,
+      ...source,
       nodes: [
         { id: 0, type: 'transform', child: 1, layer: -1, frames: [{}] },
         { id: 1, type: 'group', children: Array.from({ length: tiles }, (_, k) => 2 + 2 * k) },
@@ -1001,20 +1004,22 @@ test('benchmark: parse, write and paste a 1M-voxel model (printed)', (t) => {
       ],
       layers: [{ id: 0 }],
     };
-  // The knight (20 x 21 x 20) centred on translation t: MagicaVoxel cell c = t + v - (10, 10, 10) becomes world
-  // (c0, c2, -1 - c1); the pasted box's minimum corner, (-10, -10, -1061), goes to the origin.
-  const knightCells = [],
+  // The model (size s) centred on translation t: MagicaVoxel cell c = t + v - h, h = floor(s / 2), becomes world
+  // (c0, c2, -1 - c1); the pasted box's minimum corner, (-h0, -h2, -1 - (lastRow + s1 - 1 - h1)), goes to the origin,
+  // so cell v of the tile at (tx, ty) lands at (tx + v0, v2, lastRow + s1 - 1 - ty - v1).
+  const modelCells = [],
     randomCells = [];
   for (let k = 0; k < tiles; k++) {
     const [tx, ty] = tile(k),
       v = model.voxels;
-    for (let i = 0; i < v.length; i += 4) knightCells.push([tx + v[i], v[i + 2], 1070 - ty - v[i + 1], v[i + 3]]);
+    for (let i = 0; i < v.length; i += 4)
+      modelCells.push([tx + v[i], v[i + 2], lastRow + sizeY - 1 - ty - v[i + 1], v[i + 3]]);
   }
   for (let i = 0; i < voxels.length; i += 4)
     randomCells.push([voxels[i], voxels[i + 2], 255 - voxels[i + 1], voxels[i + 3]]);
   for (const [name, target, cells] of [
     ['random cells in a 256^3 box', back.models[0], randomCells],
-    [`chr_knight.vox x ${tiles} (${(tiles * model.voxels.length) / 4} voxels)`, tiled, knightCells],
+    [`tree.vox x ${tiles} (${(tiles * model.voxels.length) / 4} voxels)`, tiled, modelCells],
   ]) {
     const batched = best((w) => pasteVoxModel(w, target, [0, 0, 0], mapping)),
       single = best((w) => pasteBySetBlock(w, cells, mapping));

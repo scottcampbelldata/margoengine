@@ -1,20 +1,11 @@
-// Downloads the small real-world fixtures used by tests/loaders.test.js. Files that 404 are skipped
-// (the tests skip their checks when a fixture is missing). Run with `npm run fixtures`.
+// Downloads the small third-party fixtures used by tests/loaders.test.js (PCL, libigl and PyVista samples). Files
+// that 404 are skipped (the tests skip their checks when a fixture is missing). Run with `npm run fixtures`. The
+// Margo-made fixtures come from scripts/make-fixtures.js instead.
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 
-const three = 'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models';
 const sources = {
-  'dolphins.ply': `${three}/ply/ascii/dolphins.ply`,
-  'dolphins_be.ply': `${three}/ply/binary/dolphins_be.ply`,
-  'dolphins_colored.ply': `${three}/ply/ascii/dolphins_colored.ply`,
-  'cube_gears.3mf': `${three}/3mf/cube_gears.3mf`,
-  'facecolors.3mf': `${three}/3mf/facecolors.3mf`,
-  'vertexcolors.3mf': `${three}/3mf/vertexcolors.3mf`,
-  'simple.pcd': `${three}/pcd/ascii/simple.pcd`,
-  'pcl_logo.pcd': `${three}/pcd/binary_compressed/pcl_logo.pcd`,
-  'helix_201.xyz': `${three}/xyz/helix_201.xyz`,
   'bunny.pcd': 'https://raw.githubusercontent.com/PointCloudLibrary/pcl/master/test/bunny.pcd',
   'cube.off': 'https://raw.githubusercontent.com/libigl/libigl-tutorial-data/master/cube.off',
   'decimated-knight.off': 'https://raw.githubusercontent.com/libigl/libigl-tutorial-data/master/decimated-knight.off',
