@@ -1,6 +1,7 @@
 node_modules/
 dist/
 packages/*/LICENSE
+!packages/brep/LICENSE
 test-results/
 *.log
 packages/*/target/

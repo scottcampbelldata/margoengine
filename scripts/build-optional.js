@@ -1,4 +1,5 @@
 import { buildWorkers } from './build-workers.js';
+import { ownLicenses } from './package-licenses.js';
 import { packageDeclarations } from './package-declarations.js';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -31,7 +32,7 @@ for (const entry of Object.values(manifest.exports)) {
   }
   entries[module] = source;
 }
-await copyFile(resolve(repository, 'LICENSE'), resolve(root, 'LICENSE'));
+if (!ownLicenses.has(name)) await copyFile(resolve(repository, 'LICENSE'), resolve(root, 'LICENSE'));
 await build({
   root,
   configFile: false,

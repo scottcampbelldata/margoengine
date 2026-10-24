@@ -2,7 +2,7 @@
   "name": "@margoengine/brep",
   "version": "1.0.0",
   "type": "module",
-  "license": "MIT",
+  "license": "AGPL-3.0-only OR LicenseRef-Commercial",
   "description": "Margo's own CAD kernel: STEP (ISO 10303-21) reading, product structure, units and colours, exact B-rep geometry (analytic surfaces and NURBS) and crack-free tessellation.",
   "sideEffects": false,
   "exports": {
@@ -14,6 +14,7 @@
   "files": [
     "dist",
     "LICENSE",
+    "LICENSE-COMMERCIAL.md",
     "NOTICE"
   ],
   "publishConfig": {

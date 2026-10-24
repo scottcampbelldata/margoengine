@@ -134,3 +134,8 @@ of an assembly; a larger one throws a `RangeError` that names the option. Links,
 cannot use are skipped with a message in `model.warnings` (at most 100). A face whose surface, curve or bounds the
 kernel cannot resolve is left out of its body's mesh and listed in `mesh.failures` with the reason; the rest of the body
 still meshes. Tessellation options out of range throw a `RangeError` that names the option.
+
+## Licence
+
+`@margoengine/brep` is dual licensed: GNU AGPLv3 (`LICENSE`) or a commercial proprietary licence for enterprise
+integrations (`LICENSE-COMMERCIAL.md`). The rest of Margo Engine is MIT licensed.

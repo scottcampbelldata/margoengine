@@ -1,3 +1,4 @@
+import { expectedLicense, ownLicenses } from './package-licenses.js';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdir, mkdtemp, writeFile, readFile, copyFile, readdir, rm, realpath } from 'node:fs/promises';
@@ -115,6 +116,7 @@ for (const name of packedNames) {
           'package.json',
           'README.md',
           'LICENSE',
+          ...(ownLicenses.has(name) ? ['LICENSE-COMMERCIAL.md'] : []),
           ...(packageDocuments.has(name) ? [packageDocuments.get(name)] : []),
         ].includes(file.path) && !file.path.startsWith('dist/'),
     )
@@ -137,7 +139,7 @@ for (const name of packedNames) {
     ])
       assert.ok(files.has('dist/workers/' + file), `Missing CAD worker asset: ${file}`);
   assert.notEqual(manifest.private, true);
-  assert.equal(manifest.license, name === 'materials' ? 'MIT AND Apache-2.0' : 'MIT');
+  assert.equal(manifest.license, expectedLicense(name));
   assert.equal(manifest.publishConfig.access, 'public');
   for (const entry of Object.values(manifest.exports))
     for (const target of Object.values(entry))
@@ -162,7 +164,7 @@ try {
   for (const name of names) {
     assert.equal(
       await readFile(join(fixture, `node_modules/${packageName(name)}/LICENSE`), 'utf8'),
-      await readFile('LICENSE', 'utf8'),
+      await readFile(ownLicenses.has(name) ? `packages/${name}/LICENSE` : 'LICENSE', 'utf8'),
     );
     const markdown = await readFile(join(fixture, `node_modules/${packageName(name)}/README.md`), 'utf8');
     // Standalone examples have imports; continuation blocks retain the preceding setup.
