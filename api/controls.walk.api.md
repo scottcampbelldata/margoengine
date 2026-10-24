@@ -68,7 +68,7 @@ export class OrbitControls extends Controls {
         ONE: number | null;
         TWO: number | null;
     };
-    state: Action;
+    state: 'none' | 'rotate' | 'dolly' | 'pan' | 'touch-rotate' | 'touch-pan' | 'touch-dolly-pan' | 'touch-dolly-rotate';
     constructor(source: Camera | EngineKernel, element?: ControlElement | null);
     protected get kind(): string;
     protected bind(element: ControlElement): Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
@@ -161,8 +161,6 @@ export interface WalkControlsOptions {
 export type WalkMode = 'walk' | 'dollhouse';
 
 // Not exported from this entry, but used by the exports above:
-
-type Action = 'none' | 'rotate' | 'dolly' | 'pan' | 'touch-rotate' | 'touch-pan' | 'touch-dolly-pan' | 'touch-dolly-rotate';
 
 interface ControlDocument extends EventTargetLike {
     readonly pointerLockElement?: Element | ControlElement | null;

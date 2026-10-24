@@ -290,7 +290,7 @@ export class OrbitControls extends Controls {
         ONE: number | null;
         TWO: number | null;
     };
-    state: Action;
+    state: 'none' | 'rotate' | 'dolly' | 'pan' | 'touch-rotate' | 'touch-pan' | 'touch-dolly-pan' | 'touch-dolly-rotate';
     constructor(source: Camera | EngineKernel, element?: ControlElement | null);
     protected get kind(): string;
     protected bind(element: ControlElement): Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
@@ -389,7 +389,7 @@ export class TrackballControls extends Controls {
         MIDDLE: number | null;
         RIGHT: number | null;
     };
-    state: Mode;
+    state: State;
     constructor(source: Camera | EngineKernel, element?: ControlElement | null, options?: {
         keyTarget?: EventTargetLike | null;
     });
@@ -473,8 +473,6 @@ export function tessellate(prims: Prim[], matrix: ArrayLike<number>, width: numb
 
 // Not exported from this entry, but used by the exports above:
 
-type Action = 'none' | 'rotate' | 'dolly' | 'pan' | 'touch-rotate' | 'touch-pan' | 'touch-dolly-pan' | 'touch-dolly-rotate';
-
 interface Basis {
     position: V3;
     forward: V3;
@@ -502,8 +500,6 @@ interface LinePrim {
     width: number;
     colors: RGBA[];
 }
-
-type Mode = 'none' | 'rotate' | 'zoom' | 'pan' | 'touch-rotate' | 'touch-zoom-pan';
 
 class OverlayRenderer {
     lastTriangles: number;
@@ -538,6 +534,8 @@ type Pick = {
 };
 
 type RGBA = readonly [number, number, number, number];
+
+type State = 'none' | 'rotate' | 'zoom' | 'pan' | 'touch-rotate' | 'touch-zoom-pan';
 
 interface TrianglePrim {
     kind: 'triangles';

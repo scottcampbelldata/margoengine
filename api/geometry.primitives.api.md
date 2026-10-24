@@ -43,6 +43,8 @@ export function tubeGeometry(path: Curve<Vec>, tubularSegments?: number, radius?
 
 abstract class Curve<V extends Vec> {
     arcLengthDivisions: number;
+    protected arcTable: number[] | null;
+    protected arcTableDivisions: number;
     abstract getPoint(t: number): V;
     getPointAt(u: number): V;
     getPoints(divisions?: number): V[];

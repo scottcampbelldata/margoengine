@@ -17,6 +17,7 @@ export class CatmullRomCurve3 extends Curve<MutableVec3> {
     tension: number;
     constructor(points?: MutableVec3[], closed?: boolean, curveType?: CatmullRomType, tension?: number);
     getPoint(t: number): MutableVec3;
+    getTangent(t: number): MutableVec3;
 }
 
 export type CatmullRomType = 'centripetal' | 'chordal' | 'catmullrom' | 'uniform';
@@ -42,6 +43,8 @@ export class CubicBezierCurve3 extends CubicBezierCurve<MutableVec3> {
 
 export abstract class Curve<V extends Vec> {
     arcLengthDivisions: number;
+    protected arcTable: number[] | null;
+    protected arcTableDivisions: number;
     abstract getPoint(t: number): V;
     getPointAt(u: number): V;
     getPoints(divisions?: number): V[];
@@ -218,7 +221,7 @@ export function geometryData(positions: ArrayLike<number>, normals: ArrayLike<nu
 
 export function icosahedronGeometry(radius?: number, detail?: number, smooth?: boolean): GeometryData;
 
-export const isClockWise: (points: readonly MutableVec2[]) => boolean;
+export function isClockWise(points: readonly MutableVec2[]): boolean;
 
 export function latheGeometry(points?: readonly MutableVec2[], segmentCount?: number, phiStart?: number, phiLength?: number): GeometryData;
 

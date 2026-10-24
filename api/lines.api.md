@@ -8,7 +8,7 @@ import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 import { Mat4 } from "@margoengine/math";
 
 export class ArrowHelper extends Line {
-    constructor({ direction, origin, length, color, headLength, headWidth, ...options }?: {
+    constructor(options?: {
         direction?: Vec3;
         origin?: Vec3;
         length?: number;
@@ -22,21 +22,21 @@ export class ArrowHelper extends Line {
 }
 
 export class AxesHelper extends Line {
-    constructor({ size, ...options }?: {
+    constructor(options?: {
         size?: number;
     } & HelperOptions);
     setColors(x: ColorInput | ArrayLike<number> | null, y?: ColorInput, z?: ColorInput): this;
 }
 
 export class Box3Helper extends Line {
-    constructor(min?: Vec3, max?: Vec3, { color, ...options }?: {
+    constructor(min?: Vec3, max?: Vec3, options?: {
         color?: ColorInput;
     } & HelperOptions);
     setBox(min: Vec3, max: Vec3): this;
 }
 
 export class BoxHelper extends Line {
-    constructor(mesh: Mesh, { color, ...options }?: {
+    constructor(mesh: Mesh, options?: {
         color?: ColorInput;
     } & HelperOptions);
     setFromMesh(mesh: Mesh): this;
@@ -46,7 +46,8 @@ export class BoxHelper extends Line {
 export class CameraHelper extends Line {
     readonly camera: Camera;
     aspect?: number;
-    constructor(camera: Camera, { aspect, ...options }?: {
+    constructor(
+    camera: Camera, options?: {
         aspect?: number;
     } & HelperOptions);
     update(engine: EngineKernel): boolean;
@@ -97,7 +98,7 @@ export interface GLTFSkinSource {
 }
 
 export class GridHelper extends Line {
-    constructor({ size, divisions, color1, color2, ...options }?: {
+    constructor(options?: {
         size?: number;
         divisions?: number;
         color1?: ColorInput;
@@ -247,7 +248,7 @@ export interface LinesOptions {
 }
 
 export class PlaneHelper extends Line {
-    constructor({ normal, constant, size, color, ...options }?: {
+    constructor(options?: {
         normal?: Vec3;
         constant?: number;
         size?: number;
@@ -267,7 +268,7 @@ export interface PointLightShape {
 }
 
 export class PolarGridHelper extends Line {
-    constructor({ radius, sectors, rings, divisions, color1, color2, ...options }?: {
+    constructor(options?: {
         radius?: number;
         sectors?: number;
         rings?: number;
@@ -335,7 +336,8 @@ export const VERTICES_PER_SEGMENT: number;
 export class VertexNormalsHelper extends Line {
     readonly mesh: Mesh;
     size: number;
-    constructor(mesh: Mesh, { size, color, ...options }?: {
+    constructor(
+    mesh: Mesh, options?: {
         size?: number;
         color?: ColorInput;
     } & HelperOptions);

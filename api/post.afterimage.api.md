@@ -13,7 +13,9 @@ export class Afterimage implements EnginePlugin {
     static attach(engine: EngineKernel, options?: AfterimageOptions): Afterimage;
     get enabled(): boolean;
     set enabled(value: boolean);
-    get damp(): number;
+    get halfLife(): number;
+    set halfLife(value: number);
+    get damp(): number | undefined;
     set damp(value: number);
     reset(): void;
     setup(engine: Engine): void;
@@ -23,6 +25,7 @@ export class Afterimage implements EnginePlugin {
 }
 
 export interface AfterimageOptions {
+    halfLife?: number;
     damp?: number;
     enabled?: boolean;
 }

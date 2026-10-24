@@ -13,81 +13,81 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 
 | Package | Exports per entry | Unexported | `any` | Gzip |
 | --- | --- | ---: | ---: | ---: |
-| @margoengine/animation | `.` 34, `./vat` 14, `./sampling` 3, `./skeleton-utils` 6 | 16 |  | 15,829 |
+| @margoengine/animation | `.` 34, `./vat` 14, `./sampling` 3, `./skeleton-utils` 6 | 16 |  | 15,807 |
 | @margoengine/animator | `.` 18 |  |  | 11,419 |
-| @margoengine/audio | `.` 19 | 2 |  | 7,473 |
+| @margoengine/audio | `.` 19 | 2 |  | 7,474 |
 | @margoengine/blender | `.` 5 |  |  | 3,149 |
-| @margoengine/brep | `.` 58 | 5 |  | 104,764 |
-| @margoengine/bvh | `.` 63, `./tree` 23, `./bake` 7 | 17 |  | 22,785 |
+| @margoengine/brep | `.` 58 | 5 |  | 104,941 |
+| @margoengine/bvh | `.` 63, `./tree` 23, `./bake` 7 | 17 |  | 22,716 |
 | @margoengine/cache | `.` 5 |  |  | 2,421 |
 | @margoengine/cameras | `.` 3, `./origin` 3, `./layers` 8 |  |  | 1,837 |
 | @margoengine/cinematic | `.` 3 |  |  | 1,820 |
-| @margoengine/clustered | `.` 18, `./shadows` 4, `./area` 6, `./directional` 6, `./ies` 7, `./projector` 7, `./units` 12 | 80 |  | 12,585 |
-| @margoengine/controls | `.` 44, `./orbit` 5, `./transform` 5, `./drag` 3, `./profiles` 13, `./walk` 6 | 58 |  | 19,368 |
+| @margoengine/clustered | `.` 18, `./shadows` 4, `./area` 6, `./directional` 6, `./ies` 7, `./projector` 7, `./units` 12 | 80 |  | 12,749 |
+| @margoengine/controls | `.` 44, `./orbit` 5, `./transform` 5, `./drag` 3, `./profiles` 13, `./walk` 6 | 55 |  | 19,391 |
 | @margoengine/core | `.` 17, `./extension` 26 | 16 |  | 20,015 |
-| @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 18,008 |
+| @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 18,072 |
 | @margoengine/culling | `.` 6 |  |  | 8,883 |
 | @margoengine/decoders | `.` 23, `./meshopt` 5, `./texture` 4, `./png` 3 | 5 |  | 478,457 |
-| @margoengine/dof | `.` 2 |  |  | 6,906 |
+| @margoengine/dof | `.` 2 |  |  | 6,941 |
 | @margoengine/ecs | `.` 6 |  |  | 1,350 |
-| @margoengine/environment | `.` 62, `./probes` 8, `./volumetric` 3, `./reflector` 7, `./refractor` 7, `./cube-camera` 4, `./exr-write` 4 | 15 |  | 29,219 |
-| @margoengine/exporters | `.` 59, `./usdz` 2, `./model` 6, `./dae` 3, `./capture` 29, `./roblox` 16, `./roblox-chunks` 22, `./skin` 9, `./godot` 7, `./godot-addon` 2, `./unity` 12, `./hash` 2, `./import-names` 7, `./godot-lightmap` 3, `./unity-precision` 21, `./unity-precision-importer` 3, `./unreal-precision` 23, `./unreal-precision-importer` 2, `./godot-precision-addon` 3, `./godot-precision` 23, `./godot-flipbook` 2, `./roblox-runtime` 25, `./roblox-runtime-restore` 1 | 88 |  | 33,477 |
+| @margoengine/environment | `.` 62, `./probes` 8, `./volumetric` 3, `./reflector` 7, `./refractor` 7, `./cube-camera` 4, `./exr-write` 4 | 15 |  | 29,058 |
+| @margoengine/exporters | `.` 59, `./usdz` 2, `./model` 6, `./dae` 3, `./capture` 29, `./roblox` 16, `./roblox-chunks` 22, `./skin` 9, `./godot` 7, `./godot-addon` 2, `./unity` 12, `./hash` 2, `./import-names` 7, `./godot-lightmap` 3, `./unity-precision` 21, `./unity-precision-importer` 3, `./unreal-precision` 23, `./unreal-precision-importer` 2, `./godot-precision-addon` 3, `./godot-precision` 23, `./godot-flipbook` 2, `./roblox-runtime` 25, `./roblox-runtime-restore` 1 | 88 |  | 32,605 |
 | @margoengine/fbx | `.` 4, `./worker` 2 | 1 |  | 16,887 |
 | @margoengine/fsm | `.` 3 |  |  | 875 |
 | @margoengine/geometry | `.` 64, `./shapes` 25, `./primitives` 17, `./utils` 21, `./extras` 6 | 9 |  | 16,119 |
-| @margoengine/gltf | `.` 4 |  |  | 5,156 |
-| @margoengine/gltf-pro | `.` 42, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 4, `./coordinates` 2, `./worker` 4 | 259 |  | 41,678 |
-| @margoengine/html | `.` 7 |  |  | 4,776 |
+| @margoengine/gltf | `.` 4 |  |  | 5,314 |
+| @margoengine/gltf-pro | `.` 42, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 4, `./coordinates` 2, `./worker` 4 | 259 |  | 41,971 |
+| @margoengine/html | `.` 7 |  |  | 4,757 |
 | @margoengine/ifc | `.` 4, `./worker` 2 | 3 |  | 2,568 |
 | @margoengine/input | `.` 4 |  |  | 2,297 |
-| @margoengine/inspector | `.` 2, `./frame` 16 | 1 |  | 4,884 |
+| @margoengine/inspector | `.` 2, `./frame` 16 | 1 |  | 4,894 |
 | @margoengine/kinematics-constraints | `.` 18 |  |  | 6,544 |
-| @margoengine/labels | `.` 19 | 2 |  | 4,532 |
+| @margoengine/labels | `.` 19 | 2 |  | 4,500 |
 | @margoengine/lightmap | `.` 9, `./global` 4, `./refracted` 6 | 12 |  | 3,801 |
-| @margoengine/lines | `.` 50 | 3 |  | 16,817 |
-| @margoengine/loaders | `.` 104, `./worker` 2, `./common` 17, `./usd` 8, `./font` 10, `./svg` 7, `./mtl` 10, `./render` 2 | 31 |  | 39,406 |
-| @margoengine/lod | `.` 17 |  |  | 10,337 |
-| @margoengine/machinery | `.` 49, `./cad` 8, `./cad-async` 3, `./kinematics` 7, `./surface` 4, `./telemetry` 2, `./section` 3, `./assembly` 1, `./metrology` 7, `./spatial` 2, `./clearance` 2, `./materials` 2, `./overlays` 7, `./exploded` 2, `./edges` 3, `./dimensions` 7 | 14 |  | 42,960 |
+| @margoengine/lines | `.` 50 | 3 |  | 16,897 |
+| @margoengine/loaders | `.` 104, `./worker` 2, `./common` 17, `./usd` 8, `./font` 10, `./svg` 7, `./mtl` 10, `./render` 2 | 31 |  | 39,265 |
+| @margoengine/lod | `.` 17 |  |  | 10,376 |
+| @margoengine/machinery | `.` 49, `./cad` 8, `./cad-async` 3, `./kinematics` 7, `./surface` 4, `./telemetry` 2, `./section` 3, `./assembly` 1, `./metrology` 7, `./spatial` 2, `./clearance` 2, `./materials` 2, `./overlays` 7, `./exploded` 2, `./edges` 3, `./dimensions` 7 | 14 |  | 42,972 |
 | margoengine | `.` 24 | 1 |  | 2,802 |
-| @margoengine/materials | `.` 106, `./atlas` 4, `./transmission` 8 | 11 |  | 51,238 |
-| @margoengine/math | `.` 53, `./vector2` 1, `./vector3` 1, `./vector4` 1, `./quaternion` 1, `./euler` 3, `./matrix3` 1, `./matrix4` 1, `./color` 15, `./box3` 1, `./sphere` 1, `./plane` 1, `./ray` 2, `./frustum` 1, `./spherical` 1, `./mathutils` 21, `./mat4` 11, `./validate` 3, `./quat` 10, `./vec3` 7, `./errors` 2, `./mesh` 1, `./billboard` 4, `./affine` 2 | 87 |  | 12,119 |
-| @margoengine/mesh-edit | `.` 88 | 2 |  | 29,535 |
+| @margoengine/materials | `.` 106, `./atlas` 4, `./transmission` 8 | 11 |  | 51,112 |
+| @margoengine/math | `.` 53, `./vector2` 1, `./vector3` 1, `./vector4` 1, `./quaternion` 1, `./euler` 3, `./matrix3` 1, `./matrix4` 1, `./color` 15, `./box3` 1, `./sphere` 1, `./plane` 1, `./ray` 2, `./frustum` 1, `./spherical` 1, `./mathutils` 21, `./mat4` 11, `./validate` 3, `./quat` 10, `./vec3` 7, `./errors` 2, `./mesh` 1, `./billboard` 4, `./affine` 2 | 87 |  | 12,179 |
+| @margoengine/mesh-edit | `.` 88 | 2 |  | 29,555 |
 | @margoengine/navmesh | `.` 4, `./build` 3 | 1 |  | 3,140 |
 | @margoengine/net | `.` 3 |  |  | 1,115 |
-| @margoengine/oit | `.` 2 |  |  | 2,944 |
-| @margoengine/physics | `.` 35 | 20 |  | 11,593 |
-| @margoengine/points | `.` 41 | 3 |  | 18,094 |
-| @margoengine/post | `.` 33, `./bloom` 4, `./ssao` 3, `./scene-fade` 4, `./stack` 1, `./fxaa` 1, `./decals` 4, `./ssr` 4, `./gtao` 2, `./ssgi` 2, `./motion-blur` 3, `./lens-flare` 2, `./image` 4, `./smaa` 3, `./glitch` 2, `./afterimage` 2 | 15 |  | 37,941 |
-| @margoengine/procedural | `.` 26, `./noise` 10, `./lsystem` 12, `./voronoi` 15, `./expression` 15 |  |  | 7,247 |
+| @margoengine/oit | `.` 2 |  |  | 2,962 |
+| @margoengine/physics | `.` 35 | 20 |  | 11,680 |
+| @margoengine/points | `.` 41 | 3 |  | 18,119 |
+| @margoengine/post | `.` 33, `./bloom` 4, `./ssao` 3, `./scene-fade` 4, `./stack` 1, `./fxaa` 1, `./decals` 4, `./ssr` 4, `./gtao` 2, `./ssgi` 2, `./motion-blur` 3, `./lens-flare` 2, `./image` 4, `./smaa` 3, `./glitch` 2, `./afterimage` 2 | 15 |  | 38,027 |
+| @margoengine/procedural | `.` 26, `./noise` 10, `./lsystem` 12, `./voronoi` 15, `./expression` 15 |  |  | 7,281 |
 | @margoengine/quality | `.` 17, `./warm` 3 | 1 |  | 1,623 |
-| @margoengine/react | `.` 102, `./kit` 29, `./post` 12, `./physics` 16, `./xr` 12 | 31 |  | 20,749 |
+| @margoengine/react | `.` 102, `./kit` 29, `./post` 12, `./physics` 16, `./xr` 12 | 31 |  | 20,751 |
 | @margoengine/road | `.` 3 |  |  | 915 |
-| @margoengine/scatter | `.` 18 | 1 |  | 11,546 |
+| @margoengine/scatter | `.` 18 | 1 |  | 11,560 |
 | @margoengine/scenery | `.` 2, `./sky` 2 |  |  | 218 |
-| @margoengine/selection | `.` 10 | 1 |  | 13,501 |
-| @margoengine/shader | `.` 142, `./noise` 9, `./graph` 17, `./readback` 4, `./raw` 13, `./effects` 19 | 142 |  | 12,161 |
-| @margoengine/shadows | `.` 8 | 1 |  | 11,902 |
-| @margoengine/sky | `.` 11, `./base` 12, `./preetham` 1, `./bruneton` 1, `./clouds` 1, `./night` 1, `./fog` 1, `./reflection` 1, `./lighting` 1 | 92 |  | 14,767 |
-| @margoengine/splats | `.` 5, `./data` 3 |  |  | 8,483 |
+| @margoengine/selection | `.` 10 | 1 |  | 13,593 |
+| @margoengine/shader | `.` 142, `./noise` 9, `./graph` 17, `./readback` 4, `./raw` 13, `./effects` 19 | 142 |  | 12,152 |
+| @margoengine/shadows | `.` 8 | 1 |  | 12,059 |
+| @margoengine/sky | `.` 11, `./base` 12, `./preetham` 1, `./bruneton` 1, `./clouds` 1, `./night` 1, `./fog` 1, `./reflection` 1, `./lighting` 1 | 92 |  | 14,783 |
+| @margoengine/splats | `.` 5, `./data` 3 |  |  | 8,551 |
 | @margoengine/splines | `.` 3 |  |  | 1,299 |
-| @margoengine/staging | `.` 4 |  |  | 4,890 |
+| @margoengine/staging | `.` 4 |  |  | 4,941 |
 | @margoengine/stats | `.` 3 |  |  | 4,678 |
-| @margoengine/taa | `.` 7 |  |  | 9,610 |
-| @margoengine/terrain | `.` 13 | 2 |  | 9,649 |
-| @margoengine/text | `.` 33 | 2 |  | 14,928 |
-| @margoengine/tonemap | `.` 5 |  |  | 8,296 |
-| @margoengine/toon | `.` 2 |  |  | 1,451 |
-| @margoengine/transitions | `.` 2 |  |  | 3,786 |
+| @margoengine/taa | `.` 7 |  |  | 9,645 |
+| @margoengine/terrain | `.` 13 | 2 |  | 9,669 |
+| @margoengine/text | `.` 33 | 2 |  | 14,990 |
+| @margoengine/tonemap | `.` 5 |  |  | 8,330 |
+| @margoengine/toon | `.` 2 |  |  | 1,445 |
+| @margoengine/transitions | `.` 2 |  |  | 3,796 |
 | @margoengine/tween | `.` 6 |  |  | 800 |
-| @margoengine/usdz | `.` 7, `./worker` 2 | 24 |  | 7,999 |
+| @margoengine/usdz | `.` 7, `./worker` 2 | 24 |  | 8,016 |
 | @margoengine/vfx | `.` 7, `./base` 7, `./obstacles` 1, `./wrap` 1, `./sort` 1, `./texture` 1 | 23 |  | 9,121 |
 | @margoengine/video | `.` 2 |  |  | 1,943 |
 | @margoengine/viewcube | `.` 5 |  |  | 3,352 |
 | @margoengine/voxel | `.` 14, `./query` 7, `./codec` 9, `./stream` 5, `./generate` 5, `./bevel` 5, `./mesher` 12, `./light` 3, `./vox` 14, `./physics` 2, `./render` 10, `./lightmap` 3 | 80 |  | 4,902 |
 | @margoengine/voxel-edit | `.` 59, `./edit` 28, `./pick` 4, `./sparse` 16, `./mesh` 11, `./vox` 23, `./animation` 8, `./history` 3, `./export` 4, `./assist` 3, `./library` 6 | 73 |  | 7,533 |
-| @margoengine/voxel-net | `.` 23, `./server` 9, `./bot` 4 | 10 |  | 5,276 |
-| @margoengine/voxel-pathtracer | `.` 53, `./studio` 12 | 7 |  | 69,302 |
-| @margoengine/water | `.` 8 |  |  | 18,023 |
-| @margoengine/webgl | `.` 3 |  |  | 3,021 |
+| @margoengine/voxel-net | `.` 23, `./server` 9, `./bot` 4 | 10 |  | 5,358 |
+| @margoengine/voxel-pathtracer | `.` 53, `./studio` 12 | 7 |  | 69,370 |
+| @margoengine/water | `.` 8 |  |  | 18,075 |
+| @margoengine/webgl | `.` 3 |  |  | 3,074 |
 | @margoengine/wfc | `.` 3, `./overlapping` 5 |  |  | 1,622 |
 | @margoengine/xr | `.` 19 |  |  | 4,879 |

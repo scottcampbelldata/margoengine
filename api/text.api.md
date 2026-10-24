@@ -281,7 +281,7 @@ export interface TextStyleOptions {
     onTop?: boolean;
 }
 
-export function alphaToSdf(alpha: ArrayLike<number>, width: number, height: number, params?: SdfParams, stride?: number, channel?: number, out?: Uint8Array<ArrayBuffer>): Uint8Array;
+export function alphaToSdf(alpha: ArrayLike<number>, width: number, height: number, params?: SdfParams, stride?: number, channel?: number, out?: Uint8Array): Uint8Array;
 
 export function bidiClass(cluster: string): 'R' | 'L' | 'N';
 
