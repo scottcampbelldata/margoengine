@@ -7,6 +7,7 @@ import { EngineKernel, Geometry, Mesh, PbrMaterial } from "@margoengine/core";
 import { Vec2 } from "@margoengine/math";
 
 export interface USDZOptions extends SceneOptions {
+    texturePrefix?: string;
 }
 
 export function exportUSDZ(source: ExportSource, options?: USDZOptions): Uint8Array;

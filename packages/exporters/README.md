@@ -645,13 +645,43 @@ MIT licensed.
 
 ## USDZ for AR Quick Look
 
-`exportUSDZ(engineOrDataScene, sceneOptions)` returns a `Uint8Array`: a static USDA root in an uncompressed ZIP with 64-byte-aligned entries. World-space positions, normals and reflected winding use the existing validated scene collector. Names are kept as display names; hidden descendants are skipped. The stage has a default prim, Y up, meter units, mesh extents and UsdPreviewSurface color/roughness/metalness/emission/opacity materials.
+`exportUSDZ(engineOrDataScene, options)` returns a `Uint8Array`: a static USDA root and its texture images in an uncompressed ZIP with 64-byte-aligned entries. World-space positions, normals and reflected winding use the existing validated scene collector. Names are kept as display names; hidden descendants are skipped. The stage has a default prim, Y up, meter units, mesh extents and UsdPreviewSurface color/roughness/metalness/emission/opacity materials.
 
 Import `exportUSDZ` from `@margoengine/exporters/usdz`; it loads only USDZ serialization and its shared scene collector. The package root does not export it, so applications that never write USDZ do not carry it.
 
 Save as `.usdz`. A supported Apple device can open `<a rel="ar" href="model.usdz"><img src="preview.png" alt="View the model in AR"></a>`. No headset is required to generate or validate the file.
 
-Hierarchy is baked into world-space meshes. Vertex colors (RGB or RGBA, baked AO included) multiply the base color and are written as vertex `displayColor` (and, for BLEND materials, `displayOpacity`) primvars that the surface reads through `UsdPrimvarReader` shaders. Textures and alpha masks are rejected; animation, skins and morphs are not exported. Quick Look presentation remains untested on Apple hardware. `node --test tests/usdz.test.js` checks ZIP layout and loader round trips. Install the official `usd-core` wheel and run `python tests/validate-usdz.py model.usdz` for independent metadata, topology, vertex-color wiring and available OpenUSD package/material validators.
+Hierarchy is baked into world-space meshes. Vertex colors (RGB or RGBA, baked AO included) multiply the base color and are written as vertex `displayColor` (and, for BLEND and MASK materials, `displayOpacity`) primvars that the surface reads through `UsdPrimvarReader` shaders. Animation, skins and morphs are not exported.
+
+Material textures are the same `TextureData` (encoded PNG or JPEG bytes) the glTF writers take, from a data scene or from `materialData` for engine meshes. Each becomes a `UsdUVTexture` reading the mesh's `primvars:st` (its `uvs`, V flipped to USD's bottom-left origin) or `primvars:st1` (`uvs1`, for `texCoord: 1`) through a `UsdPrimvarReader_float2`, with its `wrapS`/`wrapT`:
+
+- `baseColorTexture` drives `diffuseColor` (`inputs:scale` is the color factor, sRGB) and, for BLEND and MASK, `opacity` from its alpha; MASK writes `opacityThreshold = alphaCutoff` (default 0.5). A `baseColorTextureTransform` becomes a `UsdTransform2d`.
+- `metallicRoughnessTexture` drives `roughness` from green and `metallic` from blue, scaled by the factors.
+- `normalTexture` (scale 2, bias -1, with `normalScale` on x and y), `occlusionTexture` red (`occlusionStrength`) and `emissiveTexture` (times `emissive` and `emissiveStrength`) are read as raw, raw and sRGB.
+
+The image bytes are stored unchanged under `texturePrefix` (default `textures/`), each once, with every file's data 64-byte aligned. Vertex colors cannot be combined with a base color texture (UsdPreviewSurface has no multiply), a texture whose UV set is missing is refused, and sampler filters and mipmaps have no USD equivalent and are dropped.
+
+```ts
+import { exportUSDZ } from '@margoengine/exporters/usdz';
+import type { TextureData } from '@margoengine/exporters';
+
+declare const albedoPNG: Uint8Array;
+const albedo: TextureData = { image: albedoPNG, mimeType: 'image/png', name: 'albedo' };
+const usdz = exportUSDZ({
+  nodes: [
+    {
+      geometry: {
+        positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0],
+        normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+        uvs: [0, 1, 1, 1, 1, 0, 0, 0],
+        indices: [0, 1, 2, 0, 2, 3],
+      },
+      material: { baseColorTexture: albedo, alphaMode: 'MASK', alphaCutoff: 0.5 },
+    },
+  ],
+});
+// usdz holds scene.usda and textures/albedo.png.
+``` Quick Look presentation remains untested on Apple hardware. `node --test tests/usdz.test.js` checks ZIP layout, the texture shader graph and round trips through `@margoengine/loaders` and `@margoengine/usdz`. Install the official `usd-core` wheel and run `python tests/validate-usdz.py model.usdz` for independent metadata, topology, vertex-color wiring and available OpenUSD package/material validators.
 
 ## Roblox GLB (`@margoengine/exporters/roblox`)
 
