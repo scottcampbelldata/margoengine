@@ -10,6 +10,7 @@ import type { EngineKernel } from '@margoengine/core';
 import { StereoRenderer } from './renderer.js';
 import { XRController } from './controller.js';
 export { XRController } from './controller.js';
+export { HitTest, type Hit, type HitTestHost, type HitTestOptions } from './hit-test.js';
 import type {
   XRBinding,
   XRFrameState,
@@ -35,6 +36,13 @@ export type {
   XRProjectionLayer,
   XRSubImage,
   XRSystem,
+  XRAnchor,
+  XRHitTestResult,
+  XRHitTestSource,
+  XRHitTestTrackableType,
+  XRRayLike,
+  XRTransientInputHitTestResult,
+  XRTransientInputHitTestSource,
 } from './types.js';
 export interface XRSessionOptions {
   referenceSpace?: 'viewer' | 'local' | 'local-floor' | 'bounded-floor' | 'unbounded';
@@ -109,6 +117,10 @@ export class XR implements EnginePlugin {
   }
   setup(engine: Engine): void {
     this.engine = engine;
+  }
+  /** The session's reference space (the space of frame poses and hit results); undefined without a session. */
+  get referenceSpace(): XRSpace | undefined {
+    return this.space;
   }
   private readonly uncaptured = (event: GPUUncapturedErrorEvent): void => {
     if (!this.disposed) this.fail(new Error(event.error.message));

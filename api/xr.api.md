@@ -6,6 +6,40 @@
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 
+export interface Hit {
+    readonly matrix: Float32Array;
+    readonly position: [number, number, number];
+    readonly orientation: [number, number, number, number];
+    readonly inputSource?: XRInputSource;
+    readonly result: XRHitTestResult;
+}
+
+export class HitTest {
+    private constructor();
+    static create(xr: HitTestHost, options?: HitTestOptions): Promise<HitTest>;
+    get active(): boolean;
+    results(frame: XRNativeFrame): Hit[];
+    first(frame: XRNativeFrame): Hit | null;
+    anchor(hit: Hit): Promise<XRAnchor>;
+    cancel(): void;
+}
+
+export interface HitTestHost {
+    readonly session: XRNativeSession | null;
+    readonly referenceSpace: XRSpace | undefined;
+}
+
+export interface HitTestOptions {
+    from?: 'viewer' | XRInputSource | {
+        profile: string;
+    };
+    entityTypes?: readonly XRHitTestTrackableType[];
+    offsetRay?: {
+        origin?: readonly [number, number, number];
+        direction?: readonly [number, number, number];
+    };
+}
+
 export class XR implements EnginePlugin {
     readonly name = "xr";
     session: XRNativeSession | null;
@@ -15,11 +49,17 @@ export class XR implements EnginePlugin {
     static create(engine: EngineKernel): Promise<XR>;
     private constructor();
     setup(engine: Engine): void;
+    get referenceSpace(): XRSpace | undefined;
     registerPasses(graph: FrameGraph): void;
     requestSession(mode?: XRMode, options?: XRSessionOptions): Promise<XRNativeSession>;
     end(): Promise<void>;
     dispose(): void;
     [Symbol.dispose]: () => void;
+}
+
+export interface XRAnchor {
+    readonly anchorSpace: XRSpace;
+    delete(): void;
 }
 
 export interface XRBinding {
@@ -55,6 +95,17 @@ export interface XRFrameState {
     inputs: XRInputPose[];
 }
 
+export interface XRHitTestResult {
+    getPose(baseSpace: XRSpace): XRPose | null;
+    createAnchor?(): Promise<XRAnchor>;
+}
+
+export interface XRHitTestSource {
+    cancel(): void;
+}
+
+export type XRHitTestTrackableType = 'point' | 'plane' | 'mesh';
+
 export interface XRInputPose {
     source: XRInputSource;
     targetRay: XRPose | null;
@@ -81,6 +132,7 @@ class XR implements EnginePlugin {
     static create(engine: EngineKernel): Promise<XR>;
     private constructor();
     setup(engine: Engine): void;
+    get referenceSpace(): XRSpace | undefined;
     registerPasses(graph: FrameGraph): void;
     requestSession(mode?: XRMode, options?: XRSessionOptions): Promise<XRNativeSession>;
     end(): Promise<void>;
@@ -95,11 +147,23 @@ export interface XRNativeFrame {
     getViewerPose(space: XRSpace): XRViewerPose | null;
     getPose(space: XRSpace, relativeTo: XRSpace): XRPose | null;
     getJointPose?(space: XRSpace, relativeTo: XRSpace): XRPose | null;
+    getHitTestResults?(source: XRHitTestSource): readonly XRHitTestResult[];
+    getHitTestResultsForTransientInput?(source: XRTransientInputHitTestSource): readonly XRTransientInputHitTestResult[];
 }
 
 export interface XRNativeSession extends EventTarget {
     inputSources: readonly XRInputSource[];
     enabledFeatures?: readonly string[];
+    requestHitTestSource?(options: {
+        space: XRSpace;
+        entityTypes?: XRHitTestTrackableType[];
+        offsetRay?: XRRayLike;
+    }): Promise<XRHitTestSource>;
+    requestHitTestSourceForTransientInput?(options: {
+        profile: string;
+        entityTypes?: XRHitTestTrackableType[];
+        offsetRay?: XRRayLike;
+    }): Promise<XRTransientInputHitTestSource>;
     requestReferenceSpace(type: string): Promise<XRSpace>;
     updateRenderState(state: {
         layers?: XRProjectionLayer[];
@@ -137,6 +201,21 @@ export interface XRProjectionLayer {
     destroy(): void;
 }
 
+export interface XRRayLike {
+    origin: {
+        x: number;
+        y: number;
+        z: number;
+        w: number;
+    };
+    direction: {
+        x: number;
+        y: number;
+        z: number;
+        w: number;
+    };
+}
+
 export interface XRSessionOptions {
     referenceSpace?: 'viewer' | 'local' | 'local-floor' | 'bounded-floor' | 'unbounded';
     requiredFeatures?: string[];
@@ -164,6 +243,15 @@ export interface XRSystem {
         requiredFeatures: string[];
         optionalFeatures: string[];
     }): Promise<XRNativeSession>;
+}
+
+export interface XRTransientInputHitTestResult {
+    readonly inputSource: XRInputSource;
+    readonly results: readonly XRHitTestResult[];
+}
+
+export interface XRTransientInputHitTestSource {
+    cancel(): void;
 }
 
 export interface XRView {

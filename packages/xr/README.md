@@ -40,3 +40,32 @@ Run `npx vite --host 127.0.0.1` at the root and open `/examples/webxr-orbit/`. P
 `npm test` checks negotiation, inputs, eye buffers, reference-space failure, device loss and disposal races. Root `npm run modern:test:xr:browser` checks actual stereo pixels, GPU validation and teardown using simulated sessions with real WebGPU. Physical Meta Quest and Apple Vision Pro sessions remain untested. No Apple hardware is required for these checks.
 
 Build with root `npm run build:packages` or local `npm run build`. MIT licensed.
+
+## AR hit testing
+
+`HitTest` uses the WebXR Hit Test Module in an `immersive-ar` session started with the `'hit-test'` feature. Its ray
+starts at the viewer (the centre of the view, for a placement reticle), at an input source's target ray, or at transient
+inputs such as screen taps (`{profile: 'generic-touchscreen'}`). `hits.results(frame)` gives this frame's hits nearest
+first, each with a column-major `matrix`, `position` and `orientation` in the session's reference space;
+`hits.anchor(hit)` anchors one (WebXR Anchors Module, feature `'anchors'`). The source is cancelled with `cancel()` or
+when the session ends. Not yet tried on an AR headset or phone; tested against the specification's interfaces.
+
+```ts
+import { Engine, box } from '@margoengine/core';
+import { XR, HitTest } from '@margoengine/xr';
+
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas, { backend: 'webgpu' });
+const reticle = engine.createMesh().setGeometry(box(0.2, 0.01, 0.2));
+const xr = await XR.create(engine);
+let hits: HitTest | undefined;
+await xr.requestSession('immersive-ar', {
+  requiredFeatures: ['hit-test'],
+  onFrame({ frame }) {
+    const hit = hits?.first(frame);
+    reticle.visible = !!hit;
+    if (hit) reticle.setPosition(hit.position).setQuaternion(hit.orientation);
+  },
+});
+hits = await HitTest.create(xr, { from: 'viewer' });
+```
