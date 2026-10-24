@@ -128,7 +128,7 @@ every transform write bit for bit, and the animator has skipped unchanged writes
 | binding-limit | H-27, DOC-062, PKG-102 | `e017d50` -> `f8a36ca`: 3,812 calls without IBL, 4,556 with (384 mapped) | – |
 | gltf-pro-lighting-hooks | PKG-035, PKG-037 | `15c87f1` -> `cf2953e`: 4,556 calls; PKG-037: `114130c` -> `7072190` | `57250a49`: 4,476 calls |
 | materials-uv-transform | PKG-054, PKG-037 | `1970fda` -> `700838e`: 1,277 calls; PKG-037: `114130c` -> `7072190` | `57250a49`: 1,321 calls |
-| lines-perspective | PKG-041 | `96edc75` -> `6da7f7e`: 946 calls | `86063c47` (per-line clipping planes: every line's style uniform grows from 128 to 224 bytes and the shader carries a world-position varying and a zero-count plane loop, so unclipped lines' calls and writes changed on purpose) |
+| lines-perspective | PKG-041 | `96edc75` -> `6da7f7e`: 946 calls | `2d192a71` (per-line clipping planes at `86063c47`: the style uniform grew from 128 to 224 bytes and the shader gained a world-position varying and a zero-count plane loop; then `clipIntersection` at `2d192a71` changed that loop to count the planes a point is behind. Unclipped lines' calls and writes changed on purpose both times) |
 | math-consolidation | PKG-059 | `2484971` -> `4eed254` (math built at the pin) | `2484971` |
 | post-stack | PKG-065 | `5b1fe66^` -> `5b1fe66`: 12,378 calls (creative `5b1fe66^` -> `3319317`) | `57250a49` |
 | selection-xray-off | PKG-068 | `46f9484` -> `80d4cfb`: 10,586 calls | `b3ed8ac` |
@@ -533,7 +533,7 @@ Two fixes would clear most rows:
 | PKG-038 | "`dist/workers/gltf.js` (5.5 kB gzip)" | gltf-pro:88 | Later HANDOFF records 6,408 B | no | PROVEN | Fixed (5d): "about 5.6 kB min+gzip" (5,592 B, `entry-sizes.json`; HANDOFF's 6,408 used another method). |
 | PKG-039 | "equals `loadGLTF`… byte for byte" | gltf-pro:88 | `tests/worker.test.js` | yes | PROVEN | – |
 | PKG-040 | "Main-thread blocking measured in a real browser" | gltf-pro:88 | `pkb/workers/run.mjs` → `results/workers.json` (Edge 155, Arc) | `node pkb/workers/run.mjs` | PROVEN | – |
-| PKG-041 | "perspective GPU calls and buffer writes are byte-identical to `96edc75`" | lines:90 | `proofs/lines-perspective.proof.js`, pinned `96edc75` -> `6da7f7e` (946 calls); `--current` passes against `86063c47`, where per-line clipping planes changed the style uniform size and shader on purpose | yes | PROVEN | – |
+| PKG-041 | "perspective GPU calls and buffer writes are byte-identical to `96edc75`" | lines:90 | `proofs/lines-perspective.proof.js`, pinned `96edc75` -> `6da7f7e` (946 calls); `--current` passes against `2d192a71`, where per-line clipping planes and then `clipIntersection` changed the style uniform size and shader on purpose | yes | PROVEN | – |
 | PKG-042 | "importing `parsePLY` pulls in about 3.8 KB gzip" | loaders:42 | No record | no | REMOVED | Fixed (5d): size dropped; "only the PLY reader and its helpers, not the 3MF, ZIP or XML code". |
 | PKG-043 | "`dist/workers/usd.js`, 6.6 kB gzip" | loaders:83 | HANDOFF prose only | no | PROVEN | Fixed (5d): "about 6.6 kB min+gzip" (6,642 B, `entry-sizes.json`). |
 | PKG-044 | "nothing is allocated per frame (tested with 3,000 objects…)" | lod:36-37 | `lod.test.js` asserts heap growth < 64 KB over 1,000 frames | yes | PROVEN | Fixed (5d): "no measurable heap growth (under 64 KB over 1,000 frames with 3,000 objects, `npm test`)". |
