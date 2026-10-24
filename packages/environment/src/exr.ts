@@ -34,8 +34,10 @@ export interface EXRImage extends FloatImage {
 
 const COMPRESSION_NAMES = ['NONE', 'RLE', 'ZIPS', 'ZIP', 'PIZ', 'PXR24', 'B44', 'B44A', 'DWAA', 'DWAB', 'HTJ2K'];
 const LINES_PER_BLOCK: Record<EXRCompression, number> = { NONE: 1, RLE: 1, ZIPS: 1, ZIP: 16, PIZ: 32 };
-const TYPE_NAMES = ['UINT', 'HALF', 'FLOAT'] as const;
-const TYPE_SIZE = [4, 2, 4];
+// Shared with the writer (exr-write.ts): the file magic and pixel types in their file order (index = type code).
+export const EXR_MAGIC = 20000630;
+export const TYPE_NAMES = ['UINT', 'HALF', 'FLOAT'] as const;
+export const TYPE_SIZE = [4, 2, 4];
 // Damaged data throws MargoError 'failed' (as parseHDR), a valid file this decoder does not read 'unsupported', and a
 // decoder bound RangeError.
 const invalid = (problem: string) =>
@@ -80,7 +82,7 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
     return text;
   };
 
-  if (bytes.length < 8 || view.getUint32(0, true) !== 20000630) throw invalid('bad magic number');
+  if (bytes.length < 8 || view.getUint32(0, true) !== EXR_MAGIC) throw invalid('bad magic number');
   const version = view.getUint32(4, true);
   if ((version & 255) !== 2) throw unsupported(`Unsupported EXR version ${version & 255}`);
   if (version & 0x200) throw unsupported('Unsupported EXR: tiled images');

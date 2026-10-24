@@ -1,12 +1,12 @@
 # @margoengine/environment
 
-HDR, EXR and UltraHDR loading, GPU image-based lighting (prefiltered specular, spherical-harmonic irradiance, BRDF LUT) applied to meshes and glTF models, environment and color backgrounds, and scene-wide fog for Margo Engine on WebGPU.
+HDR, EXR and UltraHDR loading, EXR writing, GPU image-based lighting (prefiltered specular, spherical-harmonic irradiance, BRDF LUT) applied to meshes and glTF models, environment and color backgrounds, and scene-wide fog for Margo Engine on WebGPU.
 
 Build from source with `npm run build` in `packages/environment`.
 
 Decodes Radiance `.hdr` (RGBE), OpenEXR (single-part scanline EXR with NONE, RLE, ZIPS, ZIP or PIZ; no PXR24, B44 or DWAA/DWAB, see Limits) and UltraHDR gain-map JPEG images, prefilters them into image-based lighting (`Environment`, `EnvironmentLighting`), and draws a background (the environment with `exposure`, `rotation` and `blur`, or a color) and fog (linear, exponential-squared and height fog), plus froxel volumetric fog with light shafts in the optional `/volumetric` entry.
 
-The optional `/reflector`, `/refractor` and `/cube-camera` entries add a planar mirror, a planar see-through surface (glass, water) and a cube render target (see "Mirrors, glass and cube cameras").
+The optional `/reflector`, `/refractor` and `/cube-camera` entries add a planar mirror, a planar see-through surface (glass, water) and a cube render target (see "Mirrors, glass and cube cameras"); `/exr-write` writes EXR files (see "Writing EXR").
 
 ```ts
 import {Engine} from '@margoengine/core';
@@ -405,6 +405,28 @@ import {parseHDR, parseEXR} from '@margoengine/environment';
 const bytes = await (await fetch('/studio.exr')).arrayBuffer();
 const {width, height, data} = parseEXR(bytes); // data: Float32Array RGBA, row 0 at the top
 ```
+
+### Writing EXR
+
+`encodeEXR` (from `@margoengine/environment/exr-write`, CPU only, Node or browser) writes any named channels as an
+uncompressed single-part scanline EXR, row 0 at the top. HALF and FLOAT take a `Float32Array`, UINT a `Uint32Array`;
+`offset` and `stride` pick one lane of interleaved data. Channels are stored in name order; dotted names are layers.
+
+```ts
+import {encodeEXR} from '@margoengine/environment/exr-write';
+const exr = await encodeEXR({width, height, channels: [
+  {name: 'R', type: 'HALF', data: rgb, offset: 0, stride: 3},
+  {name: 'G', type: 'HALF', data: rgb, offset: 1, stride: 3},
+  {name: 'B', type: 'HALF', data: rgb, offset: 2, stride: 3},
+  {name: 'depth.Z', type: 'FLOAT', data: depth},
+  {name: 'id', type: 'UINT', data: ids},
+]}, {nonFinite: 'preserve', signal});
+```
+
+FLOAT and UINT keep their exact bits; HALF rounds to nearest even and refuses finite values above 65504 (use FLOAT).
+NaN or infinity throws unless `nonFinite: 'preserve'`. Limits: 16,384 pixels a side, 2^26 pixels, 64 channels,
+names of 1 to 31 printable ASCII characters, and `maxBytes` (default 256 MiB, at most 512 MiB) for the whole file.
+It yields to the event loop every 65,536 samples, reports `onProgress(done, total)` and stops on `signal`.
 
 ### Bounded Radiance HDR import
 

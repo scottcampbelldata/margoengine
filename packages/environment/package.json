@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
-  "description": "HDR/EXR/UltraHDR loading, image-based lighting (prefiltered specular, SH irradiance, BRDF LUT) applied to meshes and glTF models, environment and color backgrounds, and scene fog for Margo Engine on WebGPU.",
+  "description": "HDR/EXR/UltraHDR loading, EXR writing, image-based lighting (prefiltered specular, SH irradiance, BRDF LUT), environment backgrounds and scene fog for Margo Engine on WebGPU.",
   "publishConfig": {
     "access": "public"
   },
@@ -12,7 +12,7 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test tests/environment.test.js tests/hdr.test.js tests/scene.test.js tests/volumetric.test.js tests/probes.test.js tests/probes-live.test.js tests/mirror.test.js",
+    "test": "npm run build && node --test tests/environment.test.js tests/hdr.test.js tests/scene.test.js tests/volumetric.test.js tests/probes.test.js tests/probes-live.test.js tests/mirror.test.js tests/exr-write.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "prepack": "npm run build",
     "test:probes:browser": "npm run build && node scripts/test-browser.js --probe-samples"
@@ -42,6 +42,10 @@
     "./cube-camera": {
       "types": "./dist/cube-camera.d.ts",
       "import": "./dist/cube-camera.js"
+    },
+    "./exr-write": {
+      "types": "./dist/exr-write.d.ts",
+      "import": "./dist/exr-write.js"
     }
   },
   "files": [

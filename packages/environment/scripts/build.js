@@ -15,6 +15,7 @@ for (const [entry, emptyOutDir] of [
   ['reflector', false],
   ['refractor', false],
   ['cube-camera', false],
+  ['exr-write', false],
 ])
   await build({
     root,
