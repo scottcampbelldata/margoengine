@@ -27,7 +27,7 @@ Single-clip playback reuses sample buffers, quaternion arrays, palette matrices,
 
 `createMaterialAnimation(model, {clip?, loop?})` plays a clip's `KHR_animation_pointer` STEP tracks on base-color `KHR_texture_transform` offset and scale (what `@margoengine/exporters` writes from `materialAnimations`): `seek(seconds)` writes the sampled UV transform into every primitive material of the targeted glTF material, and `dispose()` releases its claim on those properties. `Animation.attach` skips those pointer channels and counts them in the clip's duration.
 
-The separate `@margoengine/animator` package adds gameplay states, blend trees, additive masks and foot IK while reusing this pass's palette buffers. `sampleTrack()` and `multiplyMatrices()` are exported for animation consumers.
+The separate `@margoengine/animator` package adds gameplay states, blend trees, additive masks and foot IK while reusing this pass's palette buffers. `sampleTrack()` is exported for animation consumers (matrix products: `@margoengine/math/mat4`).
 
 Animation installs an optional `model.prepareDeformation` encoding hook. GPU
 picking and explicit CPU snapshots use it to update the same skin/morph output
@@ -206,7 +206,7 @@ nodes and morph weights once, in `add`, and group playback creates no typed arra
 
 ## Sampling (`@margoengine/animation/sampling`)
 
-`sampleTrack`, `sampleTrackInto` and `multiplyMatrices` (also on the root) without the deformation pipeline or
+`sampleTrack` and `sampleTrackInto` (also on the root) without the deformation pipeline or
 gltf-pro, for code that samples tracks itself (`@margoengine/animator` does).
 
 ## Cloning and retargeting (`@margoengine/animation/skeleton-utils`)
