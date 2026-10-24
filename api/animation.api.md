@@ -143,6 +143,30 @@ export interface KeyframeTrackData {
     blend?: KeyframeBlend;
 }
 
+export interface RigidBinding {
+    object: string;
+    bone: string;
+    position: readonly [number, number, number];
+    rotation: readonly [number, number, number, number];
+}
+
+export interface RigidBone {
+    id: string;
+    translation: readonly [number, number, number];
+}
+
+export interface RigidClipOptions {
+    name?: string;
+    duration?: number;
+}
+
+export interface RigidKey {
+    object: string;
+    time: number;
+    position: readonly [number, number, number];
+    rotation: readonly [number, number, number, number];
+}
+
 export class Skeleton {
     readonly names: readonly string[];
     readonly parents: readonly number[];
@@ -190,6 +214,8 @@ export function bakeKeyframeClip<N>(clip: KeyframeClip, fps: number, resolve: (t
     name: string;
     channels: BakedChannel<N>[];
 };
+
+export function compileRigidClip(bones: readonly RigidBone[], bindings: readonly RigidBinding[], keys: readonly RigidKey[], options?: RigidClipOptions): KeyframeClip;
 
 export function createKeyframeClip(data: KeyframeClipData): KeyframeClip;
 

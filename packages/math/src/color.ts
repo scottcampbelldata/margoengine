@@ -378,3 +378,44 @@ export class Color {
     return out;
   }
 }
+
+/** A display-space colour grade for {@link gradeSRGB}; every field is optional and defaults to no change. */
+export interface ColorGrade {
+  /** Added after contrast, in display units (1 = full white). Default 0. */
+  brightness?: number;
+  /** Scale about mid-grey 0.5. Default 1. */
+  contrast?: number;
+  /** Hue rotation in degrees, through HSL. Default 0. */
+  hue?: number;
+  /** sRGB display colour, 0..1 per channel, multiplied in by `tintStrength`. Default white. */
+  tint?: ArrayLike<number>;
+  /** 0 (no tint) to 1 (full tint). Default 0. */
+  tintStrength?: number;
+}
+
+/**
+ * Grades an sRGB display colour (0..1 per channel, as stored in hex and image files): rotate the hue, scale contrast
+ * about 0.5, add brightness, then multiply by white blended toward `tint`. The result is not clamped.
+ * @throws RangeError for a non-finite channel or grade value.
+ */
+export function gradeSRGB<T extends NumberArray = number[]>(
+  rgb: ArrayLike<number>,
+  grade: ColorGrade,
+  out?: T,
+  offset = 0,
+): T {
+  const { brightness = 0, contrast = 1, hue = 0, tint = [1, 1, 1], tintStrength = 0 } = grade,
+    values = [rgb[0], rgb[1], rgb[2], brightness, contrast, hue, tint[0], tint[1], tint[2], tintStrength];
+  if (!values.every(Number.isFinite)) throw new RangeError('Colour and grade values must be finite numbers');
+  const color = new Color().setRGB(rgb[0], rgb[1], rgb[2], 'srgb-linear'),
+    target = out ?? ([] as unknown as T);
+  if (hue) {
+    // Raw display values in and out, so HSL is taken of the sRGB channels as given.
+    const hsl = color.getHSL({ h: 0, s: 0, l: 0 }, 'srgb-linear');
+    color.setHSL(hsl.h + hue / 360, hsl.s, hsl.l, 'srgb-linear');
+  }
+  const graded = [color.r, color.g, color.b];
+  for (let i = 0; i < 3; i++)
+    target[offset + i] = ((graded[i] - 0.5) * contrast + 0.5 + brightness) * (1 + (tint[i] - 1) * tintStrength);
+  return target;
+}

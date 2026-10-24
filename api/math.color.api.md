@@ -37,6 +37,14 @@ export class Color {
     toArray<T extends NumberArray>(out: T, offset?: number): T;
 }
 
+export interface ColorGrade {
+    brightness?: number;
+    contrast?: number;
+    hue?: number;
+    tint?: ArrayLike<number>;
+    tintStrength?: number;
+}
+
 export type ColorInput = string | number | readonly number[];
 
 export interface ColorLike {
@@ -60,6 +68,8 @@ export const SRGBToLinear: (c: number) => number;
 export const SRGB_TO_P3: readonly number[];
 
 export function clipToSRGB<T extends NumberArray = number[]>(rgb: ArrayLike<number>, out?: T, offset?: number): T;
+
+export function gradeSRGB<T extends NumberArray = number[]>(rgb: ArrayLike<number>, grade: ColorGrade, out?: T, offset?: number): T;
 
 export function linearP3ToLinearSRGB<T extends NumberArray = number[]>(rgb: ArrayLike<number>, out?: T, offset?: number): T;
 

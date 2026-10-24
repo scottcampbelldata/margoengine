@@ -438,6 +438,8 @@ export function insetMeshFace(mesh: PolygonMesh, faceId: string, amount?: number
 
 export function insetMeshRegion(mesh: PolygonMesh, faceIds: readonly string[], width?: number, options?: RegionInsetOptions): RegionInsetResult;
 
+export function isAtlasOpaque(mesh: PolygonMesh, texture: PaintTexture): boolean;
+
 export const meshPaintTexel: typeof paintTexel;
 
 export function meshSelectionUVCorners(mesh: PolygonMesh, selection: UVSelection): UVCorner[];

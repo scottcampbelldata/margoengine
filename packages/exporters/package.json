@@ -58,6 +58,14 @@
     "./hash": {
       "types": "./dist/hash.d.ts",
       "import": "./dist/hash.js"
+    },
+    "./import-names": {
+      "types": "./dist/import-names.d.ts",
+      "import": "./dist/import-names.js"
+    },
+    "./godot-lightmap": {
+      "types": "./dist/godot-lightmap.d.ts",
+      "import": "./dist/godot-lightmap.js"
     }
   },
   "files": [

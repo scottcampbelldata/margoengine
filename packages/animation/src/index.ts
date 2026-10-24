@@ -41,6 +41,13 @@ export {
   type BakedChannel,
 } from './keyframes.js';
 export {
+  compileRigidClip,
+  type RigidBinding,
+  type RigidBone,
+  type RigidClipOptions,
+  type RigidKey,
+} from './rigid.js';
+export {
   AnimationGroup,
   type AnimationGroupMember,
   type AnimationGroupOptions,

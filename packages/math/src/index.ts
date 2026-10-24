@@ -2,7 +2,7 @@ export { Vector2 } from './vector2.js';
 export { Vector3 } from './vector3.js';
 export { Vector4 } from './vector4.js';
 export { Quaternion } from './quaternion.js';
-export { Euler } from './euler.js';
+export { Euler, degreesToQuaternion, quaternionToDegrees } from './euler.js';
 export { Matrix3 } from './matrix3.js';
 export { Matrix4 } from './matrix4.js';
 export {
@@ -14,8 +14,9 @@ export {
   linearP3ToLinearSRGB,
   linearSRGBToLinearP3,
   clipToSRGB,
+  gradeSRGB,
 } from './color.js';
-export type { ColorLike, HSL } from './color.js';
+export type { ColorGrade, ColorLike, HSL } from './color.js';
 export { Box3 } from './box3.js';
 export { Sphere } from './sphere.js';
 export { Plane } from './plane.js';

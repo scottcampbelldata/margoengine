@@ -11,6 +11,11 @@ export interface RobloxGLBOptions extends SceneOptions {
     materialPolicy?: 'strict' | 'preserve';
     collision?: 'none' | 'studio';
     animations?: boolean;
+    skins?: boolean;
+    units?: 'studs' | 'meters';
+    front?: '-z' | '+z';
+    rootName?: string;
+    rootExtras?: Extras;
     generator?: string;
 }
 

@@ -191,3 +191,66 @@ test('features Roblox meshes cannot hold are refused with the fix', () => {
   for (const maxTrianglesPerPart of [0, 20_001, 1.5])
     assert.throws(() => exportRobloxGLB(mesh({}), { maxTrianglesPerPart }), RangeError);
 });
+
+// A two-joint rig: a root at the origin and a child joint carrying every vertex.
+function rig({ rootAt = [0, 0, 0], weightRoot = false } = {}) {
+  const child = { name: 'Arm', translation: [0, 1, 0] },
+    root = { name: 'Root', translation: rootAt, children: [child] },
+    skinned = {
+      name: 'Body',
+      geometry: {
+        ...triangle(),
+        indices: [0, 1, 2],
+        joints: [0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+        weights: weightRoot ? [0.5, 0.5, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0] : [0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+      },
+      skin: { joints: [root, child], inverseBindMatrices: [...identity(), ...translate(0, -1, 0)] },
+    };
+  return { nodes: [root, skinned] };
+}
+const identity = () => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+const translate = (x, y, z) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1];
+
+test('skins are kept with skins: true, split with their joints, and checked against Roblox rig rules', () => {
+  assert.throws(() => exportRobloxGLB(rig()), { name: 'TypeError', message: /skins: true/ });
+  const { glb, mapping } = exportRobloxGLB(rig(), { skins: true, maxTrianglesPerPart: 1 }),
+    file = readGLB(glb),
+    primitive = file.json.meshes[0].primitives[0];
+  assert.equal(file.json.skins.length, 1);
+  assert.deepEqual([...values(file, primitive.attributes.JOINTS_0)].slice(0, 4), [0, 1, 0, 0]);
+  assert.equal(mapping.parts.length, 1);
+  assert.throws(() => exportRobloxGLB(rig({ rootAt: [0, 0, 1] }), { skins: true }), {
+    name: 'TypeError',
+    message: /must rest at the origin/,
+  });
+  assert.throws(() => exportRobloxGLB(rig({ weightRoot: true }), { skins: true }), {
+    name: 'TypeError',
+    message: /no root influence/,
+  });
+});
+
+test('units: meters and front: +z wrap the roots in one stud root, leaving skinned meshes as roots', () => {
+  const scene = rig();
+  scene.nodes.push({ name: 'Roblox_Studs', geometry: triangle() });
+  const { glb } = exportRobloxGLB(scene, {
+      skins: true,
+      units: 'meters',
+      front: '+z',
+      rootExtras: { units: 'meters' },
+    }),
+    { json } = readGLB(glb),
+    roots = json.scenes[0].nodes.map((i) => json.nodes[i]);
+  assert.deepEqual(
+    roots.map((n) => n.name),
+    ['Roblox_Studs_2', 'Body'],
+  );
+  assert.deepEqual(roots[0].rotation, [0, 1, 0, 0]);
+  assert.ok(roots[0].scale.every((s) => Math.abs(s - 25 / 7) < 1e-6));
+  assert.deepEqual(roots[0].extras, { units: 'meters' });
+  assert.deepEqual(
+    roots[0].children.map((i) => json.nodes[i].name),
+    ['Root', 'Roblox_Studs'],
+  );
+  assert.throws(() => exportRobloxGLB(rig(), { units: 'feet' }), TypeError);
+  assert.throws(() => exportRobloxGLB(rig(), { front: 'x' }), TypeError);
+});

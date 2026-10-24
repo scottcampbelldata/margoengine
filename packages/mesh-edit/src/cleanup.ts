@@ -4,6 +4,7 @@ import { affineMatrix, transformPoints } from './matrix.js';
 import { assertPolygonMesh, centroid, edgeId, faceGeometryError, polygonAreaVector, signedVolume } from './polygon.js';
 import { positionKey } from './quantize.js';
 import { clonePolygonMesh, createMeshEditResult, identityVertexMap } from './result.js';
+import type { PaintTexture } from './paint-types.js';
 import type { PolygonMesh, MeshEditResult } from './types.js';
 
 /** One mesh for {@link cleanupPolygonMeshes}, with its world matrix and what cleanup may do with it. */
@@ -279,4 +280,31 @@ export function cleanupPolygonMeshes(
     });
   });
   return { results, removed, welded };
+}
+
+/**
+ * Whether every texel under each face's UV bounding rectangle has alpha 255 in a top-left row-major RGBA8 atlas, so
+ * the mesh may hide what is behind it ({@link PolygonCleanupInput.canOcclude}). The rectangle covers more than a
+ * non-rectangular UV island, so transparency nearby can only make the answer false, never wrongly true. Texels the
+ * faces do not reach are ignored.
+ * @throws TypeError for a malformed mesh or a texture whose pixels are not width*height*4 long.
+ */
+export function isAtlasOpaque(mesh: PolygonMesh, texture: PaintTexture): boolean {
+  assertPolygonMesh(mesh, false);
+  const { width, height, pixels } = texture ?? ({} as PaintTexture);
+  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1)
+    throw new TypeError('Atlas needs positive whole-number width and height; supply the texture size.');
+  if (!pixels || pixels.length !== width * height * 4)
+    throw new TypeError('Atlas needs width*height*4 RGBA8 values; repair the image storage.');
+  for (const face of mesh.faces) {
+    const us = face.uv.map((uv) => uv[0]),
+      vs = face.uv.map((uv) => uv[1]),
+      left = Math.max(0, Math.min(width - 1, Math.floor(Math.min(...us) * width + 1e-8))),
+      top = Math.max(0, Math.min(height - 1, Math.floor(Math.min(...vs) * height + 1e-8))),
+      right = Math.min(width, Math.max(left + 1, Math.ceil(Math.max(...us) * width - 1e-8))),
+      bottom = Math.min(height, Math.max(top + 1, Math.ceil(Math.max(...vs) * height - 1e-8)));
+    for (let y = top; y < bottom; y++)
+      for (let x = left; x < right; x++) if (pixels[(y * width + x) * 4 + 3] !== 255) return false;
+  }
+  return true;
 }

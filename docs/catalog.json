@@ -83,8 +83,11 @@
       "Vector3",
       "Vector4",
       "clipToSRGB",
+      "degreesToQuaternion",
+      "gradeSRGB",
       "linearP3ToLinearSRGB",
-      "linearSRGBToLinearP3"
+      "linearSRGBToLinearP3",
+      "quaternionToDegrees"
     ]
   },
   {
@@ -366,6 +369,7 @@
       "frameTimes",
       "joinGLB",
       "paletteTexture",
+      "readAccessor",
       "sampleFrames",
       "splitGLB"
     ],
@@ -1461,6 +1465,7 @@
       "Skin",
       "applyKeyframeClip",
       "bakeKeyframeClip",
+      "compileRigidClip",
       "createKeyframeClip",
       "createMaterialAnimation",
       "multiplyMatrices",
@@ -2058,6 +2063,7 @@
       "fillMeshPaintFaces",
       "insetMeshFace",
       "insetMeshRegion",
+      "isAtlasOpaque",
       "meshPaintTexel",
       "meshSelectionUVCorners",
       "meshSelectionVertices",

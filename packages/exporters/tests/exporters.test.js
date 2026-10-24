@@ -118,6 +118,7 @@ test('public API exposes exporter functions and module evaluation is SSR-safe', 
     'frameTimes',
     'joinGLB',
     'paletteTexture',
+    'readAccessor',
     'sampleFrames',
     'splitGLB',
   ]);

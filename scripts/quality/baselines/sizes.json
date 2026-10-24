@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 2825028,
+  "total": 2830734,
   "history": [
     {
       "date": "2026-10-24",
@@ -14,10 +14,22 @@
       "commit": "66c40cb6",
       "reason": "Small entries split from heavy roots so consumers stop loading them: decoders/texture, gltf-pro/coordinates, materials/atlas, animation/sampling, loaders/common, loaders/usd, geometry/shapes, geometry/primitives, geometry/utils",
       "grew": 9
+    },
+    {
+      "date": "2026-10-24",
+      "commit": "4b9d5cac",
+      "reason": "App alignment: engine takes app code (readAccessor, Roblox skins/units, import-names, compileRigidClip, degree Euler helpers, gradeSRGB)",
+      "grew": 6
+    },
+    {
+      "date": "2026-10-24",
+      "commit": "4b9d5cac",
+      "reason": "App alignment: Godot lightmap import helper from Margo Voxel as its own entry",
+      "grew": 1
     }
   ],
   "items": {
-    "@margoengine/animation": 15287,
+    "@margoengine/animation": 16304,
     "@margoengine/animation/sampling": 1256,
     "@margoengine/animation/skeleton-utils": 7280,
     "@margoengine/animation/vat": 7799,
@@ -66,14 +78,16 @@
     "@margoengine/environment/reflector": 10886,
     "@margoengine/environment/refractor": 10843,
     "@margoengine/environment/volumetric": 8044,
-    "@margoengine/exporters": 33448,
+    "@margoengine/exporters": 34482,
     "@margoengine/exporters/capture": 6916,
     "@margoengine/exporters/dae": 10230,
     "@margoengine/exporters/godot": 6811,
     "@margoengine/exporters/godot-addon": 1609,
+    "@margoengine/exporters/godot-lightmap": 1328,
     "@margoengine/exporters/hash": 1717,
+    "@margoengine/exporters/import-names": 738,
     "@margoengine/exporters/model": 9382,
-    "@margoengine/exporters/roblox": 16524,
+    "@margoengine/exporters/roblox": 17237,
     "@margoengine/exporters/skin": 2459,
     "@margoengine/exporters/unity": 41963,
     "@margoengine/exporters/usdz": 9551,
@@ -143,13 +157,13 @@
     "@margoengine/materials": 52539,
     "@margoengine/materials/atlas": 1250,
     "@margoengine/materials/transmission": 6359,
-    "@margoengine/math": 11960,
+    "@margoengine/math": 12483,
     "@margoengine/math/affine": 3936,
     "@margoengine/math/billboard": 2672,
     "@margoengine/math/box3": 2581,
     "@margoengine/math/color": 2858,
     "@margoengine/math/errors": 412,
-    "@margoengine/math/euler": 948,
+    "@margoengine/math/euler": 1301,
     "@margoengine/math/frustum": 2512,
     "@margoengine/math/mat4": 1631,
     "@margoengine/math/mathutils": 1138,

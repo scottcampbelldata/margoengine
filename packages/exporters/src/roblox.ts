@@ -1,6 +1,6 @@
 // Roblox GLB: the ordinary GLB writer, with every mesh primitive split into parts of at most 20,000 triangles.
 import { writeGLB } from './gltf.js';
-import type { ExportSource, Geo, Mat, Node, SceneOptions } from './scene.js';
+import type { ExportNode, ExportScene, ExportSource, Extras, Geo, Mat, Node, SceneOptions } from './scene.js';
 
 /** Options for {@link exportRobloxGLB}. */
 export interface RobloxGLBOptions extends SceneOptions {
@@ -15,6 +15,26 @@ export interface RobloxGLBOptions extends SceneOptions {
   collision?: 'none' | 'studio';
   /** Keep the scene's node translation, rotation and scale clips. Default false: a scene with clips throws. */
   animations?: boolean;
+  /**
+   * Keep skins, checked against Roblox's custom-rig rules: every root joint (a joint no other joint of its skin
+   * parents) rests at the origin, and no vertex is weighted to a root joint. Default false: a skinned node throws.
+   */
+  skins?: boolean;
+  /**
+   * Units of the scene: `'studs'` (default) writes it as given; `'meters'` wraps the scene's roots in one root node
+   * scaled by 25/7 studs per meter. Skinned mesh nodes stay scene roots (glTF poses them through their joints).
+   * Data scenes only.
+   */
+  units?: 'studs' | 'meters';
+  /**
+   * Axis the scene's front faces: `'-z'` (default, Roblox's front) or `'+z'` (glTF's), which turns the roots 180
+   * degrees about Y in the same wrapping root as `units`. Data scenes only.
+   */
+  front?: '-z' | '+z';
+  /** Name of the wrapping root, made unique among the scene's node names. Default 'Roblox_Studs'. */
+  rootName?: string;
+  /** `extras` of the wrapping root. */
+  rootExtras?: Extras;
   /** `asset.generator`. Default 'Margo Engine exporters'. */
   generator?: string;
 }
@@ -86,11 +106,12 @@ const ROLES = /^(collision|cage|innercage|outercage|inner-cage|outer-cage|wrapla
  * (only vertices a part uses are copied). Parts of shared geometry are written once. `mapping` records each part's
  * source triangles and vertices and suggested Studio import settings; write it next to the GLB as JSON. Studio's
  * acceptance of the result is not tested by this package.
- * @throws TypeError for a feature Roblox meshes cannot hold, each naming the fix: skins, morph targets, cameras,
- * lights, a second UV set, lightmaps, material animations, node clips without `animations: true`, layered-clothing cage
- * names (`_InnerCage`, `_OuterCage`), collision or cage roles in `extras.margo.role` (or `extras.margo_collision`), and
- * with `materialPolicy: 'strict'`, material fields beyond the base set; RangeError for a `maxTrianglesPerPart` outside
- * 1 to 20,000; plus everything {@link exportGLB} throws.
+ * @throws TypeError for a feature Roblox meshes cannot hold, each naming the fix: skins without `skins: true`, a root
+ * joint away from the origin or a vertex weighted to one, morph targets, cameras, lights, a second UV set, lightmaps,
+ * material animations, node clips without `animations: true`, layered-clothing cage names (`_InnerCage`,
+ * `_OuterCage`), collision or cage roles in `extras.margo.role` (or `extras.margo_collision`), `units` or `front` with
+ * an engine scene, and with `materialPolicy: 'strict'`, material fields beyond the base set; RangeError for a
+ * `maxTrianglesPerPart` outside 1 to 20,000; plus everything {@link exportGLB} throws.
  */
 export function exportRobloxGLB(source: ExportSource, options: RobloxGLBOptions = {}): RobloxGLBResult {
   const {
@@ -98,6 +119,9 @@ export function exportRobloxGLB(source: ExportSource, options: RobloxGLBOptions 
     materialPolicy = 'strict',
     collision = 'none',
     animations = false,
+    skins = false,
+    units = 'studs',
+    front = '-z',
   } = options;
   if (!Number.isInteger(cap) || cap < 1 || cap > MAX_TRIANGLES)
     throw new RangeError(`maxTrianglesPerPart must be a whole number from 1 to ${MAX_TRIANGLES}`);
@@ -105,6 +129,10 @@ export function exportRobloxGLB(source: ExportSource, options: RobloxGLBOptions 
     throw new TypeError("materialPolicy must be 'strict' or 'preserve'");
   if (collision !== 'none' && collision !== 'studio') throw new TypeError("collision must be 'none' or 'studio'");
   if (typeof animations !== 'boolean') throw new TypeError('animations must be boolean');
+  if (typeof skins !== 'boolean') throw new TypeError('skins must be boolean');
+  if (units !== 'studs' && units !== 'meters') throw new TypeError("units must be 'studs' or 'meters'");
+  if (front !== '-z' && front !== '+z') throw new TypeError("front must be '-z' or '+z'");
+  if (units !== 'studs' || front !== '-z') source = wrapped(source, units === 'meters', front === '+z', options);
   const scene = source as { lightmap?: unknown; animations?: unknown[]; materialAnimations?: unknown[] };
   if (scene.lightmap !== undefined) throw new TypeError('Roblox export cannot hold a lightmap; use exportGLB');
   if (scene.materialAnimations?.length)
@@ -119,7 +147,8 @@ export function exportRobloxGLB(source: ExportSource, options: RobloxGLBOptions 
 
   const check = (node: Node): void => {
     const label = `Node ${node.name ?? '(unnamed)'}`;
-    if (node.skin || node.morphWeights) throw new TypeError(`${label}: Roblox export has no skins or morph targets`);
+    if (node.morphWeights) throw new TypeError(`${label}: Roblox export has no morph targets`);
+    if (node.skin && !skins) throw new TypeError(`${label} is skinned; pass skins: true to keep Roblox-valid skins`);
     if (node.camera || node.light) throw new TypeError(`${label}: Roblox export has no cameras or lights`);
     for (const name of [node.name, node.meshName])
       if (name !== undefined && CAGE.test(name))
@@ -130,8 +159,39 @@ export function exportRobloxGLB(source: ExportSource, options: RobloxGLBOptions 
         throw new TypeError(`${label}: a collision or cage proxy is not a visual mesh; leave it out of the scene`);
     }
   };
+  // Root joints of a skin (joints no other joint of it parents), checked once per skin: Roblox rigs rest at the origin.
+  const rootJoints = new Map<object, Set<number>>();
+  const rootsOf = (node: Node): Set<number> => {
+    const skin = node.skin!;
+    let roots = rootJoints.get(skin);
+    if (roots) return roots;
+    const parented = new Set(skin.joints.flatMap((joint) => joint.children ?? []));
+    roots = new Set();
+    for (const [i, joint] of skin.joints.entries()) {
+      if (parented.has(joint)) continue;
+      roots.add(i);
+      if ((joint.matrix ? joint.matrix.slice(12, 15) : (joint.translation ?? [])).some((v) => v !== 0))
+        throw new TypeError(
+          `Root joint ${joint.name ?? i} of node ${node.name ?? '(unnamed)'} must rest at the origin for Roblox; move its rest position to 0, 0, 0`,
+        );
+    }
+    rootJoints.set(skin, roots);
+    return roots;
+  };
+  // Per node, not per shared geometry: the same geometry may be bound to different skins.
+  const checkSkin = (label: string, geo: Geo, node: Node): void => {
+    const owner = geo.base ?? geo;
+    if (!owner.joints) return;
+    if (!node.skin) throw new TypeError(`${label} has joints but its node has no skin; add the skin`);
+    const roots = rootsOf(node);
+    for (let slot = 0; slot < owner.weights!.length; slot++)
+      if (owner.weights![slot] > 0 && roots.has(owner.joints[slot]))
+        throw new TypeError(
+          `${label} weights a vertex to a root joint; Roblox rigs need no root influence, so bind it to a child joint`,
+        );
+  };
   const checkPrimitive = (label: string, geo: Geo, mat: Mat | undefined): void => {
-    if (geo.joints || geo.morphs) throw new TypeError(`${label}: Roblox export has no skins or morph targets`);
+    if (geo.morphs) throw new TypeError(`${label}: Roblox export has no morph targets`);
     if (geo.uvs1 || mat?.baseColorTexture?.texCoord === 1)
       throw new TypeError(`${label}: Roblox export has one UV set; drop uvs1`);
     if (
@@ -184,6 +244,11 @@ export function exportRobloxGLB(source: ExportSource, options: RobloxGLBOptions 
       if (owner.uvs) part.uvs = stream(owner.uvs, 2);
       if (owner.tangents) part.tangents = stream(owner.tangents, 4);
       if (owner.colors) part.colors = stream(owner.colors, owner.colorSize);
+      if (owner.joints) {
+        part.joints = new Uint16Array(sourceVertices.length * 4);
+        sourceVertices.forEach((v, i) => part.joints!.set(owner.joints!.subarray(v * 4, v * 4 + 4), i * 4));
+        part.weights = stream(owner.weights!, 4);
+      }
       out.push({ geometry: part, part: parts.length });
       parts.push({ firstTriangle: start / 3, triangleCount: (end - start) / 3, sourceVertices });
     }
@@ -197,6 +262,8 @@ export function exportRobloxGLB(source: ExportSource, options: RobloxGLBOptions 
     check(node);
     const items = node.primitives ?? (node.geometry ? [{ geometry: node.geometry, material: node.material }] : []);
     if (items.length) {
+      for (const [i, item] of items.entries())
+        checkSkin(`Node ${node.name ?? '(unnamed)'} primitive ${i}`, item.geometry, node);
       let key: object | undefined = node.primitivesKey;
       if (!node.primitives) {
         let byMaterial = single.get(node.geometry!);
@@ -243,4 +310,34 @@ export function exportRobloxGLB(source: ExportSource, options: RobloxGLBOptions 
       },
     },
   };
+}
+
+const STUDS_PER_METER = 25 / 7;
+
+// The data scene with its roots under one root node that scales meters to studs and/or turns +Z fronts to -Z. Skinned
+// mesh nodes stay roots: glTF poses them through their joints, which the root does move.
+function wrapped(source: ExportSource, meters: boolean, turn: boolean, options: RobloxGLBOptions): ExportScene {
+  const scene = source as ExportScene;
+  if (!Array.isArray(scene?.nodes))
+    throw new TypeError('units and front need a data scene ({nodes}); convert the engine scene first');
+  const names = new Set<string | undefined>(),
+    collect = (node: ExportNode): void => {
+      names.add(node.name);
+      node.children?.forEach(collect);
+    };
+  scene.nodes.forEach(collect);
+  const base = options.rootName ?? 'Roblox_Studs';
+  if (typeof base !== 'string' || !base) throw new TypeError('rootName must be a nonempty string');
+  let name = base;
+  for (let suffix = 2; names.has(name); suffix++) name = `${base}_${suffix}`;
+  const scale = meters ? STUDS_PER_METER : 1,
+    root: ExportNode = {
+      name,
+      translation: [0, 0, 0],
+      rotation: turn ? [0, 1, 0, 0] : [0, 0, 0, 1],
+      scale: [scale, scale, scale],
+      children: scene.nodes.filter((node) => !node.skin),
+      ...(options.rootExtras === undefined ? {} : { extras: options.rootExtras }),
+    };
+  return { ...scene, nodes: [root, ...scene.nodes.filter((node) => node.skin)] };
 }

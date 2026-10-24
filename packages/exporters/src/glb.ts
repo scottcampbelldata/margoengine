@@ -171,6 +171,139 @@ export function joinGLB({ json, bin, chunks = [] }: GLBParts): Uint8Array {
   return out;
 }
 
+/** Values of one glTF accessor read from a GLB: {@link readAccessor}'s result. */
+export interface AccessorValues {
+  /** Every element's components packed without stride or padding, in the accessor's component type. */
+  values: Int8Array | Uint8Array | Int16Array | Uint16Array | Uint32Array | Float32Array;
+  /** Elements in the accessor. */
+  count: number;
+  /** Components per element: 1 (SCALAR), 2 to 4 (VEC2 to VEC4), 4, 9 or 16 (MAT2 to MAT4, column-major). */
+  width: number;
+  /** glTF component type: 5120 to 5123 (8- and 16-bit integers), 5125 (uint32) or 5126 (float32). */
+  componentType: number;
+  /** The accessor's `normalized` flag; integer values are returned as stored, not divided. */
+  normalized: boolean;
+}
+
+// [columns, rows] of each accessor type.
+const SHAPES: Record<string, [number, number]> = {
+  SCALAR: [1, 1],
+  VEC2: [1, 2],
+  VEC3: [1, 3],
+  VEC4: [1, 4],
+  MAT2: [2, 2],
+  MAT3: [3, 3],
+  MAT4: [4, 4],
+};
+const COMPONENTS: Record<number, [new (length: number) => AccessorValues['values'], number]> = {
+  5120: [Int8Array, 1],
+  5121: [Uint8Array, 1],
+  5122: [Int16Array, 2],
+  5123: [Uint16Array, 2],
+  5125: [Uint32Array, 4],
+  5126: [Float32Array, 4],
+};
+const SPARSE_INDEX: Record<number, number> = { 5121: 1, 5123: 2, 5125: 4 };
+
+function readComponent(data: DataView, at: number, type: number): number {
+  if (type === 5126) return data.getFloat32(at, true);
+  if (type === 5125) return data.getUint32(at, true);
+  if (type === 5123) return data.getUint16(at, true);
+  if (type === 5122) return data.getInt16(at, true);
+  return type === 5121 ? data.getUint8(at) : data.getInt8(at);
+}
+
+/**
+ * Reads accessor `index` of a split GLB ({@link splitGLB}) as plain data: strided and matrix-padded elements are
+ * packed, sparse substitutions applied, and an accessor without a buffer view reads as zeros plus its sparse values.
+ * Only buffer 0, the BIN chunk, is read.
+ * @throws TypeError for a missing or malformed accessor, buffer view or sparse block, or one that reads another
+ * buffer; RangeError for data that runs past its buffer view or the BIN chunk, a sparse index past `count`, or a
+ * non-finite float.
+ */
+export function readAccessor(parts: GLBParts, index: number): AccessorValues {
+  const json = parts?.json as Record<string, unknown> | undefined,
+    list = json?.accessors,
+    accessor = Array.isArray(list) && Number.isSafeInteger(index) ? list[index] : undefined;
+  if (!isObject(accessor)) throw new TypeError(`glTF accessor ${index} does not exist; pass an index into accessors`);
+  const label = `glTF accessor ${index}`,
+    shape = SHAPES[accessor.type as string],
+    component = COMPONENTS[accessor.componentType as number],
+    count = accessor.count as number;
+  if (!shape || !component) throw new TypeError(`${label} has an unknown type or componentType; repair the GLB`);
+  if (!Number.isSafeInteger(count) || count < 1) throw new TypeError(`${label} needs a count of at least 1`);
+  const [columns, rows] = shape,
+    [Values, size] = component,
+    type = accessor.componentType as number,
+    width = columns * rows,
+    // Matrix columns start on 4-byte boundaries, so 1- and 2-byte MAT2 and MAT3 columns carry padding.
+    column = columns > 1 ? (rows * size + 3) & ~3 : rows * size,
+    element = columns * column,
+    values = new Values(count * width);
+  const view = (id: unknown, what: string): { data: DataView; stride: number } => {
+    const views = json!.bufferViews,
+      bufferView = Array.isArray(views) && Number.isSafeInteger(id) ? views[id as number] : undefined;
+    if (!isObject(bufferView)) throw new TypeError(`${label} ${what} buffer view does not exist; repair the GLB`);
+    if (bufferView.buffer !== 0 || !parts.bin)
+      throw new TypeError(`${label} reads a buffer other than the GLB BIN chunk; only buffer 0 is read`);
+    const offset = bufferView.byteOffset ?? 0,
+      length = bufferView.byteLength,
+      stride = bufferView.byteStride ?? 0;
+    if (![offset, length, stride].every((n) => Number.isSafeInteger(n) && (n as number) >= 0))
+      throw new TypeError(`${label} ${what} buffer view has a bad byteOffset, byteLength or byteStride; repair the GLB`);
+    if ((offset as number) + (length as number) > parts.bin.length)
+      throw new RangeError(`${label} ${what} buffer view runs past the BIN chunk; repair the GLB`);
+    return {
+      data: new DataView(parts.bin.buffer, parts.bin.byteOffset + (offset as number), length as number),
+      stride: stride as number,
+    };
+  };
+  const copy = (data: DataView, at: number, step: number, from: number, to: number, valueType: number): void => {
+    if (at < 0 || at + (to - from - 1) * step + element > data.byteLength)
+      throw new RangeError(`${label} runs past its buffer view; repair the GLB`);
+    for (let i = from; i < to; i++) {
+      const base = at + (i - from) * step;
+      for (let c = 0; c < columns; c++)
+        for (let r = 0; r < rows; r++)
+          values[i * width + c * rows + r] = readComponent(data, base + c * column + r * size, valueType);
+    }
+  };
+  const start = accessor.byteOffset ?? 0;
+  if (!Number.isSafeInteger(start) || (start as number) < 0) throw new TypeError(`${label} has a bad byteOffset; repair the GLB`);
+  if (accessor.bufferView !== undefined) {
+    const { data, stride } = view(accessor.bufferView, 'data');
+    copy(data, start as number, stride || element, 0, count, type);
+  }
+  const sparse = accessor.sparse;
+  if (sparse !== undefined) {
+    if (!isObject(sparse) || !isObject(sparse.indices) || !isObject(sparse.values))
+      throw new TypeError(`${label} sparse needs indices and values`);
+    const total = sparse.count as number,
+      indexType = sparse.indices.componentType as number,
+      indexSize = SPARSE_INDEX[indexType];
+    if (!Number.isSafeInteger(total) || total < 1 || total > count)
+      throw new TypeError(`${label} sparse count must be 1 to the accessor count`);
+    if (!indexSize) throw new TypeError(`${label} sparse indices need an unsigned componentType`);
+    const indices = view(sparse.indices.bufferView, 'sparse index'),
+      substitutes = view(sparse.values.bufferView, 'sparse value'),
+      indexStart = (sparse.indices.byteOffset as number | undefined) ?? 0,
+      valueStart = (sparse.values.byteOffset as number | undefined) ?? 0;
+    if (!Number.isSafeInteger(indexStart) || !Number.isSafeInteger(valueStart) || indexStart < 0 || valueStart < 0)
+      throw new TypeError(`${label} sparse has a bad byteOffset; repair the GLB`);
+    if (indexStart + total * indexSize > indices.data.byteLength)
+      throw new RangeError(`${label} sparse indices run past their buffer view; repair the GLB`);
+    for (let k = 0; k < total; k++) {
+      const target = readComponent(indices.data, indexStart + k * indexSize, indexType);
+      if (target >= count) throw new RangeError(`${label} sparse index ${target} is past count ${count}; repair the GLB`);
+      // One element at a time from the packed values view into slot `target`.
+      copy(substitutes.data, valueStart + k * element, element, target, target + 1, type);
+    }
+  }
+  if (Values === Float32Array && !values.every(Number.isFinite))
+    throw new RangeError(`${label} holds a non-finite float; repair the GLB`);
+  return { values, count, width, componentType: type, normalized: accessor.normalized === true };
+}
+
 type Point = [number, number, number];
 
 /** Validated Float32 positions with bounds, after checking every triangle has area (and the volume when asked). */

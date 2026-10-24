@@ -20,7 +20,7 @@ export { createPrimitiveMesh, meshTileUV } from './primitives.js';
 export { extrudeMeshFace, insetMeshFace, cutMeshFace, bevelPolygonMesh } from './operations.js';
 export { polygonGeometryError, polygonMeshEdges, compilePolygonMesh } from './polygon.js';
 export { quantizePolygonMesh } from './quantize.js';
-export { cleanupPolygonMeshes, type PolygonCleanupInput, type PolygonCleanupResult } from './cleanup.js';
+export { cleanupPolygonMeshes, isAtlasOpaque, type PolygonCleanupInput, type PolygonCleanupResult } from './cleanup.js';
 export { meshSelectionVertices, transformMeshComponents } from './components.js';
 export { deleteMeshComponents, type DeleteComponentsOptions, type DeleteComponentsResult } from './delete.js';
 export { traceMeshQuadRing, cutMeshQuadRing } from './ring.js';

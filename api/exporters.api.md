@@ -7,6 +7,14 @@ import { EngineKernel, Geometry, Mesh, PbrMaterial } from "@margoengine/core";
 import { PBRModel } from "@margoengine/gltf-pro";
 import { Vec2 } from "@margoengine/math";
 
+export interface AccessorValues {
+    values: Int8Array | Uint8Array | Int16Array | Uint16Array | Uint32Array | Float32Array;
+    count: number;
+    width: number;
+    componentType: number;
+    normalized: boolean;
+}
+
 export interface AnimationChannelData {
     node: ExportNode;
     path: 'translation' | 'rotation' | 'scale' | 'weights';
@@ -394,6 +402,8 @@ export function joinGLB({ json, bin, chunks }: GLBParts): Uint8Array;
 export function paletteTexture(colors: ArrayLike<number>, options?: {
     name?: string;
 }): Promise<PaletteTexture>;
+
+export function readAccessor(parts: GLBParts, index: number): AccessorValues;
 
 export function sampleFrames(first: number, last: number, fps: number, maxFrames?: number): FrameClip;
 

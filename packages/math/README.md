@@ -20,6 +20,14 @@ Core interop: `toArray()` with no target returns a tuple that `setPosition`, `se
 
 `Euler.setFromQuaternion` and `setFromRotationMatrix` keep the exact orientation in all six orders, also at and next to ±90° (the middle angle is in [-π/2, π/2]). At a pole many angle triples give the same rotation, so compare orientations, not angles.
 
+Angles saved in degrees (editors, file formats): `degreesToQuaternion([x, y, z], order)` returns `[x, y, z, w]` for the
+same intrinsic convention as `Euler` (default `'XYZ'`), and `quaternionToDegrees(q, order)` normalizes `q` and returns
+degrees. Both throw `RangeError` for non-finite input.
+
+`gradeSRGB(rgb, {brightness, contrast, hue, tint, tintStrength}, out?)` grades a display-space (sRGB, 0..1) colour as
+palette editors do: hue rotation in degrees through HSL, contrast about 0.5, added brightness, then a multiply by
+white blended toward `tint`. The result is not clamped.
+
 Shared types and errors (type-only, 0 runtime bytes for the types): every Margo package takes its tuple and colour types from here (`Vec2`, `Vec3`, `Vec4`, `Quat`, `MutableVec2`, `MutableVec3`, `Mat4`, `ColorInput`, `HeightField`, the `*Like` shapes), and throws `MargoError` (`code`: `disposed`, `attached`, `state`, `unsupported`, `failed`) for everything that is not an argument `TypeError`/`RangeError`; see [docs/conventions.md](../../docs/conventions.md). `@margoengine/math/mesh` has `meshWorldMatrix(engine, mesh)`, the live world matrix of a visible core mesh (or null), which lines, points and text re-export; it is the one entry that imports `@margoengine/core/extension` at runtime.
 
 Billboards (`@margoengine/math/billboard`, Crocotile-style object billboards; the mesh's front faces its local +Z):

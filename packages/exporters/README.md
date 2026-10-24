@@ -294,11 +294,24 @@ collision hulls do. Existing scene roots, node children and the active scene ind
 nodes, checked even when nothing is appended, so a malformed file is refused rather than passed on. The naming
 convention (a Godot `-colonly` suffix, for example) is the caller's.
 
+`readAccessor(parts, index)` reads one accessor of a split GLB back as plain data: `{values, count, width,
+componentType, normalized}`, with strided and matrix-padded elements packed, sparse values applied and integer values as
+stored. Checkers that read exported files back use it with `splitGLB(bytes, {copy: false})`, so no second copy of the
+BIN is made. Only buffer 0 (the BIN chunk) is read; anything out of bounds or non-finite throws.
+
 ```ts
 const withColliders = appendGLBMeshes(glb, [
   {name: 'Body-colonly', positions: hull, indices, volume: true, extras: {role: 'collision'}},
 ]);
 ```
+
+### Importer naming (`@margoengine/exporters/import-names`)
+
+Godot reads collision roles from node name suffixes (`-col`, `-convcol`, `-colonly`, `-convcolonly`; the Unity
+import profile reads the same ones) and loops clips whose names end in `-loop`. `collisionTag(name)` returns a
+name's suffix or null, `collisionBase(name)` strips every suffix, and `withCollisionTag(name, tag)` replaces them
+with one (or none for null). `clipImportName(name, loop)` removes leading and trailing `loop`/`cycle` tokens and adds
+`-loop` when `loop` is true, so a clip loops exactly when asked.
 
 ## Godot import bundle (`@margoengine/exporters/godot`)
 
@@ -360,6 +373,13 @@ Godot's glTF import reads `COLOR_0` as sRGB, ignores it unless the material opts
 that fixes both for any GLB: materials of primitives with `COLOR_0` use it as linear albedo (a material shared with
 uncolored primitives is cloned once), and each clip's `extras.loop` boolean sets its loop. Write the entries into the
 project, enable "glTF vertex colors and loops" under Project Settings > Plugins, then reimport.
+
+A baked GLB (a lightmap on TEXCOORD_1, written as `lightmap`) needs its own material in Godot.
+`createGodotLightmapImport({albedo, lightmap, emission?, lightmapScale, emissionScale})` (from
+`@margoengine/exporters/godot-lightmap`) returns an unshaded shader
+(`albedo * lightmap * lightmapScale + emission * emissionScale`) and an `EditorScenePostImport` script that applies it
+to every MeshInstance3D; paths are relative to the GLB's folder. Select the script as the GLB's Import Script and
+reimport.
 
 ## Skin authoring (`@margoengine/exporters/skin`)
 
@@ -501,8 +521,12 @@ save('model.roblox.json', JSON.stringify(mapping));
 places every part at a glTF node and primitive; `mapping.importSettings` gives the 3D Importer settings that keep the
 parts apart (merge meshes off, imported pivots, vertex colors on, `collision: 'none'` or `'studio'`). Node
 translation, rotation and scale clips are kept with `animations: true`. Features a MeshPart cannot hold throw with the
-fix: skins, morph targets, cameras, lights, `uvs1`, lightmaps, material clips, layered-clothing cage names and
-collision or cage roles. `materialPolicy: 'strict'` (default) also refuses material fields beyond base color,
+fix: skins without `skins: true`, morph targets, cameras, lights, `uvs1`, lightmaps, material clips, layered-clothing cage names and
+collision or cage roles. `skins: true` keeps skins (their parts carry `JOINTS_0`/`WEIGHTS_0`) and checks Roblox's
+custom-rig rules: every root joint rests at the origin and no vertex is weighted to a root joint. For data scenes,
+`units: 'meters'` wraps the roots in one root scaled 25/7 studs per meter and `front: '+z'` turns that root 180 degrees
+about Y (named `rootName`, default `Roblox_Studs`, with `rootExtras`); skinned mesh nodes stay roots, posed through
+their joints. `materialPolicy: 'strict'` (default) also refuses material fields beyond base color,
 roughness, metalness and emissive color; `'preserve'` writes them. Studio import is not tested here.
 
 ## Render to file

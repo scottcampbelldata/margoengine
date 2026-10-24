@@ -31,6 +31,10 @@ export class Euler {
     toArray<T extends NumberArray>(out: T, offset?: number): T;
 }
 
+export function degreesToQuaternion(degrees: ArrayLike<number>, order?: EulerOrder): [number, number, number, number];
+
+export function quaternionToDegrees(quaternion: ArrayLike<number>, order?: EulerOrder): [number, number, number];
+
 // Not exported from this entry, but used by the exports above:
 
 type EulerOrder = 'XYZ' | 'YXZ' | 'ZXY' | 'ZYX' | 'YZX' | 'XZY';

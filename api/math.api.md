@@ -80,6 +80,14 @@ export class Color {
     toArray<T extends NumberArray>(out: T, offset?: number): T;
 }
 
+export interface ColorGrade {
+    brightness?: number;
+    contrast?: number;
+    hue?: number;
+    tint?: ArrayLike<number>;
+    tintStrength?: number;
+}
+
 export type ColorInput = string | number | readonly number[];
 
 export interface ColorLike {
@@ -571,9 +579,15 @@ export class Vector4 {
 
 export function clipToSRGB<T extends NumberArray = number[]>(rgb: ArrayLike<number>, out?: T, offset?: number): T;
 
+export function degreesToQuaternion(degrees: ArrayLike<number>, order?: EulerOrder): [number, number, number, number];
+
+export function gradeSRGB<T extends NumberArray = number[]>(rgb: ArrayLike<number>, grade: ColorGrade, out?: T, offset?: number): T;
+
 export function linearP3ToLinearSRGB<T extends NumberArray = number[]>(rgb: ArrayLike<number>, out?: T, offset?: number): T;
 
 export function linearSRGBToLinearP3<T extends NumberArray = number[]>(rgb: ArrayLike<number>, out?: T, offset?: number): T;
+
+export function quaternionToDegrees(quaternion: ArrayLike<number>, order?: EulerOrder): [number, number, number];
 
 // Not exported from this entry, but used by the exports above:
 

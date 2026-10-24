@@ -1,5 +1,7 @@
 import type { EulerOrder, MatrixLike, NumberArray, Vec3Like, Vec4Like } from './types.js';
 
+const DEGREES = Math.PI / 180;
+
 let scratch: Float64Array | undefined;
 const axisIndex = (order: string, i: number): number => order.charCodeAt(i) - 88; // 'X' = 88
 
@@ -101,4 +103,49 @@ export class Euler {
     out[offset + 2] = this.z;
     return out;
   }
+}
+
+/**
+ * Quaternion `[x, y, z, w]` of intrinsic Euler angles given in degrees, applied in `order` (the {@link Euler}
+ * convention). For angles saved in degrees, as editors and file formats usually keep them.
+ * @throws RangeError for a non-finite angle.
+ */
+export function degreesToQuaternion(
+  degrees: ArrayLike<number>,
+  order: EulerOrder = 'XYZ',
+): [number, number, number, number] {
+  const [x, y, z] = [0, 1, 2].map((i) => degrees[i] * DEGREES);
+  if (![x, y, z].every(Number.isFinite)) throw new RangeError('Euler angles must be three finite degree values');
+  // q = q * axis(angle) for each axis of order, as Quaternion.setFromEuler.
+  let q: [number, number, number, number] = [0, 0, 0, 1];
+  for (let i = 0; i < 3; i++) {
+    const axis = axisIndex(order, i),
+      half = [x, y, z][axis] / 2,
+      s = Math.sin(half),
+      b = [0, 0, 0, Math.cos(half)];
+    b[axis] = s;
+    q = [
+      q[3] * b[0] + q[0] * b[3] + q[1] * b[2] - q[2] * b[1],
+      q[3] * b[1] - q[0] * b[2] + q[1] * b[3] + q[2] * b[0],
+      q[3] * b[2] + q[0] * b[1] - q[1] * b[0] + q[2] * b[3],
+      q[3] * b[3] - q[0] * b[0] - q[1] * b[1] - q[2] * b[2],
+    ];
+  }
+  return q;
+}
+
+/**
+ * Intrinsic Euler angles in degrees, in `order`, of quaternion `[x, y, z, w]` (normalized first). At a gimbal
+ * singularity the result is still a valid angle set for the same orientation.
+ * @throws RangeError for a non-finite or zero quaternion.
+ */
+export function quaternionToDegrees(
+  quaternion: ArrayLike<number>,
+  order: EulerOrder = 'XYZ',
+): [number, number, number] {
+  const [x, y, z, w] = [0, 1, 2, 3].map((i) => quaternion[i]),
+    length = Math.hypot(x, y, z, w);
+  if (!Number.isFinite(length) || length === 0) throw new RangeError('Quaternion must be finite and non-zero');
+  const e = new Euler().setFromQuaternion({ x: x / length, y: y / length, z: z / length, w: w / length }, order);
+  return [e.x / DEGREES, e.y / DEGREES, e.z / DEGREES];
 }

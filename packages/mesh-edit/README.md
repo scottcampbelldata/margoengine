@@ -49,6 +49,10 @@ Changed commits and successful `replace(scene)` advance the revision; replacemen
 
 `cleanupPolygonMeshes(inputs, {weld: true})` takes explicit `canEdit`, `canOcclude` and `motionGroup` policy for each mesh. It removes only strict convex enclosure or complete opposing shared polygons between eligible meshes. Occluders must have opposite directed edge incidences, one connected closed face component, supporting convex planes and nonzero volume. Duplicate/open/disconnected sheets cannot prove enclosure. Locked meshes may occlude when permitted but are never edited; shared-boundary deletion requires both meshes to be editable. Partial overlaps and general CSG are unsupported. Optional welding merges exact coincident used positions within each editable mesh and preserves independent corner UVs; unused points are compacted without counting as welds.
 
+`isAtlasOpaque(mesh, texture)` answers whether every texel under each face's UV bounding rectangle of a top-left
+row-major RGBA8 atlas has alpha 255, the usual test for `canOcclude`. The rectangle overestimates non-rectangular
+islands, so nearby transparency can only make it refuse to occlude.
+
 ## Component deletion
 
 The public deleteMeshComponents operation deletes selected vertices and incident faces, selected edges' incident faces, or selected faces. Default affected-only pruning removes formerly used vertices made loose by the edit and preserves preexisting loose vertices; set pruneUnusedVertices false to retain unselected loose vertices. This removes faces; it does not dissolve, rebuild or fill a surface. Surviving position values, face IDs, winding/corner order and UVs stay exact. Every source component has explicit output provenance through index compaction, including numeric edge-name collisions. Empty selections return owned no-ops and empty output meshes remain valid. Output boundary, more-than-two-incidence and two-face winding-conflict identities describe remaining edges, without certifying global manifold validity. The host owns eligibility, selection/history and storage.
