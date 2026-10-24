@@ -43,18 +43,19 @@ export class Euler {
       j = axisIndex(order, 1),
       l = axisIndex(order, 2),
       sign = (j - i + 3) % 3 === 1 ? 1 : -1;
-    const sinB = Math.max(-1, Math.min(1, sign * at(i, l)));
-    let a: number, c: number;
-    if (Math.abs(sinB) < 0.9999999) {
-      a = Math.atan2(-sign * at(j, l), at(l, l));
-      c = Math.atan2(-sign * at(i, j), at(i, i));
-    } else {
-      a = Math.atan2(sign * at(l, j), at(j, j));
-      c = 0;
-    }
+    const sinB = Math.max(-1, Math.min(1, sign * at(i, l))),
+      cosB = Math.hypot(at(i, i), at(i, j)),
+      c = cosB === 0 ? 0 : Math.atan2(-sign * at(i, j), at(i, i)),
+      sinC = Math.sin(c),
+      cosC = Math.cos(c);
+    // Remove R_C first: the (j,j) and (l,j) entries of R * inverse(R_C) are cos(A) and ±sin(A).
+    // Unlike reading A and C independently from terms proportional to cos(B), this keeps their combination
+    // consistent even when those terms are at rounding precision. At an exact pole either C is valid.
+    const a = Math.atan2(at(l, i) * sinC + sign * at(l, j) * cosC, sign * at(j, i) * sinC + at(j, j) * cosC);
     this.order = order;
     this.setAxis(i, a);
-    this.setAxis(j, Math.asin(sinB));
+    // atan2 retains the distance from the pole when sin(B) has rounded to ±1.
+    this.setAxis(j, Math.atan2(sinB, cosB));
     this.setAxis(l, c);
     return this;
   }
