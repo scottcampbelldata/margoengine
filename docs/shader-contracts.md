@@ -26,7 +26,7 @@ Text anchors in core's shader (the full list, with the package file using each, 
 | `let n=normalize(i.normal)*select(-1.0,1.0,facing);` | terrain colors: a block opened after it and closed with the fragment shadows `i` and `n` with the terrain's per-pixel albedo, roughness and normal, so later patches keep their text |
 | `frame.radiance.w` | sky lighting (sky ambient), environment IBL (zeroes the constant ambient) |
 | `*frame.radiance.w*frame.ambient.rgb` (terrain: `*frame.radiance.w`), or the same zeroed by IBL | environment HemisphereLight (writes `*margoSkyLight(n)` in its place; LightProbes and post SSAO recognise that term) |
-| `let mapped=linear/…return vec4f(…);` | tonemap, post stack/bloom/SSAO capture, creative post, dof: the HDR capture returns `vec4f(linear,1)` |
+| `let mapped=linear/…return vec4f(…);` | `packages/shared/display.js` `linearShader`, used by tonemap, post stack/bloom/SSAO capture, creative post, dof and environment captures: the HDR capture returns `vec4f(linear,1)` |
 | `let mapped=linear/(1.0+linear);`, `return vec4f(linear,1);` | environment Fog (on the canvas, or after an HDR capture) |
 | `let direct=…return vec4f(…);`, `i.color*(1.0-i.material.y)*frame.radiance.w` | post SSAO ambient replay |
 | `let margoAmbient=` | convention: environment IBL names its term so; post SSAO occludes it on core meshes |

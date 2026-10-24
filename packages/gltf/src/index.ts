@@ -1,7 +1,7 @@
 import { engineRuntime } from '@margoengine/core/extension';
 import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
 import { Geometry, PbrMaterial, type Mesh } from '@margoengine/core/extension';
-import { splitTRS } from '@margoengine/math/mat4';
+import { splitTRS } from '@margoengine/math/quat';
 import { readResponse } from '../../shared/loading.js';
 import { checkCount, countLimit } from '../../shared/limits.js';
 import { parseJSON } from '../../shared/json.js';

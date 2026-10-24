@@ -7,7 +7,8 @@ import type { Vec2 } from '@margoengine/math';
 import type { PBRSource } from '../../shared/pbr-source.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { hiddenInTree } from '../../shared/visibility.js';
-import { multiplyMatrices, splitTRS } from '@margoengine/math/mat4';
+import { multiplyMatrices } from '@margoengine/math/mat4';
+import { splitTRS } from '@margoengine/math/quat';
 import { accumulateNormals } from '../../shared/normals.js';
 
 /** Deepest node chain an export walks; one level deeper throws before any node is written. */

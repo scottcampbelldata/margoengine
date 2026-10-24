@@ -9,7 +9,8 @@ import {
   type PassContext,
   type Mesh,
 } from '@margoengine/core/extension';
-import { invertMatrixStable, multiplyMatrices, splitTRS } from '@margoengine/math/mat4';
+import { invertMatrixStable, multiplyMatrices } from '@margoengine/math/mat4';
+import { splitTRS } from '@margoengine/math/quat';
 import { viewMatrix } from '../../shared/view.js';
 import { applyView, inView } from '../../shared/view-rect.js';
 import { attenuationPower } from '../../shared/attenuation.js';
