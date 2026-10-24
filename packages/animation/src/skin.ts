@@ -4,6 +4,7 @@ import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine
 import type { Mat4, MutableVec3, Quat, Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
 import { composeMatrix, invertMatrixStable, multiplyMatrices } from '@margoengine/math/mat4';
+import { normalizeQuaternion } from '@margoengine/math/quat';
 import { deformationShader } from './shader.js';
 declare const GPUBufferUsage: { STORAGE: number; VERTEX: number; COPY_DST: number; COPY_SRC: number; UNIFORM: number };
 
@@ -34,16 +35,18 @@ export function finite(value: unknown, width: number, label: string): ArrayLike<
       throw new RangeError(`${label} has a non-finite value; pass finite numbers`);
   return v;
 }
+const rotation = [0, 0, 0, 0]; // normalizeQuaternion scratch
 // Each bone keeps 10 numbers per pose: translation 0-2, rotation 3-6, scale 7-9. Validates all before writing any.
 function writePose(target: Float64Array, at: number, pose: BonePose, label: string): void {
   const t = pose.translation === undefined ? undefined : finite(pose.translation, 3, label + ' translation'),
     s = pose.scale === undefined ? undefined : finite(pose.scale, 3, label + ' scale'),
-    q = pose.rotation === undefined ? undefined : finite(pose.rotation, 4, label + ' rotation'),
-    length = q ? Math.hypot(q[0], q[1], q[2], q[3]) : 1;
-  if (!length) throw new RangeError(`${label} rotation is a zero quaternion; pass a unit quaternion`);
+    q = pose.rotation === undefined ? undefined : finite(pose.rotation, 4, label + ' rotation');
+  if (q && !(q[0] || q[1] || q[2] || q[3]))
+    throw new RangeError(`${label} rotation is a zero quaternion; pass a unit quaternion`);
   if (t) target.set(t, at);
   if (s) target.set(s, at + 7);
-  if (q) for (let c = 0; c < 4; c++) target[at + 3 + c] = q[c] / length;
+  // Also normalizes finite quaternions whose length overflows or underflows.
+  if (q) target.set(normalizeQuaternion(q, rotation), at + 3);
 }
 
 /**

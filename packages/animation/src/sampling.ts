@@ -1,4 +1,5 @@
 import { multiplyMatrices as multiply } from '@margoengine/math/mat4';
+import { normalizeQuaternion } from '@margoengine/math/quat';
 export type Interpolation = 'STEP' | 'LINEAR' | 'CUBICSPLINE';
 export function sampleTrack(
   times: Float32Array,
@@ -78,9 +79,8 @@ export function sampleTrackInto(
     for (let c = 0; c < 4; c++) out[c] = values[ai + c] * x + values[bi + c] * y * sign;
   } else for (let c = 0; c < width; c++) out[c] = values[ai + c] * (1 - t) + values[bi + c] * t;
   if (quaternion) {
-    const length = width === 4 ? Math.hypot(out[0], out[1], out[2], out[3]) : Math.hypot(...out);
-    if (!length) throw new RangeError('Zero animation quaternion');
-    for (let c = 0; c < 4; c++) out[c] /= length;
+    if (!(out[0] || out[1] || out[2] || out[3])) throw new RangeError('Zero animation quaternion');
+    normalizeQuaternion(out, out);
   }
   for (let c = 0; c < width; c++) if (!Number.isFinite(out[c])) throw new RangeError('Animation sample overflow');
   return out;

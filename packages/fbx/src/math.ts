@@ -1,4 +1,5 @@
 import { invert } from '../../shared/math.js';
+import { normalizeQuaternion, rotationToQuaternion } from '@margoengine/math/quat';
 import { property, objectName, type FBXNode } from './document.js';
 
 /** Column-major matrices and column vectors, evaluated in double precision. */
@@ -132,24 +133,14 @@ export function decomposeTRS(m: ArrayLike<number>): TRS {
   const dot = (a: number, b: number) => r[a] * r[b] + r[a + 1] * r[b + 1] + r[a + 2] * r[b + 2];
   if (Math.abs(dot(0, 3)) > 1e-7 || Math.abs(dot(0, 6)) > 1e-7 || Math.abs(dot(3, 6)) > 1e-7)
     throw new RangeError('FBX transform shear cannot be represented as glTF TRS');
-  const trace = r[0] + r[4] + r[8];
-  let q: number[];
-  if (trace > 0) {
-    const s = 2 * Math.sqrt(trace + 1);
-    q = [(r[5] - r[7]) / s, (r[6] - r[2]) / s, (r[1] - r[3]) / s, s / 4];
-  } else if (r[0] > r[4] && r[0] > r[8]) {
-    const s = 2 * Math.sqrt(1 + r[0] - r[4] - r[8]);
-    q = [s / 4, (r[3] + r[1]) / s, (r[6] + r[2]) / s, (r[5] - r[7]) / s];
-  } else if (r[4] > r[8]) {
-    const s = 2 * Math.sqrt(1 + r[4] - r[0] - r[8]);
-    q = [(r[3] + r[1]) / s, s / 4, (r[7] + r[5]) / s, (r[6] - r[2]) / s];
-  } else {
-    const s = 2 * Math.sqrt(1 + r[8] - r[0] - r[4]);
-    q = [(r[6] + r[2]) / s, (r[7] + r[5]) / s, s / 4, (r[1] - r[3]) / s];
-  }
-  const length = Math.hypot(...q),
-    sign = q[3] < 0 ? -1 : 1;
-  return { translation: [m[12], m[13], m[14]], rotation: q.map((v) => (sign * v) / length), scale: [sx, sy, sz] };
+  const q = rotationToQuaternion(r);
+  normalizeQuaternion(q, q);
+  const sign = q[3] < 0 ? -1 : 1; // glTF convention here: w >= 0
+  return {
+    translation: [m[12], m[13], m[14]],
+    rotation: [q[0] * sign, q[1] * sign, q[2] * sign, q[3] * sign],
+    scale: [sx, sy, sz],
+  };
 }
 
 export function transformPoint(m: ArrayLike<number>, x: number, y: number, z: number): number[] {

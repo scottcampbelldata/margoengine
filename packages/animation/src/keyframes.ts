@@ -1,5 +1,8 @@
 import type { PBRModel } from '@margoengine/gltf-pro';
+import { normalizeQuaternion } from '@margoengine/math/quat';
 import { finite, Skeleton } from './skin.js';
+
+const rotation = [0, 0, 0, 0]; // normalizeQuaternion scratch
 
 /** How a key moves to the next key: hold then jump, straight, or a cubic ease in, out, or in and out. */
 export type KeyInterpolation = 'discrete' | 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
@@ -112,10 +115,11 @@ export function createKeyframeClip(data: KeyframeClipData): KeyframeClip {
         throw new TypeError(
           `${label} key ${k} interpolation ${interpolation} is invalid; use one of ${kinds.join(', ')}`,
         );
-      const value = finite(key.value, width, `${label} key ${k} value`),
-        length = path === 'rotation' ? Math.hypot(value[0], value[1], value[2], value[3]) : 1;
-      if (!length) throw new RangeError(`${label} key ${k} is a zero quaternion; pass a unit quaternion`);
-      for (let c = 0; c < width; c++) values[k * width + c] = value[c] / length;
+      const value = finite(key.value, width, `${label} key ${k} value`);
+      if (path !== 'rotation') values.set(value, k * width);
+      else if (!(value[0] || value[1] || value[2] || value[3]))
+        throw new RangeError(`${label} key ${k} is a zero quaternion; pass a unit quaternion`);
+      else values.set(normalizeQuaternion(value, rotation), k * width);
       times[k] = time;
       return interpolation;
     });
@@ -185,9 +189,7 @@ export function sampleKeyframes(track: KeyframeTrack, time: number, out?: Float6
     x = s > 1e-6 ? Math.sin((1 - f) * angle) / s : 1 - f,
     y = (s > 1e-6 ? Math.sin(f * angle) / s : f) * sign;
   for (let c = 0; c < 4; c++) out[c] = values[i + c] * x + values[j + c] * y;
-  const length = Math.hypot(out[0], out[1], out[2], out[3]);
-  for (let c = 0; c < 4; c++) out[c] /= length;
-  return out;
+  return normalizeQuaternion(out, out);
 }
 
 /**

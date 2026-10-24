@@ -1,4 +1,8 @@
+import { axisAngle, conjugated, normalized, rotation } from './quat-core.js';
 import type { EulerOrder, MatrixLike, NumberArray, Vec3Like, Vec4Like } from './types.js';
+
+// Result sink for the quat-core formulas: writes the components into the Quaternion.
+const assign = <T extends Quaternion>(q: T, x: number, y: number, z: number, w: number): T => q.set(x, y, z, w);
 
 interface EulerLike {
   x: number;
@@ -35,8 +39,7 @@ export class Quaternion {
 
   /** `axis` must be unit length; `angle` in radians. */
   setFromAxisAngle(axis: Vec3Like, angle: number): this {
-    const s = Math.sin(angle / 2);
-    return this.set(axis.x * s, axis.y * s, axis.z * s, Math.cos(angle / 2));
+    return axisAngle(axis.x, axis.y, axis.z, angle, this, assign);
   }
   /** Intrinsic rotation in `euler.order`: for 'XYZ' the result is qX * qY * qZ, the convention of core. */
   setFromEuler(euler: EulerLike): this {
@@ -61,32 +64,7 @@ export class Quaternion {
   }
   /** Reads the rotation from a pure-rotation 3x3 or 4x4 matrix (column-major; scale must be removed first). */
   setFromRotationMatrix(m: MatrixLike): this {
-    const e = m.elements,
-      k = e.length === 9 ? 3 : 4;
-    const m11 = e[0],
-      m12 = e[k],
-      m13 = e[2 * k],
-      m21 = e[1],
-      m22 = e[k + 1],
-      m23 = e[2 * k + 1],
-      m31 = e[2],
-      m32 = e[k + 2],
-      m33 = e[2 * k + 2];
-    const trace = m11 + m22 + m33;
-    if (trace > 0) {
-      const s = 0.5 / Math.sqrt(trace + 1);
-      return this.set((m32 - m23) * s, (m13 - m31) * s, (m21 - m12) * s, 0.25 / s);
-    }
-    if (m11 > m22 && m11 > m33) {
-      const s = 2 * Math.sqrt(1 + m11 - m22 - m33);
-      return this.set(0.25 * s, (m12 + m21) / s, (m13 + m31) / s, (m32 - m23) / s);
-    }
-    if (m22 > m33) {
-      const s = 2 * Math.sqrt(1 + m22 - m11 - m33);
-      return this.set((m12 + m21) / s, 0.25 * s, (m23 + m32) / s, (m13 - m31) / s);
-    }
-    const s = 2 * Math.sqrt(1 + m33 - m11 - m22);
-    return this.set((m13 + m31) / s, (m23 + m32) / s, 0.25 * s, (m21 - m12) / s);
+    return rotation(m.elements, 1, 1, 1, this, assign);
   }
   /** Shortest rotation taking unit vector `from` to unit vector `to`. */
   setFromUnitVectors(from: Vec3Like, to: Vec3Like): this {
@@ -130,10 +108,7 @@ export class Quaternion {
     );
   }
   conjugate(): this {
-    this.x = -this.x;
-    this.y = -this.y;
-    this.z = -this.z;
-    return this;
+    return conjugated(this.x, this.y, this.z, this.w, this, assign);
   }
   /** True inverse (conjugate / |q|²); equal to the conjugate for unit quaternions. */
   invert(): this {
@@ -151,8 +126,10 @@ export class Quaternion {
   }
   /** Unit length; a zero quaternion becomes the identity. */
   normalize(): this {
-    const l = this.length();
-    return l ? this.set(this.x / l, this.y / l, this.z / l, this.w / l) : this.identity();
+    const { x, y, z, w } = this,
+      l = this.length();
+    // Normalizes also when the squares underflow (l is 0 but a component is not); NaN and zero give the identity.
+    return l === l && (l || x || y || z || w) ? normalized(x, y, z, w, this, assign) : this.identity();
   }
   /** Angle in radians of the rotation between the two (unit) quaternions. */
   angleTo(q: Vec4Like): number {

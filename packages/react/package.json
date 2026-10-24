@@ -39,6 +39,9 @@
   "files": [
     "dist"
   ],
+  "dependencies": {
+    "@margoengine/math": "^1.0.0"
+  },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
     "margoengine": "^1.0.0",

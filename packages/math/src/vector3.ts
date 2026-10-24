@@ -1,4 +1,8 @@
 import type { MatrixLike, NumberArray, Vec3Like, Vec4Like } from './types.js';
+import { rotated } from './quat-core.js';
+
+// Result sink for the quat-core formula: writes the components into the Vector3.
+const assign = <T extends Vector3>(v: T, x: number, y: number, z: number): T => v.set(x, y, z);
 
 /** Spherical coordinates as used by `setFromSpherical` (see `Spherical`). */
 interface SphericalLike {
@@ -229,18 +233,7 @@ export class Vector3 {
     return this.normalize();
   }
   applyQuaternion(q: Vec4Like): this {
-    const { x, y, z } = this,
-      qx = q.x,
-      qy = q.y,
-      qz = q.z,
-      qw = q.w;
-    const tx = 2 * (qy * z - qz * y),
-      ty = 2 * (qz * x - qx * z),
-      tz = 2 * (qx * y - qy * x);
-    this.x = x + qw * tx + qy * tz - qz * ty;
-    this.y = y + qw * ty + qz * tx - qx * tz;
-    this.z = z + qw * tz + qx * ty - qy * tx;
-    return this;
+    return rotated(this.x, this.y, this.z, q.x, q.y, q.z, q.w, this, assign);
   }
   setFromMatrixPosition(m: MatrixLike): this {
     const e = m.elements;

@@ -1,4 +1,5 @@
 import { multiplyMatrices } from '@margoengine/math/mat4';
+import { normalizeQuaternion, rotationToQuaternion } from '@margoengine/math/quat';
 
 /** Structural view of core's transform store (`meshRuntime(mesh).engine.store`): local TRS per entity and parent ids. */
 export interface TransformStoreLike {
@@ -74,42 +75,5 @@ export function matrixRotation(m: ArrayLike<number>, out: number[] | Float64Arra
   const sx = Math.sqrt(m[0] * m[0] + m[1] * m[1] + m[2] * m[2]) || 1,
     sy = Math.sqrt(m[4] * m[4] + m[5] * m[5] + m[6] * m[6]) || 1,
     sz = Math.sqrt(m[8] * m[8] + m[9] * m[9] + m[10] * m[10]) || 1;
-  const m00 = m[0] / sx,
-    m10 = m[1] / sx,
-    m20 = m[2] / sx,
-    m01 = m[4] / sy,
-    m11 = m[5] / sy,
-    m21 = m[6] / sy,
-    m02 = m[8] / sz,
-    m12 = m[9] / sz,
-    m22 = m[10] / sz;
-  const trace = m00 + m11 + m22;
-  // Shepperd's method: branch on the largest diagonal term for precision.
-  if (trace > 0) {
-    const s = 0.5 / Math.sqrt(trace + 1);
-    out[3] = 0.25 / s;
-    out[0] = (m21 - m12) * s;
-    out[1] = (m02 - m20) * s;
-    out[2] = (m10 - m01) * s;
-  } else if (m00 > m11 && m00 > m22) {
-    const s = 2 * Math.sqrt(1 + m00 - m11 - m22);
-    out[3] = (m21 - m12) / s;
-    out[0] = 0.25 * s;
-    out[1] = (m01 + m10) / s;
-    out[2] = (m02 + m20) / s;
-  } else if (m11 > m22) {
-    const s = 2 * Math.sqrt(1 + m11 - m00 - m22);
-    out[3] = (m02 - m20) / s;
-    out[0] = (m01 + m10) / s;
-    out[1] = 0.25 * s;
-    out[2] = (m12 + m21) / s;
-  } else {
-    const s = 2 * Math.sqrt(1 + m22 - m00 - m11);
-    out[3] = (m10 - m01) / s;
-    out[0] = (m02 + m20) / s;
-    out[1] = (m12 + m21) / s;
-    out[2] = 0.25 * s;
-  }
-  const length = Math.sqrt(out[0] * out[0] + out[1] * out[1] + out[2] * out[2] + out[3] * out[3]) || 1;
-  for (let i = 0; i < 4; i++) out[i] /= length;
+  normalizeQuaternion(rotationToQuaternion(m, out, sx, sy, sz), out);
 }

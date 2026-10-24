@@ -13,6 +13,7 @@
 // numbers, because a number passed to or returned from a call that the optimizer does not inline is boxed on the heap.
 // Lengths use Math.sqrt: Math.hypot boxes its arguments (measured: 244 collections per 2 million 4-argument calls).
 import type { Vec3 } from '@margoengine/core/extension';
+import { rotationToQuaternion } from '@margoengine/math/quat';
 
 /**
  * Per-axis Euler limits: the joint's rotation from its rest rotation, written as qX(x)·qY(y)·qZ(z) (core's XYZ order),
@@ -368,43 +369,7 @@ export class CCDSolver {
         m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]);
     if (!(sx > EPSILON) || Math.abs(sy - sx) > 1e-4 * sx || Math.abs(sz - sx) > 1e-4 * sx || det <= 0)
       throw new RangeError('CCD parent frame needs a positive uniform scale; remove non-uniform or mirrored scales');
-    // Rotation matrix (row, column) = m[column * 4 + row] / scale, to a quaternion (largest-component branch).
-    const r00 = m[0] / sx,
-      r10 = m[1] / sx,
-      r20 = m[2] / sx,
-      r01 = m[4] / sx,
-      r11 = m[5] / sx,
-      r21 = m[6] / sx,
-      r02 = m[8] / sx,
-      r12 = m[9] / sx,
-      r22 = m[10] / sx,
-      q = this.parentRotation,
-      trace = r00 + r11 + r22;
-    if (trace > 0) {
-      const s = Math.sqrt(trace + 1) * 2;
-      q[0] = (r21 - r12) / s;
-      q[1] = (r02 - r20) / s;
-      q[2] = (r10 - r01) / s;
-      q[3] = 0.25 * s;
-    } else if (r00 > r11 && r00 > r22) {
-      const s = Math.sqrt(1 + r00 - r11 - r22) * 2;
-      q[0] = 0.25 * s;
-      q[1] = (r01 + r10) / s;
-      q[2] = (r02 + r20) / s;
-      q[3] = (r21 - r12) / s;
-    } else if (r11 > r22) {
-      const s = Math.sqrt(1 + r11 - r00 - r22) * 2;
-      q[0] = (r01 + r10) / s;
-      q[1] = 0.25 * s;
-      q[2] = (r12 + r21) / s;
-      q[3] = (r02 - r20) / s;
-    } else {
-      const s = Math.sqrt(1 + r22 - r00 - r11) * 2;
-      q[0] = (r02 + r20) / s;
-      q[1] = (r12 + r21) / s;
-      q[2] = 0.25 * s;
-      q[3] = (r10 - r01) / s;
-    }
+    const q = rotationToQuaternion(m, this.parentRotation, sx, sx, sx);
     normalize(q, 0);
     this.parentPosition[0] = m[12];
     this.parentPosition[1] = m[13];

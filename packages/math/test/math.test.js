@@ -514,7 +514,8 @@ test('importing one type yields a small bundle (tree-shaking)', async (t) => {
   const viaSubpath = await bundle(`export {Vector3} from ${dist('vector3')};`);
   const viaRoot = await bundle(`export {Vector3} from ${dist('index')};`);
   const box = await bundle(`export {Box3} from ${dist('box3')};`);
-  assert.ok(viaSubpath.gzip < 1500, `Vector3 gzip ${viaSubpath.gzip}`);
+  // 1,529 B since applyQuaternion calls the shared rotateByQuaternion in @margoengine/math/quat.
+  assert.ok(viaSubpath.gzip < 1600, `Vector3 gzip ${viaSubpath.gzip}`);
   assert.ok(
     viaRoot.gzip <= viaSubpath.gzip + 50,
     `root import of Vector3 also shakes: ${viaRoot.gzip} vs ${viaSubpath.gzip}`,
@@ -527,4 +528,37 @@ test('importing one type yields a small bundle (tree-shaking)', async (t) => {
       'Matrix4, Quaternion, Color and Frustum are dropped',
     );
   assert.match(box.code, /setFromArray/);
+});
+
+test('quat array helpers: rotationToQuaternion reads 3x3 and 4x4, divides scaled or mirrored columns, writes out', async () => {
+  const quat = await import('../dist/quat.js');
+  const q = quat.normalizeQuaternion([0.3, -0.5, 0.2, 0.7]),
+    m4 = new Matrix4().makeRotationFromQuaternion(new Quaternion(...q)).elements,
+    m3 = [0, 1, 2, 4, 5, 6, 8, 9, 10].map((i) => m4[i]),
+    near = (a, b) =>
+      assert.ok(
+        a.every((v, i) => Math.abs(v - b[i]) < 1e-12),
+        `${a} vs ${b}`,
+      );
+  near(quat.rotationToQuaternion(m4), q);
+  near(quat.rotationToQuaternion(m3), q);
+  // Columns scaled by 2, -3 (mirror), 4: pass the signed column lengths.
+  const scaled = Array.from(m4, (v, i) => (i < 12 ? v * [2, -3, 4][Math.floor(i / 4)] : v)),
+    out = new Float64Array(4);
+  assert.equal(quat.rotationToQuaternion(scaled, out, 2, -3, 4), out);
+  near([...out], q);
+  near(quat.rotateByQuaternion([1, 0, 0], q), [m4[0], m4[1], m4[2]]);
+  near(quat.multiplyQuaternions(q, quat.conjugateQuaternion(q)), [0, 0, 0, 1]);
+  near(quat.axisAngleToQuaternion([0, 0, 1], Math.PI / 2), [0, 0, Math.SQRT1_2, Math.SQRT1_2]);
+});
+
+test('Quaternion.normalize and normalizeQuaternion share the overflow-safe path for extreme finite values', async () => {
+  const { normalizeQuaternion } = await import('../dist/quat.js'),
+    near = (a) => assert.ok(Math.abs(a[0] - Math.SQRT1_2) < 1e-15 && a[0] === a[1] && !a[2] && !a[3], `${a}`);
+  for (const v of [1e300, Number.MAX_VALUE, 1e-200, Number.MIN_VALUE]) {
+    near(new Quaternion(v, v, 0, 0).normalize().toArray());
+    near(normalizeQuaternion([v, v, 0, 0]));
+  }
+  assert.deepEqual(new Quaternion(0, 0, 0, 0).normalize().toArray(), [0, 0, 0, 1]);
+  assert.deepEqual(new Quaternion(NaN, 1, 0, 0).normalize().toArray(), [0, 0, 0, 1]);
 });

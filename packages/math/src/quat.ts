@@ -1,5 +1,9 @@
 // Quaternions as plain [x, y, z, w] arrays, shared by the packages (bundled into each). Keep the operand order: the
 // packages rely on bit-identical results (examples/package-benchmarks/proofs/math-consolidation.proof.js).
+import type { NumberArray } from './types.js';
+import { axisAngle, conjugated, normalized, rotated, rotation, toArray, toVector } from './quat-core.js';
+
+type Quat4 = [number, number, number, number];
 
 /** Quaternion for XYZ Euler angles in radians (qX * qY * qZ), the convention of core `Mesh.setRotation`. */
 export function eulerToQuaternion(x: number, y: number, z: number): [number, number, number, number] {
@@ -66,3 +70,48 @@ export function interpolateQuaternions(
   for (let i = 0; i < 4; i++) out[i] /= length;
   return out;
 }
+
+/**
+ * Quaternion `[x, y, z, w]` of the rotation in a column-major 3x3 (9 values) or 4x4 matrix, not normalized
+ * (Shepperd's method: it branches on the largest diagonal term). Each column is divided by its scale first; pass a
+ * negative `sx` for a mirrored matrix. Writes `out` (a new array by default) and returns it.
+ * @param e Matrix elements; a 4x4 needs only its first 11.
+ * @param out Receives x, y, z, w.
+ * @param sx Length of the first column (1 for a pure rotation), negative to undo a mirror; `sy`, `sz` likewise.
+ */
+export const rotationToQuaternion = <T extends NumberArray = Quat4>(
+  e: ArrayLike<number>,
+  out: T = [0, 0, 0, 0] as unknown as T,
+  sx = 1,
+  sy = 1,
+  sz = 1,
+): T => rotation(e, sx, sy, sz, out, toArray);
+
+// These helpers and the Quaternion/Vector3 methods share one implementation each (quat-core.ts). Each writes `out`
+// (a new array by default) and returns it; `out` may be the input.
+
+/** Rotation by `angle` radians about unit `axis` `[x, y, z]`, as `[x, y, z, w]`. */
+export const axisAngleToQuaternion = <T extends NumberArray = Quat4>(
+  axis: ArrayLike<number>,
+  angle: number,
+  out: T = [0, 0, 0, 0] as unknown as T,
+): T => axisAngle(axis[0], axis[1], axis[2], angle, out, toArray);
+/** The inverse rotation of a unit quaternion: x, y and z negated. */
+export const conjugateQuaternion = <T extends NumberArray = Quat4>(
+  q: ArrayLike<number>,
+  out: T = [0, 0, 0, 0] as unknown as T,
+): T => conjugated(q[0], q[1], q[2], q[3], out, toArray);
+/**
+ * `q` divided by its length (left unchanged when the length is 0). Finite values whose squares would overflow or
+ * underflow (beyond about 1e154 or below 1e-154) are divided by the largest component first, so they still normalize.
+ */
+export const normalizeQuaternion = <T extends NumberArray = Quat4>(
+  q: ArrayLike<number>,
+  out: T = [0, 0, 0, 0] as unknown as T,
+): T => normalized(q[0], q[1], q[2], q[3], out, toArray);
+/** `v` `[x, y, z]` rotated by unit quaternion `q` (v + 2w(u×v) + 2u×(u×v), with u = q's vector part). */
+export const rotateByQuaternion = <T extends NumberArray = [number, number, number]>(
+  v: ArrayLike<number>,
+  q: ArrayLike<number>,
+  out: T = [0, 0, 0] as unknown as T,
+): T => rotated(v[0], v[1], v[2], q[0], q[1], q[2], q[3], out, toVector);

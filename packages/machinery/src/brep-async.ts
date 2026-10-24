@@ -3,6 +3,7 @@
 import { Geometry, PbrMaterial, type Engine, type Mesh } from '@margoengine/core/extension';
 import { checkCount, countLimit } from '../../shared/limits.js';
 import { margoError } from '../../shared/errors.js';
+import { normalizeQuaternion, rotationToQuaternion } from '@margoengine/math/quat';
 import { markSolidPieces } from './closed.js';
 import type { CADModel, CADRefineOptions } from './cad.js';
 import type { CADImportOptions } from './cad-async.js';
@@ -35,26 +36,10 @@ function decompose(m: Float64Array, at: number) {
       c1[0] * (c0[1] * c2[2] - c0[2] * c2[1]) +
       c2[0] * (c0[1] * c1[2] - c0[2] * c1[1]),
     scale: [number, number, number] = [Math.hypot(...c0) * Math.sign(det || 1), Math.hypot(...c1), Math.hypot(...c2)],
-    [r0, r1, r2] = [c0.map((v) => v / scale[0]), c1.map((v) => v / scale[1]), c2.map((v) => v / scale[2])],
-    trace = r0[0] + r1[1] + r2[2];
-  let q: number[];
-  if (trace > 0) {
-    const s = 0.5 / Math.sqrt(trace + 1);
-    q = [(r1[2] - r2[1]) * s, (r2[0] - r0[2]) * s, (r0[1] - r1[0]) * s, 0.25 / s];
-  } else if (r0[0] > r1[1] && r0[0] > r2[2]) {
-    const s = 2 * Math.sqrt(1 + r0[0] - r1[1] - r2[2]);
-    q = [0.25 * s, (r1[0] + r0[1]) / s, (r2[0] + r0[2]) / s, (r1[2] - r2[1]) / s];
-  } else if (r1[1] > r2[2]) {
-    const s = 2 * Math.sqrt(1 + r1[1] - r0[0] - r2[2]);
-    q = [(r1[0] + r0[1]) / s, 0.25 * s, (r2[1] + r1[2]) / s, (r2[0] - r0[2]) / s];
-  } else {
-    const s = 2 * Math.sqrt(1 + r2[2] - r0[0] - r1[1]);
-    q = [(r2[0] + r0[2]) / s, (r2[1] + r1[2]) / s, 0.25 * s, (r0[1] - r1[0]) / s];
-  }
-  const l = Math.hypot(q[0], q[1], q[2], q[3]) || 1;
+    q = rotationToQuaternion(m.subarray(at, at + 16), [0, 0, 0, 0], ...scale);
   return {
     position: [m[at + 12], m[at + 13], m[at + 14]] as [number, number, number],
-    quaternion: q.map((v) => v / l),
+    quaternion: normalizeQuaternion(q, q),
     scale,
   };
 }

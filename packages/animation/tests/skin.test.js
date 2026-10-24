@@ -21,6 +21,21 @@ const arm = () =>
   ]);
 const at = (matrices, bone) => Array.from(matrices.subarray(bone * 16 + 12, bone * 16 + 15));
 
+test('Skeleton normalizes finite quaternions at extreme magnitudes on construction and pose changes', () => {
+  const expected = new Skeleton([{ name: 'root', parent: -1, rotation: [0, 0, 1, 1] }]);
+  for (const magnitude of [Number.MAX_VALUE, Number.MIN_VALUE]) {
+    const rotation = [0, 0, magnitude, magnitude];
+    const constructed = new Skeleton([{ name: 'root', parent: -1, rotation }]);
+    close(constructed.getPose(0).rotation, q90z, 1e-12);
+    close(constructed.matrices, expected.matrices, 1e-12);
+    const posed = new Skeleton([{ name: 'root', parent: -1 }]);
+    posed.setPose(0, { rotation });
+    close(posed.getPose(0).rotation, q90z, 1e-12);
+    close(posed.matrices, expected.matrices, 1e-12);
+    assert.deepEqual(rotation, [0, 0, magnitude, magnitude], 'the caller retains its quaternion');
+  }
+});
+
 test('bone matrices compose parent before child and inverse binds come from the base pose', () => {
   const s = arm();
   assert.equal(s.count, 3);

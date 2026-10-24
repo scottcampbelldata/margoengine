@@ -1,4 +1,5 @@
 import type { Engine, Mesh } from '@margoengine/core/extension';
+import { normalizeQuaternion, rotateByQuaternion, rotationToQuaternion } from '@margoengine/math/quat';
 
 export type Triple = readonly [number, number, number];
 export type Quaternion = readonly [number, number, number, number];
@@ -19,45 +20,16 @@ export function worldPose(mesh: Mesh): WorldPose {
     m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]);
   const x = determinant < 0 ? -sx : sx;
   if (!x || !sy || !sz) throw new RangeError('Physics and XR require invertible transforms');
-  const a = m[0] / x,
-    b = m[4] / sy,
-    c = m[8] / sz,
-    d = m[1] / x,
-    e = m[5] / sy,
-    f = m[9] / sz,
-    g = m[2] / x,
-    h = m[6] / sy,
-    i = m[10] / sz,
-    trace = a + e + i;
-  let q: number[];
-  if (trace > 0) {
-    const s = Math.sqrt(trace + 1) * 2;
-    q = [(h - f) / s, (c - g) / s, (d - b) / s, s / 4];
-  } else if (a > e && a > i) {
-    const s = Math.sqrt(1 + a - e - i) * 2;
-    q = [s / 4, (b + d) / s, (c + g) / s, (h - f) / s];
-  } else if (e > i) {
-    const s = Math.sqrt(1 + e - a - i) * 2;
-    q = [(b + d) / s, s / 4, (f + h) / s, (c - g) / s];
-  } else {
-    const s = Math.sqrt(1 + i - a - e) * 2;
-    q = [(c + g) / s, (f + h) / s, s / 4, (d - b) / s];
-  }
-  const length = Math.hypot(...q);
+  const q = rotationToQuaternion(m, [0, 0, 0, 0] as [number, number, number, number], x, sy, sz);
   return {
     position: [m[12], m[13], m[14]],
-    rotation: q.map((value) => value / length) as unknown as Quaternion,
+    rotation: normalizeQuaternion(q, q),
     scale: [x, sy, sz],
   };
 }
 
 export function rotate(point: Triple, q: Quaternion): [number, number, number] {
-  const [x, y, z] = point,
-    [qx, qy, qz, qw] = q,
-    tx = 2 * (qy * z - qz * y),
-    ty = 2 * (qz * x - qx * z),
-    tz = 2 * (qx * y - qy * x);
-  return [x + qw * tx + qy * tz - qz * ty, y + qw * ty + qz * tx - qx * tz, z + qw * tz + qx * ty - qy * tx];
+  return rotateByQuaternion(point, q);
 }
 
 /** Keep the React hierarchy while the physics/XR plugins supply world-space poses. */

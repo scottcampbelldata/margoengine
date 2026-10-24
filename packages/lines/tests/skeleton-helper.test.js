@@ -55,7 +55,10 @@ test("SkeletonHelper draws an animation Skeleton's bones parent to child and fol
   skeleton.setPose(1, { rotation: [0, 0, Math.SQRT1_2, Math.SQRT1_2] });
   helper.update({});
   assert.notEqual(helper.version, version);
-  assert.deepEqual(point(helper, 3), [0, 3, 0]);
+  assert.deepEqual(
+    point(helper, 3).map((v) => v + 0),
+    [0, 3, 0],
+  ); // + 0 folds a rotated -0
   helper.setColors('#ff0000', [0, 0, 0]);
   assert.deepEqual(
     [color(helper, 0), color(helper, 1)],

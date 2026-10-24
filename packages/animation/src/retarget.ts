@@ -1,6 +1,9 @@
 import { PBRModel } from '@margoengine/gltf-pro';
 import { createKeyframeClip, sampleKeyframes, type KeyframeClip, type KeyframeTrackData } from './keyframes.js';
 import { Skeleton, type BonePose } from './skin.js';
+import { normalizeQuaternion } from '@margoengine/math/quat';
+
+const rotation = [0, 0, 0, 0]; // normalizeQuaternion scratch
 
 /**
  * A bone hierarchy and its rest pose, as {@link Retarget} reads it. Make one with {@link retargetRig} from a
@@ -322,8 +325,8 @@ export class Retarget {
         multiply(t.rotation, b * 4, s.rotation, from * 4, d, 0);
         if (p < 0) for (let c = 0; c < 4; c++) out[l + 3 + c] = t.rotation[b * 4 + c];
         else divide(out, l + 3, t.rotation, p * 4, t.rotation, b * 4);
-        const length = Math.hypot(out[l + 3], out[l + 4], out[l + 5], out[l + 6]);
-        for (let c = 0; c < 4; c++) out[l + 3 + c] /= length;
+        for (let c = 0; c < 4; c++) rotation[c] = out[l + 3 + c];
+        out.set(normalizeQuaternion(rotation, rotation), l + 3);
       }
       if (b === this.hip) {
         // The hip's new model-space position, then back into its parent's space.

@@ -1,6 +1,7 @@
 import { engineRuntime } from '@margoengine/core/extension';
 import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
 import { Geometry, PbrMaterial, type Mesh } from '@margoengine/core/extension';
+import { rotationToQuaternion } from '@margoengine/math/quat';
 import { readResponse } from '../../shared/loading.js';
 import { checkCount, countLimit } from '../../shared/limits.js';
 import { parseJSON } from '../../shared/json.js';
@@ -145,21 +146,7 @@ function transform(mesh: Mesh, node: GLTFNode): void {
     ])
       if (Math.abs(r[a] * r[b] + r[a + 1] * r[b + 1] + r[a + 2] * r[b + 2]) > 1e-5)
         throw new Error('Sheared glTF matrices are unsupported');
-    const trace = r[0] + r[4] + r[8];
-    let q: number[];
-    if (trace > 0) {
-      const s = 2 * Math.sqrt(trace + 1);
-      q = [(r[5] - r[7]) / s, (r[6] - r[2]) / s, (r[1] - r[3]) / s, s / 4];
-    } else if (r[0] > r[4] && r[0] > r[8]) {
-      const s = 2 * Math.sqrt(1 + r[0] - r[4] - r[8]);
-      q = [s / 4, (r[3] + r[1]) / s, (r[6] + r[2]) / s, (r[5] - r[7]) / s];
-    } else if (r[4] > r[8]) {
-      const s = 2 * Math.sqrt(1 + r[4] - r[0] - r[8]);
-      q = [(r[3] + r[1]) / s, s / 4, (r[7] + r[5]) / s, (r[6] - r[2]) / s];
-    } else {
-      const s = 2 * Math.sqrt(1 + r[8] - r[0] - r[4]);
-      q = [(r[6] + r[2]) / s, (r[7] + r[5]) / s, s / 4, (r[1] - r[3]) / s];
-    }
+    const q = rotationToQuaternion(r);
     mesh.setPosition([m[12], m[13], m[14]]).setScale(scale).setQuaternion(q);
   } else {
     mesh
