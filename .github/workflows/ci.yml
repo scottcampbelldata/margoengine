@@ -38,6 +38,10 @@ jobs:
       - run: npm ci
       - name: Build Margo Engine packages and enforce core + stage gzip ceiling
         run: npm run build:packages
+      - name: Quality gate (size budgets, duplicates, tests floor, API conventions, clean room)
+        run: |
+          npm run api:check
+          npm run quality
       - name: Strict TypeScript checks for all packages
         run: npm run typecheck
       - name: Build and test the offline gameplay sandbox

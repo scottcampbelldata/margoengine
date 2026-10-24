@@ -2,6 +2,19 @@
 
 Last updated 2026-10-24. Read this first when starting a new session. Update it whenever work lands.
 
+## Landed 2026-10-24: quality gate (`npm run quality`, in verify and CI)
+
+Five ratchets, rules in [conventions.md](conventions.md#quality-gate), baselines in `scripts/quality/baselines/`.
+Later sessions shrink them (`--update`) and never grow them without `--reason`. Baseline at landing:
+
+| Gate | Baselined items |
+| --- | --- |
+| sizes | 257 entry/worker budgets; 78 static leaks (decoders reached by 21 entries, gltf-pro by 18, geometry by 13; `materials` root loads gltf-pro and decoders) |
+| duplicates | 30 package pairs, 1,120 lines (splats vs vfx 90, clustered vs shadows 88, fog.ts in lines/points/splats/vfx/water 70 per pair); 49 family copies (hidden-ancestor walk 16 packages, GGX 12, hex colour 7, glTF accessors 6, GLB 3, CRC table 3, partial view 2); 13 value re-exports |
+| tests | 51 entries no verify test imports (math 16, post 11, machinery 10, sky 5, creative 4, vfx 3, fbx 1, usdz 1); 0 packages without tests. Entries a test builds from a computed path (tests/modern-facade-isolation) are not seen |
+| api | 344 undocumented exports; 274 bare `Error` throws in 77 files; 1,431 throw messages naming no fix in 307 files |
+| clean-room | 31 mentions in 12 files (tests, fixtures and 2 READMEs); 6 third-party deps (web-ifc, recast-navigation, rapier x2, react, react-dom) |
+
 ## Landed 2026-10-24: Codex's work/changes (multi-view, voxel, lightmap, exporters, AgX)
 
 Codex's `work/changes` (82cef03e, 100 commits) was reviewed, rewritten and landed as per-change commits. Multiple

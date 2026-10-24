@@ -1,7 +1,7 @@
 import { build } from 'vite';
 import { gzipSync } from 'node:zlib';
 import { pathToFileURL } from 'node:url';
-import { resolve } from 'node:path';
+import { isAbsolute, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { checkCoreBudget, CORE_STAGE_GZIP_LIMIT } from './core-budget.js';
 
@@ -41,6 +41,31 @@ for (const peer of Object.keys(
 )) {
   if (!peer.startsWith('@margoengine/core'))
     external.push(new RegExp('^' + peer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?:/|$)'));
+}
+
+/** True for a bare import (another package): entry sizes leave those external, as apps share them. */
+export const bare = (id) => !id.startsWith('.') && !isAbsolute(id) && !/^[a-z]:[\\/]/i.test(id) && !id.startsWith('\0');
+
+/** The minified es2022 bundle of `entry` as build-modern makes it, with `external` imports left out. */
+export async function bundleBytes(entry, external = bare) {
+  const output = await build({
+    configFile: false,
+    publicDir: false,
+    logLevel: 'silent',
+    build: {
+      write: false,
+      minify: true,
+      target: 'es2022',
+      lib: { entry, formats: ['es'] },
+      rollupOptions: { external, output: compactOutput },
+    },
+  });
+  return Buffer.from(
+    (Array.isArray(output) ? output[0] : output).output
+      .filter((item) => item.type === 'chunk')
+      .map((item) => item.code)
+      .join('\n'),
+  );
 }
 
 export async function measureCoreStage() {

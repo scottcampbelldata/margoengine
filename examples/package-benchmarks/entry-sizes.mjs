@@ -10,35 +10,14 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
-import { isAbsolute, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { brotliCompressSync, gzipSync } from 'node:zlib';
-import { build } from 'vite';
 import { CORE_STAGE_GZIP_LIMIT } from '../../scripts/core-budget.js';
 import { LAZY_FILES } from '../../scripts/lazy-files.js';
-import { compactOutput, measureCoreStage } from '../../scripts/measure-size.js';
+import { bundleBytes as bundle, measureCoreStage } from '../../scripts/measure-size.js';
 
 const root = resolve(import.meta.dirname, '../..');
-const bare = (id) => !id.startsWith('.') && !isAbsolute(id) && !/^[a-z]:[\\/]/i.test(id) && !id.startsWith('\0');
-async function bundle(entry, external = bare) {
-  const output = await build({
-    configFile: false,
-    publicDir: false,
-    logLevel: 'silent',
-    build: {
-      write: false,
-      minify: true,
-      target: 'es2022',
-      lib: { entry, formats: ['es'] },
-      rollupOptions: { external, output: compactOutput },
-    },
-  });
-  return Buffer.from(
-    (Array.isArray(output) ? output[0] : output).output
-      .filter((item) => item.type === 'chunk')
-      .map((item) => item.code)
-      .join('\n'),
-  );
-}
+
 const size = async (entry) => ((code) => ({ raw: code.length, gzip: gzipSync(code).length }))(await bundle(entry));
 const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
 const commit = git('rev-parse', '--short', 'HEAD'),

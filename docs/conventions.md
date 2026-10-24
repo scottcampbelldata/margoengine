@@ -91,3 +91,23 @@ A name declared and exported by two packages must mean the same thing, or be ren
 | `Environment`, `Sky`, `Bloom`, `SSAO`, `TAA`, `Tonemap` | environment, sky, post, taa, tonemap; react | Kept: the plugin or pass class and react's JSX component that adds it with the same options (React names components after what they render). Allowlisted. |
 | `Vec3` (lod), `Color` (sky, terrain), `HeightField` (terrain) | math | Math's: lod uses `MutableVec3` / `Vec3`, sky and terrain colours are `Vec3`, terrain re-exports math's `HeightField`. |
 | `PbrMaterial` | core, materials, react | Kept, one meaning (Scott's naming): materials' `PbrMaterial` takes every core `PbrMaterial` option with the same meaning and adds maps and physical options, with a textured material's defaults (white, roughness 1, metalness 0, front side) rather than core's indigo double-sided placeholder; core's stays the constant-colour material of core meshes, and react's is the JSX element that builds core's. Allowlisted. |
+
+## Quality gate
+
+`npm run quality` (`scripts/quality-gate.mjs`, part of `npm run verify` and CI, about 6.5 s after a build) runs five
+ratchets over `packages/`. Each has a baseline of today's known violations in `scripts/quality/baselines/<gate>.json`:
+a gate passes on what its baseline records and fails on anything new or worse, naming the fix.
+
+| Gate | Items | Fails when |
+| --- | --- | --- |
+| `sizes` | gzip budget per entry and worker (entry-sizes.json's method; budget = size + max(3%, 256 B)); `leak` = an entry that statically loads another package's entry of 10,000 B or more (core and math excepted) | an entry is over its budget or new; a new static leak (use `import()` instead) |
+| `duplicates` | duplicated lines per package pair (6-line normalised windows, our own detector); `family` = a known algorithm copy (CRC table, GGX, hidden-ancestor walk, ...); `reexport` = a runtime value re-exported from another package | more copied lines, a new copy or a new re-export: move the code to one package or `packages/shared` |
+| `tests` | a package without a verify test; an entry no test imports | a new package or entry without a test that imports it |
+| `api` | from `npm run hygiene`: undocumented public export; `throw new Error(`; a throw message that names no fix (Errors, above) | a new one of each. `tests/api-conventions.test.js` keeps attach / dispose / `Symbol.dispose` at 0 with no baseline |
+| `clean-room` | mentions of three.js, Babylon or another graphics library anywhere in `packages/**`; third-party `dependencies` / `peerDependencies` | a new mention (put comparisons in docs/ or benchmarks/) or a new third-party dependency |
+
+Baselines only shrink. When you fix a violation the gate fails until you lock it in:
+`npm run quality -- --gate=<gate> --update`. Growing a baseline (a new entry's budget, an accepted dependency) needs
+`npm run quality -- --gate=<gate> --update --reason="why"`; the reason is appended to the file's `history`. Size budgets
+only suggest shrinking. `--summary` prints the biggest offenders; `--details` writes every item and duplicate block to
+`test-results/quality.json`.

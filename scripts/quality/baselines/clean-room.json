@@ -1,0 +1,33 @@
+{
+  "gate": "clean-room",
+  "about": "three.js / Babylon / graphics-library mentions per file in packages/**; third-party runtime dependencies",
+  "total": 37,
+  "history": [
+    {
+      "date": "2026-10-24",
+      "commit": "5c34c002",
+      "reason": "Initial baseline: what main held at 5c34c002 when the quality gate landed",
+      "grew": 18
+    }
+  ],
+  "items": {
+    "dependency @margoengine/ifc web-ifc": 1,
+    "dependency @margoengine/navigation recast-navigation": 1,
+    "dependency @margoengine/physics @dimforge/rapier3d-compat": 1,
+    "dependency @margoengine/react @dimforge/rapier3d-compat": 1,
+    "dependency @margoengine/react react": 1,
+    "dependency @margoengine/react react-dom": 1,
+    "mention packages/animation/README.md": 1,
+    "mention packages/animation/tests/fixtures/README.md": 6,
+    "mention packages/environment/tests/fixtures/NOTICE.md": 3,
+    "mention packages/exporters/tests/dae.test.js": 3,
+    "mention packages/geometry/scripts/three-fixture.js": 3,
+    "mention packages/geometry/tests/fixtures/three-reference.json": 1,
+    "mention packages/loaders/scripts/fetch-fixtures.js": 1,
+    "mention packages/loaders/tests/dae.test.js": 5,
+    "mention packages/loaders/tests/fixtures/SOURCES.txt": 2,
+    "mention packages/loaders/tests/obj.test.js": 4,
+    "mention packages/physics/README.md": 1,
+    "mention packages/react/tests/subpaths.test.js": 1
+  }
+}

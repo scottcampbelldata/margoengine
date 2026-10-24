@@ -1,7 +1,8 @@
 // API conventions every package class follows (HANDOFF "Scott's decisions (2026-10-14, 17:10)"):
 // - engine features (EnginePlugin classes, and classes whose constructor takes the engine) have `static attach(engine, ...)`;
 // - a class with `destroy()` also has `dispose()` (`destroy` is the deprecated alias);
-// - a class with `dispose()` also has `[Symbol.dispose]()` where the runtime defines `Symbol.dispose`.
+// - a class with `dispose()` also has `[Symbol.dispose]()` where the runtime defines `Symbol.dispose`;
+// - a class with `static attach()` also has `dispose()`.
 // Walks every exported class of every package's built entries (core and the stage facade are frozen and exempt), so new
 // classes cannot drift.
 import test from 'node:test';
@@ -54,6 +55,9 @@ test('every package class follows the attach / dispose / Symbol.dispose conventi
       problems.push(`${label}: dispose() without [Symbol.dispose]()`);
     if (typeof proto.setup === 'function' && !NOT_FEATURES.has(name) && typeof Class.attach !== 'function')
       problems.push(`${label}: engine feature without static attach()`);
+    // What attaches to an engine must be detachable.
+    if (typeof Class.attach === 'function' && typeof proto.dispose !== 'function')
+      problems.push(`${label}: static attach() without dispose()`);
     // An inherited attach must construct the subclass (`new this(...)`), not the base (GPUParticles extends VFX).
     if (
       typeof Class.attach === 'function' &&
