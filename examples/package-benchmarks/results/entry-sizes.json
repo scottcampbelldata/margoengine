@@ -1,5 +1,5 @@
 {
-  "commit": "0ca52f2a",
+  "commit": "c385b2ce",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1138,20 +1138,20 @@
     },
     "@margoengine/voxel": {
       ".": {
-        "raw": 14008,
-        "gzip": 5127
+        "raw": 16047,
+        "gzip": 5911
       },
       "./query": {
-        "raw": 7864,
-        "gzip": 3565
+        "raw": 8135,
+        "gzip": 3683
       },
       "./codec": {
-        "raw": 25037,
-        "gzip": 8706
+        "raw": 25604,
+        "gzip": 8879
       },
       "./stream": {
-        "raw": 35596,
-        "gzip": 12614
+        "raw": 36163,
+        "gzip": 12778
       },
       "./generate": {
         "raw": 10271,
@@ -1162,32 +1162,32 @@
         "gzip": 2201
       },
       "./mesher": {
-        "raw": 17722,
-        "gzip": 7629
+        "raw": 18738,
+        "gzip": 8056
       },
       "./light": {
-        "raw": 22697,
-        "gzip": 8140
+        "raw": 23615,
+        "gzip": 8436
       },
       "./vox": {
-        "raw": 35272,
-        "gzip": 12598
+        "raw": 35839,
+        "gzip": 12778
       },
       "./physics": {
-        "raw": 27402,
-        "gzip": 9958
+        "raw": 28206,
+        "gzip": 10215
       },
       "./render": {
-        "raw": 59894,
-        "gzip": 22141
+        "raw": 60341,
+        "gzip": 22305
       },
       "./lightmap": {
         "raw": 5691,
         "gzip": 2506
       },
       "dist/workers/mesher.js": {
-        "raw": 12289,
-        "gzip": 5494
+        "raw": 13305,
+        "gzip": 5906
       },
       "dist/workers/terrain.js": {
         "raw": 13770,
@@ -1256,8 +1256,8 @@
     },
     "@margoengine/voxel-pathtracer": {
       ".": {
-        "raw": 200181,
-        "gzip": 71195
+        "raw": 201799,
+        "gzip": 71804
       },
       "./studio": {
         "raw": 2264,
@@ -1405,9 +1405,9 @@
       "brotli": 2717
     },
     "packages/voxel/dist/workers/mesher.js": {
-      "raw": 12017,
-      "gzip": 5461,
-      "brotli": 4851
+      "raw": 13017,
+      "gzip": 5871,
+      "brotli": 5203
     },
     "packages/voxel/dist/workers/terrain.js": {
       "raw": 13594,

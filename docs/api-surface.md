@@ -83,10 +83,10 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/vfx | `.` 7, `./base` 7, `./obstacles` 1, `./wrap` 1, `./sort` 1, `./texture` 1 | 23 |  | 9,121 |
 | @margoengine/video | `.` 2 |  |  | 1,943 |
 | @margoengine/viewcube | `.` 5 |  |  | 3,352 |
-| @margoengine/voxel | `.` 22, `./query` 7, `./codec` 9, `./stream` 5, `./generate` 5, `./bevel` 5, `./mesher` 12, `./light` 3, `./vox` 14, `./physics` 2, `./render` 10, `./lightmap` 3 | 80 |  | 5,127 |
+| @margoengine/voxel | `.` 22, `./query` 7, `./codec` 9, `./stream` 5, `./generate` 5, `./bevel` 5, `./mesher` 12, `./light` 3, `./vox` 14, `./physics` 2, `./render` 10, `./lightmap` 3 | 80 |  | 5,911 |
 | @margoengine/voxel-edit | `.` 59, `./edit` 28, `./pick` 4, `./sparse` 16, `./mesh` 11, `./vox` 23, `./animation` 8, `./history` 3, `./export` 4, `./assist` 3, `./library` 6 | 73 |  | 7,533 |
 | @margoengine/voxel-net | `.` 23, `./server` 9, `./bot` 4 | 10 |  | 5,358 |
-| @margoengine/voxel-pathtracer | `.` 53, `./studio` 12 | 7 |  | 71,195 |
+| @margoengine/voxel-pathtracer | `.` 53, `./studio` 12 | 7 |  | 71,804 |
 | @margoengine/water | `.` 8 |  |  | 18,376 |
 | @margoengine/webgl | `.` 3 |  |  | 3,074 |
 | @margoengine/wfc | `.` 3, `./overlapping` 5 |  |  | 1,622 |
