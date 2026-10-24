@@ -21,7 +21,7 @@ import {
   type Geometry,
 } from '@margoengine/core/extension';
 import type { EngineKernel, Mesh as MeshHandle, FrameCallback } from '@margoengine/core';
-import { Stage as StageFacade } from 'margoengine';
+import { Stage as StageFacade } from '@margoengine/stage';
 import { optionalPeer } from './optional.js';
 import { preparePicking, releasePicking } from './picking.js';
 import type { PBRModel, LightingEffect } from '@margoengine/gltf-pro';

@@ -36,6 +36,8 @@ export async function measureEntries({ log = console.log } = {}) {
     const pkg = JSON.parse(readFileSync(file, 'utf8')),
       entries = {};
     for (const [path, target] of Object.entries(pkg.exports ?? {})) {
+      // margoengine/<x> is a one-line re-export of @margoengine/<x>, measured there.
+      if (pkg.name === 'margoengine' && path !== '.') continue;
       const js = typeof target === 'string' ? target : (target.import ?? target.default);
       if (!js?.endsWith('.js') || !existsSync(resolve(root, 'packages', dir, js))) continue;
       entries[path] = await size(resolve(root, 'packages', dir, js));

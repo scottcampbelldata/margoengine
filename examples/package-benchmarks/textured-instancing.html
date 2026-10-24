@@ -3,7 +3,7 @@
 // Driven by textured-instancing-gpu.mjs. Each scene is built twice, as N separate meshes (reference) and as one instanced
 // mesh, with the same transforms (rotated, scaled, two mirrored), tints and atlas regions, under shadows, clustered lights,
 // SSAO, image-based lighting and fog; the runner compares the two frames. bench() times both forms without effects.
-import {createStage} from '/packages/margoengine/dist/index.js';
+import {createStage} from '/packages/stage/dist/index.js';
 import {boxGeometry,planeGeometry} from '/packages/geometry/dist/index.js';
 import {Texture,Material,createMesh,createInstancedMesh,packAtlas} from '/packages/materials/dist/index.js';
 import {parseGLTFAsync} from '/packages/gltf-pro/dist/index.js';

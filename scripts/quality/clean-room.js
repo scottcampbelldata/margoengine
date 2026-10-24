@@ -22,7 +22,8 @@ export function cleanRoomGate({ root, files, packages }) {
     for (const m of bytes.toString('utf8').matchAll(ENGINES)) if (!THREE_CASE.test(m[0]) || m[0] === 'THREE') count++;
     if (count) items[`mention ${file}`] = count;
   }
-  for (const pkg of packages)
+  // margoengine only mirrors its packages' optional third-party peers (scripts/umbrella.mjs); those are counted there.
+  for (const pkg of packages.filter((p) => p.name !== 'margoengine'))
     for (const field of ['dependencies', 'optionalDependencies', 'peerDependencies'])
       for (const name of Object.keys(pkg.manifest[field] ?? {}))
         if (name !== 'margoengine' && !name.startsWith('@margoengine/')) items[`dependency ${pkg.name} ${name}`] = 1;

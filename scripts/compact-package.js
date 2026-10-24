@@ -36,8 +36,7 @@ export async function compactPackage(name, directory = `packages/${name}`) {
       },
       rollupOptions: {
         external: (id, importer) =>
-          !!importer &&
-          ((name !== 'margoengine' && name !== 'core') || !shared.includes(resolve(dirname(importer), id))),
+          !!importer && ((name !== 'stage' && name !== 'core') || !shared.includes(resolve(dirname(importer), id))),
         output: { ...compactOutput, comments: { annotation: true } },
       },
     },

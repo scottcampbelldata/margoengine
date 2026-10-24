@@ -26,6 +26,7 @@ const names = [
     'environment',
     'controls',
     'exporters',
+    'stage',
     'margoengine',
   ],
   npm = process.env.npm_execpath;

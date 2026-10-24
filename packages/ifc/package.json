@@ -30,5 +30,10 @@
     "@margoengine/loaders": "^1.0.0",
     "web-ifc": "^0.0.78"
   },
-  "homepage": "https://margoengine.com"
+  "homepage": "https://margoengine.com",
+  "peerDependenciesMeta": {
+    "web-ifc": {
+      "optional": true
+    }
+  }
 }

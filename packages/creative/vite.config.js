@@ -11,7 +11,7 @@ export default defineConfig({
     alias: [
       { find: /^@margoengine\/core\/extension$/, replacement: resolve(repository, 'packages/core/dist/extension.js') },
       { find: /^@margoengine\/core$/, replacement: resolve(repository, 'packages/core/dist/index.js') },
-      { find: /^margoengine$/, replacement: resolve(repository, 'packages/margoengine/dist/index.js') },
+      { find: /^margoengine$/, replacement: resolve(repository, 'packages/stage/dist/index.js') },
       { find: /^@margoengine\/creative$/, replacement: resolve(root, 'src/index.ts') },
     ],
   },

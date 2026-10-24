@@ -1,7 +1,7 @@
 <!doctype html><html><head><meta charset="utf-8"/><title>Noise CPU/GPU agreement</title><style>body{margin:0}#host{width:64px;height:64px}</style></head><body><div id="host"></div>
 <script type="module">
 // Evaluates every WGSL noise node on the GPU for 4096 positions and compares with the CPU twins in @margoengine/procedural/noise.
-import {createStage} from '/packages/margoengine/dist/index.js';
+import {createStage} from '/packages/stage/dist/index.js';
 import {ComputePass, storage} from '/packages/shader/dist/index.js';
 import {simplex2, simplex3, perlin3, fbm, ridged, domainWarp} from '/packages/shader/dist/noise.js';
 import {Noise, fbm as cpuFbm, ridged as cpuRidged, domainWarp as cpuWarp} from '/packages/procedural/dist/noise.js';

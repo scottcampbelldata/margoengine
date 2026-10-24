@@ -129,7 +129,8 @@ export function duplicatesGate({ root, files, packages }) {
   const reexports = [];
   for (const pkg of packages)
     for (const entry of pkg.entries) {
-      if (!entry.src) continue;
+      // margoengine, the one-install package, is re-exports by design (scripts/umbrella.mjs).
+      if (!entry.src || pkg.name === 'margoengine') continue;
       const { program } = parseSync(entry.src, readFileSync(join(root, entry.src), 'utf8'));
       for (const node of program.body) {
         const spec = node.source?.value;

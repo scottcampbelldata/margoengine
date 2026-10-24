@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Stage, sphere } from '../packages/margoengine/dist/index.js';
+import { Stage, sphere } from '../packages/stage/dist/index.js';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
 
 async function scene(capacity = 16) {

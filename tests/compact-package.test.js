@@ -8,7 +8,7 @@ import { compactPackage } from '../scripts/compact-package.js';
 
 test('stage compaction packages shared chunks and preserves module identities', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'margo-compact-')),
-    stage = join(root, 'packages/margoengine'),
+    stage = join(root, 'packages/stage'),
     dist = join(stage, 'dist'),
     shared = join(root, 'packages/shared');
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -28,7 +28,7 @@ test('stage compaction packages shared chunks and preserves module identities', 
   for (const [name, code] of Object.entries(modules))
     await Promise.all([writeFile(join(stage, `src/${name}.ts`), code), writeFile(join(dist, `${name}.js`), code)]);
 
-  await compactPackage('margoengine', stage);
+  await compactPackage('stage', stage);
 
   const files = await readdir(dist);
   assert.ok(files.includes('index.js') && files.includes('model.js'));

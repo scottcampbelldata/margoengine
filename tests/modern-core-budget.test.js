@@ -9,7 +9,7 @@ test('core + stage gate rejects the ceiling and any excess', async () => {
   for (const value of [NaN, -1, 19_999.5]) assert.throws(() => checkCoreBudget(value), /Invalid/);
   const { raw, gzip, modules } = await measureCoreStage();
   assert.ok(raw > gzip && gzip < 25_000);
-  assert.ok(modules.some((path) => path.includes('/packages/margoengine/')));
+  assert.ok(modules.some((path) => path.includes('/packages/stage/')));
   assert.ok(modules.some((path) => path.includes('/packages/core/')));
   assert.ok(
     modules.every((path) => !path.replaceAll('\\', '/').includes('/packages/kinematics-constraints/')),

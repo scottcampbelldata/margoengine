@@ -26,6 +26,7 @@ export const external = [
   '@margoengine/decoders/meshopt',
   '@margoengine/decoders/texture',
   'margoengine',
+  '@margoengine/stage',
   'react',
   'react/jsx-runtime',
   '@margoengine/machinery/cad',
@@ -78,7 +79,7 @@ export async function measureCoreStage() {
       write: false,
       minify: true,
       target: 'es2022',
-      lib: { entry: 'packages/margoengine/dist/index.js', formats: ['es'] },
+      lib: { entry: 'packages/stage/dist/index.js', formats: ['es'] },
       rollupOptions: {
         external: external.filter((name) => typeof name !== 'string' || !name.startsWith('@margoengine/core')),
         output: compactOutput,

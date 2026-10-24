@@ -5,7 +5,7 @@ import { openBrowser } from './browser.js';
 
 const browser = await openBrowser({
     startPath: '/tests/modern-game.html',
-    aliases: { margoengine: resolve('packages/margoengine/dist/index.js') },
+    aliases: { margoengine: resolve('packages/stage/dist/index.js') },
   }),
   { page, hardware } = browser,
   errors = [];

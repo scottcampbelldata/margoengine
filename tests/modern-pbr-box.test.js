@@ -11,7 +11,7 @@ import { deduplicateParts } from '@margoengine/machinery/cad';
 import { AssemblyBVH } from '@margoengine/machinery/spatial';
 import { BoxHelper } from '@margoengine/lines';
 import { Stage } from 'margoengine';
-import { worldBounds } from '../packages/margoengine/dist/model.js';
+import { worldBounds } from '../packages/stage/dist/model.js';
 import { meshTriangles } from '../packages/shared/mesh-source.js';
 import { accessor, readGLB } from '../packages/exporters/tests/helpers.js';
 import { loadedPBREngine, primitivePositions, positionBounds } from './support/loaded-pbr-fixtures.js';

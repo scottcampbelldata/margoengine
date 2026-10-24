@@ -12,6 +12,7 @@ export interface StageModel {
 
 type RawBuffers = Omit<GeometryBuffers, 'instance'> & Partial<Pick<GeometryBuffers, 'instance'>>;
 
+/** What `stage.load(url)` returns: the imported meshes under one root, moved, rotated and scaled as one. */
 export interface LoadedModel extends Pick<Mesh, 'position' | 'rotation' | 'scale'> {
   readonly root: Mesh;
   readonly meshes: readonly Mesh[];

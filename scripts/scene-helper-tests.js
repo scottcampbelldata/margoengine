@@ -14,8 +14,8 @@ export async function sceneHelperBrowserChecks(page) {
     const { loadFBX } = await import('/packages/fbx/dist/index.js');
     const { Animation } = await import('/packages/animation/dist/index.js');
     const { getSceneBounds, fitScene, gatherSceneBuffers } = await import('/packages/gltf-pro/dist/scene.js');
-    const { Stage } = await import('/packages/margoengine/dist/index.js');
-    const { loadedModel, worldBounds } = await import('/packages/margoengine/dist/model.js');
+    const { Stage } = await import('/packages/stage/dist/index.js');
+    const { loadedModel, worldBounds } = await import('/packages/stage/dist/model.js');
     const check = (value, message) => {
       if (!value) throw new Error(message);
     };

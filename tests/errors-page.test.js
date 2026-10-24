@@ -6,7 +6,7 @@ import { errorsPage } from '../scripts/errors/page.mjs';
 
 // margoengine.com/errors (site/errors.html) and the core and stage throws come from one source; these checks keep
 // them from drifting apart.
-const sources = ['packages/core/src', 'packages/margoengine/src'].flatMap((dir) =>
+const sources = ['packages/core/src', 'packages/stage/src'].flatMap((dir) =>
     readdirSync(dir)
       .filter((f) => f.endsWith('.ts'))
       .map((f) => ({ file: `${dir}/${f}`, text: readFileSync(`${dir}/${f}`, 'utf8') })),

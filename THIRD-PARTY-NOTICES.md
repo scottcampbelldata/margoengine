@@ -4,24 +4,24 @@
 Margo Engine's own code is MIT licensed (`LICENSE`; every tarball ships a copy), except `@margoengine/brep`, which is
 dual licensed AGPLv3 / Commercial (its own `LICENSE` and `LICENSE-COMMERCIAL.md`). This file lists everything else that
 reaches users: npm packages our published packages depend on, third-party code shipped inside our tarballs, and the
-assets the site and examples use. It covers all 80 published packages (78 in `packages/`
+assets the site and examples use. It covers all 81 published packages (79 in `packages/`
 plus `create-margo` and `margo-convert`). `node scripts/supply-chain.mjs --check` (in `npm run verify`, through
 `tests/supply-chain.test.js`) fails when this file is stale, a dependency has no stated reason, a licence is outside
 the allowed list, or a runtime dependency has an install script, a deprecation or a non-registry source.
 
 ## Runtime npm dependencies of published packages (direct and transitive)
 
-72 of 80 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
+72 of 81 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
 Versions are the ones in `package-lock.json`; users get whatever their own lockfile resolves inside our ranges.
 
 | Package | Version (lock) | Licence | Kind | Used by | Why |
 | --- | --- | --- | --- | --- | --- |
-| `@dimforge/rapier3d-compat` | 0.21.0 | Apache-2.0 | optional peer | @margoengine/physics, @margoengine/react | Rapier rigid-body solver; optional, the app installs and initializes it |
+| `@dimforge/rapier3d-compat` | 0.21.0 | Apache-2.0 | optional peer | @margoengine/physics, @margoengine/react, margoengine | Rapier rigid-body solver; optional, the app installs and initializes it |
 | `occt-import-js` | 0.0.23 | LGPL-2.1 | dependency | margo-convert | OpenCascade STEP/IGES/BREP tessellation in Node (offline converter) |
-| `react` | 19.3.0 | MIT | peer | @margoengine/react | React component bindings for the stage |
-| `react-dom` | 19.3.0 | MIT | optional peer | @margoengine/react | React DOM root and portal rendering for scene and HTML components |
-| `scheduler` | 0.28.0 | MIT | transitive (via react-dom) | @margoengine/react | React DOM scheduling dependency |
-| `web-ifc` | 0.0.78 | MPL-2.0 | peer | @margoengine/ifc | IFC (BIM) parser; the app installs and initializes it, the package only reads its output |
+| `react` | 19.3.0 | MIT | optional peer | @margoengine/react, margoengine | React component bindings for the stage |
+| `react-dom` | 19.3.0 | MIT | optional peer | @margoengine/react, margoengine | React DOM root and portal rendering for scene and HTML components |
+| `scheduler` | 0.28.0 | MIT | transitive (via react-dom) | margoengine | React DOM scheduling dependency |
+| `web-ifc` | 0.0.78 | MPL-2.0 | optional peer | @margoengine/ifc, margoengine | IFC (BIM) parser; the app installs and initializes it, the package only reads its output |
 
 None of them has an install script (`preinstall`/`install`/`postinstall`), a deprecation notice or a source other
 than registry.npmjs.org with an integrity hash. Peers are installed by the app, not by us.
@@ -102,7 +102,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/gltf` | none | none | LICENSE |
 | `@margoengine/gltf-pro` | none | none | LICENSE |
 | `@margoengine/html` | none | none | LICENSE |
-| `@margoengine/ifc` | web-ifc ^0.0.78 (peer) | none | LICENSE |
+| `@margoengine/ifc` | web-ifc ^0.0.78 (optional peer) | none | LICENSE |
 | `@margoengine/input` | none | none | LICENSE |
 | `@margoengine/inspector` | none | none | LICENSE |
 | `@margoengine/kinematics-constraints` | none | none | LICENSE |
@@ -112,7 +112,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/loaders` | none | none | LICENSE |
 | `@margoengine/lod` | none | none | LICENSE |
 | `@margoengine/machinery` | none | occt-import-js 0.0.23 with OpenCascade (LGPL-2.1) | LICENSE, dist/workers/OCCT-NOTICE.txt, dist/workers/OCCT-LICENSE.txt |
-| `margoengine` | none | none | LICENSE |
+| `margoengine` | @dimforge/rapier3d-compat >=0.14.0 <1 (optional peer); react ^18.0.0 \|\| ^19.0.0 (optional peer); react-dom ^18.0.0 \|\| ^19.0.0 (optional peer); web-ifc ^0.0.78 (optional peer) | none | LICENSE |
 | `@margoengine/materials` | none | none | LICENSE |
 | `@margoengine/math` | none | none | LICENSE |
 | `@margoengine/mesh-edit` | none | none | LICENSE |
@@ -124,7 +124,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/post` | none | Colour-transform references: AgX (attribution) | LICENSE, NOTICE.md |
 | `@margoengine/procedural` | none | none | LICENSE |
 | `@margoengine/quality` | none | none | LICENSE |
-| `@margoengine/react` | @dimforge/rapier3d-compat >=0.14.0 <1 (optional peer); react-dom ^18.0.0 \|\| ^19.0.0 (optional peer); react ^18.0.0 \|\| ^19.0.0 (peer) | none | LICENSE |
+| `@margoengine/react` | @dimforge/rapier3d-compat >=0.14.0 <1 (optional peer); react-dom ^18.0.0 \|\| ^19.0.0 (optional peer); react ^18.0.0 \|\| ^19.0.0 (optional peer) | none | LICENSE |
 | `@margoengine/road` | none | none | LICENSE |
 | `@margoengine/scatter` | none | none | LICENSE |
 | `@margoengine/scenery` | none | none | LICENSE |
@@ -134,6 +134,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/sky` | none | none | LICENSE |
 | `@margoengine/splats` | none | none | LICENSE |
 | `@margoengine/splines` | none | none | LICENSE |
+| `@margoengine/stage` | none | none | LICENSE |
 | `@margoengine/staging` | none | none | LICENSE |
 | `@margoengine/stats` | none | none | LICENSE |
 | `@margoengine/taa` | none | none | LICENSE |

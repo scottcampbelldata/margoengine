@@ -16,7 +16,7 @@ export async function pbrBoxBrowserChecks(page) {
     const { deduplicateParts } = await import('/packages/machinery/dist/cad.js');
     const { AssemblyBVH } = await import('/packages/machinery/dist/spatial.js');
     const { BoxHelper } = await import('/packages/lines/dist/index.js');
-    const { worldBounds } = await import('/packages/margoengine/dist/model.js');
+    const { worldBounds } = await import('/packages/stage/dist/model.js');
     const { meshTriangles } = await import('/packages/shared/mesh-source.js');
     const { default: RAPIER } = await import('/node_modules/@dimforge/rapier3d-compat/dist/rapier.mjs');
     await RAPIER.init();

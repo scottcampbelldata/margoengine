@@ -3,7 +3,7 @@
 // Driven by frame-debugger-gpu.mjs (HANDOFF 5h.d). DamagedHelmet (gltf-pro) on a floor with directional shadows, a
 // 20x20 grid of GPU-culled boxes (culling: compute + drawIndexedIndirect), a PostStack (SSAO, Bloom, FXAA), and the
 // frame debugger attached before anything loads so every pipeline, bind group and texture is described.
-import {createStage} from '/packages/margoengine/dist/index.js';
+import {createStage} from '/packages/stage/dist/index.js';
 import {box, PbrMaterial} from '/packages/core/dist/index.js';
 import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
 import {Shadows} from '/packages/shadows/dist/index.js';

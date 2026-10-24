@@ -20,7 +20,7 @@ try {
   const result = await browser.page.evaluate(async () => {
     const { GrassField, PostProcessing } = await import('/packages/creative/dist/index.js'),
       { Bloom } = await import('/packages/post/dist/bloom.js');
-    const { Stage } = await import('/packages/margoengine/dist/index.js');
+    const { Stage } = await import('/packages/stage/dist/index.js');
     const assert = (condition, message) => {
       if (!condition) throw new Error(message);
     };

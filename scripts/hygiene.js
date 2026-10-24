@@ -35,6 +35,7 @@ import { createRequire } from 'node:module';
 import { dirname, join, relative, resolve } from 'node:path';
 import { parseSync } from 'rolldown/utils';
 import { entries as errorHelp } from './errors/entries.js';
+import { isUmbrellaAlias } from './umbrella.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const quick = process.argv.includes('--verify');
@@ -118,7 +119,7 @@ if (!quick) {
   const reportOwner = new Map(); // report file -> package dir
   for (const dir of packages) {
     const manifest = json(`packages/${dir}/package.json`);
-    for (const subpath of Object.keys(manifest.exports ?? {}))
+    for (const subpath of Object.keys(manifest.exports ?? {}).filter((s) => !isUmbrellaAlias(manifest.name, s)))
       reportOwner.set(`${dir}${subpath === '.' ? '' : '.' + subpath.slice(2).replaceAll('/', '-')}.api.md`, dir);
   }
   const declared = new Map(); // name -> Map(package -> {type, exported})
@@ -207,12 +208,14 @@ if (!quick) {
   const { API, SymbolFlags } = await import('typescript/unstable/sync');
   const { SyntaxKind } = await import('typescript/unstable/ast');
   const entries = packages.flatMap((dir) =>
-    Object.values(json(`packages/${dir}/package.json`).exports ?? {}).map((target) => ({
-      dir,
-      dts: slash(
-        join(root, 'packages', dir, typeof target === 'string' ? target.replace(/\.js$/, '.d.ts') : target.types),
-      ),
-    })),
+    Object.entries(json(`packages/${dir}/package.json`).exports ?? {})
+      .filter(([subpath]) => !isUmbrellaAlias(json(`packages/${dir}/package.json`).name, subpath))
+      .map(([, target]) => ({
+        dir,
+        dts: slash(
+          join(root, 'packages', dir, typeof target === 'string' ? target.replace(/\.js$/, '.d.ts') : target.types),
+        ),
+      })),
   );
   const missing = entries.filter((e) => !existsSync(e.dts));
   if (missing.length) throw new Error(`${missing[0].dts} missing; run npm run build:packages first`);

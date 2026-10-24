@@ -6,7 +6,7 @@
 // onSubmittedWorkDone). With `warm`, `await warmUp(engine)` runs first; its warm frames are offscreen, so the timed
 // frame is again the first visible frame that draws the feature (the warm frames' own times are reported too). The page is left
 // showing the last frame for the runner's cold-vs-warm image comparison.
-import {createStage} from '/packages/margoengine/dist/index.js';
+import {createStage} from '/packages/stage/dist/index.js';
 import {engineRuntime} from '/packages/core/dist/extension.js';
 import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
 import {warmUp} from '/packages/quality/dist/warm.js';

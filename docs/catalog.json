@@ -5,7 +5,7 @@
     "package": "margoengine",
     "version": "1.0.0",
     "published": false,
-    "description": "Five-line setup for Margo Engine and its domain packs.",
+    "description": "Margo Engine in one install: the stage and every package as margoengine/<name> (margoengine/gltf, margoengine/shadows, margoengine/physics, margoengine/react).",
     "requirements": "See the package guide for requirements",
     "keywords": "margoengine",
     "install": "npm install margoengine@1.0.0",
@@ -23,6 +23,31 @@
       "sphere"
     ],
     "category": "Start here"
+  },
+  {
+    "id": "stage",
+    "title": "Stage facade",
+    "category": "Start here",
+    "package": "@margoengine/stage",
+    "version": "1.0.0",
+    "published": false,
+    "description": "The stage: createStage mounts a canvas, camera controls and rendering in five lines. Re-exported by margoengine.",
+    "requirements": "See the package guide for requirements",
+    "keywords": "stage",
+    "install": "npm install @margoengine/stage@1.0.0",
+    "imports": "import { CADCameraControls } from '@margoengine/stage';",
+    "exports": [
+      "CADCameraControls",
+      "Camera",
+      "Engine",
+      "EngineKernel",
+      "Geometry",
+      "PbrMaterial",
+      "Stage",
+      "box",
+      "createStage",
+      "sphere"
+    ]
   },
   {
     "id": "core",

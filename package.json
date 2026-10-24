@@ -35,6 +35,7 @@
     "packages/kinematics-constraints",
     "packages/creative",
     "packages/scenery",
+    "packages/stage",
     "packages/margoengine",
     "packages/bvh",
     "packages/lines",

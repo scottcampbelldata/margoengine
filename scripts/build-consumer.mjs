@@ -10,7 +10,7 @@ import { packageOrder } from './package-order.js';
 const repository = fileURLToPath(new URL('..', import.meta.url));
 const FORMAT = 'margo-consumer-build',
   VERSION = 1;
-const fullPipeline = new Set(['core', 'margoengine', 'machinery', 'react']);
+const fullPipeline = new Set(['core', 'stage', 'margoengine', 'machinery', 'react']);
 const slash = (value) => value.split(sep).join('/');
 const digest = (value) => createHash('sha256').update(value).digest('hex');
 const hashRecord = (value) =>

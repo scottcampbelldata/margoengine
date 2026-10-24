@@ -6,7 +6,7 @@
 // with culling off, as live capture asks when probes must see what the main camera does not.
 // GPU time of the probes' capture: every render and compute pass encoded inside the light-probes:capture pass gets
 // timestamp queries (encoders created there are wrapped), read back after each frame.
-import {createStage} from '/packages/margoengine/dist/index.js';
+import {createStage} from '/packages/stage/dist/index.js';
 import {box,PbrMaterial} from '/packages/core/dist/index.js';
 import {engineRuntime} from '/packages/core/dist/extension.js';
 import {LightProbes} from '/packages/environment/dist/probes.js';

@@ -10,7 +10,7 @@ export default defineConfig({
     alias: [
       { find: /^@margoengine\/core\/extension$/, replacement: resolve(repository, 'packages/core/dist/extension.js') },
       { find: /^@margoengine\/core$/, replacement: resolve(repository, 'packages/core/dist/index.js') },
-      { find: /^margoengine$/, replacement: resolve(repository, 'packages/margoengine/dist/index.js') },
+      { find: /^margoengine$/, replacement: resolve(repository, 'packages/stage/dist/index.js') },
     ],
   },
   server: { host: '127.0.0.1', fs: { allow: [repository] } },

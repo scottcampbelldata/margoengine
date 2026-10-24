@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { parseGLTF as parseCoreGLTF } from '@margoengine/gltf';
 import { parsePreparedPBR } from '@margoengine/gltf-pro';
 import { Stage } from 'margoengine';
-import { loadedModel, worldBounds } from '../packages/margoengine/dist/model.js';
+import { loadedModel, worldBounds } from '../packages/stage/dist/model.js';
 import { loadedPBRFixtures, serveLoadedPBRFixtures } from './support/loaded-pbr-fixtures.js';
 import { clearMeshSource, meshTriangles, setMeshSource } from '../packages/shared/mesh-source.js';
 

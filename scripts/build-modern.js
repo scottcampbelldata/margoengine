@@ -142,9 +142,14 @@ for (const name of packageOrder(manifests)) {
   assert.equal(dirname(output), resolve(`packages/${name}`), 'Output escaped its package');
   await rm(output, { recursive: true, force: true });
   if (!ownLicenses.has(name)) await copyFile('LICENSE', `packages/${name}/LICENSE`);
-  if (name === 'core' || name === 'margoengine') {
+  if (name === 'core' || name === 'stage') {
     await tsc(name);
     await compactPackage(name);
+    continue;
+  }
+  // margoengine is the one-install package: generated re-exports of every package (scripts/umbrella.mjs).
+  if (name === 'margoengine') {
+    await tsc(name);
     continue;
   }
   if (name === 'react') {
@@ -291,7 +296,7 @@ const packages = [
   'creative',
   'scenery',
   ...featurePackages,
-  'margoengine',
+  'stage',
 ];
 const sizes = { kernel: { raw: wasm.length, gzip: compressedWasm.length } };
 for (const name of packages) {

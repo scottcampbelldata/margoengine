@@ -79,7 +79,7 @@ async function stageSize(compressed) {
       write: false,
       minify: true,
       target: 'es2022',
-      lib: { entry: join(repository, 'packages/margoengine/dist/index.js'), formats: ['es'] },
+      lib: { entry: join(repository, 'packages/stage/dist/index.js'), formats: ['es'] },
       rollupOptions: {
         external: external.filter((name) => !name.startsWith('@margoengine/core')),
         output: compactOutput,

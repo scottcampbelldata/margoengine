@@ -140,7 +140,7 @@ try {
     );
   const results = await page.evaluate(async (count) => {
     const { Engine } = await import('/packages/core/dist/index.js');
-    const { createStage } = await import('/packages/margoengine/dist/index.js');
+    const { createStage } = await import('/packages/stage/dist/index.js');
     const { decodeMargo, loadMargo, parseMargo } = await import('/packages/blender/dist/index.js');
     const { Shadows } = await import('/packages/shadows/dist/index.js');
     const { SSAO } = await import('/packages/post/dist/index.js');

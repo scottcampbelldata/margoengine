@@ -50,7 +50,7 @@ mock.module('@margoengine/creative/particles', { namedExports: { GPUParticles } 
 mock.module('@margoengine/creative/post', { namedExports: { PostProcessing } });
 mock.module('@margoengine/shadows', { namedExports: { Shadows } });
 mock.module('@margoengine/environment', { namedExports: { EnvironmentLighting } });
-const { Stage } = await import('../packages/margoengine/dist/index.js');
+const { Stage } = await import('../packages/stage/dist/index.js');
 const features = [
   ['sky', SkyMoon],
   ['particles', GPUParticles],

@@ -4,7 +4,7 @@
 // ambient (1.0; sun off), so every wall radiates exactly its linear colour toward any viewpoint, with an irradiance volume
 // (2 x 2 x 2, L2) and one reflection probe filling it. ?scene=env: no walls, a synthetic HDR environment as the only light.
 // Receivers: a white core sphere and a materials sphere (gltf-pro, lit through probes.add); hidden while baking.
-import {createStage} from '/packages/margoengine/dist/index.js';
+import {createStage} from '/packages/stage/dist/index.js';
 import {box,PbrMaterial,Geometry} from '/packages/core/dist/index.js';
 import {engineRuntime} from '/packages/core/dist/extension.js';
 import {invertMatrixStable} from '/packages/math/dist/mat4.js';

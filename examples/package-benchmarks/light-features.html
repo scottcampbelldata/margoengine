@@ -4,7 +4,7 @@
 // sphere and a core box; core's sun and ambient are off, so every lit pixel is one of the new lights alone: a spot or point
 // light (decay 2, unlimited range), an extra directional light, an IES-profiled point light, a projector spot, or the
 // hemisphere light (sphere and box only). unproject() turns pixel centres into floor points and view rays.
-import {createStage} from '/packages/margoengine/dist/index.js';
+import {createStage} from '/packages/stage/dist/index.js';
 import {box,PbrMaterial} from '/packages/core/dist/index.js';
 import {engineRuntime} from '/packages/core/dist/extension.js';
 import {invertMatrixStable} from '/packages/math/dist/mat4.js';

@@ -10,11 +10,11 @@ import { TransmissionOptions } from "@margoengine/materials";
 import { Physics } from "@margoengine/physics";
 import { Bloom, BloomOptions, SSAO, SSAOOptions } from "@margoengine/post";
 import { Sky, SkyOptions } from "@margoengine/sky";
+import { Stage } from "@margoengine/stage";
 import { TAA, TAAOptions } from "@margoengine/taa";
 import { Text, TextOptions } from "@margoengine/text";
 import { CubeLUT, Tonemap, TonemapOptions } from "@margoengine/tonemap";
 import { XR } from "@margoengine/xr";
-import { Stage } from "margoengine";
 import { CSSProperties, ReactNode, RefObject } from "react";
 
 export function Animation(props: AnimationProps): null;

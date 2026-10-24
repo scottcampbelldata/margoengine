@@ -1,0 +1,56 @@
+{
+  "name": "@margoengine/stage",
+  "homepage": "https://margoengine.com",
+  "version": "1.0.0",
+  "description": "The stage: createStage mounts a canvas, camera controls and rendering in five lines. Re-exported by margoengine.",
+  "type": "module",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "node --experimental-test-module-mocks --test ../../tests/modern-wrapper.test.js ../../tests/modern-facade-lifecycle.test.js ../../tests/deep-stage-sphere.test.js ../../tests/modern-silent-facade-drops.test.js",
+    "prepack": "npm --prefix ../.. run build:packages"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@margoengine/core": "^1.0.0"
+  },
+  "peerDependencies": {
+    "@margoengine/gltf": "^1.0.0",
+    "@margoengine/machinery": "^1.0.0",
+    "@margoengine/creative": "^1.0.0",
+    "@margoengine/scenery": "^1.0.0",
+    "@margoengine/environment": "^1.0.0",
+    "@margoengine/shadows": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/gltf": {
+      "optional": true
+    },
+    "@margoengine/machinery": {
+      "optional": true
+    },
+    "@margoengine/creative": {
+      "optional": true
+    },
+    "@margoengine/scenery": {
+      "optional": true
+    },
+    "@margoengine/environment": {
+      "optional": true
+    },
+    "@margoengine/shadows": {
+      "optional": true
+    }
+  }
+}

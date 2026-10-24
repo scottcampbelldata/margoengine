@@ -1,0 +1,94 @@
+// margoengine, the one-install package (scripts/umbrella.mjs): its generated files are current, every alias serves the
+// same bindings as the entry it names, and an import through it bundles exactly what the direct import bundles.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { build } from 'vite';
+import { umbrellaEntries } from '../scripts/umbrella.mjs';
+
+const root = join(import.meta.dirname, '..');
+const manifest = JSON.parse(readFileSync(join(root, 'packages/margoengine/package.json'), 'utf8'));
+
+test('the generated margoengine entries and package.json are current', () => {
+  execFileSync(process.execPath, ['scripts/umbrella.mjs', '--check'], { cwd: root, stdio: 'pipe' });
+});
+
+test('margoengine depends on every engine package and only optionally on third-party libraries', () => {
+  for (const name of Object.keys(manifest.dependencies)) assert.match(name, /^@margoengine\//);
+  for (const name of Object.keys(manifest.peerDependencies ?? {}))
+    assert.equal(manifest.peerDependenciesMeta[name]?.optional, true, name);
+  assert.equal(manifest.sideEffects, false);
+  for (const [subpath, target] of Object.entries(manifest.exports)) {
+    assert.deepEqual(Object.keys(target), ['types', 'import'], subpath);
+    for (const file of Object.values(target)) assert.ok(existsSync(join(root, 'packages/margoengine', file)), file);
+  }
+});
+
+test('margoengine is the stage, and every margoengine/<x> is the same module as @margoengine/<x>', async () => {
+  const [umbrella, stage] = await Promise.all([import('margoengine'), import('@margoengine/stage')]);
+  assert.deepEqual(Object.keys(umbrella).sort(), Object.keys(stage).sort());
+  for (const name of Object.keys(stage)) assert.equal(umbrella[name], stage[name], name);
+  const entries = umbrellaEntries(root);
+  assert.ok(entries.length > 250);
+  for (const { subpath, source } of entries) {
+    const [alias, entry] = await Promise.all([import(`margoengine${subpath.slice(1)}`), import(source)]);
+    assert.deepEqual(Object.keys(alias).sort(), Object.keys(entry).sort(), subpath);
+    for (const name of Object.keys(entry)) assert.equal(alias[name], entry[name], `${subpath} ${name}`);
+  }
+});
+
+async function bundle(code) {
+  const out = await build({
+    configFile: false,
+    publicDir: false,
+    logLevel: 'silent',
+    build: {
+      write: false,
+      minify: true,
+      target: 'es2022',
+      lib: { entry: 'app', formats: ['es'] },
+      rollupOptions: { input: 'app' },
+    },
+    plugins: [
+      { name: 'app', resolveId: (id) => (id === 'app' ? id : null), load: (id) => (id === 'app' ? code : null) },
+    ],
+  });
+  // The entry chunk and what it imports statically; lazy chunks load on first use.
+  const byName = new Map(
+    out[0].output.filter((chunk) => chunk.type === 'chunk').map((chunk) => [chunk.fileName, chunk]),
+  );
+  const chunks = [],
+    queue = [[...byName.values()].find((chunk) => chunk.isEntry)];
+  for (const chunk of queue)
+    if (chunk && !chunks.includes(chunk)) {
+      chunks.push(chunk);
+      queue.push(...chunk.imports.map((name) => byName.get(name)));
+    }
+  return {
+    code: chunks.map((chunk) => chunk.code).join('\n'),
+    modules: chunks.flatMap((chunk) => Object.keys(chunk.modules)).map((id) => id.replaceAll('\\', '/')),
+  };
+}
+
+test('importing through margoengine bundles the same code as importing the package', async () => {
+  for (const [alias, direct] of [
+    [
+      "import { Shadows } from 'margoengine/shadows'; export { Shadows };",
+      "import { Shadows } from '@margoengine/shadows'; export { Shadows };",
+    ],
+    [
+      "import { OrbitControls } from 'margoengine/controls/orbit'; export { OrbitControls };",
+      "import { OrbitControls } from '@margoengine/controls/orbit'; export { OrbitControls };",
+    ],
+  ]) {
+    const [a, b] = await Promise.all([bundle(alias), bundle(direct)]);
+    assert.equal(a.code, b.code, alias);
+  }
+  // The root is the stage: core + stage and nothing else, however many packages margoengine depends on.
+  const { modules } = await bundle("import { createStage } from 'margoengine'; export { createStage };");
+  const packages = new Set(modules.map((id) => /\/packages\/([^/]+)\//.exec(id)?.[1]).filter(Boolean));
+  for (const name of packages) assert.ok(['core', 'margoengine', 'shared', 'stage'].includes(name), name);
+  assert.ok(packages.has('core') && packages.has('stage'));
+});

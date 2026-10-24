@@ -1,6 +1,6 @@
 <!doctype html><html><head><meta charset="utf-8"/><title>Materials browser check</title><style>body{margin:0}#host{width:400px;height:400px}</style></head><body><div id="host"></div>
 <script type="module">
-import {createStage} from '/packages/margoengine/dist/index.js';
+import {createStage} from '/packages/stage/dist/index.js';
 import {planeGeometry,sphereGeometry,boxGeometry} from '/packages/geometry/dist/index.js';
 import {Texture,Material,ShadowCatcherMaterial,WgslMaterial,createMesh,createInstancedMesh,loadTexture} from '/packages/materials/dist/index.js';
 const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,0,3],target:[0,0,0]}});

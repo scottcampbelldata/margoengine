@@ -14,6 +14,12 @@
       "commit": "1d1ce705",
       "reason": "Clean-room staging contact shadows: its scene pass descriptor (colour load, depth load/store, stencil load/store when the format has one) is the same 6 lines as environment planar's; boilerplate, not shared logic.",
       "grew": 1
+    },
+    {
+      "date": "2026-10-24",
+      "commit": "5a46eca7",
+      "reason": "The stage facade moved from packages/margoengine to packages/stage: same export * from core",
+      "grew": 1
     }
   ],
   "items": {
@@ -21,6 +27,6 @@
     "family hex-colour core": 1,
     "family hex-colour math": 1,
     "lines | text": 12,
-    "reexport packages/margoengine/src/index.ts * from @margoengine/core": 1
+    "reexport packages/stage/src/index.ts * from @margoengine/core": 1
   }
 }

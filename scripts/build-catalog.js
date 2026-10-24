@@ -32,7 +32,7 @@ const siteExamples = {
 };
 // Layers from docs/HANDOFF.md "Release presentation": the catalog and the sizes page list packages in this order.
 const layers = {
-  'Start here': ['margoengine', 'core'],
+  'Start here': ['margoengine', 'stage', 'core'],
   'Setup and diagnostics': ['math', 'quality', 'webgl', 'stats', 'inspector'],
   'Loading and formats': [
     'gltf',
@@ -132,7 +132,9 @@ for (const id of await readdir('packages')) {
     ...previous,
     ...siteExamples[id],
     id,
-    title: previous?.title ?? (id === 'margoengine' ? 'Stage facade' : id[0].toUpperCase() + id.slice(1)),
+    title:
+      previous?.title ??
+      (id === 'margoengine' ? 'One install' : id === 'stage' ? 'Stage facade' : id[0].toUpperCase() + id.slice(1)),
     category,
     package: manifest.name,
     version: manifest.version,

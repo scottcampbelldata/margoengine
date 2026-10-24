@@ -3,7 +3,7 @@
 // Driven by area-lights-gpu.mjs. A large grey floor (a core mesh, or a materials plane lit through lights.add) under one
 // rectangle area light; the directional light and ambient are off, so every floor pixel is the area light's alone. The page
 // unprojects pixel centres to floor points for the runner's CPU reference; bench() times 0/1/4/16 lights at 1280x720.
-import {createStage} from '/packages/margoengine/dist/index.js';
+import {createStage} from '/packages/stage/dist/index.js';
 import {box,PbrMaterial} from '/packages/core/dist/index.js';
 import {engineRuntime} from '/packages/core/dist/extension.js';
 import {invertMatrixStable} from '/packages/math/dist/mat4.js';

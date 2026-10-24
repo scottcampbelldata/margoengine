@@ -1,7 +1,7 @@
 {
   "gate": "api",
   "about": "undocumented public exports (tsdoc), bare Error throws and throw messages that name no fix, per file",
-  "total": 1839,
+  "total": 1838,
   "history": [
     {
       "date": "2026-10-24",
@@ -555,7 +555,6 @@
     "tsdoc machinery parseCAD": 1,
     "tsdoc machinery parseCADAsync": 1,
     "tsdoc machinery projectAnnotation": 1,
-    "tsdoc margoengine LoadedModel": 1,
     "tsdoc materials AnisotropyOptions": 1,
     "tsdoc materials AtlasOptions": 1,
     "tsdoc materials Blending": 1,

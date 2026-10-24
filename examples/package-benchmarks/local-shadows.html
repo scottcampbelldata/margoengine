@@ -4,7 +4,7 @@
 // on it: a core mesh, a materials mesh and an instance of createInstancedMesh. One point or one spot light above and behind them, the
 // directional light off and a dim ambient, so the floor is lit by the local light. The runner compares screenshots with
 // castShadow on and off at floor points the page projects. bench() times 1/4/8 shadowed point lights at 1280x720.
-import {createStage} from '/packages/margoengine/dist/index.js';
+import {createStage} from '/packages/stage/dist/index.js';
 import {box,PbrMaterial} from '/packages/core/dist/index.js';
 import {engineRuntime} from '/packages/core/dist/extension.js';
 import {boxGeometry,planeGeometry} from '/packages/geometry/dist/index.js';

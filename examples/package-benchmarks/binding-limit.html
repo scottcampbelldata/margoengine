@@ -5,7 +5,7 @@
 // LocalShadows point light: 16 sampled textures per fragment stage. Query: ?env=ref loads environment as of e017d50 (BRDF LUT
 // texture: 17 textures; the device is then created with the adapter's raised limits unless &limits=default);
 // ?brdf=karis swaps the buffer LUT for Karis's analytic mobile fit (measurement only).
-import {createStage} from '/packages/margoengine/dist/index.js';
+import {createStage} from '/packages/stage/dist/index.js';
 import {engineRuntime} from '/packages/core/dist/extension.js';
 import {sphereGeometry,planeGeometry} from '/packages/geometry/dist/index.js';
 import {parseGLTF} from '/packages/gltf-pro/dist/index.js';

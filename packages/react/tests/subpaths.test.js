@@ -112,7 +112,7 @@ test('package exports preserve independent public runtime and declaration paths 
     assert.ok(manifest.peerDependencies[peer], peer + ' is a declared peer');
     assert.equal(manifest.peerDependenciesMeta[peer]?.optional, true, peer + ' is optional');
   }
-  for (const peer of ['@margoengine/core', 'margoengine', 'react']) assert.ok(manifest.peerDependencies[peer]);
+  for (const peer of ['@margoengine/core', '@margoengine/stage', 'react']) assert.ok(manifest.peerDependencies[peer]);
   for (const group of ['dependencies', 'peerDependencies', 'optionalDependencies'])
     for (const name of Object.keys(manifest[group] ?? {}))
       assert.equal(name === 'three' || name === 'react-reconciler', false);

@@ -210,7 +210,7 @@ test('initial core + stage consumer keeps every optional pack behind a lazy boun
     'Real core code was not retained',
   );
   assert.ok(
-    modules.some((id) => packageName(id) === 'margoengine'),
+    modules.some((id) => packageName(id) === 'stage'),
     'Real stage facade was not retained',
   );
   for (const pack of optionalPacks)

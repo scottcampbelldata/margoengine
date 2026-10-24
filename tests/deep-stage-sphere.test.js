@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { sphere } from '../packages/margoengine/dist/index.js';
+import { sphere } from '../packages/stage/dist/index.js';
 
 test('Stage sphere packing remains byte-identical across radii and minimum/maximum segment counts', () => {
   for (const [radius, segments, digest] of [

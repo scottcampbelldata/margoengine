@@ -4,7 +4,7 @@
 // sun and ambient, Tonemap 'neutral' as the post capture (scene depth). ?msaa=1 runs the single-sampled scene path.
 // Atlas: 8 x 8 rgba8, quadrants red | green over blue | white.
 if(new URLSearchParams(location.search).get('msaa')==='1')globalThis.margoLow=1;
-import('/packages/margoengine/dist/index.js').then(async({createStage})=>{
+import('/packages/stage/dist/index.js').then(async({createStage})=>{
 const {box,PbrMaterial}=await import('/packages/core/dist/index.js');
 const {engineRuntime}=await import('/packages/core/dist/extension.js');
 const {invertMatrixStable}=await import('/packages/math/dist/mat4.js');

@@ -1,4 +1,4 @@
-import { createStage, box, PbrMaterial } from '/packages/margoengine/dist/index.js';
+import { createStage, box, PbrMaterial } from '/packages/stage/dist/index.js';
 import { engineRuntime } from '/packages/core/dist/extension.js';
 import { webglRenderer } from '/packages/webgl/dist/index.js';
 import { Splats } from '/packages/splats/dist/index.js';

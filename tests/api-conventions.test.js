@@ -21,7 +21,8 @@ const isClass = (value) => typeof value === 'function' && /^class\b/.test(Functi
 async function packageClasses() {
   const found = new Map();
   for (const dir of (await readdir('packages')).sort()) {
-    if (dir === 'core' || dir === 'margoengine' || dir === 'shared') continue;
+    // core and the stage are frozen (AGENTS.md); margoengine re-exports the stage.
+    if (dir === 'core' || dir === 'stage' || dir === 'margoengine' || dir === 'shared') continue;
     let manifest;
     try {
       manifest = JSON.parse(await readFile(`packages/${dir}/package.json`, 'utf8'));
@@ -29,6 +30,8 @@ async function packageClasses() {
       continue;
     }
     for (const [entry, target] of Object.entries(manifest.exports ?? {})) {
+      // margoengine/<x> re-exports @margoengine/<x>, walked on its own.
+      if (manifest.name === 'margoengine' && entry !== '.') continue;
       const file = typeof target === 'string' ? target : target.import;
       if (!file?.endsWith('.js')) continue;
       const module = await import(pathToFileURL(`packages/${dir}/${file}`).href);
@@ -72,7 +75,7 @@ test('every package class follows the attach / dispose / Symbol.dispose conventi
 test('classes constructed from the engine have static attach (API reports)', async () => {
   const problems = [];
   for (const file of await readdir('api')) {
-    if (file.startsWith('core') || file.startsWith('margoengine')) continue;
+    if (file.startsWith('core') || file.startsWith('stage') || file.startsWith('margoengine')) continue;
     const text = (await readFile(`api/${file}`, 'utf8')).replaceAll('\r', '');
     const classes = new Map(
       [...text.matchAll(/^export (?:declare )?(?:abstract )?class (\w+)([^\n]*)\{\n([\s\S]*?)^\}/gm)].map(

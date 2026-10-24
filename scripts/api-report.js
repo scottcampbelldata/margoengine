@@ -9,6 +9,7 @@ import { SyntaxKind } from 'typescript/unstable/ast';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { isUmbrellaAlias } from './umbrella.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const update = process.argv.includes('--update');
@@ -23,14 +24,22 @@ for (const dir of readdirSync(join(root, 'packages')).sort(byText)) {
   const file = join(root, 'packages', dir, 'package.json');
   if (!existsSync(file)) continue;
   const manifest = JSON.parse(readFileSync(file, 'utf8'));
-  const entries = Object.entries(manifest.exports ?? {}).map(([subpath, target]) => {
-    const types = typeof target === 'string' ? target.replace(/\.js$/, '.d.ts') : target.types;
-    const dts = join(root, 'packages', dir, types);
-    if (!existsSync(dts))
-      throw new Error(`${manifest.name} "${subpath}": ${types} missing; run npm run build:packages`);
-    const suffix = subpath === '.' ? '' : '.' + subpath.slice(2).replaceAll('/', '-');
-    return { subpath, specifier: manifest.name + subpath.slice(1), dts: slash(dts), report: `${dir}${suffix}.api.md` };
-  });
+  // margoengine/<x> aliases re-export @margoengine/<x>, which has its own report (scripts/umbrella.mjs).
+  const entries = Object.entries(manifest.exports ?? {})
+    .filter(([subpath]) => !isUmbrellaAlias(manifest.name, subpath))
+    .map(([subpath, target]) => {
+      const types = typeof target === 'string' ? target.replace(/\.js$/, '.d.ts') : target.types;
+      const dts = join(root, 'packages', dir, types);
+      if (!existsSync(dts))
+        throw new Error(`${manifest.name} "${subpath}": ${types} missing; run npm run build:packages`);
+      const suffix = subpath === '.' ? '' : '.' + subpath.slice(2).replaceAll('/', '-');
+      return {
+        subpath,
+        specifier: manifest.name + subpath.slice(1),
+        dts: slash(dts),
+        report: `${dir}${suffix}.api.md`,
+      };
+    });
   if (entries.length)
     packages.push({ dir, name: manifest.name, home: key(join(root, 'packages', dir)) + '/', entries });
 }
