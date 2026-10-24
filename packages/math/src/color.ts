@@ -134,8 +134,22 @@ function cssColor(text: string): { rgb: number[]; space: ColorSpace } | null {
 }
 
 /**
+ * sRGB components (0..1) `[r, g, b, a]` of a CSS hex colour: `#rgb`, `#rrggbb` or `#rrggbbaa` (the `#` is
+ * optional, surrounding spaces are ignored, alpha is 1 when absent), or undefined when `text` is not one. The one hex
+ * parser: parseColor, Color, environment's colours, the 3MF loader, materials, mesh-edit palettes and shader colours use it.
+ */
+export function hexColor(text: string): [number, number, number, number] | undefined {
+  const digits = /^#?([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(text.trim())?.[1];
+  if (!digits) return undefined;
+  const full = digits.length === 3 ? digits.replace(/./g, '$&$&') : digits,
+    out: [number, number, number, number] = [0, 0, 0, 1];
+  for (let i = 0; i < full.length / 2; i++) out[i] = parseInt(full.slice(2 * i, 2 * i + 2), 16) / 255;
+  return out;
+}
+
+/**
  * Converts a {@link ColorInput} to linear RGB at `out[offset..offset + 2]` and returns `out` (default: a new
- * `[0, 0, 0]`; `offset` defaults to 0). Strings are `#rrggbb`, `#rgb` (sRGB) or CSS `color(display-p3 r g b)` (also
+ * `[0, 0, 0]`; `offset` defaults to 0). Strings are hex (sRGB, see {@link hexColor}; alpha is ignored) or CSS `color(display-p3 r g b)` (also
  * `srgb`, `srgb-linear` and `display-p3-linear`; components 0..1 or %): a Display P3 colour outside sRGB keeps its
  * negative linear sRGB channels, for the shaders that carry them to a wide-gamut canvas (tonemap, ColorOutput).
  * @throws RangeError for a number outside 0x000000..0xffffff or a negative/non-finite `[r, g, b]` component (linear
@@ -158,11 +172,9 @@ export function parseColor(
     rgb = [0, 0, 0];
     toLinear(parts[0], parts[1], parts[2], space, rgb, 0);
   } else if (typeof value === 'string') {
-    const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(value),
-      long = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(value);
-    const parts = long ? long.slice(1) : short ? short.slice(1).map((c) => c + c) : null;
-    if (!parts) throw new TypeError('Color strings must be #rrggbb or #rgb');
-    rgb = parts.map((p) => SRGBToLinear(parseInt(p, 16) / 255));
+    const hex = hexColor(value);
+    if (!hex) throw new TypeError('Color strings must be #rrggbb or #rgb');
+    rgb = [SRGBToLinear(hex[0]), SRGBToLinear(hex[1]), SRGBToLinear(hex[2])];
   } else if (value && typeof value === 'object' && value.length === 3) {
     rgb = [value[0], value[1], value[2]];
     if (rgb.some((v) => typeof v !== 'number' || !Number.isFinite(v) || v < 0))
@@ -240,17 +252,14 @@ export class Color {
       p = 2 * l - q;
     return this.setRGB(hue(p, q, h + 1 / 3), hue(p, q, h), hue(p, q, h - 1 / 3), colorSpace);
   }
-  /** Parses `#rgb`, `#rrggbb`, `rgb()`/`rgba()` (0-255 or %) and `hsl()`/`hsla()`. Alpha is ignored. Named colors are not supported. */
+  /** Parses hex (`#rgb`, `#rrggbb`, see {@link hexColor}), `rgb()`/`rgba()` (0-255 or %) and `hsl()`/`hsla()`. Alpha is ignored. Named colors are not supported. */
   setStyle(style: string, colorSpace: ColorSpace = 'srgb'): this {
     const text = style.trim(),
       css = cssColor(text);
     if (css) return this.setRGB(css.rgb[0], css.rgb[1], css.rgb[2], css.space);
-    let match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(text);
-    if (match) {
-      const hex = match[1].length === 3 ? match[1].replace(/./g, '$&$&') : match[1];
-      return this.setHex(parseInt(hex, 16), colorSpace);
-    }
-    match = /^(rgb|hsl)a?\(([^)]*)\)$/i.exec(text);
+    const hex = hexColor(text);
+    if (hex) return this.setRGB(hex[0], hex[1], hex[2], colorSpace);
+    const match = /^(rgb|hsl)a?\(([^)]*)\)$/i.exec(text);
     const parts = match?.[2].split(/[\s,/]+/).filter(Boolean);
     if (match && parts && parts.length >= 3 && parts.length <= 4) {
       const numbers = parts.map((part) => parseFloat(part));

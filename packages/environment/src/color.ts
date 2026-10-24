@@ -5,6 +5,7 @@ import { engineRuntime, type FrameGraph, type PassContext } from '@margoengine/c
 import {
   type ColorInput,
   LinearToSRGB as linearToSrgb,
+  hexColor,
   parseColor,
   SRGBToLinear as srgbToLinear,
 } from '@margoengine/math/color';
@@ -27,10 +28,9 @@ function colorPair(value: ColorInput): { srgb: RGB; linear: RGB } {
     return { srgb: [linearToSrgb(linear[0]), linearToSrgb(linear[1]), linearToSrgb(linear[2])], linear };
   }
   if (typeof value === 'string') {
-    const digits = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(value)?.[1];
-    if (!digits)
-      throw new TypeError(`Color '${value}' is not '#rgb' or '#rrggbb'; pass a hex color or linear [r, g, b]`);
-    hex = parseInt(digits.length === 3 ? digits.replace(/./g, '$&$&') : digits, 16);
+    const rgb = hexColor(value);
+    if (!rgb) throw new TypeError(`Color '${value}' is not '#rgb' or '#rrggbb'; pass a hex color or linear [r, g, b]`);
+    hex = (Math.round(rgb[0] * 255) << 16) | (Math.round(rgb[1] * 255) << 8) | Math.round(rgb[2] * 255);
   }
   if (hex !== undefined) {
     if (!Number.isInteger(hex) || hex < 0 || hex > 0xffffff)

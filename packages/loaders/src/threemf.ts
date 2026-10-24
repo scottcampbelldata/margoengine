@@ -2,6 +2,7 @@ import { LoaderError, type LoadedGeometry, type LoadedGroup, type ParseLimits } 
 import { floats, limits, throwIfAborted, toBytes, uints, type BinaryInput, type Growable } from './util.js';
 import { readZipDirectory, readZipEntry, type ZipEntry, type ZipOptions } from './zip.js';
 import { decodeXML, readXML } from './xml.js';
+import { hexColor } from '@margoengine/math/color';
 
 const F = '3MF';
 const NONE = 0xffffffff;
@@ -61,10 +62,9 @@ interface Model {
 const IDENTITY = new Float64Array([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]);
 
 function parseColor(value: string | undefined): Color {
-  const match = /^#([0-9a-fA-F]{6})([0-9a-fA-F]{2})?$/.exec(value?.trim() ?? '');
-  if (!match) throw new LoaderError(F, 'syntax', `invalid color "${String(value).slice(0, 16)}"`);
-  const hex = match[1] + (match[2] ?? 'ff');
-  return [0, 2, 4, 6].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as Color;
+  const rgba = hexColor(value ?? '');
+  if (!rgba) throw new LoaderError(F, 'syntax', `invalid color "${String(value).slice(0, 16)}"`);
+  return rgba;
 }
 
 function parseTransform(value: string | undefined): Float64Array {

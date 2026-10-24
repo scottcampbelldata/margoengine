@@ -1,13 +1,15 @@
 import type { PaintAtlas, PaintTexture } from './paint-types.js';
 import { validatePaintTexture } from './paint-common.js';
 import { paintColorBytes } from './paint.js';
+import { hexColor } from '@margoengine/math/color';
 
 const rgbHex = (r: number, g: number, b: number): string =>
   `#${[r, g, b].map((value) => value.toString(16).padStart(2, '0')).join('')}`;
 const normalizedHex = (value: string): string => {
-  if (typeof value !== 'string' || !/^#[0-9a-f]{6}$/i.test(value))
-    throw new TypeError('Palette colors must be six-digit hexadecimal RGB colors; use #rrggbb.');
-  return value.toLowerCase();
+  const rgb = typeof value === 'string' ? hexColor(value) : undefined;
+  if (!rgb || rgb[3] !== 1)
+    throw new TypeError('Palette colors must be hexadecimal RGB colors; use six-digit #rrggbb or three-digit #rgb.');
+  return rgbHex(...(rgb.slice(0, 3).map((v) => Math.round(v * 255)) as [number, number, number]));
 };
 
 /** Most frequent opaque RGB colors, with deterministic hex ordering when frequencies tie. */

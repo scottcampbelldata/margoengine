@@ -1,5 +1,6 @@
 // Typed shader nodes and the WGSL builder shared by the material, post and compute hosts.
 import { nested } from './scope.js';
+import { hexColor, SRGBToLinear } from '@margoengine/math/color';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 type N = 2 | 3 | 4;
 /** WGSL scalar types a node can have. */
@@ -441,28 +442,26 @@ export const mat3 = (...p: Part[]): Node<'mat3x3f'> => construct('mat3x3f', p),
   mat4 = (...p: Part[]): Node<'mat4x4f'> => construct('mat4x4f', p);
 /** A colour for {@link color} and uniforms: `'#rrggbb'` or `0xrrggbb` (sRGB, decoded to linear) or linear `[r, g, b]`. */
 export type ColorValue = string | number | readonly number[];
-/** `'#rrggbb'` or `0xrrggbb` (sRGB) or linear `[r, g, b]`, as linear RGB. */
+/** `'#rrggbb'`, `'#rgb'` or `0xrrggbb` (sRGB) or linear `[r, g, b]`, as linear RGB. */
 export function linearColor(c: ColorValue): number[] {
-  const hex =
+  const srgb =
     typeof c === 'number'
-      ? c
-      : typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c)
-        ? parseInt(c.slice(1), 16)
+      ? c >= 0 && c <= 0xffffff
+        ? [16, 8, 0].map((k) => ((c >> k) & 255) / 255)
+        : undefined
+      : typeof c === 'string'
+        ? hexColor(c)?.slice(0, 3)
         : undefined;
-  const v =
-    hex !== undefined && hex >= 0 && hex <= 0xffffff
-      ? [16, 8, 0].map((k) => {
-          const x = ((hex >> k) & 255) / 255;
-          return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
-        })
-      : Array.isArray(c) && c.length === 3
-        ? [...(c as number[])]
-        : fail('Expected a #rrggbb or 0xrrggbb colour or [r, g, b]');
+  const v = srgb
+    ? srgb.map(SRGBToLinear)
+    : Array.isArray(c) && c.length === 3
+      ? [...(c as number[])]
+      : fail('Expected a #rrggbb or 0xrrggbb colour or [r, g, b]');
   return v.map((x) => Math.round(x * 1e6) / 1e6);
 }
 /**
  * A linear-RGB `vec3f` constant from a {@link ColorValue} (components rounded to 6 decimals).
- * @throws TypeError for anything but `#rrggbb`, `0xrrggbb` (0..0xffffff) or a 3-number array.
+ * @throws TypeError for anything but `#rrggbb`, `#rgb`, `0xrrggbb` (0..0xffffff) or a 3-number array.
  */
 export const color = (c: ColorValue): Node<'vec3f'> => construct('vec3f', linearColor(c));
 

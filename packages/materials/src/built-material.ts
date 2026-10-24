@@ -26,7 +26,7 @@ import { attenuationPower } from '../../shared/attenuation.js';
 import { clusterBrdf } from '../../shared/light-terms.js';
 import { primitiveAfterOpaque } from '../../shared/material-routing.js';
 import { MargoError } from '@margoengine/math/errors';
-import { parseColor, type ColorInput } from '@margoengine/math/color';
+import { hexColor, parseColor, type ColorInput } from '@margoengine/math/color';
 import {
   convertP3,
   dataGPUFormat,
@@ -1448,7 +1448,7 @@ const linear = (c: ColorInput, label: string): number[] => {
   if (typeof c === 'number' && !(Number.isInteger(c) && c >= 0 && c <= 0xffffff))
     throw new RangeError('Material ' + label + ' number must be a 0xrrggbb sRGB colour; set 0x000000 through 0xffffff');
   const v =
-    typeof c === 'number' || (typeof c === 'string' && /^#([0-9a-f]{3}){1,2}$/i.test(c))
+    typeof c === 'number' || (typeof c === 'string' && hexColor(c))
       ? (parseColor(c) as number[])
       : Array.isArray(c)
         ? [...c]

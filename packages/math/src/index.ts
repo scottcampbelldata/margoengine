@@ -7,6 +7,7 @@ export { Matrix3 } from './matrix3.js';
 export { Matrix4 } from './matrix4.js';
 export {
   Color,
+  hexColor,
   SRGBToLinear,
   LinearToSRGB,
   P3_TO_SRGB,
