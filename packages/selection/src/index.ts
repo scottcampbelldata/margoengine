@@ -15,7 +15,7 @@ import {
   type PassContext,
   type DrawOptions,
 } from '@margoengine/core/extension';
-import { fullscreen, meshVertex, group, compute, render, dispatch, draw } from '../../shared/gpu.js';
+import { fullscreen, meshVertex, group, compute, render, dispatch, draw, alphaBlend } from '../../shared/gpu.js';
 import { applyView } from '../../shared/view-rect.js';
 import { currentFrame, retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
 import {
@@ -89,10 +89,7 @@ const xrayComposite =
  let d=abs(vec2f(p-seed));if(settings[0].z>0&&fract(select(f32(seed.y),f32(seed.x),d.y>=d.x)/(2*settings[0].z))>=0.5){discard;}
  return vec4f(settings[1].rgb,settings[0].w);
 }`;
-const blend: GPUBlendState = {
-  color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-  alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-};
+const blend = alphaBlend;
 export class Selection implements EnginePlugin {
   private readonly sources = new PickingPrimitives();
   readonly name: string;

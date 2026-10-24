@@ -7,7 +7,7 @@ import { Line } from './line.js';
 import { foggedLineShader, lineShader } from './shader.js';
 import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js';
 import { applyView } from '../../shared/view-rect.js';
-import { overlayPass } from '../../shared/gpu.js';
+import { overlayPass, alphaBlend } from '../../shared/gpu.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -180,10 +180,7 @@ export class Lines implements EnginePlugin {
           targets: [
             {
               format,
-              blend: {
-                color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-                alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-              },
+              blend: alphaBlend,
             },
           ],
         },

@@ -10,6 +10,7 @@ import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine
 import { viewMatrix } from '../../shared/view.js';
 import { neutralShader } from '../../shared/display.js';
 import type { BindableTexture } from './texture.js';
+import { alphaBlend } from '../../shared/gpu.js';
 declare const GPUBufferUsage: { UNIFORM: number; VERTEX: number; INDEX: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
@@ -238,10 +239,7 @@ function bindTexture(device: GPUDevice, t: RawTexture): [GPUTextureView, GPUSamp
   return [view, own()];
 }
 const blends: Record<string, GPUBlendState | undefined> = {
-  normal: {
-    color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-    alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-  },
+  normal: alphaBlend,
   additive: {
     color: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' },
     alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },

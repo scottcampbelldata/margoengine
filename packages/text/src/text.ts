@@ -18,6 +18,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { eulerToQuaternion } from '@margoengine/math/quat';
 import type { Vec3 } from '@margoengine/math';
 import { compose, finiteArray, identity, type Mat4 } from './math.js';
+import { attachableMesh } from '../../shared/gpu.js';
 
 /**
  * Appearance options of a `Text` block. Validated every frame: opacities outside 0..1 or a negative or
@@ -208,10 +209,7 @@ export class Text {
 
   /** Follow a core mesh's world matrix (hidden with it), or null for world space. */
   attach(mesh: Mesh | null): this {
-    if (mesh !== null && (typeof mesh !== 'object' || typeof mesh.check !== 'function'))
-      throw new TypeError('Expected a Margo Engine mesh');
-    mesh?.check();
-    this.target = mesh;
+    this.target = attachableMesh(mesh);
     return this;
   }
   get attachedMesh(): Mesh | null {

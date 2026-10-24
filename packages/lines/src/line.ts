@@ -13,6 +13,7 @@ import {
   type LineMode,
 } from './geometry.js';
 import { copyIfChanged, finiteArray, identity, type Mat4 } from './math.js';
+import { attachableMesh } from '../../shared/gpu.js';
 
 /**
  * Style options for `LineMaterial` (and `Line`). Validated on set and every frame: out-of-range numbers throw
@@ -237,10 +238,7 @@ export class Line {
 
   /** Follow a core mesh's world matrix (the line's points are then in the mesh's local space), or null for world space. */
   attach(mesh: Mesh | null): this {
-    if (mesh !== null && (typeof mesh !== 'object' || typeof mesh.check !== 'function'))
-      throw new TypeError('Expected a Margo Engine mesh');
-    mesh?.check();
-    this.target = mesh;
+    this.target = attachableMesh(mesh);
     return this;
   }
 

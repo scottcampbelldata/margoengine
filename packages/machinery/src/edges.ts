@@ -10,6 +10,7 @@ import {
 } from '@margoengine/core/extension';
 import { edgesGeometry } from '@margoengine/geometry/utils';
 import { declaration } from './section-uniform.js';
+import { alphaBlend } from '../../shared/gpu.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number; INDIRECT: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
 type GPUContext = Extract<PassContext, { backend: 'webgpu' }>;
@@ -419,10 +420,7 @@ export class FeatureEdges implements EnginePlugin {
           targets: [
             {
               format: context.format,
-              blend: {
-                color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-                alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-              },
+              blend: alphaBlend,
             },
           ],
         },

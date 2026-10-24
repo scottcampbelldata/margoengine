@@ -28,6 +28,7 @@ import { voxelPostShader } from './render-post.js';
 import type { VoxelLightmap } from './lightmap.js';
 import { BlockTextures, blockTextureView } from './textures.js';
 import type { VoxelWorld } from './world.js';
+import { alphaBlend } from '../../shared/gpu.js';
 
 export type { VoxelLightmap } from './lightmap.js';
 export { type BlockPixels, BlockTextures, type BlockTexturesOptions } from './textures.js';
@@ -705,10 +706,7 @@ export class VoxelRenderer implements EnginePlugin {
           l === 2 && mode !== 'gbuffer' && index === (mode === 'occlusion' ? 1 : 0)
             ? {
                 ...t,
-                blend: {
-                  color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-                  alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-                },
+                blend: alphaBlend,
               }
             : t,
         ),

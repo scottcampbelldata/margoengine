@@ -29,6 +29,7 @@ import {
 } from './shaders.js';
 import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js';
 import { applyView, viewRect, viewSize, ViewStates } from '../../shared/view-rect.js';
+import { alphaBlend } from '../../shared/gpu.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -786,10 +787,7 @@ export class PointsPlugin implements EnginePlugin {
           color: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' },
           alpha: { srcFactor: 'zero', dstFactor: 'one', operation: 'add' },
         }
-      : {
-          color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-          alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-        };
+      : alphaBlend;
   }
 
   /** Whether `material` draws with the fogged shaders this frame. */
