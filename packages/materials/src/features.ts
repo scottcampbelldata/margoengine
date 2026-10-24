@@ -70,12 +70,13 @@ export function featureShader(code: string, group: number, key: string): string 
       'let n=normalize(cross(dpdy(i.position),dpdx(i.position)));',
     );
   // A normal map's +Y is up the image (glTF 2.0 material.schema.json normalTexture: "+X is right and +Y is up").
-  // gltf-pro's derived frame (shared/tangent-frame.js) sends B toward decreasing v, up the image for glTF's upper-left
-  // texture origin. Materials meshes have a bottom-left UV origin and flipY uploads, so up the image is increasing v,
-  // where MikkTSpace tangents of these UVs put B too (mikktspace.c: vOt along increasing t; bitangent = fSign *
-  // cross(vN, tangent)). Authored tangents keep b = cross(n, t) * w: this only changes the frame drawn without them.
-  // One definition serves every caller: the base surface and extension lobes (clearcoat(), lobes, node normalMap).
-  if (has('n')) out = edit(out, 'mat3x3f(t*scale,-b*scale,n)', 'mat3x3f(t*scale,b*scale,n)');
+  // gltf-pro's derived frame (shared/tangent-frame.js) sends B along grad(-v), toward decreasing v, up the image for
+  // glTF's upper-left texture origin. Materials meshes have a bottom-left UV origin and flipY uploads, so up the image
+  // is increasing v, where MikkTSpace tangents of these UVs put B too (mikktspace.c: vOt along increasing t; bitangent =
+  // fSign * cross(vN, tangent)): B becomes grad(v). Authored tangents keep b = cross(n, t) * w: this only changes the
+  // frame drawn without them. One definition serves every caller: the base surface and extension lobes (clearcoat(),
+  // lobes, node normalMap).
+  if (has('n')) out = edit(out, 'return mat3x3f(gu*k,gv*k,n);', 'return mat3x3f(gu*k,-gv*k,n);');
   // After the normal map: the bump tilts the mapped normal.
   if (maps[1])
     out = edit(

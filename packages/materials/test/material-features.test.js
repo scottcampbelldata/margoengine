@@ -488,9 +488,9 @@ test('tangent-space maps and anisotropy point the derived frame up bottom-left-o
       new PbrMaterial({ anisotropy: 0.5, anisotropyRotation: 1 }),
     ],
     meshes = materials.map((m) => createMesh(s.engine, quad, m)),
-    signs = codes(s.frame()).map((c) => /return mat3x3f\(t\*scale,(-?)b\*scale,n\);/.exec(c)?.[1]);
-  // gltf-pro's frame (glTF: B toward decreasing v) only for the material without one; b = cross(n, t) * w untouched.
-  assert.deepEqual(signs.sort(), ['', '', '', '-']);
+    signs = codes(s.frame()).map((c) => /return mat3x3f\(gu\*k,(-?)gv\*k,n\);/.exec(c)?.[1]);
+  // gltf-pro's frame (glTF: B = grad(-v), no sign) only for the material without one; b = cross(n, t) * w untouched.
+  assert.deepEqual(signs.sort(), ['', '-', '-', '-']);
   for (const mesh of meshes) mesh.destroy();
   s.engine.dispose();
 });
@@ -523,20 +523,20 @@ test('extension lobes sampling a tangent-space map take the materials frame (+b)
     gltf = () => parseGLTF(s.engine, doc, [new Float32Array([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0])]);
   const sign = (model, extension) => {
     model.primitives[0].extension = extension;
-    const found = codes(s.frame()).map((c) => /return mat3x3f\(t\*scale,(-?)b\*scale,n\);/.exec(c)?.[1]);
+    const found = codes(s.frame()).map((c) => /return mat3x3f\(gu\*k,(-?)gv\*k,n\);/.exec(c)?.[1]);
     model.destroy();
     return found.join();
   };
   const mesh = () => createMesh(s.engine, quad, new PbrMaterial());
-  assert.equal(sign(mesh(), clearcoat({ factor: 1, clearcoatNormalTexture: texture })), '');
-  assert.equal(sign(mesh(), materialLobes({ anisotropy: { strength: 1 } })), '');
-  assert.equal(sign(mesh(), nodeMaterial(graph(true))), '');
+  assert.equal(sign(mesh(), clearcoat({ factor: 1, clearcoatNormalTexture: texture })), '-');
+  assert.equal(sign(mesh(), materialLobes({ anisotropy: { strength: 1 } })), '-');
+  assert.equal(sign(mesh(), nodeMaterial(graph(true))), '-');
   // Feature off: lobes without a tangent-space map, and a physical material with maps but no normal map, keep the text.
-  assert.equal(sign(mesh(), clearcoat({ factor: 1 })), '-');
-  assert.equal(sign(mesh(), materialLobes({ sheen: { colorFactor: [1, 1, 1] } })), '-');
-  assert.equal(sign(mesh(), nodeMaterial(graph(false))), '-');
-  assert.equal(sign(createMesh(s.engine, quad, new PbrMaterial({ sheen: 1, sheenColorMap: solid(9, 9, 9) }))), '-');
-  assert.equal(sign(gltf(), clearcoat({ factor: 1, clearcoatNormalTexture: texture })), '-');
+  assert.equal(sign(mesh(), clearcoat({ factor: 1 })), '');
+  assert.equal(sign(mesh(), materialLobes({ sheen: { colorFactor: [1, 1, 1] } })), '');
+  assert.equal(sign(mesh(), nodeMaterial(graph(false))), '');
+  assert.equal(sign(createMesh(s.engine, quad, new PbrMaterial({ sheen: 1, sheenColorMap: solid(9, 9, 9) }))), '');
+  assert.equal(sign(gltf(), clearcoat({ factor: 1, clearcoatNormalTexture: texture })), '');
   s.engine.dispose();
 });
 
