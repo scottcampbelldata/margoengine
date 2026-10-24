@@ -164,3 +164,14 @@ export function acquireDepth(engine) {
     },
   };
 }
+
+/**
+ * A reusable pass descriptor that draws over the frame: colour loaded and stored, depth read only, or loaded and stored
+ * with `depthWrites`, stencil read only. Set `colorAttachments[0].view` and `depthStencilAttachment.view` per frame.
+ */
+export const overlayPass = (depthWrites = false) => ({
+  colorAttachments: [{ view: undefined, loadOp: 'load', storeOp: 'store' }],
+  depthStencilAttachment: depthWrites
+    ? { view: undefined, depthLoadOp: 'load', depthStoreOp: 'store', stencilReadOnly: true }
+    : { view: undefined, depthReadOnly: true, stencilReadOnly: true },
+});

@@ -7,6 +7,7 @@ import { Line } from './line.js';
 import { foggedLineShader, lineShader } from './shader.js';
 import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js';
 import { applyView } from '../../shared/view-rect.js';
+import { overlayPass } from '../../shared/gpu.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -55,20 +56,9 @@ export class Lines implements EnginePlugin {
   private readonly frameData = new Float32Array(24);
   private readonly depthLines: Array<[Line, Resources]> = [];
   private readonly topLines: Array<[Line, Resources]> = [];
-  private readonly colorAttachment: GPURenderPassColorAttachment = {
-    view: undefined!,
-    loadOp: 'load',
-    storeOp: 'store',
-  };
-  private readonly depthAttachment: GPURenderPassDepthStencilAttachment = {
-    view: undefined!,
-    depthReadOnly: true,
-    stencilReadOnly: true,
-  };
-  private readonly descriptor: GPURenderPassDescriptor = {
-    colorAttachments: [this.colorAttachment],
-    depthStencilAttachment: this.depthAttachment,
-  };
+  private readonly descriptor = overlayPass();
+  private readonly colorAttachment = this.descriptor.colorAttachments[0];
+  private readonly depthAttachment = this.descriptor.depthStencilAttachment;
   private fogSource: FogLike | null = null;
   private fogGpu?: {
     layout: GPUBindGroupLayout;

@@ -1,5 +1,5 @@
 import type { PassContext } from '@margoengine/core/extension';
-import { compute, group } from '../../shared/gpu.js';
+import { compute, group, overlayPass } from '../../shared/gpu.js';
 import { waterFrame, type CoastalFlow } from './coastal.js';
 import { fogWgsl } from '../../shared/fog.js';
 import { margoError } from '../../shared/errors.js';
@@ -90,16 +90,9 @@ export class Spray {
   private readonly simulation: GPUComputePipeline;
   private readonly simulationGroups: GPUBindGroup[] = [];
   private readonly descriptor: GPUComputePassDescriptor = {};
-  private readonly color: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' };
-  private readonly depth: GPURenderPassDepthStencilAttachment = {
-    view: undefined!,
-    depthReadOnly: true,
-    stencilReadOnly: true,
-  };
-  private readonly presentation: GPURenderPassDescriptor = {
-    colorAttachments: [this.color],
-    depthStencilAttachment: this.depth,
-  };
+  private readonly presentation = overlayPass();
+  private readonly color = this.presentation.colorAttachments[0];
+  private readonly depth = this.presentation.depthStencilAttachment;
   private render?: GPURenderPipeline;
   private renderGroup?: GPUBindGroup;
   private format = '';

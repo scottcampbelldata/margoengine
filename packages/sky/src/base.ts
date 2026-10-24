@@ -7,7 +7,7 @@ import {
   type FrameGraph,
   type PassContext,
 } from '@margoengine/core/extension';
-import { fullscreen, group, compute, dispatch } from '../../shared/gpu.js';
+import { fullscreen, group, compute, dispatch, overlayPass } from '../../shared/gpu.js';
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { margoError } from '../../shared/errors.js';
 import type { Vec3 } from '@margoengine/math';
@@ -263,16 +263,9 @@ ${displayShader}
  * matrix is not invertible.
  */
 export class Sky implements EnginePlugin {
-  private readonly attachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' };
-  private readonly depthAttachment: GPURenderPassDepthStencilAttachment = {
-    view: undefined!,
-    depthReadOnly: true,
-    stencilReadOnly: true,
-  };
-  private readonly presentation: GPURenderPassDescriptor = {
-    colorAttachments: [this.attachment],
-    depthStencilAttachment: this.depthAttachment,
-  };
+  private readonly presentation = overlayPass();
+  private readonly attachment = this.presentation.colorAttachments[0];
+  private readonly depthAttachment = this.presentation.depthStencilAttachment;
   readonly name: string = 'sky';
   private engine?: Engine;
   private uniform?: GPUBuffer;

@@ -23,3 +23,8 @@ export function dispatch(
   y?: number,
 ): void;
 export function acquireDepth(engine: Engine): { texture: () => GPUTexture | undefined; release(): void };
+/** A reusable pass descriptor drawing over the frame (colour load/store; depth read only, or load/store with `depthWrites`). */
+export function overlayPass(depthWrites?: boolean): GPURenderPassDescriptor & {
+  colorAttachments: [GPURenderPassColorAttachment];
+  depthStencilAttachment: GPURenderPassDepthStencilAttachment;
+};

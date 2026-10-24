@@ -27,7 +27,7 @@ import {
   type FrameGraph,
   type PassContext,
 } from '@margoengine/core/extension';
-import { group, compute, dispatch } from '../../shared/gpu.js';
+import { group, compute, dispatch, overlayPass } from '../../shared/gpu.js';
 import { preset } from '../../shared/preset.js';
 import { displayShader } from '../../shared/display.js';
 import { MargoError } from '@margoengine/math/errors';
@@ -255,17 +255,9 @@ export class Scatter implements EnginePlugin {
   private pbrShader = '';
   private pbrBindings: GPUBindGroupEntry[] = [];
   private readonly pbrGroups = new Map<GPURenderPipeline, GPUBindGroup>();
-  private readonly attachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' };
-  private readonly depthAttachment: GPURenderPassDepthStencilAttachment = {
-    view: undefined!,
-    depthLoadOp: 'load',
-    depthStoreOp: 'store',
-    stencilReadOnly: true,
-  };
-  private readonly presentation: GPURenderPassDescriptor = {
-    colorAttachments: [this.attachment],
-    depthStencilAttachment: this.depthAttachment,
-  };
+  private readonly presentation = overlayPass(true);
+  private readonly attachment = this.presentation.colorAttachments[0];
+  private readonly depthAttachment = this.presentation.depthStencilAttachment;
   private readonly options: ScatterOptions;
   /** Whether any instance can fade between LOD meshes: shaders keep the dither `discard` only then. */
   private readonly fade: boolean;

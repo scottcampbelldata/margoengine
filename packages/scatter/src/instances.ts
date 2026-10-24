@@ -10,6 +10,7 @@ import {
 import { windShader, validateWind, type ScatterWind } from './wind.js';
 import { sameBindings, snapshotBindings } from './bindings.js';
 import { MargoError } from '@margoengine/math/errors';
+import { overlayPass } from '../../shared/gpu.js';
 
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; INDIRECT: number; UNIFORM: number; COPY_DST: number };
 type ScatterPassContext = Extract<PassContext, { backend: 'webgpu' }>;
@@ -122,17 +123,9 @@ export class ScatterInstances implements EnginePlugin {
   private bindings: GPUBindGroupEntry[] = [];
   /** Whether any batch sets `translucency`; otherwise the shader and layout stay as they were without it. */
   private translucent = false;
-  private readonly color: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' };
-  private readonly depth: GPURenderPassDepthStencilAttachment = {
-    view: undefined!,
-    depthLoadOp: 'load',
-    depthStoreOp: 'store',
-    stencilReadOnly: true,
-  };
-  private readonly presentation: GPURenderPassDescriptor = {
-    colorAttachments: [this.color],
-    depthStencilAttachment: this.depth,
-  };
+  private readonly presentation = overlayPass(true);
+  private readonly color = this.presentation.colorAttachments[0];
+  private readonly depth = this.presentation.depthStencilAttachment;
 
   constructor(private readonly generate: () => readonly ScatterBatch[]) {
     if (typeof generate !== 'function') throw new TypeError('Expected an instance factory');

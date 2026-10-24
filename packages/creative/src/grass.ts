@@ -16,6 +16,7 @@ import cullShader from './shaders/grass-cull.wgsl?raw';
 import grassShader from './shaders/grass.wgsl?raw';
 import { displayShader } from '../../shared/display.js';
 import { applyView } from '../../shared/view-rect.js';
+import { overlayPass } from '../../shared/gpu.js';
 
 declare const GPUBufferUsage: {
   STORAGE: number;
@@ -82,17 +83,9 @@ export class GrassField implements EnginePlugin {
   private readonly frame = new Float32Array(72);
   private time = 0;
   private readonly spores: boolean;
-  private readonly color: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' };
-  private readonly depth: GPURenderPassDepthStencilAttachment = {
-    view: undefined!,
-    depthLoadOp: 'load',
-    depthStoreOp: 'store',
-    stencilReadOnly: true,
-  };
-  private readonly pass: GPURenderPassDescriptor = {
-    colorAttachments: [this.color],
-    depthStencilAttachment: this.depth,
-  };
+  private readonly pass = overlayPass(true);
+  private readonly color = this.pass.colorAttachments[0];
+  private readonly depth = this.pass.depthStencilAttachment;
   private readonly sporeDepth: GPURenderPassDepthStencilAttachment = {
     view: undefined!,
     depthReadOnly: true,

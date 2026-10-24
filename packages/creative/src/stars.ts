@@ -4,6 +4,7 @@ import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
 import shader from './shaders/stars.wgsl?raw';
+import { overlayPass } from '../../shared/gpu.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number };
@@ -31,16 +32,9 @@ export class Stars implements EnginePlugin {
   private readonly data = new Float32Array(20);
   private readonly inverse = new Float32Array(16);
   private readonly workspace = new Float64Array(52);
-  private readonly color: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' };
-  private readonly depth: GPURenderPassDepthStencilAttachment = {
-    view: undefined!,
-    depthReadOnly: true,
-    stencilReadOnly: true,
-  };
-  private readonly descriptor: GPURenderPassDescriptor = {
-    colorAttachments: [this.color],
-    depthStencilAttachment: this.depth,
-  };
+  private readonly descriptor = overlayPass();
+  private readonly color = this.descriptor.colorAttachments[0];
+  private readonly depth = this.descriptor.depthStencilAttachment;
 
   setup(engine: Engine): void {
     const device = engine.gpu;

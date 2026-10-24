@@ -22,6 +22,7 @@ export {
   type ImposterSource,
 } from './imposter.js';
 import { MargoError } from '@margoengine/math/errors';
+import { overlayPass } from '../../shared/gpu.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
@@ -123,17 +124,9 @@ export class LODSystem implements EnginePlugin {
   private samples = 0;
   private depthFormat?: string;
   private readonly frame = new Float32Array(32);
-  private readonly color: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' };
-  private readonly depth: GPURenderPassDepthStencilAttachment = {
-    view: undefined!,
-    depthLoadOp: 'load',
-    depthStoreOp: 'store',
-    stencilReadOnly: true,
-  };
-  private readonly descriptor: GPURenderPassDescriptor = {
-    colorAttachments: [this.color],
-    depthStencilAttachment: this.depth,
-  };
+  private readonly descriptor = overlayPass(true);
+  private readonly color = this.descriptor.colorAttachments[0];
+  private readonly depth = this.descriptor.depthStencilAttachment;
   /** Same as `engine.use(new LODSystem(...))`; returns the LODSystem. */
   static attach(engine: EngineKernel, options?: LODSystemOptions): LODSystem {
     const value = new LODSystem(options);

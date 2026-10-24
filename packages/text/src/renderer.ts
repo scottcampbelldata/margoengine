@@ -9,6 +9,7 @@ import { multiplyMatrices } from '@margoengine/math/mat4';
 import { textShader } from './shader.js';
 import { Text } from './text.js';
 import { applyView } from '../../shared/view-rect.js';
+import { overlayPass } from '../../shared/gpu.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -82,20 +83,9 @@ export class TextRenderer implements EnginePlugin {
   private readonly view = new Float32Array(16);
   private readonly depthTexts: Array<[Text, Resources]> = [];
   private readonly topTexts: Array<[Text, Resources]> = [];
-  private readonly colorAttachment: GPURenderPassColorAttachment = {
-    view: undefined!,
-    loadOp: 'load',
-    storeOp: 'store',
-  };
-  private readonly depthAttachment: GPURenderPassDepthStencilAttachment = {
-    view: undefined!,
-    depthReadOnly: true,
-    stencilReadOnly: true,
-  };
-  private readonly descriptor: GPURenderPassDescriptor = {
-    colorAttachments: [this.colorAttachment],
-    depthStencilAttachment: this.depthAttachment,
-  };
+  private readonly descriptor = overlayPass();
+  private readonly colorAttachment = this.descriptor.colorAttachments[0];
+  private readonly depthAttachment = this.descriptor.depthStencilAttachment;
   private atlasEpoch = 0;
 
   /** Same as `engine.use(new TextRenderer(...))`; returns the TextRenderer. */
