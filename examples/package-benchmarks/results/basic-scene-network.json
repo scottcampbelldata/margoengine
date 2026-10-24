@@ -1,5 +1,5 @@
 {
-  "commit": "2ac118cb",
+  "commit": "65c715a9",
   "dirty": false,
   "browser": "msedge 155.0.4283.62 headless",
   "adapter": "nvidia ampere",
@@ -11,8 +11,17 @@
       "encoding": "identity",
       "transferred": 808,
       "raw": 558,
-      "gzip": 369,
-      "brotli": 228
+      "gzip": 370,
+      "brotli": 227
+    },
+    {
+      "path": "assets/index-_jb7403o.js",
+      "role": "Entry: core + stage + app",
+      "encoding": "gzip",
+      "transferred": 23185,
+      "raw": 57068,
+      "gzip": 22804,
+      "brotli": 20081
     },
     {
       "path": "assets/geometry-CAWt7Gfm.js",
@@ -22,15 +31,6 @@
       "raw": 2036,
       "gzip": 1016,
       "brotli": 938
-    },
-    {
-      "path": "assets/index-ClHVINtI.js",
-      "role": "Entry: core + stage + app",
-      "encoding": "gzip",
-      "transferred": 23182,
-      "raw": 57068,
-      "gzip": 22801,
-      "brotli": 20075
     },
     {
       "path": "assets/extension-DuYhGmhk.js",
@@ -62,10 +62,10 @@
   ],
   "total": {
     "requests": 6,
-    "transferred": 32856,
+    "transferred": 32859,
     "raw": 73557,
-    "gzip": 29838,
-    "brotli": 26271
+    "gzip": 29842,
+    "brotli": 26276
   },
   "notFetched": [
     {
@@ -73,12 +73,12 @@
       "raw": 127725
     },
     {
-      "path": "assets/cad-D0aHcgQQ.js",
-      "raw": 108
+      "path": "assets/cad-Bz1kFDJ0-C8MVdhlW.js",
+      "raw": 38624
     },
     {
-      "path": "assets/cad-D1SFeheG-CGR_gu6h.js",
-      "raw": 38647
+      "path": "assets/cad-CpQJAPFw.js",
+      "raw": 108
     },
     {
       "path": "assets/cad-runtime-BaWQAECA.js",
@@ -101,7 +101,7 @@
       "raw": 44
     },
     {
-      "path": "assets/dist-DVPPeg5m.js",
+      "path": "assets/dist-QgBCyLaw.js",
       "raw": 61245
     },
     {
