@@ -24,7 +24,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/cinematic | `.` 3 |  |  | 1,820 |
 | @margoengine/clustered | `.` 18, `./shadows` 4, `./area` 6, `./directional` 6, `./ies` 7, `./projector` 7, `./units` 12 | 80 |  | 12,785 |
 | @margoengine/controls | `.` 44, `./orbit` 5, `./transform` 5, `./drag` 3, `./profiles` 13, `./walk` 6 | 55 |  | 20,455 |
-| @margoengine/core | `.` 17, `./extension` 26 | 16 |  | 20,015 |
+| @margoengine/core | `.` 17, `./extension` 26 | 16 |  | 20,899 |
 | @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 18,535 |
 | @margoengine/culling | `.` 6 |  |  | 8,883 |
 | @margoengine/decoders | `.` 23, `./meshopt` 5, `./texture` 4, `./png` 3 | 5 |  | 478,249 |

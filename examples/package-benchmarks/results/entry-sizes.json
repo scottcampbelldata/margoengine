@@ -1,10 +1,10 @@
 {
-  "commit": "10148ace",
+  "commit": "0ca52f2a",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
-    "raw": 56444,
-    "gzip": 22253,
+    "raw": 59317,
+    "gzip": 23271,
     "limit": 25000
   },
   "packages": {
@@ -148,12 +148,12 @@
     },
     "@margoengine/core": {
       ".": {
-        "raw": 49841,
-        "gzip": 20015
+        "raw": 52322,
+        "gzip": 20899
       },
       "./extension": {
-        "raw": 46694,
-        "gzip": 19116
+        "raw": 48924,
+        "gzip": 20024
       }
     },
     "@margoengine/creative": {
@@ -630,18 +630,18 @@
         "gzip": 4072
       },
       "dist/workers/brep-runtime.js": {
-        "raw": 128612,
-        "gzip": 44819
+        "raw": 128742,
+        "gzip": 44860
       },
       "dist/workers/cad-runtime.js": {
-        "raw": 17578,
-        "gzip": 7104
+        "raw": 17708,
+        "gzip": 7141
       }
     },
     "margoengine": {
       ".": {
-        "raw": 6732,
-        "gzip": 2802
+        "raw": 7118,
+        "gzip": 2981
       }
     },
     "@margoengine/materials": {
@@ -1256,8 +1256,8 @@
     },
     "@margoengine/voxel-pathtracer": {
       ".": {
-        "raw": 200177,
-        "gzip": 71193
+        "raw": 200181,
+        "gzip": 71195
       },
       "./studio": {
         "raw": 2264,
@@ -1330,14 +1330,14 @@
       "brotli": 11404
     },
     "packages/machinery/dist/workers/cad-runtime.js": {
-      "raw": 17496,
-      "gzip": 7075,
-      "brotli": 6400
+      "raw": 17626,
+      "gzip": 7112,
+      "brotli": 6430
     },
     "packages/machinery/dist/workers/brep-runtime.js": {
-      "raw": 127429,
-      "gzip": 44735,
-      "brotli": 38656
+      "raw": 127559,
+      "gzip": 44773,
+      "brotli": 38744
     },
     "packages/machinery/dist/workers/occt-import-js.js": {
       "raw": 97856,
