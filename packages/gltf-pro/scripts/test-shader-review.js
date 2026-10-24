@@ -9,7 +9,7 @@ process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 const baseline = await readFile(new URL('../tests/fixtures/pbr-before-naming.wgsl', import.meta.url), 'utf8');
 assert.equal(
   createHash('sha256').update(baseline).digest('hex'),
-  '1920d3bb180dbf0fa32fe4d373a3c03bdfccbdc834fb02a26fcb1b8dfeeffa5b',
+  '55d97b19f64633a459972ca528268598c48f5a751df47f598152ee110c446c86',
 );
 const browser = await openBrowser({ startPath: '/tests/modern-extension.html', port: 5198 }),
   errors = [];

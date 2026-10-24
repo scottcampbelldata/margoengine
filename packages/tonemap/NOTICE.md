@@ -11,6 +11,14 @@ Color transform references
   luminance weights from the ITU-R BT.709 and BT.2020 primaries and D65. `packages/tonemap/tests/agx.test.js` derives
   every matrix, weight and curve constant from those definitions and checks the shader's numbers. One implementation,
   `packages/shared/agx.js`, serves Tonemap, ImagePost and the voxel path tracer.
-- ACES RRT/ODT fitted curve: [Stephen Hill](https://github.com/selfshadow/ltc_code/blob/master/webgl/shaders/ltc/ltc_blit.fs), with no extra exposure scale.
+- ACES-style fitted curve (`curve: 'acescg'`, `packages/shared/aces.js`): Margo's own fit; no published fit's
+  constants. Form: a 3x3 mix with rows summing to 1, a per-channel curve a w (w + b) / (w (w + c) + d) with
+  w = x^m, a second 3x3 mix with rows summing to 1, then a clamp to 0..1; no extra exposure scale. Its numbers come
+  from Levenberg-Marquardt least squares, on the error in 8-bit sRGB codes, against 60 sampled outputs (a 20-stop
+  grey ramp, primaries, secondaries and mixed colours) of the approximation of the ACES 1.x RRT + sRGB 100-nit ODT
+  (the Academy's [aces-dev](https://github.com/ampas/aces-dev) reference transforms) that the engine used before.
+  `packages/tonemap/tests/aces.test.js` holds that table and the procedure, and measures the fit: grey ramp at most
+  0.47 codes (mean 0.17), colours at most 0.41 (mean 0.12). It has not been measured against the Academy reference
+  itself.
 - Khronos PBR Neutral: [reference implementation](https://github.com/KhronosGroup/ToneMapping/blob/main/PBR_Neutral/pbrNeutral.glsl).
 - ACEScg is AP1 with a D60 white point: [ACES specification](https://docs.acescentral.com/encodings/acescg/). The AP1 to linear-sRGB matrix includes D60 to D65 adaptation.

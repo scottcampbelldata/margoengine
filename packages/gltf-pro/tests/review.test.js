@@ -17,7 +17,7 @@ test('named base lighting keeps all prior resources and optional lighting splice
   );
   assert.equal(
     createHash('sha256').update(before).digest('hex'),
-    '1920d3bb180dbf0fa32fe4d373a3c03bdfccbdc834fb02a26fcb1b8dfeeffa5b',
+    '55d97b19f64633a459972ca528268598c48f5a751df47f598152ee110c446c86',
   );
   assert.match(pbrShader, /fn direct_light\(s:Surface,v:vec3f,l:vec3f\)->vec3f/);
   assert.match(pbrShader, /let direct=direct_light\(s,v,l\)/);

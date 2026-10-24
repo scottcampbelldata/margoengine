@@ -18,6 +18,7 @@ import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { cpuLoad } from '../../scripts/quiet-gate.mjs';
 import { decodePNG } from '../../tests/support/png.js';
+import { pbrNeutral } from '../../packages/shared/display.js';
 import { AreaLights } from '../../packages/clustered/dist/area.js';
 import { ltc, bruteForce } from '../../packages/clustered/test/ltc-reference.js';
 
@@ -45,26 +46,10 @@ const linear = (byte) => {
   const c = byte / 255;
   return c >= 0.04045 ? ((c + 0.055) / 1.055) ** 2.4 : c / 12.92;
 };
-// Output transforms: core (Reinhard, packages/core/src/shaders.ts) and gltf-pro (ACES fit / 0.6, packages/shared/aces.js).
-const aces = (v) => {
-  const m1 = [
-      [0.59719, 0.35458, 0.04823],
-      [0.076, 0.90834, 0.01566],
-      [0.0284, 0.13383, 0.83777],
-    ],
-    m2 = [
-      [1.60475, -0.53108, -0.07367],
-      [-0.10208, 1.10813, -0.00605],
-      [-0.00327, -0.07276, 1.07602],
-    ];
-  const x = m1
-    .map((r) => r[0] * v[0] + r[1] * v[1] + r[2] * v[2])
-    .map((x) => (x * (x + 0.0245786) - 0.000090537) / (x * (0.983729 * x + 0.432951) + 0.238081));
-  return m2.map((r) => Math.min(1, Math.max(0, r[0] * x[0] + r[1] * x[1] + r[2] * x[2])));
-};
+// Output transforms: core (Reinhard, packages/core/src/shaders.ts) and gltf-pro (Khronos PBR Neutral, packages/shared/display.js).
 const output = {
   core: (rgb) => rgb.map((c) => srgb(c / (1 + c))),
-  materials: (rgb) => aces(rgb.map((c) => Math.max(c, 0) / 0.6)).map(srgb),
+  materials: (rgb) => pbrNeutral(rgb.map((c) => Math.max(c, 0))).map(srgb),
 };
 const pixel = (image, [x, y]) => {
   const i = (y * image.width + x) * 4;

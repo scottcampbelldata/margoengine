@@ -1,5 +1,12 @@
-// ACES fit by Stephen Hill; references in ../tonemap/NOTICE.md.
-export const acesShader = `fn aces(v:vec3f)->vec3f{let x=mat3x3f(vec3f(0.59719,0.076,0.0284),vec3f(0.35458,0.90834,0.13383),vec3f(0.04823,0.01566,0.83777))*v;return clamp(mat3x3f(vec3f(1.60475,-0.10208,-0.00327),vec3f(-0.53108,1.10813,-0.07276),vec3f(-0.07367,-0.00605,1.07602))*((x*(x+0.0245786)-0.000090537)/(x*(0.983729*x+0.432951)+0.238081)),vec3f(0),vec3f(1));}`;
+// ACES-style filmic display transform (ACES 1.x RRT + sRGB 100-nit ODT look), fitted for this engine: linear Rec.709
+// scene light in (non-negative, exposure applied, no extra scale), display-linear Rec.709 out, clamped to 0..1, before
+// the sRGB encoding. Form: a 3x3 mix in (rows sum to 1), then per channel 1.002 * (w / (w + s))^q with w = x^k (a scaled
+// Dagum, or Burr type III, distribution function: 0 at black, strictly rising, reaching display white at a finite
+// input), then a 3x3 mix out (rows sum to 1, so greys stay grey) and the clamp. Fitted by least squares, then an L^p
+// polish (p up to 12) toward minimax, in 8-bit sRGB code units against the grey ramp and colour samples that
+// packages/tonemap/tests/aces.test.js holds (at most 1.3 codes off, mean 0.42). WGSL mat3x3f takes columns.
+export const acesShader = `fn aces(v:vec3f)->vec3f{let x=max(mat3x3f(vec3f(0.593472,0.076823,0.028601),vec3f(0.358198,0.90752,0.139254),vec3f(0.04833,0.015657,0.832145))*v,vec3f(0.0));let w=pow(x,vec3f(1.332491));let y=1.002*pow(w/(w+0.445751),vec3f(1.325334));return clamp(mat3x3f(vec3f(1.624002,-0.102265,-0.001975),vec3f(-0.547579,1.110313,-0.089177),vec3f(-0.076423,-0.008048,1.091152))*y,vec3f(0.0),vec3f(1.0));}
+`;
 
 /**
  * WGSL `fn acesNarkowicz(c: vec3f) -> vec3f`: Krzysztof Narkowicz's fit of the ACES film curve (2016), after the 0.6
