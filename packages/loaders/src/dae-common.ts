@@ -138,19 +138,67 @@ export interface DAETransform {
   type: 'matrix' | 'translate' | 'rotate' | 'scale' | 'lookat' | 'skew';
   /** The element's `sid`, which animation channels address. */
   sid?: string;
-  /** The numbers as written: 16 row-major for `matrix`, xyz for translate and scale, axis and degrees for rotate. */
+  /**
+   * The numbers as written: 16 row-major for `matrix`, xyz for translate and scale, axis and degrees for rotate, eye,
+   * interest point and up for lookat, degrees, rotation axis and translation axis for skew.
+   */
   values: number[];
 }
 
 export const TRANSFORM_SIZES = { matrix: 16, translate: 3, rotate: 4, scale: 3, lookat: 9, skew: 7 } as const;
 
-/** The stack in document order, each element post-multiplying; `lookat` and `skew` are skipped. */
+const unit = (x: number, y: number, z: number): number[] | undefined => {
+  const length = Math.hypot(x, y, z);
+  return length > 1e-12 && Number.isFinite(length) ? [x / length, y / length, z / length] : undefined;
+};
+
+/**
+ * A `<lookat>` (eye, interest point, up) as the matrix that places a frame looking down its -Z at the eye: columns
+ * side = forward x up, true up = side x forward, -forward and the eye, forward being interest - eye. Undefined when
+ * the eye is the interest point or up is parallel to the view.
+ */
+export function lookatMatrix(v: ArrayLike<number>): Matrix | undefined {
+  const f = unit(v[3] - v[0], v[4] - v[1], v[5] - v[2]),
+    s = f && unit(f[1] * v[8] - f[2] * v[7], f[2] * v[6] - f[0] * v[8], f[0] * v[7] - f[1] * v[6]);
+  if (!f || !s) return;
+  const u = [s[1] * f[2] - s[2] * f[1], s[2] * f[0] - s[0] * f[2], s[0] * f[1] - s[1] * f[0]];
+  return [s[0], s[1], s[2], 0, u[0], u[1], u[2], 0, -f[0], -f[1], -f[2], 0, v[0], v[1], v[2], 1];
+}
+
+/**
+ * A `<skew>` (degrees, rotation axis a, translation axis t) as the RenderMan skew the spec adopts: points slide
+ * parallel to t, so that a turns by the angle toward t in their common plane: M = I + k t d^T, d being the unit part
+ * of a perpendicular to t and k = cot(phi - angle) - cot(phi) for phi the angle from t to a (tan(angle) when they are
+ * perpendicular). Undefined when t is zero, a is parallel to t, or a would turn onto or past t.
+ */
+export function skewMatrix(v: ArrayLike<number>): Matrix | undefined {
+  const t = unit(v[4], v[5], v[6]);
+  if (!t) return;
+  const along = v[1] * t[0] + v[2] * t[1] + v[3] * t[2],
+    d = unit(v[1] - along * t[0], v[2] - along * t[1], v[3] - along * t[2]);
+  if (!d) return;
+  const across = v[1] * d[0] + v[2] * d[1] + v[3] * d[2],
+    turned = Math.atan2(across, along) - (v[0] * Math.PI) / 180;
+  if (!(Math.sin(turned) > 1e-9)) return;
+  const k = Math.cos(turned) / Math.sin(turned) - along / across,
+    m = [...IDENTITY];
+  for (let c = 0; c < 3; c++) for (let r = 0; r < 3; r++) m[c * 4 + r] += k * t[r] * d[c];
+  return m;
+}
+
+/**
+ * The stack in document order, each element post-multiplying. A degenerate `lookat` keeps only its eye translation
+ * and a degenerate `skew` is skipped (parseDAE warns about both).
+ */
 export function stackMatrix(transforms: readonly DAETransform[]): Matrix {
   let m = IDENTITY;
   for (const { type, values: v } of transforms)
     if (type === 'matrix') m = multiply(m, fromRows(v));
     else if (type === 'translate') m = multiply(m, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, v[0], v[1], v[2], 1]);
     else if (type === 'scale') m = multiply(m, [v[0], 0, 0, 0, 0, v[1], 0, 0, 0, 0, v[2], 0, 0, 0, 0, 1]);
+    else if (type === 'lookat')
+      m = multiply(m, lookatMatrix(v) ?? [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, v[0], v[1], v[2], 1]);
+    else if (type === 'skew') m = multiply(m, skewMatrix(v) ?? IDENTITY);
     else if (type === 'rotate') {
       const length = Math.hypot(v[0], v[1], v[2]);
       if (!length) continue;

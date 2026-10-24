@@ -223,15 +223,43 @@ for (const path of paths) {
 
 ## COLLADA
 
-`parseDAE(textOrBytes, {maxVertices, maxTriangles})` reads COLLADA 1.4.1 and 1.5 (`.dae`) and returns `{upAxis, meter, geometries, materials, images, nodes, warnings}`, already converted to Y-up meters (`Z_UP` and `X_UP` rotate per the spec's axis table, `unit meter` scales geometry and translations).
+`parseDAE(textOrBytes, {maxVertices, maxTriangles})` reads COLLADA 1.4.1 and 1.5 (`.dae`) and returns `{upAxis, meter, geometries, materials, images, nodes, cameras, lights, warnings}`, already converted to Y-up meters (`Z_UP` and `X_UP` rotate per the spec's axis table, `unit meter` scales geometry and translations).
 
 - `geometries`: each `<mesh>` as a `LoadedGeometry` plus `id`, `name`, `faceSizes` and `positionIndices`, from `<triangles>`, `<polylist>` (`vcount` kept as `faceSizes`), `<polygons>`, `<trifans>` and `<tristrips>` with VERTEX/POSITION, NORMAL, TEXCOORD (lowest `set`, v flipped to 1 - t) and COLOR inputs at any offset, in the primitive or in `<vertices>`. One group per primitive with its material `symbol`. Corners are welded per primitive, so seams survive.
 - `materials`: `profile_COMMON` `constant`, `lambert`, `phong` and `blinn` with `emission`, `ambient`, `diffuse`, `specular`, `reflective` and `transparent` as `{color}` or `{texture: {path, texcoord}}` (through 1.4.1 sampler2D, surface and image, 1.5 `instance_image`, or a bare image id), `opaque`, `shininess`, `reflectivity`, `transparency`, `indexOfRefraction`.
 - `images`: the texture paths materials use, relative to the .dae folder (`file:///C:/a%20b.png` becomes `C:/a b.png`), for your resolver.
-- `nodes`: the instanced visual scene as `{id, name, matrix, instances, children}`, `matrix` being the node's matrix/translate/rotate/scale stack (column-major, Y-up meters); `instances` are `{geometry, materials}` with `bind_material` symbols mapped to material indices; `instance_node` is expanded (at most 64 deep and 100,000 nodes).
-- Not imported, each reported in `warnings`: `<lines>` and `<linestrips>`, polygon holes (the outer polygon is kept), `lookat` and `skew`, embedded image data, non-mesh geometry, and the controllers, joints and animation channels described below when they do not resolve.
+- `nodes`: the instanced visual scene as `{id, name, matrix, instances, children}`, `matrix` being the node's matrix/translate/rotate/scale/lookat/skew stack (column-major, Y-up meters); `instances` are `{geometry, materials}` with `bind_material` symbols mapped to material indices; `instance_node` is expanded (at most 64 deep and 100,000 nodes).
+- Not imported, each reported in `warnings`: `<lines>` and `<linestrips>`, polygon holes (the outer polygon is kept), embedded image data, non-mesh geometry, cameras and lights without `technique_common` optics or light (profile-specific techniques), and the controllers, joints and animation channels described below when they do not resolve. A degenerate `lookat` (eye on the interest point, or up along the view) keeps only its eye; a degenerate `skew` is skipped; both are warned.
 
 `flattenDAE(dae, pose?)` bakes the hierarchy into one `LoadedGeometry` (mirrored nodes keep outward winding) with a group per node instance and primitive, named after the node and colored with the bound material's diffuse color, so `createMeshes(engine, flattenDAE(dae))` shows the scene. Skinned and morphed instances are deformed: at rest without a pose, animated with `flattenDAE(dae, poseDAE(dae, seconds))`.
+
+### Collada cameras, lights, lookat and skew
+
+- `lookat` (eye, interest, up) is the matrix that puts a frame at the eye looking down its -Z at the interest point: columns side = forward x up, true up = side x forward, -forward and the eye. `skew` (degrees, rotation axis, translation axis) is the RenderMan skew the spec adopts: points slide parallel to the translation axis so that the rotation axis turns by the angle toward it (x' = x + tan(angle) y for `45 0 1 0 1 0 0`). Both are stack elements like the others, so channels animate them by sid, whole (`node/look`, 9 values) or one value (`node/look(0)` is the eye's x).
+- `cameras`: every `<instance_camera>` in scene order (one per `instance_node` copy) as `{id, name, node, type, perspective | orthographic, matrix}`. `perspective` keeps what the file gives (`xfov`, `yfov`, `aspectRatio`, full angles in degrees) and `orthographic` `xmag`/`ymag` (read as half-width and half-height, like glTF's); `znear`, `zfar` and magnifications are in meters. `matrix` is the camera's frame at rest in Y-up meters, looking down its -Z with +Y up (the node's world matrix times the up-axis rotation, so a `Z_UP` camera still looks where it did); `daeFrame(dae, node, pose)` gives it at a pose.
+- `daeCameraView(dae, index, {pose, aspect})` returns what core's camera takes, `{position, target, up, fov, near, far, aspect, project}`: `yfov` is the vertical fov; `xfov` with `aspect_ratio` gives yfov = 2 atan(tan(xfov / 2) / aspect); `xfov` and `yfov` keep yfov and fix the aspect at tan(xfov / 2) / tan(yfov / 2); `xfov` alone needs `{aspect}` (the viewport's). All three warn and drop `aspect_ratio`. Orthographic views set `project` (half-height `ymag`, or `xmag / aspect_ratio`, or `xmag` over the viewport's aspect; WebGPU reversed depth) and perspective views clear it, so `Object.assign(engine.camera, view)` switches either way. `target` is one meter ahead.
+- `lights`: every `<instance_light>` as `{id, name, node, type, color, position, direction, matrix}` (`ambient`, `directional`, `point`, `spot`; `direction` is the frame's -Z, the way the light travels) with `constantAttenuation`, `linearAttenuation` and `quadraticAttenuation` for point and spot (defaults 1, 0, 0, converted so distance is in meters) and `falloffAngle` (the full cone, default 180) and `falloffExponent` (default 0) for spot.
+- `daeEngineLights(dae, {pose, intensity})` converts them: each color splits into a unit color and its brightest channel as the intensity (times `intensity`). The first directional light is `sun`, for core's `engine.scene.lighting` (`toward` the light); others are `directional`, for `@margoengine/clustered/directional`; ambient lights sum into `ambient` for core's `scene.lighting.ambient` and `radiance[3]`. Point and spot lights become `local` entries for `Clustered.setLights` (`position`, `range`, `color`, `intensity`, `decay`, and `direction`, `outerAngle`, `innerAngle` for spots). Approximations: `1 / (c + l d + q d^2)` keeps only its strongest set term (q: `decay` 2 and intensity / q; else l: `decay` 1; else c: `decay` 0 and unlimited `range`), matching far away and brighter close to the light; `range` ends where the light falls to 1/256; `outerAngle` is half the falloff angle (at most a hemisphere) and the `cos^e` falloff becomes a smooth edge starting where cos^e is 1/2 (`innerAngle`), a hard edge for e = 0.
+
+```ts
+import {parseDAE, daeCameraView, daeEngineLights} from '@margoengine/loaders';
+import {Clustered} from '@margoengine/clustered';
+import type {EngineKernel} from '@margoengine/core';
+
+declare const engine: EngineKernel, text: string;
+const dae = parseDAE(text);
+if (dae.cameras.length) Object.assign(engine.camera, daeCameraView(dae, 0, {aspect: 16 / 9}));
+const {sun, ambient, local} = daeEngineLights(dae);
+if (sun) {
+  engine.scene.lighting.direction.set([...sun.toward, sun.intensity]);
+  engine.scene.lighting.radiance.set(sun.color);
+}
+if (ambient) {
+  engine.scene.lighting.ambient.set(ambient.color);
+  engine.scene.lighting.radiance[3] = ambient.intensity;
+}
+Clustered.attach(engine).setLights(local);
+```
 
 ### Collada skins, morphs and animation
 

@@ -20,10 +20,12 @@ import {
   integer,
   kid,
   kids,
+  lookatMatrix,
   multiply,
   numbers,
   readSource,
   ref,
+  skewMatrix,
   stackMatrix,
   TRANSFORM_SIZES,
   type DAETransform,
@@ -33,9 +35,11 @@ import {
 import { readControllers, type DAEMorph, type DAESkin } from './dae-controllers.js';
 import { readAnimations, type DAEAnimation, type DAEClip } from './dae-animation.js';
 import { deformInstance, restPose, type DAEPose } from './dae-pose.js';
+import { placeScene, type DAECamera, type DAELight, type DAEPlacement } from './dae-scene.js';
 
 export type { DAETransform } from './dae-common.js';
 export type { DAESkin, DAEMorph } from './dae-controllers.js';
+export type { DAECamera, DAELight } from './dae-scene.js';
 export type {
   DAEAnimation,
   DAEAnimationChannel,
@@ -121,7 +125,10 @@ export interface DAENode {
   name?: string;
   /** The node's `sid`, which skin joints name. */
   sid?: string;
-  /** Local transform (the node's matrix, translate, rotate and scale stack), column-major 4x4, in Y-up meters. */
+  /**
+   * Local transform (the node's matrix, translate, rotate, scale, lookat and skew stack), column-major 4x4, in Y-up
+   * meters.
+   */
   matrix: number[];
   /** The transform stack as written (the file's axes and units), which animation channels address by sid. */
   transforms: DAETransform[];
@@ -149,6 +156,10 @@ export interface LoadedDAE {
   animations: DAEAnimation[];
   /** `<animation_clip>`s. */
   clips: DAEClip[];
+  /** Every `<instance_camera>` in scene order, with its optics and frame at rest. */
+  cameras: DAECamera[];
+  /** Every `<instance_light>` in scene order, with its color, attenuation and frame at rest. */
+  lights: DAELight[];
   /** What was skipped: lines, holes, unresolved references, channels and controllers that do not fit. */
   warnings: string[];
 }
@@ -448,12 +459,16 @@ function readTransforms(node: XMLElement, warn: (message: string) => void): DAET
       count = TRANSFORM_SIZES[type],
       what = `node "${node.attributes.id ?? node.attributes.name ?? ''}" <${e.name}>`,
       values = numbers(e.text, what);
-    if (type === 'lookat' || type === 'skew') {
-      warn(`${what} transforms are not imported`);
-      continue;
-    }
     if (values.length !== count || !values.every(Number.isFinite))
       throw new LoaderError(F, 'syntax', `${what} needs ${count} finite numbers, got ${values.length}`);
+    if (type === 'lookat' && !lookatMatrix(values))
+      warn(
+        `${what} has its eye on the interest point or up along the view; only the eye is used: fix eye, interest or up`,
+      );
+    if (type === 'skew' && !skewMatrix(values))
+      warn(
+        `${what} is skipped: give a nonzero translation axis, a rotation axis not parallel to it, and an angle that does not turn the rotation axis onto or past it`,
+      );
     const transform: DAETransform = { type, values };
     if (e.attributes.sid !== undefined) transform.sid = e.attributes.sid;
     out.push(transform);
@@ -493,8 +508,10 @@ function findNode(roots: readonly DAENode[], match: (node: DAENode) => boolean):
  * Controllers (`<skin>` with up to four influences per vertex, `<morph>` NORMALIZED or RELATIVE) and
  * `<instance_controller>` with `<skeleton>` roots, animations (nested, LINEAR, STEP, BEZIER and HERMITE samplers on
  * node transform elements and morph weights) and animation clips are read too. `up_axis` and `unit` are converted to
- * Y-up meters, alike for geometry, node, bind shape and inverse bind matrices. Lines, polygon holes, `lookat`, `skew`
- * and channels or controllers that do not fit are not imported; each is reported in `warnings`. Image paths are
+ * Y-up meters, alike for geometry, node, bind shape and inverse bind matrices. `lookat` and `skew` join the transform
+ * stack; `<instance_camera>` and `<instance_light>` give `cameras` and `lights` (technique_common optics and lights)
+ * with their frames. Lines, polygon holes, and cameras, lights, channels or controllers that do not fit are not
+ * imported; each is reported in `warnings`. Image paths are
  * relative to the .dae folder, for the caller's resolver.
  */
 export function parseDAE(input: BinaryInput | string, options: DAEParseOptions = {}): LoadedDAE {
@@ -573,6 +590,7 @@ export function parseDAE(input: BinaryInput | string, options: DAEParseOptions =
   );
   // Controller instances whose skin joints resolve once the whole scene exists.
   const pending: { instance: DAEInstance; roots: string[]; idref: boolean; url: string }[] = [],
+    placements: DAEPlacement[] = [],
     copies = new Map<XMLElement, DAENode[]>();
   let nodeCount = 0;
   const readNode = (e: XMLElement, depth: number): DAENode => {
@@ -598,6 +616,14 @@ export function parseDAE(input: BinaryInput | string, options: DAEParseOptions =
           else warn(`instance_node "${child.attributes.url}" names no <node>`);
           break;
         }
+        case 'instance_camera':
+        case 'instance_light':
+          placements.push({
+            node,
+            kind: child.name === 'instance_camera' ? 'camera' : 'light',
+            url: child.attributes.url ?? '',
+          });
+          break;
         case 'instance_geometry': {
           const geometry = geometryIndex.get(ref(child.attributes.url));
           if (geometry === undefined) {
@@ -666,7 +692,8 @@ export function parseDAE(input: BinaryInput | string, options: DAEParseOptions =
     if (joints.length === skin.joints.length) instance.joints = joints;
     else delete instance.skin;
   }
-  const { animations, clips } = readAnimations(root, ids, morphs, warn);
+  const { animations, clips } = readAnimations(root, ids, morphs, warn),
+    { cameras, lights } = placeScene({ nodes, upAxis, meter }, ids, placements, warn);
   const used = new Set<string>();
   for (const material of materials)
     for (const name of CHANNELS) {
@@ -684,6 +711,8 @@ export function parseDAE(input: BinaryInput | string, options: DAEParseOptions =
     morphs,
     animations,
     clips,
+    cameras,
+    lights,
     warnings: [...warnings],
   };
 }

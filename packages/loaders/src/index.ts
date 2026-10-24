@@ -31,6 +31,17 @@ export type {
   DAESampler,
 } from './dae.js';
 export { sampleDAESampler } from './dae-animation.js';
+export { daeCameraView, daeEngineLights, daeFrame } from './dae-scene.js';
+export type {
+  DAECamera,
+  DAELight,
+  DAECameraView,
+  DAECameraViewOptions,
+  DAELocalLight,
+  DAEDirectionalLight,
+  DAEEngineLights,
+  DAEEngineLightOptions,
+} from './dae-scene.js';
 export { poseDAE, morphDAE, bindDAESkin, daeKeyframeClip, daeNodeNames } from './dae-pose.js';
 export type {
   DAEPose,

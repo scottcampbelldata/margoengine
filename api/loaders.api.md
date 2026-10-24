@@ -51,6 +51,44 @@ export interface DAEBone {
     scale: MutableVec3;
 }
 
+export interface DAECamera {
+    id?: string;
+    name?: string;
+    node: DAENode;
+    type: 'perspective' | 'orthographic';
+    perspective?: {
+        xfov?: number;
+        yfov?: number;
+        aspectRatio?: number;
+        znear: number;
+        zfar: number;
+    };
+    orthographic?: {
+        xmag?: number;
+        ymag?: number;
+        aspectRatio?: number;
+        znear: number;
+        zfar: number;
+    };
+    matrix: number[];
+}
+
+export interface DAECameraView {
+    position: MutableVec3;
+    target: MutableVec3;
+    up: MutableVec3;
+    fov?: number;
+    near: number;
+    far: number;
+    aspect?: number;
+    project: ((out: Float64Array, aspect: number, webgpu: boolean) => void) | undefined;
+}
+
+export interface DAECameraViewOptions {
+    pose?: DAEPose;
+    aspect?: number;
+}
+
 export interface DAEChannel {
     color?: [number, number, number, number];
     texture?: {
@@ -65,6 +103,31 @@ export interface DAEClip {
     start: number;
     end?: number;
     animations: number[];
+}
+
+export interface DAEDirectionalLight {
+    direction: MutableVec3;
+    color: MutableVec3;
+    intensity: number;
+}
+
+export interface DAEEngineLightOptions {
+    pose?: DAEPose;
+    intensity?: number;
+}
+
+export interface DAEEngineLights {
+    sun?: {
+        toward: MutableVec3;
+        color: MutableVec3;
+        intensity: number;
+    };
+    ambient?: {
+        color: MutableVec3;
+        intensity: number;
+    };
+    directional: DAEDirectionalLight[];
+    local: DAELocalLight[];
 }
 
 export interface DAEGeometry extends LoadedGeometry {
@@ -111,6 +174,33 @@ export interface DAEKeyframeTrack {
     target: string;
     path: 'translation' | 'rotation' | 'scale' | 'weights';
     keys: DAEKeyframe[];
+}
+
+export interface DAELight {
+    id?: string;
+    name?: string;
+    node: DAENode;
+    type: 'ambient' | 'directional' | 'point' | 'spot';
+    color: MutableVec3;
+    constantAttenuation?: number;
+    linearAttenuation?: number;
+    quadraticAttenuation?: number;
+    falloffAngle?: number;
+    falloffExponent?: number;
+    position: MutableVec3;
+    direction: MutableVec3;
+    matrix: number[];
+}
+
+export interface DAELocalLight {
+    position: MutableVec3;
+    range: number;
+    color: MutableVec3;
+    intensity: number;
+    decay: number;
+    direction?: MutableVec3;
+    outerAngle?: number;
+    innerAngle?: number;
 }
 
 export interface DAEMaterial {
@@ -285,6 +375,8 @@ export interface LoadedDAE {
     morphs: DAEMorph[];
     animations: DAEAnimation[];
     clips: DAEClip[];
+    cameras: DAECamera[];
+    lights: DAELight[];
     warnings: string[];
 }
 
@@ -643,6 +735,12 @@ export function computeVertexNormals(positions: ArrayLike<number>, indices: Arra
 export function crc32(bytes: Uint8Array, crc?: number): number;
 
 export function createMeshes(engine: EngineKernel, loaded: LoadedGeometry, options?: CreateMeshesOptions): LoadedMeshes;
+
+export function daeCameraView(dae: LoadedDAE, camera?: number, options?: DAECameraViewOptions): DAECameraView;
+
+export function daeEngineLights(dae: LoadedDAE, options?: DAEEngineLightOptions): DAEEngineLights;
+
+export function daeFrame(dae: Pick<LoadedDAE, 'nodes' | 'upAxis'>, node: DAENode, pose?: DAEPose): number[];
 
 export function daeKeyframeClip(dae: LoadedDAE, options?: DAEKeyframeClipOptions): DAEKeyframeClip;
 
