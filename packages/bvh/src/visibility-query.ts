@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { MargoError } from '@margoengine/math';
+import { imageSize } from '@margoengine/math/validate';
 import { Raycaster } from './raycaster.js';
 import { RaycastProjection, readPoint, type RaycastProjectedPoint } from './projection.js';
 import type { RaycastSnapshot } from './raycast-snapshot.js';
@@ -223,8 +224,7 @@ function captureAlpha(texture: RaycastAlphaTexture): AlphaImage {
   if (!texture || typeof texture !== 'object')
     throw new TypeError('Visibility alpha texture needs width, height and RGBA8 pixels; supply a shared atlas.');
   const { width, height, pixels } = texture;
-  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width * height > 16_777_216)
-    throw new RangeError('Visibility alpha dimensions need positive integers up to 16777216 texels; resize the atlas.');
+  imageSize(width, height, 'Visibility alpha texture');
   if (!pixels || pixels.length !== width * height * 4)
     throw new TypeError('Visibility alpha texture needs width * height * 4 channels; repair the RGBA storage.');
   const alpha = new Uint8Array(width * height);

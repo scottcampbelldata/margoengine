@@ -1,3 +1,4 @@
+import { imageSize } from '@margoengine/math/validate';
 import type { MutableVec2, MutableVec3 } from '@margoengine/math';
 import { affineMatrix, transformPoints } from './matrix.js';
 import type { PaintAtlas, PaintFace, PaintObject, PaintScene, PaintTexture } from './paint-types.js';
@@ -39,22 +40,8 @@ const islandCache = new WeakMap<
 /** Collision-free object/face identity within an independently validated scene. */
 export const paintFaceKey = (objectId: string, faceId: string): string => JSON.stringify([objectId, faceId]);
 
-/**
- * Check RGBA8 image dimensions before any storage is read or copied.
- * @throws RangeError unless both are positive safe integers with at most 16777216 texels.
- */
-export function paintTextureSize(width: number, height: number): void {
-  if (
-    !Number.isSafeInteger(width) ||
-    !Number.isSafeInteger(height) ||
-    width < 1 ||
-    height < 1 ||
-    width * height > 16_777_216
-  )
-    throw new RangeError(
-      'Paint texture needs positive integer dimensions with at most 16777216 texels; resize the atlas.',
-    );
-}
+/** Check RGBA8 image dimensions before any storage is read or copied. */
+export const paintTextureSize = (width: number, height: number): void => imageSize(width, height, 'Paint texture');
 
 /** Whether every corner UV is a finite pair (the corner count is checked separately where it matters). */
 export const finiteUVs = (face: PaintFace): boolean =>
