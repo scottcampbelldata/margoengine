@@ -1,0 +1,516 @@
+{
+ "about": "Binding parts of the clean-room triangulation vectors: polygon area minus holes, triangle counts where the spec binds them, thrown error classes. Triangle lists are free.",
+ "triangulate": {
+  "square": {
+   "data": [
+    0,
+    0,
+    2,
+    0,
+    2,
+    2,
+    0,
+    2
+   ],
+   "holes": [],
+   "dim": 2,
+   "polygonAreaMinusHoles": 4,
+   "triangles": 2,
+   "area": 4,
+   "allCCW": true
+  },
+  "square clockwise": {
+   "data": [
+    0,
+    0,
+    0,
+    2,
+    2,
+    2,
+    2,
+    0
+   ],
+   "holes": [],
+   "dim": 2,
+   "polygonAreaMinusHoles": 4,
+   "triangles": 2,
+   "area": 4,
+   "allCCW": true
+  },
+  "concave arrow": {
+   "data": [
+    0,
+    0,
+    4,
+    0,
+    4,
+    3,
+    2,
+    1,
+    0,
+    3
+   ],
+   "holes": [],
+   "dim": 2,
+   "polygonAreaMinusHoles": 8,
+   "triangles": 3,
+   "area": 8,
+   "allCCW": true
+  },
+  "collinear rectangle with closing point": {
+   "data": [
+    0,
+    0,
+    1,
+    0,
+    2,
+    0,
+    3,
+    0,
+    3,
+    1,
+    3,
+    2,
+    2,
+    2,
+    1,
+    2,
+    0,
+    2,
+    0,
+    1,
+    0,
+    0
+   ],
+   "holes": [],
+   "dim": 2,
+   "polygonAreaMinusHoles": 6,
+   "triangles": 8,
+   "area": 6,
+   "allCCW": true,
+   "note": "collinear corners may be dropped"
+  },
+  "duplicates": {
+   "data": [
+    0,
+    0,
+    0,
+    0,
+    2,
+    0,
+    2,
+    0,
+    2,
+    2,
+    1,
+    2,
+    1,
+    2,
+    0,
+    2
+   ],
+   "holes": [],
+   "dim": 2,
+   "polygonAreaMinusHoles": 4,
+   "triangles": 2,
+   "area": 4,
+   "allCCW": true
+  },
+  "hole on collinear outer": {
+   "data": [
+    0,
+    0,
+    2,
+    0,
+    4,
+    0,
+    4,
+    4,
+    2,
+    4,
+    0,
+    4,
+    1,
+    1,
+    1,
+    3,
+    3,
+    3,
+    3,
+    1,
+    1,
+    1
+   ],
+   "holes": [
+    6
+   ],
+   "dim": 2,
+   "polygonAreaMinusHoles": 12,
+   "triangles": 10,
+   "area": 12,
+   "allCCW": true
+  },
+  "comb": {
+   "data": [
+    0,
+    0,
+    10,
+    0,
+    10,
+    3,
+    9,
+    3,
+    8.5,
+    1,
+    8,
+    3,
+    7,
+    3,
+    6.5,
+    1,
+    6,
+    3,
+    5,
+    3,
+    4.5,
+    1,
+    4,
+    3,
+    3,
+    3,
+    2.5,
+    1,
+    2,
+    3,
+    1,
+    3,
+    0.5,
+    1,
+    0,
+    3,
+    0,
+    3
+   ],
+   "holes": [],
+   "dim": 2,
+   "polygonAreaMinusHoles": 25,
+   "triangles": 16,
+   "area": 25,
+   "allCCW": true
+  },
+  "all collinear": {
+   "data": [
+    0,
+    0,
+    1,
+    1,
+    2,
+    2,
+    3,
+    3
+   ],
+   "holes": [],
+   "dim": 2,
+   "polygonAreaMinusHoles": 0,
+   "triangles": 0,
+   "area": 0,
+   "allCCW": true
+  },
+  "two points": {
+   "data": [
+    0,
+    0,
+    1,
+    1
+   ],
+   "holes": [],
+   "dim": 2,
+   "polygonAreaMinusHoles": 0,
+   "triangles": 0,
+   "area": 0,
+   "allCCW": true
+  },
+  "empty": {
+   "data": [],
+   "holes": [],
+   "dim": 2,
+   "polygonAreaMinusHoles": 0,
+   "triangles": 0,
+   "area": 0,
+   "allCCW": true
+  },
+  "zero area quad": {
+   "data": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    0,
+    0
+   ],
+   "holes": [],
+   "dim": 2,
+   "polygonAreaMinusHoles": 0,
+   "triangles": 0,
+   "area": 0,
+   "allCCW": true
+  },
+  "hole touching outer at a vertex": {
+   "data": [
+    -2,
+    -2,
+    2,
+    -2,
+    2,
+    2,
+    -2,
+    2,
+    -2,
+    -2,
+    0,
+    -1,
+    -1,
+    0
+   ],
+   "holes": [
+    4
+   ],
+   "dim": 2,
+   "polygonAreaMinusHoles": 14.5,
+   "triangles": 5,
+   "area": 14.5,
+   "allCCW": true
+  },
+  "square with two holes (one each orientation)": {
+   "data": [
+    -2,
+    -2,
+    2,
+    -2,
+    2,
+    2,
+    -2,
+    2,
+    -1.5,
+    -1.5,
+    -0.5,
+    -1.5,
+    -0.5,
+    -0.5,
+    -1.5,
+    -0.5,
+    0.5,
+    0.5,
+    0.5,
+    1.5,
+    1.5,
+    1.5,
+    1.5,
+    0.5
+   ],
+   "holes": [
+    4,
+    8
+   ],
+   "dim": 2,
+   "polygonAreaMinusHoles": 14,
+   "triangles": 14,
+   "area": 14,
+   "allCCW": true
+  },
+  "steiner point hole": {
+   "data": [
+    0,
+    0,
+    4,
+    0,
+    4,
+    4,
+    0,
+    4,
+    1,
+    1
+   ],
+   "holes": [
+    4
+   ],
+   "dim": 2,
+   "polygonAreaMinusHoles": 16,
+   "triangles": 4,
+   "area": 16,
+   "allCCW": true,
+   "note": "a one-point hole is a Steiner point"
+  },
+  "dim 3 square": {
+   "data": [
+    0,
+    0,
+    99,
+    2,
+    0,
+    99,
+    2,
+    2,
+    99,
+    0,
+    2,
+    99
+   ],
+   "holes": [],
+   "dim": 3,
+   "polygonAreaMinusHoles": 4,
+   "triangles": 2,
+   "area": 4,
+   "allCCW": true
+  },
+  "self-intersecting bowtie": {
+   "data": [
+    0,
+    0,
+    2,
+    2,
+    2,
+    0,
+    0,
+    2
+   ],
+   "holes": [],
+   "dim": 2,
+   "polygonAreaMinusHoles": 0,
+   "triangles": 1,
+   "area": 2,
+   "allCCW": true,
+   "note": "best effort; must terminate"
+  },
+  "two holes sharing an edge": {
+   "data": [
+    0,
+    0,
+    6,
+    0,
+    6,
+    4,
+    0,
+    4,
+    1,
+    1,
+    3,
+    1,
+    3,
+    3,
+    1,
+    3,
+    3,
+    1,
+    5,
+    1,
+    5,
+    3,
+    3,
+    3
+   ],
+   "holes": [
+    4,
+    8
+   ],
+   "dim": 2,
+   "polygonAreaMinusHoles": 16,
+   "triangles": 8,
+   "area": 16,
+   "allCCW": true
+  },
+  "hole touching hole at a vertex": {
+   "data": [
+    0,
+    0,
+    6,
+    0,
+    6,
+    4,
+    0,
+    4,
+    1,
+    1,
+    3,
+    1,
+    3,
+    3,
+    1,
+    3,
+    3,
+    3,
+    5,
+    3,
+    5,
+    1
+   ],
+   "holes": [
+    4,
+    8
+   ],
+   "dim": 2,
+   "polygonAreaMinusHoles": 18,
+   "triangles": 10,
+   "area": 18,
+   "allCCW": true
+  },
+  "noisy 300-gon with 6 holes (Park-Miller seed 7)": {
+   "data": "(840 numbers; see generator)",
+   "holes": [
+    300,
+    320,
+    340,
+    360,
+    380,
+    400
+   ],
+   "dim": 2,
+   "polygonAreaMinusHoles": 358.821282,
+   "triangles": 430,
+   "area": 358.821282,
+   "allCCW": true,
+   "note": "expected triangles n - 2 + 2h = 430"
+  },
+  "performance: 20000-vertex star-ish ring": {
+   "data": "r = 10 + 2 sin(37 a), a = 2 pi i / 20000",
+   "triangles": 19998,
+   "area": 320.442021,
+   "allCCW": true,
+   "polygonArea": 320.442021
+  },
+  "bad dim 0": {
+   "throws": "RangeError",
+   "message": "Invalid triangulation dimension"
+  },
+  "bad dim 1": {
+   "throws": "RangeError",
+   "message": "Invalid triangulation dimension"
+  },
+  "bad dim 2.5": {
+   "throws": "RangeError",
+   "message": "Invalid triangulation dimension"
+  },
+  "bad dim NaN": {
+   "throws": "RangeError",
+   "message": "Invalid triangulation dimension"
+  },
+  "bad holes [-1]": {
+   "throws": "RangeError",
+   "message": "Invalid triangulation hole boundary"
+  },
+  "bad holes [1.5]": {
+   "throws": "RangeError",
+   "message": "Invalid triangulation hole boundary"
+  },
+  "bad holes [5]": {
+   "throws": "RangeError",
+   "message": "Invalid triangulation hole boundary"
+  },
+  "bad holes [3,2]": {
+   "throws": "RangeError",
+   "message": "Invalid triangulation hole boundary"
+  }
+ }
+}

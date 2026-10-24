@@ -1,39 +1,75 @@
-import { geometryData, type GeometryData, type GeometryGroup } from './data.js';
+import type { GeometryData, GeometryGroup } from './data.js';
 import type { Curve } from './curve.js';
-import { finiteNumber, type Vec, type MutableVec2 } from './math.js';
+import { finiteNumber, to3, type Vec, type MutableVec2 } from './math.js';
 
 const TAU = Math.PI * 2;
-const segments = (value: number, min: number) => Math.max(min, Math.floor(finiteNumber(value)));
 
-class Builder {
+/** Segment counts: non-finite throws before any work; finite values are floored and raised to `min`. */
+const count = (value: number, min: number): number => Math.max(min, Math.floor(finiteNumber(value)));
+
+// Which triangle of a lattice quad to leave out: none, the one on the quad's lower row, or the one on its upper row.
+// Lower and upper rows collapse to a point at a cone apex or a sphere pole.
+const BOTH = 0,
+  NO_LOWER = 1,
+  NO_UPPER = 2;
+
+/** Growing vertex streams shared by the primitives. */
+class Mesh {
   p: number[] = [];
   n: number[] = [];
-  uv: number[] = [];
-  idx: number[] = [];
+  t: number[] = [];
+  i: number[] = [];
   groups: GeometryGroup[] = [];
-  get count(): number {
+  get size(): number {
     return this.p.length / 3;
   }
-  vertex(x: number, y: number, z: number, nx: number, ny: number, nz: number, u: number, v: number): number {
+  add(x: number, y: number, z: number, nx: number, ny: number, nz: number, u: number, v: number): void {
     this.p.push(x, y, z);
     this.n.push(nx, ny, nz);
-    this.uv.push(u, v);
-    return this.p.length / 3 - 1;
+    this.t.push(u, v);
   }
-  /** Pushes a normalized normal. */
-  vertexN(x: number, y: number, z: number, nx: number, ny: number, nz: number, u: number, v: number): number {
-    const l = Math.hypot(nx, ny, nz) || 1;
-    return this.vertex(x, y, z, nx / l, ny / l, nz / l, u, v);
+  /**
+   * Indexes a lattice of `(cols + 1) x (rows + 1)` vertices written row by row from `first`. Columns must advance
+   * along the surface's u direction and rows along v with u x v pointing to the front, so the triangles come out
+   * counter-clockwise seen from the front. `drop(row)` leaves out one triangle of each quad in that row.
+   */
+  lattice(first: number, cols: number, rows: number, drop?: (row: number) => number): void {
+    for (let r = 0; r < rows; r++) {
+      const skip = drop ? drop(r) : BOTH;
+      for (let c = 0; c < cols; c++) {
+        const a = first + r * (cols + 1) + c,
+          b = a + 1,
+          d = a + cols + 1,
+          e = d + 1;
+        // Split along a-e: the lower triangle owns the edge a-b, the upper one d-e.
+        if (skip !== NO_LOWER) this.i.push(a, b, e);
+        if (skip !== NO_UPPER) this.i.push(a, e, d);
+      }
+    }
   }
+  /** Closes a draw group over every index added since `start`; empty groups are left out. */
   group(start: number, materialIndex: number): void {
-    this.groups.push({ start, count: this.idx.length - start, materialIndex });
+    if (this.i.length > start) this.groups.push({ start, count: this.i.length - start, materialIndex });
   }
-  build(withGroups = false): GeometryData {
-    return geometryData(this.p, this.n, this.uv, this.idx, withGroups ? this.groups : undefined);
+  done(withGroups = false): GeometryData {
+    const data: GeometryData = {
+      positions: Float32Array.from(this.p),
+      normals: Float32Array.from(this.n),
+      uvs: Float32Array.from(this.t),
+      indices: Uint32Array.from(this.i),
+    };
+    if (withGroups) data.groups = this.groups;
+    return data;
   }
 }
 
-/** Box. Six groups, one per face (+x, -x, +y, -y, +z, -z). */
+/**
+ * Axis-aligned box centred on the origin: `width` along x, `height` along y, `depth` along z. Each face is its own
+ * grid (corners are not shared, normals are flat) and its own group, in the order +x, -x, +y, -y, +z, -z
+ * (materialIndex 0 to 5). The x faces use depth by height segments, the y faces width by depth, the z faces width by
+ * height. Every face maps UVs 0..1 so the texture reads upright and unmirrored from outside (the y faces have -z, or
+ * +z on the bottom, as their up).
+ */
 export function boxGeometry(
   width = 1,
   height = 1,
@@ -42,96 +78,85 @@ export function boxGeometry(
   heightSegments = 1,
   depthSegments = 1,
 ): GeometryData {
-  const b = new Builder();
-  widthSegments = segments(widthSegments, 1);
-  heightSegments = segments(heightSegments, 1);
-  depthSegments = segments(depthSegments, 1);
-  const plane = (
-    u: number,
-    v: number,
-    w: number,
-    udir: number,
-    vdir: number,
-    pw: number,
-    ph: number,
-    pd: number,
-    gridX: number,
-    gridY: number,
-    material: number,
-  ) => {
-    const start = b.idx.length,
-      base = b.count,
-      gridX1 = gridX + 1;
-    for (let iy = 0; iy <= gridY; iy++) {
-      const y = (iy * ph) / gridY - ph / 2;
-      for (let ix = 0; ix <= gridX; ix++) {
-        const x = (ix * pw) / gridX - pw / 2,
-          p = [0, 0, 0],
-          n = [0, 0, 0];
-        p[u] = x * udir;
-        p[v] = y * vdir;
-        p[w] = pd / 2;
-        n[w] = pd > 0 ? 1 : -1;
-        b.vertex(p[0], p[1], p[2], n[0], n[1], n[2], ix / gridX, 1 - iy / gridY);
+  const segs = [count(widthSegments, 1), count(heightSegments, 1), count(depthSegments, 1)],
+    size = [width, height, depth],
+    mesh = new Mesh();
+  // One face: normal axis and sign, then the axes (and directions) that u and v grow along seen from outside.
+  const face = (axis: number, sign: number, ua: number, us: number, va: number, vs: number, material: number) => {
+    const first = mesh.size,
+      start = mesh.i.length,
+      cols = segs[ua],
+      rows = segs[va],
+      p = [0, 0, 0],
+      q = [0, 0, 0];
+    q[axis] = sign;
+    p[axis] = (sign * size[axis]) / 2;
+    // Rows run from the face's top edge down, the layout roundedBoxGeometry uses, so radius 0 there is this box.
+    for (let r = 0; r <= rows; r++)
+      for (let c = 0; c <= cols; c++) {
+        p[ua] = us * (c / cols - 0.5) * size[ua];
+        p[va] = vs * (0.5 - r / rows) * size[va];
+        mesh.add(p[0], p[1], p[2], q[0], q[1], q[2], c / cols, 1 - r / rows);
       }
-    }
-    for (let iy = 0; iy < gridY; iy++)
-      for (let ix = 0; ix < gridX; ix++) {
-        const a = base + ix + gridX1 * iy,
-          bb = base + ix + gridX1 * (iy + 1),
-          c = base + ix + 1 + gridX1 * (iy + 1),
-          d = base + ix + 1 + gridX1 * iy;
-        b.idx.push(a, bb, d, bb, c, d);
+    for (let r = 0; r < rows; r++)
+      for (let c = 0; c < cols; c++) {
+        const a = first + r * (cols + 1) + c,
+          below = a + cols + 1;
+        // Down then right is the face's front-facing turn.
+        mesh.i.push(a, below, a + 1, below, below + 1, a + 1);
       }
-    b.group(start, material);
+    mesh.group(start, material);
   };
-  plane(2, 1, 0, -1, -1, depth, height, width, depthSegments, heightSegments, 0);
-  plane(2, 1, 0, 1, -1, depth, height, -width, depthSegments, heightSegments, 1);
-  plane(0, 2, 1, 1, 1, width, depth, height, widthSegments, depthSegments, 2);
-  plane(0, 2, 1, 1, -1, width, depth, -height, widthSegments, depthSegments, 3);
-  plane(0, 1, 2, 1, -1, width, height, depth, widthSegments, heightSegments, 4);
-  plane(0, 1, 2, -1, -1, width, height, -depth, widthSegments, heightSegments, 5);
-  return b.build(true);
+  face(0, 1, 2, -1, 1, 1, 0);
+  face(0, -1, 2, 1, 1, 1, 1);
+  face(1, 1, 0, 1, 2, -1, 2);
+  face(1, -1, 0, 1, 2, 1, 3);
+  face(2, 1, 0, 1, 1, 1, 4);
+  face(2, -1, 0, -1, 1, 1, 5);
+  return mesh.done(true);
 }
 
-/** Plane in the XY plane, facing +z. */
+/**
+ * Rectangle in the XY plane at z = 0, centred on the origin and facing +z: a regular grid of
+ * `(widthSegments + 1) * (heightSegments + 1)` vertices with UV (0, 0) at the (-x, -y) corner and (1, 1) at (+x, +y).
+ * No groups.
+ */
 export function planeGeometry(width = 1, height = 1, widthSegments = 1, heightSegments = 1): GeometryData {
-  const b = new Builder(),
-    gridX = segments(widthSegments, 1),
-    gridY = segments(heightSegments, 1),
-    gridX1 = gridX + 1;
-  for (let iy = 0; iy <= gridY; iy++) {
-    const y = (iy * height) / gridY - height / 2;
-    for (let ix = 0; ix <= gridX; ix++)
-      b.vertex((ix * width) / gridX - width / 2, -y, 0, 0, 0, 1, ix / gridX, 1 - iy / gridY);
-  }
-  for (let iy = 0; iy < gridY; iy++)
-    for (let ix = 0; ix < gridX; ix++) {
-      const a = ix + gridX1 * iy,
-        bb = ix + gridX1 * (iy + 1),
-        c = ix + 1 + gridX1 * (iy + 1),
-        d = ix + 1 + gridX1 * iy;
-      b.idx.push(a, bb, d, bb, c, d);
-    }
-  return b.build();
+  const cols = count(widthSegments, 1),
+    rows = count(heightSegments, 1),
+    mesh = new Mesh();
+  for (let r = 0; r <= rows; r++)
+    for (let c = 0; c <= cols; c++)
+      mesh.add((c / cols - 0.5) * width, (r / rows - 0.5) * height, 0, 0, 0, 1, c / cols, r / rows);
+  mesh.lattice(0, cols, rows);
+  return mesh.done();
 }
 
-/** Circle: a center vertex plus `segments + 1` rim vertices, facing +z. */
+/**
+ * Disc, or a sector of one, in the XY plane facing +z: a centre vertex fanned to `segmentCount + 1` rim vertices from
+ * `thetaStart` over `thetaLength` (radians from +x toward +y). UVs are the planar map of the unit square around the
+ * disc, centre at (0.5, 0.5). No groups.
+ */
 export function circleGeometry(radius = 1, segmentCount = 32, thetaStart = 0, thetaLength = TAU): GeometryData {
-  const b = new Builder(),
-    n = segments(segmentCount, 3);
-  b.vertex(0, 0, 0, 0, 0, 1, 0.5, 0.5);
-  for (let s = 0; s <= n; s++) {
-    const a = thetaStart + (s / n) * thetaLength,
+  const n = count(segmentCount, 3),
+    mesh = new Mesh(),
+    scale = 2 * (radius || 1);
+  mesh.add(0, 0, 0, 0, 0, 1, 0.5, 0.5);
+  for (let k = 0; k <= n; k++) {
+    const a = thetaStart + (k / n) * thetaLength,
       x = radius * Math.cos(a),
       y = radius * Math.sin(a);
-    b.vertex(x, y, 0, 0, 0, 1, (x / (radius || 1) + 1) / 2, (y / (radius || 1) + 1) / 2);
+    mesh.add(x, y, 0, 0, 0, 1, 0.5 + x / scale, 0.5 + y / scale);
+    if (k) mesh.i.push(0, k, k + 1);
   }
-  for (let i = 1; i <= n; i++) b.idx.push(i, i + 1, 0);
-  return b.build();
+  return mesh.done();
 }
 
-/** Flat ring, facing +z. */
+/**
+ * Flat annulus, or a sector of one, in the XY plane facing +z: `phiSegments + 1` concentric rings from `innerRadius`
+ * to `outerRadius`, each of `thetaSegments + 1` vertices from `thetaStart` over `thetaLength` (radians from +x toward
+ * +y). UVs are the planar map of the square around the outer rim, centre at (0.5, 0.5). No groups.
+ */
 export function ringGeometry(
   innerRadius = 0.5,
   outerRadius = 1,
@@ -140,35 +165,32 @@ export function ringGeometry(
   thetaStart = 0,
   thetaLength = TAU,
 ): GeometryData {
-  const b = new Builder(),
-    ts = segments(thetaSegments, 3),
-    ps = segments(phiSegments, 1),
-    step = (outerRadius - innerRadius) / ps;
-  let radius = innerRadius;
-  for (let j = 0; j <= ps; j++) {
-    for (let i = 0; i <= ts; i++) {
-      const a = thetaStart + (i / ts) * thetaLength,
-        x = radius * Math.cos(a),
-        y = radius * Math.sin(a);
-      b.vertex(x, y, 0, 0, 0, 1, (x / (outerRadius || 1) + 1) / 2, (y / (outerRadius || 1) + 1) / 2);
+  const around = count(thetaSegments, 3),
+    rings = count(phiSegments, 1),
+    mesh = new Mesh(),
+    scale = 2 * (outerRadius || 1);
+  // Lattice columns run outward and rows counter-clockwise, so the radial x tangential cross product is +z.
+  for (let r = 0; r <= around; r++) {
+    const a = thetaStart + (r / around) * thetaLength,
+      cos = Math.cos(a),
+      sin = Math.sin(a);
+    for (let c = 0; c <= rings; c++) {
+      const rad = innerRadius + ((outerRadius - innerRadius) * c) / rings,
+        x = rad * cos,
+        y = rad * sin;
+      mesh.add(x, y, 0, 0, 0, 1, 0.5 + x / scale, 0.5 + y / scale);
     }
-    radius += step;
   }
-  for (let j = 0; j < ps; j++)
-    for (let i = 0; i < ts; i++) {
-      const s = i + j * (ts + 1),
-        a = s,
-        bb = s + ts + 1,
-        c = s + ts + 2,
-        d = s + 1;
-      b.idx.push(a, bb, d, bb, c, d);
-    }
-  return b.build();
+  mesh.lattice(0, rings, around);
+  return mesh.done();
 }
 
 /**
- * Cylinder along +y. Groups: 0 side, 1 top cap, 2 bottom cap. A zero radius drops that cap and
- * the degenerate side triangles, so a cone has a single apex row of triangles.
+ * Cylinder or frustum along y, centred on the origin, from `radiusTop` at y = +height/2 to `radiusBottom` at
+ * -height/2. Angles start at `thetaStart` on +z and turn toward +x. The side is a grid with u around and v = 1 at the
+ * top, true slanted normals, and a single triangle per quad next to a zero radius (no slivers at a cone tip). Unless
+ * `openEnded`, every end with a radius above zero gets a flat cap facing out along y. Groups: side 0, top cap 1,
+ * bottom cap 2; a missing cap has no group.
  */
 export function cylinderGeometry(
   radiusTop = 1,
@@ -180,67 +202,62 @@ export function cylinderGeometry(
   thetaStart = 0,
   thetaLength = TAU,
 ): GeometryData {
-  const b = new Builder(),
-    rs = segments(radialSegments, 1),
-    hs = segments(heightSegments, 1),
-    half = height / 2,
-    slope = height === 0 ? Math.sign(radiusBottom - radiusTop) : (radiusBottom - radiusTop) / height,
-    radialNormal = height === 0 && radiusBottom !== radiusTop ? 0 : 1;
-  const rows: number[][] = [];
-  for (let y = 0; y <= hs; y++) {
-    const row: number[] = [],
-      v = y / hs,
-      radius = v * (radiusBottom - radiusTop) + radiusTop;
-    for (let x = 0; x <= rs; x++) {
-      const u = x / rs,
-        theta = u * thetaLength + thetaStart,
-        s = Math.sin(theta),
-        c = Math.cos(theta);
-      row.push(
-        b.vertexN(radius * s, -v * height + half, radius * c, s * radialNormal, slope, c * radialNormal, u, 1 - v),
-      );
+  const cols = count(radialSegments, 1),
+    rows = count(heightSegments, 1),
+    mesh = new Mesh();
+  // Side normal in the (radial, y) plane: the profile runs (radiusTop - radiusBottom, height), so (height, rb - rt)
+  // points out. A flat side (height 0) with equal radii has no slope: use the horizontal radial direction.
+  const slope = radiusBottom - radiusTop,
+    l = Math.hypot(height, slope),
+    nr = l ? height / l : 1,
+    ny = l ? slope / l : 0;
+  for (let r = 0; r <= rows; r++) {
+    const t = r / rows,
+      rad = radiusBottom + (radiusTop - radiusBottom) * t,
+      y = (t - 0.5) * height;
+    for (let c = 0; c <= cols; c++) {
+      const a = thetaStart + (c / cols) * thetaLength,
+        s = Math.sin(a),
+        k = Math.cos(a);
+      // + 0 keeps a flat side's normal free of -0.
+      mesh.add(rad * s, y, rad * k, nr * s + 0, ny, nr * k + 0, c / cols, t);
     }
-    rows.push(row);
   }
-  for (let x = 0; x < rs; x++)
-    for (let y = 0; y < hs; y++) {
-      const a = rows[y][x],
-        bb = rows[y + 1][x],
-        c = rows[y + 1][x + 1],
-        d = rows[y][x + 1];
-      if (radiusTop > 0 || y !== 0) b.idx.push(a, bb, d);
-      if (radiusBottom > 0 || y !== hs - 1) b.idx.push(bb, c, d);
-    }
-  b.group(0, 0);
+  mesh.lattice(0, cols, rows, (r) =>
+    r === 0 && !(radiusBottom > 0) ? NO_LOWER : r === rows - 1 && !(radiusTop > 0) ? NO_UPPER : BOTH,
+  );
+  mesh.group(0, 0);
   const cap = (top: boolean) => {
-    const start = b.idx.length,
-      radius = top ? radiusTop : radiusBottom,
+    const rad = top ? radiusTop : radiusBottom;
+    if (openEnded || !(rad > 0)) return;
+    const y = top ? height / 2 : -height / 2,
       sign = top ? 1 : -1,
-      centers = b.count;
-    for (let x = 1; x <= rs; x++) b.vertex(0, half * sign, 0, 0, sign, 0, 0.5, 0.5);
-    const rim = b.count;
-    for (let x = 0; x <= rs; x++) {
-      const theta = (x / rs) * thetaLength + thetaStart,
-        s = Math.sin(theta),
-        c = Math.cos(theta);
-      b.vertex(radius * s, half * sign, radius * c, 0, sign, 0, c * 0.5 + 0.5, s * 0.5 * sign + 0.5);
+      start = mesh.i.length,
+      centres = mesh.size;
+    // One centre per segment, then the rim. Seen from outside, the cap's u runs toward +x and its v toward -z on top
+    // and +z underneath, as on the box.
+    for (let c = 0; c < cols; c++) mesh.add(0, y, 0, 0, sign, 0, 0.5, 0.5);
+    const rim = mesh.size;
+    for (let c = 0; c <= cols; c++) {
+      const a = thetaStart + (c / cols) * thetaLength,
+        s = Math.sin(a),
+        k = Math.cos(a);
+      mesh.add(rad * s, y, rad * k, 0, sign, 0, 0.5 + s / 2, 0.5 - (sign * k) / 2);
     }
-    for (let x = 0; x < rs; x++) {
-      const c = centers + x,
-        i = rim + x;
-      if (top) b.idx.push(i, i + 1, c);
-      else b.idx.push(i + 1, i, c);
-    }
-    b.group(start, top ? 1 : 2);
+    for (let c = 0; c < cols; c++)
+      if (top) mesh.i.push(centres + c, rim + c, rim + c + 1);
+      else mesh.i.push(centres + c, rim + c + 1, rim + c);
+    mesh.group(start, top ? 1 : 2);
   };
-  if (!openEnded) {
-    if (radiusTop > 0) cap(true);
-    if (radiusBottom > 0) cap(false);
-  }
-  return b.build(true);
+  cap(true);
+  cap(false);
+  return mesh.done(true);
 }
 
-/** Cone: a cylinder with a zero top radius. */
+/**
+ * Cone along y with its tip at y = +height/2 and a base of `radius` at -height/2: exactly
+ * `cylinderGeometry(0, radius, height, ...)`, so the groups are side 0 and (unless `openEnded`) bottom cap 2.
+ */
 export function coneGeometry(
   radius = 1,
   height = 1,
@@ -253,7 +270,12 @@ export function coneGeometry(
   return cylinderGeometry(0, radius, height, radialSegments, heightSegments, openEnded, thetaStart, thetaLength);
 }
 
-/** UV sphere. Pole rows emit one triangle per quad, so the full sphere has no degenerate triangles. */
+/**
+ * UV sphere centred on the origin, y up. For u, v in [0, 1] the point is at azimuth phiStart + u * phiLength (0 on -x,
+ * turning through +z) and polar angle thetaStart + v * thetaLength (0 at the +y pole, clamped to pi); its UV is
+ * (u, 1 - v). A `(widthSegments + 1) * (heightSegments + 1)` grid with radial unit normals. Rows on a pole keep one
+ * triangle per quad, and their u moves half a column toward that triangle's middle. No groups.
+ */
 export function sphereGeometry(
   radius = 1,
   widthSegments = 32,
@@ -263,44 +285,37 @@ export function sphereGeometry(
   thetaStart = 0,
   thetaLength = Math.PI,
 ): GeometryData {
-  const b = new Builder(),
-    w = segments(widthSegments, 3),
-    h = segments(heightSegments, 2),
-    thetaEnd = Math.min(thetaStart + thetaLength, Math.PI);
-  const grid: number[][] = [];
-  for (let iy = 0; iy <= h; iy++) {
-    const row: number[] = [],
-      v = iy / h;
-    const uOffset = iy === 0 && thetaStart === 0 ? 0.5 / w : iy === h && thetaEnd === Math.PI ? -0.5 / w : 0;
-    for (let ix = 0; ix <= w; ix++) {
-      const u = ix / w,
+  const cols = count(widthSegments, 3),
+    rows = count(heightSegments, 2),
+    mesh = new Mesh(),
+    top = thetaStart === 0,
+    bottom = thetaStart + thetaLength >= Math.PI;
+  // Lattice rows go upward (v from the bottom of the band), so azimuth x up points outward.
+  for (let r = 0; r <= rows; r++) {
+    const v = 1 - r / rows,
+      theta = Math.min(thetaStart + v * thetaLength, Math.PI),
+      st = Math.sin(theta),
+      ct = Math.cos(theta),
+      shift = r === rows && top ? 0.5 / cols : r === 0 && bottom ? -0.5 / cols : 0;
+    for (let c = 0; c <= cols; c++) {
+      const u = c / cols,
         phi = phiStart + u * phiLength,
-        theta = thetaStart + v * thetaLength;
-      const x = -radius * Math.cos(phi) * Math.sin(theta),
-        y = radius * Math.cos(theta),
-        z = radius * Math.sin(phi) * Math.sin(theta);
-      const nx = -Math.cos(phi) * Math.sin(theta),
-        ny = Math.cos(theta),
-        nz = Math.sin(phi) * Math.sin(theta);
-      row.push(b.vertexN(x, y, z, nx, ny, nz, u + uOffset, 1 - v));
+        x = -Math.cos(phi) * st,
+        z = Math.sin(phi) * st;
+      mesh.add(radius * x, radius * ct, radius * z, x, ct, z, u + shift, 1 - v);
     }
-    grid.push(row);
   }
-  for (let iy = 0; iy < h; iy++)
-    for (let ix = 0; ix < w; ix++) {
-      const a = grid[iy][ix + 1],
-        bb = grid[iy][ix],
-        c = grid[iy + 1][ix],
-        d = grid[iy + 1][ix + 1];
-      if (iy !== 0 || thetaStart > 0) b.idx.push(a, bb, d);
-      if (iy !== h - 1 || thetaEnd < Math.PI) b.idx.push(bb, c, d);
-    }
-  return b.build();
+  mesh.lattice(0, cols, rows, (r) => (r === 0 && bottom ? NO_LOWER : r === rows - 1 && top ? NO_UPPER : BOTH));
+  return mesh.done();
 }
 
 /**
- * Capsule: hemispherical caps of `capSegments` rows joined by a cylinder of
- * `heightSegments` rows, along +y. `height` is the length of the middle section. UVs follow arc length.
+ * Capsule along y: a straight section of `height` (negative counts as 0) between two hemispheres of `radius`, so it
+ * spans y from -(height/2 + radius) to +(height/2 + radius). Each hemisphere has `capSegments` rows of equal angle and
+ * the straight part `heightSegments` rows; every row has `radialSegments + 1` vertices with the sphere's azimuth (u = 0
+ * on -x, turning through +z). v is the arc length from the bottom pole over the whole profile length (pi * radius +
+ * height). Normals are smooth and unit; the pole rows keep one triangle per quad, with u moved half a column like the
+ * sphere's. No groups.
  */
 export function capsuleGeometry(
   radius = 1,
@@ -309,63 +324,49 @@ export function capsuleGeometry(
   radialSegments = 8,
   heightSegments = 1,
 ): GeometryData {
-  const b = new Builder();
-  height = Math.max(0, height);
-  const cs = segments(capSegments, 1),
-    rs = segments(radialSegments, 3),
-    hs = segments(heightSegments, 1);
-  const half = height / 2,
-    capArc = (Math.PI / 2) * radius,
-    total = 2 * capArc + height,
-    rows = cs * 2 + hs,
-    perRow = rs + 1;
-  for (let iy = 0; iy <= rows; iy++) {
-    let y: number, r: number, ny: number, arc: number;
-    if (iy <= cs) {
-      const t = iy / cs,
-        angle = (t * Math.PI) / 2;
-      y = -half - radius * Math.cos(angle);
-      r = radius * Math.sin(angle);
-      ny = -radius * Math.cos(angle);
-      arc = t * capArc;
-    } else if (iy <= cs + hs) {
-      const t = (iy - cs) / hs;
-      y = -half + t * height;
-      r = radius;
-      ny = 0;
-      arc = capArc + t * height;
-    } else {
-      const t = (iy - cs - hs) / cs,
-        angle = (t * Math.PI) / 2;
-      y = half + radius * Math.sin(angle);
-      r = radius * Math.cos(angle);
-      ny = radius * Math.sin(angle);
-      arc = capArc + height + t * capArc;
-    }
-    const v = Math.max(0, Math.min(1, arc / (total || 1))),
-      uOffset = iy === 0 ? 0.5 / rs : iy === rows ? -0.5 / rs : 0;
-    for (let ix = 0; ix <= rs; ix++) {
-      const u = ix / rs,
-        theta = u * TAU,
-        s = Math.sin(theta),
-        c = Math.cos(theta);
-      b.vertexN(-r * c, y, r * s, -r * c, ny, r * s, u + uOffset, v);
-    }
-    if (iy > 0) {
-      const prev = (iy - 1) * perRow;
-      for (let ix = 0; ix < rs; ix++) {
-        const i1 = prev + ix,
-          i2 = prev + ix + 1,
-          i3 = iy * perRow + ix,
-          i4 = iy * perRow + ix + 1;
-        b.idx.push(i1, i2, i3, i2, i4, i3);
-      }
-    }
+  const caps = count(capSegments, 1),
+    cols = count(radialSegments, 3),
+    straight = count(heightSegments, 1),
+    h = Math.max(0, height),
+    half = h / 2,
+    total = Math.PI * radius + h,
+    on = radius === 0 ? 0 : 1,
+    mesh = new Mesh();
+  // The profile from the bottom pole up: radial distance, height, profile normal (radial, y) and arc length.
+  const profile: number[][] = [];
+  for (let k = 0; k <= caps; k++) {
+    const a = Math.PI - (k / caps) * (Math.PI / 2),
+      s = Math.sin(a),
+      c = Math.cos(a);
+    profile.push([radius * s, -half + radius * c, s, c, radius * (Math.PI - a)]);
   }
-  return b.build();
+  for (let k = 1; k <= straight; k++)
+    profile.push([radius, -half + (k / straight) * h, 1, 0, (Math.PI / 2) * radius + (k / straight) * h]);
+  for (let k = 1; k <= caps; k++) {
+    const a = Math.PI / 2 - (k / caps) * (Math.PI / 2),
+      s = Math.sin(a),
+      c = Math.cos(a);
+    profile.push([radius * s, half + radius * c, s, c, (Math.PI / 2) * radius + h + radius * (Math.PI / 2 - a)]);
+  }
+  const rows = profile.length - 1;
+  profile.forEach(([rad, y, nr, ny, arc], r) => {
+    const shift = r === 0 ? -0.5 / cols : r === rows ? 0.5 / cols : 0;
+    for (let c = 0; c <= cols; c++) {
+      const phi = (c / cols) * TAU,
+        x = -Math.cos(phi),
+        z = Math.sin(phi);
+      mesh.add(rad * x, y, rad * z, nr * x * on, ny * on, nr * z * on, c / cols + shift, total > 0 ? arc / total : 0);
+    }
+  });
+  mesh.lattice(0, cols, rows, (r) => (r === 0 ? NO_LOWER : r === rows - 1 ? NO_UPPER : BOTH));
+  return mesh.done();
 }
 
-/** Torus in the XY plane. */
+/**
+ * Torus around the z axis, lying in the XY plane: ring `radius` (centre to tube centre) and tube radius `tube`. The
+ * ring runs from +x toward +y over `arc` radians in `tubularSegments` steps and each tube cross-section has
+ * `radialSegments` steps; UV is (step along the ring, step around the tube), both 0..1. No groups.
+ */
 export function torusGeometry(
   radius = 1,
   tube = 0.4,
@@ -373,31 +374,31 @@ export function torusGeometry(
   tubularSegments = 48,
   arc = TAU,
 ): GeometryData {
-  const b = new Builder(),
-    rs = segments(radialSegments, 1),
-    ts = segments(tubularSegments, 1);
-  for (let j = 0; j <= rs; j++)
-    for (let i = 0; i <= ts; i++) {
-      const u = (i / ts) * arc,
-        v = (j / rs) * TAU,
+  const around = count(radialSegments, 1),
+    along = count(tubularSegments, 1),
+    mesh = new Mesh();
+  for (let j = 0; j <= around; j++) {
+    const v = (j / around) * TAU,
+      cv = Math.cos(v),
+      sv = Math.sin(v);
+    for (let i = 0; i <= along; i++) {
+      const u = (i / along) * arc,
         cu = Math.cos(u),
         su = Math.sin(u),
-        cv = Math.cos(v),
-        sv = Math.sin(v);
-      b.vertexN((radius + tube * cv) * cu, (radius + tube * cv) * su, tube * sv, cv * cu, cv * su, sv, i / ts, j / rs);
+        reach = radius + tube * cv;
+      mesh.add(reach * cu, reach * su, tube * sv, cv * cu, cv * su, sv, i / along, j / around);
     }
-  for (let j = 1; j <= rs; j++)
-    for (let i = 1; i <= ts; i++) {
-      const a = (ts + 1) * j + i - 1,
-        bb = (ts + 1) * (j - 1) + i - 1,
-        c = (ts + 1) * (j - 1) + i,
-        d = (ts + 1) * j + i;
-      b.idx.push(a, bb, d, bb, c, d);
-    }
-  return b.build();
+  }
+  mesh.lattice(0, along, around);
+  return mesh.done();
 }
 
-/** Tube along a (p, q) torus knot. */
+/**
+ * Tube of radius `tube` around a (p, q) torus knot: the centre line winds `p` times around the z axis and `q` times
+ * through the hole of a torus with major radius `radius` and minor radius `radius / 2`. `tubularSegments + 1` rings
+ * of `radialSegments + 1` vertices, outward unit normals, UV (along the knot, around the tube); the two end rings
+ * coincide. No groups.
+ */
 export function torusKnotGeometry(
   radius = 1,
   tube = 0.4,
@@ -406,51 +407,72 @@ export function torusKnotGeometry(
   p = 2,
   q = 3,
 ): GeometryData {
-  const b = new Builder(),
-    ts = segments(tubularSegments, 1),
-    rs = segments(radialSegments, 1);
-  const knot = (u: number): [number, number, number] => {
-    const cs = Math.cos((q / p) * u);
-    return [
-      radius * (2 + cs) * 0.5 * Math.cos(u),
-      radius * (2 + cs) * Math.sin(u) * 0.5,
-      radius * Math.sin((q / p) * u) * 0.5,
-    ];
+  const along = count(tubularSegments, 1),
+    around = count(radialSegments, 1),
+    k = radius / 2,
+    ratio = q / p,
+    mesh = new Mesh();
+  const unit = (v: number[]) => {
+    const l = Math.hypot(v[0], v[1], v[2]);
+    return l ? [v[0] / l, v[1] / l, v[2] / l] : [0, 0, 0];
   };
-  for (let i = 0; i <= ts; i++) {
-    const u = (i / ts) * p * TAU,
-      p1 = knot(u),
-      p2 = knot(u + 0.01);
-    const t = [p2[0] - p1[0], p2[1] - p1[1], p2[2] - p1[2]],
-      s = [p2[0] + p1[0], p2[1] + p1[1], p2[2] + p1[2]];
-    let bn = [t[1] * s[2] - t[2] * s[1], t[2] * s[0] - t[0] * s[2], t[0] * s[1] - t[1] * s[0]];
-    let n = [bn[1] * t[2] - bn[2] * t[1], bn[2] * t[0] - bn[0] * t[2], bn[0] * t[1] - bn[1] * t[0]];
-    const lb = Math.hypot(...bn) || 1,
-      ln = Math.hypot(...n) || 1;
-    bn = bn.map((x) => x / lb);
-    n = n.map((x) => x / ln);
-    for (let j = 0; j <= rs; j++) {
-      const v = (j / rs) * TAU,
-        cx = -tube * Math.cos(v),
-        cy = tube * Math.sin(v);
-      const off = [cx * n[0] + cy * bn[0], cx * n[1] + cy * bn[1], cx * n[2] + cy * bn[2]];
-      b.vertexN(p1[0] + off[0], p1[1] + off[1], p1[2] + off[2], off[0], off[1], off[2], i / ts, j / rs);
+  for (let i = 0; i <= along; i++) {
+    const s = (i / along) * p * TAU,
+      w = ratio * s,
+      reach = 2 + Math.cos(w),
+      cs = Math.cos(s),
+      ss = Math.sin(s),
+      centre = [k * reach * cs, k * reach * ss, k * Math.sin(w)],
+      // Exact derivative of the centre line, then a frame from it and the position: B is perpendicular to the plane
+      // through the axis origin, the point and its tangent (never degenerate, the in-plane radius is at least k).
+      tangent = unit([
+        k * (-ratio * Math.sin(w) * cs - reach * ss),
+        k * (-ratio * Math.sin(w) * ss + reach * cs),
+        k * ratio * Math.cos(w),
+      ]),
+      b = unit([
+        tangent[1] * centre[2] - tangent[2] * centre[1],
+        tangent[2] * centre[0] - tangent[0] * centre[2],
+        tangent[0] * centre[1] - tangent[1] * centre[0],
+      ]),
+      n = [
+        b[1] * tangent[2] - b[2] * tangent[1],
+        b[2] * tangent[0] - b[0] * tangent[2],
+        b[0] * tangent[1] - b[1] * tangent[0],
+      ];
+    for (let j = 0; j <= around; j++) {
+      const v = (j / around) * TAU,
+        cv = -Math.cos(v),
+        sv = Math.sin(v),
+        d = [cv * n[0] + sv * b[0], cv * n[1] + sv * b[1], cv * n[2] + sv * b[2]];
+      mesh.add(
+        centre[0] + tube * d[0],
+        centre[1] + tube * d[1],
+        centre[2] + tube * d[2],
+        d[0],
+        d[1],
+        d[2],
+        i / along,
+        j / around,
+      );
     }
   }
-  for (let j = 1; j <= ts; j++)
-    for (let i = 1; i <= rs; i++) {
-      const a = (rs + 1) * (j - 1) + i - 1,
-        bb = (rs + 1) * j + i - 1,
-        c = (rs + 1) * j + i,
-        d = (rs + 1) * (j - 1) + i;
-      b.idx.push(a, bb, d, bb, c, d);
+  // Rows advance along the knot and columns around it: around x along points out, so index with the axes swapped.
+  for (let i = 0; i < along; i++)
+    for (let j = 0; j < around; j++) {
+      const a = i * (around + 1) + j,
+        b = a + around + 1;
+      mesh.i.push(a, b, b + 1, a, b + 1, a + 1);
     }
-  return b.build();
+  return mesh.done();
 }
 
 /**
- * Lathe: revolves 2D points (x is the radius, y the height) around +y. Normals come from the
- * profile, and every normal is unit length.
+ * Surface of revolution around +y. Each profile point is [distance from the axis, height]; the profile is swept from
+ * `phiStart` over `phiLength` (clamped to [0, 2 pi]) with angle 0 on +z turning toward +x, in `segmentCount` steps
+ * (the seam meridian is duplicated, not welded). UV is (step around, profile index / (points - 1)). Normals are the
+ * profile's own 2D normals turned with the sweep, unit length; a profile running upward at positive distance faces
+ * outward. No groups.
  */
 export function latheGeometry(
   points: readonly MutableVec2[] = [
@@ -462,59 +484,38 @@ export function latheGeometry(
   phiStart = 0,
   phiLength = TAU,
 ): GeometryData {
-  if (points.length < 2) throw new RangeError('Lathe needs at least two points');
-  const b = new Builder(),
-    n = segments(segmentCount, 1),
-    last = points.length - 1;
-  phiLength = Math.min(Math.max(phiLength, 0), TAU);
-  const profile: [number, number][] = [];
-  let prev: [number, number] = [0, 0];
-  for (let j = 0; j <= last; j++) {
-    if (j === 0) {
-      const dx = points[1][0] - points[0][0],
-        dy = points[1][1] - points[0][1];
-      prev = [dy, -dx];
-      profile.push(prev);
-    } else if (j === last) profile.push(prev);
-    else {
-      const dx = points[j + 1][0] - points[j][0],
-        dy = points[j + 1][1] - points[j][1],
-        cur: [number, number] = [dy, -dx];
-      profile.push([prev[0] + cur[0], prev[1] + cur[1]]);
-      prev = cur;
+  const cols = count(segmentCount, 1);
+  if (points.length < 2)
+    throw new RangeError(`latheGeometry got ${points.length} profile point(s); pass at least two [x, y] points`);
+  const sweep = Math.min(Math.max(phiLength, 0), TAU),
+    last = points.length - 1,
+    mesh = new Mesh();
+  // Profile normals: a segment going (dx, dy) has normal (dy, -dx), weighted by its length; ends take their segment's.
+  const normals = points.map((_, j) => {
+    let x = 0,
+      y = 0;
+    if (j > 0) (x += points[j][1] - points[j - 1][1]), (y -= points[j][0] - points[j - 1][0]);
+    if (j < last) (x += points[j + 1][1] - points[j][1]), (y -= points[j + 1][0] - points[j][0]);
+    const l = Math.hypot(x, y);
+    return l ? [x / l, y / l] : [0, 0];
+  });
+  for (let j = 0; j <= last; j++)
+    for (let c = 0; c <= cols; c++) {
+      const a = phiStart + (c / cols) * sweep,
+        s = Math.sin(a),
+        k = Math.cos(a),
+        [x, y] = points[j],
+        [nx, ny] = normals[j];
+      mesh.add(x * s, y, x * k, nx * s, ny, nx * k, c / cols, j / last);
     }
-  }
-  for (let i = 0; i <= n; i++) {
-    const phi = phiStart + (i / n) * phiLength,
-      s = Math.sin(phi),
-      c = Math.cos(phi);
-    for (let j = 0; j <= last; j++)
-      b.vertexN(
-        points[j][0] * s,
-        points[j][1],
-        points[j][0] * c,
-        profile[j][0] * s,
-        profile[j][1],
-        profile[j][0] * c,
-        i / n,
-        j / last,
-      );
-  }
-  for (let i = 0; i < n; i++)
-    for (let j = 0; j < last; j++) {
-      const base = j + i * points.length,
-        a = base,
-        bb = base + points.length,
-        c = base + points.length + 1,
-        d = base + 1;
-      b.idx.push(a, bb, d, c, d, bb);
-    }
-  return b.build();
+  mesh.lattice(0, cols, last);
+  return mesh.done();
 }
 
 /**
- * A tube of `radius` swept along a 3D (or 2D, z = 0) curve using its Frenet frames.
- * `closed` reuses the first ring as the last so a closed curve gives a seamless tube.
+ * Tube of `radius` swept along `path` (2D points get z = 0): `tubularSegments + 1` rings at even arc-length steps,
+ * each of `radialSegments + 1` vertices, oriented by the path's Frenet frames. With `closed` the last ring repeats the
+ * first. Normals point out from the path, UV is (along the path, around the tube). No groups.
  */
 export function tubeGeometry(
   path: Curve<Vec>,
@@ -523,49 +524,42 @@ export function tubeGeometry(
   radialSegments = 8,
   closed = false,
 ): GeometryData {
-  const b = new Builder(),
-    ts = segments(tubularSegments, 1),
-    rs = segments(radialSegments, 1),
-    frames = path.computeFrenetFrames(ts, closed);
-  const ring = (i: number) => {
-    const p = path.getPointAt(i / ts),
-      N = frames.normals[i],
-      B = frames.binormals[i],
-      px = p[0],
-      py = p[1],
-      pz = p.length > 2 ? p[2]! : 0;
-    for (let j = 0; j <= rs; j++) {
-      const v = (j / rs) * TAU,
-        s = Math.sin(v),
-        c = -Math.cos(v);
-      let nx = c * N[0] + s * B[0],
-        ny = c * N[1] + s * B[1],
-        nz = c * N[2] + s * B[2];
-      const l = Math.hypot(nx, ny, nz) || 1;
-      nx /= l;
-      ny /= l;
-      nz /= l;
-      b.vertex(px + radius * nx, py + radius * ny, pz + radius * nz, nx, ny, nz, 0, 0);
+  const along = count(tubularSegments, 1),
+    around = count(radialSegments, 1),
+    frames = path.computeFrenetFrames(along, closed),
+    mesh = new Mesh();
+  let first: number[][] = [];
+  for (let i = 0; i <= along; i++) {
+    const ring: number[][] = [];
+    if (closed && i === along) ring.push(...first);
+    else {
+      const centre = to3(path.getPointAt(i / along)),
+        N = frames.normals[i],
+        B = frames.binormals[i];
+      for (let j = 0; j <= around; j++) {
+        const v = (j / around) * TAU,
+          cv = -Math.cos(v),
+          sv = Math.sin(v),
+          d = [cv * N[0] + sv * B[0], cv * N[1] + sv * B[1], cv * N[2] + sv * B[2]],
+          l = Math.hypot(d[0], d[1], d[2]) || 1;
+        ring.push([d[0] / l, d[1] / l, d[2] / l, centre[0], centre[1], centre[2]]);
+      }
     }
-  };
-  for (let i = 0; i < ts; i++) ring(i);
-  ring(closed ? 0 : ts);
-  for (let i = 0; i <= ts; i++)
-    for (let j = 0; j <= rs; j++) {
-      const k = (i * (rs + 1) + j) * 2;
-      b.uv[k] = i / ts;
-      b.uv[k + 1] = j / rs;
+    if (i === 0) first = ring;
+    ring.forEach(([nx, ny, nz, x, y, z], j) =>
+      mesh.add(x + radius * nx, y + radius * ny, z + radius * nz, nx, ny, nz, i / along, j / around),
+    );
+  }
+  // Rows run along the path and columns around it, as for the torus knot.
+  for (let i = 0; i < along; i++)
+    for (let j = 0; j < around; j++) {
+      const a = i * (around + 1) + j,
+        b = a + around + 1;
+      mesh.i.push(a, b, b + 1, a, b + 1, a + 1);
     }
-  for (let j = 1; j <= ts; j++)
-    for (let i = 1; i <= rs; i++) {
-      const a = (rs + 1) * (j - 1) + i - 1,
-        bb = (rs + 1) * j + i - 1,
-        c = (rs + 1) * j + i,
-        d = (rs + 1) * (j - 1) + i;
-      b.idx.push(a, bb, d, bb, c, d);
-    }
-  return b.build();
+  return mesh.done();
 }
+
 // `@margoengine/geometry/primitives` serves this module, so it carries the polyhedra too.
 export {
   dodecahedronGeometry,

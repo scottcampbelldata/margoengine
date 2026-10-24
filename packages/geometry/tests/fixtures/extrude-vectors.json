@@ -1,0 +1,419 @@
+{
+ "about": "Binding parts of the clean-room shape/extrude vectors (gear cases left out: their shape is not recorded). Bounding boxes, area, signed volume and groups are binding; vertex order and wall UVs are free.",
+ "extrude": {
+  "shape holey 6": {
+   "call": "shapeGeometry(holey, 6)",
+   "vertices": 21,
+   "indices": 69,
+   "triangles": 23,
+   "groups": [],
+   "bboxMin": [
+    -2,
+    -1,
+    0
+   ],
+   "bboxMax": [
+    2,
+    1.5,
+    0
+   ],
+   "area": 8.52,
+   "signedVolume": 0,
+   "degenerateTriangles": 1,
+   "windingAgreesWithNormals": 22,
+   "windingDisagrees": 0,
+   "uvMin": [
+    -2,
+    -1
+   ],
+   "uvMax": [
+    2,
+    1.5
+   ]
+  },
+  "shape square with 2 square holes": {
+   "call": "shapeGeometry(square 4x4 with two 1x1 square holes)",
+   "vertices": 12,
+   "indices": 42,
+   "triangles": 14,
+   "groups": [],
+   "bboxMin": [
+    -2,
+    -2,
+    0
+   ],
+   "bboxMax": [
+    2,
+    2,
+    0
+   ],
+   "area": 14,
+   "signedVolume": 0,
+   "degenerateTriangles": 0,
+   "windingAgreesWithNormals": 14,
+   "windingDisagrees": 0,
+   "uvMin": [
+    -2,
+    -2
+   ],
+   "uvMax": [
+    2,
+    2
+   ]
+  },
+  "shape array of two": {
+   "call": "shapeGeometry([sq, square at (6,0)])",
+   "vertices": 16,
+   "indices": 48,
+   "triangles": 16,
+   "groups": [
+    [
+     0,
+     42,
+     0
+    ],
+    [
+     42,
+     6,
+     1
+    ]
+   ],
+   "bboxMin": [
+    -2,
+    -2,
+    0
+   ],
+   "bboxMax": [
+    7,
+    2,
+    0
+   ],
+   "area": 18,
+   "signedVolume": 0,
+   "degenerateTriangles": 0,
+   "windingAgreesWithNormals": 16,
+   "windingDisagrees": 0,
+   "uvMin": [
+    -2,
+    -2
+   ],
+   "uvMax": [
+    7,
+    2
+   ]
+  },
+  "extrude holey bevel": {
+   "call": "extrudeGeometry(holey, {curveSegments:6, depth:0.5, bevelSegments:2, bevelThickness:0.1, bevelSize:0.05})",
+   "vertices": 732,
+   "indices": 732,
+   "triangles": 244,
+   "groups": [
+    [
+     0,
+     132,
+     0
+    ],
+    [
+     132,
+     600,
+     1
+    ]
+   ],
+   "bboxMin": [
+    -2.05,
+    -1.05,
+    -0.1
+   ],
+   "bboxMax": [
+    2.05,
+    1.55,
+    0.6
+   ],
+   "area": 31.17465,
+   "signedVolume": 6.58396,
+   "degenerateTriangles": 0,
+   "windingAgreesWithNormals": 244,
+   "windingDisagrees": 0
+  },
+  "extrude holey flat": {
+   "call": "extrudeGeometry(holey, {curveSegments:6, depth:0.7, steps:2, bevelEnabled:false})",
+   "vertices": 372,
+   "indices": 372,
+   "triangles": 124,
+   "groups": [
+    [
+     0,
+     132,
+     0
+    ],
+    [
+     132,
+     240,
+     1
+    ]
+   ],
+   "bboxMin": [
+    -2,
+    -1,
+    0
+   ],
+   "bboxMax": [
+    2,
+    1.5,
+    0.7
+   ],
+   "area": 30.679264,
+   "signedVolume": 5.964,
+   "degenerateTriangles": 0,
+   "windingAgreesWithNormals": 124,
+   "windingDisagrees": 0
+  },
+  "extrude sq defaults": {
+   "call": "extrudeGeometry(sq) defaults",
+   "vertices": 588,
+   "indices": 588,
+   "triangles": 196,
+   "groups": [
+    [
+     0,
+     84,
+     0
+    ],
+    [
+     84,
+     504,
+     1
+    ]
+   ],
+   "bboxMin": [
+    -2.1,
+    -2.1,
+    -0.2
+   ],
+   "bboxMax": [
+    2.1,
+    2.1,
+    1.2
+   ],
+   "area": 62.431634,
+   "signedVolume": 22.670047,
+   "degenerateTriangles": 0,
+   "windingAgreesWithNormals": 196,
+   "windingDisagrees": 0
+  },
+  "extrude sq flat steps 3": {
+   "call": "extrudeGeometry(sq, {bevelEnabled:false, steps:3, depth:2})",
+   "vertices": 300,
+   "indices": 300,
+   "triangles": 100,
+   "groups": [
+    [
+     0,
+     84,
+     0
+    ],
+    [
+     84,
+     216,
+     1
+    ]
+   ],
+   "bboxMin": [
+    -2,
+    -2,
+    0
+   ],
+   "bboxMax": [
+    2,
+    2,
+    2
+   ],
+   "area": 76,
+   "signedVolume": 28,
+   "degenerateTriangles": 0,
+   "windingAgreesWithNormals": 100,
+   "windingDisagrees": 0
+  },
+  "extrude sq bevel 4": {
+   "call": "extrudeGeometry(sq, {steps:2, bevelSegments:4})",
+   "vertices": 804,
+   "indices": 804,
+   "triangles": 268,
+   "groups": [
+    [
+     0,
+     84,
+     0
+    ],
+    [
+     84,
+     720,
+     1
+    ]
+   ],
+   "bboxMin": [
+    -2.1,
+    -2.1,
+    -0.2
+   ],
+   "bboxMax": [
+    2.1,
+    2.1,
+    1.2
+   ],
+   "area": 62.484161,
+   "signedVolume": 22.684491,
+   "degenerateTriangles": 0,
+   "windingAgreesWithNormals": 268,
+   "windingDisagrees": 0
+  },
+  "extrude sq reversed rings": {
+   "call": "extrudeGeometry(sq with every ring reversed, {bevelEnabled:false})",
+   "vertices": 156,
+   "indices": 156,
+   "triangles": 52,
+   "groups": [
+    [
+     0,
+     84,
+     0
+    ],
+    [
+     84,
+     72,
+     1
+    ]
+   ],
+   "bboxMin": [
+    -2,
+    -2,
+    0
+   ],
+   "bboxMax": [
+    2,
+    2,
+    1
+   ],
+   "area": 52,
+   "signedVolume": 14,
+   "degenerateTriangles": 0,
+   "windingAgreesWithNormals": 52,
+   "windingDisagrees": 0
+  },
+  "extrude along path": {
+   "call": "extrudeGeometry(square 0.6, {steps:40, extrudePath: CatmullRomCurve3([[0,0,0],[2,3,1],[5,3,-2],[8,0,0]])})",
+   "vertices": 972,
+   "indices": 972,
+   "triangles": 324,
+   "groups": [
+    [
+     0,
+     12,
+     0
+    ],
+    [
+     12,
+     960,
+     1
+    ]
+   ],
+   "bboxMin": [
+    -0.294119,
+    -0.31579,
+    -2.44244
+   ],
+   "bboxMax": [
+    8.27741,
+    3.771457,
+    1.351068
+   ],
+   "area": 31.875052,
+   "signedVolume": 4.668314,
+   "degenerateTriangles": 0,
+   "windingAgreesWithNormals": 324,
+   "windingDisagrees": 0
+  },
+  "extrude steps NaN": {
+   "call": "extrudeGeometry(sq, {steps: NaN})",
+   "throws": "RangeError",
+   "message": "Expected a finite number"
+  },
+  "mergeOverlappingPoints": {
+   "full arc end": [
+    [
+     0,
+     1
+    ],
+    [
+     -1,
+     0
+    ],
+    [
+     0,
+     -1
+    ],
+    [
+     1,
+     0
+    ]
+   ],
+   "consecutive duplicates": [
+    [
+     0,
+     0
+    ],
+    [
+     1,
+     0
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     0,
+     1
+    ]
+   ],
+   "far from origin, 1e-3 apart (kept)": [
+    [
+     1000000,
+     0
+    ],
+    [
+     1000000.001,
+     0
+    ],
+    [
+     1000000,
+     1
+    ]
+   ],
+   "single point": [
+    [
+     1,
+     2
+    ]
+   ],
+   "all same": [
+    [
+     1,
+     2
+    ]
+   ]
+  },
+  "triangulateShape closing duplicate and small hole": {
+   "contourLength": 4,
+   "holeLengths": [
+    3
+   ],
+   "triangles": 7
+  },
+  "isClockWise / shapeArea": {
+   "ccw square 2x2 area": 4,
+   "ccw isClockWise": false,
+   "cw isClockWise": true,
+   "empty area": 0
+  }
+ }
+}

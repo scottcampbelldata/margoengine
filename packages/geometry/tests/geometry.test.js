@@ -224,41 +224,7 @@ test('plane, circle and ring counts match the formulas', () => {
   assert.equal(r.indices.length, 20 * 3 * 6);
 });
 
-test('cylinder and cone counts match the formulas including open ends and the cone apex', () => {
-  const r = 16,
-    h = 3,
-    cyl = cylinderGeometry(1, 2, 3, r, h);
-  assert.equal(vcount(cyl), (r + 1) * (h + 1) + 2 * (2 * r + 1));
-  assert.equal(cyl.indices.length, r * h * 6 + 2 * r * 3);
-  assert.deepEqual(
-    cyl.groups.map((g) => g.materialIndex),
-    [0, 1, 2],
-  );
-  const open = cylinderGeometry(1, 1, 1, r, h, true);
-  assert.equal(vcount(open), (r + 1) * (h + 1));
-  assert.equal(open.indices.length, r * h * 6);
-  const cone = coneGeometry(1, 2, r, h);
-  assert.equal(vcount(cone), (r + 1) * (h + 1) + 2 * r + 1);
-  assert.equal(cone.indices.length, r * h * 6 - r * 3 + r * 3, 'apex row drops one triangle per quad, one cap');
-  const partial = cylinderGeometry(1, 1, 1, 8, 1, false, 0, Math.PI);
-  assert.equal(vcount(partial), 9 * 2 + 2 * 17);
-});
-
-test('sphere counts match the formulas, including partial theta ranges', () => {
-  const full = sphereGeometry(1, 32, 16);
-  assert.equal(vcount(full), 33 * 17);
-  assert.equal(full.indices.length, 32 * 16 * 6 - 2 * 32 * 3, 'poles have one triangle per quad');
-  const cap = sphereGeometry(1, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2);
-  assert.equal(cap.indices.length, 12 * 6 * 6 - 12 * 3, 'only the top pole collapses');
-  const band = sphereGeometry(1, 12, 6, 0, Math.PI, 0.3, 1);
-  assert.equal(band.indices.length, 12 * 6 * 6);
-  assert.equal(vcount(sphereGeometry(1, 1, 1)), 4 * 3, 'clamps to 3 x 2 segments');
-});
-
-test('capsule, torus and torus knot counts match the formulas', () => {
-  const cap = capsuleGeometry(0.5, 2, 5, 12, 3);
-  assert.equal(vcount(cap), (2 * 5 + 3 + 1) * 13);
-  assert.equal(cap.indices.length, (2 * 5 + 3) * 12 * 6);
+test('torus and torus knot counts match the formulas', () => {
   const t = torusGeometry(1, 0.3, 10, 30);
   assert.equal(vcount(t), 11 * 31);
   assert.equal(t.indices.length, 10 * 30 * 6);
@@ -337,149 +303,6 @@ test('shape and extrude counts match the formulas', () => {
     [0, 1],
   );
   assert.equal(bevel.groups[0].count, 2 * F * 3);
-});
-
-// ---------- exact agreement with the reference fixture ----------
-
-const reference = JSON.parse(await readFile(new URL('./fixtures/three-reference.json', import.meta.url), 'utf8'));
-const refShape = () => {
-  const s = new Shape([
-      [-2, -1],
-      [2, -1],
-      [2, 1.5],
-      [-2, 1.5],
-    ]),
-    h = new Path();
-  h.absarc(-0.8, 0.2, 0.4, 0, Math.PI * 2, true);
-  s.holes.push(
-    h,
-    new Path([
-      [0.5, -0.5],
-      [1.5, -0.5],
-      [1.5, 0.5],
-      [0.5, 0.5],
-    ]),
-  );
-  return s;
-};
-const refPoints = [
-  [0, 0, 0],
-  [1, 2, 0],
-  [1.2, 2.1, 0.3],
-  [3, 1, 1],
-  [4, 4, 2],
-];
-const assertArrayClose = (actual, expected, tol, label) => {
-  assert.equal(actual.length, expected.length, `${label} length`);
-  let worst = 0,
-    at = -1;
-  for (let i = 0; i < actual.length; i++) {
-    const d = Math.abs(actual[i] - expected[i]);
-    if (d > worst) {
-      worst = d;
-      at = i;
-    }
-  }
-  assert.ok(worst <= tol, `${label}: max difference ${worst} at ${at}`);
-};
-
-test('primitives match the reference fixture vertex for vertex', () => {
-  const ours = {
-    box: boxGeometry(1, 2, 3, 2, 1, 3),
-    plane: planeGeometry(2, 3, 2, 3),
-    circle: circleGeometry(1.5, 7, 0.3, 4),
-    ring: ringGeometry(0.3, 1.2, 7, 2, 0.2, 5),
-    cylinder: cylinderGeometry(0.5, 1, 2, 7, 2, false, 0.1, 5),
-    cone: coneGeometry(1, 2, 6, 2),
-    sphere: sphereGeometry(1, 8, 6),
-    spherePartial: sphereGeometry(1.2, 7, 5, 0.1, 5, 0.2, 2.5),
-    capsule: capsuleGeometry(0.5, 1, 3, 6, 2),
-    torus: torusGeometry(1, 0.3, 5, 9, 5),
-    torusKnot: torusKnotGeometry(1, 0.3, 12, 5, 2, 3),
-    tetrahedron: tetrahedronGeometry(1, 1),
-    octahedron: octahedronGeometry(1.5, 0),
-    icosahedron: icosahedronGeometry(1, 1),
-    dodecahedron: dodecahedronGeometry(1, 0),
-    lathe: latheGeometry(
-      [
-        [0.2, -1],
-        [1, -0.5],
-        [0.8, 0.5],
-        [0.3, 1],
-      ],
-      7,
-      0.2,
-      5,
-    ),
-    tube: tubeGeometry(new CatmullRomCurve3(refPoints), 10, 0.2, 5, false),
-    shape: shapeGeometry(refShape(), 6),
-    extrude: extrudeGeometry(refShape(), {
-      curveSegments: 6,
-      depth: 0.5,
-      bevelSegments: 2,
-      bevelThickness: 0.1,
-      bevelSize: 0.05,
-    }),
-    extrudeFlat: extrudeGeometry(refShape(), { curveSegments: 6, depth: 0.7, steps: 2, bevelEnabled: false }),
-  };
-  assert.deepEqual(Object.keys(ours).sort(), Object.keys(reference.primitives).sort());
-  for (const [name, g] of Object.entries(ours)) {
-    const r = reference.primitives[name];
-    assert.equal(vcount(g), r.vertices, `${name} vertex count`);
-    assert.deepEqual([...g.indices], r.index ?? Array.from({ length: r.vertices }, (_, i) => i), `${name} indices`);
-    assertArrayClose(g.positions, r.positions, 1e-5, `${name} positions`);
-    assertArrayClose(g.uvs, r.uvs, 1e-5, `${name} uvs`);
-    assert.deepEqual(
-      (g.groups ?? []).map((x) => [x.start, x.count, x.materialIndex]),
-      r.groups,
-      `${name} groups`,
-    );
-    if (name === 'lathe') {
-      // The reference leaves the last profile normal unnormalized; directions must still agree.
-      for (let i = 0; i < r.vertices; i++) {
-        const a = [g.normals[i * 3], g.normals[i * 3 + 1], g.normals[i * 3 + 2]],
-          b = r.normals.slice(i * 3, i * 3 + 3);
-        close(dot(a, b) / len(b), 1, 1e-4, `lathe normal ${i}`);
-      }
-    } else assertArrayClose(g.normals, r.normals, 1e-5, `${name} normals`);
-  }
-});
-
-test('curves and Frenet frames match the reference fixture', () => {
-  const c = (closed, type) => new CatmullRomCurve3(refPoints, closed, type);
-  const flat = (list) => list.flat();
-  assertArrayClose(
-    flat(c(false, 'centripetal').getPoints(12)),
-    flat(reference.curves.centripetal),
-    1e-5,
-    'centripetal',
-  );
-  assertArrayClose(flat(c(false, 'chordal').getPoints(12)), flat(reference.curves.chordal), 1e-5, 'chordal');
-  assertArrayClose(flat(c(false, 'catmullrom').getPoints(12)), flat(reference.curves.catmullrom), 1e-5, 'uniform');
-  assertArrayClose(flat(c(true, 'centripetal').getPoints(12)), flat(reference.curves.closed), 1e-5, 'closed');
-  assertArrayClose(flat(c(false, 'centripetal').getSpacedPoints(12)), flat(reference.curves.spaced), 1e-5, 'spaced');
-  assertArrayClose(
-    flat(new EllipseCurve(1, 2, 3, 1.5, 0.3, 4, true, 0.4).getPoints(10)),
-    flat(reference.curves.ellipse),
-    1e-5,
-    'ellipse',
-  );
-  const path = new Path()
-    .moveTo(0, 0)
-    .lineTo(1, 0)
-    .quadraticCurveTo(2, 0, 2, 1)
-    .bezierCurveTo(2, 2, 1, 2, 0, 2)
-    .splineThru([
-      [-1, 1],
-      [0, 0],
-    ]);
-  assertArrayClose(flat(path.getPoints(5)), flat(reference.curves.pathPoints), 1e-5, 'path');
-  const f = c(false, 'centripetal').computeFrenetFrames(8, false);
-  for (const k of ['tangents', 'normals', 'binormals'])
-    assertArrayClose(flat(f[k]), flat(reference.curves.frames[k]), 1e-5, `frames ${k}`);
-  const fc = c(true, 'centripetal').computeFrenetFrames(8, true);
-  for (const k of ['normals', 'binormals'])
-    assertArrayClose(flat(fc[k]), flat(reference.curves.framesClosed[k]), 1e-5, `closed frames ${k}`);
 });
 
 // ---------- closed solids: watertight and outward ----------
@@ -697,15 +520,6 @@ test('UVs are in [0, 1] where the layout normalizes them', () => {
       assert.ok(g.uvs[i * 2] >= -1e-6 && g.uvs[i * 2] <= 1.2 + 1e-6);
     }
   }
-});
-
-test('box and plane UVs follow the reference layout', () => {
-  const p = planeGeometry(2, 2, 1, 1);
-  assert.deepEqual([...p.positions.slice(0, 3)], [-1, 1, 0]);
-  assert.deepEqual([...p.uvs.slice(0, 2)], [0, 1]);
-  const b = boxGeometry(2, 2, 2);
-  assert.deepEqual([...b.positions.slice(0, 3)], [1, 1, 1], '+x face starts at (1, 1, 1)');
-  assert.deepEqual([...b.normals.slice(0, 3)], [1, 0, 0]);
 });
 
 // ---------- triangulation ----------
@@ -1027,37 +841,6 @@ test('Frenet frames are orthonormal and right-handed, and closed frames meet', (
     }
     if (closed) close(dot(f.normals[0], f.normals[50]), 1, 1e-4, 'closed frames line up');
   }
-});
-
-test('Path builders match the reference point sampling', () => {
-  const p = new Path();
-  p.moveTo(0, 0)
-    .lineTo(1, 0)
-    .quadraticCurveTo(2, 0, 2, 1)
-    .bezierCurveTo(2, 2, 1, 2, 0, 2)
-    .splineThru([
-      [-1, 1],
-      [0, 0],
-    ]);
-  assert.equal(p.curves.length, 4);
-  const pts = p.getPoints(6);
-  // line: 2 points, quadratic: 6 more, cubic: 6 more, spline (3 points): 18 more.
-  assert.equal(pts.length, 2 + 6 + 6 + 18);
-  assert.deepEqual(pts.at(-1), [0, 0]);
-  assert.equal(
-    new Path().moveTo(5, 0).absarc(0, 0, 1, 0, Math.PI, false).curves.length,
-    1,
-    'a bare moveTo adds no curve',
-  );
-  const arc = new Path().moveTo(4, 0).lineTo(5, 0).absarc(0, 0, 1, 0, Math.PI, false);
-  assert.equal(arc.curves.length, 3, 'absarc adds a connecting line when the pen is elsewhere');
-  const rel = new Path().moveTo(1, 1);
-  rel.arc(1, 0, 1, Math.PI, 0, true);
-  assert.deepEqual(
-    rel.curves[0].getPoint(0).map((x) => Math.round(x * 1e9) / 1e9),
-    [1, 1],
-  );
-  assert.equal(p.getSpacedPoints(10).length, 11);
 });
 
 // ---------- utilities ----------

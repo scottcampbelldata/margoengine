@@ -657,68 +657,75 @@ export function center(data: GeometryData): GeometryData {
 }
 
 /**
- * Edges whose two faces meet at more than `thresholdAngle` degrees, plus boundary edges.
- * Positions are matched at 1e-4 precision, so split vertices along seams still pair up. Returns line index pairs
- * into `data.positions`.
+ * Feature edges of a triangle mesh: every edge whose two faces meet at an angle of at least `thresholdAngle` degrees
+ * (faces exactly at the threshold count), plus every boundary edge (used by one face). Vertex positions are welded
+ * on a 1e-4 grid (rounded to four decimal places), so meshes split at UV or normal seams still pair their faces.
+ * Faces with two corners at the same welded point are skipped. Reads only `data.positions` and `data.indices`.
+ * Returns line index pairs into `data.positions`; never throws.
+ *
+ * Non-manifold rule: an edge pairs its first face with the next face that uses it in the opposite direction; a face
+ * repeating the direction of a still-open edge is ignored for that edge, and a face on an already-paired edge opens
+ * a new entry, which ends up as a boundary if nothing closes it.
  */
 export function edgesGeometry(data: GeometryData, thresholdAngle = 1): Uint32Array {
   const P = data.positions,
     I = data.indices,
-    threshold = Math.cos((thresholdAngle * Math.PI) / 180),
-    precision = 1e4;
-  const hash = (v: number) =>
-    `${Math.round(P[v * 3] * precision)},${Math.round(P[v * 3 + 1] * precision)},${Math.round(P[v * 3 + 2] * precision)}`;
-  // Each vertex's rounded position is hashed once and numbered, so an edge is one number: from * span + to.
-  const count = P.length / 3,
-    span = count + 1,
-    ids = new Int32Array(Number.isInteger(count) ? count : 0).fill(-1),
-    numbers = new Map<string, number>();
-  const id = (v: number): number => {
-    let n = ids[v];
-    if (n === undefined || n < 0) {
-      const key = hash(v),
-        found = numbers.get(key);
-      n = found ?? numbers.size;
-      if (found === undefined) numbers.set(key, n);
-      if (v < ids.length) ids[v] = n;
-    }
-    return n;
-  };
-  const open = new Map<number, { a: number; b: number; n: MutableVec3 }>(),
-    out: number[] = [],
-    tri = [0, 0, 0],
-    keys = [0, 0, 0];
-  for (let t = 0; t < I.length; t += 3) {
-    const a = (tri[0] = I[t]),
-      b = (tri[1] = I[t + 1]),
-      c = (tri[2] = I[t + 2]);
-    keys[0] = id(a);
-    keys[1] = id(b);
-    keys[2] = id(c);
-    if (keys[0] === keys[1] || keys[1] === keys[2] || keys[0] === keys[2]) continue;
-    const e1x = P[b * 3] - P[a * 3],
-      e1y = P[b * 3 + 1] - P[a * 3 + 1],
-      e1z = P[b * 3 + 2] - P[a * 3 + 2],
-      e2x = P[c * 3] - P[a * 3],
-      e2y = P[c * 3 + 1] - P[a * 3 + 1],
-      e2z = P[c * 3 + 2] - P[a * 3 + 2];
-    const n: MutableVec3 = [e1y * e2z - e1z * e2y, e1z * e2x - e1x * e2z, e1x * e2y - e1y * e2x],
-      l = Math.hypot(n[0], n[1], n[2]) || 1;
-    n[0] /= l;
-    n[1] /= l;
-    n[2] /= l;
-    for (let k = 0; k < 3; k++) {
-      const j = (k + 1) % 3,
-        forward = keys[k] * span + keys[j],
-        reverse = keys[j] * span + keys[k],
-        other = open.get(reverse);
-      if (other) {
-        if (n[0] * other.n[0] + n[1] * other.n[1] + n[2] * other.n[2] <= threshold) out.push(other.a, other.b);
-        open.delete(reverse);
-      } else if (!open.has(forward)) open.set(forward, { a: tri[k], b: tri[j], n });
-    }
+    // Tiny slack so coplanar faces still count at a threshold of 0 despite rounding in the normals.
+    limit = Math.cos((thresholdAngle * Math.PI) / 180) + 1e-9,
+    weldOf = new Map<string, number>(),
+    welded = new Uint32Array(P.length / 3);
+  for (let v = 0; v < welded.length; v++) {
+    const key = `${Math.round(P[v * 3] * 1e4)},${Math.round(P[v * 3 + 1] * 1e4)},${Math.round(P[v * 3 + 2] * 1e4)}`;
+    let id = weldOf.get(key);
+    if (id === undefined) weldOf.set(key, (id = weldOf.size));
+    welded[v] = id;
   }
-  for (const e of open.values()) out.push(e.a, e.b);
+  const span = weldOf.size,
+    // Open edges by undirected welded key: [face, from vertex, to vertex, from welded id].
+    open = new Map<number, [number, number, number, number]>(),
+    normals: number[] = [],
+    out: number[] = [];
+  for (let t = 0, face = 0; t + 2 < I.length; t += 3) {
+    const a = I[t],
+      b = I[t + 1],
+      c = I[t + 2],
+      wa = welded[a],
+      wb = welded[b],
+      wc = welded[c];
+    if (wa === wb || wb === wc || wc === wa || wa === undefined || wb === undefined || wc === undefined) continue;
+    const ux = P[b * 3] - P[a * 3],
+      uy = P[b * 3 + 1] - P[a * 3 + 1],
+      uz = P[b * 3 + 2] - P[a * 3 + 2],
+      vx = P[c * 3] - P[a * 3],
+      vy = P[c * 3 + 1] - P[a * 3 + 1],
+      vz = P[c * 3 + 2] - P[a * 3 + 2],
+      nx = uy * vz - uz * vy,
+      ny = uz * vx - ux * vz,
+      nz = ux * vy - uy * vx,
+      len = Math.hypot(nx, ny, nz) || 1;
+    normals.push(nx / len, ny / len, nz / len);
+    const corners = [a, b, c];
+    for (let k = 0; k < 3; k++) {
+      const from = corners[k],
+        to = corners[(k + 1) % 3],
+        wf = welded[from],
+        wt = welded[to],
+        key = wf < wt ? wf * span + wt : wt * span + wf,
+        entry = open.get(key);
+      if (!entry) {
+        open.set(key, [face, from, to, wf]);
+        continue;
+      }
+      if (entry[3] === wf) continue; // same direction as the open face: not a manifold partner
+      open.delete(key);
+      const f = entry[0] * 3,
+        g = face * 3,
+        dot = normals[f] * normals[g] + normals[f + 1] * normals[g + 1] + normals[f + 2] * normals[g + 2];
+      if (dot <= limit) out.push(entry[1], entry[2]);
+    }
+    face++;
+  }
+  for (const entry of open.values()) out.push(entry[1], entry[2]);
   return Uint32Array.from(out);
 }
 

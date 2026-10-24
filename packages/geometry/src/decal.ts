@@ -187,6 +187,7 @@ export function decalGeometry(
         origin[2] + R[2] * lx + R[5] * ly + R[8] * lz + nz * offset,
       );
       normals.push(nx, ny, nz);
+      // Orthographic projection onto the box's front face: x across, y up, origin at the bottom-left corner.
       uvs.push(Math.min(1, Math.max(0, lx / box[0] + 0.5)), Math.min(1, Math.max(0, ly / box[1] + 0.5)));
     }
     for (let i = 1; i + 1 < corners; i++)

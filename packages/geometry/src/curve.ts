@@ -1,164 +1,201 @@
-import {
-  cross,
-  distance,
-  dot,
-  finiteNumber,
-  normalize,
-  rotateAxis,
-  sub,
-  to3,
-  type Vec,
-  type MutableVec3,
-} from './math.js';
+import { cross, dot, normalize, rotateAxis, sub, to3, type MutableVec3, type Vec } from './math.js';
 
-/** Per-sample orthonormal frames along a curve. Arrays have `segments + 1` entries. */
+/**
+ * Moving frames along a curve, one per sample: `segments + 1` entries in each list, sampled at equal arc length.
+ * `binormals[i] = tangents[i] x normals[i]`; all three are unit length and mutually perpendicular.
+ */
 export interface FrenetFrames {
   tangents: MutableVec3[];
   normals: MutableVec3[];
   binormals: MutableVec3[];
 }
 
+// Parameter step for the finite-difference tangent. Central differences have O(h^2) truncation error and O(eps / h)
+// rounding error; 1e-5 keeps both well under 1e-8 for curves of everyday scale.
+export const tangentStep = 1e-5;
+// Below this |T(i-1) x T(i)| two consecutive tangents count as parallel and the normal is carried over unchanged.
+const parallelLimit = 1e-12;
+
+/** Throws a RangeError naming the method when a sample count is not finite, before any loop runs. */
+export function sampleCount(method: string, value: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value))
+    throw new RangeError(`${method} got ${value} divisions; pass a finite number`);
+  return value;
+}
+
 /**
- * Base class for 2D and 3D parametric curves. `t` is the raw parameter, `u` is normalized arc
- * length. Arc lengths are cached; call `updateArcLengths()` after mutating a curve's control points.
+ * A parametric curve in 2D (`[x, y]`) or 3D (`[x, y, z]`).
+ *
+ * Two parameters run along every curve, both in [0, 1]:
+ * - `t`, the raw parameter of the curve's own formula (`getPoint`, `getTangent`, `getPoints`). Equal steps in `t` are
+ *   generally not equal steps in distance.
+ * - `u`, the normalized arc length (`getPointAt`, `getTangentAt`, `getSpacedPoints`): `u = 0.5` is halfway along the
+ *   curve by distance.
+ *
+ * Arc length comes from a table of cumulative chord lengths over `arcLengthDivisions + 1` evenly spaced `t` samples,
+ * cached on the instance. After editing control points call `updateArcLengths()`, or the cached table is reused.
+ *
+ * Every point and tangent is a new array the caller may keep or mutate.
  */
 export abstract class Curve<V extends Vec> {
+  /** Number of chords in the cached arc-length table. Default 200. */
   arcLengthDivisions = 200;
-  private lengths: number[] | null = null;
+  /** Cached cumulative chord lengths and the division count they were built with. */
+  protected arcTable: number[] | null = null;
+  protected arcTableDivisions = -1;
 
-  /** Point at parameter `t` in [0, 1]. */
+  /** The point at raw parameter `t` in [0, 1]. */
   abstract getPoint(t: number): V;
 
-  /** Point at normalized arc length `u` in [0, 1]. */
+  /** The point at normalized arc length `u` in [0, 1]. */
   getPointAt(u: number): V {
     return this.getPoint(this.getUtoTmapping(u));
   }
 
-  /** `divisions + 1` points at evenly spaced `t`. */
+  /** `divisions + 1` points at evenly spaced raw parameter `t = i / divisions`. */
   getPoints(divisions = 5): V[] {
-    finiteNumber(divisions);
+    sampleCount('getPoints', divisions);
     const points: V[] = [];
-    for (let d = 0; d <= divisions; d++) points.push(this.getPoint(d / divisions));
+    for (let i = 0; i <= divisions; i++) points.push(this.getPoint(i / divisions));
     return points;
   }
 
-  /** `divisions + 1` points evenly spaced by arc length. */
+  /** `divisions + 1` points at evenly spaced arc length `u = i / divisions`. */
   getSpacedPoints(divisions = 5): V[] {
-    finiteNumber(divisions);
+    sampleCount('getSpacedPoints', divisions);
     const points: V[] = [];
-    for (let d = 0; d <= divisions; d++) points.push(this.getPointAt(d / divisions));
+    for (let i = 0; i <= divisions; i++) points.push(this.getPointAt(i / divisions));
     return points;
   }
 
+  /** Total length: the sum of `arcLengthDivisions` chords. */
   getLength(): number {
-    const l = this.getLengths();
-    return l[l.length - 1];
+    const table = this.getLengths();
+    return table[table.length - 1];
   }
 
-  /** Cumulative chord lengths at `divisions + 1` evenly spaced `t` values. */
+  /**
+   * Cumulative chord lengths at `divisions + 1` evenly spaced `t` samples; entry 0 is 0 and the last is the length.
+   * The most recent table is cached and returned as the same array while `divisions` is unchanged.
+   */
   getLengths(divisions = this.arcLengthDivisions): number[] {
-    finiteNumber(divisions);
-    if (this.lengths && this.lengths.length === divisions + 1) return this.lengths;
-    const lengths = [0];
-    let last = this.getPoint(0),
+    sampleCount('getLengths', divisions);
+    if (this.arcTable && this.arcTableDivisions === divisions) return this.arcTable;
+    const table: number[] = [0];
+    let previous = this.getPoint(0),
       sum = 0;
-    for (let p = 1; p <= divisions; p++) {
-      const current = this.getPoint(p / divisions);
-      sum += distance(current, last);
-      lengths.push(sum);
-      last = current;
+    for (let i = 1; i <= divisions; i++) {
+      const point = this.getPoint(i / divisions);
+      let squared = 0;
+      for (let k = 0; k < point.length; k++) squared += (point[k] - previous[k]) ** 2;
+      sum += Math.sqrt(squared);
+      table.push(sum);
+      previous = point;
     }
-    return (this.lengths = lengths);
+    this.arcTable = table;
+    this.arcTableDivisions = divisions;
+    return table;
   }
 
+  /** Drops the cached arc-length table. Call after changing the curve's control points. */
   updateArcLengths(): void {
-    this.lengths = null;
+    this.arcTable = null;
+    this.arcTableDivisions = -1;
   }
 
-  /** Maps normalized arc length `u` (or an absolute `distance`) to the parameter `t`. */
+  /**
+   * Converts normalized arc length `u` (or an absolute `distanceAlong` the curve, when given) to raw parameter `t`, by
+   * inverting the cached chord-length table with linear interpolation inside the bracketing chord. The target
+   * distance is clamped to [0, length]. A curve with no length returns `u` unchanged.
+   */
   getUtoTmapping(u: number, distanceAlong?: number): number {
-    const arcLengths = this.getLengths(),
-      il = arcLengths.length,
-      total = arcLengths[il - 1];
+    const table = this.getLengths(),
+      last = table.length - 1,
+      total = table[last];
     if (!(total > 0)) return u;
-    const target = Math.min(Math.max(distanceAlong ?? u * total, 0), total);
+    let target = distanceAlong === undefined ? u * total : distanceAlong;
+    target = target < 0 ? 0 : target > total ? total : target;
+    // Largest index whose cumulative length does not exceed the target (the table is non-decreasing).
     let low = 0,
-      high = il - 1;
-    while (low <= high) {
-      const i = Math.floor(low + (high - low) / 2),
-        comparison = arcLengths[i] - target;
-      if (comparison < 0) low = i + 1;
-      else if (comparison > 0) high = i - 1;
-      else {
-        high = i;
-        break;
-      }
+      high = last;
+    while (low < high) {
+      const mid = (low + high + 1) >> 1;
+      if (table[mid] <= target) low = mid;
+      else high = mid - 1;
     }
-    const i = Math.max(0, Math.min(high, il - 2));
-    if (arcLengths[i] === target) return i / (il - 1);
-    const segment = arcLengths[i + 1] - arcLengths[i];
-    return (i + (segment > 0 ? (target - arcLengths[i]) / segment : 0)) / (il - 1);
+    if (table[low] === target || low === last) return low / last;
+    const fraction = (target - table[low]) / (table[low + 1] - table[low]);
+    return (low + fraction) / last;
   }
 
-  /** Unit tangent at `t`, by central difference unless a subclass knows it exactly. */
+  /**
+   * Unit tangent at raw parameter `t`: the normalized central difference of `getPoint` over a small step, one-sided
+   * where the step would leave [0, 1]. Curves with a closed-form direction override this.
+   */
   getTangent(t: number): V {
-    const delta = 0.0001,
-      t1 = Math.max(0, t - delta),
-      t2 = Math.min(1, t + delta);
-    return normalize(sub(this.getPoint(t2), this.getPoint(t1)));
+    const before = Math.max(0, t - tangentStep),
+      after = Math.min(1, t + tangentStep);
+    return normalize(sub(this.getPoint(after), this.getPoint(before)));
   }
 
+  /** Unit tangent at normalized arc length `u`. */
   getTangentAt(u: number): V {
     return this.getTangent(this.getUtoTmapping(u));
   }
 
   /**
-   * Parallel-transport (Frenet) frames, sampled at `segments + 1` arc-length positions.
-   * `closed` spreads the twist between the first and last frame over the whole curve so a closed tube meets itself.
+   * `segments + 1` orthonormal, right-handed frames at equal arc length, for sweeping a profile along the curve
+   * (tubes, extrusions). The frames are rotation-minimizing (parallel transport): each normal is the previous one
+   * turned by the smallest rotation that takes the previous tangent onto the current one, so the profile does not
+   * twist on its own. The first normal is perpendicular to the first tangent, built from the world axis least aligned
+   * with it. With `closed`, the twist left over after going once round is spread evenly over the frames so the last
+   * frame lines up with the first (a closed tube meets itself without a seam). 2D curves get frames in the z = 0 plane.
    */
   computeFrenetFrames(segments: number, closed = false): FrenetFrames {
-    finiteNumber(segments);
+    sampleCount('computeFrenetFrames', segments);
     const tangents: MutableVec3[] = [],
       normals: MutableVec3[] = [],
       binormals: MutableVec3[] = [];
     for (let i = 0; i <= segments; i++) tangents.push(normalize(to3(this.getTangentAt(i / segments))));
-    const t0 = tangents[0],
-      ax = Math.abs(t0[0]),
-      ay = Math.abs(t0[1]),
-      az = Math.abs(t0[2]);
-    let min = Infinity,
-      seed: MutableVec3 = [0, 0, 1];
-    if (ax <= min) {
-      min = ax;
-      seed = [1, 0, 0];
+    if (tangents.length === 0) return { tangents, normals, binormals };
+
+    // Seed normal: the world axis least aligned with the first tangent, made perpendicular to it.
+    const first = tangents[0],
+      ax = Math.abs(first[0]),
+      ay = Math.abs(first[1]),
+      az = Math.abs(first[2]);
+    const axis: MutableVec3 = ax <= ay && ax <= az ? [1, 0, 0] : ay <= az ? [0, 1, 0] : [0, 0, 1];
+    normals.push(perpendicular(axis, first));
+
+    for (let i = 1; i <= segments; i++) normals.push(transport(normals[i - 1], tangents[i - 1], tangents[i]));
+
+    if (closed && segments > 0) {
+      // Carry the last normal on to the first tangent, measure how far it ends up from the first normal about that
+      // tangent, then turn frame i about its own tangent by i / segments of that angle.
+      const last = segments,
+        carried = transport(normals[last], tangents[last], first),
+        angle = Math.atan2(dot(cross(carried, normals[0]), first), dot(carried, normals[0]));
+      for (let i = 1; i <= last; i++)
+        normals[i] = perpendicular(rotateAxis(normals[i], tangents[i], (angle * i) / last), tangents[i]);
     }
-    if (ay <= min) {
-      min = ay;
-      seed = [0, 1, 0];
-    }
-    if (az <= min) seed = [0, 0, 1];
-    const v = normalize(cross(t0, seed));
-    normals[0] = cross(t0, v);
-    binormals[0] = cross(t0, normals[0]);
-    for (let i = 1; i <= segments; i++) {
-      let n = normals[i - 1];
-      const axis = cross(tangents[i - 1], tangents[i]),
-        axisLength = Math.hypot(...axis);
-      if (axisLength > Number.EPSILON) {
-        const theta = Math.acos(Math.min(1, Math.max(-1, dot(tangents[i - 1], tangents[i]))));
-        n = rotateAxis(n, normalize(axis), theta);
-      }
-      normals[i] = n;
-      binormals[i] = cross(tangents[i], n);
-    }
-    if (closed) {
-      let theta = Math.acos(Math.min(1, Math.max(-1, dot(normals[0], normals[segments])))) / segments;
-      if (dot(tangents[0], cross(normals[0], normals[segments])) > 0) theta = -theta;
-      for (let i = 1; i <= segments; i++) {
-        normals[i] = rotateAxis(normals[i], tangents[i], theta * i);
-        binormals[i] = cross(tangents[i], normals[i]);
-      }
-    }
+
+    for (let i = 0; i <= segments; i++) binormals.push(normalize(cross(tangents[i], normals[i])));
     return { tangents, normals, binormals };
   }
+}
+
+// `v` with its component along unit `t` removed, normalized.
+function perpendicular(v: MutableVec3, t: MutableVec3): MutableVec3 {
+  const along = dot(v, t);
+  return normalize([v[0] - t[0] * along, v[1] - t[1] * along, v[2] - t[2] * along]);
+}
+
+// Parallel transport of `normal` from unit tangent `from` to unit tangent `to`: rotate about `from x to` by the angle
+// between them (Bishop 1975; Hanson and Ma 1995). Re-orthogonalized against `to` so rounding cannot accumulate.
+function transport(normal: MutableVec3, from: MutableVec3, to: MutableVec3): MutableVec3 {
+  const axis = cross(from, to),
+    sine = Math.sqrt(dot(axis, axis));
+  if (sine <= parallelLimit) return perpendicular(normal, to);
+  const angle = Math.atan2(sine, dot(from, to));
+  return perpendicular(rotateAxis(normal, [axis[0] / sine, axis[1] / sine, axis[2] / sine], angle), to);
 }
