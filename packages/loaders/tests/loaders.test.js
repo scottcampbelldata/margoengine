@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
-import { deflateRawSync, inflateRawSync } from 'node:zlib';
+import { crc32 as zlibCrc32, deflateRawSync, inflateRawSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import {
   LoaderError,
@@ -969,14 +969,8 @@ test('VTK: real pyvista polydata files', (t) => {
 
 // ---------------------------------------------------------------- ZIP and 3MF
 
-function crcReference(bytes) {
-  let crc = ~0;
-  for (const byte of bytes) {
-    crc ^= byte;
-    for (let k = 0; k < 8; k++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
-  }
-  return ~crc >>> 0;
-}
+// Node's zlib CRC-32 is the independent reference.
+const crcReference = (bytes) => zlibCrc32(bytes);
 /** entries: [{name, data: string | Uint8Array, method: 0 | 8, flags?, crc?, size?}] */
 function writeZip(entries) {
   const locals = [],

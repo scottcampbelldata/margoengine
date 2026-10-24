@@ -3,24 +3,7 @@
 // chunk with its CRC-32. Rows are filtered per row with the type of smallest sum of absolute differences, the
 // specification's suggested heuristic. Rows go in as they are rendered, so a large capture never holds its raw image.
 
-const CRC = new Uint32Array(256);
-for (let n = 0; n < 256; n++) {
-  let c = n;
-  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-  CRC[n] = c >>> 0;
-}
-const crc = (value: number, bytes: Uint8Array): number => {
-  let c = value;
-  for (let i = 0; i < bytes.length; i++) c = CRC[(c ^ bytes[i]) & 255] ^ (c >>> 8);
-  return c;
-};
-const u32 = (value: number) => new Uint8Array([value >>> 24, (value >>> 16) & 255, (value >>> 8) & 255, value & 255]);
-const ascii = (text: string) => Uint8Array.from(text, (c) => c.charCodeAt(0));
-
-function chunk(type: string, data: Uint8Array): Uint8Array[] {
-  const name = ascii(type);
-  return [u32(data.length), name, data, u32((crc(crc(0xffffffff, name), data) ^ 0xffffffff) >>> 0)];
-}
+import { pngParts, pngPredict } from '../../shared/png.js';
 
 /** Streams an RGB8 (or, with `alpha`, RGBA8 with straight alpha) image into a PNG Blob row by row. */
 export class PngWriter {
@@ -75,18 +58,7 @@ export class PngWriter {
             b = up[i],
             c = i >= bpp ? up[i - bpp] : 0,
             x = line[i];
-          let predictor = 0;
-          if (type === 1) predictor = a;
-          else if (type === 2) predictor = b;
-          else if (type === 3) predictor = (a + b) >> 1;
-          else if (type === 4) {
-            const p = a + b - c,
-              pa = Math.abs(p - a),
-              pb = Math.abs(p - b),
-              pc = Math.abs(p - c);
-            predictor = pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
-          }
-          const v = (x - predictor) & 255;
+          const v = (x - pngPredict(type, a, b, c)) & 255;
           out[i + 1] = v;
           score += v < 128 ? v : 256 - v;
         }
@@ -116,15 +88,8 @@ export class PngWriter {
       data.set(p, at);
       at += p.length;
     }
-    const header = new Uint8Array(13);
-    header.set(u32(this.width), 0);
-    header.set(u32(this.height), 4);
-    header.set([8, this.channels === 4 ? 6 : 2, 0, 0, 0], 8); // 8 bits, RGB (6: RGBA), deflate, adaptive, no interlace
-    const signature = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
-    return new Blob(
-      [signature, ...chunk('IHDR', header), ...chunk('IDAT', data), ...chunk('IEND', new Uint8Array(0))] as BlobPart[],
-      { type: 'image/png' },
-    );
+    // 8 bits, RGB (6: RGBA), deflate, adaptive filters, no interlace.
+    return new Blob(pngParts(this.width, this.height, this.channels === 4 ? 6 : 2, data), { type: 'image/png' });
   }
 
   /** Drops the stream (cancelled capture). */

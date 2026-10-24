@@ -6,6 +6,7 @@
 import { crc32 } from '../../shared/crc32.js';
 import { margoError } from '../../shared/errors.js';
 import { inflateZlib } from '../../shared/inflate.js';
+import { PNG_SIGNATURE, pngPredict } from '../../shared/png.js';
 
 /** A decoded image: RGBA8 rows, top row first, `width * height * 4` bytes. */
 export interface DecodedPNG {
@@ -20,9 +21,8 @@ export interface PNGDecodeOptions {
   maxPixels?: number;
 }
 
-const SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10],
-  // Adam7 passes: x start, y start, x step, y step.
-  ADAM7 = [
+// Adam7 passes: x start, y start, x step, y step.
+const ADAM7 = [
     [0, 0, 8, 8],
     [4, 0, 8, 8],
     [0, 4, 4, 8],
@@ -56,18 +56,7 @@ function unfilter(rows: Uint8Array, offset: number, height: number, stride: numb
       const a = x >= bpp ? rows[row + x - bpp] : 0,
         b = y ? rows[up + x] : 0,
         c = y && x >= bpp ? rows[up + x - bpp] : 0;
-      let predictor = 0;
-      if (filter === 1) predictor = a;
-      else if (filter === 2) predictor = b;
-      else if (filter === 3) predictor = (a + b) >> 1;
-      else if (filter === 4) {
-        const p = a + b - c,
-          pa = Math.abs(p - a),
-          pb = Math.abs(p - b),
-          pc = Math.abs(p - c);
-        predictor = pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
-      }
-      rows[row + x] = (rows[row + x] + predictor) & 255;
+      rows[row + x] = (rows[row + x] + pngPredict(filter, a, b, c)) & 255;
     }
   }
 }
@@ -85,7 +74,7 @@ export function decodePNG(bytes: Uint8Array, options: PNGDecodeOptions = {}): De
   const maxPixels = options.maxPixels ?? 2 ** 26;
   if (!(Number.isSafeInteger(maxPixels) && maxPixels > 0))
     throw new RangeError('PNG maxPixels must be a positive integer');
-  if (bytes.length < 8 || SIGNATURE.some((v, i) => bytes[i] !== v)) throw corrupt('signature is missing');
+  if (bytes.length < 8 || PNG_SIGNATURE.some((v, i) => bytes[i] !== v)) throw corrupt('signature is missing');
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
     idat: Uint8Array[] = [];
   let width = 0,

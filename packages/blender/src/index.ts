@@ -4,6 +4,7 @@ import type { EngineKernel } from '@margoengine/core';
 import { parsePreparedPBR, type GLTFDocument, type PBRModel, type PreparedGeometry } from '@margoengine/gltf-pro';
 import { validatePreparedGeometry } from '../../shared/prepared-geometry.js';
 import { readResponse } from '../../shared/loading.js';
+import { pngHeader } from '../../shared/png.js';
 
 const maxBytes = 256 * 1024 * 1024;
 const littleEndian = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
@@ -166,22 +167,10 @@ export function decodeMargo(
     if (!image || image.mimeType !== 'image/png' || image.uri !== undefined)
       throw new TypeError('.margo images must be embedded PNG');
     const { bytes } = section(image.section, 4),
-      png = new DataView(buffer, bytes.byteOffset, bytes.byteLength);
-    if (
-      bytes.length < 33 ||
-      png.getUint32(0) !== 0x89504e47 ||
-      png.getUint32(4) !== 0x0d0a1a0a ||
-      png.getUint32(8) !== 13 ||
-      png.getUint32(12) !== 0x49484452 ||
-      bytes[24] !== 8 ||
-      bytes[25] !== 6 ||
-      bytes[26] ||
-      bytes[27] ||
-      bytes[28]
-    )
+      header = pngHeader(bytes);
+    if (!header || header.depth !== 8 || header.colour !== 6 || header.compression || header.filter || header.interlace)
       throw new TypeError('Invalid .margo RGBA8 PNG');
-    const width = png.getUint32(16),
-      height = png.getUint32(20);
+    const { width, height } = header;
     decoded += width * height * 4;
     if (!width || !height || width > 4096 || height > 4096 || decoded > maxBytes)
       throw new RangeError('.margo images exceed decoded size limit');
@@ -210,8 +199,8 @@ export async function parseMargo(
         throw new TypeError(`.margo image ${images.length} could not be decoded (${error?.message ?? error})`);
       });
       images.push(image);
-      const png = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-      if (image.width !== png.getUint32(16) || image.height !== png.getUint32(20))
+      const header = pngHeader(bytes)!;
+      if (image.width !== header.width || image.height !== header.height)
         throw new RangeError('Decoded .margo image size mismatch');
     }
     signal?.throwIfAborted();

@@ -1,6 +1,7 @@
 import { Geometry } from '@margoengine/core';
 import { triangulatePolygon } from '../../shared/polygon.js';
 import { checkCount, countLimit } from '../../shared/limits.js';
+import { crc32 } from '../../shared/crc32.js';
 export const maxBytes = 64 * 1024 * 1024,
   maxVertices = 1_000_000,
   maxIndices = 3_000_000;
@@ -330,16 +331,6 @@ export function fingerprint(geometry: Pick<Geometry, 'vertices' | 'indices'>): F
   }
   return sorted;
 }
-let crcTable: Uint32Array | undefined;
 export function hash(data: Float32Array): number {
-  crcTable ??= Uint32Array.from({ length: 256 }, (_, i) => {
-    let c = i;
-    for (let bit = 0; bit < 8; bit++) c = (c >>> 1) ^ (c & 1 ? 0xedb88320 : 0);
-    return c >>> 0;
-  });
-  let crc = 0xffffffff;
-  const bytes = new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
-    table = crcTable;
-  for (let i = 0; i < bytes.length; i++) crc = (crc >>> 8) ^ table[(crc ^ bytes[i]) & 255];
-  return (crc ^ 0xffffffff) >>> 0;
+  return crc32(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
 }

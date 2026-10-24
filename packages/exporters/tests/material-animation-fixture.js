@@ -1,18 +1,13 @@
-import { deflateSync } from 'node:zlib';
+import { crc32, deflateSync } from 'node:zlib';
 
 // A real 64x16 RGBA PNG with four solid cells. No application image encoder is involved.
 function chunk(type, data) {
   const tag = Buffer.from(type),
     bytes = Buffer.concat([tag, data]);
-  let crc = 0xffffffff;
-  for (const byte of bytes) {
-    crc ^= byte;
-    for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
-  }
   const header = Buffer.alloc(4),
     tail = Buffer.alloc(4);
   header.writeUInt32BE(data.length);
-  tail.writeUInt32BE((crc ^ 0xffffffff) >>> 0);
+  tail.writeUInt32BE(crc32(bytes));
   return Buffer.concat([header, bytes, tail]);
 }
 const header = Buffer.alloc(13);

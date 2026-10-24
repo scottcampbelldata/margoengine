@@ -1,5 +1,5 @@
 // PNG encoding for exportModel, loaded with import() only when a texture has no encoded bytes or must shrink.
-import { crc32 } from '../../shared/crc32.js';
+import { pngParts } from '../../shared/png.js';
 
 interface Pixels {
   data: Uint8Array | Uint8ClampedArray;
@@ -64,24 +64,5 @@ export async function png(source: PNGSource, max: number, flipY: boolean): Promi
   const zlib = new Uint8Array(
     await new Response(new Blob([rows]).stream().pipeThrough(new CompressionStream('deflate'))).arrayBuffer(),
   );
-  const parts: Uint8Array[] = [Uint8Array.of(137, 80, 78, 71, 13, 10, 26, 10)],
-    header = new DataView(new ArrayBuffer(13));
-  header.setUint32(0, W);
-  header.setUint32(4, H);
-  header.setUint8(8, 8);
-  header.setUint8(9, 6);
-  for (const [type, data] of [
-    ['IHDR', new Uint8Array(header.buffer)],
-    ['IDAT', zlib],
-    ['IEND', new Uint8Array()],
-  ] as const) {
-    const chunk = new Uint8Array(data.length + 12),
-      view = new DataView(chunk.buffer);
-    view.setUint32(0, data.length);
-    for (let i = 0; i < 4; i++) chunk[4 + i] = type.charCodeAt(i);
-    chunk.set(data, 8);
-    view.setUint32(data.length + 8, crc32(chunk.subarray(4, data.length + 8)));
-    parts.push(chunk);
-  }
-  return new Uint8Array(await new Blob(parts as Uint8Array<ArrayBuffer>[]).arrayBuffer());
+  return new Uint8Array(await new Blob(pngParts(W, H, 6, zlib)).arrayBuffer());
 }
