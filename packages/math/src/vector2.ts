@@ -117,9 +117,13 @@ export class Vector2 {
   setLength(length: number): this {
     return this.normalize().multiplyScalar(length);
   }
-  /** Angle in radians from the +x axis, in [0, 2π). */
+  /** Angle in radians of this vector from the +x axis, counter-clockwise, in [0, 2π); the zero vector gives 0. */
   angle(): number {
-    return Math.atan2(-this.y, -this.x) + Math.PI;
+    const a = Math.atan2(this.y, this.x) + 0; // + 0 turns -0 into 0
+    if (a >= 0) return a;
+    // A tiny negative angle would round to exactly 2π, outside the range: it belongs at 0.
+    const wrapped = a + 2 * Math.PI;
+    return wrapped === 2 * Math.PI ? 0 : wrapped; // NaN passes through
   }
   distanceTo(v: Vec2Like): number {
     return Math.hypot(this.x - v.x, this.y - v.y);

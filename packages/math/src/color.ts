@@ -342,6 +342,7 @@ export class Color {
     this.b += s;
     return this;
   }
+  /** Subtracts per channel, each result clamped below at 0 (NaN stays NaN). */
   sub(c: ColorLike): this {
     this.r = Math.max(0, this.r - c.r);
     this.g = Math.max(0, this.g - c.g);

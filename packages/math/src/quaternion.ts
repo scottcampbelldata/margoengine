@@ -66,17 +66,28 @@ export class Quaternion {
   setFromRotationMatrix(m: MatrixLike): this {
     return rotation(m.elements, 1, 1, 1, this, assign);
   }
-  /** Shortest rotation taking unit vector `from` to unit vector `to`. */
+  /**
+   * Shortest rotation taking unit vector `from` onto unit vector `to`, normalized: the half-way construction
+   * (vector part `from x to`, scalar part `1 + from . to`). Opposite vectors give a half turn about an axis
+   * perpendicular to `from`.
+   */
   setFromUnitVectors(from: Vec3Like, to: Vec3Like): this {
-    const r = from.x * to.x + from.y * to.y + from.z * to.z + 1;
+    const { x: ax, y: ay, z: az } = from,
+      { x: bx, y: by, z: bz } = to,
+      r = 1 + ax * bx + ay * by + az * bz;
+    // Below this the half-way vector is shorter than about 1.4e-4 and the cross product no longer pins the axis
+    // to the 1e-12 level, so the vectors count as opposite.
     if (r < 1e-8) {
-      // Opposite vectors: rotate 180 degrees about any perpendicular axis.
-      if (Math.abs(from.x) > Math.abs(from.z)) this.set(-from.y, from.x, 0, 0);
-      else this.set(0, -from.z, from.y, 0);
-    } else {
-      this.set(from.y * to.z - from.z * to.y, from.z * to.x - from.x * to.z, from.x * to.y - from.y * to.x, r);
+      // Half turn (w = 0) about from x e, with e the world axis least aligned with from: perpendicular to from.
+      const mx = Math.abs(ax),
+        my = Math.abs(ay),
+        mz = Math.abs(az);
+      if (mx <= my && mx <= mz) this.set(0, az, -ay, 0);
+      else if (my <= mz) this.set(-az, 0, ax, 0);
+      else this.set(ay, -ax, 0, 0);
+      return this.normalize();
     }
-    return this.normalize();
+    return this.set(ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx, r).normalize();
   }
 
   /** this = this * q (apply q first, then this). */
@@ -131,40 +142,49 @@ export class Quaternion {
     // Normalizes also when the squares underflow (l is 0 but a component is not); NaN and zero give the identity.
     return l === l && (l || x || y || z || w) ? normalized(x, y, z, w, this, assign) : this.identity();
   }
-  /** Angle in radians of the rotation between the two (unit) quaternions. */
+  /** Angle in radians of the rotation between this and `q` (both unit), in [0, π]; `q` and `-q` give the same. */
   angleTo(q: Vec4Like): number {
     return 2 * Math.acos(Math.min(1, Math.abs(this.dot(q))));
   }
-  /** Rotates toward `q` by at most `step` radians. */
+  /** Rotates toward `q` by at most `step` radians; never overshoots, and lands exactly on `q` once within reach. */
   rotateTowards(q: Vec4Like, step: number): this {
     const angle = this.angleTo(q);
-    return angle ? this.slerp(q, Math.min(1, step / angle)) : this;
+    return angle === 0 ? this : this.slerp(q, Math.min(1, step / angle));
   }
-  /** Spherical interpolation along the shortest arc; t=0 keeps this, t=1 gives q. */
+  /**
+   * Spherical linear interpolation along the shortest arc (Shoemake, SIGGRAPH 1985): t = 0 keeps this exactly,
+   * t = 1 copies `q` exactly, `t` outside [0, 1] extrapolates along the same great circle. Not re-normalized.
+   */
   slerp(q: Vec4Like, t: number): this {
     if (t === 0) return this;
     if (t === 1) return this.copy(q);
-    let { x: bx, y: by, z: bz, w: bw } = q,
-      cos = this.dot(q);
+    const { x, y, z, w } = this;
+    let cos = this.dot(q),
+      bx = q.x,
+      by = q.y,
+      bz = q.z,
+      bw = q.w;
+    // q and -q are the same rotation; the one with a non-negative dot is the shorter way round.
     if (cos < 0) {
+      cos = -cos;
       bx = -bx;
       by = -by;
       bz = -bz;
       bw = -bw;
-      cos = -cos;
     }
     if (cos >= 1) return this;
-    const sin2 = 1 - cos * cos;
-    if (sin2 <= Number.EPSILON) {
-      const s = 1 - t;
-      return this.set(s * this.x + t * bx, s * this.y + t * by, s * this.z + t * bz, s * this.w + t * bw).normalize();
+    const sinSq = 1 - cos * cos;
+    // A half-angle sine at rounding level cannot be divided by reliably; there the arc is a straight line.
+    if (sinSq <= Number.EPSILON) {
+      return this.set(x + (bx - x) * t, y + (by - y) * t, z + (bz - z) * t, w + (bw - w) * t).normalize();
     }
-    const sin = Math.sqrt(sin2),
-      half = Math.atan2(sin, cos),
-      a = Math.sin((1 - t) * half) / sin,
-      b = Math.sin(t * half) / sin;
-    return this.set(this.x * a + bx * b, this.y * a + by * b, this.z * a + bz * b, this.w * a + bw * b);
+    const sin = Math.sqrt(sinSq),
+      angle = Math.atan2(sin, cos),
+      ka = Math.sin((1 - t) * angle) / sin,
+      kb = Math.sin(t * angle) / sin;
+    return this.set(x * ka + bx * kb, y * ka + by * kb, z * ka + bz * kb, w * ka + bw * kb);
   }
+  /** this = `a` slerped toward `b` by `t` (see {@link Quaternion.slerp}). */
   slerpQuaternions(a: Vec4Like, b: Vec4Like, t: number): this {
     return this.copy(a).slerp(b, t);
   }

@@ -20,7 +20,12 @@ export const toVector = <T extends NumberArray>(out: T, x: number, y: number, z:
   return out;
 };
 
-/** Shepperd's method on a column-major 3x3 or 4x4, each column divided by its scale. Not normalized. */
+/**
+ * Quaternion of the rotation in a column-major 3x3 (9 elements) or 4x4 matrix, each rotation column first divided by
+ * its scale `sx`, `sy`, `sz` (1 for a pure rotation, negative to undo a mirror). Not normalized. Shepperd's method
+ * (Journal of Guidance and Control 1(3), 1978): the square root is taken of the largest of 1 + trace and the three
+ * 1 + 2 m_ii - trace terms, so it is bounded away from zero; that component comes out positive.
+ */
 export function rotation<T>(
   e: ArrayLike<number>,
   sx: number,
@@ -29,31 +34,38 @@ export function rotation<T>(
   out: T,
   sink: (out: T, x: number, y: number, z: number, w: number) => T,
 ): T {
-  const k = e.length === 9 ? 3 : 4,
-    m11 = e[0] / sx,
-    m21 = e[1] / sx,
-    m31 = e[2] / sx,
-    m12 = e[k] / sy,
-    m22 = e[k + 1] / sy,
-    m32 = e[k + 2] / sy,
-    m13 = e[2 * k] / sz,
-    m23 = e[2 * k + 1] / sz,
-    m33 = e[2 * k + 2] / sz,
-    trace = m11 + m22 + m33;
+  const n = e.length === 9 ? 3 : 4,
+    // mRC: row R, column C.
+    m00 = e[0] / sx,
+    m10 = e[1] / sx,
+    m20 = e[2] / sx,
+    m01 = e[n] / sy,
+    m11 = e[n + 1] / sy,
+    m21 = e[n + 2] / sy,
+    m02 = e[2 * n] / sz,
+    m12 = e[2 * n + 1] / sz,
+    m22 = e[2 * n + 2] / sz,
+    trace = m00 + m11 + m22;
+  // Branch rule kept fixed (exporters write these signs to files): trace when strictly positive, else the strictly
+  // largest diagonal term, with ties going to the later axis.
   if (trace > 0) {
-    const s = 2 * Math.sqrt(trace + 1);
-    return sink(out, (m32 - m23) / s, (m13 - m31) / s, (m21 - m12) / s, s / 4);
+    const r = Math.sqrt(1 + trace),
+      f = 0.5 / r;
+    return sink(out, (m21 - m12) * f, (m02 - m20) * f, (m10 - m01) * f, r / 2);
   }
-  if (m11 > m22 && m11 > m33) {
-    const s = 2 * Math.sqrt(1 + m11 - m22 - m33);
-    return sink(out, s / 4, (m12 + m21) / s, (m13 + m31) / s, (m32 - m23) / s);
+  if (m00 > m11 && m00 > m22) {
+    const r = Math.sqrt(1 + m00 - m11 - m22),
+      f = 0.5 / r;
+    return sink(out, r / 2, (m01 + m10) * f, (m02 + m20) * f, (m21 - m12) * f);
   }
-  if (m22 > m33) {
-    const s = 2 * Math.sqrt(1 + m22 - m11 - m33);
-    return sink(out, (m12 + m21) / s, s / 4, (m23 + m32) / s, (m13 - m31) / s);
+  if (m11 > m22) {
+    const r = Math.sqrt(1 + m11 - m00 - m22),
+      f = 0.5 / r;
+    return sink(out, (m01 + m10) * f, r / 2, (m12 + m21) * f, (m02 - m20) * f);
   }
-  const s = 2 * Math.sqrt(1 + m33 - m11 - m22);
-  return sink(out, (m13 + m31) / s, (m23 + m32) / s, s / 4, (m21 - m12) / s);
+  const r = Math.sqrt(1 + m22 - m00 - m11),
+    f = 0.5 / r;
+  return sink(out, (m02 + m20) * f, (m12 + m21) * f, r / 2, (m10 - m01) * f);
 }
 
 /** (x, y, z, w) divided by its length; finite values beyond about 1e±154 are divided by the largest first. A zero length leaves it. */

@@ -46,26 +46,43 @@ export const ceilPowerOfTwo = (value: number): number => 2 ** Math.ceil(Math.log
 /** Largest power of two <= `value` (expects value > 0; 0 gives 0, negative gives NaN). */
 export const floorPowerOfTwo = (value: number): number => 2 ** Math.floor(Math.log2(value));
 
-const step = (state: number): number => {
+// One mulberry32 output (Tommy Ettinger, 2017, public domain) from a state already advanced by its Weyl increment:
+// two multiply-xorshift rounds, then the unsigned 32-bit result over 2^32, so values lie in [0, 1).
+const mulberry32 = (state: number): number => {
   let t = Math.imul(state ^ (state >>> 15), state | 1);
   t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
-/** An independent seeded generator returning floats in [0, 1). Same seed, same sequence (mulberry32). */
+// The mulberry32 Weyl increment.
+const WEYL = 0x6d2b79f5;
+
+/**
+ * Independent generator: same seed, same sequence; floats in [0, 1). mulberry32. The seed is taken as a 32-bit
+ * integer (`seed | 0`), so 1.7 acts as 1 and NaN as 0. Each call returns a new, independent stream.
+ */
 export function createRandom(seed = 0): () => number {
   let state = seed | 0;
-  return () => step((state = (state + 0x6d2b79f5) | 0));
+  return () => mulberry32((state = (state + WEYL) | 0));
 }
-/** Seeded 32-bit linear congruential generator (Numerical Recipes constants) returning floats in [0, 1). Cheaper and lower quality than `createRandom`; scatter and grass placement use it, so its sequences must not change. */
-export const createLcgRandom =
-  (seed: number): (() => number) =>
-  () =>
-    (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
-let shared = 1234567;
-/** Shared seeded random in [0, 1). Passing `seed` restarts the shared sequence. Prefer `createRandom` for isolated streams. */
+/**
+ * 32-bit linear congruential generator with the Numerical Recipes constants (Press et al., Numerical Recipes in C,
+ * 2nd ed., §7.1): `state = (1664525 * state + 1013904223) mod 2^32`, then `state / 2^32`. Floats in [0, 1). Cheaper
+ * and lower quality than {@link createRandom}; its sequences never change. The seed wraps to 32 bits (`seed >>> 0`).
+ */
+export const createLcgRandom = (seed: number): (() => number) => {
+  let state = seed >>> 0;
+  return () => (state = (Math.imul(1664525, state) + 1013904223) >>> 0) / 4294967296;
+};
+// Shared stream of seededRandom. Before any seed it starts from 0x9e3779b9 (2^32 / golden ratio, a common
+// "arbitrary but well mixed" 32-bit constant); our own choice.
+let sharedState = 0x9e3779b9 | 0;
+/**
+ * Next value of one shared mulberry32 stream in [0, 1). Passing `seed` restarts the stream from it (as
+ * `createRandom(seed)`), and this call already returns the stream's first value.
+ */
 export function seededRandom(seed?: number): number {
-  if (seed !== undefined) shared = seed | 0;
-  return step((shared = (shared + 0x6d2b79f5) | 0));
+  if (seed !== undefined) sharedState = seed | 0;
+  return mulberry32((sharedState = (sharedState + WEYL) | 0));
 }
 /** Float in [low, high) from `random` (default `Math.random`; pass `createRandom(seed)` for a repeatable stream). */
 export const randFloat = (low: number, high: number, random: () => number = Math.random): number =>

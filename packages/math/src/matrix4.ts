@@ -277,66 +277,82 @@ export class Matrix4 {
       1,
     );
   }
-  /** Splits an affine TRS matrix back into its parts (negative determinant flips scale.x). Shear is not recovered. */
+  /**
+   * Splits an affine TRS matrix: `position` = column 3, `scale` = the column lengths (x negated when the determinant
+   * is negative), rotation read by `quaternion.setFromRotationMatrix` from the 3x3 with columns divided by their
+   * signed scales (not normalized afterwards). A zero-length column stays zero. Shear is not recovered.
+   */
   decompose(position: Vec3Like, quaternion: { setFromRotationMatrix(m: MatrixLike): unknown }, scale: Vec3Like): this {
     const e = this.elements,
       r = (scratch ??= new Float64Array(16));
     let sx = Math.hypot(e[0], e[1], e[2]);
     const sy = Math.hypot(e[4], e[5], e[6]),
       sz = Math.hypot(e[8], e[9], e[10]);
+    // A mirror flips one axis; putting it on x is enough for compose() to rebuild the same matrix.
     if (this.determinant() < 0) sx = -sx;
     position.x = e[12];
     position.y = e[13];
     position.z = e[14];
-    r.set(e);
-    const ix = sx ? 1 / sx : 0,
-      iy = sy ? 1 / sy : 0,
-      iz = sz ? 1 / sz : 0;
-    r[0] *= ix;
-    r[1] *= ix;
-    r[2] *= ix;
-    r[4] *= iy;
-    r[5] *= iy;
-    r[6] *= iy;
-    r[8] *= iz;
-    r[9] *= iz;
-    r[10] *= iz;
-    quaternion.setFromRotationMatrix({ elements: r });
     scale.x = sx;
     scale.y = sy;
     scale.z = sz;
+    for (let column = 0; column < 3; column++) {
+      const d = column === 0 ? sx : column === 1 ? sy : sz;
+      for (let row = 0; row < 3; row++) r[column * 4 + row] = d === 0 ? 0 : e[column * 4 + row] / d;
+      r[column * 4 + 3] = 0;
+    }
+    r[12] = r[13] = r[14] = 0;
+    r[15] = 1;
+    quaternion.setFromRotationMatrix({ elements: r });
     return this;
   }
-  /** Rotation that points the object's +z from `target` toward `eye` (cameras look down -z). Translation is unchanged. */
+  /**
+   * Rotation whose +Z points from `target` toward `eye` (so a camera with it looks at `target`); +X is along
+   * `up x +Z`, +Y completes the right-handed basis. Only the upper-left 3x3 is written. `eye === target` uses +Z as
+   * the back axis; an `up` parallel to it picks some perpendicular +X.
+   */
   lookAt(eye: Vec3Like, target: Vec3Like, up: Vec3Like): this {
+    const e = this.elements;
     let zx = eye.x - target.x,
       zy = eye.y - target.y,
       zz = eye.z - target.z;
-    if (zx === 0 && zy === 0 && zz === 0) zz = 1;
-    let l = Math.hypot(zx, zy, zz);
-    zx /= l;
-    zy /= l;
-    zz /= l;
+    const zl = Math.hypot(zx, zy, zz);
+    if (zl === 0) {
+      zx = 0;
+      zy = 0;
+      zz = 1;
+    } else {
+      zx /= zl;
+      zy /= zl;
+      zz /= zl;
+    }
     let xx = up.y * zz - up.z * zy,
       xy = up.z * zx - up.x * zz,
       xz = up.x * zy - up.y * zx;
     if (xx === 0 && xy === 0 && xz === 0) {
-      // up is parallel to the view direction: nudge the direction and retry.
-      if (Math.abs(up.z) === 1) zx += 1e-4;
-      else zz += 1e-4;
-      l = Math.hypot(zx, zy, zz);
-      zx /= l;
-      zy /= l;
-      zz /= l;
-      xx = up.y * zz - up.z * zy;
-      xy = up.z * zx - up.x * zz;
-      xz = up.x * zy - up.y * zx;
+      // up is parallel to the back axis (or zero): use the world axis least aligned with +Z instead of up, which
+      // gives an exactly perpendicular +X with no tilt of the back axis.
+      const ax = Math.abs(zx),
+        ay = Math.abs(zy),
+        az = Math.abs(zz);
+      if (ax <= ay && ax <= az) {
+        xx = 0;
+        xy = -zz;
+        xz = zy;
+      } else if (ay <= az) {
+        xx = zz;
+        xy = 0;
+        xz = -zx;
+      } else {
+        xx = -zy;
+        xy = zx;
+        xz = 0;
+      }
     }
-    l = Math.hypot(xx, xy, xz);
-    xx /= l;
-    xy /= l;
-    xz /= l;
-    const e = this.elements;
+    const xl = Math.hypot(xx, xy, xz);
+    xx /= xl;
+    xy /= xl;
+    xz /= xl;
     e[0] = xx;
     e[1] = xy;
     e[2] = xz;

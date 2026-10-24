@@ -166,10 +166,14 @@ export class Vector3 {
       dz = this.z - v.z;
     return dx * dx + dy * dy + dz * dz;
   }
-  /** Angle in radians between the two directions; π/2 if either is zero. */
+  /** Angle in radians between the two directions, in [0, π]; π/2 if either vector is zero. */
   angleTo(v: Vec3Like): number {
-    const denominator = Math.sqrt(this.lengthSq() * (v.x * v.x + v.y * v.y + v.z * v.z));
-    return denominator ? Math.acos(Math.max(-1, Math.min(1, this.dot(v) / denominator))) : Math.PI / 2;
+    const { x, y, z } = this;
+    if ((x === 0 && y === 0 && z === 0) || (v.x === 0 && v.y === 0 && v.z === 0)) return Math.PI / 2;
+    // atan2 of |a x b| and a . b is accurate at every angle (an arccosine loses precision near 0 and π), and exactly
+    // parallel or antiparallel inputs have a zero cross product, so they give exactly 0 or π.
+    const cross = Math.hypot(y * v.z - z * v.y, z * v.x - x * v.z, x * v.y - y * v.x);
+    return Math.atan2(cross, x * v.x + y * v.y + z * v.z);
   }
 
   lerp(v: Vec3Like, t: number): this {

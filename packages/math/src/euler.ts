@@ -35,47 +35,64 @@ export class Euler {
     return this.set(v.x, v.y, v.z, order);
   }
 
-  /** Reads angles from the rotation part of a 3x3 or 4x4 matrix (column-major, unscaled). */
+  /**
+   * Reads the angles in `order` (default: the receiver's order) from the rotation part of a column-major 3x3 or 4x4
+   * matrix (unscaled; it is not normalized) and sets `this.order = order`. The middle angle comes back in
+   * [-π/2, π/2], the outer two in [-π, π]. The last angle is read first and the first angle is then solved from it,
+   * so the triple reproduces the matrix even next to a gimbal pole; at an exact pole the last angle is 0.
+   */
   setFromRotationMatrix(m: MatrixLike, order: EulerOrder = this.order): this {
     const e = m.elements,
-      k = e.length === 9 ? 3 : 4,
-      at = (row: number, column: number): number => e[column * k + row];
-    // Order "ABC" means R = R_A * R_B * R_C. With axis indices i, j, l, element (i, l) is ±sin(B).
-    const i = axisIndex(order, 0),
-      j = axisIndex(order, 1),
-      l = axisIndex(order, 2),
-      sign = (j - i + 3) % 3 === 1 ? 1 : -1;
-    const sinB = Math.max(-1, Math.min(1, sign * at(i, l))),
-      cosB = Math.hypot(at(i, i), at(i, j)),
-      c = cosB === 0 ? 0 : Math.atan2(-sign * at(i, j), at(i, i)),
-      sinC = Math.sin(c),
-      cosC = Math.cos(c);
-    // Remove R_C first: the (j,j) and (l,j) entries of R * inverse(R_C) are cos(A) and ±sin(A).
-    // Unlike reading A and C independently from terms proportional to cos(B), this keeps their combination
-    // consistent even when those terms are at rounding precision. At an exact pole either C is valid.
-    const a = Math.atan2(at(l, i) * sinC + sign * at(l, j) * cosC, sign * at(j, i) * sinC + at(j, j) * cosC);
+      n = e.length === 9 ? 3 : 4,
+      // Axes of the first, middle and last rotation: R = R_a * R_b * R_c.
+      a = axisIndex(order, 0),
+      b = axisIndex(order, 1),
+      c = axisIndex(order, 2),
+      // +1 when (a, b, c) is a cyclic shift of (X, Y, Z), so that axis a x axis b = +axis c; -1 otherwise.
+      sign = (b - a + 3) % 3 === 1 ? 1 : -1,
+      at = (row: number, column: number): number => e[column * n + row];
+    // R_a leaves its own axis alone, so row a of R is row a of R_b * R_c:
+    //   R[a][a] = cos B cos C,  R[a][b] = -sign cos B sin C,  R[a][c] = sign sin B.
+    const raa = at(a, a),
+      rab = at(a, b),
+      cosB = Math.hypot(raa, rab),
+      sinB = Math.max(-1, Math.min(1, sign * at(a, c))),
+      // From both sine and cosine, so B keeps its small distance from a pole even where sin B rounds to ±1.
+      angleB = Math.atan2(sinB, cosB),
+      // At an exact pole (cos B = 0) only the combination of A and C is defined: A carries all of it.
+      angleC = cosB === 0 ? 0 : Math.atan2(-sign * rab, raa),
+      cc = Math.cos(angleC),
+      sc = sign * Math.sin(angleC);
+    // Undo R_c: column b of R * R_c^T is cos C * (column b of R) + sign sin C * (column a of R), and it equals
+    // R_a * axis b = cos A * axis b + sign sin A * axis c. A is solved from the chosen C, so the two stay consistent.
+    const mbb = cc * at(b, b) + sc * at(b, a),
+      mcb = cc * at(c, b) + sc * at(c, a);
+    this.setAxis(a, Math.atan2(sign * mcb, mbb));
+    this.setAxis(b, angleB);
+    this.setAxis(c, angleC);
     this.order = order;
-    this.setAxis(i, a);
-    // atan2 retains the distance from the pole when sin(B) has rounded to ±1.
-    this.setAxis(j, Math.atan2(sinB, cosB));
-    this.setAxis(l, c);
     return this;
   }
-  /** Converts a unit quaternion to angles in `order`. */
+  /**
+   * Angles in `order` (default: the receiver's order) of the unit quaternion `q`, read through its rotation matrix
+   * exactly as {@link Euler.setFromRotationMatrix}. Does not modify `q`; `q` and `-q` give the same angles.
+   */
   setFromQuaternion(q: Vec4Like, order: EulerOrder = this.order): this {
     const { x, y, z, w } = q,
-      m = (scratch ??= new Float64Array(9));
-    m[0] = 1 - 2 * (y * y + z * z);
-    m[3] = 2 * (x * y - z * w);
-    m[6] = 2 * (x * z + y * w);
-    m[1] = 2 * (x * y + z * w);
-    m[4] = 1 - 2 * (x * x + z * z);
-    m[7] = 2 * (y * z - x * w);
-    m[2] = 2 * (x * z - y * w);
-    m[5] = 2 * (y * z + x * w);
-    m[8] = 1 - 2 * (x * x + y * y);
-    return this.setFromRotationMatrix({ elements: m }, order);
+      r = (scratch ??= new Float64Array(9));
+    // The standard unit-quaternion rotation matrix, column-major 3x3; each term is a product of two components.
+    r[0] = 1 - 2 * (y * y + z * z);
+    r[1] = 2 * (x * y + w * z);
+    r[2] = 2 * (x * z - w * y);
+    r[3] = 2 * (x * y - w * z);
+    r[4] = 1 - 2 * (x * x + z * z);
+    r[5] = 2 * (y * z + w * x);
+    r[6] = 2 * (x * z + w * y);
+    r[7] = 2 * (y * z - w * x);
+    r[8] = 1 - 2 * (x * x + y * y);
+    return this.setFromRotationMatrix({ elements: r }, order);
   }
+  // Writes the angle about axis 0 (x), 1 (y) or 2 (z).
   private setAxis(index: number, value: number): void {
     if (index === 0) this.x = value;
     else if (index === 1) this.y = value;

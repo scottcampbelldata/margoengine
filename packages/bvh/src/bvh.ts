@@ -92,24 +92,36 @@ export interface Box3Like {
   min: ArrayLike<number>;
   max: ArrayLike<number>;
 }
-/** Reused box handed to shapecast callbacks. Copy it if you need to keep it. */
+/**
+ * A node's bounds as {@link MeshBVH.shapecast} hands them to callbacks: `min` and `max`, three numbers each, in the
+ * BVH's own space. One object per query, refilled for every node; copy the numbers to keep them.
+ */
 export interface ShapecastBox {
   min: Float64Array;
   max: Float64Array;
 }
-/** Reused triangle handed to shapecast callbacks: a, b and c in the BVH's space. */
+/**
+ * The three corners of a triangle handed to `intersectsTriangle`, in the BVH's own space and stored winding. One
+ * object per query, refilled for every triangle; copy the numbers to keep them.
+ */
 export interface ShapecastTriangle {
   a: Float64Array;
   b: Float64Array;
   c: Float64Array;
 }
-/** shapecast `intersectsBounds` results: skip the node, descend into it, or accept its whole subtree. */
-export const NOT_INTERSECTED = 0,
-  INTERSECTED = 1,
-  CONTAINED = 2;
-/** Generic traversal callbacks for shapecast. The query returns true when a callback stops it. */
+/** `intersectsBounds` result: skip this node and everything below it (`false` means the same). */
+export const NOT_INTERSECTED = 0;
+/** `intersectsBounds` result: test the node's children, or visit the leaf (`true` means the same). */
+export const INTERSECTED = 1;
+/** `intersectsBounds` result: accept the whole subtree; its leaves are visited without further bounds tests. */
+export const CONTAINED = 2;
+/** Callbacks that drive {@link MeshBVH.shapecast}. Only `intersectsBounds` is required. */
 export interface ShapecastCallbacks {
-  /** Return NOT_INTERSECTED (or false) to skip the node, INTERSECTED (or true) to descend, CONTAINED to accept the subtree without more bounds tests. */
+  /**
+   * Classifies a node: {@link NOT_INTERSECTED} (0 or `false`) skips it, {@link CONTAINED} (exactly 2) accepts its
+   * whole subtree, anything else descends. `score` is this node's `boundsTraverseOrder` value (undefined for the
+   * root or without that callback); `depth` is 0 at the root; `nodeIndex` indexes `nodeBounds`/`nodeData`.
+   */
   intersectsBounds(
     box: ShapecastBox,
     isLeaf: boolean,
@@ -117,16 +129,25 @@ export interface ShapecastCallbacks {
     depth: number,
     nodeIndex: number,
   ): number | boolean;
-  /** Called for each triangle of an accepted leaf. Return true to stop the whole query. */
+  /**
+   * Called for each triangle of an accepted leaf, in leaf order, with its original face index; `contained` tells
+   * whether the leaf lies in a CONTAINED subtree. Returning exactly `true` ends the query.
+   */
   intersectsTriangle?(
     triangle: ShapecastTriangle,
     faceIndex: number,
     contained: boolean,
     depth: number,
   ): boolean | void;
-  /** Called for each accepted leaf with its range in leaf order (see `leafTriangles`). Return true to stop. */
+  /**
+   * Called once per accepted leaf, before its triangles, with the leaf's span `[offset, offset + count)` of
+   * `MeshBVH.index` / `MeshBVH.triangles`. Returning exactly `true` ends the query (its triangles are not reported).
+   */
   intersectsRange?(offset: number, count: number, contained: boolean, depth: number, nodeIndex: number): boolean | void;
-  /** Score for visiting children in ascending order (for example the distance to a query point). */
+  /**
+   * Scores a child box before either child is tested; the child with the strictly lower score is visited first
+   * (ties and NaN keep the left child first). Not called inside a CONTAINED subtree.
+   */
   boundsTraverseOrder?(box: ShapecastBox): number;
 }
 /** Output of MeshBVH.serialize: node buffer plus leaf index and triangle order, for deserialize or a worker transfer. */
@@ -866,85 +887,83 @@ export class MeshBVH {
     return false;
   }
 
+  /**
+   * Generic depth-first traversal driven by `callbacks` (see {@link ShapecastCallbacks}): the root is tested first,
+   * each subtree finishes before its sibling is tested, and accepted leaves report their range and then their
+   * triangles. Callbacks may run other queries, including shapecast, on any BVH. Returns true if a callback stopped
+   * the query, false if it ran to the end.
+   * @throws TypeError when `callbacks.intersectsBounds` is not a function.
+   */
   shapecast(callbacks: ShapecastCallbacks): boolean {
     const { intersectsBounds, intersectsTriangle, intersectsRange, boundsTraverseOrder } = callbacks;
-    if (typeof intersectsBounds !== 'function') throw new TypeError('shapecast needs intersectsBounds');
-    const f = this.nodeBounds,
-      u = this.nodeData,
+    if (typeof intersectsBounds !== 'function')
+      throw new TypeError('shapecast needs intersectsBounds: pass a function that classifies node boxes');
+    const bounds = this.nodeBounds,
+      data = this.nodeData,
       index = this.index,
+      faces = this.triangles,
       P = this.positions,
-      s = this.stride,
-      faces = this.triangles;
-    const box: ShapecastBox = { min: new Float64Array(3), max: new Float64Array(3) };
-    const triangle: ShapecastTriangle = { a: new Float64Array(3), b: new Float64Array(3), c: new Float64Array(3) };
-    const fill = (node: number): ShapecastBox => {
+      s = this.stride;
+    // Per query, so a nested query (from inside a callback) gets its own and never disturbs this one.
+    const box: ShapecastBox = { min: new Float64Array(3), max: new Float64Array(3) },
+      tri: ShapecastTriangle = { a: new Float64Array(3), b: new Float64Array(3), c: new Float64Array(3) };
+    const load = (node: number): ShapecastBox => {
       const w = node * NODE_WORDS;
-      box.min[0] = f[w];
-      box.min[1] = f[w + 1];
-      box.min[2] = f[w + 2];
-      box.max[0] = f[w + 3];
-      box.max[1] = f[w + 4];
-      box.max[2] = f[w + 5];
+      box.min[0] = bounds[w];
+      box.min[1] = bounds[w + 1];
+      box.min[2] = bounds[w + 2];
+      box.max[0] = bounds[w + 3];
+      box.max[1] = bounds[w + 4];
+      box.max[2] = bounds[w + 5];
       return box;
     };
-    const classify = (result: number | boolean): number =>
-      result === true ? INTERSECTED : result === false ? NOT_INTERSECTED : result;
+    const corner = (out: Float64Array, vertex: number): void => {
+      const o = vertex * s;
+      out[0] = P[o];
+      out[1] = P[o + 1];
+      out[2] = P[o + 2];
+    };
+    // Reports one accepted leaf; true when a callback asked to stop.
     const leaf = (node: number, contained: boolean, depth: number): boolean => {
       const w = node * NODE_WORDS,
-        offset = u[w + 6],
-        count = u[w + 7];
-      if (intersectsRange && intersectsRange(offset, count, contained, depth, node) === true) return true;
-      if (intersectsTriangle)
-        for (let k = offset; k < offset + count; k++) {
-          const a = index[k * 3] * s,
-            b = index[k * 3 + 1] * s,
-            c = index[k * 3 + 2] * s;
-          triangle.a[0] = P[a];
-          triangle.a[1] = P[a + 1];
-          triangle.a[2] = P[a + 2];
-          triangle.b[0] = P[b];
-          triangle.b[1] = P[b + 1];
-          triangle.b[2] = P[b + 2];
-          triangle.c[0] = P[c];
-          triangle.c[1] = P[c + 1];
-          triangle.c[2] = P[c + 2];
-          if (intersectsTriangle(triangle, faces[k], contained, depth) === true) return true;
-        }
-      return false;
-    };
-    const visit = (node: number, contained: boolean, depth: number): boolean => {
-      const word = u[node * NODE_WORDS + 7];
-      if (!(word & INTERNAL_FLAG)) return leaf(node, contained, depth);
-      let first = node + 1,
-        second = u[node * NODE_WORDS + 6],
-        firstScore: number | undefined,
-        secondScore: number | undefined;
-      if (boundsTraverseOrder && !contained) {
-        firstScore = boundsTraverseOrder(fill(first));
-        secondScore = boundsTraverseOrder(fill(second));
-        if (secondScore < firstScore) {
-          const q = first;
-          first = second;
-          second = q;
-          const t = firstScore;
-          firstScore = secondScore;
-          secondScore = t;
-        }
-      }
-      for (let i = 0; i < 2; i++) {
-        let state = CONTAINED;
-        if (!contained) {
-          const isLeaf = !(u[first * NODE_WORDS + 7] & INTERNAL_FLAG);
-          state = classify(intersectsBounds(fill(first), isLeaf, firstScore, depth + 1, first));
-        }
-        if (state !== NOT_INTERSECTED && visit(first, state === CONTAINED, depth + 1)) return true;
-        first = second;
-        firstScore = secondScore;
+        offset = data[w + 6],
+        count = data[w + 7];
+      if (intersectsRange && intersectsRange.call(callbacks, offset, count, contained, depth, node) === true)
+        return true;
+      if (!intersectsTriangle) return false;
+      for (let k = offset; k < offset + count; k++) {
+        corner(tri.a, index[k * 3]);
+        corner(tri.b, index[k * 3 + 1]);
+        corner(tri.c, index[k * 3 + 2]);
+        if (intersectsTriangle.call(callbacks, tri, faces[k], contained, depth) === true) return true;
       }
       return false;
     };
-    const root = classify(intersectsBounds(fill(0), !(u[7] & INTERNAL_FLAG), undefined, 0, 0));
-    return root !== NOT_INTERSECTED && visit(0, root === CONTAINED, 0);
+    // Inside a CONTAINED subtree: every leaf, left before right, with no bounds or order calls.
+    const all = (node: number, depth: number): boolean => {
+      const w = node * NODE_WORDS;
+      if (!(data[w + 7] & INTERNAL_FLAG)) return leaf(node, true, depth);
+      return all(node + 1, depth + 1) || all(data[w + 6], depth + 1);
+    };
+    // Tests one node (score: its order value, undefined without one) and handles what the answer asks for.
+    const visit = (node: number, score: number | undefined, depth: number): boolean => {
+      const w = node * NODE_WORDS,
+        internal = (data[w + 7] & INTERNAL_FLAG) !== 0,
+        result = intersectsBounds.call(callbacks, load(node), !internal, score, depth, node);
+      // Skip only on 0 or false; contained only on exactly 2; any other value descends.
+      if (result === NOT_INTERSECTED || result === false) return false;
+      if (result === CONTAINED) return all(node, depth);
+      if (!internal) return leaf(node, false, depth);
+      const left = node + 1,
+        right = data[w + 6];
+      if (!boundsTraverseOrder) return visit(left, undefined, depth + 1) || visit(right, undefined, depth + 1);
+      const leftScore = boundsTraverseOrder.call(callbacks, load(left)),
+        rightScore = boundsTraverseOrder.call(callbacks, load(right));
+      // Strictly smaller goes first, so ties and NaN keep the left child first.
+      if (rightScore < leftScore) return visit(right, rightScore, depth + 1) || visit(left, leftScore, depth + 1);
+      return visit(left, leftScore, depth + 1) || visit(right, rightScore, depth + 1);
+    };
+    return visit(0, undefined, 0);
   }
 
   /**

@@ -20,7 +20,7 @@ export class Spherical {
   clone(): Spherical {
     return new Spherical().copy(this);
   }
-  /** Keeps phi just inside (0, π) so a look-at built from it never goes exactly vertical. */
+  /** Clamps `phi` into [epsilon, π - epsilon] so a look-at built from it never goes exactly vertical. */
   makeSafe(epsilon = 1e-6): this {
     this.phi = Math.max(epsilon, Math.min(Math.PI - epsilon, this.phi));
     return this;
