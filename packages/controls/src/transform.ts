@@ -87,6 +87,11 @@ let counter = 0;
  * Events: `change`, `mouseDown`, `mouseUp`, `objectChange`, `dragging-changed` (`value`), `axis-changed` (`value`),
  * `mode-changed` and `space-changed`.
  */
+/** Share of the viewport height covered by one gizmo unit (the translate arrow length): a fifth of the view. */
+const GIZMO_SCREEN_FRACTION = 0.2;
+/** Largest tan(fov / 2) used for the gizmo size (a 135 degree lens); wider lenses keep that world size. */
+const GIZMO_TAN_CAP = Math.tan((3 * Math.PI) / 8);
+
 export class TransformControls extends EventDispatcher {
   readonly engine: EngineKernel;
   element: ControlElement | null = null;
@@ -259,9 +264,10 @@ export class TransformControls extends EventDispatcher {
           ];
     const toCamera = sub(camera.position, origin),
       distance = Math.hypot(...toCamera) || 1;
-    // Constant screen size: a fixed fraction of the visible height at the gizmo (the whole view height when orthographic,
-    // where every point also sees the camera along the same direction).
-    const size = ((b.ortho !== undefined ? b.ortho * 1.9 : distance * Math.min(1.9 * b.tanHalf, 7)) / 4) * this.size;
+    // One gizmo unit spans GIZMO_SCREEN_FRACTION of the viewport height. The visible half height at the gizmo is
+    // distance * tan(fov / 2) in perspective (tan capped so very wide lenses stay bounded) or the orthographic half height.
+    const halfHeight = b.ortho ?? distance * Math.min(b.tanHalf, GIZMO_TAN_CAP),
+      size = 2 * GIZMO_SCREEN_FRACTION * halfHeight * this.size;
     return {
       mode: this.mode,
       origin,

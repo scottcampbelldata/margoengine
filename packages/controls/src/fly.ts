@@ -6,49 +6,90 @@ import {
   type EventTargetLike,
   type InputEventListener,
 } from './controls.js';
-import { EPS, madd, rotateAxis, type V3 } from './math.js';
-import { add, scale } from '@margoengine/math/vec3';
-import { clamp } from '@margoengine/math/mathutils';
+import { EPS, madd } from './math.js';
 import { basis } from './view.js';
 
-/** Largest pitch away from the horizon. The Y-up camera cannot look straight up or down. */
+/**
+ * Largest elevation of the view direction above or below the horizon, in radians: a milliradian short of straight
+ * up or down, so the world-up camera always has a defined screen frame.
+ */
 export const MAX_PITCH = Math.PI / 2 - 1e-3;
 
-/** Turns the camera by yaw (around world +Y) and pitch (around its right axis), keeping the target distance. */
+// Shift multiplies the flight speed by this (public, documented on `movementSpeedMultiplier`).
+const SLOW = 0.1;
+
+/**
+ * Turns the camera by `yaw` radians around world +Y (positive turns left, counterclockwise seen from above) and
+ * raises the view by `pitch` radians (positive looks up), with the elevation clamped to plus or minus
+ * {@link MAX_PITCH}. The eye stays where it is and the target keeps its distance from it.
+ */
 export function turn(camera: Pick<Camera, 'position' | 'target' | 'fov'>, yaw: number, pitch: number): void {
-  const b = basis(camera),
-    distance = Math.max(b.distance, EPS);
-  let forward = rotateAxis(b.forward, [0, 1, 0], yaw);
-  const current = Math.asin(clamp(forward[1], -1, 1)),
-    next = clamp(current + pitch, -MAX_PITCH, MAX_PITCH);
-  const h = Math.hypot(forward[0], forward[2]) || 1;
-  forward = [(forward[0] / h) * Math.cos(next), Math.sin(next), (forward[2] / h) * Math.cos(next)];
-  camera.target = madd(camera.position, forward, distance);
+  const p = camera.position,
+    t = camera.target,
+    distance = Math.max(Math.hypot(t[0] - p[0], t[1] - p[1], t[2] - p[2]), EPS),
+    view = basis(camera).forward;
+  // Heading on the ground plane, then the yaw about +Y: a turn by `a` maps (x, z) to (x cos a + z sin a, z cos a - x sin a).
+  let hx = view[0],
+    hz = view[2],
+    flat = Math.hypot(hx, hz);
+  if (flat < 1e-12) {
+    // Looking straight up or down: leave the pole toward the screen top (looking down) or bottom (looking up).
+    const up = (camera as { up?: readonly number[] }).up,
+      side = view[1] > 0 ? -1 : 1;
+    hx = up ? up[0] * side : 0;
+    hz = up ? up[2] * side : -1;
+    flat = Math.hypot(hx, hz);
+    if (flat < 1e-12) (hx = 0), (hz = -1), (flat = 1);
+  }
+  hx /= flat;
+  hz /= flat;
+  const c = Math.cos(yaw),
+    s = Math.sin(yaw),
+    x = hx * c + hz * s,
+    z = hz * c - hx * s;
+  const elevation = Math.asin(Math.max(-1, Math.min(1, view[1]))),
+    next = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, elevation + pitch)),
+    across = Math.cos(next);
+  camera.target = [p[0] + x * across * distance, p[1] + Math.sin(next) * distance, p[2] + z * across * distance];
 }
-/** Moves position and target together by `offset`. */
+
+/** Moves the camera position and target together by `offset`. */
 export function translate(camera: Pick<Camera, 'position' | 'target'>, offset: readonly number[]): void {
-  camera.position = add(camera.position, offset);
-  camera.target = add(camera.target, offset);
+  camera.position = madd(camera.position, offset, 1);
+  camera.target = madd(camera.target, offset, 1);
+}
+
+/** Largest change of any coordinate between two snapshots of position and target. */
+export function moved(before: readonly number[], camera: Pick<Camera, 'position' | 'target'>): boolean {
+  const now = [...camera.position, ...camera.target];
+  for (let i = 0; i < 6; i++) if (Math.abs(now[i] - before[i]) > EPS) return true;
+  return false;
 }
 
 /**
- * Six-degree-of-freedom flight: WASD moves, R/F moves up and down, arrows yaw and pitch,
- * the mouse offset from the canvas center steers (or drag to look with `dragToLook`). Left button flies forward
- * and right button backward unless `dragToLook` is set.
- *
- * Roll: Q and E are the usual roll keys. The Margo Engine camera has no up vector and always renders with world +Y up, so roll
- * is not supported and those keys do nothing; yaw turns around world +Y and pitch stops short of the poles.
+ * Free flight. W/S fly forward and back along the view, A/D strafe, R/F rise and sink along the screen up axis, the
+ * arrow keys yaw and pitch, and the pointer's offset from the element centre steers (proportionally, 1 at the edge).
+ * Without `dragToLook` the pointer steers whenever it moves and the left and right buttons fly forward and back;
+ * with `dragToLook` it steers only while a button is held. The camera always renders with world +Y up, so there is
+ * no roll: Q and E do nothing, yaw turns around world +Y and pitch stops short of the poles ({@link MAX_PITCH}).
+ * Keys are read from `keyTarget` (default the element's document); key presses with Alt held are ignored.
+ * Events: `change`.
  */
 export class FlyControls extends Controls {
-  /** World units per second. */
+  /** Flight speed in world units per second. Default 1. */
   movementSpeed = 1;
-  /** Radians per second per unit of steering input (the turn rate is about twice this value). */
-  rollSpeed = 0.005;
+  /**
+   * Turn rate in radians per second at full steering input (an arrow key, or the pointer at the element edge).
+   * Default 0.01. The name is kept for compatibility; the camera does not roll.
+   */
+  rollSpeed = 0.01;
+  /** Steer only while a pointer button is held. Default false. */
   dragToLook = false;
+  /** Keep flying forward unless the back input is held. Default false. */
   autoForward = false;
-  /** User speed multiplier; holding Shift applies an additional factor of 0.1. */
+  /** Your speed multiplier. Default 1. Holding either Shift key applies an additional factor of 0.1. */
   movementSpeedMultiplier = 1;
-  private shiftKeys = 0;
+  /** Current inputs: 1 or 0 for keys and buttons, proportional (not clamped) for pointer steering. */
   readonly moveState = {
     up: 0,
     down: 0,
@@ -61,8 +102,10 @@ export class FlyControls extends Controls {
     yawLeft: 0,
     yawRight: 0,
   };
-  private status = 0;
   private readonly keyTarget: EventTargetLike | null;
+  private presses = 0;
+  private shiftLeft = false;
+  private shiftRight = false;
 
   constructor(
     source: Camera | EngineKernel,
@@ -76,60 +119,66 @@ export class FlyControls extends Controls {
   protected override get kind(): string {
     return 'fly';
   }
-  protected bind(element: ControlElement) {
+  protected bind(
+    element: ControlElement,
+  ): Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]> {
     const keys = this.keyTarget ?? documentOf(element);
     return [
-      [element, 'pointerdown', this.onDown],
-      [element, 'pointermove', this.onMove],
-      [element, 'pointerup', this.onUp],
-      [element, 'pointercancel', this.onCancel],
-      [element, 'contextmenu', this.onMenu],
-      [keys, 'keydown', this.onKeyDown],
-      [keys, 'keyup', this.onKeyUp],
-    ] as Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
+      [element, 'pointerdown', this.onDown as InputEventListener],
+      [element, 'pointermove', this.onMove as InputEventListener],
+      [element, 'pointerup', this.onUp as InputEventListener],
+      [element, 'pointercancel', this.onCancel as InputEventListener],
+      [element, 'contextmenu', this.onContextMenu as InputEventListener],
+      [keys, 'keydown', this.onKeyDown as InputEventListener],
+      [keys, 'keyup', this.onKeyUp as InputEventListener],
+    ];
   }
   protected override onDisconnect(): void {
-    for (const key of Object.keys(this.moveState)) this.moveState[key as keyof typeof this.moveState] = 0;
-    this.status = 0;
-    this.shiftKeys = 0;
+    const state = this.moveState as Record<string, number>;
+    for (const key in state) state[key] = 0;
+    this.presses = 0;
+    this.shiftLeft = this.shiftRight = false;
   }
 
+  /** Flies and turns for `delta` seconds (default 1/60). Returns true when the camera moved. */
   update(delta = 1 / 60): boolean {
-    const c = this.camera,
-      before = [...c.position, ...c.target],
-      s = this.moveState;
-    const move = delta * this.movementSpeed * this.movementSpeedMultiplier * (this.shiftKeys ? 0.1 : 1),
-      rotate = 2 * delta * this.rollSpeed;
-    const forward = s.forward || (this.autoForward && !s.back ? 1 : 0);
-    const b = basis(c);
-    let offset: V3 = scale(b.right, (s.right - s.left) * move);
-    offset = madd(offset, b.up, (s.up - s.down) * move);
-    offset = madd(offset, b.forward, (forward - s.back) * move);
-    translate(c, offset);
-    turn(c, (s.yawLeft - s.yawRight) * rotate, (s.pitchUp - s.pitchDown) * rotate);
-    const after = [...c.position, ...c.target],
-      moved = before.some((v, i) => Math.abs(v - after[i]) > EPS);
-    if (moved) this.dispatchEvent({ type: 'change' });
-    return moved;
+    const camera = this.camera,
+      before = [...camera.position, ...camera.target],
+      s = this.moveState,
+      slow = this.shiftLeft || this.shiftRight ? SLOW : 1,
+      step = delta * this.movementSpeed * this.movementSpeedMultiplier * slow,
+      forward = this.autoForward && !s.back ? 1 : s.forward;
+    const frame = basis(camera),
+      across = (s.right - s.left) * step,
+      lift = (s.up - s.down) * step,
+      along = (forward - s.back) * step;
+    if (across || lift || along)
+      translate(camera, madd(madd(madd([0, 0, 0], frame.right, across), frame.up, lift), frame.forward, along));
+    const rate = delta * this.rollSpeed,
+      yaw = (s.yawLeft - s.yawRight) * rate,
+      pitch = (s.pitchUp - s.pitchDown) * rate;
+    if (yaw || pitch) turn(camera, yaw, pitch);
+    const changed = moved(before, camera);
+    if (changed) this.dispatchEvent({ type: 'change' });
+    return changed;
   }
 
-  private readonly onMenu = (event: Event): void => {
-    if (this.enabled) event.preventDefault();
-  };
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     if (!this.enabled || event.altKey) return;
     this.key(event.code, 1);
-    if (event.code === 'ShiftLeft') this.shiftKeys |= 1;
-    if (event.code === 'ShiftRight') this.shiftKeys |= 2;
   };
   private readonly onKeyUp = (event: KeyboardEvent): void => {
     this.key(event.code, 0);
-    if (event.code === 'ShiftLeft') this.shiftKeys &= ~1;
-    if (event.code === 'ShiftRight') this.shiftKeys &= ~2;
   };
   private key(code: string, value: number): void {
     const s = this.moveState;
     switch (code) {
+      case 'ShiftLeft':
+        this.shiftLeft = !!value;
+        break;
+      case 'ShiftRight':
+        this.shiftRight = !!value;
+        break;
       case 'KeyW':
         s.forward = value;
         break;
@@ -165,25 +214,24 @@ export class FlyControls extends Controls {
   private readonly onDown = (event: PointerEvent): void => {
     if (!this.enabled) return;
     this.capture(event.pointerId);
-    if (this.dragToLook) this.status++;
+    if (this.dragToLook) this.presses++;
     else if (event.button === 0) this.moveState.forward = 1;
     else if (event.button === 2) this.moveState.back = 1;
   };
   private readonly onMove = (event: PointerEvent): void => {
-    if (!this.enabled || (this.dragToLook && this.status <= 0)) return;
-    const p = this.local(event),
-      e = this.element!,
-      hw = Math.max(1, e.clientWidth) / 2,
-      hh = Math.max(1, e.clientHeight) / 2;
-    this.moveState.yawLeft = -(p.x - hw) / hw;
-    this.moveState.pitchDown = (p.y - hh) / hh;
-    this.moveState.yawRight = 0;
-    this.moveState.pitchUp = 0;
+    if (!this.enabled || !this.element || (this.dragToLook && this.presses <= 0)) return;
+    const halfWidth = Math.max(this.element.clientWidth, 1) / 2,
+      halfHeight = Math.max(this.element.clientHeight, 1) / 2,
+      { x, y } = this.local(event),
+      s = this.moveState;
+    s.yawLeft = -(x - halfWidth) / halfWidth;
+    s.pitchDown = (y - halfHeight) / halfHeight;
+    s.yawRight = s.pitchUp = 0;
   };
   private readonly onUp = (event: PointerEvent): void => {
     this.release(event.pointerId);
     if (this.dragToLook) {
-      this.status = Math.max(0, this.status - 1);
+      this.presses = Math.max(0, this.presses - 1);
       this.moveState.yawLeft = this.moveState.pitchDown = 0;
     } else if (event.button === 0) this.moveState.forward = 0;
     else if (event.button === 2) this.moveState.back = 0;
@@ -191,8 +239,11 @@ export class FlyControls extends Controls {
   private readonly onCancel = (event: PointerEvent): void => {
     this.release(event.pointerId);
     if (this.dragToLook) {
-      this.status = 0;
+      this.presses = 0;
       this.moveState.yawLeft = this.moveState.pitchDown = 0;
     } else this.moveState.forward = this.moveState.back = 0;
+  };
+  private readonly onContextMenu = (event: Event): void => {
+    if (this.enabled) event.preventDefault();
   };
 }

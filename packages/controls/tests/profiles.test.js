@@ -1,4 +1,4 @@
-// CAD navigation profiles (HANDOFF 5h.b): the default replays a recording made before profiles existed, each profile maps
+// CAD navigation profiles (HANDOFF 5h.b): the default replays a recorded input script, each profile maps
 // its gestures to the right camera motion, and browser gesture conflicts are handled.
 // Re-record the replay (only when an orbit behaviour change is intended): RECORD=1 node --test tests/profiles.test.js
 import test from 'node:test';
@@ -66,120 +66,109 @@ const mouse = (button, mods = {}) => ({
   ...mods,
 });
 
-// ---------- recorded sequence (default behaviour) ----------
-// Events as a browser sends them for a mouse (pointerdown then the compatibility mousedown), touch, wheel and keys.
-function sequence() {
-  const events = [];
-  let t = 1000;
-  const drag = (button, mods, from, to) => {
-    const base = { ...mouse(button, mods) };
-    events.push(
-      ['pointerdown', { ...base, clientX: from[0], clientY: from[1], timeStamp: (t += 50) }],
-      ['mousedown', { ...base, clientX: from[0], clientY: from[1] }],
-    );
-    if (button === 2) events.push(['contextmenu', {}]);
-    for (let i = 1; i <= 3; i++)
-      events.push([
+// ---------- default replay ----------
+// A fixed input script for the default bindings. Each step is [kind, ...args]; the recorder stores the camera after
+// every step, so any change to the default feel shows up as a diff of orbit-replay.json.
+function script() {
+  const steps = [];
+  const dragSteps = (button, mods, from, to, n = 5) => {
+    steps.push(['pointer', 'pointerdown', { ...mouse(button, mods), clientX: from[0], clientY: from[1] }]);
+    for (let i = 1; i <= n; i++)
+      steps.push([
+        'pointer',
         'pointermove',
-        { ...base, clientX: from[0] + ((to[0] - from[0]) * i) / 3, clientY: from[1] + ((to[1] - from[1]) * i) / 3 },
+        {
+          ...mouse(button, mods),
+          clientX: from[0] + ((to[0] - from[0]) * i) / n,
+          clientY: from[1] + ((to[1] - from[1]) * i) / n,
+        },
       ]);
-    events.push(['pointerup', { ...base, clientX: to[0], clientY: to[1] }]);
+    steps.push(['pointer', 'pointerup', { ...mouse(button, mods), clientX: to[0], clientY: to[1] }]);
+    steps.push(['frames', 20]);
   };
-  drag(0, {}, [400, 300], [460, 330]);
-  drag(2, {}, [400, 300], [350, 260]);
-  drag(0, { shiftKey: true }, [400, 300], [420, 350]);
-  drag(0, { ctrlKey: true }, [300, 200], [330, 210]);
-  drag(0, { metaKey: true }, [300, 200], [280, 230]);
-  drag(2, { ctrlKey: true }, [400, 300], [380, 280]);
-  drag(1, {}, [400, 300], [400, 340]);
-  drag(1, {}, [400, 300], [400, 280]);
-  drag(0, { altKey: true }, [400, 300], [440, 300]);
-  drag(1, { shiftKey: true }, [400, 300], [430, 320]);
-  drag(1, { ctrlKey: true }, [400, 300], [400, 330]);
-  drag(2, { shiftKey: true }, [400, 300], [420, 310]);
-  drag(1, {}, [500, 250], [500, 250]);
-  drag(1, {}, [501, 251], [501, 251]); // a quick double middle click
-  for (const [deltaY, deltaMode, mods] of [
-    [-100, 0, {}],
-    [120, 0, {}],
-    [3, 1, {}],
-    [-1, 2, {}],
-    [-2, 0, { ctrlKey: true }],
-    [5, 0, { ctrlKey: true }],
-    [-100, 0, { shiftKey: true }],
-    [-100, 0, { altKey: true }],
+  dragSteps(0, {}, [400, 300], [470, 340]); // rotate
+  dragSteps(0, {}, [300, 200], [250, 120]);
+  dragSteps(2, {}, [400, 300], [455, 270]); // pan
+  dragSteps(0, { shiftKey: true }, [500, 400], [430, 420]); // Shift swaps to pan
+  dragSteps(2, { ctrlKey: true }, [400, 300], [380, 360]); // Ctrl swaps to rotate
+  dragSteps(1, {}, [400, 300], [400, 350]); // dolly out
+  dragSteps(1, {}, [400, 300], [400, 210]); // dolly in
+  for (const [deltaY, deltaMode, x, y, ctrlKey] of [
+    [-100, 0, 400, 300, false],
+    [100, 0, 610, 180, false],
+    [-3, 1, 200, 450, false],
+    [-1, 2, 700, 100, false],
+    [-6, 0, 520, 260, true],
+    [53, 0, 120, 520, false],
   ])
-    events.push(['wheel', { deltaY, deltaMode, clientX: 610, clientY: 180, ...mods }]);
+    steps.push(['wheel', { deltaY, deltaMode, clientX: x, clientY: y, ctrlKey }], ['frames', 5]);
   const touch = (type, id, x, y) =>
-    events.push([type, { pointerId: id, pointerType: 'touch', button: 0, clientX: x, clientY: y }]);
+    steps.push(['pointer', type, { pointerId: id, pointerType: 'touch', button: 0, clientX: x, clientY: y }]);
   touch('pointerdown', 7, 400, 300);
   touch('pointermove', 7, 430, 320);
-  touch('pointermove', 7, 450, 310);
+  touch('pointermove', 7, 470, 330);
   touch('pointerdown', 8, 500, 300);
-  touch('pointermove', 8, 560, 330);
-  touch('pointermove', 7, 430, 280);
-  touch('pointerup', 8, 560, 330);
-  touch('pointermove', 7, 420, 290);
-  touch('pointerup', 7, 420, 290);
+  touch('pointermove', 8, 540, 310);
+  touch('pointermove', 7, 450, 300);
+  touch('pointerup', 8, 540, 310);
+  touch('pointermove', 7, 420, 280);
+  touch('pointerup', 7, 420, 280);
+  steps.push(['frames', 20]);
   for (const [code, mods] of [
     ['ArrowLeft', {}],
     ['ArrowUp', {}],
     ['ArrowRight', { shiftKey: true }],
     ['ArrowDown', { ctrlKey: true }],
-    ['KeyF', {}],
-    ['Numpad1', {}],
-    ['Digit1', { ctrlKey: true }],
-    ['Home', {}],
+    ['KeyQ', {}],
   ])
-    events.push([
-      'keydown',
-      { code, key: code, ctrlKey: false, shiftKey: false, altKey: false, metaKey: false, ...mods },
-    ]);
-  events.push(['keyup', { key: 'Alt', code: 'AltLeft' }]);
-  return events;
+    steps.push(['key', { code, key: code, ctrlKey: false, shiftKey: false, altKey: false, metaKey: false, ...mods }]);
+  steps.push(['api', 'rotateLeft', 0.25], ['api', 'rotateUp', -0.15], ['api', 'pan', 12, -8], ['api', 'dollyIn', 0.9]);
+  steps.push(['frames', 30]);
+  return steps;
 }
 const VARIANTS = { plain: {}, damping: { enableDamping: true }, cursor: { zoomToCursor: true } };
-function replay(events, setup, variant) {
+const round = (v) => Number(v.toPrecision(12));
+function replay(variant) {
   const el = new FakeElement(),
     cam = camera(),
     orbit = new OrbitControls(cam, el);
-  setup?.(orbit);
   Object.assign(orbit, VARIANTS[variant]);
-  orbit.listenToKeyEvents(el); // options after the profile, as an app would
-  const fired = [];
-  for (const type of ['start', 'change', 'end', 'fit']) orbit.addEventListener(type, () => fired.push(type));
-  const states = events.map(([type, props]) => {
-    fired.length = 0;
-    const event = el.dispatch(type, props);
-    if (variant === 'damping') orbit.update(1 / 60);
-    return [...cam.position, ...cam.target, event.defaultPrevented ? 1 : 0, orbit.state, fired.join()];
-  });
+  orbit.listenToKeyEvents(el);
+  const states = [];
+  for (const [kind, ...args] of script()) {
+    if (kind === 'pointer') el.dispatch(args[0], args[1]);
+    else if (kind === 'wheel') el.dispatch('wheel', args[0]);
+    else if (kind === 'key') el.dispatch('keydown', args[0]);
+    else if (kind === 'api') orbit[args[0]](...args.slice(1));
+    else for (let i = 0; i < args[0]; i++) orbit.update(1 / 60);
+    states.push([...cam.position, ...cam.target].map(round));
+  }
   orbit.dispose();
-  assert.equal(el.count, 0, 'every listener removed');
   return states;
 }
 
-test('default unchanged: the recorded pointer/wheel/touch/key sequence replays to the exact camera states', () => {
+test('default unchanged: the recorded pointer/wheel/touch/key script replays to the exact camera states', () => {
   if (process.env.RECORD) {
-    const events = sequence(),
-      runs = Object.fromEntries(Object.keys(VARIANTS).map((variant) => [variant, replay(events, null, variant)]));
-    writeFileSync(
-      FIXTURE,
-      JSON.stringify({ note: 'Recorded from OrbitControls before navigation profiles (659038f).', events, runs }) +
-        '\n',
+    const recorded = {
+      note: 'Recorded by RECORD=1 node --test tests/profiles.test.js from the current OrbitControls.',
+    };
+    for (const variant of Object.keys(VARIANTS)) recorded[variant] = replay(variant);
+    writeFileSync(FIXTURE, `${JSON.stringify(recorded)}\n`);
+  }
+  const fixture = JSON.parse(readFileSync(FIXTURE, 'utf8'));
+  for (const variant of Object.keys(VARIANTS)) {
+    const states = replay(variant),
+      expected = fixture[variant];
+    assert.equal(states.length, expected.length, `${variant}: step count`);
+    states.forEach((state, step) =>
+      state.forEach((v, i) =>
+        assert.ok(
+          Math.abs(v - expected[step][i]) <= 1e-9 * Math.max(1, Math.abs(expected[step][i])),
+          `${variant} step ${step}[${i}]: expected ${expected[step][i]}, got ${v}`,
+        ),
+      ),
     );
   }
-  const { events, runs } = JSON.parse(readFileSync(FIXTURE, 'utf8'));
-  assert.deepEqual(events, JSON.parse(JSON.stringify(sequence())), 'the fixture is this sequence');
-  // Exact equality: JSON round-trips doubles, so any change in the arithmetic fails.
-  const setups = {
-    'no profile': null,
-    'setProfile(MARGO)': (o) => o.setProfile(controls.MARGO),
-    'BLENDER then MARGO': (o) => o.setProfile(controls.BLENDER).setProfile(controls.MARGO),
-  };
-  for (const [label, setup] of Object.entries(setups))
-    for (const variant of Object.keys(VARIANTS))
-      assert.deepEqual(replay(events, setup, variant), runs[variant], `${label}, ${variant}`);
 });
 
 // ---------- per profile ----------

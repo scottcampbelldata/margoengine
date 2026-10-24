@@ -65,9 +65,10 @@ const PLANES: Array<[HandleName, number, number, number]> = [
   ['YZ', 1, 2, 0],
   ['XZ', 0, 2, 1],
 ];
-/** Thresholds that hide an axis that points at the camera and a plane seen edge-on. */
-const AXIS_HIDE_THRESHOLD = 0.99,
-  PLANE_HIDE_THRESHOLD = 0.2;
+/** An axis handle is hidden when it lies within 5 degrees of the view line (|cos| above this): too short to grab. */
+const AXIS_END_ON_COS = Math.cos((5 * Math.PI) / 180);
+/** A plane handle is hidden when the plane is within 10 degrees of edge-on (|cos| of its normal below this). */
+const PLANE_EDGE_ON_COS = Math.sin((10 * Math.PI) / 180);
 /** Gizmo-unit layout. */
 const LAYOUT = {
   arrow: 1,
@@ -168,7 +169,7 @@ export function buildGizmo(f: GizmoFrame): Handle[] {
     for (let i = 0; i < 3; i++) {
       const name = 'XYZ'[i] as HandleName,
         a = axes[i];
-      if (hidden(name) || Math.abs(dot(a, eye)) > AXIS_HIDE_THRESHOLD) continue;
+      if (hidden(name) || Math.abs(dot(a, eye)) > AXIS_END_ON_COS) continue;
       const color = lit(name, COLORS[i]),
         prims: Prim[] = [];
       if (f.mode === 'translate') {
@@ -187,7 +188,7 @@ export function buildGizmo(f: GizmoFrame): Handle[] {
     }
     if (f.mode === 'translate')
       for (const [name, i, j, k] of PLANES) {
-        if (hidden(name) || Math.abs(dot(axes[k], eye)) < PLANE_HIDE_THRESHOLD) continue;
+        if (hidden(name) || Math.abs(dot(axes[k], eye)) < PLANE_EDGE_ON_COS) continue;
         const u = axes[i],
           v = axes[j],
           at = (x: number, y: number) => madd(madd(o, u, x * s), v, y * s),

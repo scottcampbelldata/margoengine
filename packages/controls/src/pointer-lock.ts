@@ -2,31 +2,42 @@ import type { Camera, EngineKernel } from '@margoengine/core';
 import {
   Controls,
   documentOf,
+  type ControlDocument,
   type ControlElement,
   type EventTargetLike,
   type InputEventListener,
-  type ControlDocument,
 } from './controls.js';
-import type { V3 } from './math.js';
-import { cross, normalize, scale } from '@margoengine/math/vec3';
-import { clamp } from '@margoengine/math/mathutils';
+import { madd, type V3 } from './math.js';
 import { basis } from './view.js';
 import { MAX_PITCH, translate, turn } from './fly.js';
 
+// Look sensitivity at pointerSpeed 1, in radians per pixel (mouse count) of locked movement. Derived so that 2 inches
+// (5.08 cm) of travel on an 800 DPI mouse (1600 counts) turns the view a quarter turn (90 degrees): a full turn
+// takes about 20 cm, a mid-range desktop first-person setting. Higher-DPI mice turn faster; scale with pointerSpeed.
+const RADIANS_PER_PIXEL = Math.PI / 2 / (2 * 800); // about 9.82e-4
+
 /**
- * Mouse-look with the pointer locked to the canvas, plus WASD movement helpers.
- * `lock()` must be called from a user gesture. While locked, mouse movement turns the view; `update(delta)` moves
- * at `movementSpeed` while movement keys are held.
+ * Mouse look with the pointer locked to the element, plus keyboard movement. Call `lock()` from a user gesture
+ * (a click); while locked, mouse movement turns the view and `update(delta)` moves at `movementSpeed` while a key in
+ * `keys` is held (W/A/S/D and arrows on the ground plane, R/F along world +Y). `look(mx, my)` applies a mouse movement
+ * in pixels, as a locked `mousemove` does. Elevation stays within `minPolarAngle`..`maxPolarAngle` and short of the
+ * poles. Pass `document` to listen on another document (an iframe, or a test fake); keys default to that document.
+ * Events: `lock`, `unlock`, `change`, and `error` when the lock request fails.
  */
 export class PointerLockControls extends Controls {
+  /** True while the pointer is locked to the element. */
   isLocked = false;
+  /** Smallest polar angle of the view, radians from +Y. Default 0. */
   minPolarAngle = 0;
+  /** Largest polar angle of the view, radians from +Y. Default PI. */
   maxPolarAngle = Math.PI;
+  /** Mouse-look sensitivity multiplier. Default 1. */
   pointerSpeed = 1;
-  /** World units per second for the keyboard helpers. Set 0 to disable keyboard movement. */
+  /** Key movement speed in world units per second; 0 turns key movement off. Default 1. */
   movementSpeed = 1;
-  /** Move with the keys only while locked (default) or any time. */
+  /** Keys move the camera only while the pointer is locked. Default true. */
   requireLock = true;
+  /** `KeyboardEvent.code` values for each movement direction. */
   keys = {
     FORWARD: ['KeyW', 'ArrowUp'],
     BACKWARD: ['KeyS', 'ArrowDown'],
@@ -35,8 +46,10 @@ export class PointerLockControls extends Controls {
     UP: ['KeyR'],
     DOWN: ['KeyF'],
   };
+  /** `KeyboardEvent.code` values currently held. */
   readonly pressed = new Set<string>();
-  private readonly keyTarget: EventTargetLike | null;
+  private readonly keyOption: EventTargetLike | null;
+  private readonly documentOption: EventTargetLike | null;
   private doc: ControlDocument | null = null;
 
   constructor(
@@ -45,93 +58,105 @@ export class PointerLockControls extends Controls {
     options: { keyTarget?: EventTargetLike | null; document?: EventTargetLike | null } = {},
   ) {
     super(source, element);
-    this.keyTarget = options.keyTarget ?? null;
-    this.doc = options.document ?? null;
+    this.keyOption = options.keyTarget ?? null;
+    this.documentOption = options.document ?? null;
     this.init();
   }
   protected override get kind(): string {
     return 'pointer-lock';
   }
-  protected bind(element: ControlElement) {
-    const doc = this.doc ?? documentOf(element),
-      keys = this.keyTarget ?? doc;
-    this.doc = doc;
+  protected bind(
+    element: ControlElement,
+  ): Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]> {
+    const doc = this.documentOption ?? documentOf(element),
+      keys = this.keyOption ?? doc;
+    this.doc = doc as ControlDocument;
     return [
-      [doc, 'mousemove', this.onMouseMove],
+      [doc, 'mousemove', this.onMouseMove as InputEventListener],
       [doc, 'pointerlockchange', this.onLockChange],
       [doc, 'pointerlockerror', this.onLockError],
-      [keys, 'keydown', this.onKeyDown],
-      [keys, 'keyup', this.onKeyUp],
-    ] as Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
+      [keys, 'keydown', this.onKeyDown as InputEventListener],
+      [keys, 'keyup', this.onKeyUp as InputEventListener],
+    ];
   }
   protected override onDisconnect(): void {
     this.pressed.clear();
   }
 
-  /** Requests pointer lock. Call from a click handler. */
+  /** Asks the browser to lock the pointer to the element; call it from a user gesture. */
   lock(unadjustedMovement = false): void {
-    const request = this.element?.requestPointerLock as ((options?: unknown) => unknown) | undefined;
-    const result = request?.call(this.element, { unadjustedMovement }) as Promise<void> | undefined;
-    if (result && typeof result.catch === 'function') result.catch(() => this.dispatchEvent({ type: 'error' }));
+    const element = this.element as (ControlElement & { requestPointerLock?(options?: object): unknown }) | null;
+    if (!element?.requestPointerLock) return;
+    let request: unknown;
+    try {
+      request = element.requestPointerLock({ unadjustedMovement });
+    } catch (error) {
+      this.dispatchEvent({ type: 'error', error });
+      return;
+    }
+    if (request && typeof (request as Promise<void>).then === 'function')
+      (request as Promise<void>).then(undefined, (error: unknown) => this.dispatchEvent({ type: 'error', error }));
   }
+  /** Releases the pointer lock. */
   unlock(): void {
     this.doc?.exitPointerLock?.();
   }
-
   /** Unit view direction. */
   getDirection(): V3 {
     return basis(this.camera).forward;
   }
-  /** Moves parallel to the ground plane along the view direction. */
+  /** Moves by `distance` along the view heading on the ground plane (looking down still moves horizontally). */
   moveForward(distance: number): void {
-    const b = basis(this.camera);
-    translate(this.camera, scale(normalize(cross([0, 1, 0], b.right)), distance));
+    const right = basis(this.camera).right;
+    // World +Y crossed with the horizontal screen right is the horizontal heading.
+    translate(this.camera, [right[2] * distance, 0, -right[0] * distance]);
   }
+  /** Moves by `distance` along the horizontal screen right. */
   moveRight(distance: number): void {
-    translate(this.camera, scale(basis(this.camera).right, distance));
+    translate(this.camera, madd([0, 0, 0], basis(this.camera).right, distance));
   }
+  /** Moves by `distance` along world +Y. */
   moveUp(distance: number): void {
     translate(this.camera, [0, distance, 0]);
   }
 
+  /** Moves for `delta` seconds (default 1/60) while movement keys are held. Returns true when it moved. */
   update(delta = 1 / 60): boolean {
     if (!this.movementSpeed || (this.requireLock && !this.isLocked) || !this.pressed.size) return false;
-    const has = (list: string[]) => (list.some((code) => this.pressed.has(code)) ? 1 : 0),
+    const held = (codes: readonly string[]) => (codes.some((code) => this.pressed.has(code)) ? 1 : 0),
       k = this.keys;
-    let forward = has(k.FORWARD) - has(k.BACKWARD),
-      right = has(k.RIGHT) - has(k.LEFT);
-    const up = has(k.UP) - has(k.DOWN),
-      length = Math.hypot(forward, right);
-    if (length > 1) {
-      forward /= length;
-      right /= length;
-    }
+    let forward = held(k.FORWARD) - held(k.BACKWARD),
+      right = held(k.RIGHT) - held(k.LEFT);
+    const up = held(k.UP) - held(k.DOWN),
+      flat = Math.hypot(forward, right);
+    // Diagonals are not faster than straight movement.
+    if (flat > 1) (forward /= flat), (right /= flat);
     const step = this.movementSpeed * delta;
     if ((!forward && !right && !up) || !step) return false;
-    this.moveForward(forward * step);
-    this.moveRight(right * step);
-    this.moveUp(up * step);
+    if (forward) this.moveForward(forward * step);
+    if (right) this.moveRight(right * step);
+    if (up) this.moveUp(up * step);
     this.dispatchEvent({ type: 'change' });
     return true;
   }
 
-  /** Applies a mouse movement in pixels (what the `mousemove` handler does while locked). */
+  /** Turns the view by a mouse movement in pixels: right turns right, down looks down. Dispatches `change`. */
   look(movementX: number, movementY: number): void {
-    const b = basis(this.camera),
-      pitch = Math.asin(clamp(b.forward[1], -1, 1));
-    const low = Math.max(-MAX_PITCH, Math.PI / 2 - this.maxPolarAngle),
-      high = Math.min(MAX_PITCH, Math.PI / 2 - this.minPolarAngle);
-    const next = clamp(pitch - movementY * 0.002 * this.pointerSpeed, low, high);
-    turn(this.camera, -movementX * 0.002 * this.pointerSpeed, next - pitch);
+    const rate = RADIANS_PER_PIXEL * this.pointerSpeed,
+      view = basis(this.camera).forward,
+      elevation = Math.asin(Math.max(-1, Math.min(1, view[1]))),
+      low = Math.max(-MAX_PITCH, Math.PI / 2 - this.maxPolarAngle),
+      high = Math.min(MAX_PITCH, Math.PI / 2 - this.minPolarAngle),
+      next = Math.max(low, Math.min(high, elevation - movementY * rate));
+    turn(this.camera, -movementX * rate, next - elevation);
     this.dispatchEvent({ type: 'change' });
   }
 
   private readonly onMouseMove = (event: MouseEvent): void => {
-    if (!this.enabled || !this.isLocked) return;
-    this.look(event.movementX || 0, event.movementY || 0);
+    if (this.enabled && this.isLocked) this.look(event.movementX || 0, event.movementY || 0);
   };
   private readonly onLockChange = (): void => {
-    const locked = !!this.doc && this.doc.pointerLockElement === this.element;
+    const locked = !!this.element && this.doc?.pointerLockElement === this.element;
     if (locked === this.isLocked) return;
     this.isLocked = locked;
     if (!locked) this.pressed.clear();

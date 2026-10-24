@@ -6,34 +6,44 @@ import {
   type EventTargetLike,
   type InputEventListener,
 } from './controls.js';
-import { EPS, madd, type V3 } from './math.js';
-import { add, cross, dot, sub } from '@margoengine/math/vec3';
-import { clamp } from '@margoengine/math/mathutils';
+import { EPS, type V3 } from './math.js';
 import { basis, intersectPlane, ray } from './view.js';
 import type { KeyAction, NavigationProfile } from './profiles.js';
-// `@margoengine/controls/orbit` serves this module, so it carries the base class the orbit controls attach through.
 export { Controls };
 
-/** Mouse button actions. */
+/** Mouse button actions, for `mouseButtons` and profiles. */
 export const MOUSE = { ROTATE: 0, DOLLY: 1, PAN: 2 } as const;
-/** Touch gesture actions. */
+/** Touch gesture actions, for `touches` and profiles. */
 export const TOUCH = { ROTATE: 0, PAN: 1, DOLLY_PAN: 2, DOLLY_ROTATE: 3 } as const;
 
-type Action =
-  | 'none'
-  | 'rotate'
-  | 'dolly'
-  | 'pan'
-  | 'touch-rotate'
-  | 'touch-pan'
-  | 'touch-dolly-pan'
-  | 'touch-dolly-rotate';
-type Point = { x: number; y: number };
+// ---- tuning (internal) ----
+/** Radians turned by a drag across the full element height: half a turn, so one sweep flips the view over. */
+const TURN_PER_HEIGHT = Math.PI;
+/** Pixels of wheel or vertical dolly drag that double (or halve) the distance at zoomSpeed 1: one 100 px notch is 2^0.2. */
+const PIXELS_PER_DOUBLING = 500;
+/** Pixel equivalents of one wheel line and one wheel page (a line-mode notch is usually 3 lines, close to a 100 px notch). */
+const LINE_PIXELS = 100 / 3;
+const PAGE_PIXELS = 800;
+/** Ctrl + wheel is a trackpad pinch, whose deltas are a few pixels per event; this brings it close to wheel speed. */
+const PINCH_BOOST = 8;
+/** Pending rotation (radians) and pan (fraction of the distance) below which damping stops. */
+const ANGLE_SETTLE = 1e-8;
+const PAN_SETTLE = 1e-8;
+/** Double click for a profile's `fitClick`: the second press within this time (ms) and radius (CSS px). */
+const FIT_CLICK_MS = 400;
+const FIT_CLICK_PX = 6;
 const TAU = Math.PI * 2;
-/** Profile binding key: `ctrl+shift+alt+` (as held; Meta counts as ctrl) then the button or key code. */
-const chord = (e: MouseEvent | KeyboardEvent, input: number | string): string =>
-  (e.ctrlKey || e.metaKey ? 'ctrl+' : '') + (e.shiftKey ? 'shift+' : '') + (e.altKey ? 'alt+' : '') + input;
-const VIEWS: Record<string, V3> = {
+
+type OrbitState = OrbitControls['state'];
+type Drag = 'rotate' | 'pan' | 'dolly';
+interface Tracked {
+  x: number;
+  y: number;
+  touch: boolean;
+}
+
+/** Directions from the target toward the camera for the profile view keys. */
+const VIEWS: Partial<Record<KeyAction, V3>> = {
   front: [0, 0, 1],
   back: [0, 0, -1],
   right: [1, 0, 0],
@@ -43,63 +53,94 @@ const VIEWS: Record<string, V3> = {
   iso: [1, 1, 1],
 };
 
+/** Modifier prefix of a profile chord: ctrl (or Meta), shift, alt, in that order. */
+const chord = (event: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean; altKey?: boolean }): string =>
+  (event.ctrlKey || event.metaKey ? 'ctrl+' : '') + (event.shiftKey ? 'shift+' : '') + (event.altKey ? 'alt+' : '');
+
+/** Wraps an angle into (-PI, PI]. */
+const wrap = (angle: number): number => {
+  const a = angle - TAU * Math.floor((angle + Math.PI) / TAU);
+  return a === -Math.PI ? Math.PI : a;
+};
+/** One +/-2PI shift into [-PI, PI]. */
+const shift = (angle: number): number => (angle < -Math.PI ? angle + TAU : angle > Math.PI ? angle - TAU : angle);
+const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v);
+
 /**
- * Orbits the camera around `camera.target`. Left drag rotates, middle drag or wheel
- * dollies, right drag (or shift/ctrl + left) pans; one finger rotates, two fingers dolly and pan.
+ * Orbits the camera around `camera.target`. Left drag rotates, middle drag or the wheel dollies, right drag (or
+ * Ctrl/Meta/Shift + left) pans; one finger rotates, two fingers dolly and pan. Pass the engine to update every frame,
+ * or a `Camera` plus an element and call `update(delta)` yourself. Events: `start`, `change`, `end`, `fit`.
  */
 export class OrbitControls extends Controls {
+  /** Ease motion out over several frames. Default false. */
   enableDamping = false;
-  /** Fraction of the remaining motion applied per 1/60 s frame. Frame-rate independent. */
+  /** Fraction of the remaining motion applied per 1/60 s, frame-rate independent. Default 0.05. */
   dampingFactor = 0.05;
+  /** Wheel, middle-drag and pinch dolly. Default true. */
   enableZoom = true;
+  /** Dolly speed multiplier. Default 1. */
   zoomSpeed = 1;
+  /** Drag rotation. Default true. */
   enableRotate = true;
+  /** Rotation speed multiplier. Default 1. */
   rotateSpeed = 1;
+  /** Panning. Default true. */
   enablePan = true;
+  /** Pan speed multiplier. Default 1. */
   panSpeed = 1;
-  /** True pans in the screen plane; false pans along the ground (XZ) plane. */
+  /** Pan in the screen plane (true, default) or on the ground plane (false). */
   screenSpacePanning = true;
-  /** Pixels moved per arrow key press. */
+  /** CSS pixels panned per arrow-key press. Default 7. */
   keyPanSpeed = 7;
-  /** Dolly toward the point under the cursor instead of toward the target. */
+  /** Dolly toward the point under the cursor instead of the view centre. Default false. */
   zoomToCursor = false;
+  /** Turn around the target while idle. Default false. */
   autoRotate = false;
-  /** 2.0 is one turn every 30 seconds. */
+  /** Auto-rotation speed: 2 is one full turn every 30 s (counterclockwise seen from above). Default 2. */
   autoRotateSpeed = 2;
+  /** Closest allowed distance to the target. Default 0. */
   minDistance = 0;
+  /** Farthest allowed distance to the target. Default Infinity. */
   maxDistance = Infinity;
+  /** Smallest polar angle (radians from +Y). Default 0. */
   minPolarAngle = 0;
+  /** Largest polar angle (radians from +Y). Default PI. */
   maxPolarAngle = Math.PI;
+  /** Azimuth limits in radians; both must be finite to apply. Defaults -Infinity and Infinity. */
   minAzimuthAngle = -Infinity;
   maxAzimuthAngle = Infinity;
+  /** `KeyboardEvent.code` of the four arrow keys. */
   keys = { LEFT: 'ArrowLeft', UP: 'ArrowUp', RIGHT: 'ArrowRight', BOTTOM: 'ArrowDown' };
+  /** Action of each mouse button (a `MOUSE` value or null). Not used by profiles with a `drag` table. */
   mouseButtons: { LEFT: number | null; MIDDLE: number | null; RIGHT: number | null } = {
     LEFT: MOUSE.ROTATE,
     MIDDLE: MOUSE.DOLLY,
     RIGHT: MOUSE.PAN,
   };
+  /** Action of one and two fingers (a `TOUCH` value or null). */
   touches: { ONE: number | null; TWO: number | null } = { ONE: TOUCH.ROTATE, TWO: TOUCH.DOLLY_PAN };
-  /** Current gesture, `'none'` when idle. */
-  state: Action = 'none';
-  private nav: NavigationProfile | null = null;
-  private lastClick: (Point & { t: number }) | null = null;
-  private altTarget: EventTargetLike | null = null;
-  private altDrag = false;
+  /** The active gesture. */
+  state: 'none' | 'rotate' | 'dolly' | 'pan' | 'touch-rotate' | 'touch-pan' | 'touch-dolly-pan' | 'touch-dolly-rotate' =
+    'none';
 
-  private dTheta = 0;
-  private dPhi = 0;
-  private dPan: V3 = [0, 0, 0];
-  private dScale = 1;
-  private cursor: Point | null = null;
-  private readonly pointers = new Map<number, Point>();
-  private last: Point = { x: 0, y: 0 };
-  private lastSpread = 0;
+  // Pending motion, consumed by update().
+  private turnAzimuth = 0;
+  private turnPolar = 0;
+  private readonly shiftTarget: V3 = [0, 0, 0];
+  private dollyScale = 1;
+  private cursor: { x: number; y: number } | null = null;
+  // Pointers owned by these controls, and the last gesture sample.
+  private readonly tracked = new Map<number, Tracked>();
+  private last = { x: 0, y: 0, spread: 0 };
+  private lastPress: { button: number; time: number; x: number; y: number } | null = null;
   private keyTarget: EventTargetLike | null = null;
-  private previousTouchAction = '';
-  private saved!: { position: V3; target: V3; fov: number };
-  private readonly nextPosition: V3 = [0, 0, 0];
-  private readonly nextTarget: V3 = [0, 0, 0];
-  private readonly changeEvent = { type: 'change' };
+  private altTarget: EventTargetLike | null = null;
+  private savedTouchAction: string | null = null;
+  private activeProfile: NavigationProfile | null = null;
+  private saved: { position: V3; target: V3; fov: number } = { position: [0, 0, 1], target: [0, 0, 0], fov: 60 };
+  // The camera vectors these controls write (never the caller's arrays).
+  private readonly ownPosition: V3 = [0, 0, 0];
+  private readonly ownTarget: V3 = [0, 0, 0];
 
   constructor(source: Camera | EngineKernel, element?: ControlElement | null) {
     super(source, element);
@@ -110,9 +151,11 @@ export class OrbitControls extends Controls {
     return 'orbit';
   }
 
-  protected bind(element: ControlElement) {
+  protected override bind(
+    element: ControlElement,
+  ): Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]> {
     if (element.style) {
-      this.previousTouchAction = element.style.touchAction;
+      this.savedTouchAction = element.style.touchAction;
       element.style.touchAction = 'none';
     }
     return [
@@ -123,474 +166,499 @@ export class OrbitControls extends Controls {
       [element, 'wheel', this.onWheel, { passive: false }],
       [element, 'contextmenu', this.onMenu],
       [element, 'mousedown', this.onMouseDown],
-    ] as Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
+    ];
   }
   protected override onDisconnect(): void {
     this.stopListenToKeyEvents();
-    this.altTarget?.removeEventListener('keyup', this.onAltUp);
-    this.altTarget = null;
-    for (const id of this.pointers.keys()) this.release(id);
-    this.pointers.clear();
+    this.disarmAlt();
+    this.releaseAll();
     this.state = 'none';
-    if (this.element?.style) this.element.style.touchAction = this.previousTouchAction;
+    const element = this.element;
+    if (element?.style && this.savedTouchAction !== null) element.style.touchAction = this.savedTouchAction;
+    this.savedTouchAction = null;
   }
-  /** Arrow keys pan (or rotate with ctrl, meta or shift). Pass `window` or a focusable element. */
+
+  /** Arrow keys pan (or rotate with Ctrl, Meta or Shift), plus the profile's keys. Pass `window` or a focusable element. */
   listenToKeyEvents(target: EventTargetLike): void {
     this.stopListenToKeyEvents();
     target.addEventListener('keydown', this.onKey);
     this.keyTarget = target;
   }
+  /** Stops listening for keys. */
   stopListenToKeyEvents(): void {
     this.keyTarget?.removeEventListener('keydown', this.onKey);
     this.keyTarget = null;
   }
 
-  /** The CAD navigation profile set with `setProfile`, or null for the defaults. */
+  /** The navigation profile last set, or null. */
   get profile(): NavigationProfile | null {
-    return this.nav;
+    return this.activeProfile;
   }
-  /**
-   * Uses a CAD tool's mouse, wheel, touch and key bindings: `orbit.setProfile(SOLIDWORKS)`. Sets `mouseButtons` (when the
-   * profile has no `drag` table), `touches` and `zoomToCursor`; `MARGO` restores the defaults. Returns the controls.
-   */
+  /** Applies a CAD tool's bindings (`MARGO` restores the defaults). Returns the controls. */
   setProfile(profile: NavigationProfile): this {
-    this.nav = profile;
+    this.activeProfile = profile;
     if (profile.mouseButtons) this.mouseButtons = { ...profile.mouseButtons };
     this.touches = { ...profile.touches };
     this.zoomToCursor = profile.zoomToCursor;
     return this;
   }
 
+  /** Polar angle in radians from +Y, in [0, PI]. */
   getPolarAngle(): number {
-    const o = this.offset();
-    return Math.acos(clamp(o[1] / Math.hypot(...o), -1, 1));
+    const o = this.offset(),
+      d = Math.hypot(o[0], o[1], o[2]);
+    return d ? Math.acos(clamp(o[1] / d, -1, 1)) : Math.PI / 2;
   }
+  /** Azimuth in radians, atan2(x, z) of position minus target, in (-PI, PI]. */
   getAzimuthalAngle(): number {
-    const o = this.offset();
-    return this.heading(o[0], o[1], o[2]);
+    const a = this.heading(this.offset());
+    return a === -Math.PI ? Math.PI : a;
   }
-  /** Azimuth of an offset; on an exact pole (a ViewCube top or bottom view) it comes from `camera.up`, the screen up. */
-  private heading(x: number, y: number, z: number): number {
-    if (x || z) return Math.atan2(x, z);
-    const up = this.camera.up,
-      s = y > 0 ? -1 : 1;
-    return Math.atan2(s * up[0], s * up[2]);
-  }
+  /** Distance from the camera to the target. */
   getDistance(): number {
-    return Math.hypot(...this.offset());
+    const o = this.offset();
+    return Math.hypot(o[0], o[1], o[2]);
   }
+  /** A copy of `camera.target`; assigning writes `camera.target`. */
   get target(): V3 {
-    return [...this.camera.target] as V3;
+    const t = this.camera.target;
+    return [t[0], t[1], t[2]];
   }
   set target(value: readonly number[]) {
     this.camera.target = [value[0], value[1], value[2]];
   }
 
+  /** Remembers the camera position, target and fov for `reset`. */
   saveState(): void {
-    this.saved = {
-      position: [...this.camera.position] as V3,
-      target: [...this.camera.target] as V3,
-      fov: this.camera.fov,
-    };
+    const c = this.camera;
+    this.saved = { position: [...c.position] as V3, target: [...c.target] as V3, fov: c.fov };
   }
+  /** Restores the saved state, drops pending motion and dispatches `change`. */
   reset(): void {
-    this.camera.position = [...this.saved.position];
-    this.camera.target = [...this.saved.target];
-    this.camera.fov = this.saved.fov;
-    this.dTheta = this.dPhi = 0;
-    this.dPan = [0, 0, 0];
-    this.dScale = 1;
+    const s = this.saved;
+    this.camera.fov = s.fov;
+    this.write(s.position, s.target);
+    this.clearPending();
     this.state = 'none';
     this.dispatchEvent({ type: 'change' });
   }
 
-  /** Rotates left by `angle` radians (positive moves the camera clockwise seen from above). */
+  /** Turns around the target; a positive angle moves the camera clockwise seen from above (azimuth decreases). */
   rotateLeft(angle: number): void {
-    this.dTheta -= angle;
+    this.turnAzimuth -= angle;
   }
+  /** Tilts around the target; a positive angle raises the camera toward +Y (polar angle decreases). */
   rotateUp(angle: number): void {
-    this.dPhi -= angle;
+    this.turnPolar -= angle;
   }
-  /** Pans by a screen delta in CSS pixels. */
+  /** Pans by a screen delta in CSS pixels; the scene follows the pointer. */
   pan(deltaX: number, deltaY: number): void {
-    const element = this.element,
-      height = Math.max(1, element?.clientHeight ?? 1);
     const b = basis(this.camera),
-      distance = b.ortho ?? b.distance * b.tanHalf;
-    this.dPan = madd(this.dPan, b.right, (-2 * deltaX * distance) / height);
-    const up = this.screenSpacePanning ? b.up : cross([0, 1, 0], b.right);
-    this.dPan = madd(this.dPan, up, (2 * deltaY * distance) / height);
+      half = b.ortho ?? b.distance * b.tanHalf,
+      perPixel = (2 * half) / Math.max(1, this.element?.clientHeight ?? 1);
+    const along = this.screenSpacePanning ? b.up : this.groundForward(b.right),
+      sx = -deltaX * perPixel,
+      sy = deltaY * perPixel,
+      t = this.shiftTarget;
+    for (let i = 0; i < 3; i++) t[i] += b.right[i] * sx + along[i] * sy;
   }
-  /** Multiplies the distance by `factor` (factor below 1 moves closer). */
+  /** Multiplies the pending distance scale by `factor` (below 1 moves closer). */
   dollyIn(factor: number): void {
-    this.dScale *= factor;
+    this.dollyScale *= factor;
   }
-  /** Divides the distance by `factor` (factor below 1 moves farther). */
+  /** Divides the pending distance scale by `factor` (below 1 moves farther). */
   dollyOut(factor: number): void {
-    this.dScale /= factor;
+    this.dollyScale /= factor;
   }
 
-  update(delta = 1 / 60): boolean {
-    const c = this.camera,
-      px = c.position[0],
-      py = c.position[1],
-      pz = c.position[2],
-      tx = c.target[0],
-      ty = c.target[1],
-      tz = c.target[2];
-    if (this.autoRotate && this.state === 'none') this.rotateLeft((-TAU / 60) * this.autoRotateSpeed * delta);
-    const f = this.enableDamping ? 1 - Math.pow(1 - clamp(this.dampingFactor, 0, 1), Math.max(0, delta) * 60) : 1;
-    const ox = px - tx,
+  /** Advances damping and auto-rotation by `delta` seconds (default 1/60). Returns true when the camera moved. */
+  override update(delta = 1 / 60): boolean {
+    const cam = this.camera,
+      p0 = cam.position,
+      t0 = cam.target;
+    const px = p0[0],
+      py = p0[1],
+      pz = p0[2],
+      tx = t0[0],
+      ty = t0[1],
+      tz = t0[2];
+    // Share of the pending motion applied now: dampingFactor per 1/60 s, compounded for other step lengths.
+    const f = this.enableDamping ? 1 - (1 - clamp(this.dampingFactor, 0, 1)) ** (60 * Math.max(0, delta)) : 1;
+    const spin = this.autoRotate && this.state === 'none' ? ((TAU * this.autoRotateSpeed) / 60) * delta : 0;
+    const dAzimuth = this.turnAzimuth * f,
+      dPolar = this.turnPolar * f;
+
+    // Spherical angles, read fresh from the camera. Position equal to the target falls back to the +Z side.
+    let ox = px - tx,
       oy = py - ty,
-      oz = pz - tz,
-      radius = Math.hypot(ox, oy, oz);
-    let theta = this.heading(ox, oy, oz) + this.dTheta * f,
-      phi = Math.acos(clamp(oy / radius, -1, 1)) + this.dPhi * f;
-    let min = this.minAzimuthAngle,
-      max = this.maxAzimuthAngle;
-    if (Number.isFinite(min) && Number.isFinite(max)) {
-      if (min < -Math.PI) min += TAU;
-      else if (min > Math.PI) min -= TAU;
-      if (max < -Math.PI) max += TAU;
-      else if (max > Math.PI) max -= TAU;
-      if (theta > Math.PI) theta -= TAU;
-      else if (theta < -Math.PI) theta += TAU;
-      theta =
-        min <= max ? clamp(theta, min, max) : theta > (min + max) / 2 ? Math.max(min, theta) : Math.min(max, theta);
+      oz = pz - tz;
+    const distance = Math.hypot(ox, oy, oz);
+    if (!distance) [ox, oy, oz] = [0, 0, 1];
+    const radius = distance || 1;
+    let theta = this.heading([ox, oy, oz]) + dAzimuth + spin,
+      phi = Math.acos(clamp(oy / radius, -1, 1)) + dPolar;
+    const startPhi = phi;
+
+    let azimuthClamped = false;
+    const lo = this.minAzimuthAngle,
+      hi = this.maxAzimuthAngle;
+    if (Number.isFinite(lo) && Number.isFinite(hi)) {
+      const min = shift(lo),
+        max = shift(hi),
+        wrapped = shift(theta);
+      let limited = wrapped;
+      if (min <= max) limited = clamp(wrapped, min, max);
+      else if (wrapped > max && wrapped < min) limited = wrapped < (max + min) / 2 ? max : min;
+      azimuthClamped = limited !== wrapped;
+      theta = limited;
     }
-    // Exact cardinal views are renderable with a nonparallel screen-up direction. Preserve their
-    // offset while only panning/dollying; the default +Y up and angular motion still need the safety gap.
-    const preservePole =
-      ox === 0 &&
-      oz === 0 &&
-      oy !== 0 &&
-      this.dTheta * f === 0 &&
-      this.dPhi * f === 0 &&
-      theta === this.heading(ox, oy, oz) &&
-      Math.hypot(c.up[0], c.up[2]) > 0 &&
-      phi >= this.minPolarAngle &&
-      phi <= this.maxPolarAngle;
-    phi = clamp(
-      clamp(phi, this.minPolarAngle, this.maxPolarAngle),
-      preservePole ? 0 : EPS,
-      preservePole ? Math.PI : Math.PI - EPS,
-    );
-    const target = this.nextTarget,
-      // A fixed-size orthographic view (@margoengine/cameras) does not scale with distance: no cursor pan.
-      cursorZoom =
-        this.zoomToCursor &&
-        this.cursor &&
-        this.dScale !== 1 &&
-        !(c as { fixedOrthographic?: boolean }).fixedOrthographic;
-    target[0] = tx + this.dPan[0] * f;
-    target[1] = ty + this.dPan[1] * f;
-    target[2] = tz + this.dPan[2] * f;
-    const next = this.clampDistance(radius * this.dScale),
-      s = preservePole ? 0 : Math.sin(phi);
-    const position = this.nextPosition;
-    position[0] = target[0] + next * s * Math.sin(theta);
-    position[1] = target[1] + next * Math.cos(phi);
-    position[2] = target[2] + next * s * Math.cos(theta);
-    if (cursorZoom) {
-      // Scale about the point under the cursor on the plane through the target facing the camera: the view
-      // direction is unchanged and that point keeps its pixel.
-      const b = basis({
-        position: add(target, [radius * s * Math.sin(theta), radius * Math.cos(phi), radius * s * Math.cos(theta)]),
-        target,
-        fov: c.fov,
-        up: c.up,
-      });
-      const element = this.element!,
-        hit = intersectPlane(
-          ray(b, this.cursor!.x, this.cursor!.y, Math.max(1, element.clientWidth), Math.max(1, element.clientHeight)),
-          target,
-          b.forward,
-        );
-      const k = next / radius;
+
+    const up = cam.up ?? [0, 1, 0],
+      vertical = ox === 0 && oz === 0 && oy !== 0,
+      polePhi = oy > 0 ? 0 : Math.PI;
+    const keepPole =
+      vertical &&
+      dAzimuth === 0 &&
+      dPolar === 0 &&
+      spin === 0 &&
+      !azimuthClamped &&
+      (up[0] !== 0 || up[2] !== 0) &&
+      polePhi >= this.minPolarAngle &&
+      polePhi <= this.maxPolarAngle;
+    if (!keepPole) phi = clamp(clamp(phi, this.minPolarAngle, this.maxPolarAngle), EPS, Math.PI - EPS);
+
+    const s = this.shiftTarget;
+    let nx = tx + s[0] * f,
+      ny = ty + s[1] * f,
+      nz = tz + s[2] * f;
+    const scale = this.dollyScale,
+      newDistance = clamp(distance * scale, Math.max(this.minDistance, EPS), this.maxDistance);
+
+    // Unit direction from the new target toward the camera.
+    let dx: number, dy: number, dz: number;
+    let qx: number, qy: number, qz: number;
+    const unturned =
+      distance > 0 && dAzimuth === 0 && dPolar === 0 && spin === 0 && !azimuthClamped && phi === startPhi;
+    if (keepPole || unturned) {
+      // No rotation: keep the exact offset direction (exact poles, and no rounding drift while idle).
+      const k = newDistance / distance;
+      [dx, dy, dz] = [ox / distance, oy / distance, oz / distance];
+      [qx, qy, qz] = [nx + ox * k, ny + oy * k, nz + oz * k];
+    } else {
+      const sp = Math.sin(phi);
+      [dx, dy, dz] = [sp * Math.sin(theta), Math.cos(phi), sp * Math.cos(theta)];
+      [qx, qy, qz] = [nx + dx * newDistance, ny + dy * newDistance, nz + dz * newDistance];
+    }
+
+    if (
+      this.zoomToCursor &&
+      this.cursor &&
+      scale !== 1 &&
+      !(cam as { fixedOrthographic?: boolean }).fixedOrthographic &&
+      distance > 0
+    ) {
+      const hit = this.cursorHit([nx, ny, nz], [nx + dx * distance, ny + dy * distance, nz + dz * distance]);
       if (hit) {
-        c.position = madd(hit, sub(b.position, hit), k);
-        c.target = madd(hit, sub(target, hit), k);
-      } else {
-        c.position = position;
-        c.target = target;
+        // Scale the view about the hit point: same direction, new distance, the hit keeps its pixel.
+        const k = newDistance / distance,
+          old: V3 = [nx + dx * distance, ny + dy * distance, nz + dz * distance];
+        qx = hit[0] + (old[0] - hit[0]) * k;
+        qy = hit[1] + (old[1] - hit[1]) * k;
+        qz = hit[2] + (old[2] - hit[2]) * k;
+        nx = hit[0] + (nx - hit[0]) * k;
+        ny = hit[1] + (ny - hit[1]) * k;
+        nz = hit[2] + (nz - hit[2]) * k;
       }
-    } else {
-      c.position = position;
-      c.target = target;
     }
+
+    this.write([qx, qy, qz], [nx, ny, nz]);
+
+    // Remaining motion.
     if (this.enableDamping) {
-      this.dTheta *= 1 - f;
-      this.dPhi *= 1 - f;
-      this.dPan[0] *= 1 - f;
-      this.dPan[1] *= 1 - f;
-      this.dPan[2] *= 1 - f;
-      if (Math.abs(this.dTheta) < 1e-10) this.dTheta = 0;
-      if (Math.abs(this.dPhi) < 1e-10) this.dPhi = 0;
-      if (dot(this.dPan, this.dPan) < 1e-20) this.dPan.fill(0);
+      const keep = 1 - f,
+        settle = PAN_SETTLE * Math.max(newDistance, 1);
+      this.turnAzimuth = Math.abs(this.turnAzimuth * keep) < ANGLE_SETTLE ? 0 : this.turnAzimuth * keep;
+      this.turnPolar = Math.abs(this.turnPolar * keep) < ANGLE_SETTLE ? 0 : this.turnPolar * keep;
+      for (let i = 0; i < 3; i++) s[i] *= keep;
+      if (Math.hypot(s[0], s[1], s[2]) < settle) s.fill(0);
     } else {
-      this.dTheta = this.dPhi = 0;
-      this.dPan.fill(0);
+      this.turnAzimuth = this.turnPolar = 0;
+      s.fill(0);
     }
-    this.dScale = 1;
-    const moved =
-      (px - c.position[0]) ** 2 + (py - c.position[1]) ** 2 + (pz - c.position[2]) ** 2 > EPS * EPS ||
-      (tx - c.target[0]) ** 2 + (ty - c.target[1]) ** 2 + (tz - c.target[2]) ** 2 > EPS * EPS;
-    if (moved) this.dispatchEvent(this.changeEvent);
+    this.dollyScale = 1;
+
+    const moved = Math.hypot(qx - px, qy - py, qz - pz) > EPS || Math.hypot(nx - tx, ny - ty, nz - tz) > EPS;
+    if (moved) this.dispatchEvent({ type: 'change' });
     return moved;
   }
 
+  // ---- geometry helpers ----
   private offset(): V3 {
-    return sub(this.camera.position, this.camera.target);
+    const p = this.camera.position,
+      t = this.camera.target;
+    return [p[0] - t[0], p[1] - t[1], p[2] - t[2]];
   }
-  private clampDistance(d: number): number {
-    return clamp(d, Math.max(this.minDistance, EPS), this.maxDistance);
+  /** Azimuth of an offset; at an exact pole it comes from camera.up (top: opposite its horizontal part, bottom: along it). */
+  private heading(o: readonly number[]): number {
+    if (o[0] !== 0 || o[2] !== 0) return Math.atan2(o[0], o[2]);
+    const up = this.camera.up ?? [0, 1, 0];
+    if (up[0] === 0 && up[2] === 0) return 0;
+    return o[1] > 0 ? Math.atan2(-up[0], -up[2]) : Math.atan2(up[0], up[2]);
   }
-  private zoomScale(delta: number): number {
-    return Math.pow(0.95, this.zoomSpeed * Math.abs(delta * 0.01));
+  /** Horizontal direction perpendicular to +Y and to the screen right (away from the camera). */
+  private groundForward(right: readonly number[]): V3 {
+    const x = right[2],
+      z = -right[0],
+      l = Math.hypot(x, z) || 1;
+    return [x / l, 0, z / l];
+  }
+  /** Where the cursor's perspective ray meets the plane through `target` facing a camera at `eye`, or null. */
+  private cursorHit(target: V3, eye: V3): V3 | null {
+    const cam = this.camera,
+      b = basis({ position: eye, target, fov: cam.fov, up: cam.up }),
+      width = Math.max(1, this.element?.clientWidth ?? 1),
+      height = Math.max(1, this.element?.clientHeight ?? 1),
+      c = this.cursor as { x: number; y: number };
+    return intersectPlane(ray(b, c.x, c.y, width, height), target, b.forward);
+  }
+  /** Writes the camera through its setters into vectors these controls own. */
+  private write(position: readonly number[], target: readonly number[]): void {
+    const p = this.ownPosition,
+      t = this.ownTarget;
+    for (let i = 0; i < 3; i++) {
+      p[i] = position[i];
+      t[i] = target[i];
+    }
+    this.camera.position = p;
+    this.camera.target = t;
+  }
+  private clearPending(): void {
+    this.turnAzimuth = this.turnPolar = 0;
+    this.shiftTarget.fill(0);
+    this.dollyScale = 1;
+  }
+  /** Radians for a drag of `pixels` CSS pixels. */
+  private turn(pixels: number): number {
+    return (TURN_PER_HEIGHT * this.rotateSpeed * pixels) / Math.max(1, this.element?.clientHeight ?? 1);
+  }
+  /** Distance scale for `pixels` of wheel or dolly drag (positive moves away); equal and opposite deltas cancel. */
+  private zoomScale(pixels: number): number {
+    return 2 ** ((this.zoomSpeed * pixels) / PIXELS_PER_DOUBLING);
   }
   private applyNow(): void {
-    if (!this.enableDamping) this.update(0);
+    this.update(0);
   }
-  private begin(state: Action): void {
+
+  // ---- pointer gestures ----
+  private begin(state: OrbitState): void {
     this.state = state;
     if (state !== 'none') this.dispatchEvent({ type: 'start' });
   }
-  private cancel(): void {
-    if (this.state !== 'none') this.dispatchEvent({ type: 'end' });
-    for (const id of this.pointers.keys()) this.release(id);
-    this.pointers.clear();
-    this.state = 'none';
+  private releaseAll(): void {
+    for (const id of this.tracked.keys()) this.release(id);
+    this.tracked.clear();
   }
+  private cancel(): void {
+    const active = this.state !== 'none';
+    this.releaseAll();
+    this.state = 'none';
+    if (active) this.dispatchEvent({ type: 'end' });
+  }
+  /** The gesture a mouse or pen press starts, or none. */
+  private mouseGesture(event: PointerEvent): Drag | null {
+    const table = this.activeProfile?.drag;
+    let action: Drag | null = null;
+    if (table) {
+      const bound = table[chord(event) + event.button];
+      if (bound === 'rotate-or-pan') action = basis(this.camera).ortho !== undefined ? 'pan' : 'rotate';
+      else action = bound ?? null;
+    } else {
+      const m = this.mouseButtons;
+      let value = event.button === 0 ? m.LEFT : event.button === 1 ? m.MIDDLE : event.button === 2 ? m.RIGHT : null;
+      if (event.ctrlKey || event.metaKey || event.shiftKey)
+        value = value === MOUSE.ROTATE ? MOUSE.PAN : value === MOUSE.PAN ? MOUSE.ROTATE : value;
+      action = value === MOUSE.ROTATE ? 'rotate' : value === MOUSE.DOLLY ? 'dolly' : value === MOUSE.PAN ? 'pan' : null;
+    }
+    if (action === 'rotate' && !this.enableRotate) return null;
+    if (action === 'dolly' && !this.enableZoom) return null;
+    if (action === 'pan' && !this.enablePan) return null;
+    return action;
+  }
+  private oneTouch(): OrbitState {
+    const one = this.touches.ONE;
+    if (one === TOUCH.ROTATE && this.enableRotate) return 'touch-rotate';
+    if (one === TOUCH.PAN && this.enablePan) return 'touch-pan';
+    return 'none';
+  }
+  private twoTouch(): OrbitState {
+    const two = this.touches.TWO;
+    if (two === TOUCH.DOLLY_PAN && (this.enableZoom || this.enablePan)) return 'touch-dolly-pan';
+    if (two === TOUCH.DOLLY_ROTATE && (this.enableZoom || this.enableRotate)) return 'touch-dolly-rotate';
+    return 'none';
+  }
+  /** Midpoint and spread of the first two tracked touches. */
+  private pair(): { x: number; y: number; spread: number } {
+    const [a, b] = [...this.tracked.values()];
+    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, spread: Math.hypot(a.x - b.x, a.y - b.y) };
+  }
+  /** Re-chooses the touch gesture after the number of touches changed. */
+  private retouch(): void {
+    if (this.state !== 'none') this.dispatchEvent({ type: 'end' });
+    this.state = 'none';
+    const count = this.tracked.size;
+    let next: OrbitState = 'none';
+    if (count === 1) {
+      const [p] = this.tracked.values();
+      this.last = { x: p.x, y: p.y, spread: 0 };
+      next = this.oneTouch();
+    } else if (count === 2) {
+      this.last = this.pair();
+      next = this.twoTouch();
+    }
+    this.begin(next);
+  }
+
+  private readonly onDown = (event: PointerEvent): void => {
+    if (!this.enabled) return;
+    const at = this.local(event);
+    if (event.pointerType === 'touch') {
+      for (const p of this.tracked.values()) if (!p.touch) return;
+      // Touch reservation: keep the first finger for a coming two-finger gesture, unless no touch gesture is usable.
+      if (this.oneTouch() === 'none' && this.twoTouch() === 'none') return;
+      this.capture(event.pointerId);
+      this.tracked.set(event.pointerId, { x: at.x, y: at.y, touch: true });
+      this.retouch();
+      return;
+    }
+    if (this.tracked.size) return;
+    const fitButton = this.activeProfile?.fitClick;
+    if (fitButton !== undefined && event.button === fitButton) {
+      const prev = this.lastPress,
+        time = event.timeStamp ?? 0;
+      if (
+        prev &&
+        prev.button === event.button &&
+        time - prev.time < FIT_CLICK_MS &&
+        Math.hypot(at.x - prev.x, at.y - prev.y) < FIT_CLICK_PX
+      ) {
+        this.lastPress = null;
+        this.dispatchEvent({ type: 'fit' });
+      } else this.lastPress = { button: event.button, time, x: at.x, y: at.y };
+    }
+    const gesture = this.mouseGesture(event);
+    if (!gesture) return;
+    if (event.altKey && this.activeProfile?.drag) this.armAlt();
+    this.capture(event.pointerId);
+    this.tracked.set(event.pointerId, { x: at.x, y: at.y, touch: false });
+    this.last = { x: at.x, y: at.y, spread: 0 };
+    this.cursor = { x: at.x, y: at.y };
+    this.begin(gesture);
+  };
+
+  private readonly onMove = (event: PointerEvent): void => {
+    if (!this.enabled) {
+      if (this.state !== 'none' || this.tracked.size) this.cancel();
+      return;
+    }
+    const p = this.tracked.get(event.pointerId);
+    if (!p) return;
+    const at = this.local(event);
+    p.x = at.x;
+    p.y = at.y;
+    const state = this.state;
+    if (
+      state === 'rotate' ||
+      state === 'touch-rotate' ||
+      state === 'pan' ||
+      state === 'touch-pan' ||
+      state === 'dolly'
+    ) {
+      const dx = at.x - this.last.x,
+        dy = at.y - this.last.y;
+      this.last = { x: at.x, y: at.y, spread: 0 };
+      if (state === 'rotate' || state === 'touch-rotate') {
+        this.rotateLeft(this.turn(dx));
+        this.rotateUp(this.turn(dy));
+      } else if (state === 'dolly') this.dollyScale *= this.zoomScale(dy);
+      else this.pan(dx * this.panSpeed, dy * this.panSpeed);
+    } else if ((state === 'touch-dolly-pan' || state === 'touch-dolly-rotate') && this.tracked.size === 2) {
+      const now = this.pair(),
+        before = this.last;
+      if (this.enableZoom && before.spread > 0 && now.spread > 0) {
+        this.cursor = { x: now.x, y: now.y };
+        this.dollyScale *= (before.spread / now.spread) ** this.zoomSpeed;
+      }
+      const dx = now.x - before.x,
+        dy = now.y - before.y;
+      if (state === 'touch-dolly-pan' && this.enablePan) this.pan(dx * this.panSpeed, dy * this.panSpeed);
+      else if (state === 'touch-dolly-rotate' && this.enableRotate) {
+        this.rotateLeft(this.turn(dx));
+        this.rotateUp(this.turn(dy));
+      }
+      this.last = now;
+    } else return;
+    if (!this.enableDamping) this.applyNow();
+  };
+
+  private readonly onUp = (event: PointerEvent): void => {
+    const p = this.tracked.get(event.pointerId);
+    if (!p) return;
+    this.release(event.pointerId);
+    this.tracked.delete(event.pointerId);
+    if (!this.tracked.size) {
+      if (this.state !== 'none') this.dispatchEvent({ type: 'end' });
+      this.state = 'none';
+    } else if (p.touch) this.retouch();
+  };
+
+  private readonly onWheel = (event: WheelEvent): void => {
+    if (!this.enabled || !this.enableZoom || this.state !== 'none') return;
+    event.preventDefault();
+    let pixels = event.deltaY * (event.deltaMode === 1 ? LINE_PIXELS : event.deltaMode === 2 ? PAGE_PIXELS : 1);
+    if (event.ctrlKey) pixels *= PINCH_BOOST;
+    else if (this.activeProfile?.wheel === -1) pixels = -pixels;
+    const at = this.local(event);
+    this.cursor = { x: at.x, y: at.y };
+    this.dispatchEvent({ type: 'start' });
+    this.dollyScale *= this.zoomScale(pixels);
+    this.applyNow();
+    this.dispatchEvent({ type: 'end' });
+  };
 
   private readonly onMenu = (event: Event): void => {
     if (this.enabled) event.preventDefault();
   };
-  private readonly onDown = (event: PointerEvent): void => {
-    if (!this.enabled) return;
-    const p = this.local(event);
-    if (event.pointerType === 'touch') {
-      // Reserve the first touch for an enabled two-touch gesture even when one-touch input is unbound.
-      if (this.touchAction(1) === 'none' && this.touchAction(2) === 'none') return;
-      this.capture(event.pointerId);
-      this.pointers.set(event.pointerId, p);
-      this.touchStart();
-      return;
-    }
-    if (this.pointers.size) return;
-    const nav = this.nav,
-      table = nav?.drag;
-    if (nav?.fitClick === event.button) {
-      // Double click: a second press within 400 ms and 6 px of the first.
-      const l = this.lastClick,
-        t = event.timeStamp;
-      if (l && t - l.t < 400 && Math.hypot(p.x - l.x, p.y - l.y) < 6) {
-        this.lastClick = null;
-        this.dispatchEvent({ type: 'fit' });
-      } else this.lastClick = { x: p.x, y: p.y, t };
-    }
-    let state: Action;
-    if (table) {
-      let drag = table[chord(event, event.button)];
-      if (drag === 'rotate-or-pan') drag = basis(this.camera).ortho ? 'pan' : 'rotate';
-      state =
-        drag === 'rotate' && this.enableRotate
-          ? 'rotate'
-          : drag === 'dolly' && this.enableZoom
-            ? 'dolly'
-            : drag === 'pan' && this.enablePan
-              ? 'pan'
-              : 'none';
-      if (state !== 'none' && event.altKey) {
-        // Releasing Alt after an Alt drag would open the menu bar in some browsers (Firefox on Windows): eat that keyup.
-        this.altDrag = true;
-        if (!this.altTarget) (this.altTarget = documentOf(this.element!)).addEventListener('keyup', this.onAltUp);
-      }
-    } else {
-      let action =
-        event.button === 0
-          ? this.mouseButtons.LEFT
-          : event.button === 1
-            ? this.mouseButtons.MIDDLE
-            : event.button === 2
-              ? this.mouseButtons.RIGHT
-              : null;
-      const modified = event.ctrlKey || event.metaKey || event.shiftKey;
-      if (action === MOUSE.ROTATE && modified) action = MOUSE.PAN;
-      else if (action === MOUSE.PAN && modified) action = MOUSE.ROTATE;
-      state =
-        action === MOUSE.ROTATE && this.enableRotate
-          ? 'rotate'
-          : action === MOUSE.DOLLY && this.enableZoom
-            ? 'dolly'
-            : action === MOUSE.PAN && this.enablePan
-              ? 'pan'
-              : 'none';
-    }
-    if (state === 'none') return;
-    this.capture(event.pointerId);
-    this.pointers.set(event.pointerId, p);
-    this.last = p;
-    this.cursor = p;
-    this.begin(state);
+  private readonly onMouseDown = (event: Event): void => {
+    if (this.activeProfile?.drag && this.state !== 'none') event.preventDefault();
   };
-  /** With a profile: a press that starts a gesture (e.g. middle drag) must not start autoscroll, text selection or a native drag. */
-  private readonly onMouseDown = (event: MouseEvent): void => {
-    if (this.nav?.drag && this.state !== 'none') event.preventDefault();
-  };
-  private readonly onAltUp = (event: KeyboardEvent): void => {
-    if (event.key === 'Alt' && this.altDrag) {
-      this.altDrag = false;
-      event.preventDefault();
-    }
-  };
-  private touchAction(count: number): Action {
-    if (count === 1) {
-      const action = this.touches.ONE;
-      return action === TOUCH.ROTATE && this.enableRotate
-        ? 'touch-rotate'
-        : action === TOUCH.PAN && this.enablePan
-          ? 'touch-pan'
-          : 'none';
-    }
-    if (count === 2) {
-      const action = this.touches.TWO;
-      return action === TOUCH.DOLLY_PAN && (this.enableZoom || this.enablePan)
-        ? 'touch-dolly-pan'
-        : action === TOUCH.DOLLY_ROTATE && (this.enableZoom || this.enableRotate)
-          ? 'touch-dolly-rotate'
-          : 'none';
-    }
-    return 'none';
-  }
-  private touchStart(): void {
-    const points = [...this.pointers.values()];
-    if (this.state !== 'none') this.dispatchEvent({ type: 'end' });
-    this.state = 'none';
-    if (points.length === 1) {
-      this.last = points[0];
-      this.begin(this.touchAction(1));
-    } else if (points.length === 2) {
-      this.last = mid(points[0], points[1]);
-      this.lastSpread = spread(points[0], points[1]);
-      this.begin(this.touchAction(2));
-    }
-  }
-  private readonly onMove = (event: PointerEvent): void => {
-    if (!this.enabled) {
-      if (this.state !== 'none' || this.pointers.size) this.cancel();
-      return;
-    }
-    if (!this.pointers.has(event.pointerId)) return;
-    const p = this.local(event);
-    this.pointers.set(event.pointerId, p);
-    const height = Math.max(1, this.element!.clientHeight);
-    const rotate = (dx: number, dy: number) => {
-      this.rotateLeft((TAU * dx * this.rotateSpeed) / height);
-      this.rotateUp((TAU * dy * this.rotateSpeed) / height);
-    };
-    const dolly = (factor: number, at: Point) => {
-      this.cursor = at;
-      if (factor > 1) this.dollyOut(factor);
-      else if (factor < 1) this.dollyIn(1 / factor);
-    };
-    switch (this.state) {
-      case 'rotate':
-      case 'touch-rotate':
-        rotate(p.x - this.last.x, p.y - this.last.y);
-        this.last = p;
-        break;
-      case 'pan':
-      case 'touch-pan':
-        this.pan((p.x - this.last.x) * this.panSpeed, (p.y - this.last.y) * this.panSpeed);
-        this.last = p;
-        break;
-      case 'dolly': {
-        const dy = p.y - this.last.y;
-        if (dy > 0) this.dollyOut(this.zoomScale(dy));
-        else if (dy < 0) this.dollyIn(this.zoomScale(dy));
-        this.last = p;
-        break;
-      }
-      case 'touch-dolly-pan':
-      case 'touch-dolly-rotate': {
-        const [a, b] = [...this.pointers.values()],
-          center = mid(a, b),
-          distance = spread(a, b);
-        if (this.enableZoom && this.lastSpread > 0 && distance > 0)
-          dolly(Math.pow(distance / this.lastSpread, this.zoomSpeed), center);
-        if (this.state === 'touch-dolly-pan' && this.enablePan)
-          this.pan((center.x - this.last.x) * this.panSpeed, (center.y - this.last.y) * this.panSpeed);
-        if (this.state === 'touch-dolly-rotate' && this.enableRotate)
-          rotate(center.x - this.last.x, center.y - this.last.y);
-        this.last = center;
-        this.lastSpread = distance;
-        break;
-      }
-      default:
-        return;
-    }
-    this.applyNow();
-  };
-  private readonly onUp = (event: PointerEvent): void => {
-    if (!this.pointers.delete(event.pointerId)) return;
-    this.release(event.pointerId);
-    if (!this.pointers.size) {
-      if (this.state !== 'none') this.dispatchEvent({ type: 'end' });
-      this.state = 'none';
-      return;
-    }
-    if (event.pointerType === 'touch') this.touchStart();
-  };
-  private readonly onWheel = (event: WheelEvent): void => {
-    if (!this.enabled || !this.enableZoom || this.state !== 'none') return;
-    event.preventDefault();
-    let delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 100 : 1);
-    if (event.ctrlKey)
-      delta *= 10; // trackpad pinch (never inverted)
-    else if (this.nav?.wheel === -1) delta = -delta;
-    this.cursor = this.local(event);
-    this.dispatchEvent({ type: 'start' });
-    if (delta < 0) this.dollyIn(this.zoomScale(delta));
-    else if (delta > 0) this.dollyOut(this.zoomScale(delta));
-    this.update(0);
-    this.dispatchEvent({ type: 'end' });
-  };
+
+  // ---- keyboard ----
   private readonly onKey = (event: KeyboardEvent): void => {
     if (!this.enabled) return;
-    const bound = this.nav?.keys?.[chord(event, event.code)];
+    const bound = this.activeProfile?.keys?.[chord(event) + event.code];
     if (bound) {
       event.preventDefault();
       this.keyAction(bound);
       return;
     }
-    const height = Math.max(1, this.element?.clientHeight ?? 1),
-      turn = (TAU * this.rotateSpeed) / height;
-    const rotate = (event.ctrlKey || event.metaKey || event.shiftKey) && this.enableRotate;
-    let handled = true;
-    switch (event.code ?? event.key) {
-      case this.keys.UP:
-        if (rotate) this.rotateUp(turn);
-        else if (this.enablePan) this.pan(0, this.keyPanSpeed);
-        break;
-      case this.keys.BOTTOM:
-        if (rotate) this.rotateUp(-turn);
-        else if (this.enablePan) this.pan(0, -this.keyPanSpeed);
-        break;
-      case this.keys.LEFT:
-        if (rotate) this.rotateLeft(turn);
-        else if (this.enablePan) this.pan(this.keyPanSpeed, 0);
-        break;
-      case this.keys.RIGHT:
-        if (rotate) this.rotateLeft(-turn);
-        else if (this.enablePan) this.pan(-this.keyPanSpeed, 0);
-        break;
-      default:
-        handled = false;
+    const code = event.code || event.key,
+      k = this.keys;
+    if (code !== k.UP && code !== k.BOTTOM && code !== k.LEFT && code !== k.RIGHT) return;
+    event.preventDefault();
+    if ((event.ctrlKey || event.metaKey || event.shiftKey) && this.enableRotate) {
+      const step = this.turn(1);
+      if (code === k.UP) this.rotateUp(step);
+      else if (code === k.BOTTOM) this.rotateUp(-step);
+      else if (code === k.LEFT) this.rotateLeft(step);
+      else this.rotateLeft(-step);
+    } else if (this.enablePan) {
+      const s = this.keyPanSpeed;
+      if (code === k.UP) this.pan(0, s);
+      else if (code === k.BOTTOM) this.pan(0, -s);
+      else if (code === k.LEFT) this.pan(s, 0);
+      else this.pan(-s, 0);
     }
-    if (handled) {
-      event.preventDefault();
-      this.update(0);
-    }
+    this.applyNow();
   };
   private keyAction(action: KeyAction): void {
     if (action === 'fit') {
@@ -598,29 +666,43 @@ export class OrbitControls extends Controls {
       return;
     }
     if (action === 'projection') {
-      // The engine's @margoengine/cameras CameraProjection, found by plugin name (as the ViewCube does).
-      const projection = (
-        this.engine as unknown as { plugins?: ReadonlyMap<string, { mode?: string }> } | null
-      )?.plugins?.get('cameras');
-      if (projection?.mode) projection.mode = projection.mode === 'orthographic' ? 'perspective' : 'orthographic';
+      const projection = (this.engine as { plugins?: ReadonlyMap<string, unknown> } | null)?.plugins?.get('cameras') as
+        | { mode?: string }
+        | undefined;
+      if (projection && typeof projection.mode === 'string')
+        projection.mode = projection.mode === 'perspective' ? 'orthographic' : 'perspective';
       return;
     }
-    // Snap to the view's spherical angles: the shortest turn, eased when damping is on.
-    const d = VIEWS[action],
-      o = this.offset(),
-      turn = (d[0] || d[2] ? Math.atan2(d[0], d[2]) : 0) - this.heading(o[0], o[1], o[2]);
-    this.dTheta = (((turn % TAU) + 3 * Math.PI) % TAU) - Math.PI;
-    this.dPhi = Math.acos(d[1] / Math.hypot(...d)) - Math.acos(clamp(o[1] / Math.hypot(...o), -1, 1));
+    const view = VIEWS[action];
+    if (!view) return;
+    const l = Math.hypot(view[0], view[1], view[2]),
+      heading = view[0] || view[2] ? Math.atan2(view[0], view[2]) : 0;
+    this.turnAzimuth = wrap(heading - this.getAzimuthalAngle());
+    this.turnPolar = Math.acos(view[1] / l) - this.getPolarAngle();
     this.applyNow();
   }
+
+  // ---- Alt keyup guard (stops the browser menu bar after an Alt drag) ----
+  private armAlt(): void {
+    if (this.altTarget || !this.element) return;
+    const target = documentOf(this.element);
+    target.addEventListener('keyup', this.onAltUp);
+    this.altTarget = target;
+  }
+  private disarmAlt(): void {
+    this.altTarget?.removeEventListener('keyup', this.onAltUp);
+    this.altTarget = null;
+  }
+  private readonly onAltUp = (event: KeyboardEvent): void => {
+    if (event.key !== 'Alt' && event.code !== 'AltLeft' && event.code !== 'AltRight') return;
+    event.preventDefault();
+    this.disarmAlt();
+  };
 }
 
-const mid = (a: Point, b: Point): Point => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
-const spread = (a: Point, b: Point): number => Math.hypot(a.x - b.x, a.y - b.y);
-
 /**
- * Map-style orbit: left drag pans along the ground plane, right drag rotates,
- * two fingers dolly and rotate.
+ * Map-style orbit controls: left drag pans on the ground plane, right drag rotates, middle drag dollies; one finger
+ * pans, two fingers dolly and rotate. Ctrl/Meta/Shift + left rotates.
  */
 export class MapControls extends OrbitControls {
   constructor(source: Camera | EngineKernel, element?: ControlElement | null) {

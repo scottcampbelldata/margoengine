@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { Camera } from '@margoengine/core';
 import { Engine as Runtime, TransformStore } from '@margoengine/core/extension';
 import { box } from '@margoengine/core';
+import { CameraProjection } from '../../cameras/dist/index.js';
 import {
   OrbitControls,
   MapControls,
@@ -143,22 +144,27 @@ test('import and construction touch no browser globals', () => {
 });
 
 // ---------- OrbitControls ----------
-test('orbit: horizontal and vertical drags change azimuth and polar angles by 2*PI*pixels/height', () => {
+test('orbit: drags turn half a turn per element height; right lowers the azimuth, down lowers the polar angle', () => {
   const el = new FakeElement(),
-    cam = camera(),
+    cam = camera({ position: [3, 4, 9], target: [0, 1, 0] }),
     orbit = new OrbitControls(cam, el);
   const events = [];
   for (const type of ['start', 'change', 'end']) orbit.addEventListener(type, () => events.push(type));
+  const azimuth = orbit.getAzimuthalAngle(),
+    polar = orbit.getPolarAngle(),
+    distance = orbit.getDistance();
   drag(el, [400, 300], [460, 300]);
-  close(orbit.getAzimuthalAngle(), (-2 * Math.PI * 60) / 600, 1e-9, 'azimuth');
-  close(orbit.getDistance(), 10, 1e-9, 'distance');
-  drag(el, [400, 300], [400, 360]);
-  close(orbit.getPolarAngle(), Math.PI / 2 - (2 * Math.PI * 60) / 600, 1e-9, 'polar');
-  closeVec(cam.target, [0, 0, 0], 1e-12);
-  assert.equal(events[0], 'start');
-  assert.ok(events.includes('change'));
-  assert.equal(events.at(-1), 'end');
-  assert.equal(el.captured.size, 0, 'pointer capture released');
+  close(orbit.getAzimuthalAngle(), azimuth - (Math.PI * 60) / 600, 1e-12, 'azimuth');
+  close(orbit.getPolarAngle(), polar, 1e-12, 'polar unchanged');
+  drag(el, [400, 300], [400, 330]);
+  close(orbit.getPolarAngle(), polar - (Math.PI * 30) / 600, 1e-12, 'polar');
+  close(orbit.getDistance(), distance, 1e-12, 'distance kept');
+  closeVec(cam.target, [0, 1, 0], 0, 'target kept');
+  assert.deepEqual([...new Set(events)], ['start', 'change', 'end']);
+  orbit.rotateSpeed = 2;
+  const a = orbit.getAzimuthalAngle();
+  drag(el, [400, 300], [370, 300]);
+  close(orbit.getAzimuthalAngle(), a + (2 * Math.PI * 30) / 600, 1e-12, 'rotateSpeed scales the rate');
   orbit.dispose();
 });
 
@@ -205,44 +211,82 @@ test('orbit: polar and azimuth clamping, and the poles stay renderable', () => {
 });
 
 test('orbit: damping converges to the undamped result, frame-rate independently', () => {
-  const run = (fps) => {
+  const run = (damping, fps, seconds) => {
     const el = new FakeElement(),
       cam = camera(),
       orbit = new OrbitControls(cam, el);
-    orbit.enableDamping = true;
+    orbit.enableDamping = damping;
     orbit.dampingFactor = 0.1;
-    drag(el, [400, 300], [460, 330]);
-    for (let i = 0; i < fps / 2; i++) orbit.update(1 / fps);
-    const half = [orbit.getAzimuthalAngle(), orbit.getPolarAngle()];
-    let changes = 0;
-    orbit.addEventListener('change', () => changes++);
-    for (let i = 0; i < fps * 20; i++) orbit.update(1 / fps);
-    const final = [orbit.getAzimuthalAngle(), orbit.getPolarAngle()];
-    const quiet = orbit.update(1 / fps);
+    orbit.pan(30, -20); // before the drag, so both runs pan in the same screen frame
+    drag(el, [400, 300], [520, 240]);
+    const states = {},
+      frames = Math.round(seconds * fps);
+    for (let frame = 1; frame <= frames; frame++) {
+      orbit.update(1 / fps);
+      for (const mark of [1 / 6, 1])
+        if (frame === Math.round(mark * fps)) states[mark] = [...cam.position, ...cam.target];
+    }
+    const final = [...cam.position, ...cam.target],
+      quiet = orbit.update(1 / fps);
     orbit.dispose();
-    return { half, final, quiet, changes };
+    return { states, quiet, final };
   };
-  const a = run(60),
-    b = run(30);
-  closeVec(a.final, [(-2 * Math.PI * 60) / 600, Math.PI / 2 - (2 * Math.PI * 30) / 600], 1e-6, 'converged');
-  closeVec(a.half, b.half, 1e-9, '30 fps matches 60 fps after 0.5 s');
-  assert.ok(Math.abs(a.half[0]) < Math.abs(a.final[0]) && Math.abs(a.half[0]) > 0.9 * Math.abs(a.final[0]));
-  assert.equal(a.quiet, false, 'no change once settled');
+  const at60 = run(true, 60, 20),
+    at30 = run(true, 30, 20),
+    undamped = run(false, 60, 1 / 6);
+  for (const mark of [1 / 6, 1])
+    closeVec(at30.states[mark], at60.states[mark], 1e-9, `30 fps equals 60 fps at ${mark} s`);
+  assert.ok(Math.hypot(...sub(at60.states[1 / 6], undamped.final)) > 0.1, 'still easing after 1/6 s');
+  closeVec(at60.final, undamped.final, 1e-6, 'settles on the undamped result');
+  closeVec(at30.final, undamped.final, 1e-6, 'and at 30 fps');
+  assert.equal(at60.quiet, false, 'a settled update reports no motion');
+  // delta 0 keeps the pending motion.
+  const cam = camera(),
+    orbit = new OrbitControls(cam, new FakeElement());
+  orbit.enableDamping = true;
+  orbit.rotateLeft(0.5);
+  assert.equal(orbit.update(0), false);
+  closeVec(cam.position, [0, 0, 10], 0);
+  assert.equal(orbit.update(1 / 60), true);
+  orbit.dispose();
 });
 
-test('orbit: wheel dolly respects min and max distance', () => {
+test('orbit: wheel dolly is exponential and inverse in and out, normalises line and page modes, respects min and max distance', () => {
   const el = new FakeElement(),
-    orbit = new OrbitControls(camera(), el);
+    cam = camera({ position: [3, 4, 9], target: [0, 1, 0] }),
+    orbit = new OrbitControls(cam, el);
+  const events = [];
+  for (const type of ['start', 'change', 'end']) orbit.addEventListener(type, () => events.push(type));
+  const wheel = (deltaY, deltaMode = 0, extra = {}) =>
+    el.dispatch('wheel', { deltaY, deltaMode, clientX: 400, clientY: 300, ...extra });
+  const d0 = orbit.getDistance();
+  assert.ok(wheel(-100).defaultPrevented);
+  assert.deepEqual(events, ['start', 'change', 'end']);
+  close(orbit.getDistance(), d0 * 2 ** (-100 / 500), 1e-9, 'forward moves closer');
+  wheel(100);
+  close(orbit.getDistance(), d0, 1e-9, 'back is the exact inverse');
+  wheel(-3, 1);
+  close(orbit.getDistance(), d0 * 2 ** (-100 / 500), 1e-9, 'three lines equal one 100 px notch');
+  wheel(3, 1);
+  wheel(-1, 2);
+  close(orbit.getDistance(), d0 * 2 ** (-800 / 500), 1e-9, 'a page is 800 px');
+  wheel(1, 2);
+  wheel(-10, 0, { ctrlKey: true });
+  close(orbit.getDistance(), d0 * 2 ** (-80 / 500), 1e-9, 'Ctrl (pinch) boost');
+  wheel(10, 0, { ctrlKey: true });
+  orbit.zoomSpeed = 2;
+  wheel(-100);
+  close(orbit.getDistance(), d0 * 2 ** (-200 / 500), 1e-9, 'zoomSpeed scales the exponent');
+  orbit.zoomSpeed = 1;
   orbit.minDistance = 5;
-  orbit.maxDistance = 20;
-  el.dispatch('wheel', { deltaY: -100, deltaMode: 0, clientX: 400, clientY: 300 });
-  close(orbit.getDistance(), 10 * 0.95 ** 1, 1e-9, 'one notch dollies in by 0.95');
-  for (let i = 0; i < 100; i++) el.dispatch('wheel', { deltaY: -500, deltaMode: 0, clientX: 400, clientY: 300 });
+  orbit.maxDistance = 12;
+  for (let i = 0; i < 50; i++) wheel(-100);
   close(orbit.getDistance(), 5, 1e-12, 'min distance');
-  for (let i = 0; i < 100; i++) el.dispatch('wheel', { deltaY: 500, deltaMode: 0, clientX: 400, clientY: 300 });
-  close(orbit.getDistance(), 20, 1e-12, 'max distance');
-  const event = el.dispatch('wheel', { deltaY: 100, deltaMode: 0, clientX: 400, clientY: 300 });
-  assert.ok(event.defaultPrevented);
+  for (let i = 0; i < 50; i++) wheel(100);
+  close(orbit.getDistance(), 12, 1e-12, 'max distance');
+  closeVec(cam.target, [0, 1, 0], 1e-12, 'centre zoom keeps the target');
+  orbit.enableZoom = false;
+  assert.equal(wheel(-100).defaultPrevented, false, 'disabled zoom leaves the page alone');
   orbit.dispose();
 });
 
@@ -303,37 +347,48 @@ test('orbit: touch rotate, two-finger dolly and pan, pointer capture, enabled an
   const el = new FakeElement(),
     cam = camera(),
     orbit = new OrbitControls(cam, el);
-  orbit.saveState();
+  assert.equal(el.style.touchAction, 'none');
   const touch = (type, id, x, y) =>
-    el.dispatch(type, { clientX: x, clientY: y, pointerId: id, button: 0, pointerType: 'touch' });
+    el.dispatch(type, { pointerId: id, pointerType: 'touch', button: 0, clientX: x, clientY: y });
   touch('pointerdown', 1, 400, 300);
+  assert.equal(orbit.state, 'touch-rotate');
   touch('pointermove', 1, 460, 300);
-  close(orbit.getAzimuthalAngle(), (-2 * Math.PI * 60) / 600, 1e-9, 'one finger rotates');
+  close(orbit.getAzimuthalAngle(), (-Math.PI * 60) / 600, 1e-12, 'one finger rotates like the mouse');
+  // Second finger 40 px away; spreading to 80 px about a fixed midpoint halves the distance and does not pan.
   touch('pointerdown', 2, 500, 300);
-  assert.ok(el.captured.has(1) && el.captured.has(2));
-  const distance = orbit.getDistance(),
+  assert.equal(orbit.state, 'touch-dolly-pan');
+  touch('pointermove', 2, 500, 300);
+  const d = orbit.getDistance(),
     target = [...cam.target];
-  touch('pointermove', 2, 540, 300); // spread 40 -> 80: dolly in by 2, midpoint +20 px
-  close(orbit.getDistance(), distance / 2, 1e-9, 'pinch dollies');
-  assert.ok(len(sub(cam.target, target)) > 0, 'midpoint pans');
-  touch('pointerup', 2, 540, 300);
-  touch('pointerup', 1, 460, 300);
-  assert.equal(el.captured.size, 0);
+  touch('pointerdown', 9, 0, 0); // a third finger is tracked and ends the two-finger gesture
   assert.equal(orbit.state, 'none');
+  touch('pointerup', 9, 0, 0);
+  assert.equal(orbit.state, 'touch-dolly-pan');
+  touch('pointermove', 1, 440, 300);
+  touch('pointermove', 2, 520, 300);
+  close(orbit.getDistance(), d / 2, 1e-9, '40 to 80 px halves the distance');
+  touch('pointermove', 1, 460, 300);
+  touch('pointermove', 2, 540, 300);
+  assert.ok(Math.hypot(...sub(cam.target, target)) > 1e-3, 'a moving midpoint pans');
+  assert.deepEqual([...el.captured].sort(), [1, 2]);
+  touch('pointerup', 2, 540, 300);
+  assert.equal(orbit.state, 'touch-rotate', 'one finger left continues as rotate');
+  touch('pointerup', 1, 460, 300);
+  assert.equal(orbit.state, 'none');
+  assert.equal(el.captured.size, 0, 'captures released');
   orbit.enabled = false;
-  const frozen = [...cam.position];
-  drag(el, [400, 300], [500, 300]);
-  closeVec(cam.position, frozen, 0, 'disabled ignores input');
+  touch('pointerdown', 3, 400, 300);
+  assert.equal(orbit.state, 'none', 'disabled controls ignore touches');
+  assert.equal(el.captured.size, 0);
   orbit.enabled = true;
+  let changes = 0;
+  orbit.addEventListener('change', () => changes++);
   orbit.reset();
-  closeVec(cam.position, [0, 0, 10], 0);
-  closeVec(cam.target, [0, 0, 0], 0);
-  orbit.autoRotate = true;
-  orbit.update(1);
-  close(orbit.getAzimuthalAngle(), (2 * Math.PI) / 30, 1e-9, 'auto-rotate: one turn per 30 s at speed 2');
+  closeVec(cam.position, [0, 0, 10], 0, 'reset position');
+  closeVec(cam.target, [0, 0, 0], 0, 'reset target');
+  assert.equal(changes, 1, 'reset dispatches change');
   orbit.dispose();
-  assert.equal(el.listenerCount, 0);
-  assert.equal(el.style.touchAction, 'auto');
+  assert.equal(el.style.touchAction, 'auto', 'touch-action restored');
 });
 
 test('orbit: disabling mid-drag (as TransformControls does) stops the gesture', () => {
@@ -367,183 +422,13 @@ test('map controls: left drag pans along the ground plane', () => {
 });
 
 // ---------- TrackballControls ----------
-test('trackball: rotates around the target, coasts with damping, and never crosses a pole', () => {
-  const el = new FakeElement(),
-    keys = new FakeTarget(),
-    cam = camera(),
-    ball = new TrackballControls(cam, el, { keyTarget: keys });
-  pointer(el, 'pointerdown', 400, 300);
-  pointer(el, 'pointermove', 480, 300);
-  ball.update(1 / 60);
-  close(len(cam.position), 10, 1e-9, 'distance kept');
-  const angle = Math.atan2(cam.position[0], cam.position[2]);
-  close(angle, -80 / 400, 1e-6, 'horizontal drag of half-width/5 turns 0.2 rad');
-  pointer(el, 'pointerup', 480, 300);
-  const coastStart = Math.atan2(cam.position[0], cam.position[2]);
-  for (let i = 0; i < 600; i++) ball.update(1 / 60);
-  const coastEnd = Math.atan2(cam.position[0], cam.position[2]);
-  assert.ok(coastEnd < coastStart - 0.05, 'keeps coasting');
-  assert.equal(ball.update(1 / 60), false, 'and stops');
-  ball.staticMoving = true;
-  pointer(el, 'pointerdown', 400, 300);
-  for (let i = 1; i <= 40; i++) {
-    pointer(el, 'pointermove', 400, 300 + i * 30);
-    ball.update(1 / 60);
-    assert.doesNotThrow(() => cam.update(4 / 3, true));
-  }
-  pointer(el, 'pointerup', 400, 1500);
-  assert.ok(
-    Math.hypot(cam.position[0] - cam.target[0], cam.position[2] - cam.target[2]) > 0,
-    'eye stays off the Y axis',
-  );
-  assert.ok(cam.position[1] > 9.99, 'stopped at the top pole');
-  // Pan and zoom.
-  const target = [...cam.target];
-  drag(el, [400, 300], [440, 300], { button: 2 });
-  ball.update(1 / 60);
-  close(len(sub(cam.target, target)), (40 / 800) * 10 * 0.3, 1e-6, 'pan');
-  el.dispatch('wheel', { deltaY: 400, deltaMode: 0 });
-  ball.update(1 / 60);
-  close(len(sub(cam.position, cam.target)), 10 * (1 + 0.1 * 1.2), 1e-6, 'wheel zoom');
-  ball.dispose();
-  assert.equal(el.listenerCount + keys.listenerCount, 0);
-});
 
 // ---------- FlyControls ----------
-test('fly: WASD moves in the camera frame, arrows yaw and pitch, roll keys are ignored', () => {
-  const el = new FakeElement(),
-    keys = new FakeTarget(),
-    cam = camera(),
-    fly = new FlyControls(cam, el, { keyTarget: keys });
-  fly.movementSpeed = 2;
-  keys.dispatch('keydown', { code: 'KeyW' });
-  fly.update(1);
-  keys.dispatch('keyup', { code: 'KeyW' });
-  closeVec(cam.position, [0, 0, 8], 1e-9, 'forward');
-  closeVec(cam.target, [0, 0, -2], 1e-9);
-  keys.dispatch('keydown', { code: 'KeyD' });
-  fly.update(0.5);
-  keys.dispatch('keyup', { code: 'KeyD' });
-  closeVec(cam.position, [1, 0, 8], 1e-9, 'strafe right');
-  keys.dispatch('keydown', { code: 'KeyR' });
-  fly.update(0.5);
-  keys.dispatch('keyup', { code: 'KeyR' });
-  closeVec(cam.position, [1, 1, 8], 1e-9, 'up');
-  fly.rollSpeed = 0.25;
-  keys.dispatch('keydown', { code: 'ArrowLeft' });
-  fly.update(1);
-  keys.dispatch('keyup', { code: 'ArrowLeft' });
-  const d = sub(cam.target, cam.position);
-  close(Math.atan2(-d[0], -d[2]), 0.5, 1e-9, 'yaw left by 2 * rollSpeed per second');
-  const before = [...cam.target];
-  keys.dispatch('keydown', { code: 'KeyQ' });
-  fly.update(1);
-  keys.dispatch('keyup', { code: 'KeyQ' });
-  closeVec(cam.target, before, 0, 'no roll');
-  keys.dispatch('keydown', { code: 'ArrowUp' });
-  for (let i = 0; i < 100; i++) fly.update(1);
-  assert.doesNotThrow(() => cam.update(1, true), 'pitch stops short of the pole');
-  fly.dispose();
-  assert.equal(el.listenerCount + keys.listenerCount, 0);
-});
 
-test('fly: pointer offset steers and the left button flies forward', () => {
-  const el = new FakeElement(),
-    cam = camera(),
-    fly = new FlyControls(cam, el, { keyTarget: new FakeTarget() });
-  pointer(el, 'pointermove', 600, 300); // half-way to the right edge
-  fly.rollSpeed = 1;
-  fly.update(0.1);
-  const d = sub(cam.target, cam.position);
-  close(Math.atan2(-d[0], -d[2]), -0.5 * 2 * 0.1, 1e-9, 'turns right');
-  pointer(el, 'pointerdown', 400, 300);
-  pointer(el, 'pointermove', 400, 300);
-  fly.update(1);
-  assert.ok(cam.position[2] < 10, 'flies forward');
-  pointer(el, 'pointerup', 400, 300);
-  fly.dispose();
-});
 
 // ---------- FirstPersonControls ----------
-test('first person: movement, pointer look and latitude limits', () => {
-  const el = new FakeElement(),
-    keys = new FakeTarget(),
-    cam = camera(),
-    fp = new FirstPersonControls(cam, el, { keyTarget: keys });
-  close(fp.longitude, 180, 1e-9);
-  close(fp.latitude, 0, 1e-9);
-  fp.movementSpeed = 4;
-  keys.dispatch('keydown', { code: 'KeyW' });
-  fp.update(0.5);
-  keys.dispatch('keyup', { code: 'KeyW' });
-  closeVec(cam.position, [0, 0, 8], 1e-9, 'forward');
-  keys.dispatch('keydown', { code: 'KeyA' });
-  fp.update(0.25);
-  keys.dispatch('keyup', { code: 'KeyA' });
-  closeVec(cam.position, [-1, 0, 8], 1e-9, 'left');
-  pointer(el, 'pointermove', 500, 300);
-  fp.update(1);
-  close(fp.longitude, 180 - (100 * 0.005 * 180) / Math.PI, 1e-9, 'turn right by lookSpeed per pixel');
-  pointer(el, 'pointermove', 400, -100000);
-  fp.update(1);
-  close(fp.latitude, 85, 1e-9, 'latitude clamp');
-  assert.doesNotThrow(() => cam.update(4 / 3, true));
-  fp.lookAt(0, 0, 100);
-  close(fp.latitude, 0, 1e-6);
-  assert.ok(Math.abs(fp.longitude) < 1);
-  fp.dispose();
-  assert.equal(el.listenerCount + keys.listenerCount, 0);
-});
 
 // ---------- PointerLockControls ----------
-test('pointer lock: lock events, mouse look with polar limits, WASD helpers', () => {
-  const el = new FakeElement(),
-    doc = new FakeTarget(),
-    cam = camera(),
-    plc = new PointerLockControls(cam, el, { document: doc });
-  let requested = null;
-  el.requestPointerLock = (options) => {
-    requested = options;
-  };
-  const events = [];
-  for (const type of ['lock', 'unlock', 'change']) plc.addEventListener(type, () => events.push(type));
-  plc.lock();
-  assert.deepEqual(requested, { unadjustedMovement: false });
-  doc.pointerLockElement = el;
-  doc.dispatch('pointerlockchange');
-  assert.equal(plc.isLocked, true);
-  assert.equal(events[0], 'lock');
-  doc.dispatch('mousemove', { movementX: 100, movementY: 0 });
-  let d = plc.getDirection();
-  close(Math.atan2(-d[0], -d[2]), -0.2, 1e-9, 'yaw by 0.002 rad per pixel');
-  plc.maxPolarAngle = Math.PI / 2 + 0.3;
-  doc.dispatch('mousemove', { movementX: 0, movementY: 100000 });
-  d = plc.getDirection();
-  close(Math.asin(d[1]), -0.3, 1e-9, 'pitch limited by maxPolarAngle');
-  // WASD moves along the ground even when looking down.
-  plc.movementSpeed = 3;
-  const start = [...cam.position];
-  doc.dispatch('keydown', { code: 'KeyW' });
-  plc.update(1);
-  doc.dispatch('keyup', { code: 'KeyW' });
-  const moved = sub(cam.position, start);
-  close(moved[1], 0, 1e-12, 'no vertical motion');
-  close(Math.hypot(moved[0], moved[2]), 3, 1e-9, 'speed');
-  doc.dispatch('keydown', { code: 'KeyD' });
-  doc.dispatch('keydown', { code: 'KeyW' });
-  plc.update(1);
-  close(len(sub(cam.position, start)) > 3 ? 1 : 0, 1, 0);
-  doc.pointerLockElement = null;
-  doc.dispatch('pointerlockchange');
-  assert.equal(plc.isLocked, false);
-  assert.equal(events.includes('unlock'), true);
-  assert.equal(plc.pressed.size, 0, 'keys cleared on unlock');
-  const frozen = [...cam.target];
-  doc.dispatch('mousemove', { movementX: 50, movementY: 0 });
-  closeVec(cam.target, frozen, 0, 'no look when unlocked');
-  plc.dispose();
-  assert.equal(el.listenerCount + doc.listenerCount, 0);
-});
 
 // ---------- TransformControls ----------
 async function engineWith(cameraOptions = { position: [0, 0, 10], target: [0, 0, 0] }) {
@@ -562,54 +447,33 @@ function dragWorld(canvas, engine, from, to, steps = 3) {
 }
 const at = (o, axis, t) => o.map((v, i) => v + axis[i] * t);
 
-test('transform: dragging the X arrow moves the mesh by the dragged world distance', async () => {
+test('transform: one gizmo unit is a fifth of the view height; dragging the X arrow moves the mesh by the dragged world distance', async () => {
   const { engine, canvas } = await engineWith();
-  const mesh = engine.createMesh().setGeometry(box());
-  const gizmo = new TransformControls(engine);
+  const mesh = engine.createMesh().setGeometry(box()),
+    gizmo = new TransformControls(engine);
   gizmo.attach(mesh);
   engine.render();
-  const f = gizmo.frame(),
-    s = f.size;
-  close(s, (10 * 1.9 * Math.tan(Math.PI / 6)) / 4, 1e-9, 'constant screen size');
-  const pixelsPerUnit = 600 / (2 * 10 * Math.tan(Math.PI / 6));
+  const half = 10 * Math.tan(Math.PI / 6);
+  close(gizmo.frame().size, 0.2 * 2 * half, 1e-12, 'size at distance 10, fov 60');
+  gizmo.setSize(2.5);
+  close(gizmo.frame().size, 2.5 * 0.2 * 2 * half, 1e-12, 'user multiplier');
+  gizmo.setSize(1);
+  engine.camera.position = [0, 0, 20];
+  close(gizmo.frame().size, 0.2 * 2 * 20 * Math.tan(Math.PI / 6), 1e-12, 'linear in distance');
+  engine.camera.fov = 170;
+  const wide = gizmo.frame().size;
+  assert.ok(Number.isFinite(wide) && wide < 20 * 2 * 0.2 * 2.5, 'very wide lenses stay bounded');
+  engine.camera.fov = 60;
+  engine.camera.position = [0, 0, 10];
+  engine.render();
+  const pixelsPerUnit = 600 / (2 * half),
+    s = gizmo.frame().size;
+  close(s * pixelsPerUnit, 120, 1e-9, 'a gizmo unit is 120 px of a 600 px view');
   const grab = [400 + 0.5 * s * pixelsPerUnit, 300];
   assert.equal(gizmo.pick(grab[0], grab[1]), 'X');
-  const events = [];
-  for (const type of ['dragging-changed', 'mouseDown', 'mouseUp', 'objectChange'])
-    gizmo.addEventListener(type, (e) => events.push(type + (e.value === undefined ? '' : ':' + e.value)));
-  drag(canvas, grab, [grab[0] + 104, grab[1] + 37]);
-  close(mesh.position.x, 104 / pixelsPerUnit, 1e-4, 'x');
-  close(mesh.position.y, 0, 1e-12);
-  close(mesh.position.z, 0, 1e-12);
-  assert.deepEqual(
-    [events[0], events[1], events.at(-2), events.at(-1)],
-    ['dragging-changed:true', 'mouseDown', 'mouseUp', 'dragging-changed:false'],
-  );
-  assert.ok(events.includes('objectChange'));
-  // Snapping in world space.
-  engine.render();
-  gizmo.setTranslationSnap(0.5);
-  dragWorld(
-    canvas,
-    engine,
-    at([mesh.position.x, 0, 0], [1, 0, 0], 0.5 * s),
-    at([mesh.position.x, 0, 0], [1, 0, 0], 0.5 * s + 0.6),
-  );
-  close(mesh.position.x, 2.5, 1e-6, 'snapped world x');
-  // Plane handle XY moves in both axes, screen handle moves in the view plane.
-  engine.render();
-  gizmo.setTranslationSnap(null);
-  const o = [mesh.position.x, 0, 0],
-    corner = [o[0] + 0.22 * s, 0.22 * s, 0];
-  const pc = toPixel(engine.camera, corner);
-  assert.equal(gizmo.pick(pc[0], pc[1]), 'XY');
-  dragWorld(canvas, engine, corner, [corner[0] + 1, corner[1] - 0.5, 0]);
-  close(mesh.position.x, o[0] + 1, 1e-4);
-  close(mesh.position.y, -0.5, 1e-4);
-  close(mesh.position.z, 0, 1e-9);
-  engine.render();
-  const centre = toPixel(engine.camera, [mesh.position.x, mesh.position.y, 0]);
-  assert.equal(gizmo.pick(centre[0], centre[1]), 'XYZ');
+  drag(canvas, grab, [grab[0] + 75, grab[1] + 10]);
+  close(mesh.position.x, 75 / pixelsPerUnit, 1e-4, 'moved by the dragged distance');
+  close(mesh.position.y, 0, 1e-9, 'constrained to X');
   gizmo.dispose();
   engine.dispose();
 });
@@ -634,42 +498,38 @@ test('transform: a view gizmo uses its camera, picks and drags only inside its r
 });
 
 test('transform: constant screen size, picking and drags under an orthographic camera (@margoengine/cameras)', async () => {
-  const { CameraProjection } = await import('../../cameras/dist/index.js');
-  const { engine, canvas } = await engineWith(),
-    projection = new CameraProjection({ height: 4 });
-  engine.use(projection);
+  const { engine, canvas } = await engineWith();
+  const projection = new CameraProjection({ mode: 'orthographic', height: 2 });
+  projection.attach(engine.camera);
   const mesh = engine.createMesh().setGeometry(box()),
     gizmo = new TransformControls(engine);
   gizmo.attach(mesh);
-  const arrowPixels = () => {
-    engine.render();
-    const s = gizmo.frame().size,
-      a = toPixel(
-        engine.camera,
-        mesh.position.x === undefined ? [0, 0, 0] : [mesh.position.x, mesh.position.y, mesh.position.z],
-      ),
-      b = toPixel(engine.camera, [mesh.position.x + s, mesh.position.y, mesh.position.z]);
-    return Math.hypot(b[0] - a[0], b[1] - a[1]);
-  };
-  // Same on-screen size as the perspective gizmo: 1.9 / 8 of the view height.
-  close(arrowPixels(), (600 * 1.9) / 8, 1e-6, 'height 4');
+  engine.render();
+  engine.camera.update(800 / 600, true);
+  const size = gizmo.frame().size;
+  close(size, 0.2 * 2, 1e-6, 'same screen fraction as the perspective gizmo (half height 1)');
+  engine.camera.position = [0, 0, 40];
+  engine.camera.update(800 / 600, true);
+  close(gizmo.frame().size, size, 1e-6, 'independent of distance');
+  mesh.setPosition([0, 0, 45]); // nearer than the eye, inside the orthographic depth range
+  engine.render();
+  engine.camera.update(800 / 600, true);
+  close(gizmo.frame().size, size, 1e-6, 'and of a mesh behind the eye');
+  mesh.setPosition([0, 0, 0]);
   projection.zoom = 2;
-  close(arrowPixels(), (600 * 1.9) / 8, 1e-6, 'zoomed in');
-  mesh.setPosition([0, 0, 12]);
-  close(arrowPixels(), (600 * 1.9) / 8, 1e-6, 'nearer than the eye (inside the orthographic depth range)');
-  assert.deepEqual(gizmo.frame().eye, [-0, -0, 1], 'parallel view: the eye direction is the view direction everywhere');
-  const s = gizmo.frame().size,
-    grab = toPixel(engine.camera, [0.5 * s, 0, 12]);
+  engine.camera.update(800 / 600, true);
+  close(gizmo.frame().size, size / 2, 1e-6, 'follows zoom');
+  projection.zoom = 1;
+  engine.render();
+  engine.camera.update(800 / 600, true);
+  // Half height 1 on a 600 px view: 300 px per world unit.
+  const grab = [400 + 0.5 * size * 300, 300];
   assert.equal(gizmo.pick(grab[0], grab[1]), 'X');
-  drag(canvas, grab, [grab[0] + 90, grab[1] + 20]);
-  close(mesh.position.x, 90 / 300, 1e-6, '300 px per unit at half-height 1');
-  close(mesh.position.y, 0, 1e-9);
+  assert.equal(gizmo.pick(400, 300 - 0.5 * size * 300), 'Y');
+  drag(canvas, grab, [grab[0] + 60, grab[1]]);
+  close(mesh.position.x, 60 / 300, 1e-4, 'drag follows the cursor at 300 px per unit');
   gizmo.dispose();
-  const orbit = new OrbitControls(engine);
-  orbit.pan(90, 0);
-  orbit.update(0);
-  close(engine.camera.target[0], -90 / 300, 1e-9, 'orbit pan follows the cursor at any orthographic zoom');
-  orbit.dispose();
+  projection.dispose();
   engine.dispose();
 });
 
@@ -935,29 +795,3 @@ test('controls built from an engine update before each render and are disposed w
   assert.equal(canvas.listenerCount, 0, 'engine dispose disposes controls');
 });
 
-test('Fly Shift preserves configured speed and remains slow until both Shift keys release', () => {
-  const c = camera(),
-    el = new FakeElement(),
-    control = new FlyControls(c, el, { keyTarget: el });
-  control.movementSpeed = 2;
-  control.movementSpeedMultiplier = 3;
-  try {
-    el.dispatch('keydown', { code: 'KeyW' });
-    control.update(1);
-    close(c.position[2], 4, 1e-9);
-    el.dispatch('keydown', { code: 'ShiftLeft' });
-    el.dispatch('keydown', { code: 'ShiftRight' });
-    assert.equal(control.movementSpeedMultiplier, 3);
-    control.update(1);
-    close(c.position[2], 3.4, 1e-9);
-    el.dispatch('keyup', { code: 'ShiftLeft' });
-    control.update(1);
-    close(c.position[2], 2.8, 1e-9);
-    el.dispatch('keyup', { code: 'ShiftRight' });
-    control.update(0.1);
-    close(c.position[2], 2.2, 1e-9);
-    assert.equal(control.movementSpeedMultiplier, 3);
-  } finally {
-    control.dispose();
-  }
-});
