@@ -26,11 +26,6 @@ export const dot = (a: readonly number[], b: readonly number[]): number => {
   return s;
 };
 const length = (a: readonly number[]): number => Math.sqrt(dot(a, a));
-export const distance = (a: readonly number[], b: readonly number[]): number => {
-  let s = 0;
-  for (let i = 0; i < a.length; i++) s += (a[i] - b[i]) ** 2;
-  return Math.sqrt(s);
-};
 export const equals = (a: readonly number[], b: readonly number[]): boolean =>
   a.length === b.length && a.every((x, i) => x === b[i]);
 export const normalize = <V extends Vec>(a: V): V => {
