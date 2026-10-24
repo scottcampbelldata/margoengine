@@ -2,12 +2,19 @@
 // Run: node examples/package-benchmarks/proofs/decoders.proof.js [ref] [pin]
 // Pinned: f05414a against f47ff3f, the commit that recorded results/decoders.json, so the run never depends on today's tree.
 import assert from 'node:assert/strict';
-import { MeshoptEncoder } from 'meshoptimizer';
+import {
+  encodeAttributes,
+  encodeIndexSequence,
+  encodeTriangles,
+  exponentialFilter,
+  octahedralFilter,
+  quaternionFilter,
+} from '../../../packages/decoders/tests/support/meshopt-encode.js';
 import { refs, versions, time, record, fileAt } from './compare.js';
 
 const { ref, pin } = refs('f05414a', 'f47ff3f'),
   { baseline, candidate } = await versions('decoders', ref, 'src/meshopt.ts', pin);
-await MeshoptEncoder.ready; // the reference encoder only produces the inputs
+// The repository's test encoder only produces the inputs; both decoders are compared on them.
 const outcome = (operation) => {
   try {
     return { value: operation() };
@@ -55,8 +62,7 @@ for (let y = 0, i = 0; y < side; y++)
     rotations.set([Math.sin(a / 2) * n[0], Math.sin(a / 2) * n[1], Math.sin(a / 2) * n[2], Math.cos(a / 2)], i * 4);
   }
 const bytes = (view) => new Uint8Array(view.buffer, view.byteOffset, view.byteLength),
-  attributes = (data, stride) =>
-    MeshoptEncoder.encodeVertexBufferLevel(bytes(data), data.byteLength / stride, stride, 2, 0);
+  attributes = (data, stride) => encodeAttributes(bytes(data), data.byteLength / stride, stride);
 // Noise does not compress, so its groups take the widest (raw 16-byte) encoding.
 const noise = Uint8Array.from({ length: count * 16 }, (_, i) => Math.imul(i, 2654435761) >>> 13),
   indices32 = Uint32Array.from(faces),
@@ -65,7 +71,7 @@ const streams = [
   ['positions (16-bit, stride 8)', attributes(positions, 8), count, 8, 'ATTRIBUTES'],
   [
     'normals OCTAHEDRAL 8-bit',
-    attributes(MeshoptEncoder.encodeFilterOct(normals, count, 4, 8), 4),
+    attributes(octahedralFilter(normals, count, 4, 8), 4),
     count,
     4,
     'ATTRIBUTES',
@@ -73,7 +79,7 @@ const streams = [
   ],
   [
     'normals OCTAHEDRAL 16-bit',
-    attributes(MeshoptEncoder.encodeFilterOct(normals, count, 8, 12), 8),
+    attributes(octahedralFilter(normals, count, 8, 12), 8),
     count,
     8,
     'ATTRIBUTES',
@@ -82,42 +88,17 @@ const streams = [
   ['uvs (stride 4)', attributes(uvs, 4), count, 4, 'ATTRIBUTES'],
   [
     'float positions EXPONENTIAL',
-    attributes(MeshoptEncoder.encodeFilterExp(floats, count, 12, 15), 12),
+    attributes(exponentialFilter(floats, count, 12, 15), 12),
     count,
     12,
     'ATTRIBUTES',
     'EXPONENTIAL',
   ],
-  [
-    'rotations QUATERNION',
-    attributes(MeshoptEncoder.encodeFilterQuat(rotations, count, 8, 12), 8),
-    count,
-    8,
-    'ATTRIBUTES',
-    'QUATERNION',
-  ],
+  ['rotations QUATERNION', attributes(quaternionFilter(rotations, count, 12), 8), count, 8, 'ATTRIBUTES', 'QUATERNION'],
   ['incompressible attributes (stride 16)', attributes(noise, 16), count, 16, 'ATTRIBUTES'],
-  [
-    'triangles 32-bit',
-    MeshoptEncoder.encodeIndexBuffer(bytes(indices32), indices32.length, 4),
-    indices32.length,
-    4,
-    'TRIANGLES',
-  ],
-  [
-    'triangles 16-bit',
-    MeshoptEncoder.encodeIndexBuffer(bytes(indices16), indices16.length, 2),
-    indices16.length,
-    2,
-    'TRIANGLES',
-  ],
-  [
-    'index sequence',
-    MeshoptEncoder.encodeIndexSequence(bytes(indices32), indices32.length, 4),
-    indices32.length,
-    4,
-    'INDICES',
-  ],
+  ['triangles 32-bit', encodeTriangles(indices32), indices32.length, 4, 'TRIANGLES'],
+  ['triangles 16-bit', encodeTriangles(indices16), indices16.length, 2, 'TRIANGLES'],
+  ['index sequence', encodeIndexSequence(indices32), indices32.length, 4, 'INDICES'],
 ];
 for (const [name, source, n, stride, mode, filter] of streams) {
   agree(name, source, n, stride, mode, filter);

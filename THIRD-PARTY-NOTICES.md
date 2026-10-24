@@ -170,7 +170,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 
 ## Development and workspace tooling (never shipped)
 
-`package-lock.json` holds 188 third-party entries (build tools, test tools, the examples' and apps' own
-dependencies, platform-optional binaries). Licences: MIT 95, Apache-2.0 45, MPL-2.0 13, LGPL-3.0-or-later 10, MIT OR Apache-2.0 9, ISC 4, Apache-2.0 AND LGPL-3.0-or-later 3, BSD-2-Clause 2, BSD-3-Clause 2, 0BSD 1, Apache-2.0 AND LGPL-3.0-or-later AND MIT 1, CC-BY-4.0 1, LGPL-2.1 1, MIT-0 1.
+`package-lock.json` holds 187 third-party entries (build tools, test tools, the examples' and apps' own
+dependencies, platform-optional binaries). Licences: MIT 94, Apache-2.0 45, MPL-2.0 13, LGPL-3.0-or-later 10, MIT OR Apache-2.0 9, ISC 4, Apache-2.0 AND LGPL-3.0-or-later 3, BSD-2-Clause 2, BSD-3-Clause 2, 0BSD 1, Apache-2.0 AND LGPL-3.0-or-later AND MIT 1, CC-BY-4.0 1, LGPL-2.1 1, MIT-0 1.
 Install scripts anywhere in the lock: fsevents@2.3.3. Deprecated: whatwg-encoding@3.1.1. CI and releases install with `npm ci`, which refuses a lockfile that does not match `package.json` and checks
 every tarball against its integrity hash.

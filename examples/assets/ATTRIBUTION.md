@@ -10,15 +10,15 @@ GitHub's asset server. The original GLBs retain their geometry, materials and an
   CC0 1.0 Universal (© 2018, Public; conversion from Maya credited to Gary Hsu). Credit is a courtesy; CC0 does not
   require it. Derived from `khronos/FlightHelmet/` (glTF + PNG, see `khronos/README.md` in the repository): all
   94,722 triangles, 1024-pixel JPEG maps, quantized normals/tangents/UVs (`KHR_mesh_quantization`).
-- `flight-helmet-mobile.glb`: the same helmet with 512-pixel JPEG maps and 20,734 triangles (meshoptimizer,
-  normal/UV-aware, error bound 0.005). Also CC0.
+- `flight-helmet-mobile.glb`: the same helmet with 512-pixel JPEG maps and 20,734 triangles, simplified earlier with
+  meshoptimizer (normal/UV-aware, error bound 0.005) and kept as committed. Also CC0.
 
 - `tokyo-diorama.glb`: original work for Margo Engine (MIT), built by `npm run build:tokyo`. Its baked textures use
   Poly Haven CC0 textures and its lettering uses Noto Sans CJK (SIL OFL 1.1). See [its credits](tokyo-diorama-CREDITS.md).
 
-Regenerate both helmet GLBs with `node scripts/optimize-demo-assets.js`. This uses
-the image and mesh tools already installed in this workspace and validates each GLB
-(Khronos glTF-Validator: 0 errors, 0 warnings).
+Regenerate the desktop helmet GLB with `node scripts/optimize-demo-assets.js`. This uses
+the image tools already installed in this workspace and validates the GLB
+(Khronos glTF-Validator: 0 errors, 0 warnings). The phone GLB is not regenerated.
 
 ## Internal tests and benchmarks only (not served on margoengine.com)
 

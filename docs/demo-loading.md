@@ -105,8 +105,9 @@ The full request timings, per-run hardware information and samples are written t
 Pass selected production paths to benchmark just those demos; that writes
 `test-results/demo-loads-focused.json`. The subject regression writes
 `test-results/demo-subject-report.json` and captures complete-scene images.
-`node scripts/optimize-demo-assets.js` regenerates the checked-in phone assets using
-the workspace's installed sharp, meshoptimizer and gltf-validator tools.
+`node scripts/optimize-demo-assets.js` regenerates the checked-in Earth phone assets and
+the desktop helmet using the workspace's installed sharp and gltf-validator tools; the
+phone helmet was simplified earlier and is kept as committed.
 
 The Planet unit tests cover concurrent requests, sibling failure, late decode
 cleanup, caller cancellation, GPU validation failures and device restoration.

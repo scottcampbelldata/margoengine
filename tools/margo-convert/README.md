@@ -59,9 +59,9 @@ const model = await loadGLTF(engine, '/assembly.glb'); // or @margoengine/gltf-p
   same edges at load, about 1 ms per 1,000 distinct triangles in Node (1.8 ms for `as1-oc-214`'s 1,996, 4.0 ms for
   4,348; diagnostic, busy machine), so baking only pays off for models with hundreds of thousands of distinct triangles
   once `FeatureEdges` takes precomputed edges.
-- **Not written:** Draco or meshopt compression. No Draco encoder is installed; meshoptimizer's encoder is in
-  `node_modules` only through `@types/three`, so `--meshopt` would mean a new dependency (meshoptimizer, MIT) and
-  gltf-pro's meshopt decoder at load time. Serve the GLB with gzip or brotli instead.
+- **Not written:** Draco or meshopt compression. No Draco encoder is installed, and the repository's meshopt encoder
+  (`packages/decoders/tests/support/meshopt-encode.js`) is a test tool, so `--meshopt` would mean a production encoder
+  and gltf-pro's meshopt decoder at load time. Serve the GLB with gzip or brotli instead.
 
 ## Why a separate package
 

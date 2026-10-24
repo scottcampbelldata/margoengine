@@ -1,10 +1,11 @@
-// Regenerate the checked-in desktop Earth and phone assets and the demo helmet GLBs with installed sharp.
+// Regenerate the checked-in desktop Earth and phone assets and the desktop demo helmet GLB with installed sharp.
+// The phone helmet (examples/assets/flight-helmet-mobile.glb) was simplified earlier with another tool and is kept as
+// committed: there is no mesh simplifier here to rebuild it.
 import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import sharp from 'sharp';
 import validator from 'gltf-validator';
-import { MeshoptSimplifier } from 'meshoptimizer';
 
 const earth = 'packages/creative/examples/earth/assets/';
 for (const [source, target, lossless, desktopTarget] of [
@@ -46,8 +47,8 @@ for (const [source, target, lossless, desktopTarget] of [
 
 // Packs a .gltf with external files (one buffer, no animation) into a web GLB: JPEG textures fitted to maxSize (colour
 // maps at quality[0], data maps at quality[1], 4:4:4), duplicate vertices welded, normals/tangents/UVs quantized
-// (KHR_mesh_quantization) and, for ratio < 1, every primitive simplified by meshoptimizer (normal/UV-aware, error <= 0.005).
-async function packGLTF(source, target, { maxSize, ratio = 1, quality = [85, 90] }) {
+// (KHR_mesh_quantization), and vertices renumbered in the order the indices first use them.
+async function packGLTF(source, target, { maxSize, quality = [85, 90] }) {
   const doc = JSON.parse(await readFile(source, 'utf8')),
     dir = dirname(source);
   assert.equal(doc.buffers.length, 1);
@@ -58,7 +59,6 @@ async function packGLTF(source, target, { maxSize, ratio = 1, quality = [85, 90]
     accessors = [];
   let offset = 0,
     triangles = 0,
-    maxError = 0,
     quantized = false;
   const push = (bytes, target, byteStride) => {
     views.push({
@@ -96,7 +96,6 @@ async function packGLTF(source, target, { maxSize, ratio = 1, quality = [85, 90]
             : new Uint32Array(new Uint16Array(copy)),
     };
   };
-  await MeshoptSimplifier.ready;
   for (const mesh of doc.meshes)
     for (const primitive of mesh.primitives) {
       assert.equal(primitive.mode ?? 4, 4);
@@ -122,7 +121,7 @@ async function packGLTF(source, target, { maxSize, ratio = 1, quality = [85, 90]
           .join('|');
         weld[i] = keys.get(key) ?? keys.set(key, keys.size).get(key);
       }
-      let indices = Uint32Array.from(source, (i) => weld[i]);
+      const indices = Uint32Array.from(source, (i) => weld[i]);
       const welded = attrs.map((a, k) => {
         const out = new Float32Array(keys.size * a.width);
         for (let i = 0; i < count; i++)
@@ -143,30 +142,13 @@ async function packGLTF(source, target, { maxSize, ratio = 1, quality = [85, 90]
           for (let c = 0; c < 3; c++) t[j * 4 + c] /= length;
           t[j * 4 + 3] = attrs[tangent].data[i * 4 + 3];
         }
-      if (ratio < 1) {
-        const p = welded[names.indexOf('POSITION')],
-          n = welded[names.indexOf('NORMAL')],
-          uv = welded[names.indexOf('TEXCOORD_0')],
-          extra = new Float32Array(keys.size * 5);
-        for (let i = 0; i < keys.size; i++) {
-          extra.set(n.subarray(i * 3, i * 3 + 3), i * 5);
-          extra.set(uv.subarray(i * 2, i * 2 + 2), i * 5 + 3);
-        }
-        const [simplified, error] = MeshoptSimplifier.simplifyWithAttributes(
-          indices,
-          p,
-          3,
-          extra,
-          5,
-          [0.1, 0.1, 0.1, 1, 1],
-          null,
-          Math.floor((indices.length * ratio) / 3) * 3,
-          0.005,
-        );
-        indices = simplified;
-        maxError = Math.max(maxError, error);
+      // Number the used vertices in order of first use and point the indices at the new numbers.
+      const remap = new Uint32Array(keys.size).fill(0xffffffff);
+      let vertexCount = 0;
+      for (let i = 0; i < indices.length; i++) {
+        if (remap[indices[i]] === 0xffffffff) remap[indices[i]] = vertexCount++;
+        indices[i] = remap[indices[i]];
       }
-      const [remap, vertexCount] = MeshoptSimplifier.compactMesh(indices);
       primitive.attributes = Object.fromEntries(
         names.map((name, k) => {
           const { width, type } = attrs[k],
@@ -254,28 +236,19 @@ async function packGLTF(source, target, { maxSize, ratio = 1, quality = [85, 90]
   return {
     bytes: glb.length,
     triangles,
-    simplificationError: maxError,
     validationErrors: report.issues.numErrors,
     warnings: report.issues.numWarnings,
   };
 }
 
-// Demo helmet: Khronos FlightHelmet (CC0). Desktop: full mesh, 1024-pixel maps; phone: 512-pixel maps, ~22% of the triangles.
+// Demo helmet: Khronos FlightHelmet (CC0). Desktop: full mesh, 1024-pixel maps.
 const helmet = 'examples/assets/khronos/FlightHelmet/FlightHelmet.gltf';
 const desktop = await packGLTF(helmet, 'examples/assets/flight-helmet.glb', { maxSize: 1024 });
-const mobile = await packGLTF(helmet, 'examples/assets/flight-helmet-mobile.glb', {
-  maxSize: 512,
-  ratio: 0.2,
-  quality: [80, 85],
-});
-assert.ok(mobile.bytes < desktop.bytes / 4, 'Phone model must be at least 75% smaller');
-for (const r of [desktop, mobile]) assert.equal(r.warnings, 0);
+assert.equal(desktop.warnings, 0);
 console.log(
   JSON.stringify({
     helmetDesktop: desktop.bytes,
-    helmetMobile: mobile.bytes,
-    triangles: [desktop.triangles, mobile.triangles],
-    simplificationError: mobile.simplificationError,
-    validationErrors: desktop.validationErrors + mobile.validationErrors,
+    triangles: desktop.triangles,
+    validationErrors: desktop.validationErrors,
   }),
 );
