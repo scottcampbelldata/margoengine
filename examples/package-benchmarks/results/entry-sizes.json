@@ -1,10 +1,10 @@
 {
-  "commit": "18cede0a",
+  "commit": "f6940cdf",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
-    "raw": 59317,
-    "gzip": 23271,
+    "raw": 57343,
+    "gzip": 22636,
     "limit": 25000
   },
   "packages": {
@@ -130,12 +130,12 @@
     },
     "@margoengine/controls": {
       ".": {
-        "raw": 69600,
-        "gzip": 22224
+        "raw": 69771,
+        "gzip": 22277
       },
       "./orbit": {
-        "raw": 15110,
-        "gzip": 5470
+        "raw": 15274,
+        "gzip": 5535
       },
       "./arcball": {
         "raw": 11532,
@@ -160,12 +160,12 @@
     },
     "@margoengine/core": {
       ".": {
-        "raw": 52322,
-        "gzip": 20899
+        "raw": 50451,
+        "gzip": 20322
       },
       "./extension": {
-        "raw": 48924,
-        "gzip": 20024
+        "raw": 47298,
+        "gzip": 19412
       }
     },
     "@margoengine/creative": {
@@ -210,8 +210,8 @@
     },
     "@margoengine/decoders": {
       ".": {
-        "raw": 1130705,
-        "gzip": 478249
+        "raw": 1130529,
+        "gzip": 478169
       },
       "./meshopt": {
         "raw": 7103,
@@ -658,18 +658,18 @@
         "gzip": 4072
       },
       "dist/workers/brep-runtime.js": {
-        "raw": 128742,
-        "gzip": 44860
+        "raw": 128748,
+        "gzip": 44893
       },
       "dist/workers/cad-runtime.js": {
-        "raw": 17708,
-        "gzip": 7141
+        "raw": 17705,
+        "gzip": 7182
       }
     },
     "margoengine": {
       ".": {
-        "raw": 7118,
-        "gzip": 2981
+        "raw": 7009,
+        "gzip": 2941
       }
     },
     "@margoengine/materials": {
@@ -818,8 +818,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 32656,
-        "gzip": 11683
+        "raw": 32447,
+        "gzip": 11568
       }
     },
     "@margoengine/points": {
@@ -1370,14 +1370,14 @@
       "brotli": 11442
     },
     "packages/machinery/dist/workers/cad-runtime.js": {
-      "raw": 17626,
-      "gzip": 7112,
-      "brotli": 6430
+      "raw": 17623,
+      "gzip": 7152,
+      "brotli": 6451
     },
     "packages/machinery/dist/workers/brep-runtime.js": {
-      "raw": 127559,
-      "gzip": 44773,
-      "brotli": 38744
+      "raw": 127565,
+      "gzip": 44806,
+      "brotli": 38809
     },
     "packages/machinery/dist/workers/occt-import-js.js": {
       "raw": 97856,
@@ -1395,9 +1395,9 @@
       "brotli": 3359
     },
     "packages/decoders/dist/draco/draco_wasm_wrapper.js": {
-      "raw": 58572,
-      "gzip": 11816,
-      "brotli": 10032
+      "raw": 58456,
+      "gzip": 11748,
+      "brotli": 9994
     },
     "packages/decoders/dist/draco/draco_decoder.wasm": {
       "raw": 192420,
@@ -1405,9 +1405,9 @@
       "brotli": 48729
     },
     "packages/decoders/dist/basis/basis_transcoder.js": {
-      "raw": 58535,
-      "gzip": 15553,
-      "brotli": 13980
+      "raw": 58516,
+      "gzip": 15542,
+      "brotli": 13951
     },
     "packages/decoders/dist/basis/basis_transcoder.wasm": {
       "raw": 527333,

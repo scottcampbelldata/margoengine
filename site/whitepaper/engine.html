@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Margo Engine whitepaper</title>
-  <meta name="description" content="Margo Engine: a WebGPU engine for the web whose core plus stage is 23,271 bytes gzip, with a Rust/Wasm transform kernel, 81 optional packages, and a source for every number.">
+  <meta name="description" content="Margo Engine: a WebGPU engine for the web whose core plus stage is 22,636 bytes gzip, with a Rust/Wasm transform kernel, 81 optional packages, and a source for every number.">
   <link rel="canonical" href="https://margoengine.com/whitepaper/engine">
   <meta name="theme-color" content="#0b1020">
   <meta property="og:type" content="article">
   <meta property="og:title" content="Margo Engine whitepaper">
-  <meta property="og:description" content="Margo Engine: a WebGPU engine for the web whose core plus stage is 23,271 bytes gzip, with a Rust/Wasm transform kernel, 81 optional packages, and a source for every number.">
+  <meta property="og:description" content="Margo Engine: a WebGPU engine for the web whose core plus stage is 22,636 bytes gzip, with a Rust/Wasm transform kernel, 81 optional packages, and a source for every number.">
   <meta property="og:url" content="https://margoengine.com/whitepaper/engine">
   <meta name="twitter:card" content="summary">
   <link rel="icon" href="../favicon.ico" sizes="32x32">
@@ -30,12 +30,12 @@
 <header class="masthead">
   <p class="eyebrow">Whitepaper · October 2026 · pre-release</p>
   <h1>Margo Engine</h1>
-  <p class="deck">A WebGPU engine for the web whose core plus stage is 23,271 bytes gzipped, with a Rust transform kernel in WebAssembly, 81 optional packages, and a named source for every number we publish.</p>
-  <div class="byline"><span>Scott Campbell · Margo Interactive</span><span>Figures measured at commit 5eb44eca unless a table says otherwise; sizes at 0ca52f2a (network log at 2ac118cb)</span></div>
+  <p class="deck">A WebGPU engine for the web whose core plus stage is 22,636 bytes gzipped, with a Rust transform kernel in WebAssembly, 81 optional packages, and a named source for every number we publish.</p>
+  <div class="byline"><span>Scott Campbell · Margo Interactive</span><span>Figures measured at commit 5eb44eca unless a table says otherwise; sizes at f6940cdf (network log at 2ac118cb)</span></div>
 </header>
 
 <div class="ledger" role="list">
-  <div role="listitem"><b>23,271 B</b><span>core + stage facade, min + gzip, Wasm kernel and WebGPU backend included</span><i>entry-sizes.json · 0ca52f2a</i></div>
+  <div role="listitem"><b>22,636 B</b><span>core + stage facade, min + gzip, Wasm kernel and WebGPU backend included</span><i>entry-sizes.json · f6940cdf</i></div>
   <div role="listitem"><b>25,000 B</b><span>the CI gate: any change that reaches it fails</span><i>scripts/measure-size.js</i></div>
   <div role="listitem"><b>8,388,608</b><span>entity slots the kernel grows to, starting at 1,024</span><i>packages/core/src/kernel.ts</i></div>
   <div role="listitem"><b>51</b><span>GPU-call proofs, each pinned to the commit that made its claim</span><i>package-benchmarks/proofs</i></div>
@@ -69,7 +69,7 @@
 </nav>
 
 <h2 id="abstract"><span class="n">0</span>Abstract</h2>
-<p>Margo Engine is a 3D engine for web applications written in TypeScript, with a Rust kernel compiled to WebAssembly and a WebGPU renderer. Core plus the high-level stage facade (<code>createStage</code>) measures 59,317 bytes minified and 23,271 bytes gzipped, and the build fails at 25,000. Everything else, from glTF PBR and shadows to post-processing, physics, CAD import and voxel worlds, lives in 81 optional, side-effect-free packages. A bundle contains only the packages it imports, and large runtimes such as OpenCascade or the Draco decoder are fetched only when a file needs them.</p>
+<p>Margo Engine is a 3D engine for web applications written in TypeScript, with a Rust kernel compiled to WebAssembly and a WebGPU renderer. Core plus the high-level stage facade (<code>createStage</code>) measures 57,343 bytes minified and 22,636 bytes gzipped, and the build fails at 25,000. Everything else, from glTF PBR and shadows to post-processing, physics, CAD import and voxel worlds, lives in 81 optional, side-effect-free packages. A bundle contains only the packages it imports, and large runtimes such as OpenCascade or the Draco decoder are fetched only when a file needs them.</p>
 <p>This paper covers the design, the size and performance we have measured, the tooling that keeps those measurements reproducible, and the limits we know about. Each figure names the result file it came from and the hardware it ran on. Where we have no committed measurement, we say so. A companion paper covers <a href="./voxel.html">Margo Voxel</a>, the voxel editor built on the engine.</p>
 
 <pre><code>import {createStage} from 'margoengine';
@@ -189,18 +189,18 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
 <div class="table"><table>
 <thead><tr><th>Entry</th><th class="num">Raw</th><th class="num">Gzip</th><th>Notes</th></tr></thead>
 <tbody>
-<tr><td><code>@margoengine/core</code></td><td class="num">52,322</td><td class="num">20,899</td><td>Wasm kernel, WebGPU renderer</td></tr>
-<tr><td>core + <code>margoengine</code> stage</td><td class="num">59,317</td><td class="num">23,271</td><td>the CI-gated figure</td></tr>
+<tr><td><code>@margoengine/core</code></td><td class="num">50,451</td><td class="num">20,322</td><td>Wasm kernel, WebGPU renderer</td></tr>
+<tr><td>core + <code>margoengine</code> stage</td><td class="num">57,343</td><td class="num">22,636</td><td>the CI-gated figure</td></tr>
 <tr><td><code>@margoengine/webgl</code></td><td class="num">6,867</td><td class="num">3,074</td><td>optional WebGL2 fallback</td></tr>
-<tr><td><code>@margoengine/gltf</code></td><td class="num">12,888</td><td class="num">5,322</td><td>static glTF</td></tr>
-<tr><td><code>@margoengine/gltf-pro</code></td><td class="num">133,691</td><td class="num">42,613</td><td>glTF 2.0 metallic-roughness PBR</td></tr>
-<tr><td><code>@margoengine/shadows</code></td><td class="num">36,077</td><td class="num">12,717</td><td>four cached cascades, PCSS</td></tr>
-<tr><td><code>@margoengine/post/ssao</code></td><td class="num">29,264</td><td class="num">9,334</td><td>one effect entry</td></tr>
+<tr><td><code>@margoengine/gltf</code></td><td class="num">12,909</td><td class="num">5,331</td><td>static glTF</td></tr>
+<tr><td><code>@margoengine/gltf-pro</code></td><td class="num">133,786</td><td class="num">42,673</td><td>glTF 2.0 metallic-roughness PBR</td></tr>
+<tr><td><code>@margoengine/shadows</code></td><td class="num">36,130</td><td class="num">12,761</td><td>four cached cascades, PCSS</td></tr>
+<tr><td><code>@margoengine/post/ssao</code></td><td class="num">29,264</td><td class="num">9,330</td><td>one effect entry</td></tr>
 <tr><td><code>@margoengine/culling</code></td><td class="num">26,837</td><td class="num">8,883</td><td>GPU frustum and Hi-Z culling</td></tr>
 <tr><td><code>@margoengine/react</code></td><td class="num">60,040</td><td class="num">20,751</td><td>React external</td></tr>
 <tr><td><code>@margoengine/brep</code></td><td class="num">298,352</td><td class="num">104,982</td><td>STEP, SAT, Parasolid XT, JT reader and modeler</td></tr>
 </tbody></table></div>
-<span class="src">examples/package-benchmarks/results/entry-sizes.json · commit 0ca52f2a · dirty: false</span>
+<span class="src">examples/package-benchmarks/results/entry-sizes.json · commit f6940cdf · dirty: false</span>
 
 <h3>What a real page fetches</h3>
 <p>A release test builds a page with Vite that calls <code>createStage('#scene')</code> and <code>app.load('./model.glb')</code> on a 1,332-byte cube, serves the production build, and records every request in headless Edge. It passes only if the page fetches the HTML, the entry chunk and its imports, the glTF chunk and the model, each once, and nothing else.</p>
@@ -225,7 +225,7 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
 <tr><td>three.js <code>WebGLRenderer</code> minimal app</td><td class="num">530,069</td><td class="num">129,899</td></tr>
 <tr><td>three.js <code>WebGPURenderer</code> minimal app</td><td class="num">790,857</td><td class="num">211,584</td></tr>
 <tr><td>Margo core + stage when this was recorded (80b4a1f)</td><td class="num">45,616</td><td class="num">19,577</td></tr>
-<tr><td>Margo core + stage today (0ca52f2a)</td><td class="num">59,317</td><td class="num">23,271</td></tr>
+<tr><td>Margo core + stage today (f6940cdf)</td><td class="num">57,343</td><td class="num">22,636</td></tr>
 </tbody></table></div>
 <span class="src">examples/package-benchmarks/results/threejs-size.json · scripts/compare-threejs-size.js · recorded at 80b4a1f</span>
 <p>Two caveats. The comparison is not symmetric: the three.js numbers are a tree-shaken minimal app, while ours is the whole core plus stage. And three.js gives you far more in those bytes than our core does; a Margo app that wants PBR textures, shadows or post-processing adds the packages in the table above.</p>

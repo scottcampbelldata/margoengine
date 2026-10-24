@@ -1,5 +1,5 @@
 {
-  "commit": "18cede0a",
+  "commit": "f6940cdf",
   "dirty": false,
   "browser": "msedge 156.0.4314.42 headless",
   "adapter": "nvidia ampere",
@@ -11,26 +11,26 @@
       "encoding": "identity",
       "transferred": 808,
       "raw": 558,
-      "gzip": 372,
-      "brotli": 230
+      "gzip": 369,
+      "brotli": 227
     },
     {
-      "path": "assets/geometry-CQ78uYbM.js",
+      "path": "assets/geometry-DT4GWWnY.js",
       "role": "Shared chunk",
       "encoding": "gzip",
-      "transferred": 1489,
-      "raw": 2287,
-      "gzip": 1119,
-      "brotli": 1032
+      "transferred": 1535,
+      "raw": 2289,
+      "gzip": 1165,
+      "brotli": 1049
     },
     {
-      "path": "assets/index-CZLGt-Q4.js",
+      "path": "assets/index-CW8Wla1A.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 24106,
-      "raw": 59734,
-      "gzip": 23725,
-      "brotli": 20857
+      "transferred": 23562,
+      "raw": 57803,
+      "gzip": 23181,
+      "brotli": 20424
     },
     {
       "path": "assets/extension-DuYhGmhk.js",
@@ -42,13 +42,13 @@
       "brotli": 44
     },
     {
-      "path": "assets/dist-CsqJxiS6.js",
+      "path": "assets/dist-Bq1HRPrA.js",
       "role": "@margoengine/gltf (app.load)",
       "encoding": "gzip",
-      "transferred": 5684,
-      "raw": 12848,
-      "gzip": 5312,
-      "brotli": 4778
+      "transferred": 5682,
+      "raw": 12843,
+      "gzip": 5310,
+      "brotli": 4774
     },
     {
       "path": "model.glb",
@@ -62,27 +62,27 @@
   ],
   "total": {
     "requests": 6,
-    "transferred": 34051,
-    "raw": 76799,
-    "gzip": 31036,
-    "brotli": 27300
+    "transferred": 33551,
+    "raw": 74865,
+    "gzip": 30533,
+    "brotli": 26877
   },
   "notFetched": [
     {
-      "path": "assets/brep-runtime-Bz9xRDwD.js",
-      "raw": 127559
+      "path": "assets/brep-runtime-CKVpR84w.js",
+      "raw": 127565
     },
     {
-      "path": "assets/cad-BeerKuHa.js",
+      "path": "assets/cad-C7RC7GGg-BcofazpJ.js",
+      "raw": 38926
+    },
+    {
+      "path": "assets/cad-CUEMeCPt.js",
       "raw": 108
     },
     {
-      "path": "assets/cad-C7RC7GGg-DxlJFQUK.js",
-      "raw": 38931
-    },
-    {
-      "path": "assets/cad-runtime-xobivxHg.js",
-      "raw": 17626
+      "path": "assets/cad-runtime-DcFUxdaM.js",
+      "raw": 17623
     },
     {
       "path": "assets/dist-BJ-WyuQ7.js",
@@ -93,12 +93,12 @@
       "raw": 44
     },
     {
-      "path": "assets/dist-BWfAaSQO.js",
-      "raw": 61049
-    },
-    {
       "path": "assets/dist-CVLR-kq4.js",
       "raw": 41482
+    },
+    {
+      "path": "assets/dist-CYatMQ_Z.js",
+      "raw": 61049
     },
     {
       "path": "assets/dist-X3HwIIFT.js",
