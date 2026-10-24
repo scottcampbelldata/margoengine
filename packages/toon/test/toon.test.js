@@ -63,10 +63,7 @@ test('toon outlines rebuild for changed scene sampling while retaining stable-fr
   assert.ok(h.resources.every((resource) => resource.destroyed));
 });
 
-test('the public toon shading export retains the existing Creative constructor identity', async () => {
-  const [{ ToonShading }, { ToonShading: creative }] = await Promise.all([
-    import('../dist/index.js'),
-    import('@margoengine/creative'),
-  ]);
-  assert.equal(ToonShading, creative);
+test("toon reuses creative's ToonShading without exporting it again", async () => {
+  const toon = await import('../dist/index.js');
+  assert.equal('ToonShading' in toon, false);
 });

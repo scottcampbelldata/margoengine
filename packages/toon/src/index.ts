@@ -5,7 +5,6 @@ import { ToonShading, type ToonOptions } from '@margoengine/creative/toon';
 import { MargoError } from '@margoengine/math/errors';
 import { meshVertex } from '../../shared/gpu.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
-export { ToonShading };
 /** `ToonShading`'s ramp options plus the inverted-hull outline. */
 export interface ToonPipelineOptions extends ToonOptions {
   /** Outline thickness in world units, 0-10 (0 hides it). Default 0.025. */

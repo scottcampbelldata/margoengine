@@ -85,6 +85,7 @@
       "clipToSRGB",
       "degreesToQuaternion",
       "gradeSRGB",
+      "hexColor",
       "linearP3ToLinearSRGB",
       "linearSRGBToLinearP3",
       "quaternionToDegrees"
@@ -349,7 +350,6 @@
       "exportOBJ",
       "exportPLY",
       "exportSTL",
-      "exportUSDZ",
       "frameTimes",
       "joinGLB",
       "paletteTexture",
@@ -749,8 +749,7 @@
     "install": "npm install @margoengine/core@1.0.0 @margoengine/toon@1.0.0",
     "imports": "import { Toon } from '@margoengine/toon';",
     "exports": [
-      "Toon",
-      "ToonShading"
+      "Toon"
     ],
     "category": "Rendering and lighting"
   },
@@ -839,8 +838,6 @@
       "cullBlocks",
       "expandBlockBounds",
       "mergeRanges",
-      "meshWorldMatrix",
-      "multiply",
       "packColors",
       "parseColor",
       "pickPoint",
@@ -887,7 +884,6 @@
       "expandLine",
       "geometryBounds",
       "lightKind",
-      "meshWorldMatrix",
       "parseColor",
       "segmentCount",
       "segmentIndices",
@@ -919,7 +915,6 @@
       "graphemes",
       "hitTest",
       "layoutText",
-      "meshWorldMatrix",
       "parseColor",
       "sdfDistance",
       "squaredDistanceTransform",
@@ -944,14 +939,11 @@
       "LabelRenderer",
       "cameraCSSTransform",
       "composeMatrix",
-      "createScreenPoint",
       "cssPerspective",
       "cssPointToWorld",
-      "isOrthographic",
       "lookAtView",
       "objectCSSTransform",
-      "orthographicCSSTransform",
-      "projectPoint"
+      "orthographicCSSTransform"
     ],
     "category": "Rendering and lighting"
   },
@@ -967,10 +959,7 @@
     "install": "npm install @margoengine/core@1.0.0 @margoengine/html@1.0.0",
     "imports": "import { CSS3DObject } from '@margoengine/html';",
     "exports": [
-      "CSS3DObject",
-      "HTML",
-      "Label",
-      "projectPoint"
+      "HTML"
     ],
     "category": "Rendering and lighting"
   },
@@ -1453,7 +1442,6 @@
       "compileRigidClip",
       "createKeyframeClip",
       "createMaterialAnimation",
-      "multiplyMatrices",
       "sampleKeyframes",
       "sampleTrack",
       "sampleTrackInto",
@@ -1910,15 +1898,11 @@
       "engineProxies",
       "frustumPlanes",
       "getGeometryBVH",
-      "getMeshLayers",
       "getPrimitiveBVH",
       "hasGeometryBVH",
       "hasPrimitiveBVH",
-      "invertMatrix",
       "isModel",
-      "multiplyMatrices",
       "setGeometryBVH",
-      "setMeshLayers",
       "terminateBVHWorker",
       "worldTriangles"
     ],
