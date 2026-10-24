@@ -11,12 +11,12 @@ import {
   boxInFrustum,
   boxScreenRect,
   mergeRanges,
-  multiply,
   pickPoint,
   screenArea,
   worldBox,
   type PickRange,
 } from './math.js';
+import { multiplyMatrices } from '@margoengine/math/mat4';
 import {
   CLOUD_BYTES,
   FLAG,
@@ -487,7 +487,7 @@ export class PointsPlugin implements EnginePlugin {
       const gpu = this.cloudGpu.get(cloud),
         drawn = picked.drawn.get(cloud);
       if (!gpu || !drawn?.length) continue;
-      multiply(viewProj, gpu.model, mvp);
+      multiplyMatrices(viewProj, gpu.model, mvp);
       let rangeCount = 0;
       for (let i = 0; i < drawn.length; i += 2) {
         const block = drawn[i];

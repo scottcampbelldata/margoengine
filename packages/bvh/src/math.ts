@@ -1,6 +1,5 @@
 // Exact triangle predicates shared by the BVH queries and the brute-force references in the tests.
 // Every function works in float64 on float32 inputs, so the BVH and a linear scan agree bit for bit.
-import { invertMatrix, multiplyMatrices } from '@margoengine/math/mat4';
 
 /** Ray side filter. Front faces wind counter-clockwise when seen from the ray origin, matching the engine. */
 export type Side = 'double' | 'front' | 'back';
@@ -411,23 +410,6 @@ export function transformPoint(
   out[offset] = m[0] * x + m[4] * y + m[8] * z + m[12];
   out[offset + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
   out[offset + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
-}
-
-/**
- * Public `invertMatrix` of this package: math's `invertMatrix` with `out` defaulting to a new Float64Array (math's
- * requires it). Returns null for a singular matrix.
- */
-export function invert(m: ArrayLike<number>, out: Float64Array = new Float64Array(16)): Float64Array | null {
-  return invertMatrix(m, out);
-}
-
-/** Public `multiplyMatrices` of this package: math's `multiplyMatrices` with `out` defaulting to a new Float64Array. */
-export function multiply(
-  a: ArrayLike<number>,
-  b: ArrayLike<number>,
-  out: Float64Array = new Float64Array(16),
-): Float64Array {
-  return multiplyMatrices(a, b, out);
 }
 
 /**

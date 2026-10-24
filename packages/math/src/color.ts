@@ -134,12 +134,12 @@ function cssColor(text: string): { rgb: number[]; space: ColorSpace } | null {
 }
 
 /**
- * sRGB components (0..1) `[r, g, b, a]` of a CSS hex colour: `#rgb`, `#rrggbb` or `#rrggbbaa` (the `#` is
- * optional, surrounding spaces are ignored, alpha is 1 when absent), or undefined when `text` is not one. The one hex
+ * sRGB components (0..1) `[r, g, b, a]` of a CSS hex colour: `#rgb`, `#rrggbb` or `#rrggbbaa` (alpha is 1
+ * when absent), or undefined when `text` is not one. The one hex
  * parser: parseColor, Color, environment's colours, the 3MF loader, materials, mesh-edit palettes and shader colours use it.
  */
 export function hexColor(text: string): [number, number, number, number] | undefined {
-  const digits = /^#?([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(text.trim())?.[1];
+  const digits = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(text)?.[1];
   if (!digits) return undefined;
   const full = digits.length === 3 ? digits.replace(/./g, '$&$&') : digits,
     out: [number, number, number, number] = [0, 0, 0, 1];

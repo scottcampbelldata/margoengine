@@ -4,14 +4,13 @@ import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { Camera, Geometry, box } from '@margoengine/core';
+import { invertMatrix, multiplyMatrices } from '@margoengine/math/mat4';
 import {
   MeshBVH,
   Raycaster,
   buildAsync,
   buildBVH,
   frustumPlanes,
-  multiplyMatrices,
-  invertMatrix,
   getGeometryBVH,
   setGeometryBVH,
   setMeshLayers,

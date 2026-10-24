@@ -8,6 +8,7 @@ import { rotationToQuaternion } from '@margoengine/math/quat';
 import type { PBRSource } from '../../shared/pbr-source.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { multiplyMatrices } from '@margoengine/math/mat4';
 
 /** Deepest node chain an export walks; one level deeper throws before any node is written. */
 const MAX_HIERARCHY_DEPTH = 1024;
@@ -807,14 +808,6 @@ export function compose(t: number[], q: number[], s: number[]): Float64Array {
   ]);
 }
 
-export function multiply(a: Float64Array, b: Float64Array): Float64Array {
-  const out = new Float64Array(16);
-  for (let c = 0; c < 4; c++)
-    for (let r = 0; r < 4; r++)
-      out[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
-  return out;
-}
-
 export const determinant3 = (m: Float64Array): number =>
   m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]);
 
@@ -895,7 +888,7 @@ function makeNode(name: unknown, t: number[], r: number[], s: number[], parent: 
     r,
     s,
     local,
-    world: parent ? multiply(parent, local) : local,
+    world: parent ? multiplyMatrices(parent, local) : local,
     children: [],
   };
 }
@@ -1116,7 +1109,7 @@ export function collect(source: ExportSource, options: SceneOptions = {}, plan?:
             t.sy[id],
             t.sz[id],
           ]);
-        base = base ? multiply(base, local) : local;
+        base = base ? multiplyMatrices(base, local) : local;
       }
     }
     const collected = roots.map((mesh) => visit(mesh, base, 0)).filter((node): node is Node => node !== null);
@@ -1151,7 +1144,7 @@ export function collect(source: ExportSource, options: SceneOptions = {}, plan?:
         throw new RangeError('Matrix must split into translation, rotation and nonzero scale; glTF forbids shear');
       node = makeNode(data.name, parts.t, parts.r, parts.s, parent);
       node.local = m;
-      node.world = parent ? multiply(parent, m) : m;
+      node.world = parent ? multiplyMatrices(parent, m) : m;
       node.matrix = values;
     } else
       node = makeNode(

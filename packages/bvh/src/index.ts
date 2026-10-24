@@ -37,7 +37,7 @@ export type {
   PickingGeometry,
   DeformedPickingSource,
 } from './raycaster.js';
-export { frustumPlanes, multiply as multiplyMatrices, invert as invertMatrix } from './math.js';
+export { frustumPlanes } from './math.js';
 export type { Side } from './math.js';
 
 export {

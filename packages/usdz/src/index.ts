@@ -10,6 +10,7 @@ import {
 import { readUSDA, type USDPrim, type USDValue } from '@margoengine/loaders/usd';
 import { parseCrate, type Specs } from './crate.js';
 import type { GLTFDocument, GLTFMaterial, GLTFNode } from '../../shared/gltf.js';
+import { multiplyMatrices } from '@margoengine/math/mat4';
 
 export interface USDOptions {
   fetch?: typeof fetch;
@@ -170,13 +171,7 @@ function parseLayer(input: string | BinaryInput, options: USDOptions): Specs {
   }
   return specs;
 }
-function multiply(a: number[], b: number[]): number[] {
-  const out = new Array<number>(16);
-  for (let c = 0; c < 4; c++)
-    for (let r = 0; r < 4; r++)
-      out[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
-  return out;
-}
+const multiply = (a: number[], b: number[]): number[] => multiplyMatrices(a, b, new Array<number>(16));
 function compose(path: string, specs: Specs): number[] {
   const order = specs[path + '.xformOpOrder']?.fields.default ?? specs[path]?.fields.xformOpOrder ?? [];
   if (!Array.isArray(order) || order.some((op) => typeof op !== 'string')) fail('invalid xformOpOrder');

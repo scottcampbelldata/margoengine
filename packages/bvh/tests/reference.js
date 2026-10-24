@@ -2,7 +2,6 @@
 // disagreement comes from traversal or pruning, not from floating point differences in the triangle tests.
 import {
   closestPointTriangle,
-  invert,
   rayTriangle,
   sideCode,
   transformPoint,
@@ -10,6 +9,7 @@ import {
   triangleOutsidePlanes,
   triangleTriangle,
 } from '../dist/math.js';
+import { invertMatrix as invert } from '@margoengine/math/mat4';
 
 export function rng(seed) {
   let a = seed >>> 0;

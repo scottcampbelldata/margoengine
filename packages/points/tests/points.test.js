@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { multiplyMatrices } from '@margoengine/math/mat4';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Camera } from '@margoengine/core';
@@ -16,7 +17,6 @@ import {
   cullBlocks,
   screenArea,
   allocateBudget,
-  multiply,
   projectToPixels,
   pickPoint,
   boxScreenRect,
@@ -288,7 +288,7 @@ test('projection and nearest-point picking match a brute-force search', () => {
   // Points behind the camera never project.
   assert.equal(projectToPixels(camera().matrix, 0, 0, 20, 256, 256, p), false);
   // The model matrix goes through `multiply(viewProj, model)`.
-  const mvp = multiply(camera().matrix, translate(1, 0, 0));
+  const mvp = multiplyMatrices(camera().matrix, translate(1, 0, 0));
   projectToPixels(mvp, 0, 0, 0, 256, 256, p);
   assert.ok(Math.abs(p[0] - (128 + 128 / Math.tan(Math.PI / 6) / 10)) < 1e-3);
   const rect = boxScreenRect([0, 0, 0, 1, 1, 0], camera().matrix, 256, 256);

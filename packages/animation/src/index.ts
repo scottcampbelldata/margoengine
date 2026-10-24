@@ -21,7 +21,7 @@ import {
   skinDefinition,
   morphDefinition,
 } from './gltf.js';
-export { sampleTrack, sampleTrackInto, multiplyMatrices, type Interpolation } from './sampling.js';
+export { sampleTrack, sampleTrackInto, type Interpolation } from './sampling.js';
 export { Skeleton, Skin, type BoneData, type BonePose } from './skin.js';
 export {
   createKeyframeClip,

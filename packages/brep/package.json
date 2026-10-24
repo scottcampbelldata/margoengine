@@ -25,5 +25,8 @@
     "test": "npm run build && node --test tests/*.test.js",
     "prepack": "npm run build"
   },
+  "dependencies": {
+    "@margoengine/math": "^1.0.0"
+  },
   "homepage": "https://margoengine.com"
 }

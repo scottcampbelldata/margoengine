@@ -3,6 +3,7 @@
 // colours. Written from the ISO 10303-41/42/43 resource schemas and the application protocols' mapping of assemblies
 // (NEXT_ASSEMBLY_USAGE_OCCURRENCE with CONTEXT_DEPENDENT_SHAPE_REPRESENTATION, and MAPPED_ITEM).
 import { Enum, Ref, Typed, type STEPFile, type STEPValue } from './file.js';
+import { multiplyMatrices } from '@margoengine/math/mat4';
 
 /** RGBA in 0..1: the colour as the file writes it (display values) and 1 - transparency. */
 export type STEPColor = readonly [number, number, number, number];
@@ -179,14 +180,8 @@ const BODIES: Readonly<Record<string, STEPBody['kind']>> = {
 
 // --- 4x4 column-major affine matrices -------------------------------------------------------------------------------
 const identity = (): Float64Array => Float64Array.of(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
-/** Product of two column-major affine matrices. */
-export function multiply(a: Float64Array, b: Float64Array): Float64Array {
-  const out = new Float64Array(16);
-  for (let c = 0; c < 4; c++)
-    for (let r = 0; r < 4; r++)
-      out[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
-  return out;
-}
+/** Product of two column-major affine matrices (math's multiplyMatrices). */
+export const multiply = (a: Float64Array, b: Float64Array): Float64Array => multiplyMatrices(a, b);
 /** Inverse of an affine matrix (general 3x3 part, so a scaled transformation operator inverts correctly). */
 export function invert(m: Float64Array): Float64Array {
   const [a, b, c, , d, e, f, , g, h, i] = m,

@@ -1,4 +1,3 @@
-import { multiplyMatrices as multiply } from '@margoengine/math/mat4';
 import { normalizeQuaternion } from '@margoengine/math/quat';
 export type Interpolation = 'STEP' | 'LINEAR' | 'CUBICSPLINE';
 export function sampleTrack(
@@ -84,8 +83,4 @@ export function sampleTrackInto(
   }
   for (let c = 0; c < width; c++) if (!Number.isFinite(out[c])) throw new RangeError('Animation sample overflow');
   return out;
-}
-/** out = a * b (column-major); `@margoengine/math/mat4` multiplyMatrices with `out` first. */
-export function multiplyMatrices(out: Float32Array, a: ArrayLike<number>, b: ArrayLike<number>): void {
-  multiply(a, b, out);
 }

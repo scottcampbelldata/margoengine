@@ -18,6 +18,7 @@ import { int32Packet } from './codec.js';
 import { fail, JTContainer, type JTElement, type JTReader, readElement } from './file.js';
 import { JT_TYPES, type JTLateLoaded, type JTSceneGraph, type JTShapeKind, readSceneGraph } from './lsg.js';
 import { type JTMesh, readTriStripLOD } from './mesh.js';
+import { multiplyMatrices as multiply } from '@margoengine/math/mat4';
 
 /** A shape of a part: a tessellated representation stored in shape LOD segments. */
 export interface JTShape {
@@ -100,18 +101,6 @@ const UNITS: Readonly<Record<string, number>> = {
 };
 
 const IDENTITY = () => new Float64Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
-
-/** Column-major a × b. */
-function multiply(a: Float64Array, b: Float64Array): Float64Array {
-  const out = new Float64Array(16);
-  for (let c = 0; c < 4; c++)
-    for (let r = 0; r < 4; r++) {
-      let s = 0;
-      for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k];
-      out[c * 4 + r] = s;
-    }
-  return out;
-}
 
 const isLate = (v: unknown): v is JTLateLoaded =>
   typeof v === 'object' && v !== null && 'segment' in v && 'segmentType' in v;

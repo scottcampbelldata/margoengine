@@ -23,7 +23,6 @@ export {
   cullBlocks,
   screenArea,
   allocateBudget,
-  multiply,
   projectToPixels,
   pickPoint,
   boxScreenRect,

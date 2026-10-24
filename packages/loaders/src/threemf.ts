@@ -62,7 +62,7 @@ interface Model {
 const IDENTITY = new Float64Array([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]);
 
 function parseColor(value: string | undefined): Color {
-  const rgba = hexColor(value ?? '');
+  const rgba = hexColor(value?.trim() ?? '');
   if (!rgba) throw new LoaderError(F, 'syntax', `invalid color "${String(value).slice(0, 16)}"`);
   return rgba;
 }

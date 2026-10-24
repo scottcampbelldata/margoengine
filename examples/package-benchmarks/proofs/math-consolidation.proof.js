@@ -143,7 +143,7 @@ families.push({
         assert.equal(mat4.multiplyMatrices(a, b, actual), actual);
         assert.ok(same(actual, expected), `multiply ${i}`);
         points.baseline.multiply(a, b, p);
-        assert.equal(points.candidate.multiply(a, b, q), q);
+        assert.equal(mat4.multiplyMatrices(a, b, q), q);
         assert.ok(same(p, actual) && same(q, actual));
       }
       const t = new Float32Array(16),
@@ -154,7 +154,8 @@ families.push({
       mat4.multiplyMatrices(a, b, u);
       assert.ok(same(t, u));
       animation.baseline.multiplyMatrices(s, a, b);
-      assert.equal(animation.candidate.multiplyMatrices(v, a, b), undefined);
+      // animation's (out, a, b) wrapper is gone (docs/renames-2026-10-24.md): math is the candidate.
+      mat4.multiplyMatrices(a, b, v);
       assert.ok(same(s, u) && same(v, u));
       assert.ok(
         same(
@@ -164,7 +165,7 @@ families.push({
       );
       for (const module of [bvh, points]) {
         const x = module.baseline.multiply(a, b),
-          y = module.candidate.multiply(a, b);
+          y = mat4.multiplyMatrices(a, b);
         assert.ok(y instanceof Float64Array && same(x, y));
       }
     }
@@ -244,10 +245,10 @@ families.push({
         assert.equal(lines.invert(c, m), result !== null);
         assert.equal(environment.invert(m, d), result !== null);
         assert.ok(same(a, c) && same(a, d));
-        assert.equal(bvh.candidate.invert(m, e), result && e);
+        assert.equal(mat4.invertMatrix(m, e), result && e);
         assert.ok(same(a, e));
         const x = bvh.baseline.invert(m),
-          y = bvh.candidate.invert(m);
+          y = mat4.invertMatrix(m);
         assert.ok(x === null ? y === null : y instanceof Float64Array && same(x, y));
       }
     return M.length * 3 * 5;

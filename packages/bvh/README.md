@@ -89,7 +89,7 @@ corrupt node links throw instead of looping.
 
 Engine-free code (editors, tools, workers) can import `@margoengine/bvh/tree`: `MeshBVH`, `buildBVH`, the shapecast constants and their types, with no engine core in its module graph or types. The core peer dependency is optional.
 
-Other exports: `buildBVH` (raw `BVHData`), `shapecast` callbacks with `NOT_INTERSECTED`/`INTERSECTED`/`CONTAINED`, `getGeometryBVH`/`setGeometryBVH`/`hasGeometryBVH`, `setMeshLayers`/`getMeshLayers`, `terminateBVHWorker`, `frustumPlanes`, `multiplyMatrices`, `invertMatrix`.
+Other exports: `buildBVH` (raw `BVHData`), `shapecast` callbacks with `NOT_INTERSECTED`/`INTERSECTED`/`CONTAINED`, `getGeometryBVH`/`setGeometryBVH`/`hasGeometryBVH`, `setMeshLayers`/`getMeshLayers`, `terminateBVHWorker`, `frustumPlanes` (matrix products and inverses: `@margoengine/math/mat4`).
 
 ## Baking light and AO into vertex colours
 

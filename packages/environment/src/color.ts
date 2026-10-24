@@ -28,7 +28,7 @@ function colorPair(value: ColorInput): { srgb: RGB; linear: RGB } {
     return { srgb: [linearToSrgb(linear[0]), linearToSrgb(linear[1]), linearToSrgb(linear[2])], linear };
   }
   if (typeof value === 'string') {
-    const rgb = hexColor(value);
+    const rgb = hexColor(value[0] === '#' ? value : '#' + value);
     if (!rgb) throw new TypeError(`Color '${value}' is not '#rgb' or '#rrggbb'; pass a hex color or linear [r, g, b]`);
     hex = (Math.round(rgb[0] * 255) << 16) | (Math.round(rgb[1] * 255) << 8) | Math.round(rgb[2] * 255);
   }

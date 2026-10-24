@@ -5,16 +5,26 @@ import type { MutableVec3, NumberArray } from './types.js';
 // These are the one copy the packages share and they rely on bit-identical results, so keep every expression's operand
 // order as it is (examples/package-benchmarks/proofs/math-consolidation.proof.js checks them against the old copies).
 
-/** out = a * b. `out` must not alias `a` or `b`. */
-export function multiplyMatrices<T extends NumberArray>(a: ArrayLike<number>, b: ArrayLike<number>, out: T): T {
+/** out = a * b (`out` defaults to a new Float64Array). `out` must not alias `a` or `b`. */
+export function multiplyMatrices<T extends NumberArray = Float64Array>(
+  a: ArrayLike<number>,
+  b: ArrayLike<number>,
+  out: T = new Float64Array(16) as unknown as T,
+): T {
   for (let c = 0; c < 4; c++)
     for (let r = 0; r < 4; r++)
       out[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
   return out;
 }
 
-/** Inverse by cofactors. Returns `out`, or null (leaving `out` untouched) when the determinant is 0 or not finite. */
-export function invertMatrix<T extends NumberArray>(m: ArrayLike<number>, out: T): T | null {
+/**
+ * Inverse by cofactors into `out` (default a new Float64Array). Returns `out`, or null (leaving `out` untouched) when
+ * the determinant is 0 or not finite.
+ */
+export function invertMatrix<T extends NumberArray = Float64Array>(
+  m: ArrayLike<number>,
+  out: T = new Float64Array(16) as unknown as T,
+): T | null {
   const a00 = m[0],
     a01 = m[1],
     a02 = m[2],
