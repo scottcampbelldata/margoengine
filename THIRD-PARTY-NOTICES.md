@@ -167,7 +167,6 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | [`packages/decoders/tests/fixtures/NOTICE.md`](packages/decoders/tests/fixtures/NOTICE.md) | test fixtures: Khronos glTF sample models Box (CC BY 4.0, Cesium) and Avocado (CC0 1.0, Microsoft), Draco-compressed; AnisotropyBarnLamp normal texture (CC BY 4.0, Wayfair, Eric Chadwick) |
 | [`packages/decoders/tests/fixtures/KTX2-README.md`](packages/decoders/tests/fixtures/KTX2-README.md) | test fixtures: Khronos CarConcept textures Dot_C.ktx2 and Rib_N.ktx2 (CC BY 4.0, Darmstadt Graphics Group, Eric Chadwick) |
 | [`packages/exporters/tests/fixtures/NOTICE.md`](packages/exporters/tests/fixtures/NOTICE.md) | test fixtures: Khronos glTF sample models Box and BoxTextured (CC BY 4.0, Cesium) |
-| [`packages/animation/tests/fixtures/README.md`](packages/animation/tests/fixtures/README.md) | Babylon.js Assets octopus_customRig.glb (CC BY 4.0): downloaded at test time by scripts/animation-influences-browser-tests.js, never committed |
 
 ## Development and workspace tooling (never shipped)
 

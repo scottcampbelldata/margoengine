@@ -120,10 +120,6 @@ const ASSETS = [
     'packages/exporters/tests/fixtures/NOTICE.md',
     'test fixtures: Khronos glTF sample models Box and BoxTextured (CC BY 4.0, Cesium)',
   ],
-  [
-    'packages/animation/tests/fixtures/README.md',
-    'Babylon.js Assets octopus_customRig.glb (CC BY 4.0): downloaded at test time by scripts/animation-influences-browser-tests.js, never committed',
-  ],
 ];
 
 /** Every published package: packages/* with a package.json, plus the two npm tools. */

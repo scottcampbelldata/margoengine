@@ -4,33 +4,15 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
 import { animatedTriangle } from '../tests/support/gltf-pro-fixture.js';
 
-const source = {
-  url: 'https://raw.githubusercontent.com/BabylonJS/Assets/a6c64e15d8f12d1e81328c553353f86810081788/meshes/octopus_customRig.glb',
-  sha256: '28981df80e5232ccbc335d746c37b446df157fa2517e82b0f242d57eec54d154',
-  bytes: 18471872,
-  attribution:
-    'Octopus custom rig, Babylon.js Assets contributors, CC BY 4.0. Unmodified Maya-exported production asset.',
-  license: 'https://github.com/BabylonJS/Assets/blob/a6c64e15d8f12d1e81328c553353f86810081788/LICENSE',
-};
+// Margo-made rig written by packages/animation/scripts/make-rig-fixture.js (see its fixtures README).
+const fixture = 'packages/animation/tests/fixtures/tentacle-rig.glb',
+  source = {
+    file: fixture,
+    sha256: createHash('sha256')
+      .update(await readFile(fixture))
+      .digest('hex'),
+  };
 await mkdir('test-results', { recursive: true });
-const cache = 'test-results/animation-octopus.glb';
-let asset;
-try {
-  asset = await readFile(cache);
-} catch (error) {
-  if (error.code !== 'ENOENT') throw error;
-  const response = await fetch(source.url);
-  assert.ok(response.ok, 'Octopus download failed');
-  asset = Buffer.from(await response.arrayBuffer());
-  await writeFile(cache, asset);
-}
-assert.equal(asset.length, source.bytes);
-assert.equal(
-  createHash('sha256').update(asset).digest('hex'),
-  source.sha256,
-  'Cached octopus differs from the pinned source',
-);
-await writeFile('test-results/animation-octopus-source.json', JSON.stringify(source, null, 2) + '\n');
 
 const f = animatedTriangle(),
   a = f.doc.meshes[0].primitives[0].attributes;
@@ -66,7 +48,6 @@ page.on('console', (message) => {
     errors.push(message.text());
 });
 try {
-  await page.route(source.url, (route) => route.fulfill({ body: asset, contentType: 'model/gltf-binary' }));
   const result = await page.evaluate(
     async ({ doc, buffers, url }) => {
       const { Engine } = await import('/packages/core/dist/index.js'),
@@ -290,12 +271,12 @@ try {
       assert(Math.abs(manyOutput[0] + 0.1) < 0.00001, 'Secondary influence failed with 1,001-bone palette');
       many.dispose();
       assert(engine.meshes.size === 0, 'Synthetic skin resources leaked');
-      const octopus = await loadGLTF(engine, url),
-        octopusAnimation = Animation.attach(octopus),
-        primitive = octopus.primitives[0],
+      const rig = await loadGLTF(engine, url),
+        rigAnimation = Animation.attach(rig),
+        primitive = rig.primitives[0],
         attrs = primitive.definition.attributes,
-        w1 = octopus.asset.accessor(attrs.WEIGHTS_1, 'VEC4'),
-        j1 = octopus.asset.accessor(attrs.JOINTS_1, 'VEC4');
+        w1 = rig.asset.accessor(attrs.WEIGHTS_1, 'VEC4'),
+        j1 = rig.asset.accessor(attrs.JOINTS_1, 'VEC4');
       let secondaryVertices = 0,
         largest = -1,
         best = 0;
@@ -307,19 +288,19 @@ try {
             best = vertex * 4 + channel;
           }
       }
-      assert(secondaryVertices === 1552, 'Pinned asset lost its genuine secondary skin weights');
-      octopusAnimation.seek(0.37);
-      octopusAnimation.playing = false;
+      assert(secondaryVertices === 247, 'Generated rig lost its secondary skin weights; rerun make-rig-fixture.js');
+      rigAnimation.seek(0.37);
+      rigAnimation.playing = false;
       engine.render({ culling: false });
       const clipOutput = await read(primitive),
-        clipError = compare(clipOutput, reference(octopus, primitive), 'Production octopus clip');
-      const skin = octopus.asset.doc.skins[octopus.asset.doc.nodes[primitive.nodeIndex].skin],
-        joint = octopus.nodes[skin.joints[j1[best]]];
+        clipError = compare(clipOutput, reference(rig, primitive), 'Generated rig clip');
+      const skin = rig.asset.doc.skins[rig.asset.doc.nodes[primitive.nodeIndex].skin],
+        joint = rig.nodes[skin.joints[j1[best]]];
       joint.position.x += 0.02;
       engine.render({ culling: false });
       const posed = await read(primitive),
-        posedError = compare(posed, reference(octopus, primitive), 'Production octopus secondary-joint pose'),
-        truncated = reference(octopus, primitive, 4);
+        posedError = compare(posed, reference(rig, primitive), 'Generated rig secondary-joint pose'),
+        truncated = reference(rig, primitive, 4);
       let truncationDifference = 0,
         movingVertices = 0;
       for (let vertex = 0; vertex < posed.length / 20; vertex++) {
@@ -335,12 +316,9 @@ try {
           }
         }
       }
-      assert(
-        truncationDifference > 0.00001,
-        'Production asset does not distinguish all eight inputs from truncated four',
-      );
-      assert(movingVertices > 0, 'Secondary-joint pose did not move production vertices');
-      const bounds = octopus.bounds;
+      assert(truncationDifference > 0.00001, 'Generated rig does not distinguish all eight inputs from truncated four');
+      assert(movingVertices > 0, 'Secondary-joint pose did not move rig vertices');
+      const bounds = rig.bounds;
       engine.camera.fitToBoundingBox([bounds[0], bounds[1], bounds[2]], [bounds[3], bounds[4], bounds[5]], {
         duration: 0,
       });
@@ -348,15 +326,15 @@ try {
       await device.queue.onSubmittedWorkDone();
       const validation = await device.popErrorScope();
       assert(!validation, validation?.message);
-      window.animationInfluencesScene = { engine, octopus, octopusAnimation, read };
+      window.animationInfluencesScene = { engine, rig, rigAnimation, read };
       return {
         syntheticError,
         fourInfluenceParity: true,
         largeSkinJoints: jointCount,
-        production: {
+        rig: {
           vertices: primitive.vertices.length / 20,
           joints: skin.joints.length,
-          clips: octopusAnimation.clips.length,
+          clips: rigAnimation.clips.length,
           secondaryVertices,
           clipError,
           posedError,
@@ -368,28 +346,28 @@ try {
     {
       doc: f.doc,
       buffers: f.buffers.map((b) => [...new Uint8Array(b.buffer, b.byteOffset, b.byteLength)]),
-      url: source.url,
+      url: '/' + fixture,
     },
   );
-  await page.locator('canvas').screenshot({ path: 'test-results/animation-octopus-eight-influences.png' });
+  await page.locator('canvas').screenshot({ path: 'test-results/animation-rig-eight-influences.png' });
   const restore = await page.evaluate(async () => {
-    const { engine, octopus, octopusAnimation, read } = window.animationInfluencesScene,
-      before = octopus.primitives[0].deformed,
-      original = await read(octopus.primitives[0]);
+    const { engine, rig, rigAnimation, read } = window.animationInfluencesScene,
+      before = rig.primitives[0].deformed,
+      original = await read(rig.primitives[0]);
     await engine.rebootDevice();
     engine.gpu.pushErrorScope('validation');
     engine.render({ culling: false });
     await engine.gpu.queue.onSubmittedWorkDone();
-    const after = await read(octopus.primitives[0]),
-      restored = octopus.primitives[0].deformed !== before && !!octopus.primitives[0].deformed;
+    const after = await read(rig.primitives[0]),
+      restored = rig.primitives[0].deformed !== before && !!rig.primitives[0].deformed;
     let error = 0;
     for (let index = 0; index < after.length; index++)
       error = Math.max(error, Math.abs(original[index] - after[index]));
     const validation = await engine.gpu.popErrorScope();
     if (validation || error > 0.00001)
       throw new Error('Restored skin differs: ' + JSON.stringify({ validation: validation?.message, error }));
-    octopus.dispose();
-    const cleaned = engine.meshes.size === 0 && !engine.hasPlugin(octopusAnimation.name);
+    rig.dispose();
+    const cleaned = engine.meshes.size === 0 && !engine.hasPlugin(rigAnimation.name);
     engine.dispose();
     return { restored, cleaned, error };
   });

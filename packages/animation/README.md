@@ -40,7 +40,7 @@ Run the character demo at `/examples/robot-expressive.html` (also `character-ani
 
 The demo leaves facial weights under the sliders' control by removing weight tracks from its clips. Expressions persist while playing, pausing and switching clips. Presets include a neutral reset; playback speed and a reset-view button accompany touch-enabled orbit controls. The studio floor uses the optional shadows and tone-mapping packages.
 
-After building the packages, run `node --test packages/animation/tests/*.test.js` for influence validation, packed formats, lifecycle, and allocation checks. `node scripts/animation-influences-browser-tests.js` checks real WebGPU deformation against an independent CPU reference, four-influence parity, eight active influences with morphs, a 1,001-joint palette, and device restoration. Its pinned [Babylon.js octopus fixture](tests/fixtures/README.md) has 48,222 vertices, 91 joints, seven clips, and 1,552 vertices with genuine secondary skin weights. The CC BY 4.0 asset downloads into `test-results/` and is not bundled with the package.
+After building the packages, run `node --test packages/animation/tests/*.test.js` for influence validation, packed formats, lifecycle, and allocation checks. `node scripts/animation-influences-browser-tests.js` checks real WebGPU deformation against an independent CPU reference, four-influence parity, eight active influences with morphs, a 1,001-joint palette, and device restoration. Its Margo-made [rig fixture](tests/fixtures/README.md) (`scripts/make-rig-fixture.js`) has 273 vertices, 8 joints, two clips, and 247 vertices with secondary skin weights (up to eight influences); it is committed in the repository and not bundled with the package.
 
 ## Skeletons and skins from raw data
 
