@@ -255,15 +255,30 @@ export class OrbitControls extends Controls {
       theta =
         min <= max ? clamp(theta, min, max) : theta > (min + max) / 2 ? Math.max(min, theta) : Math.min(max, theta);
     }
-    // Core rejects a view parallel to camera.up (default +Y), so the poles stay EPS away.
-    phi = clamp(clamp(phi, this.minPolarAngle, this.maxPolarAngle), EPS, Math.PI - EPS);
+    // Exact cardinal views are renderable with a nonparallel screen-up direction. Preserve their
+    // offset while only panning/dollying; the default +Y up and angular motion still need the safety gap.
+    const preservePole =
+      ox === 0 &&
+      oz === 0 &&
+      oy !== 0 &&
+      this.dTheta * f === 0 &&
+      this.dPhi * f === 0 &&
+      theta === this.heading(ox, oy, oz) &&
+      Math.hypot(c.up[0], c.up[2]) > 0 &&
+      phi >= this.minPolarAngle &&
+      phi <= this.maxPolarAngle;
+    phi = clamp(
+      clamp(phi, this.minPolarAngle, this.maxPolarAngle),
+      preservePole ? 0 : EPS,
+      preservePole ? Math.PI : Math.PI - EPS,
+    );
     const target = this.nextTarget,
       cursorZoom = this.zoomToCursor && this.cursor && this.dScale !== 1;
     target[0] = tx + this.dPan[0] * f;
     target[1] = ty + this.dPan[1] * f;
     target[2] = tz + this.dPan[2] * f;
     const next = this.clampDistance(radius * this.dScale),
-      s = Math.sin(phi);
+      s = preservePole ? 0 : Math.sin(phi);
     const position = this.nextPosition;
     position[0] = target[0] + next * s * Math.sin(theta);
     position[1] = target[1] + next * Math.cos(phi);
@@ -275,6 +290,7 @@ export class OrbitControls extends Controls {
         position: add(target, [radius * s * Math.sin(theta), radius * Math.cos(phi), radius * s * Math.cos(theta)]),
         target,
         fov: c.fov,
+        up: c.up,
       });
       const element = this.element!,
         hit = intersectPlane(
@@ -343,14 +359,14 @@ export class OrbitControls extends Controls {
   };
   private readonly onDown = (event: PointerEvent): void => {
     if (!this.enabled) return;
-    this.capture(event.pointerId);
     const p = this.local(event);
-    this.pointers.set(event.pointerId, p);
     if (event.pointerType === 'touch') {
+      this.capture(event.pointerId);
+      this.pointers.set(event.pointerId, p);
       this.touchStart();
       return;
     }
-    if (this.pointers.size > 1) return;
+    if (this.pointers.size) return;
     const nav = this.nav,
       table = nav?.drag;
     if (nav?.fitClick === event.button) {
@@ -400,13 +416,11 @@ export class OrbitControls extends Controls {
               ? 'pan'
               : 'none';
     }
+    if (state === 'none') return;
+    this.capture(event.pointerId);
+    this.pointers.set(event.pointerId, p);
     this.last = p;
     this.cursor = p;
-    if (state === 'none') {
-      this.pointers.delete(event.pointerId);
-      this.release(event.pointerId);
-      return;
-    }
     this.begin(state);
   };
   /** With a profile: a press that starts a gesture (e.g. middle drag) must not start autoscroll, text selection or a native drag. */

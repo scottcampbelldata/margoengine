@@ -3,7 +3,8 @@ import { EPS, madd, type V3 } from './math.js';
 import { cross, dot, normalize, sub } from '@margoengine/math/vec3';
 
 /**
- * The camera frame Margo Engine renders with: forward from position to target, right from forward x world +Y, no roll.
+ * The controls' usual world-up camera frame. At an exact vertical view, a supplied nonparallel camera.up
+ * supplies the screen frame instead of the world-up fallback.
  * `ortho` is the visible half-height in world units when `camera.matrix` is orthographic (`@margoengine/cameras`); then
  * `position` is moved back by `camera.far` so rays and depths cover an orthographic depth range that starts behind the eye.
  */
@@ -18,14 +19,18 @@ export interface Basis {
 }
 
 export function basis(
-  camera: Pick<Camera, 'position' | 'target' | 'fov'> & Partial<Pick<Camera, 'matrix' | 'far'>>,
+  camera: Pick<Camera, 'position' | 'target' | 'fov'> & Partial<Pick<Camera, 'matrix' | 'far' | 'up'>>,
 ): Basis {
   let position = [...camera.position] as V3;
   const offset = sub(camera.target, position),
     distance = Math.hypot(...offset);
   const forward = distance ? normalize(offset) : ([0, 0, -1] as V3);
   let right = cross(forward, [0, 1, 0]);
-  right = Math.hypot(...right) > EPS ? normalize(right) : [1, 0, 0];
+  if (!forward[0] && !forward[2] && camera.up) {
+    const side = cross(forward, camera.up);
+    if (Math.hypot(...side) > 0) right = normalize(side);
+    else right = [1, 0, 0];
+  } else right = Math.hypot(...right) > EPS ? normalize(right) : [1, 0, 0];
   // ponytail: assumes a frustum centred on the view axis (cameras' default); off-centre left/right/top/bottom are not read.
   const m = camera.matrix,
     scaleY = m && !m[3] && !m[7] && !m[11] && m[15] ? Math.hypot(m[1], m[5], m[9]) : 0,

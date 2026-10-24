@@ -107,6 +107,14 @@ Without an engine, pass a `Camera` and an element and drive the controls yoursel
 
 `OrbitControls.update()` reuses its camera vectors during continuous updates. Copy `camera.position` and `camera.target` when taking a snapshot.
 
+Unbound mouse buttons and disabled mouse actions leave existing pointer capture untouched, including on pointer-up,
+cancellation and disposal. Orbit captures a mouse pointer only after selecting a supported drag; handled mouse/touch
+gestures release their captures when they end, are cancelled or the controls disconnect.
+
+An exact top/bottom view stays exact during idle updates, panning and dollying when `camera.up` is nonparallel to the
+view direction (for example `[0,0,-1]` above the target). Polar/distance limits still apply. The default parallel `+Y`
+up direction and angular motion retain the small pole safety gap; rotating away keeps the heading from `camera.up`.
+
 ## Controls
 
 | Class | Input |
