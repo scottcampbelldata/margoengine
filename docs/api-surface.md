@@ -18,12 +18,12 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/audio | `.` 19 | 2 |  | 7,473 |
 | @margoengine/blender | `.` 5 |  |  | 2,890 |
 | @margoengine/brep | `.` 58 | 5 |  | 104,764 |
-| @margoengine/bvh | `.` 74, `./tree` 23 |  |  | 17,457 |
+| @margoengine/bvh | `.` 74, `./tree` 23 |  |  | 24,372 |
 | @margoengine/cache | `.` 5 |  |  | 2,421 |
 | @margoengine/cameras | `.` 3, `./origin` 3, `./layers` 12 |  |  | 1,674 |
 | @margoengine/cinematic | `.` 3 |  |  | 1,820 |
 | @margoengine/clustered | `.` 18, `./shadows` 4, `./area` 6, `./directional` 6, `./ies` 7, `./projector` 7, `./units` 12 | 80 |  | 12,513 |
-| @margoengine/controls | `.` 44, `./walk` 6 | 23 |  | 18,369 |
+| @margoengine/controls | `.` 44, `./walk` 6 | 23 |  | 18,481 |
 | @margoengine/core | `.` 15, `./extension` 23 | 14 |  | 19,120 |
 | @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 17,623 |
 | @margoengine/culling | `.` 6 |  |  | 8,763 |
@@ -31,13 +31,13 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/dof | `.` 2 |  |  | 6,446 |
 | @margoengine/ecs | `.` 6 |  |  | 1,350 |
 | @margoengine/environment | `.` 62, `./probes` 8, `./volumetric` 3, `./reflector` 7, `./refractor` 7, `./cube-camera` 4 | 14 |  | 28,732 |
-| @margoengine/exporters | `.` 57, `./usdz` 2, `./model` 6, `./dae` 3, `./capture` 29, `./skin` 9, `./godot` 6, `./unity` 12 | 54 |  | 31,824 |
+| @margoengine/exporters | `.` 57, `./usdz` 2, `./model` 6, `./dae` 3, `./capture` 29, `./skin` 9, `./godot` 6, `./unity` 12 | 54 |  | 32,074 |
 | @margoengine/fbx | `.` 4, `./worker` 2 | 1 |  | 16,674 |
 | @margoengine/fsm | `.` 3 |  |  | 875 |
 | @margoengine/geometry | `.` 64, `./extras` 6 | 2 |  | 16,079 |
 | @margoengine/gizmo | `.` 12 |  |  | 108 |
 | @margoengine/gltf | `.` 4 |  |  | 5,048 |
-| @margoengine/gltf-pro | `.` 42, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 4, `./worker` 4 | 252 |  | 39,915 |
+| @margoengine/gltf-pro | `.` 42, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 4, `./worker` 4 | 252 |  | 40,229 |
 | @margoengine/html | `.` 8 |  |  | 4,330 |
 | @margoengine/ifc | `.` 4, `./worker` 2 | 3 |  | 2,563 |
 | @margoengine/input | `.` 4 |  |  | 2,297 |
@@ -51,8 +51,8 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/machinery | `.` 49, `./cad` 8, `./cad-async` 3, `./kinematics` 7, `./surface` 4, `./telemetry` 2, `./section` 3, `./assembly` 1, `./metrology` 7, `./spatial` 2, `./clearance` 2, `./materials` 2, `./overlays` 7, `./exploded` 2, `./edges` 3, `./dimensions` 7 | 14 |  | 42,810 |
 | margoengine | `.` 22 | 1 |  | 2,790 |
 | @margoengine/materials | `.` 104, `./transmission` 8 | 10 |  | 50,096 |
-| @margoengine/math | `.` 45, `./vector2` 1, `./vector3` 1, `./vector4` 1, `./quaternion` 1, `./euler` 1, `./matrix3` 1, `./matrix4` 1, `./color` 12, `./box3` 1, `./sphere` 1, `./plane` 1, `./ray` 1, `./frustum` 1, `./spherical` 1, `./mathutils` 21, `./mat4` 6, `./validate` 3, `./quat` 3, `./vec3` 7, `./errors` 2, `./mesh` 1, `./billboard` 4, `./affine` 2 | 84 |  | 11,389 |
-| @margoengine/mesh-edit | `.` 88 | 2 |  |  |
+| @margoengine/math | `.` 45, `./vector2` 1, `./vector3` 1, `./vector4` 1, `./quaternion` 1, `./euler` 1, `./matrix3` 1, `./matrix4` 1, `./color` 12, `./box3` 1, `./sphere` 1, `./plane` 1, `./ray` 1, `./frustum` 1, `./spherical` 1, `./mathutils` 21, `./mat4` 6, `./validate` 3, `./quat` 3, `./vec3` 7, `./errors` 2, `./mesh` 1, `./billboard` 4, `./affine` 2 | 84 |  | 11,402 |
+| @margoengine/mesh-edit | `.` 88 | 2 |  | 29,323 |
 | @margoengine/navigation | `.` 2 |  |  | 989 |
 | @margoengine/navmesh | `.` 4 |  |  | 3,140 |
 | @margoengine/net | `.` 3 |  |  | 1,115 |
