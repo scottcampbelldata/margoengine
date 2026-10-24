@@ -293,6 +293,8 @@ function leftmost(start: Node): Node {
  * Triangulates a flat polygon. `data` holds the outer ring then each hole, `dim` numbers per vertex (x and y are read);
  * `holeIndices` are the starting vertex indices of each hole. Returns vertex index triples, each wound
  * counter-clockwise (positive area in a y-up frame). Ring orientation in the input does not matter.
+ * Collinear corners may be dropped; @margoengine/mesh-edit keeps its own corner-preserving, fixed-diagonal ear split
+ * for editable faces, so the two are deliberately separate.
  */
 export function triangulate(data: ArrayLike<number>, holeIndices: ArrayLike<number> = [], dim = 2): number[] {
   if (!Number.isSafeInteger(dim) || dim < 2) throw new RangeError('Invalid triangulation dimension');
