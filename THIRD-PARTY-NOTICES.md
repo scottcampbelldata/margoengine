@@ -41,6 +41,16 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
   notices and mark modified files. `@margoengine/decoders` ships `dist/LICENSE-Apache-2.0.txt` and
   `dist/THIRD-PARTY-NOTICE.md` (projects, sources, what changed); the modified `basis_transcoder.js` states the change
   in its first line. Neither upstream build ships a NOTICE file to carry forward. Rapier is not redistributed by us.
+  The vendored files are byte-identical to the official releases (checked 2026-10-24; `.gitattributes` keeps them
+  binary so checkouts do not change line endings):
+  - Draco 1.5.6 glTF decoder from https://www.gstatic.com/draco/versioned/decoders/1.5.6/:
+    `draco_decoder_gltf.wasm` (sha256 `a680d927bed9cb864ddbd63521868891af2bfbe755092761b4837487618df8ac`) as
+    `draco_decoder.wasm`, `draco_wasm_wrapper_gltf.js`
+    (`8bb2952d2ba7d67e1414f8df819410cb0434a666be53f671fff75f68843d76f6`) as `draco_wasm_wrapper.js`.
+  - Basis Universal v1_50_0_2 WebGL transcoder from
+    https://github.com/BinomialLLC/basis_universal/tree/v1_50_0_2/webgl/transcoder/build: `basis_transcoder.wasm`
+    (`6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a`) and `basis_transcoder.js`
+    (`8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1`, before the build's static-embind step).
 - **LGPL-2.1 (occt-import-js and the OpenCascade code compiled into it, `@margoengine/machinery`).** We ship the
   library unchanged as Wasm plus a modified copy of its JavaScript glue. How each obligation is met:
   - *Licence and notice* (s. 1, 2): `dist/workers/OCCT-LICENSE.txt` (the upstream LGPL-2.1 text) and

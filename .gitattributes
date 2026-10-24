@@ -19,3 +19,5 @@ packages/bvh/tests/fixtures/*.obj -text
 
 # Shader text whose SHA-256 the tests pin
 packages/gltf-pro/tests/fixtures/*.wgsl text eol=lf
+packages/decoders/vendor/draco/* -text
+packages/decoders/vendor/basis/* -text
