@@ -1,7 +1,7 @@
 import { engineRuntime } from '@margoengine/core/extension';
 import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
 import { Geometry, PbrMaterial, type Mesh } from '@margoengine/core/extension';
-import { rotationToQuaternion } from '@margoengine/math/quat';
+import { splitTRS } from '@margoengine/math/mat4';
 import { readResponse } from '../../shared/loading.js';
 import { checkCount, countLimit } from '../../shared/limits.js';
 import { parseJSON } from '../../shared/json.js';
@@ -105,23 +105,12 @@ function transform(mesh: Mesh, node: GLTFNode): void {
       throw new TypeError('Invalid glTF matrix');
     const m = node.matrix;
     if (m[3] !== 0 || m[7] !== 0 || m[11] !== 0 || m[15] !== 1) throw new TypeError('glTF matrix must be affine');
-    const sx = Math.hypot(m[0], m[1], m[2]),
-      sy = Math.hypot(m[4], m[5], m[6]),
-      sz = Math.hypot(m[8], m[9], m[10]);
-    if (Math.min(sx, sy, sz) === 0) throw new RangeError('Singular glTF matrix');
-    const det =
-        m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]),
-      scale = [sx * Math.sign(det), sy, sz] as const;
-    const r = Array.from({ length: 9 }, (_, i) => m[Math.floor(i / 3) * 4 + (i % 3)] / scale[Math.floor(i / 3)]);
-    for (const [a, b] of [
-      [0, 3],
-      [0, 6],
-      [3, 6],
-    ])
-      if (Math.abs(r[a] * r[b] + r[a + 1] * r[b + 1] + r[a + 2] * r[b + 2]) > 1e-5)
-        throw new Error('Sheared glTF matrices are unsupported');
-    const q = rotationToQuaternion(r);
-    mesh.setPosition([m[12], m[13], m[14]]).setScale(scale).setQuaternion(q);
+    const trs = splitTRS(m);
+    if (!trs.ok)
+      throw trs.reason === 'singular'
+        ? new RangeError('Singular glTF matrix')
+        : new Error('Sheared glTF matrices are unsupported');
+    mesh.setPosition(trs.position).setScale(trs.scale).setQuaternion(trs.rotation);
   } else {
     mesh
       .setPosition((node.translation ?? [0, 0, 0]) as [number, number, number])

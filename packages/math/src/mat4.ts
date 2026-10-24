@@ -1,4 +1,5 @@
 import type { MutableVec3, NumberArray } from './types.js';
+import { rotationToQuaternion } from './quat.js';
 
 // Column-major 4x4 matrices as plain arrays (number[], Float32Array, Float64Array: the layout of core `camera.matrix`
 // and mesh world matrices). Arithmetic is float64; a Float32Array `out` rounds once on store. Nothing allocates.
@@ -227,6 +228,35 @@ export function projectPoint(
   out.y = ((1 - ny) / 2) * height;
   out.inFrustum = nx >= -1 && nx <= 1 && ny >= -1 && ny <= 1 && out.depth >= 0 && out.depth <= 1;
   return out;
+}
+
+/** Result of {@link splitTRS}: translation, rotation and scale, or why the matrix has none. */
+export type TRSSplit =
+  | { ok: true; position: MutableVec3; rotation: [number, number, number, number]; scale: MutableVec3 }
+  | { ok: false; reason: 'singular' | 'shear' };
+
+/**
+ * Splits a column-major affine matrix into translation, rotation (quaternion `[x, y, z, w]`) and scale, a mirror going
+ * into a negative x scale. `'singular'` when a column or the determinant is zero (or not finite), `'shear'` when the
+ * scaled columns are not perpendicular within `tolerance` (default 1e-5, as dot products of the unit columns).
+ */
+export function splitTRS(m: ArrayLike<number>, tolerance = 1e-5): TRSSplit {
+  const sx = Math.hypot(m[0], m[1], m[2]),
+    sy = Math.hypot(m[4], m[5], m[6]),
+    sz = Math.hypot(m[8], m[9], m[10]),
+    det =
+      m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]),
+    scale: MutableVec3 = [sx * Math.sign(det), sy, sz];
+  if (!scale[0] || !sy || !sz) return { ok: false, reason: 'singular' };
+  const r = Array.from({ length: 9 }, (_, i) => m[Math.floor(i / 3) * 4 + (i % 3)] / scale[Math.floor(i / 3)]);
+  for (const [a, b] of [
+    [0, 3],
+    [0, 6],
+    [3, 6],
+  ])
+    if (Math.abs(r[a] * r[b] + r[a + 1] * r[b + 1] + r[a + 2] * r[b + 2]) > tolerance)
+      return { ok: false, reason: 'shear' };
+  return { ok: true, position: [m[12], m[13], m[14]], rotation: rotationToQuaternion(r), scale };
 }
 
 /**

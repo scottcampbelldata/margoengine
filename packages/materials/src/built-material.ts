@@ -43,6 +43,7 @@ import {
   type TextureDimension,
   type TranscodedTexture,
 } from './texture-kinds.js';
+import { generateMipmaps } from '../../shared/mipmaps.js';
 export type { TextureTransform, MaterialSide } from '@margoengine/gltf-pro';
 export { packAtlas, transformUVs, type Atlas, type AtlasOptions } from './atlas.js';
 export type { EnvCombine, EnvironmentMap } from './env-map.js';
@@ -170,10 +171,6 @@ const textureOptions: Record<keyof TextureOptions, [(v: unknown) => boolean, str
   ],
   flipY: [optional([true, false]), 'true or false'],
 };
-const mipShader = `struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f}
-@vertex fn vertex(@builtin(vertex_index) i:u32)->Out {let p=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));var o:Out;o.clip=vec4f(p[i],0,1);o.uv=p[i]*vec2f(0.5,-0.5)+0.5;return o;}
-@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var imageSampler:sampler;
-@fragment fn fragment(i:Out)->@location(0) vec4f {return textureSample(image,imageSampler,i.uv);}`;
 const shared = new WeakMap<
   GPUDevice,
   {
@@ -182,7 +179,6 @@ const shared = new WeakMap<
     anisotropy?: GPUTextureView;
     black?: GPUTextureView;
     sampler: GPUSampler;
-    pipelines: Map<string, GPURenderPipeline>;
   }
 >();
 function defaults(device: GPUDevice) {
@@ -203,7 +199,6 @@ function defaults(device: GPUDevice) {
     // Binary16 stores 0.5 exactly, so an absent normal map cannot tilt the surface.
     normal: pixel([0x3800, 0x3800, 0x3c00, 0x3c00], 'rgba16float'),
     sampler: device.createSampler({ magFilter: 'linear', minFilter: 'linear' }),
-    pipelines: new Map(),
   };
   shared.set(device, d);
   return d;
@@ -908,56 +903,14 @@ export class Texture {
     return view;
   }
 }
-function mipmaps(device: GPUDevice, texture: GPUTexture): void {
-  if (texture.mipLevelCount < 2) return;
-  const d = defaults(device),
-    format = texture.format;
-  let pipeline = d.pipelines.get(format);
-  if (!pipeline) {
-    const module = device.createShaderModule({ code: mipShader });
-    pipeline = device.createRenderPipeline({
-      layout: 'auto',
-      vertex: { module, entryPoint: 'vertex' },
-      fragment: { module, entryPoint: 'fragment', targets: [{ format }] },
-    });
-    d.pipelines.set(format, pipeline);
-  }
-  // Array and cube layers each get their own chain (2D views of one layer); a single-layer texture keeps its plain views.
-  const layers = texture.dimension === '2d' ? (texture.depthOrArrayLayers ?? 1) : 1,
-    encoder = device.createCommandEncoder();
-  for (let layer = 0; layer < layers; layer++) {
-    const level = (baseMipLevel: number) =>
-      layers > 1
-        ? texture.createView({
-            format,
-            dimension: '2d',
-            baseMipLevel,
-            mipLevelCount: 1,
-            baseArrayLayer: layer,
-            arrayLayerCount: 1,
-          })
-        : texture.createView({ format, baseMipLevel, mipLevelCount: 1 });
-    for (let i = 1; i < texture.mipLevelCount; i++) {
-      const group = device.createBindGroup({
-        layout: pipeline.getBindGroupLayout(0),
-        entries: [
-          { binding: 0, resource: level(i - 1) },
-          { binding: 1, resource: d.sampler },
-        ],
-      });
-      const pass = encoder.beginRenderPass({
-        colorAttachments: [
-          { view: level(i), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 0 } },
-        ],
-      });
-      pass.setPipeline(pipeline);
-      pass.setBindGroup(0, group);
-      pass.draw(3);
-      pass.end();
-    }
-  }
-  device.queue.submit([encoder.finish()]);
-}
+// Mip chains read through the materials sampler (made only when a texture has mips to fill).
+const mipmaps = (device: GPUDevice, texture: GPUTexture): void =>
+  generateMipmaps(
+    device,
+    texture,
+    texture.mipLevelCount,
+    texture.mipLevelCount > 1 ? defaults(device).sampler : undefined,
+  );
 /** The bytes at an http(s), blob: or data: `url` (64 MiB at most) and the response's content type. */
 async function download(url: string | URL, signal?: AbortSignal): Promise<[Uint8Array, string]> {
   const target = new URL(url, globalThis.location?.href);

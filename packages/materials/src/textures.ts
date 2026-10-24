@@ -2,6 +2,7 @@ import type { PBRModel } from '@margoengine/gltf-pro';
 import { textureCoordinates, type TextureTransform } from '@margoengine/gltf-pro/coordinates';
 import type { ClearcoatTexture } from './index.js';
 import type { GLTFTexture, GLTFSampler, GLTFTextureInfo } from '../../shared/gltf.js';
+import { generateMipmaps } from '../../shared/mipmaps.js';
 
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
 
@@ -11,16 +12,6 @@ export interface TextureInfo {
   scale?: number;
   transform?: TextureTransform;
 }
-
-const mipShader = /* wgsl */ `
-struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f}
-@vertex fn vertex(@builtin(vertex_index) i:u32)->Out {
-  let p=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));var o:Out;o.clip=vec4f(p[i],0,1);o.uv=p[i]*vec2f(0.5,-0.5)+0.5;return o;
-}
-@group(0) @binding(0) var image:texture_2d<f32>;
-@group(0) @binding(1) var imageSampler:sampler;
-@fragment fn fragment(i:Out)->@location(0) vec4f {return textureSample(image,imageSampler,i.uv);}
-`;
 
 function integer(value: unknown, label: string): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0)
@@ -85,8 +76,6 @@ export class MaterialTextures {
   private readonly images = new Map<string, ImageTexture>();
   private readonly samplers = new Map<number, GPUSampler>();
   private readonly owned = new Set<GPUTexture>();
-  private readonly mipPipelines = new Map<GPUTextureFormat, GPURenderPipeline>();
-  private mipSampler?: GPUSampler;
   private disposed = false;
   constructor(
     private readonly model: PBRModel,
@@ -151,42 +140,7 @@ export class MaterialTextures {
   }
 
   private generateMips(image: ImageTexture): void {
-    let pipeline = this.mipPipelines.get(image.format);
-    if (!pipeline) {
-      const module = this.device.createShaderModule({ code: mipShader });
-      pipeline = this.device.createRenderPipeline({
-        layout: 'auto',
-        vertex: { module, entryPoint: 'vertex' },
-        fragment: { module, entryPoint: 'fragment', targets: [{ format: image.format }] },
-      });
-      this.mipPipelines.set(image.format, pipeline);
-    }
-    this.mipSampler ??= this.device.createSampler({ minFilter: 'linear', magFilter: 'linear' });
-    const encoder = this.device.createCommandEncoder();
-    for (let level = 1; level < image.levels; level++) {
-      const group = this.device.createBindGroup({
-        layout: pipeline.getBindGroupLayout(0),
-        entries: [
-          { binding: 0, resource: image.texture.createView({ baseMipLevel: level - 1, mipLevelCount: 1 }) },
-          { binding: 1, resource: this.mipSampler },
-        ],
-      });
-      const pass = encoder.beginRenderPass({
-        colorAttachments: [
-          {
-            view: image.texture.createView({ baseMipLevel: level, mipLevelCount: 1 }),
-            loadOp: 'clear',
-            storeOp: 'store',
-            clearValue: { r: 0, g: 0, b: 0, a: 0 },
-          },
-        ],
-      });
-      pass.setPipeline(pipeline);
-      pass.setBindGroup(0, group);
-      pass.draw(3);
-      pass.end();
-    }
-    this.device.queue.submit([encoder.finish()]);
+    generateMipmaps(this.device, image.texture, image.levels);
     image.mipsReady = true;
   }
 
@@ -203,8 +157,6 @@ export class MaterialTextures {
     this.owned.clear();
     this.images.clear();
     this.samplers.clear();
-    this.mipPipelines.clear();
-    this.mipSampler = undefined;
     if (failure !== undefined) throw failure;
   }
 }

@@ -9,8 +9,7 @@ import {
   type PassContext,
   type Mesh,
 } from '@margoengine/core/extension';
-import { invertMatrixStable, multiplyMatrices } from '@margoengine/math/mat4';
-import { rotationToQuaternion } from '@margoengine/math/quat';
+import { invertMatrixStable, multiplyMatrices, splitTRS } from '@margoengine/math/mat4';
 import { viewMatrix } from '../../shared/view.js';
 import { applyView, inView } from '../../shared/view-rect.js';
 import { attenuationPower } from '../../shared/attenuation.js';
@@ -61,7 +60,7 @@ import { lightPBR } from '../../shared/pbr-hooks.js';
 export type { PBRLighting, PBRTransparency, PBRCapture, PBRTransmission, ExtendedPlan } from './shader.js';
 import { createKTX2Texture, getBytesPerRow } from '@margoengine/decoders/texture';
 import type { TranscodedKTX2Result } from '@margoengine/decoders';
-import { mipShader } from './mip.js';
+import { generateMipmaps } from '../../shared/mipmaps.js';
 import {
   prepareMaterialExtension,
   materialExtensionShader,
@@ -878,24 +877,12 @@ function transform(node: Mesh, def: GLTFNode): void {
     const m = vector(def.matrix, 16, 'matrix');
     if (def.translation || def.rotation || def.scale || m[3] || m[7] || m[11] || m[15] !== 1)
       throw new TypeError('Invalid glTF affine matrix');
-    const scale = [Math.hypot(m[0], m[1], m[2]), Math.hypot(m[4], m[5], m[6]), Math.hypot(m[8], m[9], m[10])];
-    const det =
-      m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]);
-    scale[0] *= Math.sign(det);
-    if (scale.some((v) => v === 0)) throw new RangeError('Singular glTF matrix');
-    const r = Array.from({ length: 9 }, (_, i) => m[Math.floor(i / 3) * 4 + (i % 3)] / scale[Math.floor(i / 3)]);
-    for (const [a, b] of [
-      [0, 3],
-      [0, 6],
-      [3, 6],
-    ])
-      if (Math.abs(r[a] * r[b] + r[a + 1] * r[b + 1] + r[a + 2] * r[b + 2]) > 1e-5)
-        throw new Error('Sheared matrices are unsupported');
-    const q = rotationToQuaternion(r);
-    node
-      .setPosition([m[12], m[13], m[14]])
-      .setScale(scale as [number, number, number])
-      .setQuaternion(q);
+    const trs = splitTRS(m);
+    if (!trs.ok)
+      throw trs.reason === 'singular'
+        ? new RangeError('Singular glTF matrix')
+        : new Error('Sheared matrices are unsupported');
+    node.setPosition(trs.position).setScale(trs.scale).setQuaternion(trs.rotation);
   } else
     node
       .setPosition((def.translation ?? [0, 0, 0]) as [number, number, number])
@@ -1203,7 +1190,6 @@ export class PBRModel implements EnginePlugin {
   setup(engine: Engine, device = engine.gpu): void {
     if (engine !== this.engine || this.disposed) throw new Error('PBRModel belongs to another engine or is disposed');
     if (!device) throw new Error('PBRModel requires WebGPU');
-    const mipSampler = device.createSampler({ minFilter: 'linear', magFilter: 'linear' });
     const upload = this.bufferUpload(device);
     for (const p of this.pointsAndLines.length ? [...this.primitives, ...this.pointsAndLines] : this.primitives) {
       const r: DrawResource = {
@@ -1223,9 +1209,9 @@ export class PBRModel implements EnginePlugin {
       r.vertex = upload(from.vertices, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE);
       r.index = upload(from.indices, GPUBufferUsage.INDEX);
       p.buffers = { vertex: r.vertex, index: r.index };
-      this.bindMaterial(r, device, mipSampler);
+      this.bindMaterial(r, device);
     }
-    this.installBatches(device, mipSampler, upload);
+    this.installBatches(device, upload);
   }
   /**
    * Points `target` at `source`'s vertex and index GPU buffers and frees the pair `target` used, so identical shapes
@@ -1427,16 +1413,11 @@ export class PBRModel implements EnginePlugin {
     if (this.disposed || this.staticBatches !== undefined) return;
     const device = this.engine.gpu;
     if (!device) throw new Error('PBRModel requires WebGPU');
-    this.installBatches(
-      device,
-      device.createSampler({ minFilter: 'linear', magFilter: 'linear' }),
-      this.bufferUpload(device),
-    );
+    this.installBatches(device, this.bufferUpload(device));
   }
   /** Bakes static same-material triangles once, after world matrices exist, and uploads that mesh on each device. */
   private installBatches(
     device: GPUDevice,
-    mipSampler: GPUSampler,
     upload: (data: Float32Array | Uint32Array, usage: number) => GPUBuffer,
   ): void {
     // Streaming setup runs on placeholder boxes, and each arrived chunk borrows this model as its prototype.
@@ -1471,7 +1452,7 @@ export class PBRModel implements EnginePlugin {
       r.vertex = upload(p.vertices, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE);
       r.index = upload(p.indices, GPUBufferUsage.INDEX);
       p.buffers = { vertex: r.vertex, index: r.index };
-      this.bindMaterial(r, device, mipSampler);
+      this.bindMaterial(r, device);
       for (const part of batch.parts) {
         const held = byPrimitive.get(part.primitive);
         if (held) held.mergedInto = r;
@@ -1524,7 +1505,7 @@ export class PBRModel implements EnginePlugin {
     return out;
   }
   // The material's uniform buffer (880 bytes, 1088 for extended materials), textures and samplers; again after a variant switch.
-  private bindMaterial(r: DrawResource, device: GPUDevice, mipSampler: GPUSampler): void {
+  private bindMaterial(r: DrawResource, device: GPUDevice): void {
     const m = r.primitive.material,
       floats =
         !(r.primitive.extension ?? m.extension)?.replacesPhysical && (m.extendedFrame || m.physical || m.ext?.[0])
@@ -1601,43 +1582,7 @@ export class PBRModel implements EnginePlugin {
             { bytesPerRow: 4 },
             [1, 1],
           );
-        if (levels > 1 && !compressed) {
-          let pipeline = cache.get(format) as GPURenderPipeline | undefined;
-          if (!pipeline) {
-            const module = device.createShaderModule({ code: mipShader });
-            pipeline = device.createRenderPipeline({
-              layout: 'auto',
-              vertex: { module, entryPoint: 'vertex' },
-              fragment: { module, entryPoint: 'fragment', targets: [{ format }] },
-            });
-            cache.set(format, pipeline);
-          }
-          const encoder = device.createCommandEncoder();
-          for (let level = 1; level < levels; level++) {
-            const group = device.createBindGroup({
-              layout: pipeline.getBindGroupLayout(0),
-              entries: [
-                { binding: 0, resource: texture.createView({ baseMipLevel: level - 1, mipLevelCount: 1 }) },
-                { binding: 1, resource: mipSampler },
-              ],
-            });
-            const pass = encoder.beginRenderPass({
-              colorAttachments: [
-                {
-                  view: texture.createView({ baseMipLevel: level, mipLevelCount: 1 }),
-                  loadOp: 'clear',
-                  storeOp: 'store',
-                  clearValue: { r: 0, g: 0, b: 0, a: 0 },
-                },
-              ],
-            });
-            pass.setPipeline(pipeline);
-            pass.setBindGroup(0, group);
-            pass.draw(3);
-            pass.end();
-          }
-          device.queue.submit([encoder.finish()]);
-        }
+        if (!compressed) generateMipmaps(device, texture, levels);
       }
       r.views.push(texture.createView());
       const s = def?.sampler === undefined ? {} : entry(this.asset.doc.samplers, def.sampler, 'sampler');
@@ -1785,17 +1730,11 @@ export class PBRModel implements EnginePlugin {
     }
     const device = this.engine.gpu,
       resources = new Map(this.resources.map((r) => [r.primitive, r]));
-    let mipSampler: GPUSampler | undefined;
     for (const [p, m] of changes) {
       if (!this.defaults.has(p)) this.defaults.set(p, p.material);
       p.material = m;
       const r = resources.get(p);
-      if (r && device)
-        this.bindMaterial(
-          r,
-          device,
-          (mipSampler ??= device.createSampler({ minFilter: 'linear', magFilter: 'linear' })),
-        );
+      if (r && device) this.bindMaterial(r, device);
     }
   }
   get shadowPrimitives(): ShadowCasterRecord[] {
@@ -2054,7 +1993,7 @@ export class PBRModel implements EnginePlugin {
           !!(p.extension ?? m.extension)?.replacesPhysical || (!m.extendedFrame && !m.physical && !m.ext?.[0]);
         const floatCount = compact ? 100 : m.extended ? 272 : 220;
         if (r.values.length !== floatCount || r.replacesTextures !== !!m.shading?.replacesTextures)
-          this.bindMaterial(r, c.device, c.device.createSampler({ minFilter: 'linear', magFilter: 'linear' }));
+          this.bindMaterial(r, c.device);
         const v = r.values;
         v.set(scratch.projection);
         v.set(node.matrix, 16);
@@ -2643,7 +2582,6 @@ export class PBRModel implements EnginePlugin {
       factory = this.createDeformationRenderer;
     const projections = new Map<PBRInstances, PBRInstances>(),
       used = new Set<PBRInstances>();
-    let mipSampler: GPUSampler | undefined;
     const synchronize = (sources: PBRPrimitive[], copies: PBRPrimitive[], offset: number) => {
       for (let i = 0; i < sources.length; i++) {
         const source = sources[i],
@@ -2661,12 +2599,7 @@ export class PBRModel implements EnginePlugin {
             resource = replica.resources[offset + i];
           copy.material = source.material;
           try {
-            if (resource)
-              replica.bindMaterial(
-                resource,
-                device,
-                (mipSampler ??= device.createSampler({ minFilter: 'linear', magFilter: 'linear' })),
-              );
+            if (resource) replica.bindMaterial(resource, device);
           } catch (error) {
             copy.material = previous;
             throw error;

@@ -4,11 +4,11 @@ import { engineRuntime, meshRuntime } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import type { EngineKernel, Mesh, Geometry, PbrMaterial } from '@margoengine/core';
 import type { Vec2 } from '@margoengine/math';
-import { rotationToQuaternion } from '@margoengine/math/quat';
 import type { PBRSource } from '../../shared/pbr-source.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { hiddenInTree } from '../../shared/visibility.js';
-import { multiplyMatrices } from '@margoengine/math/mat4';
+import { multiplyMatrices, splitTRS } from '@margoengine/math/mat4';
+import { accumulateNormals } from '../../shared/normals.js';
 
 /** Deepest node chain an export walks; one level deeper throws before any node is written. */
 const MAX_HIERARCHY_DEPTH = 1024;
@@ -604,23 +604,8 @@ export function normalizeGeometry(data: Geometry | GeometryData): Geo {
   return geo;
 }
 
-function faceNormals(positions: Float32Array, indices: Uint32Array, count: number): Float64Array {
-  const out = new Float64Array(count * 3);
-  for (let i = 0; i < indices.length; i += 3) {
-    const a = indices[i] * 3,
-      b = indices[i + 1] * 3,
-      c = indices[i + 2] * 3;
-    const ux = positions[b] - positions[a],
-      uy = positions[b + 1] - positions[a + 1],
-      uz = positions[b + 2] - positions[a + 2];
-    const vx = positions[c] - positions[a],
-      vy = positions[c + 1] - positions[a + 1],
-      vz = positions[c + 2] - positions[a + 2];
-    const n = [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx];
-    for (const v of [a, b, c]) for (let k = 0; k < 3; k++) out[v + k] += n[k];
-  }
-  return out;
-}
+const faceNormals = (positions: Float32Array, indices: Uint32Array, count: number): Float64Array =>
+  accumulateNormals(positions, indices, new Float64Array(count * 3));
 
 /** @internal A validated texture, or undefined. */
 export function checkTexture(texture: unknown, label: string): TextureData | undefined {
@@ -840,16 +825,8 @@ export function normalMatrix(m: Float64Array): Float64Array {
 
 /** Splits an affine matrix into translation, unit quaternion and scale, or returns null when it has shear. */
 export function decompose(m: Float64Array): { t: number[]; r: number[]; s: number[] } | null {
-  let sx = Math.hypot(m[0], m[1], m[2]);
-  const sy = Math.hypot(m[4], m[5], m[6]),
-    sz = Math.hypot(m[8], m[9], m[10]);
-  if (!sx || !sy || !sz) return null;
-  if (determinant3(m) < 0) sx = -sx;
-  const r = [m[0] / sx, m[1] / sx, m[2] / sx, m[4] / sy, m[5] / sy, m[6] / sy, m[8] / sz, m[9] / sz, m[10] / sz];
-  const dot = (a: number, b: number) => r[a] * r[b] + r[a + 1] * r[b + 1] + r[a + 2] * r[b + 2];
-  if (Math.abs(dot(0, 3)) > 1e-6 || Math.abs(dot(0, 6)) > 1e-6 || Math.abs(dot(3, 6)) > 1e-6) return null;
-  const q = rotationToQuaternion(r);
-  return { t: [m[12], m[13], m[14]], r: unitQuaternion(q), s: [sx, sy, sz] };
+  const trs = splitTRS(m, 1e-6);
+  return trs.ok ? { t: trs.position, r: unitQuaternion(trs.rotation), s: trs.scale } : null;
 }
 
 /**

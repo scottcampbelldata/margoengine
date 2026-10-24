@@ -1,28 +1,10 @@
+import { accumulateNormals } from '../../shared/normals.js';
 /**
  * Area-weighted smooth vertex normals for an indexed triangle list. Vertices touched by no
  * non-degenerate triangle get (0, 0, 1).
  */
 export function computeVertexNormals(positions: ArrayLike<number>, indices: ArrayLike<number>): Float32Array {
-  const normals = new Float64Array(positions.length);
-  for (let t = 0; t + 2 < indices.length; t += 3) {
-    const a = indices[t] * 3,
-      b = indices[t + 1] * 3,
-      c = indices[t + 2] * 3;
-    const ux = positions[b] - positions[a],
-      uy = positions[b + 1] - positions[a + 1],
-      uz = positions[b + 2] - positions[a + 2];
-    const vx = positions[c] - positions[a],
-      vy = positions[c + 1] - positions[a + 1],
-      vz = positions[c + 2] - positions[a + 2];
-    const nx = uy * vz - uz * vy,
-      ny = uz * vx - ux * vz,
-      nz = ux * vy - uy * vx;
-    for (const v of [a, b, c]) {
-      normals[v] += nx;
-      normals[v + 1] += ny;
-      normals[v + 2] += nz;
-    }
-  }
+  const normals = accumulateNormals(positions, indices, new Float64Array(positions.length));
   const out = new Float32Array(positions.length);
   for (let v = 0; v < out.length; v += 3) {
     const length = Math.hypot(normals[v], normals[v + 1], normals[v + 2]);
