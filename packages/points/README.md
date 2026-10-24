@@ -118,6 +118,7 @@ fragment's world position on its camera-facing disc (on the sphere for `shading:
 point in half; world-sized sprites test each fragment on the quad, pixel-sized sprites (`sizeUnits: 'pixels'`) their
 centre. Planes are normalised on assignment and reading returns copies; assign a new list to change them (live, next
 frame, no recompile). More than 6 planes throw a RangeError, a malformed plane or a zero normal a TypeError.
+`clipIntersection: true` cuts only fragments behind every plane (their intersection) instead of any.
 
 ```ts
 import {Engine} from '@margoengine/core';

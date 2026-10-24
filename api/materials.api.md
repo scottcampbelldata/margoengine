@@ -185,6 +185,8 @@ export class Material {
     matcap: Texture | null;
     get clippingPlanes(): number[][];
     set clippingPlanes(v: readonly (readonly number[])[]);
+    get clipIntersection(): boolean;
+    set clipIntersection(v: boolean);
     get clipShadows(): boolean;
     set clipShadows(v: boolean);
     get alphaMap(): Texture | null;
@@ -466,6 +468,7 @@ export interface MaterialOptions extends PhysicalOptions {
     lightMapResponse?: 'multiply' | 'lambertian';
     clippingPlanes?: readonly (readonly number[])[];
     clipShadows?: boolean;
+    clipIntersection?: boolean;
     transparent?: boolean;
     alphaTest?: number;
     side?: MaterialSide;

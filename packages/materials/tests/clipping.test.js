@@ -112,3 +112,34 @@ test('clipped materials hand their planes to shadow casters unless clipShadows i
   material.clippingPlanes = [];
   assert.equal(mesh.shadowPrimitives[0].clip, undefined);
 });
+
+test('clipIntersection: union by default, intersection on request, in the uniform and every clip site', async () => {
+  const { engine } = await world(),
+    material = new Material({
+      clippingPlanes: [
+        [1, 0, 0, 0],
+        [0, 1, 0, 0],
+      ],
+    }),
+    mesh = createMesh(engine, triangle, material),
+    shading = mesh.primitives[0].material.shading;
+  assert.equal(material.clipIntersection, false);
+  const code = shading.shader(pbrShader, 2);
+  // Each site counts the planes the point is behind, then discards on any (union) or all (intersection).
+  const sites = code.split('materialClip.settings.y>0.5').length - 1;
+  assert.ok(sites >= 2, 'fragments and the shared surface read the mode');
+  assert.equal(code.split('materialClip.settings.x').length - 1, sites, 'every clip site reads the mode');
+  const data = () => new Float32Array(shading.bindings().find((e) => e.binding === 199).resource.buffer.data);
+  assert.deepEqual([data()[24], data()[25]], [2, 0]);
+  material.clipIntersection = true;
+  assert.deepEqual([data()[24], data()[25]], [2, 1], 'live: the mode is a uniform value');
+  assert.equal(shading.shader(pbrShader, 2), code, 'switching the mode compiles nothing new');
+  assert.equal(
+    mesh.shadowPrimitives[0].clip.buffer,
+    shading.bindings().find((e) => e.binding === 199).resource.buffer,
+    'shadow casters read the same uniform, mode included',
+  );
+  assert.equal(new Material({ clipIntersection: true }).clipIntersection, true);
+  assert.equal(material.clone().clipIntersection, true, 'clone keeps the mode');
+  assert.throws(() => (material.clipIntersection = 'all'), { name: 'TypeError', message: /clipIntersection/ });
+});

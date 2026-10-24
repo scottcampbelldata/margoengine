@@ -95,12 +95,20 @@ try {
   const cloud = PointsPlugin.attach(engine).add(
     new PointCloud({ positions: dots, material: { size: 4, color: '#f2f2f2' } }),
   );
-  // A slanted plane through every shape's centre height, and on the toon box a second one cutting a corner.
+  // A slanted plane through every shape's centre height, and on the toon box a second one cutting a corner. The torus
+  // knot uses clipIntersection: only what is behind both of its planes goes, a wedge out of the front quadrant.
+  materials[0].clipIntersection = true;
   const cut = (t: number) =>
     materials.forEach((material, i) => {
       const x = items[i].x,
         height = 1.2 + 0.5 * Math.sin(t + i);
-      material.clippingPlanes = [[0.25, -1, 0.35, height - 0.25 * x], ...(i === 2 ? [[-0.7, 0, -0.7, 0.75]] : [])];
+      material.clippingPlanes =
+        i === 0
+          ? [
+              [-1, 0, 0, x + 0.3 * Math.sin(t)],
+              [0, 0, -1, 0],
+            ]
+          : [[0.25, -1, 0.35, height - 0.25 * x], ...(i === 2 ? [[-0.7, 0, -0.7, 0.75]] : [])];
       lineMaterial.clippingPlanes = [[0, -1, 0, 1.6 + 0.6 * Math.sin(t)]];
       cloud.material.clippingPlanes = [[-1, 0, 0.3, 3.9 + 0.4 * Math.sin(t)]];
     });

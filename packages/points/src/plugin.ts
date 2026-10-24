@@ -1029,9 +1029,9 @@ export class PointsPlugin implements EnginePlugin {
       (m.shading === 'sphere' ? FLAG.sphere : 0) |
       (cloud.direct ? FLAG.direct : 0) |
       (cloud.colorSpace === 'srgb' ? FLAG.srgbColors : 0);
-    // Clipping planes: count in flags.y, planes from byte 128, unused slots zeroed.
+    // Clipping planes: count in flags.y (bit 16: intersection), planes from byte 128, unused slots zeroed.
     const planes = m['clipping'];
-    u[25] = planes.length / 4;
+    u[25] = planes.length / 4 + (m.clipIntersection ? 65536 : 0);
     u[26] = u[27] = 0;
     f.set(planes, 32);
     f.fill(0, 32 + planes.length);
@@ -1293,9 +1293,9 @@ export class PointsPlugin implements EnginePlugin {
       f[20] = m.rotation;
       f[21] = m.alphaTest;
       f[22] = m.sizeUnits === 'pixels' ? 1 : 0;
-      // Clipping planes: count in params.w, planes from byte 96, unused slots zeroed.
+      // Clipping planes: count in params.w (negative: intersection), planes from byte 96, unused slots zeroed.
       const planes = m['clipping'];
-      f[23] = planes.length / 4;
+      f[23] = (planes.length / 4) * (m.clipIntersection ? -1 : 1);
       f.set(planes, 24);
       f.fill(0, 24 + planes.length);
       let changed = false;

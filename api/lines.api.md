@@ -183,6 +183,7 @@ export class LineMaterial {
     onTop: boolean;
     antialias: boolean;
     fog: boolean;
+    clipIntersection: boolean;
     constructor(options?: LineMaterialOptions);
     set(options: LineMaterialOptions): this;
     setColor(color: ColorInput): this;
@@ -208,6 +209,7 @@ export interface LineMaterialOptions {
     antialias?: boolean;
     fog?: boolean;
     clippingPlanes?: readonly (readonly number[])[];
+    clipIntersection?: boolean;
 }
 
 export type LineMode = 'segments' | 'strip' | 'loop';

@@ -55,6 +55,8 @@ export interface LineMaterialOptions {
    * (the `@margoengine/materials` convention). Live; default none.
    */
   clippingPlanes?: readonly (readonly number[])[];
+  /** false (default): cut away what is behind any plane. true: only what is behind every plane (their intersection). */
+  clipIntersection?: boolean;
 }
 
 /** Style shared by any number of lines. Fields may be changed at any time. */
@@ -74,6 +76,8 @@ export class LineMaterial {
   onTop = false;
   antialias = true;
   fog = true;
+  /** false (default): `clippingPlanes` cut away what is behind any plane; true: only what is behind every plane. */
+  clipIntersection = false;
   /** Clipping planes, four normalised numbers each (at most 24). */
   private clipping: number[] = [];
   constructor(options: LineMaterialOptions = {}) {
@@ -116,7 +120,7 @@ export class LineMaterial {
     if (this.dashSize <= 0 || this.gapSize < 0)
       throw new RangeError('Dash size must be positive and gap size non-negative');
     if (!JOINS.includes(this.join) || !CAPS.includes(this.cap)) throw new TypeError('Unknown line join or cap');
-    for (const flag of [this.worldUnits, this.dashed, this.onTop, this.antialias, this.fog])
+    for (const flag of [this.worldUnits, this.dashed, this.onTop, this.antialias, this.fog, this.clipIntersection])
       if (typeof flag !== 'boolean') throw new TypeError('Line flags must be boolean');
   }
 }

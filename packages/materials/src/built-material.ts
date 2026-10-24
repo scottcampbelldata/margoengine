@@ -44,7 +44,7 @@ import {
   type TranscodedTexture,
 } from './texture-kinds.js';
 import { generateMipmaps } from '../../shared/mipmaps.js';
-import { sectionShader } from '../../shared/section.js';
+import { clipStatement, sectionShader } from '../../shared/section.js';
 export type { TextureTransform, MaterialSide } from '@margoengine/gltf-pro';
 export { packAtlas, transformUVs, type Atlas, type AtlasOptions } from './atlas.js';
 export type { EnvCombine, EnvironmentMap } from './env-map.js';
@@ -1215,6 +1215,11 @@ export interface MaterialOptions extends PhysicalOptions {
   clippingPlanes?: readonly (readonly number[])[];
   /** The planes clip the material's directional shadows too (default true). Live. */
   clipShadows?: boolean;
+  /**
+   * false (default): cut away what is behind any plane (the union of their negative sides). true: cut away only what is
+   * behind every plane (their intersection), e.g. a wedge out of a solid. Live.
+   */
+  clipIntersection?: boolean;
   transparent?: boolean;
   alphaTest?: number;
   /** Faces drawn by triangle meshes. Explicit side takes precedence over doubleSided. */
@@ -1645,6 +1650,7 @@ function clipUniform(m: Material, device: GPUDevice, owner: object): GPUBufferBi
   data.fill(0);
   data.set(planes);
   data[24] = planes.length / 4;
+  data[25] = +m.clipIntersection;
   device.queue.writeBuffer(buffer, 0, data);
   if (state.clipBinding?.buffer !== buffer) state.clipBinding = { buffer };
   return state.clipBinding;
@@ -1660,11 +1666,7 @@ const surfaceAnchor = 'if(!facing&&f.settings.z<0.5){discard;}';
  */
 function clipShader(code: string, group: number): string {
   const out = sectionShader(code, group, 199, 'materialClip');
-  return out.replace(
-    surfaceAnchor,
-    'for(var p=0u;p<u32(materialClip.settings.x);p++){if(dot(materialClip.planes[p].xyz,i.position)+materialClip.planes[p].w<0){discard;}}' +
-      surfaceAnchor,
-  );
+  return out.replace(surfaceAnchor, clipStatement('materialClip') + surfaceAnchor);
 }
 function mapped(m: Material): boolean {
   return !!m.physical && (m.physical.length > 12 || mapSlots.slice(5).some((k) => m[k] != null));
@@ -1834,6 +1836,7 @@ export class Material {
   /** Clipping planes, four normalised numbers each (at most 24), and whether they clip shadows. */
   private clipping: number[] = [];
   private clipShadow = true;
+  private clipAll = false;
   /**
    * Up to 6 world-space planes `[a, b, c, d]`; points with `a x + b y + c z + d < 0` are cut away in every pass that
    * draws the material (beauty, G-buffer and, with `clipShadows`, directional shadows). Reading gives normalised copies;
@@ -1860,6 +1863,17 @@ export class Material {
       flat.push(p[0] / length, p[1] / length, p[2] / length, p[3] / length);
     }
     this.clipping = flat;
+  }
+  /**
+   * false (default): `clippingPlanes` cut away what is behind any plane (their union). true: only what is behind every
+   * plane (their intersection). Live; shadows follow.
+   */
+  get clipIntersection(): boolean {
+    return this.clipAll;
+  }
+  set clipIntersection(v: boolean) {
+    if (typeof v !== 'boolean') throw new TypeError('Material clipIntersection must be a boolean; pass true or false');
+    this.clipAll = v;
   }
   /** Whether `clippingPlanes` clip this material's directional shadows too (default true), live. */
   get clipShadows(): boolean {
@@ -2115,6 +2129,7 @@ export class Material {
       'toneMapped',
       'clippingPlanes',
       'clipShadows',
+      'clipIntersection',
     ] as const)
       if (o[key] !== undefined) this[key] = o[key] as never;
     // Physical options enable their lobes as they are set (transmission before the volume values that need it); the

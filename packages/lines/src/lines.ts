@@ -327,9 +327,9 @@ export class Lines implements EnginePlugin {
         (material.worldUnits ? 16 : 0) |
         (material.dashed ? 32 : 0) |
         (vertexColors ? 64 : 0);
-      // Clipping planes: count in flags.w, planes from byte 128, unused slots zeroed.
+      // Clipping planes: count in flags.w (bit 16: intersection), planes from byte 128, unused slots zeroed.
       const planes = material['clipping'];
-      u[31] = planes.length / 4;
+      u[31] = planes.length / 4 + (material.clipIntersection ? 65536 : 0);
       f.set(planes, 32);
       f.fill(0, 32 + planes.length);
       let changed = false;

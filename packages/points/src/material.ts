@@ -47,6 +47,8 @@ export interface BaseMaterialOptions {
    * `@margoengine/materials` convention). Live; default none.
    */
   clippingPlanes?: readonly (readonly number[])[];
+  /** false (default): cut away what is behind any plane. true: only what is behind every plane (their intersection). */
+  clipIntersection?: boolean;
 }
 
 const checkUnit = (value: number, label: string) => {
@@ -90,6 +92,7 @@ abstract class BaseMaterial {
   private source: PointsTextureSource | null = null;
   /** Clipping planes, four normalised numbers each (at most 24). */
   private clipping: number[] = [];
+  private clipAll = false;
 
   protected constructor(transparent: boolean) {
     this.transparent = transparent;
@@ -122,6 +125,16 @@ abstract class BaseMaterial {
     this.clipping = clipPlanes(planes);
   }
 
+  /** false (default): `clippingPlanes` cut away what is behind any plane; true: only what is behind every plane. */
+  get clipIntersection(): boolean {
+    return this.clipAll;
+  }
+  set clipIntersection(value: boolean) {
+    if (typeof value !== 'boolean')
+      throw new TypeError('Points material clipIntersection must be a boolean; pass true or false');
+    this.clipAll = value;
+  }
+
   /** Re-uploads an image source whose pixels changed (for example a canvas you drew into). */
   needsUpdate(): void {
     this.mapVersion++;
@@ -149,6 +162,7 @@ abstract class BaseMaterial {
     if (options.depthWrite !== undefined) this.depthWrite = options.depthWrite;
     if (options.fog !== undefined) this.fog = options.fog;
     if (options.clippingPlanes !== undefined) this.clippingPlanes = options.clippingPlanes;
+    if (options.clipIntersection !== undefined) this.clipIntersection = options.clipIntersection;
   }
 
   validate(): void {

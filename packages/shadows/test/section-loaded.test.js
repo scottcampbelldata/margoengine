@@ -6,11 +6,12 @@ import { wgsl } from '../../core/src/shaders.ts';
 import { parseGLTF } from '../../gltf-pro/dist/index.js';
 import { SectionPlanes } from '../../machinery/dist/section.js';
 import { Shadows } from '../dist/index.js';
+import { Material, createMesh } from '../../materials/dist/index.js';
 import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 
 // The GPU boundary is mocked; the asset parser, native caster records and both
 // optional plugins are real. Pixel coverage is checked by the browser regression.
-async function fixture(t, { node = false, section = true } = {}) {
+async function fixture(t, { node = false, section = true, material } = {}) {
   const gpu = mockGPU(),
     modules = new WeakMap(),
     pipelines = new WeakMap(),
@@ -80,7 +81,17 @@ async function fixture(t, { node = false, section = true } = {}) {
       { position: [0, 2, 4], target: [0, 0, 0] },
       null,
     ),
-    model = parseGLTF(engine, await readFile(new URL('../../exporters/tests/fixtures/Box.glb', import.meta.url))),
+    model = material
+      ? createMesh(
+          engine,
+          {
+            positions: [-1, 0, -1, 1, 0, -1, -1, 0, 1, 1, 0, 1],
+            normals: [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0],
+            indices: [0, 2, 1, 1, 2, 3],
+          },
+          material,
+        )
+      : parseGLTF(engine, await readFile(new URL('../../exporters/tests/fixtures/Box.glb', import.meta.url))),
     planes = [[1, 0, 0, 0]],
     sections = new SectionPlanes({ planes, cap: false }),
     shadows = new Shadows({ resolution: 64, bounds: { min: [-2, -2, -2], max: [2, 2, 2] } }),
@@ -177,4 +188,33 @@ test('sections and directional shadow sampling use distinct core binding declara
   }
   assert.ok([...seen.values()].includes('section'));
   assert.ok([...seen.values()].includes('shadowFrame'));
+});
+
+test("a material's own clipping planes clip its shadow under their own name, union or intersection", async (t) => {
+  const material = new Material({
+      clippingPlanes: [
+        [1, 0, 0, 0],
+        [0, 0, 1, 0],
+      ],
+    }),
+    f = await fixture(t, { section: false, material }),
+    frame = f.frame(),
+    [draw] = frame.draws;
+  assert.equal(frame.draws.length, 1);
+  assert.match(draw.code, /@group\(0\) @binding\(3\) var<uniform> materialClip:materialClipPlanes;/);
+  assert.doesNotMatch(draw.code, /var<uniform> section:/);
+  assert.match(
+    draw.code,
+    /select\(materialClipBehind>0u,materialClipBehind==materialClipCount,materialClip\.settings\.y>0\.5\)/,
+  );
+  const buffer = draw.group.entries.find((entry) => entry.binding === 3).resource.buffer;
+  assert.equal(buffer, f.model.shadowPrimitives[0].clip.buffer, 'the material uniform itself is bound');
+});
+
+test("with SectionPlanes attached the scene planes clip a clipped material's shadow", async (t) => {
+  const material = new Material({ clippingPlanes: [[0, 0, 1, 0]] }),
+    f = await fixture(t, { section: true, material }),
+    [draw] = f.frame().draws;
+  assert.match(draw.code, /var<uniform> section:Section;/);
+  assert.doesNotMatch(draw.code, /materialClip/);
 });

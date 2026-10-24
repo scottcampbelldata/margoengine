@@ -1122,7 +1122,9 @@ export class Shadows implements EnginePlugin {
     scene?: GPUBufferBinding,
   ): void {
     if (p.stride !== 24 && p.stride !== 80) throw new RangeError('Unsupported shadow vertex stride');
-    const section = scene ?? p.clip;
+    // A scene's SectionPlanes win; a material's planes (union or intersection, settings.y) bind under their own name.
+    const section = scene ?? p.clip,
+      material = !scene && !!p.clip;
     const inst = p.instances;
     if (inst && !inst.count) return;
     if (inst && p.stride !== 80) throw new RangeError('Instanced shadow casters need 80-byte vertices');
@@ -1139,7 +1141,13 @@ export class Shadows implements EnginePlugin {
       throw new TypeError('Shadow alpha transform requires finite affine rows and PBR vertices');
     const lines = p.topology === 'line-list',
       key =
-        p.stride + (transform ? 1 : 0) + (inst ? 2 : 0) + (lines ? 4 : 0) + (section ? 8 : 0) + (displacement ? 16 : 0);
+        p.stride +
+        (transform ? 1 : 0) +
+        (inst ? 2 : 0) +
+        (lines ? 4 : 0) +
+        (section ? 8 : 0) +
+        (displacement ? 16 : 0) +
+        (material ? 32 : 0);
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       let code = shadowDepth(p.stride === 80, !!transform);
@@ -1149,7 +1157,7 @@ export class Shadows implements EnginePlugin {
         code = code
           .replace('struct Out {', 'struct Out {@location(2) position:vec3f,')
           .replace(/o.clip=f.camera\*([^;]+);/, 'let world=$1;o.clip=f.camera*world;o.position=world.xyz;');
-        code = sectionShader(code, 0, 3);
+        code = sectionShader(code, 0, 3, material ? 'materialClip' : 'section');
       }
       const module = this.device!.createShaderModule({ code });
       pipeline = casterPipeline(this.device!, module, p.stride, !!displacement, !!inst, lines);

@@ -107,12 +107,15 @@ fn surface(i:VOut)->Surface{
       color=vec4f(color.rgb*(0.3+0.7*max(dot(n,l),0.0)),color.a);
     }
   } else if(any(abs(i.quad)>vec2f(r))){discard;}
-  // Clipping planes (flags.y of them), tested at this fragment's world point: the centre moved across the camera-facing
+  // Clipping planes (flags.y & 0xffff of them; bit 16: cut only behind every plane), tested at this fragment's world point: the centre moved across the camera-facing
   // disc by the quad offset (info.z / info.x world units per pixel), and out to the sphere surface for sphere shading.
-  if(cloud.flags.y>0u){
+  let clipCount=cloud.flags.y&0xffffu;
+  if(clipCount>0u){
     let wp=i.center+(frame.right.xyz*i.quad.x+frame.up.xyz*i.quad.y)*(i.info.z/r)
       +frame.back.xyz*select(0.0,s.nz*i.info.z,has(${FLAG.sphere}u));
-    for(var p=0u;p<cloud.flags.y;p++){if(dot(cloud.planes[p].xyz,wp)+cloud.planes[p].w<0.0){discard;}}
+    var clipBehind=0u;
+    for(var p=0u;p<clipCount;p++){if(dot(cloud.planes[p].xyz,wp)+cloud.planes[p].w<0.0){clipBehind++;}}
+    if(select(clipBehind>0u,clipBehind==clipCount,(cloud.flags.y&65536u)!=0u)){discard;}
   }
   s.color=encode(color);
   return s;
@@ -172,8 +175,10 @@ struct VOut{@builtin(position) clip:vec4f,@location(0) color:vec4f,@location(1) 
   let texel=textureSampleLevel(map,mapSampler,i.uv,0.0);
   let color=i.color*texel;
   if(color.a<batch.params.y||color.a<=0.0){discard;}
-  // Clipping planes (params.w of them) at this fragment's world point.
-  for(var p=0u;p<u32(batch.params.w);p++){if(dot(batch.planes[p].xyz,i.world)+batch.planes[p].w<0.0){discard;}}
+  // Clipping planes (abs(params.w) of them; negative: cut only behind every plane) at this fragment's world point.
+  let clipCount=u32(abs(batch.params.w));var clipBehind=0u;
+  for(var p=0u;p<clipCount;p++){if(dot(batch.planes[p].xyz,i.world)+batch.planes[p].w<0.0){clipBehind++;}}
+  if(clipCount>0u&&select(clipBehind>0u,clipBehind==clipCount,batch.params.w<0.0)){discard;}
   return encode(color);
 }
 `;

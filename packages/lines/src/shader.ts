@@ -171,8 +171,11 @@ fn encode(c:vec3f)->vec3f{return select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.05
     let inside=dash*0.5-abs(t);
     cover*=select(select(0.0,1.0,inside>=0.0),clamp(inside/fw+0.5,0.0,1.0),aa);
   }
-  // Clipping planes (flags.w of them): cut away where the centre line's world point is on a plane's negative side.
-  for(var p=0u;p<style.flags.w;p++){if(dot(style.planes[p].xyz,i.world)+style.planes[p].w<0.0){discard;}}
+  // Clipping planes (flags.w & 0xffff of them): cut away where the centre line's world point is on a plane's negative
+  // side, of any plane, or with bit 16 set (clipIntersection) of every plane.
+  let clipCount=style.flags.w&0xffffu;var clipBehind=0u;
+  for(var p=0u;p<clipCount;p++){if(dot(style.planes[p].xyz,i.world)+style.planes[p].w<0.0){clipBehind++;}}
+  if(clipCount>0u&&select(clipBehind>0u,clipBehind==clipCount,(style.flags.w&65536u)!=0u)){discard;}
   let alpha=i.color.a*cover;
   var rgb=max(i.color.rgb,vec3f(0.0));
   if(frame.extra.x>0.5){rgb=encode(min(rgb,vec3f(1.0)));}

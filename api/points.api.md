@@ -18,6 +18,7 @@ export interface BaseMaterialOptions {
     depthWrite?: boolean;
     fog?: boolean;
     clippingPlanes?: readonly (readonly number[])[];
+    clipIntersection?: boolean;
 }
 
 export { ColorInput } from "@margoengine/math";
@@ -312,6 +313,8 @@ abstract class BaseMaterial {
     set map(value: PointsTextureSource | null);
     get clippingPlanes(): number[][];
     set clippingPlanes(planes: readonly (readonly number[])[]);
+    get clipIntersection(): boolean;
+    set clipIntersection(value: boolean);
     needsUpdate(): void;
     setColor(color: ColorInput): this;
     get writesDepth(): boolean;

@@ -72,7 +72,7 @@ test('the shader carries the world varying and the discard loop; one shader for 
   assert.match(code, /o\.world=mix\(wa\.xyz\/wa\.w,wb\.xyz\/wb\.w,select\(ta,tb,cr\.atB\)\);/);
   assert.match(
     code,
-    /for\(var p=0u;p<style\.flags\.w;p\+\+\)\{if\(dot\(style\.planes\[p\]\.xyz,i\.world\)\+style\.planes\[p\]\.w<0\.0\)\{discard;\}\}/,
+    /for\(var p=0u;p<clipCount;p\+\+\)\{if\(dot\(style\.planes\[p\]\.xyz,i\.world\)\+style\.planes\[p\]\.w<0\.0\)\{clipBehind\+\+;\}\}\s*if\(clipCount>0u&&select\(clipBehind>0u,clipBehind==clipCount,\(style\.flags\.w&65536u\)!=0u\)\)\{discard;\}/,
   );
   const layout = r.setup.filter((e) => e[0] === 'layout')[1];
   assert.equal(layout[2].entries[0].buffer.minBindingSize, STYLE_BYTES);
@@ -115,6 +115,23 @@ test('planes reach the Style uniform at byte 128 with their count in flags.w, li
   const [cleared] = styleWrites(r.frame());
   assert.equal(new Uint32Array(cleared)[31], 0);
   assert.deepEqual([...new Float32Array(cleared, 128)], Array(24).fill(0));
+});
+
+test('clipIntersection sets bit 16 of flags.w beside the plane count, live and validated', () => {
+  const r = rig({
+    clippingPlanes: [
+      [1, 0, 0, 0],
+      [0, 1, 0, 0],
+    ],
+  });
+  assert.equal(new Uint32Array(styleWrites(r.frame())[0])[31], 2, 'union by default');
+  r.line.material.clipIntersection = true;
+  assert.equal(new Uint32Array(styleWrites(r.frame())[0])[31], 65536 + 2, 'intersection bit plus the count');
+  r.line.material.set({ clipIntersection: false });
+  assert.equal(new Uint32Array(styleWrites(r.frame())[0])[31], 2);
+  assert.equal(new LineMaterial({ clipIntersection: true }).clipIntersection, true);
+  r.line.material.clipIntersection = 1;
+  assert.throws(() => r.frame(), TypeError);
 });
 
 test('fogged lines keep the clipping loop', () => {

@@ -117,7 +117,8 @@ lines.setFog(fog);
 `a x + b y + c z + d < 0` (the `@margoengine/materials` convention). Each fragment is tested at its point on the line's
 centre line, so a cut runs straight across the line. Planes are normalised on assignment and reading returns copies;
 assign a new list to change them (live, next frame, no recompile). More than 6 planes throw a RangeError, a malformed
-plane or a zero normal a TypeError. Lines cast no shadows, so there is no `clipShadows`.
+plane or a zero normal a TypeError. `clipIntersection: true` cuts only where the point is behind every plane (their
+intersection) instead of any. Lines cast no shadows, so there is no `clipShadows`.
 
 ```ts
 import {Engine} from '@margoengine/core';

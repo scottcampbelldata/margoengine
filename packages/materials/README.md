@@ -790,7 +790,7 @@ toon, normal, matcap, depth, distance, `WgslMaterial` and `@margoengine/shader` 
 beauty, G-buffer and SSAO passes and, with `clipShadows` (default true), in `@margoengine/shadows` directional shadow
 maps. Planes are normalised on assignment and reading returns copies; assign a new list to change them (live). A
 clipped caster redraws its shadow every frame. `@margoengine/lines` and `@margoengine/points` materials take the same
-option. A scene's `SectionPlanes` still clip everything; with both, the scene's planes clip the shadows. Clustered
+option. `clipIntersection: true` cuts away only what is behind every plane (their intersection: a wedge or a corner out of a solid) instead of what is behind any of them; it is a uniform value, so switching it compiles nothing, and shadows follow it. A scene's `SectionPlanes` still clip everything; with both, the scene's planes clip the shadows. Clustered
 point-light shadows and GPU picking ignore material planes.
 
 ```ts
@@ -804,6 +804,7 @@ const material = new Material({ color: '#e0a040', doubleSided: true, clippingPla
 createMesh(engine, torusKnotGeometry(), material); // everything above y = 0.5 is cut away
 material.clippingPlanes = [[0, -1, 0, 0.5], [1, 0, 0, 0]]; // live: also cut x < 0
 material.clipShadows = false; // the shadow stays whole
+material.clipIntersection = true; // only what is behind both planes is cut: a wedge
 ```
 
 ## KTX2 textures

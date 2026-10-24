@@ -72,7 +72,7 @@ test('point and sprite shaders carry world points and the discard loops', () => 
   );
   assert.match(
     point,
-    /for\(var p=0u;p<cloud\.flags\.y;p\+\+\)\{if\(dot\(cloud\.planes\[p\]\.xyz,wp\)\+cloud\.planes\[p\]\.w<0\.0\)\{discard;\}\}/,
+    /for\(var p=0u;p<clipCount;p\+\+\)\{if\(dot\(cloud\.planes\[p\]\.xyz,wp\)\+cloud\.planes\[p\]\.w<0\.0\)\{clipBehind\+\+;\}\}\s*if\(select\(clipBehind>0u,clipBehind==clipCount,\(cloud\.flags\.y&65536u\)!=0u\)\)\{discard;\}/,
   );
   assert.ok(point.indexOf('cloud.planes[p]') < point.indexOf('s.color=encode(color);'), 'before the colour is final');
   assert.match(sprite, /struct Batch\{model:mat4x4f,color:vec4f,params:vec4f,planes:array<vec4f,6>\}/);
@@ -80,7 +80,7 @@ test('point and sprite shaders carry world points and the discard loops', () => 
   assert.match(sprite, /out\.clip=clip;out\.world=wp;/);
   assert.match(
     sprite,
-    /for\(var p=0u;p<u32\(batch\.params\.w\);p\+\+\)\{if\(dot\(batch\.planes\[p\]\.xyz,i\.world\)\+batch\.planes\[p\]\.w<0\.0\)\{discard;\}\}/,
+    /for\(var p=0u;p<clipCount;p\+\+\)\{if\(dot\(batch\.planes\[p\]\.xyz,i\.world\)\+batch\.planes\[p\]\.w<0\.0\)\{clipBehind\+\+;\}\}\s*if\(clipCount>0u&&select\(clipBehind>0u,clipBehind==clipCount,batch\.params\.w<0\.0\)\)\{discard;\}/,
   );
   const sizes = r.setup.filter((e) => e[0] === 'layout').map((e) => e[2].entries?.[0]?.buffer?.minBindingSize);
   assert.ok(sizes.includes(CLOUD_BYTES) && sizes.includes(SPRITE_BYTES), 'bind group layouts sized for the planes');
@@ -141,4 +141,24 @@ test('cloud planes reach byte 128 with the count in flags.y; batch planes byte 9
   );
   assert.equal(new Float32Array(b3)[23], 0);
   assert.deepEqual([...new Float32Array(b3, 96)], Array(24).fill(0));
+});
+
+test('clipIntersection: bit 16 of the cloud count, a negative batch count; live and validated', () => {
+  const r = rig();
+  r.frame();
+  r.cloud.material.clippingPlanes = [
+    [1, 0, 0, 0],
+    [0, 1, 0, 0],
+  ];
+  r.batch.material.clippingPlanes = [[1, 0, 0, 0]];
+  r.cloud.material.clipIntersection = true;
+  r.batch.material.clipIntersection = true;
+  const log = r.frame(),
+    [cloud] = writes(log, CLOUD_BYTES),
+    [batch] = writes(log, SPRITE_BYTES);
+  assert.equal(new Uint32Array(cloud)[25], 65536 + 2);
+  assert.equal(new Float32Array(batch)[23], -1);
+  r.cloud.material.clipIntersection = false;
+  assert.equal(new Uint32Array(writes(r.frame(), CLOUD_BYTES)[0])[25], 2);
+  assert.throws(() => (r.cloud.material.clipIntersection = 'yes'), { name: 'TypeError', message: /clipIntersection/ });
 });

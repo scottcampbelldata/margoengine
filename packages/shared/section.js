@@ -9,11 +9,21 @@ export function sectionState(context) {
   const resource = context.bindings.find((entry) => entry.binding === Number(match[1]))?.resource;
   return resource && 'buffer' in resource ? resource : undefined;
 }
+/**
+ * The WGSL statement that discards `position` against uniform `name`'s planes. SectionPlanes ('section') cut away the
+ * union of the planes' negative sides; other names read settings.y as the mode: 0 the union, 1 the intersection (a
+ * point goes only when it is behind every plane).
+ */
+export function clipStatement(name, position = 'i.position') {
+  if (name === 'section')
+    return `for(var p=0u;p<u32(section.settings.x);p++){if(dot(section.planes[p].xyz,${position})+section.planes[p].w<0){discard;}}`;
+  return `{let ${name}Count=u32(${name}.settings.x);var ${name}Behind=0u;for(var p=0u;p<${name}Count;p++){if(dot(${name}.planes[p].xyz,${position})+${name}.planes[p].w<0){${name}Behind++;}}if(${name}Count>0u&&select(${name}Behind>0u,${name}Behind==${name}Count,${name}.settings.y>0.5)){discard;}}`;
+}
 export function sectionShader(source, group, binding, name = 'section') {
   const key = `${group}:${binding}:${name}:${source}`;
   if (cache.has(key)) return cache.get(key);
   const type = name === 'section' ? 'Section' : `${name}Planes`,
-    clip = `for(var p=0u;p<u32(${name}.settings.x);p++){if(dot(${name}.planes[p].xyz,i.position)+${name}.planes[p].w<0){discard;}}`;
+    clip = clipStatement(name);
   const signature = /@fragment\s+fn\s+\w+\(i:Out\b[^{]*\{/g;
   let code = '',
     cursor = 0,
