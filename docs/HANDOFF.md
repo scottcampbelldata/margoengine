@@ -372,7 +372,8 @@ Five parallel workers reviewed 58 packages against baseline `f05414a`; Claude ve
 4. GPU-side optimization (shaders, particles, passes). Must be measured on hardware one change at a time;
    Codex's notes list tried and rejected ideas. VFX done (0b: about 2x less GPU time at 1M; the
    workgroup-compaction lead measured no gain).
-5. Fair three.js benchmark: check `examples/conveyor-simulator` and `examples/benchmark` are like-for-like.
+5. [DROPPED 2026-10-24] Fair three.js benchmark: `examples/conveyor-simulator` (a port of a three.js app) and
+   `examples/benchmark` were deleted 2026-10-24 (clean room); other engines run only from engine-bench.
 6. Verified three.js parity matrix, then the feature gaps below.
 
 ## Work queue Scott approved (2026-10-14), in order
@@ -2736,7 +2737,7 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    `importScripts`; environment/audio/decoder `.wasm` loads read app URLs without a byte cap; text/lines copy option
    keys onto the instance); `@margoengine/cache` keys by URL only (no `Vary`/credentials) and trusts its own IndexedDB;
    telemetry socket is the app's. Examples (not packages) use `innerHTML` with first-party numbers only
-   (`examples/conveyor-simulator/src/main.js`).
+   (`examples/conveyor-simulator/src/main.js`, deleted 2026-10-24: port of a three.js app).
    Noted for others (not security, not fixed here): bvh `transfer: true` + abort leaves the caller's buffers detached
    (`bvh/src/async.ts`); progressive glTF ignores the `fetch` option; decoder pool queues are not capped per worker.
    Status 2026-10-15, 11a part 2 (asset parsers; gltf/gltf-pro/decoders/environment images/.margo are part 1):
@@ -3034,9 +3035,8 @@ Built and deployed to the preview, not yet measured:
 2. Sharper light tier: same page with `&scale=1.25`, `&scale=1.5`, `&scale=2`. Keep the highest scale that holds
    60, then set it as the default (`scale` fallback in `packages/quality/src/index.ts`).
 3. Full tier for comparison: `?quality=high`.
-4. three.js comparison (`examples/conveyor-simulator`, see its README; needs `git lfs pull` and a local HTTP
-   server): Margo page vs three page vs three page with `?renderer=webgpu`, with Chromium launched using
-   `--disable-gpu-vsync --disable-frame-rate-limit`. Not yet run since the WebGPU option was added.
+4. [DROPPED 2026-10-24] three.js comparison (`examples/conveyor-simulator`): the example, a port of a three.js app,
+   was deleted 2026-10-24 before this was run.
 5. [DONE, rejected: no compute gain, draw 0.3 ms slower; see 0b] VFX workgroup compaction GPU timing.
 6. UNCOMMITTED, written while the laptop was busy: `packages/geometry/src/subdivide.ts` (loopSubdivide without
    per-vertex strings, per-edge arrays or Sets). Prove it with

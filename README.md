@@ -61,7 +61,6 @@ npm run modern:test:usdz      # USDA/USDC fixtures, archive integrity and limits
 npm run modern:test:gltf-compression # production Draco/Meshopt loading and decoder teardown
 npm run modern:test:wrapper   # five-line setup, loading, lazy packs and teardown
 npm run modern:test:finalization # picking, industrial depth and conveyor stress; dev server required
-npm run modern:check:conveyor     # live UI, motor timing and 15s Chrome GC trace; dev server required
 npm run modern:dev               # original Vite starter / machinery checks
 npm run dev --workspace @margoengine/starter-next
 ```
@@ -320,4 +319,4 @@ Run `npm run catalog` to preview the [searchable Margo catalog](docs/README.md).
 
 `npm run release:check` builds and tests the engine, enforces the 25,000-byte core + stage ceiling, and verifies every tarball's exports, TypeScript declarations and internal dependency versions. `npm run publish:dry-run` runs the local release and supply-chain checks and previews the workspace tarballs without publishing. Releases use the manual [Publish workflow](.github/workflows/publish.yml) from `main`; it defaults to a dry run and requires `NPM_PUBLISH_ENABLED=true` and the `npm-publish` environment. Follow the [release guide](docs/releasing.md) for approval, credentials and publishing the libraries and tools. Starter apps and showcases are private. Refresh the catalog after publishing and run `npm run build:site` to assemble the website.
 
-[Committed SwiftShader results](benchmarks/README.md#swiftshader-runs-no-gpu) include repeat commands and the [historical conveyor picking failure](benchmarks/swiftshader/conveyor-check-picking-failure.txt). Software-renderer timings do not establish physical GPU performance.
+[Committed SwiftShader results](benchmarks/README.md#swiftshader-runs-no-gpu) include repeat commands. Software-renderer timings do not establish physical GPU performance.

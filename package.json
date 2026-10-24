@@ -144,7 +144,6 @@
     "modern:test:citadel": "node scripts/modern-night-citadel-tests.js",
     "modern:test:machinery": "node scripts/modern-machinery-runtime-tests.js",
     "modern:test:finalization": "node scripts/modern-finalization-tests.js",
-    "modern:check:conveyor": "node scripts/modern-conveyor-checks.js",
     "modern:test:packages": "node scripts/modern-package-tests.js",
     "modern:test:wrapper": "node scripts/modern-wrapper-tests.js",
     "modern:test:hardware": "node scripts/modern-hardware-gpu-tests.js",

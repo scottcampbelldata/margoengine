@@ -325,7 +325,7 @@ A case may set `runs` or `warmup` when one sample is already a whole script run 
 | --- | --- |
 | `npm run bench:all` (`scripts/bench-all.mjs`) | `npm run bench`; its real-GPU steps are `npm run bench -- features`. Proofs stay `npm run proofs -- --current`. |
 | `npm run bench:threejs` (`examples/package-benchmarks/vs-threejs/`) | `--engines=` with implementations in engine-bench. Margo's side and the harness moved to `bench/scenes/`. The three.js and Babylon.js files were deleted (clean room); the old harness is in git history before this change. |
-| `npm run benchmark:three-vs-margo` (conveyor pages) | Deleted for the same reason. `examples/benchmark/conveyor-scene.js` and its test stay. |
+| `npm run benchmark:three-vs-margo` (conveyor pages) | Deleted for the same reason. `examples/benchmark/conveyor-scene.js`, its test and the conveyor simulator (a port of a three.js app) followed on 24 October 2026. |
 | `npm run measure:threejs` (`scripts/compare-threejs-size.js`) | `npm run bench -- size --engines=all`, with each engine's `sizeEntry` in engine-bench. `examples/package-benchmarks/results/threejs-size.json` stays as the record of the last measurement. |
 | `npm run measure:demos` (`scripts/measure-demo-bytes.js`) | `npm run bench -- size --cases=demo-`. |
 | `npm run benchmark:demo-loads` | `npm run bench -- startup --cases=demo-` (`LOAD_PROFILE` as before). |

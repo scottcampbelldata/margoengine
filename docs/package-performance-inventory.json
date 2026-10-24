@@ -12,8 +12,11 @@
     "withUnitCoverage": 61,
     "withBrowserReferences": 45,
     "withBenchmarkReferences": 37,
-    "withMeaningfulVisualDemo": 61,
-    "missingMeaningfulDemo": [],
+    "withMeaningfulVisualDemo": 59,
+    "missingMeaningfulDemo": [
+      "@margoengine/environment",
+      "@margoengine/selection"
+    ],
     "needsDefaultReproducibleAsset": [],
     "withoutExplicitBenchmarkReferences": [
       "@margoengine/animation",
@@ -1059,28 +1062,6 @@
           "performanceInstrumentationBuiltIn": false,
           "requiresUserAsset": false,
           "requiresHardware": false
-        },
-        {
-          "key": "conveyor-simulator",
-          "title": "Conveyor maintenance simulator",
-          "pagePath": "examples/conveyor-simulator/margo-conveyor.html",
-          "localDevelopmentPath": "/examples/conveyor-simulator/margo-conveyor.html",
-          "productionUrl": null,
-          "productionEvidence": "Local source example, not in current build-site routes",
-          "sourcePaths": [
-            "examples/conveyor-simulator/src/main.js"
-          ],
-          "evidence": {
-            "path": "examples/conveyor-simulator/src/main.js",
-            "absolutePath": "examples/conveyor-simulator/src/main.js",
-            "line": 513,
-            "link": "examples/conveyor-simulator/src/main.js:513",
-            "actualExercise": "new OrbitControls("
-          },
-          "notes": "Embedded model/HDR; actual environment, picking, outlines and debug lines. Outside current build-site production routes.",
-          "performanceInstrumentationBuiltIn": false,
-          "requiresUserAsset": false,
-          "requiresHardware": false
         }
       ],
       "missingDemo": false,
@@ -1793,50 +1774,6 @@
           "performanceInstrumentationBuiltIn": false,
           "requiresUserAsset": false,
           "requiresHardware": false
-        },
-        {
-          "key": "conveyor-simulator",
-          "title": "Conveyor maintenance simulator",
-          "pagePath": "examples/conveyor-simulator/margo-conveyor.html",
-          "localDevelopmentPath": "/examples/conveyor-simulator/margo-conveyor.html",
-          "productionUrl": null,
-          "productionEvidence": "Local source example, not in current build-site routes",
-          "sourcePaths": [
-            "examples/conveyor-simulator/src/main.js"
-          ],
-          "evidence": {
-            "path": "examples/conveyor-simulator/src/main.js",
-            "absolutePath": "examples/conveyor-simulator/src/main.js",
-            "line": 507,
-            "link": "examples/conveyor-simulator/src/main.js:507",
-            "actualExercise": "Engine.create("
-          },
-          "notes": "Embedded model/HDR; actual environment, picking, outlines and debug lines. Outside current build-site production routes.",
-          "performanceInstrumentationBuiltIn": false,
-          "requiresUserAsset": false,
-          "requiresHardware": false
-        },
-        {
-          "key": "conveyor-core-benchmark",
-          "title": "Margo conveyor benchmark",
-          "pagePath": "examples/conveyor-margo.html",
-          "localDevelopmentPath": "/examples/conveyor-margo.html",
-          "productionUrl": null,
-          "productionEvidence": "Local source example, not in current build-site routes",
-          "sourcePaths": [
-            "examples/benchmark/conveyor-margo.js"
-          ],
-          "evidence": {
-            "path": "examples/benchmark/conveyor-margo.js",
-            "absolutePath": "examples/benchmark/conveyor-margo.js",
-            "line": 6,
-            "link": "examples/benchmark/conveyor-margo.js:6",
-            "actualExercise": "Engine.create("
-          },
-          "notes": "Reproducible engine rendering benchmark; geometry helper is local code and does not exercise the Machinery package.",
-          "performanceInstrumentationBuiltIn": true,
-          "requiresUserAsset": false,
-          "requiresHardware": false
         }
       ],
       "missingDemo": false,
@@ -2508,34 +2445,11 @@
         "benchmark": 0,
         "packageInterop": 1
       },
-      "existingVisualDemos": [
-        {
-          "key": "conveyor-simulator",
-          "title": "Conveyor maintenance simulator",
-          "pagePath": "examples/conveyor-simulator/margo-conveyor.html",
-          "localDevelopmentPath": "/examples/conveyor-simulator/margo-conveyor.html",
-          "productionUrl": null,
-          "productionEvidence": "Local source example, not in current build-site routes",
-          "sourcePaths": [
-            "examples/conveyor-simulator/src/main.js"
-          ],
-          "evidence": {
-            "path": "examples/conveyor-simulator/src/main.js",
-            "absolutePath": "examples/conveyor-simulator/src/main.js",
-            "line": 534,
-            "link": "examples/conveyor-simulator/src/main.js:534",
-            "actualExercise": "Environment.create("
-          },
-          "notes": "Embedded model/HDR; actual environment, picking, outlines and debug lines. Outside current build-site production routes.",
-          "performanceInstrumentationBuiltIn": false,
-          "requiresUserAsset": false,
-          "requiresHardware": false
-        }
-      ],
-      "missingDemo": false,
+      "existingVisualDemos": [],
+      "missingDemo": true,
       "needsIsolatedPackagePerformanceFixture": true,
       "needsDefaultReproducibleAsset": false,
-      "exerciseIdea": "Use the existing Conveyor maintenance simulator example with fixed package workload; instrument cpu hdr/exr parse and gpu ibl precomputation and compare quality/settings before and after.",
+      "exerciseIdea": "Build a demo (the Conveyor maintenance simulator, a port of a three.js app, was deleted 2026-10-24) with fixed package workload; instrument cpu hdr/exr parse and gpu ibl precomputation and compare quality/settings before and after.",
       "measurementTarget": "CPU HDR/EXR parse and GPU IBL precomputation",
       "nextHypothesis": "Measure parse/upload separately from SH/prefilter/LUT compute; inspect repeated unchanged environment work and decoder copies.",
       "performanceStatus": "inventory only: existing references are not new test runs or performance proof",
@@ -4034,28 +3948,6 @@
           },
           "notes": "Shared scene: enable wireframe for Lines, explore/move for Input and locomotion. CPU geometry/procedural generation is startup work, separate from steady rendering.",
           "performanceInstrumentationBuiltIn": true,
-          "requiresUserAsset": false,
-          "requiresHardware": false
-        },
-        {
-          "key": "conveyor-simulator",
-          "title": "Conveyor maintenance simulator",
-          "pagePath": "examples/conveyor-simulator/margo-conveyor.html",
-          "localDevelopmentPath": "/examples/conveyor-simulator/margo-conveyor.html",
-          "productionUrl": null,
-          "productionEvidence": "Local source example, not in current build-site routes",
-          "sourcePaths": [
-            "examples/conveyor-simulator/src/main.js"
-          ],
-          "evidence": {
-            "path": "examples/conveyor-simulator/src/main.js",
-            "absolutePath": "examples/conveyor-simulator/src/main.js",
-            "line": 512,
-            "link": "examples/conveyor-simulator/src/main.js:512",
-            "actualExercise": "new Lines"
-          },
-          "notes": "Embedded model/HDR; actual environment, picking, outlines and debug lines. Outside current build-site production routes.",
-          "performanceInstrumentationBuiltIn": false,
           "requiresUserAsset": false,
           "requiresHardware": false
         }
@@ -6246,31 +6138,8 @@
         "benchmark": 0,
         "packageInterop": 1
       },
-      "existingVisualDemos": [
-        {
-          "key": "conveyor-simulator",
-          "title": "Conveyor maintenance simulator",
-          "pagePath": "examples/conveyor-simulator/margo-conveyor.html",
-          "localDevelopmentPath": "/examples/conveyor-simulator/margo-conveyor.html",
-          "productionUrl": null,
-          "productionEvidence": "Local source example, not in current build-site routes",
-          "sourcePaths": [
-            "examples/conveyor-simulator/src/main.js"
-          ],
-          "evidence": {
-            "path": "examples/conveyor-simulator/src/main.js",
-            "absolutePath": "examples/conveyor-simulator/src/main.js",
-            "line": 512,
-            "link": "examples/conveyor-simulator/src/main.js:512",
-            "actualExercise": "Picking.attach("
-          },
-          "notes": "Embedded model/HDR; actual environment, picking, outlines and debug lines. Outside current build-site production routes.",
-          "performanceInstrumentationBuiltIn": false,
-          "requiresUserAsset": false,
-          "requiresHardware": false
-        }
-      ],
-      "missingDemo": false,
+      "existingVisualDemos": [],
+      "missingDemo": true,
       "needsIsolatedPackagePerformanceFixture": true,
       "needsDefaultReproducibleAsset": false,
       "exerciseIdea": "Picking/outline scene with many selectable objects and both outline algorithms; GPU pass/readback timings with fixed request cadence.",

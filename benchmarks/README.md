@@ -12,7 +12,7 @@ For release fault injection, deterministic hardware-limit fuzzing, lifecycle soa
 
 The [local stress validation results](stress-results.md) record the completed NVIDIA/AMD campaigns, 3M-splat run, 100-cycle soak and remaining release gaps.
 
-[results.md](results.md) holds the 11 October 2026 conveyor comparison with Three.js **0.186.1**. Its runner (`npm run benchmark:three-vs-margo`) was removed on 24 October 2026: other engines now run only from the engine-bench folder next to this repository, through `npm run bench -- --engines=...` (AGENTS.md, clean room).
+The 11 October 2026 conveyor comparison with Three.js **0.186.1** (`results.md`, `conveyor-simulator.md`) and its runners were deleted on 24 October 2026 with the conveyor simulator, a port of a three.js app: other engines now run only from the engine-bench folder next to this repository, through `npm run bench -- --engines=...` (AGENTS.md, clean room).
 
 These measurements were captured on 11 October 2026 before the Margo Engine rename. Historical captures retain their original package names. Raw traces, heap profiles, machine inventories, logs and recovery archives remain local; this repository contains portable summaries and the scripts needed to repeat the checks.
 
@@ -35,9 +35,8 @@ The files in [swiftshader/](swiftshader/) were recorded on 11 October 2026 at co
 | `modern-browser.json` | The browser suite: 8 check groups for both backends and both starters |
 | `modern-domains.json` | The domain suite: 8 check groups for caps, effects, particle sorting and device loss |
 | `modern-packages.json` | The packed package suite: standalone imports, strict consumer types and React 18 |
-| `conveyor-check-picking-failure.txt` | Output of the full `modern:check:conveyor` run, which fails at its live picking step on SwiftShader (the absolute checkout path is shortened) |
 
-To repeat, follow the commands in [README.md](../README.md). GPU suites run sequentially; finalization and live conveyor checks require the Vite dev server. `GPU_VENDOR`, `GPU_POWER` and JSON `BROWSER_ARGS` select the adapter; `scripts/gpu-adapters.ps1` lists Windows adapter LUIDs, which vary by machine/session. A Rust source rebuild also requires the toolchain pinned in `rust-toolchain.toml`; ordinary consumers use the checked-in embedded Wasm.
+To repeat, follow the commands in [README.md](../README.md). GPU suites run sequentially; the finalization suite requires the Vite dev server. `GPU_VENDOR`, `GPU_POWER` and JSON `BROWSER_ARGS` select the adapter; `scripts/gpu-adapters.ps1` lists Windows adapter LUIDs, which vary by machine/session. A Rust source rebuild also requires the toolchain pinned in `rust-toolchain.toml`; ordinary consumers use the checked-in embedded Wasm.
 
 The machinery runtime extension was measured separately on an AMD Ryzen 9 9950X with Node 24.15.0. For 500 queued parts, the Wasm solver median/p95 was 0.0135/0.0137 ms; the complete JS + Wasm surface update was 0.0421/0.0429 ms. Solver maximum was 0.3122 ms, so the 0.040 ms target is met at p95 on this host, not for every sample. Picking a 6,000-triangle assembly measured 0.0009/0.0011 ms median/p95, with a 0.3233 ms maximum. Memory views remained stable; this does not establish whole-application zero GC. Repeat with `npm run bench -- physics --cases=conveyor` (solver) and `npm run bench -- math --cases=raycast-assembly` (picking).
 
@@ -69,11 +68,7 @@ Adjust `D` to the headless shell folder Playwright installed on your machine.
 
 ### Tick and frame timing
 
-```sh
-npm run modern:check:conveyor -- --timing-only
-```
-
-This loads the demo roller assembly at 20, 200 and 240 rollers. For each size it times 300 ticks of the motor drive, gear couplings and Wasm transform update after 120 warm up ticks, then times 180 rendered frames split into JavaScript before the tick, the Wasm export, and scene collection, encoding and upload. It writes `test-results/modern-conveyor-timing.json` and skips the picking and drag trace steps. The browser timer resolves 0.1 ms, so the summary uses means over 10 tick windows.
+The timing check (`npm run modern:check:conveyor -- --timing-only`, `scripts/modern-conveyor-checks.js`) was deleted on 24 October 2026 with the conveyor simulator, a port of a three.js app. It loaded the demo roller assembly at 20, 200 and 240 rollers. For each size it timed 300 ticks of the motor drive, gear couplings and Wasm transform update after 120 warm up ticks, then timed 180 rendered frames split into JavaScript before the tick, the Wasm export, and scene collection, encoding and upload. It wrote `test-results/modern-conveyor-timing.json` and skipped the picking and drag trace steps. The browser timer resolves 0.1 ms, so the summary uses means over 10 tick windows.
 
 The three committed runs were recorded with a copy of the same timing section before the `--timing-only` flag existed; a later run with the flag gave results in the same range.
 

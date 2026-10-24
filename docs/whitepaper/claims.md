@@ -283,6 +283,7 @@ Before this task, no committed same-machine, same-scene result supported "faster
   - three ran at 4x MSAA, Margo at 1x.
   - three won orbit FPS (1586 vs 1446) and load-to-ready (609 vs 816 ms). Margo won explode (1219 vs 786 FPS) and click-to-select (5.8 vs 11.4 ms).
 - **`examples/conveyor-simulator/{margo,three}-conveyor.html`** is the closest to fair: instancing on both sides, 4x MSAA, WebGPU mode for three. It has never had results committed (HANDOFF: "Not yet run since the WebGPU option was added").
+- All three, their scripts and `examples/benchmark/conveyor-scene.js` were deleted on 2026-10-24: the conveyor simulator was a port of a three.js app (clean room). The rows below that cite them are history.
 
 New in this task: `examples/package-benchmarks/vs-threejs/` (`npm run bench:threejs`, since 2026-10-24 `npm run bench -- --engines=all` with other engines in engine-bench). Results are in the section
 [vs-three.js results](#vs-threejs-results) below.

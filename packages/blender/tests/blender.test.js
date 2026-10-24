@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { decodeMargo, parseMargo, loadMargo } from '../dist/index.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { readModel, readMeshes } from '../../../examples/conveyor-simulator/src/glb.js';
 
 const source = await readFile(new URL('./fixtures/triangle.margo', import.meta.url));
 const cadSource = await readFile(new URL('./fixtures/cad-triangle.margo', import.meta.url));
@@ -142,21 +141,6 @@ test('uint16 indices expand to uint32 while legacy and flagged uint32 retain inp
   assert.equal(decodeMargo(flagged).geometry[0][0].indices.buffer, flagged.buffer);
 });
 
-test('conveyor adapter reads compact meshes through its existing geometry and selection path', () => {
-  const model = readModel(Uint8Array.from(cadSource).buffer),
-    [mesh] = readMeshes(model);
-  assert.equal(model.doc.nodes.length, 2);
-  assert.deepEqual(
-    [...mesh.positions],
-    [-Math.fround(0.6), -Math.fround(0.6), 0, Math.fround(0.6), -Math.fround(0.6), 0, 0, Math.fround(0.6), 0],
-  );
-  assert.deepEqual([...mesh.normals], [0, 0, 1, 0, 0, 1, 0, 0, 1]);
-  assert.deepEqual([...mesh.indices], [0, 1, 2]);
-  assert.equal(mesh.material, 0);
-  assert.deepEqual(mesh.min, [-Math.fround(0.6), -Math.fround(0.6), 0]);
-  assert.deepEqual(mesh.max, [Math.fround(0.6), Math.fround(0.6), 0]);
-  assert.throws(() => readModel(new ArrayBuffer(4)), /GLB/);
-});
 test('container rejects malformed headers, section references, overlaps and PNG bombs', () => {
   for (const [offset, value] of [
     [0, 0],

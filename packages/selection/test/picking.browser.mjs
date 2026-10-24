@@ -208,12 +208,6 @@ try {
           checks.push({
             name: 'Occlusion, mutable section clipping, mirrored/sheared transforms and outline integration',
           });
-          const { StudioShading } = await import('/examples/conveyor-simulator/src/shading.js');
-          e.use(new StudioShading());
-          e.render();
-          reset();
-          assert((await e.pick(64, 64)) === front && passes === expectedPasses, 'Conveyor PBR shader lost picking IDs');
-          checks.push({ name: 'Conveyor source shader composes with the MRT attachment' });
           await e.rebootDevice();
           instrument();
           assert((await e.pick(64, 64)) === front, 'Picking did not recover before a restored color frame');

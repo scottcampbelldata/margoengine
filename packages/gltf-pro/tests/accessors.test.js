@@ -1,10 +1,10 @@
-// HANDOFF 5l.p: examples/conveyor-simulator/Untitled.glb (Blender I/O 5.3) was rejected with "Unsupported glTF accessor"
-// only because two uint32 index accessors held more than 1,000,000 elements (accessor 174: 1,021,494 for mesh 66
-// "Mesh_16"; accessor 487: 1,480,944 for mesh 171 "Mesh_15"). The decoded-size budget bounds accessors now; vertices
-// stay capped at 1M per primitive on both the main-thread and worker paths. Errors name mesh, primitive and accessor.
+// HANDOFF 5l.p: the conveyor example's Untitled.glb (Blender I/O 5.3; example deleted 2026-10-24) was rejected with
+// "Unsupported glTF accessor" only because two uint32 index accessors held more than 1,000,000 elements (accessor 174:
+// 1,021,494 for mesh 66 "Mesh_16"; accessor 487: 1,480,944 for mesh 171 "Mesh_15"). The decoded-size budget bounds
+// accessors now; vertices stay capped at 1M per primitive on both the main-thread and worker paths. Errors name mesh,
+// primitive and accessor.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import { parseGLTFAsync, PBRModel } from '../dist/index.js';
 import { instancing } from '../dist/instancing.js';
 import { instancedGLTF } from '../../../tests/support/instanced-gltf.js';
@@ -126,29 +126,6 @@ test('an accessor gltf-pro cannot decode names mesh, primitive, attribute and ac
     const engine = await headless();
     assert.throws(() => modelFromPrepared(engine, prepared), { name: 'TypeError', message });
   }));
-
-// The real file is a Git LFS object: skipped where only the pointer is checked out.
-const conveyor = await readFile(new URL('../../../examples/conveyor-simulator/Untitled.glb', import.meta.url)).catch(
-  () => null,
-);
-const real = conveyor?.length > 12 && conveyor.readUInt32LE(0) === 0x46546c67;
-test(
-  'the 62 MB conveyor GLB parses on the main thread and in the worker, with identical geometry',
-  { skip: !real && 'Untitled.glb is not checked out (git lfs pull)' },
-  () =>
-    headlessModels(async () => {
-      const model = await both(new Uint8Array(conveyor.buffer, conveyor.byteOffset, conveyor.byteLength));
-      assert.equal(model.primitives.length, 570); // 242 meshes drawn by 570 nodes
-      // HANDOFF 5l.r: each mesh is packed once and shared by its nodes (was 570 packs, ~231 MB; now ~174 MB).
-      assert.equal(new Set(model.primitives.map((p) => p.vertices)).size, 242);
-      assert.equal(new Set(model.primitives.map((p) => p.indices)).size, 242);
-      assert.equal(
-        model.primitives.reduce((sum, p) => sum + p.indices.length / 3, 0),
-        2_445_355,
-      );
-      assert.equal(model.asset.accessor(487).length, 1_480_944);
-    }),
-);
 
 // HANDOFF 5l.r: the main-thread path packs a mesh once and its nodes share the arrays, so PBRModel.setup (whose upload
 // cache is keyed by array) creates one vertex and one index buffer per mesh primitive, like the worker path.
