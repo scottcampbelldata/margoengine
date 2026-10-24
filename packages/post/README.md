@@ -2,6 +2,33 @@
 
 Optional WebGPU frame-graph SSAO, GTAO, SSR and SSGI, bloom, motion blur, lens flare, afterimage trails, SMAA and FXAA, a glitch and an effect stack, separate from the frozen core and stage.
 
+## HDR images and render exports: `ImagePost`
+
+`ImagePost` (`@margoengine/post/image`) runs one bloom and display transform for both a path-traced HDR viewport and
+its offscreen PNGs, so exports match what is on screen.
+
+```js
+import { ImagePost } from '@margoengine/post/image';
+
+const post = ImagePost.attach(engine, { bloom: { strength: 0.8, threshold: 1, radius: 0.5 } });
+const png = await post.capture(await tracer.renderImage({ width, height, samples }), { signal });
+```
+
+Options: `bloom` (strength, threshold, radius), `toneMapping` (`'neutral'` by default, `'linear'` or
+`'aces-narkowicz'`), `exposure` in stops (default 0), `gamma` (1 to 5; leave unset for sRGB) and `vignette` (default
+0). The producer's viewport already applies its exposure and vignette, so pass the same values here; raw
+`renderImage` pixels get them once on export. `setOptions()` replaces the whole preset and is refused while an export
+runs. `capture()` returns a PNG blob; `renderImage(image, { signal })` returns display-encoded RGBA8 pixels instead.
+Call it once per frame for a sequence.
+
+The source image is linear RGB. Optional coverage `alpha` means RGB is premultiplied; output PNGs have straight alpha,
+and glow can raise coverage over a transparent background. Exports are limited to 16,777,216 pixels and the device's
+texture limits; use the tracer's own capture for larger images without post-processing. Cancelling, a device change or
+disposal ends an active export. Dispose `ImagePost` before its engine, and detach it when bloom is off.
+
+`Bloom.encodeImage(context, input, output)` runs the same HDR bloom kernel for other packages: use a separate
+unattached `Bloom`, `rgba16float` views of the image size, and submit before disposing it.
+
 ## Combining effects: `PostStack`
 
 Each effect alone owns its own scene capture, so alone they reject each other. `PostStack`
