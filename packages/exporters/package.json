@@ -46,6 +46,10 @@
     "./unity": {
       "types": "./dist/unity.d.ts",
       "import": "./dist/unity.js"
+    },
+    "./hash": {
+      "types": "./dist/hash.d.ts",
+      "import": "./dist/hash.js"
     }
   },
   "files": [

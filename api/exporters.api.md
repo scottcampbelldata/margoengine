@@ -319,6 +319,11 @@ export interface SkinData {
     extras?: Extras;
 }
 
+export interface SplitGLBOptions {
+    copy?: boolean;
+    parse?: (text: string) => unknown;
+}
+
 export interface TextureData {
     image: Uint8Array;
     mimeType: 'image/png' | 'image/jpeg';
@@ -388,7 +393,7 @@ export function paletteTexture(colors: ArrayLike<number>, options?: {
 
 export function sampleFrames(first: number, last: number, fps: number, maxFrames?: number): FrameClip;
 
-export function splitGLB(bytes: Uint8Array): GLBParts;
+export function splitGLB(bytes: Uint8Array, options?: SplitGLBOptions): GLBParts;
 
 // Not exported from this entry, but used by the exports above:
 

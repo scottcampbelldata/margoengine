@@ -22,6 +22,20 @@ export interface GLBParts {
   chunks: GLBChunk[];
 }
 
+/** Options for {@link splitGLB}. */
+export interface SplitGLBOptions {
+  /**
+   * `false` returns `bin` and the chunk data as views into `bytes` instead of copies, for large files read once;
+   * they change if `bytes` does. Default `true`.
+   */
+  copy?: boolean;
+  /**
+   * Parses the JSON chunk's text, for a stricter parser. The default is JSON.parse without `__proto__`,
+   * `constructor` and `prototype` keys. A throw refuses the GLB.
+   */
+  parse?: (text: string) => unknown;
+}
+
 /** A triangle mesh to append as a new root node. */
 export interface AppendedMesh {
   /** Name of the new node and its mesh, distinct from every node name already in the file. */
@@ -70,9 +84,10 @@ export function glbFrame(text: Uint8Array, jsonLength: number, binLength: number
 /**
  * Splits GLB bytes into the parsed JSON, the BIN chunk and any further chunks, checking the header, chunk order and
  * alignment, the UTF-8 JSON and that buffer 0 matches the BIN chunk.
- * @throws TypeError for anything that is not a valid glTF 2.0 GLB.
+ * @throws TypeError for anything that is not a valid glTF 2.0 GLB, or when `options.parse` throws.
  */
-export function splitGLB(bytes: Uint8Array): GLBParts {
+export function splitGLB(bytes: Uint8Array, options: SplitGLBOptions = {}): GLBParts {
+  const { copy = true, parse = parseJSON } = options;
   if (!(bytes instanceof Uint8Array) || bytes.length < 20) throw new TypeError('GLB needs at least a 20-byte header');
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (view.getUint32(0, true) !== MAGIC || view.getUint32(4, true) !== 2 || view.getUint32(8, true) !== bytes.length)
@@ -92,10 +107,10 @@ export function splitGLB(bytes: Uint8Array): GLBParts {
   if (!chunks.length) throw new TypeError('GLB has no JSON chunk');
   let json: unknown;
   try {
-    // Untrusted file: __proto__/constructor/prototype keys are dropped so they cannot reach a caller's merge.
-    json = parseJSON(new TextDecoder('utf-8', { fatal: true }).decode(chunks[0].data));
-  } catch {
-    throw new TypeError('GLB JSON chunk is not valid UTF-8 JSON');
+    // Untrusted file: the default parser drops __proto__/constructor/prototype keys so they cannot reach a caller's merge.
+    json = parse(new TextDecoder('utf-8', { fatal: true }).decode(chunks[0].data));
+  } catch (cause) {
+    throw new TypeError('GLB JSON chunk is not valid UTF-8 JSON', { cause });
   }
   if (!isObject(json) || Array.isArray(json) || !isObject(json.asset) || json.asset.version !== '2.0')
     throw new TypeError('GLB JSON is not a glTF 2.0 document');
@@ -113,8 +128,8 @@ export function splitGLB(bytes: Uint8Array): GLBParts {
   }
   return {
     json: json as Record<string, unknown>,
-    bin: bin && bin.slice(),
-    chunks: chunks.slice(bin ? 2 : 1).map(({ type, data }) => ({ type, data: data.slice() })),
+    bin: bin && (copy ? bin.slice() : bin),
+    chunks: chunks.slice(bin ? 2 : 1).map(({ type, data }) => ({ type, data: copy ? data.slice() : data })),
   };
 }
 

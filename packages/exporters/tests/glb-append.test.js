@@ -76,6 +76,28 @@ test('splitGLB and joinGLB round-trip JSON, BIN and unknown chunks', () => {
   assert.throws(() => joinGLB({ ...parts, chunks: [{ type: NOTE, data: new Uint8Array(3) }] }), /aligned/);
 });
 
+test('splitGLB copy: false returns views into the file and parse replaces JSON.parse', () => {
+  const bytes = visual(),
+    copied = splitGLB(bytes),
+    views = splitGLB(bytes, { copy: false });
+  assert.deepEqual(views, copied);
+  assert.equal(views.bin.buffer, bytes.buffer, 'BIN shares the input buffer');
+  assert.equal(views.chunks[0].data.buffer, bytes.buffer, 'unknown chunks share the input buffer');
+  assert.notEqual(copied.bin.buffer, bytes.buffer, 'the default copies');
+  const seen = [];
+  splitGLB(bytes, { parse: (text) => (seen.push(text), JSON.parse(text)) });
+  assert.equal(seen.length, 1);
+  assert.throws(
+    () =>
+      splitGLB(bytes, {
+        parse: () => {
+          throw new SyntaxError('duplicate key');
+        },
+      }),
+    (error) => error instanceof TypeError && error.cause instanceof SyntaxError,
+  );
+});
+
 test('appendGLBMeshes adds named proxies and keeps every existing byte', needsValidator, async () => {
   const before = visual(),
     original = splitGLB(before),

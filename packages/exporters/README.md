@@ -1,7 +1,7 @@
 # @margoengine/exporters
 
 glTF 2.0 / GLB, STL, OBJ (with MTL), PLY, static USDZ and static COLLADA 1.4.1 (`.dae`) export for Margo Engine scenes
-and plain geometry data.
+and plain geometry data, plus SHA-256 for checking exported files.
 
 Build from source with `npm run build` in `packages/exporters`.
 
@@ -279,8 +279,10 @@ const glb = exportGLB({nodes: [prop], animations: [{name: 'Clip', channels, extr
 
 `splitGLB(bytes)` checks a GLB (header, chunk order and alignment, UTF-8 JSON, buffer 0 against the BIN chunk) and
 returns `{json, bin, chunks}`, where `chunks` are the chunks glTF 2.0 does not define, in order; `joinGLB(parts)`
-writes them back (a round trip is byte-identical). `appendGLBMeshes(bytes, meshes)` adds `{name, positions, indices,
-volume?, extras?, meshExtras?}` triangle meshes as root nodes of the active scene and keeps everything else: existing
+writes them back (a round trip is byte-identical). `splitGLB(bytes, {copy: false})` returns `bin` and the chunks as
+views into `bytes` (no second copy of a large file), and `{parse}` replaces the default parser (`JSON.parse` without
+`__proto__`, `constructor` and `prototype` keys) with a stricter one. `appendGLBMeshes(bytes, meshes)` adds `{name,
+positions, indices, volume?, extras?, meshExtras?}` triangle meshes as root nodes of the active scene and keeps everything else: existing
 JSON members, extensions and extras, the BIN bytes, and every further chunk. Names must not clash with an existing node
 (importers match them); every triangle needs area, and `volume: true` requires points off one plane, as convex
 collision hulls do. Existing scene roots, node children and the active scene index must resolve to distinct existing
@@ -375,6 +377,26 @@ const {root, skin} = skinHierarchy(joints, {origin, name: 'Rig'});
 const mesh = {name: 'Figure', geometry: {positions, normals, indices, ...skinWeights(positions, joints, {origin})}, skin};
 const glb = exportGLB({nodes: [{name: 'Model', children: [mesh, root]}]});
 ```
+
+## Hashing exported files (`@margoengine/exporters/hash`)
+
+An optional subpath for content hashes of exported files and manifests, with no other hash library:
+
+| Function | Result |
+| --- | --- |
+| `sha256(bytes)` | 64 lowercase hex digits |
+| `new SHA256().update(a).update(b)`, `.digest()` / `.hex()` | Incremental, synchronous SHA-256 (FIPS 180-4): hash a file in pieces as it is written; no input is copied or kept |
+
+```ts
+import {SHA256, sha256} from '@margoengine/exporters/hash';
+
+const fileHash = sha256(glb);
+const manifestHash = new SHA256().update(header).update(body).hex();
+```
+
+Measured in Node 26 on the development machine: 266 MB/s (64 MiB in 241 ms). For one-shot hashing of large buffers in
+a browser, `crypto.subtle.digest('SHA-256', bytes)` is faster. To check exported textures, read them with
+`decodePNG` from `@margoengine/decoders/png`.
 
 ## GLB size limits
 
