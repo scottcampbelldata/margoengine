@@ -7,6 +7,7 @@ import { checkCount, countLimit } from '../../shared/limits.js';
 import { parseJSON } from '../../shared/json.js';
 import { assetURL } from '../../shared/asset-url.js';
 import { GLB_BIN, glbChunks, isGLB } from '../../shared/glb.js';
+import { COMPONENT_BYTES, readComponent } from '../../shared/accessor.js';
 
 const limit = 64 * 1024 * 1024;
 import type { GLTFDocument as Document, GLTFNode } from '../../shared/gltf.js';
@@ -182,7 +183,7 @@ export function parseGLTF(
       !(index ? [5121, 5123, 5125] : [5126]).includes(a.componentType)
     )
       throw new Error('Unsupported glTF accessor');
-    const size = a.componentType === 5121 ? 1 : a.componentType === 5123 ? 2 : 4,
+    const size = COMPONENT_BYTES[a.componentType],
       components = index ? 1 : 3,
       count = integer(a.count, 'accessor count', 1),
       offset = integer(a.byteOffset ?? 0, 'accessor offset'),
@@ -203,16 +204,8 @@ export function parseGLTF(
     const view = new DataView(buffer.buffer, buffer.byteOffset + start, length),
       out = index ? new Uint32Array(count) : new Float32Array(count * 3);
     for (let i = 0; i < count; i++)
-      for (let c = 0; c < components; c++) {
-        const at = offset + i * stride + c * size;
-        out[i * components + c] = index
-          ? size === 1
-            ? view.getUint8(at)
-            : size === 2
-              ? view.getUint16(at, true)
-              : view.getUint32(at, true)
-          : view.getFloat32(at, true);
-      }
+      for (let c = 0; c < components; c++)
+        out[i * components + c] = readComponent(view, offset + i * stride + c * size, a.componentType);
     return out;
   };
   const materials = (doc.materials ?? []).map((m) => {

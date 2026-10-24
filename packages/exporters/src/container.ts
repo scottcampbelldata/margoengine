@@ -2,6 +2,7 @@
 // 4-byte-aligned bufferViews, accessors with exact Float32 bounds, and GLB / .gltf packaging. No engine imports.
 import type { GLTFDocument } from '../../shared/gltf.js';
 import { glbFrame } from './glb.js';
+import { ACCESSOR_WIDTHS } from '../../shared/accessor.js';
 
 export interface GLTFJsonResult {
   /** The glTF document object. */
@@ -17,26 +18,6 @@ export interface GLTFJsonResult {
 export const FLOAT = 5126,
   ARRAY_BUFFER = 34962,
   ELEMENT_ARRAY_BUFFER = 34963;
-// No prototype: accessor types come from the source file ("constructor" must not resolve to a function).
-/** @internal Components per glTF accessor type. Shared with the import-bundle readers (import-data.ts). */
-export const ACCESSOR_WIDTHS: Readonly<Record<string, number>> = /* @__PURE__ */ Object.assign(Object.create(null), {
-  SCALAR: 1,
-  VEC2: 2,
-  VEC3: 3,
-  VEC4: 4,
-  MAT2: 4,
-  MAT3: 9,
-  MAT4: 16,
-});
-/** @internal Bytes per glTF component type, keyed by its code. */
-export const COMPONENT_BYTES: Readonly<Record<string, number>> = /* @__PURE__ */ Object.assign(Object.create(null), {
-  5120: 1,
-  5121: 1,
-  5122: 2,
-  5123: 2,
-  5125: 4,
-  5126: 4,
-});
 const arrays: Record<
   number,
   {

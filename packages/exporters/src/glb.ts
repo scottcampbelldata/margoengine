@@ -4,6 +4,7 @@ import { parseJSON } from '../../shared/json.js';
 import { copyExtras } from './extras.js';
 import type { Extras } from './scene.js';
 import { GLB_BIN, GLB_JSON, GLB_MAGIC, glbChunks } from '../../shared/glb.js';
+import { readComponent } from '../../shared/accessor.js';
 
 const isObject = <T>(value: T): value is T & Record<string, unknown> => typeof value === 'object' && value !== null;
 
@@ -187,14 +188,6 @@ const COMPONENTS: Record<number, [new (length: number) => AccessorValues['values
   5126: [Float32Array, 4],
 };
 const SPARSE_INDEX: Record<number, number> = { 5121: 1, 5123: 2, 5125: 4 };
-
-function readComponent(data: DataView, at: number, type: number): number {
-  if (type === 5126) return data.getFloat32(at, true);
-  if (type === 5125) return data.getUint32(at, true);
-  if (type === 5123) return data.getUint16(at, true);
-  if (type === 5122) return data.getInt16(at, true);
-  return type === 5121 ? data.getUint8(at) : data.getInt8(at);
-}
 
 /**
  * Reads accessor `index` of a split GLB ({@link splitGLB}) as plain data: strided and matrix-padded elements are

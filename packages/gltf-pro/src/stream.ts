@@ -1,5 +1,6 @@
 import type { GLTFPrimitive } from '../../shared/gltf.js';
 import { GLB_BIN, GLB_JSON, GLB_MAGIC } from '../../shared/glb.js';
+import { COMPONENT_BYTES } from '../../shared/accessor.js';
 // Network and decode half of @margoengine/gltf-pro/progressive. Runs in dist/workers/progressive.js, or on the main
 // thread where Worker is unavailable. HTTP range requests fetch each primitive's accessor bytes in the priority order
 // the main thread sends; a server without range support streams the whole file and primitives decode as their bytes
@@ -9,7 +10,6 @@ import {
   asyncCompression,
   assetLimit,
   checkDocument,
-  componentSizes,
   decodeImage,
   components,
   embedded,
@@ -367,7 +367,7 @@ export class GLTFStream {
   // Byte ranges (in source coordinates) an accessor reads, exactly as GLTFAsset.accessor reads them.
   private ranges(doc: GLTFDocument, id: number, out: Range[]): void {
     const a = entry(doc.accessors, id, 'accessor'),
-      size = componentSizes[a.componentType],
+      size = COMPONENT_BYTES[a.componentType],
       width = components[a.type],
       count = a.count;
     const span = (view: number, offset: number, length: number) => {
@@ -393,7 +393,7 @@ export class GLTFStream {
       span(
         a.sparse.indices.bufferView,
         a.sparse.indices.byteOffset ?? 0,
-        n * componentSizes[a.sparse.indices.componentType],
+        n * COMPONENT_BYTES[a.sparse.indices.componentType],
       );
       span(a.sparse.values.bufferView, a.sparse.values.byteOffset ?? 0, n * size * width);
     }

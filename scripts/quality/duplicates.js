@@ -18,7 +18,8 @@ export const FAMILIES = {
   'crc32-table': /0xedb88320/i, // CRC-32 (IEEE) table polynomial: shared/crc32.js
   'inflate-tables': /3,\s*4,\s*5,\s*6,\s*7,\s*8,\s*9,\s*10,\s*11,\s*13,\s*15,\s*17/, // DEFLATE length bases: shared/inflate.js
   'glb-container': /0x46546c67/i, // 'glTF' GLB magic: GLB read/write
-  'gltf-accessor': /\bcomponentType\b/, // glTF accessor readers
+  'gltf-accessor':
+    /(?:5126|getFloat32)[\s\S]{0,80}(?:5125|getUint32)[\s\S]{0,80}(?:5123|getUint16)[\s\S]{0,80}(?:getInt16|getUint8)/, // glTF component read: shared/accessor.js
   'hidden-ancestor': /for \(\s*(?:let )?[^;{]*;[^;{]*;[^{]*?parents(?:\?\.)?\[[\s\S]{0,240}?\.hidden\[/, // visibility walk up store.parents: shared/visibility.js
   'ggx-ndf': /\(\s*[\w.]*\s*-\s*1(?:\.0?)?\s*\)\s*\+\s*1(?:\.0?)?\b/, // GGX D term denominator nh*nh*(a2 - 1) + 1
   'hex-colour': /\/\^#\??\(?\[0-9a-f/i, // '#rgb' / '#rrggbb' parsing regex: math/color

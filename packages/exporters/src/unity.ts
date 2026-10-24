@@ -1,7 +1,7 @@
 // Unity import bundle: the unchanged GLB and its atlas PNG plus a profile sidecar for the separately installed
 // support package (glTFast import, colliders, clips). Native Unity/glTFast owns interpretation; the caller's encoded
 // geometry, skin, clips and PNG are never rewritten.
-import { ACCESSOR_WIDTHS } from './container.js';
+import { ACCESSOR_WIDTHS } from '../../shared/accessor.js';
 import { splitGLB } from './glb.js';
 import {
   type BundleEntry,

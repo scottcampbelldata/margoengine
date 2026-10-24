@@ -15,6 +15,7 @@ import type {
   GLTFTextureInfo,
 } from '../../shared/gltf.js';
 import { GLB_BIN, glbChunks, isGLB } from '../../shared/glb.js';
+import { COMPONENT_BYTES, readComponent } from '../../shared/accessor.js';
 export type { GLTFDocument } from '../../shared/gltf.js';
 import { withMaterials } from './default-materials.js';
 /** Retained mip bytes let compressed textures upload again after device restoration. */
@@ -249,7 +250,6 @@ export function embedded(uri: string, limit = assetLimit): Uint8Array {
   }
   return Uint8Array.from(text, (c) => c.charCodeAt(0));
 }
-export const componentSizes: Record<number, number> = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 };
 export const components: Record<string, number> = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
 const meshoptExtension = 'EXT_meshopt_compression',
   dracoExtension = 'KHR_draco_mesh_compression',
@@ -265,7 +265,7 @@ function accessorLayout(doc: GLTFDocument, id: unknown, type?: string) {
   const index = integer(id, 'accessor'),
     def = entry(doc.accessors, index, 'accessor');
   if (type && def.type !== type) throw new TypeError('Invalid glTF accessor type');
-  const size = typeof def.componentType === 'number' ? componentSizes[def.componentType] : undefined,
+  const size = typeof def.componentType === 'number' ? COMPONENT_BYTES[def.componentType] : undefined,
     width = typeof def.type === 'string' && Object.hasOwn(components, def.type) ? components[def.type] : undefined,
     count = integer(def.count, 'accessor count', 1);
   if (
@@ -280,22 +280,6 @@ function accessorLayout(doc: GLTFDocument, id: unknown, type?: string) {
   return { index, def, size, width, count };
 }
 const normalizers: Record<number, number> = { 5120: 127, 5121: 255, 5122: 32767, 5123: 65535 };
-function component(view: DataView, at: number, type: number): number {
-  switch (type) {
-    case 5126:
-      return view.getFloat32(at, true);
-    case 5125:
-      return view.getUint32(at, true);
-    case 5123:
-      return view.getUint16(at, true);
-    case 5122:
-      return view.getInt16(at, true);
-    case 5121:
-      return view.getUint8(at);
-    default:
-      return view.getInt8(at);
-  }
-}
 export class GLTFAsset {
   readonly buffers: Uint8Array[];
   private readonly cache = new Map<number, Float32Array>();
@@ -500,7 +484,7 @@ export class GLTFAsset {
       for (let i = 0; i < n; i++) {
         const row = (ids ? ids[i] : i) * width;
         for (let c = 0, at = offset + i * stride; c < width; c++, at += size) {
-          let value = component(view, at, type);
+          let value = readComponent(view, at, type);
           if (divisor) value = Math.max(-1, value / divisor);
           if (!Number.isFinite(Math.fround(value))) throw new RangeError('Non-finite glTF accessor');
           output[row + c] = value;
@@ -534,7 +518,7 @@ export class GLTFAsset {
         n = integer(sparse.count, 'sparse count', 1),
         indices = sparse.indices,
         values = sparse.values,
-        indexSize = componentSizes[indices?.componentType];
+        indexSize = COMPONENT_BYTES[indices?.componentType];
       if (n > count || ![5121, 5123, 5125].includes(indices?.componentType))
         throw new TypeError('Invalid glTF sparse indices');
       const bytes = this.view(indices.bufferView),

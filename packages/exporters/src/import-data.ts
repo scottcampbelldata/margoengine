@@ -2,7 +2,7 @@
 // GLB range check, node hierarchy, SHA-256 file digests and the entry type. Geometry stays owned by the native importer.
 import { MargoError } from '@margoengine/math/errors';
 import type { ZIPEntry } from './archive.js';
-import { ACCESSOR_WIDTHS as ARITY, COMPONENT_BYTES } from './container.js';
+import { ACCESSOR_WIDTHS as ARITY, COMPONENT_BYTES, readComponent } from '../../shared/accessor.js';
 
 /** One file of an import bundle: a safe relative POSIX path and its owned bytes. Pass entries to `encodeZIP`. */
 export interface BundleEntry extends ZIPEntry {
@@ -212,14 +212,6 @@ export function validateEmbeddedImportData(document: Json, bin: Uint8Array | nul
   }
 }
 
-const GETTERS: Record<number, 'getInt8' | 'getUint8' | 'getInt16' | 'getUint16' | 'getUint32' | 'getFloat32'> = {
-  5120: 'getInt8',
-  5121: 'getUint8',
-  5122: 'getInt16',
-  5123: 'getUint16',
-  5125: 'getUint32',
-};
-
 /**
  * @internal Reader of one validated accessor's components: `read(element, component)`. Call only after
  * {@link validateEmbeddedImportData}, which proves every read stays inside `bin`.
@@ -234,7 +226,6 @@ export function accessorReader(
     size = COMPONENT_BYTES[String(accessor.componentType)],
     base = ((view.byteOffset ?? 0) as number) + ((accessor.byteOffset ?? 0) as number),
     stride = (view.byteStride ?? size * ARITY[String(accessor.type)]) as number;
-  const get = GETTERS[accessor.componentType as number] ?? 'getFloat32';
-  // getInt8/getUint8 ignore the little-endian flag.
-  return (element, component) => data[get](base + element * stride + component * size, true);
+  const type = accessor.componentType as number;
+  return (element, component) => readComponent(data, base + element * stride + component * size, type);
 }
