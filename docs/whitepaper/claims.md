@@ -126,26 +126,26 @@ every transform write bit for bit, and the animator has skipped unchanged writes
 | animation-vat (measurement, no baseline) | H-16, PKG-002 | gltf-pro + animation at `700838e` | – |
 | materials-atlas (measurement, no baseline) | PKG-055 | geometry + materials at `700838e` | – |
 | binding-limit | H-27, DOC-062, PKG-102 | `e017d50` -> `f8a36ca`: 3,812 calls without IBL, 4,556 with (384 mapped) | – |
-| gltf-pro-lighting-hooks | PKG-035, PKG-037 | `15c87f1` -> `cf2953e`: 4,556 calls; PKG-037: `114130c` -> `7072190` | `8199756`: 4,476 calls |
-| materials-uv-transform | PKG-054, PKG-037 | `1970fda` -> `700838e`: 1,277 calls; PKG-037: `114130c` -> `7072190` | `fd4d2156`: 1,321 calls |
+| gltf-pro-lighting-hooks | PKG-035, PKG-037 | `15c87f1` -> `cf2953e`: 4,556 calls; PKG-037: `114130c` -> `7072190` | `57250a49`: 4,476 calls |
+| materials-uv-transform | PKG-054, PKG-037 | `1970fda` -> `700838e`: 1,277 calls; PKG-037: `114130c` -> `7072190` | `57250a49`: 1,321 calls |
 | lines-perspective | PKG-041 | `96edc75` -> `6da7f7e`: 946 calls | `96edc75` |
 | math-consolidation | PKG-059 | `2484971` -> `4eed254` (math built at the pin) | `2484971` |
-| post-stack | PKG-065 | `5b1fe66^` -> `5b1fe66`: 12,378 calls (creative `5b1fe66^` -> `3319317`) | `780b785c` |
+| post-stack | PKG-065 | `5b1fe66^` -> `5b1fe66`: 12,378 calls (creative `5b1fe66^` -> `3319317`) | `57250a49` |
 | selection-xray-off | PKG-068 | `46f9484` -> `80d4cfb`: 10,586 calls | `b3ed8ac` |
-| clustered-local-shadows | PKG-096, PKG-097 | `0ed56b9` -> `590278e`: 482 calls, 8 params.z writes | `0ed56b9` |
-| clustered-area-lights | – | `67e0172` -> `dab9633`: 482 calls | `67e0172` |
-| clustered-light-hooks | – | `6c20076d` -> `b4700864`: 482 calls without the directional, IES and projector entries and with each attached but empty | `6c20076d` |
-| environment-hemisphere | – | `6c20076d` -> `b4700864`: 53 shader texts (IBL, Fog, LightProbes on six core variants, gltf-pro's four shader kinds) and 23 calls without a HemisphereLight | `6c20076d` |
-| color-output | – | `7dcc958` -> `225b1d6`: 6,174 calls | `780b785c` |
+| clustered-local-shadows | PKG-096, PKG-097 | `0ed56b9` -> `590278e`: 482 calls, 8 params.z writes | `57250a49` |
+| clustered-area-lights | – | `67e0172` -> `dab9633`: 482 calls | `57250a49` |
+| clustered-light-hooks | – | `6c20076d` -> `b4700864`: 482 calls without the directional, IES and projector entries and with each attached but empty | `57250a49` |
+| environment-hemisphere | – | `6c20076d` -> `b4700864`: 53 shader texts (IBL, Fog, LightProbes on six core variants, gltf-pro's four shader kinds) and 23 calls without a HemisphereLight | `57250a49` |
+| color-output | – | `7dcc958` -> `225b1d6`: 6,174 calls | `57250a49` |
 | deformed-shadows | – | `38d448e` -> `282e751` | `2cd81c1` |
 | environment-volumetric | – | `7c47a09` -> `366ebff` | `2cd81c1`: 70 root calls; 344/533 isolated calls |
-| oit-detached | – | `b803d56` -> `0e02ead`: 2,864 calls (2,964 until 5w.f replaced the story's transmission material with a plain BLEND one: transmission now draws twice by design) | `8199756`: 2,732 calls |
+| oit-detached | – | `b803d56` -> `0e02ead`: 2,864 calls (2,964 until 5w.f replaced the story's transmission material with a plain BLEND one: transmission now draws twice by design) | `57250a49`: 2,732 calls |
 | post-ssr | – | `7c47a09` -> `3cf1453`: 9,269 calls | `de93aa5`: 12,431 calls (AgX normalised for older refs, see below) |
 | post-ssr-models | LIM-016 | `3cf1453` -> `838ae6e`: 30,858 calls | `de93aa5`: 37,182 calls |
 | taa-velocity | – | `6c20076d` (before the `taa.velocity` getter) -> `e1a20e13` (the motion-blur commit): 16,923 calls at 1x and 4x, the getter read every frame | `d41cdafd` |
 | terrain-ssr | – | `6c20076d` (before terrain's capture hook) -> the water/terrain SSR commit: terrain.proof.js's story, 6,458 calls in two of its three terrains | `6c20076d` |
-| water-ssr | – | `6c20076d` (before water's capture hook) -> the water/terrain SSR commit: 2,762 calls in 3 stories | `780b785c` |
-| quality-presets | – | `96daac7` -> `01e5e35` | `780b785c` |
+| water-ssr | – | `6c20076d` (before water's capture hook) -> the water/terrain SSR commit: 2,762 calls in 3 stories | `57250a49` |
+| quality-presets | – | `96daac7` -> `01e5e35` | `57250a49` |
 | post-ssao-perspective | – | `9c761d5` -> `9702e57`: 3,282 calls | – |
 | probes-decals | – | `ecdcb31` -> `7d144fb`: 15 identical entry bundles, 135 + 12,320 calls | – |
 | procedural-deps | – | HISTORICAL: `ed53ec5` -> `fff47af`; the baseline imports simplex-noise and isosurface, removed from the lockfile in 5l.v, so the runner reports it instead of failing | – |
@@ -195,6 +195,33 @@ the view's origin so a fog view can sit anywhere on the canvas, and its bind gro
 helper in a different order; uniform bytes are identical (`f30bfe1e`). water-ssr: water keeps its foam textures per
 view (`f30bfe1e`), which changes when they are created and released; Codex's work/changes pins for these two proofs
 (`018cd31`, `c92807f`) were never on main and are not used.
+
+**Eleven current references advanced to `57250a49` on 2026-10-24 (clean-room rewrites):** each failing proof was
+re-run with every assertion reported (not stopped at the first), and every difference is shader text from a named
+rewrite; call counts, descriptors, bindings and every buffer write are unchanged (4,476 / 1,321 / 2,732 / 14,610 /
+7,734 calls as before).
+
+- **clustered-area-lights, clustered-light-hooks, clustered-local-shadows:** 10 of 241 calls per story (shader
+  modules only): the light loop's falloff and cone are now `packages/shared/light-terms.js`'s `legacyTerms` (window
+  `clamp(1 - (d/range)^4, 0, 1)^2` over `max(d^2, 2^-12)` instead of `0.01`; the same Hermite cone, written with a
+  `ramp` local and a 1e-6 instead of 1e-5 guard; `adff4e06`).
+- **gltf-pro-lighting-hooks:** 75 of 2,238 calls per sample count: the shared cotangent frame
+  (`shared/tangent-frame.js`, `adff4e06`; B = grad(-v) as before), one extra blank line after it, and the clustered
+  falloff text above.
+- **oit-detached:** 38 of 1,366 calls: the cotangent frame text only.
+- **materials-uv-transform:** 7 of 1,321 calls: the cotangent frame text; on the normal-mapped materials box the
+  feature edit is now `mat3x3f(gu*k,-gv*k,n)` (the same +b for bottom-left UVs, `69e926e7`); the matcap lookup is
+  rewritten (view-space basis with a fallback when the eye looks straight along y, scale 0.49 instead of 0.495).
+- **environment-hemisphere:** shader texts only: the cotangent frame; sheen's ambient uses the directional albedo
+  `margoSheenAlbedo(n.v, roughness)` instead of the constant 0.157, the Charlie lobe is `margoSheenBRDF`, sheen
+  roughness is clamped to 0.03-1 instead of floored at 0.07, and the sky term of the probes path reads the base normal
+  `s.n` instead of the clearcoat normal (`adff4e06`).
+- **color-output and post-stack:** 4 (2 for the Bloom stack) shader modules per story: the refitted ACES curve
+  (`26cb6fc0`, see `packages/tonemap/NOTICE.md`); creative's pinned pair is unchanged.
+- **quality-presets:** 2 calls in the volumetric story: VolumetricFog's 3D value noise now uses a PCG lattice hash
+  and a second octave offset of (23.7, -11.3, 5.9) at x2.11 (`2d28deb2`); every other story matches.
+- **water-ssr:** 4 calls in each of 3 stories: the ripple gradient noise is rewritten (PCG-hashed corner angles,
+  explicit quintic-fade derivatives; `2d28deb2`).
 
 **taa-velocity, advanced to `d41cdafd` on 2026-10-21:** hygiene group C (HANDOFF 5k) converted TAA's bare Errors.
 The story records each thrown error as a `throw` entry (class and message), and exactly three per run changed: the

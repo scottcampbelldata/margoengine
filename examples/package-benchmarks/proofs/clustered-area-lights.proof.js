@@ -5,7 +5,7 @@
 // identical at `ref` and in the working tree, both without the entry and with an AreaLights attached whose list is empty
 // (it creates its buffer and hook only once it has lights).
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/clustered-area-lights.proof.js [ref] [pin] [--current]
-// Pinned: 67e0172 against dab9633, the commit that made this claim. --current: 67e0172 against the working tree.
+// Pinned: 67e0172 against dab9633, the commit that made this claim. --current: 57250a49 against the working tree.
 import assert from 'node:assert/strict';
 import { refs, versions, entryAt } from './compare.js';
 import { mockGPU, context, passes } from './gpu-recorder.js';
@@ -13,7 +13,7 @@ import { Engine, TransformStore } from '../../../packages/core/dist/extension.js
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 
-const { ref, pin } = refs('67e0172', 'dab9633', '67e0172');
+const { ref, pin } = refs('67e0172', 'dab9633', '57250a49');
 const { baseline, candidate } = await versions('clustered', ref, undefined, pin);
 const gltf = await entryAt('gltf-pro', 'src/index.ts', pin),
   { AreaLights } = await entryAt('clustered', 'src/area.ts', pin);

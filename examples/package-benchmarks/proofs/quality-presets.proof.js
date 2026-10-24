@@ -7,7 +7,7 @@
 // Story per package: setup on a core Engine over the recording mock GPU, 8 frames at 1x and 4x MSAA with a resize and a
 // device restore, then dispose.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/quality-presets.proof.js [ref] [pin] [--current]
-// Pinned: 96daac7 against 01e5e35, the commit that recorded results/quality-presets.json. --current: 8199756 against the
+// Pinned: 96daac7 against 01e5e35, the commit that recorded results/quality-presets.json. --current: 57250a49 against the
 // working tree, including the approved phone shadows, deterministic/minimum-size VFX and PBR Neutral output (claims.md).
 import assert from 'node:assert/strict';
 import { refs, versions, entryAt, save } from './compare.js';
@@ -15,7 +15,7 @@ import { mockGPU, context } from './gpu-recorder.js';
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 
-const { ref, pin } = refs('96daac7', '01e5e35', '780b785c');
+const { ref, pin } = refs('96daac7', '01e5e35', '57250a49');
 const [{ Clustered }, { Tonemap }, { QUALITY_PRESETS }] = await Promise.all(
     ['clustered', 'tonemap', 'quality'].map((name) => entryAt(name, 'src/index.ts', pin)),
   ),
