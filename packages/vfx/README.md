@@ -47,6 +47,8 @@ and make the same GPU calls:
 
 ```ts
 // Block-break debris: 24 pieces of a 16 x 16 block texture, a random 4 x 4 texel piece each.
+const stonePixels = new Uint8Array(16 * 16 * 4); // the block's RGBA8 texels
+const [x, y, z] = [3, 0, -2];                    // the broken block
 const debris = VFX.attach(engine, {
   capacity: 256, rate: 0, size: 0.1, lifetime: [0.5, 1], velocity: [0, 3, 0], spread: 2, ground: 0,
   texture: {width: 16, height: 16, data: stonePixels, atlas: {columns: 4, rows: 4, frames: 'random'}},
@@ -71,7 +73,10 @@ sRGB-encoded and a fully fogged particle matches the fogged background. VFX does
 `fog.enabled = false` clears it without recompiling; `effect.setFog(null)` (the default) draws exactly as before.
 
 ```ts
+import type {EngineKernel} from '@margoengine/core';
 import {Fog} from '@margoengine/environment';
+import type {VFX} from '@margoengine/vfx';
+declare const engine: EngineKernel, sparks: VFX; // from the first example
 const fog = Fog.attach(engine, {color: '#8090a0', near: 5, far: 60});
 sparks.setFog(fog);
 ```

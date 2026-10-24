@@ -17,7 +17,8 @@
 
 Several agents push to `main`. Each push must leave it at least as clean as it found it:
 
-- `npm run verify` passes. For changes to shaders or anything a demo draws, run `npm run check:merge` (adds the site build and the visual check).
+- `npm run verify` passes. For changes to shaders, anything a demo draws, a package README or package exports, run `npm run check:merge` (adds the site build, the visual check and `modern:test:packages`, which packs every package,
+  installs the tarballs into a clean project and type-checks each README example; about 11 minutes).
 - `npm run hygiene`: no gate gets worse for the packages you touched. New public exports carry TSDoc; new throws follow `docs/conventions.md` (`MargoError` with a code, `TypeError`, `RangeError`; the message names the fix). Run `npx biome format --write` on files you touched.
 - `npm run proofs -- --current` passes. If a deliberate change alters what a feature-off path emits, advance that proof's current reference to your commit and say why in `docs/whitepaper/claims.md`; never leave a proof failing.
 - Public numbers stay true: `site/index.html`, `README.md` and `docs/limits.md` must match `npm run measure:size`. When work affects a launch gate, update its status in `docs/HANDOFF.md`.

@@ -6,7 +6,7 @@ Optional gameplay animation on the existing `@margoengine/animation` skinning pa
 import {EngineKernel} from '@margoengine/core';
 import {loadGLTF} from '@margoengine/gltf-pro';
 import {Animation} from '@margoengine/animation';
-import {Animator} from '@margoengine/animator';
+import {Animator, addCCDChain, type CCDChain} from '@margoengine/animator';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 const model = await loadGLTF(engine, '/hero.glb'); // clips named Idle, Walk, Run
 const animation = Animation.attach(model);
@@ -31,8 +31,10 @@ For a 2D state use `{parameters:['strafe','forward'],samples:[{value:[0,0],clip:
 `addCCDChain(animator, chain)` adds a Cyclic Coordinate Descent IK chain (Wang and Chen 1991) for arms, spines, tails, tentacles or fingers, solved every frame after the pose, additive layers and foot IK. Each sweep goes from the last joint to the first; every joint turns, on its own, so the end effector moves toward the target, then its limit is applied. `joints` lists glTF node indices from the first joint to the last, each the child of the one before. The Animator keeps the chain object and reads `target`, `rotation`, `pole`, `weight` and the solve settings every frame, so move the target by writing into it:
 
 ```ts
-const reach = {
-  joints: [shoulder, elbow, wrist],          // glTF node indices
+const joint = (name: string) => model.asset.doc.nodes!.findIndex((node) => node.name === name);
+const grab = () => console.log('reached');
+const reach: CCDChain = {
+  joints: [joint('Shoulder'), joint('Elbow'), joint('Wrist')], // glTF node indices
   target: [0.4, 1.3, 0.5],                   // world space; mutate it per frame
   rotation: null,                            // optional world rotation (x, y, z, w) for the last joint
   pole: [0.3, 1.0, -0.5],                    // optional: the elbow bends toward this point
@@ -45,7 +47,7 @@ const reach = {
   iterations: 16, tolerance: 0.001, weight: 1,
   onSolve: (result) => { if (result.reached) grab(); },
 };
-const remove = addCCDChain(animator, reach); // import {addCCDChain} from '@margoengine/animator'
+const remove = addCCDChain(animator, reach);
 ```
 
 - **Limits** are measured from each joint's rest (bind) rotation, in radians: `euler` clamps the qX·qY·qZ angles per axis (equal bounds lock an axis), `hinge` turns about one rest-frame axis, `cone` keeps the bone within `angle` of its rest direction (the bone axis defaults to the direction of the next joint) with an optional `twist` range. Joints start each solve inside their limits.

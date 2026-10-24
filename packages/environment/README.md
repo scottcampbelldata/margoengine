@@ -40,7 +40,9 @@ fog.far = 120;                                                 // every option i
 A skybox from ordinary PNG/JPG images (box, sphere or cylinder), crisp for pixel art:
 
 ```ts
+import {EngineKernel} from '@margoengine/core';
 import {ImageBackground} from '@margoengine/environment';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 const box = await ImageBackground.load({shape: 'box', images: ['px.png', 'nx.png', 'py.png', 'ny.png', 'pz.png', 'nz.png'], filter: 'nearest'});
 engine.use(box);
 // or one panorama: {shape: 'sphere', images: ['sky.jpg']} (equirect), {shape: 'cylinder', images: ['hills.png'], height: 1.5}
@@ -246,7 +248,11 @@ does not change.
 import {Reflector} from '@margoengine/environment/reflector';
 import {Refractor} from '@margoengine/environment/refractor';
 import {CubeCamera} from '@margoengine/environment/cube-camera';
+import {EngineKernel} from '@margoengine/core';
 import {Environment, EnvironmentLighting} from '@margoengine/environment';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+// A flat normal map (RGBA8, +Z up); any width x height of RGBA bytes works.
+const ripples = {width: 1, height: 1, data: new Uint8Array([128, 128, 255, 255])};
 
 const mirror = Reflector.attach(engine, {width: 4, height: 3, color: '#e8e8e8'});
 mirror.node.setPosition([0, 1.5, -2]);           // the mirror is a core mesh node: move, rotate, scale, parent it
@@ -414,6 +420,10 @@ uncompressed single-part scanline EXR, row 0 at the top. HALF and FLOAT take a `
 
 ```ts
 import {encodeEXR} from '@margoengine/environment/exr-write';
+import {parseHDR} from '@margoengine/environment';
+const [width, height] = [640, 360];
+const rgb = new Float32Array(width * height * 3), depth = new Float32Array(width * height);
+const ids = new Uint32Array(width * height), signal = new AbortController().signal;
 const exr = await encodeEXR({width, height, channels: [
   {name: 'R', type: 'HALF', data: rgb, offset: 0, stride: 3},
   {name: 'G', type: 'HALF', data: rgb, offset: 1, stride: 3},
@@ -434,6 +444,7 @@ It yields to the event loop every 65,536 samples, reports `onProgress(done, tota
 behaves as it always has (RGBA, `-Y h +X w` or `+Y h +X w`, other orders refused).
 
 ```ts
+const bytes = new Uint8Array(await (await fetch('/studio.hdr')).arrayBuffer());
 const image = parseHDR(bytes, {
   channels: 3, // RGB triples instead of RGBA
   orientation: 'all', // also mirrored X (-X) and the X-major, column-scanned orders (+X w -Y h ...)

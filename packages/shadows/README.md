@@ -49,6 +49,9 @@ Core meshes receive shadows automatically. `shadows.add(pbrModel)` or `shadows.a
 Per object, as Crocotile's Cast Shadows and Receive Shadows (both default on): `shadows.add(source, {castShadow: false})` lights the object with the shadow map but leaves it out of the map, and `{receiveShadow: false}` draws it into the map but keeps its own lighting unshadowed (no lighting hook is added). Receiving is per object for sources with their own lighting hook (glTF-pro models, materials meshes, clipmap terrain) and for core meshes: `receiveShadow: false` on a core mesh sets core's `mesh.receiveShadow = false` and the remover restores the earlier value. Setting `mesh.receiveShadow` directly works too, for meshes added or not:
 
 ```ts
+const groundTile = engine.createMesh().setGeometry(box());
+const lamp = engine.createMesh().setGeometry(box()).setPosition([2, 1, 0]);
+const marker = engine.createMesh().setGeometry(box()).setPosition([-2, 1, 0]);
 shadows.add(groundTile);            // casts and receives
 shadows.add(lamp, { receiveShadow: false }); // casts, lit as if unshadowed
 marker.receiveShadow = false;      // same for any core mesh, next frame

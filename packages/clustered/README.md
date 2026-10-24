@@ -50,8 +50,10 @@ Core meshes receive local lighting automatically. Call `lights.add(pbrModel)` or
 shaded in the same light loop as the point lights:
 
 ```ts
+import {EngineKernel} from '@margoengine/core';
 import {Clustered} from '@margoengine/clustered';
 import {DirectionalLights} from '@margoengine/clustered/directional';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 const lights = Clustered.attach(engine), suns = DirectionalLights.attach(engine, {lights});
 suns.setLights([{direction: [-1, -2, 0.5], color: [1, 0.9, 0.8], intensity: 3}]); // direction: the way the light travels
 ```
@@ -76,6 +78,10 @@ import {Clustered} from '@margoengine/clustered';
 import {LocalShadows} from '@margoengine/clustered/shadows';
 import {DirectionalLights} from '@margoengine/clustered/directional';
 import {AreaLights} from '@margoengine/clustered/area';
+import {EngineKernel, box} from '@margoengine/core';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const floor = engine.createMesh().setGeometry(box()).setScale([10, 0.1, 10]);
+const table = engine.createMesh().setGeometry(box()).setPosition([0, 1, 0]);
 const lights = Clustered.attach(engine), local = LocalShadows.attach(engine, {lights, resolution: 1024});
 const suns = DirectionalLights.attach(engine, {lights}), panels = AreaLights.attach(engine, {lights});
 suns.setLights([
@@ -121,7 +127,11 @@ local.add(table);
 shapes point and spot lights with them:
 
 ```ts
+import {EngineKernel} from '@margoengine/core';
+import {Clustered} from '@margoengine/clustered';
 import {IESLights, parseIES} from '@margoengine/clustered/ies';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const lights = Clustered.attach(engine);
 const profile = parseIES(await (await fetch('/downlight.ies')).text());
 const ies = IESLights.attach(engine, {lights});
 lights.setLights([{position: [0, 3, 0], range: 0, decay: 2, intensity: profile.peak}]);
@@ -145,7 +155,11 @@ it adds nothing to the shaders or the GPU work.
 `@margoengine/clustered/projector` makes spot lights project an image:
 
 ```ts
+import {EngineKernel} from '@margoengine/core';
+import {Clustered} from '@margoengine/clustered';
 import {ProjectorLights} from '@margoengine/clustered/projector';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const lights = Clustered.attach(engine);
 const projectors = ProjectorLights.attach(engine, {lights});
 lights.setLights([{position: [0, 3, 2], range: 10, direction: [0, -1, -0.6], outerAngle: 0.5, intensity: 40}]);
 const bitmap = await createImageBitmap(await (await fetch('/slide.png')).blob());
@@ -174,7 +188,11 @@ passes through unchanged): a point or spot `intensity` is candela, a directional
 `@margoengine/clustered/units` holds the conversions, plain functions with no GPU work:
 
 ```ts
+import {EngineKernel} from '@margoengine/core';
+import {Clustered} from '@margoengine/clustered';
 import {lumensToCandela, nitsToLumens, ev100, exposureFromEV100} from '@margoengine/clustered/units';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const lights = Clustered.attach(engine);
 lights.setLights([
   {position: [0, 3, 0], range: 0, decay: 2, intensity: lumensToCandela(800)},                    // an 800 lm bulb
   {position: [2, 3, 0], range: 0, direction: [0, -1, 0], outerAngle: 0.5, innerAngle: 0.3,
@@ -197,7 +215,7 @@ individual lights, and register their casters:
 
 ```ts
 import {Clustered} from '@margoengine/clustered';
-import type {EngineKernel,Mesh} from '@margoengine/core';
+import {EngineKernel,type Mesh} from '@margoengine/core';
 
 function localShadows(engine:EngineKernel,blocker:Mesh) {
   const lights=Clustered.attach(engine,{shadows:{resolution:512,maxLights:4}});
@@ -230,6 +248,7 @@ rendering.
 Per light, as Crocotile's Shadow Map Width/Height and shadow camera Near/Far:
 
 ```ts
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 const lights = Clustered.attach(engine, {shadows: {resolution: 1024, maxLights: 2}});
 lights.setLights([
   {position: [0, 4, 0], range: 12, intensity: 30, shadow: {resolution: 256, near: 0.2, far: 8}},
@@ -250,7 +269,11 @@ it did before these options existed, and the shaders never change.
 up to its own `resolution`, the same way (corner viewport, matching UVs, two-texel guard band, no shader change):
 
 ```ts
+import {EngineKernel, box} from '@margoengine/core';
+import {Clustered} from '@margoengine/clustered';
 import {LocalShadows} from '@margoengine/clustered/shadows';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const blocker = engine.createMesh().setGeometry(box()).setPosition([0, 2, 0]);
 const lights = Clustered.attach(engine), local = LocalShadows.attach(engine, {lights, resolution: 1024});
 lights.setLights([{position: [0, 4, 0], range: 12, castShadow: true, shadow: {resolution: [512, 256], far: 8}}]);
 local.add(blocker);

@@ -2,6 +2,15 @@
 
 Last updated 2026-10-24. Read this first when starting a new session. Update it whenever work lands.
 
+## Landed 2026-10-24: packed packages type-check again
+
+`npm run modern:test:packages` (pack every package, install the tarballs into a clean project, type-check each README
+example) failed on 8a21261e. 17 package build scripts and `scripts/build-postfx.js` skipped `packageDeclarations`, so
+`npm pack` shipped .d.ts files importing `../../shared/*` (environment's `capture.d.ts`); all now call it, and
+`tests/package-declarations.test.js` checks every pack-time build and every built .d.ts. The 112 README type errors
+(animation, clustered, environment, post, core, vfx, animator, shadows, splats) are fixed with real setup code. The test
+now ends `npm run check:merge` (639 s on the A6000 PC).
+
 ## Landed 2026-10-24: modularity (static leaks 78 -> 28)
 
 gltf-pro imported two KTX2 helpers from the decoders root statically while also `import()`ing it, so bundlers put

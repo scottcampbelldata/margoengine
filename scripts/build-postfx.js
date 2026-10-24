@@ -4,6 +4,7 @@ import { copyFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { build } from 'vite';
+import { packageDeclarations } from './package-declarations.js';
 
 const name = process.argv[2];
 assert.ok(['dof', 'tonemap'].includes(name), 'Expected dof or tonemap');
@@ -28,3 +29,5 @@ execFileSync(
   [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', resolve(root, 'tsconfig.json')],
   { stdio: 'inherit' },
 );
+// Copy the shared declarations the emitted .d.ts files reference into dist, so the packed package type-checks.
+await packageDeclarations(root);

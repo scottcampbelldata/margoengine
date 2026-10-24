@@ -13,7 +13,7 @@ Entity capacity grows on demand: `Engine.create(canvas, {capacity})` sets the in
 Package name: `@margoengine/core`, version `1.0.0`. Build from source or install a local tarball until the package is published.
 
 ```ts
-import { Engine, box, PbrMaterial } from '@margoengine/core';
+import { Camera, Engine, box, PbrMaterial } from '@margoengine/core';
 
 const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
 const engine = await Engine.create(canvas, { backend: 'auto' });
@@ -44,14 +44,18 @@ Several cameras in one frame: split screen, a four-view CAD layout, a minimap. E
 fractions of the canvas by default (`pixels: true` for drawing-buffer pixels); the camera aspect follows the rectangle.
 
 ```ts
+const top = new Camera({ position: [0, 20, 0], target: [0, 0, 0] });
+top.up = [0, 0, -1];                               // straight down needs another screen-up
+const front = new Camera({ position: [0, 0, 20] });
+const side = new Camera({ position: [20, 0, 0] });
 engine.views = [
   { camera: top, viewport: [0, 0, 0.5, 0.5], clear: { color: '#20242a' } },
   { camera: front, viewport: [0.5, 0, 0.5, 0.5] },
   { camera: side, viewport: [0, 0.5, 0.5, 0.5] },
   { camera: engine.camera, viewport: [0.5, 0.5, 0.5, 0.5] },
 ];                                                 // the frame loop draws these instead of the full-canvas view
-engine.render({ views, delta });                   // or draw them yourself
-const hit = await engine.pick(x, y);               // picks through the view under the point
+engine.render({ views: engine.views, delta: 0 });  // or draw them yourself
+const hit = await engine.pick(400, 300);           // CSS pixel; picks through the view under it
 ```
 
 - Views draw in order; the first clears colour, later ones keep it (`clear: {color, depth}` per view). Plugins update

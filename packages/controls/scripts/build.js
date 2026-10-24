@@ -3,6 +3,7 @@ import { copyFile, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { build } from 'vite';
+import { packageDeclarations } from '../../../scripts/package-declarations.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
@@ -38,3 +39,5 @@ execFileSync(
   [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', resolve(root, 'tsconfig.json')],
   { stdio: 'inherit' },
 );
+// Copy the shared declarations the emitted .d.ts files reference into dist, so the packed package type-checks.
+await packageDeclarations(root);

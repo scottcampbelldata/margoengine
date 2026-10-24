@@ -171,6 +171,10 @@ Jimenez, Wu, Pesce and Jarabo 2016 ("Practical Real-Time Strategies for Accurate
 import {PostStack} from '@margoengine/post/stack';
 import {GTAO} from '@margoengine/post/gtao';
 import {SSR} from '@margoengine/post/ssr';
+import {createStage} from 'margoengine';
+import {loadGLTF} from '@margoengine/gltf-pro';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const model = await loadGLTF(stage.engine, '/scene.glb');
 const gtao = new GTAO({radius: 0.5, slices: 2, steps: 6});
 PostStack.attach(stage.engine, [gtao, new SSR()]); // or GTAO.attach(stage.engine)
 gtao.add(model);                // gltf-pro model: its normal maps feed the horizon search, as with SSAO
@@ -211,6 +215,10 @@ that lit surfaces on screen throw onto their neighbours (a red wall tints the fl
 import {PostStack} from '@margoengine/post/stack';
 import {SSGI} from '@margoengine/post/ssgi';
 import {SSR} from '@margoengine/post/ssr';
+import {createStage} from 'margoengine';
+import {loadGLTF} from '@margoengine/gltf-pro';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const model = await loadGLTF(stage.engine, '/scene.glb');
 const ssgi = new SSGI({rays: 4, maxDistance: 10, thickness: 0.5, steps: 32, intensity: 1});
 const ssr = new SSR();
 PostStack.attach(stage.engine, [ssgi, ssr]);
@@ -262,6 +270,8 @@ import {TAA} from '@margoengine/taa';
 import {PostStack} from '@margoengine/post/stack';
 import {MotionBlur} from '@margoengine/post/motion-blur';
 import {Bloom} from '@margoengine/post/bloom';
+import {createStage} from 'margoengine';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
 let taa: TAA;
 const stack = PostStack.attach(stage.engine, [new MotionBlur({velocity: () => taa.velocity, shutter: 0.5}), new Bloom()]);
 taa = TAA.attach(stage.engine, {depth: () => stack.depthTexture});
@@ -307,6 +317,8 @@ before Bloom so the flare glows. `LensFlare.attach(engine, options)` runs it alo
 import {PostStack} from '@margoengine/post/stack';
 import {LensFlare} from '@margoengine/post/lens-flare';
 import {Bloom} from '@margoengine/post/bloom';
+import {createStage} from 'margoengine';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
 PostStack.attach(stage.engine, [new LensFlare({intensity: 0.1}), new Bloom()]);   // follows engine.lighting
 // With @margoengine/sky: new LensFlare({sun: () => sky.lights[0].direction})    // w = 0 below the horizon hides it
 ```
@@ -341,6 +353,12 @@ flat areas and straight, pixel-aligned shapes alone.
 
 ```ts
 import {SMAA} from '@margoengine/post/smaa';
+import {PostStack} from '@margoengine/post/stack';
+import {Bloom} from '@margoengine/post/bloom';
+import {Glitch} from '@margoengine/post/glitch';
+import {Tonemap} from '@margoengine/tonemap';
+import {createStage} from 'margoengine';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
 SMAA.attach(stage.engine, {quality: 'high'});   // alone: wraps the finished frame, like FXAA
 // or in a stack, after the display effect and before Glitch:
 PostStack.attach(stage.engine, [new Bloom(), new Tonemap(), new SMAA({quality: 'ultra'}), new Glitch()]);
@@ -384,6 +402,8 @@ few pixels apart) and scanline tearing (up to three bands of rows slide sideways
 
 ```ts
 import {Glitch} from '@margoengine/post/glitch';
+import {createStage} from 'margoengine';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
 const glitch = Glitch.attach(stage.engine, {seed: 7});
 glitch.options.wild = true;        // glitch every frame
 glitch.options.intensity = 0.4;    // 0-1, scales displacement, split and tearing
@@ -408,6 +428,8 @@ history. `damp` defaults to 0.96.
 
 ```ts
 import {Afterimage} from '@margoengine/post/afterimage';
+import {createStage} from 'margoengine';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
 const trails = Afterimage.attach(stage.engine, {damp: 0.9});
 trails.damp = 0.96;   // any frame
 trails.reset();       // drop the trail, e.g. on a camera cut

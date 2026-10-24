@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { packageDeclarations } from '../scripts/package-declarations.js';
 
 const compiler = resolve(import.meta.dirname, '../node_modules/typescript/bin/tsc');
@@ -78,4 +78,53 @@ test('declaration packaging leaves documentation and literal types containing im
   const { root } = await fixture(t, { 'packages/sample/dist/index.d.ts': text });
   await packageDeclarations(root);
   assert.equal(await readFile(join(root, 'dist/index.d.ts'), 'utf8'), text);
+});
+
+// `npm pack` runs each package's own prepack build, not build:packages, so that build must package declarations too
+// (environment once shipped dist/capture.d.ts importing ../../shared/msaa.js).
+const repository = resolve(import.meta.dirname, '..');
+const packages = (await readdir(join(repository, 'packages'), { withFileTypes: true }))
+  .filter((entry) => entry.isDirectory() && entry.name !== 'shared')
+  .map((entry) => entry.name);
+
+test('every package build that npm pack runs copies shared declarations into dist', async () => {
+  const missing = [];
+  for (const name of packages) {
+    let manifest;
+    try {
+      manifest = JSON.parse(await readFile(join(repository, 'packages', name, 'package.json'), 'utf8'));
+    } catch {
+      continue;
+    }
+    const prepack = manifest.scripts?.prepack ?? '';
+    // build:packages runs packageDeclarations after every package (scripts/build-modern.js).
+    if (prepack.includes('build:packages')) continue;
+    assert.equal(prepack, 'npm run build', `${name} prepack`);
+    const script = /^node (\S+\.js)/.exec(manifest.scripts.build)?.[1];
+    assert.ok(script, `${name} build runs a node script`);
+    const text = await readFile(resolve(repository, 'packages', name, script), 'utf8');
+    if (!/\bpackageDeclarations\(/.test(text)) missing.push(`${name} (${script})`);
+  }
+  assert.deepEqual(missing, []);
+});
+
+test('built declarations import nothing outside their package', async () => {
+  const escapes = [];
+  for (const name of packages) {
+    const root = join(repository, 'packages', name),
+      dist = join(root, 'dist');
+    let files;
+    try {
+      files = await readdir(dist, { recursive: true });
+    } catch {
+      continue;
+    }
+    for (const file of files.filter((f) => /\.d\.[mc]?ts$/.test(f))) {
+      const path = join(dist, file);
+      for (const [, specifier] of (await readFile(path, 'utf8')).matchAll(/(?:from|import\()\s*['"](\.[^'"]+)['"]/g))
+        if (!resolve(dirname(path), specifier).startsWith(root + sep))
+          escapes.push(`${name}/dist/${file}: ${specifier}`);
+    }
+  }
+  assert.deepEqual(escapes, []);
 });

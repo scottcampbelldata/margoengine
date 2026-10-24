@@ -48,19 +48,28 @@ After building the packages, run `node --test packages/animation/tests/*.test.js
 document needed). Bones live in the skinned mesh's local space; exactly one bone is the root (`parent: -1`).
 
 ```ts
+import {createStage} from 'margoengine';
+import {boxGeometry} from '@margoengine/geometry';
 import {Material, createMesh} from '@margoengine/materials';
 import {Skeleton, Skin} from '@margoengine/animation';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
 const skeleton = new Skeleton([
   {name: 'upper', parent: -1},
   {name: 'forearm', parent: 0, translation: [0, 1, 0]},
 ]); // inverse bind matrices come from this base pose unless passed as a second argument
-const mesh = createMesh(stage.engine, geometry, new Material({map: tileTexture}));
+const geometry = boxGeometry(1, 2, 1);
+const mesh = createMesh(stage.engine, geometry, new Material({color: '#c08060'}));
 // Four bone indices and four weights per vertex; weights normalise to sum 1, a zero sum follows the root bone.
+const count = geometry.positions.length / 3, joints = new Uint16Array(count * 4), weights = new Float32Array(count * 4);
+for (let v = 0; v < count; v++) {
+  joints[v * 4] = geometry.positions[v * 3 + 1] > 0 ? 1 : 0; // the top half follows the forearm
+  weights[v * 4] = 1;
+}
 const skin = Skin.attach(mesh, skeleton, joints, weights); // or new Skin(...) for CPU-only skinning
 skeleton.setPose(1, {rotation: [0, 0, Math.SQRT1_2, Math.SQRT1_2]}); // posing; the GPU follows next frame
 skeleton.restorePose(1); // Restore Pose; restorePose(1, true) also resets nested bones; restorePose() resets all
 skeleton.setBindPose(); // the current pose becomes the base pose, inverse binds recomputed
-skin.setInfluences(first, joints4, weights4); // weight painting
+skin.setInfluences(0, [1, 0, 0, 0], [1, 0, 0, 0]); // weight painting: vertex 0 now follows the forearm
 const world = skeleton.worldMatrix(1, mesh.primitives[0].node.matrix); // for drawing and picking bones
 const posed = skin.pose(geometry.positions, geometry.normals); // CPU skinning: picking, Export Static Pose (OBJ/DAE)
 skin.dispose();
@@ -77,7 +86,23 @@ Validation rejects bad indices and counts, repeated names, parent cycles and any
 ## Keyframe clips from raw keys
 
 ```ts
-import {createKeyframeClip, applyKeyframeClip, sampleKeyframes, segmentTime, bakeKeyframeClip} from '@margoengine/animation';
+import {createStage} from 'margoengine';
+import {loadGLTF} from '@margoengine/gltf-pro';
+import {
+  Animation,
+  Skeleton,
+  applyKeyframeClip,
+  bakeKeyframeClip,
+  compileRigidClip,
+  createKeyframeClip,
+  sampleKeyframes,
+  segmentTime,
+} from '@margoengine/animation';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const model = await loadGLTF(stage.engine, '/face.glb');
+const skeleton = new Skeleton([{name: 'forearm', parent: -1}]);
+const exportNodes = new Map([['forearm', 0], ['door', 1]]); // track target -> exporter node index
+const elapsed = 1.25; // seconds since the segment started
 const wave = createKeyframeClip({name: 'Wave', tracks: [
   {target: 'forearm', path: 'rotation', keys: [
     {time: 0, value: [0, 0, 0, 1], interpolation: 'easeInOut'}, // shapes the time until the next key
@@ -89,7 +114,7 @@ const wave = createKeyframeClip({name: 'Wave', tracks: [
 const t = segmentTime(elapsed, wave.duration, {loop: true, timeScale: -1}); // a reversed, looping segment
 applyKeyframeClip(wave, skeleton, t); // poses bones named by track targets
 const door = sampleKeyframes(wave.tracks[1], t); // any other target: sample it yourself
-const animation = bakeKeyframeClip(wave, 30, (target) => exportNodes.get(target)); // exporters AnimationData
+const baked = bakeKeyframeClip(wave, 30, (target) => exportNodes.get(target)); // exporters AnimationData
 ```
 
 Tracks target a bone (by name) or the caller's node by a stable string id, for translation, rotation, scale and morph
@@ -149,7 +174,7 @@ const clip = compileRigidClip(
   [{object: 'sword', time: 0.5, position: [1, 2, 0], rotation: [0, 0, 0, 1]}],
   {duration: 2},
 );
-applyKeyframeClip(clip, skeleton, time);
+applyKeyframeClip(clip, skeleton, t);
 ```
 
 ## Groups: one clip for many models
@@ -159,9 +184,15 @@ applyKeyframeClip(clip, skeleton, time);
 and `Animation`s whose bones or nodes the tracks name. Each member can run ahead or behind by an offset in seconds.
 
 ```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from '@margoengine/gltf-pro';
 import {Animation, AnimationGroup} from '@margoengine/animation';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const walkers = await Promise.all([0, 1, 2].map(() => loadGLTF(stage.engine, '/RobotExpressive.glb')));
 const crowd = new AnimationGroup('Walking', {speed: 1});
-for (const [i, model] of walkers.entries()) crowd.add(Animation.attach(model), i * 0.37); // offset per walker
+const animations = walkers.map((model) => Animation.attach(model));
+for (const [i, animation] of animations.entries()) crowd.add(animation, i * 0.37); // offset per walker
+const walkerAnimation = animations[0];
 stage.engine.use(crowd); // advances in onPreUpdate; or call crowd.update(delta) yourself
 crowd.seek(2); crowd.playing = false; crowd.setOffset(walkerAnimation, 0.5); crowd.remove(walkerAnimation);
 ```
@@ -185,6 +216,13 @@ Cloning skinned models and retargeting poses and clips between skeletons, in the
 ```ts
 import {Animation, AnimationGroup, applyKeyframeClip} from '@margoengine/animation';
 import {Retarget, cloneModel, retargetRig} from '@margoengine/animation/skeleton-utils';
+import {createStage} from 'margoengine';
+import {loadGLTF} from '@margoengine/gltf-pro';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const [robot, mixamoModel, hero] = await Promise.all(
+  ['/RobotExpressive.glb', '/mixamo-walk.glb', '/hero.glb'].map((url) => loadGLTF(stage.engine, url)),
+);
+const mixamoAnimation = Animation.attach(mixamoModel), t = 0.5;
 
 const second = await cloneModel(robot); // own nodes and skeleton; shares the parsed asset
 Animation.attach(second).play('Dance'); // animates apart from `robot`

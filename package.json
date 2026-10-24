@@ -120,7 +120,7 @@
     "format": "biome format --write",
     "lint": "biome lint",
     "check:views": "node scripts/test-views-browser.mjs",
-    "check:merge": "npm run verify && npm run build:site && npm run visual:check -- --no-build && npm run check:views",
+    "check:merge": "npm run verify && npm run build:site && npm run visual:check -- --no-build && npm run check:views && npm run modern:test:packages",
     "verify:full": "npm run verify && npm run modern:test:react && npm run modern:test:usdz && npm run modern:test:interop && npm run modern:test:interop:packages && npm run modern:test:game:packages && npm run modern:test:postfx:packages && npm run test:modules:packages",
     "pack:packages": "npm run build:packages && npm pack --workspace packages --ignore-scripts --pack-destination test-results",
     "package:blender": "python tools/blender-addon/package_addon.py",

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { build } from 'vite';
 import { staticEmbind } from '../../../scripts/static-embind.js';
+import { packageDeclarations } from '../../../scripts/package-declarations.js';
 
 // Plain TypeScript emit keeps every `new URL('./…', import.meta.url)` literal intact, so the consuming app's
 // bundler (Vite, webpack 5, Next.js) emits the worker and the Wasm decoders as its own assets.
@@ -17,6 +18,8 @@ execFileSync(
   [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', resolve(root, 'tsconfig.json')],
   { stdio: 'inherit' },
 );
+// Copy the shared declarations the emitted .d.ts files reference into dist, so the packed package type-checks.
+await packageDeclarations(root);
 // The worker replaces tsc's module emit with one self-contained classic script, so it can importScripts the wrappers.
 await build({
   configFile: false,
