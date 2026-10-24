@@ -2,6 +2,7 @@ import type { Batch, DrawOptions, Engine, Geometry, Mesh, PassContext } from '@m
 import { invertMatrixStable, multiplyMatrices } from '@margoengine/math/mat4';
 import { capsAsSolid } from './closed.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { cachedBindGroup } from '../../shared/draw-cache.js';
 
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; UNIFORM: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -459,35 +460,7 @@ export class PartPacks {
     return pipeline;
   }
   private group(device: GPUDevice, pipeline: GPURenderPipeline, bindings: GPUBindGroupEntry[]): GPUBindGroup {
-    let cached = this.groups.get(pipeline);
-    if (
-      !cached ||
-      cached.bindings.length !== bindings.length ||
-      bindings.some((entry, i) => {
-        const previous = cached!.bindings[i],
-          resource = entry.resource as GPUBufferBinding,
-          old = previous.resource as GPUBufferBinding;
-        return (
-          entry.binding !== previous.binding ||
-          (resource.buffer
-            ? resource.buffer !== old.buffer || resource.offset !== old.offset || resource.size !== old.size
-            : resource !== old)
-        );
-      })
-    ) {
-      cached = {
-        bindings: bindings.map(({ binding, resource }) => ({
-          binding,
-          resource: (resource as GPUBufferBinding).buffer ? { ...resource } : resource,
-        })),
-        group: device.createBindGroup({
-          layout: pipeline.getBindGroupLayout(0),
-          entries: [{ binding: 0, resource: { buffer: this.frame! } }, ...bindings],
-        }),
-      };
-      this.groups.set(pipeline, cached);
-    }
-    return cached.group;
+    return cachedBindGroup(this.groups, device, pipeline, { binding: 0, resource: { buffer: this.frame! } }, bindings);
   }
   private invalidateShadows(): void {
     (this.engine?.plugins.get('shadows') as { invalidate?: () => void } | undefined)?.invalidate?.();

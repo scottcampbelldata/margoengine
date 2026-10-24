@@ -16,6 +16,7 @@ import { meshVertex } from '../../shared/gpu.js';
 import { webgpuPass } from '../../shared/pass.js';
 import { inView } from '../../shared/view-rect.js';
 import { PickingPrimitives, type PickingSource } from './picking-primitives.js';
+import { coreMeshBuffers as buffers } from '../../shared/draw-cache.js';
 export type { PickingSource, PickingPrimitive } from './picking-primitives.js';
 import { instanceMatrix } from '../../shared/instances.js';
 import {
@@ -44,24 +45,6 @@ const covers = (rect: readonly number[] | undefined, c: Context) =>
   !rect || (rect[0] === 0 && rect[1] === 0 && rect[2] === c.width && rect[3] === c.height);
 const attachedPickers = new WeakMap<Engine, Picking>();
 type Snapshot = { geometry: Geometry | null; values: Float32Array; visible: number };
-const buffers: GPUVertexBufferLayout[] = [
-  {
-    arrayStride: 24,
-    attributes: [
-      { shaderLocation: 0, offset: 0, format: 'float32x3' },
-      { shaderLocation: 1, offset: 12, format: 'float32x3' },
-    ],
-  },
-  {
-    arrayStride: 96,
-    stepMode: 'instance',
-    attributes: Array.from({ length: 6 }, (_, i) => ({
-      shaderLocation: i + 2,
-      offset: i * 16,
-      format: 'float32x4' as const,
-    })),
-  },
-];
 const microShader =
   meshVertex
     .replace('id:u32}', 'id:u32,@location(1) position:vec3f,@location(2) material:vec4f}')

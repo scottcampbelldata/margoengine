@@ -6,6 +6,7 @@ import type { FrameGraph, PassContext, DrawOptions } from './plugin.js';
 import { sceneSamples } from './quality.js';
 import { defaultClear, clearColorValue, clearDraw } from '../../shared/clear-color.js';
 import { partialRect, validateRectangle } from '../../shared/view-rect.js';
+import { cachedBindGroup, coreMeshBuffers } from '../../shared/draw-cache.js';
 // TypeScript's DOM library omits WebGPU flag namespaces and the canvas overload.
 declare const GPUBufferUsage: {
   COPY_DST: number;
@@ -220,24 +221,7 @@ export class GPURenderer implements Renderer {
         vertex: {
           module,
           entryPoint: 'vertex',
-          buffers: [
-            {
-              arrayStride: 24,
-              attributes: [
-                { shaderLocation: 0, offset: 0, format: 'float32x3' },
-                { shaderLocation: 1, offset: 12, format: 'float32x3' },
-              ],
-            },
-            {
-              arrayStride: 96,
-              stepMode: 'instance',
-              attributes: Array.from({ length: 6 }, (_, i) => ({
-                shaderLocation: i + 2,
-                offset: i * 16,
-                format: 'float32x4' as const,
-              })),
-            },
-          ],
+          buffers: coreMeshBuffers,
         },
         fragment: { module, entryPoint: 'fragment', targets: [{ format }] },
         depthStencil: {
@@ -440,36 +424,13 @@ export class GPURenderer implements Renderer {
         }
         let group = this.bindGroup;
         if (pipeline !== this.pipeline || bindings.length) {
-          let cached = this.groups.get(pipeline);
-          if (
-            !cached ||
-            cached.bindings.length !== bindings.length ||
-            bindings.some((entry, i) => {
-              const previous = cached!.bindings[i],
-                resource = entry.resource as GPUBufferBinding,
-                old = previous.resource as GPUBufferBinding;
-              return (
-                entry.binding !== previous.binding ||
-                (resource.buffer
-                  ? resource.buffer !== old.buffer || resource.offset !== old.offset || resource.size !== old.size
-                  : resource !== old)
-              );
-            })
-          ) {
-            const group = this.device.createBindGroup({
-              layout: pipeline.getBindGroupLayout(0),
-              entries: [{ binding: 0, resource: { buffer: this.uniform } }, ...bindings],
-            });
-            cached = {
-              bindings: bindings.map(({ binding, resource }) => ({
-                binding,
-                resource: (resource as GPUBufferBinding).buffer ? { ...resource } : resource,
-              })),
-              group,
-            };
-            this.groups.set(pipeline, cached);
-          }
-          group = cached.group;
+          group = cachedBindGroup(
+            this.groups,
+            this.device,
+            pipeline,
+            { binding: 0, resource: { buffer: this.uniform } },
+            bindings,
+          );
         }
         const named = context.view?.clear?.color;
         const explicit = typeof named === 'string';
