@@ -1,11 +1,18 @@
 # Margo Engine handoff
 
-Last updated 2026-10-19. Read this first when starting a new session. Update it whenever work lands.
+Last updated 2026-10-24. Read this first when starting a new session. Update it whenever work lands.
 
-## Next up (Scott, 2026-10-21)
+## Landed 2026-10-24: Codex's work/changes (multi-view, voxel, lightmap, exporters, AgX)
 
-Multiple views and scenes are the very next work after the visual-parity pass: the plan, measured prototype
-sizes, milestones and the decisions Scott still has to make are in [multi-view-roadmap.md](multi-view-roadmap.md).
+Codex's `work/changes` (82cef03e, 100 commits) was reviewed, rewritten and landed as per-change commits. Multiple
+views and scenes are in core as Scott's approved freeze exception: core + stage 22,253 B gzip (core 20,015), 2,747 B
+under the 25,000 B gate. Every package is view-aware ([multi-view-roadmap.md](multi-view-roadmap.md)); only the M7
+CAD demos are open. One clean-room AgX in `packages/shared/agx.js`. Public renames for the apps:
+[renames-2026-10-24.md](renames-2026-10-24.md). Removed until done properly: voxel slab and stair shapes.
+Checks at landing: `npm run check:merge` (4,405 tests, proofs 20/20, visual 62/62, `check:views`) and hygiene with no
+gate worse than main for the packages touched. Left for the dedupe session: the hidden-ancestor walk repeated in
+about 9 packages, GGX direct light copied in about 9 packages, `usdz-export` re-exporting `exporters/usdz`, the
+exporters root re-exporting `exportUSDZ`.
 The full WebGL2 fallback follows in the next version: [webgl2-compat-roadmap.md](webgl2-compat-roadmap.md).
 
 ## Landed 2026-10-24: Codex's Margo Mesh engine work (codex/mesh-rotation-visibility)

@@ -1,6 +1,6 @@
 # Design envelope
 
-Margo is a small WebGPU engine: core plus the stage facade is 21,343 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes), and every
+Margo is a small WebGPU engine: core plus the stage facade is 22,253 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes), and every
 other capability is an optional package. That size is a decision, and so are the boundaries below. Each one exists
 for one of two reasons: it keeps core small and frozen, or it follows the limits WebGPU guarantees on every adapter
 (Margo's device requests none above them, so an app that runs on a laptop also runs on a phone). This page lists every

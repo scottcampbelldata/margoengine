@@ -1,5 +1,5 @@
 {
-  "commit": "5eb44eca",
+  "commit": "ab6e1cf3",
   "dirty": false,
   "browser": "msedge 155.0.4283.62 headless",
   "adapter": "nvidia ampere",
@@ -11,17 +11,8 @@
       "encoding": "identity",
       "transferred": 808,
       "raw": 558,
-      "gzip": 371,
+      "gzip": 369,
       "brotli": 228
-    },
-    {
-      "path": "assets/index-BzXyWQ28.js",
-      "role": "Entry: core + stage + app",
-      "encoding": "gzip",
-      "transferred": 22231,
-      "raw": 51582,
-      "gzip": 21850,
-      "brotli": 19293
     },
     {
       "path": "assets/geometry-CAWt7Gfm.js",
@@ -33,6 +24,15 @@
       "brotli": 938
     },
     {
+      "path": "assets/index-ClHVINtI.js",
+      "role": "Entry: core + stage + app",
+      "encoding": "gzip",
+      "transferred": 23182,
+      "raw": 57068,
+      "gzip": 22801,
+      "brotli": 20075
+    },
+    {
       "path": "assets/extension-DuYhGmhk.js",
       "role": "Shared chunk",
       "encoding": "identity",
@@ -42,13 +42,13 @@
       "brotli": 44
     },
     {
-      "path": "assets/dist-CoxE7TLT.js",
+      "path": "assets/dist-IJ-EPr53.js",
       "role": "@margoengine/gltf (app.load)",
       "encoding": "gzip",
-      "transferred": 5407,
-      "raw": 12388,
-      "gzip": 5035,
-      "brotli": 4535
+      "transferred": 5516,
+      "raw": 12523,
+      "gzip": 5144,
+      "brotli": 4627
     },
     {
       "path": "model.glb",
@@ -62,10 +62,10 @@
   ],
   "total": {
     "requests": 6,
-    "transferred": 31796,
-    "raw": 67936,
-    "gzip": 28780,
-    "brotli": 25397
+    "transferred": 32856,
+    "raw": 73557,
+    "gzip": 29838,
+    "brotli": 26271
   },
   "notFetched": [
     {
@@ -73,36 +73,36 @@
       "raw": 127725
     },
     {
-      "path": "assets/cad-DFowXvJU.js",
+      "path": "assets/cad-D0aHcgQQ.js",
       "raw": 108
     },
     {
-      "path": "assets/cad-DZ4VkNBk-B65UBbNR.js",
-      "raw": 38296
+      "path": "assets/cad-D1SFeheG-CGR_gu6h.js",
+      "raw": 38647
     },
     {
       "path": "assets/cad-runtime-BaWQAECA.js",
       "raw": 17489
     },
     {
-      "path": "assets/dist-BzqjyC3W.js",
-      "raw": 44
+      "path": "assets/dist-CmfFZPvK.js",
+      "raw": 40590
+    },
+    {
+      "path": "assets/dist-D5fEH00T.js",
+      "raw": 88335
     },
     {
       "path": "assets/dist-DBck6Grm.js",
       "raw": 32922
     },
     {
-      "path": "assets/dist-DJ8BszER.js",
-      "raw": 40581
+      "path": "assets/dist-DppId7fM.js",
+      "raw": 44
     },
     {
-      "path": "assets/dist-DW2Qr4n3.js",
+      "path": "assets/dist-DVPPeg5m.js",
       "raw": 61245
-    },
-    {
-      "path": "assets/dist-ZDlnIyQf.js",
-      "raw": 87235
     },
     {
       "path": "assets/occt-import-js-BhHfLpto.wasm",
@@ -113,28 +113,28 @@
       "raw": 97856
     },
     {
-      "path": "assets/particles-mQ3QBoHF.js",
+      "path": "assets/particles-BObAJPcg.js",
+      "raw": 28470
+    },
+    {
+      "path": "assets/particles-DlSrho4X.js",
       "raw": 55
     },
     {
-      "path": "assets/particles-Wx8EVt7B.js",
-      "raw": 28283
+      "path": "assets/post--jku-Z86.js",
+      "raw": 18361
     },
     {
-      "path": "assets/post-DLJh6HQm.js",
-      "raw": 17234
-    },
-    {
-      "path": "assets/post-js_nBhmM.js",
+      "path": "assets/post-fjJA8FAx.js",
       "raw": 52
     },
     {
-      "path": "assets/sky-BzqjyC3W.js",
+      "path": "assets/sky-DppId7fM.js",
       "raw": 44
     },
     {
-      "path": "assets/sky-DSsTh9I0.js",
-      "raw": 19962
+      "path": "assets/sky-DrlMjJ89.js",
+      "raw": 20237
     },
     {
       "path": "assets/validate-DE7v94fO.js",

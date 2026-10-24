@@ -2,8 +2,8 @@
 
 Date: 2026-10-24. The table in [threejs-parity.md](threejs-parity.md) was recounted after multi-view:
 **161 features, 142 COVERED, 13 PARTIAL, 6 MISSING** (138 / 16 / 6 after the visual-parity pass, 117 / 29 / 14
-before it). Multi-view (2026-10-24) closed three rows (scenes, viewports, ArrayCamera) and the EXR writer split EXRExporter out as covered; core + stage measures 21,599
-bytes gzip with it, 3,401 bytes below the 25,000-byte ceiling. The rows and the
+before it). Multi-view (2026-10-24) closed three rows (scenes, viewports, ArrayCamera) and the EXR writer split EXRExporter out as covered; core + stage measures 22,253
+bytes gzip with it, 2,747 bytes below the 25,000-byte ceiling. The rows and the
 [to-do tables](threejs-parity.md#what-is-missing-or-partial-and-what-to-do) are the source; this page only explains how
 to read them.
 
