@@ -2,6 +2,8 @@
 // shadow maps), @margoengine/staging (contact shadows) and @margoengine/selection (picking): the vertex layout of core
 // (24-byte) and gltf-pro (80-byte) geometry, the displacement bind group, the per-draw uniform and the draw itself.
 import { instanceLayout } from './instances.js';
+import { meshRuntime } from '@margoengine/core/extension';
+import { margoError } from './errors.js';
 
 /**
  * Vertex buffers of a caster with `stride` 24 (core: position) or 80 (gltf-pro: position, uv for `displaced`,
@@ -23,6 +25,38 @@ export function casterBuffers(stride, displaced = false, instanced = false) {
     },
     ...(instanced ? [instanceLayout] : []),
   ];
+}
+
+/** A depth-only caster pipeline (`layout: 'auto'`, less-equal depth into depth32float, line lists for `lines`). */
+export const casterPipeline = (device, module, stride, displaced, instanced, lines) =>
+  device.createRenderPipeline({
+    layout: 'auto',
+    vertex: { module, entryPoint: 'vertex', buffers: casterBuffers(stride, displaced, instanced) },
+    fragment: { module, entryPoint: 'fragment', targets: [] },
+    ...(lines ? { primitive: { topology: 'line-list' } } : {}),
+    depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less-equal' },
+  });
+
+/** The per-primitive draw records of `node` in `draws`, created empty on first use. */
+export function nodeRecords(draws, node) {
+  let records = draws.get(node);
+  if (!records) draws.set(node, (records = new Map()));
+  return records;
+}
+
+/**
+ * The runtime object of a caster `source` (a core mesh handle or a shadowPrimitives source): a disposed source throws
+ * MargoError 'disposed' (`noun` names it in the message), a core mesh of another engine than `engine` 'attached'.
+ */
+export function casterRuntime(source, engine, noun) {
+  if ('disposed' in source && source.disposed) throw margoError('disposed', `${noun} is disposed; add a live mesh`);
+  const runtime = 'id' in source ? meshRuntime(source) : source;
+  if ('id' in runtime) {
+    runtime.check();
+    if (engine && runtime.engine !== engine)
+      throw margoError('attached', 'Shadow mesh belongs to another engine; use objects created by the same engine');
+  }
+  return runtime;
 }
 
 /** The bind group of a displaced caster (shared/displacement.js): its feature uniform, map and sampler; else undefined. */

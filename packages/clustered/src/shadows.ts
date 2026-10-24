@@ -27,7 +27,7 @@ import {
 } from './light-shadow-math.js';
 import { MargoError } from '@margoengine/math/errors';
 import { hiddenInTree } from '../../shared/visibility.js';
-import { casterBuffers, displacementGroup } from '../../shared/caster.js';
+import { casterBuffers, casterRuntime, displacementGroup } from '../../shared/caster.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -362,17 +362,12 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   /** Adds a caster: a core mesh, or a gltf-pro model / materials mesh (`shadowPrimitives`). `dynamic` re-renders its lights every frame (skinned or morphing geometry). */
   add(source: LocalShadowSource | MeshHandle, { dynamic = false }: { dynamic?: boolean } = {}): () => void {
     if (this.disposed || !source || typeof dynamic !== 'boolean') throw new TypeError('Invalid shadow caster');
-    if ('disposed' in source && source.disposed)
-      throw new MargoError('disposed', 'Shadow caster is disposed; add a live mesh');
-    const runtime = 'id' in source ? meshRuntime(source as MeshHandle) : (source as LocalShadowSource);
-    if ('id' in runtime) {
-      runtime.check();
-      if (this.engine && runtime.engine !== this.engine)
-        throw new MargoError(
-          'attached',
-          'Shadow mesh belongs to another engine; use objects created by the same engine',
-        );
-    } else if (!('shadowPrimitives' in runtime)) throw new TypeError('Invalid shadow caster');
+    const runtime = casterRuntime<object, ReturnType<typeof meshRuntime> | LocalShadowSource>(
+      source,
+      this.engine,
+      'Shadow caster',
+    );
+    if (!('id' in runtime) && !('shadowPrimitives' in runtime)) throw new TypeError('Invalid shadow caster');
     if (this.sources.some((r) => r.source === runtime))
       throw new MargoError('attached', 'Duplicate shadow caster; add each caster once');
     const r: Source = { source: runtime, dynamic };

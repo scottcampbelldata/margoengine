@@ -7,7 +7,14 @@ import { displacedDepth } from '../../shared/displacement.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { hemisphere, localShadowMatrix, viewportMatrix } from './local-shadow-math.js';
 import { hiddenInTree } from '../../shared/visibility.js';
-import { casterBuffers, depthPassDescriptor, displacementGroup, drawCaster } from '../../shared/caster.js';
+import {
+  casterPipeline,
+  casterRuntime,
+  nodeRecords,
+  depthPassDescriptor,
+  displacementGroup,
+  drawCaster,
+} from '../../shared/caster.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUTextureUsage: {
   RENDER_ATTACHMENT: number;
@@ -540,25 +547,11 @@ export class LocalShadowMaps {
               )
             : code,
         });
-      pipeline = this.device!.createRenderPipeline({
-        layout: 'auto',
-        vertex: {
-          module,
-          entryPoint: 'vertex',
-          buffers: casterBuffers(p.stride, !!displacement, !!inst),
-        },
-        fragment: { module, entryPoint: 'fragment', targets: [] },
-        ...(lines ? { primitive: { topology: 'line-list' as const } } : {}),
-        depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less-equal' },
-      });
+      pipeline = casterPipeline(this.device!, module, p.stride, !!displacement, !!inst, lines);
       this.pipelines.set(key, pipeline);
     }
-    const identity = p.primitive ?? p.index;
-    let records = this.draws.get(p.node);
-    if (!records) {
-      records = new Map();
-      this.draws.set(p.node, records);
-    }
+    const identity = p.primitive ?? p.index,
+      records = nodeRecords(this.draws, p.node);
     let record = records.get(identity);
     if (
       !record ||

@@ -23,7 +23,14 @@ import { MargoError } from '@margoengine/math/errors';
 import { cascadeSplits, fitCascades } from './cascades.js';
 import { shadowSampling, shadowDepth, type ShadowFilter } from './shader.js';
 import { hiddenInTree } from '../../shared/visibility.js';
-import { casterBuffers, depthPassDescriptor, displacementGroup, drawCaster } from '../../shared/caster.js';
+import {
+  casterPipeline,
+  casterRuntime,
+  nodeRecords,
+  depthPassDescriptor,
+  displacementGroup,
+  drawCaster,
+} from '../../shared/caster.js';
 export { cascadeSplits, fitCascades } from './cascades.js';
 export type { ShadowFilter } from './shader.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
@@ -382,17 +389,12 @@ export class Shadows implements EnginePlugin {
       typeof receiveShadow !== 'boolean'
     )
       throw new TypeError('Invalid shadow source');
-    if ('disposed' in source && source.disposed)
-      throw new MargoError('disposed', 'Shadow source is disposed; add a live mesh');
-    const runtime = 'id' in source ? meshRuntime(source as MeshHandle) : (source as ShadowSource);
-    if ('id' in runtime) {
-      runtime.check();
-      if (this.engine && runtime.engine !== this.engine)
-        throw new MargoError(
-          'attached',
-          'Shadow mesh belongs to another engine; use objects created by the same engine',
-        );
-    } else if (!('shadowPrimitives' in runtime) && typeof runtime.drawShadow !== 'function')
+    const runtime = casterRuntime<object, ReturnType<typeof meshRuntime> | ShadowSource>(
+      source,
+      this.engine,
+      'Shadow source',
+    );
+    if (!('id' in runtime) && !('shadowPrimitives' in runtime) && typeof runtime.drawShadow !== 'function')
       throw new TypeError('Invalid shadow source');
     if (
       this.engine &&
@@ -1031,26 +1033,12 @@ export class Shadows implements EnginePlugin {
         code = sectionShader(code, 0, 3);
       }
       const module = this.device!.createShaderModule({ code });
-      pipeline = this.device!.createRenderPipeline({
-        layout: 'auto',
-        vertex: {
-          module,
-          entryPoint: 'vertex',
-          buffers: casterBuffers(p.stride, !!displacement, !!inst),
-        },
-        fragment: { module, entryPoint: 'fragment', targets: [] },
-        ...(lines ? { primitive: { topology: 'line-list' as const } } : {}),
-        depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less-equal' },
-      });
+      pipeline = casterPipeline(this.device!, module, p.stride, !!displacement, !!inst, lines);
       this.pipelines.set(key, pipeline);
     }
     // Primitives sharing a node can have different alpha maps and geometry.
-    const identity = p.primitive ?? p.index;
-    let records = this.draws.get(p.node);
-    if (!records) {
-      records = new Map();
-      this.draws.set(p.node, records);
-    }
+    const identity = p.primitive ?? p.index,
+      records = nodeRecords(this.draws, p.node);
     let record = records.get(identity);
     if (
       !record ||
