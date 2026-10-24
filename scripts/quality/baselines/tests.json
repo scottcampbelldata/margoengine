@@ -1,7 +1,7 @@
 {
   "gate": "tests",
   "about": "packages with no test in verify; public entries no test imports",
-  "total": 48,
+  "total": 47,
   "history": [
     {
       "date": "2026-10-24",
@@ -53,7 +53,6 @@
     "unimported @margoengine/post/stack": 1,
     "unimported @margoengine/sky/bruneton": 1,
     "unimported @margoengine/sky/fog": 1,
-    "unimported @margoengine/sky/night": 1,
     "unimported @margoengine/sky/preetham": 1,
     "unimported @margoengine/sky/reflection": 1,
     "unimported @margoengine/vfx/obstacles": 1,
