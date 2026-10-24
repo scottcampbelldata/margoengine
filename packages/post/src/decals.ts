@@ -9,8 +9,10 @@ import {
   type Vec3,
 } from '@margoengine/core/extension';
 import { invertMatrixStable } from '@margoengine/math/mat4';
+import { finiteVector } from '@margoengine/math/validate';
 import { sceneTarget } from '../../shared/msaa.js';
 import { margoError } from '../../shared/errors.js';
+import { applyView } from '../../shared/view-rect.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -146,28 +148,35 @@ export class Decals implements EnginePlugin {
     engineRuntime(instance).use(decals);
     return decals;
   }
-  /** Replaces the decals (at most {@link MAX_DECALS}); validates every entry before changing anything. Drawn in list order within each mode, 'multiply' first. */
+  /**
+   * Replaces the decals (at most {@link MAX_DECALS}); validates every entry before changing anything. Drawn in list
+   * order within each mode, 'multiply' first.
+   * @throws RangeError for a missing or invalid entry; TypeError when a value overflows Float32.
+   */
   setDecals(list: readonly Decal[]): this {
-    if (this.disposed || !Array.isArray(list) || list.length > MAX_DECALS)
-      throw new RangeError(`Expected at most ${MAX_DECALS} decals`);
-    const packed = list.map((d) => {
+    const count = Array.isArray(list) ? list.length : MAX_DECALS + 1;
+    if (this.disposed || count > MAX_DECALS) throw new RangeError(`Expected at most ${MAX_DECALS} decals`);
+    const packed = Array.from({ length: count }, (_, i) => {
+      const d = list[i];
+      if (!d || typeof d !== 'object') throw new RangeError('Invalid decal: expected a decal object');
+      // Index every lane: `every` skips the holes of a sparse array.
       const vec = (v: readonly number[] | undefined): boolean =>
-        Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
-      const f: readonly number[] = d?.direction,
+        Array.isArray(v) && v.length === 3 && [0, 1, 2].every((i) => Number.isFinite(v[i]));
+      const f: readonly number[] = d.direction,
         length = vec(f) ? Math.hypot(...f) : 0,
-        size: number[] = [d?.width, d?.height, d?.depth ?? Math.min(d?.width, d?.height)],
-        rect: readonly number[] = d?.rect ?? [0, 0, 1, 1],
-        color: readonly number[] = d?.color ?? [1, 1, 1],
-        opacity = d?.opacity ?? 1,
-        angle = d?.angle ?? Math.PI / 3,
-        mode = d?.mode ?? 'multiply';
+        size: number[] = [d.width, d.height, d.depth ?? Math.min(d.width, d.height)],
+        rect: readonly number[] = d.rect ?? [0, 0, 1, 1],
+        color: readonly number[] = d.color ?? [1, 1, 1],
+        opacity = d.opacity ?? 1,
+        angle = d.angle ?? Math.PI / 3,
+        mode = d.mode ?? 'multiply';
       if (
-        !vec(d?.position) ||
+        !vec(d.position) ||
         !length ||
         !size.every((v) => Number.isFinite(v) && v > 0) ||
         !Array.isArray(rect) ||
         rect.length !== 4 ||
-        !rect.every((v) => Number.isFinite(v) && v >= 0 && v <= 1) ||
+        ![0, 1, 2, 3].every((i) => Number.isFinite(rect[i]) && rect[i] >= 0 && rect[i] <= 1) ||
         !vec(color) ||
         color.some((v) => v < 0) ||
         !(opacity >= 0 && opacity <= 1) ||
@@ -185,22 +194,22 @@ export class Decals implements EnginePlugin {
       if (!(rl > 1e-6 * Math.hypot(...hint))) throw new RangeError('Decal up is parallel to its direction');
       const right = r.map((v) => v / rl),
         up = [n[1] * right[2] - n[2] * right[1], n[2] * right[0] - n[0] * right[2], n[0] * right[1] - n[1] * right[0]];
-      return {
-        mode,
-        values: [
-          ...d.position,
-          +(mode === 'over'),
-          ...right.map((v) => (v * size[0]) / 2),
-          Math.cos(angle),
-          ...up.map((v) => (v * size[1]) / 2),
-          opacity,
-          ...n.map((v) => (v * size[2]) / 2),
-          0,
-          ...rect,
-          ...color,
-          0,
-        ],
-      };
+      const values = [
+        ...d.position,
+        +(mode === 'over'),
+        ...right.map((v) => (v * size[0]) / 2),
+        Math.cos(angle),
+        ...up.map((v) => (v * size[1]) / 2),
+        opacity,
+        ...n.map((v) => (v * size[2]) / 2),
+        0,
+        ...rect,
+        ...color,
+        0,
+      ];
+      // Position, half extents and colour must stay finite as Float32 on upload.
+      finiteVector(values, FLOATS, 'Decal position, size and color');
+      return { mode, values };
     });
     const order = [...packed.filter((p) => p.mode === 'multiply'), ...packed.filter((p) => p.mode === 'over')];
     this.data = new Float32Array(order.length * FLOATS);
@@ -340,6 +349,7 @@ export class Decals implements EnginePlugin {
       };
     (this.pass.colorAttachments as GPURenderPassColorAttachment[])[0].view = c.color;
     const pass = c.encoder.beginRenderPass(this.pass);
+    applyView(pass, c);
     if (this.counts[0]) {
       pass.setPipeline(pipeline('multiply'));
       pass.setBindGroup(0, this.group.group);
