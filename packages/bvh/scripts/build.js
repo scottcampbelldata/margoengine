@@ -16,8 +16,7 @@ execFileSync(
 );
 // Keep the registry inside the published package; Symbol.for shares it with independently bundled loaders.
 await copyFile(resolve(repository, 'packages/shared/mesh-source.js'), resolve(root, 'dist/mesh-source.js'));
-const raycaster = resolve(root, 'dist/raycaster.js');
-await writeFile(
-  raycaster,
-  (await readFile(raycaster, 'utf8')).replace('../../shared/mesh-source.js', './mesh-source.js'),
-);
+for (const name of ['raycaster.js', 'snapshot-source.js']) {
+  const file = resolve(root, 'dist', name);
+  await writeFile(file, (await readFile(file, 'utf8')).replace('../../shared/mesh-source.js', './mesh-source.js'));
+}

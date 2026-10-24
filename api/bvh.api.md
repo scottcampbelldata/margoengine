@@ -194,10 +194,124 @@ export interface Ray {
     direction: ArrayLike<number>;
 }
 
+export interface RaycastAlphaTexture {
+    width: number;
+    height: number;
+    pixels: ArrayLike<number>;
+}
+
+export interface RaycastDepthHit {
+    distance: number;
+    point: Vec3;
+    uv?: [number, number];
+}
+
+export interface RaycastDepthSample {
+    depth: number | null;
+    missed: boolean;
+}
+
 export interface RaycastOptions {
     near?: number;
     far?: number;
     side?: Side;
+}
+
+export interface RaycastProjectSegmentOptions {
+    nearPadding?: number;
+}
+
+export interface RaycastProjectedPoint {
+    x: number;
+    y: number;
+    depth: number;
+}
+
+export interface RaycastProjectedSegment {
+    a: Vec3;
+    b: Vec3;
+    start: RaycastProjectedPoint;
+    end: RaycastProjectedPoint;
+}
+
+export class RaycastProjection {
+    private constructor();
+    static capture(engine: Engine, options?: RaycastProjectionOptions): RaycastProjection;
+    get disposed(): boolean;
+    get orthographic(): boolean;
+    basis(): {
+        forward: Vec3;
+        right: Vec3;
+        up: Vec3;
+    };
+    size(): {
+        width: number;
+        height: number;
+    };
+    depth(point: ArrayLike<number>): number;
+    project(point: ArrayLike<number>): RaycastProjectedPoint | null;
+    pointDistance(point: ArrayLike<number>, x: number, y: number): RaycastSegmentPoint | null;
+    closestSegmentPoint(a: ArrayLike<number>, b: ArrayLike<number>, x: number, y: number): RaycastSegmentPoint | null;
+    projectSegment(a: ArrayLike<number>, b: ArrayLike<number>, options?: RaycastProjectSegmentOptions): RaycastProjectedSegment | null;
+    rectangle(x1: number, y1: number, x2: number, y2: number): RaycastScreenRectangle;
+    pixelWorldSize(depth: number, orthographicHeight?: number | undefined): number;
+    setFromCanvas(raycaster: Raycaster, x: number, y: number): Raycaster;
+    dispose(): void;
+    [Symbol.dispose](): void;
+}
+
+export interface RaycastProjectionOptions {
+    orthographicHeight?: number;
+}
+
+export interface RaycastScreenRectangle {
+    project(point: ArrayLike<number>): RaycastProjectedPoint | null;
+    canvasSamples(): [number, number][];
+    segmentSamples(a: ArrayLike<number>, b: ArrayLike<number>): IterableIterator<RaycastSegmentPoint>;
+}
+
+export interface RaycastSegmentPoint {
+    point: Vec3;
+    screen: RaycastProjectedPoint;
+    distance: number;
+}
+
+export class RaycastSnapshot {
+    private constructor();
+    static capture(engine: Engine, objects: Iterable<Mesh | ModelLike>, options?: RaycastSnapshotOptions): RaycastSnapshot;
+    get disposed(): boolean;
+    dispose(): void;
+    [Symbol.dispose](): void;
+    setFromCanvas(raycaster: Raycaster, x: number, y: number): Raycaster;
+    createVisibilityQuery(options?: RaycastVisibilityOptions): RaycastVisibilityQuery;
+    intersectDepth(raycaster: Raycaster): RaycastDepthHit[];
+    intersect(raycaster: Raycaster): RaycasterHit[];
+}
+
+export interface RaycastSnapshotOptions extends IntersectOptions {
+    bvhOptions?: BVHBuildOptions;
+}
+
+export interface RaycastVisibilityOptions {
+    projection?: RaycastProjection;
+    orthographicHeight?: number;
+    alphaTexture?: RaycastAlphaTexture;
+    alphaThreshold?: number;
+    near?: number;
+    far?: number;
+    side?: Raycaster['side'];
+    layers?: number;
+    filter?: Raycaster['filter'];
+}
+
+export interface RaycastVisibilityQuery {
+    readonly disposed: boolean;
+    project(point: ArrayLike<number>): RaycastProjectedPoint | null;
+    depthAtCanvas(x: number, y: number): RaycastDepthSample;
+    visible(point: ArrayLike<number>): boolean;
+    visibleMany(points: readonly ArrayLike<number>[]): boolean[];
+    dispose(): void;
+    [Symbol.dispose](): void;
 }
 
 export class Raycaster {

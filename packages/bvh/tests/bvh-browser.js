@@ -1,8 +1,10 @@
 import { Engine, Geometry, PbrMaterial, box } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
+import { webglRenderer } from '@margoengine/webgl';
 import {
   MeshBVH,
   Raycaster,
+  RaycastSnapshot,
   buildAsync,
   computeGeometryBVHAsync,
   hasGeometryBVH,
@@ -146,7 +148,11 @@ async function engineChecks(backend, report) {
   const canvas = document.createElement('canvas');
   canvas.style.cssText = 'width:256px;height:256px';
   document.body.append(canvas);
-  const engine = await Engine.create(canvas, { backend, camera: { position: [0, 0, 6], target: [0, 0, 0], fov: 50 } });
+  const engine = await Engine.create(canvas, {
+    backend,
+    fallback: webglRenderer,
+    camera: { position: [0, 0, 6], target: [0, 0, 0], fov: 50 },
+  });
   assert(engine.backend === backend, `${backend} requested, got ${engine.backend}: ${engine.fallbackReason}`);
   const runtime = engineRuntime(engine),
     errors = [];
@@ -255,9 +261,32 @@ async function engineChecks(backend, report) {
 
     // Every pixel of a 64x64 grid: CPU raycast against the rendered colors (silhouette pixels excluded).
     raycaster.firstHitOnly = true;
+    const capturedScene = RaycastSnapshot.capture(engine, Array.from(runtime.meshes.values()), { refresh: false });
+    const preparedRay = new Raycaster();
+    preparedRay.firstHitOnly = true;
+    let snapshotComparisons = 0;
     const castAt = (x, y) => {
       raycaster.setFromEngine(engine, x, y);
-      return raycaster.intersectEngine(engine, { refresh: false })[0]?.mesh ?? null;
+      const live = raycaster.intersectEngine(engine, { refresh: false });
+      capturedScene.setFromCanvas(preparedRay, x, y);
+      const captured = capturedScene.intersect(preparedRay);
+      assert(live.length === captured.length, `${backend}: snapshot hit count`);
+      for (let i = 0; i < live.length; i++) {
+        assert(
+          live[i].mesh === captured[i].mesh &&
+            live[i].distance === captured[i].distance &&
+            live[i].faceIndex === captured[i].faceIndex &&
+            live[i].frontFace === captured[i].frontFace,
+          `${backend}: snapshot identity/distance`,
+        );
+        for (const field of ['point', 'normal', 'faceNormal', 'barycoord', 'localPoint'])
+          assert(
+            live[i][field].every((v, k) => v === captured[i][field][k]),
+            `${backend}: snapshot ${field}`,
+          );
+      }
+      snapshotComparisons++;
+      return live[0]?.mesh ?? null;
     };
     let compared = 0,
       mismatches = 0,
@@ -325,6 +354,10 @@ async function engineChecks(backend, report) {
       const scoped = await runtime.gpu.popErrorScope();
       assert(!scoped, `WebGPU validation error: ${scoped?.message}`);
     }
+    capturedScene.dispose();
+    report.checks.push(
+      `${backend}: captured local-space queries match live numeric hits for ${snapshotComparisons} canvas rays`,
+    );
     assert(errors.length === 0, `uncaptured WebGPU errors: ${errors.join('; ')}`);
     return {
       gridRaysPerSecond: Math.round(((64 * 64 * 5) / gridMs) * 1000),

@@ -11,6 +11,7 @@ import {
   type Side,
 } from './math.js';
 
+/** Mutable [x, y, z] owned by the caller (hit points, normals, barycentric weights). */
 export type Vec3 = [number, number, number];
 /** Anything with interleaved stride-6 `vertices` (position xyz, normal xyz) and `indices`, such as the core `Geometry`. */
 export interface GeometryLike {
@@ -24,10 +25,12 @@ export interface TriangleSource {
   normals?: ArrayLike<number> | null;
   stride?: number;
 }
+/** A ray: `origin + t * direction`. The direction need not be normalized; distances are t * |direction|. */
 export interface Ray {
   origin: ArrayLike<number>;
   direction: ArrayLike<number>;
 }
+/** Distance range and face side for MeshBVH ray queries. */
 export interface RaycastOptions {
   /** Hits closer than this distance are ignored. Distances are t * |direction|. Default 0. */
   near?: number;
@@ -36,6 +39,7 @@ export interface RaycastOptions {
   /** Which triangle faces count. Front faces wind counter-clockwise toward the ray origin. Default 'double'. */
   side?: Side;
 }
+/** One ray/triangle hit from MeshBVH.raycast or raycastFirst, in the BVH's space. */
 export interface BVHHit {
   /** t * |direction| from the ray origin. */
   distance: number;
@@ -52,18 +56,21 @@ export interface BVHHit {
   faceNormal: Vec3;
   frontFace: boolean;
 }
+/** Search range for MeshBVH.closestPointToPoint. */
 export interface ClosestPointOptions {
   /** Only triangles within this distance are considered. Default Infinity. */
   maxDistance?: number;
   /** Stop searching once a triangle at or below this distance is found. Default 0. */
   minDistance?: number;
 }
+/** Closest point on the mesh, its distance, triangle and barycentric weights. */
 export interface ClosestPointResult {
   point: Vec3;
   distance: number;
   faceIndex: number;
   barycoord: Vec3;
 }
+/** Axis-aligned box given by `min` and `max` corners. */
 export interface Box3Like {
   min: ArrayLike<number>;
   max: ArrayLike<number>;
@@ -79,6 +86,7 @@ export interface ShapecastTriangle {
   b: Float64Array;
   c: Float64Array;
 }
+/** shapecast `intersectsBounds` results: skip the node, descend into it, or accept its whole subtree. */
 export const NOT_INTERSECTED = 0,
   INTERSECTED = 1,
   CONTAINED = 2;
@@ -104,6 +112,7 @@ export interface ShapecastCallbacks {
   /** Score for visiting children in ascending order (for example the distance to a query point). */
   boundsTraverseOrder?(box: ShapecastBox): number;
 }
+/** Output of MeshBVH.serialize: node buffer plus leaf index and triangle order, for deserialize or a worker transfer. */
 export interface SerializedBVH {
   version: 1;
   nodes: ArrayBuffer;
@@ -378,7 +387,8 @@ export class MeshBVH {
       s = this.stride;
     const ix = 1 / dx,
       iy = 1 / dy,
-      iz = 1 / dz;
+      iz = 1 / dz,
+      exact = finiteReciprocals(ix, iy, iz);
     let best = tmax,
       bestSlot = -1,
       bu = 0,
@@ -386,7 +396,9 @@ export class MeshBVH {
       bdet = 0,
       sp = 0;
     // Front-to-back traversal: children are entered nearest first and skipped once their entry passes the best hit.
-    const rootEntry = slab(f, 0, ox, oy, oz, ix, iy, iz, tmin, best);
+    const rootEntry = exact
+      ? slab(f, 0, ox, oy, oz, ix, iy, iz, tmin, best)
+      : slabAny(f, 0, ox, oy, oz, dx, dy, dz, ix, iy, iz, tmin, best);
     if (rootEntry !== Infinity) {
       STACK[sp] = 0;
       ENTRY[sp++] = rootEntry;
@@ -400,8 +412,12 @@ export class MeshBVH {
       if (word & INTERNAL_FLAG) {
         const l = node + 1,
           r = u[w + 6];
-        const tl = slab(f, l * NODE_WORDS, ox, oy, oz, ix, iy, iz, tmin, best),
-          tr = slab(f, r * NODE_WORDS, ox, oy, oz, ix, iy, iz, tmin, best);
+        const tl = exact
+            ? slab(f, l * NODE_WORDS, ox, oy, oz, ix, iy, iz, tmin, best)
+            : slabAny(f, l * NODE_WORDS, ox, oy, oz, dx, dy, dz, ix, iy, iz, tmin, best),
+          tr = exact
+            ? slab(f, r * NODE_WORDS, ox, oy, oz, ix, iy, iz, tmin, best)
+            : slabAny(f, r * NODE_WORDS, ox, oy, oz, dx, dy, dz, ix, iy, iz, tmin, best);
         if (tl <= tr) {
           if (tr !== Infinity) {
             STACK[sp] = r;
@@ -479,42 +495,19 @@ export class MeshBVH {
     const ix = 1 / dx,
       iy = 1 / dy,
       iz = 1 / dz,
+      exact = finiteReciprocals(ix, iy, iz),
       hits: BVHHit[] = [];
     let sp = 0;
     STACK[sp++] = 0;
     while (sp) {
       const node = STACK[--sp],
         w = node * NODE_WORDS;
-      let lo = tmin,
-        hi = tmax,
-        t1 = (f[w] - ox) * ix,
-        t2 = (f[w + 3] - ox) * ix;
-      if (t1 > t2) {
-        const q = t1;
-        t1 = t2;
-        t2 = q;
-      }
-      if (t1 > lo) lo = t1;
-      if (t2 < hi) hi = t2;
-      t1 = (f[w + 1] - oy) * iy;
-      t2 = (f[w + 4] - oy) * iy;
-      if (t1 > t2) {
-        const q = t1;
-        t1 = t2;
-        t2 = q;
-      }
-      if (t1 > lo) lo = t1;
-      if (t2 < hi) hi = t2;
-      t1 = (f[w + 2] - oz) * iz;
-      t2 = (f[w + 5] - oz) * iz;
-      if (t1 > t2) {
-        const q = t1;
-        t1 = t2;
-        t2 = q;
-      }
-      if (t1 > lo) lo = t1;
-      if (t2 < hi) hi = t2;
-      if (lo > hi + EPS * (Math.abs(hi) + Math.abs(lo) + 1)) continue;
+      if (
+        (exact
+          ? slab(f, w, ox, oy, oz, ix, iy, iz, tmin, tmax)
+          : slabAny(f, w, ox, oy, oz, dx, dy, dz, ix, iy, iz, tmin, tmax)) === Infinity
+      )
+        continue;
       const word = u[w + 7];
       if (word & INTERNAL_FLAG) {
         STACK[sp++] = u[w + 6];
@@ -1108,10 +1101,14 @@ function rayRange(d: ArrayLike<number>, { near = 0, far = Infinity }: RaycastOpt
   return [near / length, far / length, length];
 }
 
+/** Every direction component has a finite reciprocal: the plain multiply-only slab test applies. */
+const finiteReciprocals = (ix: number, iy: number, iz: number): boolean =>
+  Number.isFinite(ix) && Number.isFinite(iy) && Number.isFinite(iz);
+
 /**
- * Slab test against node bounds at word offset w. Returns the entry parameter, or Infinity on a miss. NaN products
- * (a zero direction component with the origin on a slab plane) are ignored, which keeps the test conservative, and a
- * small relative slack keeps rays that graze a box edge from being culled before the exact triangle test.
+ * Slab test against node bounds at word offset w for rays whose reciprocals are all finite. Returns the entry
+ * parameter, or Infinity on a miss. A small relative slack keeps rays that graze a box edge from being culled before
+ * the exact triangle test; it applies only to finite endpoints, so an infinite far range still prunes missed slabs.
  */
 function slab(
   f: Float32Array,
@@ -1152,7 +1149,59 @@ function slab(
   }
   if (t1 > lo) lo = t1;
   if (t2 < hi) hi = t2;
-  return lo > hi + EPS * (Math.abs(hi) + Math.abs(lo) + 1) ? Infinity : lo;
+  return missed(lo, hi) ? Infinity : lo;
+}
+
+/**
+ * @internal Slab test for any ray, including one with a zero component (axis-parallel, common for orthographic
+ * picks) or a subnormal one whose reciprocal overflows. Parallel axes keep a finite spatial slack instead of
+ * evaluating 0 * Infinity; overflowing axes divide. Same result contract as slab. Also tests RaycastSnapshot's
+ * Float64 top-level bounds.
+ */
+export function slabAny(
+  f: ArrayLike<number>,
+  w: number,
+  ox: number,
+  oy: number,
+  oz: number,
+  dx: number,
+  dy: number,
+  dz: number,
+  ix: number,
+  iy: number,
+  iz: number,
+  lo: number,
+  hi: number,
+): number {
+  for (let k = 0; k < 3; k++) {
+    const o = k === 0 ? ox : k === 1 ? oy : oz,
+      d = k === 0 ? dx : k === 1 ? dy : dz,
+      inv = k === 0 ? ix : k === 1 ? iy : iz,
+      min = f[w + k],
+      max = f[w + k + 3];
+    if (d === 0) {
+      if (parallelOutside(o, min, max)) return Infinity;
+      continue;
+    }
+    let t1 = Number.isFinite(inv) ? (min - o) * inv : (min - o) / d,
+      t2 = Number.isFinite(inv) ? (max - o) * inv : (max - o) / d;
+    if (t1 > t2) {
+      const q = t1;
+      t1 = t2;
+      t2 = q;
+    }
+    if (t1 > lo) lo = t1;
+    if (t2 < hi) hi = t2;
+  }
+  return missed(lo, hi) ? Infinity : lo;
+}
+
+const missed = (lo: number, hi: number): boolean =>
+  lo > hi && (!Number.isFinite(lo) || !Number.isFinite(hi) || lo > hi + EPS * (Math.abs(hi) + Math.abs(lo) + 1));
+
+function parallelOutside(origin: number, min: number, max: number): boolean {
+  const slack = EPS * (Math.abs(origin) + Math.abs(min) + Math.abs(max) + 1);
+  return origin < min - slack || origin > max + slack;
 }
 
 function normalize(x: number, y: number, z: number): Vec3 {
@@ -1168,7 +1217,7 @@ function boxDistanceSq(f: Float32Array, w: number, px: number, py: number, pz: n
 }
 
 /** Loads triangle `slot` (leaf order) into out, optionally transformed by m. */
-export function loadTriangle(
+function loadTriangle(
   P: Float32Array,
   s: number,
   index: Uint32Array,

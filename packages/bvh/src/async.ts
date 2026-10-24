@@ -1,6 +1,7 @@
 import { resolveOptions, type BVHBuildOptions, type BVHData } from './build.js';
 import { MeshBVH, sourceArrays, type GeometryLike, type TriangleSource } from './bvh.js';
 
+/** BVH build options for worker builds (buildAsync, computeGeometryBVHAsync), plus transfer and cancellation. */
 export interface AsyncBuildOptions extends BVHBuildOptions {
   /**
    * Move raw `positions` and `indices` buffers to the worker instead of copying them. They come back with the
@@ -8,6 +9,7 @@ export interface AsyncBuildOptions extends BVHBuildOptions {
    * Ignored for a Geometry, whose vertices stay with the engine. Default false.
    */
   transfer?: boolean;
+  /** Aborting it rejects the build with the signal's reason. */
   signal?: AbortSignal;
 }
 

@@ -4,7 +4,7 @@ import { invertMatrix, multiplyMatrices } from '@margoengine/math/mat4';
 
 /** Ray side filter. Front faces wind counter-clockwise when seen from the ray origin, matching the engine. */
 export type Side = 'double' | 'front' | 'back';
-export const SIDE_DOUBLE = 0,
+const SIDE_DOUBLE = 0,
   SIDE_FRONT = 1,
   SIDE_BACK = 2;
 export const sideCode = (side: Side | undefined): number => {

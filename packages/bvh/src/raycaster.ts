@@ -2,8 +2,9 @@ import type { Camera, Engine, Geometry, Mesh } from '@margoengine/core';
 import type { Engine as Runtime } from '@margoengine/core/extension';
 import { buildAsync, type AsyncBuildOptions } from './async.js';
 import type { BVHBuildOptions } from './build.js';
-import { MeshBVH, type GeometryLike, type Vec3 } from './bvh.js';
+import { MeshBVH, type BVHHit, type GeometryLike, type Vec3 } from './bvh.js';
 import { invertMatrix, multiplyMatrices } from '@margoengine/math/mat4';
+import { MargoError } from '@margoengine/math/errors';
 import { transformPoint, type Side } from './math.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 
@@ -50,6 +51,7 @@ export function setGeometryBVH(geometry: Geometry | GeometryLike, bvh: MeshBVH |
     throw new TypeError('BVH was not built over this geometry');
   bvhCache.set(geometry, bvh);
 }
+/** Whether a geometry already has a cached (or installed) BVH. */
 export const hasGeometryBVH = (geometry: Geometry | GeometryLike): boolean => bvhCache.has(geometry);
 /** Builds a geometry's BVH in the worker and caches it. Call before raycasting to keep large builds off the main thread. */
 export async function computeGeometryBVHAsync(
@@ -71,11 +73,17 @@ export function setMeshLayers(mesh: Mesh, mask: number): void {
     throw new RangeError('Layer mask must be a 32-bit unsigned integer');
   layerMasks.set(mesh, mask >>> 0);
 }
+/** Layer bit mask of a mesh set with setMeshLayers (default 1). */
 export const getMeshLayers = (mesh: Mesh): number => layerMasks.get(mesh) ?? 1;
+
+/** @internal Captured model masks follow the same node/root inheritance as live queries. */
+export function modelMeshLayers(mesh: Mesh, root: Mesh): number {
+  return layerMasks.get(mesh) ?? layerMasks.get(root) ?? 1;
+}
 
 /**
  * Structural view of a gltf-pro `PBRModel` primitive (also what @margoengine/materials meshes are). `vertices` is gltf-pro's
- * 20-float CPU vertex: position at 0, normal at 4, TEXCOORD_0 at 12. Skinned and morphed primitives are hit in their bind pose.
+ * 20-float CPU vertex: position at 0, normal at 4, TEXCOORD_0 at 12. Active GPU deformation requires async intersectModel.
  */
 export interface ModelPrimitiveLike {
   readonly node: Mesh;
@@ -142,30 +150,54 @@ const primitiveSource = (p: ModelPrimitiveLike) => ({
 function primitiveEntry(p: ModelPrimitiveLike): PrimitiveEntry {
   let entry = primitiveCache.get(p.indices);
   if (!entry || entry.vertices !== p.vertices) {
-    const v = p.vertices,
-      min = [Infinity, Infinity, Infinity],
-      max = [-Infinity, -Infinity, -Infinity];
-    for (let i = 0; i < v.length; i += 20)
-      for (let k = 0; k < 3; k++) {
-        if (v[i + k] < min[k]) min[k] = v[i + k];
-        if (v[i + k] > max[k]) max[k] = v[i + k];
-      }
-    const cx = (min[0] + max[0]) / 2,
-      cy = (min[1] + max[1]) / 2,
-      cz = (min[2] + max[2]) / 2;
-    let r = 0;
-    for (let i = 0; i < v.length; i += 20)
-      r = Math.max(r, (v[i] - cx) ** 2 + (v[i + 1] - cy) ** 2 + (v[i + 2] - cz) ** 2);
-    entry = { vertices: v, sphere: new Float64Array([cx, cy, cz, Math.sqrt(r)]), bvh: null };
+    entry = { vertices: p.vertices, sphere: boundingSphere(p.vertices, 20), bvh: null };
     primitiveCache.set(p.indices, entry);
   }
   return entry;
 }
+
+/**
+ * @internal Local bounding sphere (x, y, z, radius) of strided positions around their box centre (not the minimal
+ * sphere). Shared by live model queries and RaycastSnapshot capture.
+ */
+export function boundingSphere(v: Float32Array, stride: number): Float64Array {
+  let x0 = Infinity,
+    y0 = Infinity,
+    z0 = Infinity,
+    x1 = -Infinity,
+    y1 = -Infinity,
+    z1 = -Infinity;
+  for (let i = 0; i < v.length; i += stride) {
+    const x = v[i],
+      y = v[i + 1],
+      z = v[i + 2];
+    if (x < x0) x0 = x;
+    if (x > x1) x1 = x;
+    if (y < y0) y0 = y;
+    if (y > y1) y1 = y;
+    if (z < z0) z0 = z;
+    if (z > z1) z1 = z;
+  }
+  const cx = (x0 + x1) / 2,
+    cy = (y0 + y1) / 2,
+    cz = (z0 + z1) / 2;
+  let r = 0;
+  for (let i = 0; i < v.length; i += stride)
+    r = Math.max(r, (v[i] - cx) ** 2 + (v[i + 1] - cy) ** 2 + (v[i + 2] - cz) ** 2);
+  return new Float64Array([cx, cy, cz, Math.sqrt(r)]);
+}
+
+/** @internal Material side of a model primitive: its `side`, else gltf-pro's settings[2] (2 back, >= 0.5 double). */
+export const primitiveSide = (material: ModelPrimitiveLike['material']): Side =>
+  material.side ?? (material.settings[2] === 2 ? 'back' : material.settings[2] >= 0.5 ? 'double' : 'front');
+/** @internal Material side of a core mesh: double-sided when material data[6] >= 0.5. */
+export const meshSide = (material: { data: Float32Array }): Side => (material.data[6] >= 0.5 ? 'double' : 'front');
 /** The cached BVH of a model primitive (primitives sharing vertex and index arrays share it), built on first use. */
 export function getPrimitiveBVH(primitive: ModelPrimitiveLike, options?: BVHBuildOptions): MeshBVH {
   const entry = primitiveEntry(primitive);
   return (entry.bvh ??= MeshBVH.build(primitiveSource(primitive), options));
 }
+/** Whether a model primitive already has a cached BVH. */
 export const hasPrimitiveBVH = (primitive: ModelPrimitiveLike): boolean => !!primitiveCache.get(primitive.indices)?.bvh;
 /** Builds a primitive's BVH in the worker (vertices are copied, not moved) and caches it, for example right after `loadGLTF`. */
 export async function computePrimitiveBVHAsync(
@@ -187,7 +219,9 @@ interface Candidate {
   matrix?: Float32Array;
   instance?: number;
 }
+/** Faces a Raycaster tests: a fixed side, or 'material' to follow each material. */
 export type RaycasterSide = Side | 'material';
+/** One Raycaster hit in world space, with the mesh (and model data) it belongs to. */
 export interface RaycasterHit {
   /** The core mesh, or for a model hit the glTF node that owns the primitive. */
   mesh: Mesh;
@@ -225,6 +259,7 @@ export interface RaycasterHit {
    */
   approximate?: boolean;
 }
+/** Options for Raycaster queries against an engine. */
 export interface IntersectOptions {
   /** Run the transform kernel first so world matrices reflect transform edits made since the last render. Default true. */
   refresh?: boolean;
@@ -313,13 +348,7 @@ export class Raycaster {
     const x = coords[0],
       y = coords[1];
     if (!Number.isFinite(x) || !Number.isFinite(y)) throw new RangeError('Invalid device coordinates');
-    const near = unproject(inverse, x, y, webgpu ? 1 : -1),
-      far = unproject(inverse, x, y, webgpu ? 0 : 1);
-    return this.set(!m[3] && !m[7] && !m[11] ? near : camera.position, [
-      far[0] - near[0],
-      far[1] - near[1],
-      far[2] - near[2],
-    ]);
+    return cameraRay(this, inverse, isOrthographic(m), camera.position, x, y, webgpu);
   }
 
   /** Ray through a canvas point in CSS pixels (as `engine.pick` takes), using the engine camera and backend. */
@@ -354,8 +383,13 @@ export class Raycaster {
     const root = source.root as unknown as RuntimeMesh & { engine: RuntimeEngine },
       runtime = root.engine;
     if (!runtime || !runtime.meshes || !runtime.store) throw new TypeError('Picking source root has no engine');
-    if (source.disposed || runtime.disposed) throw new Error('Picking source or engine is disposed');
-    if (runtime.meshes.get(root.id) !== root) throw new Error('Picking source root is disposed');
+    if (source.disposed || runtime.disposed)
+      throw new MargoError('disposed', 'Picking source or engine is disposed; pick a live model on a live Engine.');
+    if (runtime.meshes.get(root.id) !== root)
+      throw new MargoError(
+        'disposed',
+        'Picking source root is disposed; pick a model whose root is still in the scene.',
+      );
     const { near, far, side, firstHitOnly, layers, filter } = this,
       bvhOptions = { ...this.bvhOptions };
     if (!(near >= 0) || !(far >= near)) throw new RangeError('Expected 0 <= near <= far');
@@ -448,14 +482,9 @@ export class Raycaster {
       next[i] = cached;
       if (!invertMatrix(matrix, inverse)) continue;
       const local = new Float64Array(3),
-        [ox, oy, oz] = origin,
-        [dx, dy, dz] = direction;
-      transformPoint(inverse, ox, oy, oz, local);
-      const lx = inverse[0] * dx + inverse[4] * dy + inverse[8] * dz,
-        ly = inverse[1] * dx + inverse[5] * dy + inverse[9] * dz,
-        lz = inverse[2] * dx + inverse[6] * dy + inverse[10] * dz;
-      const length = Math.hypot(lx, ly, lz);
-      const ray = { origin: local, direction: [lx, ly, lz] },
+        localDirection = [0, 0, 0],
+        length = localRay(inverse, origin, direction, local, localDirection),
+        ray = { origin: local, direction: localDirection },
         options = {
           near: near * length,
           far: (firstHitOnly ? best : far) * length,
@@ -465,36 +494,18 @@ export class Raycaster {
       const found = firstHitOnly ? [cached.bvh.raycastFirst(ray, options)] : cached.bvh.raycast(ray, options);
       for (const hit of found) {
         if (!hit) continue;
-        const point: Vec3 = [0, 0, 0];
-        transformPoint(matrix, hit.point[0], hit.point[1], hit.point[2], point);
         const distance = hit.distance / length;
         if (firstHitOnly) {
           if (distance > best) continue;
           best = distance;
           hits.length = 0;
         }
-        // TEXCOORD_0 of the posed snapshot (offset 12 of the 20-float vertex), weighted like the sync model path.
-        const a = hit.face[0] * 20 + 12,
-          b = hit.face[1] * 20 + 12,
-          c = hit.face[2] * 20 + 12,
-          [wa, wb, wc] = hit.barycoord;
-        hits.push({
-          mesh: handle,
-          distance,
-          point,
-          normal: normalTransform(inverse, hit.normal),
-          faceNormal: normalTransform(inverse, hit.faceNormal),
-          faceIndex: hit.faceIndex,
-          barycoord: hit.barycoord,
-          frontFace: hit.frontFace,
-          localPoint: hit.point,
-          uv: [
-            wa * vertices[a] + wb * vertices[b] + wc * vertices[c],
-            wa * vertices[a + 1] + wb * vertices[b + 1] + wc * vertices[c + 1],
-          ],
-          ...(primitiveIndex === undefined ? {} : { primitiveIndex }),
-          ...(nodeIndex === undefined ? {} : { nodeIndex }),
-        });
+        // TEXCOORD_0 of the posed snapshot, weighted like the sync model path.
+        const result = worldHit(handle, hit, matrix, inverse, length);
+        result.uv = hitUV(vertices, hit);
+        if (primitiveIndex !== undefined) result.primitiveIndex = primitiveIndex;
+        if (nodeIndex !== undefined) result.nodeIndex = nodeIndex;
+        hits.push(result);
       }
     }
     poseCache.set(source, next);
@@ -525,7 +536,7 @@ export class Raycaster {
     proxies: readonly PickProxy[],
     { refresh = true }: IntersectOptions = {},
   ): RaycasterHit[] {
-    if (runtime.disposed) throw new Error('Engine is disposed');
+    if (runtime.disposed) throw new MargoError('disposed', 'Engine is disposed; raycast against a live Engine.');
     if (!(this.near >= 0) || !(this.far >= this.near)) throw new RangeError('Expected 0 <= near <= far');
     const store = runtime.store,
       candidates: Candidate[] = [],
@@ -537,8 +548,7 @@ export class Raycaster {
       const source = meshTriangles(mesh as unknown as Mesh);
       if (source?.kind === 'pbr') {
         if (!this.usable(runtime, mesh, getMeshLayers(mesh as unknown as Mesh), null)) continue;
-        if (source.source.primitives.some((p) => p.deformed))
-          throw new Error('Deformed PBR mesh requires async Raycaster.intersectModel(model)');
+        if (source.source.primitives.some((p) => p.deformed)) throw deformedError();
         const owner = source.source.model as unknown as ModelLike;
         if (!models.includes(owner))
           for (const primitive of source.source.primitives) {
@@ -561,9 +571,13 @@ export class Raycaster {
       for (let index = 0; index < primitives.length; index++) {
         const primitive = primitives[index],
           node = primitive.node as unknown as RuntimeMesh,
-          instances = primitive.instances,
-          // Per ray, not per model: a rewritten primitive (new vertex or index array) gets a fresh sphere.
-          sphere = primitiveEntry(primitive).sphere;
+          instances = primitive.instances;
+        if (deformedNode(primitive.node)) {
+          if (this.usable(runtime, node, layerMasks.get(node) ?? rootMask ?? 1, model)) throw deformedError();
+          continue;
+        }
+        // Per ray, not per model: a rewritten primitive (new vertex or index array) gets a fresh sphere.
+        const sphere = primitiveEntry(primitive).sphere;
         if (instances) {
           // ponytail: a linear scan over instances (one 4x4 product and sphere test each); add a BVH over instances past ~100k.
           if (
@@ -600,112 +614,46 @@ export class Raycaster {
       local = new Float64Array(3),
       direction = [0, 0, 0],
       ray = { origin: local, direction };
-    const ox = this.origin[0],
-      oy = this.origin[1],
-      oz = this.origin[2],
-      dx = this.direction[0],
-      dy = this.direction[1],
-      dz = this.direction[2];
     let best = this.far;
     for (const { node, entry, model, primitive, index, sphere, matrix: world, instance } of candidates) {
       if (this.firstHitOnly && entry > best) break;
       matrix.set(world ?? store.matrices.subarray(node.id * 16, node.id * 16 + 16));
       if (!invertMatrix(matrix, inverse)) continue;
-      transformPoint(inverse, ox, oy, oz, local);
-      direction[0] = inverse[0] * dx + inverse[4] * dy + inverse[8] * dz;
-      direction[1] = inverse[1] * dx + inverse[5] * dy + inverse[9] * dz;
-      direction[2] = inverse[2] * dx + inverse[6] * dy + inverse[10] * dz;
+      const length = localRay(inverse, this.origin, this.direction, local, direction),
+        far = this.firstHitOnly ? best : this.far;
       if (sphere) {
-        // Local ray o + t*d with the world direction mapped (not normalized), so t is the world distance. Proxies are double-sided.
-        const px = local[0] - sphere[0],
-          py = local[1] - sphere[1],
-          pz = local[2] - sphere[2],
-          a = direction[0] ** 2 + direction[1] ** 2 + direction[2] ** 2;
-        const b = px * direction[0] + py * direction[1] + pz * direction[2],
-          disc = b * b - a * (px * px + py * py + pz * pz - sphere[3] ** 2);
-        if (disc < 0) continue;
-        const near = (-b - Math.sqrt(disc)) / a,
-          t = near >= this.near ? near : (-b + Math.sqrt(disc)) / a;
-        if (t < this.near || t > (this.firstHitOnly ? best : this.far)) continue;
+        const hit = proxyHit(node as unknown as Mesh, model, sphere, inverse, local, direction, this, far);
+        if (!hit) continue;
         if (this.firstHitOnly) {
-          best = t;
+          best = hit.distance;
           hits.length = 0;
         }
-        const localPoint: Vec3 = [
-          local[0] + t * direction[0],
-          local[1] + t * direction[1],
-          local[2] + t * direction[2],
-        ];
-        const normal = normalTransform(inverse, [
-          localPoint[0] - sphere[0],
-          localPoint[1] - sphere[1],
-          localPoint[2] - sphere[2],
-        ]);
-        hits.push({
-          mesh: node as unknown as Mesh,
-          distance: t,
-          point: [ox + t * dx, oy + t * dy, oz + t * dz],
-          normal,
-          faceNormal: normal.slice() as Vec3,
-          faceIndex: -1,
-          barycoord: [0, 0, 0],
-          frontFace: t === near,
-          localPoint,
-          ...(model ? { model } : {}),
-          approximate: true,
-        });
+        hits.push(hit);
         continue;
       }
       // Sides follow the local winding, as the renderers do: a mirrored world matrix keeps the mesh's front side.
-      const length = Math.hypot(direction[0], direction[1], direction[2]),
-        materialSide: Side = primitive
-          ? (primitive.material.side ??
-            (primitive.material.settings[2] === 2
-              ? 'back'
-              : primitive.material.settings[2] >= 0.5
-                ? 'double'
-                : 'front'))
-          : node.material.data[6] >= 0.5
-            ? 'double'
-            : 'front';
-      const side: Side = this.side === 'material' ? materialSide : this.side;
+      const side: Side =
+        this.side !== 'material' ? this.side : primitive ? primitiveSide(primitive.material) : meshSide(node.material);
       const bvh = primitive
         ? getPrimitiveBVH(primitive, this.bvhOptions)
         : getGeometryBVH(node.geometry!, this.bvhOptions);
-      const options = { near: this.near * length, far: (this.firstHitOnly ? best : this.far) * length, side };
+      const options = { near: this.near * length, far: far * length, side };
       const found = this.firstHitOnly ? [bvh.raycastFirst(ray, options)] : bvh.raycast(ray, options);
       for (const hit of found) {
         if (!hit) continue;
-        const point: Vec3 = [0, 0, 0];
-        transformPoint(matrix, hit.point[0], hit.point[1], hit.point[2], point);
         const distance = hit.distance / length;
         if (this.firstHitOnly) {
           if (distance > best) continue;
           best = distance;
           hits.length = 0;
         }
-        const result: RaycasterHit = {
-          mesh: node as unknown as Mesh,
-          distance,
-          point,
-          normal: normalTransform(inverse, hit.normal),
-          faceNormal: normalTransform(inverse, hit.faceNormal),
-          faceIndex: hit.faceIndex,
-          barycoord: hit.barycoord,
-          frontFace: hit.frontFace,
-          localPoint: hit.point,
-        };
+        const result = worldHit(node as unknown as Mesh, hit, matrix, inverse, length);
         if (primitive) {
-          const v = primitive.vertices,
-            a = hit.face[0] * 20 + 12,
-            b = hit.face[1] * 20 + 12,
-            c = hit.face[2] * 20 + 12,
-            [wa, wb, wc] = hit.barycoord;
           result.model = model!;
           result.primitive = primitive;
           result.primitiveIndex = index;
           result.nodeIndex = primitive.nodeIndex;
-          result.uv = [wa * v[a] + wb * v[b] + wc * v[c], wa * v[a + 1] + wb * v[b + 1] + wc * v[c + 1]];
+          result.uv = hitUV(primitive.vertices, hit);
           if (instance !== undefined) result.instanceId = instance;
         }
         hits.push(result);
@@ -725,30 +673,151 @@ export class Raycaster {
 
   /** Distance at which the ray enters the local bounding sphere `b` under the world matrix at `m[o]`, or -1 for a miss. */
   private entry(m: Float32Array, o: number, b: ArrayLike<number>): number {
-    const dx = this.direction[0],
-      dy = this.direction[1],
-      dz = this.direction[2];
-    // World bounding sphere: the absolute row-sum bound of M^T M also covers hierarchy shear.
-    const cx = m[o] * b[0] + m[o + 4] * b[1] + m[o + 8] * b[2] + m[o + 12] - this.origin[0];
-    const cy = m[o + 1] * b[0] + m[o + 5] * b[1] + m[o + 9] * b[2] + m[o + 13] - this.origin[1];
-    const cz = m[o + 2] * b[0] + m[o + 6] * b[1] + m[o + 10] * b[2] + m[o + 14] - this.origin[2];
-    const xy = Math.abs(m[o] * m[o + 4] + m[o + 1] * m[o + 5] + m[o + 2] * m[o + 6]);
-    const xz = Math.abs(m[o] * m[o + 8] + m[o + 1] * m[o + 9] + m[o + 2] * m[o + 10]);
-    const yz = Math.abs(m[o + 4] * m[o + 8] + m[o + 5] * m[o + 9] + m[o + 6] * m[o + 10]);
-    const scale = Math.sqrt(
-      Math.max(
-        m[o] ** 2 + m[o + 1] ** 2 + m[o + 2] ** 2 + xy + xz,
-        m[o + 4] ** 2 + m[o + 5] ** 2 + m[o + 6] ** 2 + xy + yz,
-        m[o + 8] ** 2 + m[o + 9] ** 2 + m[o + 10] ** 2 + xz + yz,
-      ),
-    );
-    const radius = b[3] * scale * (1 + 1e-5) + 1e-6,
-      along = cx * dx + cy * dy + cz * dz,
-      offAxis = cx * cx + cy * cy + cz * cz - along * along;
-    if (offAxis > radius * radius) return -1;
-    const half = Math.sqrt(radius * radius - Math.max(0, offAxis));
-    return along + half < this.near || along - half > this.far ? -1 : Math.max(0, along - half);
+    return sphereEntry(worldSphere(m, o, b, SPHERE), this.origin, this.direction, this.near, this.far);
   }
+}
+
+const SPHERE = new Float64Array(4);
+
+/**
+ * @internal Conservative world bounding sphere of local sphere `b` (x, y, z, radius) under the world matrix at `m[o]`:
+ * the absolute row-sum bound of M^T M also covers hierarchy shear. Written to `out`.
+ */
+export function worldSphere(m: ArrayLike<number>, o: number, b: ArrayLike<number>, out: Float64Array): Float64Array {
+  const xy = Math.abs(m[o] * m[o + 4] + m[o + 1] * m[o + 5] + m[o + 2] * m[o + 6]);
+  const xz = Math.abs(m[o] * m[o + 8] + m[o + 1] * m[o + 9] + m[o + 2] * m[o + 10]);
+  const yz = Math.abs(m[o + 4] * m[o + 8] + m[o + 5] * m[o + 9] + m[o + 6] * m[o + 10]);
+  const scale = Math.sqrt(
+    Math.max(
+      m[o] ** 2 + m[o + 1] ** 2 + m[o + 2] ** 2 + xy + xz,
+      m[o + 4] ** 2 + m[o + 5] ** 2 + m[o + 6] ** 2 + xy + yz,
+      m[o + 8] ** 2 + m[o + 9] ** 2 + m[o + 10] ** 2 + xz + yz,
+    ),
+  );
+  out[0] = m[o] * b[0] + m[o + 4] * b[1] + m[o + 8] * b[2] + m[o + 12];
+  out[1] = m[o + 1] * b[0] + m[o + 5] * b[1] + m[o + 9] * b[2] + m[o + 13];
+  out[2] = m[o + 2] * b[0] + m[o + 6] * b[1] + m[o + 10] * b[2] + m[o + 14];
+  out[3] = b[3] * scale * (1 + 1e-5) + 1e-6;
+  return out;
+}
+
+/** @internal Distance at which a unit-direction ray enters world sphere `s` within [near, far], or -1 for a miss. */
+export function sphereEntry(
+  s: ArrayLike<number>,
+  origin: ArrayLike<number>,
+  direction: ArrayLike<number>,
+  near: number,
+  far: number,
+): number {
+  const cx = s[0] - origin[0],
+    cy = s[1] - origin[1],
+    cz = s[2] - origin[2],
+    radius = s[3],
+    along = cx * direction[0] + cy * direction[1] + cz * direction[2],
+    offAxis = cx * cx + cy * cy + cz * cz - along * along;
+  if (offAxis > radius * radius) return -1;
+  const half = Math.sqrt(radius * radius - Math.max(0, offAxis));
+  return along + half < near || along - half > far ? -1 : Math.max(0, along - half);
+}
+
+/**
+ * @internal Maps a world ray into local space with `inverse`. The local direction is not normalized, so a local
+ * parameter t is the world distance; returns its length (local BVH distances divide by it).
+ */
+export function localRay(
+  inverse: Float64Array,
+  origin: ArrayLike<number>,
+  direction: ArrayLike<number>,
+  local: Float64Array | number[],
+  localDirection: Float64Array | number[],
+): number {
+  const dx = direction[0],
+    dy = direction[1],
+    dz = direction[2];
+  transformPoint(inverse, origin[0], origin[1], origin[2], local);
+  localDirection[0] = inverse[0] * dx + inverse[4] * dy + inverse[8] * dz;
+  localDirection[1] = inverse[1] * dx + inverse[5] * dy + inverse[9] * dz;
+  localDirection[2] = inverse[2] * dx + inverse[6] * dy + inverse[10] * dz;
+  return Math.hypot(localDirection[0], localDirection[1], localDirection[2]);
+}
+
+/**
+ * @internal Double-sided hit on a pick proxy's local sphere for the local ray from {@link localRay}; `ray` holds the
+ * world origin, unit direction and near distance. Null when the hit is outside [ray.near, far].
+ */
+export function proxyHit(
+  mesh: Mesh,
+  model: ModelLike | null,
+  sphere: ArrayLike<number>,
+  inverse: Float64Array,
+  local: ArrayLike<number>,
+  direction: ArrayLike<number>,
+  ray: { readonly origin: ArrayLike<number>; readonly direction: ArrayLike<number>; readonly near: number },
+  far: number,
+): RaycasterHit | null {
+  const px = local[0] - sphere[0],
+    py = local[1] - sphere[1],
+    pz = local[2] - sphere[2],
+    a = direction[0] ** 2 + direction[1] ** 2 + direction[2] ** 2,
+    b = px * direction[0] + py * direction[1] + pz * direction[2],
+    disc = b * b - a * (px * px + py * py + pz * pz - sphere[3] ** 2);
+  if (disc < 0) return null;
+  const near = (-b - Math.sqrt(disc)) / a,
+    t = near >= ray.near ? near : (-b + Math.sqrt(disc)) / a;
+  if (t < ray.near || t > far) return null;
+  const localPoint: Vec3 = [local[0] + t * direction[0], local[1] + t * direction[1], local[2] + t * direction[2]];
+  const normal = normalTransform(inverse, [
+      localPoint[0] - sphere[0],
+      localPoint[1] - sphere[1],
+      localPoint[2] - sphere[2],
+    ]),
+    o = ray.origin,
+    d = ray.direction;
+  return {
+    mesh,
+    distance: t,
+    point: [o[0] + t * d[0], o[1] + t * d[1], o[2] + t * d[2]],
+    normal,
+    faceNormal: normal.slice() as Vec3,
+    faceIndex: -1,
+    barycoord: [0, 0, 0],
+    frontFace: t === near,
+    localPoint,
+    ...(model ? { model } : {}),
+    approximate: true,
+  };
+}
+
+/** @internal World-space Raycaster hit for a local BVH hit; `length` is the local direction length from localRay. */
+export function worldHit(
+  mesh: Mesh,
+  hit: BVHHit,
+  matrix: ArrayLike<number>,
+  inverse: Float64Array,
+  length: number,
+): RaycasterHit {
+  const point: Vec3 = [0, 0, 0];
+  transformPoint(matrix, hit.point[0], hit.point[1], hit.point[2], point);
+  return {
+    mesh,
+    distance: hit.distance / length,
+    point,
+    normal: normalTransform(inverse, hit.normal),
+    faceNormal: normalTransform(inverse, hit.faceNormal),
+    faceIndex: hit.faceIndex,
+    barycoord: hit.barycoord,
+    frontFace: hit.frontFace,
+    localPoint: hit.point,
+  };
+}
+
+/** @internal TEXCOORD_0 (offset 12 of the 20-float PBR vertex) interpolated at a hit. */
+export function hitUV(v: Float32Array, hit: BVHHit): [number, number] {
+  const a = hit.face[0] * 20 + 12,
+    b = hit.face[1] * 20 + 12,
+    c = hit.face[2] * 20 + 12,
+    [wa, wb, wc] = hit.barycoord;
+  return [wa * v[a] + wb * v[b] + wc * v[c], wa * v[a + 1] + wb * v[b + 1] + wc * v[c + 1]];
 }
 
 function packPose(source: Float32Array, target: Float32Array): void {
@@ -762,7 +831,43 @@ function packPose(source: Float32Array, target: Float32Array): void {
   }
 }
 
-function hiddenInHierarchy(store: RuntimeStore, id: number): boolean {
+/** @internal True when a registered PBR source on `node` has an active GPU deformation (skin or morph). */
+export function deformedNode(node: Mesh): boolean {
+  const source = meshTriangles(node);
+  return source?.kind === 'pbr' && source.source.primitives.some((p) => p.deformed);
+}
+/** @internal Synchronous queries never test a deformed mesh's bind pose. */
+export const deformedError = (): MargoError =>
+  new MargoError(
+    'unsupported',
+    'Deformed PBR mesh cannot be picked synchronously; use await Raycaster.intersectModel(model) for its current pose.',
+  );
+
+/** @internal True for a projection or view-projection matrix without perspective (last row 0, 0, 0, w). */
+export const isOrthographic = (m: ArrayLike<number>): boolean => !m[3] && !m[7] && !m[11];
+
+/**
+ * @internal Sets `ray` through normalized device coordinates (x, y) of a camera whose inverted view-projection is
+ * `inverse`: from the eye `position`, or from the near-plane point for an orthographic camera (parallel rays).
+ * `webgpu` selects reversed-Z clip depth (near 1, far 0) instead of WebGL's -1..1. Shared by setFromCamera and
+ * RaycastProjection.setFromCanvas, so live and captured rays use the same arithmetic.
+ */
+export function cameraRay<T extends Raycaster>(
+  ray: T,
+  inverse: Float64Array,
+  orthographic: boolean,
+  position: ArrayLike<number>,
+  x: number,
+  y: number,
+  webgpu: boolean,
+): T {
+  const near = unproject(inverse, x, y, webgpu ? 1 : -1),
+    far = unproject(inverse, x, y, webgpu ? 0 : 1);
+  return ray.set(orthographic ? near : position, [far[0] - near[0], far[1] - near[1], far[2] - near[2]]);
+}
+
+/** @internal Shared hierarchy visibility predicate for live and captured queries. */
+export function hiddenInHierarchy(store: RuntimeStore, id: number): boolean {
   for (let node = id, depth = 0; node >= 0 && depth <= 64; node = store.parents[node], depth++)
     if (store.hidden[node]) return true;
   return false;

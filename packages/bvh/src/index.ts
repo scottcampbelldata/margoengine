@@ -50,3 +50,20 @@ export { worldTriangles } from './triangles.js';
 export { bakeVertexColors, limitPalette } from './bake.js';
 export type { BakeAmbientOcclusion, BakeLight, BakeOptions, BakeTarget, PaletteMode } from './bake.js';
 export type { WorldTriangles, WorldTrianglesOptions } from './triangles.js';
+export { RaycastSnapshot } from './raycast-snapshot.js';
+export type { RaycastSnapshotOptions } from './raycast-snapshot.js';
+export type { RaycastDepthHit } from './raycast-snapshot.js';
+export {
+  RaycastProjection,
+  type RaycastProjectedPoint,
+  type RaycastProjectionOptions,
+  type RaycastProjectedSegment,
+  type RaycastProjectSegmentOptions,
+} from './projection.js';
+export type { RaycastSegmentPoint, RaycastScreenRectangle } from './screen-query.js';
+export type {
+  RaycastAlphaTexture,
+  RaycastDepthSample,
+  RaycastVisibilityOptions,
+  RaycastVisibilityQuery,
+} from './visibility-query.js';

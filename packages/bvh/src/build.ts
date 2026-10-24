@@ -52,6 +52,7 @@ export function checkSource(positions: ArrayLike<number>, stride: number, indice
   return count / 3;
 }
 
+/** Builds BVH arrays over strided `positions` (and optional `indices`) without wrapping them in a MeshBVH. */
 export function buildBVH(
   positions: ArrayLike<number>,
   stride: number,

@@ -1,5 +1,6 @@
 import type { Engine, Geometry, Mesh } from '@margoengine/core';
 import { multiplyMatrices } from '@margoengine/math/mat4';
+import { MargoError } from '@margoengine/math/errors';
 import { isModel, type ModelLike } from './raycaster.js';
 
 // Structural view of `engineRuntime(engine)`; types only, like the Raycaster.
@@ -9,6 +10,7 @@ interface RuntimeEngine {
   disposed: boolean;
 }
 
+/** Options for worldTriangles. */
 export interface WorldTrianglesOptions {
   /** Run the transform kernel first so world matrices include transform edits made since the last render. Default true. */
   refresh?: boolean;
@@ -33,7 +35,7 @@ export function worldTriangles(
   { refresh = true, filter }: WorldTrianglesOptions = {},
 ): WorldTriangles {
   const runtime = engine as unknown as RuntimeEngine;
-  if (runtime.disposed) throw new Error('Engine is disposed');
+  if (runtime.disposed) throw new MargoError('disposed', 'Engine is disposed; collect triangles from a live Engine.');
   if (refresh) runtime.store.tick(false);
   const live = (mesh: Mesh): boolean =>
     runtime.meshes.get((mesh as unknown as { id: number }).id) === (mesh as unknown);
