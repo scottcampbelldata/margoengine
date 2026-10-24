@@ -20,8 +20,14 @@ Scott approved (2026-10-24) replacing the long fix-naming messages of the core b
   `tests/core-set-quaternion.test.js` counts array iterations and maps during 1,000 calls (zero).
 - Size: core + stage 23,271 -> 22,600 B gzip (2,400 B under the gate); core alone back under the original 20 KiB
   cap in `scripts/build-modern.js`, which is restored.
-- Logged for later, not done: `using`/`Symbol.dispose` on Engine and Mesh, a `CADCameraControls` profile option,
-  and a UV channel and point primitive (optional-package candidates). The `requiredLimits` patch is dropped.
+- **`using`.** `[Symbol.dispose]` is `dispose()` on Engine, Mesh and Scene where the runtime has the symbol (+36 B;
+  `tests/core-dispose.test.js`). Disposal is synchronous, so there is no `Symbol.asyncDispose`.
+- **CAD profiles, 0 core bytes.** `cadControls(engine, {profile, keys})` in `@margoengine/controls` replaces the
+  stage's core `CADCameraControls` with `OrbitControls` under a navigation profile (`SOLIDWORKS`, `AUTOCAD`, ...);
+  core's class itself still takes no profile.
+- **Second UV set and points: already covered**, no new code. `@margoengine/materials` `createMesh` takes `uvs1`,
+  gltf-pro reads `TEXCOORD_1`, and `@margoengine/points` draws point clouds and sprites. The core README says where.
+- The `requiredLimits` patch is dropped.
 
 ## Landed 2026-10-24: parity closing (three.js matrix 142 / 13 / 6 -> 153 / 4 / 4)
 

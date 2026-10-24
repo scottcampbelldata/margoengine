@@ -5,6 +5,11 @@
 ```ts
 import { Camera, EngineKernel } from "@margoengine/core";
 
+export interface CADControlsOptions {
+    profile?: NavigationProfile;
+    keys?: EventTargetLike;
+}
+
 export abstract class Controls extends EventDispatcher {
     readonly camera: Camera;
     readonly engine: EngineKernel | null;
@@ -108,6 +113,8 @@ export const TOUCH: {
     readonly DOLLY_PAN: 2;
     readonly DOLLY_ROTATE: 3;
 };
+
+export function cadControls(engine: EngineKernel, { profile, keys }?: CADControlsOptions): OrbitControls;
 
 // Not exported from this entry, but used by the exports above:
 

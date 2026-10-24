@@ -715,3 +715,26 @@ export class MapControls extends OrbitControls {
     return 'map';
   }
 }
+
+/** Options of {@link cadControls}. */
+export interface CADControlsOptions {
+  /** Mouse, wheel, touch and key mapping: `MARGO` (the default) or a CAD tool's profile (`SOLIDWORKS`, `AUTOCAD`, ...). */
+  profile?: NavigationProfile;
+  /** Where the profile's keys (view keys, F to fit) are read, for example `window`. Default none: keys are off. */
+  keys?: EventTargetLike;
+}
+
+/**
+ * Familiar CAD navigation in one call: replaces the stage's built-in core `CADCameraControls` (attached by
+ * `createStage` unless `controls: false`) with `OrbitControls` under `profile`, or attaches them to a bare engine.
+ * Core's controls take no profile; these give the same orbit, pan and zoom with a CAD tool's mouse buttons. Listen
+ * for `fit` on the result to frame your model when the profile's fit gesture is used.
+ */
+export function cadControls(engine: EngineKernel, { profile, keys }: CADControlsOptions = {}): OrbitControls {
+  // The stage facade's plugin that drives core CADCameraControls (packages/margoengine/src/index.ts); a no-op without it.
+  engine.removePlugin('margoengine-controls');
+  const orbit = OrbitControls.attach(engine);
+  if (profile) orbit.setProfile(profile);
+  if (keys) orbit.listenToKeyEvents(keys);
+  return orbit;
+}

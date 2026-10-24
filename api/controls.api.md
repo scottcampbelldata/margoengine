@@ -54,6 +54,11 @@ export interface ArcballProjection {
 
 export const BLENDER: NavigationProfile;
 
+export interface CADControlsOptions {
+    profile?: NavigationProfile;
+    keys?: EventTargetLike;
+}
+
 export interface ControlElement {
     addEventListener(type: string, listener: InputEventListener, options?: AddEventListenerOptions | boolean): void;
     removeEventListener(type: string, listener: InputEventListener, options?: EventListenerOptions | boolean): void;
@@ -509,6 +514,8 @@ export type TransformSpace = 'world' | 'local';
 export function arcballPoint(x: number, y: number): V3;
 
 export function buildGizmo(f: GizmoFrame): Handle[];
+
+export function cadControls(engine: EngineKernel, { profile, keys }?: CADControlsOptions): OrbitControls;
 
 export function pickHandle(handles: Handle[], b: Basis, origin: V3, x: number, y: number, width: number, height: number): HandleName | null;
 

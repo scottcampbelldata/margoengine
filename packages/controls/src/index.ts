@@ -1,6 +1,7 @@
 export { Controls, EventDispatcher } from './controls.js';
 export type { ControlElement, ControlEvent, ControlListener, EventTargetLike } from './controls.js';
-export { OrbitControls, MapControls, MOUSE, TOUCH } from './orbit.js';
+export { OrbitControls, MapControls, MOUSE, TOUCH, cadControls } from './orbit.js';
+export type { CADControlsOptions } from './orbit.js';
 export {
   MARGO,
   SOLIDWORKS,

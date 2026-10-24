@@ -13,6 +13,8 @@ import {
   PointerLockControls,
   TransformControls,
   tessellate,
+  cadControls,
+  SOLIDWORKS,
 } from '../dist/index.js';
 
 // ---------- fakes ----------
@@ -430,6 +432,45 @@ test('map controls: left drag pans along the ground plane', () => {
 // ---------- PointerLockControls ----------
 
 // ---------- TransformControls ----------
+test("cadControls replaces the stage's CAD controls with OrbitControls under a CAD tool's profile", async () => {
+  const { engine, canvas } = await engineWith();
+  let disposed = 0;
+  // What createStage attaches by default: the plugin that drives core CADCameraControls.
+  engine.use({ name: 'margoengine-controls', setup() {}, dispose: () => disposed++ });
+  const keys = new FakeTarget(),
+    orbit = cadControls(engine, { profile: SOLIDWORKS, keys });
+  try {
+    assert.ok(orbit instanceof OrbitControls);
+    assert.equal(disposed, 1, "the stage's controls are removed");
+    assert.equal(engine.plugins.has('margoengine-controls'), false);
+    assert.equal(orbit.zoomToCursor, SOLIDWORKS.zoomToCursor);
+    assert.ok(keys.listenerCount > 0, 'profile keys are read from `keys`');
+    const start = [...engine.camera.position];
+    // Left is selection in SolidWorks: a left drag leaves the camera alone, a middle drag orbits.
+    drag(canvas, [400, 300], [520, 300]);
+    orbit.update(1 / 60);
+    closeVec(engine.camera.position, start, 1e-9, 'left drag');
+    drag(canvas, [400, 300], [520, 300], { button: 1 });
+    orbit.update(1 / 60);
+    assert.ok(len(sub(engine.camera.position, start)) > 0.1, 'middle drag orbits');
+  } finally {
+    orbit.dispose();
+    engine.dispose();
+  }
+  // A bare engine keeps the default mapping: left drag orbits.
+  const bare = await engineWith(),
+    plain = cadControls(bare.engine);
+  try {
+    const start = [...bare.engine.camera.position];
+    drag(bare.canvas, [400, 300], [520, 300]);
+    plain.update(1 / 60);
+    assert.ok(len(sub(bare.engine.camera.position, start)) > 0.1, 'left drag orbits');
+  } finally {
+    plain.dispose();
+    bare.engine.dispose();
+  }
+});
+
 async function engineWith(cameraOptions = { position: [0, 0, 10], target: [0, 0, 0] }) {
   const canvas = new FakeElement(800, 600);
   const store = await TransformStore.create(32);
