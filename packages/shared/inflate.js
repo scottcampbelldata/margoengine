@@ -182,7 +182,7 @@ function huffmanBlock(stream, literals, distances, output, written) {
   }
 }
 
-export function inflateZlib(input, size) {
+export function inflateZlib(input, size, checkAdler = true) {
   if (input.length < 2) throw damaged('is too short for a zlib header');
   const method = input[0],
     flags = input[1];
@@ -219,5 +219,29 @@ export function inflateZlib(input, size) {
     } else throw damaged('uses the reserved block type 3');
   } while (!final);
   if (written !== size) throw damaged(`inflates to ${written} bytes, not the ${size} its header states`);
+  // RFC 1950 trailer: the Adler-32 of the decompressed bytes, big-endian, after the last block's final byte.
+  const at = stream.alignToByte();
+  if (input.length - at < 4) throw damaged('ends before its Adler-32 checksum');
+  const stored = ((input[at] << 24) | (input[at + 1] << 16) | (input[at + 2] << 8) | input[at + 3]) >>> 0;
+  if (checkAdler && adler32(output) !== stored) throw damaged('fails its Adler-32 checksum');
   return output;
+}
+
+/**
+ * Adler-32 (RFC 1950 section 8.2): two sums modulo 65521. 5552 bytes is the longest run after which the second sum
+ * still fits in 32 unsigned bits, so the sums stay 32-bit integers (twice as fast as doubles) and are reduced per run.
+ */
+function adler32(bytes) {
+  let a = 1,
+    b = 0;
+  for (let start = 0; start < bytes.length; start += 5552) {
+    const end = Math.min(bytes.length, start + 5552);
+    for (let i = start; i < end; i++) {
+      a = (a + bytes[i]) | 0;
+      b = (b + a) | 0;
+    }
+    a %= 65521;
+    b = (b >>> 0) % 65521;
+  }
+  return ((b << 16) | a) >>> 0;
 }

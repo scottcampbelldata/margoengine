@@ -1,5 +1,7 @@
 /**
- * Inflates a zlib stream (2 byte header, DEFLATE data, Adler-32 trailer is not verified) into exactly `size` bytes.
- * Throws MargoError `'failed'` on malformed data or when the stream does not produce exactly `size` bytes.
+ * Inflates a zlib stream (2 byte header, DEFLATE data, Adler-32 trailer) into exactly `size` bytes. Throws MargoError
+ * `'failed'` on malformed data, a missing or wrong Adler-32, or when the stream does not produce exactly `size` bytes.
+ * `checkAdler: false` still requires the trailer but skips computing the checksum; only for callers whose container
+ * already checks the compressed bytes (PNG's per-chunk CRC-32).
  */
-export function inflateZlib(input: Uint8Array, size: number): Uint8Array;
+export function inflateZlib(input: Uint8Array, size: number, checkAdler?: boolean): Uint8Array;

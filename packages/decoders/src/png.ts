@@ -170,7 +170,8 @@ export function decodePNG(bytes: Uint8Array, options: PNGDecodeOptions = {}): De
       o += chunk.length;
     }
   }
-  const rows = inflateZlib(zlib, size),
+  // Every IDAT chunk passed its CRC-32 above, which covers these compressed bytes; the Adler-32 would only repeat it.
+  const rows = inflateZlib(zlib, size, false),
     out = new Uint8Array(width * height * 4),
     max = (1 << Math.min(depth, 8)) - 1,
     key = alpha && colour !== 3 ? alpha : undefined,
