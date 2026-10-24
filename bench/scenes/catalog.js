@@ -212,9 +212,11 @@ export const SCENES = {
     title: 'Boxes',
     draws:
       'n boxes of 0.5 m on a cubic grid with 16 colours and an orbiting camera. move=1 spins every box every frame; ' +
-      'mode=instanced draws them through the engine instancing API (static matrices, one batch).',
+      'mode=instanced draws them through the engine instancing API (static matrices, one batch). views=4 draws the ' +
+      'boxes four times a frame, one quarter of the canvas each (split screen), through four cameras on the same ' +
+      'orbit a quarter turn apart.',
     measures: ['cpuMs', 'gpuMs', 'fps', 'buildMs', 'drawCalls'],
-    params: { n: 10_000, mode: 'mesh', move: 0 },
+    params: { n: 10_000, mode: 'mesh', move: 0, views: 1 },
     data: (p) => boxes(p.n),
   },
   materials: {
@@ -304,6 +306,8 @@ export const STANDARD = {
   scaling: [
     ...[1, 100, 1000, 10_000, 100_000].map((n) => ({ scene: 'boxes', params: { n } })),
     ...[100_000, 250_000].map((n) => ({ scene: 'boxes', params: { n, mode: 'instanced' } })),
+    // Four views of one scene (docs/multi-view-roadmap.md): the per-view cost against the single-view cases above.
+    ...[10_000, 100_000].map((n) => ({ scene: 'boxes', params: { n, views: 4 } })),
     // Shadow casters (render has 1,000): every caster is drawn into each of the 4 cascades.
     ...[400, 5000, 10_000].map((n) => ({ scene: 'shadows', params: { n } })),
   ],

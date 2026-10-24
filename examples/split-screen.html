@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Split-screen two players · Margo Engine</title>
+  <link rel="stylesheet" href="./multi-view.css">
+</head>
+<body>
+  <h1>Split screen</h1>
+  <p>Core views and render layers (<code>@margoengine/cameras/layers</code>) · Two chase cameras share one arena. Each
+    player's yellow marker is on a layer only that player's view draws. Steer with <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>
+    and the arrow keys.</p>
+  <div id="views" class="views">
+    <canvas id="viewport" aria-label="Two players in an arena, each seen from behind in its own half of the screen"></canvas>
+  </div>
+  <p id="status" data-webgpu-status role="status">Starting WebGPU…</p>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./split-screen.ts'));
+  </script>
+</body>
+</html>

@@ -69,7 +69,8 @@ test('bench scenes: every standard case names a scene, ids are stable, data is d
     }
   assert.equal(caseId('boxes', { n: 100_000, mode: 'instanced', move: 1 }), 'boxes-100000-instanced-moving');
   assert.equal(caseId('gltf', { model: 'flight-helmet' }), 'gltf-flight-helmet');
-  assert.deepEqual(sceneParams('boxes', { n: 5 }), { n: 5, mode: 'mesh', move: 0 });
+  assert.equal(caseId('boxes', { n: 10_000, views: 4 }), 'boxes-10000-views4');
+  assert.deepEqual(sceneParams('boxes', { n: 5 }), { n: 5, mode: 'mesh', move: 0, views: 1 });
   const env = { assets: '/a/' };
   for (const scene of ['boxes', 'materials', 'lights', 'shadows', 'post', 'startup', 'gltf', 'helmet', 'react']) {
     const p = sceneParams(scene, scene === 'boxes' || scene === 'react' ? { n: 64 } : {});

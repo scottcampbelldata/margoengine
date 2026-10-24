@@ -124,6 +124,12 @@ const demos = [
     path: 'demos/windy-meadow.html',
     ready: "document.querySelector('#viewport')?.dataset.ready==='true'",
   },
+  // Multi-view demos (docs/multi-view-roadmap.md M7): several views of one engine in one canvas.
+  ...['cad-views', 'split-screen', 'minimap'].map((id) => ({
+    id,
+    path: `demos/${id}.html`,
+    ready: "document.querySelector('#viewport')?.dataset.ready==='true'",
+  })),
   { id: 'earth', path: 'demos/earth/', ready: "!!window.earthDemo&&window.earthDemo.quality!=='preview'" },
   { id: 'dof', path: 'demos/dof/', ready: '!!window.dofDemo', views: ['high', 'light', 'phone'] },
   { id: 'tonemap', path: 'demos/tonemap/', ready: '!!window.tonemapDemo', views: ['high', 'phone'] },

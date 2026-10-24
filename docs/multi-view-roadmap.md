@@ -2,7 +2,7 @@
 
 Date: 2026-10-24. Status: **views (part 1), the package work (part 2) and separate scenes (part 3) are in core**,
 landed as an approved exception to the v1.0 core freeze (Scott, 2026-10-23: "the core size change and additions to it
-are approved"), and every package is view-aware. Only the CAD demos (M7) remain open; part 4 is optional. The
+are approved"), and every package is view-aware. The three demos (M7) are on the site; part 4 is optional. The
 real-GPU check `npm run check:views` runs in `check:merge`.
 
 ## Summary
@@ -106,9 +106,27 @@ engine.views = [{ camera: engine.camera, viewport: [0, 0, 1, 1] }, { camera: hud
 | M4 | Shadows and lights | Done: cascades follow the drawn camera, clustered grid per view. |
 | M5 | Picking and interaction | Done: `engine.pick`, selection, points, controls; labels, html and viewcube bind to a view. |
 | M6 | Remaining renderers | Done, including inspector and exporters `capture`. |
-| M7 | CAD demos | Open: four-view CAD layout, split-screen and minimap demos with visual baselines. |
-| M8 | Separate scenes | Done in core and stage (`tests/core-scenes.test.js`); HUD and item-preview demos open with M7. |
-| M9 | Kernel speed-up | Optional: a full kernel tick runs per view. A per-entity scene byte and a cull-only export would remove it; measure four views at 100,000 entities first. |
+| M7 | CAD demos | Done: [demos](#demos) on the site, in the visual check and in `check:views` (demos section). |
+| M8 | Separate scenes | Done in core and stage (`tests/core-scenes.test.js`); `check:views` draws a HUD scene and a 4x item preview. No site demo of either yet. |
+| M9 | Kernel speed-up | Optional: a full kernel tick runs per view. A per-entity scene byte and a cull-only export would remove it. Measured (`npm run bench -- scaling`, `boxes-*-views4`, RTX A6000, 2026-10-24): 100,000 boxes take 1.07 ms CPU and 0.57 ms GPU per frame in one view, 4.44 ms CPU and 2.02 ms GPU in four (10,000: 0.16/0.10 against 0.48/0.24 ms). CPU grows 4.2x for 4 views, so the kernel tick dominates. |
+
+## Demos
+
+Three site demos (`examples/*.html`, built into `site/dist/demos/` by `scripts/build-site.js`, linked from the home
+page), using only public APIs. Each view has a labelled box over its rectangle that its controls listen on, and a click
+picks through the view under it (`examples/multi-view.ts`). Reduced motion holds each one still for the visual check.
+
+| Demo | What it shows | Frame time |
+| --- | --- | ---: |
+| [Four-view CAD layout](../examples/cad-views.html) | A shaft assembly in one scene, seen through top, front and right orthographic cameras (`@margoengine/cameras`) and a perspective camera, third-angle layout. Ortho views pan and zoom, the perspective view orbits. A click in any view selects the part in all four. | 3.5 ms |
+| [Split-screen two players](../examples/split-screen.html) | Two chase cameras in one arena, side by side (stacked on a tall screen). Each player's marker is on a render layer only that player's view draws. WASD and the arrow keys steer; idle players drive round the pillars. | 3.4 ms |
+| [Minimap](../examples/minimap.html) | A chase view of a car going round a town, with a square orthographic map in the corner looking straight down, north up or turning with the car. The car arrow and route dots are on a layer only the map draws. | 3.5 ms |
+
+Frame time: `npm run check:views` (demos section), the median of 60 frames each rendered and awaited until the GPU
+finished (CPU and GPU together, no overlap), 1280 x 720 at 4x MSAA, NVIDIA RTX A6000, Edge, 2026-10-24.
+
+Core runs one `engine.pick` at a time and throws `Pick pending` for a second call while one is in flight; the demos
+drop a click while a pick is pending.
 
 ## Testing
 
@@ -117,5 +135,7 @@ engine.views = [{ camera: engine.camera, viewport: [0, 0, 1, 1] }, { camera: hud
   package's view tests (taa, water, culling, clustered, points, labels, viewcube, dof, volumetric, inspector,
   exporters capture).
 - Real GPU: `npm run check:views` under the GPU lock (scenes, post effects, temporal history, water, a 4x item preview
-  into 1x textures against a 1x reference) at 1x and 4x MSAA with device restore.
+  into 1x textures against a 1x reference) at 1x and 4x MSAA with device restore; then the three demos (picks through
+  each view, layers a view leaves out, frame time).
+- Visual check: `cad-views`, `split-screen` and `minimap` at high, light and phone.
 - `npm run proofs -- --current`: without views, core emits what it emitted before.

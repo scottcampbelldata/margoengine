@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Minimap · Margo Engine</title>
+  <link rel="stylesheet" href="./multi-view.css">
+</head>
+<body>
+  <h1>Minimap</h1>
+  <p>Core views, <code>@margoengine/cameras</code> and render layers · A small orthographic view looks straight down
+    over the chase view. The yellow arrow and the blue route dots are on a layer only the map draws.</p>
+  <div id="views" class="views">
+    <canvas id="viewport" aria-label="A car driving round a town, with a top-down map in the corner"></canvas>
+  </div>
+  <p id="status" data-webgpu-status role="status">Starting WebGPU…</p>
+  <label><input id="heading-up" type="checkbox"> Turn the map with the car</label>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./minimap.ts'));
+  </script>
+</body>
+</html>

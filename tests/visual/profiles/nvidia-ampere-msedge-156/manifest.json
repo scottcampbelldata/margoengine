@@ -1611,6 +1611,240 @@
     "renderedInputsDirty": false,
     "renderedInputChanges": []
    }
+  },
+  "cad-views-high": {
+   "url": "demos/cad-views.html?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 156.0.4314.42",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-24T18:54:18.206Z",
+    "commit": "6ecfa01815566747090ccd9564dafcbcbf4de986",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
+   }
+  },
+  "cad-views-light": {
+   "url": "demos/cad-views.html?quality=low",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 156.0.4314.42",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-24T18:54:18.206Z",
+    "commit": "6ecfa01815566747090ccd9564dafcbcbf4de986",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
+   }
+  },
+  "cad-views-phone": {
+   "url": "demos/cad-views.html",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 156.0.4314.42",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-24T18:54:18.206Z",
+    "commit": "6ecfa01815566747090ccd9564dafcbcbf4de986",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
+   }
+  },
+  "split-screen-high": {
+   "url": "demos/split-screen.html?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 156.0.4314.42",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-24T18:54:18.206Z",
+    "commit": "6ecfa01815566747090ccd9564dafcbcbf4de986",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
+   }
+  },
+  "split-screen-light": {
+   "url": "demos/split-screen.html?quality=low",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 156.0.4314.42",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-24T18:54:18.206Z",
+    "commit": "6ecfa01815566747090ccd9564dafcbcbf4de986",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
+   }
+  },
+  "split-screen-phone": {
+   "url": "demos/split-screen.html",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 156.0.4314.42",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-24T18:54:18.206Z",
+    "commit": "6ecfa01815566747090ccd9564dafcbcbf4de986",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
+   }
+  },
+  "minimap-high": {
+   "url": "demos/minimap.html?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 156.0.4314.42",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-24T18:54:18.206Z",
+    "commit": "6ecfa01815566747090ccd9564dafcbcbf4de986",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
+   }
+  },
+  "minimap-light": {
+   "url": "demos/minimap.html?quality=low",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 156.0.4314.42",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-24T18:54:18.206Z",
+    "commit": "6ecfa01815566747090ccd9564dafcbcbf4de986",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
+   }
+  },
+  "minimap-phone": {
+   "url": "demos/minimap.html",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 156.0.4314.42",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-24T18:54:18.206Z",
+    "commit": "6ecfa01815566747090ccd9564dafcbcbf4de986",
+    "packagesDirty": false,
+    "renderedInputsDirty": false,
+    "renderedInputChanges": []
+   }
   }
  },
  "profile": "nvidia-ampere-msedge-156",

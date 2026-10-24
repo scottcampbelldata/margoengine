@@ -70,7 +70,16 @@ else
 await site({ root: 'apps/showcase-night-citadel', base: './', build: { outDir: `${out}/night-citadel` } });
 await site({ root: 'examples/gameplay-sandbox', base: './', build: { outDir: `${out}/gameplay-sandbox` } });
 await site({ root: 'examples/voxel-sandbox', base: './', build: { outDir: `${out}/voxel` } });
-const pages = ['character-animation', 'robot-expressive', 'flight-helmet', 'windy-meadow', 'tokyo-diorama'];
+const pages = [
+  'character-animation',
+  'robot-expressive',
+  'flight-helmet',
+  'windy-meadow',
+  'tokyo-diorama',
+  'cad-views',
+  'split-screen',
+  'minimap',
+];
 await site({
   configFile: false,
   root: 'examples',

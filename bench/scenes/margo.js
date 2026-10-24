@@ -2,7 +2,7 @@
 // the CLI) are what an app gets. Box and CAD materials are single-sided (doubleSided: false, like other engines'
 // default front-side materials): the objects are closed solids, and core draws such batches with a back-culled pipeline.
 // Every optional package is imported by the scene that uses it, so a scene's page loads only what that scene needs.
-import { Engine, PbrMaterial, box } from '@margoengine/core';
+import { Camera, Engine, PbrMaterial, box } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { CAD_MATERIALS, LIGHT, PALETTE } from './catalog.js';
 
@@ -31,7 +31,10 @@ const app = (engine, update, extra) => ({
   render(t) {
     update(t);
     engine.camera.position = extra.camera.at(t);
-    engine.render();
+    if (!extra.views) return engine.render();
+    // views: the quarter-turn cameras follow the same orbit.
+    extra.views.forEach((view, k) => k && (view.camera.position = extra.camera.at(t + (k * Math.PI) / 2 / 0.3)));
+    engine.render({ views: extra.views });
   },
   idle: () => engine.gpu.queue.onSubmittedWorkDone(),
   info: () =>
@@ -39,6 +42,20 @@ const app = (engine, update, extra) => ({
       ? { drawCalls: extra.draws, note: `${extra.draws} instanced draws, not counted by core` }
       : { drawCalls: engine.stats.drawCalls, note: extra.note ?? 'core batches (package passes not counted)' },
 });
+/** Four views, one per quarter of the canvas: the engine camera, then three more cameras on its orbit. */
+const quarters = (engine, camera) =>
+  [0, 1, 2, 3].map((k) => ({
+    camera: k
+      ? new Camera({
+          fov: camera.fov,
+          near: camera.near,
+          far: camera.far,
+          position: camera.at(0),
+          target: camera.target,
+        })
+      : engine.camera,
+    viewport: [(k % 2) * 0.5, (k >> 1) * 0.5, 0.5, 0.5],
+  }));
 const linear = (hex) =>
   [1, 3, 5].map((i) => {
     const v = parseInt(hex.slice(i, i + 2), 16) / 255;
@@ -94,7 +111,9 @@ const builders = {
     return app(stage.engine, () => {}, { camera });
   },
 
-  async boxes(canvas, data, marks, { n, mode, move }) {
+  async boxes(canvas, data, marks, { n, mode, move, views = 1 }) {
+    if (views !== 1 && (views !== 4 || mode === 'instanced'))
+      throw new RangeError(`boxes views=${views}: 1, or 4 with mode=mesh`);
     if (mode === 'instanced') return instancedBoxes(canvas, data, marks, { n, move });
     const engine = await engineFor(canvas, data.camera, n + 8, marks),
       s = performance.now(),
@@ -106,7 +125,7 @@ const builders = {
       (t) => {
         for (let i = 0; i < moving; i++) list[i].rotation.y = data.items[i].rotation[1] + t;
       },
-      { camera: data.camera },
+      { camera: data.camera, views: views === 4 ? quarters(engine, data.camera) : undefined },
     );
   },
 

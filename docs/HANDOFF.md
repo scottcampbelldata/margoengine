@@ -2,6 +2,20 @@
 
 Last updated 2026-10-24. Read this first when starting a new session. Update it whenever work lands.
 
+## Landed 2026-10-24: multi-view demos (roadmap M7 done)
+
+Three site demos built from public APIs only: [four-view CAD layout](../examples/cad-views.html) (top, front and right
+orthographic views plus perspective, one scene, a click picks per view and selects the part in all four),
+[split-screen two players](../examples/split-screen.html) (two chase cameras, each player's marker on a layer only
+their view draws) and [minimap](../examples/minimap.html) (a square straight-down ortho map over a chase view; the car
+arrow and route are map-only layers). Built by `scripts/build-site.js`, linked from the home page and the sitemap, in
+the visual check (high, light, phone), in `check:no-webgpu` (found automatically) and in a new `check:views` demos
+section (picks through each view, layers a view leaves out, frame time: 3.5, 3.4 and 3.5 ms on the RTX A6000).
+`npm run bench -- scaling` gained `boxes-10000-views4` and `boxes-100000-views4` (4.44 ms CPU against 1.07 ms for one
+view at 100,000: the per-view kernel tick, roadmap M9). No engine change; core + stage unchanged at 22,253 B. Core
+throws `Pick pending` for a second `engine.pick` while one is in flight, so the demos drop such clicks. No HUD or
+item-preview site demo yet (M8); `check:views` covers both.
+
 ## Landed 2026-10-24: clean-room rewrites (ac465a00..ccb4a164 and follow-ups)
 
 Every area the 2026-10-21 audit found close to other engines' or libraries' code was rewritten from words-only specs

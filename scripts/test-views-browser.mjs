@@ -4,7 +4,8 @@
 // Sections: scenes (separate scenes, picking, resize, device restore), postfx (four views equal one view with Tonemap,
 // DOF, PostStack and zero-density fog), temporal (TAA, motion blur and volumetric fog keep separate histories and
 // depth), water (a later view keeps the earlier view's pixels, also after resize and device restore), preview (an item
-// preview drawn at 4x into a caller's 1x colour and depth matches 1x, with antialiased edges).
+// preview drawn at 4x into a caller's 1x colour and depth matches 1x, with antialiased edges), demos (the three
+// multi-view demos: picks through each view, layers kept out of a view, frame time).
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
@@ -719,7 +720,80 @@ try {
   );
   assert.ok(preview.centerDepth > 0 && preview.cornerDepth === 0, 'the caller depth holds the item and nothing else');
 
-  const report = { hardware, scenes, postfx, temporal, water, preview };
+  // The multi-view demos (examples/cad-views, split-screen, minimap) held still by reduced motion: picks through each
+  // view hit what that view shows, a mesh on a layer a view leaves out is never picked through it, and the frame time
+  // (median of 60 frames, each awaited on the GPU) is recorded.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const scan = (name, index) =>
+    page.evaluate(
+      async ([name, index]) => {
+        const hits = [];
+        for (let fx = 0.05; fx < 1; fx += 0.1)
+          for (let fy = 0.05; fy < 1; fy += 0.05) hits.push(await window[name].pickAt(index, fx, fy));
+        return [...new Set(hits)];
+      },
+      [name, index],
+    );
+  const demos = {};
+  for (const [file, name, checks] of [
+    [
+      'cad-views',
+      'cadViews',
+      [
+        [0, 0.5, 0.5, 'Pulley'],
+        [1, 0.5, 0.5, 'Pulley'],
+        [2, 0.5, 0.5, 'Pulley'],
+        [3, 0.5, 0.5, 'Right bearing block'],
+        [0, 0.03, 0.97, null],
+      ],
+    ],
+    [
+      'split-screen',
+      'splitScreen',
+      [
+        [0, 0.5, 0.6, 'Player 1'],
+        [1, 0.5, 0.6, 'Player 2'],
+      ],
+    ],
+    [
+      'minimap',
+      'minimap',
+      [
+        [0, 0.5, 0.75, 'Car'],
+        [1, 0.5, 0.5, 'Car marker'],
+      ],
+    ],
+  ]) {
+    const before = errors.length;
+    await page.goto(`${new URL(page.url()).origin}/examples/${file}.html`);
+    await page.waitForFunction((name) => !!window[name], name, { timeout: 120_000 });
+    const picks = await page.evaluate(
+      // One pick at a time: core rejects a pick while another is pending.
+      async ([name, checks]) => {
+        const out = [];
+        for (const [index, fx, fy] of checks) out.push(await window[name].pickAt(index, fx, fy));
+        return out;
+      },
+      [name, checks],
+    );
+    checks.forEach(([index, fx, fy, expected], i) =>
+      assert.equal(picks[i], expected, `${file}: pick at (${fx}, ${fy}) in view ${index}`),
+    );
+    const views = await page.evaluate((name) => window[name].views.length, name);
+    demos[file] = {
+      views,
+      picks: Object.fromEntries(checks.map(([index, fx, fy], i) => [`${index}:${fx},${fy}`, picks[i]])),
+      frameMs: Math.round((await page.evaluate((name) => window[name].frameTime(60), name)) * 100) / 100,
+    };
+    // Layers: player 2 never picks player 1's marker, the chase view never picks the map-only car marker.
+    if (file === 'split-screen')
+      assert.ok(!(await scan(name, 1)).includes('Player 1 marker'), "player 2's view leaves out player 1's marker");
+    if (file === 'minimap')
+      assert.ok(!(await scan(name, 0)).includes('Car marker'), 'the chase view leaves out the map-only marker');
+    assert.deepEqual(errors.slice(before), [], `${file}: no page errors`);
+  }
+
+  const report = { hardware, scenes, postfx, temporal, water, preview, demos };
   await writeFile('test-results/views-browser.json', JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
 } finally {
