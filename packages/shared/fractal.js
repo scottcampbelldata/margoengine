@@ -8,6 +8,8 @@ export function fractalOptions({ octaves = 5, lacunarity = 2, gain = 0.5, freque
     octaves > 16 ||
     ![lacunarity, gain, frequency].every(Number.isFinite)
   )
-    throw new RangeError('Invalid fractal options');
+    throw new RangeError(
+      'Invalid fractal options; pass integer octaves from 1 to 16 and finite lacunarity, gain and frequency',
+    );
   return [octaves, lacunarity, gain, frequency];
 }

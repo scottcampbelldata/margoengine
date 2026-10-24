@@ -30,7 +30,10 @@ export function mergePrimitives(primitives, normals = false, check) {
   let vertexCount = 0,
     indexCount = 0;
   for (const primitive of primitives) {
-    if (primitive.vertices.length % 20) throw new RangeError('PBR vertex array length is not a multiple of its stride');
+    if (primitive.vertices.length % 20)
+      throw new RangeError(
+        'PBR vertex array length is not a multiple of its stride; pass gltf-pro primitives with 20-float vertices',
+      );
     vertexCount += primitive.vertices.length / 20;
     indexCount += primitive.indices.length;
   }

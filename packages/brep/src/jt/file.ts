@@ -17,7 +17,7 @@ const inflateSegment = (input: Uint8Array): Uint8Array => {
   try {
     return inflateZlib(input, { limit: 1 << 30 });
   } catch (error) {
-    throw new TypeError(`Invalid JT file: corrupt zlib data (${(error as Error).message})`);
+    throw new TypeError(`Invalid JT file: corrupt zlib data (${(error as Error).message}); export the JT file again`);
   }
 };
 

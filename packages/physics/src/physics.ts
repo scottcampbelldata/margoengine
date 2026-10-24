@@ -78,6 +78,7 @@ export interface QueryFilter {
   /** Return false to skip a body. */
   predicate?: (body: PhysicsBody, collider: Collider) => boolean;
 }
+/** Options of `Physics.raycast` and `raycastAll`: the query filter plus a distance limit and solid starts. */
 export interface PhysicsRaycastOptions extends QueryFilter {
   /** Default unbounded. */
   maxDistance?: number;
