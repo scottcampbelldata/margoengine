@@ -402,12 +402,9 @@ export class Physics implements EnginePlugin, BodyOwner {
     const length = Math.sqrt(out[0] * out[0] + out[1] * out[1] + out[2] * out[2] + out[3] * out[3]) || 1;
     for (let i = 0; i < 4; i++) out[i] /= length;
     if (mesh instanceof CoreMesh) {
-      // Frozen core's setQuaternion maps a fresh array; synchronize through its extension storage.
       const runtime = meshRuntime(mesh),
         store = runtime.engine.store,
-        t = store.transforms,
-        id = runtime.id,
-        parent = store.parents[id];
+        parent = store.parents[runtime.id];
       // A child mesh gets its pose relative to the parent's current world transform (no frame of lag).
       if (parent !== -1) this.toLocal(store, parent, position, out);
       const x = out[0],
@@ -427,16 +424,8 @@ export class Physics implements EnginePlugin, BodyOwner {
         !Number.isFinite(Math.fround(w))
       )
         throw new RangeError('Invalid physics quaternion');
-      mesh.setPosition(position);
-      t.qx[id] = x;
-      t.qy[id] = y;
-      t.qz[id] = z;
-      t.qw[id] = w;
-      const lanes = store.rotations,
-        at = id * 3;
-      lanes[at + 1] = Math.asin(Math.max(-1, Math.min(1, 2 * (x * z + w * y))));
-      lanes[at] = Math.atan2(2 * (w * x - y * z), 1 - 2 * (x * x + y * y));
-      lanes[at + 2] = Math.atan2(2 * (w * z - x * y), 1 - 2 * (y * y + z * z));
+      // Core's setters allocate nothing, so preallocated `position` and `out` go straight in.
+      mesh.setPosition(position).setQuaternion(out);
     } else {
       if (parentOf(mesh) !== -1)
         throw new Error('Non-core physics bodies need root-level meshes; child meshes require core transform storage');

@@ -53,7 +53,7 @@ test('duplicate attachment removes only the rejected overlay', async (t) => {
   const { engine, inspector, dom } = await scene(t);
   assert.throws(() => Inspector.attach(engine, { parent: dom.window.document.body }), {
     name: 'TypeError',
-    message: 'Invalid plugin; give it a unique name and setup(), and attach it once',
+    message: 'Invalid plugin; see https://margoengine.com/errors#arguments',
   });
   assert.equal(dom.window.document.querySelectorAll('[data-margo-inspector]').length, 1);
   assert.equal(inspector.element.isConnected, true);

@@ -1,7 +1,7 @@
 import type { Engine, Mesh } from './engine.js';
 import type { Camera } from './camera.js';
 import type { Batch, RenderView } from './renderer.js';
-import { margoError } from '../../shared/errors.js';
+import { fault, typeError } from '../../shared/errors.js';
 
 /** Options for `PassContext.draw`, which draws every batch in one render pass. The WebGPU fields apply to WebGPU only. */
 export interface DrawOptions {
@@ -119,7 +119,7 @@ export class FrameGraph {
   private owner?: string;
   private executing = false;
   private idle(): void {
-    if (this.executing) throw margoError('state', 'Graph executing; change passes outside execute');
+    if (this.executing) throw fault('state', 'Graph executing', 'reentrancy');
   }
   add(pass: FramePass): () => void {
     this.idle();
@@ -129,7 +129,7 @@ export class FrameGraph {
       typeof pass.execute !== 'function' ||
       this.passes.some((p) => p.name === pass.name)
     )
-      throw new TypeError('Invalid pass; give it a unique name, a finite order and execute()');
+      throw typeError('Invalid pass', 'arguments');
     const record = { ...pass, owner: this.owner };
     this.passes.push(record);
     this.passes.sort((a, b) => a.order - b.order);
@@ -156,7 +156,7 @@ export class FrameGraph {
     this.revision++;
   }
   execute(context: PassContext): void {
-    if (this.executing) throw margoError('state', 'Graph recursion; do not run the graph from a pass');
+    if (this.executing) throw fault('state', 'Graph recursion', 'reentrancy');
     this.executing = true;
     try {
       for (const pass of this.passes) pass.execute(context);
@@ -165,7 +165,7 @@ export class FrameGraph {
     }
   }
   prepare(context: PassContext): void {
-    if (this.executing) throw margoError('state', 'Graph recursion; do not run the graph from a pass');
+    if (this.executing) throw fault('state', 'Graph recursion', 'reentrancy');
     this.executing = true;
     try {
       for (const pass of this.passes) pass.prepare?.(context);

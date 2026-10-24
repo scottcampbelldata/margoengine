@@ -196,12 +196,12 @@ test('Geometry validates indices and box winding; material colors use linear RGB
   }
   assert.throws(() => new Geometry([0, 0, 0, 1, 0, 0, 0, 1, 0], [0, 0, 1, 0, 0, 1, 0, 0, 1], [0, 1, 3]), {
     name: 'RangeError',
-    message: 'Invalid geometry; pass 3 to 1,000,000 vertices and in-range triangle indices',
+    message: 'Invalid geometry; see https://margoengine.com/errors#geometry',
   });
   assert.throws(() => box(-1), /positive/);
   assert.throws(() => new PbrMaterial({ roughness: NaN }), {
     name: 'RangeError',
-    message: 'Invalid material; keep color, roughness and metalness in 0..1',
+    message: 'Invalid material; see https://margoengine.com/errors#material',
   });
   assert.ok(Math.abs(new PbrMaterial({ color: '#808080' }).data[0] - 0.21586) < 1e-4);
 });

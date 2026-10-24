@@ -1,9 +1,11 @@
+import { rangeError, typeError } from '../../shared/errors.js';
+
 export function finite(values: ArrayLike<number>, size: number, label: string): void {
-  if (values.length !== size) throw new TypeError(`${label}: ${size} values only`);
+  if (values.length !== size) throw typeError(`${label}: ${size} values`, 'transform');
   for (let i = 0; i < size; i++) {
     const value = values[i];
     if (typeof value !== 'number' || !Number.isFinite(Math.fround(value)))
-      throw new RangeError(`${label}: finite values only`);
+      throw rangeError(`${label}: finite values`, 'transform');
   }
 }
 
@@ -19,12 +21,12 @@ export class Geometry {
   constructor(positions: ArrayLike<number>, normals: ArrayLike<number>, indices: ArrayLike<number>) {
     const count = positions.length / 3;
     if (!Number.isInteger(count) || count < 3 || count > 1_000_000 || !indices.length || indices.length % 3)
-      throw new RangeError('Invalid geometry; pass 3 to 1,000,000 vertices and in-range triangle indices');
+      throw rangeError('Invalid geometry', 'geometry');
     finite(positions, count * 3, 'Positions');
     finite(normals, count * 3, 'Normals');
     for (let i = 0; i < indices.length; i++)
       if (!Number.isInteger(indices[i]) || indices[i] < 0 || indices[i] >= count)
-        throw new RangeError('Invalid geometry; pass 3 to 1,000,000 vertices and in-range triangle indices');
+        throw rangeError('Invalid geometry', 'geometry');
     this.vertices = new Float32Array(count * 6);
     const min = [Infinity, Infinity, Infinity],
       max = [-Infinity, -Infinity, -Infinity];
@@ -55,7 +57,7 @@ export class Geometry {
 export function box(width = 1, height = 1, depth = 1): Geometry {
   const size = [width, height, depth];
   finite(size, 3, 'Box size');
-  if (Math.min(width, height, depth) <= 0) throw new RangeError('Box size: use positive sizes');
+  if (Math.min(width, height, depth) <= 0) throw rangeError('Box size: positive', 'geometry');
   const positions: number[] = [],
     normals: number[] = [],
     indices: number[] = [];
@@ -104,11 +106,11 @@ export class PbrMaterial {
             })
           : null
         : color;
-    if (!rgb) throw new TypeError("Invalid Color; use '#rrggbb' or linear [r, g, b]");
+    if (!rgb) throw typeError('Invalid Color', 'material');
     finite(rgb, 3, 'Color');
     if ([...rgb, roughness, metalness].some((v) => !Number.isFinite(v) || v < 0 || v > 1))
-      throw new RangeError('Invalid material; keep color, roughness and metalness in 0..1');
-    if (typeof doubleSided !== 'boolean') throw new TypeError('Invalid material; doubleSided must be a boolean');
+      throw rangeError('Invalid material', 'material');
+    if (typeof doubleSided !== 'boolean') throw typeError('Invalid material', 'material');
     this.data.set([...rgb, 1, Math.max(0.045, roughness), metalness, +doubleSided]);
   }
 }

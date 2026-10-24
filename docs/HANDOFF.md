@@ -2,6 +2,27 @@
 
 Last updated 2026-10-24. Read this first when starting a new session. Update it whenever work lands.
 
+## Landed 2026-10-24: short core errors with a help page; setQuaternion allocates nothing
+
+Scott approved (2026-10-24) replacing the long fix-naming messages of the core bug-fix landing below.
+
+- **Short messages, linked help.** Every core and stage error keeps its code but is short again, ending with
+  `; see https://margoengine.com/errors#<anchor>`: `fault(code, message, anchor?)`, `typeError(message, anchor)`
+  and `rangeError(message, anchor)` in `packages/shared/errors.js`. The page, `site/errors.html` (linked from the
+  home page footer and the sitemap), has an entry per MargoError code and per message family (19 entries) with the
+  cause and fix, generated from `scripts/errors/entries.js` by `node scripts/errors/page.mjs`.
+  `tests/errors-page.test.js` checks the page matches the file, every link points at an entry, every code core
+  throws has one and every literal message is listed under its entry. The hygiene and quality gates count a linked
+  message as naming its fix (a link to a missing entry as naming none). Packages may use the same helpers and add
+  their entries to the same page ([conventions.md](conventions.md#short-messages-with-a-help-link)).
+- **setQuaternion** no longer spreads or maps a fresh array (it ran for every moving body and animated node each
+  frame). Physics now calls it with its preallocated buffer instead of writing core's transform storage itself.
+  `tests/core-set-quaternion.test.js` counts array iterations and maps during 1,000 calls (zero).
+- Size: core + stage 23,271 -> 22,600 B gzip (2,400 B under the gate); core alone back under the original 20 KiB
+  cap in `scripts/build-modern.js`, which is restored.
+- Logged for later, not done: `using`/`Symbol.dispose` on Engine and Mesh, a `CADCameraControls` profile option,
+  and a UV channel and point primitive (optional-package candidates). The `requiredLimits` patch is dropped.
+
 ## Landed 2026-10-24: parity closing (three.js matrix 142 / 13 / 6 -> 153 / 4 / 4)
 
 Twelve rows of [threejs-parity.md](threejs-parity.md), each its own commit in an optional package (core untouched,

@@ -75,7 +75,7 @@ test('facade preserves real mesh handles, hierarchy and rollback after bad trans
     assert.throws(() => app.box({ size: [1, 2] }), /3 values/);
     assert.throws(() => app.sphere({ roughness: NaN }), {
       name: 'RangeError',
-      message: 'Invalid material; keep color, roughness and metalness in 0..1',
+      message: 'Invalid material; see https://margoengine.com/errors#material',
     });
     assert.equal(engine.meshes.size, count);
     assert.equal(resources.size, allocated);

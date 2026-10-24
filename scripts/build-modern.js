@@ -330,9 +330,7 @@ for (const name of packages) {
     );
   sizes[name] = { raw: Buffer.byteLength(code), gzip: gzipSync(code).length };
 }
-// Core alone; the binding limit is core + stage under 25,000 B (AGENTS.md). Raised from 20 KiB on 2026-10-24 for the
-// core bug fixes (coded errors, messages that name their fix, the pick queue; core 20,899 B).
-assert.ok(sizes.core.gzip < 21 * 1024, `Core exceeds 21 KiB gzip: ${sizes.core.gzip}`);
+assert.ok(sizes.core.gzip < 20 * 1024, `Core exceeds 20 KiB gzip: ${sizes.core.gzip}`);
 assert.ok(sizes.core.gzip + sizes.gltf.gzip < 30 * 1024, 'Core + glTF exceed 30 KiB gzip');
 const { modules, ...baseSize } = await measureCoreStage();
 sizes.base = baseSize;

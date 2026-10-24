@@ -1,7 +1,7 @@
 import type { EngineKernel, Mesh } from '@margoengine/core';
 import type { Engine as RuntimeEngine, Mesh as RuntimeMesh, GeometryBuffers } from '@margoengine/core/extension';
 import { meshTriangles } from '../../shared/mesh-source.js';
-import { margoError } from '../../shared/errors.js';
+import { fault, typeError } from '../../shared/errors.js';
 
 /** Root, meshes, and dispose. `loadedModel` reads only these fields. */
 export interface StageModel {
@@ -28,7 +28,7 @@ export function worldBounds(
   visibleOnly = false,
 ): Float32Array {
   const engine = instance as unknown as RuntimeEngine;
-  if (engine.disposed) throw margoError('disposed', 'Engine disposed; create a new engine');
+  if (engine.disposed) throw fault('disposed', 'Engine disposed');
   engine.store.tick(false);
   output.fill(Infinity, 0, 3);
   output.fill(-Infinity, 3);
@@ -48,14 +48,14 @@ export function worldBounds(
   for (const handle of meshes) {
     const mesh = handle as unknown as RuntimeMesh;
     mesh.check();
-    if (mesh.engine !== engine) throw new TypeError('Foreign mesh; pass meshes of this engine');
+    if (mesh.engine !== engine) throw typeError('Foreign mesh', 'hierarchy');
     if (visibleOnly && !engine.store.visible[mesh.id]) continue;
     const triangles = meshTriangles(handle);
     if (triangles?.kind === 'core') include(triangles.geometry.vertices, 6, mesh.matrix);
     else if (triangles?.kind === 'pbr')
       for (const primitive of triangles.source.primitives) include(primitive.vertices, 20, primitive.node.matrix);
   }
-  if (!Number.isFinite(output[0])) throw margoError('state', 'No geometry; give the model meshes with geometry');
+  if (!Number.isFinite(output[0])) throw fault('state', 'No geometry', 'geometry');
   return output;
 }
 
@@ -86,8 +86,7 @@ export function loadedModel(engine: EngineKernel, model: StageModel): LoadedMode
         seen = new Set<Mesh>();
       for (const mesh of model.meshes) {
         mesh.check();
-        if ((mesh as unknown as RuntimeMesh).engine !== runtime)
-          throw new TypeError('Foreign mesh; pass meshes of this engine');
+        if ((mesh as unknown as RuntimeMesh).engine !== runtime) throw typeError('Foreign mesh', 'hierarchy');
         if (seen.has(mesh)) continue;
         seen.add(mesh);
         const triangles = meshTriangles(mesh);

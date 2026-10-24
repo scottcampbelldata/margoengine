@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Error help - Margo Engine</title>
+  <meta name="description" content="What each Margo Engine error means and how to fix it. Every core error message links to its entry here.">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="stylesheet" href="/site.css">
+</head>
+<body>
+  <main>
+    <h1>Error help</h1>
+    <p>Margo Engine keeps its error messages short and ends each one with a link to its entry on this page, for
+      example <code>Mesh disposed; see https://margoengine.com/errors#disposed</code>. Errors that are not a
+      <code>TypeError</code> or <code>RangeError</code> are a <code>MargoError</code> with a stable <code>code</code>:
+      branch on <code>error.code</code>, not on the message. Optional packages follow the same pattern.</p>
+    <h2>Codes</h2>
+    <ul>
+      <li><a href="#disposed"><code>disposed</code></a></li>
+      <li><a href="#unsupported"><code>unsupported</code></a></li>
+      <li><a href="#state"><code>state</code></a></li>
+      <li><a href="#failed"><code>failed</code></a></li>
+    </ul>
+    <section id="disposed">
+      <h2><a href="#disposed">disposed: used after dispose()</a></h2>
+      <p class="messages"><code>Engine disposed</code> <code>Mesh disposed</code> <code>Transforms disposed</code></p>
+      <p><strong>Cause.</strong> The engine, a mesh or the transform store was disposed, and the code kept a reference and called it again. A pick still waiting when the engine is disposed resolves null instead.</p>
+      <p><strong>Fix.</strong> Drop references when you call <code>dispose()</code>, and create a new <code>Engine</code> or mesh (<code>engine.createMesh()</code>) to keep drawing. Check <code>engine.disposed</code> before late callbacks (timers, fetches, promise continuations) touch the engine.</p>
+    </section>
+    <section id="unsupported">
+      <h2><a href="#unsupported">unsupported: the browser or device lacks something needed</a></h2>
+      <p><strong>Cause.</strong> The browser or GPU lacks a capability the call needs. See the WebGPU entry for the messages core throws.</p>
+      <p><strong>Fix.</strong> Feature-test before calling, or offer a fallback path. Branch on <code>error.code === "unsupported"</code>.</p>
+    </section>
+    <section id="state">
+      <h2><a href="#state">state: not valid right now</a></h2>
+      <p><strong>Cause.</strong> The call is valid in general but not at this moment: a re-entrant call from a callback, a missing prerequisite, or a device that is being restored. The re-entrancy, device restore and install entries list the messages.</p>
+      <p><strong>Fix.</strong> Retry later, from outside the callback, or after the prerequisite is in place.</p>
+    </section>
+    <section id="failed">
+      <h2><a href="#failed">failed: the operation ran and produced no result</a></h2>
+      <p><strong>Cause.</strong> The GPU or the transform kernel could not complete the work. See the GPU lost and limits entries.</p>
+      <p><strong>Fix.</strong> Read the message for the GPU or kernel detail; most failures are recovered by the engine or need smaller inputs.</p>
+    </section>
+    <h2>Messages</h2>
+    <section id="webgpu">
+      <h2><a href="#webgpu">WebGPU required or unavailable</a></h2>
+      <p class="messages"><code>WebGPU required</code> <code>WebGPU unavailable</code> <code>WebGPU adapter unavailable</code> <code>No WebGPU canvas</code></p>
+      <p><strong>Cause.</strong> <code>engine.pick</code> and <code>engine.rebootDevice</code> need the WebGPU backend; on the WebGL2 fallback they reject. <code>Engine.create</code> found no <code>navigator.gpu</code>, no adapter, or a canvas that already has another context.</p>
+      <p><strong>Fix.</strong> Use a browser with WebGPU (current Chrome, Edge or Safari; margoengine.com/webgpu), turn on hardware acceleration, or pass <code>{backend: "auto", fallback: webglRenderer}</code> from <code>@margoengine/webgl</code>. Give the engine a fresh canvas that has no 2D or WebGL context.</p>
+    </section>
+    <section id="device-restore">
+      <h2><a href="#device-restore">Geometry unavailable during device restore</a></h2>
+      <p class="messages"><code>Geometry unavailable</code></p>
+      <p><strong>Cause.</strong> The GPU device was lost and the engine is recreating it; GPU resources cannot be read or created until it finishes.</p>
+      <p><strong>Fix.</strong> Wait for <code>engine.rebootDevice()</code> (or the next frame) to finish, then retry. Packages restore their GPU state in <code>onDeviceRestored</code>.</p>
+    </section>
+    <section id="gpu-lost">
+      <h2><a href="#gpu-lost">GPU lost or a GPU validation error</a></h2>
+      <p class="messages"><code>GPU lost: &lt;reason&gt;</code> <code>&lt;WebGPU validation message&gt;</code></p>
+      <p><strong>Cause.</strong> The browser lost the GPU device (driver reset, tab in the background too long, GPU process crash), or WebGPU reported an uncaptured validation error.</p>
+      <p><strong>Fix.</strong> Core recreates the device itself; recreate textures your code owns (view <code>target</code>s) in <code>onDeviceRestored</code>. A validation error names the GPU object at fault: fix the call that created it.</p>
+    </section>
+    <section id="reentrancy">
+      <h2><a href="#reentrancy">Render or frame graph re-entered</a></h2>
+      <p class="messages"><code>Render recursion</code> <code>Graph executing</code> <code>Graph recursion</code></p>
+      <p><strong>Cause.</strong> <code>engine.render</code> was called from inside a frame callback, a plugin hook or a pass, or a pass added passes to the graph or ran the graph while it was executing.</p>
+      <p><strong>Fix.</strong> Call <code>render</code> from your own loop or <code>engine.start()</code>, never from inside a frame. Add or remove passes from <code>registerPasses</code>, <code>setup</code> or outside the frame.</p>
+    </section>
+    <section id="install">
+      <h2><a href="#install">Optional package missing or format unknown</a></h2>
+      <p class="messages"><code>Install &lt;package&gt;</code> <code>Specify format</code></p>
+      <p><strong>Cause.</strong> <code>stage.load</code> needs an optional package for this format and it is not installed, or the URL has no known extension.</p>
+      <p><strong>Fix.</strong> Install the named package (for example <code>npm i @margoengine/gltf</code>), or pass <code>{format}</code>: one of gltf, glb, stl, obj, step, iges.</p>
+    </section>
+    <section id="camera">
+      <h2><a href="#camera">Camera and controls values</a></h2>
+      <p class="messages"><code>Invalid projection</code> <code>Camera at target</code> <code>Vertical camera</code> <code>Invalid frustum</code> <code>Invalid fit</code> <code>Bounds exceed far: raise camera.far</code> <code>Invalid pivot</code> <code>Invalid orbit</code> <code>Invalid pan</code></p>
+      <p><strong>Cause.</strong> The camera cannot build a view: <code>fov</code> outside 0-180, <code>near</code> not above 0 or <code>far</code> not above <code>near</code>, the position equal to the target, a view parallel to <code>camera.up</code>, or non-finite values. <code>fitToBoundingBox</code> needs min &lt;= max, aspect &gt; 0, duration &gt;= 0 and padding &gt;= 1, and a box that fits inside <code>far</code>. Controls need finite input and a camera off its target.</p>
+      <p><strong>Fix.</strong> Keep 0 &lt; fov &lt; 180 and 0 &lt; near &lt; far; move the position off the target; for straight-down views set <code>camera.up</code> (for example <code>[0, 0, -1]</code>) or use <code>CameraProjection</code> from <code>@margoengine/cameras</code>. Raise <code>camera.far</code> for large models.</p>
+    </section>
+    <section id="transform">
+      <h2><a href="#transform">Transform values</a></h2>
+      <p class="messages"><code>Invalid transform</code> <code>Scale nonzero</code> <code>Quaternion nonzero</code> <code>&lt;name&gt;: &lt;n&gt; values</code> <code>&lt;name&gt;: finite values</code> <code>Invalid transform/bounds: &lt;id&gt;</code></p>
+      <p><strong>Cause.</strong> A position, rotation, scale, quaternion or other vector had the wrong length, a value that is not a finite float32, a zero scale, or an all-zero quaternion. The kernel names the entity whose transform or bounds went non-finite.</p>
+      <p><strong>Fix.</strong> Pass arrays of the stated length with finite numbers; use nonzero scale factors and a nonzero quaternion. Look for divisions by zero or NaN upstream of the entity id the kernel reports.</p>
+    </section>
+    <section id="hierarchy">
+      <h2><a href="#hierarchy">Parents and meshes from another engine or scene</a></h2>
+      <p class="messages"><code>Foreign parent</code> <code>Hierarchy cycle</code> <code>Parent depth: 64</code> <code>Foreign mesh</code></p>
+      <p><strong>Cause.</strong> A parent belongs to another engine or scene, would make the mesh its own ancestor, or nests deeper than 64 levels; or the stage was given a mesh of another engine.</p>
+      <p><strong>Fix.</strong> Parent meshes of the same engine and scene, pick a parent outside the mesh subtree, and keep hierarchies under 64 levels. Create meshes with the scene they belong to (<code>scene.createMesh()</code>).</p>
+    </section>
+    <section id="scene">
+      <h2><a href="#scene">Scenes</a></h2>
+      <p class="messages"><code>Unknown scene: use engine.createScene()</code> <code>Default scene: dispose the engine instead</code></p>
+      <p><strong>Cause.</strong> A scene from another engine, or one already disposed, was passed in; or <code>engine.scene</code> (the default scene) was disposed.</p>
+      <p><strong>Fix.</strong> Use scenes from this engine: <code>engine.createScene()</code>. The default scene lives as long as the engine: call <code>engine.dispose()</code>.</p>
+    </section>
+    <section id="geometry">
+      <h2><a href="#geometry">Geometry</a></h2>
+      <p class="messages"><code>Invalid geometry</code> <code>Box size: positive</code> <code>Sphere radius</code> <code>Sphere segments: 3..256</code> <code>No geometry</code></p>
+      <p><strong>Cause.</strong> Core geometry needs 3 to 1,000,000 vertices, a triangle index count that is a multiple of 3, indices inside the vertex range, and finite positions and normals. Boxes and spheres need positive sizes and 3-256 segments. Fitting needs at least one mesh with geometry.</p>
+      <p><strong>Fix.</strong> Split meshes over 1,000,000 vertices, check index ranges, and pass positive sizes. Give the model meshes with geometry before fitting.</p>
+    </section>
+    <section id="material">
+      <h2><a href="#material">Material values</a></h2>
+      <p class="messages"><code>Invalid material</code> <code>Invalid Color</code></p>
+      <p><strong>Cause.</strong> A material colour, roughness or metalness was outside 0..1 or not finite, <code>doubleSided</code> was not a boolean, a colour was not <code>#rrggbb</code> or linear <code>[r, g, b]</code>, or the material data was changed directly to an invalid value.</p>
+      <p><strong>Fix.</strong> Pass <code>#rrggbb</code> or linear <code>[r, g, b]</code> in 0..1, roughness and metalness in 0..1, a boolean <code>doubleSided</code>, and change values with <code>material.set()</code>.</p>
+    </section>
+    <section id="lighting">
+      <h2><a href="#lighting">Lighting values</a></h2>
+      <p class="messages"><code>Invalid lighting</code></p>
+      <p><strong>Cause.</strong> The light direction was zero, or an intensity, radiance or ambient value was negative.</p>
+      <p><strong>Fix.</strong> Use a nonzero light direction and non-negative intensities.</p>
+    </section>
+    <section id="views">
+      <h2><a href="#views">Views, rectangles and picking</a></h2>
+      <p class="messages"><code>Invalid views</code> <code>Invalid view: pass {camera, viewport}</code> <code>Invalid view target: use 1-sample colour</code> <code>Partial-view clear: draw extra attachments with clear: false</code> <code>Invalid draw rectangle</code> <code>Draw rectangle exceeds target</code> <code>Invalid pick</code></p>
+      <p><strong>Cause.</strong> <code>render({views})</code> needs a non-empty array of <code>{camera, viewport}</code>. A view target needs 1-sample colour and a depth of the same size. A pass drawing a partial rectangle with extra colour attachments cannot clear them. Draw rectangles are 4 integers inside the target. <code>pick</code> needs finite CSS pixel coordinates.</p>
+      <p><strong>Fix.</strong> Pass <code>{camera, viewport}</code> objects; use 1-sample target textures; draw extra attachments with <code>clear: false</code>; keep rectangles inside the target; pass finite numbers to <code>pick</code>.</p>
+    </section>
+    <section id="limits">
+      <h2><a href="#limits">Capacity and GPU limits</a></h2>
+      <p class="messages"><code>Capacity: 1..8388608</code> <code>Capacity</code> <code>Transform allocation</code> <code>GPU buffer limit</code> <code>Shader limit: 64</code></p>
+      <p><strong>Cause.</strong> The transform store capacity is outside 1..8,388,608, a grow did not raise it, the kernel could not allocate memory, a buffer is larger than the device allows, or more than 64 shader variants were requested.</p>
+      <p><strong>Fix.</strong> Lower <code>capacity</code>, split large geometry, and reuse materials and plugins so fewer shader variants are built.</p>
+    </section>
+    <section id="arguments">
+      <h2><a href="#arguments">Wrong argument types</a></h2>
+      <p class="messages"><code>Expected canvas</code> <code>Unknown backend</code> <code>Invalid camera</code> <code>Invalid geometry</code> <code>Invalid material</code> <code>Invalid plugin</code> <code>Invalid pass</code> <code>Invalid delta</code> <code>receiveShadow: boolean</code> <code>Visibility: boolean</code> <code>Box: 3 values</code> <code>fit: boolean</code> <code>Invalid stage options</code> <code>Expected element</code></p>
+      <p><strong>Cause.</strong> An argument had the wrong type: not a canvas or element, an unknown backend, a camera, geometry or material not from core, a plugin without a unique name and <code>setup</code>, a pass without a unique name, finite order and <code>execute</code>, a frame delta outside 0..1 seconds, or a non-boolean flag.</p>
+      <p><strong>Fix.</strong> Pass core objects (<code>Camera</code>, <code>Geometry</code>, <code>PbrMaterial</code>), a backend of "auto", "webgpu" or "webgl2", plugins and passes with unique names, and booleans for flags.</p>
+    </section>
+    <p><a href="/">Back to margoengine.com</a></p>
+  </main>
+</body>
+</html>

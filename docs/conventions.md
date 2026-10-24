@@ -67,9 +67,20 @@ the 1-based line and column) for faults in the expression text; its arguments fo
 `packages/shared` is copied into packages that may not depend on math, so it cannot import the class: it throws
 `margoError(code, message)` from `packages/shared/errors.js`, which builds the same shape (name `MargoError`, `code`).
 
-Core and the stage facade follow the same table: they throw `margoError(code, message)` from
-`packages/shared/errors.js`, bundled into their dist, so no core or stage throw is a bare `Error` and every message
-names its fix.
+### Short messages with a help link
+
+Core and the stage facade follow the same table, but keep messages short and link each to its entry on
+[margoengine.com/errors](https://margoengine.com/errors), where the cause and the fix are written out: they throw
+`fault(code, message, anchor?)`, `typeError(message, anchor)` and `rangeError(message, anchor)` from
+`packages/shared/errors.js` (bundled into their dist), which append `; see https://margoengine.com/errors#<anchor>`
+(the anchor defaults to the code). The page is generated from `scripts/errors/entries.js` (`node
+scripts/errors/page.mjs`); `tests/errors-page.test.js` checks that every link points at an entry, that every
+MargoError code has one, and that the page matches the file. The quality gate counts a linked message as naming its
+fix, and a link to a missing entry as naming none.
+
+Packages may follow the same pattern: a short message, the same helpers, and their entries on the same page (add them
+to `scripts/errors/entries.js`, one entry per message family). A package message without a link must name its fix
+itself, as the table above says.
 
 ## Core freeze
 

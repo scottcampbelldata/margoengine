@@ -5,7 +5,7 @@ import { wgsl } from './shaders.js';
 import type { FrameGraph, PassContext, DrawOptions } from './plugin.js';
 import { sceneSamples } from './quality.js';
 import { defaultClear, clearColorValue, clearDraw } from '../../shared/clear-color.js';
-import { margoError } from '../../shared/errors.js';
+import { fault, rangeError, typeError } from '../../shared/errors.js';
 // TypeScript's DOM library omits WebGPU flag namespaces and the canvas overload.
 declare const GPUBufferUsage: {
   COPY_DST: number;
@@ -34,21 +34,19 @@ export function rectangleClear(
   if (!clearColor && !clearDepth) return 'none';
   const partial = !!rect && (rect[0] !== 0 || rect[1] !== 0 || rect[2] !== width || rect[3] !== height);
   if (!partial) return 'attachment';
-  if (extraAttachments)
-    throw new TypeError('A partial-view clear cannot cover extra colour attachments; draw them with clear: false');
+  if (extraAttachments) throw typeError('Partial-view clear: draw extra attachments with clear: false', 'views');
   return 'draw';
 }
 
 /** @internal Checks a pixel rectangle [x, y, width, height] against a target of `width` x `height`. */
 export function validateRectangle(rectangle: readonly number[] | undefined, width: number, height: number): void {
   if (rectangle === undefined) return;
-  if (!Array.isArray(rectangle) || rectangle.length !== 4)
-    throw new RangeError('Invalid draw rectangle; pass 4 integers [x, y, width, height]');
+  if (!Array.isArray(rectangle) || rectangle.length !== 4) throw rangeError('Invalid draw rectangle', 'views');
   for (let i = 0; i < 4; i++)
     if (!Number.isSafeInteger(rectangle[i]) || rectangle[i] < (i < 2 ? 0 : 1))
-      throw new RangeError('Invalid draw rectangle; pass 4 integers [x, y, width, height]');
+      throw rangeError('Invalid draw rectangle', 'views');
   if (rectangle[0] + rectangle[2] > width || rectangle[1] + rectangle[3] > height)
-    throw new RangeError('Draw rectangle exceeds target; keep it inside the target');
+    throw rangeError('Draw rectangle exceeds target', 'views');
 }
 
 /** `start`/`end`: float range of `instances` changed since the WebGPU renderer last uploaded it (absent: upload all).
@@ -217,7 +215,7 @@ export class GPURenderer implements Renderer {
 
   static async create(canvas: HTMLCanvasElement, features: GPUFeatureName[] = []): Promise<GPURenderer> {
     const adapter = await navigator.gpu?.requestAdapter({ powerPreference: 'high-performance' });
-    if (!adapter) throw margoError('unsupported', 'WebGPU adapter unavailable; check the browser GPU settings');
+    if (!adapter) throw fault('unsupported', 'WebGPU adapter unavailable', 'webgpu');
     const device = await adapter.requestDevice({
       requiredLimits: { maxTextureArrayLayers: adapter.limits?.maxTextureArrayLayers },
       requiredFeatures: ['depth32float-stencil8' as GPUFeatureName, ...features].filter((feature) =>
@@ -266,7 +264,7 @@ export class GPURenderer implements Renderer {
           fragment: { ...descriptor.fragment!, constants: { C: 1 } },
         });
       const context = canvas.getContext('webgpu') as GPUCanvasContext | null;
-      if (!context) throw margoError('unsupported', 'No WebGPU canvas context; pass a canvas with no other context');
+      if (!context) throw fault('unsupported', 'No WebGPU canvas', 'webgpu');
       return new GPURenderer(canvas, device, context, format, pipeline, descriptor, culled);
     } catch (error) {
       device.destroy();
@@ -300,11 +298,10 @@ export class GPURenderer implements Renderer {
     }
     device.lost.then((info) => {
       this.deviceLost = true;
-      if (!this.disposed)
-        this.onLost?.(margoError('failed', `GPU lost: ${info.message}; the engine restores the device`));
+      if (!this.disposed) this.onLost?.(fault('failed', `GPU lost: ${info.message}`, 'gpu-lost'));
     });
     device.addEventListener('uncapturederror', (event) => {
-      this.lost = margoError('failed', event.error.message);
+      this.lost = fault('failed', event.error.message, 'gpu-lost');
     });
   }
 
@@ -312,8 +309,7 @@ export class GPURenderer implements Renderer {
     const buffers: GPUBuffer[] = [];
     try {
       const upload = (data: Float32Array | Uint32Array, usage: number) => {
-        if (data.byteLength > this.device.limits.maxBufferSize)
-          throw new RangeError('GPU buffer limit; split the geometry or lower capacity');
+        if (data.byteLength > this.device.limits.maxBufferSize) throw rangeError('GPU buffer limit', 'limits');
         const buffer = this.device.createBuffer({ size: data.byteLength, usage: usage | GPUBufferUsage.COPY_DST });
         buffers.push(buffer);
         this.device.queue.writeBuffer(buffer, 0, data as Float32Array<ArrayBuffer>);
@@ -321,8 +317,7 @@ export class GPURenderer implements Renderer {
       };
       const vertex = upload(geometry.vertices, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE),
         index = upload(geometry.indices, GPUBufferUsage.INDEX | GPUBufferUsage.STORAGE);
-      if (capacity * 96 > this.device.limits.maxBufferSize)
-        throw new RangeError('GPU buffer limit; split the geometry or lower capacity');
+      if (capacity * 96 > this.device.limits.maxBufferSize) throw rangeError('GPU buffer limit', 'limits');
       const instance = this.device.createBuffer({
         size: capacity * 96,
         usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
@@ -345,8 +340,7 @@ export class GPURenderer implements Renderer {
   }
   geometryBuffers(geometry: Geometry): GeometryBuffers {
     const resource = this.resources.get(geometry);
-    if (this.disposed || this.deviceLost || !resource)
-      throw margoError('state', 'Geometry unavailable; wait for the device to restore');
+    if (this.disposed || this.deviceLost || !resource) throw fault('state', 'Geometry unavailable', 'device-restore');
     return resource;
   }
   render(
@@ -391,9 +385,7 @@ export class GPURenderer implements Renderer {
       (target.color.sampleCount > 1 ||
         (caller && (caller.width !== width || caller.height !== height || (!direct && caller.sampleCount > 1))))
     )
-      throw new TypeError(
-        'Invalid view target: use 1-sample colour and a depth of its size (1 sample, or the scene samples and format)',
-      );
+      throw typeError('Invalid view target: use 1-sample colour', 'views');
     this.frame.set(camera.matrix);
     this.frame.set(camera.position, 16);
     this.frame.set(lighting.direction, 20);
@@ -443,7 +435,7 @@ export class GPURenderer implements Renderer {
           for (const variant of this.variants)
             if (variant[0] === context.shader && variant[1] === key) cached = variant[2];
           if (!cached) {
-            if (this.variants.length >= 64) throw new RangeError('Shader limit: 64; use fewer shader variants');
+            if (this.variants.length >= 64) throw rangeError('Shader limit: 64', 'limits');
             const module = this.device.createShaderModule({ code: context.shader });
             cached = this.device.createRenderPipeline({
               ...context.descriptor,

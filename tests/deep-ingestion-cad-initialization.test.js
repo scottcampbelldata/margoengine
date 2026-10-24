@@ -39,10 +39,9 @@ try {
 } finally {
   await fs.rm(directory, { recursive: true, force: true });
 }
-source = source.replace(
-  "'./camera.js'",
-  JSON.stringify(new URL('../packages/core/dist/camera.js', import.meta.url).href),
-);
+source = source
+  .replace("'./camera.js'", JSON.stringify(new URL('../packages/core/dist/camera.js', import.meta.url).href))
+  .replace("'../../shared/errors.js'", JSON.stringify(new URL('../packages/shared/errors.js', import.meta.url).href));
 const { CADCameraControls } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 function element(failAt = Infinity) {
   const listeners = new Map(),

@@ -3,3 +3,13 @@
 // The result has MargoError's name and `code`, so `error instanceof MargoError` (it matches by name) and
 // `error.code` behave exactly as for the class.
 export const margoError = (code, message) => Object.assign(new Error(message), { name: 'MargoError', code });
+
+// Core and the stage keep their messages short and link each one to its entry on the error help page
+// (site/errors.html, generated from scripts/errors/entries.js; tests/errors-page.test.js keeps them in step).
+const linked = (message, anchor) => `${message}; see https://margoengine.com/errors#${anchor}`;
+/** `margoError` whose message links to `anchor` (default the code) on the error help page. */
+export const fault = (code, message, anchor = code) => margoError(code, linked(message, anchor));
+/** TypeError whose message links to `anchor` on the error help page. */
+export const typeError = (message, anchor) => new TypeError(linked(message, anchor));
+/** RangeError whose message links to `anchor` on the error help page. */
+export const rangeError = (message, anchor) => new RangeError(linked(message, anchor));

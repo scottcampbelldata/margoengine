@@ -34,6 +34,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { createRequire } from 'node:module';
 import { dirname, join, relative, resolve } from 'node:path';
 import { parseSync } from 'rolldown/utils';
+import { entries as errorHelp } from './errors/entries.js';
 
 const root = resolve(import.meta.dirname, '..');
 const quick = process.argv.includes('--verify');
@@ -263,7 +264,8 @@ if (!quick) {
   // use, call, pass; scripts/quality/api.js ratchets both).
   const fix =
     /;|\b(must|needs?|expects?|expected|use|call|pass|set|give|create|run|requires?|only|at (most|least)|between|install|enable|add|load|remove|provide|choose|one of|instead|before|after|try|check|should|wait|await|reduce|increase|split|keep|make|within|up to|no more than)\b/i;
-  const throwSites = {};
+  const throwSites = {},
+    help = new Set(errorHelp.map((entry) => entry.id));
   for (const dir of packages.concat('shared')) {
     for (const file of srcFiles(dir)) {
       const text = read(file);
@@ -279,6 +281,13 @@ if (!quick) {
         const end = text.indexOf(quote, m.index + m[0].length + 1);
         if (!fix.test(text.slice(m.index + m[0].length + 1, end))) noFix++;
       }
+      // A short message linked to its help entry names its fix there: fault(code, message[, anchor]),
+      // typeError(message, anchor) and rangeError(message, anchor) from packages/shared/errors.js, with an anchor
+      // that site/errors.html has (scripts/errors/entries.js). A link to a missing entry counts as naming no fix.
+      for (const m of text.matchAll(
+        /\bthrow (?:fault\(\s*'(\w+)'|(?:typeError|rangeError)\()[^;]*?(?:,\s*'([\w-]+)')?,?\s*\)\s*;/g,
+      ))
+        if (!help.has(m[2] ?? m[1])) noFix++;
       if (bare || noFix) throwSites[file] = { bare, noFix };
     }
   }

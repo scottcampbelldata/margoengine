@@ -965,7 +965,7 @@ rtest('sensors also fire for kinematic bodies such as characters', () => {
   physics.dispose();
 });
 
-rtest('core transform synchronization reuses input buffers and bypasses allocating quaternion conversion', async () => {
+rtest('core transform synchronization passes the same preallocated buffers to core setters every frame', async () => {
   const store = await TransformStore.create(8),
     engine = new Engine(
       { width: 1, height: 1 },
@@ -979,16 +979,21 @@ rtest('core transform synchronization reuses input buffers and bypasses allocati
   const body = physics.addBody(mesh);
   body.raw.setAngvel({ x: 0.2, y: 0.4, z: 0.1 }, true);
   const setPosition = mesh.setPosition,
-    inputs = new Set();
+    setQuaternion = mesh.setQuaternion,
+    inputs = new Set(),
+    rotations = new Set();
   mesh.setPosition = function (value) {
     inputs.add(value);
     return setPosition.call(this, value);
   };
-  mesh.setQuaternion = () => {
-    throw new Error('Allocating core quaternion method used');
+  // Core's setQuaternion allocates nothing (tests/core-set-quaternion.test.js), so physics hands it its own buffer.
+  mesh.setQuaternion = function (value) {
+    rotations.add(value);
+    return setQuaternion.call(this, value);
   };
   for (let i = 0; i < 120; i++) physics.update(1 / 60);
   assert.equal(inputs.size, 1);
+  assert.equal(rotations.size, 1);
   assert.ok(mesh.position.y < 5);
   const id = mesh.id,
     q = body.pose.subarray(10, 14);
@@ -1172,7 +1177,9 @@ rtest(
       assert.equal(physics.bodyCount, 0);
       assert.equal(physics.world.bodies.len(), 0);
       root.dispose();
-      assert.throws(() => physics.addBody(root), { message: 'Mesh disposed; create a new mesh' });
+      assert.throws(() => physics.addBody(root), {
+        message: 'Mesh disposed; see https://margoengine.com/errors#disposed',
+      });
       assert.equal(physics.bodyCount, 0);
     } finally {
       clearMeshSource(child);

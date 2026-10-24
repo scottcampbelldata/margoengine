@@ -1151,7 +1151,8 @@ test('consumers tree-shake to what they import', async (t) => {
   };
   const all = await bundle(`export * from ${JSON.stringify(entry)};`);
   const box = await bundle(`export {boxGeometry, toGeometry} from ${JSON.stringify(entry)};`);
-  assert.ok(gzipSync(box).length < 1500, `box-only gzip ${gzipSync(box).length}`);
+  // Includes core's Geometry, whose messages link to margoengine.com/errors (1,517 B on 2026-10-24).
+  assert.ok(gzipSync(box).length < 1550, `box-only gzip ${gzipSync(box).length}`);
   assert.ok(gzipSync(box).length * 8 < gzipSync(all).length, 'box alone is a small fraction of the package');
   assert.doesNotMatch(box, /Catmull|steiner/, 'curves and the triangulator are dropped');
 });

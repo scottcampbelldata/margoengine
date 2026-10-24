@@ -1,5 +1,5 @@
 import { wasmBase64 } from './wasm.js';
-import { margoError } from '../../shared/errors.js';
+import { fault, rangeError } from '../../shared/errors.js';
 
 interface Exports extends WebAssembly.Exports {
   memory: WebAssembly.Memory;
@@ -18,7 +18,7 @@ const rotationSlots = new WeakMap<TransformStore, RotationSlot>();
 /** Writes `qx, qy, qz, qw` from slot `id`'s Euler XYZ lanes through `Kernel::sync_rotation`. */
 export function syncStoredRotation(store: TransformStore, id: number): void {
   const slot = rotationSlots.get(store);
-  if (!slot?.handle) throw margoError('disposed', 'Transforms disposed; create a new engine');
+  if (!slot?.handle) throw fault('disposed', 'Transforms disposed');
   slot.api.kernel_sync_rotation(slot.handle, id);
 }
 let compiled: Promise<WebAssembly.Module> | undefined;
@@ -89,10 +89,10 @@ export class TransformStore {
 
   private bind(capacity: number): void {
     if (!Number.isSafeInteger(capacity) || capacity < 1 || capacity > 1 << 23)
-      throw new RangeError('Capacity: use 1..8388608');
+      throw rangeError('Capacity: 1..8388608', 'limits');
     const api = this.api,
       handle = api.kernel_new(capacity);
-    if (!handle) throw margoError('failed', 'Transform allocation failed; lower capacity');
+    if (!handle) throw fault('failed', 'Transform allocation', 'limits');
     const offset = api.kernel_data(handle),
       flags = api.kernel_flags(handle),
       buffer = api.memory.buffer;
@@ -135,7 +135,7 @@ export class TransformStore {
    * tick does. Throws and keeps the old capacity when the capacity is invalid or memory cannot grow.
    */
   grow(capacity: number): void {
-    if (!(capacity > this.capacity)) throw new RangeError('Capacity: pass more than the current capacity');
+    if (!(capacity > this.capacity)) throw rangeError('Capacity', 'limits');
     // Every typed-array view, in the same (assignment) order before and after bind.
     const views = () =>
       Object.values({ ...this.transforms, ...this }).filter(ArrayBuffer.isView) as (Float32Array | Uint8Array)[];
@@ -153,14 +153,12 @@ export class TransformStore {
   }
 
   tick(culling = true): void {
-    if (!this.handle) throw margoError('disposed', 'Transforms disposed; create a new engine');
+    if (!this.handle) throw fault('disposed', 'Transforms disposed');
     const error = this.api.kernel_tick(this.handle, +culling);
     if (error)
-      throw new RangeError(
-        error > this.capacity
-          ? 'Invalid frustum; check the camera values'
-          : `Invalid transform/bounds: ${error - 1}; use finite values`,
-      );
+      throw error > this.capacity
+        ? rangeError('Invalid frustum', 'camera')
+        : rangeError(`Invalid transform/bounds: ${error - 1}`, 'transform');
   }
 
   dispose(): void {
