@@ -525,7 +525,7 @@ fn margoIridescence(f0:vec3f,c1:f32,thickness:f32,film:f32)->vec3f {
   let root=sqrt(min(f0+0.0001,vec3f(0.9999))); let base=(1+root)/(1-root);
   let q=(base-film)/(base+film); let r23=q*q+(1-q*q)*pow(1-c2,5.0);
   let r123=clamp(r12*r23,vec3f(0.00001),vec3f(0.9999)); let inner=t*t*r23/(1-r123);
-  let opd=2*film*thickness*c2; let phase=select(vec3f(3.14159265),vec3f(0),film<1)+select(vec3f(0),vec3f(3.14159265),base<film);
+  let opd=2*film*thickness*c2; let phase=select(vec3f(3.14159265),vec3f(0),film<1)+select(vec3f(0),vec3f(3.14159265),base<vec3f(film));
   let order=2*(inner-t);
   return max(r12+inner+order*sqrt(r123)*margoFilmSpectrum(opd,phase)+order*r123*margoFilmSpectrum(2*opd,2*phase),vec3f(0));
 }

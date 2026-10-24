@@ -51,7 +51,7 @@ fn materialIridescenceFresnel(cosTheta:f32,outsideIor:f32,filmIor:f32,thicknessN
   let filmOpd=2.0*filmEta*thicknessNm*filmC2;
   if(filmOpd>50000.0){return mix(filmPlain,clamp(filmSum,vec3f(0.0),vec3f(1.0)),filmFade);}
   // Reflection phase: pi going from a lower to a higher IOR at each interface (spec "Phase Shift").
-  let filmPhase=select(vec3f(3.14159265),vec3f(0.0),filmEta<filmOutside)+select(vec3f(0.0),vec3f(3.14159265),filmBase<filmEta);
+  let filmPhase=select(vec3f(3.14159265),vec3f(0.0),filmEta<filmOutside)+select(vec3f(0.0),vec3f(3.14159265),filmBase<vec3f(filmEta));
   let filmOrder=2.0*(filmInner-filmT121);
   filmSum+=filmOrder*sqrt(filmR123)*materialIridescenceSpectrum(filmOpd,filmPhase);
   filmSum+=filmOrder*filmR123*materialIridescenceSpectrum(2.0*filmOpd,2.0*filmPhase);
