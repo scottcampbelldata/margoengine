@@ -33,6 +33,15 @@
     }
   },
   "assist": { "enabled": false },
+  "overrides": [
+    {
+      "includes": [
+        "packages/exporters/scripts/generate-unity-support.js",
+        "packages/exporters/src/unity-support.generated.ts"
+      ],
+      "formatter": { "lineEnding": "lf" }
+    }
+  ],
   "linter": {
     "enabled": true,
     "rules": {

@@ -38,6 +38,14 @@
     "./skin": {
       "types": "./dist/skin.d.ts",
       "import": "./dist/skin.js"
+    },
+    "./godot": {
+      "types": "./dist/godot.d.ts",
+      "import": "./dist/godot.js"
+    },
+    "./unity": {
+      "types": "./dist/unity.d.ts",
+      "import": "./dist/unity.js"
     }
   },
   "files": [

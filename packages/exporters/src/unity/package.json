@@ -1,0 +1,10 @@
+{
+  "name": "com.margo.mesh",
+  "version": "0.3.0",
+  "displayName": "Margo Mesh Unity Companion",
+  "description": "Strict, sidecar-scoped exact atlas and native glTFast target imports for public Margo Unity bundles.",
+  "unity": "6000.0",
+  "dependencies": {
+    "com.unity.cloud.gltfast": "6.20.0"
+  }
+}

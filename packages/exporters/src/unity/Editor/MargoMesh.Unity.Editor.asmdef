@@ -1,0 +1,7 @@
+{
+  "name": "MargoMesh.Unity.Editor",
+  "rootNamespace": "MargoMesh.Unity.Editor",
+  "references": ["MargoMesh.Unity", "glTFast", "Unity.Collections"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": true
+}

@@ -9,6 +9,7 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
 await rm(resolve(root, 'dist'), { recursive: true, force: true });
 await copyFile(resolve(repository, 'LICENSE'), resolve(root, 'LICENSE'));
+execFileSync(process.execPath, [resolve(root, 'scripts/generate-unity-support.js')], { stdio: 'inherit' });
 execFileSync(
   process.execPath,
   [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', resolve(root, 'tsconfig.json')],

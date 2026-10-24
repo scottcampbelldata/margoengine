@@ -293,6 +293,61 @@ const withColliders = appendGLBMeshes(glb, [
 ]);
 ```
 
+## Godot import bundle (`@margoengine/exporters/godot`)
+
+`createGodotImportBundle(glb, options)` returns owned files around an already encoded Margo GLB. It does not rewrite
+the GLB, run Godot or change the project settings. Copy the returned folder into the root of an existing project
+without renaming it; the seed `.glb.import` refers to the generated script at that fixed `res://` location. Godot
+creates its own UID and cache paths. The caller can package the entries with the existing public ZIP encoder:
+
+```ts
+import {createGodotImportBundle} from '@margoengine/exporters/godot';
+import {encodeZIP} from '@margoengine/exporters/capture';
+
+const bundle = await createGodotImportBundle(glb, {
+  folder: 'margo_exports/waystone',
+  convexHelperIds: ['exported-helper-id'], // default []
+  // fps: 24, // required when exported clips have mixed or missing extras.fps
+});
+const zip = await encodeZIP(bundle.entries);
+```
+
+The optional module emits `model.glb`, its partial import seed, `margo-import.gd`, a README and a manifest with the
+exact payload SHA-256 hashes (using WebCrypto). An input Buffer is cloned before asynchronous work. It generates no
+project file, cache, host path or import UID. `folder` accepts safe relative ASCII folder segments; use a
+different directory for another asset. Replacing existing content and copying during an active editor import need
+caller coordination.
+
+The configured Godot 4.7.2 mechanism embeds PNGs uncompressed, without mipmaps, disables mesh compression/LODs/shadow
+meshes and retains immutable animation tracks. Existing nearest texture samplers are preserved. The explicit helper
+inventory must match every hidden, static `-convcol` mesh node by its unique exported `extras.id`; ordinary art, skins,
+morphs, instances and animated helper ancestry are rejected as helper inputs. The script validates all imported
+identities/shapes and requires identity shape-to-mesh alignment before replacing any shape with native
+`ArrayMesh.create_convex_shape(false, false)`, preserving its margin. Failure frees the rejected scene. There is no
+custom hull construction, geometry rewrite or automatic collision authoring.
+
+Only STEP animation is accepted. A uniform positive clip `extras.fps` supplies the native clock; mixed or missing
+metadata requires an explicit `fps`. Every actual Float32 key time must lie on a unique point of that grid or
+the bundle rejects, so an explicit clock cannot silently discard a transition. The original clip names, loop
+metadata, Godot loop-token names and bytes remain unchanged. For example, 12/24 FPS keys can fit a 24 FPS import
+clock, while 12/30 can fit 60; this CPU preflight is not native certification of mixed clocks.
+
+Animated bundles explicitly disable optimizer and compression on the generated `PATH:AnimationPlayer` node. Godot's
+default optimizer can merge distinct tiny STEP keys, so immutable-track retention alone does not preserve every
+authored hold. A source node named `AnimationPlayer` rejects this route because its collision can change the native
+generated player path; rename it or use general GLB. The importer path is pinned to Godot 4.7.2 and needs native
+acceptance in another version. There is no guessed global or per-clip optimizer setting.
+
+The delivery preflight requires one embedded BIN buffer and bounds every declared buffer view and ordinary accessor
+against it, including geometry, image, skin and animation references. Additional/external buffers, external images,
+sparse accessors and unsupported matrix encodings reject without mutating caller bytes or emitting partial files.
+
+This is a target import profile, separate from raw Godot defaults and generic/Roblox exports. Exact native RGBA,
+normals, UVs, animation holds/loops, collision surfaces and physics require acceptance for the asset and destination
+version. Fresh Godot 4.7.2 tests established the seed, embedded-image and static-helper mechanisms; relocation,
+open-editor copy ordering and other versions remain separately tested behavior. CPU coverage is
+`node --test packages/exporters/tests/godot.test.js packages/exporters/tests/subpaths.test.js`.
+
 ## Skin authoring (`@margoengine/exporters/skin`)
 
 An optional subpath (nothing else imports it) that skins a mesh to an authored rest skeleton:
@@ -482,3 +537,50 @@ zlib, and checks capture sizing, tiling and restoring against a mocked canvas.
 `node scripts/gpu-lock.mjs run --owner=<id> -- node packages/exporters/tests/capture-browser.mjs` checks a real
 WebGPU engine: a 333x111 capture from a 200x150 canvas, 4200x100 tiles against a direct render, transparency, GIFs
 decoded by `ImageDecoder`, JPEG and WebM duration.
+
+## Unity asset and support bundles (`@margoengine/exporters/unity`)
+
+The optional Unity delivery module returns files around an unchanged encoded Margo Mesh GLB. Install-once native
+support and per-asset exports are separate artifacts. The file APIs never install packages, launch an editor,
+access a destination project, resize pixels or rewrite geometry, skin data or animation keys.
+
+```ts
+import {createUnityImportBundle, createUnityImportSupportPackage} from '@margoengine/exporters/unity';
+import {encodeZIP} from '@margoengine/exporters/capture';
+
+const support = await createUnityImportSupportPackage();
+const asset = await createUnityImportBundle(glb, {
+  folder: 'Assets/Margo/Ranger',
+  colliders: true, // default
+});
+const supportZIP = await encodeZIP(support.entries);
+const assetZIP = await encodeZIP(asset.entries);
+```
+
+The initial `margo-unity-exact-v1` profile targets Unity 6000.6.7f1, official glTFast 6.20.0 and the exact separately
+installed `com.margo.mesh` 0.3.0 support descriptor. Asset files contain `model.glb`, its exact embedded `atlas.png`,
+the explicit profile, a hash manifest and instructions. No asset archive contains shared package files or invented
+asset GUIDs. Manual extraction can overwrite files; these pure generators cannot inspect or protect a destination.
+
+This focused source profile requires one ordinary RGBA8 power-of-two atlas with explicit nearest/clamp sampling,
+one base-color material, complete node identities, authored TRS, ordinary Float32 attributes/weights and explicit
+STEP clip FPS/loop metadata. It rejects matrix decomposition, unbound instancing, ambiguous clip names, malformed
+skin data and unsupported required collision. It preserves input bytes rather than reducing an unsupported source.
+General GLB and other target exports retain their separate capabilities and quality.
+
+The native support uses an isolated public glTFast invocation with explicit source context, public native resource
+clones and a mip-free sRGB RGBA32 atlas. It leaves the ordinary raw GLB import untouched. Read the package's
+readiness and partial-generation recovery contract before using a generated prefab. A stored report is a snapshot;
+the native readiness API must revalidate its current source, support and generated outputs.
+
+Native support 0.3.0 uses an explicit source-clock controller policy and owner schema 2. Ordered clip names,
+mesh-file/source-ID mappings and the complete intended resource inventory must remain compatible before an
+update writes generated resources. Unsupported controller edits, disabled Animators, deactivated saved prefab
+roots and identity changes reject with recovery guidance; existing resources are not silently retargeted or deleted.
+Older owner schemas require a fresh target. Supported renderer-disable and Rigidbody overrides retain their
+separate preservation policy. Read the support package README for the exact contract.
+
+Version 0.3.0 is under review on the selected development branch. Its source/CPU checks and earlier 0.2.0
+texture, source-rest and cancellation evidence do not certify this new native route. Source pixels, complete
+geometry/rig poses, reimport/restart, native playback and failure recovery need new bound acceptance before
+app installation. No generic GLB, Godot or Roblox quality setting is reduced by this optional support.

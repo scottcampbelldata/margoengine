@@ -8,5 +8,8 @@ examples/assets/khronos/**/*.glb filter=lfs diff=lfs merge=lfs -text
 examples/assets/khronos/**/*.gif filter=lfs diff=lfs merge=lfs -text
 examples/assets/kaykit/**/*.glb filter=lfs diff=lfs merge=lfs -text
 examples/assets/kaykit/**/*.gltf filter=lfs diff=lfs merge=lfs -text
+packages/exporters/src/unity/** text eol=lf
+packages/exporters/src/unity-support.generated.ts text eol=lf
+packages/exporters/scripts/generate-unity-support.js text eol=lf
 examples/assets/kaykit/**/*.bin filter=lfs diff=lfs merge=lfs -text
 examples/assets/kaykit/**/*.png filter=lfs diff=lfs merge=lfs -text
