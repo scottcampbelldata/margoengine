@@ -1472,8 +1472,12 @@ fn margoAmbientLayers(i:Out,s:Surface,v:vec3f)->vec3f {var o=margoFront(s); let 
 const outputs: Record<Exclude<Shading, 'standard' | 'depth' | 'distance' | 'lambert' | 'phong' | 'toon'>, string> = {
   basic: 'return vec4f(mat_out(s.base.rgb+s.emissive),alpha);',
   normal: 'return vec4f(normalize((f.view*vec4f(s.n,0)).xyz)*0.5+0.5,alpha);',
+  // Lit-sphere lookup (Sloan et al. 2001) by the view-space normal, in a frame facing the eye from the shaded point (so
+  // the image does not slide toward the screen edges) with a level right axis: right = +Y x eye, up = eye x right.
+  // Eye along +/-Y has no level frame and falls back to the view axes. uv = 0.5 + 0.49 d keeps the disc's rim one
+  // percent inside the image, clear of the texture border.
   matcap:
-    'let e=normalize(-(f.view*vec4f(i.position,1)).xyz);let n=normalize((f.view*vec4f(s.n,0)).xyz);let x=normalize(vec3f(e.z,0,-e.x));let m=textureSample(mat_matcap,mat_matcapS,vec2f(dot(x,n),dot(cross(e,x),n))*0.495+0.5).rgb;return vec4f(mat_out(s.base.rgb*m),alpha);',
+    'let mat_n=normalize((f.view*vec4f(s.n,0)).xyz);let mat_e=normalize(-(f.view*vec4f(i.position,1)).xyz);let mat_x=vec3f(mat_e.z,0.0,-mat_e.x);let mat_level=dot(mat_x,mat_x)>0.0000000001;let mat_r=select(vec3f(1,0,0),mat_x*inverseSqrt(max(dot(mat_x,mat_x),0.0000000001)),mat_level);let mat_u=select(vec3f(0,1,0),cross(mat_e,mat_r),mat_level);return vec4f(mat_out(s.base.rgb*textureSample(mat_matcap,mat_matcapS,vec2f(0.5)+0.49*vec2f(dot(mat_n,mat_r),dot(mat_n,mat_u))).rgb),alpha);',
 };
 const encode =
   'fn mat_out(c:vec3f)->vec3f {if(f.settings.w>0.5){return c;}let x=clamp(c,vec3f(0),vec3f(1));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>=vec3f(0.0031308));}';

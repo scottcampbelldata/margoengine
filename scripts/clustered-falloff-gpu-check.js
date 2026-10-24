@@ -1,6 +1,6 @@
 // Real-WebGPU check of clustered light decay and the angle/penumbra cone. Clustered.setLights packs the lights, the
 // decay-aware light terms of clusteredSampling (packages/clustered/src/shader.ts) compute falloff and cone per sample
-// in a compute shader, and both must match the definition shared with @margoengine/bvh's vertex-light bake: window / max(d^decay, 0.01), window =
+// in a compute shader, and both must match the definition shared with @margoengine/bvh's vertex-light bake: window / max(d^decay, 2^-12), window =
 // range > 0 ? clamp(1 - (d/range)^4, 0, 1)^2 : 1, cone = smoothstep(cos(angle), cos(angle * (1 - penumbra)), dot(-L,
 // direction)) with penumbra 0 a hard edge, up to a pi/2 hemisphere. Lights without decay or angle must keep the original
 // inverse-square term. The same holds for the light terms @margoengine/environment's VolumetricFog compiles for these
@@ -45,7 +45,7 @@ function expected(light, position) {
     d = Math.hypot(...delta),
     window = light.range > 0 ? Math.min(Math.max(1 - (d / light.range) ** 4, 0), 1) ** 2 : 1,
     fresh = light.decay !== undefined || light.angle !== undefined,
-    falloff = window / Math.max(fresh ? d ** (light.decay ?? 2) : d * d, 0.01);
+    falloff = window / Math.max(fresh ? Math.max(d, 1e-6) ** (light.decay ?? 2) : d * d, 2 ** -12);
   if (!light.direction) return [falloff, 1];
   const length = Math.hypot(...light.direction),
     x = -delta.reduce((sum, v, i) => sum + (v / d) * (light.direction[i] / length), 0),

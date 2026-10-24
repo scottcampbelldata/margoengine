@@ -127,7 +127,7 @@ const pixelArt = limitPalette(colors, ['#1a1c2c', '#5d275d', '#b13e53', '#ef7d57
 
 Per vertex: `(sum of lights) * (1 - strength * occludedRays / rays) * multiplier`, times the existing colour with
 `'standard'`. Falloff is shared with Margo's GPU lights: directional `color * intensity * max(N.L, 0)`; point and spot
-times `window / max(d^decay, 0.01)` with `window = distance > 0 ? clamp(1 - (d / distance)^4, 0, 1)^2 : 1`; spot also
+times `window / max(d^decay, 2^-12)` with `window = distance > 0 ? clamp(1 - (d / distance)^4, 0, 1)^2 : 1`; spot also
 times `smoothstep(cos(angle), cos(angle * (1 - penumbra)), dot(-L, direction))`, a hard edge at penumbra 0. Results
 are not clamped. Palette modes follow Crocotile's: `'nearest'` closest RGB in sRGB-encoded values, `'luminance'`
 closest linear Rec. 709 luminance (hue ignored), `'balanced'` nearest after stretching the colours so their darkest and

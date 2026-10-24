@@ -1,8 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-// Refraction for KHR_materials_transmission + KHR_materials_volume (gltf-pro models and @margoengine/materials meshes)
-// through gltf-pro's transmission hook: the opaque scene is copied into a mip chain once per frame, then each transmissive
-// surface reads it along its refracted ray (Khronos glTF PBR, Appendix B "specular_btdf"; the screen-space approximation
-// of the Khronos glTF sample renderer).
+// Scene-copy transmission for gltf-pro's transmission hook: after the opaque draws the resolved scene is copied into a
+// box-filtered mip chain, and transmissive surfaces read it where their refracted ray leaves the volume
+// (KHR_materials_transmission, KHR_materials_volume, KHR_materials_dispersion), blurred by roughness.
 import { margoError } from '../../shared/errors.js';
 import type { EngineKernel } from '@margoengine/core';
 import {
@@ -26,46 +25,65 @@ export interface TransmissionPassOptions {
 }
 // Group-2 bindings, clear of shadows (1-3), clustered (10-16), IBL/fog (20-25), materials (32-43) and OIT (120).
 const BINDING = 124;
-// Light through the surface (base layer, before clearcoat and sheen): the scene behind along the refracted ray, blurred by
-// roughness, attenuated by the volume (Beer-Lambert) and weighted by the dielectric's transmitted share (1 - Fresnel).
-// - Exit point: position + refract(-v, n, 1/ior) normalized x thickness (mesh units, scaled to world); thickness 0 is thin-walled.
-// - Blur: mip level log2(width) x roughness x clamp(2 ior - 2, 0, 1): no blur when the IOR does not bend light.
-// - Volume: transmittance per world unit margoVolume.yzw = attenuationColor^(1/attenuationDistance), raised to the path length.
-const declarations = (group: number) => /* wgsl */ `
+// Hook WGSL: margoTransmission is the light arriving through the surface (linear HDR), added under clearcoat and sheen.
+// The blur level is a footprint estimate: a lobe about roughness^2 wide, scaled by how strongly the IOR bends light
+// (none at IOR 1, full from IOR 1.5), spans that share of the screen; the level is log2 of its size in texels.
+const declarations = (group: number): string => /* wgsl */ `
 @group(${group}) @binding(${BINDING}) var margoScene:texture_2d<f32>;
 @group(${group}) @binding(${BINDING + 1}) var margoSceneSampler:sampler;
+fn margoTransmissionBehind(i:Out,n:vec3f,v:vec3f,ior:f32,path:f32,level:f32)->vec3f {
+  let r=refract(-v,faceForward(n,-v,n),1.0/ior);
+  let c=f.camera*vec4f(i.position+r*path,1.0);
+  let uv=clamp(c.xy/max(c.w,0.000001)*vec2f(0.5,-0.5)+0.5,vec2f(0),vec2f(1));
+  return textureSampleLevel(margoScene,margoSceneSampler,uv,level).rgb;
+}
 fn margoTransmission(s:Surface,v:vec3f,i:Out)->vec3f {
-  let ior=max(f.ext.y,1.0); let r=refract(-v,s.n,1/ior);
-  let path=margoVolume.x*s.th*(length(f.model[0].xyz)+length(f.model[1].xyz)+length(f.model[2].xyz))/3;
-  var behind:vec3f;
-  if(f.ext.w>0&&path>0){
-    // KHR_materials_dispersion stores 20/Abbe: red has the smallest IOR, blue the largest.
-    let halfSpread=(ior-1)*0.025*f.ext.w;
-    let iors=max(vec3f(ior-halfSpread,ior,ior+halfSpread),vec3f(1));
-    for(var channel=0u;channel<3u;channel++){
-      let ray=refract(-v,s.n,1/iors[channel]);
-      let clip=f.camera*vec4f(i.position+ray*(path/max(length(ray),1e-4)),1);
-      let uv=clip.xy/clip.w*vec2f(0.5,-0.5)+0.5;
-      let lod=log2(f32(textureDimensions(margoScene).x))*s.roughness*clamp(iors[channel]*2-2,0.0,1.0);
-      behind[channel]=textureSampleLevel(margoScene,margoSceneSampler,uv,lod)[channel];
-    }
-  }else{
-    let clip=f.camera*vec4f(i.position+r*(path/max(length(r),1e-4)),1); let uv=clip.xy/clip.w*vec2f(0.5,-0.5)+0.5;
-    let lod=log2(f32(textureDimensions(margoScene).x))*s.roughness*clamp(ior*2-2,0.0,1.0);
-    behind=textureSampleLevel(margoScene,margoSceneSampler,uv,lod).rgb;
+  let ior=max(f.ext.y,1.0);
+  // Node transforms scale the thickness (KHR_materials_volume): the mean of the model axis lengths.
+  let scale=(length(f.model[0].xyz)+length(f.model[1].xyz)+length(f.model[2].xyz))/3.0;
+  let path=max(margoVolume.x*s.th*scale,0.0);
+  let size=vec2f(textureDimensions(margoScene,0));
+  let bend=clamp(2.0*(ior-1.0),0.0,1.0);
+  let footprint=max(size.x,size.y)*s.roughness*s.roughness*bend;
+  let level=clamp(log2(max(footprint,1.0)),0.0,f32(textureNumLevels(margoScene))-1.0);
+  var behind=margoTransmissionBehind(i,s.n,v,ior,path,level);
+  if(f.ext.w>0.0&&path>0.0){
+    // KHR_materials_dispersion: IOR spread (IOR-1)*0.025*dispersion; red and blue each read on their own ray.
+    let spread=(ior-1.0)*0.025*f.ext.w;
+    behind=vec3f(margoTransmissionBehind(i,s.n,v,max(1.0,ior-spread),path,level).r,behind.g,margoTransmissionBehind(i,s.n,v,ior+spread,path,level).b);
   }
-  let volume=select(pow(margoVolume.yzw,vec3f(path)),vec3f(1),path<=0);
-  let f0=mix(s.f0,s.base.rgb,s.metal); let fresnel=f0+(1-f0)*pow(1-clamp(dot(s.n,v),0.0,1.0),5.0);
-  return (1-s.metal)*s.tr*(1-fresnel)*s.base.rgb*volume*behind;
+  // Beer-Lambert through the volume: margoVolume.yzw is the transmittance per world unit.
+  var transmittance=vec3f(1.0);
+  if(path>0.0){
+    let t=margoVolume.yzw;
+    transmittance=select(select(pow(max(t,vec3f(0.000001)),vec3f(path)),vec3f(0.0),t<=vec3f(0.0)),vec3f(1.0),t>=vec3f(1.0));
+  }
+  let f0=mix(s.f0,s.base.rgb,s.metal);
+  let q=1.0-clamp(dot(s.n,v),0.0,1.0); let q2=q*q;
+  let fresnel=f0+(1.0-f0)*q2*q2*q;
+  return (1.0-s.metal)*s.tr*(1.0-fresnel)*s.base.rgb*transmittance*behind;
 }
 `;
-// Level 0 copies the resolved scene texel for texel; each further level averages 2x2 texels of the one above (bilinear at its centre).
+// Mip chain of the scene copy: level0 copies the resolved scene texel for texel; reduce writes each next level as
+// the mean of the 2x2 texels above it (an odd last row or column repeats its edge texel).
 const copy = /* wgsl */ `
-@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {return vec4f(f32(i&1u)*4-1,f32(i>>1u)*4-1,0,1);}
 @group(0) @binding(0) var source:texture_2d<f32>;
-@group(0) @binding(1) var bilinear:sampler;
-@fragment fn level0(@builtin(position) p:vec4f)->@location(0) vec4f {return textureLoad(source,vec2i(p.xy),0);}
-@fragment fn reduce(@builtin(position) p:vec4f)->@location(0) vec4f {return textureSampleLevel(source,bilinear,p.xy/vec2f(max(textureDimensions(source)/2u,vec2u(1))),0);}
+@group(0) @binding(1) var sourceSampler:sampler;
+@vertex fn vertex(@builtin(vertex_index) k:u32)->@builtin(position) vec4f {
+  let corner=vec2f(f32((k<<1u)&2u),f32(k&2u));
+  return vec4f(corner*2.0-1.0,0.0,1.0);
+}
+@fragment fn level0(@builtin(position) p:vec4f)->@location(0) vec4f {
+  return textureLoad(source,vec2i(p.xy),0);
+}
+@fragment fn reduce(@builtin(position) p:vec4f)->@location(0) vec4f {
+  _=sourceSampler;
+  let last=vec2i(textureDimensions(source,0))-vec2i(1);
+  let o=vec2i(p.xy)*2;
+  let sum=textureLoad(source,min(o,last),0)+textureLoad(source,min(o+vec2i(1,0),last),0)+
+    textureLoad(source,min(o+vec2i(0,1),last),0)+textureLoad(source,min(o+vec2i(1,1),last),0);
+  return sum*0.25;
+}
 `;
 const over: GPUBlendState = alphaBlend;
 let serial = 0;

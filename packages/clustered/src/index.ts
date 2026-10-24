@@ -34,7 +34,8 @@ export interface PointLight {
   /** Radiance multiplier, 0 or more. Default 1. */
   intensity?: number;
   /**
-   * Distance falloff exponent, 0 or more: attenuation is `window / max(d^decay, 0.01)` (2 is inverse-square, 0 none).
+   * Distance falloff exponent, 0 or more: attenuation is `window / max(d^decay, 2^-12)` (2 is inverse-square, 0 none;
+   * the floor caps the peak beside the light at 4096 times the window).
    * A light that sets neither `decay` nor `angle` keeps the original inverse-square shader term, `d * d`, bit for bit.
    */
   decay?: number;

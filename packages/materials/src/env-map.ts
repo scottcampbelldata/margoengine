@@ -124,7 +124,8 @@ export function envMapShader(code: string, group: number, shading: 'standard' | 
       out = edit(
         out,
         /fn margoSheenAmbient\(s:Surface,v:vec3f\)->vec3f \{return [^;]*;\}/,
-        'fn margoSheenAmbient(s:Surface,v:vec3f)->vec3f {return 0.157*margoEnvIrradiance(s.cn)*s.occlusion;}',
+        // Sheen albedo (declared by the physical shader) times the map's irradiance at the base normal.
+        'fn margoSheenAmbient(s:Surface,v:vec3f)->vec3f {return margoSheenAlbedo(clamp(dot(s.n,v),0.0001,1.0),s.sh.w)*margoEnvIrradiance(s.n)*s.occlusion;}',
       );
   } else if (shading === 'basic')
     out = edit(

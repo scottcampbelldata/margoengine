@@ -64,10 +64,11 @@ function expected(point, options, variant = {}, z) {
     value: clamp(options.shading === 'depth' ? (packing === 'basic' ? 1 - forwardDepth : forwardDepth) : distance),
   };
 }
-// Independent inverse of the base-256 RGBA encoding. Endpoints map to all-zero/all-one channels.
+// Decodes the documented RGBA8 format: v = R/2^8 + G/2^16 + B/2^24 + (A/255)/2^24; all-255 is exactly 1.
 function unpack(rgba) {
-  const weights = [255 / 256, 255 / 65536, 255 / 16777216, 1 / 16777216];
-  return rgba.reduce((sum, byte, index) => sum + (byte / 255) * weights[index], 0);
+  const [r, g, b, a] = rgba;
+  if (r === 255 && g === 255 && b === 255 && a === 255) return 1;
+  return r / 256 + g / 65536 + (b + a / 255) / 16777216;
 }
 function check(name, actual, expected) {
   report.checks.push({ name, samples, actual, expected });

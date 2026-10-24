@@ -3,15 +3,17 @@ export function depthDistanceShader(source: string, group: number, shading: 'dep
   const declarations = /* wgsl */ `
 struct MargoDepthDistance {reference:vec4f,range:vec4f}
 @group(${group}) @binding(196) var<uniform> margoDepthDistance:MargoDepthDistance;
-// Base-256 packing, R most significant. The endpoint branches preserve exact zero and one.
+// RGBA8 fixed point (README "RGBA packing"): q = floor(v*2^24) is split into bytes R (bits 23-16), G (15-8) and
+// B (7-0); A holds the leftover fraction v*2^24 - q, rounded by the unorm write. Every step is exact in f32: scaling by
+// a power of two, and floor and division by 256 or 65536 of integers below 2^24. v <= 0 and v >= 1 write all-0 / all-255.
 fn margoPackDepth(value:f32)->vec4f {
-  if(value<=0){return vec4f(0);}
-  if(value>=1){return vec4f(1);}
-  let scaled=value*16777216.0;
-  let whole=floor(scaled);
-  let b=whole/256.0;
-  let g=floor(b)/256.0;
-  return vec4f(floor(g)/255.0,fract(g)*(256.0/255.0),fract(b)*(256.0/255.0),fract(scaled));
+  let scaled=clamp(value,0.0,1.0)*16777216.0;
+  let q=floor(scaled);
+  let high=floor(q/65536.0);
+  let upper=floor(q/256.0);
+  let bytes=vec3f(high,upper-high*256.0,q-upper*256.0);
+  let packed=vec4f(bytes/255.0,scaled-q);
+  return select(select(packed,vec4f(1.0),value>=1.0),vec4f(0.0),value<=0.0);
 }
 `;
   const value =

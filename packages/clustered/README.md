@@ -26,7 +26,7 @@ lights.setLights([
 ]);
 ```
 
-- Attenuation is `window / max(d^decay, 0.01)` with `window = range > 0 ? clamp(1 - (d/range)^4, 0, 1)^2 : 1`.
+- Attenuation is `window / max(d^decay, 2^-12)` with `window = range > 0 ? clamp(1 - (d/range)^4, 0, 1)^2 : 1`.
   `decay` defaults to 2 (inverse-square); 0 turns distance falloff off. `range: 0` is unlimited (the light reaches every
   cluster); a light with a shadow map needs a finite range.
 - A spot takes `angle` (half-angle, up to π/2) and `penumbra` (0 to 1, default 0) instead of `outerAngle`/`innerAngle`:

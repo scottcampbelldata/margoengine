@@ -98,8 +98,9 @@ hemisphere approximation. Clustered and environment lighting retain their base
 PBR response. Clearcoat remains on top of the underlying lobes; transmission
 retains its existing single-sample screen-space model.
 
-The shader sources and license notices are included in
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Run
+The sheen and thin-film terms are written from the KHR_materials_sheen and
+KHR_materials_iridescence specifications (Estevez and Kulla 2017; Belcour and Barla
+2017); the sheen albedo fit is our own (`scripts/sheen-albedo-fit.mjs`). Run
 `node scripts/materials-lobe-tests.js` for quantitative GPU and parity checks;
 the complete-asset runner also checks original Khronos models.
 

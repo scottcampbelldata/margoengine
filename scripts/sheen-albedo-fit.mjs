@@ -1,5 +1,5 @@
 // Derives the directional albedo of our own sheen BRDF and fits the closed form in materialLobesSheenAlbedo
-// (packages/materials/src/lobe-shader.ts). Nothing here comes from another engine: the BRDF is
+// (sheenAlbedoWGSL in packages/shared/sheen.js). Nothing here comes from another engine: the BRDF is
 // materialLobesSheenBRDF as written in that file, i.e. the KHR_materials_sheen Charlie distribution
 // (Estevez & Kulla 2017, "Production Friendly Microfacet Sheen BRDF") with alpha = roughness^2 and the
 // Neubelt visibility clamped to 1. E(mu, r) = integral over the hemisphere of f(l, v) (n.l) dl with n.v = mu.
@@ -255,7 +255,7 @@ function format(value) {
   return text.includes('.') || text.includes('e') ? text : text + '.0';
 }
 
-/** The WGSL function body the fit produces (materialLobesSheenAlbedo in lobe-shader.ts). */
+/** The WGSL function body the fit produces (sheenAlbedoWGSL in packages/shared/sheen.js, named materialLobesSheenAlbedo in the lobes). */
 export function wgsl(p) {
   const vector = (t) =>
     `vec4f(${p

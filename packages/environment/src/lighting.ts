@@ -251,7 +251,10 @@ export class EnvironmentLighting extends ShaderEffect {
       declarations: this.declarations(group),
       ambient: iblCall('s.n', 'v', 's.base.rgb', 's.metal', 's.roughness') + '*s.occlusion',
       coat: 'iblPrefiltered(iblSpecular,iblSampler,iblParams,reflect(-v,s.cn),s.cr)*iblParams.w*s.occlusion',
-      sheen: '0.157*iblIrradiance(iblSh,iblRotate(s.n,iblParams))*iblParams.w*s.occlusion',
+      // Sheen: its albedo (gltf-pro's margoSheenAlbedo, the physical shader declares it) times the spherical-harmonic
+      // irradiance at the base normal, where the sheen lies.
+      sheen:
+        'margoSheenAlbedo(clamp(dot(s.n,v),0.0001,1.0),s.sh.w)*iblIrradiance(iblSh,iblRotate(s.n,iblParams))*iblParams.w*s.occlusion',
     };
   }
   override setup(engine: EngineKernel): void {

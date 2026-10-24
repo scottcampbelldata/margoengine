@@ -3,6 +3,7 @@ import type { ClearcoatTextureSlot } from './shader.js';
 import { coordinateExpression, coordinateWGSL } from './coordinates.js';
 import { iridescenceWGSL } from './iridescence.js';
 import { ggxNamed } from '../../shared/light-terms.js';
+import { sheenAlbedoWGSL, sheenBrdfWGSL } from '../../shared/sheen.js';
 const materialGgx = /* @__PURE__ */ ggxNamed('materialA2', 'materialNH', 'materialNV', 'materialNL');
 
 export interface LobeShaderConfig {
@@ -116,21 +117,8 @@ fn materialLobesFilmActive(material:MaterialLobeInputs)->bool {
   return material.iridescence.x>0.0&&material.iridescence.z>0.0&&material.iridescence.y!=1.0;
 }
 fn materialLobesDielectricF0(material:MaterialLobeInputs)->vec3f {return min(vec3f(${dielectricF0})*material.specular.rgb,vec3f(1));}
-// Charlie's distribution with the permitted Neubelt visibility approximation.
-// https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_sheen
-fn materialLobesSheenBRDF(roughness:f32,nl:f32,nv:f32,nh:f32)->f32 {
-  let materialRoughness=max(roughness,0.0001);let materialInverse=1.0/(materialRoughness*materialRoughness);
-  let materialDistribution=(2.0+materialInverse)*pow(max(1.0-nh*nh,0.0),materialInverse*0.5)/6.2831853;
-  let materialVisibility=min(1.0,1.0/max(4.0*(nl+nv-nl*nv),0.000001));
-  return materialDistribution*materialVisibility;
-}
-// Albedo of the KHR_materials_sheen BRDF above (Estevez & Kulla 2017), fit by scripts/sheen-albedo-fit.mjs.
-fn materialLobesSheenAlbedo(mu:f32,roughness:f32)->f32 {
-  let materialR2=roughness*roughness;let materialQ=materialR2/(materialR2+0.046698);
-  let materialBasis=vec4f(1.0,materialQ,roughness,materialQ*roughness);let materialX=mu/max(roughness,0.0001);
-  return clamp(exp(dot(materialBasis,vec4f(0.67486,-1.0569,1.2955,-1.6596))-materialX*(dot(materialBasis,vec4f(0.78851,0.09914,-0.27042,0.61309))+materialX*dot(materialBasis,vec4f(0.072685,0.29184,-0.084342,-0.10518)))),0.0,1.0);
-}
-fn materialLobesDirect(i:Out,s:Surface,baseline:vec3f,material:MaterialLobeInputs)->vec3f {
+// KHR_materials_sheen BRDF and its albedo, shared with gltf-pro's physical shader (shared/sheen.js).
+${sheenBrdfWGSL('materialLobesSheenBRDF')}${sheenAlbedoWGSL('materialLobesSheenAlbedo')}fn materialLobesDirect(i:Out,s:Surface,baseline:vec3f,material:MaterialLobeInputs)->vec3f {
   let materialSpecularActive=materialLobesSpecularActive(s,material);
   let materialFilmActive=materialLobesFilmActive(material);
   let materialSheenActive=any(material.sheen.rgb>vec3f(0));

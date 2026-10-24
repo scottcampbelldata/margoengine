@@ -1,6 +1,6 @@
 import type { MaterialExtension } from '@margoengine/gltf-pro';
-import type { ClearcoatTextureSlot } from './shader.js';
 import { coordinateExpression } from './coordinates.js';
+import type { ClearcoatTextureSlot } from './shader.js';
 
 export interface TransmissionShaderTextures {
   /** Snapshot of the opaque scene, in the render attachment's original format. */
@@ -20,133 +20,138 @@ export interface TransmissionShaderValues {
   dispersion?: string;
 }
 
-/** The output hook composites after the baseline tone map, so the copy is never tone mapped twice. */
+/** WGSL reading a material map at the fragment's UV: filtered when the slot has a sampler, else the nearest texel. */
+function readMap(slot: ClearcoatTextureSlot, explicitLevel: boolean): string {
+  const texture = `materialTexture${slot.index}`,
+    coords = coordinateExpression(slot);
+  if (slot.sampler)
+    return explicitLevel
+      ? `textureSampleLevel(${texture},materialSampler${slot.index},${coords},0.0)`
+      : `textureSample(${texture},materialSampler${slot.index},${coords})`;
+  const size = `vec2f(textureDimensions(${texture},0))`;
+  return `textureLoad(${texture},vec2i(clamp(${coords}*${size},vec2f(0),${size}-vec2f(1))),0)`;
+}
+
+/**
+ * Screen-space KHR_materials_transmission / KHR_materials_volume / KHR_materials_dispersion for a material extension.
+ * The opaque-scene snapshot is read where the view ray, refracted by Snell's law, leaves a slab `thickness` deep (mesh
+ * units, measured along the mesh normal). That light is tinted by the base colour and attenuated by Beer-Lambert
+ * (T = attenuationColor^(path / attenuationDistance)), then added to the lit colour, weighted by the factor, the
+ * dielectric share (1 - metal) and 1 - Schlick Fresnel. The host already dims diffuse and ambient light by the factor.
+ *
+ * @param textures - Slot of the opaque snapshot, optional transmission (R) and thickness (G) maps, and the factor row.
+ * @param values - Compiler-owned WGSL expressions used in place of the factor rows (node materials).
+ * @returns The extension's module declarations, beauty `output` statement and `transmission` weight expression.
+ */
 export function transmissionShader(
   textures: TransmissionShaderTextures,
   values?: TransmissionShaderValues,
 ): Pick<MaterialExtension, 'declarations' | 'output' | 'transmission'> {
-  const index = textures.factorsIndex ?? 0,
-    opaque = `materialTexture${textures.opaque}`;
-  const sample = (slot: ClearcoatTextureSlot) => {
-    const texture = `materialTexture${slot.index}`,
-      coords = coordinateExpression(slot);
-    if (slot.sampler) return `textureSampleLevel(${texture},materialSampler${slot.index},${coords},0.0)`;
-    const size = `vec2f(textureDimensions(${texture},0))`;
-    return `textureLoad(${texture},vec2i(clamp(${coords}*${size},vec2f(0),${size}-vec2f(1))),0)`;
-  };
-  return {
-    // The host scales diffuse and ambient light by 1 - this factor (as native transmission does), and the output adds
-    // the transmitted light behind, so reflections keep their strength.
-    transmission: values
-      ? values.factor
-      : `materialFactors[${index}].x${textures.factor ? '*' + sample(textures.factor) + '.r' : ''}`,
-    // Assign RGB and reconverge before the host's final return, which owns alpha and derivatives.
-    output: `if(${values ? values.factor : `materialFactors[${index}].x`}>0.0){color=materialTransmission(i,s,color,front${values ? ',' + values.factor + ',' + values.ior + ',' + values.thickness + ',' + values.attenuation + ',' + values.inverseDistance + ',' + (values.dispersion ?? '0.0') : ''});}`,
-    declarations: /* wgsl */ `
-fn materialTransmissionLinear(value:vec3f)->vec3f {
-  return select(value/12.92,pow((value+0.055)/1.055,vec3f(2.4)),value>vec3f(0.04045));
+  const row = textures.factorsIndex ?? 0,
+    first = `materialFactors[${row}]`,
+    second = `materialFactors[${row + 1}]`,
+    snapshot = `materialTexture${textures.opaque}`;
+  let helpers = '',
+    factor: string,
+    thickness: string;
+  if (values) {
+    factor = values.factor;
+    thickness = values.thickness;
+  } else {
+    factor = `${first}.x`;
+    thickness = `max(${first}.z,0.0)`;
+    if (textures.factor) {
+      // Evaluated in the surface hook (uniform control flow), so the map keeps its mip filtering.
+      helpers += `fn materialTransmissionMap(i:Out)->f32 {return ${first}.x*${readMap(textures.factor, false)}.r;}\n`;
+      factor = 'materialTransmissionMap(i)';
+    }
+    if (textures.thickness) {
+      // Read from the output hook (non-uniform control flow), so at an explicit level.
+      helpers += `fn materialTransmissionDepth(i:Out)->f32 {return ${first}.z*${readMap(textures.thickness, true)}.g;}\n`;
+      thickness = 'max(materialTransmissionDepth(i),0.0)';
+    }
+  }
+  const ior = values ? values.ior : `${first}.y`,
+    attenuation = values ? values.attenuation : `${second}.xyz`,
+    inverseDistance = values ? values.inverseDistance : `${first}.w`,
+    dispersion = values ? (values.dispersion ?? '0.0') : `${second}.w`;
+  const declarations = /* wgsl */ `${helpers}// IEC 61966-2-1 transfer, to tint display-encoded snapshots in linear light.
+fn materialTransmissionLinear(c:vec3f)->vec3f {let x=max(c,vec3f(0)); return select(x/12.92,pow((x+0.055)/1.055,vec3f(2.4)),x>vec3f(0.04045));}
+fn materialTransmissionEncode(c:vec3f)->vec3f {let x=max(c,vec3f(0)); return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>vec3f(0.0031308));}
+// The snapshot texel under a framebuffer position, clamped to the texture.
+fn materialTransmissionRead(p:vec2f)->vec3f {
+  let size=vec2f(textureDimensions(${snapshot},0));
+  return textureLoad(${snapshot},vec2i(clamp(floor(p),vec2f(0),size-vec2f(1))),0).rgb;
 }
-fn materialTransmissionEncoded(value:vec3f)->vec3f {
-  return select(value*12.92,1.055*pow(max(value,vec3f(0)),vec3f(1.0/2.4))-0.055,value>=vec3f(0.0031308));
+// World point to framebuffer position (NDC y up, framebuffer y down); |w| is floored away from zero.
+fn materialTransmissionPixel(p:vec3f)->vec2f {
+  let c=f.camera*vec4f(p,1.0);
+  let w=select(min(c.w,-0.000001),max(c.w,0.000001),c.w>=0.0);
+  return (c.xy/w*vec2f(0.5,-0.5)+0.5)*vec2f(textureDimensions(${snapshot},0));
 }
-// Transmitted share of the light behind: the dielectric part not reflected (Schlick Fresnel), as on the native path.
+// Multiplies the snapshot colour in linear light; a channel whose multiplier is exactly one keeps the value as read.
+fn materialTransmissionFilter(captured:vec3f,k:vec3f)->vec3f {
+  var filtered=captured*k;
+  if(f.settings.w<0.5){filtered=materialTransmissionEncode(materialTransmissionLinear(captured)*k);}
+  return select(filtered,captured,k==vec3f(1.0));
+}
+// Beer-Lambert c^(path*inverseDistance): a white channel stays exactly 1, black stays 0, and 0^0 is never evaluated.
+fn materialTransmissionBeer(c:vec3f,path:f32,inverseDistance:f32)->vec3f {
+  if(path<=0.0||inverseDistance<=0.0){return vec3f(1.0);}
+  let x=clamp(c,vec3f(0),vec3f(1));
+  return select(select(pow(max(x,vec3f(0.000001)),vec3f(path*inverseDistance)),vec3f(0.0),x<=vec3f(0.0)),vec3f(1.0),x>=vec3f(1.0));
+}
+// Light arriving through the surface along one IOR's ray; zero on total internal reflection.
+fn materialTransmissionTrace(i:Out,n:vec3f,front:bool,ior:f32,thickness:f32,tint:vec3f,attenuation:vec3f,inverseDistance:f32)->vec3f {
+  // Thin wall: the sightline is kept, so the light is this fragment's own pixel.
+  if(thickness<=0.0){return materialTransmissionFilter(materialTransmissionRead(i.clip.xy),tint);}
+  let d=normalize(i.position-f.eye.xyz);
+  let entering=front==(f.coordsB.y>0.0);
+  let r=refract(d,faceForward(n,d,n),select(ior,1.0/ior,entering));
+  if(dot(r,r)<0.000001){return vec3f(0.0);}
+  // Mesh space: the ray a = M^-1 r and the unit mesh normal m. Moving t along r moves t*a in mesh space, so the slab
+  // depth (along m) is crossed after the world length thickness/|a.m|; this keeps rotation and non-uniform scale right.
+  let c0=f.model[0].xyz; let c1=f.model[1].xyz; let c2=f.model[2].xyz;
+  let x0=cross(c1,c2); let x1=cross(c2,c0); let x2=cross(c0,c1);
+  let det=dot(c0,x0);
+  let a=vec3f(dot(x0,r),dot(x1,r),dot(x2,r))/select(det,0.000000000001,abs(det)<0.000000000001);
+  let g=vec3f(dot(c0,i.normal),dot(c1,i.normal),dot(c2,i.normal));
+  let m=g/max(length(g),0.00000001);
+  let path=thickness/max(abs(dot(a,m)),0.0001);
+  // Only the bending moves the lookup: the exit point against the point as far along the unbent view ray.
+  let shift=materialTransmissionPixel(i.position+r*path)-materialTransmissionPixel(i.position+d*path);
+  let at=select(i.clip.xy+shift,i.clip.xy,ior==1.0);
+  return materialTransmissionFilter(materialTransmissionRead(at),tint*materialTransmissionBeer(attenuation,path,inverseDistance));
+}
+// Dielectric F0 of the current fragment, ((IOR-1)/(IOR+1))^2 (KHR_materials_ior), set by materialTransmission
+// before it calls materialTransmissionWeight (whose four-argument call the host contract fixes). Zero at IOR 1.
+var<private> materialTransmissionF0:f32=0.04;
+// Share of the light behind that enters: the dielectric part less the Schlick Fresnel reflection (glTF 2.0 Appendix B).
 fn materialTransmissionWeight(s:Surface,v:vec3f,n:vec3f,factor:f32)->vec3f {
-  let f0=mix(vec3f(0.04),s.base.rgb,s.metal);
-  return factor*(1-s.metal)*(1-(f0+(1-f0)*pow(1-clamp(dot(n,v),0.0,1.0),5.0)));
+  let f0=mix(vec3f(materialTransmissionF0),clamp(s.base.rgb,vec3f(0),vec3f(1)),s.metal);
+  let q=1.0-clamp(dot(n,v),0.0,1.0); let q2=q*q;
+  return factor*(1.0-s.metal)*(1.0-(f0+(1.0-f0)*q2*q2*q));
 }
-fn materialTransmission(i:Out,s:Surface,color:vec3f,front:bool${values ? ',materialTransmissionFactor:f32,materialTransmissionIor:f32,materialTransmissionThickness:f32,materialTransmissionAttenuation:vec3f,materialTransmissionInverseDistance:f32,materialTransmissionDispersion:f32' : ''})->vec3f {
-${values ? '  let factors=vec4f(materialTransmissionFactor,materialTransmissionIor,materialTransmissionThickness,materialTransmissionInverseDistance);' : '  let factors=materialFactors[' + index + '];'}
-  // Explicit mip samples do not require derivatives in the beauty output hook.
-  let factor=clamp(factors.x${textures.factor ? '*' + sample(textures.factor) + '.r' : ''},0.0,1.0);
-  let thickness=max(factors.z${textures.thickness ? '*' + sample(textures.thickness) + '.g' : ''},0.0);
-  if(factor<=0.0){return color;}
-  let size=vec2f(textureDimensions(${opaque},0));
-  var pixel=i.clip.xy;
-  let view=f.eye.xyz-i.position;
-  let viewDistance=length(view);
-  let v=select(vec3f(0,0,1),view/max(viewDistance,0.000001),viewDistance>0.000001);
-  let normalLength=length(s.n);
-  let n=select(vec3f(0,0,1),s.n/max(normalLength,0.000001),normalLength>0.000001);
-  let dispersion=${values ? 'materialTransmissionDispersion' : `materialFactors[${index + 1}].w`};
-  if(dispersion>0.0&&thickness>0.0&&factors.y!=1.0){
-    let halfSpread=(factors.y-1.0)*0.025*dispersion;
-    let iors=max(vec3f(1),vec3f(factors.y-halfSpread,factors.y,factors.y+halfSpread));
-    let entering=front==(f.coordsB.y>0);
-    let localNormalRaw=(transpose(f.model)*vec4f(n,0)).xyz;
-    let localNormal=localNormalRaw/max(length(localNormalRaw),0.000001);
-    let attenuation=${values ? 'materialTransmissionAttenuation' : `materialFactors[${index + 1}].rgb`};
-    let tint=clamp(s.base.rgb,vec3f(0),vec3f(1));
-    var dispersed=color;
-    for(var channel=0u;channel<3u;channel++){
-      let ior=iors[channel];
-      var ray=refract(-v,n,select(ior,1.0/ior,entering));
-      let rayLength=length(ray);
-      if(rayLength>0.000001){
-        ray/=rayLength;
-        let localRay=(transpose(f.normalMatrix)*vec4f(ray,0)).xyz;
-        let path=thickness/max(abs(dot(localRay,localNormal)),0.0001);
-        var channelPixel=i.clip.xy;
-        if(ior!=1.0){
-          let bent=f.camera*vec4f(i.position+ray*path,1);
-          let straight=f.camera*vec4f(i.position-v*path,1);
-          if(bent.w>0.000001&&straight.w>0.000001){
-            channelPixel+=(bent.xy/bent.w-straight.xy/straight.w)*vec2f(0.5,-0.5)*size;
-          }
-        }
-        var received=vec3f(textureLoad(${opaque},vec2i(clamp(channelPixel,vec2f(0),size-vec2f(1))),0)[channel]);
-        let attenuating=path>0.0&&factors.w>0.0;
-        if(attenuating||tint[channel]!=1.0){
-          if(f.settings.w<0.5){received=materialTransmissionLinear(received);}
-          received*=tint[channel];
-          if(attenuating){received*=pow(attenuation[channel],path*factors.w);}
-          if(f.settings.w<0.5){received=materialTransmissionEncoded(received);}
-        }
-        dispersed[channel]=received.x;
-      }
-    }
-    return color+materialTransmissionWeight(s,v,n,factor)*dispersed;
-  }
-  var ray=-v;
-  // In particular, IOR 1 never projects or rounds a different screen pixel.
-  if(thickness>0.0&&factors.y!=1.0){
-    let entering=front==(f.coordsB.y>0);
-    ray=refract(-v,n,select(factors.y,1.0/factors.y,entering));
-    let rayLength=length(ray);
-    if(rayLength<=0.000001){return color;}
-    ray/=rayLength;
-  }
-  // Thickness is measured in mesh coordinates. Projecting the inverse-transformed
-  // world ray onto the mesh normal also handles nonuniform scale and rotation.
-  let localRay=(transpose(f.normalMatrix)*vec4f(ray,0)).xyz;
-  let localNormalRaw=(transpose(f.model)*vec4f(n,0)).xyz;
-  let localNormal=localNormalRaw/max(length(localNormalRaw),0.000001);
-  let path=thickness/max(abs(dot(localRay,localNormal)),0.0001);
-  if(thickness>0.0&&factors.y!=1.0){
-    // A thin interface keeps the sightline; only an authored volume supplies a
-    // refraction path. The opaque snapshot still has no traced scene depth.
-    let distance=path;
-    let bent=f.camera*vec4f(i.position+ray*distance,1);
-    let straight=f.camera*vec4f(i.position-v*distance,1);
-    if(bent.w>0.000001&&straight.w>0.000001){
-      pixel+=(bent.xy/bent.w-straight.xy/straight.w)*vec2f(0.5,-0.5)*size;
-    }
-  }
-  var transmitted=textureLoad(${opaque},vec2i(clamp(pixel,vec2f(0),size-vec2f(1))),0).rgb;
-  let attenuation=${values ? 'materialTransmissionAttenuation' : `materialFactors[${index + 1}].rgb`};
-  let attenuating=path>0.0&&factors.w>0.0;
+fn materialTransmission(i:Out,s:Surface,color:vec3f,front:bool,factor:f32,ior:f32,thickness:f32,attenuation:vec3f,inverseDistance:f32,dispersion:f32)->vec3f {
+  let v=normalize(f.eye.xyz-i.position);
+  let n=s.n;
   let tint=clamp(s.base.rgb,vec3f(0),vec3f(1));
-  // Preserve captured values exactly for a colorless, unattenuated interface.
-  // Otherwise tint and Beer attenuation operate in linear light. HDR captures
-  // are already linear; LDR captures include the baseline sRGB transfer.
-  if(attenuating||any(tint!=vec3f(1))){
-    if(f.settings.w<0.5){transmitted=materialTransmissionLinear(transmitted);}
-    transmitted*=tint;
-    // This branch excludes 0^0 when an attenuation channel and thickness are 0.
-    if(attenuating){transmitted*=pow(attenuation,vec3f(path*factors.w));}
-    if(f.settings.w<0.5){transmitted=materialTransmissionEncoded(transmitted);}
+  var transmitted=materialTransmissionTrace(i,n,front,ior,thickness,tint,attenuation,inverseDistance);
+  if(dispersion>0.0&&thickness>0.0&&ior!=1.0){
+    // KHR_materials_dispersion: IOR spread (IOR-1)*0.025*dispersion; red and blue each read on their own ray.
+    let spread=(ior-1.0)*0.025*dispersion;
+    let red=materialTransmissionTrace(i,n,front,max(1.0,ior-spread),thickness,tint,attenuation,inverseDistance);
+    let blue=materialTransmissionTrace(i,n,front,ior+spread,thickness,tint,attenuation,inverseDistance);
+    transmitted=vec3f(red.r,transmitted.g,blue.b);
   }
+  let r0=(ior-1.0)/(ior+1.0);
+  materialTransmissionF0=r0*r0;
   return color+materialTransmissionWeight(s,v,n,factor)*transmitted;
 }
-`,
+`;
+  return {
+    transmission: factor,
+    output: `if(s.tr>0.0){color=materialTransmission(i,s,color,front,s.tr,${ior},${thickness},${attenuation},${inverseDistance},${dispersion});}`,
+    declarations,
   };
 }

@@ -1,17 +1,22 @@
-// Light parity (Crocotile point and spot lights): decay, angle + penumbra, unlimited range, and receivers without
-// local-light shadows. The falloff is the one @margoengine/bvh's vertex-light bake uses.
+// Point and spot lights: decay, angle + penumbra, unlimited range, and receivers without local-light shadows. The
+// falloff is the one @margoengine/bvh's vertex-light bake uses.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Clustered, clusteredSampling } from '../dist/index.js';
 import { cullingShader } from '../src/shader.ts';
+import { decayTerms, legacyTerms } from '../../shared/light-terms.js';
 import { bakeVertexColors } from '../../bvh/dist/bake.js';
 import { wgsl } from '../../core/src/shaders.ts';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
-// CPU mirror of the definition: window / max(d^decay, 0.01), window = range > 0 ? clamp(1 - (d/range)^4, 0, 1)^2 : 1,
-// and the cone smoothstep(cos(angle), cos(angle * (1 - penumbra)), dot(-L, direction)), a step when the two are equal.
-const attenuation = (d, range, decay = 2) =>
-  (range > 0 ? Math.min(Math.max(1 - (d / range) ** 4, 0), 1) ** 2 : 1) / Math.max(d ** decay, 0.01);
+// CPU mirror of the distance falloff: window / max(d^decay, 2^-12), window = clamp(1 - (d / range)^4, 0, 1)^2 (1 for
+// range 0). The cone below is smoothstep(cos(angle), cos(angle * (1 - penumbra)), dot(-L, direction)), a step when the
+// two are equal.
+const NEAR_FLOOR = 2 ** -12;
+const attenuation = (d, range, decay = 2) => {
+  const fade = range > 0 ? Math.min(Math.max(1 - (d / range) ** 4, 0), 1) : 1;
+  return (fade * fade) / Math.max(Math.max(d, 1e-6) ** decay, NEAR_FLOOR);
+};
 const smoothstep = (low, high, x) => {
   if (x < low) return 0;
   if (x >= high) return 1;
@@ -36,7 +41,9 @@ test('falloff and cone: the bake numbers (decay 1 at 2 m is 0.5, decay 0 is the 
   assert.ok(close(attenuation(2, 0, 1), 0.5));
   assert.ok(close(attenuation(2, 3, 0), (1 - (2 / 3) ** 4) ** 2));
   assert.ok(close(attenuation(2, 0), 0.25), 'default decay 2 is inverse-square');
-  assert.ok(close(attenuation(0.05, 0), 100), 'max(d^decay, 0.01) caps the peak');
+  assert.equal(attenuation(0.01, 0), 1 / NEAR_FLOOR, 'the near-light floor caps the peak at 4096');
+  assert.equal(attenuation(0, 0, 3.5), 1 / NEAR_FLOOR, 'no 0^decay at the light');
+  assert.equal(attenuation(0.5, 0, 0), 1, 'decay 0 is 1 / max(1, floor)');
   assert.equal(attenuation(3, 3), 0, 'nothing at the range');
   const deg = Math.PI / 180;
   assert.equal(cone(30 * deg, 0, Math.cos(29.9 * deg)), 1);
@@ -83,8 +90,9 @@ test('setLights packs decay, angle and penumbra; lights without them keep the ex
     assert.equal(data[64 + 11], data[64 + 12], 'penumbra 0: outer and inner cosines are equal (a hard edge)');
     h.frame();
     assert.notEqual(h.context.shader, original);
-    assert.ok(h.context.shader.includes('let legacy=kind==0.0||kind==1.0;'));
-    assert.ok(lights.pbr(2).declarations.includes('max(pow(max(distance,0.0001),decay),0.01)'));
+    assert.ok(h.context.shader.includes(decayTerms), 'decay-aware light terms');
+    assert.ok(!original.includes(decayTerms) && original.includes(legacyTerms), 'legacy shader keeps the legacy terms');
+    assert.ok(decayTerms.includes('max(power,0.000244140625)'), 'the near-light floor 2^-12');
     assert.equal(lights.pbr(2).declarations, clusteredSampling(2, undefined, undefined, false, true));
     lights.setLights(legacy);
     h.frame();

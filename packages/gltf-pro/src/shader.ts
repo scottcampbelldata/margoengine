@@ -2,6 +2,7 @@ import { neutralShader } from '../../shared/display.js';
 import { transmittedDiffuse } from '../../shared/pbr-transmission.js';
 import { cotangentFrameShader } from '../../shared/tangent-frame.js';
 import { ggxD, smithG } from '../../shared/light-terms.js';
+import { sheenAlbedoWGSL, sheenBrdfWGSL } from '../../shared/sheen.js';
 // Hemisphere ambient and GGX direct light, shared by the compact and extended shaders.
 const lightingTerms = /* wgsl */ `fn hemisphere_ambient(s:Surface)->vec3f {
   let f0=mix(vec3f(0.04),s.base.rgb,s.metal);
@@ -392,7 +393,9 @@ const physicalEdits = (sample: (name: string) => string, bindings: string): [str
     `  let ior=(f.ext.y-1)/(f.ext.y+1); s.f0=min(ior*ior*f.specular.rgb*${sample('specularColor')}.rgb,vec3f(1))*f.specular.w*${sample('specular')}.a;
   s.tr=f.coat.w*${sample('transmission')}.r; s.th=1; let cm=${sample('clearcoatNormal')}.xyz*2-1; s.cn=normalize(t*cm.x*f.coat.z+b*cm.y*f.coat.z+n*cm.z);
   s.cc=f.coat.x*${sample('clearcoat')}.r; s.cr=clamp(f.coat.y*${sample('clearcoatRoughness')}.g,0.045,1.0);
-  s.sh=vec4f(f.sheen.rgb*${sample('sheenColor')}.rgb,max(f.sheen.w*${sample('sheenRoughness')}.a,0.07));
+  // Sheen: linear colour (factor x map rgb) and roughness (factor x map alpha), raised to 0.03 so the Charlie lobe's
+  // 1/alpha stays moderate (alpha 9e-4, peak D about 180) instead of collapsing to a spike no texel resolves.
+  s.sh=vec4f(f.sheen.rgb*${sample('sheenColor')}.rgb,clamp(f.sheen.w*${sample('sheenRoughness')}.a,0.03,1.0));
   if(margoFaceTest&&!facing&&f.settings.z<0.5){discard;}`,
   ],
   ['mix(vec3f(0.04),s.base.rgb,s.metal)', 'mix(s.f0,s.base.rgb,s.metal)'],
@@ -408,11 +411,15 @@ fn margoLayerSky(s:Surface)->vec3f {return mix(vec3f(0.35,0.3,0.25),vec3f(1),cla
 // Ambient light of the clearcoat (before its Fresnel) and of the sheen (before its colour); lighting effects with an
 // environment replace them (PBRHooks coat and sheen), the defaults are the hemisphere.
 fn margoCoatAmbient(s:Surface,v:vec3f)->vec3f {return 0.5*margoLayerSky(s);}
-fn margoSheenAmbient(s:Surface,v:vec3f)->vec3f {return 0.157*margoLayerSky(s);}
+${sheenBrdfWGSL('margoSheenBRDF')}${sheenAlbedoWGSL('margoSheenAlbedo')}fn margoSheenAmbient(s:Surface,v:vec3f)->vec3f {return margoSheenAlbedo(clamp(dot(s.n,v),0.0001,1.0),s.sh.w)*mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(s.n.y*0.5+0.5,0.0,1.0))*f.radiance.w*s.occlusion;}
 fn layers(s:Surface,v:vec3f,l:vec3f,under:vec3f)->vec3f {
-  let light=f.radiance.rgb*f.light.w; let h=normalize(v+l); let nl=clamp(dot(s.n,l),0.0,1.0); let nv=clamp(dot(s.n,v),0.0001,1.0); let nh=clamp(dot(s.n,h),0.0,1.0);
-  let inv=1/(s.sh.w*s.sh.w); let sheen=(2+inv)*pow(1-nh*nh,inv*0.5)/6.2831853/(4*(nl+nv-nl*nv))*nl;
-  let color=under*(1-0.157*max(s.sh.r,max(s.sh.g,s.sh.b)))+s.sh.rgb*(sheen*light+margoSheenAmbient(s,v));
+  let light=f.radiance.rgb*f.light.w;
+  // Sheen (KHR_materials_sheen) lies on the base surface, so it uses s.n. \`under\` holds direct and ambient light
+  // together, so it is scaled once by the view albedo, 1 - max(sheen colour) E(n.v) (the spec's ambient form); black
+  // sheen leaves it exactly as it was and adds zero.
+  let sheenH=(v+l)/max(length(v+l),0.0001); let sheenNV=clamp(dot(s.n,v),0.0001,1.0); let sheenNL=clamp(dot(s.n,l),0.0,1.0);
+  let sheenLobe=margoSheenBRDF(s.sh.w,sheenNL,sheenNV,clamp(dot(s.n,sheenH),0.0,1.0))*sheenNL*light;
+  let color=under*(1-max(s.sh.r,max(s.sh.g,s.sh.b))*margoSheenAlbedo(sheenNV,s.sh.w))+s.sh.rgb*(sheenLobe+margoSheenAmbient(s,v));
   let fc=0.04+0.96*pow(1-clamp(dot(s.cn,v),0.0,1.0),5.0);
   return color*(1-s.cc*fc)+s.cc*fc*(ggx(s.cn,v,l,s.cr)*light+margoCoatAmbient(s,v));
 }
@@ -500,24 +507,27 @@ export function extendedPlan(
     });
   return { slots, ...features };
 }
-// Thin-film Fresnel at the viewing angle (KHR_materials_iridescence "Iridescence Fresnel", after Belcour and Barla 2017):
-// outside IOR 1, Schlick reflectances at both interfaces, phase shifts 0 or pi, two Fourier terms of the spectral integral
-// (Gaussian fits of the CIE matching functions, XYZ to linear Rec. 709).
-export const iridescenceWgsl = `fn margoSensitivity(opd:f32,shift:vec3f)->vec3f {
-  let phase=6.2831853*opd*1e-9; let val=vec3f(5.4856e-13,4.4201e-13,5.2481e-13); let pos=vec3f(1.6810e6,1.7953e6,2.2084e6); let va=vec3f(4.3278e9,9.3046e9,6.6121e9);
-  var xyz=val*sqrt(6.2831853*va)*cos(pos*phase+shift)*exp(-phase*phase*va);
-  xyz.x+=9.7470e-14*sqrt(6.2831853*4.5282e9)*cos(2.2399e6*phase+shift.x)*exp(-4.5282e9*phase*phase);
-  return mat3x3f(3.2404542,-0.9692660,0.0556434,-1.5371385,1.8760108,-0.2040259,-0.4985314,0.0415560,1.0572252)*(xyz/1.0685e-7);
+// KHR_materials_iridescence "Iridescence Fresnel" (Belcour and Barla 2017): air (IOR 1) over a film of IOR `film` and
+// `thickness` nm over the base, whose IOR comes from F0 (exact for dielectrics, extinction ignored for metals; F0 + 1e-4,
+// at most 0.9999, keeps a white metal finite). Airy sum: constant term plus Fourier orders 1 and 2, each weighted by
+// margoFilmSpectrum, the closed-form Fourier transform of the spec's Gaussian CIE fits (amplitudes a sqrt(2 pi var) /
+// 1.0685e-7 precomputed) in linear Rec. 709. Total internal reflection in the film reflects everything.
+/** WGSL module-scope text declaring gltf-pro's thin-film Fresnel for extended materials. */
+export const iridescenceWgsl = /* wgsl */ `fn margoFilmSpectrum(opd:f32,shift:vec3f)->vec3f {
+  let k=6.28318531e-9*opd;
+  var xyz=vec3f(0.84659,1.0002219,1.0011225)*cos(vec3f(1.6810e6,1.7953e6,2.2084e6)*k+shift)*exp(-k*k*vec3f(4.3278e9,9.3046e9,6.6121e9));
+  xyz.x+=0.15386831*cos(2.2399e6*k+shift.x)*exp(-4.5282e9*k*k);
+  return mat3x3f(3.2404542,-0.969266,0.0556434,-1.5371385,1.8760108,-0.2040259,-0.4985314,0.041556,1.0572252)*xyz;
 }
 fn margoIridescence(f0:vec3f,c1:f32,thickness:f32,film:f32)->vec3f {
-  let c2sq=1-(1-c1*c1)/(film*film); if(c2sq<0.0){return vec3f(1);}
-  let c2=sqrt(c2sq); let x0=(film-1)/(film+1); let r12=x0*x0+(1-x0*x0)*pow(1-c1,5.0); let t121=1-r12;
-  let phi21=3.14159265-select(0.0,3.14159265,film<1.0);
-  let sf=sqrt(min(f0+0.0001,vec3f(0.9999))); let base=(1+sf)/(1-sf); let x1=(base-film)/(base+film); let r1=x1*x1;
-  let r23=r1+(1-r1)*pow(1-c2,5.0); let phi=phi21+select(vec3f(0),vec3f(3.14159265),base<vec3f(film)); let opd=2*film*thickness*c2;
-  let r123=clamp(r12*r23,vec3f(1e-5),vec3f(0.9999)); let r=sqrt(r123); let rs=t121*t121*r23/(1-r123);
-  let c1m=(rs-t121)*r; let c2m=c1m*r;
-  return max(r12+rs+c1m*2*margoSensitivity(opd,phi)+c2m*2*margoSensitivity(2*opd,2*phi),vec3f(0));
+  let c2Squared=1-(1-c1*c1)/(film*film); if(c2Squared<0){return vec3f(1);}
+  let c2=sqrt(c2Squared); let r0=(film-1)/(film+1); let r12=r0*r0+(1-r0*r0)*pow(1-c1,5.0); let t=1-r12;
+  let root=sqrt(min(f0+0.0001,vec3f(0.9999))); let base=(1+root)/(1-root);
+  let q=(base-film)/(base+film); let r23=q*q+(1-q*q)*pow(1-c2,5.0);
+  let r123=clamp(r12*r23,vec3f(0.00001),vec3f(0.9999)); let inner=t*t*r23/(1-r123);
+  let opd=2*film*thickness*c2; let phase=select(vec3f(3.14159265),vec3f(0),film<1)+select(vec3f(0),vec3f(3.14159265),base<film);
+  let order=2*(inner-t);
+  return max(r12+inner+order*sqrt(r123)*margoFilmSpectrum(opd,phase)+order*r123*margoFilmSpectrum(2*opd,2*phase),vec3f(0));
 }
 `;
 // KHR_materials_anisotropy: the texture's direction (default +X) rotated by anisotropyRotation in tangent space, as a

@@ -6,11 +6,13 @@ import { finiteVector } from '@margoengine/math/validate';
 import type { MeshBVH } from './bvh.js';
 
 /**
- * A light for {@link bakeVertexColors}. Falloff is the definition Margo's GPU lights share: directional
- * `color * intensity * max(N.L, 0)`; point and spot multiply that by `window / max(d^decay, 0.01)` with
- * `window = distance > 0 ? clamp(1 - (d / distance)^4, 0, 1)^2 : 1` (Karis 2013), and spot also by
- * `smoothstep(cos(angle), cos(angle * (1 - penumbra)), dot(-L, direction))` (a hard edge when `penumbra` is 0).
- * Ambient adds `color * intensity` everywhere, unshadowed.
+ * A light for {@link bakeVertexColors}.
+ * Ambient adds `color * intensity` to every vertex; the others add `color * intensity * falloff * cone * max(N.L, 0)`.
+ * Directional lights have falloff 1. Point and spot lights at distance d use the windowed inverse power of Karis 2013,
+ * `window / max(d^decay, 2^-12)` with `window = clamp(1 - (d / distance)^4, 0, 1)^2` (1 when `distance` is 0); the
+ * floor 2^-12 caps the peak next to the light at 4096 times the window. A spot's cone is
+ * `smoothstep(cos(angle), cos(angle * (1 - penumbra)), dot(-L, direction))`, a hard edge (1 on or inside the cone)
+ * when `penumbra` is 0; point lights have cone 1.
  */
 export interface BakeLight {
   type: 'ambient' | 'directional' | 'point' | 'spot';
@@ -80,12 +82,15 @@ export interface BakeTarget {
   colors?: ArrayLike<number> | null;
 }
 
-const smoothstep = (low: number, high: number, x: number): number => {
-  if (x < low) return 0;
-  if (x >= high) return 1;
-  const t = (x - low) / (high - low);
+// Below this d^decay the falloff of a point or spot light stops growing: a ball of radius 1/64 unit around the light.
+const NEAR_FLOOR = 2 ** -12;
+
+/** Hermite step from 0 at `low` to 1 at `high`; with `low == high` a hard step (1 from `low` on). */
+function hermite(low: number, high: number, x: number): number {
+  if (!(high > low)) return x >= low ? 1 : 0;
+  const t = Math.min(Math.max((x - low) / (high - low), 0), 1);
   return t * t * (3 - 2 * t);
-};
+}
 
 /**
  * Bakes lighting and ambient occlusion into linear RGBA vertex colours (Crocotile's Bake Lighting panel): for each
@@ -176,11 +181,13 @@ export function bakeVertexColors(
         lx /= d;
         ly /= d;
         lz /= d;
-        const window = light.distance > 0 ? Math.min(Math.max(1 - (d / light.distance) ** 4, 0), 1) ** 2 : 1;
-        scale = window / Math.max(d ** light.decay, 0.01);
+        // Windowed inverse power (Karis 2013), the same terms clustered's shader evaluates in float32.
+        const reach = light.distance > 0 ? (d / light.distance) ** 4 : 0,
+          fade = Math.min(Math.max(1 - reach, 0), 1);
+        scale = (fade * fade) / Math.max(Math.max(d, 1e-6) ** light.decay, NEAR_FLOOR);
         if (light.type === 'spot') {
           const [sx, sy, sz] = light.direction;
-          scale *= smoothstep(
+          scale *= hermite(
             Math.cos(light.angle),
             Math.cos(light.angle * (1 - light.penumbra)),
             -(lx * sx + ly * sy + lz * sz),

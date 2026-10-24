@@ -1,136 +1,168 @@
-// CPU references for @margoengine/clustered/area: `ltc` mirrors the WGSL (clusterAreaLighting in src/area.ts) line by line,
-// `bruteForce` integrates the GGX + Lambert BRDF over the rectangle by quadrature (the ground truth LTC approximates).
-// A packed light is 16 floats as AreaLights uploads it: centre + twoSided, half-width vector, half-height vector, radiance.
+// CPU references for @margoengine/clustered/area, shared by test/area.test.js and
+// examples/package-benchmarks/area-lights-gpu.mjs.
+// - edge(): the exact edge term of the polygon form factor in float64.
+// - ltc(): a float64 mirror of the WGSL clusterAreaLighting (frame, LUT lookup, horizon clipping, edge sum).
+// - bruteForce(): independent midpoint quadrature over the rectangle of the BRDF the LTC table approximates (GGX D,
+//   height-correlated Smith G2, Schlick Fresnel) plus Lambert diffuse, with no LTC or polygon integration at all.
+// Lights are AreaLights' packed 16-float records: centre xyz + twoSided, right half-extent, up half-extent, radiance.
 import { ltcSize, ltcTable } from '../src/ltc.ts';
 
-const half = (h) =>
-  (h & 0x8000 ? -1 : 1) *
-  ((h >> 10) & 31 ? 2 ** (((h >> 10) & 31) - 15) * (1 + (h & 1023) / 1024) : 2 ** -14 * ((h & 1023) / 1024));
-const table = Float32Array.from(ltcTable(), half),
-  S = ltcSize;
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+  cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
   sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
-  add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-const scale = (a, s) => [a[0] * s, a[1] * s, a[2] * s],
-  cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-const normalize = (a) => scale(a, 1 / Math.hypot(...a)),
-  unit = (p) => scale(p, 1 / Math.sqrt(Math.max(dot(p, p), 1e-20)));
-// Column-major 3x3 (like WGSL mat3x3f) and helpers.
-const mul = (m, p) => [
-  m[0] * p[0] + m[3] * p[1] + m[6] * p[2],
-  m[1] * p[0] + m[4] * p[1] + m[7] * p[2],
-  m[2] * p[0] + m[5] * p[1] + m[8] * p[2],
-];
-const matmul = (a, b) => [0, 1, 2].flatMap((c) => mul(a, b.slice(c * 3, c * 3 + 3)));
+  add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
+  scale = (a, s) => [a[0] * s, a[1] * s, a[2] * s],
+  mix = (a, b, t) => add(a, scale(sub(b, a), t));
 
-/** Bilinear LTC table lookup: [x, y, z, w, magnitude, fresnel]. */
-export function lookup(roughness, nv) {
-  const st = [Math.min(Math.max(roughness, 0.045), 1) * (S - 1), Math.sqrt(1 - nv) * (S - 1)],
-    i = st.map(Math.floor),
-    j = i.map((v) => Math.min(v + 1, S - 1)),
+/** Edge (a, b) of the vector form factor, z component: (a x b).z * theta / sin(theta) / (2 pi), theta = angle(a, b). */
+export function edge(a, b) {
+  const n = cross(a, b),
+    s = Math.hypot(...n);
+  if (s === 0) return 0;
+  return ((n[2] / s) * Math.atan2(s, dot(a, b))) / (2 * Math.PI);
+}
+
+/** Exact cosine-weighted solid angle / pi of a polygon of points (any distance) above z = 0, counter-clockwise from +z. */
+export function formFactor(points) {
+  const unit = (p) => scale(p, 1 / Math.hypot(...p));
+  let sum = 0;
+  for (let i = 0; i < points.length; i++) sum += edge(unit(points[i]), unit(points[(i + 1) % points.length]));
+  return sum;
+}
+
+// IEEE half to number.
+function half(bits) {
+  const sign = bits & 0x8000 ? -1 : 1,
+    exponent = (bits >> 10) & 31,
+    mantissa = bits & 1023;
+  if (exponent === 0) return sign * mantissa * 2 ** -24;
+  if (exponent === 31) return mantissa ? Number.NaN : sign * Infinity;
+  return sign * (1 + mantissa / 1024) * 2 ** (exponent - 15);
+}
+let table;
+const cell = (x, y, k) => {
+  table ??= ltcTable();
+  const at = (y * ltcSize + x) * 6 + k * 2;
+  return [half(table[at]), half(table[at + 1])];
+};
+/** Bilinear LUT lookup at table coordinates st, pair k (0: matrix x y, 1: matrix z w, 2: magnitude, Fresnel). */
+function lookup(st, k) {
+  const i = [Math.floor(st[0]), Math.floor(st[1])],
+    j = [Math.min(i[0] + 1, ltcSize - 1), Math.min(i[1] + 1, ltcSize - 1)],
     f = [st[0] - i[0], st[1] - i[1]];
-  const cell = (x, y, k) => table[(y * S + x) * 6 + k],
-    mix = (a, b, t) => a + (b - a) * t;
-  return [0, 1, 2, 3, 4, 5].map((k) =>
-    mix(mix(cell(i[0], i[1], k), cell(j[0], i[1], k), f[0]), mix(cell(i[0], j[1], k), cell(j[0], j[1], k), f[0]), f[1]),
+  const lerp = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+  return lerp(
+    lerp(cell(i[0], i[1], k), cell(j[0], i[1], k), f[0]),
+    lerp(cell(i[0], j[1], k), cell(j[0], j[1], k), f[0]),
+    f[1],
   );
 }
-function edge(a, b) {
-  const x = dot(a, b),
-    y = Math.abs(x),
-    v = (0.8543985 + (0.4965155 + 0.0145206 * y) * y) / (3.417594 + (4.1616724 + y) * y);
-  return (a[0] * b[1] - a[1] * b[0]) * (x > 0 ? v : 0.5 / Math.sqrt(Math.max(1 - x * x, 1e-7)) - v);
-}
-function integral(m, quad) {
-  const p = quad.map((q) => mul(m, q));
-  let sum = 0,
-    leave = [0, 0, 0],
-    enter = [0, 0, 0];
+
+const unitOrZero = (p) => scale(p, 1 / Math.sqrt(Math.max(dot(p, p), 1e-20)));
+// Quad seen through the 3x3 transform `m` (a function), clipped to z >= 0, closed along the horizon.
+function integral(m, corners) {
+  const p = corners.map(m);
+  let leave = [0, 0, 0],
+    enter = [0, 0, 0],
+    sum = 0;
   for (let i = 0; i < 4; i++) {
-    let s = p[i],
-      e = p[(i + 1) % 4];
-    if (s[2] < 0 && e[2] < 0) continue;
-    const at = (t) => add(s, scale(sub(e, s), t));
-    if (s[2] < 0) {
-      s = at(s[2] / (s[2] - e[2]));
-      enter = s;
-    } else if (e[2] < 0) {
-      e = at(s[2] / (s[2] - e[2]));
-      leave = e;
-    }
-    sum += edge(unit(s), unit(e));
+    const s0 = p[i],
+      e0 = p[(i + 1) % 4];
+    if (s0[2] < 0 && e0[2] < 0) continue;
+    let s = s0,
+      e = e0;
+    if (s0[2] < 0) enter = s = mix(s0, e0, s0[2] / (s0[2] - e0[2]));
+    else if (e0[2] < 0) leave = e = mix(s0, e0, s0[2] / (s0[2] - e0[2]));
+    sum += edge(unitOrZero(s), unitOrZero(e));
   }
-  return sum + edge(unit(leave), unit(enter)); // zero when nothing was clipped
+  return sum + edge(unitOrZero(leave), unitOrZero(enter));
 }
-/** Mirror of clusterAreaLighting for one packed light: {specular, diffuse} radiance (rgb), and their total. */
-export function ltc(light, position, n, v, base, roughness, metal) {
-  const nv = Math.min(Math.max(dot(n, v), 0.0001), 1),
-    [x1, y1, z1, w1, magnitude, fresnel] = lookup(roughness, nv);
+
+const light = (l) => ({
+  center: l.slice(0, 3),
+  twoSided: l[3] > 0.5,
+  right: l.slice(4, 7),
+  up: l.slice(8, 11),
+  color: l.slice(12, 15),
+});
+
+/** The shader's result for one packed light at point p, unit normal n and unit view v: {diffuse, specular, total}. */
+export function ltc(l, p, n, v, base, roughness, metal) {
+  const { center, twoSided, right, up, color } = light(l),
+    nv = Math.min(Math.max(dot(n, v), 0.0001), 1),
+    st = [Math.min(Math.max(roughness, 0.045), 1) * (ltcSize - 1), Math.sqrt(1 - nv) * (ltcSize - 1)],
+    [m0, m1] = lookup(st, 0),
+    [m2, m3] = lookup(st, 1),
+    [magnitude, fresnel] = lookup(st, 2);
   let t = sub(v, scale(n, dot(n, v)));
   if (dot(t, t) < 1e-8) t = cross(n, Math.abs(n[0]) > 0.5 ? [0, 0, 1] : [1, 0, 0]);
-  const x = normalize(t),
+  const x = scale(t, 1 / Math.hypot(...t)),
     y = cross(n, x),
-    local = [x[0], y[0], n[0], x[1], y[1], n[1], x[2], y[2], n[2]];
-  const lobe = matmul([x1, 0, y1, 0, 1, 0, z1, 0, w1], local);
-  const c = sub(light.slice(0, 3), position),
-    r = light.slice(4, 7),
-    u = light.slice(8, 11),
-    color = light.slice(12, 15);
+    local = (q) => [dot(x, q), dot(y, q), dot(n, q)],
+    lobe = (q) => {
+      const [a, b, c] = local(q);
+      return [a * m0 + c * m2, b, a * m1 + c * m3];
+    };
+  const c = sub(center, p);
   let side = 1;
-  if (dot(cross(r, u), c) > 0) {
-    if (light[3] < 0.5) return { specular: [0, 0, 0], diffuse: [0, 0, 0], total: [0, 0, 0] };
+  const zero = { diffuse: [0, 0, 0], specular: [0, 0, 0], total: [0, 0, 0] };
+  if (dot(cross(right, up), c) > 0) {
+    if (!twoSided) return zero;
     side = -1;
   }
-  const quad = [sub(sub(c, r), u), add(sub(c, r), u), add(add(c, r), u), sub(add(c, r), u)];
-  const s = Math.max(side * integral(lobe, quad), 0),
-    d = Math.max(side * integral(local, quad), 0);
-  const specular = [0, 1, 2].map((k) => {
-    const f0 = 0.04 + (base[k] - 0.04) * metal;
-    return (f0 * magnitude + (1 - f0) * fresnel) * color[k] * s;
-  });
-  const diffuse = [0, 1, 2].map((k) => (1 - metal) * base[k] * color[k] * d);
-  return { specular, diffuse, total: [0, 1, 2].map((k) => specular[k] + diffuse[k]) };
+  const corners = [sub(sub(c, right), up), add(sub(c, right), up), add(add(c, right), up), sub(add(c, right), up)],
+    spec = Math.max(side * integral(lobe, corners), 0),
+    diff = Math.max(side * integral(local, corners), 0);
+  const diffuse = color.map((k, i) => k * diff * (1 - metal) * base[i]),
+    specular = color.map((k, i) => {
+      const f0 = 0.04 + (base[i] - 0.04) * metal;
+      return k * spec * (f0 * magnitude + (1 - f0) * fresnel);
+    });
+  return { diffuse, specular, total: diffuse.map((d, i) => d + specular[i]) };
 }
-const lambda = (a2, c) => (Math.sqrt(1 + (a2 * (1 - c * c)) / (c * c)) - 1) / 2;
-/** Midpoint quadrature (k x k) of GGX (height-correlated Smith, Schlick Fresnel; the BRDF the LTC table was fitted to) and Lambert over the rectangle. */
-export function bruteForce(light, position, n, v, base, roughness, metal, k = 1024) {
-  const a = Math.max(roughness, 0.045) ** 2,
-    a2 = a * a,
-    nv = Math.min(Math.max(dot(n, v), 0.0001), 1);
-  const center = light.slice(0, 3),
-    r = light.slice(4, 7),
-    u = light.slice(8, 11),
-    color = light.slice(12, 15),
-    normal = normalize(cross(r, u));
-  const area = (4 * Math.hypot(...r) * Math.hypot(...u)) / (k * k),
-    f0 = base.map((b) => 0.04 + (b - 0.04) * metal);
-  const specular = [0, 0, 0],
-    diffuse = [0, 0, 0];
+
+/**
+ * Midpoint quadrature over a k x k grid on the rectangle of radiance x BRDF x n.l x d(omega), with
+ * d(omega) = |cos at the light| dA / r^2. BRDF: (1 - metal) base / pi + D G2 F / (4 n.l n.v), GGX with alpha =
+ * roughness^2 (roughness clamped to 0.045 as the shader does), height-correlated Smith G2 = 1 / (1 + Lambda(v) +
+ * Lambda(l)), Schlick F with f0 = mix(0.04, base, metal). Returns {diffuse, specular, total}.
+ */
+export function bruteForce(l, p, n, v, base, roughness, metal, k = 256) {
+  const { center, twoSided, right, up, color } = light(l),
+    normal = cross(right, up),
+    area = 4 * Math.hypot(...normal),
+    facing = scale(normal, 1 / Math.hypot(...normal)),
+    alpha = Math.min(Math.max(roughness, 0.045), 1) ** 2,
+    a2 = alpha * alpha,
+    nv = Math.min(Math.max(dot(n, v), 0.0001), 1),
+    lambda = (c) => (Math.sqrt(1 + (a2 * (1 - c * c)) / (c * c)) - 1) / 2;
+  const diffuse = [0, 0, 0],
+    specular = [0, 0, 0];
+  if (dot(facing, sub(center, p)) > 0 && !twoSided) return { diffuse, specular, total: [0, 0, 0] };
   for (let i = 0; i < k; i++)
     for (let j = 0; j < k; j++) {
-      const p = add(center, add(scale(r, (2 * (i + 0.5)) / k - 1), scale(u, (2 * (j + 0.5)) / k - 1))),
-        d = sub(p, position),
-        d2 = dot(d, d),
-        l = scale(d, 1 / Math.sqrt(d2));
-      const nl = dot(n, l);
-      if (nl <= 0) continue;
-      let emit = -dot(normal, l);
-      if (emit <= 0) {
-        if (light[3] < 0.5) continue;
-        emit = -emit;
-      }
-      const solid = (emit * area) / d2,
-        h = normalize(add(v, l)),
-        nh = dot(n, h),
-        vh = Math.max(dot(v, h), 0);
-      const D = a2 / (Math.PI * (nh * nh * (a2 - 1) + 1) ** 2),
-        G = 1 / (1 + lambda(a2, nv) + lambda(a2, nl)),
-        spec = ((D * G) / (4 * nv)) * solid,
-        w = (1 - vh) ** 5;
+      const q = add(add(center, scale(right, (2 * i + 1) / k - 1)), scale(up, (2 * j + 1) / k - 1)),
+        w = sub(q, p),
+        r2 = dot(w, w),
+        r = Math.sqrt(r2),
+        dir = scale(w, 1 / r),
+        nl = dot(n, dir);
+      if (!(nl > 0)) continue;
+      const solid = (Math.abs(dot(facing, dir)) * area) / (k * k) / r2;
+      let h = add(v, dir);
+      h = scale(h, 1 / Math.hypot(...h));
+      const nh = dot(n, h),
+        vh = Math.max(dot(v, h), 0),
+        t = nh * nh * (a2 - 1) + 1,
+        D = nh > 0 ? a2 / (Math.PI * t * t) : 0,
+        G2 = 1 / (1 + lambda(nv) + lambda(nl)),
+        weight = (1 - vh) ** 5;
       for (let c = 0; c < 3; c++) {
-        specular[c] += (f0[c] + (1 - f0[c]) * w) * spec * color[c];
-        diffuse[c] += (((1 - metal) * base[c]) / Math.PI) * nl * solid * color[c];
+        const f0 = 0.04 + (base[c] - 0.04) * metal,
+          F = f0 + (1 - f0) * weight;
+        diffuse[c] += (color[c] * (1 - metal) * base[c] * nl * solid) / Math.PI;
+        specular[c] += color[c] * ((D * G2 * F) / (4 * nl * nv)) * nl * solid;
       }
     }
-  return { specular, diffuse, total: [0, 1, 2].map((c) => specular[c] + diffuse[c]) };
+  return { diffuse, specular, total: diffuse.map((d, i) => d + specular[i]) };
 }

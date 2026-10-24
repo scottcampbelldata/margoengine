@@ -1,17 +1,16 @@
-// WGSL distance falloff and spot cone of one clustered light record (`light`, its unit vector `l` from the shaded point
-// and `distance`), shared by @margoengine/clustered's light loop and @margoengine/environment's volumetric fog.
-// As written before lights had a decay.
-export const legacyTerms = /* wgsl */ `let falloff=pow(max(0.0,1-pow(distance/light.positionRange.w,4.0)),2.0)/max(distance*distance,0.01);
-    var cone=1.0;if(light.params.y>0.5){cone=clamp((dot(-l,light.directionOuter.xyz)-light.directionOuter.w)/max(light.params.x-light.directionOuter.w,0.00001),0.0,1.0);cone*=cone*(3-2*cone);}`;
-// The same terms once any light sets `decay` or `angle` (clustered `setLights`): params.y holds 0 (point) or 1 (spot)
-// for a light that sets neither, which keeps the terms above, and -(1 + decay) (point) or 2 + decay (spot) for one that
-// does, so every `params.y > 0.5` spot test elsewhere still holds. Those lights get window / max(d^decay, 0.01) and the
-// cone smoothstep(cos outer, cos inner, dot(-L, direction)), a hard edge when the two are equal (penumbra 0).
-export const decayTerms = /* wgsl */ `let kind=light.params.y;let legacy=kind==0.0||kind==1.0;let decay=select(-1.0-kind,kind-2.0,kind>0.5);
-    let falloff=pow(max(0.0,1-pow(distance/light.positionRange.w,4.0)),2.0)/select(max(pow(max(distance,0.0001),decay),0.01),max(distance*distance,0.01),legacy);
-    var cone=1.0;if(kind>0.5){let x=dot(-l,light.directionOuter.xyz);let lo=light.directionOuter.w;let hi=light.params.x;
-      if(legacy){cone=clamp((x-lo)/max(hi-lo,0.00001),0.0,1.0);}else if(hi>lo){cone=clamp((x-lo)/(hi-lo),0.0,1.0);}else{cone=select(0.0,1.0,x>=lo);}
-      cone*=cone*(3-2*cone);}`;
+// Distance falloff and spot cone of clustered's per-light loop (and environment's volumetric local lights), as WGSL
+// statements over the loop's `light` record, `l` (unit vector to the light) and `distance`. Both declare
+// `let falloff:f32` and `var cone:f32`. The falloff is the windowed inverse power of Karis 2013 ("Real Shading in
+// Unreal Engine 4"): window = clamp(1 - (d / range)^4, 0, 1)^2 (an unlimited range is stored as +Infinity, window 1),
+// divided by max(d^decay, 2^-12). The floor 2^-12 (exact in float32) treats the light as a ball of radius 1/64 unit:
+// nearer than that the falloff stops growing, so the peak at the light is window * 4096. Legacy lights (params.y 0
+// point, 1 spot) square the distance by multiplication and fade the cone with a Hermite ramp between cos(outer) and
+// cos(inner); decay-aware lights (params.y -(1 + decay) point, 2 + decay spot) raise d to `decay` and use WGSL's
+// smoothstep, a hard edge when the two cosines are equal (penumbra 0).
+export const legacyTerms =
+  'let reach=distance/light.positionRange.w;let fade=clamp(1.0-reach*reach*reach*reach,0.0,1.0);let falloff=fade*fade/max(distance*distance,0.000244140625);var cone=1.0;if(light.params.y>0.5){let ramp=clamp((dot(-l,light.directionOuter.xyz)-light.directionOuter.w)/max(light.params.x-light.directionOuter.w,0.000001),0.0,1.0);cone=ramp*ramp*(3.0-2.0*ramp);}';
+export const decayTerms =
+  'let kind=light.params.y;let reach=distance/light.positionRange.w;let fade=clamp(1.0-reach*reach*reach*reach,0.0,1.0);let fresh=kind<-0.5||kind>1.5;let power=select(distance*distance,pow(max(distance,0.000001),select(-1.0-kind,kind-2.0,kind>1.5)),fresh);let falloff=fade*fade/max(power,0.000244140625);var cone=1.0;if(kind>0.5){let along=dot(-l,light.directionOuter.xyz);let lo=light.directionOuter.w;let hi=light.params.x;if(fresh){cone=select(select(0.0,1.0,along>=lo),smoothstep(lo,hi,along),hi>lo);}else{let ramp=clamp((along-lo)/max(hi-lo,0.000001),0.0,1.0);cone=ramp*ramp*(3.0-2.0*ramp);}}';
 // The per-light BRDF of clustered's light loop (GGX with Fresnel, as gltf-pro's direct light), in the loop's locals (n, v,
 // l, h, base, metal, nl, nv, d, g, fresnel). @margoengine/materials' Lambert and Phong put their own BRDF in its place.
 export const clusterBrdf = '((1-fresnel)*(1-metal)*base/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))';

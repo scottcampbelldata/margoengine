@@ -123,7 +123,11 @@ test('coat and sheen hooks light the physical layers; shaders without layers ign
   const defaults = physicalShader();
   // Without an environment the layers keep the hemisphere terms they always had.
   assert.match(defaults, /fn margoCoatAmbient\(s:Surface,v:vec3f\)->vec3f \{return 0\.5\*margoLayerSky\(s\);\}/);
-  assert.match(defaults, /fn margoSheenAmbient\(s:Surface,v:vec3f\)->vec3f \{return 0\.157\*margoLayerSky\(s\);\}/);
+  // The sheen's default is its albedo times the sky gradient at the base normal s.n (the coat keeps s.cn).
+  assert.match(
+    defaults,
+    /fn margoSheenAmbient\(s:Surface,v:vec3f\)->vec3f \{return margoSheenAlbedo\(clamp\(dot\(s\.n,v\),0\.0001,1\.0\),s\.sh\.w\)\*mix\(vec3f\(0\.35,0\.3,0\.25\),vec3f\(1\),clamp\(s\.n\.y\*0\.5\+0\.5,0\.0,1\.0\)\)\*f\.radiance\.w\*s\.occlusion;\}/,
+  );
   const hooks = { declarations: '', coat: 'coatLight(s,v)', sheen: 'sheenLight(s,v)' },
     lit = lightPBR(defaults, hooks);
   assert.match(lit, /fn margoCoatAmbient\(s:Surface,v:vec3f\)->vec3f \{return coatLight\(s,v\);\}/);

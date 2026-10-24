@@ -3,4 +3,4 @@
 export const ownLicenses = new Map([['brep', 'AGPL-3.0-only OR LicenseRef-Commercial']]);
 
 /** @param {string} name package directory name, e.g. `brep` */
-export const expectedLicense = (name) => ownLicenses.get(name) ?? (name === 'materials' ? 'MIT AND Apache-2.0' : 'MIT');
+export const expectedLicense = (name) => ownLicenses.get(name) ?? 'MIT';

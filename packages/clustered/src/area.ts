@@ -34,9 +34,15 @@ fn areaLutCell(x:u32,y:u32,k:u32)->vec2f {return unpack2x16float(areaLights.lut[
 fn areaLut(st:vec2f,k:u32)->vec2f {let i=vec2u(st);let j=min(i+1u,vec2u(${ltcSize - 1}u));let f=st-vec2f(i);
   return mix(mix(areaLutCell(i.x,i.y,k),areaLutCell(j.x,i.y,k),f.x),mix(areaLutCell(i.x,j.y,k),areaLutCell(j.x,j.y,k),f.x),f.y);}
 fn areaUnit(p:vec3f)->vec3f {return p*inverseSqrt(max(dot(p,p),1e-20));}
-// z of the edge's vector form factor: cross(a,b).z * theta/sin(theta)/2pi (rational fit, Hill and Heitz 2016).
-fn areaEdge(a:vec3f,b:vec3f)->f32 {let x=dot(a,b);let y=abs(x);let v=(0.8543985+(0.4965155+0.0145206*y)*y)/(3.417594+(4.1616724+y)*y);
-  return (a.x*b.y-a.y*b.x)*select(0.5*inverseSqrt(max(1-x*x,1e-7))-v,v,x>0);}
+// One edge's share of the polygon's vector form factor (Lambert's formula, as Heitz et al. 2016 integrate it), z
+// component: (a x b).z / |a x b| * angle(a, b) / (2 pi). The angle is atan2(|a x b|, a.b), which is well conditioned
+// everywhere (acos loses digits near a.b = 1, asin near -1), and (a x b).z / |a x b| is a direction cosine in [-1, 1],
+// so no factor grows without bound as the edge closes up (angle -> 0) or opens to pi. Both pieces are invariant to
+// the scale of the cross product, so it is divided by its largest component first (no float32 underflow in |a x b|^2
+// for nearly parallel edges). Rounding adds a few ulp to atan2's own error. A zero cross product (parallel or zero
+// vectors, as the unclipped horizon chord) returns 0.
+fn areaEdge(a:vec3f,b:vec3f)->f32 {let n=cross(a,b);let top=max(max(abs(n.x),abs(n.y)),abs(n.z));if(top<=0.0){return 0.0;}
+  let k=n/top;let s=length(k);return k.z/s*atan2(top*s,dot(a,b))*0.15915494;}
 // One edge clipped to z>=0; records where the quad leaves and re-enters the upper hemisphere.
 fn areaClip(s0:vec3f,e0:vec3f,leave:ptr<function,vec3f>,enter:ptr<function,vec3f>)->f32 {
   if(s0.z<0&&e0.z<0){return 0.0;}var s=s0;var e=e0;
