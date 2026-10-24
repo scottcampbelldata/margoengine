@@ -19,7 +19,7 @@ export const FAMILIES = {
   'inflate-tables': /3,\s*4,\s*5,\s*6,\s*7,\s*8,\s*9,\s*10,\s*11,\s*13,\s*15,\s*17/, // DEFLATE length bases: shared/inflate.js
   'glb-container': /0x46546c67/i, // 'glTF' GLB magic: GLB read/write
   'gltf-accessor': /\bcomponentType\b/, // glTF accessor readers
-  'hidden-ancestor': /store\.hidden\[/, // visibility walk up engine.store.parents
+  'hidden-ancestor': /for \(\s*(?:let )?[^;{]*;[^;{]*;[^{]*?parents(?:\?\.)?\[[\s\S]{0,240}?\.hidden\[/, // visibility walk up store.parents: shared/visibility.js
   'ggx-ndf': /\(\s*[\w.]*\s*-\s*1(?:\.0?)?\s*\)\s*\+\s*1(?:\.0?)?\b/, // GGX D term denominator nh*nh*(a2 - 1) + 1
   'hex-colour': /\/\^#\??\(?\[0-9a-f/i, // '#rgb' / '#rrggbb' parsing regex: math/color
   'partial-view': /\[0\] !== 0 \|\| [\w.]+\[1\] !== 0 \|\| [\w.]+\[2\] !== [\w.]*width/, // full-view test of a view rectangle: core renderer

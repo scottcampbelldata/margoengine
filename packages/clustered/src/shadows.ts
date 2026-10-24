@@ -26,6 +26,7 @@ import {
   type DirectionalShadowLight,
 } from './light-shadow-math.js';
 import { MargoError } from '@margoengine/math/errors';
+import { hiddenInTree } from '../../shared/visibility.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -683,8 +684,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
             'attached',
             'Shadow caster belongs to another engine; use objects created by the same engine',
           );
-        let visible = true;
-        for (let id = node.id; id !== -1; id = engine.store.parents[id]) if (engine.store.hidden[id]) visible = false;
+        const visible = !hiddenInTree(engine.store, node.id);
         const inst = p.instances,
           d = this.record(p);
         d.seen = true;

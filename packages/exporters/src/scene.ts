@@ -7,6 +7,7 @@ import type { Vec2 } from '@margoengine/math';
 import { rotationToQuaternion } from '@margoengine/math/quat';
 import type { PBRSource } from '../../shared/pbr-source.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
+import { hiddenInTree } from '../../shared/visibility.js';
 
 /** Deepest node chain an export walks; one level deeper throws before any node is written. */
 const MAX_HIERARCHY_DEPTH = 1024;
@@ -1104,11 +1105,10 @@ export function collect(source: ExportSource, options: SceneOptions = {}, plan?:
     // An exported subtree root keeps its local transform, but its parents still place it in world space.
     let base: Float64Array | null = null;
     if (options.root !== undefined) {
-      const chain: number[] = [];
-      for (let id = store.parents[meshRuntime(options.root).id]; id !== -1; id = store.parents[id]) {
-        chain.unshift(id);
-        if (onlyVisible && store.hidden[id]) return [];
-      }
+      const chain: number[] = [],
+        parent = store.parents[meshRuntime(options.root).id];
+      if (onlyVisible && hiddenInTree(store, parent)) return [];
+      for (let id = parent; id !== -1; id = store.parents[id]) chain.unshift(id);
       for (const id of chain) {
         const t = store.transforms,
           local = compose([t.x[id], t.y[id], t.z[id]], unitQuaternion([t.qx[id], t.qy[id], t.qz[id], t.qw[id]]), [

@@ -1,5 +1,6 @@
 import type { EngineKernel, Mesh } from '@margoengine/core';
 import { engineRuntime, meshRuntime } from '@margoengine/core/extension';
+import { hiddenInTree } from '../../shared/visibility.js';
 
 /**
  * World matrix (column-major, 16 floats, a live view: copy it to keep it) of a core mesh after the latest transform
@@ -11,11 +12,6 @@ export function meshWorldMatrix(engine: EngineKernel, mesh: Mesh): Float32Array 
     object = meshRuntime(mesh),
     id = object.id;
   if (runtime.disposed || runtime.meshes.get(id) !== (mesh as unknown)) return null;
-  for (
-    let current = id, depth = 0;
-    current >= 0 && depth < 64;
-    current = runtime.store.parents?.[current] ?? -1, depth++
-  )
-    if (runtime.store.hidden[current]) return null;
+  if (hiddenInTree(runtime.store, id)) return null;
   return object.matrix ?? runtime.store.matrices.subarray(id * 16, id * 16 + 16);
 }

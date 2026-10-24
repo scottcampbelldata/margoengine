@@ -15,6 +15,7 @@ import { halton, jitterProjection } from './jitter.js';
 import { fullscreen, cameraVelocity, objectVelocity, snapshot, resolve, present } from './shader.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView, fromTarget, toTarget, viewLoadOp, viewRect, viewSize, ViewStates } from '../../shared/view-rect.js';
+import { hiddenInTree } from '../../shared/visibility.js';
 export { halton, jitterProjection } from './jitter.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; COPY_SRC: number; STORAGE: number };
 declare const GPUTextureUsage: {
@@ -538,7 +539,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     p.node.check();
     if (p.node.engine !== this.engine || ![24, 80].includes(p.stride))
       throw new TypeError('Invalid TAA velocity primitive; use a mesh of this engine with stride 24 or 80');
-    for (let id = p.node.id; id !== -1; id = this.engine!.store.parents[id]) if (this.engine!.store.hidden[id]) return;
+    if (hiddenInTree(this.engine!.store, p.node.id)) return;
     const transform = p.alphaTransform;
     if (
       transform &&

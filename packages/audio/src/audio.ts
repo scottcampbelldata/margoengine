@@ -3,6 +3,7 @@ import type { EngineKernel, Mesh } from '@margoengine/core';
 import { engineRuntime, meshRuntime } from '@margoengine/core/extension';
 import type { AudioListener, ListenerSource } from './listener.js';
 import { normalize, smoothParam, type DistanceModel, type Vec3 } from './math.js';
+import { hiddenInTree } from '../../shared/visibility.js';
 
 export interface AudioOptions {
   /** Volume of this sound, default 1. */
@@ -761,14 +762,7 @@ export class PositionalAudio extends Audio {
       this.worldDirection.set(direction);
       this.writePose();
     }
-    let hidden = false;
-    if (this.muteWhenHidden)
-      for (let current = id, depth = 0; current >= 0 && depth < 64; current = store.parents[current], depth++)
-        if (store.hidden[current]) {
-          hidden = true;
-          break;
-        }
-    this.setMuted(hidden);
+    this.setMuted(this.muteWhenHidden && hiddenInTree(store, id));
   }
 
   override dispose(): void {

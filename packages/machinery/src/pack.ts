@@ -1,6 +1,7 @@
 import type { Batch, DrawOptions, Engine, Geometry, Mesh, PassContext } from '@margoengine/core/extension';
 import { invertMatrixStable, multiplyMatrices } from '@margoengine/math/mat4';
 import { capsAsSolid } from './closed.js';
+import { hiddenInTree } from '../../shared/visibility.js';
 
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; UNIFORM: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -402,7 +403,7 @@ export class PartPacks {
   private draw(c: Context, options: DrawOptions): void {
     const store = this.engine!.store;
     let any = false;
-    for (const pack of this.packs) any ||= !this.hiddenRoot(store, pack.root.id);
+    for (const pack of this.packs) any ||= !hiddenInTree(store, pack.root.id);
     if (!any) return;
     const pipeline = options.pipeline ?? this.variant(c),
       group = this.group(c.device, pipeline, options.bindings ?? c.bindings),
@@ -424,7 +425,7 @@ export class PartPacks {
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, group);
     for (const pack of this.packs) {
-      if (this.hiddenRoot(store, pack.root.id)) continue;
+      if (hiddenInTree(store, pack.root.id)) continue;
       pass.setVertexBuffer(0, pack.vertex);
       pass.setVertexBuffer(1, pack.instance);
       pass.setIndexBuffer(pack.index, 'uint32');
@@ -442,10 +443,6 @@ export class PartPacks {
     const data = mesh.material.data;
     for (let i = 0; i < 7; i++) if (data[i] !== values[i]) return false;
     return true;
-  }
-  private hiddenRoot(store: Engine['store'], id: number): boolean {
-    for (; id !== -1; id = store.parents[id]) if (store.hidden[id]) return true;
-    return false;
   }
   /** Core's variant for the frame shader: same descriptor, shader and target format as its own draw. */
   private variant(c: Context): GPURenderPipeline {

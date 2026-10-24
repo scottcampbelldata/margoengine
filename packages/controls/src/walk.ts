@@ -25,6 +25,7 @@ import { OrbitControls } from './orbit.js';
 import { MAX_PITCH, turn } from './fly.js';
 import { basis } from './view.js';
 import type { V3 } from './math.js';
+import { hiddenInTree } from '../../shared/visibility.js';
 
 // The base class and the dollhouse orbit class, typed from this entry too.
 export type { Controls, OrbitControls };
@@ -538,7 +539,7 @@ export class WalkControls extends Controls {
   }
   private alive(mesh: RuntimeMesh): boolean {
     const runtime = engineRuntime(this.engine!);
-    return runtime.meshes.get(mesh.id) === (mesh as unknown) && !hidden(runtime.store, mesh.id);
+    return runtime.meshes.get(mesh.id) === (mesh as unknown) && !hiddenInTree(runtime.store, mesh.id);
   }
   /** Adds a candidate whose world box (left in OB by `overlaps`) touches the query, when its matrix inverts. */
   private accept(
@@ -895,11 +896,6 @@ interface RuntimeMesh {
   geometry: { vertices: Float32Array; indices: Uint32Array; bounds: Float32Array } | null;
 }
 
-function hidden(store: { parents: ArrayLike<number>; hidden: ArrayLike<number> }, id: number): boolean {
-  for (let node = id, depth = 0; node >= 0 && depth <= 64; node = store.parents[node], depth++)
-    if (store.hidden[node]) return true;
-  return false;
-}
 /** Local box of interleaved positions (stride 6 for core geometry, 20 for gltf-pro), cached per geometry. */
 function localBounds(key: object, v: Float32Array, stride: number, cache: number): Float64Array {
   let box = cache ? localBoxes.get(key) : undefined;

@@ -12,6 +12,7 @@ import {
 } from '@margoengine/core/extension';
 import { instanceLayout, instancedDepth } from '../../shared/instances.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
+import { hiddenInTree } from '../../shared/visibility.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -339,9 +340,7 @@ export class ContactShadows implements EnginePlugin {
         const node = p.node;
         node.check();
         if (node.engine !== engine) throw new Error('Contact shadow source belongs to another engine');
-        let visible = true;
-        for (let id = node.id; id !== -1; id = engine.store.parents[id]) if (engine.store.hidden[id]) visible = false;
-        if (!visible || (p.instances && !p.instances.count)) continue;
+        if (hiddenInTree(engine.store, node.id) || (p.instances && !p.instances.count)) continue;
         const draw = this.record(p),
           v = draw.values,
           before = v.slice();

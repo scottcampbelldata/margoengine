@@ -22,6 +22,7 @@ import { finiteVector } from '@margoengine/math/validate';
 import { MargoError } from '@margoengine/math/errors';
 import { cascadeSplits, fitCascades } from './cascades.js';
 import { shadowSampling, shadowDepth, type ShadowFilter } from './shader.js';
+import { hiddenInTree } from '../../shared/visibility.js';
 export { cascadeSplits, fitCascades } from './cascades.js';
 export type { ShadowFilter } from './shader.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
@@ -887,13 +888,8 @@ export class Shadows implements EnginePlugin {
     if (transform) for (let i = 0; i < transform.length; i++) hash = this.mixFloat(hash, transform[i]);
     const matrix = primitive.node.matrix;
     for (let i = 0; i < 16; i++) hash = this.mixFloat(hash, matrix[i]);
-    let hidden = 0;
-    const store = this.engine?.store;
-    if (store)
-      for (let id = primitive.node.id; id !== -1; id = store.parents[id]) {
-        if (store.hidden[id]) hidden = 1;
-        if (id === store.parents[id]) break;
-      }
+    const store = this.engine?.store,
+      hidden = store && hiddenInTree(store, primitive.node.id) ? 1 : 0;
     return Math.imul(hash, 16777619) ^ hidden;
   }
   private casters(record: Source, level: number): readonly ShadowPrimitive[] {
@@ -980,10 +976,7 @@ export class Shadows implements EnginePlugin {
               'attached',
               'Shadow source belongs to another engine; use objects created by the same engine',
             );
-          let visible = true;
-          for (let id = node.id; id !== -1; id = this.engine!.store.parents[id])
-            if (this.engine!.store.hidden[id]) visible = false;
-          if (!visible) continue;
+          if (hiddenInTree(this.engine!.store, node.id)) continue;
           const key = primitive.primitive ?? primitive.index;
           if (frame.owners.get(node)?.get(key) !== cached) continue;
           let indices = submitted.get(node);

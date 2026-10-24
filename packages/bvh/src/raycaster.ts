@@ -8,6 +8,7 @@ import { invertMatrix, multiplyMatrices } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
 import { transformPoint, type Side } from './math.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
+import { hiddenInTree } from '../../shared/visibility.js';
 
 // Structural views of the engine internals that `engineRuntime(engine)` exposes. Types only: this module never
 // imports core at runtime, so it stays usable from workers and Node.
@@ -422,7 +423,7 @@ export class Raycaster {
       const handle = snapshot.node,
         mesh = handle as unknown as RuntimeMesh & { engine: RuntimeEngine };
       if (mesh.engine !== runtime) throw new TypeError('Picking geometry belongs to another engine');
-      if (runtime.meshes.get(mesh.id) !== mesh || hiddenInHierarchy(runtime.store, mesh.id)) continue;
+      if (runtime.meshes.get(mesh.id) !== mesh || hiddenInTree(runtime.store, mesh.id)) continue;
       if (!(getMeshLayers(handle) & layers) || (filter && !filter(handle))) continue;
       // User predicates can dispose or reparent scene objects synchronously as well.
       if (
@@ -434,7 +435,7 @@ export class Raycaster {
         return [];
       if (
         runtime.meshes.get(mesh.id) !== mesh ||
-        hiddenInHierarchy(runtime.store, mesh.id) ||
+        hiddenInTree(runtime.store, mesh.id) ||
         !(getMeshLayers(handle) & layers)
       )
         continue;
@@ -714,7 +715,7 @@ export class Raycaster {
       !runtime.disposed &&
       !model?.disposed &&
       runtime.meshes.get(mesh.id) === mesh &&
-      !hiddenInHierarchy(runtime.store, mesh.id)
+      !hiddenInTree(runtime.store, mesh.id)
     );
   }
 
@@ -915,13 +916,6 @@ export function cameraRay<T extends Raycaster>(
   const near = unproject(inverse, x, y, webgpu ? 1 : -1),
     far = unproject(inverse, x, y, webgpu ? 0 : 1);
   return ray.set(orthographic ? near : position, [far[0] - near[0], far[1] - near[1], far[2] - near[2]]);
-}
-
-/** @internal Shared hierarchy visibility predicate for live and captured queries. */
-export function hiddenInHierarchy(store: RuntimeStore, id: number): boolean {
-  for (let node = id, depth = 0; node >= 0 && depth <= 64; node = store.parents[node], depth++)
-    if (store.hidden[node]) return true;
-  return false;
 }
 
 function unproject(inverse: Float64Array, x: number, y: number, z: number): MutableVec3 {

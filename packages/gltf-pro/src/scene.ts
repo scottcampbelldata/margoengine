@@ -7,6 +7,7 @@ import {
   type Mesh as RuntimeMesh,
 } from '@margoengine/core/extension';
 import { meshTriangles } from '../../shared/mesh-source.js';
+import { hiddenInTree } from '../../shared/visibility.js';
 
 export interface SceneQueryOptions {
   /** Exclude meshes hidden by themselves or any ancestor. Defaults to true; ignores frustum culling. */
@@ -67,14 +68,12 @@ function selectedMeshes(
   const meshes: RuntimeMesh[] = [];
   for (const mesh of engine.meshes.values()) {
     let included = false,
-      visible = true,
       depth = 0;
     for (let id = mesh.id; id !== -1; id = engine.store.parents[id]) {
       if (++depth > 64) throw new RangeError('Parent depth: 64');
       if (selected.has(id)) included = true;
-      if (engine.store.hidden[id]) visible = false;
     }
-    if (included && (!visibleOnly || visible)) meshes.push(mesh);
+    if (included && (!visibleOnly || !hiddenInTree(engine.store, mesh.id))) meshes.push(mesh);
   }
   return { engine, meshes };
 }

@@ -8,7 +8,6 @@ import {
   deformedError,
   deformedNode,
   getMeshLayers,
-  hiddenInHierarchy,
   isModel,
   meshSide,
   modelMeshLayers,
@@ -19,6 +18,7 @@ import {
   type PickProxy,
 } from './raycaster.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
+import { hiddenInTree } from '../../shared/visibility.js';
 
 /** @internal Structural runtime supplied by core's public extension. No core runtime import. */
 export interface SnapshotRuntime {
@@ -87,8 +87,7 @@ export function captureEntries(
     if (isModel(object)) models.add(object);
     else meshes.push(object as unknown as SnapshotNode);
   }
-  const live = (node: SnapshotNode) =>
-    runtime.meshes.get(node.id) === node && !hiddenInHierarchy(runtime.store, node.id);
+  const live = (node: SnapshotNode) => runtime.meshes.get(node.id) === node && !hiddenInTree(runtime.store, node.id);
   const worldOf = (node: SnapshotNode) => runtime.store.matrices.subarray(node.id * 16, node.id * 16 + 16);
 
   const geometry = (vertices: Float32Array, indices: Uint32Array, stride: number): SnapshotGeometry | null => {

@@ -1,6 +1,7 @@
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import type { Shadows } from '@margoengine/shadows';
 import { live, type Registry } from './internal.js';
+import { hiddenInTree } from '../../shared/visibility.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 export interface ContactGroundOptions {
@@ -55,8 +56,7 @@ export class ContactGround implements EnginePlugin {
   private draw(context: Extract<PassContext, { backend: 'webgpu' }>): void {
     const mesh = live(this.registry);
     if (!mesh || !mesh.visible) return;
-    for (let id = mesh.id, depth = 0; id >= 0 && depth < 64; id = this.engine!.store.parents[id], depth++)
-      if (this.engine!.store.hidden[id]) return;
+    if (hiddenInTree(this.engine!.store, mesh.id)) return;
     const { width = 10, height = 10, opacity = 0.5, color = [0, 0, 0] } = this.options();
     if (
       !Number.isFinite(width) ||

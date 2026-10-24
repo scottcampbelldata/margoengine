@@ -6,6 +6,7 @@ import { instanceLayout, instancedDepth } from '../../shared/instances.js';
 import { displacedDepth } from '../../shared/displacement.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { hemisphere, localShadowMatrix, viewportMatrix } from './local-shadow-math.js';
+import { hiddenInTree } from '../../shared/visibility.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUTextureUsage: {
   RENDER_ATTACHMENT: number;
@@ -486,13 +487,7 @@ export class LocalShadowMaps {
                   'attached',
                   'Local shadow source belongs to another engine; use objects created by the same engine',
                 );
-              let visible = true;
-              for (let id = node.id; id !== -1; id = this.engine!.store.parents[id])
-                if (this.engine!.store.hidden[id]) {
-                  visible = false;
-                  break;
-                }
-              if (!visible) continue;
+              if (hiddenInTree(this.engine!.store, node.id)) continue;
               const key = primitive.primitive ?? primitive.index;
               let indices = submitted.get(node);
               if (indices?.has(key)) continue;

@@ -5,6 +5,7 @@ import { meshTriangles } from '../../shared/mesh-source.js';
 import { machineryMemory } from './runtime.js';
 import { holeAnchor, snapFeature, vertexAnchor, edgeAnchor } from './metrology.js';
 import { worldAnchor, type Anchor } from './anchors.js';
+import { hiddenInTree } from '../../shared/visibility.js';
 export interface RayHit {
   node: Mesh;
   triangle: number;
@@ -163,16 +164,7 @@ export class AssemblyBVH {
       this.checkSource(n);
       s[n * 4 + 3] = -1;
       if (!this.shape[n].length) continue;
-      let visible = true;
-      for (let id = runtime.id, depth = 0; id !== -1; id = runtime.engine.store.parents[id], depth++) {
-        if (depth >= 64 || !Number.isSafeInteger(id) || id < 0 || id >= runtime.engine.store.capacity)
-          throw new Error('Invalid BVH hierarchy');
-        if (runtime.engine.store.hidden[id]) {
-          visible = false;
-          break;
-        }
-      }
-      if (!visible) continue;
+      if (hiddenInTree(runtime.engine.store, runtime.id)) continue;
       const m = runtime.matrix,
         b = this.bounds.subarray(n * 4, n * 4 + 4);
       if (!m.every(Number.isFinite)) throw new RangeError('Invalid BVH coordinates'); // Affine inverse: rows of the 3x3 inverse are the cross products of the columns over the determinant.

@@ -27,6 +27,7 @@ import {
   type CapturePassFilter,
 } from './capture.js';
 import { checkLayers } from '../../shared/view-rect.js';
+import { hiddenInTree } from '../../shared/visibility.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
@@ -395,8 +396,8 @@ export abstract class PlanarSurface {
       world = this.world;
     world.fill(0);
     world[0] = world[5] = world[10] = world[15] = 1;
+    if (hiddenInTree(store, meshRuntime(node).id)) return false;
     for (let id = meshRuntime(node).id, depth = 0; id >= 0 && depth < 64; id = store.parents[id], depth++) {
-      if (store.hidden[id]) return false;
       composeMatrix(
         [t.x[id], t.y[id], t.z[id]],
         [t.qx[id], t.qy[id], t.qz[id], t.qw[id]],
@@ -463,8 +464,7 @@ export abstract class PlanarSurface {
     if (!this.captured || !color || this.target.device !== c.device) return;
     const runtime = engineRuntime(engine),
       store = runtime.store;
-    for (let id = meshRuntime(node).id, depth = 0; id >= 0 && depth < 64; id = store.parents[id], depth++)
-      if (store.hidden[id]) return;
+    if (hiddenInTree(store, meshRuntime(node).id)) return;
     const m = meshRuntime(node).matrix,
       eye = c.camera.position,
       nx = m[1] * m[6] - m[2] * m[5],

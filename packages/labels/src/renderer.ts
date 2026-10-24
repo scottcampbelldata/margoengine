@@ -14,6 +14,7 @@ import {
   type ScreenPoint,
   type Vec3,
 } from './projection.js';
+import { hiddenInTree } from '../../shared/visibility.js';
 
 export interface LabelInfo {
   /** Projected position in CSS pixels relative to the canvas. */
@@ -367,7 +368,7 @@ export class LabelRenderer implements EnginePlugin {
       const world = label.world;
       if (show && mesh) {
         const id = meshRuntime(mesh).id;
-        if (runtime.meshes.get(id) !== mesh || (label.followVisibility && this.hidden(store, id))) show = false;
+        if (runtime.meshes.get(id) !== mesh || (label.followVisibility && hiddenInTree(store, id))) show = false;
         else {
           const o = id * 16,
             [ox, oy, oz] = label.offset;
@@ -487,7 +488,7 @@ export class LabelRenderer implements EnginePlugin {
         matrix = object.matrix;
       if (show && mesh) {
         const id = meshRuntime(mesh).id;
-        if (runtime.meshes.get(id) !== mesh || (object.followVisibility && this.hidden(store, id))) show = false;
+        if (runtime.meshes.get(id) !== mesh || (object.followVisibility && hiddenInTree(store, id))) show = false;
         else for (let i = 0; i < 16; i++) matrix[i] = matrices[id * 16 + i];
       } else if (show) matrix.set(object.ownMatrix);
       if (show) {
@@ -539,11 +540,6 @@ export class LabelRenderer implements EnginePlugin {
     if (cache[property] === value) return;
     write(element, cache, property, value);
     this.writes++;
-  }
-  private hidden(store: { parents: ArrayLike<number>; hidden: ArrayLike<number> }, id: number): boolean {
-    for (let current = id, depth = 0; current >= 0 && depth < 64; current = store.parents[current], depth++)
-      if (store.hidden[current]) return true;
-    return false;
   }
   private syncRoot(canvas: HTMLCanvasElement, x: number, y: number, width: number, height: number): void {
     const root = this.root!;

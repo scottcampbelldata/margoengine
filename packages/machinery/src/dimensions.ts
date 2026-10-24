@@ -14,6 +14,7 @@ import { viewMatrix } from '../../shared/view.js';
 import { worldAnchor, type Anchor } from './anchors.js';
 import { measureDistance } from './metrology.js';
 import { sub } from '@margoengine/math/vec3';
+import { hiddenInTree } from '../../shared/visibility.js';
 export type { Anchor } from './anchors.js';
 
 /** Distance between two anchors; `offset` is the dimension line's distance from them in CSS pixels (signed, default 24) or a screen pixel vector, as `EngineeringAnnotations` dimensions. */
@@ -208,8 +209,7 @@ export class Dimensions implements EnginePlugin {
     const e = this.engine!,
       id = meshRuntime(anchor.node).id;
     if (e.meshes.get(id) !== (anchor.node as unknown)) return true;
-    for (let slot = id; slot !== -1; slot = e.store.parents[slot]) if (e.store.hidden[slot]) return true;
-    return false;
+    return hiddenInTree(e.store, id);
   }
   /** Screen position (CSS pixels) of a world point and the world vectors of one pixel right and down there; null behind the eye. */
   private project(p: Vec3): { x: number; y: number; px: Vec3; py: Vec3 } | null {
