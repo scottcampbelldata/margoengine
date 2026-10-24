@@ -26,7 +26,7 @@ import {
   type CapturePassContext,
   type CapturePassFilter,
 } from './capture.js';
-import { layerMask } from './layers.js';
+import { checkLayers } from '../../shared/view-rect.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
@@ -269,7 +269,7 @@ export abstract class PlanarSurface {
     return this.layersValue;
   }
   set layers(value: number) {
-    this.layersValue = layerMask(value, 'Surface layers');
+    this.layersValue = checkLayers(value, 'Surface layers');
   }
   get normalMap(): GPUTexture | NormalMapImage | undefined {
     return this.normalSource;

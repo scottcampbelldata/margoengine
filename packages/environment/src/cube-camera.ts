@@ -10,7 +10,7 @@ import {
   type CapturePassContext,
   type CapturePassFilter,
 } from './capture.js';
-import { layerMask } from './layers.js';
+import { checkLayers } from '../../shared/view-rect.js';
 
 export { scenePasses, type CapturePassFilter } from './capture.js';
 
@@ -188,7 +188,7 @@ export class CubeCamera {
     return this.layersValue;
   }
   set layers(value: number) {
-    this.layersValue = layerMask(value, 'CubeCamera layers');
+    this.layersValue = checkLayers(value, 'CubeCamera layers');
   }
   /** The cube texture: `rgba16float`, `size` x `size`, 6 array layers. Replaced on device restore (see `version`). */
   get texture(): GPUTexture {

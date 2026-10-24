@@ -36,7 +36,34 @@ The canvas is opaque. For a transparent canvas over HTML and CSS, attach `Transp
 
 `engine.render({camera: anotherCamera, delta: 0})` draws the implicit scene through that camera. The camera supplied to `Engine.create` remains `engine.camera`; its fit animation does not advance during the alternate render. Before returning, core restores the primary camera's frustum, visible instances, batches and statistics, including when a pass throws. Plugins receive one pre-update callback per call. A later ordinary render or pick uses the primary camera.
 
-Alternate renders must be sequential, outside a running frame pass. This hook does not create a second scene, separate temporal histories, CubeCamera or a mirror. Camera-dependent plugins that read `engine.camera` in their update callbacks still follow the primary camera. Use `delta: 0` for additional views so simulation is not advanced again. Projection aspect follows the canvas; an offscreen capture with another aspect needs an explicit `Camera.project` override.
+Alternate renders must be sequential, outside a running frame pass. For several cameras in one frame use views (below). Camera-dependent plugins that read `engine.camera` in their update callbacks still follow the primary camera. Use `delta: 0` for additional views so simulation is not advanced again. Projection aspect follows the canvas; an offscreen capture with another aspect needs an explicit `Camera.project` override.
+
+## Views and scenes
+
+Several cameras in one frame: split screen, a four-view CAD layout, a minimap. Each view is a camera and a rectangle,
+fractions of the canvas by default (`pixels: true` for drawing-buffer pixels); the camera aspect follows the rectangle.
+
+```ts
+engine.views = [
+  { camera: top, viewport: [0, 0, 0.5, 0.5], clear: { color: '#20242a' } },
+  { camera: front, viewport: [0.5, 0, 0.5, 0.5] },
+  { camera: side, viewport: [0, 0.5, 0.5, 0.5] },
+  { camera: engine.camera, viewport: [0.5, 0.5, 0.5, 0.5] },
+];                                                 // the frame loop draws these instead of the full-canvas view
+engine.render({ views, delta });                   // or draw them yourself
+const hit = await engine.pick(x, y);               // picks through the view under the point
+```
+
+- Views draw in order; the first clears colour, later ones keep it (`clear: {color, depth}` per view). Plugins update
+  once per scene and each camera advances once per frame. Partial rectangles clear with a draw inside the rectangle.
+- `PassContext.view` (`id`, `camera`, `viewport`, `scissor`, `index`, `count`, `clear`, `layers`) tells passes which
+  view they draw; `draw()` uses its rectangles by default and effects key per-view history on `id`.
+- `target: {color, depth?}` draws a view into textures (sized by the texture) instead of the canvas.
+- `layers` draws only the meshes whose render layers (`@margoengine/cameras/layers`) share a bit; default the camera's.
+- Scenes: `engine.createScene()` makes a scene with its own meshes (`scene.createMesh()`), lighting, `background` and
+  plugins (`scene.use(plugin)`); a view draws it with `scene`. `engine.scene` is the default scene; while a scene is
+  drawn or set up, `engine.lighting`, `plugins`, `stats` and `createMesh` are that scene's. `scene.dispose()` removes it.
+- Which packages are view-aware: [multi-view-roadmap.md](../../docs/multi-view-roadmap.md).
 
 ## Ambient RGB
 

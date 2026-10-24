@@ -6,13 +6,14 @@ const reviewed = {
   Camera: 'fit view projection',
   CADCameraControls: 'pointer velocity previousTouchAction menu down move up wheel',
   VectorRef: 'mesh kind get validate write',
-  Mesh: 'current',
+  EulerView: 'mesh write lane',
+  Mesh: 'current receives',
   Engine:
-    'batches checkedMaterials materialFrame free next revision materials seen slots callbacks raf last running frameOptions disposing watchDevice collect frame update',
+    'batches checkedMaterials materialFrame free next revision materials seen slots callbacks raf last running rendering primaryCulling recovery frameOptions disposing watchDevice collect frame update collectedScene collectedLayers active layers drawn claims enter checkScene renderViews viewPixels cameraLayers resize collectInstances',
   TransformStore: 'handle api bind',
   FrameGraph: 'passes owner executing',
   GPURenderer:
-    'frame targets views resolveTarget preserveMSAA passDescriptor passContext drawBatches commands draw bindings width height frameId lost deviceLost resources variants groups uniform bindGroup culledGroup culled disposed picking canvas device context format pipeline descriptor renderFrame',
+    'frame attachments msaa resolveTarget preserveMSAA passDescriptor passContext drawBatches commands draw bindings frameId lost deviceLost resources variants groups uniform bindGroup culledGroup culled disposed picking canvas device context format pipeline descriptor renderFrame attach holdColor clears',
   Stage: 'imports',
 };
 
@@ -45,7 +46,7 @@ function walkThis(node, visit) {
     else if (value && typeof value === 'object') walkThis(value, visit);
   }
 }
-const body = (member) => (member.type === 'MethodDefinition' ? member.value.body : member.value);
+const body = (member) => (member.type === 'MethodDefinition' ? [member.value.params, member.value.body] : member.value);
 // Gzip-tested order; only explicitly reviewed private members use these aliases.
 const aliases = 'efghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZabcd';
 

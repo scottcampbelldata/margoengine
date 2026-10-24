@@ -6,7 +6,7 @@ import { Reflector } from '../packages/environment/dist/reflector.js';
 import { Refractor } from '../packages/environment/dist/refractor.js';
 import { CubeCamera } from '../packages/environment/dist/cube-camera.js';
 import { Environment } from '../packages/environment/dist/index.js';
-import { ALL_LAYERS, CameraLayers, setRenderLayers } from '../packages/cameras/dist/layers.js';
+import { ALL_LAYERS, setCameraLayers, setRenderLayers } from '../packages/cameras/dist/layers.js';
 import { CameraProjection } from '../packages/cameras/dist/index.js';
 import { TAA } from '../packages/taa/dist/index.js';
 
@@ -104,7 +104,7 @@ const RED: Vec = [-0.6, 0.2, 1.2],
     cube: cubeParts,
   },
   all = Object.values(groups).flat();
-let taa: TAA | undefined, projection: CameraProjection | undefined, layers: CameraLayers | undefined;
+let taa: TAA | undefined, projection: CameraProjection | undefined;
 // Attached on first use, so the first baseline frame is drawn without them (feature-off reference).
 let mirror: Reflector | undefined, glass: Refractor | undefined;
 
@@ -173,11 +173,8 @@ function apply(state: State, attach = true) {
   const mode = state.layers ?? 'none';
   setRenderLayers(red, mode === 'none' ? 1 : 0b10);
   setRenderLayers(virtualRed, mode === 'none' ? 1 : 0b10);
-  if (mode !== 'none' && !layers) layers = CameraLayers.attach(engine);
-  if (mode === 'none' && layers) {
-    engine.removePlugin(layers.name);
-    layers = undefined;
-  }
+  // The main camera draws layer 0 only when layers are on; captures keep their own masks.
+  setCameraLayers(engine.camera, mode === 'none' ? ALL_LAYERS : 1);
 }
 const reader = new OffscreenCanvas(320, 240).getContext('2d', { willReadFrequently: true })!;
 async function render(state: State & { pristine?: boolean }) {

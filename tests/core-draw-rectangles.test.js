@@ -197,9 +197,17 @@ test('WebGL clears the full attachment with scissor disabled and honors clear:fa
     draw({ scissor: [1, 2, 3, 4] });
   });
   assert.deepEqual(h.clears, [
-    { mask: 16640, scissorEnabled: false },
-    { mask: 16640, scissorEnabled: false },
+    { mask: 16640, scissorEnabled: true },
+    { mask: 16640, scissorEnabled: true },
   ]);
+  assert.deepEqual(
+    h.trace.filter(([name]) => name === 'scissor'),
+    [
+      ['scissor', 9, 90, 25, 17],
+      ['scissor', 80, 0, 80, 120],
+      ['scissor', 1, 114, 3, 4],
+    ],
+  );
   assert.equal(h.draws.length, 3);
   assert.ok(
     h.draws.every((draw) => draw.scissorEnabled),

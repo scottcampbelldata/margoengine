@@ -1,5 +1,6 @@
 import { margoError } from './errors.js';
 import { SceneTarget, sceneTarget } from './msaa.js';
+import { applyView, viewLoadOp } from './view-rect.js';
 export const fullscreen = `
 struct Vertex { @builtin(position) position:vec4f,@location(0) uv:vec2f }
 @vertex fn vertex(@builtin(vertex_index) index:u32)->Vertex {
@@ -35,9 +36,12 @@ export function compute(device, code, entryPoint = 'main') {
   });
 }
 export function draw(c, pipeline, bindGroup, loadOp = 'load') {
-  const pass = c.encoder.beginRenderPass({ colorAttachments: [{ view: c.color, loadOp, storeOp: 'store' }] });
+  const pass = c.encoder.beginRenderPass({
+    colorAttachments: [{ view: c.color, loadOp: viewLoadOp(c, loadOp), storeOp: 'store' }],
+  });
   pass.setPipeline(pipeline);
   pass.setBindGroup(0, bindGroup);
+  applyView(pass, c);
   pass.draw(3);
   pass.end();
 }

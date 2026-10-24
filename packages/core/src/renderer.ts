@@ -1,8 +1,10 @@
 import type { Camera } from './camera.js';
 import type { Geometry } from './geometry.js';
+import type { Scene } from './api.js';
 import { wgsl } from './shaders.js';
 import type { FrameGraph, PassContext, DrawOptions } from './plugin.js';
 import { sceneSamples } from './quality.js';
+import { defaultClear, clearColorValue, clearDraw } from '../../shared/clear-color.js';
 // TypeScript's DOM library omits WebGPU flag namespaces and the canvas overload.
 declare const GPUBufferUsage: {
   COPY_DST: number;
@@ -14,12 +16,30 @@ declare const GPUBufferUsage: {
   INDIRECT: number;
   STORAGE: number;
 };
-declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; COPY_SRC: number };
+declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; COPY_SRC: number; TEXTURE_BINDING: number };
 declare const GPUMapMode: { READ: number };
 
 const defaultDraw: DrawOptions = {};
 
-function validateRectangle(rectangle: DrawOptions['viewport'], width: number, height: number): void {
+/** @internal How a view clears. A partial rectangle cannot use the attachment load operation: that clears the whole target. */
+export function rectangleClear(
+  rect: readonly number[] | undefined,
+  width: number,
+  height: number,
+  clearColor: boolean,
+  clearDepth: boolean,
+  extraAttachments: number,
+): 'draw' | 'attachment' | 'none' {
+  if (!clearColor && !clearDepth) return 'none';
+  const partial = !!rect && (rect[0] !== 0 || rect[1] !== 0 || rect[2] !== width || rect[3] !== height);
+  if (!partial) return 'attachment';
+  if (extraAttachments)
+    throw new TypeError('A partial-view clear cannot cover extra colour attachments; draw them with clear: false');
+  return 'draw';
+}
+
+/** @internal Checks a pixel rectangle [x, y, width, height] against a target of `width` x `height`. */
+export function validateRectangle(rectangle: readonly number[] | undefined, width: number, height: number): void {
   if (rectangle === undefined) return;
   if (!Array.isArray(rectangle) || rectangle.length !== 4) throw new RangeError('Invalid draw rectangle');
   for (let i = 0; i < 4; i++)
@@ -66,9 +86,63 @@ export interface GeometryBuffers {
   readonly instance: GPUBuffer;
 }
 /**
+ * One camera drawn into a rectangle of the canvas, or into a texture: split screen, a four-view CAD layout, a
+ * minimap, a HUD overlay scene or an item preview. Pass views to `engine.render({views})` or set `engine.views`.
+ */
+export interface RenderView {
+  camera: Camera;
+  /**
+   * [x, y, width, height] from the top left, in fractions of the canvas (or of `target`) by default:
+   * `[0, 0, 0.5, 0.5]` is the top-left quarter. Camera aspect follows it.
+   */
+  viewport: readonly [number, number, number, number];
+  /** `viewport` and `scissor` are drawing-buffer pixels instead of fractions. Default false. */
+  pixels?: boolean;
+  /** Clip rectangle inside the viewport, same units. Default the viewport. */
+  scissor?: readonly [number, number, number, number];
+  /**
+   * `color`: a `#rrggbb` clear colour, or false to keep the colour below. `depth`: false keeps the depth. Default: the
+   * first canvas view clears colour (the scene's `background`, else core's clear colour) and every view clears depth.
+   */
+  clear?: { color?: string | false; depth?: boolean };
+  /**
+   * Draw into these textures instead of the canvas; the caller owns them and recreates them after device loss.
+   * `color`: 1 sample, any renderable colour format, RENDER_ATTACHMENT usage; with 4x MSAA core draws into its own 4x
+   * texture of that format (kept per target size and format) and resolves into it, so edges are antialiased.
+   * `depth` (optional): the size of `color`. With the scene's depth format and sample count core draws into it;
+   * otherwise (a 1-sample depth under 4x MSAA, or another format) core draws into its own depth and then writes the
+   * nearest sample of each pixel into it with a fullscreen pass. Other shapes throw TypeError. Several views may draw
+   * into one target: they stack like canvas views (later ones keep the colour outside their rectangle).
+   */
+  target?: { color: GPUTexture; depth?: GPUTexture };
+  /**
+   * Layer mask: draw only meshes whose render layers (`setRenderLayers` in @margoengine/cameras/layers) share a bit
+   * with it. Default the camera's mask (`setCameraLayers`), else every layer.
+   */
+  layers?: number;
+  /** Stable id that effects key per-view history on (TAA, motion blur, water foam). Default the view's index. */
+  id?: string;
+  /** Scene to draw. Default `engine.scene`. */
+  scene?: Scene;
+}
+/** What the engine passes to {@link Renderer.render} for one view: rectangles in pixels of the target. */
+export interface ViewDraw {
+  rect: readonly [number, number, number, number];
+  scissor?: readonly [number, number, number, number];
+  /** Layer mask in use; absent when every layer is drawn. */
+  layers?: number;
+  /** Position among the frame's views into the same destination (the canvas, or one target texture). */
+  index: number;
+  /** Number of the frame's views into that destination. */
+  count: number;
+  id: string;
+  clear?: { color?: string | false; depth?: boolean };
+  target?: { color: GPUTexture; depth?: GPUTexture };
+}
+/**
  * Backend contract the engine draws through: core's WebGPU renderer, or an `EngineOptions.fallback` such as WebGL2.
  * `add` sizes a geometry's instance storage (`capacity` instances), `render` draws one frame (`delta` in seconds), and
- * `onLost` reports device loss.
+ * `onLost` reports device loss. `view` draws into that rectangle and keeps earlier views' color when `index` is not 0.
  */
 export interface Renderer {
   readonly backend: 'webgpu' | 'webgl2';
@@ -77,7 +151,14 @@ export interface Renderer {
   add(geometry: Geometry, capacity: number): void;
   remove(geometry: Geometry): void;
   geometryBuffers?(geometry: Geometry): GeometryBuffers;
-  render(camera: Camera, lighting: Lighting, batches: Iterable<Batch>, graph: FrameGraph, delta: number): void;
+  render(
+    camera: Camera,
+    lighting: Lighting,
+    batches: Iterable<Batch>,
+    graph: FrameGraph,
+    delta: number,
+    view?: ViewDraw,
+  ): void;
   dispose(unconfigure?: boolean): void;
 }
 
@@ -88,8 +169,18 @@ export class GPURenderer implements Renderer {
   }
   readonly backend = 'webgpu';
   private readonly frame = new Float32Array(32);
-  private targets: GPUTexture[] = [];
-  private views: GPUTextureView[] = [];
+  /** MSAA colour (4x only) and depth attachments by size: slot 0 for the canvas, 1 for target views. */
+  private attachments: {
+    width: number;
+    height: number;
+    format: GPUTextureFormat;
+    textures: GPUTexture[];
+    views: GPUTextureView[];
+    pipeline?: GPURenderPipeline;
+    group?: GPUBindGroup;
+  }[] = [];
+  /** The current draw's MSAA colour, which resolves into `resolveTarget`. */
+  private msaa?: GPUTextureView;
   private resolveTarget?: GPUTextureView;
   private preserveMSAA = false;
   private passDescriptor?: GPURenderPassDescriptor;
@@ -97,9 +188,10 @@ export class GPURenderer implements Renderer {
   private readonly commands: GPUCommandBuffer[] = [];
   private passContext?: Extract<PassContext, { backend: 'webgpu' }>;
   private draw?: PassContext['draw'];
+  /** Keep the multisample color for a later view instead of resolving it this submit. */
+  private holdColor = false;
+  private readonly clears = new Map<string, GPURenderPipeline>();
   private readonly bindings: GPUBindGroupEntry[] = [];
-  private width = 0;
-  private height = 0;
   private frameId = 0;
   private lost?: Error;
   private deviceLost = false;
@@ -126,6 +218,7 @@ export class GPURenderer implements Renderer {
     const adapter = await navigator.gpu?.requestAdapter({ powerPreference: 'high-performance' });
     if (!adapter) throw new Error('adapter unavailable');
     const device = await adapter.requestDevice({
+      requiredLimits: { maxTextureArrayLayers: adapter.limits?.maxTextureArrayLayers },
       requiredFeatures: ['depth32float-stencil8' as GPUFeatureName, ...features].filter((feature) =>
         adapter.features.has(feature),
       ),
@@ -251,10 +344,17 @@ export class GPURenderer implements Renderer {
     if (this.disposed || this.deviceLost || !resource) throw new Error('Geometry unavailable');
     return resource;
   }
-  render(camera: Camera, lighting: Lighting, batches: Iterable<Batch>, graph: FrameGraph, delta: number): void {
+  render(
+    camera: Camera,
+    lighting: Lighting,
+    batches: Iterable<Batch>,
+    graph: FrameGraph,
+    delta: number,
+    view?: ViewDraw,
+  ): void {
     if (this.deviceLost || this.disposed) return;
     try {
-      this.renderFrame(camera, lighting, batches, graph, delta);
+      this.renderFrame(camera, lighting, batches, graph, delta, view);
     } catch (error) {
       if (error instanceof DOMException && ['InvalidStateError', 'OperationError'].includes(error.name)) {
         this.deviceLost = true;
@@ -270,28 +370,25 @@ export class GPURenderer implements Renderer {
     batches: Iterable<Batch>,
     graph: FrameGraph,
     delta: number,
+    view?: ViewDraw,
   ): void {
     if (this.lost) throw this.lost;
-    const { width, height } = this.canvas;
-    if (width !== this.width || height !== this.height) {
-      for (const target of this.targets) target.destroy();
-      this.targets = [];
-      this.views = [];
-      for (const format of [this.format, this.descriptor.depthStencil!.format].slice(
-        this.descriptor.multisample!.count === 4 ? 0 : 1,
-      )) {
-        const target = this.device.createTexture({
-          size: [width, height],
-          sampleCount: this.descriptor.multisample!.count,
-          format,
-          usage: GPUTextureUsage.RENDER_ATTACHMENT,
-        });
-        this.targets.push(target);
-        this.views.push(target.createView());
-      }
-      this.width = width;
-      this.height = height;
-    }
+    const target = view?.target,
+      { width, height } = target?.color ?? this.canvas,
+      format = target?.color.format ?? this.format,
+      views = this.attach(+!!target, width, height, format),
+      samples = this.descriptor.multisample!.count!,
+      caller = target?.depth,
+      // A caller depth core can draw into directly; any other is written from core's own depth after the frame.
+      direct = caller?.sampleCount === samples && caller.format === this.descriptor.depthStencil!.format;
+    if (
+      target &&
+      (target.color.sampleCount > 1 ||
+        (caller && (caller.width !== width || caller.height !== height || (!direct && caller.sampleCount > 1))))
+    )
+      throw new TypeError(
+        'Invalid view target: use 1-sample colour and a depth of its size (1 sample, or the scene samples and format)',
+      );
     this.frame.set(camera.matrix);
     this.frame.set(camera.position, 16);
     this.frame.set(lighting.direction, 20);
@@ -299,22 +396,35 @@ export class GPURenderer implements Renderer {
     this.frame.fill(1, 28, 31);
     if (lighting.ambient) this.frame.set(lighting.ambient, 28);
     this.device.queue.writeBuffer(this.uniform, 0, this.frame);
+    const stacked = !!view && view.index + 1 !== view.count;
+    // A canvas view before the last keeps its multisample colour for the next one instead of resolving it.
+    this.holdColor = stacked;
     const encoder = this.device.createCommandEncoder();
     this.frameId++;
     const drawBatches = this.drawBatches;
     let count = 0;
     for (const batch of batches) drawBatches[count++] = batch;
     drawBatches.length = count;
-    this.resolveTarget = this.context.getCurrentTexture().createView();
-    const color = this.targets.length > 1 ? this.views[0] : this.resolveTarget,
-      depth = this.views.at(-1)!;
-    this.preserveMSAA = graph.revision > 0 && this.targets.length > 1;
+    this.resolveTarget = target?.color.createView() ?? this.context.getCurrentTexture().createView();
+    this.msaa = views.length > 1 ? views[0] : undefined;
+    const color = this.msaa ?? this.resolveTarget,
+      depth = direct ? caller.createView() : views.at(-1)!,
+      keepDepth = stacked || (!!caller && !direct);
+    this.preserveMSAA = (graph.revision > 0 || keepDepth) && !!this.msaa;
     const context = (this.passContext ??= {
       backend: 'webgpu',
       draw: (options: DrawOptions = defaultDraw) => {
         const context = this.passContext!;
-        validateRectangle(options.viewport, context.width, context.height);
-        validateRectangle(options.scissor, context.width, context.height);
+        const viewRect = context.view?.viewport,
+          viewport = options.viewport === undefined ? viewRect : options.viewport,
+          scissor =
+            options.scissor === undefined
+              ? options.viewport === undefined
+                ? (context.view?.scissor ?? viewRect)
+                : undefined
+              : options.scissor;
+        validateRectangle(viewport, context.width, context.height);
+        validateRectangle(scissor, context.width, context.height);
         let pipeline = options.pipeline ?? this.pipeline;
         const bindings = options.bindings ?? context.bindings;
         if (
@@ -372,11 +482,21 @@ export class GPURenderer implements Renderer {
           }
           group = cached.group;
         }
-        const clear = options.clear ?? true;
+        const named = context.view?.clear?.color;
+        const explicit = typeof named === 'string';
+        const clearColor = options.clear ?? (named === false ? false : explicit || !context.view?.index),
+          clearDepth = options.clearDepth ?? context.view?.clear?.depth ?? options.clear ?? true,
+          tint = clearColorValue(explicit ? named : undefined);
+        const mode = rectangleClear(
+          context.view ? (viewport ?? scissor) : undefined,
+          context.width,
+          context.height,
+          !!clearColor,
+          !!clearDepth,
+          options.colorAttachments?.length ?? 0,
+        );
         const descriptor = (this.passDescriptor ??= {
-          colorAttachments: [
-            { view: context.color, clearValue: [0.018, 0.023, 0.035, 1], loadOp: 'clear', storeOp: 'store' },
-          ],
+          colorAttachments: [{ view: context.color, clearValue: defaultClear, loadOp: 'clear', storeOp: 'store' }],
           depthStencilAttachment: {
             view: context.depth,
             depthClearValue: 0,
@@ -388,21 +508,37 @@ export class GPURenderer implements Renderer {
           attachment = attachments[0],
           depth = descriptor.depthStencilAttachment!;
         attachment.view = context.color;
-        attachment.loadOp = clear ? 'clear' : 'load';
+        attachment.loadOp = mode === 'attachment' && clearColor ? 'clear' : 'load';
+        if (mode === 'attachment' && clearColor) attachment.clearValue = tint as GPUColor;
         depth.view = context.depth;
-        depth.depthLoadOp = attachment.loadOp;
-        attachment.resolveTarget = context.color === this.views[0] ? this.resolveTarget : undefined;
+        depth.depthLoadOp = mode === 'attachment' && clearDepth ? 'clear' : 'load';
+        attachment.resolveTarget = context.color === this.msaa && !this.holdColor ? this.resolveTarget : undefined;
         // Later scene passes load MSAA color and depth until the final resolve.
         attachment.storeOp = depth.depthStoreOp = attachment.resolveTarget && !this.preserveMSAA ? 'discard' : 'store';
         attachments.length = 1;
         if (options.colorAttachments) attachments.push(...options.colorAttachments);
         const stencil = context.descriptor.depthStencil!.format.includes('stencil');
         depth.stencilClearValue = stencil ? (options.stencilClear ?? 0) : undefined;
-        depth.stencilLoadOp = stencil ? (clear || options.stencilClear !== undefined ? 'clear' : 'load') : undefined;
+        depth.stencilLoadOp = stencil
+          ? mode === 'draw'
+            ? 'load'
+            : clearColor || options.stencilClear !== undefined
+              ? 'clear'
+              : 'load'
+          : undefined;
         depth.stencilStoreOp = stencil ? depth.depthStoreOp : undefined;
         const pass = context.encoder.beginRenderPass(descriptor);
-        if (options.viewport) pass.setViewport(...options.viewport, 0, 1);
-        if (options.scissor) pass.setScissorRect(...options.scissor);
+        if (viewport) pass.setViewport(...viewport, 0, 1);
+        if (scissor) pass.setScissorRect(...scissor);
+        if (mode === 'draw')
+          clearDraw(this.device, this.clears, pass, {
+            formats: [context.format],
+            depthFormat: context.descriptor.depthStencil!.format,
+            writeDepth: !!clearDepth,
+            samples: context.descriptor.multisample?.count,
+            writeColor: !!clearColor,
+            tint,
+          });
         let current: GPURenderPipeline | undefined;
         for (const batch of drawBatches)
           if (batch.count && !batch.claimed) {
@@ -459,10 +595,21 @@ export class GPURenderer implements Renderer {
       color,
       depth,
       camera,
+      view: view && {
+        id: view.id,
+        camera,
+        viewport: view.rect,
+        scissor: view.scissor,
+        index: view.index,
+        count: view.count,
+        clear: view.clear,
+        layers: view.layers,
+        target: view.target,
+      },
       width,
       height,
       delta,
-      format: this.format,
+      format,
       shader: wgsl,
       bindings: this.bindings,
       indirect: false,
@@ -470,21 +617,96 @@ export class GPURenderer implements Renderer {
     this.bindings.length = 0;
     graph.execute(context);
     if (!this.deviceLost && !this.disposed) {
-      if (this.preserveMSAA)
+      if (this.preserveMSAA && !this.holdColor)
         encoder
           .beginRenderPass({
-            colorAttachments: [{ view: color, resolveTarget: this.resolveTarget, loadOp: 'load', storeOp: 'discard' }],
+            colorAttachments: [
+              {
+                view: color,
+                resolveTarget: this.resolveTarget,
+                loadOp: 'load',
+                storeOp: stacked ? 'store' : 'discard',
+              },
+            ],
             depthStencilAttachment: {
               view: depth,
               depthLoadOp: 'load',
-              depthStoreOp: 'discard',
+              depthStoreOp: keepDepth ? 'store' : 'discard',
               stencilReadOnly: true,
             },
           })
           .end();
+      // Once the last view into this target is drawn.
+      if (caller && !direct && !stacked) this.resolveDepth(encoder, caller, samples);
       this.commands[0] = encoder.finish();
       this.device.queue.submit(this.commands);
     }
+  }
+  /** Colour (4x only) and depth attachments of one size and colour format: slot 0 the canvas, 1 target views. */
+  private attach(slot: number, width: number, height: number, format: GPUTextureFormat): GPUTextureView[] {
+    let set = this.attachments[slot];
+    if (!set || set.width !== width || set.height !== height || set.format !== format) {
+      for (const texture of set?.textures ?? []) texture.destroy();
+      set = this.attachments[slot] = { width, height, format, textures: [], views: [] };
+      for (const each of [format, this.descriptor.depthStencil!.format].slice(
+        this.descriptor.multisample!.count === 4 ? 0 : 1,
+      )) {
+        const texture = this.device.createTexture({
+          size: [width, height],
+          sampleCount: this.descriptor.multisample!.count,
+          format: each,
+          // A target view's depth is read to write the caller's own depth texture.
+          usage: GPUTextureUsage.RENDER_ATTACHMENT | (slot ? GPUTextureUsage.TEXTURE_BINDING : 0),
+        });
+        set.textures.push(texture);
+        set.views.push(texture.createView());
+      }
+    }
+    return set.views;
+  }
+  /**
+   * Writes a target view's depth into the caller's depth texture of another sample count or format: a fullscreen pass
+   * writes each pixel's nearest sample (the largest reversed-Z value, so overlays test against the visible surface).
+   */
+  private resolveDepth(encoder: GPUCommandEncoder, caller: GPUTexture, samples: number): void {
+    const key = 'depth' + caller.format + samples,
+      set = this.attachments[1]!;
+    let pipeline = this.clears.get(key);
+    if (!pipeline) {
+      const module = this.device.createShaderModule({
+        code: `@group(0) @binding(0) var d:texture_depth${samples > 1 ? '_multisampled' : ''}_2d;
+@vertex fn v(@builtin(vertex_index) i:u32)->@builtin(position) vec4f{return vec4f(f32(i&1u)*4-1,f32(i>>1u)*4-1,0,1);}
+@fragment fn f(@builtin(position) p:vec4f)->@builtin(frag_depth) f32{var z=0.0;for(var i=0;i<${samples};i++){z=max(z,textureLoad(d,vec2i(p.xy),i));}return z;}`,
+      });
+      pipeline = this.device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module, entryPoint: 'v' },
+        fragment: { module, entryPoint: 'f', targets: [] },
+        depthStencil: { format: caller.format, depthWriteEnabled: true, depthCompare: 'always' },
+      });
+      this.clears.set(key, pipeline);
+    }
+    if (set.pipeline !== pipeline) {
+      set.pipeline = pipeline;
+      set.group = this.device.createBindGroup({
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [{ binding: 0, resource: set.textures.at(-1)!.createView({ aspect: 'depth-only' }) }],
+      });
+    }
+    const pass = encoder.beginRenderPass({
+      colorAttachments: [],
+      depthStencilAttachment: {
+        view: caller.createView(),
+        depthClearValue: 0,
+        depthLoadOp: 'clear',
+        depthStoreOp: 'store',
+        ...(caller.format.includes('stencil') && { stencilLoadOp: 'clear', stencilStoreOp: 'store' }),
+      },
+    });
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, set.group!);
+    pass.draw(3);
+    pass.end();
   }
   async pick(
     camera: Camera,
@@ -493,6 +715,7 @@ export class GPURenderer implements Renderer {
     graph: FrameGraph,
     x: number,
     y: number,
+    span?: readonly [number, number],
   ): Promise<number | null> {
     if (this.deviceLost || this.disposed) return null;
     if (this.picking) throw new Error('Pick pending');
@@ -511,11 +734,13 @@ export class GPURenderer implements Renderer {
       depth = device.createTexture({ size: [1, 1], format: 'depth32float', usage: GPUTextureUsage.RENDER_ATTACHMENT });
       read = device.createBuffer({ size: 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
       const matrix = camera.matrix.slice(),
-        nx = (2 * (Math.floor(x) + 0.5)) / this.canvas.width - 1,
-        ny = 1 - (2 * (Math.floor(y) + 0.5)) / this.canvas.height;
+        sw = span?.[0] ?? this.canvas.width,
+        sh = span?.[1] ?? this.canvas.height,
+        nx = (2 * (Math.floor(x) + 0.5)) / sw - 1,
+        ny = 1 - (2 * (Math.floor(y) + 0.5)) / sh;
       for (let c = 0; c < 4; c++) {
-        matrix[c * 4] = (camera.matrix[c * 4] - nx * camera.matrix[c * 4 + 3]) * this.canvas.width;
-        matrix[c * 4 + 1] = (camera.matrix[c * 4 + 1] - ny * camera.matrix[c * 4 + 3]) * this.canvas.height;
+        matrix[c * 4] = (camera.matrix[c * 4] - nx * camera.matrix[c * 4 + 3]) * sw;
+        matrix[c * 4 + 1] = (camera.matrix[c * 4 + 1] - ny * camera.matrix[c * 4 + 3]) * sh;
       }
       const frame = new Float32Array(32);
       frame.set(matrix);
@@ -606,7 +831,7 @@ export class GPURenderer implements Renderer {
     if (this.disposed) return;
     this.disposed = true;
     for (const geometry of this.resources.keys()) this.remove(geometry);
-    for (const target of this.targets) target.destroy();
+    for (const set of this.attachments) for (const texture of set?.textures ?? []) texture.destroy();
     this.uniform.destroy();
     if (unconfigure) this.context.unconfigure();
     this.device.destroy();

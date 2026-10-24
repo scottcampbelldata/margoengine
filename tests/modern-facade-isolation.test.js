@@ -360,7 +360,7 @@ test('stage shadows and environment load the real packs: shadows attaches, envir
   const attached = [],
     engine = {
       disposed: false,
-      meshes: new Map(),
+      scene: { meshes: new Map() },
       use(plugin) {
         attached.push(plugin);
       },

@@ -8,9 +8,9 @@ import {
   type EngineOptions,
   type EnginePlugin,
   type Mesh,
+  type Scene,
   type Vec3,
 } from '@margoengine/core';
-import type { Engine as RuntimeEngine } from '@margoengine/core/extension';
 import { loadedModel, worldBounds, type LoadedModel, type StageModel } from './model.js';
 
 export * from '@margoengine/core';
@@ -38,6 +38,8 @@ export type MeshOptions = NonNullable<ConstructorParameters<typeof PbrMaterial>[
   scale?: Vec3;
   /** Default ''. */
   name?: string;
+  /** Scene to put the mesh in (`engine.createScene()`). Default the engine's default scene. */
+  scene?: Scene;
 };
 /** Options for `Stage.load`. Format and framing belong to the stage; the rest are forwarded to a CAD import. */
 export interface LoadOptions {
@@ -136,7 +138,7 @@ export class Stage {
 
   mesh(geometry: Geometry, options: MeshOptions = {}): Mesh {
     const material = new PbrMaterial(options),
-      mesh = this.engine.createMesh(options.parent);
+      mesh = (options.scene ?? this.engine).createMesh(options.parent);
     try {
       mesh.setGeometry(geometry).setMaterial(material);
       if (options.position) mesh.setPosition(options.position);
@@ -159,7 +161,7 @@ export class Stage {
     return this.mesh(sphere(radius, segments), options);
   }
 
-  fit(meshes: Iterable<Mesh> = (this.engine as unknown as RuntimeEngine).meshes.values()): void {
+  fit(meshes: Iterable<Mesh> = this.engine.scene.meshes.values()): void {
     const b = worldBounds(this.engine, meshes, new Float32Array(6), true);
     this.engine.camera.fitToBoundingBox([b[0], b[1], b[2]], [b[3], b[4], b[5]], {
       aspect: Math.max(1, this.canvas.clientWidth) / Math.max(1, this.canvas.clientHeight),
@@ -260,7 +262,7 @@ export class Stage {
     const { Shadows } = await loadPackage('@margoengine/shadows', () => import('@margoengine/shadows'));
     this.imports.signal.throwIfAborted();
     const shadows = this.use(new Shadows(options as ConstructorParameters<typeof Shadows>[0]));
-    for (const mesh of (this.engine as unknown as RuntimeEngine).meshes.values()) shadows.add(mesh);
+    for (const mesh of this.engine.scene.meshes.values()) shadows.add(mesh);
     return shadows;
   }
 }

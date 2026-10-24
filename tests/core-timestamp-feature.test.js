@@ -16,7 +16,8 @@ function harness(t, offered) {
     ),
     requests = [],
     devices = [],
-    pipelines = [];
+    pipelines = [],
+    limitsRequests = [];
   const context = {
       configure() {},
       unconfigure() {},
@@ -27,9 +28,11 @@ function harness(t, offered) {
     canvas = { width: 8, height: 6, clientWidth: 8, clientHeight: 6, getContext: () => context };
   const adapter = {
     features: new Set(offered),
+    limits: { maxTextureArrayLayers: 256 },
     async requestDevice(descriptor) {
       assert.equal(this, adapter);
       requests.push(descriptor.requiredFeatures);
+      limitsRequests.push(descriptor.requiredLimits);
       const resources = [];
       const resource = () => {
         const value = {
@@ -105,8 +108,22 @@ function harness(t, offered) {
       else delete globalThis[key];
   };
   t.after(restore);
-  return { adapter, canvas, requests, devices, pipelines, restore };
+  return { adapter, canvas, requests, devices, pipelines, limitsRequests, restore };
 }
+
+test('renderer preserves the adapter texture-array capability for optional packages', async (t) => {
+  for (const maxTextureArrayLayers of [256, 2048]) {
+    const h = harness(t, []);
+    h.adapter.limits.maxTextureArrayLayers = maxTextureArrayLayers;
+    const renderer = await GPURenderer.create(h.canvas);
+    try {
+      assert.deepEqual(h.limitsRequests[0], { maxTextureArrayLayers });
+    } finally {
+      renderer.dispose();
+      h.restore();
+    }
+  }
+});
 
 test('renderer requests only the advertised depth-stencil feature (never timestamp queries) and preserves effective primitive defaults', async (t) => {
   for (const offered of [

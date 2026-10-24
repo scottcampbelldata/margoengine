@@ -14,7 +14,7 @@ function frames(renderer, canvas, batch) {
   const camera = new Camera();
   camera.update(canvas.width / canvas.height, renderer.backend === 'webgpu');
   renderer.add(batch.geometry, 1);
-  return (draws) => {
+  return (draws, view) => {
     const graph = new FrameGraph();
     if (draws)
       graph.add({
@@ -25,7 +25,7 @@ function frames(renderer, canvas, batch) {
           context.draw = () => draws(draw, context);
         },
       });
-    renderer.render(camera, lighting, [batch], graph, 0);
+    renderer.render(camera, lighting, [batch], graph, 0, view);
   };
 }
 
@@ -47,16 +47,23 @@ export function gpuDrawHarness(t, samples = 1) {
       queue: { writeBuffer() {}, submit() {} },
       createBuffer: (descriptor) => ({ ...descriptor, destroy() {} }),
       createBindGroup: () => ({}),
+      textures: [],
       createTexture(descriptor) {
         const texture = {
           ...descriptor,
+          sampleCount: descriptor.sampleCount ?? 1,
           width: descriptor.size[0],
           height: descriptor.size[1],
           createView: () => ({ texture }),
-          destroy() {},
+          destroy() {
+            texture.destroyed = true;
+          },
         };
+        device.textures.push(texture);
         return texture;
       },
+      createShaderModule: (descriptor) => descriptor,
+      createRenderPipeline: (descriptor) => ({ ...descriptor, getBindGroupLayout: () => ({}) }),
       createCommandEncoder: () => ({
         finish: () => ({}),
         beginRenderPass(descriptor) {
@@ -77,6 +84,8 @@ export function gpuDrawHarness(t, samples = 1) {
             setVertexBuffer() {},
             setIndexBuffer() {},
             drawIndexed: (...args) => record.commands.push(['draw', ...args]),
+            draw: (...args) => record.commands.push(['fullscreen', ...args]),
+            setBlendConstant() {},
             end: () => record.commands.push(['end']),
           };
         },
@@ -101,6 +110,8 @@ export function gpuDrawHarness(t, samples = 1) {
   });
   return {
     canvas,
+    device,
+    renderer,
     passes,
     frame: frames(renderer, canvas, batch),
     draws: () => passes.filter((pass) => pass.commands.some(([name]) => name === 'draw')),

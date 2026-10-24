@@ -1,9 +1,17 @@
 import { TransformStore, syncStoredRotation } from './kernel.js';
 import { Camera, type CameraOptions, type Vec3 } from './camera.js';
 import { Geometry, PbrMaterial, finite } from './geometry.js';
-import { GPURenderer, type Renderer, type Batch, type GeometryBuffers } from './renderer.js';
+import {
+  GPURenderer,
+  validateRectangle,
+  type Renderer,
+  type Batch,
+  type GeometryBuffers,
+  type RenderView,
+} from './renderer.js';
 import { FrameGraph, type EnginePlugin } from './plugin.js';
 import { sceneSamples } from './quality.js';
+import { checkLayers, layerRegistry, meshLayers } from '../../shared/view-rect.js';
 
 /** `fallback` supplies a renderer when WebGPU is unavailable or `backend` is 'webgl2', for example `webglRenderer` from @margoengine/webgl. */
 export interface EngineOptions {
@@ -22,7 +30,7 @@ export interface EngineOptions {
 export type FrameCallback = (engine: Engine, delta: number) => void;
 const positionFields = ['x', 'y', 'z'] as const,
   scaleFields = ['sx', 'sy', 'sz'] as const;
-const owners = new WeakMap<EnginePlugin, Engine>();
+const owners = new WeakMap<EnginePlugin, Scene>();
 
 /**
  * Live x/y/z view of a mesh's position (world units), rotation (Euler radians) or scale in the transform store. Writes
@@ -149,7 +157,8 @@ const views = (mesh: Mesh) =>
   });
 /**
  * Runtime mesh: a slot `id` in its engine's transform store plus geometry and material. Create it with
- * `engine.createMesh`. Positions are world units relative to the parent, rotations Euler radians, parents at most 64 deep.
+ * `engine.createMesh` or `scene.createMesh`. Positions are world units relative to the parent, rotations Euler radians,
+ * parents at most 64 deep and in the same scene.
  */
 export class Mesh {
   name = '';
@@ -194,6 +203,8 @@ export class Mesh {
   constructor(
     readonly engine: Engine,
     readonly id: number,
+    /** The scene this mesh belongs to, fixed at creation. */
+    readonly scene: Scene = engine.scene,
   ) {
     views(this);
   }
@@ -253,7 +264,8 @@ export class Mesh {
   setParent(parent: Mesh | null): this {
     this.check();
     parent?.check();
-    if (parent && parent.engine !== this.engine) throw new TypeError('Foreign parent');
+    if (parent && (parent.engine !== this.engine || parent.scene !== this.scene))
+      throw new TypeError('Foreign parent: parent a mesh of the same engine and scene');
     let depth = 0;
     for (let id = parent?.id ?? -1; id !== -1; id = this.engine.store.parents[id]) {
       if (id === this.id) throw new Error('Hierarchy cycle');
@@ -288,34 +300,84 @@ export class Mesh {
 }
 
 /**
- * Runtime engine behind the public `EngineKernel` surface, with extension access to the store, frame graph and
- * GPU device. Create it with `Engine.create(canvas, options)`; deltas are seconds, and `render` rejects a delta outside
- * [0, 1] with RangeError.
+ * Meshes, lighting and plugins drawn together. `engine.scene` is the default; make more with `engine.createScene()`
+ * and draw one with a view's `scene`. While a scene is drawn or set up, `engine.lighting`, `frameGraph`, `plugins`,
+ * `stats` and `createMesh` are that scene's, so packages work in any scene unchanged; otherwise they are the default
+ * scene's.
  */
-export class Engine {
+export class Scene {
+  /** Clear colour (`#rrggbb`) for views of this scene, or null to keep the colour below (overlays). A view's `clear` wins. Default: core's clear colour. */
+  background?: string | null;
   readonly frameGraph = new FrameGraph();
-  readonly meshes = new Map<number, Mesh>();
-  readonly camera: Camera;
+  readonly plugins: ReadonlyMap<string, EnginePlugin> = new Map();
+  readonly meshes: ReadonlyMap<number, Mesh> = new Map();
+  readonly stats = { visible: 0, drawCalls: 0 };
   readonly lighting = {
     direction: new Float32Array([3, 5, 4, 3]),
     radiance: new Float32Array([1, 1, 1, 0.15]),
     ambient: new Float32Array([1, 1, 1]),
   };
-  readonly stats = { visible: 0, drawCalls: 0 };
+  constructor(
+    readonly engine: Engine,
+    readonly name: string,
+  ) {}
+  /** A mesh in this scene; same as `engine.createMesh(parent)` while this scene is set up. */
+  createMesh(parent: Mesh | null = null): Mesh {
+    return this.engine.createMesh(parent, this);
+  }
+  /** Attaches a plugin to this scene; its passes draw in this scene's views only. */
+  use(plugin: EnginePlugin): this {
+    this.engine.use(plugin, this);
+    return this;
+  }
+  /** Removes this scene's plugin and its passes, then disposes it. */
+  removePlugin(name: string): void {
+    this.engine.removePlugin(name, this);
+  }
+  /** Disposes this scene's plugins and meshes and removes the scene. The default scene lives as long as the engine. */
+  dispose(): void {
+    const engine = this.engine;
+    if (this === engine.scene)
+      throw new TypeError('The default scene lives as long as the engine: dispose the engine instead');
+    if (!engine.scenes.delete(this)) return;
+    for (const name of this.plugins.keys()) engine.removePlugin(name, this);
+    for (const mesh of this.meshes.values()) engine.remove(mesh);
+  }
+}
+
+/**
+ * Runtime engine behind the public `EngineKernel` surface, with extension access to the store, frame graph and
+ * GPU device. Create it with `Engine.create(canvas, options)`; deltas are seconds, and `render` rejects a delta outside
+ * [0, 1] with RangeError.
+ */
+export class Engine {
+  /** The default scene. */
+  readonly scene: Scene;
+  /** @internal Every live scene of this engine, the default one first. */
+  readonly scenes = new Set<Scene>();
+  readonly meshes = new Map<number, Mesh>();
+  readonly camera: Camera;
   disposed = false;
   onError: (error: unknown) => void = (error) => {
     if (typeof reportError === 'function') reportError(error);
     else console.error(error);
   };
+  /** Return false to skip this display refresh (for example a 60 FPS cap on a 120 Hz screen); delta spans skipped refreshes. */
+  pace?: (time: number) => boolean;
+  /** Views the frame loop draws each frame instead of the full-canvas camera view; list `engine.camera` to keep it. */
+  views?: readonly RenderView[];
   private readonly batches = new Map<Geometry, Batch & { references: number }>();
   private readonly checkedMaterials = new WeakMap<PbrMaterial, number>();
   private materialFrame = 0;
   private readonly free: number[] = [];
   private next = 0;
   private revision = 0;
-  // Last full collection: revision, visibility, material values, and each entity's instance offset (-1 when not drawn).
+  // Last full collection: revision, scene, layers, visibility, material values, and each entity's instance offset
+  // (-1 when not drawn).
   /** @internal Revision of the last full instance collection; -1 forces one. */ collected = -1;
   /** @internal Meshes with receiveShadow false at the last full collection; shadow plugins patch for them only then. */ unshadowed = 0;
+  private collectedScene?: Scene;
+  private collectedLayers = -1;
   private readonly materials = new Set<[PbrMaterial, ...number[]]>();
   private seen: Uint8Array;
   private slots: Int32Array;
@@ -325,14 +387,31 @@ export class Engine {
   private running = false;
   private rendering = false;
   private primaryCulling = true;
-  private readonly frameOptions: { culling?: boolean; delta: number } = { delta: 0 };
+  private readonly frameOptions: { culling?: boolean; delta: number; views?: readonly RenderView[] } = { delta: 0 };
   private disposing = false;
-  /** Attached plugins by name (read-only). */
-  readonly plugins: ReadonlyMap<string, EnginePlugin> = new Map();
-  /** Return false to skip this display refresh (for example a 60 FPS cap on a 120 Hz screen); delta spans skipped refreshes. */
-  pace?: (time: number) => boolean;
   private recovery?: Promise<void>;
+  /** The scene being drawn or set up; the default scene otherwise. */
+  private active: Scene;
+  /** Layer mask of the current draw; -1 draws every layer. */
+  private layers = -1;
+  /** Canvas views of the last `render({views})`, rectangles copied, for picking. */
+  private drawn?: RenderView[];
+  /** Each scene's `claimed`/`redirect` state of a shared batch, swapped in when that scene draws. */
+  private readonly claims = new WeakMap<Batch, Map<Scene, [boolean?, Batch['redirect']?]>>();
   /** @internal Features requested at creation, requested again when the device is restored. */ features?: GPUFeatureName[];
+  get frameGraph(): FrameGraph {
+    return this.active.frameGraph;
+  }
+  get lighting(): Scene['lighting'] {
+    return this.active.lighting;
+  }
+  get stats(): Scene['stats'] {
+    return this.active.stats;
+  }
+  /** Attached plugins by name (read-only). */
+  get plugins(): ReadonlyMap<string, EnginePlugin> {
+    return this.active.plugins;
+  }
 
   static async create(canvas: HTMLCanvasElement, options: EngineOptions = {}): Promise<Engine> {
     if (!canvas || typeof canvas.getContext !== 'function') throw new TypeError('Expected canvas');
@@ -372,6 +451,7 @@ export class Engine {
     readonly fallbackReason: string | null,
   ) {
     this.camera = new Camera(camera);
+    this.scenes.add((this.scene = this.active = new Scene(this, 'default')));
     this.seen = new Uint8Array(store.capacity);
     this.slots = new Int32Array(store.capacity);
     this.watchDevice();
@@ -401,7 +481,14 @@ export class Engine {
       this.renderer = next;
       this.watchDevice();
       previous.dispose(false);
-      for (const plugin of this.plugins.values()) plugin.onDeviceRestored?.(this);
+      for (const scene of this.scenes) {
+        const outer = this.enter(scene);
+        try {
+          for (const plugin of scene.plugins.values()) plugin.onDeviceRestored?.(this);
+        } finally {
+          this.enter(outer);
+        }
+      }
     })().finally(() => {
       this.recovery = undefined;
     });
@@ -420,38 +507,88 @@ export class Engine {
   hasPlugin(name: string): boolean {
     return this.plugins.has(name);
   }
-  use(plugin: EnginePlugin): this {
+  /** Makes `scene` the active one and swaps in its batch claims; returns the previous active scene. */
+  private enter(scene: Scene): Scene {
+    const from = this.active;
+    if (from !== scene) {
+      for (const batch of this.batches.values()) {
+        let states = this.claims.get(batch);
+        if (!states) this.claims.set(batch, (states = new Map()));
+        states.set(from, [batch.claimed, batch.redirect]);
+        [batch.claimed, batch.redirect] = states.get(scene) ?? [];
+      }
+      this.active = scene;
+    }
+    return from;
+  }
+  private live(): void {
     if (this.disposed || this.disposing) throw new Error('Engine disposed');
-    if (!plugin.name || this.plugins.has(plugin.name) || owners.has(plugin) || typeof plugin.setup !== 'function')
+  }
+  private checkScene(scene: Scene): void {
+    if (!this.scenes.has(scene)) throw new TypeError('Unknown scene: use one from engine.createScene()');
+  }
+  use(plugin: EnginePlugin, scene: Scene = this.active): this {
+    this.live();
+    this.checkScene(scene);
+    const name = plugin.name,
+      plugins = scene.plugins as Map<string, EnginePlugin>;
+    if (!name || plugins.has(name) || owners.has(plugin) || typeof plugin.setup !== 'function')
       throw new TypeError('Invalid plugin');
+    const outer = this.enter(scene);
     try {
-      this.frameGraph.withOwner(plugin.name, () => {
-        plugin.setup(this);
-        plugin.registerPasses?.(this.frameGraph);
+      // withOwner throws during a frame before anything changes. Registered before setup, so `sceneOf` works in it.
+      scene.frameGraph.withOwner(name, () => {
+        plugins.set(name, plugin);
+        owners.set(plugin, scene);
+        try {
+          plugin.setup(this);
+          plugin.registerPasses?.(scene.frameGraph);
+        } catch (error) {
+          scene.frameGraph.removeOwner(name);
+          plugins.delete(name);
+          owners.delete(plugin);
+          try {
+            plugin.dispose?.();
+          } catch {}
+          throw error;
+        }
       });
-      (this.plugins as Map<string, EnginePlugin>).set(plugin.name, plugin);
-      owners.set(plugin, this);
-    } catch (error) {
-      this.frameGraph.removeOwner(plugin.name);
-      try {
-        plugin.dispose?.();
-      } catch {}
-      throw error;
+    } finally {
+      this.enter(outer);
     }
     return this;
   }
-  removePlugin(name: string): void {
-    const plugin = this.plugins.get(name);
+  removePlugin(name: string, scene: Scene = this.active): void {
+    const plugin = scene.plugins.get(name);
     if (!plugin) return;
-    this.frameGraph.removeOwner(name);
-    (this.plugins as Map<string, EnginePlugin>).delete(name);
+    scene.frameGraph.removeOwner(name);
+    (scene.plugins as Map<string, EnginePlugin>).delete(name);
     owners.delete(plugin);
-    plugin.dispose?.();
+    const outer = this.enter(scene);
+    try {
+      plugin.dispose?.();
+    } finally {
+      this.enter(outer);
+    }
   }
-  createMesh(parent: Mesh | null = null): Mesh {
-    if (this.disposed || this.disposing) throw new Error('Engine disposed');
+  /** A new scene with its own meshes, lighting and plugins. Draw it with a view's `scene`. */
+  createScene(name = 'scene'): Scene {
+    this.live();
+    const scene = new Scene(this, name);
+    this.scenes.add(scene);
+    return scene;
+  }
+  /** The scene `plugin` is attached to, or undefined when it is not attached to this engine. */
+  sceneOf(plugin: EnginePlugin): Scene | undefined {
+    const scene = owners.get(plugin);
+    return scene?.engine === this ? scene : undefined;
+  }
+  createMesh(parent: Mesh | null = null, scene: Scene = this.active): Mesh {
+    this.live();
+    this.checkScene(scene);
     parent?.check();
-    if (parent && parent.engine !== this) throw new TypeError('Foreign parent');
+    if (parent && (parent.engine !== this || parent.scene !== scene))
+      throw new TypeError('Foreign parent: parent a mesh of the same engine and scene');
     const id = this.free.pop() ?? this.next++;
     // Double the store when full (seen and slots are rebuilt by the full collection the new mesh forces).
     if (id >= this.store.capacity)
@@ -472,8 +609,9 @@ export class Engine {
     this.store.constrained[id] = 0;
     this.store.hidden[id] = 0;
     this.store.rotations.fill(0, id * 3, id * 3 + 3);
-    const mesh = new Mesh(this, id);
+    const mesh = new Mesh(this, id, scene);
     this.meshes.set(id, mesh);
+    (scene.meshes as Map<number, Mesh>).set(id, mesh);
     this.revision++;
     this.store.active[id] = 1;
     try {
@@ -491,6 +629,7 @@ export class Engine {
       for (let id = parents.indexOf(mesh.id); id >= 0; id = parents.indexOf(mesh.id, id + 1)) parents[id] = -1;
     if (mesh.geometry) this.release(mesh.geometry);
     this.meshes.delete(mesh.id);
+    (mesh.scene.meshes as Map<number, Mesh>).delete(mesh.id);
     this.revision++;
     this.store.active[mesh.id] = 0;
     this.store.visible[mesh.id] = 0;
@@ -518,6 +657,7 @@ export class Engine {
     }
   }
   private readonly collect = (mesh: Mesh): void => {
+    if (this.layers !== -1 && !(meshLayers(mesh) & this.layers)) return;
     const unshadowed = !mesh.receiveShadow;
     this.unshadowed += +unshadowed;
     if (mesh.geometry && this.store.visible[mesh.id]) {
@@ -542,23 +682,51 @@ export class Engine {
       this.stats.visible++;
     }
   };
-  /** Draw through `camera` for this call, restoring the primary view before returning. Alternate views are sequential. */
+  /**
+   * Draws one frame. Without `views`: the full canvas through `camera` (default the engine camera), restoring the
+   * primary view before returning. With `views`: each view in order (see {@link RenderView}); plugins update once
+   * per scene and each camera advances once.
+   */
   render({
     camera = this.camera,
     culling = true,
     delta = 0,
+    views,
   }: {
     camera?: Camera;
     culling?: boolean;
     delta?: number;
+    views?: readonly RenderView[];
   } = {}): void {
     if (this.rendering) throw new Error('Render recursion');
+    if (views) return this.renderViews(views, culling, delta);
     if (!(camera instanceof Camera)) throw new TypeError('Invalid camera');
     this.rendering = true;
+    this.drawn = undefined;
     let failed = false;
     try {
       this.update(culling, delta, camera);
-      if (!this.recovery) this.renderer.render(camera, this.lighting, this.batches.values(), this.frameGraph, delta);
+      const background = this.active.background,
+        { width, height } = this.canvas;
+      if (!this.recovery)
+        this.renderer.render(
+          camera,
+          this.lighting,
+          this.batches.values(),
+          this.frameGraph,
+          delta,
+          // A background or a camera layer mask is passed as a full-canvas view, so passes see it.
+          background === undefined && this.layers === -1
+            ? undefined
+            : {
+                rect: [0, 0, width, height],
+                index: 0,
+                count: 1,
+                id: '0',
+                clear: background === undefined ? undefined : { color: background ?? false },
+                layers: this.layers === -1 ? undefined : this.layers,
+              },
+        );
     } catch (error) {
       failed = true;
       throw error;
@@ -568,6 +736,7 @@ export class Engine {
           this.camera.update(this.canvas.width / this.canvas.height, this.backend === 'webgpu');
           this.store.planes.set(this.camera.planes);
           this.store.tick(this.primaryCulling);
+          this.layers = this.cameraLayers(this.camera);
           this.collectInstances();
         }
       } catch (error) {
@@ -577,38 +746,153 @@ export class Engine {
       }
     }
   }
-  private update(culling: boolean, delta: number, camera = this.camera): void {
-    if (this.disposed || this.disposing) throw new Error('Engine disposed');
-    if (!Number.isFinite(delta) || delta < 0 || delta > 1) throw new RangeError('Invalid delta');
-    for (const plugin of this.plugins.values()) plugin.onPreUpdate?.(delta);
+  private renderViews(views: readonly RenderView[], culling: boolean, delta: number): void {
+    if (!Array.isArray(views) || !views.length) throw new TypeError('Invalid views: pass a non-empty array');
+    this.rendering = true;
+    const cameras = new Set<Camera>(),
+      scenes = new Set<Scene>(),
+      drawn: RenderView[] = [],
+      // Views stack per destination (the canvas, or one target texture) and draw grouped by it, in order of first
+      // appearance and caller order within: counts, then positions so far.
+      destination = (view?: RenderView) => view?.target?.color ?? this.canvas,
+      counts = new Map<object, number>(),
+      stacked = new Map<object, number>();
+    for (const view of views) counts.set(destination(view), (counts.get(destination(view)) ?? 0) + 1);
+    const groups = [...counts.keys()],
+      order = views
+        .map((_, index) => index)
+        .sort((a, b) => groups.indexOf(destination(views[a])) - groups.indexOf(destination(views[b])));
+    try {
+      this.resize();
+      order.forEach((index) => {
+        const entry = views[index];
+        if (!(entry?.camera instanceof Camera) || !entry.viewport)
+          throw new TypeError('Invalid view: pass {camera, viewport}');
+        // Copy the rectangles: picking uses them after the caller may have changed this view.
+        const view: RenderView = {
+            ...entry,
+            viewport: [...entry.viewport],
+            scissor: entry.scissor && [...entry.scissor],
+          },
+          scene = (view.scene ?? this.scene) as Scene,
+          target = view.target?.color,
+          size = target ? [target.width, target.height] : [this.canvas.width, this.canvas.height],
+          rect = this.viewPixels(view.viewport, view.pixels, size),
+          prepare = !scenes.has(scene);
+        this.checkScene(scene);
+        this.enter(scene);
+        this.update(culling, cameras.has(view.camera) ? 0 : delta, view.camera, rect, prepare, delta, view.layers);
+        cameras.add(view.camera);
+        scenes.add(scene);
+        if (!this.recovery)
+          this.renderer.render(
+            view.camera,
+            this.lighting,
+            this.batches.values(),
+            this.frameGraph,
+            prepare ? delta : 0,
+            {
+              rect,
+              scissor: view.scissor && this.viewPixels(view.scissor, view.pixels, size),
+              layers: this.layers === -1 ? undefined : this.layers,
+              index: stacked.get(destination(view)) ?? 0,
+              count: counts.get(destination(view))!,
+              id: view.id ?? String(index),
+              clear: view.clear ?? (scene.background === undefined ? undefined : { color: scene.background ?? false }),
+              target: view.target,
+            },
+          );
+        stacked.set(destination(view), (stacked.get(destination(view)) ?? 0) + 1);
+        if (!target) drawn.push(view);
+      });
+    } finally {
+      this.rendering = false;
+      this.drawn = drawn;
+      this.enter(this.scene);
+    }
+  }
+  /** A view rectangle in pixels of `size`: fractions of it, or pixels when `pixels` is set. `trusted` skips the bounds check. */
+  private viewPixels(
+    viewport: readonly number[],
+    pixels: boolean | undefined,
+    [width, height]: readonly number[],
+    trusted?: boolean,
+  ): [number, number, number, number] {
+    const rect = (
+      pixels
+        ? [...viewport]
+        : [
+            Math.round(viewport[0] * width),
+            Math.round(viewport[1] * height),
+            Math.round((viewport[0] + viewport[2]) * width) - Math.round(viewport[0] * width),
+            Math.round((viewport[1] + viewport[3]) * height) - Math.round(viewport[1] * height),
+          ]
+    ) as [number, number, number, number];
+    if (!trusted) validateRectangle(rect, width, height);
+    return rect;
+  }
+  /**
+   * Plugin updates (`prepare`), camera, kernel tick and instance collection for one draw. `rect` sets the camera aspect
+   * and skips the canvas resize; `layers` defaults to the camera's mask from @margoengine/cameras/layers.
+   */
+  private update(
+    culling: boolean,
+    delta: number,
+    camera = this.camera,
+    rect?: readonly number[],
+    prepare = true,
+    frameDelta = delta,
+    layers?: number,
+  ): void {
+    this.live();
+    if (!Number.isFinite(frameDelta) || frameDelta < 0 || frameDelta > 1) throw new RangeError('Invalid delta');
+    if (prepare) for (const plugin of this.plugins.values()) plugin.onPreUpdate?.(frameDelta);
+    if (!rect) this.resize();
+    camera.advance(delta);
+    camera.update(rect ? rect[2] / rect[3] : this.canvas.width / this.canvas.height, this.backend === 'webgpu');
+    this.layers = this.cameraLayers(camera, layers);
+    this.store.planes.set(camera.planes);
+    this.store.tick(culling);
+    const lighting = this.lighting;
+    finite(lighting.direction, 4, 'Light');
+    finite(lighting.radiance, 4, 'Radiance');
+    if (lighting.ambient !== undefined) finite(lighting.ambient, 3, 'Ambient');
+    if (
+      !Math.hypot(lighting.direction[0], lighting.direction[1], lighting.direction[2]) ||
+      lighting.direction[3] < 0 ||
+      lighting.radiance.some((v) => v < 0) ||
+      lighting.ambient?.some((v) => v < 0)
+    )
+      throw new RangeError('Invalid lighting');
+    this.collectInstances();
+    if (camera === this.camera) this.primaryCulling = culling;
+  }
+  /** A view's layer mask: `layers`, else the camera's from @margoengine/cameras/layers, else -1 (every layer). */
+  private cameraLayers(camera: Camera, layers?: number): number {
+    return (
+      (layers === undefined ? (layerRegistry()?.cameras.get(camera) ?? -1) : checkLayers(layers, 'View layers')) | 0
+    );
+  }
+  private resize(): void {
     // Avoid multiplying desktop 4x MSAA by another 4x in HiDPI backing pixels; the light tier caps DPR at margoLow.
     const dpr = Math.min(globalThis.devicePixelRatio ?? 1, globalThis.margoLow || 2, 4 / sceneSamples()),
       width = Math.max(1, Math.min(4096, Math.round(this.canvas.clientWidth * dpr) || this.canvas.width)),
       height = Math.max(1, Math.min(4096, Math.round(this.canvas.clientHeight * dpr) || this.canvas.height));
     if (this.canvas.width !== width) this.canvas.width = width;
     if (this.canvas.height !== height) this.canvas.height = height;
-    camera.advance(delta);
-    camera.update(this.canvas.width / this.canvas.height, this.backend === 'webgpu');
-    this.store.planes.set(camera.planes);
-    this.store.tick(culling);
-    finite(this.lighting.direction, 4, 'Light');
-    finite(this.lighting.radiance, 4, 'Radiance');
-    if (this.lighting.ambient !== undefined) finite(this.lighting.ambient, 3, 'Ambient');
-    if (
-      !Math.hypot(this.lighting.direction[0], this.lighting.direction[1], this.lighting.direction[2]) ||
-      this.lighting.direction[3] < 0 ||
-      this.lighting.radiance.some((v) => v < 0) ||
-      this.lighting.ambient?.some((v) => v < 0)
-    )
-      throw new RangeError('Invalid lighting');
-    this.collectInstances();
-    if (camera === this.camera) this.primaryCulling = culling;
   }
   private collectInstances(): void {
-    // Reuse last frame's instances unless the mesh set, visibility or a material changed; then patch moved matrices only.
+    // Reuse the last collection unless the mesh set, scene, layers, visibility or a material changed (or masks come
+    // from a source that can change at any time); then patch moved matrices only.
     const { visible, changed } = this.store,
-      seen = this.seen;
-    let full = this.collected !== this.revision;
+      seen = this.seen,
+      scene = this.active,
+      layers = this.layers;
+    let full =
+      this.collected !== this.revision ||
+      this.collectedScene !== scene ||
+      this.collectedLayers !== layers ||
+      (layers !== -1 && !!layerRegistry()?.source);
     for (let id = 0; !full && id < this.next; id++) full = visible[id] !== seen[id];
     for (const values of this.materials)
       for (let i = 0; !full && i < 8; i++) full = values[0].data[i] !== values[i + 1];
@@ -618,8 +902,10 @@ export class Engine {
       this.materialFrame++;
       this.materials.clear();
       this.slots.fill(-1);
-      this.meshes.forEach(this.collect);
+      scene.meshes.forEach(this.collect);
       this.collected = this.revision;
+      this.collectedScene = scene;
+      this.collectedLayers = layers;
       seen.set(visible);
       changed.fill(0);
       for (const batch of this.batches.values()) {
@@ -643,30 +929,73 @@ export class Engine {
     this.stats.drawCalls = 0;
     for (const batch of this.batches.values()) if (batch.count && !batch.claimed) this.stats.drawCalls++;
   }
-  async pick(x: number, y: number): Promise<Mesh | null> {
+  /**
+   * The mesh under CSS pixel (x, y), or null. With `view`, picks through that view (null outside its rectangle);
+   * without, through the canvas view under the point when the last frame drew views, else the engine camera.
+   */
+  async pick(x: number, y: number, view?: RenderView): Promise<Mesh | null> {
     if (![x, y].every(Number.isFinite)) throw new RangeError('Invalid pick');
-    if (this.disposed || this.disposing) throw new Error('Engine disposed');
+    this.live();
     if (this.backend !== 'webgpu') throw new Error('WebGPU required');
     const w = this.canvas.clientWidth || this.canvas.width,
       h = this.canvas.clientHeight || this.canvas.height;
     if (x < 0 || y < 0 || x >= w || y >= h || this.recovery) return null;
-    this.update(true, 0);
+    this.resize();
     const renderer = this.renderer as GPURenderer,
       revision = this.revision,
-      picker = [...this.plugins.values()].find((plugin) => plugin.onPick);
-    const mesh = picker
-      ? await picker.onPick!(x, y)
-      : (this.meshes.get(
-          (await renderer.pick(
-            this.camera,
-            this.lighting,
-            this.batches.values(),
-            this.frameGraph,
-            (x * this.canvas.width) / w,
-            (y * this.canvas.height) / h,
-          )) ?? -1,
-        ) ?? null);
-    return this.renderer === renderer && this.revision === revision ? mesh : null;
+      size = [this.canvas.width, this.canvas.height],
+      px = (x * size[0]) / w,
+      py = (y * size[1]) / h,
+      inside = (r?: readonly number[]) => !r || (px >= r[0] && py >= r[1] && px < r[0] + r[2] && py < r[1] + r[3]),
+      resolve = (v: RenderView, trusted?: boolean): RenderView & { pixels: true } => ({
+        ...v,
+        viewport: this.viewPixels(v.viewport, v.pixels, size, trusted),
+        scissor: v.scissor && this.viewPixels(v.scissor, v.pixels, size, trusted),
+        pixels: true,
+      });
+    let chosen = view && resolve(view);
+    if (!view && this.drawn) {
+      for (const candidate of this.drawn) {
+        const current = resolve(candidate, true);
+        if (inside(current.viewport) && inside(current.scissor)) chosen = current;
+      }
+      if (!chosen) return null;
+    }
+    if (chosen && !(inside(chosen.viewport) && inside(chosen.scissor))) return null;
+    const scene = (chosen?.scene ?? this.scene) as Scene,
+      camera = chosen?.camera ?? this.camera,
+      rect = chosen?.viewport;
+    this.checkScene(scene);
+    if (!(camera instanceof Camera)) throw new TypeError('Invalid camera');
+    const outer = this.enter(scene);
+    let pending: Promise<Mesh | null>;
+    try {
+      this.update(true, 0, camera, rect, true, 0, chosen?.layers);
+      if (chosen) chosen.layers = this.layers === -1 ? undefined : this.layers;
+      const picker = [...this.plugins.values()].find((plugin) => plugin.onPick);
+      pending = picker
+        ? picker.onPick!(x, y, chosen)
+        : renderer
+            .pick(
+              camera,
+              this.lighting,
+              this.batches.values(),
+              this.frameGraph,
+              px - (rect?.[0] ?? 0),
+              py - (rect?.[1] ?? 0),
+              rect && [rect[2], rect[3]],
+            )
+            .then((id) => this.meshes.get(id ?? -1) ?? null);
+    } finally {
+      this.enter(outer);
+    }
+    const layers = this.layers,
+      mesh = await pending;
+    return this.renderer === renderer &&
+      this.revision === revision &&
+      (!mesh || (mesh.scene === scene && (layers === -1 || meshLayers(mesh) & layers)))
+      ? mesh
+      : null;
   }
   onFrame(callback: FrameCallback): () => void {
     this.callbacks.add(callback);
@@ -675,7 +1004,7 @@ export class Engine {
     };
   }
   start({ culling }: { culling?: boolean } = {}): void {
-    if (this.disposed || this.disposing) throw new Error('Engine disposed');
+    this.live();
     this.frameOptions.culling = culling;
     if (this.running) return;
     this.running = true;
@@ -694,6 +1023,7 @@ export class Engine {
     try {
       for (const callback of this.callbacks) callback(this, delta);
       this.frameOptions.delta = delta;
+      this.frameOptions.views = this.views?.length ? this.views : undefined;
       if (!this.disposed) this.render(this.frameOptions);
     } catch (error) {
       this.stop();
@@ -724,7 +1054,8 @@ export class Engine {
         }
       }
     };
-    for (const name of this.plugins.keys()) cleanup(() => this.removePlugin(name));
+    for (const scene of this.scenes)
+      for (const name of scene.plugins.keys()) cleanup(() => this.removePlugin(name, scene));
     for (const mesh of this.meshes.values()) cleanup(() => mesh.dispose());
     this.callbacks.clear();
     cleanup(() => this.renderer.dispose());

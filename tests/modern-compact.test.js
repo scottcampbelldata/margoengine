@@ -37,6 +37,14 @@ test('production compaction drops debugger and preserves public exports', () => 
   assert.match(code, /publicName/);
 });
 
+test('compaction preserves private defaults and lexical parameter initializers', () => {
+  const source =
+    'class Stage { private imports = 7; read(value = this.imports, lazy = () => this.imports) { return [value, lazy()]; } }';
+  const output = compactInternals(source, source.replace('private ', ''));
+  const instance = new (Function(`${output}; return Stage;`)())();
+  assert.deepEqual(instance.read(), [7, 7]);
+});
+
 test('extended private aliases reject collisions with public uppercase members', async () => {
   const source = await readFile(new URL('../packages/core/src/renderer.ts', import.meta.url), 'utf8');
   assert.throws(() => compactInternals(source, 'class GPURenderer { A = 1; }'), /Internal alias A collides/);

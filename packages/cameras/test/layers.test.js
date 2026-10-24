@@ -3,12 +3,9 @@ import assert from 'node:assert/strict';
 import { EngineKernel, PbrMaterial, Camera, box } from '../../core/dist/index.js';
 import {
   ALL_LAYERS,
-  CameraLayers,
-  SceneSwitch,
   getCameraLayers,
   getRenderLayers,
   layerMask,
-  renderView,
   setCameraLayers,
   setRenderLayers,
   useLayerSource,
@@ -48,6 +45,8 @@ async function engine(t) {
         setVertexBuffer() {},
         setIndexBuffer() {},
         drawIndexed() {},
+        setViewport() {},
+        setScissorRect() {},
         end() {},
       }),
       finish: () => ({}),
@@ -102,7 +101,7 @@ test('masks: layerMask builds bits, meshes default to layer 0 and children inher
   assert.throws(() => setRenderLayers(other, -1), RangeError);
   assert.throws(() => setRenderLayers(other, 2 ** 32), RangeError);
   assert.throws(() => setRenderLayers(other, 1.5), RangeError);
-  assert.equal(getCameraLayers(e.camera), 1, 'default camera mask: layer 0');
+  assert.equal(getCameraLayers(e.camera), ALL_LAYERS, 'a camera without a mask draws every layer');
   setCameraLayers(e.camera, ALL_LAYERS);
   assert.equal(getCameraLayers(e.camera), ALL_LAYERS);
   useLayerSource((mesh) => (mesh === other ? 8 : 1));
@@ -144,70 +143,26 @@ test('withLayers hides meshes outside the mask and excluded meshes for the call 
   assert.throws(() => withLayers(e, -2, () => 0), RangeError);
 });
 
-test('CameraLayers draws the primary camera mask per frame and restores visibility after the frame', async (t) => {
+test('core draws each camera and view through its layer mask without touching visibility', async (t) => {
   const e = await engine(t),
-    a = part(e),
+    root = part(e),
+    child = part(e, root),
     b = part(e);
-  setRenderLayers(b, 0b10);
-  CameraLayers.attach(e);
+  setRenderLayers(root, 0b10);
   e.render();
-  assert.equal(e.stats.visible, 1, 'default camera mask 1 skips layer 1');
-  assert.equal(b.visible, true, 'visible again after the frame');
-  setCameraLayers(e.camera, 0b11);
+  assert.equal(e.stats.visible, 3, 'no camera mask: every layer');
+  setCameraLayers(e.camera, 0b01);
   e.render();
-  assert.equal(e.stats.visible, 2);
-  setCameraLayers(e.camera, 0b10);
+  assert.equal(e.stats.visible, 1, 'the engine camera mask skips layer 1 (root and its child)');
+  assert.deepEqual([root.visible, child.visible, b.visible], [true, true, true], 'nothing was hidden');
+  setRenderLayers(child, 0b01);
   e.render();
-  assert.equal(e.stats.visible, 1);
-  assert.equal(a.visible, true);
-  // Inside a filtered render (a capture), the capture's mask applies, not the primary camera's.
+  assert.equal(e.stats.visible, 2, 'a mask change re-collects on the next frame');
   const other = new Camera({ position: [0, 0, 10], target: [0, 0, 0] });
-  setCameraLayers(other, 1);
-  renderView(e, { camera: other });
-  assert.deepEqual([a.visible, b.visible], [true, true], 'renderView restores visibility');
-  let inside = -1;
-  withLayers(e, 1, () => {
-    e.render({ camera: other });
-    inside = [a.visible, b.visible].filter(Boolean).length;
-  });
-  assert.equal(inside, 1);
-  e.removePlugin('camera-layers');
-  e.render();
-  assert.equal(e.stats.visible, 2);
-});
-
-test('SceneSwitch shows one scene at a time and gives a shown scene its own visibility back', async (t) => {
-  const e = await engine(t),
-    menu = [part(e), part(e)],
-    level = [part(e), part(e)],
-    shared = part(e),
-    scenes = new SceneSwitch(e).add('menu', menu).add('level', level);
-  level[1].visible = false;
-  scenes.show('menu');
-  e.render();
-  assert.equal(e.stats.visible, 3);
-  assert.deepEqual(
-    [...menu, ...level, shared].map((m) => m.visible),
-    [true, true, false, false, true],
-  );
-  scenes.show('level');
-  assert.deepEqual(
-    [...menu, ...level].map((m) => m.visible),
-    [false, false, true, false],
-    'level[1] keeps the visibility it had',
-  );
-  e.render();
-  assert.equal(e.stats.visible, 2);
-  assert.equal(scenes.active, 'level');
-  assert.deepEqual(scenes.names, ['menu', 'level']);
-  const late = part(e);
-  scenes.add('menu', [late]);
-  assert.equal(late.visible, false, 'added to a hidden scene');
-  scenes.show(null);
-  assert.deepEqual(
-    [...menu, ...level, late].map((m) => m.visible),
-    [true, true, true, false, true],
-  );
-  assert.throws(() => scenes.show('missing'), RangeError);
-  assert.throws(() => scenes.add('', []), TypeError);
+  setCameraLayers(other, 0b10);
+  e.render({ views: [{ camera: other, viewport: [0, 0, 1, 1] }] });
+  assert.equal(e.stats.visible, 1, 'a view follows its camera mask');
+  e.render({ views: [{ camera: other, viewport: [0, 0, 1, 1], layers: ALL_LAYERS }] });
+  assert.equal(e.stats.visible, 3, 'unless it sets its own layers');
+  setCameraLayers(e.camera, ALL_LAYERS);
 });

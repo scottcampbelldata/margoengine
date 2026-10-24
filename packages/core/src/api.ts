@@ -1,6 +1,7 @@
 import { Engine as Runtime } from './engine.js';
 import type { EngineOptions } from './engine.js';
 import type { Camera, Vec3 } from './camera.js';
+import type { RenderView } from './renderer.js';
 import type { Geometry, PbrMaterial } from './geometry.js';
 /**
  * Live x/y/z view of a mesh's position (world units), rotation (Euler radians) or scale. Writes must be finite as
@@ -42,6 +43,30 @@ export interface Mesh {
   dispose(): void;
 }
 /**
+ * Meshes, lighting and plugins drawn together, from {@link EngineKernel.createScene}; `engine.scene` is the default.
+ * Draw one with a view's `scene`: a HUD overlay, a menu item preview or a portal. While a scene is drawn or set up,
+ * `engine.lighting`, `stats`, `plugins` and `createMesh` are that scene's. A mesh's parent must be in its scene.
+ */
+export interface Scene {
+  readonly name: string;
+  /** Clear colour (`#rrggbb`) for views of this scene, or null to keep the colour below (overlays). A view's `clear` wins. */
+  background?: string | null;
+  /** This scene's sun and ambient light, as `engine.lighting`. */
+  readonly lighting: { direction: Float32Array; radiance: Float32Array; ambient: Float32Array };
+  readonly stats: { visible: number; drawCalls: number };
+  readonly meshes: ReadonlyMap<number, Mesh>;
+  readonly plugins: ReadonlyMap<string, EnginePlugin>;
+  createMesh(parent?: Mesh | null): Mesh;
+  /** Attaches a plugin to this scene; its passes draw in this scene's views only. */
+  use(plugin: EnginePlugin): this;
+  removePlugin(name: string): void;
+  /**
+   * Disposes this scene's plugins and meshes and removes the scene; views must stop naming it. Throws Error for the
+   * default scene, which lives as long as the engine.
+   */
+  dispose(): void;
+}
+/**
  * Public engine surface: owns the canvas, camera, meshes, plugins and the frame loop. Create it with
  * `Engine.create(canvas, options)`. Frame deltas are seconds.
  */
@@ -53,10 +78,30 @@ export interface EngineKernel {
   readonly disposed: boolean;
   readonly stats: { visible: number; drawCalls: number };
   onError: (error: unknown) => void;
+  /** A mesh in the scene being drawn or set up (the default scene otherwise). */
   createMesh(parent?: Mesh | null): Mesh;
-  pick(x: number, y: number): Promise<Mesh | null>;
-  /** Draw through an optional camera for this call; the primary camera and culling state are restored on return. */
-  render(options?: { camera?: Camera; culling?: boolean; delta?: number }): void;
+  /** The default scene: the meshes, lighting and plugins the engine camera draws. */
+  readonly scene: Scene;
+  /** A new scene with its own meshes, lighting and plugins; draw it with a view's `scene`. */
+  createScene(name?: string): Scene;
+  /** The scene `plugin` is attached to, or undefined when it is not attached to this engine. */
+  sceneOf(plugin: EnginePlugin): Scene | undefined;
+  /**
+   * Views the frame loop draws each frame instead of the full-canvas camera view, for split screen, a four-view
+   * layout or a minimap. List `engine.camera` in one of them to keep it. Unset or empty: the full-canvas view.
+   */
+  views?: readonly RenderView[];
+  /**
+   * The mesh under CSS pixel (x, y), or null. With `view`, picks through that view (null outside its rectangle);
+   * without, through the canvas view under the point when the last frame drew views, else the engine camera.
+   */
+  pick(x: number, y: number, view?: RenderView): Promise<Mesh | null>;
+  /**
+   * Draws one frame. Without `views`: the full canvas through `camera` (default the engine camera); the primary camera
+   * and culling state are restored on return. With `views`: each view in order (canvas views stack, the first clears),
+   * with plugin updates once per scene and each camera advanced once.
+   */
+  render(options?: { camera?: Camera; culling?: boolean; delta?: number; views?: readonly RenderView[] }): void;
   start(options?: { culling?: boolean }): void;
   stop(): void;
   dispose(): void;
@@ -67,7 +112,7 @@ export interface EngineKernel {
   onFrame(callback: FrameCallback): () => void;
 }
 /**
- * Extension attached with `engine.use(plugin)`. `name` must be non-empty and unique per engine; `setup` runs once on
+ * Extension attached with `engine.use(plugin)`. `name` must be non-empty and unique in its scene; `setup` runs once on
  * attach, `onPreUpdate` receives each frame's delta in seconds, and `dispose` runs on removal or engine disposal.
  */
 export interface EnginePlugin {

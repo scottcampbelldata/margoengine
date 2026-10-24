@@ -7,7 +7,10 @@ import { compactOutput } from './measure-size.js';
 
 export async function compactPackage(name, directory = `packages/${name}`) {
   const root = resolve(directory, 'dist'),
-    shared = resolve(directory, '../shared/mesh-source.js'),
+    // Shared helpers bundled into core and the stage; everything else stays an import.
+    shared = (name === 'core' ? ['clear-color', 'view-rect'] : ['mesh-source']).map((file) =>
+      resolve(directory, `../shared/${file}.js`),
+    ),
     files = (await readdir(root)).filter((file) => file.endsWith('.js'));
   for (const file of files)
     await writeFile(
@@ -32,8 +35,10 @@ export async function compactPackage(name, directory = `packages/${name}`) {
         fileName: (_, name) => `${name}.js`,
       },
       rollupOptions: {
-        external: (id, importer) => !!importer && (name !== 'margoengine' || resolve(dirname(importer), id) !== shared),
-        output: compactOutput,
+        external: (id, importer) =>
+          !!importer &&
+          ((name !== 'margoengine' && name !== 'core') || !shared.includes(resolve(dirname(importer), id))),
+        output: { ...compactOutput, comments: { annotation: true } },
       },
     },
   });

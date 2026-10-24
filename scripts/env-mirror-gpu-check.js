@@ -209,7 +209,7 @@ try {
       glassControl > 0.05,
     );
 
-    // Layers: the main camera (CameraLayers, mask 1) hides the red box moved to layer 1 while the mirror (every
+    // Layers: the main camera (setCameraLayers, mask 1) hides the red box moved to layer 1 while the mirror (every
     // layer) still reflects it; a mirror with mask 1 drops the reflection too.
     const noRed = await render({ scene: 'mirror', redHidden: true }),
       noRedDark = await render({ scene: 'mirror', redHidden: true, tint: [0, 0, 0] }),

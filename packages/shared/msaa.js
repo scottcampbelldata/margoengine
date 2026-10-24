@@ -1,3 +1,5 @@
+import { applyView, viewLoadOp } from './view-rect.js';
+import { retire } from './frame-resources.js';
 const fullscreen = `@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {return vec4f(array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3))[i],0,1);}`;
 const group = (device, pipeline, view) =>
   device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [{ binding: 0, resource: view }] });
@@ -59,6 +61,8 @@ export class SceneTarget {
     }
   }
   begin(c) {
+    // The view being captured: depth copies stay inside its rectangle and keep earlier views' depth.
+    (this.viewContext ??= {}).view = c.view;
     Object.assign((this.original ??= {}), {
       color: c.color,
       depth: c.depth,
@@ -118,9 +122,11 @@ export class SceneTarget {
       formats.set(format, cached);
     }
     cached.descriptor.depthStencilAttachment.view = view;
+    cached.descriptor.depthStencilAttachment.depthLoadOp = this.viewContext?.view ? 'load' : 'clear';
     const pass = encoder.beginRenderPass(cached.descriptor);
     pass.setPipeline(cached.pipeline);
     pass.setBindGroup(0, cached.group);
+    if (this.viewContext) applyView(pass, this.viewContext);
     pass.draw(3);
     pass.end();
   }
@@ -128,6 +134,11 @@ export class SceneTarget {
     if (this.samples === 1) return;
     this.copyDepth(encoder, this.resolvedDepthView, 1);
     if (final) {
+      // A later view loads these samples before resolving the full HDR target.
+      // Standalone captures still retire both attachments after their final use.
+      const store = this.viewContext?.view ? 'store' : 'discard';
+      this.finalResolution.colorAttachments[0].storeOp = store;
+      this.finalResolution.depthStencilAttachment.depthStoreOp = store;
       if (this.original)
         this.copyDepth(
           encoder,
@@ -190,14 +201,16 @@ export class SceneTarget {
       colorAttachments: [{ view: c.color, loadOp: 'clear', storeOp: 'store' }],
     });
     descriptor.colorAttachments[0].view = c.color;
+    descriptor.colorAttachments[0].loadOp = viewLoadOp(c, 'clear');
     const pass = c.encoder.beginRenderPass(descriptor);
     pass.setPipeline(this.presentation);
     pass.setBindGroup(0, this.presentationGroup);
+    applyView(pass, c);
     pass.draw(3);
     pass.end();
   }
   dispose() {
-    for (const texture of this.textures) texture.destroy();
+    for (const texture of this.textures) retire(this.device, texture);
     this.textures = [];
     this.pipelines.clear();
   }

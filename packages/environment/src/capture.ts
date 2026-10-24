@@ -9,7 +9,7 @@ import { FrameGraph, engineRuntime, type Camera, type FramePass, type PassContex
 import { MargoError } from '@margoengine/math/errors';
 import { invertMatrix } from '@margoengine/math/mat4';
 import { SceneTarget } from '../../shared/msaa.js';
-import { withCaptureLayers } from './layers.js';
+import { withHidden } from '../../shared/view-rect.js';
 
 declare const GPUTextureUsage: {
   RENDER_ATTACHMENT: number;
@@ -182,8 +182,9 @@ const graphs = new WeakMap<
  * frame did not draw (WebGPU device being restored).
  */
 export function captureScene(engine: EngineKernel, job: CaptureJob): boolean {
+  // `render({camera})` draws the default scene: swap its graph for the capture's.
   const runtime = engineRuntime(engine),
-    frameGraph = runtime.frameGraph,
+    frameGraph = runtime.scene.frameGraph,
     passes = passArray(frameGraph);
   if (!passes)
     throw new MargoError(
@@ -206,12 +207,12 @@ export function captureScene(engine: EngineKernel, job: CaptureJob): boolean {
     cached = { passes, revision: frameGraph.revision, filter: job.filter, graph };
     graphs.set(frameGraph, cached);
   }
-  const host = runtime as unknown as { frameGraph: FrameGraph };
+  const host = runtime.scene as unknown as { frameGraph: FrameGraph };
   active = job;
   drawn = false;
   host.frameGraph = cached.graph;
   try {
-    withCaptureLayers(engine, job.layers, job.exclude, () => engine.render({ camera: job.camera, delta: 0 }));
+    withHidden(engine, job.layers, job.exclude, () => engine.render({ camera: job.camera, delta: 0 }));
   } finally {
     host.frameGraph = frameGraph;
     active = null;

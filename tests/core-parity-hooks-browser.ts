@@ -34,7 +34,7 @@ async function frame(options: { camera?: Camera } = {}) {
   return { visible: engine.stats.visible, primary: engine.camera !== alternate };
 }
 
-(window as any).coreHooks = {
+const coreHooks = {
   engine,
   front,
   back,
@@ -175,3 +175,5 @@ async function frame(options: { camera?: Camera } = {}) {
     engine.dispose();
   },
 };
+const testWindow: Window & { coreHooks?: typeof coreHooks } = window;
+testWindow.coreHooks = coreHooks;

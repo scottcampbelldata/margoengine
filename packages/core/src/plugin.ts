@@ -1,6 +1,6 @@
 import type { Engine, Mesh } from './engine.js';
 import type { Camera } from './camera.js';
-import type { Batch } from './renderer.js';
+import type { Batch, RenderView } from './renderer.js';
 
 /** Options for `PassContext.draw`, which draws every batch in one render pass. The WebGPU fields apply to WebGPU only. */
 export interface DrawOptions {
@@ -8,8 +8,14 @@ export interface DrawOptions {
   pipeline?: GPURenderPipeline;
   /** Extra bind group 0 entries after core's uniform at binding 0. Default the context's `bindings`. */
   bindings?: GPUBindGroupEntry[];
-  /** Clear the whole color/depth attachments before drawing instead of loading them, regardless of rectangles. Default true. */
+  /**
+   * Clear colour before drawing instead of loading it. Default true, except in a later view of a multi-view frame
+   * (which loads, so earlier views stay) or when the view's `clear.color` is false. Inside a view rectangle only the
+   * rectangle is cleared.
+   */
   clear?: boolean;
+  /** Clear depth before drawing. Default `clear` when set, else the view's `clear.depth`, else true. */
+  clearDepth?: boolean;
   /** Viewport [x, y, width, height] in top-left drawing-buffer pixels. Integer origin >= 0 and size > 0, within context dimensions. Does not change camera aspect. */
   viewport?: readonly [number, number, number, number];
   /** Independent clipping rectangle, in the same pixels/bounds as viewport. Omitted means the full target. Custom target owners must report their dimensions. */
@@ -32,6 +38,25 @@ export type PassContext = {
   width: number;
   height: number;
   camera: Camera;
+  /**
+   * The view being drawn; absent for a plain full-canvas frame. `viewport` and `scissor` are drawing-buffer pixels from
+   * the top left, and `draw()` uses them by default. `id` is stable across frames, so effects key per-view history on
+   * it. `index` is the view's place among the frame's views into the same canvas or target (later views load
+   * colour), `count` their number.
+   * `layers` is the layer mask in use (absent: every layer); packages that draw their own meshes test it with
+   * `inView`. `target` is the view's target textures; absent for the canvas.
+   */
+  view?: {
+    id: string;
+    camera: Camera;
+    viewport: readonly [number, number, number, number];
+    scissor?: readonly [number, number, number, number];
+    index: number;
+    count: number;
+    clear?: { color?: string | false; depth?: boolean };
+    layers?: number;
+    target?: { color: GPUTexture; depth?: GPUTexture };
+  };
   draw(options?: DrawOptions): void;
 } & (
   | {
@@ -62,7 +87,7 @@ export interface FramePass {
   prepare?(context: PassContext): void;
 }
 /**
- * Runtime plugin attached with `engine.use(plugin)`. `name` must be non-empty and unique per engine. `setup` and
+ * Runtime plugin attached with `engine.use(plugin)` or `scene.use(plugin)`. `name` must be non-empty and unique per scene. `setup` and
  * `registerPasses` run once on attach (passes are removed with the plugin), `onPreUpdate` receives each frame's delta in
  * seconds, `onPick` replaces the built-in pick, and `dispose` runs on removal or engine disposal.
  */
@@ -72,7 +97,11 @@ export interface EnginePlugin {
   onPreUpdate?(delta: number): void;
   registerPasses?(graph: FrameGraph): void;
   onDeviceRestored?(engine: Engine): void;
-  onPick?(x: number, y: number): Promise<Mesh | null>;
+  /**
+   * Replaces the built-in pick. `view` is the view picked through, rectangles in drawing-buffer pixels; absent for the
+   * engine camera. Read the camera synchronously: the engine restores its primary state when the hook returns.
+   */
+  onPick?(x: number, y: number, view?: RenderView & { pixels: true }): Promise<Mesh | null>;
   dispose?(): void;
 }
 
@@ -88,8 +117,11 @@ export class FrameGraph {
   ];
   private owner?: string;
   private executing = false;
-  add(pass: FramePass): () => void {
+  private idle(): void {
     if (this.executing) throw new Error('Graph executing');
+  }
+  add(pass: FramePass): () => void {
+    this.idle();
     if (
       !pass.name ||
       !Number.isFinite(pass.order) ||
@@ -102,12 +134,13 @@ export class FrameGraph {
     this.passes.sort((a, b) => a.order - b.order);
     this.revision++;
     return () => {
-      if (this.executing) throw new Error('Graph executing');
+      this.idle();
       this.passes = this.passes.filter((p) => p !== record);
       this.revision++;
     };
   }
   withOwner(owner: string, register: () => void): void {
+    this.idle();
     const previous = this.owner;
     this.owner = owner;
     try {
@@ -117,7 +150,7 @@ export class FrameGraph {
     }
   }
   removeOwner(owner: string): void {
-    if (this.executing) throw new Error('Graph executing');
+    this.idle();
     this.passes = this.passes.filter((p) => p.owner !== owner);
     this.revision++;
   }
