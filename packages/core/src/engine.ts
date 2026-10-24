@@ -165,6 +165,8 @@ const views = (mesh: Mesh) =>
  * parents at most 64 deep and in the same scene.
  */
 export class Mesh {
+  /** `dispose()`, for `using` (set at the end of this file where the runtime has `Symbol.dispose`). */
+  declare [Symbol.dispose]: () => void;
   name = '';
   readonly position = new VectorRef(this, 'position');
   readonly rotation = new VectorRef(this, 'rotation');
@@ -314,6 +316,8 @@ export class Mesh {
  * scene's.
  */
 export class Scene {
+  /** `dispose()`, for `using` (set at the end of this file where the runtime has `Symbol.dispose`). */
+  declare [Symbol.dispose]: () => void;
   /** Clear colour (`#rrggbb`) for views of this scene, or null to keep the colour below (overlays). A view's `clear` wins. Default: core's clear colour. */
   background?: string | null;
   readonly frameGraph = new FrameGraph();
@@ -358,6 +362,8 @@ export class Scene {
  * [0, 1] with RangeError.
  */
 export class Engine {
+  /** `dispose()`, for `using` (set at the end of this file where the runtime has `Symbol.dispose`). */
+  declare [Symbol.dispose]: () => void;
   /** The default scene. */
   readonly scene: Scene;
   /** @internal Every live scene of this engine, the default one first. */
@@ -1090,3 +1096,7 @@ export class Engine {
     if (failed) throw failure;
   }
 }
+// `using`: Symbol.dispose is dispose(), on runtimes that have the symbol (others keep plain dispose()).
+if (Symbol.dispose)
+  for (const type of [Engine, Mesh, Scene])
+    (type.prototype as { [Symbol.dispose]?: () => void })[Symbol.dispose] = type.prototype.dispose;

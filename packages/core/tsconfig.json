@@ -3,7 +3,7 @@
     "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext",
     "strict": true, "noImplicitOverride": true, "noFallthroughCasesInSwitch": true,
     "declaration": true, "outDir": "dist", "rootDir": "src",
-    "types": [], "lib": ["ES2022", "DOM"], "skipLibCheck": false
+    "types": [], "lib": ["ES2022", "ESNext.Disposable", "DOM"], "skipLibCheck": false
   },
   "include": ["src"]
 }

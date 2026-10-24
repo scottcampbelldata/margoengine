@@ -63,6 +63,7 @@ export class Engine {
     readonly canvas: HTMLCanvasElement;
     readonly store: TransformStore;
     readonly fallbackReason: string | null;
+    [Symbol.dispose]: () => void;
     readonly scene: Scene;
     readonly scenes: Set<Scene>;
     readonly meshes: Map<number, Mesh>;
@@ -169,6 +170,7 @@ export class Mesh {
     readonly engine: Engine;
     readonly id: number;
     readonly scene: Scene;
+    [Symbol.dispose]: () => void;
     name: string;
     readonly position: VectorRef;
     readonly rotation: VectorRef;
@@ -281,6 +283,7 @@ export interface Renderer {
 export class Scene {
     readonly engine: Engine;
     readonly name: string;
+    [Symbol.dispose]: () => void;
     background?: string | null;
     readonly frameGraph: FrameGraph;
     readonly plugins: ReadonlyMap<string, EnginePlugin>;
@@ -389,6 +392,7 @@ interface EngineKernel {
     }): void;
     stop(): void;
     dispose(): void;
+    [Symbol.dispose](): void;
     rebootDevice(): Promise<void>;
     use(plugin: EnginePlugin): this;
     hasPlugin(name: string): boolean;
@@ -428,6 +432,7 @@ interface Mesh {
     setGeometry(value: Geometry | null): this;
     setMaterial(value: PbrMaterial): this;
     dispose(): void;
+    [Symbol.dispose](): void;
 }
 
 interface PbrMaterialOptions {
@@ -455,6 +460,7 @@ interface Scene {
     use(plugin: EnginePlugin): this;
     removePlugin(name: string): void;
     dispose(): void;
+    [Symbol.dispose](): void;
 }
 
 interface VectorRef {

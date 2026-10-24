@@ -76,6 +76,7 @@ export interface EngineKernel {
     }): void;
     stop(): void;
     dispose(): void;
+    [Symbol.dispose](): void;
     rebootDevice(): Promise<void>;
     use(plugin: EnginePlugin): this;
     hasPlugin(name: string): boolean;
@@ -129,6 +130,7 @@ export interface Mesh {
     setGeometry(value: Geometry | null): this;
     setMaterial(value: PbrMaterial): this;
     dispose(): void;
+    [Symbol.dispose](): void;
 }
 
 export class PbrMaterial {
@@ -180,6 +182,7 @@ export interface Scene {
     use(plugin: EnginePlugin): this;
     removePlugin(name: string): void;
     dispose(): void;
+    [Symbol.dispose](): void;
 }
 
 export type Vec3 = readonly [number, number, number];

@@ -113,7 +113,13 @@ Both tuples use top-left drawing-buffer pixels, with nonnegative integer origins
 
 Clearing still clears the whole attachment, regardless of either rectangle. Use `clear:false` for later subviews that must retain color and depth. Rectangles do not change camera aspect or culling, the coordinates used by `engine.pick`, or optional packages that open their own native render passes. WebGL's core-mesh preview supports the same rectangles and clear/load behavior.
 
-Call `engine.dispose()` when the canvas is removed. Wasm is embedded; no Rust toolchain or Wasm bundler plugin is required. The public API is exported from `@margoengine/core`; raw GPU/Wasm access uses the explicit `@margoengine/core/extension` entry. Both entries include TypeScript declarations.
+Call `engine.dispose()` when the canvas is removed, or let `using engine = await Engine.create(canvas)` (and `using mesh = engine.createMesh()`, `using scene = engine.createScene()`) dispose at the end of the block: `[Symbol.dispose]` is `dispose()` where the runtime has the symbol. Disposing twice is harmless.
+
+Errors are a `MargoError` with a `code` (or a `TypeError` / `RangeError`) whose short message links to its entry on [margoengine.com/errors](https://margoengine.com/errors).
+
+Core geometry holds positions and normals only. For a second UV set (lightmaps, ambient occlusion), vertex colours or tangents on CPU geometry, use `createMesh(engine, {positions, normals, uvs, uvs1, ...}, material)` from `@margoengine/materials`; glTF files keep `TEXCOORD_1` through `@margoengine/gltf-pro`. For points (point clouds and sprites), use `PointCloud` and `PointsPlugin` from `@margoengine/points`.
+
+Wasm is embedded; no Rust toolchain or Wasm bundler plugin is required. The public API is exported from `@margoengine/core`; raw GPU/Wasm access uses the explicit `@margoengine/core/extension` entry. Both entries include TypeScript declarations.
 
 TypeScript 7+ with DOM types, Wasm SIMD and DecompressionStream gzip support are required. WebGPU requires HTTPS or localhost. See the API and lifecycle guide and committed measurements and how to reproduce them.
 

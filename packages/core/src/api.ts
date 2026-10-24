@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" preserve="true" />
 import { Engine as Runtime } from './engine.js';
 import type { EngineOptions } from './engine.js';
 import type { Camera, Vec3 } from './camera.js';
@@ -41,6 +42,8 @@ export interface Mesh {
   setGeometry(value: Geometry | null): this;
   setMaterial(value: PbrMaterial): this;
   dispose(): void;
+  /** `dispose()`, so `using mesh = engine.createMesh()` disposes it at the end of the block (where the runtime has `Symbol.dispose`). */
+  [Symbol.dispose](): void;
 }
 /**
  * Meshes, lighting and plugins drawn together, from {@link EngineKernel.createScene}; `engine.scene` is the default.
@@ -65,6 +68,8 @@ export interface Scene {
    * default scene, which lives as long as the engine.
    */
   dispose(): void;
+  /** `dispose()`, for `using` (where the runtime has `Symbol.dispose`). */
+  [Symbol.dispose](): void;
 }
 /**
  * Public engine surface: owns the canvas, camera, meshes, plugins and the frame loop. Create it with
@@ -107,6 +112,8 @@ export interface EngineKernel {
   start(options?: { culling?: boolean }): void;
   stop(): void;
   dispose(): void;
+  /** `dispose()`, so `using engine = await Engine.create(canvas)` disposes it at the end of the block (where the runtime has `Symbol.dispose`). Disposal is synchronous, so there is no `Symbol.asyncDispose`. */
+  [Symbol.dispose](): void;
   rebootDevice(): Promise<void>;
   use(plugin: EnginePlugin): this;
   hasPlugin(name: string): boolean;
