@@ -105,9 +105,12 @@ const ASSETS = [
   ['packages/environment/tests/fixtures/NOTICE.md', 'test fixtures: OpenEXR test images (BSD-3-Clause)'],
   [
     'packages/loaders/tests/fixtures/SOURCES.txt',
-    'test fixtures: PCL bunny.pcd (BSD-3-Clause, Stanford bunny scan), libigl tutorial data cube.off and decimated-knight.off, PyVista vtk-data fran_cut.vtk and polyEx.vtk',
+    'test fixtures: Point Cloud Library test/bunny.pcd (BSD-3-Clause, github.com/PointCloudLibrary/pcl; Stanford bunny scan), libigl tutorial data cube.off and decimated-knight.off, PyVista vtk-data fran_cut.vtk and polyEx.vtk',
   ],
-  ['packages/points/tests/fixtures/NOTICE.md', 'test fixture: PCL bunny.pcd (BSD-3-Clause, Stanford bunny scan)'],
+  [
+    'packages/points/tests/fixtures/NOTICE.md',
+    'test fixture: Point Cloud Library test/bunny.pcd (BSD-3-Clause, github.com/PointCloudLibrary/pcl; Stanford bunny scan)',
+  ],
   [
     'packages/decoders/tests/fixtures/NOTICE.md',
     'test fixtures: Khronos glTF sample models Box (CC BY 4.0, Cesium) and Avocado (CC0 1.0, Microsoft), Draco-compressed; AnisotropyBarnLamp normal texture (CC BY 4.0, Wayfair, Eric Chadwick)',

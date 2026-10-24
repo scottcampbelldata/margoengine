@@ -4,7 +4,10 @@ Margo-made, written by scripts/make-fixtures.js (procedural shapes, deterministi
   torus.ply, torus_be.ply, torus_le.ply, torus_colored.ply, gears.3mf, face_colors.3mf, corner_colors.3mf,
   rose.pcd, spiral.pcd, helix.xyz
 
-Third-party, downloaded by scripts/fetch-fixtures.js:
-Point Cloud Library test data (BSD-3-Clause, https://github.com/PointCloudLibrary/pcl): bunny.pcd
+Third-party, committed here (the tests never download them; scripts/fetch-fixtures.js refreshes them by hand):
+Point Cloud Library test data, test/bunny.pcd (BSD-3-Clause, https://github.com/PointCloudLibrary/pcl,
+  Copyright (c) 2009-2012 Willow Garage, Inc., Copyright (c) 2012- Open Perception, Inc.; licence text:
+  https://github.com/PointCloudLibrary/pcl/blob/master/LICENSE.txt), a subsampled scan of the Stanford bunny
+  (Stanford 3D Scanning Repository): bunny.pcd, the same bytes as packages/points/tests/fixtures/bunny.pcd
 libigl tutorial data (https://github.com/libigl/libigl-tutorial-data): cube.off, decimated-knight.off
 PyVista vtk-data (https://github.com/pyvista/vtk-data): fran_cut.vtk, polyEx.vtk
