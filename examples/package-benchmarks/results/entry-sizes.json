@@ -1,5 +1,5 @@
 {
-  "commit": "6ce380cf",
+  "commit": "3fbfeef6",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -372,12 +372,20 @@
     },
     "@margoengine/geometry": {
       ".": {
-        "raw": 53798,
-        "gzip": 20161
+        "raw": 53801,
+        "gzip": 20127
       },
       "./shapes": {
-        "raw": 29395,
-        "gzip": 11026
+        "raw": 9947,
+        "gzip": 3584
+      },
+      "./triangulate": {
+        "raw": 16429,
+        "gzip": 6550
+      },
+      "./extrude": {
+        "raw": 19846,
+        "gzip": 7930
       },
       "./primitives": {
         "raw": 9105,
@@ -530,8 +538,8 @@
         "gzip": 7129
       },
       "./font": {
-        "raw": 15423,
-        "gzip": 6334
+        "raw": 15466,
+        "gzip": 6351
       },
       "./svg": {
         "raw": 24978,
@@ -790,8 +798,8 @@
     },
     "@margoengine/post": {
       ".": {
-        "raw": 140827,
-        "gzip": 38745
+        "raw": 140408,
+        "gzip": 38613
       },
       "./bloom": {
         "raw": 19549,
@@ -850,14 +858,14 @@
         "gzip": 6016
       },
       "./afterimage": {
-        "raw": 16454,
-        "gzip": 5555
+        "raw": 16041,
+        "gzip": 5408
       }
     },
     "@margoengine/procedural": {
       ".": {
-        "raw": 17015,
-        "gzip": 7301
+        "raw": 17058,
+        "gzip": 7307
       },
       "./noise": {
         "raw": 4401,
@@ -868,8 +876,8 @@
         "gzip": 2198
       },
       "./voronoi": {
-        "raw": 11363,
-        "gzip": 4775
+        "raw": 11368,
+        "gzip": 4773
       },
       "./expression": {
         "raw": 11133,
