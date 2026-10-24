@@ -42,11 +42,36 @@ export interface BaseMaterialOptions {
   depthWrite?: boolean;
   /** Fogged by the plugin's fog (`PointsPlugin.setFog`); false keeps this material clear. Default true. */
   fog?: boolean;
+  /**
+   * Up to 6 world-space planes `[a, b, c, d]`: fragments at points with `a x + b y + c z + d < 0` are cut away (the
+   * `@margoengine/materials` convention). Live; default none.
+   */
+  clippingPlanes?: readonly (readonly number[])[];
 }
 
 const checkUnit = (value: number, label: string) => {
   if (typeof value !== 'number' || !(value >= 0 && value <= 1)) throw new RangeError(`${label} must be in [0, 1]`);
 };
+
+/** Validates up to 6 planes `[a, b, c, d]` and returns them flat with unit normals. */
+function clipPlanes(planes: readonly (readonly number[])[]): number[] {
+  if (!Array.isArray(planes))
+    throw new TypeError('Points material clippingPlanes must be an array of [a, b, c, d] planes');
+  if (planes.length > 6) throw new RangeError('Points material clippingPlanes holds at most 6 planes; pass fewer');
+  const flat: number[] = [];
+  for (const p of planes) {
+    if (
+      !Array.isArray(p) ||
+      p.length !== 4 ||
+      !p.every((x) => typeof x === 'number' && Number.isFinite(Math.fround(x)))
+    )
+      throw new TypeError('Points material clipping plane must be four finite numbers [a, b, c, d]');
+    const length = Math.hypot(p[0], p[1], p[2]);
+    if (!length) throw new TypeError('Points material clipping plane needs a non-zero normal [a, b, c]');
+    flat.push(p[0] / length, p[1] / length, p[2] / length, p[3] / length);
+  }
+  return flat;
+}
 
 abstract class BaseMaterial {
   /** Linear RGB. */
@@ -63,6 +88,8 @@ abstract class BaseMaterial {
   /** Bumped when `map` changes or `needsUpdate()` is called; the plugin re-uploads image sources. */
   mapVersion = 0;
   private source: PointsTextureSource | null = null;
+  /** Clipping planes, four normalised numbers each (at most 24). */
+  private clipping: number[] = [];
 
   protected constructor(transparent: boolean) {
     this.transparent = transparent;
@@ -77,6 +104,22 @@ abstract class BaseMaterial {
       this.source = value;
       this.mapVersion++;
     }
+  }
+
+  /**
+   * Up to 6 world-space planes `[a, b, c, d]`; fragments at points with `a x + b y + c z + d < 0` are discarded. Points
+   * test each fragment's world position on the point's camera-facing disc (on the sphere for `shading: 'sphere'`);
+   * world-sized sprites each fragment's position on the quad, pixel-sized sprites their centre. Reading gives
+   * normalised copies; assign a new list to change them (live, next frame). Throws TypeError for a malformed plane,
+   * RangeError for more than 6.
+   */
+  get clippingPlanes(): number[][] {
+    const out: number[][] = [];
+    for (let i = 0; i < this.clipping.length; i += 4) out.push(this.clipping.slice(i, i + 4));
+    return out;
+  }
+  set clippingPlanes(planes: readonly (readonly number[])[]) {
+    this.clipping = clipPlanes(planes);
   }
 
   /** Re-uploads an image source whose pixels changed (for example a canvas you drew into). */
@@ -105,6 +148,7 @@ abstract class BaseMaterial {
     if (options.depthTest !== undefined) this.depthTest = options.depthTest;
     if (options.depthWrite !== undefined) this.depthWrite = options.depthWrite;
     if (options.fog !== undefined) this.fog = options.fog;
+    if (options.clippingPlanes !== undefined) this.clippingPlanes = options.clippingPlanes;
   }
 
   validate(): void {

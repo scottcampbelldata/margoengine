@@ -257,6 +257,11 @@ export interface PBRMaterial extends GLTFMaterial {
    * too: the materials feature uniform, the map's view and its sampler (shared/displacement.js `displacedDepth`).
    */
   displacement?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  /**
+   * Clipping planes the shading applies (`@margoengine/materials` clippingPlanes with clipShadows), for shadow casters
+   * to clip too: a uniform of up to 6 world planes in the SectionPlanes layout (plane count in settings.x).
+   */
+  clip?: GPUBufferBinding;
   /** Use the retained UV-transform frame layout for constructed optional materials. */
   extendedFrame?: boolean;
 }
@@ -391,6 +396,7 @@ interface ShadowCasterRecord {
   alphaTransform?: Float32Array;
   instances?: PBRInstances;
   displacement?: PBRMaterial['displacement'];
+  clip?: GPUBufferBinding;
   dynamic: boolean;
 }
 // Keep the original triangle buffer for queries and exports. Duplicate shared
@@ -447,15 +453,19 @@ function fillShadow(r: DrawResource, value: ShadowCasterRecord): void {
   if (m.maps[0]?.extensions?.KHR_texture_transform) value.alphaTransform = coordinates?.transform;
   else delete value.alphaTransform;
   value.instances = p.instances;
-  const displacement = m.displacement;
+  const displacement = m.displacement,
+    clip = m.clip;
   if (displacement) value.displacement = displacement;
   else delete value.displacement;
+  if (clip) value.clip = clip;
+  else delete value.clip;
   // ponytail: edited geometry stays a dynamic caster after its first write; add a geometry revision to the shadow
   // still-hash if edited static levels need the cached atlas back. Displaced casters redraw too (live scale and bias).
   value.dynamic =
     !r.batch &&
     (!!r.edited ||
       !!displacement ||
+      !!clip ||
       p.definition.attributes?.JOINTS_0 !== undefined ||
       !!p.definition.targets?.length ||
       !!p.instances ||

@@ -1,5 +1,6 @@
 // Optional renderers reuse SectionPlanes' existing uniform; core and machinery
-// keep their shader patch and ownership unchanged.
+// keep their shader patch and ownership unchanged. Per-material clipping planes (@margoengine/materials
+// `clippingPlanes`) use the same layout under another name, so one shader can carry both.
 const bindingPattern = /@group\(0\) @binding\((\d+)\) var<uniform> section:Section;/;
 const cache = new Map();
 export function sectionState(context) {
@@ -8,11 +9,11 @@ export function sectionState(context) {
   const resource = context.bindings.find((entry) => entry.binding === Number(match[1]))?.resource;
   return resource && 'buffer' in resource ? resource : undefined;
 }
-export function sectionShader(source, group, binding) {
-  const key = `${group}:${binding}:${source}`;
+export function sectionShader(source, group, binding, name = 'section') {
+  const key = `${group}:${binding}:${name}:${source}`;
   if (cache.has(key)) return cache.get(key);
-  const clip =
-    'for(var p=0u;p<u32(section.settings.x);p++){if(dot(section.planes[p].xyz,i.position)+section.planes[p].w<0){discard;}}';
+  const type = name === 'section' ? 'Section' : `${name}Planes`,
+    clip = `for(var p=0u;p<u32(${name}.settings.x);p++){if(dot(${name}.planes[p].xyz,i.position)+${name}.planes[p].w<0){discard;}}`;
   const signature = /@fragment\s+fn\s+\w+\(i:Out\b[^{]*\{/g;
   let code = '',
     cursor = 0,
@@ -32,14 +33,14 @@ export function sectionShader(source, group, binding) {
       (body.includes('return')
         ? body.replace(
             /\breturn\s+([^;]+);/g,
-            (_, value) => `{let sectionResult=${value};${clip}return sectionResult;}`,
+            (_, value) => `{let ${name}Result=${value};${clip}return ${name}Result;}`,
           )
         : body + clip) +
       '}';
     cursor = signature.lastIndex = end;
   }
   code =
-    `struct Section {planes:array<vec4f,6>,settings:vec4f}\n@group(${group}) @binding(${binding}) var<uniform> section:Section;\n` +
+    `struct ${type} {planes:array<vec4f,6>,settings:vec4f}\n@group(${group}) @binding(${binding}) var<uniform> ${name}:${type};\n` +
     code +
     source.slice(cursor);
   if (cache.size >= 64) cache.clear();

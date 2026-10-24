@@ -38,3 +38,25 @@ export function finiteArray(values: ArrayLike<number>, label: string): void {
       throw new RangeError(`${label} must be finite Float32 values`);
   }
 }
+
+/**
+ * Validates up to 6 world-space planes `[a, b, c, d]` and returns them flat with unit normals. `label` names the
+ * owner in messages. Throws TypeError for a malformed plane or a zero normal, RangeError for more than 6.
+ */
+export function clipPlanes(planes: readonly (readonly number[])[], label: string): number[] {
+  if (!Array.isArray(planes)) throw new TypeError(`${label} clippingPlanes must be an array of [a, b, c, d] planes`);
+  if (planes.length > 6) throw new RangeError(`${label} clippingPlanes holds at most 6 planes; pass fewer`);
+  const flat: number[] = [];
+  for (const p of planes) {
+    if (
+      !Array.isArray(p) ||
+      p.length !== 4 ||
+      !p.every((x) => typeof x === 'number' && Number.isFinite(Math.fround(x)))
+    )
+      throw new TypeError(`${label} clipping plane must be four finite numbers [a, b, c, d]`);
+    const length = Math.hypot(p[0], p[1], p[2]);
+    if (!length) throw new TypeError(`${label} clipping plane needs a non-zero normal [a, b, c]`);
+    flat.push(p[0] / length, p[1] / length, p[2] / length, p[3] / length);
+  }
+  return flat;
+}

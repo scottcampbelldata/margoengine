@@ -13,10 +13,13 @@ export const FLAG = {
   srgbColors: 128,
 } as const;
 
-/** Bytes of the shared frame uniform, the per-cloud uniform and the per-batch sprite uniform. */
+/**
+ * Bytes of the shared frame uniform, the per-cloud uniform and the per-batch sprite uniform. Both per-draw uniforms end
+ * with 6 clipping planes: the cloud's at byte 128 (count in `flags.y`), the batch's at byte 96 (count in `params.w`).
+ */
 export const FRAME_BYTES = 144,
-  CLOUD_BYTES = 128,
-  SPRITE_BYTES = 96;
+  CLOUD_BYTES = 224,
+  SPRITE_BYTES = 192;
 
 const common = /* wgsl */ `
 struct Frame{viewProj:mat4x4f,viewport:vec4f,depth:vec4f,right:vec4f,up:vec4f,back:vec4f}
@@ -38,7 +41,7 @@ const CORNERS=array<vec2f,4>(vec2f(-1.0,-1.0),vec2f(1.0,-1.0),vec2f(-1.0,1.0),ve
 export const pointShader: string =
   common +
   /* wgsl */ `
-struct Cloud{model:mat4x4f,color:vec4f,size:vec4f,flags:vec4u,pad:vec4f}
+struct Cloud{model:mat4x4f,color:vec4f,size:vec4f,flags:vec4u,pad:vec4f,planes:array<vec4f,6>}
 @group(1) @binding(0) var<uniform> cloud:Cloud;
 @group(1) @binding(1) var<storage,read> positions:array<f32>;
 @group(1) @binding(2) var<storage,read> colors:array<u32>;
@@ -51,6 +54,7 @@ struct VOut{
   @location(0) color:vec4f,
   @location(1) quad:vec2f,
   @location(2) @interpolate(flat) info:vec4f,
+  @location(3) @interpolate(flat) center:vec3f,
 }
 fn has(bit:u32)->bool{return (cloud.flags.x&bit)!=0u;}
 
@@ -77,6 +81,7 @@ fn has(bit:u32)->bool{return (cloud.flags.x&bit)!=0u;}
   }
   out.clip=clip;out.color=color;out.quad=corner*extent;
   out.info=vec4f(radius,select(clip.w,1.0+(1.0-clip.z)/frame.depth.y,frame.depth.w>0.5),radius*clip.w/frame.viewport.z,0.0);
+  out.center=world.xyz;
   return out;
 }
 
@@ -102,6 +107,13 @@ fn surface(i:VOut)->Surface{
       color=vec4f(color.rgb*(0.3+0.7*max(dot(n,l),0.0)),color.a);
     }
   } else if(any(abs(i.quad)>vec2f(r))){discard;}
+  // Clipping planes (flags.y of them), tested at this fragment's world point: the centre moved across the camera-facing
+  // disc by the quad offset (info.z / info.x world units per pixel), and out to the sphere surface for sphere shading.
+  if(cloud.flags.y>0u){
+    let wp=i.center+(frame.right.xyz*i.quad.x+frame.up.xyz*i.quad.y)*(i.info.z/r)
+      +frame.back.xyz*select(0.0,s.nz*i.info.z,has(${FLAG.sphere}u));
+    for(var p=0u;p<cloud.flags.y;p++){if(dot(cloud.planes[p].xyz,wp)+cloud.planes[p].w<0.0){discard;}}
+  }
   s.color=encode(color);
   return s;
 }
@@ -126,12 +138,12 @@ struct SphereEdlOut{@location(0) color:vec4f,@location(1) edl:f32,@builtin(frag_
 export const spriteShader: string =
   common +
   /* wgsl */ `
-struct Batch{model:mat4x4f,color:vec4f,params:vec4f}
+struct Batch{model:mat4x4f,color:vec4f,params:vec4f,planes:array<vec4f,6>}
 @group(1) @binding(0) var<uniform> batch:Batch;
 @group(1) @binding(1) var<storage,read> sprites:array<vec4f>;
 @group(1) @binding(2) var map:texture_2d<f32>;
 @group(1) @binding(3) var mapSampler:sampler;
-struct VOut{@builtin(position) clip:vec4f,@location(0) color:vec4f,@location(1) uv:vec2f}
+struct VOut{@builtin(position) clip:vec4f,@location(0) color:vec4f,@location(1) uv:vec2f,@location(2) world:vec3f}
 
 @vertex fn vertex(@builtin(vertex_index) vi:u32,@builtin(instance_index) ii:u32)->VOut{
   var out:VOut;
@@ -142,13 +154,16 @@ struct VOut{@builtin(position) clip:vec4f,@location(0) color:vec4f,@location(1) 
   let offset=vec2f(local.x*cos(angle)-local.y*sin(angle),local.x*sin(angle)+local.y*cos(angle));
   var world=batch.model*vec4f(a.xyz,1.0);
   var clip:vec4f;
+  // World point of this corner: on the quad for world-sized sprites, the centre for pixel-sized ones.
+  var wp=world.xyz;
   if(batch.params.z>0.5){
     clip=frame.viewProj*world;
     clip=vec4f(clip.xy+offset*2.0/frame.viewport.xy*clip.w,clip.zw);
   } else {
-    clip=frame.viewProj*vec4f(world.xyz+frame.right.xyz*offset.x+frame.up.xyz*offset.y,1.0);
+    wp=world.xyz+frame.right.xyz*offset.x+frame.up.xyz*offset.y;
+    clip=frame.viewProj*vec4f(wp,1.0);
   }
-  out.clip=clip;
+  out.clip=clip;out.world=wp;
   out.uv=mix(rect.xy,rect.zw,vec2f(q.x,1.0-q.y));
   out.color=batch.color*tint;
   return out;
@@ -157,19 +172,21 @@ struct VOut{@builtin(position) clip:vec4f,@location(0) color:vec4f,@location(1) 
   let texel=textureSampleLevel(map,mapSampler,i.uv,0.0);
   let color=i.color*texel;
   if(color.a<batch.params.y||color.a<=0.0){discard;}
+  // Clipping planes (params.w of them) at this fragment's world point.
+  for(var p=0u;p<u32(batch.params.w);p++){if(dot(batch.planes[p].xyz,i.world)+batch.planes[p].w<0.0){discard;}}
   return encode(color);
 }
 `;
 
 // Scene fog (PointsPlugin.setFog), patched into copies so the shaders above stay unchanged. Points take the fog of their
-// centre (flat per point); sprites of each fragment's world position. Alpha-blended colours fade toward the fog colour,
-// additive ones toward no contribution (fog hides a glow rather than painting it in the fog colour). Both mix in linear,
-// before the shaders' own sRGB encoding.
+// centre (flat per point); sprites of each fragment's world position (the `world` varying the clipping planes use).
+// Alpha-blended colours fade toward the fog colour, additive ones toward no contribution (fog hides a glow rather than
+// painting it in the fog colour). Both mix in linear, before the shaders' own sRGB encoding.
 const fogEdits = {
   point: [
     [
       '@location(2) @interpolate(flat) info:vec4f,',
-      '@location(2) @interpolate(flat) info:vec4f,@location(3) @interpolate(flat) fog:f32,',
+      '@location(2) @interpolate(flat) info:vec4f,@location(4) @interpolate(flat) fog:f32,',
     ],
     [
       'out.clip=clip;out.color=color;out.quad=corner*extent;',
@@ -177,14 +194,7 @@ const fogEdits = {
     ],
     ['s.color=encode(color);', 's.color=encode(fogged(color,i.fog));'],
   ],
-  sprite: [
-    ['@location(1) uv:vec2f}', '@location(1) uv:vec2f,@location(2) world:vec3f}'],
-    [
-      'out.clip=clip;',
-      'out.clip=clip;out.world=select(world.xyz+frame.right.xyz*offset.x+frame.up.xyz*offset.y,world.xyz,batch.params.z>0.5);',
-    ],
-    ['return encode(color);', 'return encode(fogged(color,fogAmount(i.world)));'],
-  ],
+  sprite: [['return encode(color);', 'return encode(fogged(color,fogAmount(i.world)));']],
 } as const;
 /** The point (`kind` 'point') or sprite shader with scene fog at group 2, for normal or additive blending. */
 export function foggedShader(kind: 'point' | 'sprite', additive: boolean): string {

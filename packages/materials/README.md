@@ -782,6 +782,30 @@ batch.setColor(ball, [0.2, 0.6, 1]).setVisible(crate, false);
 batch.remove(crate); // its space is reused by a later item that fits
 ```
 
+## Clipping planes
+
+`clippingPlanes` takes up to 6 world-space planes `[a, b, c, d]`; points with `a x + b y + c z + d < 0` are cut away
+(the convention of machinery's `SectionPlanes`), on every material class: standard, physical, unlit, Lambert, Phong,
+toon, normal, matcap, depth, distance, `WgslMaterial` and `@margoengine/shader` node materials. The cut applies in the
+beauty, G-buffer and SSAO passes and, with `clipShadows` (default true), in `@margoengine/shadows` directional shadow
+maps. Planes are normalised on assignment and reading returns copies; assign a new list to change them (live). A
+clipped caster redraws its shadow every frame. `@margoengine/lines` and `@margoengine/points` materials take the same
+option. A scene's `SectionPlanes` still clip everything; with both, the scene's planes clip the shadows. Clustered
+point-light shadows and GPU picking ignore material planes.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { Material, createMesh } from '@margoengine/materials';
+import { torusKnotGeometry } from '@margoengine/geometry';
+
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas);
+const material = new Material({ color: '#e0a040', doubleSided: true, clippingPlanes: [[0, -1, 0, 0.5]] });
+createMesh(engine, torusKnotGeometry(), material); // everything above y = 0.5 is cut away
+material.clippingPlanes = [[0, -1, 0, 0.5], [1, 0, 0, 0]]; // live: also cut x < 0
+material.clipShadows = false; // the shadow stays whole
+```
+
 ## KTX2 textures
 
 A `.ktx2` file goes on any map through `@margoengine/decoders`' `KTX2Decoder`: `loadKTX2Texture(url, {decoder})`

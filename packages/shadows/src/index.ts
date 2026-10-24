@@ -132,6 +132,11 @@ export interface ShadowPrimitive {
   texCoord?: number /** Two packed vec4 affine rows applied after UV selection. */;
   alphaTransform?: Float32Array;
   instances?: { readonly count: number; upload(device: GPUDevice): GPUBuffer };
+  /**
+   * Planes that clip this caster (materials `clippingPlanes`): a uniform of up to 6 world planes in the SectionPlanes
+   * layout. A scene's SectionPlanes take precedence over it.
+   */
+  clip?: GPUBufferBinding;
   /** Vertex displacement along the normal (materials `displacementMap`, 80-byte vertices): bound at group 1. */
   displacement?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
   /** Skinned, morphed, instanced, or deformed casters redraw every frame. Unset casters are cached while they stay put. */
@@ -1046,6 +1051,7 @@ export class Shadows implements EnginePlugin {
       p.stride === 24 &&
       !p.instances &&
       !p.displacement &&
+      !p.clip &&
       !p.alphaTexture &&
       p.alphaTransform === undefined &&
       p.topology !== 'line-list' &&
@@ -1113,9 +1119,10 @@ export class Shadows implements EnginePlugin {
     p: ShadowPrimitive,
     matrix: Float32Array,
     cascade: number,
-    section?: GPUBufferBinding,
+    scene?: GPUBufferBinding,
   ): void {
     if (p.stride !== 24 && p.stride !== 80) throw new RangeError('Unsupported shadow vertex stride');
+    const section = scene ?? p.clip;
     const inst = p.instances;
     if (inst && !inst.count) return;
     if (inst && p.stride !== 80) throw new RangeError('Instanced shadow casters need 80-byte vertices');

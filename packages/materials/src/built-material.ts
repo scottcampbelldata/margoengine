@@ -44,6 +44,7 @@ import {
   type TranscodedTexture,
 } from './texture-kinds.js';
 import { generateMipmaps } from '../../shared/mipmaps.js';
+import { sectionShader } from '../../shared/section.js';
 export type { TextureTransform, MaterialSide } from '@margoengine/gltf-pro';
 export { packAtlas, transformUVs, type Atlas, type AtlasOptions } from './atlas.js';
 export type { EnvCombine, EnvironmentMap } from './env-map.js';
@@ -1207,6 +1208,13 @@ export interface MaterialOptions extends PhysicalOptions {
   lightMapIntensity?: number;
   /** Multiply by the light map (default), or Lambertian irradiance / pi on lit shadings. Use a linear lightMap texture; physical intensity must be nonnegative. Live. */
   lightMapResponse?: 'multiply' | 'lambertian';
+  /**
+   * Up to 6 world-space planes `[a, b, c, d]`: points with `a x + b y + c z + d < 0` are cut away (the SectionPlanes
+   * convention), in every pass that draws the material. Live; default none.
+   */
+  clippingPlanes?: readonly (readonly number[])[];
+  /** The planes clip the material's directional shadows too (default true). Live. */
+  clipShadows?: boolean;
   transparent?: boolean;
   alphaTest?: number;
   /** Faces drawn by triangle meshes. Explicit side takes precedence over doubleSided. */
@@ -1501,6 +1509,10 @@ type MapState = {
   refs: number;
   device?: GPUDevice;
   buffer?: GPUBuffer;
+  /** The clipping-plane uniform (SectionPlanes layout) and its binding, kept while the buffer lives. */
+  clip?: GPUBuffer;
+  clipBinding?: GPUBufferBinding;
+  clipData?: Float32Array;
   values?: Float32Array;
   features?: GPUBuffer;
   featureData?: Float32Array;
@@ -1535,6 +1547,7 @@ function retainMaps(m: Material, engine: Engine): () => void {
     state.buffer?.destroy();
     state.features?.destroy();
     state.env?.destroy();
+    state.clip?.destroy();
     mapStates.get(m)?.delete(engine);
   };
 }
@@ -1543,7 +1556,7 @@ function materialBuffer(
   device: GPUDevice,
   owner: object,
   size: number,
-  field: 'buffer' | 'features' | 'env' = 'buffer',
+  field: 'buffer' | 'features' | 'env' | 'clip' = 'buffer',
 ): GPUBuffer {
   const state = mapState(m, owner);
   if (state.device !== device || !state[field]) {
@@ -1622,6 +1635,36 @@ function displacementOf(m: Material, device: GPUDevice | null | undefined, owner
   return last?.buffer === buffer && last.view === view && last.sampler === sampler
     ? last
     : (state.displacement = { buffer, view, sampler });
+}
+/** The clipping-plane uniform of `m` for `owner` (SectionPlanes layout: 6 planes, count in settings.x), written now. */
+function clipUniform(m: Material, device: GPUDevice, owner: object): GPUBufferBinding {
+  const buffer = materialBuffer(m, device, owner, 112, 'clip'),
+    state = mapState(m, owner),
+    data = (state.clipData ??= new Float32Array(28)),
+    planes = m['clipping'];
+  data.fill(0);
+  data.set(planes);
+  data[24] = planes.length / 4;
+  device.queue.writeBuffer(buffer, 0, data);
+  if (state.clipBinding?.buffer !== buffer) state.clipBinding = { buffer };
+  return state.clipBinding;
+}
+/** What shadow casters bind to clip `m` like its beauty shader (gltf-pro `PBRMaterial.clip`), or undefined. */
+function clipOf(m: Material, device: GPUDevice | null | undefined, owner: object) {
+  return device && m['clipping'].length && m.clipShadows ? clipUniform(m, device, owner) : undefined;
+}
+const surfaceAnchor = 'if(!facing&&f.settings.z<0.5){discard;}';
+/**
+ * `code` discarding what the material's planes cut away: in every fragment entry, and in gltf-pro's `surface()` so
+ * fragments appended later (the SSAO occlusion output) clip too.
+ */
+function clipShader(code: string, group: number): string {
+  const out = sectionShader(code, group, 199, 'materialClip');
+  return out.replace(
+    surfaceAnchor,
+    'for(var p=0u;p<u32(materialClip.settings.x);p++){if(dot(materialClip.planes[p].xyz,i.position)+materialClip.planes[p].w<0){discard;}}' +
+      surfaceAnchor,
+  );
 }
 function mapped(m: Material): boolean {
   return !!m.physical && (m.physical.length > 12 || mapSlots.slice(5).some((k) => m[k] != null));
@@ -1788,6 +1831,44 @@ export class Material {
     ...textureTransform({}, 1),
   ];
   private lightResponse: 'multiply' | 'lambertian' = 'multiply';
+  /** Clipping planes, four normalised numbers each (at most 24), and whether they clip shadows. */
+  private clipping: number[] = [];
+  private clipShadow = true;
+  /**
+   * Up to 6 world-space planes `[a, b, c, d]`; points with `a x + b y + c z + d < 0` are cut away in every pass that
+   * draws the material (beauty, G-buffer and, with `clipShadows`, directional shadows). Reading gives normalised copies;
+   * assign a new list to change them (live). Throws TypeError for a malformed plane, RangeError for more than 6.
+   */
+  get clippingPlanes(): number[][] {
+    const out: number[][] = [];
+    for (let i = 0; i < this.clipping.length; i += 4) out.push(this.clipping.slice(i, i + 4));
+    return out;
+  }
+  set clippingPlanes(v: readonly (readonly number[])[]) {
+    if (!Array.isArray(v)) throw new TypeError('Material clippingPlanes must be an array of [a, b, c, d] planes');
+    if (v.length > 6) throw new RangeError('Material clippingPlanes holds at most 6 planes; pass fewer');
+    const flat: number[] = [];
+    for (const p of v) {
+      if (
+        !Array.isArray(p) ||
+        p.length !== 4 ||
+        !p.every((x) => typeof x === 'number' && Number.isFinite(Math.fround(x)))
+      )
+        throw new TypeError('Material clipping plane must be four finite numbers [a, b, c, d]');
+      const length = Math.hypot(p[0], p[1], p[2]);
+      if (!length) throw new TypeError('Material clipping plane needs a non-zero normal [a, b, c]');
+      flat.push(p[0] / length, p[1] / length, p[2] / length, p[3] / length);
+    }
+    this.clipping = flat;
+  }
+  /** Whether `clippingPlanes` clip this material's directional shadows too (default true), live. */
+  get clipShadows(): boolean {
+    return this.clipShadow;
+  }
+  set clipShadows(v: boolean) {
+    if (typeof v !== 'boolean') throw new TypeError('Material clipShadows must be a boolean; pass true or false');
+    this.clipShadow = v;
+  }
   private setFeatureMap(k: number, v: Texture | null): void {
     if (v != null && !(v instanceof Texture))
       throw new TypeError(`Material ${featureMaps[k]} must be a Texture; pass a Texture or null`);
@@ -2032,6 +2113,8 @@ export class Material {
       'vertexColors',
       'fog',
       'toneMapped',
+      'clippingPlanes',
+      'clipShadows',
     ] as const)
       if (o[key] !== undefined) this[key] = o[key] as never;
     // Physical options enable their lobes as they are set (transmission before the volume values that need it); the
@@ -2663,6 +2746,7 @@ export class Material {
         state.buffer?.destroy();
         state.features?.destroy();
         state.env?.destroy();
+        state.clip?.destroy();
         states!.delete(owner);
       }
   }
@@ -3179,6 +3263,7 @@ function surface(g: PBRMaterial, current: () => Material, runtime: Engine): void
     extensions: get(extensionsOf),
     renderState: get(renderStateOf),
     displacement: get((m) => displacementOf(m, runtime.gpu, runtime)),
+    clip: get((m) => clipOf(m, runtime.gpu, runtime)),
     wireframe: {
       ...get((m) => m.wireframe),
       set: (v: boolean) => {
@@ -3199,8 +3284,9 @@ function surface(g: PBRMaterial, current: () => Material, runtime: Engine): void
           const m = current(),
             key = featureKey(m, code),
             own = m.shader(code, group),
-            out = key ? featureShader(own, group, key) : own;
-          return m.envMap ? envMapShader(out, group, envKind(m)) : out;
+            out = key ? featureShader(own, group, key) : own,
+            env = m.envMap ? envMapShader(out, group, envKind(m)) : out;
+          return m['clipping'].length ? clipShader(env, group) : env;
         },
         lit: (code: string) => {
           const m = current(),
@@ -3209,8 +3295,11 @@ function surface(g: PBRMaterial, current: () => Material, runtime: Engine): void
         },
         bindings: () => {
           const m = current(),
-            entries = featureBindings(m, runtime.gpu!, runtime, m.bindings(runtime.gpu!, runtime));
-          return m.envMap ? [...entries, ...envBindings(m, runtime.gpu!, runtime)] : entries;
+            entries = featureBindings(m, runtime.gpu!, runtime, m.bindings(runtime.gpu!, runtime)),
+            all = m.envMap ? [...entries, ...envBindings(m, runtime.gpu!, runtime)] : entries;
+          return m['clipping'].length
+            ? [...all, { binding: 199, resource: clipUniform(m, runtime.gpu!, runtime) }]
+            : all;
         },
       } satisfies PBRMaterialShading,
     },

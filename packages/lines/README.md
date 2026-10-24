@@ -111,6 +111,27 @@ const fog = Fog.attach(engine, {color: '#8090a0', near: 5, far: 40});
 lines.setFog(fog);
 ```
 
+## Clipping planes
+
+`LineMaterial.clippingPlanes` takes up to 6 world-space planes `[a, b, c, d]`; a line is cut away where
+`a x + b y + c z + d < 0` (the `@margoengine/materials` convention). Each fragment is tested at its point on the line's
+centre line, so a cut runs straight across the line. Planes are normalised on assignment and reading returns copies;
+assign a new list to change them (live, next frame, no recompile). More than 6 planes throw a RangeError, a malformed
+plane or a zero normal a TypeError. Lines cast no shadows, so there is no `clipShadows`.
+
+```ts
+import {Engine} from '@margoengine/core';
+import {Lines, Line, LineMaterial} from '@margoengine/lines';
+
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas);
+const lines = Lines.attach(engine);
+// Keep only the part of the line above y = 0.5.
+const material = new LineMaterial({width: 3, clippingPlanes: [[0, 1, 0, -0.5]]});
+lines.add(new Line({positions: [0, 0, 0, 0, 2, 0], material}));
+material.clippingPlanes = []; // uncut again from the next frame
+```
+
 ## SkeletonHelper
 
 `SkeletonHelper` draws a skinned model's bones as lines from each parent joint to its child joint,

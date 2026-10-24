@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clipping planes · Margo Engine</title>
+  <link rel="stylesheet" href="./multi-view.css">
+</head>
+<body>
+  <h1>Clipping planes on every material</h1>
+  <p><code>@margoengine/materials</code> <code>clippingPlanes</code> · Standard, Lambert, toon, unlit and normal materials, a fat line (<code>@margoengine/lines</code>) and a point cloud (<code>@margoengine/points</code>), each cut by its own planes; the cut follows into the shadows.</p>
+  <div id="views" class="views">
+    <canvas id="viewport" aria-label="Five shapes with different materials, each cut open by a plane"></canvas>
+  </div>
+  <p id="status" data-webgpu-status role="status">Starting WebGPU…</p>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./clipping-planes.ts'));
+  </script>
+</body>
+</html>

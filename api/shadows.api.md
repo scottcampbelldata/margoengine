@@ -59,6 +59,7 @@ export interface ShadowPrimitive {
         readonly count: number;
         upload(device: GPUDevice): GPUBuffer;
     };
+    clip?: GPUBufferBinding;
     displacement?: {
         readonly buffer: GPUBuffer;
         readonly view: GPUTextureView;

@@ -186,6 +186,8 @@ export class LineMaterial {
     constructor(options?: LineMaterialOptions);
     set(options: LineMaterialOptions): this;
     setColor(color: ColorInput): this;
+    get clippingPlanes(): number[][];
+    set clippingPlanes(planes: readonly (readonly number[])[]);
     validate(): void;
 }
 
@@ -205,6 +207,7 @@ export interface LineMaterialOptions {
     onTop?: boolean;
     antialias?: boolean;
     fog?: boolean;
+    clippingPlanes?: readonly (readonly number[])[];
 }
 
 export type LineMode = 'segments' | 'strip' | 'loop';

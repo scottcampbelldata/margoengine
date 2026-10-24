@@ -110,11 +110,35 @@ points.setFog(Fog.attach(engine, {color: '#8090a0', density: 0.03}));
 labels.material.fog = false; // keep this batch clear
 ```
 
+## Clipping planes
+
+`PointsMaterial.clippingPlanes` and `SpriteMaterial.clippingPlanes` take up to 6 world-space planes `[a, b, c, d]`;
+fragments where `a x + b y + c z + d < 0` are cut away (the `@margoengine/materials` convention). A point tests each
+fragment's world position on its camera-facing disc (on the sphere for `shading: 'sphere'`), so a plane can cut a large
+point in half; world-sized sprites test each fragment on the quad, pixel-sized sprites (`sizeUnits: 'pixels'`) their
+centre. Planes are normalised on assignment and reading returns copies; assign a new list to change them (live, next
+frame, no recompile). More than 6 planes throw a RangeError, a malformed plane or a zero normal a TypeError.
+
+```ts
+import {Engine} from '@margoengine/core';
+import {PointsPlugin, PointCloud} from '@margoengine/points';
+
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas);
+const points = PointsPlugin.attach(engine);
+// Section a scan: keep x <= 2 and z >= 0.
+const cloud = points.add(new PointCloud({
+  positions: new Float32Array([0, 0, 0, 3, 0, 1, 1, 1, -1]),
+  material: {size: 3, clippingPlanes: [[-1, 0, 0, 2], [0, 0, 1, 0]]},
+}));
+cloud.material.clippingPlanes = [[-1, 0, 0, 2]]; // live: drop the z cut
+```
+
 ## Limits
 
 - WebGPU only. On the WebGL2 backend the plugin warns once and draws nothing.
 - One cloud's positions must fit one storage binding: `maxStorageBufferBindingSize / 12` points (about 11 million at the default 128 MiB limit). Split bigger clouds into several `PointCloud`s.
-- Picking is CPU-side over the points drawn in the latest frame; meshes do not occlude it.
+- Picking is CPU-side over the points drawn in the latest frame; meshes do not occlude it, and clipping planes do not apply to it (a clipped point can still be picked).
 - Block bounds only grow on updates; call `rebuild()` to tighten them or to include points that turned finite. Non-finite points are never drawn. A `reorder`ed cloud cannot be rebuilt.
 - Per-point colors are stored as RGBA8, so HDR vertex colors are clamped to 0..1.
 - No mipmaps on maps. A `GPUTexture` you pass is created on a device the plugin does not own: after a device loss the material draws untextured (with a one-time warning) until you assign a new texture. Uploaded image sources are rebuilt automatically.

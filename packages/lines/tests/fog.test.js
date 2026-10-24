@@ -54,13 +54,8 @@ test('Lines.setFog fogs lines with a second shader and a 48-byte uniform; null k
   assert.match(code, /@group\(2\) @binding\(0\) var<uniform> margoFog:MargoFog;/);
   assert.match(code, /rgb=mix\(rgb,margoFog\.color\.rgb,fogAmount\(i\.world\)\);/, 'mixed before the sRGB encode');
   assert.ok(code.indexOf('fogAmount(i.world)') < code.indexOf('if(frame.extra.x>0.5){rgb=encode'));
-  const stripped = code
-    .replace('@location(3) world:vec3f,', '')
-    .replace(
-      'let wa=style.model*vec4f(points[ia].xyz,1.0);let wb=style.model*vec4f(points[ib].xyz,1.0);o.world=mix(wa.xyz/wa.w,wb.xyz/wb.w,select(ta,tb,cr.atB));',
-      '',
-    )
-    .replace('rgb=mix(rgb,margoFog.color.rgb,fogAmount(i.world));', '');
+  // The plain shader already carries the centre line's world point (clipping planes use it too).
+  const stripped = code.replace('rgb=mix(rgb,margoFog.color.rgb,fogAmount(i.world));', '');
   assert.equal(stripped.slice(0, plain.length), plain, 'the fogged shader is the original plus the fog lines');
   assert.match(stripped.slice(plain.length), /^\nstruct MargoFog/);
   const layout = fogged.find((e) => e[0] === 'pipelineLayout');

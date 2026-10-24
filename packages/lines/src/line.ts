@@ -12,7 +12,7 @@ import {
   type LineJoin,
   type LineMode,
 } from './geometry.js';
-import { copyIfChanged, finiteArray, identity, type Mat4 } from './math.js';
+import { clipPlanes, copyIfChanged, finiteArray, identity, type Mat4 } from './math.js';
 import { attachableMesh } from '../../shared/pass.js';
 
 /**
@@ -50,6 +50,11 @@ export interface LineMaterialOptions {
   antialias?: boolean;
   /** Fogged by the `Lines` plugin's fog (`setFog`); false keeps this material clear. Default true. */
   fog?: boolean;
+  /**
+   * Up to 6 world-space planes `[a, b, c, d]`: line fragments at points with `a x + b y + c z + d < 0` are cut away
+   * (the `@margoengine/materials` convention). Live; default none.
+   */
+  clippingPlanes?: readonly (readonly number[])[];
 }
 
 /** Style shared by any number of lines. Fields may be changed at any time. */
@@ -69,6 +74,8 @@ export class LineMaterial {
   onTop = false;
   antialias = true;
   fog = true;
+  /** Clipping planes, four normalised numbers each (at most 24). */
+  private clipping: number[] = [];
   constructor(options: LineMaterialOptions = {}) {
     this.set(options);
   }
@@ -83,6 +90,19 @@ export class LineMaterial {
   setColor(color: ColorInput): this {
     parseColor(color, this.color);
     return this;
+  }
+  /**
+   * Up to 6 world-space planes `[a, b, c, d]`; line fragments at points with `a x + b y + c z + d < 0` are discarded.
+   * Each fragment is tested at its point on the line's centre line. Reading gives normalised copies; assign a new list
+   * to change them (live, next frame). Throws TypeError for a malformed plane, RangeError for more than 6.
+   */
+  get clippingPlanes(): number[][] {
+    const out: number[][] = [];
+    for (let i = 0; i < this.clipping.length; i += 4) out.push(this.clipping.slice(i, i + 4));
+    return out;
+  }
+  set clippingPlanes(planes: readonly (readonly number[])[]) {
+    this.clipping = clipPlanes(planes, 'Line material');
   }
   /** Throws when a field is out of range. Called on every frame the material is used. */
   validate(): void {

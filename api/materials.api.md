@@ -183,6 +183,10 @@ export class Material {
     aoMap: Texture | null;
     emissiveMap: Texture | null;
     matcap: Texture | null;
+    get clippingPlanes(): number[][];
+    set clippingPlanes(v: readonly (readonly number[])[]);
+    get clipShadows(): boolean;
+    set clipShadows(v: boolean);
     get alphaMap(): Texture | null;
     set alphaMap(v: Texture | null);
     get bumpMap(): Texture | null;
@@ -460,6 +464,8 @@ export interface MaterialOptions extends PhysicalOptions {
     lightMap?: Texture | null;
     lightMapIntensity?: number;
     lightMapResponse?: 'multiply' | 'lambertian';
+    clippingPlanes?: readonly (readonly number[])[];
+    clipShadows?: boolean;
     transparent?: boolean;
     alphaTest?: number;
     side?: MaterialSide;

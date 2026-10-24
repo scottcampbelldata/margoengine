@@ -8,7 +8,7 @@ const FAN:u32=${FAN}u;
 const BLOCK:u32=${BLOCK}u;
 const PI:f32=3.14159265;
 struct Frame{viewProj:mat4x4f,viewport:vec4f,extra:vec4f}
-struct Style{model:mat4x4f,color:vec4f,a:vec4f,b:vec4f,flags:vec4u}
+struct Style{model:mat4x4f,color:vec4f,a:vec4f,b:vec4f,flags:vec4u,planes:array<vec4f,6>}
 @group(0) @binding(0) var<uniform> frame:Frame;
 @group(1) @binding(0) var<uniform> style:Style;
 @group(1) @binding(1) var<storage,read> points:array<vec4f>;
@@ -18,6 +18,7 @@ struct Out{
   @location(0) color:vec4f,
   @location(1) @interpolate(linear) edge:vec4f,
   @location(2) dist:f32,
+  @location(3) world:vec3f,
 }
 struct Joint{sOut:f32,miter:bool,innerOk:bool,inner:vec2f,outer0:vec2f,outer1:vec2f,n1:vec2f}
 struct Corner{off:vec2f,d:f32,atB:bool,valid:bool}
@@ -148,6 +149,9 @@ fn fanCorner(k:u32,start:vec2f,sweep:f32,hwG:f32,atB:bool)->Corner{
   var dA=points[ia].w;var dB=points[ib].w;
   if(mode==2u&&n>=3u&&ib==0u){dB=style.b.y;}
   o.dist=mix(dA,dB,select(ta,tb,cr.atB));
+  // The centre line's world point: each end of the quad takes its segment end, so fragments interpolate along it.
+  let wa=style.model*vec4f(points[ia].xyz,1.0);let wb=style.model*vec4f(points[ib].xyz,1.0);
+  o.world=mix(wa.xyz/wa.w,wb.xyz/wb.w,select(ta,tb,cr.atB));
   return o;
 }
 
@@ -167,6 +171,8 @@ fn encode(c:vec3f)->vec3f{return select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.05
     let inside=dash*0.5-abs(t);
     cover*=select(select(0.0,1.0,inside>=0.0),clamp(inside/fw+0.5,0.0,1.0),aa);
   }
+  // Clipping planes (flags.w of them): cut away where the centre line's world point is on a plane's negative side.
+  for(var p=0u;p<style.flags.w;p++){if(dot(style.planes[p].xyz,i.world)+style.planes[p].w<0.0){discard;}}
   let alpha=i.color.a*cover;
   var rgb=max(i.color.rgb,vec3f(0.0));
   if(frame.extra.x>0.5){rgb=encode(min(rgb,vec3f(1.0)));}
@@ -175,12 +181,6 @@ fn encode(c:vec3f)->vec3f{return select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.05
 `;
 
 const fogEdits: Array<[string, string]> = [
-  ['@location(2) dist:f32,', '@location(2) dist:f32,@location(3) world:vec3f,'],
-  // The centre line's world point: each end of the quad takes its segment end, so fragments interpolate along it.
-  [
-    'o.dist=mix(dA,dB,select(ta,tb,cr.atB));',
-    'o.dist=mix(dA,dB,select(ta,tb,cr.atB));let wa=style.model*vec4f(points[ia].xyz,1.0);let wb=style.model*vec4f(points[ib].xyz,1.0);o.world=mix(wa.xyz/wa.w,wb.xyz/wb.w,select(ta,tb,cr.atB));',
-  ],
   // Lines blend alpha over the scene, so a fogged line fades toward the fog colour, in linear before any encoding.
   [
     'var rgb=max(i.color.rgb,vec3f(0.0));',

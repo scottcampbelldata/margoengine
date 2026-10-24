@@ -27,6 +27,12 @@ interface Resources {
 
 let warned = false;
 
+/**
+ * Bytes of the per-line Style uniform: model (0), color (64), a (80), b (96), flags (112: mode, count, bits, clipping
+ * plane count) and 6 clipping planes (128).
+ */
+const STYLE_BYTES = 224;
+
 /** Options for the `Lines` plugin. An empty name or non-finite order throws a TypeError. */
 export interface LinesOptions {
   /** Plugin name, unique per engine. Default 'lines'. */
@@ -141,7 +147,7 @@ export class Lines implements EnginePlugin {
     });
     const style = device.createBindGroupLayout({
       entries: [
-        uniform(128, GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT),
+        uniform(STYLE_BYTES, GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT),
         { binding: 1, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage', minBindingSize: 16 } },
         { binding: 2, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage', minBindingSize: 16 } },
       ],
@@ -231,7 +237,7 @@ export class Lines implements EnginePlugin {
         created.push(buffer);
         return buffer;
       };
-      const uniform = make(128, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+      const uniform = make(STYLE_BYTES, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
       const points = make(Math.max(16, line.points.byteLength), GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
       const colorBuffer = make(
         Math.max(16, colors?.byteLength ?? 16),
@@ -245,7 +251,7 @@ export class Lines implements EnginePlugin {
           { binding: 2, resource: { buffer: colorBuffer } },
         ],
       });
-      const style = new ArrayBuffer(128);
+      const style = new ArrayBuffer(STYLE_BYTES);
       r = {
         uniform,
         points,
@@ -256,7 +262,7 @@ export class Lines implements EnginePlugin {
         style,
         floats: new Float32Array(style),
         uints: new Uint32Array(style),
-        written: new Float32Array(32).fill(NaN),
+        written: new Float32Array(STYLE_BYTES / 4).fill(NaN),
       };
     } catch (error) {
       for (const buffer of created) buffer.destroy();
@@ -321,9 +327,13 @@ export class Lines implements EnginePlugin {
         (material.worldUnits ? 16 : 0) |
         (material.dashed ? 32 : 0) |
         (vertexColors ? 64 : 0);
-      u[31] = 0;
+      // Clipping planes: count in flags.w, planes from byte 128, unused slots zeroed.
+      const planes = material['clipping'];
+      u[31] = planes.length / 4;
+      f.set(planes, 32);
+      f.fill(0, 32 + planes.length);
       let changed = false;
-      for (let i = 0; i < 32; i++)
+      for (let i = 0; i < f.length; i++)
         if (!Object.is(r.written[i], f[i])) {
           changed = true;
           break;
