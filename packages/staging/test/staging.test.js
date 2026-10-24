@@ -35,8 +35,8 @@ test('maps the plane footprint to the texture and the height range to depth 0..1
     contact.add(s.model);
     assert.deepEqual(
       s.frame(),
-      ['texture', 'texture', 'texture', 'texture', 'texture', 'plane'],
-      'occluders, 4 blur steps, plane',
+      ['texture', 'texture', 'texture', 'plane'],
+      'occluders, horizontal and vertical blur, plane',
     );
     const uniform = s.h.resources.find((r) => r.size === 144 && r.data),
       m = new Float32Array(uniform.data, 0, 16);
@@ -67,19 +67,15 @@ test('maps the plane footprint to the texture and the height range to depth 0..1
       ],
       [false, 'greater-equal', 4, 'bgra8unorm'],
     );
-    // Plane uniform: lifted a hair above the ground, colour + opacity.
+    // Plane uniform: colour + opacity, then the corner lifted a hair above the ground.
     const p = new Float32Array(s.h.resources.find((r) => r.size === 112).data);
-    assert.ok(p[17] > 2 && p[17] < 2.001);
+    assert.ok(p[21] > 2 && p[21] < 2.001);
     assert.deepEqual(
-      [...p.subarray(24, 28)].map((v) => +v.toFixed(4)),
+      [...p.subarray(16, 20)].map((v) => +v.toFixed(4)),
       [0, 0, 0, 0.6],
     );
     s.h.context.camera.position = [0, 1.5, 4];
-    assert.deepEqual(
-      s.frame(),
-      ['texture', 'texture', 'texture', 'texture', 'texture'],
-      'no plane seen from below the ground',
-    );
+    assert.deepEqual(s.frame(), ['texture', 'texture', 'texture'], 'no plane seen from below the ground');
   } finally {
     contact.dispose();
   }
@@ -120,7 +116,7 @@ test('instanced shadow primitives (gltf-pro PBRInstances) draw every instance in
 test('static re-renders only on transform, source, visibility or option changes', () => {
   const s = scene(),
     contact = ContactShadows.attach(s.engine, { static: true, resolution: 32 }),
-    full = 6;
+    full = 4;
   try {
     const remove = contact.add(s.model);
     assert.equal(s.frame().length, full);
@@ -226,14 +222,14 @@ test('static contact maps refresh when returning to a cached index buffer or cha
     replacement = s.engine.gpu.createBuffer({ size: 24, usage: GPUBufferUsage.INDEX });
   try {
     contact.add(s.model);
-    assert.equal(s.frame().length, 6);
+    assert.equal(s.frame().length, 4);
     primitive.index = replacement;
-    assert.equal(s.frame().length, 6);
+    assert.equal(s.frame().length, 4);
     assert.deepEqual(s.frame(), ['plane']);
     primitive.index = original;
-    assert.equal(s.frame().length, 6, 'the currently cached texture came from the other index buffer');
+    assert.equal(s.frame().length, 4, 'the currently cached texture came from the other index buffer');
     primitive.count = 0;
-    assert.equal(s.frame().length, 6, 'count-only changes refresh the cached texture');
+    assert.equal(s.frame().length, 4, 'count-only changes refresh the cached texture');
     assert.deepEqual(s.frame(), ['plane']);
   } finally {
     contact.dispose();

@@ -20,10 +20,18 @@ fn vs_main(@builtin(vertex_index) index: u32) -> VertexOutput {
     return out;
 }
 
+// Star-cell hash: the PCG hash (M. O'Neill, PCG, 2014; GPU form in Jarzynski and Olano, "Hash Functions for GPU
+// Rendering", JCGT 9(3), 2020), nested over the cell's three integer coordinates (z first, so the face and face + 10
+// streams diverge from the innermost step). The top 24 bits map to [0, 1).
+fn pcg(v: u32) -> u32 {
+    let state = v * 747796405u + 2891336453u;
+    let word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
 fn hash(p: vec3<f32>) -> f32 {
-    var q = fract(p * 0.1031);
-    q += dot(q, q.yzx + 33.33);
-    return fract((q.x + q.y) * q.z);
+    let cell = bitcast<vec3<u32>>(vec3<i32>(p));
+    return f32(pcg(cell.x + pcg(cell.y + pcg(cell.z))) >> 8u) / 16777216.0;
 }
 
 @fragment

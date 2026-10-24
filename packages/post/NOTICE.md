@@ -11,7 +11,9 @@ Color transform references
   luminance weights from the ITU-R BT.709 and BT.2020 primaries and D65. `packages/tonemap/tests/agx.test.js` derives
   every matrix, weight and curve constant from those definitions and checks the shader's numbers. One implementation,
   `packages/shared/agx.js`, serves Tonemap, ImagePost and the voxel path tracer.
-- ACES RRT/ODT fitted curve: [Stephen Hill](https://github.com/selfshadow/ltc_code/blob/master/webgl/shaders/ltc/ltc_blit.fs), with no extra exposure scale.
+- ImagePost `toneMapping: 'aces-narkowicz'` (`packages/shared/aces.js`): Krzysztof Narkowicz's published fit,
+  ["ACES Filmic Tone Mapping Curve"](https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/)
+  (2016), with the 0.6 pre-scale of his reference, clamped to 0..1.
 - Khronos PBR Neutral: [reference implementation](https://github.com/KhronosGroup/ToneMapping/blob/main/PBR_Neutral/pbrNeutral.glsl).
   Margo's display curve: Bloom, SSAO, SSR and DOF present with it, then the exact sRGB encoding, as core does.
 - ACEScg is AP1 with a D60 white point: [ACES specification](https://docs.acescentral.com/encodings/acescg/). The AP1 to linear-sRGB matrix includes D60 to D65 adaptation.

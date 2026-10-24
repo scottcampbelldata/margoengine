@@ -33,6 +33,9 @@ const resolve =
 @group(0) @binding(2) var depth:texture_depth_2d;
 @group(0) @binding(4) var output:texture_storage_2d<rgba8unorm,write>;
 ${displayShader}
+// Film grain: the PCG hash (Jarzynski and Olano, JCGT 9(3), 2020) nested over the pixel and the frame time's bits, so
+// each frame draws a fresh, structure-free pattern; the top 24 bits map to [-0.5, 0.5).
+fn grainPcg(v:u32)->u32 {let s=v*747796405u+2891336453u;let w=((s>>((s>>28u)+4u))^s)*277803737u;return (w>>22u)^w;}
 @compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let size=textureDimensions(output);if(any(id.xy>=size)){return;}let p=vec2i(id.xy);let uv=(vec2f(id.xy)+0.5)/vec2f(size);let d=textureLoad(depth,p,0);let w=world(uv,d);let distance=length(w-f.eye.xyz);var c=textureLoad(scene,p,0).xyz;
  let radius=min(8.0,abs(distance-f.lens.x)/max(distance,0.001)*f.lens.y);
  if(radius>0.5){var blurred=vec3f(0);var weights=0.0;for(var y=-2;y<=2;y++){for(var x=-2;x<=2;x++){let q=clamp(p+vec2i(round(vec2f(f32(x),f32(y))*radius*0.5)),vec2i(0),vec2i(size)-1);let neighbor=length(world((vec2f(q)+0.5)/vec2f(size),textureLoad(depth,q,0))-f.eye.xyz);let weight=exp(-f32(x*x+y*y)*0.25)*select(0.0,1.0,neighbor>=distance-radius);blurred+=textureLoad(scene,q,0).xyz*weight;weights+=weight;}}c=blurred/max(weights,0.001);}
@@ -40,7 +43,7 @@ ${displayShader}
  let sunWorld=f.eye.xyz+normalize(f.sun.xyz)*f.settings.y;let ray=normalize(sunWorld-f.eye.xyz);let farRay=normalize(w-f.eye.xyz);let alignment=pow(max(dot(ray,farRay),0.0),16.0);var shafts=0.0;
  let sunClip=f.camera*vec4f(sunWorld,1);if(sunClip.w>0&&f.fog.z>0){let sunUV=sunClip.xy/sunClip.w*vec2f(0.5,-0.5)+0.5;for(var i=1;i<=16;i++){let q=clamp(vec2i(mix(uv,sunUV,f32(i)*0.05)*vec2f(size)),vec2i(0),vec2i(size)-1);shafts+=select(0.0,1.0,textureLoad(depth,q,0)<0.000001)*pow(0.95,f32(i))/16.0;}}c+=vec3f(1,0.8,0.5)*shafts*alignment*f.fog.z;
  c=max(vec3f(0),c*exp2(f.grade.x)*f.gain.xyz+f.lift.xyz);let luminance=dot(c,vec3f(0.2126,0.7152,0.0722));c=mix(vec3f(luminance),c,f.grade.z);c=max(vec3f(0),(c-0.18)*f.grade.y+0.18);
- c=toDisplay(c);let noise=fract(sin(dot(vec2f(id.xy)+f.lens.w,vec2f(12.9898,78.233)))*43758.5453)-0.5;textureStore(output,p,vec4f(clamp(c+noise*f.lens.z,vec3f(0),vec3f(1)),1));}`;
+ c=toDisplay(c);let noise=f32(grainPcg(id.x+grainPcg(id.y+grainPcg(bitcast<u32>(f.lens.w))))>>8u)*5.9604645e-8-0.5;textureStore(output,p,vec4f(clamp(c+noise*f.lens.z,vec3f(0),vec3f(1)),1));}`;
 const present =
   vertex +
   `@group(0) @binding(0) var image:texture_2d<f32>;@fragment fn fragment(i:Out)->@location(0) vec4f{return textureLoad(image,clamp(vec2i(i.uv*vec2f(textureDimensions(image))),vec2i(0),vec2i(textureDimensions(image))-1),0);}`;

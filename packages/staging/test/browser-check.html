@@ -12,9 +12,9 @@ const cube=engine.createMesh().setGeometry(box(1,1,1)).setMaterial(new PbrMateri
 const floating=engine.createMesh().setGeometry(box(0.6,0.6,0.6)).setMaterial(new PbrMaterial({color:'#8090a0'})).setPosition([0,2.2,-2]);
 // A materials mesh is a gltf-pro PBRModel: the 80-byte vertex path.
 const sphere=createMesh(engine,sphereGeometry(0.6,48,24),new Material({color:'#a08070',roughness:0.5}));sphere.root.setPosition([1.2,0.6,0]);
-const contact=ContactShadows.attach(engine,{size:6,height:1.5,blur:0.15,opacity:0.8,resolution:+(query.get('res')??512)});
+const contact=ContactShadows.attach(engine,{size:6,height:1.5,blur:0.15,opacity:0.8,resolution:+(query.get('res')??256)});
 for(const source of [cube,floating,sphere])contact.add(source);
-// GPU timing: every contact-shadow render pass gets timestamps (occluders + 4 blur steps, then the plane).
+// GPU timing: every contact-shadow render pass gets timestamps (occluders, horizontal and vertical blur, then the plane).
 const set=device.features.has('timestamp-query')?device.createQuerySet({type:'timestamp',count:12}):null,resolve=set&&device.createBuffer({size:96,usage:GPUBufferUsage.QUERY_RESOLVE|GPUBufferUsage.COPY_SRC});
 const render=contact.render.bind(contact);let timed=false,passes=0;
 contact.render=c=>{if(!timed)return render(c);passes=0;const encoder=c.encoder;

@@ -1,228 +1,294 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+// Digital glitch, an LDR PostStack stage. A seeded schedule on the CPU decides, frame by frame, whether the frame is
+// glitched and with which random parameters; the GPU pass then tears rows sideways, shifts random grid cells sideways
+// and splits red and blue away from green. All displacement before the split is horizontal, so the green read stays
+// on its own row; quiet frames copy the input texel exactly.
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, PassContext } from '@margoengine/core/extension';
-import { fullscreen, render, group as bind } from '../../shared/gpu.js';
-import { margoError } from '../../shared/errors.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
+import { fullscreen, render, group } from '../../shared/gpu.js';
+import { margoError } from '../../shared/errors.js';
+import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { PostStack } from './stack.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
-type Context = Extract<PassContext, { backend: 'webgpu' }>;
+type GlitchPassContext = Extract<PassContext, { backend: 'webgpu' }>;
 
-/** Options of {@link Glitch}; all may change per frame. */
+/** Options of {@link Glitch}; the object is kept and read every frame. */
 export interface GlitchOptions {
-  /** Scale of the block displacement, colour split and tearing, 0-1. Default 1; 0 passes every frame through. */
+  /** Scales displacement, colour split and tearing, 0..1; 0 passes every frame through. Default 1. */
   intensity?: number;
-  /** True glitches every frame. Default false: a burst after every 120-240 frames. */
+  /** Glitch every frame (no quiet waits). Default false. */
   wild?: boolean;
-  /** A non-negative integer below 2^32: the same seed gives the same glitches on the same enabled frames. Default a
-   * random seed. Changing it restarts the sequence. */
+  /** Integer 0..2^32-1; the same seed gives the same glitches on the same enabled frames. Default: random. */
   seed?: number;
-  /** False passes the frame through and pauses the sequence. Default true; also `glitch.enabled`. */
+  /** False passes frames through and pauses the sequence. Default true. */
   enabled?: boolean;
 }
 
-// Per-pixel glitch of a display-encoded frame: rows inside a tear band slide sideways (each line jittered), cells of a
-// block grid slide by their own amount, then red and blue are read a split vector apart. Displaced reads wrap
-// horizontally and clamp vertically; alpha is the largest of the three reads, so premultiplied colour stays valid.
-// Hash: PCG (Jarzynski and Olano, "Hash Functions for GPU Rendering", JCGT 2020).
-const shader =
-  fullscreen +
-  `
-struct G {split:vec2f,block:vec2f,chance:f32,shift:f32,seed:u32,on:u32,bands:array<vec4f,3>}
-@group(0) @binding(0) var<uniform> g:G;
-@group(0) @binding(1) var image:texture_2d<f32>;
-fn hash(v:u32)->f32 {let s=v*747796405u+2891336453u;let w=((s>>((s>>28u)+4u))^s)*277803737u;return f32((w>>22u)^w)/4294967296.0;}
-fn pixel(p:vec2f)->vec4f {let size=vec2i(textureDimensions(image));let q=vec2i(floor(p));return textureLoad(image,vec2i(((q.x%size.x)+size.x)%size.x,clamp(q.y,0,size.y-1)),0);}
-@fragment fn fragment(@builtin(position) p:vec4f)->@location(0) vec4f {
- if(g.on==0u){return textureLoad(image,vec2i(p.xy),0);}
- var x=p.x;
- for(var i=0u;i<3u;i++){let b=g.bands[i];if(p.y>=b.x&&p.y<b.y){x+=b.z+b.w*(hash(u32(p.y)^(g.seed+i*0x9e3779b9u))*2-1);}}
- let cell=bitcast<vec2u>(vec2i(floor(vec2f(x,p.y)/g.block)));
- if(hash((cell.x*73856093u)^(cell.y*19349663u)^g.seed)<g.chance){x+=(hash((cell.x*83492791u)^(cell.y*2654435761u)^g.seed)*2-1)*g.shift;}
- let at=vec2f(x,p.y);let c=pixel(at);let r=pixel(at+g.split);let b=pixel(at-g.split);
- return vec4f(r.r,c.g,b.b,max(c.a,max(r.a,b.a)));
+// Schedule tuning (frames, at the display rate). Quiet waits of 90-300 frames (1.5-5 s at 60 Hz) keep the glitch an
+// occasional event; bursts of 3-10 frames (50-170 ms) read as one hiccup rather than a sustained effect.
+const WAIT = [90, 300] as const;
+const BURST = [3, 10] as const;
+const TEARS = 4; // most horizontal tear bands per glitched frame (the shader's tears array length)
+const UNIFORM_BYTES = 48 + TEARS * 16;
+
+const shader = `${fullscreen}
+struct Glitch {flags:vec4u,split:vec4f,blocks:vec4f,tears:array<vec4f,4>}
+@group(0) @binding(0) var<uniform> g:Glitch;
+@group(0) @binding(1) var frame:texture_2d<f32>;
+// PCG hash (Jarzynski and Olano, "Hash Functions for GPU Rendering", JCGT 9(3), 2020).
+fn pcg(v:u32)->u32 {let s=v*747796405u+2891336453u;let w=((s>>((s>>28u)+4u))^s)*277803737u;return (w>>22u)^w;}
+fn unit(v:u32)->f32 {return f32(pcg(v)>>8u)*(1.0/16777216.0);}
+// Wraps horizontally, clamps vertically, unfiltered.
+fn texel(p:vec2f,size:vec2i)->vec4f {
+ let x=((i32(floor(p.x))%size.x)+size.x)%size.x;
+ return textureLoad(frame,vec2i(x,clamp(i32(floor(p.y)),0,size.y-1)),0);
+}
+@fragment fn fragment(@builtin(position) at:vec4f)->@location(0) vec4f {
+ if (g.flags.y==0u) {return textureLoad(frame,vec2i(at.xy),0);}
+ let size=vec2i(textureDimensions(frame));
+ var p=at.xy;
+ let row=u32(at.y);
+ for (var i=0u;i<g.flags.z;i++) {
+  let band=g.tears[i];
+  if (p.y>=band.x&&p.y<band.x+band.y) {p.x+=band.z+(unit(g.flags.x^pcg(row+i*7919u))*2-1)*band.w;}
+ }
+ let cell=bitcast<vec2u>(vec2i(floor(p/g.split.zw)));
+ let pick=pcg(g.flags.x+pcg(cell.x^pcg(cell.y)));
+ if (unit(pick)<g.blocks.x) {p.x+=(unit(pick^0x68e31da4u)*2-1)*g.blocks.y;}
+ let centre=texel(p,size);
+ let left=texel(p+g.split.xy,size);
+ let right=texel(p-g.split.xy,size);
+ return vec4f(left.r,centre.g,right.b,max(max(left.a,centre.a),right.a));
 }`;
 
+/** PCG output hash used to scramble a seed into a generator state (Jarzynski and Olano 2020). */
+function scramble(seed: number): number {
+  const s = (Math.imul(seed >>> 0, 747796405) + 2891336453) >>> 0,
+    w = Math.imul(((s >>> ((s >>> 28) + 4)) ^ s) >>> 0, 277803737) >>> 0;
+  return ((w >>> 22) ^ w) >>> 0 || 0x9e3779b9; // xorshift needs a non-zero state
+}
+
 /**
- * A digital glitch in a {@link PostStack} (LDR effect, after the display effect): after a
- * random wait of 120-240 frames a burst of 4-16 glitched frames, the first the strongest, each with new random block
- * displacement, an RGB channel split and scanline tearing. `wild` glitches every frame. `Glitch.attach` runs it alone.
- * @throws RangeError or TypeError for invalid options; MargoError `'state'` outside a PostStack, `'unsupported'` on a
- * WebGL engine, `'disposed'` after `dispose()`, `'attached'` when it joins a second stack.
+ * Digital glitch in a PostStack: an LDR effect that runs after the display effect (and after SMAA or FXAA, so it
+ * stays sharp). After a random quiet wait of 90-300 frames comes a burst of 3-10 glitched frames, the first at full
+ * strength and the rest weaker; each glitched frame has new random block displacement, a red/blue colour split and
+ * horizontal tearing. `wild` glitches every frame. Quiet frames, `intensity` 0 and disabled frames are exact copies.
+ * `attach` runs it alone in its own PostStack, which disposing the Glitch disposes too.
+ * @throws TypeError when `wild` or `enabled` is not a boolean, RangeError when `intensity` is outside 0..1 or `seed` is
+ * not an integer in 0..2^32-1 (checked now and every frame); MargoError `'state'` when used outside a PostStack,
+ * `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`, `'attached'` when joined twice.
  */
 export class Glitch implements EnginePlugin {
   readonly name = 'glitch';
   private engine?: Engine;
-  private host?: StackHost;
   private stack?: PostStack;
+  private stacked = false;
   private disposed = false;
   private uniform?: GPUBuffer;
   private pipeline?: GPURenderPipeline;
+  private key = '';
   private group?: GPUBindGroup;
   private input?: GPUTextureView;
-  private key = '';
-  private given?: number;
+  private glitched = false;
+  // Schedule state: xorshift32 generator, seed in use, quiet frames left, burst frames left, next burst frame first.
   private state = 0;
+  private seed?: number;
+  private randomSeed?: number;
   private wait = 0;
   private burst = 0;
-  private readonly values = new Float32Array(20);
-  private readonly words = new Uint32Array(this.values.buffer);
+  private first = false;
+  private readonly bytes = new ArrayBuffer(UNIFORM_BYTES);
+  private readonly words = new Uint32Array(this.bytes);
+  private readonly floats = new Float32Array(this.bytes);
   private readonly attachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'clear', storeOp: 'store' };
-  private readonly pass: GPURenderPassDescriptor = { colorAttachments: [this.attachment] };
+  private readonly descriptor: GPURenderPassDescriptor = { colorAttachments: [this.attachment] };
+
   constructor(readonly options: GlitchOptions = {}) {
     this.validate();
   }
-  /** Alone, Glitch runs in its own one-effect PostStack; to combine it, put it in your PostStack after the display
-   * effect (and after SMAA or FXAA, so the glitch stays sharp). */
+
+  /** Attaches a new Glitch to `engine` alone in its own PostStack. */
   static attach(engine: EngineKernel, options: GlitchOptions = {}): Glitch {
-    const effect = new Glitch(options);
-    effect.stack = PostStack.attach(engine, [effect]);
+    const effect = new Glitch(options),
+      stack = PostStack.attach(engine, [effect]);
+    effect.stack = stack;
     return effect;
   }
-  /** False passes the frame through; the same as `options.enabled`. */
+
+  /** Whether frames are glitched (mirrors `options.enabled`); false passes them through and pauses the sequence. */
   get enabled(): boolean {
     return this.options.enabled ?? true;
   }
   set enabled(value: boolean) {
-    if (typeof value !== 'boolean') throw new TypeError('Glitch enabled must be boolean');
+    if (typeof value !== 'boolean') throw new TypeError('Glitch enabled must be a boolean; pass true or false');
     this.options.enabled = value;
   }
+
   /** True when the last frame drawn was glitched. */
   get active(): boolean {
-    return this.words[7] === 1;
+    return this.glitched;
   }
-  private joinStack(host: StackHost): StackStage {
-    if (this.engine || this.host || this.disposed)
-      throw margoError('attached', 'Glitch is already attached; create another Glitch for another stack');
-    this.host = host;
-    return { kind: 'ldr', render: (c, input, output) => this.stage(c, input, output) };
+
+  private joinStack(_host: StackHost): StackStage {
+    if (this.engine || this.stacked || this.disposed)
+      throw margoError('attached', 'Glitch is already attached; create a new Glitch');
+    this.stacked = true;
+    return { kind: 'ldr', render: (c, input, output) => this.draw(c, input, output) };
   }
-  private validate(): void {
-    const o = this.options,
-      i = o.intensity ?? 1,
-      s = o.seed ?? 0;
-    if (
-      (o.wild !== undefined && typeof o.wild !== 'boolean') ||
-      (o.enabled !== undefined && typeof o.enabled !== 'boolean')
-    )
-      throw new TypeError('Invalid Glitch options: wild and enabled must be boolean');
-    if (!(i >= 0 && i <= 1) || !(Number.isInteger(s) && s >= 0 && s < 2 ** 32))
-      throw new RangeError('Invalid Glitch options: intensity 0-1, seed an integer from 0 to 2^32 - 1');
-  }
+
   setup(engine: Engine): void {
     if (this.disposed) throw margoError('disposed', 'Glitch is disposed; create a new Glitch');
-    if (!this.host)
-      throw margoError(
-        'state',
-        'Glitch runs in a PostStack: use Glitch.attach(engine) or PostStack.attach(engine, [..., new Glitch()])',
-      );
-    if (!engine.gpu) throw margoError('unsupported', 'Glitch requires WebGPU');
+    if (!this.stacked)
+      throw margoError('state', 'Glitch runs inside a PostStack; use Glitch.attach(engine) or add it to a PostStack');
+    if (!engine.gpu) throw margoError('unsupported', 'Glitch requires WebGPU; it does not run on the WebGL2 fallback');
     this.engine = engine;
-    this.uniform = engine.gpu.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.uniform = engine.gpu.createBuffer({
+      size: UNIFORM_BYTES,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
   }
-  // xorshift32 (Marsaglia 2003), in [0, 1).
+
+  onDeviceRestored(engine: Engine): void {
+    this.release();
+    this.engine = undefined;
+    this.setup(engine);
+  }
+
+  /** Removes the effect, releases its GPU resources and disposes the stack `attach` created. Safe to call twice. */
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    const engine = this.engine;
+    this.engine = undefined;
+    engine?.removePlugin(this.name);
+    this.release();
+    this.stack?.dispose();
+    this.stack = undefined;
+  }
+
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
+
+  private validate(): void {
+    const o = this.options;
+    if (o.wild !== undefined && typeof o.wild !== 'boolean')
+      throw new TypeError('Glitch wild must be a boolean; pass true or false');
+    if (o.enabled !== undefined && typeof o.enabled !== 'boolean')
+      throw new TypeError('Glitch enabled must be a boolean; pass true or false');
+    const intensity = o.intensity ?? 1;
+    if (!(intensity >= 0 && intensity <= 1)) throw new RangeError('Glitch intensity must be in 0..1');
+    if (o.seed !== undefined && !(Number.isInteger(o.seed) && o.seed >= 0 && o.seed <= 0xffffffff))
+      throw new RangeError('Glitch seed must be an integer in 0..2^32-1');
+  }
+
+  /** xorshift32 (Marsaglia, "Xorshift RNGs", J. Stat. Softw. 8(14), 2003), as a float in [0, 1). */
   private random(): number {
     let x = this.state;
     x ^= x << 13;
     x ^= x >>> 17;
     x ^= x << 5;
-    this.state = x;
-    return (x >>> 0) / 4294967296;
+    this.state = x >>> 0;
+    return this.state / 4294967296;
   }
-  private between(low: number, high: number): number {
-    return low + Math.floor(this.random() * (high - low + 1));
+
+  private between(range: readonly [number, number]): number {
+    return range[0] + Math.floor(this.random() * (range[1] - range[0] + 1));
   }
-  // Advances the sequence one frame and fills the uniform: the strength of this frame's glitch (0 for none), then its
-  // random shape. Every glitched frame draws the same count of numbers, so a seed replays exactly.
-  private step(width: number, height: number): void {
-    const o = this.options,
-      v = this.values,
-      u = this.words;
-    if (!this.state || o.seed !== this.given) {
-      this.given = o.seed;
-      let x = Math.imul((o.seed ?? Math.floor(Math.random() * 4294967296)) ^ 0x5bd1e995, 0x45d9f3b);
-      x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
-      this.state = x ^ (x >>> 16) || 1;
-      this.wait = this.between(120, 240);
+
+  /** Advances the schedule one enabled frame; returns this frame's strength (0 = quiet) after drawing its parameters. */
+  private step(width: number, height: number): number {
+    const o = this.options;
+    const seed = o.seed ?? (this.randomSeed ??= Math.floor(Math.random() * 4294967296));
+    if (seed !== this.seed) {
+      this.seed = seed;
+      this.state = scramble(seed);
+      this.wait = this.between(WAIT);
       this.burst = 0;
     }
-    let strength = 0;
-    if (o.wild) strength = 0.5 + 0.5 * this.random();
+    let strength: number;
+    if (o.wild) strength = 0.6 + 0.4 * this.random();
     else if (this.burst > 0) {
-      strength = 0.15 + 0.45 * this.random();
-      if (!--this.burst) this.wait = this.between(120, 240);
-    } else if (this.wait > 0) this.wait--;
-    else {
-      strength = 1;
-      this.burst = this.between(3, 15);
+      const weaker = 0.2 + 0.6 * this.random();
+      strength = this.first ? 1 : weaker;
+      this.first = false;
+      if (--this.burst === 0) this.wait = this.between(WAIT);
+    } else {
+      if (--this.wait <= 0) {
+        this.burst = this.between(BURST);
+        this.first = true;
+      }
+      return 0;
     }
-    u[7] = 0;
-    if (!strength) return;
-    const s = strength * (o.intensity ?? 1),
-      angle = 2 * Math.PI * this.random(),
-      split = s * (0.004 + 0.016 * this.random()) * height;
-    v[0] = Math.cos(angle) * split;
-    v[1] = Math.sin(angle) * split;
-    v[2] = (0.04 + 0.2 * this.random()) * width;
-    v[3] = (0.01 + 0.06 * this.random()) * height;
-    v[4] = s * (0.15 + 0.35 * this.random());
-    v[5] = s * (0.05 + 0.25 * this.random()) * width;
-    u[6] = Math.floor(this.random() * 4294967296);
-    u[7] = +(s > 0);
-    const bands = Math.floor(this.random() * 4);
-    for (let i = 0; i < 3; i++) {
-      const y = this.random() * height,
-        thick = (0.004 + 0.05 * this.random()) * height,
-        shift = (this.random() * 2 - 1) * s * 0.3 * width,
-        jitter = s * 0.02 * width * this.random();
-      if (i < bands) v.set([y, y + thick, shift, jitter], 8 + 4 * i);
-      else v.fill(0, 8 + 4 * i, 12 + 4 * i);
+    this.parameters(width, height, strength * (o.intensity ?? 1));
+    return strength;
+  }
+
+  /**
+   * Draws one glitched frame's parameters into the uniform. The number of draws is fixed (11 + 4 per tear slot), so a
+   * seed replays exactly whatever the intensity or frame size.
+   */
+  private parameters(width: number, height: number, s: number): void {
+    const f = this.floats,
+      w = this.words,
+      r = () => this.random();
+    const angle = 2 * Math.PI * r(),
+      split = (0.003 + 0.012 * r()) * height * s; // 0.3-1.5% of the frame height
+    f[4] = Math.cos(angle) * split;
+    f[5] = Math.sin(angle) * split;
+    f[6] = Math.max(1, width * (0.03 + 0.22 * r())); // cell width: 3-25% of the frame
+    f[7] = Math.max(1, height * (0.015 + 0.1 * r())); // cell height: 1.5-11.5%
+    f[8] = (0.08 + 0.37 * r()) * s; // share of cells displaced
+    f[9] = width * (0.01 + 0.09 * r()) * s; // largest cell shift: 1-10% of the width
+    f[10] = f[11] = 0;
+    w[0] = Math.floor(r() * 4294967296) >>> 0; // per-frame shader seed
+    const bands = Math.floor(r() * (TEARS + 1));
+    w[2] = bands;
+    w[3] = 0;
+    for (let i = 0; i < TEARS; i++) {
+      const o = 12 + i * 4;
+      f[o] = r() * height; // first row
+      f[o + 1] = height * (0.004 + 0.04 * r()); // thickness
+      f[o + 2] = (r() * 2 - 1) * 0.12 * width * s; // sideways shift
+      f[o + 3] = 0.015 * width * r() * s; // per-row jitter
     }
   }
-  private stage(c: Context, input: GPUTextureView, output: StageOutput): void {
+
+  private draw(c: GlitchPassContext, input: GPUTextureView, output: StageOutput): void {
     this.validate();
-    if (this.enabled) this.step(c.width, c.height);
-    else this.words[7] = 0;
-    c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
-    const key = output.format + output.multisample.count;
+    const device = c.device;
+    const strength = this.enabled ? this.step(c.width, c.height) * (this.options.intensity ?? 1) : 0;
+    this.glitched = strength > 0;
+    this.words[1] = +this.glitched;
+    device.queue.writeBuffer(this.uniform!, 0, this.bytes);
+    const key = output.format + ':' + (output.multisample?.count ?? 1);
     if (this.key !== key) {
       this.key = key;
-      this.pipeline = render(c.device, shader, output.format, { multisample: output.multisample });
+      this.pipeline = render(device, shader, output.format, { multisample: output.multisample });
       this.input = undefined;
     }
     if (this.input !== input) {
       this.input = input;
-      this.group = bind(c.device, this.pipeline!, [{ buffer: this.uniform! }, input]);
+      this.group = group(device, this.pipeline!, [{ buffer: this.uniform! }, input]);
     }
     this.attachment.view = output.view;
-    const pass = c.encoder.beginRenderPass(this.pass);
-    pass.setPipeline(this.pipeline!);
-    pass.setBindGroup(0, this.group!);
-    pass.draw(3);
-    pass.end();
+    this.attachment.loadOp = viewLoadOp(c, 'clear');
+    const pass = c.encoder.beginRenderPass(this.descriptor);
+    try {
+      pass.setPipeline(this.pipeline!);
+      pass.setBindGroup(0, this.group!);
+      applyView(pass, c);
+      pass.draw(3);
+    } finally {
+      pass.end();
+    }
   }
+
   private release(): void {
     this.uniform?.destroy();
     this.uniform = this.pipeline = this.group = this.input = undefined;
     this.key = '';
-    this.attachment.view = undefined!;
-  }
-  onDeviceRestored(engine: Engine): void {
-    this.release();
-    this.setup(engine);
-  }
-  dispose(): void {
-    if (this.disposed) return;
-    this.disposed = true;
-    const stack = this.stack;
-    this.stack = undefined;
-    this.engine?.removePlugin(this.name);
-    this.release();
-    this.engine = undefined;
-    stack?.dispose();
-  }
-  declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void {
-    this.dispose();
   }
 }

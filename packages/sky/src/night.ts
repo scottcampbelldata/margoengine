@@ -2,7 +2,11 @@ import { finiteVector } from '@margoengine/math/validate';
 import type { SkyFeatures } from './base.js';
 /** Stylized night (`night` option): gradient, twinkling stars and a phased moon with glow. */
 export const night: NonNullable<SkyFeatures['night']> = {
-  wgsl: `fn hash21(p:vec2f)->f32 {var q=fract(p.xyx*0.1031);q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
+  wgsl: `// Star-cell hash: the PCG hash (M. O'Neill, PCG, 2014; GPU form in Jarzynski and Olano, "Hash Functions for GPU
+// Rendering", JCGT 9(3), 2020), applied to y and then to x plus that result. Integer cells hash exactly on every GPU;
+// the top 24 bits give [0, 1) with full fine digits for the twinkle phase.
+fn nightPcg(v:u32)->u32 {let s=v*747796405u+2891336453u;let w=((s>>((s>>28u)+4u))^s)*277803737u;return (w>>22u)^w;}
+fn hash21(p:vec2f)->f32 {let c=bitcast<vec2u>(vec2i(p));return f32(nightPcg(c.x+nightPcg(c.y))>>8u)*5.9604645e-8;}
 fn stylizedNight(r:vec3f,footprint:f32)->vec3f {
  let haze=frame.nightHorizon.w;let moon=frame.nightMoon;let params=frame.nightParams;
  var color=mix(frame.nightZenith.rgb,frame.nightHorizon.rgb,pow(1.0-clamp(r.y,0.0,1.0),2.5/max(haze,0.01))*min(haze,1.0));

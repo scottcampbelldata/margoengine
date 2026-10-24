@@ -48,10 +48,10 @@ const report = {
 };
 try {
   for (const [low, res] of [
-    [0, 512],
     [0, 256],
+    [0, 512],
     [0, 1024],
-    [1, 512],
+    [1, 256],
   ]) {
     const context = await openBrowser({
         startPath: `/packages/staging/test/browser-check.html?low=${low}&res=${res}`,

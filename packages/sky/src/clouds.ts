@@ -14,15 +14,16 @@ fn cloudNoise(p:vec2f)->f32 {
  let cell=vec2i(floor(p));let f=fract(p);let u=f*f*(3.0-2.0*f);
  return mix(mix(cloudHash(cell),cloudHash(cell+vec2i(1,0)),u.x),mix(cloudHash(cell+vec2i(0,1)),cloudHash(cell+vec2i(1)),u.x),u.y);
 }
-// Octaves first..last-1 of 1 km value noise, each 2.03x finer and turned 37 degrees so lattices never line up. A fine
-// octave fades to its mean once a sample covers a cell (footprint in octave-0 cells), as before.
+// Octaves first..last-1 of cloudNoise. Each octave is 2.13x finer, turned 49 degrees and shifted, so no two lattices
+// line up; weights halve per octave and the sum is divided by the weights used, keeping it in 0..1 around 0.5. An octave
+// fades to its mean 0.5 as the footprint, in that octave's cells, grows from 0.35 to 1 cell, so it never aliases.
 fn cloudOctaves(p:vec2f,footprint:f32,first:u32,last:u32)->f32 {
- var q=p;var fade=footprint;var weight=1.0;var sum=0.0;var total=0.0;
- for(var o=0u;o<last;o++){
-  if(o>=first){sum+=mix(cloudNoise(q),0.5,smoothstep(0.35,1.0,fade))*weight;total+=weight;}
-  q=mat2x2f(1.621,1.222,-1.222,1.621)*q+vec2f(17,29);fade*=2.03;weight*=0.5;
+ var q=p;var cells=footprint;var weight=1.0;var sum=0.0;var total=0.0;
+ for(var octave=0u;octave<last;octave++){
+  if(octave>=first){sum+=weight*mix(cloudNoise(q),0.5,smoothstep(0.35,1.0,cells));total+=weight;}
+  q=mat2x2f(1.39741,1.60753,-1.60753,1.39741)*q+vec2f(-31.4,12.6);cells*=2.13;weight*=0.5;
  }
- return sum/total;
+ return sum/max(total,0.000001);
 }
 // Coverage remap (Schneider 2015): the low-frequency shape says where clouds are, coverage how much sky they fill.
 fn cloudCover(shape:f32)->f32 {return clamp((shape-1.0+frame.clouds.x)/max(frame.clouds.x,0.001),0.0,1.0);}

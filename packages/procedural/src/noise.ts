@@ -38,11 +38,17 @@ function hash(x: number, y: number, z: number, seed: number): number {
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   return (h ^ (h >>> 16)) >>> 0;
 }
+// Perlin's 2002 gradient set (K. Perlin, "Improving Noise"): the 12 cube-edge midpoints, padded to 16 with (1,1,0),
+// (-1,1,0), (0,-1,1) and (0,-1,-1) so the hash's low 4 bits pick one. The index order is fixed: it decides every
+// seeded field (the island heights among them) and matches the WGSL twin's table.
+const PERLIN_GRADIENTS = new Int8Array([
+  1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1, 0, 1, 0, 1, -1, 0, 1, 1, 0, -1, -1, 0, -1, 0, 1, 1, 0, -1, 1, 0, 1, -1, 0, -1,
+  -1, 1, 1, 0, 0, -1, 1, -1, 1, 0, 0, -1, -1,
+]);
+// Dot product of corner hash h's gradient with the offset (x, y, z) from that corner.
 function gradient(h: number, x: number, y: number, z: number): number {
-  h &= 15;
-  const u = h < 8 ? x : y,
-    v = h < 4 ? y : h === 12 || h === 14 ? x : z;
-  return (h & 1 ? -u : u) + (h & 2 ? -v : v);
+  const k = (h & 15) * 3;
+  return PERLIN_GRADIENTS[k] * x + PERLIN_GRADIENTS[k + 1] * y + PERLIN_GRADIENTS[k + 2] * z;
 }
 const coordinates = (x: number, y: number, z = 0, w = 0): void => {
   if (!(Math.abs(x) <= 1e7 && Math.abs(y) <= 1e7 && Math.abs(z) <= 1e7 && Math.abs(w) <= 1e7))

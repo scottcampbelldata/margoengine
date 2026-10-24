@@ -55,13 +55,21 @@ const surfaceStruct = 'struct TerrainSurface {color:vec3f,normal:vec3f,rough:f32
 // Value noise on an integer lattice hashed with lowbias32 (C. Wellons, "Prospecting for Hash Functions"), returned with
 // its analytic derivatives (value 0..1, d/dx, d/dy). It is not periodic, so no pattern repeats and no tile needs hiding.
 const noiseCode = `
-fn terrainHash(seed:u32)->f32 {
- var h=seed;h^=h>>16u;h*=0x7feb352du;h^=h>>15u;h*=0x846ca68bu;h^=h>>16u;return f32(h>>8u)*5.9604645e-8;
+fn terrainHash(seed:u32)->u32 {
+ var h=seed;h^=h>>16u;h*=0x7feb352du;h^=h>>15u;h*=0x846ca68bu;h^=h>>16u;return h;
 }
+// Corner values: terrainHash nested over the cell (y, then x plus that result), top 24 bits as 0..1. They are blended
+// along x, then y, with the cubic fade s(t) = 3t^2 - 2t^3; by the product rule each blend's slope along its own axis is
+// s'(t) = 6t(1-t) times the difference of what it blends, and the y blend carries the x blends' slopes along.
 fn terrainNoise(p:vec2f)->vec3f {
- let c=floor(p);let f=p-c;let u=f*f*(3.0-2.0*f);let k=(bitcast<u32>(i32(c.x))*0x8da6b343u)+(bitcast<u32>(i32(c.y))*0xd8163841u);
- let a=terrainHash(k);let b=terrainHash(k+0x8da6b343u);let d=terrainHash(k+0xd8163841u);let m=a-b-d+terrainHash(k+0x65bceb84u);
- return vec3f(a+(b-a)*u.x+(d-a)*u.y+m*u.x*u.y,6.0*f*(1.0-f)*(vec2f(b-a,d-a)+m*u.yx));
+ let base=floor(p);let c=bitcast<vec2u>(vec2i(base));let t=p-base;
+ let row0=terrainHash(c.y);let row1=terrainHash(c.y+1u);
+ let v00=f32(terrainHash(c.x+row0)>>8u)*5.9604645e-8;let v10=f32(terrainHash(c.x+1u+row0)>>8u)*5.9604645e-8;
+ let v01=f32(terrainHash(c.x+row1)>>8u)*5.9604645e-8;let v11=f32(terrainHash(c.x+1u+row1)>>8u)*5.9604645e-8;
+ let s=t*t*(3.0-2.0*t);let ds=6.0*t*(1.0-t);
+ let low=mix(v00,v10,s.x);let high=mix(v01,v11,s.x);
+ let slopeX=ds.x*mix(v10-v00,v11-v01,s.y);
+ return vec3f(mix(low,high,s.y),slopeX,ds.y*(high-low));
 }
 `;
 // Height-based blending (A. Mishkinis, "Advanced Terrain Texture Splatting", 2013): near a transition the higher surface
@@ -148,7 +156,7 @@ export class TerrainColors implements EnginePlugin {
       blend = (t: string, heights: string) =>
         detail === 1 ? `terrainBlend(${t},${heights})` : `mix(${t},terrainBlend(${t},${heights}),${detail})`;
     // Per pixel: bands follow the interpolated height and normal, not the triangles. Noise has a 14 m and a 1.1 m
-    // octave (rotated 37° so the lattices do not align); the fine one fades out by 60 m, before it can alias.
+    // octave (turned 52 degrees so the lattices do not align); the fine one fades out by 60 m, before it can alias.
     // Detail: grass tufts (fine noise), sand in their hollows and rock bumps are the height maps of the blend. Rock is
     // triplanar where stone shows: anisotropic noise on the two vertical projections reads as horizontal strata, so
     // cliffs never stretch a top-down pattern; its analytic gradient tilts the normal (surface-gradient bump mapping).
@@ -158,7 +166,7 @@ fn terrainSurface(p:vec3f,n:vec3f)->TerrainSurface {
    variation || detail
      ? `let fade=1.0-smoothstep(20.0,60.0,distance(frame.eye.xyz,p));
  let large=terrainNoise(p.xz*0.07).x-0.5;var fine=0.0;
- if(fade>0.0){fine=(terrainNoise(mat2x2f(0.8,0.6,-0.6,0.8)*p.xz*0.9).x-0.5)*fade;}`
+ if(fade>0.0){fine=(terrainNoise(mat2x2f(0.61566,0.78801,-0.78801,0.61566)*p.xz*0.9).x-0.5)*fade;}`
      : ''
  }
  let meadow=mix(${rgb(options.meadow[0])},${rgb(options.meadow[1])},${band(options.meadowHeight, 'h')});

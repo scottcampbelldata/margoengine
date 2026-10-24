@@ -169,16 +169,24 @@ struct Output {@builtin(position) clip:vec4f,@location(0) normal:vec3f,@location
  let v=surface(xz,sampleWidth);var clip=frame.camera*vec4f(v.position,1);if(HORIZON){clip.z=max(clip.z,0.000001*clip.w);}return Output(clip,v.normal,v.position,v.crest,xz);
 }
 fn linear(d:f32)->f32 {return frame.cameraData.x*frame.cameraData.y/(frame.cameraData.x+d*(frame.cameraData.y-frame.cameraData.x));}
-fn hash(p:vec2i)->f32 {var x=bitcast<u32>(p.x)*1664525u+bitcast<u32>(p.y)*1013904223u;x=(x^(x>>16u))*2246822519u;return f32(x^(x>>13u))/4294967295.0;}
-fn cornerGradient(cell:vec2i)->vec2f {let angle=hash(cell)*6.2831853;return vec2f(cos(angle),sin(angle));}
-// Gradient noise over random unit corner gradients, with the quintic fade of Perlin 2002 and analytic derivatives:
-// value, d/dx, d/dy. Random angles rather than a fixed gradient set keep it free of axis bias.
-// Value noise has zero slope along every cell edge, which lit ripples as flat strips; here each edge keeps its gradients.
+// Ripple noise: 2D gradient noise (K. Perlin, "Improving Noise", SIGGRAPH 2002). Every lattice corner holds a random
+// unit gradient whose angle is the PCG hash (Jarzynski and Olano, JCGT 9(3), 2020) of the corner's cell, so the field
+// has no axis bias and works for negative and far cells alike.
+fn ripplePcg(v:u32)->u32 {let s=v*747796405u+2891336453u;let w=((s>>((s>>28u)+4u))^s)*277803737u;return (w>>22u)^w;}
+fn rippleGradient(cell:vec2i)->vec2f {
+ let c=bitcast<vec2u>(cell);let angle=f32(ripplePcg(c.x+ripplePcg(c.y))>>8u)*3.7450703e-7;return vec2f(cos(angle),sin(angle));
+}
+// (value, d/dx, d/dy). Corner ramps dot(g, p - corner) are blended along x, then y, with the quintic fade
+// q(t) = 10t^3 - 15t^4 + 6t^5; by the product rule each blend's gradient is the blend of the ramp gradients plus
+// q'(t) = 30t^2(1-t)^2 times the difference of the two blended values along that blend's axis.
 fn noise(p:vec2f)->vec3f {
- let cell=vec2i(floor(p));let f=fract(p);let u=f*f*f*(f*(f*6.0-15.0)+10.0);let du=30.0*f*f*(f*(f-2.0)+1.0);
- let a=cornerGradient(cell);let b=cornerGradient(cell+vec2i(1,0));let c=cornerGradient(cell+vec2i(0,1));let d=cornerGradient(cell+vec2i(1));
- let va=dot(a,f);let vb=dot(b,f-vec2f(1,0));let vc=dot(c,f-vec2f(0,1));let vd=dot(d,f-vec2f(1));let k=va-vb-vc+vd;
- return vec3f(va+u.x*(vb-va)+u.y*(vc-va)+u.x*u.y*k,a+u.x*(b-a)+u.y*(c-a)+u.x*u.y*(a-b-c+d)+du*vec2f(vb-va+u.y*k,vc-va+u.x*k));
+ let base=floor(p);let cell=vec2i(base);let f=p-base;
+ let g00=rippleGradient(cell);let g10=rippleGradient(cell+vec2i(1,0));let g01=rippleGradient(cell+vec2i(0,1));let g11=rippleGradient(cell+vec2i(1,1));
+ let r00=dot(g00,f);let r10=dot(g10,f-vec2f(1,0));let r01=dot(g01,f-vec2f(0,1));let r11=dot(g11,f-vec2f(1,1));
+ let q=f*f*f*(10.0+f*(6.0*f-15.0));let dq=30.0*f*f*(1.0-f)*(1.0-f);
+ let low=mix(r00,r10,q.x);let high=mix(r01,r11,q.x);
+ let dlow=mix(g00,g10,q.x)+vec2f(dq.x*(r10-r00),0.0);let dhigh=mix(g01,g11,q.x)+vec2f(dq.x*(r11-r01),0.0);
+ return vec3f(mix(low,high,q.y),mix(dlow,dhigh,q.y)+vec2f(0.0,dq.y*(high-low)));
 }
 // One ripple layer's world-space slope. Each layer turns the wind frame by its own angle (cos, sin) and scales it by
 // non-integer ratios, so no two layers share a lattice axis or spacing.

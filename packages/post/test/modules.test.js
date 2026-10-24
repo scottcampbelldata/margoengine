@@ -36,8 +36,8 @@ test('native Bloom and SSAO imports exclude the other effects', async () => {
     ['motion-blur', 'motion-blur:after-taa', ['bloom:capture', 'ssao:capture', 'ssr:gbuffer', 'ssgi:gbuffer']],
     ['lens-flare', 'const GHOSTS', ['bloom:capture', 'ssao:capture', 'ssr:gbuffer', 'motion-blur:after-taa']],
     ['smaa', 'smaa:capture', ['bloom:capture', 'ssao:capture', 'fxaa:capture', 'post:stack:capture']],
-    ['glitch', 'bands:array<vec4f,3>', ['bloom:capture', 'ssao:capture', 'fxaa:capture', 'smaa:capture']],
-    ['afterimage', 'textureLoad(previous', ['bloom:capture', 'ssao:capture', 'smaa:capture', 'bands:array']],
+    ['glitch', 'tears:array<vec4f,4>', ['bloom:capture', 'ssao:capture', 'fxaa:capture', 'smaa:capture']],
+    ['afterimage', 'var<uniform> fade:vec4f', ['bloom:capture', 'ssao:capture', 'smaa:capture', 'tears:array']],
   ]) {
     const code = await staticClosure('@margoengine/post/' + entry);
     assert.ok(code.includes(present), 'Effect implementation was omitted: ' + entry);

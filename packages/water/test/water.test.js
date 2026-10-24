@@ -197,8 +197,8 @@ test('ripple normals use gradient noise on four separately turned lattices', () 
   h.frame();
   const code = h.pipelines.find((p) => p.fragment?.targets.length === 2).fragment.module.code;
   // Perlin's quintic fade over corner gradients, not value noise's cubic fade whose slope vanishes on every cell edge.
-  assert.match(code, /fn cornerGradient\(cell:vec2i\)->vec2f/);
-  assert.match(code, /f\*f\*f\*\(f\*\(f\*6\.0-15\.0\)\+10\.0\)/);
+  assert.match(code, /fn rippleGradient\(cell:vec2i\)->vec2f/);
+  assert.match(code, /f\*f\*f\*\(10\.0\+f\*\(6\.0\*f-15\.0\)\)/);
   assert.doesNotMatch(code, /6\.0\*f\*\(1\.0-f\)/);
   const turns = [...code.matchAll(/rippleSlope\(p,vec2f\(([-\d.]+),([-\d.]+)\)/g)].map((m) => [+m[1], +m[2]]);
   assert.equal(turns.length, 4);

@@ -91,11 +91,16 @@ const compute = (lights: string | undefined, shadows: string | undefined) =>
 @group(0) @binding(4) var scattering:texture_3d<f32>;
 @group(0) @binding(5) var integrated:texture_storage_3d<rgba16float,write>;
 fn phase(c:f32,g:f32)->f32 {let k=1.0+g*g-2.0*g*c;return (1.0-g*g)/(12.5663706*k*sqrt(k));}
-fn hash(x:vec3f)->f32 {var p=fract(x*0.1031);p+=dot(p,p.zyx+31.32);return fract((p.x+p.y)*p.z);}
+// 3D value noise (Perlin 1985; Ebert et al., "Texturing and Modeling: A Procedural Approach", ch. 2): one hashed value
+// per integer lattice corner, blended trilinearly with the cubic fade 3t^2 - 2t^3. Corner values are the PCG hash
+// (Jarzynski and Olano, JCGT 9(3), 2020) nested over the corner's integer coordinates, exact at any world position.
+fn fogPcg(v:u32)->u32 {let s=v*747796405u+2891336453u;let w=((s>>((s>>28u)+4u))^s)*277803737u;return (w>>22u)^w;}
+fn fogCorner(c:vec3i)->f32 {let u=bitcast<vec3u>(c);return f32(fogPcg(u.x+fogPcg(u.y+fogPcg(u.z)))>>8u)*5.9604645e-8;}
 fn noise(x:vec3f)->f32 {
-  let i=floor(x);let f=fract(x);let u=f*f*(3.0-2.0*f);
-  return mix(mix(mix(hash(i),hash(i+vec3f(1,0,0)),u.x),mix(hash(i+vec3f(0,1,0)),hash(i+vec3f(1,1,0)),u.x),u.y),
-    mix(mix(hash(i+vec3f(0,0,1)),hash(i+vec3f(1,0,1)),u.x),mix(hash(i+vec3f(0,1,1)),hash(i+vec3f(1,1,1)),u.x),u.y),u.z);
+  let base=floor(x);let c=vec3i(base);let t=x-base;let w=t*t*(3.0-2.0*t);
+  let lower=mix(mix(fogCorner(c),fogCorner(c+vec3i(1,0,0)),w.x),mix(fogCorner(c+vec3i(0,1,0)),fogCorner(c+vec3i(1,1,0)),w.x),w.y);
+  let upper=mix(mix(fogCorner(c+vec3i(0,0,1)),fogCorner(c+vec3i(1,0,1)),w.x),mix(fogCorner(c+vec3i(0,1,1)),fogCorner(c+vec3i(1,1,1)),w.x),w.y);
+  return mix(lower,upper,w.z);
 }
 ${
   shadows
@@ -129,7 +134,7 @@ ${/* @__PURE__ */ clusterCell('p')}
   let n=unproject(vec3f(ndc,1));let d=unproject(vec3f(ndc,0.5))-n;let v=normalize(-d);
   let p=n+d*(sliceDepth(f32(id.z)+0.5+volume.jitter.z)/dot(d,volume.plane.xyz));
   var sigma=volume.shape.y*exp(-volume.shape.z*max(p.y-volume.shape.w,0.0));
-  if(volume.sunColor.w>0.0){let x=(p-volume.wind.xyz)*volume.ambient.w;sigma*=max(0.0,1.0+volume.sunColor.w*(1.3333*noise(x)+0.6667*noise(x*2.03+17.0)-1.0));}
+  if(volume.sunColor.w>0.0){let x=(p-volume.wind.xyz)*volume.ambient.w;sigma*=max(0.0,1.0+volume.sunColor.w*(1.3333*noise(x)+0.6667*noise(x*2.11+vec3f(23.7,-11.3,5.9))-1.0));}
   var light=volume.ambient.rgb;
   if(any(volume.sunColor.rgb>vec3f(0))){
     var lit=1.0;

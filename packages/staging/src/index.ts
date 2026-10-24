@@ -1,4 +1,9 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+// Soft ground contact shadows for product shots. Each update renders the added casters into a small square
+// "nearness" texture with an orthographic camera standing on the ground and looking straight up (max blend keeps the
+// surface closest to the ground per texel, no depth buffer), then softens it with one separable Gaussian (a horizontal
+// and a vertical pass whose kernels are sized per axis so the blur is round in world units), and finally lays a
+// transparent plane on the ground that composites the shadow colour over the scene.
 import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
 import {
   engineRuntime,
@@ -6,585 +11,713 @@ import {
   type Engine,
   type EnginePlugin,
   type FrameGraph,
-  type PassContext,
   type Mesh,
+  type PassContext,
   type Vec3,
 } from '@margoengine/core/extension';
+import { casterBuffers, drawCaster } from '../../shared/caster.js';
 import { instancedDepth } from '../../shared/instances.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { hiddenInTree } from '../../shared/visibility.js';
-import { casterBuffers } from '../../shared/caster.js';
+import { fullscreen, group, render as fullscreenPipeline } from '../../shared/gpu.js';
+import { applyView } from '../../shared/view-rect.js';
+import { margoError } from '../../shared/errors.js';
+
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
-type Context = Extract<PassContext, { backend: 'webgpu' }>;
+type ContactPassContext = Extract<PassContext, { backend: 'webgpu' }>;
 
+/** Options of {@link ContactShadows}. The object is kept and read every frame, so changes apply live. */
 export interface ContactShadowOptions {
-  /** Centre of the shadow on the ground; the ground is the plane y = position[1]. Default [0, 0, 0]. */
+  /** Centre of the shadow on the ground; the ground is the horizontal plane y = position[1]. Default [0, 0, 0]. */
   position?: Vec3;
-  /** Width (x) and depth (z) of the shadow plane in world units, or one number for a square. Default 4. */
+  /** Width (world x) and depth (world z) of the shadow plane; one number gives a square. Default 4. */
   size?: number | readonly [number, number];
-  /** Geometry up to this far above the ground casts; darkness fades linearly to zero at this height. Default 1. */
+  /**
+   * Geometry from the ground up to this height casts. Darkness falls linearly from full at the ground to none at this
+   * height. Default 1.
+   */
   height?: number;
-  /** Blur radius in world units. Default 1.5% of the larger plane side. */
+  /** Blur radius in world units; 0 keeps the hard shadow. Default 1.5% of the larger plane side. */
   blur?: number;
   /** Darkness where an object touches the ground, 0..1. Default 0.6. */
   opacity?: number;
-  /** Shadow colour, written as-is to the scene target. Default black. */
+  /** Shadow colour, linear RGB written as-is (not tone-mapped) to the scene target. Default black. */
   color?: Vec3;
-  /** Texels per side of the shadow texture. Default 512. */
+  /** Texels per side of the square shadow texture, an integer in 16..4096. Default 256. */
   resolution?: number;
-  /** Re-render only when a transform, source or option changes (or after `invalidate()`); for scenes whose
-   * meshes do not deform. Default false: every frame. */
+  /**
+   * Re-render the shadow texture only when something it depends on changed (casters, transforms, visibility,
+   * options) or after {@link ContactShadows.invalidate}; otherwise reuse it. Default false (every frame).
+   */
   static?: boolean;
 }
-/** Same shape as `@margoengine/shadows`' ShadowPrimitive; gltf-pro `PBRModel` and materials meshes provide it. */
+
+/**
+ * One drawable caster, the same shape as `@margoengine/shadows`' shadow primitives. gltf-pro models and materials
+ * meshes expose arrays of them as `shadowPrimitives`.
+ */
 export interface ContactPrimitive {
+  /** Node whose world matrix places the primitive. */
   node: Mesh;
+  /** Vertex buffer: 24-byte core vertices (position) or 80-byte gltf-pro vertices. */
   vertex: GPUBuffer;
+  /** `uint32` index buffer. */
   index: GPUBuffer;
+  /** Number of indices to draw. */
   count: number;
+  /** Vertex stride in bytes, 24 or 80. */
   stride: number;
-  /** Index topology; omitted for triangle casters. Wireframe casters supply triangle-edge line indices. */
+  /** Omitted means triangles; wireframe casters give line-list indices. */
   topology?: 'triangle-list' | 'line-list';
+  /** Alpha mask (80-byte vertices); its alpha channel is multiplied in. Missing means opaque white. */
   alphaTexture?: GPUTextureView;
+  /** Sampler of `alphaTexture`. */
   alphaSampler?: GPUSampler;
+  /** Alpha factor. Default 1. */
   alpha?: number;
+  /** Fragments with texture alpha x `alpha` x vertex alpha below this are dropped. Default 0. */
   cutoff?: number;
+  /** 1 reads the mask with TEXCOORD_1, anything else with TEXCOORD_0. */
   texCoord?: number;
+  /** Per-instance rows (80-byte primitives only); all `count` instances are drawn in one draw, none when 0. */
   instances?: { readonly count: number; upload(device: GPUDevice): GPUBuffer };
 }
+
+/** Anything that provides contact casters: gltf-pro `PBRModel`, `@margoengine/materials` meshes. */
 export interface ContactSource {
+  /** Casters, read again every frame (the list may change). */
   shadowPrimitives?: readonly ContactPrimitive[];
+  /** When true the source is dropped on the next frame. */
   disposed?: boolean;
 }
-interface Source {
-  source: ContactSource | Mesh;
-  primitive?: ContactPrimitive[];
+
+/** Validated, defaulted options of one frame. */
+interface Settings {
+  x: number;
+  ground: number;
+  z: number;
+  width: number;
+  depth: number;
+  height: number;
+  blur: number;
+  opacity: number;
+  color: readonly number[];
+  resolution: number;
+  cached: boolean;
 }
-interface Draw {
+
+type Entry = { mesh: Mesh; proxy?: ContactPrimitive } | { source: ContactSource };
+
+/** Per-draw GPU state, reused by draw slot so steady frames allocate nothing. */
+interface Slot {
   uniform: GPUBuffer;
-  group: GPUBindGroup;
-  values: Float32Array;
-  vertex: GPUBuffer;
-  pipeline: GPURenderPipeline;
-  alpha?: GPUTextureView;
+  values: Float32Array<ArrayBuffer>;
+  group?: GPUBindGroup;
+  pipeline?: GPURenderPipeline;
+  mask?: GPUTextureView;
   sampler?: GPUSampler;
 }
 
-// Seen from the ground looking up: depth 0 at the ground, 1 at `height`; max blending keeps the lowest surface.
-const occluderShader = (pbr: boolean) => /* wgsl */ `
-struct Frame {camera:mat4x4f,model:mat4x4f,alpha:vec4f}
-@group(0) @binding(0) var<uniform> f:Frame;
-@group(0) @binding(1) var alphaMap:texture_2d<f32>;
-@group(0) @binding(2) var alphaSampler:sampler;
-struct In {@location(0) position:${pbr ? 'vec4f' : 'vec3f'},${pbr ? '@location(3) uv:vec4f,@location(4) color:vec4f' : ''}}
-struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32}
-@vertex fn vertex(i:In)->Out {var o:Out;o.clip=f.camera*f.model*vec4f(i.position.xyz,1);${pbr ? 'o.uv=select(i.uv.xy,i.uv.zw,f.alpha.z>0.5);o.alpha=i.color.a;' : 'o.uv=vec2f(0);o.alpha=1;'}return o;}
-@fragment fn fragment(i:Out)->@location(0) vec4f {if(textureSampleLevel(alphaMap,alphaSampler,i.uv,0).a*f.alpha.x*i.alpha<f.alpha.y){discard;}return vec4f(1-i.clip.z,0,0,1);}
-`;
-const fullscreen =
-  '@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {return vec4f(vec2f(f32((i<<1u)&2u),f32(i&2u))*2-1,0,1);}';
-// Separable 9-tap Gaussian (sigma = 2 taps); `step` is the tap spacing in UV.
-const blurShader = /* wgsl */ `
-@group(0) @binding(0) var<uniform> blur:vec4f;
-@group(0) @binding(1) var source:texture_2d<f32>;
-@group(0) @binding(2) var linearSampler:sampler;
-${fullscreen}
-@fragment fn fragment(@builtin(position) p:vec4f)->@location(0) vec4f {
-  let uv=p.xy/vec2f(textureDimensions(source));const w=array<f32,5>(0.2041637,0.1801738,0.1238315,0.0662822,0.0276306);
-  var sum=textureSampleLevel(source,linearSampler,uv,0).r*w[0];
-  for(var i=1;i<5;i++){let o=blur.xy*f32(i);sum+=(textureSampleLevel(source,linearSampler,uv+o,0).r+textureSampleLevel(source,linearSampler,uv-o,0).r)*w[i];}
-  return vec4f(sum,0,0,1);
-}`;
-const planeShader = /* wgsl */ `
-struct Plane {camera:mat4x4f,centre:vec4f,size:vec4f,color:vec4f}
-@group(0) @binding(0) var<uniform> p:Plane;
-@group(0) @binding(1) var shadowMap:texture_2d<f32>;
-@group(0) @binding(2) var linearSampler:sampler;
-struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f}
-@vertex fn vertex(@builtin(vertex_index) i:u32)->Out {
-  var o:Out;o.uv=vec2f(f32(i&1u),f32(i>>1u));
-  o.clip=p.camera*vec4f(p.centre.x+(o.uv.x-0.5)*p.size.x,p.centre.y,p.centre.z+(0.5-o.uv.y)*p.size.y,1);return o;
+// Blur: Gaussian with sigma = radius / 2, cut at 3 sigma (the truncated tail is 0.3% of the weight, below r16float
+// visibility), sampled with the bilinear pair trick (two neighbouring texel weights fetched by one filtered read at
+// their weighted centre). At most 32 filtered reads per side; wider kernels spread their samples further apart.
+const MAX_PAIRS = 32;
+const KERNEL_FLOATS = 4 + MAX_PAIRS * 2;
+const PLANE_LIFT = 1e-4; // share of the larger plane side the plane floats above the ground (avoids z-fighting)
+const DEFAULT_RESOLUTION = 256; // 64 texels per world unit on the default 4-unit plane; the blur hides the texel grid
+const STRIDES = new Set([24, 80]);
+
+const occluderBody = `
+struct Draw {camera:mat4x4f,model:mat4x4f,alpha:vec4f}
+@group(0) @binding(0) var<uniform> f:Draw;`;
+
+// 80-byte casters: alpha cutout from TEXCOORD_0 or _1. The input struct and vertex expression keep the shape
+// instancedDepth (shared/instances.js) rewrites into the per-instance program.
+const pbrOccluder = `${occluderBody}
+@group(0) @binding(1) var mask:texture_2d<f32>;
+@group(0) @binding(2) var maskSampler:sampler;
+struct Input {@location(0) position:vec4f,@location(3) uvs:vec4f,@location(4) color:vec4f}
+struct Varyings {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32}
+@vertex fn vertex(i:Input)->Varyings {
+ var o:Varyings;
+ o.clip=f.camera*f.model*vec4f(i.position.xyz,1);
+ o.uv=select(i.uvs.xy,i.uvs.zw,f.alpha.z==1);
+ o.alpha=i.color.a;
+ return o;
 }
-@fragment fn fragment(i:Out)->@location(0) vec4f {let a=textureSample(shadowMap,linearSampler,i.uv).r*p.color.a;return vec4f(p.color.rgb*a,a);}
-`;
+@fragment fn fragment(v:Varyings)->@location(0) vec4f {
+ let coverage=textureSample(mask,maskSampler,v.uv).a*f.alpha.x*v.alpha;
+ if (coverage<f.alpha.y) {discard;}
+ return vec4f(1-v.clip.z,0,0,1);
+}`;
+
+// 24-byte core casters: position only.
+const coreOccluder = `${occluderBody}
+@vertex fn vertex(@location(0) position:vec3f)->@builtin(position) vec4f {
+ return f.camera*f.model*vec4f(position,1);
+}
+@fragment fn fragment(@builtin(position) clip:vec4f)->@location(0) vec4f {
+ return vec4f(1-clip.z,0,0,1);
+}`;
+
+// One axis of the separable Gaussian. axis.xy: uv step per unit offset, axis.z: filtered pairs per side,
+// axis.w: centre weight; taps hold (offset, weight) pairs, two per vec4.
+const blurShader = `${fullscreen}
+struct Kernel {axis:vec4f,taps:array<vec4f,${MAX_PAIRS / 2}>}
+@group(0) @binding(0) var<uniform> kernel:Kernel;
+@group(0) @binding(1) var nearness:texture_2d<f32>;
+@group(0) @binding(2) var bilinear:sampler;
+@fragment fn fragment(v:Vertex)->@location(0) vec4f {
+ var sum=textureSampleLevel(nearness,bilinear,v.uv,0).r*kernel.axis.w;
+ let pairs=u32(kernel.axis.z);
+ for (var i=0u;i<pairs;i++) {
+  let packed=kernel.taps[i/2u];
+  let tap=select(packed.xy,packed.zw,(i&1u)==1u);
+  let step=kernel.axis.xy*tap.x;
+  sum+=tap.y*(textureSampleLevel(nearness,bilinear,v.uv+step,0).r+textureSampleLevel(nearness,bilinear,v.uv-step,0).r);
+ }
+ return vec4f(sum,0,0,1);
+}`;
+
+// The shadow catcher: a 4-vertex strip over the plane rectangle, premultiplied colour x coverage.
+const planeShader = `
+struct Plane {camera:mat4x4f,tint:vec4f,origin:vec4f,extent:vec4f}
+@group(0) @binding(0) var<uniform> plane:Plane;
+@group(0) @binding(1) var shade:texture_2d<f32>;
+@group(0) @binding(2) var bilinear:sampler;
+struct Varyings {@builtin(position) clip:vec4f,@location(0) uv:vec2f}
+@vertex fn vertex(@builtin(vertex_index) corner:u32)->Varyings {
+ let t=vec2f(f32(corner&1u),f32(corner>>1u));
+ let world=vec3f(plane.origin.x+t.x*plane.extent.x,plane.origin.y,plane.origin.z+t.y*plane.extent.y);
+ return Varyings(plane.camera*vec4f(world,1),vec2f(t.x,1-t.y));
+}
+@fragment fn fragment(v:Varyings)->@location(0) vec4f {
+ let a=clamp(textureSample(shade,bilinear,v.uv).r,0,1)*plane.tint.a;
+ return vec4f(plane.tint.rgb*a,a);
+}`;
+
+const optionError = (what: string) => new RangeError(`Invalid contact shadow options: ${what}`);
+const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+function triple(value: unknown, name: string): readonly number[] {
+  const v = value as ArrayLike<unknown> | null;
+  if (!v || typeof v !== 'object' || v.length !== 3 || ![0, 1, 2].every((i) => finite(v[i])))
+    throw optionError(`${name} must be 3 finite numbers`);
+  return value as readonly number[];
+}
+
+/** Writes the Gaussian kernel for a radius of `texels` along `axis` (uv step per texel) into `out`. */
+function gaussianKernel(texels: number, axis: readonly [number, number], out: Float32Array): void {
+  out.fill(0);
+  const sigma = texels / 2,
+    support = Math.max(1, Math.ceil(3 * sigma)),
+    samples = Math.min(support, MAX_PAIRS * 2),
+    spacing = support / samples,
+    weight = (k: number) => Math.exp(-((k * spacing) ** 2) / (2 * sigma * sigma));
+  let total = weight(0);
+  for (let k = 1; k <= samples; k++) total += 2 * weight(k);
+  let pairs = 0;
+  for (let k = 1; k <= samples; k += 2) {
+    const a = weight(k),
+      b = k + 1 <= samples ? weight(k + 1) : 0;
+    out[4 + pairs * 2] = ((k * a + (k + 1) * b) / (a + b)) * spacing;
+    out[5 + pairs * 2] = (a + b) / total;
+    pairs++;
+  }
+  out[0] = axis[0];
+  out[1] = axis[1];
+  out[2] = pairs;
+  out[3] = weight(0) / total;
+}
 
 /**
- * Soft ground-contact shadow for product shots: the added meshes are drawn from
- * the ground looking up into a small texture (darker the closer to the ground), blurred, and laid on the ground as a
- * shadow-catcher plane over whatever is there. No light direction, no shadow map; independent of `@margoengine/shadows`.
+ * Soft contact shadow under added objects: the ground darkens where an object is close above it, strongest where it
+ * touches and fading to nothing at `height`, blurred by `blur` world units and drawn as a transparent shadow-catcher
+ * plane over whatever is already on the ground. No light direction and no shadow map. WebGPU only.
  */
 export class ContactShadows implements EnginePlugin {
   readonly name = 'contact-shadows';
-  /** Shadow-texture updates and frames that reused the previous texture (`static`). */
+  /** `updates`: frames that re-rendered the shadow texture; `cacheHits`: frames that reused it (`static`). */
   readonly stats = { updates: 0, cacheHits: 0 };
   private engine?: Engine;
-  private device?: GPUDevice;
-  private textures: GPUTexture[] = [];
-  private views: GPUTextureView[] = [];
+  private disposed = false;
+  private dirty = true;
+  private readonly entries = new Map<object, Entry>();
+  private signature: unknown[] = [];
+  private nextSignature: unknown[] = [];
+  private readonly slots: Slot[] = [];
+  private readonly occluders = new Map<string, GPURenderPipeline>();
+  private readonly planes = new Map<string, GPURenderPipeline>();
+  private blurPipeline?: GPURenderPipeline;
   private sampler?: GPUSampler;
   private white?: GPUTexture;
   private whiteView?: GPUTextureView;
-  private blurUniform?: GPUBuffer;
+  private targets?: { size: number; textures: GPUTexture[]; views: GPUTextureView[] };
+  private blurGroups?: GPUBindGroup[];
+  private planeGroup?: { group: GPUBindGroup; view: GPUTextureView; pipeline: GPURenderPipeline };
+  private kernels?: GPUBuffer[];
+  private readonly kernelValues = [new Float32Array(KERNEL_FLOATS), new Float32Array(KERNEL_FLOATS)];
   private planeUniform?: GPUBuffer;
-  private blurGroups: GPUBindGroup[] = [];
-  private planeGroup?: GPUBindGroup;
-  private blurPipeline?: GPURenderPipeline;
-  private occluders = new Map<number, GPURenderPipeline>();
-  private planes = new Map<string, GPURenderPipeline>();
-  private draws = new Map<Mesh, Map<GPUBuffer, Draw>>();
-  private readonly previousCasters: { draw: Draw; count: number; instances: number }[] = [];
-  private sources: Source[] = [];
-  private readonly matrix = new Float32Array(16);
-  private readonly previous = new Float64Array(20);
-  private readonly plane = new Float32Array(28);
-  private dirty = true;
-  private disposed = false;
-  private count = 0;
-  private readonly occluderPass: GPURenderPassDescriptor = {
-    colorAttachments: [{ view: undefined!, loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }],
-  };
+  private readonly planeValues = new Float32Array(28);
+  private readonly view = new Float32Array(16);
+
+  /** `options` is kept (not copied) and validated now and every frame; throws RangeError for invalid values. */
   constructor(readonly options: ContactShadowOptions = {}) {
-    this.validate();
+    this.settings();
   }
+
+  /** Creates the effect and registers it on `instance`; returns it. */
   static attach(instance: EngineKernel, options: ContactShadowOptions = {}): ContactShadows {
     const effect = new ContactShadows(options);
     engineRuntime(instance).use(effect);
     return effect;
   }
-  /** Centres the plane under `[minX, minY, minZ, maxX, maxY, maxZ]` (`model.bounds`): ground at minY, size = the larger
-   * footprint side × `spread`, height = the box height. */
+
+  /**
+   * Centres the plane under `bounds` ([minX, minY, minZ, maxX, maxY, maxZ], as `model.bounds`): ground at minY,
+   * a square `spread` times the larger footprint side, height the bounds height. Writes `position`, `size` and
+   * `height` into `options`.
+   */
   fit(bounds: ArrayLike<number>, spread = 2): this {
-    const b = Array.from(bounds);
-    if (b.length !== 6 || !b.every(Number.isFinite) || b[0] > b[3] || b[1] > b[4] || b[2] > b[5] || !(spread >= 1))
-      throw new RangeError('Invalid contact shadow bounds');
-    Object.assign(this.options, {
-      position: [(b[0] + b[3]) / 2, b[1], (b[2] + b[5]) / 2],
-      size: Math.max(b[3] - b[0], b[5] - b[2], 1e-6) * spread,
-      height: Math.max(b[4] - b[1], 1e-6),
-    });
-    this.validate();
+    if (
+      !bounds ||
+      bounds.length !== 6 ||
+      !Array.from({ length: 6 }, (_, i) => bounds[i]).every(finite) ||
+      bounds[0] > bounds[3] ||
+      bounds[1] > bounds[4] ||
+      bounds[2] > bounds[5] ||
+      !(spread >= 1)
+    )
+      throw new RangeError(
+        'Invalid contact shadow bounds; pass [minX, minY, minZ, maxX, maxY, maxZ] with min <= max and a spread >= 1',
+      );
+    this.options.position = [(bounds[0] + bounds[3]) / 2, bounds[1], (bounds[2] + bounds[5]) / 2];
+    this.options.size = Math.max(bounds[3] - bounds[0], bounds[5] - bounds[2], 1e-6) * spread;
+    this.options.height = Math.max(bounds[4] - bounds[1], 1e-6);
+    this.settings();
     return this;
   }
-  /** Includes a core mesh, gltf-pro model or materials mesh. Returns a function that removes it. */
+
+  /**
+   * Adds a caster: a core mesh handle, a gltf-pro model or a materials mesh. Returns a remover (safe to call twice).
+   * Throws TypeError for anything else, MargoError 'disposed' for a disposed source and 'state' for a duplicate or a
+   * mesh of another engine.
+   */
   add(source: ContactSource | MeshHandle): () => void {
-    if (this.disposed || !source) throw new TypeError('Invalid contact shadow source');
-    if ((source as ContactSource).disposed === true) throw new Error('Contact shadow source is disposed');
-    const runtime = 'id' in source ? meshRuntime(source as MeshHandle) : (source as ContactSource);
-    if ('id' in runtime) {
-      runtime.check();
-      if (this.engine && runtime.engine !== this.engine)
-        throw new Error('Contact shadow mesh belongs to another engine');
-    } else if (!('shadowPrimitives' in runtime)) throw new TypeError('Invalid contact shadow source');
-    if (this.sources.some((r) => r.source === runtime)) throw new Error('Duplicate contact shadow source');
-    const r: Source = { source: runtime };
-    this.sources.push(r);
+    if (!source || typeof source !== 'object' || this.disposed)
+      throw new TypeError(
+        this.disposed
+          ? 'ContactShadows is disposed; create a new one to add casters'
+          : 'Invalid contact shadow source; pass a mesh, a gltf-pro model or a materials mesh',
+      );
+    if ((source as ContactSource).disposed === true)
+      throw margoError('disposed', 'Contact shadow source is disposed; add a live mesh or model');
+    let entry: Entry;
+    if ('shadowPrimitives' in source) entry = { source };
+    else if ('id' in source) entry = { mesh: meshRuntime(source as MeshHandle) };
+    else throw new TypeError('Invalid contact shadow source; pass a mesh, a gltf-pro model or a materials mesh');
+    if (this.entries.has(source))
+      throw margoError('state', 'Duplicate contact shadow source; add each mesh or model once');
+    if ('mesh' in entry) {
+      if (this.engine) this.owned(entry.mesh);
+      entry.mesh.check();
+    }
+    this.entries.set(source, entry);
     this.dirty = true;
     return () => {
-      const i = this.sources.indexOf(r);
-      if (i >= 0) {
-        this.sources.splice(i, 1);
-        this.dirty = true;
-        this.clearDraws();
-      }
+      if (this.entries.get(source) !== entry) return;
+      this.entries.delete(source);
+      this.dirty = true;
     };
   }
-  /** Re-render a `static` shadow on the next frame (e.g. after a skinned pose change). */
+
+  /** Re-renders a `static` shadow on the next frame (for skinning or morph pose changes). */
   invalidate(): void {
     this.dirty = true;
   }
-  private validate(): void {
-    const o = this.options,
-      size = typeof o.size === 'number' ? [o.size, o.size] : (o.size ?? [4, 4]),
-      position = o.position ?? [0, 0, 0],
-      color = o.color ?? [0, 0, 0],
-      resolution = o.resolution ?? 512;
-    if (
-      size.length !== 2 ||
-      position.length !== 3 ||
-      color.length !== 3 ||
-      ![...size, ...position, ...color, o.height ?? 1, o.blur ?? 0, o.opacity ?? 0.6].every(Number.isFinite) ||
-      size.some((v) => v <= 0) ||
-      (o.height ?? 1) <= 0 ||
-      (o.blur ?? 0) < 0 ||
-      (o.opacity ?? 0.6) < 0 ||
-      (o.opacity ?? 0.6) > 1 ||
-      !Number.isInteger(resolution) ||
-      resolution < 16 ||
-      resolution > 4096 ||
-      typeof (o.static ?? false) !== 'boolean'
-    )
-      throw new RangeError('Invalid contact shadow options');
-  }
+
   setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu) throw new Error('Contact shadows require WebGPU and a live effect');
-    for (const r of this.sources)
-      if ('id' in r.source && r.source.engine !== engine)
-        throw new Error('Contact shadow mesh belongs to another engine');
-    const device = (this.device = engine.gpu);
+    if (this.disposed) throw margoError('disposed', 'ContactShadows is disposed; create a new one');
+    if (!engine.gpu)
+      throw margoError('unsupported', 'ContactShadows needs WebGPU; it does not run on the WebGL2 fallback');
+    for (const entry of this.entries.values()) if ('mesh' in entry) this.owned(entry.mesh, engine);
     this.engine = engine;
+    const device = engine.gpu;
     this.sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
     this.white = device.createTexture({
       size: [1, 1],
       format: 'rgba8unorm',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
-    device.queue.writeTexture(
-      { texture: this.white },
-      new Uint8Array([255, 255, 255, 255]),
-      { bytesPerRow: 4 },
-      [1, 1],
-    );
+    device.queue.writeTexture({ texture: this.white }, new Uint8Array([255, 255, 255, 255]), {}, [1, 1]);
     this.whiteView = this.white.createView();
-    // Four blur steps at 256-byte offsets, then the plane.
-    this.blurUniform = device.createBuffer({ size: 784, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    this.planeUniform = device.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    const module = device.createShaderModule({ code: blurShader });
-    this.blurPipeline = device.createRenderPipeline({
-      layout: 'auto',
-      vertex: { module, entryPoint: 'vertex' },
-      fragment: { module, entryPoint: 'fragment', targets: [{ format: 'r16float' }] },
-    });
+    const uniform = (size: number) =>
+      device.createBuffer({ size, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.kernels = [uniform(KERNEL_FLOATS * 4), uniform(KERNEL_FLOATS * 4)];
+    this.planeUniform = uniform(this.planeValues.byteLength);
     this.dirty = true;
   }
+
   registerPasses(graph: FrameGraph): void {
     graph.add({
-      name: this.name,
+      name: 'contact-shadows',
       order: 0.5,
       execute: (c) => {
-        if (c.backend === 'webgpu') this.render(c);
+        if (c.backend === 'webgpu' && this.engine && !this.disposed) this.render(c);
       },
     });
   }
-  private targets(device: GPUDevice, resolution: number): void {
-    if (this.textures[0]?.width === resolution) return;
-    for (const t of this.textures) t.destroy();
-    this.textures = [0, 1].map(() =>
+
+  onDeviceRestored(engine: Engine): void {
+    this.release();
+    this.setup(engine);
+  }
+
+  /** Removes the effect from its engine and destroys every GPU resource it created. Safe to call twice. */
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.entries.clear();
+    this.release();
+    this.engine?.removePlugin(this.name);
+  }
+
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
+
+  /** Throws MargoError 'state' when `mesh` belongs to another engine than `engine`. */
+  private owned(mesh: Mesh, engine = this.engine): void {
+    if (mesh.engine && mesh.engine !== engine)
+      throw margoError('state', 'Contact shadow mesh belongs to another engine; add meshes of the engine it runs on');
+  }
+
+  /** Validates the live options and fills in the defaults. */
+  private settings(): Settings {
+    const o = this.options;
+    if (!o || typeof o !== 'object') throw optionError('pass an options object');
+    const position = o.position === undefined ? [0, 0, 0] : triple(o.position, 'position');
+    const color = o.color === undefined ? [0, 0, 0] : triple(o.color, 'color');
+    let width = 4,
+      depth = 4;
+    if (typeof o.size === 'number') width = depth = o.size;
+    else if (o.size !== undefined) {
+      const s = o.size as ArrayLike<number>;
+      if (!s || typeof s !== 'object' || s.length !== 2) throw optionError('size must be a number or [width, depth]');
+      width = s[0];
+      depth = s[1];
+    }
+    if (!finite(width) || !finite(depth) || width <= 0 || depth <= 0)
+      throw optionError('size must be finite and above 0');
+    const height = o.height ?? 1,
+      blur = o.blur ?? 0.015 * Math.max(width, depth),
+      opacity = o.opacity ?? 0.6,
+      resolution = o.resolution ?? DEFAULT_RESOLUTION;
+    if (!finite(height) || height <= 0) throw optionError('height must be finite and above 0');
+    if (!finite(blur) || blur < 0) throw optionError('blur must be finite and 0 or more');
+    if (!finite(opacity) || opacity < 0 || opacity > 1) throw optionError('opacity must be in 0..1');
+    if (!Number.isInteger(resolution) || resolution < 16 || resolution > 4096)
+      throw optionError('resolution must be an integer in 16..4096');
+    if (o.static !== undefined && typeof o.static !== 'boolean') throw optionError('static must be a boolean');
+    return {
+      x: position[0],
+      ground: position[1],
+      z: position[2],
+      width,
+      depth,
+      height,
+      blur,
+      opacity,
+      color,
+      resolution,
+      cached: o.static === true,
+    };
+  }
+
+  /** The two r16float targets (nearness, blur scratch) at `size`, recreated when it changes. */
+  private ensureTargets(device: GPUDevice, size: number): { views: GPUTextureView[] } {
+    if (this.targets?.size === size) return this.targets;
+    this.releaseTargets();
+    const textures = [0, 1].map(() =>
       device.createTexture({
-        size: [resolution, resolution],
+        size: [size, size],
         format: 'r16float',
         usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
       }),
     );
-    this.views = this.textures.map((t) => t.createView());
-    // Blur A→B (x), B→A (y), then again at 0.4× radius to hide the tap pattern.
-    this.blurGroups = [0, 1, 0, 1].map((from, i) =>
-      device.createBindGroup({
-        layout: this.blurPipeline!.getBindGroupLayout(0),
-        entries: [
-          { binding: 0, resource: { buffer: this.blurUniform!, offset: i * 256, size: 16 } },
-          { binding: 1, resource: this.views[from] },
-          { binding: 2, resource: this.sampler! },
-        ],
-      }),
-    );
-    this.planeGroup = undefined;
+    this.targets = { size, textures, views: textures.map((t) => t.createView()) };
     this.dirty = true;
+    return this.targets;
   }
-  private render(c: Context): void {
-    this.validate();
-    const o = this.options,
-      device = this.device!,
-      engine = this.engine!,
-      resolution = o.resolution ?? 512,
-      [x, y, z] = o.position ?? [0, 0, 0],
-      [w, d] = typeof o.size === 'number' ? [o.size, o.size] : (o.size ?? [4, 4]),
-      height = o.height ?? 1;
-    this.targets(device, resolution);
-    // World x → clip x, z → clip y, height above ground → depth 0..1.
-    const m = this.matrix;
-    m[0] = 2 / w;
-    m[9] = 2 / d;
-    m[6] = 1 / height;
-    m[12] = (-2 * x) / w;
-    m[13] = (-2 * z) / d;
-    m[14] = -y / height;
-    m[15] = 1;
-    const blur = o.blur ?? 0.015 * Math.max(w, d),
-      texels = (blur / Math.max(w, d)) * resolution;
-    for (let i = this.sources.length - 1; i >= 0; i--) {
-      const s = this.sources[i].source;
-      if (('disposed' in s && s.disposed === true) || ('id' in s && engine.meshes.get(s.id) !== s)) {
-        this.sources.splice(i, 1);
-        this.clearDraws();
-        this.dirty = true;
-      }
-    }
-    let changed = !o.static;
-    const settings = [...m, blur, w, d, resolution];
-    for (let i = 0; i < 20; i++)
-      if (this.previous[i] !== settings[i]) {
-        this.previous[i] = settings[i];
-        changed = true;
-      }
-    const list: [Draw, ContactPrimitive][] = [];
-    for (const r of this.sources) {
-      let primitives: readonly ContactPrimitive[];
-      if ('id' in r.source) {
-        const node = r.source,
-          triangles = meshTriangles(node);
+
+  /** Every primitive to draw this frame; drops disposed and removed sources. */
+  private collect(engine: Engine): ContactPrimitive[] {
+    const out: ContactPrimitive[] = [];
+    for (const [key, entry] of this.entries) {
+      let list: readonly ContactPrimitive[] | undefined;
+      if ('source' in entry) {
+        if (entry.source.disposed) {
+          this.entries.delete(key);
+          this.dirty = true;
+          continue;
+        }
+        list = entry.source.shadowPrimitives;
+      } else {
+        const mesh = entry.mesh;
+        this.owned(mesh, engine);
+        if (engine.meshes.get(mesh.id) !== mesh) {
+          this.entries.delete(key);
+          this.dirty = true;
+          continue;
+        }
+        const triangles = meshTriangles(mesh);
         if (!triangles) continue;
-        if (triangles.kind === 'pbr') primitives = triangles.source.shadowPrimitives;
+        if (triangles.kind === 'pbr')
+          list = (triangles.source as unknown as ContactSource).shadowPrimitives as readonly ContactPrimitive[];
         else {
           const buffers = engine.geometryBuffers(triangles.geometry);
           if (!buffers) continue;
-          r.primitive ??= [{ node, vertex: buffers.vertex, index: buffers.index, count: 0, stride: 24 }];
-          Object.assign(r.primitive[0], {
+          const proxy = (entry.proxy ??= {
+            node: mesh,
             vertex: buffers.vertex,
             index: buffers.index,
-            count: triangles.geometry.indices.length,
+            count: 0,
+            stride: 24,
           });
-          primitives = r.primitive;
+          proxy.vertex = buffers.vertex;
+          proxy.index = buffers.index;
+          proxy.count = triangles.geometry.indices.length;
+          list = [proxy];
         }
-      } else primitives = r.source.shadowPrimitives ?? [];
-      for (const p of primitives) {
-        const node = p.node;
-        node.check();
-        if (node.engine !== engine) throw new Error('Contact shadow source belongs to another engine');
-        if (hiddenInTree(engine.store, node.id) || (p.instances && !p.instances.count)) continue;
-        const draw = this.record(p),
-          v = draw.values,
-          before = v.slice();
-        v.set(m);
-        v.set(node.matrix, 16);
-        v[32] = p.alpha ?? 1;
-        v[33] = p.cutoff ?? 0;
-        v[34] = p.texCoord ?? 0;
-        for (let i = 0; i < 35 && !changed; i++) if (v[i] !== before[i]) changed = true;
-        const instances = p.instances?.count ?? 1,
-          previous = this.previousCasters[list.length];
-        if (!previous) this.previousCasters[list.length] = { draw, count: p.count, instances };
-        else {
-          if (previous.draw !== draw || previous.count !== p.count || previous.instances !== instances) changed = true;
-          previous.draw = draw;
-          previous.count = p.count;
-          previous.instances = instances;
-        }
-        list.push([draw, p]);
+      }
+      for (const p of list ?? []) {
+        if (!STRIDES.has(p.stride))
+          throw new RangeError('Contact shadow primitive stride must be 24 or 80; pass core or gltf-pro vertices');
+        if (p.instances && p.stride !== 80)
+          throw new RangeError('Instanced contact shadow primitives need 80-byte vertices; pass gltf-pro instances');
+        p.node.check();
+        this.owned(p.node, engine);
+        if (hiddenInTree(engine.store, p.node.id) || p.instances?.count === 0) continue;
+        out.push(p);
       }
     }
-    changed ||= this.dirty || list.length !== this.count;
-    this.count = list.length;
-    this.previousCasters.length = list.length;
-    if (changed) {
-      this.stats.updates++;
-      this.dirty = false;
-      (this.occluderPass.colorAttachments as GPURenderPassColorAttachment[])[0].view = this.views[0];
-      const pass = c.encoder.beginRenderPass(this.occluderPass);
-      try {
-        for (const [draw, p] of list) {
-          device.queue.writeBuffer(draw.uniform, 0, draw.values as Float32Array<ArrayBuffer>);
-          pass.setPipeline(draw.pipeline);
-          pass.setBindGroup(0, draw.group);
-          pass.setVertexBuffer(0, p.vertex);
-          pass.setIndexBuffer(p.index, 'uint32');
-          if (p.instances) {
-            pass.setVertexBuffer(1, p.instances.upload(device));
-            pass.drawIndexed(p.count, p.instances.count);
-          } else pass.drawIndexed(p.count);
-        }
-      } catch (error) {
-        try {
-          pass.end();
-        } catch {}
-        throw error;
-      }
-      pass.end();
-      const steps = new Float32Array(196);
-      for (let i = 0; i < 4; i++) steps[i * 64 + (i & 1)] = ((texels / 4) * (i < 2 ? 1 : 0.4)) / resolution;
-      device.queue.writeBuffer(this.blurUniform!, 0, steps);
-      for (let i = 0; i < 4; i++) {
-        const blurPass = c.encoder.beginRenderPass({
-          colorAttachments: [
-            { view: this.views[1 - (i & 1)], loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] },
-          ],
-        });
-        blurPass.setPipeline(this.blurPipeline!);
-        blurPass.setBindGroup(0, this.blurGroups[i]);
-        blurPass.draw(3);
-        blurPass.end();
-      }
-    } else this.stats.cacheHits++;
-    // Seen from below the ground there is nothing to catch.
-    if (c.camera.position[1] <= y) return;
-    const key = c.format + c.descriptor.multisample?.count + c.descriptor.depthStencil!.format;
-    let pipeline = this.planes.get(key);
-    if (!pipeline) {
-      const module = device.createShaderModule({ code: planeShader });
-      pipeline = device.createRenderPipeline({
-        layout: 'auto',
-        vertex: { module, entryPoint: 'vertex' },
-        primitive: { topology: 'triangle-strip' },
-        multisample: c.descriptor.multisample,
-        fragment: {
-          module,
-          entryPoint: 'fragment',
-          targets: [
-            {
-              format: c.format,
-              blend: {
-                color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
-                alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
-              },
-            },
-          ],
-        },
-        depthStencil: {
-          format: c.descriptor.depthStencil!.format,
-          depthWriteEnabled: false,
-          depthCompare: 'greater-equal',
-        },
-      });
-      this.planes.set(key, pipeline);
-      this.planeGroup = undefined;
-    }
-    this.planeGroup ??= device.createBindGroup({
-      layout: pipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: this.planeUniform! } },
-        { binding: 1, resource: this.views[0] },
-        { binding: 2, resource: this.sampler! },
-      ],
-    });
-    // Lifted a hair so it does not z-fight with a floor mesh at the same height.
-    const p = this.plane,
-      color = o.color ?? [0, 0, 0];
-    p.set(c.camera.matrix);
-    p[16] = x;
-    p[17] = y + 1e-4 * Math.max(w, d);
-    p[18] = z;
-    p[20] = w;
-    p[21] = d;
-    p.set(color, 24);
-    p[27] = o.opacity ?? 0.6;
-    device.queue.writeBuffer(this.planeUniform!, 0, p);
-    const stencil = c.descriptor.depthStencil!.format.includes('stencil')
-      ? { stencilLoadOp: 'load' as const, stencilStoreOp: 'store' as const }
-      : {};
-    const pass = c.encoder.beginRenderPass({
-      colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
-      depthStencilAttachment: { view: c.depth, depthLoadOp: 'load', depthStoreOp: 'store', ...stencil },
-    });
-    pass.setPipeline(pipeline);
-    pass.setBindGroup(0, this.planeGroup);
-    pass.draw(4);
-    pass.end();
+    return out;
   }
-  private record(p: ContactPrimitive): Draw {
-    const inst = !!p.instances,
-      lines = p.topology === 'line-list',
-      key = p.stride + (inst ? 1 : 0) + (lines ? 2 : 0);
+
+  /** Whether the static texture is out of date for `draws` and `s`; records the new signature. */
+  private changed(draws: readonly ContactPrimitive[], s: Settings): boolean {
+    const next = this.nextSignature;
+    next.length = 0;
+    next.push(s.x, s.ground, s.z, s.width, s.depth, s.height, s.blur, s.resolution, draws.length);
+    for (const p of draws) {
+      next.push(p.node, p.vertex, p.index, p.count, p.topology ?? 'triangle-list', p.instances?.count ?? -1);
+      next.push(p.alpha, p.cutoff, p.texCoord, p.alphaTexture, p.alphaSampler);
+      for (let i = 0; i < 16; i++) next.push(p.node.matrix[i]);
+    }
+    const old = this.signature,
+      differs = old.length !== next.length || next.some((v, i) => !Object.is(v, old[i]));
+    this.nextSignature = old;
+    this.signature = next;
+    return differs;
+  }
+
+  private occluder(device: GPUDevice, stride: number, instanced: boolean, lines: boolean): GPURenderPipeline {
+    const key = `${stride}|${instanced}|${lines}`;
     let pipeline = this.occluders.get(key);
-    const device = this.device!;
     if (!pipeline) {
-      if ((p.stride !== 24 && p.stride !== 80) || (inst && p.stride !== 80))
-        throw new RangeError('Unsupported contact shadow vertex stride');
-      const code = occluderShader(p.stride === 80),
-        module = device.createShaderModule({ code: inst ? instancedDepth(code) : code });
+      const code = stride === 24 ? coreOccluder : instanced ? instancedDepth(pbrOccluder) : pbrOccluder,
+        module = device.createShaderModule({ code }),
+        keepNearest = { operation: 'max', srcFactor: 'one', dstFactor: 'one' } as const;
       pipeline = device.createRenderPipeline({
         layout: 'auto',
-        vertex: {
-          module,
-          entryPoint: 'vertex',
-          buffers: casterBuffers(p.stride, false, !!inst),
-        },
+        vertex: { module, entryPoint: 'vertex', buffers: casterBuffers(stride, false, instanced) },
         fragment: {
           module,
           entryPoint: 'fragment',
-          targets: [
-            {
-              format: 'r16float',
-              blend: {
-                color: { operation: 'max', srcFactor: 'one', dstFactor: 'one' },
-                alpha: { operation: 'max', srcFactor: 'one', dstFactor: 'one' },
-              },
-            },
-          ],
+          targets: [{ format: 'r16float', blend: { color: keepNearest, alpha: keepNearest } }],
         },
         ...(lines ? { primitive: { topology: 'line-list' as const } } : {}),
       });
       this.occluders.set(key, pipeline);
     }
-    let records = this.draws.get(p.node);
-    if (!records) {
-      records = new Map();
-      this.draws.set(p.node, records);
-    }
-    let draw = records.get(p.index);
-    if (
-      !draw ||
-      draw.vertex !== p.vertex ||
-      draw.pipeline !== pipeline ||
-      draw.alpha !== p.alphaTexture ||
-      draw.sampler !== p.alphaSampler
-    ) {
-      draw?.uniform.destroy();
-      records.delete(p.index);
-      this.dirty = true;
-      const uniform = device.createBuffer({ size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-      try {
-        draw = {
-          uniform,
-          values: new Float32Array(36),
-          vertex: p.vertex,
+    return pipeline;
+  }
+
+  /** Orthographic camera on the ground looking up: x -> clip x, z -> clip y, height above ground -> depth 0..1. */
+  private projection(s: Settings): Float32Array {
+    const m = this.view;
+    m.fill(0);
+    m[0] = 2 / s.width;
+    m[6] = 1 / s.height;
+    m[9] = 2 / s.depth;
+    m[12] = -1 - (2 * (s.x - s.width / 2)) / s.width;
+    m[13] = -1 - (2 * (s.z - s.depth / 2)) / s.depth;
+    m[14] = -s.ground / s.height;
+    m[15] = 1;
+    return m;
+  }
+
+  /** Renders the nearness texture of `draws` and blurs it; returns the view holding the result. */
+  private update(c: ContactPassContext, draws: readonly ContactPrimitive[], s: Settings): GPUTextureView {
+    const device = c.device,
+      views = this.targets!.views,
+      projection = this.projection(s);
+    const pass = c.encoder.beginRenderPass({
+      colorAttachments: [{ view: views[0], clearValue: [0, 0, 0, 0], loadOp: 'clear', storeOp: 'store' }],
+    });
+    try {
+      draws.forEach((p, i) => {
+        const pipeline = this.occluder(device, p.stride, !!p.instances, p.topology === 'line-list'),
+          slot = (this.slots[i] ??= {
+            uniform: device.createBuffer({ size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+            values: new Float32Array(36),
+          });
+        const mask = p.stride === 80 ? (p.alphaTexture ?? this.whiteView) : undefined,
+          sampler = p.stride === 80 ? (p.alphaSampler ?? this.sampler) : undefined;
+        if (!slot.group || slot.pipeline !== pipeline || slot.mask !== mask || slot.sampler !== sampler) {
+          slot.group = group(
+            device,
+            pipeline,
+            mask ? [{ buffer: slot.uniform }, mask, sampler!] : [{ buffer: slot.uniform }],
+          );
+          slot.pipeline = pipeline;
+          slot.mask = mask;
+          slot.sampler = sampler;
+        }
+        drawCaster(
+          pass,
+          device,
           pipeline,
-          alpha: p.alphaTexture,
-          sampler: p.alphaSampler,
-          group: device.createBindGroup({
-            layout: pipeline.getBindGroupLayout(0),
-            entries: [
-              { binding: 0, resource: { buffer: uniform } },
-              { binding: 1, resource: p.alphaTexture ?? this.whiteView! },
-              { binding: 2, resource: p.alphaSampler ?? this.sampler! },
-            ],
-          }),
-        };
-      } catch (error) {
-        uniform.destroy();
-        throw error;
-      }
-      records.set(p.index, draw);
+          slot.group,
+          slot.uniform,
+          slot.values,
+          projection,
+          p,
+          undefined,
+          undefined,
+          p.instances,
+        );
+      });
+    } finally {
+      pass.end();
     }
-    return draw;
+    // Slots beyond this frame's draws are released so a shrinking caster list does not hold buffers.
+    for (const slot of this.slots.splice(draws.length)) slot.uniform.destroy();
+    if (s.blur === 0) return views[0];
+    const pipeline = (this.blurPipeline ??= fullscreenPipeline(device, blurShader, 'r16float')),
+      texel = 1 / s.resolution;
+    this.blurGroups ??= [
+      group(device, pipeline, [{ buffer: this.kernels![0] }, views[0], this.sampler!]),
+      group(device, pipeline, [{ buffer: this.kernels![1] }, views[1], this.sampler!]),
+    ];
+    // Per-axis radius in texels keeps the blur round in world units on a non-square plane.
+    gaussianKernel((s.blur / s.width) * s.resolution, [texel, 0], this.kernelValues[0]);
+    gaussianKernel((s.blur / s.depth) * s.resolution, [0, texel], this.kernelValues[1]);
+    for (let axis = 0; axis < 2; axis++) {
+      device.queue.writeBuffer(this.kernels![axis], 0, this.kernelValues[axis]);
+      const blur = c.encoder.beginRenderPass({
+        colorAttachments: [{ view: views[1 - axis], loadOp: 'clear', clearValue: [0, 0, 0, 0], storeOp: 'store' }],
+      });
+      try {
+        blur.setPipeline(pipeline);
+        blur.setBindGroup(0, this.blurGroups[axis]);
+        blur.draw(3);
+      } finally {
+        blur.end();
+      }
+    }
+    return views[0];
   }
-  private clearDraws(): void {
-    for (const records of this.draws.values()) for (const r of records.values()) r.uniform.destroy();
-    this.draws.clear();
-    this.previousCasters.length = 0;
+
+  /** One frame: validate, refresh the shadow texture when needed, draw the plane. */
+  private render(c: ContactPassContext): void {
+    const engine = this.engine!,
+      device = c.device,
+      s = this.settings(),
+      views = this.ensureTargets(device, s.resolution).views;
+    const draws = this.collect(engine),
+      changed = this.changed(draws, s);
+    let shade = views[0];
+    if (this.dirty || !s.cached || changed) {
+      this.dirty = false;
+      this.stats.updates++;
+      shade = this.update(c, draws, s);
+    } else this.stats.cacheHits++;
+    if (c.camera.position[1] <= s.ground) return;
+    const depthFormat = c.descriptor.depthStencil?.format ?? 'depth32float',
+      multisample = c.descriptor.multisample ?? {},
+      key = `${c.format}|${multisample.count ?? 1}|${depthFormat}`;
+    let pipeline = this.planes.get(key);
+    if (!pipeline) {
+      const module = device.createShaderModule({ code: planeShader }),
+        over = { operation: 'add', srcFactor: 'one', dstFactor: 'one-minus-src-alpha' } as const;
+      pipeline = device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module, entryPoint: 'vertex' },
+        fragment: {
+          module,
+          entryPoint: 'fragment',
+          targets: [{ format: c.format, blend: { color: over, alpha: over } }],
+        },
+        primitive: { topology: 'triangle-strip' },
+        depthStencil: { format: depthFormat, depthWriteEnabled: false, depthCompare: 'greater-equal' },
+        multisample,
+      });
+      this.planes.set(key, pipeline);
+    }
+    if (this.planeGroup?.view !== shade || this.planeGroup.pipeline !== pipeline)
+      this.planeGroup = {
+        view: shade,
+        pipeline,
+        group: group(device, pipeline, [{ buffer: this.planeUniform! }, shade, this.sampler!]),
+      };
+    const p = this.planeValues;
+    p.set(c.camera.matrix);
+    p.set(s.color, 16);
+    p[19] = s.opacity;
+    p[20] = s.x - s.width / 2;
+    p[21] = s.ground + PLANE_LIFT * Math.max(s.width, s.depth);
+    p[22] = s.z - s.depth / 2;
+    p[24] = s.width;
+    p[25] = s.depth;
+    device.queue.writeBuffer(this.planeUniform!, 0, p);
+    const stencil = depthFormat.includes('stencil');
+    const pass = c.encoder.beginRenderPass({
+      colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
+      depthStencilAttachment: {
+        view: c.depth,
+        depthLoadOp: 'load',
+        depthStoreOp: 'store',
+        ...(stencil ? { stencilLoadOp: 'load' as const, stencilStoreOp: 'store' as const } : {}),
+      },
+    });
+    try {
+      applyView(pass, c);
+      pass.setPipeline(pipeline);
+      pass.setBindGroup(0, this.planeGroup.group);
+      pass.draw(4);
+    } finally {
+      pass.end();
+    }
   }
+
+  private releaseTargets(): void {
+    for (const t of this.targets?.textures ?? []) t.destroy();
+    this.targets = this.blurGroups = this.planeGroup = undefined;
+  }
+
+  /** Destroys every buffer and texture and forgets cached pipelines (they belong to the old device). */
   private release(): void {
-    this.clearDraws();
-    for (const t of [...this.textures, this.white]) t?.destroy();
-    this.blurUniform?.destroy();
+    this.releaseTargets();
+    for (const slot of this.slots.splice(0)) slot.uniform.destroy();
+    for (const b of this.kernels ?? []) b.destroy();
     this.planeUniform?.destroy();
-    this.textures = [];
-    this.views = [];
-    this.blurGroups = [];
-    this.white =
-      this.whiteView =
-      this.blurUniform =
-      this.planeUniform =
-      this.planeGroup =
-      this.blurPipeline =
-      this.sampler =
-        undefined;
+    this.white?.destroy();
+    this.kernels = this.planeUniform = this.white = this.whiteView = this.sampler = this.blurPipeline = undefined;
     this.occluders.clear();
     this.planes.clear();
-  }
-  onDeviceRestored(engine: Engine): void {
-    this.release();
-    this.setup(engine);
-  }
-  dispose(): void {
-    if (this.disposed) return;
-    this.disposed = true;
-    this.engine?.removePlugin(this.name);
-    this.sources.length = 0;
-    this.release();
-    this.engine = this.device = undefined;
-  }
-  declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void {
-    this.dispose();
+    this.signature.length = 0;
+    this.dirty = true;
   }
 }

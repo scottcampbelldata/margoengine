@@ -395,9 +395,10 @@ PostStack.attach(stage.engine, [new Bloom(), new Tonemap(), new SMAA({quality: '
 ## Glitch
 
 `@margoengine/post/glitch` (5,295 B min+gzip, its own entry; it carries the stack) is a digital glitch:
-after a random wait of 120-240 frames a burst of 4-16 glitched frames, the first at full strength. Each
-glitched frame draws new random block displacement (cells of a grid slide sideways), an RGB split (red and blue read a
-few pixels apart) and scanline tearing (up to three bands of rows slide sideways, each line jittered). It is an LDR
+after a random quiet wait of 90-300 frames (1.5-5 s at 60 Hz) a burst of 3-10 glitched frames, the first at full
+strength and the rest at 20-80%. Each glitched frame draws new random block displacement (cells of a grid slide
+sideways), an RGB split (red and blue read a few pixels apart, opposite ways, in a random direction) and scanline
+tearing (up to four bands of rows slide sideways, each line jittered). It is an LDR
 `PostStack` effect; `Glitch.attach` runs it alone.
 
 ```ts
@@ -417,26 +418,29 @@ glitch.options.intensity = 0.4;    // 0-1, scales displacement, split and tearin
 - **Checked on a real GPU** (same run): idle frames and `intensity: 0` pass the frame through exactly (also alone on
   a core scene, 4x and 1x); wild frames move pixels but keep every row's content in its row; the same seed replays
   exactly and another seed differs.
-- **Limits.** Sizes follow the canvas (split up to 2% of its height, shifts up to 30% of its width); the wait and burst
-  lengths are fixed; no colour noise. GPU cost not measured yet. WebGPU only.
+- **Limits.** Sizes follow the canvas (split up to 1.5% of its height, cell shifts up to 10% and tear shifts up to 12%
+  of its width); the wait and burst lengths are fixed; no colour noise. GPU cost not measured yet. WebGPU only.
 
 ## Afterimage
 
 `@margoengine/post/afterimage` (4,825 B min+gzip, its own entry; it carries the stack) leaves trails:
-each channel of the output is `max(current, history x damp)`, and the output becomes the next frame's
-history. `damp` defaults to 0.96.
+each channel of the output is `max(current, history x keep)`, and the output becomes the next frame's
+history. `keep = 0.5 ^ (delta / halfLife)` with the frame's `delta` in seconds, so a trail halves in `halfLife`
+seconds (default 0.15) at any frame rate; a paused render (`delta` 0) keeps it. The deprecated `damp` (1.x) sets
+`keep` per frame instead and wins when both are given; `trails.halfLife` then reports its 60 Hz equivalent, and
+setting `halfLife` clears it.
 
 ```ts
 import {Afterimage} from '@margoengine/post/afterimage';
 import {createStage} from 'margoengine';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
-const trails = Afterimage.attach(stage.engine, {damp: 0.9});
-trails.damp = 0.96;   // any frame
+const trails = Afterimage.attach(stage.engine, {halfLife: 0.25});
+trails.halfLife = 0.1; // seconds, any frame
 trails.reset();       // drop the trail, e.g. on a camera cut
 ```
 
 - **HDR placement.** An HDR `PostStack` effect: the history is linear `rgba16float`, so trails fade smoothly to black
-  (an 8-bit history stops fading once `damp` cannot lower a value by a whole step: about 12/255 at 0.96), and Bloom
+  (an 8-bit history would stop fading once `keep` cannot lower a value by a whole step), and Bloom
   after it makes bright trails glow. Put it among the HDR effects, before Bloom; alone or last it presents through
   Margo's display curve.
 - **Resets.** The trail starts empty on the first frame, after a resize, after a device restore, after `reset()` and

@@ -76,10 +76,13 @@ const PERLIN3 = `fn noiseHash(x: i32, y: i32, z: i32, seed: u32) -> u32 {
   h = (h ^ (h >> 13u)) * 1274126177u;
   return h ^ (h >> 16u);
 }
-fn noisePerlinGrad(h: u32, d: vec3f) -> f32 {
-  let k = h & 15u; let u = select(d.y, d.x, k < 8u); let v = select(select(d.z, d.x, k == 12u || k == 14u), d.y, k < 4u);
-  return select(u, -u, (k & 1u) != 0u) + select(v, -v, (k & 2u) != 0u);
-}
+// Perlin's 2002 gradient set: the 12 cube-edge midpoints padded to 16 (indexed by the hash's low 4 bits), in the same
+// index order as the CPU table, so every seed gives the same field on both sides.
+var<private> noisePerlinGradients: array<vec3f, 16> = array<vec3f, 16>(
+  vec3f(1, 1, 0), vec3f(-1, 1, 0), vec3f(1, -1, 0), vec3f(-1, -1, 0), vec3f(1, 0, 1), vec3f(-1, 0, 1), vec3f(1, 0, -1),
+  vec3f(-1, 0, -1), vec3f(0, 1, 1), vec3f(0, -1, 1), vec3f(0, 1, -1), vec3f(0, -1, -1), vec3f(1, 1, 0), vec3f(0, -1, 1),
+  vec3f(-1, 1, 0), vec3f(0, -1, -1));
+fn noisePerlinGrad(h: u32, d: vec3f) -> f32 { return dot(noisePerlinGradients[h & 15u], d); }
 fn noisePerlin3(p: vec3f, seed: u32) -> f32 {
   let c = floor(p); let f = p - c; let i = vec3i(c); let w = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
   var value = 0.0;

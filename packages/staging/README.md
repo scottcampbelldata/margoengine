@@ -2,7 +2,8 @@
 
 Product-shot staging. `ContactShadows`: a soft ground-contact shadow.
 The added meshes are drawn from the ground looking up into a small texture (darker the closer to the
-ground), blurred twice, and laid on the ground as a shadow-catcher plane over whatever is there (a floor mesh, a
+ground), softened by one separable Gaussian blur (sigma = half the `blur` radius, sized per axis so it stays round
+in world units on a non-square plane), and laid on the ground as a shadow-catcher plane over whatever is there (a floor mesh, a
 background, nothing). No light direction and no shadow map, so it works with or without `@margoengine/shadows`.
 
 ```ts
@@ -23,11 +24,11 @@ Options (all optional): `position` (ground centre; the ground is the plane y = p
 `size` (plane width × depth in world units, or one number, default 4), `height` (geometry up to this far above the ground
 casts, fading linearly to nothing at it, default 1), `blur` (world units, default 1.5% of the larger side), `opacity`
 (default 0.6), `color` (default black, written as-is to the scene target), `resolution` (texels per side, default
-512), `static` (default false).
+256), `static` (default false).
 
-- **Cost** (Intel Arc 140V laptop iGPU, Edge 155, 1280x720, AC; `node packages/staging/test/browser-check.mjs`, JSON in
-  `examples/package-benchmarks/results/staging-contact.json`): a texture update (occluders + 4 blur passes) takes
-  0.05 ms at 256, 0.25 ms at 512 and 0.9-1.1 ms at 1024; the plane 0.02-0.04 ms (4x MSAA). With `static: true` an
+- **Cost**: a texture update is three passes (occluders, horizontal blur, vertical blur), the plane one more; not yet
+  re-measured for this blur (`node packages/staging/test/browser-check.mjs` writes
+  `examples/package-benchmarks/results/staging-contact.json`). With `static: true` an
   unchanged scene costs only the plane.
 - **`static: true`** re-renders the texture only when a transform, visibility, source, option or the resolution
   changes, or after `invalidate()`. Skinned or morphed models change without a transform change: keep the default
