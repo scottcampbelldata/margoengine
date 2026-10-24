@@ -9,8 +9,17 @@
 // License Terms. US 8,019,788, US 2011/0199382 and corresponding foreign patents are licensed royalty-free under the
 // Siemens JT Data Format Reference Patent Clarification Notice. JT and Parasolid are trademarks of Siemens; they are
 // named here only to identify the format. This software is not endorsed by or affiliated with Siemens.
-import { inflateZlib } from './inflate.js';
+import { inflateZlib } from '../../../shared/inflate.js';
 import { inflateLZMA, inflateXZ, isXZ } from './lzma.js';
+
+// JT 9 zlib segments do not store their inflated size: the shared inflater grows its output up to 1 GiB.
+const inflateSegment = (input: Uint8Array): Uint8Array => {
+  try {
+    return inflateZlib(input, { limit: 1 << 30 });
+  } catch (error) {
+    throw new TypeError(`Invalid JT file: corrupt zlib data (${(error as Error).message})`);
+  }
+};
 
 export const fail = (message: string): never => {
   throw new TypeError(`Invalid JT file: ${message}`);
@@ -212,7 +221,7 @@ export class JTContainer {
     if (!((flag === 2 && algorithm === 2) || (flag === 3 && algorithm === 3))) return r;
     const stream = r.sub(packed - 1),
       input = this.bytes.subarray(stream.at, stream.end),
-      inflated = algorithm === 2 ? inflateZlib(input) : isXZ(input) ? inflateXZ(input) : inflateLZMA(input);
+      inflated = algorithm === 2 ? inflateSegment(input) : isXZ(input) ? inflateXZ(input) : inflateLZMA(input);
     return new JTReader(inflated, this.little);
   }
 }

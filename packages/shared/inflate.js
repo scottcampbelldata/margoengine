@@ -1,7 +1,8 @@
-// zlib (RFC 1950) and DEFLATE (RFC 1951) decoder, written from the two RFCs, for data whose decompressed size is
-// known up front: EXR ZIP and ZIPS chunks (@margoengine/environment) and PNG image data (@margoengine/decoders/png).
-// Decoding fills one buffer of exactly that size; every input read, output write and back reference is bounds
-// checked, and damaged data throws MargoError 'failed'.
+// zlib (RFC 1950) and DEFLATE (RFC 1951) decoder, written from the two RFCs: EXR ZIP and ZIPS chunks
+// (@margoengine/environment) and PNG image data (@margoengine/decoders/png), whose decompressed size is known up front
+// and fills one buffer of exactly that size, and JT segments (@margoengine/brep), whose size is not stored: the buffer
+// grows up to a limit. Every input read, output write and back reference is bounds checked, and damaged data throws
+// MargoError 'failed'.
 import { margoError } from './errors.js';
 
 const damaged = (problem) => margoError('failed', `Compressed data ${problem}; the file is damaged, export it again`);
@@ -158,13 +159,23 @@ function dynamicCodes(stream) {
   return [huffmanTable(lengths.subarray(0, literalCount)), huffmanTable(lengths.subarray(literalCount))];
 }
 
-/** Decodes one Huffman-coded block into `output` from `written` on; returns the new output length. */
-function huffmanBlock(stream, literals, distances, output, written) {
-  const capacity = output.length;
+/** The output buffer of `sink` with room for `need` bytes: grown (doubling, at most `sink.limit`) when growable. */
+function grow(sink, need) {
+  if (sink.limit === undefined || need > sink.limit)
+    throw damaged(`inflates past its ${sink.limit ?? sink.output.length} bytes`);
+  const bigger = new Uint8Array(Math.min(sink.limit, Math.max(sink.output.length * 2, need)));
+  bigger.set(sink.output);
+  return (sink.output = bigger);
+}
+
+/** Decodes one Huffman-coded block into `sink.output` from `written` on; returns the new output length. */
+function huffmanBlock(stream, literals, distances, sink, written) {
+  let output = sink.output,
+    capacity = output.length;
   for (;;) {
     const symbol = stream.symbol(literals);
     if (symbol < END_OF_BLOCK) {
-      if (written >= capacity) throw damaged(`inflates past its ${capacity} bytes`);
+      if (written >= capacity) capacity = (output = grow(sink, written + 1)).length;
       output[written++] = symbol;
       continue;
     }
@@ -176,13 +187,15 @@ function huffmanBlock(stream, literals, distances, output, written) {
     if (distanceSymbol >= 30) throw damaged(`uses the reserved distance symbol ${distanceSymbol}`);
     const distance = DISTANCES.base[distanceSymbol] + stream.bits(DISTANCES.extra[distanceSymbol]);
     if (distance > written) throw damaged('refers back before the start of its data');
-    if (length > capacity - written) throw damaged(`inflates past its ${capacity} bytes`);
+    if (length > capacity - written) capacity = (output = grow(sink, written + length)).length;
     // Front to back, one byte at a time: a distance shorter than the length repeats the bytes just written.
     for (let from = written - distance, stop = written + length; written < stop; ) output[written++] = output[from++];
   }
 }
 
 export function inflateZlib(input, size, checkAdler = true) {
+  const sink =
+    typeof size === 'number' ? { output: new Uint8Array(size) } : { output: new Uint8Array(1024), limit: size.limit };
   if (input.length < 2) throw damaged('is too short for a zlib header');
   const method = input[0],
     flags = input[1];
@@ -190,8 +203,7 @@ export function inflateZlib(input, size, checkAdler = true) {
   if ((method & 15) !== 8 || method >> 4 > 7 || ((method << 8) | flags) % 31 !== 0)
     throw damaged('has no valid zlib header');
   if (flags & 0x20) throw damaged('needs a preset dictionary');
-  const output = new Uint8Array(size),
-    stream = new BitStream(input, 2);
+  const stream = new BitStream(input, 2);
   let written = 0,
     final = 0;
   do {
@@ -206,19 +218,21 @@ export function inflateZlib(input, size, checkAdler = true) {
       if ((length ^ 0xffff) !== check) throw damaged('has a stored block whose length check fails');
       at += 4;
       if (length > input.length - at) throw damaged('ends early');
-      if (length > size - written) throw damaged(`inflates past its ${size} bytes`);
-      output.set(input.subarray(at, at + length), written);
+      if (length > sink.output.length - written) grow(sink, written + length);
+      sink.output.set(input.subarray(at, at + length), written);
       written += length;
       stream.position = at + length;
     } else if (type === 1) {
       const [literals, distances] = fixedCodes();
-      written = huffmanBlock(stream, literals, distances, output, written);
+      written = huffmanBlock(stream, literals, distances, sink, written);
     } else if (type === 2) {
       const [literals, distances] = dynamicCodes(stream);
-      written = huffmanBlock(stream, literals, distances, output, written);
+      written = huffmanBlock(stream, literals, distances, sink, written);
     } else throw damaged('uses the reserved block type 3');
   } while (!final);
-  if (written !== size) throw damaged(`inflates to ${written} bytes, not the ${size} its header states`);
+  if (typeof size === 'number' && written !== size)
+    throw damaged(`inflates to ${written} bytes, not the ${size} its header states`);
+  const output = sink.output.subarray(0, written);
   // RFC 1950 trailer: the Adler-32 of the decompressed bytes, big-endian, after the last block's final byte.
   const at = stream.alignToByte();
   if (input.length - at < 4) throw damaged('ends before its Adler-32 checksum');
