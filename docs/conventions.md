@@ -79,7 +79,7 @@ A name declared and exported by two packages must mean the same thing, or be ren
 | `add`, `sub`, `dot`, `cross`, `length`, `normalize`, `clamp`, `smoothstep` | math, shader | Kept: math's work on CPU numbers/arrays (three.js `MathUtils` names), shader's build GPU nodes (WGSL/TSL names). Note the argument orders differ for `smoothstep`: math `(x, min, max)`, shader `(low, high, x)` as WGSL. Allowlisted. |
 | `fbm`, `ridged`, `domainWarp` | procedural, shader | Kept: CPU noise and its GPU twin in `@margoengine/shader/noise` share names on purpose. Allowlisted. |
 | `multiplyMatrices` | math, animation | math's `multiplyMatrices(a, b, out)` (out = a * b, `out` last like every math helper) is canonical. animation's `(out, a, b)` wrapper is removed or renamed by group B. |
-| `parseColor`, `ColorInput`, `meshWorldMatrix`, `Mat4` | lines, points, text | One definition in math (`math/color`, `math/mesh`, `math`); the packages re-export it. |
+| `parseColor`, `ColorInput`, `meshWorldMatrix`, `Mat4` | lines, points, text | One definition in math (`math/color`, `math/mesh`, `math`); import it from there (the packages no longer re-export `meshWorldMatrix`). |
 | `Input`, `Stage`, `TextureSource` (shader) | input, margoengine, materials, points | Shader's renamed: `NodeInput`, `ShaderStage`, `BindableTexture`. |
 | `projectPoint`, `PickHit`, `Blending`, `TextureSource` (points) | labels, selection, materials, shader | Points' renamed: `projectToPixels`, `PointsPickHit`, `PointsBlending`, `PointsTextureSource`. |
 | `smoothstep` (tween) | math, shader | Tween's easing renamed `easeSmoothstep`. |

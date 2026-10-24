@@ -1,5 +1,5 @@
 export { TextRenderer } from './renderer.js';
-export { meshWorldMatrix } from '@margoengine/math/mesh';
+
 export type { TextRendererOptions } from './renderer.js';
 export { Text } from './text.js';
 export type { TextOptions, TextStyleOptions } from './text.js';

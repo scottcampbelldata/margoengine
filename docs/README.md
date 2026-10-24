@@ -38,7 +38,7 @@ node --test tests/catalog.test.js
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-81 packages in 10 layers, the same as the [catalog](https://margoengine.com/catalog/).
+79 packages in 10 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (2)
 
@@ -57,7 +57,7 @@ node --test tests/catalog.test.js
 | [`@margoengine/stats`](../packages/stats/README.md) | Allocation-free frame samples, DOM performance overlay and optional WebGPU timestamp profiling. |
 | [`@margoengine/inspector`](../packages/inspector/README.md) | Entity hierarchy, live properties, WebGPU wireframe, normal and bounding-box overlays, and a frame debugger. |
 
-### Loading and formats (12)
+### Loading and formats (11)
 
 | Package | What it is |
 | --- | --- |
@@ -67,7 +67,6 @@ node --test tests/catalog.test.js
 | [`@margoengine/decoders`](../packages/decoders/README.md) | Worker-pooled Draco geometry and KTX2/Basis texture decoding, and synchronous PNG reading, for Margo Engine. |
 | [`@margoengine/fbx`](../packages/fbx/README.md) | Binary and ASCII FBX conversion into the optional Margo glTF animation pipeline. |
 | [`@margoengine/usdz`](../packages/usdz/README.md) | Optional static USDA, USDC and USDZ ingestion through Margo glTF PBR. |
-| [`@margoengine/usdz-export`](../packages/usdz-export/README.md) | Static scene USDZ packaging for AR Quick Look. |
 | [`@margoengine/exporters`](../packages/exporters/README.md) | glTF/GLB, STL, OBJ, PLY, USDZ and COLLADA exporters for Margo Engine scenes and geometry data. |
 | [`@margoengine/ifc`](../packages/ifc/README.md) | IFC geometry and BIM identifiers for Margo Engine, using an initialized web-ifc runtime. |
 | [`@margoengine/blender`](../packages/blender/README.md) | Optional offline Blender .margo assets using Margo's WebGPU PBR renderer. |
@@ -126,7 +125,7 @@ node --test tests/catalog.test.js
 | [`@margoengine/wfc`](../packages/wfc/README.md) | Seeded wave function collapse: 3D tile adjacency and the 2D overlapping (sample-based) model with backtracking. |
 | [`@margoengine/splines`](../packages/splines/README.md) | 3D Catmull-Rom, Bezier and Hermite curves with arc-length lookup. |
 
-### Animation and interaction (12)
+### Animation and interaction (11)
 
 | Package | What it is |
 | --- | --- |
@@ -138,7 +137,6 @@ node --test tests/catalog.test.js
 | [`@margoengine/controls`](../packages/controls/README.md) | Orbit, map, trackball, fly, first-person, pointer-lock and collision-aware walkthrough (/walk) camera controls, a transform gizmo and drag controls for Margo Engine. |
 | [`@margoengine/cameras`](../packages/cameras/README.md) | Orthographic projection and exactly vertical (top-down) views for the core camera, with matching culling and picking. |
 | [`@margoengine/input`](../packages/input/README.md) | Semantic keyboard, pointer, gamepad and touch actions with haptics. |
-| [`@margoengine/gizmo`](../packages/gizmo/README.md) | Transform manipulators using the existing controls implementation. |
 | [`@margoengine/viewcube`](../packages/viewcube/README.md) | CAD view cube: shows the camera orientation and animates to top, front, side and isometric views, with a perspective/orthographic toggle. |
 | [`@margoengine/selection`](../packages/selection/README.md) | GPU picking and visible mesh selection outlines. |
 | [`@margoengine/audio`](../packages/audio/README.md) | Web Audio listener, global and positional sounds and a frequency analyser for Margo Engine. |

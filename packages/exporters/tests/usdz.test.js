@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { box, PbrMaterial } from '@margoengine/core';
-import { exportUSDZ } from '../dist/index.js';
+import { exportUSDZ } from '../dist/usdz.js';
 import { parseUSDZ, readZipDirectory, readZipEntry } from '@margoengine/loaders';
 import { headlessEngine } from './helpers.js';
 test('USDZ packages world-space reflected hierarchy and PreviewSurface colors', async () => {

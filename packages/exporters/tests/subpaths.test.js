@@ -1,12 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { exportDAE, exportUSDZ } from '@margoengine/exporters';
+import * as root from '@margoengine/exporters';
+import { exportDAE } from '@margoengine/exporters';
 
-test('USDZ subpath preserves root identity and loads only its serializer', async () => {
+test('USDZ lives only in its subpath, which loads only its serializer', async () => {
   const isolated = await import('@margoengine/exporters/usdz');
   assert.deepEqual(Object.keys(isolated), ['exportUSDZ']);
-  assert.equal(isolated.exportUSDZ, exportUSDZ);
+  assert.equal(typeof isolated.exportUSDZ, 'function');
+  assert.equal('exportUSDZ' in root, false);
   const entry = await readFile(new URL('../dist/usdz.js', import.meta.url), 'utf8');
   assert.match(entry, /from ['"]\.\/scene\.js['"]/);
   assert.doesNotMatch(entry, /from ['"]\.\/(?:index|gltf|stl|obj|ply)\.js['"]/);

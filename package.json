@@ -49,8 +49,6 @@
     "packages/labels",
     "packages/stats",
     "packages/inspector",
-    "packages/gizmo",
-    "packages/usdz-export",
     "packages/tween",
     "packages/quality",
     "packages/materials",

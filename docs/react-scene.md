@@ -9,7 +9,7 @@ Core and the stage facade stay frozen. The layer lives under `@margoengine/react
 | Subpath | What an R3F app gets from Fiber or Drei | What it binds |
 | --- | --- | --- |
 | `@margoengine/react` | `<Canvas>`, `<Mesh>`, `useFrame`, events, Suspense | The stage the canvas already creates |
-| `@margoengine/react/kit` | Loaders, lights, `<Html>`, `<Text>`, gizmos, environment, sky | `gltf-pro`, `fbx`, `environment`, `html`, `text`, `gizmo`, `sky`, `shadows` |
+| `@margoengine/react/kit` | Loaders, lights, `<Html>`, `<Text>`, gizmos, environment, sky | `gltf-pro`, `fbx`, `environment`, `html`, `text`, `controls`, `sky`, `shadows` |
 | `@margoengine/react/post` | Effect composer passes | `post`, `dof`, `tonemap`, `taa` |
 | `@margoengine/react/physics` | Rigid bodies | `physics` |
 | `@margoengine/react/xr` | Immersive session | `xr` |
@@ -22,7 +22,7 @@ The kit is one component per job the engine already implements.
 
 - **Loaders.** `<Gltf>`, `<Fbx>`, `preload(src)`, and a cache keyed by URL. Suspense throws the same promise `preload` starts.
 - **Staging.** `<Environment>`, `<Sky>`, `<ContactShadows>` as a shadow-only ground, and `<Center>` using `worldBounds` from the stage.
-- **Controls.** `<OrbitControls>` exists. Add `<PointerLock>` and `<TransformControls>` from `@margoengine/controls` and `@margoengine/gizmo`.
+- **Controls.** `<OrbitControls>` exists. Add `<PointerLock>` and `<TransformControls>` from `@margoengine/controls`.
 - **Screen.** `<Html>` from `@margoengine/html`. `<Text>` from `@margoengine/text`.
 - **Shapes.** `<Box>`, `<Sphere>`, and `<Plane>` call `@margoengine/geometry` and pass the result to the existing `<Mesh>`. The stage's `sphere()` stays out of this package.
 

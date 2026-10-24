@@ -1,5 +1,5 @@
 export { Lines } from './lines.js';
-export { meshWorldMatrix } from '@margoengine/math/mesh';
+
 export type { LinesOptions } from './lines.js';
 export { Line, LineMaterial } from './line.js';
 export type { LineOptions, LineMaterialOptions } from './line.js';

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { exportGLB, exportOBJ, exportUSDZ } from '@margoengine/exporters';
+import { exportGLB, exportOBJ } from '@margoengine/exporters';
+import { exportUSDZ } from '@margoengine/exporters/usdz';
 import { gridToExportSource } from '../dist/export.js';
 
 const grid = { size: [1, 1, 1], voxels: Uint8Array.of(2) };

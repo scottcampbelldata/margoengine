@@ -15,7 +15,7 @@ import { decodePNG } from '../../../tests/support/png.js';
 import { bigGLB } from '../../../tests/support/big-glb.js';
 import { acPower } from '../cad/power.mjs';
 import { binary, grid } from '../../../packages/fbx/test/fixtures.js';
-import { exportUSDZ } from '../../../packages/exporters/dist/index.js';
+import { exportUSDZ } from '../../../packages/exporters/dist/usdz.js';
 import { torusKnotGeometry, toGeometry } from '../../../packages/geometry/dist/index.js';
 
 const arg = (name, fallback) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;

@@ -10,7 +10,7 @@ import {
 } from '@margoengine/labels';
 import { acquireDepth, compute, group, dispatch } from '../../shared/gpu.js';
 import { resolveMSAA } from '../../shared/msaa.js';
-export { Label, CSS3DObject, projectPoint } from '@margoengine/labels';
+export type { Label, CSS3DObject } from '@margoengine/labels';
 export type { LabelOptions, CSS3DOptions, LabelInfo } from '@margoengine/labels';
 declare const GPUBufferUsage: { STORAGE: number; COPY_DST: number; COPY_SRC: number; MAP_READ: number };
 declare const GPUMapMode: { READ: number };

@@ -99,7 +99,6 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/fbx` | none | none | LICENSE |
 | `@margoengine/fsm` | none | none | LICENSE |
 | `@margoengine/geometry` | none | none | LICENSE |
-| `@margoengine/gizmo` | none | none | LICENSE |
 | `@margoengine/gltf` | none | none | LICENSE |
 | `@margoengine/gltf-pro` | none | none | LICENSE |
 | `@margoengine/html` | none | none | LICENSE |
@@ -146,7 +145,6 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/transitions` | none | none | LICENSE |
 | `@margoengine/tween` | none | none | LICENSE |
 | `@margoengine/usdz` | none | none | LICENSE |
-| `@margoengine/usdz-export` | none | none | LICENSE |
 | `@margoengine/vfx` | none | none | LICENSE |
 | `@margoengine/video` | none | none | LICENSE |
 | `@margoengine/viewcube` | none | none | LICENSE |

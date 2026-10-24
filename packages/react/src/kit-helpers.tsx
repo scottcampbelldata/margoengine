@@ -466,7 +466,7 @@ function TransformBinding({
     let active = true,
       current: GizmoControls | undefined,
       release = () => {};
-    optionalPeer('@margoengine/gizmo', () => import('@margoengine/gizmo'))
+    optionalPeer('@margoengine/controls', () => import('@margoengine/controls'))
       .then(({ TransformControls }) => {
         if (!active || scene.engine.disposed) return;
         current = new TransformControls(scene.engine as unknown as EngineKernel, latest.current);

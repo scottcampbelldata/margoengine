@@ -9,7 +9,8 @@ import {
   type Mesh,
   type PassContext,
 } from '@margoengine/core/extension';
-import { Lines, Line, BoxHelper, VertexNormalsHelper, LightsHelper, meshWorldMatrix } from '@margoengine/lines';
+import { Lines, Line, BoxHelper, VertexNormalsHelper, LightsHelper } from '@margoengine/lines';
+import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { inView } from '../../shared/view-rect.js';
 

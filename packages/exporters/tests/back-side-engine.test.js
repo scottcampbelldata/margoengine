@@ -5,7 +5,8 @@ import { Material, Texture, createMesh } from '@margoengine/materials';
 import { parseGLTF } from '@margoengine/gltf-pro';
 import { readZipDirectory, readZipEntry } from '@margoengine/loaders';
 import { exportModel } from '../dist/model.js';
-import { exportDAE, exportGLTF, exportGLB, exportUSDZ, exportOBJ, exportPLY, exportSTL } from '../dist/index.js';
+import { exportDAE, exportGLTF, exportGLB, exportOBJ, exportPLY, exportSTL } from '../dist/index.js';
+import { exportUSDZ } from '../dist/usdz.js';
 import { headless, headlessModels } from '../../../tests/support/pbr-snapshot.js';
 import { accessor, readGLB, parseOBJ, parsePLY, parseASCIISTL } from './helpers.js';
 

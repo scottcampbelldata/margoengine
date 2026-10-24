@@ -1,5 +1,5 @@
 export { PointsPlugin } from './plugin.js';
-export { meshWorldMatrix } from '@margoengine/math/mesh';
+
 export type { PointsPluginOptions, PointsPickOptions, PointsPickResult } from './plugin.js';
 export { PointCloud } from './cloud.js';
 export type { PointCloudData, PointCloudOptions } from './cloud.js';

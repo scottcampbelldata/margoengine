@@ -5,7 +5,11 @@ import assert from 'node:assert/strict';
 import { refs, versions, time, record } from './compare.js';
 
 const { ref, pin } = refs('f05414a', 'f47ff3f'),
-  { baseline, candidate } = await versions('exporters', ref, undefined, pin);
+  versioned = await versions('exporters', ref, undefined, pin),
+  // exportUSDZ left the package root for its own entry (docs/renames-2026-10-24.md); the candidate reads it there.
+  { exportUSDZ } = (await versions('exporters', ref, 'src/usdz.ts', pin)).candidate,
+  baseline = versioned.baseline,
+  candidate = { ...versioned.candidate, exportUSDZ };
 // Number formatting is shared by every text format, so check it alone first through OBJ `v` lines under an identity
 // transform: both neighbours of every power of ten and two, subnormals, integers, and two million random Float32 bit patterns.
 const bits = new Uint32Array(1),

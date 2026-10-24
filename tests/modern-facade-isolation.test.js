@@ -134,7 +134,6 @@ const optionalPacks = [
   'cinematic',
   'stats',
   'inspector',
-  'gizmo',
   'tween',
   'splines',
   'points',

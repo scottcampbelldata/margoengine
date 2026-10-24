@@ -1,9 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
-import { meshWorldMatrix as pointsMatrix } from '../packages/points/dist/index.js';
-import { meshWorldMatrix as linesMatrix } from '../packages/lines/dist/index.js';
-import { meshWorldMatrix as textMatrix } from '../packages/text/dist/index.js';
+import { meshWorldMatrix } from '../packages/math/dist/mesh.js';
 
 test('attached point, line and text overlays retain mesh matrices and follow ancestor visibility', async () => {
   const store = await TransformStore.create(8),
@@ -21,7 +19,7 @@ test('attached point, line and text overlays retain mesh matrices and follow anc
   child.position.y = 3;
   store.tick(false);
   try {
-    for (const matrix of [pointsMatrix, linesMatrix, textMatrix]) {
+    for (const matrix of [meshWorldMatrix]) {
       assert.deepEqual([...matrix(engine, child)], [...child.matrix]);
       parent.visible = false;
       assert.equal(matrix(engine, child), null, 'Hidden ancestors must hide attached overlays');
@@ -48,7 +46,7 @@ test('attached point, line and text overlays retain mesh matrices and follow anc
       assert.equal(matrix(engine, child)[12], 6);
     }
     child.dispose();
-    for (const matrix of [pointsMatrix, linesMatrix, textMatrix]) assert.equal(matrix(engine, child), null);
+    for (const matrix of [meshWorldMatrix]) assert.equal(matrix(engine, child), null);
   } finally {
     engine.dispose();
   }

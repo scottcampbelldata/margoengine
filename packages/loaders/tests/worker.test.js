@@ -1,7 +1,7 @@
 // HANDOFF 1f.j: the USD worker (dist/workers/usd.js) returns the same LoadedGeometry as parseUSDZ / parseUSDA, byte for byte.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { exportUSDZ } from '@margoengine/exporters';
+import { exportUSDZ } from '@margoengine/exporters/usdz';
 import { torusKnotGeometry, toGeometry } from '@margoengine/geometry';
 import { parseUSDA, parseUSDZ } from '../dist/index.js';
 import { parseUSDZInWorker } from '../dist/worker.js';

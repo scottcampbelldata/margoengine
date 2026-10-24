@@ -186,7 +186,6 @@ import * as module19 from '@margoengine/inspector';
 import * as module20 from '@margoengine/navigation';
 import * as module21 from '@margoengine/tween';
 import * as module22 from '@margoengine/fbx';
-import * as module23 from '@margoengine/usdz-export';
 import * as module24 from '@margoengine/bvh';
 export function capturedVisibilityConsumer(engine: import('@margoengine/core').Engine): boolean[] {
   const projection = module24.RaycastProjection.capture(engine, { orthographicHeight: 10 });
@@ -237,7 +236,6 @@ import * as module29 from '@margoengine/exporters';
 import * as module30 from '@margoengine/decoders';
 import * as module31 from '@margoengine/text';
 import * as module32 from '@margoengine/controls';
-import * as module33 from '@margoengine/gizmo';
 import * as module34 from '@margoengine/points';
 import * as module35 from '@margoengine/audio';
 import * as module36 from '@margoengine/physics';
@@ -267,7 +265,6 @@ export const modules = [
   module20,
   module21,
   module22,
-  module23,
   module24,
   module25,
   module26,
@@ -277,7 +274,6 @@ export const modules = [
   module30,
   module31,
   module32,
-  module33,
   module34,
   module35,
   module36,

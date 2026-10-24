@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@margoengine/lines": "^1.0.0",
+    "@margoengine/math": "^1.0.0",
     "@margoengine/stats": "^1.0.0"
   },
   "peerDependencies": {

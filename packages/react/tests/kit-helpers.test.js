@@ -134,10 +134,6 @@ mock.module('@margoengine/controls', {
         this.updates.push(delta);
       }
     },
-  },
-});
-mock.module('@margoengine/gizmo', {
-  namedExports: {
     TransformControls: class extends Events {
       constructor(engine, options) {
         super();

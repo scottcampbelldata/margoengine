@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { box } from '@margoengine/core';
-import { exportUSDZ } from '@margoengine/exporters';
+import { exportUSDZ } from '@margoengine/exporters/usdz';
 import { parseUSDA, parseUSDZ, parseAny, detectFormat, crc32 } from '../dist/index.js';
 const triangle = `def Mesh "Triangle" {
  point3f[] points = [(0,0,0),(1,0,0),(0,1,0)]
