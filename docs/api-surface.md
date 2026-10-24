@@ -25,10 +25,10 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/clustered | `.` 18, `./shadows` 4, `./area` 6, `./directional` 6, `./ies` 7, `./projector` 7, `./units` 12 | 80 |  | 12,235 |
 | @margoengine/controls | `.` 44, `./walk` 6 | 23 |  | 18,382 |
 | @margoengine/core | `.` 15, `./extension` 23 | 14 |  | 19,120 |
-| @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 17,361 |
-| @margoengine/culling | `.` 6 |  |  | 8,679 |
+| @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 17,623 |
+| @margoengine/culling | `.` 6 |  |  | 8,763 |
 | @margoengine/decoders | `.` 23, `./meshopt` 5 | 1 |  | 478,417 |
-| @margoengine/dof | `.` 2 |  |  | 6,283 |
+| @margoengine/dof | `.` 2 |  |  | 6,446 |
 | @margoengine/ecs | `.` 6 |  |  | 1,350 |
 | @margoengine/environment | `.` 62, `./probes` 8, `./volumetric` 3, `./reflector` 7, `./refractor` 7, `./cube-camera` 4 | 14 |  | 28,010 |
 | @margoengine/exporters | `.` 57, `./usdz` 2, `./model` 6, `./dae` 3, `./capture` 29, `./skin` 9 | 52 |  | 31,824 |
@@ -37,7 +37,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/geometry | `.` 64, `./extras` 6 | 2 |  | 16,079 |
 | @margoengine/gizmo | `.` 12 |  |  | 108 |
 | @margoengine/gltf | `.` 4 |  |  | 5,048 |
-| @margoengine/gltf-pro | `.` 42, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 4, `./worker` 4 | 252 |  | 39,915 |
+| @margoengine/gltf-pro | `.` 42, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 4, `./worker` 4 | 252 |  | 40,229 |
 | @margoengine/html | `.` 8 |  |  | 4,330 |
 | @margoengine/ifc | `.` 4, `./worker` 2 | 3 |  | 2,563 |
 | @margoengine/input | `.` 4 |  |  | 2,297 |
@@ -55,7 +55,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/navigation | `.` 2 |  |  | 989 |
 | @margoengine/navmesh | `.` 4 |  |  | 3,140 |
 | @margoengine/net | `.` 3 |  |  | 1,115 |
-| @margoengine/oit | `.` 2 |  |  | 2,210 |
+| @margoengine/oit | `.` 2 |  |  | 2,273 |
 | @margoengine/physics | `.` 35 | 20 |  | 11,459 |
 | @margoengine/points | `.` 43 | 3 |  | 16,381 |
 | @margoengine/post | `.` 33, `./bloom` 4, `./ssao` 3, `./scene-fade` 4, `./stack` 1, `./fxaa` 1, `./decals` 4, `./ssr` 4, `./gtao` 2, `./ssgi` 2, `./motion-blur` 3, `./lens-flare` 2, `./image` 4, `./smaa` 3, `./glitch` 2, `./afterimage` 2 | 15 |  | 29,701 |
@@ -63,7 +63,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/quality | `.` 17, `./warm` 3 | 1 |  | 1,623 |
 | @margoengine/react | `.` 102, `./kit` 29, `./post` 12, `./physics` 16, `./xr` 12 | 31 |  | 20,966 |
 | @margoengine/road | `.` 3 |  |  | 915 |
-| @margoengine/scatter | `.` 18 | 1 |  | 11,366 |
+| @margoengine/scatter | `.` 18 | 1 |  | 11,427 |
 | @margoengine/scenery | `.` 2, `./sky` 2 |  |  | 218 |
 | @margoengine/selection | `.` 10 |  |  | 12,400 |
 | @margoengine/shader | `.` 142, `./noise` 9, `./graph` 17, `./readback` 4, `./raw` 13, `./effects` 19 | 136 |  | 12,062 |
@@ -73,12 +73,12 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/splines | `.` 3 |  |  | 1,299 |
 | @margoengine/staging | `.` 4 |  |  | 4,890 |
 | @margoengine/stats | `.` 3 |  |  | 4,678 |
-| @margoengine/taa | `.` 7 |  |  | 8,398 |
-| @margoengine/terrain | `.` 13 | 2 |  | 9,513 |
+| @margoengine/taa | `.` 7 |  |  | 8,601 |
+| @margoengine/terrain | `.` 13 | 2 |  | 9,547 |
 | @margoengine/text | `.` 34 | 2 |  | 14,857 |
-| @margoengine/tonemap | `.` 5 |  |  | 7,009 |
-| @margoengine/toon | `.` 3 |  |  | 1,338 |
-| @margoengine/transitions | `.` 2 |  |  | 3,294 |
+| @margoengine/tonemap | `.` 5 |  |  | 7,183 |
+| @margoengine/toon | `.` 3 |  |  | 1,387 |
+| @margoengine/transitions | `.` 2 |  |  | 3,359 |
 | @margoengine/tween | `.` 6 |  |  | 800 |
 | @margoengine/usdz | `.` 7, `./worker` 2 | 24 |  | 7,984 |
 | @margoengine/usdz-export | `.` 9 |  |  | 64 |

@@ -3,14 +3,14 @@
 
 Margo Engine's own code is MIT licensed (`LICENSE`; every tarball ships a copy). This file lists everything else that
 reaches users: npm packages our published packages depend on, third-party code shipped inside our tarballs, and the
-assets the site and examples use. It covers all 82 published packages (80 in `packages/`
+assets the site and examples use. It covers all 83 published packages (81 in `packages/`
 plus `create-margo` and `margo-convert`). `node scripts/supply-chain.mjs --check` (in `npm run verify`, through
 `tests/supply-chain.test.js`) fails when this file is stale, a dependency has no stated reason, a licence is outside
 the allowed list, or a runtime dependency has an install script, a deprecation or a non-registry source.
 
 ## Runtime npm dependencies of published packages (direct and transitive)
 
-71 of 82 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
+72 of 83 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
 Versions are the ones in `package-lock.json`; users get whatever their own lockfile resolves inside our ranges.
 
 | Package | Version (lock) | Licence | Kind | Used by | Why |
@@ -115,6 +115,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `margoengine` | none | none | LICENSE |
 | `@margoengine/materials` | none | Khronos thin-film Fresnel (Apache-2.0) | LICENSE, THIRD_PARTY_NOTICES.md |
 | `@margoengine/math` | none | none | LICENSE |
+| `@margoengine/mesh-edit` | none | none | LICENSE |
 | `@margoengine/navigation` | recast-navigation 0.43.1 (dependency) | none | LICENSE |
 | `@margoengine/navmesh` | none | none | LICENSE |
 | `@margoengine/net` | none | none | LICENSE |

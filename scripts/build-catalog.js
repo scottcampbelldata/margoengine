@@ -100,7 +100,7 @@ const layers = {
     'audio',
   ],
   'Simulation and games': ['physics', 'navigation', 'navmesh', 'ecs', 'fsm', 'net', 'voxel-net'],
-  'CAD and engineering': ['machinery', 'brep', 'bvh', 'geometry'],
+  'CAD and engineering': ['machinery', 'brep', 'bvh', 'geometry', 'mesh-edit'],
   'Frameworks': ['react'],
 };
 const order = Object.values(layers).flat(),

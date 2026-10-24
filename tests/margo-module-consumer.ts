@@ -1,5 +1,48 @@
 import * as module0 from '@margoengine/input';
 import {
+  createPrimitiveMesh,
+  cutMeshFace,
+  compilePolygonMesh,
+  quantizePolygonMesh,
+  cleanupPolygonMeshes,
+  MeshSurfaceQuery,
+  type SurfaceHit,
+  type PolygonMesh,
+  type MeshEditResult,
+} from '@margoengine/mesh-edit';
+import { Matrix4 } from '@margoengine/math';
+
+export function editablePolygonConsumer(): MeshEditResult {
+  const mesh: PolygonMesh = createPrimitiveMesh('cube', 'typed-cube');
+  const edit = cutMeshFace(mesh, mesh.faces[0].id, { createId: () => 'typed-cut' });
+  const matrix = new Matrix4().elements;
+  const snapped = quantizePolygonMesh(edit.mesh, matrix, 0.125);
+  const cleanup = cleanupPolygonMeshes(
+    [{ mesh: snapped.mesh, worldMatrix: matrix, canEdit: true, canOcclude: true, motionGroup: 'static' }],
+    { weld: true },
+  );
+  const sourceFace: string | undefined = compilePolygonMesh(cleanup.results[0].mesh).triangleFaces[0];
+  void sourceFace;
+  const surface = new MeshSurfaceQuery([{ objectId: 'typed', mesh, worldMatrix: matrix }]);
+  const hit: SurfaceHit | undefined = surface.intersect(
+    { origin: [0, 0, 3], direction: [0, 0, -1] },
+    { objectIds: ['typed'], firstHitOnly: true },
+  )[0];
+  void [hit?.barycoord, hit?.localPoint, surface.worldVertices('typed'), surface.triangles(), surface.frame()];
+  const presented: number | undefined = surface.worldFrame().triangles[0]?.a[0];
+  void presented;
+  // @ts-expect-error Surface eligibility is an explicit source ID array.
+  surface.intersect({ origin: [0, 0, 3], direction: [0, 0, -1] }, { objectIds: true });
+  surface.dispose();
+  // @ts-expect-error Only declared low-poly primitives are accepted.
+  createPrimitiveMesh('sphere', 'typed-invalid');
+  // @ts-expect-error Face identity callbacks return string IDs.
+  cutMeshFace(mesh, mesh.faces[0].id, { createId: () => 2 });
+  // @ts-expect-error Cleanup eligibility is explicit boolean policy.
+  cleanupPolygonMeshes([{ mesh, worldMatrix: matrix, canEdit: 'yes', canOcclude: true, motionGroup: 'static' }]);
+  return edit;
+}
+import {
   materialLobes,
   sheen,
   specular,
@@ -145,6 +188,47 @@ import * as module21 from '@margoengine/tween';
 import * as module22 from '@margoengine/fbx';
 import * as module23 from '@margoengine/usdz-export';
 import * as module24 from '@margoengine/bvh';
+export function capturedVisibilityConsumer(engine: import('@margoengine/core').Engine): boolean[] {
+  const projection = module24.RaycastProjection.capture(engine, { orthographicHeight: 10 });
+  const scene = module24.RaycastSnapshot.capture(engine, []);
+  const visibility: module24.RaycastVisibilityQuery = scene.createVisibilityQuery({
+    projection,
+    alphaTexture: { width: 1, height: 1, pixels: [255, 255, 255, 255] },
+  });
+  const depth: module24.RaycastDepthHit | undefined = scene.intersectDepth(
+    projection.setFromCanvas(new module24.Raycaster(), 0, 0),
+  )[0];
+  const point: module24.RaycastProjectedPoint | null = visibility.project([0, 0, 0]);
+  const nearest: module24.RaycastSegmentPoint | null = projection.closestSegmentPoint([0, 0, 0], [1, 0, 0], 0, 0);
+  const line: module24.RaycastProjectedSegment | null = projection.projectSegment([0, 0, 0], [1, 0, 0], {
+    nearPadding: 0.001,
+  });
+  const rectangle: module24.RaycastScreenRectangle = projection.rectangle(10, 10, 0, 0);
+  const segmentIterator: IterableIterator<module24.RaycastSegmentPoint> = rectangle.segmentSamples(
+    [0, 0, 0],
+    [1, 0, 0],
+  );
+  void [
+    nearest,
+    line,
+    segmentIterator.next(),
+    rectangle.canvasSamples(),
+    rectangle.project([0, 0, 0]),
+    projection.pointDistance([0, 0, 0], 0, 0),
+  ];
+  const result = visibility.visibleMany([[0, 0, 0]]);
+  void [depth, point, visibility.depthAtCanvas(0, 0)];
+  if (false) {
+    // @ts-expect-error Visibility side policy uses declared ray sides.
+    scene.createVisibilityQuery({ side: 'invisible' });
+    // @ts-expect-error Near padding is a finite numeric world-depth offset.
+    projection.projectSegment([0, 0, 0], [1, 0, 0], { nearPadding: '1' });
+  }
+  visibility.dispose();
+  scene.dispose();
+  projection.dispose();
+  return result;
+}
 import * as module25 from '@margoengine/lines';
 import * as module26 from '@margoengine/environment';
 import * as module27 from '@margoengine/geometry';
