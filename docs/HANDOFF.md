@@ -12,6 +12,9 @@ animation/sampling, loaders/common, loaders/usd, geometry/shapes, geometry/primi
 usdz worker entries load their main-thread fallback with `import()`. No renames; list in
 [renames-2026-10-24.md](renames-2026-10-24.md). The 28 leaks left are real layering (entries that build a gltf-pro
 `PBRModel`, raycast with bvh, or draw lines and text); making them lazy would make synchronous APIs async.
+Follow-up: `controls/orbit`, `controls/transform`, `controls/drag` and `controls/profiles` entries. No materials split:
+bundlers already drop `createMesh` and gltf-pro when an app imports only `Material`/`Texture` (21,232 B startup gzip,
+72,082 B with `createMesh`), and a Material is only drawn through `createMesh`.
 
 ## Landed 2026-10-24: quality gate (`npm run quality`, in verify and CI)
 

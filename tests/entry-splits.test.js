@@ -17,6 +17,11 @@ const splits = [
   ['@margoengine/geometry/shapes', '@margoengine/geometry'],
   ['@margoengine/geometry/primitives', '@margoengine/geometry'],
   ['@margoengine/geometry/utils', '@margoengine/geometry'],
+  ['@margoengine/controls/orbit', '@margoengine/controls'],
+  ['@margoengine/controls/transform', '@margoengine/controls'],
+  ['@margoengine/controls/profiles', '@margoengine/controls'],
+  // DragControls picks with bvh's Raycaster.
+  ['@margoengine/controls/drag', '@margoengine/controls', ['@margoengine/bvh']],
 ];
 
 /** Bare specifiers a dist file loads statically, following its relative imports (type-only imports are erased). */
@@ -42,10 +47,23 @@ for (const [sub, whole] of splits)
   });
 
 test('the split entries load no other package beyond core and math', () => {
-  for (const [sub] of splits) {
+  for (const [sub, , allowed = []] of splits) {
     const [, pkg, entry] = /^@margoengine\/([^/]+)\/(.+)$/.exec(sub);
     const foreign = [...staticImports(dist(pkg, entry))].filter((s) => !/^@margoengine\/(core|math)(\/|$)/.test(s));
-    assert.deepEqual(foreign, [], sub);
+    assert.deepEqual(foreign, allowed, sub);
+  }
+});
+
+test('the orbit and transform entries load no fly, first-person, trackball or drag code', () => {
+  for (const entry of ['orbit', 'transform']) {
+    const files = new Set();
+    staticImports(dist('controls', entry), files);
+    const names = [...files].map((file) => file.replace(/^.*[\\/]/, ''));
+    assert.ok(names.length > 1, entry);
+    assert.ok(
+      names.every((name) => !/^(fly|first-person|pointer-lock|trackball|drag)[.-]/.test(name)),
+      entry,
+    );
   }
 });
 

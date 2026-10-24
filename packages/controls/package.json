@@ -21,6 +21,22 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./orbit": {
+      "types": "./dist/orbit.d.ts",
+      "import": "./dist/orbit.js"
+    },
+    "./transform": {
+      "types": "./dist/transform.d.ts",
+      "import": "./dist/transform.js"
+    },
+    "./drag": {
+      "types": "./dist/drag.d.ts",
+      "import": "./dist/drag.js"
+    },
+    "./profiles": {
+      "types": "./dist/profiles.d.ts",
+      "import": "./dist/profiles.js"
+    },
     "./walk": {
       "types": "./dist/walk.d.ts",
       "import": "./dist/walk.js"

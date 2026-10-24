@@ -134,6 +134,11 @@ Every control has `enabled`, `connect(element)`, `disconnect()`, `update(delta)`
 
 `DragControls` casts the pointer ray with a bvh `Raycaster` (`setFromEngine`, then `intersectObjects` on its `objects`), so it follows layers, `filter` and material sides, and works with orthographic cameras from @margoengine/cameras, whose rays start on the near plane. The drag plane passes through the grabbed point; with `axis` it contains the axis and faces the camera as far as it can. Each move intersects the new pointer ray with that plane and sets the object's position in its parent's space, so parented meshes follow the pointer. A grab stops later pointer-down listeners on the element and captures the pointer; touch uses the primary pointer and ignores other fingers. Pass your own `raycaster` to share layers and filters.
 
+The root exports every control. An app that uses a few imports their entries instead, so the others stay out of its
+module graph: `@margoengine/controls/orbit` (`OrbitControls`, `MapControls`, `MOUSE`, `TOUCH`, the `Controls` base),
+`@margoengine/controls/transform` (`TransformControls` and its types), `@margoengine/controls/drag` (`DragControls`;
+loads bvh) and `@margoengine/controls/profiles` (the navigation profiles). They are the same classes as the root's.
+
 ## Navigation profiles
 
 Engineers get the mouse, wheel, touch and keys of the tool they know, in one call:

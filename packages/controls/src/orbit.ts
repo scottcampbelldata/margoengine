@@ -11,6 +11,8 @@ import { add, cross, dot, sub } from '@margoengine/math/vec3';
 import { clamp } from '@margoengine/math/mathutils';
 import { basis, intersectPlane, ray } from './view.js';
 import type { KeyAction, NavigationProfile } from './profiles.js';
+// `@margoengine/controls/orbit` serves this module, so it carries the base class the orbit controls attach through.
+export { Controls };
 
 /** Mouse button actions. */
 export const MOUSE = { ROTATE: 0, DOLLY: 1, PAN: 2 } as const;
