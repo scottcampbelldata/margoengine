@@ -1,5 +1,5 @@
 {
-  "commit": "c385b2ce",
+  "commit": "18cede0a",
   "dirty": false,
   "browser": "msedge 156.0.4314.42 headless",
   "adapter": "nvidia ampere",
@@ -11,8 +11,8 @@
       "encoding": "identity",
       "transferred": 808,
       "raw": 558,
-      "gzip": 370,
-      "brotli": 227
+      "gzip": 372,
+      "brotli": 230
     },
     {
       "path": "assets/geometry-CQ78uYbM.js",
@@ -24,13 +24,13 @@
       "brotli": 1032
     },
     {
-      "path": "assets/index-ClW1odj-.js",
+      "path": "assets/index-CZLGt-Q4.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 24104,
+      "transferred": 24106,
       "raw": 59734,
-      "gzip": 23723,
-      "brotli": 20858
+      "gzip": 23725,
+      "brotli": 20857
     },
     {
       "path": "assets/extension-DuYhGmhk.js",
@@ -42,13 +42,13 @@
       "brotli": 44
     },
     {
-      "path": "assets/dist-CozdyMyF.js",
+      "path": "assets/dist-CsqJxiS6.js",
       "role": "@margoengine/gltf (app.load)",
       "encoding": "gzip",
-      "transferred": 5675,
-      "raw": 12827,
-      "gzip": 5303,
-      "brotli": 4764
+      "transferred": 5684,
+      "raw": 12848,
+      "gzip": 5312,
+      "brotli": 4778
     },
     {
       "path": "model.glb",
@@ -62,10 +62,10 @@
   ],
   "total": {
     "requests": 6,
-    "transferred": 34040,
-    "raw": 76778,
-    "gzip": 31023,
-    "brotli": 27284
+    "transferred": 34051,
+    "raw": 76799,
+    "gzip": 31036,
+    "brotli": 27300
   },
   "notFetched": [
     {
@@ -85,8 +85,8 @@
       "raw": 17626
     },
     {
-      "path": "assets/dist-7GDmpwI7.js",
-      "raw": 87813
+      "path": "assets/dist-BJ-WyuQ7.js",
+      "raw": 87877
     },
     {
       "path": "assets/dist-BkanMCkI.js",
@@ -97,12 +97,12 @@
       "raw": 61049
     },
     {
-      "path": "assets/dist-recUg52g.js",
-      "raw": 41254
+      "path": "assets/dist-CVLR-kq4.js",
+      "raw": 41482
     },
     {
-      "path": "assets/dist-rSleZwAr.js",
-      "raw": 35614
+      "path": "assets/dist-X3HwIIFT.js",
+      "raw": 35667
     },
     {
       "path": "assets/occt-import-js-BhHfLpto.wasm",

@@ -1,7 +1,7 @@
 {
   "gate": "api",
   "about": "undocumented public exports (tsdoc), bare Error throws and throw messages that name no fix, per file",
-  "total": 1845,
+  "total": 1839,
   "history": [
     {
       "date": "2026-10-24",
@@ -186,7 +186,7 @@
     "no-fix packages/exporters/src/stl.ts": 1,
     "no-fix packages/exporters/src/unity-precision.ts": 1,
     "no-fix packages/exporters/src/unreal-precision.ts": 1,
-    "no-fix packages/exporters/src/usdz.ts": 4,
+    "no-fix packages/exporters/src/usdz.ts": 1,
     "no-fix packages/fbx/src/animation.ts": 27,
     "no-fix packages/fbx/src/convert.ts": 1,
     "no-fix packages/fbx/src/document.ts": 7,
@@ -407,7 +407,6 @@
     "tsdoc audio PositionalAudioOptions": 1,
     "tsdoc audio Vec3": 1,
     "tsdoc blender MargoAsset": 1,
-    "tsdoc blender loadMargo": 1,
     "tsdoc blender parseMargo": 1,
     "tsdoc controls ControlEvent": 1,
     "tsdoc controls ControlListener": 1,
@@ -444,12 +443,10 @@
     "tsdoc exporters STLOptions": 1,
     "tsdoc exporters SceneOptions": 1,
     "tsdoc exporters SkinData": 1,
-    "tsdoc exporters USDZOptions": 1,
     "tsdoc fbx FBXOptions": 1,
     "tsdoc fbx loadFBX": 1,
     "tsdoc fbx parseFBX": 1,
     "tsdoc gltf Model": 1,
-    "tsdoc gltf loadGLTF": 1,
     "tsdoc gltf parseGLTF": 1,
     "tsdoc gltf-pro CoreSceneBuffers": 1,
     "tsdoc gltf-pro GLTFAsset": 1,
