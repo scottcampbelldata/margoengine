@@ -3,6 +3,7 @@ export type {
   Vec3,
   GeometryLike,
   TriangleSource,
+  BVHPositions,
   Ray,
   RaycastOptions,
   BVHHit,

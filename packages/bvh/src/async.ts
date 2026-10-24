@@ -22,7 +22,7 @@ interface Pending {
 interface Reply extends Partial<BVHData> {
   id: number;
   error?: string;
-  positions?: Float32Array | null;
+  positions?: Float32Array | Float64Array | null;
   indices?: Uint32Array | null;
 }
 

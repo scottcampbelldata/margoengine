@@ -1,4 +1,13 @@
-import { buildBVH, checkSource, INTERNAL_FLAG, NODE_WORDS, type BVHBuildOptions, type BVHData } from './build.js';
+import {
+  buildBVH,
+  checkSource,
+  ceilFloat32,
+  floorFloat32,
+  INTERNAL_FLAG,
+  NODE_WORDS,
+  type BVHBuildOptions,
+  type BVHData,
+} from './build.js';
 import { invertMatrix } from '@margoengine/math/mat4';
 import {
   closestPointTriangle,
@@ -24,7 +33,16 @@ export interface TriangleSource {
   indices?: ArrayLike<number> | null;
   normals?: ArrayLike<number> | null;
   stride?: number;
+  /**
+   * Storage of `positions` read by queries and `refit`. 'float32' (default) uses a Float32Array as is and converts
+   * anything else; 'float64' uses a Float64Array as is (not copied) and converts anything else, so triangle tests,
+   * hit points and barycentric weights keep full double precision. Node bounds stay float32, rounded outward so no
+   * hit is lost. Normals are float32 either way.
+   */
+  precision?: 'float32' | 'float64';
 }
+/** Vertex positions of a MeshBVH: float32 unless its source asked for `precision: 'float64'`. */
+export type BVHPositions = Float32Array | Float64Array;
 /** A ray: `origin + t * direction`. The direction need not be normalized; distances are t * |direction|. */
 export interface Ray {
   origin: ArrayLike<number>;
@@ -130,7 +148,7 @@ const EPS = 1e-7;
 const MAGIC = 0x48564256; // 'VBVH'
 
 interface Attributes {
-  positions: Float32Array;
+  positions: BVHPositions;
   stride: number;
   normals: Float32Array | null;
   normalStride: number;
@@ -146,8 +164,12 @@ function attributes(source: GeometryLike | TriangleSource): Attributes {
   if (isGeometry(source))
     return { positions: source.vertices, stride: 6, normals: source.vertices, normalStride: 6, normalOffset: 3 };
   if (!source || !source.positions) throw new TypeError('Expected a Geometry or {positions, indices}');
-  const stride = source.stride ?? 3;
-  const positions = source.positions instanceof Float32Array ? source.positions : Float32Array.from(source.positions);
+  const stride = source.stride ?? 3,
+    precision = source.precision ?? 'float32';
+  if (precision !== 'float32' && precision !== 'float64')
+    throw new TypeError(`Triangle source precision ${String(precision)} is invalid; use 'float32' or 'float64'.`);
+  const Storage = precision === 'float64' ? Float64Array : Float32Array,
+    positions = source.positions instanceof Storage ? source.positions : Storage.from(source.positions);
   const normals = source.normals
     ? source.normals instanceof Float32Array
       ? source.normals
@@ -160,7 +182,7 @@ function attributes(source: GeometryLike | TriangleSource): Attributes {
 
 /** Triangle source description handed to the build worker. */
 export function sourceArrays(source: GeometryLike | TriangleSource): {
-  positions: Float32Array;
+  positions: BVHPositions;
   stride: number;
   indices: Uint32Array | null;
 } {
@@ -191,8 +213,11 @@ export class MeshBVH {
   readonly index: Uint32Array;
   /** Original face index of every triangle in leaf order. */
   readonly triangles: Uint32Array;
-  /** Positions read by queries and `refit` (not copied: edits followed by `refit()` are picked up). */
-  readonly positions: Float32Array;
+  /**
+   * Positions read by queries and `refit` (not copied: edits followed by `refit()` are picked up). A Float64Array
+   * only for a source with `precision: 'float64'`.
+   */
+  readonly positions: BVHPositions;
   readonly stride: number;
   readonly normals: Float32Array | null;
   private readonly normalStride: number;
@@ -211,7 +236,9 @@ export class MeshBVH {
     // Preserve geometry identity and reuse already converted raw attributes when wrapping the result.
     return new MeshBVH(
       buildBVH(a.positions, a.stride, indices, options),
-      isGeometry(source) ? source : { positions: a.positions, stride: a.stride, normals: a.normals },
+      isGeometry(source)
+        ? source
+        : { positions: a.positions, stride: a.stride, normals: a.normals, precision: source.precision },
     );
   }
 
@@ -359,17 +386,18 @@ export class MeshBVH {
           if (z < z0) z0 = z;
           if (z > z1) z1 = z;
         }
-        f[w] = x0;
-        f[w + 1] = y0;
-        f[w + 2] = z0;
-        f[w + 3] = x1;
-        f[w + 4] = y1;
-        f[w + 5] = z1;
+        // Outward rounding: float64 positions never fall outside their float32 leaf box.
+        f[w] = floorFloat32(x0);
+        f[w + 1] = floorFloat32(y0);
+        f[w + 2] = floorFloat32(z0);
+        f[w + 3] = ceilFloat32(x1);
+        f[w + 4] = ceilFloat32(y1);
+        f[w + 5] = ceilFloat32(z1);
       }
     }
   }
 
-  /** Nearest hit along the ray, or null. */
+  /** Nearest hit along the ray, or null. Equal distances resolve to the lowest face index, as in `raycast`. */
   raycastFirst(ray: Ray, options: RaycastOptions = {}): BVHHit | null {
     const { origin: o, direction: d } = ray,
       [tmin, tmax, length] = rayRange(d, options),
@@ -463,7 +491,8 @@ export class MeshBVH {
             best,
             HIT,
           ) &&
-          (HIT[0] < best || bestSlot < 0)
+          // Equal distances keep the lowest face index, so the result is raycast()[0] whatever the traversal order.
+          (bestSlot < 0 || HIT[0] < best || (HIT[0] === best && this.triangles[k] < this.triangles[bestSlot]))
         ) {
           best = HIT[0];
           bestSlot = k;
@@ -1218,7 +1247,7 @@ function boxDistanceSq(f: Float32Array, w: number, px: number, py: number, pz: n
 
 /** Loads triangle `slot` (leaf order) into out, optionally transformed by m. */
 function loadTriangle(
-  P: Float32Array,
+  P: BVHPositions,
   s: number,
   index: Uint32Array,
   slot: number,

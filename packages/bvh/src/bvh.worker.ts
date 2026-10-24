@@ -3,7 +3,7 @@ import { buildBVH, type BVHBuildOptions } from './build.js';
 
 interface BuildRequest {
   id: number;
-  positions: Float32Array;
+  positions: Float32Array | Float64Array;
   stride: number;
   indices: Uint32Array | null;
   options: BVHBuildOptions;

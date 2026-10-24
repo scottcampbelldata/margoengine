@@ -38,6 +38,28 @@ export function resolveOptions(options: BVHBuildOptions = {}): Required<BVHBuild
   return { maxLeafTriangles, maxDepth, bins, strategy };
 }
 
+const F32 = new Float32Array(1),
+  BITS = new Int32Array(F32.buffer);
+
+/** @internal Largest float32 value <= x (x itself when it is a float32). */
+export function floorFloat32(x: number): number {
+  const f = Math.fround(x);
+  if (f <= x || f !== f) return f;
+  if (f === 0) return -1.401298464324817e-45;
+  F32[0] = f;
+  BITS[0] += f > 0 ? -1 : 1;
+  return F32[0];
+}
+/** @internal Smallest float32 value >= x (x itself when it is a float32). */
+export function ceilFloat32(x: number): number {
+  const f = Math.fround(x);
+  if (f >= x || f !== f) return f;
+  if (f === 0) return 1.401298464324817e-45;
+  F32[0] = f;
+  BITS[0] += f > 0 ? 1 : -1;
+  return F32[0];
+}
+
 /** Validates vertex data and returns the triangle count. */
 export function checkSource(positions: ArrayLike<number>, stride: number, indices: ArrayLike<number> | null): number {
   if (!Number.isInteger(stride) || stride < 3) throw new RangeError('stride must be an integer >= 3');
@@ -74,8 +96,9 @@ export function buildBVH(
         pc = positions[c + k];
       if (!Number.isFinite(pa) || !Number.isFinite(pb) || !Number.isFinite(pc))
         throw new RangeError('Positions must be finite');
-      boxes[t * 6 + k] = pa < pb ? (pa < pc ? pa : pc) : pb < pc ? pb : pc;
-      boxes[t * 6 + 3 + k] = pa > pb ? (pa > pc ? pa : pc) : pb > pc ? pb : pc;
+      // Rounded outward, so float64 positions stay inside their float32 boxes (exact for float32 positions).
+      boxes[t * 6 + k] = floorFloat32(pa < pb ? (pa < pc ? pa : pc) : pb < pc ? pb : pc);
+      boxes[t * 6 + 3 + k] = ceilFloat32(pa > pb ? (pa > pc ? pa : pc) : pb > pc ? pb : pc);
     }
     order[t] = t;
   }

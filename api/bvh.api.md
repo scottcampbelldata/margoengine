@@ -35,6 +35,8 @@ export interface BVHHit {
     frontFace: boolean;
 }
 
+export type BVHPositions = Float32Array | Float64Array;
+
 export interface BakeAmbientOcclusion {
     strength?: number;
     rays?: number;
@@ -114,7 +116,7 @@ export class MeshBVH {
     readonly nodeData: Uint32Array;
     readonly index: Uint32Array;
     readonly triangles: Uint32Array;
-    readonly positions: Float32Array;
+    readonly positions: BVHPositions;
     readonly stride: number;
     readonly normals: Float32Array | null;
     static fromGeometry(geometry: GeometryLike, options?: BVHBuildOptions): MeshBVH;
@@ -387,6 +389,7 @@ export interface TriangleSource {
     indices?: ArrayLike<number> | null;
     normals?: ArrayLike<number> | null;
     stride?: number;
+    precision?: 'float32' | 'float64';
 }
 
 export type Vec3 = [number, number, number];
