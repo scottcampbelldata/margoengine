@@ -41,14 +41,18 @@ Later sessions shrink them (`--update`) and never grow them without `--reason`. 
 ## Landed 2026-10-24: Codex's work/changes (multi-view, voxel, lightmap, exporters, AgX)
 
 Codex's `work/changes` (82cef03e, 100 commits) was reviewed, rewritten and landed as per-change commits. Multiple
-views and scenes are in core as Scott's approved freeze exception: core + stage 22,253 B gzip (core 20,015), 2,747 B
+views and scenes are in core as Scott's approved freeze exception: core + stage 22,253 B gzip (core 20,015) at that landing; 22,403 B (core 20,155) after the duplicate cleanup, 2,597 B
 under the 25,000 B gate. Every package is view-aware ([multi-view-roadmap.md](multi-view-roadmap.md)); only the M7
 CAD demos are open. One clean-room AgX in `packages/shared/agx.js`. Public renames for the apps:
 [renames-2026-10-24.md](renames-2026-10-24.md). Removed until done properly: voxel slab and stair shapes.
 Checks at landing: `npm run check:merge` (4,405 tests, proofs 20/20, visual 62/62, `check:views`) and hygiene with no
-gate worse than main for the packages touched. Left for the dedupe session: the hidden-ancestor walk repeated in
-about 9 packages, GGX direct light copied in about 9 packages, `usdz-export` re-exporting `exporters/usdz`, the
-exporters root re-exporting `exportUSDZ`.
+gate worse than main for the packages touched.
+Duplicate cleanup (2026-10-24): the duplicates gate went from 92 items (1,182 duplicated lines) to 4 (15). Shared
+work lives in math or `packages/shared` (fog, visibility, CRC-32, PNG, GLB, accessors, inflate, GGX, casters,
+passes, mips, bytes ...); `gizmo` and `usdz-export` are removed (79 packages). Survivors: core keeps its own
+`#rrggbb` check and GGX text (frozen, size-capped; core depends on nothing), `margoengine` re-exports core (it is
+the stage facade), and lines/text share a 12-line method shape. navigation (a Recast wrapper) vs navmesh waits for
+the clean-room rewrite. Renames: [renames-2026-10-24.md](renames-2026-10-24.md).
 The full WebGL2 fallback is paused by Scott (2026-10-24) until his apps ship: [webgl2-compat-roadmap.md](webgl2-compat-roadmap.md),
 which also records what visitors without WebGPU see today (every site demo: a needs-WebGPU message, `check:no-webgpu`).
 

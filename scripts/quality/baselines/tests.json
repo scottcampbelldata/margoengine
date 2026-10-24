@@ -1,7 +1,7 @@
 {
   "gate": "tests",
   "about": "packages with no test in verify; public entries no test imports",
-  "total": 49,
+  "total": 48,
   "history": [
     {
       "date": "2026-10-24",
@@ -31,7 +31,6 @@
     "unimported @margoengine/math/frustum": 1,
     "unimported @margoengine/math/matrix3": 1,
     "unimported @margoengine/math/matrix4": 1,
-    "unimported @margoengine/math/mesh": 1,
     "unimported @margoengine/math/plane": 1,
     "unimported @margoengine/math/quaternion": 1,
     "unimported @margoengine/math/ray": 1,
