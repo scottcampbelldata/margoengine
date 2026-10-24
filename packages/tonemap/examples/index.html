@@ -12,6 +12,9 @@
 <label for="exposure">Exposure <output id="exposure-value">0 stops</output><input id="exposure" type="range" min="-6" max="6" step="0.1" value="0"></label>
 <label for="contrast">Contrast <output id="contrast-value">1</output><input id="contrast" type="range" min="0" max="3" step="0.05" value="1"></label>
 <label for="lut">.cube LUT (2–65 samples per axis)<input id="lut" type="file" accept=".cube,text/plain"></label><button id="clear-lut" type="button">Clear LUT</button>
-</fieldset><p id="status" role="status">Starting WebGPU…</p>
-<script type="module" src="./main.ts"></script>
+</fieldset><p id="status" data-webgpu-status role="status">Starting WebGPU…</p>
+<script type="module">
+  import { needsWebGPU } from '../../../examples/needs-webgpu.js';
+  needsWebGPU('#viewport').then((ok) => ok && import('./main.ts'));
+</script>
 </body></html>

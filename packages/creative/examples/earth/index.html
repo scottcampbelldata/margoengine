@@ -65,11 +65,14 @@
         </fieldset>
         <p id="quality"></p>
         <p class="help" id="navigation-help">Drag to orbit; scroll or pinch to zoom. With the view focused, use arrow keys to orbit, + / − to zoom, and Home to reset.</p>
-        <p id="status" role="status">Loading Earth textures…</p>
+        <p id="status" data-webgpu-status role="status">Loading Earth textures…</p>
         <p id="error" role="alert" hidden></p>
         <footer>Day imagery: <a href="https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-map/">NASA Blue Marble</a>.<br />Other maps: <a href="https://www.solarsystemscope.com/textures/">Solar System Scope</a>, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.</footer>
       </aside>
     </main>
-    <script type="module" src="./main.ts"></script>
+    <script type="module">
+      import { needsWebGPU } from '../../../../examples/needs-webgpu.js';
+      needsWebGPU('#viewport').then((ok) => ok && import('./main.ts'));
+    </script>
   </body>
 </html>

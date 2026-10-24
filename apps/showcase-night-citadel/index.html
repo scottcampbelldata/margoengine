@@ -151,7 +151,10 @@
         <div><output id="draws">—</output><span>PBR BATCHES</span></div>
       </div>
     </footer>
-    <p id="status" class="status" role="status">Preparing the citadel…</p>
-    <script type="module" src="./src/main.ts"></script>
+    <p id="status" data-webgpu-status class="status" role="status">Preparing the citadel…</p>
+    <script type="module">
+      import { needsWebGPU } from '../../examples/needs-webgpu.js';
+      needsWebGPU('#scene').then((ok) => ok && import('./src/main.ts'));
+    </script>
   </body>
 </html>

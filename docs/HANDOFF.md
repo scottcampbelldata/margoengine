@@ -49,7 +49,8 @@ Checks at landing: `npm run check:merge` (4,405 tests, proofs 20/20, visual 62/6
 gate worse than main for the packages touched. Left for the dedupe session: the hidden-ancestor walk repeated in
 about 9 packages, GGX direct light copied in about 9 packages, `usdz-export` re-exporting `exporters/usdz`, the
 exporters root re-exporting `exportUSDZ`.
-The full WebGL2 fallback follows in the next version: [webgl2-compat-roadmap.md](webgl2-compat-roadmap.md).
+The full WebGL2 fallback is paused by Scott (2026-10-24) until his apps ship: [webgl2-compat-roadmap.md](webgl2-compat-roadmap.md),
+which also records what visitors without WebGPU see today (every site demo: a needs-WebGPU message, `check:no-webgpu`).
 
 ## Landed 2026-10-24: Codex's Margo Mesh engine work (codex/mesh-rotation-visibility)
 

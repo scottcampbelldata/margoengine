@@ -16,9 +16,9 @@
   <div id="toast" role="status"></div>
   <div id="hotbar-label" aria-hidden="true"></div>
   <div id="hotbar" aria-label="Hotbar"></div>
-  <section id="overlay" data-state="loading">
+  <section id="overlay" data-state="loading" data-webgpu-status>
     <h1>Voxel sandbox</h1>
-    <p id="overlay-status" role="status">Starting WebGPU</p>
+    <p id="overlay-status" data-webgpu-status role="status">Starting WebGPU</p>
     <p class="play">Click to play</p>
     <dl>
       <dt>WASD</dt><dd>move</dd>
@@ -36,6 +36,9 @@
     </dl>
     <pre id="error" hidden></pre>
   </section>
-  <script type="module" src="./src/main.ts"></script>
+  <script type="module">
+    import { needsWebGPU } from '../needs-webgpu.js';
+    needsWebGPU('#scene').then((ok) => ok && import('./src/main.ts'));
+  </script>
 </body>
 </html>

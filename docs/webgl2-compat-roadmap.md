@@ -1,6 +1,23 @@
 # WebGL2 compatibility layer: roadmap for the next version
 
-Date: 2026-10-21. Status: planned for the version after v1.0.0. Nothing here is implemented yet.
+Date: 2026-10-21. Status: PAUSED by Scott on 2026-10-24 until his apps ship (few of his customers lack WebGPU, and his apps run on Electron, which has it). Before that it was planned for the version after v1.0.0. Nothing here is implemented yet.
+
+## What visitors without WebGPU see today (2026-10-24)
+
+- **Site demos.** Every live demo on margoengine.com (Night Citadel, the gameplay sandbox, the voxel sandbox, flight
+  helmet, character animation, robot, windy meadow, Tokyo corner, earth, DOF, tonemap, animator and light-keeper) loads
+  [examples/needs-webgpu.js](../examples/needs-webgpu.js) first. Without WebGPU (no `navigator.gpu`, or
+  `requestAdapter()` answers null) it shows "This demo needs a browser with WebGPU: Chrome, Edge or Safari." in the
+  canvas area, with a link to [webgpu.html](../site/webgpu.html) on which browser to update, and the demo's own code
+  is never downloaded. None of the demos runs on the WebGL2 preview: each needs effects, particles, skinning or compute.
+  The landing page draws no scene. `npm run check:no-webgpu` (part of `check:merge`) loads every page both ways and
+  fails on a missing message or any uncaught error.
+- **Apps on the engine.** `Engine.create` (and `createStage`) reject with `WebGPU unavailable` unless the app passes
+  `fallback: webglRenderer` from `@margoengine/webgl`. With it, core meshes draw on WebGL2 (per-pixel PBR from each
+  mesh's constant colour, one directional light plus ambient, no textures, effects or picking). Packages that need
+  WebGPU throw `MargoError` code `unsupported` naming themselves; core's `engine.pick` throws `WebGPU required`.
+  Covered by [webgl-preview.test.js](../tests/webgl-preview.test.js) in `npm run verify` and by the pixel readback in
+  `check:no-webgpu`.
 
 ## Summary
 

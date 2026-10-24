@@ -19,7 +19,7 @@
       <h1 id="title">Afterlight</h1>
       <p class="description">One island. A million points of light.<br>A world in motion, built on Margo.</p>
       <button id="explore" disabled>Preparing your world <span aria-hidden="true">↗</span></button>
-      <p id="status" role="status">Initializing WebGPU and procedural terrain…</p>
+      <p id="status" data-webgpu-status role="status">Initializing WebGPU and procedural terrain…</p>
       <details id="error-details" hidden><summary>Technical error details</summary><pre id="error-message" tabindex="0"></pre></details>
     </section>
     <div class="world-label" aria-hidden="true"><span>THE AMBER COAST</span><small>Procedural terrain / golden hour</small></div>
@@ -35,6 +35,9 @@
     <div id="touch-controls" aria-label="Touch movement and camera controls"></div>
     <noscript>This interactive showcase needs JavaScript and a WebGPU-capable browser.</noscript>
   </main>
-  <script type="module" src="/src/main.ts"></script>
+  <script type="module">
+    import { needsWebGPU } from '../needs-webgpu.js';
+    needsWebGPU('#scene').then((ok) => ok && import('/src/main.ts'));
+  </script>
 </body>
 </html>

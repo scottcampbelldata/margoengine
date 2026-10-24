@@ -12,6 +12,9 @@
 <label for="length">Focal length <output id="length-value">160 mm</output><input id="length" type="range" min="20" max="200" step="1" value="160"></label>
 <label for="aperture">Aperture <output id="aperture-value">f/0.7</output><input id="aperture" type="range" min="0.5" max="16" step="0.1" value="0.7"></label>
 <label for="enabled">Depth of field<input id="enabled" type="checkbox" checked></label>
-</fieldset><p id="status" role="status">Starting WebGPU…</p>
-<script type="module" src="./main.ts"></script>
+</fieldset><p id="status" data-webgpu-status role="status">Starting WebGPU…</p>
+<script type="module">
+  import { needsWebGPU } from '../../../examples/needs-webgpu.js';
+  needsWebGPU('#viewport').then((ok) => ok && import('./main.ts'));
+</script>
 </body></html>

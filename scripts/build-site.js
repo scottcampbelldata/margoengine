@@ -19,9 +19,18 @@ const names = {
   chunkFileNames: 'assets/[name]-[hash:10].js',
   assetFileNames: 'assets/[name]-[hash:10][extname]',
 };
+// Demo pages import their own code only once examples/needs-webgpu.js finds WebGPU. Rollup drops a dynamically
+// imported module whose exports go unused when its package says "sideEffects": false (dof, tonemap, animator and
+// creative's earth demo left a 20-277 B main chunk), so demo sources keep their side effects.
+const demoSources = {
+  name: 'margo-site-demo-sources',
+  transform: (code, id) =>
+    id.includes('/examples/') && !id.includes('/node_modules/') ? { code, map: null, moduleSideEffects: true } : null,
+};
 const site = (config) =>
   build({
     ...config,
+    plugins: [...(config.plugins ?? []), demoSources],
     logLevel: 'warn',
     worker: { rollupOptions: { output: names } },
     build: { ...config.build, emptyOutDir: true, rollupOptions: { ...config.build.rollupOptions, output: names } },

@@ -14,7 +14,10 @@
 <label for="wander">Target wanders<input id="wander" type="checkbox" checked></label>
 <label for="iterations">Sweeps per frame <output id="iterations-value">16</output><input id="iterations" type="range" min="1" max="32" step="1" value="16"></label>
 <label for="weight">IK weight <output id="weight-value">1</output><input id="weight" type="range" min="0" max="1" step="0.05" value="1"></label>
-</fieldset><p id="solve" role="status" aria-live="off"></p><p id="status" role="status">Starting WebGPU…</p>
+</fieldset><p id="solve" role="status" aria-live="off"></p><p id="status" data-webgpu-status role="status">Starting WebGPU…</p>
 <p><small>Drag the orange sphere to move the target; drag elsewhere to orbit. Turning the reach step off runs plain CCD, which stays short of targets near full reach.</small></p>
-<script type="module" src="./main.ts"></script>
+<script type="module">
+  import { needsWebGPU } from '../../../examples/needs-webgpu.js';
+  needsWebGPU('#viewport').then((ok) => ok && import('./main.ts'));
+</script>
 </body></html>

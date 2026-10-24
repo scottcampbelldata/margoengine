@@ -51,9 +51,12 @@
     <div class="buttons"><button id="pause" type="button" aria-pressed="false">Pause motion</button><button id="reset-view" type="button">Reset view</button></div>
     <small id="quality"></small>
     <small id="navigation-help">Focus the scene: arrow keys orbit, + / − zoom.</small>
-    <small id="status" role="status">Starting WebGPU…</small>
+    <small id="status" data-webgpu-status role="status">Starting WebGPU…</small>
     <p id="error" role="alert"></p>
   </aside>
-  <script type="module" src="./windy-meadow.ts"></script>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./windy-meadow.ts'));
+  </script>
 </body>
 </html>

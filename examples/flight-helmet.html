@@ -12,10 +12,13 @@
     <h1>Flight helmet</h1>
     <p>Leather, rubber, brass and glass on a wooden stand. Drag to orbit; scroll to zoom.</p>
     <label class="check"><input id="ssao" type="checkbox" checked disabled> Ambient occlusion</label>
-    <p id="status" role="status">Loading model…</p><p id="error" role="alert"></p>
+    <p id="status" data-webgpu-status role="status">Loading model…</p><p id="error" role="alert"></p>
     <small>Focus the scene: arrow keys orbit, + / − zoom.</small>
     <small>Flight Helmet from the Khronos glTF Sample Assets, CC0 (glTF conversion by Gary Hsu). <a href="https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/FlightHelmet">Asset source</a>.</small>
   </aside>
-  <script type="module" src="./extension-demo.ts"></script>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./extension-demo.ts'));
+  </script>
 </body>
 </html>

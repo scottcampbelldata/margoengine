@@ -20,7 +20,7 @@
       <label for="target-x">Side to side <output id="target-x-value">50%</output></label><input id="target-x" type="range" min="0" max="1" step="0.001" value="0.5" aria-label="Side to side: outward to across the front">
       <label for="target-y">Height <output id="target-y-value">50%</output></label><input id="target-y" type="range" min="0" max="1" step="0.001" value="0.5" aria-label="Height: arm at side to overhead">
       <label for="target-z">Near & far <output id="target-z-value">50%</output></label><input id="target-z" type="range" min="0" max="1" step="0.001" value="0.5" aria-label="Near and far: folded, down at side, then forward">
-      <div class="readout"><span id="reach-state" role="status">Preparing workshop…</span><output id="distance">—</output></div>
+      <div class="readout"><span id="reach-state" data-webgpu-status role="status">Preparing workshop…</span><output id="distance">—</output></div>
       <h3>OPTIONS</h3>
       <label class="toggle"><span>Inverse kinematics</span><input id="ik-enabled" type="checkbox" checked></label>
       <label class="toggle"><span>Show arm rig</span><input id="show-rig" type="checkbox"></label>
@@ -42,6 +42,9 @@
     <div class="panel-signoff"><i></i><p>CURIOSITY TURNS<br>IDEAS INTO MOTION.</p><span>❧</span></div>
     <p class="credits">An original robot & workshop, made in Blender.<br>Scanned wood & stone: <a href="https://polyhaven.com/license" target="_blank" rel="noopener">Poly Haven · CC0</a>.<br>Rendered with Margo Engine. <a href="https://threejs.org/examples/#webgl_animation_skinning_ik" target="_blank" rel="noopener">Interaction inspiration ↗</a></p>
   </aside>
-  <script type="module" src="./skinning-ik/main.ts"></script>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./skinning-ik/main.ts'));
+  </script>
 </body>
 </html>
