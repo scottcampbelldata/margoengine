@@ -30,6 +30,7 @@ import {
   depthPassDescriptor,
   displacementGroup,
   drawCaster,
+  staleCaster,
 } from '../../shared/caster.js';
 export { cascadeSplits, fitCascades } from './cascades.js';
 export type { ShadowFilter } from './shader.js';
@@ -1040,15 +1041,7 @@ export class Shadows implements EnginePlugin {
     const identity = p.primitive ?? p.index,
       records = nodeRecords(this.draws, p.node);
     let record = records.get(identity);
-    if (
-      !record ||
-      record.vertex !== p.vertex ||
-      record.pipeline !== pipeline ||
-      record.alpha !== p.alphaTexture ||
-      record.sampler !== p.alphaSampler ||
-      record.section !== section?.buffer ||
-      record.displacement !== displacement
-    ) {
+    if (staleCaster(record, p, pipeline, displacement) || record.section !== section?.buffer) {
       if (record) for (const b of record.uniforms) b.destroy();
       records.delete(identity);
       const uniforms: GPUBuffer[] = [],

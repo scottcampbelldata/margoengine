@@ -16,7 +16,7 @@ import type { PBRModel, PBRTransmission } from '@margoengine/gltf-pro';
 import { sceneTarget } from '../../shared/msaa.js';
 import { applyView } from '../../shared/view-rect.js';
 import { currentFrame, retire } from '../../shared/frame-resources.js';
-import { webgpuPass, alphaBlend } from '../../shared/pass.js';
+import { groupCode, webgpuPass, alphaBlend } from '../../shared/pass.js';
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; RENDER_ATTACHMENT: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
@@ -142,9 +142,7 @@ export class Transmission implements EnginePlugin, PBRTransmission {
   }
   /** @internal gltf-pro transmission hook. */
   declarations(group: number): string {
-    let code = this.code.get(group);
-    if (!code) this.code.set(group, (code = declarations(group)));
-    return code;
+    return groupCode(this.code, group, declarations);
   }
   /** @internal gltf-pro transmission hook. */
   bindings(): GPUBindGroupEntry[] {

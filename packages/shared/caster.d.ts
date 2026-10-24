@@ -45,3 +45,10 @@ export function drawCaster(
   displaced: GPUBindGroup | undefined,
   instances: { upload(device: GPUDevice): GPUBuffer; count: number } | undefined | null,
 ): void;
+/** Whether a caster's cached draw `record` no longer fits primitive `p` drawn with `pipeline` and `displacement`. */
+export function staleCaster<R extends object>(
+  record: R | undefined,
+  p: { vertex: GPUBuffer; alphaTexture?: unknown; alphaSampler?: unknown },
+  pipeline: GPURenderPipeline,
+  displacement: unknown,
+): record is undefined;

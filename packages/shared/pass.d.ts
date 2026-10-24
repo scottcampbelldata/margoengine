@@ -15,3 +15,5 @@ export function webgpuPass(
   order: number,
   run: (context: Context) => void,
 ): { name: string; order: number; execute(context: PassContext): void };
+/** The WGSL `make(group)` builds for bind group `group`, made once per group and kept in `cache`. */
+export function groupCode(cache: Map<number, string>, group: number, make: (group: number) => string): string;

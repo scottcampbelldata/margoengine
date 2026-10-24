@@ -14,6 +14,7 @@ import {
   depthPassDescriptor,
   displacementGroup,
   drawCaster,
+  staleCaster,
 } from '../../shared/caster.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUTextureUsage: {
@@ -553,14 +554,7 @@ export class LocalShadowMaps {
     const identity = p.primitive ?? p.index,
       records = nodeRecords(this.draws, p.node);
     let record = records.get(identity);
-    if (
-      !record ||
-      record.vertex !== p.vertex ||
-      record.pipeline !== pipeline ||
-      record.alpha !== p.alphaTexture ||
-      record.sampler !== p.alphaSampler ||
-      record.displacement !== displacement
-    ) {
+    if (staleCaster(record, p, pipeline, displacement)) {
       if (record) this.destroyDraw(record);
       records.delete(identity);
       record = {

@@ -34,3 +34,10 @@ export const webgpuPass = (name, order, run) => ({
     if (context.backend === 'webgpu') run(context);
   },
 });
+
+/** The WGSL `make(group)` builds for bind group `group`, made once per group and kept in `cache`. */
+export function groupCode(cache, group, make) {
+  let code = cache.get(group);
+  if (code === undefined) cache.set(group, (code = make(group)));
+  return code;
+}

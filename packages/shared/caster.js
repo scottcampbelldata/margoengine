@@ -100,3 +100,12 @@ export function drawCaster(pass, device, pipeline, group, uniform, values, view,
     pass.drawIndexed(p.count, instances.count);
   } else pass.drawIndexed(p.count);
 }
+
+/** Whether a caster's cached draw `record` no longer fits primitive `p` drawn with `pipeline` and `displacement`. */
+export const staleCaster = (record, p, pipeline, displacement) =>
+  !record ||
+  record.vertex !== p.vertex ||
+  record.pipeline !== pipeline ||
+  record.alpha !== p.alphaTexture ||
+  record.sampler !== p.alphaSampler ||
+  record.displacement !== displacement;
