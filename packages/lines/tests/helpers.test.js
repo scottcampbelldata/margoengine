@@ -296,7 +296,7 @@ test('CameraHelper unprojects a reversed-Z frustum and keeps unchanged frames', 
       assert.ok(has([10 * x, 10 * y, -5]), `far corner ${x},${y}`);
     }
   assert.ok(has([0, 0, 5]), 'eye');
-  check(helper, 'CameraHelper fov90 pos[0,0,5] near1 far10 aspect1 (layout from three.js: NOT binding)');
+  check(helper, 'CameraHelper fov90 pos[0,0,5] near1 far10 aspect1 (vertex layout not binding)');
   // Five colours, both ends of each segment equal.
   const colours = new Set();
   for (let i = 0; i < helper.count; i += 2) {

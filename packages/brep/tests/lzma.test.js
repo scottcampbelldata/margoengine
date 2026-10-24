@@ -515,9 +515,9 @@ test('LZMA2 / XZ framing: control bytes, missing properties, literal settings, f
     const blocks = [
       [blockHeader(), [...lit('one ', 3), 0]],
       [blockHeader(), [...stored(1, ascii('two ')), 0]],
-      [blockHeader(), [...lit('three', 3), 0]],
+      [blockHeader(), [...lit('six', 3), 0]],
     ];
-    assert.equal(text(inflateXZ(xz(blocks, check))), 'one two three');
+    assert.equal(text(inflateXZ(xz(blocks, check))), 'one two six');
   }
   // A packed size past the input.
   const cut = one(lit('abcdefgh', 3));

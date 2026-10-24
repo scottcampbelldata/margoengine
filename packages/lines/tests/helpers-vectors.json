@@ -1191,7 +1191,7 @@
    "pointCount": 12,
    "totalLength": 27.31371
   },
-  "CameraHelper fov90 pos[0,0,5] near1 far10 aspect1 (layout from three.js: NOT binding)": {
+  "CameraHelper fov90 pos[0,0,5] near1 far10 aspect1 (vertex layout not binding)": {
    "bounds": {
     "min": [
      -10,
