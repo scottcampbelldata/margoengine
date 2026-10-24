@@ -8,6 +8,21 @@ Multiple views and scenes are the very next work after the visual-parity pass: t
 sizes, milestones and the decisions Scott still has to make are in [multi-view-roadmap.md](multi-view-roadmap.md).
 The full WebGL2 fallback follows in the next version: [webgl2-compat-roadmap.md](webgl2-compat-roadmap.md).
 
+## Landed 2026-10-24: Codex's Margo Mesh engine work (codex/mesh-rotation-visibility)
+
+Rebased, cleaned and landed as 12 commits; core + stage unchanged at 21,343 B gzip.
+
+- New optional `@margoengine/mesh-edit`: engine-free polygon editing (face edits, components, quad-ring cuts,
+  region inset/extrude, delete, cleanup, quantize), UV and CPU paint kernels, `MeshPaintSession`, `MeshSurfaceQuery`
+  (on `@margoengine/bvh/tree`). Public names lost the `MeshEdit` prefix; the old-to-new list is in the commit report.
+- `@margoengine/bvh`: `RaycastSnapshot`, `RaycastProjection`, `RaycastVisibilityQuery`, screen queries; float64
+  positions option and the engine-free `./tree` entry; shared raycast helpers (faster angled rays).
+- `@margoengine/exporters`: `./godot` and `./unity` import bundles (Unity C# compiled against 6000.6 + glTFast 6.20),
+  `ExportNode.retainedVisibility` (KHR_node_visibility); `splitGLB` now uses the safe JSON parser.
+- Fixes kept with their tests: Euler near both poles (math `euler-poles`), editor pointer capture and exact top/bottom
+  views (controls `orbit-ownership-poles`, to keep through the planned controls rewrite), gltf-pro KHR_node_visibility
+  import with hidden lights, and `parseGLTFAsync` decoding images by default.
+
 ## Resume here (2026-10-19, moving from the laptop to scott dev)
 
 State on GitHub: `main` has everything finished (see the next two paragraphs). Branch `wip/voxel-phase4-renderer`
