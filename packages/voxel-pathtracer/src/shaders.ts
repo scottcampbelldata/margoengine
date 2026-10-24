@@ -65,6 +65,7 @@ import {
   INSTANCE_WORDS,
   MODEL_WORDS,
 } from './layout.js';
+import { ggxDenominator } from '../../shared/light-terms.js';
 
 /** Frame uniform shared by the trace and ids entry points (layout in layout.ts, FRAME_BYTES). */
 const FRAME = /* wgsl */ `
@@ -129,7 +130,7 @@ fn basis(n:vec3f)->mat3x3f {
  let s=select(-1.0,1.0,n.z>=0.0);let a=-1.0/(s+n.z);let b=n.x*n.y*a;
  return mat3x3f(vec3f(1.0+s*n.x*n.x*a,s*b,-s*n.x),vec3f(b,s+n.y*n.y*a,-n.y),n);
 }
-fn ggxD(a2:f32,nh:f32)->f32 {let k=nh*nh*(a2-1.0)+1.0;return a2/(PI*k*k);}
+fn ggxD(a2:f32,nh:f32)->f32 {let k=${ggxDenominator('a2', 'nh', true)};return a2/(PI*k*k);}
 fn lambdaG(a2:f32,c:f32)->f32 {let c2=max(c*c,1e-8);return 0.5*(sqrt(1.0+a2*(1.0-c2)/c2)-1.0);}
 fn fresnel(ci:f32,eta:f32)->f32 {
  let s2=eta*eta*max(0.0,1.0-ci*ci);

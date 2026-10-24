@@ -4,6 +4,7 @@
 // Equirect convention: u = 0.5 + atan2(d.x, -d.z) / 2PI (image center faces -Z, +X is right of center),
 // v = acos(d.y) / PI (row 0 is straight up, +Y).
 import { displayShader } from '../../shared/display.js';
+import { ggxDenominator } from '../../shared/light-terms.js';
 
 export const common = /* wgsl */ `
 const PI = 3.141592653589793;
@@ -102,7 +103,7 @@ struct Params { roughness: f32, sourceSize: f32, samples: u32, lod0: f32, face: 
       let l = 2.0 * hl.z * h - n;
       let nl = dot(n, l);
       if (nl > 0.0) {
-        let q = hl.z * hl.z * (a2 - 1.0) + 1.0;
+        let q = ${ggxDenominator('a2', 'hl.z', true)};
         let pdf = a2 / (PI * q * q) * 0.25; // D * NdotH / (4 VdotH) with V = N
         let sampleSolidAngle = 1.0 / (f32(params.samples) * pdf + 1e-6);
         let lod = max(0.5 * log2(sampleSolidAngle / texelSolidAngle) + 1.0, params.lod0);

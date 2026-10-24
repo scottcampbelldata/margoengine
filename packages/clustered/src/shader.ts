@@ -1,4 +1,4 @@
-import { legacyTerms, decayTerms, clusterBrdf, clusterCell } from '../../shared/light-terms.js';
+import { legacyTerms, decayTerms, clusterBrdf, clusterCell, ggxD, smithG } from '../../shared/light-terms.js';
 const declarations = (group: number) => /* wgsl */ `
 struct ClusterFrame {view:mat4x4f,grid:vec4u,screen:vec4f,depth:vec4f,intensity:vec4f}
 struct ClusterLight {positionRange:vec4f,colorIntensity:vec4f,directionOuter:vec4f,params:vec4f}
@@ -45,8 +45,8 @@ const directionalLoop = (shadow: string) => /* wgsl */ `
   for(var j=0u;j<clusterDirectional.count.x;j++){
     let light=clusterDirectional.lights[j];let l=light.toLight.xyz;let h=(v+l)/max(length(v+l),0.0001);
     let nl=clamp(dot(n,l),0.0,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
-    let d=a2/(3.14159265*pow(nh*nh*(a2-1)+1,2.0));
-    let g=2*nv/(nv+sqrt(a2+(1-a2)*nv*nv))*2*nl/max(nl+sqrt(a2+(1-a2)*nl*nl),0.0001);
+    let d=${ggxD('a2', 'nh')};
+    let g=${smithG('a2', 'nv', 'nl')};
     let f0=mix(vec3f(0.04),base,metal);let fresnel=f0+(1-f0)*pow(1-vh,5.0);
     result+=${clusterBrdf}*nl*light.color.rgb${shadow};
   }`;
@@ -104,8 +104,8 @@ ${clusterCell('position')}
     ${terms.length ? 'let index=clusterIndices[cell*1024u+j];let light=clusterLights[index];' : 'let light=clusterLights[clusterIndices[cell*1024u+j]];'}let delta=light.positionRange.xyz-position;let distance=length(delta);
     if(distance>=light.positionRange.w){continue;}let l=delta/max(distance,0.0001);let h=(v+l)/max(length(v+l),0.0001);
     let nl=clamp(dot(n,l),0.0,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
-    let d=a2/(3.14159265*pow(nh*nh*(a2-1)+1,2.0));
-    let g=2*nv/(nv+sqrt(a2+(1-a2)*nv*nv))*2*nl/max(nl+sqrt(a2+(1-a2)*nl*nl),0.0001);
+    let d=${ggxD('a2', 'nh')};
+    let g=${smithG('a2', 'nv', 'nl')};
     let f0=mix(vec3f(0.04),base,metal);let fresnel=f0+(1-f0)*pow(1-vh,5.0);
     ${decay ? decayTerms : legacyTerms}
     result+=${clusterBrdf}*nl*light.colorIntensity.rgb*light.colorIntensity.w*falloff*cone${terms.map((t) => '*' + t.term).join('')}${hook ? term('clusterShadow(light,position,n)') : ''}${shadows ? term('clusterShadowVisibility(light,position,n)') : ''};

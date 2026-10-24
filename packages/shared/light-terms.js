@@ -27,3 +27,18 @@ export const clusterCell = (
   let near=clusterFrame.depth.x;let far=clusterFrame.depth.y;
   let z=min(u32(max(0.0,select(log(depth/near)/log(far/near),(depth-near)/(far-near),clusterFrame.intensity.w>0.5)*f32(grid.z))),grid.z-1);
   let cell=xy.x+grid.x*(xy.y+grid.y*z);let count=clusterCounts[cell];var result=vec3f(0);`;
+
+// The GGX (Trowbridge-Reitz) microfacet terms every PBR shader in the engine writes, as source text over the caller's
+// variable names (WGSL; GLSL takes the same text with `float`). `float` writes 1.0 and 2.0 instead of 1 and 2, the
+// spelling GLSL needs and some shaders use, so each shader's text stays as it was.
+const one = (float) => (float ? '1.0' : '1');
+/** GGX distribution denominator `nh^2 (a2 - 1) + 1` (`a2` = roughness^4). */
+export const ggxDenominator = (a2, nh, float = false) => `${nh}*${nh}*(${a2}-${one(float)})+${one(float)}`;
+/** GGX normal distribution `a2 / (pi (nh^2 (a2 - 1) + 1)^2)`. */
+export const ggxD = (a2, nh, float = false) => `${a2}/(3.14159265*pow(${ggxDenominator(a2, nh, float)},2.0))`;
+/** Smith-GGX geometry term (uncorrelated, both directions). */
+export const smithG = (a2, nv, nl, float = false) => {
+  const o = one(float),
+    t = float ? '2.0' : '2';
+  return `${t}*${nv}/(${nv}+sqrt(${a2}+(${o}-${a2})*${nv}*${nv}))*${t}*${nl}/max(${nl}+sqrt(${a2}+(${o}-${a2})*${nl}*${nl}),0.0001)`;
+};

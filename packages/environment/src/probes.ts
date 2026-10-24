@@ -16,6 +16,7 @@ import { evaluateSH } from './sh.js';
 import { halfToFloat } from './half.js';
 import { common } from './shaders.js';
 import { captureDevice } from './capture-device.js';
+import { ggxDenominator } from '../../shared/light-terms.js';
 
 declare const GPUBufferUsage: {
   UNIFORM: number;
@@ -345,7 +346,7 @@ var<workgroup> texelSum:array<vec4f,64>;
   var sum=vec4f(0);
   for(var j=0u;j<m*m;j++){
     let p=octDecode((vec2f(f32(j%m),f32(j/m))+0.5)/f32(m));let r=length(p);let l=p/r;let nl=dot(n,l);if(nl<=0.0){continue;}
-    let nh=dot(n,normalize(n+l));let q=nh*nh*(a2-1.0)+1.0;let w=a2/(q*q)*nl/(r*r*r);
+    let nh=dot(n,normalize(n+l));let q=${ggxDenominator('a2', 'nh', true)};let w=a2/(q*q)*nl/(r*r*r);
     sum+=vec4f(probeTexel(bake.source+j)*w,w);
   }
   store(bake.offset+id.y*s+id.x,sum.rgb/max(sum.a,1e-20));
