@@ -1,453 +1,489 @@
-// EXT_meshopt_compression / KHR_meshopt_compression decoding: a pure TypeScript port of the meshoptimizer reference decoder
-// (vertex codec v0/v1, index codec v0/v1, index sequence, OCTAHEDRAL/QUATERNION/EXPONENTIAL/COLOR filters).
-// Output matches the reference SIMD decoder bit for bit. Synchronous and dependency-free.
+// glTF meshopt bufferView decoding, written from the KHR_meshopt_compression and EXT_meshopt_compression extension
+// specifications (Appendix A "Bitstream", Appendix B "Filters", Appendix C "Differences"). Covers the attribute codec
+// in versions 0 and 1, the triangle and index-sequence codecs, and the OCTAHEDRAL, QUATERNION, EXPONENTIAL and COLOR
+// filters. Synchronous, dependency-free, and every read is bounds checked before it happens.
 
-function meshoptDecodeBytes(src: Uint8Array, pos: number, end: number, buffer: Uint8Array, size: number): number {
-  const headerSize = ((size >> 4) + 3) >> 2;
-  if (end - pos < headerSize) throw new Error('EXT_meshopt_compression: truncated vertex stream');
-  const hdr = pos;
-  pos += headerSize;
-  for (let i = 0; i < size; i += 16) {
-    if (end - pos < 24) throw new Error('EXT_meshopt_compression: truncated vertex stream');
-    const gi = i >> 4;
-    const bits = (src[hdr + (gi >> 2)] >> ((gi & 3) << 1)) & 3;
-    if (bits === 0) {
-      buffer.fill(0, i, i + 16);
-    } else if (bits === 1) {
-      let v = pos + 4;
-      for (let b = 0, o = i; b < 4; b++, o += 4) {
-        // Four 2-bit codes per byte, high bits first; code 3 means the value follows as a whole byte.
-        const byte = src[pos + b],
-          e0 = byte >> 6,
-          e1 = (byte >> 4) & 3,
-          e2 = (byte >> 2) & 3,
-          e3 = byte & 3;
-        buffer[o] = e0 === 3 ? src[v++] : e0;
-        buffer[o + 1] = e1 === 3 ? src[v++] : e1;
-        buffer[o + 2] = e2 === 3 ? src[v++] : e2;
-        buffer[o + 3] = e3 === 3 ? src[v++] : e3;
-      }
-      pos = v;
-    } else if (bits === 2) {
-      let v = pos + 8;
-      for (let b = 0; b < 8; b++) {
-        const byte = src[pos + b];
-        const hi = byte >> 4,
-          lo = byte & 15;
-        buffer[i + b * 2] = hi === 15 ? src[v++] : hi;
-        buffer[i + b * 2 + 1] = lo === 15 ? src[v++] : lo;
-      }
-      pos = v;
-    } else {
-      for (let b = 0; b < 16; b++) buffer[i + b] = src[pos + b];
-      pos += 16;
-    }
-  }
-  return pos;
-}
+const PREFIX = 'EXT_meshopt_compression: ';
+const fail = (message: string): never => {
+  throw new Error(PREFIX + message);
+};
+const failRange = (message: string): never => {
+  throw new RangeError(PREFIX + message);
+};
 
-// Group widths in bits by header code: version 0, then version 1 under byte control modes 0 and 1.
-const V1_BITS = [
+// ------------------------------------------------------------------------------------------------ attribute codec
+
+/** Largest number of bytes one 16-element group can occupy: 8 bytes of 4-bit codes plus 16 escape bytes. */
+const GROUP_MAX_BYTES = 24;
+
+/**
+ * Bits per delta for each 2-bit group header. 8 means the group stores 16 raw delta bytes; 0 means all deltas are 0.
+ * Version 0 has one table; version 1 picks one of two per byte lane through the block's control header.
+ */
+const WIDTHS_V0 = [0, 2, 4, 8];
+const WIDTHS_V1 = [
   [0, 1, 2, 4],
   [1, 2, 4, 8],
 ];
 
 /**
- * Vertex codec version 1 (KHR_meshopt_compression): per-byte control modes (zero, raw, or 1/2/4/8-bit groups) and
- * per-4-byte channel modes (byte deltas, 16-bit deltas, rotated 32-bit XOR). Integer-only, so the port is exact.
+ * Reads one group of 16 deltas of `bits` bits each at `pos` into `out[at..at+16]`. Values with every bit set are
+ * escapes: their real value is the next byte after the packed codes. Returns the position after the group.
  */
-function meshoptDecodeVertexV1(target: Uint8Array, count: number, size: number, src: Uint8Array): void {
-  const tailSize = size + size / 4,
-    end = src.length - Math.max(tailSize, 24);
-  if (end < 1) throw new Error('EXT_meshopt_compression: truncated vertex stream');
-  const last = src.slice(src.length - tailSize, src.length - size / 4),
-    channels = src.subarray(src.length - size / 4);
-  for (const c of channels) if ((c & 3) === 3) throw new Error('EXT_meshopt_compression: invalid vertex channel mode');
-  const blockMax = Math.min((8192 / size) & ~15, 256),
-    deltas = new Uint8Array(blockMax * size),
-    // Every read below stays inside src: a group reads at most 24 bytes (8 code bytes + 16 escapes), the
-    // reference decoder's per-group limit, and the tail (at least 24 bytes) follows valid data.
-    need = (n: number) => {
-      if (src.length - pos < n) throw new RangeError('EXT_meshopt_compression: truncated vertex stream');
-    };
+function readGroup(src: Uint8Array, pos: number, bits: number, out: Uint8Array, at: number): number {
+  if (bits === 0) {
+    out.fill(0, at, at + 16);
+    return pos;
+  }
+  if (bits === 8) {
+    for (let i = 0; i < 16; i++) out[at + i] = src[pos + i];
+    return pos + 16;
+  }
+  let escape = pos + bits * 2;
+  if (bits === 1) {
+    // Least significant bit first, 8 deltas per byte.
+    for (let i = 0; i < 16; i++) {
+      const v = (src[pos + (i >> 3)] >> (i & 7)) & 1;
+      out[at + i] = v === 1 ? src[escape++] : 0;
+    }
+  } else if (bits === 2) {
+    // Most significant pair first, 4 deltas per byte.
+    for (let i = 0; i < 16; i++) {
+      const v = (src[pos + (i >> 2)] >> (6 - 2 * (i & 3))) & 3;
+      out[at + i] = v === 3 ? src[escape++] : v;
+    }
+  } else {
+    // High nibble first, 2 deltas per byte.
+    for (let i = 0; i < 16; i++) {
+      const v = (src[pos + (i >> 1)] >> (4 - 4 * (i & 1))) & 15;
+      out[at + i] = v === 15 ? src[escape++] : v;
+    }
+  }
+  return escape;
+}
+
+/** Zigzag decoding at 8, 16 and 32 bits: the low bit is the sign. */
+const unzig8 = (v: number): number => (v & 1 ? ~(v >> 1) : v >> 1) & 0xff;
+const unzig16 = (v: number): number => (v & 1 ? ~(v >> 1) : v >> 1) & 0xffff;
+
+/**
+ * Decodes an attribute stream (codec version 0 or 1) into `target`: `count` elements of `size` bytes, interleaved.
+ * Filters are not applied here.
+ */
+export function meshoptDecodeVertexBuffer(target: Uint8Array, count: number, size: number, src: Uint8Array): void {
+  if (!Number.isInteger(size) || size < 1 || size > 256 || size % 4 !== 0)
+    fail(`invalid ATTRIBUTES byteStride ${size}`);
+  if (!Number.isSafeInteger(count) || count < 0 || target.length < count * size)
+    failRange('invalid count or output size');
+  const length = src.length;
+  if (length < 1 + size) fail('truncated vertex stream');
+  const header = src[0];
+  if (header >> 4 !== 0xa) fail('bad vertex stream header');
+  const version = header & 15;
+  if (version > 1) fail(`vertex codec version ${version} is not supported (only versions 0 and 1)`);
+  const channels = size >> 2;
+  const v1 = version === 1;
+  if (v1 && length < 1 + size + channels) fail('truncated vertex stream');
+  const tailSize = v1 ? Math.max(24, size + channels) : Math.max(32, size);
+  const baselineAt = length - size - (v1 ? channels : 0);
+  const modesAt = length - channels;
+
+  // The running value of every byte of the element, starting from the tail's baseline element.
+  const prev = new Uint8Array(size);
+  for (let i = 0; i < size; i++) prev[i] = src[baselineAt + i];
+
+  const blockMax = Math.min(Math.floor(8192 / size) & ~15, 256);
+  // Deltas for one block, one 256-byte row per byte lane.
+  const lanes = new Uint8Array(size * 256);
   let pos = 1;
-  for (let vo = 0; vo < count; vo += blockMax) {
-    const bc = Math.min(blockMax, count - vo),
-      groups = (bc + 15) >> 4,
-      headerSize = (groups + 3) >> 2,
-      control = pos;
-    need(size / 4);
-    pos += size / 4;
-    deltas.fill(0);
-    for (let k = 0; k < size; k++) {
-      const mode = (src[control + (k >> 2)] >> ((k & 3) << 1)) & 3,
-        base = k * bc;
-      if (mode === 2) continue;
-      if (mode === 3) {
-        need(bc);
-        deltas.set(src.subarray(pos, pos + bc), base);
-        pos += bc;
-        continue;
-      }
-      const header = pos;
-      need(headerSize);
-      pos += headerSize;
-      for (let g = 0; g < groups; g++) {
-        need(24);
-        const bits = V1_BITS[mode][(src[header + (g >> 2)] >> ((g & 3) << 1)) & 3],
-          o = base + (g << 4),
-          n = Math.min(16, bc - (g << 4));
-        if (bits === 8) {
-          deltas.set(src.subarray(pos, pos + n), o);
-          pos += 16;
+  let checkedModes = false;
+
+  for (let start = 0; start < count; start += blockMax) {
+    const n = Math.min(count - start, blockMax);
+    const groups = (n + 15) >> 4;
+    let controlAt = 0;
+    if (v1) {
+      if (pos + channels > length) fail('truncated vertex stream');
+      controlAt = pos;
+      pos += channels;
+    }
+    for (let lane = 0; lane < size; lane++) {
+      const row = lane * 256;
+      let widths = WIDTHS_V0;
+      if (v1) {
+        const control = (src[controlAt + (lane >> 2)] >> ((lane & 3) * 2)) & 3;
+        if (control === 2) {
+          lanes.fill(0, row, row + groups * 16);
           continue;
         }
-        if (!bits) continue;
-        // Sentinel codes: the all-ones value means a whole byte follows. 1-bit codes are LSB first, 2- and 4-bit MSB first.
-        const width = bits << 1,
-          sentinel = (1 << bits) - 1,
-          codes = pos;
-        pos += width;
-        for (let m = 0; m < 16; m++) {
-          const shift = bits === 1 ? m & 7 : 8 - bits - (m & (8 / bits - 1)) * bits;
-          let d = (src[codes + Math.floor((m * bits) / 8)] >> shift) & sentinel;
-          if (d === sentinel) d = src[pos++];
-          if (m < n) deltas[o + m] = d;
+        if (control === 3) {
+          // Literal lane: one raw delta byte per element, no group headers.
+          if (length - pos < n + GROUP_MAX_BYTES) fail('truncated vertex stream');
+          for (let i = 0; i < n; i++) lanes[row + i] = src[pos + i];
+          pos += n;
+          continue;
+        }
+        widths = WIDTHS_V1[control];
+      }
+      const headerBytes = (groups + 3) >> 2;
+      if (pos + headerBytes > length) fail('truncated vertex stream');
+      const headerAt = pos;
+      pos += headerBytes;
+      for (let g = 0; g < groups; g++) {
+        if (length - pos < GROUP_MAX_BYTES) fail('truncated vertex stream');
+        const code = (src[headerAt + (g >> 2)] >> ((g & 3) * 2)) & 3;
+        pos = readGroup(src, pos, widths[code], lanes, row + g * 16);
+      }
+    }
+
+    // Channel modes live in the tail; check them once, after the first block shows the data is all there.
+    if (v1 && !checkedModes) {
+      for (let c = 0; c < channels; c++) if ((src[modesAt + c] & 3) === 3) fail('invalid vertex channel mode');
+      checkedModes = true;
+    }
+
+    for (let i = 0; i < n; i++) {
+      const out = (start + i) * size;
+      for (let c = 0; c < channels; c++) {
+        const b = c * 4;
+        const mode = v1 ? src[modesAt + c] : 0;
+        const kind = mode & 3;
+        if (kind === 0) {
+          for (let k = b; k < b + 4; k++) {
+            const v = (prev[k] + unzig8(lanes[k * 256 + i])) & 0xff;
+            prev[k] = v;
+            target[out + k] = v;
+          }
+        } else if (kind === 1) {
+          for (let k = b; k < b + 4; k += 2) {
+            const delta = unzig16(lanes[k * 256 + i] | (lanes[(k + 1) * 256 + i] << 8));
+            const v = (prev[k] + (prev[k + 1] << 8) + delta) & 0xffff;
+            prev[k] = v & 0xff;
+            prev[k + 1] = v >> 8;
+            target[out + k] = v & 0xff;
+            target[out + k + 1] = v >> 8;
+          }
+        } else {
+          // 32-bit XOR delta, stored rotated left by the high nibble; rotate it back right.
+          const r = mode >> 4;
+          const d =
+            (lanes[b * 256 + i] |
+              (lanes[(b + 1) * 256 + i] << 8) |
+              (lanes[(b + 2) * 256 + i] << 16) |
+              (lanes[(b + 3) * 256 + i] << 24)) >>>
+            0;
+          const x = (d >>> r) | (d << ((32 - r) & 31));
+          for (let k = 0; k < 4; k++) {
+            const v = prev[b + k] ^ ((x >>> (8 * k)) & 0xff);
+            prev[b + k] = v;
+            target[out + b + k] = v;
+          }
         }
       }
-      if (pos > end) throw new Error('EXT_meshopt_compression: truncated vertex stream');
-    }
-    for (let i = 0; i < bc; i++) {
-      const out = (vo + i) * size;
-      for (let k = 0; k < size; k += 4) {
-        const channel = channels[k >> 2],
-          at = k * bc + i;
-        if ((channel & 3) === 0)
-          for (let j = 0; j < 4; j++) {
-            const v = deltas[at + j * bc];
-            last[k + j] = (last[k + j] + ((v >> 1) ^ -(v & 1))) & 255;
-          }
-        else if ((channel & 3) === 1)
-          for (let j = 0; j < 4; j += 2) {
-            const v = deltas[at + j * bc] | (deltas[at + (j + 1) * bc] << 8),
-              p = ((last[k + j] | (last[k + j + 1] << 8)) + ((v >> 1) ^ -(v & 1))) & 0xffff;
-            last[k + j] = p & 255;
-            last[k + j + 1] = p >> 8;
-          }
-        else {
-          const v =
-              (deltas[at] | (deltas[at + bc] << 8) | (deltas[at + 2 * bc] << 16) | (deltas[at + 3 * bc] << 24)) >>> 0,
-            rot = channel >> 4;
-          const p =
-            (last[k] | (last[k + 1] << 8) | (last[k + 2] << 16) | (last[k + 3] << 24)) ^
-            ((v >>> rot) | (v << (32 - rot)));
-          last[k] = p & 255;
-          last[k + 1] = (p >> 8) & 255;
-          last[k + 2] = (p >> 16) & 255;
-          last[k + 3] = p >>> 24;
-        }
-      }
-      target.set(last, out);
     }
   }
-  if (pos !== end) throw new Error('EXT_meshopt_compression: vertex stream has trailing or missing data');
+  if (length - pos !== tailSize) fail('vertex stream has trailing or missing data');
 }
 
-// Counts and output sizes are checked before anything is decoded, so no write lands outside the output.
-function checkOutput(count: number, output: { length: number }, length: number): void {
-  if (!Number.isSafeInteger(count) || count < 0 || output.length < length)
-    throw new RangeError('EXT_meshopt_compression: invalid count or output size');
-}
+// ------------------------------------------------------------------------------------------------ index codecs
 
-/** meshopt vertex codec, versions 0 (EXT_meshopt_compression) and 1 (KHR_meshopt_compression). */
-export function meshoptDecodeVertexBuffer(target: Uint8Array, count: number, size: number, src: Uint8Array): void {
-  if (!Number.isInteger(size) || size <= 0 || size > 256 || size % 4 !== 0)
-    throw new Error(`EXT_meshopt_compression: invalid ATTRIBUTES byteStride ${size}`);
-  checkOutput(count, target, count * size);
-  if (src.length < 1 + size) throw new Error('EXT_meshopt_compression: truncated vertex stream');
-  const header = src[0];
-  if ((header & 0xf0) !== 0xa0) throw new Error('EXT_meshopt_compression: bad vertex stream header');
-  if ((header & 0x0f) === 1) return meshoptDecodeVertexV1(target, count, size, src);
-  if ((header & 0x0f) !== 0)
-    throw new Error(
-      `EXT_meshopt_compression: vertex codec version ${header & 0x0f} is not supported (only versions 0 and 1)`,
-    );
-  const end = src.length;
-  const last = src.slice(end - size);
-  let blockMax = Math.floor(8192 / size) & ~15;
-  if (blockMax > 256) blockMax = 256;
-  const buffer = new Uint8Array(256);
-  let pos = 1;
-  for (let vo = 0; vo < count; vo += blockMax) {
-    const bc = Math.min(blockMax, count - vo);
-    const aligned = (bc + 15) & ~15;
-    for (let k = 0; k < size; k++) {
-      pos = meshoptDecodeBytes(src, pos, end, buffer, aligned);
-      let p = last[k];
-      let o = vo * size + k;
-      for (let i = 0; i < bc; i++) {
-        const d = buffer[i];
-        p = (p + ((d >> 1) ^ -(d & 1))) & 255;
-        target[o] = p;
-        o += size;
-      }
-      last[k] = p;
-    }
-  }
-  const tail = size < 32 ? 32 : size;
-  if (end - pos !== tail) throw new Error('EXT_meshopt_compression: vertex stream has trailing or missing data');
-}
-
-function meshoptVByte(src: Uint8Array, st: { p: number }): number {
-  const lead = src[st.p++];
-  if (lead < 128) return lead;
-  let result = lead & 127;
-  let shift = 7;
-  for (let i = 0; i < 4; i++) {
-    const g = src[st.p++];
-    result |= (g & 127) << shift;
+/** Reads an unsigned LEB128 value of at most 5 bytes at `state.pos` (32-bit wraparound). */
+function readVarint(src: Uint8Array, state: { pos: number }): number {
+  let value = 0;
+  let shift = 0;
+  let pos = state.pos;
+  for (let i = 0; i < 5; i++) {
+    const byte = src[pos++];
+    value |= (byte & 127) << shift;
     shift += 7;
-    if (g < 128) break;
+    if (byte < 128) break;
   }
-  return result >>> 0;
+  state.pos = pos;
+  return value >>> 0;
 }
 
-/** meshopt triangle index codec (versions 0 and 1). */
+function checkIndexOutput(out: Uint32Array | Uint16Array, count: number): void {
+  if (!Number.isSafeInteger(count) || count < 0 || out.length < count) failRange('invalid count or output size');
+}
+
+/**
+ * Decodes a triangle-list stream (index codec version 0 or 1) into `out`: `count` indices, a multiple of 3.
+ * A 16-bit output keeps the low 16 bits of each index.
+ */
 export function meshoptDecodeIndexBuffer(out: Uint32Array | Uint16Array, count: number, src: Uint8Array): void {
-  checkOutput(count, out, count);
-  if (count % 3 !== 0) throw new Error('EXT_meshopt_compression: TRIANGLES count must be a multiple of 3');
-  if (src.length < 1 + count / 3 + 16) throw new Error('EXT_meshopt_compression: truncated index stream');
-  if ((src[0] & 0xf0) !== 0xe0) throw new Error('EXT_meshopt_compression: bad index stream header');
-  const version = src[0] & 0x0f;
-  if (version > 1) throw new Error(`EXT_meshopt_compression: index codec version ${version} is not supported`);
-  const edge = new Uint32Array(32).fill(0xffffffff);
-  const vfifo = new Uint32Array(16).fill(0xffffffff);
-  let eo = 0,
-    vo = 0,
-    next = 0,
-    last = 0;
-  const fecmax = version >= 1 ? 13 : 15;
-  let code = 1;
-  const st = { p: 1 + count / 3 };
-  const safeEnd = src.length - 16;
-  const aux = safeEnd;
-  for (let i = 0; i < count; i += 3) {
-    if (st.p > safeEnd) throw new Error('EXT_meshopt_compression: truncated index stream');
-    const codetri = src[code++];
-    let a: number, b: number, c: number;
-    if (codetri < 0xf0) {
-      const fe = codetri >> 4;
-      const ei = ((eo - 1 - fe) & 15) * 2;
-      a = edge[ei];
-      b = edge[ei + 1];
-      const fec = codetri & 15;
-      if (fec < fecmax) {
-        c = fec === 0 ? next : vfifo[(vo - 1 - fec) & 15];
-        const f0 = fec === 0 ? 1 : 0;
-        next += f0;
-        vfifo[vo] = c;
-        vo = (vo + f0) & 15;
-      } else {
-        if (fec !== 15) c = (last + (fec - (fec ^ 3))) >>> 0;
-        else {
-          const v = meshoptVByte(src, st);
-          c = (last + ((v >>> 1) ^ -(v & 1))) >>> 0;
-        }
-        last = c;
-        vfifo[vo] = c;
-        vo = (vo + 1) & 15;
-      }
-      edge[eo * 2] = c;
-      edge[eo * 2 + 1] = b;
-      eo = (eo + 1) & 15;
-      edge[eo * 2] = a;
-      edge[eo * 2 + 1] = c;
-      eo = (eo + 1) & 15;
-    } else if (codetri < 0xfe) {
-      const codeaux = src[aux + (codetri & 15)];
-      const feb = codeaux >> 4,
-        fec = codeaux & 15;
-      a = next++;
-      b = feb === 0 ? next : vfifo[(vo - feb) & 15];
-      const fb0 = feb === 0 ? 1 : 0;
-      next += fb0;
-      c = fec === 0 ? next : vfifo[(vo - fec) & 15];
-      const fc0 = fec === 0 ? 1 : 0;
-      next += fc0;
-      vfifo[vo] = a;
-      vo = (vo + 1) & 15;
-      vfifo[vo] = b;
-      vo = (vo + fb0) & 15;
-      vfifo[vo] = c;
-      vo = (vo + fc0) & 15;
-      edge[eo * 2] = b;
-      edge[eo * 2 + 1] = a;
-      eo = (eo + 1) & 15;
-      edge[eo * 2] = c;
-      edge[eo * 2 + 1] = b;
-      eo = (eo + 1) & 15;
-      edge[eo * 2] = a;
-      edge[eo * 2 + 1] = c;
-      eo = (eo + 1) & 15;
-    } else {
-      const codeaux = src[st.p++];
-      const fea = codetri === 0xfe ? 0 : 15;
-      const feb = codeaux >> 4,
-        fec = codeaux & 15;
-      if (codeaux === 0) next = 0;
-      a = fea === 0 ? next++ : 0;
-      b = feb === 0 ? next++ : vfifo[(vo - feb) & 15];
-      c = fec === 0 ? next++ : vfifo[(vo - fec) & 15];
-      if (fea === 15) {
-        const v = meshoptVByte(src, st);
-        last = a = (last + ((v >>> 1) ^ -(v & 1))) >>> 0;
-      }
-      if (feb === 15) {
-        const v = meshoptVByte(src, st);
-        last = b = (last + ((v >>> 1) ^ -(v & 1))) >>> 0;
-      }
-      if (fec === 15) {
-        const v = meshoptVByte(src, st);
-        last = c = (last + ((v >>> 1) ^ -(v & 1))) >>> 0;
-      }
-      vfifo[vo] = a;
-      vo = (vo + 1) & 15;
-      vfifo[vo] = b;
-      vo = (vo + (feb === 0 || feb === 15 ? 1 : 0)) & 15;
-      vfifo[vo] = c;
-      vo = (vo + (fec === 0 || fec === 15 ? 1 : 0)) & 15;
-      edge[eo * 2] = b;
-      edge[eo * 2 + 1] = a;
-      eo = (eo + 1) & 15;
-      edge[eo * 2] = c;
-      edge[eo * 2 + 1] = b;
-      eo = (eo + 1) & 15;
-      edge[eo * 2] = a;
-      edge[eo * 2 + 1] = c;
-      eo = (eo + 1) & 15;
-    }
-    out[i] = a;
-    out[i + 1] = b;
-    out[i + 2] = c;
-  }
-  if (st.p !== safeEnd) throw new Error('EXT_meshopt_compression: index stream has trailing or missing data');
-}
+  checkIndexOutput(out, count);
+  if (count % 3 !== 0) fail('TRIANGLES count must be a multiple of 3');
+  const triangles = count / 3;
+  const length = src.length;
+  if (length < 1 + triangles + 16) fail('truncated index stream');
+  const header = src[0];
+  if (header >> 4 !== 0xe) fail('bad index stream header');
+  const version = header & 15;
+  if (version > 1) fail(`index codec version ${version} is not supported`);
+  // Version 1 adds the "last - 1" and "last + 1" codes 13 and 14; version 0 reads the vertex FIFO there instead.
+  const fifoLimit = version === 1 ? 13 : 15;
 
-/** meshopt index sequence codec. */
-export function meshoptDecodeIndexSequence(out: Uint32Array | Uint16Array, count: number, src: Uint8Array): void {
-  checkOutput(count, out, count);
-  if (src.length < 1 + count + 4) throw new Error('EXT_meshopt_compression: truncated index sequence');
-  if ((src[0] & 0xf0) !== 0xd0) throw new Error('EXT_meshopt_compression: bad index sequence header');
-  const version = src[0] & 0x0f;
-  if (version > 1) throw new Error(`EXT_meshopt_compression: index sequence version ${version} is not supported`);
-  const safeEnd = src.length - 4;
-  const st = { p: 1 };
-  let last0 = 0,
-    last1 = 0;
-  for (let i = 0; i < count; i++) {
-    if (st.p >= safeEnd) throw new Error('EXT_meshopt_compression: truncated index sequence');
-    let v = meshoptVByte(src, st);
-    const cur = v & 1;
-    v >>>= 1;
-    const d = (v >>> 1) ^ -(v & 1);
-    if (cur) {
-      last1 = (last1 + d) >>> 0;
-      out[i] = last1;
-    } else {
-      last0 = (last0 + d) >>> 0;
-      out[i] = last0;
-    }
-  }
-  if (st.p !== safeEnd) throw new Error('EXT_meshopt_compression: index sequence has trailing or missing data');
-}
-
-const fr = Math.fround;
-
-function meshoptFilterOct(data: Int8Array | Int16Array, count: number): void {
-  // Same arithmetic order and rounding as the reference SIMD decoder (bit-identical output).
-  const max = data instanceof Int8Array ? 127 : 32767;
-  for (let i = 0; i < count; i++) {
-    let x = data[i * 4],
-      y = data[i * 4 + 1];
-    const z = data[i * 4 + 2] - (Math.abs(x) + Math.abs(y)); // small integers: exact
-    const t = z < 0 ? z : 0;
-    x = x + (x < 0 ? -t : t);
-    y = y + (y < 0 ? -t : t);
-    const ll = fr(fr(x * x) + fr(fr(y * y) + fr(z * z)));
-    const s = fr(max / fr(Math.sqrt(ll)));
-    data[i * 4] = snap(x * s);
-    data[i * 4 + 1] = snap(y * s);
-    data[i * 4 + 2] = snap(z * s);
-  }
-}
-
-// Round a float32 to the nearest integer, ties to even (the "3 << 22" snap trick the SIMD
-// reference decoder uses). Valid for |v| < 2^22.
-const SNAP = 3 << 22;
-function snap(v: number): number {
-  return fr(fr(v) + SNAP) - SNAP;
-}
-
-function meshoptFilterQuat(data: Int16Array, count: number): void {
-  // Same arithmetic order and rounding as the reference SIMD decoder (the one browsers and
-  // Node run), so results are bit-identical: x/y/z/w are reconstructed unscaled, then scaled once.
-  const scale = fr(32767 / fr(Math.SQRT2));
-  for (let i = 0; i < count; i++) {
-    const q3 = data[i * 4 + 3];
-    const s = q3 | 3;
-    const x = data[i * 4],
-      y = data[i * 4 + 1],
-      z = data[i * 4 + 2];
-    const ws = fr(s * fr(s + s));
-    const ww = fr(ws - fr(fr(x * x) + fr(fr(y * y) + fr(z * z))));
-    const w = fr(Math.sqrt(ww >= 0 ? ww : 0));
-    const ss = fr(scale / s);
-    const qc = q3 & 3;
-    data[i * 4 + ((qc + 1) & 3)] = snap(x * ss);
-    data[i * 4 + ((qc + 2) & 3)] = snap(y * ss);
-    data[i * 4 + ((qc + 3) & 3)] = snap(z * ss);
-    data[i * 4 + (qc & 3)] = snap(w * ss);
-  }
-}
-
-// KHR_meshopt_compression COLOR: YCoCg plus alpha, whose highest set bit carries the precision. Same float32 arithmetic as the
-// SIMD reference decoder, which stores the low bits of (value + 3 << 22)'s float32 bit pattern: the value rounded to even
-// for valid data, and the same bits as the reference for out-of-range data too.
-function meshoptFilterColor(data: Uint8Array | Uint16Array, signed: Int8Array | Int16Array, count: number): void {
-  const max = data instanceof Uint8Array ? 255 : 65535,
-    float = new Float32Array(1),
-    bits = new Uint32Array(float.buffer);
-  const store = (at: number, value: number) => {
-    float[0] = fr(value) + SNAP;
-    data[at] = bits[0];
+  const tail = length - 16;
+  // FIFOs start filled with all ones: a slot read before it was written yields 0xffffffff (0xffff in 16 bits).
+  const edgeA = new Uint32Array(16).fill(0xffffffff);
+  const edgeB = new Uint32Array(16).fill(0xffffffff);
+  const verts = new Uint32Array(16).fill(0xffffffff);
+  let edgeHead = 0;
+  let vertHead = 0;
+  const pushEdge = (a: number, b: number): void => {
+    edgeA[edgeHead] = a;
+    edgeB[edgeHead] = b;
+    edgeHead = (edgeHead + 1) & 15;
   };
-  for (let i = 0; i < count * 4; i += 4) {
-    const y = data[i],
-      co = signed[i + 1],
-      cg = signed[i + 2],
-      alpha = data[i + 3];
-    let as = alpha | (alpha >> 1);
-    as |= as >> 2;
-    as |= as >> 4;
-    as |= as >> 8;
-    const ss = fr(max / as);
-    store(i, (y + co - cg) * ss);
-    store(i + 1, (y + cg) * ss);
-    store(i + 2, (y - co - cg) * ss);
-    store(i + 3, (((alpha << 1) & as) | (alpha & 1)) * ss);
+  const pushVertex = (v: number): void => {
+    verts[vertHead] = v;
+    vertHead = (vertHead + 1) & 15;
+  };
+  // Index 0 is the most recent entry.
+  const vertex = (i: number): number => verts[(vertHead - 1 - i) & 15];
+
+  let next = 0;
+  let last = 0;
+  const data = { pos: 1 + triangles };
+  const explicit = (): number => {
+    const v = readVarint(src, data);
+    last = (last + (v & 1 ? ~(v >>> 1) : v >>> 1)) >>> 0;
+    return last;
+  };
+
+  for (let t = 0; t < triangles; t++) {
+    if (data.pos > tail) fail('truncated index stream');
+    const code = src[1 + t];
+    const hi = code >> 4;
+    const lo = code & 15;
+    let a: number;
+    let b: number;
+    let c: number;
+    if (hi < 15) {
+      // An edge from the FIFO plus one more vertex.
+      const e = (edgeHead - 1 - hi) & 15;
+      a = edgeA[e];
+      b = edgeB[e];
+      if (lo === 0) {
+        c = next;
+        next = (next + 1) >>> 0;
+        pushVertex(c);
+      } else if (lo < fifoLimit) {
+        c = vertex(lo);
+      } else if (lo < 15) {
+        c = (lo === 13 ? last - 1 : last + 1) >>> 0;
+        last = c;
+        pushVertex(c);
+      } else {
+        c = explicit();
+        pushVertex(c);
+      }
+      pushEdge(c, b);
+      pushEdge(a, c);
+    } else {
+      let z: number;
+      let w: number;
+      if (lo < 14) {
+        // Three vertices described by one codeaux byte.
+        const aux = src[tail + lo];
+        z = aux >> 4;
+        w = aux & 15;
+        a = next;
+        next = (next + 1) >>> 0;
+      } else {
+        const aux = src[data.pos++];
+        if (aux === 0) next = 0;
+        z = aux >> 4;
+        w = aux & 15;
+        if (lo === 14) {
+          a = next;
+          next = (next + 1) >>> 0;
+        } else a = explicit();
+      }
+      if (z === 0) {
+        b = next;
+        next = (next + 1) >>> 0;
+      } else b = z < 15 ? vertex(z - 1) : explicit();
+      if (w === 0) {
+        c = next;
+        next = (next + 1) >>> 0;
+      } else c = w < 15 ? vertex(w - 1) : explicit();
+      pushEdge(b, a);
+      pushEdge(c, b);
+      pushEdge(a, c);
+      pushVertex(a);
+      if (z === 0 || z === 15) pushVertex(b);
+      if (w === 0 || w === 15) pushVertex(c);
+    }
+    out[t * 3] = a;
+    out[t * 3 + 1] = b;
+    out[t * 3 + 2] = c;
   }
+  if (data.pos !== tail) fail('index stream has trailing or missing data');
 }
 
-function meshoptFilterExp(u32: Uint32Array, f32: Float32Array, count: number): void {
+/**
+ * Decodes an index-sequence stream (mode INDICES, version 0 or 1) into `out`: `count` indices, each a zigzag delta
+ * against one of two running baselines. A 16-bit output keeps the low 16 bits.
+ */
+export function meshoptDecodeIndexSequence(out: Uint32Array | Uint16Array, count: number, src: Uint8Array): void {
+  checkIndexOutput(out, count);
+  const length = src.length;
+  if (length < 1 + count + 4) fail('truncated index sequence');
+  const header = src[0];
+  if (header >> 4 !== 0xd) fail('bad index sequence header');
+  const version = header & 15;
+  if (version > 1) fail(`index sequence version ${version} is not supported`);
+  const tail = length - 4;
+  const baselines = [0, 0];
+  const data = { pos: 1 };
   for (let i = 0; i < count; i++) {
-    const v = u32[i];
-    const m = (v << 8) >> 8;
-    const e = v >> 24;
-    f32[i] = m * Math.pow(2, e);
+    if (data.pos >= tail) fail('truncated index sequence');
+    const v = readVarint(src, data);
+    const which = v & 1;
+    const value = (baselines[which] + (v & 2 ? ~(v >>> 2) : v >>> 2)) >>> 0;
+    baselines[which] = value;
+    out[i] = value;
+  }
+  if (data.pos !== tail) fail('index sequence has trailing or missing data');
+}
+
+// ------------------------------------------------------------------------------------------------ filters
+
+const f32 = Math.fround;
+/** 1.5 * 2^23: adding it to a float32 below 2^22 in magnitude leaves the value rounded half to even in the low bits. */
+const ROUND_BIAS = 12582912;
+const roundEven = (v: number): number => f32(v + ROUND_BIAS) - ROUND_BIAS;
+const bitsScratch = new Float32Array(1);
+const bitsView = new Uint32Array(bitsScratch.buffer);
+/** The low bits of the float32 pattern of `v + 1.5 * 2^23`, which wrap for values outside the output range. */
+const roundBits = (v: number): number => {
+  bitsScratch[0] = v + ROUND_BIAS;
+  return bitsView[0];
+};
+/** 32767 / sqrt(2) in float32: the largest magnitude of the three stored quaternion components. */
+const QUAT_RANGE = f32(32767 / Math.SQRT2);
+
+function octahedral(view: DataView, count: number, stride: number): void {
+  const wide = stride === 8;
+  const max = wide ? 32767 : 127;
+  const step = wide ? 2 : 1;
+  const get = wide ? (o: number) => view.getInt16(o, true) : (o: number) => view.getInt8(o);
+  const set = wide ? (o: number, v: number) => view.setInt16(o, v, true) : (o: number, v: number) => view.setInt8(o, v);
+  for (let i = 0, o = 0; i < count; i++, o += stride) {
+    let x = get(o);
+    let y = get(o + step);
+    const one = get(o + 2 * step);
+    const z = one - Math.abs(x) - Math.abs(y);
+    if (z < 0) {
+      // Fold the lower hemisphere back: move x and y toward zero by |z|.
+      x += x >= 0 ? z : -z;
+      y += y >= 0 ? z : -z;
+    }
+    const lengthSq = f32(f32(x * x) + f32(f32(y * y) + f32(z * z)));
+    if (lengthSq === 0) {
+      set(o, 0);
+      set(o + step, 0);
+      set(o + 2 * step, 0);
+      continue;
+    }
+    const scale = f32(max / f32(Math.sqrt(lengthSq)));
+    set(o, roundEven(f32(x * scale)));
+    set(o + step, roundEven(f32(y * scale)));
+    set(o + 2 * step, roundEven(f32(z * scale)));
   }
 }
 
-/** Decode one EXT_meshopt_compression or KHR_meshopt_compression bufferView payload. */
+function quaternion(view: DataView, count: number): void {
+  for (let i = 0, o = 0; i < count; i++, o += 8) {
+    const x = view.getInt16(o, true);
+    const y = view.getInt16(o + 2, true);
+    const z = view.getInt16(o + 4, true);
+    const packed = view.getInt16(o + 6, true);
+    const largest = packed & 3;
+    const one = packed | 3;
+    const wSq = f32(f32(2 * f32(one * one)) - f32(f32(x * x) + f32(f32(y * y) + f32(z * z))));
+    const w = f32(Math.sqrt(Math.max(wSq, 0)));
+    const scale = f32(QUAT_RANGE / one);
+    view.setInt16(o + ((largest + 1) & 3) * 2, roundEven(f32(x * scale)), true);
+    view.setInt16(o + ((largest + 2) & 3) * 2, roundEven(f32(y * scale)), true);
+    view.setInt16(o + ((largest + 3) & 3) * 2, roundEven(f32(z * scale)), true);
+    view.setInt16(o + largest * 2, roundEven(f32(w * scale)), true);
+  }
+}
+
+function exponential(view: DataView, words: number): void {
+  for (let i = 0, o = 0; i < words; i++, o += 4) {
+    const v = view.getInt32(o, true);
+    // m * 2^e is exact in float64 for every 8-bit e and 24-bit m, so this rounds once, to float32.
+    view.setFloat32(o, ((v << 8) >> 8) * 2 ** (v >> 24), true);
+  }
+}
+
+function color(view: DataView, count: number, stride: number): void {
+  const wide = stride === 8;
+  const max = wide ? 65535 : 255;
+  const keep = wide ? 0xffff : 0xff;
+  const step = wide ? 2 : 1;
+  const getU = wide ? (o: number) => view.getUint16(o, true) : (o: number) => view.getUint8(o);
+  const getS = wide ? (o: number) => view.getInt16(o, true) : (o: number) => view.getInt8(o);
+  const set = wide
+    ? (o: number, v: number) => view.setUint16(o, v, true)
+    : (o: number, v: number) => view.setUint8(o, v);
+  for (let i = 0, o = 0; i < count; i++, o += stride) {
+    const luma = getU(o);
+    const co = getS(o + step);
+    const cg = getS(o + 2 * step);
+    const alpha = getU(o + 3 * step);
+    // Every bit at or below alpha's highest set bit; its top bit marks the precision K.
+    const mask = alpha === 0 ? 0 : 2 ** (32 - Math.clz32(alpha)) - 1;
+    const scale = f32(max / mask);
+    const r = luma + co - cg;
+    const g = luma + cg;
+    const b = luma - co - cg;
+    const a = ((alpha << 1) & mask) | (alpha & 1);
+    set(o, roundBits(f32(r * scale)) & keep);
+    set(o + step, roundBits(f32(g * scale)) & keep);
+    set(o + 2 * step, roundBits(f32(b * scale)) & keep);
+    set(o + 3 * step, roundBits(f32(a * scale)) & keep);
+  }
+}
+
+function applyFilter(out: Uint8Array, count: number, stride: number, filter: string): void {
+  const view = new DataView(out.buffer, out.byteOffset, out.byteLength);
+  switch (filter) {
+    case 'OCTAHEDRAL':
+      if (stride !== 4 && stride !== 8) fail('OCTAHEDRAL filter requires byteStride 4 or 8');
+      octahedral(view, count, stride);
+      return;
+    case 'QUATERNION':
+      if (stride !== 8) fail('QUATERNION filter requires byteStride 8');
+      quaternion(view, count);
+      return;
+    case 'EXPONENTIAL':
+      exponential(view, (count * stride) >> 2);
+      return;
+    case 'COLOR':
+      if (stride !== 4 && stride !== 8) fail('COLOR filter requires byteStride 4 or 8');
+      color(view, count, stride);
+      return;
+    default:
+      fail(`unknown filter '${filter}'`);
+  }
+}
+
+// ------------------------------------------------------------------------------------------------ glTF entry points
+
+/**
+ * Decodes one glTF meshopt bufferView payload (`EXT_meshopt_compression` or `KHR_meshopt_compression`) and returns
+ * `count * stride` bytes. `mode` is `'ATTRIBUTES'`, `'TRIANGLES'` or `'INDICES'`; `filter` is `'NONE'` (also `''`),
+ * `'OCTAHEDRAL'`, `'QUATERNION'`, `'EXPONENTIAL'` or `'COLOR'`. Both attribute codec versions are accepted under either
+ * extension name.
+ *
+ * @throws RangeError for a bad count or stride, or a count the stream is too short to describe (checked before the
+ * output is allocated); Error for a malformed, truncated or over-long stream, a bad stride for the mode or filter, or
+ * an unknown mode or filter. Every message starts with `EXT_meshopt_compression: `.
+ */
 export function meshoptDecodeGltfBuffer(
   src: Uint8Array,
   count: number,
@@ -462,57 +498,53 @@ export function meshoptDecodeGltfBuffer(
     stride <= 0 ||
     count * stride > 2 ** 31
   )
-    throw new RangeError('EXT_meshopt_compression: invalid count or byteStride');
-  // A stream cannot describe more elements than its bytes allow, checked before the output is allocated: each block of
-  // up to 256 vertices costs at least one control byte per 4 vertex bytes, a triangle at least one code byte and an
-  // index sequence element at least one byte.
+    failRange('invalid count or byteStride');
+  // The most elements each mode could describe in src.length bytes. A group of 16 attributes needs at least
+  // stride / 4 bytes (one 2-bit header per byte lane, each covering 4 groups); a triangle needs a code byte; a
+  // sequence index needs a varint byte.
+  const length = src.length;
   const most =
     mode === 'ATTRIBUTES'
-      ? 256 * (Math.floor((src.length * 4) / stride) + 1)
+      ? 256 * (Math.floor((4 * length) / stride) + 1)
       : mode === 'TRIANGLES'
-        ? 3 * src.length
-        : src.length;
-  if (count > most)
-    throw new RangeError(
-      `EXT_meshopt_compression: truncated stream (${count} elements cannot fit in ${src.length} bytes)`,
-    );
-  const out = new Uint8Array(count * stride);
+        ? 3 * length
+        : mode === 'INDICES'
+          ? length
+          : Number.POSITIVE_INFINITY;
+  if (count > most) failRange(`truncated stream (${count} elements cannot fit in ${length} bytes)`);
+
+  let out: Uint8Array;
   if (mode === 'ATTRIBUTES') {
+    out = new Uint8Array(count * stride);
     meshoptDecodeVertexBuffer(out, count, stride, src);
   } else if (mode === 'TRIANGLES' || mode === 'INDICES') {
-    if (stride !== 2 && stride !== 4) throw new Error(`EXT_meshopt_compression: ${mode} byteStride must be 2 or 4`);
-    const view = stride === 2 ? new Uint16Array(out.buffer) : new Uint32Array(out.buffer);
-    if (mode === 'TRIANGLES') meshoptDecodeIndexBuffer(view, count, src);
-    else meshoptDecodeIndexSequence(view, count, src);
-  } else {
-    throw new Error(`EXT_meshopt_compression: unknown mode '${mode}'`);
-  }
+    if (stride !== 2 && stride !== 4) fail(`${mode} byteStride must be 2 or 4`);
+    out = new Uint8Array(count * stride);
+    const indices = stride === 2 ? new Uint16Array(out.buffer, 0, count) : new Uint32Array(out.buffer, 0, count);
+    if (mode === 'TRIANGLES') meshoptDecodeIndexBuffer(indices, count, src);
+    else meshoptDecodeIndexSequence(indices, count, src);
+  } else return fail(`unknown mode '${mode}'`);
+
   if (filter && filter !== 'NONE') {
-    if (mode !== 'ATTRIBUTES') throw new Error('EXT_meshopt_compression: filters only apply to ATTRIBUTES');
-    if (filter === 'OCTAHEDRAL') {
-      if (stride === 4) meshoptFilterOct(new Int8Array(out.buffer), count);
-      else if (stride === 8) meshoptFilterOct(new Int16Array(out.buffer), count);
-      else throw new Error('EXT_meshopt_compression: OCTAHEDRAL filter requires byteStride 4 or 8');
-    } else if (filter === 'QUATERNION') {
-      if (stride !== 8) throw new Error('EXT_meshopt_compression: QUATERNION filter requires byteStride 8');
-      meshoptFilterQuat(new Int16Array(out.buffer), count);
-    } else if (filter === 'EXPONENTIAL') {
-      meshoptFilterExp(new Uint32Array(out.buffer), new Float32Array(out.buffer), (count * stride) >> 2);
-    } else if (filter === 'COLOR') {
-      if (stride === 4) meshoptFilterColor(out, new Int8Array(out.buffer), count);
-      else if (stride === 8) meshoptFilterColor(new Uint16Array(out.buffer), new Int16Array(out.buffer), count);
-      else throw new Error('EXT_meshopt_compression: COLOR filter requires byteStride 4 or 8');
-    } else {
-      throw new Error(`EXT_meshopt_compression: unknown filter '${filter}'`);
-    }
+    if (mode !== 'ATTRIBUTES') fail('filters only apply to ATTRIBUTES');
+    applyFilter(out, count, stride, filter);
   }
   return out;
 }
 
-/** Matches the meshoptimizer project's own `MeshoptDecoder` interface (`supported`, `ready`, `decodeGltfBuffer`), so glTF loaders written against it work unchanged. */
+/**
+ * An object with the members of the meshoptimizer project's own `MeshoptDecoder` (`supported`, `ready`,
+ * `decodeGltfBuffer`), so glTF loaders written against that interface work unchanged. Decoding is synchronous.
+ */
 export const MeshoptDecoder = {
+  /** Always true: the decoder is plain TypeScript. */
   supported: true,
+  /** Already resolved; there is nothing to load. */
   ready: Promise.resolve(),
+  /**
+   * Decodes into `target`, which needs at least `count * stride` bytes. Throws what {@link meshoptDecodeGltfBuffer}
+   * throws, then a RangeError when `target` is too small.
+   */
   decodeGltfBuffer(
     target: Uint8Array,
     count: number,
@@ -521,8 +553,8 @@ export const MeshoptDecoder = {
     mode: string,
     filter?: string,
   ): void {
-    const out = meshoptDecodeGltfBuffer(source, count, stride, mode, filter);
-    if (target.byteLength < out.byteLength) throw new RangeError('EXT_meshopt_compression: target buffer is too small');
-    target.set(out);
+    const decoded = meshoptDecodeGltfBuffer(source, count, stride, mode, filter);
+    if (target.byteLength < count * stride) failRange('target buffer is too small');
+    target.set(decoded);
   },
 };

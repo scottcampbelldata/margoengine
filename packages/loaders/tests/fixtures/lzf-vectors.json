@@ -1,0 +1,203 @@
+{
+ "about": "decompressLZF(input, outputLength, format?) from packages/loaders/src/lzf.ts. Errors are LoaderError (name \"LoaderError\", fields format and code); message text is Margo wording (prefix \"<format>: \"). Inputs are hand-assembled from the format description.",
+ "cases": [
+  {
+   "name": "empty",
+   "input": "",
+   "outputLength": 0,
+   "result": {
+    "output": ""
+   }
+  },
+  {
+   "name": "one literal",
+   "input": "002a",
+   "outputLength": 1,
+   "result": {
+    "output": "2a"
+   }
+  },
+  {
+   "name": "32-byte literal run (max)",
+   "input": "1f000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+   "outputLength": 32,
+   "result": {
+    "output": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+   }
+  },
+  {
+   "name": "run via distance 1 (overlapping copy)",
+   "input": "0009c000",
+   "outputLength": 9,
+   "result": {
+    "output": "090909090909090909"
+   }
+  },
+  {
+   "name": "shortest match (3 bytes)",
+   "input": "020102032002",
+   "outputLength": 6,
+   "result": {
+    "output": "010203010203"
+   }
+  },
+  {
+   "name": "length field 6 (8 bytes), no extra byte",
+   "input": "010506c001",
+   "outputLength": 10,
+   "result": {
+    "output": "05060506050605060506"
+   }
+  },
+  {
+   "name": "length field 7 with extra 0 (9 bytes)",
+   "input": "010506e00001",
+   "outputLength": 11,
+   "result": {
+    "output": "0506050605060506050605"
+   }
+  },
+  {
+   "name": "longest match (264 bytes)",
+   "input": "0301020304e0ff03",
+   "outputLength": 268,
+   "result": {
+    "output": "01020304010203040102030401020304010203040102030401020304010203040102030401020304010203040102030401020304010203040102030401020304010203040102030401020304010203040102030401020304010203040102030401020304010203040102030401020304010203040102030401020304010203040102030401020304010203040102030401020304010203040102030401020304010203040102030401020304010203040102030401020304010203040102030401020304010203040102030401020304010203040102030401020304010203040102030401020304010203040102030401020304010203040102030401020304010203040102030401020304"
+   }
+  },
+  {
+   "name": "farthest distance (8192)",
+   "inputNote": "256 literal runs of 32 bytes (byte i of run k = (7i + 13k) & 255), then the reference",
+   "outputLength": 8197,
+   "result": {
+    "length": 8197,
+    "sha256": "85566996c2d3aea2bacb7c3955cfcb32953284f16158c37167dfd27d0206db36"
+   }
+  },
+  {
+   "name": "reference before output start",
+   "input": "00012001",
+   "outputLength": 4,
+   "result": {
+    "name": "LoaderError",
+    "code": "range",
+    "message": "LZF: LZF back reference points before the output"
+   }
+  },
+  {
+   "name": "literal past output",
+   "input": "02010203",
+   "outputLength": 2,
+   "result": {
+    "name": "LoaderError",
+    "code": "range",
+    "message": "LZF: LZF literal run overflows the output"
+   }
+  },
+  {
+   "name": "literal past input",
+   "input": "040102",
+   "outputLength": 5,
+   "result": {
+    "name": "LoaderError",
+    "code": "truncated",
+    "message": "LZF: LZF literal run overflows the input"
+   }
+  },
+  {
+   "name": "reference past output",
+   "input": "00012000",
+   "outputLength": 3,
+   "result": {
+    "name": "LoaderError",
+    "code": "range",
+    "message": "LZF: LZF back reference overflows the output"
+   }
+  },
+  {
+   "name": "missing offset byte",
+   "input": "000120",
+   "outputLength": 4,
+   "result": {
+    "name": "LoaderError",
+    "code": "truncated",
+    "message": "LZF: LZF back reference overflows the input"
+   }
+  },
+  {
+   "name": "missing extra length byte",
+   "input": "0001e0",
+   "outputLength": 12,
+   "result": {
+    "name": "LoaderError",
+    "code": "truncated",
+    "message": "LZF: LZF back reference overflows the input"
+   }
+  },
+  {
+   "name": "missing offset byte after extra length",
+   "input": "0001e000",
+   "outputLength": 12,
+   "result": {
+    "name": "LoaderError",
+    "code": "truncated",
+    "message": "LZF: LZF back reference overflows the input"
+   }
+  },
+  {
+   "name": "stream shorter than declared",
+   "input": "010102",
+   "outputLength": 4,
+   "result": {
+    "name": "LoaderError",
+    "code": "truncated",
+    "message": "LZF: LZF produced 2 bytes, expected 4"
+   }
+  },
+  {
+   "name": "empty stream, declared 0 (ok)",
+   "input": "",
+   "outputLength": 0,
+   "result": {
+    "output": ""
+   }
+  },
+  {
+   "name": "negative output length",
+   "input": "",
+   "outputLength": -1,
+   "result": {
+    "name": "LoaderError",
+    "code": "range",
+    "message": "LZF: invalid LZF output length -1"
+   }
+  },
+  {
+   "name": "fractional output length",
+   "input": "",
+   "outputLength": 1.5,
+   "result": {
+    "name": "LoaderError",
+    "code": "range",
+    "message": "LZF: invalid LZF output length 1.5"
+   }
+  }
+ ],
+ "formatArgument": {
+  "call": "decompressLZF(hex 0001, 4, 'PCD')",
+  "result": {
+   "name": "LoaderError",
+   "code": "truncated",
+   "message": "PCD: LZF produced 1 bytes, expected 4"
+  }
+ },
+ "fixture": {
+  "path": "packages/loaders/tests/fixtures/pcl_logo.pcd",
+  "bodyOffset": 202,
+  "compressedSize": 25610,
+  "uncompressedSize": 206544,
+  "outputSha256": "bd4ac88c12e8696e7281348c013f32bc21ba1831d394b40e90e764b42661ef67",
+  "first16": "143f76bf143f76bf666676bf827376bf",
+  "last16": "8080804a8080804a8080804a8080804a"
+ }
+}

@@ -1,0 +1,2434 @@
+{
+ "about": "parseEXR(bytes) from packages/environment/src/exr.ts. Synthetic fixtures were written by the reference OpenEXR library (generate.py); AllHalfValues/BrightRings come from openexr-images. dataSha256 = SHA-256 of the returned Float32Array bytes (little-endian); f32Sha256 = the matching .f32 file the reference library decoded. Binding: data bit exact. Damaged-file outcomes: \"throws vs decodes\", error name and code binding; messages are Margo wording. Flip positions are byte offsets into the named base file.",
+ "fixtures": [
+  {
+   "path": "packages/environment/tests/fixtures/synthetic-half-rgba-none.exr",
+   "width": 37,
+   "height": 45,
+   "compression": "NONE",
+   "layout": "RGBA",
+   "channels": [
+    "A:HALF",
+    "B:HALF",
+    "G:HALF",
+    "R:HALF"
+   ],
+   "dataWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "displayWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "dataSha256": "ae34e01d38ba001aa506268a2fb13fc1ceac1affdce8e4a10ff0c3b3608e2195",
+   "f32Sha256": "ae34e01d38ba001aa506268a2fb13fc1ceac1affdce8e4a10ff0c3b3608e2195",
+   "matchesF32": true
+  },
+  {
+   "path": "packages/environment/tests/fixtures/synthetic-half-rgba-rle.exr",
+   "width": 37,
+   "height": 45,
+   "compression": "RLE",
+   "layout": "RGBA",
+   "channels": [
+    "A:HALF",
+    "B:HALF",
+    "G:HALF",
+    "R:HALF"
+   ],
+   "dataWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "displayWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "dataSha256": "ae34e01d38ba001aa506268a2fb13fc1ceac1affdce8e4a10ff0c3b3608e2195",
+   "f32Sha256": "ae34e01d38ba001aa506268a2fb13fc1ceac1affdce8e4a10ff0c3b3608e2195",
+   "matchesF32": true
+  },
+  {
+   "path": "packages/environment/tests/fixtures/synthetic-half-rgba-zips.exr",
+   "width": 37,
+   "height": 45,
+   "compression": "ZIPS",
+   "layout": "RGBA",
+   "channels": [
+    "A:HALF",
+    "B:HALF",
+    "G:HALF",
+    "R:HALF"
+   ],
+   "dataWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "displayWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "dataSha256": "ae34e01d38ba001aa506268a2fb13fc1ceac1affdce8e4a10ff0c3b3608e2195",
+   "f32Sha256": "ae34e01d38ba001aa506268a2fb13fc1ceac1affdce8e4a10ff0c3b3608e2195",
+   "matchesF32": true
+  },
+  {
+   "path": "packages/environment/tests/fixtures/synthetic-half-rgba-zip.exr",
+   "width": 37,
+   "height": 45,
+   "compression": "ZIP",
+   "layout": "RGBA",
+   "channels": [
+    "A:HALF",
+    "B:HALF",
+    "G:HALF",
+    "R:HALF"
+   ],
+   "dataWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "displayWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "dataSha256": "ae34e01d38ba001aa506268a2fb13fc1ceac1affdce8e4a10ff0c3b3608e2195",
+   "f32Sha256": "ae34e01d38ba001aa506268a2fb13fc1ceac1affdce8e4a10ff0c3b3608e2195",
+   "matchesF32": true
+  },
+  {
+   "path": "packages/environment/tests/fixtures/synthetic-half-rgba-piz.exr",
+   "width": 37,
+   "height": 45,
+   "compression": "PIZ",
+   "layout": "RGBA",
+   "channels": [
+    "A:HALF",
+    "B:HALF",
+    "G:HALF",
+    "R:HALF"
+   ],
+   "dataWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "displayWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "dataSha256": "ae34e01d38ba001aa506268a2fb13fc1ceac1affdce8e4a10ff0c3b3608e2195",
+   "f32Sha256": "ae34e01d38ba001aa506268a2fb13fc1ceac1affdce8e4a10ff0c3b3608e2195",
+   "matchesF32": true
+  },
+  {
+   "path": "packages/environment/tests/fixtures/synthetic-float-rgb-none.exr",
+   "width": 37,
+   "height": 45,
+   "compression": "NONE",
+   "layout": "RGB",
+   "channels": [
+    "B:FLOAT",
+    "G:FLOAT",
+    "R:FLOAT"
+   ],
+   "dataWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "displayWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "dataSha256": "5176754759982dc1bdf5ebf0238ce73d79513e3fec33466d0d01c69dc51ebfc5",
+   "f32Sha256": "5176754759982dc1bdf5ebf0238ce73d79513e3fec33466d0d01c69dc51ebfc5",
+   "matchesF32": true
+  },
+  {
+   "path": "packages/environment/tests/fixtures/synthetic-float-rgb-rle.exr",
+   "width": 37,
+   "height": 45,
+   "compression": "RLE",
+   "layout": "RGB",
+   "channels": [
+    "B:FLOAT",
+    "G:FLOAT",
+    "R:FLOAT"
+   ],
+   "dataWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "displayWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "dataSha256": "5176754759982dc1bdf5ebf0238ce73d79513e3fec33466d0d01c69dc51ebfc5",
+   "f32Sha256": "5176754759982dc1bdf5ebf0238ce73d79513e3fec33466d0d01c69dc51ebfc5",
+   "matchesF32": true
+  },
+  {
+   "path": "packages/environment/tests/fixtures/synthetic-float-rgb-zips.exr",
+   "width": 37,
+   "height": 45,
+   "compression": "ZIPS",
+   "layout": "RGB",
+   "channels": [
+    "B:FLOAT",
+    "G:FLOAT",
+    "R:FLOAT"
+   ],
+   "dataWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "displayWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "dataSha256": "5176754759982dc1bdf5ebf0238ce73d79513e3fec33466d0d01c69dc51ebfc5",
+   "f32Sha256": "5176754759982dc1bdf5ebf0238ce73d79513e3fec33466d0d01c69dc51ebfc5",
+   "matchesF32": true
+  },
+  {
+   "path": "packages/environment/tests/fixtures/synthetic-float-rgb-zip.exr",
+   "width": 37,
+   "height": 45,
+   "compression": "ZIP",
+   "layout": "RGB",
+   "channels": [
+    "B:FLOAT",
+    "G:FLOAT",
+    "R:FLOAT"
+   ],
+   "dataWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "displayWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "dataSha256": "5176754759982dc1bdf5ebf0238ce73d79513e3fec33466d0d01c69dc51ebfc5",
+   "f32Sha256": "5176754759982dc1bdf5ebf0238ce73d79513e3fec33466d0d01c69dc51ebfc5",
+   "matchesF32": true
+  },
+  {
+   "path": "packages/environment/tests/fixtures/synthetic-float-rgb-piz.exr",
+   "width": 37,
+   "height": 45,
+   "compression": "PIZ",
+   "layout": "RGB",
+   "channels": [
+    "B:FLOAT",
+    "G:FLOAT",
+    "R:FLOAT"
+   ],
+   "dataWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "displayWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "dataSha256": "5176754759982dc1bdf5ebf0238ce73d79513e3fec33466d0d01c69dc51ebfc5",
+   "f32Sha256": "5176754759982dc1bdf5ebf0238ce73d79513e3fec33466d0d01c69dc51ebfc5",
+   "matchesF32": true
+  },
+  {
+   "path": "packages/environment/tests/fixtures/synthetic-half-y-none.exr",
+   "width": 37,
+   "height": 45,
+   "compression": "NONE",
+   "layout": "Y",
+   "channels": [
+    "Y:HALF"
+   ],
+   "dataWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "displayWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "dataSha256": "1c96d10b1e0b0a796cd0435b7b160209c0a0611834d1fe1e0a35ecc859de2d57",
+   "f32Sha256": "1c96d10b1e0b0a796cd0435b7b160209c0a0611834d1fe1e0a35ecc859de2d57",
+   "matchesF32": true
+  },
+  {
+   "path": "packages/environment/tests/fixtures/synthetic-half-y-rle.exr",
+   "width": 37,
+   "height": 45,
+   "compression": "RLE",
+   "layout": "Y",
+   "channels": [
+    "Y:HALF"
+   ],
+   "dataWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "displayWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "dataSha256": "1c96d10b1e0b0a796cd0435b7b160209c0a0611834d1fe1e0a35ecc859de2d57",
+   "f32Sha256": "1c96d10b1e0b0a796cd0435b7b160209c0a0611834d1fe1e0a35ecc859de2d57",
+   "matchesF32": true
+  },
+  {
+   "path": "packages/environment/tests/fixtures/synthetic-half-y-zips.exr",
+   "width": 37,
+   "height": 45,
+   "compression": "ZIPS",
+   "layout": "Y",
+   "channels": [
+    "Y:HALF"
+   ],
+   "dataWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "displayWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "dataSha256": "1c96d10b1e0b0a796cd0435b7b160209c0a0611834d1fe1e0a35ecc859de2d57",
+   "f32Sha256": "1c96d10b1e0b0a796cd0435b7b160209c0a0611834d1fe1e0a35ecc859de2d57",
+   "matchesF32": true
+  },
+  {
+   "path": "packages/environment/tests/fixtures/synthetic-half-y-zip.exr",
+   "width": 37,
+   "height": 45,
+   "compression": "ZIP",
+   "layout": "Y",
+   "channels": [
+    "Y:HALF"
+   ],
+   "dataWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "displayWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "dataSha256": "1c96d10b1e0b0a796cd0435b7b160209c0a0611834d1fe1e0a35ecc859de2d57",
+   "f32Sha256": "1c96d10b1e0b0a796cd0435b7b160209c0a0611834d1fe1e0a35ecc859de2d57",
+   "matchesF32": true
+  },
+  {
+   "path": "packages/environment/tests/fixtures/synthetic-half-y-piz.exr",
+   "width": 37,
+   "height": 45,
+   "compression": "PIZ",
+   "layout": "Y",
+   "channels": [
+    "Y:HALF"
+   ],
+   "dataWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "displayWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "dataSha256": "1c96d10b1e0b0a796cd0435b7b160209c0a0611834d1fe1e0a35ecc859de2d57",
+   "f32Sha256": "1c96d10b1e0b0a796cd0435b7b160209c0a0611834d1fe1e0a35ecc859de2d57",
+   "matchesF32": true
+  },
+  {
+   "path": "packages/environment/tests/fixtures/synthetic-mixed-none.exr",
+   "width": 37,
+   "height": 45,
+   "compression": "NONE",
+   "layout": "RGBA",
+   "channels": [
+    "A:HALF",
+    "B:UINT",
+    "G:FLOAT",
+    "R:HALF",
+    "Z:FLOAT"
+   ],
+   "dataWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "displayWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "dataSha256": "b5f1b540fb09987d6ff7f694e3205c2c53d07e68c1329d3dc55cb48f85e47a14",
+   "f32Sha256": "b5f1b540fb09987d6ff7f694e3205c2c53d07e68c1329d3dc55cb48f85e47a14",
+   "matchesF32": true
+  },
+  {
+   "path": "packages/environment/tests/fixtures/synthetic-mixed-rle.exr",
+   "width": 37,
+   "height": 45,
+   "compression": "RLE",
+   "layout": "RGBA",
+   "channels": [
+    "A:HALF",
+    "B:UINT",
+    "G:FLOAT",
+    "R:HALF",
+    "Z:FLOAT"
+   ],
+   "dataWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "displayWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "dataSha256": "b5f1b540fb09987d6ff7f694e3205c2c53d07e68c1329d3dc55cb48f85e47a14",
+   "f32Sha256": "b5f1b540fb09987d6ff7f694e3205c2c53d07e68c1329d3dc55cb48f85e47a14",
+   "matchesF32": true
+  },
+  {
+   "path": "packages/environment/tests/fixtures/synthetic-mixed-zips.exr",
+   "width": 37,
+   "height": 45,
+   "compression": "ZIPS",
+   "layout": "RGBA",
+   "channels": [
+    "A:HALF",
+    "B:UINT",
+    "G:FLOAT",
+    "R:HALF",
+    "Z:FLOAT"
+   ],
+   "dataWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "displayWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "dataSha256": "b5f1b540fb09987d6ff7f694e3205c2c53d07e68c1329d3dc55cb48f85e47a14",
+   "f32Sha256": "b5f1b540fb09987d6ff7f694e3205c2c53d07e68c1329d3dc55cb48f85e47a14",
+   "matchesF32": true
+  },
+  {
+   "path": "packages/environment/tests/fixtures/synthetic-mixed-zip.exr",
+   "width": 37,
+   "height": 45,
+   "compression": "ZIP",
+   "layout": "RGBA",
+   "channels": [
+    "A:HALF",
+    "B:UINT",
+    "G:FLOAT",
+    "R:HALF",
+    "Z:FLOAT"
+   ],
+   "dataWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "displayWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "dataSha256": "b5f1b540fb09987d6ff7f694e3205c2c53d07e68c1329d3dc55cb48f85e47a14",
+   "f32Sha256": "b5f1b540fb09987d6ff7f694e3205c2c53d07e68c1329d3dc55cb48f85e47a14",
+   "matchesF32": true
+  },
+  {
+   "path": "packages/environment/tests/fixtures/synthetic-mixed-piz.exr",
+   "width": 37,
+   "height": 45,
+   "compression": "PIZ",
+   "layout": "RGBA",
+   "channels": [
+    "A:HALF",
+    "B:UINT",
+    "G:FLOAT",
+    "R:HALF",
+    "Z:FLOAT"
+   ],
+   "dataWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "displayWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "dataSha256": "b5f1b540fb09987d6ff7f694e3205c2c53d07e68c1329d3dc55cb48f85e47a14",
+   "f32Sha256": "b5f1b540fb09987d6ff7f694e3205c2c53d07e68c1329d3dc55cb48f85e47a14",
+   "matchesF32": true
+  },
+  {
+   "path": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "width": 256,
+   "height": 256,
+   "compression": "PIZ",
+   "layout": "RGB",
+   "channels": [
+    "B:HALF",
+    "G:HALF",
+    "R:HALF"
+   ],
+   "dataSha256": "2bc183e65c8146294457b6bf5a840e90576ddd41d1dc90971a6ff156b03061bc"
+  },
+  {
+   "path": "packages/environment/tests/fixtures/BrightRings.exr",
+   "width": 800,
+   "height": 800,
+   "compression": "ZIP",
+   "layout": "RGB",
+   "channels": [
+    "B:HALF",
+    "G:HALF",
+    "R:HALF"
+   ],
+   "dataSha256": "6dcd443feed1227b03b75837c9168d78ebbd169b966a91c90d0e109921aa6d6b"
+  }
+ ],
+ "damaged": [
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 8,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: unexpected end of file; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 2366,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 0 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 4724,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 0 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 7082,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 0 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 9440,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 1 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 11798,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 1 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 14156,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 1 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 16514,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 1 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 18872,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 2 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 21230,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 2 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 23588,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 2 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 25946,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 2 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 28304,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 3 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 30662,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 3 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 33020,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 3 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 35378,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 3 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 37736,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 4 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 40094,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 4 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 42452,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 4 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 44810,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 5 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 47168,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 5 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 49526,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 5 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 51884,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 5 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 54242,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 6 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 56600,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 6 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 58958,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 6 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 61316,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 6 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 63674,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 7 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 66032,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 7 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 68390,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 7 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "truncate",
+   "length": 70748,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 7 data out of bounds"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 1708,
+   "bit": 0,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: bad Huffman table; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 3366,
+   "bit": 1,
+   "result": {
+    "ok": true,
+    "dataSha256": "7890f1f21ec448c14da674f696895f503e97c8a355b52303d330fbfb4a48505d"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 8590,
+   "bit": 2,
+   "result": {
+    "ok": true,
+    "dataSha256": "cff050f0fb22cf7a46c36c52ce6ec2ea942baee9cf26f606cedf20f25f739844"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 38239,
+   "bit": 3,
+   "result": {
+    "ok": true,
+    "dataSha256": "f1f56c8d0fd7262cd13bb57df25c995b1c23eba62976a5c44fd3122bd3693943"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 23715,
+   "bit": 4,
+   "result": {
+    "ok": true,
+    "dataSha256": "db0dd3223bf1937f58ab454aa9837a798ab05a20c893fb7408e84adab5cdacc5"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 39445,
+   "bit": 5,
+   "result": {
+    "ok": true,
+    "dataSha256": "64bc7d4b374d33949892aec42d78676d966e30bd3a5f041ecaa88a198be72d00"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 3812,
+   "bit": 6,
+   "result": {
+    "ok": true,
+    "dataSha256": "b4f9a6e3bff90d1e540d093d163631dc96a8ace6d519817db737f1adcce13224"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 37239,
+   "bit": 7,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman produced 24575 of 24576 values; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 11010,
+   "bit": 0,
+   "result": {
+    "ok": true,
+    "dataSha256": "4aff525b57a86d7f4a81837dbd868763199c7ebb9f2b75511f5cc3642e85be7f"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 11131,
+   "bit": 1,
+   "result": {
+    "ok": true,
+    "dataSha256": "949f727180b8ae6651de98db46764db91e35a4da0012f896ac57e6abbbb76c5d"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 34240,
+   "bit": 2,
+   "result": {
+    "ok": true,
+    "dataSha256": "bd4d40ee690a5d26dd46845f37e6aad9e2b3b9655c016df449244245e438449d"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 39831,
+   "bit": 3,
+   "result": {
+    "ok": true,
+    "dataSha256": "0ae53641384639dca7133ea92b697d409e3e8ecc952869e4e7ddd7798479c6c9"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 9437,
+   "bit": 4,
+   "result": {
+    "ok": true,
+    "dataSha256": "290df4c58a0e45f63730c4a8e4b0c899bc67819e5f401216bc98e3ecb6ab72b1"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 27827,
+   "bit": 5,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman produced 21043 of 24576 values; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 42531,
+   "bit": 6,
+   "result": {
+    "ok": true,
+    "dataSha256": "330bcd5797ac5f5cc40a6eda39b6932403d6c9e0dec8299601d80cdc54ffdab7"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 62227,
+   "bit": 7,
+   "result": {
+    "ok": true,
+    "dataSha256": "e9a16d3186a8b6fa6e9f36c450ef98c62270c4233d400749e4fa0bca912743e8"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 27588,
+   "bit": 0,
+   "result": {
+    "ok": true,
+    "dataSha256": "0269e931b29fb046b3392c478c4a6d5cfddeeb173d9be2ad1448ec1e08e15694"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 66192,
+   "bit": 1,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman produced 24575 of 24576 values; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 3884,
+   "bit": 2,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman produced 24575 of 24576 values; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 5726,
+   "bit": 3,
+   "result": {
+    "ok": true,
+    "dataSha256": "5f58656ff5da9d6ed0534495136189e1071b06cb8db1fa1163fb6b9013ce8cae"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 17942,
+   "bit": 4,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman produced 24575 of 24576 values; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 32817,
+   "bit": 5,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman produced 24575 of 24576 values; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 67955,
+   "bit": 6,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman output overflow; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 37224,
+   "bit": 7,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman produced 24575 of 24576 values; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 38945,
+   "bit": 0,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman output overflow; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 36584,
+   "bit": 1,
+   "result": {
+    "ok": true,
+    "dataSha256": "eee22e30e41f2f87a84c56eae4a96da88a48742d791e49b0f91fa4491b29bc6e"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 18107,
+   "bit": 2,
+   "result": {
+    "ok": true,
+    "dataSha256": "b2719db50e1678031bb20efd68d5906ccefc50fb82fe2d4c23c896d301d0e9f0"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 54431,
+   "bit": 3,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: bad Huffman table; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 67824,
+   "bit": 4,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman output overflow; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 7242,
+   "bit": 5,
+   "result": {
+    "ok": true,
+    "dataSha256": "4f020c11e980029f3678f88e28c44e8f6baa91d3e33cd1670e2664db15a8b381"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 39460,
+   "bit": 6,
+   "result": {
+    "ok": true,
+    "dataSha256": "756e0267064c49ad9811a682f16f1200430ad416459c53d60c16a9599b779a3f"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 49427,
+   "bit": 7,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman output overflow; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 54677,
+   "bit": 0,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: bad Huffman table; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 9734,
+   "bit": 1,
+   "result": {
+    "ok": true,
+    "dataSha256": "0ab17e091a77686c3980bb034394fbd5becc5e7ac830b41eb87a138b497c4f1d"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 67457,
+   "bit": 2,
+   "result": {
+    "ok": true,
+    "dataSha256": "133b5bddf1877e7aacdf437e7b402c095b12c96635061c62b778be1ea780f25c"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 20610,
+   "bit": 3,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman output overflow; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 22195,
+   "bit": 4,
+   "result": {
+    "ok": true,
+    "dataSha256": "cfe0775b087d962d318a802d27a2d7fe0621959f2203ec665a54223de8509493"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 45882,
+   "bit": 5,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: bad Huffman table; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 5431,
+   "bit": 6,
+   "result": {
+    "ok": true,
+    "dataSha256": "4d45b4f7c065737af1b7d3637c2158a72d08cef3c2acad571d646076a7169a7d"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 21970,
+   "bit": 7,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman output overflow; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 44336,
+   "bit": 0,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman produced 24575 of 24576 values; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 18196,
+   "bit": 1,
+   "result": {
+    "ok": true,
+    "dataSha256": "188dbd6f26bb9b78901934d5dec4acc804c45ceb42b99ea853b5b5dd43ad6d12"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 3558,
+   "bit": 2,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman produced 24575 of 24576 values; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 17359,
+   "bit": 3,
+   "result": {
+    "ok": true,
+    "dataSha256": "fa51386421a595b32a110b0254029775ab3fdea59dae51037c30c4f34823c275"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 6938,
+   "bit": 4,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman output overflow; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 17660,
+   "bit": 5,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman produced 24575 of 24576 values; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 6248,
+   "bit": 6,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman output overflow; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 56914,
+   "bit": 7,
+   "result": {
+    "ok": true,
+    "dataSha256": "7a9f392acde4ab623df82547b43b8fa30787314b42100a55b6db90134a01851f"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 21267,
+   "bit": 0,
+   "result": {
+    "ok": true,
+    "dataSha256": "d689ddcdf8c73c568b6016a3fd3a70bbd333c4bc098b305a49036020fe30dac2"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 9953,
+   "bit": 1,
+   "result": {
+    "ok": true,
+    "dataSha256": "65bc9bd42298927b128060c09a3700ff71e061ec97bf0225cfc24b1478d16290"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 56437,
+   "bit": 2,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman output overflow; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 19076,
+   "bit": 3,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: bad Huffman table; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 15274,
+   "bit": 4,
+   "result": {
+    "ok": true,
+    "dataSha256": "50ce22ea658de279928a39e7ea7ff0ed9c8dd098677c4d736642a4ceedba0a61"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 6352,
+   "bit": 5,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman output overflow; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 65320,
+   "bit": 6,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman produced 24575 of 24576 values; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 54537,
+   "bit": 7,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: bad Huffman code; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 27592,
+   "bit": 0,
+   "result": {
+    "ok": true,
+    "dataSha256": "f5bb710074e0126f547f2b8e739b027535f79fe793775e5621106eab7d54b198"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 44719,
+   "bit": 1,
+   "result": {
+    "ok": true,
+    "dataSha256": "4739c2f3c9ebab99e19fb07c59ea87dcf1abecd1bbb635cb4cf3f24096d5a373"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 47386,
+   "bit": 2,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman produced 24575 of 24576 values; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "packages/environment/tests/fixtures/AllHalfValues.exr",
+   "kind": "flip",
+   "at": 24242,
+   "bit": 3,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman output overflow; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 8,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: unexpected end of file; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 398,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 0 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 788,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 0 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 1178,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 0 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 1568,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 0 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 1958,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 0 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 2348,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 0 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 2738,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 0 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 3128,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 0 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 3518,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 0 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 3908,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 0 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 4298,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 0 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 4688,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 0 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 5078,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 0 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 5468,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 0 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 5858,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 0 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 6248,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 0 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 6638,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 0 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 7028,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 0 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 7418,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 0 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 7808,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 0 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 8198,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 1 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 8588,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 1 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 8978,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 1 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 9368,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 1 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 9758,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 1 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 10148,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 1 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 10538,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 1 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 10928,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 1 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "truncate",
+   "length": 11318,
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "Invalid EXR: chunk 1 data out of bounds"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 4455,
+   "bit": 0,
+   "result": {
+    "ok": true,
+    "dataSha256": "27c71d666f03a0657ec86cf6989e9f4277c9fe1ad7bd6be445ff7defa4c597d3"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 4952,
+   "bit": 1,
+   "result": {
+    "ok": true,
+    "dataSha256": "88fb674ff670563d4aea6f8ad4f64921320b3d2944d2ec94e38220564b1effba"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 7960,
+   "bit": 2,
+   "result": {
+    "ok": true,
+    "dataSha256": "b456fcd996e4b7124df47782122b5e018203962773f8ac72cfee35273f7a6e00"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 4113,
+   "bit": 3,
+   "result": {
+    "ok": true,
+    "dataSha256": "43a34919632d79d795c52697bc760617d6e722e459d00ec045a0e4406d0a294c"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 10321,
+   "bit": 4,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman output overflow; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 2830,
+   "bit": 5,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman table overrun; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 11522,
+   "bit": 6,
+   "result": {
+    "ok": true,
+    "dataSha256": "1c51c95b742ebdf237331be612d2dcd154eb5eb2773d69e3ad0d51b3b9254ac8"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 2430,
+   "bit": 7,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: bad Huffman table; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 3057,
+   "bit": 0,
+   "result": {
+    "name": "MargoError",
+    "code": "unsupported",
+    "message": "Unsupported EXR: Huffman code too long; export it with ZIP compression"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 985,
+   "bit": 1,
+   "result": {
+    "ok": true,
+    "dataSha256": "9fd99c448b6fe0190f51a439c30c0d88914bd09db03275525b49e17c0f6b52f1"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 1867,
+   "bit": 2,
+   "result": {
+    "ok": true,
+    "dataSha256": "7fff5a8c2df8488a2e0ce5e914958ccaf1188e183db237f0de171c30b276a25a"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 11017,
+   "bit": 3,
+   "result": {
+    "ok": true,
+    "dataSha256": "3b07e7b3705e4f193ab65a44ab0fbe855837b9610a29f91c30285f59ae12f8a0"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 10689,
+   "bit": 4,
+   "result": {
+    "ok": true,
+    "dataSha256": "794b833b00a70bf9befe810808fd673a28af77d6594d44ec162c777bfff35a27"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 546,
+   "bit": 5,
+   "result": {
+    "ok": true,
+    "dataSha256": "decb0927cc527a9d36d20f084b568e3dc82915e153e4c682d7feab17e41669fa"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 6007,
+   "bit": 6,
+   "result": {
+    "ok": true,
+    "dataSha256": "4c8124ffce24f32546bad08b1ef0bf8fe8be1d0efad95726e21536c55bef02f0"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 1207,
+   "bit": 7,
+   "result": {
+    "ok": true,
+    "dataSha256": "b6e0eedb8ef8491bb737cde60c77bb39d37e10de6e571a80f56bedb5b9c4a6c1"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 9269,
+   "bit": 0,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: bad Huffman code; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 2463,
+   "bit": 1,
+   "result": {
+    "name": "MargoError",
+    "code": "unsupported",
+    "message": "Unsupported EXR: Huffman code too long; export it with ZIP compression"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 3717,
+   "bit": 2,
+   "result": {
+    "ok": true,
+    "dataSha256": "cbb83c227a3e36f4922c1f038ae1d770c67a3ff889f3e92857b6abd74c563753"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 7752,
+   "bit": 3,
+   "result": {
+    "ok": true,
+    "dataSha256": "9b24ead64f342edde212485d0ca0b0d1b8cc8eee33fc1ed801efe854f8859f44"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 11689,
+   "bit": 4,
+   "result": {
+    "ok": true,
+    "dataSha256": "27a4008fb382531a6d2427c18c90761546be491be1d8330ebf4653391a3f020b"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 482,
+   "bit": 5,
+   "result": {
+    "ok": true,
+    "dataSha256": "6a83fb2ae9235224bb9a7bae77ab25515e8d900aea09beaa21addfd2ad8e686d"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 10350,
+   "bit": 6,
+   "result": {
+    "ok": true,
+    "dataSha256": "173bf246a85efc00709f2dcad0352b1642c5b4749386d73db912e66e505ecc46"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 6050,
+   "bit": 7,
+   "result": {
+    "ok": true,
+    "dataSha256": "42b4281e585f7ce9e9cb48a186b3540e0cac6e673175f5f692372dc2a4e48a63"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 11459,
+   "bit": 0,
+   "result": {
+    "ok": true,
+    "dataSha256": "c59ddc5236aead1c2d5ce2eea1b2755e0c1ebe68343baf457e4f74166afe935a"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 7125,
+   "bit": 1,
+   "result": {
+    "ok": true,
+    "dataSha256": "2612c87bcd663d1aa602369e4d7be8c3a4f9c9848683a121b37c9d83dc065606"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 8128,
+   "bit": 2,
+   "result": {
+    "ok": true,
+    "dataSha256": "786185794ecfeec7e0d890f53eec2e5f4ac3dd9cc8ca10a1d41fedead8a87968"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 2487,
+   "bit": 3,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: bad Huffman code; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 1530,
+   "bit": 4,
+   "result": {
+    "ok": true,
+    "dataSha256": "41687ab7d5bcefac4861df32dd9037c84dcc93c0c9d584ebd6185690b604f09b"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 7500,
+   "bit": 5,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman output overflow; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 11367,
+   "bit": 6,
+   "result": {
+    "ok": true,
+    "dataSha256": "a5a97a44476f5d79588022dabf12a76080b46d071b588c9b2e060549179799e3"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 11575,
+   "bit": 7,
+   "result": {
+    "ok": true,
+    "dataSha256": "0b081a8bf99301aeb6d7e2720e3f32793d9185bde90c4e4f291bdfb7b96c52e4"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 6239,
+   "bit": 0,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman produced 4735 of 4736 values; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 7776,
+   "bit": 1,
+   "result": {
+    "ok": true,
+    "dataSha256": "9304897dd6da812a48c2cac6093ce08c0997ea1486e0ca141817410fde829c34"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 1717,
+   "bit": 2,
+   "result": {
+    "ok": true,
+    "dataSha256": "b24fb9020f6128f3374539d9851604f5f451cc3c842d1ec1084b4a11c825faca"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 10593,
+   "bit": 3,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman produced 1923 of 1924 values; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 3140,
+   "bit": 4,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: bad Huffman table; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 7423,
+   "bit": 5,
+   "result": {
+    "ok": true,
+    "dataSha256": "8c9717858fc8b5c0071b6a6a00b53f74dfffe6848f94029e2da79377c6c123d4"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 5742,
+   "bit": 6,
+   "result": {
+    "ok": true,
+    "dataSha256": "18045f023b3c094fe9776d1ea65bc25069eb58d0643da4190a090b442f7feb28"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 2012,
+   "bit": 7,
+   "result": {
+    "ok": true,
+    "dataSha256": "b7104e0933cea8d5ab233e6c268b592734871da886db2b60f146cf225f7c686c"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 8533,
+   "bit": 0,
+   "result": {
+    "ok": true,
+    "dataSha256": "9198623be01c38f613990599e422aa6f80634bda1e60e63ca4adfbe13c3221a1"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 3163,
+   "bit": 1,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: bad Huffman table; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 11397,
+   "bit": 2,
+   "result": {
+    "ok": true,
+    "dataSha256": "d9ee09bce04db9b7b610fce1f2976cc854cba8ead67d5a020551d263bc2ae0fd"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 10514,
+   "bit": 3,
+   "result": {
+    "ok": true,
+    "dataSha256": "8b078be62a3592cdccd0db6ecf05ffab190ff14a7e88e5aa4428167d113e9cfc"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 9260,
+   "bit": 4,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman table overrun; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 9783,
+   "bit": 5,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: bad Huffman code; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 11560,
+   "bit": 6,
+   "result": {
+    "ok": true,
+    "dataSha256": "9f10eb3d6bbd5640f1a75b279a2cce7fea336d44a79a3460c498e0f6e9aa6bc2"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 11610,
+   "bit": 7,
+   "result": {
+    "ok": true,
+    "dataSha256": "7601d12f8419d6b2b7f38c717409446bc0720d0496370c44fb5d6347dbe597e5"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 8556,
+   "bit": 0,
+   "result": {
+    "ok": true,
+    "dataSha256": "8ff9dc6348b5e0aaf36dcab4280ff9b6c1896029da76c892584af1c41846033a"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 2296,
+   "bit": 1,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: bad Huffman table; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 8181,
+   "bit": 2,
+   "result": {
+    "ok": true,
+    "dataSha256": "ed70a59339485f12a0a10a6f04082a5f63f4c6c9d3ce83789bfa14d3b9c773c3"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 6570,
+   "bit": 3,
+   "result": {
+    "ok": true,
+    "dataSha256": "9ecb954004eaaf12034fe51e5113941a5cb84e3cc1726ca5302468800cb8f33d"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 6122,
+   "bit": 4,
+   "result": {
+    "ok": true,
+    "dataSha256": "66a73a4a1509f05c338073fe1d8e575ccebf2ffc64aba64ab3131ea0b124dc4f"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 8932,
+   "bit": 5,
+   "result": {
+    "ok": true,
+    "dataSha256": "455de526dce657b7662f4e426ecaa07b79df897a61605616eed6adbdb003a1a5"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 5537,
+   "bit": 6,
+   "result": {
+    "ok": true,
+    "dataSha256": "a85925132876634b80cac472fa6d8870c22737890d81576a23cd826f6d85f735"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 9696,
+   "bit": 7,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: Huffman table overrun; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 3445,
+   "bit": 0,
+   "result": {
+    "ok": true,
+    "dataSha256": "33b1f9a19fc68447f2d824aea0697e2703bc6e0e944151e342dc5741bece4937"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 4082,
+   "bit": 1,
+   "result": {
+    "ok": true,
+    "dataSha256": "c04b0b05b694be2b8396d48ad4bcc431cd5a844d02c5a4503ed8076e367df237"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 9792,
+   "bit": 2,
+   "result": {
+    "name": "MargoError",
+    "code": "failed",
+    "message": "Invalid EXR: bad Huffman table; the file is damaged or not OpenEXR, export it again"
+   }
+  },
+  {
+   "base": "vectors/exr-piz/half-rgba-smooth.exr",
+   "kind": "flip",
+   "at": 6515,
+   "bit": 3,
+   "result": {
+    "ok": true,
+    "dataSha256": "d173662465c4adbc48146e3258de3f20e96fa4b873e4261cf01646d839b10e61"
+   }
+  }
+ ]
+}

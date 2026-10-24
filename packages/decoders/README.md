@@ -27,7 +27,7 @@ or `new Texture(await ktx2.transcode(bytes))`, which uploads the transcoded mips
 
 ## Meshopt
 
-`decodeMeshoptBuffer(source, count, stride, mode, filter)` decodes one `EXT_meshopt_compression` bufferView (ATTRIBUTES, TRIANGLES or INDICES, with the OCTAHEDRAL, QUATERNION and EXPONENTIAL filters) and returns a `Uint8Array`. It is pure TypeScript, synchronous and needs no Wasm. Output matches the meshoptimizer reference decoder bit for bit. `MeshoptDecoder` has the members of the meshoptimizer project's own decoder object (`supported`, `ready`, `decodeGltfBuffer`), so glTF loaders written against that interface work unchanged. The extension only allows vertex codec version 0, so version 1 streams are rejected with a clear error.
+`decodeMeshoptBuffer(source, count, stride, mode, filter)` decodes one `EXT_meshopt_compression` or `KHR_meshopt_compression` bufferView (ATTRIBUTES, TRIANGLES or INDICES, with the OCTAHEDRAL, QUATERNION, EXPONENTIAL and COLOR filters) and returns a `Uint8Array`. It is pure TypeScript, written from the two extension specifications, synchronous and needs no Wasm. Output matches the meshoptimizer reference decoder bit for bit. Attribute streams of vertex codec version 0 (the only one `EXT_meshopt_compression` defines) and version 1 (added by `KHR_meshopt_compression`) are both decoded, whichever extension names the bufferView; any other version is rejected with a clear error. `MeshoptDecoder` has the members of the meshoptimizer project's own decoder object (`supported`, `ready`, `decodeGltfBuffer`), so glTF loaders written against that interface work unchanged.
 
 ## Texture upload (`@margoengine/decoders/texture`)
 

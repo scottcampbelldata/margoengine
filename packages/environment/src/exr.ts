@@ -234,7 +234,7 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
     else if (compression === 'NONE') throw invalid(`chunk ${block} has ${dataSize} bytes, expected ${expected}`);
     else if (compression === 'RLE') raw = unpredict(rleDecode(packed, expected));
     else if (compression === 'ZIP' || compression === 'ZIPS') raw = unpredict(inflateZlib(packed, expected));
-    else raw = pizDecode(packed, expected, channels, width, lines);
+    else raw = decodePizChunk(packed, expected, channels, width, lines);
     const raw16 = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
     for (let line = 0; line < lines; line++) {
       const row = index * linesPerBlock + line,
@@ -257,337 +257,364 @@ export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
   return { width, height, data, compression, channels, layout, dataWindow, displayWindow: displayWindow ?? dataWindow };
 }
 
-function rleDecode(input: Uint8Array, size: number): Uint8Array {
-  const out = new Uint8Array(size);
-  let i = 0,
-    o = 0;
-  while (i < input.length) {
-    const count = (input[i++] << 24) >> 24;
+// ------------------------------------------------------------------ RLE, ZIP and ZIPS reconstruction
+
+/**
+ * Expands an RLE chunk (OpenEXR Technical Introduction, "Data Compression"). Each packet starts with a signed count
+ * byte: a negative count -k is followed by k literal bytes, a count k >= 0 by one byte repeated k + 1 times.
+ * The packets must fill exactly `expected` bytes.
+ */
+function rleDecode(packed: Uint8Array, expected: number): Uint8Array {
+  const out = new Uint8Array(expected);
+  let read = 0,
+    written = 0;
+  while (read < packed.length) {
+    const count = (packed[read++] << 24) >> 24;
     if (count < 0) {
-      const n = -count;
-      if (i + n > input.length || o + n > size) throw invalid('RLE literal out of bounds');
-      out.set(input.subarray(i, i + n), o);
-      i += n;
-      o += n;
+      const length = -count;
+      if (read + length > packed.length || written + length > expected) throw invalid('RLE literal out of bounds');
+      out.set(packed.subarray(read, read + length), written);
+      read += length;
+      written += length;
     } else {
-      const n = count + 1;
-      if (i >= input.length || o + n > size) throw invalid('RLE run out of bounds');
-      out.fill(input[i++], o, o + n);
-      o += n;
+      const length = count + 1;
+      if (read >= packed.length || written + length > expected) throw invalid('RLE run out of bounds');
+      out.fill(packed[read++], written, written + length);
+      written += length;
     }
   }
-  if (o !== size) throw invalid('RLE chunk size mismatch');
+  if (written !== expected) throw invalid('RLE chunk size mismatch');
   return out;
 }
 
-// Undoes the byte delta predictor and the even/odd byte split shared by RLE, ZIPS and ZIP.
-function unpredict(t: Uint8Array): Uint8Array {
-  for (let i = 1; i < t.length; i++) t[i] = (t[i - 1] + t[i] - 128) & 255;
-  const out = new Uint8Array(t.length),
-    half = (t.length + 1) >> 1;
-  for (let i = 0, a = 0, b = half; i < t.length; ) {
-    out[i++] = t[a++];
-    if (i < t.length) out[i++] = t[b++];
-  }
+/**
+ * Undoes the byte predictor and the even/odd split that RLE, ZIPS and ZIP apply before compressing. The stored bytes
+ * are differences biased by 128; once summed, the first half (rounded up) holds the even-indexed output bytes and the
+ * rest the odd-indexed ones.
+ */
+function unpredict(stored: Uint8Array): Uint8Array {
+  const n = stored.length;
+  const summed = new Uint8Array(n);
+  if (n) summed[0] = stored[0];
+  for (let i = 1; i < n; i++) summed[i] = (summed[i - 1] + stored[i] - 128) & 255;
+  const out = new Uint8Array(n);
+  const half = (n + 1) >> 1;
+  for (let i = 0; i < half; i++) out[2 * i] = summed[i];
+  for (let i = half; i < n; i++) out[2 * (i - half) + 1] = summed[i];
   return out;
 }
 
-// ---------------------------------------------------------------- PIZ (Huffman + Haar wavelet + LUT)
+// ------------------------------------------------------------------ PIZ
 
-const USHORT_RANGE = 1 << 16,
-  BITMAP_SIZE = USHORT_RANGE >> 3;
-const HUF_ENCSIZE = (1 << 16) + 1,
-  HUF_DECBITS = 14,
-  HUF_DECSIZE = 1 << HUF_DECBITS,
-  HUF_DECMASK = HUF_DECSIZE - 1;
-const SHORT_ZEROCODE_RUN = 59,
-  LONG_ZEROCODE_RUN = 63,
-  SHORTEST_LONG_RUN = 2 + LONG_ZEROCODE_RUN - SHORT_ZEROCODE_RUN;
-// Bit accumulators stay exact in a double up to 53 bits, so codes longer than this are rejected.
-const MAX_CODE_LENGTH = 44;
+// Format facts (OpenEXR PIZ): the bitmap covers every 16-bit value, the Huffman alphabet is the 65,536 words plus one
+// run symbol, and code lengths are packed in 6-bit fields whose top values 59..63 encode runs of absent symbols.
+const BITMAP_BYTES = 8192;
+const WORD_VALUES = 65536;
+const SYMBOLS = WORD_VALUES + 1;
+const LENGTH_FIELD_BITS = 6;
+const SHORT_ABSENT_FIRST = 59; // 59..62: 2..5 absent symbols
+const LONG_ABSENT = 63; // followed by 8 bits: 6..261 absent symbols
+const LARGEST_LEGAL_LENGTH = 58;
+// Margo's own cap: codes up to 44 bits keep every code and bit read exact in a double.
+const LONGEST_SUPPORTED_LENGTH = 44;
+// Decoding window: codes up to this many bits resolve with one table lookup; longer ones by their 14-bit prefix.
+const WINDOW_BITS = 14;
+const WINDOW_SIZE = 1 << WINDOW_BITS;
+// The wavelet runs in its 14-bit form while every rank fits in 14 bits, else in its 16-bit form.
+const FOURTEEN_BIT_LIMIT = 1 << 14;
 
-function pizDecode(input: Uint8Array, size: number, channels: EXRChannel[], width: number, lines: number): Uint8Array {
+/**
+ * Decodes the pixel data of one PIZ chunk (after its 8-byte y / size prefix) into the chunk's uncompressed scanline
+ * bytes: for each line, each channel in list order, its `width` samples little-endian.
+ * `size` is lines * width * (sum of channel sample sizes); the result has exactly that length.
+ */
+function decodePizChunk(
+  input: Uint8Array,
+  size: number,
+  channels: EXRChannel[],
+  width: number,
+  lines: number,
+): Uint8Array {
   const view = new DataView(input.buffer, input.byteOffset, input.byteLength);
   if (input.length < 4) throw invalid('truncated PIZ chunk');
-  const minNonZero = view.getUint16(0, true),
-    maxNonZero = view.getUint16(2, true);
-  let position = 4;
-  if (maxNonZero >= BITMAP_SIZE) throw invalid('PIZ bitmap out of range');
-  const bitmap = new Uint8Array(BITMAP_SIZE);
-  if (minNonZero <= maxNonZero) {
-    const n = maxNonZero - minNonZero + 1;
-    if (position + n > input.length) throw invalid('truncated PIZ bitmap');
-    bitmap.set(input.subarray(position, position + n), minNonZero);
-    position += n;
-  }
-  const lut = new Uint16Array(USHORT_RANGE);
-  let k = 0;
-  for (let i = 0; i < USHORT_RANGE; i++) if (i === 0 || bitmap[i >> 3] & (1 << (i & 7))) lut[k++] = i;
-  const maxValue = k - 1;
-  if (position + 4 > input.length) throw invalid('truncated PIZ chunk');
-  const length = view.getInt32(position, true);
-  position += 4;
-  if (length < 0 || position + length > input.length) throw invalid('PIZ Huffman data out of bounds');
-  if (size & 1) throw invalid('PIZ chunk size is odd');
-  const buffer = new Uint16Array(size >> 1);
-  hufUncompress(input.subarray(position, position + length), buffer);
+  const firstByte = view.getUint16(0, true),
+    lastByte = view.getUint16(2, true);
+  if (lastByte >= BITMAP_BYTES) throw invalid('PIZ bitmap out of range');
+  const bitmapLength = firstByte <= lastByte ? lastByte - firstByte + 1 : 0;
+  let at = 4;
+  if (at + bitmapLength > input.length) throw invalid('truncated PIZ bitmap');
+  const bitmap = new Uint8Array(BITMAP_BYTES);
+  bitmap.set(input.subarray(at, at + bitmapLength), firstByte);
+  at += bitmapLength;
+  if (at + 4 > input.length) throw invalid('truncated PIZ chunk');
+  const huffmanLength = view.getInt32(at, true);
+  at += 4;
+  if (huffmanLength < 0 || at + huffmanLength > input.length) throw invalid('PIZ Huffman data out of bounds');
+  if (size % 2) throw invalid('PIZ chunk size is odd');
 
-  // Wavelet decode each channel plane (FLOAT and UINT channels are two interleaved 16-bit planes).
-  const starts: number[] = [];
-  let start = 0;
+  // Ranks back to values: rank k is the k-th present value counting up from 0, which is always present.
+  const values = new Uint16Array(WORD_VALUES);
+  let present = 0;
+  for (let value = 0; value < WORD_VALUES; value++)
+    if (value === 0 || bitmap[value >> 3] & (1 << (value & 7))) values[present++] = value;
+
+  const words = decodeHuffman(input.subarray(at, at + huffmanLength), size / 2);
+
+  const fourteenBit = present - 1 < FOURTEEN_BIT_LIMIT;
+  let planeStart = 0;
   for (const channel of channels) {
-    const components = channel.type === 'HALF' ? 1 : 2;
-    starts.push(start);
-    for (let j = 0; j < components; j++)
-      wav2Decode(buffer, start + j, width, components, lines, width * components, maxValue);
-    start += width * lines * components;
+    const parts = channel.type === 'HALF' ? 1 : 2;
+    for (let part = 0; part < parts; part++)
+      inverseWavelet(words, planeStart + part, width, lines, parts, parts * width, fourteenBit);
+    planeStart += parts * width * lines;
   }
-  for (let i = 0; i < buffer.length; i++) buffer[i] = lut[buffer[i]];
+  for (let i = 0; i < words.length; i++) words[i] = values[words[i]];
 
-  // Interleave the planes back into scanline order.
-  const out = new Uint8Array(size),
-    outView = new DataView(out.buffer);
+  const out = new Uint8Array(size);
   let o = 0;
-  for (let y = 0; y < lines; y++)
-    for (let c = 0; c < channels.length; c++) {
-      const n = width * (channels[c].type === 'HALF' ? 1 : 2),
-        from = starts[c] + y * n;
-      for (let i = 0; i < n; i++, o += 2) outView.setUint16(o, buffer[from + i], true);
+  for (let line = 0; line < lines; line++) {
+    let start = 0;
+    for (const channel of channels) {
+      const rowWords = (channel.type === 'HALF' ? 1 : 2) * width;
+      for (let i = start + line * rowWords, end = i + rowWords; i < end; i++) {
+        const word = words[i];
+        out[o++] = word & 255;
+        out[o++] = word >> 8;
+      }
+      start += rowWords * lines;
     }
+  }
   return out;
 }
 
-function hufUncompress(input: Uint8Array, out: Uint16Array): void {
-  if (input.length < 20) throw invalid('truncated PIZ Huffman header');
-  const view = new DataView(input.buffer, input.byteOffset, input.byteLength);
-  const im = view.getUint32(0, true),
-    iM = view.getUint32(4, true),
-    nBits = view.getUint32(12, true);
-  if (im >= HUF_ENCSIZE || iM >= HUF_ENCSIZE || im > iM) throw invalid('bad Huffman symbol range');
-  const codes = new Float64Array(HUF_ENCSIZE); // (code << 6) | length, may exceed 32 bits
-  let position = 20;
-  // Unpack the code length table.
-  {
-    let c = 0,
-      lc = 0;
-    const getBits = (n: number): number => {
-      while (lc < n) {
-        if (position >= input.length) throw invalid('truncated Huffman table');
-        c = ((c << 8) | input[position++]) & 0xffffff;
-        lc += 8;
-      }
-      lc -= n;
-      return (c >> lc) & ((1 << n) - 1);
-    };
-    for (let i = im; i <= iM; i++) {
-      const l = getBits(6);
-      codes[i] = l;
-      if (l === LONG_ZEROCODE_RUN) {
-        let run = getBits(8) + SHORTEST_LONG_RUN;
-        if (i + run > iM + 1) throw invalid('Huffman table overrun');
-        while (run--) codes[i++] = 0;
-        i--;
-      } else if (l >= SHORT_ZEROCODE_RUN) {
-        let run = l - SHORT_ZEROCODE_RUN + 2;
-        if (i + run > iM + 1) throw invalid('Huffman table overrun');
-        while (run--) codes[i++] = 0;
-        i--;
-      }
+/**
+ * Decodes PIZ's Huffman section (20-byte header, packed code lengths, then the coded words) into exactly `count`
+ * 16-bit words. The largest symbol in the table is the run symbol: it is followed by an 8-bit count of extra copies of
+ * the previous word.
+ */
+function decodeHuffman(section: Uint8Array, count: number): Uint16Array {
+  if (section.length < 20) throw invalid('truncated PIZ Huffman header');
+  const header = new DataView(section.buffer, section.byteOffset, 20);
+  const lowest = header.getUint32(0, true),
+    highest = header.getUint32(4, true),
+    bitCount = header.getUint32(12, true);
+  if (lowest >= SYMBOLS || highest >= SYMBOLS || lowest > highest) throw invalid('bad Huffman symbol range');
+
+  // Packed code lengths, read MSB-first from byte 20.
+  const lengths = new Uint8Array(SYMBOLS);
+  const tableBits = (section.length - 20) * 8;
+  let bit = 0;
+  const take = (n: number): number => {
+    if (bit + n > tableBits) throw invalid('truncated Huffman table');
+    let value = 0;
+    for (let k = 0; k < n; k++, bit++) value = (value << 1) | ((section[20 + (bit >> 3)] >> (7 - (bit & 7))) & 1);
+    return value;
+  };
+  for (let symbol = lowest; symbol <= highest; ) {
+    const field = take(LENGTH_FIELD_BITS);
+    if (field < SHORT_ABSENT_FIRST) {
+      lengths[symbol++] = field;
+      continue;
     }
+    const absent = field === LONG_ABSENT ? take(8) + 6 : field - SHORT_ABSENT_FIRST + 2;
+    if (symbol + absent > highest + 1) throw invalid('Huffman table overrun');
+    symbol += absent; // their lengths stay 0
   }
-  // Canonical code assignment.
-  const counts = new Float64Array(59);
-  for (let i = 0; i < HUF_ENCSIZE; i++) counts[codes[i]]++;
-  let code = 0;
-  for (let i = 58; i > 0; i--) {
-    const next = Math.floor((code + counts[i]) / 2);
-    counts[i] = code;
-    code = next;
+  const dataStart = 20 + Math.ceil(bit / 8);
+
+  // Canonical codes: longer codes take smaller values; within one length, codes follow symbol order.
+  const perLength = new Float64Array(LARGEST_LEGAL_LENGTH + 1);
+  for (let symbol = lowest; symbol <= highest; symbol++) perLength[lengths[symbol]]++;
+  const next = new Float64Array(LARGEST_LEGAL_LENGTH + 1);
+  for (let length = LARGEST_LEGAL_LENGTH, c = 0; length >= 1; length--) {
+    next[length] = c;
+    c = Math.floor((c + perLength[length]) / 2);
   }
-  const lengths = new Uint8Array(HUF_ENCSIZE);
-  const values = new Float64Array(HUF_ENCSIZE);
-  for (let i = 0; i < HUF_ENCSIZE; i++) {
-    const l = codes[i];
-    if (l > 0) {
-      lengths[i] = l;
-      values[i] = counts[l]++;
-    }
-  }
-  // Decoding table: short codes fill a direct lookup, long codes chain off their 14-bit prefix.
-  const decodeLength = new Uint8Array(HUF_DECSIZE),
-    decodeLiteral = new Int32Array(HUF_DECSIZE);
-  const longCodes: (number[] | undefined)[] = new Array(HUF_DECSIZE);
-  for (let i = im; i <= iM; i++) {
-    const l = lengths[i],
-      c = values[i];
-    if (!l) continue;
-    if (l > MAX_CODE_LENGTH)
+
+  // Lookup: a window value maps to the short code covering it, or to the long codes that have it as their prefix.
+  const codes = new Float64Array(SYMBOLS);
+  const windowSymbol = new Int32Array(WINDOW_SIZE).fill(-1);
+  const windowLength = new Uint8Array(WINDOW_SIZE);
+  const longByPrefix = new Map<number, number[]>();
+  for (let symbol = lowest; symbol <= highest; symbol++) {
+    const length = lengths[symbol];
+    if (!length) continue;
+    if (length > LONGEST_SUPPORTED_LENGTH)
       throw unsupported('Unsupported EXR: Huffman code too long', 'export it with ZIP compression');
-    if (c >= 2 ** l) throw invalid('bad Huffman code');
-    if (l > HUF_DECBITS) {
-      const prefix = Math.floor(c / 2 ** (l - HUF_DECBITS));
-      if (decodeLength[prefix]) throw invalid('bad Huffman table');
-      (longCodes[prefix] ??= []).push(i);
+    const code = next[length]++;
+    if (code >= 2 ** length) throw invalid('bad Huffman code');
+    codes[symbol] = code;
+    if (length <= WINDOW_BITS) {
+      const first = code * 2 ** (WINDOW_BITS - length),
+        end = first + 2 ** (WINDOW_BITS - length);
+      for (let w = first; w < end; w++) {
+        if (windowSymbol[w] >= 0 || longByPrefix.has(w)) throw invalid('bad Huffman table');
+        windowSymbol[w] = symbol;
+        windowLength[w] = length;
+      }
     } else {
-      const first = c * 2 ** (HUF_DECBITS - l),
-        count = 1 << (HUF_DECBITS - l);
-      for (let j = first; j < first + count; j++) {
-        if (decodeLength[j] || longCodes[j]) throw invalid('bad Huffman table');
-        decodeLength[j] = l;
-        decodeLiteral[j] = i;
-      }
+      const prefix = Math.floor(code / 2 ** (length - WINDOW_BITS));
+      if (windowSymbol[prefix] >= 0) throw invalid('bad Huffman table');
+      const list = longByPrefix.get(prefix);
+      if (list) list.push(symbol);
+      else longByPrefix.set(prefix, [symbol]);
     }
   }
-  // Decode the bit stream. `c` holds the `lc` unread bits, kept below 2^53.
-  const available = input.length - position;
-  if (nBits > available * 8) throw invalid('Huffman bit count exceeds data');
-  const end = position + Math.ceil(nBits / 8),
-    rlc = iM,
-    size = out.length;
-  let c = 0,
-    lc = 0,
-    o = 0;
-  const top = (n: number) =>
-    lc <= 32 && n <= 30 ? (c >>> (lc - n)) & ((1 << n) - 1) : Math.floor(c / 2 ** (lc - n)) % 2 ** n;
-  const consume = (n: number) => {
-    lc -= n;
-    c = lc <= 30 ? c & ((1 << lc) - 1) : c % 2 ** lc;
+  if (bitCount > (section.length - dataStart) * 8) throw invalid('Huffman bit count exceeds data');
+
+  const data = section.subarray(dataStart, dataStart + Math.ceil(bitCount / 8));
+  const totalBits = data.length * 8;
+  const byteAt = (i: number) => (i < data.length ? data[i] : 0);
+  // The 14 bits starting at bit position p (zeros past the data).
+  const peekWindow = (p: number): number => {
+    const i = p >>> 3;
+    const three = (byteAt(i) << 16) | (byteAt(i + 1) << 8) | byteAt(i + 2);
+    return (three >> (10 - (p & 7))) & (WINDOW_SIZE - 1);
   };
-  const emit = (symbol: number) => {
-    if (symbol === rlc) {
-      if (lc < 8) {
-        if (position >= end) throw invalid('truncated Huffman run');
-        c = c * 256 + input[position++];
-        lc += 8;
-      }
-      const run = top(8);
-      consume(8);
-      if (o + run > size || o < 1) throw invalid('Huffman run out of bounds');
-      out.fill(out[o - 1], o, o + run);
-      o += run;
-    } else {
-      if (o >= size) throw invalid('Huffman output overflow');
-      out[o++] = symbol;
-    }
+  // n bits (n <= 44) starting at bit position p, all inside the data.
+  const readBits = (p: number, n: number): number => {
+    let value = 0;
+    for (let k = 0; k < n; k++, p++) value = value * 2 + ((data[p >>> 3] >> (7 - (p & 7))) & 1);
+    return value;
   };
-  while (position < end) {
-    c = c * 256 + input[position++];
-    lc += 8;
-    while (lc >= HUF_DECBITS) {
-      const index = top(HUF_DECBITS) & HUF_DECMASK;
-      if (decodeLength[index]) {
-        consume(decodeLength[index]);
-        emit(decodeLiteral[index]);
-        continue;
-      }
-      const candidates = longCodes[index];
-      if (!candidates) throw invalid('bad Huffman code in data');
-      let matched = false;
-      for (const symbol of candidates) {
-        const l = lengths[symbol];
-        while (lc < l && position < end) {
-          c = c * 256 + input[position++];
-          lc += 8;
-        }
-        if (lc >= l && top(l) === values[symbol]) {
-          consume(l);
-          emit(symbol);
-          matched = true;
-          break;
-        }
-      }
-      if (!matched) throw invalid('bad Huffman code in data');
+
+  const out = new Uint16Array(count);
+  let produced = 0,
+    position = 0;
+  // Outputs one decoded symbol whose code ended at bit `at`; returns the position after it (and after a run count).
+  const emit = (symbol: number, at: number): number => {
+    if (symbol !== highest) {
+      if (produced >= count) throw invalid('Huffman output overflow');
+      out[produced++] = symbol;
+      return at;
     }
+    const repeat = readBits(at, 8);
+    if (produced === 0 || produced + repeat > count) throw invalid('Huffman run out of bounds');
+    out.fill(out[produced - 1], produced, produced + repeat);
+    produced += repeat;
+    return at + 8;
+  };
+
+  // Phase 1: a full window is available (padding bits count as available).
+  while (totalBits - position >= WINDOW_BITS) {
+    const w = peekWindow(position);
+    let symbol = windowSymbol[w],
+      length = windowLength[w];
+    if (symbol < 0) {
+      const candidates = longByPrefix.get(w);
+      if (candidates)
+        for (const candidate of candidates) {
+          const l = lengths[candidate];
+          if (totalBits - position >= l && readBits(position, l) === codes[candidate]) {
+            symbol = candidate;
+            length = l;
+            break;
+          }
+        }
+      if (symbol < 0) throw invalid('bad Huffman code in data');
+    }
+    position += length;
+    if (symbol === highest && totalBits - position < 8) throw invalid('truncated Huffman run');
+    position = emit(symbol, position);
   }
-  const pad = (8 - nBits) & 7;
-  c = Math.floor(c / 2 ** pad);
-  lc -= pad;
-  while (lc > 0) {
-    const index = (c * 2 ** (HUF_DECBITS - lc)) % HUF_DECSIZE;
-    if (!decodeLength[index] || decodeLength[index] > lc) throw invalid('bad Huffman tail');
-    consume(decodeLength[index]);
-    emit(decodeLiteral[index]);
+
+  // Phase 2: under 14 bits left; only the meaningful ones (not the padding) are decoded, with short codes.
+  let left = bitCount - position;
+  while (left > 0) {
+    const shift = WINDOW_BITS - left;
+    const w = (peekWindow(position) >> shift) << shift;
+    const symbol = windowSymbol[w],
+      length = windowLength[w];
+    if (symbol < 0 || length > left) throw invalid('bad Huffman tail');
+    position += length;
+    left -= length;
+    if (symbol === highest) {
+      if (left < 8) throw invalid('truncated Huffman run');
+      left -= 8;
+    }
+    position = emit(symbol, position);
   }
-  if (o !== size) throw invalid(`Huffman produced ${o} of ${size} values`);
+
+  if (produced !== count) throw invalid(`Huffman produced ${produced} of ${count} values`);
+  return out;
 }
 
-function wav2Decode(
-  buffer: Uint16Array,
+/**
+ * Inverts PIZ's Haar-like wavelet in place on one sub-plane of `words`: element (x, y) sits at
+ * start + x * xStride + y * yStride for 0 <= x < nx, 0 <= y < ny. Levels run coarsest first; at each level an odd
+ * last column or row is transformed in one direction only.
+ */
+function inverseWavelet(
+  words: Uint16Array,
   start: number,
   nx: number,
-  ox: number,
   ny: number,
-  oy: number,
-  maxValue: number,
+  xStride: number,
+  yStride: number,
+  fourteenBit: boolean,
 ): void {
-  const w14 = maxValue < 1 << 14;
-  const n = nx > ny ? ny : nx;
-  let p = 1;
-  while (p <= n) p <<= 1;
-  p >>= 1;
-  let p2 = p;
-  p >>= 1;
-  let a = 0,
-    b = 0;
-  // 14-bit and 16-bit inverse Haar steps; results land in `a` and `b`.
-  const dec14 = (l: number, h: number) => {
-    const ls = (l << 16) >> 16,
-      hs = (h << 16) >> 16;
-    const ai = ls + (hs & 1) + (hs >> 1);
-    a = ai & 0xffff;
-    b = (ai - hs) & 0xffff;
-  };
-  const dec16 = (l: number, h: number) => {
-    const bb = (l - (h >> 1)) & 0xffff;
-    a = (h + bb - 0x8000) & 0xffff;
-    b = bb;
-  };
-  const dec = w14 ? dec14 : dec16;
-  while (p >= 1) {
-    let py = start;
-    const ey = start + oy * (ny - p2),
-      oy1 = oy * p,
-      oy2 = oy * p2,
-      ox1 = ox * p,
-      ox2 = ox * p2;
-    for (; py <= ey; py += oy2) {
-      let px = py;
-      const ex = py + ox * (nx - p2);
-      for (; px <= ex; px += ox2) {
-        const p01 = px + ox1,
-          p10 = px + oy1,
-          p11 = p10 + ox1;
-        dec(buffer[px], buffer[p10]);
-        const i00 = a,
-          i10 = b;
-        dec(buffer[p01], buffer[p11]);
-        const i01 = a,
-          i11 = b;
-        dec(i00, i01);
-        buffer[px] = a;
-        buffer[p01] = b;
-        dec(i10, i11);
-        buffer[p10] = a;
-        buffer[p11] = b;
+  // Inverse of one (low, high) pair; the two results land in pair[0] and pair[1].
+  const pair = [0, 0];
+  const unpair = fourteenBit
+    ? (low: number, high: number) => {
+        const l = low >= 32768 ? low - 65536 : low,
+          h = high >= 32768 ? high - 65536 : high;
+        const a = l + (h & 1) + (h >> 1);
+        pair[0] = a & 0xffff;
+        pair[1] = (a - h) & 0xffff;
+      }
+    : (low: number, high: number) => {
+        const b = (low - (high >> 1)) & 0xffff;
+        pair[0] = (high + b - 32768) & 0xffff;
+        pair[1] = b;
+      };
+  const smaller = Math.min(nx, ny);
+  if (smaller < 2) return;
+  let top = 1;
+  while (top * 2 <= smaller) top *= 2;
+  for (let p = top >> 1; p >= 1; p >>= 1) {
+    const q = 2 * p;
+    const dx = p * xStride,
+      dy = p * yStride;
+    const fullX = nx - (nx % q),
+      fullY = ny - (ny % q);
+    for (let y0 = 0; y0 < fullY; y0 += q) {
+      const row = start + y0 * yStride;
+      for (let x0 = 0; x0 < fullX; x0 += q) {
+        const i00 = row + x0 * xStride,
+          i10 = i00 + dx,
+          i01 = i00 + dy,
+          i11 = i01 + dx;
+        unpair(words[i00], words[i01]);
+        const s = pair[0],
+          t = pair[1];
+        unpair(words[i10], words[i11]);
+        const u = pair[0],
+          v = pair[1];
+        unpair(s, u);
+        words[i00] = pair[0];
+        words[i10] = pair[1];
+        unpair(t, v);
+        words[i01] = pair[0];
+        words[i11] = pair[1];
       }
       if (nx & p) {
-        const p10 = px + oy1;
-        dec(buffer[px], buffer[p10]);
-        buffer[px] = a;
-        buffer[p10] = b;
+        const i0 = row + fullX * xStride,
+          i1 = i0 + dy;
+        unpair(words[i0], words[i1]);
+        words[i0] = pair[0];
+        words[i1] = pair[1];
       }
     }
     if (ny & p) {
-      let px = py;
-      const ex = py + ox * (nx - p2);
-      for (; px <= ex; px += ox2) {
-        const p01 = px + ox1;
-        dec(buffer[px], buffer[p01]);
-        buffer[px] = a;
-        buffer[p01] = b;
+      const row = start + fullY * yStride;
+      for (let x0 = 0; x0 < fullX; x0 += q) {
+        const i0 = row + x0 * xStride,
+          i1 = i0 + dx;
+        unpair(words[i0], words[i1]);
+        words[i0] = pair[0];
+        words[i1] = pair[1];
       }
     }
-    p2 = p;
-    p >>= 1;
   }
 }

@@ -1,0 +1,1205 @@
+{
+ "about": "meshoptDecodeGltfBuffer(src, count, stride, mode, filter) from packages/decoders/src/meshopt.ts. fixtureCases re-decode packages/decoders/tests/fixtures/meshopt-vectors.json (encoded and decoded by the meshoptimizer 1.1.1 npm package, the format reference): binding, byte exact. gltf views: binding, byte exact. Errors: throw-vs-decode and class (Error vs RangeError) binding; message wording not binding.",
+ "fixtureCases": [
+  {
+   "name": "attributes",
+   "count": 300,
+   "stride": 16,
+   "mode": "ATTRIBUTES",
+   "filter": "NONE",
+   "header": "0xa0",
+   "encodedBytes": 3134,
+   "outputSha256": "c080f8113e4058d3c2a108c4c9a0aee2c5dd62daa2c8b8f9b1af7a21c96f23df",
+   "matchesFixtureExpected": true
+  },
+  {
+   "name": "triangles32",
+   "count": 864,
+   "stride": 4,
+   "mode": "TRIANGLES",
+   "filter": "NONE",
+   "header": "0xe1",
+   "encodedBytes": 593,
+   "outputSha256": "c9c63a5183c544e77e1ebe9dce2d22ffac1d0eb847f4716a6f2724576e18817b",
+   "matchesFixtureExpected": true
+  },
+  {
+   "name": "triangles16",
+   "count": 864,
+   "stride": 2,
+   "mode": "TRIANGLES",
+   "filter": "NONE",
+   "header": "0xe1",
+   "encodedBytes": 593,
+   "outputSha256": "8e04d50eae46ad6f9d69f3fb00bf7df05f8631d9c69fc2c391472e3fe05642f7",
+   "matchesFixtureExpected": true
+  },
+  {
+   "name": "indices",
+   "count": 10,
+   "stride": 4,
+   "mode": "INDICES",
+   "filter": "NONE",
+   "header": "0xd1",
+   "encodedBytes": 19,
+   "outputSha256": "80a189f43508ccfe301f713b4ceed56de69d182f2070390584e9c20db0b30f8c",
+   "matchesFixtureExpected": true
+  },
+  {
+   "name": "octahedral4",
+   "count": 500,
+   "stride": 4,
+   "mode": "ATTRIBUTES",
+   "filter": "OCTAHEDRAL",
+   "header": "0xa0",
+   "encodedBytes": 824,
+   "outputSha256": "abefe1242975247eb1c1d3e9953ec324cd8e94af797c6d6cd529245c08d3a08a",
+   "matchesFixtureExpected": true
+  },
+  {
+   "name": "octahedral8",
+   "count": 500,
+   "stride": 8,
+   "mode": "ATTRIBUTES",
+   "filter": "OCTAHEDRAL",
+   "header": "0xa0",
+   "encodedBytes": 1388,
+   "outputSha256": "d5b678b184ad8a1dabcd16d066a7a1f5bdd8baafa9e15d5f338046afe2f3f184",
+   "matchesFixtureExpected": true
+  },
+  {
+   "name": "quaternion",
+   "count": 500,
+   "stride": 8,
+   "mode": "ATTRIBUTES",
+   "filter": "QUATERNION",
+   "header": "0xa0",
+   "encodedBytes": 2671,
+   "outputSha256": "d2e0166663104145ed291f3fbc62751974c64784c017436604d638f92c43f659",
+   "matchesFixtureExpected": true
+  },
+  {
+   "name": "exponential",
+   "count": 200,
+   "stride": 12,
+   "mode": "ATTRIBUTES",
+   "filter": "EXPONENTIAL",
+   "header": "0xa0",
+   "encodedBytes": 1461,
+   "outputSha256": "e1cf68ec75692ec2c1c0ece34a847f588680b8263eac37c91a6c07c0c82d61ee",
+   "matchesFixtureExpected": true
+  },
+  {
+   "name": "attributesV1",
+   "count": 300,
+   "stride": 16,
+   "mode": "ATTRIBUTES",
+   "filter": "NONE",
+   "header": "0xa1",
+   "encodedBytes": 4021,
+   "outputSha256": "217413d73f6b3dab1b58e078e336d29fad33d385d0300003eed0d238d71cf028",
+   "matchesFixtureExpected": true
+  },
+  {
+   "name": "color4V1",
+   "count": 400,
+   "stride": 4,
+   "mode": "ATTRIBUTES",
+   "filter": "COLOR",
+   "header": "0xa1",
+   "encodedBytes": 1627,
+   "outputSha256": "722e573d66e5b0afd5fc010f5aeda007693815fada8373243da7f9366b52c372",
+   "matchesFixtureExpected": true
+  },
+  {
+   "name": "color8",
+   "count": 400,
+   "stride": 8,
+   "mode": "ATTRIBUTES",
+   "filter": "COLOR",
+   "header": "0xa0",
+   "encodedBytes": 2278,
+   "outputSha256": "6584eb9b7438d34216da5e76ac582b9581ecf99ad3339a28fa88a2223bdb155d",
+   "matchesFixtureExpected": true
+  },
+  {
+   "name": "color8Raw",
+   "count": 200,
+   "stride": 8,
+   "mode": "ATTRIBUTES",
+   "filter": "COLOR",
+   "header": "0xa0",
+   "encodedBytes": 1697,
+   "outputSha256": "35d3d98e5c0296c2cbf313531bcbf6145d963bdbd15bea756190730bf611735f",
+   "matchesFixtureExpected": true
+  }
+ ],
+ "gltfs": [
+  {
+   "path": "examples/assets/khronos/MeshoptCubeTest/MeshoptCubeTest.gltf",
+   "views": [
+    {
+     "bufferView": 23,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 20,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 480,
+      "sha256": "347f341cdcfe57f85cd08f153e9df44621ecb3e42b3a30c3563d73306e9f484e"
+     }
+    },
+    {
+     "bufferView": 24,
+     "extension": "KHR",
+     "header": "0xd1",
+     "count": 36,
+     "byteStride": 2,
+     "mode": "INDICES",
+     "filter": "NONE",
+     "result": {
+      "length": 72,
+      "sha256": "778e05f55eae14dd15ae0e1816266c449682ba47f7188731cd70c1163f00bc3f"
+     }
+    },
+    {
+     "bufferView": 25,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 12,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 288,
+      "sha256": "4f55b0060bc60fea4d2de088c4ca2dd42afacb368947df7112e1776c72601021"
+     }
+    },
+    {
+     "bufferView": 26,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 4,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 96,
+      "sha256": "b340979f558f5e465849e164e85b9c47d49ac6c9394138f14db607e5d4dae12e"
+     }
+    },
+    {
+     "bufferView": 27,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 4,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 96,
+      "sha256": "5022760c9d663fc8ab8f9899ba9a694f1e25c0872e2caa361067334c65c1ce58"
+     }
+    },
+    {
+     "bufferView": 28,
+     "extension": "KHR",
+     "header": "0xd1",
+     "count": 36,
+     "byteStride": 2,
+     "mode": "INDICES",
+     "filter": "NONE",
+     "result": {
+      "length": 72,
+      "sha256": "778e05f55eae14dd15ae0e1816266c449682ba47f7188731cd70c1163f00bc3f"
+     }
+    },
+    {
+     "bufferView": 29,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 12,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 288,
+      "sha256": "4f55b0060bc60fea4d2de088c4ca2dd42afacb368947df7112e1776c72601021"
+     }
+    },
+    {
+     "bufferView": 30,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 8,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 192,
+      "sha256": "8933fa6ae3b97e8e5c50066921ce60cdd0bb04648753b3c175178170b171a8db"
+     }
+    },
+    {
+     "bufferView": 31,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 8,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 192,
+      "sha256": "b0c11677f99b1931558322936ba7729ac8d33cb9d8fba7ed257e2e5b07726685"
+     }
+    },
+    {
+     "bufferView": 32,
+     "extension": "KHR",
+     "header": "0xd1",
+     "count": 36,
+     "byteStride": 2,
+     "mode": "INDICES",
+     "filter": "NONE",
+     "result": {
+      "length": 72,
+      "sha256": "778e05f55eae14dd15ae0e1816266c449682ba47f7188731cd70c1163f00bc3f"
+     }
+    },
+    {
+     "bufferView": 33,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 12,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 288,
+      "sha256": "4f55b0060bc60fea4d2de088c4ca2dd42afacb368947df7112e1776c72601021"
+     }
+    },
+    {
+     "bufferView": 34,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 4,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 96,
+      "sha256": "b340979f558f5e465849e164e85b9c47d49ac6c9394138f14db607e5d4dae12e"
+     }
+    },
+    {
+     "bufferView": 35,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 4,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 96,
+      "sha256": "5022760c9d663fc8ab8f9899ba9a694f1e25c0872e2caa361067334c65c1ce58"
+     }
+    },
+    {
+     "bufferView": 36,
+     "extension": "KHR",
+     "header": "0xd1",
+     "count": 36,
+     "byteStride": 4,
+     "mode": "INDICES",
+     "filter": "NONE",
+     "result": {
+      "length": 144,
+      "sha256": "6a6aca884dea3fc67883037c147c94d5d53561ac7a32c7076340eb92c1f60196"
+     }
+    },
+    {
+     "bufferView": 41,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 3,
+     "byteStride": 8,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 24,
+      "sha256": "fd8a7ffe1e84c684f1b2a72d53b7933a6e537b3f97fb9847a7de5399f27538fa"
+     }
+    },
+    {
+     "bufferView": 42,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 20,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 480,
+      "sha256": "347f341cdcfe57f85cd08f153e9df44621ecb3e42b3a30c3563d73306e9f484e"
+     }
+    },
+    {
+     "bufferView": 43,
+     "extension": "KHR",
+     "header": "0xe1",
+     "count": 36,
+     "byteStride": 2,
+     "mode": "TRIANGLES",
+     "filter": "NONE",
+     "result": {
+      "length": 72,
+      "sha256": "1d8bb03a33fc697f9a84db3aeb22f90c8b91670b5f6cee12c76cdb3c31d63d30"
+     }
+    },
+    {
+     "bufferView": 44,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 12,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 288,
+      "sha256": "4f55b0060bc60fea4d2de088c4ca2dd42afacb368947df7112e1776c72601021"
+     }
+    },
+    {
+     "bufferView": 45,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 4,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 96,
+      "sha256": "b340979f558f5e465849e164e85b9c47d49ac6c9394138f14db607e5d4dae12e"
+     }
+    },
+    {
+     "bufferView": 46,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 4,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 96,
+      "sha256": "5022760c9d663fc8ab8f9899ba9a694f1e25c0872e2caa361067334c65c1ce58"
+     }
+    },
+    {
+     "bufferView": 47,
+     "extension": "KHR",
+     "header": "0xe1",
+     "count": 36,
+     "byteStride": 2,
+     "mode": "TRIANGLES",
+     "filter": "NONE",
+     "result": {
+      "length": 72,
+      "sha256": "1d8bb03a33fc697f9a84db3aeb22f90c8b91670b5f6cee12c76cdb3c31d63d30"
+     }
+    },
+    {
+     "bufferView": 48,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 12,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 288,
+      "sha256": "4f55b0060bc60fea4d2de088c4ca2dd42afacb368947df7112e1776c72601021"
+     }
+    },
+    {
+     "bufferView": 49,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 8,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 192,
+      "sha256": "8933fa6ae3b97e8e5c50066921ce60cdd0bb04648753b3c175178170b171a8db"
+     }
+    },
+    {
+     "bufferView": 50,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 8,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 192,
+      "sha256": "b0c11677f99b1931558322936ba7729ac8d33cb9d8fba7ed257e2e5b07726685"
+     }
+    },
+    {
+     "bufferView": 51,
+     "extension": "KHR",
+     "header": "0xe1",
+     "count": 36,
+     "byteStride": 2,
+     "mode": "TRIANGLES",
+     "filter": "NONE",
+     "result": {
+      "length": 72,
+      "sha256": "1d8bb03a33fc697f9a84db3aeb22f90c8b91670b5f6cee12c76cdb3c31d63d30"
+     }
+    },
+    {
+     "bufferView": 52,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 12,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 288,
+      "sha256": "4f55b0060bc60fea4d2de088c4ca2dd42afacb368947df7112e1776c72601021"
+     }
+    },
+    {
+     "bufferView": 53,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 4,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 96,
+      "sha256": "b340979f558f5e465849e164e85b9c47d49ac6c9394138f14db607e5d4dae12e"
+     }
+    },
+    {
+     "bufferView": 54,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 4,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 96,
+      "sha256": "5022760c9d663fc8ab8f9899ba9a694f1e25c0872e2caa361067334c65c1ce58"
+     }
+    },
+    {
+     "bufferView": 55,
+     "extension": "KHR",
+     "header": "0xe1",
+     "count": 36,
+     "byteStride": 4,
+     "mode": "TRIANGLES",
+     "filter": "NONE",
+     "result": {
+      "length": 144,
+      "sha256": "e9cad909981c7877c5e3b73e001e06fb7f5160f1381b63b18b0e580f9a045e9f"
+     }
+    },
+    {
+     "bufferView": 60,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 3,
+     "byteStride": 8,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 24,
+      "sha256": "fd8a7ffe1e84c684f1b2a72d53b7933a6e537b3f97fb9847a7de5399f27538fa"
+     }
+    },
+    {
+     "bufferView": 61,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 20,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 480,
+      "sha256": "347f341cdcfe57f85cd08f153e9df44621ecb3e42b3a30c3563d73306e9f484e"
+     }
+    },
+    {
+     "bufferView": 62,
+     "extension": "KHR",
+     "header": "0xe1",
+     "count": 36,
+     "byteStride": 2,
+     "mode": "TRIANGLES",
+     "filter": "NONE",
+     "result": {
+      "length": 72,
+      "sha256": "1d8bb03a33fc697f9a84db3aeb22f90c8b91670b5f6cee12c76cdb3c31d63d30"
+     }
+    },
+    {
+     "bufferView": 63,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 12,
+     "mode": "ATTRIBUTES",
+     "filter": "EXPONENTIAL",
+     "result": {
+      "length": 288,
+      "sha256": "4f55b0060bc60fea4d2de088c4ca2dd42afacb368947df7112e1776c72601021"
+     }
+    },
+    {
+     "bufferView": 64,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 4,
+     "mode": "ATTRIBUTES",
+     "filter": "OCTAHEDRAL",
+     "result": {
+      "length": 96,
+      "sha256": "b340979f558f5e465849e164e85b9c47d49ac6c9394138f14db607e5d4dae12e"
+     }
+    },
+    {
+     "bufferView": 65,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 4,
+     "mode": "ATTRIBUTES",
+     "filter": "COLOR",
+     "result": {
+      "length": 96,
+      "sha256": "417421e23f7b90f98d55027af0ffb1d7062f81a93b1c55daad1e9d17105f7cd5"
+     }
+    },
+    {
+     "bufferView": 66,
+     "extension": "KHR",
+     "header": "0xe1",
+     "count": 36,
+     "byteStride": 2,
+     "mode": "TRIANGLES",
+     "filter": "NONE",
+     "result": {
+      "length": 72,
+      "sha256": "1d8bb03a33fc697f9a84db3aeb22f90c8b91670b5f6cee12c76cdb3c31d63d30"
+     }
+    },
+    {
+     "bufferView": 67,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 12,
+     "mode": "ATTRIBUTES",
+     "filter": "EXPONENTIAL",
+     "result": {
+      "length": 288,
+      "sha256": "4f55b0060bc60fea4d2de088c4ca2dd42afacb368947df7112e1776c72601021"
+     }
+    },
+    {
+     "bufferView": 68,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 8,
+     "mode": "ATTRIBUTES",
+     "filter": "OCTAHEDRAL",
+     "result": {
+      "length": 192,
+      "sha256": "8933fa6ae3b97e8e5c50066921ce60cdd0bb04648753b3c175178170b171a8db"
+     }
+    },
+    {
+     "bufferView": 69,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 8,
+     "mode": "ATTRIBUTES",
+     "filter": "COLOR",
+     "result": {
+      "length": 192,
+      "sha256": "e432275add795aa35ed50dd6a25d639b20365d14a5478f0962717dd957112e8c"
+     }
+    },
+    {
+     "bufferView": 70,
+     "extension": "KHR",
+     "header": "0xe1",
+     "count": 36,
+     "byteStride": 2,
+     "mode": "TRIANGLES",
+     "filter": "NONE",
+     "result": {
+      "length": 72,
+      "sha256": "1d8bb03a33fc697f9a84db3aeb22f90c8b91670b5f6cee12c76cdb3c31d63d30"
+     }
+    },
+    {
+     "bufferView": 71,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 12,
+     "mode": "ATTRIBUTES",
+     "filter": "EXPONENTIAL",
+     "result": {
+      "length": 288,
+      "sha256": "4f55b0060bc60fea4d2de088c4ca2dd42afacb368947df7112e1776c72601021"
+     }
+    },
+    {
+     "bufferView": 72,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 4,
+     "mode": "ATTRIBUTES",
+     "filter": "OCTAHEDRAL",
+     "result": {
+      "length": 96,
+      "sha256": "b340979f558f5e465849e164e85b9c47d49ac6c9394138f14db607e5d4dae12e"
+     }
+    },
+    {
+     "bufferView": 73,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 24,
+     "byteStride": 4,
+     "mode": "ATTRIBUTES",
+     "filter": "COLOR",
+     "result": {
+      "length": 96,
+      "sha256": "417421e23f7b90f98d55027af0ffb1d7062f81a93b1c55daad1e9d17105f7cd5"
+     }
+    },
+    {
+     "bufferView": 74,
+     "extension": "KHR",
+     "header": "0xe1",
+     "count": 36,
+     "byteStride": 4,
+     "mode": "TRIANGLES",
+     "filter": "NONE",
+     "result": {
+      "length": 144,
+      "sha256": "e9cad909981c7877c5e3b73e001e06fb7f5160f1381b63b18b0e580f9a045e9f"
+     }
+    },
+    {
+     "bufferView": 79,
+     "extension": "KHR",
+     "header": "0xa0",
+     "count": 3,
+     "byteStride": 8,
+     "mode": "ATTRIBUTES",
+     "filter": "QUATERNION",
+     "result": {
+      "length": 24,
+      "sha256": "fd8a7ffe1e84c684f1b2a72d53b7933a6e537b3f97fb9847a7de5399f27538fa"
+     }
+    },
+    {
+     "bufferView": 80,
+     "extension": "KHR",
+     "header": "0xa1",
+     "count": 24,
+     "byteStride": 20,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 480,
+      "sha256": "347f341cdcfe57f85cd08f153e9df44621ecb3e42b3a30c3563d73306e9f484e"
+     }
+    },
+    {
+     "bufferView": 81,
+     "extension": "KHR",
+     "header": "0xe1",
+     "count": 36,
+     "byteStride": 2,
+     "mode": "TRIANGLES",
+     "filter": "NONE",
+     "result": {
+      "length": 72,
+      "sha256": "1d8bb03a33fc697f9a84db3aeb22f90c8b91670b5f6cee12c76cdb3c31d63d30"
+     }
+    },
+    {
+     "bufferView": 82,
+     "extension": "KHR",
+     "header": "0xa1",
+     "count": 24,
+     "byteStride": 12,
+     "mode": "ATTRIBUTES",
+     "filter": "EXPONENTIAL",
+     "result": {
+      "length": 288,
+      "sha256": "4f55b0060bc60fea4d2de088c4ca2dd42afacb368947df7112e1776c72601021"
+     }
+    },
+    {
+     "bufferView": 83,
+     "extension": "KHR",
+     "header": "0xa1",
+     "count": 24,
+     "byteStride": 4,
+     "mode": "ATTRIBUTES",
+     "filter": "OCTAHEDRAL",
+     "result": {
+      "length": 96,
+      "sha256": "b340979f558f5e465849e164e85b9c47d49ac6c9394138f14db607e5d4dae12e"
+     }
+    },
+    {
+     "bufferView": 84,
+     "extension": "KHR",
+     "header": "0xa1",
+     "count": 24,
+     "byteStride": 4,
+     "mode": "ATTRIBUTES",
+     "filter": "COLOR",
+     "result": {
+      "length": 96,
+      "sha256": "417421e23f7b90f98d55027af0ffb1d7062f81a93b1c55daad1e9d17105f7cd5"
+     }
+    },
+    {
+     "bufferView": 85,
+     "extension": "KHR",
+     "header": "0xe1",
+     "count": 36,
+     "byteStride": 2,
+     "mode": "TRIANGLES",
+     "filter": "NONE",
+     "result": {
+      "length": 72,
+      "sha256": "1d8bb03a33fc697f9a84db3aeb22f90c8b91670b5f6cee12c76cdb3c31d63d30"
+     }
+    },
+    {
+     "bufferView": 86,
+     "extension": "KHR",
+     "header": "0xa1",
+     "count": 24,
+     "byteStride": 12,
+     "mode": "ATTRIBUTES",
+     "filter": "EXPONENTIAL",
+     "result": {
+      "length": 288,
+      "sha256": "4f55b0060bc60fea4d2de088c4ca2dd42afacb368947df7112e1776c72601021"
+     }
+    },
+    {
+     "bufferView": 87,
+     "extension": "KHR",
+     "header": "0xa1",
+     "count": 24,
+     "byteStride": 8,
+     "mode": "ATTRIBUTES",
+     "filter": "OCTAHEDRAL",
+     "result": {
+      "length": 192,
+      "sha256": "8933fa6ae3b97e8e5c50066921ce60cdd0bb04648753b3c175178170b171a8db"
+     }
+    },
+    {
+     "bufferView": 88,
+     "extension": "KHR",
+     "header": "0xa1",
+     "count": 24,
+     "byteStride": 8,
+     "mode": "ATTRIBUTES",
+     "filter": "COLOR",
+     "result": {
+      "length": 192,
+      "sha256": "e432275add795aa35ed50dd6a25d639b20365d14a5478f0962717dd957112e8c"
+     }
+    },
+    {
+     "bufferView": 89,
+     "extension": "KHR",
+     "header": "0xe1",
+     "count": 36,
+     "byteStride": 2,
+     "mode": "TRIANGLES",
+     "filter": "NONE",
+     "result": {
+      "length": 72,
+      "sha256": "1d8bb03a33fc697f9a84db3aeb22f90c8b91670b5f6cee12c76cdb3c31d63d30"
+     }
+    },
+    {
+     "bufferView": 90,
+     "extension": "KHR",
+     "header": "0xa1",
+     "count": 24,
+     "byteStride": 12,
+     "mode": "ATTRIBUTES",
+     "filter": "EXPONENTIAL",
+     "result": {
+      "length": 288,
+      "sha256": "4f55b0060bc60fea4d2de088c4ca2dd42afacb368947df7112e1776c72601021"
+     }
+    },
+    {
+     "bufferView": 91,
+     "extension": "KHR",
+     "header": "0xa1",
+     "count": 24,
+     "byteStride": 4,
+     "mode": "ATTRIBUTES",
+     "filter": "OCTAHEDRAL",
+     "result": {
+      "length": 96,
+      "sha256": "b340979f558f5e465849e164e85b9c47d49ac6c9394138f14db607e5d4dae12e"
+     }
+    },
+    {
+     "bufferView": 92,
+     "extension": "KHR",
+     "header": "0xa1",
+     "count": 24,
+     "byteStride": 4,
+     "mode": "ATTRIBUTES",
+     "filter": "COLOR",
+     "result": {
+      "length": 96,
+      "sha256": "417421e23f7b90f98d55027af0ffb1d7062f81a93b1c55daad1e9d17105f7cd5"
+     }
+    },
+    {
+     "bufferView": 93,
+     "extension": "KHR",
+     "header": "0xe1",
+     "count": 36,
+     "byteStride": 4,
+     "mode": "TRIANGLES",
+     "filter": "NONE",
+     "result": {
+      "length": 144,
+      "sha256": "e9cad909981c7877c5e3b73e001e06fb7f5160f1381b63b18b0e580f9a045e9f"
+     }
+    },
+    {
+     "bufferView": 98,
+     "extension": "KHR",
+     "header": "0xa1",
+     "count": 3,
+     "byteStride": 8,
+     "mode": "ATTRIBUTES",
+     "filter": "QUATERNION",
+     "result": {
+      "length": 24,
+      "sha256": "fd8a7ffe1e84c684f1b2a72d53b7933a6e537b3f97fb9847a7de5399f27538fa"
+     }
+    }
+   ]
+  },
+  {
+   "path": "packages/gltf-pro/tests/fixtures/Triangle.meshopt.gltf",
+   "views": [
+    {
+     "bufferView": 0,
+     "extension": "EXT",
+     "header": "0xa0",
+     "count": 3,
+     "byteStride": 12,
+     "mode": "ATTRIBUTES",
+     "filter": "NONE",
+     "result": {
+      "length": 36,
+      "sha256": "79f7a3b42c57393857bd6618d0e16bc46138e3f601a7aae088eb649004962fbb"
+     }
+    },
+    {
+     "bufferView": 1,
+     "extension": "EXT",
+     "header": "0xe1",
+     "count": 3,
+     "byteStride": 2,
+     "mode": "TRIANGLES",
+     "filter": "NONE",
+     "result": {
+      "length": 6,
+      "sha256": "90c2698921ca9fd02950be353f721888760e33ab5095a21e50f1e4360b6de1a0"
+     }
+    }
+   ]
+  }
+ ],
+ "errorCases": [
+  {
+   "name": "ATTRIBUTES count 0 on a v0 stream (header + 32-byte tail)",
+   "result": {
+    "ok": true,
+    "length": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+   }
+  },
+  {
+   "name": "ATTRIBUTES count 0 on a v0 stream, stride 48 (tail = stride)",
+   "result": {
+    "ok": true,
+    "length": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+   }
+  },
+  {
+   "name": "bad vertex header 0xb0",
+   "result": {
+    "name": "Error",
+    "code": null,
+    "message": "EXT_meshopt_compression: bad vertex stream header"
+   }
+  },
+  {
+   "name": "vertex version 2",
+   "result": {
+    "name": "Error",
+    "code": null,
+    "message": "EXT_meshopt_compression: vertex codec version 2 is not supported (only versions 0 and 1)"
+   }
+  },
+  {
+   "name": "stride 6",
+   "result": {
+    "name": "Error",
+    "code": null,
+    "message": "EXT_meshopt_compression: invalid ATTRIBUTES byteStride 6"
+   }
+  },
+  {
+   "name": "stride 260",
+   "result": {
+    "name": "Error",
+    "code": null,
+    "message": "EXT_meshopt_compression: invalid ATTRIBUTES byteStride 260"
+   }
+  },
+  {
+   "name": "attributes with one trailing byte",
+   "result": {
+    "name": "Error",
+    "code": null,
+    "message": "EXT_meshopt_compression: vertex stream has trailing or missing data"
+   }
+  },
+  {
+   "name": "attributes missing last byte",
+   "result": {
+    "name": "Error",
+    "code": null,
+    "message": "EXT_meshopt_compression: vertex stream has trailing or missing data"
+   }
+  },
+  {
+   "name": "count above what the bytes can hold",
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "EXT_meshopt_compression: truncated stream (10000000 elements cannot fit in 3134 bytes)"
+   }
+  },
+  {
+   "name": "negative count",
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "EXT_meshopt_compression: invalid count or byteStride"
+   }
+  },
+  {
+   "name": "count*stride over 2^31",
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "EXT_meshopt_compression: invalid count or byteStride"
+   }
+  },
+  {
+   "name": "bad index header 0xd1 as TRIANGLES",
+   "result": {
+    "name": "Error",
+    "code": null,
+    "message": "EXT_meshopt_compression: bad index stream header"
+   }
+  },
+  {
+   "name": "index codec version 2",
+   "result": {
+    "name": "Error",
+    "code": null,
+    "message": "EXT_meshopt_compression: index codec version 2 is not supported"
+   }
+  },
+  {
+   "name": "TRIANGLES count not a multiple of 3",
+   "result": {
+    "name": "Error",
+    "code": null,
+    "message": "EXT_meshopt_compression: TRIANGLES count must be a multiple of 3"
+   }
+  },
+  {
+   "name": "TRIANGLES stride 3",
+   "result": {
+    "name": "Error",
+    "code": null,
+    "message": "EXT_meshopt_compression: TRIANGLES byteStride must be 2 or 4"
+   }
+  },
+  {
+   "name": "triangles with one trailing byte",
+   "result": {
+    "name": "Error",
+    "code": null,
+    "message": "EXT_meshopt_compression: index stream has trailing or missing data"
+   }
+  },
+  {
+   "name": "triangles with codes truncated",
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "EXT_meshopt_compression: truncated stream (864 elements cannot fit in 100 bytes)"
+   }
+  },
+  {
+   "name": "index sequence bad header",
+   "result": {
+    "name": "Error",
+    "code": null,
+    "message": "EXT_meshopt_compression: bad index sequence header"
+   }
+  },
+  {
+   "name": "index sequence trailing byte",
+   "result": {
+    "name": "Error",
+    "code": null,
+    "message": "EXT_meshopt_compression: index sequence has trailing or missing data"
+   }
+  },
+  {
+   "name": "index sequence as 16-bit",
+   "result": {
+    "ok": true,
+    "length": 20,
+    "sha256": "8393969e6561c4b7df0b55d394a29c86613141c94454ab9e802d1dac1c9304db"
+   }
+  },
+  {
+   "name": "unknown mode",
+   "result": {
+    "name": "Error",
+    "code": null,
+    "message": "EXT_meshopt_compression: unknown mode 'POINTS'"
+   }
+  },
+  {
+   "name": "filter on TRIANGLES",
+   "result": {
+    "name": "Error",
+    "code": null,
+    "message": "EXT_meshopt_compression: filters only apply to ATTRIBUTES"
+   }
+  },
+  {
+   "name": "OCTAHEDRAL with stride 16",
+   "result": {
+    "name": "Error",
+    "code": null,
+    "message": "EXT_meshopt_compression: OCTAHEDRAL filter requires byteStride 4 or 8"
+   }
+  },
+  {
+   "name": "QUATERNION with stride 16",
+   "result": {
+    "name": "Error",
+    "code": null,
+    "message": "EXT_meshopt_compression: QUATERNION filter requires byteStride 8"
+   }
+  },
+  {
+   "name": "COLOR with stride 16",
+   "result": {
+    "name": "Error",
+    "code": null,
+    "message": "EXT_meshopt_compression: COLOR filter requires byteStride 4 or 8"
+   }
+  },
+  {
+   "name": "unknown filter",
+   "result": {
+    "name": "Error",
+    "code": null,
+    "message": "EXT_meshopt_compression: unknown filter 'SPHERICAL'"
+   }
+  },
+  {
+   "name": "EXPONENTIAL on stride 16 (allowed)",
+   "result": {
+    "ok": true,
+    "length": 4800,
+    "sha256": "65794ccf2b430eeed34f6ae8692c551f1735f57065a038f7d766ab070c3d09df"
+   }
+  },
+  {
+   "name": "filter empty string treated as NONE",
+   "result": {
+    "ok": true,
+    "length": 4800,
+    "sha256": "1f5ee5c5eb31163f8ba11cdc9f03d1a62205b0fe1ca9ebdea0dbb48d2febe609"
+   }
+  },
+  {
+   "name": "MeshoptDecoder.decodeGltfBuffer into a too-small target",
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "EXT_meshopt_compression: target buffer is too small"
+   }
+  },
+  {
+   "name": "meshoptDecodeVertexBuffer with output too small",
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "EXT_meshopt_compression: invalid count or output size"
+   }
+  },
+  {
+   "name": "meshoptDecodeIndexBuffer with output too small",
+   "result": {
+    "name": "RangeError",
+    "code": null,
+    "message": "EXT_meshopt_compression: invalid count or output size"
+   }
+  }
+ ]
+}

@@ -1,0 +1,214 @@
+{
+ "about": "PIZ files written by a scratch encoder from the format description (tools/pizgen.mjs; the clean agent does not need it). expectedDataSha256 is the SHA-256 of the Float32Array RGBA (little-endian, alpha 1 when absent) computed from the source samples without Margo code. Binding: parseEXR must return exactly these bytes.",
+ "results": [
+  {
+   "file": "vectors/exr-piz/half-rgba-smooth.exr",
+   "note": "37x45 HALF RGBA smooth: two chunks (32 + 13 lines), odd width and height, 14-bit wavelet, runs from a flat region",
+   "bytes": 11707,
+   "width": 37,
+   "height": 45,
+   "dataWindow": [
+    0,
+    0,
+    36,
+    44
+   ],
+   "channels": [
+    "A:HALF",
+    "B:HALF",
+    "G:HALF",
+    "R:HALF"
+   ],
+   "waveletModePerChunk": [
+    "14-bit",
+    "14-bit"
+   ],
+   "expectedDataSha256": "58e9f46c5c93ae6db46dff7765f5cac94ff67f1de4fb7c6f849a270efb13688b",
+   "margoMatchesExpected": true
+  },
+  {
+   "file": "vectors/exr-piz/float-rgb-smooth-offset-window.exr",
+   "note": "33x40 FLOAT RGB with dataWindow origin (-3, 5): two 16-bit planes per channel, 14-bit wavelet",
+   "bytes": 11317,
+   "width": 33,
+   "height": 40,
+   "dataWindow": [
+    -3,
+    5,
+    29,
+    44
+   ],
+   "channels": [
+    "B:FLOAT",
+    "G:FLOAT",
+    "R:FLOAT"
+   ],
+   "waveletModePerChunk": [
+    "14-bit",
+    "14-bit"
+   ],
+   "expectedDataSha256": "b378963b47c4223ec5f3c0bdf5863b16c0ba457d6b6e1ae85b66f2b6b1fa27a9",
+   "margoMatchesExpected": true
+  },
+  {
+   "file": "vectors/exr-piz/mixed-half-float-uint-extra.exr",
+   "note": "29x35 R HALF, G FLOAT, B UINT, A HALF, Z FLOAT (Z decoded but not returned); constant blocks give runs",
+   "bytes": 22860,
+   "width": 29,
+   "height": 35,
+   "dataWindow": [
+    0,
+    0,
+    28,
+    34
+   ],
+   "channels": [
+    "A:HALF",
+    "B:UINT",
+    "G:FLOAT",
+    "R:HALF",
+    "Z:FLOAT"
+   ],
+   "waveletModePerChunk": [
+    "14-bit",
+    "14-bit"
+   ],
+   "expectedDataSha256": "199150f167437ce94f5ef6a224bd71a9e4489f398b7423ceb26f446f3ff4c74e",
+   "margoMatchesExpected": true
+  },
+  {
+   "file": "vectors/exr-piz/random-float-16bit-mode.exr",
+   "note": "160x32 two FLOAT channels of random finite bit patterns: more than 16,384 distinct words, so the 16-bit wavelet",
+   "bytes": 90015,
+   "width": 160,
+   "height": 32,
+   "dataWindow": [
+    0,
+    0,
+    159,
+    31
+   ],
+   "channels": [
+    "B:FLOAT",
+    "G:FLOAT",
+    "R:FLOAT"
+   ],
+   "waveletModePerChunk": [
+    "16-bit"
+   ],
+   "expectedDataSha256": "1e932801a86c0169d4608898e20e1f9c9f6fafb7971f23783be76193de76115e",
+   "margoMatchesExpected": true
+  },
+  {
+   "file": "vectors/exr-piz/half-y-column.exr",
+   "note": "1x40 HALF Y: min(width, height) is 1, so the wavelet does nothing",
+   "bytes": 6002,
+   "width": 1,
+   "height": 40,
+   "dataWindow": [
+    0,
+    0,
+    0,
+    39
+   ],
+   "channels": [
+    "Y:HALF"
+   ],
+   "waveletModePerChunk": [
+    "14-bit",
+    "14-bit"
+   ],
+   "expectedDataSha256": "63354d603864570307650465dc2a866d67025e2a2d7dc0317f4dbd7915814a10",
+   "margoMatchesExpected": true
+  },
+  {
+   "file": "vectors/exr-piz/half-y-row.exr",
+   "note": "70x1 HALF Y: one line",
+   "bytes": 1258,
+   "width": 70,
+   "height": 1,
+   "dataWindow": [
+    0,
+    0,
+    69,
+    0
+   ],
+   "channels": [
+    "Y:HALF"
+   ],
+   "waveletModePerChunk": [
+    "14-bit"
+   ],
+   "expectedDataSha256": "b1118d449eb214388682bd0e093531aaa5f92ff7735dec5d65c5345fe83b6be8",
+   "margoMatchesExpected": true
+  },
+  {
+   "file": "vectors/exr-piz/half-y-3x3.exr",
+   "note": "3x3 HALF Y: one wavelet level with leftover column, row and corner",
+   "bytes": 1297,
+   "width": 3,
+   "height": 3,
+   "dataWindow": [
+    0,
+    0,
+    2,
+    2
+   ],
+   "channels": [
+    "Y:HALF"
+   ],
+   "waveletModePerChunk": [
+    "14-bit"
+   ],
+   "expectedDataSha256": "359e291af51293334fb65fe437d0e4c46aa19d9b6b525f8ca97eca5734812098",
+   "margoMatchesExpected": true
+  },
+  {
+   "file": "vectors/exr-piz/all-zero-rgb.exr",
+   "note": "20x20 HALF RGB all zero: empty bitmap (minNonZero > maxNonZero), one literal plus runs",
+   "bytes": 807,
+   "width": 20,
+   "height": 20,
+   "dataWindow": [
+    0,
+    0,
+    19,
+    19
+   ],
+   "channels": [
+    "B:HALF",
+    "G:HALF",
+    "R:HALF"
+   ],
+   "waveletModePerChunk": [
+    "14-bit"
+   ],
+   "expectedDataSha256": "9e0f2a7dee149218037f84351caac6af5266b010568431977e7c34f0949f3c3b",
+   "margoMatchesExpected": true
+  },
+  {
+   "file": "vectors/exr-piz/half-rgb-no-runs.exr",
+   "note": "24x33 HALF RGB smooth, encoded without run symbols (the run symbol is in the table but never used)",
+   "bytes": 15322,
+   "width": 24,
+   "height": 33,
+   "dataWindow": [
+    0,
+    0,
+    23,
+    32
+   ],
+   "channels": [
+    "B:HALF",
+    "G:HALF",
+    "R:HALF"
+   ],
+   "waveletModePerChunk": [
+    "14-bit",
+    "14-bit"
+   ],
+   "expectedDataSha256": "3d14c014a3fdd1fa3e260d2082294526c888fd47990fb0c8087fa55b122a6031",
+   "margoMatchesExpected": true
+  }
+ ]
+}

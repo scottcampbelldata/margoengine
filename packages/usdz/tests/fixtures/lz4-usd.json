@@ -1,0 +1,369 @@
+{
+ "about": "TfFastCompression + LZ4 block decoding as crate.ts does it (private inflate(src, max) and lz4); inputs written from the LZ4 block format by tools/vectors2.mjs. Outputs binding byte exact; errors are plain Error with message \"USD: <problem>\" (wording Margo, kind binding).",
+ "roundTrips": [
+  {
+   "name": "empty",
+   "framed": "AAA=",
+   "framedSha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+   "framedLength": 2,
+   "max": 0,
+   "expectedLength": 0,
+   "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+   "name": "short-literal",
+   "framed": "AFBoZWxsbw==",
+   "framedSha256": "95f730f8141c331d24c39c5f7887f10559f837377ceee8269ec8327ae14e69f8",
+   "framedLength": 7,
+   "max": 5,
+   "expectedLength": 5,
+   "expectedSha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+  },
+  {
+   "name": "text",
+   "framed": "APANcG9pbnRzIG5vcm1hbHMgZmFjZVZlcnRleENvdRkABhEAj0luZGljZXMgMgD//////5dQaWNlcyA=",
+   "framedSha256": "5c0d2adb48c5bff740398e38680720f9649a75d05927da07b6e696a5742aaf9e",
+   "framedLength": 59,
+   "max": 1500,
+   "expectedLength": 1500,
+   "expectedSha256": "3ad52ffe51de6682812fd04a6266024407d0fdb7c9a1df1437ccc3835ad41050"
+  },
+  {
+   "name": "zeros-4000",
+   "framed": "AB8AAQD///////////////////+WUAAAAAAA",
+   "framedSha256": "745ca3e12c5eb17dd58f1fedf1ec97190c852b9e5b46b9d1418266571834f388",
+   "framedLength": 27,
+   "max": 4000,
+   "expectedLength": 4000,
+   "expectedSha256": "fc19b1997119425765295aeab72d76faa6927d4f83985d328c26f20468d6cc76"
+  },
+  {
+   "name": "noise-700",
+   "framed": "APD//6/FG2ZnryBvtUKbpp4mQbyLJDzS8Cq2VJlTkbtvpi5MOtYo2FoBF95p+HQa2OFViCBYwSqZfSVP8rZcNv/b8g7CoyAPTlG+Ju6x+wk3j2f8iyoio/XqbFo3Puj3lRl5/8vsSlUL7ChvgeY9ggb+gTumaIaoOviUd6oAQoz3IkaUlVLwrXd+gL2zKi3nnRtoAf4u6um5spIdJycTQedAsNo898fLqalmG4DAsbNVTxQ8R+LTqoQz3n59V1msIZPOxtkAsz+1GVJpRWXjiqiI5u/OLngd2ESzVUPj45UX6ucgG79OnqkSxUI8ysFt3JUEGqmxvSwA80AtnHZiNHE5fspfirZxW1Yijm4ODh4PIPPtKec2CyXb/c9uePR4fSOmwD4EwgjfGNflJmXstmX1y0Q6mRniB/M7tNZUEq1rMQz3k6T0GBimr7+B+E9eiRVA/AmGub11frRYfSbsdYFwxde3ipUjaCPpJTKwvwtFGwKOFYA17OzrdrfAdGilKOTlHqgJvocqNvjNWsWmQZagC/b9qGAiGwUdffd72R+idjeWaApPvYGYBAycKvcSlPpZ3Wl6nmuKo/LChJR4wK4nrnAeR54Bnw8pehrDscC6HkXgnwqOT6j5LTFZDfvvRo/Bu8wm7DCMZags3SZzutJU6NH8onsUJsR2zh3VKPl3Mj+rBqm10RCs6+B5N7uVAnBo+T/rq0GugwmZTzu+JPp66p61E5xaElAOxzdJf0EO4/kUeBGhG0vHzOnQx4zNqM0YL6KkGUVAqnoMI+GhgiYOzZ0vgXXUZK7tXVu3F42AQMxfD7IK9U7OUMRVX+rcMQeTKmOd44OAcw6inZ7MorvS4aS+ITBkw+6iRY1sZJ7C5SX6LPZaWPnRfGz8e0Xd6w33+J0OdZVAIo070R4z3Gvg2x0YvFi8/7bwreni9IDn",
+   "framedSha256": "2ab39c1882c510301357692914ee2a392dd7f62a09f3d7b2482b0310e976dbd2",
+   "framedLength": 705,
+   "max": 700,
+   "expectedLength": 700,
+   "expectedSha256": "56c4b62f960bf8d0112d6b0c3f7436b0ea9a59bb267e922de44a91895173d137"
+  },
+  {
+   "name": "tokens",
+   "framed": "APAkAE1lc2gAcG9pbnRzAG5vcm1hbHMAZXh0ZW50AHhmb3JtT3BPcmRlcgB0cmlhbmdsZQBYFgCvAHNwZWNpZmllckEA/7BQaWZpZXI=",
+   "framedSha256": "e205d9ef82a138edcddc08e16ae00e5a7b9b6978cd7818b536da9eecc3bf6506",
+   "framedLength": 77,
+   "max": 520,
+   "expectedLength": 520,
+   "expectedSha256": "fd467f826eeb2e61b8a9ae22b6530734b54e0e4a79485c927c3b5ddb18c58c9d"
+  },
+  {
+   "name": "long-run-70000",
+   "framed": "AB9BAQD///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////++//HQ0dLT1NXW19jZ2tvc3d7f4OHi4+Tl5ufo6err7O3u7/Dx8vP09fb3+Pn6+/z9/v8AAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1+f4CBgoOEhYaHiImKi4yNjo+QkZKTlJWWl5iZmpucnZ6foKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr/AwcLDxMXGx8jJysvMzc7PAAH//////////////////5ZQa2xtbm8=",
+   "framedSha256": "a85d7ed0aac0d6664c2206bfc0a8976ddab6788b8c14f4b09cdb2a582efd3825",
+   "framedLength": 545,
+   "max": 70000,
+   "expectedLength": 70000,
+   "expectedSha256": "bd918ac83dfb127175a1f7ff89d851ff82479b727701d51547c77f9ad4d4e84d"
+  }
+ ],
+ "handCases": [
+  {
+   "name": "empty block (chunk count 0, nothing after)",
+   "input": "00",
+   "max": 0,
+   "result": {
+    "output": ""
+   }
+  },
+  {
+   "name": "literals only",
+   "input": "0030010203",
+   "max": 3,
+   "result": {
+    "output": "010203"
+   }
+  },
+  {
+   "name": "literal length exactly 15 (needs a 0 extension byte)",
+   "input": "00f00000070e151c232a31383f464d545b62",
+   "max": 15,
+   "result": {
+    "output": "00070e151c232a31383f464d545b62"
+   }
+  },
+  {
+   "name": "literal length 270 (extension 255 then 0)",
+   "input": "00f0ff0000070e151c232a31383f464d545b626970777e858c939aa1a8afb6bdc4cbd2d9e0e7eef5fc030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d848b9299a0a7aeb5bcc3cad1d8dfe6edf4fb020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4dbe2e9f0f7fe050c131a21282f363d444b525960676e757c838a91989fa6adb4bbc2c9d0d7dee5ecf3fa01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3dae1e8eff6fd040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4ebf2f900070e151c232a31383f464d545b",
+   "max": 270,
+   "result": {
+    "length": 270,
+    "sha256": "3523ff953301240a6de192109fcc6a9d349e29ee2dcdd6f90adcbe05940042f1"
+   }
+  },
+  {
+   "name": "overlapping match, offset 1",
+   "input": "001f09010001500102030405",
+   "max": 26,
+   "result": {
+    "output": "0909090909090909090909090909090909090909090102030405"
+   }
+  },
+  {
+   "name": "overlapping match, offset 3",
+   "input": "00350102030300",
+   "max": 12,
+   "result": {
+    "output": "010203010203010203010203"
+   }
+  },
+  {
+   "name": "match length 18 (no extension)",
+   "input": "004e00070e150400",
+   "max": 22,
+   "result": {
+    "output": "00070e1500070e1500070e1500070e1500070e150007"
+   }
+  },
+  {
+   "name": "match length 19 (extension 0)",
+   "input": "004f00070e15040000",
+   "max": 23,
+   "result": {
+    "output": "00070e1500070e1500070e1500070e1500070e1500070e"
+   }
+  },
+  {
+   "name": "match length 274 (extension 255)",
+   "input": "004f00070e150400ff00",
+   "max": 278,
+   "result": {
+    "length": 278,
+    "sha256": "6963b8ee6b8b3c662eeb29b4b00866f5a3c259e2a25ca65730e5c3f6616784bd"
+   }
+  },
+  {
+   "name": "block ending right after a match (Margo accepts)",
+   "input": "004400070e150400",
+   "max": 12,
+   "result": {
+    "output": "00070e1500070e1500070e15"
+   }
+  },
+  {
+   "name": "offset 0",
+   "input": "004000070e150000",
+   "max": 8,
+   "result": {
+    "name": "Error",
+    "message": "USD: LZ4 match outside output"
+   }
+  },
+  {
+   "name": "offset beyond output",
+   "input": "004000070e150500",
+   "max": 8,
+   "result": {
+    "name": "Error",
+    "message": "USD: LZ4 match outside output"
+   }
+  },
+  {
+   "name": "literals past max",
+   "input": "00a000070e151c232a31383f",
+   "max": 9,
+   "result": {
+    "name": "Error",
+    "message": "USD: LZ4 literals overflow"
+   }
+  },
+  {
+   "name": "match past max",
+   "input": "004400070e150400",
+   "max": 11,
+   "result": {
+    "name": "Error",
+    "message": "USD: LZ4 match outside output"
+   }
+  },
+  {
+   "name": "truncated literal extension",
+   "input": "00f0",
+   "max": 20,
+   "result": {
+    "name": "Error",
+    "message": "USD: truncated LZ4 block"
+   }
+  },
+  {
+   "name": "truncated literals",
+   "input": "00500102",
+   "max": 5,
+   "result": {
+    "name": "Error",
+    "message": "USD: LZ4 literals overflow"
+   }
+  },
+  {
+   "name": "offset bytes present but pointing past the output",
+   "input": "00140102030404",
+   "max": 8,
+   "result": {
+    "name": "Error",
+    "message": "USD: LZ4 match outside output"
+   }
+  },
+  {
+   "name": "truncated offset (one byte)",
+   "input": "00100104",
+   "max": 8,
+   "result": {
+    "name": "Error",
+    "message": "USD: truncated LZ4 block"
+   }
+  },
+  {
+   "name": "truncated match extension",
+   "input": "001f010400",
+   "max": 30,
+   "result": {
+    "name": "Error",
+    "message": "USD: truncated LZ4 block"
+   }
+  },
+  {
+   "name": "empty input (no chunk count byte)",
+   "input": "",
+   "max": 10,
+   "result": {
+    "name": "Error",
+    "message": "USD: empty compressed block"
+   }
+  },
+  {
+   "name": "two chunks",
+   "input": "02070000006000070e151c2306000000500910171e25",
+   "max": 11,
+   "result": {
+    "output": "00070e151c230910171e25"
+   }
+  },
+  {
+   "name": "two chunks, second matches into the first (Margo accepts)",
+   "input": "02070000006000070e151c2303000000020600",
+   "max": 12,
+   "result": {
+    "output": "00070e151c2300070e151c23"
+   }
+  },
+  {
+   "name": "chunk size negative",
+   "input": "01ffffffff1001",
+   "max": 4,
+   "result": {
+    "name": "Error",
+    "message": "USD: LZ4 chunk outside block"
+   }
+  },
+  {
+   "name": "chunk past the block",
+   "input": "010a0000001001",
+   "max": 4,
+   "result": {
+    "name": "Error",
+    "message": "USD: LZ4 chunk outside block"
+   }
+  },
+  {
+   "name": "chunk count 2 but one chunk",
+   "input": "02040000003000070e",
+   "max": 3,
+   "result": {
+    "name": "Error",
+    "message": "USD: truncated LZ4 chunk"
+   }
+  },
+  {
+   "name": "bytes after the last chunk (ignored)",
+   "input": "01040000003000070eaabb",
+   "max": 3,
+   "result": {
+    "output": "00070e"
+   }
+  },
+  {
+   "name": "max larger than output (returns what was produced)",
+   "input": "005000070e151c",
+   "max": 100,
+   "result": {
+    "output": "00070e151c"
+   }
+  }
+ ],
+ "cap": {
+  "name": "one long match (4000 bytes from about 20 input bytes), within the src.length * 255 + 64 output cap",
+  "input": "001f410100ffffffffffffffffffffffffffffff9c",
+  "max": 4001,
+  "result": {
+   "length": 4001,
+   "sha256": "2e3fa0fe9b8bdb515cf70af1a9eb2a69ee2f7ea03f53e96912927ea186c8f84a"
+  }
+ },
+ "fixture": {
+  "path": "packages/usdz/tests/fixtures/triangle.usdc",
+  "section": "TOKENS",
+  "packedOffset": 460,
+  "packedSize": 432,
+  "rawSize": 479,
+  "tokenCount": 46,
+  "chunkCountByte": 0,
+  "outputLength": 479,
+  "outputSha256": "a2eeaf4b53ff2a20994e71e33a86fbf93a99803e30443bca1e900089d86af53d",
+  "tokens": [
+   ";-)",
+   "metersPerUnit",
+   "Y",
+   "upAxis",
+   "Root",
+   "primChildren",
+   "",
+   "specifier",
+   "Xform",
+   "typeName",
+   "Triangle",
+   "Material",
+   "xformOp:translate",
+   "xformOpOrder",
+   "properties",
+   "Surface",
+   "outputs:surface",
+   "Shader",
+   "info:id",
+   "inputs:diffuseColor",
+   "inputs:roughness",
+   "inputs:metallic",
+   "Mesh",
+   "points",
+   "normals",
+   "primvars:st",
+   "faceVertexCounts",
+   "faceVertexIndices",
+   "subdivisionScheme",
+   "material:binding",
+   "custom",
+   "int[]",
+   "variability",
+   "default",
+   "token",
+   "UsdPreviewSurface",
+   "color3f",
+   "float",
+   "targetPaths",
+   "normal3f[]",
+   "connectionPaths",
+   "point3f[]",
+   "texCoord2f[]",
+   "none",
+   "double3",
+   "token[]"
+  ]
+ }
+}

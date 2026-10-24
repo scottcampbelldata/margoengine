@@ -4,85 +4,111 @@ export type Specs = Record<string, { specType: number; fields: Record<string, un
 function fail(message: string): never {
   throw new Error('USD: ' + message);
 }
-/** Decodes one raw LZ4 block into `out` from `at`; returns the end offset. */
-function lz4(src: Uint8Array, out: Uint8Array, at: number): number {
-  let p = 0,
+/**
+ * Decodes one raw LZ4 block (LZ4 Block Format Description) from `src` into `out`, writing from offset `at`, and returns
+ * the end offset. Match offsets may reach anywhere in `out[0, at)`, so a block can refer back into an earlier chunk.
+ * The end-of-block rules (last 5 bytes literal, last match 12 bytes before the end) are not enforced.
+ */
+function lz4Block(src: Uint8Array, out: Uint8Array, at: number): number {
+  const end = src.length,
+    limit = out.length;
+  let i = 0,
     o = at;
-  const byte = () => {
-    if (p >= src.length) fail('truncated LZ4 block');
-    return src[p++];
+  const next = () => {
+    if (i >= end) fail('truncated LZ4 block');
+    return src[i++];
   };
-  const length = (n: number) => {
-    if (n === 15)
-      for (let b = 255; b === 255; ) {
-        b = byte();
+  // A nibble of 15 continues in extra bytes, each added, until one below 255.
+  const extend = (n: number) => {
+    if (n === 15) {
+      let b: number;
+      do {
+        b = next();
         n += b;
-      }
+      } while (b === 255);
+    }
     return n;
   };
-  while (p < src.length) {
-    const token = byte(),
-      literal = length(token >> 4);
-    if (p + literal > src.length || o + literal > out.length) fail('LZ4 literals overflow');
-    out.set(src.subarray(p, p + literal), o);
-    p += literal;
-    o += literal;
-    if (p >= src.length) break;
-    const offset = byte() | (byte() << 8),
-      match = length(token & 15) + 4;
-    if (!offset || offset > o || o + match > out.length) fail('LZ4 match outside output');
-    for (let k = 0; k < match; k++, o++) out[o] = out[o - offset];
+  while (i < end) {
+    const tokenByte = src[i++],
+      literals = extend(tokenByte >> 4);
+    if (literals > end - i || literals > limit - o) fail('LZ4 literals overflow');
+    out.set(src.subarray(i, i + literals), o);
+    i += literals;
+    o += literals;
+    if (i === end) break; // final, literals-only sequence
+    const lo = next(),
+      offset = lo | (next() << 8),
+      length = extend(tokenByte & 15) + 4;
+    if (offset === 0 || offset > o || length > limit - o) fail('LZ4 match outside output');
+    // Byte by byte, front to back, so an overlapping match repeats its pattern.
+    for (let from = o - offset, stop = o + length; o < stop; ) out[o++] = out[from++];
   }
   return o;
 }
-/** TfFastCompression: a chunk count byte, then one LZ4 block (count 0) or `count` size-prefixed blocks. */
-function inflate(src: Uint8Array, max: number): Uint8Array {
-  if (!src.length) fail('empty compressed block');
-  // LZ4 expands at most 255x (one length byte per 255 output bytes): never allocate more than the input can produce.
+
+/**
+ * TfFastCompression: a chunk-count byte, then either one LZ4 block covering the rest (count 0) or `count` blocks each
+ * prefixed by an int32 LE size. Decodes into at most `max` bytes and returns exactly the bytes produced; callers check
+ * the length. The output is also capped at `src.length * 255 + 64` (LZ4 grows at most ~255x), so a corrupt `max` from
+ * the file cannot force a huge allocation.
+ */
+function decompressFast(src: Uint8Array, max: number): Uint8Array {
+  if (src.length === 0) fail('empty compressed block');
   const out = new Uint8Array(Math.min(max, src.length * 255 + 64)),
-    chunks = src[0],
-    view = new DataView(src.buffer, src.byteOffset, src.byteLength);
-  if (!chunks) return out.subarray(0, lz4(src.subarray(1), out, 0));
+    chunks = src[0];
+  if (chunks === 0) return out.subarray(0, lz4Block(src.subarray(1), out, 0));
+  const sizes = new DataView(src.buffer, src.byteOffset, src.byteLength);
   let p = 1,
     o = 0;
-  for (let i = 0; i < chunks; i++) {
-    if (p + 4 > src.length) fail('truncated LZ4 chunk');
-    const size = view.getInt32(p, true);
-    if (size < 0 || p + 4 + size > src.length) fail('LZ4 chunk outside block');
-    o = lz4(src.subarray(p + 4, p + 4 + size), out, o);
-    p += 4 + size;
+  for (let c = 0; c < chunks; c++) {
+    if (src.length - p < 4) fail('truncated LZ4 chunk');
+    const size = sizes.getInt32(p, true);
+    p += 4;
+    if (size < 0 || size > src.length - p) fail('LZ4 chunk outside block');
+    o = lz4Block(src.subarray(p, p + size), out, o);
+    p += size;
   }
   return out.subarray(0, o);
 }
-/** Usd integer coding: common value, 2-bit codes, then 8/16/32-bit (or 16/32/64-bit) deltas. */
+
+/**
+ * USD Crate integer coding: a common delta of the value width, 2-bit codes (four per byte, first value lowest), then the
+ * stored deltas. Code 0 is the common delta; 1/2/3 store a quarter, half or all of the value width. Outputs are running
+ * sums from 0: wrapped to int32 for 32-bit streams, doubles for 64-bit ones.
+ */
 function decodeInts(data: Uint8Array, count: number, wide: boolean): number[] {
   const width = wide ? 8 : 4,
-    view = new DataView(data.buffer, data.byteOffset, data.byteLength),
-    codes = width;
-  let at = codes + ((count * 2 + 7) >> 3),
-    previous = 0;
-  if (at > data.length) fail('truncated integer codes');
-  const out = new Array<number>(count);
-  const common = wide ? Number(view.getBigInt64(0, true)) : view.getInt32(0, true);
+    codeBytes = (count * 2 + 7) >> 3;
+  if (data.length < width + codeBytes) fail('truncated integer codes');
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  const signed = (at: number, bytes: number) =>
+    bytes === 1
+      ? view.getInt8(at)
+      : bytes === 2
+        ? view.getInt16(at, true)
+        : bytes === 4
+          ? view.getInt32(at, true)
+          : Number(view.getBigInt64(at, true));
+  const common = signed(0, width),
+    values: number[] = [];
+  let q = width + codeBytes,
+    sum = 0;
   for (let i = 0; i < count; i++) {
-    const code = (data[codes + (i >> 2)] >> ((i & 3) * 2)) & 3,
-      size = code ? (wide ? 0.5 : 0.25) * (2 << code) : 0;
-    if (at + size > data.length) fail('truncated integer values');
-    const delta = !code
-      ? common
-      : size === 1
-        ? view.getInt8(at)
-        : size === 2
-          ? view.getInt16(at, true)
-          : size === 4
-            ? view.getInt32(at, true)
-            : Number(view.getBigInt64(at, true));
-    at += size;
-    previous = wide ? previous + delta : (previous + delta) | 0;
-    out[i] = previous;
+    const code = (data[width + (i >> 2)] >> ((i & 3) * 2)) & 3;
+    let delta = common;
+    if (code) {
+      const bytes = width >> (3 - code); // a quarter, a half or all of the value width
+      if (q + bytes > data.length) fail('truncated integer values');
+      delta = signed(q, bytes);
+      q += bytes;
+    }
+    sum = wide ? sum + delta : (sum + delta) | 0;
+    values.push(sum);
   }
-  return out;
+  return values;
 }
+
 const half = (h: number) => {
   const e = (h >> 10) & 31,
     m = h & 1023,
@@ -150,7 +176,7 @@ export function parseCrate(data: Uint8Array, maxBytes: number, maxDepth = 64): S
       width = wide ? 8 : 4;
     budget(count * 8);
     return decodeInts(
-      inflate(data.subarray(take(size), p), width + ((count * 2 + 7) >> 3) + count * width),
+      decompressFast(data.subarray(take(size), p), width + ((count * 2 + 7) >> 3) + count * width),
       count,
       wide,
     );
@@ -176,7 +202,7 @@ export function parseCrate(data: Uint8Array, maxBytes: number, maxDepth = 64): S
   const tokenCount = u64(),
     rawSize = u64(),
     packedSize = u64(),
-    raw = inflate(data.subarray(take(packedSize), p), rawSize);
+    raw = decompressFast(data.subarray(take(packedSize), p), rawSize);
   const tokens = new TextDecoder().decode(raw).split('\0').slice(0, tokenCount);
   if (tokens.length !== tokenCount) fail('truncated Crate tokens');
   const token = (i: number) => {
@@ -189,7 +215,7 @@ export function parseCrate(data: Uint8Array, maxBytes: number, maxDepth = 64): S
   section('FIELDS');
   const fieldCount = u64(),
     fieldNames = ints(fieldCount).map(token),
-    repBytes = inflate(data.subarray(take(u64()), p), fieldCount * 8);
+    repBytes = decompressFast(data.subarray(take(u64()), p), fieldCount * 8);
   if (repBytes.length !== fieldCount * 8) fail('truncated Crate value reps');
   const reps = new DataView(repBytes.buffer, repBytes.byteOffset, repBytes.byteLength);
   section('FIELDSETS');
