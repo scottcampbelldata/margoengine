@@ -11,7 +11,7 @@ import { mockGPU, context } from './gpu-recorder.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 
 const before = '5b1fe66^',
-  { ref, pin } = refs(before, '5b1fe66', '8199756');
+  { ref, pin } = refs(before, '5b1fe66', '780b785c');
 const post = await versions('post', ref, undefined, pin),
   dof = await versions('dof', ref, undefined, pin),
   tonemap = await versions('tonemap', ref, undefined, pin);

@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { refs, versions, current } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 
-const { ref, pin } = refs('6c20076d'),
+const { ref, pin } = refs('6c20076d', undefined, '780b785c'),
   { baseline, candidate } = await versions('water', ref, undefined, pin);
 
 function story(m, options) {

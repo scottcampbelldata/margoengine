@@ -11,7 +11,7 @@ import { refs, versions, ignoreAgx, entryAt } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 
-const { ref, pin } = refs('7dcc958', '225b1d6', '2cd81c1'),
+const { ref, pin } = refs('7dcc958', '225b1d6', '780b785c'),
   { PostStack, FXAA, Bloom } = await entryAt('post', 'src/index.ts', pin); // the stack around the effects
 const tonemap = await versions('tonemap', ref, undefined, pin),
   dof = await versions('dof', ref, undefined, pin),
