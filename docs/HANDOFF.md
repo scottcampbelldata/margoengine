@@ -2,6 +2,30 @@
 
 Last updated 2026-10-24. Read this first when starting a new session. Update it whenever work lands.
 
+## Landed 2026-10-24: corner stairs, double slabs, waterlogging; WGSL compile gate
+
+Voxel shapes finished: `stairState(id, facing, upsideDown, corner?)` with inner and outer corners (state bits 3-6) and
+`connectStairs(world, x, y, z)` to pick them from neighbouring stairs (a corner given by hand is kept);
+`doubleSlabState(id)`; `waterlogState(state)` with `BlockTypeOptions.waterlog` (a liquid fills the open octants:
+meshed by the liquid rules per half block, lit at the liquid's opacity, swum in, the block still collides). The path
+tracer light-samples shaped emissive cells as quarter faces (area-weighted, so the density is unchanged) and cuts
+shaped cut-out cells per run through their filled octants. Tests: the half-block oracle now covers liquids, corners,
+double slabs and waterlogged cells; the tracer's browser check gained a `shapes` section (GPU first hits equal the CPU
+raycast on all 19,200 pixels, cut-out light 0.4775 against 0.4775, emissive slab ceilings 0.6671 against 2/3 with the
+noise of whole cells). Bench: `mesh-128-mixed-shape-chunks` 99.2 ms; `mesh-128-shaped-chunks` 85.5-86.1 ms against
+78.2-79.2 ms for 10148ace's mesher (same process, same 326,057 quads, identical bytes); cube terrain unchanged
+(39.8-41.0 ms both). Sizes (gzip, against 10148ace): voxel root +784 B, `./mesher` +427, `./light` +296, `./physics`
++257, `./query` +118, `./render` +164, `./codec` +173, `./stream` +164, `./vox` +180, mesher worker +412,
+voxel-pathtracer +611; core + stage unchanged at 22,253 B. The shapes view shows the new pieces (reference re-recorded).
+
+WGSL gate (after 10148ace shipped a trace shader that did not compile, fixed in 2dbd76ca): `npm run check:wgsl` (in
+check:merge) compiles on the GPU every top-level WGSL constant with an entry point in packages/*/src and
+packages/shared and every top-level WGSL builder called with each combination of its flag parameters: 100 files, 145
+constants and 42 builder variants, 180 distinct sources, 16 of them fragments joined elsewhere, 26 builders skipped
+(they take source text or option objects), 1.7 s. scripts/support/wgsl-guard.js also checks every module any page
+opened by scripts/browser.js or the visual check creates, so check:views, the package tests and the 73 views fail on a
+WGSL error too. `npm run check:tracer` (in check:merge) runs the tracer's compile and shapes checks.
+
 ## Landed 2026-10-24: core bug fixes; the freeze blocks features, not fixes
 
 Scott's rule (2026-10-24): the v1.0 core freeze means no new features; bugs and unsafe APIs are fixed in core, with
@@ -43,8 +67,8 @@ Demo: the voxel sandbox's `?view=shapes`, a new visual reference (`voxel-shapes-
 Sizes (gzip): voxel root +225 B, `./mesher` +1,344, `./light` +503, `./physics` +848, `./query` +545, `./render` +340,
 mesher worker +1,342, voxel-pathtracer +1,823; core + stage unchanged at 22,253 B. Meshing the 128-chunk bench terrain
 (Node, RTX A6000 desktop): 39.2 ms before, 39.7-40.6 ms after (A/B in one process, same 106,971 quads); with slabs and
-stairs on two thirds of its surface (`mesh-128-shaped-chunks`): 80.0 ms. Open: no corner (inner/outer) stairs, no
-double slabs as one state, no waterlogging; the path tracer does not light-sample shaped emissive cells.
+stairs on two thirds of its surface (`mesh-128-shaped-chunks`): 80.0 ms. The open items (corners, double slabs,
+waterlogging, tracer emission and cut-outs) landed next, above.
 
 ## Landed 2026-10-24: multi-view demos (roadmap M7 done)
 

@@ -28,6 +28,7 @@ import { resolve, dirname } from 'node:path';
 import { deflateSync, crc32 } from 'node:zlib';
 import { decodePNG } from '../tests/support/png.js';
 import { acPower } from '../examples/package-benchmarks/cad/power.mjs';
+import { watchWgsl, wgslGuard } from './support/wgsl-guard.js';
 import { margoError } from '../packages/shared/errors.js';
 import {
   selectBaselineProfile,
@@ -383,6 +384,7 @@ try {
       })
     ).listen();
   const devOrigin = devServer && new URL(devServer.resolvedUrls.local[0]).origin;
+  const wgslModules = new Set();
   for (let run = 0; run < runs; run++) {
     const browser = await chromium.launch({
       channel: process.env.BROWSER_CHANNEL ?? 'msedge',
@@ -398,6 +400,9 @@ try {
         const context = await browser.newContext({ ...options, reducedMotion: 'reduce' }),
           page = await context.newPage();
         if (loss) await page.addInitScript(lossHooks);
+        // WGSL errors of any module the view creates fail it, drawn or not.
+        await page.addInitScript(wgslGuard);
+        const wgsl = watchWgsl(page);
         const capture = async () => {
           // Let late UI text settle (sandbox clock label ticks every 500 ms) and a few frames present.
           await page.waitForTimeout(1000);
@@ -459,6 +464,8 @@ try {
               });
           }
           result.captures.push(await capture());
+          for (const e of wgsl.errors) result.errors.push(`wgsl: ${e}`);
+          for (const k of wgsl.modules) wgslModules.add(k);
         } catch (error) {
           if (error.name === 'MargoError' && error.code === 'state') throw error;
           result.errors.push(`capture: ${String(error.message ?? error).split('\n')[0]}`);
@@ -520,7 +527,9 @@ try {
     if (runs < 2) throw new RangeError('A new visual profile needs repeated captures; use --runs=4');
     if (
       [...results.values()].some(
-        (r) => r.captures.length < runs || r.errors.some((e) => e.startsWith('pageerror') || e.startsWith('capture')),
+        (r) =>
+          r.captures.length < runs ||
+          r.errors.some((e) => e.startsWith('pageerror') || e.startsWith('capture') || e.startsWith('wgsl')),
       )
     )
       throw margoError(
@@ -533,7 +542,8 @@ try {
   const rows = [];
   for (const r of results.values()) {
     const failed =
-      r.captures.length < runs || r.errors.some((e) => e.startsWith('pageerror') || e.startsWith('capture'));
+      r.captures.length < runs ||
+      r.errors.some((e) => e.startsWith('pageerror') || e.startsWith('capture') || e.startsWith('wgsl'));
     if (update) {
       if (failed) {
         exitCode = 1;
@@ -637,7 +647,7 @@ try {
 <table>${rows.map((r) => `<tr><td><b class="${r.status.split(' ')[0]}">${r.status}</b> ${esc(r.id)}<br><code>/${esc(r.url)}</code><pre>${esc(JSON.stringify({ loss: r.loss, metrics: r.metrics, noise: r.noise, tolerance: r.tolerance, baselineEnvironment: r.baselineEnvironment, why: r.why }, null, 1))}\n${esc(r.errors.slice(0, 8).join('\n'))}</pre></td>${r.images ? ['baseline', 'actual', 'diff'].map((k) => `<td>${k}<img src="${r.id}.${k}.png"></td>`).join('') : ''}</tr>`).join('\n')}</table>`,
   );
   console.log(
-    `${update ? 'updated' : 'checked'} ${rows.length} views in ${seconds} s; report test-results/visual/index.html`,
+    `${update ? 'updated' : 'checked'} ${rows.length} views in ${seconds} s (${wgslModules.size} distinct WGSL modules compiled); report test-results/visual/index.html`,
   );
 } catch (error) {
   console.error(error);

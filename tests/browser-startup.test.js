@@ -13,7 +13,7 @@ mock.module('@playwright/test', {
 const { openBrowser } = await import('../scripts/browser.js');
 
 function fixture(failures) {
-  const result = { probes: 0, waits: 0, browserCloses: 0, serverCloses: 0, reload: null };
+  const result = { probes: 0, waits: 0, browserCloses: 0, serverCloses: 0, reload: null, initScripts: [] };
   const hardware = {
     webglRenderer: process.env.GPU_VENDOR ?? 'test',
     webgpu: { vendor: process.env.GPU_VENDOR?.toLowerCase() ?? 'test', fallback: false },
@@ -28,6 +28,9 @@ function fixture(failures) {
       if (event === 'websocket') callback(socket);
     },
     setDefaultTimeout() {},
+    async addInitScript(script) {
+      result.initScripts.push(script);
+    },
     async goto() {},
     async waitForLoadState(state) {
       assert.equal(state, 'load');
@@ -71,6 +74,11 @@ test('startup hardware probing waits through a confirmed Vite dependency reload'
   assert.equal(state.probes, 2);
   assert.equal(state.waits, 1);
   assert.equal(session.page, state.page);
+  // The WGSL compile guard is installed before the first navigation.
+  assert.deepEqual(
+    state.initScripts.map((f) => f.name),
+    ['wgslGuard'],
+  );
   await session.close();
   assert.equal(state.browserCloses, 1);
   assert.equal(state.serverCloses, 1);

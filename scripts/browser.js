@@ -2,6 +2,7 @@ import { chromium, firefox, webkit } from '@playwright/test';
 import { createServer } from 'vite';
 import { mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import { watchWgsl, wgslGuard } from './support/wgsl-guard.js';
 
 export async function openBrowser({
   browserName = 'chromium',
@@ -11,12 +12,14 @@ export async function openBrowser({
   firefoxUserPrefs = {},
   startPath = '/tests/modern.html',
   aliases = {},
+  plugins = [],
   headless = true,
   port = 5193,
 } = {}) {
   await mkdir('test-results', { recursive: true });
   const server = await createServer({
     resolve: { alias: aliases },
+    plugins,
     optimizeDeps: { entries: [startPath.replace(/^\//, '')] },
     // No file watcher: its first crawl of the repository (and every worktree under it) blocked this process for
     // 30-140 s on a busy machine, so the first page load timed out ("Preparing the citadel...", gate 9).
@@ -41,6 +44,9 @@ export async function openBrowser({
       });
     const page = await browser.newPage({ viewport: { width: 1440, height: 1100 }, deviceScaleFactor: 1 });
     page.setDefaultTimeout(30000);
+    // Every shader module the page creates is compiled for diagnostics; close() fails on a WGSL error.
+    await page.addInitScript(wgslGuard);
+    const wgsl = watchWgsl(page);
     let reloads = 0,
       handledReloads = 0;
     page.on('websocket', (socket) =>
@@ -114,9 +120,15 @@ export async function openBrowser({
     return {
       page,
       hardware,
+      wgsl,
       async close() {
+        // Compilation info arrives asynchronously: let the last reports in before reading them.
+        await page.evaluate(() => new Promise((r) => setTimeout(r, 200))).catch(() => {});
         await browser.close();
         await server.close();
+        if (wgsl.modules.size)
+          console.log(`WGSL: ${wgsl.modules.size} distinct shader modules compiled, ${wgsl.errors.length} errors`);
+        if (wgsl.errors.length) throw new Error(`WGSL compile errors:\n${wgsl.errors.slice(0, 20).join('\n')}`);
       },
     };
   } catch (error) {
