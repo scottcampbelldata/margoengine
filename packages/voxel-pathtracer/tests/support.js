@@ -31,10 +31,14 @@ const recorder = (commands) =>
   );
 
 /** A device that records what the tracer asks of it. `onMap(buffer)` may fill a staging buffer before it is read. */
-export function fakeDevice({ maxStorageBufferBindingSize = 128 << 20, maxTextureDimension2D = 8192 } = {}) {
+export function fakeDevice({
+  maxStorageBufferBindingSize = 128 << 20,
+  maxBufferSize = 256 << 20,
+  maxTextureDimension2D = 8192,
+} = {}) {
   let lose;
   const device = {
-    limits: { maxStorageBufferBindingSize, maxBufferSize: 256 << 20, maxTextureDimension2D },
+    limits: { maxStorageBufferBindingSize, maxBufferSize, maxTextureDimension2D },
     buffers: [],
     textures: [],
     passes: [],
@@ -45,6 +49,7 @@ export function fakeDevice({ maxStorageBufferBindingSize = 128 << 20, maxTexture
     }),
     lose: () => lose({ reason: 'destroyed', message: 'test' }),
     createBuffer({ size, usage }) {
+      assert.ok(size <= maxBufferSize, `buffer ${size} exceeds maxBufferSize ${maxBufferSize}`);
       const data = new ArrayBuffer(size),
         b = {
           size,
@@ -92,7 +97,17 @@ export function fakeDevice({ maxStorageBufferBindingSize = 128 << 20, maxTexture
     createRenderPipelineAsync: async (d) => ({ ...d, kind: 'render' }),
     createBindGroup: (d) => {
       for (const e of d.entries) {
-        if (e.resource.buffer) assert.ok(!e.resource.buffer.destroyed, 'bind group of a destroyed buffer');
+        if (e.resource.buffer) {
+          const { buffer, offset = 0, size = buffer.size - offset } = e.resource;
+          assert.ok(!buffer.destroyed, 'bind group of a destroyed buffer');
+          assert.ok(offset >= 0 && size > 0 && offset + size <= buffer.size, 'binding exceeds its buffer range');
+          const type = d.layout.entries?.find((entry) => entry.binding === e.binding)?.buffer?.type;
+          if (type === 'storage' || type === 'read-only-storage')
+            assert.ok(
+              size <= maxStorageBufferBindingSize,
+              `storage binding ${e.binding} size ${size} exceeds maxStorageBufferBindingSize ${maxStorageBufferBindingSize}`,
+            );
+        }
         if (e.resource.texture) assert.ok(!e.resource.texture.destroyed, 'bind group of a destroyed texture');
       }
       // A texture may not be read and written by one dispatch.
