@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
-  "description": "Worker-pooled Draco geometry and KTX2/Basis texture decoding, and synchronous PNG reading, for Margo Engine.",
+  "description": "Worker-pooled Draco geometry and KTX2/Basis texture decoding, and synchronous PNG, TGA, TIFF, DDS and KTX reading, for Margo Engine.",
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"
   },
@@ -12,7 +12,7 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test tests/decoders.test.js tests/meshopt.test.js tests/meshopt-encode.test.js",
+    "test": "npm run build && node --test tests/decoders.test.js tests/meshopt.test.js tests/meshopt-encode.test.js tests/tga.test.js tests/dds.test.js tests/ktx.test.js tests/tiff.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "prepack": "npm run build"
   },
@@ -33,6 +33,22 @@
     "./png": {
       "types": "./dist/png.d.ts",
       "import": "./dist/png.js"
+    },
+    "./tga": {
+      "types": "./dist/tga.d.ts",
+      "import": "./dist/tga.js"
+    },
+    "./dds": {
+      "types": "./dist/dds.d.ts",
+      "import": "./dist/dds.js"
+    },
+    "./ktx": {
+      "types": "./dist/ktx.d.ts",
+      "import": "./dist/ktx.js"
+    },
+    "./tiff": {
+      "types": "./dist/tiff.d.ts",
+      "import": "./dist/tiff.js"
     }
   },
   "files": [

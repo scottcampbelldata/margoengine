@@ -8,3 +8,7 @@ export const decodeFailed = (message: string, cause?: unknown): Error =>
     name: 'MargoError',
     code: 'failed' as const,
   });
+
+/** The device lacks a feature a texture needs: MargoError code 'unsupported'. */
+export const deviceUnsupported = (message: string): Error =>
+  Object.assign(new Error(message), { name: 'MargoError', code: 'unsupported' as const });

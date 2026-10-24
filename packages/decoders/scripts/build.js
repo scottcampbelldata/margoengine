@@ -51,6 +51,9 @@ await copyFile(resolve(root, 'vendor/NOTICE.md'), resolve(dist, 'THIRD-PARTY-NOT
 await mkdir(resolve(dist, 'shared'), { recursive: true });
 for (const name of ['crc32', 'errors', 'inflate', 'png'])
   await copyFile(resolve(repository, `packages/shared/${name}.js`), resolve(dist, `shared/${name}.js`));
-const png = resolve(dist, 'png.js');
-await writeFile(png, (await readFile(png, 'utf8')).replaceAll('../../shared/', './shared/'));
+// The TIFF reader shares the zlib inflater for its Deflate strips.
+for (const name of ['png', 'tiff']) {
+  const file = resolve(dist, `${name}.js`);
+  await writeFile(file, (await readFile(file, 'utf8')).replaceAll('../../shared/', './shared/'));
+}
 await copyFile(resolve(root, 'vendor/LICENSE-Apache-2.0.txt'), resolve(dist, 'LICENSE-Apache-2.0.txt'));

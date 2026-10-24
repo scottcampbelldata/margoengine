@@ -1,6 +1,6 @@
 # @margoengine/decoders
 
-Worker-pooled Draco geometry decoding, KTX2/Basis Universal texture transcoding and EXT_meshopt_compression decoding, and synchronous PNG reading (`@margoengine/decoders/png`), for Margo Engine.
+Worker-pooled Draco geometry decoding, KTX2/Basis Universal texture transcoding and EXT_meshopt_compression decoding, and synchronous PNG, TGA, TIFF, DDS and KTX 1 reading (`@margoengine/decoders/png`, `/tga`, `/tiff`, `/dds`, `/ktx`), for Margo Engine.
 
 Build from source with `npm run build` in `packages/decoders`.
 
@@ -54,6 +54,60 @@ const {width, height, data} = decodePNG(pngBytes);
 Measured in Node 26 on the development machine: a 2048 x 2048 RGBA PNG decodes in 110 to 130 ms (incompressible or
 smooth content). All 179 PNGs in this repository decode to the same pixels as libvips (one file's embedded ICC profile,
 which libvips applies, removed first).
+
+## TGA, TIFF, DDS and KTX 1 (`@margoengine/decoders/tga`, `/tiff`, `/dds`, `/ktx`)
+
+Four small synchronous readers, each its own entry and each written from its published specification (Truevision TGA
+2.0, Adobe TIFF 6.0, Microsoft's DDS documentation, Khronos KTX 1.1). None loads the workers or Wasm decoders.
+
+- `parseTGA(bytes, {maxPixels?})` returns `{width, height, data}`, RGBA8 rows top first, like `decodePNG`: image
+  types 1, 2, 3 and their RLE forms 9, 10, 11; 8-, 15-, 16-, 24- and 32-bit pixels; colour maps of 15 to 32 bits;
+  any origin corner; alpha from the descriptor bits, with a TGA 2.0 extension area's "no alpha" honoured and
+  premultiplied alpha divided out.
+- `parseTIFF(bytes, {maxPixels?})` reads the first image: little- or big-endian, strips or tiles, uncompressed, LZW
+  (with Predictor 2 at 8 and 16 bits), PackBits or Deflate; grey (either polarity), RGB and palette at 1, 2, 4, 8 or 16 bits per
+  sample, chunky or planar, with an associated or unassociated alpha extra sample. Integer images come out as
+  `{width, height, format: 'rgba8unorm', data: Uint8Array}` (16-bit samples scale to 0-255), 32-bit float images as
+  `{format: 'rgba32float', data: Float32Array}`. JPEG, CMYK, YCbCr, signed samples and the float predictor are refused.
+- `parseDDS(bytes)` and `parseKTX(bytes)` return a `TextureFile`: `{width, height, layers, dimension, mipmaps, format,
+  feature?, target, srgb, hasAlpha}` with every mip level, each level holding all its layers (cube faces in WebGPU
+  order +X, -X, +Y, -Y, +Z, -Z) back to back. Block-compressed data passes through untouched: BC1 to BC7 (sRGB, BC4 and
+  BC5 signed, BC6H signed and unsigned) from either file, and ETC1, ETC2, EAC and every ASTC block size from KTX.
+  `feature` names the device feature such a format needs. DDS BGRA8, BGRX8, 565, 5551, 4444, 24-bit, luminance and
+  alpha-only pixels, and KTX RGB8, become `rgba8unorm`; RGBA8, R8, RG8, 16- and 32-bit float and the packed
+  10-bit and shared-exponent formats pass through. 2D textures, cube maps and arrays of either; volume and 1D textures
+  are refused. KTX padding rules (row, cube and mip) are followed, big-endian files are swapped, and key/value data
+  is skipped, so `KTXorientation` is not applied and rows come out as stored.
+- `uploadTexture(device, file, {label?, usage?})` (on both `/dds` and `/ktx`) creates the GPUTexture and writes every
+  level and layer. On a device without the feature (`texture-compression-bc`, `-etc2` or `-astc`) it throws
+  `MargoError` `unsupported` naming the feature to request in `requestDevice`.
+
+Broken files throw `MargoError` `failed` naming the problem; a non-`Uint8Array` input is a TypeError and an image over
+`maxPixels` a RangeError.
+
+```ts
+import {parseTGA} from '@margoengine/decoders/tga';
+import {parseTIFF} from '@margoengine/decoders/tiff';
+import {parseDDS, uploadTexture} from '@margoengine/decoders/dds';
+
+declare const device: GPUDevice;
+declare const tgaBytes: Uint8Array, tiffBytes: Uint8Array, ddsBytes: Uint8Array;
+
+const decal = parseTGA(tgaBytes); // {width, height, data: RGBA8}
+const heightMap = parseTIFF(tiffBytes); // rgba8unorm or rgba32float
+const sky = parseDDS(ddsBytes); // e.g. a BC6H cube map
+if (sky.feature && !device.features.has(sky.feature)) console.warn(`${sky.format} needs ${sky.feature}`);
+const texture = uploadTexture(device, sky);
+```
+
+With `@margoengine/materials`, `new Texture(decal)` and `new Texture(heightMap)` take the TGA and TIFF results as raw or
+data images. A DDS or KTX result that is one 2D layer in `rgba8unorm`, `bc7-rgba-unorm`, `astc-4x4-unorm` or
+`etc2-rgba8unorm` (each with or without `-srgb`) is also a transcoded texture `new Texture(file)` accepts; other formats,
+cube maps and arrays go through `uploadTexture` and are handed to materials as a GPUTexture.
+
+`tests/tga.test.js`, `dds.test.js`, `ktx.test.js` and `tiff.test.js` build every supported variant with the encoders in
+`tests/support/texture-encoders.js` and check decoded pixels exactly. `scripts/texture-fixtures.mjs` uses the same
+encoders to write the 64x64 demo checkerboards in `examples/assets/texture-formats/`.
 
 ## How it works
 
