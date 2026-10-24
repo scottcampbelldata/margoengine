@@ -5,7 +5,7 @@ import { Engine } from '../packages/core/dist/extension.js';
 import {
   CubeTexture,
   LambertMaterial,
-  Material,
+  type Material,
   PbrMaterial,
   ShadowCatcherMaterial,
   Texture,

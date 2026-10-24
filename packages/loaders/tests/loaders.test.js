@@ -15,7 +15,6 @@ import {
   parseOFF,
   parseXYZ,
   parseVTK,
-  decompressLZF,
   readZipDirectory,
   readZipEntry,
   crc32,

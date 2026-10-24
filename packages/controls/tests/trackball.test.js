@@ -161,7 +161,7 @@ test('trackball: coasting after a fling is frame-rate independent and stops', ()
 });
 
 test('trackball: pan moves the target with the scene following the pointer', () => {
-  let { el, cam, control } = ball({ staticMoving: true });
+  const { el, cam, control } = ball({ staticMoving: true });
   gesture(
     el,
     control,
@@ -240,8 +240,9 @@ test('trackball: zoom by wheel, middle drag, held keys and touch pinch; distance
   control.dispose();
 
   // Held KeyS makes the left button zoom, KeyD pan; any keyup clears it.
-  let k;
-  ({ el, keys: k, cam, control } = ball({ staticMoving: true }));
+  const held = ball({ staticMoving: true }),
+    k = held.keys;
+  ({ el, cam, control } = held);
   key(k, 'keydown', 'KeyS');
   gesture(el, control, [
     [400, 300],

@@ -3,7 +3,6 @@
 // It exists so tests execute the shader text itself instead of a hand-written JavaScript copy of it.
 
 const f32 = Math.fround;
-const isVec = (v) => Array.isArray(v) && !Array.isArray(v[0]);
 const map2 = (a, b, op) => {
   if (Array.isArray(a) && Array.isArray(b)) return a.map((x, i) => op(x, b[i]));
   if (Array.isArray(a)) return a.map((x) => op(x, b));

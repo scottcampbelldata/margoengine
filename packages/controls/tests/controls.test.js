@@ -425,7 +425,6 @@ test('map controls: left drag pans along the ground plane', () => {
 
 // ---------- FlyControls ----------
 
-
 // ---------- FirstPersonControls ----------
 
 // ---------- PointerLockControls ----------
@@ -794,4 +793,3 @@ test('controls built from an engine update before each render and are disposed w
   engine.dispose();
   assert.equal(canvas.listenerCount, 0, 'engine dispose disposes controls');
 });
-

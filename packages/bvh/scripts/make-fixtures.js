@@ -16,7 +16,7 @@ const fixed = (v) => {
 /** Icosahedron subdivided `levels` times, vertices on the unit sphere; faces wind outward. */
 function icosphere(levels) {
   const t = (1 + Math.sqrt(5)) / 2;
-  let points = [
+  const points = [
     [-1, t, 0],
     [1, t, 0],
     [-1, -t, 0],
