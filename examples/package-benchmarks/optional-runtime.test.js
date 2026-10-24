@@ -13,11 +13,11 @@ function avoidsHole(path) {
         t = j / 64,
         x = a.x + (b.x - a.x) * t,
         z = a.z + (b.z - a.z) * t;
-      assert.ok(Math.abs(x) >= 3 - 1e-4 || Math.abs(z) >= 3 - 1e-4, 'Detour route must not cross the missing floor');
+      assert.ok(Math.abs(x) >= 3 - 1e-4 || Math.abs(z) >= 3 - 1e-4, 'route must not cross the missing floor');
     }
 }
 
-test('Navigation builds real Recast geometry and markers follow hole-avoiding Detour routes', async () => {
+test('Navigation builds a navmesh from the floor triangles and markers follow hole-avoiding routes', async () => {
   const work = await navigation(96),
     originalPoints = work.points,
     originalYaw = work.yaw,

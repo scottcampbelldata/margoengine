@@ -14,8 +14,10 @@ interface Polygon {
   plane: readonly [number, number, number, number];
 }
 const cross = (a: Vec3, b: Vec3, c: Vec3) => (b[0] - a[0]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[0] - a[0]);
-const area = (a: Vec3, b: Vec3, c: Vec3) => -cross(a, b, c);
-const same = (a: Vec3, b: Vec3) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]) < 1e-8;
+/** Same point within the point-equality floor (1e-8 per axis, our own choice). */
+const same = (a: Vec3, b: Vec3) =>
+  a === b || (Math.abs(a[0] - b[0]) <= 1e-8 && Math.abs(a[1] - b[1]) <= 1e-8 && Math.abs(a[2] - b[2]) <= 1e-8);
+const copy = (v: Vec3) => [v[0], v[1], v[2]] as unknown as Vec3;
 const distance = (a: Vec3, b: Vec3) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 function point(value: Vec3): void {
   if (value.length !== 3 || value.some((v) => !Number.isFinite(Math.fround(v))))
@@ -277,53 +279,63 @@ export class NavMesh {
       corridor.push(node);
     }
     corridor.reverse();
-    const portals: { left: Vec3; right: Vec3 }[] = [{ left: start, right: start }];
-    for (let i = 0; i + 1 < corridor.length; i++) {
+    return this.pull(corridor, start, end);
+  }
+  /** Funnel deque reused by `pull`: the left chain grows down from the apex slot, the right chain up. */
+  private readonly funnel: Vec3[] = [];
+  /**
+   * Shortest XZ polyline from `start` to `end` through the corridor's portals: the funnel of D. T. Lee and
+   * F. P. Preparata (Networks 14, 1984), as used by J. Hershberger and J. Snoeyink (CGTA 4, 1994). The deque holds
+   * the shortest paths from the apex to the latest left and right portal ends; the left chain only turns
+   * counter-clockwise, the right one only clockwise. A new end point pops the vertices of its own chain it can see
+   * past; when it crosses the other chain, the apex walks along that chain and every vertex passed is a corner.
+   */
+  private pull(corridor: readonly number[], start: Vec3, end: Vec3): Vec3[] {
+    const result: Vec3[] = [copy(start)],
+      polygons = this.polygons,
+      portals = corridor.length - 1,
+      middle = portals + 2,
+      deque = this.funnel;
+    if (deque.length < 2 * middle + 1) deque.length = 2 * middle + 1;
+    deque[middle] = start;
+    let low = middle,
+      apex = middle,
+      high = middle;
+    const corner = (v: Vec3) => {
+      if (!same(v, result[result.length - 1])) result.push(copy(v));
+    };
+    const addLeft = (p: Vec3) => {
+      if (same(p, deque[low])) return;
+      while (low < apex && cross(deque[low + 1], deque[low], p) <= 0) low++;
+      if (low === apex) {
+        // p is clockwise of the right chain's first edge: the path to p wraps that chain's vertices.
+        while (apex < high && cross(deque[apex], deque[apex + 1], p) < 0) corner(deque[++apex]);
+        low = apex;
+      }
+      deque[--low] = p;
+    };
+    const addRight = (p: Vec3) => {
+      if (same(p, deque[high])) return;
+      while (high > apex && cross(deque[high - 1], deque[high], p) >= 0) high--;
+      if (high === apex) {
+        while (apex > low && cross(deque[apex], deque[apex - 1], p) > 0) corner(deque[--apex]);
+        high = apex;
+      }
+      deque[++high] = p;
+    };
+    for (let i = 0; i < portals; i++) {
       const links = polygons[corridor[i]].links,
         next = corridor[i + 1];
       let l = 0;
       while (links[l].to !== next) l++;
-      portals.push(links[l]);
+      addLeft(links[l].left);
+      addRight(links[l].right);
     }
-    portals.push({ left: end, right: end });
-    const result: Vec3[] = [[...start] as unknown as Vec3];
-    let apex = start,
-      left = start,
-      right = start,
-      apexIndex = 0,
-      leftIndex = 0,
-      rightIndex = 0;
-    for (let i = 1; i < portals.length; i++) {
-      const portal = portals[i];
-      if (area(apex, right, portal.right) <= 0) {
-        if (same(apex, right) || area(apex, left, portal.right) > 0) {
-          right = portal.right;
-          rightIndex = i;
-        } else {
-          result.push([...left] as unknown as Vec3);
-          apex = left;
-          apexIndex = leftIndex;
-          left = right = apex;
-          leftIndex = rightIndex = apexIndex;
-          i = apexIndex;
-          continue;
-        }
-      }
-      if (area(apex, left, portal.left) >= 0) {
-        if (same(apex, left) || area(apex, right, portal.left) < 0) {
-          left = portal.left;
-          leftIndex = i;
-        } else {
-          result.push([...right] as unknown as Vec3);
-          apex = right;
-          apexIndex = rightIndex;
-          left = right = apex;
-          leftIndex = rightIndex = apexIndex;
-          i = apexIndex;
-        }
-      }
-    }
-    if (!same(result.at(-1)!, end)) result.push([...end] as unknown as Vec3);
+    // The end is a portal of zero width; the left chain then runs from the apex to it.
+    addLeft(end);
+    for (let i = apex - 1; i > low; i--) corner(deque[i]);
+    if (!same(end, result[result.length - 1])) result.push(copy(end));
+    deque.fill(undefined as unknown as Vec3, 0, 2 * middle + 1);
     return result;
   }
 }

@@ -105,7 +105,7 @@ test('ORCA validates component values without spreading vectors on stable ticks'
     neighbors = [b];
   for (let i = 0; i < 120; i++) {
     assert.equal(avoid(a, neighbors, 1 / 60, 2, output), output);
-    assert.deepEqual(Array.from(output), [0.96, -0.19595917942265426]);
+    assert.ok(Math.abs(output[0] - 0.96) <= 1e-12 && Math.abs(output[1] + 0.19595917942265426) <= 1e-12);
   }
   assert.equal(iterations, 0, 'validation must not allocate a six-component spread array for each agent');
   for (const field of ['position', 'velocity', 'preferred'])

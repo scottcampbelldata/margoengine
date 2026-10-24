@@ -1,4 +1,4 @@
-import { Navigation } from '../../packages/navigation/dist/index.js';
+import { Navigation } from '../../packages/navmesh/dist/build.js';
 
 const floorMarkers = 72;
 export async function createWorkload(count = 128) {
@@ -61,7 +61,7 @@ export async function createWorkload(count = 128) {
         if (path.length > 2) bentPaths++;
         points[offset + 3] = path.length > 2 ? 1 : 0;
         let remaining = delta * 1.6;
-        // Consume actual Detour waypoints; a long callback cannot cut across the hole.
+        // Consume actual path waypoints; a long callback cannot cut across the hole.
         for (let waypoint = 1; waypoint < path.length && remaining > 0; waypoint++) {
           const next = path[waypoint],
             dx = next.x - agent.position.x,
@@ -111,7 +111,7 @@ export async function createWorkload(count = 128) {
     },
     bounds: { min: [-9.2, -0.3, -9.2], max: [9.2, 0.7, 9.2] },
     description:
-      'Actual Recast voxelization and Detour queries route agents around a missing central floor. Purple marks 72 walkable input tiles; amber marks a route with bends, green a direct route and red a failed query. This is pathfinding, without crowd avoidance.',
+      'A navmesh voxelised from the floor triangles routes agents around a missing central floor with funnel-pulled paths. Purple marks 72 walkable input tiles; amber marks a route with bends, green a direct route and red a failed query. This is pathfinding, without crowd avoidance.',
     step(delta) {
       if (disposed) return;
       if (!Number.isFinite(delta) || delta < 0 || delta > 0.1) throw new RangeError('Invalid navigation frame delta');

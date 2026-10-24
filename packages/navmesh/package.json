@@ -8,6 +8,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./build": {
+      "types": "./dist/build.d.ts",
+      "import": "./dist/build.js"
     }
   },
   "files": [
@@ -29,5 +33,5 @@
     "prepack": "npm run build"
   },
   "homepage": "https://margoengine.com",
-  "description": "Convex polygon navigation with A*, funnel paths and ORCA avoidance."
+  "description": "Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build)."
 }
