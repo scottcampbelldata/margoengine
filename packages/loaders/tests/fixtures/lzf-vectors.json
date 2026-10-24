@@ -192,12 +192,11 @@
   }
  },
  "fixture": {
-  "path": "packages/loaders/tests/fixtures/pcl_logo.pcd",
-  "bodyOffset": 202,
-  "compressedSize": 25610,
-  "uncompressedSize": 206544,
-  "outputSha256": "bd4ac88c12e8696e7281348c013f32bc21ba1831d394b40e90e764b42661ef67",
-  "first16": "143f76bf143f76bf666676bf827376bf",
-  "last16": "8080804a8080804a8080804a8080804a"
+  "path": "packages/loaders/tests/fixtures/spiral.pcd",
+  "about": "Margo spiral fixture from packages/loaders/scripts/make-fixtures.js (spiralPoints); the test also rebuilds the expected body from spiralPoints().",
+  "bodyOffset": 192,
+  "compressedSize": 38529,
+  "uncompressedSize": 65536,
+  "outputSha256": "18d97d702c73a3cd4701b45bd20bd0edd235cb3f4bc2f4b841bdb7631adaa6ce"
  }
 }

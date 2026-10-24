@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { decompressLZF, LoaderError } from '../dist/index.js';
 import { lzfCompress } from './lzf-compress.js';
+import { spiralPoints } from '../scripts/make-fixtures.js';
 
 const fixture = (name) => new URL(`./fixtures/${name}`, import.meta.url);
 const vectors = JSON.parse(readFileSync(fixture('lzf-vectors.json'), 'utf8'));
@@ -57,7 +58,7 @@ test('LZF: decodes the hand-assembled format vectors byte for byte, with the doc
   });
 });
 
-test('LZF: decodes the real PCL binary_compressed body', () => {
+test('LZF: decodes the binary_compressed body of the Margo spiral PCD', () => {
   const f = vectors.fixture;
   const bytes = readFileSync(new URL(`../../../${f.path}`, import.meta.url));
   // bodyOffset is where the LZF data starts, after PCD's two uint32 sizes.
@@ -66,10 +67,18 @@ test('LZF: decodes the real PCL binary_compressed body', () => {
   assert.equal(view.getUint32(4, true), f.uncompressedSize);
   const body = bytes.subarray(f.bodyOffset, f.bodyOffset + f.compressedSize);
   const out = decompressLZF(body, f.uncompressedSize, 'PCD');
-  assert.equal(out.length, f.uncompressedSize);
+  // Expected body: the generator's points laid out field by field (x[], y[], z[], rgb[]), little endian.
+  const points = spiralPoints(),
+    n = points.length,
+    expected = new Uint8Array(n * 16),
+    fields = new DataView(expected.buffer);
+  points.forEach((p, i) => {
+    for (let a = 0; a < 3; a++) fields.setFloat32((a * n + i) * 4, p.position[a], true);
+    fields.setUint32((3 * n + i) * 4, (p.rgb[0] << 16) | (p.rgb[1] << 8) | p.rgb[2], true);
+  });
+  assert.equal(out.length, expected.length);
+  assert.deepEqual(out, expected);
   assert.equal(sha256(out), f.outputSha256);
-  assert.equal(toHex(out.subarray(0, 16)), f.first16);
-  assert.equal(toHex(out.subarray(out.length - 16)), f.last16);
 });
 
 test('LZF: the test compressor round trips literals, short and long references and far distances', () => {
@@ -90,7 +99,7 @@ test('LZF: the test compressor round trips literals, short and long references a
     Uint8Array.from({ length: 5000 }, (_, i) => (i * 31) % 7),
     Uint8Array.from({ length: 4096 }, random),
     far,
-    new Uint8Array(readFileSync(fixture('simple.pcd'))),
+    new Uint8Array(readFileSync(fixture('rose.pcd'))),
   ];
   const kinds = { literal: 0, short: 0, long: 0 };
   for (const input of samples) {
