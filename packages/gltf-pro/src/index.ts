@@ -2897,14 +2897,19 @@ export async function loadGLTF(
     options.signal,
   );
 }
-/** Like parseGLTF for in-memory JSON/GLB, but async so Draco, meshopt and KTX2 decoders can run; also decodes embedded images. External URIs resolve against the page. */
+/**
+ * Async in-memory JSON/GLB parsing, including Draco, meshopt and KTX2. With no third argument (or an options object),
+ * decodes embedded images and resolves external URIs against the page. The positional buffers/images overload uses
+ * supplied ordinary bitmaps; an undefined buffers argument keeps that overload when images or later options are passed.
+ */
 export async function parseGLTFAsync(
   instance: EngineKernel,
   input: string | object | ArrayBuffer | ArrayBufferView,
-  buffersOrOptions: Array<ArrayBuffer | ArrayBufferView> | (AssetOptions & CompressionOptions) = [],
+  buffersOrOptions?: Array<ArrayBuffer | ArrayBufferView> | (AssetOptions & CompressionOptions),
   images: readonly GLTFImage[] = [],
   options: GLTFLoadOptions = {},
 ): Promise<PBRModel> {
+  if (buffersOrOptions === undefined) buffersOrOptions = arguments.length < 4 ? {} : [];
   if (!Array.isArray(buffersOrOptions)) {
     const config = buffersOrOptions;
     return attach(

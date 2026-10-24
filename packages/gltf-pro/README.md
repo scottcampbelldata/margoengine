@@ -73,8 +73,15 @@ encountered and are released after decoding, including on failure or cancellatio
 Meshopt decoding is synchronous and cached per buffer view, including views used
 by skin, morph and animation accessors. Unknown required extensions still fail.
 
-For in-memory JSON or GLB bytes, use
-`await parseGLTFAsync(engine, input, buffers, images, {signal, draco, ktx2})`.
+For in-memory JSON or GLB bytes, use `await parseGLTFAsync(engine, input)` or pass an options object as the third
+argument, for example `{buffers, signal, draco, ktx2}`. Both forms decode embedded PNG/JPEG and KTX2 images;
+external buffers and images resolve against the page. Passing `undefined` as the third argument alone behaves like
+omitting it. Decoded bitmaps close with the model, or before rejection on decode, size-limit, cancellation or attachment
+failure.
+
+The positional `await parseGLTFAsync(engine, input, buffers, images, {signal, draco, ktx2})` overload keeps supplied
+ordinary bitmaps and decodes embedded KTX2 when needed. Passing `undefined` for buffers with a fourth or fifth argument
+retains this positional behavior. Use the no-options/options-object form for automatic ordinary image decoding.
 The existing `parseGLTF(engine, input, buffers, images)` remains synchronous for
 uncompressed and meshopt assets; Draco input directs callers to the async API.
 Both async APIs accept `{signal}`, an optional reusable `draco` decoder with a
@@ -90,7 +97,8 @@ RGBA8 from the device's enabled features. Color/emissive roles use sRGB formats;
 data maps use linear formats. Loader-owned workers terminate after decoding,
 including failure and abort. Retained mip bytes support device restoration without
 another transcode. `KHR_texture_basisu.source` takes precedence over a PNG fallback.
-`parseGLTFAsync` decodes embedded/data-URI KTX2; external images use `loadGLTF`.
+The positional `parseGLTFAsync` overload decodes embedded/data-URI KTX2; use the options-object overload or `loadGLTF`
+for external images.
 Synchronous `parseGLTF` also accepts already decoded `GLTFImage` blueprints.
 
 `KHR_texture_transform` supports offset, rotation, scale, and the overriding UV set
