@@ -8,6 +8,16 @@ const write = <T extends Vec3Like>(out: T, x: number, y: number, z: number): T =
   return out;
 };
 
+/**
+ * Array-shaped ray: `origin + t * direction`, read as `[x, y, z]` array-likes (plain arrays, Float64Arrays), the plain
+ * data that bvh's MeshBVH queries and mesh-edit's MeshSurfaceQuery read. Each says whether `direction` must be unit.
+ * {@link Ray} converts with `{ origin: ray.origin.toArray(), direction: ray.direction.toArray() }`.
+ */
+export interface RayLike {
+  readonly origin: ArrayLike<number>;
+  readonly direction: ArrayLike<number>;
+}
+
 /** Half-line from `origin` along unit `direction`. Intersection methods write into `out` and return it, or return null on a miss. */
 export class Ray {
   constructor(

@@ -20,6 +20,7 @@ import {
   triangleTriangle,
   type Side,
 } from './math.js';
+import type { RayLike } from '@margoengine/math/ray';
 
 /** Anything with interleaved stride-6 `vertices` (position xyz, normal xyz) and `indices`, such as the core `Geometry`. */
 export interface GeometryLike {
@@ -42,16 +43,6 @@ export interface TriangleSource {
 }
 /** Vertex positions of a MeshBVH: float32 unless its source asked for `precision: 'float64'`. */
 export type BVHPositions = Float32Array | Float64Array;
-/**
- * Array-shaped ray input for MeshBVH queries: `origin + t * direction`, read as `[x, y, z]` array-likes (a
- * Raycaster's Float64Arrays, plain arrays). The direction need not be normalized; distances are t * |direction|.
- * This is the plain data a query reads, not a second ray type: math's `Ray` class (Vector3 fields, unit direction)
- * converts with `{ origin: ray.origin.toArray(), direction: ray.direction.toArray() }`.
- */
-export interface Ray {
-  origin: ArrayLike<number>;
-  direction: ArrayLike<number>;
-}
 /** Distance range and face side for MeshBVH ray queries. */
 export interface RaycastOptions {
   /** Hits closer than this distance are ignored. Distances are t * |direction|. Default 0. */
@@ -434,7 +425,7 @@ export class MeshBVH {
   }
 
   /** Nearest hit along the ray, or null. Equal distances resolve to the lowest face index, as in `raycast`. */
-  raycastFirst(ray: Ray, options: RaycastOptions = {}): BVHHit | null {
+  raycastFirst(ray: RayLike, options: RaycastOptions = {}): BVHHit | null {
     const { origin: o, direction: d } = ray,
       [tmin, tmax, length] = rayRange(d, options),
       side = sideCode(options.side),
@@ -544,7 +535,7 @@ export class MeshBVH {
   }
 
   /** Every hit along the ray, sorted by distance (ties by face index). */
-  raycast(ray: Ray, options: RaycastOptions = {}): BVHHit[] {
+  raycast(ray: RayLike, options: RaycastOptions = {}): BVHHit[] {
     const { origin: o, direction: d } = ray,
       [tmin, tmax, length] = rayRange(d, options),
       side = sideCode(options.side),

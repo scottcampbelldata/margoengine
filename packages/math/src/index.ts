@@ -22,6 +22,7 @@ export { Box3 } from './box3.js';
 export { Sphere } from './sphere.js';
 export { Plane } from './plane.js';
 export { Ray } from './ray.js';
+export type { RayLike } from './ray.js';
 export { Frustum } from './frustum.js';
 export { Spherical } from './spherical.js';
 export * as MathUtils from './mathutils.js';

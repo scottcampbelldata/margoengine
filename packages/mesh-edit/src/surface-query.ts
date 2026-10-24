@@ -10,12 +10,7 @@ import {
   type SurfaceTriangle,
   type CapturedSurface,
 } from './surface-source.js';
-
-/** A world-space ray. `direction` must be normalized. */
-export interface SurfaceRay {
-  origin: ArrayLike<number>;
-  direction: ArrayLike<number>;
-}
+import type { RayLike } from '@margoengine/math/ray';
 
 /** Options for {@link MeshSurfaceQuery.intersect}. Visibility and which helpers count are up to the caller. */
 export interface SurfaceQueryOptions {
@@ -140,8 +135,8 @@ export class MeshSurfaceQuery {
     return source.points.map((p) => [...p]);
   }
 
-  /** Every surface hit along the ray (or the nearest, with `firstHitOnly`), skipping transparent texels. */
-  intersect(input: SurfaceRay, options: SurfaceQueryOptions = {}): SurfaceHit[] {
+  /** Every surface hit along the world-space ray (`direction` normalized; or the nearest, with `firstHitOnly`), skipping transparent texels. */
+  intersect(input: RayLike, options: SurfaceQueryOptions = {}): SurfaceHit[] {
     this.#open();
     if (this.#busy)
       throw new MargoError('state', 'Surface query is already running; finish the current query before reentry.');

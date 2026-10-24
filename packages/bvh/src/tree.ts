@@ -5,7 +5,6 @@ export type {
   GeometryLike,
   TriangleSource,
   BVHPositions,
-  Ray,
   RaycastOptions,
   SegmentOptions,
   BVHHit,

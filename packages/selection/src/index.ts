@@ -2,7 +2,7 @@
 import { meshTriangles } from '../../shared/mesh-source.js';
 import type { EngineKernel, Mesh } from '@margoengine/core';
 export { Picking, type PickHit } from './picking.js';
-export type { Model, ModelPrimitive, PickProxy } from './models.js';
+export type { ModelLike, ModelPrimitiveLike, PickProxy } from './models.js';
 
 export type { PickingSource, PickingPrimitive } from './picking.js';
 import { PickingPrimitives, type PickingSource } from './picking-primitives.js';
@@ -25,8 +25,8 @@ import {
   modelPipeline,
   hidden,
   isModel,
-  type Model,
-  type ModelPrimitive,
+  type ModelLike,
+  type ModelPrimitiveLike,
 } from './models.js';
 const maskFragment = `@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {if(culled(i,front)){discard;}return vec4f(1,0,0,1);}`;
 declare const GPUBufferUsage: { STORAGE: number; UNIFORM: number; COPY_DST: number };
@@ -99,7 +99,7 @@ export class Selection implements EnginePlugin {
   private engine?: Engine;
   /** Device of the current GPU resources, so a release after device restoration retires them on their own device. */
   private device?: GPUDevice;
-  private selected = new Set<Mesh | Model>();
+  private selected = new Set<Mesh | ModelLike>();
   /** X-ray state, created on first use: whole-selection mask pipelines, composite, its bind group and uniform, and model draws. */
   private xr?: {
     mask?: GPURenderPipeline;
@@ -115,7 +115,7 @@ export class Selection implements EnginePlugin {
   private readonly models = new Models();
   private readonly draws = new ModelDraws();
   private modelMask?: GPURenderPipeline;
-  private resolved: ModelPrimitive[] = [];
+  private resolved: ModelPrimitiveLike[] = [];
   private readonly resolvedKey = [-1, -1];
   private revision = 0;
   private flags = new Uint32Array(0);
@@ -157,7 +157,7 @@ export class Selection implements EnginePlugin {
     return this.sources.add(source);
   }
   /** Core meshes, gltf-pro models, or glTF nodes (from `engine.pick`); a node outlines its own and its descendants' primitives. */
-  set(meshes: Iterable<Mesh | Model>): void {
+  set(meshes: Iterable<Mesh | ModelLike>): void {
     if (this.disposed) throw new Error('Selection is disposed');
     const values = new Set(meshes);
     if (values.size > 4096) throw new RangeError('Selection budget exceeded');
@@ -171,7 +171,7 @@ export class Selection implements EnginePlugin {
     this.revision++;
   }
   /** Selected model primitives, resolved again only when the selection or the attached models change. */
-  private primitives(e: Engine): ModelPrimitive[] {
+  private primitives(e: Engine): ModelPrimitiveLike[] {
     const models = this.models.update(e);
     if (this.resolvedKey[0] === this.revision && this.resolvedKey[1] === this.models.version) return this.resolved;
     const ids = new Set<number>();

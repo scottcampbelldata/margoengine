@@ -9,6 +9,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { transformPoint, type Side } from './math.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { engineProxies, isModel, type ModelLike, type ModelPrimitiveLike, type PickProxy } from '../../shared/model.js';
 
 // Structural views of the engine internals that `engineRuntime(engine)` exposes. Types only: this module never
 // imports core at runtime, so it stays usable from workers and Node.
@@ -83,57 +84,15 @@ export function modelMeshLayers(mesh: Mesh, root: Mesh): number {
   return layerMasks.get(mesh) ?? layerMasks.get(root) ?? 1;
 }
 
-/**
- * Structural view of a gltf-pro `PBRModel` primitive (also what @margoengine/materials meshes are). `vertices` is gltf-pro's
- * 20-float CPU vertex: position at 0, normal at 4, TEXCOORD_0 at 12. Active GPU deformation requires async intersectModel.
- */
-export interface ModelPrimitiveLike {
-  readonly node: Mesh;
-  readonly vertices: Float32Array;
-  readonly indices: Uint32Array;
-  readonly material: { readonly settings: ArrayLike<number>; readonly side?: Side };
-  readonly nodeIndex?: number;
-  /** gltf-pro `PBRInstances`: the primitive is tested once per drawn instance (24 floats each, node-space matrix first). */
-  readonly instances?: { readonly count: number; readonly data: Float32Array };
-}
-/** Structural view of a gltf-pro `PBRModel`: its `root` node and `primitives`. `intersectEngine` finds attached models itself. */
-export interface ModelLike {
-  readonly root: Mesh;
-  readonly primitives: readonly ModelPrimitiveLike[];
-  readonly disposed?: boolean;
-}
-/** gltf-pro shape: a `root` node and `primitives` with 20-float CPU vertices (the first one is checked). */
-export const isModel = (value: unknown): value is ModelLike =>
-  !!value &&
-  typeof value === 'object' &&
-  !!(value as ModelLike).root &&
-  Array.isArray((value as ModelLike).primitives) &&
-  (!(value as ModelLike).primitives.length || (value as ModelLike).primitives[0].vertices instanceof Float32Array);
+// gltf-pro's structural model shapes (active GPU deformation requires async intersectModel); `intersectEngine` finds
+// attached models itself.
+export { engineProxies, isModel, type ModelLike, type ModelPrimitiveLike, type PickProxy };
 /** Live gltf-pro models attached to an engine: its plugins that have `root` and `primitives`. */
 export function engineModels(engine: Engine): ModelLike[] {
   const out: ModelLike[] = [];
   // Structural engines (tests, tools) may have no plugin map.
   for (const plugin of (engine as Runtime).plugins?.values() ?? [])
     if (isModel(plugin) && !plugin.disposed) out.push(plugin);
-  return out;
-}
-
-/**
- * Structural view of a pick proxy: an object drawn without triangles (an @margoengine/lod imposter level), hit through its
- * local bounding sphere `sphere` (x, y, z, radius) under `anchor`'s world matrix. `model` is reported with the hit.
- */
-export interface PickProxy {
-  readonly anchor: Mesh;
-  readonly sphere: ArrayLike<number>;
-  readonly model?: object | null;
-}
-/** Proxies from every engine plugin with a `pickProxies()` method (an @margoengine/lod `LODSystem`). A new array. */
-export function engineProxies(engine: Engine): PickProxy[] {
-  const out: PickProxy[] = [];
-  for (const plugin of ((engine as Runtime).plugins?.values() ?? []) as Iterable<{
-    pickProxies?(): readonly PickProxy[];
-  }>)
-    if (typeof plugin.pickProxies === 'function') out.push(...plugin.pickProxies());
   return out;
 }
 

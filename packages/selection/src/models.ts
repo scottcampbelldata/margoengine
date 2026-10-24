@@ -2,58 +2,22 @@ import type { Engine, Mesh, FrameGraph } from '@margoengine/core/extension';
 import { instanceMatrix } from '../../shared/instances.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 import { retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
+import { isModel, type ModelLike, type ModelPrimitiveLike } from '../../shared/model.js';
 declare const GPUBufferUsage: { STORAGE: number; UNIFORM: number; COPY_DST: number };
 
-/** Structural gltf-pro `PBRPrimitive`: `buffers` exist while its model is set up on a device; `deformed` replaces the vertices when skinned. */
-export interface ModelPrimitive {
-  readonly node: Mesh;
-  readonly vertices: Float32Array;
-  readonly indices: Uint32Array;
-  readonly material: { readonly settings: ArrayLike<number>; readonly side?: 'front' | 'back' | 'double' };
-  readonly buffers?: { vertex: GPUBuffer; index: GPUBuffer };
-  readonly deformed?: GPUBuffer;
-  /** gltf-pro PBRInstances: drawn once per instance (24 floats each, node-space matrix first). */
-  readonly instances?: { readonly count: number; readonly data: Float32Array };
-}
-/** Structural gltf-pro `PBRModel` (@margoengine/materials meshes are PBRModels too). */
-export interface Model {
-  readonly root: Mesh;
-  readonly primitives: readonly ModelPrimitive[];
-  readonly disposed?: boolean;
-}
-/** gltf-pro shape: a `root` node and `primitives` with 20-float CPU vertices (the first one is checked). */
-export const isModel = (value: unknown): value is Model =>
-  !!value &&
-  typeof value === 'object' &&
-  !!(value as Model).root &&
-  Array.isArray((value as Model).primitives) &&
-  (!(value as Model).primitives.length || (value as Model).primitives[0].vertices instanceof Float32Array);
-/** Structural pick proxy (an @margoengine/lod imposter level): local bounding sphere (x, y, z, radius) under the anchor's world matrix. */
-export interface PickProxy {
-  readonly anchor: Mesh;
-  readonly sphere: ArrayLike<number>;
-  readonly model?: object | null;
-}
-/** Proxies from engine plugins with `pickProxies()` (an @margoengine/lod LODSystem), copied into a new array. */
-export const proxies = (e: Engine): PickProxy[] => {
-  const out: PickProxy[] = [];
-  if (e.plugins)
-    for (const p of e.plugins.values() as Iterable<{ pickProxies?: () => readonly PickProxy[] }>)
-      if (typeof p.pickProxies === 'function') out.push(...p.pickProxies());
-  return out;
-};
+export { engineProxies, isModel, type ModelLike, type ModelPrimitiveLike, type PickProxy } from '../../shared/model.js';
 export const hidden = (e: Engine, id: number): boolean => hiddenInTree(e.store, id);
 
 /** Attached gltf-pro models (engine plugins with `root` and `primitives`), rescanned only when the frame graph, mesh count or a model's liveness changes. */
 export class Models {
-  list: Model[] = [];
+  list: ModelLike[] = [];
   starts: number[] = []; /** Primitives over all models: pick slots after them belong to pick proxies. */
   total = 0;
   version = 0;
   private revision = -1;
   private size = -1;
   private graph?: FrameGraph;
-  update(e: Engine): Model[] {
+  update(e: Engine): ModelLike[] {
     // Scenes have their own frame graphs: a switch is stale even at an equal revision.
     let stale = e.frameGraph !== this.graph || e.frameGraph.revision !== this.revision || e.meshes.size !== this.size;
     for (let i = 0; !stale && i < this.list.length; i++) stale = !!this.list[i].disposed;
@@ -79,7 +43,7 @@ export class Models {
 
 const spheres = new WeakMap<Uint32Array, Float64Array>();
 /** Local bounding sphere (centre, radius) of a primitive's 20-float vertices, cached by its index array. */
-export function sphere(p: ModelPrimitive): Float64Array {
+export function sphere(p: ModelPrimitiveLike): Float64Array {
   let s = spheres.get(p.indices);
   if (s) return s;
   const v = p.vertices,
@@ -135,7 +99,7 @@ export class ModelDraws {
   count = 0;
   private data = new Float32Array(20 * 16);
   private words = new Uint32Array(this.data.buffer);
-  private primitives: ModelPrimitive[] = [];
+  private primitives: ModelPrimitiveLike[] = [];
   private runs: number[] = [];
   private device?: GPUDevice;
   private storage?: GPUBuffer;
@@ -147,7 +111,7 @@ export class ModelDraws {
     this.count = 0;
     this.runs.length = 0;
   }
-  add(p: ModelPrimitive, id: number, m: ArrayLike<number> = p.node.matrix): void {
+  add(p: ModelPrimitiveLike, id: number, m: ArrayLike<number> = p.node.matrix): void {
     const o = this.count * 20;
     if (o + 20 > this.data.length) {
       const data = new Float32Array(this.data.length * 2);
@@ -174,7 +138,7 @@ export class ModelDraws {
     this.primitives[this.count++] = p;
   }
   /** Every drawn instance of `p` (world = node x instance) with one ID, drawn as one instanced draw over consecutive slots. */
-  addInstances(p: ModelPrimitive, id: number, node: ArrayLike<number>): void {
+  addInstances(p: ModelPrimitiveLike, id: number, node: ArrayLike<number>): void {
     const inst = p.instances!,
       first = this.count,
       m = new Float32Array(16);

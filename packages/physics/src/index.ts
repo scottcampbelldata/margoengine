@@ -5,7 +5,7 @@ export type {
   CollisionEvent,
   CollisionEventType,
   QueryFilter,
-  RaycastOptions,
+  PhysicsRaycastOptions,
   Hit,
   RaycastHit,
   ShapeCastHit,
@@ -27,7 +27,7 @@ export type {
   ColliderOptions,
   ColliderSettings,
   CombineRule,
-  GeometryLike,
+  ColliderGeometry,
 } from './shapes.js';
 export { eulerToQuat } from './math.js';
 export type { Vec3, Quat } from './math.js';

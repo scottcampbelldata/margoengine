@@ -25,9 +25,9 @@ import {
   sphere,
   hidden,
   isModel,
-  proxies,
-  type Model,
-  type ModelPrimitive,
+  engineProxies,
+  type ModelLike,
+  type ModelPrimitiveLike,
   type PickProxy,
 } from './models.js';
 import { retire } from '../../shared/frame-resources.js';
@@ -92,8 +92,8 @@ const idFragment = `@fragment fn fragment(i:Out,@builtin(front_facing) front:boo
 /** A pick result: the core mesh, or for gltf-pro models the glTF node with its model and primitive. `approximate`: a pick proxy (imposter level) hit through its bounding sphere; `mesh` is the LOD anchor. */
 export interface PickHit {
   mesh: Mesh;
-  model?: Model;
-  primitive?: ModelPrimitive;
+  model?: ModelLike;
+  primitive?: ModelPrimitiveLike;
   primitiveIndex?: number;
   approximate?: boolean;
   /** Instanced primitives (gltf-pro PBRInstances): the instance index. */
@@ -101,7 +101,7 @@ export interface PickHit {
 }
 
 /** UV sphere scaled so its faces enclose the unit sphere (proxy picks cover at least the bounding sphere the bvh Raycaster tests), as 20-float gltf-pro vertices. */
-function proxySphere(device: GPUDevice): ModelPrimitive {
+function proxySphere(device: GPUDevice): ModelPrimitiveLike {
   const rows = 8,
     cols = 16,
     p: number[] = [],
@@ -179,7 +179,7 @@ export class Picking implements EnginePlugin {
   private readonly draws = new ModelDraws();
   private modelPipeline?: GPURenderPipeline;
   private last: PickHit | null = null;
-  private sphere?: ModelPrimitive;
+  private sphere?: ModelPrimitiveLike;
   private readonly proxyMatrix = new Float32Array(16);
   private readonly instanceWorld = new Float32Array(16);
   private instanceHits: number[][] = [];
@@ -405,7 +405,7 @@ export class Picking implements EnginePlugin {
       models = this.models.update(e),
       starts = this.models.starts,
       total = this.models.total,
-      list = proxies(e),
+      list = engineProxies(e),
       capacity = e.store.capacity;
     try {
       this.primitives.discover(e.meshes.values());
@@ -425,7 +425,7 @@ export class Picking implements EnginePlugin {
       if (px < left || px >= right || py < top || py >= bottom) return null;
       const encoder = device.createCommandEncoder();
       let texture: GPUTexture, origin: number[], candidates: Map<Mesh, PickingSource[]> | undefined;
-      // Model and proxy IDs are not in the forward pass (gltf-pro and imposters draw their own pipelines), so those scenes use the micro pass.
+      // ModelLike and proxy IDs are not in the forward pass (gltf-pro and imposters draw their own pipelines), so those scenes use the micro pass.
       if (!view && !models.length && !list.length && this.fresh()) {
         texture = this.ids!;
         origin = [x0, y0];
@@ -472,7 +472,7 @@ export class Picking implements EnginePlugin {
           if (proxy)
             hit = { mesh: proxy.anchor, ...(isModel(proxy.model) ? { model: proxy.model } : {}), approximate: true };
         } else if (id > capacity) {
-          // Model slots follow the core slots: capacity + 1 + the model's first slot + primitive index.
+          // ModelLike slots follow the core slots: capacity + 1 + the model's first slot + primitive index.
           const slot = id - capacity - 1;
           let m = models.length - 1;
           while (m > 0 && starts[m] > slot) m--;
@@ -502,7 +502,7 @@ export class Picking implements EnginePlugin {
         if (!hit.model) {
           const source = meshTriangles(hit.mesh);
           if (source?.kind === 'pbr') {
-            const model = source.source.model as unknown as Model,
+            const model = source.source.model as unknown as ModelLike,
               primitiveIndex = model.primitives.findIndex((p) => p.node === hit!.mesh);
             if (primitiveIndex >= 0)
               Object.assign(hit, { model, primitive: model.primitives[primitiveIndex], primitiveIndex });
@@ -678,7 +678,7 @@ export class Picking implements EnginePlugin {
         format: 'r32uint',
         depthFormat: 'depth32float',
         filter: (node, _primitive, source, index) => {
-          const owner = models.indexOf(source as unknown as Model),
+          const owner = models.indexOf(source as unknown as ModelLike),
             p = owner < 0 ? undefined : models[owner].primitives[index];
           return (
             inView(scope, node) &&
@@ -687,7 +687,7 @@ export class Picking implements EnginePlugin {
           );
         },
         id: (node, source, index) => {
-          const owner = models.indexOf(source as unknown as Model);
+          const owner = models.indexOf(source as unknown as ModelLike);
           return owner < 0 ? node.id + 1 : e.store.capacity + 1 + starts[owner] + index;
         },
       });

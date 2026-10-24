@@ -12,13 +12,14 @@ import {
   createColliderDesc,
   geometryPositions,
   type ColliderOptions,
-  type GeometryLike,
+  type ColliderGeometry,
   type ColliderSettings,
   type RapierModule,
   type ShapeOptions,
 } from './shapes.js';
 import { matrixRotation, matrixScale, worldMatrix, type TransformStoreLike } from './transform.js';
 import { invertMatrix, multiplyMatrices } from '@margoengine/math/mat4';
+import type { ModelLike, ModelPrimitiveLike } from '../../shared/model.js';
 
 export interface PhysicsOptions {
   /** The initialized `@dimforge/rapier3d-compat` module. */
@@ -77,7 +78,7 @@ export interface QueryFilter {
   /** Return false to skip a body. */
   predicate?: (body: PhysicsBody, collider: Collider) => boolean;
 }
-export interface RaycastOptions extends QueryFilter {
+export interface PhysicsRaycastOptions extends QueryFilter {
   /** Default unbounded. */
   maxDistance?: number;
   /** Solid shapes report a hit at distance 0 when the ray starts inside (default true). */
@@ -107,23 +108,9 @@ export interface PointProjection extends Hit {
   distance: number;
 }
 
-/**
- * Structural view of a gltf-pro `PBRModel` primitive (also what @margoengine/materials meshes are): node-space vertices,
- * 20 floats each with the position first, and triangle indices. Skinned and morphed primitives are read in their bind pose.
- */
-export interface ModelPrimitiveLike {
-  readonly node: Mesh;
-  readonly vertices: Float32Array;
-  readonly indices: Uint32Array;
-  readonly nodeIndex?: number;
-  /** gltf-pro `PBRInstances`: one collider per drawn instance (24 floats each, node-space matrix first). */
-  readonly instances?: { readonly count: number; readonly data: Float32Array };
-}
-/** Structural view of a gltf-pro `PBRModel`: its `root` node and `primitives`. */
-export interface ModelLike {
-  readonly root: Mesh;
-  readonly primitives: readonly ModelPrimitiveLike[];
-}
+// gltf-pro models (shared/model.js): skinned and morphed primitives are read in their bind pose; an instanced
+// primitive gives one collider per drawn instance.
+export type { ModelLike, ModelPrimitiveLike };
 /** Options for `Physics.addModel`: body options plus how the model's triangles become colliders. */
 export interface ModelBodyOptions extends Omit<BodyOptions, 'colliders' | 'position' | 'rotation'> {
   /**
@@ -830,7 +817,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   }
 
   /** First hit along a ray, or null. */
-  raycast(origin: Vec3, direction: Vec3, options: RaycastOptions = {}): RaycastHit | null {
+  raycast(origin: Vec3, direction: Vec3, options: PhysicsRaycastOptions = {}): RaycastHit | null {
     const { ray, dir } = this.ray(origin, direction);
     const result = this.world.castRayAndGetNormal(
       ray,
@@ -851,7 +838,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   }
 
   /** Every hit along a ray, nearest first. */
-  raycastAll(origin: Vec3, direction: Vec3, options: RaycastOptions = {}): RaycastHit[] {
+  raycastAll(origin: Vec3, direction: Vec3, options: PhysicsRaycastOptions = {}): RaycastHit[] {
     const { ray, dir } = this.ray(origin, direction),
       hits: RaycastHit[] = [];
     const [flags, groups, , excludeBody, predicate] = this.filterArgs(options);
@@ -1039,7 +1026,7 @@ function parentOf(mesh: Mesh): number {
 }
 
 /** Static bind-pose triangle data from optional PBR loaders; never attach a second core draw geometry. */
-function primitiveGeometry(mesh: Mesh): GeometryLike | null {
+function primitiveGeometry(mesh: Mesh): ColliderGeometry | null {
   const triangles = meshTriangles(meshRuntime(mesh));
   if (!triangles) return null;
   if (triangles.kind === 'core') return triangles.geometry;
@@ -1068,7 +1055,7 @@ function primitiveGeometry(mesh: Mesh): GeometryLike | null {
 }
 
 /** Fit a geometry-free root to its static descendants without altering the hierarchy. */
-function colliderGeometry(mesh: Mesh): { geometry: GeometryLike; scale: Vec3 } {
+function colliderGeometry(mesh: Mesh): { geometry: ColliderGeometry; scale: Vec3 } {
   const direct = primitiveGeometry(mesh);
   if (direct) return { geometry: direct, scale: [mesh.scale.x, mesh.scale.y, mesh.scale.z] };
   const root = meshRuntime(mesh),

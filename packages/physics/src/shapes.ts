@@ -4,7 +4,7 @@ import type { Geometry } from '@margoengine/core';
 import { checkVec, quat, vec, type Quat, type Vec3 } from './math.js';
 
 /** Geometry-like source: a core `Geometry` (stride-6 interleaved vertices) or raw arrays. */
-export type GeometryLike =
+export type ColliderGeometry =
   | Geometry
   | { readonly vertices: ArrayLike<number>; readonly indices?: ArrayLike<number>; readonly stride?: number };
 
@@ -14,8 +14,8 @@ export type ShapeOptions =
   | { shape: 'capsule'; halfHeight: number; radius: number }
   | { shape: 'cylinder'; halfHeight: number; radius: number }
   | { shape: 'cone'; halfHeight: number; radius: number }
-  | { shape: 'convexHull'; geometry?: GeometryLike; points?: ArrayLike<number> }
-  | { shape: 'trimesh'; geometry?: GeometryLike; vertices?: ArrayLike<number>; indices?: ArrayLike<number> }
+  | { shape: 'convexHull'; geometry?: ColliderGeometry; points?: ArrayLike<number> }
+  | { shape: 'trimesh'; geometry?: ColliderGeometry; vertices?: ArrayLike<number>; indices?: ArrayLike<number> }
   | { shape: 'heightfield'; rows: number; columns: number; heights: ArrayLike<number>; scale: Vec3 }
   /**
    * A Rapier `ColliderDesc` you built yourself, for shapes and flags this wrapper does not cover (voxels,
@@ -80,7 +80,7 @@ const positive = (value: unknown, label: string): number => {
 };
 
 /** Positions from a geometry-like source, scaled, as a packed xyz Float32Array. */
-export function geometryPositions(source: GeometryLike, scale: Vec3 = [1, 1, 1]): Float32Array {
+export function geometryPositions(source: ColliderGeometry, scale: Vec3 = [1, 1, 1]): Float32Array {
   const vertices = source.vertices;
   // A core Geometry interleaves position and normal (stride 6); raw sources default to packed xyz.
   const stride = ('stride' in source ? source.stride : undefined) ?? ('bounds' in source ? 6 : 3);
@@ -111,7 +111,7 @@ export function bounds(positions: Float32Array): { min: [number, number, number]
 export function createColliderDesc(
   R: RapierModule,
   options: ShapeOptions,
-  fit?: { geometry: GeometryLike | null; scale: Vec3 },
+  fit?: { geometry: ColliderGeometry | null; scale: Vec3 },
 ): { desc: ColliderDesc; center: [number, number, number] } {
   const center: [number, number, number] = [0, 0, 0];
   const fitted = (): Float32Array => {

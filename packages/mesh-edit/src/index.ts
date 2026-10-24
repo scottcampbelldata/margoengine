@@ -29,7 +29,6 @@ export { insetMeshRegion, type RegionInsetOptions, type RegionInsetResult } from
 export { MeshRegionInsetSession } from './inset-session.js';
 export {
   MeshSurfaceQuery,
-  type SurfaceRay,
   type SurfaceQueryOptions,
   type SurfaceHit,
   type SurfaceFrame,
