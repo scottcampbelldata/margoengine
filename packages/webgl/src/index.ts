@@ -13,18 +13,9 @@ import type {
 import { MargoError } from '@margoengine/math/errors';
 import { sceneSamples } from '../../shared/quality.js';
 import { clearColorValue, defaultClear } from '../../shared/clear-color.js';
+import { validateRectangle } from '../../shared/view-rect.js';
 
 const defaultDraw: DrawOptions = {};
-
-function validateRectangle(rectangle: DrawOptions['viewport'], width: number, height: number): void {
-  if (rectangle === undefined) return;
-  if (!Array.isArray(rectangle) || rectangle.length !== 4) throw new RangeError('Invalid draw rectangle');
-  for (let i = 0; i < 4; i++)
-    if (!Number.isSafeInteger(rectangle[i]) || rectangle[i] < (i < 2 ? 0 : 1))
-      throw new RangeError('Invalid draw rectangle');
-  if (rectangle[0] + rectangle[2] > width || rectangle[1] + rectangle[3] > height)
-    throw new RangeError('Draw rectangle exceeds target');
-}
 
 const glVertex = `#version 300 es
 precision highp float;layout(location=0) in vec3 p;layout(location=1) in vec3 n;layout(location=2) in vec4 m0;layout(location=3) in vec4 m1;layout(location=4) in vec4 m2;layout(location=5) in vec4 m3;layout(location=6) in vec4 color;layout(location=7) in vec4 factors;uniform mat4 camera;out vec3 w;out vec3 wn;out vec3 b;out vec4 m;void main(){mat4 M=mat4(m0,m1,m2,m3);vec4 q=M*vec4(p,1);vec3 a=m0.xyz,y=m1.xyz,c=m2.xyz;wn=mat3(cross(y,c),cross(c,a),cross(a,y))*n*sign(dot(a,cross(y,c)));w=q.xyz;b=color.rgb;m=vec4(factors.xyz,sign(dot(a,cross(y,c))));gl_Position=camera*q;}`;

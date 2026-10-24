@@ -1,6 +1,6 @@
 import type { PassContext } from '@margoengine/core/extension';
 import { clearColorValue, clearDraw } from '../../shared/clear-color.js';
-import { applyView, viewRect } from '../../shared/view-rect.js';
+import { applyView, partialRect, viewRect } from '../../shared/view-rect.js';
 
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 const zero = [0, 0, 0, 0];
@@ -8,9 +8,7 @@ const zero = [0, 0, 0, 0];
 // A full viewport with an independent partial scissor still needs a scoped clear.
 export function partialMaterialView(c: Context): boolean {
   const rect = viewRect(c);
-  const partial = (r: readonly number[] | undefined) =>
-    !!r && (r[0] !== 0 || r[1] !== 0 || r[2] !== c.width || r[3] !== c.height);
-  return !!rect && (partial(rect) || partial(c.view?.scissor));
+  return !!rect && (partialRect(rect, c.width, c.height) || partialRect(c.view?.scissor, c.width, c.height));
 }
 
 function components(color: GPUColor | undefined): number[] {

@@ -20,6 +20,8 @@ export function layerRegistry():
   | undefined;
 export function meshLayers(mesh: object): number;
 export function ownLayers(mesh: object): number | undefined;
+export function partialRect(rect: readonly number[] | undefined, width: number, height: number): boolean;
+export function validateRectangle(rectangle: readonly number[] | undefined, width: number, height: number): void;
 export function checkLayers(mask: number, subject: string): number;
 /** `engine` is a core engine (its runtime meshes and store are read); `exclude` its meshes. */
 export function withHidden<T>(engine: object, mask: number, exclude: Iterable<object> | undefined, run: () => T): T;

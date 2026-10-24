@@ -45,6 +45,21 @@ export function ownLayers(mesh) {
   return layerRegistry()?.masks.get(mesh);
 }
 
+/** Whether pixel rectangle `rect` [x, y, width, height] covers less than the whole `width` x `height` target. */
+export const partialRect = (rect, width, height) =>
+  !!rect && (rect[0] !== 0 || rect[1] !== 0 || rect[2] !== width || rect[3] !== height);
+
+/** Checks a pixel rectangle [x, y, width, height] (or undefined) against a target of `width` x `height`. */
+export function validateRectangle(rectangle, width, height) {
+  if (rectangle === undefined) return;
+  if (!Array.isArray(rectangle) || rectangle.length !== 4) throw new RangeError('Invalid draw rectangle');
+  for (let i = 0; i < 4; i++)
+    if (!Number.isSafeInteger(rectangle[i]) || rectangle[i] < (i < 2 ? 0 : 1))
+      throw new RangeError('Invalid draw rectangle');
+  if (rectangle[0] + rectangle[2] > width || rectangle[1] + rectangle[3] > height)
+    throw new RangeError('Draw rectangle exceeds target');
+}
+
 /** Checks a 32-bit layer mask; `subject` names it in the message. */
 export function checkLayers(mask, subject) {
   if (!Number.isInteger(mask) || mask < 0 || mask > 0xffffffff)
