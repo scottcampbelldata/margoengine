@@ -186,6 +186,8 @@ for (const name of packageOrder(manifests)) {
           '@margoengine/sky',
           '@margoengine/geometry',
           '@margoengine/geometry/shapes',
+          '@margoengine/geometry/triangulate',
+          '@margoengine/geometry/extrude',
           '@margoengine/geometry/primitives',
           '@margoengine/geometry/utils',
           /^@margoengine\/(sky|vfx)\//,

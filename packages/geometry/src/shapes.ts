@@ -1,4 +1,5 @@
-// 2D curves, paths and shapes, their triangulation and extrusion: `@margoengine/geometry/shapes`.
+// 2D curves, paths and shapes: `@margoengine/geometry/shapes`. Triangulation (`@margoengine/geometry/triangulate`) and
+// extrusion (`@margoengine/geometry/extrude`) have their own entries, so loading shapes does not load them.
 export type { Vec } from './math.js';
 export { Curve, type FrenetFrames } from './curve.js';
 export {
@@ -15,5 +16,4 @@ export {
   type CatmullRomType,
 } from './curves.js';
 export { CurvePath, Path, Shape } from './path.js';
-export { isClockWise, mergeOverlappingPoints, shapeArea, triangulate, triangulateShape } from './triangulate.js';
-export { extrudeGeometry, shapeGeometry, type ExtrudeOptions } from './extrude.js';
+export { isClockWise, mergeOverlappingPoints, shapeArea } from './triangulate.js';

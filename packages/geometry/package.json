@@ -22,6 +22,14 @@
       "types": "./dist/shapes.d.ts",
       "import": "./dist/shapes.js"
     },
+    "./triangulate": {
+      "types": "./dist/triangulate.d.ts",
+      "import": "./dist/triangulate.js"
+    },
+    "./extrude": {
+      "types": "./dist/extrude.d.ts",
+      "import": "./dist/extrude.js"
+    },
     "./primitives": {
       "types": "./dist/primitives.d.ts",
       "import": "./dist/primitives.js"

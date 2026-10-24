@@ -76,18 +76,6 @@ export class EllipseCurve extends Curve<MutableVec2> {
     getPoint(t: number): MutableVec2;
 }
 
-export interface ExtrudeOptions {
-    curveSegments?: number;
-    steps?: number;
-    depth?: number;
-    bevelEnabled?: boolean;
-    bevelThickness?: number;
-    bevelSize?: number;
-    bevelOffset?: number;
-    bevelSegments?: number;
-    extrudePath?: Curve<MutableVec3>;
-}
-
 export interface FrenetFrames {
     tangents: MutableVec3[];
     normals: MutableVec3[];
@@ -150,38 +138,9 @@ export class SplineCurve extends Curve<MutableVec2> {
 
 export type Vec = MutableVec2 | MutableVec3;
 
-export function extrudeGeometry(shapes: Shape | readonly Shape[], options?: ExtrudeOptions): GeometryData;
-
 export function isClockWise(points: readonly MutableVec2[]): boolean;
 
 export function mergeOverlappingPoints(points: readonly MutableVec2[]): MutableVec2[];
 
 export function shapeArea(contour: readonly MutableVec2[]): number;
-
-export function shapeGeometry(shapes: Shape | readonly Shape[], curveSegments?: number): GeometryData;
-
-export function triangulate(data: ArrayLike<number>, holeIndices?: ArrayLike<number>, dim?: number): number[];
-
-export function triangulateShape(contour: readonly MutableVec2[], holes?: readonly (readonly MutableVec2[])[]): {
-    indices: number[];
-    contour: MutableVec2[];
-    holes: MutableVec2[][];
-};
-
-// Not exported from this entry, but used by the exports above:
-
-interface GeometryData {
-    positions: Float32Array;
-    normals: Float32Array;
-    uvs: Float32Array;
-    indices: Uint32Array;
-    tangents?: Float32Array;
-    groups?: GeometryGroup[];
-}
-
-interface GeometryGroup {
-    start: number;
-    count: number;
-    materialIndex: number;
-}
 ```

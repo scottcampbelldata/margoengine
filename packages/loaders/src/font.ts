@@ -1,4 +1,4 @@
-import { extrudeGeometry } from '@margoengine/geometry/shapes';
+import { extrudeGeometry } from '@margoengine/geometry/extrude';
 import type { GeometryData } from '@margoengine/geometry/utils';
 import { OutlineFont, type TextShapeOptions } from './outline-font.js';
 

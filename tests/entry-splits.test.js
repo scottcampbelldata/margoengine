@@ -15,6 +15,8 @@ const splits = [
   ['@margoengine/loaders/common', '@margoengine/loaders'],
   ['@margoengine/loaders/usd', '@margoengine/loaders'],
   ['@margoengine/geometry/shapes', '@margoengine/geometry'],
+  ['@margoengine/geometry/triangulate', '@margoengine/geometry'],
+  ['@margoengine/geometry/extrude', '@margoengine/geometry'],
   ['@margoengine/geometry/primitives', '@margoengine/geometry'],
   ['@margoengine/geometry/utils', '@margoengine/geometry'],
   ['@margoengine/controls/orbit', '@margoengine/controls'],
@@ -105,7 +107,7 @@ test('the split entries work on their own', async () => {
   assert.ok(readUSDA);
   const { boxGeometry } = await import('@margoengine/geometry/primitives');
   const { mergeGeometries } = await import('@margoengine/geometry/utils');
-  const { triangulate } = await import('@margoengine/geometry/shapes');
+  const { triangulate } = await import('@margoengine/geometry/triangulate');
   const box = boxGeometry();
   assert.equal(mergeGeometries([box, box]).positions.length, box.positions.length * 2);
   assert.equal(triangulate([0, 0, 1, 0, 0, 1]).length, 3);

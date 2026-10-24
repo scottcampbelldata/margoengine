@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3022825,
+  "total": 3030261,
   "history": [
     {
       "date": "2026-10-24",
@@ -62,6 +62,12 @@
       "commit": "1d1ce705",
       "reason": "Clean-room rewrites (2026-10-24): geometry triangulation (Eberly ear clipping with FIST-style fallbacks, touching-ring handling) grows geometry and geometry/shapes by about 4 KB gzip, which makes shapes heavy, so loaders/font, loaders/svg, procedural and procedural/voronoi now count as leaks of it; staging contact shadows +0.9 KB; controls +0.8 KB; SVG loader +0.6 KB (non-overlapping strokes, new warnings); smaller growth in clustered/area (LTC edge), environment/volumetric, gltf-pro extended/prepare/worker (sheen, thin film, transmission), lines helpers, loaders font/mtl, materials/transmission, post glitch/afterimage (halfLife), creative/stars, sky/night, text (SDF); new entry navmesh/build (own navmesh builder).",
       "grew": 26
+    },
+    {
+      "date": "2026-10-24",
+      "commit": "ccb4a164",
+      "reason": "geometry: triangulation and extrusion move to their own entries (geometry/triangulate, geometry/extrude) so geometry/shapes drops from about 11.0 KB to 3.6 KB gzip and is no longer heavy; loaders/font, loaders/svg, procedural and procedural/voronoi stop counting as leaks of it",
+      "grew": 2
     }
   ],
   "items": {
@@ -145,10 +151,12 @@
     "@margoengine/fbx dist/workers/fbx.js": 49755,
     "@margoengine/fbx/worker": 18215,
     "@margoengine/fsm": 1131,
-    "@margoengine/geometry": 20766,
+    "@margoengine/geometry": 20732,
     "@margoengine/geometry/extras": 5843,
+    "@margoengine/geometry/extrude": 8186,
     "@margoengine/geometry/primitives": 4058,
-    "@margoengine/geometry/shapes": 11357,
+    "@margoengine/geometry/shapes": 3840,
+    "@margoengine/geometry/triangulate": 6805,
     "@margoengine/geometry/utils": 5406,
     "@margoengine/gltf": 5412,
     "@margoengine/gltf-pro": 42929,
@@ -357,18 +365,14 @@
     "leak @margoengine/lightmap -> @margoengine/bvh/tree": 1,
     "leak @margoengine/lightmap/global -> @margoengine/bvh/tree": 1,
     "leak @margoengine/lightmap/refracted -> @margoengine/bvh/tree": 1,
-    "leak @margoengine/loaders/font -> @margoengine/geometry/shapes": 1,
     "leak @margoengine/loaders/mtl -> @margoengine/gltf-pro": 1,
     "leak @margoengine/loaders/mtl -> @margoengine/materials": 1,
     "leak @margoengine/loaders/render -> @margoengine/gltf-pro": 1,
-    "leak @margoengine/loaders/svg -> @margoengine/geometry/shapes": 1,
     "leak @margoengine/lod -> @margoengine/gltf-pro": 1,
     "leak @margoengine/machinery/dimensions -> @margoengine/lines": 1,
     "leak @margoengine/machinery/dimensions -> @margoengine/text": 1,
     "leak @margoengine/materials -> @margoengine/gltf-pro": 1,
     "leak @margoengine/mesh-edit -> @margoengine/bvh/tree": 1,
-    "leak @margoengine/procedural -> @margoengine/geometry/shapes": 1,
-    "leak @margoengine/procedural/voronoi -> @margoengine/geometry/shapes": 1,
     "leak @margoengine/shader -> @margoengine/gltf-pro": 1,
     "leak @margoengine/shader -> @margoengine/materials": 1,
     "leak @margoengine/shader/graph -> @margoengine/gltf-pro": 1,

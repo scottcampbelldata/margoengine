@@ -54,7 +54,8 @@ Every function returns a plain `GeometryData` (`positions`, `normals`, `uvs`, `i
 ## Smaller entries
 
 The root exports everything. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
-shapes, triangulation, `extrudeGeometry`, `shapeGeometry`), `@margoengine/geometry/primitives` (the solids and
+shapes), `@margoengine/geometry/triangulate` (`triangulate`, `triangulateShape`), `@margoengine/geometry/extrude`
+(`extrudeGeometry`, `shapeGeometry`), `@margoengine/geometry/primitives` (the solids and
 polyhedra) and `@margoengine/geometry/utils` (`geometryData`, `toGeometry`, merging, normals, tangents, edges and
 the other helpers). They are the same functions as the root's.
 
