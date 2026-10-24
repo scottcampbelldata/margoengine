@@ -641,7 +641,8 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       frame-graph order 0.5 (after core, before glTF models). Real GPU (`node packages/staging/test/browser-check.mjs`,
       Arc 140V, AC, 1280x720): pixel checks pass (contact darkens, mesh above `height` casts nothing, floor outside and
       mesh tops unchanged); texture update 0.05/0.25/0.9-1.1 ms at 256/512/1024, plane 0.02-0.04 ms; `static: true`
-      skips the update while nothing moves. Cameras: `projection.fit(bounds, {aspect, duration, padding})` takes the flat
+      skips the update while nothing moves. Re-measured 2026-10-24 after the clean-room blur (RTX A6000, 4x MSAA): update
+      0.010/0.029/0.157 ms at 256/512/1024, plane 0.008-0.009 ms (results/staging-contact.json). Cameras: `projection.fit(bounds, {aspect, duration, padding})` takes the flat
       bounds array; orthographic fits by zoom to the box's projected outline (keeps direction and distance, animated
       through `onPreUpdate`), perspective delegates to core. Cameras 1,072 -> 1,931 B min+gzip.
    e. [DONE] Outlines: selection already uses jump-flood outlines; add dashed x-ray outlines for hidden parts and glTF/model

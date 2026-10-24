@@ -1,6 +1,6 @@
 {
- "recordedAt": "2026-10-14T14:47:17.760Z",
- "commit": "46f9484",
+ "recordedAt": "2026-10-24T17:31:45.231Z",
+ "commit": "f06e5ed3",
  "acPowerBefore": true,
  "pixels": {
   "cubeContact": {
@@ -9,16 +9,16 @@
     410
    ],
    "off": [
-    157,
-    157,
-    157
+    183,
+    183,
+    183
    ],
    "on": [
-    128,
-    128,
-    128
+    156,
+    156,
+    156
    ],
-   "ratio": 0.815
+   "ratio": 0.852
   },
   "sphereContact": {
    "at": [
@@ -26,16 +26,16 @@
     413
    ],
    "off": [
-    158,
-    158,
-    158
+    183,
+    183,
+    183
    ],
    "on": [
-    127,
-    127,
-    127
+    149,
+    149,
+    149
    ],
-   "ratio": 0.804
+   "ratio": 0.814
   },
   "underFloating": {
    "at": [
@@ -43,14 +43,14 @@
     325
    ],
    "off": [
-    158,
-    158,
-    158
+    183,
+    183,
+    183
    ],
    "on": [
-    158,
-    158,
-    158
+    183,
+    183,
+    183
    ],
    "ratio": 1
   },
@@ -60,14 +60,14 @@
     431
    ],
    "off": [
-    157,
-    157,
-    157
+    183,
+    183,
+    183
    ],
    "on": [
-    157,
-    157,
-    157
+    183,
+    183,
+    183
    ],
    "ratio": 1
   },
@@ -77,14 +77,14 @@
     319
    ],
    "off": [
-    108,
+    103,
     119,
-    129
+    135
    ],
    "on": [
-    108,
+    103,
     119,
-    129
+    135
    ],
    "ratio": 1
   },
@@ -94,14 +94,14 @@
     520
    ],
    "off": [
-    157,
-    157,
-    157
+    183,
+    183,
+    183
    ],
    "on": [
-    157,
-    157,
-    157
+    183,
+    183,
+    183
    ],
    "ratio": 1
   }
@@ -110,12 +110,12 @@
   {
    "frames": 65,
    "static": false,
-   "passesPerFrame": 6,
-   "updateMs": 0.24531150000000002,
-   "planeMs": 0.037422,
-   "totalMs": 0.2824455,
+   "passesPerFrame": 4,
+   "updateMs": 0.010239999999999999,
+   "planeMs": 0.008192,
+   "totalMs": 0.018944,
    "samples": "1280x720 4x MSAA",
-   "resolution": 512,
+   "resolution": 256,
    "stats": {
     "updates": 71,
     "cacheHits": 0
@@ -126,10 +126,10 @@
    "static": true,
    "passesPerFrame": 1,
    "updateMs": 0,
-   "planeMs": 0.041639999999999996,
-   "totalMs": 0.041639999999999996,
+   "planeMs": 0.009216,
+   "totalMs": 0.009216,
    "samples": "1280x720 4x MSAA",
-   "resolution": 512,
+   "resolution": 256,
    "stats": {
     "updates": 71,
     "cacheHits": 65
@@ -138,12 +138,12 @@
   {
    "frames": 65,
    "static": false,
-   "passesPerFrame": 6,
-   "updateMs": 0.048827499999999996,
-   "planeMs": 0.028775500000000002,
-   "totalMs": 0.07651,
+   "passesPerFrame": 4,
+   "updateMs": 0.028672,
+   "planeMs": 0.008192,
+   "totalMs": 0.036864,
    "samples": "1280x720 4x MSAA",
-   "resolution": 256,
+   "resolution": 512,
    "stats": {
     "updates": 65,
     "cacheHits": 0
@@ -154,10 +154,10 @@
    "static": true,
    "passesPerFrame": 1,
    "updateMs": 0,
-   "planeMs": 0.03401,
-   "totalMs": 0.03401,
+   "planeMs": 0.009216,
+   "totalMs": 0.009216,
    "samples": "1280x720 4x MSAA",
-   "resolution": 256,
+   "resolution": 512,
    "stats": {
     "updates": 65,
     "cacheHits": 65
@@ -166,10 +166,10 @@
   {
    "frames": 65,
    "static": false,
-   "passesPerFrame": 6,
-   "updateMs": 0.869266,
-   "planeMs": 0.0391925,
-   "totalMs": 0.9104635,
+   "passesPerFrame": 4,
+   "updateMs": 0.15667199999999998,
+   "planeMs": 0.008192,
+   "totalMs": 0.16486399999999998,
    "samples": "1280x720 4x MSAA",
    "resolution": 1024,
    "stats": {
@@ -182,8 +182,8 @@
    "static": true,
    "passesPerFrame": 1,
    "updateMs": 0,
-   "planeMs": 0.038724,
-   "totalMs": 0.038724,
+   "planeMs": 0.009216,
+   "totalMs": 0.009216,
    "samples": "1280x720 4x MSAA",
    "resolution": 1024,
    "stats": {
@@ -194,12 +194,12 @@
   {
    "frames": 65,
    "static": false,
-   "passesPerFrame": 6,
-   "updateMs": 0.24494649999999998,
-   "planeMs": 0.015754999999999998,
-   "totalMs": 0.2611445,
+   "passesPerFrame": 4,
+   "updateMs": 0.006144,
+   "planeMs": 0.004096,
+   "totalMs": 0.010239999999999999,
    "samples": "1280x720 1x MSAA",
-   "resolution": 512,
+   "resolution": 256,
    "stats": {
     "updates": 65,
     "cacheHits": 0
@@ -210,10 +210,10 @@
    "static": true,
    "passesPerFrame": 1,
    "updateMs": 0,
-   "planeMs": 0.018854,
-   "totalMs": 0.018854,
+   "planeMs": 0.001024,
+   "totalMs": 0.001024,
    "samples": "1280x720 1x MSAA",
-   "resolution": 512,
+   "resolution": 256,
    "stats": {
     "updates": 65,
     "cacheHits": 65
@@ -221,17 +221,17 @@
   }
  ],
  "hardware": {
-  "webglRenderer": "ANGLE (Intel, Intel(R) Arc(TM) 140V GPU (16GB) (0x000064A0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
   "webgpu": {
-   "vendor": "intel",
-   "architecture": "xe-2lpg",
-   "device": "0x64a0",
-   "description": "Intel(R) Arc(TM) 140V GPU (16GB)",
+   "vendor": "nvidia",
+   "architecture": "ampere",
+   "device": "0x2230",
+   "description": "NVIDIA RTX A6000",
    "fallback": false
   },
   "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
   "browserName": "chromium",
-  "browserVersion": "155.0.4283.45",
+  "browserVersion": "155.0.4283.62",
   "requestedChannel": "msedge",
   "launchArgs": [
    "--enable-webgpu-developer-features"

@@ -394,7 +394,7 @@ PostStack.attach(stage.engine, [new Bloom(), new Tonemap(), new SMAA({quality: '
 
 ## Glitch
 
-`@margoengine/post/glitch` (5,295 B min+gzip, its own entry; it carries the stack) is a digital glitch:
+`@margoengine/post/glitch` (6,016 B min+gzip, its own entry; it carries the stack) is a digital glitch:
 after a random quiet wait of 90-300 frames (1.5-5 s at 60 Hz) a burst of 3-10 glitched frames, the first at full
 strength and the rest at 20-80%. Each glitched frame draws new random block displacement (cells of a grid slide
 sideways), an RGB split (red and blue read a few pixels apart, opposite ways, in a random direction) and scanline
@@ -423,7 +423,7 @@ glitch.options.intensity = 0.4;    // 0-1, scales displacement, split and tearin
 
 ## Afterimage
 
-`@margoengine/post/afterimage` (4,825 B min+gzip, its own entry; it carries the stack) leaves trails:
+`@margoengine/post/afterimage` (5,555 B min+gzip, its own entry; it carries the stack) leaves trails:
 each channel of the output is `max(current, history x keep)`, and the output becomes the next frame's
 history. `keep = 0.5 ^ (delta / halfLife)` with the frame's `delta` in seconds, so a trail halves in `halfLife`
 seconds (default 0.15) at any frame rate; a paused render (`delta` 0) keeps it. The deprecated `damp` (1.x) sets

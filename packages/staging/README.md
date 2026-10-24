@@ -26,10 +26,11 @@ casts, fading linearly to nothing at it, default 1), `blur` (world units, defaul
 (default 0.6), `color` (default black, written as-is to the scene target), `resolution` (texels per side, default
 256), `static` (default false).
 
-- **Cost**: a texture update is three passes (occluders, horizontal blur, vertical blur), the plane one more; not yet
-  re-measured for this blur (`node packages/staging/test/browser-check.mjs` writes
-  `examples/package-benchmarks/results/staging-contact.json`). With `static: true` an
-  unchanged scene costs only the plane.
+- **Cost**: a texture update is three passes (occluders, horizontal blur, vertical blur), the plane one more. Measured
+  on an NVIDIA RTX A6000 at 1280x720 with 4x MSAA (`node packages/staging/test/browser-check.mjs`, timestamp queries,
+  [staging-contact.json](../../examples/package-benchmarks/results/staging-contact.json)): texture update 0.010 /
+  0.029 / 0.157 ms at resolution 256 / 512 / 1024, plane 0.008-0.009 ms. With `static: true` an unchanged scene costs
+  only the plane.
 - **`static: true`** re-renders the texture only when a transform, visibility, source, option or the resolution
   changes, or after `invalidate()`. Skinned or morphed models change without a transform change: keep the default
   (every frame) for them, or call `invalidate()` per pose.
@@ -44,6 +45,6 @@ Limits: Y-up ground only; the blur is uniform, so the shadow does not get softer
 like a real penumbra; `size` should cover the footprint plus the blur, or the shadow is cut at the plane edge; WebGPU
 only (nothing is drawn on the WebGL2 fallback); the plane is not in SSAO's G-buffer or picking.
 
-MIT. Optional, tree-shakable package, about 4.6 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); core peer: ^0.1.0 || ^1.0.0.
+MIT. Optional, tree-shakable package, about 6.0 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/staging. Real GPU: `node packages/staging/test/browser-check.mjs`.

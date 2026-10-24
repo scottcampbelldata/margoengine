@@ -62,7 +62,7 @@ box.filter = 'linear';                                         // filter, rotati
 
 ## Volumetric fog and light shafts
 
-`@margoengine/environment/volumetric` is a separate entry (6.7 kB min+gzip on its own; nothing is loaded, compiled or run unless you import and attach it; the root entry is byte-identical without it):
+`@margoengine/environment/volumetric` is a separate entry (8.2 kB min+gzip on its own; nothing is loaded, compiled or run unless you import and attach it; the root entry is byte-identical without it):
 
 ```ts
 import {Engine} from '@margoengine/core';
