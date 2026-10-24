@@ -1,5 +1,6 @@
 import type { PassContext } from '@margoengine/core/extension';
 import type { Prim } from './gizmo.js';
+import { applyView } from '../../shared/view-rect.js';
 
 declare const GPUBufferUsage: { VERTEX: number; COPY_DST: number };
 
@@ -156,6 +157,7 @@ export class OverlayRenderer {
     device.queue.writeBuffer(this.buffer!, 0, vertices as Float32Array<ArrayBuffer>);
     this.attachment.view = ctx.color;
     const pass = ctx.encoder.beginRenderPass({ colorAttachments: [this.attachment] });
+    applyView(pass, ctx);
     pass.setPipeline(pipeline);
     pass.setVertexBuffer(0, this.buffer!, 0, vertices.byteLength);
     pass.draw(vertices.length / FLOATS);

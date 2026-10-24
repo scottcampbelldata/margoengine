@@ -109,7 +109,8 @@ Without an engine, pass a `Camera` and an element and drive the controls yoursel
 
 Unbound mouse buttons and disabled mouse actions leave existing pointer capture untouched, including on pointer-up,
 cancellation and disposal. Orbit captures a mouse pointer only after selecting a supported drag; handled mouse/touch
-gestures release their captures when they end, are cancelled or the controls disconnect.
+gestures release their captures when they end, are cancelled or the controls disconnect. A touch is captured
+when a one- or two-touch gesture is enabled, so the first finger of a pinch is held even when one-touch input is unbound.
 
 An exact top/bottom view stays exact during idle updates, panning and dollying when `camera.up` is nonparallel to the
 view direction (for example `[0,0,-1]` above the target). Polar/distance limits still apply. The default parallel `+Y`
@@ -202,7 +203,7 @@ Inventor F2-F6 (F6 focuses the browser's address bar), 3Dconnexion space mice (W
 buttons or Shift pan, wheel zoom, and core is frozen, so it takes no profile: use `OrbitControls.attach(engine)` instead.
 Under an orthographic `@margoengine/cameras` projection the wheel and dolly drags change the visible height (ortho zoom)
 about the cursor when the projection's `height` is left at its default (perspective height at the target); with an
-explicit `height` they change only the distance.
+explicit `height` or all four fixed bounds they change only the distance, and zoom to cursor adds no pan.
 
 SolidWorks, AutoCAD, Inventor, Fusion, Blender, Maya, Onshape and Rhino are trademarks of their respective owners. They
 are named here only to say whose mouse mapping a profile follows; Margo Engine is not affiliated with or endorsed by
@@ -213,7 +214,7 @@ any of them.
 - **Camera model.** The Margo Engine `Camera` is a position, a target, `fov`, `near`, `far` and an `up` vector (default world +Y). All controls write `camera.position` and `camera.target` and nothing else. `OrbitControls.target` reads and writes `camera.target`. The core camera rejects a view parallel to its `up`, so with the default +Y every control keeps the view at least a hair off the poles (orbit uses an epsilon on the polar angle, the walk controls cap pitch just under 90 degrees).
 - **Roll.** These controls keep world +Y up and do not roll (core's `camera.up` exists, but they don't drive it; on an exact pole, such as a ViewCube top view, OrbitControls reads its heading from `camera.up`). `TrackballControls` computes its rotation axis from the rendered frame (screen right and up derived from +Y), drops any roll of `camera.up`, and stops the eye just short of a pole instead of tumbling over it, which would flip the image. `FlyControls` ignores Q and E (roll) and yaws around world +Y. Roll could be built on `camera.up`; not done yet.
 - **Damping.** The factors are applied per 1/60 s (`1 - (1 - factor)^(delta * 60)`), so 30 and 60 fps settle identically. Without damping, pointer input is applied immediately.
-- **Zoom to cursor.** The dolly is a scaling about the point under the cursor on the plane through the target facing the camera, so the view direction is unchanged and that point keeps its pixel exactly.
+- **Zoom to cursor.** The dolly is a scaling about the point under the cursor on the plane through the target facing the camera, so the view direction is unchanged and that point keeps its pixel exactly. A fixed-size orthographic projection keeps its target instead, since its visible size does not change.
 - **Engine integration.** Constructed with an engine, a control registers a small plugin whose `onPreUpdate` calls `update(delta)` before each render, and `engine.dispose()` disposes it. Rendering manually with `engine.render()` passes `delta = 0`, which still applies direct input but does not advance damping, auto-rotate or key movement; pass `{delta}` to advance them.
 - **Listeners.** Pointer listeners go on the canvas (or the element you pass), using pointer capture. Keyboard listeners for the trackball, fly, first-person and pointer-lock controls go on the element's `ownerDocument` unless you pass `{keyTarget}`. Nothing is touched at import time and construction only touches the element you give it, so modules are SSR-safe. `dispose()` removes every listener and restores `touch-action`.
 - **Gizmo rendering.** `TransformControls` builds its handles on the CPU each frame (lines, cones, cubes, squares, rings), keeping a constant screen size (under an orthographic camera from @margoengine/cameras: the same fraction of the view height at any `zoom` or `height`, with parallel-ray picking and drags). A frame graph pass (order 1000) turns lines into screen-space quads, sorts triangles back to front and draws them with alpha blending over the finished frame, with no depth test against the scene. It uses WebGPU when the engine does, and a tiny WebGL2 program on the fallback backend.
@@ -241,6 +242,7 @@ any of them.
 | `translationSnap`, `rotationSnap` (radians), `scaleSnap` | Transform | `null` |
 | `showX`, `showY`, `showZ`, `visible`, `enabled` | Transform | `true` |
 | `element`, `order` | Transform | engine canvas, `1000` |
+| `view` (one of `engine.views`: its camera, pointers inside its rectangle, drawn only there) | Transform | `null` (engine camera, whole element) |
 
 ## Limits
 

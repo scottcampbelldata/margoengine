@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type { EngineKernel, Mesh } from '@margoengine/core';
+import type { EngineKernel, Mesh, RenderView } from '@margoengine/core';
 import { engineRuntime, meshRuntime, type FrameGraph, type PassContext } from '@margoengine/core/extension';
 import { EventDispatcher, type ControlElement } from './controls.js';
 import {
@@ -11,23 +11,18 @@ import {
   type Prim,
   type TransformMode,
 } from './gizmo.js';
-import {
-  IDENTITY,
-  invertAffine,
-  madd,
-  quatAxis,
-  quatConj,
-  quatFromMatrix,
-  quatNormalize,
-  quatRotate,
-  transformPoint,
-  type Q4,
-  type V3,
-} from './math.js';
+import { IDENTITY, invertAffine, madd, quatFromMatrix, transformPoint, type Q4, type V3 } from './math.js';
 import { add, cross, dot, normalize, scale, sub } from '@margoengine/math/vec3';
 import { OverlayRenderer, tessellate } from './overlay.js';
-import { multiplyQuaternions as quatMul } from '@margoengine/math/quat';
+import {
+  axisAngleToQuaternion,
+  conjugateQuaternion,
+  multiplyQuaternions,
+  normalizeQuaternion,
+  rotateByQuaternion,
+} from '@margoengine/math/quat';
 import { basis, intersectPlane, project, ray, type Basis } from './view.js';
+import { viewSize } from '../../shared/view-rect.js';
 
 export type TransformSpace = 'world' | 'local';
 export type { TransformMode, HandleName };
@@ -46,6 +41,11 @@ export interface TransformControlsOptions {
   showZ?: boolean;
   /** Element to listen on. Defaults to the engine canvas. */
   element?: ControlElement;
+  /**
+   * The engine view (one of `engine.views`) the gizmo lives in: it uses that camera, takes pointers only inside that
+   * rectangle and draws only in that view. Default: the engine camera and the whole element.
+   */
+  view?: RenderView;
   /** Frame graph order of the overlay pass. Default 1000, after the scene and most effects. */
   order?: number;
 }
@@ -90,6 +90,8 @@ let counter = 0;
 export class TransformControls extends EventDispatcher {
   readonly engine: EngineKernel;
   element: ControlElement | null = null;
+  /** The view the gizmo lives in (see {@link TransformControlsOptions.view}), or null for the engine camera. */
+  view: RenderView | null = null;
   enabled = true;
   /** Draws the gizmo when attached. */
   visible = true;
@@ -131,6 +133,7 @@ export class TransformControls extends EventDispatcher {
     this.showX = options.showX ?? true;
     this.showY = options.showY ?? true;
     this.showZ = options.showZ ?? true;
+    this.view = options.view ?? null;
     this.pluginName = `margoengine-controls:transform:${++counter}`;
     const order = options.order ?? 1000;
     engine.use({
@@ -242,13 +245,13 @@ export class TransformControls extends EventDispatcher {
       id = meshRuntime(object).id,
       m = store.matrices.subarray(id * 16, id * 16 + 16);
     const origin: V3 = [m[12], m[13], m[14]],
-      camera = this.engine.camera,
+      camera = this.view?.camera ?? this.engine.camera,
       b = basis(camera);
     const space = this.mode === 'scale' ? 'local' : this.space,
       q = this.worldQuaternion(object);
     const axes: [V3, V3, V3] =
       space === 'local'
-        ? [quatRotate(q, [1, 0, 0]), quatRotate(q, [0, 1, 0]), quatRotate(q, [0, 0, 1])]
+        ? [rotateByQuaternion([1, 0, 0], q), rotateByQuaternion([0, 1, 0], q), rotateByQuaternion([0, 0, 1], q)]
         : [
             [1, 0, 0],
             [0, 1, 0],
@@ -279,17 +282,32 @@ export class TransformControls extends EventDispatcher {
   /** Screen-space hit test at CSS pixel coordinates relative to the element. */
   pick(x: number, y: number): HandleName | null {
     const f = this.frame(),
-      e = this.element;
-    if (!f || !e) return null;
-    return pickHandle(
-      buildGizmo(f),
-      basis(this.engine.camera),
-      f.origin,
-      x,
-      y,
-      Math.max(1, e.clientWidth),
-      Math.max(1, e.clientHeight),
-    );
+      s = this.screen();
+    if (!f || !s) return null;
+    x -= s.x;
+    y -= s.y;
+    if (x < 0 || y < 0 || x >= s.width || y >= s.height) return null;
+    return pickHandle(buildGizmo(f), s.b, f.origin, x, y, s.width, s.height);
+  }
+  /** The camera basis and the view's rectangle on the element in CSS pixels (core viewports are fractions unless `pixels`). */
+  private screen(): { b: Basis; x: number; y: number; width: number; height: number } | null {
+    const e = this.element;
+    if (!e) return null;
+    const w = Math.max(1, e.clientWidth),
+      h = Math.max(1, e.clientHeight),
+      v = this.view;
+    if (!v) return { b: basis(this.engine.camera), x: 0, y: 0, width: w, height: h };
+    const canvas = this.engine.canvas,
+      sx = v.pixels ? w / canvas.width : w,
+      sy = v.pixels ? h / canvas.height : h,
+      [x, y, width, height] = v.viewport;
+    return {
+      b: basis(v.camera),
+      x: x * sx,
+      y: y * sy,
+      width: Math.max(1, width * sx),
+      height: Math.max(1, height * sy),
+    };
   }
 
   dispose(): void {
@@ -376,11 +394,11 @@ export class TransformControls extends EventDispatcher {
   pointerDown(x: number, y: number): void {
     const object = this.attached(),
       f = this.frame(),
-      element = this.element;
-    if (!object || !f || !this.axis || !element) return;
-    const width = Math.max(1, element.clientWidth),
-      height = Math.max(1, element.clientHeight),
-      b = basis(this.engine.camera);
+      s = this.screen();
+    if (!object || !f || !this.axis || !s) return;
+    const { b, width, height } = s;
+    x -= s.x;
+    y -= s.y;
     const axis = this.axis,
       local = this.local(),
       parent = this.parentMatrix(object),
@@ -443,11 +461,11 @@ export class TransformControls extends EventDispatcher {
   pointerMove(x: number, y: number): void {
     const d = this.drag,
       object = this.attached(),
-      element = this.element;
-    if (!d || !object || !element) return;
-    const width = Math.max(1, element.clientWidth),
-      height = Math.max(1, element.clientHeight),
-      b = basis(this.engine.camera);
+      s = this.screen();
+    if (!d || !object || !s) return;
+    const { b, width, height } = s;
+    x -= s.x;
+    y -= s.y;
     if (this.mode === 'translate') this.translate(d, object, b, x, y, width, height);
     else if (this.mode === 'rotate') this.rotate(d, object, b, x, y, width, height);
     else this.scale(d, object, b, x, y, width, height);
@@ -487,8 +505,11 @@ export class TransformControls extends EventDispatcher {
         distance = Math.hypot(dx, dy);
       if (!distance) return;
       const drag = normalize(madd(scale(b.right, dx), b.up, -dy));
-      d.free = quatNormalize(
-        quatMul(quatAxis(normalize(cross(d.eye, drag)), distance / Math.max(1, d.pixelsPerUnit)), d.free),
+      d.free = normalizeQuaternion(
+        multiplyQuaternions(
+          axisAngleToQuaternion(normalize(cross(d.eye, drag)), distance / Math.max(1, d.pixelsPerUnit)),
+          d.free,
+        ),
       );
       this.applyRotation(d, object, d.free);
       return;
@@ -513,7 +534,7 @@ export class TransformControls extends EventDispatcher {
     }
     if (this.rotationSnap) angle = Math.round(angle / this.rotationSnap) * this.rotationSnap;
     d.angle = angle;
-    this.applyRotation(d, object, quatAxis(axis, angle));
+    this.applyRotation(d, object, axisAngleToQuaternion(axis, angle));
   }
   /** Keeps a continuous angle across the atan2 seam. */
   private unwrap(d: DragStart, raw: number): number {
@@ -525,8 +546,11 @@ export class TransformControls extends EventDispatcher {
   /** Applies a world-space rotation R: local' = P^-1 R P local, P being the parent's world rotation. */
   private applyRotation(d: DragStart, object: Mesh, rotation: Q4): void {
     const P = d.parentQuaternion,
-      next = quatMul(quatMul(quatMul(quatConj(P), rotation), P), d.quaternion);
-    object.setQuaternion(quatNormalize(next));
+      next = multiplyQuaternions(
+        multiplyQuaternions(multiplyQuaternions(conjugateQuaternion(P), rotation), P),
+        d.quaternion,
+      );
+    object.setQuaternion(normalizeQuaternion(next));
   }
 
   private scale(d: DragStart, object: Mesh, b: Basis, x: number, y: number, width: number, height: number): void {
@@ -616,11 +640,13 @@ export class TransformControls extends EventDispatcher {
   private worldQuaternion(object: Mesh): Q4 {
     const t = engineRuntime(this.engine).store.transforms,
       id = meshRuntime(object).id;
-    return quatNormalize(quatMul(quatFromMatrix(this.parentMatrix(object)), [t.qx[id], t.qy[id], t.qz[id], t.qw[id]]));
+    return normalizeQuaternion(
+      multiplyQuaternions(quatFromMatrix(this.parentMatrix(object)), [t.qx[id], t.qy[id], t.qz[id], t.qw[id]]),
+    );
   }
 
   private readonly execute = (ctx: PassContext): void => {
-    if (!this.visible || this.disposed) return;
+    if (!this.visible || this.disposed || (this.view && ctx.view && ctx.view.camera !== this.view.camera)) return;
     const f = this.frame();
     if (!f) {
       this.overlay.lastTriangles = 0;
@@ -630,6 +656,7 @@ export class TransformControls extends EventDispatcher {
     for (const handle of buildGizmo(f)) prims.push(...handle.prims);
     const canvas = this.engine.canvas,
       ratio = canvas.clientWidth ? ctx.width / canvas.clientWidth : 1;
-    this.overlay.draw(ctx, tessellate(prims, ctx.camera.matrix, ctx.width, ctx.height, ratio));
+    const [width, height] = viewSize(ctx);
+    this.overlay.draw(ctx, tessellate(prims, ctx.camera.matrix, width, height, ratio));
   };
 }

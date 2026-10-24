@@ -4,17 +4,17 @@ import { intersectPlane, project, ray, type Basis } from './view.js';
 
 export type TransformMode = 'translate' | 'rotate' | 'scale';
 export type HandleName = 'X' | 'Y' | 'Z' | 'XY' | 'YZ' | 'XZ' | 'XYZ' | 'E' | 'XYZE';
-export type RGBA = readonly [number, number, number, number];
+type RGBA = readonly [number, number, number, number];
 
 /** A world-space line strip segment list (pairs of points) drawn `width` CSS pixels wide. */
-export interface LinePrim {
+interface LinePrim {
   kind: 'lines';
   points: V3[];
   width: number;
   colors: RGBA[];
 }
 /** World-space triangles (three points each). */
-export interface TrianglePrim {
+interface TrianglePrim {
   kind: 'triangles';
   points: V3[];
   color: RGBA;
@@ -66,10 +66,10 @@ const PLANES: Array<[HandleName, number, number, number]> = [
   ['XZ', 0, 2, 1],
 ];
 /** Thresholds that hide an axis that points at the camera and a plane seen edge-on. */
-export const AXIS_HIDE_THRESHOLD = 0.99,
+const AXIS_HIDE_THRESHOLD = 0.99,
   PLANE_HIDE_THRESHOLD = 0.2;
 /** Gizmo-unit layout. */
-export const LAYOUT = {
+const LAYOUT = {
   arrow: 1,
   tip: 1.15,
   coneRadius: 0.065,
@@ -83,7 +83,7 @@ export const LAYOUT = {
   pickStart: 0.2,
 };
 /** Pick tolerance in CSS pixels. */
-export const PICK_RADIUS = 8;
+const PICK_RADIUS = 8;
 
 const perpendicular = (a: V3): [V3, V3] => {
   const p = normalize(Math.abs(a[0]) < 0.9 ? cross(a, [1, 0, 0]) : cross(a, [0, 1, 0]));

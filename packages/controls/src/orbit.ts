@@ -219,10 +219,11 @@ export class OrbitControls extends Controls {
     const up = this.screenSpacePanning ? b.up : cross([0, 1, 0], b.right);
     this.dPan = madd(this.dPan, up, (2 * deltaY * distance) / height);
   }
-  /** Multiplies the distance by 1 / `factor` (factor above 1 moves closer). */
+  /** Multiplies the distance by `factor` (factor below 1 moves closer). */
   dollyIn(factor: number): void {
     this.dScale *= factor;
   }
+  /** Divides the distance by `factor` (factor below 1 moves farther). */
   dollyOut(factor: number): void {
     this.dScale /= factor;
   }
@@ -273,7 +274,12 @@ export class OrbitControls extends Controls {
       preservePole ? Math.PI : Math.PI - EPS,
     );
     const target = this.nextTarget,
-      cursorZoom = this.zoomToCursor && this.cursor && this.dScale !== 1;
+      // A fixed-size orthographic view (@margoengine/cameras) does not scale with distance: no cursor pan.
+      cursorZoom =
+        this.zoomToCursor &&
+        this.cursor &&
+        this.dScale !== 1 &&
+        !(c as { fixedOrthographic?: boolean }).fixedOrthographic;
     target[0] = tx + this.dPan[0] * f;
     target[1] = ty + this.dPan[1] * f;
     target[2] = tz + this.dPan[2] * f;
@@ -361,6 +367,8 @@ export class OrbitControls extends Controls {
     if (!this.enabled) return;
     const p = this.local(event);
     if (event.pointerType === 'touch') {
+      // Reserve the first touch for an enabled two-touch gesture even when one-touch input is unbound.
+      if (this.touchAction(1) === 'none' && this.touchAction(2) === 'none') return;
       this.capture(event.pointerId);
       this.pointers.set(event.pointerId, p);
       this.touchStart();
@@ -433,31 +441,36 @@ export class OrbitControls extends Controls {
       event.preventDefault();
     }
   };
+  private touchAction(count: number): Action {
+    if (count === 1) {
+      const action = this.touches.ONE;
+      return action === TOUCH.ROTATE && this.enableRotate
+        ? 'touch-rotate'
+        : action === TOUCH.PAN && this.enablePan
+          ? 'touch-pan'
+          : 'none';
+    }
+    if (count === 2) {
+      const action = this.touches.TWO;
+      return action === TOUCH.DOLLY_PAN && (this.enableZoom || this.enablePan)
+        ? 'touch-dolly-pan'
+        : action === TOUCH.DOLLY_ROTATE && (this.enableZoom || this.enableRotate)
+          ? 'touch-dolly-rotate'
+          : 'none';
+    }
+    return 'none';
+  }
   private touchStart(): void {
     const points = [...this.pointers.values()];
     if (this.state !== 'none') this.dispatchEvent({ type: 'end' });
     this.state = 'none';
     if (points.length === 1) {
-      const action = this.touches.ONE;
-      const state: Action =
-        action === TOUCH.ROTATE && this.enableRotate
-          ? 'touch-rotate'
-          : action === TOUCH.PAN && this.enablePan
-            ? 'touch-pan'
-            : 'none';
       this.last = points[0];
-      this.begin(state);
+      this.begin(this.touchAction(1));
     } else if (points.length === 2) {
-      const action = this.touches.TWO;
-      const state: Action =
-        action === TOUCH.DOLLY_PAN && (this.enableZoom || this.enablePan)
-          ? 'touch-dolly-pan'
-          : action === TOUCH.DOLLY_ROTATE && (this.enableZoom || this.enableRotate)
-            ? 'touch-dolly-rotate'
-            : 'none';
       this.last = mid(points[0], points[1]);
       this.lastSpread = spread(points[0], points[1]);
-      this.begin(state);
+      this.begin(this.touchAction(2));
     }
   }
   private readonly onMove = (event: PointerEvent): void => {

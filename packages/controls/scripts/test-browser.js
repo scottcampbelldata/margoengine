@@ -78,11 +78,38 @@ try {
   assert.equal(gizmo.insideWithout, 'mesh');
   assert.equal(gizmo.insideWith, 'red', 'X arrow drawn on top of the mesh');
   assert.ok(
-    gizmo.countsWith.red > 150 && gizmo.countsWith.green > 150 && gizmo.countsWith.blue > 100,
-    `gizmo colors ${JSON.stringify(gizmo.countsWith)}`,
+    gizmo.countsWith.red > 150 && gizmo.countsWith.green > 150,
+    `aligned gizmo colors ${JSON.stringify(gizmo.countsWith)}`,
   );
   assert.equal(gizmo.countsWithout.red, 0);
-  checks.push('Gizmo renders on top of the mesh (red X arrow over mesh pixels; red, green and blue handles visible)');
+  const aligned = await page.evaluate(() => window.gizmoView());
+  assert.equal(aligned.axisDots[2], 1);
+  assert.equal(aligned.handles.includes('Z'), false, 'camera-aligned Z arrow is deliberately hidden');
+  let oblique;
+  try {
+    oblique = await page.evaluate(() => window.gizmoView([6, 4, 6]));
+    for (const view of [aligned, oblique]) {
+      assert.equal(view.axis, null);
+      assert.equal(view.dragging, false);
+      assert.equal(view.mode, 'translate');
+      assert.equal(view.space, 'world');
+      assert.equal(view.visible, true);
+      assert.deepEqual(view.show, [true, true, true]);
+    }
+    assert.ok(oblique.axisDots.every((dot) => dot < 0.99));
+    for (const axis of ['X', 'Y', 'Z']) assert.ok(oblique.handles.includes(axis));
+    assert.ok(
+      oblique.counts.red > 150 && oblique.counts.green > 150 && oblique.counts.blue > 100,
+      `oblique gizmo colors ${JSON.stringify(oblique.counts)}`,
+    );
+    assert.ok(oblique.zArrowPixels.includes('blue'), 'Z arrow rasterizes beyond the blue XY plane');
+    await page.locator('#gpu').screenshot({ path: resolve(results, 'gizmo-oblique.png') });
+  } finally {
+    const restored = await page.evaluate(() => window.gizmoView());
+    assert.deepEqual(restored, aligned, 'original camera, handles and rendered counts restored before dragging');
+  }
+  report.gizmoViews = { aligned, oblique };
+  checks.push('Gizmo renders over the mesh; aligned Z hides, and the oblique view renders all three colored arrows');
   await page.mouse.move(...at(gizmo.arrow[0], gizmo.arrow[1]));
   const hovered = await page.evaluate(() => window.gizmoState());
   assert.equal(hovered.axis, 'X');
@@ -131,7 +158,7 @@ try {
   assert.ok(end.before > 0);
   assert.equal(end.after, 0, 'all canvas listeners removed');
   assert.equal(end.plugin, false, 'overlay plugin removed');
-  assert.equal(end.counts.red + end.counts.yellow + end.counts.green, 0, 'gizmo gone after dispose');
+  assert.equal(end.counts.red + end.counts.yellow + end.counts.green + end.counts.blue, 0, 'gizmo gone after dispose');
   assert.deepEqual(end.errors, [], 'no WebGPU validation errors');
   checks.push(`Dispose removes ${end.before} canvas listeners and the overlay pass; zero WebGPU validation errors`);
 

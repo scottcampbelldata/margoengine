@@ -162,7 +162,7 @@ test('perspective mode leaves non-vertical views to core exactly; dispose restor
     q.attach(camera);
     q.attach(camera);
   }, /attached/);
-  assert.throws(() => new CameraProjection().attach(camera), /already set/);
+  assert.throws(() => new CameraProjection().attach(camera), { name: 'MargoError', code: 'attached' });
 });
 
 test('culling planes enclose exactly the orthographic box', () => {

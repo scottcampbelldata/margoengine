@@ -1,6 +1,7 @@
 import { Engine, PbrMaterial, box } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { OrbitControls, TransformControls } from '@margoengine/controls';
+import { webglRenderer } from '@margoengine/webgl';
 
 const state = { errors: [] };
 window.controlsState = state;
@@ -142,6 +143,30 @@ window.setupGizmo = () => {
     pixelsPerUnit: 400 / (2 * 6 * Math.tan(Math.PI / 6)),
   };
 };
+// Reuse the same gizmo: an axis pointing at the camera is deliberately hidden.
+window.gizmoView = (position) => {
+  const { engine, gizmo, orbit } = state;
+  if (position) engine.camera.position = [...position];
+  else orbit.reset();
+  engine.render();
+  const f = gizmo.frame(),
+    shown = analyze(engine),
+    zArrow = project(engine, [0, 0, 0.6 * f.size]);
+  return {
+    counts: shown.counts,
+    camera: [...engine.camera.position],
+    target: [...engine.camera.target],
+    handles: gizmo.handles().map((handle) => handle.name),
+    axisDots: f.axes.map((axis) => Math.abs(axis.reduce((sum, value, i) => sum + value * f.eye[i], 0))),
+    axis: gizmo.axis,
+    dragging: gizmo.dragging,
+    mode: gizmo.mode,
+    space: gizmo.space,
+    visible: gizmo.visible,
+    show: [gizmo.showX, gizmo.showY, gizmo.showZ],
+    zArrowPixels: [-1, 0, 1].flatMap((dy) => [-1, 0, 1].map((dx) => shown.pixel(zArrow[0] + dx, zArrow[1] + dy))),
+  };
+};
 window.gizmoState = () => {
   const { engine, gizmo, mesh } = state;
   gizmo.visible = true;
@@ -179,7 +204,11 @@ window.finish = async () => {
 // WebGL2 backend: the same overlay through the GL path.
 window.runGL = async () => {
   const canvas = document.getElementById('gl');
-  const engine = await Engine.create(canvas, { backend: 'webgl2', camera: { position: [0, 0, 6], target: [0, 0, 0] } });
+  const engine = await Engine.create(canvas, {
+    backend: 'webgl2',
+    fallback: webglRenderer,
+    camera: { position: [0, 0, 6], target: [0, 0, 0] },
+  });
   const mesh = engine
     .createMesh()
     .setGeometry(box())

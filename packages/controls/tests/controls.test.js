@@ -614,6 +614,25 @@ test('transform: dragging the X arrow moves the mesh by the dragged world distan
   engine.dispose();
 });
 
+test('transform: a view gizmo uses its camera, picks and drags only inside its rectangle', async () => {
+  const { engine, canvas } = await engineWith();
+  const mesh = engine.createMesh().setGeometry(box()),
+    camera = new Camera({ position: [0, 0, 10], target: [0, 0, 0] }),
+    gizmo = new TransformControls(engine, { view: { camera, viewport: [0.5, 0, 0.5, 1] } });
+  gizmo.attach(mesh);
+  engine.camera.position = [0, 10, 0.01]; // the engine camera looks elsewhere
+  const pixelsPerUnit = 600 / (2 * 10 * Math.tan(Math.PI / 6)),
+    grab = [600 + 0.5 * gizmo.frame().size * pixelsPerUnit, 300];
+  assert.equal(gizmo.pick(grab[0], grab[1]), 'X', 'centre of the right half');
+  assert.equal(gizmo.pick(grab[0] - 400, grab[1]), null, 'outside the view');
+  drag(canvas, grab, [grab[0] + 52, grab[1]]);
+  close(mesh.position.x, 52 / pixelsPerUnit, 1e-4, 'x');
+  gizmo.view = { camera, viewport: [400, 0, 400, 600], pixels: true };
+  assert.equal(gizmo.pick(grab[0] + 52, grab[1]), 'X', 'pixel viewport');
+  gizmo.dispose();
+  engine.dispose();
+});
+
 test('transform: constant screen size, picking and drags under an orthographic camera (@margoengine/cameras)', async () => {
   const { CameraProjection } = await import('../../cameras/dist/index.js');
   const { engine, canvas } = await engineWith(),

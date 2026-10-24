@@ -1,7 +1,9 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
 import type { Camera, Engine, EnginePlugin, Vec3 } from '@margoengine/core/extension';
+import { margoError } from '../../shared/errors.js';
 
+/** Options of `CameraProjection`: orthographic or perspective framing, frustum bounds, zoom and clip range. */
 export interface ProjectionOptions {
   /** 'orthographic' (default) or 'perspective'; both accept exactly vertical views. */
   mode?: 'orthographic' | 'perspective';
@@ -21,6 +23,7 @@ export interface ProjectionOptions {
   up?: Vec3;
 }
 
+/** Options of `CameraProjection.fit`: the view's aspect, the animation time and the margin around the box. */
 export interface FitOptions {
   /** Width / height of the view. Default: the engine canvas (`setup`), else 1. */
   aspect?: number;
@@ -90,7 +93,8 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
     }: FitOptions = {},
   ): void {
     const camera = this.camera;
-    if (!camera) throw new Error('Projection not attached');
+    if (!camera)
+      throw margoError('state', 'Projection is not attached; call attach(camera) or engine.use(projection) first');
     const b = Array.from(bounds),
       min = b.slice(0, 3) as unknown as Vec3,
       max = b.slice(3) as unknown as Vec3;
@@ -167,8 +171,8 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
   }
   /** Use without an engine, e.g. on a second Camera. */
   attach(camera: Camera): void {
-    if (this.camera) throw new Error('Projection attached');
-    if (camera.project) throw new Error('Camera projection already set');
+    if (this.camera) throw margoError('attached', 'Projection is already attached; dispose() it or create another');
+    if (camera.project) throw margoError('attached', 'Camera already has a projection; dispose that projection first');
     this.camera = camera;
     this.worldUp = camera.up;
     // camera.up is the world up except for exactly vertical views, where it is this.up.
@@ -180,6 +184,8 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
         this.worldUp = up;
       },
     });
+    // Read by @margoengine/controls: a fixed orthographic size means cursor dolly must not pan.
+    Object.defineProperty(camera, 'fixedOrthographic', { configurable: true, get: () => this.fixedOrthographic });
     camera.project = (out, aspect, webgpu) => this.project(camera, out, aspect, webgpu);
   }
   dispose(): void {
@@ -188,11 +194,22 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
     this.camera = undefined;
     this.animation = undefined;
     Object.defineProperty(camera, 'up', { configurable: true, enumerable: true, writable: true, value: this.worldUp });
+    delete (camera as { fixedOrthographic?: boolean }).fixedOrthographic;
     camera.project = undefined;
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
     this.dispose();
+  }
+  /**
+   * True when the orthographic view size is fixed (`height` or all four bounds set), so moving the camera along its
+   * view direction does not change what is visible. Also exposed on the attached camera for controls.
+   */
+  get fixedOrthographic(): boolean {
+    return (
+      this.mode === 'orthographic' &&
+      (this.height !== undefined || [this.left, this.right, this.top, this.bottom].every((v) => v !== undefined))
+    );
   }
   private screenUp(camera: Camera): Vec3 {
     const p = camera.position,

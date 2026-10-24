@@ -31,6 +31,8 @@ projection.fit(model.bounds);                // frame a box: [minX, minY, minZ, 
   so `fitToBoundingBox`, core's `CADCameraControls` and `@margoengine/controls` dolly become ortho zoom and pan tracks
   the cursor exactly. Without `near`/`far` the depth range is `camera.far` deep and centred on the target (Blender's
   convention), so zooming in never clips a model at the eye.
+- **Fixed size.** With an explicit `height` or all four bounds, `projection.fixedOrthographic` (also readable on the
+  attached camera) is true: dolly changes only the distance, so `@margoengine/controls` zoom-to-cursor adds no pan.
 - **Depth** is reversed-Z on WebGPU (near 1, far 0) like core, and -1..1 on WebGL. Orthographic depth is linear.
 - **Vertical views**: core's `Camera.update` throws `Vertical camera` when the view is parallel to `camera.up`, which with the default +Y up means looking straight up or down. With the plugin,
   such a view renders exactly vertical with screen up = `up` (default `[0, 0, -1]`, north up looking down; it needs a
@@ -91,46 +93,38 @@ origin.onRebase(() => { section.options.planes = [origin.toLocalPlane(worldPlane
   kilometres from their root are float32 when loaded: re-centre such assets (or load each far part as its own root).
   `dispose()` leaves the scene in local coordinates.
 
-## Render layers and scenes: `@margoengine/cameras/layers`
+## Render layers: `@margoengine/cameras/layers`
 
-Render layers: every mesh has a 32-bit layer mask (default 1, layer 0) and every view draws only the
-meshes whose mask shares a bit with its own. Built on core's `mesh.visible` (no core change): a filtered render hides
-the meshes outside its mask and shows them again afterwards.
+Every mesh has a 32-bit layer mask (default 1, layer 0) and every camera or engine view draws only the meshes whose
+mask shares a bit with its own. Core does the filtering while it collects instances, so nothing is hidden and
+`mesh.visible` stays yours.
 
 ```ts
-import {CameraLayers, layerMask, renderView, setCameraLayers, setRenderLayers, SceneSwitch} from '@margoengine/cameras/layers';
+import {ALL_LAYERS, layerMask, setCameraLayers, setRenderLayers, withLayers} from '@margoengine/cameras/layers';
 
 setRenderLayers(helpers.root, layerMask(1));      // a model by its root: children without a mask follow it
-CameraLayers.attach(engine);                      // the engine camera draws its mask (default 1): helpers hidden
-setCameraLayers(engine.camera, layerMask(0, 1));  // now it draws both layers
-renderView(engine, {camera: topView, layers: layerMask(1), delta: 0}); // one render of another camera, layer 1 only
+setCameraLayers(engine.camera, layerMask(0));     // the engine camera now skips the helpers
+engine.views = [
+  {camera: engine.camera, viewport: [0, 0, 0.5, 1]},
+  {camera: top, viewport: [0.5, 0, 0.5, 1], layers: ALL_LAYERS}, // this view shows the helpers too
+];
 mirror.layers = layerMask(0);                     // Reflector, Refractor and CubeCamera take a mask too
-
-const scenes = new SceneSwitch(engine).add('menu', menuMeshes).add('level', levelMeshes);
-scenes.show('menu');                              // one scene shown at a time; meshes in no scene always draw
 ```
 
 - **Masks**: `setRenderLayers(mesh, mask)` / `getRenderLayers(mesh)`; a mesh without its own mask takes its nearest
   ancestor's, else 1. `layerMask(...layers)` builds a mask from layer indices 0-31; `ALL_LAYERS` is every bit.
   `useLayerSource(getMeshLayers)` (from `@margoengine/bvh`) makes drawing read the masks raycasts use, so one
   `setMeshLayers` call filters both; `useLayerSource(null)` goes back. The masks live in one registry on `globalThis`,
-  shared by every copy of this module and read by `@margoengine/environment`'s captures.
-- **Views**: `setCameraLayers(camera, mask)` / `getCameraLayers(camera)` (default 1, layer 0).
-  `CameraLayers` (an engine plugin) applies the engine camera's mask to every frame: it hides from the start of the
-  frame (`onPreUpdate`) to its last pass (order 1e9), so between frames `mesh.visible` reads and writes your own values.
-  `withLayers(engine, mask, run, exclude?)` hides for one callback (restored also when it throws); `renderView(engine,
-  {camera, layers, exclude, culling, delta})` is `engine.render` inside it (delta 0 by default). Captures inside
-  `withLayers` (environment's Reflector, Refractor, CubeCamera) use their own mask, not the primary camera's.
-- **SceneSwitch** is the light "several scenes in one engine": `add(name, meshes)` puts meshes (with their children) in
-  a named scene, `show(name)` hides the other scenes and gives the shown one the visibility its meshes had when it was
-  hidden; `show(null)` shows all. The camera, lights, environment and plugins are shared: it is not a second scene graph
-  with its own background or lighting (a second `Engine` remains that).
-- **Limits**: core's visibility is inherited, so a hidden parent hides its children: a child shows only where its parent
-  also shows. Hiding changes `mesh.visible`, so core re-collects instances for a frame whose mask hides something (as any
-  visibility change does); with no mask set and layer 0 in the view mask, nothing is touched. Raycasts keep bvh's own
-  `raycaster.layers`. Unit tests: `test/layers.test.js` (real core on a mock GPU); real-GPU layer checks run in
-  `scripts/env-mirror-gpu-check.js` (the main camera hides a layer-1 box while a mirror on every layer still reflects it,
-  byte-exact against renders without that box).
+  shared by every copy of this module and read by core and `@margoengine/environment`'s captures.
+- **Cameras and views**: `setCameraLayers(camera, mask)` / `getCameraLayers(camera)` (default every layer). The engine
+  frame, `engine.render({camera})` and every view through that camera use its mask; a view's own `layers` wins.
+- **Scenes**: to show one set of meshes at a time, put each set on its own layer and switch the camera's mask (or the
+  view's `layers`). Separate meshes, lighting and plugins are core scenes: `engine.createScene()`.
+- **withLayers(engine, mask, run, exclude?)** hides the meshes outside `mask` and the `exclude` meshes for one callback
+  (restored also when it throws): for a capture that must also leave out given meshes.
+- **Limits**: masks with a layer source are re-read every frame; set masks are applied on the next frame. Raycasts keep
+  bvh's own `raycaster.layers`. Unit tests: `test/layers.test.js` (real core on a mock GPU); real-GPU layer checks run
+  in `scripts/env-mirror-gpu-check.js`.
 
 MIT. Optional, tree-shakable package, about 1.7 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); `/origin` and `/layers` are separate entries; core peer: ^0.1.0 || ^1.0.0.
 

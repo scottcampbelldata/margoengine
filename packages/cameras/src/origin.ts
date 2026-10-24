@@ -10,6 +10,7 @@ import {
   type Vec3,
 } from '@margoengine/core/extension';
 
+/** Options of `FloatingOrigin`. */
 export interface FloatingOriginOptions {
   /** Rebase when the camera is farther from the origin than `ratio` × its distance to `camera.target`. Default 1000. */
   ratio?: number;
