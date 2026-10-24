@@ -31,6 +31,39 @@ function strokeArea(geometry) {
   }
   return { area, ccw };
 }
+/** Union area of a stroke geometry's triangles, from a 400 x 400 grid of cell centres over their bounds. */
+function coveredArea(geometry) {
+  const p = geometry.positions,
+    triangles = [];
+  if (!p.length) return 0;
+  let x0 = Infinity,
+    y0 = Infinity,
+    x1 = -Infinity,
+    y1 = -Infinity;
+  for (let i = 0; i < p.length; i += 3) {
+    x0 = Math.min(x0, p[i]);
+    x1 = Math.max(x1, p[i]);
+    y0 = Math.min(y0, p[i + 1]);
+    y1 = Math.max(y1, p[i + 1]);
+  }
+  for (let i = 0; i < geometry.indices.length; i += 3)
+    triangles.push([0, 1, 2].map((k) => [p[geometry.indices[i + k] * 3], p[geometry.indices[i + k] * 3 + 1]]));
+  const n = 400,
+    dx = (x1 - x0) / n,
+    dy = (y1 - y0) / n;
+  let hits = 0;
+  for (let j = 0; j < n; j++)
+    for (let i = 0; i < n; i++) {
+      const x = x0 + (i + 0.5) * dx,
+        y = y0 + (j + 0.5) * dy;
+      const inside = ([a, b, c]) => {
+        const edge = (u, v) => (v[0] - u[0]) * (y - u[1]) - (v[1] - u[1]) * (x - u[0]);
+        return edge(a, b) >= -1e-12 && edge(b, c) >= -1e-12 && edge(c, a) >= -1e-12;
+      };
+      if (triangles.some(inside)) hits++;
+    }
+  return (hits / (n * n)) * (x1 - x0) * (y1 - y0);
+}
 
 test('SVG path data: every command, absolute and relative, implicit repeats, S and T reflections', () => {
   const { paths, warnings } = parseSVG(
@@ -261,26 +294,52 @@ test('SVG strokes: butt, square and round caps; miter, bevel and round joins; mi
         svg(`<path fill="none" stroke="black" stroke-width="2" ${attributes} d="${d}"/>`),
       ).paths[0].toStrokeGeometry(options),
     );
-  const close = (actual, expected, label) =>
-    assert.ok(Math.abs(actual - expected) < 1e-6, `${label}: ${actual} != ${expected}`);
-  close(area('').area, 20, 'butt');
-  close(area('stroke-linecap="square"').area, 24, 'square caps');
-  const round = area('stroke-linecap="round"', 'M0 0 L10 0', { divisions: 64 });
-  assert.ok(Math.abs(round.area - (20 + Math.PI)) < 0.01, `round caps ${round.area}`);
-  assert.ok(round.ccw, 'every triangle faces +z');
-  // A right-angle corner: two 20-unit segments, plus a half-unit bevel and a half-unit miter tip.
+  const geometry = (attributes, d = 'M0 0 L10 0', options) =>
+    parseSVG(
+      svg(`<path fill="none" stroke="black" stroke-width="2" ${attributes} d="${d}"/>`),
+    ).paths[0].toStrokeGeometry(options);
+  // Area of a regular n-gon inscribed in a circle of radius r: how round parts are tessellated.
+  const ngon = (n, r = 1) => (n / 2) * r * r * Math.sin((2 * Math.PI) / n);
   const corner = 'M0 0 L10 0 L10 10';
-  close(area('', corner).area, 41, 'miter join');
-  close(area('stroke-linejoin="bevel"', corner).area, 40.5, 'bevel join');
-  const roundJoin = area('stroke-linejoin="round"', corner, { divisions: 64 }).area;
-  assert.ok(Math.abs(roundJoin - (40 + Math.PI / 4)) < 0.01, `round join ${roundJoin}`);
-  // 90 degrees needs a miter ratio of sqrt(2): a limit of 1.2 falls back to the bevel.
-  close(area('stroke-miterlimit="1.2"', corner).area, 40.5, 'miter limit');
-  // A closed square has joins at all four corners and no caps.
-  close(area('stroke-linecap="round"', 'M0 0 H10 V10 H0 Z').area, 4 * 20 + 4 * 1, 'closed square');
-  // Strokes are built in the element's units, then transformed (a non-uniform scale widens them unevenly).
-  close(area('transform="scale(3 1)"').area, 60, 'scaled');
-  close(area('', 'M0 0 L10 0', { width: 4 }).area, 40, 'width override');
+  // [attributes, d, options, true covered (union) area, the area of the tessellated union]
+  const cases = [
+    ['', undefined, undefined, 20, 20],
+    ['stroke-linecap="square"', undefined, undefined, 24, 24],
+    ['stroke-linecap="round"', undefined, { divisions: 64 }, 20 + Math.PI, 20 + ngon(256)],
+    // Two 10 x 2 bodies overlapping in a unit square, plus the 1 x 1 miter corner.
+    ['', corner, undefined, 40, 40],
+    ['stroke-linejoin="bevel"', corner, undefined, 39.5, 39.5],
+    ['stroke-linejoin="round"', corner, { divisions: 64 }, 39 + Math.PI / 4, 39 + ngon(256) / 4],
+    // The miter ratio of a right angle is sqrt(2) > 1, so the join falls back to a bevel.
+    ['stroke-miterlimit="1"', corner, undefined, 39.5, 39.5],
+    ['', 'M0 0 H10 V10 H0 Z', undefined, 80, 80],
+    ['transform="scale(3 1)"', undefined, undefined, 60, 60],
+    ['', undefined, { width: 4 }, 40, 40],
+  ];
+  for (const [attributes, d, options, union, tessellated] of cases) {
+    const g = geometry(attributes, d, options);
+    const label = `${attributes || 'default'} ${d ?? ''} ${JSON.stringify(options ?? {})}`;
+    // Measured by sampling, so it does not depend on how the pieces are cut.
+    const covered = coveredArea(g);
+    assert.ok(Math.abs(covered - union) <= 0.01 * union, `${label}: covered ${covered}, expected ${union}`);
+    // The pieces tile the stroke without overlap: their areas add up to the union exactly.
+    const { area: sum, ccw } = strokeArea(g);
+    assert.ok(Math.abs(sum - tessellated) < 1e-4, `${label}: triangle areas ${sum}, expected ${tessellated}`);
+    assert.ok(ccw, `${label}: every triangle faces +z`);
+  }
+  // A full reversal with a round join draws a half disc beyond the turning point.
+  const reversed = geometry('stroke-linejoin="round"', 'M0 0 L10 0 L5 0', { divisions: 64 });
+  assert.ok(Math.abs(coveredArea(reversed) - (20 + Math.PI / 2)) < 0.01 * 21.6);
+  assert.ok(Math.abs(Math.max(...reversed.positions.filter((_, i) => i % 3 === 0)) - 11) < 1e-6);
+  // Zero-length subpaths draw only their caps: a disc, an axis-aligned square, or nothing for butt.
+  assert.ok(
+    Math.abs(strokeArea(geometry('stroke-linecap="round"', 'M5 5 L5 5', { divisions: 64 })).area - ngon(256)) < 1e-4,
+  );
+  assert.ok(Math.abs(strokeArea(geometry('stroke-linecap="square"', 'M5 5 Z')).area - 4) < 1e-9);
+  assert.equal(geometry('', 'M5 5 L5 5').positions.length, 0);
+  assert.equal(geometry('stroke-linecap="round"', 'M5 5').positions.length, 0, 'a lone moveto draws nothing');
+  const round = area('stroke-linecap="round"', 'M0 0 L10 0', { divisions: 64 });
+  assert.ok(round.ccw, 'every triangle faces +z');
   assert.equal(area('stroke-width="0"').area, 0);
   const flipped = parseSVG(svg('<path stroke="red" d="M0 0 L10 0 L10 10"/>')).paths[0].toStrokeGeometry({
     flipY: true,
@@ -308,4 +367,69 @@ test('SVG input: bytes, root size and viewBox, malformed documents', () => {
   const selfUse = parseSVG(svg('<g id="a"><use href="#a"/><rect width="1" height="1"/></g>'));
   assert.equal(selfUse.paths.length, 2);
   assert.ok(selfUse.warnings.some((w) => /refers to itself/.test(w)));
+});
+
+test('SVG cascade, switch, use cycles, unapplied features and the command limit', () => {
+  const { paths, warnings } = parseSVG(
+    svg(
+      '<style>#a { fill: lime } .c { fill: red } rect { fill: blue } .c.d { fill: navy }</style>' +
+        '<rect id="a" class="c" fill="yellow" width="1" height="1"/><rect class="c d" width="1" height="1"/>' +
+        '<rect class="c" style="fill: white !important" width="1" height="1"/>' +
+        '<switch><g requiredExtensions="urn:x"><rect width="1" height="1"/></g><circle r="1"/><ellipse rx="1" ry="1"/></switch>' +
+        '<g id="p"><use href="#q"/></g><g id="q"><use href="#p"/></g>' +
+        '<rect clip-path="url(#c)" stroke-dasharray="1 1" width="1" height="1"/>' +
+        '<use href="other.svg#x"/>',
+    ),
+  );
+  // id beats class beats type beats the presentation attribute; the style attribute beats them all.
+  assert.deepEqual(
+    paths.slice(0, 3).map((p) => p.fill),
+    [
+      [0, 1, 0],
+      [0, 0, 128 / 255],
+      [1, 1, 1],
+    ],
+  );
+  // switch draws only its first child whose conditions hold.
+  assert.deepEqual(
+    paths.slice(3, -1).map((p) => p.element),
+    ['circle'],
+  );
+  assert.equal(paths.length, 5, 'the use cycle draws nothing');
+  for (const pattern of [/refers to itself/, /clip-path/, /stroke-dasharray/, /"other\.svg#x"/])
+    assert.ok(
+      warnings.some((w) => pattern.test(w)),
+      `warning ${pattern}`,
+    );
+  assert.throws(
+    () => parseSVG(svg(`<path d="M0 0${'h1'.repeat(4_000_001)}"/>`)),
+    (e) => e instanceof LoaderError && e.code === 'limit',
+  );
+});
+
+test('SVG arcs: rotated ellipses keep every piece end on the ellipse and end exactly on the target', () => {
+  const [path] = parseSVG(svg('<path d="M10 0 A20 10 30 1 1 0 10"/>')).paths;
+  const pieces = path.commands.filter((c) => c[0] === 'C');
+  assert.ok(pieces.length >= 2 && pieces.length <= 4);
+  assert.deepEqual(pieces.at(-1).slice(-2), [0, 10]);
+  // Recover the centre from the first three end points' common distance in the ellipse frame.
+  const phi = (30 * Math.PI) / 180;
+  const frame = ([x, y], [cx, cy]) => {
+    const dx = x - cx,
+      dy = y - cy;
+    return (
+      ((Math.cos(phi) * dx + Math.sin(phi) * dy) / 20) ** 2 + ((-Math.sin(phi) * dx + Math.cos(phi) * dy) / 10) ** 2
+    );
+  };
+  // F.6.5 centre for this arc, computed independently.
+  const hx = 5,
+    hy = -5,
+    px = Math.cos(phi) * hx + Math.sin(phi) * hy,
+    py = -Math.sin(phi) * hx + Math.cos(phi) * hy;
+  // large-arc = sweep, so the centre takes the negative root.
+  const k = -Math.sqrt((400 * 100 - 400 * py * py - 100 * px * px) / (400 * py * py + 100 * px * px));
+  const qx = (k * 20 * py) / 10,
+    qy = (-k * 10 * px) / 20;
+  const centre = [Math.cos(phi) * qx - Math.sin(phi) * qy + 5, Math.sin(phi) * qx + Math.cos(phi) * qy + 5];
+  for (const c of pieces) assert.ok(Math.abs(frame(c.slice(-2), centre) - 1) < 1e-9);
 });

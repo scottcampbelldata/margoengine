@@ -1,22 +1,19 @@
 import type { EngineKernel } from '@margoengine/core';
 import {
   Material,
-  createMesh,
-  loadTexture as loadMaterialTexture,
-  type MapSlot,
   type MaterialMesh,
   type MaterialOptions,
   type MeshGeometry,
   type Texture,
   type TextureOptions,
+  createMesh,
+  loadTexture as loadMaterialTexture,
 } from '@margoengine/materials';
 import { SRGBToLinear } from '@margoengine/math/color';
-import { fetchBytes, type FetchOptions } from './load.js';
-import { parseOBJ, type LoadedOBJ, type MTLMap, type MTLMaterial } from './obj.js';
+import { type FetchOptions, fetchBytes } from './load.js';
+import { type LoadedOBJ, type MTLMapOptions, type MTLMaterial, parseOBJ } from './obj.js';
 import { LoaderError, type ParseLimits } from './types.js';
 import { resolvePath } from './util.js';
-
-const F = 'MTL';
 
 /** Loads one texture for `createMTLMaterials`: the URL and the texture options the map needs. */
 export type MTLTextureLoader = (url: string, options: TextureOptions & { signal?: AbortSignal }) => Promise<Texture>;
@@ -24,27 +21,28 @@ export type MTLTextureLoader = (url: string, options: TextureOptions & { signal?
 /** Options of `createMTLMaterials`. */
 export interface MTLMaterialsOptions {
   /**
-   * URL the maps' `path`s are relative to: the .mtl file's URL for `parseMTL` output, the .obj file's URL for the
-   * `materials` of `parseOBJ` (their paths already include the library's folder). Default the page's URL.
+   * URL that map paths are relative to: the .mtl URL for `parseMTL` output, the .obj URL for `parseOBJ`'s
+   * `materials` (their paths already include the library folder). Default: the page URL.
    */
   baseUrl?: string | URL;
-  /** Texture loader. Default materials `loadTexture` (http(s), blob: and data: URLs). */
+  /** Texture loader. Default: materials' `loadTexture` (http(s), blob: and data: URLs). */
   loadTexture?: MTLTextureLoader;
   /**
-   * What `bump` / `map_Bump` holds: `'height'` (the MTL specification: a bump map, scaled by `-bm`) or `'normal'`
-   * (a tangent-space normal map, as many exporters write it). Default `'height'`.
+   * What `bump` / `map_Bump` holds: `'height'` (the MTL meaning, scaled by `-bm`) or `'normal'` (a tangent-space
+   * normal map, as many exporters write). Default `'height'`.
    */
   bump?: 'height' | 'normal';
-  /** Draws both faces. Default false (front faces). */
+  /** Draw both faces. Default false. */
   doubleSided?: boolean;
+  /** Aborts texture loading; the promise then rejects with a `LoaderError` with code `'aborted'`. */
   signal?: AbortSignal;
 }
 
-/** Materials built by `createMTLMaterials`. */
+/** The materials `createMTLMaterials` built, and the textures they use. */
 export interface MTLMaterialSet {
-  /** Materials by `newmtl` name. */
+  /** One material per `newmtl` name, in input order. */
   materials: Map<string, Material>;
-  /** Every texture loaded, once per file, colour space and wrap mode. */
+  /** Every texture loaded, once per (file, colour space, wrap mode). */
   textures: Texture[];
   /** Maps that failed to load and MTL values with no Margo equivalent. */
   warnings: string[];
@@ -52,285 +50,405 @@ export interface MTLMaterialSet {
   dispose(): void;
 }
 
-const linear = (rgb: readonly number[]): [number, number, number] =>
-  rgb.map((v) => SRGBToLinear(Math.min(1, Math.max(0, Number.isFinite(v) ? v : 0)))) as [number, number, number];
+const F = 'MTL';
 
-/** Maps and extension statements `createMTLMaterials` uses; it reports the others. */
-const USED_MAPS = new Set(['map_Kd', 'map_Ke', 'map_d', 'bump']);
-const USED_EXTRAS = new Set(['norm', 'pr', 'pm']);
+/** Map statements with a material slot; every other map key is reported as unused. */
+const SLOTTED_MAPS = new Set(['map_Kd', 'map_Ke', 'map_d', 'bump']);
+/** PBR-extension statements read from `extras` (compared in lower case); other extras are reported as unused. */
+const READ_EXTRAS = new Set(['norm', 'pr', 'pm']);
 
-/** Value of an extension statement (`Pr 0.4`), or undefined. */
-const extra = (m: MTLMaterial, keyword: string): string | undefined =>
-  m.extras.find((e) => e.keyword.toLowerCase() === keyword.toLowerCase())?.value;
+type Slot = 'map' | 'alphaMap' | 'emissiveMap' | 'bumpMap' | 'normalMap';
+interface MapUse {
+  slot: Slot;
+  path: string;
+  options: MTLMapOptions;
+  colorSpace: 'srgb' | 'linear';
+}
+
+const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
+/** One sRGB channel as written in the file to linear light: non-finite becomes 0, then clamped to [0, 1]. */
+const linear = (v: number | undefined): number => SRGBToLinear(Number.isFinite(v) ? clamp01(v as number) : 0);
+const linear3 = (c: readonly number[]): [number, number, number] => [linear(c[0]), linear(c[1]), linear(c[2])];
+
+/** Value of the first extension statement named `keyword` (any case), or undefined. */
+function extra(m: MTLMaterial, keyword: string): string | undefined {
+  return m.extras?.find((s) => s.keyword.toLowerCase() === keyword)?.value;
+}
+
+/** First number of an extension statement's value, or NaN. */
+function extraNumber(m: MTLMaterial, keyword: string): number {
+  const value = extra(m, keyword);
+  return value === undefined ? Number.NaN : Number(value.trim().split(/\s+/)[0]);
+}
 
 /**
- * The folder the material's library lives in, relative to where its map paths point: recovered from another map's
- * `file` and `path` (`path` = folder + `file`), or '' when no map tells.
+ * Roughness from the Phong exponent Ns. Walter, Marschner, Li and Torrance, "Microfacet Models for Refraction
+ * through Rough Surfaces" (EGSR 2007) §5.2 match Blinn-Phong exponent Ns to a Beckmann width alpha with
+ * alpha^2 = 2 / (Ns + 2); glTF 2.0 metallic-roughness uses alpha = roughness^2, so roughness = (2 / (Ns + 2))^(1/4).
+ * Ns 0 gives 1, 10 about 0.64, 100 about 0.37, 1000 about 0.21.
  */
+const roughnessFromNs = (ns: number): number => clamp01((2 / (Math.max(0, ns) + 2)) ** 0.25);
+
+/** The folder of the material's library, recovered from a map whose resolved path ends with its file name. */
 function libraryFolder(m: MTLMaterial): string {
-  for (const map of Object.values(m.maps)) {
-    const file = resolvePath('', map.file);
-    if (!map.file.includes('..') && !/^(\/|[a-z][a-z\d+.-]*:)/i.test(file) && map.path.endsWith(file))
-      return map.path.slice(0, map.path.length - file.length);
+  for (const map of Object.values(m.maps ?? {})) {
+    const file = resolvePath('_', map.file);
+    if (file && map.path.endsWith(file)) return map.path.slice(0, map.path.length - file.length);
   }
   return '';
 }
 
-/** The `norm` statement (PBR extension), which `parseMTL` keeps in `extras`, as a map. */
-function normMap(m: MTLMaterial): MTLMap | undefined {
-  const value = extra(m, 'norm');
-  if (!value) return undefined;
-  const tokens = value.split(/\s+/),
-    options: MTLMap['options'] = {};
+/** Reads a `norm` statement like a map statement: `-bm n`, `-o u [v [w]]`, `-s u [v [w]]`, `-clamp on|off`, file. */
+function parseNorm(value: string): { file: string; options: MTLMapOptions } {
+  const tokens = value.trim().split(/\s+/).filter(Boolean),
+    options: MTLMapOptions = {};
   let i = 0;
-  while (i < tokens.length - 1 && tokens[i][0] === '-') {
-    const name = tokens[i++].slice(1);
-    if (name === 'bm') options.bm = Number(tokens[i++]);
-    else if (name === 'o' || name === 's') {
-      const fill = name === 's' ? 1 : 0,
-        v: [number, number, number] = [fill, fill, fill];
-      for (let k = 0; k < 3 && i < tokens.length - 1 && Number.isFinite(Number(tokens[i])); k++)
-        v[k] = Number(tokens[i++]);
-      options[name] = v;
-    } else if (name === 'clamp') options.clamp = tokens[i++] === 'on';
-    else i++;
+  const numbers = (fill: number): [number, number, number] => {
+    const out: [number, number, number] = [fill, fill, fill];
+    for (let k = 0; k < 3 && i < tokens.length && Number.isFinite(Number(tokens[i])); k++) out[k] = Number(tokens[i++]);
+    return out;
+  };
+  while (i < tokens.length && tokens[i].startsWith('-')) {
+    const option = tokens[i++];
+    if (option === '-bm') options.bm = Number(tokens[i++]);
+    else if (option === '-o') options.o = numbers(0);
+    else if (option === '-s') options.s = numbers(1);
+    else if (option === '-clamp') options.clamp = tokens[i++] === 'on';
+    else i++; // an option this reader does not use: skip its value
   }
-  const file = tokens.slice(i).join(' ');
-  return file ? { file, path: resolvePath(`${libraryFolder(m)}library.mtl`, file), options } : undefined;
+  return { file: tokens.slice(i).join(' '), options };
 }
 
-/**
- * Roughness for a Blinn-Phong exponent: Beckmann alpha = sqrt(2 / (Ns + 2)) (Walter et al. 2007), roughness =
- * sqrt(alpha). Ns 0 gives 1, Ns 10 0.64, Ns 100 0.37, Ns 1000 0.21.
- */
-const roughnessOf = (ns: number): number => Math.min(1, Math.max(0, (2 / (Math.max(0, ns) + 2)) ** 0.25));
-
-/**
- * Material options for one MTL material, without textures: `Kd` colour (sRGB to linear), `d` (or 1 - `Tr`) opacity,
- * `Ke` emission, roughness from `Ns` (1 when `illum` is 1 or `Ks` is black), the PBR extension's `Pr` roughness and
- * `Pm` metalness when present, and unlit shading for `illum 0`.
- */
+/** The `new Material` options of one MTL material (section "MTL material format", illumination models included). */
 function materialOptions(m: MTLMaterial, doubleSided: boolean): MaterialOptions {
-  const options: MaterialOptions = { doubleSided };
-  if (m.illum === 0) options.shading = 'basic';
-  options.color = m.Kd ? linear(m.Kd) : [1, 1, 1];
-  const opacity = m.d ?? (m.Tr !== undefined ? 1 - m.Tr : 1);
-  options.opacity = Math.min(1, Math.max(0, Number.isFinite(opacity) ? opacity : 1));
-  if (options.opacity < 1 || m.maps.map_d) options.transparent = true;
-  if (m.illum === 0) return options;
-  const emissive = m.Ke ?? (m.maps.map_Ke ? [1, 1, 1] : undefined);
-  if (emissive) {
-    const peak = Math.max(...emissive);
-    // Emission brighter than 1 keeps its colour and moves the excess into emissiveIntensity.
-    options.emissive = linear(peak > 1 ? emissive.map((v) => v / peak) : emissive);
-    if (peak > 1) options.emissiveIntensity = peak;
+  const unlit = m.illum === 0,
+    options: MaterialOptions = { doubleSided };
+  if (unlit) options.shading = 'basic';
+  options.color = m.Kd ? linear3(m.Kd) : [1, 1, 1];
+  const written = m.d !== undefined ? m.d : m.Tr !== undefined ? 1 - m.Tr : 1,
+    opacity = Number.isFinite(written) ? clamp01(written) : 1;
+  options.opacity = opacity;
+  if (opacity < 1 || m.maps?.map_d) options.transparent = true;
+  if (unlit) return options;
+  const emit = m.Ke ? [...m.Ke] : m.maps?.map_Ke ? [1, 1, 1] : undefined;
+  if (emit) {
+    const peak = Math.max(emit[0], emit[1], emit[2]);
+    if (peak > 1) {
+      for (let k = 0; k < 3; k++) emit[k] /= peak;
+      options.emissive = linear3(emit);
+      options.emissiveIntensity = peak;
+    } else options.emissive = linear3(emit);
   }
-  const pr = parseFloat(extra(m, 'Pr') ?? ''),
-    pm = parseFloat(extra(m, 'Pm') ?? ''),
-    noHighlight = m.illum === 1 || (m.Ks !== undefined && Math.max(...m.Ks) <= 0);
-  options.roughness = Number.isFinite(pr)
-    ? Math.min(1, Math.max(0, pr))
-    : noHighlight || m.Ns === undefined
-      ? 1
-      : roughnessOf(m.Ns);
-  options.metalness = Number.isFinite(pm) ? Math.min(1, Math.max(0, pm)) : 0;
+  const pr = extraNumber(m, 'pr');
+  if (Number.isFinite(pr)) options.roughness = clamp01(pr);
+  else if (m.illum === 1 || (m.Ks && m.Ks.every((c) => c <= 0)) || m.Ns === undefined || !Number.isFinite(m.Ns))
+    options.roughness = 1;
+  else options.roughness = roughnessFromNs(m.Ns);
+  const pm = extraNumber(m, 'pm');
+  options.metalness = Number.isFinite(pm) ? clamp01(pm) : 0;
   return options;
 }
 
+/** The maps a material uses, in slot (and load) order: map, alphaMap, emissiveMap, bump or normal, norm. */
+function mapUses(m: MTLMaterial, bump: 'height' | 'normal'): MapUse[] {
+  const maps = m.maps ?? {},
+    uses: MapUse[] = [];
+  const add = (
+    slot: Slot,
+    map: { path: string; options: MTLMapOptions } | undefined,
+    colorSpace: 'srgb' | 'linear',
+  ) => {
+    if (map) uses.push({ slot, path: map.path, options: map.options ?? {}, colorSpace });
+  };
+  add('map', maps.map_Kd, 'srgb');
+  add('alphaMap', maps.map_d, 'linear');
+  if (m.illum === 0) return uses;
+  add('emissiveMap', maps.map_Ke, 'srgb');
+  add(bump === 'normal' ? 'normalMap' : 'bumpMap', maps.bump, 'linear');
+  const norm = extra(m, 'norm');
+  if (norm !== undefined) {
+    const { file, options } = parseNorm(norm);
+    if (file) add('normalMap', { path: resolvePath(`${libraryFolder(m)}_`, file), options }, 'linear');
+  }
+  return uses;
+}
+
+/** What a material says that Margo materials cannot show, as warnings. */
+function unusedWarnings(m: MTLMaterial): string[] {
+  const out: string[] = [];
+  for (const key of Object.keys(m.maps ?? {}))
+    if (!SLOTTED_MAPS.has(key)) out.push(`${key} has no Margo material slot; it is not used`);
+  for (const s of m.extras ?? [])
+    if (!READ_EXTRAS.has(s.keyword.toLowerCase()))
+      out.push(`${s.keyword} has no Margo material equivalent; it is not used`);
+  if (m.Ka) out.push('Ka (ambient colour) has no Margo material equivalent; it is not used');
+  if (m.Ks && m.Ks.some((c) => c > 0) && m.illum !== 0)
+    out.push('Ks (specular colour) only sets whether there is a highlight; roughness comes from Ns');
+  return out;
+}
+
 /**
- * Builds materials `Material`s from MTL data: metallic-roughness materials with
- * `Kd`, `d`/`Tr`, `Ke`, `Ns` (see `MTLMaterialsOptions`) and the maps `map_Kd` (colour), `map_Ke` (emission),
- * `bump`/`map_Bump` (bump or normal map, `-bm` as the bump scale), `norm` (normal map) and `map_d` (opacity, makes the
- * material transparent), each with its `-o`/`-s` offset and scale as the slot's UV transform and `-clamp` as clamped
- * wrapping. `illum 0` is unlit, `illum 1` has no highlight. Everything else (`Ka`, the `Ks` colour, `Ni`, `Tf`,
- * `map_Ka`, `map_Ks`, `map_Ns`, `disp`, `decal`, `refl`, ...) has no Margo equivalent and is named in `warnings`, as is
- * any map that fails to load (that material is built without it). Texture URLs resolve against `baseUrl`.
+ * Builds one materials `Material` per `newmtl` of `parseMTL` output (or `parseOBJ`'s `materials`), mapped to
+ * metallic-roughness: `Kd` is the base colour (sRGB in the file, linear in the material), `d` (else 1 - `Tr`) the
+ * opacity, `Ke` the emission (a peak above 1 moves into `emissiveIntensity`), and roughness comes from the Phong
+ * exponent `Ns` as (2 / (Ns + 2))^(1/4) (Walter et al. 2007's Blinn-Phong to Beckmann match with glTF's
+ * alpha = roughness^2). The PBR extension's `Pr`, `Pm` and `norm` are read when present. `illum 0` is unlit.
+ * `map_Kd`, `map_d`, `map_Ke`, `bump` and `norm` load as textures, each (file, colour space, wrap) once; their `-o`
+ * and `-s` become the slot's UV transform and `-clamp on` a clamped wrap. A map that fails to load is a warning.
+ * Rejects with `TypeError` / `RangeError` for bad arguments and with a `LoaderError` (code `'aborted'`) when
+ * `signal` aborts; whatever was built is disposed first.
  */
 export async function createMTLMaterials(
   mtl: readonly MTLMaterial[],
   options: MTLMaterialsOptions = {},
 ): Promise<MTLMaterialSet> {
-  if (!Array.isArray(mtl)) throw new TypeError('createMTLMaterials input is not an array; pass parseMTL output');
-  const bump = options.bump ?? 'height';
-  if (bump !== 'height' && bump !== 'normal') throw new RangeError(`bump "${String(bump)}" is not height or normal`);
-  const load = options.loadTexture ?? loadMaterialTexture;
-  if (typeof load !== 'function') throw new TypeError('loadTexture is not a function; pass (url, options) => Texture');
-  let base: URL | undefined;
-  const resolve = (path: string): string => {
-    try {
-      base ??= new URL(options.baseUrl ?? '', globalThis.location?.href);
-    } catch {
-      throw new TypeError(
-        `baseUrl "${String(options.baseUrl)}" is not an absolute URL; pass the .mtl (or .obj) URL to resolve maps against`,
-      );
+  if (!Array.isArray(mtl))
+    throw new TypeError('createMTLMaterials mtl is not an array of materials; pass parseMTL output or obj.materials');
+  const opts = options ?? {},
+    bump = opts.bump ?? 'height';
+  if (bump !== 'height' && bump !== 'normal')
+    throw new RangeError(
+      `createMTLMaterials bump ${JSON.stringify(bump)} is not 'height' or 'normal'; pass one of them`,
+    );
+  if (opts.loadTexture !== undefined && typeof opts.loadTexture !== 'function')
+    throw new TypeError('createMTLMaterials loadTexture is not a function; pass (url, options) => Promise<Texture>');
+  const load: MTLTextureLoader = opts.loadTexture ?? loadMaterialTexture,
+    signal = opts.signal,
+    doubleSided = opts.doubleSided ?? false;
+
+  const materials = new Map<string, Material>(),
+    warnings: string[] = [],
+    arrived: Texture[] = [];
+  let disposed = false;
+  const warn = (message: string) => {
+    if (!warnings.includes(message)) warnings.push(message);
+  };
+  const set: MTLMaterialSet = {
+    materials,
+    textures: [],
+    warnings,
+    dispose() {
+      disposed = true;
+      for (const material of materials.values()) material.dispose();
+      for (const texture of arrived) texture.dispose();
+    },
+  };
+  const abortError = () => new LoaderError(F, 'aborted', 'aborted while loading textures');
+
+  let base: string | undefined;
+  const urlOf = (path: string): string => {
+    if (base === undefined) {
+      const from = opts.baseUrl ?? (globalThis as { location?: { href?: string } }).location?.href;
+      try {
+        base = new URL(String(from)).href;
+      } catch {
+        throw new TypeError(
+          `createMTLMaterials baseUrl ${JSON.stringify(String(from))} is not an absolute URL; pass the .mtl (or .obj) URL to resolve maps against`,
+        );
+      }
     }
     return new URL(path, base).href;
   };
-  const warnings: string[] = [],
-    warn = (message: string) => {
-      if (!warnings.includes(message)) warnings.push(message);
-    },
-    textures = new Map<string, Promise<Texture | undefined>>(),
-    loaded: Texture[] = [],
-    built: Material[] = [],
-    materials = new Map<string, Material>();
-  let disposed = false;
-  const dispose = () => {
-    disposed = true;
-    for (const material of built) material.dispose();
-    for (const item of loaded) item.dispose();
+
+  // One request per (colour space, wrap, URL), in first-use order.
+  const requests = new Map<string, { promise: Promise<Texture | undefined>; texture?: Texture }>(),
+    assignments: { material: Material; slot: Slot; key: string }[] = [];
+  const request = (url: string, colorSpace: 'srgb' | 'linear', wrap: 'clamp' | 'repeat'): string => {
+    const key = `${colorSpace} ${wrap} ${url}`;
+    if (requests.has(key)) return key;
+    const entry: { promise: Promise<Texture | undefined>; texture?: Texture } = {
+      promise: Promise.resolve()
+        .then(() => load(url, { colorSpace, wrapS: wrap, wrapT: wrap, signal }))
+        .then(
+          (texture) => {
+            if (disposed) {
+              texture.dispose();
+              return undefined;
+            }
+            arrived.push(texture);
+            entry.texture = texture;
+            return texture;
+          },
+          (error) => {
+            if (signal?.aborted) throw abortError();
+            warn(`texture ${url} could not be loaded (${(error as Error)?.message ?? error}); its maps are left out`);
+            return undefined;
+          },
+        ),
+    };
+    requests.set(key, entry);
+    return key;
   };
-  const texture = (map: MTLMap, colorSpace: 'srgb' | 'linear'): Promise<Texture | undefined> => {
-    const url = resolve(map.path),
-      wrap = map.options.clamp ? 'clamp' : 'repeat',
-      key = `${colorSpace} ${wrap} ${url}`;
-    let pending = textures.get(key);
-    if (!pending) {
-      pending = load(url, { colorSpace, wrapS: wrap, wrapT: wrap, signal: options.signal }).then(
-        (result) => {
-          // A texture that arrives after an abort is freed at once.
-          if (disposed) result.dispose();
-          else loaded.push(result);
-          return result;
-        },
-        (error: unknown) => {
-          if (options.signal?.aborted) throw error;
-          warn(`texture ${url} could not be loaded (${(error as Error)?.message ?? error}); its maps are left out`);
-          return undefined;
-        },
-      );
-      textures.set(key, pending);
-    }
-    return pending;
-  };
-  const assignments: Promise<void>[] = [];
-  const build = (m: MTLMaterial) => {
-    if (materials.has(m.name)) return;
-    const material = new Material(materialOptions(m, options.doubleSided ?? false));
-    built.push(material);
-    materials.set(m.name, material);
-    for (const key of Object.keys(m.maps))
-      if (!USED_MAPS.has(key)) warn(`${key} has no Margo material slot; it is not used`);
-    for (const { keyword } of m.extras)
-      if (!USED_EXTRAS.has(keyword.toLowerCase())) warn(`${keyword} has no Margo material equivalent; it is not used`);
-    if (m.Ka) warn('Ka (ambient colour) has no Margo material equivalent; it is not used');
-    if (m.Ks && m.illum !== 0 && Math.max(...m.Ks) > 0)
-      warn('Ks (specular colour) only sets whether there is a highlight; roughness comes from Ns');
-    const slots: [MapSlot | 'alphaMap' | 'bumpMap', MTLMap, 'srgb' | 'linear'][] = [];
-    if (m.maps.map_Kd) slots.push(['map', m.maps.map_Kd, 'srgb']);
-    if (m.maps.map_d) slots.push(['alphaMap', m.maps.map_d, 'linear']);
-    if (m.illum !== 0) {
-      if (m.maps.map_Ke) slots.push(['emissiveMap', m.maps.map_Ke, 'srgb']);
-      if (m.maps.bump) slots.push([bump === 'normal' ? 'normalMap' : 'bumpMap', m.maps.bump, 'linear']);
-      const norm = normMap(m);
-      if (norm) slots.push(['normalMap', norm, 'linear']);
-    }
-    for (const [slot, map, space] of slots)
-      assignments.push(
-        texture(map, space).then((value) => {
-          if (!value || disposed) return;
-          if (slot === 'alphaMap') material.alphaMap = value;
-          else if (slot === 'bumpMap') {
-            material.bumpMap = value;
-            if (map.options.bm !== undefined && Number.isFinite(map.options.bm)) material.bumpScale = map.options.bm;
-          } else material[slot as 'map' | 'emissiveMap' | 'normalMap'] = value;
-          const { o, s } = map.options;
-          if ((o && (o[0] || o[1])) || (s && (s[0] !== 1 || s[1] !== 1)))
-            material.setUVTransform({ offset: [o?.[0] ?? 0, o?.[1] ?? 0], scale: [s?.[0] ?? 1, s?.[1] ?? 1] }, slot);
-        }),
-      );
-  };
+
+  let stopListening = () => {};
   try {
-    for (const m of mtl) build(m);
-    await Promise.all(assignments);
+    for (const m of mtl) {
+      if (!m || typeof m.name !== 'string' || materials.has(m.name)) continue;
+      const material = new Material(materialOptions(m, doubleSided));
+      materials.set(m.name, material);
+      for (const message of unusedWarnings(m)) warn(message);
+      for (const use of mapUses(m, bump)) {
+        const wrap = use.options.clamp ? 'clamp' : 'repeat';
+        assignments.push({ material, slot: use.slot, key: request(urlOf(use.path), use.colorSpace, wrap) });
+        if (use.slot === 'bumpMap' && Number.isFinite(use.options.bm)) material.bumpScale = use.options.bm as number;
+        const [ou = 0, ov = 0] = use.options.o ?? [],
+          [su = 1, sv = 1] = use.options.s ?? [];
+        if (ou !== 0 || ov !== 0 || su !== 1 || sv !== 1)
+          material.setUVTransform({ offset: [ou, ov], scale: [su, sv] }, use.slot);
+      }
+    }
+    const all = Promise.all([...requests.values()].map((r) => r.promise));
+    if (signal) {
+      const aborted = new Promise<never>((_, reject) => {
+        const onAbort = () => reject(abortError());
+        if (signal.aborted) onAbort();
+        else {
+          signal.addEventListener('abort', onAbort, { once: true });
+          stopListening = () => signal.removeEventListener('abort', onAbort);
+        }
+      });
+      all.catch(() => {});
+      await Promise.race([all, aborted]);
+    } else await all;
+    for (const { material, slot, key } of assignments) {
+      const texture = requests.get(key)?.texture;
+      if (texture) material[slot] = texture;
+    }
+    set.textures = [...requests.values()].flatMap((r) => (r.texture ? [r.texture] : []));
+    return set;
   } catch (error) {
-    dispose();
-    if (options.signal?.aborted) throw new LoaderError(F, 'aborted', 'aborted while loading textures');
+    set.dispose();
     throw error;
+  } finally {
+    stopListening();
   }
-  return { materials, textures: loaded, warnings, dispose };
 }
 
 /** Options of `prepareOBJMesh` and `createOBJMesh`. */
 export interface OBJMeshOptions {
-  /** Material of groups without `usemtl` or naming an unknown material. Default a new white `Material`. */
+  /** Material for groups without `usemtl` or naming an unknown material. Default: a new white `Material`. */
   fallback?: Material;
 }
 
+/** A unit normal, or +z for a zero or non-finite one (materials meshes reject zero normals). */
+function unit(out: Float32Array, at: number, x: number, y: number, z: number): void {
+  const length = Math.hypot(x, y, z);
+  if (length > 0 && Number.isFinite(length)) {
+    out[at] = x / length;
+    out[at + 1] = y / length;
+    out[at + 2] = z / length;
+  } else {
+    out[at] = 0;
+    out[at + 1] = 0;
+    out[at + 2] = 1;
+  }
+}
+
 /**
- * The materials mesh input for an OBJ: geometry with `groups` (one slot per distinct material) and the material array
- * in slot order. UVs go back to OBJ orientation (v up, for `flipY` textures, materials' default), vertex
- * colours from sRGB to linear, and missing normals become smooth normals shared across UV seams (by `positionIndices`).
- * Groups whose `usemtl` names no material use `options.fallback`.
+ * Smooth vertex normals per OBJ position: each triangle's area-weighted face normal is summed into the positions its
+ * corners came from, so corners split by UV seams share one normal.
+ */
+function smoothNormals(positions: ArrayLike<number>, indices: ArrayLike<number>, origin?: ArrayLike<number>) {
+  const vertices = positions.length / 3,
+    from = (v: number) => (origin ? origin[v] : v);
+  let slots = 0;
+  for (let v = 0; v < vertices; v++) slots = Math.max(slots, from(v) + 1);
+  const sums = new Float64Array(slots * 3);
+  for (let t = 0; t + 2 < indices.length; t += 3) {
+    const a = indices[t] * 3,
+      b = indices[t + 1] * 3,
+      c = indices[t + 2] * 3,
+      e1x = positions[b] - positions[a],
+      e1y = positions[b + 1] - positions[a + 1],
+      e1z = positions[b + 2] - positions[a + 2],
+      e2x = positions[c] - positions[a],
+      e2y = positions[c + 1] - positions[a + 1],
+      e2z = positions[c + 2] - positions[a + 2],
+      nx = e1y * e2z - e1z * e2y,
+      ny = e1z * e2x - e1x * e2z,
+      nz = e1x * e2y - e1y * e2x;
+    for (const corner of [indices[t], indices[t + 1], indices[t + 2]]) {
+      const s = from(corner) * 3;
+      sums[s] += nx;
+      sums[s + 1] += ny;
+      sums[s + 2] += nz;
+    }
+  }
+  const normals = new Float32Array(vertices * 3);
+  for (let v = 0; v < vertices; v++) {
+    const s = from(v) * 3;
+    unit(normals, v * 3, sums[s], sums[s + 1], sums[s + 2]);
+  }
+  return normals;
+}
+
+/**
+ * Turns a parsed OBJ and its materials into materials-ready geometry plus one material per slot, without a GPU:
+ * groups map to materials by their `usemtl` name. Positions and indices are the OBJ's own arrays. Normals are the
+ * OBJ's (normalised) or, without them, smooth normals shared across UV seams; zero normals become +z. UVs go back to
+ * OBJ's v-up orientation for flipY textures, and vertex colours from sRGB to linear. Throws a `LoaderError` (code
+ * `'unsupported'`) for an OBJ without faces and `TypeError` when `materials` is neither a Map nor a set.
  */
 export function prepareOBJMesh(
   obj: LoadedOBJ,
   materials: MTLMaterialSet | ReadonlyMap<string, Material>,
   options: OBJMeshOptions = {},
 ): { geometry: MeshGeometry; materials: Material[] } {
-  if (!obj || obj.kind !== 'mesh' || !obj.indices?.length)
-    throw new LoaderError('OBJ', 'unsupported', 'the OBJ has no faces; draw its points with pointsToGeometry');
-  const byName = materials instanceof Map ? materials : (materials as MTLMaterialSet).materials;
-  if (!(byName instanceof Map))
-    throw new TypeError('prepareOBJMesh materials is not a Map or createMTLMaterials result');
+  if (!obj || obj.kind !== 'mesh' || !obj.indices)
+    throw new LoaderError(
+      'OBJ',
+      'unsupported',
+      'the OBJ has no faces to draw as a mesh; draw its points with pointsToGeometry instead',
+    );
+  const lookup: ReadonlyMap<string, Material> | undefined =
+    materials instanceof Map
+      ? materials
+      : materials && (materials as MTLMaterialSet).materials instanceof Map
+        ? (materials as MTLMaterialSet).materials
+        : undefined;
+  if (!lookup)
+    throw new TypeError('prepareOBJMesh materials is not a Map or material set; pass createMTLMaterials output');
   const { positions, indices } = obj,
-    count = positions.length / 3;
-  let normals = obj.normals;
-  if (!normals) {
-    // Smooth normals per OBJ position, so vertices split by UV seams share them.
-    let positionsInFile = 0;
-    for (const p of obj.positionIndices) if (p >= positionsInFile) positionsInFile = p + 1;
-    const sums = new Float64Array(positionsInFile * 3);
-    for (let t = 0; t + 2 < indices.length; t += 3) {
-      const a = indices[t] * 3,
-        b = indices[t + 1] * 3,
-        c = indices[t + 2] * 3,
-        ux = positions[b] - positions[a],
-        uy = positions[b + 1] - positions[a + 1],
-        uz = positions[b + 2] - positions[a + 2],
-        vx = positions[c] - positions[a],
-        vy = positions[c + 1] - positions[a + 1],
-        vz = positions[c + 2] - positions[a + 2],
-        n = [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx];
-      for (const v of [indices[t], indices[t + 1], indices[t + 2]])
-        for (let k = 0; k < 3; k++) sums[obj.positionIndices[v] * 3 + k] += n[k];
-    }
-    normals = new Float32Array(count * 3);
-    for (let v = 0; v < count; v++)
-      for (let k = 0; k < 3; k++) normals[v * 3 + k] = sums[obj.positionIndices[v] * 3 + k];
-  }
-  // Materials meshes reject zero normals: unused or degenerate corners face +z.
-  const safe = new Float32Array(normals);
-  for (let v = 0; v < count; v++) {
-    const length = Math.hypot(safe[v * 3], safe[v * 3 + 1], safe[v * 3 + 2]);
-    if (length > 0 && Number.isFinite(length)) for (let k = 0; k < 3; k++) safe[v * 3 + k] /= length;
-    else safe.set([0, 0, 1], v * 3);
-  }
-  const geometry: MeshGeometry = { positions, normals: safe, indices };
+    vertices = positions.length / 3;
+
+  let normals: Float32Array;
+  if (obj.normals) {
+    normals = new Float32Array(vertices * 3);
+    for (let v = 0; v < vertices; v++)
+      unit(normals, v * 3, obj.normals[v * 3], obj.normals[v * 3 + 1], obj.normals[v * 3 + 2]);
+  } else normals = smoothNormals(positions, indices, obj.positionIndices);
+
+  const geometry: MeshGeometry = { positions, normals, indices };
   if (obj.uvs) {
-    const uvs = new Float32Array(obj.uvs);
+    const uvs = Float32Array.from(obj.uvs);
     for (let i = 1; i < uvs.length; i += 2) uvs[i] = 1 - uvs[i];
     geometry.uvs = uvs;
   }
-  if (obj.colors) geometry.colors = obj.colors.map((c) => SRGBToLinear(Math.min(1, Math.max(0, c))));
+  if (obj.colors) geometry.colors = obj.colors.map((c) => linear(c));
+
   const slots: Material[] = [],
+    slotOf = new Map<Material, number>(),
     groups: { start: number; count: number; materialIndex: number }[] = [];
-  let fallback = options.fallback;
-  for (const group of obj.groups.length ? obj.groups : [{ start: 0, count: indices.length, groupNames: [] }]) {
+  let fallback = options?.fallback;
+  const source = obj.groups?.length ? obj.groups : [{ start: 0, count: indices.length, material: undefined }];
+  for (const group of source) {
     if (!group.count) continue;
-    let material = group.material === undefined ? undefined : byName.get(group.material);
+    let material = group.material === undefined ? undefined : lookup.get(group.material);
     if (!material) material = fallback ??= new Material();
-    let slot = slots.indexOf(material);
-    if (slot < 0) slot = slots.push(material) - 1;
-    groups.push({ start: group.start, count: group.count, materialIndex: slot });
+    let index = slotOf.get(material);
+    if (index === undefined) {
+      index = slots.push(material) - 1;
+      slotOf.set(material, index);
+    }
+    groups.push({ start: group.start, count: group.count, materialIndex: index });
   }
   geometry.groups = groups;
   return { geometry, materials: slots };
 }
 
 /**
- * Creates one materials mesh (`createMesh` with groups) for a parsed OBJ: each `usemtl` group draws with its material
- * from `createMTLMaterials`. See `prepareOBJMesh` for the conversion. The mesh has at most 1,000,000 vertices.
+ * `prepareOBJMesh`, then materials' `createMesh` with one material slot per OBJ material. Dispose the mesh with
+ * `destroy()`; the materials stay owned by their set.
  */
 export function createOBJMesh(
   engine: EngineKernel,
@@ -339,66 +457,71 @@ export function createOBJMesh(
   options: OBJMeshOptions & { renderOrder?: number } = {},
 ): MaterialMesh<Material[]> {
   const prepared = prepareOBJMesh(obj, materials, options);
-  return createMesh(engine, prepared.geometry, prepared.materials, { renderOrder: options.renderOrder ?? 0 });
+  return createMesh(engine, prepared.geometry, prepared.materials, { renderOrder: options?.renderOrder ?? 0 });
 }
 
-/** Options of `loadOBJ`: fetch limits and init, parse limits, material options and mesh options. */
+/** Options of `loadOBJ`: fetching, parse limits, material building and the mesh. */
 export interface LoadOBJOptions
   extends FetchOptions,
     ParseLimits,
     Omit<MTLMaterialsOptions, 'baseUrl' | 'signal'>,
     OBJMeshOptions {
+  /** Draw order of the mesh. Default 0. */
   renderOrder?: number;
 }
 
-/** The result of `loadOBJ`. */
+/** What `loadOBJ` returns. */
 export interface LoadedOBJMesh {
   mesh: MaterialMesh<Material[]>;
   /** The parsed OBJ, with its MTL materials as data. */
   obj: LoadedOBJ;
-  /** The built materials and textures. */
   materials: MTLMaterialSet;
-  /** The OBJ's and the materials' warnings together. */
+  /** The OBJ's warnings followed by the material set's. */
   warnings: string[];
-  /** Destroys the mesh and disposes its materials (the fallback too, when `loadOBJ` made it) and textures. */
+  /** Destroys the mesh and disposes the material set (and the fallback material when loadOBJ made it). */
   dispose(): void;
 }
 
 /**
- * Loads an OBJ with its MTL libraries and textures in one call: fetches the
- * .obj, every `mtllib` next to it, every texture relative to its .mtl file, builds the materials with
- * `createMTLMaterials` and one materials mesh with `createOBJMesh`, each `usemtl` group drawn with its material.
- * A library or texture that fails to load becomes a warning; the OBJ itself failing to load or parse throws a
- * `LoaderError`. Textures load through `options.loadTexture` (default materials `loadTexture`).
+ * Loads a textured OBJ in one call: fetches the OBJ, then each `mtllib` relative to it, builds the materials with
+ * `createMTLMaterials` (textures relative to their library) and the mesh with `createOBJMesh`. A library that cannot
+ * be read is a warning. Throws `TypeError` when `url` is not absolute and there is no page URL, and the
+ * `LoaderError` of a failed fetch or parse. When the mesh cannot be built, everything loaded is disposed first.
  */
 export async function loadOBJ(
   engine: EngineKernel,
   url: string | URL,
   options: LoadOBJOptions = {},
 ): Promise<LoadedOBJMesh> {
-  let base: URL;
+  const opts = options ?? {};
+  let objUrl: string;
   try {
-    base = new URL(url, globalThis.location?.href);
+    objUrl = new URL(String(url), (globalThis as { location?: { href?: string } }).location?.href).href;
   } catch {
-    throw new TypeError(`OBJ URL "${String(url)}" is not absolute and there is no page URL; pass an absolute URL`);
+    throw new TypeError(`loadOBJ url ${JSON.stringify(String(url))} is not an absolute URL; pass the full .obj URL`);
   }
-  const obj = await parseOBJ(await fetchBytes(base, options), {
-    resolve: (path) => fetchBytes(new URL(path, base), options),
-    signal: options.signal,
-    maxVertices: options.maxVertices,
-    maxTriangles: options.maxTriangles,
+  const fetchOptions: FetchOptions = {
+    signal: opts.signal,
+    maxBytes: opts.maxBytes,
+    fetch: opts.fetch,
+    init: opts.init,
+  };
+  const bytes = await fetchBytes(objUrl, fetchOptions);
+  const obj = await parseOBJ(bytes, {
+    resolve: (path) => fetchBytes(new URL(path, objUrl), fetchOptions),
+    signal: opts.signal,
+    maxVertices: opts.maxVertices,
+    maxTriangles: opts.maxTriangles,
   });
-  const set = await createMTLMaterials(obj.materials, { ...options, baseUrl: base }),
-    named = new Set(set.materials.values());
-  let mesh: MaterialMesh<Material[]>, made: Material | undefined;
+  const set = await createMTLMaterials(obj.materials, { ...opts, baseUrl: objUrl });
+  const ownFallback = opts.fallback ? undefined : new Material(),
+    fallback = opts.fallback ?? (ownFallback as Material);
+  let mesh: MaterialMesh<Material[]>;
   try {
-    const prepared = prepareOBJMesh(obj, set, options);
-    // The fallback this call made (when options.fallback is absent) is disposed with the mesh.
-    made = options.fallback ? undefined : prepared.materials.find((m) => !named.has(m));
-    mesh = createMesh(engine, prepared.geometry, prepared.materials, { renderOrder: options.renderOrder ?? 0 });
+    mesh = createOBJMesh(engine, obj, set, { fallback, renderOrder: opts.renderOrder ?? 0 });
   } catch (error) {
     set.dispose();
-    made?.dispose();
+    ownFallback?.dispose();
     throw error;
   }
   return {
@@ -409,7 +532,7 @@ export async function loadOBJ(
     dispose() {
       mesh.destroy();
       set.dispose();
-      made?.dispose();
+      ownFallback?.dispose();
     },
   };
 }
