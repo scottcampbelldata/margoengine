@@ -4,17 +4,16 @@ import { Camera } from '@margoengine/core';
 import { fakeEngine } from './fake-dom.js';
 import {
   LabelRenderer,
-  projectPoint,
   lookAtView,
   cssPerspective,
   cameraCSSTransform,
   objectCSSTransform,
   orthographicCSSTransform,
-  isOrthographic,
   cssPointToWorld,
   composeMatrix,
 } from '../dist/index.js';
 import { CameraProjection } from '../../cameras/dist/index.js';
+import { isOrthographic, projectPoint } from '@margoengine/math/mat4';
 
 const close = (a, b, epsilon = 1e-6) => Math.abs(a - b) <= epsilon;
 

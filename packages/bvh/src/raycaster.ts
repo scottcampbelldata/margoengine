@@ -10,6 +10,7 @@ import { transformPoint, type Side } from './math.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 import { engineProxies, isModel, type ModelLike, type ModelPrimitiveLike, type PickProxy } from '../../shared/model.js';
+import { isOrthographic, transformPointChecked } from '@margoengine/math/mat4';
 
 // Structural views of the engine internals that `engineRuntime(engine)` exposes. Types only: this module never
 // imports core at runtime, so it stays usable from workers and Node.
@@ -854,9 +855,6 @@ export const deformedError = (): MargoError =>
     'Deformed PBR mesh cannot be picked synchronously; use await Raycaster.intersectModel(model) for its current pose.',
   );
 
-/** @internal True for a projection or view-projection matrix without perspective (last row 0, 0, 0, w). */
-export const isOrthographic = (m: ArrayLike<number>): boolean => !m[3] && !m[7] && !m[11];
-
 /**
  * @internal Sets `ray` through normalized device coordinates (x, y) of a camera whose inverted view-projection is
  * `inverse`: from the eye `position`, or from the near-plane point for an orthographic camera (parallel rays).
@@ -877,13 +875,10 @@ export function cameraRay<T extends Raycaster>(
   return ray.set(orthographic ? near : position, [far[0] - near[0], far[1] - near[1], far[2] - near[2]]);
 }
 
+// A point that does not project (w 0 or not finite) gives NaN, which ray.set rejects.
 function unproject(inverse: Float64Array, x: number, y: number, z: number): MutableVec3 {
-  const w = inverse[3] * x + inverse[7] * y + inverse[11] * z + inverse[15];
-  return [
-    (inverse[0] * x + inverse[4] * y + inverse[8] * z + inverse[12]) / w,
-    (inverse[1] * x + inverse[5] * y + inverse[9] * z + inverse[13]) / w,
-    (inverse[2] * x + inverse[6] * y + inverse[10] * z + inverse[14]) / w,
-  ];
+  const result = transformPointChecked(inverse, [x, y, z], 0);
+  return result.ok ? result.point : [Number.NaN, Number.NaN, Number.NaN];
 }
 
 /** Inverse-transpose of the upper 3x3 applied to a normal, normalized. */

@@ -9,15 +9,12 @@ export type {
   DistanceScale,
 } from './renderer.js';
 export {
-  projectPoint,
-  createScreenPoint,
   lookAtView,
   cssPerspective,
   cameraCSSTransform,
   orthographicCSSTransform,
-  isOrthographic,
   objectCSSTransform,
   cssPointToWorld,
   composeMatrix,
 } from './projection.js';
-export type { ScreenPoint, Backend, Vec3 } from './projection.js';
+export type { Backend, Vec3 } from './projection.js';

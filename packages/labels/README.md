@@ -46,7 +46,7 @@ engine.removePlugin(labels.name); // or engine.dispose(): removes every element 
 | `LabelRenderer` | Engine plugin: `add(element, options)`, `add3D(element, options)`, `remove(item)`, `update()`, `occlude`, `root`, `writes`, `dispose()` |
 | `Label` | `element`, `visible`, `onScreen`, `screen` (x, y, depth, w), `world`, `distance`, `setMesh`, `setPosition`, `setOffset`, `anchor`, `distanceScale`, `frustumCulling`, `followVisibility`, `sort`, `occlude`, `remove()` |
 | `CSS3DObject` | `element`, `visible`, `onScreen`, `matrix`, `pixelScale`, `setMesh`, `setMatrix`, `setPose(position, quaternion)`, `remove()` |
-| `projectPoint` | World point to CSS pixels plus normalized depth and frustum flags, for either backend |
+| `projectPoint`, `isOrthographic` (from `@margoengine/math/mat4`) | World point to CSS pixels plus normalized depth and frustum flags, for either backend; the renderer uses math's |
 | `lookAtView`, `cssPerspective`, `cameraCSSTransform`, `objectCSSTransform`, `cssPointToWorld`, `composeMatrix` | The CSS 3D math, exported for custom layouts and tests (`lookAtView(position, target, out?, up?)` takes core's `camera.up`, default +Y, so exact top-down views work) |
 
 ## Options

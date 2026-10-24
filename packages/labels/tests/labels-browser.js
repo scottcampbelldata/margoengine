@@ -1,6 +1,7 @@
 import { Engine, PbrMaterial, box } from '@margoengine/core';
 import { engineRuntime, meshRuntime } from '@margoengine/core/extension';
-import { LabelRenderer, projectPoint, cssPointToWorld } from '@margoengine/labels';
+import { LabelRenderer, cssPointToWorld } from '@margoengine/labels';
+import { projectPoint } from '@margoengine/math/mat4';
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);

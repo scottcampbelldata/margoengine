@@ -4,17 +4,14 @@ import { engineRuntime, meshRuntime, type FrameGraph } from '@margoengine/core/e
 import {
   cameraCSSTransform,
   composeMatrix,
-  createScreenPoint,
   cssPerspective,
-  isOrthographic,
   lookAtView,
   objectCSSTransform,
   orthographicCSSTransform,
-  projectPoint,
-  type ScreenPoint,
   type Vec3,
 } from './projection.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { createScreenPoint, isOrthographic, projectPoint, type ScreenPoint } from '@margoengine/math/mat4';
 
 export interface LabelInfo {
   /** Projected position in CSS pixels relative to the canvas. */

@@ -1,61 +1,8 @@
 import { composeMatrix as compose } from '@margoengine/math/mat4';
+import type { Backend } from '@margoengine/math/mat4';
+export type { Backend };
 
 export type Vec3 = readonly [number, number, number];
-export type Backend = 'webgpu' | 'webgl2';
-
-export interface ScreenPoint {
-  /** CSS pixels from the left edge of the canvas. */
-  x: number;
-  /** CSS pixels from the top edge of the canvas. */
-  y: number;
-  /** Normalized depth, 0 at the near plane and 1 at the far plane, on both backends. */
-  depth: number;
-  /** Clip-space w, the distance in front of the camera along its view axis. */
-  w: number;
-  /** w > 0: the point is in front of the camera. */
-  inFront: boolean;
-  /** Inside all six frustum planes. */
-  inFrustum: boolean;
-}
-
-export const createScreenPoint = (): ScreenPoint => ({ x: 0, y: 0, depth: 0, w: 0, inFront: false, inFrustum: false });
-
-/**
- * Projects a world point with a column-major view-projection matrix (Margo Engine `camera.matrix`) to CSS pixels.
- * WebGPU clip space is reversed-Z with z in 0..w (near maps to w); WebGL2 clip space has z in -w..w.
- */
-export function projectPoint(
-  matrix: ArrayLike<number>,
-  x: number,
-  y: number,
-  z: number,
-  width: number,
-  height: number,
-  backend: Backend = 'webgpu',
-  out: ScreenPoint = createScreenPoint(),
-): ScreenPoint {
-  const m = matrix;
-  const cx = m[0] * x + m[4] * y + m[8] * z + m[12];
-  const cy = m[1] * x + m[5] * y + m[9] * z + m[13];
-  const cz = m[2] * x + m[6] * y + m[10] * z + m[14];
-  const cw = m[3] * x + m[7] * y + m[11] * z + m[15];
-  out.w = cw;
-  out.inFront = cw > 0;
-  if (!out.inFront) {
-    out.x = out.y = Number.NaN;
-    out.depth = Number.NaN;
-    out.inFrustum = false;
-    return out;
-  }
-  const nx = cx / cw,
-    ny = cy / cw,
-    nz = cz / cw;
-  out.depth = backend === 'webgpu' ? 1 - nz : (nz + 1) / 2;
-  out.x = ((nx + 1) / 2) * width;
-  out.y = ((1 - ny) / 2) * height;
-  out.inFrustum = nx >= -1 && nx <= 1 && ny >= -1 && ny <= 1 && out.depth >= 0 && out.depth <= 1;
-  return out;
-}
 
 /** Look-at view matrix (column-major), identical to the one Margo Engine's Camera builds; pass `camera.up` (default +Y). */
 export function lookAtView(
@@ -146,7 +93,6 @@ export function orthographicCSSTransform(
 }
 
 /** True when a column-major view-projection is orthographic: clip w does not depend on position. */
-export const isOrthographic = (matrix: ArrayLike<number>): boolean => !(matrix[3] || matrix[7] || matrix[11]);
 
 /**
  * Transform for a CSS3D object: center the element on its origin, scale CSS pixels to world units with `pixelScale`,

@@ -4,7 +4,8 @@ import { MargoError, Vector3 } from '@margoengine/math';
 import { invertMatrix } from '@margoengine/math/mat4';
 import { add, cross, dot, normalize, scale, sub } from '@margoengine/math/vec3';
 import type { MutableVec3 } from '@margoengine/math';
-import { Raycaster, cameraRay, isOrthographic } from './raycaster.js';
+import { Raycaster, cameraRay } from './raycaster.js';
+import { isOrthographic } from '@margoengine/math/mat4';
 import {
   createScreenRectangle,
   finiteCanvasPoint,
