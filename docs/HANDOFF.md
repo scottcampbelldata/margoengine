@@ -2,6 +2,16 @@
 
 Last updated 2026-10-24. Read this first when starting a new session. Update it whenever work lands.
 
+## Landed 2026-10-24: visual baselines for Edge 156
+
+Edge on the RTX A6000 PC updated to 156, and visual profiles are per browser major version, so `visual:check` (and
+`check:merge`) had no baseline there. `tests/visual/profiles/nvidia-ampere-msedge-156` holds the full view set (62
+views, 4 runs each, captured from a clean tree); the Edge 155 profile stays for older Edge. Against Edge 155 with the
+visual check's metric, every view is within its 155 tolerance: 58 are identical, and the other four differ only in
+scattered pixels with none over the hot threshold (khronos-ToyCar 0.07% changed, max 1; khronos-IridescenceLamp 0.01%,
+max 11; gameplay-sandbox-light under 0.01%, max 8; gameplay-sandbox-high under 0.01%, max 1). No regression is hidden.
+The voxel views list the new profile too.
+
 ## Landed 2026-10-24: packed packages type-check again
 
 `npm run modern:test:packages` (pack every package, install the tarballs into a clean project, type-check each README

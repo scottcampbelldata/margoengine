@@ -59,8 +59,9 @@ const MARGIN = 3,
   ALLOWANCE = { changed: 0.0005, hot: 0.0002 },
   GATED = Object.keys(ALLOWANCE);
 
-// Baseline profiles with references for the voxel sandbox views (recorded on the RTX A6000 desktop, 2026-10-19).
-const VOXEL = ['nvidia-ampere-msedge-155'];
+// Baseline profiles with references for the voxel sandbox views (recorded on the RTX A6000 desktop: Edge 155 on 2026-10-19,
+// Edge 156 on 2026-10-24).
+const VOXEL = ['nvidia-ampere-msedge-155', 'nvidia-ampere-msedge-156'];
 const iphone =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1';
 const desktop = { viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1, factor: 2 };
