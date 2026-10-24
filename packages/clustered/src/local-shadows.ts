@@ -9,7 +9,6 @@ import { hemisphere, localShadowMatrix, viewportMatrix } from './local-shadow-ma
 import { hiddenInTree } from '../../shared/visibility.js';
 import {
   casterPipeline,
-  casterRuntime,
   nodeRecords,
   depthPassDescriptor,
   displacementGroup,

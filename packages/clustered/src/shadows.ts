@@ -2,7 +2,7 @@
 import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
 import {
   engineRuntime,
-  meshRuntime,
+  type meshRuntime,
   type Engine,
   type EnginePlugin,
   type FrameGraph,

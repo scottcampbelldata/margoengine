@@ -1,4 +1,4 @@
-import type { Engine, Mesh, FrameGraph } from '@margoengine/core/extension';
+import type { Engine, FrameGraph } from '@margoengine/core/extension';
 import { instanceMatrix } from '../../shared/instances.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 import { retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
