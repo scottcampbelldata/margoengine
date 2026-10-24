@@ -6,7 +6,7 @@
 // submit. A frame with a single view behaves exactly like plain writes and destroys.
 // Every package bundles its own copy of this module, so the state lives on globalThis, one per device: a resource
 // retired by one package waits for a frame another package recorded on the same device, and a lost device's pending
-// resources and uniform copies are dropped without touching any other device. Keep the shape.
+// resources and uniform copies are released at once without touching any other device. Keep the shape.
 const devices = (globalThis[Symbol.for('margoengine.frame-resources')] ??= { devices: new WeakMap() }).devices;
 
 function stateOf(device) {
@@ -24,11 +24,13 @@ function stateOf(device) {
         written: new WeakMap(),
       }),
     );
-    // A lost device's resources are already invalid: nothing of it is destroyed or reused later.
+    // A lost device's resources are already invalid: they are destroyed at once (a no-op on the GPU, so owners and
+    // resource accounting see them released) and never reused.
     device.lost?.then?.(() => {
       state.lost = true;
+      const list = state.retired;
       state.retired = [];
-      state.written = new WeakMap();
+      for (const resource of list) resource.destroy();
     });
   }
   return state;
@@ -75,10 +77,9 @@ export function endDraw(device) {
 export function retire(device, resource) {
   if (!resource) return;
   const state = stateOf(device);
-  if (state.lost) return;
   const list = [resource, ...(state.written.get(resource)?.extras ?? [])];
   state.written.delete(resource);
-  if (state.open && (state.views.size > 1 || state.drawing > 0)) state.retired.push(...list);
+  if (!state.lost && state.open && (state.views.size > 1 || state.drawing > 0)) state.retired.push(...list);
   else for (const item of list) item.destroy();
 }
 

@@ -81,7 +81,7 @@ test('steady multi-view frames reuse their uniform copies', async () => {
   );
 });
 
-test('a lost device drops its retirements and copies; the restored device is unaffected', async () => {
+test('a lost device releases its retirements and copies at once; the restored device is unaffected', async () => {
   const old = lostDevice(),
     restored = strictGPU().device,
     uniform = old.gpu.device.createBuffer({ size: 16 }),
@@ -95,8 +95,24 @@ test('a lost device drops its retirements and copies; the restored device is una
   retire(old.gpu.device, uniform);
   writeUniform(restored, fresh, new Float32Array(4), left);
   await frame();
-  assert.equal(old.gpu.buffers.filter((buffer) => buffer.destroyed).length, 0, 'nothing of the lost device is touched');
+  assert.ok(
+    old.gpu.buffers.every((buffer) => buffer.destroyed),
+    'the buffer and its uniform copy of the lost device are released, so owners see nothing left',
+  );
   assert.equal(fresh.destroyed, false, "the new device's resources stay");
+});
+
+test('resources waiting for a multi-view frame are released when the device is lost', async () => {
+  const old = lostDevice(),
+    { device } = old.gpu,
+    waiting = device.createBuffer({ size: 16 });
+  currentFrame(device, left);
+  currentFrame(device, right);
+  retire(device, waiting);
+  assert.equal(waiting.destroyed, false, 'still referenced by the open two-view frame');
+  old.lose({ reason: 'destroyed' });
+  await device.lost;
+  assert.equal(waiting.destroyed, true);
 });
 
 test('one view drawing several times in a frame writes its own buffer, as a plain writeBuffer would', () => {
