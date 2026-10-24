@@ -11,6 +11,7 @@ import { meshTriangles } from '../../shared/mesh-source.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 import { engineProxies, isModel, type ModelLike, type ModelPrimitiveLike, type PickProxy } from '../../shared/model.js';
 import { isOrthographic, transformPointChecked } from '@margoengine/math/mat4';
+import { ownLayers as maskOf } from '../../shared/view-rect.js';
 
 // Structural views of the engine internals that `engineRuntime(engine)` exposes. Types only: this module never
 // imports core at runtime, so it stays usable from workers and Node.
@@ -67,22 +68,16 @@ export async function computeGeometryBVHAsync(
   return bvh;
 }
 
-const layerMasks = new WeakMap<object, number>();
 /**
- * Layer bit mask of a mesh (default 1). A Raycaster only tests meshes whose mask shares a bit with `raycaster.layers`.
- * Model primitives use their node's mask, else the mask of `model.root`.
+ * @internal The layer mask a Raycaster tests: the mask set on the mesh itself with `setRenderLayers`
+ * (@margoengine/cameras/layers, the one mask registry), default 1. Model primitives use their node's, else
+ * `model.root`'s ({@link modelMeshLayers}).
  */
-export function setMeshLayers(mesh: Mesh, mask: number): void {
-  if (!Number.isInteger(mask) || mask < 0 || mask > 0xffffffff)
-    throw new RangeError('Layer mask must be a 32-bit unsigned integer');
-  layerMasks.set(mesh, mask >>> 0);
-}
-/** Layer bit mask of a mesh set with setMeshLayers (default 1). */
-export const getMeshLayers = (mesh: Mesh): number => layerMasks.get(mesh) ?? 1;
+export const getMeshLayers = (mesh: Mesh): number => maskOf(mesh) ?? 1;
 
 /** @internal Captured model masks follow the same node/root inheritance as live queries. */
 export function modelMeshLayers(mesh: Mesh, root: Mesh): number {
-  return layerMasks.get(mesh) ?? layerMasks.get(root) ?? 1;
+  return maskOf(mesh) ?? maskOf(root) ?? 1;
 }
 
 // gltf-pro's structural model shapes (active GPU deformation requires async intersectModel); `intersectEngine` finds
@@ -273,7 +268,7 @@ export class Raycaster {
   side: RaycasterSide = 'material';
   /** Return only the nearest hit. Much faster with many overlapping meshes. */
   firstHitOnly = false;
-  /** Bit mask tested against `getMeshLayers(mesh)`. Default: every layer. */
+  /** Bit mask tested against each mesh's render layers (`setRenderLayers`, @margoengine/cameras/layers). Default: every layer. */
   layers = 0xffffffff;
   /** Extra per-mesh predicate (for a model primitive: its node and model). Return false to skip it. */
   filter: ((mesh: Mesh, model?: ModelLike) => boolean) | null = null;
@@ -549,13 +544,13 @@ export class Raycaster {
     for (const model of models) {
       if (model.disposed) continue;
       const primitives = model.primitives,
-        rootMask = layerMasks.get(model.root);
+        rootMask = maskOf(model.root);
       for (let index = 0; index < primitives.length; index++) {
         const primitive = primitives[index],
           node = primitive.node as unknown as RuntimeMesh,
           instances = primitive.instances;
         if (deformedNode(primitive.node)) {
-          if (this.usable(runtime, node, layerMasks.get(node) ?? rootMask ?? 1, model)) throw deformedError();
+          if (this.usable(runtime, node, maskOf(node) ?? rootMask ?? 1, model)) throw deformedError();
           continue;
         }
         // Per ray, not per model: a rewritten primitive (new vertex or index array) gets a fresh sphere.
@@ -565,7 +560,7 @@ export class Raycaster {
           if (
             !instances.count ||
             runtime.meshes.get(node.id) !== node ||
-            !this.usable(runtime, node, layerMasks.get(node) ?? rootMask ?? 1, model)
+            !this.usable(runtime, node, maskOf(node) ?? rootMask ?? 1, model)
           )
             continue;
           const world = store.matrices.subarray(node.id * 16, node.id * 16 + 16);
@@ -586,7 +581,7 @@ export class Raycaster {
           continue;
         }
         const entry = this.entry(store.matrices, node.id * 16, sphere);
-        if (entry >= 0 && this.usable(runtime, node, layerMasks.get(node) ?? rootMask ?? 1, model))
+        if (entry >= 0 && this.usable(runtime, node, maskOf(node) ?? rootMask ?? 1, model))
           candidates.push({ node, entry, model, primitive, index });
       }
     }
@@ -611,9 +606,7 @@ export class Raycaster {
       // The filter of a later candidate may have disposed, hidden or re-layered this one.
       if (
         !this.live(runtime, node, model) ||
-        !(
-          (layerMasks.get(node) ?? (ownLayers || !model ? undefined : layerMasks.get(model.root)) ?? 1) & this.layers
-        ) ||
+        !((maskOf(node) ?? (ownLayers || !model ? undefined : maskOf(model.root)) ?? 1) & this.layers) ||
         (primitive && model?.primitives[index] !== primitive)
       )
         continue;

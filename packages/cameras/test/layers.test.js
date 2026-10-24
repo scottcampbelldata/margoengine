@@ -105,7 +105,7 @@ test('masks: layerMask builds bits, meshes default to layer 0 and children inher
   setCameraLayers(e.camera, ALL_LAYERS);
   assert.equal(getCameraLayers(e.camera), ALL_LAYERS);
   useLayerSource((mesh) => (mesh === other ? 8 : 1));
-  assert.equal(getRenderLayers(other), 8, 'a source such as bvh getMeshLayers replaces the registry');
+  assert.equal(getRenderLayers(other), 8, 'a layer source replaces the registry');
   useLayerSource(null);
   assert.throws(() => useLayerSource(5), TypeError);
 });

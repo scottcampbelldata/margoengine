@@ -3,7 +3,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore, box } from '../../core/dist/extension.js';
-import { Raycaster, setMeshLayers, engineProxies } from '../dist/index.js';
+import { Raycaster, engineProxies } from '../dist/index.js';
+import { setRenderLayers } from '../../cameras/dist/layers.js';
 
 async function world() {
   const engine = new Engine(
@@ -81,7 +82,7 @@ test('proxies follow visibility, layers, filters, liveness, object lists and nea
   parent.visible = false;
   assert.ok(!raycaster.intersectEngine(engine).some((h) => h.approximate), 'hidden parent');
   parent.visible = true;
-  setMeshLayers(anchor, 2);
+  setRenderLayers(anchor, 2);
   raycaster.layers = 1;
   assert.ok(!raycaster.intersectEngine(engine).some((h) => h.approximate), 'anchor layers');
   raycaster.layers = 0xffffffff;
@@ -97,8 +98,8 @@ test('proxies follow visibility, layers, filters, liveness, object lists and nea
   list[0] = { anchor, sphere: [0, 0, 0, 1], model };
   const [byModel] = raycaster.intersectObjects(engine, [model]);
   assert.ok(byModel.approximate && byModel.model === model, 'the LOD model selects its proxy');
-  setMeshLayers(anchor, 1);
-  setMeshLayers(model.root, 2);
+  setRenderLayers(anchor, 1);
+  setRenderLayers(model.root, 2);
   raycaster.layers = 1;
   assert.ok(
     raycaster.intersectEngine(engine).some((h) => h.approximate),

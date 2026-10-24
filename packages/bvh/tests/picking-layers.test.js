@@ -6,10 +6,9 @@ const { parseGLTFAsync } = await import(
   process.env.MARGO_SOURCE_TEST ? '../../gltf-pro/src/index.ts' : '../../gltf-pro/dist/index.js'
 );
 import { exportGLB } from '../../exporters/dist/index.js';
-const { Raycaster, setMeshLayers } = await import(
-  process.env.MARGO_SOURCE_TEST ? '../src/index.ts' : '../dist/index.js'
-);
+const { Raycaster } = await import(process.env.MARGO_SOURCE_TEST ? '../src/index.ts' : '../dist/index.js');
 import { mockGPU } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
+import { setRenderLayers } from '../../cameras/dist/layers.js';
 const ix = { helper: 1 };
 const scene = () => ({
   nodes: [
@@ -62,7 +61,7 @@ test('direct PBR node queries keep their own default layer independently of the 
       node = model.nodes[ix.helper],
       r = ray();
     r.layers = 1;
-    setMeshLayers(model.root, 2);
+    setRenderLayers(model.root, 2);
     const hits = r.intersectObjects(engine, [node]);
     assert.equal(hits.length, 1);
     assert.equal(hits[0].mesh, node);
@@ -75,7 +74,7 @@ test('direct PBR node candidates recheck their live own layer after the filter',
       r = ray();
     r.layers = 1;
     r.filter = () => {
-      setMeshLayers(node, 2);
+      setRenderLayers(node, 2);
       return true;
     };
     assert.deepEqual(r.intersectObjects(engine, [node]), []);
@@ -87,7 +86,7 @@ test('a direct PBR node filter changing the root layer does not change its layer
       r = ray();
     r.layers = 1;
     r.filter = () => {
-      setMeshLayers(model.root, 2);
+      setRenderLayers(model.root, 2);
       return true;
     };
     const hits = r.intersectObjects(engine, [node]);

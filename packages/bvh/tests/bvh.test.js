@@ -13,7 +13,6 @@ import {
   frustumPlanes,
   getGeometryBVH,
   setGeometryBVH,
-  setMeshLayers,
   CONTAINED,
   INTERSECTED,
   NOT_INTERSECTED,
@@ -33,6 +32,7 @@ import {
   rng,
   soup,
 } from './reference.js';
+import { setRenderLayers } from '../../cameras/dist/layers.js';
 
 const fixture = (name) => parseObj(readFileSync(fileURLToPath(new URL(`fixtures/${name}`, import.meta.url)), 'utf8'));
 const close = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps * Math.max(1, Math.abs(a), Math.abs(b));
@@ -683,7 +683,7 @@ test('Raycaster: world-space hits match brute force over transformed meshes, wit
   assert.equal(raycaster.intersectEngine(engine).filter((h) => h.mesh === target.mesh).length, 0, 'hidden ancestor');
   engine.store.hidden[transforms[5].mesh.id] = 0;
   engine.store.parents[target.mesh.id] = -1;
-  setMeshLayers(target.mesh, 0b10);
+  setRenderLayers(target.mesh, 0b10);
   raycaster.layers = 0b01;
   assert.equal(raycaster.intersectEngine(engine).filter((h) => h.mesh === target.mesh).length, 0, 'layers');
   raycaster.layers = 0b11;

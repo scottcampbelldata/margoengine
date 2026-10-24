@@ -26,8 +26,6 @@ export {
   setGeometryBVH,
   hasGeometryBVH,
   computeGeometryBVHAsync,
-  setMeshLayers,
-  getMeshLayers,
 } from './raycaster.js';
 export type {
   RaycasterHit,

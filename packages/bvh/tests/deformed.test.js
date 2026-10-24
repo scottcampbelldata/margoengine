@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MeshBVH, Raycaster, setMeshLayers } from '../dist/index.js';
+import { MeshBVH, Raycaster } from '../dist/index.js';
+import { setRenderLayers } from '../../cameras/dist/layers.js';
 
 const identity = () => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 const close = (actual, expected, epsilon = 1e-6) =>
@@ -228,7 +229,7 @@ test('intersectModel respects current hidden ancestors, layer masks and filters 
     assert.deepEqual(await ray.intersectModel(f.source), []);
     f.store.hidden[hidden] = 0;
   }
-  setMeshLayers(f.node, 2);
+  setRenderLayers(f.node, 2);
   ray.layers = 1;
   assert.deepEqual(await ray.intersectModel(f.source), []);
   ray.layers = 3;

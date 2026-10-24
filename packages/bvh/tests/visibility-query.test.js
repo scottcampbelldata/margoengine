@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore, box } from '../../core/dist/extension.js';
 import { CameraProjection } from '../../cameras/dist/index.js';
-import { Raycaster, RaycastSnapshot, RaycastProjection, setMeshLayers } from '../dist/index.js';
+import { Raycaster, RaycastSnapshot, RaycastProjection } from '../dist/index.js';
 import { setMeshSource } from '../../shared/mesh-source.js';
+import { setRenderLayers } from '../../cameras/dist/layers.js';
 
 async function world(backend = 'webgl2') {
   return new Engine(
@@ -166,8 +167,8 @@ test('depth-only proxy results and masked/filter candidates retain rich-query li
     anchor = engine.createMesh().setPosition([0, 0, -1]),
     core = engine.createMesh().setGeometry(box());
   engine.use({ name: 'visibility-proxy', setup() {}, pickProxies: () => [{ anchor, sphere: [0, 0, 0, 1] }] });
-  setMeshLayers(core, 2);
-  setMeshLayers(anchor, 4);
+  setRenderLayers(core, 2);
+  setRenderLayers(anchor, 4);
   const s = RaycastSnapshot.capture(engine, [core, anchor]);
   try {
     for (const mask of [0, 2, 4, 6, 0xffffffff]) {

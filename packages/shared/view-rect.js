@@ -40,6 +40,11 @@ export function meshLayers(mesh) {
   return layerRegistry()?.maskOf(mesh) ?? 1;
 }
 
+/** The mask set on `mesh` itself with `setRenderLayers` (no inheritance, no layer source), or undefined. */
+export function ownLayers(mesh) {
+  return layerRegistry()?.masks.get(mesh);
+}
+
 /** Checks a 32-bit layer mask; `subject` names it in the message. */
 export function checkLayers(mask, subject) {
   if (!Number.isInteger(mask) || mask < 0 || mask > 0xffffffff)

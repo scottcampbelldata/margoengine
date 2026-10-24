@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore, box } from '../../core/dist/extension.js';
 import { CameraProjection } from '../../cameras/dist/index.js';
-import { Raycaster, RaycastSnapshot, setMeshLayers } from '../dist/index.js';
+import { Raycaster, RaycastSnapshot } from '../dist/index.js';
 import { setMeshSource } from '../../shared/mesh-source.js';
+import { setRenderLayers } from '../../cameras/dist/layers.js';
 
 async function world(backend = 'webgl2') {
   return new Engine(
@@ -130,7 +131,7 @@ test('captured geometry, indices, transforms, material masks and returned hits d
     source.indices.fill(0);
     mesh.setPosition([30, 0, 0]);
     mesh.visible = false;
-    setMeshLayers(mesh, 8);
+    setRenderLayers(mesh, 8);
     engine.store.tick(false);
     same(snapshot.intersect(ray), original);
     const damaged = snapshot.intersect(ray);
@@ -147,7 +148,7 @@ test('captured layer masks and visibility are refreshed by recapture, never by h
   const engine = await world(),
     mesh = engine.createMesh().setGeometry(geometry()),
     ray = query();
-  setMeshLayers(mesh, 2);
+  setRenderLayers(mesh, 2);
   const snapshot = RaycastSnapshot.capture(engine, [mesh]);
   try {
     ray.layers = 1;
@@ -247,7 +248,7 @@ test('PBR UVs, normal/side/winding fields and root-mask inheritance match live q
     ray = query();
   f.root.setScale([-2, 1.5, 0.75]);
   f.node.setRotation([0.1, 0.2, 0.3]);
-  setMeshLayers(f.root, 8);
+  setRenderLayers(f.root, 8);
   ray.layers = 8;
   try {
     for (const given of [[f.model], [f.node], [f.node, f.model]])

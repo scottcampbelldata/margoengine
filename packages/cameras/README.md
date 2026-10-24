@@ -113,9 +113,10 @@ mirror.layers = layerMask(0);                     // Reflector, Refractor and Cu
 
 - **Masks**: `setRenderLayers(mesh, mask)` / `getRenderLayers(mesh)`; a mesh without its own mask takes its nearest
   ancestor's, else 1. `layerMask(...layers)` builds a mask from layer indices 0-31; `ALL_LAYERS` is every bit.
-  `useLayerSource(getMeshLayers)` (from `@margoengine/bvh`) makes drawing read the masks raycasts use, so one
-  `setMeshLayers` call filters both; `useLayerSource(null)` goes back. The masks live in one registry on `globalThis`,
-  shared by every copy of this module and read by core and `@margoengine/environment`'s captures.
+  `@margoengine/bvh` raycasts read the same masks (a mesh's own; a model primitive's node, else its root), so one
+  `setRenderLayers` call filters both. `useLayerSource(fn)` makes drawing read masks from `fn` instead;
+  `useLayerSource(null)` goes back. The masks live in one registry on `globalThis`, shared by every copy of this
+  module and read by core and `@margoengine/environment`'s captures.
 - **Cameras and views**: `setCameraLayers(camera, mask)` / `getCameraLayers(camera)` (default every layer). The engine
   frame, `engine.render({camera})` and every view through that camera use its mask; a view's own `layers` wins.
 - **Scenes**: to show one set of meshes at a time, put each set on its own layer and switch the camera's mask (or the

@@ -6,18 +6,11 @@ import { Engine, TransformStore, box } from '../../core/dist/extension.js';
 import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
 import { CameraProjection } from '../../cameras/dist/index.js';
 import { Material, createMesh } from '../../materials/dist/index.js';
-import {
-  Raycaster,
-  getPrimitiveBVH,
-  hasPrimitiveBVH,
-  setMeshLayers,
-  engineModels,
-  worldTriangles,
-  MeshBVH,
-} from '../dist/index.js';
+import { Raycaster, getPrimitiveBVH, hasPrimitiveBVH, engineModels, worldTriangles, MeshBVH } from '../dist/index.js';
 import { rayTriangle } from '../dist/math.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 import { rng } from './reference.js';
+import { setRenderLayers } from '../../cameras/dist/layers.js';
 
 const asset = (name) => readFileSync(new URL(`../../../examples/assets/${name}`, import.meta.url));
 export function readGLB(bytes) {
@@ -213,11 +206,11 @@ test('model hits report UV, front faces, materials sides, mirrored nodes, layers
   }
   raycaster.set([0.5, 0.2, 5], [0, 0, -1]);
   raycaster.layers = 1;
-  setMeshLayers(model.root, 2);
+  setRenderLayers(model.root, 2);
   assert.equal(raycaster.intersectEngine(engine).length, 0, 'root layer');
-  setMeshLayers(model.nodes[1], 1);
+  setRenderLayers(model.nodes[1], 1);
   assert.equal(raycaster.intersectEngine(engine).length, 1, 'node layer wins');
-  setMeshLayers(model.nodes[1], 2);
+  setRenderLayers(model.nodes[1], 2);
   raycaster.layers = 2;
   assert.equal(raycaster.intersectEngine(engine).length, 1);
   raycaster.layers = 0xffffffff;

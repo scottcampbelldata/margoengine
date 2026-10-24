@@ -50,28 +50,30 @@ export function layerMask(...layers: number[]): number {
 }
 
 /**
- * Sets the render layer mask of `mesh` (32-bit, default 1 = layer 0). Its descendants without a mask of their own
- * follow it, so `setRenderLayers(model.root, mask)` layers a whole model.
+ * Sets the layer mask of `mesh` (32-bit, default 1 = layer 0), the one mask drawing and @margoengine/bvh raycasts read.
+ * For drawing, its descendants without a mask of their own follow it, so `setRenderLayers(model.root, mask)` layers a
+ * whole model; a Raycaster tests a mesh's own mask (a model primitive: its node's, else `model.root`'s).
  * @throws RangeError for a mask that is not an integer from 0 to 0xffffffff.
  */
 export function setRenderLayers(mesh: Mesh, mask: number): void {
   registry.masks.set(mesh, checkLayers(mask, 'Render layer mask'));
   registry.used = true;
-  // Engine views cache their instance lists: collect again on the next draw.
-  (mesh as RuntimeMesh).engine.collected = -1;
+  // Engine views cache their instance lists: collect again on the next draw. A structural mesh (a raycast-only
+  // object in a tool or test) has no engine.
+  const engine = (mesh as Partial<RuntimeMesh>).engine;
+  if (engine) engine.collected = -1;
 }
 /** Render layer mask of `mesh`: its own, else its nearest ancestor's, else 1; or the `useLayerSource` reader's value. */
 export function getRenderLayers(mesh: Mesh): number {
   return registry.maskOf(mesh);
 }
 /**
- * Reads every mesh mask through `source` instead of `setRenderLayers`, or restores the default with null. Pass
- * `getMeshLayers` from @margoengine/bvh so raycasts and drawing share one set of masks.
+ * Reads every mesh mask for drawing through `source` instead of `setRenderLayers`, or restores the default with null.
  * @throws TypeError when `source` is neither a function nor null.
  */
 export function useLayerSource(source: ((mesh: Mesh) => number) | null): void {
   if (source !== null && typeof source !== 'function')
-    throw new TypeError('Layer source must be a function (mesh) => mask or null; pass getMeshLayers or null');
+    throw new TypeError('Layer source must be a function (mesh) => mask or null; pass such a function or null');
   registry.source = source;
 }
 /**
