@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test tests/text.test.js",
+    "test": "npm run build && node --test tests/text.test.js tests/sdf.test.js tests/compose.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "prepack": "npm run build"
   },

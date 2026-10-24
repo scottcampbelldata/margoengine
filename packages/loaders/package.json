@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test tests/loaders.test.js tests/lzf.test.js tests/dxf.test.js tests/obj.test.js tests/dae.test.js tests/tmx.test.js tests/font.test.js tests/svg.test.js tests/mtl.test.js",
+    "test": "npm run build && node --test tests/loaders.test.js tests/lzf.test.js tests/dxf.test.js tests/obj.test.js tests/dae.test.js tests/tmx.test.js tests/font.test.js tests/svg.test.js tests/mtl.test.js tests/mtl-vectors.test.js tests/outline-font.test.js tests/svg-vectors.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "test:render:browser": "npm run build && node scripts/test-render-browser.mjs",
     "fixtures": "node scripts/fetch-fixtures.js",
