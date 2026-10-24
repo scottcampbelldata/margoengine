@@ -159,7 +159,7 @@
   "character-animation-high": {
    "url": "demos/character-animation.html?quality=high",
    "size": "640x360",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -171,12 +171,12 @@
     "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 155.0.4283.60",
+    "browser": "msedge 155.0.4283.62",
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-18T09:23:53.336Z",
-    "commit": "121a67a689a34006125784c32c2cc07e56c2f600",
+    "date": "2026-10-24T07:34:49.792Z",
+    "commit": "eef3132feef0099946eba90d744c578470873478",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -185,7 +185,7 @@
   "character-animation-light": {
    "url": "demos/character-animation.html?quality=low",
    "size": "640x360",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -197,12 +197,12 @@
     "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 155.0.4283.60",
+    "browser": "msedge 155.0.4283.62",
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-18T09:23:53.336Z",
-    "commit": "121a67a689a34006125784c32c2cc07e56c2f600",
+    "date": "2026-10-24T07:34:49.792Z",
+    "commit": "eef3132feef0099946eba90d744c578470873478",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -211,7 +211,7 @@
   "character-animation-phone": {
    "url": "demos/character-animation.html",
    "size": "195x422",
-   "runs": 4,
+   "runs": 3,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -223,12 +223,12 @@
     "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 155.0.4283.60",
+    "browser": "msedge 155.0.4283.62",
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-18T09:23:53.336Z",
-    "commit": "121a67a689a34006125784c32c2cc07e56c2f600",
+    "date": "2026-10-24T07:34:49.792Z",
+    "commit": "eef3132feef0099946eba90d744c578470873478",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -1619,8 +1619,8 @@
   "gpu": "nvidia ampere",
   "acPowerBefore": true,
   "acPowerAfter": true,
-  "date": "2026-10-19T12:36:35.938Z",
-  "commit": "c22e1ff584b6199cc68bb4fca7b0448d4e15fe93",
+  "date": "2026-10-24T07:34:49.792Z",
+  "commit": "eef3132feef0099946eba90d744c578470873478",
   "packagesDirty": false,
   "renderedInputsDirty": false,
   "renderedInputChanges": []
