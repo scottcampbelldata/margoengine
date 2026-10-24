@@ -167,6 +167,24 @@ test('overlay root sits after the canvas, covers it and passes pointer events th
   assert.equal(root.style.height, '400px');
 });
 
+test('a view places the overlay in its rectangle and projects labels through its camera', () => {
+  const camera = new Camera({ position: [0, 0, 5], target: [0, 0, 0] });
+  const { engine, renderer, document } = setup({ renderer: { view: { camera, viewport: [0.5, 0, 0.5, 1] } } });
+  camera.update(1, true);
+  const label = renderer.add(document.createElement('div'), { position: [1, 0.5, 0] });
+  engine.frame();
+  const root = renderer.root,
+    canvas = engine.canvas.getBoundingClientRect();
+  assert.deepEqual(root.getBoundingClientRect(), { left: canvas.left + 400, top: canvas.top });
+  assert.deepEqual([root.style.width, root.style.height], ['400px', '400px']);
+  const expected = projectPoint(camera.matrix, 1, 0.5, 0, 400, 400),
+    [x, y] = translate(label.element);
+  assert.ok(close(x, expected.x, 0.01) && close(y, expected.y, 0.01), 'label relative to the view corner');
+  renderer.view = { camera, viewport: [0, 0, 100, 100], pixels: true };
+  engine.frame();
+  assert.equal(root.style.width, `${(100 * 800) / engine.canvas.width}px`, 'pixels scale to CSS');
+});
+
 test('a mesh label sits on the projected mesh center, follows it, hides behind the camera and when hidden', () => {
   const { engine, renderer, document } = setup();
   const mesh = engine.createMesh([1, 0.5, 0]);

@@ -11,6 +11,7 @@ import { sceneSamples } from '../../shared/quality.js';
 import { fullscreen } from '../../shared/gpu.js';
 import { afterPresented as presented, submitPrincipalScene as submit } from '../../shared/demo-frame.js';
 import { margoError } from '../../shared/errors.js';
+import { applyView } from '../../shared/view-rect.js';
 /**
  * Resolves once the queue's submitted work is done and the browser has had a presentation opportunity (two animation
  * frames later): use it before revealing a scene. Rejects with `signal.reason` when aborted, or with the queue's error.
@@ -214,6 +215,7 @@ export class SceneFade implements EnginePlugin {
     const pass = c.encoder.beginRenderPass({ colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }] });
     pass.setPipeline(this.pipeline);
     pass.setBindGroup(0, this.group!);
+    applyView(pass, c);
     pass.draw(3);
     pass.end();
   }

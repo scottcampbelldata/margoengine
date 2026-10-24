@@ -139,7 +139,7 @@ test('SSAO occludes the ambient light a plugin names margoAmbient (environment I
   );
 });
 
-test('SSAO retains frame upload arrays, updates radius and restores owned resources', () => {
+test('SSAO retains frame upload arrays, updates radius and restores owned resources', async () => {
   const h = optionalGPU(),
     effect = new SSAO(),
     writes = new Map(),
@@ -200,9 +200,11 @@ test('SSAO retains frame upload arrays, updates radius and restores owned resour
     h.context.width = 64;
     frame();
     assert.equal(effect.depthTexture.width, 64);
+    await null; // released resources are destroyed at the end of the task
     assert.ok(depth.destroyed);
     effect.onDeviceRestored(h.engine);
     frame();
+    await null; // released resources are destroyed at the end of the task
     const restored = h.resources.filter((resource) => !resource.destroyed && resource.size === 16);
     assert.deepEqual(
       restored.map((buffer) => Array.from(writes.get(buffer))),
@@ -214,5 +216,6 @@ test('SSAO retains frame upload arrays, updates radius and restores owned resour
   } finally {
     effect.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(h.resources.every((resource) => resource.destroyed));
 });

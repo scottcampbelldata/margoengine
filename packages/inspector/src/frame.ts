@@ -121,6 +121,12 @@ export interface FramePassReport {
   /** Plugin that registered the pass; `core` for the main pass, `engine` for work outside the graph, `app` for unowned passes. */
   owner: string;
   order: number | null;
+  /**
+   * The engine view it ran for (`RenderView.id`, its rectangle in drawing-buffer pixels, its scene's name); absent for a
+   * plain full-canvas frame. A frame of several views lists every pass once per view. Passes of scenes created after
+   * the capture started are not listed; start a new capture to include them.
+   */
+  view?: { id: string; viewport: readonly [number, number, number, number]; scene: string };
   cpuMilliseconds: number;
   gpuMilliseconds: number | null;
   passes: GPUPassReport[];
@@ -239,6 +245,7 @@ interface RawGraphPass {
   name: string;
   owner: string;
   order: number | null;
+  view?: FramePassReport['view'];
   cpu: number;
   passes: RawPass[];
 }
@@ -750,55 +757,61 @@ export class FrameDebugger implements EnginePlugin {
   private instrument(session: Session, engine: Engine, device: GPUDevice): void {
     const self = this,
       keep = <T>(target: T, unpatch: Unpatch<T>): void => hold(session.unpatch, target, unpatch);
-    const graph = engine.frameGraph;
-    keep(
-      graph,
-      patch(
+    // Every scene's graph at the start of the capture (a scene created later is not instrumented): a frame of views
+    // runs each view's scene graph once per view.
+    for (const scene of engine.scenes) {
+      const graph = scene.frameGraph;
+      keep(
         graph,
-        'execute',
-        (original) =>
-          function (this: FrameGraph, context: PassContext): void {
-            if (!session.live) return original.call(this, context);
-            if (context.backend === 'webgpu') session.main = context.encoder;
-            const restores: Array<() => void> = [];
-            for (const record of graphPasses(this)) {
-              const entry: RawGraphPass = {
-                name: record.name,
-                owner: record.owner ?? (record.name === 'main' ? 'core' : 'app'),
-                order: record.order,
-                cpu: 0,
-                passes: [],
-              };
-              session.graph.push(entry);
-              hold(
-                restores,
-                record,
-                patch(
+        patch(
+          graph,
+          'execute',
+          (original) =>
+            function (this: FrameGraph, context: PassContext): void {
+              if (!session.live) return original.call(this, context);
+              if (context.backend === 'webgpu') session.main = context.encoder;
+              const restores: Array<() => void> = [],
+                view = context.view && { id: context.view.id, viewport: context.view.viewport, scene: scene.name };
+              for (const record of graphPasses(this)) {
+                const entry: RawGraphPass = {
+                  name: record.name,
+                  owner: record.owner ?? (record.name === 'main' ? 'core' : 'app'),
+                  order: record.order,
+                  ...(view && { view }),
+                  cpu: 0,
+                  passes: [],
+                };
+                session.graph.push(entry);
+                hold(
+                  restores,
                   record,
-                  'execute',
-                  (run) =>
-                    function (this: GraphRecord, pass: PassContext): void {
-                      session.current = entry;
-                      const start = performance.now();
-                      try {
-                        run.call(this, pass);
-                      } finally {
-                        entry.cpu += performance.now() - start;
-                        session.current = session.after;
-                      }
-                    },
-                ),
-              );
-            }
-            try {
-              original.call(this, context);
-            } finally {
-              for (const restore of restores) restore();
-              session.current = session.after;
-            }
-          },
-      ),
-    );
+                  patch(
+                    record,
+                    'execute',
+                    (run) =>
+                      function (this: GraphRecord, pass: PassContext): void {
+                        session.current = entry;
+                        const start = performance.now();
+                        try {
+                          run.call(this, pass);
+                        } finally {
+                          entry.cpu += performance.now() - start;
+                          session.current = session.after;
+                        }
+                      },
+                  ),
+                );
+              }
+              try {
+                original.call(this, context);
+              } finally {
+                for (const restore of restores) restore();
+                session.current = session.after;
+              }
+            },
+        ),
+      );
+    }
     keep(
       device,
       patch(
@@ -1368,6 +1381,7 @@ export class FrameDebugger implements EnginePlugin {
         return {
           name: entry.name,
           owner: entry.owner,
+          ...(entry.view && { view: entry.view }),
           order: entry.order,
           cpuMilliseconds: entry.cpu,
           gpuMilliseconds: timed.length ? timed.reduce((sum, pass) => sum + (pass.gpuMilliseconds ?? 0), 0) : null,

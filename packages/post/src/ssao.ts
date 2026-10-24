@@ -16,6 +16,8 @@ import { orthographic } from '../../shared/projection.js';
 import { fullscreen, render, group as bind } from '../../shared/gpu.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { extractShader, ssaoShader, blurShader, compositeShader } from './shaders.js';
+import { applyView, viewLoadOp } from '../../shared/view-rect.js';
+import { currentFrame, retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
 const linearComposite = compositeShader.replace('return vec4f(toDisplay(c),s.a);', 'return vec4f(c,s.a);');
 // The display transform must be gone, or an HDR stage would hand the next effect display-encoded colour.
 if (linearComposite.includes('vec4f(toDisplay(c)'))
@@ -93,6 +95,9 @@ export class SSAO implements EnginePlugin {
   private textures: GPUTexture[] = [];
   private directions: GPUBuffer[] = [];
   private groups: GPUBindGroup[] = [];
+  /** Extract and occlusion groups per uniform binding: a second view of a frame binds its own uniform slice. */
+  private viewGroups?: { get(copy?: GPUBufferBinding): GPUBindGroup[] };
+  private slice?: GPUBufferBinding;
   private width = 0;
   private height = 0;
   private original?: GPUTextureView;
@@ -316,7 +321,7 @@ export class SSAO implements EnginePlugin {
         v[51] = +this.enabled;
         v[52] = c.width;
         v[53] = c.height;
-        c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
+        this.slice = writeUniform(c.device, this.uniform!, this.values as Float32Array<ArrayBuffer>, c.view ?? c);
         for (let i = 0; i < 2; i++) {
           this.directionValues[i][2] = this.options.radius ?? 0.5;
           c.device.queue.writeBuffer(this.directions[i], 0, this.directionValues[i]);
@@ -340,7 +345,7 @@ export class SSAO implements EnginePlugin {
       name: 'ssao:occlusion',
       order: 11,
       execute: (c) => {
-        if (c.backend === 'webgpu') this.dispatch(c, this.occlusion!, this.groups[1]);
+        if (c.backend === 'webgpu') this.dispatch(c, this.occlusion!, this.viewGroups!.get(this.slice)[1]);
       },
     });
     graph.add({
@@ -369,9 +374,11 @@ export class SSAO implements EnginePlugin {
   }
   private present(c: PostPassContext, view: GPUTextureView): void {
     this.compositeAttachment.view = view;
+    this.compositeAttachment.loadOp = viewLoadOp(c, 'clear');
     const pass = c.encoder.beginRenderPass(this.compositePass);
     pass.setPipeline(this.composite!);
     pass.setBindGroup(0, this.groups[4]);
+    applyView(pass, c);
     pass.draw(3);
     pass.end();
   }
@@ -392,6 +399,8 @@ export class SSAO implements EnginePlugin {
     this.present(c, output.view);
   }
   private resize(c: PostPassContext): void {
+    // This view draws in the frame: what it releases waits while another view's commands still need it.
+    currentFrame(c.device, c.view ?? c);
     const host = this.host;
     if (
       this.width === c.width &&
@@ -404,7 +413,7 @@ export class SSAO implements EnginePlugin {
     )
       return;
     if (!host) this.captureTarget?.dispose();
-    for (const t of this.textures) t.destroy();
+    for (const t of this.textures) retire(this.device!, t);
     this.textures = [];
     this.width = c.width;
     this.height = c.height;
@@ -478,16 +487,20 @@ export class SSAO implements EnginePlugin {
         multisample: c.descriptor.multisample,
       });
     }
-    this.groups = [
-      group(this.extract!, [{ buffer: this.uniform! }, depthOnly, this.gbuffer]),
+    let noise: GPUTextureView | undefined;
+    this.viewGroups = uniformGroups(this.uniform!, (uniform) => [
+      group(this.extract!, [uniform, depthOnly, this.gbuffer!]),
       group(this.occlusion!, [
-        { buffer: this.uniform! },
+        uniform,
         depthOnly,
-        this.gbuffer,
-        this.noise!.createView(),
+        this.gbuffer!,
+        (noise ??= this.noise!.createView()),
         { buffer: this.samples! },
         raw,
       ]),
+    ]);
+    this.groups = [
+      ...this.viewGroups.get(),
       group(this.blur!, [raw, this.gbuffer, x, { buffer: this.directions[0] }]),
       group(this.blur!, [x, this.gbuffer, y, { buffer: this.directions[1] }]),
     ];
@@ -527,7 +540,7 @@ export class SSAO implements EnginePlugin {
   }
   private extractScene(c: PostPassContext): void {
     this.captureTarget!.resolve(c.encoder);
-    this.dispatch(c, this.extract!, this.groups[0]);
+    this.dispatch(c, this.extract!, this.viewGroups!.get(this.slice)[0]);
     const gbuffer = this.replayViews[0] ?? this.gbuffer!,
       ambient = this.replayViews[1] ?? this.ambient!;
     // Replays must test the same coverage samples as the scene; their sampled outputs stay 1x.
@@ -545,6 +558,7 @@ export class SSAO implements EnginePlugin {
       this.geometryDepth.stencilStoreOp = stencil ? 'store' : undefined;
       const pass = c.encoder.beginRenderPass(this.geometryPass);
       try {
+        applyView(pass, c);
         for (const source of this.sources)
           source.draw(c, 'occlusion', gbuffer, c.depth, 'all', {
             pass,
@@ -622,11 +636,11 @@ export class SSAO implements EnginePlugin {
     this.captureTarget = undefined;
     this.ao = this.input = undefined;
     this.key = '';
-    for (const t of this.textures) t.destroy();
-    for (const b of this.directions) b.destroy();
-    this.uniform?.destroy();
-    this.samples?.destroy();
-    this.noise?.destroy();
+    for (const t of this.textures) retire(this.device!, t);
+    for (const b of this.directions) retire(this.device!, b);
+    retire(this.device!, this.uniform);
+    retire(this.device!, this.samples);
+    retire(this.device!, this.noise);
     this.textures = [];
     this.directions = [];
     this.groups = [];

@@ -12,6 +12,7 @@ import { margoError } from '../../shared/errors.js';
 import { MargoError } from '@margoengine/math/errors';
 import { clipmapGrid } from './grid.js';
 import { terrainVertex, terrainFragment } from './shader.js';
+import { applyView } from '../../shared/view-rect.js';
 export { clipmapGrid } from './grid.js';
 export { TerrainColors, type TerrainColorOptions } from './colors.js';
 export { heightfieldGeometry, TerrainHeightmap, type HeightField, type HeightfieldOptions } from './heightfield.js';
@@ -448,6 +449,7 @@ export class Terrain implements EnginePlugin {
           : {}),
       },
     });
+    applyView(pass, c);
     pass.setPipeline(pipeline);
     if (entries.length) pass.setBindGroup(1, this.lightingGroup(c.device, pipeline, entries));
     pass.setVertexBuffer(0, this.vertex!);

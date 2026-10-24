@@ -113,9 +113,9 @@ test('disabled debug rendering skips the frame mesh scan and resumes it for live
     mesh = engine.createMesh().setGeometry(box());
   // Exercise the sync pass without a native device; the Lines draw pass remains inactive.
   Object.defineProperty(engine, 'backend', { value: 'webgpu', configurable: true });
-  const original = engine.meshes.values;
+  const original = engine.scene.meshes.values;
   let scans = 0;
-  t.mock.method(engine.meshes, 'values', function () {
+  t.mock.method(engine.scene.meshes, 'values', function () {
     scans++;
     return original.call(this);
   });
@@ -133,6 +133,37 @@ test('disabled debug rendering skips the frame mesh scan and resumes it for live
   const afterCleanup = scans;
   for (let i = 0; i < 120; i++) frame();
   assert.equal(scans, afterCleanup, 'disposed debug helpers must release the steady-frame scan');
+});
+
+test('debug helpers follow the view being drawn and the tree lists only the inspector scene', async (t) => {
+  const { engine, inspector } = await scene(t),
+    shown = engine.createMesh().setGeometry(box()),
+    masked = engine.createMesh().setGeometry(box()),
+    hud = engine.createScene('hud');
+  hud.createMesh().name = 'HUD only';
+  Object.defineProperty(engine, 'backend', { value: 'webgpu', configurable: true });
+  const key = Symbol.for('margoengine.layers'),
+    saved = globalThis[key],
+    masks = new WeakMap([[masked, 0b10]]);
+  globalThis[key] = { cameras: new WeakMap(), source: null, maskOf: (mesh) => masks.get(mesh) ?? 1 };
+  t.after(() => {
+    globalThis[key] = saved;
+  });
+  inspector.setDebug('bounds', true);
+  engine.store.visible.fill(1);
+  const frame = (layers) =>
+    engine.frameGraph.execute({
+      backend: 'webgpu',
+      draw() {},
+      view: { id: '0', viewport: [0, 0, 200, 200], index: 0, count: 1, layers },
+    });
+  frame(0b01);
+  const bounds = (mesh) => inspector.helpers.get(mesh).bounds.visible;
+  assert.deepEqual([bounds(shown), bounds(masked)], [true, false], 'a view on layer 0 shows no helper for layer 1');
+  frame(0b10);
+  assert.deepEqual([bounds(shown), bounds(masked)], [false, true]);
+  inspector.refresh();
+  assert.doesNotMatch(inspector.root.querySelector('[role=tree]').textContent, /HUD only/);
 });
 
 test('the light helpers toggle draws the sun, clustered lists and a hemisphere light by shape', async (t) => {

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Water } from '../dist/index.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 import { SceneTarget } from '../../shared/msaa.js';
-test('water validates nonfolding waves, samples shared scene depth, accumulates foam and restores', () => {
+test('water validates nonfolding waves, samples shared scene depth, accumulates foam and restores', async () => {
   const h = optionalGPU(),
     effect = new Water({ segments: 4 });
   h.engine.use(effect);
@@ -27,12 +27,13 @@ test('water validates nonfolding waves, samples shared scene depth, accumulates 
   effect.dispose();
   assert.equal(effect.depthTexture, undefined);
   assert.equal(h.engine.hasPlugin('optional:scene-depth'), false);
+  await null;
   assert.ok(h.resources.every((r) => r.destroyed));
   assert.throws(() => new Water({ waves: [{ direction: [1, 0], amplitude: 10, wavelength: 1 }] }), /fold/);
   assert.throws(() => new Water({ size: [0, 1] }), /options/);
 });
 
-test('moon radiance drives wave glints, foam and the water ambient floor', () => {
+test('moon radiance drives wave glints, foam and the water ambient floor', async () => {
   const h = optionalGPU();
   h.engine.lighting = {
     direction: new Float32Array([0.2, 0.95, -0.3, 0.6]),
@@ -58,10 +59,11 @@ test('moon radiance drives wave glints, foam and the water ambient floor', () =>
   water.onDeviceRestored(h.engine);
   h.frame();
   water.dispose();
+  await null;
   assert.ok(h.resources.every((r) => r.destroyed));
 });
 
-test('explicit reflection lights stay separate, update in place and survive restoration', () => {
+test('explicit reflection lights stay separate, update in place and survive restoration', async () => {
   const h = optionalGPU(),
     lights = [
       { direction: new Float32Array([3, 4, 0, 2]), radiance: new Float32Array([1, 0.8, 0.5]) },
@@ -98,6 +100,7 @@ test('explicit reflection lights stay separate, update in place and survive rest
       .every((v) => v === 0),
   );
   water.dispose();
+  await null;
   assert.ok(h.resources.every((r) => r.destroyed));
   for (const lights of [
     null,
@@ -163,7 +166,7 @@ test('steady water frames reuse bind groups, views and their render descriptor',
   for (let i = perFrame; i < descriptors.length; i++) assert.equal(descriptors[i], descriptors[i % perFrame]);
   effect.dispose();
 });
-test('default reflection lights copy exact uniform bits without creating temporary typed-array views', () => {
+test('default reflection lights copy exact uniform bits without creating temporary typed-array views', async () => {
   const h = optionalGPU(),
     water = new Water({ segments: 4 });
   h.engine.use(water);
@@ -184,6 +187,7 @@ test('default reflection lights copy exact uniform bits without creating tempora
   assert.deepEqual(values.slice(112, 116), values.slice(104, 108));
   assert.deepEqual(values.slice(116, 119), values.slice(108, 111));
   water.dispose();
+  await null;
   assert.ok(h.resources.every((r) => r.destroyed));
 });
 test('ripple normals use gradient noise on four separately turned lattices', () => {
@@ -211,7 +215,7 @@ test('ripple normals use gradient noise on four separately turned lattices', () 
     }
   water.dispose();
 });
-test('foam takes N.L lighting, and a shadow source shades glints and foam from bind group 1', () => {
+test('foam takes N.L lighting, and a shadow source shades glints and foam from bind group 1', async () => {
   const h = optionalGPU(),
     entries = [
       { binding: 1, resource: { buffer: {} } },
@@ -248,6 +252,7 @@ fn shadowVisibility(position:vec3f,normal:vec3f)->f32 {return shadowFrame.x;}`,
   h.frame();
   assert.equal(shadowGroups(), 1, 'New shadow entries rebuild the group once');
   water.dispose();
+  await null;
   assert.ok(h.resources.every((r) => r.destroyed));
   const plain = optionalGPU(),
     unshadowed = new Water({ segments: 4 });
@@ -270,7 +275,7 @@ test('default swells share a wind cone and keep distinct wavelengths', () => {
   assert.notEqual(v[35], v[43]);
   effect.dispose();
 });
-test('borrowed HDR optics retain resources and copy descriptors between frames', () => {
+test('borrowed HDR optics retain resources and copy descriptors between frames', async () => {
   const h = optionalGPU(),
     device = h.engine.gpu;
   const sky = device.createTexture({ size: [64, 32], format: 'rgba16float', usage: GPUTextureUsage.TEXTURE_BINDING });
@@ -297,6 +302,7 @@ test('borrowed HDR optics retain resources and copy descriptors between frames',
   assert.equal(scene.destroyed, false);
   sky.destroy();
   scene.destroy();
+  await null;
   assert.ok(h.resources.every((r) => r.destroyed));
   assert.throws(() => new Water({ spray: true }), /spray/);
   assert.throws(() => new Water({ reflection: 42 }), /optics/);
@@ -338,7 +344,7 @@ for (const [samples, kind] of [
     try {
       frame();
       const borrow = samples === 4 && kind === 'resolved',
-        sampled = water.groups[0].entries.find((e) => e.binding === 6).resource.texture;
+        sampled = water.view.groups[0].entries.find((e) => e.binding === 6).resource.texture;
       assert.equal(sampled, borrow ? scene : water.captured);
       assert.notEqual(
         sampled,
@@ -387,7 +393,7 @@ test('4x refraction switches borrowed sources and survives restoration without d
     target.resolve(c.encoder, true);
     target.restore(c);
   };
-  const sampled = () => water.groups[0].entries.find((e) => e.binding === 6).resource.texture;
+  const sampled = () => water.view.groups[0].entries.find((e) => e.binding === 6).resource.texture;
   try {
     frame();
     assert.equal(sampled(), color);
@@ -440,7 +446,7 @@ test('mesh sampling fades short waves without changing their wavelength or heigh
   }
   effect.dispose();
 });
-test('coastal flow reuses its resources and borrows terrain across resize and restoration', () => {
+test('coastal flow reuses its resources and borrows terrain across resize and restoration', async () => {
   const h = optionalGPU(),
     terrain = h.engine.gpu.createTexture({
       size: [16, 16],
@@ -481,6 +487,7 @@ test('coastal flow reuses its resources and borrows terrain across resize and re
   assert.equal(effect.coastalDepthTexture, undefined);
   assert.equal(terrain.destroyed, false);
   terrain.destroy();
+  await null;
   assert.ok(h.resources.every((r) => r.destroyed));
   assert.throws(() => new Water({ terrain: { heightmap: () => terrain, origin: [0, 0], size: [0, 1] } }), /terrain/);
   const bad = new Water({ terrain: { heightmap: () => undefined, origin: [0, 0], size: [16, 16] } });
@@ -489,7 +496,7 @@ test('coastal flow reuses its resources and borrows terrain across resize and re
   bad.dispose();
 });
 
-test('ocean horizon retains the central grid and supplies larger sample footprints offshore', () => {
+test('ocean horizon retains the central grid and supplies larger sample footprints offshore', async () => {
   const bounded = new Water({ size: [160, 160], segments: 32 }),
     ocean = new Water({ size: [160, 160], segments: 32, horizon: true });
   assert.equal(ocean.positions.length, bounded.positions.length);
@@ -512,6 +519,7 @@ test('ocean horizon retains the central grid and supplies larger sample footprin
   assert.match(pipeline.vertex.module.code, /const HORIZON=true;/);
   ocean.dispose();
   bounded.dispose();
+  await null;
   assert.ok(h.resources.every((r) => r.destroyed));
   assert.throws(() => new Water({ horizon: 'yes' }), /options/);
 });

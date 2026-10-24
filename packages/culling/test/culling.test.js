@@ -134,6 +134,38 @@ test('Hi-Z levels cover the screen down to 1x1 and resize rebuilds only size-dep
   parts.dispose();
 });
 
+test('an offset view gets a view-sized Hi-Z drawn at the target origin; smaller views reuse the resources', () => {
+  const h = harness(),
+    parts = new CulledInstances(batches(), { culling: 'occlusion' });
+  h.engine.use(parts);
+  const viewports = [];
+  const begin = h.context.encoder.beginRenderPass;
+  h.context.encoder.beginRenderPass = (descriptor) => {
+    const pass = begin(descriptor);
+    return { ...pass, setViewport: (...v) => viewports.push(v) };
+  };
+  const frame = (viewport) => {
+    h.context.view = { id: String(viewport), camera: h.context.camera, viewport, index: 1, count: 2 };
+    viewports.length = 0;
+    h.run();
+  };
+  try {
+    frame([64, 32, 64, 64]);
+    const uniform = h.resources.find((r) => r.size === 448),
+      depth = h.resources.filter((r) => r.format === 'depth32float' && !r.destroyed).at(-1);
+    assert.deepEqual([depth.size[0], depth.size[1]], [64, 64], 'occluder depth is view-sized');
+    assert.deepEqual(viewports[0], [0, 0, 64, 64, 0, 1], 'occluders draw at the origin of their own target');
+    assert.deepEqual(Array.from(new Uint32Array(uniform.data).subarray(40, 42)), [64, 64]);
+    const textures = h.counts.textures;
+    frame([0, 0, 32, 16]);
+    assert.equal(h.counts.textures, textures, 'a smaller view reuses the resources');
+    assert.deepEqual(Array.from(new Uint32Array(uniform.data).subarray(40, 43)), [32, 16, 6]);
+    assert.deepEqual(viewports[0], [0, 0, 32, 16, 0, 1]);
+  } finally {
+    parts.dispose();
+  }
+});
+
 test('frustum and none modes skip the prepass; sections fall back to frustum culling', () => {
   for (const [culling, shader, mode] of [
     ['frustum', wgsl, 1],

@@ -16,6 +16,7 @@ import { margoError } from '../../shared/errors.js';
 import { MargoError } from '@margoengine/math/errors';
 import { checkFog, FOG_BYTES, fogWgsl, writeFog, type FogLike } from './fog.js';
 export type { FogLike } from './fog.js';
+import { applyView, ViewStates } from '../../shared/view-rect.js';
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; UNIFORM: number; COPY_DST: number; STORAGE: number };
 declare const GPUTextureUsage: {
   COPY_SRC: number;
@@ -287,6 +288,18 @@ const depthCopy = `
 @fragment fn fragment(@builtin(position) p:vec4f)->@builtin(frag_depth) f32 {return textureLoad(sceneDepth,vec2i(p.xy),0);}
 `;
 let instances = 0;
+/** One view's foam history and the bind groups that read it. */
+interface WaterView {
+  foam: GPUTexture[];
+  foamViews: GPUTextureView[];
+  current: number;
+  groups: GPUBindGroup[];
+  // Resources of each group (the capture pipeline has its own auto layout) and which group this view drew with.
+  resources: GPUBindingResource[][];
+  drawn: number;
+  built: number;
+  captureGroups: GPUBindGroup[];
+}
 /**
  * An opaque, Y-up water surface: up to eight Gerstner swell trains with analytic normals, Fresnel reflection, glints,
  * absorption and shoreline foam, with optional terrain-coupled shallow-water flow and spray. `Water.attach(engine,
@@ -330,6 +343,8 @@ export class Water implements EnginePlugin {
   private surfaceView?: GPUTextureView;
   private copyPipeline?: GPURenderPipeline;
   private copyGroup?: GPUBindGroup;
+  private copyBuilt = -1;
+  private depthView?: GPUTextureView;
   private reflected?: GPUTexture;
   private captured?: GPUTexture;
   private capturedView?: GPUTextureView;
@@ -338,17 +353,20 @@ export class Water implements EnginePlugin {
   private readonly colorSource: GPUTexelCopyTextureInfo = { texture: undefined! };
   private readonly colorTarget: GPUTexelCopyTextureInfo = { texture: undefined! };
   private readonly colorSize: GPUExtent3DDict = { width: 1, height: 1, depthOrArrayLayers: 1 };
-  private foamViews: GPUTextureView[] = [];
-  private groups: GPUBindGroup[] = [];
-  // Resources of each group 0 above (the capture pipeline has its own auto layout) and which one this frame drew with.
-  private resources: GPUBindingResource[][] = [];
-  private drawn = 0;
+  // Foam history and its bind groups per engine view (the plain frame is one too), released when a view is not drawn
+  // for a frame. `built` bumps when a binding all views share changes, so each view rebuilds its groups once.
+  private readonly views = new ViewStates<WaterView>(
+    () => ({ foam: [], foamViews: [], current: 0, groups: [], resources: [], drawn: 0, built: -1, captureGroups: [] }),
+    (view) => {
+      for (const texture of view.foam) texture.destroy();
+    },
+  );
+  private view?: WaterView;
+  private built = 0;
   private shaderCode = '';
   private capture?: WaterCapture;
   private capturePipeline?: GPURenderPipeline;
   private captureKey = '';
-  private captureSource?: GPUBindGroup[];
-  private captureGroups: GPUBindGroup[] = [];
   private captureShadow?: GPUBindGroup;
   private captureShadowEntries?: GPUBindGroupEntry[];
   private readonly disposers = new Set<() => void>();
@@ -366,8 +384,6 @@ export class Water implements EnginePlugin {
   private count = 0;
   private pipeline?: GPURenderPipeline;
   private format = '';
-  private foam: GPUTexture[] = [];
-  private current = 0;
   private time = 0;
   private readonly values = new Float32Array(128);
   private fogSource: FogLike | null = null;
@@ -641,7 +657,7 @@ export class Water implements EnginePlugin {
       );
     if (this.reflected !== reflection) {
       this.reflected = reflection;
-      this.groups = [];
+      this.built++;
     }
     this.values[27] = +!!reflection;
     const scene = this.options.sceneColor?.();
@@ -674,7 +690,7 @@ export class Water implements EnginePlugin {
           this.captured?.destroy();
           this.captured = undefined;
           this.capturedView = scene.createView();
-          this.groups = [];
+          this.built++;
         }
         this.colorSource.texture = scene;
       } else {
@@ -693,7 +709,7 @@ export class Water implements EnginePlugin {
           this.colorTarget.texture = this.captured;
           this.colorSize.width = c.width;
           this.colorSize.height = c.height;
-          this.groups = [];
+          this.built++;
         }
         this.colorSource.texture = scene;
         c.encoder.copyTextureToTexture(this.colorSource, this.colorTarget, this.colorSize);
@@ -715,7 +731,7 @@ export class Water implements EnginePlugin {
       });
       this.surfaceView = this.surfaceDepth.createView();
       this.copiedDepth.view = this.surfaceView;
-      this.groups = [];
+      this.built++;
       if (changed) {
         const module = c.device.createShaderModule({ code: depthCopy });
         this.copyPipeline = c.device.createRenderPipeline({
@@ -729,9 +745,9 @@ export class Water implements EnginePlugin {
       }
     }
     if (
-      this.foam[0]?.width !== c.width ||
-      this.foam[0]?.height !== c.height ||
-      (this.foamMSAA?.sampleCount ?? 1) !== samples
+      (samples === 4 &&
+        (this.foamMSAA?.width !== c.width || this.foamMSAA.height !== c.height || !this.foamMSAAView)) ||
+      (samples === 1 && this.foamMSAA)
     ) {
       this.foamMSAA?.destroy();
       this.foamMSAA = undefined;
@@ -745,19 +761,22 @@ export class Water implements EnginePlugin {
         });
         this.foamMSAAView = this.foamMSAA.createView();
       }
-      for (const t of this.foam) t.destroy();
-      this.foam = [];
+    }
+    const view = (this.view = this.views.get(c));
+    if (view.foam[0]?.width !== c.width || view.foam[0]?.height !== c.height) {
+      for (const texture of view.foam) texture.destroy();
+      view.foam = [];
       for (let i = 0; i < 2; i++)
-        this.foam.push(
+        view.foam.push(
           c.device.createTexture({
             size: [c.width, c.height],
             format: 'r8unorm',
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
           }),
         );
-      this.foamViews = this.foam.map((texture) => texture.createView());
-      this.groups = [];
-      this.current = 0;
+      view.foamViews = view.foam.map((texture) => texture.createView());
+      view.built = -1;
+      view.current = 0;
     }
     const shadows = this.options.shadows,
       fog = this.fogSource;
@@ -798,7 +817,7 @@ export class Water implements EnginePlugin {
         multisample: { count: samples },
       });
       this.format = format;
-      this.groups = [];
+      this.built++;
       this.shadowEntries = undefined;
     }
     this.time += c.delta;
@@ -857,44 +876,52 @@ export class Water implements EnginePlugin {
         if (this.options.spray) this.spray = new Spray(c.device, this.uniform!, this.coastal);
         this.values[101] = this.values[98] / terrain.width;
         this.values[102] = this.values[99] / terrain.height;
-        this.groups = [];
+        this.built++;
       }
       this.values[100] = Math.min(Math.max(c.delta, 0), 1 / 15) / 3;
     }
     c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
     this.coastal?.step(c.encoder);
     this.spray?.step(c.encoder);
-    if (this.sampledDepth !== depth || !this.groups.length) {
-      const view = depth.createView({ aspect: 'depth-only' });
-      this.copyGroup = group(c.device, this.copyPipeline!, [view]);
-      this.groups = [];
-      this.resources = [];
+    if (this.sampledDepth !== depth) {
+      this.sampledDepth = depth;
+      this.built++;
+    }
+    if (this.copyBuilt !== this.built) {
+      this.depthView = depth.createView({ aspect: 'depth-only' });
+      this.copyGroup = group(c.device, this.copyPipeline!, [this.depthView]);
+      this.copyBuilt = this.built;
+    }
+    if (view.built !== this.built) {
+      view.groups = [];
+      view.resources = [];
+      view.captureGroups = [];
       for (let i = 0; i < 2; i++)
         for (let j = 0; j < (this.coastal ? 2 : 1); j++) {
           const resources: GPUBindingResource[] = [
             { buffer: this.uniform! },
-            view,
-            this.foamViews[i],
-            this.coastal?.views[j] ?? this.foamViews[i],
-            reflection?.createView() ?? this.foamViews[i],
+            this.depthView!,
+            view.foamViews[i],
+            this.coastal?.views[j] ?? view.foamViews[i],
+            reflection?.createView() ?? view.foamViews[i],
             this.skySampler!,
-            this.capturedView ?? this.foamViews[i],
+            this.capturedView ?? view.foamViews[i],
             { buffer: this.coastal?.connected ?? this.uniform! },
           ];
           if (fog) resources.push({ buffer: this.fogBuffer! });
-          this.resources.push(resources);
-          this.groups.push(group(c.device, this.pipeline!, resources));
+          view.groups.push(group(c.device, this.pipeline!, resources));
+          view.resources.push(resources);
         }
-      this.sampledDepth = depth;
+      view.built = this.built;
     }
     // The shadow source owns its entries; a new array (resize, restoration) rebuilds group 1.
     const shadowEntries = shadows?.bindings();
     if (shadowEntries && this.shadowEntries !== shadowEntries) {
-      this.shadowEntries = shadowEntries;
       this.shadowGroup = c.device.createBindGroup({
         layout: this.pipeline!.getBindGroupLayout(1),
         entries: shadowEntries,
       });
+      this.shadowEntries = shadowEntries;
     }
     const target = sceneTarget(c);
     if (target && samples === 4) target.copyDepth(c.encoder, this.surfaceView!, 4);
@@ -902,18 +929,20 @@ export class Water implements EnginePlugin {
       const copy = c.encoder.beginRenderPass(this.depthPresentation);
       copy.setPipeline(this.copyPipeline!);
       copy.setBindGroup(0, this.copyGroup!);
+      applyView(copy, c);
       copy.draw(3);
       copy.end();
     }
-    this.drawn = this.current * (this.coastal ? 2 : 1) + (this.coastal?.current ?? 0);
-    const bind = this.groups[this.drawn];
-    this.current = 1 - this.current;
+    view.drawn = view.current * (this.coastal ? 2 : 1) + (this.coastal?.current ?? 0);
+    const bind = view.groups[view.drawn];
+    view.current = 1 - view.current;
     this.attachment.view = c.color;
-    this.foamAttachment.view = samples === 4 ? this.foamMSAAView! : this.foamViews[this.current];
-    this.foamAttachment.resolveTarget = samples === 4 ? this.foamViews[this.current] : undefined;
+    this.foamAttachment.view = samples === 4 ? this.foamMSAAView! : view.foamViews[view.current];
+    this.foamAttachment.resolveTarget = samples === 4 ? view.foamViews[view.current] : undefined;
     this.foamAttachment.storeOp = samples === 4 ? 'discard' : 'store';
     this.depthAttachment.view = this.surfaceView!;
     const pass = c.encoder.beginRenderPass(this.presentation);
+    applyView(pass, c);
     pass.setPipeline(this.pipeline!);
     pass.setBindGroup(0, bind);
     if (shadowEntries) pass.setBindGroup(1, this.shadowGroup!);
@@ -958,7 +987,8 @@ export class Water implements EnginePlugin {
     depth?: GPUTextureView,
   ): void {
     const hook = this.capture;
-    if (mode !== 'capture' || !hook || this.disposed || !this.groups.length || !this.shaderCode) return;
+    const view = this.view;
+    if (mode !== 'capture' || !hook || this.disposed || !view?.groups.length || !this.shaderCode) return;
     void color;
     void depth;
     const shadows = this.options.shadows,
@@ -996,16 +1026,14 @@ export class Water implements EnginePlugin {
         multisample: c.descriptor.multisample,
       });
       this.captureKey = key;
-      this.captureSource = undefined;
+      for (const state of this.views.values()) state.captureGroups = [];
       this.captureShadowEntries = undefined;
     }
-    if (this.captureSource !== this.groups) {
-      this.captureSource = this.groups;
-      // The capture fragment ends before the fog mix, so its layout has no fog binding (resource 8).
-      this.captureGroups = this.resources.map((resources) =>
+    // The capture fragment ends before the fog mix, so its layout has no fog binding (resource 8).
+    if (!view.captureGroups.length)
+      view.captureGroups = view.resources.map((resources) =>
         group(c.device, this.capturePipeline!, resources.slice(0, 8)),
       );
-    }
     const entries = shadows?.bindings();
     if (entries && this.captureShadowEntries !== entries) {
       this.captureShadowEntries = entries;
@@ -1013,16 +1041,14 @@ export class Water implements EnginePlugin {
     }
     const pass = hook.begin();
     pass.setPipeline(this.capturePipeline!);
-    pass.setBindGroup(0, this.captureGroups[this.drawn]);
+    pass.setBindGroup(0, view.captureGroups[view.drawn]);
     if (entries) pass.setBindGroup(1, this.captureShadow!);
     pass.setVertexBuffer(0, this.vertices!);
     pass.setIndexBuffer(this.indices!, 'uint32');
     pass.drawIndexed(this.count);
   }
   private release(): void {
-    this.capturePipeline = this.captureSource = this.captureShadow = this.captureShadowEntries = undefined;
-    this.captureGroups = [];
-    this.resources = [];
+    this.capturePipeline = this.captureShadow = this.captureShadowEntries = undefined;
     this.captureKey = this.shaderCode = '';
     this.foamMSAA?.destroy();
     this.foamMSAA = undefined;
@@ -1037,7 +1063,7 @@ export class Water implements EnginePlugin {
     this.surfaceDepth = undefined;
     this.surfaceView = undefined;
     this.copyPipeline = undefined;
-    this.copyGroup = undefined;
+    this.copyGroup = this.depthView = undefined;
     this.captured?.destroy();
     this.captured = undefined;
     this.capturedView = undefined;
@@ -1048,10 +1074,9 @@ export class Water implements EnginePlugin {
     this.indices?.destroy();
     this.fogBuffer?.destroy();
     this.fogBuffer = undefined;
-    for (const t of this.foam) t.destroy();
-    this.foam = [];
-    this.foamViews = [];
-    this.groups = [];
+    this.views.clear();
+    this.view = undefined;
+    this.built++;
     this.shadowGroup = this.shadowEntries = undefined;
     this.sampledDepth = undefined;
     this.uniform = this.vertices = this.indices = undefined;
@@ -1061,6 +1086,12 @@ export class Water implements EnginePlugin {
   onDeviceRestored(engine: Engine): void {
     this.release();
     this.setup(engine);
+  }
+  /** Releases the foam of engine views that were not drawn in the last frame (once per frame, not on picks). */
+  onPreUpdate(delta: number): void {
+    if (!(delta > 0)) return;
+    this.views.prune();
+    this.view = undefined;
   }
   dispose(): void {
     if (this.disposed) return;

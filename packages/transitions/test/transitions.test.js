@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Transitions } from '../dist/index.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
-test('transition freezes previous scene once, advances progress, resizes and tears down', () => {
+test('transition freezes previous scene once, advances progress, resizes and tears down', async () => {
   const h = optionalGPU(),
     effect = new Transitions();
   h.engine.use(effect);
@@ -25,5 +25,6 @@ test('transition freezes previous scene once, advances progress, resizes and tea
   h.frame();
   effect.dispose();
   assert.equal(h.engine.hasPlugin('transitions'), false);
+  await null;
   assert.ok(h.resources.every((r) => r.destroyed));
 });

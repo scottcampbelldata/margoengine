@@ -19,7 +19,7 @@ function probe(seen) {
 }
 
 for (const samples of [4, 1])
-  test(`Afterimage alone folds linear frames into a ping-pong history and presents through the display curve (${samples}x)`, () => {
+  test(`Afterimage alone folds linear frames into a ping-pong history and presents through the display curve (${samples}x)`, async () => {
     const h = harness({ samples }),
       after = Afterimage.attach(h.engine),
       first = h.gpu.record(() => h.frame());
@@ -64,10 +64,11 @@ for (const samples of [4, 1])
     assert.deepEqual(uniforms(h.gpu.record(() => h.frame())), [[0.5, 1, 0, 0]]);
     after.dispose();
     assert.ok(!h.engine.hasPlugin('post:stack'));
+    await null;
     assert.deepEqual(h.live(), [], 'disposal releases every GPU resource');
   });
 
-test('Afterimage before a display effect hands it the history itself, in linear light', () => {
+test('Afterimage before a display effect hands it the history itself, in linear light', async () => {
   const h = harness(),
     seen = [],
     stack = PostStack.attach(h.engine, [new Afterimage({ damp: 0.9 }), probe(seen)]),
@@ -79,6 +80,7 @@ test('Afterimage before a display effect hands it the history itself, in linear 
   h.frame();
   assert.notEqual(seen[1], seen[0]);
   stack.dispose();
+  await null;
   assert.deepEqual(h.live(), []);
   for (const options of [{ damp: -0.1 }, { damp: 1.1 }, { damp: NaN }])
     assert.throws(() => new Afterimage(options), RangeError);

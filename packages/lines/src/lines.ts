@@ -6,6 +6,7 @@ import { CAPS, JOINS, MODES, VERTICES_PER_SEGMENT } from './geometry.js';
 import { Line } from './line.js';
 import { foggedLineShader, lineShader } from './shader.js';
 import { checkFog, FOG_BYTES, writeFog, type FogLike } from './fog.js';
+import { applyView } from '../../shared/view-rect.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -377,6 +378,7 @@ export class Lines implements EnginePlugin {
     const depthFormat = context.descriptor.depthStencil!.format,
       count = context.descriptor.multisample?.count ?? 1;
     const pass = context.encoder.beginRenderPass(this.descriptor);
+    applyView(pass, context);
     pass.setBindGroup(0, this.frameGroup!);
     if (fogged) pass.setBindGroup(2, this.fogGpu!.group);
     for (const [list, onTop] of [

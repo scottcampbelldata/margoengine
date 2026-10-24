@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type { Camera, EngineKernel } from '@margoengine/core';
+import type { Camera, EngineKernel, RenderView } from '@margoengine/core';
 import type { FrameGraph } from '@margoengine/core/extension';
 
 export type Face = 'top' | 'bottom' | 'front' | 'back' | 'left' | 'right';
@@ -9,6 +9,11 @@ export type Projection = 'orthographic' | 'perspective';
 export interface ViewCubeOptions {
   /** Element the cube is placed in. Default: the canvas's parent. */
   container?: HTMLElement;
+  /**
+   * The engine view this cube belongs to: it turns that view's camera and sits in the corner of its rectangle (the
+   * container must cover the canvas). Default the engine camera and the whole canvas.
+   */
+  view?: Pick<RenderView, 'camera' | 'viewport' | 'pixels'>;
   corner?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left';
   /** Cube edge in CSS pixels. Default 80. */
   size?: number;
@@ -135,6 +140,7 @@ export class ViewCube {
       projection,
       labels = {},
       flip = false,
+      view,
     }: ViewCubeOptions = {},
   ) {
     if (!container) throw new TypeError('ViewCube needs a container (the canvas has no parent)');
@@ -144,7 +150,7 @@ export class ViewCube {
       'cameras',
     );
     projection ??= found?.mode ? (found as { mode: Projection }) : undefined;
-    this.camera = engine.camera;
+    this.camera = view?.camera ?? engine.camera;
     this.duration = duration;
     this.flip = flip;
     this.projection = projection;
@@ -169,8 +175,13 @@ export class ViewCube {
     root.setAttribute('role', 'group');
     root.setAttribute('aria-label', 'View cube');
     const [v, h] = corner.split('-');
-    root.style[v as 'top'] = (v === 'bottom' && projection ? 38 : 12) + 'px';
-    root.style[h as 'left'] = '12px';
+    // Distance of each canvas edge to the view's edge, as a share of the canvas.
+    const [x, y, w, hh] = view?.viewport ?? [0, 0, 1, 1],
+      [sx, sy] = view?.pixels ? [engine.canvas.width, engine.canvas.height] : [1, 1],
+      edge = { left: x / sx, top: y / sy, right: 1 - (x + w) / sx, bottom: 1 - (y + hh) / sy },
+      at = (side: string, px: number) => (view ? `calc(${edge[side as 'top'] * 100}% + ${px}px)` : px + 'px');
+    root.style[v as 'top'] = at(v, v === 'bottom' && projection ? 38 : 12);
+    root.style[h as 'left'] = at(h, 12);
     root.style.width = root.style.height = size + 'px';
     el('style', root).textContent = CSS;
     this.cube = el('div', root, 'mvc-cube');

@@ -461,6 +461,8 @@ decals.setDecals([
   the effects after it draw over them. Back faces of the boxes only, no depth test: each covered pixel runs once, also
   with the camera inside a box. One render pass, one instanced draw per mode (36 vertices per decal), one storage buffer
   of 96 B per decal; it adds nothing to any mesh shader. With no decals the pass records nothing.
+- **Validation.** `setDecals` checks the whole list (no holes, every field valid, values finite as Float32) before
+  replacing anything, so a bad list throws and leaves the current decals drawing. `setDecals([])` clears them.
 - **Checks** (Intel Arc 140V, Edge 155, AC, GPU lock; `node examples/package-benchmarks/decals-gpu.mjs`,
   [decals-gpu.json](../../examples/package-benchmarks/results/decals-gpu.json)), each at 4x and 1x MSAA, every 8th
   pixel ray-cast on the CPU: outside every decal box (3 cm margin) the frame equals the decal-free frame exactly; a

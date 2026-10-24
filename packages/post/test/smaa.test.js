@@ -75,7 +75,7 @@ test('SMAA builds its area and search tables from the morphological model', () =
 });
 
 for (const samples of [4, 1])
-  test(`SMAA alone wraps the finished frame in three passes and keeps steady frames free of uploads (${samples}x)`, () => {
+  test(`SMAA alone wraps the finished frame in three passes and keeps steady frames free of uploads (${samples}x)`, async () => {
     const h = harness({ samples }),
       log = h.gpu.record(() => {
         SMAA.attach(h.engine);
@@ -96,10 +96,11 @@ for (const samples of [4, 1])
     assert.ok(!steady.some(([name]) => /^(writeBuffer|writeTexture|texture|group|renderPipeline|module)$/.test(name)));
     assert.equal(draws(steady), 3);
     h.engine.removePlugin('smaa');
+    await null;
     assert.deepEqual(h.live(), [], 'disposal releases every GPU resource');
   });
 
-test('SMAA presets, overrides, disabling, resize and restore', () => {
+test('SMAA presets, overrides, disabling, resize and restore', async () => {
   const h = harness(),
     smaa = SMAA.attach(h.engine, { quality: 'low' });
   assert.deepEqual(
@@ -149,6 +150,7 @@ test('SMAA presets, overrides, disabling, resize and restore', () => {
   h.frame();
   smaa.dispose();
   smaa.dispose();
+  await null;
   assert.deepEqual(h.live(), []);
   for (const options of [
     { threshold: 0 },
@@ -164,7 +166,7 @@ test('SMAA presets, overrides, disabling, resize and restore', () => {
   assert.throws(() => (smaa.enabled = 'yes'), TypeError);
 });
 
-test('SMAA is an LDR effect of a PostStack and never runs next to FXAA', () => {
+test('SMAA is an LDR effect of a PostStack and never runs next to FXAA', async () => {
   assert.throws(() => new PostStack([new SMAA(), new FXAA()]), { name: 'TypeError', message: /SMAA or FXAA/ });
   assert.throws(() => new PostStack([new SMAA(), new Bloom()]), RangeError);
   const h = harness(),
@@ -176,6 +178,7 @@ test('SMAA is an LDR effect of a PostStack and never runs next to FXAA', () => {
   assert.equal(passes(log).at(-1).colorAttachments[0].view, h.gpu.snap(h.view.c.color), 'SMAA writes the frame');
   assert.throws(() => h.engine.use(smaa), /Invalid plugin|already attached/);
   h.engine.removePlugin('post:stack');
+  await null;
   assert.deepEqual(h.live(), []);
   for (const [first, second] of [
     [FXAA, SMAA],

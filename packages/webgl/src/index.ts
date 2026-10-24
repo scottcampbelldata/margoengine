@@ -8,9 +8,11 @@ import type {
   FrameGraph,
   PassContext,
   DrawOptions,
+  ViewDraw,
 } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { sceneSamples } from '../../shared/quality.js';
+import { clearColorValue, defaultClear } from '../../shared/clear-color.js';
 
 const defaultDraw: DrawOptions = {};
 
@@ -50,12 +52,12 @@ export class GLRenderer implements Renderer {
     { vao: WebGLVertexArrayObject; buffers: WebGLBuffer[]; instance: WebGLBuffer }
   >();
 
-  private readonly clear: [number, number, number, number];
+  private readonly clear: readonly number[];
   constructor(
     private readonly canvas: HTMLCanvasElement,
     { transparent = false }: WebGLRendererOptions = {},
   ) {
-    this.clear = transparent ? [0, 0, 0, 0] : [0.018, 0.023, 0.035, 1];
+    this.clear = transparent ? [0, 0, 0, 0] : defaultClear;
     const gl = canvas.getContext('webgl2', {
       alpha: transparent,
       premultipliedAlpha: true,
@@ -148,35 +150,68 @@ export class GLRenderer implements Renderer {
       this.resources.delete(geometry);
     }
   }
-  render(camera: Camera, lighting: Lighting, batches: Iterable<Batch>, graph: FrameGraph, delta: number): void {
+  render(
+    camera: Camera,
+    lighting: Lighting,
+    batches: Iterable<Batch>,
+    graph: FrameGraph,
+    delta: number,
+    view?: ViewDraw,
+  ): void {
     const gl = this.gl;
     if (gl.isContextLost()) throw new MargoError('failed', 'WebGL context lost; create a new engine');
+    if (view?.target)
+      throw new MargoError(
+        'unsupported',
+        'WebGL2 cannot draw a view into a texture; use the WebGPU backend for target views',
+      );
     const context: PassContext = {
       backend: 'webgl2',
       gl,
       camera,
+      view: view && {
+        id: view.id,
+        camera,
+        viewport: view.rect,
+        scissor: view.scissor,
+        index: view.index,
+        count: view.count,
+        clear: view.clear,
+        layers: view.layers,
+        target: view.target,
+      },
       width: this.canvas.width,
       height: this.canvas.height,
       delta,
       draw: (options: DrawOptions = defaultDraw) => {
         const { width, height } = context,
-          viewport = options.viewport,
-          scissor = options.scissor;
+          viewport = options.viewport === undefined ? context.view?.viewport : options.viewport,
+          scissor =
+            options.scissor === undefined
+              ? options.viewport === undefined
+                ? (context.view?.scissor ?? context.view?.viewport)
+                : undefined
+              : options.scissor;
         validateRectangle(viewport, width, height);
         validateRectangle(scissor, width, height);
+        const named = context.view?.clear?.color,
+          clearColor = options.clear ?? (named === false ? false : typeof named === 'string' || !context.view?.index),
+          clearDepth = options.clearDepth ?? context.view?.clear?.depth ?? options.clear ?? true;
         if (viewport) gl.viewport(viewport[0], height - viewport[1] - viewport[3], viewport[2], viewport[3]);
         else gl.viewport(0, 0, width, height);
-        gl.disable(gl.SCISSOR_TEST);
-        gl.enable(gl.DEPTH_TEST);
-        gl.disable(gl.CULL_FACE);
-        if (options.clear ?? true) {
-          gl.clearColor(...this.clear);
-          gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-        }
+        // Clear only the rectangle. WebGL clear ignores the viewport, so the scissor has to be on first.
         if (scissor) {
           gl.scissor(scissor[0], height - scissor[1] - scissor[3], scissor[2], scissor[3]);
           gl.enable(gl.SCISSOR_TEST);
-        }
+        } else gl.disable(gl.SCISSOR_TEST);
+        gl.enable(gl.DEPTH_TEST);
+        gl.disable(gl.CULL_FACE);
+        if (clearColor)
+          gl.clearColor(
+            ...((typeof named === 'string' ? clearColorValue(named) : this.clear) as [number, number, number, number]),
+          );
+        if (clearColor || clearDepth)
+          gl.clear((clearColor ? gl.COLOR_BUFFER_BIT : 0) | (clearDepth ? gl.DEPTH_BUFFER_BIT : 0));
         gl.useProgram(this.program);
         gl.uniformMatrix4fv(this.camera, false, camera.matrix);
         gl.uniform3f(this.eye, ...camera.position);

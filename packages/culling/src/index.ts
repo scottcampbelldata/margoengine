@@ -4,6 +4,7 @@ import { Geometry, PbrMaterial } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { computeShader, depthShader } from './shaders.js';
+import { viewSize } from '../../shared/view-rect.js';
 export { CulledMeshes } from './meshes.js';
 export type { CulledMeshesOptions } from './meshes.js';
 
@@ -414,8 +415,8 @@ export class CulledInstances implements EnginePlugin {
     this.samples = samples;
     this.width = this.height = 0;
   }
-  // Size-dependent resources: the occluder depth target and the Hi-Z pyramid (level 0 at full resolution).
-  private resize(c: Context): void {
+  // Size-dependent resources: the occluder depth target and the Hi-Z pyramid buffer, for a view of up to width x height.
+  private resize(c: Context, width: number, height: number): void {
     const d = c.device,
       p = this.compute!,
       b = this.buffers;
@@ -423,24 +424,15 @@ export class CulledInstances implements EnginePlugin {
     this.hiz?.destroy();
     this.depth = this.hiz = undefined;
     this.depth = d.createTexture({
-      size: [c.width, c.height],
+      size: [width, height],
       format: 'depth32float',
       sampleCount: this.samples,
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     });
-    let w = c.width,
-      h = c.height,
-      offset = 0,
-      level = 0;
-    for (; ; level++) {
-      this.words.set([offset, w, h, 0], 48 + level * 4);
-      offset += w * h;
-      if (w === 1 && h === 1) break;
-      w = Math.ceil(w / 2);
-      h = Math.ceil(h / 2);
-    }
-    this.levels = level + 1;
-    this.hiz = d.createBuffer({ size: offset * 4, usage: GPUBufferUsage.STORAGE });
+    this.width = width;
+    this.height = height;
+    const levels = this.pyramid(width, height);
+    this.hiz = d.createBuffer({ size: levels * 4, usage: GPUBufferUsage.STORAGE });
     const view = this.depth.createView(),
       hiz: GPUBindingResource = { buffer: this.hiz };
     this.occluders.view = view;
@@ -464,14 +456,34 @@ export class CulledInstances implements EnginePlugin {
         [13, { buffer: b.levels, offset: l * 256, size: 16 }],
       ]),
     );
-    this.width = c.width;
-    this.height = c.height;
+  }
+  // Writes the Hi-Z level table (offset, width, height) for a width x height view, level 0 at full resolution; sets
+  // `levels` and returns the texel count.
+  private pyramid(width: number, height: number): number {
+    let w = width,
+      h = height,
+      offset = 0,
+      level = 0;
+    for (; ; level++) {
+      this.words.set([offset, w, h, 0], 48 + level * 4);
+      offset += w * h;
+      if (w === 1 && h === 1) break;
+      w = Math.ceil(w / 2);
+      h = Math.ceil(h / 2);
+    }
+    this.levels = level + 1;
+    return offset;
   }
   private draw(c: Context): void {
     const d = c.device,
       b = this.buffers;
     if (!this.compute || (c.descriptor.multisample?.count ?? 1) !== this.samples) this.build(c);
-    if (c.width !== this.width || c.height !== this.height) this.resize(c);
+    // The occluder depth and Hi-Z cover the view being drawn: its camera projects onto its rectangle. Views of different
+    // sizes share resources sized for the largest; a plain frame keeps them at the canvas size.
+    const [width, height] = viewSize(c);
+    if (c.view ? width > this.width || height > this.height : width !== this.width || height !== this.height)
+      this.resize(c, Math.max(width, c.view ? this.width : 0), Math.max(height, c.view ? this.height : 0));
+    this.pyramid(width, height);
     const occlusion = this.culling === 'occlusion' && exactShader(c.shader),
       mode = occlusion ? 2 : this.culling === 'none' ? 0 : 1;
     if (!(this.occluderSize >= 0)) throw new RangeError('Invalid occluder size');
@@ -479,7 +491,7 @@ export class CulledInstances implements EnginePlugin {
       f = this.floats;
     f.set(m);
     f.set(c.camera.planes, 16);
-    this.words.set([c.width, c.height, this.levels, this.count, mode, this.batches.length, depthKind(m)], 40);
+    this.words.set([width, height, this.levels, this.count, mode, this.batches.length, depthKind(m)], 40);
     f[47] = this.occluderSize;
     d.queue.writeBuffer(b.uniform, 0, this.words);
     const lighting = this.engine!.lighting;
@@ -500,6 +512,8 @@ export class CulledInstances implements EnginePlugin {
       select.dispatchWorkgroups(groups);
       select.end();
       const pass = c.encoder.beginRenderPass(this.early);
+      // The target may be larger than this view (shared with a larger one).
+      if (c.view) pass.setViewport(0, 0, width, height, 0, 1);
       this.batches.forEach((batch, i) => {
         const sided = batch.material.data[6] < 0.5;
         pass.setPipeline(sided ? this.prepass!.sided : this.prepass!.plain);
@@ -516,7 +530,7 @@ export class CulledInstances implements EnginePlugin {
     if (occlusion) {
       pass.setPipeline(p.depth0);
       pass.setBindGroup(0, this.groups.depth0);
-      pass.dispatchWorkgroups(Math.ceil(c.width / 8), Math.ceil(c.height / 8));
+      pass.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(height / 8));
       pass.setPipeline(p.reduce);
       for (let l = 1; l < this.levels; l++) {
         pass.setBindGroup(0, this.levelGroups[l]);

@@ -88,6 +88,9 @@ function fakeGPU(t, offered = []) {
       setBindGroup() {},
       setVertexBuffer() {},
       setIndexBuffer() {},
+      setViewport() {},
+      setScissorRect() {},
+      setBlendConstant() {},
       end() {},
       draw: record('draw'),
       drawIndexed: record('drawIndexed'),
@@ -633,6 +636,32 @@ test('security: GPU labels and pass names reach the panel as text, never markup 
   const panel = dom.window.document.querySelector('[data-margo-frame-debugger]').shadowRoot;
   assert.ok(panel.textContent.includes(hostile), 'the label is shown literally');
   assert.equal(panel.querySelector('img'), null, 'no element was parsed from a label');
+});
+
+test('capture of a frame of views lists each pass once per view with its id, rectangle and scene', async (t) => {
+  const gpu = fakeGPU(t),
+    engine = await EngineKernel.create(gpu.canvas, { capacity: 4, backend: 'webgpu' });
+  t.after(() => engine.dispose());
+  const debug = FrameDebugger.attach(engine, { parent: null });
+  engine.createMesh().setGeometry(box());
+  const pending = debug.capture();
+  engine.render({
+    views: [
+      { id: 'left', camera: engine.camera, viewport: [0, 0, 0.5, 1] },
+      { id: 'right', camera: engine.camera, viewport: [0.5, 0, 0.5, 1] },
+    ],
+  });
+  const report = await pending,
+    main = report.graph.filter((entry) => entry.name === 'main');
+  const { width, height } = gpu.canvas;
+  assert.deepEqual(
+    main.map((entry) => entry.view),
+    [
+      { id: 'left', viewport: [0, 0, width / 2, height], scene: 'default' },
+      { id: 'right', viewport: [width / 2, 0, width / 2, height], scene: 'default' },
+    ],
+  );
+  debug.dispose();
 });
 
 test('texture size estimate covers mips, layers, samples and block formats', () => {

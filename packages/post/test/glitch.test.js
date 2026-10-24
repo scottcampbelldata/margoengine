@@ -4,7 +4,7 @@ import { Glitch, PostStack } from '../dist/index.js';
 import { harness, modules } from './support.js';
 
 /** Runs `frames` frames of a Glitch alone and returns the uniform it wrote each frame (80 bytes as words). */
-function run(options, frames, between) {
+async function run(options, frames, between) {
   const h = harness(),
     glitch = Glitch.attach(h.engine, options),
     out = [];
@@ -16,15 +16,16 @@ function run(options, frames, between) {
     assert.equal(glitch.active, out.at(-1)[7] === 1);
   }
   glitch.dispose();
+  await null;
   assert.deepEqual(h.live(), [], 'disposal releases every GPU resource');
   return out;
 }
 const active = (frames) => frames.map((u) => u[7]);
 
-test('Glitch replays a seed exactly: a wait of 120-240 frames, then a burst of 4-16 glitched frames', () => {
-  const a = run({ seed: 42 }, 600),
-    b = run({ seed: 42 }, 600),
-    c = run({ seed: 43 }, 600);
+test('Glitch replays a seed exactly: a wait of 120-240 frames, then a burst of 4-16 glitched frames', async () => {
+  const a = await run({ seed: 42 }, 600),
+    b = await run({ seed: 42 }, 600),
+    c = await run({ seed: 43 }, 600);
   assert.deepEqual(a, b, 'same seed, same frames');
   assert.notDeepEqual(active(a), active(c), 'another seed, other bursts');
   for (const frames of [a, c]) {
@@ -42,20 +43,20 @@ test('Glitch replays a seed exactly: a wait of 120-240 frames, then a burst of 4
   }
 });
 
-test('Glitch wild glitches every frame; intensity 0 and enabled false pass through', () => {
-  assert.ok(active(run({ seed: 1, wild: true }, 30)).every((flag) => flag === 1));
-  assert.ok(active(run({ seed: 1, wild: true, intensity: 0 }, 30)).every((flag) => flag === 0));
+test('Glitch wild glitches every frame; intensity 0 and enabled false pass through', async () => {
+  assert.ok(active(await run({ seed: 1, wild: true }, 30)).every((flag) => flag === 1));
+  assert.ok(active(await run({ seed: 1, wild: true, intensity: 0 }, 30)).every((flag) => flag === 0));
   // Disabled frames pass through and pause the sequence: the enabled frames replay the uninterrupted run.
-  const straight = run({ seed: 9, wild: true }, 10),
-    paused = run({ seed: 9, wild: true }, 13, (glitch, i) => (glitch.enabled = i < 4 || i > 6));
+  const straight = await run({ seed: 9, wild: true }, 10),
+    paused = await run({ seed: 9, wild: true }, 13, (glitch, i) => (glitch.enabled = i < 4 || i > 6));
   assert.deepEqual(active(paused).slice(4, 7), [0, 0, 0]);
   assert.deepEqual([...paused.slice(0, 4), ...paused.slice(7)], straight);
   // A new seed restarts the sequence.
-  const reseeded = run({ seed: 9, wild: true }, 6, (glitch, i) => (glitch.options.seed = i < 3 ? 5 : 9));
+  const reseeded = await run({ seed: 9, wild: true }, 6, (glitch, i) => (glitch.options.seed = i < 3 ? 5 : 9));
   assert.deepEqual(reseeded.slice(3), straight.slice(0, 3));
 });
 
-test('Glitch is an LDR stage: alone in its own stack on the core shader, restored and disposed cleanly', () => {
+test('Glitch is an LDR stage: alone in its own stack on the core shader, restored and disposed cleanly', async () => {
   const h = harness(),
     glitch = Glitch.attach(h.engine, { wild: true, seed: 3 }),
     log = h.gpu.record(() => h.frame());
@@ -69,6 +70,7 @@ test('Glitch is an LDR stage: alone in its own stack on the core shader, restore
   h.frame();
   glitch.dispose();
   assert.ok(!h.engine.hasPlugin('post:stack'));
+  await null;
   assert.deepEqual(h.live(), []);
   assert.throws(
     () => new PostStack([new Glitch(), { name: 'hdr', setup() {}, joinStack: () => ({ kind: 'hdr' }) }]),

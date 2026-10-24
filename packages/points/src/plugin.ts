@@ -28,6 +28,7 @@ import {
   spriteShader,
 } from './shaders.js';
 import { checkFog, FOG_BYTES, writeFog, type FogLike } from './fog.js';
+import { applyView, viewRect, viewSize, ViewStates } from '../../shared/view-rect.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -49,7 +50,7 @@ interface CloudGpu {
   floats: Float32Array;
   uints: Uint32Array;
   written: Float32Array;
-  /** Model matrix and drawn [block, count] pairs of the latest frame, for picking. */
+  /** Model matrix of the latest frame and the drawn [block, count] pairs of the view being drawn, for picking. */
   model: Float32Array;
   drawn: number[];
   pipeline: GPURenderPipeline | null;
@@ -113,6 +114,22 @@ export interface PointsPluginOptions {
 export interface PointsPickOptions {
   /** Search radius in CSS pixels; negative throws a RangeError. Default 6. */
   radius?: number;
+  /**
+   * Id of the engine view to pick through (`RenderView.id`, default its index as a string). Default the canvas view
+   * under the point, as `engine.pick` chooses, or the full-canvas frame.
+   */
+  view?: string;
+}
+/** The camera and rectangle of one view as last drawn, for picking. */
+interface PickView {
+  viewProj: Float32Array;
+  /** Drawing-buffer pixels of the target it was drawn into. */
+  rect: [number, number, number, number];
+  /** Whether it was drawn to the canvas (not into a target texture). */
+  canvas: boolean;
+  orthographic: boolean;
+  /** Each cloud's drawn [block, count] pairs in this view: its own level of detail. */
+  drawn: WeakMap<PointCloud, number[]>;
 }
 
 /** The point found by `PointsPlugin.pick`. */
@@ -213,10 +230,16 @@ export class PointsPlugin implements EnginePlugin {
   private readonly fogData = new Float32Array(12);
   private readonly edlData = new Float32Array(4);
   private orthographic = false;
-  private readonly lastViewProj = new Float32Array(16);
   private readonly view = new Float32Array(16);
-  private lastSize: [number, number] = [0, 0];
-  private hasFrame = false;
+  /** Each view's camera and rectangle as last drawn (the plain full-canvas frame is one too). */
+  private readonly pickViews = new ViewStates<PickView>(() => ({
+    viewProj: new Float32Array(16),
+    rect: [0, 0, 0, 0],
+    canvas: true,
+    orthographic: false,
+    drawn: new WeakMap(),
+  }));
+  private pickView?: PickView;
   private readonly box = new Float64Array(6);
   private readonly pickMvp = new Float64Array(16);
   private readonly pickRanges: PickRange[] = [];
@@ -414,6 +437,10 @@ export class PointsPlugin implements EnginePlugin {
     this.releaseGpu();
     this.setup(engine);
   }
+  /** Drops the pick record of each view not drawn in the last frame (once per frame, not on picks). */
+  onPreUpdate(delta: number): void {
+    if (delta > 0) this.pickViews.prune();
+  }
 
   /** Releases every GPU resource. Clouds and batches stay registered, so the plugin can be used again. */
   dispose(): void {
@@ -427,19 +454,28 @@ export class PointsPlugin implements EnginePlugin {
 
   /**
    * CPU picking: the drawn point nearest to CSS pixel (x, y) of the canvas within `radius`, using the latest
-   * frame's camera, transforms and level of detail. Meshes do not occlude picks.
+   * frame's camera, transforms and level of detail of the view picked through. Meshes do not occlude picks.
    */
   pick(x: number, y: number, options: PointsPickOptions = {}): PointsPickResult | null {
     if (!Number.isFinite(x) || !Number.isFinite(y)) throw new RangeError('Invalid pick coordinates');
     const radius = options.radius ?? 6;
     if (!(radius >= 0)) throw new RangeError('radius must be non-negative');
     const engine = this.engine as unknown as EngineKernel | undefined;
-    if (!engine || !this.hasFrame) return null;
+    if (!engine) return null;
     const canvas = engine.canvas,
-      [width, height] = this.lastSize;
-    const scale = canvas.clientWidth ? width / canvas.clientWidth : 1,
-      px = x * scale,
-      py = y * scale,
+      scale = canvas.clientWidth ? canvas.width / canvas.clientWidth : 1,
+      bx = x * scale,
+      by = y * scale,
+      inside = (r: readonly number[]) => bx >= r[0] && by >= r[1] && bx < r[0] + r[2] && by < r[1] + r[3];
+    let picked: PickView | undefined;
+    if (options.view === undefined) {
+      for (const view of this.pickViews.drawn()) if (view.canvas && inside(view.rect)) picked = view;
+    } else picked = this.pickViews.find(options.view);
+    if (!picked || !inside(picked.rect)) return null;
+    const viewProj = picked.viewProj,
+      [, , width, height] = picked.rect,
+      px = bx - picked.rect[0],
+      py = by - picked.rect[1],
       r = radius * scale;
     let best: PointsPickResult | null = null,
       bestDistance = Infinity,
@@ -448,20 +484,21 @@ export class PointsPlugin implements EnginePlugin {
       ranges = this.pickRanges,
       window = this.pickWindow;
     for (const cloud of this.clouds) {
-      const gpu = this.cloudGpu.get(cloud);
-      if (!gpu || !gpu.drawn.length) continue;
-      multiply(this.lastViewProj, gpu.model, mvp);
+      const gpu = this.cloudGpu.get(cloud),
+        drawn = picked.drawn.get(cloud);
+      if (!gpu || !drawn?.length) continue;
+      multiply(viewProj, gpu.model, mvp);
       let rangeCount = 0;
-      for (let i = 0; i < gpu.drawn.length; i += 2) {
-        const block = gpu.drawn[i];
+      for (let i = 0; i < drawn.length; i += 2) {
+        const block = drawn[i];
         worldBox(cloud.blocks.bounds, block, gpu.model, this.box);
-        const rect = boxScreenRect(this.box, this.lastViewProj, width, height);
+        const rect = boxScreenRect(this.box, viewProj, width, height);
         if (rect && (px < rect[0] - r - 1 || px > rect[2] + r + 1 || py < rect[1] - r - 1 || py > rect[3] + r + 1))
           continue;
         let range = ranges[rangeCount];
         if (!range) ranges[rangeCount] = range = { start: 0, count: 0 };
         range.start = cloud.blocks.starts[block];
-        range.count = gpu.drawn[i + 1];
+        range.count = drawn[i + 1];
         window[rangeCount] = range;
         rangeCount++;
       }
@@ -495,9 +532,7 @@ export class PointsPlugin implements EnginePlugin {
           index: hit.index,
           position,
           distance: hit.distance / scale,
-          depth: this.orthographic
-            ? hit.depth / Math.hypot(this.lastViewProj[2], this.lastViewProj[6], this.lastViewProj[10])
-            : hit.depth,
+          depth: picked.orthographic ? hit.depth / Math.hypot(viewProj[2], viewProj[6], viewProj[10]) : hit.depth,
         };
         bestDistance = hit.distance;
         bestDepth = hit.depth;
@@ -740,7 +775,8 @@ export class PointsPlugin implements EnginePlugin {
     this.fogGpu = undefined;
     this.gpu = undefined;
     this.device = undefined;
-    this.hasFrame = false;
+    this.pickViews.clear();
+    this.pickView = undefined;
     this.pipelines.clear();
   }
 
@@ -933,11 +969,13 @@ export class PointsPlugin implements EnginePlugin {
     // from the y row's length, and depth is linear: depth.y is NDC per world unit and the EDL/sphere value is
     // 1 + distance from the near plane.
     this.orthographic = !(c[3] || c[7] || c[11]);
-    const projScale = this.orthographic
-      ? 0.5 * context.height * Math.hypot(c[1], c[5], c[9])
-      : (0.5 * context.height) / Math.tan((camera.fov * Math.PI) / 360);
-    f[16] = context.width;
-    f[17] = context.height;
+    // Point sizes are pixels of the view being drawn: its camera projects onto its rectangle.
+    const [width, height] = viewSize(context),
+      projScale = this.orthographic
+        ? 0.5 * height * Math.hypot(c[1], c[5], c[9])
+        : (0.5 * height) / Math.tan((camera.fov * Math.PI) / 360);
+    f[16] = width;
+    f[17] = height;
     f[18] = projScale;
     f[19] = context.format.endsWith('-srgb') || context.format.includes('float') ? 0 : 1;
     if (this.orthographic) {
@@ -966,10 +1004,11 @@ export class PointsPlugin implements EnginePlugin {
     f[34] = v[10];
     f[35] = 0;
     this.device!.queue.writeBuffer(this.gpu!.frame, 0, f);
-    this.lastViewProj.set(camera.matrix);
-    this.lastSize[0] = context.width;
-    this.lastSize[1] = context.height;
-    this.hasFrame = true;
+    const picked = (this.pickView = this.pickViews.get(context));
+    picked.viewProj.set(c);
+    picked.rect = [...(viewRect(context) ?? [0, 0, width, height])] as PickView['rect'];
+    picked.canvas = !context.view?.target;
+    picked.orthographic = this.orthographic;
   }
 
   private writeCloudUniform(cloud: PointCloud, r: CloudGpu, model: ArrayLike<number>, mapped: boolean): void {
@@ -1062,7 +1101,9 @@ export class PointsPlugin implements EnginePlugin {
       gpu = this.gpu,
       camera = context.camera;
     this.writeFrame(context);
-    const projScale = this.frameData[18];
+    const projScale = this.frameData[18],
+      viewWidth = this.frameData[16],
+      viewHeight = this.frameData[17];
     // Fog: one uniform write per frame when a drawn material uses it, bound as group 2 in both passes.
     this.fogUsed = false;
     if (this.fogSource) {
@@ -1086,14 +1127,17 @@ export class PointsPlugin implements EnginePlugin {
     let cloudDrawCount = 0;
     for (const cloud of this.clouds) {
       cloud.stats.blocksVisible = cloud.stats.pointsVisible = cloud.stats.pointsDrawn = 0;
-      const prior = this.cloudGpu.get(cloud);
-      if (prior) prior.drawn.length = 0;
+      // This view's level of detail for the cloud, recorded for picking through it.
+      let drawn = this.pickView!.drawn.get(cloud);
+      if (!drawn) this.pickView!.drawn.set(cloud, (drawn = []));
+      drawn.length = 0;
       if (!cloud.visible || !cloud.count) continue;
       const mesh = cloud.attachedMesh,
         model = mesh ? meshWorldMatrix(engine, mesh) : cloud.matrix;
       if (!model) continue;
       cloud.material.validate();
       const r = this.ensureCloud(cloud);
+      r.drawn = drawn;
       this.flushCloud(cloud, r);
       const view = this.texture(cloud.material);
       this.writeCloudUniform(cloud, r, model, !!view && cloud.material.map !== null);
@@ -1109,7 +1153,7 @@ export class PointsPlugin implements EnginePlugin {
         const box = this.box;
         entryBlock.push(b);
         entryCount.push(blocks.counts[b]);
-        entryWeight.push(screenArea(box, camera.position, projScale, context.width, context.height, this.orthographic));
+        entryWeight.push(screenArea(box, camera.position, projScale, viewWidth, viewHeight, this.orthographic));
         entryDistance.push(
           Math.hypot(box[0] - camera.position[0], box[1] - camera.position[1], box[2] - camera.position[2]),
         );
@@ -1166,6 +1210,7 @@ export class PointsPlugin implements EnginePlugin {
       if (depthFormat.includes('stencil')) depthAttachment.stencilReadOnly = true;
       else delete depthAttachment.stencilReadOnly;
       const pass = context.encoder.beginRenderPass({ colorAttachments, depthStencilAttachment: depthAttachment });
+      applyView(pass, context);
       pass.setBindGroup(0, gpu.frameGroup);
       if (this.fogUsed) pass.setBindGroup(2, this.fogGpu!.group);
       const order = this.blockOrder;
@@ -1197,11 +1242,12 @@ export class PointsPlugin implements EnginePlugin {
         this.edlData[0] = this.edlStrength;
         this.edlData[1] = this.edlRadius;
         this.edlData[2] = this.orthographic
-          ? ((this.frameData[18] * 2) / context.height) * Math.tan((camera.fov * Math.PI) / 360) * Math.LOG2E
+          ? ((this.frameData[18] * 2) / this.frameData[17]) * Math.tan((camera.fov * Math.PI) / 360) * Math.LOG2E
           : 0;
         device.queue.writeBuffer(gpu.edlParams, 0, this.edlData);
         this.pointColors.length = 1;
         const edlPass = context.encoder.beginRenderPass({ colorAttachments: this.pointColors });
+        applyView(edlPass, context);
         edlPass.setPipeline(this.edlPipeline(context.format, context.descriptor.multisample?.count ?? 1));
         edlPass.setBindGroup(0, this.edl.group);
         edlPass.draw(3);
@@ -1281,6 +1327,7 @@ export class PointsPlugin implements EnginePlugin {
         colorAttachments: this.pointColors,
         depthStencilAttachment: depthAttachment,
       });
+      applyView(pass, context);
       pass.setBindGroup(0, gpu.frameGroup);
       if (this.fogUsed) pass.setBindGroup(2, this.fogGpu!.group);
       for (let i = 0; i < spriteCount; i++) {

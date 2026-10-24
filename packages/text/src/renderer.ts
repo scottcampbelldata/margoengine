@@ -8,6 +8,7 @@ import { LinearToSRGB as encodeSrgb } from '@margoengine/math/color';
 import { multiplyMatrices } from '@margoengine/math/mat4';
 import { textShader } from './shader.js';
 import { Text } from './text.js';
+import { applyView } from '../../shared/view-rect.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -455,6 +456,7 @@ export class TextRenderer implements EnginePlugin {
     this.depthAttachment.view = context.depth;
     const depthFormat = context.descriptor.depthStencil!.format;
     const pass = context.encoder.beginRenderPass(this.descriptor);
+    applyView(pass, context);
     pass.setBindGroup(0, this.frameGroup);
     for (const [list, onTop] of [
       [this.depthTexts, false],

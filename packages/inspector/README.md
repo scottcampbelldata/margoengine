@@ -28,6 +28,6 @@ importing their packages: core's sun, every `clustered*` plugin's `list` (point 
 and an environment hemisphere or ambient light (lines' `LightsHelper`). Debug drawing is disabled on WebGL2. The hierarchy and property
 editor still work there. Neither core nor the stage facade is modified.
 
-`select(mesh)` selects an entity. `setDebug('wireframe' | 'normals' | 'bounds' | 'lights', true)`
+With engine views, the debug helpers show in each view for the meshes that view draws (its culling and layers), the tree lists the meshes of the inspector's scene (`scene.use(inspector)` for another scene), and a frame capture lists every pass once per view with `view` (id, rectangle, scene); scenes created after a capture starts appear from the next capture. `select(mesh)` selects an entity. `setDebug('wireframe' | 'normals' | 'bounds' | 'lights', true)`
 toggles a scene overlay. `dispose()` releases the DOM, timer, GPU resources and
 registered passes; engine disposal also performs this cleanup.

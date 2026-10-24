@@ -3,6 +3,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type FrameGraph, type PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
+import { applyView } from '../../shared/view-rect.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_SRC: number };
@@ -333,6 +334,7 @@ export class ColorOutput {
     const pass = c.encoder.beginRenderPass(this.passDescriptor);
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, state.group);
+    applyView(pass, c);
     pass.draw(3);
     pass.end();
   }

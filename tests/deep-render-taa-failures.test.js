@@ -34,7 +34,7 @@ function harness() {
     },
   };
 }
-test('TAA restores public camera state on capture and motion failure and retries incomplete draw bindings', () => {
+test('TAA restores public camera state on capture and motion failure and retries incomplete draw bindings', async () => {
   for (const stage of ['capture', 'depth', 'primitive']) {
     const h = harness(),
       d = h.engine.gpu,
@@ -91,11 +91,12 @@ test('TAA restores public camera state on capture and motion failure and retries
       restore();
       taa.dispose();
       for (const r of owned) r.destroy();
+      await null;
       assert.ok(h.resources.every((r) => r.destroyed));
     }
   }
 });
-test('foreign pass failure cannot leave the public camera jittered, and later passes still receive jittered projection', () => {
+test('foreign pass failure cannot leave the public camera jittered, and later passes still receive jittered projection', async () => {
   const h = harness(),
     taa = new TAA(),
     failure = new Error('Foreign pass failed');
@@ -136,11 +137,12 @@ test('foreign pass failure cannot leave the public camera jittered, and later pa
     assert.deepEqual(h.publicCamera.matrix, h.matrix);
   } finally {
     taa.dispose();
+    await null;
     assert.ok(h.resources.every((r) => r.destroyed));
   }
 });
 
-test('instanced PBR casters retain camera reprojection without a non-instanced object velocity draw', () => {
+test('instanced PBR casters retain camera reprojection without a non-instanced object velocity draw', async () => {
   const h = harness(),
     taa = new TAA(),
     d = h.engine.gpu;
@@ -170,6 +172,7 @@ test('instanced PBR casters retain camera reprojection without a non-instanced o
     vertex.destroy();
     index.destroy();
     alpha.destroy();
+    await null;
     assert.ok(h.resources.every((resource) => resource.destroyed));
   }
 });

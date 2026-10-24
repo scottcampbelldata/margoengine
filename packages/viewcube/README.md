@@ -39,6 +39,7 @@ also follows projection changes made elsewhere (Blender's numpad 5 through a pro
   leaves the pole, or on `dispose` (then 1e-6 rad off the pole, same image). An up it did not set is left alone, such as
   a CameraProjection's vertical `up`. OrbitControls and CADCameraControls leave an exact pole at azimuth 0, so after a
   top view reached from the side they start from the front.
+- **Engine views.** `ViewCube.attach(engine, {view: {camera, viewport}})` turns that view's camera and sits in the chosen corner of its rectangle (the cube's container must cover the canvas). One cube per view.
 - **Controls.** The cube writes `camera.position` (and `camera.up` on the poles); OrbitControls, MapControls and core's CADCameraControls read
   the camera each frame, so they keep working. Any other camera change during an animation (a drag, a wheel) cancels it.
   A running `fitToBoundingBox` animation is cancelled when a view starts.

@@ -57,7 +57,7 @@ type CaptureResources = {
   descriptor: GPURenderPipelineDescriptor;
   depthStencil: GPUDepthStencilState;
   multisample: GPUMultisampleState;
-  draw: { pipeline: GPURenderPipeline; bindings: GPUBindGroupEntry[]; clear: false };
+  draw: { pipeline: GPURenderPipeline; bindings: GPUBindGroupEntry[]; clear: false; clearDepth: false };
   view?: Context;
   environmentView?: GPUTextureView;
   environmentParams?: GPUBuffer;
@@ -988,7 +988,7 @@ export class LightProbes extends ShaderEffect {
           descriptor: {} as GPURenderPipelineDescriptor,
           depthStencil: { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'greater-equal' },
           multisample: { count: 1 },
-          draw: { pipeline: this.capture!.pipeline, bindings, clear: false },
+          draw: { pipeline: this.capture!.pipeline, bindings, clear: false, clearDepth: false },
         };
       this.captureResources = resources;
       return resources;
@@ -1245,45 +1245,59 @@ export class LightProbes extends ShaderEffect {
     const encoder = device.createCommandEncoder(),
       color = target.colors[face],
       depth = target.depthView,
-      savedEncoder = c.encoder,
-      savedColor = c.color,
-      savedDepth = c.depth,
-      savedDescriptor = c.descriptor;
-    encoder.beginRenderPass(target.passes[face]).end();
-    c.encoder = encoder;
-    c.color = color;
-    c.depth = depth;
-    c.descriptor = resources.descriptor;
-    resources.draw.pipeline = this.capture!.pipeline;
-    resources.draw.bindings = resources.bindings;
-    resources.draw.clear = false;
+      saved = {
+        encoder: c.encoder,
+        color: c.color,
+        depth: c.depth,
+        descriptor: c.descriptor,
+        camera: c.camera,
+        width: c.width,
+        height: c.height,
+        format: c.format,
+        view: c.view,
+      },
+      hadView = Object.hasOwn(c, 'view'),
+      rect = [0, 0, size, size] as const,
+      // A face of a multi-view frame draws the whole face target, with the view's layers.
+      faceView = saved.view && {
+        id: saved.view.id,
+        camera,
+        viewport: rect,
+        index: 0,
+        count: 1,
+        layers: saved.view.layers,
+      };
     try {
+      encoder.beginRenderPass(target.passes[face]).end();
+      c.encoder = encoder;
+      c.color = color;
+      c.depth = depth;
+      c.descriptor = resources.descriptor;
+      c.camera = camera;
+      c.width = c.height = size;
+      c.format = 'rgba16float';
+      c.view = faceView;
+      resources.draw.pipeline = this.capture!.pipeline;
+      resources.draw.bindings = resources.bindings;
+      resources.draw.clear = false;
+      resources.draw.clearDepth = false;
       c.draw(resources.draw);
-    } finally {
-      c.encoder = savedEncoder;
-      c.color = savedColor;
-      c.depth = savedDepth;
-      c.descriptor = savedDescriptor;
-    }
-    if (this.disposed || this.gpu !== device) throw interrupted(this.disposed);
-    for (const key in view)
-      if (!Object.prototype.hasOwnProperty.call(c, key)) delete (view as unknown as Record<string, unknown>)[key];
-    Object.assign(view, c);
-    view.device = this.captureProxy!.proxy;
-    view.encoder = encoder;
-    view.camera = camera;
-    view.color = color;
-    view.depth = depth;
-    view.descriptor = resources.descriptor;
-    view.format = 'rgba16float';
-    view.width = view.height = size;
-    for (const model of this.captured) {
-      model.draw(view, 'beauty', color, depth);
       if (this.disposed || this.gpu !== device) throw interrupted(this.disposed);
+      for (const key in view)
+        if (!Object.prototype.hasOwnProperty.call(c, key)) delete (view as unknown as Record<string, unknown>)[key];
+      Object.assign(view, c);
+      view.device = this.captureProxy!.proxy;
+      for (const model of this.captured) {
+        model.draw(view, 'beauty', color, depth);
+        if (this.disposed || this.gpu !== device) throw interrupted(this.disposed);
+      }
+      if (face === 5) this.filterProbe(resources, target, bake, encoder, volumeIndex, reflectionIndex, samples);
+      resources.commands[0] = encoder.finish();
+      device.queue.submit(resources.commands);
+    } finally {
+      Object.assign(c, saved);
+      if (!hadView) delete c.view;
     }
-    if (face === 5) this.filterProbe(resources, target, bake, encoder, volumeIndex, reflectionIndex, samples);
-    resources.commands[0] = encoder.finish();
-    device.queue.submit(resources.commands);
   }
   private captureGroup(
     resources: CaptureResources,

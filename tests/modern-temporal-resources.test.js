@@ -77,6 +77,7 @@ async function integration(run) {
     scatter.dispose();
     taa.dispose();
     renderer?.dispose();
+    await null;
     assert.ok(
       h.resources.every((resource) => resource.destroyed),
       'Owned GPU resources survive disposal',

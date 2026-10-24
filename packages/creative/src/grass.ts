@@ -15,6 +15,7 @@ import frameShader from './shaders/grass-frame.wgsl?raw';
 import cullShader from './shaders/grass-cull.wgsl?raw';
 import grassShader from './shaders/grass.wgsl?raw';
 import { displayShader } from '../../shared/display.js';
+import { applyView } from '../../shared/view-rect.js';
 
 declare const GPUBufferUsage: {
   STORAGE: number;
@@ -354,6 +355,7 @@ export class GrassField implements EnginePlugin {
     this.color.view = c.color;
     this.depth.view = c.depth;
     const pass = c.encoder.beginRenderPass(this.pass);
+    applyView(pass, c);
     pass.setBindGroup(0, variant.group);
     pass.setVertexBuffer(0, this.vertices!);
     pass.setPipeline(variant.near);

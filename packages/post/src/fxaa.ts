@@ -11,6 +11,7 @@ import {
 import { fullscreen, render, group } from '../../shared/gpu.js';
 import type { StackStage } from '../../shared/stack.js';
 import { margoError } from '../../shared/errors.js';
+import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 // FXAA 3.11-style edge walk (after Timothy Lottes) on display-encoded colour, so luma is already perceptual.
@@ -152,9 +153,11 @@ export class FXAA implements EnginePlugin {
       this.group = group(c.device, this.pipeline!, [input, this.sampler!]);
     }
     this.attachment.view = view;
+    this.attachment.loadOp = viewLoadOp(c, 'clear');
     const pass = c.encoder.beginRenderPass(this.descriptor);
     pass.setPipeline(this.pipeline!);
     pass.setBindGroup(0, this.group!);
+    applyView(pass, c);
     pass.draw(3);
     pass.end();
   }

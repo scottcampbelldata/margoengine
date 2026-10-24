@@ -8,6 +8,7 @@ import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { displayShader } from '../../shared/display.js';
 import { PostStack } from './stack.js';
 import { vertex } from './hiz.js';
+import { applyView, fromTarget, viewLoadOp } from '../../shared/view-rect.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; STORAGE_BINDING: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -236,6 +237,8 @@ export class MotionBlur implements EnginePlugin {
       values = this.values;
     if (!invertMatrixStable(c.camera.matrix, values.subarray(0, 16), this.workspace))
       throw margoError('state', 'Invalid MotionBlur camera: its matrix cannot be inverted');
+    // The inverse takes full-target pixels (the velocity and depth textures) back to world space.
+    fromTarget(c, values);
     values.set(c.camera.position, 16);
     values[19] = 0;
     values[20] = c.width;
@@ -249,33 +252,36 @@ export class MotionBlur implements EnginePlugin {
     c.device.queue.writeBuffer(this.uniform!, 0, values as Float32Array<ArrayBuffer>);
     if (this.width !== c.width || this.height !== c.height || this.tileSize !== k) {
       for (const t of this.tiles) t.destroy();
+      this.tiles = [];
+      this.tileSize = this.width = this.height = 0;
+      this.velocityTexture = undefined;
+      this.groups.clear();
+      const size = [Math.ceil(c.width / k), Math.ceil(c.height / k)];
+      for (let i = 0; i < 2; i++)
+        this.tiles.push(
+          c.device.createTexture({
+            size,
+            format: 'rgba16float',
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
+          }),
+        );
+      this.tileViews = this.tiles.map((t) => t.createView());
       this.width = c.width;
       this.height = c.height;
       this.tileSize = k;
-      const size = [Math.ceil(c.width / k), Math.ceil(c.height / k)];
-      this.tiles = [0, 1].map(() =>
-        c.device.createTexture({
-          size,
-          format: 'rgba16float',
-          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
-        }),
-      );
-      this.tileViews = this.tiles.map((t) => t.createView());
-      this.velocityTexture = undefined;
-      this.groups.clear();
     }
     if (this.velocityTexture !== v) {
-      this.velocityTexture = v;
       this.velocityView = v.createView();
       this.tileGroups = [
         bind(c.device, this.tilePipeline!, [{ buffer: this.uniform! }, this.velocityView, this.tileViews[0]]),
         bind(c.device, this.neighbourPipeline!, [this.tileViews[0], this.tileViews[1]]),
       ];
+      this.velocityTexture = v;
       this.groups.clear();
     }
     if (this.depthTexture !== depth) {
-      this.depthTexture = depth;
       this.depthView = depth.createView({ aspect: 'depth-only' });
+      this.depthTexture = depth;
       this.groups.clear();
     }
     const pass = c.encoder.beginComputePass(),
@@ -316,9 +322,11 @@ export class MotionBlur implements EnginePlugin {
       byInput.set(input, group);
     }
     this.attachment.view = view;
+    this.attachment.loadOp = viewLoadOp(c, 'clear');
     const pass = c.encoder.beginRenderPass(this.pass);
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, group);
+    applyView(pass, c);
     pass.draw(3);
     pass.end();
   }

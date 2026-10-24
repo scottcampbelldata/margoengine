@@ -22,6 +22,7 @@ test('HTML shares rendered depth, projects anchors, bounds capacity and removes 
   await new Promise((resolve) => setImmediate(resolve));
   overlay.dispose();
   assert.equal(dom.window.document.querySelector('[data-margoengine-labels]'), null);
+  await null;
   assert.ok(h.resources.every((r) => r.destroyed));
   dom.window.close();
 });
@@ -118,6 +119,7 @@ test('HTML depth uploads avoid temporary arrays over 120 frames and clear remove
     overlay.dispose();
     dom.window.close();
   }
+  await null;
   assert.ok(h.resources.every((r) => r.destroyed));
 });
 

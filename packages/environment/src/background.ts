@@ -8,6 +8,7 @@ import type { RGBA8Image } from './ultrahdr.js';
 import { background as backgroundShader, imageBackground as imageBackgroundShader } from './shaders.js';
 import { invertMatrix } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
+import { applyView } from '../../shared/view-rect.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
@@ -203,6 +204,7 @@ export class EnvironmentBackground {
     const pass = context.encoder.beginRenderPass(this.passDescriptor);
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, state.group);
+    applyView(pass, context);
     pass.draw(3);
     pass.end();
   }

@@ -71,7 +71,7 @@ const ibl =
   '\nfn iblBrdfTerms(nv:f32,r:f32)->vec2f {return vec2f(1,0);}';
 
 for (const samples of [4, 1])
-  test(`SSR replays core materials into its targets and composes the stack input (${samples}x)`, () => {
+  test(`SSR replays core materials into its targets and composes the stack input (${samples}x)`, async () => {
     const h = harness(samples),
       ssr = new SSR(),
       taa = { binding: 8, resource: { buffer: {} } },
@@ -119,6 +119,7 @@ for (const samples of [4, 1])
     const composite = modules(log).find((code) => code.includes('fn closest('));
     assert.match(composite, /return vec4f\(toDisplay\(c\),s\.a\);/);
     // Steady frames create no GPU objects.
+    await null; // the next frame
     const steady = h.gpu.record(() => h.frame([taa, env]));
     assert.deepEqual(
       steady.filter((e) => /^(texture|buffer|module|group|renderPipeline|computePipeline|view|sampler)$/.test(e[0])),
@@ -126,11 +127,14 @@ for (const samples of [4, 1])
     );
     // Resize releases sized targets; dispose releases everything.
     const before = h.live().length;
+    await null; // the next frame
     h.view.state.width = 640;
     h.frame();
+    await null; // released resources are destroyed at the end of the task
     assert.equal(h.live().length, before);
     ssr.dispose();
     h.engine.removePlugin('post:stack');
+    await null; // released resources are destroyed at the end of the task
     assert.deepEqual(h.live(), []);
   });
 
@@ -145,13 +149,14 @@ test('SSR replaces the IBL specular from EnvironmentLighting (margoAmbient + its
   );
 });
 
-test('SSR.attach runs alone in its own PostStack; options are validated', () => {
+test('SSR.attach runs alone in its own PostStack; options are validated', async () => {
   const h = harness(4),
     ssr = SSR.attach(h.engine, { maxRoughness: 0.4 });
   assert.ok(h.plugins.has('post:stack') && h.plugins.has('ssr'));
   h.frame();
   ssr.dispose();
   assert.ok(!h.plugins.has('post:stack') && !h.plugins.has('ssr'));
+  await null; // released resources are destroyed at the end of the task
   assert.deepEqual(h.live(), []);
   assert.throws(() => h.engine.use(new SSR()), /PostStack/);
   for (const options of [
@@ -333,6 +338,7 @@ for (const samples of [4, 1])
       'guarded composite',
     );
     // Steady frames create no GPU objects; removers and dispose detach the hook.
+    await null; // the next frame
     const steady = h.gpu.record(() => h.frame());
     assert.deepEqual(
       steady.filter((e) => /^(texture|buffer|module|group|renderPipeline|computePipeline|view|sampler)$/.test(e[0])),

@@ -3,6 +3,7 @@ export type {
   LabelOptions,
   CSS3DOptions,
   LabelRendererOptions,
+  LabelView,
   LabelInfo,
   OccludeHook,
   DistanceScale,

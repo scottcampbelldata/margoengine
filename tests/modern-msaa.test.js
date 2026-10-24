@@ -282,7 +282,7 @@ test('single-sample optional captures allocate no intermediates and never resolv
   depth.destroy();
 });
 
-test('standalone 4x HDR captures resolve depth and discard samples without an outer scene', () => {
+test('standalone 4x HDR captures resolve depth and discard samples without an outer scene', async () => {
   const h = gpuHarness(),
     color = h.engine.gpu.createTexture({ size: [128, 96], format: 'rgba16float' }),
     depth = h.engine.gpu.createTexture({ size: [128, 96], format: 'depth32float' });
@@ -295,6 +295,7 @@ test('standalone 4x HDR captures resolve depth and discard samples without an ou
   assert.equal(h.pipelines[0].multisample.count, 1);
   assert.match(h.pipelines[0].fragment.module.code, /return max/);
   target.dispose();
+  await null;
   assert.ok(h.resources.slice(2).every((t) => t.destroyed));
   assert.equal(color.destroyed, false);
   color.destroy();

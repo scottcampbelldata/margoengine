@@ -181,7 +181,7 @@ test('PostStack validates its order and keeps an LDR-only stack on the core shad
   assert.equal(ldr.sceneTexture, undefined, 'no HDR scene to share without an HDR or display effect');
 });
 
-test('SSAO + DOF + Bloom + Tonemap + FXAA combine, resize, restore and dispose without leaks', () => {
+test('SSAO + DOF + Bloom + Tonemap + FXAA combine, resize, restore and dispose without leaks', async () => {
   for (const samples of [1, 4]) {
     const h = harness(samples),
       effects = [new SSAO(), new DOF({ aperture: 2 }), new Bloom(), new Tonemap({ curve: 'agx' }), new FXAA()];
@@ -198,6 +198,7 @@ test('SSAO + DOF + Bloom + Tonemap + FXAA combine, resize, restore and dispose w
     assert.equal(scene.width, h.view.c.width);
     assert.ok(scene.usage & GPUTextureUsage.COPY_SRC && scene.usage & GPUTextureUsage.TEXTURE_BINDING);
     // Steady frames allocate nothing on the GPU.
+    await null; // the next frame
     const count = h.resources.length,
       calls = h.gpu.record(() => restored(h, h.frame()));
     assert.equal(h.resources.length, count);
@@ -221,11 +222,12 @@ test('SSAO + DOF + Bloom + Tonemap + FXAA combine, resize, restore and dispose w
     restored(h, h.frame());
     stack.dispose();
     assert.equal(h.plugins.size, 0);
+    await null; // released resources are destroyed at the end of the task
     assert.deepEqual(h.live(), [], 'GPU textures leaked');
   }
 });
 
-test('combinations that rejected each other alone now share one capture', () => {
+test('combinations that rejected each other alone now share one capture', async () => {
   for (const make of [
     () => [new SSAO(), new Bloom()],
     () => [new Bloom(), new Tonemap()],
@@ -239,6 +241,7 @@ test('combinations that rejected each other alone now share one capture', () => 
       stack = PostStack.attach(h.engine, effects);
     for (let i = 0; i < 3; i++) restored(h, h.frame());
     stack.dispose();
+    await null; // released resources are destroyed at the end of the task
     assert.deepEqual(h.live(), [], effects.map((e) => e.name).join('+') + ' leaked');
   }
 });
@@ -262,7 +265,7 @@ test('PostStack refuses standalone capture owners and they refuse a live stack',
   assert.equal(f.plugins.size, 0);
 });
 
-test('FXAA alone wraps the finished frame, nests around another effect and restores and disposes cleanly', () => {
+test('FXAA alone wraps the finished frame, nests around another effect and restores and disposes cleanly', async () => {
   for (const samples of [1, 4]) {
     const h = harness(samples),
       fxaa = FXAA.attach(h.engine),
@@ -277,6 +280,7 @@ test('FXAA alone wraps the finished frame, nests around another effect and resto
     bloom.dispose();
     fxaa.dispose();
     fxaa.dispose();
+    await null;
     assert.deepEqual(h.live(), []);
   }
 });

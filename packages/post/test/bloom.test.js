@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Bloom, SSAO, bloomWeights } from '../dist/index.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
-test('Bloom captures HDR, preserves scene depth for later overlays, resizes and restores without leaks', () => {
+test('Bloom captures HDR, preserves scene depth for later overlays, resizes and restores without leaks', async () => {
   const h = optionalGPU(),
     effect = new Bloom();
   h.engine.use(effect);
@@ -44,6 +44,7 @@ test('Bloom captures HDR, preserves scene depth for later overlays, resizes and 
   effect.onDeviceRestored(h.engine);
   h.frame();
   effect.dispose();
+  await null;
   assert.ok(h.resources.every((r) => r.destroyed));
 });
 

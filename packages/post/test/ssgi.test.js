@@ -8,7 +8,7 @@ const ibl = wgsl.replace(/let linear=([^;]+);/, 'let margoAmbient=vec3f(0.5);let
 const passes = (log) => log.filter((e) => e[0] === 'beginRenderPass').length;
 
 for (const samples of [4, 1])
-  test(`SSGI replays core materials, traces the bounce and composes the stack input (${samples}x)`, () => {
+  test(`SSGI replays core materials, traces the bounce and composes the stack input (${samples}x)`, async () => {
     const h = harness({ samples }),
       ssgi = new SSGI({ rays: 2, maxDistance: 8, steps: 24, intensity: 0.5 });
     const setup = h.gpu.record(() => h.engine.use(new PostStack([ssgi]))),
@@ -58,6 +58,7 @@ for (const samples of [4, 1])
     assert.ok(passes(off) <= passes(log) - 8, 'disabled: no mips, trace or blur');
     assert.equal(written(off, 176)[39], 0);
     h.engine.removePlugin('post:stack');
+    await null; // released resources are destroyed at the end of the task
     assert.deepEqual(h.live(), [], 'disposal releases every GPU resource');
   });
 
@@ -116,7 +117,7 @@ test('SSGI and SSR capture the same model through one hook, each into its own ta
   h.engine.removePlugin('post:stack');
 });
 
-test('SSGI runs only in a PostStack and validates its options', () => {
+test('SSGI runs only in a PostStack and validates its options', async () => {
   const h = harness();
   assert.throws(() => h.engine.use(new SSGI()), {
     name: 'MargoError',
@@ -128,6 +129,7 @@ test('SSGI runs only in a PostStack and validates its options', () => {
   h.frame();
   ssgi.dispose();
   assert.ok(!h.engine.hasPlugin('post:stack'));
+  await null; // released resources are destroyed at the end of the task
   assert.deepEqual(h.live(), []);
   for (const options of [
     { rays: 0 },

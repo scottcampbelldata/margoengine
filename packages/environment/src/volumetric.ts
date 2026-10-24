@@ -18,6 +18,7 @@ import { sceneTarget } from '../../shared/msaa.js';
 import { preset } from '../../shared/preset.js';
 import { displayShader } from '../../shared/display.js';
 import { legacyTerms, decayTerms } from '../../shared/light-terms.js';
+import { applyView, viewRect, ViewStates } from '../../shared/view-rect.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; STORAGE_BINDING: number; COPY_SRC: number };
@@ -146,7 +147,7 @@ ${
     }
     light+=volume.sunColor.rgb*phase(dot(-volume.sun.xyz,v),volume.scatter.w)*lit;
   }
-  ${lights ? 'light+=localLight(uv*volume.screen.xy,p,v,volume.scatter.w);' : ''}
+  ${lights ? 'light+=localLight(uv*volume.screen.xy+volume.screen.zw,p,v,volume.scatter.w);' : ''}
   var value=vec4f(sigma*volume.scatter.rgb*light,sigma);
   if(volume.grid.w>0.0){
     // Reproject the froxel's centre, not the jittered sample: a still camera reads its own texel unfiltered (no drift).
@@ -185,7 +186,7 @@ const composite =
 @vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {return vec4f(array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3))[i],0,1);}
 ${displayShader}
 @fragment fn fragment(@builtin(position) position:vec4f)->@location(0) vec4f {
-  let depth=textureLoad(sceneDepth,vec2i(position.xy),0);let uv=position.xy/volume.screen.xy;var t=volume.shape.x;
+  let depth=textureLoad(sceneDepth,vec2i(position.xy),0);let uv=(position.xy-volume.screen.zw)/volume.screen.xy;var t=volume.shape.x;
   if(depth>0.0){let p=volume.inverse*vec4f(uv.x*2-1,1-uv.y*2,depth,1);t=clamp(dot(volume.plane,vec4f(p.xyz/p.w,1)),0.0,t);}
   let s=textureSampleLevel(fogVolume,linearSampler,vec3f(uv,(sqrt(t/volume.shape.x)*volume.grid.z-0.5)/volume.grid.z),0);
   let opacity=1.0-exp(-s.a);var light=s.rgb;
@@ -232,11 +233,30 @@ export class VolumetricFog implements EnginePlugin {
   private depthViews = new WeakMap<GPUTexture, GPUTextureView>();
   private frameIndex = 0;
   private valid = false;
+  private viewGeometry = '';
+  // Each engine view keeps its own froxel grid and history in a VolumetricFog of its own, which reads this one's live
+  // options and wind offset; it is released when the view is not drawn for a frame.
+  private readonly views = new ViewStates<VolumetricFog>(
+    () => {
+      const view = new VolumetricFog();
+      (view as { options: VolumetricFogOptions }).options = this.options;
+      view.offset = this.offset;
+      try {
+        view.setup(this.engine!);
+      } catch (error) {
+        view.release();
+        throw error;
+      }
+      return view;
+    },
+    (view) => view.release(),
+  );
+  private activeView?: VolumetricFog;
   private disposed = false;
   private readonly values = new Float32Array(76);
   private readonly inverse = this.values.subarray(0, 16);
   private readonly previous = this.values.subarray(16, 32);
-  private readonly offset = [0, 0, 0];
+  private offset = [0, 0, 0];
   private readonly attachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' };
   private readonly pass: GPURenderPassDescriptor = { colorAttachments: [this.attachment] };
 
@@ -252,6 +272,7 @@ export class VolumetricFog implements EnginePlugin {
   }
   /** The integrated volume (rgba16float 3D, grid sized): in-scattered light (rgb) and optical depth (a) from the camera to each slice's far edge, for custom shaders (particles). Changes on grid change and device restore. */
   get texture(): GPUTexture | undefined {
+    if (this.activeView) return this.activeView.texture;
     return this.textures[2];
   }
 
@@ -307,9 +328,16 @@ export class VolumetricFog implements EnginePlugin {
       name: this.name,
       order: 5,
       execute: (c) => {
-        if (c.backend === 'webgpu') this.render(c);
+        if (c.backend === 'webgpu') this.forView(c).render(c);
       },
     });
+  }
+
+  private forView(c: Context): VolumetricFog {
+    return (this.activeView = c.view && this.views.get(c)) ?? this;
+  }
+  onPreUpdate(delta: number): void {
+    if (delta > 0) this.views.prune();
   }
 
   private conflicts(): void {
@@ -335,12 +363,20 @@ export class VolumetricFog implements EnginePlugin {
     }
   }
   private allocate(device: GPUDevice, grid: readonly number[]): void {
-    for (const texture of this.textures) texture.destroy();
     const size = [grid[0], grid[1], grid[2]],
       usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC;
     if (size.some((v) => v > device.limits.maxTextureDimension3D))
       throw new RangeError('Volumetric grid exceeds device limit');
-    this.textures = [0, 1, 2].map(() => device.createTexture({ size, dimension: '3d', format: 'rgba16float', usage }));
+    const textures: GPUTexture[] = [];
+    try {
+      for (let i = 0; i < 3; i++)
+        textures.push(device.createTexture({ size, dimension: '3d', format: 'rgba16float', usage }));
+    } catch (error) {
+      for (const texture of textures) texture.destroy();
+      throw error;
+    }
+    for (const texture of this.textures) texture.destroy();
+    this.textures = textures;
     this.gridKey = grid.join();
     this.injectGroups = [];
     this.integrateGroups = [];
@@ -358,6 +394,12 @@ export class VolumetricFog implements EnginePlugin {
     if (this.disposed || c.device !== this.device) return;
     this.validate();
     this.conflicts();
+    const rect = viewRect(c),
+      geometry = [c.width, c.height, ...(rect ?? []), c.camera.fov, c.camera.near, c.camera.far].join(':');
+    if (geometry !== this.viewGeometry) {
+      this.valid = false;
+      this.viewGeometry = geometry;
+    }
     const o = this.options,
       device = c.device,
       target = sceneTarget(c);
@@ -406,9 +448,11 @@ export class VolumetricFog implements EnginePlugin {
     }
     if (!this.injectGroups.length) {
       const views = this.textures.map((t) => t.createView()),
-        uniform = { binding: 0, resource: { buffer: this.uniform! } };
+        uniform = { binding: 0, resource: { buffer: this.uniform! } },
+        injectGroups: GPUBindGroup[] = [],
+        integrateGroups: GPUBindGroup[] = [];
       for (let i = 0; i < 2; i++) {
-        this.injectGroups.push(
+        injectGroups.push(
           this.group(this.inject, 0, [
             uniform,
             { binding: 1, resource: views[1 - i] },
@@ -416,7 +460,7 @@ export class VolumetricFog implements EnginePlugin {
             { binding: 3, resource: views[i] },
           ]),
         );
-        this.integrateGroups.push(
+        integrateGroups.push(
           this.group(this.integrateStep!, 0, [
             uniform,
             { binding: 2, resource: this.sampler! },
@@ -425,6 +469,8 @@ export class VolumetricFog implements EnginePlugin {
           ]),
         );
       }
+      this.injectGroups = injectGroups;
+      this.integrateGroups = integrateGroups;
     }
     // Uniform: matrices, near planes, grid, density shape, scattering, sun, ambient, noise, jitter, screen.
     const m = c.camera.matrix,
@@ -459,8 +505,10 @@ export class VolumetricFog implements EnginePlugin {
     v[67] = +(c.format === 'rgba16float' || c.format === 'rgba32float');
     const frame = (this.frameIndex % 16) + 1;
     for (let i = 0; i < 3; i++) v[68 + i] = temporal > 0 ? halton(frame, [2, 3, 5][i]) - 0.5 : 0;
-    v[72] = c.width;
-    v[73] = c.height;
+    v[72] = rect?.[2] ?? c.width;
+    v[73] = rect?.[3] ?? c.height;
+    v[74] = rect?.[0] ?? 0;
+    v[75] = rect?.[1] ?? 0;
     device.queue.writeBuffer(this.uniform!, 0, v as Float32Array<ArrayBuffer>);
     // Froxel lighting and reprojection, then the per-column integration.
     const parity = this.frameIndex & 1,
@@ -522,6 +570,7 @@ export class VolumetricFog implements EnginePlugin {
     const draw = c.encoder.beginRenderPass(this.pass);
     draw.setPipeline(pipeline);
     draw.setBindGroup(0, this.compositeGroup.group);
+    applyView(draw, c);
     draw.draw(3);
     draw.end();
     this.previous.set(m);
@@ -535,6 +584,8 @@ export class VolumetricFog implements EnginePlugin {
     return view;
   }
   private release(): void {
+    this.views.clear();
+    this.activeView = undefined;
     for (const texture of this.textures) texture.destroy();
     this.uniform?.destroy();
     this.textures = [];
@@ -546,6 +597,8 @@ export class VolumetricFog implements EnginePlugin {
     this.composites.clear();
     this.depthViews = new WeakMap();
     this.valid = false;
+    this.viewGeometry = '';
+    this.frameIndex = 0;
   }
   onDeviceRestored(engine: Engine): void {
     this.release();

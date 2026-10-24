@@ -12,6 +12,9 @@ import { PostStack } from './stack.js';
 import { vertex, reduceShader, downsampleShader, traceFunctions, march } from './hiz.js';
 import { shareCapture, drawCapture } from './capture.js';
 import type { SSRCapture, SSRModel } from './ssr.js';
+import { applyView, viewLoadOp } from '../../shared/view-rect.js';
+import { MaterialClear, partialMaterialView } from './material-clear.js';
+import { currentFrame, retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; STORAGE_BINDING: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -178,6 +181,8 @@ function directions(count: number): Float32Array {
 export class SSGI implements EnginePlugin {
   readonly name = 'ssgi';
   private engine?: Engine;
+  /** Device of the current GPU resources, so a release after device restoration retires them on their own device. */
+  private device?: GPUDevice;
   private host?: StackHost;
   private stack?: PostStack;
   private disposed = false;
@@ -208,15 +213,17 @@ export class SSGI implements EnginePlugin {
   private chainPasses: GPURenderPassDescriptor[] = [];
   private gi: GPUTextureView[] = [];
   private giPasses: GPURenderPassDescriptor[] = [];
-  private blurGroups: GPUBindGroup[] = [];
-  private traceGroup?: GPUBindGroup;
   private replay?: GPURenderPipeline;
   private replayKey?: string;
   private composite?: GPURenderPipeline;
-  private compositeGroup?: GPUBindGroup;
+  /** Groups that hold the uniform, per uniform binding: a second view of a frame binds its own uniform slice. */
+  private viewGroups?: { get(copy?: GPUBufferBinding): GPUBindGroup[] };
+  private blurViewGroups?: { get(copy?: GPUBufferBinding): GPUBindGroup[] };
+  private slice?: GPUBufferBinding;
   private input?: GPUTextureView;
   private key = '';
   private clearPass?: GPURenderPassDescriptor;
+  private materialClear?: MaterialClear;
   private extra: GPURenderPassColorAttachment[] = [];
   private readonly compositeAttachment: GPURenderPassColorAttachment = {
     view: undefined!,
@@ -244,10 +251,12 @@ export class SSGI implements EnginePlugin {
         stencil = c.descriptor.depthStencil!.format.includes('stencil')
           ? ({ stencilLoadOp: 'load', stencilStoreOp: 'store' } as const)
           : {};
-      return (this.pass = c.encoder.beginRenderPass({
+      const pass = (this.pass = c.encoder.beginRenderPass({
         colorAttachments: this.material.map((view) => ({ view, loadOp: 'load', storeOp: 'store' })),
         depthStencilAttachment: { view: c.depth, depthLoadOp: 'load', depthStoreOp: 'store', ...stencil },
       }));
+      applyView(pass, c);
+      return pass;
     },
   };
   private readonly values = new Float32Array(44);
@@ -327,6 +336,7 @@ export class SSGI implements EnginePlugin {
       );
     if (!engine.gpu) throw margoError('unsupported', 'SSGI requires WebGPU');
     this.engine = engine;
+    this.device = engine.gpu;
     const device = engine.gpu;
     this.uniform = device.createBuffer({ size: 176, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.rays = device.createBuffer({ size: 4096, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
@@ -379,7 +389,7 @@ export class SSGI implements EnginePlugin {
     v[42] = 0;
     // Cone of one of the 16 x rays directions (solid angle 2 pi / n): the hit footprint per pixel travelled.
     v[43] = Math.sqrt((2 * Math.PI) / (16 * rays));
-    c.device.queue.writeBuffer(this.uniform!, 0, v as Float32Array<ArrayBuffer>);
+    this.slice = writeUniform(c.device, this.uniform!, v as Float32Array<ArrayBuffer>, c.view ?? c);
     if (this.rayCount !== rays) {
       this.rayCount = rays;
       c.device.queue.writeBuffer(this.rays!, 0, directions(rays) as Float32Array<ArrayBuffer>);
@@ -407,15 +417,29 @@ export class SSGI implements EnginePlugin {
       });
       this.replayKey = key;
     }
+    const partial = partialMaterialView(c);
     const { color, depth, descriptor } = c;
     c.color = this.material[0];
     if (own) {
       c.depth = own;
       c.descriptor = this.single!;
-    } else c.encoder.beginRenderPass(this.clearPass!).end();
+    }
     try {
       // With margoAmbient the lighting runs, so the replay keeps every pass binding (as SSAO's does).
-      c.draw({ pipeline: this.replay, clear: !!own, bindings: c.bindings, colorAttachments: this.extra });
+      if (partial) {
+        const clear = (this.materialClear ??= new MaterialClear(formats, this.extra));
+        clear.draw(c, !!own);
+        c.draw({
+          pipeline: this.replay,
+          clear: false,
+          clearDepth: false,
+          bindings: c.bindings,
+          colorAttachments: clear.extra,
+        });
+      } else {
+        if (!own) c.encoder.beginRenderPass(this.clearPass!).end();
+        c.draw({ pipeline: this.replay, clear: !!own, bindings: c.bindings, colorAttachments: this.extra });
+      }
       if (this.models.size) {
         this.context = c;
         for (const model of this.models.keys()) drawCapture(model, this.hook, c);
@@ -433,10 +457,17 @@ export class SSGI implements EnginePlugin {
     }
     pass.end();
   }
-  private fullscreen(c: Context, descriptor: GPURenderPassDescriptor, pipeline: GPURenderPipeline, g: GPUBindGroup) {
+  private fullscreen(
+    c: Context,
+    descriptor: GPURenderPassDescriptor,
+    pipeline: GPURenderPipeline,
+    g: GPUBindGroup,
+    scoped = true,
+  ) {
     const pass = c.encoder.beginRenderPass(descriptor);
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, g);
+    if (scoped) applyView(pass, c);
     pass.draw(3);
     pass.end();
   }
@@ -451,38 +482,39 @@ export class SSGI implements EnginePlugin {
     }
     if (this.input !== input) {
       this.input = input;
-      const uniform = { buffer: this.uniform! };
       this.chainGroups[0] = bind(c.device, this.downsample!, [input, this.sampler!]);
-      this.traceGroup = bind(c.device, this.tracer!, [
-        uniform,
-        input,
-        this.chain!,
-        this.sampler!,
-        this.depthView!,
-        this.hiz!,
-        this.material[2],
-        this.material[1],
-        { buffer: this.rays! },
-      ]);
-      this.compositeGroup = bind(c.device, this.composite!, [
-        uniform,
-        input,
-        this.gi[0],
-        this.material[0],
-        this.material[1],
+      this.viewGroups = uniformGroups(this.uniform!, (uniform) => [
+        bind(c.device, this.tracer!, [
+          uniform,
+          input,
+          this.chain!,
+          this.sampler!,
+          this.depthView!,
+          this.hiz!,
+          this.material[2],
+          this.material[1],
+          { buffer: this.rays! },
+        ]),
+        bind(c.device, this.composite!, [uniform, input, this.gi[0], this.material[0], this.material[1]]),
       ]);
     }
+    const [trace, composite] = this.viewGroups!.get(this.slice);
     if (this.enabled) {
+      // Normalized prefilter UVs cover each complete native mip, independent of the main-target rectangle.
       for (let i = 0; i < blurLevels; i++)
-        this.fullscreen(c, this.chainPasses[i], this.downsample!, this.chainGroups[i]);
-      this.fullscreen(c, this.giPasses[0], this.tracer!, this.traceGroup!);
-      this.fullscreen(c, this.giPasses[1], this.blur!, this.blurGroups[0]);
-      this.fullscreen(c, this.giPasses[0], this.blur!, this.blurGroups[1]);
+        this.fullscreen(c, this.chainPasses[i], this.downsample!, this.chainGroups[i], false);
+      const blur = this.blurViewGroups!.get(this.slice);
+      this.fullscreen(c, this.giPasses[0], this.tracer!, trace);
+      this.fullscreen(c, this.giPasses[1], this.blur!, blur[0]);
+      this.fullscreen(c, this.giPasses[0], this.blur!, blur[1]);
     }
     this.compositeAttachment.view = output.view;
-    this.fullscreen(c, this.compositePass, this.composite!, this.compositeGroup!);
+    this.compositeAttachment.loadOp = viewLoadOp(c, 'clear');
+    this.fullscreen(c, this.compositePass, this.composite!, composite);
   }
   private resize(c: Context): void {
+    // This view draws in the frame: what it releases waits while another view's commands still need it.
+    currentFrame(c.device, c.view ?? c);
     const target = this.host!.target!;
     if (this.width === c.width && this.height === c.height && this.target === target) return;
     this.release();
@@ -532,18 +564,14 @@ export class SSGI implements EnginePlugin {
     this.gi = [0, 1].map(() => texture([c.width, c.height], 'rgba16float', attachment).createView());
     this.giPasses = this.gi.map((view) => ({ colorAttachments: [{ view, loadOp: 'clear', storeOp: 'store' }] }));
     const normals = this.material[2];
-    this.blurGroups = [0, 1].map((i) =>
-      bind(device, this.blur!, [
-        { buffer: this.uniform! },
-        this.gi[i],
-        this.depthView!,
-        normals,
-        { buffer: this.axes[i] },
-      ]),
+    this.blurViewGroups = uniformGroups(this.uniform!, (uniform) =>
+      [0, 1].map((i) =>
+        bind(device, this.blur!, [uniform, this.gi[i], this.depthView!, normals, { buffer: this.axes[i] }]),
+      ),
     );
   }
   private release(): void {
-    for (const t of this.textures) t.destroy();
+    for (const t of this.textures) retire(this.device!, t);
     this.textures = [];
     this.width = this.height = 0;
     this.target = undefined;
@@ -555,17 +583,18 @@ export class SSGI implements EnginePlugin {
     this.chainPasses = [];
     this.gi = [];
     this.giPasses = [];
-    this.blurGroups = [];
+    this.blurViewGroups = undefined;
     this.extra = [];
     this.depthView = this.ownDepth = this.hiz = this.chain = undefined;
-    this.traceGroup = this.compositeGroup = undefined;
+    this.viewGroups = undefined;
     this.clearPass = undefined;
+    this.materialClear = undefined;
     this.compositeAttachment.view = undefined!;
   }
   private releaseBuffers(): void {
-    this.uniform?.destroy();
-    this.rays?.destroy();
-    for (const b of this.axes) b.destroy();
+    retire(this.device!, this.uniform);
+    retire(this.device!, this.rays);
+    for (const b of this.axes) retire(this.device!, b);
     this.uniform = this.rays = undefined;
     this.axes = [];
     this.replay = this.composite = undefined;

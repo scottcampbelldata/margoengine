@@ -22,7 +22,7 @@ function harness() {
     },
   };
 }
-test('Creative capture and presentation pipelines follow depth, sampling and target formats', () => {
+test('Creative capture and presentation pipelines follow depth, sampling and target formats', async () => {
   const h = harness(),
     c = h.context,
     p = new PostProcessing({ atmosphere: { density: 0.02 } });
@@ -66,10 +66,11 @@ test('Creative capture and presentation pipelines follow depth, sampling and tar
     h.frame();
   } finally {
     p.dispose();
+    await null;
     assert.ok(h.resources.every((r) => r.destroyed));
   }
 });
-test('Creative validation and Toon source patches avoid repeated stable-frame scaffolding', () => {
+test('Creative validation and Toon source patches avoid repeated stable-frame scaffolding', async () => {
   const h = harness(),
     p = new PostProcessing(),
     toon = new ToonShading();
@@ -113,10 +114,11 @@ test('Creative validation and Toon source patches avoid repeated stable-frame sc
   }
   toon.dispose();
   p.dispose();
+  await null;
   assert.ok(h.resources.every((r) => r.destroyed));
 });
 
-test('Creative capture retries every fallible first-frame allocation and upload', () => {
+test('Creative capture retries every fallible first-frame allocation and upload', async () => {
   for (const method of ['createTexture', 'createBindGroup', 'createRenderPipeline', 'writeBuffer']) {
     const baseline = harness(),
       effect = new PostProcessing({ atmosphere: { density: 0.02 } });
@@ -130,6 +132,7 @@ test('Creative capture retries every fallible first-frame allocation and upload'
     };
     baseline.frame();
     effect.dispose();
+    await null;
     assert.ok(baseline.resources.every((r) => r.destroyed));
     for (let at = 1; at <= total; at++) {
       const h = harness(),
@@ -149,6 +152,7 @@ test('Creative capture retries every fallible first-frame allocation and upload'
         h.frame();
         h.frame();
         candidate.dispose();
+        await null;
         assert.ok(
           h.resources.every((r) => r.destroyed),
           failure.message + ' leaked',
@@ -233,7 +237,7 @@ test('Creative option bounds, unknown finite fields and Toon shader variants sta
   assert.ok(h.resources.every((r) => r.destroyed));
 });
 
-test('Creative closes failed compute and presentation passes before restoring capture ownership', () => {
+test('Creative closes failed compute and presentation passes before restoring capture ownership', async () => {
   for (const stage of ['compute', 'present']) {
     const h = harness(),
       p = new PostProcessing({ atmosphere: { density: 0.02 } }),
@@ -276,6 +280,7 @@ test('Creative closes failed compute and presentation passes before restoring ca
       h.frame();
     } finally {
       p.dispose();
+      await null;
       assert.ok(h.resources.every((r) => r.destroyed));
     }
   }

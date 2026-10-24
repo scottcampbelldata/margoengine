@@ -13,6 +13,7 @@ import { displayShader } from '../../shared/display.js';
 import { margoError } from '../../shared/errors.js';
 import { render } from '../../shared/gpu.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
+import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: {
   COPY_SRC: number;
@@ -30,7 +31,7 @@ export interface BloomOptions {
   strength?: number;
   /** Linear brightness (brightest channel) above which a pixel glows, 0 to 100 (default 1). */
   threshold?: number;
-  /** Exposure in stops, applied before the AgX display transform, -10 to 10 (default 0). */
+  /** Exposure in stops, applied before the neutral display transform, -10 to 10 (default 0). */
   exposure?: number;
   /**
    * How far the glow spreads, 0 to 1 (default 0.5). Level j of the chain (j = 0 is the half-resolution level, the
@@ -150,7 +151,7 @@ function bind(
 }
 
 /**
- * Owns linear HDR scene capture, a glow chain from half resolution down to 1/64 and a single dithered AgX presentation.
+ * Owns linear HDR scene capture, a glow chain from half resolution down to 1/64 and a single dithered neutral display presentation.
  * @throws RangeError when an option or an `encodeImage` size is out of range.
  * @throws MargoError `'unsupported'` on a WebGL engine or when another plugin replaced core's lighting shader,
  * `'disposed'` after `dispose()`, `'attached'` when attached twice, `'state'` when another post effect owns the output
@@ -352,7 +353,7 @@ export class Bloom implements EnginePlugin {
       },
     });
     graph.add({
-      name: 'bloom:AgX',
+      name: 'bloom:present',
       order: 30,
       execute: (c) => {
         if (c.backend === 'webgpu') this.draw(c);
@@ -481,7 +482,7 @@ export class Bloom implements EnginePlugin {
     this.capture!.restore(c);
     c.draw = this.originalDraw!;
   }
-  /** Stacked: run the chain on `input` and composite into `output`, AgX-encoded only as the display output. */
+  /** Stacked: run the chain on `input` and composite into `output`, display-encoded only as the final output. */
   private stage(c: PostPassContext, input: GPUTextureView, output: StageOutput): void {
     this.validate();
     const device = c.device,
@@ -529,9 +530,11 @@ export class Bloom implements EnginePlugin {
     }
     compute.end();
     this.attachment.view = view;
+    this.attachment.loadOp = viewLoadOp(c, 'clear');
     const pass = c.encoder.beginRenderPass(this.presentation);
     pass.setPipeline(this.present!);
     pass.setBindGroup(0, this.group!);
+    applyView(pass, c);
     pass.draw(3);
     pass.end();
   }

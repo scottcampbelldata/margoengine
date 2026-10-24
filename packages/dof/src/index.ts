@@ -13,6 +13,7 @@ import { orthographic } from '../../shared/projection.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { cocShader, coarseShader, bokehShader, presentShader } from './shaders.js';
 import { MargoError } from '@margoengine/math/errors';
+import { applyView, viewLoadOp, viewSize } from '../../shared/view-rect.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: {
@@ -188,13 +189,14 @@ export class DOF implements EnginePlugin {
     this.validate();
     const o = this.options,
       v = this.values;
+    const [, viewHeight] = viewSize(c);
     v[0] = o.focalDistance ?? 5;
     v[1] = o.focalLength ?? 0.05;
     v[2] = o.aperture ?? 2.8;
     v[3] = o.maxRadius ?? 16;
     v[4] = c.camera.near;
     v[5] = c.camera.far;
-    v[6] = (v[1] * c.height) / (4 * v[2] * (v[0] - v[1]) * Math.tan((c.camera.fov * Math.PI) / 360));
+    v[6] = (v[1] * viewHeight) / (4 * v[2] * (v[0] - v[1]) * Math.tan((c.camera.fov * Math.PI) / 360));
     v[7] = +this.enabled;
     v[8] = 0;
     // Orthographic clip matrix (e.g. @margoengine/cameras): linear depth and a blur linear in defocus, scaled like a
@@ -203,7 +205,7 @@ export class DOF implements EnginePlugin {
     if (ortho) {
       v[4] = ortho.near;
       v[5] = ortho.far;
-      v[6] = (v[1] * c.height * ortho.sy * v[0]) / (4 * v[2] * (v[0] - v[1]));
+      v[6] = (v[1] * viewHeight * ortho.sy * v[0]) / (4 * v[2] * (v[0] - v[1]));
       v[8] = 1;
     }
     if (!Number.isFinite(v[6])) throw new RangeError('DOF lens scale exceeds float32');
@@ -317,9 +319,11 @@ export class DOF implements EnginePlugin {
   }
   private present(c: Context): void {
     this.attachment.view = this.originalColor!;
+    this.attachment.loadOp = viewLoadOp(c, 'clear');
     const pass = c.encoder.beginRenderPass(this.presentation);
     pass.setPipeline(this.presentPipeline!);
     pass.setBindGroup(0, this.groups[2]);
+    applyView(pass, c);
     pass.draw(3);
     pass.end();
     this.captureTarget!.restore(c);
@@ -368,9 +372,11 @@ export class DOF implements EnginePlugin {
       this.groups[2] = group(device, this.presentPipeline, [this.outputView!]);
     }
     this.attachment.view = output.view;
+    this.attachment.loadOp = viewLoadOp(c, 'clear');
     const pass = c.encoder.beginRenderPass(this.presentation);
     pass.setPipeline(this.presentPipeline!);
     pass.setBindGroup(0, this.groups[2]);
+    applyView(pass, c);
     pass.draw(3);
     pass.end();
   }

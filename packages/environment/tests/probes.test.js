@@ -909,3 +909,28 @@ test('irradianceAt mirrors the shader: trilinear between probe centres, float16 
   assert.equal(probes.irradianceAt([0, 4, 0], [0, 1, 0]), null, 'outside the volume');
   probes.dispose();
 });
+
+test('a probe baked inside a multi-view frame draws each face as a whole-target view with the host layers', async () => {
+  const h = pooledProbes(),
+    host = { id: 'right', camera: h.frame.camera, viewport: [64, 0, 64, 96], index: 1, count: 2, layers: 4 },
+    seen = [];
+  h.frame.c.view = host;
+  h.probes.add({
+    addLighting() {
+      return () => {};
+    },
+    draw(c) {
+      seen.push({ ...c.view, size: c.width });
+    },
+  });
+  await h.probes.bake();
+  assert.ok(seen.length);
+  for (const view of seen) {
+    assert.deepEqual(view.viewport, [0, 0, view.size, view.size]);
+    assert.equal(view.index, 0);
+    assert.equal(view.layers, 4);
+    assert.notEqual(view.camera, host.camera);
+  }
+  assert.equal(h.frame.c.view, host, 'the host view is restored');
+  h.probes.dispose();
+});

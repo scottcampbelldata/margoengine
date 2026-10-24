@@ -6,7 +6,7 @@ import { harness, modules, written } from './support.js';
 const dispatches = (log) => log.filter((e) => e[0] === 'pass.dispatchWorkgroups').length;
 
 for (const samples of [4, 1])
-  test(`LensFlare follows the engine light by default, tests the stack depth and adds to the HDR frame (${samples}x)`, () => {
+  test(`LensFlare follows the engine light by default, tests the stack depth and adds to the HDR frame (${samples}x)`, async () => {
     const h = harness({ samples }),
       flare = new LensFlare({ intensity: 0.5, occlusionRadius: 20 });
     const log = h.gpu.record(() => {
@@ -33,6 +33,7 @@ for (const samples of [4, 1])
     flare.enabled = false;
     assert.equal(dispatches(h.gpu.record(() => h.frame())), 0);
     h.engine.removePlugin('post:stack');
+    await null;
     assert.deepEqual(h.live(), [], 'disposal releases every GPU resource');
   });
 

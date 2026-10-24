@@ -14,6 +14,7 @@ import { meshTriangles } from '../../shared/mesh-source.js';
 import { halton, jitterProjection } from './jitter.js';
 import { fullscreen, cameraVelocity, objectVelocity, snapshot, resolve, present } from './shader.js';
 import { MargoError } from '@margoengine/math/errors';
+import { applyView, fromTarget, toTarget, viewLoadOp, viewRect, viewSize, ViewStates } from '../../shared/view-rect.js';
 export { halton, jitterProjection } from './jitter.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; COPY_SRC: number; STORAGE: number };
 declare const GPUTextureUsage: {
@@ -123,6 +124,24 @@ export class TAA implements EnginePlugin {
   private expected?: GPUTexture;
   private histories: GPUTexture[] = [];
   private historyDepths: GPUTexture[] = [];
+  // Each engine view keeps its whole temporal state (captures, history, jitter, object snapshots) in a TAA of its own,
+  // released when the view is not drawn for a frame.
+  private readonly views = new ViewStates<TAA>(
+    () => {
+      const view = new TAA(this.options);
+      view.sources = this.sources;
+      try {
+        view.setup(this.engine!);
+      } catch (error) {
+        view.release();
+        throw error;
+      }
+      return view;
+    },
+    (view) => view.release(),
+  );
+  private activeView?: TAA;
+  private captureReady = false;
   private colorView?: GPUTextureView;
   private depthView?: GPUTextureView;
   private sampledDepth?: GPUTextureView;
@@ -196,6 +215,13 @@ export class TAA implements EnginePlugin {
   }
   reset(): void {
     this.valid = false;
+    for (const view of this.views.values()) view.reset();
+  }
+  private forView(c: Context): TAA {
+    return (this.activeView = c.view && this.views.get(c)) ?? this;
+  }
+  onPreUpdate(delta: number): void {
+    if (delta > 0) this.views.prune();
   }
   setup(engine: Engine): void {
     if (this.disposed || !engine.gpu)
@@ -221,28 +247,30 @@ export class TAA implements EnginePlugin {
       name: 'taa:capture',
       order: -70,
       execute: (c) => {
-        if (c.backend === 'webgpu') this.capture(c);
+        if (c.backend === 'webgpu') this.forView(c).capture(c);
       },
     });
     graph.add({
       name: 'taa:velocity',
       order: 9,
       execute: (c) => {
-        if (c.backend === 'webgpu')
+        if (c.backend === 'webgpu') {
+          const view = this.forView(c);
           try {
-            this.motion(c);
+            view.motion(c);
           } catch (error) {
-            this.restoreCamera(c);
-            this.reset();
+            view.restoreCamera(c);
+            view.reset();
             throw error;
           }
+        }
       },
     });
     graph.add({
       name: 'taa:resolve',
       order: 40,
       execute: (c) => {
-        if (c.backend === 'webgpu') this.finish(c);
+        if (c.backend === 'webgpu') this.forView(c).finish(c);
       },
     });
   }
@@ -256,12 +284,13 @@ export class TAA implements EnginePlugin {
       this.cameraView = Object.assign(Object.create(camera), { matrix: this.jittered });
     this.originalCamera = camera;
     try {
-      jitterProjection(this.jittered, camera.matrix, this.frame, c.width, c.height);
+      const [width, height] = viewSize(c);
+      jitterProjection(this.jittered, camera.matrix, this.frame, width, height);
       c.camera = this.cameraView!;
       // jitterProjection's NDC offset in uv; the velocity passes see it in both matrices only with history.
       this.offset[0] = (halton((this.frame % 8) + 1, 2) - 0.5) / c.width;
       this.offset[1] = (halton((this.frame % 8) + 1, 3) - 0.5) / c.height;
-      const projection = [c.camera.fov, c.camera.near, c.camera.far].join(':');
+      const projection = [c.camera.fov, c.camera.near, c.camera.far, ...(viewRect(c) ?? [])].join(':');
       if (projection !== this.projection) {
         this.reset();
         this.projection = projection;
@@ -270,6 +299,8 @@ export class TAA implements EnginePlugin {
       this.values.set(this.valid ? this.previous : c.camera.matrix, 16);
       if (!invertMatrixStable(c.camera.matrix, this.values.subarray(32, 48), this.workspace))
         throw new MargoError('state', 'Invalid TAA camera; give the camera a finite, invertible projection');
+      toTarget(c, this.values, 16);
+      fromTarget(c, this.values, 32);
       this.values.set([this.options.historyWeight ?? 0.9, this.options.depthThreshold ?? 0.01, +this.valid, 0], 48);
       const jitter = this.vectors.jitter;
       jitter[0] = this.valid ? this.offset[0] - this.lastOffset[0] : 0;
@@ -291,6 +322,7 @@ export class TAA implements EnginePlugin {
   }
   private resize(c: Context): void {
     if (
+      this.captureReady &&
       this.scene?.width === c.width &&
       this.scene.height === c.height &&
       this.format === c.format &&
@@ -298,6 +330,7 @@ export class TAA implements EnginePlugin {
       this.captureTarget?.samples === (c.descriptor.multisample?.count ?? 4)
     )
       return;
+    this.captureReady = false;
     this.captureTarget?.dispose();
     for (const t of this.textures) t.destroy();
     this.textures = [];
@@ -395,6 +428,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     );
     this.depthSource = undefined;
     this.reset();
+    this.captureReady = true;
   }
   private motion(c: Context): void {
     resolveMSAA(c);
@@ -436,6 +470,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     const views = this.motionViews.length ? this.motionViews : [this.velocityView!, this.expectedView!];
     const attachments = views.map((view) => ({ view, loadOp: 'clear' as const, storeOp: 'store' as const }));
     const camera = c.encoder.beginRenderPass({ colorAttachments: attachments });
+    applyView(camera, c);
     camera.setPipeline(this.cameraPipeline!);
     camera.setBindGroup(0, this.cameraGroup!);
     camera.draw(3);
@@ -469,11 +504,11 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     if (this.motionViews.length) {
       const depth = sceneTarget(c)!.depthSource!;
       if (this.motionDepth !== depth) {
-        this.motionDepth = depth;
         this.motionGroup = c.device.createBindGroup({
           layout: this.motionResolve!.getBindGroupLayout(0),
           entries: [...this.motionViews, depth].map((resource, binding) => ({ binding, resource })),
         });
+        this.motionDepth = depth;
       }
       const pass = c.encoder.beginRenderPass({
         colorAttachments: [this.velocityView!, this.expectedView!].map((view) => ({
@@ -627,6 +662,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     }
     r.values.set(c.camera.matrix);
     r.values.set(this.valid ? this.previous : c.camera.matrix, 16);
+    toTarget(c, r.values, 16);
     r.values.set(p.node.matrix, 32);
     r.values.set(r.previous, 48);
     r.values.set(
@@ -656,6 +692,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
         ...(c.descriptor.depthStencil!.format.includes('stencil') ? { stencilReadOnly: true } : {}),
       },
     });
+    applyView(pass, c);
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, r.group);
     pass.setVertexBuffer(0, p.vertex);
@@ -680,19 +717,24 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       compute.setBindGroup(0, this.resolveGroups[this.front]);
       compute.dispatchWorkgroups(Math.ceil(c.width / 8), Math.ceil(c.height / 8));
       compute.end();
-      this.front = 1 - this.front;
+      const next = 1 - this.front;
       const pass = c.encoder.beginRenderPass({
-        colorAttachments: [{ view: this.original!, loadOp: 'clear', storeOp: 'store' }],
+        colorAttachments: [{ view: this.original!, loadOp: viewLoadOp(c, 'clear'), storeOp: 'store' }],
       });
+      applyView(pass, c);
       pass.setPipeline(this.presentPipeline!);
-      pass.setBindGroup(0, this.presentGroups[this.front]);
+      pass.setBindGroup(0, this.presentGroups[next]);
       pass.draw(3);
       pass.end();
+      this.front = next;
       this.previous.set(c.camera.matrix);
       this.lastOffset.set(this.offset);
       this.valid = true;
       this.frame++;
       this.captureTarget!.restore(c);
+    } catch (error) {
+      this.reset();
+      throw error;
     } finally {
       this.restoreCamera(c);
     }
@@ -700,12 +742,14 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
   /** The velocity texture with its jitter offset and the resolved frame ({@link TAAVelocity}); undefined before the
    * first resolved frame and after disposal. One object, updated in place. */
   get velocity(): TAAVelocity | undefined {
+    if (this.activeView) return this.activeView.velocity;
     if (!this.velocityTarget || !this.histories.length || !this.frame) return undefined;
     this.vectors.texture = this.velocityTarget;
     this.vectors.resolved = this.histories[this.front];
     return this.vectors;
   }
   get gpuState(): { velocity: GPUTexture; history: GPUTexture; depth: GPUTexture } {
+    if (this.activeView) return this.activeView.gpuState;
     if (!this.velocityTarget || !this.histories.length)
       throw new MargoError('state', 'TAA is not rendered; render a frame first');
     return {
@@ -715,6 +759,9 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     };
   }
   private release(): void {
+    this.views.clear();
+    this.activeView = undefined;
+    this.captureReady = false;
     this.motionViews = [];
     this.motionResolve = undefined;
     this.motionGroup = undefined;

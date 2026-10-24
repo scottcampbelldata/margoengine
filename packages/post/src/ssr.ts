@@ -11,6 +11,9 @@ import { PostStack } from './stack.js';
 import { displayShader } from '../../shared/display.js';
 import { vertex, reduceShader, downsampleShader, traceFunctions, march } from './hiz.js';
 import { shareCapture, drawCapture } from './capture.js';
+import { applyView, viewLoadOp } from '../../shared/view-rect.js';
+import { MaterialClear, partialMaterialView } from './material-clear.js';
+import { currentFrame, retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; STORAGE_BINDING: number };
 type PostPassContext = Extract<PassContext, { backend: 'webgpu' }>;
@@ -141,6 +144,8 @@ const formats: GPUTextureFormat[] = ['rgba16float', 'rgb10a2unorm', 'rgb10a2unor
 export class SSR implements EnginePlugin {
   readonly name = 'ssr';
   private engine?: Engine;
+  /** Device of the current GPU resources, so a release after device restoration retires them on their own device. */
+  private device?: GPUDevice;
   private host?: StackHost;
   private stack?: PostStack;
   private disposed = false;
@@ -168,10 +173,13 @@ export class SSR implements EnginePlugin {
   private replay?: GPURenderPipeline;
   private replayKey?: string;
   private composite?: GPURenderPipeline;
-  private compositeGroup?: GPUBindGroup;
+  /** Composite group per uniform binding: a second view of a frame binds its own uniform slice. */
+  private compositeGroups?: { get(copy?: GPUBufferBinding): GPUBindGroup };
+  private slice?: GPUBufferBinding;
   private input?: GPUTextureView;
   private key = '';
   private clearPass?: GPURenderPassDescriptor;
+  private materialClear?: MaterialClear;
   private extra: GPURenderPassColorAttachment[] = [];
   private blurPasses: GPURenderPassDescriptor[] = [];
   private readonly compositeAttachment: GPURenderPassColorAttachment = {
@@ -201,10 +209,12 @@ export class SSR implements EnginePlugin {
         stencil = c.descriptor.depthStencil!.format.includes('stencil')
           ? ({ stencilLoadOp: 'load', stencilStoreOp: 'store' } as const)
           : {};
-      return (this.pass = c.encoder.beginRenderPass({
+      const pass = (this.pass = c.encoder.beginRenderPass({
         colorAttachments: this.material.map((view) => ({ view, loadOp: 'load', storeOp: 'store' })),
         depthStencilAttachment: { view: c.depth, depthLoadOp: 'load', depthStoreOp: 'store', ...stencil },
       }));
+      applyView(pass, c);
+      return pass;
     },
   };
   private readonly values = new Float32Array(40);
@@ -278,6 +288,7 @@ export class SSR implements EnginePlugin {
       );
     if (!engine.gpu) throw margoError('unsupported', 'SSR requires WebGPU; use a WebGPU engine');
     this.engine = engine;
+    this.device = engine.gpu;
     const device = engine.gpu;
     this.uniform = device.createBuffer({ size: 160, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' });
@@ -312,7 +323,7 @@ export class SSR implements EnginePlugin {
     v[37] = o.steps ?? 64;
     v[38] = this.hizGroups.length;
     v[39] = +this.enabled;
-    c.device.queue.writeBuffer(this.uniform!, 0, v as Float32Array<ArrayBuffer>);
+    this.slice = writeUniform(c.device, this.uniform!, v as Float32Array<ArrayBuffer>, c.view ?? c);
     if (!this.enabled) return;
     // Material replay of core's lit shader with its lighting in a dead block (every binding stays statically used, so the
     // pass bindings fit the auto layout, but none of the light is computed), from its shading normal `let n=normalize(i.normal)…` and view vector
@@ -353,14 +364,28 @@ export class SSR implements EnginePlugin {
       });
       this.replayKey = key;
     }
+    const partial = partialMaterialView(c);
     const { color, depth, descriptor } = c;
     c.color = this.material[0];
     if (own) {
       c.depth = own;
       c.descriptor = this.single!;
-    } else c.encoder.beginRenderPass(this.clearPass!).end();
+    }
     try {
-      c.draw({ pipeline: this.replay, clear: !!own, bindings: c.bindings, colorAttachments: this.extra });
+      if (partial) {
+        const clear = (this.materialClear ??= new MaterialClear(formats, this.extra));
+        clear.draw(c, !!own);
+        c.draw({
+          pipeline: this.replay,
+          clear: false,
+          clearDepth: false,
+          bindings: c.bindings,
+          colorAttachments: clear.extra,
+        });
+      } else {
+        if (!own) c.encoder.beginRenderPass(this.clearPass!).end();
+        c.draw({ pipeline: this.replay, clear: !!own, bindings: c.bindings, colorAttachments: this.extra });
+      }
       // Added models draw their own materials on top, depth tested against (and, at 4x, into) the same depth.
       if (this.models.size) {
         this.context = c;
@@ -394,15 +419,17 @@ export class SSR implements EnginePlugin {
     if (this.input !== input) {
       this.input = input;
       this.blurGroups[0] = bind(c.device, this.downsample!, [input, this.sampler!]);
-      this.compositeGroup = bind(c.device, this.composite!, [
-        { buffer: this.uniform! },
-        input,
-        this.blur!,
-        this.sampler!,
-        this.depthView!,
-        this.hiz!,
-        ...this.material,
-      ]);
+      this.compositeGroups = uniformGroups(this.uniform!, (uniform) =>
+        bind(c.device, this.composite!, [
+          uniform,
+          input,
+          this.blur!,
+          this.sampler!,
+          this.depthView!,
+          this.hiz!,
+          ...this.material,
+        ]),
+      );
     }
     if (this.enabled)
       for (let i = 0; i < blurLevels; i++) {
@@ -413,13 +440,17 @@ export class SSR implements EnginePlugin {
         pass.end();
       }
     this.compositeAttachment.view = output.view;
+    this.compositeAttachment.loadOp = viewLoadOp(c, 'clear');
     const pass = c.encoder.beginRenderPass(this.compositePass);
     pass.setPipeline(this.composite!);
-    pass.setBindGroup(0, this.compositeGroup!);
+    pass.setBindGroup(0, this.compositeGroups!.get(this.slice));
+    applyView(pass, c);
     pass.draw(3);
     pass.end();
   }
   private resize(c: PostPassContext): void {
+    // This view draws in the frame: what it releases waits while another view's commands still need it.
+    currentFrame(c.device, c.view ?? c);
     const target = this.host!.target!,
       // Own 1x depth at 4x, and at 1x once models are added: a capture writes depth, and water samples the stack's.
       own = target.samples === 4 || this.models.size > 0;
@@ -476,7 +507,7 @@ export class SSR implements EnginePlugin {
     }
   }
   private release(): void {
-    for (const t of this.textures) t.destroy();
+    for (const t of this.textures) retire(this.device!, t);
     this.textures = [];
     this.width = this.height = 0;
     this.target = undefined;
@@ -489,13 +520,14 @@ export class SSR implements EnginePlugin {
     this.blurPasses = [];
     this.extra = [];
     this.depthView = this.ownDepth = this.hiz = this.blur = undefined;
-    this.compositeGroup = undefined;
+    this.compositeGroups = undefined;
     this.clearPass = undefined;
+    this.materialClear = undefined;
     this.compositeAttachment.view = undefined!;
   }
   onDeviceRestored(engine: Engine): void {
     this.release();
-    this.uniform?.destroy();
+    retire(this.device!, this.uniform);
     this.replay = this.composite = undefined;
     this.replayKey = this.base = undefined;
     this.key = '';
@@ -509,7 +541,7 @@ export class SSR implements EnginePlugin {
     for (const release of [...this.models.values()]) release();
     this.engine?.removePlugin(this.name);
     this.release();
-    this.uniform?.destroy();
+    retire(this.device!, this.uniform);
     this.uniform = undefined;
     this.replay = this.composite = undefined;
     this.engine = undefined;

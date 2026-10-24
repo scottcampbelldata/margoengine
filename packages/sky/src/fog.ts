@@ -1,5 +1,6 @@
 import { finiteVector } from '@margoengine/math/validate';
 import type { SkyFeatures } from './base.js';
+import { applyView } from '../../shared/view-rect.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number };
 const fragment = `
@@ -111,6 +112,7 @@ export const fog: NonNullable<SkyFeatures['fog']> = {
         c.device.queue.writeBuffer(uniform, 0, values as Float32Array<ArrayBuffer>);
         attachment.view = c.color;
         const pass = c.encoder.beginRenderPass(descriptor);
+        applyView(pass, c);
         pass.setPipeline(pipeline!);
         pass.setBindGroup(0, bind!);
         pass.draw(3);

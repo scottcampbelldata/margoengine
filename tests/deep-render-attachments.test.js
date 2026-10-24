@@ -70,7 +70,7 @@ for (const [name, Effect] of [
   ['Bloom', Bloom],
   ['Transitions', Transitions],
 ])
-  test(name + ' rebuilds same-size captures for MSAA/depth changes and retains stable resources', () => {
+  test(name + ' rebuilds same-size captures for MSAA/depth changes and retains stable resources', async () => {
     const h = harness(),
       effect = new Effect();
     try {
@@ -101,6 +101,7 @@ for (const [name, Effect] of [
       h.frame();
     } finally {
       effect.dispose();
+      await null; // released resources are destroyed at the end of the task
       assert.ok(
         h.resources.every((resource) => resource.destroyed),
         'Owned resources survive disposal',
@@ -108,7 +109,7 @@ for (const [name, Effect] of [
     }
   });
 
-test('TAA motion draw groups follow changed pipelines through MSAA and depth transitions', () => {
+test('TAA motion draw groups follow changed pipelines through MSAA and depth transitions', async () => {
   const h = harness(),
     device = h.engine.gpu,
     create = device.createRenderPipeline;
@@ -147,6 +148,7 @@ test('TAA motion draw groups follow changed pipelines through MSAA and depth tra
     taa.dispose();
     vertex.destroy();
     index.destroy();
+    await null;
     assert.ok(h.resources.every((resource) => resource.destroyed));
   }
 });

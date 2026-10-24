@@ -6,7 +6,7 @@ import { harness, modules, written } from './support.js';
 const kernel = (log) => modules(log).find((code) => code.includes('fn arc('));
 
 for (const samples of [4, 1])
-  test(`GTAO runs SSAO's G-buffer, blur and ambient replay with its own horizon kernel (${samples}x)`, () => {
+  test(`GTAO runs SSAO's G-buffer, blur and ambient replay with its own horizon kernel (${samples}x)`, async () => {
     const h = harness({ samples }),
       gtao = new GTAO({ radius: 1.5, slices: 3, steps: 5 }),
       ssao = harness({ samples });
@@ -53,10 +53,11 @@ for (const samples of [4, 1])
     );
     assert.deepEqual([next[50], next[51]], [1, 0], 'options and enabled are read per frame');
     h.engine.removePlugin('post:stack');
+    await null; // released resources are destroyed at the end of the task
     assert.deepEqual(h.live(), [], 'disposal releases every GPU resource');
   });
 
-test('GTAO runs only in a PostStack; GTAO.attach gives it one of its own', () => {
+test('GTAO runs only in a PostStack; GTAO.attach gives it one of its own', async () => {
   const h = harness();
   assert.throws(() => h.engine.use(new GTAO()), {
     name: 'MargoError',
@@ -69,6 +70,7 @@ test('GTAO runs only in a PostStack; GTAO.attach gives it one of its own', () =>
   h.frame();
   gtao.dispose();
   assert.ok(!h.engine.hasPlugin('post:stack') && !h.engine.hasPlugin('gtao'), 'disposal removes its stack');
+  await null; // released resources are destroyed at the end of the task
   assert.deepEqual(h.live(), []);
 });
 

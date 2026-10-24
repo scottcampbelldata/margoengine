@@ -7,6 +7,7 @@ import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { displayShader } from '../../shared/display.js';
 import { PostStack } from './stack.js';
 import { vertex } from './hiz.js';
+import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
@@ -214,9 +215,11 @@ export class LensFlare implements EnginePlugin {
       ]);
     }
     this.attachment.view = output.view;
+    this.attachment.loadOp = viewLoadOp(c, 'clear');
     const pass = c.encoder.beginRenderPass(this.pass);
     pass.setPipeline(this.composite!);
     pass.setBindGroup(0, this.compositeGroup!);
+    applyView(pass, c);
     pass.draw(3);
     pass.end();
   }

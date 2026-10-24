@@ -206,3 +206,29 @@ test('clustered: orthographic cameras get linear depth slices whose cells contai
     lights.dispose();
   }
 });
+
+test('clustered: an offset view sizes the grid to its rectangle and offsets fragments by its origin', () => {
+  const h = optionalGPU(),
+    lights = new Clustered({ grid: [2, 2, 2] });
+  lights.setLights([{ position: [0, 2, 1], range: 6 }]);
+  h.engine.use(lights);
+  const frame = (view) => {
+    h.context.shader = wgsl;
+    h.context.bindings.length = 0;
+    h.context.view = view;
+    h.engine.frameGraph.execute(h.context);
+    return new Float32Array(lights.bindings()[0].resource.buffer.data).slice(20, 28);
+  };
+  try {
+    const full = frame(undefined),
+      { width, height } = h.context,
+      rect = [width / 2, height / 4, width / 2, height / 2],
+      offset = frame({ id: 'right', camera: h.context.camera, viewport: rect, index: 1, count: 2 });
+    assert.deepEqual([offset[0], offset[1]], [rect[2], rect[3]], 'grid spans the view');
+    // The shader subtracts depth.zw * screen.xy pixels from the fragment: the jitter plus the view's origin.
+    assert.ok(Math.abs((offset[6] - full[6]) * rect[2] - rect[0]) < 1e-3);
+    assert.ok(Math.abs((offset[7] - full[7]) * rect[3] - rect[1]) < 1e-3);
+  } finally {
+    lights.dispose();
+  }
+});

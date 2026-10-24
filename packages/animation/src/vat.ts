@@ -6,6 +6,7 @@ import { invertMatrixStable } from '@margoengine/math/mat4';
 import { neutralShader } from '../../shared/display.js';
 import { lightPBR } from '../../shared/pbr-hooks.js';
 import { multiplyMatrices } from '@margoengine/math/mat4';
+import { applyView } from '../../shared/view-rect.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; VERTEX: number; INDEX: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -626,6 +627,7 @@ export class VATCrowd implements EnginePlugin {
       colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
       depthStencilAttachment: { view: c.depth, depthLoadOp: 'load', depthStoreOp: 'store', stencilReadOnly: true },
     });
+    applyView(pass, c);
     pass.setPipeline(this.pipeline!);
     pass.setBindGroup(0, this.group);
     if (entries.length) {

@@ -15,6 +15,7 @@ import { checkFog, FOG_BYTES, writeFog, type FogLike } from './fog.js';
 export type { FogLike } from './fog.js';
 import { histogram, scan, scanTotals, scatter } from './sort.js';
 import { MargoError } from '@margoengine/math/errors';
+import { applyView } from '../../shared/view-rect.js';
 export { parseSplat, validateSplats, type SplatData } from './data.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; COPY_SRC: number; STORAGE: number; INDEX: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -343,6 +344,7 @@ export class Splats implements EnginePlugin {
     this.attachment.view = c.color;
     this.presentation.depthStencilAttachment!.view = c.depth;
     const pass = c.encoder.beginRenderPass(this.presentation);
+    applyView(pass, c);
     pass.setPipeline(record.pipeline);
     pass.setBindGroup(0, record.group);
     pass.setIndexBuffer(this.index!, 'uint32');

@@ -15,6 +15,7 @@ import { preset } from '../../shared/preset.js';
 import { simulationShader, billboardShader, multisampled, foggedBillboard } from './shader.js';
 import { checkFog, FOG_BYTES, writeFog, type FogLike } from './fog.js';
 export type { FogLike } from './fog.js';
+import { applyView } from '../../shared/view-rect.js';
 declare const GPUBufferUsage: {
   UNIFORM: number;
   STORAGE: number;
@@ -483,6 +484,7 @@ export class VFX implements EnginePlugin {
     const pass = c.encoder.beginRenderPass(this.presentation);
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, group);
+    applyView(pass, c);
     pass.drawIndirect(this.visible!, 0);
     pass.end();
     this.engine!.stats.drawCalls++;

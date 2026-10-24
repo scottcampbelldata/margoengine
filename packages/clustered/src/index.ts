@@ -8,6 +8,7 @@ import { orthographic } from '../../shared/projection.js';
 import { coreReceives, unshadowedCore } from '../../shared/shadow-source.js';
 import { cullingShader, clusteredSampling } from './shader.js';
 import { shadowCamera } from './local-shadow-math.js';
+import { viewRect, viewSize } from '../../shared/view-rect.js';
 import {
   LocalShadowMaps,
   type LocalShadowOptions,
@@ -549,10 +550,12 @@ export class Clustered implements EnginePlugin {
         for (let i = 0; i < 3; i++) this.ints[16 + i] = this.grid[i];
         this.ints[19] = intensity === 0 ? 0 : this.lightCount;
         const values = this.values;
-        values[20] = c.width;
-        values[21] = c.height;
+        // The grid covers the view's rectangle (the whole target without a view).
+        const [width, height] = viewSize(c);
+        values[20] = width;
+        values[21] = height;
         values[22] = Math.tan((c.camera.fov * Math.PI) / 360);
-        values[23] = c.width / c.height;
+        values[23] = width / height;
         values[24] = c.camera.near;
         values[25] = c.camera.far;
         values[26] = values[27] = 0;
@@ -574,6 +577,12 @@ export class Clustered implements EnginePlugin {
           v = this.values;
         v[26] = -0.5 * (m[0] * v[2] + m[4] * v[6] + m[8] * v[10]);
         v[27] = 0.5 * (m[1] * v[2] + m[5] * v[6] + m[9] * v[10]);
+        // The shader subtracts this offset times the grid size from the fragment pixel: add the view's origin.
+        const rect = viewRect(c);
+        if (rect) {
+          v[26] += rect[0] / width;
+          v[27] += rect[1] / height;
+        }
         c.device.queue.writeBuffer(this.uniform!, 0, v as Float32Array<ArrayBuffer>);
         const pass = c.encoder.beginComputePass();
         pass.setPipeline(this.pipeline!);

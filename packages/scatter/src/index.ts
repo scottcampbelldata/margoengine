@@ -31,6 +31,7 @@ import { group, compute, dispatch } from '../../shared/gpu.js';
 import { preset } from '../../shared/preset.js';
 import { displayShader } from '../../shared/display.js';
 import { MargoError } from '@margoengine/math/errors';
+import { applyView } from '../../shared/view-rect.js';
 declare const GPUBufferUsage: {
   VERTEX: number;
   INDEX: number;
@@ -632,6 +633,7 @@ export class Scatter implements EnginePlugin {
     this.attachment.view = c.color;
     this.depthAttachment.view = c.depth;
     const pass = c.encoder.beginRenderPass(this.presentation);
+    applyView(pass, c);
     pass.setPipeline(pipeline);
     if (lit) pass.setBindGroup(0, lighting!);
     for (let i = 0; i < 3; i++) {

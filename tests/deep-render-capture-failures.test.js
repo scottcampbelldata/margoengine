@@ -35,7 +35,7 @@ for (const [name, factory] of Object.entries({
   water: () => new Water({ segments: 4 }),
   transitions: () => new Transitions(),
 }))
-  test(name + ' retains ownership of partial first-frame allocations for disposal', () => {
+  test(name + ' retains ownership of partial first-frame allocations for disposal', async () => {
     for (const method of ['createBuffer', 'createTexture', 'createBindGroup']) {
       const base = harness(),
         effect = factory();
@@ -49,6 +49,7 @@ for (const [name, factory] of Object.entries({
       };
       base.frame();
       effect.dispose();
+      await null; // released resources are destroyed at the end of the task
       assert.ok(base.resources.every((r) => r.destroyed));
       for (let at = 1; at <= total; at++) {
         const h = harness(),
@@ -65,6 +66,7 @@ for (const [name, factory] of Object.entries({
         try {
           assert.throws(h.frame, (error) => error === failure);
           candidate.dispose();
+          await null; // released resources are destroyed at the end of the task
           assert.ok(
             h.resources.every((r) => r.destroyed),
             failure.message + ' leaked native resources',
@@ -76,7 +78,7 @@ for (const [name, factory] of Object.entries({
     }
   });
 
-test('Tonemap destroys a failed LUT upload and retains the prior GPU texture for retry', () => {
+test('Tonemap destroys a failed LUT upload and retains the prior GPU texture for retry', async () => {
   const h = harness(),
     effect = new Tonemap();
   h.engine.use(effect);
@@ -106,5 +108,6 @@ test('Tonemap destroys a failed LUT upload and retains the prior GPU texture for
   assert.equal(previous.destroyed, true);
   h.frame();
   effect.dispose();
+  await null;
   assert.ok(h.resources.every((r) => r.destroyed));
 });

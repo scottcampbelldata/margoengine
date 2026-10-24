@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type { EngineKernel, EnginePlugin, Mesh } from '@margoengine/core';
+import type { Camera, EngineKernel, EnginePlugin, Mesh, RenderView } from '@margoengine/core';
 import { engineRuntime, meshRuntime, type FrameGraph } from '@margoengine/core/extension';
 import {
   cameraCSSTransform,
@@ -80,7 +80,14 @@ export interface LabelRendererOptions {
   name?: string;
   /** Frame-pass order. Default 1000, after the scene and other overlays. */
   order?: number;
+  /** Engine view the labels belong to; see {@link LabelRenderer.view}. Default the engine camera and whole canvas. */
+  view?: LabelView;
 }
+/**
+ * The camera and rectangle labels are placed in, as in an engine `RenderView`: `viewport` is fractions of the canvas,
+ * or drawing-buffer pixels with `pixels`. Labels outside the rectangle are clipped.
+ */
+export type LabelView = Pick<RenderView, 'camera' | 'viewport' | 'pixels'>;
 
 type StyleCache = Record<string, string>;
 const write = (element: HTMLElement, cache: StyleCache, property: string, value: string): void => {
@@ -241,7 +248,7 @@ export class LabelRenderer implements EnginePlugin {
   private readonly rootCache: StyleCache = {};
   private readonly viewerCache: StyleCache = {};
   private readonly cameraCache: StyleCache = {};
-  private readonly view = new Float64Array(16);
+  private readonly cssView = new Float64Array(16);
   private readonly point = createScreenPoint();
   private readonly visibleLabels: Label[] = [];
   private readonly world: [number, number, number] = [0, 0, 0];
@@ -256,8 +263,14 @@ export class LabelRenderer implements EnginePlugin {
     engine.use(value);
     return value;
   }
+  /**
+   * Engine view the labels belong to: they project through its camera and sit in its rectangle, clipped to it, and
+   * hook and `LabelInfo` coordinates are relative to its corner. Null: the engine camera and the whole canvas.
+   */
+  view: LabelView | null;
   constructor(options: LabelRendererOptions = {}) {
     this.options = options;
+    this.view = options.view ?? null;
     this.name = options.name ?? 'margoengine-labels';
     this.order = options.order ?? 1000;
     this.occlude = options.occlude ?? null;
@@ -324,14 +337,21 @@ export class LabelRenderer implements EnginePlugin {
     this.writes = 0;
     if (!engine || engine.disposed || !root) return;
     const canvas = engine.canvas,
-      camera = engine.camera,
-      backend = engine.backend;
-    const width = canvas.clientWidth || canvas.width,
-      height = canvas.clientHeight || canvas.height;
+      view = this.view,
+      camera = view?.camera ?? engine.camera,
+      backend = engine.backend,
+      cssWidth = canvas.clientWidth || canvas.width,
+      cssHeight = canvas.clientHeight || canvas.height;
+    // The view rectangle in CSS pixels: fractions of the canvas, or drawing-buffer pixels scaled to CSS.
+    const [x, y, w, h] = view?.viewport ?? [0, 0, 1, 1],
+      sx = view?.pixels ? cssWidth / canvas.width : cssWidth,
+      sy = view?.pixels ? cssHeight / canvas.height : cssHeight,
+      width = w * sx,
+      height = h * sy;
     const runtime = engineRuntime(engine),
       store = runtime.store,
       matrices = store.matrices;
-    this.syncRoot(canvas, width, height);
+    this.syncRoot(canvas, x * sx, y * sy, width, height);
     const visible = this.visibleLabels;
     visible.length = 0;
     const [ex, ey, ez] = camera.position,
@@ -433,17 +453,17 @@ export class LabelRenderer implements EnginePlugin {
     // Far labels first: nearer labels get higher z-index and draw on top.
     visible.sort((a, b) => b.distance - a.distance);
     for (let i = 0; i < visible.length; i++) this.set(visible[i].element, visible[i].cache, 'zIndex', String(i + 1));
-    if (this.objects.size) this.update3D(width, height, runtime, backend);
+    if (this.objects.size) this.update3D(camera, width, height, runtime, backend);
   }
 
   private update3D(
+    camera: Camera,
     width: number,
     height: number,
     runtime: ReturnType<typeof engineRuntime>,
     backend: 'webgpu' | 'webgl2',
   ): void {
-    const camera = runtime.camera,
-      store = runtime.store,
+    const store = runtime.store,
       matrices = store.matrices;
     const viewer = this.viewer!,
       cameraElement = this.cameraElement!,
@@ -452,7 +472,7 @@ export class LabelRenderer implements EnginePlugin {
     this.set(viewer, this.viewerCache, 'perspective', orthographic ? 'none' : px(perspective));
     this.set(cameraElement, this.cameraCache, 'width', px(width));
     this.set(cameraElement, this.cameraCache, 'height', px(height));
-    const view = orthographic ? this.view : lookAtView(camera.position, camera.target, this.view, camera.up);
+    const view = orthographic ? this.cssView : lookAtView(camera.position, camera.target, this.cssView, camera.up);
     this.set(
       cameraElement,
       this.cameraCache,
@@ -525,13 +545,14 @@ export class LabelRenderer implements EnginePlugin {
       if (store.hidden[current]) return true;
     return false;
   }
-  private syncRoot(canvas: HTMLCanvasElement, width: number, height: number): void {
+  private syncRoot(canvas: HTMLCanvasElement, x: number, y: number, width: number, height: number): void {
     const root = this.root!;
-    // Correct the root by the measured offset to the canvas content box, so any containing block works.
+    // Correct the root by the measured offset to the view's corner in the canvas content box, so any containing
+    // block works.
     const target = canvas.getBoundingClientRect(),
       current = root.getBoundingClientRect();
-    const dx = target.left + canvas.clientLeft - current.left,
-      dy = target.top + canvas.clientTop - current.top;
+    const dx = target.left + canvas.clientLeft + x - current.left,
+      dy = target.top + canvas.clientTop + y - current.top;
     if (Math.abs(dx) > 0.01) this.left += dx;
     if (Math.abs(dy) > 0.01) this.top += dy;
     this.set(root, this.rootCache, 'left', px(this.left));

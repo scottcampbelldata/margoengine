@@ -92,11 +92,13 @@ export class HTML extends LabelRenderer {
         record.z = 1 - info.depth;
         const canvas = this.runtime?.canvas;
         if (canvas) {
-          const scaleX = canvas.width / (canvas.clientWidth || canvas.width),
+          // Hook coordinates are CSS pixels from the view's corner; the depth test reads drawing-buffer pixels.
+          const view = this.view,
+            scaleX = canvas.width / (canvas.clientWidth || canvas.width),
             scaleY = canvas.height / (canvas.clientHeight || canvas.height),
             at = index * 4;
-          this.values[at] = info.x * scaleX;
-          this.values[at + 1] = info.y * scaleY;
+          this.values[at] = info.x * scaleX + (view ? view.viewport[0] * (view.pixels ? 1 : canvas.width) : 0);
+          this.values[at + 1] = info.y * scaleY + (view ? view.viewport[1] * (view.pixels ? 1 : canvas.height) : 0);
           this.values[at + 2] = record.z;
           this.values[at + 3] = this.settings.depthBias ?? 0.0001;
         }

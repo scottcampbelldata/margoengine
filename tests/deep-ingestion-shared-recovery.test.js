@@ -57,7 +57,7 @@ function failures(h, failAt) {
 test('Shared owned depth retries every interrupted 1x/4x allocation without leaked resources', async (t) => {
   for (const samples of [1, 4])
     for (let at = 1; at <= (samples === 1 ? 2 : 9); at++)
-      await t.test(samples + 'x operation ' + at, () => {
+      await t.test(samples + 'x operation ' + at, async () => {
         const h = gpuHarness();
         h.context.descriptor.multisample.count = samples;
         const { lease, capture } = acquire(h),
@@ -67,6 +67,7 @@ test('Shared owned depth retries every interrupted 1x/4x allocation without leak
             () => capture.execute(h.context),
             (error) => error === failure,
           );
+          await null;
           assert.ok(
             h.resources.every((resource) => resource.destroyedCount === 1),
             'Interrupted initialization leaked a native texture',
@@ -79,13 +80,14 @@ test('Shared owned depth retries every interrupted 1x/4x allocation without leak
         } finally {
           lease.release();
         }
+        await null;
         assert.ok(
           h.resources.every((resource) => resource.destroyedCount === 1),
           'Release leaked or double destroyed a texture',
         );
       });
 });
-test('Shared owned depth invalidates sampling, survives failed resize and stays allocation stable', () => {
+test('Shared owned depth invalidates sampling, survives failed resize and stays allocation stable', async () => {
   const h = gpuHarness();
   const first = acquireDepth(h.engine),
     second = acquireDepth(h.engine);
@@ -112,6 +114,7 @@ test('Shared owned depth invalidates sampling, survives failed resize and stays 
       () => h.frame(),
       (error) => error === failure,
     );
+    await null;
     assert.ok(
       h.resources.every((resource) => resource.destroyed),
       'Resize failure leaked partially owned native textures',
@@ -125,6 +128,7 @@ test('Shared owned depth invalidates sampling, survives failed resize and stays 
     first.release();
     second.release();
   }
+  await null;
   assert.ok(h.resources.every((resource) => resource.destroyed));
 });
 test('Shared depth preserves borrowed target ownership and invalid sample rejection', () => {

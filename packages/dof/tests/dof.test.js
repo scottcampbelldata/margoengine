@@ -22,7 +22,7 @@ test('DOF validates the thin lens at float32 precision and rejects WebGL', () =>
   assert.throws(() => new DOF().setup({ gpu: null }), /WebGPU/);
 });
 
-test('DOF runs three compute passes, restores attachments, and reuses all steady-state resources', () => {
+test('DOF runs three compute passes, restores attachments, and reuses all steady-state resources', async () => {
   const h = gpuHarness(),
     dof = DOF.attach(h.engine, { focalDistance: 5, focalLength: 0.05, aperture: 2 });
   h.frame();
@@ -81,6 +81,7 @@ test('DOF runs three compute passes, restores attachments, and reuses all steady
   dof.destroy();
   dof.destroy();
   assert.equal(h.engine.hasPlugin('dof'), false);
+  await null;
   assert.ok(h.resources.every((r) => r.destroyed));
   assert.equal(dof.outputTexture, undefined);
   const dispatches = h.counts.compute;
@@ -144,4 +145,16 @@ test('DOF under an orthographic camera: linear depth from the clip matrix and a 
   } finally {
     dof.destroy();
   }
+});
+
+test('DOF scales the circle of confusion by the height of the view being drawn', () => {
+  const h = gpuHarness(),
+    dof = DOF.attach(h.engine, { focalDistance: 5, focalLength: 0.05, aperture: 2 });
+  h.context.view = { id: 'top', camera: h.context.camera, viewport: [0, 0, 128, 48], index: 0, count: 2 };
+  const begin = h.context.encoder.beginRenderPass;
+  h.context.encoder.beginRenderPass = (d) => ({ ...begin(d), setViewport() {}, setScissorRect() {} });
+  h.frame();
+  const scale = (0.05 * 48) / (4 * 2 * (5 - 0.05) * Math.tan(Math.PI / 6));
+  assert.ok(Math.abs(h.writes[6] - scale) < 1e-6, 'half-height view, half the scale');
+  dof.dispose();
 });

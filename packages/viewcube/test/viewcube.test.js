@@ -454,6 +454,20 @@ test('dispose removes the widget and its plugin; engine removal disposes it', ()
   assert.throws(() => new ViewCube(engine, { size: 0 }), /Invalid ViewCube size/);
 });
 
+test('a view option turns that view camera and places the cube in the corner of its rectangle', () => {
+  const { engine } = setup(),
+    camera = new Camera({ position: [0, 0, 5], target: [0, 0, 0] });
+  const cube = new ViewCube(engine, { view: { camera, viewport: [0.5, 0, 0.5, 0.5] } });
+  assert.equal(cube.camera, camera);
+  assert.equal(cube.element.style.top, 'calc(0% + 12px)');
+  assert.equal(cube.element.style.right, 'calc(0% + 12px)');
+  cube.dispose();
+  const left = new ViewCube(engine, { corner: 'bottom-left', view: { camera, viewport: [0.25, 0, 0.5, 0.5] } });
+  assert.equal(left.element.style.left, 'calc(25% + 12px)');
+  assert.equal(left.element.style.bottom, 'calc(50% + 12px)');
+  left.dispose();
+});
+
 test('size budget', async (t) => {
   const { build } = await import('vite'),
     { gzipSync } = await import('node:zlib'),

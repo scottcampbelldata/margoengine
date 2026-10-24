@@ -15,6 +15,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { celestialShader } from './celestial.js';
 import { head, mid, transmittance, sunlight } from './atmosphere.js';
 import { displayShader } from '../../shared/display.js';
+import { applyView } from '../../shared/view-rect.js';
 export { sunlight } from './atmosphere.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { STORAGE_BINDING: number; TEXTURE_BINDING: number };
@@ -533,6 +534,7 @@ export class Sky implements EnginePlugin {
     const pass = c.encoder.beginRenderPass(this.presentation);
     pass.setPipeline(this.render!);
     pass.setBindGroup(0, this.bind!);
+    applyView(pass, c);
     pass.draw(3);
     pass.end();
   }

@@ -7,9 +7,11 @@ import {
   type EnginePlugin,
   type FrameGraph,
   type Mesh,
+  type PassContext,
 } from '@margoengine/core/extension';
 import { Lines, Line, BoxHelper, VertexNormalsHelper, LightsHelper, meshWorldMatrix } from '@margoengine/lines';
 import { meshTriangles } from '../../shared/mesh-source.js';
+import { inView } from '../../shared/view-rect.js';
 
 export interface InspectorOptions {
   parent?: HTMLElement;
@@ -272,11 +274,17 @@ export class Inspector implements EnginePlugin {
     this.refresh();
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add({ name: 'inspector:sync', order: 19, execute: () => this.syncDebug() });
+    graph.add({ name: 'inspector:sync', order: 19, execute: (c) => this.syncDebug(c) });
     this.lines.registerPasses(graph);
   }
 
-  private syncDebug(): void {
+  /** The meshes of the scene this inspector is attached to (the default scene unless attached with `scene.use`). */
+  private meshes(): Iterable<Mesh> {
+    const engine = this.engine!;
+    return (engine.sceneOf(this) ?? engine.scene).meshes.values();
+  }
+  // Runs in every view: helpers show for the meshes that view draws (its culling and layers).
+  private syncDebug(c: PassContext): void {
     const engine = this.engine!;
     if (this.debug.lights && !this.lightLines && engine.backend === 'webgpu')
       this.lightLines = this.lines.add(new LightsHelper(() => this.gatherLights(), { onTop: true, size: 0.25 }));
@@ -290,7 +298,7 @@ export class Inspector implements EnginePlugin {
         this.helpers.delete(mesh);
       }
     if (engine.backend !== 'webgpu') return;
-    for (const mesh of engine.meshes.values()) {
+    for (const mesh of this.meshes()) {
       const source = meshData(mesh);
       if (!source) continue;
       let helpers = this.helpers.get(mesh);
@@ -312,7 +320,9 @@ export class Inspector implements EnginePlugin {
         // can be outside the frustum while the primitive still crosses the edge.
         if (helpers[mode])
           helpers[mode]!.visible =
-            this.debug[mode] && (source.pbr ? meshWorldMatrix(engine, mesh) !== null : !!engine.store.visible[mesh.id]);
+            this.debug[mode] &&
+            inView(c, mesh) &&
+            (source.pbr ? meshWorldMatrix(engine, mesh) !== null : !!engine.store.visible[mesh.id]);
       }
     }
   }
@@ -372,7 +382,7 @@ export class Inspector implements EnginePlugin {
     let signature = '',
       replaced = false;
     if (engine && !engine.disposed)
-      for (const mesh of engine.meshes.values()) {
+      for (const mesh of this.meshes()) {
         signature += JSON.stringify([
           mesh.id,
           mesh.name,
@@ -392,7 +402,7 @@ export class Inspector implements EnginePlugin {
       if (engine) {
         const groups = new Map<number, HTMLElement>(),
           doc = this.element.ownerDocument;
-        for (const mesh of engine.meshes.values()) {
+        for (const mesh of this.meshes()) {
           const item = doc.createElement('div'),
             row = doc.createElement('div'),
             name = doc.createElement('span'),
