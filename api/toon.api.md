@@ -22,6 +22,4 @@ export interface ToonPipelineOptions extends ToonOptions {
     outline?: number;
     color?: readonly [number, number, number];
 }
-
-export { ToonShading } from "@margoengine/creative";
 ```

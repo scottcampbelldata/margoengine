@@ -4,6 +4,7 @@
 
 ```ts
 import { EngineKernel, EnginePlugin, Geometry, Mesh } from "@margoengine/core";
+import { Mesh } from "@margoengine/core/extension";
 
 export interface BodyOptions {
     type?: BodyType;
@@ -68,6 +69,12 @@ export interface CharacterMoveResult {
     collisions: number;
 }
 
+export type ColliderGeometry = Geometry | {
+    readonly vertices: ArrayLike<number>;
+    readonly indices?: ArrayLike<number>;
+    readonly stride?: number;
+};
+
 export type ColliderOptions = ShapeOptions & ColliderSettings;
 
 export interface ColliderSettings {
@@ -101,12 +108,6 @@ export type CollisionEventType = 'contactstart' | 'contactend' | 'intersectionst
 
 export type CombineRule = 'average' | 'min' | 'multiply' | 'max';
 
-export type GeometryLike = Geometry | {
-    readonly vertices: ArrayLike<number>;
-    readonly indices?: ArrayLike<number>;
-    readonly stride?: number;
-};
-
 export interface Hit {
     body: PhysicsBody;
     mesh: Mesh | null;
@@ -136,19 +137,20 @@ export interface ModelBodyOptions extends Omit<BodyOptions, 'colliders' | 'posit
 }
 
 export interface ModelLike {
-    readonly root: Mesh;
-    readonly primitives: readonly ModelPrimitiveLike[];
+  readonly root: Mesh;
+  readonly primitives: readonly ModelPrimitiveLike[];
+  readonly disposed?: boolean;
 }
 
 export interface ModelPrimitiveLike {
-    readonly node: Mesh;
-    readonly vertices: Float32Array;
-    readonly indices: Uint32Array;
-    readonly nodeIndex?: number;
-    readonly instances?: {
-        readonly count: number;
-        readonly data: Float32Array;
-    };
+  readonly node: Mesh;
+  readonly vertices: Float32Array;
+  readonly indices: Uint32Array;
+  readonly material: { readonly settings: ArrayLike<number>; readonly side?: 'front' | 'back' | 'double' };
+  readonly nodeIndex?: number;
+  readonly instances?: { readonly count: number; readonly data: Float32Array };
+  readonly buffers?: { vertex: GPUBuffer; index: GPUBuffer };
+  readonly deformed?: GPUBuffer;
 }
 
 export interface MotorOptions {
@@ -195,8 +197,8 @@ export class Physics implements EnginePlugin, BodyOwner {
     createCharacterController(body: PhysicsBody, options?: CharacterControllerOptions): CharacterController;
     removeController(controller: CharacterController): void;
     on<K extends keyof PhysicsEventMap>(type: K, listener: (event: PhysicsEventMap[K]) => void): () => void;
-    raycast(origin: Vec3, direction: Vec3, options?: RaycastOptions): RaycastHit | null;
-    raycastAll(origin: Vec3, direction: Vec3, options?: RaycastOptions): RaycastHit[];
+    raycast(origin: Vec3, direction: Vec3, options?: PhysicsRaycastOptions): RaycastHit | null;
+    raycastAll(origin: Vec3, direction: Vec3, options?: PhysicsRaycastOptions): RaycastHit[];
     shapeCast(shape: ShapeOptions, position: Vec3, rotation: Quat, direction: Vec3, options?: QueryFilter & {
         maxDistance?: number;
         targetDistance?: number;
@@ -305,6 +307,11 @@ export interface PhysicsOptions {
     name?: string;
 }
 
+export interface PhysicsRaycastOptions extends QueryFilter {
+    maxDistance?: number;
+    solid?: boolean;
+}
+
 export interface PointProjection extends Hit {
     point: [number, number, number];
     inside: boolean;
@@ -370,11 +377,6 @@ export interface RaycastHit extends Hit {
     normal: [number, number, number];
 }
 
-export interface RaycastOptions extends QueryFilter {
-    maxDistance?: number;
-    solid?: boolean;
-}
-
 export interface ShapeCastHit extends Hit {
     distance: number;
     point: [number, number, number];
@@ -401,11 +403,11 @@ export type ShapeOptions = {
     radius: number;
 } | {
     shape: 'convexHull';
-    geometry?: GeometryLike;
+    geometry?: ColliderGeometry;
     points?: ArrayLike<number>;
 } | {
     shape: 'trimesh';
-    geometry?: GeometryLike;
+    geometry?: ColliderGeometry;
     vertices?: ArrayLike<number>;
     indices?: ArrayLike<number>;
 } | {
@@ -426,7 +428,7 @@ export function collisionGroups(memberships: number | readonly number[], filter?
 
 export const eulerToQuat: (x: number, y: number, z: number) => [number, number, number, number];
 
-export function geometryPositions(source: GeometryLike, scale?: Vec3): Float32Array;
+export function geometryPositions(source: ColliderGeometry, scale?: Vec3): Float32Array;
 
 // Not exported from this entry, but used by the exports above:
 

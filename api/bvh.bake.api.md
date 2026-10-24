@@ -4,7 +4,7 @@
 
 ```ts
 import { Vec3 } from "@margoengine/core";
-import { ColorInput, MutableVec3 } from "@margoengine/math";
+import { ColorInput, MutableVec3, RayLike } from "@margoengine/math";
 
 export interface BakeAmbientOcclusion {
     strength?: number;
@@ -129,8 +129,8 @@ class MeshBVH {
     toArrayBuffer(): ArrayBuffer;
     refit(): void;
     intersectsSegment(start: ArrayLike<number>, end: ArrayLike<number>, options?: SegmentOptions): boolean;
-    raycastFirst(ray: Ray, options?: RaycastOptions): BVHHit | null;
-    raycast(ray: Ray, options?: RaycastOptions): BVHHit[];
+    raycastFirst(ray: RayLike, options?: RaycastOptions): BVHHit | null;
+    raycast(ray: RayLike, options?: RaycastOptions): BVHHit[];
     closestPointToPoint(point: ArrayLike<number>, { maxDistance, minDistance }?: ClosestPointOptions): ClosestPointResult | null;
     intersectsSphere(center: ArrayLike<number>, radius: number): boolean;
     intersectsBox(box: Box3Like, matrix?: ArrayLike<number>): boolean;
@@ -139,11 +139,6 @@ class MeshBVH {
     collectFrustum(planes: ArrayLike<number>, { mode }?: {
         mode?: 'triangles' | 'leaves';
     }): Uint32Array;
-}
-
-interface Ray {
-    origin: ArrayLike<number>;
-    direction: ArrayLike<number>;
 }
 
 interface RaycastOptions {

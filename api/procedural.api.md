@@ -9,10 +9,10 @@ import { GeometryData } from "@margoengine/geometry";
 export type DensityField = (x: number, y: number, z: number) => number;
 
 export interface FractalOptions {
-    octaves?: number;
-    lacunarity?: number;
-    gain?: number;
-    frequency?: number;
+  octaves?: number;
+  lacunarity?: number;
+  gain?: number;
+  frequency?: number;
 }
 
 export { HeightField } from "@margoengine/math";

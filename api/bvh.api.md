@@ -4,6 +4,8 @@
 
 ```ts
 import { Camera, Engine, Geometry, Mesh } from "@margoengine/core";
+import { Mesh } from "@margoengine/core/extension";
+import { RayLike } from "@margoengine/math";
 
 export interface AsyncBuildOptions extends BVHBuildOptions {
     transfer?: boolean;
@@ -100,8 +102,8 @@ export class MeshBVH {
     toArrayBuffer(): ArrayBuffer;
     refit(): void;
     intersectsSegment(start: ArrayLike<number>, end: ArrayLike<number>, options?: SegmentOptions): boolean;
-    raycastFirst(ray: Ray, options?: RaycastOptions): BVHHit | null;
-    raycast(ray: Ray, options?: RaycastOptions): BVHHit[];
+    raycastFirst(ray: RayLike, options?: RaycastOptions): BVHHit | null;
+    raycast(ray: RayLike, options?: RaycastOptions): BVHHit[];
     closestPointToPoint(point: ArrayLike<number>, { maxDistance, minDistance }?: ClosestPointOptions): ClosestPointResult | null;
     intersectsSphere(center: ArrayLike<number>, radius: number): boolean;
     intersectsBox(box: Box3Like, matrix?: ArrayLike<number>): boolean;
@@ -113,24 +115,20 @@ export class MeshBVH {
 }
 
 export interface ModelLike {
-    readonly root: Mesh;
-    readonly primitives: readonly ModelPrimitiveLike[];
-    readonly disposed?: boolean;
+  readonly root: Mesh;
+  readonly primitives: readonly ModelPrimitiveLike[];
+  readonly disposed?: boolean;
 }
 
 export interface ModelPrimitiveLike {
-    readonly node: Mesh;
-    readonly vertices: Float32Array;
-    readonly indices: Uint32Array;
-    readonly material: {
-        readonly settings: ArrayLike<number>;
-        readonly side?: Side;
-    };
-    readonly nodeIndex?: number;
-    readonly instances?: {
-        readonly count: number;
-        readonly data: Float32Array;
-    };
+  readonly node: Mesh;
+  readonly vertices: Float32Array;
+  readonly indices: Uint32Array;
+  readonly material: { readonly settings: ArrayLike<number>; readonly side?: 'front' | 'back' | 'double' };
+  readonly nodeIndex?: number;
+  readonly instances?: { readonly count: number; readonly data: Float32Array };
+  readonly buffers?: { vertex: GPUBuffer; index: GPUBuffer };
+  readonly deformed?: GPUBuffer;
 }
 
 export { MutableVec3 } from "@margoengine/math";
@@ -138,9 +136,9 @@ export { MutableVec3 } from "@margoengine/math";
 export const NOT_INTERSECTED = 0;
 
 export interface PickProxy {
-    readonly anchor: Mesh;
-    readonly sphere: ArrayLike<number>;
-    readonly model?: object | null;
+  readonly anchor: Mesh;
+  readonly sphere: ArrayLike<number>;
+  readonly model?: object | null;
 }
 
 export interface PickingGeometry {
@@ -152,11 +150,6 @@ export interface PickingGeometry {
     readonly matrix: Float32Array;
     readonly primitiveIndex?: number;
     readonly nodeIndex?: number;
-}
-
-export interface Ray {
-    origin: ArrayLike<number>;
-    direction: ArrayLike<number>;
 }
 
 export interface RaycastAlphaTexture {
@@ -380,13 +373,11 @@ export function computePrimitiveBVHAsync(primitive: ModelPrimitiveLike, options?
 
 export function engineModels(engine: Engine): ModelLike[];
 
-export function engineProxies(engine: Engine): PickProxy[];
+export function engineProxies(engine: object): PickProxy[];
 
 export function frustumPlanes(matrix: ArrayLike<number>, webgpu?: boolean, out?: Float64Array): Float64Array;
 
 export function getGeometryBVH(geometry: Geometry | GeometryLike, options?: BVHBuildOptions): MeshBVH;
-
-export const getMeshLayers: (mesh: Mesh) => number;
 
 export function getPrimitiveBVH(primitive: ModelPrimitiveLike, options?: BVHBuildOptions): MeshBVH;
 
@@ -394,17 +385,9 @@ export const hasGeometryBVH: (geometry: Geometry | GeometryLike) => boolean;
 
 export const hasPrimitiveBVH: (primitive: ModelPrimitiveLike) => boolean;
 
-export { invert as invertMatrix };
-function invert(m: ArrayLike<number>, out?: Float64Array): Float64Array | null;
-
-export const isModel: (value: unknown) => value is ModelLike;
-
-export { multiply as multiplyMatrices };
-function multiply(a: ArrayLike<number>, b: ArrayLike<number>, out?: Float64Array): Float64Array;
+export function isModel(value: unknown): value is ModelLike;
 
 export function setGeometryBVH(geometry: Geometry | GeometryLike, bvh: MeshBVH | null): void;
-
-export function setMeshLayers(mesh: Mesh, mask: number): void;
 
 export function terminateBVHWorker(): void;
 

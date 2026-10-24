@@ -227,8 +227,6 @@ export function createMaterialAnimation(model: PBRModel, options?: {
     dispose(): void;
 };
 
-export function multiplyMatrices(out: Float32Array, a: ArrayLike<number>, b: ArrayLike<number>): void;
-
 export function sampleKeyframes(track: KeyframeTrack, time: number, out?: Float64Array): Float64Array;
 
 export function sampleTrack(times: Float32Array, values: Float32Array, width: number, time: number, interpolation: Interpolation, quaternion?: boolean, target?: Float32Array): Float32Array;

@@ -503,7 +503,7 @@ export interface ZipOptions {
 
 export function computeVertexNormals(positions: ArrayLike<number>, indices: ArrayLike<number>): Float32Array;
 
-export function crc32(bytes: Uint8Array): number;
+export function crc32(bytes: Uint8Array, crc?: number): number;
 
 export function createMeshes(engine: EngineKernel, loaded: LoadedGeometry, options?: CreateMeshesOptions): LoadedMeshes;
 

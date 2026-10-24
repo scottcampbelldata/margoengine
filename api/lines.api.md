@@ -73,13 +73,13 @@ export interface ExpandLineOptions {
 }
 
 export interface FogLike {
-    readonly color?: ColorInput;
-    readonly near?: number;
-    readonly far?: number;
-    readonly density?: number;
-    readonly heightFalloff?: number;
-    readonly height?: number;
-    readonly enabled?: boolean;
+  readonly color?: ColorInput;
+  readonly near?: number;
+  readonly far?: number;
+  readonly density?: number;
+  readonly heightFalloff?: number;
+  readonly height?: number;
+  readonly enabled?: boolean;
 }
 
 export interface GLTFSkinSource {
@@ -349,8 +349,6 @@ export function expandLine(points: ArrayLike<number>, options?: ExpandLineOption
 export function geometryBounds(geometry: Geometry): Float32Array;
 
 export function lightKind(light: unknown): Kind | null;
-
-export { meshWorldMatrix } from "@margoengine/math";
 
 export { parseColor } from "@margoengine/math";
 

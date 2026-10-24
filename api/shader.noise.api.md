@@ -5,12 +5,7 @@
 ```ts
 export type NoiseField<T extends 'vec2f' | 'vec3f'> = (p: Node<T>) => Node<'f32'>;
 
-export interface NoiseFractalOptions {
-    octaves?: number;
-    lacunarity?: number;
-    gain?: number;
-    frequency?: number;
-}
+export type NoiseFractalOptions = FractalOptions;
 
 export interface NoiseWarpOptions<T extends 'vec2f' | 'vec3f'> {
     warp?: (p: Node<T>) => Node<'f32'>;
@@ -66,6 +61,13 @@ type Count<S extends string, A extends 0[] = []> = S extends `${infer _}${infer 
 type Emit = (b: Builder, n: Node) => string;
 
 type Floats<T extends Type> = Node<VecOf<'f32', Size<T>>>;
+
+interface FractalOptions {
+  octaves?: number;
+  lacunarity?: number;
+  gain?: number;
+  frequency?: number;
+}
 
 interface Host {
     width: number;

@@ -66,7 +66,7 @@ export interface ZipOptions {
 
 export function computeVertexNormals(positions: ArrayLike<number>, indices: ArrayLike<number>): Float32Array;
 
-export function crc32(bytes: Uint8Array): number;
+export function crc32(bytes: Uint8Array, crc?: number): number;
 
 export function faceNormal(positions: ArrayLike<number>, a: number, b: number, c: number): [number, number, number];
 

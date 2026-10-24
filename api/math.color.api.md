@@ -71,6 +71,8 @@ export function clipToSRGB<T extends NumberArray = number[]>(rgb: ArrayLike<numb
 
 export function gradeSRGB<T extends NumberArray = number[]>(rgb: ArrayLike<number>, grade: ColorGrade, out?: T, offset?: number): T;
 
+export function hexColor(text: string): [number, number, number, number] | undefined;
+
 export function linearP3ToLinearSRGB<T extends NumberArray = number[]>(rgb: ArrayLike<number>, out?: T, offset?: number): T;
 
 export function linearSRGBToLinearP3<T extends NumberArray = number[]>(rgb: ArrayLike<number>, out?: T, offset?: number): T;

@@ -5,8 +5,6 @@
 ```ts
 export type Interpolation = 'STEP' | 'LINEAR' | 'CUBICSPLINE';
 
-export function multiplyMatrices(out: Float32Array, a: ArrayLike<number>, b: ArrayLike<number>): void;
-
 export function sampleTrack(times: Float32Array, values: Float32Array, width: number, time: number, interpolation: Interpolation, quaternion?: boolean, target?: Float32Array): Float32Array;
 
 export function sampleTrackInto(times: Float32Array, values: Float32Array, width: number, time: number, interpolation: Interpolation, quaternion?: boolean, out?: Float32Array): Float32Array;

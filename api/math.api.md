@@ -368,6 +368,11 @@ export class Ray {
     equals(ray: Ray): boolean;
 }
 
+export interface RayLike {
+    readonly origin: ArrayLike<number>;
+    readonly direction: ArrayLike<number>;
+}
+
 export interface RectAreaLight {
     position: Vec3;
     direction: Vec3;
@@ -582,6 +587,8 @@ export function clipToSRGB<T extends NumberArray = number[]>(rgb: ArrayLike<numb
 export function degreesToQuaternion(degrees: ArrayLike<number>, order?: EulerOrder): [number, number, number, number];
 
 export function gradeSRGB<T extends NumberArray = number[]>(rgb: ArrayLike<number>, grade: ColorGrade, out?: T, offset?: number): T;
+
+export function hexColor(text: string): [number, number, number, number] | undefined;
 
 export function linearP3ToLinearSRGB<T extends NumberArray = number[]>(rgb: ArrayLike<number>, out?: T, offset?: number): T;
 

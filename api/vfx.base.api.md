@@ -8,13 +8,13 @@ import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 import { ColorInput } from "@margoengine/math";
 
 export interface FogLike {
-    readonly color?: ColorInput;
-    readonly near?: number;
-    readonly far?: number;
-    readonly density?: number;
-    readonly heightFalloff?: number;
-    readonly height?: number;
-    readonly enabled?: boolean;
+  readonly color?: ColorInput;
+  readonly near?: number;
+  readonly far?: number;
+  readonly density?: number;
+  readonly heightFalloff?: number;
+  readonly height?: number;
+  readonly enabled?: boolean;
 }
 
 export interface ParticleAtlas {

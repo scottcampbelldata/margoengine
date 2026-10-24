@@ -351,9 +351,6 @@ export interface TextureData {
     extras?: Extras;
 }
 
-export interface USDZOptions extends SceneOptions {
-}
-
 export function animateCels(cels: readonly ExportNode[], clip: FrameClip, shown: ArrayLike<number>): AnimationChannelData[];
 
 export function animatePlacements(node: ExportNode, clip: FrameClip, matrices: readonly (ArrayLike<number> | null)[]): AnimationChannelData[];
@@ -394,8 +391,6 @@ export function exportSTL(source: ExportSource, options?: STLOptions & {
 export function exportSTL(source: ExportSource, options: STLOptions & {
     binary: false;
 }): string;
-
-export function exportUSDZ(source: ExportSource, options?: USDZOptions): Uint8Array;
 
 export function frameTimes(clip: FrameClip): Float32Array;
 

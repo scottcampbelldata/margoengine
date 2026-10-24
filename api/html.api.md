@@ -34,6 +34,4 @@ export { Label } from "@margoengine/labels";
 export { LabelInfo } from "@margoengine/labels";
 
 export { LabelOptions } from "@margoengine/labels";
-
-export { projectPoint } from "@margoengine/labels";
 ```

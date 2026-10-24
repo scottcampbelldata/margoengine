@@ -28,6 +28,11 @@ export class Ray {
     equals(ray: Ray): boolean;
 }
 
+export interface RayLike {
+    readonly origin: ArrayLike<number>;
+    readonly direction: ArrayLike<number>;
+}
+
 // Not exported from this entry, but used by the exports above:
 
 interface BoxLike {

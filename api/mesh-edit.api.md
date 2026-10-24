@@ -4,7 +4,7 @@
 
 ```ts
 import { Vec3 } from "@margoengine/core";
-import { Mat4, MutableVec2, MutableVec3 } from "@margoengine/math";
+import { Mat4, MutableVec2, MutableVec3, RayLike } from "@margoengine/math";
 
 export interface CompiledPolygonMesh {
     positions: number[];
@@ -106,7 +106,7 @@ export class MeshSurfaceQuery {
     frame(): SurfaceFrame;
     worldFrame(): SurfaceWorldFrame;
     worldVertices(objectId: string): MutableVec3[];
-    intersect(input: SurfaceRay, options?: SurfaceQueryOptions): SurfaceHit[];
+    intersect(input: RayLike, options?: SurfaceQueryOptions): SurfaceHit[];
     dispose(): void;
     [Symbol.dispose](): void;
 }
@@ -314,11 +314,6 @@ export interface SurfaceQueryOptions {
     texture?: PaintTexture;
     includeTransparent?: boolean;
     alphaThreshold?: number;
-}
-
-export interface SurfaceRay {
-    origin: ArrayLike<number>;
-    direction: ArrayLike<number>;
 }
 
 export interface SurfaceSource {

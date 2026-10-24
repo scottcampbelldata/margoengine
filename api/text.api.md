@@ -301,8 +301,6 @@ export function hitTest(layout: TextLayout, x: number, y: number): number;
 
 export function layoutText(text: string, options: LayoutOptions, measurer: TextMeasurer): TextLayout;
 
-export { meshWorldMatrix } from "@margoengine/math";
-
 export { parseColor } from "@margoengine/math";
 
 export const sdfDistance: (value: number, params?: SdfParams) => number;

@@ -5,8 +5,9 @@
 ```ts
 import { EngineKernel, EnginePlugin, Mesh, RenderView } from "@margoengine/core";
 import { FrameGraph } from "@margoengine/core/extension";
+import { ScreenPoint } from "@margoengine/math/mat4";
 
-export type Backend = 'webgpu' | 'webgl2';
+export { Backend } from "@margoengine/math";
 
 export class CSS3DObject extends Item {
     pixelScale: number;
@@ -109,36 +110,21 @@ export type LabelView = Pick<RenderView, 'camera' | 'viewport' | 'pixels'>;
 
 export type OccludeHook = (label: Label, info: LabelInfo) => boolean;
 
-export interface ScreenPoint {
-    x: number;
-    y: number;
-    depth: number;
-    w: number;
-    inFront: boolean;
-    inFrustum: boolean;
-}
-
 export type Vec3 = readonly [number, number, number];
 
 export function cameraCSSTransform(view: ArrayLike<number>, perspective: number, width: number, height: number): string;
 
 export function composeMatrix(position: Vec3, quaternion?: readonly number[], scale?: Vec3, out?: Float64Array): Float64Array;
 
-export const createScreenPoint: () => ScreenPoint;
-
 export const cssPerspective: (fov: number, height: number) => number;
 
 export function cssPointToWorld(world: ArrayLike<number>, pixelScale: number, x: number, y: number): [number, number, number];
-
-export const isOrthographic: (matrix: ArrayLike<number>) => boolean;
 
 export function lookAtView(position: Vec3, target: Vec3, out?: Float64Array, up?: Vec3): Float64Array;
 
 export function objectCSSTransform(world: ArrayLike<number>, pixelScale?: number): string;
 
 export function orthographicCSSTransform(matrix: ArrayLike<number>, width: number, height: number, backend?: Backend): string;
-
-export function projectPoint(matrix: ArrayLike<number>, x: number, y: number, z: number, width: number, height: number, backend?: Backend, out?: ScreenPoint): ScreenPoint;
 
 // Not exported from this entry, but used by the exports above:
 

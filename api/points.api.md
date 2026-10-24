@@ -22,13 +22,13 @@ export interface BaseMaterialOptions {
 export { ColorInput } from "@margoengine/math";
 
 export interface FogLike {
-    readonly color?: ColorInput;
-    readonly near?: number;
-    readonly far?: number;
-    readonly density?: number;
-    readonly heightFalloff?: number;
-    readonly height?: number;
-    readonly enabled?: boolean;
+  readonly color?: ColorInput;
+  readonly near?: number;
+  readonly far?: number;
+  readonly density?: number;
+  readonly heightFalloff?: number;
+  readonly height?: number;
+  readonly enabled?: boolean;
 }
 
 export const NO_BLOCK = 4294967295;
@@ -278,10 +278,6 @@ export function cullBlocks(blocks: Pick<PointBlocks, 'bounds' | 'counts' | 'leng
 export function expandBlockBounds(blocks: PointBlocks, positions: ArrayLike<number>, start: number, count: number): number;
 
 export function mergeRanges(ranges: Array<[number, number]>): Array<[number, number]>;
-
-export { meshWorldMatrix } from "@margoengine/math";
-
-export function multiply(a: ArrayLike<number>, b: ArrayLike<number>, out?: Float64Array | Float32Array | number[]): Float64Array | Float32Array | number[];
 
 export function packColors(source: ArrayLike<number>, components: number, count: number, out: Uint32Array, offset?: number): Uint32Array;
 

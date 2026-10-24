@@ -4,10 +4,10 @@
 
 ```ts
 export interface FractalOptions {
-    octaves?: number;
-    lacunarity?: number;
-    gain?: number;
-    frequency?: number;
+  octaves?: number;
+  lacunarity?: number;
+  gain?: number;
+  frequency?: number;
 }
 
 export class Noise {

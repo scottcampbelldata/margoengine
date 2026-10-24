@@ -6,44 +6,36 @@
 import { EngineKernel, Mesh, RenderView } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, Mesh } from "@margoengine/core/extension";
 
-export interface Model {
-    readonly root: Mesh;
-    readonly primitives: readonly ModelPrimitive[];
-    readonly disposed?: boolean;
+export interface ModelLike {
+  readonly root: Mesh;
+  readonly primitives: readonly ModelPrimitiveLike[];
+  readonly disposed?: boolean;
 }
 
-export interface ModelPrimitive {
-    readonly node: Mesh;
-    readonly vertices: Float32Array;
-    readonly indices: Uint32Array;
-    readonly material: {
-        readonly settings: ArrayLike<number>;
-        readonly side?: 'front' | 'back' | 'double';
-    };
-    readonly buffers?: {
-        vertex: GPUBuffer;
-        index: GPUBuffer;
-    };
-    readonly deformed?: GPUBuffer;
-    readonly instances?: {
-        readonly count: number;
-        readonly data: Float32Array;
-    };
+export interface ModelPrimitiveLike {
+  readonly node: Mesh;
+  readonly vertices: Float32Array;
+  readonly indices: Uint32Array;
+  readonly material: { readonly settings: ArrayLike<number>; readonly side?: 'front' | 'back' | 'double' };
+  readonly nodeIndex?: number;
+  readonly instances?: { readonly count: number; readonly data: Float32Array };
+  readonly buffers?: { vertex: GPUBuffer; index: GPUBuffer };
+  readonly deformed?: GPUBuffer;
 }
 
 export interface PickHit {
     mesh: Mesh;
-    model?: Model;
-    primitive?: ModelPrimitive;
+    model?: ModelLike;
+    primitive?: ModelPrimitiveLike;
     primitiveIndex?: number;
     approximate?: boolean;
     instanceId?: number;
 }
 
 export interface PickProxy {
-    readonly anchor: Mesh;
-    readonly sphere: ArrayLike<number>;
-    readonly model?: object | null;
+  readonly anchor: Mesh;
+  readonly sphere: ArrayLike<number>;
+  readonly model?: object | null;
 }
 
 export class Picking implements EnginePlugin {
@@ -101,7 +93,7 @@ export class Selection implements EnginePlugin {
     constructor(options?: SelectionOptions);
     static attach(engine: EngineKernel, options?: SelectionOptions): Selection;
     add(source: PickingSource): () => void;
-    set(meshes: Iterable<Mesh | Model>): void;
+    set(meshes: Iterable<Mesh | ModelLike>): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;

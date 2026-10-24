@@ -166,7 +166,7 @@ export function duplicatesGate({ root, files, packages }) {
     sides,
     summary() {
       return Object.entries(items)
-        .filter(([k]) => !k.startsWith('reexport '))
+        .filter(([k]) => !k.startsWith('reexport ') && !k.startsWith('family '))
         .sort((a, b) => b[1] - a[1])
         .slice(0, 12)
         .map(([pair, n]) => `  ${pair}: ${n} lines, e.g. ${sides(pair).join(' ~ ')}`)
