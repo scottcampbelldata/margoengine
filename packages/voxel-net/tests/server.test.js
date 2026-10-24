@@ -176,7 +176,12 @@ test('protocol violations close the connection', async (t) => {
 });
 
 test('four bots walk and build for two seconds without errors', async (t) => {
-  const { server, url } = await start(t),
+  // Each bot spawns on its own corner of a 40-block square. Within two seconds no bot can reach another's edits
+  // (6-block reach plus at most about 12 blocks walked each), so every client predicts exactly what the server
+  // simulates and a correction would mean a real disagreement. Four bots 4 blocks apart (as before) could walk into a
+  // block another bot placed before its client heard of it; the server then corrects it, rightly, and how often that
+  // happens depends on machine load. All four stay within the 96-block player distance of bot 0.
+  const { server, url } = await start(t, { spawn: (id) => [(id % 2) * 40, ((id >> 1) % 2) * 40] }),
     bots = await Promise.all(
       [0, 1, 2, 3].map((i) => VoxelBot.connect({ url, blocks, editInterval: 0.25, players: i === 0 })),
     ),
