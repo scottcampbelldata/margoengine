@@ -19,11 +19,6 @@ type AfterimagePassContext = Extract<PassContext, { backend: 'webgpu' }>;
 export interface AfterimageOptions {
   /** Seconds for a trail to fade to half its brightness; finite and above 0. Default 0.15. */
   halfLife?: number;
-  /**
-   * @deprecated Use `halfLife`. Share of the trail kept per frame, 0..1 (1.x compatibility); the trail then depends
-   * on the frame rate. Overrides `halfLife` when set.
-   */
-  damp?: number;
   /** False passes frames through; enabling again starts a new trail. Default true. */
   enabled?: boolean;
 }
@@ -31,7 +26,6 @@ export interface AfterimageOptions {
 // 0.15 s: about 9 frames at 60 Hz to half brightness and about 0.5 s until a bright trail is near black on screen,
 // long enough to read as motion and short enough not to smear the scene.
 const DEFAULT_HALF_LIFE = 0.15;
-const RATE = 60; // frames per second at which `damp` is reported as a half-life
 
 // next = max(current, previous x keep) per channel; a fresh history takes the current frame as it is.
 const foldShader = `${fullscreen}
@@ -52,7 +46,6 @@ const presentShader = `${fullscreen}${displayShader}
  return vec4f(toDisplay(linear.rgb),linear.a);
 }`;
 
-const dampError = () => new RangeError('Afterimage damp must be in 0..1; pass a share of the trail kept per frame');
 const halfLifeError = () => new RangeError('Afterimage halfLife must be finite and above 0; pass seconds');
 
 /**
@@ -61,8 +54,8 @@ const halfLifeError = () => new RangeError('Afterimage halfLife must be finite a
  * (`rgba16float`), so trails fade smoothly to black and later HDR effects (Bloom) and the display effect see them.
  * It starts empty, and again after a resize, a device restore, `reset()`, or while disabled. Place it among the HDR
  * effects: before Bloom so trails glow, after it to trail the glow. `attach` runs it alone in its own PostStack.
- * @throws TypeError when `enabled` is not a boolean; RangeError when `halfLife` is not finite and above 0 or `damp`
- * is outside 0..1 (checked now, every frame and in the setters); MargoError `'state'` outside a PostStack,
+ * @throws TypeError when `enabled` is not a boolean; RangeError when `halfLife` is not finite and above 0
+ * (checked now, every frame and in the setter); MargoError `'state'` outside a PostStack,
  * `'unsupported'` without WebGPU, `'disposed'` after `dispose()`, `'attached'` when joined twice.
  */
 export class Afterimage implements EnginePlugin {
@@ -107,28 +100,13 @@ export class Afterimage implements EnginePlugin {
     this.options.enabled = value;
   }
 
-  /**
-   * Seconds to half brightness. With the deprecated `damp` set it reports the half-life `damp` gives at 60 frames per
-   * second. Setting it clears `damp`, so the trail follows time again.
-   */
+  /** Mirrors `options.halfLife`: seconds for a trail to fade to half its brightness. Default 0.15. */
   get halfLife(): number {
-    const damp = this.options.damp;
-    if (damp === undefined) return this.options.halfLife ?? DEFAULT_HALF_LIFE;
-    return damp === 0 ? 0 : damp === 1 ? Number.POSITIVE_INFINITY : Math.log(0.5) / Math.log(damp) / RATE;
+    return this.options.halfLife ?? DEFAULT_HALF_LIFE;
   }
   set halfLife(value: number) {
     if (!(Number.isFinite(value) && value > 0)) throw halfLifeError();
     this.options.halfLife = value;
-    delete this.options.damp;
-  }
-
-  /** @deprecated Use `halfLife`. The per-frame share of the trail kept, or undefined when the half-life is used. */
-  get damp(): number | undefined {
-    return this.options.damp;
-  }
-  set damp(value: number) {
-    if (!(value >= 0 && value <= 1)) throw dampError();
-    this.options.damp = value;
   }
 
   /** Starts a new trail on the next frame. */
@@ -185,15 +163,12 @@ export class Afterimage implements EnginePlugin {
     const o = this.options;
     if (o.enabled !== undefined && typeof o.enabled !== 'boolean')
       throw new TypeError('Afterimage enabled must be a boolean; pass true or false');
-    if (o.damp !== undefined && !(o.damp >= 0 && o.damp <= 1)) throw dampError();
     if (o.halfLife !== undefined && !(Number.isFinite(o.halfLife) && o.halfLife > 0)) throw halfLifeError();
   }
 
   /** The history multiplier of a frame `delta` seconds long. */
   private keep(delta: number): number {
-    const o = this.options;
-    if (o.damp !== undefined) return o.damp;
-    return delta > 0 ? 0.5 ** (delta / (o.halfLife ?? DEFAULT_HALF_LIFE)) : 1;
+    return delta > 0 ? 0.5 ** (delta / this.halfLife) : 1;
   }
 
   private draw(c: AfterimagePassContext, input: GPUTextureView, output: StageOutput): GPUTextureView | void {

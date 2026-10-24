@@ -52,7 +52,7 @@ for (const samples of [4, 1])
     after.reset();
     assert.deepEqual(uniforms(h.gpu.record(() => h.frame())), [[KEEP, 1, 0, 0]]);
     h.frame();
-    after.damp = 0.5;
+    after.halfLife = 1 / 60; // one frame: keep 0.5
     after.enabled = false;
     assert.deepEqual(uniforms(h.gpu.record(() => h.frame())), [[0.5, 1, 0, 0]]);
     after.enabled = true;
@@ -73,7 +73,7 @@ for (const samples of [4, 1])
 test('Afterimage before a display effect hands it the history itself, in linear light', async () => {
   const h = harness(),
     seen = [],
-    stack = PostStack.attach(h.engine, [new Afterimage({ damp: 0.9 }), probe(seen)]),
+    stack = PostStack.attach(h.engine, [new Afterimage({ halfLife: 0.25 }), probe(seen)]),
     log = h.gpu.record(() => h.frame());
   const passes = log.filter((e) => e[0] === 'beginRenderPass' && e[1].colorAttachments.length);
   const fold = passes.at(-1)[1].colorAttachments[0].view;
@@ -87,16 +87,13 @@ test('Afterimage before a display effect hands it the history itself, in linear 
   stack.dispose();
   await null;
   assert.deepEqual(h.live(), []);
-  for (const options of [{ damp: -0.1 }, { damp: 1.1 }, { damp: NaN }])
-    assert.throws(() => new Afterimage(options), RangeError);
   assert.throws(() => new Afterimage({ enabled: 0 }), TypeError);
-  assert.throws(() => (new Afterimage().damp = 2), RangeError);
   assert.throws(() => new PostStack([probe([]), new Afterimage()]), RangeError, 'HDR effects come first');
   const alone = harness();
   assert.throws(() => alone.engine.use(new Afterimage()), { name: 'MargoError', code: 'state', message: /PostStack/ });
 });
 
-test('Afterimage fades by a half-life in seconds, whatever the frame rate; damp is a per-frame alias', async () => {
+test('Afterimage fades by a half-life in seconds, whatever the frame rate', async () => {
   const h = harness(),
     after = Afterimage.attach(h.engine, { halfLife: 0.5 }),
     keep = (delta) => {
@@ -120,15 +117,9 @@ test('Afterimage fades by a half-life in seconds, whatever the frame rate; damp 
   const sixty = Math.fround(0.5 ** (1 / 30));
   assert.ok(Math.abs(sixty * sixty - Math.fround(0.5 ** (1 / 15))) < 1e-6);
   assert.equal(after.halfLife, 0.5);
-  assert.equal(after.damp, undefined);
-  after.damp = 0.9;
-  assert.deepEqual(at(1 / 30), [[Math.fround(0.9), 0, 0, 0]], 'damp wins over halfLife, per frame');
-  assert.ok(
-    Math.abs(after.halfLife - Math.log(0.5) / Math.log(0.9) / 60) < 1e-12,
-    'damp reported as a 60 Hz half-life',
-  );
+  assert.equal('damp' in after, false, 'no per-frame damp option');
   after.halfLife = 0.25;
-  assert.equal(after.damp, undefined, 'setting halfLife clears damp');
+  assert.equal(after.options.halfLife, 0.25);
   assert.deepEqual(at(0.25), [[0.5, 0, 0, 0]]);
   for (const value of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
     assert.throws(() => (after.halfLife = value), RangeError);

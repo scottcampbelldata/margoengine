@@ -147,7 +147,7 @@ async function render() {
   const device = observe();
   device.pushErrorScope('validation');
   try {
-    engine.render();
+    engine.render({ delta: 1 / 60 }); // fixed 60 Hz frames, so Afterimage fades the same every run
     await device.queue.onSubmittedWorkDone();
   } finally {
     const error = await device.popErrorScope();

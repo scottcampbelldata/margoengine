@@ -15,8 +15,6 @@ export class Afterimage implements EnginePlugin {
     set enabled(value: boolean);
     get halfLife(): number;
     set halfLife(value: number);
-    get damp(): number | undefined;
-    set damp(value: number);
     reset(): void;
     setup(engine: Engine): void;
     onDeviceRestored(engine: Engine): void;
@@ -26,7 +24,6 @@ export class Afterimage implements EnginePlugin {
 
 export interface AfterimageOptions {
     halfLife?: number;
-    damp?: number;
     enabled?: boolean;
 }
 

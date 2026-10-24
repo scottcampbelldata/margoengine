@@ -9,8 +9,9 @@
 //   SMAA alone on a core scene, 4x and 1x: no validation errors, and only pixels next to an edge change.
 // glitch: a coordinate image (red = x, green = y): idle frames and intensity 0 pass it through exactly; glitched frames
 //   keep each row's green (displacement is horizontal), move pixels, and replay exactly from the same seed.
-// afterimage: a bright square (linear 3.0 on 0.05) moving 20 px per frame: the probed HDR output equals
-//   max(current, history x damp) per channel, computed here with float16 rounding of the history; damp 0, disabled,
+// afterimage: a bright square (linear 3.0 on 0.05) moving 20 px per 1/60 s frame: the probed HDR output equals
+//   max(current, history x keep) per channel, keep = 0.5 ^ (delta / halfLife), computed here with float16 rounding of
+//   the history; a half-life far below a frame, disabled,
 //   after a resize and after a device restore it equals the frame without Afterimage; premultiplied alpha trails
 //   with the colour; the display-encoded path equals the display curve of that expectation.
 import assert from 'node:assert/strict';
@@ -328,8 +329,13 @@ try {
           }
         return out;
       };
-    const trail = async (damp, frames, list, values = square, extra) => {
-      await configure(list(damp));
+    // The half-life whose 60 Hz frames keep `share` of the trail, and the keep the effect computes from it.
+    const life = (share) => Math.log(0.5) / (60 * Math.log(share)),
+      keepOf = (halfLife) => Math.fround(0.5 ** (1 / 60 / halfLife));
+    const trail = async (share, frames, list, values = square, extra) => {
+      const halfLife = life(share),
+        keep = keepOf(halfLife);
+      await configure(list(halfLife));
       const got = [],
         expected = [];
       let history;
@@ -340,14 +346,14 @@ try {
           now = current(v, W, (x) => x);
         await extra?.(k);
         got.push((await frame(v)).pixels);
-        history = history ? now.map((c, i) => Math.max(c, history[i] * damp)) : now;
+        history = history ? now.map((c, i) => Math.max(c, history[i] * keep)) : now;
         expected.push(history);
       }
       return { got, expected, bound: (k) => (k + 1) * 2 ** -10 };
     };
-    const hdrProbe = (damp) => [
+    const hdrProbe = (halfLife) => [
       { type: 'pattern', kind: 'hdr' },
-      { type: 'afterimage', options: { damp } },
+      { type: 'afterimage', options: { halfLife } },
       { type: 'probe', kind: 'display' },
     ];
     const relative = (a, b) => {
@@ -359,16 +365,16 @@ try {
     const errors = opaque.got.map((g, k) => relative(g, opaque.expected[k])),
       tail = opaque.got[5][(48 * W + 18) * 4];
     check(
-      'afterimage: output = max(current, history x damp) per channel (HDR, float16 history)',
+      'afterimage: output = max(current, history x keep) per channel (HDR, float16 history)',
       errors.every((e, k) => e <= opaque.bound(k)),
       {
         relativeErrorPerFrame: errors,
         boundPerFrame: errors.map((_, k) => opaque.bound(k)),
         oldestTrail: tail,
-        expectedOldest: V * 0.9 ** 5,
+        expectedOldest: V * keepOf(life(0.9)) ** 5,
       },
     );
-    // Without the effect, damp 0 and disabled give the frame itself.
+    // Without the effect, a half-life far below a frame (keep 0) and disabled give the frame itself.
     await configure([
       { type: 'pattern', kind: 'hdr' },
       { type: 'probe', kind: 'display' },
@@ -376,7 +382,7 @@ try {
     const plain = [];
     for (let k = 0; k < 3; k++) plain.push((await frame(square(k))).pixels);
     for (const [label, options] of [
-      ['damp 0', { damp: 0 }],
+      ['halfLife 1e-4 s', { halfLife: 1e-4 }],
       ['disabled', { enabled: false }],
     ]) {
       await configure([
@@ -393,7 +399,7 @@ try {
       ['resize', () => configureSize(128)],
       ['device restore', () => page.evaluate(() => window.looks.reboot())],
     ]) {
-      await configure(hdrProbe(0.9));
+      await configure(hdrProbe(life(0.9)));
       for (let k = 0; k < 3; k++) await frame(square(k));
       await action();
       const result = await frame(square(3)),
@@ -422,9 +428,9 @@ try {
       },
     );
     // As the last HDR stage it presents through the display curve.
-    const display = await trail(0.9, 4, (damp) => [
+    const display = await trail(0.9, 4, (halfLife) => [
       { type: 'pattern', kind: 'hdr' },
-      { type: 'afterimage', options: { damp } },
+      { type: 'afterimage', options: { halfLife } },
       { type: 'probe', kind: 'ldr' },
     ]);
     const encoded = [];
@@ -434,7 +440,7 @@ try {
     check('afterimage display path: the display curve of the expected trail (8-bit)', shown.max <= 2 / 255, shown);
     await configure([
       { type: 'pattern', kind: 'hdr' },
-      { type: 'afterimage', options: { damp: 0.9 } },
+      { type: 'afterimage', options: { halfLife: life(0.9) } },
     ]);
     let state;
     for (let k = 0; k < 4; k++) state = await frame(square(k));

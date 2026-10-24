@@ -37,4 +37,4 @@ Anti-aliasing and screen-look references (our own code, written from the papers 
 - Glitch: bursts at random intervals, and a mode that glitches every frame. Random numbers: xorshift32,
   George Marsaglia, "Xorshift RNGs", Journal of Statistical Software 8(14), 2003. Per-pixel hash: PCG hash from Mark
   Jarzynski and Marc Olano, "Hash Functions for GPU Rendering", Journal of Computer Graphics Techniques 9(3), 2020.
-- Afterimage: `max(current, history x damp)`, `damp` default 0.96.
+- Afterimage: `max(current, history x keep)` with `keep = 0.5 ^ (delta / halfLife)`, `halfLife` default 0.15 s.

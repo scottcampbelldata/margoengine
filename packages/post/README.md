@@ -423,12 +423,10 @@ glitch.options.intensity = 0.4;    // 0-1, scales displacement, split and tearin
 
 ## Afterimage
 
-`@margoengine/post/afterimage` (5,555 B min+gzip, its own entry; it carries the stack) leaves trails:
+`@margoengine/post/afterimage` (5,408 B min+gzip, its own entry; it carries the stack) leaves trails:
 each channel of the output is `max(current, history x keep)`, and the output becomes the next frame's
 history. `keep = 0.5 ^ (delta / halfLife)` with the frame's `delta` in seconds, so a trail halves in `halfLife`
-seconds (default 0.15) at any frame rate; a paused render (`delta` 0) keeps it. The deprecated `damp` (1.x) sets
-`keep` per frame instead and wins when both are given; `trails.halfLife` then reports its 60 Hz equivalent, and
-setting `halfLife` clears it.
+seconds (default 0.15) at any frame rate; a paused render (`delta` 0) keeps it.
 
 ```ts
 import {Afterimage} from '@margoengine/post/afterimage';
@@ -446,10 +444,10 @@ trails.reset();       // drop the trail, e.g. on a camera cut
 - **Resets.** The trail starts empty on the first frame, after a resize, after a device restore, after `reset()` and
   while disabled (disabled frames pass through).
 - **Checked on a real GPU** (same run): a bright square (linear 3.0) moving 20 px per frame leaves exactly
-  `max(current, history x damp)` within the float16 rounding of the stored history (0.0022 relative after six frames);
-  `damp: 0` and disabled equal the frame without Afterimage; the first frame after a resize or a device restore has
-  no trail; premultiplied alpha trails with its colour; the presented frame is the display curve of the expected trail
-  within 2/255.
+  `max(current, history x keep)` (60 Hz frames) within the float16 rounding of the stored history (0.0022 relative after
+  six frames); a half-life far below a frame and disabled equal the frame without Afterimage; the first frame after a
+  resize or a device restore has no trail; premultiplied alpha trails with its colour; the presented frame is the
+  display curve of the expected trail within 2/255.
 - **Limits.** Screen-space trails: a moving camera smears the whole frame. Two full-size `rgba16float` history
   textures. GPU cost not measured yet. WebGPU only.
 
