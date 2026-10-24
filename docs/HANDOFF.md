@@ -2,6 +2,19 @@
 
 Last updated 2026-10-24. Read this first when starting a new session. Update it whenever work lands.
 
+## Landed 2026-10-24: parity closing follow-ups (Collada scene, clipIntersection, DepthTexture checks)
+
+- Collada `<lookat>`, `<skew>`, cameras (`daeCameraView`) and lights (`daeEngineLights`) from the 1.4.1/1.5 spec, 9
+  tests built from the spec text (`packages/loaders/tests/dae-scene.test.js`).
+- `clipIntersection` on every materials Material, LineMaterial and points/sprite material, and in directional
+  shadows (a material's planes bind as `materialClip`; scene SectionPlanes keep their unchanged shader text). The
+  clipping demo's torus knot loses a wedge to it.
+- DepthTexture: 10 node tests and `npm run check:depth` (in check:merge) reading depth back on the GPU at 1x and 4x.
+  It found a real bug: SceneTargets recreated its textures every view when a canvas view and a target view of
+  another size drew in one frame; each size now keeps its own set.
+- USDZ Quick Look and AR hit testing are recorded as hardware-blocked in [known-bugs.md](known-bugs.md), with what
+  is needed to close them.
+
 ## Landed 2026-10-24: short core errors with a help page; setQuaternion allocates nothing
 
 Scott approved (2026-10-24) replacing the long fix-naming messages of the core bug-fix landing below.
