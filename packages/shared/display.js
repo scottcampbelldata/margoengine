@@ -1,3 +1,4 @@
+import { margoError } from './errors.js';
 // Margo's display transform. Khronos PBR Neutral tone mapping, written from the Khronos Group's published specification
 // (2024): a colour passes through below 0.76 (less a small offset that keeps blacks black), its peak rolls off towards
 // white above that, and saturation falls only as the peak does, so base colours under neutral light show as authored.
@@ -8,3 +9,21 @@ export const neutralShader = `fn pbrNeutral(input:vec3f)->vec3f {let x=min(input
 `;
 export const displayShader = `${neutralShader}fn toDisplay(c:vec3f)->vec3f {let x=pbrNeutral(max(c,vec3f(0)));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>=vec3f(0.0031308));}
 `;
+
+// Core's display transform at the end of its fragment shader (tone mapping and sRGB encoding).
+const displayTail = /let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/;
+
+/**
+ * Core's lighting shader `shader` returning linear HDR radiance instead of the display colour, for effects that capture
+ * the scene before tone mapping (post, DOF, tonemap, creative, environment captures). When `owner` is given and the
+ * shader has no core display transform (another plugin replaced it), throws MargoError 'unsupported' naming `owner`.
+ */
+export function linearShader(shader, owner) {
+  const linear = shader.replace(displayTail, 'return vec4f(linear,1);');
+  if (owner && linear === shader)
+    throw margoError(
+      'unsupported',
+      `${owner} requires the standard core lighting shader; remove the plugin that replaced core's shader`,
+    );
+  return linear;
+}

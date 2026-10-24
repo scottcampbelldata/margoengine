@@ -9,7 +9,7 @@ import {
   type PassContext,
   type DrawOptions,
 } from '@margoengine/core/extension';
-import { displayShader } from '../../shared/display.js';
+import { displayShader, linearShader } from '../../shared/display.js';
 import { margoError } from '../../shared/errors.js';
 import { render } from '../../shared/gpu.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
@@ -314,17 +314,9 @@ export class Bloom implements EnginePlugin {
         this.originalDepth = c.depth;
         this.originalFormat = c.format;
         if (this.sourceShader !== c.shader) {
-          const linearShader = c.shader.replace(
-            /let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/,
-            'return vec4f(linear,1);',
-          );
-          if (linearShader === c.shader)
-            throw margoError(
-              'unsupported',
-              "Bloom requires the standard core lighting shader; remove the plugin that replaced core's shader",
-            );
+          const linear = linearShader(c.shader, 'Bloom');
           this.sourceShader = c.shader;
-          this.linearShader = linearShader;
+          this.linearShader = linear;
         }
         this.capture!.begin(c);
         c.shader = this.linearShader;

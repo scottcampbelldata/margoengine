@@ -10,6 +10,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { invertMatrix } from '@margoengine/math/mat4';
 import { SceneTarget } from '../../shared/msaa.js';
 import { withHidden } from '../../shared/view-rect.js';
+import { linearShader } from '../../shared/display.js';
 
 declare const GPUTextureUsage: {
   RENDER_ATTACHMENT: number;
@@ -32,8 +33,6 @@ export type CapturePassFilter = (pass: { readonly name: string; readonly order: 
 export const scenePasses: CapturePassFilter = ({ order }) => order < -110 || (order >= -25 && order < 9);
 
 const OWNER = Symbol.for('margoengine.optional.msaa');
-// Core's display transform at the end of its fragment shader, as the post effects replace it for HDR captures.
-const DISPLAY = /let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/;
 
 /** @internal An rgba16float colour target with a matching depth, MSAA like the scene, reused across captures. */
 export class CaptureTarget {
@@ -138,7 +137,7 @@ const BEGIN: FramePass = {
     target.scene!.begin(c);
     c.width = job.width;
     c.height = job.height;
-    c.shader = c.shader.replace(DISPLAY, 'return vec4f(linear,1);');
+    c.shader = linearShader(c.shader);
     drawn = true;
   },
 };

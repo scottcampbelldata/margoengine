@@ -5,7 +5,7 @@ import { invertMatrixStable } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
 import { HDRRenderTarget } from './targets.js';
 import type { StackHost, StackStage } from '../../shared/stack.js';
-import { displayShader } from '../../shared/display.js';
+import { displayShader, linearShader } from '../../shared/display.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; STORAGE_BINDING: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -204,10 +204,7 @@ export class PostProcessing implements EnginePlugin {
         // The patch depends only on the source text, so it is redone only when another plugin changes the shader.
         if (this.shaderSource !== context.shader) {
           this.shaderSource = context.shader;
-          this.linearShader = context.shader.replace(
-            /let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/,
-            'return vec4f(linear,1);',
-          );
+          this.linearShader = linearShader(context.shader);
         }
         context.shader = this.linearShader;
       },

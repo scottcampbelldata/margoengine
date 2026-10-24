@@ -18,6 +18,7 @@ import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { extractShader, ssaoShader, blurShader, compositeShader } from './shaders.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { currentFrame, retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
+import { linearShader } from '../../shared/display.js';
 const linearComposite = compositeShader.replace('return vec4f(toDisplay(c),s.a);', 'return vec4f(c,s.a);');
 // The display transform must be gone, or an HDR stage would hand the next effect display-encoded colour.
 if (linearComposite.includes('vec4f(toDisplay(c)'))
@@ -284,10 +285,7 @@ export class SSAO implements EnginePlugin {
           this.captureTarget!.begin(c);
           if (this.captureSource !== c.shader) {
             this.captureSource = c.shader;
-            this.captureShader = c.shader.replace(
-              /let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/,
-              'return vec4f(linear,1);',
-            );
+            this.captureShader = linearShader(c.shader);
           }
           c.shader = this.captureShader;
         }

@@ -13,6 +13,7 @@ import { outputShader, tonemapShader, sizedLUTShader } from './shaders.js';
 import type { StackHost, StackStage } from '../../shared/stack.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
+import { linearShader } from '../../shared/display.js';
 export { parseCube };
 export type { CubeLUT };
 
@@ -253,12 +254,7 @@ export class Tonemap implements EnginePlugin {
     }
     let shader = this.shaders.get(c.shader);
     if (shader === undefined) {
-      shader = c.shader.replace(/let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/, 'return vec4f(linear,1);');
-      if (shader === c.shader)
-        throw new MargoError(
-          'unsupported',
-          "Tonemap requires the standard core lighting shader; remove the plugin that replaced core's shader",
-        );
+      shader = linearShader(c.shader, 'Tonemap');
       this.shaders.set(c.shader, shader);
     }
     c.shader = shader;

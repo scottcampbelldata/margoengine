@@ -14,6 +14,7 @@ import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { cocShader, coarseShader, bokehShader, presentShader } from './shaders.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView, viewLoadOp, viewSize } from '../../shared/view-rect.js';
+import { linearShader } from '../../shared/display.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: {
@@ -224,12 +225,7 @@ export class DOF implements EnginePlugin {
       this.originalDepth = c.depth;
       let shader = this.shaders.get(c.shader);
       if (shader === undefined) {
-        shader = c.shader.replace(/let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/, 'return vec4f(linear,1);');
-        if (shader === c.shader)
-          throw new MargoError(
-            'unsupported',
-            "DOF requires the standard core lighting shader; remove the plugin that replaced core's shader",
-          );
+        shader = linearShader(c.shader, 'DOF');
         this.shaders.set(c.shader, shader);
       }
       c.shader = shader;
