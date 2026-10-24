@@ -97,7 +97,7 @@ const layers = {
     'selection',
     'audio',
   ],
-  'Simulation and games': ['physics', 'navigation', 'navmesh', 'ecs', 'fsm', 'net', 'voxel-net'],
+  'Simulation and games': ['physics', 'navmesh', 'ecs', 'fsm', 'net', 'voxel-net'],
   'CAD and engineering': ['machinery', 'brep', 'bvh', 'geometry', 'mesh-edit'],
   'Frameworks': ['react'],
 };

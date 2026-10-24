@@ -45,7 +45,7 @@ window.check={
     if(step==='B'){robot.root.visible=false;slab=engine.createMesh().setGeometry(box(5,0.2,5)).setPosition([0,2.4,0]);engine.camera.position=[6,1.6,7];engine.camera.target=[-1,1,-1];shadows.add(slab);crowd=new VATCrowd(vat,{color:[0.95,0.8,0.35,1]});engine.use(crowd);for(const i of instances)crowd.add(i);}
     if(step==='C')crowd.truncate(0);
     if(step==='A'){for(const i of instances)crowd.add(i);removeCrowd=shadows.add(crowd);}
-    if(step==='D'){const lighting=await EnvironmentLighting.load(engine,'/packages/environment/tests/fixtures/spot1Lux.hdr',{intensity:2});removeIbl=lighting.add(crowd);window.lighting=lighting;}
+    if(step==='D'){const lighting=await EnvironmentLighting.load(engine,'/packages/environment/tests/fixtures/sun_sky.hdr',{intensity:2});removeIbl=lighting.add(crowd);window.lighting=lighting;}
     await render(3);const silhouetteTexels=step==='A'?count(await silhouette()):undefined;return {silhouetteTexels,errors:errors.splice(0)};
   },
   // Diagnostic frame times (render + GPU completion): one skinned robot and a 1,024-robot VAT crowd, each with and without casting.

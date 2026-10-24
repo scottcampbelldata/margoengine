@@ -163,8 +163,8 @@ Draco's internal Wasm geometry decode still has its own allocations.
 `@margoengine/usdz` is an ancillary optional package outside the six core launch
 packages. It supports static USDA, binary USDC and USDZ archives through its own parsers
 (`src/crate.ts` and the shared `readUSDA`), on plain data and typed arrays. Builds and
-runtime imports need no `three` or `@types/three` dependency. Benchmark and parity
-tools retain a pinned reference through `scripts/three-reference.js`.
+runtime imports need no `three` or `@types/three` dependency, and the repository has none. The size benchmark
+resolves the other engines it measures from the sibling `engine-bench` checkout.
 
 `parseUSDA` and `parseUSDC` are synchronous; `parseUSDZ`, `USDAsset.create` and
 `loadUSDZ` are asynchronous. The basic `@margoengine/gltf` and the USDA-only

@@ -120,7 +120,7 @@ test('ZIP: a deflate bomb or a lying declared size is refused before inflating',
   await assert.rejects(parseUSDZ(bomb), (e) => e instanceof LoaderError && e.code === 'limit');
   const lying = zip([{ name: 'a', data: text('x'), method: 8, size: 0x1fffffff }]);
   await loaderError(() => readZipEntry(lying, readZipDirectory(lying)[0]), 'limit', 8);
-  // A big entry that compresses 9x (cube_gears.3mf) still reads; maxRatio raises the limit.
+  // A big entry that compresses 10x (packages/loaders/tests/fixtures/gears.3mf) still reads; maxRatio raises the limit.
   const plain = zip([{ name: 'a', data: new Uint8Array(4 << 20), method: 8 }]);
   assert.equal((await readZipEntry(plain, readZipDirectory(plain)[0], { maxRatio: 10_000 })).length, 4 << 20);
 });

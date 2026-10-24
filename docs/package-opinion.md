@@ -29,7 +29,7 @@ Several jobs are also split across packages that a caller has to reconcile:
 | Sky | `scenery` (moonlit SkyMoon) and `sky` (Preetham / Bruneton) |
 | Particles | `creative` and `vfx` |
 | Post | `post`, `dof`, `tonemap`, `taa`, plus passes inside `creative` |
-| Paths | `navmesh` (A* and ORCA) and `navigation` (Recast) |
+| Paths | `navmesh` (A*, funnel, ORCA, and generation from triangles in `navmesh/build`) |
 | USD | `usdz`, `loaders`, `exporters`, `usdz-export` |
 | IK | `animator` foot IK, `machinery` bounded IK, and `kinematics-constraints` |
 | Screen anchors | `labels` and `html` |
@@ -54,7 +54,7 @@ This is aimed at a Show HN of the engine. I would leave the solvers, skies, part
 
 **Say what the engine is for, in the post.** A small embeddable stage, CAD and machinery, and constraint-aware motion. The thread will ask why this exists next to Three.js. The answer is the 20 KB core and the packs that do not enter it. A feature-count answer loses.
 
-**Say where Three.js still appears.** `@margoengine/fbx` no longer parses with `FBXLoader` or writes with `GLTFExporter`. The package depends on `@margoengine/exporters` and `@margoengine/gltf-pro`. Root `devDependencies` no longer include `three` or `@types/three`. Benchmarks and visual parity checks download a pinned 0.186.1 reference through `scripts/three-reference.js`; USDZ vendors standalone parsers with attribution. The README should say that in one sentence, so a reader who searches the lockfile does not think the runtime is Three.js. Native demos stay on `gltf` and `gltf-pro`.
+**Say where Three.js still appears.** `@margoengine/fbx` no longer parses with `FBXLoader` or writes with `GLTFExporter`. The package depends on `@margoengine/exporters` and `@margoengine/gltf-pro`. Root `devDependencies` no longer include `three` or `@types/three`. The size benchmark resolves the other engines it measures from the sibling `engine-bench` checkout, and the visual parity script checks the ACES curve against its own behaviour table; USDZ vendors standalone parsers with attribution. The README should say that in one sentence, so a reader who searches the lockfile does not think the runtime is Three.js. Native demos stay on `gltf` and `gltf-pro`.
 
 **Call it 0.1.0.** Core and the stage package are `0.1.0`. The size freeze is the v1 discipline, and it is not a 1.0 release. `dof` and `tonemap` are already `1.0.0`, which looks like a different product. I would not claim 1.0 in the title.
 
@@ -71,7 +71,7 @@ The rest can wait until after the post.
 | Sky | `scenery` for the moonlit SkyMoon plugin. `sky` for a Preetham or Bruneton daytime model. |
 | Particles | `creative` for the existing textured and weather effects. `vfx` for the fixed-capacity million-particle billboards. |
 | Post | `post`, `dof`, `tonemap`, and `taa` for a single pass. `creative` when the page already uses that pack's combined stack. |
-| Paths | `navmesh` for the pure A* and ORCA helper. `navigation` for Recast and Detour. |
+| Paths | `navmesh` for A*, funnel paths and ORCA over your own polygons; `navmesh/build` to generate them from level triangles. |
 | USD | `usdz` and `loaders` to read. `exporters` to write. `usdz-export` is the same writer under a second name. |
 | IK | `machinery` for assembly joints. `animator` for foot IK on a playing clip. `kinematics-constraints` for a standalone two-bone clearance solve. |
 | Screen anchors | `labels` for projected markers. `html` when those markers also need scene-depth occlusion. |
@@ -98,7 +98,7 @@ Publish `margoengine`, `@margoengine/core`, and `@margoengine/react`, then make 
 
 Put three things above the catalog: the live demo, the five-line `createStage` example, and one gzip number from `npm run measure:size`. The verified run on 2026-10-16 reported **19,999 bytes gzip**, limit 20,000, raw 47,983. Use that figure for the current release. Earlier benchmark reports cite 19,874 bytes, and sandbox notes describe an older 20,480-byte gate; those historical figures belong to their recorded builds. One command, one number, one commit.
 
-Call the release 0.1.0. Say in one sentence that FBX import is native, USDZ uses its own parsers, and Three.js rendering remains a pinned benchmark and visual parity reference in `scripts/three-reference.js`.
+Call the release 0.1.0. Say in one sentence that FBX import is native, USDZ uses its own parsers, and other engines appear only in the size benchmark, resolved from the sibling `engine-bench` checkout.
 
 ### 8 to 9: the claim survives outside this repo
 

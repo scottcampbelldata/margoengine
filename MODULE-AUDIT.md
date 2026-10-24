@@ -38,7 +38,7 @@ existing reusable capability, not a half-written package directory.
 | 18 | net | Not started | Fixed snapshot ring, Hermite position, shortest-arc slerp and capped dead reckoning; network interpolation tests |
 | 19 | stats | Not started | Allocation-free numeric ring sampling, DOM/canvas overlay, direct/indirect counters and optional timestamp profiler; unit/hardware checks |
 | 20 | inspector | Not started | Accessible hierarchy, live transforms/material/effect controls and lines-based wireframe/normals/AABB; unit/desktop/mobile GPU checks |
-| 21 | navigation | Not started | Recast/Detour Wasm construction and bounded path queries, explicit cleanup and independent strict declarations; real Wasm tests |
+| 21 | navigation | Removed 2026-10-24 | Folded into `@margoengine/navmesh/build` (clean-room generator, no Wasm); see docs/renames-2026-10-24.md |
 | 22 | tween | Not started | Numeric easing/delay/overwrite/cancel tracks and allocation-free update compaction; reentrant callback tests |
 | 23 | fbx | Not started | Established binary/ASCII FBX parser, PBR material conversion and GLB bridge; Khronos validation, animated CPU fixture and real skinned GPU asset |
 | 24 | usdz-export | Partial: exporters/exportUSDZ | Standalone export of the existing tested USDZ serializer; wrapper and exporter tests |

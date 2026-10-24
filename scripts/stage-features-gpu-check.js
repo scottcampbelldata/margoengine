@@ -131,7 +131,7 @@ try {
 
   const plain = await shot('plain');
   const environment = await page.evaluate(async () => {
-    const lighting = await window.stage.app.environment('/packages/environment/tests/fixtures/spot1Lux.hdr', {
+    const lighting = await window.stage.app.environment('/packages/environment/tests/fixtures/sun_sky.hdr', {
       intensity: 4,
     });
     window.stage.lighting = lighting;
@@ -186,7 +186,7 @@ try {
     };
     // A second stage disposed while its environment is still loading: the load rejects with AbortError.
     const other = await window.wrapper.createStage('#stage', { backend: 'webgpu', controls: false, autoStart: false });
-    const pending = other.environment('/packages/environment/tests/fixtures/spot1Lux.hdr').then(
+    const pending = other.environment('/packages/environment/tests/fixtures/sun_sky.hdr').then(
       () => 'resolved',
       (error) => error.name,
     );

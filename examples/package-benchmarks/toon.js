@@ -4,7 +4,7 @@ import { assetWorkload, displayGeometry } from './asset-scene.js';
 import { controls } from './ui-scene.js';
 
 export async function createWorkload(count = 4, options = {}) {
-  const source = await fetchBytes(new URL('../../packages/loaders/tests/fixtures/dolphins.ply', import.meta.url), {
+  const source = await fetchBytes(new URL('../../packages/loaders/tests/fixtures/torus.ply', import.meta.url), {
       ...options,
       maxBytes: 100000,
     }),
@@ -15,7 +15,7 @@ export async function createWorkload(count = 4, options = {}) {
   const scene = await assetWorkload(
     count,
     () => geometry,
-    'Actual @margoengine/toon draws stepped diffuse/rim shading and an expanded, front-culled silhouette hull on the parsed dolphin surfaces. Run rotates the models; toggle shading to compare the actual core-mesh pipeline.',
+    'Actual @margoengine/toon draws stepped diffuse/rim shading and an expanded, front-culled silhouette hull on the parsed torus surfaces. Run rotates the models; toggle shading to compare the actual core-mesh pipeline.',
     {
       ...options,
       repeat: false,

@@ -109,7 +109,7 @@ Draft inventory to verify:
 - Snapping, grid sizes, selection modes, camera presets.
 - Export: `.obj`, `.gltf`/`.glb`, `.dae` and others the current release offers; import of its scene files.
 - Margo advantages: per-tile game metadata (walkable, sound, collider type, triggers) carried into the level,
-  baked navmesh (`@margoengine/navigation`) and Rapier colliders (`@margoengine/physics`) on save, instanced batching.
+  baked navmesh (`@margoengine/navmesh/build`) and Rapier colliders (`@margoengine/physics`) on save, instanced batching.
 
 ### Engine gaps for the tile editor (Scott, 2026-10-18)
 

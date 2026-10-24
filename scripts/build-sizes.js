@@ -68,7 +68,7 @@ function lazyFiles(sizes) {
   });
   return `<section class="lazy" aria-labelledby="loaded-later">
   <h2 id="loaded-later">Loaded later, and what loads it</h2>
-  <p class="section-lede">Every file a package fetches or compiles on its own after the entry you import: the stage's packs, workers and Wasm runtimes. Workers, glue scripts and <code>.wasm</code> files are measured as served, because your bundler copies them as they are. The stage's packs, the BVH module worker and the Rapier and Recast modules are bundled and minified like the entries below (the packs with core left out, since the stage already loaded it). Rapier and Recast inline their Wasm, so neither makes a separate <code>.wasm</code> request.</p>
+  <p class="section-lede">Every file a package fetches or compiles on its own after the entry you import: the stage's packs, workers and Wasm runtimes. Workers, glue scripts and <code>.wasm</code> files are measured as served, because your bundler copies them as they are. The stage's packs, the BVH module worker and the Rapier module are bundled and minified like the entries below (the packs with core left out, since the stage already loaded it). Rapier inlines its Wasm, so it makes no separate <code>.wasm</code> request.</p>
 ${table('loaded-later', 'Files loaded after the entry, in bytes, with the call that loads each', [['File'], ['Kind'], ['Raw (B)', 1], ['Gzip (B)', 1], ['Brotli (B)', 1], ['Loads when']], groups.join('\n'))}
 </section>`;
 }

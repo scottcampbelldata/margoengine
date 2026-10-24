@@ -26,10 +26,6 @@ const EXCEPTIONS = { 'occt-import-js': 'LGPL-2.1', 'web-ifc': 'MPL-2.0' };
 
 /** Why each external runtime dependency or peer exists. A new one fails --check until it is added here. */
 const WHY = {
-  'recast-navigation': 'Recast/Detour navmesh generation, path and crowd queries (compiled to Wasm by the package)',
-  '@recast-navigation/core': 'runtime half of recast-navigation (loads the Wasm build)',
-  '@recast-navigation/generators': 'navmesh generator helpers of recast-navigation',
-  '@recast-navigation/wasm': 'Recast/Detour compiled to WebAssembly (inlined as base64 in the compat build)',
   '@dimforge/rapier3d-compat': 'Rapier rigid-body solver; optional, the app installs and initializes it',
   'web-ifc': 'IFC (BIM) parser; the app installs and initializes it, the package only reads its output',
   react: 'React component bindings for the stage',
@@ -43,15 +39,6 @@ const WHY = {
  * (tests/supply-chain.test.js checks the packed file lists); `source` is where the copy comes from in this repo.
  */
 export const BUNDLED = [
-  {
-    package: '@margoengine/materials',
-    component: 'Khronos thin-film Fresnel',
-    licence: 'Apache-2.0',
-    files: 'dist material-lobe shaders',
-    source: 'packages/materials/src/lobe-shader.ts; upstream references in THIRD_PARTY_NOTICES.md',
-    modified: 'translated to WGSL and adapted to the isolated material extension slot',
-    notices: ['THIRD_PARTY_NOTICES.md'],
-  },
   {
     package: '@margoengine/decoders',
     component: 'Draco 3D decoder (Google)',
@@ -72,15 +59,6 @@ export const BUNDLED = [
     notices: ['dist/THIRD-PARTY-NOTICE.md', 'dist/LICENSE-Apache-2.0.txt'],
   },
   {
-    package: '@margoengine/decoders',
-    component: 'meshoptimizer vertex/index decoder (Arseny Kapoulkine)',
-    licence: 'MIT',
-    files: 'dist/meshopt.js',
-    source: 'packages/decoders/src/meshopt.ts (TypeScript port of the reference decoder)',
-    modified: 'ported to TypeScript',
-    notices: ['dist/THIRD-PARTY-NOTICE.md'],
-  },
-  {
     package: '@margoengine/machinery',
     component: 'occt-import-js 0.0.23 with OpenCascade (Viktor Kovacs; Open Cascade SAS)',
     licence: 'LGPL-2.1',
@@ -91,22 +69,15 @@ export const BUNDLED = [
     notices: ['dist/workers/OCCT-NOTICE.txt', 'dist/workers/OCCT-LICENSE.txt'],
   },
   {
-    package: '@margoengine/text',
-    component: 'TinySDF distance transform (Mapbox)',
-    licence: 'BSD-2-Clause',
-    files: 'dist/sdf.js',
-    source: 'packages/text/src/sdf.ts (same Felzenszwalb-Huttenlocher transform and structure as TinySDF)',
-    modified: 'rewritten in TypeScript',
-    notices: ['NOTICE.md'],
-  },
-  {
     package: '@margoengine/post, @margoengine/tonemap',
     component:
-      'Colour-transform references: AgX (Troy Sobotka, Eary Chow), ACES fit (Stephen Hill), Khronos PBR Neutral',
-    licence: 'attribution (formulas and constants; tests re-derive every matrix)',
-    files: 'AgX/ACES shader code (also compiled into gltf-pro, animation, lod and shader from packages/shared)',
+      'Colour-transform references: AgX (Troy Sobotka, Eary Chow), ACES filmic curve (Krzysztof Narkowicz), Khronos PBR Neutral; the ACES 1.x style fit written for Margo',
+    licence:
+      'attribution (formulas and constants; agx.test.js re-derives every AgX matrix and constant, aces.test.js measures the own ACES fit against its sample table)',
+    files:
+      'AgX/ACES shader code: AgX and the Narkowicz curve also compiled into post (ImagePost) and voxel-pathtracer from packages/shared; the own ACES fit only into tonemap',
     source: 'packages/shared/agx.js, packages/shared/aces.js, packages/tonemap/src/shaders.ts',
-    modified: 're-derived',
+    modified: 're-derived; ACES fit written for Margo',
     notices: ['NOTICE.md'],
   },
 ];
@@ -131,11 +102,28 @@ const ASSETS = [
     'examples/assets/damaged-helmet-CREDITS.md',
     'DamagedHelmet (CC BY-NC 4.0 / CC BY 4.0): internal tests and benchmarks only, never served',
   ],
+  ['packages/environment/tests/fixtures/NOTICE.md', 'test fixtures: OpenEXR test images (BSD-3-Clause)'],
   [
-    'packages/environment/tests/fixtures/NOTICE.md',
-    'test fixtures: OpenEXR test images (BSD-3-Clause), three.js spot1Lux.hdr (MIT)',
+    'packages/loaders/tests/fixtures/SOURCES.txt',
+    'test fixtures: PCL bunny.pcd (BSD-3-Clause, Stanford bunny scan), libigl tutorial data cube.off and decimated-knight.off, PyVista vtk-data fran_cut.vtk and polyEx.vtk',
   ],
-  ['packages/voxel/tests/fixtures/NOTICE.md', 'test fixture: MagicaVoxel sample chr_knight.vox (ephtracy, MIT)'],
+  ['packages/points/tests/fixtures/NOTICE.md', 'test fixture: PCL bunny.pcd (BSD-3-Clause, Stanford bunny scan)'],
+  [
+    'packages/decoders/tests/fixtures/NOTICE.md',
+    'test fixtures: Khronos glTF sample models Box (CC BY 4.0, Cesium) and Avocado (CC0 1.0, Microsoft), Draco-compressed; AnisotropyBarnLamp normal texture (CC BY 4.0, Wayfair, Eric Chadwick)',
+  ],
+  [
+    'packages/decoders/tests/fixtures/KTX2-README.md',
+    'test fixtures: Khronos CarConcept textures Dot_C.ktx2 and Rib_N.ktx2 (CC BY 4.0, Darmstadt Graphics Group, Eric Chadwick)',
+  ],
+  [
+    'packages/exporters/tests/fixtures/NOTICE.md',
+    'test fixtures: Khronos glTF sample models Box and BoxTextured (CC BY 4.0, Cesium)',
+  ],
+  [
+    'packages/animation/tests/fixtures/README.md',
+    'Babylon.js Assets octopus_customRig.glb (CC BY 4.0): downloaded at test time by scripts/animation-influences-browser-tests.js, never committed',
+  ],
 ];
 
 /** Every published package: packages/* with a package.json, plus the two npm tools. */
@@ -339,13 +327,10 @@ ${table(
     interface-compatible build. \`margo-convert\` depends on the unmodified npm package, so npm can swap it.
 - **MPL-2.0 (web-ifc, peer of \`@margoengine/ifc\`).** Not redistributed in any tarball: the app installs it. A site or
   app that serves \`web-ifc.wasm\` must say where its source is (https://github.com/ThatOpen/engine_web-ifc).
-- **MIT (meshoptimizer port, recast-navigation, React).** Keep the copyright and permission notice: the decoders notice
-  carries meshoptimizer's; npm dependencies carry their own LICENSE files.
-- **BSD-2-Clause (TinySDF).** \`@margoengine/text\` ships \`NOTICE.md\` with the copyright, conditions and disclaimer.
-- **Zlib (Recast/Detour inside \`@recast-navigation/wasm\`).** Requires the notice in source distributions only; we do
-  not redistribute it (npm dependency).
+- **MIT (React).** Keep the copyright and permission notice: npm dependencies carry their own
+  LICENSE files.
 - **Site and demos.** The site build copies this file to \`/THIRD-PARTY-NOTICES.md\`, so the demos that bundle Draco,
-  Basis, OCCT, Rapier or Recast carry these notices next to the asset credits below.
+  Basis, OCCT or Rapier carry these notices next to the asset credits below.
 
 ## Published packages
 

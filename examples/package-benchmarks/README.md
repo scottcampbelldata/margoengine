@@ -41,11 +41,12 @@ Build the packages with `npm run build:packages`, then run
   startup setup CPU are recorded separately. Frames between solves render the
   existing solution. Larger presets expose synchronous generation stalls; this
   is bounded propagation/restart generation, not an exhaustive backtracking solver.
-- [Navigation](./index.html?package=navigation): actual Recast voxelization and
-  Detour path queries around a missing central floor. The default is 72 input
-  floor markers plus 56 agents; it provides paths without crowd avoidance.
-  Optional Wasm initialization/build elapsed is included in readiness and
-  separated from synchronous query CPU. Native baseline averaged 120 callbacks/s;
+- [Navigation](./index.html?package=navigation): `@margoengine/navmesh/build`
+  voxelises the floor triangles and answers funnel path queries around a missing
+  central floor. The default is 72 input floor markers plus 56 agents; it
+  provides paths without crowd avoidance. The navmesh build elapsed is included
+  in readiness and separated from synchronous query CPU. Recorded before the
+  generator replaced the Recast wrapper (2026-10-24): Native baseline averaged 120 callbacks/s;
   its 1,409 ms initial principal opportunity missed the startup deadline.
 - [Physics](./index.html?package=physics): 64 rotation-locked Rapier cubes and
   16 real downward ray-hit markers by default. The Margo Physics package performs
@@ -77,8 +78,8 @@ Build the packages with `npm run build:packages`, then run
 The seven runtime/UI cases have [local native and Intel phone-layout evidence](../../docs/package-ui-runtime-workloads-2026-10-13.md).
 Those short runs do not establish physical-mobile or cold-hosted acceptance.
 
-- [Loaders](./index.html?package=loaders): real PLY dolphins from the existing
-  fixture. Fetch limits, parsing, normal/geometry construction and visible
+- [Loaders](./index.html?package=loaders): the Margo-made PLY torus from the loaders
+  fixtures. Fetch limits, parsing, normal/geometry construction and visible
   surfaces use the actual package. Run repeats a bounded parse batch each second.
 - [Exporters](./index.html?package=exporters): the fixture knight is written to
   GLB, binary PLY, STL and OBJ/MTL; displayed surfaces come from parsing the PLY
@@ -100,10 +101,10 @@ Those short runs do not establish physical-mobile or cold-hosted acceptance.
   and rotates the sprite markers. Toggle eye-dome lighting, recolor a selected
   cloud or click drawn points to invoke package picking. Input/drawn point counts
   and actual GPU-upload bytes are separate from the small core anchor cubes.
-- [Toon](./index.html?package=toon): four real dolphin surfaces with the specific
+- [Toon](./index.html?package=toon): four PLY torus surfaces with the specific
   Toon package's stepped lighting and front-culled expanded silhouette hull.
   Run rotates the models; the toggle removes/re-attaches the actual plugin.
-- [Transitions](./index.html?package=transitions): real knight/dolphin scenes
+- [Transitions](./index.html?package=transitions): real knight/torus scenes
   captured and blended through wipe, seeded dissolve, radial and chromatic passes.
   Run changes geometry every 1.5 seconds and animates each 0.75-second transition.
   The button starts a new transition; progress requires Run while paused.

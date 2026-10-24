@@ -225,7 +225,6 @@
     "@margoengine/math/vector3": 1547,
     "@margoengine/math/vector4": 925,
     "@margoengine/mesh-edit": 30203,
-    "@margoengine/navigation": 1245,
     "@margoengine/navmesh": 3396,
     "@margoengine/net": 1371,
     "@margoengine/oit": 3199,

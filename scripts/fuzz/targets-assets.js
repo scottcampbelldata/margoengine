@@ -552,7 +552,7 @@ export default [
       },
     ],
   }),
-  cadTarget('obj', () => [file('packages/bvh/tests/fixtures/suzanne.obj'), bytesOf(objQuad)], {
+  cadTarget('obj', () => [file('packages/bvh/tests/fixtures/bean.obj'), bytesOf(objQuad)], {
     text: true,
     timeMs: 4000,
     generators: [

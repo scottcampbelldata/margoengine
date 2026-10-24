@@ -35,12 +35,12 @@ test('Draco fixture demo rejects Node without workers instead of publishing fake
   await assert.rejects(decoders(1, options), /SSR/);
 });
 
-test('Loaders demo renders actual dolphin topology and repeats real bounded parses', async () => {
+test('Loaders demo renders actual torus fixture topology and repeats real bounded parses', async () => {
   const w = await loaders(1, options);
   try {
     verify(w);
-    assert.equal(w.details().verticesPerModel, 855);
-    assert.equal(w.details().trianglesPerModel, 1689);
+    assert.equal(w.details().verticesPerModel, 864);
+    assert.equal(w.details().trianglesPerModel, 1728);
     const before = w.geometries[0];
     await advance(w);
     assert.equal(w.details().completedJobs, 2);

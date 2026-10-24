@@ -183,7 +183,7 @@ import * as module16 from '@margoengine/video';
 import * as module17 from '@margoengine/net';
 import * as module18 from '@margoengine/stats';
 import * as module19 from '@margoengine/inspector';
-import * as module20 from '@margoengine/navigation';
+import * as module20 from '@margoengine/navmesh/build';
 import * as module21 from '@margoengine/tween';
 import * as module22 from '@margoengine/fbx';
 import * as module24 from '@margoengine/bvh';
@@ -331,8 +331,8 @@ export function example(engine: EngineKernel) {
   return { world, path, input, tree, shrub, bushes, cabin, grass, ground };
 }
 export async function navigation() {
-  const nav = await module20.Navigation.create([0, 0, 0, 1, 0, 0, 0, 0, 1], [0, 2, 1]);
-  const points = nav.path({ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 1 });
+  const nav = await module20.Navigation.create([-1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1], [0, 2, 1, 0, 3, 2]);
+  const points = nav.path({ x: 0, y: 0, z: 0 }, { x: 0.5, y: 0, z: 0.5 });
   nav.dispose();
   return points;
 }

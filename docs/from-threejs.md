@@ -215,8 +215,8 @@ mesh.setParent(group);
 mesh.visible = false;
 ```
 
-Every three.js primitive is in `@margoengine/geometry`, with the same parameters, defaults and vertex order (tested
-against three.js r180). They return plain typed arrays; `toGeometry` hands them to core.
+Every three.js primitive is in `@margoengine/geometry`, with the same parameters and defaults (vertex
+order is our own and not part of the API). They return plain typed arrays; `toGeometry` hands them to core.
 
 ```js
 const sphere = new THREE.SphereGeometry(1, 32, 16);

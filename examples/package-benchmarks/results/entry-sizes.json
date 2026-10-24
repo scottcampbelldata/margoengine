@@ -754,12 +754,6 @@
         "gzip": 29555
       }
     },
-    "@margoengine/navigation": {
-      ".": {
-        "raw": 2031,
-        "gzip": 989
-      }
-    },
     "@margoengine/navmesh": {
       ".": {
         "raw": 7452,
@@ -1412,11 +1406,6 @@
       "raw": 4335248,
       "gzip": 1644912,
       "brotli": 1196116
-    },
-    "node_modules/@recast-navigation/wasm/dist/recast-navigation.wasm-compat.js": {
-      "raw": 726258,
-      "gzip": 217735,
-      "brotli": 171217
     },
     "packages/ifc/dist/workers/ifc.js": {
       "raw": 7248,

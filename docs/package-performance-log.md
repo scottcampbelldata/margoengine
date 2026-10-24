@@ -61,7 +61,6 @@ claim that new performance tests passed.
 | [@margoengine/loaders](../packages/loaders/README.md) | [Labeled package workload](../examples/package-benchmarks/index.html?package=loaders): Real bounded PLY parsing of 855 vertices/1,689 triangles with normal/geometry construction and repeated jobs. Eight shared correctness checks pass; native acceptance/candidate audit pending. | Open |
 | [@margoengine/machinery](../packages/machinery/README.md) | Performance workload and candidate audit pending. | Open |
 | [margoengine](../packages/margoengine/README.md) | Frozen stage facade; unchanged. CPU facade/bundle checks pending. | Open |
-| [@margoengine/navigation](../packages/navigation/README.md) | Performance workload and candidate audit pending. | Open |
 | [@margoengine/navmesh](../packages/navmesh/README.md) | New demo with 32 polygons and 64 A*/funnel/ORCA agents; source/behavior checks pass. Native mean 120 Hz; first local complete scene 1,497 ms misses deadline; full acceptance pending. [Evidence](package-routing-workloads-2026-10-13.md). | Open |
 | [@margoengine/net](../packages/net/README.md) | Exact-output search/trig fix: about 3x CPU speed at 32 slots, about 20x at 257; final -1 package gzip byte. Native workload means exceed60; isolated tail stalls still need attribution. | Open |
 | [@margoengine/physics](../packages/physics/README.md) | Performance workload and candidate audit pending. | Open |

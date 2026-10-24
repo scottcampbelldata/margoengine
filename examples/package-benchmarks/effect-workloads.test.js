@@ -90,10 +90,10 @@ test('Points demo updates real bounded PCD ranges, draws sprites, picks, toggles
   assert.ok(h.resources.every((resource) => resource.destroyed));
 });
 
-test('Specific Toon package shades actual dolphin surfaces and toggles its inverted-hull pass without background parses', async (t) => {
+test('Specific Toon package shades actual torus surfaces and toggles its inverted-hull pass without background parses', async (t) => {
   const h = await mount(t, toon),
     initial = h.meshes[0].geometry;
-  assert.equal(initial.indices.length / 3, 1689);
+  assert.equal(initial.indices.length / 3, 1728);
   assert.equal(h.engine.hasPlugin('toon'), true);
   assert.ok(h.pipelines.some((pipeline) => pipeline.primitive?.cullMode === 'front'));
   for (let i = 0; i < 22; i++) h.w.step(0.1);
@@ -118,9 +118,9 @@ test('Transitions factory changes actual model geometry, captures once, preserve
   assert.equal(h.w.details().progress, 1);
   h.context.delta = 0;
   h.parent.querySelector('[data-ui-transition]').click();
-  assert.equal(h.w.details().scene, 'dolphins');
+  assert.equal(h.w.details().scene, 'torus');
   assert.equal(h.w.details().progress, 0);
-  assert.equal(h.meshes[0].geometry.indices.length / 3, 1689);
+  assert.equal(h.meshes[0].geometry.indices.length / 3, 1728);
   const copies = h.counts.copies;
   h.frame();
   assert.equal(h.counts.copies, copies);

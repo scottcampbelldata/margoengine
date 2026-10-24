@@ -2,7 +2,7 @@ import { fetchBytes, parsePLY } from '../../packages/loaders/dist/index.js';
 import { assetWorkload, displayGeometry } from './asset-scene.js';
 
 export async function createWorkload(count = 4, options = {}) {
-  const source = await fetchBytes(new URL('../../packages/loaders/tests/fixtures/dolphins.ply', import.meta.url), {
+  const source = await fetchBytes(new URL('../../packages/loaders/tests/fixtures/torus.ply', import.meta.url), {
     ...options,
     maxBytes: 100000,
   });
@@ -24,7 +24,7 @@ export async function createWorkload(count = 4, options = {}) {
       triangles = loaded.indices.length / 3;
       return geometry;
     },
-    'Actual PLY dolphins from the existing fixture: load with byte limits, parse positions/faces, build normals and render the resulting surfaces. Run reparses one bounded batch per simulation second; it does not refetch files.',
+    'Actual PLY torus from the loaders fixture: load with byte limits, parse positions/faces, build normals and render the resulting surfaces. Run reparses one bounded batch per simulation second; it does not refetch files.',
     {
       ...options,
       details: () => ({

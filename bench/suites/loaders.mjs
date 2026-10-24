@@ -26,9 +26,9 @@ function objGrid(side) {
 }
 
 const FILES = [
-  ['ply-binary', 'dolphins.ply', 'parsePLY', 'PLY binary little-endian (dolphins)'],
-  ['ply-colored', 'dolphins_colored.ply', 'parsePLY', 'PLY with vertex colours'],
-  ['3mf-gears', 'cube_gears.3mf', 'parse3MF', '3MF (zip + XML), gears'],
+  ['ply-binary', 'torus_le.ply', 'parsePLY', 'PLY binary little-endian (torus)'],
+  ['ply-colored', 'torus_colored.ply', 'parsePLY', 'PLY with vertex colours'],
+  ['3mf-gears', 'gears.3mf', 'parse3MF', '3MF (zip + XML), gears'],
   ['off-knight', 'decimated-knight.off', 'parseOFF', 'OFF text (knight)'],
   ['vtk-fran', 'fran_cut.vtk', 'parseVTK', 'VTK legacy (fran)'],
   ['pcd-bunny', 'bunny.pcd', 'parsePCD', 'PCD point cloud (bunny)'],

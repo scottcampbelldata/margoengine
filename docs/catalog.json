@@ -1681,28 +1681,12 @@
     "category": "Simulation and games"
   },
   {
-    "id": "navigation",
-    "title": "Navigation",
-    "package": "@margoengine/navigation",
-    "version": "1.0.0",
-    "published": false,
-    "description": "Optional Recast and Detour WebAssembly navigation.",
-    "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
-    "keywords": "navigation",
-    "install": "npm install @margoengine/core@1.0.0 @margoengine/navigation@1.0.0",
-    "imports": "import { Navigation } from '@margoengine/navigation';",
-    "exports": [
-      "Navigation"
-    ],
-    "category": "Simulation and games"
-  },
-  {
     "id": "navmesh",
     "title": "Navmesh",
     "package": "@margoengine/navmesh",
     "version": "1.0.0",
     "published": false,
-    "description": "Convex polygon navigation with A*, funnel paths and ORCA avoidance.",
+    "description": "Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build).",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "navmesh",
     "install": "npm install @margoengine/core@1.0.0 @margoengine/navmesh@1.0.0",

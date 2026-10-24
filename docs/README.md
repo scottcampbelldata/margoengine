@@ -146,8 +146,7 @@ node --test tests/catalog.test.js
 | Package | What it is |
 | --- | --- |
 | [`@margoengine/physics`](../packages/physics/README.md) | Rigid-body physics for Margo Engine on Rapier: fixed-step engine plugin with interpolation, colliders, joints, queries, events and a character controller. |
-| [`@margoengine/navigation`](../packages/navigation/README.md) | Optional Recast and Detour WebAssembly navigation. |
-| [`@margoengine/navmesh`](../packages/navmesh/README.md) | Convex polygon navigation with A*, funnel paths and ORCA avoidance. |
+| [`@margoengine/navmesh`](../packages/navmesh/README.md) | Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build). |
 | [`@margoengine/ecs`](../packages/ecs/README.md) | Typed-array packed sparse-set entity component storage. |
 | [`@margoengine/fsm`](../packages/fsm/README.md) | Hierarchical state transitions with cross-fade progress. |
 | [`@margoengine/net`](../packages/net/README.md) | Hermite and quaternion snapshot interpolation with bounded prediction. |

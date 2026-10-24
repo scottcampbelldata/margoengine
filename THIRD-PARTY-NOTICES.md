@@ -4,26 +4,22 @@
 Margo Engine's own code is MIT licensed (`LICENSE`; every tarball ships a copy), except `@margoengine/brep`, which is
 dual licensed AGPLv3 / Commercial (its own `LICENSE` and `LICENSE-COMMERCIAL.md`). This file lists everything else that
 reaches users: npm packages our published packages depend on, third-party code shipped inside our tarballs, and the
-assets the site and examples use. It covers all 81 published packages (79 in `packages/`
+assets the site and examples use. It covers all 80 published packages (78 in `packages/`
 plus `create-margo` and `margo-convert`). `node scripts/supply-chain.mjs --check` (in `npm run verify`, through
 `tests/supply-chain.test.js`) fails when this file is stale, a dependency has no stated reason, a licence is outside
 the allowed list, or a runtime dependency has an install script, a deprecation or a non-registry source.
 
 ## Runtime npm dependencies of published packages (direct and transitive)
 
-70 of 81 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
+72 of 80 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
 Versions are the ones in `package-lock.json`; users get whatever their own lockfile resolves inside our ranges.
 
 | Package | Version (lock) | Licence | Kind | Used by | Why |
 | --- | --- | --- | --- | --- | --- |
 | `@dimforge/rapier3d-compat` | 0.21.0 | Apache-2.0 | optional peer | @margoengine/physics, @margoengine/react | Rapier rigid-body solver; optional, the app installs and initializes it |
-| `@recast-navigation/core` | 0.43.1 | MIT | transitive (via @recast-navigation/generators, recast-navigation) | @margoengine/navigation | runtime half of recast-navigation (loads the Wasm build) |
-| `@recast-navigation/generators` | 0.43.1 | MIT | transitive (via recast-navigation) | @margoengine/navigation | navmesh generator helpers of recast-navigation |
-| `@recast-navigation/wasm` | 0.43.1 | MIT | transitive (via @recast-navigation/core, @recast-navigation/generators) | @margoengine/navigation | Recast/Detour compiled to WebAssembly (inlined as base64 in the compat build) |
 | `occt-import-js` | 0.0.23 | LGPL-2.1 | dependency | margo-convert | OpenCascade STEP/IGES/BREP tessellation in Node (offline converter) |
 | `react` | 19.3.0 | MIT | peer | @margoengine/react | React component bindings for the stage |
 | `react-dom` | 19.3.0 | MIT | optional peer | @margoengine/react | React DOM root and portal rendering for scene and HTML components |
-| `recast-navigation` | 0.43.1 | MIT | dependency | @margoengine/navigation | Recast/Detour navmesh generation, path and crowd queries (compiled to Wasm by the package) |
 | `scheduler` | 0.28.0 | MIT | transitive (via react-dom) | @margoengine/react | React DOM scheduling dependency |
 | `web-ifc` | 0.0.78 | MPL-2.0 | peer | @margoengine/ifc | IFC (BIM) parser; the app installs and initializes it, the package only reads its output |
 
@@ -34,13 +30,10 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 
 | Package | Component | Licence | Shipped files | Modified | Notices in the tarball |
 | --- | --- | --- | --- | --- | --- |
-| @margoengine/materials | Khronos thin-film Fresnel | Apache-2.0 | dist material-lobe shaders | translated to WGSL and adapted to the isolated material extension slot | THIRD_PARTY_NOTICES.md |
 | @margoengine/decoders | Draco 3D decoder (Google) | Apache-2.0 | dist/draco/draco_decoder.wasm, dist/draco/draco_wasm_wrapper.js | no | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
 | @margoengine/decoders | Basis Universal transcoder (Binomial LLC) | Apache-2.0 | dist/basis/basis_transcoder.wasm, dist/basis/basis_transcoder.js | the .js glue only: scripts/static-embind.js swaps two `new Function` generators for closures; the file states it in its first line | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
-| @margoengine/decoders | meshoptimizer vertex/index decoder (Arseny Kapoulkine) | MIT | dist/meshopt.js | ported to TypeScript | dist/THIRD-PARTY-NOTICE.md |
 | @margoengine/machinery | occt-import-js 0.0.23 with OpenCascade (Viktor Kovacs; Open Cascade SAS) | LGPL-2.1 | dist/workers/occt-import-js.wasm, dist/workers/occt-import-js.js | the .js glue only: scripts/static-embind.js swaps two `new Function` generators for closures; the file states it in its first line | dist/workers/OCCT-NOTICE.txt, dist/workers/OCCT-LICENSE.txt |
-| @margoengine/text | TinySDF distance transform (Mapbox) | BSD-2-Clause | dist/sdf.js | rewritten in TypeScript | NOTICE.md |
-| @margoengine/post, @margoengine/tonemap | Colour-transform references: AgX (Troy Sobotka, Eary Chow), ACES fit (Stephen Hill), Khronos PBR Neutral | attribution (formulas and constants; tests re-derive every matrix) | AgX/ACES shader code (also compiled into gltf-pro, animation, lod and shader from packages/shared) | re-derived | NOTICE.md |
+| @margoengine/post, @margoengine/tonemap | Colour-transform references: AgX (Troy Sobotka, Eary Chow), ACES filmic curve (Krzysztof Narkowicz), Khronos PBR Neutral; the ACES 1.x style fit written for Margo | attribution (formulas and constants; agx.test.js re-derives every AgX matrix and constant, aces.test.js measures the own ACES fit against its sample table) | AgX/ACES shader code: AgX and the Narkowicz curve also compiled into post (ImagePost) and voxel-pathtracer from packages/shared; the own ACES fit only into tonemap | re-derived; ACES fit written for Margo | NOTICE.md |
 
 ### Licence obligations and how they are met
 
@@ -65,13 +58,10 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
     interface-compatible build. `margo-convert` depends on the unmodified npm package, so npm can swap it.
 - **MPL-2.0 (web-ifc, peer of `@margoengine/ifc`).** Not redistributed in any tarball: the app installs it. A site or
   app that serves `web-ifc.wasm` must say where its source is (https://github.com/ThatOpen/engine_web-ifc).
-- **MIT (meshoptimizer port, recast-navigation, React).** Keep the copyright and permission notice: the decoders notice
-  carries meshoptimizer's; npm dependencies carry their own LICENSE files.
-- **BSD-2-Clause (TinySDF).** `@margoengine/text` ships `NOTICE.md` with the copyright, conditions and disclaimer.
-- **Zlib (Recast/Detour inside `@recast-navigation/wasm`).** Requires the notice in source distributions only; we do
-  not redistribute it (npm dependency).
+- **MIT (React).** Keep the copyright and permission notice: npm dependencies carry their own
+  LICENSE files.
 - **Site and demos.** The site build copies this file to `/THIRD-PARTY-NOTICES.md`, so the demos that bundle Draco,
-  Basis, OCCT, Rapier or Recast carry these notices next to the asset credits below.
+  Basis, OCCT or Rapier carry these notices next to the asset credits below.
 
 ## Published packages
 
@@ -91,7 +81,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/core` | none | none | LICENSE |
 | `@margoengine/creative` | none | none | LICENSE |
 | `@margoengine/culling` | none | none | LICENSE |
-| `@margoengine/decoders` | none | Draco 3D decoder (Apache-2.0); Basis Universal transcoder (Apache-2.0); meshoptimizer vertex/index decoder (MIT) | LICENSE, dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
+| `@margoengine/decoders` | none | Draco 3D decoder (Apache-2.0); Basis Universal transcoder (Apache-2.0) | LICENSE, dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
 | `@margoengine/dof` | none | none | LICENSE |
 | `@margoengine/ecs` | none | none | LICENSE |
 | `@margoengine/environment` | none | none | LICENSE |
@@ -113,10 +103,9 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/lod` | none | none | LICENSE |
 | `@margoengine/machinery` | none | occt-import-js 0.0.23 with OpenCascade (LGPL-2.1) | LICENSE, dist/workers/OCCT-NOTICE.txt, dist/workers/OCCT-LICENSE.txt |
 | `margoengine` | none | none | LICENSE |
-| `@margoengine/materials` | none | Khronos thin-film Fresnel (Apache-2.0) | LICENSE, THIRD_PARTY_NOTICES.md |
+| `@margoengine/materials` | none | none | LICENSE |
 | `@margoengine/math` | none | none | LICENSE |
 | `@margoengine/mesh-edit` | none | none | LICENSE |
-| `@margoengine/navigation` | recast-navigation 0.43.1 (dependency) | none | LICENSE |
 | `@margoengine/navmesh` | none | none | LICENSE |
 | `@margoengine/net` | none | none | LICENSE |
 | `@margoengine/oit` | none | none | LICENSE |
@@ -139,7 +128,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/stats` | none | none | LICENSE |
 | `@margoengine/taa` | none | none | LICENSE |
 | `@margoengine/terrain` | none | none | LICENSE |
-| `@margoengine/text` | none | TinySDF distance transform (BSD-2-Clause) | LICENSE, NOTICE.md |
+| `@margoengine/text` | none | none | LICENSE |
 | `@margoengine/tonemap` | none | Colour-transform references: AgX (attribution) | LICENSE, NOTICE.md |
 | `@margoengine/toon` | none | none | LICENSE |
 | `@margoengine/transitions` | none | none | LICENSE |
@@ -172,12 +161,17 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | [`examples/assets/kaykit/LICENSE-dungeon.txt`](examples/assets/kaykit/LICENSE-dungeon.txt) | KayKit Dungeon (Kay Lousberg, CC0) |
 | [`packages/creative/examples/earth/assets/ATTRIBUTION.md`](packages/creative/examples/earth/assets/ATTRIBUTION.md) | Earth demo: NASA Blue Marble, Solar System Scope textures (CC BY 4.0) |
 | [`examples/assets/damaged-helmet-CREDITS.md`](examples/assets/damaged-helmet-CREDITS.md) | DamagedHelmet (CC BY-NC 4.0 / CC BY 4.0): internal tests and benchmarks only, never served |
-| [`packages/environment/tests/fixtures/NOTICE.md`](packages/environment/tests/fixtures/NOTICE.md) | test fixtures: OpenEXR test images (BSD-3-Clause), three.js spot1Lux.hdr (MIT) |
-| [`packages/voxel/tests/fixtures/NOTICE.md`](packages/voxel/tests/fixtures/NOTICE.md) | test fixture: MagicaVoxel sample chr_knight.vox (ephtracy, MIT) |
+| [`packages/environment/tests/fixtures/NOTICE.md`](packages/environment/tests/fixtures/NOTICE.md) | test fixtures: OpenEXR test images (BSD-3-Clause) |
+| [`packages/loaders/tests/fixtures/SOURCES.txt`](packages/loaders/tests/fixtures/SOURCES.txt) | test fixtures: PCL bunny.pcd (BSD-3-Clause, Stanford bunny scan), libigl tutorial data cube.off and decimated-knight.off, PyVista vtk-data fran_cut.vtk and polyEx.vtk |
+| [`packages/points/tests/fixtures/NOTICE.md`](packages/points/tests/fixtures/NOTICE.md) | test fixture: PCL bunny.pcd (BSD-3-Clause, Stanford bunny scan) |
+| [`packages/decoders/tests/fixtures/NOTICE.md`](packages/decoders/tests/fixtures/NOTICE.md) | test fixtures: Khronos glTF sample models Box (CC BY 4.0, Cesium) and Avocado (CC0 1.0, Microsoft), Draco-compressed; AnisotropyBarnLamp normal texture (CC BY 4.0, Wayfair, Eric Chadwick) |
+| [`packages/decoders/tests/fixtures/KTX2-README.md`](packages/decoders/tests/fixtures/KTX2-README.md) | test fixtures: Khronos CarConcept textures Dot_C.ktx2 and Rib_N.ktx2 (CC BY 4.0, Darmstadt Graphics Group, Eric Chadwick) |
+| [`packages/exporters/tests/fixtures/NOTICE.md`](packages/exporters/tests/fixtures/NOTICE.md) | test fixtures: Khronos glTF sample models Box and BoxTextured (CC BY 4.0, Cesium) |
+| [`packages/animation/tests/fixtures/README.md`](packages/animation/tests/fixtures/README.md) | Babylon.js Assets octopus_customRig.glb (CC BY 4.0): downloaded at test time by scripts/animation-influences-browser-tests.js, never committed |
 
 ## Development and workspace tooling (never shipped)
 
-`package-lock.json` holds 202 third-party entries (build tools, test tools, the examples' and apps' own
-dependencies, platform-optional binaries). Licences: MIT 105, Apache-2.0 49, MPL-2.0 13, LGPL-3.0-or-later 10, MIT OR Apache-2.0 9, ISC 4, Apache-2.0 AND LGPL-3.0-or-later 3, BSD-2-Clause 2, BSD-3-Clause 2, 0BSD 1, Apache-2.0 AND LGPL-3.0-or-later AND MIT 1, CC-BY-4.0 1, LGPL-2.1 1, MIT-0 1.
+`package-lock.json` holds 192 third-party entries (build tools, test tools, the examples' and apps' own
+dependencies, platform-optional binaries). Licences: MIT 99, Apache-2.0 45, MPL-2.0 13, LGPL-3.0-or-later 10, MIT OR Apache-2.0 9, ISC 4, Apache-2.0 AND LGPL-3.0-or-later 3, BSD-2-Clause 2, BSD-3-Clause 2, 0BSD 1, Apache-2.0 AND LGPL-3.0-or-later AND MIT 1, CC-BY-4.0 1, LGPL-2.1 1, MIT-0 1.
 Install scripts anywhere in the lock: fsevents@2.3.3. Deprecated: whatwg-encoding@3.1.1. CI and releases install with `npm ci`, which refuses a lockfile that does not match `package.json` and checks
 every tarball against its integrity hash.

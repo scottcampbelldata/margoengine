@@ -37,7 +37,6 @@ const noticeFiles = new Map([
   ['brep', 'NOTICE'],
   ['post', 'NOTICE.md'],
   ['tonemap', 'NOTICE.md'],
-  ['materials', 'THIRD_PARTY_NOTICES.md'],
   ['text', 'NOTICE.md'],
 ]);
 const packageDocuments = new Map([...noticeFiles, ['blender', 'FORMAT.md']]);

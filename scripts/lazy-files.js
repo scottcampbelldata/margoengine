@@ -227,15 +227,6 @@ export const LAZY_FILES = [
     when: 'Your import of the Rapier peer (no separate .wasm request: the Wasm is base64 in the module); compiled by `await RAPIER.init()` before `new Physics(engine, {rapier})`',
   },
   {
-    package: '@margoengine/navigation',
-    file: 'node_modules/@recast-navigation/wasm/dist/recast-navigation.wasm-compat.js',
-    label: 'recast-navigation (Wasm build)',
-    kind: 'JS with inlined Wasm',
-    measure: 'bundle',
-    external: [],
-    when: 'Importing `@margoengine/navigation` (no separate .wasm request: the Wasm is inlined in the module); compiled by the first `Navigation.create()`',
-  },
-  {
     package: '@margoengine/ifc',
     file: 'packages/ifc/dist/workers/ifc.js',
     label: 'workers/ifc.js',

@@ -18,7 +18,7 @@ and imported from there. Types are erased at build time, so this costs 0 runtime
 | `Mat4` | `ArrayLike<number>` | column-major 4x4 (`camera.matrix`, world matrices) |
 | `ColorInput` | `string \| number \| readonly number[]` | `'#rrggbb'`, `'#rgb'`, `0xrrggbb` (sRGB), CSS `'color(display-p3 r g b)'` (also `srgb`, `srgb-linear`, `display-p3-linear`) or linear sRGB `[r, g, b]`; decode with `parseColor`. A P3 colour outside sRGB decodes to negative linear sRGB channels and keeps them; linear arrays must stay non-negative. Light colours (clustered, area, directional) may be negative per channel with a luminance of 0 or more; core's sun takes only sRGB, so give it `clipToSRGB(rgb)`. |
 | `HeightField` | `(x, z) => number` | ground height samplers |
-| `Vec2Like`, `Vec3Like`, `Vec4Like` | `{x, y}`, `{x, y, z}`, `{x, y, z, w}` | object-shaped input (`mesh.position`, Recast points) |
+| `Vec2Like`, `Vec3Like`, `Vec4Like` | `{x, y}`, `{x, y, z}`, `{x, y, z, w}` | object-shaped input (`mesh.position`, navigation path endpoints) |
 | `SphereLike`, `PlaneLike`, `BoxLike` | `{center, radius}`, `{normal, constant}`, `{min, max}` | structural input of the bounds classes |
 
 Rules:
@@ -85,7 +85,7 @@ A name declared and exported by two packages must mean the same thing, or be ren
 | `smoothstep` (tween) | math, shader | Tween's easing renamed `easeSmoothstep`. |
 | `ExpandOptions` | lines, procedural | lines' renamed `ExpandLineOptions` (its function is `expandLine`). |
 | `SurfaceOptions` | procedural, machinery | procedural's renamed `MarchingCubesOptions`. |
-| `Vector3` (navigation) | math | Navigation takes math's `Vec3Like`; math's `Vector3` is the class. |
+| `Vector3` (navmesh/build) | math | `Navigation` takes math's `Vec3Like`; math's `Vector3` is the class. |
 | `loadGLTF`, `parseGLTF` | gltf, gltf-pro | Open, group B (HANDOFF "API rough edges" item 7). |
 | `texture` (vfx) | shader | vfx's `@margoengine/vfx/texture` feature object renamed `textureFeature` (pass `{texture: textureFeature}`); shader's `texture()` node keeps the name. |
 | `Environment`, `Sky`, `Bloom`, `SSAO`, `TAA`, `Tonemap` | environment, sky, post, taa, tonemap; react | Kept: the plugin or pass class and react's JSX component that adds it with the same options (React names components after what they render). Allowlisted. |

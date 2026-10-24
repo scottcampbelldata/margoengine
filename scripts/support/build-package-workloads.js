@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 
 const fixtures = [
-  'packages/loaders/tests/fixtures/dolphins.ply',
+  'packages/loaders/tests/fixtures/torus.ply',
   'packages/loaders/tests/fixtures/decimated-knight.off',
   'packages/loaders/tests/fixtures/bunny.pcd',
   'packages/ifc/tests/fixtures/wall.ifc',

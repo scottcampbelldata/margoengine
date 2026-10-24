@@ -1,7 +1,7 @@
 {
   "gate": "api",
   "about": "undocumented public exports (tsdoc), bare Error throws and throw messages that name no fix, per file",
-  "total": 2019,
+  "total": 2013,
   "history": [
     {
       "date": "2026-10-24",
@@ -282,7 +282,6 @@
     "no-fix packages/materials/src/transmission-pass.ts": 1,
     "no-fix packages/materials/src/transmission.ts": 6,
     "no-fix packages/math/src/color.ts": 2,
-    "no-fix packages/navigation/src/index.ts": 6,
     "no-fix packages/navmesh/src/index.ts": 3,
     "no-fix packages/navmesh/src/orca.ts": 2,
     "no-fix packages/net/src/index.ts": 6,

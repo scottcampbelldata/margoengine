@@ -44,7 +44,7 @@ npm install @margoengine/core @margoengine/gltf-pro @margoengine/animation @marg
   @margoengine/audio @margoengine/sky @margoengine/water @margoengine/shadows @margoengine/post @margoengine/quality
 ```
 
-Add `@margoengine/navigation` (or `navmesh`), `@margoengine/ecs`, `@margoengine/decoders` and
+Add `@margoengine/navmesh`, `@margoengine/ecs`, `@margoengine/decoders` and
 `@margoengine/environment` only if you use them. Each package is separate and declares `sideEffects: false`, so your
 bundle contains only what you import.
 
@@ -398,15 +398,15 @@ With physics attached, `physics.raycast` answers the same question from the coll
 
 ## Navigation for enemies
 
-Two packages, by size of problem:
+`@margoengine/navmesh` is dependency-free and covers both sizes of problem:
 
-- `@margoengine/navigation` builds a Recast/Detour navmesh from triangles (it depends on `recast-navigation`, a Wasm
-  module) and answers path queries. Feed it the level's world-space triangles from `worldTriangles`.
-- `@margoengine/navmesh` is dependency-free: A* over convex polygons you supply, funnel smoothing, and ORCA
-  avoidance between agents (`avoid()`), up to 4,096 polygons. Good for a hand-made walk mesh exported from Blender.
+- `@margoengine/navmesh/build` generates a navmesh from triangles (voxelised, filtered by agent height, step and
+  radius) and answers path queries. Feed it the level's world-space triangles from `worldTriangles`.
+- The root entry runs A* over convex polygons you supply, with funnel smoothing and ORCA avoidance between agents
+  (`avoid()`), up to 4,096 polygons. Good for a hand-made walk mesh exported from Blender.
 
 ```ts
-import {Navigation} from '@margoengine/navigation';
+import {Navigation} from '@margoengine/navmesh/build';
 import {worldTriangles} from '@margoengine/bvh';
 import {loadGLTF} from '@margoengine/gltf-pro';
 
@@ -425,7 +425,7 @@ engine.onFrame((_engine, delta) => {
 // navigation.dispose() when the level unloads.
 ```
 
-Recast's crowd simulation, tiled meshes and off-mesh links are not wrapped; use `recast-navigation` directly for them.
+Tiled meshes and off-mesh links are not supported; steer crowds with `avoid()` from `@margoengine/navmesh`.
 
 ## Many entities: ECS
 
@@ -592,8 +592,8 @@ The game is static files: build with Vite (or any bundler that copies `new URL(.
 the worker loaders and decoders use) and serve over HTTPS (WebGPU needs a secure context). [docs/deploying.md](../deploying.md)
 has tested Content Security Policy, caching and compression configs for Cloudflare Pages, Netlify, Vercel and Nginx:
 Margo needs `script-src 'wasm-unsafe-eval'` and `worker-src 'self'` (the Draco and KTX2 decoder workers included,
-no `'unsafe-eval'`), and no cross-origin isolation headers are needed. Rapier (`@dimforge/rapier3d-compat`) and
-`recast-navigation` also compile Wasm; they are not part of that page's CSP check, so test your policy with them.
+no `'unsafe-eval'`), and no cross-origin isolation headers are needed. Rapier (`@dimforge/rapier3d-compat`) also
+compiles Wasm; it is not part of that page's CSP check, so test your policy with it.
 An offline asset cache for GLB files and textures is coming; it has not merged.
 ## What you build yourself
 
@@ -628,7 +628,7 @@ laptop with an Intel Arc 140V integrated GPU, Edge 155, on AC power.
 | Island demo, full tier (4x MSAA) on the same laptop | 45-53 FPS (100k), 40-44 FPS (1M): below 60, which is why the light tier exists | same file |
 | Loading a generated 41 MB GLB (1.28M triangles) while rendering | longest main-thread task 222 ms with `loadGLTF`, 0 ms with `loadGLTFInWorker`; load time 0.60 s vs 0.68 s | [workers.json](../../examples/package-benchmarks/results/workers.json) (`examples/package-benchmarks/workers/run.mjs`) |
 | Screen-space reflections, worst case (glossy floor filling the view) | 2.3 ms GPU at 1280x720 4x MSAA, 5.8 ms at 1920x1080 4x | [ssr-gpu.json](../../examples/package-benchmarks/results/ssr-gpu.json) |
-| Package entries this game imports (min + gzip, each alone; Rapier and recast-navigation not included) | gltf-pro 16.9 kB, animation 5.0, animator 3.9, input 2.3, physics 8.2, bvh 13.6, cinematic 1.5, audio 6.3, sky base + bruneton + clouds + fog + reflection + lighting 11.7, water 13.9, shadows 6.4, Bloom 4.9, quality 1.3 | [entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json) (`examples/package-benchmarks/entry-sizes.mjs`) |
+| Package entries this game imports (min + gzip, each alone; Rapier not included) | gltf-pro 16.9 kB, animation 5.0, animator 3.9, input 2.3, physics 8.2, bvh 13.6, cinematic 1.5, audio 6.3, sky base + bruneton + clouds + fog + reflection + lighting 11.7, water 13.9, shadows 6.4, Bloom 4.9, quality 1.3 | [entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json) (`examples/package-benchmarks/entry-sizes.mjs`) |
 
 | Rapier itself, `@dimforge/rapier3d-compat` 0.21.0 `rapier.mjs` (Wasm inlined as base64) | 1,645,573 bytes gzip (4,340,292 raw); the bare Wasm 1,176,707 gzip | [walk-size.json](../../examples/package-benchmarks/results/walk-size.json) (`examples/package-benchmarks/walk-size.mjs`) |
 

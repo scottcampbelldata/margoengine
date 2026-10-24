@@ -36,7 +36,7 @@ Later sessions shrink them (`--update`) and never grow them without `--reason`. 
 | duplicates | 30 package pairs, 1,120 lines (splats vs vfx 90, clustered vs shadows 88, fog.ts in lines/points/splats/vfx/water 70 per pair); 49 family copies (hidden-ancestor walk 16 packages, GGX 12, hex colour 7, glTF accessors 6, GLB 3, CRC table 3, partial view 2); 13 value re-exports |
 | tests | 51 entries no verify test imports (math 16, post 11, machinery 10, sky 5, creative 4, vfx 3, fbx 1, usdz 1); 0 packages without tests. Entries a test builds from a computed path (tests/modern-facade-isolation) are not seen |
 | api | 344 undocumented exports; 274 bare `Error` throws in 77 files; 1,431 throw messages naming no fix in 307 files |
-| clean-room | 31 mentions in 12 files (tests, fixtures and 2 READMEs); 6 third-party deps (web-ifc, recast-navigation, rapier x2, react, react-dom) |
+| clean-room | 31 mentions in 12 files (tests, fixtures and 2 READMEs); 5 third-party deps (web-ifc, rapier x2, react, react-dom); recast-navigation removed 2026-10-24 with the navigation package |
 
 ## Landed 2026-10-24: Codex's work/changes (multi-view, voxel, lightmap, exporters, AgX)
 
@@ -53,8 +53,8 @@ passes, mips, bytes ...); `gizmo` and `usdz-export` are removed (79 packages). C
 stage 22,253 B) and the root entries of the other packages total 30 B less than before. Survivors: core keeps its own
 `#rrggbb` check, GGX text, view-rectangle check, mesh buffer layout and bind-group cache (frozen, size-capped; core
 depends on nothing), `margoengine` re-exports core (it is the stage facade), and lines/text share a 12-line method
-shape. navigation (a Recast wrapper) vs navmesh waits for
-the clean-room rewrite. Renames: [renames-2026-10-24.md](renames-2026-10-24.md).
+shape. navigation (a Recast wrapper) is removed: its API is `@margoengine/navmesh/build`, a clean-room generator, with
+ORCA and the funnel rewritten clean room too (78 packages). Renames: [renames-2026-10-24.md](renames-2026-10-24.md).
 The full WebGL2 fallback is paused by Scott (2026-10-24) until his apps ship: [webgl2-compat-roadmap.md](webgl2-compat-roadmap.md),
 which also records what visitors without WebGPU see today (every site demo: a needs-WebGPU message, `check:no-webgpu`).
 
@@ -206,7 +206,7 @@ change `56ee9876`) updated; posed-picking metadata (`uv`, `primitiveIndex`, `nod
 `Raycaster.intersectModel` hits, `ab75f70b`; the consumer repo `margo3d-studio` is not on the laptop).
 `@margoengine/voxel` (Minecraft-style game and the MagicaVoxel-style editor; design and as-built notes in
 `packages/voxel/DESIGN.md`): phases 1-3 and 6-12 on main (storage, mesher, worker mesher, light, queries, codec and
-store, streaming and `noiseTerrain`, `.vox` with the `chr_knight.vox` MIT fixture, Rapier colliders with balls
+store, streaming and `noiseTerrain`, `.vox` with the Margo-made `tree.vox` fixture, Rapier colliders with balls
 working via triangle meshes, `AudioVoicePool`, vfx `ParticleAtlas`). Remaining: phase 4 (chunk renderer), 5
 (renderer lighting: shadows, clustered, fog, IBL, day/night, animated water/lava), 13 (playable example, site page,
 visual baselines, measured performance at render distance 8 and 16). Rapier 0.21.0 panics on ball-vs-voxel edges
@@ -2102,7 +2102,7 @@ Done: core instance storage sized to use (`4d4de78`), kernel -Oz + raw deflate (
       `packages/gltf-pro/tests/khronos.test.js` (indices per mode vs the spec formulas, unlit, worker parity).
    b. [DONE 2026-10-15] MeshoptCubeTest also needed vertex codec v1 (11 of its views; header 0xa1), not only `COLOR`.
       `packages/decoders/src/meshopt.ts`: v1 (per-byte control modes, 1/2/4/8-bit groups, byte / 16-bit / rotated-XOR
-      channels, ported from meshoptimizer 1.1.1's reference decoder) and `COLOR` (YCoCg + alpha precision bit, the SIMD
+      channels; since 2026-10-24 the whole module is written from the KHR/EXT extension specifications, no port) and `COLOR` (YCoCg + alpha precision bit, the SIMD
       decoder's float32 arithmetic; it stores the low bits of the float32 pattern of value + 3<<22, which differs from a
       rounded integer only for out-of-range YCoCg). Bit-exact vs the installed meshoptimizer Wasm decoder: 1,030 fuzz
       streams (v0/v1, strides 4-64, NONE/COLOR) + 132 encoder-made COLOR streams (8/16-bit, 2-16 bits) + all 60
@@ -2664,10 +2664,11 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
    `npm audit` (registry reachable, 2026-10-15): 0 vulnerabilities (all and `--omit=dev`); `npm audit signatures`
    against the main checkout's install: 116 packages with verified registry signatures, 39 with attestations.
    Shipped third-party code and notices: decoders (Draco, Basis: Apache-2.0, now with `dist/LICENSE-Apache-2.0.txt`;
-   the meshopt decoder is a port of meshoptimizer, MIT notice added to its THIRD-PARTY-NOTICE.md), machinery (OCCT
+   the meshopt decoder was then a port of meshoptimizer with its MIT notice; rewritten from the extension specifications
+   on 2026-10-24, so that notice and its THIRD-PARTY-NOTICES row are removed), machinery (OCCT
    glue + Wasm, LGPL-2.1: OCCT-NOTICE.txt rewritten to state each obligation; the patched glue's first line now
    carries the change date, LGPL s. 2b, via `scripts/static-embind.js`), text (`sdf.ts` follows TinySDF line by line:
-   BSD-2-Clause `NOTICE.md` added and shipped). LGPL how-met list in THIRD-PARTY-NOTICES.md (notice + licence text
+   BSD-2-Clause `NOTICE.md` added and shipped; 2026-10-24: `sdf.ts` was rewritten clean-room from the Felzenszwalb-Huttenlocher paper with its own sub-pixel seeding, so the TinySDF notice and `NOTICE.md` were removed). LGPL how-met list in THIRD-PARTY-NOTICES.md (notice + licence text
    next to the files, modification marked and dated, transformation script public, upstream source linked, glue and
    Wasm loaded by URL so users can swap in their own build). Open for Scott: whether linking upstream occt-import-js
    0.0.23 suffices for LGPL s. 4 or we mirror its source tarball (the airtight option); not legal advice.
@@ -2899,7 +2900,8 @@ particles, post, `app.environment()`, `app.shadows()`), so a spinning model cost
    removes its environment), and shadows cast from the meshes present at the call (later ones: `shadows.add(mesh)`).
    Lazy packs on first call (Vite minify, core external): environment 25,572 B gzip, shadows 7,120 B.
    Real GPU (`scripts/stage-features-gpu-check.js`, Arc 140V / Edge 155 headless, GPU lock): stage with a loaded glTF
-   cube on a floor; `app.environment(spot1Lux.hdr, {intensity: 4})` changed 66,084 of 120,000 pixels, then
+   cube on a floor; `app.environment(<former spot1Lux.hdr fixture>, {intensity: 4})` changed 66,084 of 120,000 pixels (the check now
+   loads the Margo-made `sun_sky.hdr`; re-measure), then
    `app.shadows({resolution: 1024})` changed 3,266 (8 dynamic caster draws); 0 validation errors; `app.dispose()`
    disposed the lighting, its environment and shadows and removed the canvas, and a load pending at dispose rejected
    with AbortError. Seen in the frame (test-results/stage-features-shadows.png): the 1 m cube's shadow edge is visibly

@@ -24,7 +24,6 @@ const requested = [
   'net',
   'stats',
   'inspector',
-  'navigation',
   'tween',
   'fbx',
   'bvh',

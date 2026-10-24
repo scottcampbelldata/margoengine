@@ -4,17 +4,17 @@ import { assetWorkload, displayGeometry } from './asset-scene.js';
 import { controls } from './ui-scene.js';
 
 export async function createWorkload(count = 4, options = {}) {
-  const [knight, dolphin] = await Promise.all([
+  const [knight, torus] = await Promise.all([
       fetchBytes(new URL('../../packages/loaders/tests/fixtures/decimated-knight.off', import.meta.url), {
         ...options,
         maxBytes: 100000,
       }),
-      fetchBytes(new URL('../../packages/loaders/tests/fixtures/dolphins.ply', import.meta.url), {
+      fetchBytes(new URL('../../packages/loaders/tests/fixtures/torus.ply', import.meta.url), {
         ...options,
         maxBytes: 100000,
       }),
     ]),
-    geometries = [displayGeometry(parseOFF(knight)), displayGeometry(parsePLY(dolphin))],
+    geometries = [displayGeometry(parseOFF(knight)), displayGeometry(parsePLY(torus))],
     kinds = ['wipe', 'dissolve', 'radial', 'chromatic'];
   let selected = 0,
     switches = 0,
@@ -27,7 +27,7 @@ export async function createWorkload(count = 4, options = {}) {
   const scene = await assetWorkload(
     count,
     () => geometries[selected],
-    'Actual captured knight/dolphin scene images alternate through wipe, seeded dissolve, radial and chromatic transitions. Run switches real model geometry every 1.5 seconds and animates 0.75-second composites; the button starts another switch while paused or running.',
+    'Actual captured knight/torus scene images alternate through wipe, seeded dissolve, radial and chromatic transitions. Run switches real model geometry every 1.5 seconds and animates 0.75-second composites; the button starts another switch while paused or running.',
     {
       ...options,
       repeat: false,
@@ -70,8 +70,8 @@ export async function createWorkload(count = 4, options = {}) {
     },
     details: () => ({
       models: count,
-      sourceBytes: knight.length + dolphin.length,
-      scene: selected ? 'dolphins' : 'knight',
+      sourceBytes: knight.length + torus.length,
+      scene: selected ? 'torus' : 'knight',
       sceneSwitches: switches,
       transitionKind: switches ? kinds[(switches - 1) % kinds.length] : 'none',
       progress: effect?.progress ?? null,

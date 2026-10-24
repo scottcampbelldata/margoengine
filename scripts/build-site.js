@@ -121,6 +121,6 @@ for (const name of ['ATTRIBUTION.md', 'robot-CREDITS.md', 'tokyo-diorama-CREDITS
 execFileSync(process.execPath, [resolve('scripts/build-skinning-ik.mjs')], { stdio: 'inherit' });
 await cp('test-results/skinning-ik-site', `${out}/demos/light-keeper`, { recursive: true });
 await cp('packages/creative/examples/earth/assets/ATTRIBUTION.md', `${out}/demos/earth/assets/ATTRIBUTION.md`);
-// Licence notices for the third-party code the demos bundle (Draco, Basis, OCCT, Rapier, Recast); scripts/supply-chain.mjs.
+// Licence notices for the third-party code the demos bundle (Draco, Basis, OCCT, Rapier); scripts/supply-chain.mjs.
 await cp('THIRD-PARTY-NOTICES.md', `${out}/THIRD-PARTY-NOTICES.md`);
 console.log(out);
