@@ -6,6 +6,9 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
+// The suite may itself run under `gpu-lock.mjs run`; its nested marker would turn acquire() into a no-op here and
+// in the child processes below, so this test uses only its own temporary lock.
+delete process.env.MARGO_GPU_LOCK_NESTED;
 process.env.MARGO_GPU_LOCK = join(mkdtempSync(join(tmpdir(), 'gpu-lock-')), 'gpu.lock');
 const { acquire, status, lockDir } = await import('../scripts/gpu-lock.mjs');
 
