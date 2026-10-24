@@ -27,6 +27,12 @@ export interface OBJOptions extends SceneOptions {
    * the image files in `textures`. Default false.
    */
   textures?: boolean;
+  /**
+   * With `textures`, give each MASK or BLEND material's base color texture its own opacity map: `map_d -imfchan r`
+   * names `<texture>-opacity.png`, holding its alpha in every color channel (readers mostly ignore a color file's
+   * alpha in `map_d`). `exportOBJ` lists those files in `opacityMaps`; `writeOpacityMaps` encodes them. Default false.
+   */
+  opacityMaps?: boolean;
   /** Prepended to every texture file name, e.g. 'textures/' or 'level1_'. Default ''. */
   texturePrefix?: string;
   /** One `g` group (true, default) or one `o` object (false) per mesh. */
@@ -43,6 +49,8 @@ export interface OBJResult {
   mtl: string | null;
   /** The texture files the MTL names, keyed by that relative path; save each beside the OBJ. Empty unless `textures`. */
   textures: Map<string, Uint8Array>;
+  /** With `opacityMaps`: each opacity map's file name and the texture file whose alpha it holds. */
+  opacityMaps: Map<string, string>;
 }
 
 const linear = (v: number): number => v;
@@ -57,6 +65,7 @@ export function exportOBJ(source: ExportSource, options: OBJOptions = {}): OBJRe
     colors = options.colors ?? false,
     colorSpace = options.colorSpace ?? 'srgb',
     withTextures = options.textures ?? false,
+    withOpacity = options.opacityMaps ?? false,
     groups = options.groups ?? true,
     merge = options.mergeVertices ?? false,
     scale = options.scale ?? 1;
@@ -68,6 +77,8 @@ export function exportOBJ(source: ExportSource, options: OBJOptions = {}): OBJRe
     throw new TypeError('mtlName must be a file name without spaces');
   if (colorSpace !== 'srgb' && colorSpace !== 'linear') throw new TypeError("colorSpace must be 'srgb' or 'linear'");
   if (withTextures && !withMaterials) throw new TypeError('textures needs materials: true to write the MTL');
+  if (typeof withOpacity !== 'boolean') throw new TypeError('opacityMaps must be boolean');
+  if (withOpacity && !withTextures) throw new TypeError('opacityMaps needs textures: true to name the texture files');
   if (typeof scale !== 'number') throw new TypeError('scale must be a number');
   if (!(scale > 0) || !Number.isFinite(scale)) throw new RangeError('scale must be positive and finite');
   const lines = ['# Margo Engine OBJ export'],
@@ -75,6 +86,7 @@ export function exportOBJ(source: ExportSource, options: OBJOptions = {}): OBJRe
     names = new Map<Mat, string>(),
     groupNames = new Set<string>(),
     files = textureFiles(options.texturePrefix ?? ''),
+    opacity = new Map<string, string>(),
     encode = colorSpace === 'srgb' ? toSrgb : linear;
   if (withMaterials) lines.push(`mtllib ${mtlName}`);
   let vertexBase = 1,
@@ -109,14 +121,19 @@ export function exportOBJ(source: ExportSource, options: OBJOptions = {}): OBJRe
           `Ke ${m.emissive.map((v) => num(toSrgb(v))).join(' ')}`,
           `Pr ${num(m.roughness)}`,
           `Pm ${num(m.metalness)}`,
-          `d ${num(m.color[3])}`,
-          // MTL illumination models: 1 diffuse only, 2 diffuse plus highlight.
-          m.shading === 'lambert' ? 'illum 1' : 'illum 2',
+          // An opaque material ignores its color's alpha.
+          `d ${m.alphaMode === 'OPAQUE' ? 1 : num(m.color[3])}`,
+          // MTL illumination models: 0 color only (unlit), 1 diffuse only, 2 diffuse plus highlight.
+          m.unlit ? 'illum 0' : m.shading === 'lambert' ? 'illum 1' : 'illum 2',
         );
         if (withTextures && m.baseColorTexture) {
           const file = files.name(m.baseColorTexture);
           mtl.push(`map_Kd ${file}`);
-          if (m.alphaMode !== 'OPAQUE') mtl.push(`map_d ${file}`);
+          if (m.alphaMode !== 'OPAQUE' && withOpacity) {
+            const map = file.replace(/\.(?:png|jpg)$/, '-opacity.png');
+            opacity.set(map, file);
+            mtl.push(`map_d -imfchan r ${map}`);
+          } else if (m.alphaMode !== 'OPAQUE') mtl.push(`map_d ${file}`);
         }
         mtl.push('');
       }
@@ -165,5 +182,32 @@ export function exportOBJ(source: ExportSource, options: OBJOptions = {}): OBJRe
     if (uvs) uvBase += kept.length;
   }
   lines.push('');
-  return { obj: lines.join('\n'), mtl: withMaterials ? mtl.join('\n') : null, textures: files.files };
+  return {
+    obj: lines.join('\n'),
+    mtl: withMaterials ? mtl.join('\n') : null,
+    textures: files.files,
+    opacityMaps: opacity,
+  };
+}
+
+/**
+ * Encodes the opacity maps an `exportOBJ` result with `opacityMaps` names: each texture's alpha in every color
+ * channel, fully opaque, as PNG, added to `result.textures`.
+ * @throws TypeError when such a texture is not PNG (JPEG has no alpha); what decodePNG and encodePNG throw.
+ */
+export async function writeOpacityMaps(result: OBJResult): Promise<void> {
+  if (!result.opacityMaps.size) return;
+  const { decodePNG } = await import('@margoengine/decoders/png');
+  const { encodePNG } = await import('./capture.js');
+  for (const [map, file] of result.opacityMaps) {
+    if (!file.endsWith('.png')) throw new TypeError(`${file} is not PNG; give a MASK or BLEND material a PNG texture`);
+    const image = decodePNG(result.textures.get(file)!),
+      data = new Uint8Array(image.data.length);
+    for (let i = 0; i < data.length; i += 4) {
+      const alpha = image.data[i + 3];
+      data[i] = data[i + 1] = data[i + 2] = alpha;
+      data[i + 3] = 255;
+    }
+    result.textures.set(map, await encodePNG({ width: image.width, height: image.height, data }));
+  }
 }

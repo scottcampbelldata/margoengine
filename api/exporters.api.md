@@ -288,6 +288,7 @@ export interface OBJOptions extends SceneOptions {
     colors?: boolean;
     colorSpace?: 'srgb' | 'linear';
     textures?: boolean;
+    opacityMaps?: boolean;
     texturePrefix?: string;
     groups?: boolean;
     mergeVertices?: boolean;
@@ -298,6 +299,7 @@ export interface OBJResult {
     obj: string;
     mtl: string | null;
     textures: Map<string, Uint8Array>;
+    opacityMaps: Map<string, string>;
 }
 
 export interface PLYOptions extends SceneOptions {
@@ -408,6 +410,8 @@ export function readAccessor(parts: GLBParts, index: number): AccessorValues;
 export function sampleFrames(first: number, last: number, fps: number, maxFrames?: number): FrameClip;
 
 export function splitGLB(bytes: Uint8Array, options?: SplitGLBOptions): GLBParts;
+
+export function writeOpacityMaps(result: OBJResult): Promise<void>;
 
 // Not exported from this entry, but used by the exports above:
 

@@ -434,3 +434,75 @@ test('the import add-on binds linear vertex colors and applies extras.loop', asy
   );
   assert.ok((await encodeZIP(entries)) instanceof Uint8Array);
 });
+
+test('flipbooks add the player, bindings and a scene; files join the bundle and its manifest', async () => {
+  const bindings = [
+    { nodePath: 'Geometry/Stone', surface: 0, fps: 8, startFrame: 0, frames: [{ offset: [0, 0], scale: [1, 1] }] },
+  ];
+  const extra = new TextEncoder().encode('{"names":[]}\n');
+  const bundle = await createGodotImportBundle(
+    exportGLB(scene()),
+    options({ flipbooks: { appName: 'Acme', bindings }, files: [{ name: 'names.json', data: extra }] }),
+  );
+  const names = bundle.entries.map((entry) => entry.name.slice('margo_exports/stone/'.length));
+  for (const name of ['flipbook-player.gd', 'flipbook-bindings.json', 'scene.tscn', 'names.json'])
+    assert.ok(names.includes(name), name);
+  assert.deepEqual(JSON.parse(text(bundle, 'flipbook-bindings.json')), {
+    format: 'AcmeFlipbook',
+    version: 1,
+    bindings,
+  });
+  assert.match(text(bundle, 'flipbook-player.gd'), /AcmeFlipbook/);
+  const tscn = text(bundle, 'scene.tscn');
+  assert.match(tscn, /path="res:\/\/margo_exports\/stone\/model\.glb"/);
+  assert.match(
+    tscn,
+    /\[node name="Acme" type="Node3D"\]\nscript = ExtResource\("2"\)\nbindings_path = "flipbook-bindings\.json"/,
+  );
+  assert.match(tscn, /\[node name="Geometry" parent="\." instance=ExtResource\("1"\)\]/);
+  const listed = bundle.manifest.files.map((file) => file.path ?? file.name);
+  assert.ok(
+    listed.some((path) => String(path).endsWith('names.json')),
+    'app files are in the manifest digests',
+  );
+  assert.match(text(bundle, 'model.glb.import'), /nodes\/use_name_suffixes=true\nnodes\/use_node_type_suffixes=true\n/);
+  await assert.rejects(
+    createGodotImportBundle(exportGLB(scene()), options({ files: [{ name: '../x', data: extra }] })),
+    /distinct plain file names/,
+  );
+});
+
+test('material pointer clips need no target node but keep the STEP grid', async () => {
+  const parts = splitGLB(exportGLB(scene())),
+    json = parts.json,
+    start = parts.bin.length,
+    keys = new Uint8Array(new Float32Array([0, 0.125, 0.5, 0.5]).buffer);
+  json.extensionsUsed = [...(json.extensionsUsed ?? []), 'KHR_animation_pointer'];
+  json.bufferViews.push({ buffer: 0, byteOffset: start, byteLength: 16 });
+  const view = json.bufferViews.length - 1,
+    times = json.accessors.length;
+  json.accessors.push(
+    { bufferView: view, byteOffset: 0, componentType: 5126, count: 2, type: 'SCALAR', min: [0], max: [0.125] },
+    { bufferView: view, byteOffset: 8, componentType: 5126, count: 2, type: 'SCALAR' },
+  );
+  json.animations = [
+    {
+      name: 'flip',
+      samplers: [{ input: times, output: times + 1, interpolation: 'STEP' }],
+      channels: [
+        {
+          sampler: 0,
+          target: { path: 'pointer', extensions: { KHR_animation_pointer: { pointer: '/materials/0/alphaCutoff' } } },
+        },
+      ],
+    },
+  ];
+  const bin = new Uint8Array(start + 16);
+  bin.set(parts.bin);
+  bin.set(keys, start);
+  json.buffers[0].byteLength = bin.length;
+  const glb = joinGLB({ ...parts, json, bin });
+  const bundle = await createGodotImportBundle(glb, options({ fps: 8 }));
+  assert.equal(bundle.manifest.animationFPS, 8);
+  await assert.rejects(createGodotImportBundle(glb, options({ fps: 5 })), /cannot represent a STEP key/);
+});

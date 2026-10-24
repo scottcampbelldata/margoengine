@@ -13,6 +13,17 @@ export interface FileDigest {
     sha256: string;
 }
 
+export interface GodotFlipbookBinding {
+    readonly nodePath: string;
+    readonly surface: number;
+    readonly fps: number;
+    readonly startFrame: number;
+    readonly frames: readonly {
+        readonly offset: readonly [number, number];
+        readonly scale: readonly [number, number];
+    }[];
+}
+
 export interface GodotImportBundle {
     entries: BundleEntry[];
     manifest: GodotImportManifest;
@@ -46,6 +57,14 @@ export interface GodotImportOptions {
     folder: string;
     convexHelperIds?: readonly string[];
     fps?: number;
+    flipbooks?: {
+        appName: string;
+        bindings: readonly GodotFlipbookBinding[];
+    };
+    files?: readonly {
+        name: string;
+        data: Uint8Array;
+    }[];
 }
 
 export function createGodotImportBundle(glb: Uint8Array, options: GodotImportOptions): Promise<GodotImportBundle>;

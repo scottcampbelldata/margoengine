@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 2994709,
+  "total": 2998271,
   "history": [
     {
       "date": "2026-10-24",
@@ -38,6 +38,12 @@
       "commit": "b8e88643",
       "reason": "MargoTile precision move: Unity/Unreal/Godot precision bundles, Roblox chunk checks and runtime source bundle as new on-demand exporters entries; roblox gains the shared partitioning (robloxChunkTriangleCounts, splitRobloxPrimitives) that exportRobloxGLB now uses; import-names gains godotImportedNodeName and GODOT_SUFFIX_IMPORT_SETTINGS",
       "grew": 12
+    },
+    {
+      "date": "2026-10-24",
+      "commit": "a5ceb02f",
+      "reason": "createGodotImportBundle flipbooks option: loads the godot-flipbook player on demand (dynamic import) for one Godot bundle path shared with MargoTile",
+      "grew": 1
     }
   ],
   "items": {
@@ -97,7 +103,7 @@
     "@margoengine/exporters": 34482,
     "@margoengine/exporters/capture": 6916,
     "@margoengine/exporters/dae": 10230,
-    "@margoengine/exporters/godot": 6811,
+    "@margoengine/exporters/godot": 10373,
     "@margoengine/exporters/godot-addon": 1609,
     "@margoengine/exporters/godot-flipbook": 3605,
     "@margoengine/exporters/godot-lightmap": 1328,

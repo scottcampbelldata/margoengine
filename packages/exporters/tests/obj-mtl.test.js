@@ -3,7 +3,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { exportOBJ } from '../dist/index.js';
+import { exportOBJ, writeOpacityMaps } from '../dist/index.js';
+import { decodePNG } from '@margoengine/decoders/png';
 import { readGLB } from './helpers.js';
 
 function readOBJ(text) {
@@ -213,4 +214,36 @@ test('OBJ groups or objects, vertex color space, welding and scale', () => {
   assert.throws(() => exportOBJ(scene, { textures: true }), /needs materials/);
   assert.throws(() => exportOBJ(scene, { materials: true, textures: true, texturePrefix: 'my textures/' }), TypeError);
   assert.throws(() => exportOBJ(scene, { mergeVertices: 'yes' }), TypeError);
+});
+
+test('OBJ opacity maps hold a MASK or BLEND texture alpha in every channel; unlit is illum 0, opaque d 1', async () => {
+  const image = await png(),
+    tile = { image, mimeType: 'image/png', name: 'tile.png' };
+  const scene = {
+    nodes: [
+      {
+        name: 'glass',
+        geometry: tiles(),
+        material: { name: 'glass', alphaMode: 'BLEND', color: [1, 1, 1, 0.5], baseColorTexture: tile },
+      },
+      { name: 'flat', geometry: tiles(), material: { name: 'flat', unlit: true, color: [1, 1, 1, 0.25] } },
+    ],
+  };
+  const result = exportOBJ(scene, { materials: true, textures: true, opacityMaps: true });
+  const materials = readMTL(result.mtl);
+  assert.equal(materials.glass.map_d, '-imfchan r tile-opacity.png');
+  assert.deepEqual([...result.opacityMaps], [['tile-opacity.png', 'tile.png']]);
+  assert.deepEqual(materials.flat.illum, [0]);
+  assert.deepEqual(materials.flat.d, [1], 'an opaque material ignores its color alpha');
+  assert.deepEqual(materials.glass.d, [0.5]);
+  await writeOpacityMaps(result);
+  const source = decodePNG(image),
+    map = decodePNG(result.textures.get('tile-opacity.png'));
+  assert.deepEqual([map.width, map.height], [source.width, source.height]);
+  for (let i = 0; i < map.data.length; i += 4)
+    assert.deepEqual(
+      [...map.data.subarray(i, i + 4)],
+      [source.data[i + 3], source.data[i + 3], source.data[i + 3], 255],
+    );
+  assert.throws(() => exportOBJ(scene, { materials: true, opacityMaps: true }), /opacityMaps needs textures: true/);
 });

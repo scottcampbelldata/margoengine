@@ -148,6 +148,12 @@ or `texture_<n>`, with `.png` or `.jpg` from the `mimeType`; one image's bytes b
 taken gets `_2`, `_3`. The files are the `TextureData` bytes as given. `texturePrefix` may hold letters, digits,
 `_ . - /`.
 
+The MTL writes `Kd`, `Ks`/`Ns` (Phong), `Ke`, `Pr`/`Pm`, `d` (1 for opaque materials) and `illum` (0 unlit, 1 Lambert,
+2 otherwise). A MASK or BLEND material's texture is also its `map_d`; with `opacityMaps: true` it gets its own
+`<texture>-opacity.png` instead (`map_d -imfchan r`), since most readers ignore a color file's alpha there.
+`exportOBJ` names those files in `opacityMaps`; `await writeOpacityMaps(result)` encodes each from its PNG's alpha
+into `result.textures`.
+
 ## COLLADA (.dae)
 
 `exportDAE(engineOrDataScene, options)` from `@margoengine/exporters/dae` (or the package root) returns
@@ -333,6 +339,12 @@ const bundle = await createGodotImportBundle(glb, {
 });
 const zip = await encodeZIP(bundle.entries);
 ```
+
+`flipbooks: { appName, bindings }` adds `flipbook-player.gd` (the `godot-flipbook` player), `flipbook-bindings.json` and
+`scene.tscn`, which runs the player with the GLB instanced as `Geometry`; bindings name surfaces by path from there.
+`files` adds the application's own files to the folder and the manifest. Clips may animate nodes or, through
+`KHR_animation_pointer`, material properties such as UV flipbooks; every STEP key must sit on the `fps` grid. The seed
+turns on name and node-type suffixes, which `-col`/`-convcol` collision nodes need.
 
 The optional module emits `model.glb`, its partial import seed, `margo-import.gd`, a README and a manifest with the
 exact payload SHA-256 hashes (using WebCrypto). An input Buffer is cloned before asynchronous work. It generates no

@@ -1,5 +1,6 @@
 // Godot import bundle: the unchanged GLB plus a `.import` seed, a post-import script and a manifest. The supplied GLB
 // is never rewritten; only Godot's public scene-import and convex-shape APIs interpret the profile.
+import type { GodotFlipbookBinding } from './godot-flipbook.js';
 import { splitGLB } from './glb.js';
 import {
   type BundleEntry,
@@ -20,6 +21,7 @@ import {
 } from './import-data.js';
 
 export type { BundleEntry, FileDigest } from './import-data.js';
+export type { GodotFlipbookBinding } from './godot-flipbook.js';
 
 /** Options for {@link createGodotImportBundle}. No project-wide configuration is written. */
 export interface GodotImportOptions {
@@ -38,6 +40,14 @@ export interface GodotImportOptions {
    * clips declare different or no rates. Every STEP key time must fall on this grid.
    */
   fps?: number;
+  /**
+   * UV flipbooks to play in Godot: adds `flipbook-player.gd` (from `createGodotFlipbookPlayer`),
+   * `flipbook-bindings.json` and `scene.tscn`, a Node3D named `appName` running the player with the GLB instanced as
+   * its `Geometry` child. Binding `nodePath`s are relative to that Node3D (`Geometry/<GLB root>/...`).
+   */
+  flipbooks?: { appName: string; bindings: readonly GodotFlipbookBinding[] };
+  /** Further files written into the bundle folder and its manifest, such as the application's own metadata. */
+  files?: readonly { name: string; data: Uint8Array }[];
 }
 
 /** The `margo-godot-profile.json` written by {@link createGodotImportBundle}; it does not list itself. */
@@ -122,7 +132,14 @@ function animations(document: Json, bin: Uint8Array | null, suppliedFPS: unknown
     const samplers = records(clip.samplers, 'Godot animation samplers');
     for (const channel of records(clip.channels, 'Godot animation channels')) {
       const target = object(channel.target, 'Godot animation target');
-      animated.add(index(target.node, nodes.length, 'Godot animation target node'));
+      // KHR_animation_pointer channels (such as UV flipbooks on a material) target a property, not a node.
+      const pointer = isObject(target.extensions) ? target.extensions.KHR_animation_pointer : undefined;
+      if (target.path === 'pointer' && target.node === undefined) {
+        if (!isObject(pointer) || typeof pointer.pointer !== 'string' || !pointer.pointer.startsWith('/'))
+          throw new TypeError(
+            'Godot pointer animation target needs a KHR_animation_pointer JSON pointer; repair the GLB',
+          );
+      } else animated.add(index(target.node, nodes.length, 'Godot animation target node'));
       index(channel.sampler, samplers.length, 'Godot animation sampler');
     }
     for (const sampler of samplers) {
@@ -304,6 +321,9 @@ export async function createGodotImportBundle(
       'cannot pin the generated AnimationPlayer path when a source node uses that name; rename that node or use general GLB',
     );
   const settings: GodotImportManifest['settings'] = {
+    // Collision and helper nodes are named by suffix (-col, -convcol, ...); state the import that reads them.
+    'nodes/use_name_suffixes': true,
+    'nodes/use_node_type_suffixes': true,
     'meshes/force_disable_compression': true,
     'meshes/generate_lods': false,
     'meshes/create_shadow_meshes': false,
@@ -338,6 +358,39 @@ export async function createGodotImportBundle(
       ),
     },
   ];
+  if (options.flipbooks !== undefined) {
+    const { appName, bindings } = options.flipbooks;
+    const { createGodotFlipbookPlayer } = await import('./godot-flipbook.js');
+    const player = createGodotFlipbookPlayer({ appName });
+    if (!Array.isArray(bindings)) throw new TypeError('flipbooks.bindings must be an array of flipbook bindings');
+    entries.push(
+      { name: `${folder}/flipbook-player.gd`, data: utf8.encode(player) },
+      {
+        name: `${folder}/flipbook-bindings.json`,
+        data: encodeJSON({ format: `${appName}Flipbook`, version: 1, bindings }),
+      },
+      {
+        name: `${folder}/scene.tscn`,
+        data: utf8.encode(
+          `[gd_scene load_steps=3 format=3]\n\n[ext_resource type="PackedScene" path="res://${folder}/model.glb" id="1"]\n[ext_resource type="Script" path="res://${folder}/flipbook-player.gd" id="2"]\n\n[node name="${appName}" type="Node3D"]\nscript = ExtResource("2")\nbindings_path = "flipbook-bindings.json"\n\n[node name="Geometry" parent="." instance=ExtResource("1")]\n`,
+        ),
+      },
+    );
+  }
+  for (const file of options.files ?? []) {
+    if (
+      !isObject(file) ||
+      typeof file.name !== 'string' ||
+      !/^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(file.name) ||
+      !(file.data instanceof Uint8Array) ||
+      entries.some((entry) => entry.name === `${folder}/${file.name}`) ||
+      file.name === 'margo-godot-profile.json'
+    )
+      throw new TypeError(
+        'Godot bundle files need distinct plain file names (letters, digits, _ . -) and Uint8Array data; rename the file',
+      );
+    entries.push({ name: `${folder}/${file.name}`, data: Uint8Array.from(file.data) });
+  }
   const files = await digests(entries, GODOT);
   const manifest: GodotImportManifest = {
     schema: 1,

@@ -2,7 +2,7 @@ export { exportGLTF, exportGLB } from './gltf.js';
 export type { GLBOptions, GLTFOptions, GLTFJsonOptions, GLTFJsonResult } from './gltf.js';
 export { exportSTL } from './stl.js';
 export type { STLOptions } from './stl.js';
-export { exportOBJ } from './obj.js';
+export { exportOBJ, writeOpacityMaps } from './obj.js';
 export type { OBJOptions, OBJResult } from './obj.js';
 export { exportPLY } from './ply.js';
 export type { PLYOptions } from './ply.js';
