@@ -13,6 +13,18 @@
   - `@margoengine/animation`: skeletal animation and morph targets.
   - `@margoengine/post`: SSAO and post-processing passes.
 
+## Clean room: no files from other repos
+
+Scott's rule (2026-10-24): Margo never uses files from other repositories, whatever their licence (MIT included).
+
+- Write what Margo needs clean room, from public specs, papers and descriptions. Never copy, adapt or paste code or
+  files from other engines or projects (three.js, Babylon, WAMR3D, WasmGPU, Blockbench, Crocotile, MagicaVoxel and
+  the like), and never read their source while writing the matching Margo code.
+- Other engines are run only where they live (for benchmarks: `../engine-bench`). Margo's own benchmark scenes,
+  harnesses and scripts are written clean room too.
+- The one exception is large standard files that every engine uses, such as standard sample models, test assets and
+  prebuilt decoders. Record each one's source and licence in `THIRD-PARTY-NOTICES.md`.
+
 ## Before every push to main
 
 Several agents push to `main`. Each push must leave it at least as clean as it found it:
