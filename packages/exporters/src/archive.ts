@@ -1,7 +1,7 @@
 // Archives of captured frames: a bounded full-frame sprite atlas, a deterministic stored ZIP, and PNG-sequence and
 // atlas ZIPs with a manifest the caller can extend. Every step can report progress and stop on an AbortSignal; a
 // cancelled call throws the signal's reason and returns nothing partial. Re-exported by `@margoengine/exporters/capture`.
-import { png } from './png.js';
+import { crc32, png } from './png.js';
 import type { FrameSource, Pixels } from './capture.js';
 
 /** Progress and cancellation for the archive functions. */
@@ -28,21 +28,6 @@ const MAX_ZIP = 0xffffffff,
   DEFAULT_ZIP = 256 * 1024 * 1024,
   // 1980-01-01 00:00, the ZIP epoch: every archive of the same files is byte-identical.
   DOS_DATE = (0 << 9) | (1 << 5) | 1;
-
-let crcTable: Int32Array | undefined;
-function crc32(bytes: Uint8Array): number {
-  if (!crcTable) {
-    crcTable = new Int32Array(256);
-    for (let n = 0; n < 256; n++) {
-      let c = n;
-      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-      crcTable[n] = c;
-    }
-  }
-  let c = -1;
-  for (let i = 0; i < bytes.length; i++) c = crcTable[(c ^ bytes[i]) & 255] ^ (c >>> 8);
-  return ~c >>> 0;
-}
 
 const size = (data: ZIPEntry['data'], text: Uint8Array | undefined): number =>
   text ? text.length : data instanceof Uint8Array ? data.length : (data as Blob).size;

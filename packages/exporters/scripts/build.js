@@ -19,4 +19,8 @@ execFileSync(
 await copyFile(resolve(repository, 'packages/shared/mesh-source.js'), resolve(root, 'dist/mesh-source.js'));
 const scene = resolve(root, 'dist/scene.js');
 await writeFile(scene, (await readFile(scene, 'utf8')).replace('../../shared/mesh-source.js', './mesh-source.js'));
+// The untrusted-JSON parser ships the same way (splitGLB parses caller files with it).
+await copyFile(resolve(repository, 'packages/shared/json.js'), resolve(root, 'dist/json.js'));
+const glb = resolve(root, 'dist/glb.js');
+await writeFile(glb, (await readFile(glb, 'utf8')).replace('../../shared/json.js', './json.js'));
 await packageDeclarations(root);

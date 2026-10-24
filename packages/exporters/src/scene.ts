@@ -1,6 +1,7 @@
 // Shared scene collection for every exporter: walks a Margo Engine engine (or a plain data scene), validates and
 // normalizes geometry and materials, and computes local and world transforms in double precision.
 import { engineRuntime, meshRuntime } from '@margoengine/core/extension';
+import { MargoError } from '@margoengine/math/errors';
 import type { EngineKernel, Mesh, Geometry, PbrMaterial } from '@margoengine/core';
 import type { Vec2 } from '@margoengine/math';
 import type { PBRSource } from '../../shared/pbr-source.js';
@@ -1056,7 +1057,8 @@ export function collect(source: ExportSource, options: SceneOptions = {}, plan?:
 
   if (isEngine(source)) {
     const engine = engineRuntime(source);
-    if (engine.disposed) throw new Error('Engine is disposed');
+    if (engine.disposed)
+      throw new MargoError('disposed', 'Engine is disposed; export before dispose() or from a live engine');
     const store = engine.store,
       children = new Map<number, Mesh[]>(),
       tops: Mesh[] = [];

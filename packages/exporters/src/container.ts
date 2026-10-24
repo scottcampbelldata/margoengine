@@ -1,6 +1,7 @@
 // The glTF container shared by the scene writer (gltf.ts) and the model writer (model.ts): one binary buffer of
 // 4-byte-aligned bufferViews, accessors with exact Float32 bounds, and GLB / .gltf packaging. No engine imports.
 import type { GLTFDocument } from '../../shared/gltf.js';
+import { glbFrame } from './glb.js';
 
 export interface GLTFJsonResult {
   /** The glTF document object. */
@@ -17,12 +18,24 @@ export const FLOAT = 5126,
   ARRAY_BUFFER = 34962,
   ELEMENT_ARRAY_BUFFER = 34963;
 // No prototype: accessor types come from the source file ("constructor" must not resolve to a function).
-const widths: Record<string, number> = Object.assign(Object.create(null), {
+/** @internal Components per glTF accessor type. Shared with the import-bundle readers (import-data.ts). */
+export const ACCESSOR_WIDTHS: Readonly<Record<string, number>> = /* @__PURE__ */ Object.assign(Object.create(null), {
   SCALAR: 1,
   VEC2: 2,
   VEC3: 3,
   VEC4: 4,
+  MAT2: 4,
+  MAT3: 9,
   MAT4: 16,
+});
+/** @internal Bytes per glTF component type, keyed by its code. */
+export const COMPONENT_BYTES: Readonly<Record<string, number>> = /* @__PURE__ */ Object.assign(Object.create(null), {
+  5120: 1,
+  5121: 1,
+  5122: 2,
+  5123: 2,
+  5125: 4,
+  5126: 4,
 });
 const arrays: Record<
   number,
@@ -30,7 +43,12 @@ const arrays: Record<
     new (n: number): Uint8Array | Uint16Array | Uint32Array | Float32Array;
     from(values: ArrayLike<number>): Uint8Array | Uint16Array | Uint32Array | Float32Array;
   }
-> = Object.assign(Object.create(null), { 5121: Uint8Array, 5123: Uint16Array, 5125: Uint32Array, 5126: Float32Array });
+> = /* @__PURE__ */ Object.assign(Object.create(null), {
+  5121: Uint8Array,
+  5123: Uint16Array,
+  5125: Uint32Array,
+  5126: Float32Array,
+});
 // Stable key order: asset first, buffers last.
 const order = [
   'asset',
@@ -84,7 +102,7 @@ export class Bin {
   /** Writes `values` (converted to `componentType` when not already that array type) as a tightly packed accessor; `bounds` adds exact min/max. */
   accessor(values: ArrayLike<number>, type: string, componentType = FLOAT, target?: number, bounds = false): number {
     const Type = arrays[componentType],
-      size = widths[type];
+      size = ACCESSOR_WIDTHS[type];
     const data = values instanceof Type ? values : Type.from(values as ArrayLike<number>);
     const accessor: Record<string, unknown> = {
       bufferView: this.view(new Uint8Array(data.buffer, data.byteOffset, data.byteLength).slice(), target),
@@ -118,27 +136,11 @@ export class Bin {
   /** Binary glTF: 12-byte header, a space-padded JSON chunk and a zero-padded BIN chunk. */
   glb(): Uint8Array {
     const text = new TextEncoder().encode(JSON.stringify(this.json)),
-      jsonLength = Math.ceil(text.length / 4) * 4;
-    const binLength = this.length,
-      total = 12 + 8 + jsonLength + (binLength ? 8 + binLength : 0);
-    const out = new Uint8Array(total),
-      view = new DataView(out.buffer);
-    view.setUint32(0, 0x46546c67, true);
-    view.setUint32(4, 2, true);
-    view.setUint32(8, total, true);
-    view.setUint32(12, jsonLength, true);
-    view.setUint32(16, 0x4e4f534a, true);
-    out.set(text, 20);
-    out.fill(0x20, 20 + text.length, 20 + jsonLength);
-    if (binLength) {
-      const at = 20 + jsonLength;
-      view.setUint32(at, binLength, true);
-      view.setUint32(at + 4, 0x004e4942, true);
-      let offset = at + 8;
-      for (const part of this.parts) {
-        out.set(part, offset);
-        offset += part.length;
-      }
+      { out, bin } = glbFrame(text, Math.ceil(text.length / 4) * 4, this.length);
+    let offset = bin;
+    for (const part of this.parts) {
+      out.set(part, offset);
+      offset += part.length;
     }
     return out;
   }

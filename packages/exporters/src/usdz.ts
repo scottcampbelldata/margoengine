@@ -1,21 +1,7 @@
 import { collect, drawables, num, toWorld, normalizeMaterial, type ExportSource, type SceneOptions } from './scene.js';
+import { crc32 } from './png.js';
 export interface USDZOptions extends SceneOptions {}
 
-let table: Int32Array | undefined;
-function crc32(bytes: Uint8Array): number {
-  // One table lookup per byte; the table is built on first use so importing stays free.
-  if (!table) {
-    table = new Int32Array(256);
-    for (let n = 0; n < 256; n++) {
-      let c = n;
-      for (let bit = 0; bit < 8; bit++) c = (c >>> 1) ^ (-(c & 1) & 0xedb88320);
-      table[n] = c;
-    }
-  }
-  let crc = -1;
-  for (let i = 0; i < bytes.length; i++) crc = table[(crc ^ bytes[i]) & 255] ^ (crc >>> 8);
-  return (crc ^ 0xffffffff) >>> 0;
-}
 const tuples = (values: ArrayLike<number>, size: number): string => {
   const result: string[] = [];
   for (let i = 0; i < values.length; i += size) {

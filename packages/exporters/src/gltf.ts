@@ -1,6 +1,7 @@
 // glTF 2.0 writer.
 import type { GLTFDocument } from '../../shared/gltf.js';
 import { copyExtras } from './extras.js';
+import { glbFrame } from './glb.js';
 import {
   checkTexture,
   collect,
@@ -928,21 +929,7 @@ export function exportGLB(source: ExportSource, options: GLBOptions = {}): Uint8
     throw new RangeError(
       `GLB needs ${total} bytes (JSON chunk ${jsonLength}, binary chunk ${binLength}), over ${options.maxBytes === undefined ? "the GLB format's limit" : 'maxBytes'} ${maxFile}; export less data or raise the limit`,
     );
-  const text = new TextEncoder().encode(json),
-    out = new Uint8Array(total),
-    view = new DataView(out.buffer);
-  view.setUint32(0, 0x46546c67, true);
-  view.setUint32(4, 2, true);
-  view.setUint32(8, total, true);
-  view.setUint32(12, jsonLength, true);
-  view.setUint32(16, 0x4e4f534a, true);
-  out.set(text, 20);
-  out.fill(0x20, 20 + text.length, 20 + jsonLength);
-  if (binLength) {
-    const at = 20 + jsonLength;
-    view.setUint32(at, binLength, true);
-    view.setUint32(at + 4, 0x004e4942, true);
-    for (const { bytes, offset } of writer.parts) out.set(bytes, at + 8 + offset);
-  }
+  const { out, bin } = glbFrame(new TextEncoder().encode(json), jsonLength, binLength);
+  for (const { bytes, offset } of writer.parts) out.set(bytes, bin + offset);
   return out;
 }

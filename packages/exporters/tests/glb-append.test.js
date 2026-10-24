@@ -184,3 +184,37 @@ test('appendGLBMeshes refuses unresolved scene and node references, even with no
     assert.throws(() => appendGLBMeshes(bytes, [{ name: 'Box', ...cube(1) }]), message);
   }
 });
+
+const triangle = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], normals: [0, 0, 1, 0, 0, 1, 0, 0, 1], indices: [0, 1, 2] };
+test('splitGLB drops __proto__, constructor and prototype keys from untrusted JSON', () => {
+  const { json, bin } = splitGLB(exportGLB({ nodes: [{ name: 'A', geometry: triangle, extras: { id: 'a' } }] }));
+  const text = JSON.stringify(json)
+    .replace('{', '{"__proto__":{"polluted":true},"constructor":{"prototype":{"polluted":true}},')
+    .replace('"extras":{', '"extras":{"__proto__":{"polluted":true},');
+  assert.ok(text.includes('__proto__'), 'fixture carries the hostile keys');
+  const encoded = new TextEncoder().encode(text),
+    jsonLength = Math.ceil(encoded.length / 4) * 4,
+    binLength = Math.ceil(bin.length / 4) * 4,
+    total = 12 + 8 + jsonLength + 8 + binLength,
+    glb = new Uint8Array(total),
+    view = new DataView(glb.buffer);
+  view.setUint32(0, 0x46546c67, true);
+  view.setUint32(4, 2, true);
+  view.setUint32(8, total, true);
+  view.setUint32(12, jsonLength, true);
+  view.setUint32(16, 0x4e4f534a, true);
+  glb.set(encoded, 20);
+  glb.fill(0x20, 20 + encoded.length, 20 + jsonLength);
+  view.setUint32(20 + jsonLength, binLength, true);
+  view.setUint32(24 + jsonLength, 0x004e4942, true);
+  glb.set(bin, 28 + jsonLength);
+  const parsed = splitGLB(glb).json;
+  for (const value of [parsed, parsed.nodes[0].extras]) {
+    assert.equal(Object.getPrototypeOf(value), Object.prototype);
+    assert.ok(!Object.hasOwn(value, '__proto__') && !Object.hasOwn(value, 'constructor'));
+    assert.equal(Object.assign({}, value).polluted, undefined);
+  }
+  assert.equal(parsed.nodes[0].extras.id, 'a');
+  assert.equal({}.polluted, undefined);
+  assert.equal(Object.prototype.polluted, undefined);
+});

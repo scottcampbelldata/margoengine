@@ -453,7 +453,10 @@ class Writer extends Bin {
         out.bufferView = this.view(bytes.slice());
       } else if (!bytes && !this.embedImages) out.uri = def.uri;
       else if (decoded && !('mipmaps' in decoded) && !('ktx2' in decoded)) this.encode(out, decoded, false);
-      else throw new Error(`glTF image ${index} has neither encoded bytes nor decoded pixels to embed`);
+      else
+        throw new TypeError(
+          `glTF image ${index} has neither encoded bytes nor decoded pixels to embed; load its bytes or decode it first`,
+        );
       return this.list('images', out);
     });
   }

@@ -13,6 +13,13 @@ const crcTable = /* @__PURE__ */ Int32Array.from({ length: 256 }, (_, n) => {
   return n;
 });
 
+/** @internal CRC-32 (the ISO-HDLC polynomial PNG and ZIP use) of `bytes`; shared by the PNG, ZIP and USDZ writers. */
+export function crc32(bytes: Uint8Array): number {
+  let c = -1;
+  for (let i = 0; i < bytes.length; i++) c = crcTable[(c ^ bytes[i]) & 255] ^ (c >>> 8);
+  return ~c >>> 0;
+}
+
 /**
  * RGBA8 PNG (Sub filter, zlib from CompressionStream) of a texture source, at most `max` pixels on its longer side,
  * its rows bottom first with `flipY`. Raw `{data, width, height}` rows encode directly (anywhere); other sources and
@@ -83,9 +90,7 @@ export async function png(source: PNGSource, max: number, flipY: boolean): Promi
     view.setUint32(0, data.length);
     for (let i = 0; i < 4; i++) chunk[4 + i] = type.charCodeAt(i);
     chunk.set(data, 8);
-    let c = -1;
-    for (let i = 4; i < data.length + 8; i++) c = crcTable[(c ^ chunk[i]) & 255] ^ (c >>> 8);
-    view.setUint32(data.length + 8, ~c >>> 0);
+    view.setUint32(data.length + 8, crc32(chunk.subarray(4, data.length + 8)));
     parts.push(chunk);
   }
   return new Uint8Array(await new Blob(parts as Uint8Array<ArrayBuffer>[]).arrayBuffer());

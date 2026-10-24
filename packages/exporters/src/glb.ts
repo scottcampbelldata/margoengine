@@ -1,5 +1,6 @@
 // Lossless GLB augmentation: split a GLB into its JSON, BIN and any further chunks, join them back, and append named
 // meshes (collision proxies, markers) to an existing file without touching its other data, extensions or extras.
+import { parseJSON } from '../../shared/json.js';
 import { copyExtras } from './extras.js';
 import type { Extras } from './scene.js';
 
@@ -43,6 +44,30 @@ const MAGIC = 0x46546c67,
 const align = (n: number): number => (n + 3) & ~3;
 
 /**
+ * @internal A zeroed GLB of one JSON chunk (`text`, space-padded to `jsonLength`) and, when `binLength` > 0, a BIN
+ * chunk header for `binLength` bytes; the caller writes the BIN data at the returned `bin` offset. Shared by the
+ * scene and model writers so neither concatenates its buffer parts.
+ */
+export function glbFrame(text: Uint8Array, jsonLength: number, binLength: number): { out: Uint8Array; bin: number } {
+  const total = 20 + jsonLength + (binLength ? 8 + binLength : 0),
+    out = new Uint8Array(total),
+    view = new DataView(out.buffer),
+    at = 20 + jsonLength;
+  view.setUint32(0, MAGIC, true);
+  view.setUint32(4, 2, true);
+  view.setUint32(8, total, true);
+  view.setUint32(12, jsonLength, true);
+  view.setUint32(16, JSON_CHUNK, true);
+  out.set(text, 20);
+  out.fill(0x20, 20 + text.length, at);
+  if (binLength) {
+    view.setUint32(at, binLength, true);
+    view.setUint32(at + 4, BIN_CHUNK, true);
+  }
+  return { out, bin: at + 8 };
+}
+
+/**
  * Splits GLB bytes into the parsed JSON, the BIN chunk and any further chunks, checking the header, chunk order and
  * alignment, the UTF-8 JSON and that buffer 0 matches the BIN chunk.
  * @throws TypeError for anything that is not a valid glTF 2.0 GLB.
@@ -67,7 +92,8 @@ export function splitGLB(bytes: Uint8Array): GLBParts {
   if (!chunks.length) throw new TypeError('GLB has no JSON chunk');
   let json: unknown;
   try {
-    json = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(chunks[0].data));
+    // Untrusted file: __proto__/constructor/prototype keys are dropped so they cannot reach a caller's merge.
+    json = parseJSON(new TextDecoder('utf-8', { fatal: true }).decode(chunks[0].data));
   } catch {
     throw new TypeError('GLB JSON chunk is not valid UTF-8 JSON');
   }
