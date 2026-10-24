@@ -1,4 +1,4 @@
-import { Gizmo } from '../../packages/gizmo/dist/index.js';
+import { TransformControls as Gizmo } from '../../packages/controls/dist/index.js';
 import { createScene, controls } from './ui-scene.js';
 
 export function createWorkload(count = 16) {

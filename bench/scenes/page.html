@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Margo benchmark scene</title>
+    <link rel="icon" href="data:," />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #000;
+      }
+      canvas {
+        display: block;
+        width: 1280px;
+        height: 720px;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas width="1280" height="720"></canvas>
+    <script type="module">
+      import { needsWebGPU } from '../../examples/needs-webgpu.js';
+      needsWebGPU().then((ok) => ok && import('./page.js'));
+    </script>
+  </body>
+</html>

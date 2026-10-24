@@ -107,7 +107,7 @@ windows, torches and a glowstone lamp post by the lake (`src/showcase.ts`) once 
 ### Benchmark
 
 ```sh
-node examples/voxel-sandbox/bench.mjs   # or npm run bench:voxel; options --distances=8,16 --loads=3 --no-quiet
+node examples/voxel-sandbox/bench.mjs   # options --distances=8,16 --loads=3 --no-quiet; npm run bench:voxel runs it in the bench tool
 ```
 
 It holds the GPU lock, waits for `scripts/quiet-gate.mjs` (numbers from a busy machine are labelled DIAGNOSTIC), loads

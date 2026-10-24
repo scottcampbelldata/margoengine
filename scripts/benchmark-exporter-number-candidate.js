@@ -102,7 +102,10 @@ if (process.env.NUM_CANDIDATE_SIZE === '1') {
     { compactOutput } = await import('./measure-size.js');
   report.bundles = {};
   for (const [name, source] of Object.entries(sources))
-    for (const package_ of ['exporters', 'usdz-export']) {
+    for (const [package_, entry] of [
+      ['exporters', 'packages/exporters/src/index.ts'],
+      ['exporters/usdz', 'packages/exporters/src/usdz.ts'],
+    ]) {
       const built = await build({
         configFile: false,
         publicDir: false,
@@ -121,7 +124,7 @@ if (process.env.NUM_CANDIDATE_SIZE === '1') {
         build: {
           write: false,
           target: 'es2022',
-          lib: { entry: `packages/${package_}/src/index.ts`, formats: ['es'] },
+          lib: { entry, formats: ['es'] },
           rollupOptions: { external: ['@margoengine/core', '@margoengine/core/extension'], output: compactOutput },
         },
       });

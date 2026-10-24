@@ -139,8 +139,10 @@ async function runBenchmarks() {
       'Unknown profile',
     );
   const bytes = [];
+  // Workloads named after a package that was folded into another (gizmo -> controls, usdz-export -> exporters/usdz).
+  const builtFile = { gizmo: 'controls/dist/index.js', 'usdz-export': 'exporters/dist/usdz.js' };
   for (const path of [...new Set(['core', 'stats', ...packages])]
-    .map((name) => `packages/${name}/dist/index.js`)
+    .map((name) => `packages/${builtFile[name] ?? `${name}/dist/index.js`}`)
     .concat(
       packages.map((name) => `examples/package-benchmarks/${name}.js`),
       [

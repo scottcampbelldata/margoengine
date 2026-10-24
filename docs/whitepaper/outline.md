@@ -41,9 +41,9 @@ changed since); **[need]** no data yet.
   7,653 B in `vfx-size.json` vs 7,009 B in `docs/api-surface.md`): pick one for the paper and re-measure everything
   with it.
 - Core + stage: `npm run measure:size` (the CI gate). **[have]**
-- vs three.js r186: `npm run measure:threejs` (minimal lit-box app in each). **[have]**, but state the asymmetry: the
+- vs three.js r186: `npm run bench -- size --engines=all` (minimal lit-box app in each; last result `results/threejs-size.json`). **[have]**, but state the asymmetry: the
   Margo number is the whole core + stage, the three.js numbers are a tree-shaken minimal app.
-- Realistic apps: each demo's eager JS (`npm run measure:demos`) and the vs-three.js harness bundles (Margo vs three
+- Realistic apps: each demo's eager JS (`npm run bench -- size --cases=demo-`) and the vs-three.js harness bundles (Margo vs three
   WebGL vs three WebGPU for the same three scenes, `results/vs-threejs.json` `bundles`). **[have]** (harness) / **[rerun]**
   (demos, after the demo rebuild).
 - Per-package sizes and the cost of every optimization (HANDOFF records bytes per change). **[have]**
@@ -67,7 +67,7 @@ changed since); **[need]** no data yet.
 
 1. Head-to-head with three.js r186 (WebGL2 and WebGPU renderers, `Mesh` and `InstancedMesh` variants), same scenes:
    lit boxes 1k/10k/50k static and 10k moving; CAD assembly 10k/50k parts; DamagedHelmet + IBL + shadows.
-   `npm run bench:threejs`. Harness built and smoke-tested only. **[need]** the quiet-PC timing run
+   `npm run bench -- --engines=all` (scenes in `bench/scenes/catalog.js`, other engines in engine-bench). Tool built and smoke-tested only. **[need]** the quiet-PC timing run
    (reproduce.md), the particles scene, a second machine and a phone.
 2. CAD scale: 10k/50k/90k parts, kernel tick, pick latency, feature edges, GPU culling (`docs/cad-performance.md`,
    `cad/results-*.json`). Core path: **[have]**, publication-grade: the quiet-machine before/after of the merged
@@ -117,7 +117,7 @@ error a user sees and the escape hatch; numbers in claims.md LIM-001 to LIM-026)
 
 ## 8. Reproduce everything
 
-- `npm ci && npm run build:packages`, then `npm run bench:all` (size, CPU, proofs) and `npm run bench:all -- --gpu`.
+- `npm ci && npm run build:packages`, then `npm run bench`, `npm run proofs -- --current` and `npm run bench -- features`.
   Per-claim commands in [reproduce.md](reproduce.md).
 
 ## 9. Hardware list
@@ -132,7 +132,7 @@ error a user sees and the escape hatch; numbers in claims.md LIM-001 to LIM-026)
 
 ## What Scott needs to provide or decide
 
-1. A discrete-GPU desktop (NVIDIA preferred; AMD as well if available) for one `npm run bench:all -- --gpu` run, and
+1. A discrete-GPU desktop (NVIDIA preferred; AMD as well if available) for one `npm run bench` + `npm run bench -- features` run, and
    `modern-hardware-gpu-tests.js` (needs `GPU_VENDOR`). Same commit as the laptop run.
 2. Phone runs: a scripted page for iPhone Safari and an Android Chrome device (S23 is the known problem). The
    harness runs headless Edge today; phones need a remote-debugging variant (Safari Web Inspector / `adb` + Chrome

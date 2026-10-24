@@ -7,10 +7,12 @@
 // gzip and brotli) and the commit measured; `dirty` means packages/ had uncommitted changes. scripts/build-sizes.js
 // turns this file into margoengine.com/sizes.html (`npm run build:site`).
 // Run from the repo root (after npm run build:packages): node examples/package-benchmarks/entry-sizes.mjs
+// `npm run bench -- size` measures the same entries through measureEntries() without writing this record.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { brotliCompressSync, gzipSync } from 'node:zlib';
 import { CORE_STAGE_GZIP_LIMIT } from '../../scripts/core-budget.js';
 import { LAZY_FILES } from '../../scripts/lazy-files.js';
@@ -19,51 +21,58 @@ import { bundleBytes as bundle, measureCoreStage } from '../../scripts/measure-s
 const root = resolve(import.meta.dirname, '../..');
 
 const size = async (entry) => ((code) => ({ raw: code.length, gzip: gzipSync(code).length }))(await bundle(entry));
-const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
-const commit = git('rev-parse', '--short', 'HEAD'),
-  dirty = git('status', '--porcelain', '--', 'packages') !== '';
-const { raw, gzip } = await measureCoreStage();
-const report = {
-  commit,
-  dirty,
-  method: 'vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level',
-  coreStage: { raw, gzip, limit: CORE_STAGE_GZIP_LIMIT },
-  packages: {},
-};
-for (const dir of readdirSync(resolve(root, 'packages')).sort()) {
-  const file = resolve(root, 'packages', dir, 'package.json');
-  if (!existsSync(file)) continue;
-  const pkg = JSON.parse(readFileSync(file, 'utf8')),
-    entries = {};
-  for (const [path, target] of Object.entries(pkg.exports ?? {})) {
-    const js = typeof target === 'string' ? target : (target.import ?? target.default);
-    if (!js?.endsWith('.js') || !existsSync(resolve(root, 'packages', dir, js))) continue;
-    entries[path] = await size(resolve(root, 'packages', dir, js));
-  }
-  const workers = resolve(root, 'packages', dir, 'dist/workers');
-  if (existsSync(workers))
-    for (const name of readdirSync(workers).filter((n) => n.endsWith('.js') && !n.startsWith('occt-import-js')))
-      entries[`dist/workers/${name}`] = await size(resolve(workers, name));
-  if (Object.keys(entries).length) report.packages[pkg.name] = entries;
-  console.log(
-    pkg.name,
-    Object.entries(entries)
-      .map(([k, v]) => `${k} ${v.gzip}`)
-      .join(', '),
-  );
-}
-// Served as is ('file') or bundled by the app ('bundle'); gzip at zlib's default level, brotli at its default (11).
-report.lazyFiles = {};
-for (const { file, measure, external } of LAZY_FILES) {
-  const bytes =
-    measure === 'file'
-      ? readFileSync(resolve(root, file))
-      : await bundle(resolve(root, file), (id) => external.some((pattern) => pattern.test(id)));
-  report.lazyFiles[file] = {
-    raw: bytes.length,
-    gzip: gzipSync(bytes).length,
-    brotli: brotliCompressSync(bytes).length,
+
+/** Core + stage, every package entry and worker, and every lazily loaded file, measured as described above. */
+export async function measureEntries({ log = console.log } = {}) {
+  const { raw, gzip } = await measureCoreStage();
+  const report = {
+    method: 'vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level',
+    coreStage: { raw, gzip, limit: CORE_STAGE_GZIP_LIMIT },
+    packages: {},
   };
-  console.log(file, report.lazyFiles[file].gzip);
+  for (const dir of readdirSync(resolve(root, 'packages')).sort()) {
+    const file = resolve(root, 'packages', dir, 'package.json');
+    if (!existsSync(file)) continue;
+    const pkg = JSON.parse(readFileSync(file, 'utf8')),
+      entries = {};
+    for (const [path, target] of Object.entries(pkg.exports ?? {})) {
+      const js = typeof target === 'string' ? target : (target.import ?? target.default);
+      if (!js?.endsWith('.js') || !existsSync(resolve(root, 'packages', dir, js))) continue;
+      entries[path] = await size(resolve(root, 'packages', dir, js));
+    }
+    const workers = resolve(root, 'packages', dir, 'dist/workers');
+    if (existsSync(workers))
+      for (const name of readdirSync(workers).filter((n) => n.endsWith('.js') && !n.startsWith('occt-import-js')))
+        entries[`dist/workers/${name}`] = await size(resolve(workers, name));
+    if (Object.keys(entries).length) report.packages[pkg.name] = entries;
+    log(
+      pkg.name,
+      Object.entries(entries)
+        .map(([k, v]) => `${k} ${v.gzip}`)
+        .join(', '),
+    );
+  }
+  // Served as is ('file') or bundled by the app ('bundle'); gzip at zlib's default level, brotli at its default (11).
+  report.lazyFiles = {};
+  for (const { file, measure, external } of LAZY_FILES) {
+    const bytes =
+      measure === 'file'
+        ? readFileSync(resolve(root, file))
+        : await bundle(resolve(root, file), (id) => external.some((pattern) => pattern.test(id)));
+    report.lazyFiles[file] = {
+      raw: bytes.length,
+      gzip: gzipSync(bytes).length,
+      brotli: brotliCompressSync(bytes).length,
+    };
+    log(file, report.lazyFiles[file].gzip);
+  }
+  return report;
 }
-await writeFile(resolve(import.meta.dirname, 'results/entry-sizes.json'), JSON.stringify(report, null, 2) + '\n');
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+  const commit = git('rev-parse', '--short', 'HEAD'),
+    dirty = git('status', '--porcelain', '--', 'packages') !== '';
+  const report = { commit, dirty, ...(await measureEntries()) };
+  await writeFile(resolve(import.meta.dirname, 'results/entry-sizes.json'), JSON.stringify(report, null, 2) + '\n');
+}

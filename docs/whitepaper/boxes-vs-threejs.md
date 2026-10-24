@@ -6,7 +6,9 @@ load than frame rates, the variants alternated within every round and the order 
 ratios between variants of the same run are used. Do not quote these numbers as engine performance.
 
 Machine: Intel Core Ultra 7 258V, Intel Arc 140V (Xe2), driver 32.0.101.8860, Edge 155 headless, 1280x720, DPR 1,
-4x MSAA, AC power before and after every run, GPU lock held. Harness: `examples/package-benchmarks/vs-threejs`.
+4x MSAA, AC power before and after every run, GPU lock held. Harness: `examples/package-benchmarks/vs-threejs`
+(removed 2026-10-24 for the clean-room rule; its Margo side and in-page harness became `bench/scenes/`, see
+docs/benchmarking.md, and the commands below need a checkout from before that date).
 Raw JSON: `examples/package-benchmarks/results/vs-threejs-boxes-{diag1,diag2,proto,fps}.json` (per-run `resources`
 lists stripped). Reproduce: `node examples/package-benchmarks/vs-threejs/run.mjs --busy --rounds=3 --frames=120
 --only=boxes:1000,boxes:10000,boxes:50000,cad:50000 --variants=margo,margo+double,margo+cull,margo+plugin,margo+pass,three-webgpu-instanced,three-webgl-instanced`.

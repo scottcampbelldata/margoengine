@@ -99,6 +99,22 @@ for (const name of ['dof', 'tonemap', 'animator'])
     plugins: [noCAD],
     build: { outDir: `${out}/demos/${name}`, target: 'es2022' },
   });
+// The in-browser benchmark (bench/): the CLI's scene page and harness behind a runner page, with the models its glTF
+// scenes open (copied unhashed: the scenes name them).
+await site({
+  configFile: false,
+  root: 'bench',
+  base: './',
+  publicDir: false,
+  plugins: [noCAD],
+  build: {
+    outDir: `${out}/bench`,
+    target: 'es2022',
+    rollupOptions: { input: { index: resolve('bench/index.html'), page: resolve('bench/scenes/page.html') } },
+  },
+});
+for (const name of ['damaged-helmet.glb', 'flight-helmet.glb', 'robot-expressive.glb', 'ATTRIBUTION.md'])
+  await cp(`examples/assets/${name}`, `${out}/bench/assets/${name}`);
 for (const name of ['ATTRIBUTION.md', 'robot-CREDITS.md', 'tokyo-diorama-CREDITS.md'])
   await cp(`examples/assets/${name}`, `${out}/demos/assets/${name}`);
 // Keep the workshop's audited optional-package build and local asset paths intact.

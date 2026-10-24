@@ -1,5 +1,5 @@
 import { fetchBytes, parseOFF, parseUSDZ } from '../../packages/loaders/dist/index.js';
-import { exportUSDZ } from '../../packages/usdz-export/dist/index.js';
+import { exportUSDZ } from '../../packages/exporters/dist/usdz.js';
 import { assetWorkload, displayGeometry, geometryData } from './asset-scene.js';
 
 export async function createWorkload(count = 4, options = {}) {

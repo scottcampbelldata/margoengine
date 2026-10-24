@@ -241,6 +241,31 @@ Import the scoped packages listed above. Native STEP/IGES solids and heavier ren
 Run `npm run modern:dev:extensions`, then open `/examples/damaged-helmet.html` for PBR and the SSAO toggle or `/examples/robot-expressive.html` for clip playback and facial morph sliders. The demos download credited sample assets. The three extension packages are local workspace packages and have not been published. Their READMEs document supported glTF features and limits. `npm run modern:test:extensions` checks GPU deformation readback, a 1,001-joint skin, ambient-only SSAO, resize/device recovery, and both demos; `npm run modern:test:packages` checks standalone tarballs and TypeScript consumers.
 
 
+## Benchmarks
+
+`npm run bench` is Margo's benchmark tool. It has 15 suites:
+
+- size, startup, render, objects, scaling
+- math, glTF, loaders, CAD, voxel, physics
+- memory, React
+- compute and viz (stubs until the data track lands)
+
+It checks the machine before every run: AC power, the GPU lock, and an idle CPU and GPU. It runs each case 5 times and
+reports the median, p95 and spread, and it marks a noisy run invalid. Each run writes a versioned JSON result with
+Markdown and HTML reports to `benchmarks/runs/`. Every result records the commit, machine, GPU, driver and browser.
+
+```sh
+npm run build:packages
+npm run bench                    # every suite
+npm run bench:render             # one suite
+npm run bench -- --baseline      # save this machine's baseline
+npm run bench -- --compare=last  # deltas; a regression over 5% fails the run
+```
+
+The same scenes run in your browser at [margoengine.com/bench/](https://margoengine.com/bench/). Your numbers appear
+next to ours. Other engines run the same scene descriptions from their own folder (engine-bench), never from this
+repository. How to run it, read results, add a suite or a scene, and the quiet-machine rules:
+[docs/benchmarking.md](docs/benchmarking.md).
 
 ## Asset loading and release verification
 
@@ -248,8 +273,8 @@ The six core launch packages are the stage facade, `core`, `react`, `gltf`,
 `gltf-pro` and `machinery`. USDZ remains an ancillary optional format outside
 that launch set. Its USDA/USDC parsers are Margo's own; the
 root and package manifests require neither `three` nor `@types/three`.
-Benchmark and visual-parity tools use a separately cached, pinned Three.js
-0.186.1 reference.
+Visual-parity tools use a separately cached, pinned Three.js 0.186.1
+reference; benchmarks run other engines only from engine-bench.
 
 `@margoengine/gltf-pro` automatically loads Draco and Meshopt glTF/GLB through
 `loadGLTF`. In-memory `parseGLTF` remains synchronous for uncompressed and Meshopt

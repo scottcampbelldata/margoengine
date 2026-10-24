@@ -4,7 +4,12 @@
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
-const ps = (script) => execFileSync('powershell', ['-NoProfile', '-Command', script], { encoding: 'utf8' }).trim();
+// stderr ignored: on a desktop without a battery the BatteryStatus class is missing and PowerShell prints an error.
+const ps = (script) =>
+  execFileSync('powershell', ['-NoProfile', '-Command', script], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  }).trim();
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const onAC = () =>

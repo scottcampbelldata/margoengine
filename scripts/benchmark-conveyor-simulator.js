@@ -11,7 +11,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { chromium } from '@playwright/test';
-import { summarize } from './benchmark-three-vs-margo.js';
+import { frameIntervals as summarize } from '../bench/lib/stats.mjs';
 
 const RUNS = Number(process.env.RUNS ?? 5),
   WARMUP = 60,

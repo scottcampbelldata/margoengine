@@ -1,10 +1,18 @@
 # Margo Engine validation baseline
 
+Performance is measured with one tool, `npm run bench` ([docs/benchmarking.md](../docs/benchmarking.md)). Its results live in this folder:
+
+- `runs/`: every run (git-ignored).
+- `baselines/<machine>.json`: the run each machine compares against (`--baseline`).
+- `records/`: runs kept on purpose (`--record`), such as the smoke run that proved the tool.
+
+The rest of this page is the October 2026 validation record.
+
 For release fault injection, deterministic hardware-limit fuzzing, lifecycle soaks and sharded campaigns, see [stress testing](stress-testing.md). Run `npm run test:release` before publishing; it includes a 500-session matrix in addition to the existing regression suites.
 
 The [local stress validation results](stress-results.md) record the completed NVIDIA/AMD campaigns, 3M-splat run, 100-cycle soak and remaining release gaps.
 
-Run `npm run benchmark:three-vs-margo` after `npm run build:packages` for the automated Three.js **0.186.1** comparison. Install Playwright Chromium (`npx playwright install chromium`) or select an installed Chromium browser with `BROWSER_CHANNEL`. The runner serves gzipped production bundles through a local Vite server, renders exactly 1,200 frames per scene, records CDP heap/GC and Resource Timing data, and counts actual GPU/GL API draws and dispatches. Results are written to [results.md](results.md) and `test-results/benchmark-three-vs-margo.json`. `BROWSER_ARGS` accepts extra Chromium flags. A missing WebGPU adapter fails explicitly; use a physical adapter for performance claims or explicit SwiftShader flags for validation only.
+[results.md](results.md) holds the 11 October 2026 conveyor comparison with Three.js **0.186.1**. Its runner (`npm run benchmark:three-vs-margo`) was removed on 24 October 2026: other engines now run only from the engine-bench folder next to this repository, through `npm run bench -- --engines=...` (AGENTS.md, clean room).
 
 These measurements were captured on 11 October 2026 before the Margo Engine rename. Historical captures retain their original package names. Raw traces, heap profiles, machine inventories, logs and recovery archives remain local; this repository contains portable summaries and the scripts needed to repeat the checks.
 
@@ -31,7 +39,7 @@ The files in [swiftshader/](swiftshader/) were recorded on 11 October 2026 at co
 
 To repeat, follow the commands in [README.md](../README.md). GPU suites run sequentially; finalization and live conveyor checks require the Vite dev server. `GPU_VENDOR`, `GPU_POWER` and JSON `BROWSER_ARGS` select the adapter; `scripts/gpu-adapters.ps1` lists Windows adapter LUIDs, which vary by machine/session. A Rust source rebuild also requires the toolchain pinned in `rust-toolchain.toml`; ordinary consumers use the checked-in embedded Wasm.
 
-The machinery runtime extension was measured separately on an AMD Ryzen 9 9950X with Node 24.15.0. For 500 queued parts, the Wasm solver median/p95 was 0.0135/0.0137 ms; the complete JS + Wasm surface update was 0.0421/0.0429 ms. Solver maximum was 0.3122 ms, so the 0.040 ms target is met at p95 on this host, not for every sample. Picking a 6,000-triangle assembly measured 0.0009/0.0011 ms median/p95, with a 0.3233 ms maximum. Memory views remained stable; this does not establish whole-application zero GC. Repeat with `npm run modern:bench:machinery`; raw JSON remains in `test-results/modern-machinery-performance.json`.
+The machinery runtime extension was measured separately on an AMD Ryzen 9 9950X with Node 24.15.0. For 500 queued parts, the Wasm solver median/p95 was 0.0135/0.0137 ms; the complete JS + Wasm surface update was 0.0421/0.0429 ms. Solver maximum was 0.3122 ms, so the 0.040 ms target is met at p95 on this host, not for every sample. Picking a 6,000-triangle assembly measured 0.0009/0.0011 ms median/p95, with a 0.3233 ms maximum. Memory views remained stable; this does not establish whole-application zero GC. Repeat with `npm run bench -- physics --cases=conveyor` (solver) and `npm run bench -- math --cases=raycast-assembly` (picking).
 
 `npm run modern:test:machinery` checks real STEP/IGES import, worker transfer/deduplication, progress, cancellation and production asset URLs on NVIDIA RTX A6000 / Edge. A 5 MB, 100,000-triangle STL import kept animation frames running while parsing and optimization ran in a worker. B-Rep progress is stage-based because OCCT's reader is synchronous inside that worker. Existing domain GPU checks pass with dedicated depth-fail cap masks, retained descriptors, resize and device restoration. These fixtures do not establish support for every industrial CAD dialect or universal frame-time limits.
 

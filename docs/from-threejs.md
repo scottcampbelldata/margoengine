@@ -44,8 +44,8 @@ code that does the same job. Where Margo has no equivalent yet, the section says
   `[Symbol.dispose]` for `using` (core's `Engine` and meshes and the stage facade have `dispose()` only).
 - **Small core, optional packages.** Core plus the `margoengine` stage facade is about 21 kB gzip (`npm run measure:size` prints the exact figure;
   WebGPU only). The smallest lit-box app is about 130 kB gzip with three.js 0.186's WebGLRenderer and
-  212 kB with its WebGPURenderer, built the same way (`npm run measure:threejs`,
-  [threejs-size.json](../examples/package-benchmarks/results/threejs-size.json)). Everything else is a separate
+  212 kB with its WebGPURenderer, built the same way ([threejs-size.json](../examples/package-benchmarks/results/threejs-size.json);
+  `npm run bench -- size --engines=all` remeasures it from engine-bench). Everything else is a separate
   package that you install and import only when you use it.
 - **Tuples, not classes.** Positions, colours and directions are plain arrays (`[x, y, z]`, `'#rrggbb'`). A three.js-style
   math library exists (`@margoengine/math`) and converts with `toArray()`.

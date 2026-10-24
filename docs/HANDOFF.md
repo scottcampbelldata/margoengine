@@ -2455,10 +2455,15 @@ to confirm the machine is quiet before the final benchmark run; numbers taken wh
 ### LAUNCH GATES (Scott, 2026-10-15): every box checked before the engine goes live. No exceptions.
 
 1. **Benchmarks reproducible, not boastful.** Every speed statement names hardware, browser, scene, commit and the
-   one command to reproduce it (`BENCH_QUIET=1 npm run bench:all -- --gpu`, vs-three.js harness pairs mesh<->mesh and
-   instanced<->instanced, three.js given its best-practice settings); taken on a quiet PC; results committed; places
-   where three.js wins are stated. No "Nx faster" headline without that. Never invent hardware or numbers (e.g. no
-   "RTX A6000" unless one was actually used).
+   one command to reproduce it (`npm run bench -- --label=official --record`; other engines run the same scenes from
+   engine-bench with `--engines=all`, mesh<->mesh and instanced<->instanced, each given its best-practice settings);
+   taken on a quiet PC; results committed; places where three.js wins are stated. No "Nx faster" headline without that.
+   Never invent hardware or numbers (e.g. no "RTX A6000" unless one was actually used).
+   Status 2026-10-24 (benchmark tool): `npm run bench` is the one tool (docs/benchmarking.md): 15 suites, the
+   quiet-machine gate before every run, 5 runs with median/p95/spread, versioned JSON + reports in `benchmarks/runs/`,
+   `--compare`/`--baseline` with regression failure, the in-browser runner at margoengine.com/bench/. Only a smoke run
+   exists (`benchmarks/records/`). Open: the official quiet-machine run and the engine head-to-heads, which need the
+   three.js, WAMR3D and WasmGPU scene implementations in engine-bench/margo-bench (test-and-measure).
    Status 2026-10-15 (proofs): every `examples/package-benchmarks/proofs/*.proof.js` is pinned: by default it compares
    its baseline ref with the commit where its claim was made (`refs()` in compare.js; `node <proof> [ref] [pin]`), so
    later code cannot break it. `npm run proofs` runs all 46, two at a time, and prints a table (baseline -> candidate,

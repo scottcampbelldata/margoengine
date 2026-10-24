@@ -25,3 +25,5 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+# npm run bench writes every run here; --record and --baseline keep committed copies in benchmarks/records and benchmarks/baselines.
+benchmarks/runs/

@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Margo Benchmark</title>
+    <meta
+      name="description"
+      content="Run Margo Engine's standard benchmark scenes on your own machine and see your numbers next to ours."
+    />
+    <link rel="icon" href="data:," />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f5f6f9;
+        --surface: #ffffff;
+        --text: #141b2d;
+        --muted: #4a556b;
+        --line: #d5dae4;
+        --accent: #7a4d00;
+        --accent-text: #ffffff;
+        --good: #067647;
+        --bad: #b42318;
+        --radius: 10px;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0b1020;
+          --surface: #121a30;
+          --text: #e9edf6;
+          --muted: #a9b3c7;
+          --line: #26304a;
+          --accent: #e5b454;
+          --accent-text: #1a1304;
+          --good: #5ad19a;
+          --bad: #ff8a7a;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font:
+          16px/1.55 system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+        color: var(--text);
+        background: var(--bg);
+      }
+      header,
+      main {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 16px;
+      }
+      header a {
+        color: var(--text);
+        font-weight: 700;
+        text-decoration: none;
+      }
+      h1 {
+        font-size: clamp(1.6rem, 4vw, 2.3rem);
+        line-height: 1.2;
+        margin: 24px 0 8px;
+      }
+      p {
+        color: var(--muted);
+        max-width: 70ch;
+      }
+      a {
+        color: var(--accent);
+      }
+      fieldset {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        padding: 12px 16px;
+        margin: 16px 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 20px;
+        align-items: center;
+      }
+      legend {
+        font-weight: 600;
+        padding: 0 6px;
+      }
+      label {
+        white-space: nowrap;
+      }
+      button {
+        font: inherit;
+        font-weight: 600;
+        padding: 10px 18px;
+        border-radius: var(--radius);
+        border: 1px solid var(--accent);
+        background: var(--accent);
+        color: var(--accent-text);
+        cursor: pointer;
+      }
+      button.secondary {
+        background: transparent;
+        color: var(--text);
+        border-color: var(--line);
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      .stage {
+        width: 100%;
+        max-width: 640px;
+        aspect-ratio: 16 / 9;
+        border-radius: var(--radius);
+        overflow: hidden;
+        border: 1px solid var(--line);
+        background: #000;
+        position: relative;
+      }
+      .stage iframe {
+        border: 0;
+        width: 1280px;
+        height: 720px;
+        transform-origin: 0 0;
+        position: absolute;
+        left: 0;
+        top: 0;
+      }
+      #status {
+        font-variant-numeric: tabular-nums;
+        min-height: 1.6em;
+      }
+      .wrap {
+        overflow-x: auto;
+        margin: 16px 0 32px;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-variant-numeric: tabular-nums;
+        font-size: 15px;
+      }
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 6px 10px;
+        text-align: right;
+        white-space: nowrap;
+      }
+      th:first-child,
+      td:first-child,
+      th:nth-child(2),
+      td:nth-child(2) {
+        text-align: left;
+      }
+      .faster {
+        color: var(--good);
+      }
+      .slower {
+        color: var(--bad);
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .row {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: minmax(0, 1fr);
+      }
+      @media (min-width: 900px) {
+        .row {
+          grid-template-columns: minmax(0, 1fr) 640px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header><a href="../">Margo Engine</a></header>
+    <main>
+      <h1>Benchmark Margo on your machine</h1>
+      <p>
+        These are the same scenes and the same measuring code that <code>npm run bench</code> runs on our machines. Pick
+        the suites, press Run, and your results appear next to ours. Your browser needs WebGPU. Close other tabs and
+        plug in a laptop for steady numbers.
+      </p>
+      <p id="support" class="muted"></p>
+      <div class="row">
+        <div>
+          <fieldset id="suites">
+            <legend>Suites</legend>
+          </fieldset>
+          <fieldset>
+            <legend>Method</legend>
+            <label>Runs per scene <select id="runs"><option>1</option><option selected>3</option><option>5</option></select></label>
+            <label
+              >Frames per run
+              <select id="frames"><option value="120">120</option><option value="300" selected>300</option></select></label
+            >
+          </fieldset>
+          <p>
+            <button id="run" type="button">Run</button>
+            <button id="stop" class="secondary" type="button" disabled>Stop</button>
+            <button id="save" class="secondary" type="button" disabled>Download JSON</button>
+          </p>
+          <p id="status" role="status" aria-live="polite"></p>
+        </div>
+        <div class="stage" id="stage" aria-label="The scene being measured"></div>
+      </div>
+      <div class="wrap">
+        <table id="results">
+          <caption class="muted" id="reference"></caption>
+          <thead>
+            <tr>
+              <th scope="col">Suite</th>
+              <th scope="col">Scene</th>
+              <th scope="col">Metric</th>
+              <th scope="col">Yours</th>
+              <th scope="col">Ours</th>
+              <th scope="col">Yours vs ours</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p>
+        Each run loads the scene in a fresh frame, warms up for 60 frames, then measures CPU time per frame, GPU time per
+        frame (WebGPU timestamp queries, when your browser allows them), frames per second and memory. The table shows
+        the median over runs. The startup suite reuses this page's cache, so its numbers are lower than a cold start.
+        The full tool, with the quiet-machine gate and every suite, is <code>npm run bench</code> in the repository
+        (docs/benchmarking.md).
+      </p>
+    </main>
+    <script type="module">
+      // The site's one WebGPU check (examples/needs-webgpu.js): without WebGPU the stage shows its message and the
+      // runner's code is never downloaded.
+      import { needsWebGPU } from '../examples/needs-webgpu.js';
+      needsWebGPU('#stage').then((ok) => ok && import('./web/app.js'));
+    </script>
+  </body>
+</html>

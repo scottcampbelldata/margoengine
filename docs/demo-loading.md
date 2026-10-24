@@ -11,8 +11,8 @@ density. This note measured 19,988 bytes, below the 20,000-byte core/stage gzip 
 
 ## Method
 
-`npm run benchmark:demo-loads` uses three fresh Edge/Chromium browser processes per
-page, an iPhone user agent, 390 × 844 CSS pixels, DPR 3, touch input, 4× CPU
+`npm run bench -- startup --cases=demo-` (the startup suite, docs/benchmarking.md) uses a fresh Edge/Chromium
+browser process per run (1 warm-up and 5 measured runs per page), an iPhone user agent, 390 × 844 CSS pixels, DPR 3, touch input, 4× CPU
 slowdown, 40 ms request latency and a 10 Mbps download cap. Browser cache is
 disabled. A snapshot of `site/dist` keeps concurrent builds from changing assets
 during a run. Run this benchmark without other GPU benchmarks for useful timings.
@@ -96,7 +96,7 @@ Build package distributions, then run:
 
 ```sh
 node scripts/build-site.js
-npm run benchmark:demo-loads
+npm run bench -- startup --cases=demo-
 node scripts/demo-subject-tests.js
 ```
 

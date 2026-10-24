@@ -15,31 +15,35 @@ npm run build:packages     # every package, size gates, catalog (no Rust toolcha
 ## Everything in one command
 
 ```sh
-npm run bench:all              # size + CPU + recorded-GPU-call proofs; no GPU needed
-npm run bench:all -- --gpu     # also every real-GPU benchmark (AC power, GPU lock, about an hour on a laptop)
-npm run bench:all -- --list    # the steps
-npm run bench:all -- --only=size,vs-threejs   # groups (size, cpu, proofs, gpu) or step names
+npm run bench                  # every suite: size, startup, render, objects, scaling, math, glTF, loaders, CAD,
+                               # voxel, physics, memory, React (quiet-machine gate, GPU lock, 5 runs per case)
+npm run bench -- features      # also every per-feature real-GPU script below (about an hour)
+npm run bench -- --list        # the suites and cases
+npm run proofs -- --current    # the recorded-GPU-call proofs
 ```
 
-`scripts/bench-all.mjs` runs each step serially and writes `test-results/bench/<date>/`: one `<step>.log` per step,
-every result file the step wrote (moved out of the tree; the committed versions are restored, so a run never changes
-committed results), and `manifest.json` with the commit, host, exit code, duration and AC power per step. It refuses
-to start when `examples/package-benchmarks/` has uncommitted changes. A failing step is recorded and the run goes on.
+`npm run bench` is the one benchmark tool ([docs/benchmarking.md](../benchmarking.md)). Each run writes
+`benchmarks/runs/<id>.json` with its Markdown and HTML report. The JSON records the commit, machine, GPU and driver,
+browser and the gate's readings. `--record` keeps a committed copy in `benchmarks/records/`. The `features` suite
+copies what each script writes to `benchmarks/runs/<id>/features/` and restores the committed results, so a run never
+changes them.
 
 ## Whitepaper timing run (pending: needs a quiet PC)
 
-The harnesses in this repo have only been smoke-tested so far (2026-10-14, a busy machine, few frames, marked "SMOKE
-TEST, NOT FOR PUBLICATION"). No timing number from them is whitepaper data yet. When Scott confirms the machine is
-quiet (no other apps, no builds, no other agents, on AC power), run this once on the release commit:
+No timing number is whitepaper data yet. The tool has only been smoke-tested (labelled "smoke", not for
+publication). When Scott confirms the machine is quiet (no other apps, no builds, no other agents, on AC power), run
+this once on the release commit:
 
 ```sh
 npm run build:packages
-BENCH_QUIET=1 npm run bench:all -- --gpu      # PowerShell: $env:BENCH_QUIET=1; npm run bench:all -- --gpu
+npm run bench -- --label=official --record
+npm run bench -- features
 ```
 
-That runs every size, CPU and proof step, then every real-GPU step including the vs-three.js head-to-head (5 rounds x
-300 frames, about 30-45 minutes on its own), and writes one dated folder under `test-results/bench/`. Copy the JSON the
-whitepaper cites into `examples/package-benchmarks/results/` and commit it with the paper.
+The gate refuses battery power and waits for a quiet CPU and GPU. Any case whose runs spread more than 10% makes the
+run invalid. An official label on an invalid run stays invalid. The head-to-head with three.js and other engines runs
+the same scenes from `C:DevelopmentProjectsengine-bench` (`--engines=all`, see docs/benchmarking.md "Comparing
+engines").
 
 ## Rules for real-GPU numbers
 
@@ -58,17 +62,17 @@ whitepaper cites into `examples/package-benchmarks/results/` and commit it with 
 | Area | Command | GPU | Output | Notes |
 | --- | --- | --- | --- | --- |
 | Core + stage gzip (CI gate, < 20,000 B) | `npm run measure:size` | no | console | Also enforced by `npm run build:packages`. |
-| Margo vs three.js bundle size | `npm run measure:threejs` | no | `results/threejs-size.json` | Minimal lit-box app in three r186 (WebGL and WebGPU) vs Margo's whole core + stage, all built with the size gate's output options. |
+| Margo vs other engines, bundle size | `npm run bench -- size --engines=all` | no | `benchmarks/runs/<id>.json` | Each engine's smallest lit-box app from engine-bench (`sizeEntry`) vs Margo's whole core + stage, all built with the size gate's output options. The last three.js measurement stays in `results/threejs-size.json`. |
 | Every package entry and worker, min+gzip | `node examples/package-benchmarks/entry-sizes.mjs` (after `build:packages`) | no | `results/entry-sizes.json` | build-modern's method, other packages external; also feeds the Gzip column of `docs/api-surface.md`. |
-| Eager JS per demo | `npm run measure:demos` | no | console / `--json=path` | Builds each demo with Vite. |
+| Eager JS per demo | `npm run bench -- size --cases=demo-` | no | `benchmarks/runs/<id>.json` | Builds each demo with Vite. |
 | Per-package min+gzip | `node examples/package-benchmarks/proofs/size.js` | no | `proofs/results/sizes.json` | |
 | VFX entry sizes | `node examples/package-benchmarks/vfx-size.mjs` | no | `results/vfx-size.json` | |
 | Package optimization proofs (same GPU calls / same output, faster) | `node examples/package-benchmarks/proofs/<name>.proof.js [ref]` | no (recording mock GPU) | `proofs/results/<name>.json` | Each builds a baseline ref; some default refs no longer build (see claims.md). |
-| Kernel tick in Node | `node examples/package-benchmarks/cad/kernel-node.mjs` | no | `cad/results-kernel-node.json` | |
+| Kernel tick in Node | `npm run bench -- cad --cases=kernel` (or `node examples/package-benchmarks/cad/kernel-node.mjs`) | no | `benchmarks/runs/<id>.json` (`cad/results-kernel-node.json`) | |
 | glTF export: validator errors and export time | `node examples/package-benchmarks/exporters-model.mjs` | no | `results/exporters-model.json` | Khronos glTF-Validator from node_modules; the timing needs the quiet PC. |
 | Textured instancing, encoding CPU | `node examples/package-benchmarks/textured-instancing.mjs` | no (mock) | `results/textured-instancing.json` | Mock GPU: CPU encoding only, not frame rate. |
-| **Margo vs three.js, same scenes** | `npm run bench:threejs` (`examples/package-benchmarks/vs-threejs/run.mjs`) | yes | `results/vs-threejs.json`, `test-results/vs-threejs/*.png` | See [vs-three.js](../../examples/package-benchmarks/vs-threejs/README.md). |
-| CAD scale 10k/50k/90k parts | `node examples/package-benchmarks/cad/run.mjs --sizes=10000,50000,max --label=<name>` | yes | `cad/results-<name>.json` | `--edges` feature edges, `--low` 1x MSAA, `--step` OCCT STEP/IGES load. Takes no lock itself (bench:all takes it). |
+| **Margo vs other engines, same scenes** | `npm run bench -- render objects scaling --engines=all` | yes | `benchmarks/runs/<id>.json`, screenshots in `benchmarks/runs/<id>/` | Scenes in `bench/scenes/catalog.js`; other engines' implementations live in engine-bench. Earlier results: `results/vs-threejs-*.json`. |
+| CAD scale 10k/50k/90k parts | `node examples/package-benchmarks/cad/run.mjs --sizes=10000,50000,max --label=<name>` | yes | `cad/results-<name>.json` | `--edges` feature edges, `--low` 1x MSAA, `--step` OCCT STEP/IGES load. Takes no lock itself (`npm run bench -- features` takes it). |
 | GPU culling | `node examples/package-benchmarks/cad/culling.mjs --check --label=<name>` | yes | `cad/results-<name>.json` | |
 | Post stack per effect, SSAO + IBL | `node examples/package-benchmarks/gates/post-stack.mjs` | yes | `results/gates-post-stack.json` | |
 | DOF before/after | `node examples/package-benchmarks/gates/dof.mjs --baseline=5b9dbbd` | yes | `results/gates-dof.json` | Builds the baseline. |
@@ -77,14 +81,14 @@ whitepaper cites into `examples/package-benchmarks/results/` and commit it with 
 | Textured instancing on GPU | `node examples/package-benchmarks/textured-instancing-gpu.mjs` | yes | `results/textured-instancing-gpu.json` | |
 | Atlas + VAT | `node examples/package-benchmarks/atlas-vat/check.mjs` | yes | `test-results/atlas-vat-check.json` | Result is not committed today. |
 | Workers / OffscreenCanvas | `node examples/package-benchmarks/workers/run.mjs` | yes | `results/workers.json` | Edge and Chrome. |
-| VFX 100k/1M particles | `node examples/package-benchmarks/vfx-gpu.mjs --a=<dist> --b=packages/vfx/dist` | yes | `results/vfx-gpu-*.json` | A/B of two builds: snapshot a baseline dist first (header of the script). Not in bench:all. |
-| Island demo with VFX | `node examples/package-benchmarks/vfx-island.mjs --variants=...` | yes | `results/vfx-island-*.json` | Needs variant builds. Not in bench:all. |
-| Pipeline toggles | `node examples/package-benchmarks/pipeline-toggles/toggle.mjs [stall|pixels|gpu|override]` | yes | `results/pipeline-toggles.json` | Not in bench:all (needs `old-gltf.mjs` first for `pixproof`). |
+| VFX 100k/1M particles | `node examples/package-benchmarks/vfx-gpu.mjs --a=<dist> --b=packages/vfx/dist` | yes | `results/vfx-gpu-*.json` | A/B of two builds: snapshot a baseline dist first (header of the script). Not in the features suite. |
+| Island demo with VFX | `node examples/package-benchmarks/vfx-island.mjs --variants=...` | yes | `results/vfx-island-*.json` | Needs variant builds. Not in the features suite. |
+| Pipeline toggles | `node examples/package-benchmarks/pipeline-toggles/toggle.mjs [stall|pixels|gpu|override]` | yes | `results/pipeline-toggles.json` | Not in the features suite (needs `old-gltf.mjs` first for `pixproof`). |
 | Every real-browser test | `node examples/package-benchmarks/gates/run-browser-tests.mjs` | yes | `results/gates-browser-tests.json` | 41 scripts; `modern-hardware-gpu-tests.js` needs `GPU_VENDOR` and a discrete GPU. |
 | Unit tests, API snapshots, size gate | `npm run verify` | no | console | `npm run verify:full` adds packed-package and interop suites. |
 
 ## A second machine
 
-On a discrete-GPU desktop or a Mac: the setup above, then `npm run bench:all -- --gpu` and send back the
-`test-results/bench/<date>/` folder. On Linux or macOS the AC check returns `null` (recorded, not enforced). Set
+On a discrete-GPU desktop or a Mac: the setup above, then `npm run bench` and `npm run bench -- features`, and
+send back the `benchmarks/runs/` folder. On Linux or macOS the AC check returns `null` (recorded, not enforced). Set
 `BROWSER_CHANNEL=chrome` where Edge is not installed. Phones are not scripted yet (see outline.md).

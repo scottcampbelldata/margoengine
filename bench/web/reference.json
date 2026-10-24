@@ -1,0 +1,366 @@
+{
+ "id": "20261024-125617-ebff9bc4-smoke",
+ "label": "smoke",
+ "valid": false,
+ "date": "2026-10-24T12:56:17.455Z",
+ "machine": "AMD Ryzen 9 9950X 16-Core Processor, NVIDIA RTX A6000, chromium 155.0.4283.62",
+ "cases": {
+  "startup/startup": {
+   "loadMs": 281,
+   "firstFrameMs": 14.4,
+   "createMs": 220.8,
+   "jsBytes": 85469,
+   "cpuMs": 0.065,
+   "gpuMs": 0.004,
+   "jsHeapMB": 1.76,
+   "gpuMB": 28.13
+  },
+  "render/boxes-10000": {
+   "cpuMs": 0.155,
+   "gpuMs": 0.102,
+   "fps": 2109.5,
+   "serialFrameMs": 3.54,
+   "loadMs": 185.1,
+   "firstFrameMs": 15.3,
+   "createMs": 121.6,
+   "buildMs": 14.9,
+   "jsHeapMB": 6.91,
+   "gpuMB": 29.63,
+   "gpuPeakMB": 29.69,
+   "jsBytes": 74477,
+   "drawCalls": 1
+  },
+  "render/materials-4096": {
+   "cpuMs": 0.1,
+   "gpuMs": 0.06,
+   "fps": 2392.6,
+   "serialFrameMs": 3.54,
+   "loadMs": 180.5,
+   "firstFrameMs": 15.7,
+   "createMs": 126.2,
+   "buildMs": 8.7,
+   "jsHeapMB": 4.15,
+   "gpuMB": 28.88,
+   "gpuPeakMB": 28.94,
+   "jsBytes": 74477,
+   "drawCalls": 1
+  },
+  "render/lights-1000": {
+   "cpuMs": 0.1,
+   "gpuMs": 0.426,
+   "fps": 1649.7,
+   "serialFrameMs": 3.54,
+   "loadMs": 216.4,
+   "firstFrameMs": 56.8,
+   "createMs": 119.5,
+   "buildMs": 7.5,
+   "jsHeapMB": 2.54,
+   "gpuMB": 41.8,
+   "gpuPeakMB": 41.86,
+   "jsBytes": 111126,
+   "drawCalls": 2
+  },
+  "render/shadows-1000": {
+   "cpuMs": 5.725,
+   "gpuMs": 0.543,
+   "fps": 147.2,
+   "serialFrameMs": 15.85,
+   "loadMs": 292,
+   "firstFrameMs": 129.2,
+   "createMs": 123.4,
+   "buildMs": 10.1,
+   "jsHeapMB": 3.71,
+   "gpuMB": 156.77,
+   "gpuPeakMB": 156.83,
+   "jsBytes": 107399,
+   "drawCalls": 2
+  },
+  "render/post-1000": {
+   "cpuMs": 0.13,
+   "gpuMs": 0.53,
+   "fps": 1319,
+   "serialFrameMs": 3.53,
+   "loadMs": 364.2,
+   "firstFrameMs": 204.9,
+   "createMs": 120.8,
+   "buildMs": 9.8,
+   "jsHeapMB": 2.85,
+   "gpuMB": 184.63,
+   "gpuPeakMB": 184.69,
+   "jsBytes": 150060,
+   "drawCalls": 2
+  },
+  "objects/boxes-10000": {
+   "cpuMs": 0.155,
+   "gpuMs": 0.102,
+   "fps": 2061.9,
+   "serialFrameMs": 3.525,
+   "loadMs": 185.1,
+   "firstFrameMs": 15.4,
+   "createMs": 125.4,
+   "buildMs": 15.3,
+   "jsHeapMB": 6.91,
+   "gpuMB": 29.63,
+   "gpuPeakMB": 29.69,
+   "jsBytes": 74477,
+   "drawCalls": 1
+  },
+  "objects/boxes-10000-moving": {
+   "cpuMs": 1.355,
+   "gpuMs": 0.097,
+   "fps": 581.9,
+   "serialFrameMs": 5.03,
+   "loadMs": 187.2,
+   "firstFrameMs": 16.1,
+   "createMs": 125.6,
+   "buildMs": 15.1,
+   "jsHeapMB": 6.93,
+   "gpuMB": 29.63,
+   "gpuPeakMB": 29.69,
+   "jsBytes": 74477,
+   "drawCalls": 1
+  },
+  "objects/boxes-10000-instanced": {
+   "cpuMs": 0.085,
+   "gpuMs": 0.168,
+   "fps": 2550.7,
+   "serialFrameMs": 3.52,
+   "loadMs": 232.6,
+   "firstFrameMs": 58,
+   "createMs": 123.6,
+   "buildMs": 23.1,
+   "jsHeapMB": 5.13,
+   "gpuMB": 29.04,
+   "gpuPeakMB": 29.11,
+   "jsBytes": 471578,
+   "drawCalls": 1
+  },
+  "objects/boxes-10000-instanced-moving": {
+   "cpuMs": 1.425,
+   "gpuMs": 0.16,
+   "fps": 544.9,
+   "serialFrameMs": 5.335,
+   "loadMs": 239.8,
+   "firstFrameMs": 60.1,
+   "createMs": 125.1,
+   "buildMs": 23.6,
+   "jsHeapMB": 5.15,
+   "gpuMB": 29.04,
+   "gpuPeakMB": 29.11,
+   "jsBytes": 471578,
+   "drawCalls": 1
+  },
+  "scaling/boxes-1": {
+   "cpuMs": 0.055,
+   "gpuMs": 0.002,
+   "fps": 2774.6,
+   "serialFrameMs": 3.025,
+   "buildMs": 0.9,
+   "jsHeapMB": 1.74,
+   "gpuMB": 28.13,
+   "drawCalls": 1
+  },
+  "scaling/boxes-100": {
+   "cpuMs": 0.055,
+   "gpuMs": 0.007,
+   "fps": 2647.3,
+   "serialFrameMs": 3.435,
+   "buildMs": 1.5,
+   "jsHeapMB": 1.84,
+   "gpuMB": 28.14,
+   "drawCalls": 1
+  },
+  "scaling/boxes-1000": {
+   "cpuMs": 0.065,
+   "gpuMs": 0.025,
+   "fps": 2791,
+   "serialFrameMs": 3.39,
+   "buildMs": 4.6,
+   "jsHeapMB": 2.26,
+   "gpuMB": 28.22,
+   "drawCalls": 1
+  },
+  "scaling/boxes-10000": {
+   "cpuMs": 0.155,
+   "gpuMs": 0.102,
+   "fps": 2044.8,
+   "serialFrameMs": 3.525,
+   "buildMs": 14.3,
+   "jsHeapMB": 6.91,
+   "gpuMB": 29.63,
+   "drawCalls": 1
+  },
+  "scaling/boxes-100000": {
+   "cpuMs": 1.045,
+   "gpuMs": 0.575,
+   "fps": 706.9,
+   "serialFrameMs": 4.58,
+   "buildMs": 119.1,
+   "jsHeapMB": 48.7,
+   "gpuMB": 40.13,
+   "drawCalls": 1
+  },
+  "scaling/boxes-100000-instanced": {
+   "cpuMs": 0.09,
+   "gpuMs": 1.221,
+   "fps": 745.6,
+   "serialFrameMs": 3.54,
+   "buildMs": 90.3,
+   "jsHeapMB": 22.86,
+   "gpuMB": 37.28,
+   "drawCalls": 1
+  },
+  "scaling/boxes-250000-instanced": {
+   "cpuMs": 0.085,
+   "gpuMs": 2.906,
+   "fps": 327.3,
+   "serialFrameMs": 5.025,
+   "buildMs": 179.4,
+   "jsHeapMB": 52.61,
+   "gpuMB": 51.02,
+   "drawCalls": 1
+  },
+  "gltf/gltf-damaged-helmet": {
+   "buildMs": 135.5,
+   "firstFrameMs": 93,
+   "cpuMs": 0.09,
+   "gpuMs": 0.02,
+   "fps": 2359,
+   "jsHeapMB": 7.89,
+   "gpuMB": 136.08,
+   "drawCalls": 1
+  },
+  "gltf/gltf-flight-helmet": {
+   "buildMs": 121.5,
+   "firstFrameMs": 147.1,
+   "cpuMs": 0.12,
+   "gpuMs": 0.028,
+   "fps": 2193.2,
+   "jsHeapMB": 16.85,
+   "gpuMB": 113.44,
+   "drawCalls": 6
+  },
+  "gltf/gltf-robot-expressive": {
+   "buildMs": 18.6,
+   "firstFrameMs": 46.5,
+   "cpuMs": 0.125,
+   "gpuMs": 0.009,
+   "fps": 2162.4,
+   "jsHeapMB": 4.34,
+   "gpuMB": 29.08,
+   "drawCalls": 9
+  },
+  "gltf/helmet": {
+   "buildMs": 254.2,
+   "firstFrameMs": 127.8,
+   "cpuMs": 0.125,
+   "gpuMs": 0.502,
+   "fps": 1040.9,
+   "jsHeapMB": 9,
+   "gpuMB": 264.89,
+   "drawCalls": 2
+  },
+  "cad/kernel-assembly-10017": {
+   "tickMs": 0.1257,
+   "tickCullMs": 0.1337
+  },
+  "cad/kernel-assembly-50004": {
+   "tickMs": 0.6297,
+   "tickCullMs": 0.6709
+  },
+  "cad/kernel-assembly-89883": {
+   "tickMs": 1.1396,
+   "tickCullMs": 1.2205
+  },
+  "cad/brep-drill-16": {
+   "booleanMs": 72.9123,
+   "meshMs": 16.5332
+  },
+  "cad/brep-step-roundtrip": {
+   "writeMs": 0.4988,
+   "parseMs": 0.3676,
+   "tessellateMs": 5.3397,
+   "stepBytes": 35169
+  },
+  "cad/cad-10000": {
+   "cpuMs": 0.65,
+   "gpuMs": 0.219,
+   "fps": 1010.6,
+   "serialFrameMs": 4.065,
+   "loadMs": 199.2,
+   "firstFrameMs": 16.8,
+   "createMs": 117.5,
+   "buildMs": 20.2,
+   "jsHeapMB": 7.68,
+   "gpuMB": 29.46,
+   "gpuPeakMB": 29.52,
+   "jsBytes": 119669,
+   "drawCalls": 5
+  },
+  "cad/cad-50000": {
+   "cpuMs": 3.405,
+   "gpuMs": 0.864,
+   "fps": 253.3,
+   "serialFrameMs": 7.57,
+   "loadMs": 259.8,
+   "firstFrameMs": 23.9,
+   "createMs": 121.8,
+   "buildMs": 71.9,
+   "jsHeapMB": 27.53,
+   "gpuMB": 33.26,
+   "gpuPeakMB": 33.32,
+   "jsBytes": 119669,
+   "drawCalls": 5
+  },
+  "voxel/fill-256x64x256": {
+   "fillMs": 86.5983
+  },
+  "voxel/mesh-128-chunks": {
+   "meshMs": 43.6952,
+   "quads": 106971
+  },
+  "voxel/raycast-10k": {
+   "raysMs": 8.8908
+  },
+  "voxel/sandbox-rd8": {
+   "spawnMs": 1100.8,
+   "frameCpuMs": 0.4,
+   "voxelGpuMs": 0.459,
+   "flightFrameCpuP95Ms": 2.5,
+   "quads": 1182034,
+   "draws": 322
+  },
+  "memory/heap-100k-meshes": {
+   "heapMB": 68.419,
+   "buffersMB": 12.0005,
+   "bytesPerMesh": 843.2592
+  },
+  "memory/boxes-10000": {
+   "jsHeapMB": 6.91,
+   "gpuMB": 29.63,
+   "gpuPeakMB": 29.69,
+   "buildMs": 14.8
+  },
+  "memory/boxes-100000-instanced": {
+   "jsHeapMB": 22.86,
+   "gpuMB": 37.28,
+   "gpuPeakMB": 37.35,
+   "buildMs": 91.2
+  },
+  "memory/helmet": {
+   "jsHeapMB": 8.99,
+   "gpuMB": 264.89,
+   "gpuPeakMB": 264.96,
+   "buildMs": 259.7
+  },
+  "react/react-1000": {
+   "buildMs": 155.7,
+   "createMs": 128.5,
+   "cpuMs": 2.22,
+   "gpuMs": 0.052,
+   "fps": 330.6,
+   "jsHeapMB": 10.9,
+   "drawCalls": 1000
+  }
+ }
+}

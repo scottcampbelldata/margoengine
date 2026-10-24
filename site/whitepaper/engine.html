@@ -218,7 +218,7 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
 <p>The same build contains 18 more files totalling 8,176,650 bytes (the OpenCascade Wasm, the CAD worker, the B-rep runtime and other packs) that this page never requests. Transferred bytes include response headers.</p>
 
 <h3>Against three.js</h3>
-<p><code>npm run measure:threejs</code> builds a minimal lit-box app with three.js r186 (0.186.1) using the same minifier and output options as our size gate.</p>
+<p>A minimal lit-box app built with three.js r186 (0.186.1) using the same minifier and output options as our size gate. <code>npm run bench -- size --engines=all</code> repeats it from the engine-bench folder, where other engines live.</p>
 <div class="table"><table>
 <thead><tr><th>Build</th><th class="num">Raw</th><th class="num">Gzip</th></tr></thead>
 <tbody>
@@ -332,13 +332,13 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
 <pre><code>npm ci
 npm run build:packages
 npm run measure:size          # core + stage gzip, fails at 25,000
-npm run measure:threejs       # the three.js size table
+npm run bench                 # every benchmark suite (GPU; docs/benchmarking.md)
 npm run proofs                # all 51 pinned GPU-call proofs
 npm run proofs -- --current   # the 20 ongoing guarantees
 npm run fuzz -- --short       # every parser fuzzer, 4 s each
 npm run test:basic-scene      # the six-request page (GPU)
 node examples/package-benchmarks/cad/scale-node.mjs
-npm run bench:threejs         # the same-scene harness (GPU)</code></pre>
+npm run bench -- --engines=all  # the same scenes in other engines (engine-bench)</code></pre>
 <p>Per-claim commands are in <code>docs/whitepaper/reproduce.md</code>.</p>
 
 <h3>Hardware</h3>

@@ -252,7 +252,7 @@ Status: on main are phases 1 (storage), 2 (mesher), 3 (worker mesher), 4 (render
   GPU-verified on the RTX A6000 (tests/render-lighting-browser-check.mjs).
 - Example and benchmarks (phase 13): `examples/voxel-sandbox` (site page `/voxel/`; shadows, torch point lights, Sky,
   Bloom), visual references on the RTX A6000 profile only (other profiles skip them until recorded), benchmark
-  `npm run bench:voxel` behind the quiet gate. Measured on the A6000 at 1920 x 1080, 4x MSAA (docs/limits.md): render
+  `npm run bench:voxel` (the bench tool's voxel suite) behind the quiet gate. Measured on the A6000 at 1920 x 1080, 4x MSAA (docs/limits.md): render
   distance 8 fills in 1.06-1.22 s (1.18 M quads, 322 draws, 0.7 ms frame CPU still), 16 in 3.59-3.67 s (4.84 M quads,
   1,170 draws; 1.1 ms still in a single-load run, settling from 2.4 ms over about 4 s after a fill); GPU time per
   frame is not yet measured reliably. The sandbox's chunks are 32 blocks, so its render distance 16 is a 512-block

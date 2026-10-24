@@ -9,6 +9,7 @@
       "examples/**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}",
       "apps/**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}",
       "tools/**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}",
+      "bench/**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}",
       "!**/dist",
       "!**/vendor",
       "!packages/clustered/src/ltc.ts",
