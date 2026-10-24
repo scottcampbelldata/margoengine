@@ -14,6 +14,7 @@ export class VolumetricFog implements EnginePlugin {
     get texture(): GPUTexture | undefined;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    onPreUpdate(delta: number): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;

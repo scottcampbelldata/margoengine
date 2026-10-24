@@ -13,6 +13,7 @@ export class TAA implements EnginePlugin {
     static attach(instance: EngineKernel, options?: TAAOptions): TAA;
     add(source: VelocitySource): () => void;
     reset(): void;
+    onPreUpdate(delta: number): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     get velocity(): TAAVelocity | undefined;

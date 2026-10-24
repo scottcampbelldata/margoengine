@@ -59,6 +59,8 @@ export function meshChunk(input: MeshInput): ChunkMesh;
 
 export function meshInput(world: VoxelWorld, key: string): MeshInput | undefined;
 
+export function quadCenters(words: Uint32Array): Float32Array;
+
 export function sortQuads(words: Uint32Array, eye: Vec3): Uint32Array;
 
 // Not exported from this entry, but used by the exports above:
@@ -85,6 +87,13 @@ interface BlockType {
         readonly frames: number;
         readonly fps: number;
     };
+    readonly maps: {
+        readonly normal: number;
+        readonly roughness: number;
+        readonly emissive: number;
+    };
+    readonly transmission: number;
+    readonly scatter: number;
 }
 
 interface BlockTypeOptions {
@@ -103,6 +112,13 @@ interface BlockTypeOptions {
         frames: number;
         fps: number;
     };
+    maps?: {
+        normal?: number;
+        roughness?: number;
+        emissive?: number;
+    };
+    transmission?: number;
+    scatter?: number;
 }
 
 class BlockTypes {

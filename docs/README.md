@@ -80,10 +80,10 @@ node --test tests/catalog.test.js
 | --- | --- |
 | [`@margoengine/materials`](../packages/materials/README.md) | Optional glTF PBR material lobes, transmission, volume and typed node graphs through an isolated extension slot. |
 | [`@margoengine/shader`](../packages/shader/README.md) | Typed shader nodes that compile to readable WGSL: node materials, node post effects and node compute passes. |
-| [`@margoengine/environment`](../packages/environment/README.md) | HDR/EXR/UltraHDR loading, image-based lighting (prefiltered specular, SH irradiance, BRDF LUT) applied to meshes and glTF models, environment and color backgrounds, and scene fog for Margo Engine on WebGPU. |
+| [`@margoengine/environment`](../packages/environment/README.md) | HDR/EXR/UltraHDR loading, EXR writing, image-based lighting (prefiltered specular, SH irradiance, BRDF LUT), environment backgrounds and scene fog for Margo Engine on WebGPU. |
 | [`@margoengine/clustered`](../packages/clustered/README.md) | WebGPU clustered forward point and spot lighting with optional local shadows. |
 | [`@margoengine/shadows`](../packages/shadows/README.md) | Four-cascade cached directional shadows with PCSS. |
-| [`@margoengine/lightmap`](../packages/lightmap/README.md) | Bakes lightmaps on the CPU: one padded UV atlas for a quad mesh with direct light, ambient occlusion and matching albedo, emission, normal and ORM textures. |
+| [`@margoengine/lightmap`](../packages/lightmap/README.md) | CPU lightmap atlases with native albedo, emission, normal and ORM textures; optional area lights, emissive surfaces, bounces and glass (./global) and caustics (./refracted). |
 | [`@margoengine/sky`](../packages/sky/README.md) | Procedural atmospheric skies, clouds, sun, moon and stars. |
 | [`@margoengine/toon`](../packages/toon/README.md) | Stepped diffuse shading and inverted-hull outlines. |
 | [`@margoengine/oit`](../packages/oit/README.md) | Weighted blended order-independent transparency for gltf-pro BLEND primitives and materials transparent meshes: no popping between overlapping transparent parts. |

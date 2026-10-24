@@ -35,6 +35,7 @@ export class Water implements EnginePlugin {
         backend: 'webgpu';
     }>, mode: 'capture', color?: GPUTextureView, depth?: GPUTextureView): void;
     onDeviceRestored(engine: Engine): void;
+    onPreUpdate(delta: number): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
 }

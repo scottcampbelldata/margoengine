@@ -82,6 +82,7 @@ export class MeshBVH {
     }): SerializedBVH;
     toArrayBuffer(): ArrayBuffer;
     refit(): void;
+    intersectsSegment(start: ArrayLike<number>, end: ArrayLike<number>, options?: SegmentOptions): boolean;
     raycastFirst(ray: Ray, options?: RaycastOptions): BVHHit | null;
     raycast(ray: Ray, options?: RaycastOptions): BVHHit[];
     closestPointToPoint(point: ArrayLike<number>, { maxDistance, minDistance }?: ClosestPointOptions): ClosestPointResult | null;
@@ -107,7 +108,10 @@ export interface RaycastOptions {
     near?: number;
     far?: number;
     side?: Side;
+    includeFace?: (faceIndex: number) => boolean;
 }
+
+export type SegmentOptions = Pick<RaycastOptions, 'side' | 'includeFace'>;
 
 export interface SerializedBVH {
     version: 1;

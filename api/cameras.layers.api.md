@@ -4,51 +4,14 @@
 
 ```ts
 import { Camera, EngineKernel, Mesh } from "@margoengine/core";
-import { EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 
 export const ALL_LAYERS = 4294967295;
-
-export class CameraLayers implements EnginePlugin {
-    readonly name: string;
-    static attach(engine: EngineKernel, options?: {
-        name?: string;
-    }): CameraLayers;
-    constructor(options?: {
-        name?: string;
-    });
-    setup(engine: EngineKernel): void;
-    onPreUpdate(): void;
-    registerPasses(graph: FrameGraph): void;
-    dispose(): void;
-    [Symbol.dispose]: () => void;
-}
-
-export interface RenderViewOptions {
-    camera?: Camera;
-    layers?: number;
-    exclude?: Iterable<Mesh>;
-    culling?: boolean;
-    delta?: number;
-}
-
-export class SceneSwitch {
-    readonly engine: EngineKernel;
-    static attach(engine: EngineKernel): SceneSwitch;
-    constructor(engine: EngineKernel);
-    get active(): string | null;
-    get names(): string[];
-    add(name: string, meshes: Iterable<Mesh>): this;
-    remove(meshes: Iterable<Mesh>): this;
-    show(name: string | null): void;
-}
 
 export function getCameraLayers(camera: Camera): number;
 
 export function getRenderLayers(mesh: Mesh): number;
 
 export function layerMask(...layers: number[]): number;
-
-export function renderView(engine: EngineKernel, options?: RenderViewOptions): void;
 
 export function setCameraLayers(camera: Camera, mask: number): void;
 

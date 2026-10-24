@@ -91,6 +91,13 @@ interface BlockType {
         readonly frames: number;
         readonly fps: number;
     };
+    readonly maps: {
+        readonly normal: number;
+        readonly roughness: number;
+        readonly emissive: number;
+    };
+    readonly transmission: number;
+    readonly scatter: number;
 }
 
 interface BlockTypeOptions {
@@ -109,6 +116,13 @@ interface BlockTypeOptions {
         frames: number;
         fps: number;
     };
+    maps?: {
+        normal?: number;
+        roughness?: number;
+        emissive?: number;
+    };
+    transmission?: number;
+    scatter?: number;
 }
 
 class BlockTypes {

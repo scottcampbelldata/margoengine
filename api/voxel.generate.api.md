@@ -58,6 +58,13 @@ interface BlockType {
         readonly frames: number;
         readonly fps: number;
     };
+    readonly maps: {
+        readonly normal: number;
+        readonly roughness: number;
+        readonly emissive: number;
+    };
+    readonly transmission: number;
+    readonly scatter: number;
 }
 
 interface PackedChunk {

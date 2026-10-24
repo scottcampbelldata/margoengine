@@ -444,7 +444,9 @@ interface LightingEffect {
 }
 
 interface MaterialExtension {
+    afterOpaque?: boolean;
     replacesPhysical?: boolean;
+    transmission?: string;
     wgsl?: string;
     direct?: string;
     ambient?: string;

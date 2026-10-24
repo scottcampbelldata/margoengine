@@ -132,6 +132,9 @@ interface LightmapData {
     texCoord?: 0 | 1;
     key?: string;
     extras?: Extras;
+    emission?: TextureData;
+    lightmapScale?: number;
+    emissionScale?: number;
 }
 
 interface Lookup<K, V> {

@@ -10,11 +10,7 @@ export interface AreaLightOptions {
     lights: Clustered;
 }
 
-export interface AreaLightShadow {
-    resolution?: number | readonly [number, number];
-    near?: number;
-    far?: number;
-}
+export { AreaLightShadow } from "@margoengine/math";
 
 export class AreaLights implements EnginePlugin, ClusteredArea {
     readonly name = "clustered:area";
@@ -38,18 +34,7 @@ export const MAX_AREA_LIGHTS = 64;
 
 export const MAX_AREA_SHADOWS = 4;
 
-export interface RectAreaLight {
-    position: Vec3;
-    direction: Vec3;
-    width: number;
-    height: number;
-    up?: Vec3;
-    color?: Vec3;
-    intensity?: number;
-    twoSided?: boolean;
-    castShadow?: boolean;
-    shadow?: AreaLightShadow;
-}
+export { RectAreaLight } from "@margoengine/math";
 
 // Not exported from this entry, but used by the exports above:
 

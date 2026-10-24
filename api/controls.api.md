@@ -4,7 +4,7 @@
 
 ```ts
 import { ModelLike, Raycaster, RaycasterHit } from "@margoengine/bvh";
-import { Camera, EngineKernel, Mesh } from "@margoengine/core";
+import { Camera, EngineKernel, Mesh, RenderView } from "@margoengine/core";
 import { PassContext } from "@margoengine/core/extension";
 
 export const AUTOCAD: NavigationProfile;
@@ -404,6 +404,7 @@ export class TrackballControls extends Controls {
 export class TransformControls extends EventDispatcher {
     readonly engine: EngineKernel;
     element: ControlElement | null;
+    view: RenderView | null;
     enabled: boolean;
     visible: boolean;
     mode: TransformMode;
@@ -454,6 +455,7 @@ export interface TransformControlsOptions {
     showY?: boolean;
     showZ?: boolean;
     element?: ControlElement;
+    view?: RenderView;
     order?: number;
 }
 

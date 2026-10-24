@@ -1,8 +1,9 @@
 # Reading the three.js parity counts
 
-Date: 2026-10-21. The table in [threejs-parity.md](threejs-parity.md) was recounted after the visual-parity pass:
-**160 features, 138 COVERED, 16 PARTIAL, 6 MISSING** (it was 117 / 29 / 14 that morning). The pass closed 21 rows in
-optional packages; core + stage stayed at 21,343 bytes gzip, 3,657 bytes below the 25,000-byte ceiling. The rows and the
+Date: 2026-10-24. The table in [threejs-parity.md](threejs-parity.md) was recounted after multi-view:
+**161 features, 142 COVERED, 13 PARTIAL, 6 MISSING** (138 / 16 / 6 after the visual-parity pass, 117 / 29 / 14
+before it). Multi-view (2026-10-24) closed three rows (scenes, viewports, ArrayCamera) and the EXR writer split EXRExporter out as covered; core + stage measures 21,599
+bytes gzip with it, 3,401 bytes below the 25,000-byte ceiling. The rows and the
 [to-do tables](threejs-parity.md#what-is-missing-or-partial-and-what-to-do) are the source; this page only explains how
 to read them.
 
@@ -24,16 +25,12 @@ WebGL2 path at zero core bytes is planned for the next version in
 | --- | --- |
 | StereoCamera, AnaglyphEffect, ParallaxBarrierEffect | Use `@margoengine/xr` for stereo. Anaglyph is not planned. |
 | Long-tail model loaders (LDraw, VRML, 3DS, LWO, AMF, MD2, PDB, GCode, BVH motion capture, 3DM, KMZ, TDS) | Add one when a project brings that file. |
-| DRACOExporter, EXRExporter, KTX2Exporter | glTF export is `@margoengine/exporters`; these three are not planned. |
+| DRACOExporter, KTX2Exporter | glTF export is `@margoengine/exporters`; these two are not planned (EXR is written by `@margoengine/environment/exr-write`). |
 | ArcballControls | Orbit, map, trackball, fly, first-person and pointer-lock exist; add it in `@margoengine/controls` when needed. |
 | BatchedMesh | Distinct geometries stay separate draws; machinery `PartPacks` and geometry `mergeGeometries` bake static meshes. |
 | XRControllerModelFactory, XRHandModelFactory | Poses and 25 hand joints exist; models come after a headset test. |
 
-## The 16 PARTIAL rows
-
-Limits of core's single-scene design, planned next in [multi-view-roadmap.md](multi-view-roadmap.md): Scene object and
-multiple scenes (one engine per canvas; `SceneSwitch` swaps mesh sets), Multiple viewports / scissor (core draws only),
-ArrayCamera (stereo inside XR only).
+## The 13 PARTIAL rows
 
 Closed or v1 limits: WebGL2 fallback (above).
 

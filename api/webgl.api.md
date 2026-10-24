@@ -4,14 +4,14 @@
 
 ```ts
 import { Camera, Geometry } from "@margoengine/core";
-import { Batch, FrameGraph, Lighting, Renderer } from "@margoengine/core/extension";
+import { Batch, FrameGraph, Lighting, Renderer, ViewDraw } from "@margoengine/core/extension";
 
 export class GLRenderer implements Renderer {
     readonly backend = "webgl2";
     constructor(canvas: HTMLCanvasElement, { transparent }?: WebGLRendererOptions);
     add(geometry: Geometry, capacity: number): void;
     remove(geometry: Geometry): void;
-    render(camera: Camera, lighting: Lighting, batches: Iterable<Batch>, graph: FrameGraph, delta: number): void;
+    render(camera: Camera, lighting: Lighting, batches: Iterable<Batch>, graph: FrameGraph, delta: number, view?: ViewDraw): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
 }

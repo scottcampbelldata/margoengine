@@ -57,30 +57,31 @@ export function mockGPU() {
     this.destroyed = true;
     if (log) log.push(['destroy', ids.get(this)]);
   };
-  const pass = Object.fromEntries(
-    [
-      'setPipeline',
-      'setBindGroup',
-      'setVertexBuffer',
-      'setIndexBuffer',
-      'setViewport',
-      'setScissorRect',
-      'setStencilReference',
-      'setBlendConstant',
-      'draw',
-      'drawIndexed',
-      'drawIndirect',
-      'drawIndexedIndirect',
-      'dispatchWorkgroups',
-      'dispatchWorkgroupsIndirect',
-      'end',
-    ].map((name) => [name, call('pass.' + name)]),
-  );
+  const pass = () =>
+    Object.fromEntries(
+      [
+        'setPipeline',
+        'setBindGroup',
+        'setVertexBuffer',
+        'setIndexBuffer',
+        'setViewport',
+        'setScissorRect',
+        'setStencilReference',
+        'setBlendConstant',
+        'draw',
+        'drawIndexed',
+        'drawIndirect',
+        'drawIndexedIndirect',
+        'dispatchWorkgroups',
+        'dispatchWorkgroupsIndirect',
+        'end',
+      ].map((name) => [name, call('pass.' + name)]),
+    );
   const begin = (name) => {
     const record = call(name);
     return (descriptor) => {
       record(descriptor);
-      return pass;
+      return pass();
     };
   };
   const pipeline = () => ({
@@ -154,6 +155,7 @@ export function mockGPU() {
     copyTextureToBuffer: call('copyTextureToBuffer'),
     copyBufferToTexture: call('copyBufferToTexture'),
   });
+  device.createCommandEncoder = () => ({ ...encoder });
   return {
     device,
     encoder,

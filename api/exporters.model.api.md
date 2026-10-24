@@ -34,6 +34,7 @@ export interface ModelExportOptions {
     binary?: boolean;
     animations?: readonly ExportAnimation[];
     onlyVisible?: boolean;
+    retainedVisibility?: boolean;
     embedImages?: boolean;
     maxTextureSize?: number;
     generator?: string;

@@ -60,11 +60,16 @@ export interface EngineKernel {
     };
     onError: (error: unknown) => void;
     createMesh(parent?: Mesh | null): Mesh;
-    pick(x: number, y: number): Promise<Mesh | null>;
+    readonly scene: Scene;
+    createScene(name?: string): Scene;
+    sceneOf(plugin: EnginePlugin): Scene | undefined;
+    views?: readonly RenderView[];
+    pick(x: number, y: number, view?: RenderView): Promise<Mesh | null>;
     render(options?: {
         camera?: Camera;
         culling?: boolean;
         delta?: number;
+        views?: readonly RenderView[];
     }): void;
     start(options?: {
         culling?: boolean;
@@ -139,6 +144,44 @@ export interface PbrMaterialOptions {
     doubleSided?: boolean;
 }
 
+export interface RenderView {
+    camera: Camera;
+    viewport: readonly [number, number, number, number];
+    pixels?: boolean;
+    scissor?: readonly [number, number, number, number];
+    clear?: {
+        color?: string | false;
+        depth?: boolean;
+    };
+    target?: {
+        color: GPUTexture;
+        depth?: GPUTexture;
+    };
+    layers?: number;
+    id?: string;
+    scene?: Scene;
+}
+
+export interface Scene {
+    readonly name: string;
+    background?: string | null;
+    readonly lighting: {
+        direction: Float32Array;
+        radiance: Float32Array;
+        ambient: Float32Array;
+    };
+    readonly stats: {
+        visible: number;
+        drawCalls: number;
+    };
+    readonly meshes: ReadonlyMap<number, Mesh>;
+    readonly plugins: ReadonlyMap<string, EnginePlugin>;
+    createMesh(parent?: Mesh | null): Mesh;
+    use(plugin: EnginePlugin): this;
+    removePlugin(name: string): void;
+    dispose(): void;
+}
+
 export type Vec3 = readonly [number, number, number];
 
 export interface VectorRef {
@@ -171,6 +214,7 @@ interface DrawOptions {
     pipeline?: GPURenderPipeline;
     bindings?: GPUBindGroupEntry[];
     clear?: boolean;
+    clearDepth?: boolean;
     viewport?: readonly [number, number, number, number];
     scissor?: readonly [number, number, number, number];
     stencilClear?: number;
@@ -212,6 +256,23 @@ type PassContext = {
     width: number;
     height: number;
     camera: Camera;
+    view?: {
+        id: string;
+        camera: Camera;
+        viewport: readonly [number, number, number, number];
+        scissor?: readonly [number, number, number, number];
+        index: number;
+        count: number;
+        clear?: {
+            color?: string | false;
+            depth?: boolean;
+        };
+        layers?: number;
+        target?: {
+            color: GPUTexture;
+            depth?: GPUTexture;
+        };
+    };
     draw(options?: DrawOptions): void;
 } & ({
     backend: 'webgpu';
@@ -237,7 +298,24 @@ interface Renderer {
     add(geometry: Geometry, capacity: number): void;
     remove(geometry: Geometry): void;
     geometryBuffers?(geometry: Geometry): GeometryBuffers;
-    render(camera: Camera, lighting: Lighting, batches: Iterable<Batch>, graph: FrameGraph, delta: number): void;
+    render(camera: Camera, lighting: Lighting, batches: Iterable<Batch>, graph: FrameGraph, delta: number, view?: ViewDraw): void;
     dispose(unconfigure?: boolean): void;
+}
+
+interface ViewDraw {
+    rect: readonly [number, number, number, number];
+    scissor?: readonly [number, number, number, number];
+    layers?: number;
+    index: number;
+    count: number;
+    id: string;
+    clear?: {
+        color?: string | false;
+        depth?: boolean;
+    };
+    target?: {
+        color: GPUTexture;
+        depth?: GPUTexture;
+    };
 }
 ```

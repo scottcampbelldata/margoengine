@@ -31,6 +31,7 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
     attach(camera: Camera): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
+    get fixedOrthographic(): boolean;
 }
 
 export interface FitOptions {

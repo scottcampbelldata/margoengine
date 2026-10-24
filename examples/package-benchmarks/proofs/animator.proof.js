@@ -2,6 +2,8 @@
 // the pose already owns, and clip blending normalizes quaternions in place, instead of allocating per track and joint.
 // Run: node examples/package-benchmarks/proofs/animator.proof.js [ref] [pin]
 // Pinned: f05414a against f47ff3f, the commit that recorded results/animator.json, so the run never depends on today's tree.
+// Not in `npm run proofs -- --current`: it compares every transform write bit for bit, and the animator has skipped
+// unchanged writes since f33e094 and reads `options.speed` since 6a1c6bb, so only the pinned run can match.
 import assert from 'node:assert/strict';
 import { refs, versions, time, record } from './compare.js';
 

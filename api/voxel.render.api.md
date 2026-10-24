@@ -35,6 +35,13 @@ export interface VoxelCapture {
     begin(): GPURenderPassEncoder;
 }
 
+export interface VoxelLightmap {
+    readonly texture: GPUTexture;
+    readonly charts: Float32Array;
+    readonly index: Int32Array;
+    shader(code: string): string;
+}
+
 export class VoxelRenderer implements EnginePlugin {
     readonly name: string;
     readonly world: VoxelWorld;
@@ -57,6 +64,8 @@ export class VoxelRenderer implements EnginePlugin {
         depthCompare: GPUCompareFunction;
     }): void;
     get shadowVersion(): number;
+    get lightmap(): VoxelLightmap | undefined;
+    set lightmap(lightmap: VoxelLightmap | undefined);
     addLighting(effect: VoxelRendererEffect): () => void;
     drawShadow({ context, pass, matrix, cascade }: VoxelShadowContext): void;
     setup(engine: Engine): void;
@@ -84,12 +93,15 @@ export interface VoxelRendererOptions {
     maxQuadBytes?: number;
     daylight?: number;
     fancyLeaves?: boolean;
+    bevel?: VoxelBevel;
+    lightmap?: VoxelLightmap;
 }
 
 export interface VoxelRendererStats {
     readonly chunks: number;
     readonly visible: number;
     readonly quads: number;
+    readonly triangles: number;
     readonly bytes: number;
     readonly draws: number;
 }
@@ -127,6 +139,13 @@ interface BlockType {
         readonly frames: number;
         readonly fps: number;
     };
+    readonly maps: {
+        readonly normal: number;
+        readonly roughness: number;
+        readonly emissive: number;
+    };
+    readonly transmission: number;
+    readonly scatter: number;
 }
 
 interface BlockTypeOptions {
@@ -145,6 +164,13 @@ interface BlockTypeOptions {
         frames: number;
         fps: number;
     };
+    maps?: {
+        normal?: number;
+        roughness?: number;
+        emissive?: number;
+    };
+    transmission?: number;
+    scatter?: number;
 }
 
 class BlockTypes {
@@ -155,11 +181,36 @@ class BlockTypes {
     get(id: number): BlockType;
 }
 
+interface CubeFace {
+    x: number;
+    y: number;
+    z: number;
+    face: number;
+    w: number;
+    h: number;
+    material?: number;
+    ao?: readonly number[];
+    sky?: readonly number[];
+    block?: readonly number[];
+}
+
 interface PackedChunk {
     palette: Uint32Array;
     bits: 0 | 1 | 2 | 4 | 8 | 16;
     words: Uint32Array;
     light: number | Uint8Array;
+}
+
+interface VoxelBevel {
+    readonly amount: number;
+    mesh(faces: readonly CubeFace[], origin: readonly number[]): {
+        vertices: Float32Array;
+        indices: Uint32Array;
+        centers: Float32Array;
+    };
+    readonly layout: GPUVertexBufferLayout;
+    readonly shader: string;
+    readonly shadow: string;
 }
 
 class VoxelChunk {

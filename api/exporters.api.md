@@ -206,6 +206,9 @@ export interface LightmapData {
     texCoord?: 0 | 1;
     key?: string;
     extras?: Extras;
+    emission?: TextureData;
+    lightmapScale?: number;
+    emissionScale?: number;
 }
 
 export interface MaterialAnimationChannelData {
@@ -256,6 +259,7 @@ export interface ModelExportOptions {
     binary?: boolean;
     animations?: readonly ExportAnimation[];
     onlyVisible?: boolean;
+    retainedVisibility?: boolean;
     embedImages?: boolean;
     maxTextureSize?: number;
     generator?: string;

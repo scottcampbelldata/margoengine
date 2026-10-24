@@ -7,6 +7,29 @@ import { Vec3 } from "@margoengine/core";
 import { MutableVec3 } from "@margoengine/math";
 import { VoxelWorld } from "@margoengine/voxel";
 
+export interface ChamferMesh {
+    positions: Float32Array;
+    normals: Float32Array;
+    indices: Uint32Array;
+    trianglePalette: Uint8Array;
+    min: MutableVec3;
+    max: MutableVec3;
+}
+
+export interface ChamferOptions {
+    bevel: number;
+    pivot?: Vec3;
+    maxQuads?: number;
+    maxCells?: number;
+}
+
+export interface ChamferStats {
+    voxels: number;
+    quads: number;
+    triangles: number;
+    clamped: number;
+}
+
 export interface GridMesh {
     positions: Float32Array;
     normals: Float32Array;
@@ -45,6 +68,11 @@ export interface MeshStats {
 export interface PartitionOptions {
     maxQuads?: number;
 }
+
+export function chamferGrid(source: VoxelGrid | SparseGrid, options: ChamferOptions): {
+    mesh: ChamferMesh;
+    stats: ChamferStats;
+};
 
 export function meshGrid(source: VoxelGrid | SparseGrid, options?: GridMeshOptions): {
     mesh: GridMesh;

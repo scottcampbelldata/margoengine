@@ -50,6 +50,7 @@ export interface DrawOptions {
     pipeline?: GPURenderPipeline;
     bindings?: GPUBindGroupEntry[];
     clear?: boolean;
+    clearDepth?: boolean;
     viewport?: readonly [number, number, number, number];
     scissor?: readonly [number, number, number, number];
     stencilClear?: number;
@@ -62,25 +63,21 @@ export class Engine {
     readonly canvas: HTMLCanvasElement;
     readonly store: TransformStore;
     readonly fallbackReason: string | null;
-    readonly frameGraph: FrameGraph;
+    readonly scene: Scene;
+    readonly scenes: Set<Scene>;
     readonly meshes: Map<number, Mesh>;
     readonly camera: Camera;
-    readonly lighting: {
-        direction: Float32Array<ArrayBuffer>;
-        radiance: Float32Array<ArrayBuffer>;
-        ambient: Float32Array<ArrayBuffer>;
-    };
-    readonly stats: {
-        visible: number;
-        drawCalls: number;
-    };
     disposed: boolean;
     onError: (error: unknown) => void;
+    pace?: (time: number) => boolean;
+    views?: readonly RenderView[];
     collected: number;
     unshadowed: number;
-    readonly plugins: ReadonlyMap<string, EnginePlugin>;
-    pace?: (time: number) => boolean;
     features?: GPUFeatureName[];
+    get frameGraph(): FrameGraph;
+    get lighting(): Scene['lighting'];
+    get stats(): Scene['stats'];
+    get plugins(): ReadonlyMap<string, EnginePlugin>;
     static create(canvas: HTMLCanvasElement, options?: EngineOptions): Promise<Engine>;
     private constructor();
     rebootDevice(): Promise<void>;
@@ -88,18 +85,21 @@ export class Engine {
     get gpu(): GPUDevice | null;
     geometryBuffers(geometry: Geometry): GeometryBuffers | null;
     hasPlugin(name: string): boolean;
-    use(plugin: EnginePlugin): this;
-    removePlugin(name: string): void;
-    createMesh(parent?: Mesh | null): Mesh;
+    use(plugin: EnginePlugin, scene?: Scene): this;
+    removePlugin(name: string, scene?: Scene): void;
+    createScene(name?: string): Scene;
+    sceneOf(plugin: EnginePlugin): Scene | undefined;
+    createMesh(parent?: Mesh | null, scene?: Scene): Mesh;
     remove(mesh: Mesh): void;
     retain(geometry: Geometry): void;
     release(geometry: Geometry): void;
-    render({ camera, culling, delta }?: {
+    render({ camera, culling, delta, views }?: {
         camera?: Camera;
         culling?: boolean;
         delta?: number;
+        views?: readonly RenderView[];
     }): void;
-    pick(x: number, y: number): Promise<Mesh | null>;
+    pick(x: number, y: number, view?: RenderView): Promise<Mesh | null>;
     onFrame(callback: FrameCallback): () => void;
     start({ culling }?: {
         culling?: boolean;
@@ -122,7 +122,9 @@ export interface EnginePlugin {
     onPreUpdate?(delta: number): void;
     registerPasses?(graph: FrameGraph): void;
     onDeviceRestored?(engine: Engine): void;
-    onPick?(x: number, y: number): Promise<Mesh | null>;
+    onPick?(x: number, y: number, view?: RenderView & {
+        pixels: true;
+    }): Promise<Mesh | null>;
     dispose?(): void;
 }
 
@@ -166,6 +168,7 @@ export interface Lighting {
 export class Mesh {
     readonly engine: Engine;
     readonly id: number;
+    readonly scene: Scene;
     name: string;
     readonly position: VectorRef;
     readonly rotation: VectorRef;
@@ -184,7 +187,8 @@ export class Mesh {
     set material(value: PbrMaterial);
     get receiveShadow(): boolean;
     set receiveShadow(value: boolean);
-    constructor(engine: Engine, id: number);
+    constructor(engine: Engine, id: number,
+    scene?: Scene);
     get visible(): boolean;
     set visible(value: boolean);
     check(): void;
@@ -204,6 +208,23 @@ export type PassContext = {
     width: number;
     height: number;
     camera: Camera;
+    view?: {
+        id: string;
+        camera: Camera;
+        viewport: readonly [number, number, number, number];
+        scissor?: readonly [number, number, number, number];
+        index: number;
+        count: number;
+        clear?: {
+            color?: string | false;
+            depth?: boolean;
+        };
+        layers?: number;
+        target?: {
+            color: GPUTexture;
+            depth?: GPUTexture;
+        };
+    };
     draw(options?: DrawOptions): void;
 } & ({
     backend: 'webgpu';
@@ -228,6 +249,24 @@ export class PbrMaterial {
     set({ color, roughness, metalness, doubleSided }: PbrMaterialOptions): void;
 }
 
+export interface RenderView {
+    camera: Camera;
+    viewport: readonly [number, number, number, number];
+    pixels?: boolean;
+    scissor?: readonly [number, number, number, number];
+    clear?: {
+        color?: string | false;
+        depth?: boolean;
+    };
+    target?: {
+        color: GPUTexture;
+        depth?: GPUTexture;
+    };
+    layers?: number;
+    id?: string;
+    scene?: Scene;
+}
+
 export interface Renderer {
     readonly backend: 'webgpu' | 'webgl2';
     readonly gpu?: GPUDevice;
@@ -235,8 +274,31 @@ export interface Renderer {
     add(geometry: Geometry, capacity: number): void;
     remove(geometry: Geometry): void;
     geometryBuffers?(geometry: Geometry): GeometryBuffers;
-    render(camera: Camera, lighting: Lighting, batches: Iterable<Batch>, graph: FrameGraph, delta: number): void;
+    render(camera: Camera, lighting: Lighting, batches: Iterable<Batch>, graph: FrameGraph, delta: number, view?: ViewDraw): void;
     dispose(unconfigure?: boolean): void;
+}
+
+export class Scene {
+    readonly engine: Engine;
+    readonly name: string;
+    background?: string | null;
+    readonly frameGraph: FrameGraph;
+    readonly plugins: ReadonlyMap<string, EnginePlugin>;
+    readonly meshes: ReadonlyMap<number, Mesh>;
+    readonly stats: {
+        visible: number;
+        drawCalls: number;
+    };
+    readonly lighting: {
+        direction: Float32Array<ArrayBuffer>;
+        radiance: Float32Array<ArrayBuffer>;
+        ambient: Float32Array<ArrayBuffer>;
+    };
+    constructor(engine: Engine, name: string);
+    createMesh(parent?: Mesh | null): Mesh;
+    use(plugin: EnginePlugin): this;
+    removePlugin(name: string): void;
+    dispose(): void;
 }
 
 export class TransformStore {
@@ -274,6 +336,23 @@ export class VectorRef {
     set z(v: number);
 }
 
+export interface ViewDraw {
+    rect: readonly [number, number, number, number];
+    scissor?: readonly [number, number, number, number];
+    layers?: number;
+    index: number;
+    count: number;
+    id: string;
+    clear?: {
+        color?: string | false;
+        depth?: boolean;
+    };
+    target?: {
+        color: GPUTexture;
+        depth?: GPUTexture;
+    };
+}
+
 export function box(width?: number, height?: number, depth?: number): Geometry;
 
 export const engineRuntime: (engine: EngineKernel) => Engine;
@@ -294,11 +373,16 @@ interface EngineKernel {
     };
     onError: (error: unknown) => void;
     createMesh(parent?: Mesh | null): Mesh;
-    pick(x: number, y: number): Promise<Mesh | null>;
+    readonly scene: Scene;
+    createScene(name?: string): Scene;
+    sceneOf(plugin: EnginePlugin): Scene | undefined;
+    views?: readonly RenderView[];
+    pick(x: number, y: number, view?: RenderView): Promise<Mesh | null>;
     render(options?: {
         camera?: Camera;
         culling?: boolean;
         delta?: number;
+        views?: readonly RenderView[];
     }): void;
     start(options?: {
         culling?: boolean;
@@ -351,6 +435,26 @@ interface PbrMaterialOptions {
     roughness?: number;
     metalness?: number;
     doubleSided?: boolean;
+}
+
+interface Scene {
+    readonly name: string;
+    background?: string | null;
+    readonly lighting: {
+        direction: Float32Array;
+        radiance: Float32Array;
+        ambient: Float32Array;
+    };
+    readonly stats: {
+        visible: number;
+        drawCalls: number;
+    };
+    readonly meshes: ReadonlyMap<number, Mesh>;
+    readonly plugins: ReadonlyMap<string, EnginePlugin>;
+    createMesh(parent?: Mesh | null): Mesh;
+    use(plugin: EnginePlugin): this;
+    removePlugin(name: string): void;
+    dispose(): void;
 }
 
 interface VectorRef {

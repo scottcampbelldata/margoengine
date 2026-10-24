@@ -5,6 +5,7 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
+import { RectAreaLight } from "@margoengine/math";
 
 export type AtmosphereBelow = 'horizon' | 'surface';
 
@@ -61,18 +62,6 @@ export type ResolvedTraceOptions = Omit<Required<VoxelPathTracerOptions>, 'scene
     edges?: TraceEdges;
     grid?: Required<TraceGrid>;
 };
-
-export interface TraceAreaLight {
-    id: string;
-    position: TraceVec3;
-    edgeU: TraceVec3;
-    edgeV: TraceVec3;
-    color?: TraceVec3;
-    intensity?: number;
-    twoSided?: boolean;
-    opaque?: boolean;
-    visible?: boolean;
-}
 
 export interface TraceBounceLimits {
     diffuse?: number;
@@ -138,6 +127,7 @@ export interface TraceInstance {
     matrix: readonly number[];
     visible?: boolean;
     previousMatrix?: readonly number[];
+    motionInterpolation?: 'matrix' | 'trs';
 }
 
 export interface TraceLensDistortion {
@@ -285,7 +275,7 @@ export interface VoxelPathTracerOptions {
     fisheye?: TraceFisheye;
     distortion?: TraceLensDistortion | null;
     clamp?: number;
-    toneMapping?: 'neutral' | 'linear' | 'aces-narkowicz';
+    toneMapping?: 'neutral' | 'linear' | 'aces-narkowicz' | 'agx';
     gamma?: number;
     bounceLimits?: TraceBounceLimits | null;
     transparentShadows?: boolean;
@@ -366,7 +356,10 @@ export interface VoxelTraceScene {
     instances: readonly TraceInstance[];
     materials: readonly TraceMaterial[];
     environment?: TraceEnvironment;
-    lights?: readonly TraceAreaLight[];
+    lights?: readonly (RectAreaLight & {
+        opaque?: boolean;
+        visible?: boolean;
+    })[];
     textures?: readonly TraceTexture[];
 }
 

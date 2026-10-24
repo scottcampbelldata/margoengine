@@ -4,7 +4,6 @@
 
 ```ts
 import { Camera, Engine, Geometry, Mesh } from "@margoengine/core";
-import { ColorInput } from "@margoengine/math";
 
 export interface AsyncBuildOptions extends BVHBuildOptions {
     transfer?: boolean;
@@ -36,43 +35,6 @@ export interface BVHHit {
 }
 
 export type BVHPositions = Float32Array | Float64Array;
-
-export interface BakeAmbientOcclusion {
-    strength?: number;
-    rays?: number;
-    distance?: number;
-}
-
-export interface BakeLight {
-    type: 'ambient' | 'directional' | 'point' | 'spot';
-    color?: ColorInput;
-    intensity?: number;
-    direction?: Vec3;
-    position?: Vec3;
-    distance?: number;
-    decay?: number;
-    angle?: number;
-    penumbra?: number;
-    visible?: boolean;
-}
-
-export interface BakeOptions {
-    lights?: readonly BakeLight[];
-    shadows?: boolean;
-    backfaces?: boolean;
-    includeHidden?: boolean;
-    ao?: BakeAmbientOcclusion;
-    apply?: 'none' | 'standard';
-    multiplier?: number;
-    seed?: number;
-    bias?: number;
-}
-
-export interface BakeTarget {
-    positions: ArrayLike<number>;
-    normals: ArrayLike<number>;
-    colors?: ArrayLike<number> | null;
-}
 
 export interface Box3Like {
     min: ArrayLike<number>;
@@ -137,6 +99,7 @@ export class MeshBVH {
     }): SerializedBVH;
     toArrayBuffer(): ArrayBuffer;
     refit(): void;
+    intersectsSegment(start: ArrayLike<number>, end: ArrayLike<number>, options?: SegmentOptions): boolean;
     raycastFirst(ray: Ray, options?: RaycastOptions): BVHHit | null;
     raycast(ray: Ray, options?: RaycastOptions): BVHHit[];
     closestPointToPoint(point: ArrayLike<number>, { maxDistance, minDistance }?: ClosestPointOptions): ClosestPointResult | null;
@@ -173,8 +136,6 @@ export interface ModelPrimitiveLike {
 export { MutableVec3 } from "@margoengine/math";
 
 export const NOT_INTERSECTED = 0;
-
-export type PaletteMode = 'nearest' | 'balanced' | 'luminance';
 
 export interface PickProxy {
     readonly anchor: Mesh;
@@ -219,6 +180,7 @@ export interface RaycastOptions {
     near?: number;
     far?: number;
     side?: Side;
+    includeFace?: (faceIndex: number) => boolean;
 }
 
 export interface RaycastProjectSegmentOptions {
@@ -359,6 +321,8 @@ export interface RaycasterHit {
 
 export type RaycasterSide = Side | 'material';
 
+export type SegmentOptions = Pick<RaycastOptions, 'side' | 'includeFace'>;
+
 export interface SerializedBVH {
     version: 1;
     nodes: ArrayBuffer;
@@ -406,8 +370,6 @@ export interface WorldTrianglesOptions {
     filter?: (mesh: Mesh, model?: ModelLike) => boolean;
 }
 
-export function bakeVertexColors(target: BakeTarget, occluder: MeshBVH | null, options?: BakeOptions): Float32Array;
-
 export function buildAsync(source: GeometryLike | TriangleSource, options?: AsyncBuildOptions): Promise<MeshBVH>;
 
 export function buildBVH(positions: ArrayLike<number>, stride: number, indices: ArrayLike<number> | null, options?: BVHBuildOptions): BVHData;
@@ -436,8 +398,6 @@ export { invert as invertMatrix };
 function invert(m: ArrayLike<number>, out?: Float64Array): Float64Array | null;
 
 export const isModel: (value: unknown) => value is ModelLike;
-
-export function limitPalette(colors: ArrayLike<number>, palette: readonly ColorInput[], mode?: PaletteMode): Float32Array;
 
 export { multiply as multiplyMatrices };
 function multiply(a: ArrayLike<number>, b: ArrayLike<number>, out?: Float64Array): Float64Array;

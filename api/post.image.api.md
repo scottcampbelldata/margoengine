@@ -27,7 +27,7 @@ export class ImagePost implements EnginePlugin {
 
 export interface ImagePostOptions {
     bloom?: Pick<BloomOptions, 'strength' | 'threshold' | 'radius'>;
-    toneMapping?: 'neutral' | 'linear' | 'aces-narkowicz';
+    toneMapping?: 'neutral' | 'linear' | 'aces-narkowicz' | 'agx';
     exposure?: number;
     gamma?: number;
     vignette?: number;

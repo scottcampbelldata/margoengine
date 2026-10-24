@@ -199,6 +199,8 @@ export class Material {
     set lightMap(v: Texture | null);
     get lightMapIntensity(): number;
     set lightMapIntensity(v: number);
+    get lightMapResponse(): 'multiply' | 'lambertian';
+    set lightMapResponse(v: 'multiply' | 'lambertian');
     get clearcoatMap(): Texture | null;
     set clearcoatMap(v: Texture | null);
     get clearcoatRoughnessMap(): Texture | null;
@@ -376,6 +378,15 @@ export interface MaterialGraph {
     nodes: readonly MaterialNode[];
 }
 
+export interface MaterialGraphOutput {
+    wgsl: string;
+    color: true;
+    normal: boolean;
+    metalRough: boolean;
+    clearcoat: boolean;
+    transmission: boolean;
+}
+
 export class MaterialInstallation implements EnginePlugin {
     readonly model: PBRModel;
     static attach(model: PBRModel): MaterialInstallation;
@@ -448,6 +459,7 @@ export interface MaterialOptions extends PhysicalOptions {
     displacementBias?: number;
     lightMap?: Texture | null;
     lightMapIntensity?: number;
+    lightMapResponse?: 'multiply' | 'lambertian';
     transparent?: boolean;
     alphaTest?: number;
     side?: MaterialSide;
@@ -828,6 +840,8 @@ export function loadKTX2Texture(url: string | URL, { decoder, signal, ...options
 export function loadTexture(url: string | URL, { signal, ...options }?: TextureOptions & {
     signal?: AbortSignal;
 }): Promise<Texture>;
+
+export function materialGraphOutput(graph: MaterialGraph, options?: NodeMaterialOptions): MaterialGraphOutput;
 
 export function materialLobes(options?: MaterialLobeOptions, base?: MaterialExtension): MaterialExtension;
 

@@ -162,6 +162,7 @@ export class NodeMaterial extends Material {
     readonly fragmentCode: string;
     readonly vertexCode: string;
     readonly varyingFields: string;
+    surfaceGraph?: SurfaceGraph;
     constructor(options?: NodeMaterialOptions);
     shader(source: string, group: number): string;
     bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[];
@@ -566,6 +567,39 @@ interface Spec {
     id: number;
     params: Node[];
     result: Node;
+}
+
+interface SurfaceFallback {
+    color: [number, number, number];
+    emissive: [number, number, number];
+    roughness: number;
+    metalness: number;
+    opacity: number;
+}
+
+interface SurfaceGraph {
+    version: 1;
+    nodes: SurfaceGraphNode[];
+    outputs: SurfaceOutputs;
+    fallback: SurfaceFallback;
+}
+
+interface SurfaceGraphNode {
+    id: string;
+    op: SurfaceOperation;
+    inputs: string[];
+    value?: number | [number, number, number];
+}
+
+type SurfaceOperation = 'float' | 'vec3' | 'position' | 'worldPosition' | 'normal' | 'worldNormal' | 'color' | 'uv' | 'add' | 'sub' | 'mul' | 'div' | 'min' | 'max' | 'pow' | 'mix' | 'clamp' | 'sin' | 'cos' | 'abs' | 'floor' | 'fract' | 'saturate' | 'length' | 'dot' | 'normalize' | 'component' | 'combine';
+
+interface SurfaceOutputs {
+    color?: string;
+    roughness?: string;
+    metalness?: string;
+    emissive?: string;
+    opacity?: string;
+    normal?: string;
 }
 
 type Sw<X extends string> = X | `${X}${X}` | `${X}${X}${X}` | `${X}${X}${X}${X}`;

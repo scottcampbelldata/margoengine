@@ -50,11 +50,16 @@ export type MeshOptions = NonNullable<ConstructorParameters<typeof PbrMaterial>[
     rotation?: Vec3;
     scale?: Vec3;
     name?: string;
+    scene?: Scene;
 };
 
 export { PbrMaterial } from "@margoengine/core";
 
 export { PbrMaterialOptions } from "@margoengine/core";
+
+export { RenderView } from "@margoengine/core";
+
+export { Scene } from "@margoengine/core";
 
 export class Stage {
     readonly engine: EngineKernel;

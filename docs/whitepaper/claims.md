@@ -95,7 +95,9 @@ proofs` runs all 46 pinned, two at a time (about 8 min; 45 PASS, 1 HISTORICAL). 
 guarantees and also pass against the working tree with `npm run proofs -- --current` (part of `npm run verify`), from the
 ref given (the last intended change to their output). Pinned runs build the compared packages and packages/shared at
 the pin; `@margoengine/core` (frozen), the proof scripts and their fixtures are today's, so mock-GPU timings recorded
-before the core speed-ups (`0ed56b9`) re-run faster than recorded.
+before the core speed-ups (`0ed56b9`) re-run faster than recorded. The animator proof has no current run: it compares
+every transform write bit for bit, and the animator has skipped unchanged writes since `f33e094` and reads
+`options.speed` since `6a1c6bb`, so only its pinned run can match.
 
 | Proof | Rows | Pinned: baseline -> claim commit | Current: ref -> working tree |
 | --- | --- | --- | --- |

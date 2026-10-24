@@ -163,7 +163,9 @@ export interface LightingEffect {
 }
 
 export interface MaterialExtension {
+    afterOpaque?: boolean;
     replacesPhysical?: boolean;
+    transmission?: string;
     wgsl?: string;
     direct?: string;
     ambient?: string;
@@ -417,7 +419,7 @@ export function textureCoordinates(info: Pick<GLTFTextureInfo, 'texCoord' | 'ext
 
 export function textureTransform(x?: TextureTransform, texCoord?: number): number[];
 
-export function validatePreparedGeometry(data: PreparedGeometry): void;
+export function validatePreparedGeometry(data: { vertices: Float32Array; indices: Uint32Array }): void;
 
 export function viewGLTFCamera(model: PBRModel, camera?: number | GLTFCamera): void;
 

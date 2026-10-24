@@ -149,6 +149,7 @@ export interface PointsPickHit {
 
 export interface PointsPickOptions {
     radius?: number;
+    view?: string;
 }
 
 export interface PointsPickResult {
@@ -188,6 +189,7 @@ export class PointsPlugin implements EnginePlugin {
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
+    onPreUpdate(delta: number): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
     pick(x: number, y: number, options?: PointsPickOptions): PointsPickResult | null;

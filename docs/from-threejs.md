@@ -1190,7 +1190,7 @@ features add no core or stage functionality.
 
 | three.js | Status in Margo |
 | --- | --- |
-| Multiple scenes, general multi-view rendering | One implicit scene per engine; `SceneSwitch` (`@margoengine/cameras/layers`) swaps mesh sets. Mirrors, glass and `CubeCamera` (`@margoengine/environment`) capture other views; nested rendering and independent temporal histories remain absent. Planned next: [multi-view-roadmap.md](multi-view-roadmap.md) |
+| Multiple scenes, general multi-view rendering | `engine.createScene(name)` and `engine.views` (or `engine.render({views})`): each view draws one scene through its own camera into its own rectangle, with per-view effects and history. Layer masks from `@margoengine/cameras/layers`. Mirrors, glass and `CubeCamera` (`@margoengine/environment`) capture other views. Status per package: [multi-view-roadmap.md](multi-view-roadmap.md) |
 | General viewport/scissor support | Core draws accept viewport/scissor rectangles; optional native passes and picking do not inherit them, and camera aspect remains caller-controlled |
 | WebGL2 for optional packages | Closed v1 limit: core meshes, controls, labels, viewcube, bvh, LOD distance levels and the small glTF loader run on WebGL2; the rest needs WebGPU |
 | glTF `KHR_animation_pointer` | Files that require it are rejected; when only used, animation `createMaterialAnimation` plays base-colour UV offset and scale tracks, and exporters write those tracks from data scenes. Dispersion, iridescence, anisotropy and diffuse transmission use the documented `@margoengine/gltf-pro/extended` material path; material variants (`selectVariant`) and glTF cameras (`viewGLTFCamera`) are supported |

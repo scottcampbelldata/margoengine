@@ -74,6 +74,11 @@ export interface FramePassReport {
     name: string;
     owner: string;
     order: number | null;
+    view?: {
+        id: string;
+        viewport: readonly [number, number, number, number];
+        scene: string;
+    };
     cpuMilliseconds: number;
     gpuMilliseconds: number | null;
     passes: GPUPassReport[];

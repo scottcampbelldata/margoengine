@@ -101,6 +101,8 @@ export function pasteVoxModel(world: VoxelWorld, model: VoxModel | VoxScene, at:
 
 export function readVoxRenderDictionaries(scene: VoxScene, limits?: VoxRenderLimits): VoxRenderDictionaries;
 
+export function voxBlockOptions(material: VoxMaterial): BlockTypeOptions;
+
 export function writeVox(scene: VoxScene): Uint8Array;
 
 // Not exported from this entry, but used by the exports above:
@@ -127,6 +129,13 @@ interface BlockType {
         readonly frames: number;
         readonly fps: number;
     };
+    readonly maps: {
+        readonly normal: number;
+        readonly roughness: number;
+        readonly emissive: number;
+    };
+    readonly transmission: number;
+    readonly scatter: number;
 }
 
 interface BlockTypeOptions {
@@ -145,6 +154,13 @@ interface BlockTypeOptions {
         frames: number;
         fps: number;
     };
+    maps?: {
+        normal?: number;
+        roughness?: number;
+        emissive?: number;
+    };
+    transmission?: number;
+    scatter?: number;
 }
 
 class BlockTypes {

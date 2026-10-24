@@ -22,6 +22,7 @@ export interface Lightmap {
     };
     lightmapScale: number;
     emissionScale: number;
+    radiometry?: 'physical';
     samples: number;
     rays: number;
 }
@@ -35,6 +36,7 @@ export interface LightmapChart {
 }
 
 export interface LightmapOptions {
+    radiometry?: 'legacy' | 'physical';
     texelsPerUnit?: number;
     padding?: number;
     maxAtlasSize?: number;
@@ -75,4 +77,26 @@ export interface LightmapTexel {
 }
 
 export function bakeLightmap(quads: LightmapQuads, options?: LightmapOptions): Promise<Lightmap>;
+
+export function lightingAsset(lightmap: Lightmap, terms?: {
+    indirect?: boolean;
+    emissive?: boolean;
+    area?: boolean;
+    transmission?: boolean;
+}): {
+    lightmapScale: number;
+    emissionScale: number;
+    width: number;
+    height: number;
+    radiometry?: 'physical';
+    response?: 'lambertian';
+    terms: {
+        direct: true;
+        occlusion: boolean;
+        indirect: boolean;
+        emissive: boolean;
+        area: boolean;
+        transmission: boolean;
+    };
+};
 ```
