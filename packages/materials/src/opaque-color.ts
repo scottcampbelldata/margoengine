@@ -3,6 +3,7 @@ import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine
 import { SceneTarget, sceneTarget } from '../../shared/msaa.js';
 import { currentFrame, retire } from '../../shared/frame-resources.js';
 import { fullscreen } from '../../shared/gpu.js';
+import { webgpuPass } from '../../shared/pass.js';
 import { Cleanup } from '../../shared/cleanup.js';
 
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
@@ -71,20 +72,8 @@ class OpaqueColor implements EnginePlugin {
     this.placeholderView = this.placeholder.createView();
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add({
-      name: this.name + ':begin',
-      order: -0.1,
-      execute: (c) => {
-        if (c.backend === 'webgpu') this.begin(c);
-      },
-    });
-    graph.add({
-      name: this.name + ':copy',
-      order: 8,
-      execute: (c) => {
-        if (c.backend === 'webgpu') this.snapshot(c);
-      },
-    });
+    graph.add(webgpuPass(this.name + ':begin', -0.1, (c) => this.begin(c)));
+    graph.add(webgpuPass(this.name + ':copy', 8, (c) => this.snapshot(c)));
     graph.add({
       name: this.name + ':blend',
       order: 8.1,
@@ -97,13 +86,7 @@ class OpaqueColor implements EnginePlugin {
         }
       },
     });
-    graph.add({
-      name: this.name + ':present',
-      order: 8.2,
-      execute: (c) => {
-        if (c.backend === 'webgpu') this.present(c);
-      },
-    });
+    graph.add(webgpuPass(this.name + ':present', 8.2, (c) => this.present(c)));
   }
   private create(c: Context, borrowed?: SceneTarget): Capture {
     const textures: GPUTexture[] = [];

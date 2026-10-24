@@ -23,12 +23,3 @@ export function dispatch(
   y?: number,
 ): void;
 export function acquireDepth(engine: Engine): { texture: () => GPUTexture | undefined; release(): void };
-/** A reusable pass descriptor drawing over the frame (colour load/store; depth read only, or load/store with `depthWrites`). */
-export function overlayPass(depthWrites?: boolean): GPURenderPassDescriptor & {
-  colorAttachments: [GPURenderPassColorAttachment];
-  depthStencilAttachment: GPURenderPassDepthStencilAttachment;
-};
-/** Straight (non-premultiplied) alpha blending. */
-export const alphaBlend: GPUBlendState;
-/** `mesh` when it is null or a core mesh handle (checked live); else a TypeError. */
-export function attachableMesh<M extends { check(): void } | null>(mesh: M): M;

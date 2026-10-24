@@ -28,6 +28,7 @@ import {
 import { MargoError } from '@margoengine/math/errors';
 import { hiddenInTree } from '../../shared/visibility.js';
 import { casterBuffers, casterRuntime, displacementGroup } from '../../shared/caster.js';
+import { webgpuPass } from '../../shared/pass.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -514,13 +515,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   }
   // Runs after skinning (-10) and before directional shadows (-5), which upload pending instance rows.
   registerPasses(graph: FrameGraph): void {
-    graph.add({
-      name: this.name,
-      order: -5.5,
-      execute: (c) => {
-        if (c.backend === 'webgpu') this.render(c);
-      },
-    });
+    graph.add(webgpuPass(this.name, -5.5, (c) => this.render(c)));
   }
   private render(c: Context): void {
     this.validate();

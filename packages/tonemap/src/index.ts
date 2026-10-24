@@ -14,6 +14,7 @@ import type { StackHost, StackStage } from '../../shared/stack.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { linearShader } from '../../shared/display.js';
+import { webgpuPass } from '../../shared/pass.js';
 export { parseCube };
 export type { CubeLUT };
 
@@ -204,20 +205,8 @@ export class Tonemap implements EnginePlugin {
   }
   registerPasses(graph: FrameGraph): void {
     if (this.stacked) return;
-    graph.add({
-      name: 'tonemap:capture',
-      order: -50,
-      execute: (c) => {
-        if (c.backend === 'webgpu') this.capture(c);
-      },
-    });
-    graph.add({
-      name: 'tonemap:grade',
-      order: 31,
-      execute: (c) => {
-        if (c.backend === 'webgpu') this.grade(c);
-      },
-    });
+    graph.add(webgpuPass('tonemap:capture', -50, (c) => this.capture(c)));
+    graph.add(webgpuPass('tonemap:grade', 31, (c) => this.grade(c)));
   }
   private capture(c: Context): void {
     this.validate();

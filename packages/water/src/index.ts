@@ -9,6 +9,7 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { acquireDepth, group } from '../../shared/gpu.js';
+import { webgpuPass } from '../../shared/pass.js';
 import { CoastalFlow, waterFrame, oceanWaves } from './coastal.js';
 import { Spray } from './spray.js';
 import { displayShader } from '../../shared/display.js';
@@ -601,13 +602,7 @@ export class Water implements EnginePlugin {
     engine.gpu.queue.writeBuffer(this.indices, 0, this.triangles as Uint32Array<ArrayBuffer>);
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add({
-      name: this.name + ':draw',
-      order: 4,
-      execute: (c) => {
-        if (c.backend === 'webgpu') this.drawSurface(c);
-      },
-    });
+    graph.add(webgpuPass(this.name + ':draw', 4, (c) => this.drawSurface(c)));
   }
   private validateLights(): void {
     const lights = this.options.lights;

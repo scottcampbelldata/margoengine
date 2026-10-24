@@ -28,7 +28,7 @@ import { voxelPostShader } from './render-post.js';
 import type { VoxelLightmap } from './lightmap.js';
 import { BlockTextures, blockTextureView } from './textures.js';
 import type { VoxelWorld } from './world.js';
-import { alphaBlend } from '../../shared/gpu.js';
+import { alphaBlend } from '../../shared/pass.js';
 
 export type { VoxelLightmap } from './lightmap.js';
 export { type BlockPixels, BlockTextures, type BlockTexturesOptions } from './textures.js';

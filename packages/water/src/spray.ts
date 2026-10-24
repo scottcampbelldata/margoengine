@@ -1,5 +1,6 @@
 import type { PassContext } from '@margoengine/core/extension';
-import { compute, group, overlayPass } from '../../shared/gpu.js';
+import { compute, group } from '../../shared/gpu.js';
+import { overlayPass } from '../../shared/pass.js';
 import { waterFrame, type CoastalFlow } from './coastal.js';
 import { fogWgsl } from '../../shared/fog.js';
 import { margoError } from '../../shared/errors.js';

@@ -16,6 +16,7 @@ export type { FogLike } from '../../shared/fog.js';
 import { histogram, scan, scanTotals, scatter } from './sort.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView } from '../../shared/view-rect.js';
+import { webgpuPass } from '../../shared/pass.js';
 export { parseSplat, validateSplats, type SplatData } from './data.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; COPY_SRC: number; STORAGE: number; INDEX: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -190,20 +191,8 @@ export class Splats implements EnginePlugin {
     }
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add({
-      name: this.name + ':project-sort',
-      order: -7,
-      execute: (c) => {
-        if (c.backend === 'webgpu') this.sort(c);
-      },
-    });
-    graph.add({
-      name: this.name + ':draw',
-      order: 3,
-      execute: (c) => {
-        if (c.backend === 'webgpu') this.draw(c);
-      },
-    });
+    graph.add(webgpuPass(this.name + ':project-sort', -7, (c) => this.sort(c)));
+    graph.add(webgpuPass(this.name + ':draw', 3, (c) => this.draw(c)));
   }
   private sort(c: Context): void {
     this.values.set(c.camera.matrix);

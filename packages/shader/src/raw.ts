@@ -10,7 +10,7 @@ import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine
 import { viewMatrix } from '../../shared/view.js';
 import { neutralShader } from '../../shared/display.js';
 import type { BindableTexture } from './texture.js';
-import { alphaBlend } from '../../shared/gpu.js';
+import { alphaBlend } from '../../shared/pass.js';
 declare const GPUBufferUsage: { UNIFORM: number; VERTEX: number; INDEX: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };

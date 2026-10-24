@@ -28,6 +28,7 @@ import {
 } from './capture.js';
 import { checkLayers } from '../../shared/view-rect.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { webgpuPass } from '../../shared/pass.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
@@ -311,13 +312,7 @@ export abstract class PlanarSurface {
     });
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add({
-      name: this.name,
-      order: this.order,
-      execute: (c) => {
-        if (c.backend === 'webgpu') this.draw(c);
-      },
-    });
+    graph.add(webgpuPass(this.name, this.order, (c) => this.draw(c)));
   }
   onDeviceRestored(): void {
     this.release();

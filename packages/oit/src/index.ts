@@ -13,6 +13,7 @@ import type { PBRModel, PBRTransparency } from '@margoengine/gltf-pro';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView } from '../../shared/view-rect.js';
 import { currentFrame, retire, writeUniform } from '../../shared/frame-resources.js';
+import { webgpuPass } from '../../shared/pass.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; RENDER_ATTACHMENT: number };
@@ -144,13 +145,7 @@ export class OIT implements EnginePlugin, PBRTransparency {
     this.uniform = engine.gpu.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add({
-      name: this.name,
-      order: this.order,
-      execute: (c) => {
-        if (c.backend === 'webgpu') this.render(c);
-      },
-    });
+    graph.add(webgpuPass(this.name, this.order, (c) => this.render(c)));
   }
   /** @internal gltf-pro transparency hook. */
   declarations(group: number): string {

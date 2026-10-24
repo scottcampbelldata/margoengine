@@ -16,7 +16,7 @@ import cullShader from './shaders/grass-cull.wgsl?raw';
 import grassShader from './shaders/grass.wgsl?raw';
 import { displayShader } from '../../shared/display.js';
 import { applyView } from '../../shared/view-rect.js';
-import { overlayPass } from '../../shared/gpu.js';
+import { overlayPass } from '../../shared/pass.js';
 
 declare const GPUBufferUsage: {
   STORAGE: number;

@@ -14,6 +14,7 @@ import { invertMatrixStable } from '@margoengine/math/mat4';
 import { declaration } from './section-uniform.js';
 import { capsAsSolid } from './closed.js';
 import { displayShader } from '../../shared/display.js';
+import { webgpuPass } from '../../shared/pass.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; INDIRECT: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
 type GPUContext = Extract<PassContext, { backend: 'webgpu' }>;
@@ -166,14 +167,7 @@ export class SectionPlanes implements EnginePlugin {
       this.upload(context);
     };
     graph.add({ name: 'sections:clip', order: -30, execute: clip, prepare: clip });
-    if (this.cap)
-      graph.add({
-        name: 'sections:cap',
-        order: 5,
-        execute: (context) => {
-          if (context.backend === 'webgpu') this.drawCaps(context);
-        },
-      });
+    if (this.cap) graph.add(webgpuPass('sections:cap', 5, (context) => this.drawCaps(context)));
   }
   private upload(context: GPUContext): void {
     const inverse = this.inverse;

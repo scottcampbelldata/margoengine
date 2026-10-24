@@ -7,6 +7,7 @@ import { neutralShader } from '../../shared/display.js';
 import { lightPBR } from '../../shared/pbr-hooks.js';
 import { multiplyMatrices } from '@margoengine/math/mat4';
 import { applyView } from '../../shared/view-rect.js';
+import { webgpuPass } from '../../shared/pass.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; VERTEX: number; INDEX: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -424,13 +425,7 @@ export class VATCrowd implements EnginePlugin {
     this.time += delta;
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add({
-      name: this.name,
-      order: 1,
-      execute: (c) => {
-        if (c.backend === 'webgpu') this.draw(c);
-      },
-    });
+    graph.add(webgpuPass(this.name, 1, (c) => this.draw(c)));
   }
   private resources(device: GPUDevice) {
     if (this.device === device && this.gpu) return this.gpu;

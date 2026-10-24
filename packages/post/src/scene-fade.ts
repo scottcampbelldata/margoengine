@@ -9,6 +9,7 @@ import {
 } from '@margoengine/core/extension';
 import { sceneSamples } from '../../shared/quality.js';
 import { fullscreen } from '../../shared/gpu.js';
+import { webgpuPass } from '../../shared/pass.js';
 import { afterPresented as presented, submitPrincipalScene as submit } from '../../shared/demo-frame.js';
 import { margoError } from '../../shared/errors.js';
 import { applyView } from '../../shared/view-rect.js';
@@ -190,13 +191,7 @@ export class SceneFade implements EnginePlugin {
     this.started ??= performance.now();
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add({
-      name: this.name,
-      order: 100,
-      execute: (c) => {
-        if (c.backend === 'webgpu') this.draw(c);
-      },
-    });
+    graph.add(webgpuPass(this.name, 100, (c) => this.draw(c)));
   }
   private draw(c: Extract<PassContext, { backend: 'webgpu' }>): void {
     if (!this.pipeline || this.disposed) return;

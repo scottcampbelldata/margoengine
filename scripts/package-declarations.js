@@ -104,6 +104,8 @@ export async function packageRuntime(root) {
       let next;
       if (inside(dist, target)) next = target;
       else if (inside(shared, target)) next = join(dist, 'shared', relative(shared, target));
+      else if (inside(shared, source))
+        throw new Error(`Runtime dependency escapes ${root}: ${reference.specifier} in ${source}`);
       else continue;
       await visit(target, next);
       let replacement = relative(dirname(destination), next).split(sep).join('/');

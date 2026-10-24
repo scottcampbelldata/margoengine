@@ -10,7 +10,7 @@ import {
 } from '@margoengine/core/extension';
 import { edgesGeometry } from '@margoengine/geometry/utils';
 import { declaration } from './section-uniform.js';
-import { alphaBlend } from '../../shared/gpu.js';
+import { alphaBlend, webgpuPass } from '../../shared/pass.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number; INDIRECT: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
 type GPUContext = Extract<PassContext, { backend: 'webgpu' }>;
@@ -245,13 +245,7 @@ export class FeatureEdges implements EnginePlugin {
     this.cull = device.createComputePipeline({ layout: 'auto', compute: { module, entryPoint: 'cull' } });
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add({
-      name: 'feature-edges:draw',
-      order: this.order,
-      execute: (context) => {
-        if (context.backend === 'webgpu') this.draw(context);
-      },
-    });
+    graph.add(webgpuPass('feature-edges:draw', this.order, (context) => this.draw(context)));
   }
   private draw(context: GPUContext): void {
     const engine = this.engine!,

@@ -9,6 +9,7 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { render, group, compute } from '../../shared/gpu.js';
+import { webgpuPass } from '../../shared/pass.js';
 import { orthographic } from '../../shared/projection.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { cocShader, coarseShader, bokehShader, presentShader } from './shaders.js';
@@ -156,13 +157,7 @@ export class DOF implements EnginePlugin {
     this.coarsePipeline = compute(engine.gpu, coarseShader);
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add({
-      name: 'dof:capture',
-      order: -55,
-      execute: (c) => {
-        if (c.backend === 'webgpu') this.capture(c);
-      },
-    });
+    graph.add(webgpuPass('dof:capture', -55, (c) => this.capture(c)));
     if (this.host) return;
     graph.add({
       name: 'dof:coc',
@@ -171,20 +166,8 @@ export class DOF implements EnginePlugin {
         if (c.backend === 'webgpu') this.dispatch(c, this.cocPipeline!, this.groups[0]);
       },
     });
-    graph.add({
-      name: 'dof:bokeh',
-      order: 21,
-      execute: (c) => {
-        if (c.backend === 'webgpu') this.blur(c);
-      },
-    });
-    graph.add({
-      name: 'dof:present',
-      order: 30,
-      execute: (c) => {
-        if (c.backend === 'webgpu') this.present(c);
-      },
-    });
+    graph.add(webgpuPass('dof:bokeh', 21, (c) => this.blur(c)));
+    graph.add(webgpuPass('dof:present', 30, (c) => this.present(c)));
   }
   private capture(c: Context): void {
     this.validate();

@@ -9,7 +9,7 @@ import { multiplyMatrices } from '@margoengine/math/mat4';
 import { textShader } from './shader.js';
 import { Text } from './text.js';
 import { applyView } from '../../shared/view-rect.js';
-import { overlayPass } from '../../shared/gpu.js';
+import { overlayPass } from '../../shared/pass.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };

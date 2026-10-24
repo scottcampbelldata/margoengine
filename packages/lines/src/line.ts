@@ -13,7 +13,7 @@ import {
   type LineMode,
 } from './geometry.js';
 import { copyIfChanged, finiteArray, identity, type Mat4 } from './math.js';
-import { attachableMesh } from '../../shared/gpu.js';
+import { attachableMesh } from '../../shared/pass.js';
 
 /**
  * Style options for `LineMaterial` (and `Line`). Validated on set and every frame: out-of-range numbers throw

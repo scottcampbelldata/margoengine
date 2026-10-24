@@ -9,6 +9,7 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { compute } from '../../shared/gpu.js';
+import { webgpuPass } from '../../shared/pass.js';
 import {
   Node,
   Program,
@@ -294,13 +295,7 @@ export class ComputePass implements EnginePlugin {
     this.engine = engine;
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add({
-      name: this.name,
-      order: this.order,
-      execute: (c) => {
-        if (c.backend === 'webgpu') this.dispatch(c);
-      },
-    });
+    graph.add(webgpuPass(this.name, this.order, (c) => this.dispatch(c)));
   }
   private dispatch(c: Context): void {
     this.encode(c.device, c.encoder, { width: c.width, height: c.height, delta: c.delta });

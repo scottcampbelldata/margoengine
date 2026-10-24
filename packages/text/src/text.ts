@@ -18,7 +18,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { eulerToQuaternion } from '@margoengine/math/quat';
 import type { Vec3 } from '@margoengine/math';
 import { compose, finiteArray, identity, type Mat4 } from './math.js';
-import { attachableMesh } from '../../shared/gpu.js';
+import { attachableMesh } from '../../shared/pass.js';
 
 /**
  * Appearance options of a `Text` block. Validated every frame: opacities outside 0..1 or a negative or

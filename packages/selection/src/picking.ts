@@ -13,6 +13,7 @@ import {
   type RenderView,
 } from '@margoengine/core/extension';
 import { meshVertex } from '../../shared/gpu.js';
+import { webgpuPass } from '../../shared/pass.js';
 import { inView } from '../../shared/view-rect.js';
 import { PickingPrimitives, type PickingSource } from './picking-primitives.js';
 export type { PickingSource, PickingPrimitive } from './picking-primitives.js';
@@ -240,13 +241,7 @@ export class Picking implements EnginePlugin {
   }
   registerPasses(graph: FrameGraph): void {
     if (this.options.capture === false) return;
-    graph.add({
-      name: 'picking:capture',
-      order: -1,
-      execute: (c) => {
-        if (c.backend === 'webgpu') this.capture(c);
-      },
-    });
+    graph.add(webgpuPass('picking:capture', -1, (c) => this.capture(c)));
     graph.add({
       name: 'picking:restore',
       order: 0.01,

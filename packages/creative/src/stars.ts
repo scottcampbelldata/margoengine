@@ -4,7 +4,7 @@ import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
 import shader from './shaders/stars.wgsl?raw';
-import { overlayPass } from '../../shared/gpu.js';
+import { overlayPass } from '../../shared/pass.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number };

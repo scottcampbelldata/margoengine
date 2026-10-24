@@ -22,7 +22,7 @@ export {
   type ImposterSource,
 } from './imposter.js';
 import { MargoError } from '@margoengine/math/errors';
-import { overlayPass } from '../../shared/gpu.js';
+import { overlayPass, webgpuPass } from '../../shared/pass.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
@@ -143,13 +143,7 @@ export class LODSystem implements EnginePlugin {
     this.engine = engine;
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add({
-      name: this.name,
-      order: 1.5,
-      execute: (c) => {
-        if (c.backend === 'webgpu') this.draw(c);
-      },
-    });
+    graph.add(webgpuPass(this.name, 1.5, (c) => this.draw(c)));
   }
   onPreUpdate(): void {
     this.update();

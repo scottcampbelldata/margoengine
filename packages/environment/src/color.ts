@@ -10,6 +10,7 @@ import {
   SRGBToLinear as srgbToLinear,
 } from '@margoengine/math/color';
 import { MargoError } from '@margoengine/math/errors';
+import { webgpuPass } from '../../shared/pass.js';
 
 export type { ColorInput } from '@margoengine/math/color';
 
@@ -152,13 +153,7 @@ export class ColorBackground {
       );
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add({
-      name: this.name,
-      order: this.order,
-      execute: (c) => {
-        if (c.backend === 'webgpu') this.record(c);
-      },
-    });
+    graph.add(webgpuPass(this.name, this.order, (c) => this.record(c)));
   }
   onDeviceRestored(): void {
     this.release();

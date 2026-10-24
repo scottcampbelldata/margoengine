@@ -9,6 +9,7 @@ import { background as backgroundShader, imageBackground as imageBackgroundShade
 import { invertMatrix } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView } from '../../shared/view-rect.js';
+import { webgpuPass } from '../../shared/pass.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
@@ -143,13 +144,7 @@ export class EnvironmentBackground {
       this.environment.restore(device).catch((error) => engine.onError(error));
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add({
-      name: this.name,
-      order: this.order,
-      execute: (context) => {
-        if (context.backend === 'webgpu') this.record(context);
-      },
-    });
+    graph.add(webgpuPass(this.name, this.order, (context) => this.record(context)));
   }
   onDeviceRestored(engine: EngineKernel): void {
     this.releaseState();
@@ -479,13 +474,7 @@ export class ImageBackground {
       throw new MargoError('unsupported', 'ImageBackground requires the WebGPU backend; create the engine with WebGPU');
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add({
-      name: this.name,
-      order: this.order,
-      execute: (context) => {
-        if (context.backend === 'webgpu') this.record(context);
-      },
-    });
+    graph.add(webgpuPass(this.name, this.order, (context) => this.record(context)));
   }
   onDeviceRestored(): void {
     this.release();

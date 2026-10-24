@@ -14,6 +14,7 @@ import { instancedDepth } from '../../shared/instances.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 import { casterBuffers } from '../../shared/caster.js';
+import { webgpuPass } from '../../shared/pass.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -248,13 +249,7 @@ export class ContactShadows implements EnginePlugin {
     this.dirty = true;
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add({
-      name: this.name,
-      order: 0.5,
-      execute: (c) => {
-        if (c.backend === 'webgpu') this.render(c);
-      },
-    });
+    graph.add(webgpuPass(this.name, 0.5, (c) => this.render(c)));
   }
   private targets(device: GPUDevice, resolution: number): void {
     if (this.textures[0]?.width === resolution) return;

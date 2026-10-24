@@ -2,6 +2,7 @@ import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine
 import type { Shadows } from '@margoengine/shadows';
 import { live, type Registry } from './internal.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { webgpuPass } from '../../shared/pass.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 export interface ContactGroundOptions {
@@ -45,13 +46,7 @@ export class ContactGround implements EnginePlugin {
     this.engine = engine;
   }
   registerPasses(graph: FrameGraph): void {
-    graph.add({
-      name: this.name,
-      order: 4,
-      execute: (context) => {
-        if (context.backend === 'webgpu') this.draw(context);
-      },
-    });
+    graph.add(webgpuPass(this.name, 4, (context) => this.draw(context)));
   }
   private draw(context: Extract<PassContext, { backend: 'webgpu' }>): void {
     const mesh = live(this.registry);
