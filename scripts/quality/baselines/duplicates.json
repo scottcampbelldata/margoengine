@@ -1,16 +1,23 @@
 {
   "gate": "duplicates",
   "about": "duplicated lines per package pair (8-line normalised windows); reexport items: value re-exports across packages",
-  "total": 15,
+  "total": 27,
   "history": [
     {
       "date": "2026-10-24",
       "commit": "5c34c002",
       "reason": "Initial baseline: what main held at 5c34c002 when the quality gate landed",
       "grew": 92
+    },
+    {
+      "date": "2026-10-24",
+      "commit": "1d1ce705",
+      "reason": "Clean-room staging contact shadows: its scene pass descriptor (colour load, depth load/store, stencil load/store when the format has one) is the same 6 lines as environment planar's; boilerplate, not shared logic.",
+      "grew": 1
     }
   ],
   "items": {
+    "environment | staging": 12,
     "family hex-colour core": 1,
     "family hex-colour math": 1,
     "lines | text": 12,
