@@ -21,7 +21,29 @@ export type {
   DAENode,
   DAEInstance,
   DAEParseOptions,
+  DAETransform,
+  DAESkin,
+  DAEMorph,
+  DAEAnimation,
+  DAEAnimationChannel,
+  DAEClip,
+  DAEInterpolation,
+  DAESampler,
 } from './dae.js';
+export { sampleDAESampler } from './dae-animation.js';
+export { poseDAE, morphDAE, bindDAESkin, daeKeyframeClip, daeNodeNames } from './dae-pose.js';
+export type {
+  DAEPose,
+  DAEPoseOptions,
+  DAEMeshGeometry,
+  DAEBone,
+  DAESkinBinding,
+  DAESkinBindingOptions,
+  DAEKeyframe,
+  DAEKeyframeTrack,
+  DAEKeyframeClip,
+  DAEKeyframeClipOptions,
+} from './dae-pose.js';
 export { parseTMX, tmxLayerQuads } from './tmx.js';
 export type {
   LoadedTMX,

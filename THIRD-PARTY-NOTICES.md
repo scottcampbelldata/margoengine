@@ -166,6 +166,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | [`examples/assets/robot-CREDITS.md`](examples/assets/robot-CREDITS.md) | RobotExpressive upstream credits (Tomás Laulhé, Don McCurdy; CC0) |
 | [`examples/assets/tokyo-diorama-CREDITS.md`](examples/assets/tokyo-diorama-CREDITS.md) | Tokyo diorama: Poly Haven textures (CC0), Noto Sans CJK (OFL 1.1); inspiration credit to Glen Fox, Littlest Tokyo (CC BY 4.0, nothing copied) |
 | [`examples/assets/khronos/README.md`](examples/assets/khronos/README.md) | 32 Khronos glTF sample models, each CC0 1.0 or CC BY 4.0 with its credit |
+| [`examples/assets/khronos-samples/README.md`](examples/assets/khronos-samples/README.md) | Collada and KHR_animation_pointer test models: AnimatedColorsCube (CC0 1.0, Khronos glTF-Sample-Assets), Cesium Man `.dae` and texture (CC BY 4.0, Cesium); URLs, pinned commits and sha256 there |
 | [`examples/assets/kaykit/LICENSE-adventurers.txt`](examples/assets/kaykit/LICENSE-adventurers.txt) | KayKit Adventurers (Kay Lousberg, CC0) |
 | [`examples/assets/kaykit/LICENSE-character-animations.txt`](examples/assets/kaykit/LICENSE-character-animations.txt) | KayKit Character Animations (Kay Lousberg, CC0) |
 | [`examples/assets/kaykit/LICENSE-dungeon.txt`](examples/assets/kaykit/LICENSE-dungeon.txt) | KayKit Dungeon (Kay Lousberg, CC0) |

@@ -12,8 +12,38 @@ import {
   type Limits,
 } from './util.js';
 import { decodeXML, readXMLTree, type XMLElement } from './xml.js';
+import {
+  AXES,
+  converter,
+  F,
+  IDENTITY,
+  integer,
+  kid,
+  kids,
+  multiply,
+  numbers,
+  readSource,
+  ref,
+  stackMatrix,
+  TRANSFORM_SIZES,
+  type DAETransform,
+  type Matrix,
+  type Source,
+} from './dae-common.js';
+import { readControllers, type DAEMorph, type DAESkin } from './dae-controllers.js';
+import { readAnimations, type DAEAnimation, type DAEClip } from './dae-animation.js';
+import { deformInstance, restPose, type DAEPose } from './dae-pose.js';
 
-const F = 'DAE';
+export type { DAETransform } from './dae-common.js';
+export type { DAESkin, DAEMorph } from './dae-controllers.js';
+export type {
+  DAEAnimation,
+  DAEAnimationChannel,
+  DAEClip,
+  DAEInterpolation,
+  DAESampler,
+} from './dae-animation.js';
+
 const NONE = 0xffffffff;
 // The per-file part cap shared by every loader that makes one mesh per part (docs/limits.md).
 const MAX_NODES = 100_000;
@@ -68,20 +98,33 @@ export interface DAEMaterial {
   indexOfRefraction?: number;
 }
 
-/** An `<instance_geometry>`. */
+/**
+ * An `<instance_geometry>`, or an `<instance_controller>` (then `skin` and/or `morph` are set and `geometry` is the
+ * controller's base mesh).
+ */
 export interface DAEInstance {
   /** Index into `LoadedDAE.geometries`. */
   geometry: number;
   /** Index into `LoadedDAE.materials` by primitive symbol, in a null-prototype object. */
   materials: Record<string, number>;
+  /** Index into `LoadedDAE.skins`; set only when every joint resolved to a node (`joints`). */
+  skin?: number;
+  /** Index into `LoadedDAE.morphs`. */
+  morph?: number;
+  /** The node of each of the skin's `joints`, found under the instance's `<skeleton>` roots (else the whole scene). */
+  joints?: DAENode[];
 }
 
 /** A scene node. `instance_node` references are expanded into copies. */
 export interface DAENode {
   id?: string;
   name?: string;
+  /** The node's `sid`, which skin joints name. */
+  sid?: string;
   /** Local transform (the node's matrix, translate, rotate and scale stack), column-major 4x4, in Y-up meters. */
   matrix: number[];
+  /** The transform stack as written (the file's axes and units), which animation channels address by sid. */
+  transforms: DAETransform[];
   instances: DAEInstance[];
   children: DAENode[];
 }
@@ -98,85 +141,25 @@ export interface LoadedDAE {
   images: string[];
   /** Root nodes of the instanced visual scene. */
   nodes: DAENode[];
-  /** What was skipped: lines, holes, skins, morphs, animations, unresolved references. */
+  /** `<skin>` controllers, in Y-up meters. */
+  skins: DAESkin[];
+  /** `<morph>` controllers. */
+  morphs: DAEMorph[];
+  /** Every `<animation>`, nested ones included, with the channels that address imported nodes and morphs. */
+  animations: DAEAnimation[];
+  /** `<animation_clip>`s. */
+  clips: DAEClip[];
+  /** What was skipped: lines, holes, unresolved references, channels and controllers that do not fit. */
   warnings: string[];
 }
 
 /** Options of `parseDAE`. */
 export interface DAEParseOptions extends ParseLimits {}
 
-const kid = (e: XMLElement | undefined, name: string): XMLElement | undefined =>
-  e?.children.find((c) => c.name === name);
-const kids = (e: XMLElement | undefined, name: string): XMLElement[] =>
-  e?.children.filter((c) => c.name === name) ?? [];
-const ref = (url: string | undefined): string => (url?.startsWith('#') ? url.slice(1) : (url ?? ''));
-
-function numbers(text: string, what: string): number[] {
-  const trimmed = text.trim();
-  if (!trimmed) return [];
-  const parts = trimmed.split(/\s+/),
-    out = new Array<number>(parts.length);
-  for (let i = 0; i < parts.length; i++) {
-    const value = Number(parts[i]);
-    if (Number.isNaN(value) && !/^[+-]?nan$/i.test(parts[i]))
-      throw new LoaderError(F, 'syntax', `${what} has the invalid number "${parts[i].slice(0, 32)}"`);
-    out[i] = value;
-  }
-  return out;
-}
-
-function integer(value: string | undefined, fallback: number, what: string): number {
-  if (value === undefined) return fallback;
-  const number = Number(value);
-  if (!Number.isSafeInteger(number) || number < 0)
-    throw new LoaderError(F, 'syntax', `${what} must be a non-negative integer, got "${value.slice(0, 32)}"`);
-  return number;
-}
-
-interface Source {
-  id: string;
-  data: number[];
-  stride: number;
-  offset: number;
-  count: number;
-  /** Offset inside a stride of each named `<param>`. */
-  params: number[];
-}
-
-function readSource(e: XMLElement, ids: Map<string, XMLElement>): Source {
-  const id = e.attributes.id ?? '',
-    accessor = kid(kid(e, 'technique_common'), 'accessor'),
-    array = ids.get(ref(accessor?.attributes.source)) ?? kid(e, 'float_array');
-  if (!accessor || array?.name !== 'float_array')
-    throw new LoaderError(F, 'syntax', `source "${id}" has no float_array with an accessor`);
-  const data = numbers(array.text, `float_array of source "${id}"`),
-    count = integer(accessor.attributes.count, 0, `accessor count of source "${id}"`),
-    stride = integer(accessor.attributes.stride, 1, `accessor stride of source "${id}"`),
-    offset = integer(accessor.attributes.offset, 0, `accessor offset of source "${id}"`),
-    declared = kids(accessor, 'param'),
-    params: number[] = [];
-  declared.forEach((p, i) => p.attributes.name !== undefined && params.push(i));
-  if (!declared.length) for (let i = 0; i < stride; i++) params.push(i);
-  if (count && offset + (count - 1) * stride + Math.max(1, ...params.map((p) => p + 1)) > data.length)
-    throw new LoaderError(
-      F,
-      'truncated',
-      `source "${id}" declares ${count} x ${stride} values but its array holds ${data.length}`,
-    );
-  return { id, data, stride, offset, count, params };
-}
-
 interface Input {
   source: Source;
   offset: number;
 }
-
-const AXES = {
-  Y_UP: [1, 0, 0, 0, 1, 0, 0, 0, 1],
-  // Row-major rotations taking the file's axes to Y-up (COLLADA 1.4.1 up_axis table).
-  Z_UP: [1, 0, 0, 0, 0, 1, 0, -1, 0],
-  X_UP: [0, -1, 0, 1, 0, 0, 0, 0, 1],
-} as const;
 
 function readMesh(
   geometry: XMLElement,
@@ -456,88 +439,50 @@ function readMaterial(
   return result;
 }
 
-type Matrix = number[];
-const IDENTITY: Matrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
-
-/** Column-major a * b. */
-function multiply(a: Matrix, b: Matrix): Matrix {
-  const out = new Array<number>(16);
-  for (let c = 0; c < 4; c++)
-    for (let r = 0; r < 4; r++) {
-      let sum = 0;
-      for (let k = 0; k < 4; k++) sum += a[k * 4 + r] * b[c * 4 + k];
-      out[c * 4 + r] = sum;
+/** The node's transform stack as written, in document order (each element post-multiplies). */
+function readTransforms(node: XMLElement, warn: (message: string) => void): DAETransform[] {
+  const out: DAETransform[] = [];
+  for (const e of node.children) {
+    if (!Object.hasOwn(TRANSFORM_SIZES, e.name)) continue;
+    const type = e.name as DAETransform['type'],
+      count = TRANSFORM_SIZES[type],
+      what = `node "${node.attributes.id ?? node.attributes.name ?? ''}" <${e.name}>`,
+      values = numbers(e.text, what);
+    if (type === 'lookat' || type === 'skew') {
+      warn(`${what} transforms are not imported`);
+      continue;
     }
+    if (values.length !== count || !values.every(Number.isFinite))
+      throw new LoaderError(F, 'syntax', `${what} needs ${count} finite numbers, got ${values.length}`);
+    const transform: DAETransform = { type, values };
+    if (e.attributes.sid !== undefined) transform.sid = e.attributes.sid;
+    out.push(transform);
+  }
   return out;
 }
 
-/** The node's transform stack, applied in document order (each element post-multiplies). */
-function localMatrix(node: XMLElement, warn: (message: string) => void): Matrix {
-  let m = IDENTITY;
-  for (const e of node.children) {
-    const what = `node "${node.attributes.id ?? node.attributes.name ?? ''}" <${e.name}>`;
-    const v = (count: number): number[] => {
-      const values = numbers(e.text, what);
-      if (values.length !== count || !values.every(Number.isFinite))
-        throw new LoaderError(F, 'syntax', `${what} needs ${count} finite numbers, got ${values.length}`);
-      return values;
-    };
-    switch (e.name) {
-      case 'matrix': {
-        const rows = v(16);
-        m = multiply(
-          m,
-          rows.map((_, i) => rows[(i % 4) * 4 + Math.floor(i / 4)]),
-        );
-        break;
-      }
-      case 'translate': {
-        const [x, y, z] = v(3);
-        m = multiply(m, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1]);
-        break;
-      }
-      case 'scale': {
-        const [x, y, z] = v(3);
-        m = multiply(m, [x, 0, 0, 0, 0, y, 0, 0, 0, 0, z, 0, 0, 0, 0, 1]);
-        break;
-      }
-      case 'rotate': {
-        const [ax, ay, az, degrees] = v(4),
-          length = Math.hypot(ax, ay, az);
-        if (!length) break;
-        const x = ax / length,
-          y = ay / length,
-          z = az / length,
-          angle = (degrees * Math.PI) / 180,
-          c = Math.cos(angle),
-          s = Math.sin(angle),
-          t = 1 - c;
-        m = multiply(m, [
-          t * x * x + c,
-          t * x * y + s * z,
-          t * x * z - s * y,
-          0,
-          t * x * y - s * z,
-          t * y * y + c,
-          t * y * z + s * x,
-          0,
-          t * x * z + s * y,
-          t * y * z - s * x,
-          t * z * z + c,
-          0,
-          0,
-          0,
-          0,
-          1,
-        ]);
-        break;
-      }
-      case 'lookat':
-      case 'skew':
-        warn(`${what} transforms are not imported`);
-    }
+function bindMaterials(
+  instance: XMLElement,
+  materialIndex: Map<string, number>,
+  warn: (message: string) => void,
+): Record<string, number> {
+  const bound: Record<string, number> = Object.create(null);
+  for (const m of kids(kid(kid(instance, 'bind_material'), 'technique_common'), 'instance_material')) {
+    const material = materialIndex.get(ref(m.attributes.target));
+    if (material === undefined) warn(`instance_material "${m.attributes.target}" names no <material>`);
+    else if (m.attributes.symbol !== undefined) bound[m.attributes.symbol] = material;
   }
-  return m;
+  return bound;
+}
+
+/** Depth-first search of node trees. */
+function findNode(roots: readonly DAENode[], match: (node: DAENode) => boolean): DAENode | undefined {
+  for (const root of roots) {
+    if (match(root)) return root;
+    const found = findNode(root.children, match);
+    if (found) return found;
+  }
+  return undefined;
 }
 
 /**
@@ -545,8 +490,12 @@ function localMatrix(node: XMLElement, warn: (message: string) => void): Matrix 
  * `<trifans>`, `<tristrips>` with VERTEX, POSITION, NORMAL, TEXCOORD and COLOR inputs), `profile_COMMON` materials
  * (constant, lambert, phong, blinn; colors and textures through sampler and surface params), images, and the
  * instanced visual scene with matrix/translate/rotate/scale stacks, `bind_material` symbols and `instance_node`.
- * `up_axis` and `unit` are converted to Y-up meters. Lines, polygon holes, skins, morphs and animations are not
- * imported; each is reported in `warnings`. Image paths are relative to the .dae folder, for the caller's resolver.
+ * Controllers (`<skin>` with up to four influences per vertex, `<morph>` NORMALIZED or RELATIVE) and
+ * `<instance_controller>` with `<skeleton>` roots, animations (nested, LINEAR, STEP, BEZIER and HERMITE samplers on
+ * node transform elements and morph weights) and animation clips are read too. `up_axis` and `unit` are converted to
+ * Y-up meters, alike for geometry, node, bind shape and inverse bind matrices. Lines, polygon holes, `lookat`, `skew`
+ * and channels or controllers that do not fit are not imported; each is reported in `warnings`. Image paths are
+ * relative to the .dae folder, for the caller's resolver.
  */
 export function parseDAE(input: BinaryInput | string, options: DAEParseOptions = {}): LoadedDAE {
   const limit = limits(options, F),
@@ -613,25 +562,31 @@ export function parseDAE(input: BinaryInput | string, options: DAEParseOptions =
   }
 
   // M' = C M C^-1 with C = meter * R: rotations keep their axes in Y-up, translations scale to meters.
-  const C: Matrix = [...IDENTITY],
-    inverse: Matrix = [...IDENTITY];
-  for (let r = 0; r < 3; r++)
-    for (let c = 0; c < 3; c++) {
-      C[c * 4 + r] = meter * axis[r * 3 + c];
-      inverse[r * 4 + c] = axis[r * 3 + c] / meter;
-    }
+  const convert = converter(upAxis, meter);
+  const { skins, morphs, controllers } = readControllers(
+    root,
+    ids,
+    geometryIndex,
+    (g) => geometries[g].positionIndices,
+    convert,
+    warn,
+  );
+  // Controller instances whose skin joints resolve once the whole scene exists.
+  const pending: { instance: DAEInstance; roots: string[]; idref: boolean; url: string }[] = [],
+    copies = new Map<XMLElement, DAENode[]>();
   let nodeCount = 0;
   const readNode = (e: XMLElement, depth: number): DAENode => {
     if (depth > MAX_DEPTH)
       throw new LoaderError(F, 'limit', `nodes nest deeper than ${MAX_DEPTH} (an instance_node cycle?)`);
     if (++nodeCount > MAX_NODES) throw new LoaderError(F, 'limit', `the scene expands to more than ${MAX_NODES} nodes`);
-    const node: DAENode = {
-      matrix: multiply(multiply(C, localMatrix(e, warn)), inverse),
-      instances: [],
-      children: [],
-    };
+    const transforms = readTransforms(e, warn),
+      node: DAENode = { matrix: convert(stackMatrix(transforms)), transforms, instances: [], children: [] };
     if (e.attributes.id !== undefined) node.id = e.attributes.id;
     if (e.attributes.name !== undefined) node.name = e.attributes.name;
+    if (e.attributes.sid !== undefined) node.sid = e.attributes.sid;
+    const list = copies.get(e);
+    if (list) list.push(node);
+    else copies.set(e, [node]);
     for (const child of e.children)
       switch (child.name) {
         case 'node':
@@ -649,19 +604,34 @@ export function parseDAE(input: BinaryInput | string, options: DAEParseOptions =
             warn(`instance_geometry "${child.attributes.url}" names no imported mesh`);
             break;
           }
-          const bound: Record<string, number> = Object.create(null);
-          for (const m of kids(kid(kid(child, 'bind_material'), 'technique_common'), 'instance_material')) {
-            const material = materialIndex.get(ref(m.attributes.target));
-            if (material === undefined) warn(`instance_material "${m.attributes.target}" names no <material>`);
-            else if (m.attributes.symbol !== undefined) bound[m.attributes.symbol] = material;
-          }
-          node.instances.push({ geometry, materials: bound });
+          node.instances.push({ geometry, materials: bindMaterials(child, materialIndex, warn) });
           break;
         }
-        case 'instance_controller':
-          warn(
-            `controller "${ref(child.attributes.url)}" is not imported: skins and morphs are not supported, so its node has no mesh`,
-          );
+        case 'instance_controller': {
+          const url = ref(child.attributes.url),
+            controller = controllers.get(url);
+          if (!controller) {
+            warn(
+              `instance_controller "${child.attributes.url}" names no imported <controller>, so its node has no mesh`,
+            );
+            break;
+          }
+          const instance: DAEInstance = {
+            geometry: controller.geometry,
+            materials: bindMaterials(child, materialIndex, warn),
+          };
+          if (controller.morph !== undefined) instance.morph = controller.morph;
+          if (controller.skin !== undefined) {
+            instance.skin = controller.skin;
+            pending.push({
+              instance,
+              roots: kids(child, 'skeleton').map((s) => ref(s.text.trim())),
+              idref: !!controller.idref,
+              url,
+            });
+          }
+          node.instances.push(instance);
+        }
       }
     return node;
   };
@@ -670,31 +640,77 @@ export function parseDAE(input: BinaryInput | string, options: DAEParseOptions =
   if (sceneUrl && scene?.name !== 'visual_scene')
     throw new LoaderError(F, 'syntax', `instance_visual_scene "${sceneUrl.slice(0, 64)}" names no <visual_scene>`);
   const nodes = kids(scene, 'node').map((e) => readNode(e, 0));
-  const animations = kids(kid(root, 'library_animations'), 'animation').length;
-  if (animations) warn(`${animations} animation${animations > 1 ? 's are' : ' is'} not imported`);
+  // Name_array joints are sids under the <skeleton> roots; IDREF_array joints are node ids. Ids and names are also
+  // tried, since exporters disagree.
+  for (const { instance, roots, idref, url } of pending) {
+    const skin = skins[instance.skin!],
+      starts = roots.flatMap((id) => {
+        const element = ids.get(id);
+        return (element && copies.get(element)?.slice(0, 1)) ?? [];
+      }),
+      scope = starts.length ? starts : nodes,
+      joints: DAENode[] = [];
+    for (const name of skin.joints) {
+      const joint = idref
+        ? findNode(nodes, (n) => n.id === name)
+        : (findNode(scope, (n) => n.sid === name) ??
+          findNode(scope, (n) => n.id === name) ??
+          findNode(scope, (n) => n.name === name) ??
+          findNode(nodes, (n) => n.sid === name));
+      if (!joint) {
+        warn(`skin "${url}": joint "${name}" names no node, so the mesh is not skinned`);
+        break;
+      }
+      joints.push(joint);
+    }
+    if (joints.length === skin.joints.length) instance.joints = joints;
+    else delete instance.skin;
+  }
+  const { animations, clips } = readAnimations(root, ids, morphs, warn);
   const used = new Set<string>();
   for (const material of materials)
     for (const name of CHANNELS) {
       const path = material[name]?.texture?.path;
       if (path !== undefined) used.add(path);
     }
-  return { upAxis, meter, geometries, materials, images: [...used], nodes, warnings: [...warnings] };
+  return {
+    upAxis,
+    meter,
+    geometries,
+    materials,
+    images: [...used],
+    nodes,
+    skins,
+    morphs,
+    animations,
+    clips,
+    warnings: [...warnings],
+  };
 }
 
 /**
  * Bakes a parsed COLLADA scene into one `LoadedGeometry` for `createMeshes` and `toGeometry`: every node instance's
  * geometry transformed by its world matrix (mirroring transforms keep outward winding), one group per instance and
- * primitive, named after the node and colored with the bound material's diffuse color.
+ * primitive, named after the node and colored with the bound material's diffuse color. Morphed instances use the
+ * pose's weights and skinned ones are skinned by their joints' world matrices, so `flattenDAE(dae, poseDAE(dae, t))`
+ * bakes the animated scene at time t; without a pose the scene is at rest.
  */
-export function flattenDAE(dae: LoadedDAE): LoadedGeometry & { faceSizes: Uint32Array } {
-  const parts: { node: DAENode; world: Matrix; geometry: DAEGeometry; materials: Record<string, number> }[] = [];
+export function flattenDAE(dae: LoadedDAE, pose: DAEPose = restPose(dae)): LoadedGeometry & { faceSizes: Uint32Array } {
+  const parts: {
+    node: DAENode;
+    geometry: DAEGeometry;
+    materials: Record<string, number>;
+    positions: Float32Array;
+    normals?: Float32Array;
+    flip: boolean;
+  }[] = [];
   const walk = (node: DAENode, parent: Matrix): void => {
-    const world = multiply(parent, node.matrix);
+    const world = multiply(parent, pose.local.get(node) ?? node.matrix);
     for (const instance of node.instances) {
       const geometry = dae.geometries[instance.geometry];
       if (!geometry)
         throw new LoaderError(F, 'range', `instance names geometry ${instance.geometry}, which does not exist`);
-      parts.push({ node, world, geometry, materials: instance.materials });
+      parts.push({ node, geometry, materials: instance.materials, ...deformInstance(dae, instance, world, pose) });
     }
     for (const child of node.children) walk(child, world);
   };
@@ -724,46 +740,14 @@ export function flattenDAE(dae: LoadedDAE): LoadedGeometry & { faceSizes: Uint32
   let v = 0,
     o = 0,
     f = 0;
-  for (const { node, world: m, geometry, materials } of parts) {
-    const p = geometry.positions,
-      count = p.length / 3;
-    // Cofactors of the 3x3 part: the inverse transpose times the determinant.
-    const n = [
-        m[5] * m[10] - m[6] * m[9],
-        m[6] * m[8] - m[4] * m[10],
-        m[4] * m[9] - m[5] * m[8],
-        m[2] * m[9] - m[1] * m[10],
-        m[0] * m[10] - m[2] * m[8],
-        m[1] * m[8] - m[0] * m[9],
-        m[1] * m[6] - m[2] * m[5],
-        m[2] * m[4] - m[0] * m[6],
-        m[0] * m[5] - m[1] * m[4],
-      ],
-      determinant = m[0] * n[0] + m[1] * n[1] + m[2] * n[2];
-    for (let i = 0; i < count; i++) {
-      const x = p[i * 3],
-        y = p[i * 3 + 1],
-        z = p[i * 3 + 2],
-        out = (v + i) * 3;
-      for (let r = 0; r < 3; r++) positions[out + r] = m[r] * x + m[4 + r] * y + m[8 + r] * z + m[12 + r];
-      if (normals && geometry.normals) {
-        const a = geometry.normals[i * 3],
-          b = geometry.normals[i * 3 + 1],
-          c = geometry.normals[i * 3 + 2];
-        let nx = n[0] * a + n[3] * b + n[6] * c,
-          ny = n[1] * a + n[4] * b + n[7] * c,
-          nz = n[2] * a + n[5] * b + n[8] * c;
-        // Cofactors carry the determinant's sign; the normal transform (inverse transpose) does not.
-        const length = (Math.hypot(nx, ny, nz) || 1) * Math.sign(determinant || 1);
-        nx /= length;
-        ny /= length;
-        nz /= length;
-        normals.set([nx, ny, nz], out);
-      }
-      if (uvs && geometry.uvs) uvs.set(geometry.uvs.subarray(i * 2, i * 2 + 2), (v + i) * 2);
-      if (colors && geometry.colors) colors.set(geometry.colors.subarray(i * 3, i * 3 + 3), out);
-    }
-    const flip = determinant < 0,
+  for (const part of parts) {
+    const { node, geometry, materials } = part,
+      count = geometry.positions.length / 3;
+    positions.set(part.positions, v * 3);
+    if (normals && part.normals) normals.set(part.normals, v * 3);
+    if (uvs && geometry.uvs) uvs.set(geometry.uvs, v * 2);
+    if (colors && geometry.colors) colors.set(geometry.colors, v * 3);
+    const flip = part.flip,
       source = geometry.indices;
     for (let i = 0; i < source.length; i += 3) {
       indices[o + i] = v + source[i];

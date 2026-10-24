@@ -227,9 +227,47 @@ for (const path of paths) {
 - `materials`: `profile_COMMON` `constant`, `lambert`, `phong` and `blinn` with `emission`, `ambient`, `diffuse`, `specular`, `reflective` and `transparent` as `{color}` or `{texture: {path, texcoord}}` (through 1.4.1 sampler2D, surface and image, 1.5 `instance_image`, or a bare image id), `opaque`, `shininess`, `reflectivity`, `transparency`, `indexOfRefraction`.
 - `images`: the texture paths materials use, relative to the .dae folder (`file:///C:/a%20b.png` becomes `C:/a b.png`), for your resolver.
 - `nodes`: the instanced visual scene as `{id, name, matrix, instances, children}`, `matrix` being the node's matrix/translate/rotate/scale stack (column-major, Y-up meters); `instances` are `{geometry, materials}` with `bind_material` symbols mapped to material indices; `instance_node` is expanded (at most 64 deep and 100,000 nodes).
-- Not imported, each reported in `warnings`: `<lines>` and `<linestrips>`, polygon holes (the outer polygon is kept), `lookat` and `skew`, skins and morphs (`instance_controller` nodes get no mesh), animations, embedded image data, non-mesh geometry.
+- Not imported, each reported in `warnings`: `<lines>` and `<linestrips>`, polygon holes (the outer polygon is kept), `lookat` and `skew`, embedded image data, non-mesh geometry, and the controllers, joints and animation channels described below when they do not resolve.
 
-`flattenDAE(dae)` bakes the hierarchy into one `LoadedGeometry` (mirrored nodes keep outward winding) with a group per node instance and primitive, named after the node and colored with the bound material's diffuse color, so `createMeshes(engine, flattenDAE(dae))` shows the scene.
+`flattenDAE(dae, pose?)` bakes the hierarchy into one `LoadedGeometry` (mirrored nodes keep outward winding) with a group per node instance and primitive, named after the node and colored with the bound material's diffuse color, so `createMeshes(engine, flattenDAE(dae))` shows the scene. Skinned and morphed instances are deformed: at rest without a pose, animated with `flattenDAE(dae, poseDAE(dae, seconds))`.
+
+### Collada skins, morphs and animation
+
+The result also has `skins`, `morphs`, `animations` and `clips`, all in the same Y-up meters as the geometry: node transforms, `bind_shape_matrix`, inverse bind matrices and animated values go through one conversion, so a `Z_UP` centimeter rig poses exactly like its Y-up meter twin.
+
+- `skins`: each `<controller><skin>` as `{id, name, geometry, morph, bindShapeMatrix, joints, inverseBindMatrices, vertexJoints, vertexWeights}`. `joints` come from `Name_array` (sids) or `IDREF_array` (node ids); `vertex_weights` (`vcount`/`v`) keep the strongest four influences per `<vertices>` position, renormalised to sum 1, joint -1 being the bind shape. A skin may wrap a morph.
+- `morphs`: each `<controller><morph>` as `{id, name, method, base, targets, weights}`; `NORMALIZED` blends (1 - sum w) base + sum w target, `RELATIVE` base + sum w target, position by position. `morphDAE(dae, morph, weights?)` returns the blended mesh (normals included), in the base mesh's vertex order.
+- `<instance_controller>` adds an instance with `skin` and/or `morph`; `joints` lists the joint nodes, found by sid under its `<skeleton>` roots (else by id or name, else anywhere in the scene). A joint that names no node is reported and the instance stays unskinned.
+- `animations`: every `<animation>`, nested ones included (each names its `parent`), with `channels` `{target, node, transform, morph, index, sampler}`. Targets address a node transform by sid, whole (`node/transform` matrix, `node/location` translate) or one value (`.X`, `.Y`, `.Z`, `.ANGLE`, `(i)`, and `(row)(column)` in a matrix), or a morph weight (`morph/weights(i)` or `weightsSource(i)`). Samplers keep `LINEAR`, `STEP`, `BEZIER` (2D `(time, value)` tangents, or value-only ones at a third of the segment) and `HERMITE` (value tangents) keys; `sampleDAESampler(sampler, seconds)` evaluates one, other interpolations sample as `LINEAR` with a warning. `clips` are `<animation_clip>`s `{id, name, start, end, animations}`.
+- `poseDAE(dae, seconds, {clip})` gives every node's `local` and `world` matrix and every morph's `weights` at a time (a clip's time 0 is its `start`).
+
+To play a rig on the GPU, `bindDAESkin(dae, instance?)` gives the animation package's `Skeleton` and `Skin` their inputs: the joint nodes and their ancestors as bones (named by `daeNodeNames`, split into translation, rotation and scale), inverse bind matrices, and four joints and weights per vertex of `geometry`, the mesh in its bind shape. Bones live in scene space, so keep the mesh at the scene root. `daeKeyframeClip(dae, {clip, fps})` turns the channels into `createKeyframeClip` input: COLLADA channels move single transform elements, so each animated node is sampled at its key times and every `1 / fps` second (default 30) and split into translation, rotation and scale tracks (nodes that only STEP keep their keys, `discrete`); animated morphs become `weights` tracks.
+
+```ts
+import {parseDAE, bindDAESkin, daeKeyframeClip, morphDAE, poseDAE} from '@margoengine/loaders';
+import {Skeleton, Skin, createKeyframeClip, applyKeyframeClip, segmentTime} from '@margoengine/animation';
+import {Material, createMesh} from '@margoengine/materials';
+import type {EngineKernel} from '@margoengine/core';
+
+declare const engine: EngineKernel, text: string;
+const dae = parseDAE(text);
+const binding = bindDAESkin(dae); // the first skinned instance
+const skeleton = new Skeleton(binding.bones, binding.inverseBindMatrices);
+const body = createMesh(engine, binding.geometry, new Material({color: '#c08060'}));
+Skin.attach(body, skeleton, binding.joints, binding.weights);
+const clip = createKeyframeClip(daeKeyframeClip(dae, {fps: 60}));
+// A morphed (unskinned) instance: blend on the CPU and replace the geometry.
+const face = dae.morphs.length ? createMesh(engine, morphDAE(dae, 0), new Material({color: '#e0b090'})) : undefined;
+let elapsed = 0;
+function frame(delta: number): void {
+  elapsed += delta;
+  const time = segmentTime(elapsed, clip.duration, {loop: true});
+  applyKeyframeClip(clip, skeleton, time); // the GPU skin follows next frame
+  face?.setGeometry(morphDAE(dae, 0, poseDAE(dae, time).weights[0]));
+}
+```
+
+`Skin` takes no morph targets, so a morph is blended on the CPU (`morphDAE`), and a skin over a morph re-binds with `bindDAESkin(dae, instance, {weights})` and `setGeometry`. Without the animation package, `flattenDAE(dae, poseDAE(dae, seconds))` bakes any frame on the CPU.
 
 ## Tiled TMX
 

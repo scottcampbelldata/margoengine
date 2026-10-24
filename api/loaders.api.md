@@ -4,6 +4,7 @@
 
 ```ts
 import { EngineKernel, Geometry, Mesh, PbrMaterial } from "@margoengine/core";
+import { MutableVec3 } from "@margoengine/math";
 
 export type AnyOptions = PLYOptions & ThreeMFOptions & PCDOptions & OFFOptions & XYZOptions & VTKOptions & USDOptions & {
     name?: string;
@@ -26,12 +27,44 @@ export interface CreateMeshesOptions extends Pick<ToGeometryOptions, 'normals'>,
     vertexColors?: 'average' | 'ignore';
 }
 
+export interface DAEAnimation {
+    id?: string;
+    name?: string;
+    parent: number;
+    channels: DAEAnimationChannel[];
+}
+
+export interface DAEAnimationChannel {
+    target: string;
+    node?: string;
+    transform?: string;
+    morph?: number;
+    index?: number;
+    sampler: DAESampler;
+}
+
+export interface DAEBone {
+    name: string;
+    parent: number;
+    translation: MutableVec3;
+    rotation: [number, number, number, number];
+    scale: MutableVec3;
+}
+
 export interface DAEChannel {
     color?: [number, number, number, number];
     texture?: {
         path: string;
         texcoord?: string;
     };
+}
+
+export interface DAEClip {
+    id?: string;
+    name?: string;
+    start: number;
+    end?: number;
+    animations: number[];
 }
 
 export interface DAEGeometry extends LoadedGeometry {
@@ -51,6 +84,33 @@ export interface DAEGroup extends LoadedGroup {
 export interface DAEInstance {
     geometry: number;
     materials: Record<string, number>;
+    skin?: number;
+    morph?: number;
+    joints?: DAENode[];
+}
+
+export type DAEInterpolation = 'LINEAR' | 'STEP' | 'BEZIER' | 'HERMITE';
+
+export interface DAEKeyframe {
+    time: number;
+    value: number[];
+    interpolation: 'linear' | 'discrete';
+}
+
+export interface DAEKeyframeClip {
+    name: string;
+    tracks: DAEKeyframeTrack[];
+}
+
+export interface DAEKeyframeClipOptions extends DAEPoseOptions {
+    fps?: number;
+    name?: string;
+}
+
+export interface DAEKeyframeTrack {
+    target: string;
+    path: 'translation' | 'rotation' | 'scale' | 'weights';
+    keys: DAEKeyframe[];
 }
 
 export interface DAEMaterial {
@@ -70,15 +130,86 @@ export interface DAEMaterial {
     indexOfRefraction?: number;
 }
 
+export type DAEMeshGeometry = Omit<DAEGeometry, 'groups'> & {
+    normals: Float32Array;
+    groups: (DAEGroup & {
+        materialIndex: number;
+    })[];
+};
+
+export interface DAEMorph {
+    id: string;
+    name?: string;
+    method: 'NORMALIZED' | 'RELATIVE';
+    base: number;
+    targets: number[];
+    weights: number[];
+    weightsSource?: string;
+}
+
 export interface DAENode {
     id?: string;
     name?: string;
+    sid?: string;
     matrix: number[];
+    transforms: DAETransform[];
     instances: DAEInstance[];
     children: DAENode[];
 }
 
 export interface DAEParseOptions extends ParseLimits {
+}
+
+export interface DAEPose {
+    local: Map<DAENode, number[]>;
+    world: Map<DAENode, number[]>;
+    weights: number[][];
+}
+
+export interface DAEPoseOptions {
+    clip?: number;
+}
+
+export interface DAESampler {
+    input: Float64Array;
+    output: Float64Array;
+    stride: number;
+    interpolations: DAEInterpolation[];
+    inTangents?: Float64Array;
+    outTangents?: Float64Array;
+    tangentStride?: number;
+}
+
+export interface DAESkin {
+    id: string;
+    name?: string;
+    geometry: number;
+    morph?: number;
+    bindShapeMatrix: number[];
+    joints: string[];
+    inverseBindMatrices: Float64Array;
+    vertexJoints: Int32Array;
+    vertexWeights: Float32Array;
+}
+
+export interface DAESkinBinding {
+    node: DAENode;
+    instance: DAEInstance;
+    geometry: DAEMeshGeometry;
+    bones: DAEBone[];
+    inverseBindMatrices: Float64Array;
+    joints: Uint32Array;
+    weights: Float32Array;
+}
+
+export interface DAESkinBindingOptions {
+    weights?: ArrayLike<number>;
+}
+
+export interface DAETransform {
+    type: 'matrix' | 'translate' | 'rotate' | 'scale' | 'lookat' | 'skew';
+    sid?: string;
+    values: number[];
 }
 
 export const DEFAULT_MAX_BYTES: number;
@@ -150,6 +281,10 @@ export interface LoadedDAE {
     materials: DAEMaterial[];
     images: string[];
     nodes: DAENode[];
+    skins: DAESkin[];
+    morphs: DAEMorph[];
+    animations: DAEAnimation[];
+    clips: DAEClip[];
     warnings: string[];
 }
 
@@ -501,11 +636,17 @@ export interface ZipOptions {
     signal?: AbortSignal;
 }
 
+export function bindDAESkin(dae: LoadedDAE, instance?: DAEInstance, options?: DAESkinBindingOptions): DAESkinBinding;
+
 export function computeVertexNormals(positions: ArrayLike<number>, indices: ArrayLike<number>): Float32Array;
 
 export function crc32(bytes: Uint8Array, crc?: number): number;
 
 export function createMeshes(engine: EngineKernel, loaded: LoadedGeometry, options?: CreateMeshesOptions): LoadedMeshes;
+
+export function daeKeyframeClip(dae: LoadedDAE, options?: DAEKeyframeClipOptions): DAEKeyframeClip;
+
+export function daeNodeNames(dae: LoadedDAE): Map<DAENode, string>;
 
 export function decompressLZF(input: Uint8Array, outputLength: number, format?: string): Uint8Array;
 
@@ -515,11 +656,13 @@ export function faceNormal(positions: ArrayLike<number>, a: number, b: number, c
 
 export function fetchBytes(url: string | URL, options?: FetchOptions): Promise<Uint8Array>;
 
-export function flattenDAE(dae: LoadedDAE): LoadedGeometry & {
+export function flattenDAE(dae: LoadedDAE, pose?: DAEPose): LoadedGeometry & {
     faceSizes: Uint32Array;
 };
 
 export function load<T, O extends object = object>(url: string | URL, parse: (input: Uint8Array, options?: O) => T | Promise<T>, options?: O & FetchOptions): Promise<T>;
+
+export function morphDAE(dae: LoadedDAE, morph: number, weights?: ArrayLike<number>): DAEMeshGeometry;
 
 export function parse3MF(input: BinaryInput, options?: ThreeMFOptions): Promise<ThreeMFResult>;
 
@@ -555,11 +698,15 @@ export function parseXYZ(input: BinaryInput, options?: XYZOptions): LoadedGeomet
 
 export function pointsToGeometry(loaded: LoadedGeometry, options?: PointsToGeometryOptions): Geometry;
 
+export function poseDAE(dae: LoadedDAE, time: number, options?: DAEPoseOptions): DAEPose;
+
 export function readUSDA(text: string, options?: USDAReadOptions): USDALayer;
 
 export function readZipDirectory(input: BinaryInput, options?: ZipOptions): ZipEntry[];
 
 export function readZipEntry(input: BinaryInput, entry: ZipEntry, options?: ZipOptions): Promise<Uint8Array>;
+
+export function sampleDAESampler(sampler: DAESampler, time: number, out?: Float64Array): Float64Array;
 
 export function tmxLayerQuads(map: LoadedTMX, layer: TMXTileLayer, options?: TileQuadsOptions): TileQuads;
 

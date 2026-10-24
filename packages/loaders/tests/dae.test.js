@@ -20,7 +20,7 @@ const xyz = (id, values) =>
 
 // COLLADA 1.4.1, Y-up: a polylist quad and a triangle with two materials bound through symbols, a textured phong
 // effect (sampler2D -> surface -> image), nested nodes with TRS stacks and an instance_node, plus a line primitive,
-// an animation and a skin controller that are reported as not imported.
+// an empty animation and an instance_controller naming no controller (reported, with no mesh).
 const YUP = `<?xml version="1.0" encoding="utf-8"?>
 <COLLADA xmlns="http://www.collada.org/2005/11/COLLADASchema" version="1.4.1">
   <asset><unit name="meter" meter="1"/><up_axis>Y_UP</up_axis></asset>
@@ -197,8 +197,7 @@ test('DAE: Y-up polylist quads, triangles, two materials bound through symbols, 
   assert.deepEqual(dae.images, ['../textures/tile a.png']);
   assert.deepEqual(dae.warnings, [
     'geometry "mesh": <lines> are not imported (only polygons)',
-    'controller "skin" is not imported: skins and morphs are not supported, so its node has no mesh',
-    '1 animation is not imported',
+    'instance_controller "#skin" names no imported <controller>, so its node has no mesh',
   ]);
   // Hierarchy: translate * rotate * scale, a row-major <matrix>, and the instance_node copy.
   const [parent, rig] = dae.nodes;
