@@ -93,7 +93,7 @@ async function frame() {
 let current: AnyMaterialMesh | undefined, selected: Material | undefined, ssao: SSAO | undefined;
 const identity = (x: number) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, 0, 0, 1];
 
-(window as any).uvGroups = {
+const uvGroups = {
   engine,
   errors,
   async uv(mode: 'uv0' | 'uv1' | 'fallback' | 'ao0' | 'ao1') {
@@ -224,3 +224,5 @@ const identity = (x: number) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, 0, 0, 1]
     engine.dispose();
   },
 };
+const testWindow: Window & { uvGroups?: typeof uvGroups } = window;
+testWindow.uvGroups = uvGroups;

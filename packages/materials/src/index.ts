@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { margoError } from '../../shared/errors.js';
 import {
   textureCoordinates,
   type TextureTransform,
@@ -24,7 +25,8 @@ export type {
   IridescenceOptions,
 } from './lobes.js';
 export { transmission, type TransmissionOptions, type VolumeOptions } from './transmission.js';
-export { nodeMaterial, installNodeMaterial, NodeMaterialInstallation } from './nodes.js';
+export { nodeMaterial, installNodeMaterial, materialGraphOutput, NodeMaterialInstallation } from './nodes.js';
+export type { MaterialGraphOutput } from './nodes.js';
 export type * from './node-types.js';
 export { StencilBuffer } from './stencil-buffer.js';
 
@@ -126,7 +128,6 @@ interface Plan {
   transmission?: TransmissionOptions;
   lobes?: MaterialLobeOptions;
   opaqueIndex?: number;
-  previousMode?: number;
 }
 const mapFields: readonly CoatMap[] = ['clearcoatTexture', 'clearcoatRoughnessTexture', 'clearcoatNormalTexture'];
 function definition(value: unknown, label: string): MaterialDefinition | undefined {
@@ -252,7 +253,7 @@ export class MaterialInstallation implements EnginePlugin {
         maps: {},
         previous: material.extension,
         ...(hasLobes ? { lobes: lobeOptions } : {}),
-        ...(transmitted.factor > 0 ? { transmission: transmissionOptions, previousMode: material.settings[0] } : {}),
+        ...(transmitted.factor > 0 ? { transmission: transmissionOptions } : {}),
       };
       const maps: Partial<Record<MapField, TextureInfo | ClearcoatTexture>> = { ...lobeTextures };
       for (const field of mapFields) if (def?.[field] !== undefined) maps[field] = def[field];
@@ -285,7 +286,8 @@ export class MaterialInstallation implements EnginePlugin {
   setup(engine: Engine): void {
     if (this.disposed || this.model.disposed || engine !== this.model.root.engine)
       throw new Error('Materials model is disposed or belongs to another engine');
-    if (!engine.gpu) throw new Error('Materials require WebGPU');
+    if (!engine.gpu)
+      throw margoError('unsupported', 'Materials require WebGPU: create the engine with a WebGPU device');
     const textures = new MaterialTextures(this.model, engine.gpu);
     try {
       if (this.plans.some((plan) => plan.transmission) && !this.capture)
@@ -341,7 +343,6 @@ export class MaterialInstallation implements EnginePlugin {
         extension.replacesPhysical = true;
         plan.extension = extension;
         plan.material.extension = extension;
-        if (plan.transmission) plan.material.settings[0] = 2;
       }
       this.textures = textures;
       this.unsubscribe ??= this.model.onDispose(() => this.destroy());
@@ -367,8 +368,6 @@ export class MaterialInstallation implements EnginePlugin {
     for (const plan of this.plans)
       if (plan.extension && plan.material.extension === plan.extension) {
         plan.material.extension = plan.previous;
-        if (plan.previousMode !== undefined && plan.material.settings[0] === 2)
-          plan.material.settings[0] = plan.previousMode;
       }
     cleanup.run(() => this.textures?.dispose()).run(() => this.capture?.release());
     this.textures = undefined;

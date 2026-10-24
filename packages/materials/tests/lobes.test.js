@@ -245,6 +245,7 @@ test('standard glTF metadata installs all four lobes synchronously through one g
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
@@ -320,6 +321,7 @@ test('color maps upload in sRGB while factor, roughness and direction maps share
     s.engine.dispose();
   }
   assert.equal(image.closed, true);
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
@@ -390,6 +392,7 @@ test('composed extension texture and sampler limits reject before allocating a u
     } finally {
       s.engine.dispose();
     }
+    await null; // released resources are destroyed at the end of the task
     assert.ok(s.resources.every((resource) => resource.destroyed));
   }
 });
@@ -487,5 +490,6 @@ test('disposing new lobes restores earlier extensions and preserves caller repla
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });

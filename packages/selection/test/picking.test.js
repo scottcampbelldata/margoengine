@@ -114,6 +114,7 @@ test('Picking reuses MRT and readback, resolves center before orthogonal and dia
   assert.equal(h.counts.buffers, buffers);
   assert.equal(h.counts.textures, textures);
   h.effect.dispose();
+  await null; // released resources are destroyed at the end of the task
   assert.ok(h.resources.every((r) => r.destroyed));
 });
 test('Picking culls individual instances in the micro frustum and invalidates camera, transforms, graph and stale mesh slots', async () => {

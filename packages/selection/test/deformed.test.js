@@ -245,6 +245,7 @@ test('Distinct PBR primitives retain distinct uniforms, UV1 affine alpha, mirror
   assert.equal(h.counts.buffers, buffers);
   assert.equal(h.counts.textures, textures);
   h.picking.dispose();
+  await null; // released resources are destroyed at the end of the task
   assert.ok(h.resources.every((resource) => resource.destroyed));
   h.cleanup();
 });
@@ -312,6 +313,7 @@ test('Optional picking releases caches on device restoration, keeps registration
   await h.picking.onPick(64, 48);
   const owned = [...h.resources];
   h.picking.onDeviceRestored(h.e);
+  await null; // released resources are destroyed at the end of the task
   assert.ok(owned.every((resource) => resource.destroyed));
   assert.equal(await h.picking.onPick(64, 48), mesh);
   source.disposed = true;
@@ -321,11 +323,12 @@ test('Optional picking releases caches on device restoration, keeps registration
   assert.equal(p.vertex.destroyed, undefined);
   assert.equal(p.index.destroyed, undefined);
   h.picking.dispose();
+  await null; // released resources are destroyed at the end of the task
   assert.ok(h.resources.every((resource) => resource.destroyed));
   h.cleanup();
 });
 
-test('PBR selection loads multisampled stencil depth read-only and preserves exact beauty depth', () => {
+test('PBR selection loads multisampled stencil depth read-only and preserves exact beauty depth', async () => {
   const h = harness(),
     mesh = h.node(0),
     selection = new Selection();
@@ -346,6 +349,7 @@ test('PBR selection loads multisampled stencil depth read-only and preserves exa
   assert.equal(pipeline.fragment.targets[0].format, 'r8unorm');
   selection.dispose();
   h.picking.dispose();
+  await null; // released resources are destroyed at the end of the task
   assert.ok(h.resources.every((resource) => resource.destroyed));
   h.cleanup();
 });

@@ -124,7 +124,11 @@ refraction output. Native transmission uses scalar volume thickness; imported
 `KHR_materials_volume.thicknessTexture` is sampled by the explicit
 `@margoengine/materials` installation route.
 
-The optional `/worker` entry exposes `loadGLTFInWorker` and `parseGLTFInWorker`. Ordinary assets parse and pack in a worker. Automatic Draco/KTX2 inputs transfer their source buffers back before codec work, then decode on the GPU-owning thread; custom decoders or `fetch` keep the entire load there. The `/progressive` loader exposes `ready` and `complete`; compressed assets use the normal async loader before publishing a model. `maxDownloadBytes`, `maxNodes`, allowed resource URLs and abort signals remain enforced.
+The optional `/worker` entry exposes `loadGLTFInWorker` and `parseGLTFInWorker`. Ordinary assets parse and pack in a worker. Automatic Draco/KTX2 inputs transfer their source buffers back before codec work, then decode on the GPU-owning thread; custom decoders or `fetch` keep the entire load there. The `/progressive` loader exposes `ready` and `complete`; compressed assets use the normal async loader before publishing a model. `maxDownloadBytes`, `maxNodes`, allowed resource URLs and abort signals remain enforced; `maxDownloadBytes` counts the root JSON/GLB file together with its fetched and data-URI resources.
+
+In a multi-view frame, a model draws only the nodes in the view's layers, and each view keeps its own camera uniforms
+even when one command encoder records several views or probe faces. Buffers released mid-draw (a callback that
+disposes the model) stay valid until the frame is submitted.
 
 The loader passes declared vertex/index counts, accessor widths and the remaining
 256 MiB decoded-data budget into Draco. The default decoder rejects oversized
@@ -271,6 +275,8 @@ and `cancelOpaquePass(context)` releases an interrupted phase. Calls to `draw()`
 with an explicit `opaque` or `blend` phase participate in the same deferral:
 opaque primitives draw immediately and blended primitives flush once per model.
 Calls outside that optional phase retain their existing order and bindings.
+An extension with `afterOpaque: true` (materials transmission sets it) also flushes with the blended draws, after the
+opaque capture, but keeps its authored alpha mode, blending and depth writes; such primitives cast no opaque shadows.
 
 Full generated WGSL, including the injection and resource layout, distinguishes
 pipeline cache entries. Even an empty extension cannot share the baseline

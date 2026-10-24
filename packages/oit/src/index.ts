@@ -11,6 +11,8 @@ import {
 } from '@margoengine/core/extension';
 import type { PBRModel, PBRTransparency } from '@margoengine/gltf-pro';
 import { MargoError } from '@margoengine/math/errors';
+import { applyView } from '../../shared/view-rect.js';
+import { currentFrame, retire, writeUniform } from '../../shared/frame-resources.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; RENDER_ATTACHMENT: number };
@@ -80,11 +82,15 @@ export class OIT implements EnginePlugin, PBRTransparency {
   ];
   private readonly depthScale?: number;
   private engine?: Engine;
+  /** Device of the current GPU resources, so a release after device restoration retires them on their own device. */
+  private device?: GPUDevice;
   private disposed = false;
   private readonly models = new Map<PBRModel, () => void>();
   private readonly code = new Map<number, string>();
   private readonly values = new Float32Array(4);
   private uniform?: GPUBuffer;
+  /** This view's uniform binding while its models draw (a frame-arena slice for a second view). */
+  private binding?: GPUBufferBinding;
   private textures: GPUTexture[] = [];
   private views: GPUTextureView[] = [];
   private size = '';
@@ -134,6 +140,7 @@ export class OIT implements EnginePlugin, PBRTransparency {
     if (this.disposed) throw new MargoError('disposed', 'OIT is disposed; create a new OIT');
     if (!engine.gpu) throw new MargoError('unsupported', 'OIT requires WebGPU; use a WebGPU engine');
     this.engine = engine;
+    this.device = engine.gpu;
     this.uniform = engine.gpu.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   }
   registerPasses(graph: FrameGraph): void {
@@ -153,7 +160,7 @@ export class OIT implements EnginePlugin, PBRTransparency {
   }
   /** @internal gltf-pro transparency hook. */
   bindings(): GPUBindGroupEntry[] {
-    return [{ binding: BINDING, resource: { buffer: this.uniform! } }];
+    return [{ binding: BINDING, resource: this.binding ?? { buffer: this.uniform! } }];
   }
   /** @internal gltf-pro transparency hook: the accumulation pass, begun on the first transparent draw of the frame. */
   begin(): GPURenderPassEncoder {
@@ -161,7 +168,7 @@ export class OIT implements EnginePlugin, PBRTransparency {
     const c = this.context!,
       msaa = this.views.length > 2,
       v = this.views;
-    return (this.pass = c.encoder.beginRenderPass({
+    const pass = (this.pass = c.encoder.beginRenderPass({
       label: 'oit:accumulate',
       colorAttachments: [
         {
@@ -181,8 +188,12 @@ export class OIT implements EnginePlugin, PBRTransparency {
       ],
       depthStencilAttachment: { view: c.depth, depthReadOnly: true, stencilReadOnly: true },
     }));
+    applyView(pass, c);
+    return pass;
   }
   private render(c: Context): void {
+    // This view draws in the frame: what it releases waits while another view's commands still need it.
+    currentFrame(c.device, c.view ?? c);
     if (this.disposed || !this.models.size) return;
     const samples = c.descriptor.multisample?.count ?? 1,
       size = c.width + 'x' + c.height + 'x' + samples,
@@ -206,13 +217,19 @@ export class OIT implements EnginePlugin, PBRTransparency {
     }
     const scale = this.depthScale ?? Math.hypot(...c.camera.position.map((p, i) => p - c.camera.target[i]));
     this.values[0] = 1 / (scale || 1);
-    device.queue.writeBuffer(this.uniform!, 0, this.values);
+    // A second view in the same frame gets its own copy of the uniform.
+    this.binding = writeUniform(device, this.uniform!, this.values, c.view ?? c);
     this.context = c;
     this.pass = undefined;
     try {
       for (const model of this.models.keys()) model.draw(c, 'transparent', c.color, c.depth);
+    } catch (error) {
+      (this.pass as GPURenderPassEncoder | undefined)?.end();
+      this.pass = undefined;
+      throw error;
     } finally {
       this.context = undefined;
+      this.binding = undefined;
     }
     const pass = this.pass as GPURenderPassEncoder | undefined;
     if (!pass) return;
@@ -249,13 +266,14 @@ export class OIT implements EnginePlugin, PBRTransparency {
       label: 'oit:composite',
       colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
     });
+    applyView(out, c);
     out.setPipeline(pipeline);
     out.setBindGroup(0, group);
     out.draw(3);
     out.end();
   }
   private release(): void {
-    for (const t of this.textures) t.destroy();
+    for (const t of this.textures) retire(this.device!, t);
     this.textures = [];
     this.views = [];
     this.size = '';
@@ -264,7 +282,7 @@ export class OIT implements EnginePlugin, PBRTransparency {
   onDeviceRestored(engine: Engine): void {
     this.release();
     this.pipelines.clear();
-    this.uniform?.destroy();
+    retire(this.device!, this.uniform);
     this.setup(engine);
   }
   /** Restores sorted blending on every added model and frees the targets. */
@@ -274,7 +292,7 @@ export class OIT implements EnginePlugin, PBRTransparency {
     for (const release of [...this.models.values()]) release();
     this.release();
     this.pipelines.clear();
-    this.uniform?.destroy();
+    retire(this.device!, this.uniform);
     this.uniform = undefined;
     this.engine?.removePlugin(this.name);
   }

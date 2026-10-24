@@ -157,6 +157,7 @@ test('unextended PBR retains the exact baseline shader, frame bytes, pipeline an
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
@@ -220,6 +221,7 @@ test('material factors and optional sampled textures occupy group 3 only on exte
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
@@ -254,6 +256,7 @@ test('extension identity and complete WGSL signatures separate pipelines while f
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
@@ -294,6 +297,7 @@ test('extensions coexist with lighting in its permanent group 2 allocation', asy
     s.engine.dispose();
     lightingBuffer.destroy();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
@@ -319,6 +323,7 @@ test('removing an empty lighting effect still binds the group 2 auto-layout gap'
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
@@ -343,16 +348,19 @@ test('material defaults, primitive overrides, replacement and removal manage onl
     override.factors = new Float32Array([9, 8, 7, 6, 5, 4, 3, 2]);
     s.draw();
     const resized = s.draws[2].groups.get(3).entries[0].resource.buffer;
+    await null; // released resources are destroyed at the end of the task
     assert.equal(first.destroyed, true);
     assert.equal(resized.size, 32);
     assert.deepEqual([...new Float32Array(resized.data)], [...override.factors]);
     delete s.model.primitives[0].extension;
     s.draw();
+    await null; // released resources are destroyed at the end of the task
     assert.equal(resized.destroyed, true);
     assert.deepEqual([...new Float32Array(s.draws[4].groups.get(3).entries[0].resource.buffer.data)], [1, 2, 3, 4]);
     const inherited = s.draws[4].groups.get(3).entries[0].resource.buffer;
     delete material.extension;
     s.draw();
+    await null; // released resources are destroyed at the end of the task
     assert.equal(inherited.destroyed, true);
     assert.equal(second.destroyed, true);
     for (const draw of s.draws.slice(-2)) {
@@ -364,6 +372,7 @@ test('material defaults, primitive overrides, replacement and removal manage onl
     s.engine.dispose();
     texture.destroy();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
@@ -404,6 +413,7 @@ test('texture view changes rebuild their bind group and sampler shape changes ke
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
@@ -415,12 +425,14 @@ test('restoring the device releases and recreates extension uniforms and disposa
     s.draw();
     const old = s.draws[0].groups.get(3).entries[0].resource.buffer;
     s.model.onDeviceRestored(s.engine);
+    await null; // released resources are destroyed at the end of the task
     assert.equal(old.destroyed, true);
     s.draw();
     const restored = s.draws[1].groups.get(3).entries[0].resource.buffer;
     assert.notEqual(restored, old);
     assert.deepEqual([...new Float32Array(restored.data)], [...extension.factors]);
     s.model.dispose();
+    await null; // released resources are destroyed at the end of the task
     assert.equal(restored.destroyed, true);
   } finally {
     s.engine.dispose();
@@ -453,6 +465,7 @@ test('invalid or oversized extension factors fail before allocating their second
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
@@ -488,12 +501,14 @@ test('failed extension uniform uploads release new allocations and allow a later
     s.device.queue.writeBuffer = queueWrite;
     s.draw();
     const recovered = s.draws[1].groups.get(3).entries[0].resource.buffer;
+    await null; // released resources are destroyed at the end of the task
     assert.equal(first.destroyed, true);
     assert.deepEqual([...new Float32Array(recovered.data)], [...extension.factors]);
   } finally {
     s.device.queue.writeBuffer = queueWrite;
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
@@ -530,5 +545,6 @@ test('ambient hooks affect beauty and ambient passes after lighting without rewr
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });

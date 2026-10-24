@@ -24,7 +24,7 @@ export interface TransmissionShaderValues {
 export function transmissionShader(
   textures: TransmissionShaderTextures,
   values?: TransmissionShaderValues,
-): Pick<MaterialExtension, 'declarations' | 'output'> {
+): Pick<MaterialExtension, 'declarations' | 'output' | 'transmission'> {
   const index = textures.factorsIndex ?? 0,
     opaque = `materialTexture${textures.opaque}`;
   const sample = (slot: ClearcoatTextureSlot) => {
@@ -35,14 +35,24 @@ export function transmissionShader(
     return `textureLoad(${texture},vec2i(clamp(${coords}*${size},vec2f(0),${size}-vec2f(1))),0)`;
   };
   return {
-    // The zero-factor branch preserves the complete original return, including alpha.
-    output: `if(${values ? values.factor : `materialFactors[${index}].x`}>0.0){return vec4f(materialTransmission(i,s,color,front${values ? ',' + values.factor + ',' + values.ior + ',' + values.thickness + ',' + values.attenuation + ',' + values.inverseDistance + ',' + (values.dispersion ?? '0.0') : ''}),1.0);}`,
+    // The host scales diffuse and ambient light by 1 - this factor (as native transmission does), and the output adds
+    // the transmitted light behind, so reflections keep their strength.
+    transmission: values
+      ? values.factor
+      : `materialFactors[${index}].x${textures.factor ? '*' + sample(textures.factor) + '.r' : ''}`,
+    // Assign RGB and reconverge before the host's final return, which owns alpha and derivatives.
+    output: `if(${values ? values.factor : `materialFactors[${index}].x`}>0.0){color=materialTransmission(i,s,color,front${values ? ',' + values.factor + ',' + values.ior + ',' + values.thickness + ',' + values.attenuation + ',' + values.inverseDistance + ',' + (values.dispersion ?? '0.0') : ''});}`,
     declarations: /* wgsl */ `
 fn materialTransmissionLinear(value:vec3f)->vec3f {
   return select(value/12.92,pow((value+0.055)/1.055,vec3f(2.4)),value>vec3f(0.04045));
 }
 fn materialTransmissionEncoded(value:vec3f)->vec3f {
   return select(value*12.92,1.055*pow(max(value,vec3f(0)),vec3f(1.0/2.4))-0.055,value>=vec3f(0.0031308));
+}
+// Transmitted share of the light behind: the dielectric part not reflected (Schlick Fresnel), as on the native path.
+fn materialTransmissionWeight(s:Surface,v:vec3f,n:vec3f,factor:f32)->vec3f {
+  let f0=mix(vec3f(0.04),s.base.rgb,s.metal);
+  return factor*(1-s.metal)*(1-(f0+(1-f0)*pow(1-clamp(dot(n,v),0.0,1.0),5.0)));
 }
 fn materialTransmission(i:Out,s:Surface,color:vec3f,front:bool${values ? ',materialTransmissionFactor:f32,materialTransmissionIor:f32,materialTransmissionThickness:f32,materialTransmissionAttenuation:vec3f,materialTransmissionInverseDistance:f32,materialTransmissionDispersion:f32' : ''})->vec3f {
 ${values ? '  let factors=vec4f(materialTransmissionFactor,materialTransmissionIor,materialTransmissionThickness,materialTransmissionInverseDistance);' : '  let factors=materialFactors[' + index + '];'}
@@ -94,11 +104,11 @@ ${values ? '  let factors=vec4f(materialTransmissionFactor,materialTransmissionI
         dispersed[channel]=received.x;
       }
     }
-    return mix(color,dispersed,factor);
+    return color+materialTransmissionWeight(s,v,n,factor)*dispersed;
   }
   var ray=-v;
   // In particular, IOR 1 never projects or rounds a different screen pixel.
-  if(factors.y!=1.0){
+  if(thickness>0.0&&factors.y!=1.0){
     let entering=front==(f.coordsB.y>0);
     ray=refract(-v,n,select(factors.y,1.0/factors.y,entering));
     let rayLength=length(ray);
@@ -111,10 +121,10 @@ ${values ? '  let factors=vec4f(materialTransmissionFactor,materialTransmissionI
   let localNormalRaw=(transpose(f.model)*vec4f(n,0)).xyz;
   let localNormal=localNormalRaw/max(length(localNormalRaw),0.000001);
   let path=thickness/max(abs(dot(localRay,localNormal)),0.0001);
-  if(factors.y!=1.0){
-    // Without a volume, probe 10% of the view distance behind the surface. This
-    // is a single screen-space estimate; the opaque snapshot has no traced depth.
-    let distance=select(viewDistance*0.1,path,thickness>0.0);
+  if(thickness>0.0&&factors.y!=1.0){
+    // A thin interface keeps the sightline; only an authored volume supplies a
+    // refraction path. The opaque snapshot still has no traced scene depth.
+    let distance=path;
     let bent=f.camera*vec4f(i.position+ray*distance,1);
     let straight=f.camera*vec4f(i.position-v*distance,1);
     if(bent.w>0.000001&&straight.w>0.000001){
@@ -135,7 +145,7 @@ ${values ? '  let factors=vec4f(materialTransmissionFactor,materialTransmissionI
     if(attenuating){transmitted*=pow(attenuation,vec3f(path*factors.w));}
     if(f.settings.w<0.5){transmitted=materialTransmissionEncoded(transmitted);}
   }
-  return mix(color,transmitted,factor);
+  return color+materialTransmissionWeight(s,v,n,factor)*transmitted;
 }
 `,
   };

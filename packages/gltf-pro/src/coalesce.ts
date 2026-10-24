@@ -1,6 +1,7 @@
 import type { Mesh } from '@margoengine/core/extension';
 import { invertMatrixStable, multiplyMatrices } from '@margoengine/math/mat4';
 import type { PBRMaterial, PBRPrimitive } from './index.js';
+import { primitiveAfterOpaque } from '../../shared/material-routing.js';
 
 /** One static part baked into a material batch, with the root-relative matrix and source arrays captured at bake time. */
 export interface BatchPart {
@@ -31,6 +32,7 @@ function determinant(m: ArrayLike<number>): number {
 function eligible(p: PBRPrimitive): boolean {
   const m = p.material;
   if (p.topology || p.instances || p.deformed) return false;
+  if (primitiveAfterOpaque(p)) return false;
   if (p.definition.targets?.length || p.definition.attributes?.JOINTS_0 !== undefined) return false;
   if (m.settings[0] === 2 || (m.tint && !m.extension?.replacesPhysical)) return false;
   if (p.indices.length < 3 || p.indices.length % 3 || p.vertices.length < stride * 3) return false;

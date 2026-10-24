@@ -67,6 +67,7 @@ test('untransformed shadow casters retain the recorded shader and 144-byte unifo
   } finally {
     s.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
@@ -98,6 +99,7 @@ test('transformed mask casters select UV1 then apply affine rows in a separate s
       assert.equal(values[34], 1);
       assert.deepEqual(values.slice(36), primitive.alphaTransform);
     }
+    await null; // the next frame
     const total = s.counts.buffers;
     map.extensions.KHR_texture_transform.offset = [0.75, -0.25];
     s.frame();
@@ -113,6 +115,7 @@ test('transformed mask casters select UV1 then apply affine rows in a separate s
   } finally {
     s.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
@@ -130,6 +133,7 @@ test('invalid shadow alpha transforms fail before caster pipeline or uniform all
     } finally {
       s.dispose();
     }
+    await null; // released resources are destroyed at the end of the task
     assert.ok(s.resources.every((resource) => resource.destroyed));
   }
 });
@@ -161,5 +165,6 @@ test('transformed caster allocation failures clean partial uniforms and recover 
   } finally {
     s.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });

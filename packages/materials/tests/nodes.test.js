@@ -301,10 +301,11 @@ test('compiled and baseline materials have isolated pipelines and mutable factor
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
-test('node installation is synchronous, restores slots and blend mode, and releases capture on disposal', async () => {
+test('node installation is synchronous, preserves authored coverage, restores slots and releases capture on disposal', async () => {
   const s = await scene();
   try {
     const primitive = s.model.primitives[0],
@@ -324,7 +325,8 @@ test('node installation is synchronous, restores slots and blend mode, and relea
       s.model,
       graph(emit(color(), { transmission: { type: 'transmission', factor: scalar(1), ior: scalar(1) } })),
     );
-    assert.equal(primitive.material.settings[0], 2);
+    assert.equal(primitive.material.settings[0], 0);
+    assert.equal(primitive.extension.afterOpaque, true);
     assert.equal(s.engine.hasPlugin('materials:opaque-color'), true);
     s.frame();
     tx.dispose();
@@ -334,10 +336,11 @@ test('node installation is synchronous, restores slots and blend mode, and relea
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
-test('disposing a partially replaced graph preserves a shared material blend mode', async () => {
+test('disposing a partially replaced graph preserves shared authored coverage and extension ownership', async () => {
   const s = await scene();
   try {
     const first = s.model.primitives[0],
@@ -350,17 +353,19 @@ test('disposing a partially replaced graph preserves a shared material blend mod
       graph(emit(color(), { transmission: { type: 'transmission', factor: scalar(1), ior: scalar(1) } })),
     );
     assert.equal(first.extension, second.extension);
-    assert.equal(first.material.settings[0], 2);
+    assert.equal(first.material.settings[0], 0);
+    assert.equal(first.extension.afterOpaque, true);
     const replacement = { wgsl: 's.emissive+=vec3f(0.1);' };
     first.extension = replacement;
     installation.dispose();
     assert.equal(first.extension, replacement);
     assert.equal(second.extension, previous);
-    assert.equal(first.material.settings[0], 2, 'A caller replacement still uses the same shared material');
+    assert.equal(first.material.settings[0], 0, 'A caller replacement retains the same authored shared material');
     assert.equal(s.engine.hasPlugin('materials:opaque-color'), false);
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 

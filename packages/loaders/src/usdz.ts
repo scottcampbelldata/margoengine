@@ -3,6 +3,7 @@ import { limits, throwIfAborted, toBytes, type BinaryInput } from './util.js';
 import { readZipDirectory, readZipEntry, type ZipOptions } from './zip.js';
 import { computeVertexNormals } from './normals.js';
 import { multiplyMatrices } from '@margoengine/math/mat4';
+import { LinearToSRGB } from '@margoengine/math/color';
 
 const F = 'USD';
 export interface USDOptions extends ParseLimits, Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'signal'> {
@@ -47,6 +48,90 @@ function numbers(value: Value | undefined, size?: number): number[] {
   )
     fail('syntax', 'expected a numeric tuple or array');
   return value as number[];
+}
+interface ColorChannel {
+  values: number[];
+  varying: boolean;
+}
+function colorValues(values: number[]): number[] {
+  if (values.some((v) => !Number.isFinite(v) || v < 0 || v > 1))
+    fail('range', 'invalid color or opacity primvar values');
+  return values;
+}
+/** Resolve only point-addressable interpolation; face-varying data needs vertex splitting and is rejected. */
+function colorPrimvar(node: Prim, name: string, width: number, count: number, fallback: number[]): ColorChannel {
+  const key = `primvars:${name}`,
+    data = node.attrs.get(key);
+  if (data === undefined) return { values: colorValues(fallback), varying: false };
+  const metadata = node.properties.get(key),
+    interpolation = metadata?.get('interpolation') ?? 'constant';
+  if (interpolation !== 'constant' && interpolation !== 'vertex')
+    fail('unsupported', `unsupported color primvar interpolation ${interpolation}`);
+  if ((metadata?.get('elementSize') ?? 1) !== 1) fail('unsupported', 'color primvar elementSize must be 1');
+  if (!Array.isArray(data)) fail('syntax', 'color primvar must be an array');
+  const values = width === 1 ? numbers(data) : data.flatMap((value) => numbers(value, width));
+  colorValues(values);
+  const indices = node.attrs.get(`${key}:indices`),
+    indexed = indices === undefined ? undefined : numbers(indices),
+    expected = interpolation === 'vertex' ? count : 1;
+  if ((indexed?.length ?? values.length / width) !== expected)
+    fail('syntax', 'color primvar length does not match interpolation');
+  if (indexed) {
+    const resolved: number[] = [];
+    for (const index of indexed) {
+      if (!Number.isSafeInteger(index) || index < 0 || index >= values.length / width)
+        fail('range', 'color primvar index outside values');
+      for (let c = 0; c < width; c++) resolved.push(values[index * width + c]);
+    }
+    return { values: resolved, varying: interpolation === 'vertex' };
+  }
+  return { values, varying: interpolation === 'vertex' };
+}
+function shaderColor(
+  node: Prim,
+  shader: Prim,
+  input: string,
+  width: number,
+  count: number,
+  prims: Map<string, Prim>,
+  fallback: number[],
+): ColorChannel {
+  const connection = shader.attrs.get(`inputs:${input}.connect`);
+  if (connection === undefined) {
+    const value = shader.attrs.get(`inputs:${input}`);
+    return {
+      values: colorValues(
+        value === undefined ? fallback : width === 1 && typeof value === 'number' ? [value] : numbers(value, width),
+      ),
+      varying: false,
+    };
+  }
+  if (
+    !connection ||
+    typeof connection !== 'object' ||
+    Array.isArray(connection) ||
+    !('path' in connection) ||
+    !connection.path.endsWith('.outputs:result')
+  )
+    fail('unsupported', 'color connections require a UsdPrimvarReader result');
+  const reader = prims.get(connection.path.slice(0, -'.outputs:result'.length)),
+    name = reader?.attrs.get('inputs:varname');
+  if (
+    !reader ||
+    reader.attrs.get('info:id') !== `UsdPrimvarReader_float${width === 1 ? '' : width}` ||
+    typeof name !== 'string' ||
+    reader.attrs.has('inputs:varname.connect') ||
+    reader.attrs.has('inputs:fallback.connect')
+  )
+    fail('unsupported', 'color connections require an unconnected matching UsdPrimvarReader');
+  const value = reader.attrs.get('inputs:fallback'),
+    defaultValue =
+      value === undefined
+        ? Array(width).fill(0)
+        : width === 1 && typeof value === 'number'
+          ? [value]
+          : numbers(value, width);
+  return colorPrimvar(node, name, width, count, defaultValue);
 }
 function transform(prim: Prim, parent: Float64Array, base: Float64Array): Float64Array {
   const order = prim.attrs.get('xformOpOrder');
@@ -324,7 +409,8 @@ export function parseUSDA(input: string | BinaryInput, options: USDOptions = {})
   }
   const positions: number[] = [],
     indices: number[] = [],
-    groups: LoadedGroup[] = [];
+    groups: LoadedGroup[] = [],
+    appearance: { count: number; rgb: ColorChannel; opacity: ColorChannel }[] = [];
   function visit(node: Prim, parent: Float64Array, hidden = false): void {
     hidden ||= node.attrs.get('visibility') === 'invisible' || node.metadata.get('active') === false;
     if (hidden) return;
@@ -411,7 +497,7 @@ export function parseUSDA(input: string | BinaryInput, options: USDOptions = {})
           );
       }
       if (cursor !== faces.length) fail('syntax', 'faceVertexCounts does not match indices');
-      let color: LoadedGroup['color'];
+      let color: LoadedGroup['color'], rgb: ColorChannel | undefined, opacity: ColorChannel | undefined;
       const binding = node.attrs.get('material:binding');
       if (binding && typeof binding === 'object' && !Array.isArray(binding) && 'path' in binding) {
         const material = prims.get(binding.path),
@@ -419,30 +505,23 @@ export function parseUSDA(input: string | BinaryInput, options: USDOptions = {})
         if (!surface || typeof surface !== 'object' || Array.isArray(surface) || !('path' in surface))
           fail('unsupported', 'unsupported material binding');
         const shader = prims.get((surface as { path: string }).path.split('.outputs:')[0]);
-        if (
-          !shader ||
-          shader.attrs.get('info:id') !== 'UsdPreviewSurface' ||
-          shader.attrs.has('inputs:diffuseColor.connect')
-        )
-          fail('unsupported', 'only constant UsdPreviewSurface colors are supported');
-        const rgb = numbers(shader.attrs.get('inputs:diffuseColor') ?? [0.18, 0.18, 0.18], 3),
-          opacity = shader.attrs.get('inputs:opacity') ?? 1;
-        if (typeof opacity !== 'number') fail('range', 'invalid opacity');
-        color = [
-          ...rgb.map((v) => (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055)),
-          opacity,
-        ] as LoadedGroup['color'];
+        if (!shader || shader.attrs.get('info:id') !== 'UsdPreviewSurface')
+          fail('unsupported', 'only UsdPreviewSurface colors are supported');
+        rgb = shaderColor(node, shader, 'diffuseColor', 3, points.length, prims, [0.18, 0.18, 0.18]);
+        opacity = shaderColor(node, shader, 'opacity', 1, points.length, prims, [1]);
       } else {
-        const display = node.attrs.get('primvars:displayColor');
-        if (display !== undefined) {
-          if (!Array.isArray(display) || display.length !== 1)
-            fail('unsupported', 'only uniform displayColor is supported');
-          color = [
-            ...numbers(display[0], 3).map((v) => (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055)),
-            1,
-          ] as LoadedGroup['color'];
-        }
+        if (node.attrs.has('primvars:displayColor'))
+          rgb = colorPrimvar(node, 'displayColor', 3, points.length, [1, 1, 1]);
+        if (node.attrs.has('primvars:displayOpacity'))
+          opacity = colorPrimvar(node, 'displayOpacity', 1, points.length, [1]);
       }
+      if ((rgb || opacity) && !rgb?.varying && !opacity?.varying)
+        color = [...(rgb?.values ?? [1, 1, 1]).map(LinearToSRGB), opacity?.values[0] ?? 1] as LoadedGroup['color'];
+      appearance.push({
+        count: points.length,
+        rgb: rgb ?? { values: [1, 1, 1], varying: false },
+        opacity: opacity ?? { values: [1], varying: false },
+      });
       if (color?.some((v) => !Number.isFinite(v) || v < 0 || v > 1)) fail('range', 'invalid display color');
       groups.push({
         start,
@@ -459,12 +538,25 @@ export function parseUSDA(input: string | BinaryInput, options: USDOptions = {})
   if (!indices.length) fail('unsupported', 'stage contains no polygon meshes');
   const vertices = new Float32Array(positions),
     triangles = new Uint32Array(indices);
+  let colors: Float32Array | undefined, opacity: Float32Array | undefined;
+  if (appearance.some((part) => part.rgb.varying || part.opacity.varying)) {
+    colors = new Float32Array(positions.length);
+    opacity = new Float32Array(positions.length / 3);
+    let vertex = 0;
+    for (const part of appearance)
+      for (let v = 0; v < part.count; v++, vertex++) {
+        for (let c = 0; c < 3; c++)
+          colors[vertex * 3 + c] = LinearToSRGB(part.rgb.values[(part.rgb.varying ? v * 3 : 0) + c]);
+        opacity[vertex] = part.opacity.values[part.opacity.varying ? v : 0];
+      }
+  }
   return {
     kind: 'mesh',
     positions: vertices,
     indices: triangles,
     normals: computeVertexNormals(vertices, triangles),
     groups,
+    ...(colors ? { colors, attributes: { opacity: opacity! } } : {}),
   };
 }
 

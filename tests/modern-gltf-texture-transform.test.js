@@ -141,6 +141,7 @@ test('offset, rotation and scale use group 3 without widening PBR vertices or th
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
   assert.equal(s.image.closed, true);
 });
@@ -189,6 +190,7 @@ test('texture transforms compose with caller factors and preserve their uniform 
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 

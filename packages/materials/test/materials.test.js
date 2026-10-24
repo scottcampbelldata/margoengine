@@ -425,6 +425,7 @@ test('uvTransform follows KHR_texture_transform, defaults to gltf-pro identity r
       rows = () => [...new Float32Array(uniform.data, 104 * 4, 8)];
     assert.deepEqual(rows(), [0.5, 0, 0.25, 0, -0, 0.25, 0.5, 0]);
     material.setUVTransform({ offset: [0.75, 0] }, 'map');
+    await null; // the next frame
     s.frame();
     assert.deepEqual(rows(), [1, 0, 0.75, 0, -0, 1, 0, 0], 'live on the next frame');
     model.destroy();
@@ -619,6 +620,7 @@ test('grouped meshes share vertices and a node while keeping each group material
     );
     const vertex = model.primitives[0].buffers.vertex;
     model.destroy();
+    await null; // released resources are destroyed at the end of the task
     assert.equal(vertex.destroyed, true);
   } finally {
     s.close();

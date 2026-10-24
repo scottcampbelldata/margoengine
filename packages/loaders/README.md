@@ -49,7 +49,7 @@ Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per
 - **One module per format.** The build is a plain TypeScript emit with `"sideEffects": false`, so importing `parsePLY` pulls in only the PLY reader and its helpers, not the 3MF, ZIP or XML code. In the main entry only `toGeometry`, `pointsToGeometry` and `createMeshes` import core; `/font` and `/svg` import `@margoengine/geometry` (a dependency), and `/mtl` imports `@margoengine/materials` (an optional peer: install it to use that entry).
 - **Defensive parsing.** Headers are length-capped, every count is checked against `maxVertices` (default 8,000,000) and `maxTriangles` (default 16,000,000) before allocation, binary reads are bounds-checked before the loop, face and cell indices are validated, and ZIP entries are checked against their declared size while inflating (zip-bomb safe) and against CRC-32 afterwards. Every failure is a `LoaderError` with `format` and a `code` of `header`, `truncated`, `limit`, `range`, `syntax`, `unsupported`, `zip`, `aborted` or `fetch`.
 - **3MF builds are baked.** Component and build item transforms are multiplied into the positions (Margo Engine meshes take position, rotation and scale only, not arbitrary 3x4 matrices). Mirroring transforms flip the winding back. Triangles are grouped by build item, object and color so `createMeshes` gives each its own material. When a `colorgroup` gives one triangle different corner colors, those objects are split per corner and `colors` is filled.
-- **Colors.** Vertex colors are sRGB in [0,1]. `createMeshes` converts group colors to linear for `PbrMaterial`; since core has no vertex colors, meshes with only vertex colors get their average (`vertexColors: 'ignore'` turns that off).
+- **Colors.** Vertex colors are sRGB in [0,1]. `createMeshes` converts group colors to linear for `PbrMaterial`; since core has no vertex colors, meshes with only vertex colors get their average (`vertexColors: 'ignore'` turns that off). The optional [`/render` entry](#optional-vertex-color-and-opacity-rendering) preserves vertex RGB and opacity through the existing PBR renderer.
 - **SSR safe.** Nothing touches `window`, `document`, `navigator` or `Worker` at import or parse time. `parse3MF` needs `DecompressionStream`, present in browsers and Node 22.
 
 ## Options
@@ -85,13 +85,38 @@ MIT licensed.
 
 ## USD and USDZ
 
-`parseUSDA(textOrBytes, options)` reads static polygon meshes with hierarchy, matrix/translate/scale/rotateXYZ transforms, reset stacks, visibility, Y/Z up, units, winding and constant display/PreviewSurface colors. `parseUSDZ(bytes, options)` validates stored ZIP entries, 64-byte alignment and root-layer CRC before parsing USDA. Both return `LoadedGeometry` for `createMeshes`. `readUSDA(text, {maxDepth, signal, assets, skipOver})` exposes the underlying layer reader (the `def` prim tree with attributes, connections, relationships and property metadata such as `interpolation`); `@margoengine/usdz` builds on it. It skips dictionaries and triple-quoted strings, accepts list-op prefixes (`prepend apiSchemas`) in metadata, and parses numeric arrays on a fast path capped at 16 million values. `parseAny` detects USDA text and USDZ root filenames; ordinary ZIPs retain 3MF detection.
+`parseUSDA(textOrBytes, options)` reads static polygon meshes with hierarchy, matrix/translate/scale/rotateXYZ transforms, reset stacks, visibility, Y/Z up, units, winding and display/PreviewSurface colors. Constant colors become `groups[].color` (sRGB). Constant or per-vertex RGB and opacity primvars, indexed or not, and read directly or through `UsdPrimvarReader_float3`/`UsdPrimvarReader_float` nodes, become sRGB `colors` and linear `attributes.opacity`. Other shader graphs and interpolations are refused. `createMeshes` averages vertex RGB and ignores vertex alpha; `createPBRMeshes` from `/render` keeps both. `parseUSDZ(bytes, options)` validates stored ZIP entries, 64-byte alignment and root-layer CRC before parsing USDA. Both return `LoadedGeometry`. `readUSDA(text, {maxDepth, signal, assets, skipOver})` exposes the underlying layer reader (the `def` prim tree with attributes, connections, relationships and property metadata such as `interpolation`); `@margoengine/usdz` builds on it. It skips dictionaries and triple-quoted strings, accepts list-op prefixes (`prepend apiSchemas`) in metadata, and parses numeric arrays on a fast path capped at 16 million values. `parseAny` detects USDA text and USDZ root filenames; ordinary ZIPs retain 3MF detection.
 
 `@margoengine/loaders/worker` exports `parseUSDZInWorker(bytes, options)` and `parseUSDAInWorker(textOrBytes, options)`: the same `LoadedGeometry` (byte for byte, `tests/worker.test.js`) parsed in a worker (`dist/workers/usd.js`, about 6.6 kB min+gzip, [entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)) with its arrays transferred back; errors stay `LoaderError`s. A whole ArrayBuffer input moves to the worker (detached). Without `Worker` they parse on the calling thread.
 
-Triangles and convex planar polygons are supported; meshes must author `subdivisionScheme = "none"`. Binary USDC (the common production USDZ encoding), composition/references, animation, subdivision, hole faces, textures, varying colors and concave polygons are rejected explicitly. Use OpenUSD `usdcat` to convert a binary root, or load it with `@margoengine/usdz`, which reads USDC natively; flatten/tessellate unsupported features before loading. File normals and UVs are not retained; normals are recomputed. `units` defaults to `'meters'`; `'file'` keeps authored scale. `maxDepth` defaults to 32 (maximum 64), `maxEntryBytes` to 64 MiB, and vertex/triangle/ZIP limits apply.
+Triangles and convex planar polygons are supported; meshes must author `subdivisionScheme = "none"`. Binary USDC (the common production USDZ encoding), composition/references, animation, subdivision, hole faces, textures, uniform/face-varying color interpolation and concave polygons are rejected explicitly. Use OpenUSD `usdcat` to convert a binary root, or load it with `@margoengine/usdz`, which reads USDC natively; flatten/tessellate unsupported features before loading. File normals and UVs are not retained; normals are recomputed. `units` defaults to `'meters'`; `'file'` keeps authored scale. `maxDepth` defaults to 32 (maximum 64), `maxEntryBytes` to 64 MiB, and vertex/triangle/ZIP limits apply.
 
 Root `npm run modern:test:interop` checks round trips, units, transforms, visibility, winding, topology/composition errors, CRC, alignment, USDC rejection and budgets. Full IFC geometry parsing is provided separately by `@margoengine/ifc` with web-ifc.
+
+## Optional vertex color and opacity rendering
+
+Install `@margoengine/gltf-pro` alongside loaders to use this entry. The decode/root entry does not import it.
+
+```ts
+import {parseUSDZ} from '@margoengine/loaders';
+import {createPBRMeshes} from '@margoengine/loaders/render';
+
+const source = await parseUSDZ(bytes);
+const model = createPBRMeshes(engine, source, {
+  baseColorFactor: [1, 1, 1, 1], // linear material multiplier; default white
+  maxBytes: 256 << 20,          // packed geometry budget; default 256 MiB
+});
+model.root.setScale([-1, 1, 1]);
+// Existing PBRModel ownership includes automatic device restoration.
+model.dispose();
+```
+
+`createPBRMeshes` returns a `PBRModel` (dispose it when done) that renders per-vertex sRGB colors and linear
+`attributes.opacity` through `@margoengine/gltf-pro`. Group RGBA fills in only a missing channel; `baseColorFactor`
+multiplies the result, and any alpha below one draws blended. `parent`, `normals`, `roughness`, `metalness` and
+`doubleSided` work as in `createMeshes`; `unlit` uses the unlit material. It accepts triangle meshes with at most
+1,000,000 vertices and 4096 parts, and refuses point clouds, malformed attributes, overlapping groups and data over
+`maxBytes` before allocating GPU resources. `npm run test:render:browser` checks the colors on the GPU.
 
 ## Files that refer to other files
 

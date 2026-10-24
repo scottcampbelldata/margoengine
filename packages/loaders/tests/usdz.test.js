@@ -116,3 +116,75 @@ test('USDZ detection, CRC, stored/aligned envelope and USDC rejection', async ()
   new DataView(compressed.buffer).setUint16(central + 10, 8, true);
   await assert.rejects(parseUSDZ(compressed), /compression/);
 });
+
+test('USDA resolves indexed vertex displayColor and displayOpacity without dropping alpha', () => {
+  const attrs = `
+ color3f[] primvars:displayColor = [(0.25,0.5,1),(1,0,0.5)] (interpolation = "vertex")
+ int[] primvars:displayColor:indices = [1,0,1]
+ float[] primvars:displayOpacity = [0.25,0.75] (interpolation = "vertex")
+ int[] primvars:displayOpacity:indices = [0,1,0]
+ `;
+  const mesh = parseUSDA(stage(triangle.replace(' point3f[]', `${attrs}\n point3f[]`)));
+  const srgb = (v) => (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055);
+  assert.deepEqual(
+    [...mesh.colors],
+    [1, 0, 0.5, 0.25, 0.5, 1, 1, 0, 0.5].map((v) => Math.fround(srgb(v))),
+  );
+  assert.deepEqual([...mesh.attributes.opacity], [0.25, 0.75, 0.25]);
+  for (const [invalid, pattern] of [
+    [attrs.replace('[1,0,1]', '[1,0]'), /length/],
+    [attrs.replace('[1,0,1]', '[1,0,2]'), /index/],
+    [attrs.replace('[1,0,1]', '[1,0,-1]'), /index/],
+    [attrs.replace('"vertex"', '"faceVarying"'), /interpolation/],
+    [attrs.replace('(0.25,0.5,1)', '(0.25,0.5,2)'), /color|primvar/],
+  ])
+    assert.throws(() => parseUSDA(stage(triangle.replace(' point3f[]', `${invalid}\n point3f[]`))), pattern);
+});
+
+test('USDA reader fallback, constant opacity, mixed meshes and unsupported graphs stay explicit', () => {
+  const material = `def Material "Mat" {
+ token outputs:surface.connect = </Mat/Surface.outputs:surface>
+ def Shader "Surface" {
+  uniform token info:id = "UsdPreviewSurface"
+  color3f inputs:diffuseColor.connect = </Mat/Color.outputs:result>
+  float inputs:opacity = 0.5
+ }
+ def Shader "Color" {
+  uniform token info:id = "UsdPrimvarReader_float3"
+  string inputs:varname = "absent"
+  float3 inputs:fallback = (0.25,0.5,1)
+  float3 outputs:result
+ }
+}`;
+  const bound = triangle.replace(' point3f[]', ' rel material:binding = </Mat>\n point3f[]');
+  const plain = parseUSDA(stage(material + bound));
+  assert.equal(plain.colors, undefined);
+  assert.equal(plain.groups[0].color[3], 0.5);
+  assert.ok(Math.abs(plain.groups[0].color[0] - 0.5370987304831942) < 1e-10);
+  const varied = triangle
+    .replace('"Triangle"', '"Vertex"')
+    .replace(
+      ' point3f[]',
+      ' color3f[] primvars:displayColor = [(1,0,0),(0,1,0),(0,0,1)] (interpolation = "vertex")\n point3f[]',
+    );
+  const mixed = parseUSDA(stage(material + bound + varied));
+  assert.equal(mixed.colors.length, 18);
+  assert.deepEqual([...mixed.attributes.opacity], [0.5, 0.5, 0.5, 1, 1, 1]);
+  assert.equal(mixed.groups[1].color, undefined);
+  assert.throws(
+    () => parseUSDA(stage(material.replace('UsdPrimvarReader_float3', 'UsdUVTexture') + bound)),
+    /PrimvarReader/,
+  );
+  assert.throws(
+    () =>
+      parseUSDA(
+        stage(
+          material.replace(
+            'float3 inputs:fallback',
+            'string inputs:varname.connect = </Other.outputs:result>\n float3 inputs:fallback',
+          ) + bound,
+        ),
+      ),
+    /PrimvarReader/,
+  );
+});

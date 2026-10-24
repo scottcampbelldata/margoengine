@@ -11,6 +11,7 @@
     "build": "node scripts/build.js",
     "test": "npm run build && node --test tests/loaders.test.js tests/dxf.test.js tests/obj.test.js tests/dae.test.js tests/tmx.test.js tests/font.test.js tests/svg.test.js tests/mtl.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
+    "test:render:browser": "npm run build && node scripts/test-render-browser.mjs",
     "fixtures": "node scripts/fetch-fixtures.js",
     "prepack": "npm run build"
   },
@@ -35,6 +36,10 @@
     "./mtl": {
       "types": "./dist/mtl.d.ts",
       "import": "./dist/mtl.js"
+    },
+    "./render": {
+      "types": "./dist/render.d.ts",
+      "import": "./dist/render.js"
     }
   },
   "files": [
@@ -42,9 +47,13 @@
   ],
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
+    "@margoengine/gltf-pro": "^1.0.0",
     "@margoengine/materials": "^1.0.0"
   },
   "peerDependenciesMeta": {
+    "@margoengine/gltf-pro": {
+      "optional": true
+    },
     "@margoengine/materials": {
       "optional": true
     }

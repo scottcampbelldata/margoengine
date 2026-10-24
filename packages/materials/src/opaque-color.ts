@@ -1,6 +1,7 @@
 import { PBRModel } from '@margoengine/gltf-pro';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { SceneTarget, sceneTarget } from '../../shared/msaa.js';
+import { currentFrame, retire } from '../../shared/frame-resources.js';
 import { fullscreen } from '../../shared/gpu.js';
 import { Cleanup } from '../../shared/cleanup.js';
 
@@ -176,10 +177,12 @@ class OpaqueColor implements EnginePlugin {
     if (!capture) return;
     const cleanup = new Cleanup();
     cleanup.run(() => capture.target?.dispose());
-    for (const texture of capture.textures) cleanup.run(() => texture.destroy());
+    for (const texture of capture.textures) cleanup.run(() => retire(this.device!, texture));
     cleanup.finish();
   }
   private begin(c: Context): void {
+    // This view draws in the frame: what it releases waits while another view's commands still need it.
+    currentFrame(c.device, c.view ?? c);
     const borrowed = sceneTarget(c),
       old = this.capture;
     if (
@@ -274,7 +277,7 @@ class OpaqueColor implements EnginePlugin {
     if (this.frame) cleanup.run(() => this.abort(this.frame!.context));
     const capture = this.capture;
     this.capture = undefined;
-    cleanup.run(() => this.releaseCapture(capture)).run(() => this.placeholder?.destroy());
+    cleanup.run(() => this.releaseCapture(capture)).run(() => retire(this.device!, this.placeholder));
     this.placeholder = this.placeholderView = undefined;
     cleanup.finish();
   }

@@ -320,7 +320,7 @@ async function draw(direction: number[]) {
 }
 
 let current: { dispose(): void } | undefined;
-(window as any).normalOrientation = {
+const normalOrientation = {
   errors,
   /** Draws round-trip `path` lit from image-up (`fromUp`) or image-down; returns the export error, if any. */
   async roundTrip(path: string, fromUp: boolean) {
@@ -359,3 +359,5 @@ let current: { dispose(): void } | undefined;
     engine.dispose();
   },
 };
+const testWindow: Window & { normalOrientation?: typeof normalOrientation } = window;
+testWindow.normalOrientation = normalOrientation;

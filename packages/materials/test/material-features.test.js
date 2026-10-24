@@ -717,3 +717,80 @@ test('WgslMaterial splices shade() and displace(), binds its uniforms and textur
   mesh.destroy();
   s.engine.dispose();
 });
+
+test('Lambertian lightMap response converts physical irradiance in the existing uniform and keeps raw intensity live', async () => {
+  const s = await scene();
+  const texture = new Texture(
+    { data: new Uint8Array(16).fill(255), width: 2, height: 2 },
+    { colorSpace: 'linear', mipmaps: false },
+  );
+  const material = new PbrMaterial({ lightMap: texture, lightMapIntensity: 1, lightMapResponse: 'lambertian' });
+  const mesh = createMesh(s.engine, quad, material);
+  try {
+    assert.equal(material.lightMapResponse, 'lambertian');
+    assert.equal(material.lightMapIntensity, 1);
+    let log = s.frame();
+    assert.equal(featureUniform(log, s.history)[3], Math.fround(1 / Math.PI));
+    const modules = codes(log);
+    assert.ok(modules.some((code) => code.includes('margoLightMap')));
+    assert.ok(
+      !log.some((e) => e[0] === 'view' && e[2]?.format === 'rgba8unorm-srgb'),
+      'explicit linear irradiance stays linear',
+    );
+    material.lightMapIntensity = 12;
+    log = s.frame();
+    assert.equal(featureUniform(log, s.history)[3], Math.fround(12 / Math.PI));
+    assert.equal(material.lightMapIntensity, 12);
+    assert.deepEqual(codes(log), [], 'response/intensity updates keep shader and bindings');
+    material.lightMapResponse = 'multiply';
+    assert.equal(featureUniform(s.frame(), s.history)[3], 12);
+    material.lightMapResponse = 'lambertian';
+    const clone = material.clone(),
+      copy = new PbrMaterial().copy(material);
+    for (const other of [clone, copy]) {
+      assert.equal(other.lightMapResponse, 'lambertian');
+      assert.equal(other.lightMapIntensity, 12);
+      assert.equal(other.lightMap, texture);
+      const next = createMesh(s.engine, quad, other);
+      assert.ok(featureWrites(s.frame(), s.history).some((values) => values[3] === Math.fround(12 / Math.PI)));
+      other.lightMapResponse = 'multiply';
+      assert.equal(material.lightMapResponse, 'lambertian');
+      next.destroy();
+      other.dispose();
+    }
+  } finally {
+    mesh.destroy();
+    material.dispose();
+    texture.dispose();
+    s.engine.dispose();
+  }
+});
+
+test('Lambertian lightMap response rejects invalid dormant modes and intensities before changing live state', () => {
+  const material = new LambertMaterial({ lightMapIntensity: 2, lightMapResponse: 'lambertian' });
+  for (const bad of [null, 1, '', 'physical']) {
+    assert.throws(() => {
+      material.lightMapResponse = bad;
+    }, TypeError);
+    assert.equal(material.lightMapResponse, 'lambertian');
+    assert.equal(material.lightMapIntensity, 2);
+  }
+  for (const bad of [-1, Infinity, NaN, 2 ** 128]) {
+    assert.throws(() => {
+      material.lightMapIntensity = bad;
+    }, RangeError);
+    assert.equal(material.lightMapIntensity, 2);
+  }
+  for (const Ctor of [UnlitMaterial, NormalMaterial])
+    assert.throws(() => new Ctor({ lightMapResponse: 'lambertian' }), /lightMapResponse.*lit|Lambertian.*lit/);
+  assert.throws(() => new PbrMaterial({ lightMapIntensity: -2, lightMapResponse: 'lambertian' }), RangeError);
+  const legacy = new PbrMaterial({ lightMapIntensity: -2 });
+  assert.equal(legacy.lightMapResponse, 'multiply');
+  assert.throws(() => {
+    legacy.lightMapResponse = 'lambertian';
+  }, RangeError);
+  assert.equal(legacy.lightMapResponse, 'multiply');
+  assert.equal(legacy.lightMapIntensity, -2);
+  legacy.dispose();
+  material.dispose();
+});

@@ -20,6 +20,24 @@ test('worker-parsed USDZ and USDA equal parseUSDZ / parseUSDA', async () => {
     parseUSDA(stage, { units: 'file' }),
   );
 });
+
+test('USD worker transfers new vertex RGB and opacity arrays byte for byte', async () => {
+  const archive = exportUSDZ({
+    nodes: [
+      {
+        geometry: {
+          positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+          normals: new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+          colors: new Float32Array([1, 0.5, 0.25, 1, 0.5, 0.25, 1, 0.5, 0.25, 1, 0.5, 0]),
+        },
+        material: { alphaMode: 'BLEND' },
+      },
+    ],
+  });
+  const result = await parseUSDZ(archive.slice());
+  assertSameBytes(await runParseWorker(worker, { format: 'usdz', input: archive.slice().buffer, options: {} }), result);
+  assertSameBytes(result.attributes.opacity, new Float32Array([1, 0.5, 0]));
+});
 test('USD worker errors come back as LoaderError; without Worker the entry runs here', async () => {
   const reply = await runParseWorker(worker, { format: 'usda', input: stage, options: { maxVertices: 2 } }).catch(
     (error) => error,

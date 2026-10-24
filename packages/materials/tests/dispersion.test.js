@@ -52,11 +52,13 @@ test('materials.install reads dispersion metadata and appends it after existing 
       extension = s.material.extension;
     assert.deepEqual([...extension.factors].slice(-8), [1, 1.5, 0.5, 0.5, 0.25, 0.5, 0.75, 2.75]);
     assert.equal(extension.factors.length, 12, 'clearcoat and transmission keep their existing factor layout');
-    assert.equal(s.material.settings[0], 2);
+    assert.equal(s.material.settings[0], 0, 'Installed dispersion retains authored OPAQUE coverage');
+    assert.equal(extension.afterOpaque, true);
     installation.dispose();
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 

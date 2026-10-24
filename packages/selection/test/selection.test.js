@@ -4,7 +4,7 @@ import { Selection } from '../dist/index.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 import { Camera } from '../../core/dist/extension.js';
 import { GPURenderer } from '../../core/dist/renderer.js';
-test('selection replays only visible depth, switches between JFA and morphology and cleans up', () => {
+test('selection replays only visible depth, switches between JFA and morphology and cleans up', async () => {
   const h = optionalGPU(),
     effect = new Selection(),
     mesh = { id: 2 };
@@ -31,6 +31,7 @@ test('selection replays only visible depth, switches between JFA and morphology 
   effect.onDeviceRestored(h.engine);
   h.frame();
   effect.dispose();
+  await null; // released resources are destroyed at the end of the task
   assert.ok(h.resources.every((r) => r.destroyed));
 });
 
@@ -50,7 +51,7 @@ test('selection mask reuses renderer bindings and texture views, replacing them 
   device.queue.submit = () => {};
   device.createRenderPipelineAsync = async (descriptor) => device.createRenderPipeline(descriptor);
   h.context.encoder.finish = () => ({});
-  device.createCommandEncoder = () => h.context.encoder;
+  device.createCommandEncoder = () => ({ ...h.context.encoder });
   Object.defineProperty(globalThis, 'navigator', {
     configurable: true,
     value: {
@@ -101,6 +102,7 @@ test('selection mask reuses renderer bindings and texture views, replacing them 
     assert.deepEqual({ groups: h.counts.groups, views: h.counts.views }, afterResize);
     assert.equal(original.entries[1].resource.buffer.destroyed, false, 'Resize keeps the selection storage buffer');
     effect.onDeviceRestored(h.engine);
+    await null; // released resources are destroyed at the end of the task
     assert.equal(original.entries[1].resource.buffer.destroyed, true);
     frame();
     const restored = h.groups.at(-1);
@@ -111,6 +113,7 @@ test('selection mask reuses renderer bindings and texture views, replacing them 
   } finally {
     effect.dispose();
     renderer?.dispose();
+    await null; // released resources are destroyed at the end of the task
     assert.ok(h.resources.every((r) => r.destroyed));
     for (const [key, descriptor] of globals)
       if (descriptor) Object.defineProperty(globalThis, key, descriptor);

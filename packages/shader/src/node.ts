@@ -747,8 +747,10 @@ export class UniformNode<T extends Type = Type> extends Node<T> {
           : typeof v === 'string' || typeof v === 'number'
             ? linearColor(v)
             : Array.from(v as ArrayLike<number>);
-    if (d.length !== size || d.some((x) => !Number.isFinite(x)))
-      fail(`Uniform ${this.name ?? ''} needs ${size} finite numbers`);
+    // Float uniforms upload as float32: a finite double such as 1e39 would become Infinity.
+    const f32 = scalarOf(this.type) === 'f32';
+    if (d.length !== size || d.some((x) => !Number.isFinite(f32 ? Math.fround(x) : x)))
+      fail(`Uniform ${this.name ?? ''} needs ${size} finite${f32 ? ' float32' : ''} numbers`);
     this.data = d;
   }
   /** @internal */

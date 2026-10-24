@@ -10,12 +10,19 @@ import {
   type Mesh,
 } from '@margoengine/core/extension';
 import { invertMatrixStable, multiplyMatrices } from '@margoengine/math/mat4';
+import { rotationToQuaternion } from '@margoengine/math/quat';
 import { viewMatrix } from '../../shared/view.js';
+import { applyView, inView } from '../../shared/view-rect.js';
+import { attenuationPower } from '../../shared/attenuation.js';
+import { beginDraw, endDraw, recording, retire, writeUniform } from '../../shared/frame-resources.js';
 import { Cleanup } from '../../shared/cleanup.js';
 import type { PBRSource } from '../../shared/pbr-source.js';
 import { setMeshSource, clearMeshSource, type MeshSource } from '../../shared/mesh-source.js';
 import { margoError } from '../../shared/errors.js';
 import { shadowPrimitivesInto } from '../../shared/shadow-source.js';
+import { primitiveAfterOpaque } from '../../shared/material-routing.js';
+import { hiddenInTree } from '../../shared/visibility.js';
+import { validatePreparedGeometry, checkPreparedVertices } from '../../shared/prepared-geometry.js';
 import {
   GLTFAsset,
   checkDocument,
@@ -156,7 +163,10 @@ export interface GLTFLightReceiver {
 export type GLTFLoadOptions = Omit<AssetOptions, 'buffers'> & CompressionOptions;
 const srgbMaps = [0, 4, 9, 12, 17],
   normalMaps = [2, 7],
-  blended = (m: PBRMaterial) => m.settings[0] === 2 || (!!m.tint && !m.extension?.replacesPhysical);
+  blended = (m: PBRMaterial) => m.settings[0] === 2 || (!!m.tint && !m.extension?.replacesPhysical),
+  // Drawn after the opaque phase: blended, or its extension asks for the opaque capture (`afterOpaque`). A static
+  // batch holds no such part (pose() checks every part), whatever its shared material says.
+  late = (r: DrawResource) => blended(r.primitive.material) || (!r.batch && primitiveAfterOpaque(r.primitive));
 // An extended material's binding plan, by material object (progressive loading swaps in copies with fewer maps) and
 // features object (a materials mesh's record follows the Material it draws, whose features can change).
 const plans = new WeakMap<object, ExtendedPlan & { from: object }>();
@@ -299,41 +309,7 @@ export interface PBRRenderState {
   /** False disables color writes while depth and stencil still run. */
   colorWrite?: boolean;
 }
-export function validatePreparedGeometry(data: PreparedGeometry): void {
-  const { vertices, indices } = data,
-    count = vertices?.length / 20;
-  if (
-    !(vertices instanceof Float32Array) ||
-    !(indices instanceof Uint32Array) ||
-    !Number.isInteger(count) ||
-    count < 3 ||
-    count > 1_000_000 ||
-    !indices.length ||
-    indices.length % 3
-  )
-    throw new RangeError('Invalid prepared PBR geometry');
-  for (let i = 0; i < indices.length; i++)
-    if (indices[i] >= count) throw new RangeError('Invalid prepared PBR geometry');
-  checkVertices(vertices, 0, count);
-}
-function checkVertices(vertices: Float32Array, from: number, to: number): void {
-  for (let i = from * 20; i < to * 20; i++)
-    if (!Number.isFinite(vertices[i])) throw new RangeError('Non-finite prepared PBR vertex');
-  for (let i = from * 20; i < to * 20; i += 20) {
-    const sign = vertices[i + 11];
-    if (
-      vertices[i + 3] !== 1 ||
-      vertices[i + 7] !== 0 ||
-      Math.abs(Math.hypot(vertices[i + 4], vertices[i + 5], vertices[i + 6]) - 1) > 1e-3 ||
-      (sign !== 0 && sign !== -1 && sign !== 1)
-    )
-      throw new RangeError('Invalid prepared PBR normal/tangent');
-    if (vertices[i + 11] && Math.abs(Math.hypot(vertices[i + 8], vertices[i + 9], vertices[i + 10]) - 1) > 1e-3)
-      throw new RangeError('Invalid prepared PBR tangent');
-    for (let c = 16; c < 20; c++)
-      if (vertices[i + c] < 0 || vertices[i + c] > 1) throw new RangeError('Invalid prepared PBR color');
-  }
-}
+export { validatePreparedGeometry };
 function preparedPrimitive(
   asset: GLTFAsset,
   p: GLTFPrimitive,
@@ -381,6 +357,8 @@ interface DrawResource {
   volumeWritten?: GPUBuffer;
   values: Float32Array;
   groups: Map<GPURenderPipeline, GPUBindGroup[]>;
+  /** Group 0 for each `writeUniform` copy of `uniform` (a later view of a frame), by pipeline; cleared with `groups`. */
+  copies?: Map<GPUBuffer, Map<GPURenderPipeline, GPUBindGroup>>;
   sectionBuffer?: GPUBuffer;
   views: GPUTextureView[];
   samplers: GPUSampler[];
@@ -521,6 +499,51 @@ function checkDrawLimits(
     }),
   ]);
 }
+// Group 0: the draw's uniform (its own buffer, or a frame-arena slice for a repeat draw), volume and section.
+function frameGroup(
+  device: GPUDevice,
+  pipeline: GPURenderPipeline,
+  r: DrawResource,
+  transmission: boolean,
+  section: GPUBuffer | undefined,
+  uniform: GPUBufferBinding = { buffer: r.uniform },
+): GPUBindGroup {
+  return device.createBindGroup({
+    layout: pipeline.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: uniform },
+      ...(transmission
+        ? [
+            {
+              binding: 1,
+              resource: {
+                buffer: (r.volume ??= device.createBuffer({
+                  size: 16,
+                  usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+                })),
+              },
+            },
+          ]
+        : []),
+      ...(section ? [{ binding: 2, resource: { buffer: section } }] : []),
+    ],
+  });
+}
+// Group 0 for a uniform copy, cached so steady multi-view frames create no groups.
+function copyGroup(
+  device: GPUDevice,
+  pipeline: GPURenderPipeline,
+  r: DrawResource,
+  transmission: boolean,
+  section: GPUBuffer | undefined,
+  uniform: GPUBufferBinding,
+): GPUBindGroup {
+  let byPipeline = (r.copies ??= new Map()).get(uniform.buffer);
+  if (!byPipeline) r.copies.set(uniform.buffer, (byPipeline = new Map()));
+  let group = byPipeline.get(pipeline);
+  if (!group) byPipeline.set(pipeline, (group = frameGroup(device, pipeline, r, transmission, section, uniform)));
+  return group;
+}
 function createDrawGroups(
   device: GPUDevice,
   pipeline: GPURenderPipeline,
@@ -531,26 +554,7 @@ function createDrawGroups(
   section?: GPUBuffer,
 ): GPUBindGroup[] {
   return [
-    device.createBindGroup({
-      layout: pipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: r.uniform } },
-        ...(transmission
-          ? [
-              {
-                binding: 1,
-                resource: {
-                  buffer: (r.volume ??= device.createBuffer({
-                    size: 16,
-                    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-                  })),
-                },
-              },
-            ]
-          : []),
-        ...(section ? [{ binding: 2, resource: { buffer: section } }] : []),
-      ],
-    }),
+    frameGroup(device, pipeline, r, transmission, section),
     device.createBindGroup({
       layout: pipeline.getBindGroupLayout(1),
       entries: r.views.flatMap((view, i) => {
@@ -567,6 +571,10 @@ function createDrawGroups(
 }
 interface DrawScratch {
   context?: Context;
+  /** This invocation's camera: a nested draw (probe face, second view) may change the context's camera meanwhile. */
+  projection: Float32Array;
+  view: Float32Array;
+  eye: Float32Array;
   resources: DrawResource[];
   effects: LightingEffect[];
   entries: GPUBindGroupEntry[];
@@ -588,6 +596,9 @@ function createDrawScratch(color: GPUTextureView, depth: GPUTextureView): DrawSc
     depthStoreOp: 'store',
   };
   const scratch: DrawScratch = {
+    projection: new Float32Array(16),
+    view: new Float32Array(16),
+    eye: new Float32Array(3),
     resources: [],
     effects: [],
     entries: [],
@@ -600,8 +611,8 @@ function createDrawScratch(color: GPUTextureView, depth: GPUTextureView): DrawSc
     blendDistance: new Map(),
     descriptor: { colorAttachments: [attachment], depthStencilAttachment: depthAttachment },
     compare(a, b) {
-      const blendA = blended(a.primitive.material),
-        blendB = blended(b.primitive.material);
+      const blendA = late(a),
+        blendB = late(b);
       if (blendA !== blendB) return +blendA - +blendB;
       if (!blendA) return 0;
       const distances = scratch.blendDistance;
@@ -796,9 +807,11 @@ function material(def: GLTFMaterial = {}, extended?: GLTFExtendedMaterials): PBR
       : undefined,
     extended: x?.features,
     // Transmission blends the background by this per-material tint (base color, Beer-Lambert volume attenuation at thicknessFactor).
-    tint: transmission ? base.slice(0, 3).map((v, i) => v * transmission * attenuation[i] ** depth) : undefined,
+    tint: transmission
+      ? base.slice(0, 3).map((v, i) => v * transmission * attenuationPower(attenuation[i], depth))
+      : undefined,
     // Transmission hook only: thickness (mesh space) and transmittance per world unit, attenuationColor^(1/attenuationDistance).
-    volume: transmission ? [thickness, ...attenuation.map((c) => c ** (1 / distance))] : undefined,
+    volume: transmission ? [thickness, ...attenuation.map((c) => attenuationPower(c, 1 / distance))] : undefined,
   };
 }
 function primitive(
@@ -877,22 +890,7 @@ function transform(node: Mesh, def: GLTFNode): void {
     ])
       if (Math.abs(r[a] * r[b] + r[a + 1] * r[b + 1] + r[a + 2] * r[b + 2]) > 1e-5)
         throw new Error('Sheared matrices are unsupported');
-    const trace = r[0] + r[4] + r[8];
-    let q: number[];
-    if (trace > 0) {
-      const s = 2 * Math.sqrt(trace + 1);
-      q = [(r[5] - r[7]) / s, (r[6] - r[2]) / s, (r[1] - r[3]) / s, s / 4];
-    } else {
-      const k = r[0] > r[4] && r[0] > r[8] ? 0 : r[4] > r[8] ? 1 : 2,
-        s = 2 * Math.sqrt(1 + r[k * 4] - r[((k + 1) % 3) * 4] - r[((k + 2) % 3) * 4]);
-      q = [0, 0, 0, 0];
-      q[k] = s / 4;
-      const a = (k + 1) % 3,
-        b = (k + 2) % 3;
-      q[a] = (r[a * 3 + k] + r[k * 3 + a]) / s;
-      q[b] = (r[b * 3 + k] + r[k * 3 + b]) / s;
-      q[3] = (r[a * 3 + b] - r[b * 3 + a]) / s;
-    }
+    const q = rotationToQuaternion(r);
     node
       .setPosition([m[12], m[13], m[14]])
       .setScale(scale as [number, number, number])
@@ -905,8 +903,7 @@ function transform(node: Mesh, def: GLTFNode): void {
 }
 
 function nodeVisible(engine: Engine, node: Mesh): boolean {
-  for (let id = node.id; id !== -1; id = engine.store.parents[id]) if (engine.store.hidden[id]) return false;
-  return true;
+  return !hiddenInTree(engine.store, node.id);
 }
 export class PBRModel implements EnginePlugin {
   /** Optional scene-wide opaque phase, used by caller-owned color captures. */
@@ -949,7 +946,6 @@ export class PBRModel implements EnginePlugin {
   private readonly gpuCache = new Map<unknown, GPUBuffer | GPUTexture | GPURenderPipeline>();
   private readonly inverse = new Float32Array(16);
   private readonly workspace = new Float64Array(52);
-  private readonly view = new Float32Array(16);
   /** Material batches baked once. Device restore uploads them again and keeps the same nodes. */
   private staticBatches?: StaticBatch[];
   /** Primitives drawn from another primitive's buffer pair (see `shareBuffers`), each mapped to the pair's owner. */
@@ -1274,7 +1270,7 @@ export class PBRModel implements EnginePlugin {
     for (const buffer of old)
       if (!this.resources.some((r) => r.vertex === buffer || r.index === buffer)) {
         for (const [key, value] of this.gpuCache) if (value === buffer) this.gpuCache.delete(key);
-        buffer.destroy();
+        retire(to.device, buffer);
       }
     return true;
   }
@@ -1337,7 +1333,8 @@ export class PBRModel implements EnginePlugin {
         throw new RangeError(
           'PBR geometry range must be whole vertices inside the mesh; pass start >= 0 and count >= 1',
         );
-      for (const vertices of new Set(geometry.map((g) => g.vertices))) checkVertices(vertices, start, start + count);
+      for (const vertices of new Set(geometry.map((g) => g.vertices)))
+        checkPreparedVertices(vertices, start, start + count);
     }
     this.retireBatches();
     const written = new Map<Float32Array | Uint32Array, GPUBuffer>(),
@@ -1347,6 +1344,8 @@ export class PBRModel implements EnginePlugin {
     for (const r of this.resources)
       if (!list.includes(r.primitive)) for (const b of [r.vertex, r.index]) claimed.add(b);
     // Each new array gets one buffer: its own old one when it fits and no other array took it, else a larger one.
+    const device = this.resources[0]?.device,
+      midFrame = !!device && recording(device);
     const place = (
       r: DrawResource,
       from: GPUBuffer,
@@ -1356,14 +1355,16 @@ export class PBRModel implements EnginePlugin {
     ) => {
       let to = written.get(data);
       if (!to) {
-        if (!claimed.has(from) && (part || data.byteLength <= from.size)) {
+        const fits = part || data.byteLength <= from.size;
+        // Mid-frame, earlier draws (this model's, shadows') keep the old contents: the new data takes a new buffer.
+        if (!claimed.has(from) && fits && !midFrame) {
           if (!part) r.device.queue.writeBuffer(from, 0, data as Float32Array<ArrayBuffer>);
           else if (part[1])
             r.device.queue.writeBuffer(from, part[0] * 4, data as Float32Array<ArrayBuffer>, part[0], part[1]);
           to = from;
         } else {
           to = r.device.createBuffer({
-            size: Math.min(max, Math.max(data.byteLength, from.size * 2)),
+            size: Math.min(max, Math.max(data.byteLength, fits ? from.size : from.size * 2)),
             usage: usage | GPUBufferUsage.COPY_DST,
           });
           r.device.queue.writeBuffer(to, 0, data as Float32Array<ArrayBuffer>);
@@ -1401,7 +1402,7 @@ export class PBRModel implements EnginePlugin {
     }
     for (const [data, buffer] of written) this.gpuCache.set(data, buffer);
     for (const buffer of dropped)
-      if (!this.resources.some((r) => r.vertex === buffer || r.index === buffer)) buffer.destroy();
+      if (!this.resources.some((r) => r.vertex === buffer || r.index === buffer)) retire(device!, buffer);
   }
   /** Drops every static material batch for good: its parts draw individually from their own, now editable, buffers. */
   private retireBatches(): void {
@@ -1409,7 +1410,7 @@ export class PBRModel implements EnginePlugin {
     for (const r of this.resources)
       if (r.batch)
         for (const b of [r.vertex, r.index, r.wireframe?.index, r.uniform, r.extension?.uniform, r.volume])
-          b?.destroy();
+          retire(r.device, b);
     this.resources = this.resources.filter((r) => !r.batch);
     for (const r of this.resources) r.mergedInto = undefined;
     for (const { primitive } of this.staticBatches) {
@@ -1476,17 +1477,18 @@ export class PBRModel implements EnginePlugin {
       }
     }
   }
-  /** True while every baked part still has the captured root-relative pose, material, and visibility. */
-  private pose(batch: StaticBatch): boolean {
+  /** True while every baked part still has the captured root-relative pose, material and visibility, and is in `context`'s view. */
+  private pose(batch: StaticBatch, context?: Context): boolean {
     this.relative ??= new Float32Array(16);
     if (!invertMatrixStable(this.root.matrix, this.inverse, this.workspace)) return false;
-    const relative = this.relative,
-      store = this.engine.store;
+    const relative = this.relative;
     for (let i = 0; i < batch.parts.length; i++) {
       const part = batch.parts[i],
         primitive = part.primitive;
       if (
         primitive.material !== batch.material ||
+        (context && !inView(context, primitive.node)) ||
+        primitiveAfterOpaque(primitive) ||
         primitive.deformed ||
         primitive.instances ||
         primitive.topology ||
@@ -1494,7 +1496,7 @@ export class PBRModel implements EnginePlugin {
         primitive.indices !== part.indices
       )
         return false;
-      for (let id = primitive.node.id; id !== -1; id = store.parents[id]) if (store.hidden[id]) return false;
+      if (!nodeVisible(this.engine, primitive.node)) return false;
       multiplyMatrices(this.inverse, primitive.node.matrix, relative);
       const stamp = part.stamp;
       for (let c = 0; c < 16; c++) if (relative[c] !== stamp[c]) return false;
@@ -1506,7 +1508,13 @@ export class PBRModel implements EnginePlugin {
     const out: ShadowCasterRecord[] = [];
     for (let i = 0; i < this.resources.length; i++) {
       const r = this.resources[i];
-      if (r.batch || r.primitive.node !== node || r.primitive.material.settings[0] === 2 || r.primitive.topology)
+      if (
+        r.batch ||
+        r.primitive.node !== node ||
+        r.primitive.material.settings[0] === 2 ||
+        r.primitive.topology ||
+        primitiveAfterOpaque(r.primitive)
+      )
         continue;
       const value = {} as ShadowCasterRecord;
       fillShadow(r, value);
@@ -1525,13 +1533,14 @@ export class PBRModel implements EnginePlugin {
           : 100,
       cache = this.gpuCache;
     if (r.values?.length !== floats) {
-      r.uniform?.destroy();
+      retire(r.device, r.uniform);
       r.values = new Float32Array(floats);
       r.uniform = device.createBuffer({ size: floats * 4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     }
     r.views = [];
     r.samplers = [];
     r.groups.clear();
+    r.copies?.clear();
     r.replacesTextures = !!m.shading?.replacesTextures;
     if (r.replacesTextures) return;
     for (let i = 0; i < m.maps.length; i++) {
@@ -1925,7 +1934,7 @@ export class PBRModel implements EnginePlugin {
     for (let i = 0; i < this.resources.length; i++) {
       const r = this.resources[i],
         p = r.primitive;
-      if (p.material.settings[0] === 2 || p.topology) continue;
+      if (p.material.settings[0] === 2 || p.topology || primitiveAfterOpaque(p)) continue;
       if (r.batch ? !shown(r.batch) : !!(r.mergedInto?.batch && shown(r.mergedInto.batch))) continue;
       fillShadow(r, (out[count] ??= {} as ShadowCasterRecord));
       count++;
@@ -1959,10 +1968,14 @@ export class PBRModel implements EnginePlugin {
       if (phase === 'blend') return;
       phase = 'opaque';
     }
-    if (external) this.view.set(external.view);
-    else viewMatrix(this.view, c.camera);
     const scratch = (this.drawScratch[this.drawDepth] ??= createDrawScratch(color, depth));
+    scratch.projection.set(c.camera.matrix);
+    scratch.eye.set(c.camera.position);
+    if (external) scratch.view.set(external.view);
+    else viewMatrix(scratch.view, c.camera);
     this.drawDepth++;
+    // Resources a callback releases during this draw stay valid until the frame is submitted.
+    beginDraw(c.device, c.view ?? c);
     scratch.context = c;
     let pass: GPURenderPassEncoder | undefined = external?.pass,
       shared: GPURenderPassEncoder | undefined;
@@ -1974,19 +1987,19 @@ export class PBRModel implements EnginePlugin {
         let sort = false;
         for (let i = 0; i < source.length; i++) {
           resources[i] = source[i];
-          sort ||= blended(source[i].primitive.material);
+          sort ||= late(source[i]);
         }
         resources.length = source.length;
         // Sorting an all-opaque list only returns the original stable order.
         // Preserve a snapshot for hooks while avoiding V8's sort workspace.
         // Distances are filled once; the comparator used to call hypot twice per pair.
         if (sort) {
-          const position = c.camera.position,
+          const position = scratch.eye,
             distances = scratch.blendDistance;
           distances.clear();
           for (let i = 0; i < resources.length; i++) {
             const resource = resources[i];
-            if (!blended(resource.primitive.material)) continue;
+            if (!late(resource)) continue;
             const matrix = resource.primitive.node.matrix;
             distances.set(
               resource,
@@ -2003,7 +2016,7 @@ export class PBRModel implements EnginePlugin {
         if (value === undefined)
           liveBatches.set(
             batch,
-            (value = (mode !== 'beauty' || !asymmetricStencilFaces(batch.material.renderState)) && this.pose(batch)),
+            (value = (mode !== 'beauty' || !asymmetricStencilFaces(batch.material.renderState)) && this.pose(batch, c)),
           );
         return value;
       };
@@ -2013,23 +2026,24 @@ export class PBRModel implements EnginePlugin {
         const p = r.primitive,
           m = p.material,
           node = p.node,
-          inst = p.instances;
+          inst = p.instances,
+          // Drawn in the beauty pass after the opaque capture, keeping its authored alpha mode.
+          deferred = !r.batch && primitiveAfterOpaque(p);
+        // A batch was checked part by part against the view's layers in pose().
+        if (!r.batch && !inView(c, node)) continue;
         if (
           p.topology
             ? mode !== 'beauty'
             : through
-              ? !(transmission ? transmits(m) : separable(m))
+              ? deferred || !(transmission ? transmits(m) : separable(m))
               : capture
-                ? blended(m) || m.ext![0]
-                : mode === 'beauty' && ((oit && separable(m)) || (!!this.transmission && transmits(m)))
+                ? deferred || blended(m) || m.ext![0]
+                : mode === 'beauty' && !deferred && ((oit && separable(m)) || (!!this.transmission && transmits(m)))
         )
           continue;
-        if (phase !== 'all' && blended(m) !== (phase === 'blend')) continue;
+        if (phase !== 'all' && (blended(m) || deferred) !== (phase === 'blend')) continue;
         node.check();
-        let visible = true;
-        for (let id = node.id; id !== -1; id = this.engine.store.parents[id])
-          if (this.engine.store.hidden[id]) visible = false;
-        if (!visible || (inst && !inst.count)) continue;
+        if (!nodeVisible(this.engine, node) || (inst && !inst.count)) continue;
         const wireframe = wireframeIndices(r),
           topology = p.topology ?? (wireframe ? 'line-list' : undefined),
           index = wireframe?.index ?? r.index,
@@ -2041,12 +2055,12 @@ export class PBRModel implements EnginePlugin {
         if (r.values.length !== floatCount || r.replacesTextures !== !!m.shading?.replacesTextures)
           this.bindMaterial(r, c.device, c.device.createSampler({ minFilter: 'linear', magFilter: 'linear' }));
         const v = r.values;
-        v.set(c.camera.matrix);
+        v.set(scratch.projection);
         v.set(node.matrix, 16);
         if (!invertMatrixStable(node.matrix, this.inverse, this.workspace)) throw new Error('Singular PBR transform');
         for (let i = 0; i < 16; i++) v[32 + i] = this.inverse[(i % 4) * 4 + Math.floor(i / 4)];
-        v.set(this.view, 48);
-        v.set(c.camera.position, 64);
+        v.set(scratch.view, 48);
+        v.set(scratch.eye, 64);
         v.set(this.engine.lighting.direction, 68);
         v.set(this.engine.lighting.radiance, 72);
         v.set(m.base, 76);
@@ -2083,7 +2097,8 @@ export class PBRModel implements EnginePlugin {
           v[99] = m.tint[1];
           v[102] = m.tint[2];
         }
-        c.device.queue.writeBuffer(r.uniform, 0, v as Float32Array<ArrayBuffer>);
+        // A later draw of this frame with other values (another view, a probe face) gets its own uniform slice.
+        const uniform = writeUniform(c.device, r.uniform, v as Float32Array<ArrayBuffer>, c.view ?? c);
         // Physical materials listing only the five core maps (materials built in code) draw the factor-only variant;
         // transmission draws its transmissive form, extended materials the shader of decoders.materials.
         const x = this.asset.hooks.materials || undefined,
@@ -2138,7 +2153,7 @@ export class PBRModel implements EnginePlugin {
           r.extension = prepareMaterialExtension(c.device, extension, r.extension);
           code = materialExtensionShader(code, extension);
         } else if (r.extension) {
-          r.extension.uniform?.destroy();
+          retire(r.device, r.extension.uniform);
           r.extension = undefined;
         }
         const lighting = extension?.lighting !== false,
@@ -2399,6 +2414,7 @@ export class PBRModel implements EnginePlugin {
         }
         if (r.sectionBuffer !== section) {
           r.groups.clear();
+          r.copies?.clear();
           r.sectionBuffer = section;
         }
         let groups = r.groups.get(pipeline);
@@ -2406,6 +2422,7 @@ export class PBRModel implements EnginePlugin {
           groups = createDrawGroups(c.device, pipeline, r, m, transmission, x, section);
           r.groups.set(pipeline, groups);
         }
+        if (uniform) groups = [copyGroup(c.device, pipeline, r, transmission, section, uniform), groups[1]];
         let target: GPURenderPassEncoder;
         if (through || capture) target = shared ??= (through ? oit! : hook!).begin();
         else {
@@ -2421,6 +2438,7 @@ export class PBRModel implements EnginePlugin {
             scratch.depth.stencilLoadOp = stencil ? 'load' : undefined;
             scratch.depth.stencilStoreOp = stencil ? 'store' : undefined;
             pass = c.encoder.beginRenderPass(scratch.descriptor);
+            applyView(pass, c);
           }
           target = pass;
         }
@@ -2488,6 +2506,9 @@ export class PBRModel implements EnginePlugin {
           }
           effectGroup = cached!.group;
         }
+        // A callback above (lighting, instancing, transparency hooks) may have disposed this model or its node.
+        if (this.disposed) break;
+        if (this.engine.meshes.get(node.id) !== node) continue;
         // Transmission first multiplies the background, then adds the lit surface.
         if (tinted) {
           const tint = this.pipelines.get(key + ':tint')!,
@@ -2496,17 +2517,10 @@ export class PBRModel implements EnginePlugin {
           if (!tintGroups) {
             tintGroups = mappedTint
               ? createDrawGroups(c.device, tint, r, m, false, x, section)
-              : [
-                  c.device.createBindGroup({
-                    layout: tint.getBindGroupLayout(0),
-                    entries: [
-                      { binding: 0, resource: { buffer: r.uniform } },
-                      ...(section ? [{ binding: 2, resource: { buffer: section } }] : []),
-                    ],
-                  }),
-                ];
+              : [frameGroup(c.device, tint, r, false, section)];
             r.groups.set(tint, tintGroups);
           }
+          if (uniform) tintGroups = [copyGroup(c.device, tint, r, false, section, uniform), ...tintGroups.slice(1)];
           target.setPipeline(tint);
           target.setBindGroup(0, tintGroups[0]);
           if (mappedTint) {
@@ -2560,6 +2574,7 @@ export class PBRModel implements EnginePlugin {
         } catch {}
       throw error;
     } finally {
+      endDraw(c.device);
       this.drawDepth--;
       scratch.context = undefined;
       scratch.code = '';
@@ -2579,9 +2594,12 @@ export class PBRModel implements EnginePlugin {
     // rather than drawing a bind pose or silently omitting an extended surface.
     for (const primitive of [...this.primitives, ...this.pointsAndLines]) {
       if (primitive.material.shading && device !== this.engine.gpu)
-        throw new Error('Cross-device PBR rendering requires recreating local material shading');
+        throw margoError('unsupported', 'Cross-device PBR rendering requires recreating local material shading');
       if ((primitive.extension ?? primitive.material.extension)?.textures?.length)
-        throw new Error('Cross-device PBR rendering requires recreating caller-owned material extension textures');
+        throw margoError(
+          'unsupported',
+          'Cross-device PBR rendering requires recreating caller-owned material extension textures',
+        );
     }
     const replica = Object.create(PBRModel.prototype) as PBRModel;
     Object.assign(replica, {
@@ -2598,7 +2616,6 @@ export class PBRModel implements EnginePlugin {
       pipelines: new Map(),
       inverse: new Float32Array(16),
       workspace: new Float64Array(52),
-      view: new Float32Array(16),
       engine: this.engine,
       cleanupCallbacks: new Set(),
       lighting: new Set(),
@@ -2631,9 +2648,12 @@ export class PBRModel implements EnginePlugin {
         const source = sources[i],
           copy = copies[i];
         if (source.material.shading && device !== this.engine.gpu)
-          throw new Error('Cross-device PBR rendering requires recreating local material shading');
+          throw margoError('unsupported', 'Cross-device PBR rendering requires recreating local material shading');
         if ((source.extension ?? source.material.extension)?.textures?.length)
-          throw new Error('Cross-device PBR rendering requires recreating caller-owned material extension textures');
+          throw margoError(
+            'unsupported',
+            'Cross-device PBR rendering requires recreating caller-owned material extension textures',
+          );
         copy.extension = source.extension;
         if (copy.material !== source.material) {
           const previous = copy.material,
@@ -2689,7 +2709,10 @@ export class PBRModel implements EnginePlugin {
       replica.setup(this.engine, device);
       if (factory) deformation = factory(replica, device);
       else if (this.primitives.some((primitive) => primitive.deformed))
-        throw new Error('Cross-device deformed PBR rendering requires an isolated deformation renderer');
+        throw margoError(
+          'unsupported',
+          'Cross-device deformed PBR rendering requires an isolated deformation renderer',
+        );
       return deviceRenderer(
         device,
         (context) => {
@@ -2703,7 +2726,10 @@ export class PBRModel implements EnginePlugin {
             factory = next;
           }
           if (!factory && this.primitives.some((primitive) => primitive.deformed))
-            throw new Error('Cross-device deformed PBR rendering requires an isolated deformation renderer');
+            throw margoError(
+              'unsupported',
+              'Cross-device deformed PBR rendering requires an isolated deformation renderer',
+            );
           deformation?.prepare(context);
         },
         (context, pass, view) =>
@@ -2771,12 +2797,13 @@ export class PBRModel implements EnginePlugin {
   private releaseGPU(): void {
     this.gpuRevision++;
     const cleanup = new Cleanup(),
-      buffers = new Set<GPUBuffer>();
+      buffers = new Map<GPUBuffer, GPUDevice>(),
+      device = this.resources[0]?.device ?? this.engine.gpu;
     for (const r of this.resources)
       for (const b of [r.vertex, r.index, r.wireframe?.index, r.uniform, r.extension?.uniform, r.volume])
-        if (b) buffers.add(b);
-    for (const b of buffers) cleanup.run(() => b.destroy());
-    for (const t of this.textures) cleanup.run(() => t.destroy());
+        if (b) buffers.set(b, r.device);
+    for (const [b, owner] of buffers) cleanup.run(() => retire(owner, b));
+    if (device) for (const t of this.textures) cleanup.run(() => retire(device, t));
     for (const p of [...this.primitives, ...this.pointsAndLines]) {
       p.buffers = undefined;
       cleanup.run(() => p.instances?.dispose());
@@ -2934,14 +2961,14 @@ export async function parseGLTFAsync(
   const { doc, binary } = container(input, downloadLimit(options.maxDownloadBytes)),
     asset = new GLTFAsset(
       doc,
-      buffersOrOptions,
+      buffersOrOptions ?? [],
       binary,
       await withMaterials(doc, options.decoders),
       options.maxDownloadBytes,
       options.maxNodes,
     );
   await decompressPrimitives(asset, { ...options, draco: options.draco ?? options.decoders?.draco });
-  images = await decodeKTX2Images(asset, images, {
+  images = await decodeKTX2Images(asset, images ?? [], {
     ...options,
     ktx2: options.ktx2 ?? options.decoders?.ktx2,
     device: engineRuntime(instance).gpu ?? undefined,

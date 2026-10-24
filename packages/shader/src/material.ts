@@ -1,5 +1,6 @@
 import { MargoError } from '@margoengine/math/errors';
 import { Material, type MaterialOptions } from '@margoengine/materials';
+import type { SurfaceGraph } from './graph.js';
 import type { Engine } from '@margoengine/core/extension';
 import {
   Program,
@@ -94,6 +95,11 @@ export class NodeMaterial extends Material {
   readonly fragmentCode: string;
   readonly vertexCode: string;
   readonly varyingFields: string;
+  /**
+   * The validated surface graph a `createGraphMaterial` material was built from, so a baking host can evaluate the
+   * same pattern with `evaluateSurfaceGraph`. Undefined for other node materials.
+   */
+  surfaceGraph?: SurfaceGraph;
   private readonly patched = new Map<string, string>();
   constructor(options: NodeMaterialOptions = {}) {
     const { colorNode, opacityNode, roughnessNode, metalnessNode, emissiveNode, normalNode, positionNode, ...rest } =

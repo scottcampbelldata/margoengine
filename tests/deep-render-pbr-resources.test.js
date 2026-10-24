@@ -73,6 +73,7 @@ test('PBR lighting observes in-place buffer binding edits without rebuilding its
     first.destroy();
     second.destroy();
     engine.dispose();
+    await null; // released resources are destroyed at the end of the task
     assert.ok(h.resources.every((r) => r.destroyed));
   }
 });

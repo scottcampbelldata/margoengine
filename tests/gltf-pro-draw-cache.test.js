@@ -298,21 +298,25 @@ test('PBR pooled snapshots preserve opaque order and mutable transparent distanc
   f.model.primitives[0].material.settings[0] = 2;
   f.model.primitives[1].material.settings[0] = 2;
   f.model.primitives[3].material.settings[0] = 2;
+  await null; // the next frame
   assert.deepEqual(
     f.frame().map((draw) => draw.x),
     [0, 2, 2, -1],
   );
   f.context.camera.position = [-4, 0, 4];
+  await null; // the next frame
   assert.deepEqual(
     f.frame().map((draw) => draw.x),
     [0, 2, 2, -1],
   );
   f.context.camera.position = [4, 0, 4];
+  await null; // the next frame
   assert.deepEqual(
     f.frame().map((draw) => draw.x),
     [0, -1, 2, 2],
   );
   for (const primitive of f.model.primitives) primitive.material.settings[0] = 0;
+  await null; // the next frame
   assert.deepEqual(
     f.frame().map((draw) => draw.x),
     x,

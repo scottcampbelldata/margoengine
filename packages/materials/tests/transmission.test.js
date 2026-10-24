@@ -68,10 +68,14 @@ async function scene(extensions, images = [], configure = () => {}) {
             },
             setVertexBuffer() {},
             setIndexBuffer() {},
+            setViewport() {},
+            setScissorRect() {},
             drawIndexed() {
               draws.push({ pipeline, groups: new Map(groups), pass: record });
             },
-            draw() {},
+            draw(count) {
+              record.fullscreen = { count, pipeline, groups: new Map(groups) };
+            },
             end() {
               record.ended = true;
             },
@@ -166,6 +170,7 @@ test('transmission factor zero preserves the opaque material, baseline shader, d
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
@@ -300,6 +305,7 @@ test('transmission and thickness glTF texture transforms append affine rows and 
     } finally {
       s.engine.dispose();
     }
+    await null; // released resources are destroyed at the end of the task
     assert.ok(s.resources.every((resource) => resource.destroyed));
   }
 });
@@ -326,7 +332,7 @@ test('caller-owned transmission and thickness maps validate transform-selected U
   }
 });
 
-test('transmission installs a shared opaque copy, blends without depth writes or shadows, then restores material state', async () => {
+test('transmission installs a shared opaque copy, defers authored coverage without opaque shadows, then restores slots', async () => {
   const s = await scene(transmission(0.75, { KHR_materials_ior: { ior: 1.33 } }));
   try {
     const material = s.model.primitives[1].material,
@@ -342,7 +348,8 @@ test('transmission installs a shared opaque copy, blends without depth writes or
       },
     });
     const installation = install(s.model);
-    assert.equal(material.settings[0], 2);
+    assert.deepEqual(material.settings, settings, 'Transmission scheduling retains authored coverage');
+    assert.equal(material.extension.afterOpaque, true);
     assert.equal(material.extension.lighting, false);
     assert.equal(s.model.shadowPrimitives.length, 1);
     assert.ok(s.engine.hasPlugin('materials:opaque-color'));
@@ -354,8 +361,8 @@ test('transmission installs a shared opaque copy, blends without depth writes or
       /direct\*0\.5\+ambient\(s\)/,
       'Transmission must skip installed shadow effects',
     );
-    assert.ok(s.draws[1].pipeline.fragment.targets[0].blend);
-    assert.equal(s.draws[1].pipeline.depthStencil.depthWriteEnabled, false);
+    assert.equal(s.draws[1].pipeline.fragment.targets[0].blend, undefined);
+    assert.equal(s.draws[1].pipeline.depthStencil.depthWriteEnabled, true);
     assert.ok(s.draws[1].groups.has(3));
     const extensionBuffer = s.draws[1].groups.get(3).entries[0].resource.buffer;
     installation.dispose();
@@ -365,11 +372,13 @@ test('transmission installs a shared opaque copy, blends without depth writes or
     assert.equal(s.engine.hasPlugin('materials:opaque-color'), false);
     assert.equal(s.model.shadowPrimitives.length, 2);
     s.draw();
+    await null; // released resources are destroyed at the end of the task
     assert.equal(extensionBuffer.destroyed, true);
     removeLighting();
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
@@ -421,6 +430,7 @@ test('transmission and volume share linear image uploads and preserve caller-own
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
@@ -460,8 +470,22 @@ test('the opaque snapshot is shared across models and all opaque draws precede e
     assert.equal(s.draws.length, 4);
     assert.deepEqual(
       s.draws.map((draw) => draw.pipeline.depthStencil.depthWriteEnabled),
-      [true, true, false, false],
-      'A transmissive primitive sampled before another model had rendered its opaque primitive',
+      [true, true, true, true],
+    );
+    assert.deepEqual(
+      s.draws.map((draw) => draw.groups.has(3)),
+      [false, false, true, true],
+    );
+    const snapshotView = s.model.primitives[1].material.extension.textures[0].view,
+      copyIndex = s.events.findIndex(
+        (event) => event.fullscreen && event.descriptor.colorAttachments[0].view === snapshotView,
+      );
+    assert.ok(copyIndex >= 0, 'The actual fullscreen blit must target the shared sampled snapshot');
+    assert.equal(s.events[copyIndex].fullscreen.count, 3);
+    assert.ok(s.draws.slice(0, 2).every((draw) => s.events.indexOf(draw.pass) < copyIndex));
+    assert.ok(
+      s.draws.slice(2).every((draw) => s.events.indexOf(draw.pass) > copyIndex),
+      'A deferred primitive sampled before every model rendered its ordinary opaque primitive',
     );
     firstInstallation.dispose();
     assert.ok(
@@ -474,6 +498,7 @@ test('the opaque snapshot is shared across models and all opaque draws precede e
     second?.destroy();
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
@@ -490,11 +515,21 @@ test('scene snapshot resources survive unchanged frames and replace cleanly on r
     assert.equal(s.context.color, originalColor);
     assert.equal(s.context.depth, originalDepth);
     const textures = s.counts.textures;
+    await null; // the next frame
+    s.context.view = { id: 'a', camera: s.context.camera, viewport: [0, 0, 128, 96], index: 0, count: 2 };
     s.frame();
     assert.equal(s.counts.textures, textures, 'An unchanged frame must reuse scene targets');
+    // A second view of another size in the same frame: the first view's commands still read the old scene copy.
     s.context.width = 256;
     s.context.height = 192;
+    s.context.view = { id: 'b', camera: s.context.camera, viewport: [0, 0, 256, 192], index: 1, count: 2 };
     s.frame();
+    delete s.context.view;
+    assert.ok(
+      first.some((texture) => !texture.destroyed),
+      'the scene copy outlives the frame that drew with it',
+    );
+    await null; // the frame is submitted
     assert.ok(
       first.every((texture) => texture.destroyed),
       'Resize leaked the previous snapshot',
@@ -505,6 +540,7 @@ test('scene snapshot resources survive unchanged frames and replace cleanly on r
     assert.ok(resized.length >= 2);
     s.context.format = 'rgba16float';
     s.frame();
+    await null;
     assert.ok(
       resized.every((texture) => texture.destroyed),
       'An HDR format change leaked the previous snapshot',
@@ -513,6 +549,7 @@ test('scene snapshot resources survive unchanged frames and replace cleanly on r
     assert.ok(hdr.every((texture) => texture.format === 'rgba16float'));
     s.context.descriptor = { ...s.context.descriptor, multisample: { count: 4 } };
     s.frame();
+    await null;
     assert.ok(
       hdr.every((texture) => texture.destroyed),
       'An MSAA change leaked the previous snapshot',
@@ -521,6 +558,7 @@ test('scene snapshot resources survive unchanged frames and replace cleanly on r
     assert.equal(s.context.color, originalColor);
     assert.equal(s.context.depth, originalDepth);
     installation.dispose();
+    await null;
     assert.ok(
       s.resources
         .filter((resource) => resource.createView && resource.width === 256)
@@ -529,6 +567,7 @@ test('scene snapshot resources survive unchanged frames and replace cleanly on r
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
@@ -575,6 +614,7 @@ test('a failed snapshot resize releases partial replacements and preserves the p
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
@@ -591,13 +631,13 @@ test('a deferred transmission draw failure restores MSAA context and recovers on
     let failed = false;
     s.context.encoder.beginRenderPass = (descriptor) => {
       const pass = beginRenderPass(descriptor),
-        setPipeline = pass.setPipeline;
-      pass.setPipeline = (pipeline) => {
-        if (!failed && pipeline.fragment?.targets[0]?.blend) {
+        setBindGroup = pass.setBindGroup;
+      pass.setBindGroup = (index, group) => {
+        if (!failed && index === 3) {
           failed = true;
           throw failure;
         }
-        setPipeline(pipeline);
+        setBindGroup(index, group);
       };
       return pass;
     };
@@ -613,7 +653,11 @@ test('a deferred transmission draw failure restores MSAA context and recovers on
     s.frame();
     assert.deepEqual(
       s.draws.slice(-2).map((draw) => draw.pipeline.depthStencil.depthWriteEnabled),
-      [true, false],
+      [true, true],
+    );
+    assert.deepEqual(
+      s.draws.slice(-2).map((draw) => draw.groups.has(3)),
+      [false, true],
     );
     assert.equal(s.context.color, originalColor);
     assert.equal(s.context.depth, originalDepth);
@@ -622,6 +666,7 @@ test('a deferred transmission draw failure restores MSAA context and recovers on
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
@@ -664,11 +709,16 @@ test('device recovery retires an unfinished opaque frame without using its old e
     s.frame();
     assert.deepEqual(
       s.draws.slice(-2).map((draw) => draw.pipeline.depthStencil.depthWriteEnabled),
-      [true, false],
+      [true, true],
+    );
+    assert.deepEqual(
+      s.draws.slice(-2).map((draw) => draw.groups.has(3)),
+      [false, true],
     );
     installation.dispose();
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });

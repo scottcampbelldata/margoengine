@@ -10,8 +10,10 @@ import {
   type FrameGraph,
   type PassContext,
   type DrawOptions,
+  type RenderView,
 } from '@margoengine/core/extension';
 import { meshVertex } from '../../shared/gpu.js';
+import { inView } from '../../shared/view-rect.js';
 import { PickingPrimitives, type PickingSource } from './picking-primitives.js';
 export type { PickingSource, PickingPrimitive } from './picking-primitives.js';
 import { instanceMatrix } from '../../shared/instances.js';
@@ -28,11 +30,17 @@ import {
   type ModelPrimitive,
   type PickProxy,
 } from './models.js';
+import { retire } from '../../shared/frame-resources.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; MAP_READ: number; VERTEX: number; INDEX: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; COPY_SRC: number };
 declare const GPUMapMode: { READ: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+/** A view resolved by `engine.pick`: rectangles in drawing-buffer pixels. */
+type PickView = RenderView & { pixels: true };
+/** True when `rect` is absent or covers the whole target. */
+const covers = (rect: readonly number[] | undefined, c: Context) =>
+  !rect || (rect[0] === 0 && rect[1] === 0 && rect[2] === c.width && rect[3] === c.height);
 const attachedPickers = new WeakMap<Engine, Picking>();
 type Snapshot = { geometry: Geometry | null; values: Float32Array; visible: number };
 const buffers: GPUVertexBufferLayout[] = [
@@ -189,6 +197,7 @@ export class Picking implements EnginePlugin {
   private readonly clip = new Float64Array(16);
   private readonly snapshot = new Map<Mesh, Snapshot>();
   private graphRevision = -1;
+  private graph?: FrameGraph;
   private captured = false;
   private original?: Context['draw'];
   private context?: Context;
@@ -275,12 +284,14 @@ export class Picking implements EnginePlugin {
   private capture(c: Context): void {
     this.captured = false;
     this.context = c;
+    // Only a full first view fills the ID attachment; later or partial views pick through the micro pass.
+    if (c.view && (c.view.index || !covers(c.view.viewport, c) || !covers(c.view.scissor, c))) return;
     this.primitives.discover(this.engine!.meshes.values());
     if (this.primitives.hasSources) return;
     // Integer IDs cannot be resolved; retain the existing single-sample micro pass under MSAA. Scenes with models always pick through it too.
     if ((c.descriptor.multisample?.count ?? 1) > 1 || this.models.update(this.engine!).length) return;
     if (this.ids?.width !== c.width || this.ids.height !== c.height) {
-      this.ids?.destroy();
+      retire(this.device!, this.ids);
       this.ids = c.device.createTexture({
         size: [c.width, c.height],
         format: 'r32uint',
@@ -290,11 +301,16 @@ export class Picking implements EnginePlugin {
     }
     this.original = c.draw;
     const original = c.draw;
+    let eligible = true;
     c.draw = (options: DrawOptions = {}) => {
+      // A partial draw leaves the IDs incomplete for the rest of the frame.
+      eligible &&= covers(options.viewport, c) && covers(options.scissor, c);
       if (
+        !eligible ||
         options.pipeline ||
         !c.shader.includes('@fragment fn fragment(i:Output,@builtin(front_facing) front:bool)->@location(0) vec4f')
       ) {
+        this.captured &&= eligible;
         original(options);
         return;
       }
@@ -307,7 +323,8 @@ export class Picking implements EnginePlugin {
         ],
       });
       this.camera.set(c.camera.matrix);
-      this.graphRevision = this.engine!.frameGraph.revision;
+      this.graph = this.engine!.frameGraph;
+      this.graphRevision = this.graph.revision;
       for (const mesh of this.snapshot.keys())
         if (this.engine!.meshes.get(mesh.id) !== mesh) this.snapshot.delete(mesh);
       for (const mesh of this.engine!.meshes.values()) {
@@ -331,6 +348,7 @@ export class Picking implements EnginePlugin {
       this.primitives.hasSources ||
       !this.captured ||
       e.hasPlugin('section-planes') ||
+      this.graph !== e.frameGraph ||
       this.graphRevision !== e.frameGraph.revision ||
       this.snapshot.size !== e.meshes.size ||
       this.ids?.width !== e.canvas.width ||
@@ -350,22 +368,25 @@ export class Picking implements EnginePlugin {
     }
     return true;
   }
-  /** `engine.pick` hook: the core mesh, or the glTF node of a gltf-pro model, at a canvas CSS pixel. */
-  async onPick(x: number, y: number): Promise<Mesh | null> {
-    const hit = await this.resolve(x, y);
+  /** `engine.pick` hook: the core mesh, or the glTF node of a gltf-pro model, at a canvas CSS pixel, in `view` when given. */
+  async onPick(x: number, y: number, view?: PickView): Promise<Mesh | null> {
+    const hit = await this.resolve(x, y, view);
     this.last = hit;
     return hit?.mesh ?? null;
   }
-  /** `engine.pick` (transforms and camera refreshed first), with the model and primitive for model hits. */
-  async pick(x: number, y: number): Promise<PickHit | null> {
+  /**
+   * `engine.pick` (transforms and camera refreshed first), with the model and primitive for model hits. With `view`,
+   * picks inside that view with its camera, scene and layers.
+   */
+  async pick(x: number, y: number, view?: RenderView): Promise<PickHit | null> {
     if (this.disposed || !this.engine) throw new Error('Picking is disposed');
     this.last = null;
-    const mesh = await this.engine.pick(x, y),
+    const mesh = await this.engine.pick(x, y, view),
       hit = this.last as PickHit | null;
     this.last = null;
     return mesh && hit?.mesh === mesh ? hit : null;
   }
-  private async resolve(x: number, y: number): Promise<PickHit | null> {
+  private async resolve(x: number, y: number, view?: PickView): Promise<PickHit | null> {
     if (this.disposed || !this.engine) throw new Error('Picking is disposed');
     if (this.pending) throw new Error('A pick is already pending');
     if (![x, y].every(Number.isFinite)) throw new RangeError('Invalid pick coordinates');
@@ -378,7 +399,9 @@ export class Picking implements EnginePlugin {
     const e = this.engine,
       device = this.device!,
       read = this.read!,
-      meshes = new Map(e.meshes),
+      // The picked scene's live meshes (engine.pick enters that scene until this first await) and a snapshot.
+      live = e.meshes,
+      meshes = new Map(live),
       models = this.models.update(e),
       starts = this.models.starts,
       total = this.models.total,
@@ -386,20 +409,28 @@ export class Picking implements EnginePlugin {
       capacity = e.store.capacity;
     try {
       this.primitives.discover(e.meshes.values());
-      const px = Math.floor((x * e.canvas.width) / cssWidth),
+      // The view's rectangle, clipped by its scissor; the whole canvas without a view.
+      const rect = view?.viewport ?? [0, 0, e.canvas.width, e.canvas.height],
+        clip = view?.scissor ?? rect,
+        left = Math.max(0, rect[0], clip[0]),
+        top = Math.max(0, rect[1], clip[1]),
+        right = Math.min(e.canvas.width, rect[0] + rect[2], clip[0] + clip[2]),
+        bottom = Math.min(e.canvas.height, rect[1] + rect[3], clip[1] + clip[3]),
+        px = Math.floor((x * e.canvas.width) / cssWidth),
         py = Math.floor((y * e.canvas.height) / cssHeight),
-        x0 = Math.max(0, px - 1),
-        y0 = Math.max(0, py - 1),
-        width = Math.min(e.canvas.width, px + 2) - x0,
-        height = Math.min(e.canvas.height, py + 2) - y0;
+        x0 = Math.max(left, px - 1),
+        y0 = Math.max(top, py - 1),
+        width = Math.min(right, px + 2) - x0,
+        height = Math.min(bottom, py + 2) - y0;
+      if (px < left || px >= right || py < top || py >= bottom) return null;
       const encoder = device.createCommandEncoder();
       let texture: GPUTexture, origin: number[], candidates: Map<Mesh, PickingSource[]> | undefined;
       // Model and proxy IDs are not in the forward pass (gltf-pro and imposters draw their own pipelines), so those scenes use the micro pass.
-      if (!models.length && !list.length && this.fresh()) {
+      if (!view && !models.length && !list.length && this.fresh()) {
         texture = this.ids!;
         origin = [x0, y0];
       } else {
-        candidates = this.renderMicro(encoder, px, py, list);
+        candidates = this.renderMicro(encoder, px, py, list, rect, view);
         texture = this.micro!;
         origin = [1 + x0 - px, 1 + y0 - py];
       }
@@ -457,8 +488,9 @@ export class Picking implements EnginePlugin {
           this.disposed ||
           device !== this.device ||
           !hit ||
-          e.meshes.get(hit.mesh.id) !== hit.mesh ||
-          hidden(e, hit.mesh.id)
+          live.get(hit.mesh.id) !== hit.mesh ||
+          hidden(e, hit.mesh.id) ||
+          !inView({ view }, hit.mesh)
         )
           return null;
         if (
@@ -492,18 +524,23 @@ export class Picking implements EnginePlugin {
     x: number,
     y: number,
     list: readonly PickProxy[],
+    rect: readonly number[],
+    view?: PickView,
   ): Map<Mesh, PickingSource[]> | undefined {
     const e = this.engine!,
       device = this.device!,
-      matrix = e.camera.matrix.slice(),
-      nx = (2 * (x + 0.5)) / e.canvas.width - 1,
-      ny = 1 - (2 * (y + 0.5)) / e.canvas.height;
+      camera = view?.camera ?? e.camera,
+      scope = { view },
+      shown = (mesh: Mesh) => !hidden(e, mesh.id) && inView(scope, mesh),
+      matrix = camera.matrix.slice(),
+      nx = (2 * (x - rect[0] + 0.5)) / rect[2] - 1,
+      ny = 1 - (2 * (y - rect[1] + 0.5)) / rect[3];
     for (let c = 0; c < 4; c++) {
-      matrix[c * 4] = ((matrix[c * 4] - nx * matrix[c * 4 + 3]) * e.canvas.width) / 3;
-      matrix[c * 4 + 1] = ((matrix[c * 4 + 1] - ny * matrix[c * 4 + 3]) * e.canvas.height) / 3;
+      matrix[c * 4] = ((matrix[c * 4] - nx * matrix[c * 4 + 3]) * rect[2]) / 3;
+      matrix[c * 4 + 1] = ((matrix[c * 4 + 1] - ny * matrix[c * 4 + 3]) * rect[3]) / 3;
     }
     this.frame.set(matrix);
-    this.frame.set(e.camera.position, 16);
+    this.frame.set(camera.position, 16);
     this.frame.set(e.lighting.direction, 20);
     this.frame.set(e.lighting.radiance, 24);
     this.frame.fill(1, 28, 31);
@@ -513,7 +550,7 @@ export class Picking implements EnginePlugin {
       backend: 'webgpu',
       device,
       encoder,
-      camera: e.camera,
+      camera,
       width: e.canvas.width,
       height: e.canvas.height,
       delta: 0,
@@ -554,6 +591,7 @@ export class Picking implements EnginePlugin {
       if (
         mesh.geometry &&
         e.store.visible[mesh.id] &&
+        inView(scope, mesh) &&
         intersects(matrix, mesh.matrix, mesh.geometry.bounds, this.clip)
       ) {
         let values = batches.get(mesh.geometry);
@@ -573,7 +611,7 @@ export class Picking implements EnginePlugin {
     // Own instance buffer: the core uploads its instance buffers only when they change, so they must not be overwritten here.
     const data = new Float32Array([...batches.values()].flat());
     if (data.length && (this.instances?.size ?? 0) < data.byteLength) {
-      this.instances?.destroy();
+      retire(this.device!, this.instances);
       this.instances = device.createBuffer({
         size: data.byteLength * 2,
         usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
@@ -601,7 +639,7 @@ export class Picking implements EnginePlugin {
       for (let i = 0; i < model.primitives.length; i++) {
         const p = model.primitives[i],
           inst = p.instances;
-        if (!p.buffers || hidden(e, p.node.id) || (!inst && meshTriangles(p.node)?.kind === 'pbr')) continue;
+        if (!p.buffers || !shown(p.node) || (!inst && meshTriangles(p.node)?.kind === 'pbr')) continue;
         // Instances meeting the micro frustum get IDs after the pick proxies' (one slot per hit candidate, not per instance).
         if (inst) {
           for (let k = 0; k < inst.count; k++) {
@@ -621,7 +659,7 @@ export class Picking implements EnginePlugin {
       const { anchor, sphere: b } = list[i],
         m = anchor.matrix,
         k = this.proxyMatrix;
-      if (e.meshes.get(anchor.id) !== anchor || hidden(e, anchor.id) || !intersects(matrix, m, b, this.clip)) continue;
+      if (e.meshes.get(anchor.id) !== anchor || !shown(anchor) || !intersects(matrix, m, b, this.clip)) continue;
       for (let c = 0; c < 3; c++) for (let r = 0; r < 4; r++) k[c * 4 + r] = m[c * 4 + r] * b[3];
       for (let r = 0; r < 4; r++) k[12 + r] = m[r] * b[0] + m[4 + r] * b[1] + m[8 + r] * b[2] + m[12 + r];
       draws.add((this.sphere ??= proxySphere(device)), e.store.capacity + 1 + this.models.total + i, k);
@@ -642,9 +680,11 @@ export class Picking implements EnginePlugin {
         filter: (node, _primitive, source, index) => {
           const owner = models.indexOf(source as unknown as Model),
             p = owner < 0 ? undefined : models[owner].primitives[index];
-          return !p?.instances && (!p || p.deformed || intersects(matrix, node.matrix, sphere(p), this.clip))
-            ? true
-            : false;
+          return (
+            inView(scope, node) &&
+            !p?.instances &&
+            (!p || !!p.deformed || intersects(matrix, node.matrix, sphere(p), this.clip))
+          );
         },
         id: (node, source, index) => {
           const owner = models.indexOf(source as unknown as Model);
@@ -656,20 +696,21 @@ export class Picking implements EnginePlugin {
     if (this.engine && attachedPickers.get(this.engine) === this) attachedPickers.delete(this.engine);
     this.primitives.release();
     for (const resource of [this.ids, this.micro, this.depth, this.uniform, this.read, this.instances])
-      resource?.destroy();
+      retire(this.device!, resource);
     this.ids = this.micro = this.depth = undefined;
     this.idsView = undefined;
     this.uniform = this.read = this.instances = undefined;
     this.pipelines.clear();
     this.draws.release();
-    this.sphere?.buffers?.vertex.destroy();
-    this.sphere?.buffers?.index.destroy();
+    retire(this.device!, this.sphere?.buffers?.vertex);
+    retire(this.device!, this.sphere?.buffers?.index);
     this.sphere = undefined;
     this.modelPipeline = undefined;
     this.groups.clear();
     this.snapshot.clear();
     this.captured = false;
     this.context = undefined;
+    this.graph = undefined;
   }
   onDeviceRestored(engine: Engine): void {
     this.release();

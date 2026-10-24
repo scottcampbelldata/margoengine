@@ -154,6 +154,7 @@ test('install on a model without clearcoat preserves its baseline shader, bindin
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
@@ -186,11 +187,13 @@ test('factor-only glTF clearcoat installs synchronously without textures or samp
     installation.dispose();
     s.draw();
     assert.equal(s.model.primitives[0].material.extension, undefined);
+    await null; // released resources are destroyed at the end of the task
     assert.equal(entries[0].resource.buffer.destroyed, true);
     assert.equal(digest(s.draws.at(-1).pipeline.vertex.module.code), baselineShader);
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
@@ -296,6 +299,7 @@ test('glTF maps share linear image uploads and samplers, restore after device lo
     s.engine.dispose();
   }
   assert.equal(closed, 1, 'The model retains sole ownership of its decoded image');
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
@@ -342,6 +346,7 @@ test('model disposal removes the installation and releases its texture resources
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 
@@ -373,6 +378,7 @@ test('glTF coat texture transforms install through the shared affine block and s
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 

@@ -639,7 +639,7 @@ test('lighting hooks (contract v1): every hook point occurs once in both variant
   );
   assert.throws(
     () => lightPBR(lightPBR(pbrShader, ibl), { declarations: '', ambient: 'vec3f(1)' }),
-    /hook point missing or used twice/,
+    /hook point missing/,
     'one ambient effect',
   );
   assert.equal(lightPBR(pbrShader, fog), lightPBR(pbrShader, fog), 'cached per hooks object');

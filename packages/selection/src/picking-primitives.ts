@@ -1,6 +1,8 @@
 import type { Engine, Mesh, PassContext } from '@margoengine/core/extension';
 import type { Mesh as MeshHandle } from '@margoengine/core';
 import { meshTriangles } from '../../shared/mesh-source.js';
+import { hiddenInTree } from '../../shared/visibility.js';
+import { retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
@@ -38,7 +40,9 @@ interface DrawOptions {
 interface Draw {
   uniform: GPUBuffer;
   values: Float32Array;
-  group: GPUBindGroup;
+  /** Group 0 per uniform binding: a second view of a frame binds its own uniform slice. */
+  groups: { get(copy?: GPUBufferBinding): GPUBindGroup };
+  slice?: GPUBufferBinding;
   pipeline: GPURenderPipeline;
   texture?: GPUTextureView;
   sampler?: GPUSampler;
@@ -198,14 +202,8 @@ export class PickingPrimitives {
         if (node.engine !== this.engine) throw new Error('Picking source belongs to another engine');
         if (this.engine!.meshes.get(node.id) !== node) continue;
         this.validatePrimitive(p);
-        let visible = true;
-        for (let id = node.id; id !== -1; id = this.engine!.store.parents[id])
-          if (this.engine!.store.hidden[id]) {
-            visible = false;
-            break;
-          }
         if (
-          !visible ||
+          hiddenInTree(this.engine!.store, node.id) ||
           (options.filter && !options.filter(node, p, source, sourceIndex)) ||
           (options.mask && !options.mask(node)) ||
           !p.count
@@ -285,7 +283,7 @@ export class PickingPrimitives {
       draws = [];
       this.drawsByPipeline.set(pipeline, draws);
     }
-    // Each primitive owns its uniform: queue writes all complete before the submitted passes execute.
+    // Each primitive owns its uniform; another view of the same frame writes a frame-arena slice.
     for (let index = 0; index < primitives.length; index++) {
       const p = primitives[index];
       let record = draws[index];
@@ -295,11 +293,13 @@ export class PickingPrimitives {
         record.texture !== p.alphaTexture ||
         record.sampler !== p.alphaSampler
       ) {
-        record?.uniform.destroy();
+        retire(this.device!, record?.uniform);
         const uniform = this.device.createBuffer({
           size: 192,
           usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
+        const texture = p.alphaTexture ?? this.whiteView!,
+          sampler = p.alphaSampler ?? this.sampler!;
         try {
           record = {
             uniform,
@@ -307,14 +307,16 @@ export class PickingPrimitives {
             pipeline,
             texture: p.alphaTexture,
             sampler: p.alphaSampler,
-            group: this.device.createBindGroup({
-              layout: pipeline.getBindGroupLayout(0),
-              entries: [
-                { binding: 0, resource: { buffer: uniform } },
-                { binding: 1, resource: p.alphaTexture ?? this.whiteView! },
-                { binding: 2, resource: p.alphaSampler ?? this.sampler! },
-              ],
-            }),
+            groups: uniformGroups(uniform, (binding) =>
+              this.device!.createBindGroup({
+                layout: pipeline.getBindGroupLayout(0),
+                entries: [
+                  { binding: 0, resource: binding },
+                  { binding: 1, resource: texture },
+                  { binding: 2, resource: sampler },
+                ],
+              }),
+            ),
           };
           draws[index] = record;
         } catch (error) {
@@ -336,9 +338,9 @@ export class PickingPrimitives {
       values.set(p.alphaTransform ?? identityUV, 36);
       values[44] = ids[index];
       values[45] = p.side === 'back' ? 2 : p.side === 'double' ? 1 : p.side === 'front' ? 0 : +(p.doubleSided ?? false);
-      this.device.queue.writeBuffer(record.uniform, 0, values as Float32Array<ArrayBuffer>);
+      record.slice = writeUniform(this.device, record.uniform, values as Float32Array<ArrayBuffer>, c.view ?? c);
     }
-    for (const record of draws.splice(primitives.length)) record.uniform.destroy();
+    for (const record of draws.splice(primitives.length)) retire(this.device!, record.uniform);
     const pass = c.encoder.beginRenderPass({
       colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
       depthStencilAttachment: {
@@ -352,7 +354,7 @@ export class PickingPrimitives {
       pass.setPipeline(pipeline);
       for (let index = 0; index < primitives.length; index++) {
         const p = primitives[index];
-        pass.setBindGroup(0, draws[index].group);
+        pass.setBindGroup(0, draws[index].groups.get(draws[index].slice));
         pass.setVertexBuffer(0, p.vertex);
         pass.setIndexBuffer(p.index, 'uint32');
         pass.drawIndexed(p.count);
@@ -363,12 +365,12 @@ export class PickingPrimitives {
     return candidates;
   }
   private clearDraws(): void {
-    for (const draws of this.drawsByPipeline.values()) for (const record of draws) record.uniform.destroy();
+    for (const draws of this.drawsByPipeline.values()) for (const record of draws) retire(this.device!, record.uniform);
     this.drawsByPipeline.clear();
   }
   release(): void {
     this.clearDraws();
-    this.white?.destroy();
+    retire(this.device!, this.white);
     this.white = undefined;
     this.whiteView = undefined;
     this.sampler = undefined;

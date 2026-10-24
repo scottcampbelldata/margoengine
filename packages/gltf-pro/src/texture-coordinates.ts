@@ -89,7 +89,17 @@ export function coordinateExtension(
   // Hooks, factors and views remain editable after installation.
   Object.assign(extension, source);
   extension.factors = factors;
-  for (const key of ['wgsl', 'direct', 'ambient', 'output', 'lighting', 'declarations', 'textures'] as const)
+  for (const key of [
+    'wgsl',
+    'direct',
+    'ambient',
+    'output',
+    'lighting',
+    'declarations',
+    'textures',
+    'transmission',
+    'afterOpaque',
+  ] as const)
     if (source?.[key] === undefined) delete extension[key];
   if (source?.factors) factors.set(source.factors);
   let at = length;

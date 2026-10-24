@@ -87,7 +87,13 @@ function compile(
   graph: MaterialGraph,
   options: NodeMaterialOptions = {},
   allowMissing = false,
-): { extension: MaterialExtension; transmits: boolean; opaqueIndex?: number; uvSets: Set<0 | 1> } {
+): {
+  extension: MaterialExtension;
+  transmits: boolean;
+  opaqueIndex?: number;
+  uvSets: Set<0 | 1>;
+  output: MaterialGraphOutput;
+} {
   keys(graph, ['nodes'], 'graph');
   keys(options, ['opaqueColor'], 'options');
   if (!Array.isArray(graph.nodes) || !graph.nodes.length || graph.nodes.length > 256)
@@ -332,7 +338,8 @@ function compile(
     direct = shader.direct ?? '';
   }
   let transmits = false,
-    opaqueIndex: number | undefined;
+    opaqueIndex: number | undefined,
+    transmitted: string | undefined;
   if (transmission && (constantChannel(child(transmission, 'factor', values)) ?? 1) > 0) {
     transmits = true;
     opaqueIndex = textures.length;
@@ -359,22 +366,55 @@ function compile(
     );
     declarations += shader.declarations;
     output = shader.output ?? '';
+    transmitted = shader.transmission;
   }
   if (needsNormal) declarations = normalShader + declarations;
   const extension: MaterialExtension = {
     wgsl: statements,
     ...(declarations ? { declarations } : {}),
     ...(direct ? { direct } : {}),
-    ...(output ? { output, lighting: false } : {}),
+    ...(output ? { output, lighting: false, afterOpaque: true, transmission: transmitted } : {}),
     ...(factors.length ? { factors: Float32Array.from(factors) } : {}),
     ...(textures.length ? { textures } : {}),
   };
-  return { extension, transmits, opaqueIndex, uvSets };
+  return {
+    extension,
+    transmits,
+    opaqueIndex,
+    uvSets,
+    output: {
+      wgsl: statements,
+      color: true as const,
+      normal: !!normal,
+      metalRough: !!mr,
+      clearcoat: !!coat,
+      transmission: transmits,
+    },
+  };
 }
 
 /** Compile the closed TypeScript graph into the isolated material extension slot. */
 export function nodeMaterial(graph: MaterialGraph, options: NodeMaterialOptions = {}): MaterialExtension {
   return compile(graph, options).extension;
+}
+
+/** Which slots the graph writes. Color is always written. The rest are present only when the emit node sets them. */
+export interface MaterialGraphOutput {
+  /** WGSL the emit node appends to the surface shader. */
+  wgsl: string;
+  color: true;
+  normal: boolean;
+  metalRough: boolean;
+  clearcoat: boolean;
+  transmission: boolean;
+}
+
+/**
+ * The graph's output, separate from the extension object. Callers that only had `nodeMaterial` could not tell which
+ * slots the graph replaces.
+ */
+export function materialGraphOutput(graph: MaterialGraph, options: NodeMaterialOptions = {}): MaterialGraphOutput {
+  return compile(graph, options, true).output;
 }
 
 /** Applies one graph to a model; owns only its optional shared opaque capture. */
@@ -390,7 +430,6 @@ export class NodeMaterialInstallation implements EnginePlugin {
   disposed = false;
   private readonly compiled: ReturnType<typeof compile>;
   private readonly previous = new Map<PBRPrimitive, MaterialExtension | undefined>();
-  private readonly modes = new Map<PBRPrimitive['material'], number>();
   private capture?: ReturnType<typeof acquireOpaqueColor>;
   private unsubscribe?: () => void;
   constructor(
@@ -405,7 +444,6 @@ export class NodeMaterialInstallation implements EnginePlugin {
         if (p.definition.attributes && p.definition.attributes['TEXCOORD_' + coord] === undefined)
           throw new Error('Node material requires available TEXCOORD_' + coord);
       this.previous.set(p, p.extension);
-      this.modes.set(p.material, p.material.settings[0]);
     }
   }
   setup(engine: Engine): void {
@@ -417,7 +455,6 @@ export class NodeMaterialInstallation implements EnginePlugin {
       });
     for (const p of this.model.primitives) {
       p.extension = this.compiled.extension;
-      if (this.compiled.transmits) p.material.settings[0] = 2;
     }
     this.unsubscribe ??= this.model.onDispose(() => this.dispose());
   }
@@ -431,15 +468,10 @@ export class NodeMaterialInstallation implements EnginePlugin {
     cleanup.run(() => this.model.root.engine.removePlugin(this.name));
     this.unsubscribe?.();
     this.unsubscribe = undefined;
-    const restored = new Set<PBRPrimitive['material']>(),
-      replaced = new Set<PBRPrimitive['material']>();
     for (const [p, previous] of this.previous)
       if (p.extension === this.compiled.extension) {
         p.extension = previous;
-        restored.add(p.material);
-      } else replaced.add(p.material);
-    for (const m of restored)
-      if (!replaced.has(m) && this.compiled.transmits && m.settings[0] === 2) m.settings[0] = this.modes.get(m)!;
+      }
     cleanup.run(() => this.capture?.release());
     this.capture = undefined;
     cleanup.finish();

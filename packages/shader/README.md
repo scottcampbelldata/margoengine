@@ -65,6 +65,8 @@ ComputePass.attach(stage.engine, n, i => {
 
 The compiler hash-conses the graph, so equal subexpressions built separately (three calls to `uv().y`) become one `let`; nodes not reachable from an output, unused uniforms and unused textures are never emitted. Output text depends only on the graph, so equal graphs give equal shaders and pipelines cache; uniform values live in a buffer, so changing them never recompiles. `material.fragmentCode`, `material.vertexCode`, `pass.code()` and `computePass.code` show the generated WGSL; `test/snapshots` holds examples.
 
+Float uniforms (scalars, vectors and matrices) must stay finite as float32; otherwise construction or a `.value` assignment throws `TypeError` and keeps the previous value. Portable graphs (`@margoengine/shader/graph`) need complete three-number `fallback.color` and `fallback.emissive` arrays. A material from `createGraphMaterial` keeps its validated graph in `material.surfaceGraph`, so a baking host can evaluate the same pattern with `evaluateSurfaceGraph`.
+
 ## Noise (`@margoengine/shader/noise`, +2.0 kB min+gzip over the root entry)
 
 ```ts

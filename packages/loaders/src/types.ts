@@ -28,7 +28,7 @@ export interface LoadedGeometry {
   indices?: Uint32Array;
   /** Per-object or per-color index ranges, in order and non-overlapping. */
   groups?: LoadedGroup[];
-  /** Extra per-vertex scalars such as PCD `intensity` or VTK point SCALARS. */
+  /** Extra per-vertex scalars such as PCD `intensity`, VTK point SCALARS or USD `opacity` (0 to 1). */
   attributes?: Record<string, Float32Array>;
 }
 

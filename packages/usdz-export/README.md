@@ -7,7 +7,11 @@ import {exportUSDZ} from '@margoengine/usdz-export';
 const bytes = exportUSDZ(engine);
 ```
 
-Exports USDZ scene types and static scene serialization into an aligned USDZ archive with USDPreviewSurface materials. This lightweight exporter does not package textures or vertex colors; those inputs reject rather than silently lose data. For texture-bearing PBR models and broader USDZ interoperability, use the existing @margoengine/usdz package. The same exporter implementation remains available from @margoengine/exporters.
+Exports USDZ scene types and static scene serialization into an aligned USDZ archive with USDPreviewSurface materials.
+Linear RGB/RGBA vertex colors (including baked AO) multiply the base color and are written as `displayColor` and
+`displayOpacity` primvars read by the material; BLEND keeps vertex alpha, OPAQUE ignores it. Textures and alpha masks
+are refused rather than silently lost. For texture-bearing PBR models and broader USDZ interoperability, use
+@margoengine/usdz. The same exporter is also available from @margoengine/exporters.
 
 MIT. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 

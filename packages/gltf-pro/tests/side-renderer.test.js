@@ -130,6 +130,7 @@ test('coalesced static triangles keep one draw and live front, back and double s
   for (const [index, state] of states.entries()) {
     material.side = state.side;
     for (const mode of ['beauty', 'ambient', 'gbuffer', 'occlusion']) {
+      await null; // each draw is its own frame
       const pipeline = f.frame(mode),
         label = `${state.side} ${mode}`;
       assert.equal(f.draws.length, 1, label);
@@ -171,6 +172,7 @@ test('occlusion preserves back culling and logical face guards through mirrored 
       ['front', 0, 1],
     ]) {
       primitive.material.side = side;
+      await null; // each draw is its own frame
       const pipeline = f.frame('occlusion');
       assert.equal(f.draws.length, 1);
       assert.equal(f.draws[0].instances, 2);

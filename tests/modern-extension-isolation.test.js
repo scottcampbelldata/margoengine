@@ -76,6 +76,15 @@ test('Blender decoding discards PBR and never enters core + stage', async () => 
     !code.includes('@fragment') && !code.includes('createBuffer') && !code.includes('WebSocket'),
     'Decode-only imports retained rendering/live-link code',
   );
+  const decodeModules = result[0].output
+    .filter((chunk) => chunk.type === 'chunk')
+    .flatMap((chunk) => Object.entries(chunk.modules))
+    .filter(([, module]) => module.renderedLength > 0)
+    .map(([id]) => id);
+  assert.ok(
+    decodeModules.every((id) => !/\/packages\/(gltf-pro|decoders)\//.test(id)),
+    'Decode-only imports retained PBR or codec modules',
+  );
   const { measureCoreStage } = await import('../scripts/measure-size.js');
   const { modules } = await measureCoreStage();
   assert.ok(

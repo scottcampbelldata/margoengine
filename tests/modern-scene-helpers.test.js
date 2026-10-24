@@ -302,13 +302,14 @@ for (const fixture of loadedPBRFixtures) {
   });
 
   test(`${fixture.producer}: scene snapshots refresh borrowed GPU records after restoration and exclude disposed child nodes`, async () => {
-    await withLoaded(fixture, ({ engine, model, mesh }) => {
+    await withLoaded(fixture, async ({ engine, model, mesh }) => {
       const first = gatherSceneBuffers(engine, [model.root])[0];
       model.onDeviceRestored(engine);
       const next = gatherSceneBuffers(engine, [model.root])[0];
       assert.notEqual(next, first);
       assert.notEqual(next.vertex, first.vertex);
       assert.notEqual(next.index, first.index);
+      await null; // released resources are destroyed at the end of the task
       assert.equal(first.vertex.destroyed, true);
       assert.equal(first.index.destroyed, true);
       assert.equal(next.vertex, model.pickingPrimitives[0].vertex);

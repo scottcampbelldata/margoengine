@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Picking } from '../dist/index.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
-test('forEngine borrows the successfully attached configured picker without allocation or ownership transfer', () => {
+test('forEngine borrows the successfully attached configured picker without allocation or ownership transfer', async () => {
   const h = optionalGPU(),
     other = optionalGPU(),
     picker = new Picking({ capture: false });
@@ -17,12 +17,13 @@ test('forEngine borrows the successfully attached configured picker without allo
   assert.equal(Picking.forEngine(other.engine), undefined);
   picker.dispose();
   assert.equal(Picking.forEngine(h.engine), undefined);
+  await null; // released resources are destroyed at the end of the task
   assert.ok(h.resources.every((resource) => resource.destroyed));
   h.cleanup();
   other.cleanup();
 });
 
-test('failed setup never publishes a partial picker and releases its allocations', () => {
+test('failed setup never publishes a partial picker and releases its allocations', async () => {
   const h = optionalGPU(),
     create = h.engine.gpu.createTexture;
   let textures = 0;
@@ -33,16 +34,18 @@ test('failed setup never publishes a partial picker and releases its allocations
   assert.throws(() => h.engine.use(new Picking()), /Injected picker texture failure/);
   assert.equal(Picking.forEngine(h.engine), undefined);
   assert.equal(h.engine.hasPlugin('picking'), false);
+  await null; // released resources are destroyed at the end of the task
   assert.ok(h.resources.every((resource) => resource.destroyed));
   h.cleanup();
 });
 
-test('lookup follows device restoration and removes failed restoration state until retry succeeds', () => {
+test('lookup follows device restoration and removes failed restoration state until retry succeeds', async () => {
   const h = optionalGPU(),
     picker = Picking.attach(h.engine, { capture: false }),
     before = h.resources.slice();
   picker.onDeviceRestored(h.engine);
   assert.equal(Picking.forEngine(h.engine), picker);
+  await null; // released resources are destroyed at the end of the task
   assert.ok(before.every((resource) => resource.destroyed));
   const create = h.engine.gpu.createTexture;
   h.engine.gpu.createTexture = () => {
@@ -56,11 +59,12 @@ test('lookup follows device restoration and removes failed restoration state unt
   assert.equal(picker.options.capture, false);
   picker.dispose();
   assert.equal(Picking.forEngine(h.engine), undefined);
+  await null; // released resources are destroyed at the end of the task
   assert.ok(h.resources.every((resource) => resource.destroyed));
   h.cleanup();
 });
 
-test('disposing an older setup cannot erase a newer picker lookup', () => {
+test('disposing an older setup cannot erase a newer picker lookup', async () => {
   const h = optionalGPU(),
     old = new Picking({ capture: true }),
     current = new Picking({ capture: false });
@@ -74,6 +78,7 @@ test('disposing an older setup cannot erase a newer picker lookup', () => {
   assert.equal(current.options.capture, false);
   current.dispose();
   assert.equal(Picking.forEngine(h.engine), undefined);
+  await null; // released resources are destroyed at the end of the task
   assert.ok(h.resources.every((resource) => resource.destroyed));
   h.cleanup();
 });

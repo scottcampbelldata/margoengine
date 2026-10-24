@@ -90,6 +90,8 @@ async function world() {
       },
       setIndexBuffer() {},
       setBlendConstant() {},
+      setViewport() {},
+      setScissorRect() {},
       draw() {},
       end() {},
       drawIndexed(count, instances = 1, first = 0, base = 0, firstInstance = 0) {
@@ -403,4 +405,33 @@ test('integration: source picking keeps separate primitive IDs on one loader nod
     model.dispose();
     w.engine.dispose();
   }
+});
+
+test('outline masks of two views in one frame each keep their own camera', async () => {
+  const w = await world(),
+    { engine, c, draws } = w,
+    model = quads(engine, [[0, 0, 0]]),
+    selection = Selection.attach(engine);
+  c.camera = engine.camera;
+  selection.set([model]);
+  const masks = [];
+  for (const [index, x] of [
+    [0, 0],
+    [1, 2],
+  ]) {
+    draws.length = 0;
+    engine.camera.position[0] = x;
+    engine.camera.update(128 / 96, true);
+    engine.store.tick(false);
+    c.view = { id: 'v' + index, camera: engine.camera, viewport: [index * 64, 0, 64, 96], index, count: 2 };
+    engine.frameGraph.execute(c);
+    masks.push(draws.find((d) => d.pipeline?.fragment?.targets?.[0]?.format === 'r8unorm'));
+  }
+  const camera = (draw) => draw.group.entries.find((e) => e.binding === 0).resource.buffer;
+  assert.notEqual(camera(masks[0]), camera(masks[1]), 'the second view binds its own uniform copy');
+  assert.notDeepEqual(
+    new Float32Array(camera(masks[0]).data).slice(0, 16),
+    new Float32Array(camera(masks[1]).data).slice(0, 16),
+  );
+  selection.dispose();
 });

@@ -622,7 +622,11 @@ test('shadow flags update registration independently and HDR composes with the s
   assert.equal(effect.sources.size, 1);
   assert.equal(model.lighting.size, 2);
   assert.ok(model.lighting.has(effect));
-  const source = (await readFile(new URL('../../gltf-pro/src/shader.ts', import.meta.url), 'utf8')).split('`')[1];
+  // gltf-pro's base PBR shader as built: its template literal with the shared lighting terms spliced in.
+  const chunks = (await readFile(new URL('../../gltf-pro/src/shader.ts', import.meta.url), 'utf8'))
+      .replaceAll('\r\n', '\n')
+      .split('`'),
+    source = chunks.find((chunk) => chunk.includes('direct+ambient(s)')).replace('${lightingTerms}', chunks[1]);
   const ibl = [...model.lighting].find((value) => value !== effect);
   const replace = String.prototype.replace;
   let rewrites = 0;

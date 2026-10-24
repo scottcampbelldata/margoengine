@@ -3,6 +3,7 @@
 // through gltf-pro's transmission hook: the opaque scene is copied into a mip chain once per frame, then each transmissive
 // surface reads it along its refracted ray (Khronos glTF PBR, Appendix B "specular_btdf"; the screen-space approximation
 // of the Khronos glTF sample renderer).
+import { margoError } from '../../shared/errors.js';
 import type { EngineKernel } from '@margoengine/core';
 import {
   engineRuntime,
@@ -13,6 +14,8 @@ import {
 } from '@margoengine/core/extension';
 import type { PBRModel, PBRTransmission } from '@margoengine/gltf-pro';
 import { sceneTarget } from '../../shared/msaa.js';
+import { applyView } from '../../shared/view-rect.js';
+import { currentFrame, retire } from '../../shared/frame-resources.js';
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; RENDER_ATTACHMENT: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
@@ -80,6 +83,8 @@ export class Transmission implements EnginePlugin, PBRTransmission {
   readonly order: number;
   targets: readonly GPUColorTargetState[] = [];
   private engine?: Engine;
+  /** Device of the current GPU resources, so a release after device restoration retires them on their own device. */
+  private device?: GPUDevice;
   private disposed = false;
   private readonly models = new Map<PBRModel, () => void>();
   private readonly code = new Map<number, string>();
@@ -129,8 +134,10 @@ export class Transmission implements EnginePlugin, PBRTransmission {
   }
   setup(engine: Engine): void {
     if (this.disposed) throw new Error('Transmission is disposed');
-    if (!engine.gpu) throw new Error('Transmission requires WebGPU');
+    if (!engine.gpu)
+      throw margoError('unsupported', 'Transmission requires WebGPU: create the engine with a WebGPU device');
     this.engine = engine;
+    this.device = engine.gpu;
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
@@ -179,13 +186,17 @@ export class Transmission implements EnginePlugin, PBRTransmission {
       pass.draw(3);
       pass.end();
     }
-    return (this.pass = encoder.beginRenderPass({
+    this.pass = encoder.beginRenderPass({
       label: 'transmission',
       colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
       depthStencilAttachment: { view: c.depth, depthReadOnly: true, stencilReadOnly: true },
-    }));
+    });
+    applyView(this.pass, c);
+    return this.pass;
   }
   private render(c: Context): void {
+    // This view draws in the frame: what it releases waits while another view's commands still need it.
+    currentFrame(c.device, c.view ?? c);
     if (this.disposed || !this.models.size) return;
     const target = sceneTarget(c),
       device = c.device;
@@ -254,7 +265,7 @@ export class Transmission implements EnginePlugin, PBRTransmission {
     }
   }
   private release(): void {
-    this.texture?.destroy();
+    retire(this.device!, this.texture);
     this.texture = this.view = this.source = this.sourceGroup = undefined;
     this.levels = [];
     this.reduceGroups = [];

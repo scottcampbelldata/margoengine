@@ -151,6 +151,7 @@ test('BLEND primitives leave the beauty pass and accumulate into rgba16float + r
     ) < 1e-6,
   );
   // Steady frames create nothing.
+  await null; // the next frame
   const next = frame(1);
   for (const name of ['texture', 'renderPipeline', 'group', 'module', 'view'])
     assert.equal(of(next, name).length, 0, name);
@@ -228,4 +229,24 @@ test('removing a model, disposing it, and materials meshes (normal blending via 
     'opaque again: drawn by the materials pass',
   );
   assert.throws(() => model.setTransparency({}), TypeError);
+});
+
+test('two views in one frame keep their own depth scale', async () => {
+  const { engine, model, view, gpu } = await scene(1),
+    oit = OIT.attach(engine);
+  oit.add(model);
+  const scale = (hex) => new Float32Array(Uint8Array.from(Buffer.from(hex, 'hex')).buffer)[0];
+  const log = gpu.record(() => {
+    view.begin(0);
+    view.c.view = { id: 'near', viewport: [0, 0, 64, 96], index: 0 };
+    engine.frameGraph.execute(view.c);
+    view.c.view = { id: 'far', viewport: [64, 0, 64, 96], index: 1 };
+    view.camera.position[2] *= 2;
+    engine.frameGraph.execute(view.c);
+  });
+  const writes = of(log, 'writeBuffer').filter((e) => e[3].length === 32 && Math.abs(scale(e[3]) - 0.25) < 0.2);
+  assert.equal(writes.length, 2, 'one depth-scale packet per view');
+  assert.notEqual(writes[0][1], writes[1][1], 'the second view writes its own buffer slice');
+  assert.ok(scale(writes[0][3]) > scale(writes[1][3]), 'the farther camera has the smaller inverse scale');
+  oit.dispose();
 });

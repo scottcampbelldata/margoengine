@@ -107,11 +107,13 @@ Positive transmission opts into a shared opaque-color capture. All opaque and ma
 
 Transmission defaults to factor `0` and IOR `1.5`. Its optional texture multiplies the factor using the red channel. Refraction samples the opaque color already rendered this frame; IOR `1` samples the same pixel without bending. This is screen-space transmission with one background sample. It does not trace rays or produce multiple bounces.
 
-Without positive volume thickness, the refracted sample probes 10% of the camera-to-surface distance behind the surface. Positive thickness supplies the probe length. Off-screen coordinates clamp to the image edge, and transparent layers are absent from the opaque snapshot.
+Thin glass (no or zero volume thickness) keeps its sightline: it samples the pixel behind it, as glTF specifies. Only positive thickness bends the view along a refraction path. Off-screen coordinates clamp to the image edge, and transparent layers are absent from the opaque snapshot.
 
 Volume requires positive transmission; otherwise installation throws `KHR_materials_volume requires transmission`. Thickness defaults to `0`, and its optional texture uses the green channel. Beer's law attenuates the transmitted color using `attenuationColor` (default `[1, 1, 1]`) and `attenuationDistance`. A missing distance or `Infinity` leaves the transmitted color unattenuated. There is no participating-media scattering. Transmission and thickness maps accept UV0 or UV1 and use linear data.
 
-Transmissive primitives blend without writing depth. They do not cast shadows or receive the cascaded shadow map in this version. A clearcoat lobe on the same transmissive material follows this shadow limitation.
+Transmissive primitives draw after the opaque capture (`afterOpaque: true`) and keep their authored alpha mode: OPAQUE
+and MASK surfaces keep their coverage and depth writes, BLEND surfaces blend. They do not cast shadows or receive the
+cascaded shadow map in this version. A clearcoat lobe on the same transmissive material follows this shadow limitation.
 
 For a caller-owned screen capture, `transmission(options)` returns an extension without installing a scene pass:
 
@@ -126,13 +128,16 @@ function applyTransmission(primitive: PBRPrimitive, opaqueTexture: GPUTexture) {
     opaqueColor: opaqueTexture.createView(),
     volume: {thicknessFactor: 0.1, attenuationColor: [0.8, 1, 1], attenuationDistance: 1},
   });
-  primitive.material.settings[0] = 2;
 }
 ```
 
 The caller renders opaque and masked geometry into `opaqueColor` before this primitive. The view and optional transmission/thickness textures stay caller-owned; textures use the same `view`, optional `sampler`, and `texCoord` interface as clearcoat.
 
-`installation.dispose()` and its `destroy()` alias release installation-owned resources and restore the extension slots and blend modes the installation replaced. Destroying the model also cleans up the installation. The opaque snapshot is shared per engine and released with its final installation. Device restoration recreates installation-owned glTF texture uploads and capture resources. Caller-owned views and samplers require fresh GPU resources and extension reassignment or reinstallation after device restoration.
+`installation.dispose()` and its `destroy()` alias release installation-owned resources and restore the extension slots
+the installation still owns; alpha mode and cutoff are never changed. Destroying the model also cleans up the
+installation. The opaque snapshot is shared per engine and released with its final installation. Device restoration
+recreates installation-owned glTF texture uploads and capture resources. Caller-owned views and samplers require fresh
+GPU resources and extension reassignment or reinstallation after device restoration.
 
 ## Node materials
 
@@ -575,6 +580,7 @@ while it is in use: a material that never sets one keeps exactly its shader, bin
 | `bumpMap`, `bumpScale` | Red channel (linear) is a height, `bumpScale` (default 1, finite, negative inverts) its full range in mesh units; its screen-space slope tilts the shading normal (Mikkelsen 2010), after `normalMap` when both are set |
 | `displacementMap`, `displacementScale`, `displacementBias` | Each vertex moves along its normal by red (linear) * scale (default 1) + bias (default 0) mesh units, before the model and instance matrices: in the beauty and G-buffer passes and in the directional (`Shadows`) and clustered (integrated and `LocalShadows`) shadow maps. Normals are not recomputed; CPU picking, bounds and exports see the undisplaced mesh |
 | `lightMap`, `lightMapIntensity` | Baked light (RGB, sRGB by default), read on UV1 (`geometry.uvs1`, else UV0) unless `setUVTransform(t, 'lightMap')` names another set; it keeps its own UV set when `uvTransform` moves the other maps. Lit shadings (standard, Lambert, Phong) add diffuse colour * map * intensity (default 1) as indirect light, darkened by `aoMap`; unlit materials multiply their colour by map * intensity. Normal, matcap, depth and distance output ignore it. glTF has no light maps: `exportModel` leaves it out |
+| `lightMapResponse` | `'multiply'` (default) multiplies by the light map; `'lambertian'` converts physical irradiance with `1 / pi`, on standard/Lambert/Phong shading only. Use a linear texture and nonnegative raw intensity. Constructor, live setter, clone and copy preserve the selected response; raw `lightMapIntensity` remains the decode scale |
 | `emissiveIntensity` | Scales `emissive` and `emissiveMap` (default 1, finite, >= 0), so emission can pass 1 (bloom). No shader change. `exportModel` writes it as `KHR_materials_emissive_strength` with `emissive` as the factor |
 | `flatShading` | Each triangle shades with its own face normal (from the position's screen derivatives, facing the viewer on both sides) instead of the interpolated vertex normals; lit, normal and matcap shading. Default false |
 | `vertexColors` | Geometry `colors` multiply colour and opacity while true (the default, Margo's behaviour so far); false ignores them. Instance tints (`setColorAt`) still apply |
@@ -766,3 +772,30 @@ curve, P3 primaries) and converts them once on the GPU, after each upload, into 
 working space, with `@margoengine/math`'s `P3_TO_SRGB`: colours outside sRGB keep negative channels, as
 `color(display-p3 ...)` colours do, so an environment `ColorOutput` P3 canvas shows them. Load images with `loadTexture`
 (no browser colour conversion). Float data takes linear sRGB values instead (`linearP3ToLinearSRGB`).
+
+### Physical irradiance atlases
+
+For `bakeLightmap(..., { radiometry: 'physical' })` or `bakeRefractedLightmap`, use the existing linear atlas with an
+explicit Lambertian diffuse response. Emission remains separate and is added once.
+
+```ts
+const texture = new Texture(
+  { width: atlas.width, height: atlas.height, data: atlas.textures.lightmap },
+  { colorSpace: 'linear', mipmaps: false },
+);
+const material = new PbrMaterial({
+  lightMap: texture,
+  lightMapIntensity: atlas.lightmapScale,
+  lightMapResponse: 'lambertian',
+});
+```
+
+Set the mesh's UV1 to `atlas.uv`. Constructed materials add baked lighting to live lighting; disable duplicate live
+terms when the atlas already includes them. An `aoMap` still applies artist attenuation. This slot approximates
+Lambertian diffuse with metal suppression, not the complete layered BRDF. `'multiply'` keeps the plain multiplication,
+including unlit shading and its existing intensity range. Neither this selector nor linear RGB defines a universal
+RGB-watts-to-lumens conversion.
+
+GPU scalars (`normalScale`, `clearcoatNormalScale`, `ior`, `iridescenceIOR`, `thickness`, `shininess` and
+`iridescenceThicknessRange`) must stay finite as float32; a value such as `1e39` throws `RangeError` and leaves the
+material unchanged. A white attenuation channel stays white at any attenuation distance.

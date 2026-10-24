@@ -16,6 +16,8 @@ import {
   type DrawOptions,
 } from '@margoengine/core/extension';
 import { fullscreen, meshVertex, group, compute, render, dispatch, draw } from '../../shared/gpu.js';
+import { applyView } from '../../shared/view-rect.js';
+import { currentFrame, retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
 import {
   Models,
   ModelDraws,
@@ -95,13 +97,15 @@ export class Selection implements EnginePlugin {
   private readonly sources = new PickingPrimitives();
   readonly name: string;
   private engine?: Engine;
+  /** Device of the current GPU resources, so a release after device restoration retires them on their own device. */
+  private device?: GPUDevice;
   private selected = new Set<Mesh | Model>();
   /** X-ray state, created on first use: whole-selection mask pipelines, composite, its bind group and uniform, and model draws. */
   private xr?: {
     mask?: GPURenderPipeline;
     model?: GPURenderPipeline;
     composite?: GPURenderPipeline;
-    bind?: GPUBindGroup;
+    bind?: { get(copy?: GPUBufferBinding): GPUBindGroup };
     uniform?: GPUBuffer;
     readonly draw: DrawOptions;
     readonly draws: ModelDraws;
@@ -131,7 +135,8 @@ export class Selection implements EnginePlugin {
   private readonly maskDraw: DrawOptions = { clear: false };
   private maskPipeline?: GPURenderPipeline;
   private composite?: GPURenderPipeline;
-  private bind?: GPUBindGroup;
+  /** Composite group per uniform binding: a second view of a frame binds its own uniform slice. */
+  private bind?: { get(copy?: GPUBufferBinding): GPUBindGroup };
   private format = '';
   private depthFormat = '';
   private readonly values = new Float32Array(8);
@@ -214,6 +219,7 @@ export class Selection implements EnginePlugin {
   setup(engine: Engine): void {
     if (this.disposed || !engine.gpu) throw new Error('Selection requires WebGPU');
     this.engine = engine;
+    this.device = engine.gpu;
     this.set(this.selected);
     this.flags = new Uint32Array(engine.store.capacity);
     this.buffer = engine.gpu.createBuffer({
@@ -297,13 +303,14 @@ export class Selection implements EnginePlugin {
     });
     this.maskDraw.pipeline = this.maskPipeline;
     this.composite = render(c.device, composite, c.format, { multisample: c.descriptor.multisample });
-    this.bind = group(c.device, this.composite, [
-      { buffer: this.uniform! },
-      this.maskView,
-      (this.fieldView = this.fields[index % 2].createView()),
-    ]);
+    const field = (this.fieldView = this.fields[index % 2].createView()),
+      pipeline = this.composite,
+      mask = this.maskView;
+    this.bind = uniformGroups(this.uniform!, (uniform) => group(c.device, pipeline, [uniform, mask, field]));
   }
   private draw(c: Context): void {
+    // This view draws in the frame: what it releases waits while another view's commands still need it.
+    currentFrame(c.device, c.view ?? c);
     if (!this.selected.size) return;
     this.sources.discover(this.engine!.meshes.values());
     if (this.sources.hasSources) this.sources.prepare(c);
@@ -311,7 +318,7 @@ export class Selection implements EnginePlugin {
     this.resize(c);
     // Core grows its entity store on demand; keep one flag per entity slot.
     if (this.flags.length < this.engine!.store.capacity) {
-      this.buffer?.destroy();
+      retire(this.device!, this.buffer);
       this.flags = new Uint32Array(this.engine!.store.capacity);
       this.buffer = c.device.createBuffer({
         size: this.flags.byteLength,
@@ -331,10 +338,10 @@ export class Selection implements EnginePlugin {
     this.values[0] = this.options.width ?? 3;
     this.values[1] = +(this.options.algorithm === 'morphological');
     this.values.set(this.options.color ?? [1, 0.5, 0], 4);
-    c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
+    const slice = writeUniform(c.device, this.uniform!, this.values as Float32Array<ArrayBuffer>, c.view ?? c);
     if (this.options.xray) this.xray(c);
     this.mark(c, this.maskDraw, false);
-    draw(c, this.composite!, this.bind!);
+    draw(c, this.composite!, this.bind!.get(slice));
   }
   /** Selected surfaces into the mask (resolved), then the jump-flood field over it. */
   private mark(c: Context, options: DrawOptions, xray: boolean): void {
@@ -403,7 +410,10 @@ export class Selection implements EnginePlugin {
         fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format, blend }] },
         multisample: c.descriptor.multisample,
       });
-      xr.bind = group(c.device, xr.composite, [{ buffer: xr.uniform }, this.maskView!, this.fieldView!]);
+      const pipeline = xr.composite,
+        mask = this.maskView!,
+        field = this.fieldView!;
+      xr.bind = uniformGroups(xr.uniform!, (uniform) => group(c.device, pipeline, [uniform, mask, field]));
     }
     xr.draw.bindings = this.maskDraw.bindings;
     const v = xr.values;
@@ -412,9 +422,9 @@ export class Selection implements EnginePlugin {
     v[2] = x.dash ?? 4;
     v[3] = x.opacity ?? 0.85;
     v.set(x.color ?? o.color ?? [1, 0.5, 0], 4);
-    c.device.queue.writeBuffer(xr.uniform!, 0, v as Float32Array<ArrayBuffer>);
+    const slice = writeUniform(c.device, xr.uniform!, v as Float32Array<ArrayBuffer>, c.view ?? c);
     this.mark(c, xr.draw, true);
-    draw(c, xr.composite!, xr.bind!);
+    draw(c, xr.composite!, xr.bind!.get(slice));
   }
   /** Selected gltf-pro primitives into the mask, equal depth against the scene so occluded parts stay unmarked (x-ray: no depth test). */
   private drawModels(c: Context, xray: boolean): void {
@@ -447,19 +457,20 @@ export class Selection implements EnginePlugin {
         ...(format.includes('stencil') ? { stencilReadOnly: true } : {}),
       },
     });
-    draws.draw(c.device, pass, model, c.camera.matrix);
+    applyView(pass, c);
+    draws.draw(c.device, pass, model, c.camera.matrix, c.view ?? c);
     pass.end();
   }
   private releaseTargets(): void {
     if (this.xr) this.xr.mask = this.xr.model = this.xr.composite = this.xr.bind = this.xr.draw.pipeline = undefined;
     this.fieldView = undefined;
     this.modelMask = undefined;
-    this.mask?.destroy();
-    this.msaaMask?.destroy();
+    retire(this.device!, this.mask);
+    retire(this.device!, this.msaaMask);
     this.msaaMask = undefined;
     this.maskView = this.msaaMaskView = undefined;
-    for (const t of this.fields) t.destroy();
-    for (const b of this.steps) b.destroy();
+    for (const t of this.fields) retire(this.device!, t);
+    for (const b of this.steps) retire(this.device!, b);
     this.mask = undefined;
     this.fields = [];
     this.steps = [];
@@ -472,10 +483,10 @@ export class Selection implements EnginePlugin {
     this.releaseTargets();
     this.draws.release();
     this.xr?.draws.release();
-    this.xr?.uniform?.destroy();
+    retire(this.device!, this.xr?.uniform);
     this.xr = undefined;
-    this.buffer?.destroy();
-    this.uniform?.destroy();
+    retire(this.device!, this.buffer);
+    retire(this.device!, this.uniform);
     this.buffer = this.uniform = undefined;
     this.maskDraw.bindings = undefined;
     this.seed = this.jump = undefined;

@@ -60,11 +60,11 @@ export function optionalGPU() {
   };
   c.encoder.beginRenderPass = () => {
     counts.render++;
-    return pass;
+    return { ...pass };
   };
   c.encoder.beginComputePass = () => {
     counts.compute++;
-    return pass;
+    return { ...pass };
   };
   c.encoder.clearBuffer = () => {};
   c.encoder.copyTextureToTexture = () => {

@@ -86,7 +86,8 @@ test('custom-device PBR uploads preserve Float32 bits after camera, material, li
   t.after(() => f.engine.dispose());
   const resource = f.model.resources[0],
     material = f.model.primitives[0].material;
-  const change = (edit) => {
+  const change = async (edit) => {
+    await null; // each change is drawn in a new frame
     const before = f.uploads.length;
     edit();
     f.frame();
@@ -100,33 +101,33 @@ test('custom-device PBR uploads preserve Float32 bits after camera, material, li
     assert.equal(f.uploads.length, before + 3);
   };
   f.frame();
-  change(() => {
+  await change(() => {
     material.base[0] = 0;
   });
-  change(() => {
+  await change(() => {
     material.base[0] = -0;
   });
-  change(() => {
+  await change(() => {
     material.base[0] = +0;
   });
-  change(() => {
+  await change(() => {
     material.factors[0] = 0.125;
   });
-  change(() => {
+  await change(() => {
     material.uvt[5] = 0.25;
   });
-  change(() => {
+  await change(() => {
     f.engine.lighting.radiance[0] = 0.75;
   });
-  change(() => {
+  await change(() => {
     f.engine.camera.position[0] += 0.1;
     f.engine.camera.update(4 / 3, true);
   });
-  change(() => {
+  await change(() => {
     f.model.nodes[0].position.x += 0.2;
     f.engine.store.tick(false);
   });
-  change(() => {
+  await change(() => {
     f.context.format = 'rgba16float';
   });
 });

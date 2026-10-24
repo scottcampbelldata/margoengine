@@ -77,6 +77,7 @@ test('setGeometry rewrites fitting buffers in place and reallocates with headroo
     assert.equal(p.indices.length, 6);
     mesh.setGeometry(strip(3));
     assert.equal(s.h.counts.buffers, made + 2, 'outgrown buffers reallocate');
+    await null; // released resources are destroyed at the end of the task
     assert.ok(vertex.destroyed && index.destroyed);
     assert.deepEqual([p.buffers.vertex.size, p.buffers.index.size], [2 * 8 * 80, 2 * 12 * 4], 'doubled sizes');
     mesh.setGeometry(strip(9));
@@ -84,9 +85,11 @@ test('setGeometry rewrites fitting buffers in place and reallocates with headroo
     made = s.h.counts.buffers;
     for (let i = 0; i < 6; i++) mesh.setGeometry(strip(9 - (i % 3)));
     assert.equal(s.h.counts.buffers, made, 'repeated edits that fit allocate nothing');
+    await null; // released resources are destroyed at the end of the task
     assert.equal(s.live().length, 2, 'one vertex and one index buffer stay alive');
     assert.equal(mesh.shadowPrimitives[0].dynamic, true, 'edited geometry casts as a dynamic shadow');
     mesh.dispose();
+    await null; // released resources are destroyed at the end of the task
     assert.equal(s.live().length, 0, 'dispose frees every geometry buffer, including reallocated ones');
     assert.throws(
       () => mesh.setGeometry(strip(1)),
@@ -201,12 +204,14 @@ test('grouped meshes keep their materials while group ranges move, and static ba
     assert.equal(mesh.primitives[0].vertices, mesh.primitives[1].vertices, 'groups still share one vertex array');
     assert.equal(mesh.primitives[0].buffers.vertex, mesh.primitives[1].buffers.vertex);
     assert.equal(mesh.shadowPrimitives.length, 2, 'the stale batch is gone; parts draw from their own buffers');
+    await null; // released resources are destroyed at the end of the task
     assert.equal(s.live().length, 3, 'one shared vertex buffer and two index buffers');
     assert.throws(
       () => mesh.setGeometry({ ...strip(3), groups: [{ start: 0, count: 18, materialIndex: 0 }] }),
       RangeError,
     );
     mesh.dispose();
+    await null; // released resources are destroyed at the end of the task
     assert.equal(s.live().length, 0);
   } finally {
     s.close();

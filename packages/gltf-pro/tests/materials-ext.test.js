@@ -511,6 +511,7 @@ test('KHR_materials_variants: names, switching rebinds the mapped material, unde
   draw();
   model.selectVariant('Red');
   assert.equal(p.material, model.primitives[1].material, 'the mapped material object');
+  await null; // next frame: within one frame a changed uniform goes to a frame-arena slice
   const write = draw().find(
     (e) => e[0] === 'writeBuffer' && e[1] === gpu.snap(model['resources'].find((r) => r.primitive === p).uniform),
   );

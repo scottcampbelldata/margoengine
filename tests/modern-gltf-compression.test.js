@@ -182,6 +182,7 @@ test('asynchronous parsing decodes real required Draco Box and Avocado geometry 
     } finally {
       engine.dispose();
     }
+    await null; // released resources are destroyed at the end of the task
     assert.ok(resources.every((resource) => resource.destroyed));
   }
 });

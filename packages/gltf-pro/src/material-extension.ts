@@ -1,3 +1,6 @@
+import { retire } from '../../shared/frame-resources.js';
+import { transmissionWeight } from '../../shared/pbr-transmission.js';
+
 /** Caller-owned, filterable 2D texture and optional filtering sampler. */
 export interface MaterialExtensionTexture {
   view: GPUTextureView;
@@ -6,8 +9,19 @@ export interface MaterialExtensionTexture {
 
 /** Optional material slot. Group 3 is permanently reserved; lighting stays in group 2. */
 export interface MaterialExtension {
+  /**
+   * Draw the beauty pass after the opaque phase (for example to read an opaque-scene capture), keeping the material's
+   * authored alpha mode, cutoff, blending and depth writes. Such primitives cast no opaque shadows. Default false.
+   */
+  afterOpaque?: boolean;
   /** The extension supplies physical lobes in place of imported built-in physical shading. */
   replacesPhysical?: boolean;
+  /**
+   * WGSL f32 expression (evaluated after `wgsl`) of the share of light this surface transmits, for an extension that
+   * composites its own transmission in `output`: diffuse and ambient light scale by 1 minus it, as on the native
+   * transmission path, so reflections keep their strength. The value is in `s.tr`.
+   */
+  transmission?: string;
   /** Statements after surface(i,front), in every fragment entry point. May mutate s. */
   wgsl?: string;
   /** Beauty-only statements after directional direct lighting, before lighting effects. */
@@ -57,10 +71,13 @@ export function prepareMaterialExtension(
     (extension.direct !== undefined && typeof extension.direct !== 'string') ||
     (extension.ambient !== undefined && typeof extension.ambient !== 'string') ||
     (extension.output !== undefined && typeof extension.output !== 'string') ||
+    (extension.transmission !== undefined && typeof extension.transmission !== 'string') ||
     (extension.lighting !== undefined && typeof extension.lighting !== 'boolean') ||
     (extension.declarations !== undefined && typeof extension.declarations !== 'string')
   )
     throw new TypeError('Invalid material extension WGSL');
+  if (extension.afterOpaque !== undefined && typeof extension.afterOpaque !== 'boolean')
+    throw new TypeError('Material extension afterOpaque must be a boolean; pass true or false');
   validateDeclarations(extension.declarations);
   const { factors, textures = [] } = extension;
   if (
@@ -89,7 +106,7 @@ export function prepareMaterialExtension(
     const uniform = bytes
       ? device.createBuffer({ size: bytes, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
       : undefined;
-    resource.uniform?.destroy();
+    retire(device, resource.uniform);
     resource.uniform = uniform;
     resource.bytes = bytes;
     resource.groups.clear();
@@ -126,7 +143,9 @@ function extensionAccess(extension: MaterialExtension): string {
 export function materialExtensionSurface(code: string, extension: MaterialExtension): string {
   return code.replaceAll(
     'let s=surface(i,front);',
-    () => `var s=surface(i,front);\n${extensionAccess(extension)}${extension.wgsl ?? ''}\n`,
+    () =>
+      `var s=surface(i,front);\n${extensionAccess(extension)}${extension.wgsl ?? ''}\n` +
+      (extension.transmission ? `s.tr=clamp(${extension.transmission},0.0,1.0);\n` : ''),
   );
 }
 
@@ -142,7 +161,7 @@ export function materialExtensionShader(source: string, extension: MaterialExten
   });
   // Phony assignments retain the resource interface even for factors-only slots,
   // without texture samples or changes to the surface (WGSL 9.2.3).
-  let code = source;
+  let code = extension.transmission ? transmissionWeight(source) : source;
   if (extension.direct)
     code = code.replace('let direct=', 'var direct=').replace('var color=', () => `${extension.direct}\n  var color=`);
   if (extension.output)

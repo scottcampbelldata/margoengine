@@ -1,13 +1,8 @@
 import { parseJSON } from '../../shared/json.js';
 import { checkCount, countLimit } from '../../shared/limits.js';
 import type { EngineKernel } from '@margoengine/core';
-import {
-  parsePreparedPBR,
-  validatePreparedGeometry,
-  type GLTFDocument,
-  type PBRModel,
-  type PreparedGeometry,
-} from '@margoengine/gltf-pro';
+import { parsePreparedPBR, type GLTFDocument, type PBRModel, type PreparedGeometry } from '@margoengine/gltf-pro';
+import { validatePreparedGeometry } from '../../shared/prepared-geometry.js';
 import { readResponse } from '../../shared/loading.js';
 
 const maxBytes = 256 * 1024 * 1024;

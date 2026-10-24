@@ -243,7 +243,7 @@ for (const fixture of loadedPBRFixtures) {
   });
 
   test(`${fixture.producer}: isolated PBR eye renderers follow late animation and extension replacement without owning desktop resources`, async () => {
-    await withLoaded(fixture, ({ engine, model, primitive }, h) => {
+    await withLoaded(fixture, async ({ engine, model, primitive }, h) => {
       const target = optionalGPU(),
         device = target.engine.gpu,
         start = target.resources.length,
@@ -335,6 +335,7 @@ for (const fixture of loadedPBRFixtures) {
         draw(left);
         assert.throws(() => left.prepare({ ...context, device: engine.gpu }), /another GPU device/);
         model.dispose();
+        await null; // destruction waits for the recorded frame to be submitted
         assert.ok(
           target.resources.slice(start).every((resource) => resource.destroyed),
           'source disposal frees every owned eye resource',

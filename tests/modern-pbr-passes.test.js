@@ -143,6 +143,7 @@ test('PBR batches nonblended draws and retains transparent pass boundaries and p
   } finally {
     engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(resources.every((resource) => resource.destroyed));
 });
 
@@ -243,6 +244,7 @@ test('PBR culls authored single-sided faces in every pass and reuses mirrored an
   } finally {
     engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(resources.every((resource) => resource.destroyed));
 });
 
@@ -318,5 +320,6 @@ test('PBR closes a partially encoded pass after an upload failure and remains us
     queue.writeBuffer = write;
     engine.dispose();
   }
+  await null; // released resources are destroyed at the end of the task
   assert.ok(resources.every((resource) => resource.destroyed));
 });

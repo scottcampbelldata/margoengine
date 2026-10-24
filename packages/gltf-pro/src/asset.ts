@@ -126,6 +126,7 @@ const supported = new Set([
   'KHR_materials_sheen',
   'KHR_materials_specular',
   'KHR_materials_variants',
+  'KHR_node_visibility',
   'EXT_texture_webp',
   'EXT_texture_avif',
   'EXT_mesh_gpu_instancing',
@@ -208,14 +209,16 @@ export function checkDocument(doc: GLTFDocument): void {
 export function container(
   input: string | object | ArrayBuffer | ArrayBufferView,
   limit = assetLimit,
-): { doc: GLTFDocument; binary?: Uint8Array } {
+): { doc: GLTFDocument; binary?: Uint8Array; sourceBytes: number } {
   if (typeof input === 'string') {
     // Every UTF-16 unit encodes to at least one byte: a long string fails before it is encoded.
-    if (input.length > limit || new TextEncoder().encode(input).length > limit)
-      throw overBudget('glTF JSON exceeds byte budget', limit);
-    return { doc: parseJSON(input) };
+    if (input.length > limit) throw overBudget('glTF JSON exceeds byte budget', limit);
+    const sourceBytes = new TextEncoder().encode(input).byteLength;
+    if (sourceBytes > limit) throw overBudget('glTF JSON exceeds byte budget', limit);
+    return { doc: parseJSON(input), sourceBytes };
   }
-  if (!(input instanceof ArrayBuffer) && !ArrayBuffer.isView(input)) return { doc: input as GLTFDocument };
+  if (!(input instanceof ArrayBuffer) && !ArrayBuffer.isView(input))
+    return { doc: input as GLTFDocument, sourceBytes: 0 };
   const data =
     input instanceof ArrayBuffer
       ? new Uint8Array(input)
@@ -223,7 +226,7 @@ export function container(
   if (data.length >= 4 && new DataView(data.buffer, data.byteOffset).getUint32(0, true) !== 0x46546c67) {
     // JSON bytes: the budget is checked before the text is decoded, so a huge input is not copied twice first.
     if (data.length > limit) throw overBudget('glTF JSON exceeds byte budget', limit);
-    return container(utf8(data), limit);
+    return { ...container(utf8(data), limit), sourceBytes: data.byteLength };
   }
   if (data.length > limit) throw overBudget('glTF exceeds download budget', limit);
   if (data.length < 20) throw new RangeError('Invalid GLB size');
@@ -253,7 +256,7 @@ export function container(
     offset += length;
   }
   if (!doc) throw new TypeError('Missing GLB JSON');
-  return { doc, binary };
+  return { doc, binary, sourceBytes: data.byteLength };
 }
 export function embedded(uri: string, limit = assetLimit): Uint8Array {
   const match = /^data:[^;,]+;base64,([A-Za-z0-9+/]*={0,2})$/.exec(uri);
@@ -786,9 +789,14 @@ export async function loadAsset(
     return bytes;
   };
   const resolve = (uri: string) => assetURL(uri, base ?? globalThis.location?.href, allowedURLs, 'glTF resource');
-  const { doc, binary } = container(input ?? (await fetchBytes(base!, true)), limit),
+  const { doc, binary, sourceBytes } = container(input ?? (await fetchBytes(base!, true)), limit),
     buffers: Uint8Array[] = [],
     images: GLTFImage[] = [];
+  // Fetched roots already count toward total; parsed worker continuations have no encoded root charge.
+  if (input != null) {
+    if (sourceBytes > limit - total) throw overBudget('glTF exceeds download budget', limit);
+    total += sourceBytes;
+  }
   checkDocument(doc);
   for (let i = 0; i < (doc.buffers?.length ?? 0); i++) {
     const def = entry(doc.buffers, i, 'buffer');
@@ -807,7 +815,7 @@ export async function loadAsset(
     else if (def.uri.startsWith('data:')) {
       const b = embedded(def.uri, limit);
       total += b.length;
-      if (total > limit) throw new RangeError('glTF exceeds download budget');
+      if (total > limit) throw overBudget('glTF exceeds download budget', limit);
       buffers[i] = b;
     } else buffers[i] = await fetchBytes(resolve(def.uri));
   }

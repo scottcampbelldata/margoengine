@@ -22,7 +22,9 @@ import { catcherLit } from './catcher.js';
 import { toonDeclarations, toonEdits, toonLit } from './toon-shader.js';
 import { envFloats, envMapLit, envMapShader, packEnv, type EnvCombine, type EnvironmentMap } from './env-map.js';
 import { readResponse } from '../../shared/loading.js';
+import { attenuationPower } from '../../shared/attenuation.js';
 import { clusterBrdf } from '../../shared/light-terms.js';
+import { primitiveAfterOpaque } from '../../shared/material-routing.js';
 import { MargoError } from '@margoengine/math/errors';
 import { parseColor, type ColorInput } from '@margoengine/math/color';
 import {
@@ -1229,6 +1231,8 @@ export interface MaterialOptions extends PhysicalOptions {
   lightMap?: Texture | null;
   /** Finite; default 1. Live. */
   lightMapIntensity?: number;
+  /** Multiply by the light map (default), or Lambertian irradiance / pi on lit shadings. Use a linear lightMap texture; physical intensity must be nonnegative. Live. */
+  lightMapResponse?: 'multiply' | 'lambertian';
   transparent?: boolean;
   alphaTest?: number;
   /** Faces drawn by triangle meshes. Explicit side takes precedence over doubleSided. */
@@ -1316,9 +1320,12 @@ const stencilOperations: readonly string[] = [
   'increment-wrap',
   'decrement-wrap',
 ];
-const finiteFloat = (v: unknown, label: string): number => {
-  if (typeof v !== 'number' || !Number.isFinite(Math.fround(v)))
-    throw new RangeError('Material ' + label + ' must be finite as float32');
+// GPU uniforms are float32: a finite double such as 1e39 would upload as Infinity.
+const finiteFloat = (v: unknown, label: string, min = -Infinity): number => {
+  if (typeof v !== 'number' || !Number.isFinite(Math.fround(v)) || !(v >= min))
+    throw new RangeError(
+      'Material ' + label + ' must be finite as float32' + (min > -Infinity ? ' and >= ' + min : ''),
+    );
   return v;
 };
 /** Render state, live: each change selects the matching beauty pipeline on the next draw. */
@@ -1608,6 +1615,7 @@ function featureUniform(m: Material, device: GPUDevice, owner: object): GPUBuffe
   const buffer = materialBuffer(m, device, owner, 144, 'features'),
     data = (mapState(m, owner).featureData ??= new Float32Array(36));
   data.set(m['featureValues']);
+  if (m.lightMapResponse === 'lambertian') data[3] = m.lightMapIntensity / Math.PI;
   device.queue.writeBuffer(buffer, 0, data);
   return buffer;
 }
@@ -1801,6 +1809,7 @@ export class Material {
     ...Array(3).fill(textureTransform({}, 0)).flat(),
     ...textureTransform({}, 1),
   ];
+  private lightResponse: 'multiply' | 'lambertian' = 'multiply';
   private setFeatureMap(k: number, v: Texture | null): void {
     if (v != null && !(v instanceof Texture))
       throw new TypeError(`Material ${featureMaps[k]} must be a Texture; pass a Texture or null`);
@@ -1852,7 +1861,25 @@ export class Material {
     return this.featureValues[3];
   }
   set lightMapIntensity(v: number) {
-    this.featureValues[3] = rasterFloat(v, 'lightMapIntensity');
+    const value = rasterFloat(v, 'lightMapIntensity');
+    if (this.lightResponse === 'lambertian' && value < 0)
+      throw new RangeError('Material Lambertian lightMapIntensity must be nonnegative; use physical irradiance');
+    this.featureValues[3] = value;
+  }
+  /** The live baked-light response; Lambertian requires lit shading, a linear irradiance texture and nonnegative intensity. */
+  get lightMapResponse(): 'multiply' | 'lambertian' {
+    return this.lightResponse;
+  }
+  set lightMapResponse(v: 'multiply' | 'lambertian') {
+    if (v !== 'multiply' && v !== 'lambertian')
+      throw new TypeError("Material lightMapResponse must be 'multiply' or 'lambertian'; choose a supported response");
+    if (v === 'lambertian') {
+      if (!lit.includes(this.shading))
+        throw new TypeError('Material Lambertian lightMapResponse needs lit shading; use standard, lambert or phong');
+      if (this.featureValues[3] < 0)
+        throw new RangeError('Material Lambertian lightMapIntensity must be nonnegative; use physical irradiance');
+    }
+    this.lightResponse = v;
   }
   private readonly physicalTextures: (Texture | null)[] = Array(12).fill(null);
   private setMap(i: number, value: Texture | null): void {
@@ -1957,7 +1984,8 @@ export class Material {
       !['standard', 'basic', 'normal', 'matcap', 'depth', 'distance', 'lambert', 'phong', 'toon'].includes(shading) ||
       (o.side !== undefined && !['front', 'back', 'double'].includes(o.side)) ||
       [o.transparent, o.doubleSided].some((v) => v !== undefined && typeof v !== 'boolean') ||
-      (o.normalScale !== undefined && !Number.isFinite(o.normalScale))
+      (o.normalScale !== undefined &&
+        (typeof o.normalScale !== 'number' || !Number.isFinite(Math.fround(o.normalScale))))
     )
       throw new TypeError('Invalid material options');
     for (const slot of [...mapSlots, 'matcap'] as const)
@@ -2020,6 +2048,7 @@ export class Material {
       'displacementBias',
       'lightMap',
       'lightMapIntensity',
+      'lightMapResponse',
       'emissiveIntensity',
       'flatShading',
       'vertexColors',
@@ -2283,12 +2312,13 @@ export class Material {
         `Material ${label} is part of transmission; set transmission (or a transmission or thickness map) first`,
       );
     if (!(v >= 0 && (v < Infinity || i === 4))) throw new RangeError(`Material ${label} must be a finite number >= 0`);
+    if (i === 0) finiteFloat(v, label);
     if (i) this.attenuation[i - 1] = v;
     else this.volume[0] = v;
     const [r, g, b, d] = this.attenuation;
-    this.volume[1] = r ** (1 / d);
-    this.volume[2] = g ** (1 / d);
-    this.volume[3] = b ** (1 / d);
+    this.volume[1] = attenuationPower(r, 1 / d);
+    this.volume[2] = attenuationPower(g, 1 / d);
+    this.volume[3] = attenuationPower(b, 1 / d);
   }
   get clearcoat(): number {
     return this.physical?.[0] ?? 0;
@@ -2306,8 +2336,7 @@ export class Material {
     return this.physical?.[2] ?? 1;
   }
   set clearcoatNormalScale(v: number) {
-    if (!Number.isFinite(v)) throw new RangeError('Invalid clearcoatNormalScale');
-    this.enable('clearcoatNormalScale')[2] = v;
+    this.enable('clearcoatNormalScale')[2] = finiteFloat(v, 'clearcoatNormalScale');
   }
   get anisotropy(): number {
     return this.physical?.[16] ?? 0;
@@ -2335,15 +2364,15 @@ export class Material {
     return this.physical?.[13] ?? 1.3;
   }
   set iridescenceIOR(v: number) {
-    if (!(v >= 1 && v < Infinity)) throw new RangeError('Invalid iridescenceIOR');
-    this.enable('iridescenceIOR')[13] = v;
+    this.enable('iridescenceIOR')[13] = finiteFloat(v, 'iridescenceIOR', 1);
   }
   get iridescenceThicknessRange(): readonly [number, number] {
     return [this.physical?.[14] ?? 100, this.physical?.[15] ?? 400];
   }
   set iridescenceThicknessRange(v: readonly [number, number]) {
-    if (!Array.isArray(v) || v.length !== 2 || !v.every(Number.isFinite) || v[0] < 0 || v[1] < v[0])
-      throw new RangeError('Invalid iridescenceThicknessRange');
+    if (!Array.isArray(v) || v.length !== 2)
+      throw new RangeError('Material iridescenceThicknessRange must be [min, max] nanometres');
+    finiteFloat(v[1], 'iridescenceThicknessRange', finiteFloat(v[0], 'iridescenceThicknessRange', 0));
     const p = this.enable('iridescenceThicknessRange');
     p[14] = v[0];
     p[15] = v[1];
@@ -2382,7 +2411,7 @@ export class Material {
     return this.ext?.[1] ?? 1.5;
   }
   set ior(v: number) {
-    if (!(v >= 1 && v < Infinity)) throw new RangeError('Material ior must be a finite number >= 1');
+    finiteFloat(v, 'ior', 1);
     this.enable('ior');
     this.ext![1] = v;
   }
@@ -2441,8 +2470,7 @@ export class Material {
     return this.factors[2];
   }
   set normalScale(v: number) {
-    if (!Number.isFinite(v)) throw new RangeError('Invalid normalScale');
-    this.factors[2] = v;
+    this.factors[2] = finiteFloat(v, 'normalScale');
   }
   get aoMapIntensity(): number {
     return this.factors[3];
@@ -2533,9 +2561,7 @@ export class Material {
     return this.gloss;
   }
   set shininess(v: number) {
-    if (typeof v !== 'number' || !(v >= 0 && v < Infinity))
-      throw new RangeError('Material shininess must be a finite number >= 0 (default 30)');
-    this.gloss = v;
+    this.gloss = finiteFloat(v, 'shininess', 0);
   }
   get opacity(): number {
     return this.color[3];
@@ -2885,6 +2911,9 @@ interface MaterialDraws {
 }
 const queues = new WeakMap<Engine, MaterialDraws>(),
   late = (m: Material) => m.transparent || m.transmissive;
+function lateEntry(entry: Entry, index: number): boolean {
+  return late(entry.materials[index]) || primitiveAfterOpaque(entry.model.primitives[index]);
+}
 let serial = 0;
 /** One pass per engine draws every material mesh: opaque then transparent, each by renderOrder; transparent meshes back to front. */
 function queue(runtime: Engine): MaterialDraws {
@@ -2902,8 +2931,8 @@ function queue(runtime: Engine): MaterialDraws {
     phases.length = 0;
     for (let i = 0; i < members.length; i++) {
       const entry = members[i],
-        opaque = entry.materials.some((m) => !late(m)),
-        blend = entry.materials.some(late);
+        opaque = entry.materials.some((_, i) => !lateEntry(entry, i)),
+        blend = entry.materials.some((_, i) => lateEntry(entry, i));
       entry.opaque = opaque;
       entry.blend = blend;
       if (opaque) phases.push({ entry, blend: false, phase: blend ? 'opaque' : 'all' });
@@ -2930,8 +2959,8 @@ function queue(runtime: Engine): MaterialDraws {
           if (!stale)
             for (let i = 0; i < members.length; i++) {
               const entry = members[i],
-                opaque = entry.materials.some((m) => !late(m)),
-                blend = entry.materials.some(late);
+                opaque = entry.materials.some((_, i) => !lateEntry(entry, i)),
+                blend = entry.materials.some((_, i) => lateEntry(entry, i));
               if (opaque !== entry.opaque || blend !== entry.blend) {
                 stale = true;
                 break;

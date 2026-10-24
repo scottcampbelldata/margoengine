@@ -263,6 +263,7 @@ test('progressive geometry replaces and releases wireframe edge buffers created 
     assert.ok(final.length > 0);
     assert.ok(final.every((buffer) => !buffer.destroyed && !placeholders.includes(buffer)));
     model.dispose();
+    await null; // released resources are destroyed at the end of the task
     assert.ok(final.every((buffer) => buffer.destroyed));
   }));
 

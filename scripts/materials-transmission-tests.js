@@ -276,12 +276,26 @@ export async function transmissionBrowserChecks(page) {
           difference(hdrStraight, hdrInfinity, true, 8).changed === 0,
           'Infinite distance changed the borrowed HDR transmission image',
         );
-        const straightPattern = await render(extensions(1, 1), () => {}, true, 1, false, true);
-        const refractedPattern = await render(extensions(1, 1.5), () => {}, true, 1, false, true),
+        const straightPattern = await render(extensions(1, 1, { thicknessFactor: 1 }), () => {}, true, 1, false, true);
+        const refractedPattern = await render(
+            extensions(1, 1.5, { thicknessFactor: 1 }),
+            () => {},
+            true,
+            1,
+            false,
+            true,
+          ),
           refractionDifference = difference(straightPattern, refractedPattern, true);
         assert(
           refractionDifference.changed > 0,
-          'IOR 1.5 did not refract an opaque red/green boundary through the tilted surface',
+          'Positive volume at IOR 1.5 did not refract an opaque red/green boundary through the tilted surface',
+        );
+        // Thin glass (no volume) keeps its sightline at any IOR, as glTF specifies.
+        const thinPattern = await render(extensions(1, 1.5), () => {}, true, 1, false, true),
+          thinStraight = await render(extensions(1, 1), () => {}, true, 1, false, true);
+        assert(
+          difference(thinStraight, thinPattern, true).changed === 0,
+          'Thin IOR 1.5 transmission moved the background instead of keeping its sightline',
         );
         assert(red(straight) > red(opaque), 'Transmission did not reveal the red opaque background');
         const infinite = await render(
@@ -377,7 +391,7 @@ export async function transmissionBrowserChecks(page) {
           iorOne: iorOneDifference,
           msaaIorOne: msaaDifference,
           borrowedHDRIorOne: hdrDifference,
-          refraction: refractionDifference,
+          volumeRefraction: refractionDifference,
           redBackground: red(background),
           redTransmission: red(straight),
           redVolume: red(volume),

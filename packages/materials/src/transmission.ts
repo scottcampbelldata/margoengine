@@ -111,10 +111,11 @@ export function createTransmission(options: TransmissionOptions = {}, base?: Mat
     factors: Float32Array.from(factors),
     textures,
     lighting: false,
+    afterOpaque: true,
   };
 }
 
-/** Caller-owned screen capture. Set the primitive material's settings[0] to 2 for blending. */
+/** Caller-owned screen capture; positive transmission defers beauty without changing authored alpha coverage. */
 export function transmission(options: TransmissionOptions = {}): MaterialExtension {
   return createTransmission(options);
 }

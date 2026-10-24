@@ -101,7 +101,8 @@ const vectorSlots = new Set<string>(['color', 'emissive', 'normal']);
 const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const finite = (v: unknown): v is number =>
   typeof v === 'number' && Number.isFinite(Math.fround(v)) && Math.abs(v) <= 1e6;
-const vec = (v: unknown): v is [number, number, number] => Array.isArray(v) && v.length === 3 && v.every(finite);
+const vec = (v: unknown): v is [number, number, number] =>
+  Array.isArray(v) && v.length === 3 && finite(v[0]) && finite(v[1]) && finite(v[2]);
 const fail = (message: string): never => {
   throw new TypeError(`Surface graph: ${message}`);
 };
@@ -326,7 +327,10 @@ export function compileSurfaceGraph(
 }
 /** Construct a native Margo surface material. Only the standard PBR raster host executes the graph. */
 export function createGraphMaterial(graph: SurfaceGraph, options: NodeMaterialOptions = {}): NodeMaterial {
-  return new NodeMaterial({ ...options, ...compileSurfaceGraph(graph) });
+  const snapshot = parseSurfaceGraph(serializeSurfaceGraph(graph));
+  const material = new NodeMaterial({ ...options, ...compileSurfaceGraph(snapshot) });
+  material.surfaceGraph = snapshot;
+  return material;
 }
 /** Coordinates and original material values supplied by a texture/voxel baking host. RGB is linear. */
 export interface SurfaceSample {

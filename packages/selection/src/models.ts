@@ -1,5 +1,7 @@
-import type { Engine, Mesh } from '@margoengine/core/extension';
+import type { Engine, Mesh, FrameGraph } from '@margoengine/core/extension';
 import { instanceMatrix } from '../../shared/instances.js';
+import { hiddenInTree } from '../../shared/visibility.js';
+import { retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
 declare const GPUBufferUsage: { STORAGE: number; UNIFORM: number; COPY_DST: number };
 
 /** Structural gltf-pro `PBRPrimitive`: `buffers` exist while its model is set up on a device; `deformed` replaces the vertices when skinned. */
@@ -40,10 +42,7 @@ export const proxies = (e: Engine): PickProxy[] => {
       if (typeof p.pickProxies === 'function') out.push(...p.pickProxies());
   return out;
 };
-export const hidden = (e: Engine, id: number): boolean => {
-  for (let slot = id; slot !== -1; slot = e.store.parents[slot]) if (e.store.hidden[slot]) return true;
-  return false;
-};
+export const hidden = (e: Engine, id: number): boolean => hiddenInTree(e.store, id);
 
 /** Attached gltf-pro models (engine plugins with `root` and `primitives`), rescanned only when the frame graph, mesh count or a model's liveness changes. */
 export class Models {
@@ -53,11 +52,14 @@ export class Models {
   version = 0;
   private revision = -1;
   private size = -1;
+  private graph?: FrameGraph;
   update(e: Engine): Model[] {
-    let stale = e.frameGraph.revision !== this.revision || e.meshes.size !== this.size;
+    // Scenes have their own frame graphs: a switch is stale even at an equal revision.
+    let stale = e.frameGraph !== this.graph || e.frameGraph.revision !== this.revision || e.meshes.size !== this.size;
     for (let i = 0; !stale && i < this.list.length; i++) stale = !!this.list[i].disposed;
     if (!stale) return this.list;
     this.revision = e.frameGraph.revision;
+    this.graph = e.frameGraph;
     this.size = e.meshes.size;
     this.version++;
     this.list = [];
@@ -135,9 +137,11 @@ export class ModelDraws {
   private words = new Uint32Array(this.data.buffer);
   private primitives: ModelPrimitive[] = [];
   private runs: number[] = [];
+  private device?: GPUDevice;
   private storage?: GPUBuffer;
   private camera?: GPUBuffer;
-  private group?: GPUBindGroup;
+  /** Group per camera binding: a second view of a frame binds its own camera copy. */
+  private groups?: { get(copy?: GPUBufferBinding): GPUBindGroup };
   private pipeline?: GPURenderPipeline;
   reset(): void {
     this.count = 0;
@@ -178,34 +182,45 @@ export class ModelDraws {
     this.runs[first] = inst.count;
   }
   /** Uploads the draws and camera and binds them; call inside a pass using `pipeline`. */
-  draw(device: GPUDevice, pass: GPURenderPassEncoder, pipeline: GPURenderPipeline, camera: Float32Array): void {
+  /** `view` is the pass context's view (else the context): another view of the same frame gets its own camera copy. */
+  draw(
+    device: GPUDevice,
+    pass: GPURenderPassEncoder,
+    pipeline: GPURenderPipeline,
+    camera: Float32Array,
+    view: object = this,
+  ): void {
     if (!this.count) return;
+    this.device = device;
     if (!this.storage || this.storage.size < this.data.byteLength) {
-      this.storage?.destroy();
+      retire(this.device!, this.storage);
       this.storage = device.createBuffer({
         size: this.data.byteLength,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       });
-      this.group = undefined;
+      this.groups = undefined;
     }
     if (!this.camera) {
       this.camera = device.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-      this.group = undefined;
+      this.groups = undefined;
     }
-    if (!this.group || this.pipeline !== pipeline) {
+    if (!this.groups || this.pipeline !== pipeline) {
+      const storage = this.storage;
       this.pipeline = pipeline;
-      this.group = device.createBindGroup({
-        layout: pipeline.getBindGroupLayout(0),
-        entries: [
-          { binding: 0, resource: { buffer: this.camera } },
-          { binding: 1, resource: { buffer: this.storage } },
-        ],
-      });
+      this.groups = uniformGroups(this.camera, (binding) =>
+        device.createBindGroup({
+          layout: pipeline.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: binding },
+            { binding: 1, resource: { buffer: storage } },
+          ],
+        }),
+      );
     }
-    device.queue.writeBuffer(this.camera, 0, camera as Float32Array<ArrayBuffer>);
+    const copy = writeUniform(device, this.camera, camera as Float32Array<ArrayBuffer>, view);
     device.queue.writeBuffer(this.storage, 0, this.data, 0, this.count * 20);
     pass.setPipeline(pipeline);
-    pass.setBindGroup(0, this.group);
+    pass.setBindGroup(0, this.groups.get(copy));
     for (let i = 0; i < this.count; ) {
       const p = this.primitives[i],
         n = this.runs[i] || 1;
@@ -216,9 +231,9 @@ export class ModelDraws {
     }
   }
   release(): void {
-    this.storage?.destroy();
-    this.camera?.destroy();
-    this.storage = this.camera = this.group = this.pipeline = undefined;
+    retire(this.device!, this.storage);
+    retire(this.device!, this.camera);
+    this.storage = this.camera = this.groups = this.pipeline = undefined;
     this.primitives = [];
     this.count = 0;
   }

@@ -344,6 +344,7 @@ for (const samples of [4, 1])
       'opaque mesh in the beauty pass; both transmissive ones only in the transmission pass',
     );
     // Steady frames create nothing; hidden glass costs no copy.
+    await null; // the next frame
     const next = frame(2);
     for (const name of ['texture', 'renderPipeline', 'group', 'module', 'view', 'buffer'])
       assert.equal(of(next, name).length, 0, name);

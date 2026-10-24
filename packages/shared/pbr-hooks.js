@@ -18,14 +18,14 @@ const hasGradient = (text) => text !== undefined && new RegExp(gradient.source).
 // Keep the miss-only replacement closures outside the hot cache lookup's function context.
 function composeLightPBR(code, hooks, cache) {
   let out = code;
+  // A hook may return its anchor unchanged, so a miss is tested on the anchor, not on the result.
   const edit = (from, to) => {
-    const next = out.replace(from, to);
-    if (next === out)
+    if (typeof from === 'string' ? !out.includes(from) : out.search(from) < 0)
       throw margoError(
         'unsupported',
-        `PBR lighting hook point missing or used twice: ${from}; use matching @margoengine/gltf-pro and effect package versions`,
+        `PBR lighting hook point missing: ${from}; use matching @margoengine/gltf-pro and effect package versions`,
       );
-    out = next;
+    out = out.replace(from, to);
   };
   // gltf-pro's transmissive and extended shaders (they define margoAmbientLayers) evaluate light and ambient hooks as
   // functions of the surface: local lights see the diffuse left after transmission (margoFront), the ambient hook is
@@ -89,11 +89,19 @@ fn margoSkyHook(n:vec3f)->vec3f {return ${hooks.sky};}
 `;
   }
   if (hooks.sky || sky) out = skyText(out);
-  if (hooks.output)
+  // The output hook wraps the tone-mapped colour; the sRGB encoding stays after it. Shaders end either with gltf-pro's
+  // inline tone-map line or with shared/display.js toDisplay (voxels).
+  const shared = 'if(f.settings.w<0.5) {color=toDisplay(color);}',
+    srgb = 'select(color*12.92,1.055*pow(color,vec3f(1.0/2.4))-0.055,color>=vec3f(0.0031308))';
+  if (hooks.output) {
+    const display = out.includes(shared);
     edit(
-      'if(f.settings.w<0.5) {color=pbrNeutral(max(color,vec3f(0)));',
-      `color=${hooks.output('select(color,pbrNeutral(max(color,vec3f(0))),f.settings.w<0.5)')};if(f.settings.w<0.5) {`,
+      display ? shared : 'if(f.settings.w<0.5) {color=pbrNeutral(max(color,vec3f(0)));',
+      `color=${hooks.output('select(color,pbrNeutral(max(color,vec3f(0))),f.settings.w<0.5)')};if(f.settings.w<0.5) {${
+        display ? `color=${srgb};}` : ''
+      }`,
     );
+  }
   out = hooks.declarations + out;
   if (!cache) lit.set(hooks, (cache = new Map()));
   if (cache.size >= 64) cache.clear();

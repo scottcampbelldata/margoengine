@@ -169,11 +169,13 @@ test('wireframe buffers are released on device restoration and disposal', async 
   f.primitive.material.wireframe = true;
   const first = f.frame()[0].index;
   f.model.onDeviceRestored(f.engine);
+  await null; // buffers drawn this frame are destroyed once it is submitted
   assert.equal(first.destroyed, true);
   const next = f.frame()[0].index;
   assert.notEqual(next, first);
   assert.deepEqual([...new Uint32Array(next.data)], edges);
   f.model.dispose();
+  await null;
   assert.equal(next.destroyed, true);
 });
 

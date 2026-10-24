@@ -14,7 +14,7 @@ const objects = (h) => ({
   pipelines: h.pipelines.length,
 });
 
-test('x-ray marks the whole selection without the depth test, outlines it dashed before the visible outline, and toggles per set', () => {
+test('x-ray marks the whole selection without the depth test, outlines it dashed before the visible outline, and toggles per set', async () => {
   const h = optionalGPU(),
     mesh = { id: 2 },
     uploads = [],
@@ -88,6 +88,7 @@ test('x-ray marks the whole selection without the depth test, outlines it dashed
   assert.equal(draws.length, 2);
   h.engine.removePlugin('hover');
   selection.dispose();
+  await null; // released resources are destroyed at the end of the task
   assert.ok(
     h.resources.every((r) => r.destroyed),
     'dispose releases the x-ray buffers too',

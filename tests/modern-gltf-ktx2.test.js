@@ -144,12 +144,14 @@ test('real required Basis glTF images preserve sRGB, linear roles, and every mip
     assert.equal(model.image(1).ktx2.mipmaps.length, 6);
     model.onDeviceRestored(s.engine);
     assert.equal(calls.length, 2, 'restoration reuses retained transcodes');
+    await null; // released resources are destroyed at the end of the task
     assert.equal(color.destroyed, true);
     assert.equal(normal.destroyed, true);
     model.destroy();
   } finally {
     s.engine.dispose();
   }
+  await null; // released resources are destroyed once the frame is submitted
   assert.ok(s.resources.every((resource) => resource.destroyed));
 });
 

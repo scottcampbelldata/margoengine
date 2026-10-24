@@ -63,7 +63,7 @@ function harness() {
   return h;
 }
 for (const [name, factory] of Object.entries(factories))
-  test(name + ' releases partial setup allocations when native operations fail', () => {
+  test(name + ' releases partial setup allocations when native operations fail', async () => {
     for (const method of ['createBuffer', 'createTexture', 'createBindGroup', 'writeBuffer']) {
       const baseline = harness(),
         effect = factory(baseline),
@@ -76,6 +76,7 @@ for (const [name, factory] of Object.entries(factories))
       };
       baseline.engine.use(effect);
       effect.dispose();
+      await null; // released resources are destroyed at the end of the task
       assert.ok(baseline.resources.every((r) => r.destroyed));
       for (let at = 1; at <= total; at++) {
         const h = harness(),
@@ -95,6 +96,7 @@ for (const [name, factory] of Object.entries(factories))
             (error) => error === failure,
           );
           assert.equal(h.engine.hasPlugin(candidate.name), false);
+          await null; // released resources are destroyed at the end of the task
           assert.ok(
             h.resources.every((r) => r.destroyed),
             name + ' ' + method + ' failure ' + at + ' leaked native resources',
