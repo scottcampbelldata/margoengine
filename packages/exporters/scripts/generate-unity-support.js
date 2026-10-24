@@ -1,9 +1,11 @@
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join, relative, sep } from 'node:path';
+import { compactCSharp } from './compact-csharp.js';
 
-// Canonical native support is ordinary, reviewable source. The generated module
-// embeds text only; the public delivery API hashes/returns it without I/O.
+// Canonical native support is ordinary, reviewable source. The generated module embeds text only (C# compacted:
+// comments and layout whitespace dropped; .meta, package.json and README unchanged); the public delivery API
+// hashes and returns it without I/O, so installed files and support-manifest.json hashes are of the embedded text.
 const root = fileURLToPath(new URL('../src/unity/', import.meta.url));
 const output = fileURLToPath(new URL('../src/unity-support.generated.ts', import.meta.url));
 const files = [];
@@ -23,7 +25,7 @@ async function walk(directory) {
         throw new TypeError(
           `Unity support payload must be canonical UTF-8/LF: ${name}; save it without CRLF or invalid bytes`,
         );
-      files.push({ name, text });
+      files.push({ name, text: name.endsWith('.cs') ? compactCSharp(text) : text });
     } else throw new TypeError(`Unsupported Unity payload entry ${path}; use ordinary canonical files`);
   }
 }
