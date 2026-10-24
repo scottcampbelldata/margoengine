@@ -13,7 +13,7 @@ export const overlayPass = (depthWrites = false) => ({
 });
 
 /** Straight (non-premultiplied) alpha blending: colour by source alpha, alpha accumulating coverage. */
-export const alphaBlend = Object.freeze({
+export const alphaBlend = /* @__PURE__ */ Object.freeze({
   color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
   alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
 });

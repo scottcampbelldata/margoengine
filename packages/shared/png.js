@@ -3,7 +3,7 @@
 import { crc32 } from './crc32.js';
 
 /** The 8-byte PNG signature. */
-export const PNG_SIGNATURE = Object.freeze([137, 80, 78, 71, 13, 10, 26, 10]);
+export const PNG_SIGNATURE = /* @__PURE__ */ Object.freeze([137, 80, 78, 71, 13, 10, 26, 10]);
 
 /** Value predicted for a byte by row filter `type` (0 none, 1 Sub, 2 Up, 3 Average, 4 Paeth) from its left `a`, up `b`
  * and up-left `c` neighbours. */
