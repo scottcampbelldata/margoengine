@@ -2,7 +2,7 @@
 import type { Collider, EventQueue, PhysicsHooks, Ray, RigidBody, World } from './rapier-types.js';
 import type { EngineKernel, EnginePlugin, Mesh } from '@margoengine/core';
 import { meshRuntime, Mesh as CoreMesh } from '@margoengine/core/extension';
-import { meshTriangles } from '../../shared/mesh-source.js';
+import { meshTriangles, mergePrimitives } from '../../shared/mesh-source.js';
 import { PhysicsBody, type BodyOptions, type BodyOwner, type BodyType } from './body.js';
 import { CharacterController, type CharacterControllerOptions } from './character.js';
 import { PhysicsJoint, createJointData, type JointOptions } from './joints.js';
@@ -1033,25 +1033,7 @@ function primitiveGeometry(mesh: Mesh): ColliderGeometry | null {
   if (triangles.source.skinned || triangles.source.morphed) throw new Error('Skinned mesh needs an explicit collider');
   const { primitives } = triangles.source;
   if (!primitives.length) return null;
-  let vertexCount = 0,
-    indexCount = 0;
-  for (const primitive of primitives) {
-    if (primitive.vertices.length % 20) throw new RangeError('PBR vertex array length is not a multiple of its stride');
-    vertexCount += primitive.vertices.length / 20;
-    indexCount += primitive.indices.length;
-  }
-  const vertices = new Float32Array(vertexCount * 3),
-    indices = new Uint32Array(indexCount);
-  let vertexOffset = 0,
-    indexOffset = 0;
-  for (const primitive of primitives) {
-    const count = primitive.vertices.length / 20;
-    for (let i = 0; i < count; i++)
-      vertices.set(primitive.vertices.subarray(i * 20, i * 20 + 3), (vertexOffset + i) * 3);
-    for (const index of primitive.indices) indices[indexOffset++] = vertexOffset + index;
-    vertexOffset += count;
-  }
-  return { vertices, indices, stride: 3 };
+  return mergePrimitives(primitives);
 }
 
 /** Fit a geometry-free root to its static descendants without altering the hierarchy. */

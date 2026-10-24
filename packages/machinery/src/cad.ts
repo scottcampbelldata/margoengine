@@ -10,7 +10,7 @@ import {
   type FrameGraph,
 } from '@margoengine/core/extension';
 import { readResponse } from '../../shared/loading.js';
-import { meshTriangles } from '../../shared/mesh-source.js';
+import { meshTriangles, mergePrimitives } from '../../shared/mesh-source.js';
 import type { PBRSourcePrimitive } from '../../shared/pbr-source.js';
 import type { MeshSourceOwner } from '../../shared/mesh-source.js';
 import { maxBytes, maxIndices, parseCADGeometry, fingerprint, hash } from './cad-parser.js';
@@ -128,28 +128,10 @@ function shareBuffers(
 }
 /** Compare all bind-pose triangles and normals without modifying PBR attributes or GPU buffers. */
 function primitiveFingerprint(primitives: readonly PBRSourcePrimitive[]): Float32Array {
-  let vertexCount = 0,
-    indexCount = 0;
-  for (const primitive of primitives) {
-    if (primitive.vertices.length % 20) throw new RangeError('PBR vertex array length is not a multiple of its stride');
-    vertexCount += primitive.vertices.length / 20;
-    indexCount += primitive.indices.length;
-  }
-  if (!vertexCount || !indexCount || indexCount % 3) throw new RangeError('PBR geometry needs whole triangles');
-  if (indexCount > maxIndices) throw new RangeError('Deduplication triangle limit');
-  const vertices = new Float32Array(vertexCount * 6),
-    indices = new Uint32Array(indexCount);
-  let vertexOffset = 0,
-    indexOffset = 0;
-  for (const primitive of primitives) {
-    const count = primitive.vertices.length / 20;
-    for (let i = 0; i < count; i++) {
-      vertices.set(primitive.vertices.subarray(i * 20, i * 20 + 3), (vertexOffset + i) * 6);
-      vertices.set(primitive.vertices.subarray(i * 20 + 4, i * 20 + 7), (vertexOffset + i) * 6 + 3);
-    }
-    for (const index of primitive.indices) indices[indexOffset++] = vertexOffset + index;
-    vertexOffset += count;
-  }
+  const { vertices, indices } = mergePrimitives(primitives, true, (vertexCount, indexCount) => {
+    if (!vertexCount || !indexCount || indexCount % 3) throw new RangeError('PBR geometry needs whole triangles');
+    if (indexCount > maxIndices) throw new RangeError('Deduplication triangle limit');
+  });
   return fingerprint({ vertices, indices });
 }
 export function parseCAD(

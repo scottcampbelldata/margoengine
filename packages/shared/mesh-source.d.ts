@@ -71,3 +71,9 @@ export function clearMeshSource(mesh: PublicMesh): void;
 export function meshTriangles(
   mesh: PublicMesh | null | undefined,
 ): { kind: 'core'; geometry: Geometry } | { kind: 'pbr'; source: MeshSource } | null;
+/** gltf-pro primitives' triangles in one list (positions, and normals with `normals`); `check` runs before allocation. */
+export function mergePrimitives(
+  primitives: readonly { readonly vertices: Float32Array; readonly indices: ArrayLike<number> }[],
+  normals?: boolean,
+  check?: (vertexCount: number, indexCount: number) => void,
+): { vertices: Float32Array; indices: Uint32Array; stride: 3 | 6 };
