@@ -12,6 +12,7 @@ import {
   type Vec3,
 } from '@margoengine/core';
 import { loadedModel, worldBounds, type LoadedModel, type StageModel } from './model.js';
+import { margoError } from '../../shared/errors.js';
 
 export * from '@margoengine/core';
 export type { LoadedModel } from './model.js';
@@ -68,8 +69,8 @@ function missingInstall(error: unknown, name: string): never {
     code === 'ERR_MODULE_NOT_FOUND' ||
     /Cannot find (module|package)|Failed to resolve|dynamically imported module/i.test(message)
   )
-    throw new Error(`Install ${name}`);
-  throw error instanceof Error ? error : new Error(message);
+    throw margoError('state', `Install ${name}`);
+  throw error instanceof Error ? error : margoError('failed', message);
 }
 
 function loadPackage<T>(name: string, load: () => Promise<T>): Promise<T> {
@@ -82,8 +83,9 @@ function loadPackage<T>(name: string, load: () => Promise<T>): Promise<T> {
  */
 export function sphere(radius = 1, segments = 32): Geometry {
   if (typeof radius !== 'number' || !Number.isFinite(Math.fround(radius)) || Math.fround(radius) <= 0)
-    throw new RangeError('Sphere radius');
-  if (!Number.isInteger(segments) || segments < 3 || segments > 256) throw new RangeError('Sphere segments');
+    throw new RangeError('Sphere radius: use a positive number');
+  if (!Number.isInteger(segments) || segments < 3 || segments > 256)
+    throw new RangeError('Sphere segments: use an integer from 3 to 256');
   const rings = Math.ceil(segments / 2),
     positions: number[] = [],
     normals: number[] = [],
@@ -153,7 +155,7 @@ export class Stage {
   }
 
   box({ size = [1, 1, 1], ...options }: MeshOptions & { size?: Vec3 } = {}): Mesh {
-    if (size.length !== 3) throw new TypeError('Box: 3 values');
+    if (size.length !== 3) throw new TypeError('Box: pass 3 values');
     return this.mesh(box(...size), options);
   }
 
@@ -169,11 +171,12 @@ export class Stage {
   }
 
   async load(url: string | URL, { format, fit = true, signal, ...options }: LoadOptions = {}): Promise<LoadedModel> {
-    if (typeof fit !== 'boolean') throw new TypeError('Invalid fit');
+    if (typeof fit !== 'boolean') throw new TypeError('Invalid fit; use a boolean');
     const target = new URL(url, globalThis.location?.href),
       extension = target.pathname.toLowerCase().split('.').at(-1);
     const kind = format ?? (extension === 'stp' ? 'step' : extension === 'igs' ? 'iges' : extension);
-    if (!['gltf', 'glb', 'stl', 'obj', 'step', 'iges'].includes(kind ?? '')) throw new TypeError('Specify format');
+    if (!['gltf', 'glb', 'stl', 'obj', 'step', 'iges'].includes(kind ?? ''))
+      throw new TypeError("Specify format: one of 'gltf', 'glb', 'stl', 'obj', 'step', 'iges'");
     const abort = signal ? AbortSignal.any([signal, this.imports.signal]) : this.imports.signal;
     abort.throwIfAborted();
     const model =
@@ -276,13 +279,14 @@ export async function createStage(
   target: string | HTMLElement,
   { controls = true, autoStart = true, label = 'Interactive 3D scene', onError, ...options }: StageOptions = {},
 ): Promise<Stage> {
-  if (typeof controls !== 'boolean' || typeof autoStart !== 'boolean') throw new TypeError('Invalid stage options');
+  if (typeof controls !== 'boolean' || typeof autoStart !== 'boolean')
+    throw new TypeError('Invalid stage options; check their types');
   if (typeof label !== 'string' || (onError !== undefined && typeof onError !== 'function'))
-    throw new TypeError('Invalid stage options');
+    throw new TypeError('Invalid stage options; check their types');
   const element = typeof target === 'string' ? document.querySelector<HTMLElement>(target) : target;
   const owner = element?.ownerDocument;
   if (!element || !owner?.defaultView || !(element instanceof owner.defaultView.HTMLElement))
-    throw new TypeError('Expected element');
+    throw new TypeError('Expected element; pass an element or a selector that matches one');
   const owned = element.tagName !== 'CANVAS',
     canvas = owned ? owner.createElement('canvas') : (element as HTMLCanvasElement);
   let engine: EngineKernel | undefined;

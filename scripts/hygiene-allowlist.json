@@ -1,27 +1,6 @@
 {
   "any": {},
-  "errors": {
-    "packages/core/src/engine.ts": {
-      "count": 10,
-      "reason": "Frozen core (v1.0.0): core + stage is 19,999 of 20,000 gzip bytes, a typed error costs bytes; Scott's decision (HANDOFF 5k phase 2)."
-    },
-    "packages/core/src/kernel.ts": {
-      "count": 2,
-      "reason": "Frozen core (v1.0.0): core + stage is 19,999 of 20,000 gzip bytes, a typed error costs bytes; Scott's decision (HANDOFF 5k phase 2)."
-    },
-    "packages/core/src/plugin.ts": {
-      "count": 5,
-      "reason": "Frozen core (v1.0.0): core + stage is 19,999 of 20,000 gzip bytes, a typed error costs bytes; Scott's decision (HANDOFF 5k phase 2)."
-    },
-    "packages/core/src/renderer.ts": {
-      "count": 4,
-      "reason": "Frozen core (v1.0.0): core + stage is 19,999 of 20,000 gzip bytes, a typed error costs bytes; Scott's decision (HANDOFF 5k phase 2)."
-    },
-    "packages/margoengine/src/model.ts": {
-      "count": 2,
-      "reason": "Frozen stage facade, counted in the same 19,999 / 20,000 core + stage gzip budget as core; same reason as core's (HANDOFF 5k phase 2)."
-    }
-  },
+  "errors": {},
   "names": {
     "add": {
       "packages": [

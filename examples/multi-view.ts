@@ -34,23 +34,17 @@ export function pickOnClick(
   picked: (mesh: Mesh | null) => void,
   signal: AbortSignal,
 ): void {
-  let down: { x: number; y: number } | null = null,
-    pending = false;
+  let down: { x: number; y: number } | null = null;
   box.addEventListener('pointerdown', (e) => (down = { x: e.clientX, y: e.clientY }), { signal });
   box.addEventListener(
     'pointerup',
     async (e) => {
-      // Core runs one pick at a time; a click while one is in flight is dropped.
-      if (!down || pending || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return;
+      if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return;
       down = null;
-      pending = true;
-      try {
-        const rect = engine.canvas.getBoundingClientRect(),
-          mesh = await engine.pick(e.clientX - rect.left, e.clientY - rect.top, view());
-        if (!signal.aborted) picked(mesh);
-      } finally {
-        pending = false;
-      }
+      // Core answers overlapping picks in order, so rapid clicks each get their own result.
+      const rect = engine.canvas.getBoundingClientRect(),
+        mesh = await engine.pick(e.clientX - rect.left, e.clientY - rect.top, view());
+      if (!signal.aborted) picked(mesh);
     },
     { signal },
   );

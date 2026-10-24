@@ -1,4 +1,5 @@
 import { wasmBase64 } from './wasm.js';
+import { margoError } from '../../shared/errors.js';
 
 interface Exports extends WebAssembly.Exports {
   memory: WebAssembly.Memory;
@@ -17,7 +18,7 @@ const rotationSlots = new WeakMap<TransformStore, RotationSlot>();
 /** Writes `qx, qy, qz, qw` from slot `id`'s Euler XYZ lanes through `Kernel::sync_rotation`. */
 export function syncStoredRotation(store: TransformStore, id: number): void {
   const slot = rotationSlots.get(store);
-  if (!slot?.handle) throw new Error('Transforms disposed');
+  if (!slot?.handle) throw margoError('disposed', 'Transforms disposed; create a new engine');
   slot.api.kernel_sync_rotation(slot.handle, id);
 }
 let compiled: Promise<WebAssembly.Module> | undefined;
@@ -88,10 +89,10 @@ export class TransformStore {
 
   private bind(capacity: number): void {
     if (!Number.isSafeInteger(capacity) || capacity < 1 || capacity > 1 << 23)
-      throw new RangeError('Capacity: 1..8388608');
+      throw new RangeError('Capacity: use 1..8388608');
     const api = this.api,
       handle = api.kernel_new(capacity);
-    if (!handle) throw new Error('Transform allocation');
+    if (!handle) throw margoError('failed', 'Transform allocation failed; lower capacity');
     const offset = api.kernel_data(handle),
       flags = api.kernel_flags(handle),
       buffer = api.memory.buffer;
@@ -134,7 +135,7 @@ export class TransformStore {
    * tick does. Throws and keeps the old capacity when the capacity is invalid or memory cannot grow.
    */
   grow(capacity: number): void {
-    if (!(capacity > this.capacity)) throw new RangeError('Capacity');
+    if (!(capacity > this.capacity)) throw new RangeError('Capacity: pass more than the current capacity');
     // Every typed-array view, in the same (assignment) order before and after bind.
     const views = () =>
       Object.values({ ...this.transforms, ...this }).filter(ArrayBuffer.isView) as (Float32Array | Uint8Array)[];
@@ -152,10 +153,14 @@ export class TransformStore {
   }
 
   tick(culling = true): void {
-    if (!this.handle) throw new Error('Transforms disposed');
+    if (!this.handle) throw margoError('disposed', 'Transforms disposed; create a new engine');
     const error = this.api.kernel_tick(this.handle, +culling);
     if (error)
-      throw new RangeError(error > this.capacity ? 'Invalid frustum' : `Invalid transform/bounds: ${error - 1}`);
+      throw new RangeError(
+        error > this.capacity
+          ? 'Invalid frustum; check the camera values'
+          : `Invalid transform/bounds: ${error - 1}; use finite values`,
+      );
   }
 
   dispose(): void {

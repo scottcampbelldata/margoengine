@@ -40,12 +40,12 @@ export class ArmHeadClearance {
 
   /** Write a signed authored-frame gap for an absolute proposed local Head quaternion; never change the scene. */
   evaluate(rotation: readonly number[], out: Float64Array): void {
-    if (!rotation || rotation.length !== 4) throw new TypeError('Quaternion: 4 values');
+    if (!rotation || rotation.length !== 4) throw new TypeError('Quaternion: 4 values only');
     for (let i = 0; i < 4; i++)
       if (typeof rotation[i] !== 'number' || !Number.isFinite(Math.fround(rotation[i])))
-        throw new RangeError('Quaternion: finite values');
+        throw new RangeError('Quaternion: finite values only');
     hypot4Into(rotation, this.length);
-    if (!this.length[0]) throw new RangeError('Quaternion nonzero');
+    if (!this.length[0]) throw new RangeError('Quaternion nonzero; pass a nonzero quaternion');
     this.prepare();
     for (let i = 0; i < 4; i++) this.quaternion[i] = rotation[i] / this.length[0];
     // Match the transform kernel: normalize the stored Float32 quaternion, then round the local/world matrices.

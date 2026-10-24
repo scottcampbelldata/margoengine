@@ -67,8 +67,16 @@ the 1-based line and column) for faults in the expression text; its arguments fo
 `packages/shared` is copied into packages that may not depend on math, so it cannot import the class: it throws
 `margoError(code, message)` from `packages/shared/errors.js`, which builds the same shape (name `MargoError`, `code`).
 
-Exception: `@margoengine/core` (21 sites) and the stage facade `margoengine` (2) keep their bare `Error` throws. Core +
-stage is 19,999 of the 20,000-byte gzip budget and frozen for v1.0.0; Scott's decision, listed in the allowlist.
+Core and the stage facade follow the same table: they throw `margoError(code, message)` from
+`packages/shared/errors.js`, bundled into their dist, so no core or stage throw is a bare `Error` and every message
+names its fix.
+
+## Core freeze
+
+`@margoengine/core` and the stage facade are frozen for v1.0.0 against new features, not against bug fixes (Scott,
+2026-10-24). A bug, an unsafe API (a throw that cannot be branched on, a race, a leak) or a message that names no fix
+is fixed in core, with a test, inside the 25,000-byte core + stage gzip gate; record the bytes it costs. New
+capabilities go in optional packages, and a fix that would add a capability is listed for Scott instead.
 
 ## Names exported by more than one package
 

@@ -125,8 +125,8 @@ picks through the view under it (`examples/multi-view.ts`). Reduced motion holds
 Frame time: `npm run check:views` (demos section), the median of 60 frames each rendered and awaited until the GPU
 finished (CPU and GPU together, no overlap), 1280 x 720 at 4x MSAA, NVIDIA RTX A6000, Edge, 2026-10-24.
 
-Core runs one `engine.pick` at a time and throws `Pick pending` for a second call while one is in flight; the demos
-drop a click while a pick is pending.
+Overlapping `engine.pick` calls are answered in order, each for its own point and view (one GPU readback at a time),
+so rapid clicks in different views each get their own result.
 
 ## Testing
 

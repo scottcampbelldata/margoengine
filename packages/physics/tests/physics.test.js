@@ -1172,7 +1172,7 @@ rtest(
       assert.equal(physics.bodyCount, 0);
       assert.equal(physics.world.bodies.len(), 0);
       root.dispose();
-      assert.throws(() => physics.addBody(root), { message: 'Mesh disposed' });
+      assert.throws(() => physics.addBody(root), { message: 'Mesh disposed; create a new mesh' });
       assert.equal(physics.bodyCount, 0);
     } finally {
       clearMeshSource(child);

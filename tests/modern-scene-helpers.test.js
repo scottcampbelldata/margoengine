@@ -375,7 +375,7 @@ test('iterator-time disposal and slot reuse are validated before scene helpers c
         yield second;
       }
       try {
-        assert.throws(() => helper(engine, changingRoots()), { message: 'Mesh disposed' });
+        assert.throws(() => helper(engine, changingRoots()), { message: 'Mesh disposed; create a new mesh' });
       } finally {
         replacement?.dispose();
         second.dispose();

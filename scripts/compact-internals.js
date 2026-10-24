@@ -9,11 +9,11 @@ const reviewed = {
   EulerView: 'mesh write lane',
   Mesh: 'current receives',
   Engine:
-    'batches checkedMaterials materialFrame free next revision materials seen slots callbacks raf last running rendering primaryCulling recovery frameOptions disposing watchDevice collect frame update collectedScene collectedLayers active layers drawn claims enter checkScene renderViews viewPixels cameraLayers resize collectInstances',
+    'batches checkedMaterials materialFrame free next revision materials seen slots callbacks raf last running rendering primaryCulling recovery frameOptions disposing watchDevice collect frame update collectedScene collectedLayers active layers drawn claims enter checkScene renderViews viewPixels cameraLayers resize collectInstances picking pickNow',
   TransformStore: 'handle api bind',
   FrameGraph: 'passes owner executing',
   GPURenderer:
-    'frame attachments msaa resolveTarget preserveMSAA passDescriptor passContext drawBatches commands draw bindings frameId lost deviceLost resources variants groups uniform bindGroup culledGroup culled disposed picking canvas device context format pipeline descriptor renderFrame attach holdColor clears',
+    'frame attachments msaa resolveTarget preserveMSAA passDescriptor passContext drawBatches commands draw bindings frameId lost deviceLost resources variants groups uniform bindGroup culledGroup culled disposed canvas device context format pipeline descriptor renderFrame attach holdColor clears',
   Stage: 'imports',
 };
 

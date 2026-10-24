@@ -93,7 +93,9 @@ export interface EngineKernel {
   views?: readonly RenderView[];
   /**
    * The mesh under CSS pixel (x, y), or null. With `view`, picks through that view (null outside its rectangle);
-   * without, through the canvas view under the point when the last frame drew views, else the engine camera.
+   * without, through the canvas view under the point when the last frame drew views, else the engine camera. Calls
+   * may overlap: one readback runs at a time and the others wait, answered in order, each for its own point and view.
+   * A pick waiting or in flight when the engine is disposed, and one in flight when the device is lost, resolves null.
    */
   pick(x: number, y: number, view?: RenderView): Promise<Mesh | null>;
   /**

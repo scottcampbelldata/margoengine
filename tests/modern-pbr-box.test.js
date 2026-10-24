@@ -388,7 +388,7 @@ test('Box default fitting rolls back empty roots and disposed model handles with
       model.dispose();
       assert.equal(meshTriangles(leftover), null);
       // Core rejects its disposed handle before optional physics can fit it.
-      assert.throws(() => physics.addBody(leftover), { message: 'Mesh disposed' });
+      assert.throws(() => physics.addBody(leftover), { message: 'Mesh disposed; create a new mesh' });
       assert.equal(physics.bodyCount, 0);
     } finally {
       physics.dispose();

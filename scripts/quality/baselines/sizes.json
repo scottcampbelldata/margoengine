@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3034720,
+  "total": 3036565,
   "history": [
     {
       "date": "2026-10-24",
@@ -74,6 +74,12 @@
       "commit": "37c45372",
       "reason": "voxel slabs and stairs: half-block mesher faces, light through open faces, octant collision and picking",
       "grew": 5
+    },
+    {
+      "date": "2026-10-24",
+      "commit": "e69bfb2d",
+      "reason": "Core bug fixes (Scott 2026-10-24: freeze blocks features, not fixes): engine.pick queues overlapping calls, MargoError codes and fix-naming messages for every core throw",
+      "grew": 2
     }
   ],
   "items": {
@@ -106,8 +112,8 @@
     "@margoengine/controls/profiles": 960,
     "@margoengine/controls/transform": 9547,
     "@margoengine/controls/walk": 13027,
-    "@margoengine/core": 20616,
-    "@margoengine/core/extension": 19690,
+    "@margoengine/core": 21526,
+    "@margoengine/core/extension": 20625,
     "@margoengine/creative": 18549,
     "@margoengine/creative/grass": 6122,
     "@margoengine/creative/particles": 759,

@@ -8,7 +8,7 @@ import { compactOutput } from './measure-size.js';
 export async function compactPackage(name, directory = `packages/${name}`) {
   const root = resolve(directory, 'dist'),
     // Shared helpers bundled into core and the stage; everything else stays an import.
-    shared = (name === 'core' ? ['clear-color', 'view-rect'] : ['mesh-source']).map((file) =>
+    shared = (name === 'core' ? ['clear-color', 'view-rect', 'errors'] : ['mesh-source', 'errors']).map((file) =>
       resolve(directory, `../shared/${file}.js`),
     ),
     files = (await readdir(root)).filter((file) => file.endsWith('.js'));

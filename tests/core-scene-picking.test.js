@@ -247,3 +247,66 @@ test('a plugin picker gets the view in drawing-buffer pixels with its layers, an
     engine.dispose();
   }
 });
+
+test('overlapping picks wait for the one in flight and are answered in order, each for its own view', async () => {
+  const { engine, a, b, view, calls, renderer } = await rig();
+  const gates = [],
+    started = [];
+  const original = renderer.pick;
+  renderer.pick = (...args) => {
+    started.push(args[4]);
+    const result = original.apply(renderer, args);
+    return new Promise((resolve) => gates.push(() => resolve(result)));
+  };
+  try {
+    const canvasView = { ...view, scene: engine.scene, viewport: [0, 0, 0.5, 1] };
+    engine.render({ culling: false, views: [canvasView, view] });
+    // Rapid clicks: the first starts at once, the rest wait; none throws.
+    const picks = [engine.pick(150, 50), engine.pick(50, 50), engine.pick(150, 50, view), engine.pick(40, 20)];
+    assert.equal(started.length, 1, 'one readback in flight');
+    for (let i = 0; i < picks.length; i++) {
+      while (gates.length <= i) await null;
+      assert.equal(started.length, i + 1, 'the next readback starts only after the previous one settles');
+      gates[i]();
+    }
+    assert.deepEqual(await Promise.all(picks), [b, a, b, a]);
+    assert.deepEqual(
+      calls.map((c) => c.x),
+      [50, 50, 50, 40],
+      'each pick reads its own point in its own view',
+    );
+    // Layers apply to a waiting pick as to an immediate one.
+    const hidden = [engine.pick(150, 50, { ...view, layers: 0 }), engine.pick(150, 50, view)];
+    gates[4]();
+    while (gates.length < 6) await null;
+    gates[5]();
+    assert.deepEqual(await Promise.all(hidden), [null, b]);
+    // A pick still waiting when the engine is disposed resolves null, without a readback.
+    const inFlight = engine.pick(50, 50),
+      waiting = engine.pick(150, 50);
+    engine.dispose();
+    gates[6]();
+    assert.equal(await waiting, null);
+    assert.equal(started.length, 7);
+    await inFlight;
+    await assert.rejects(engine.pick(50, 50), /Engine disposed/);
+  } finally {
+    if (!engine.disposed) engine.dispose();
+  }
+});
+
+test('a rejected pick does not block the picks waiting behind it', async () => {
+  const { engine, a, renderer } = await rig();
+  const original = renderer.pick;
+  let fail = true;
+  renderer.pick = (...args) =>
+    fail ? ((fail = false), Promise.reject(new Error('readback failed'))) : original.apply(renderer, args);
+  try {
+    const first = engine.pick(50, 50),
+      second = engine.pick(50, 50);
+    await assert.rejects(first, /readback failed/);
+    assert.equal(await second, a);
+  } finally {
+    engine.dispose();
+  }
+});

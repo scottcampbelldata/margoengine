@@ -12,6 +12,10 @@ import {
 import { FrameGraph, type EnginePlugin } from './plugin.js';
 import { sceneSamples } from './quality.js';
 import { checkLayers, layerRegistry, meshLayers } from '../../shared/view-rect.js';
+import { margoError } from '../../shared/errors.js';
+
+const DISPOSED = 'Engine disposed; create a new engine',
+  WEBGPU = "WebGPU required; create the engine with backend 'webgpu' in a WebGPU browser";
 
 /** `fallback` supplies a renderer when WebGPU is unavailable or `backend` is 'webgl2', for example `webglRenderer` from @margoengine/webgl. */
 export interface EngineOptions {
@@ -53,7 +57,7 @@ export class VectorRef {
       !Number.isFinite(Math.fround(value)) ||
       (this.kind === 'scale' && Math.fround(value) === 0)
     )
-      throw new RangeError('Invalid transform');
+      throw new RangeError('Invalid transform; use finite numbers, nonzero scale');
   }
   private write(axis: number, value: number): void {
     this.mesh.check();
@@ -196,7 +200,7 @@ export class Mesh {
     return this.receives;
   }
   set receiveShadow(value: boolean) {
-    if (typeof value !== 'boolean') throw new TypeError('Invalid receiveShadow');
+    if (typeof value !== 'boolean') throw new TypeError('Invalid receiveShadow; use a boolean');
     this.receives = value;
     this.engine.collected = -1;
   }
@@ -214,11 +218,12 @@ export class Mesh {
   }
   set visible(value: boolean) {
     this.check();
-    if (typeof value !== 'boolean') throw new TypeError('Invalid Visibility');
+    if (typeof value !== 'boolean') throw new TypeError('Invalid Visibility; use a boolean');
     this.engine.store.hidden[this.id] = +!value;
   }
   check(): void {
-    if (this.engine.disposed || this.engine.meshes.get(this.id) !== this) throw new Error('Mesh disposed');
+    if (this.engine.disposed || this.engine.meshes.get(this.id) !== this)
+      throw margoError('disposed', 'Mesh disposed; create a new mesh');
   }
   setPosition(value: Vec3): this {
     this.check();
@@ -229,7 +234,7 @@ export class Mesh {
   setScale(value: Vec3): this {
     this.check();
     finite(value, 3, 'Scale');
-    if (value.some((v) => Math.fround(v) === 0)) throw new RangeError('Scale nonzero');
+    if (value.some((v) => Math.fround(v) === 0)) throw new RangeError('Scale nonzero; use nonzero factors');
     this.scale.set(value[0], value[1], value[2]);
     return this;
   }
@@ -246,7 +251,7 @@ export class Mesh {
     this.check();
     finite(value, 4, 'Quaternion');
     const length = Math.hypot(...value);
-    if (!length) throw new RangeError('Quaternion nonzero');
+    if (!length) throw new RangeError('Quaternion nonzero; pass a nonzero quaternion');
     const [x, y, z, w] = value.map((v) => v / length),
       t = this.engine.store.transforms,
       id = this.id;
@@ -265,18 +270,19 @@ export class Mesh {
     this.check();
     parent?.check();
     if (parent && (parent.engine !== this.engine || parent.scene !== this.scene))
-      throw new TypeError('Foreign parent: parent a mesh of the same engine and scene');
+      throw new TypeError('Foreign parent; use a mesh of the same engine and scene');
     let depth = 0;
     for (let id = parent?.id ?? -1; id !== -1; id = this.engine.store.parents[id]) {
-      if (id === this.id) throw new Error('Hierarchy cycle');
-      if (++depth >= 64) throw new RangeError('Parent depth: 64');
+      if (id === this.id) throw new TypeError('Hierarchy cycle; pick a parent outside this subtree');
+      if (++depth >= 64) throw new RangeError('Parent depth: 64; use a shallower hierarchy');
     }
     this.engine.store.parents[this.id] = parent?.id ?? -1;
     return this;
   }
   setGeometry(geometry: Geometry | null): this {
     this.check();
-    if (geometry !== null && !(geometry instanceof Geometry)) throw new TypeError('Invalid geometry');
+    if (geometry !== null && !(geometry instanceof Geometry))
+      throw new TypeError('Invalid geometry; pass a core Geometry or null');
     if (geometry === this.geometry) return this;
     if (geometry) this.engine.retain(geometry);
     const previous = this.geometry;
@@ -290,7 +296,7 @@ export class Mesh {
   }
   setMaterial(material: PbrMaterial): this {
     this.check();
-    if (!(material instanceof PbrMaterial)) throw new TypeError('Invalid material');
+    if (!(material instanceof PbrMaterial)) throw new TypeError('Invalid material; pass a core PbrMaterial');
     this.material = material;
     return this;
   }
@@ -396,6 +402,8 @@ export class Engine {
   private layers = -1;
   /** Canvas views of the last `render({views})`, rectangles copied, for picking. */
   private drawn?: RenderView[];
+  // The last pick in flight or waiting; later picks wait for it.
+  private picking?: Promise<void>;
   /** Each scene's `claimed`/`redirect` state of a shared batch, swapped in when that scene draws. */
   private readonly claims = new WeakMap<Batch, Map<Scene, [boolean?, Batch['redirect']?]>>();
   /** @internal Features requested at creation, requested again when the device is restored. */ features?: GPUFeatureName[];
@@ -414,9 +422,11 @@ export class Engine {
   }
 
   static async create(canvas: HTMLCanvasElement, options: EngineOptions = {}): Promise<Engine> {
-    if (!canvas || typeof canvas.getContext !== 'function') throw new TypeError('Expected canvas');
+    if (!canvas || typeof canvas.getContext !== 'function')
+      throw new TypeError('Expected canvas; pass an HTMLCanvasElement or OffscreenCanvas');
     const backend = options.backend ?? 'auto';
-    if (!['auto', 'webgpu', 'webgl2'].includes(backend)) throw new TypeError('Unknown backend');
+    if (!['auto', 'webgpu', 'webgl2'].includes(backend))
+      throw new TypeError("Unknown backend; use 'auto', 'webgpu' or 'webgl2'");
     const store = await TransformStore.create(options.capacity ?? 1024);
     let renderer: Renderer | undefined,
       fallbackReason: string | null = null;
@@ -431,7 +441,7 @@ export class Engine {
       renderer ??= (
         options.fallback ??
         (() => {
-          throw new Error('WebGPU unavailable');
+          throw margoError('unsupported', 'WebGPU unavailable; use a WebGPU browser or pass a fallback');
         })
       )(canvas);
       const engine = new Engine(canvas, store, renderer, options.camera, fallbackReason);
@@ -462,8 +472,8 @@ export class Engine {
     };
   }
   rebootDevice(): Promise<void> {
-    if (this.disposed || this.disposing) return Promise.reject(new Error('Engine disposed'));
-    if (this.backend !== 'webgpu') return Promise.reject(new Error('WebGPU required'));
+    if (this.disposed || this.disposing) return Promise.reject(margoError('disposed', DISPOSED));
+    if (this.backend !== 'webgpu') return Promise.reject(margoError('unsupported', WEBGPU));
     if (this.recovery) return this.recovery;
     this.recovery = (async () => {
       const previous = this.renderer,
@@ -501,7 +511,8 @@ export class Engine {
     return this.renderer.gpu ?? null;
   }
   geometryBuffers(geometry: Geometry): GeometryBuffers | null {
-    if (this.disposed || this.disposing || this.recovery) throw new Error('Geometry unavailable');
+    if (this.disposed || this.disposing || this.recovery)
+      throw margoError('state', 'Geometry unavailable; wait for the device to restore');
     return this.renderer.geometryBuffers?.(geometry) ?? null;
   }
   hasPlugin(name: string): boolean {
@@ -522,7 +533,7 @@ export class Engine {
     return from;
   }
   private live(): void {
-    if (this.disposed || this.disposing) throw new Error('Engine disposed');
+    if (this.disposed || this.disposing) throw margoError('disposed', DISPOSED);
   }
   private checkScene(scene: Scene): void {
     if (!this.scenes.has(scene)) throw new TypeError('Unknown scene: use one from engine.createScene()');
@@ -533,7 +544,7 @@ export class Engine {
     const name = plugin.name,
       plugins = scene.plugins as Map<string, EnginePlugin>;
     if (!name || plugins.has(name) || owners.has(plugin) || typeof plugin.setup !== 'function')
-      throw new TypeError('Invalid plugin');
+      throw new TypeError('Invalid plugin; give it a unique name and setup(), and attach it once');
     const outer = this.enter(scene);
     try {
       // withOwner throws during a frame before anything changes. Registered before setup, so `sceneOf` works in it.
@@ -588,7 +599,7 @@ export class Engine {
     this.checkScene(scene);
     parent?.check();
     if (parent && (parent.engine !== this || parent.scene !== scene))
-      throw new TypeError('Foreign parent: parent a mesh of the same engine and scene');
+      throw new TypeError('Foreign parent; use a mesh of the same engine and scene');
     const id = this.free.pop() ?? this.next++;
     // Double the store when full (seen and slots are rebuilt by the full collection the new mesh forces).
     if (id >= this.store.capacity)
@@ -664,9 +675,11 @@ export class Engine {
       if (this.checkedMaterials.get(mesh.material) !== this.materialFrame) {
         const material = mesh.material.data;
         finite(material, 8, 'Material');
-        for (let i = 0; i < 8; i++) if (material[i] < 0 || material[i] > 1) throw new RangeError('Invalid material');
+        for (let i = 0; i < 8; i++)
+          if (material[i] < 0 || material[i] > 1)
+            throw new RangeError('Invalid material; set values with material.set()');
         if (material[3] !== 1 || material[4] < Math.fround(0.045) || (material[6] !== 0 && material[6] !== 1))
-          throw new RangeError('Invalid material');
+          throw new RangeError('Invalid material; set values with material.set()');
         this.checkedMaterials.set(mesh.material, this.materialFrame);
         this.materials.add([mesh.material, ...material]);
       }
@@ -698,9 +711,9 @@ export class Engine {
     delta?: number;
     views?: readonly RenderView[];
   } = {}): void {
-    if (this.rendering) throw new Error('Render recursion');
+    if (this.rendering) throw margoError('state', 'Render recursion; call render outside frame callbacks and passes');
     if (views) return this.renderViews(views, culling, delta);
-    if (!(camera instanceof Camera)) throw new TypeError('Invalid camera');
+    if (!(camera instanceof Camera)) throw new TypeError('Invalid camera; pass a core Camera');
     this.rendering = true;
     this.drawn = undefined;
     let failed = false;
@@ -845,7 +858,8 @@ export class Engine {
     layers?: number,
   ): void {
     this.live();
-    if (!Number.isFinite(frameDelta) || frameDelta < 0 || frameDelta > 1) throw new RangeError('Invalid delta');
+    if (!Number.isFinite(frameDelta) || frameDelta < 0 || frameDelta > 1)
+      throw new RangeError('Invalid delta; use seconds from 0 to 1');
     if (prepare) for (const plugin of this.plugins.values()) plugin.onPreUpdate?.(frameDelta);
     if (!rect) this.resize();
     camera.advance(delta);
@@ -863,7 +877,7 @@ export class Engine {
       lighting.radiance.some((v) => v < 0) ||
       lighting.ambient?.some((v) => v < 0)
     )
-      throw new RangeError('Invalid lighting');
+      throw new RangeError('Invalid lighting; use a nonzero direction and non-negative intensities');
     this.collectInstances();
     if (camera === this.camera) this.primaryCulling = culling;
   }
@@ -932,11 +946,26 @@ export class Engine {
   /**
    * The mesh under CSS pixel (x, y), or null. With `view`, picks through that view (null outside its rectangle);
    * without, through the canvas view under the point when the last frame drew views, else the engine camera.
+   * One readback runs at a time; overlapping calls wait and are answered in order, each for its own point and view,
+   * reading the scene as it is when its turn comes (EngineKernel.pick).
    */
-  async pick(x: number, y: number, view?: RenderView): Promise<Mesh | null> {
-    if (![x, y].every(Number.isFinite)) throw new RangeError('Invalid pick');
+  pick(x: number, y: number, view?: RenderView): Promise<Mesh | null> {
+    const copy = view && { ...view },
+      run = this.picking
+        ? this.picking.then(() => (this.disposed || this.disposing ? null : this.pickNow(x, y, copy)))
+        : this.pickNow(x, y, copy),
+      // Settles before the caller's own continuation, so a pick made once this one resolves starts at once.
+      done = () => {
+        if (this.picking === tail) this.picking = undefined;
+      },
+      tail: Promise<void> = run.then(done, done);
+    this.picking = tail;
+    return run;
+  }
+  private async pickNow(x: number, y: number, view?: RenderView): Promise<Mesh | null> {
+    if (![x, y].every(Number.isFinite)) throw new RangeError('Invalid pick; pass finite CSS pixel coordinates');
     this.live();
-    if (this.backend !== 'webgpu') throw new Error('WebGPU required');
+    if (this.backend !== 'webgpu') throw margoError('unsupported', WEBGPU);
     const w = this.canvas.clientWidth || this.canvas.width,
       h = this.canvas.clientHeight || this.canvas.height;
     if (x < 0 || y < 0 || x >= w || y >= h || this.recovery) return null;
@@ -966,7 +995,7 @@ export class Engine {
       camera = chosen?.camera ?? this.camera,
       rect = chosen?.viewport;
     this.checkScene(scene);
-    if (!(camera instanceof Camera)) throw new TypeError('Invalid camera');
+    if (!(camera instanceof Camera)) throw new TypeError('Invalid camera; pass a core Camera');
     const outer = this.enter(scene);
     let pending: Promise<Mesh | null>;
     try {

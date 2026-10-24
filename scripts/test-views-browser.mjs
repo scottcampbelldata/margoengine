@@ -768,12 +768,8 @@ try {
     await page.goto(`${new URL(page.url()).origin}/examples/${file}.html`);
     await page.waitForFunction((name) => !!window[name], name, { timeout: 120_000 });
     const picks = await page.evaluate(
-      // One pick at a time: core rejects a pick while another is pending.
-      async ([name, checks]) => {
-        const out = [];
-        for (const [index, fx, fy] of checks) out.push(await window[name].pickAt(index, fx, fy));
-        return out;
-      },
+      // Overlapping picks: core answers them in order, each for its own view.
+      ([name, checks]) => Promise.all(checks.map(([index, fx, fy]) => window[name].pickAt(index, fx, fy))),
       [name, checks],
     );
     checks.forEach(([index, fx, fy, expected], i) =>

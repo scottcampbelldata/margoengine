@@ -94,6 +94,88 @@ test('Core picking releases partial allocations and permits retries after setup 
   }
 });
 
+test('Core picking resolves null when the device is lost during the readback, and rejects other map failures', async (t) => {
+  const flags = {
+    GPUBufferUsage: { UNIFORM: 1, COPY_DST: 2, MAP_READ: 4 },
+    GPUTextureUsage: { RENDER_ATTACHMENT: 1, COPY_SRC: 2 },
+    GPUMapMode: { READ: 1 },
+  };
+  for (const [key, value] of Object.entries(flags)) {
+    const old = Object.getOwnPropertyDescriptor(globalThis, key);
+    Object.defineProperty(globalThis, key, { value, configurable: true });
+    t.after(() => (old ? Object.defineProperty(globalThis, key, old) : delete globalThis[key]));
+  }
+  let lose,
+    loseOnMap = true;
+  const resources = [],
+    mapFailure = new Error('map failed'),
+    lost = new Promise((resolve) => (lose = resolve));
+  const resource = () => {
+    const value = {
+      destroyed: 0,
+      destroy() {
+        this.destroyed++;
+      },
+      createView: () => ({}),
+      async mapAsync() {
+        if (!loseOnMap) throw mapFailure;
+        lose({ message: 'test loss' });
+        await lost;
+        await null;
+        throw new DOMException('Device lost', 'AbortError');
+      },
+      getMappedRange: () => new Uint32Array([7]).buffer,
+      unmap() {},
+    };
+    resources.push(value);
+    return value;
+  };
+  const device = {
+    createBuffer: resource,
+    createTexture: resource,
+    createBindGroup: () => ({}),
+    lost,
+    addEventListener() {},
+    destroy() {},
+    queue: { writeBuffer() {}, submit() {} },
+    createShaderModule: () => ({}),
+    createRenderPipeline: () => ({ getBindGroupLayout: () => ({}) }),
+    createCommandEncoder: () => ({
+      copyTextureToBuffer() {},
+      finish: () => ({}),
+      beginRenderPass: () => ({ setPipeline() {}, setBindGroup() {}, end() {} }),
+    }),
+  };
+  const make = () =>
+    new GPURenderer(
+      { width: 4, height: 4 },
+      device,
+      { configure() {}, unconfigure() {} },
+      'bgra8unorm',
+      { getBindGroupLayout: () => ({}) },
+      { multisample: { count: 4 }, depthStencil: { format: 'depth32float' } },
+      { getBindGroupLayout: () => ({}) },
+    );
+  const camera = new Camera();
+  camera.update(1, true);
+  const light = { direction: new Float32Array(4), radiance: new Float32Array(4) },
+    graph = new FrameGraph();
+  const renderer = make(),
+    owned = resources.length;
+  try {
+    loseOnMap = false;
+    await assert.rejects(renderer.pick(camera, light, [], graph, 0, 0), (error) => error === mapFailure);
+    loseOnMap = true;
+    assert.equal(await renderer.pick(camera, light, [], graph, 0, 0), null);
+    assert.ok(
+      resources.slice(owned).every((r) => r.destroyed === 1),
+      'Picking resources leaked after the device was lost',
+    );
+  } finally {
+    renderer.dispose();
+  }
+});
+
 test('Core draw bindings observe mutable buffer ranges and shader variants observe depth format', (t) => {
   for (const [key, value] of Object.entries({
     GPUBufferUsage: { UNIFORM: 1, COPY_DST: 2 },

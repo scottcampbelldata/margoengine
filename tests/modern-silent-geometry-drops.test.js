@@ -107,7 +107,7 @@ for (const fixture of loadedPBRFixtures) {
         assert.equal(meshTriangles(mesh)?.kind, 'pbr');
         model.dispose();
         assert.equal(meshTriangles(mesh), null, 'disposal clears the registered triangle source');
-        assert.throws(() => physics.addBody(mesh), { name: 'Error', message: 'Mesh disposed' });
+        assert.throws(() => physics.addBody(mesh), { name: 'MargoError', message: 'Mesh disposed; create a new mesh' });
         assert.equal(physics.bodyCount, 0, 'a disposed loader mesh cannot retain an empty body');
         assert.equal(mesh.geometry, null);
       } finally {

@@ -52,12 +52,12 @@ export class Camera {
       this.near <= 0 ||
       this.far <= this.near
     )
-      throw new RangeError('Invalid projection');
+      throw new RangeError('Invalid projection; use 0 < fov < 180 and 0 < near < far');
     let zx = this.position[0] - this.target[0],
       zy = this.position[1] - this.target[1],
       zz = this.position[2] - this.target[2];
     const length = Math.hypot(zx, zy, zz);
-    if (!length) throw new RangeError('Camera at target');
+    if (!length) throw new RangeError('Camera at target; move the position off the target');
     zx /= length;
     zy /= length;
     zz /= length;
@@ -66,7 +66,7 @@ export class Camera {
       xy = u[2] * zx - u[0] * zz,
       xz = u[0] * zy - u[1] * zx;
     const side = Math.hypot(xx, xy, xz);
-    if (!side) throw new RangeError('Vertical camera');
+    if (!side) throw new RangeError('Vertical camera; set camera.up off the view direction');
     xx /= side;
     xy /= side;
     xz /= side;
@@ -119,7 +119,7 @@ export class Camera {
         if (c < 3) length2 += value * value;
       }
       const norm = Math.sqrt(length2);
-      if (!norm) throw new RangeError('Invalid frustum');
+      if (!norm) throw new RangeError('Invalid frustum; check the camera and projection values');
       for (let c = 0; c < 4; c++) this.planes[plane * 4 + c] /= norm;
     }
   }
@@ -141,14 +141,14 @@ export class Camera {
       this.near <= 0 ||
       this.far <= this.near
     )
-      throw new RangeError('Invalid fit');
+      throw new RangeError('Invalid fit; pass min <= max, aspect > 0, duration >= 0, padding >= 1');
     const target: Vec3 = min.map((v, i) => (v + max[i]) / 2) as unknown as Vec3,
       radius = Math.max(this.near * 2, Math.hypot(...max.map((v, i) => (v - min[i]) / 2))),
       angle = Math.atan(Math.tan((this.fov * Math.PI) / 360) * Math.min(1, aspect)),
       distance = (radius * padding) / Math.sin(angle),
       direction = this.position.map((v, i) => v - this.target[i]),
       length = Math.hypot(...direction);
-    if (!length || distance + radius >= this.far) throw new RangeError('Bounds exceed far');
+    if (!length || distance + radius >= this.far) throw new RangeError('Bounds exceed far; raise camera.far');
     const position = target.map((v, i) => v + (direction[i] / length) * distance) as unknown as Vec3;
     this.fit = { position, target, elapsed: 0, duration, from: this.position, fromTarget: this.target };
     this.advance(0);

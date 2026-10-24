@@ -83,13 +83,13 @@ export class RigScratch {
   /** Same finite Float32 guard, normalization and Euler synchronization as Mesh.setQuaternion. */
   setQuaternion(mesh: Mesh, value: readonly number[]): void {
     mesh.check();
-    if (value.length !== 4) throw new TypeError('Quaternion: 4 values');
+    if (value.length !== 4) throw new TypeError('Quaternion: 4 values only');
     for (let i = 0; i < 4; i++)
       if (typeof value[i] !== 'number' || !Number.isFinite(Math.fround(value[i])))
-        throw new RangeError('Quaternion: finite values');
+        throw new RangeError('Quaternion: finite values only');
     hypot4Into(value, this.lengths);
     const length = this.lengths[0];
-    if (!length) throw new RangeError('Quaternion nonzero');
+    if (!length) throw new RangeError('Quaternion nonzero; pass a nonzero quaternion');
     const x = value[0] / length,
       y = value[1] / length,
       z = value[2] / length,

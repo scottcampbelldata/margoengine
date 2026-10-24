@@ -5,6 +5,7 @@ import { wgsl } from './shaders.js';
 import type { FrameGraph, PassContext, DrawOptions } from './plugin.js';
 import { sceneSamples } from './quality.js';
 import { defaultClear, clearColorValue, clearDraw } from '../../shared/clear-color.js';
+import { margoError } from '../../shared/errors.js';
 // TypeScript's DOM library omits WebGPU flag namespaces and the canvas overload.
 declare const GPUBufferUsage: {
   COPY_DST: number;
@@ -41,12 +42,13 @@ export function rectangleClear(
 /** @internal Checks a pixel rectangle [x, y, width, height] against a target of `width` x `height`. */
 export function validateRectangle(rectangle: readonly number[] | undefined, width: number, height: number): void {
   if (rectangle === undefined) return;
-  if (!Array.isArray(rectangle) || rectangle.length !== 4) throw new RangeError('Invalid draw rectangle');
+  if (!Array.isArray(rectangle) || rectangle.length !== 4)
+    throw new RangeError('Invalid draw rectangle; pass 4 integers [x, y, width, height]');
   for (let i = 0; i < 4; i++)
     if (!Number.isSafeInteger(rectangle[i]) || rectangle[i] < (i < 2 ? 0 : 1))
-      throw new RangeError('Invalid draw rectangle');
+      throw new RangeError('Invalid draw rectangle; pass 4 integers [x, y, width, height]');
   if (rectangle[0] + rectangle[2] > width || rectangle[1] + rectangle[3] > height)
-    throw new RangeError('Draw rectangle exceeds target');
+    throw new RangeError('Draw rectangle exceeds target; keep it inside the target');
 }
 
 /** `start`/`end`: float range of `instances` changed since the WebGPU renderer last uploaded it (absent: upload all).
@@ -212,11 +214,10 @@ export class GPURenderer implements Renderer {
   private readonly bindGroup: GPUBindGroup;
   private readonly culledGroup: GPUBindGroup;
   private disposed = false;
-  private picking = false;
 
   static async create(canvas: HTMLCanvasElement, features: GPUFeatureName[] = []): Promise<GPURenderer> {
     const adapter = await navigator.gpu?.requestAdapter({ powerPreference: 'high-performance' });
-    if (!adapter) throw new Error('adapter unavailable');
+    if (!adapter) throw margoError('unsupported', 'WebGPU adapter unavailable; check the browser GPU settings');
     const device = await adapter.requestDevice({
       requiredLimits: { maxTextureArrayLayers: adapter.limits?.maxTextureArrayLayers },
       requiredFeatures: ['depth32float-stencil8' as GPUFeatureName, ...features].filter((feature) =>
@@ -265,7 +266,7 @@ export class GPURenderer implements Renderer {
           fragment: { ...descriptor.fragment!, constants: { C: 1 } },
         });
       const context = canvas.getContext('webgpu') as GPUCanvasContext | null;
-      if (!context) throw new Error('No WebGPU canvas');
+      if (!context) throw margoError('unsupported', 'No WebGPU canvas context; pass a canvas with no other context');
       return new GPURenderer(canvas, device, context, format, pipeline, descriptor, culled);
     } catch (error) {
       device.destroy();
@@ -299,10 +300,11 @@ export class GPURenderer implements Renderer {
     }
     device.lost.then((info) => {
       this.deviceLost = true;
-      if (!this.disposed) this.onLost?.(new Error(`GPU lost: ${info.message}`));
+      if (!this.disposed)
+        this.onLost?.(margoError('failed', `GPU lost: ${info.message}; the engine restores the device`));
     });
     device.addEventListener('uncapturederror', (event) => {
-      this.lost = new Error(event.error.message);
+      this.lost = margoError('failed', event.error.message);
     });
   }
 
@@ -310,7 +312,8 @@ export class GPURenderer implements Renderer {
     const buffers: GPUBuffer[] = [];
     try {
       const upload = (data: Float32Array | Uint32Array, usage: number) => {
-        if (data.byteLength > this.device.limits.maxBufferSize) throw new RangeError('GPU buffer limit');
+        if (data.byteLength > this.device.limits.maxBufferSize)
+          throw new RangeError('GPU buffer limit; split the geometry or lower capacity');
         const buffer = this.device.createBuffer({ size: data.byteLength, usage: usage | GPUBufferUsage.COPY_DST });
         buffers.push(buffer);
         this.device.queue.writeBuffer(buffer, 0, data as Float32Array<ArrayBuffer>);
@@ -318,7 +321,8 @@ export class GPURenderer implements Renderer {
       };
       const vertex = upload(geometry.vertices, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE),
         index = upload(geometry.indices, GPUBufferUsage.INDEX | GPUBufferUsage.STORAGE);
-      if (capacity * 96 > this.device.limits.maxBufferSize) throw new RangeError('GPU buffer limit');
+      if (capacity * 96 > this.device.limits.maxBufferSize)
+        throw new RangeError('GPU buffer limit; split the geometry or lower capacity');
       const instance = this.device.createBuffer({
         size: capacity * 96,
         usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
@@ -341,7 +345,8 @@ export class GPURenderer implements Renderer {
   }
   geometryBuffers(geometry: Geometry): GeometryBuffers {
     const resource = this.resources.get(geometry);
-    if (this.disposed || this.deviceLost || !resource) throw new Error('Geometry unavailable');
+    if (this.disposed || this.deviceLost || !resource)
+      throw margoError('state', 'Geometry unavailable; wait for the device to restore');
     return resource;
   }
   render(
@@ -438,7 +443,7 @@ export class GPURenderer implements Renderer {
           for (const variant of this.variants)
             if (variant[0] === context.shader && variant[1] === key) cached = variant[2];
           if (!cached) {
-            if (this.variants.length >= 64) throw new RangeError('Shader limit: 64');
+            if (this.variants.length >= 64) throw new RangeError('Shader limit: 64; use fewer shader variants');
             const module = this.device.createShaderModule({ code: context.shader });
             cached = this.device.createRenderPipeline({
               ...context.descriptor,
@@ -718,8 +723,6 @@ export class GPURenderer implements Renderer {
     span?: readonly [number, number],
   ): Promise<number | null> {
     if (this.deviceLost || this.disposed) return null;
-    if (this.picking) throw new Error('Pick pending');
-    this.picking = true;
     let color: GPUTexture | undefined,
       depth: GPUTexture | undefined,
       read: GPUBuffer | undefined,
@@ -815,7 +818,17 @@ export class GPURenderer implements Renderer {
       if (this.deviceLost || this.disposed) return null;
       encoder.copyTextureToBuffer({ texture: color }, { buffer: read }, [1, 1]);
       device.queue.submit([encoder.finish()]);
-      await read.mapAsync(GPUMapMode.READ);
+      // A device lost during the readback rejects the map: nothing was picked.
+      if (
+        !(await read.mapAsync(GPUMapMode.READ).then(
+          () => 1,
+          (error) => {
+            if (this.deviceLost || this.disposed) return 0;
+            throw error;
+          },
+        ))
+      )
+        return null;
       const id = new Uint32Array(read.getMappedRange())[0];
       read.unmap();
       return id === 4294967295 ? null : id;
@@ -824,7 +837,6 @@ export class GPURenderer implements Renderer {
       color?.destroy();
       depth?.destroy();
       read?.destroy();
-      this.picking = false;
     }
   }
   dispose(unconfigure = true): void {

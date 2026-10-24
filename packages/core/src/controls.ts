@@ -71,17 +71,19 @@ export class CADCameraControls {
       !point.every(Number.isFinite) ||
       Math.hypot(...point.map((v, i) => v - this.camera.position[i])) <= this.camera.near
     )
-      throw new RangeError('Invalid pivot');
+      throw new RangeError('Invalid pivot; pass a finite point beyond near from the camera');
     this.camera.target = [...point];
     this.camera.cancelFit();
   }
   orbit(azimuth: number, elevation: number): void {
-    if (![azimuth, elevation].every(Number.isFinite)) throw new RangeError('Invalid orbit');
+    if (![azimuth, elevation].every(Number.isFinite))
+      throw new RangeError('Invalid orbit; pass finite angles with the camera off its target');
     this.camera.cancelFit();
     const c = this.camera,
       p = c.position.map((v, i) => v - c.target[i]),
       r = Math.hypot(...p);
-    if (!r || !Number.isFinite(r)) throw new RangeError('Invalid orbit');
+    if (!r || !Number.isFinite(r))
+      throw new RangeError('Invalid orbit; pass finite angles with the camera off its target');
     const u = p[0] || p[2] ? p : c.up.map((v) => -v * p[1]),
       theta = Math.atan2(u[0], u[2]) + azimuth,
       phi = Math.max(0.001, Math.min(Math.PI - 0.001, Math.acos(Math.max(-1, Math.min(1, p[1] / r))) + elevation));
@@ -92,12 +94,14 @@ export class CADCameraControls {
     ];
   }
   pan(x: number, y: number): void {
-    if (![x, y].every(Number.isFinite)) throw new RangeError('Invalid pan');
+    if (![x, y].every(Number.isFinite))
+      throw new RangeError('Invalid pan; pass finite offsets with the camera off its target');
     this.camera.cancelFit();
     const c = this.camera,
       d = c.position.map((v, i) => v - c.target[i]),
       r = Math.hypot(...d);
-    if (!r || !Number.isFinite(r)) throw new RangeError('Invalid pan');
+    if (!r || !Number.isFinite(r))
+      throw new RangeError('Invalid pan; pass finite offsets with the camera off its target');
     const h = Math.hypot(d[0], d[2]),
       pole = Math.hypot(c.up[0], c.up[2]),
       right = h

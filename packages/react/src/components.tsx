@@ -260,7 +260,7 @@ export function MargoCanvas({
       if (!request) return;
       if (request === pendingHover) pendingHover = null;
       picking = true;
-      // GPU readback permits one pending pick. Preserve clicks and coalesce hover bursts.
+      // One request at a time: clicks keep their order and a burst of hovers collapses to the latest.
       void Promise.resolve()
         .then(async () => {
           if (!active || engine.disposed || !canPick()) return null;

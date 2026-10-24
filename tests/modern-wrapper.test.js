@@ -73,7 +73,10 @@ test('facade preserves real mesh handles, hierarchy and rollback after bad trans
       allocated = resources.size;
     assert.throws(() => app.box({ scale: [1, 0, 1] }), /nonzero/);
     assert.throws(() => app.box({ size: [1, 2] }), /3 values/);
-    assert.throws(() => app.sphere({ roughness: NaN }), { name: 'RangeError', message: 'Invalid material' });
+    assert.throws(() => app.sphere({ roughness: NaN }), {
+      name: 'RangeError',
+      message: 'Invalid material; keep color, roughness and metalness in 0..1',
+    });
     assert.equal(engine.meshes.size, count);
     assert.equal(resources.size, allocated);
     let captured;

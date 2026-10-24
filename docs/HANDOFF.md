@@ -2,6 +2,33 @@
 
 Last updated 2026-10-24. Read this first when starting a new session. Update it whenever work lands.
 
+## Landed 2026-10-24: core bug fixes; the freeze blocks features, not fixes
+
+Scott's rule (2026-10-24): the v1.0 core freeze means no new features; bugs and unsafe APIs are fixed in core, with
+tests, inside the 25,000 B core + stage gate (AGENTS.md, [conventions.md](conventions.md#core-freeze)).
+
+- **`engine.pick` queues.** It threw `Pick pending` when called while a readback was in flight. Now one readback runs
+  at a time and overlapping calls wait, answered in order, each for its own point, view and layers (a waiting call
+  reads the scene as it is when its turn comes). An idle pick still starts synchronously. A pick waiting when the
+  engine is disposed resolves null, and one in flight when the device is lost resolves null instead of rejecting.
+  Chosen over "only the newest is answered": a superseded call would get another point's mesh, or a null that reads
+  as "nothing there". Tests: `core-scene-picking` (rapid picks, picks in different views, layers, dispose while
+  waiting, a rejected pick does not block the next), `deep-core-resources` (device lost during the readback).
+  The demos' click-dropping is gone and `check:views` now fires its demo picks at once. React keeps its own queue,
+  which coalesces hover bursts. +63 B.
+- **Coded errors.** Every core and stage throw that was a bare `Error` (25 sites, including `pick` and
+  `rebootDevice`'s `WebGPU required`) is a `MargoError` with a code (`disposed`, `unsupported`, `state`, `failed`),
+  bundled from `packages/shared/errors.js`; `Hierarchy cycle` is a TypeError. The allowlist grant is removed.
+  +301 B.
+- **Messages name their fix.** All 74 core and stage messages the API gate counted as naming no fix now do (old text
+  kept as the prefix). +653 B. `tests/core-errors.test.js` checks codes and messages.
+- Size: core + stage 22,253 -> 23,271 B gzip (1,729 B under the gate). `scripts/build-modern.js`'s older core-only cap went from 20 KiB to 21 KiB (core
+  alone 20,015 -> 20,899 B); the binding gate is unchanged.
+- Listed for Scott, not done (features or behaviour changes): `using`/`Symbol.dispose` on Engine and Mesh;
+  Codex's `requiredLimits` patch (every device would ask for the adapter's maximum buffer sizes); a profile option for
+  `CADCameraControls`; a UV channel and a point primitive in core geometry; `setQuaternion` allocating a temporary
+  array (physics works around it; a speed change, not a bug).
+
 ## Landed 2026-10-24: voxel slabs and stairs
 
 `BlockShape` `'slab'` and `'stair'` are back, built end to end (Codex's vertex shift was removed earlier). States carry

@@ -106,7 +106,7 @@ export class Cinematic implements EnginePlugin {
    * Follow a mesh (its world position, read each update) or a fixed world point.
    * @throws TypeError for a point that is not 3 values or a mesh of another engine.
    * @throws RangeError for a non-finite point.
-   * @throws Error 'Mesh disposed' for a disposed mesh.
+   * @throws MargoError (code 'disposed') for a disposed mesh.
    */
   follow(target: Mesh | Vec3): void {
     if (Array.isArray(target)) {
