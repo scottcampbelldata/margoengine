@@ -1,8 +1,12 @@
 # Margo Engine whitepaper: outline
 
-Structure for `docs/whitepaper.md` (also published on margoengine.com). Every number in the final paper names the
-command, hardware, browser, date and commit that produced it, and links its results JSON. Status of each claim:
-[claims.md](claims.md). Commands: [reproduce.md](reproduce.md).
+Structure for the engine whitepaper. Every number in the final paper names the command, hardware, browser, date and
+commit that produced it, and links its results JSON. Status of each claim: [claims.md](claims.md). Commands:
+[reproduce.md](reproduce.md).
+
+First published versions (2026-10-24, figures at `5eb44eca`): [site/whitepaper/engine.html](../../site/whitepaper/engine.html)
+and, for the voxel editor, [site/whitepaper/voxel.html](../../site/whitepaper/voxel.html). They follow this outline
+where data exists and say what is missing where it does not; re-measure on the release commit before 1.0.
 
 Legend: **[have]** data committed today; **[rerun]** data exists but must be re-measured on the release commit (code
 changed since); **[need]** no data yet.

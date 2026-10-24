@@ -87,6 +87,24 @@ New committed records from 5d: `examples/package-benchmarks/results/entry-sizes.
 and worker, build-modern's method; also the Gzip column of `docs/api-surface.md`) and `results/threejs-size.json`
 (`npm run measure:threejs`, three.js now built with the same output options as Margo's size gate).
 
+### Whitepapers (2026-10-24)
+
+Two public pages, `site/whitepaper/engine.html` (margoengine.com/whitepaper/engine) and `site/whitepaper/voxel.html`
+(margoengine.com/whitepaper/voxel), state each figure next to its source file, hardware and commit. Their rows are not
+in the counts above yet; until they are, this table gives the status of each group of figures.
+
+| Page | Figures | Evidence | Status |
+| --- | --- | --- | --- |
+| engine | Sizes (core, core + stage, packages, brep), the six-request basic page | `entry-sizes.json`, `basic-scene-network.json` at `5eb44eca` | PROVEN |
+| engine | three.js r186 size table | `threejs-size.json` at `80b4a1f`, Margo's side shown at both commits | PROVEN (dated) |
+| engine | Kernel scaling, CAD orbit before/after, culling, BVH picks, large coordinates, design-envelope rows | `cad/results-*.json`, `results-scale-node.json`, `large-coordinates-gpu.json`, LIM-001 to LIM-030, DOC-059 | PROVEN (dated) |
+| engine | 51 proofs, 20 ongoing | `proofs/*.proof.js`, the `ongoing` list in `proofs/run.mjs` (the Proofs paragraph below still says 46 and 15) | PROVEN (file counts) |
+| engine | Speed against three.js | none: the page makes no claim and quotes no diagnostic number, only the direction of the busy-machine runs in `boxes-vs-threejs.md` | no claim |
+| voxel | Tracer GPU timings, denoiser error ratios, correctness checks, limits | `packages/voxel-pathtracer/README.md` (measurements in its browser checks; no committed result file) | UNPROVEN |
+| voxel | Sandbox render distance, multiplayer capacity, package sizes | `voxel-sandbox-bench.json`, `packages/voxel-net/bench/results.json`, `entry-sizes.json` | PROVEN |
+| voxel | App tests, denoiser gates, Unity/Godot/Unreal runs, native 4K timing | the Margo Voxel Studio repository's `docs/verification.md` (2026-10-21); raw reports sit in its git-ignored `test-results/` | UNPROVEN |
+| voxel | MagicaVoxel pixel match and speed | `docs/magicavoxel-parity.md`; MagicaVoxel's renders stay local by the clean-room rule, and its times are by stopwatch | UNPROVEN (stated on the page) |
+
 ### Proofs: pinned commits
 
 Every `examples/package-benchmarks/proofs/*.proof.js` compares a baseline ref with a pinned candidate, the commit where

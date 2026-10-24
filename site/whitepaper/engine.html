@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Margo Engine whitepaper</title>
+  <meta name="description" content="Margo Engine: a WebGPU engine for the web whose core plus stage is 21,343 bytes gzip, with a Rust/Wasm transform kernel, 81 optional packages, and a source for every number.">
+  <link rel="canonical" href="https://margoengine.com/whitepaper/engine">
+  <meta name="theme-color" content="#0b1020">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Margo Engine whitepaper">
+  <meta property="og:description" content="Margo Engine: a WebGPU engine for the web whose core plus stage is 21,343 bytes gzip, with a Rust/Wasm transform kernel, 81 optional packages, and a source for every number.">
+  <meta property="og:url" content="https://margoengine.com/whitepaper/engine">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" href="../favicon.ico" sizes="32x32">
+  <link rel="stylesheet" href="./whitepaper.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="nav">
+    <a class="brand" href="../" translate="no">Margo Engine</a>
+    <nav aria-label="Primary">
+      <a href="./engine.html" aria-current="page">Engine whitepaper</a>
+      <a href="./voxel.html">Voxel whitepaper</a>
+      <a href="../catalog/">Catalog</a>
+    </nav>
+  </header>
+
+<main id="main" class="page">
+<header class="masthead">
+  <p class="eyebrow">Whitepaper · October 2026 · pre-release</p>
+  <h1>Margo Engine</h1>
+  <p class="deck">A WebGPU engine for the web whose core is 21,343 bytes gzipped, with a Rust transform kernel in WebAssembly, 81 optional packages, and a named source for every number we publish.</p>
+  <div class="byline"><span>Scott Campbell · Margo Interactive</span><span>Figures measured at commit 5eb44eca unless a table says otherwise</span></div>
+</header>
+
+<div class="ledger" role="list">
+  <div role="listitem"><b>21,343 B</b><span>core + stage facade, min + gzip, Wasm kernel and WebGPU backend included</span><i>entry-sizes.json · 5eb44eca</i></div>
+  <div role="listitem"><b>25,000 B</b><span>the CI gate: any change that reaches it fails</span><i>scripts/measure-size.js</i></div>
+  <div role="listitem"><b>8,388,608</b><span>entity slots the kernel grows to, starting at 1,024</span><i>packages/core/src/kernel.ts</i></div>
+  <div role="listitem"><b>51</b><span>GPU-call proofs, each pinned to the commit that made its claim</span><i>package-benchmarks/proofs</i></div>
+</div>
+
+<div class="col">
+<section class="status" aria-labelledby="status-h">
+  <h2 id="status-h">Where it stands today</h2>
+  <ul>
+    <li><strong>Pre-release.</strong> The packages are not on npm yet and the source repository is private while we finish the launch checklist.</li>
+    <li><strong>Two machines, one browser.</strong> Every real-GPU result comes from Edge 155 on Windows 11: an Intel Arc 140V laptop and an NVIDIA RTX A6000 desktop. Firefox, Safari, macOS, Linux and Android are not verified. The demos were run by hand on an iPhone, with no scripted result.</li>
+    <li><strong>WebGPU first.</strong> PBR, shadows, image-based lighting and most packages need WebGPU. An optional 2,711-byte package draws basic meshes on WebGL2.</li>
+    <li><strong>No speed claim against three.js.</strong> We have a same-scene harness but no quiet-machine run committed yet. Section 5 explains what the early runs showed.</li>
+  </ul>
+</section>
+
+<nav aria-label="Contents">
+<ol class="toc">
+  <li><a href="#abstract"><span class="n">0</span>Abstract</a></li>
+  <li><a href="#bets"><span class="n">1</span>Design decisions</a></li>
+  <li><a href="#kernel"><span class="n">2</span>The kernel</a></li>
+  <li><a href="#renderer"><span class="n">3</span>The renderer and its hooks</a></li>
+  <li><a href="#size"><span class="n">4</span>Size</a></li>
+  <li><a href="#perf"><span class="n">5</span>Performance</a></li>
+  <li><a href="#honest"><span class="n">6</span>Keeping the numbers honest</a></li>
+  <li><a href="#cad"><span class="n">7</span>CAD and engineering</a></li>
+  <li><a href="#limits"><span class="n">8</span>Design envelope</a></li>
+  <li><a href="#next"><span class="n">9</span>What is not done</a></li>
+  <li><a href="#repro"><span class="n">10</span>Reproduce</a></li>
+</ol>
+</nav>
+
+<h2 id="abstract"><span class="n">0</span>Abstract</h2>
+<p>Margo Engine is a 3D engine for web applications written in TypeScript, with a Rust kernel compiled to WebAssembly and a WebGPU renderer. Core plus the high-level stage facade (<code>createStage</code>) measures 50,814 bytes minified and 21,343 bytes gzipped, and the build fails at 25,000. Everything else, from glTF PBR and shadows to post-processing, physics, CAD import and voxel worlds, lives in 81 optional, side-effect-free packages. A bundle contains only the packages it imports, and large runtimes such as OpenCascade or the Draco decoder are fetched only when a file needs them.</p>
+<p>This paper covers the design, the size and performance we have measured, the tooling that keeps those measurements reproducible, and the limits we know about. Each figure names the result file it came from and the hardware it ran on. Where we have no committed measurement, we say so. A companion paper covers <a href="./voxel.html">Margo Voxel</a>, the voxel editor built on the engine.</p>
+
+<pre><code>import {createStage} from 'margoengine';
+const app = await createStage('#scene');
+const orb = app.sphere({color: '#84d6bd', roughness: 0.25});
+app.onTick(delta =&gt; {orb.rotation.z += delta;});
+window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code></pre>
+
+<h2 id="bets"><span class="n">1</span>Design decisions</h2>
+<ol>
+  <li><strong>A small core that stays frozen.</strong> Core and the stage are feature-frozen for 1.0. New capability goes into optional packages through the extension hooks in section 3. A feature that would need a new core API does not land, and CI rejects any pull request that pushes core + stage to 25,000 bytes gzip.</li>
+  <li><strong>Data-oriented transforms in Wasm.</strong> Positions, rotations, hierarchy, world matrices, bounds and culling live in flat typed arrays inside Wasm memory and are computed by one Rust function per frame.</li>
+  <li><strong>WebGPU first, guaranteed limits only.</strong> The device asks for no limit above WebGPU's guaranteed minimums. A scene that runs on the test laptop asks nothing of the GPU that a phone is allowed to refuse.</li>
+  <li><strong>Errors that name the fix.</strong> Packages throw a <code>MargoError</code> with a code, a <code>TypeError</code> or a <code>RangeError</code>, and the message says how to get past it: <code>RangeError: Too many glTF nodes (100001 &gt; 100000; raise the maxNodes option)</code>.</li>
+  <li><strong>No number without a source.</strong> Every published figure has a row in a claims inventory with its evidence and status (section 6).</li>
+</ol>
+
+<h2 id="kernel"><span class="n">2</span>The kernel</h2>
+<p><code>packages/kernel/src/lib.rs</code> is about 21 kB of <code>no_std</code> Rust compiled to Wasm. Each entity is a slot in a structure of arrays: position, rotation and scale, parent, local and world bounding spheres, world matrix, joint limits, a snapshot of last frame's inputs, and scratch space. That is 86 float32 columns and 7 flag bytes, or 351 bytes per slot. JavaScript writes transforms into views of that memory; nothing crosses the boundary per entity.</p>
+<p>The tick follows three rules:</p>
+<ul>
+  <li><strong>Recompute only what changed.</strong> An entity is recomputed when its transform, parent, bounds or hidden flag changed, along with its descendants. A static scene pays only for the input comparison, about 41 ns per entity on the test machine.</li>
+  <li><strong>Publish nothing rather than something wrong.</strong> A bad quaternion, a zero scale, a non-finite parent or a hierarchy deeper than 64 yields no matrix. World matrices are written only after every node validates.</li>
+  <li><strong>No allocation.</strong> The tick does not allocate. Growth happens outside it: the store starts at 1,024 slots and doubles on demand up to 2<sup>23</sup> (8,388,608) by creating a larger kernel at the same address and copying the columns back. A growth that cannot allocate throws and leaves the store as it was.</li>
+</ul>
+<p>Two details reviewers usually ask about. Parent indexes are stored as float32, which is exact below 2<sup>24</sup>, so the 2<sup>23</sup> cap keeps them exact. The world bounding sphere's radius is scaled by √(‖M‖<sub>1</sub>·‖M‖<sub>∞</sub>), an upper bound on the spectral norm of the transform, so culling never drops a visible object because of a skewed matrix.</p>
+
+<h3>How it scales</h3>
+<p>Node, the same Wasm the browser loads, a fake renderer, and a CAD assembly built up from the default 1,024 slots so every doubling runs. Quiet-gated (CPU at 8%), AC power.</p>
+<div class="table"><table>
+<thead><tr><th class="num">Entities</th><th class="num">Slots</th><th class="num">Kernel memory</th><th class="num">Tick, static</th><th class="num">Tick, 1% moving</th><th class="num">Tick, full recompute</th></tr></thead>
+<tbody>
+<tr><td class="num">100,006</td><td class="num">131,072</td><td class="num">44.9 MB</td><td class="num">3.3 ms</td><td class="num">4.5 ms</td><td class="num">14.4 ms</td></tr>
+<tr><td class="num">499,992</td><td class="num">524,288</td><td class="num">176.6 MB</td><td class="num">20.2 ms</td><td class="num">26.2 ms</td><td class="num">74.9 ms</td></tr>
+<tr><td class="num">1,000,012</td><td class="num">1,048,576</td><td class="num">352.1 MB</td><td class="num">41.5 ms</td><td class="num">43.4 ms</td><td class="num">138 ms</td></tr>
+</tbody></table></div>
+<span class="src">examples/package-benchmarks/cad/results-scale-node.json · scale-node.mjs · docs/cad-performance.md</span>
+<p>The cost is linear. At a million entities the floor is about 40 ms per frame even when nothing moves, so scenes of that size keep their parts out of the entity store with the culling package (section 5). A test checks that dirty propagation produces the same world matrices and visibility, bit for bit, as a fresh full recompute, through growth from 1,024 to 1,048,576 slots, 63-deep chains, moves, removals and slot reuse.</p>
+
+<h2 id="renderer"><span class="n">3</span>The renderer and its hooks</h2>
+<figure>
+<div class="diagram" role="img" aria-label="One frame: JavaScript writes transforms into Wasm memory, the kernel tick recomputes changed entities and culls, core batches visible meshes by geometry, uploads only changed instance ranges, and draws one instanced call per geometry. Optional packages add passes and shader patches.">
+<svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg">
+  <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="head" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+  <rect class="box" x="10" y="20" width="130" height="92" rx="6"/>
+  <text class="t" x="22" y="44">Your code</text>
+  <text class="s" x="22" y="64">sets TRS through</text>
+  <text class="s" x="22" y="80">typed views of</text>
+  <text class="s" x="22" y="94">Wasm memory</text>
+  <rect class="hot" x="160" y="20" width="140" height="92" rx="6"/>
+  <text class="t" x="172" y="44">Kernel tick</text>
+  <text class="s" x="172" y="64">Rust → Wasm, no_std</text>
+  <text class="s" x="172" y="80">dirty entities only</text>
+  <text class="s" x="172" y="94">matrices + culling</text>
+  <rect class="box" x="320" y="20" width="130" height="92" rx="6"/>
+  <text class="t" x="332" y="44">Batching</text>
+  <text class="s" x="332" y="64">one batch per</text>
+  <text class="s" x="332" y="80">geometry, reused</text>
+  <text class="s" x="332" y="94">if nothing moved</text>
+  <rect class="box" x="470" y="20" width="130" height="92" rx="6"/>
+  <text class="t" x="482" y="44">Upload</text>
+  <text class="s" x="482" y="64">96 B per instance</text>
+  <text class="s" x="482" y="80">changed ranges</text>
+  <text class="s" x="482" y="94">only</text>
+  <rect class="hot" x="620" y="20" width="130" height="92" rx="6"/>
+  <text class="t" x="632" y="44">WebGPU pass</text>
+  <text class="s" x="632" y="64">1 instanced draw</text>
+  <text class="s" x="632" y="80">per geometry;</text>
+  <text class="s" x="632" y="94">back-face culled</text>
+  <path class="arrow" d="M140 66 H158" marker-end="url(#ah)"/>
+  <path class="arrow" d="M300 66 H318" marker-end="url(#ah)"/>
+  <path class="arrow" d="M450 66 H468" marker-end="url(#ah)"/>
+  <path class="arrow" d="M600 66 H618" marker-end="url(#ah)"/>
+  <rect class="box" x="160" y="150" width="590" height="80" rx="6"/>
+  <text class="t" x="174" y="174">Optional packages, loaded only when imported</text>
+  <text class="s" x="174" y="196">EnginePlugin passes (shadows, SSAO, TAA, culling) · shader hooks into core's WGSL</text>
+  <text class="s" x="174" y="214">batch.redirect: a package draws a batch from its own instance records</text>
+  <path class="arrow" d="M685 148 V114" marker-end="url(#ah)"/>
+  <path class="arrow" d="M385 148 V114" marker-end="url(#ah)"/>
+</svg>
+</div>
+<figcaption>One frame. The shaded steps are the two that do the heavy lifting.</figcaption>
+</figure>
+
+<p>Core groups visible meshes by geometry and draws each group with one instanced draw call per pass, with per-instance material values. When the mesh set, materials, visibility and cull result are unchanged, it reuses last frame's instance lists and patches only the matrices that moved, and the renderer uploads only the changed range. The renderer uses reversed float depth, GPU picking with integer ids, and recovers from device loss; <code>npm run visual:device-loss</code> destroys the device mid-frame and checks that each of 24 demo views comes back.</p>
+<p>A group whose instances are all single-sided and unmirrored draws through a second pipeline with hardware back-face culling and no <code>discard</code> in the shader. A <code>discard</code> anywhere in a fragment shader disables early depth testing, so removing it matters even for fragments that never take the branch. Frames are unchanged: 0 of 153,600 pixels differ across 13 test steps against the previous core.</p>
+<span class="src">examples/package-benchmarks/cad/cull-pixels.mjs · docs/whitepaper/boxes-vs-threejs.md (commit d96e2d7)</span>
+
+<h3>Extension points</h3>
+<dl class="kv">
+  <dt>Passes</dt><dd><code>EnginePlugin</code> frame-graph passes. Shadows, post effects, TAA and GPU culling attach with <code>X.attach(engine, options)</code>.</dd>
+  <dt>Shader hooks</dt><dd>Packages patch core's WGSL at named points. Shader-contract tests fail when a patch no longer matches the text it expects.</dd>
+  <dt>Batch redirect</dt><dd>A pass sees the frame's batches in draw order and may set <code>batch.redirect = {instances, args}</code>; core then draws that batch from the package's records with <code>drawIndexedIndirect</code>. This hook cost 34 bytes gzip and lets GPU culling run on ordinary core meshes.</dd>
+  <dt>Raw state</dt><dd>Wasm memory and GPU objects are reachable only through the explicit <code>@margoengine/core/extension</code> entry, so the public API stays portable.</dd>
+</dl>
+
+<h3>Packages</h3>
+<p>81 packages in 10 layers. 72 of the 83 published tarballs (the 81 plus two command-line tools) have no third-party runtime dependency.</p>
+<div class="table"><table>
+<thead><tr><th>Layer</th><th class="num">Packages</th><th>Examples</th></tr></thead>
+<tbody>
+<tr><td>Start here</td><td class="num">2</td><td><code>margoengine</code> (stage), <code>core</code></td></tr>
+<tr><td>Setup and diagnostics</td><td class="num">5</td><td>math, quality tiers, WebGL2 fallback, stats, inspector</td></tr>
+<tr><td>Loading and formats</td><td class="num">12</td><td>gltf, gltf-pro, loaders (PLY, 3MF, OBJ, USDA/USDZ…), decoders (Draco, KTX2), FBX, IFC, exporters</td></tr>
+<tr><td>Rendering and lighting</td><td class="num">19</td><td>materials, shader nodes, environment (IBL, fog), clustered lights, cascaded shadows, OIT, LOD, GPU culling, text</td></tr>
+<tr><td>Post-processing</td><td class="num">5</td><td>post (bloom, SSAO, GTAO, SSGI, SSR, motion blur), tonemap, DOF, TAA, transitions</td></tr>
+<tr><td>World and effects</td><td class="num">13</td><td>terrain, voxel, voxel path tracer, water, scatter, VFX particles, procedural, wave function collapse</td></tr>
+<tr><td>Animation and interaction</td><td class="num">12</td><td>skinning and morphs, animator (blend trees, IK), controls, gizmo, view cube, selection, audio</td></tr>
+<tr><td>Simulation and games</td><td class="num">7</td><td>physics (Rapier), navigation, ECS, state machines, networking, voxel multiplayer</td></tr>
+<tr><td>CAD and engineering</td><td class="num">5</td><td>machinery (sections, edges, metrology), brep (our STEP kernel), BVH, geometry, mesh editing</td></tr>
+<tr><td>Frameworks</td><td class="num">1</td><td>react (React 18 and 19 components, no custom reconciler)</td></tr>
+</tbody></table></div>
+<span class="src">README.md package list (generated from docs/catalog.json) · THIRD-PARTY-NOTICES.md</span>
+
+<h2 id="size"><span class="n">4</span>Size</h2>
+<p>Sizes are minified and gzipped at zlib defaults, per <code>exports</code> entry, with peers and other Margo packages external. The core + stage figure includes the embedded Wasm kernel and the WebGPU backend, and gives you a mesh, one directional light, orbit controls and the loader shell.</p>
+<div class="table"><table>
+<thead><tr><th>Entry</th><th class="num">Raw</th><th class="num">Gzip</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><code>@margoengine/core</code></td><td class="num">44,244</td><td class="num">19,120</td><td>Wasm kernel, WebGPU renderer</td></tr>
+<tr><td>core + <code>margoengine</code> stage</td><td class="num">50,814</td><td class="num">21,343</td><td>the CI-gated figure</td></tr>
+<tr><td><code>@margoengine/webgl</code></td><td class="num">6,086</td><td class="num">2,711</td><td>optional WebGL2 fallback</td></tr>
+<tr><td><code>@margoengine/gltf</code></td><td class="num">12,401</td><td class="num">5,048</td><td>static glTF</td></tr>
+<tr><td><code>@margoengine/gltf-pro</code></td><td class="num">128,847</td><td class="num">40,229</td><td>glTF 2.0 metallic-roughness PBR</td></tr>
+<tr><td><code>@margoengine/shadows</code></td><td class="num">33,337</td><td class="num">11,902</td><td>four cached cascades, PCSS</td></tr>
+<tr><td><code>@margoengine/post/ssao</code></td><td class="num">26,918</td><td class="num">8,517</td><td>one effect entry</td></tr>
+<tr><td><code>@margoengine/culling</code></td><td class="num">26,590</td><td class="num">8,763</td><td>GPU frustum and Hi-Z culling</td></tr>
+<tr><td><code>@margoengine/react</code></td><td class="num">60,413</td><td class="num">20,966</td><td>React external</td></tr>
+<tr><td><code>@margoengine/brep</code></td><td class="num">298,146</td><td class="num">104,764</td><td>STEP, SAT, Parasolid XT, JT reader and modeler</td></tr>
+</tbody></table></div>
+<span class="src">examples/package-benchmarks/results/entry-sizes.json · commit 5eb44eca · dirty: false</span>
+
+<h3>What a real page fetches</h3>
+<p>A release test builds a page with Vite that calls <code>createStage('#scene')</code> and <code>app.load('./model.glb')</code> on a 1,332-byte cube, serves the production build, and records every request in headless Edge. It passes only if the page fetches the HTML, the entry chunk and its imports, the glTF chunk and the model, each once, and nothing else.</p>
+<div class="table"><table>
+<thead><tr><th>File</th><th class="num">Raw</th><th class="num">Gzip</th><th class="num">Transferred</th></tr></thead>
+<tbody>
+<tr><td>Entry chunk: core + stage + app</td><td class="num">51,582</td><td class="num">21,850</td><td class="num">22,231</td></tr>
+<tr><td><code>@margoengine/gltf</code> chunk (loaded by <code>app.load</code>)</td><td class="num">12,388</td><td class="num">5,035</td><td class="num">5,407</td></tr>
+<tr><td>Shared chunks (2)</td><td class="num">2,076</td><td class="num">1,070</td><td class="num">1,745</td></tr>
+<tr><td>HTML page</td><td class="num">558</td><td class="num">371</td><td class="num">808</td></tr>
+<tr><td>Model</td><td class="num">1,332</td><td class="num">454</td><td class="num">1,605</td></tr>
+<tr><td><strong>6 requests</strong></td><td class="num">67,936</td><td class="num">28,780</td><td class="num">31,796</td></tr>
+</tbody></table></div>
+<span class="src">examples/package-benchmarks/results/basic-scene-network.json · scripts/basic-scene-network.mjs · Edge 155 headless, NVIDIA Ampere · 5eb44eca</span>
+<p>The same build contains 18 more files totalling 8,173,601 bytes (the OpenCascade Wasm, the CAD worker, the B-rep runtime and other packs) that this page never requests. Transferred bytes include response headers.</p>
+
+<h3>Against three.js</h3>
+<p><code>npm run measure:threejs</code> builds a minimal lit-box app with three.js r186 (0.186.1) using the same minifier and output options as our size gate.</p>
+<div class="table"><table>
+<thead><tr><th>Build</th><th class="num">Raw</th><th class="num">Gzip</th></tr></thead>
+<tbody>
+<tr><td>three.js <code>WebGLRenderer</code> minimal app</td><td class="num">530,069</td><td class="num">129,899</td></tr>
+<tr><td>three.js <code>WebGPURenderer</code> minimal app</td><td class="num">790,857</td><td class="num">211,584</td></tr>
+<tr><td>Margo core + stage when this was recorded (80b4a1f)</td><td class="num">45,616</td><td class="num">19,577</td></tr>
+<tr><td>Margo core + stage today (5eb44eca)</td><td class="num">50,814</td><td class="num">21,343</td></tr>
+</tbody></table></div>
+<span class="src">examples/package-benchmarks/results/threejs-size.json · scripts/compare-threejs-size.js · recorded at 80b4a1f</span>
+<p>Two caveats. The comparison is not symmetric: the three.js numbers are a tree-shaken minimal app, while ours is the whole core plus stage. And three.js gives you far more in those bytes than our core does; a Margo app that wants PBR textures, shadows or post-processing adds the packages in the table above.</p>
+
+<h2 id="perf"><span class="n">5</span>Performance</h2>
+<h3>Method</h3>
+<p>Headless Edge through Playwright, vsync and the frame-rate cap off (FPS is throughput, not a 60 Hz cap), cross-origin isolated for 5 µs timers, fixed canvas at DPR 1. GPU time comes from WebGPU timestamp queries injected into every pass. Each run records AC power at start and end and holds a GPU lock so only one GPU job runs at a time. A quiet gate waits until the CPU stays under 20% for 20 seconds. Before/after pairs alternate in rotating order within one session, because the same build varied by 10-40% between sessions. Runs on a mock GPU are labelled as CPU measurements and never reported as frame rates.</p>
+
+<h3>CAD assemblies</h3>
+<p>Five part shapes (a plate with eight holes, an L bracket, a bolt, a nut, a washer) instanced into 27-part modules under a five-level hierarchy, 936 distinct triangles, orbited by the camera. This table is the before/after of the kernel and batching fast paths described in sections 2 and 3, on a quiet machine.</p>
+<div class="table"><table>
+<thead><tr><th>Orbit</th><th class="num">Kernel in frame</th><th class="num">Frame CPU</th><th class="num">FPS</th><th class="num">GPU</th><th class="num"><code>engine.pick</code></th></tr></thead>
+<tbody>
+<tr><td>10,017 parts</td><td class="num">2.17 → 0.65 ms</td><td class="num">5.02 → 3.70 ms</td><td class="num">168 → 247</td><td class="num">4.85 → 4.62 ms</td><td class="num">10.7 → 7.6 ms</td></tr>
+<tr><td>50,004 parts</td><td class="num">10.7 → 2.66 ms</td><td class="num">19.7 → 10.4 ms</td><td class="num">49 → 92</td><td class="num">17.0 → 17.5 ms</td><td class="num">28.9 → 19.5 ms</td></tr>
+<tr><td>89,883 parts</td><td class="num">14.9 → 4.09 ms</td><td class="num">28.6 → 30.0 ms</td><td class="num">34 → 33</td><td class="num">27.0 → 28.3 ms</td><td class="num">43.2 → 30.9 ms</td></tr>
+</tbody></table></div>
+<span class="src">examples/package-benchmarks/cad/results-{before,after}{1,2}-orbit.json · Intel Core Ultra 7 258V, Arc 140V iGPU, Edge 155, 1432×768, 4x MSAA · 2026-10-14</span>
+<p>The kernel got 2.6-4x cheaper in every case. At 90k parts the orbit stays at 33 FPS because that integrated GPU needs about 28 ms per frame for 11.6 million instanced triangles, so it is GPU-bound before and after.</p>
+
+<h3>Past 100,000 parts</h3>
+<ul>
+  <li><code>CulledMeshes</code> keeps parts as core meshes (picking, hierarchy and section caps still work) and culls them in a compute pass. With parts under 1.5 CSS pixels in radius dropped, it draws 11% of a 100,008-part assembly and orbits at 138 FPS, against 29 FPS for core alone. <span class="mono">results-5l-after-culled1.5.json</span></li>
+  <li><code>CulledInstances</code> keeps parts out of the entity store entirely: 0.41-0.55 ms of CPU per frame at 89,883 parts, flat in part count, at the cost of picking, hierarchy and caps. <span class="mono">results-culling.json</span></li>
+  <li><code>AssemblyBVH.raycast</code> answers a pick in 0.68 ms median at 100k parts, where core's <code>engine.pick</code>, which re-renders the scene, takes 34-54 ms.</li>
+</ul>
+<span class="src">docs/cad-performance.md · Arc 140V laptop, Edge 155, quiet-gated · 2026-10-15</span>
+
+<h3>Large coordinates</h3>
+<p>Core stores positions in float32. With a 10 mm part 50 mm from the camera, core alone jitters 0.38 px at 1 km from the origin and 42 px at 100 km, and at 6,000 km the part is not drawn. <code>FloatingOrigin</code> (1,258 bytes gzip, no core change) holds jitter at 0.019 px at every distance up to 6,000 km, and picking still hits the part.</p>
+<span class="src">examples/package-benchmarks/results/large-coordinates-gpu.json · docs/large-coordinates.md</span>
+
+<h3>What we have not measured, and three.js</h3>
+<p>We do not claim Margo is faster than three.js. Our harness (<code>examples/package-benchmarks/vs-threejs</code>) pairs like with like: Margo core meshes against one three.js <code>Mesh</code> per object, and our instanced paths against <code>InstancedMesh</code>, with both engines timed by the same injected timestamp queries. The runs so far were diagnostics on a busy machine, so we do not quote their numbers. They pointed both ways. Core's automatic instancing used far less CPU than one <code>Mesh</code> per object, which is how most three.js code is written. On static instanced boxes, three.js's <code>InstancedMesh</code> beat our instanced paths in most cases. The same diagnostics found that our core never culled back faces in the pipeline, which led to the culled pipeline in section 3. A quiet-machine run of the full harness is the next measurement, and it will be committed with the places three.js wins.</p>
+<p>Also not measured: discrete GPUs other than the RTX A6000, Apple GPUs, Android GPUs, Firefox and Safari.</p>
+
+<h2 id="honest"><span class="n">6</span>Keeping the numbers honest</h2>
+<h3>A claims inventory</h3>
+<p><code>docs/whitepaper/claims.md</code> lists every claim the public docs make or imply, 268 rows at the last recount, each with its evidence and a status. A claim is PROVEN only when a committed script and a committed result support its exact wording and no later code change invalidates it. The audit that built it found 23 claims that overstated their evidence and 58 with no committed evidence; all 23 were corrected or removed. Today the inventory reads 213 proven, 6 stale, 16 unproven (mostly internal notes), 0 overclaims, 18 removed and 15 kept only as dated history. Every row of the design-envelope page (section 8) is proven.</p>
+
+<h3>Proofs that a feature costs nothing when it is off</h3>
+<p>A recording GPU stands in for the WebGPU device and logs every call, descriptor, shader text and buffer write. A proof builds a baseline commit and a candidate and compares the two recordings exactly, with no tolerance. That is how we check claims such as "attaching nothing from this package leaves core's GPU work unchanged" or "this optimization issues the same calls in a different order". There are 51 proofs, each pinned to the commit that made its claim so later code cannot quietly break it. Twenty are ongoing guarantees that also run against the working tree in every <code>npm run verify</code>.</p>
+<p>A deliberate change to a feature-off path advances that proof's reference, and the reason goes into the inventory. For example, when TAA's errors were converted to <code>MargoError</code>, exactly three of the 7,900 recorded entries changed (the error class and its text) and every GPU call, descriptor and buffer write stayed identical.</p>
+
+<h3>Pixels on real GPUs</h3>
+<p>The visual suite renders 55 views (32 Khronos sample models and 23 views of eight demos at different quality tiers) and compares them against references recorded per GPU and browser. The NVIDIA profile was captured four times from committed sources: 220 captures on AC power, 47 views byte-identical across all four runs. The tolerance per view is three times its measured run-to-run noise plus fixed allowances. A view captured on one GPU is never compared with references from another.</p>
+<span class="src">tests/visual/profiles/nvidia-ampere-msedge-155/source-audit.json</span>
+
+<h3>Hostile files</h3>
+<p>Every parser of untrusted input has a seeded, deterministic fuzzer (<code>npm run fuzz</code>): glTF and GLB, gltf-pro's worker and progressive stream, Draco, KTX2, meshopt, HDR, EXR, UltraHDR, FBX, OBJ, STL, PLY, 3MF, PCD, OFF, XYZ, VTK, USDA, USDC, USDZ, STEP, IGES, IFC, our own <code>.margo</code> format and network snapshots. An input passes if it returns or throws the package's own named error within its time budget, without growing memory by more than 64 MiB plus 64 times its size. Some of what it found, all fixed with regression tests:</p>
+<ul>
+  <li>A 314-byte PLY that declared millions of elements and allocated 336 MiB. Parsers now check that the body can hold the declared counts before allocating.</li>
+  <li>A 65 KB zip entry inside a 3MF that inflated to 64 MiB. Entries over 1 MiB may now expand at most 200x (real 3MF files measured at 9x).</li>
+  <li>27-byte meshopt inputs that asked for 1-2 GiB of output.</li>
+  <li>IFC files that send web-ifc's Wasm into an endless loop. Syntax is now checked first, and untrusted IFC can run in a worker that is killed at a deadline.</li>
+  <li>A glTF primitive without normals whose coordinates passed 10<sup>19</sup>, which overflowed the summed face normals to Infinity and left NaN in the vertex data.</li>
+</ul>
+
+<h3>Security review</h3>
+<p>A review of the attack surface found and fixed, each with a regression test: model files whose buffer and image URIs escaped their directory (a model could make the viewer request intranet or same-origin endpoints with cookies; URIs are now confined to the model's directory unless the app allows more); a regular expression in the STL reader that rescanned to the end of the file for every unterminated facet (0.84 s for a 380 KB file, quadratic beyond that); and a glTF accessor of <code>"type": "constructor"</code> that resolved through the object prototype, made sizes NaN and silently switched off the decoded-memory budget. Keys named <code>__proto__</code>, <code>constructor</code> and <code>prototype</code> are dropped from glTF and <code>.margo</code> JSON at every depth. Nothing in the engine needs <code>'unsafe-eval'</code>; the Wasm kernel needs <code>'wasm-unsafe-eval'</code>, and a strict policy on the page and every worker ran with zero violations in Edge.</p>
+<span class="src">docs/security.md · tests/security.test.js · examples/package-benchmarks/results/csp-check.json</span>
+
+<h2 id="cad"><span class="n">7</span>CAD and engineering</h2>
+<p>CAD viewing is the use the engine was tuned for. <code>@margoengine/machinery</code> provides section planes with capped solids, feature edges, exploded views, measurement and dimensions, kinematic joints and conveyor simulation. Around it: an assembly BVH for fast picking, a view cube, orthographic and exactly top-down cameras, and the GPU culling described above.</p>
+<h3>STEP today, through OpenCascade</h3>
+<p>STEP and IGES currently load through OpenCascade (occt-import-js 0.0.23, LGPL-2.1) in a worker that starts only when such a file arrives. The cost is real: a 7,604,031-byte Wasm (3,114,121 gzip), and 1.4-1.7 seconds from request to model for a 442 kB STEP file. The lighter path converts at build time: <code>margo-convert</code> turns that file into a 68,352-byte GLB that loads without OpenCascade.</p>
+<span class="src">examples/package-benchmarks/cad/results-step.json · margo-convert-diagnostic.json</span>
+<h3>Our own kernel</h3>
+<p><code>@margoengine/brep</code> is a B-rep kernel written from the published standards (ISO 10303-21 for the file format, ISO 10303-42 for geometry and topology, the AP203, AP214 and AP242 schemas) and textbook geometry, without reading OpenCascade's source. It reads STEP, ACIS SAT, Parasolid XT and JT 9.5+, evaluates analytic and NURBS curves and surfaces exactly, and meshes each body without cracks: every edge is discretized once and shared by both faces, and each face's domain gets a constrained Delaunay triangulation with Shewchuk's robust predicates. It checks its meshes against the volume, area and centroid many STEP files state about themselves. A first cut of modeling (Booleans, fillets and chamfers, exact mass properties) is in the package too.</p>
+<p>It is 104,764 bytes gzip against OpenCascade's 3.1 MB of Wasm, runs in an ordinary JavaScript heap, and is MIT licensed. We compare it with OpenCascade file by file and operation by operation in our own harness, but those runs are not committed yet, so this paper makes no speed or completeness claim for it. OpenCascade still leads on freeform NURBS-to-NURBS intersection, advanced blends and healing broken files.</p>
+
+<h2 id="limits"><span class="n">8</span>Design envelope</h2>
+<p>The full table, with the error each limit produces and the package that takes you past it, is <code>docs/limits.md</code>. A selection:</p>
+<div class="table"><table>
+<thead><tr><th>Limit</th><th>Where it starts</th><th>Past it</th></tr></thead>
+<tbody>
+<tr><td>Entities</td><td>8,388,608 slots; about 41 ns per entity per frame when static</td><td>GPU culling packages</td></tr>
+<tr><td>Nodes or parts per file</td><td>100,000 by default</td><td>the <code>maxNodes</code> or <code>maxParts</code> option the error names</td></tr>
+<tr><td>Lights in core</td><td>one directional light and a scalar ambient</td><td>clustered: 1,024 point and spot lights, 16 with shadows, 64 area lights</td></tr>
+<tr><td>Textures per shader stage</td><td>16, WebGPU's guaranteed minimum; gltf-pro with every lighting feature uses exactly 16</td><td>drop one feature for that material</td></tr>
+<tr><td>Shader variants</td><td>64 cached pipelines per engine</td><td>fewer distinct patches</td></tr>
+<tr><td>Coordinates</td><td>float32: visible jitter by 100 km</td><td><code>FloatingOrigin</code></td></tr>
+<tr><td>Transparency</td><td>sorted per mesh: 13 popping steps on a 360° orbit of nested parts</td><td><code>@margoengine/oit</code>: 0</td></tr>
+<tr><td>Screen-space reflections</td><td>on-screen only; 2.2-2.3 ms at 1280×720</td><td>reflection probes</td></tr>
+<tr><td>glTF download</td><td>64 MiB per load, 4x that decoded</td><td><code>maxDownloadBytes</code></td></tr>
+<tr><td>Vertices per primitive</td><td>1,000,000</td><td>split at export</td></tr>
+<tr><td>Browsers</td><td>WebGPU required for most packages</td><td>WebGL2 basic preview</td></tr>
+</tbody></table></div>
+<span class="src">docs/limits.md (claims LIM-001 to LIM-030, all proven)</span>
+
+<h2 id="next"><span class="n">9</span>What is not done</h2>
+<ul>
+  <li><strong>Publishing.</strong> The packages, the <code>npm create margo</code> starter and the public repository are waiting on the launch checklist.</li>
+  <li><strong>A fair speed comparison.</strong> The quiet-machine run of the three.js harness, on more than one GPU.</li>
+  <li><strong>Code hygiene.</strong> Our own scorer (no <code>any</code> in public APIs, TSDoc on every export, the error conventions) rates the codebase 6.8 out of 10 against a launch gate of 9. Some packages score 10; others do not yet.</li>
+  <li><strong>Coverage.</strong> Firefox, Safari, macOS, Linux, Android, and discrete GPUs beyond one RTX A6000.</li>
+  <li><strong>WebGL2.</strong> A full WebGL2 fallback for the optional packages is planned for the next version, at zero core bytes. Today it draws core meshes only, flat-shaded with one light.</li>
+  <li><strong>Multiple views and scenes</strong> on one engine is the next feature after the current visual-parity work.</li>
+  <li><strong>Replacing OpenCascade</strong> with <code>@margoengine/brep</code> once it matches on our STEP corpus.</li>
+</ul>
+
+<h2 id="repro"><span class="n">10</span>Reproduce</h2>
+<p>From a checkout (Node 22.12+ or 24+). Each command writes or prints the figure it backs; GPU commands take the shared GPU lock.</p>
+<pre><code>npm ci
+npm run build:packages
+npm run measure:size          # core + stage gzip, fails at 25,000
+npm run measure:threejs       # the three.js size table
+npm run proofs                # all 51 pinned GPU-call proofs
+npm run proofs -- --current   # the 20 ongoing guarantees
+npm run fuzz -- --short       # every parser fuzzer, 4 s each
+npm run test:basic-scene      # the six-request page (GPU)
+node examples/package-benchmarks/cad/scale-node.mjs
+npm run bench:threejs         # the same-scene harness (GPU)</code></pre>
+<p>Per-claim commands are in <code>docs/whitepaper/reproduce.md</code>.</p>
+
+<h3>Hardware</h3>
+<div class="table"><table>
+<thead><tr><th>Machine</th><th>GPU</th><th>Software</th></tr></thead>
+<tbody>
+<tr><td>ASUS Zenbook S 14 laptop, Intel Core Ultra 7 258V</td><td>Intel Arc 140V iGPU, driver 32.0.101.8860</td><td>Windows 11, Edge 155 headless</td></tr>
+<tr><td>Desktop workstation</td><td>NVIDIA RTX A6000</td><td>Windows 11, Edge 155 headless</td></tr>
+</tbody></table></div>
+</div>
+
+
+</main>
+
+<footer>
+  <p>Margo Engine's own code is MIT licensed. Third-party code that ships inside packages (Draco and Basis decoders, OpenCascade for STEP) is listed with its licence in <code>THIRD-PARTY-NOTICES.md</code>.</p>
+  <p class="links"><a href="./voxel.html">Margo Voxel whitepaper</a> <a href="../sizes.html">Sizes</a> <a href="../catalog/">Catalog</a> <a href="../THIRD-PARTY-NOTICES.md">Third-party notices</a></p>
+  <p>Built with precision, named with love. For Margie.</p>
+</footer>
+</body>
+</html>

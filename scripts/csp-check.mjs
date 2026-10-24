@@ -218,6 +218,8 @@ if (want('site')) {
       '/',
       '/catalog/',
       '/sizes.html',
+      '/whitepaper/engine.html',
+      '/whitepaper/voxel.html',
       '/night-citadel/',
       '/gameplay-sandbox/',
       '/voxel/',
@@ -229,7 +231,10 @@ if (want('site')) {
       '/demos/earth/',
       '/demos/dof/',
       '/demos/tonemap/',
-    ].map((path) => [path, settle(['/', '/catalog/', '/sizes.html'].includes(path) ? 1500 : 8000)]),
+    ].map((path) => [
+      path,
+      settle(['/', '/catalog/', '/sizes.html'].includes(path) || path.startsWith('/whitepaper/') ? 1500 : 8000),
+    ]),
   });
 }
 

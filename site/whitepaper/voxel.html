@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Margo Voxel whitepaper</title>
+  <meta name="description" content="Margo Voxel: a clean-room voxel editor for the browser and Windows, with a WebGPU path tracer measured against MagicaVoxel as a black box, and the voxel world and multiplayer packages under it.">
+  <link rel="canonical" href="https://margoengine.com/whitepaper/voxel">
+  <meta name="theme-color" content="#0b1020">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Margo Voxel whitepaper">
+  <meta property="og:description" content="Margo Voxel: a clean-room voxel editor for the browser and Windows, with a WebGPU path tracer measured against MagicaVoxel as a black box, and the voxel world and multiplayer packages under it.">
+  <meta property="og:url" content="https://margoengine.com/whitepaper/voxel">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" href="../favicon.ico" sizes="32x32">
+  <link rel="stylesheet" href="./whitepaper.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="nav">
+    <a class="brand" href="../" translate="no">Margo Engine</a>
+    <nav aria-label="Primary">
+      <a href="./engine.html">Engine whitepaper</a>
+      <a href="./voxel.html" aria-current="page">Voxel whitepaper</a>
+      <a href="../catalog/">Catalog</a>
+    </nav>
+  </header>
+
+<main id="main" class="page">
+<header class="masthead">
+  <p class="eyebrow">Whitepaper · October 2026 · pre-release</p>
+  <h1>Margo Voxel</h1>
+  <p class="deck">A clean-room voxel editor for the browser and Windows, built on Margo Engine, with a progressive WebGPU path tracer and the voxel world and multiplayer packages underneath it.</p>
+  <div class="byline"><span>Scott Campbell · Margo Interactive</span><span>App checks recorded 2026-10-21 against engine commit 85467ba2</span></div>
+</header>
+
+<div class="ledger" role="list">
+  <div role="listitem"><b>99.3-99.97%</b><span>of pixels within 3/255 of MagicaVoxel's own render, six default-lit .vox scenes, black-box comparison</span><i>docs/magicavoxel-parity.md</i></div>
+  <div role="listitem"><b>72 / 72</b><span>denoiser quality gates passed, measured against raw output at the same sample count</span><i>docs/verification.md</i></div>
+  <div role="listitem"><b>2048</b><span>voxels per axis in one traced model, given as sparse blocks</span><i>voxel-pathtracer README</i></div>
+  <div role="listitem"><b>900</b><span>bot players held at 20 ticks/s by one voxel-net server on a spread-out map</span><i>docs/voxel-net-capacity-2026-10-21.md</i></div>
+</div>
+
+<div class="col">
+<section class="status" aria-labelledby="status-h">
+  <h2 id="status-h">Where it stands today</h2>
+  <ul>
+    <li><strong>Not released.</strong> A Windows portable build exists but is unsigned and unpublished, the source repository is private, and there is no hosted version yet.</li>
+    <li><strong>One platform verified.</strong> Windows 11, Edge 155 and an NVIDIA RTX A6000, plus a Ryzen 9 9950X for the CPU benchmarks. macOS, Linux, phones and other GPUs are not verified.</li>
+    <li><strong>Parity is not complete.</strong> The MagicaVoxel comparison still has open items (section 5), and we do not claim our denoiser beats Intel's OIDN.</li>
+    <li><strong>Dated checks.</strong> The app's test receipts are from 2026-10-21. The app has had commits since then with no recorded re-run.</li>
+  </ul>
+</section>
+
+<nav aria-label="Contents">
+<ol class="toc">
+  <li><a href="#abstract"><span class="n">0</span>Abstract</a></li>
+  <li><a href="#editor"><span class="n">1</span>The editor</a></li>
+  <li><a href="#build"><span class="n">2</span>How it is built</a></li>
+  <li><a href="#tracer"><span class="n">3</span>The path tracer</a></li>
+  <li><a href="#denoise"><span class="n">4</span>The denoiser</a></li>
+  <li><a href="#vox"><span class="n">5</span>Opening MagicaVoxel files</a></li>
+  <li><a href="#export"><span class="n">6</span>Into game engines</a></li>
+  <li><a href="#worlds"><span class="n">7</span>Voxel worlds and multiplayer</a></li>
+  <li><a href="#limits"><span class="n">8</span>Limits and sizes</a></li>
+  <li><a href="#next"><span class="n">9</span>What is not done</a></li>
+  <li><a href="#repro"><span class="n">10</span>Reproduce</a></li>
+</ol>
+</nav>
+
+<h2 id="abstract"><span class="n">0</span>Abstract</h2>
+<p>Margo Voxel Studio is a voxel editor that runs in a desktop browser with WebGPU and as a Windows desktop app from the same production build. Files and recovery data stay on the local device. It is written clean-room: MagicaVoxel, the most widely used free voxel editor, serves only as a black box we test against, and none of its program files, shaders or bundled models are part of the project.</p>
+<p>The app owns its interface, documents and undo history. Everything that is engine work (voxel grids and brushes, picking, meshing, the <code>.vox</code> codec, glTF export, lightmap baking, and a progressive path tracer) comes from Margo Engine's public packages, consumed as 19 unmodified, hash-pinned archives. This paper describes that split, the path tracer and its denoiser, how closely it reproduces MagicaVoxel's renders of the same files, how exports fare in Godot, Unity and Unreal, and what is still open. Every number names its source file. The engine itself is described in the <a href="./engine.html">Margo Engine whitepaper</a>.</p>
+
+<h2 id="editor"><span class="n">1</span>The editor</h2>
+<dl class="kv">
+  <dt>Modeling</dt><dd>Attach, erase, paint, pick and select; voxel, face, box, line, sphere and flood brushes; XYZ mirroring; undo and redo; clipboard; shrink, invert, wrap and repeat, nearest-neighbour scaling, arbitrary rotation, directional morphology and enclosed-air fill. Palette-index and six-connected selection with replace, add and subtract.</dd>
+  <dt>Scenes</dt><dd>Named objects, parent groups, coloured layers, local transforms and pivots. Instances from imported <code>.vox</code> scenes share editable geometry.</dd>
+  <dt>Animation</dt><dd>Step and linear transform keys, independent geometry frames, per-object clocks, scrubbing and playback, and animated GLB export. An 18-joint humanoid skeleton generator exports a real glTF skin as a starting point; bone animation and production weight painting are open.</dd>
+  <dt>Palettes</dt><dd>Independent indexed palette banks per model, live grading that keeps the source colours, presets and shading ramps.</dd>
+  <dt>Procedural</dt><dd>A cancellable voxel-expression language with numeric parameters, deterministic noise and iteration snapshots, applied as one undo step. GPU shader tools and authored surface graphs use Margo Engine's own APIs. Original templates include six articulated showcase scenes (a citadel, a dragon, an interceptor with an opening canopy, an industrial mech and others).</dd>
+  <dt>Files</dt><dd>Native <code>.margo</code> projects with crash recovery, <code>.vox</code> import and export, sprite-sheet slices from PNG, WebP or JPEG, PNG viewport capture.</dd>
+  <dt>Output</dt><dd>Worker-side GLB export with greedy meshing, a palette atlas or vertex colours, optional corner ambient occlusion and crease-controlled normals; OBJ; path-traced PNGs, frame sequences, turntables and sprite-atlas ZIPs, all cancellable.</dd>
+</dl>
+<span class="src">README.md (app) · docs/editing-animation-workflows.md · docs/templates.md</span>
+
+<h2 id="build"><span class="n">2</span>How it is built</h2>
+<figure>
+<div class="diagram" role="img" aria-label="The app holds the interface, documents, transactions and file adapters. It calls 19 unmodified Margo Engine packages through public APIs: voxel-edit for grids, brushes, picking, meshing and .vox; voxel-pathtracer for rendering; exporters and lightmap for output; core for the raster viewport. Meshing, slicing and GLB export run in workers; the tracer loads on demand.">
+<svg viewBox="0 0 760 270" xmlns="http://www.w3.org/2000/svg">
+  <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="head" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+  <rect class="box" x="10" y="18" width="740" height="76" rx="6"/>
+  <text class="t" x="26" y="42">Margo Voxel Studio (app code)</text>
+  <text class="s" x="26" y="62">React interface · documents and undo · transactions · .margo projects and IndexedDB recovery</text>
+  <text class="s" x="26" y="78">same production build in the browser and in Electron (sandboxed, no Node in the page)</text>
+  <path class="arrow" d="M120 96 V128" marker-end="url(#ah)"/>
+  <path class="arrow" d="M300 96 V128" marker-end="url(#ah)"/>
+  <path class="arrow" d="M480 96 V128" marker-end="url(#ah)"/>
+  <path class="arrow" d="M660 96 V128" marker-end="url(#ah)"/>
+  <text class="s" x="492" y="116">public APIs only</text>
+  <rect class="hot" x="10" y="130" width="200" height="88" rx="6"/>
+  <text class="t" x="24" y="154">voxel-edit</text>
+  <text class="s" x="24" y="174">grids, brushes, selections</text>
+  <text class="s" x="24" y="190">picking, export meshing</text>
+  <text class="s" x="24" y="206">.vox scenes, frames</text>
+  <rect class="hot" x="222" y="130" width="170" height="88" rx="6"/>
+  <text class="t" x="236" y="154">voxel-pathtracer</text>
+  <text class="s" x="236" y="174">progressive WebGPU</text>
+  <text class="s" x="236" y="190">denoiser, PNG capture</text>
+  <text class="s" x="236" y="206">loaded on demand</text>
+  <rect class="box" x="404" y="130" width="160" height="88" rx="6"/>
+  <text class="t" x="418" y="154">exporters, lightmap</text>
+  <text class="s" x="418" y="174">GLB, OBJ, collision</text>
+  <text class="s" x="418" y="190">names, baked textures</text>
+  <text class="s" x="418" y="206">in workers</text>
+  <rect class="box" x="576" y="130" width="174" height="88" rx="6"/>
+  <text class="t" x="590" y="154">core and friends</text>
+  <text class="s" x="590" y="174">raster viewport, camera,</text>
+  <text class="s" x="590" y="190">materials, post, sky,</text>
+  <text class="s" x="590" y="206">shader graphs</text>
+  <text class="s" x="10" y="250">19 unmodified engine archives from commit 85467ba2 · hashes in vendor/manifest.json · 0 missing exports</text>
+</svg>
+</div>
+<figcaption>The split between app code and engine packages.</figcaption>
+</figure>
+<p>The rule that keeps the split honest: engine source is read-only for the app. When a public engine API cannot carry a feature, the app either keeps its existing behaviour frozen or disables the piece, and records it as a numbered engine gap; the fix then lands in the engine, never as a private patch. The app does not copy, extend or rebuild engine code. The engine archives are built from one engine commit and recorded with their hashes, and a check confirms all 38 import paths resolve.</p>
+<ul>
+  <li><strong>Stack:</strong> React 19, Vite 8, TypeScript 7, Electron 44 with context isolation, the sandbox on and no Node integration in the page. Browser tests run in real Edge through Playwright.</li>
+  <li><strong>Local first:</strong> the static build caches its assets for offline use after the first load. Recovery saves are one atomic IndexedDB transaction, and <code>.margo</code> is versioned JSON.</li>
+  <li><strong>Off the main thread:</strong> meshing, sprite slicing, texture baking and GLB export run in workers; the path tracer is a separate chunk loaded when Render mode opens.</li>
+</ul>
+<p>At the last recorded check (2026-10-21) the app passed 615 of 615 unit tests and 54 of 54 real-Edge browser tests against the exact engine bytes it ships.</p>
+<span class="src">vendor/manifest.json · docs/verification.md · docs/engine-gaps.md · electron/main.cjs</span>
+
+<h2 id="tracer"><span class="n">3</span>The path tracer</h2>
+<p><code>@margoengine/voxel-pathtracer</code> attaches to an engine and, while enabled, replaces the frame with a path-traced image of the voxel scene through the engine camera, refining every frame up to a sample budget. Turning it off returns the raster frame bit for bit. It also renders off-screen PNGs and float images and answers ray picks against the same scene. It is written from public rendering literature, and its README cites each source.</p>
+<h3>How it works</h3>
+<ul>
+  <li>Models are packed into 8³ bricks (empty, uniform or 512 bytes) and walked with Amanatides and Woo's grid traversal, first over bricks, then over voxels inside mixed bricks. A bounding volume hierarchy (binned surface-area heuristic) finds instances, and rays move into each model's space by its inverse transform.</li>
+  <li>Unidirectional path tracing with next-event estimation for the sun, emissive faces, area lights and the environment map, combined with BSDF sampling by multiple importance sampling, and Russian roulette.</li>
+  <li>GGX microfacets with height-correlated Smith masking, sampled from visible normals; Kulla-Conty energy compensation for rough metals, with the albedo tables integrated once per device on the GPU by the tracer's own sampling code.</li>
+  <li>Homogeneous participating media, an analytic daylight sky (Preetham et al.), importance-sampled HDR environments, single-wavelength dispersion in glass, depth of field with round and polygonal apertures, and instance motion blur.</li>
+  <li>Light through smooth glass and off mirrors is found by solving refraction and reflection at planar voxel faces for shadow rays, weighed against ordinary paths through the same chain. Voxel scenes make this tractable because every interface is axis-aligned and flat.</li>
+</ul>
+<h3>Correctness checks</h3>
+<p>The tests compare the tracer with closed forms and with itself. Error against a 16,384-sample reference falls 0.0216, 0.0114, 0.0058, 0.0030 at 16, 64, 256 and 1,024 samples, the 1/√N rate of an unbiased estimator. A floating glass cube's shadow and caustic computed with light sampling matches the same light found by path sampling within 0.31% (IOR 1.5) and 0.40% (IOR 1.33). Equal seeds give bit-identical images.</p>
+<h3>Speed</h3>
+<div class="table"><table>
+<thead><tr><th>Scene at 1920×1080, one sample per frame</th><th class="num">GPU per frame</th><th class="num">GPU memory</th></tr></thead>
+<tbody>
+<tr><td>Material scene: 7 models, glass, metal, emitter, cloud, sun, sky, ground</td><td class="num">13.76 ms</td><td class="num">95 MiB</td></tr>
+<tr><td>Same, denoised</td><td class="num">21.17-21.63 ms</td><td class="num">348 MiB</td></tr>
+<tr><td>One dense 256³ terrain model, 3,967,601 voxels</td><td class="num">10.68-10.75 ms</td><td class="num">98 MiB</td></tr>
+<tr><td>Same, denoised</td><td class="num">14.42-14.61 ms</td><td class="num">256 MiB</td></tr>
+</tbody></table></div>
+<span class="src">packages/voxel-pathtracer/README.md, "Measured performance" · tests/browser-check.mjs timing · RTX A6000, Edge 155, D3D12 · 2026-10-20 · median of 40 frames, two runs</span>
+<p>At native 3840×2160 the material scene traces in 64.03 ms raw and 104.66 ms denoised, using about 380 and 1,392.5 MiB of GPU storage (the app's fixture, 2026-10-21; an engine run on a slower day recorded 68.81 and 113.44 ms). These are fixture timings, not frame-rate promises. The viewport also has a cheaper preview kernel: the first lit frame after opening a scene arrives in 0.36-0.44 s instead of the 2.1-2.8 s the full tracer's compile used to take. Run-to-run variation between days is large enough that we only compare rows from the same day.</p>
+
+<h2 id="denoise"><span class="n">4</span>The denoiser</h2>
+<p>The denoiser is a classical filter, not a learned one: an edge-avoiding à-trous wavelet filter on albedo-demodulated radiance, with variance-guided luminance stops and a plane-distance geometric stop. In the viewport it accumulates over frames by reprojection and clamps history in YCoCg. At object, material and texture edges it weighs the filtered estimate against the raw mean by their estimated errors, so where the samples already resolve detail, filtering does not blur it.</p>
+<p>The app holds it to 72 quality gates: three original 96×72 fixtures, each with an independent 65,536-sample reference, rendered at 4, 16 and 64 samples with three seeds, and scored in both linear RGB and log(1 + radiance). A gate passes when the denoised image has no overall or flat-area regression against the raw image at the same sample count, and at most 3% regression on geometry and texture edges. The thresholds and fixture hashes have not changed since they were set.</p>
+<div class="table"><table>
+<thead><tr><th>Build</th><th class="num">Gates passed</th></tr></thead>
+<tbody>
+<tr><td>First version</td><td class="num">62 / 72</td></tr>
+<tr><td>Engine commit e1c7aefa (a regression)</td><td class="num">60 / 72</td></tr>
+<tr><td>Engine commit 107af4d6</td><td class="num">72 / 72</td></tr>
+<tr><td>Engine commit 85467ba2, the build the app ships</td><td class="num">72 / 72</td></tr>
+</tbody></table></div>
+<span class="src">docs/rendering.md · docs/verification.md · docs/progress.md (app)</span>
+<p>On the engine's own scenes, averaged over four seeds against 131,072-sample references, it lowers RMSE 2.46x, 2.32x and 2.24x at 4, 16 and 64 samples on the material scene and 2.20x, 2.09x and 2.03x on a caustic scene. Edge pixels gain less. While the camera moves, newly uncovered surfaces are noisy for a few frames. These gates compare against raw output, not against Intel's OIDN, so they say nothing about how we compare with it.</p>
+
+<h2 id="vox"><span class="n">5</span>Opening MagicaVoxel files</h2>
+<p>People who already have a library of <code>.vox</code> files should be able to open them and see what they saw before. So the tracer has an import look that maps a <code>.vox</code> file's render settings onto its own, and we measure how close that gets.</p>
+<h3>Method</h3>
+<p>MagicaVoxel 0.99.7.2 is treated strictly as a black box. We write our own <code>.vox</code> scenes with our own writer of the published format (including the default render settings, which since 2026-10-20 come from our writer, not from a file MagicaVoxel saved). MagicaVoxel renders them through its interface and we save its snapshots; we render the same files and score the two images pixel by pixel. Its code, shaders and configuration were never read. Its renders stay on our machine and are not redistributed, so anyone checking these numbers needs their own copy of MagicaVoxel and our scene scripts.</p>
+<h3>How close</h3>
+<div class="table"><table>
+<thead><tr><th>Comparison, 960×800</th><th>Pixels within 3 of 255 levels</th></tr></thead>
+<tbody>
+<tr><td>Six perspective scenes, default lighting: diffuse, metal 0.2, metal 0.8, glass, emitter, cloud</td><td>99.97, 99.94, 99.85, 99.3, 99.94, 99.93%</td></tr>
+<tr><td>Calibration boards: diffuse, metal, plastic, sun, sky, exposure, tone curve, emitters</td><td>every tile within 3 levels</td></tr>
+<tr><td>Atmosphere, scene lit at sun 50°, 20° and 5°</td><td>99.98, 99.89, 99.81%</td></tr>
+<tr><td>Looking into a low sun (5°)</td><td>98.66% (100% within 6 levels)</td></tr>
+<tr><td>Orthographic and isometric cameras</td><td>100%</td></tr>
+</tbody></table></div>
+<span class="src">docs/magicavoxel-parity.md, "Current scores" · RTX A6000, Edge 155 · 2026-10-20</span>
+<p>Still open: some tiles next to subsurface blocks under the sun are 7-16 levels off, and subsurface is fitted at one density only; glass over a lit floor comes out 1-2 levels bright; grid lines match on 92.7-94.6% of pixels; depth of field never showed in MagicaVoxel's snapshots, so it is not compared.</p>
+<h3>How fast</h3>
+<p>On the same RTX A6000 at 960×800 and 1,024 samples, MagicaVoxel took about 14 s (glass) and 15 s (diffuse), timed by stopwatch on its progress bar to about ±1 s; ours took 1.85 s and 1.70 s, about 8x faster, and 1.7-2.2 s on all six scenes. On one scene (a slab, two cubes, sun, sky and ground), MagicaVoxel's image at 1,024 samples had an 8-bit RMS noise of 0.32 against a 16,384-sample reference; ours had 0.24 raw at the same count and 0.16 denoised. Ours reached MagicaVoxel's 1,024-sample noise level with 64 denoised samples in 0.48 s. Those are two scenes and one GPU, with a stopwatch on one side: treat them as an indication, not a benchmark.</p>
+<span class="src">docs/magicavoxel-parity.md, "Current scores" and "Exceed MagicaVoxel"</span>
+<p>Where MagicaVoxel is ahead: it is a complete, mature, free editor, and its renderer has years of use behind it. We have compared on one PC and one browser.</p>
+<h3>File limits</h3>
+<p>The engine's codec reads and writes versions 150 and 200 of the published format, and an unedited file writes back byte for byte. On export the app merges palette banks into one <code>.vox</code> palette when the occupied colours fit in 255 slots, splits large models into occupied buckets of at most 256 per axis, and refuses what <code>.vox</code> cannot hold (per-object clocks, procedural graphs, placements that are not whole-cell moves and quarter turns) rather than rounding it into something different.</p>
+
+<h2 id="export"><span class="n">6</span>Into game engines</h2>
+<p>GLB export uses greedy meshing with a power-of-two palette atlas and nearest filtering (or vertex colours), optional corner ambient occlusion and crease-controlled normals, and collision naming for Godot and Unreal. The six showcase families export to 18 GLBs with zero Khronos validator errors. We then import them into the engines themselves, scripted, and the table says what each run does and does not prove.</p>
+<div class="table"><table>
+<thead><tr><th>Engine</th><th>Result</th><th>What it proves</th></tr></thead>
+<tbody>
+<tr><td>Unity 6000.6.7f1, glTFast 6.20.0</td><td>134 / 134</td><td>Editor import with offscreen shader checks, point/clamp sampling and all four collision modes. Needs our two helper scripts. Not a standalone-player test.</td></tr>
+<tr><td>Godot 4.7.2, base imports</td><td>85 / 85 configured; 83 / 85 vanilla</td><td>Headless editor import: resources, colliders, hierarchy, transforms. The two vanilla misses are importer vertex-albedo flags. No rendered-pixel check.</td></tr>
+<tr><td>Godot 4.7.2, animation</td><td>62 / 62 compatibility mode; 46 / 62 standard</td><td>The 16 standard-mode differences are combined-TRS cases traced to an upstream Godot issue.</td></tr>
+<tr><td>Godot, showcase scenes</td><td>1,562 import and 770 saved-scene checks</td><td>Zero failures on the six showcase families.</td></tr>
+<tr><td>Unreal Engine, Interchange</td><td>81 import, 37 reload, 20 scene checks</td><td>Hidden CPU-only runs with no GPU; physics simulation and rendered pixels not tested.</td></tr>
+</tbody></table></div>
+<span class="src">docs/verification.md · docs/godot-validation.md · integrations/README.md (app) · 2026-10-21</span>
+<p>The runs also found importer behaviour worth knowing: glTFast lowers emissive strength from 1.4 to 1.0, Godot ignores glass transmission so glass looks opaque, and Unreal's Nanite fallback drops some triangles of one showcase model unless Nanite is turned off for it.</p>
+
+<h2 id="worlds"><span class="n">7</span>Voxel worlds and multiplayer</h2>
+<p>The same engine has packages for Minecraft-style worlds, separate from the editor: <code>@margoengine/voxel</code> stores 32×32×32 palette chunks with a light byte per cell, a block-type registry and a chunked world with dirty tracking, and adds meshing, lighting, streaming and rendering as separate entries. Generation and meshing run in workers.</p>
+<div class="table"><table>
+<thead><tr><th>Sandbox, render distance</th><th class="num">8 chunks</th><th class="num">16 chunks</th></tr></thead>
+<tbody>
+<tr><td>Chunks loaded / with faces</td><td class="num">1,379 / 602</td><td class="num">5,579 / 2,435</td></tr>
+<tr><td>Quads on the GPU</td><td class="num">1.18 M</td><td class="num">4.84 M</td></tr>
+<tr><td>Time to fill the view</td><td class="num">1.06-1.22 s</td><td class="num">3.59-3.67 s</td></tr>
+<tr><td>Frame CPU after filling, median / p95</td><td class="num">0.7 / 1.1 ms</td><td class="num">1.7 / 2.2 ms</td></tr>
+<tr><td>Frame CPU p95 flying at 11 blocks/s while streaming</td><td class="num">3.7 ms</td><td class="num">5.0 ms</td></tr>
+</tbody></table></div>
+<span class="src">examples/package-benchmarks/results/voxel-sandbox-bench.json · RTX A6000 desktop, Edge 155, 1920×1080, 4x MSAA, quiet-gated, seed 1 · laptops and phones not measured</span>
+<p><code>@margoengine/voxel-net</code> is an authoritative Node server on a hand-written WebSocket, a browser client with prediction and correction, and headless bots for load tests. One server process kept 20 ticks per second with 95% of ticks inside the 50 ms budget for <strong>900 players spread over a map</strong> (1,000 went over) and <strong>350 crowded in one spot</strong> where everyone sees everyone (400 went over). At that point the server used about one CPU core. Traffic was 13.7 Mbit/s for the 900 spread players, and a block edit reached other players in 31-77 ms median.</p>
+<span class="src">docs/voxel-net-capacity-2026-10-21.md · packages/voxel-net/bench/results.json · Ryzen 9 9950X, Windows 11, Node 26.12</span>
+<p>Conditions matter here: server and bots ran on one PC over loopback with no latency or loss, the bots do not render, and the prototype has no accounts, persistence or TLS. The multiplayer package is not part of the editor.</p>
+
+<h2 id="limits"><span class="n">8</span>Limits and sizes</h2>
+<div class="table"><table>
+<thead><tr><th>Limit</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>Dense models in the editor</td><td>1-1,024 per axis, 16,777,216 cells shared across base models and animation frames</td></tr>
+<tr><td>Sparse models in the editor</td><td>occupied chunks only, under a separate 128 MiB document cap: bounded authoring, not infinite streaming</td></tr>
+<tr><td>One traced model</td><td>up to 2048 per axis; 65,535 instances; 256 area lights</td></tr>
+<tr><td>Materials in the tracer</td><td>255 per table, up to 4,096 tables per scene</td></tr>
+<tr><td>Animation</td><td>4,096 keys per model, 16,384 per document; frames 0 to 2,147,483,647</td></tr>
+<tr><td>Render output</td><td>up to 8,192 px per axis in the app, 1,024 frames per sequence</td></tr>
+<tr><td>GLB export</td><td>refused above 1 million greedy quads</td></tr>
+<tr><td>GPU memory</td><td>the tracer keeps each storage buffer inside WebGPU's default 128 MiB binding; native 4K, raw and denoised, fits on the tested GPU</td></tr>
+</tbody></table></div>
+<span class="src">README.md · docs/io-compatibility.md · docs/editing-animation-workflows.md (app) · packages/voxel-pathtracer/README.md</span>
+<div class="table spaced"><table>
+<thead><tr><th>Engine entry</th><th class="num">Raw</th><th class="num">Gzip</th></tr></thead>
+<tbody>
+<tr><td><code>@margoengine/voxel-pathtracer</code></td><td class="num">185,351</td><td class="num">65,421</td></tr>
+<tr><td><code>@margoengine/voxel-edit</code> (root entry)</td><td class="num">20,294</td><td class="num">7,533</td></tr>
+<tr><td><code>@margoengine/voxel</code> (root entry)</td><td class="num">13,272</td><td class="num">4,808</td></tr>
+<tr><td><code>@margoengine/voxel/render</code></td><td class="num">52,299</td><td class="num">18,931</td></tr>
+<tr><td><code>@margoengine/voxel-net</code> client / server</td><td class="num">14,022 / 27,284</td><td class="num">5,276 / 10,483</td></tr>
+</tbody></table></div>
+<span class="src">margoengine examples/package-benchmarks/results/entry-sizes.json · commit 5eb44eca · min + gzip, other packages external</span>
+<p>The Windows portable build is about 102.7 MB.</p>
+
+<h2 id="next"><span class="n">9</span>What is not done</h2>
+<ul>
+  <li><strong>Release:</strong> code signing, a public download, a hosted web version and a licence for the asset pack.</li>
+  <li><strong>Platforms:</strong> macOS, Linux, phones and GPUs other than the RTX A6000.</li>
+  <li><strong>Characters:</strong> bone-animation authoring and production weight painting.</li>
+  <li><strong>Parity:</strong> the open items in section 5, and a calibrated comparison inside the app itself rather than through the engine package.</li>
+  <li><strong>Open engine gaps:</strong> deep model hierarchies (65 levels) are refused on GLB export; a face-attach click can miss at an internal grid intersection; a dark oval appears around one showcase model on the studio ground, cause not yet found.</li>
+  <li><strong>Moving code into the engine:</strong> the OBJ writer, atlas packing, animation sampling, rigging and palette maths still live in the app and are listed to move into engine packages.</li>
+</ul>
+
+<h2 id="repro"><span class="n">10</span>Reproduce</h2>
+<p>In the app repository:</p>
+<pre><code>npm ci
+npm test                    # unit tests
+npm run test:browser        # real-Edge browser suite
+npm run test:denoiser       # the 72 denoiser gates (dev server running)
+npm run test:godot          # Godot imports, headless
+npm run test:unity          # Unity Editor imports (after test:unity:prepare)
+npm run desktop:build       # the Windows portable</code></pre>
+<p>In the engine repository, the MagicaVoxel calibration scripts are in <code>packages/voxel-pathtracer/tests/magicavoxel/</code>, the tracer timings in <code>packages/voxel-pathtracer/tests/browser-check.mjs</code>, and the multiplayer benchmark in <code>packages/voxel-net/bench/</code>.</p>
+</div>
+
+
+</main>
+
+<footer>
+  <p>MagicaVoxel is the work of its author, ephtracy. Margo Voxel Studio is an independent project, not affiliated with or endorsed by MagicaVoxel; we use its name only to describe the file format and the comparison.</p>
+  <p class="links"><a href="./engine.html">Margo Engine whitepaper</a> <a href="../catalog/">Catalog</a> <a href="../THIRD-PARTY-NOTICES.md">Third-party notices</a></p>
+  <p>Margo Engine's own code is MIT licensed. Built with precision, named with love. For Margie.</p>
+</footer>
+</body>
+</html>
