@@ -15,7 +15,7 @@ tonemap.dispose();
 stage.dispose();
 ```
 
-`agx` uses the Rec.2020 AgX inset/outset matrices and an analytic sigmoid approximation. `acescg` selects an ACES fitted RRT/ODT display transform, with AP1 color handling; it is not the full ACES reference pipeline. ACEScg itself is a working color space. Core's default input is `linear-srgb`; use `inputColorSpace:'acescg'` only with an external AP1/D60 HDR `source`. `neutral`, the default, implements Khronos PBR Neutral: Margo's display curve, the one core and every package end with, so attaching Tonemap with no options changes nothing until you grade. See [references](NOTICE.md).
+`agx` is the AgX Base display transform computed in the shader: Rec.2020 inset, log2 encoding over 16.5 stops around 18% grey, the parametric AgX sigmoid, hue restoration, then the outset back to Rec.709. 18% grey stays 18% grey. `acescg` selects an ACES fitted RRT/ODT display transform, with AP1 color handling; it is not the full ACES reference pipeline. ACEScg itself is a working color space. Core's default input is `linear-srgb`; use `inputColorSpace:'acescg'` only with an external AP1/D60 HDR `source`. `neutral`, the default, implements Khronos PBR Neutral: Margo's display curve, the one core and every package end with, so attaching Tonemap with no options changes nothing until you grade. See [references](NOTICE.md).
 
 Order: input color conversion → exposure in stops (−16 to 16) → selected curve → contrast around linear 18% gray (0 to 4) → optional LUT → clamp and exact sRGB transfer. The LUT operates on display-linear RGB after the curve; provide a LUT authored for that domain. It is not an automatic OCIO transform or a log/sRGB-encoded LUT decoder.
 

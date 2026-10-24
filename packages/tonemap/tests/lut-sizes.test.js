@@ -5,8 +5,8 @@ import { Tonemap } from '../dist/index.js';
 import { PostStack } from '../../post/dist/index.js';
 import { gpuHarness } from '../../../tests/support/postfx-gpu.js';
 
-const defaultShader = '4144b8e9d3d67651f86da5b25918134b75b9740a137c7cd125d61589a94909a5',
-  defaultOutputShader = '71832f4f7c2ff43ce4db514b86205c73c51153f4777b602a481b85c20433b326';
+const defaultShader = '428a891a0b7506d87f98db09a16e43beba77e7e355c837e8f5eacd294f233b4a',
+  defaultOutputShader = '3c1dc2e0c3aeb30a0f5bc0d012d9fbde20607289f274937066c4b324ea20612c';
 const hash = (code) => createHash('sha256').update(code).digest('hex');
 
 function lut(size = 33, explicit = true) {
@@ -83,9 +83,10 @@ function harness({ external = true, output = false } = {}) {
       frame();
       return draws.filter((draw) => draw.pipeline.fragment?.module.code.includes('fn sampleLUT'));
     },
-    close(effect) {
+    async close(effect) {
       effect.dispose();
       h.input?.destroy();
+      await null;
       assert.ok(
         h.resources.every((resource) => resource.destroyed),
         'effect resources must all be released',
@@ -97,7 +98,7 @@ function harness({ external = true, output = false } = {}) {
 const boundLUT = (draw) => draw.group.entries.find((entry) => entry.binding === 2).resource.texture;
 const domains = (h) => [...h.writes.slice(4, 7), ...h.writes.slice(8, 11)];
 
-test('Tonemap uploads every supported LUT size with its own row pitch and red-fastest samples', () => {
+test('Tonemap uploads every supported LUT size with its own row pitch and red-fastest samples', async () => {
   const h = harness(),
     effect = Tonemap.attach(h.engine, h.options);
   try {
@@ -121,11 +122,11 @@ test('Tonemap uploads every supported LUT size with its own row pitch and red-fa
       assert.deepEqual(domains(h), [-1, 0.25, 2, 1, 2, 5]);
     }
   } finally {
-    h.close(effect);
+    await h.close(effect);
   }
 });
 
-test('unattached LUT assignment snapshots size, data and domains through attachment and restoration', () => {
+test('unattached LUT assignment snapshots size, data and domains through attachment and restoration', async () => {
   const h = harness(),
     effect = new Tonemap(h.options),
     input = lut(16);
@@ -150,11 +151,11 @@ test('unattached LUT assignment snapshots size, data and domains through attachm
     assert.equal(h.uploads.at(-1).data[0], 0.125);
     assert.deepEqual(domains(h), [-1, 0.25, 2, 1, 2, 5]);
   } finally {
-    h.close(effect);
+    await h.close(effect);
   }
 });
 
-test('legacy omitted size, explicit 33 and no LUT preserve the existing shader, pipeline key and steady draw calls', () => {
+test('legacy omitted size, explicit 33 and no LUT preserve the existing shader, pipeline key and steady draw calls', async () => {
   for (const output of [false, true])
     for (const input of [null, lut(33, false), lut(33)]) {
       const h = harness({ output }),
@@ -199,12 +200,12 @@ test('legacy omitted size, explicit 33 and no LUT preserve the existing shader, 
         for (const key of ['buffers', 'textures', 'views', 'groups', 'uploads'])
           assert.equal(h.counts[key], before[key]);
       } finally {
-        h.close(effect);
+        await h.close(effect);
       }
     }
 });
 
-test('LUT swaps select one generic pipeline for 16 and 65 then return to the exact 33 and disabled paths', () => {
+test('LUT swaps select one generic pipeline for 16 and 65 then return to the exact 33 and disabled paths', async () => {
   const h = harness(),
     effect = Tonemap.attach(h.engine, h.options);
   try {
@@ -233,11 +234,11 @@ test('LUT swaps select one generic pipeline for 16 and 65 then return to the exa
     for (const key of ['buffers', 'textures', 'views', 'groups', 'uploads'])
       assert.equal(h.counts[key], allocations[key]);
   } finally {
-    h.close(effect);
+    await h.close(effect);
   }
 });
 
-test('invalid size and array/domain data preserve the previously bound LUT and uniforms', () => {
+test('invalid size and array/domain data preserve the previously bound LUT and uniforms', async () => {
   const h = harness(),
     effect = Tonemap.attach(h.engine, h.options),
     original = lut(33);
@@ -258,11 +259,11 @@ test('invalid size and array/domain data preserve the previously bound LUT and u
       assert.equal(previous.destroyed, false);
     }
   } finally {
-    h.close(effect);
+    await h.close(effect);
   }
 });
 
-test('create and write failures retain the previous CPU and GPU state and release only a failed new texture', () => {
+test('create and write failures retain the previous CPU and GPU state and release only a failed new texture', async () => {
   for (const mode of ['create', 'write', 'clear']) {
     const h = harness(),
       effect = Tonemap.attach(h.engine, h.options),
@@ -311,12 +312,12 @@ test('create and write failures retain the previous CPU and GPU state and releas
       assert.deepEqual(domains(h), [-1, 0.25, 2, 1, 2, 5]);
       assert.equal(h.writes[3], 1);
     } finally {
-      h.close(effect);
+      await h.close(effect);
     }
   }
 });
 
-test('device dimension limits reject attachment, replacement and restoration before allocating a 3D texture', () => {
+test('device dimension limits reject attachment, replacement and restoration before allocating a 3D texture', async () => {
   const attached = harness(),
     effect = Tonemap.attach(attached.engine, attached.options);
   try {
@@ -329,7 +330,7 @@ test('device dimension limits reject attachment, replacement and restoration bef
     assert.equal(boundLUT(attached.frame()[0]), previous);
     assert.deepEqual(domains(attached), [-1, 0.25, 2, 1, 2, 5]);
   } finally {
-    attached.close(effect);
+    await attached.close(effect);
   }
   const lazy = harness(),
     delayed = new Tonemap(lazy.options);
@@ -339,7 +340,7 @@ test('device dimension limits reject attachment, replacement and restoration bef
     assert.throws(() => lazy.engine.use(delayed), RangeError);
     assert.equal(lazy.textures.length, 0);
   } finally {
-    lazy.close(delayed);
+    await lazy.close(delayed);
   }
   const restored = harness(),
     retry = Tonemap.attach(restored.engine, restored.options);
@@ -355,11 +356,11 @@ test('device dimension limits reject attachment, replacement and restoration bef
     retry.onDeviceRestored(restored.engine);
     assert.deepEqual(boundLUT(restored.frame()[0]).size, [65, 65, 65]);
   } finally {
-    restored.close(retry);
+    await restored.close(retry);
   }
 });
 
-test('failed device restoration keeps enough ownership for disposal to remove the plugin and frame passes', () => {
+test('failed device restoration keeps enough ownership for disposal to remove the plugin and frame passes', async () => {
   for (const stage of ['buffer', 'texture', 'upload']) {
     const h = harness(),
       effect = Tonemap.attach(h.engine, h.options),
@@ -399,12 +400,12 @@ test('failed device restoration keeps enough ownership for disposal to remove th
       assert.doesNotThrow(() => h.frame());
       assert.equal(h.counts.render, renderCount, 'disposed grading passes must no longer run');
     } finally {
-      h.close(effect);
+      await h.close(effect);
     }
   }
 });
 
-test('ColorOutput uses dimension-based LUT sampling in both its display and excess fragments', () => {
+test('ColorOutput uses dimension-based LUT sampling in both its display and excess fragments', async () => {
   const h = harness({ output: true }),
     effect = Tonemap.attach(h.engine, h.options);
   try {
@@ -436,11 +437,11 @@ test('ColorOutput uses dimension-based LUT sampling in both its display and exce
       ],
     );
   } finally {
-    h.close(effect);
+    await h.close(effect);
   }
 });
 
-test('PostStack display and string assignments use variable-size LUTs without replacing the shared HDR capture', () => {
+test('PostStack display and string assignments use variable-size LUTs without replacing the shared HDR capture', async () => {
   const h = harness({ external: false }),
     effect = new Tonemap();
   let stack;
@@ -458,6 +459,6 @@ test('PostStack display and string assignments use variable-size LUTs without re
     assert.equal(stack.sceneTexture, capture);
     assert.equal(h.context.color, h.originalColor);
   } finally {
-    h.close(stack ?? effect);
+    await h.close(stack ?? effect);
   }
 });

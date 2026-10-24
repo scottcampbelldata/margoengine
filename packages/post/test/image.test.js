@@ -32,6 +32,20 @@ test('isolated Bloom encodes the existing HDR kernel without attaching or removi
   assert.ok(h.resources.every((resource) => resource.destroyed));
 });
 
+test('ImagePost agx draws with the shared AgX shader and no extra resources', async () => {
+  const h = optionalGPU(),
+    effect = post.ImagePost.attach(h.engine, { toneMapping: 'agx' });
+  assert.equal(effect.options.toneMapping, 'agx');
+  h.frame();
+  const display = h.pipelines.findLast((p) => p.fragment?.module?.code?.includes('fn agx('));
+  assert.ok(display, 'the display shader carries the shared agx()');
+  assert.equal(h.groups.at(-1).entries.length, 2, 'image and options only');
+  assert.equal(h.resources.filter((r) => r.dimension === '3d').length, 0);
+  effect.dispose();
+  await null;
+  assert.ok(h.resources.every((r) => r.destroyed));
+});
+
 test('ImagePost rejects invalid image and display options before touching an engine', async () => {
   assert.equal(typeof post.ImagePost, 'function');
   for (const options of [

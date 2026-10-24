@@ -12,6 +12,22 @@ function cube() {
   return text;
 }
 const text = cube();
+test('AgX is computed in the shader: no extra texture or binding, and switching curves keeps resources steady', async () => {
+  const h = gpuHarness(),
+    effect = Tonemap.attach(h.engine, { curve: 'agx' });
+  h.frame();
+  assert.equal(h.groups.at(-1).entries.length, 3);
+  assert.equal(h.resources.filter((r) => r.dimension === '3d').length, 1, 'only the grading LUT');
+  const before = { ...h.counts };
+  for (const curve of ['neutral', 'agx', 'acescg', 'agx']) {
+    effect.options.curve = curve;
+    h.frame();
+  }
+  for (const key of ['buffers', 'textures']) assert.equal(h.counts[key], before[key]);
+  effect.dispose();
+  await null;
+  assert.ok(h.resources.every((r) => r.destroyed));
+});
 test('.cube parser honors red-fastest order, domains, comments, scientific notation and exact counts', () => {
   const lut = parseCube(
     '\uFEFF# comment\r\n' +
@@ -56,7 +72,7 @@ test('Tonemap validates color controls and the standalone color space', () => {
   assert.throws(() => new Tonemap().setup({ gpu: null }), /WebGPU/);
 });
 
-test('Tonemap reuses resources, snapshots LUT data and releases/restores all owned resources', () => {
+test('Tonemap reuses resources, snapshots LUT data and releases/restores all owned resources', async () => {
   const h = gpuHarness(),
     effect = Tonemap.attach(h.engine, { curve: 'neutral' }),
     lut = parseCube(text);
@@ -87,12 +103,13 @@ test('Tonemap reuses resources, snapshots LUT data and releases/restores all own
   assert.equal(h.writes[3], 0);
   effect.destroy();
   effect.destroy();
+  await null;
   assert.ok(h.resources.every((r) => r.destroyed));
   assert.equal(h.engine.hasPlugin('tonemap'), false);
   assert.throws(() => effect.setLUT(null), /disposed/);
 });
 
-test('DOF HDR chaining works on resize/restoration and rejects missing or invalid source textures', () => {
+test('DOF HDR chaining works on resize/restoration and rejects missing or invalid source textures', async () => {
   const h = gpuHarness(),
     dof = DOF.attach(h.engine);
   assert.throws(() => Tonemap.attach(h.engine), /HDR source/);
@@ -108,6 +125,7 @@ test('DOF HDR chaining works on resize/restoration and rejects missing or invali
   h.frame();
   grade.destroy();
   dof.destroy();
+  await null;
   assert.ok(h.resources.every((r) => r.destroyed));
   const missing = gpuHarness(),
     invalid = Tonemap.attach(missing.engine, { source: () => undefined });

@@ -31,7 +31,7 @@ export const tonemapShader =
   let source=textureLoad(scene,vec2i(pos.xy),0);var hdr=source.rgb;
   if(p.settings.x==1.0){hdr=acescgToSRGB(hdr);}
   hdr=max(hdr,vec3f(0))*exp2(p.grade.x);
-  var color=agx(hdr);if(p.grade.z==1.0){color=aces(hdr);}else if(p.grade.z==2.0){color=pbrNeutral(hdr);}
+  var color:vec3f;if(p.grade.z==1.0){color=aces(hdr);}else if(p.grade.z==2.0){color=pbrNeutral(hdr);}else{color=agx(hdr);}
   color=clamp((color-0.18)*p.grade.y+0.18,vec3f(0),vec3f(1));
   if(p.grade.w==1.0){color=sampleLUT(color);}
   color=clamp(color,vec3f(0),vec3f(1));
@@ -63,7 +63,7 @@ fn linearOutput(pos:vec4f)->vec4f {
     let peak=max(color.r,max(color.g,color.b));
     if(peak>=0.76){let newPeak=rolloff(peak,white);color*=newPeak/peak;color=mix(color,vec3f(newPeak),1.0-1.0/(0.15*(peak-newPeak)+1.0));}
   }else{
-    color=agx(positive);if(p.grade.z==1.0){color=aces(positive);}
+    if(p.grade.z==1.0){color=aces(positive);}else{color=agx(positive);}
     if(m>=0.76){color*=rolloff(m,white)/rolloff(m,1.0);}
   }
   color=clamp((color-0.18)*p.grade.y+0.18,vec3f(0),vec3f(white));

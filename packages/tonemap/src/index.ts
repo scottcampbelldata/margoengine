@@ -12,6 +12,7 @@ import { parseCube, validateLUT, type CubeLUT } from './cube.js';
 import { outputShader, tonemapShader, sizedLUTShader } from './shaders.js';
 import type { StackHost, StackStage } from '../../shared/stack.js';
 import { MargoError } from '@margoengine/math/errors';
+import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 export { parseCube };
 export type { CubeLUT };
 
@@ -22,7 +23,7 @@ type Context = Extract<PassContext, { backend: 'webgpu' }>;
 const OUTPUT = Symbol.for('margoengine.color-output');
 type Output = { peak: number; p3: boolean; excess?: (width: number, height: number) => GPUTextureView };
 /**
- * Display transform: `'neutral'` (Khronos PBR Neutral, core's own curve), `'agx'` (Rec.2020 AgX, analytic sigmoid) or
+ * Display transform: `'neutral'` (Khronos PBR Neutral, core's own curve), `'agx'` (AgX, computed in the shader) or
  * `'acescg'` (ACES fitted RRT/ODT with AP1 handling).
  */
 export type TonemapCurve = 'agx' | 'acescg' | 'neutral';
@@ -349,17 +350,21 @@ export class Tonemap implements EnginePlugin {
     v[14] = +!!(excess && out!.p3);
     c.device.queue.writeBuffer(this.uniform!, 0, v as Float32Array<ArrayBuffer>);
     this.attachment.view = view;
+    this.attachment.loadOp = viewLoadOp(c, 'clear');
     const pass = c.encoder.beginRenderPass(this.presentation);
     pass.setPipeline(this.pipeline);
     pass.setBindGroup(0, this.group);
+    applyView(pass, c);
     pass.draw(3);
     pass.end();
     // Highlights above SDR white and colours outside sRGB, for ColorOutput to add back on the P3/HDR canvas.
     if (excess) {
       this.excessPass.view = excess(c.width, c.height);
+      this.excessPass.loadOp = viewLoadOp(c, 'clear');
       const extra = c.encoder.beginRenderPass(this.excessDescriptor);
       extra.setPipeline(this.excessPipeline!);
       extra.setBindGroup(0, this.excessGroup!);
+      applyView(extra, c);
       extra.draw(3);
       extra.end();
     }

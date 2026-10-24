@@ -7,11 +7,14 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { neutralShader } from '../../shared/display.js';
+import { agxShader } from '../../shared/agx.js';
+import { acesNarkowiczShader } from '../../shared/aces.js';
 import { margoError } from '../../shared/errors.js';
 import { render } from '../../shared/gpu.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { Bloom, type BloomOptions } from './bloom.js';
 import { PostStack } from './stack.js';
+import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; MAP_READ: number };
 declare const GPUTextureUsage: {
   COPY_DST: number;
@@ -29,7 +32,7 @@ export interface ImagePostOptions {
   /** Existing Margo Bloom kernel. Its exposure is kept at zero; use the shared exposure below. */
   bloom?: Pick<BloomOptions, 'strength' | 'threshold' | 'radius'>;
   /** Display transform, matching the voxel path tracer's public choices. Default neutral. */
-  toneMapping?: 'neutral' | 'linear' | 'aces-narkowicz';
+  toneMapping?: 'neutral' | 'linear' | 'aces-narkowicz' | 'agx';
   /** Exposure stops, -20 to 20; default zero. Must match the producer's HDR viewport exposure. */
   exposure?: number;
   /** Display gamma, 1 to 5, or undefined for standard sRGB. */
@@ -57,8 +60,8 @@ const range = (value: unknown, label: string, min: number, max: number) => {
 function checkedOptions(value: ImagePostOptions): ImagePostOptions {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new TypeError('ImagePost options: pass an object');
-  if (value.toneMapping !== undefined && !['neutral', 'linear', 'aces-narkowicz'].includes(value.toneMapping))
-    throw new TypeError('ImagePost toneMapping: pass neutral, linear or aces-narkowicz');
+  if (value.toneMapping !== undefined && !['neutral', 'linear', 'aces-narkowicz', 'agx'].includes(value.toneMapping))
+    throw new TypeError('ImagePost toneMapping: pass neutral, linear, aces-narkowicz or agx');
   if (value.gamma !== undefined) range(value.gamma, 'gamma', 1, 5);
   if (value.exposure !== undefined) range(value.exposure, 'exposure', -20, 20);
   if (value.vignette !== undefined) range(value.vignette, 'vignette', 0, 100);
@@ -76,6 +79,8 @@ function checkedOptions(value: ImagePostOptions): ImagePostOptions {
 // the producer's exposure/vignette before bloom; the viewport producer has already done that to its HDR target.
 const shader =
   neutralShader +
+  agxShader +
+  acesNarkowiczShader +
   `
 @group(0) @binding(0) var image:texture_2d<f32>;
 @group(0) @binding(1) var<uniform> options:array<vec4f,2>;
@@ -83,7 +88,6 @@ const shader =
  let p=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));return vec4f(p[i],0,1);
 }
 fn srgb(c:vec3f)->vec3f{return select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.055,c>=vec3f(0.0031308));}
-fn aces(c:vec3f)->vec3f{let x=0.6*c;return clamp(x*(2.51*x+0.03)/(x*(2.43*x+0.59)+0.14),vec3f(0),vec3f(1));}
 @fragment fn fragment(@builtin(position) p:vec4f)->@location(0) vec4f{
  let s=textureLoad(image,vec2i(p.xy),0);var c=max(s.rgb,vec3f(0));let mode=u32(options[0].w);
  if(mode==3u){
@@ -93,7 +97,7 @@ fn aces(c:vec3f)->vec3f{let x=0.6*c;return clamp(x*(2.51*x+0.03)/(x*(2.43*x+0.59
  // Coverage is preserved; a glow on the transparent surround raises alpha so its light survives compositing.
  let a=max(s.a,clamp(max(c.r,max(c.g,c.b)),0.0,1.0));
  if(options[1].z>0.0){c/=max(a,0.000001);}
- if(mode==0u){c=pbrNeutral(c);}else if(mode==2u){c=aces(c);}
+ if(mode==0u){c=pbrNeutral(c);}else if(mode==2u){c=acesNarkowicz(c);}else if(mode==4u){c=agx(c);}
  c=clamp(c,vec3f(0),vec3f(1));let g=options[0].y;
  if(g==1.0){return vec4f(c,a);}
  c=select(srgb(c),pow(c,vec3f(1.0/max(g,1.0))),g>0.0);
@@ -142,7 +146,9 @@ class ImageDisplay implements EnginePlugin {
           ? 1
           : this.options.toneMapping === 'aces-narkowicz'
             ? 2
-            : 0,
+            : this.options.toneMapping === 'agx'
+              ? 4
+              : 0,
       c.width,
       c.height,
       +straight,
@@ -161,10 +167,11 @@ class ImageDisplay implements EnginePlugin {
       this.pipeline = pipeline;
     }
     const pass = c.encoder.beginRenderPass({
-      colorAttachments: [{ view: output.view, loadOp: 'clear', storeOp: 'store' }],
+      colorAttachments: [{ view: output.view, loadOp: viewLoadOp(c, 'clear'), storeOp: 'store' }],
     });
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, this.group!);
+    applyView(pass, c);
     pass.draw(3);
     pass.end();
   }
