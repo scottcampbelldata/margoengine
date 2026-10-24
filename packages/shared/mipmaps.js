@@ -47,7 +47,7 @@ export function generateMipmaps(device, texture, levels = texture.mipLevelCount,
             baseArrayLayer: layer,
             arrayLayerCount: 1,
           })
-        : texture.createView({ format, baseMipLevel, mipLevelCount: 1 });
+        : texture.createView({ baseMipLevel, mipLevelCount: 1 });
     for (let i = 1; i < levels; i++) {
       const group = device.createBindGroup({
         layout: pipeline.getBindGroupLayout(0),

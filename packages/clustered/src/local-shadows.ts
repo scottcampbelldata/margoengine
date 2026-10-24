@@ -566,7 +566,7 @@ export class LocalShadowMaps {
         sampler: p.alphaSampler,
         epoch: this.epoch,
         displacement,
-        displaced: displacementGroup(this.device!, pipeline.getBindGroupLayout(1), displacement),
+        displaced: displacementGroup(this.device!, () => pipeline.getBindGroupLayout(1), displacement),
       };
       records.set(identity, record);
     }

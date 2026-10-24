@@ -59,11 +59,12 @@ export function casterRuntime(source, engine, noun) {
   return runtime;
 }
 
-/** The bind group of a displaced caster (shared/displacement.js): its feature uniform, map and sampler; else undefined. */
+/** The bind group of a displaced caster (shared/displacement.js): its feature uniform, map and sampler; else undefined.
+ * `layout` is called only when there is a displacement. */
 export const displacementGroup = (device, layout, displacement) =>
   displacement
     ? device.createBindGroup({
-        layout,
+        layout: layout(),
         entries: [
           { binding: 0, resource: { buffer: displacement.buffer } },
           { binding: 1, resource: displacement.view },

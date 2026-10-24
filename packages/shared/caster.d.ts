@@ -16,7 +16,7 @@ export function casterRuntime<S extends object, R>(source: S, engine: unknown, n
 /** The bind group of a displaced caster: its feature uniform, map and sampler; else undefined. */
 export function displacementGroup(
   device: GPUDevice,
-  layout: GPUBindGroupLayout,
+  layout: () => GPUBindGroupLayout,
   displacement: { buffer: GPUBuffer; view: GPUTextureView; sampler: GPUSampler } | undefined,
 ): GPUBindGroup | undefined;
 /** A cleared depth-only pass descriptor; set `depthStencilAttachment.view` before each use. */

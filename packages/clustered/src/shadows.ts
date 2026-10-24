@@ -925,7 +925,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
           seen: true,
           key,
           displacement,
-          displaced: displacementGroup(this.device!, this.displacementLayout(), displacement),
+          displaced: displacementGroup(this.device!, () => this.displacementLayout(), displacement),
         };
         records.set(identity, d);
         this.changed = true;

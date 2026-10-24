@@ -1080,7 +1080,7 @@ export class Shadows implements EnginePlugin {
         sampler: p.alphaSampler,
         section: section?.buffer,
         displacement,
-        displaced: displacementGroup(this.device!, pipeline.getBindGroupLayout(1), displacement),
+        displaced: displacementGroup(this.device!, () => pipeline.getBindGroupLayout(1), displacement),
       };
       records.set(identity, record);
     }
