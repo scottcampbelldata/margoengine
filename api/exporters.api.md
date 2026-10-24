@@ -78,6 +78,7 @@ export interface ExportNode {
     material?: PbrMaterial | MaterialData;
     primitives?: readonly ExportPrimitive[];
     visible?: boolean;
+    retainedVisibility?: boolean;
     children?: readonly ExportNode[];
     skin?: SkinData;
     morphWeights?: readonly number[];

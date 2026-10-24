@@ -232,6 +232,12 @@ export interface ExportNode {
   /** A multi-material mesh, instead of `geometry` and `material`. */
   primitives?: readonly ExportPrimitive[];
   visible?: boolean;
+  /**
+   * glTF writers only: emit KHR_node_visibility while retaining this node, its geometry and descendants.
+   * Unlike `visible`, this does not filter the export. Explicit true is written too; omitted means no extension.
+   * Requires the hierarchy (`flatten: false`, the default).
+   */
+  retainedVisibility?: boolean;
   children?: readonly ExportNode[];
   skin?: SkinData;
   morphWeights?: readonly number[];
@@ -370,6 +376,7 @@ export interface Node {
   extras?: Extras;
   meshName?: string;
   meshExtras?: Extras;
+  retainedVisibility?: boolean;
 }
 
 /** @internal Map slots of an @margoengine/materials Material, in gltf-pro's map order. */
@@ -1127,6 +1134,8 @@ export function collect(source: ExportSource, options: SceneOptions = {}, plan?:
     seen.add(data);
     if (data.visible !== undefined && typeof data.visible !== 'boolean') fail('visible must be boolean');
     if (onlyVisible && data.visible === false) return null;
+    if (data.retainedVisibility !== undefined && typeof data.retainedVisibility !== 'boolean')
+      fail('retainedVisibility must be boolean');
     if (data.name !== undefined && typeof data.name !== 'string') fail('Node name must be a string');
     let node: Node;
     if (data.matrix !== undefined) {
@@ -1152,6 +1161,7 @@ export function collect(source: ExportSource, options: SceneOptions = {}, plan?:
         parent,
       );
     node.source = data;
+    node.retainedVisibility = data.retainedVisibility;
     if (data.matrix === undefined)
       node.given = { t: data.translation !== undefined, r: data.rotation !== undefined, s: data.scale !== undefined };
     for (const key of ['camera', 'light'] as const)

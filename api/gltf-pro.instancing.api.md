@@ -195,6 +195,7 @@ interface GLTFExtensions {
   KHR_texture_transform?: GLTFTextureTransform;
   EXT_mesh_gpu_instancing?: GLTFInstancing;
   KHR_lights_punctual?: { light?: number; lights?: GLTFLightDefinition[] };
+  KHR_node_visibility?: { visible?: boolean };
   KHR_materials_variants?: { variants?: { name: string }[]; mappings?: { material: number; variants: number[] }[] };
   KHR_materials_unlit?: object;
   KHR_materials_emissive_strength?: { emissiveStrength?: number };

@@ -692,6 +692,8 @@ function document(source: ExportSource, options: GLTFOptions, writer = new Write
         throw new TypeError('Flatten does not support skins, morphs or animation');
       if (node.camera || node.light)
         throw new TypeError('Flatten does not support cameras or lights; keep the hierarchy');
+      if (node.retainedVisibility !== undefined)
+        throw new TypeError('retainedVisibility requires the hierarchy; pass flatten: false');
       node.children.forEach(check);
     };
     roots.forEach(check);
@@ -728,6 +730,11 @@ function document(source: ExportSource, options: GLTFOptions, writer = new Write
       if (node.morphWeights) out.weights = Array.from(node.morphWeights);
       if (node.camera) out.camera = writer.camera(node.camera);
       if (node.light) out.extensions = { KHR_lights_punctual: { light: writer.light(node.light) } };
+      if (node.retainedVisibility !== undefined) {
+        const extensions = (out.extensions ??= {}) as Record<string, unknown>;
+        extensions.KHR_node_visibility = { visible: node.retainedVisibility };
+        writer.used.add('KHR_node_visibility');
+      }
       const extras = copyExtras(node.extras, 'Node extras');
       if (extras) out.extras = extras;
       if (node.children.length) out.children = node.children.map(visit);

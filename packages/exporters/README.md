@@ -98,6 +98,14 @@ Engine export entrypoints also bake back-only optional PBR triangles by reversin
 
 `GeometryData` is `{positions, normals, uvs?, tangents?, colors?, indices?, faceSizes?, joints?, weights?, morphs?}` with xyz, xyz, uv, xyzw and linear rgb or rgba per vertex. `uvs` follow glTF (v = 0 at the image's top, images as encoded): a materials mesh's v-up UVs go in as `1 - v`. `faceSizes` lists corners per face in index order: 3 for a triangle, 4 for the next two triangles when they form a quad (sharing an edge, as (a, b, c), (a, c, d)); OBJ and DAE write those quads as 4-corner faces, the other formats write the triangles. Inputs are validated: finite Float32 values, matching lengths, complete triangles, indices in range, colors in [0, 1], nonzero scales (or [0, 0, 0], below) and quaternions, PNG or JPEG bytes that match `mimeType`, and textured materials only on geometry with the UV set they sample.
 
+### Retaining hidden nodes
+
+Data-scene `ExportNode.retainedVisibility` writes `KHR_node_visibility` without filtering the node, geometry or descendants. Omit it for the default visible fallback; explicitly set `false` for a hidden collision helper whose geometry and socket nodes must survive export. The extension is listed in `extensionsUsed`, not `extensionsRequired`. Existing `visible: false` still controls `onlyVisible` filtering. Retained visibility needs hierarchy export; `flatten: true` rejects it with a `TypeError`.
+
+```ts
+const glb = exportGLB({nodes: [{name: 'Helper-colonly', geometry, retainedVisibility: false}]});
+```
+
 ## Data-scene skin, morph and animation export
 
 `exportGLTF` and `exportGLB` accept deformation data on plain scenes and retain bind-pose skin/morph data from loaded PBR engine nodes. Original animation clips are not forwarded from an engine; supply a data scene with `animations` to export clips. Keep the hierarchy when exporting deformation; `flatten: true` rejects skins, morphs and clips.

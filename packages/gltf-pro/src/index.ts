@@ -903,6 +903,11 @@ function transform(node: Mesh, def: GLTFNode): void {
       .setScale((def.scale ?? [1, 1, 1]) as [number, number, number])
       .setQuaternion(def.rotation ?? [0, 0, 0, 1]);
 }
+
+function nodeVisible(engine: Engine, node: Mesh): boolean {
+  for (let id = node.id; id !== -1; id = engine.store.parents[id]) if (engine.store.hidden[id]) return false;
+  return true;
+}
 export class PBRModel implements EnginePlugin {
   /** Optional scene-wide opaque phase, used by caller-owned color captures. */
   static beginOpaquePass(context: Context): void {
@@ -986,6 +991,15 @@ export class PBRModel implements EnginePlugin {
     defs.forEach((def, id) => {
       if (!def || (def.children !== undefined && !Array.isArray(def.children)))
         throw new TypeError('Invalid glTF node');
+      const visibility = def.extensions?.KHR_node_visibility;
+      if (
+        visibility !== undefined &&
+        (!visibility ||
+          typeof visibility !== 'object' ||
+          Array.isArray(visibility) ||
+          (visibility.visible !== undefined && typeof visibility.visible !== 'boolean'))
+      )
+        throw new TypeError(`glTF node ${id} KHR_node_visibility must be an object with an optional boolean visible`);
       for (const child of def.children ?? []) {
         const c = integer(child, 'child');
         if (c >= defs.length || parents[c] !== -1 || c === id) throw new Error('Invalid glTF hierarchy');
@@ -1021,6 +1035,7 @@ export class PBRModel implements EnginePlugin {
         this.nodes.push(node);
         this.created.push(node);
         node.name = defs[i].name ?? '';
+        node.visible = defs[i].extensions?.KHR_node_visibility?.visible ?? true;
         transform(node, defs[i]);
       }
       for (let i = 0; i < defs.length; i++)
@@ -2705,11 +2720,11 @@ export class PBRModel implements EnginePlugin {
       throw error;
     }
   }
-  /** World-space point and spot lights for `clustered.setLights()`. Directional lights are left to engine lighting; an unset range ends where intensity/d² reaches 1/256. */
+  /** World-space visible point and spot lights for `clustered.setLights()`. Hidden ancestors hide their lights. Directional lights are left to engine lighting; an unset range ends where intensity/d² reaches 1/256. */
   clusteredLights(): GLTFClusteredLight[] {
     this.engine.store.tick(false);
     return this.lights
-      .filter((l) => l.type !== 'directional')
+      .filter((l) => l.type !== 'directional' && nodeVisible(this.engine, l.node))
       .map((l) => {
         const m = l.node.matrix,
           light: GLTFClusteredLight = {
@@ -2928,13 +2943,26 @@ export async function parseGLTFAsync(
   });
   return attach(instance, { asset, images: images as GLTFImage[] }, options.signal);
 }
+const importedSun = new WeakMap<
+  Engine,
+  {
+    owner: WeakRef<PBRModel>;
+    baseline: Float32Array;
+    applied: Float32Array;
+  }
+>();
+const sunState = (engine: Engine): Float32Array =>
+  Float32Array.from([...engine.lighting.direction, ...engine.lighting.radiance.subarray(0, 3)]);
 /**
- * Applies a model's KHR_lights_punctual lights in one call. The first directional light becomes the engine's light
+ * Applies a model's KHR_lights_punctual lights in one call. The first visible directional light becomes the engine's light
  * (`engine.lighting`: direction toward the light, its colour, and its lux x `exposure` as the strength; core's default
  * strength is 3 and core has one directional light, so further ones are ignored). Point and spot lights go to `clustered`
  * (@margoengine/clustered, candela x `exposure`), which then lights the model; without it they are ignored. Lights are
  * placed where their nodes are now: after moving the model, call `clustered.setLights(model.clusteredLights())` (or this
- * again for the sun). Call once per clustered instance; returns the remover from `clustered.add` (a no-op without one).
+ * again for the sun). Reapply after changing light visibility. If this model owns the last imported sun and none of its
+ * directional lights remain visible, restores the lighting from before imported suns were applied, unless the caller
+ * changed it afterward. The most recently applied model owns the sun; no other model is selected automatically.
+ * Call once per clustered instance; returns the remover from `clustered.add` (a no-op without one).
  */
 export function applyGLTFLights(
   model: PBRModel,
@@ -2943,13 +2971,27 @@ export function applyGLTFLights(
   if (!Number.isFinite(exposure) || exposure < 0)
     throw new RangeError('applyGLTFLights: exposure must be a finite number >= 0');
   const engine = model['engine'],
-    sun = model.lights.find((l) => l.type === 'directional');
+    sun = model.lights.find((l) => l.type === 'directional' && nodeVisible(engine, l.node));
+  const previous = importedSun.get(engine),
+    current = sunState(engine),
+    unchanged = previous?.applied.every((value, index) => value === current[index]);
   if (sun) {
     engine.store.tick(false);
     const m = sun.node.matrix,
       length = Math.hypot(m[8], m[9], m[10]) || 1;
     engine.lighting.direction.set([m[8] / length, m[9] / length, m[10] / length, sun.intensity * exposure]);
     engine.lighting.radiance.set(sun.color);
+    importedSun.set(engine, {
+      owner: new WeakRef(model),
+      baseline: unchanged ? previous!.baseline : current,
+      applied: sunState(engine),
+    });
+  } else if (previous?.owner.deref() === model) {
+    if (unchanged) {
+      engine.lighting.direction.set(previous.baseline.subarray(0, 4));
+      engine.lighting.radiance.set(previous.baseline.subarray(4));
+    }
+    importedSun.delete(engine);
   }
   if (!clustered) return () => {};
   const lights = model.clusteredLights();

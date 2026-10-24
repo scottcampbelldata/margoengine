@@ -117,6 +117,7 @@ const supported = new Set([
   'KHR_materials_emissive_strength',
   'KHR_materials_unlit',
   'KHR_lights_punctual',
+  'KHR_node_visibility',
   'KHR_materials_clearcoat',
   'KHR_materials_transmission',
   'KHR_materials_ior',

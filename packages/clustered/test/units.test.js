@@ -13,7 +13,8 @@ import {
   exposureFromEV100,
 } from '../dist/units.js';
 import { parseIES } from '../dist/ies.js';
-import { applyGLTFLights } from '../../gltf-pro/dist/index.js';
+import { applyGLTFLights, GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { headless } from '../../../tests/support/pbr-snapshot.js';
 import { iesFile, range } from './ies-reference.js';
 
 const near = (a, b, tolerance, label) =>
@@ -84,24 +85,41 @@ test('lux, nits and exposure conversions', () => {
   assert.throws(() => exposureFromEV100(NaN), RangeError);
 });
 
-test("gltf-pro's applyGLTFLights passes KHR_lights_punctual units through: candela and lux, times exposure", () => {
-  const set = [],
-    direction = new Float32Array(4),
-    model = {
-      engine: { store: { tick() {} }, lighting: { direction, radiance: new Float32Array(3) } },
-      lights: [
-        {
-          type: 'directional',
-          node: { matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] },
-          intensity: 3,
-          color: [1, 1, 1],
-        },
-      ],
-      clusteredLights: () => [{ position: [0, 2, 0], range: 0, intensity: lumensToCandela(1200) }],
+test("gltf-pro's applyGLTFLights passes KHR_lights_punctual units through: candela and lux, times exposure", async () => {
+  const engine = await headless(),
+    positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+  const doc = {
+    asset: { version: '2.0' },
+    buffers: [{ byteLength: positions.byteLength }],
+    bufferViews: [{ buffer: 0, byteLength: positions.byteLength }],
+    accessors: [{ bufferView: 0, componentType: 5126, count: 3, type: 'VEC3' }],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }],
+    nodes: [
+      { mesh: 0 },
+      { extensions: { KHR_lights_punctual: { light: 0 } } },
+      { translation: [0, 2, 0], extensions: { KHR_lights_punctual: { light: 1 } } },
+    ],
+    extensions: {
+      KHR_lights_punctual: {
+        lights: [
+          { type: 'directional', intensity: 3, color: [1, 1, 1] },
+          { type: 'point', intensity: lumensToCandela(1200), color: [1, 1, 1] },
+        ],
+      },
     },
-    clustered = { setLights: (lights) => set.push(...lights), add: () => () => {} };
-  applyGLTFLights(model, { clustered, exposure: 0.5 });
-  near(direction[3], 1.5, 1e-7, 'sun: lux x exposure');
-  near(set[0].intensity, (0.5 * 1200) / (4 * Math.PI), 1e-12, 'point: candela x exposure');
-  near(candelaToLumens(set[0].intensity / 0.5), 1200, 1e-9, 'the lumens it was given');
+  };
+  // Real loader records and Wasm-backed Mesh nodes; this units test needs no GPU setup.
+  const model = new PBRModel(engine, new GLTFAsset(doc, [positions])),
+    set = [];
+  const clustered = { setLights: (lights) => set.push(...lights), add: () => () => {} };
+  try {
+    applyGLTFLights(model, { clustered, exposure: 0.5 });
+    near(engine.lighting.direction[3], 1.5, 1e-7, 'sun: lux x exposure');
+    near(set[0].intensity, (0.5 * 1200) / (4 * Math.PI), 1e-12, 'point: candela x exposure');
+    near(candelaToLumens(set[0].intensity / 0.5), 1200, 1e-9, 'the lumens it was given');
+    assert.deepEqual(set[0].position, [0, 2, 0]);
+  } finally {
+    model.dispose();
+    engine.dispose();
+  }
 });
