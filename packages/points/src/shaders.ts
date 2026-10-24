@@ -1,5 +1,5 @@
 import { MargoError } from '@margoengine/math/errors';
-import { fogWgsl } from './fog.js';
+import { fogWgsl } from '../../shared/fog.js';
 
 /** Flag bits of `Cloud.flags.x`, shared by the plugin and the point shader. */
 export const FLAG = {

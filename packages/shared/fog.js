@@ -1,36 +1,13 @@
-// Scene fog for this package's shaders: the same maths as @margoengine/environment's Fog (linear near/far, exp2
-// density, height falloff), read from any object with Fog's fields, so this package does not import environment. Water,
-// VFX, splats, points and lines each keep a copy of this file.
-import { LinearToSRGB, parseColor, type ColorInput } from '@margoengine/math/color';
-
-/**
- * Fog as `@margoengine/environment`'s `Fog` exposes it: pass that Fog, or any object with these fields. Read every
- * frame, so changing the Fog changes the fog at once. Missing fields take Fog's defaults. A negative or non-finite
- * distance, density or falloff (or a non-finite height) throws a RangeError, a malformed colour a TypeError or
- * RangeError, a non-boolean `enabled` a TypeError.
- */
-export interface FogLike {
-  /** Fog colour: hex is sRGB, `[r, g, b]` linear. Default '#ffffff'. */
-  readonly color?: ColorInput;
-  /** Linear fog start distance from the camera. Default 1. */
-  readonly near?: number;
-  /** Linear fog end distance, where fog is full. Default 1000. */
-  readonly far?: number;
-  /** Above 0 selects exponential-squared fog `1 - exp(-(density * distance)^2)`. Default 0. */
-  readonly density?: number;
-  /** Height fog: fog thins by `exp(-heightFalloff * (y - height))` above world height `height`. Default 0 (off). */
-  readonly heightFalloff?: number;
-  /** World height below which fog is at full strength. Default 0. */
-  readonly height?: number;
-  /** False mixes in no fog; switching never recompiles. Default true. */
-  readonly enabled?: boolean;
-}
+// Scene fog for the shaders of water, VFX, splats, points and lines: the same maths as @margoengine/environment's Fog
+// (linear near/far, exp2 density, height falloff), read from any object with Fog's fields, so those packages do not
+// import environment.
+import { LinearToSRGB, parseColor } from '@margoengine/math/color';
 
 /** Bytes of the fog uniform: colour and height, near/far/density/falloff, camera position. */
 export const FOG_BYTES = 48;
 
 /** WGSL: the fog uniform at `@group(group) @binding(binding)` and `fogAmount(world position)`, 0 (clear) to 1. */
-export const fogWgsl = (group: number, binding: number): string => `
+export const fogWgsl = (group, binding) => `
 struct MargoFog {color:vec4f,params:vec4f,eye:vec4f}
 @group(${group}) @binding(${binding}) var<uniform> margoFog:MargoFog;
 fn fogAmount(p:vec3f)->f32 {
@@ -40,7 +17,7 @@ fn fogAmount(p:vec3f)->f32 {
 }
 `;
 
-const measure = (value: unknown, fallback: number, label: string, min: number): number => {
+const measure = (value, fallback, label, min) => {
   const v = value === undefined ? fallback : value;
   if (typeof v !== 'number' || !Number.isFinite(v) || v < min)
     throw new RangeError(`Fog ${label} is ${String(v)}; pass a finite number${min === 0 ? ', 0 or more' : ''}`);
@@ -48,7 +25,7 @@ const measure = (value: unknown, fallback: number, label: string, min: number): 
 };
 
 /** Throws when `fog` is neither null nor an object; `setFog` calls it so a wrong argument fails where it is passed. */
-export function checkFog(fog: FogLike | null): FogLike | null {
+export function checkFog(fog) {
   if (fog !== null && (typeof fog !== 'object' || Array.isArray(fog)))
     throw new TypeError('Fog must be an object with Fog fields; pass an environment Fog, such an object or null');
   if (fog) writeFog(fog, [0, 0, 0], new Float32Array(12));
@@ -60,7 +37,7 @@ export function checkFog(fog: FogLike | null): FogLike | null {
  * shaders that write raw values to an 8-bit target) and height, near, far, density, falloff, and `eye`. A disabled fog
  * writes Fog's off values (near and far at the float maximum, density 0), so the shaders mix in zero fog.
  */
-export function writeFog(fog: FogLike, eye: ArrayLike<number>, out: Float32Array, encode = false): void {
+export function writeFog(fog, eye, out, encode = false) {
   const enabled = fog.enabled ?? true;
   if (typeof enabled !== 'boolean') throw new TypeError(`Fog enabled is ${String(enabled)}; pass true or false`);
   const height = measure(fog.height, 0, 'height', -Infinity),

@@ -13,8 +13,8 @@ import { MargoError } from '@margoengine/math/errors';
 import { viewMatrix } from '../../shared/view.js';
 import { preset } from '../../shared/preset.js';
 import { simulationShader, billboardShader, multisampled, foggedBillboard } from './shader.js';
-import { checkFog, FOG_BYTES, writeFog, type FogLike } from './fog.js';
-export type { FogLike } from './fog.js';
+import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js';
+export type { FogLike } from '../../shared/fog.js';
 import { applyView } from '../../shared/view-rect.js';
 declare const GPUBufferUsage: {
   UNIFORM: number;

@@ -1,5 +1,5 @@
 import { MargoError } from '@margoengine/math/errors';
-import { fogWgsl } from './fog.js';
+import { fogWgsl } from '../../shared/fog.js';
 /** right and up: the camera's axes; up.w: pixels per world unit at clip w = 1 (for the billboard's minimum size). */
 export const frame = /* wgsl */ `
 struct Particle {positionLife:vec4f,velocitySize:vec4f,color:vec4f,rotation:vec4f}

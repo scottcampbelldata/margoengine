@@ -27,7 +27,7 @@ import {
   pointShader,
   spriteShader,
 } from './shaders.js';
-import { checkFog, FOG_BYTES, writeFog, type FogLike } from './fog.js';
+import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js';
 import { applyView, viewRect, viewSize, ViewStates } from '../../shared/view-rect.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };

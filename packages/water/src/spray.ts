@@ -1,7 +1,7 @@
 import type { PassContext } from '@margoengine/core/extension';
 import { compute, group } from '../../shared/gpu.js';
 import { waterFrame, type CoastalFlow } from './coastal.js';
-import { fogWgsl } from './fog.js';
+import { fogWgsl } from '../../shared/fog.js';
 import { margoError } from '../../shared/errors.js';
 declare const GPUBufferUsage: { STORAGE: number; COPY_SRC: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;

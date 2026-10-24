@@ -44,12 +44,8 @@ for (const name of names) {
   assert.ok(
     pack.files.every(
       (file) =>
-        [
-          'package.json',
-          'README.md',
-          'LICENSE',
-          ...(name === 'blender' ? ['FORMAT.md'] : []),
-        ].includes(file.path) || file.path.startsWith('dist/'),
+        ['package.json', 'README.md', 'LICENSE', ...(name === 'blender' ? ['FORMAT.md'] : [])].includes(file.path) ||
+        file.path.startsWith('dist/'),
     ),
   );
   dependencies[`@margoengine/${name}`] = `file:${join(archives, pack.filename).replaceAll('\\', '/')}`;

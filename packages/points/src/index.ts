@@ -36,4 +36,4 @@ export {
 export type { PointBlocks, PickRange, PointsPickHit } from './math.js';
 export { parseColor } from './color.js';
 export type { ColorInput } from './color.js';
-export type { FogLike } from './fog.js';
+export type { FogLike } from '../../shared/fog.js';

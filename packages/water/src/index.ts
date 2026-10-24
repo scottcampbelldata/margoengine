@@ -14,8 +14,8 @@ import { Spray } from './spray.js';
 import { displayShader } from '../../shared/display.js';
 import { margoError } from '../../shared/errors.js';
 import { MargoError } from '@margoengine/math/errors';
-import { checkFog, FOG_BYTES, fogWgsl, writeFog, type FogLike } from './fog.js';
-export type { FogLike } from './fog.js';
+import { checkFog, FOG_BYTES, fogWgsl, writeFog, type FogLike } from '../../shared/fog.js';
+export type { FogLike } from '../../shared/fog.js';
 import { applyView, ViewStates } from '../../shared/view-rect.js';
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; UNIFORM: number; COPY_DST: number; STORAGE: number };
 declare const GPUTextureUsage: {

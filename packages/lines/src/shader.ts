@@ -1,6 +1,6 @@
 import { MargoError } from '@margoengine/math/errors';
 import { BLOCK, FAN } from './geometry.js';
-import { fogWgsl } from './fog.js';
+import { fogWgsl } from '../../shared/fog.js';
 
 /** Fat line shader. The expansion mirrors `expandLine` in geometry.ts; keep the two in step. */
 export const lineShader: string = /* wgsl */ `

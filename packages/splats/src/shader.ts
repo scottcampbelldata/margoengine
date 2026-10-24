@@ -1,5 +1,5 @@
 import { MargoError } from '@margoengine/math/errors';
-import { fogWgsl } from './fog.js';
+import { fogWgsl } from '../../shared/fog.js';
 const frame = `struct Frame {camera:mat4x4f,view:mat4x4f,eye:vec4f,viewport:vec4f,settings:vec4f,counts:vec4u}
 @group(0) @binding(0) var<uniform> f:Frame;
 struct Ellipse {center:vec4f,axes:vec4f}`;

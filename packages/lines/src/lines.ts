@@ -5,7 +5,7 @@ import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { CAPS, JOINS, MODES, VERTICES_PER_SEGMENT } from './geometry.js';
 import { Line } from './line.js';
 import { foggedLineShader, lineShader } from './shader.js';
-import { checkFog, FOG_BYTES, writeFog, type FogLike } from './fog.js';
+import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js';
 import { applyView } from '../../shared/view-rect.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
