@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Animation formats · Margo Engine</title>
+  <link rel="stylesheet" href="./multi-view.css">
+</head>
+<body>
+  <h1>Collada skins and glTF animation pointers</h1>
+  <p><code>@margoengine/loaders</code> and <code>@margoengine/animation</code> · From the left: a generated Collada tube skinned to three joints; Khronos's Cesium Man walking (Collada, CC BY 4.0, Cesium); Khronos's AnimatedColorsCube and a generated cube, both animated through <code>KHR_animation_pointer</code>.</p>
+  <div id="views" class="views">
+    <canvas id="viewport" aria-label="A bending orange tube and a cube changing colour"></canvas>
+  </div>
+  <p id="status" data-webgpu-status role="status">Starting WebGPU…</p>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./animation-formats.ts'));
+  </script>
+</body>
+</html>

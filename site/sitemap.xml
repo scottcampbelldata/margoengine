@@ -13,6 +13,12 @@
   <url><loc>https://margoengine.com/demos/cad-views</loc></url>
   <url><loc>https://margoengine.com/demos/split-screen</loc></url>
   <url><loc>https://margoengine.com/demos/minimap</loc></url>
+  <url><loc>https://margoengine.com/demos/batched-mesh</loc></url>
+  <url><loc>https://margoengine.com/demos/clipping-planes</loc></url>
+  <url><loc>https://margoengine.com/demos/scene-targets</loc></url>
+  <url><loc>https://margoengine.com/demos/depth-texture</loc></url>
+  <url><loc>https://margoengine.com/demos/animation-formats</loc></url>
+  <url><loc>https://margoengine.com/demos/texture-formats</loc></url>
   <url><loc>https://margoengine.com/whitepaper/engine</loc></url>
   <url><loc>https://margoengine.com/whitepaper/voxel</loc></url>
   <url><loc>https://margoengine.com/bench/</loc></url>

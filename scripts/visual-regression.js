@@ -139,6 +139,21 @@ const demos = [
     path: `demos/${id}.html`,
     ready: "document.querySelector('#viewport')?.dataset.ready==='true'",
   })),
+  // Feature demos (docs/threejs-parity.md): batched mesh, clipping planes, scene targets (MRT), the depth texture,
+  // Collada skins with KHR_animation_pointer glTFs, and one texture per image file format.
+  ...[
+    'batched-mesh',
+    'clipping-planes',
+    'scene-targets',
+    'depth-texture',
+    'animation-formats',
+    'texture-formats',
+  ].map((id) => ({
+    id,
+    path: `demos/${id}.html`,
+    ready: "document.querySelector('#viewport')?.dataset.ready==='true'",
+    views: ['high', 'phone'],
+  })),
   { id: 'earth', path: 'demos/earth/', ready: "!!window.earthDemo&&window.earthDemo.quality!=='preview'" },
   { id: 'dof', path: 'demos/dof/', ready: '!!window.dofDemo', views: ['high', 'light', 'phone'] },
   { id: 'tonemap', path: 'demos/tonemap/', ready: '!!window.tonemapDemo', views: ['high', 'phone'] },

@@ -1871,6 +1871,402 @@
     "renderedInputsDirty": false,
     "renderedInputChanges": []
    }
+  },
+  "batched-mesh-high": {
+   "url": "demos/batched-mesh.html?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 156.0.4314.42",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-24T21:51:04.348Z",
+    "commit": "3491447ac1894f7b25df2d7b265cd810d6ada540",
+    "packagesDirty": false,
+    "renderedInputsDirty": true,
+    "renderedInputChanges": [
+     "examples/animation-formats.html",
+     "examples/animation-formats.ts",
+     "examples/texture-formats.html",
+     "examples/texture-formats.ts",
+     "site/index.html",
+     "site/sitemap.xml"
+    ]
+   }
+  },
+  "batched-mesh-phone": {
+   "url": "demos/batched-mesh.html",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 156.0.4314.42",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-24T21:51:04.348Z",
+    "commit": "3491447ac1894f7b25df2d7b265cd810d6ada540",
+    "packagesDirty": false,
+    "renderedInputsDirty": true,
+    "renderedInputChanges": [
+     "examples/animation-formats.html",
+     "examples/animation-formats.ts",
+     "examples/texture-formats.html",
+     "examples/texture-formats.ts",
+     "site/index.html",
+     "site/sitemap.xml"
+    ]
+   }
+  },
+  "clipping-planes-high": {
+   "url": "demos/clipping-planes.html?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 156.0.4314.42",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-24T21:51:04.348Z",
+    "commit": "3491447ac1894f7b25df2d7b265cd810d6ada540",
+    "packagesDirty": false,
+    "renderedInputsDirty": true,
+    "renderedInputChanges": [
+     "examples/animation-formats.html",
+     "examples/animation-formats.ts",
+     "examples/texture-formats.html",
+     "examples/texture-formats.ts",
+     "site/index.html",
+     "site/sitemap.xml"
+    ]
+   }
+  },
+  "clipping-planes-phone": {
+   "url": "demos/clipping-planes.html",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 156.0.4314.42",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-24T21:51:04.348Z",
+    "commit": "3491447ac1894f7b25df2d7b265cd810d6ada540",
+    "packagesDirty": false,
+    "renderedInputsDirty": true,
+    "renderedInputChanges": [
+     "examples/animation-formats.html",
+     "examples/animation-formats.ts",
+     "examples/texture-formats.html",
+     "examples/texture-formats.ts",
+     "site/index.html",
+     "site/sitemap.xml"
+    ]
+   }
+  },
+  "scene-targets-high": {
+   "url": "demos/scene-targets.html?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 156.0.4314.42",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-24T21:51:04.348Z",
+    "commit": "3491447ac1894f7b25df2d7b265cd810d6ada540",
+    "packagesDirty": false,
+    "renderedInputsDirty": true,
+    "renderedInputChanges": [
+     "examples/animation-formats.html",
+     "examples/animation-formats.ts",
+     "examples/texture-formats.html",
+     "examples/texture-formats.ts",
+     "site/index.html",
+     "site/sitemap.xml"
+    ]
+   }
+  },
+  "scene-targets-phone": {
+   "url": "demos/scene-targets.html",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 156.0.4314.42",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-24T21:51:04.348Z",
+    "commit": "3491447ac1894f7b25df2d7b265cd810d6ada540",
+    "packagesDirty": false,
+    "renderedInputsDirty": true,
+    "renderedInputChanges": [
+     "examples/animation-formats.html",
+     "examples/animation-formats.ts",
+     "examples/texture-formats.html",
+     "examples/texture-formats.ts",
+     "site/index.html",
+     "site/sitemap.xml"
+    ]
+   }
+  },
+  "depth-texture-high": {
+   "url": "demos/depth-texture.html?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 156.0.4314.42",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-24T21:51:04.348Z",
+    "commit": "3491447ac1894f7b25df2d7b265cd810d6ada540",
+    "packagesDirty": false,
+    "renderedInputsDirty": true,
+    "renderedInputChanges": [
+     "examples/animation-formats.html",
+     "examples/animation-formats.ts",
+     "examples/texture-formats.html",
+     "examples/texture-formats.ts",
+     "site/index.html",
+     "site/sitemap.xml"
+    ]
+   }
+  },
+  "depth-texture-phone": {
+   "url": "demos/depth-texture.html",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 156.0.4314.42",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-24T21:51:04.348Z",
+    "commit": "3491447ac1894f7b25df2d7b265cd810d6ada540",
+    "packagesDirty": false,
+    "renderedInputsDirty": true,
+    "renderedInputChanges": [
+     "examples/animation-formats.html",
+     "examples/animation-formats.ts",
+     "examples/texture-formats.html",
+     "examples/texture-formats.ts",
+     "site/index.html",
+     "site/sitemap.xml"
+    ]
+   }
+  },
+  "animation-formats-high": {
+   "url": "demos/animation-formats.html?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 156.0.4314.42",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-24T21:51:04.348Z",
+    "commit": "3491447ac1894f7b25df2d7b265cd810d6ada540",
+    "packagesDirty": false,
+    "renderedInputsDirty": true,
+    "renderedInputChanges": [
+     "examples/animation-formats.html",
+     "examples/animation-formats.ts",
+     "examples/texture-formats.html",
+     "examples/texture-formats.ts",
+     "site/index.html",
+     "site/sitemap.xml"
+    ]
+   }
+  },
+  "animation-formats-phone": {
+   "url": "demos/animation-formats.html",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 156.0.4314.42",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-24T21:51:04.348Z",
+    "commit": "3491447ac1894f7b25df2d7b265cd810d6ada540",
+    "packagesDirty": false,
+    "renderedInputsDirty": true,
+    "renderedInputChanges": [
+     "examples/animation-formats.html",
+     "examples/animation-formats.ts",
+     "examples/texture-formats.html",
+     "examples/texture-formats.ts",
+     "site/index.html",
+     "site/sitemap.xml"
+    ]
+   }
+  },
+  "texture-formats-high": {
+   "url": "demos/texture-formats.html?quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 156.0.4314.42",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-24T21:51:04.348Z",
+    "commit": "3491447ac1894f7b25df2d7b265cd810d6ada540",
+    "packagesDirty": false,
+    "renderedInputsDirty": true,
+    "renderedInputChanges": [
+     "examples/animation-formats.html",
+     "examples/animation-formats.ts",
+     "examples/texture-formats.html",
+     "examples/texture-formats.ts",
+     "site/index.html",
+     "site/sitemap.xml"
+    ]
+   }
+  },
+  "texture-formats-phone": {
+   "url": "demos/texture-formats.html",
+   "size": "195x422",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 156.0.4314.42",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-24T21:51:04.348Z",
+    "commit": "3491447ac1894f7b25df2d7b265cd810d6ada540",
+    "packagesDirty": false,
+    "renderedInputsDirty": true,
+    "renderedInputChanges": [
+     "examples/animation-formats.html",
+     "examples/animation-formats.ts",
+     "examples/texture-formats.html",
+     "examples/texture-formats.ts",
+     "site/index.html",
+     "site/sitemap.xml"
+    ]
+   }
   }
  },
  "profile": "nvidia-ampere-msedge-156",

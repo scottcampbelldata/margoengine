@@ -79,6 +79,12 @@ const pages = [
   'cad-views',
   'split-screen',
   'minimap',
+  'batched-mesh',
+  'clipping-planes',
+  'scene-targets',
+  'depth-texture',
+  'animation-formats',
+  'texture-formats',
 ];
 await site({
   configFile: false,

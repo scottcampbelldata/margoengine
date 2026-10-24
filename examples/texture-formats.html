@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Texture formats · Margo Engine</title>
+  <link rel="stylesheet" href="./multi-view.css">
+</head>
+<body>
+  <h1>TGA, TIFF, KTX and DDS textures</h1>
+  <p><code>@margoengine/decoders</code> · One test image per file format, each read by its own decoder entry (<code>/tga</code>, <code>/tiff</code>, <code>/ktx</code>, <code>/dds</code>) and drawn on a quad; the BC1 file goes to the GPU still compressed.</p>
+  <div id="views" class="views">
+    <canvas id="viewport" aria-label="Five textured squares, one per image file format"></canvas>
+  </div>
+  <p id="status" data-webgpu-status role="status">Starting WebGPU…</p>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./texture-formats.ts'));
+  </script>
+</body>
+</html>
