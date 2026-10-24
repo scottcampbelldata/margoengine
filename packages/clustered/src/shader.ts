@@ -1,4 +1,4 @@
-import { legacyTerms, decayTerms, clusterBrdf } from '../../shared/light-terms.js';
+import { legacyTerms, decayTerms, clusterBrdf, clusterCell } from '../../shared/light-terms.js';
 const declarations = (group: number) => /* wgsl */ `
 struct ClusterFrame {view:mat4x4f,grid:vec4u,screen:vec4f,depth:vec4f,intensity:vec4f}
 struct ClusterLight {positionRange:vec4f,colorIntensity:vec4f,directionOuter:vec4f,params:vec4f}
@@ -98,13 +98,7 @@ export function clusteredSampling(
 @group(${group}) @binding(6) var<storage,read> clusterCounts:array<u32>;
 @group(${group}) @binding(7) var<storage,read> clusterIndices:array<u32>;${receive ? '\nvar<private> clusterReceive=true;' : ''}
 fn clusterLighting(pixel:vec2f,position:vec3f,n:vec3f,eye:vec3f,base:vec3f,roughness:f32,metal:f32)->vec3f {
-  let grid=clusterFrame.grid.xyz;let depth=-(clusterFrame.view*vec4f(position,1)).z;
-  if(depth<clusterFrame.depth.x||depth>clusterFrame.depth.y){return vec3f(0);}
-  let screenPixel=pixel-clusterFrame.depth.zw*clusterFrame.screen.xy;
-  let xy=min(vec2u(max(screenPixel,vec2f(0))/clusterFrame.screen.xy*vec2f(grid.xy)),grid.xy-vec2u(1));
-  let near=clusterFrame.depth.x;let far=clusterFrame.depth.y;
-  let z=min(u32(max(0.0,select(log(depth/near)/log(far/near),(depth-near)/(far-near),clusterFrame.intensity.w>0.5)*f32(grid.z))),grid.z-1);
-  let cell=xy.x+grid.x*(xy.y+grid.y*z);let count=clusterCounts[cell];var result=vec3f(0);
+${clusterCell('position')}
   let v=normalize(eye-position);let nv=clamp(dot(n,v),0.0001,1.0);let a=max(roughness,0.045)*max(roughness,0.045);let a2=a*a;
   for(var j=0u;j<count;j++){
     ${terms.length ? 'let index=clusterIndices[cell*1024u+j];let light=clusterLights[index];' : 'let light=clusterLights[clusterIndices[cell*1024u+j]];'}let delta=light.positionRange.xyz-position;let distance=length(delta);

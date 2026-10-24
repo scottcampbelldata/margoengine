@@ -17,7 +17,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { sceneTarget } from '../../shared/msaa.js';
 import { preset } from '../../shared/preset.js';
 import { displayShader } from '../../shared/display.js';
-import { legacyTerms, decayTerms } from '../../shared/light-terms.js';
+import { legacyTerms, decayTerms, clusterCell } from '../../shared/light-terms.js';
 import { applyView, viewRect, ViewStates } from '../../shared/view-rect.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
@@ -111,13 +111,7 @@ ${
 ${
   lights
     ? `fn localLight(pixel:vec2f,p:vec3f,v:vec3f,g:f32)->vec3f {
-  let grid=clusterFrame.grid.xyz;let depth=-(clusterFrame.view*vec4f(p,1)).z;
-  if(depth<clusterFrame.depth.x||depth>clusterFrame.depth.y){return vec3f(0);}
-  let screenPixel=pixel-clusterFrame.depth.zw*clusterFrame.screen.xy;
-  let xy=min(vec2u(max(screenPixel,vec2f(0))/clusterFrame.screen.xy*vec2f(grid.xy)),grid.xy-vec2u(1));
-  let near=clusterFrame.depth.x;let far=clusterFrame.depth.y;
-  let z=min(u32(max(0.0,select(log(depth/near)/log(far/near),(depth-near)/(far-near),clusterFrame.intensity.w>0.5)*f32(grid.z))),grid.z-1);
-  let cell=xy.x+grid.x*(xy.y+grid.y*z);let count=clusterCounts[cell];var result=vec3f(0);
+${clusterCell('p')}
   for(var j=0u;j<count;j++){
     let light=clusterLights[clusterIndices[cell*1024u+j]];let delta=light.positionRange.xyz-p;let distance=length(delta);
     if(distance>=light.positionRange.w){continue;}let l=delta/max(distance,0.0001);
