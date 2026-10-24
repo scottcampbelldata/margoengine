@@ -25,7 +25,7 @@ Four-influence primitives keep their existing 32-byte influence records and exac
 
 Single-clip playback reuses sample buffers, quaternion arrays, palette matrices, and inverse-bind views. The animation hot path allocates no new typed arrays, quaternion copies, or GPU resources. Device restoration recreates both pipeline variants and their owned buffers. `sampleTrack()` retains its independently owned return value by default; an optional seventh `target: Float32Array` argument lets other consumers reuse their own output storage.
 
-`createMaterialAnimation(model, {clip?, loop?})` plays a clip's `KHR_animation_pointer` STEP tracks on base-color `KHR_texture_transform` offset and scale (what `@margoengine/exporters` writes from `materialAnimations`): `seek(seconds)` writes the sampled UV transform into every primitive material of the targeted glTF material, and `dispose()` releases its claim on those properties. `Animation.attach` skips those pointer channels and counts them in the clip's duration.
+`createMaterialAnimation(model, {clip?, loop?})` plays a clip's `KHR_animation_pointer` STEP tracks on base-color `KHR_texture_transform` offset and scale (what `@margoengine/exporters` writes from `materialAnimations`): `seek(seconds)` writes the sampled UV transform into every primitive material of the targeted glTF material, and `dispose()` releases its claim on those properties. Given the opt-in `pointers` option, `Animation` also plays those channels, with every other `KHR_animation_pointer` channel it supports (see below); without it, it skips them and counts them in the clip's duration.
 
 The separate `@margoengine/animator` package adds gameplay states, blend trees, additive masks and foot IK while reusing this pass's palette buffers. `sampleTrack()` is exported for animation consumers (matrix products: `@margoengine/math/mat4`).
 
@@ -196,6 +196,52 @@ objects work the same way: `{target: mesh, property: 'visible'}`, `{target: mate
 old one: create the clip again. Property tracks land in `clip.properties`; `applyKeyframeClip(clip, time)` writes
 them, and `applyKeyframeClip(clip, skeleton, time)` writes them and poses the skeleton. `bakeKeyframeClip` leaves them
 out (glTF nodes have no such paths); `AnimationGroup` and `retarget` ignore them.
+
+## KHR_animation_pointer playback
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF, viewGLTFCamera} from '@margoengine/gltf-pro';
+import {Animation} from '@margoengine/animation';
+import {pointerChannels} from '@margoengine/animation/pointer';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const model = await loadGLTF(stage.engine, '/pointer-show.glb');
+const animation = Animation.attach(model, {pointers: pointerChannels});
+for (const warning of animation.warnings) console.warn(warning); // pointers this player skips
+animation.playing = false;
+animation.seek(1.5);
+viewGLTFCamera(model, 0); // cameras and lights are data: hand them on after each update
+```
+
+Pointer playback is opt-in, like gltf-pro's optional decoders: import `pointerChannels` from
+`@margoengine/animation/pointer` and pass it as the `pointers` option, so apps whose files have no pointer channels do
+not ship it. Without it, `Animation` skips every pointer channel (still counting it in the clip's duration) and lists
+it in `animation.warnings` with the fix. With it, `Animation` plays a clip's `KHR_animation_pointer` channels with its
+ordinary ones, at the same time, speed and loop, with glTF's STEP, LINEAR and CUBICSPLINE sampling. It drives:
+
+- nodes: `/nodes/i/translation`, `rotation` (slerp), `scale`, `weights`, `/meshes/i/weights` (every node using the mesh,
+  unless the node's own weights are animated) and `/nodes/i/extensions/KHR_node_visibility/visible` (STEP, unsigned
+  byte);
+- materials (every primitive material of the glTF material): `pbrMetallicRoughness/baseColorFactor`, `metallicFactor`,
+  `roughnessFactor`, `emissiveFactor`, `alphaCutoff`, `normalTexture/scale`, `occlusionTexture/strength`,
+  `KHR_materials_emissive_strength`, `KHR_materials_dispersion`, and with the physical renderer the clearcoat,
+  transmission, specular, sheen, IOR and volume factors (the transmission tint and volume follow);
+- `KHR_texture_transform` `offset`, `scale` and `rotation` on the base, metallic-roughness, normal, occlusion,
+  emissive, clearcoat, transmission, sheen and specular textures (the map and its uniform rows);
+- `KHR_lights_punctual`: `color`, `intensity`, `range`, `spot/innerConeAngle`, `spot/outerConeAngle` on `model.lights`,
+  so `model.clusteredLights()` and `applyGLTFLights` pick them up;
+- cameras: `perspective/yfov`, `aspectRatio`, `znear`, `zfar` and `orthographic/xmag`, `ymag`, `znear`, `zfar` on
+  `model.cameras`, for `viewGLTFCamera`.
+
+Values are written to copies the model owns, never to `model.asset.doc`, and bound on the clip's first playback.
+Pointers that break the glTF rules throw: malformed or out-of-range indices, properties animations may not change
+(`/materials/0/name`), a repeated pointer, a node property animated both by pointer and by an ordinary channel,
+accessors of the wrong type or count, and booleans that are not STEP unsigned bytes. Valid pointers this player cannot
+drive are skipped and listed in `animation.warnings`: other extensions (iridescence, anisotropy and diffuse
+transmission factors, unknown extensions), `extras`, `texCoord`, textures of extended materials, properties the file
+leaves undefined (a camera without `zfar`, a light without `range`), factors gltf-pro did not load (physical factors
+without the materials decoder, transmission on a material loaded without it) and targets no scene node or primitive
+uses.
 
 ## Rigid rigs: whole meshes bound to bones
 

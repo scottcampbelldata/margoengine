@@ -164,12 +164,14 @@ test('only required extensions that are still unsupported are rejected, each lis
     'EXT_meshopt_compression',
     'KHR_texture_basisu',
     'KHR_animation_pointer',
+    'EXT_unknown_test',
   );
+  // KHR_animation_pointer is supported (played by @margoengine/animation); unknown extensions still throw.
   assert.throws(() => new GLTFAsset(doc, buffers), {
-    message: 'Required glTF extensions are unsupported: KHR_animation_pointer',
+    message: 'Required glTF extensions are unsupported: EXT_unknown_test',
   });
   assert.throws(() => new GLTFAsset(doc, buffers, undefined, { draco: {}, meshopt: {}, ktx2: {} }), {
-    message: 'Required glTF extensions are unsupported: KHR_animation_pointer',
+    message: 'Required glTF extensions are unsupported: EXT_unknown_test',
   });
 });
 

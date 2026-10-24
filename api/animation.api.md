@@ -13,6 +13,7 @@ export class Animation implements EnginePlugin {
     readonly options: AnimationOptions;
     readonly name: string;
     readonly clips: readonly Clip[];
+    readonly warnings: readonly string[];
     playing: boolean;
     time: number;
     clip: number;
@@ -76,6 +77,7 @@ export interface AnimationGroupPlayer {
 export interface AnimationOptions {
     loop?: boolean;
     speed?: number;
+    pointers?: PointerChannels;
 }
 
 export interface BakedChannel<N> {
@@ -281,10 +283,36 @@ export function segmentTime(elapsed: number, duration: number, { loop, timeScale
 
 // Not exported from this entry, but used by the exports above:
 
+interface AnimationDefinition {
+    name?: string;
+    channels: unknown[];
+    samplers: unknown[];
+}
+
+type AnimationPath = 'translation' | 'rotation' | 'scale' | 'weights';
+
 interface Clip {
     name: string;
     duration: number;
     tracks: Track[];
+    bind?: () => KeyframeClip;
+    bound?: KeyframeClip;
+}
+
+type PointerChannels = (model: PBRModel, def: AnimationDefinition, clip: string) => PointerPlan;
+
+interface PointerNodeChannel {
+    node: number;
+    path: AnimationPath;
+    sampler: unknown;
+}
+
+interface PointerPlan {
+    ordinary: unknown[];
+    nodes: PointerNodeChannel[];
+    bind?: () => KeyframeClip;
+    duration: number;
+    warnings: string[];
 }
 
 interface Track {

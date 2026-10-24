@@ -1,0 +1,222 @@
+{
+ "asset": {
+  "version": "2.0",
+  "generator": "Margo Engine examples/assets/animation-formats/generate.mjs"
+ },
+ "extensionsUsed": [
+  "KHR_animation_pointer"
+ ],
+ "extensionsRequired": [
+  "KHR_animation_pointer"
+ ],
+ "scene": 0,
+ "scenes": [
+  {
+   "nodes": [
+    0
+   ]
+  }
+ ],
+ "nodes": [
+  {
+   "name": "cube",
+   "mesh": 0,
+   "translation": [
+    0,
+    0.5,
+    0
+   ]
+  }
+ ],
+ "meshes": [
+  {
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 0,
+      "NORMAL": 1
+     },
+     "indices": 2,
+     "material": 0
+    }
+   ]
+  }
+ ],
+ "materials": [
+  {
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.9,
+     0.2,
+     0.15,
+     1
+    ],
+    "roughnessFactor": 0.4
+   },
+   "doubleSided": true
+  }
+ ],
+ "animations": [
+  {
+   "name": "show",
+   "samplers": [
+    {
+     "input": 3,
+     "output": 4,
+     "interpolation": "LINEAR"
+    },
+    {
+     "input": 3,
+     "output": 5,
+     "interpolation": "LINEAR"
+    },
+    {
+     "input": 3,
+     "output": 6,
+     "interpolation": "LINEAR"
+    }
+   ],
+   "channels": [
+    {
+     "sampler": 0,
+     "target": {
+      "path": "pointer",
+      "extensions": {
+       "KHR_animation_pointer": {
+        "pointer": "/materials/0/pbrMetallicRoughness/baseColorFactor"
+       }
+      }
+     }
+    },
+    {
+     "sampler": 1,
+     "target": {
+      "path": "pointer",
+      "extensions": {
+       "KHR_animation_pointer": {
+        "pointer": "/materials/0/emissiveFactor"
+       }
+      }
+     }
+    },
+    {
+     "sampler": 2,
+     "target": {
+      "path": "pointer",
+      "extensions": {
+       "KHR_animation_pointer": {
+        "pointer": "/nodes/0/translation"
+       }
+      }
+     }
+    }
+   ]
+  }
+ ],
+ "buffers": [
+  {
+   "byteLength": 868,
+   "uri": "data:application/octet-stream;base64,AAAAPwAAAL8AAAC/AAAAPwAAAD8AAAC/AAAAPwAAAD8AAAA/AAAAPwAAAL8AAAA/AAAAvwAAAL8AAAC/AAAAvwAAAD8AAAC/AAAAvwAAAD8AAAA/AAAAvwAAAL8AAAA/AAAAvwAAAD8AAAC/AAAAvwAAAD8AAAA/AAAAPwAAAD8AAAA/AAAAPwAAAD8AAAC/AAAAvwAAAL8AAAC/AAAAvwAAAL8AAAA/AAAAPwAAAL8AAAA/AAAAPwAAAL8AAAC/AAAAvwAAAL8AAAA/AAAAPwAAAL8AAAA/AAAAPwAAAD8AAAA/AAAAvwAAAD8AAAA/AAAAvwAAAL8AAAC/AAAAPwAAAL8AAAC/AAAAPwAAAD8AAAC/AAAAvwAAAD8AAAC/AACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAACAvwAAAAAAAAAAAACAvwAAAAAAAAAAAACAvwAAAAAAAAAAAACAvwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgL8AAAAAAAAAAAAAgL8AAAAAAAAAAAAAgL8AAAAAAAAAAAAAgL8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AAABAAIAAAACAAMABAAGAAUABAAHAAYACAAJAAoACAAKAAsADAAOAA0ADAAPAA4AEAARABIAEAASABMAFAAWABUAFAAXABYAAAAAAAAAAD8AAIA/AADAPwAAAEBmZmY/zcxMPpqZGT4AAIA/MzNzPwAAQD/NzMw9AACAP5qZGT6amRk/MzNzPwAAgD+amRk/zcxMPmZmZj8AAIA/ZmZmP83MTD6amRk+AACAPwAAAAAAAAAAAAAAAJqZGT/NzMw+AAAAAAAAAAAAAAAAAAAAAAAAAACamZk+mpkZPwAAAAAAAAAAAAAAAAAAAAAAAAA/AAAAAAAAAADNzIw/AAAAAAAAAAAAAAA/AAAAAAAAAABmZmY/AAAAAAAAAAAAAAA/AAAAAA=="
+  }
+ ],
+ "bufferViews": [
+  {
+   "buffer": 0,
+   "byteOffset": 0,
+   "byteLength": 288,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 288,
+   "byteLength": 288,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 576,
+   "byteLength": 72,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 648,
+   "byteLength": 20
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 668,
+   "byteLength": 80
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 748,
+   "byteLength": 60
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 808,
+   "byteLength": 60
+  }
+ ],
+ "accessors": [
+  {
+   "bufferView": 0,
+   "componentType": 5126,
+   "count": 24,
+   "type": "VEC3",
+   "min": [
+    -0.5,
+    -0.5,
+    -0.5
+   ],
+   "max": [
+    0.5,
+    0.5,
+    0.5
+   ]
+  },
+  {
+   "bufferView": 1,
+   "componentType": 5126,
+   "count": 24,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 2,
+   "componentType": 5123,
+   "count": 36,
+   "type": "SCALAR"
+  },
+  {
+   "bufferView": 3,
+   "componentType": 5126,
+   "count": 5,
+   "type": "SCALAR",
+   "min": [
+    0
+   ],
+   "max": [
+    2
+   ]
+  },
+  {
+   "bufferView": 4,
+   "componentType": 5126,
+   "count": 5,
+   "type": "VEC4"
+  },
+  {
+   "bufferView": 5,
+   "componentType": 5126,
+   "count": 5,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 6,
+   "componentType": 5126,
+   "count": 5,
+   "type": "VEC3"
+  }
+ ]
+}

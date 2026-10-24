@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as animation from '../dist/index.js';
+import { pointerChannels } from '../dist/pointer.js';
 import { parseGLTFAsync } from '@margoengine/gltf-pro';
 import { exportGLB } from '@margoengine/exporters';
 import { loadedPBREngine } from '../../../tests/support/loaded-pbr-fixtures.js';
@@ -234,7 +235,8 @@ test('node-only clips remain node animations and mixed clips skip only fully val
   const unknown = structuredClone(def.channels[0]);
   unknown.target.extensions.KHR_animation_pointer.pointer = '/materials/1/name';
   def.channels.push(unknown);
-  assert.throws(() => new animation.Animation(model), /pointer|material/);
+  assert.match(new animation.Animation(model).warnings.at(-1), /\/materials\/1\/name is not played/);
+  assert.throws(() => new animation.Animation(model, { pointers: pointerChannels }), /pointer|material/);
   assert.throws(() => animation.createMaterialAnimation(model), /pointer|material/);
 });
 

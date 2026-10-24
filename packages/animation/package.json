@@ -25,6 +25,10 @@
       "types": "./dist/sampling.d.ts",
       "import": "./dist/sampling.js"
     },
+    "./pointer": {
+      "types": "./dist/pointer.d.ts",
+      "import": "./dist/pointer.js"
+    },
     "./skeleton-utils": {
       "types": "./dist/skeleton-utils.d.ts",
       "import": "./dist/skeleton-utils.js"

@@ -6,7 +6,8 @@ import { ordinaryWeightBuffer } from './weight-buffer.js';
 import { multiplyMatrices } from '@margoengine/math/mat4';
 import { sampleTrackInto, type Interpolation } from './sampling.js';
 import { deformationShader, deformationShader8 } from './shader.js';
-import { materialTracks } from './material-animation.js';
+import type { PointerChannels, PointerPlan } from './pointer.js';
+import { applyKeyframeClip, type KeyframeClip } from './keyframes.js';
 export { createMaterialAnimation } from './material-animation.js';
 import {
   animationDocument,
@@ -73,6 +74,9 @@ interface Clip {
   name: string;
   duration: number;
   tracks: Track[];
+  /** Binds the clip's KHR_animation_pointer material, light, camera and visibility channels on first playback. */
+  bind?: () => KeyframeClip;
+  bound?: KeyframeClip;
 }
 interface Deformation {
   primitive: PBRPrimitive;
@@ -99,6 +103,32 @@ interface Deformation {
 export interface AnimationOptions {
   loop?: boolean;
   speed?: number;
+  /**
+   * KHR_animation_pointer playback, opt-in so apps without pointer channels do not ship it: pass `pointerChannels`
+   * from `@margoengine/animation/pointer`. Without it, pointer channels are skipped (still counted in the clip's
+   * duration) and listed in `warnings`.
+   */
+  pointers?: PointerChannels;
+}
+// Without the pointer entry: keep ordinary channels, skip and report pointer channels.
+function skipPointers(model: PBRModel, def: ReturnType<typeof animationDefinition>, clip: string): PointerPlan {
+  const ordinary: unknown[] = [],
+    warnings: string[] = [];
+  let duration = 0;
+  def.channels.forEach((value, c) => {
+    const channel = value as { sampler?: unknown; target?: { path?: unknown; extensions?: Record<string, unknown> } },
+      pointer = channel?.target?.extensions?.KHR_animation_pointer as { pointer?: unknown } | undefined;
+    if (channel?.target?.path !== 'pointer' && pointer === undefined) {
+      ordinary.push(value);
+      return;
+    }
+    const sampler = animationSampler(def.samplers[animationIndex(channel.sampler, def.samplers.length, 'sampler')]);
+    duration = Math.max(duration, model.asset.accessor(sampler.input, 'SCALAR').at(-1) ?? 0);
+    warnings.push(
+      `Animation ${clip} channel ${c}: pointer ${String(pointer?.pointer)} is not played; pass pointers from @margoengine/animation/pointer (Animation.attach(model, {pointers: pointerChannels}))`,
+    );
+  });
+  return { ordinary, nodes: [], duration, warnings };
 }
 const identity = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 // Only the ordinary same-realm native method has synchronous copy semantics
@@ -155,6 +185,11 @@ function writeInput(
 export class Animation implements EnginePlugin {
   readonly name: string;
   readonly clips: readonly Clip[];
+  /**
+   * One line per KHR_animation_pointer channel the clips skip: valid pointers this player cannot drive (an extension
+   * it does not know, `extras`, a property the asset leaves undefined, a target no scene node or primitive uses).
+   */
+  readonly warnings: readonly string[];
   playing = true;
   time = 0;
   clip = 0;
@@ -201,20 +236,20 @@ export class Animation implements EnginePlugin {
         rotation: [t.qx[id], t.qy[id], t.qz[id], t.qw[id]],
       };
     });
-    const doc = animationDocument(model.asset.doc);
+    const doc = animationDocument(model.asset.doc),
+      warnings: string[] = [];
     this.clips = doc.animations.map((value, id) => {
       const def = animationDefinition(value);
-      const material = materialTracks(model, def);
+      const label = def.name ?? String(id),
+        plan = options.pointers ? options.pointers(model, def, label) : skipPointers(model, def, label);
+      warnings.push(...plan.warnings);
       const destinations = new Set<string>();
-      const tracks: Track[] = material.nodeChannels.map((value) => {
-        const channel = animationChannel(value),
-          node = animationIndex(channel.target.node, model.nodes.length, 'node'),
-          path = animationPath(channel.target.path);
+      const track = (node: number, path: Track['path'], samplerId: unknown): Track => {
         if (animationNode(doc.nodes[node]).matrix) throw new TypeError('Invalid animation target');
         const key = node + ':' + path;
         if (destinations.has(key)) throw new Error('Duplicate animation target');
         destinations.add(key);
-        const sampler = animationSampler(def.samplers[animationIndex(channel.sampler, def.samplers.length, 'sampler')]),
+        const sampler = animationSampler(def.samplers[animationIndex(samplerId, def.samplers.length, 'sampler')]),
           times = model.asset.accessor(sampler.input, 'SCALAR'),
           interpolation = animationInterpolation(sampler.interpolation);
         if (times.some((v, i) => v < 0 || (i > 0 && v <= times[i - 1])))
@@ -243,13 +278,25 @@ export class Animation implements EnginePlugin {
           sample: new Float32Array(width),
           ...(path === 'rotation' ? { rotation: [0, 0, 0, 1] } : {}),
         };
+      };
+      const tracks: Track[] = plan.ordinary.map((value) => {
+        const channel = animationChannel(value);
+        return track(
+          animationIndex(channel.target.node, model.nodes.length, 'node'),
+          animationPath(channel.target.path),
+          channel.sampler,
+        );
       });
+      // Pointer node channels: a node's TRS or weights by pointer and by an ordinary channel is a duplicate.
+      for (const channel of plan.nodes) tracks.push(track(channel.node, channel.path, channel.sampler));
       return {
         name: def.name ?? 'Animation ' + id,
-        duration: Math.max(material.duration, ...tracks.map((t) => t.times.at(-1)!)),
+        duration: Math.max(plan.duration, ...tracks.map((t) => t.times.at(-1)!)),
         tracks,
+        ...(plan.bind ? { bind: plan.bind } : {}),
       };
     });
+    this.warnings = warnings;
   }
   static attach(model: PBRModel, options: AnimationOptions = {}): Animation {
     const animation = new Animation(model, options);
@@ -270,6 +317,10 @@ export class Animation implements EnginePlugin {
       (this.options.speed ?? 1) < 0
     )
       throw new RangeError('Invalid animation options');
+    if (this.options.pointers !== undefined && typeof this.options.pointers !== 'function')
+      throw new TypeError(
+        'Animation pointers option must be pointerChannels; import it from @margoengine/animation/pointer',
+      );
   }
   play(clip: string | number = 0): this {
     if (this.disposed) throw new Error('Animation is disposed');
@@ -332,6 +383,7 @@ export class Animation implements EnginePlugin {
         }
       } else for (const p of this.model.primitives) if (p.nodeIndex === track.node) p.weights.set(value);
     }
+    if (clip.bind) applyKeyframeClip((clip.bound ??= clip.bind()), t);
   }
   setup(engine: Engine, device = engine.gpu): void {
     if (engine !== this.model.root.engine || this.model.disposed || this.disposed)

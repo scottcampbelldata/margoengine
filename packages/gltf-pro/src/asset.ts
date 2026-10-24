@@ -132,6 +132,8 @@ const supported = new Set([
   'EXT_texture_webp',
   'EXT_texture_avif',
   'EXT_mesh_gpu_instancing',
+  // Played by @margoengine/animation (Animation); gltf-pro loads the channels as data.
+  'KHR_animation_pointer',
 ]);
 const hookFor: Record<string, keyof GLTFDecoderHooks> = {
   KHR_draco_mesh_compression: 'draco',

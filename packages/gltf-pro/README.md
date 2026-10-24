@@ -39,7 +39,7 @@ stage.engine.camera.fitToBoundingBox([b[0],b[1],b[2]], [b[3],b[4],b[5]]);
 // Call model.destroy() when unloading the model, or stage.dispose() on unmount.
 ```
 
-`KHR_node_visibility` sets each node's `visible` flag, also when the extension is required. A hidden ancestor hides the meshes and lights below it; transforms, animation, sockets and cameras keep working. Toggle `model.nodes[index].visible` to change it. `model.clusteredLights()` leaves out lights under hidden nodes. After changing visibility, call `applyGLTFLights(model)` again to refresh the imported sun; if the model no longer has a visible sun, the lighting from before goes back, unless the caller changed it since. Animated node visibility (animation pointers) is not supported yet.
+`KHR_node_visibility` sets each node's `visible` flag, also when the extension is required. A hidden ancestor hides the meshes and lights below it; transforms, animation, sockets and cameras keep working. Toggle `model.nodes[index].visible` to change it. `model.clusteredLights()` leaves out lights under hidden nodes. After changing visibility, call `applyGLTFLights(model)` again to refresh the imported sun; if the model no longer has a visible sun, the lighting from before goes back, unless the caller changed it since. `@margoengine/animation/pointer` plays animated visibility (`KHR_animation_pointer`).
 
 Supports base color/alpha, metallic-roughness (G/B), normal maps, occlusion (R), emissive, vertex colors, UV sets 0/1, tangents or derivative tangent frames, alpha masking/blending, double-sided materials, GLB/external buffers/images, normalized and sparse accessors. GGX, Smith, and Schlick implement analytical direct lighting with hemispherical ambient fill. Canvas output uses ACES Filmic tone mapping and sRGB encoding; HDR captures remain linear. Color/emissive textures decode sRGB; other maps remain linear. Images have generated mip chains and honor glTF filtering and wrapping.
 
@@ -112,6 +112,26 @@ transformed or secondary UVs; alpha-masked directional shadows use the same mapp
 Optional material maps support the same transform through `materials.install()`.
 `textureCoordinates(info)` exposes the validated UV selection and packed affine rows;
 caller-owned clearcoat/transmission textures accept a glTF-style `transform` option.
+
+`KHR_animation_pointer` is accepted when required. gltf-pro loads the pointer channels as data; `Animation` from
+`@margoengine/animation`, given `pointerChannels` from `@margoengine/animation/pointer`, plays them on the model's live
+values (node transforms and weights, material factors and
+texture transforms, `model.lights`, `model.cameras`, node visibility) and lists the pointers it skips in
+`animation.warnings`. Lights and cameras are data: hand them on after each update.
+
+```ts
+import {createStage} from 'margoengine';
+import {applyGLTFLights, loadGLTF, viewGLTFCamera} from '@margoengine/gltf-pro';
+import {Animation} from '@margoengine/animation';
+import {pointerChannels} from '@margoengine/animation/pointer';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const model = await loadGLTF(stage.engine, '/pointer-show.glb'); // extensionsRequired: ['KHR_animation_pointer']
+const animation = Animation.attach(model, {pointers: pointerChannels});
+animation.playing = false;
+animation.seek(0.5); // writes material factors, light and camera values
+viewGLTFCamera(model, 0); // the animated yfov
+applyGLTFLights(model); // the animated sun; pass {clustered} for point and spot lights
+```
 
 `loadGLTF` and `parseGLTFAsync` shade a file that uses clearcoat, transmission, IOR, volume, dispersion, sheen, specular, iridescence, anisotropy or diffuse transmission with the physical renderer by default: they import `extendedMaterials` from `@margoengine/gltf-pro/extended` on first need, so an app whose files never use those extensions ships none of its WGSL. Pass `{decoders: {materials: false}}` to keep the base shader (the extensions are then ignored, as glTF allows), or your own `extendedMaterials`. For synchronous parsing, pass `{materials: extendedMaterials}` as `parseGLTF`'s fifth argument. The imported metadata also stays available for explicit `@margoengine/materials` installation, whose lobes replace the physical renderer for the materials they cover. Constructed `@margoengine/materials` meshes retain their live material and UV-transform layout automatically.
 
