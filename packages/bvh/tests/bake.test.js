@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MeshBVH, bakeVertexColors, limitPalette } from '../dist/index.js';
+import { MeshBVH } from '../dist/index.js';
+import { bakeVertexColors, limitPalette } from '../dist/bake.js';
 
 // Quad a-b-c-d as two triangles, wound as given.
 const quad = (a, b, c, d) => [...a, ...b, ...c, ...a, ...c, ...d];

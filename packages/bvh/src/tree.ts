@@ -7,6 +7,7 @@ export type {
   BVHPositions,
   Ray,
   RaycastOptions,
+  SegmentOptions,
   BVHHit,
   ClosestPointOptions,
   ClosestPointResult,

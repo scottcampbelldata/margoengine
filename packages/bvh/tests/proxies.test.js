@@ -97,6 +97,14 @@ test('proxies follow visibility, layers, filters, liveness, object lists and nea
   list[0] = { anchor, sphere: [0, 0, 0, 1], model };
   const [byModel] = raycaster.intersectObjects(engine, [model]);
   assert.ok(byModel.approximate && byModel.model === model, 'the LOD model selects its proxy');
+  setMeshLayers(anchor, 1);
+  setMeshLayers(model.root, 2);
+  raycaster.layers = 1;
+  assert.ok(
+    raycaster.intersectEngine(engine).some((h) => h.approximate),
+    "a proxy keeps its own layer, not its model root's",
+  );
+  raycaster.layers = 0xffffffff;
   anchor.dispose();
   assert.ok(!raycaster.intersectEngine(engine).some((h) => h.approximate), 'disposed anchor');
 });

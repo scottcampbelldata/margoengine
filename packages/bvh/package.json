@@ -24,6 +24,10 @@
     "./tree": {
       "types": "./dist/tree.d.ts",
       "import": "./dist/tree.js"
+    },
+    "./bake": {
+      "types": "./dist/bake.d.ts",
+      "import": "./dist/bake.js"
     }
   },
   "files": [

@@ -31,6 +31,7 @@ await computeGeometryBVHAsync(bigGeometry);
 // Direct queries on raw data or a Geometry.
 const bvh = MeshBVH.build({positions, indices});           // or MeshBVH.fromGeometry(geometry)
 bvh.raycastFirst({origin: [0, 5, 0], direction: [0, -1, 0]}, {side: 'front'});
+bvh.intersectsSegment([0, 0, 0], [0, 5, 0], {includeFace: face => face !== receiverFace});
 bvh.closestPointToPoint([1, 2, 3], {maxDistance: 0.5});
 bvh.intersectsSphere([0, 0, 0], 0.25);
 bvh.intersectsBox({min: [-1, -1, -1], max: [1, 1, 1]}, boxMatrix);
@@ -47,6 +48,16 @@ PBR models and materials meshes honor live `side: 'front' | 'back' | 'double'` i
 deformed snapshot queries, including mirrored nodes. Ordinary engine raycasts also test each instance;
 the asynchronous pose snapshot retains its existing non-instanced primitive transform. `raycaster.side`
 can still override material sides.
+
+## Segments and face filters
+
+`intersectsSegment(start, end, {side, includeFace})` says whether a triangle crosses the segment between two
+points, ignoring contact within a relative 1e-7 of either end, so a shadow test can stop exactly at a light that sits
+on a surface. `includeFace` receives the source face index (also accepted by `raycastFirst` and `raycast`) and
+returning false skips that face, for example the receiver's own triangles.
+
+Restored trees (`deserialize`, `fromArrayBuffer`, the `MeshBVH` constructor) are checked to be one packed tree, so
+corrupt node links throw instead of looping.
 
 ## How it works
 
@@ -82,13 +93,14 @@ Other exports: `buildBVH` (raw `BVHData`), `shapecast` callbacks with `NOT_INTER
 
 ## Baking light and AO into vertex colours
 
-`bakeVertexColors(target, occluder, options)` is Crocotile's Bake Lighting panel on the CPU: it returns linear RGBA
+From `@margoengine/bvh/bake`: `bakeVertexColors(target, occluder, options)` is Crocotile's Bake Lighting panel on the CPU: it returns linear RGBA
 vertex colours (`Float32Array`, four per vertex) for `target.positions` and `target.normals` (same space as the
 occluder BVH; use `creasedNormals` from `@margoengine/geometry` for flat or smooth normals), and
 `limitPalette(colors, palette, mode)` snaps them to a palette.
 
 ```ts
-import {MeshBVH, bakeVertexColors, limitPalette, worldTriangles} from '@margoengine/bvh';
+import {MeshBVH, worldTriangles} from '@margoengine/bvh';
+import {bakeVertexColors, limitPalette} from '@margoengine/bvh/bake';
 const cast = worldTriangles(engine, castAgainst); // Cast Against: the meshes that occlude
 const occluder = MeshBVH.build({positions: cast.vertices, indices: cast.indices});
 const colors = bakeVertexColors({positions, normals, colors: existing}, occluder, {
@@ -103,13 +115,15 @@ const pixelArt = limitPalette(colors, ['#1a1c2c', '#5d275d', '#b13e53', '#ef7d57
 | --- | --- |
 | `lights` | omitted: lighting term 1 (AO only). Types `ambient`, `directional` (`direction` toward the light), `point`, `spot` (`direction` the cone points, `angle` half-angle in radians, `penumbra` 0..1); `color`, `intensity`, `distance` (0 unlimited), `decay` (2), `visible` |
 | `shadows` | true: a ray toward each directional, point and spot light |
+| `segmentShadows` | false; true tests point and spot shadows on the segment from the unshifted vertex to the light (directional shadows and AO keep the bias) |
+| `shadowFaceFilter` | omitted; with `segmentShadows`, `(faceIndex, vertexIndex) => boolean`, false skips that occluder face |
 | `backfaces` | true: occluder back faces block rays; false lets them through |
 | `includeHidden` | false: lights with `visible: false` are skipped |
 | `ao` | omitted: no AO. `strength` 1, `rays` 32 (cosine-weighted over the hemisphere), `distance` 1 |
 | `apply` | `'none'` overwrites; `'standard'` multiplies onto `target.colors` (RGB or RGBA; alpha is kept) |
 | `multiplier` | 1, scales the baked RGB |
 | `seed` | 0; same inputs and seed, same colours |
-| `bias` | 1e-3, ray origins move this far along the normal |
+| `bias` | 1e-3, ray origins move this far along the normal (not used by segment shadows) |
 
 Per vertex: `(sum of lights) * (1 - strength * occludedRays / rays) * multiplier`, times the existing colour with
 `'standard'`. Falloff is shared with Margo's GPU lights: directional `color * intensity * max(N.L, 0)`; point and spot
@@ -136,6 +150,7 @@ That is roughly 3,000 to 4,200 times the brute-force ray rate. The tree takes ab
 
 ## Limits
 
+- Raw indices may be any numeric array; each must be a whole number within the vertex range. With `buildAsync({transfer: true})` the input is checked before the buffers move, and normals may not share a buffer with the moved positions or Uint32 indices.
 - Triangles only: no lines or points. Synchronous `intersectMeshes` and `intersectEngine` discover static glTF Pro/FBX triangles as well as core `Geometry`, including several primitives on one node. Once a GPU deformation buffer is active they throw with a direction to use `await raycaster.intersectModel(model)`, which reads the current pose. They never silently test a deformed mesh's bind pose. Hits carry barycentric weights but no `uv`.
 - `collectFrustum` with `'triangles'` is the conservative culling test (a triangle is dropped only when all three vertices are outside one plane), not exact clipping.
 - `refit()` keeps the tree topology; rebuild after large deformations for good query speed.

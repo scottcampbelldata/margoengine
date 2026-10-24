@@ -60,7 +60,11 @@ export interface RaycastOptions {
   far?: number;
   /** Which triangle faces count. Front faces wind counter-clockwise toward the ray origin. Default 'double'. */
   side?: Side;
+  /** Called with the source face index of each candidate hit; returning false skips that face. Default all faces. */
+  includeFace?: (faceIndex: number) => boolean;
 }
+/** Options of {@link MeshBVH.intersectsSegment}. */
+export type SegmentOptions = Pick<RaycastOptions, 'side' | 'includeFace'>;
 /** One ray/triangle hit from MeshBVH.raycast or raycastFirst, in the BVH's space. */
 export interface BVHHit {
   /** t * |direction| from the ray origin. */
@@ -191,17 +195,15 @@ export function sourceArrays(source: GeometryLike | TriangleSource): {
   indices: Uint32Array | null;
 } {
   const a = attributes(source);
-  return { positions: a.positions, stride: a.stride, indices: sourceIndices(source) };
+  return { positions: a.positions, stride: a.stride, indices: sourceIndices(source, a) };
 }
 
-function sourceIndices(source: GeometryLike | TriangleSource): Uint32Array | null {
-  return isGeometry(source)
-    ? source.indices
-    : source.indices
-      ? source.indices instanceof Uint32Array
-        ? source.indices
-        : Uint32Array.from(source.indices)
-      : null;
+/** Uint32 indices of the source. Other index arrays are checked before conversion, which would wrap -1 or truncate 1.5. */
+function sourceIndices(source: GeometryLike | TriangleSource, a: Attributes): Uint32Array | null {
+  const raw = source.indices;
+  if (!raw || raw instanceof Uint32Array) return raw ?? null;
+  checkSource(a.positions, a.stride, raw);
+  return Uint32Array.from(raw);
 }
 
 /**
@@ -236,7 +238,7 @@ export class MeshBVH {
   /** Builds a BVH synchronously from a Geometry or raw positions and indices. */
   static build(source: GeometryLike | TriangleSource, options?: BVHBuildOptions): MeshBVH {
     const a = attributes(source),
-      indices = sourceIndices(source);
+      indices = sourceIndices(source, a);
     // Preserve geometry identity and reuse already converted raw attributes when wrapping the result.
     return new MeshBVH(
       buildBVH(a.positions, a.stride, indices, options),
@@ -295,7 +297,8 @@ export class MeshBVH {
     // Structural validation: children follow parents and leaves tile the triangle range in order.
     const u = this.nodeData,
       count = this.nodeCount;
-    let covered = 0;
+    let covered = 0,
+      leaves = 0;
     for (let node = 0, w = 0; node < count; node++, w += NODE_WORDS) {
       const word = u[w + 7];
       if (word & INTERNAL_FLAG) {
@@ -304,9 +307,24 @@ export class MeshBVH {
       } else {
         if (!word || u[w + 6] !== covered) throw new RangeError('Invalid BVH leaf ranges');
         covered += word;
+        leaves++;
       }
     }
     if (covered !== this.triangleCount) throw new RangeError('BVH leaves do not cover every triangle');
+    // Walking backwards, each internal node must take its two children's subtree roots off the stack: this proves
+    // one packed tree with every node reached once, so a restored tree with shared or cyclic links cannot loop.
+    const roots = new Uint32Array(leaves);
+    let top = 0;
+    for (let node = count - 1; node >= 0; node--) {
+      const w = node * NODE_WORDS;
+      if (u[w + 7] & INTERNAL_FLAG) {
+        if (top < 2 || roots[top - 1] !== node + 1 || roots[top - 2] !== u[w + 6])
+          throw new RangeError('Invalid BVH node links');
+        top -= 2;
+      }
+      roots[top++] = node;
+    }
+    if (top !== 1) throw new RangeError('Invalid BVH node links');
   }
 
   get nodeCount(): number {
@@ -401,11 +419,26 @@ export class MeshBVH {
     }
   }
 
+  /**
+   * Whether a triangle crosses the segment from `start` to `end`, not counting contact within a relative 1e-7 of
+   * either end: a shadow test toward a light that may lie on a surface. Coplanar overlap does not count.
+   * @throws RangeError when the endpoints coincide or are not finite.
+   */
+  intersectsSegment(start: ArrayLike<number>, end: ArrayLike<number>, options: SegmentOptions = {}): boolean {
+    const direction = [end[0] - start[0], end[1] - start[1], end[2] - start[2]],
+      length = Math.hypot(direction[0], direction[1], direction[2]);
+    return !!this.raycastFirst(
+      { origin: start, direction },
+      { ...options, near: length * EPS, far: length * (1 - EPS) },
+    );
+  }
+
   /** Nearest hit along the ray, or null. Equal distances resolve to the lowest face index, as in `raycast`. */
   raycastFirst(ray: Ray, options: RaycastOptions = {}): BVHHit | null {
     const { origin: o, direction: d } = ray,
       [tmin, tmax, length] = rayRange(d, options),
-      side = sideCode(options.side);
+      side = sideCode(options.side),
+      include = options.includeFace;
     const ox = o[0],
       oy = o[1],
       oz = o[2],
@@ -496,7 +529,8 @@ export class MeshBVH {
             HIT,
           ) &&
           // Equal distances keep the lowest face index, so the result is raycast()[0] whatever the traversal order.
-          (bestSlot < 0 || HIT[0] < best || (HIT[0] === best && this.triangles[k] < this.triangles[bestSlot]))
+          (bestSlot < 0 || HIT[0] < best || (HIT[0] === best && this.triangles[k] < this.triangles[bestSlot])) &&
+          (!include || include(this.triangles[k]))
         ) {
           best = HIT[0];
           bestSlot = k;
@@ -513,7 +547,8 @@ export class MeshBVH {
   raycast(ray: Ray, options: RaycastOptions = {}): BVHHit[] {
     const { origin: o, direction: d } = ray,
       [tmin, tmax, length] = rayRange(d, options),
-      side = sideCode(options.side);
+      side = sideCode(options.side),
+      include = options.includeFace;
     const ox = o[0],
       oy = o[1],
       oz = o[2],
@@ -571,7 +606,8 @@ export class MeshBVH {
               tmin,
               tmax,
               HIT,
-            )
+            ) &&
+            (!include || include(this.triangles[k]))
           )
             hits.push(this.makeHit(k, HIT[0], HIT[1], HIT[2], HIT[3], ox, oy, oz, dx, dy, dz, length));
         }

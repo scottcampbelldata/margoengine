@@ -50,6 +50,13 @@ export interface BakeOptions {
   lights?: readonly BakeLight[];
   /** Cast occlusion rays toward each directional, point and spot light. Default true. */
   shadows?: boolean;
+  /**
+   * Point and spot shadows test the segment from the unshifted vertex to the light, which stops at the light and
+   * needs no bias. Directional shadows and AO keep the biased ray. Default false.
+   */
+  segmentShadows?: boolean;
+  /** With `segmentShadows`, called with an occluder face index and the target vertex index; false skips that face. */
+  shadowFaceFilter?: (faceIndex: number, vertexIndex: number) => boolean;
   /** Occluder back faces block rays. Default true; false lets light and AO rays through them. */
   backfaces?: boolean;
   /** Also bake lights with `visible: false`. Default false. */
@@ -97,6 +104,8 @@ export function bakeVertexColors(
   const {
       lights,
       shadows = true,
+      segmentShadows = false,
+      shadowFaceFilter,
       backfaces = true,
       includeHidden = false,
       ao,
@@ -184,7 +193,17 @@ export function bakeVertexColors(
       direction[0] = lx;
       direction[1] = ly;
       direction[2] = lz;
-      if (shadows && blocked(far)) continue;
+      if (
+        shadows &&
+        (segmentShadows && light.type !== 'directional'
+          ? !!occluder &&
+            occluder.intersectsSegment([px, py, pz], light.position, {
+              side,
+              includeFace: shadowFaceFilter ? (face) => shadowFaceFilter(face, i) : undefined,
+            })
+          : blocked(far))
+      )
+        continue;
       r += light.rgb[0] * scale * lambert;
       g += light.rgb[1] * scale * lambert;
       b += light.rgb[2] * scale * lambert;

@@ -60,18 +60,32 @@ export function ceilFloat32(x: number): number {
   return F32[0];
 }
 
-/** Validates vertex data and returns the triangle count. */
-export function checkSource(positions: ArrayLike<number>, stride: number, indices: ArrayLike<number> | null): number {
+/**
+ * Validates vertex data and returns the triangle count. With `finite`, also checks every referenced position, so a
+ * worker build can refuse before the caller's buffers are moved.
+ */
+export function checkSource(
+  positions: ArrayLike<number>,
+  stride: number,
+  indices: ArrayLike<number> | null,
+  finite = false,
+): number {
   if (!Number.isInteger(stride) || stride < 3) throw new RangeError('stride must be an integer >= 3');
   const vertexCount = positions.length >= 3 ? Math.floor((positions.length - 3) / stride) + 1 : 0;
   const count = indices ? indices.length : vertexCount;
   if (!count || count % 3) throw new RangeError('Expected at least one triangle');
-  if (indices)
-    for (let i = 0; i < indices.length; i++) {
-      const v = indices[i];
+  if (indices || finite)
+    for (let i = 0; i < count; i++) {
+      const v = indices ? indices[i] : i;
       if (!(v >= 0 && v < vertexCount) || v !== Math.floor(v)) throw new RangeError('Index exceeds vertices');
+      if (finite) checkPosition(positions[v * stride], positions[v * stride + 1], positions[v * stride + 2]);
     }
   return count / 3;
+}
+
+function checkPosition(a: number, b: number, c: number): void {
+  if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c))
+    throw new RangeError('Positions must be finite');
 }
 
 /** Builds BVH arrays over strided `positions` (and optional `indices`) without wrapping them in a MeshBVH. */
@@ -94,8 +108,7 @@ export function buildBVH(
       const pa = positions[a + k],
         pb = positions[b + k],
         pc = positions[c + k];
-      if (!Number.isFinite(pa) || !Number.isFinite(pb) || !Number.isFinite(pc))
-        throw new RangeError('Positions must be finite');
+      checkPosition(pa, pb, pc);
       // Rounded outward, so float64 positions stay inside their float32 boxes (exact for float32 positions).
       boxes[t * 6 + k] = floorFloat32(pa < pb ? (pa < pc ? pa : pc) : pb < pc ? pb : pc);
       boxes[t * 6 + 3 + k] = ceilFloat32(pa > pb ? (pa > pc ? pa : pc) : pb > pc ? pb : pc);

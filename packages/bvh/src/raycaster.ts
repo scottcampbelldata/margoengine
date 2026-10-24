@@ -216,6 +216,8 @@ interface Candidate {
   model: ModelLike | null;
   primitive: ModelPrimitiveLike | null;
   index: number;
+  /** A direct node or a pick proxy: only its own layers count, never its model root's. */
+  ownLayers?: true;
   sphere?: ArrayLike<number>;
   matrix?: Float32Array;
   instance?: number;
@@ -420,11 +422,22 @@ export class Raycaster {
       const handle = snapshot.node,
         mesh = handle as unknown as RuntimeMesh & { engine: RuntimeEngine };
       if (mesh.engine !== runtime) throw new TypeError('Picking geometry belongs to another engine');
-      if (runtime.meshes.get(mesh.id) !== mesh || hiddenInHierarchy(store, mesh.id)) continue;
+      if (runtime.meshes.get(mesh.id) !== mesh || hiddenInHierarchy(runtime.store, mesh.id)) continue;
       if (!(getMeshLayers(handle) & layers) || (filter && !filter(handle))) continue;
       // User predicates can dispose or reparent scene objects synchronously as well.
-      if (source.disposed || runtime.disposed || runtime.meshes.get(root.id) !== root) return [];
-      if (runtime.meshes.get(mesh.id) !== mesh || hiddenInHierarchy(store, mesh.id)) continue;
+      if (
+        source.disposed ||
+        runtime.disposed ||
+        source.root !== (root as unknown as Mesh) ||
+        runtime.meshes.get(root.id) !== root
+      )
+        return [];
+      if (
+        runtime.meshes.get(mesh.id) !== mesh ||
+        hiddenInHierarchy(runtime.store, mesh.id) ||
+        !(getMeshLayers(handle) & layers)
+      )
+        continue;
       const { vertices, indices, matrix, doubleSided } = snapshot,
         count = vertices?.length / 20;
       if (
@@ -556,7 +569,14 @@ export class Raycaster {
             const p = primitive as unknown as ModelPrimitiveLike,
               entry = this.entry(store.matrices, mesh.id * 16, primitiveEntry(p).sphere);
             if (entry >= 0)
-              candidates.push({ node: mesh, entry, model: owner, primitive: p, index: owner.primitives.indexOf(p) });
+              candidates.push({
+                node: mesh,
+                entry,
+                model: owner,
+                primitive: p,
+                index: owner.primitives.indexOf(p),
+                ownLayers: true,
+              });
           }
       }
       if (!mesh.geometry) continue;
@@ -591,7 +611,16 @@ export class Raycaster {
           for (let k = 0; k < instances.count; k++) {
             const m = multiplyMatrices(world, instances.data.subarray(k * 24, k * 24 + 16), scratch),
               entry = this.entry(m, 0, sphere);
-            if (entry >= 0) candidates.push({ node, entry, model, primitive, index, matrix: m.slice(), instance: k });
+            if (entry >= 0)
+              candidates.push({
+                node,
+                entry,
+                model,
+                primitive,
+                index,
+                matrix: m.slice(),
+                instance: k,
+              });
           }
           continue;
         }
@@ -606,7 +635,7 @@ export class Raycaster {
       if (runtime.meshes.get(node.id) !== node) continue;
       const entry = this.entry(store.matrices, node.id * 16, sphere);
       if (entry >= 0 && this.usable(runtime, node, getMeshLayers(anchor), owner))
-        candidates.push({ node, entry, model: owner, primitive: null, index: -1, sphere });
+        candidates.push({ node, entry, model: owner, primitive: null, index: -1, sphere, ownLayers: true });
     }
     if (this.firstHitOnly) candidates.sort((a, b) => a.entry - b.entry);
     const hits: RaycasterHit[] = [],
@@ -616,8 +645,17 @@ export class Raycaster {
       direction = [0, 0, 0],
       ray = { origin: local, direction };
     let best = this.far;
-    for (const { node, entry, model, primitive, index, sphere, matrix: world, instance } of candidates) {
+    for (const { node, entry, model, primitive, index, ownLayers, sphere, matrix: world, instance } of candidates) {
       if (this.firstHitOnly && entry > best) break;
+      // The filter of a later candidate may have disposed, hidden or re-layered this one.
+      if (
+        !this.live(runtime, node, model) ||
+        !(
+          (layerMasks.get(node) ?? (ownLayers || !model ? undefined : layerMasks.get(model.root)) ?? 1) & this.layers
+        ) ||
+        (primitive && model?.primitives[index] !== primitive)
+      )
+        continue;
       matrix.set(world ?? store.matrices.subarray(node.id * 16, node.id * 16 + 16));
       if (!invertMatrix(matrix, inverse)) continue;
       const length = localRay(inverse, this.origin, this.direction, local, direction),
@@ -665,10 +703,18 @@ export class Raycaster {
 
   private usable(runtime: RuntimeEngine, mesh: RuntimeMesh, mask: number, model: ModelLike | null): boolean {
     return (
-      (!model || runtime.meshes.get(mesh.id) === mesh) &&
-      !hiddenInHierarchy(runtime.store, mesh.id) &&
+      this.live(runtime, mesh, model) &&
       !!(mask & this.layers) &&
       (!this.filter || this.filter(mesh as unknown as Mesh, model ?? undefined))
+    );
+  }
+
+  private live(runtime: RuntimeEngine, mesh: RuntimeMesh, model: ModelLike | null): boolean {
+    return (
+      !runtime.disposed &&
+      !model?.disposed &&
+      runtime.meshes.get(mesh.id) === mesh &&
+      !hiddenInHierarchy(runtime.store, mesh.id)
     );
   }
 

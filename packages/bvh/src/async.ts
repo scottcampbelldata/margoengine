@@ -1,4 +1,4 @@
-import { resolveOptions, type BVHBuildOptions, type BVHData } from './build.js';
+import { checkSource, resolveOptions, type BVHBuildOptions, type BVHData } from './build.js';
 import { MeshBVH, sourceArrays, type GeometryLike, type TriangleSource } from './bvh.js';
 
 /** BVH build options for worker builds (buildAsync, computeGeometryBVHAsync), plus transfer and cancellation. */
@@ -82,20 +82,20 @@ export function buildAsync(source: GeometryLike | TriangleSource, options: Async
       if (signal?.aborted) throw signal.reason ?? new Error('Aborted');
       return MeshBVH.build(source, buildOptions);
     });
-  let arrays: ReturnType<typeof sourceArrays>;
+  let arrays: ReturnType<typeof sourceArrays>, move: boolean;
   try {
     arrays = sourceArrays(source);
+    move = transfer && !(arrays.stride === 6 && (source as GeometryLike).vertices === arrays.positions);
+    // Refuse bad input before the caller's buffers are moved: a worker refusal would leave them detached.
+    if (move) checkSource(arrays.positions, arrays.stride, arrays.indices, true);
   } catch (error) {
     return Promise.reject(error);
   }
-  const isGeometry = arrays.stride === 6 && (source as GeometryLike).vertices === arrays.positions;
-  const move = transfer && !isGeometry;
-  if (
-    move &&
-    (source as TriangleSource).normals &&
-    ((source as TriangleSource).normals as Float32Array).buffer === arrays.positions.buffer
-  )
+  const normals = move ? ((source as TriangleSource).normals as { buffer?: ArrayBufferLike } | null)?.buffer : null;
+  if (normals && normals === arrays.positions.buffer)
     return Promise.reject(new TypeError('transfer cannot move positions that share a buffer with normals'));
+  if (normals && normals === arrays.indices?.buffer && !isShared(normals))
+    return Promise.reject(new TypeError('transfer cannot move indices that share a buffer with normals'));
   return new Promise<MeshBVH>((resolve, reject) => {
     const id = nextId++;
     const onAbort = (): void => {

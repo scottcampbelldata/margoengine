@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Clustered, clusteredSampling } from '../dist/index.js';
 import { cullingShader } from '../src/shader.ts';
-import { bakeVertexColors } from '../../bvh/dist/index.js';
+import { bakeVertexColors } from '../../bvh/dist/bake.js';
 import { wgsl } from '../../core/src/shaders.ts';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
