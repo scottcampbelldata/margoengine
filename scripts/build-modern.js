@@ -10,7 +10,7 @@ import { packageOrder } from './package-order.js';
 import { ownLicenses } from './package-licenses.js';
 import { buildWorkers, restoreWorkerUrls } from './build-workers.js';
 import { staticEmbind } from './static-embind.js';
-import { packageDeclarations } from './package-declarations.js';
+import { packageDeclarations, packageRuntime } from './package-declarations.js';
 const precompiled = process.argv.includes('--precompiled');
 // --only=post,lines rebuilds just those packages (their dependencies must already be built) and skips the size records.
 const only = process.argv
@@ -149,6 +149,7 @@ for (const name of packageOrder(manifests)) {
   }
   if (name === 'react') {
     await tsc(name);
+    await packageRuntime(resolve('packages/react'));
     continue;
   }
   const entry = Object.fromEntries(

@@ -82,3 +82,47 @@ export async function packageDeclarations(root) {
   }
   await walk(dist);
 }
+
+/**
+ * The runtime twin of {@link packageDeclarations} for packages emitted by plain tsc (bvh, exporters, loaders, react):
+ * copies every packages/shared module their dist JavaScript imports (and the shared modules those import) to
+ * dist/shared and points the imports there, so the packed package runs without the repository around it.
+ */
+export async function packageRuntime(root) {
+  const dist = resolve(root, 'dist'),
+    shared = resolve(root, '../shared'),
+    visited = new Set();
+  async function visit(source, destination) {
+    if (visited.has(source)) return;
+    visited.add(source);
+    const text = await readFile(source, 'utf8');
+    let output = '',
+      end = 0;
+    for (const reference of references(source, text)) {
+      if (!reference.module) continue;
+      const target = resolve(dirname(source), reference.specifier);
+      let next;
+      if (inside(dist, target)) next = target;
+      else if (inside(shared, target)) next = join(dist, 'shared', relative(shared, target));
+      else continue;
+      await visit(target, next);
+      let replacement = relative(dirname(destination), next).split(sep).join('/');
+      if (!replacement.startsWith('.')) replacement = './' + replacement;
+      output += text.slice(end, reference.start) + replacement;
+      end = reference.end;
+    }
+    output += text.slice(end);
+    if (source !== destination || output !== text) {
+      await mkdir(dirname(destination), { recursive: true });
+      await writeFile(destination, output);
+    }
+  }
+  async function walk(directory) {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const file = join(directory, entry.name);
+      if (entry.isDirectory()) await walk(file);
+      else if (/\.(?:m|c)?js$/.test(entry.name)) await visit(file, file);
+    }
+  }
+  await walk(dist);
+}

@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { copyFile, readFile, writeFile, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { packageDeclarations } from '../../../scripts/package-declarations.js';
+import { packageDeclarations, packageRuntime } from '../../../scripts/package-declarations.js';
 
 // Plain TypeScript emit keeps one module per exporter, so a consumer bundler drops the formats it does not import.
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -31,3 +31,5 @@ for (const name of ['archive', 'usdz', 'png']) {
   await writeFile(file, (await readFile(file, 'utf8')).replace('../../shared/crc32.js', './crc32.js'));
 }
 await packageDeclarations(root);
+// Ship the packages/shared modules the emitted JavaScript imports inside dist.
+await packageRuntime(root);

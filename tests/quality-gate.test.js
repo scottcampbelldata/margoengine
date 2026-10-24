@@ -77,7 +77,16 @@ test('normalise drops comments, blank lines, imports and dispose boilerplate', (
 test('family signatures match the known copies', () => {
   assert.ok(FAMILIES['crc32-table'].test('c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1'));
   assert.ok(FAMILIES['ggx-ndf'].test('let k=nh*nh*(a2-1.0)+1.0;'));
-  assert.ok(FAMILIES['hidden-ancestor'].test('if (engine.store.hidden[id]) visible = false;'));
+  assert.ok(
+    FAMILIES['hidden-ancestor'].test(
+      'for (let id = node.id; id !== -1; id = engine.store.parents[id]) if (engine.store.hidden[id]) visible = false;',
+    ),
+  );
+  assert.ok(
+    FAMILIES['gltf-accessor'].test(
+      'if (type === 5126) return data.getFloat32(at, true);\nif (type === 5125) return data.getUint32(at, true);\nif (type === 5123) return data.getUint16(at, true);\nreturn data.getInt16(at, true);',
+    ),
+  );
   assert.ok(FAMILIES['hex-colour'].test('/^#([0-9a-f]{3}|[0-9a-f]{6})$/i'));
   assert.ok(FAMILIES['partial-view'].test('r[0] !== 0 || r[1] !== 0 || r[2] !== c.width'));
 });

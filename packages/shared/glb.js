@@ -23,7 +23,7 @@ export function glbChunks(bytes) {
     view.getUint32(4, true) !== 2 ||
     view.getUint32(8, true) !== bytes.length
   )
-    throw new TypeError('GLB magic, version 2 or total length is wrong; pass a whole binary glTF 2.0 file');
+    throw new TypeError('GLB header (magic, version 2 or total length) is wrong; pass a whole binary glTF 2.0 file');
   const chunks = [];
   for (let at = 12; at < bytes.length; ) {
     if (at + 8 > bytes.length) throw new TypeError('GLB ends inside a chunk header; pass the whole file');

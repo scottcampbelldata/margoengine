@@ -4,7 +4,8 @@ import { GLTFAsset, PBRModel, parseGLTF } from '../packages/gltf-pro/dist/index.
 import { Animation } from '../packages/animation/dist/index.js';
 import { SSAO } from '../packages/post/dist/index.js';
 import { SceneFade } from '../packages/post/dist/scene-fade.js';
-import { sampleTrack, multiplyMatrices } from '../packages/animation/src/sampling.ts';
+import { sampleTrack } from '../packages/animation/src/sampling.ts';
+import { multiplyMatrices } from '../packages/math/src/mat4.ts';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
 import { animatedTriangle } from './support/gltf-pro-fixture.js';
 
@@ -54,7 +55,7 @@ test('animation handles endpoint clamps, step, cubic tangents, and antipodal qua
     translated = id.slice();
   translated[12] = 2;
   const out = new Float32Array(16);
-  multiplyMatrices(out, id, translated);
+  multiplyMatrices(id, translated, out);
   assert.deepEqual(out, translated);
 });
 async function headless(capacity = 64) {

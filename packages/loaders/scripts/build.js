@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { build } from 'vite';
 import { buildWorkers } from '../../../scripts/build-workers.js';
-import { packageDeclarations } from '../../../scripts/package-declarations.js';
+import { packageDeclarations, packageRuntime } from '../../../scripts/package-declarations.js';
 
 // Plain TypeScript emit: one ES module per loader, so a bundler keeps only the parsers an app imports.
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -34,3 +34,5 @@ await build({
 });
 await rm(resolve(root, 'dist/usd.worker.js'));
 await buildWorkers(root);
+// Ship the packages/shared modules the emitted JavaScript imports inside dist.
+await packageRuntime(root);

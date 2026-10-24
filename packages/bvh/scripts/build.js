@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { copyFile, readFile, writeFile, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { packageDeclarations } from '../../../scripts/package-declarations.js';
+import { packageDeclarations, packageRuntime } from '../../../scripts/package-declarations.js';
 
 // Plain TypeScript emit keeps the `new URL('./bvh.worker.js', import.meta.url)` literal intact, so the consuming app's
 // bundler (Vite, webpack 5, Next.js) emits the module worker as its own asset.
@@ -23,3 +23,5 @@ for (const name of ['raycaster.js', 'snapshot-source.js']) {
   const file = resolve(root, 'dist', name);
   await writeFile(file, (await readFile(file, 'utf8')).replace('../../shared/mesh-source.js', './mesh-source.js'));
 }
+// Ship the packages/shared modules the emitted JavaScript imports inside dist.
+await packageRuntime(root);
