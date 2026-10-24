@@ -755,6 +755,33 @@ filter only on a device with `float32-filterable` (request it in `Engine.create(
 elsewhere with a `MargoError('unsupported')` and a WgslMaterial reads them with `textureLoad`. A borrowed GPUTexture
 source (`new Texture(gpuTexture, {dimension})`) binds as it is and stays its owner's.
 
+## Batched meshes (`@margoengine/materials/batched`)
+
+`BatchedMesh` draws many different geometries as one materials mesh: one draw call in the main pass and one per
+shadow cascade, however many items it holds. Each item has its own matrix, colour (multiplied into its vertex colours)
+and visibility. Items are copied into shared vertex and index ranges once; moving, tinting or hiding one uploads 20
+floats and reruns a compute pass over the used vertices on the next frame (an unchanged batch costs nothing). Removed
+items' space is reused by later items that fit. `batch.mesh` takes `shadows.add`, `clustered.add`, `ssao.add` and
+picking like any `createMesh` mesh; `batch.itemOf(vertex)` maps a hit vertex back to its item and `batch.bounds(id)`
+gives an item's world box. Every item is its own copy of its geometry: for many copies of one geometry use
+`createInstancedMesh`. On the RTX A6000, 10,000 distinct boxes cost 36.8 ms of CPU per frame as one mesh each and
+0.13 ms as one batch (`npm run bench -- scaling --cases=shapes`). WebGPU only.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { Material } from '@margoengine/materials';
+import { BatchedMesh } from '@margoengine/materials/batched';
+import { boxGeometry, sphereGeometry } from '@margoengine/geometry';
+
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas);
+const batch = BatchedMesh.attach(engine, new Material({ roughness: 0.5 }), { maxItems: 1000, maxVertices: 200_000 });
+const crate = batch.add(boxGeometry(1, 1, 1), { color: '#c08040' });
+const ball = batch.add(sphereGeometry(0.5), { matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 0.5, 0, 1] });
+batch.setColor(ball, [0.2, 0.6, 1]).setVisible(crate, false);
+batch.remove(crate); // its space is reused by a later item that fits
+```
+
 ## KTX2 textures
 
 A `.ktx2` file goes on any map through `@margoengine/decoders`' `KTX2Decoder`: `loadKTX2Texture(url, {decoder})`

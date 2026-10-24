@@ -25,6 +25,10 @@
     "./transmission": {
       "types": "./dist/transmission.d.ts",
       "import": "./dist/transmission.js"
+    },
+    "./batched": {
+      "types": "./dist/batched.d.ts",
+      "import": "./dist/batched.js"
     }
   },
   "files": [

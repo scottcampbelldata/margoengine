@@ -7,7 +7,19 @@ import { engineRuntime } from '@margoengine/core/extension';
 import { CAD_MATERIALS, LIGHT, PALETTE } from './catalog.js';
 
 /** Scenes this engine implements (the page reports any other as unsupported). */
-export const scenes = ['startup', 'boxes', 'materials', 'lights', 'shadows', 'post', 'cad', 'gltf', 'helmet', 'react'];
+export const scenes = [
+  'startup',
+  'boxes',
+  'shapes',
+  'materials',
+  'lights',
+  'shadows',
+  'post',
+  'cad',
+  'gltf',
+  'helmet',
+  'react',
+];
 export const meta = { name: 'margo', api: 'webgpu' };
 
 const single = { doubleSided: false };
@@ -127,6 +139,43 @@ const builders = {
       },
       { camera: data.camera, views: views === 4 ? quarters(engine, data.camera) : undefined },
     );
+  },
+
+  async shapes(canvas, data, marks, { n, mode }) {
+    if (mode !== 'mesh' && mode !== 'batched') throw new RangeError(`shapes mode=${mode}: mesh or batched`);
+    const engine = await engineFor(canvas, data.camera, n + 8, marks),
+      s = performance.now();
+    floor(engine, data.floor);
+    if (mode === 'mesh') {
+      const materials = palette(data);
+      for (const b of data.items)
+        engine
+          .createMesh()
+          .setGeometry(box(...b.size))
+          .setMaterial(materials[b.color])
+          .setPosition(b.position)
+          .setRotation(b.rotation);
+      marks.buildMs = +(performance.now() - s).toFixed(1);
+      return app(engine, () => {}, { camera: data.camera });
+    }
+    const at = await composer(),
+      [{ Material }, { BatchedMesh }, { boxGeometry }] = await Promise.all([
+        import('@margoengine/materials'),
+        import('@margoengine/materials/batched'),
+        import('@margoengine/geometry'),
+      ]);
+    const batch = BatchedMesh.attach(engine, new Material({ color: '#ffffff', ...data.material, ...single }), {
+      maxItems: n,
+      maxVertices: n * 24,
+      maxIndices: n * 36,
+    });
+    for (const b of data.items)
+      batch.add(boxGeometry(...b.size), {
+        matrix: at(b.position, b.rotation).elements,
+        color: linear(PALETTE[b.color]),
+      });
+    marks.buildMs = +(performance.now() - s).toFixed(1);
+    return app(engine, () => {}, { camera: data.camera, draws: 2 });
   },
 
   async materials(canvas, data, marks, { n }) {

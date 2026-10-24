@@ -81,6 +81,14 @@ function yard(n) {
   };
 }
 
+/** `n` boxes on the yard grid, each with its own size, so each is a distinct geometry (BatchedMesh against one mesh each). */
+function shapes(n) {
+  const def = yard(n),
+    pick = random(5);
+  for (const item of def.items) item.size = [0.2 + pick() * 0.5, 0.2 + pick() * 0.5, 0.2 + pick() * 0.5];
+  return def;
+}
+
 /** `n` boxes sharing `count` distinct PBR materials (colour, roughness and metalness spread over the range). */
 function materials(n, count) {
   const def = boxes(n),
@@ -247,6 +255,15 @@ export const SCENES = {
     params: { n: 1000 },
     data: (p) => ({ ...yard(p.n), effects: ['ambient-occlusion', 'bloom', 'tonemap', 'fxaa'] }),
   },
+  shapes: {
+    title: 'Distinct shapes',
+    draws:
+      'n boxes on a floor, each with its own size (n distinct geometries). mode=mesh draws one object each; ' +
+      'mode=batched draws them all as one batched mesh (Margo: @margoengine/materials/batched).',
+    measures: ['cpuMs', 'gpuMs', 'fps', 'drawCalls'],
+    params: { n: 1000, mode: 'mesh' },
+    data: (p) => shapes(p.n),
+  },
   cad: {
     title: 'CAD assembly',
     draws: 'The synthetic 5-level CAD assembly (plates, brackets, bolts, washers, nuts) with n parts, one object each.',
@@ -310,6 +327,8 @@ export const STANDARD = {
     ...[10_000, 100_000].map((n) => ({ scene: 'boxes', params: { n, views: 4 } })),
     // Shadow casters (render has 1,000): every caster is drawn into each of the 4 cascades.
     ...[400, 5000, 10_000].map((n) => ({ scene: 'shadows', params: { n } })),
+    // Distinct geometries: one draw each, against one batched mesh for all of them.
+    ...[1000, 10_000].flatMap((n) => ['mesh', 'batched'].map((mode) => ({ scene: 'shapes', params: { n, mode } }))),
   ],
   gltf: [
     { scene: 'gltf', params: { model: 'damaged-helmet' } },
