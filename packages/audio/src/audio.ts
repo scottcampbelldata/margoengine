@@ -91,7 +91,9 @@ export class Audio implements ListenerSource {
   private media: HTMLMediaElement | null = null;
   private playing = false;
   private endedNaturally = false;
+  /** Context time the current buffer node started, or will start for a delayed play. */
   private startedAt = 0;
+  /** Buffer seconds played past `offset` over earlier stretches, kept wrapped into the buffer or loop region. */
   private progress = 0;
   private filterList: AudioNode[] = [];
   private loopValue: boolean;
@@ -204,6 +206,7 @@ export class Audio implements ListenerSource {
     checkFinite(delay, 'delay', 0);
     if (this.playing) return this;
     this.endedNaturally = false;
+    // A finished fade-out leaves the fade stage at 0; a running fade-in owns it.
     if (!this.fading) this.setFade(1);
     if (this.kind === 'buffer') this.startBuffer(this.context.currentTime + delay);
     else if (this.kind === 'media') {
@@ -231,6 +234,7 @@ export class Audio implements ListenerSource {
     this.playing = false;
     this.clearTimer();
     if (this.kind === 'buffer') {
+      // Fold this stretch into the stored progress, wrapped so long loops keep their precision.
       this.progress += Math.max(this.context.currentTime - this.startedAt, 0) * this.rateValue;
       this.progress = this.playhead(this.buffer!.duration) - this.offsetValue;
       this.stopNode();
@@ -242,8 +246,8 @@ export class Audio implements ListenerSource {
   stop(delay = 0): this {
     checkFinite(delay, 'delay', 0);
     this.playing = false;
-    this.progress = 0;
     this.endedNaturally = false;
+    this.progress = 0;
     this.clearTimer();
     if (this.kind === 'buffer') this.stopNode(delay);
     else if (delay > 0)
@@ -413,6 +417,8 @@ export class Audio implements ListenerSource {
   set playbackRate(value: number) {
     checkFinite(value, 'playbackRate');
     if (this.kind === 'buffer' && this.playing && this.source) {
+      // Keep the position continuous: count the time so far at the old rate, then restart the clock (a delayed
+      // start keeps its future start time).
       const now = this.context.currentTime;
       this.progress += Math.max(now - this.startedAt, 0) * this.rateValue;
       this.startedAt = Math.max(now, this.startedAt);
@@ -510,55 +516,62 @@ export class Audio implements ListenerSource {
     }
   }
 
-  /** Wraps `offset + progress` into the buffer or the loop region. */
+  /**
+   * Buffer position in seconds for `progress` seconds past `offset`. Without looping it clamps to the buffer. With
+   * looping it follows AudioBufferSourceNode's rules: the region is [loopStart, loopEnd), loopEnd 0 meaning the buffer
+   * end and capped at it; positions at or past the region end wrap into it, earlier ones (an intro) are kept; an empty
+   * or inverted region loops the whole buffer.
+   */
   private playhead(bufferDuration: number, progress = this.progress): number {
-    let position = this.offsetValue + progress;
+    const position = this.offsetValue + progress;
     if (!this.loopValue) return Math.min(Math.max(position, 0), bufferDuration);
     const start = this.loopStartValue,
       end = this.loopEndValue > 0 ? Math.min(this.loopEndValue, bufferDuration) : bufferDuration;
-    if (end > start && position >= end) position = start + ((position - start) % (end - start));
-    else if (!(end > start) && bufferDuration > 0) position %= bufferDuration;
-    return position;
+    if (end > start) return position < end ? position : start + ((position - start) % (end - start));
+    return bufferDuration > 0 ? position % bufferDuration : position;
   }
-
-  /** Replaces the buffer source with one that starts at context time `when` from the current playhead. */
+  /**
+   * Replaces the live buffer node with a new one that starts at context time `when` from the wrapped playhead.
+   * Buffer source nodes are one-shot, so every play, resume and playing seek needs a fresh node.
+   */
   private startBuffer(when: number): void {
+    const buffer = this.buffer!,
+      context = this.context;
     this.stopNode();
-    const context = this.context,
-      buffer = this.buffer!,
-      node = context.createBufferSource();
+    const node = context.createBufferSource();
     node.buffer = buffer;
     node.loop = this.loopValue;
     node.loopStart = this.loopStartValue;
     node.loopEnd = this.loopEndValue;
-    node.playbackRate.setValueAtTime(this.rateValue, context.currentTime);
-    node.detune?.setValueAtTime(this.detuneValue, context.currentTime);
-    node.onended = () => {
-      disconnect(node);
-      if (this.source !== node) return;
-      this.source = null;
-      if (!this.playing) return;
-      this.playing = false;
-      this.endedNaturally = true;
-      this.progress = 0;
-      this.onEnded?.(this);
-    };
+    smoothParam(node.playbackRate, this.rateValue, context, 0, true);
+    smoothParam(node.detune, this.detuneValue, context, 0, true);
     node.connect(this.head);
     const position = this.playhead(buffer.duration);
     this.progress = position - this.offsetValue;
     this.startedAt = when;
-    const remaining =
-      this.durationValue === undefined || this.loopValue
-        ? undefined
-        : Math.max(0, this.durationValue - Math.max(0, position - this.offsetValue));
-    if (remaining === undefined) node.start(when, position);
-    else node.start(when, position, remaining);
+    node.onended = () => this.nodeEnded(node);
     this.source = node;
+    if (this.loopValue || this.durationValue === undefined) node.start(when, position);
+    else node.start(when, position, Math.max(0, this.durationValue - Math.max(0, position - this.offsetValue)));
   }
-
+  /** The `onended` of a buffer node: a natural end only when it is still the live node of a playing sound. */
+  private nodeEnded(node: AudioBufferSourceNode): void {
+    disconnect(node);
+    if (node !== this.source) return;
+    this.source = null;
+    if (!this.playing) return;
+    this.playing = false;
+    this.endedNaturally = true;
+    this.progress = 0;
+    this.onEnded?.(this);
+  }
+  /**
+   * Stops the live buffer node. With `delay` > 0 it is scheduled to stop then and stays live until it ends or a
+   * later play replaces it; otherwise it stops now, is disconnected and released without firing `onEnded`.
+   */
   private stopNode(delay = 0): void {
     const node = this.source as AudioBufferSourceNode | null;
-    if (!node) return;
+    if (!node || this.kind !== 'buffer') return;
     if (delay > 0) {
       node.stop(this.context.currentTime + delay);
       return;
@@ -567,7 +580,7 @@ export class Audio implements ListenerSource {
     try {
       node.stop();
     } catch {
-      /* never started */
+      /* not started or already stopped */
     }
     disconnect(node);
     this.source = null;

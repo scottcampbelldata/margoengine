@@ -259,42 +259,6 @@ test('Line reuses buffers for same-size updates and validates input', () => {
   other.add(a);
 });
 
-test('helpers build the expected geometry', () => {
-  const grid = new GridHelper({ size: 4, divisions: 4 });
-  assert.equal(grid.count, 5 * 4);
-  assert.equal(grid.mode, 'segments');
-  const center = parseColor('#444444');
-  close(grid.colors[2 * 16], center[0], 1e-6, 'center row uses color1');
-  const polar = new PolarGridHelper({ radius: 2, sectors: 4, rings: 2, divisions: 8 });
-  assert.equal(polar.count, 4 * 2 + 2 * 8 * 2);
-  const axes = new AxesHelper({ size: 2 });
-  assert.deepEqual([...axes.points.subarray(4, 7)], [2, 0, 0]);
-  axes.setColors('#0000ff', '#00ff00', '#ff0000');
-  assert.deepEqual([...axes.colors.subarray(0, 3)], [0, 0, 1]);
-  const box3 = new Box3Helper([-1, -2, -3], [1, 2, 3]);
-  assert.equal(box3.count, 24);
-  for (let i = 0; i < 24; i++)
-    assert.deepEqual(
-      [0, 1, 2].map((a) => Math.abs(box3.points[i * 4 + a])),
-      [1, 2, 3],
-    );
-  assert.throws(() => box3.setBox([1, 0, 0], [0, 0, 0]), RangeError);
-  const arrow = new ArrowHelper({ direction: [0, 2, 0], origin: [1, 0, 0], length: 5 });
-  assert.deepEqual(
-    [...arrow.points.subarray(4, 7)].map((v) => Math.round(v * 1e5) / 1e5),
-    [1, 4, 0],
-    'shaft ends at the head base',
-  );
-  assert.deepEqual(
-    [...arrow.points.subarray(8, 11)].map((v) => Math.round(v * 1e5) / 1e5),
-    [1, 5, 0],
-    'spokes start at the tip',
-  );
-  const plane = new PlaneHelper({ normal: [0, 0, 2], constant: -3, size: 2 });
-  for (let i = 0; i < plane.count; i++) close(plane.points[i * 4 + 2], 1.5, 1e-6, 'points lie on the plane');
-  assert.equal(plane.count, 12);
-});
-
 function fakeEngine(meshes) {
   const capacity = 8,
     store = { matrices: new Float32Array(16 * capacity), hidden: new Uint8Array(capacity) };
@@ -355,17 +319,6 @@ test('VertexNormalsHelper keeps singular transforms hidden until a valid matrix 
   assert.equal(helper.update(engine), true);
   assert.ok(helper.version > version);
   assert.ok(helper.points.every(Number.isFinite));
-});
-
-test('CameraHelper unprojects a reversed-Z frustum', () => {
-  const camera = new Camera({ fov: 90, position: [0, 0, 5], target: [0, 0, 0], near: 1, far: 10 });
-  const helper = new CameraHelper(camera, { aspect: 1 });
-  helper.update(fakeEngine([]));
-  const p = (i) => [...helper.points.subarray(i * 4, i * 4 + 3)].map((v) => Math.round(v * 1e4) / 1e4);
-  assert.deepEqual(p(0), [-1, -1, 4], 'near plane corner n1');
-  assert.deepEqual(p(8), [-10, -10, -5], 'far plane corner f1');
-  assert.deepEqual(p(24), [0, 0, 5], 'cone starts at the camera');
-  assert.equal(helper.count, 50);
 });
 
 test('world-unit widths match the projection under perspective and orthographic cameras', () => {

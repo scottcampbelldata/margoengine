@@ -41,9 +41,9 @@ export interface GLTFSkinSource {
  * is not fogged (`fog`, default false).
  */
 export interface SkeletonHelperOptions extends HelperOptions {
-  /** Colour at each bone's own (child) end. Default blue '#0000ff'. */
+  /** Colour at each bone's own (child) end. Default orange '#ff7a2e'. */
   color?: ColorInput;
-  /** Colour at the parent end. Default green '#00ff00'. */
+  /** Colour at the parent end. Default teal '#16b3a3'. */
   parentColor?: ColorInput;
   /** With a `SkeletonShape`: the skinned mesh whose world matrix places the skeleton (e.g. `model.primitives[0].node`). */
   mesh?: Mesh | null;
@@ -87,7 +87,8 @@ export class SkeletonHelper extends Line {
           throw new TypeError(`${label} joints must be Margo Engine meshes; pass model.nodes entries`);
     } else if (!skeleton.matrices || typeof skeleton.matrices.length !== 'number')
       throw new TypeError(`${label} skeleton needs matrices, 16 numbers per bone; pass an animation Skeleton`);
-    const { color = '#0000ff', parentColor = '#00ff00', mesh = null, matrix, ...style } = options,
+    // Two mid-tone hues far apart on the colour wheel, readable on dark and light backgrounds.
+    const { color = '#ff7a2e', parentColor = '#16b3a3', mesh = null, matrix, ...style } = options,
       joints = isJoints(skeleton);
     super({
       cap: 'butt',

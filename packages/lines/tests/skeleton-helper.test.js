@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Skeleton } from '../../animation/dist/index.js';
-import { SkeletonHelper, Line } from '../dist/index.js';
+import { SkeletonHelper, Line, parseColor } from '../dist/index.js';
 
 const point = (line, i) => [...line.points.subarray(i * 4, i * 4 + 3)].map((v) => Math.round(v * 1e5) / 1e5);
 const color = (line, i) => [...line.colors.subarray(i * 4, i * 4 + 3)];
@@ -21,8 +21,9 @@ test("SkeletonHelper draws an animation Skeleton's bones parent to child and fol
   assert.equal(helper.count, 6, 'one segment per bone with a parent');
   assert.equal(helper.material.onTop, true, 'drawn over the scene');
   assert.equal(helper.material.fog, false, 'debug lines stay clear of fog');
-  assert.deepEqual(color(helper, 0), [0, 1, 0], 'parent end green');
-  assert.deepEqual(color(helper, 1), [0, 0, 1], 'child end blue');
+  const f32 = (c) => [...parseColor(c)].map(Math.fround);
+  assert.deepEqual(color(helper, 0), f32('#16b3a3'), 'parent end teal');
+  assert.deepEqual(color(helper, 1), f32('#ff7a2e'), 'child end orange');
   assert.equal(helper.update({}), true);
   assert.deepEqual(
     [point(helper, 0), point(helper, 1)],

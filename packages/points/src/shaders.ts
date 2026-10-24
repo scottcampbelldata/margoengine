@@ -206,28 +206,45 @@ export function foggedShader(kind: 'point' | 'sprite', additive: boolean): strin
   );
 }
 
-/** Eye-dome lighting: multiplies the color by a shade from log-depth differences to 8 neighbors. */
+/**
+ * Eye-dome lighting pass (C. Boucheny, PhD thesis, Universite Joseph Fourier, 2009; Boucheny and Ribes, Kitware
+ * Source Quarterly, 2011): a full-screen triangle whose output multiplies the scene colour. Each covered pixel compares
+ * its depth with 8 neighbours on a ring of `params.y` pixels; neighbours nearer the viewer add their depth step,
+ * measured in log2 units (perspective, `params.z` = 0) or as a linear step times `params.z` (orthographic). The shade
+ * is `exp(-32 * params.x * mean step)`, so flat areas keep their colour and silhouettes darken.
+ * Group 0: binding 0 the r32float depths (0 = no point), binding 1 `params` (strength, radius, orthographic scale, 0).
+ */
 export const edlShader: string = /* wgsl */ `
 @group(0) @binding(0) var depths:texture_2d<f32>;
 @group(0) @binding(1) var<uniform> params:vec4f;
-@vertex fn vertex(@builtin(vertex_index) vi:u32)->@builtin(position) vec4f{
-  let p=vec2f(f32((vi<<1u)&2u),f32(vi&2u));
-  return vec4f(p*2.0-1.0,0.0,1.0);
+// Ring directions 45 degrees apart.
+const RING=array<vec2f,8>(vec2f(1.0,0.0),vec2f(0.70710678,0.70710678),vec2f(0.0,1.0),vec2f(-0.70710678,0.70710678),
+  vec2f(-1.0,0.0),vec2f(-0.70710678,-0.70710678),vec2f(0.0,-1.0),vec2f(0.70710678,-0.70710678));
+// Darkening per unit of mean log2 step at strength 1 (our choice): beside a straight edge 3 of the 8 neighbours lie on
+// the near side, so a 5% depth step (log2 1.05 = 0.07) shades exp(-32 * 0.07 * 3 / 8) = 0.43, about half brightness,
+// and a 1% step still reads (0.84).
+const GAIN=32.0;
+@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f{
+  // Corners (-1,-1), (3,-1), (-1,3): one triangle covering the clip square.
+  return vec4f(f32(i&1u)*4.0-1.0,f32(i>>1u)*4.0-1.0,0.0,1.0);
+}
+// How much nearer a neighbour at depth n is than the centre at depth c; background (0) neighbours give nothing.
+fn nearer(c:f32,n:f32)->f32{
+  if(n<=0.0){return 0.0;}
+  if(params.z>0.0){return max(0.0,(c-n)*params.z);}
+  return max(0.0,log2(c)-log2(n));
 }
 @fragment fn fragment(@builtin(position) position:vec4f)->@location(0) vec4f{
-  let size=vec2i(textureDimensions(depths));
   let p=vec2i(position.xy);
-  let center=textureLoad(depths,p,0).r;
-  if(center<=0.0){discard;}
-  let lc=log2(center);
+  let c=textureLoad(depths,p,0).r;
+  if(c<=0.0){discard;}
+  let last=vec2i(textureDimensions(depths))-1;
   var sum=0.0;
   for(var k=0;k<8;k++){
-    let angle=f32(k)*0.78539816;
-    let q=clamp(p+vec2i(round(vec2f(cos(angle),sin(angle))*params.y)),vec2i(0),size-1);
-    let n=textureLoad(depths,q,0).r;
-    if(n>0.0){sum+=max(0.0,select(lc-log2(n),(center-n)*params.z,params.z>0.0));}
+    let q=clamp(p+vec2i(round(RING[k]*params.y)),vec2i(0),last);
+    sum+=nearer(c,textureLoad(depths,q,0).r);
   }
-  let shade=exp(-sum/8.0*300.0*params.x);
+  let shade=exp(-GAIN*params.x*sum/8.0);
   return vec4f(shade,shade,shade,1.0);
 }
 `;

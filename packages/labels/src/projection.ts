@@ -1,10 +1,43 @@
-import { composeMatrix as compose } from '@margoengine/math/mat4';
+// CSS 3D transform strings for CSS3D objects (CSS Transforms Module Level 1 and 2).
+//
+// Margo matrices are 4x4 column-major (index = column * 4 + row), world space is right-handed with +Y up and the
+// camera looks down its local -Z. CSS space is +X right, +Y down, +Z toward the viewer, and `matrix3d()` lists its
+// sixteen values column by column, the same order as Margo matrices. A transform list composes left to right by
+// post-multiplication and is applied about the element's transform-origin (its centre by default).
 import type { Backend } from '@margoengine/math/mat4';
 export type { Backend };
 
 export type Vec3 = readonly [number, number, number];
 
-/** Look-at view matrix (column-major), identical to the one Margo Engine's Camera builds; pass `camera.up` (default +Y). */
+// Rounding grid for every number written into a transform string: fine enough for sub-micro-pixel placement, coarse
+// enough that float noise between frames does not change the string (the renderer skips DOM writes on equal strings).
+const GRID = 1e6;
+
+/** Plain-decimal text for `value` on a 1e-6 grid; negative zero prints as 0. */
+function num(value: number): string {
+  const rounded = Math.round(value * GRID) / GRID;
+  return rounded === 0 ? '0' : String(rounded);
+}
+
+/** Comma-separated text of a 16-number column-major matrix. */
+function matrixText(m: ArrayLike<number>): string {
+  let text = num(m[0]);
+  for (let i = 1; i < 16; i++) text += `,${num(m[i])}`;
+  return text;
+}
+
+/**
+ * Right-handed look-at view matrix (column-major), the same matrix core's `Camera` builds.
+ *
+ * The camera's local Z points from `target` back to `position`, X = up x Z and Y = Z x X; the rotation rows are X, Y
+ * and Z, and the translation is the rotated position negated.
+ *
+ * @param position - Eye position in world space.
+ * @param target - Point the camera looks at.
+ * @param out - Destination, written and returned (default: a new Float64Array(16)).
+ * @param up - World up direction (default +Y).
+ * @throws RangeError when `position` equals `target`, or when the view direction is parallel to `up`.
+ */
 export function lookAtView(
   position: Vec3,
   target: Vec3,
@@ -14,52 +47,65 @@ export function lookAtView(
   let zx = position[0] - target[0],
     zy = position[1] - target[1],
     zz = position[2] - target[2];
-  const length = Math.hypot(zx, zy, zz);
-  if (!length) throw new RangeError('Camera position equals target');
-  zx /= length;
-  zy /= length;
-  zz /= length;
-  const u = up;
-  let xx = u[1] * zz - u[2] * zy,
-    xy = u[2] * zx - u[0] * zz,
-    xz = u[0] * zy - u[1] * zx;
-  const side = Math.hypot(xx, xy, xz);
-  if (!side) throw new RangeError('Camera is parallel to its up vector');
-  xx /= side;
-  xy /= side;
-  xz /= side;
+  const zLength = Math.hypot(zx, zy, zz);
+  if (zLength === 0) throw new RangeError('Camera position equals target; move the camera or its target apart');
+  zx /= zLength;
+  zy /= zLength;
+  zz /= zLength;
+  // X = up x Z.
+  let xx = up[1] * zz - up[2] * zy,
+    xy = up[2] * zx - up[0] * zz,
+    xz = up[0] * zy - up[1] * zx;
+  const xLength = Math.hypot(xx, xy, xz);
+  if (xLength === 0)
+    throw new RangeError('Camera is parallel to its up vector; choose an up vector not along the view direction');
+  xx /= xLength;
+  xy /= xLength;
+  xz /= xLength;
+  // Y = Z x X (already unit length: Z and X are orthonormal).
   const yx = zy * xz - zz * xy,
     yy = zz * xx - zx * xz,
-    yz = zx * xy - zy * xx,
-    p = position;
-  out.fill(0);
+    yz = zx * xy - zy * xx;
   out[0] = xx;
   out[1] = yx;
   out[2] = zx;
+  out[3] = 0;
   out[4] = xy;
   out[5] = yy;
   out[6] = zy;
+  out[7] = 0;
   out[8] = xz;
   out[9] = yz;
   out[10] = zz;
-  out[12] = -xx * p[0] - xy * p[1] - xz * p[2];
-  out[13] = -yx * p[0] - yy * p[1] - yz * p[2];
-  out[14] = -zx * p[0] - zy * p[1] - zz * p[2];
+  out[11] = 0;
+  out[12] = -(xx * position[0] + xy * position[1] + xz * position[2]);
+  out[13] = -(yx * position[0] + yy * position[1] + yz * position[2]);
+  out[14] = -(zx * position[0] + zy * position[1] + zz * position[2]);
   out[15] = 1;
   return out;
 }
 
-/** CSS `perspective` in pixels that matches a vertical field of view (degrees) on a viewport `height` CSS pixels tall. */
+/**
+ * CSS `perspective` length in pixels that reproduces a vertical field of view on a viewport.
+ *
+ * Pinhole geometry: half the viewport height over the tangent of half the field of view.
+ *
+ * @param fov - Vertical field of view in degrees.
+ * @param height - Viewport height in CSS pixels.
+ */
 export const cssPerspective = (fov: number, height: number): number => height / 2 / Math.tan((fov * Math.PI) / 360);
 
-const number = (value: number): string => {
-  const rounded = Math.round(value * 1e6) / 1e6;
-  return String(Object.is(rounded, -0) ? 0 : rounded);
-};
-
 /**
- * Transform for the CSS3D camera element: move by the perspective distance, apply the view matrix with Y flipped
- * into CSS (Y down), and center the origin in the viewport.
+ * CSS transform for the camera element (sized `width` x `height`) under a perspective camera.
+ *
+ * The list pushes the scene back by the viewer's perspective distance, applies the view matrix with its Y row negated
+ * (world Y up to CSS Y down), then moves the origin to the element's centre. Use with the viewer element's
+ * `perspective` set to the same `perspective` length.
+ *
+ * @param view - Column-major view matrix, e.g. from {@link lookAtView}.
+ * @param perspective - The viewer's CSS perspective in pixels, from {@link cssPerspective}.
+ * @param width - Viewport width in CSS pixels.
+ * @param height - Viewport height in CSS pixels.
  */
 export function cameraCSSTransform(
   view: ArrayLike<number>,
@@ -67,14 +113,22 @@ export function cameraCSSTransform(
   width: number,
   height: number,
 ): string {
-  const v = view;
-  return `translateZ(${number(perspective)}px) matrix3d(${[v[0], -v[1], v[2], v[3], v[4], -v[5], v[6], v[7], v[8], -v[9], v[10], v[11], v[12], -v[13], v[14], v[15]].map(number).join(',')}) translate(${number(width / 2)}px,${number(height / 2)}px)`;
+  let rows = '';
+  for (let i = 0; i < 16; i++) rows += (i ? ',' : '') + num(i % 4 === 1 ? -view[i] : view[i]);
+  return `translateZ(${num(perspective)}px) matrix3d(${rows}) translate(${num(width / 2)}px,${num(height / 2)}px)`;
 }
 
 /**
- * Transform for the CSS3D camera element under an orthographic view-projection (clip w independent of position, e.g.
- * @margoengine/cameras), read from the clip matrix itself: world to CSS pixels from the viewport centre, Y down, with
- * Z scaled like Y so that CSS depth sorting follows the camera. Use it with `perspective: none` on the viewer.
+ * CSS transform for the camera element under an orthographic view-projection (viewer `perspective: none`).
+ *
+ * World points map straight to CSS pixels about the viewport centre through `matrix` itself, so zoom, offsets and
+ * custom projections carry over. Depth is scaled so one world unit along the view axis is as long in CSS as one along
+ * screen Y, with the sign chosen so nearer points get larger CSS z on either backend's depth convention.
+ *
+ * @param matrix - Column-major orthographic view-projection (clip matrix).
+ * @param width - Viewport width in CSS pixels.
+ * @param height - Viewport height in CSS pixels.
+ * @param backend - Clip-space convention of `matrix` (default 'webgpu', reversed Z).
  */
 export function orthographicCSSTransform(
   matrix: ArrayLike<number>,
@@ -82,49 +136,105 @@ export function orthographicCSSTransform(
   height: number,
   backend: Backend = 'webgpu',
 ): string {
-  const m = matrix,
-    x = width / 2,
-    y = height / 2,
-    z = ((backend === 'webgpu' ? y : -y) * Math.hypot(m[1], m[5], m[9])) / (Math.hypot(m[2], m[6], m[10]) || 1);
-  return `matrix3d(${[0, 4, 8, 12]
-    .flatMap((c) => [m[c] * x, -m[c + 1] * y, m[c + 2] * z, c === 12 ? 1 : 0])
-    .map(number)
-    .join(',')}) translate(${number(x)}px,${number(y)}px)`;
+  const halfWidth = width / 2,
+    halfHeight = height / 2;
+  const yRow = Math.hypot(matrix[1], matrix[5], matrix[9]);
+  const zRow = Math.hypot(matrix[2], matrix[6], matrix[10]) || 1;
+  // WebGPU uses reversed Z (larger clip z is nearer); WebGL2 clip z grows with distance.
+  const depth = ((backend === 'webgl2' ? -halfHeight : halfHeight) * yRow) / zRow;
+  const css = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
+  for (let column = 0; column < 4; column++) {
+    const c = column * 4;
+    css[c] = matrix[c] * halfWidth;
+    css[c + 1] = -matrix[c + 1] * halfHeight;
+    css[c + 2] = matrix[c + 2] * depth;
+  }
+  return `matrix3d(${matrixText(css)}) translate(${num(halfWidth)}px,${num(halfHeight)}px)`;
 }
-
-/** True when a column-major view-projection is orthographic: clip w does not depend on position. */
 
 /**
- * Transform for a CSS3D object: center the element on its origin, scale CSS pixels to world units with `pixelScale`,
- * flip CSS Y down to world Y up, then apply the column-major world matrix.
+ * CSS transform for a CSS3D object element from its world matrix.
+ *
+ * The element is first centred on its origin (-50% of its own box), then placed by the world matrix with CSS pixels
+ * scaled to world units and CSS Y flipped to world Y: one pixel right is `pixelScale` along the matrix's X axis, one
+ * pixel down is `-pixelScale` along its Y axis.
+ *
+ * @param world - Column-major world matrix.
+ * @param pixelScale - World units per CSS pixel (default 1).
  */
 export function objectCSSTransform(world: ArrayLike<number>, pixelScale = 1): string {
-  const w = world,
-    s = pixelScale;
-  return `translate(-50%,-50%) matrix3d(${[w[0] * s, w[1] * s, w[2] * s, w[3] * s, -w[4] * s, -w[5] * s, -w[6] * s, -w[7] * s, w[8] * s, w[9] * s, w[10] * s, w[11] * s, w[12], w[13], w[14], w[15]].map(number).join(',')})`;
+  let text = '';
+  for (let i = 0; i < 16; i++) {
+    const column = i >> 2;
+    const scale = column === 3 ? 1 : column === 1 ? -pixelScale : pixelScale;
+    text += (i ? ',' : '') + num(world[i] * scale);
+  }
+  return `translate(-50%,-50%) matrix3d(${text})`;
 }
 
-/** World position of an element-local CSS point (pixels from the element center, Y down) on a CSS3D object. */
+/**
+ * World position of a point on a CSS3D object given in element pixels from the element centre (x right, y down).
+ *
+ * The inverse of the placement {@link objectCSSTransform} makes; useful for hit testing.
+ *
+ * @param world - Column-major world matrix of the object (affine).
+ * @param pixelScale - World units per CSS pixel.
+ * @param x - Pixels right of the element centre.
+ * @param y - Pixels below the element centre.
+ */
 export function cssPointToWorld(
   world: ArrayLike<number>,
   pixelScale: number,
   x: number,
   y: number,
 ): [number, number, number] {
-  const lx = x * pixelScale,
-    ly = -y * pixelScale,
-    w = world;
-  return [w[0] * lx + w[4] * ly + w[12], w[1] * lx + w[5] * ly + w[13], w[2] * lx + w[6] * ly + w[14]];
+  const u = x * pixelScale,
+    v = -y * pixelScale;
+  return [
+    world[0] * u + world[4] * v + world[12],
+    world[1] * u + world[5] * v + world[13],
+    world[2] * u + world[6] * v + world[14],
+  ];
 }
 
-/** Column-major world matrix from position, quaternion [x, y, z, w] and uniform or per-axis scale. */
+/**
+ * Column-major translation-rotation-scale matrix.
+ *
+ * @param position - Translation.
+ * @param quaternion - Rotation [x, y, z, w], normalised here; a zero quaternion gives no rotation (default identity).
+ * @param scale - Scale per local axis (default [1, 1, 1]).
+ * @param out - Destination, written and returned (default: a new Float64Array(16)).
+ */
 export function composeMatrix(
   position: Vec3,
   quaternion: readonly number[] = [0, 0, 0, 1],
   scale: Vec3 = [1, 1, 1],
   out: Float64Array = new Float64Array(16),
 ): Float64Array {
-  const [x, y, z, w] = quaternion,
-    length = Math.hypot(x, y, z, w) || 1;
-  return compose(position, [x / length, y / length, z / length, w / length], scale, out);
+  const length = Math.hypot(quaternion[0], quaternion[1], quaternion[2], quaternion[3]) || 1;
+  const x = quaternion[0] / length,
+    y = quaternion[1] / length,
+    z = quaternion[2] / length,
+    w = quaternion[3] / length;
+  const sx = scale[0],
+    sy = scale[1],
+    sz = scale[2];
+  // Rotation matrix of a unit quaternion (Hamilton convention), each column scaled by its axis scale.
+  out[0] = (1 - 2 * (y * y + z * z)) * sx;
+  out[1] = 2 * (x * y + w * z) * sx;
+  out[2] = 2 * (x * z - w * y) * sx;
+  out[3] = 0;
+  out[4] = 2 * (x * y - w * z) * sy;
+  out[5] = (1 - 2 * (x * x + z * z)) * sy;
+  out[6] = 2 * (y * z + w * x) * sy;
+  out[7] = 0;
+  out[8] = 2 * (x * z + w * y) * sz;
+  out[9] = 2 * (y * z - w * x) * sz;
+  out[10] = (1 - 2 * (x * x + y * y)) * sz;
+  out[11] = 0;
+  out[12] = position[0];
+  out[13] = position[1];
+  out[14] = position[2];
+  out[15] = 1;
+  return out;
 }

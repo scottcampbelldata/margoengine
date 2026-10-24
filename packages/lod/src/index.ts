@@ -353,17 +353,16 @@ export class LODSystem implements EnginePlugin {
             : v / bias;
         v = (bias * w) / (yScale * this.radius[i] * Math.sqrt(Math.max(sx, sy, sz)));
       }
-      // Hysteresis: the shown level's threshold drops by its hysteresis, so small camera moves never flip levels back and forth.
-      const n = counts[i],
-        shown = current[i],
-        b = i * MAX_LEVELS;
+      // Level choice, a dead band around each switch point (Schmitt trigger). The plain pick is the coarsest level
+      // whose threshold v has reached (equality counts). Going coarser is never delayed; going finer from the shown
+      // level s waits until v drops below s's threshold lowered by its own band, t_s * (1 - h_s). While v is inside
+      // that band, s holds even when the band reaches past finer thresholds.
+      const b = i * MAX_LEVELS,
+        n = counts[i],
+        shown = current[i];
       let next = 0;
-      for (let l = 1; l < n; l++) {
-        let t = thresholds[b + l];
-        if (l === shown) t -= t * bands[b + l];
-        if (v >= t) next = l;
-        else break;
-      }
+      while (next + 1 < n && v >= thresholds[b + next + 1]) next++;
+      if (next < shown && v >= thresholds[b + shown] * (1 - bands[b + shown])) next = shown;
       if (next !== shown) this.show(i, shown, next);
     }
   }
