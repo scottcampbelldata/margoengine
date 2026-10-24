@@ -12,7 +12,8 @@ import type {
 } from '@margoengine/physics';
 import { Mesh, type MeshProps } from './components.js';
 import { useScene, useCommit, useResourceEffect, type Scene, type Registry } from './internal.js';
-import { descendants, rotate, worldPose, setWorldPose, type Triple, type Quaternion } from './scene-transform.js';
+import { descendants, worldPose, setWorldPose, type Triple, type Quaternion } from './scene-transform.js';
+import { rotateByQuaternion } from '@margoengine/math/quat';
 import { optionalPeer } from './optional.js';
 
 interface PhysicsState {
@@ -194,7 +195,7 @@ function fitCollider(
     indices: number[] = [];
   const meshes = new Set(descendants(root.engine, root));
   const point = (world: Triple) => {
-    const p = rotate([world[0] - position[0], world[1] - position[1], world[2] - position[2]], inverse);
+    const p = rotateByQuaternion([world[0] - position[0], world[1] - position[1], world[2] - position[2]], inverse);
     if (p.some((value) => !Number.isFinite(value)))
       throw new RangeError('RigidBody: collider geometry contains non-finite positions');
     for (let axis = 0; axis < 3; axis++) {
@@ -440,7 +441,7 @@ function BodyBinding({
           try {
             const child = worldPose(mesh),
               source = request.options(),
-              offset = rotate(
+              offset = rotateByQuaternion(
                 [
                   child.position[0] - pose.position[0],
                   child.position[1] - pose.position[1],

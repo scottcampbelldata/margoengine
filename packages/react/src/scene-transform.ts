@@ -1,5 +1,5 @@
 import type { Engine, Mesh } from '@margoengine/core/extension';
-import { normalizeQuaternion, rotateByQuaternion, rotationToQuaternion } from '@margoengine/math/quat';
+import { normalizeQuaternion, rotationToQuaternion } from '@margoengine/math/quat';
 
 export type Triple = readonly [number, number, number];
 export type Quaternion = readonly [number, number, number, number];
@@ -26,10 +26,6 @@ export function worldPose(mesh: Mesh): WorldPose {
     rotation: normalizeQuaternion(q, q),
     scale: [x, sy, sz],
   };
-}
-
-export function rotate(point: Triple, q: Quaternion): [number, number, number] {
-  return rotateByQuaternion(point, q);
 }
 
 /** Keep the React hierarchy while the physics/XR plugins supply world-space poses. */
