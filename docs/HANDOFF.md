@@ -2,6 +2,28 @@
 
 Last updated 2026-10-24. Read this first when starting a new session. Update it whenever work lands.
 
+## Landed 2026-10-24: parity closing (three.js matrix 142 / 13 / 6 -> 153 / 4 / 4)
+
+Twelve rows of [threejs-parity.md](threejs-parity.md), each its own commit in an optional package (core untouched,
+core + stage unchanged): BatchedMesh (`@margoengine/materials/batched`), ArcballControls (`@margoengine/controls`),
+property keyframe tracks and full `KHR_animation_pointer` (`@margoengine/animation`, the pointer player opt-in at
+`/pointer`), Collada skins, morphs and animation (`@margoengine/loaders`), TGA/DDS/KTX 1/TIFF (`@margoengine/decoders`
+`/tga`, `/dds`, `/ktx`, `/tiff`), USDZ export with textures (`@margoengine/exporters`), a shared `LoadingManager`
+(`@margoengine/cache/manager`, through every loader's `fetch` option), per-material clipping planes (materials, lines,
+points, with their directional shadows), named MRT outputs (`@margoengine/post/mrt`), an owned `DepthTexture`
+(`@margoengine/post/depth`) and WebXR AR hit testing (`@margoengine/xr` `HitTest`). Eleven rows are COVERED; WebXR AR
+stays PARTIAL (hit testing and anchors only, never run on an AR device; plane detection, depth sensing and light
+estimation unwrapped).
+
+Evidence: unit tests per feature (texture formats 37, Collada 7 + a generated tube + Khronos's Cesium Man, whose GPU
+skin path matches the CPU pose within 1 mm, pointers 9 including a generated 31-channel file and Khronos's
+AnimatedColorsCube, arcball 10 + 5 real-GPU browser cases); six site demos in the visual check (batched-mesh,
+clipping-planes, scene-targets, depth-texture, animation-formats, texture-formats); bench `shapes-*` (10,000 distinct
+boxes: 36.8 ms CPU per frame as meshes, 0.13 ms batched, RTX A6000). Cesium Man (CC BY 4.0) and AnimatedColorsCube
+(CC0) are vendored through LFS from KhronosGroup at pinned commits (examples/assets/khronos-samples); the two large
+Khronos pointer samples were left out by Scott's budget. Open: USDZ textures not yet opened in Quick Look; Collada
+`lookat`/`skew`, cameras and lights; `clipIntersection`.
+
 ## Landed 2026-10-24: corner stairs, double slabs, waterlogging; WGSL compile gate
 
 Voxel shapes finished: `stairState(id, facing, upsideDown, corner?)` with inner and outer corners (state bits 3-6) and

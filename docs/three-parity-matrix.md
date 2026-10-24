@@ -1,9 +1,9 @@
 # Reading the three.js parity counts
 
-Date: 2026-10-24. The table in [threejs-parity.md](threejs-parity.md) was recounted after multi-view:
-**161 features, 142 COVERED, 13 PARTIAL, 6 MISSING** (138 / 16 / 6 after the visual-parity pass, 117 / 29 / 14
-before it). Multi-view (2026-10-24) closed three rows (scenes, viewports, ArrayCamera) and the EXR writer split EXRExporter out as covered; core + stage measured 22,253
-bytes gzip with it (23,271 after the 2026-10-24 core fixes, 1,729 bytes below the 25,000-byte ceiling). The rows and the
+Date: 2026-10-24. The table in [threejs-parity.md](threejs-parity.md) was recounted after the parity-closing work:
+**161 features, 153 COVERED, 4 PARTIAL, 4 MISSING** (142 / 13 / 6 before the parity-closing work, 138 / 16 / 6 after
+the visual-parity pass, 117 / 29 / 14 before it). The parity-closing work (2026-10-24) closed eleven rows (BatchedMesh, ArcballControls, MRT, clipping planes, DepthTexture, glTF extensions with `KHR_animation_pointer`, Collada, texture loaders, LoadingManager, USDZExporter, KeyframeTrack) and added hit testing to WebXR AR, which stays partial; multi-view closed three rows (scenes, viewports, ArrayCamera) and the EXR writer split EXRExporter out as covered; core + stage measured 22,253
+bytes gzip with it (23,271 after the 2026-10-24 core fixes, 1,729 bytes below the 25,000-byte ceiling; the parity work adds none). The rows and the
 [to-do tables](threejs-parity.md#what-is-missing-or-partial-and-what-to-do) are the source; this page only explains how
 to read them.
 
@@ -19,23 +19,19 @@ textures or effects); an app opts in with `Engine.create(canvas, {backend: 'auto
 WebGL2 path at zero core bytes is planned for the next version in
 [webgl2-compat-roadmap.md](webgl2-compat-roadmap.md).
 
-## The 6 MISSING rows
+## The 4 MISSING rows
 
 | Row | How to treat it |
 | --- | --- |
 | StereoCamera, AnaglyphEffect, ParallaxBarrierEffect | Use `@margoengine/xr` for stereo. Anaglyph is not planned. |
 | Long-tail model loaders (LDraw, VRML, 3DS, LWO, AMF, MD2, PDB, GCode, BVH motion capture, 3DM, KMZ, TDS) | Add one when a project brings that file. |
 | DRACOExporter, KTX2Exporter | glTF export is `@margoengine/exporters`; these two are not planned (EXR is written by `@margoengine/environment/exr-write`). |
-| ArcballControls | Orbit, map, trackball, fly, first-person and pointer-lock exist; add it in `@margoengine/controls` when needed. |
-| BatchedMesh | Distinct geometries stay separate draws; machinery `PartPacks` and geometry `mergeGeometries` bake static meshes. |
 | XRControllerModelFactory, XRHandModelFactory | Poses and 25 hand joints exist; models come after a headset test. |
 
-## The 13 PARTIAL rows
+## The 4 PARTIAL rows
 
 Closed or v1 limits: WebGL2 fallback (above).
 
-Narrower APIs that already have a Margo path: Node materials (typed WGSL nodes, not a statement language), MRT (low-level
-only), Clipping planes (stencil caps on core meshes only), DepthTexture (borrowed from an effect), glTF extensions
-(`KHR_animation_pointer` beyond base-colour UV tracks), ColladaLoader (no skins, morphs or animations), other texture
-loaders (TGA, DDS, KTX v1, TIFF), LoadingManager (no shared manager), USDZExporter (no textures), KeyframeTrack (no
-arbitrary-property tracks), WebXR VR and AR (untested on a headset, no hit testing).
+Narrower APIs that already have a Margo path: Node materials (typed WGSL nodes, not a statement language), WebXR VR
+(untested on a headset) and WebXR AR (hit testing and anchors, untested on a device; no plane detection, depth sensing
+or light estimation).
