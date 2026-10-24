@@ -2,6 +2,22 @@
 
 Last updated 2026-10-24. Read this first when starting a new session. Update it whenever work lands.
 
+## Landed 2026-10-24: clean-room rewrites (ac465a00..ccb4a164 and follow-ups)
+
+Every area the 2026-10-21 audit found close to other engines' or libraries' code was rewritten from words-only specs
+by agents that never saw the old bodies (geometry, controls, helpers, labels, SDF text, EDL, math edge cases,
+shapecast, contact shadows, glitch/afterimage, hashes and noise, sheen/thin film/transmission/matcap/depth pack,
+falloff/LTC/cotangent frame, ACES, LZF, meshopt, EXR PIZ, USD LZ4/integer coding, JT LZMA, SVG/outline/MTL loaders,
+ORCA and funnel). navigation is gone (navmesh/build replaces it), the conveyor simulator is deleted, three and
+Babylon are no longer dev dependencies, and fixtures from other projects are Margo-generated. Follow-ups: afterimage
+`damp` removed; triangulation and extrusion in their own geometry entries (`shapes` 11,030 -> 3,584 B gzip).
+
+**Open for the testing session:** pinned `npm run proofs` fails 9 historical proofs, identically on main before the
+rewrites (ac465a00) and after: color-output, environment-volumetric, math-consolidation, post-ssr, post-ssr-models,
+post-stack, probes-decals, quality-presets, water-ssr ("story must exercise the GPU", "fog requires the standard core
+PBR shader", "Water GPU calls differ"). `npm run proofs -- --current` passes 20/20. Draco/Basis still to be checked
+against the official releases (needs Scott's OK to download).
+
 ## Landed 2026-10-24: visual baselines for Edge 156
 
 Edge on the RTX A6000 PC updated to 156, and visual profiles are per browser major version, so `visual:check` (and
