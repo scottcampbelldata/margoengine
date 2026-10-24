@@ -65,6 +65,10 @@ pub struct Kernel {
     full: bool,
 }
 
+// SAFETY for the unchecked accessors below: kernel_new allocates DATA_LANES * n + TAIL floats and FLAG_LANES * n flags
+// for 1 <= n <= 2^23. Every index the kernel builds is inside them by layout: entity ids come from 0..n loops,
+// world_matrix validates a parent id before using it, and kernel_sync_rotation checks its external id. Only the
+// redundant slice bounds checks go (about 2 KB of Wasm); every value, finiteness, hierarchy and capacity check stays.
 impl Kernel {
     #[cfg(not(target_arch = "wasm32"))]
     fn new(capacity: usize) -> Self {
@@ -73,24 +77,51 @@ impl Kernel {
         Self { capacity, data, flags: vec![0; capacity * FLAG_LANES], full: true }
     }
 
+    #[inline(always)]
+    fn float(&self, at: usize) -> f32 { unsafe { *self.data.get_unchecked(at) } }
+    #[inline(always)]
+    fn set_float(&mut self, at: usize, value: f32) { unsafe { *self.data.get_unchecked_mut(at) = value } }
+    #[inline(always)]
+    fn floats(&self, at: usize, length: usize) -> &[f32] { unsafe { self.data.get_unchecked(at..at+length) } }
+    #[inline(always)]
+    fn floats_mut(&mut self, at: usize, length: usize) -> &mut [f32] { unsafe { self.data.get_unchecked_mut(at..at+length) } }
+    #[inline(always)]
+    fn flag(&self, at: usize) -> u8 { unsafe { *self.flags.get_unchecked(at) } }
+    #[inline(always)]
+    fn set_flag(&mut self, at: usize, value: u8) { unsafe { *self.flags.get_unchecked_mut(at) = value } }
+
     // Stores everything world_matrix reads for one entity (TRS, parent, local bounds, hidden flag) and returns whether
     // any of it differs from the previous call. A failed tick sets `full`, so a snapshot taken by it is never trusted.
+    // Lanes compare as bits, so signed zeros and NaN payloads count as changes. Wasm compares and stores four lanes at
+    // once and always visits all four groups (bitwise `|`), so every changed lane is stored.
     #[inline(never)]
     fn snapshot(&mut self, id: usize) -> bool {
         let n = self.capacity;
-        let mut changed = false;
-        // Indices are in range by layout; bounds checks here cost about 250 compressed bytes of core.
-        for f in 0..16 { unsafe {
-            let v = if f < PARENTS + 1 { self.data.get_unchecked(f*n+id).to_bits() } else if f < PARENTS + 5 { self.data.get_unchecked(LOCAL_SPHERE*n+id*4+f-(PARENTS+1)).to_bits() } else { *self.flags.get_unchecked(HIDDEN*n+id) as u32 };
-            let at = self.data.get_unchecked_mut(SNAPSHOT*n+TAIL+id*16+f);
-            if at.to_bits() != v { changed = true; *at = f32::from_bits(v); }
-        } }
-        changed
+        let lane = |k: &Self, f: usize| if f < PARENTS + 1 { k.float(f*n+id).to_bits() } else if f < PARENTS + 5 { k.float(LOCAL_SPHERE*n+id*4+f-(PARENTS+1)).to_bits() } else { k.flag(HIDDEN*n+id) as u32 };
+        let at = SNAPSHOT*n+TAIL+id*16;
+        #[cfg(target_arch = "wasm32")]
+        unsafe {
+            use core::arch::wasm32::*;
+            let group = |k: &mut Self, g: usize| {
+                let value = u32x4(lane(k, g*4), lane(k, g*4+1), lane(k, g*4+2), lane(k, g*4+3));
+                let to = k.data.as_mut_ptr().add(at+g*4).cast::<v128>();
+                let changed = v128_any_true(v128_xor(v128_load(to), value));
+                if changed { v128_store(to, value); }
+                changed
+            };
+            group(self, 0) | group(self, 1) | group(self, 2) | group(self, 3)
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let mut changed = false;
+            for f in 0..16 { let v = lane(self, f); if self.float(at+f).to_bits() != v { changed = true; self.set_float(at+f, f32::from_bits(v)); } }
+            changed
+        }
     }
 
     fn matrix(&self, id: usize) -> Option<[f32; 16]> {
         let n = self.capacity;
-        let value = |field| self.data[field * n + id] as f64;
+        let value = |field| self.float(field * n + id) as f64;
         if (X..PARENTS).any(|field| !value(field).is_finite()) || (SX..PARENTS).any(|field| value(field) == 0.0) { return None; }
         let length = sqrt((QX..SX).map(|field| { let v=value(field); v*v }).sum::<f64>());
         if length == 0.0 { return None; }
@@ -106,8 +137,7 @@ impl Kernel {
     }
 
     fn sphere(&self, id: usize, m: &[f32; 16]) -> Option<[f32; 4]> {
-        let n = self.capacity;
-        let b = &self.data[LOCAL_SPHERE*n+id*4..LOCAL_SPHERE*n+id*4+4];
+        let b = self.floats(LOCAL_SPHERE*self.capacity+id*4, 4);
         if b.iter().any(|v| !v.is_finite()) || b[3] < 0.0 { return None; }
         let mut out = [0.0; 4];
         for row in 0..3 {
@@ -123,30 +153,30 @@ impl Kernel {
     // Returns whether the entity was recomputed: its inputs differ from the snapshot or its parent was recomputed.
     #[inline(never)]
     fn world_matrix(&mut self, id: usize, level: usize) -> Option<bool> {
-        let n=self.capacity;let state=self.flags[TICK_STATE*n+id];
+        let n=self.capacity;let state=self.flag(TICK_STATE*n+id);
         if level>=64 || state==1 {return None;}
         if state!=0 {return Some(state==3);}
-        self.flags[TICK_STATE*n+id]=1;
+        self.set_flag(TICK_STATE*n+id,1);
         let mut changed=self.snapshot(id)|self.full;
-        let parent=self.data[PARENTS*n+id];
+        let parent=self.float(PARENTS*n+id);
         if parent!=-1.0 {
-            if !parent.is_finite() || parent<0.0 || parent as usize as f32!=parent || parent>=n as f32 || self.flags[ACTIVE*n+parent as usize]==0 {return None;}
+            if !parent.is_finite() || parent<0.0 || parent as usize as f32!=parent || parent>=n as f32 || self.flag(ACTIVE*n+parent as usize)==0 {return None;}
             changed|=self.world_matrix(parent as usize,level+1)?;
         }
         if changed {self.compute(id,parent)?;}
-        self.flags[TICK_STATE*n+id]=2+changed as u8;
+        self.set_flag(TICK_STATE*n+id,2+changed as u8);
         Some(changed)
     }
 
     // Separate so the two parent tests are not threaded together (which duplicates the matrix code).
     #[inline(never)]
     fn compute(&mut self, id: usize, parent: f32) -> Option<()> {
-        let n=self.capacity;let at=SCRATCH_MATRIX*n+TAIL+id*16;
-        let mut matrix=self.matrix(id)?;let mut depth=1;let mut hidden=self.flags[HIDDEN*n+id]!=0;
+        let n=self.capacity;
+        let mut matrix=self.matrix(id)?;let mut depth=1;let mut hidden=self.flag(HIDDEN*n+id)!=0;
         if parent!=-1.0 {
-            let parent=parent as usize;let p=&self.data[SCRATCH_MATRIX*n+TAIL+parent*16..SCRATCH_MATRIX*n+TAIL+(parent+1)*16];
-            depth=(self.flags[DEPTH*n+parent]&127)+1;if depth>64 {return None;}
-            hidden|=self.flags[DEPTH*n+parent]&128!=0;
+            let parent=parent as usize;let p=self.floats(SCRATCH_MATRIX*n+TAIL+parent*16,16);
+            depth=(self.flag(DEPTH*n+parent)&127)+1;if depth>64 {return None;}
+            hidden|=self.flag(DEPTH*n+parent)&128!=0;
             let mut result=[0.0;16];
             // Local transforms are affine; the last row is always [0, 0, 0, 1].
             for c in 0..4 {for r in 0..3 {result[c*4+r]=((0..3).map(|k|p[k*4+r] as f64*matrix[c*4+k] as f64).sum::<f64>()+if c==3 {p[12+r] as f64}else{0.0}) as f32;}}result[15]=1.0;
@@ -154,9 +184,9 @@ impl Kernel {
             matrix=result;
         }
         let sphere=self.sphere(id,&matrix)?;
-        self.data[at..at+16].copy_from_slice(&matrix);let sphere_at=SCRATCH_SPHERE*n+TAIL+id*4;
-        self.data[sphere_at..sphere_at+4].copy_from_slice(&sphere);
-        self.flags[DEPTH*n+id]=depth|if hidden {128}else{0};
+        self.floats_mut(SCRATCH_MATRIX*n+TAIL+id*16,16).copy_from_slice(&matrix);
+        self.floats_mut(SCRATCH_SPHERE*n+TAIL+id*4,4).copy_from_slice(&sphere);
+        self.set_flag(DEPTH*n+id,depth|if hidden {128}else{0});
         Some(())
     }
 
@@ -164,42 +194,42 @@ impl Kernel {
     #[inline(never)]
     fn sync_rotation(&mut self, id: usize) {
         let n=self.capacity;
-        let angle=&self.data[PLANES*n+TAIL+id*3..PLANES*n+TAIL+id*3+3];
+        let angle=self.floats(PLANES*n+TAIL+id*3,3);
         let pair=|a:f32|if a==0.0 {(0.0,1.0)}else{(sin(a as f64/2.0),sin(a as f64/2.0+core::f64::consts::FRAC_PI_2))};
         let ((sx,cx),(sy,cy),(sz,cz))=(pair(angle[0]),pair(angle[1]),pair(angle[2]));
-        self.data[QX*n+id]=(sx*cy*cz+cx*sy*sz) as f32;self.data[QY*n+id]=(cx*sy*cz-sx*cy*sz) as f32;self.data[QZ*n+id]=(cx*cy*sz+sx*sy*cz) as f32;self.data[QW*n+id]=(cx*cy*cz-sx*sy*sz) as f32;
+        self.set_float(QX*n+id,(sx*cy*cz+cx*sy*sz) as f32);self.set_float(QY*n+id,(cx*sy*cz-sx*cy*sz) as f32);self.set_float(QZ*n+id,(cx*cy*sz+sx*sy*cz) as f32);self.set_float(QW*n+id,(cx*cy*cz-sx*sy*sz) as f32);
     }
 
     fn tick(&mut self, culling: bool) -> usize {
         let n = self.capacity;
-        if culling && self.data[PLANES*n..PLANES*n+TAIL].iter().any(|v| !v.is_finite()) { return n+1; }
+        if culling && self.floats(PLANES*n,TAIL).iter().any(|v| !v.is_finite()) { return n+1; }
         for id in 0..n {
-            if self.flags[ACTIVE*n+id] == 0 { continue; }
-            let mask = self.flags[CONSTRAINED*n+id];if mask==0 {continue;}
+            if self.flag(ACTIVE*n+id) == 0 { continue; }
+            let mask = self.flag(CONSTRAINED*n+id);if mask==0 {continue;}
             for axis in 0..6 { if mask & (1 << axis) != 0 {
                 let at = if axis < 3 { axis*n+id } else { PLANES*n+TAIL+id*3+axis-3 };
                 let limits = LIMITS*n+TAIL+id*12+axis*2;
-                let (v, min, max) = (self.data[at],self.data[limits],self.data[limits+1]);
+                let (v, min, max) = (self.float(at),self.float(limits),self.float(limits+1));
                 if !v.is_finite() || !min.is_finite() || !max.is_finite() || min>max { return id+1; }
             } }
         }
-        for id in 0..n { let mask=self.flags[CONSTRAINED*n+id]; if self.flags[ACTIVE*n+id]==0 || mask==0 {continue;}
-            for axis in 0..6 { if mask & (1 << axis) != 0 { let at=if axis<3 {axis*n+id}else{PLANES*n+TAIL+id*3+axis-3};let limits=LIMITS*n+TAIL+id*12+axis*2;self.data[at]=self.data[at].max(self.data[limits]).min(self.data[limits+1]); } }
+        for id in 0..n { let mask=self.flag(CONSTRAINED*n+id); if self.flag(ACTIVE*n+id)==0 || mask==0 {continue;}
+            for axis in 0..6 { if mask & (1 << axis) != 0 { let at=if axis<3 {axis*n+id}else{PLANES*n+TAIL+id*3+axis-3};let limits=LIMITS*n+TAIL+id*12+axis*2;self.set_float(at,self.float(at).max(self.float(limits)).min(self.float(limits+1))); } }
             if mask & ROTATION != 0 { self.sync_rotation(id); }
         }
         // Scratch is fixed at creation; publish only after the entire hierarchy validates.
         // Only entities whose inputs or ancestors changed are recomputed; a failed tick recomputes everything next time.
-        self.flags[TICK_STATE*n..CHANGED*n].fill(0);
-        for id in 0..n {if self.flags[ACTIVE*n+id]!=0 && self.world_matrix(id,0).is_none() {self.full=true;return id+1;}}
+        unsafe { self.flags.get_unchecked_mut(TICK_STATE*n..CHANGED*n) }.fill(0);
+        for id in 0..n {if self.flag(ACTIVE*n+id)!=0 && self.world_matrix(id,0).is_none() {self.full=true;return id+1;}}
         for id in 0..n {
-            self.flags[VISIBLE*n+id]=0;if self.flags[ACTIVE*n+id]==0 {continue;}
-            if self.flags[TICK_STATE*n+id]==3 {
-                self.data.copy_within(SCRATCH_MATRIX*n+TAIL+id*16..SCRATCH_MATRIX*n+TAIL+(id+1)*16,WORLD_MATRIX*n+id*16);
-                for field in 0..4 {self.data[(WORLD_SPHERE+field)*n+id]=self.data[SCRATCH_SPHERE*n+TAIL+id*4+field];}
+            self.set_flag(VISIBLE*n+id,0);if self.flag(ACTIVE*n+id)==0 {continue;}
+            if self.flag(TICK_STATE*n+id)==3 {
+                for field in 0..16 {self.set_float(WORLD_MATRIX*n+id*16+field,self.float(SCRATCH_MATRIX*n+TAIL+id*16+field));}
+                for field in 0..4 {self.set_float((WORLD_SPHERE+field)*n+id,self.float(SCRATCH_SPHERE*n+TAIL+id*4+field));}
                 // Sticky across ticks (packages tick too) until the engine has copied the matrix.
-                self.flags[CHANGED*n+id]=1;
+                self.set_flag(CHANGED*n+id,1);
             }
-            self.flags[VISIBLE*n+id]=u8::from(self.flags[DEPTH*n+id]&128==0);
+            self.set_flag(VISIBLE*n+id,u8::from(self.flag(DEPTH*n+id)&128==0));
         }
         if culling { self.cull(); }
         self.full=false;
@@ -218,18 +248,18 @@ impl Kernel {
                 let z = v128_load(self.data.as_ptr().add(WORLD_Z*n+id).cast());
                 let r = v128_load(self.data.as_ptr().add(WORLD_R*n+id).cast());
                 let mut mask = 0;
-                for plane in self.data[PLANES*n..PLANES*n+TAIL].chunks_exact(4) {
+                for plane in self.floats(PLANES*n,TAIL).chunks_exact(4) {
                     let d = f32x4_add(f32x4_add(f32x4_mul(x, f32x4_splat(plane[0])), f32x4_mul(y, f32x4_splat(plane[1]))), f32x4_add(f32x4_mul(z, f32x4_splat(plane[2])), f32x4_splat(plane[3])));
                     mask |= i32x4_bitmask(f32x4_lt(d, f32x4_neg(r)));
                 }
-                for lane in 0..4 { if mask & (1 << lane) != 0 { self.flags[VISIBLE*n+id+lane] = 0; } }
+                for lane in 0..4 { if mask & (1 << lane) != 0 { self.set_flag(VISIBLE*n+id+lane,0); } }
             }
         }
         let start = if cfg!(target_arch = "wasm32") { n/4*4 } else { 0 };
         for id in start..n {
-            for p in self.data[PLANES*n..PLANES*n+TAIL].chunks_exact(4) {
-                let d = p[0]*self.data[WORLD_SPHERE*n+id]+p[1]*self.data[WORLD_Y*n+id]+p[2]*self.data[WORLD_Z*n+id]+p[3];
-                if d < -self.data[WORLD_R*n+id] { self.flags[VISIBLE*n+id] = 0; break; }
+            for p in self.floats(PLANES*n,TAIL).chunks_exact(4) {
+                let d = p[0]*self.float(WORLD_SPHERE*n+id)+p[1]*self.float(WORLD_Y*n+id)+p[2]*self.float(WORLD_Z*n+id)+p[3];
+                if d < -self.float(WORLD_R*n+id) { self.set_flag(VISIBLE*n+id,0); break; }
             }
         }
     }
@@ -262,7 +292,7 @@ pub extern "C" fn kernel_new(capacity: usize) -> *mut Kernel {
         if required>current && core::arch::wasm32::memory_grow::<0>(required-current)==usize::MAX { return core::ptr::null_mut(); }
         let data = core::slice::from_raw_parts_mut(start as *mut f32,length);
         let flags = core::slice::from_raw_parts_mut((start+length*4) as *mut u8,capacity*FLAG_LANES);
-        data.fill(0.0); flags.fill(0); data[PARENTS*capacity..(PARENTS+1)*capacity].fill(-1.0);
+        data.fill(0.0); flags.fill(0); data.get_unchecked_mut(PARENTS*capacity..(PARENTS+1)*capacity).fill(-1.0);
         let handle = core::ptr::addr_of_mut!(KERNEL).cast::<Kernel>();
         handle.write(Kernel {capacity,data,flags,full:true}); INITIALIZED=true; handle
     }
@@ -388,5 +418,58 @@ mod tests {
         let saved=direct.data[QX];
         unsafe { kernel_sync_rotation(&mut direct, 1); }
         assert_eq!(direct.data[QX],saved);
+    }
+    #[test]
+    fn layout_edges_preserve_validation_and_bitwise_change_tracking() {
+        for n in [1,257] {
+            let id=n-1;let mut k=Kernel::new(n);k.flags[ACTIVE*n+id]=1;
+            for field in QW..PARENTS { k.data[field*n+id]=1.0; }
+            k.data[LOCAL_SPHERE*n+id*4+3]=1.0;
+            assert_eq!(k.tick(false),0);
+            let output=k.data[WORLD_MATRIX*n..LOCAL_SPHERE*n].to_vec();
+            for (at,bad) in [(SX*n+id,0.0),(QW*n+id,0.0),(LOCAL_SPHERE*n+id*4+3,-1.0),(X*n+id,f32::from_bits(0x7fc00123))] {
+                let saved=k.data[at];k.data[at]=bad;
+                assert_eq!(k.tick(false),id+1);assert_eq!(&k.data[WORLD_MATRIX*n..LOCAL_SPHERE*n],output.as_slice());
+                k.data[at]=saved;assert_eq!(k.tick(false),0);
+            }
+            for bad in [n as f32,-2.0,0.5,f32::INFINITY,f32::NAN,id as f32] {
+                k.data[PARENTS*n+id]=bad;assert_eq!(k.tick(false),id+1);
+                k.data[PARENTS*n+id]=-1.0;assert_eq!(k.tick(false),0);
+            }
+            k.flags[CHANGED*n+id]=0;k.data[X*n+id]=-0.0;
+            assert_eq!(k.tick(false),0);assert_eq!(k.flags[CHANGED*n+id],1);
+            k.flags[CHANGED*n+id]=0;assert_eq!(k.tick(false),0);assert_eq!(k.flags[CHANGED*n+id],0);
+            k.flags[HIDDEN*n+id]=255;assert_eq!(k.tick(false),0);assert_eq!(k.flags[VISIBLE*n+id],0);
+            k.data[PLANES*n+23]=f32::INFINITY;assert_eq!(k.tick(true),n+1);
+            k.data[PLANES*n+23]=0.0;assert_eq!(k.tick(true),0);
+            k.flags[CONSTRAINED*n+id]=32;k.data[LIMITS*n+TAIL+id*12+10]=1.0;
+            k.data[LIMITS*n+TAIL+id*12+11]=-1.0;assert_eq!(k.tick(false),id+1);
+        }
+    }
+    #[test]
+    fn snapshots_keep_every_lane_bitwise_at_both_allocation_edges() {
+        for n in [1,257] { for id in [0,n-1] {
+            let mut k=Kernel::new(n);assert!(k.snapshot(id));assert!(!k.snapshot(id));
+            for lane in 0..15 {
+                let at=if lane<11 {lane*n+id}else{LOCAL_SPHERE*n+id*4+lane-11};
+                let saved=k.data[at].to_bits();
+                let bits=[0x80000000,0x7fc00123,0x7fa00123,0x3f000001][lane%4];
+                k.data[at]=f32::from_bits(bits);assert!(k.snapshot(id));
+                assert_eq!(k.data[SNAPSHOT*n+TAIL+id*16+lane].to_bits(),bits);
+                assert!(!k.snapshot(id));k.data[at]=f32::from_bits(saved);assert!(k.snapshot(id));
+            }
+            for hidden in [1,255,0] {
+                k.flags[HIDDEN*n+id]=hidden;assert!(k.snapshot(id));
+                assert_eq!(k.data[SNAPSHOT*n+TAIL+id*16+15].to_bits(),hidden as u32);
+                assert!(!k.snapshot(id));
+            }
+            // All four vector groups must be visited in this one snapshot.
+            for lane in 0..15 {
+                let at=if lane<11 {lane*n+id}else{LOCAL_SPHERE*n+id*4+lane-11};
+                k.data[at]=f32::from_bits(0x3f000001+lane as u32);
+            }
+            k.flags[HIDDEN*n+id]=123;assert!(k.snapshot(id));assert!(!k.snapshot(id));
+            for lane in 0..15 {assert_eq!(k.data[SNAPSHOT*n+TAIL+id*16+lane].to_bits(),0x3f000001+lane as u32);}
+        } }
     }
 }
