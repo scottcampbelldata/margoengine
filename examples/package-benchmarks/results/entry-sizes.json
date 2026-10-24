@@ -1,5 +1,5 @@
 {
-  "commit": "65c715a9",
+  "commit": "fdb80344",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -10,8 +10,8 @@
   "packages": {
     "@margoengine/animation": {
       ".": {
-        "raw": 47416,
-        "gzip": 14841
+        "raw": 50320,
+        "gzip": 15829
       },
       "./vat": {
         "raw": 19344,
@@ -122,12 +122,28 @@
     },
     "@margoengine/controls": {
       ".": {
-        "raw": 59688,
-        "gzip": 19066
+        "raw": 59684,
+        "gzip": 19368
+      },
+      "./orbit": {
+        "raw": 14493,
+        "gzip": 5050
+      },
+      "./transform": {
+        "raw": 24368,
+        "gzip": 9268
+      },
+      "./drag": {
+        "raw": 5857,
+        "gzip": 2377
+      },
+      "./profiles": {
+        "raw": 1975,
+        "gzip": 704
       },
       "./walk": {
-        "raw": 32614,
-        "gzip": 12151
+        "raw": 32610,
+        "gzip": 12147
       }
     },
     "@margoengine/core": {
@@ -242,8 +258,8 @@
     },
     "@margoengine/exporters": {
       ".": {
-        "raw": 95078,
-        "gzip": 32473
+        "raw": 98214,
+        "gzip": 33477
       },
       "./usdz": {
         "raw": 25994,
@@ -262,8 +278,8 @@
         "gzip": 6660
       },
       "./roblox": {
-        "raw": 49054,
-        "gzip": 16042
+        "raw": 51073,
+        "gzip": 16734
       },
       "./skin": {
         "raw": 4895,
@@ -284,6 +300,14 @@
       "./hash": {
         "raw": 2798,
         "gzip": 1461
+      },
+      "./import-names": {
+        "raw": 885,
+        "gzip": 482
+      },
+      "./godot-lightmap": {
+        "raw": 2305,
+        "gzip": 1072
       }
     },
     "@margoengine/fbx": {
@@ -594,8 +618,8 @@
     },
     "@margoengine/math": {
       ".": {
-        "raw": 38141,
-        "gzip": 11611
+        "raw": 39404,
+        "gzip": 12119
       },
       "./vector2": {
         "raw": 2043,
@@ -614,8 +638,8 @@
         "gzip": 1361
       },
       "./euler": {
-        "raw": 1401,
-        "gzip": 692
+        "raw": 2161,
+        "gzip": 1045
       },
       "./matrix3": {
         "raw": 1939,
@@ -626,8 +650,8 @@
         "gzip": 1948
       },
       "./color": {
-        "raw": 6138,
-        "gzip": 2602
+        "raw": 6625,
+        "gzip": 2816
       },
       "./box3": {
         "raw": 7341,
@@ -692,8 +716,8 @@
     },
     "@margoengine/mesh-edit": {
       ".": {
-        "raw": 90975,
-        "gzip": 29323
+        "raw": 91721,
+        "gzip": 29535
       }
     },
     "@margoengine/navigation": {
