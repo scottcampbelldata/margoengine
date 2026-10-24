@@ -1,6 +1,7 @@
 import type { PassContext } from '@margoengine/core/extension';
 import type { Prim } from './gizmo.js';
 import { applyView } from '../../shared/view-rect.js';
+import { alphaBlend } from '../../shared/pass.js';
 
 declare const GPUBufferUsage: { VERTEX: number; COPY_DST: number };
 
@@ -135,10 +136,7 @@ export class OverlayRenderer {
           targets: [
             {
               format: ctx.format,
-              blend: {
-                color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
-                alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
-              },
+              blend: alphaBlend,
             },
           ],
         },

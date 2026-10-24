@@ -9,7 +9,7 @@ import {
 } from '@margoengine/core/extension';
 import { sceneSamples } from '../../shared/quality.js';
 import { fullscreen } from '../../shared/gpu.js';
-import { webgpuPass } from '../../shared/pass.js';
+import { webgpuPass, alphaBlend } from '../../shared/pass.js';
 import { afterPresented as presented, submitPrincipalScene as submit } from '../../shared/demo-frame.js';
 import { margoError } from '../../shared/errors.js';
 import { applyView } from '../../shared/view-rect.js';
@@ -163,10 +163,7 @@ export class SceneFade implements EnginePlugin {
         targets: [
           {
             format: this.snapshot.format,
-            blend: {
-              color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
-              alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
-            },
+            blend: alphaBlend,
           },
         ],
       },

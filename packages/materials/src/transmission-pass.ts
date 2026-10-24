@@ -16,7 +16,7 @@ import type { PBRModel, PBRTransmission } from '@margoengine/gltf-pro';
 import { sceneTarget } from '../../shared/msaa.js';
 import { applyView } from '../../shared/view-rect.js';
 import { currentFrame, retire } from '../../shared/frame-resources.js';
-import { webgpuPass } from '../../shared/pass.js';
+import { webgpuPass, alphaBlend } from '../../shared/pass.js';
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; RENDER_ATTACHMENT: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
@@ -67,10 +67,7 @@ const copy = /* wgsl */ `
 @fragment fn level0(@builtin(position) p:vec4f)->@location(0) vec4f {return textureLoad(source,vec2i(p.xy),0);}
 @fragment fn reduce(@builtin(position) p:vec4f)->@location(0) vec4f {return textureSampleLevel(source,bilinear,p.xy/vec2f(max(textureDimensions(source)/2u,vec2u(1))),0);}
 `;
-const over: GPUBlendState = {
-  color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
-  alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
-};
+const over: GPUBlendState = alphaBlend;
 let serial = 0;
 
 /**

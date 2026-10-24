@@ -2,14 +2,10 @@
 // GPU (f32), within float rounding (test/noise-check.mjs measures it on a real adapter). Simplex reads the seed's
 // permutation table, declared once per shader as a private array; Perlin hashes lattice cells and takes the seed as a value.
 import { Node, cast, vec2, vec3, type NodeInput } from './node.js';
+import { fractalOptions, type FractalOptions } from '../../shared/fractal.js';
 
-/** Octave sum settings for `fbm` and `ridged` (same defaults as the CPU twins). */
-export interface NoiseFractalOptions {
-  /** Octaves summed, 1..16 (default 5). */ octaves?: number;
-  /** Frequency multiplier per octave (default 2). */ lacunarity?: number;
-  /** Amplitude multiplier per octave (default 0.5). */ gain?: number;
-  /** Frequency of the first octave (default 1). */ frequency?: number;
-}
+/** Octave sum settings for `fbm` and `ridged` (the CPU twins' FractalOptions, same defaults). */
+export type NoiseFractalOptions = FractalOptions;
 /** `domainWarp` settings. */
 export interface NoiseWarpOptions<T extends 'vec2f' | 'vec3f'> {
   /** Field displacing each axis (default: the warped field). */ warp?: (p: Node<T>) => Node<'f32'>;
@@ -156,21 +152,7 @@ export function perlin3(p: NodeInput<'vec3f'>, seed: number | Node<'u32'> = 1): 
   );
 }
 
-function octaves({
-  octaves = 5,
-  lacunarity = 2,
-  gain = 0.5,
-  frequency = 1,
-}: NoiseFractalOptions): [number, number, number, number] {
-  if (
-    !Number.isInteger(octaves) ||
-    octaves < 1 ||
-    octaves > 16 ||
-    ![lacunarity, gain, frequency].every(Number.isFinite)
-  )
-    throw new RangeError('Invalid fractal options');
-  return [octaves, lacunarity, gain, frequency];
-}
+const octaves = fractalOptions;
 function sum<T extends 'vec2f' | 'vec3f'>(
   p: Node<T>,
   options: NoiseFractalOptions,

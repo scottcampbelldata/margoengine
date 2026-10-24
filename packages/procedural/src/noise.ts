@@ -1,3 +1,4 @@
+import { fractalOptions, type FractalOptions } from '../../shared/fractal.js';
 // Seeded CPU noise, no dependencies. Simplex follows Perlin (2001) and Gustavson ("Simplex noise demystified", 2005, with
 // the 2012 rank ordering): skew the input onto the simplex lattice, find the containing simplex by ranking the offsets,
 // and sum one radial kernel (0.5 - |d|^2)^4 (g . d) per corner. The kernel's squared radius is 0.5 in every dimension, so
@@ -8,13 +9,7 @@
 
 /** A field of 2, 3 or 4 coordinates; a 2D field ignores `z` and `w`. */
 export type NoiseFunction = (x: number, y: number, z?: number, w?: number) => number;
-/** Octave sum settings shared by `fbm` and `ridged`. */
-export interface FractalOptions {
-  /** Octaves summed, 1..16 (default 5). */ octaves?: number;
-  /** Frequency multiplier per octave (default 2). */ lacunarity?: number;
-  /** Amplitude multiplier per octave (default 0.5). */ gain?: number;
-  /** Frequency of the first octave (default 1). */ frequency?: number;
-}
+export type { FractalOptions };
 /** `domainWarp` settings. */
 export interface WarpOptions {
   /** Field displacing each axis (default: the warped field itself). */ warp?: NoiseFunction;
@@ -278,21 +273,7 @@ export class Noise {
   }
 }
 
-function octaves({
-  octaves = 5,
-  lacunarity = 2,
-  gain = 0.5,
-  frequency = 1,
-}: FractalOptions): [number, number, number, number] {
-  if (
-    !Number.isInteger(octaves) ||
-    octaves < 1 ||
-    octaves > 16 ||
-    ![lacunarity, gain, frequency].every(Number.isFinite)
-  )
-    throw new RangeError('Invalid fractal options');
-  return [octaves, lacunarity, gain, frequency];
-}
+const octaves = fractalOptions;
 /** Fractal Brownian motion: octaves of `noise` summed and divided by the total amplitude, so the range stays `noise`'s. */
 export function fbm(noise: NoiseFunction, options: FractalOptions = {}): NoiseFunction {
   const [count, lacunarity, gain, frequency] = octaves(options);
