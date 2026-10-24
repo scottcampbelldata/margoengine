@@ -12,13 +12,13 @@ Color transform references
   every matrix, weight and curve constant from those definitions and checks the shader's numbers. One implementation,
   `packages/shared/agx.js`, serves Tonemap, ImagePost and the voxel path tracer.
 - ACES-style fitted curve (`curve: 'acescg'`, `packages/shared/aces.js`): Margo's own fit; no published fit's
-  constants. Form: a 3x3 mix with rows summing to 1, a per-channel curve a w (w + b) / (w (w + c) + d) with
-  w = x^m, a second 3x3 mix with rows summing to 1, then a clamp to 0..1; no extra exposure scale. Its numbers come
-  from Levenberg-Marquardt least squares, on the error in 8-bit sRGB codes, against 60 sampled outputs (a 20-stop
-  grey ramp, primaries, secondaries and mixed colours) of the approximation of the ACES 1.x RRT + sRGB 100-nit ODT
-  (the Academy's [aces-dev](https://github.com/ampas/aces-dev) reference transforms) that the engine used before.
-  `packages/tonemap/tests/aces.test.js` holds that table and the procedure, and measures the fit: grey ramp at most
-  0.47 codes (mean 0.17), colours at most 0.41 (mean 0.12). It has not been measured against the Academy reference
-  itself.
+  constants. Form: a 3x3 mix in with rows summing to 1, then per channel 1.002 * (w / (w + s))^q with w = x^k (a
+  scaled Dagum, or Burr type III, distribution function: 0 at black, strictly rising, reaching display white at a
+  finite input), a 3x3 mix out with rows summing to 1, then a clamp to 0..1; no extra exposure scale. Its numbers come
+  from least squares, then an L^p polish toward minimax, on the error in 8-bit sRGB codes against sampled outputs (a
+  grey ramp, primaries, secondaries and mixed colours) of the curve the engine used before, an approximation of the
+  ACES 1.x RRT + sRGB 100-nit ODT (the Academy's [aces-dev](https://github.com/ampas/aces-dev) reference transforms).
+  `packages/tonemap/tests/aces.test.js` holds that table and measures the fit: at most 1.27 codes (grey ramp 1.11,
+  colours 1.27), mean 0.42 codes. It has not been measured against the Academy reference itself.
 - Khronos PBR Neutral: [reference implementation](https://github.com/KhronosGroup/ToneMapping/blob/main/PBR_Neutral/pbrNeutral.glsl).
 - ACEScg is AP1 with a D60 white point: [ACES specification](https://docs.acescentral.com/encodings/acescg/). The AP1 to linear-sRGB matrix includes D60 to D65 adaptation.

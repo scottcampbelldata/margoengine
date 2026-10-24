@@ -38,7 +38,7 @@ node --test tests/catalog.test.js
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-79 packages in 10 layers, the same as the [catalog](https://margoengine.com/catalog/).
+78 packages in 10 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (2)
 
@@ -141,7 +141,7 @@ node --test tests/catalog.test.js
 | [`@margoengine/selection`](../packages/selection/README.md) | GPU picking and visible mesh selection outlines. |
 | [`@margoengine/audio`](../packages/audio/README.md) | Web Audio listener, global and positional sounds and a frequency analyser for Margo Engine. |
 
-### Simulation and games (7)
+### Simulation and games (6)
 
 | Package | What it is |
 | --- | --- |

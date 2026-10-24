@@ -16,3 +16,6 @@ packages/loaders/tests/fixtures/*.ply -text
 packages/loaders/tests/fixtures/*.pcd -text
 packages/loaders/tests/fixtures/*.xyz -text
 packages/bvh/tests/fixtures/*.obj -text
+
+# Shader text whose SHA-256 the tests pin
+packages/gltf-pro/tests/fixtures/*.wgsl text eol=lf
