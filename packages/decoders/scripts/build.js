@@ -44,4 +44,10 @@ for (const folder of ['draco', 'basis']) {
 const basis = resolve(dist, 'basis/basis_transcoder.js');
 await writeFile(basis, staticEmbind(await readFile(basis, 'utf8'), 'basis_transcoder.js'));
 await copyFile(resolve(root, 'vendor/NOTICE.md'), resolve(dist, 'THIRD-PARTY-NOTICE.md'));
+// The PNG reader's shared helpers ship in dist/shared (dist/errors.js is the package's own).
+await mkdir(resolve(dist, 'shared'), { recursive: true });
+for (const name of ['crc32', 'errors', 'inflate'])
+  await copyFile(resolve(repository, `packages/shared/${name}.js`), resolve(dist, `shared/${name}.js`));
+const png = resolve(dist, 'png.js');
+await writeFile(png, (await readFile(png, 'utf8')).replaceAll('../../shared/', './shared/'));
 await copyFile(resolve(root, 'vendor/LICENSE-Apache-2.0.txt'), resolve(dist, 'LICENSE-Apache-2.0.txt'));

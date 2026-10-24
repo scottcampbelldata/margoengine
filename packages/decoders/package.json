@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
-  "description": "Worker-pooled Draco geometry and KTX2/Basis texture decoding for Margo Engine.",
+  "description": "Worker-pooled Draco geometry and KTX2/Basis texture decoding, and synchronous PNG reading, for Margo Engine.",
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"
   },
@@ -25,6 +25,10 @@
     "./meshopt": {
       "types": "./dist/meshopt.d.ts",
       "import": "./dist/meshopt.js"
+    },
+    "./png": {
+      "types": "./dist/png.d.ts",
+      "import": "./dist/png.js"
     }
   },
   "files": [

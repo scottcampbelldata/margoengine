@@ -266,7 +266,7 @@
     "package": "@margoengine/decoders",
     "version": "1.0.0",
     "published": false,
-    "description": "Worker-pooled Draco geometry and KTX2/Basis texture decoding for Margo Engine.",
+    "description": "Worker-pooled Draco geometry and KTX2/Basis texture decoding, and synchronous PNG reading, for Margo Engine.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "decoders",
     "install": "npm install @margoengine/core@1.0.0 @margoengine/decoders@1.0.0",
