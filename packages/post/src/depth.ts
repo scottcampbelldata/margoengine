@@ -41,7 +41,7 @@ export class DepthTexture implements EnginePlugin {
   get distance(): GPUTexture | undefined {
     return this.targets.texture('distance');
   }
-  /** Calls `listener` after the textures are (re)created. Returns a remover. */
+  /** Calls `listener` after the textures change (created, resized, or another view size this frame). Returns a remover. */
   onResize(listener: () => void): () => void {
     return this.targets.onResize(listener);
   }

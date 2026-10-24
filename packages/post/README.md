@@ -504,6 +504,27 @@ const water = new WgslMaterial({
 depth.onResize(() => (water.textures.sceneDistance = new Texture(depth.distance!)));
 ```
 
+Both textures are single-sample at any scene MSAA. A canvas view and a view `target` of another size keep a texture
+set each, so drawing both every frame creates no textures after the first; `onResize` fires whenever the current set
+changes, so a material bound through it follows the view being drawn.
+
+Verified on a real GPU by `npm run check:depth` (scripts/test-depth-browser.mjs; NVIDIA RTX A6000, Edge 156, 128 x 96,
+the same results at 1x and 4x MSAA):
+
+- Reversed-Z depth of a box face 5.75 in front of a perspective camera (near 0.1, far 100): 0.0164077, within 6.3e-10
+  of what `camera.matrix` gives for that point; 0 where nothing is drawn.
+- `distance`: within 1.9e-7 (relative) of the analytic distance to the face (5.76101); 0 where empty.
+- Orthographic (`@margoengine/cameras` CameraProjection): depth linear in view depth (slope 0.0100000 per unit for a
+  100-unit clip range, within 1.4e-8 of `camera.matrix`); distance within 5.9e-6 (relative).
+- A basic-shaded WgslMaterial plane reading `distance` with `textureLoad` writes the expected colour exactly (red 200
+  of 255 for 5.761 / 10, sRGB encoded).
+- A FramePass at order 50 reading `texture` as `texture_depth_2d` gets every texel exactly.
+- At 4x MSAA the values equal 1x exactly across 11410 texels away from edges.
+- Two views with their own cameras keep their own halves (5.7610 and 8.7516, within 3.4e-7); the second view does not
+  clear the first.
+- A materials mesh added with `depth.add` is in the depth (within 1.1e-6), one not added is not, and removing it
+  leaves it out.
+
 ## Projected decals: `Decals`
 
 `@margoengine/post/decals` (4,118 B min+gzip, its own entry) projects textured boxes onto whatever is already drawn,

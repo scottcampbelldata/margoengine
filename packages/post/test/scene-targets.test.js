@@ -123,3 +123,50 @@ test('SceneTargets checks its outputs and names the fix', () => {
   const missing = new SceneTargets({ outputs: { a: 'albedo' } });
   assert.throws(() => missing.texture('b'), { name: 'RangeError', message: /no output 'b'; use one of a/ });
 });
+
+test('SceneTargets keeps one set of textures per destination size across frames', async () => {
+  const h = harness(),
+    targets = SceneTargets.attach(h.engine, { outputs: { distance: 'distance' } });
+  let resized = 0;
+  targets.onResize(() => resized++);
+  // Each frame: a canvas view (1280 x 720) and a view into a 256 x 128 target; both are index 0 of their destination.
+  const frame = () =>
+    h.gpu.record(() => {
+      for (const [width, height, id] of [
+        [1280, 720, 'canvas'],
+        [256, 128, 'target'],
+      ]) {
+        h.view.begin(0);
+        Object.assign(h.view.c, { width, height });
+        h.view.c.view = { id, camera: h.view.camera, viewport: [0, 0, width, height], index: 0, count: 1 };
+        h.engine.frameGraph.execute(h.view.c);
+        assert.deepEqual([targets.depth.width, targets.texture('distance').height], [width, height], id);
+      }
+    });
+  const made = (log) => log.filter((e) => e[0] === 'texture' && /^(r32float|depth32float)$/.test(e[2].format)).length;
+  assert.equal(made(frame()), 4, 'the first frame makes a set per size');
+  const sets = resized;
+  for (let i = 0; i < 3; i++) {
+    await null;
+    const log = frame();
+    assert.equal(made(log), 0, `steady frame ${i} creates no textures`);
+    assert.equal(log.filter((e) => e[0] === 'destroy').length, 0, `steady frame ${i} destroys none`);
+  }
+  // Listeners still hear each switch, so a material bound through onResize follows the view being drawn.
+  assert.ok(resized > sets);
+  // A size no view draws any more is released one frame later.
+  h.view.c.view = undefined;
+  await null;
+  h.frame();
+  await null;
+  h.frame();
+  await null;
+  assert.equal(h.live().filter((r) => /^(r32float|depth32float)$/.test(r.format)).length, 2, 'only the canvas set');
+  targets.dispose();
+  await null;
+  assert.deepEqual(
+    h.live().filter((r) => /^(r32float|depth32float)$/.test(r.format)),
+    [],
+    'dispose releases every size',
+  );
+});

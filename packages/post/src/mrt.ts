@@ -12,6 +12,8 @@ import { currentFrame, retire } from '../../shared/frame-resources.js';
 import type { SSRCapture, SSRModel } from './ssr.js';
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_SRC: number };
 type TargetsPassContext = Extract<PassContext, { backend: 'webgpu' }>;
+/** The textures of one drawing size, and the frame that last drew into them. */
+type TargetSet = { width: number; height: number; textures: GPUTexture[]; depth: GPUTexture; used: number };
 
 /**
  * A built-in output: `albedo` (base colour and alpha), `normal` (world shading normal, w 1), `position` (world, w 1),
@@ -77,6 +79,7 @@ export class SceneTargets implements EnginePlugin {
   private device?: GPUDevice;
   private textures: GPUTexture[] = [];
   private views: GPUTextureView[] = [];
+  private sets: TargetSet[] = [];
   private depthTexture?: GPUTexture;
   private depthView?: GPUTextureView;
   private width = 0;
@@ -191,7 +194,11 @@ export class SceneTargets implements EnginePlugin {
   get depth(): GPUTexture | undefined {
     return this.depthTexture;
   }
-  /** Calls `listener` after the textures are (re)created: the first frame, a resize, a restored device. Returns a remover. */
+  /**
+   * Calls `listener` after the current textures change: the first frame, a resize, a restored device, and between views
+   * of one frame that draw at other sizes (the canvas and a view `target`; each size keeps its own textures). Returns a
+   * remover.
+   */
   onResize(listener: () => void): () => void {
     if (typeof listener !== 'function') throw new TypeError('SceneTargets onResize needs a function');
     this.listeners.add(listener);
@@ -314,28 +321,43 @@ export class SceneTargets implements EnginePlugin {
     }
   }
   private resize(c: TargetsPassContext): void {
-    currentFrame(c.device, c.view ?? c);
-    if (this.width === c.width && this.height === c.height && this.textures.length) return;
-    this.release();
-    this.width = c.width;
-    this.height = c.height;
-    const usage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC;
-    this.textures = this.formats.map((format, i) =>
-      c.device.createTexture({ size: [c.width, c.height], format, usage, label: this.names[i] }),
-    );
-    this.views = this.textures.map((texture) => texture.createView());
-    this.depthTexture = c.device.createTexture({ size: [c.width, c.height], format: 'depth32float', usage });
-    this.depthView = this.depthTexture.createView();
+    const frame = currentFrame(c.device, c.view ?? c);
+    let set = this.sets.find((s) => s.width === c.width && s.height === c.height);
+    if (!set) {
+      const usage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
+        textures = this.formats.map((format, i) =>
+          c.device.createTexture({ size: [c.width, c.height], format, usage, label: this.names[i] }),
+        ),
+        depth = c.device.createTexture({ size: [c.width, c.height], format: 'depth32float', usage });
+      set = { width: c.width, height: c.height, textures, depth, used: frame };
+      this.sets.push(set);
+    }
+    set.used = frame;
+    // Views into destinations of other sizes (the canvas and a view target) keep a set each, so they draw every frame
+    // without recreating textures; a size no view drew last frame or this one is released.
+    for (const old of this.sets.filter((s) => s.used < frame - 1)) this.drop(old);
+    if (set.textures[0] === this.textures[0]) return;
+    this.width = set.width;
+    this.height = set.height;
+    this.textures = set.textures;
+    this.views = set.textures.map((texture) => texture.createView());
+    this.depthTexture = set.depth;
+    this.depthView = set.depth.createView();
     for (const listener of this.listeners) listener();
   }
+  private drop(set: TargetSet): void {
+    this.sets.splice(this.sets.indexOf(set), 1);
+    if (this.device) for (const t of [...set.textures, set.depth]) retire(this.device, t);
+  }
   private release(): void {
-    if (this.device) for (const t of [...this.textures, this.depthTexture]) retire(this.device, t);
+    for (const set of [...this.sets]) this.drop(set);
     this.textures = [];
     this.views = [];
     this.depthTexture = this.depthView = undefined;
     this.width = this.height = 0;
   }
   onDeviceRestored(engine: Engine): void {
+    this.sets = [];
     this.textures = [];
     this.views = [];
     this.depthTexture = this.depthView = undefined;
