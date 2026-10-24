@@ -2,6 +2,7 @@ import { Engine, PbrMaterial, box } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { OrbitControls, TransformControls } from '@margoengine/controls';
 import { webglRenderer } from '@margoengine/webgl';
+import { ArcballControls } from '@margoengine/controls/arcball';
 
 const state = { errors: [] };
 window.controlsState = state;
@@ -223,3 +224,138 @@ window.runGL = async () => {
   engine.dispose();
   return { backend: 'webgl2', shown, hidden };
 };
+
+// ArcballControls on its own canvas and engine: a grey box at the origin and a red marker on the target plane.
+const red = (r, g, b) => r > 170 && g < 110 && b < 110;
+function redCentroid(engine) {
+  const { width, height, data } = read(engine);
+  let n = 0,
+    mx = 0,
+    my = 0;
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      if (red(data[i], data[i + 1], data[i + 2])) n++, (mx += x), (my += y);
+    }
+  return n ? [mx / n + 0.5, my / n + 0.5] : null;
+}
+window.setupArcball = async () => {
+  const canvas = document.getElementById('arc');
+  const wheels = [];
+  // The test's wheel recorder goes on before listener tracking, so only the controls' listeners are counted.
+  canvas.addEventListener('wheel', (event) => wheels.push([event.deltaY, event.deltaMode]));
+  const arc = (state.arc = { listeners: trackListeners(canvas), wheels });
+  const engine = (arc.engine = await Engine.create(canvas, {
+    backend: 'webgpu',
+    camera: { position: [0, 0, 6], target: [0, 0, 0] },
+  }));
+  arc.device = engineRuntime(engine).gpu;
+  arc.errors = [];
+  arc.device.addEventListener('uncapturederror', (event) => arc.errors.push(event.error.message));
+  arc.device.pushErrorScope('validation');
+  engine
+    .createMesh()
+    .setGeometry(box())
+    .setMaterial(new PbrMaterial({ color: '#808080', roughness: 0.9 }))
+    .setScale([0.8, 0.8, 0.8]);
+  arc.marker = engine
+    .createMesh()
+    .setGeometry(box())
+    .setMaterial(new PbrMaterial({ color: '#ff0000', roughness: 1 }))
+    .setScale([0.12, 0.12, 0.01])
+    .setPosition([1.1, 0.7, 0]);
+  arc.controls = ArcballControls.attach(engine);
+  arc.controls.saveState();
+  engine.render();
+  const rect = canvas.getBoundingClientRect();
+  return { left: rect.left, top: rect.top, backend: engine.backend, ...(await arcballState()) };
+};
+async function arcballState(x, y) {
+  const { engine, controls, marker } = state.arc;
+  engine.render({ delta: 1 / 60 });
+  // Read the image before awaiting the pick: a WebGPU canvas is only readable in the task that rendered it.
+  const rendered = redCentroid(engine),
+    c = engine.camera,
+    m = marker.position,
+    pickAt = x === undefined ? null : await engine.pick(x, y);
+  return {
+    position: [...c.position],
+    target: [...c.target],
+    up: [...c.up],
+    azimuth: Math.atan2(-c.position[0] + c.target[0], c.position[2] - c.target[2]),
+    distance: controls.getDistance(),
+    marker: project(engine, [m.x, m.y, m.z]),
+    redCentroid: rendered,
+    picked: pickAt === null ? null : pickAt === marker ? 'marker' : pickAt ? 'other' : 'none',
+    wheels: state.arc.wheels,
+    state: controls.state,
+  };
+}
+window.arcballState = arcballState;
+// World point on the plane through the target facing the camera under CSS pixel (x, y), and a world point's pixel.
+window.arcballUnder = ([x, y]) => {
+  const { engine } = state.arc,
+    c = engine.camera,
+    sub = (a, b) => a.map((v, i) => v - b[i]),
+    unit = (a) => a.map((v) => v / Math.hypot(...a)),
+    forward = unit(sub(c.target, c.position)),
+    right = unit([
+      forward[1] * c.up[2] - forward[2] * c.up[1],
+      forward[2] * c.up[0] - forward[0] * c.up[2],
+      forward[0] * c.up[1] - forward[1] * c.up[0],
+    ]),
+    up = [
+      right[1] * forward[2] - right[2] * forward[1],
+      right[2] * forward[0] - right[0] * forward[2],
+      right[0] * forward[1] - right[1] * forward[0],
+    ],
+    w = engine.canvas.clientWidth,
+    h = engine.canvas.clientHeight,
+    half = Math.hypot(...sub(c.position, c.target)) * Math.tan((c.fov * Math.PI) / 360),
+    nx = (x / w) * 2 - 1,
+    ny = 1 - (y / h) * 2;
+  return c.target.map((v, i) => v + right[i] * nx * half * (w / h) + up[i] * ny * half);
+};
+window.arcballProject = (point) => (state.arc.engine.render(), project(state.arc.engine, point));
+window.arcballReset = (damping = false) => {
+  const { controls, engine } = state.arc;
+  controls.reset();
+  controls.enableDamping = damping;
+  state.arc.wheels.length = 0;
+  engine.render();
+};
+// Renders frames of 1/60 s until the camera stops; returns the per-frame motion and the total frames.
+window.arcballSettle = () => {
+  const { engine } = state.arc,
+    c = engine.camera,
+    steps = [];
+  let previous = [...c.position, ...c.up];
+  for (let frame = 0; frame < 3000; frame++) {
+    engine.render({ delta: 1 / 60 });
+    const now = [...c.position, ...c.up],
+      step = Math.hypot(...now.map((v, i) => v - previous[i]));
+    previous = now;
+    if (!step) break;
+    steps.push(step);
+  }
+  // Ten more frames: nothing left pending.
+  const before = [...c.position];
+  for (let i = 0; i < 10; i++) engine.render({ delta: 1 / 60 });
+  return {
+    steps,
+    creep: Math.hypot(...c.position.map((v, i) => v - before[i])),
+    azimuth: Math.atan2(-c.position[0], c.position[2]),
+    distance: state.arc.controls.getDistance(),
+  };
+};
+window.arcballFinish = async () => {
+  const { engine, controls, listeners } = state.arc,
+    before = listeners.size,
+    plugins = () => [...engine.plugins.keys()].filter((name) => name.includes(':arcball:')).length,
+    pluginBefore = plugins();
+  controls.dispose();
+  const error = await state.arc.device.popErrorScope();
+  if (error) state.arc.errors.push(error.message);
+  return { before, after: listeners.size, pluginBefore, pluginAfter: plugins(), errors: state.arc.errors };
+};
+window.arcballDisposeEngine = () => state.arc.engine.dispose();

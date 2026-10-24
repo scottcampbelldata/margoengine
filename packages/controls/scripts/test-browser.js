@@ -52,11 +52,12 @@ try {
   for (let i = 1; i <= 5; i++) await page.mouse.move(...at(100 + i * 10, 330));
   await page.mouse.up();
   const rotated = await page.evaluate(() => window.measure());
-  near(rotated.azimuth, -Math.PI / 4, 1e-6, 'drag of 50 px on a 400 px canvas orbits by PI/4');
+  // OrbitControls turns PI per element height since the clean-room rewrite (3a1b76cf): 50 / 400 px is PI / 8.
+  near(rotated.azimuth, -Math.PI / 8, 1e-6, 'drag of 50 px on a 400 px canvas orbits by PI/8');
   near(rotated.centroid[0], rotated.expected[0], 4, 'rotated image: box x');
   near(rotated.centroid[1], rotated.expected[1], 4, 'rotated image: box y');
   assert.ok(
-    Math.hypot(rotated.centroid[0] - start.centroid[0], rotated.centroid[1] - start.centroid[1]) > 20 ||
+    Math.hypot(rotated.centroid[0] - start.centroid[0], rotated.centroid[1] - start.centroid[1]) > 10 ||
       Math.abs(rotated.area - start.area) > start.area * 0.2,
     `box moved in the image ${JSON.stringify([start, rotated])}`,
   );
@@ -67,7 +68,8 @@ try {
   for (let i = 0; i < 3; i++) await page.mouse.wheel(0, -200);
   await page.waitForTimeout(50);
   const zoomed = await page.evaluate(() => window.measure());
-  near(zoomed.distance, 6 * 0.95 ** 6, 1e-6, 'wheel dollies in');
+  // 500 px of wheel halve the distance (3a1b76cf): three -200 px notches are 2^(-600/500).
+  near(zoomed.distance, 6 * 2 ** (-600 / 500), 1e-6, 'wheel dollies in');
   assert.ok(zoomed.area > rotated.area * 1.3, `zoom enlarges the box (${rotated.area} -> ${zoomed.area})`);
   checks.push(
     `Wheel zoom dollies to ${zoomed.distance.toFixed(3)} and the box grows from ${rotated.area} to ${zoomed.area} px`,
@@ -168,6 +170,109 @@ try {
     `WebGL2 overlay ${JSON.stringify(report.webgl2)}`,
   );
   checks.push('WebGL2 backend draws the same gizmo overlay and removes it on dispose');
+
+  // ArcballControls with real mouse input on its own WebGPU canvas (400 x 400 CSS px, camera 6 units from the target).
+  await page.locator('#arc').scrollIntoViewIfNeeded();
+  const arc0 = await page.evaluate(() => window.setupArcball());
+  assert.equal(arc0.backend, 'webgpu');
+  const arcAt = (x, y) => [arc0.left + x, arc0.top + y];
+  const arcball = (report.arcball = { start: arc0 });
+  near(arc0.redCentroid[0], arc0.marker[0], 1.5, 'arcball marker renders where projected (x)');
+  near(arc0.redCentroid[1], arc0.marker[1], 1.5, 'arcball marker renders where projected (y)');
+  // 1. A left drag of 80 px across the centre (ball radius 200 px) turns by 2 asin(40 / 200) about screen up.
+  await page.mouse.move(...arcAt(160, 200));
+  await page.mouse.down();
+  for (let i = 1; i <= 8; i++) await page.mouse.move(...arcAt(160 + i * 10, 200));
+  await page.mouse.up();
+  const turned = (arcball.rotate = await page.evaluate(() => window.arcballState()));
+  const expectedTurn = 2 * Math.asin(40 / 200);
+  near(turned.azimuth, expectedTurn, 1e-9, 'arcball drag turns by the angle between the ball points');
+  near(turned.distance, 6, 1e-9, 'arcball drag keeps the distance');
+  near(turned.position[1], 0, 1e-9, 'arcball drag about screen up stays level');
+  near(turned.redCentroid[0], turned.marker[0], 1.5, 'turned image: marker x');
+  near(turned.redCentroid[1], turned.marker[1], 1.5, 'turned image: marker y');
+  assert.ok(
+    Math.abs(turned.redCentroid[0] - arc0.redCentroid[0]) > 5,
+    `marker moved in the rendered image ${JSON.stringify([arc0.redCentroid, turned.redCentroid])}`,
+  );
+  checks.push(
+    `Arcball drag of 80 px turns the view ${turned.azimuth.toFixed(9)} rad (expected ${expectedTurn.toFixed(9)}); rendered marker ${arc0.redCentroid.map((v) => v.toFixed(1))} -> ${turned.redCentroid.map((v) => v.toFixed(1))}`,
+  );
+  // 2. A right drag pans: the grabbed marker pixel stays under the cursor.
+  await page.evaluate(() => window.arcballReset());
+  const grab = (await page.evaluate(() => window.arcballState())).marker,
+    drop = [grab[0] + 60, grab[1] - 40];
+  await page.mouse.move(...arcAt(...grab));
+  await page.mouse.down({ button: 'right' });
+  for (let i = 1; i <= 6; i++) await page.mouse.move(...arcAt(grab[0] + i * 10, grab[1] - (i * 20) / 3));
+  await page.mouse.up({ button: 'right' });
+  const panned = (arcball.pan = await page.evaluate(([x, y]) => window.arcballState(x, y), drop));
+  near(panned.marker[0], drop[0], 1e-3, 'pan: grabbed point projects under the cursor (x)');
+  near(panned.marker[1], drop[1], 1e-3, 'pan: grabbed point projects under the cursor (y)');
+  near(panned.redCentroid[0], drop[0], 1.5, 'pan: rendered marker under the cursor (x)');
+  near(panned.redCentroid[1], drop[1], 1.5, 'pan: rendered marker under the cursor (y)');
+  assert.equal(panned.picked, 'marker', 'engine.pick at the cursor finds the grabbed marker');
+  near(panned.distance, 6, 1e-9, 'pan keeps the distance');
+  checks.push(
+    `Arcball right drag (+60, -40) px keeps the grabbed marker under the cursor: projected ${panned.marker.map((v) => v.toFixed(4))}, rendered ${panned.redCentroid.map((v) => v.toFixed(2))}, pick = ${panned.picked}`,
+  );
+  // 3. Wheel zoom toward the cursor keeps the point under it.
+  await page.evaluate(() => window.arcballReset());
+  // Wheel events carry whole CSS pixels here, so the cursor goes to the marker's pixel rounded, and the check follows
+  // the world point under that pixel.
+  const cursor = (await page.evaluate(() => window.arcballState())).marker.map(Math.round),
+    anchor = await page.evaluate((at) => window.arcballUnder(at), cursor);
+  await page.mouse.move(...arcAt(...cursor));
+  for (let i = 0; i < 3; i++) await page.mouse.wheel(0, -200);
+  await page.waitForFunction(() => window.controlsState.arc.wheels.length === 3);
+  const zoomedArc = (arcball.zoom = await page.evaluate(([x, y]) => window.arcballState(x, y), cursor));
+  const wheelPixels = zoomedArc.wheels.reduce(
+    (sum, [deltaY, mode]) => sum + deltaY * (mode === 1 ? 100 / 3 : mode === 2 ? 800 : 1),
+    0,
+  );
+  near(zoomedArc.distance, 6 * 2 ** (wheelPixels / 500), 1e-9, 'wheel zoom scales the distance');
+  assert.ok(zoomedArc.distance < 6, 'wheel up zooms in');
+  const anchorAfter = (arcball.zoomAnchor = await page.evaluate((point) => window.arcballProject(point), anchor));
+  near(anchorAfter[0], cursor[0], 1e-3, 'zoom: cursor point fixed (x)');
+  near(anchorAfter[1], cursor[1], 1e-3, 'zoom: cursor point fixed (y)');
+  near(zoomedArc.redCentroid[0], cursor[0], 1.5, 'zoom: rendered marker under the cursor (x)');
+  near(zoomedArc.redCentroid[1], cursor[1], 1.5, 'zoom: rendered marker under the cursor (y)');
+  assert.equal(zoomedArc.picked, 'marker');
+  checks.push(
+    `Arcball wheel (${wheelPixels} px) zooms to distance ${zoomedArc.distance.toFixed(4)} with the point under the cursor ${cursor} still at ${anchorAfter.map((v) => v.toFixed(4))}, rendered ${zoomedArc.redCentroid.map((v) => v.toFixed(2))}, pick = ${zoomedArc.picked}`,
+  );
+  // 4. Damping: a fling keeps turning after release, slows every frame, and settles on the undamped total.
+  await page.evaluate(() => window.arcballReset(true));
+  await page.mouse.move(...arcAt(180, 200));
+  await page.mouse.down();
+  for (let i = 1; i <= 4; i++) await page.mouse.move(...arcAt(180 + i * 10, 200));
+  await page.mouse.up();
+  const settled = await page.evaluate(() => window.arcballSettle());
+  arcball.damping = { frames: settled.steps.length, creep: settled.creep, azimuth: settled.azimuth };
+  assert.ok(settled.steps.length > 30 && settled.steps.length < 3000, `settles in ${settled.steps.length} frames`);
+  for (let i = 1; i < settled.steps.length - 1; i++)
+    assert.ok(settled.steps[i] < settled.steps[i - 1], `damped motion slows at frame ${i}`);
+  assert.equal(settled.creep, 0, 'nothing pending after it settles');
+  near(settled.azimuth, 2 * Math.asin(20 / 200), 1e-9, 'damped fling ends at the undamped angle');
+  checks.push(
+    `Arcball damping settles in ${settled.steps.length} frames at ${settled.azimuth.toFixed(9)} rad (undamped ${(2 * Math.asin(20 / 200)).toFixed(9)}), then 0 creep`,
+  );
+  // 5. Dispose removes every canvas listener and the update plugin; later drags do nothing.
+  const arcEnd = (arcball.dispose = await page.evaluate(() => window.arcballFinish()));
+  assert.ok(arcEnd.before > 0);
+  assert.equal(arcEnd.after, 0, 'arcball canvas listeners removed');
+  assert.deepEqual([arcEnd.pluginBefore, arcEnd.pluginAfter], [1, 0], 'arcball plugin removed');
+  const still = (await page.evaluate(() => window.arcballState())).position;
+  await page.mouse.move(...arcAt(150, 150));
+  await page.mouse.down();
+  await page.mouse.move(...arcAt(250, 250));
+  await page.mouse.up();
+  assert.deepEqual((await page.evaluate(() => window.arcballState())).position, still, 'no motion after dispose');
+  assert.deepEqual(arcEnd.errors, [], 'no WebGPU validation errors on the arcball engine');
+  await page.evaluate(() => window.arcballDisposeEngine());
+  checks.push(
+    `Arcball dispose removes ${arcEnd.before} canvas listeners (${arcEnd.after} left) and its update plugin; a later drag moves nothing; zero WebGPU validation errors`,
+  );
 
   await page.screenshot({ path: resolve(results, 'controls.png') });
   report.browser = browser.version();

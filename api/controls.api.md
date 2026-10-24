@@ -9,6 +9,49 @@ import { PassContext } from "@margoengine/core/extension";
 
 export const AUTOCAD: NavigationProfile;
 
+export class ArcballControls extends Controls {
+    enableRotate: boolean;
+    enableZoom: boolean;
+    enablePan: boolean;
+    rotateSpeed: number;
+    zoomSpeed: number;
+    panSpeed: number;
+    enableDamping: boolean;
+    dampingFactor: number;
+    zoomToCursor: boolean;
+    minDistance: number;
+    maxDistance: number;
+    minZoom: number;
+    maxZoom: number;
+    mouseButtons: {
+        LEFT: number | null;
+        MIDDLE: number | null;
+        RIGHT: number | null;
+    };
+    state: 'none' | 'rotate' | 'pan' | 'dolly' | 'touch-rotate' | 'touch-dolly-pan';
+    constructor(source: Camera | EngineKernel, element?: ControlElement | null, options?: ArcballControlsOptions);
+    protected get kind(): string;
+    protected bind(element: ControlElement): Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
+    protected onDisconnect(): void;
+    get projection(): ArcballProjection | null;
+    saveState(): void;
+    reset(): void;
+    rotate(axis: readonly number[], angle: number): void;
+    pan(deltaX: number, deltaY: number): void;
+    dollyIn(factor: number): void;
+    dollyOut(factor: number): void;
+    getDistance(): number;
+    update(delta?: number): boolean;
+}
+
+export interface ArcballControlsOptions {
+    projection?: ArcballProjection | null;
+}
+
+export interface ArcballProjection {
+    zoom: number;
+}
+
 export const BLENDER: NavigationProfile;
 
 export interface ControlElement {
@@ -462,6 +505,8 @@ export interface TransformControlsOptions {
 export type TransformMode = 'translate' | 'rotate' | 'scale';
 
 export type TransformSpace = 'world' | 'local';
+
+export function arcballPoint(x: number, y: number): V3;
 
 export function buildGizmo(f: GizmoFrame): Handle[];
 

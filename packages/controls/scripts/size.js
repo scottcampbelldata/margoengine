@@ -16,6 +16,7 @@ const entries = {
   'OrbitControls + PROFILES': 'OrbitControls, PROFILES',
   MapControls: 'MapControls',
   TrackballControls: 'TrackballControls',
+  ArcballControls: 'ArcballControls',
   FlyControls: 'FlyControls',
   FirstPersonControls: 'FirstPersonControls',
   PointerLockControls: 'PointerLockControls',

@@ -13,6 +13,7 @@ export default defineConfig({
       { find: /^@margoengine\/core$/, replacement: resolve(repository, 'packages/core/dist/index.js') },
       { find: /^@margoengine\/controls$/, replacement: resolve(root, 'dist/index.js') },
       { find: /^@margoengine\/controls\/walk$/, replacement: resolve(root, 'dist/walk.js') },
+      { find: /^@margoengine\/controls\/arcball$/, replacement: resolve(root, 'dist/arcball.js') },
       { find: /^@margoengine\/webgl$/, replacement: resolve(repository, 'packages/webgl/dist/index.js') },
     ],
   },
