@@ -119,8 +119,23 @@ Every item is done only when all of these hold:
       refuse self-touching profiles. Left: two faces crossing in a closed curve that meets no edge of either.
 - [ ] 1.4 Crash immunity: every operation bounded (time and iteration limits on intersection, tracing and blend
       searches); every failure a typed error naming the cause; no unhandled exception on any input.
+      Open, found by `node scripts/brep-stress/bad-input.mjs` (2026-10-24; each case returns a body instead of a
+      typed error):
+      - `G-sphere-Infinity`: `model.sphere(name, Infinity)`.
+      - `G-torus-major-Infinity`: `model.torus(name, Infinity, 0.001)`.
+      - `G-frame-origin-NaN`, `G-frame-origin-Infinity`: `model.frameOf([v, 0, 0], [0, 0, 1])`.
+      - `G-frame-x-NaN`, `G-frame-x-Infinity`: `model.frameOf([0, 0, 0], [0, 0, 1], [v, 0, 0])`.
+      - `G-step-missing-ref`: a box's STEP whose MANIFOLD_SOLID_BREP points at a missing entity (#999999) imports
+        through `bodiesFromSTEP` as one body with no problems reported.
+      - `G-step-bad-number`: the same STEP with a CARTESIAN_POINT coordinate written `NaN` imports as one body with
+        no problems reported.
 - [ ] 1.5 Harnesses: an ABC Dataset slice runner, a sweep-and-jitter fuzzer for every operation, and a STEP round trip
       runner (OpenCascade reader and mesher, then FreeCAD's command line).
+      Started: `scripts/brep-stress` (seeded primitives and Booleans, blends and profiles, bad input, corpus).
+      Open, found by `node scripts/brep-stress/primitives.mjs --matrix=staged --match=A/box-sphere/s1/overlap`
+      (2026-10-24): `A/box-sphere/s1/overlap` (1 mm box, sphere offset -0.69 mm): the Boolean results' STEP round trip
+      changes their volume: subtract 6.294e-10 -> 6.456e-10 m^3, union 1.153e-9 -> 6.456e-10, intersect (moved)
+      3.706e-10 -> 3.467e-10, swapped subtract 1.530e-10 -> -3.485e-10; the same under repeat and rigid motion.
 
 ## Phase 2: read everything
 
