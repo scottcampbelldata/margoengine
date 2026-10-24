@@ -10,9 +10,10 @@ import {
   type Mesh,
   type Vec3,
 } from '@margoengine/core/extension';
-import { instanceLayout, instancedDepth } from '../../shared/instances.js';
+import { instancedDepth } from '../../shared/instances.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { casterBuffers } from '../../shared/caster.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -485,20 +486,7 @@ export class ContactShadows implements EnginePlugin {
         vertex: {
           module,
           entryPoint: 'vertex',
-          buffers: [
-            {
-              arrayStride: p.stride,
-              attributes:
-                p.stride === 80
-                  ? [
-                      { shaderLocation: 0, offset: 0, format: 'float32x4' },
-                      { shaderLocation: 3, offset: 48, format: 'float32x4' },
-                      { shaderLocation: 4, offset: 64, format: 'float32x4' },
-                    ]
-                  : [{ shaderLocation: 0, offset: 0, format: 'float32x3' }],
-            },
-            ...(inst ? [instanceLayout] : []),
-          ],
+          buffers: casterBuffers(p.stride, false, !!inst),
         },
         fragment: {
           module,

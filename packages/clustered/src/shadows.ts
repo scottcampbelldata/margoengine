@@ -9,7 +9,7 @@ import {
   type PassContext,
   type Mesh,
 } from '@margoengine/core/extension';
-import { instanceLayout, instancedDepth } from '../../shared/instances.js';
+import { instancedDepth } from '../../shared/instances.js';
 import { displacedDepth } from '../../shared/displacement.js';
 import { preset } from '../../shared/preset.js';
 import type { Clustered, ClusteredShadow } from './index.js';
@@ -27,6 +27,7 @@ import {
 } from './light-shadow-math.js';
 import { MargoError } from '@margoengine/math/errors';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { casterBuffers, displacementGroup } from '../../shared/caster.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -934,16 +935,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
           seen: true,
           key,
           displacement,
-          displaced: displacement
-            ? this.device!.createBindGroup({
-                layout: this.displacementLayout(),
-                entries: [
-                  { binding: 0, resource: { buffer: displacement.buffer } },
-                  { binding: 1, resource: displacement.view },
-                  { binding: 2, resource: displacement.sampler },
-                ],
-              })
-            : undefined,
+          displaced: displacementGroup(this.device!, this.displacementLayout(), displacement),
         };
         records.set(identity, d);
         this.changed = true;
@@ -980,20 +972,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       vertex: {
         module,
         entryPoint: 'vertex',
-        buffers: [
-          {
-            arrayStride: pbr ? 80 : 24,
-            attributes: pbr
-              ? [
-                  { shaderLocation: 0, offset: 0, format: 'float32x4' },
-                  ...(displaced ? [{ shaderLocation: 1, offset: 16, format: 'float32x4' as const }] : []),
-                  { shaderLocation: 3, offset: 48, format: 'float32x4' },
-                  { shaderLocation: 4, offset: 64, format: 'float32x4' },
-                ]
-              : [{ shaderLocation: 0, offset: 0, format: 'float32x3' }],
-          },
-          ...(key.includes('i') ? [instanceLayout as GPUVertexBufferLayout] : []),
-        ],
+        buffers: casterBuffers(pbr ? 80 : 24, displaced, key.includes('i')),
       },
       // Opaque casters need no fragment stage, which keeps early depth testing.
       ...(key.includes('m') ? { fragment: { module, entryPoint: 'fragment', targets: [] } } : {}),

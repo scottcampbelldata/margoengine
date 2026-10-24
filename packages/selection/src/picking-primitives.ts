@@ -3,6 +3,7 @@ import type { Mesh as MeshHandle } from '@margoengine/core';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 import { retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
+import { casterBuffers } from '../../shared/caster.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
@@ -241,16 +242,7 @@ export class PickingPrimitives {
         vertex: {
           module,
           entryPoint: 'vertex',
-          buffers: [
-            {
-              arrayStride: 80,
-              attributes: [
-                { shaderLocation: 0, offset: 0, format: 'float32x4' },
-                { shaderLocation: 3, offset: 48, format: 'float32x4' },
-                { shaderLocation: 4, offset: 64, format: 'float32x4' },
-              ],
-            },
-          ],
+          buffers: casterBuffers(80),
         },
         fragment: { module, entryPoint: 'fragment', targets: [{ format: options.format }] },
         primitive: { topology: 'triangle-list', cullMode: 'none' },

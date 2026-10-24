@@ -2,11 +2,12 @@ import type { Mesh as MeshHandle } from '@margoengine/core';
 import { meshRuntime, type Engine, type Mesh, type PassContext } from '@margoengine/core/extension';
 import { finiteVector } from '@margoengine/math/validate';
 import { MargoError } from '@margoengine/math/errors';
-import { instanceLayout, instancedDepth } from '../../shared/instances.js';
+import { instancedDepth } from '../../shared/instances.js';
 import { displacedDepth } from '../../shared/displacement.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { hemisphere, localShadowMatrix, viewportMatrix } from './local-shadow-math.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { casterBuffers, depthPassDescriptor, displacementGroup, drawCaster } from '../../shared/caster.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUTextureUsage: {
   RENDER_ATTACHMENT: number;
@@ -169,16 +170,8 @@ export class LocalShadowMaps {
   private dirty = true;
   private disposed = false;
   private epoch = 0;
-  private readonly depthAttachment: GPURenderPassDepthStencilAttachment = {
-    view: undefined!,
-    depthClearValue: 1,
-    depthLoadOp: 'clear',
-    depthStoreOp: 'store',
-  };
-  private readonly depthPass: GPURenderPassDescriptor = {
-    colorAttachments: [],
-    depthStencilAttachment: this.depthAttachment,
-  };
+  private readonly depthPass = depthPassDescriptor();
+  private readonly depthAttachment = this.depthPass.depthStencilAttachment;
   constructor(options: LocalShadowOptions = {}) {
     if (!options || typeof options !== 'object' || Array.isArray(options))
       throw new TypeError('Invalid local shadow options');
@@ -552,21 +545,7 @@ export class LocalShadowMaps {
         vertex: {
           module,
           entryPoint: 'vertex',
-          buffers: [
-            {
-              arrayStride: p.stride,
-              attributes:
-                p.stride === 80
-                  ? [
-                      { shaderLocation: 0, offset: 0, format: 'float32x4' },
-                      ...(displacement ? [{ shaderLocation: 1, offset: 16, format: 'float32x4' as const }] : []),
-                      { shaderLocation: 3, offset: 48, format: 'float32x4' },
-                      { shaderLocation: 4, offset: 64, format: 'float32x4' },
-                    ]
-                  : [{ shaderLocation: 0, offset: 0, format: 'float32x3' }],
-            },
-            ...(inst ? [instanceLayout as GPUVertexBufferLayout] : []),
-          ],
+          buffers: casterBuffers(p.stride, !!displacement, !!inst),
         },
         fragment: { module, entryPoint: 'fragment', targets: [] },
         ...(lines ? { primitive: { topology: 'line-list' as const } } : {}),
@@ -600,16 +579,7 @@ export class LocalShadowMaps {
         sampler: p.alphaSampler,
         epoch: this.epoch,
         displacement,
-        displaced: displacement
-          ? this.device!.createBindGroup({
-              layout: pipeline.getBindGroupLayout(1),
-              entries: [
-                { binding: 0, resource: { buffer: displacement.buffer } },
-                { binding: 1, resource: displacement.view },
-                { binding: 2, resource: displacement.sampler },
-              ],
-            })
-          : undefined,
+        displaced: displacementGroup(this.device!, pipeline.getBindGroupLayout(1), displacement),
       };
       records.set(identity, record);
     }
@@ -638,22 +608,19 @@ export class LocalShadowMaps {
       }
     }
     record.epoch = this.epoch;
-    record.values.set(this.matrices[layer]);
-    record.values.set(p.node.matrix, 16);
-    record.values[32] = p.alpha ?? 1;
-    record.values[33] = p.cutoff ?? 0;
-    record.values[34] = p.texCoord ?? 0;
-    if (transform) record.values.set(transform, 36);
-    this.device!.queue.writeBuffer(face.uniform, 0, record.values as Float32Array<ArrayBuffer>);
-    pass.setPipeline(pipeline);
-    pass.setBindGroup(0, face.group);
-    if (record.displaced) pass.setBindGroup(1, record.displaced);
-    pass.setVertexBuffer(0, p.vertex);
-    pass.setIndexBuffer(p.index, 'uint32');
-    if (inst) {
-      pass.setVertexBuffer(1, inst.upload(this.device!));
-      pass.drawIndexed(p.count, inst.count);
-    } else pass.drawIndexed(p.count);
+    drawCaster(
+      pass,
+      this.device!,
+      pipeline,
+      face.group,
+      face.uniform,
+      record.values as Float32Array<ArrayBuffer>,
+      this.matrices[layer],
+      p,
+      transform,
+      record.displaced,
+      inst,
+    );
   }
   private destroyDraw(record: Draw): void {
     for (const face of record.faces.values()) face.uniform.destroy();

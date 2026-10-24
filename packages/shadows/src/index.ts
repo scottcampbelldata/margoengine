@@ -12,7 +12,7 @@ import {
   type Vec3,
 } from '@margoengine/core/extension';
 import { preset } from '../../shared/preset.js';
-import { instanceLayout, instancedDepth } from '../../shared/instances.js';
+import { instancedDepth } from '../../shared/instances.js';
 import { displacedDepth } from '../../shared/displacement.js';
 import { shadowPrimitivesInto, coreReceives, unshadowedCore } from '../../shared/shadow-source.js';
 import { viewMatrix } from '../../shared/view.js';
@@ -23,6 +23,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { cascadeSplits, fitCascades } from './cascades.js';
 import { shadowSampling, shadowDepth, type ShadowFilter } from './shader.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { casterBuffers, depthPassDescriptor, displacementGroup, drawCaster } from '../../shared/caster.js';
 export { cascadeSplits, fitCascades } from './cascades.js';
 export type { ShadowFilter } from './shader.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
@@ -240,16 +241,8 @@ export class Shadows implements EnginePlugin {
     (matrix, cascade) => ({ context: undefined!, pass: undefined!, matrix, cascade }) as ShadowContext,
   );
   private readonly shaders = new Map<string, Map<string, string>>();
-  private readonly depthAttachment: GPURenderPassDepthStencilAttachment = {
-    view: undefined!,
-    depthClearValue: 1,
-    depthLoadOp: 'clear',
-    depthStoreOp: 'store',
-  };
-  private readonly depthPass: GPURenderPassDescriptor = {
-    colorAttachments: [],
-    depthStencilAttachment: this.depthAttachment,
-  };
+  private readonly depthPass = depthPassDescriptor();
+  private readonly depthAttachment = this.depthPass.depthStencilAttachment;
   private readonly copySource: GPUTexelCopyTextureInfo = { texture: undefined! };
   private readonly copyDestination: GPUTexelCopyTextureInfo = { texture: undefined! };
   private readonly copySize = { width: 0, height: 0, depthOrArrayLayers: 4 };
@@ -1043,21 +1036,7 @@ export class Shadows implements EnginePlugin {
         vertex: {
           module,
           entryPoint: 'vertex',
-          buffers: [
-            {
-              arrayStride: p.stride,
-              attributes:
-                p.stride === 80
-                  ? [
-                      { shaderLocation: 0, offset: 0, format: 'float32x4' },
-                      ...(displacement ? [{ shaderLocation: 1, offset: 16, format: 'float32x4' as const }] : []),
-                      { shaderLocation: 3, offset: 48, format: 'float32x4' },
-                      { shaderLocation: 4, offset: 64, format: 'float32x4' },
-                    ]
-                  : [{ shaderLocation: 0, offset: 0, format: 'float32x3' }],
-            },
-            ...(inst ? [instanceLayout] : []),
-          ],
+          buffers: casterBuffers(p.stride, !!displacement, !!inst),
         },
         fragment: { module, entryPoint: 'fragment', targets: [] },
         ...(lines ? { primitive: { topology: 'line-list' as const } } : {}),
@@ -1120,35 +1099,23 @@ export class Shadows implements EnginePlugin {
         sampler: p.alphaSampler,
         section: section?.buffer,
         displacement,
-        displaced: displacement
-          ? this.device!.createBindGroup({
-              layout: pipeline.getBindGroupLayout(1),
-              entries: [
-                { binding: 0, resource: { buffer: displacement.buffer } },
-                { binding: 1, resource: displacement.view },
-                { binding: 2, resource: displacement.sampler },
-              ],
-            })
-          : undefined,
+        displaced: displacementGroup(this.device!, pipeline.getBindGroupLayout(1), displacement),
       };
       records.set(identity, record);
     }
-    record.values.set(matrix);
-    record.values.set(p.node.matrix, 16);
-    record.values[32] = p.alpha ?? 1;
-    record.values[33] = p.cutoff ?? 0;
-    record.values[34] = p.texCoord ?? 0;
-    if (transform) record.values.set(transform, 36);
-    this.device!.queue.writeBuffer(record.uniforms[cascade], 0, record.values as Float32Array<ArrayBuffer>);
-    pass.setPipeline(pipeline);
-    pass.setBindGroup(0, record.groups[cascade]);
-    if (record.displaced) pass.setBindGroup(1, record.displaced);
-    pass.setVertexBuffer(0, p.vertex);
-    pass.setIndexBuffer(p.index, 'uint32');
-    if (inst) {
-      pass.setVertexBuffer(1, inst.upload(this.device!));
-      pass.drawIndexed(p.count, inst.count);
-    } else pass.drawIndexed(p.count);
+    drawCaster(
+      pass,
+      this.device!,
+      pipeline,
+      record.groups[cascade],
+      record.uniforms[cascade],
+      record.values as Float32Array<ArrayBuffer>,
+      matrix,
+      p,
+      transform,
+      record.displaced,
+      inst,
+    );
   }
   private clearDraws(): void {
     for (const records of this.draws.values())
