@@ -349,7 +349,7 @@ fn shapeIn(entry:u32,k:u32)->u32 {if((entry&0x40000000u)==0u){return 0u;}return 
 fn octStart(o:vec3f,d:vec3f,c:vec3i,t0:f32,t1:f32,h:ptr<function,vec3u>,nx:ptr<function,vec3f>) {
  let p=o+d*(t0+min((t1-t0)*0.5,1e-4))-vec3f(c);
  *h=select(vec3u(0u),vec3u(1u),p>=vec3f(0.5));
- let toward=(d>vec3f(0.0)&(*h==vec3u(0u)))|(d<vec3f(0.0)&(*h==vec3u(1u)));
+ let toward=((d>vec3f(0.0))&(*h==vec3u(0u)))|((d<vec3f(0.0))&(*h==vec3u(1u)));
  *nx=select(vec3f(3e38),(vec3f(c)+0.5-o)*safeInv(d),toward);
 }
 fn octWalk(mask:u32,o:vec3f,d:vec3f,c:vec3i,t0:f32,t1:f32,a0:u32,fill:bool)->vec2f {
