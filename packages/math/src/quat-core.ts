@@ -2,8 +2,7 @@
 // quat.ts write arrays and Quaternion/Vector3 write their own fields, with no temporary arrays. Not a package entry.
 import type { NumberArray } from './types.js';
 
-/** Receives a result: `[x, y, z, w]` or `[x, y, z]` (w unused). Returns `out`. */
-export type Sink<T> = (out: T, x: number, y: number, z: number, w: number) => T;
+// A sink receives a result: `[x, y, z, w]` or `[x, y, z]` (w unused), and returns `out`.
 
 /** Writes into an array: x, y, z and, for a quaternion, w. */
 export const toArray = <T extends NumberArray>(out: T, x: number, y: number, z: number, w: number): T => {
@@ -22,7 +21,14 @@ export const toVector = <T extends NumberArray>(out: T, x: number, y: number, z:
 };
 
 /** Shepperd's method on a column-major 3x3 or 4x4, each column divided by its scale. Not normalized. */
-export function rotation<T>(e: ArrayLike<number>, sx: number, sy: number, sz: number, out: T, sink: Sink<T>): T {
+export function rotation<T>(
+  e: ArrayLike<number>,
+  sx: number,
+  sy: number,
+  sz: number,
+  out: T,
+  sink: (out: T, x: number, y: number, z: number, w: number) => T,
+): T {
   const k = e.length === 9 ? 3 : 4,
     m11 = e[0] / sx,
     m21 = e[1] / sx,
@@ -51,7 +57,14 @@ export function rotation<T>(e: ArrayLike<number>, sx: number, sy: number, sz: nu
 }
 
 /** (x, y, z, w) divided by its length; finite values beyond about 1e±154 are divided by the largest first. A zero length leaves it. */
-export function normalized<T>(a: number, b: number, c: number, d: number, out: T, sink: Sink<T>): T {
+export function normalized<T>(
+  a: number,
+  b: number,
+  c: number,
+  d: number,
+  out: T,
+  sink: (out: T, x: number, y: number, z: number, w: number) => T,
+): T {
   let l = Math.sqrt(a * a + b * b + c * c + d * d);
   if (!(l > 2 ** -511 && l < Infinity)) {
     const m = Math.max(Math.abs(a), Math.abs(b), Math.abs(c), Math.abs(d));
@@ -68,11 +81,24 @@ export function normalized<T>(a: number, b: number, c: number, d: number, out: T
 }
 
 /** The inverse rotation of a unit quaternion: x, y and z negated. */
-export const conjugated = <T>(x: number, y: number, z: number, w: number, out: T, sink: Sink<T>): T =>
-  sink(out, -x, -y, -z, w);
+export const conjugated = <T>(
+  x: number,
+  y: number,
+  z: number,
+  w: number,
+  out: T,
+  sink: (out: T, x: number, y: number, z: number, w: number) => T,
+): T => sink(out, -x, -y, -z, w);
 
 /** Rotation by `angle` radians about the unit axis (x, y, z). */
-export function axisAngle<T>(x: number, y: number, z: number, angle: number, out: T, sink: Sink<T>): T {
+export function axisAngle<T>(
+  x: number,
+  y: number,
+  z: number,
+  angle: number,
+  out: T,
+  sink: (out: T, x: number, y: number, z: number, w: number) => T,
+): T {
   const s = Math.sin(angle / 2);
   return sink(out, x * s, y * s, z * s, Math.cos(angle / 2));
 }
@@ -87,7 +113,7 @@ export function rotated<T>(
   qz: number,
   qw: number,
   out: T,
-  sink: Sink<T>,
+  sink: (out: T, x: number, y: number, z: number, w: number) => T,
 ): T {
   const tx = 2 * (qy * z - qz * y),
     ty = 2 * (qz * x - qx * z),
