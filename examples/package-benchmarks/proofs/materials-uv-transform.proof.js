@@ -20,7 +20,7 @@ import { mockGPU, context } from './gpu-recorder.js';
 
 const root = resolve(import.meta.dirname, '../../..'),
   slash = (value) => value.replaceAll('\\', '/'),
-  { ref, pin } = refs('1970fda', '700838e', '60fb775d');
+  { ref, pin } = refs('1970fda', '700838e', 'fd4d2156');
 const sources = ['materials/src', 'gltf-pro/src', 'shared'].map((name) => slash(resolve(root, 'packages', name)) + '/');
 const show = (from, file) => {
   try {
