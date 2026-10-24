@@ -5,6 +5,7 @@ import type { MutableVec3, Vec3 } from '@margoengine/math';
 import type { BlockTypes } from '@margoengine/voxel';
 import type { EntityState } from '@margoengine/voxel/codec';
 import type { VoxelMoveIntent } from '@margoengine/voxel/query';
+import { ByteReader, ByteWriter, unzigzag, zigzag } from '../../shared/bytes.js';
 
 /** Version of this wire format; a server closes connections that say another. */
 export const PROTOCOL_VERSION = 1;
@@ -103,124 +104,26 @@ const HELLO = 1,
   encoder = new TextEncoder(),
   decoder = new TextDecoder('utf-8', { fatal: true });
 
-const zigzag = (n: number): number => (n < 0 ? -2 * n - 1 : 2 * n);
-const unzigzag = (z: number): number => (z % 2 ? -(z + 1) / 2 : z / 2);
-
-class Writer {
-  bytes = new Uint8Array(64);
-  view = new DataView(this.bytes.buffer);
-  at = 0;
-  room(n: number): void {
-    if (this.at + n <= this.bytes.length) return;
-    const bytes = new Uint8Array(Math.max(2 * this.bytes.length, this.at + n));
-    bytes.set(this.bytes);
-    this.bytes = bytes;
-    this.view = new DataView(bytes.buffer);
+// voxel-net messages start after their kind byte; floats must be finite.
+class Reader extends ByteReader {
+  constructor(bytes: Uint8Array) {
+    super(bytes, 'voxel-net message', 'send what encodeClientMessage or encodeServerMessage returned', 1);
   }
-  u8(v: number): void {
-    this.room(1);
-    this.bytes[this.at++] = v;
+  override f32(): number {
+    return this.finite(super.f32());
   }
-  u16(v: number): void {
-    this.room(2);
-    this.view.setUint16(this.at, v, true);
-    this.at += 2;
-  }
-  u32(v: number): void {
-    this.room(4);
-    this.view.setUint32(this.at, v, true);
-    this.at += 4;
-  }
-  f32(v: number): void {
-    this.room(4);
-    this.view.setFloat32(this.at, v, true);
-    this.at += 4;
-  }
-  f64(v: number): void {
-    this.room(8);
-    this.view.setFloat64(this.at, v, true);
-    this.at += 8;
-  }
-  varint(v: number): void {
-    this.room(5);
-    for (; v > 127; v >>>= 7) this.bytes[this.at++] = (v & 127) | 128;
-    this.bytes[this.at++] = v;
-  }
-  raw(b: Uint8Array): void {
-    this.room(b.length);
-    this.bytes.set(b, this.at);
-    this.at += b.length;
-  }
-  done(): Uint8Array {
-    return this.bytes.slice(0, this.at);
-  }
-}
-
-class Reader {
-  at = 1;
-  readonly view: DataView;
-  constructor(readonly bytes: Uint8Array) {
-    this.view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  }
-  fail(problem: string): RangeError {
-    return new RangeError(
-      `voxel-net message ${problem}; send what encodeClientMessage or encodeServerMessage returned`,
-    );
-  }
-  need(n: number): void {
-    if (this.at + n > this.bytes.length) throw this.fail(`is truncated at byte ${this.at} of ${this.bytes.length}`);
-  }
-  u8(): number {
-    this.need(1);
-    return this.bytes[this.at++];
-  }
-  u16(): number {
-    this.need(2);
-    this.at += 2;
-    return this.view.getUint16(this.at - 2, true);
-  }
-  u32(): number {
-    this.need(4);
-    this.at += 4;
-    return this.view.getUint32(this.at - 4, true);
-  }
-  f32(): number {
-    this.need(4);
-    this.at += 4;
-    return this.finite(this.view.getFloat32(this.at - 4, true));
-  }
-  f64(): number {
-    this.need(8);
-    this.at += 8;
-    return this.finite(this.view.getFloat64(this.at - 8, true));
+  override f64(): number {
+    return this.finite(super.f64());
   }
   finite(v: number): number {
     if (!Number.isFinite(v)) throw this.fail(`holds a non-finite number at byte ${this.at}`);
     return v;
-  }
-  varint(): number {
-    let value = 0,
-      scale = 1;
-    for (let n = 0; ; n++, scale *= 128) {
-      const b = this.u8();
-      if (n === 4 && b > 15) throw this.fail(`has a varint wider than 32 bits at byte ${this.at - 1}`);
-      value += (b & 127) * scale;
-      if (b < 128) return value;
-    }
   }
   int(): number {
     return unzigzag(this.varint());
   }
   vec(f: () => number): MutableVec3 {
     return [f(), f(), f()];
-  }
-  rest(): Uint8Array {
-    const out = this.bytes.slice(this.at);
-    this.at = this.bytes.length;
-    return out;
-  }
-  end(): void {
-    if (this.at !== this.bytes.length) throw this.fail(`has ${this.bytes.length - this.at} bytes past its end`);
   }
 }
 
@@ -254,7 +157,7 @@ const bytesOf = (what: string, v: unknown): Uint8Array => {
  * position, a cell outside the 32-bit cells.
  */
 export function encodeClientMessage(message: ClientMessage): Uint8Array {
-  const w = new Writer();
+  const w = new ByteWriter();
   switch (message?.type) {
     case 'hello': {
       const name = encoder.encode(String(message.name ?? ''));
@@ -350,7 +253,7 @@ export function decodeClientMessage(bytes: Uint8Array): ClientMessage {
  * @throws RangeError for a field out of range.
  */
 export function encodeServerMessage(message: ServerMessage): Uint8Array {
-  const w = new Writer();
+  const w = new ByteWriter();
   switch (message?.type) {
     case 'welcome':
       w.u8(WELCOME);

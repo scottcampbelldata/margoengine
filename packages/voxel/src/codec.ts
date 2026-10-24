@@ -5,6 +5,7 @@ import type { MutableVec3, Quat, Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
 import { type PackedChunk, stateError, VoxelChunk } from './chunk.js';
 import { VoxelWorld } from './world.js';
+import { ByteReader, ByteWriter, unzigzag, zigzag } from '../../shared/bytes.js';
 
 const CELLS = 32768,
   VERSION = 1,
@@ -16,111 +17,7 @@ const CELLS = 32768,
   // deflate-raw output for MAX_BODY input stays below this (zlib's deflateBound plus slack).
   MAX_DEFLATED = MAX_BODY + 1024;
 
-const zigzag = (n: number): number => (n < 0 ? -2 * n - 1 : 2 * n);
-const unzigzag = (z: number): number => (z % 2 ? -(z + 1) / 2 : z / 2);
 const isChunk = (c: number): boolean => (c << 5) >> 5 === c;
-
-class Writer {
-  bytes: Uint8Array;
-  view: DataView;
-  at = 0;
-  constructor(size = 64) {
-    this.bytes = new Uint8Array(size);
-    this.view = new DataView(this.bytes.buffer);
-  }
-  room(n: number): void {
-    if (this.at + n <= this.bytes.length) return;
-    const bytes = new Uint8Array(Math.max(2 * this.bytes.length, this.at + n));
-    bytes.set(this.bytes);
-    this.bytes = bytes;
-    this.view = new DataView(bytes.buffer);
-  }
-  u8(v: number): void {
-    this.room(1);
-    this.bytes[this.at++] = v;
-  }
-  u16(v: number): void {
-    this.room(2);
-    this.view.setUint16(this.at, v, true);
-    this.at += 2;
-  }
-  u32(v: number): void {
-    this.room(4);
-    this.view.setUint32(this.at, v, true);
-    this.at += 4;
-  }
-  f32(v: number): void {
-    this.room(4);
-    this.view.setFloat32(this.at, v, true);
-    this.at += 4;
-  }
-  /** LEB128 of an unsigned 32-bit integer: 7 bits per byte, low first, 1-5 bytes. */
-  varint(v: number): void {
-    this.room(5);
-    for (; v > 127; v >>>= 7) this.bytes[this.at++] = (v & 127) | 128;
-    this.bytes[this.at++] = v;
-  }
-  raw(b: Uint8Array): void {
-    this.room(b.length);
-    this.bytes.set(b, this.at);
-    this.at += b.length;
-  }
-  done(): Uint8Array {
-    return this.bytes.slice(0, this.at);
-  }
-}
-
-class Reader {
-  at = 0;
-  readonly view: DataView;
-  constructor(
-    readonly bytes: Uint8Array,
-    private readonly what: string,
-    private readonly from: string,
-  ) {
-    this.view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  }
-  fail(problem: string, fix = `pass the bytes ${this.from} returned`): RangeError {
-    return new RangeError(`${this.what} ${problem}; ${fix}`);
-  }
-  need(n: number): void {
-    if (this.at + n > this.bytes.length) throw this.fail(`is truncated at byte ${this.at} of ${this.bytes.length}`);
-  }
-  u8(): number {
-    this.need(1);
-    return this.bytes[this.at++];
-  }
-  u16(): number {
-    this.need(2);
-    this.at += 2;
-    return this.view.getUint16(this.at - 2, true);
-  }
-  u32(): number {
-    this.need(4);
-    this.at += 4;
-    return this.view.getUint32(this.at - 4, true);
-  }
-  f32(): number {
-    this.need(4);
-    this.at += 4;
-    return this.view.getFloat32(this.at - 4, true);
-  }
-  varint(): number {
-    const bytes = this.bytes;
-    let value = 0,
-      scale = 1;
-    for (let n = 0; ; n++, scale *= 128) {
-      if (this.at >= bytes.length) this.need(1);
-      const b = bytes[this.at++];
-      if (n === 4 && b > 15) throw this.fail(`has a varint wider than 32 bits at byte ${this.at - 1}`);
-      value += (b & 127) * scale;
-      if (b < 128) return value;
-    }
-  }
-  end(): void {
-    if (this.at !== this.bytes.length) throw this.fail(`has ${this.bytes.length - this.at} bytes past its end`);
-  }
-}
 
 // `data` through a compression stream, at most `limit` bytes out; RangeError for data the stream rejects.
 async function pipe(stream: CompressionStream | DecompressionStream, data: Uint8Array, limit: number) {
@@ -183,7 +80,7 @@ export async function encodeChunk(
     { palette, bits, words, light: cells } = chunk.pack();
   let byte = typeof cells === 'number' ? cells : cells[0];
   if (light && typeof cells !== 'number') for (let i = 1; i < CELLS && byte >= 0; i++) if (cells[i] !== byte) byte = -1;
-  const out = new Writer(7 + palette.length * 5 + words.length * 4 + (byte < 0 ? CELLS : 1));
+  const out = new ByteWriter(7 + palette.length * 5 + words.length * 4 + (byte < 0 ? CELLS : 1));
   out.u8(VERSION);
   out.u8(light ? (byte < 0 ? LIGHT | DENSE : LIGHT) : 0);
   out.varint(palette.length);
@@ -212,7 +109,7 @@ export async function encodeChunk(
  */
 export async function decodeChunk(bytes: Uint8Array): Promise<VoxelChunk> {
   if (!(bytes instanceof Uint8Array)) throw new TypeError('decodeChunk expects the Uint8Array encodeChunk returned');
-  let r = new Reader(bytes, 'Chunk data', 'encodeChunk');
+  let r = new ByteReader(bytes, 'Chunk data', 'pass the bytes encodeChunk returned');
   const version = r.u8(),
     flags = r.u8();
   if (version !== VERSION) throw r.fail(`has version ${version}, not ${VERSION}`, 'decode it with a matching release');
@@ -224,7 +121,7 @@ export async function decodeChunk(bytes: Uint8Array): Promise<VoxelChunk> {
     streams('decodeChunk of deflated bytes');
     body = await pipe(new DecompressionStream('deflate-raw'), body, MAX_BODY);
   }
-  r = new Reader(body, 'Chunk data', 'encodeChunk');
+  r = new ByteReader(body, 'Chunk data', 'pass the bytes encodeChunk returned');
   const n = r.varint();
   if (n < 1 || n > CELLS) throw r.fail(`has a palette of ${n} states, not 1..32768`);
   const palette = new Uint32Array(n);
@@ -290,7 +187,7 @@ export function encodeBlockChanges(changes: ArrayLike<number>): Uint8Array {
     order = Array.from({ length: n }, (_, i) => i)
       .sort((a, b) => cx[a] - cx[b] || cy[a] - cy[b] || cz[a] - cz[b] || cell[a] - cell[b])
       .filter((a, k, all) => k + 1 === all.length || !same(a, all[k + 1])),
-    out = new Writer(5 + order.length * 4);
+    out = new ByteWriter(5 + order.length * 4);
   out.varint(order.length);
   let previous = -1;
   for (const i of order) {
@@ -318,7 +215,7 @@ export function encodeBlockChanges(changes: ArrayLike<number>): Uint8Array {
 export function decodeBlockChanges(bytes: Uint8Array): Int32Array {
   if (!(bytes instanceof Uint8Array))
     throw new TypeError('decodeBlockChanges expects the Uint8Array encodeBlockChanges returned');
-  const r = new Reader(bytes, 'Block changes', 'encodeBlockChanges'),
+  const r = new ByteReader(bytes, 'Block changes', 'pass the bytes encodeBlockChanges returned'),
     n = r.varint();
   if (n > (bytes.length - r.at) / 2) throw r.fail(`list ${n} changes in ${bytes.length} bytes`);
   const out = new Int32Array(4 * n);
@@ -496,7 +393,7 @@ export class EntityCodec<const S extends Readonly<Record<string, EntityField>>> 
         throw typeof id === 'number'
           ? new RangeError(`Entity id ${id} is not an integer in 0..4294967295; key entities by u32 ids`)
           : new TypeError('Entity ids must be numbers; key entities by u32 ids');
-    const body = new Writer();
+    const body = new ByteWriter();
     let previous = -1,
       count = 0;
     // Ids are u32s here, so a Uint32Array sorts them numerically.
@@ -532,7 +429,7 @@ export class EntityCodec<const S extends Readonly<Record<string, EntityField>>> 
         else body.f32(v as number);
       });
     }
-    const out = new Writer(5 + body.at);
+    const out = new ByteWriter(5 + body.at);
     out.varint(count);
     out.raw(body.bytes.subarray(0, body.at));
     return out.done();
@@ -549,7 +446,7 @@ export class EntityCodec<const S extends Readonly<Record<string, EntityField>>> 
     if (!(bytes instanceof Uint8Array)) throw new TypeError('EntityCodec.decode expects a Uint8Array from encode');
     if (baseline !== undefined && !(baseline instanceof Map))
       throw new TypeError('EntityCodec.decode baseline must be a Map of entity id -> entity');
-    const r = new Reader(bytes, 'Entity data', 'EntityCodec.encode'),
+    const r = new ByteReader(bytes, 'Entity data', 'pass the bytes EntityCodec.encode returned'),
       n = r.varint(),
       out = new Map(baseline),
       full = 2 ** this.types.length - 1,
