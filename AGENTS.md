@@ -38,6 +38,29 @@ Scott's rule (2026-10-24): as few bugs as possible at release, and every fix is 
 - A bug you cannot fix now goes into `docs/known-bugs.md` with a repro and its cause. That list must be empty
   before release.
 
+## Make it something people want to use
+
+Scott's rule (2026-10-24): every API and tool should feel modern and familiar, so developers and artists want to use it.
+
+- Modern JavaScript and TypeScript that developers expect:
+  - ESM and full types;
+  - `using` / `Symbol.dispose`;
+  - `AbortSignal` on anything that loads or waits;
+  - promises, not callbacks;
+  - async iterators for streams;
+  - coded errors with a help link;
+  - no globals, no side effects on import.
+- Familiar conventions from the tools people already know:
+  - camera and mouse presets matching CAD and DCC apps (with the trademark notice);
+  - glTF and real-world units by default;
+  - common keyboard shortcuts;
+  - names developers already search for.
+- Good defaults: a working, good-looking result with zero configuration, and every option documented with its
+  default.
+- Every public feature ships with a short copy-paste example in its README that runs as written (the package test
+  type-checks them).
+- When you see a place where Margo is harder to use than the tools people come from, fix it or list it in HANDOFF.
+
 ## Before every push to main
 
 Several agents push to `main`. Each push must leave it at least as clean as it found it:
