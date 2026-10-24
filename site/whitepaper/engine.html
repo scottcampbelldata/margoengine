@@ -295,7 +295,7 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
 <span class="src">examples/package-benchmarks/cad/results-step.json · margo-convert-diagnostic.json</span>
 <h3>Our own kernel</h3>
 <p><code>@margoengine/brep</code> is a B-rep kernel written from the published standards (ISO 10303-21 for the file format, ISO 10303-42 for geometry and topology, the AP203, AP214 and AP242 schemas) and textbook geometry, without reading OpenCascade's source. It reads STEP, ACIS SAT, Parasolid XT and JT 9.5+, evaluates analytic and NURBS curves and surfaces exactly, and meshes each body without cracks: every edge is discretized once and shared by both faces, and each face's domain gets a constrained Delaunay triangulation with Shewchuk's robust predicates. It checks its meshes against the volume, area and centroid many STEP files state about themselves. A first cut of modeling (Booleans, fillets and chamfers, exact mass properties) is in the package too.</p>
-<p>It is 104,764 bytes gzip against OpenCascade's 3.1 MB of Wasm, runs in an ordinary JavaScript heap, and is MIT licensed. We compare it with OpenCascade file by file and operation by operation in our own harness, but those runs are not committed yet, so this paper makes no speed or completeness claim for it. OpenCascade still leads on freeform NURBS-to-NURBS intersection, advanced blends and healing broken files.</p>
+<p><code>@margoengine/brep</code> is available under a dual AGPLv3 / Commercial proprietary license for enterprise integrations. We compare it with OpenCascade file by file and operation by operation in our own harness, but those runs are not committed yet, so this paper makes no speed or completeness claim for it. OpenCascade still leads on freeform NURBS-to-NURBS intersection, advanced blends and healing broken files.</p>
 
 <h2 id="limits"><span class="n">8</span>Design envelope</h2>
 <p>The full table, with the error each limit produces and the package that takes you past it, is <code>docs/limits.md</code>. A selection:</p>
@@ -354,7 +354,7 @@ npm run bench:threejs         # the same-scene harness (GPU)</code></pre>
 </main>
 
 <footer>
-  <p>Margo Engine's own code is MIT licensed. Third-party code that ships inside packages (Draco and Basis decoders, OpenCascade for STEP) is listed with its licence in <code>THIRD-PARTY-NOTICES.md</code>.</p>
+  <p>Margo Engine's own code is MIT licensed, except <code>@margoengine/brep</code>, which is dual AGPLv3 / Commercial licensed. Third-party code that ships inside packages (Draco and Basis decoders, OpenCascade for STEP) is listed with its licence in <code>THIRD-PARTY-NOTICES.md</code>.</p>
   <p class="links"><a href="./voxel.html">Margo Voxel whitepaper</a> <a href="../sizes.html">Sizes</a> <a href="../catalog/">Catalog</a> <a href="../THIRD-PARTY-NOTICES.md">Third-party notices</a></p>
   <p>Built with precision, named with love. For Margie.</p>
 </footer>
