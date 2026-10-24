@@ -1,7 +1,7 @@
 {
   "gate": "clean-room",
   "about": "three.js / Babylon / graphics-library mentions per file in packages/**; third-party runtime dependencies",
-  "total": 14,
+  "total": 7,
   "history": [
     {
       "date": "2026-10-24",
@@ -16,8 +16,6 @@
     "dependency @margoengine/react @dimforge/rapier3d-compat": 1,
     "dependency @margoengine/react react": 1,
     "dependency @margoengine/react react-dom": 1,
-    "mention packages/animation/README.md": 1,
-    "mention packages/animation/tests/fixtures/README.md": 6,
     "mention packages/physics/README.md": 1,
     "mention packages/react/tests/subpaths.test.js": 1
   }

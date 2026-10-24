@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3030261,
+  "total": 3030113,
   "history": [
     {
       "date": "2026-10-24",
@@ -151,7 +151,7 @@
     "@margoengine/fbx dist/workers/fbx.js": 49755,
     "@margoengine/fbx/worker": 18215,
     "@margoengine/fsm": 1131,
-    "@margoengine/geometry": 20732,
+    "@margoengine/geometry": 20731,
     "@margoengine/geometry/extras": 5843,
     "@margoengine/geometry/extrude": 8186,
     "@margoengine/geometry/primitives": 4058,
@@ -246,7 +246,7 @@
     "@margoengine/physics": 11941,
     "@margoengine/points": 18637,
     "@margoengine/post": 39077,
-    "@margoengine/post/afterimage": 5811,
+    "@margoengine/post/afterimage": 5664,
     "@margoengine/post/bloom": 6716,
     "@margoengine/post/decals": 4760,
     "@margoengine/post/fxaa": 4398,
