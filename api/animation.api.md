@@ -86,6 +86,12 @@ export interface BakedChannel<N> {
     values: Float32Array;
 }
 
+export interface BakedSampler {
+    interpolation: 'STEP' | 'LINEAR';
+    times: Float32Array;
+    values: Float32Array;
+}
+
 export interface BoneData extends BonePose {
     name: string;
     parent: number;
@@ -99,12 +105,14 @@ export interface BonePose {
 
 export type Interpolation = 'STEP' | 'LINEAR' | 'CUBICSPLINE';
 
-export type KeyInterpolation = 'discrete' | 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+export type KeyInterpolation = 'discrete' | 'linear' | 'easeIn' | 'easeOut' | 'easeInOut' | 'cubicSpline';
 
 export interface Keyframe {
     time: number;
     value: readonly number[];
     interpolation?: KeyInterpolation;
+    inTangent?: readonly number[];
+    outTangent?: readonly number[];
 }
 
 export type KeyframeBlend = 'delta' | 'weighted';
@@ -113,11 +121,12 @@ export interface KeyframeClip {
     readonly name: string;
     readonly duration: number;
     readonly tracks: readonly KeyframeTrack[];
+    readonly properties?: readonly PropertyKeyframeTrack[];
 }
 
 export interface KeyframeClipData {
     name?: string;
-    tracks: readonly KeyframeTrackData[];
+    tracks: readonly (KeyframeTrackData | PropertyTrackData)[];
 }
 
 export interface KeyframeModelTarget {
@@ -134,6 +143,7 @@ export interface KeyframeTrack {
     readonly values: Float64Array;
     readonly interpolations: readonly KeyInterpolation[];
     readonly blend?: KeyframeBlend;
+    readonly tangents?: Float64Array;
 }
 
 export interface KeyframeTrackData {
@@ -142,6 +152,34 @@ export interface KeyframeTrackData {
     keys: readonly Keyframe[];
     blend?: KeyframeBlend;
 }
+
+export interface PropertyKeyframeTrack {
+    readonly target: object;
+    readonly property?: string;
+    readonly name: string;
+    readonly type: PropertyValueType;
+    readonly size: number;
+    readonly times: Float64Array;
+    readonly values: Float64Array;
+    readonly interpolations: readonly KeyInterpolation[];
+    readonly blend?: KeyframeBlend;
+    readonly tangents?: Float64Array;
+    write(value: ArrayLike<number>): void;
+    read(out?: Float64Array): Float64Array;
+}
+
+export interface PropertyTrackData {
+    target: object;
+    property?: string;
+    get?: () => number | ArrayLike<number>;
+    set?: (value: Float64Array) => void;
+    type?: PropertyValueType;
+    name?: string;
+    keys: readonly Keyframe[];
+    blend?: KeyframeBlend;
+}
+
+export type PropertyValueType = 'number' | 'vector' | 'color' | 'quaternion';
 
 export interface RigidBinding {
     object: string;
@@ -208,12 +246,15 @@ export class Skin implements EnginePlugin {
     [Symbol.dispose]: () => void;
 }
 
+export function applyKeyframeClip(clip: KeyframeClip, time: number): void;
 export function applyKeyframeClip(clip: KeyframeClip, target: Skeleton | KeyframeModelTarget, time: number): void;
 
 export function bakeKeyframeClip<N>(clip: KeyframeClip, fps: number, resolve: (target: string) => N | undefined): {
     name: string;
     channels: BakedChannel<N>[];
 };
+
+export function bakeKeyframeTrack(track: KeyframeTrack | PropertyKeyframeTrack, fps: number): BakedSampler;
 
 export function compileRigidClip(bones: readonly RigidBone[], bindings: readonly RigidBinding[], keys: readonly RigidKey[], options?: RigidClipOptions): KeyframeClip;
 
@@ -227,7 +268,7 @@ export function createMaterialAnimation(model: PBRModel, options?: {
     dispose(): void;
 };
 
-export function sampleKeyframes(track: KeyframeTrack, time: number, out?: Float64Array): Float64Array;
+export function sampleKeyframes(track: KeyframeTrack | PropertyKeyframeTrack, time: number, out?: Float64Array): Float64Array;
 
 export function sampleTrack(times: Float32Array, values: Float32Array, width: number, time: number, interpolation: Interpolation, quaternion?: boolean, target?: Float32Array): Float32Array;
 

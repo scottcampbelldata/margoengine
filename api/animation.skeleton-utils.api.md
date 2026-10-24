@@ -68,7 +68,7 @@ interface BonePose {
     scale?: Vec3;
 }
 
-type KeyInterpolation = 'discrete' | 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+type KeyInterpolation = 'discrete' | 'linear' | 'easeIn' | 'easeOut' | 'easeInOut' | 'cubicSpline';
 
 type KeyframeBlend = 'delta' | 'weighted';
 
@@ -76,6 +76,7 @@ interface KeyframeClip {
     readonly name: string;
     readonly duration: number;
     readonly tracks: readonly KeyframeTrack[];
+    readonly properties?: readonly PropertyKeyframeTrack[];
 }
 
 type KeyframePath = 'translation' | 'rotation' | 'scale' | 'weights';
@@ -87,7 +88,25 @@ interface KeyframeTrack {
     readonly values: Float64Array;
     readonly interpolations: readonly KeyInterpolation[];
     readonly blend?: KeyframeBlend;
+    readonly tangents?: Float64Array;
 }
+
+interface PropertyKeyframeTrack {
+    readonly target: object;
+    readonly property?: string;
+    readonly name: string;
+    readonly type: PropertyValueType;
+    readonly size: number;
+    readonly times: Float64Array;
+    readonly values: Float64Array;
+    readonly interpolations: readonly KeyInterpolation[];
+    readonly blend?: KeyframeBlend;
+    readonly tangents?: Float64Array;
+    write(value: ArrayLike<number>): void;
+    read(out?: Float64Array): Float64Array;
+}
+
+type PropertyValueType = 'number' | 'vector' | 'color' | 'quaternion';
 
 class Skeleton {
     readonly names: readonly string[];

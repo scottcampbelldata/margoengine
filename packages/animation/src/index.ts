@@ -29,6 +29,7 @@ export {
   applyKeyframeClip,
   segmentTime,
   bakeKeyframeClip,
+  bakeKeyframeTrack,
   type KeyInterpolation,
   type KeyframeBlend,
   type KeyframePath,
@@ -39,6 +40,10 @@ export {
   type KeyframeTrack,
   type KeyframeClip,
   type BakedChannel,
+  type BakedSampler,
+  type PropertyValueType,
+  type PropertyTrackData,
+  type PropertyKeyframeTrack,
 } from './keyframes.js';
 export {
   compileRigidClip,

@@ -113,6 +113,7 @@ class Animation implements EnginePlugin {
     readonly options: AnimationOptions;
     readonly name: string;
     readonly clips: readonly Clip[];
+    readonly warnings: readonly string[];
     playing: boolean;
     time: number;
     clip: number;
@@ -130,15 +131,26 @@ class Animation implements EnginePlugin {
     destroy(): void;
 }
 
+interface AnimationDefinition {
+    name?: string;
+    channels: unknown[];
+    samplers: unknown[];
+}
+
 interface AnimationOptions {
     loop?: boolean;
     speed?: number;
+    pointers?: PointerChannels;
 }
+
+type AnimationPath = 'translation' | 'rotation' | 'scale' | 'weights';
 
 interface Clip {
     name: string;
     duration: number;
     tracks: Track[];
+    bind?: () => KeyframeClip;
+    bound?: KeyframeClip;
 }
 
 type Context = Extract<PassContext, {
@@ -146,6 +158,62 @@ type Context = Extract<PassContext, {
 }>;
 
 type Interpolation = 'STEP' | 'LINEAR' | 'CUBICSPLINE';
+
+type KeyInterpolation = 'discrete' | 'linear' | 'easeIn' | 'easeOut' | 'easeInOut' | 'cubicSpline';
+
+type KeyframeBlend = 'delta' | 'weighted';
+
+interface KeyframeClip {
+    readonly name: string;
+    readonly duration: number;
+    readonly tracks: readonly KeyframeTrack[];
+    readonly properties?: readonly PropertyKeyframeTrack[];
+}
+
+type KeyframePath = 'translation' | 'rotation' | 'scale' | 'weights';
+
+interface KeyframeTrack {
+    readonly target: string;
+    readonly path: KeyframePath;
+    readonly times: Float64Array;
+    readonly values: Float64Array;
+    readonly interpolations: readonly KeyInterpolation[];
+    readonly blend?: KeyframeBlend;
+    readonly tangents?: Float64Array;
+}
+
+type PointerChannels = (model: PBRModel, def: AnimationDefinition, clip: string) => PointerPlan;
+
+interface PointerNodeChannel {
+    node: number;
+    path: AnimationPath;
+    sampler: unknown;
+}
+
+interface PointerPlan {
+    ordinary: unknown[];
+    nodes: PointerNodeChannel[];
+    bind?: () => KeyframeClip;
+    duration: number;
+    warnings: string[];
+}
+
+interface PropertyKeyframeTrack {
+    readonly target: object;
+    readonly property?: string;
+    readonly name: string;
+    readonly type: PropertyValueType;
+    readonly size: number;
+    readonly times: Float64Array;
+    readonly values: Float64Array;
+    readonly interpolations: readonly KeyInterpolation[];
+    readonly blend?: KeyframeBlend;
+    readonly tangents?: Float64Array;
+    write(value: ArrayLike<number>): void;
+    read(out?: Float64Array): Float64Array;
+}
+
+type PropertyValueType = 'number' | 'vector' | 'color' | 'quaternion';
 
 interface Track {
     node: number;

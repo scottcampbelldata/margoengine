@@ -160,6 +160,43 @@ nodes under the mesh node, `skeleton.inverseBindMatrices`, `bakeKeyframeClip`), 
 buffer of a skinned `createMesh` strip and matches `skin.pose()` positions and normals within 1e-5 after posing, a
 ranged `setInfluences` and a device restore, with no validation errors.
 
+## Property tracks: any number, vector or colour
+
+```ts
+import {applyKeyframeClip, bakeKeyframeTrack, createKeyframeClip, sampleKeyframes} from '@margoengine/animation';
+const lamp = {intensity: 0, material: {roughness: 1, color: new Float32Array([1, 1, 1, 1])}};
+let fov = 60;
+const pulse = createKeyframeClip({name: 'Pulse', tracks: [
+  {target: lamp, property: 'intensity', keys: [{time: 0, value: [0], interpolation: 'easeOut'}, {time: 1, value: [5]}]},
+  {target: lamp, property: 'material.roughness', keys: [{time: 0, value: [1], interpolation: 'discrete'}, {time: 0.5, value: [0.2]}]},
+  {target: lamp, property: 'material.color', type: 'color', keys: [{time: 0, value: [1, 0, 0]}, {time: 1, value: [0, 0, 1]}]},
+  {target: lamp, name: 'fov', get: () => fov, set: (value) => { fov = value[0]; }, keys: [
+    {time: 0, value: [40], interpolation: 'cubicSpline', outTangent: [30]},
+    {time: 1, value: [60], inTangent: [0]},
+  ]},
+]});
+applyKeyframeClip(pulse, 0.5); // writes all four properties
+const color = sampleKeyframes(pulse.properties![2], 0.25); // [0.75, 0, 0.25]
+const baked = bakeKeyframeTrack(pulse.properties![0], 30); // a glTF sampler for one property track
+```
+
+A track whose `target` is an object drives a property of it instead of a bone or node: name it with a dot path
+(`'material.roughness'`, `'intensity'`, `'position'`, `'lights.0.color'`) or pass `set` (and `get`, for
+`track.read()`) accessors. Keys hold 1 to 4 numbers; `type` says what they are: `'number'`, `'vector'`, `'color'`
+(linear RGB or RGBA, blended per channel in linear space) or `'quaternion'` (normalised, slerped along the shortest
+path). They take the same interpolations (`'cubicSpline'` is a glTF CUBICSPLINE segment through the key's
+`outTangent` and the next key's `inTangent`, in units per second) and the same `blend` modes as transform tracks.
+`createKeyframeClip` resolves each path once into a setter, so playback does no lookups and allocates nothing: a
+number property is assigned, a boolean gets `value >= 0.5`, an array or typed array (a materials `Material`'s live
+`color`, a clustered light's `color`) is written in place, a getter that returns a fresh array is assigned through its
+setter, and an `{x, y, z}` object such as a mesh's `position` is set through its `set(x, y, z)`. A path that does not
+resolve throws `RangeError` naming the segment; one that ends on a value it cannot write throws `TypeError`. Engine
+objects work the same way: `{target: mesh, property: 'visible'}`, `{target: material, property: 'roughness'}`,
+`{target: stage.engine.camera, property: 'fov'}`. Replacing an object along a path later leaves the track driving the
+old one: create the clip again. Property tracks land in `clip.properties`; `applyKeyframeClip(clip, time)` writes
+them, and `applyKeyframeClip(clip, skeleton, time)` writes them and poses the skeleton. `bakeKeyframeClip` leaves them
+out (glTF nodes have no such paths); `AnimationGroup` and `retarget` ignore them.
+
 ## Rigid rigs: whole meshes bound to bones
 
 `compileRigidClip(bones, bindings, keys, {name, duration})` turns keys of meshes rigidly bound to bones into stepped
