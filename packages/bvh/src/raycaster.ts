@@ -2,7 +2,8 @@ import type { Camera, Engine, Geometry, Mesh } from '@margoengine/core';
 import type { Engine as Runtime } from '@margoengine/core/extension';
 import { buildAsync, type AsyncBuildOptions } from './async.js';
 import type { BVHBuildOptions } from './build.js';
-import { MeshBVH, type BVHHit, type GeometryLike, type Vec3 } from './bvh.js';
+import type { MutableVec3, Vec3 } from '@margoengine/math';
+import { MeshBVH, type BVHHit, type GeometryLike } from './bvh.js';
 import { invertMatrix, multiplyMatrices } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
 import { transformPoint, type Side } from './math.js';
@@ -227,20 +228,20 @@ export interface RaycasterHit {
   mesh: Mesh;
   /** World-space distance from the ray origin. */
   distance: number;
-  point: Vec3;
+  point: MutableVec3;
   /** Interpolated vertex normal in world space (inverse-transpose of the world matrix), normalized. Not flipped for back faces. */
-  normal: Vec3;
+  normal: MutableVec3;
   /** Geometric normal of the triangle in world space, normalized. */
-  faceNormal: Vec3;
+  faceNormal: MutableVec3;
   faceIndex: number;
-  barycoord: Vec3;
+  barycoord: MutableVec3;
   /**
    * True when the ray hit the front side as the renderer defines it: counter-clockwise in the mesh's local space, so a
    * mirrored (negative determinant) world matrix keeps the same front side. `faceNormal` always points to the front side.
    */
   frontFace: boolean;
   /** Hit point in the mesh's local space. */
-  localPoint: Vec3;
+  localPoint: MutableVec3;
   /**
    * Model hits only: the model, the primitive and its index in `model.primitives`, the glTF node index and TEXCOORD_0 at
    * the hit. `intersectModel` hits carry `uv` from the posed snapshot, and `primitiveIndex` and `nodeIndex` when the
@@ -765,7 +766,11 @@ export function proxyHit(
   const near = (-b - Math.sqrt(disc)) / a,
     t = near >= ray.near ? near : (-b + Math.sqrt(disc)) / a;
   if (t < ray.near || t > far) return null;
-  const localPoint: Vec3 = [local[0] + t * direction[0], local[1] + t * direction[1], local[2] + t * direction[2]];
+  const localPoint: MutableVec3 = [
+    local[0] + t * direction[0],
+    local[1] + t * direction[1],
+    local[2] + t * direction[2],
+  ];
   const normal = normalTransform(inverse, [
       localPoint[0] - sphere[0],
       localPoint[1] - sphere[1],
@@ -778,7 +783,7 @@ export function proxyHit(
     distance: t,
     point: [o[0] + t * d[0], o[1] + t * d[1], o[2] + t * d[2]],
     normal,
-    faceNormal: normal.slice() as Vec3,
+    faceNormal: normal.slice() as MutableVec3,
     faceIndex: -1,
     barycoord: [0, 0, 0],
     frontFace: t === near,
@@ -796,7 +801,7 @@ export function worldHit(
   inverse: Float64Array,
   length: number,
 ): RaycasterHit {
-  const point: Vec3 = [0, 0, 0];
+  const point: MutableVec3 = [0, 0, 0];
   transformPoint(matrix, hit.point[0], hit.point[1], hit.point[2], point);
   return {
     mesh,
@@ -873,7 +878,7 @@ export function hiddenInHierarchy(store: RuntimeStore, id: number): boolean {
   return false;
 }
 
-function unproject(inverse: Float64Array, x: number, y: number, z: number): Vec3 {
+function unproject(inverse: Float64Array, x: number, y: number, z: number): MutableVec3 {
   const w = inverse[3] * x + inverse[7] * y + inverse[11] * z + inverse[15];
   return [
     (inverse[0] * x + inverse[4] * y + inverse[8] * z + inverse[12]) / w,
@@ -883,7 +888,7 @@ function unproject(inverse: Float64Array, x: number, y: number, z: number): Vec3
 }
 
 /** Inverse-transpose of the upper 3x3 applied to a normal, normalized. */
-function normalTransform(inverse: Float64Array, n: Vec3): Vec3 {
+function normalTransform(inverse: Float64Array, n: Vec3): MutableVec3 {
   const x = inverse[0] * n[0] + inverse[1] * n[1] + inverse[2] * n[2],
     y = inverse[4] * n[0] + inverse[5] * n[1] + inverse[6] * n[2],
     z = inverse[8] * n[0] + inverse[9] * n[1] + inverse[10] * n[2];

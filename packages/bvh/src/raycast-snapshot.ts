@@ -2,7 +2,7 @@
 import type { Engine, Mesh } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
 import type { BVHBuildOptions } from './build.js';
-import type { Vec3 } from './bvh.js';
+import type { MutableVec3 } from '@margoengine/math';
 import { transformPoint } from './math.js';
 import {
   Raycaster,
@@ -35,14 +35,14 @@ export interface RaycastDepthHit {
   /** World distance from the ray origin. */
   distance: number;
   /** World hit point. */
-  point: Vec3;
+  point: MutableVec3;
   /** TEXCOORD_0 at the hit, for model primitives only. */
   uv?: [number, number];
 }
 /** Raycaster settings copied at query start, so filters that change the Raycaster cannot affect a running query. */
 interface QueryState {
-  origin: Vec3;
-  direction: Vec3;
+  origin: MutableVec3;
+  direction: MutableVec3;
   near: number;
   far: number;
   side: Raycaster['side'];
@@ -240,7 +240,7 @@ export class RaycastSnapshot {
         }
         let result: RaycasterHit | RaycastDepthHit;
         if (depthOnly) {
-          const point: Vec3 = [0, 0, 0];
+          const point: MutableVec3 = [0, 0, 0];
           transformPoint(e.matrix, hit.point[0], hit.point[1], hit.point[2], point);
           result = { distance, point };
         } else {
@@ -268,8 +268,8 @@ function queryState(ray: Raycaster): QueryState {
     throw new TypeError('Snapshot intersection needs a Raycaster; create one and set its ray.');
   const o = ray.origin,
     d = ray.direction,
-    origin: Vec3 = [o[0], o[1], o[2]],
-    direction: Vec3 = [d[0], d[1], d[2]];
+    origin: MutableVec3 = [o[0], o[1], o[2]],
+    direction: MutableVec3 = [d[0], d[1], d[2]];
   if (
     !origin.every(Number.isFinite) ||
     !direction.every(Number.isFinite) ||

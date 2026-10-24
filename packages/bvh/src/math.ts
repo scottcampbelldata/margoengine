@@ -413,12 +413,15 @@ export function transformPoint(
   out[offset + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
 }
 
-/** Column-major 4x4 inverse in float64 (`@margoengine/math/mat4` invertMatrix). Returns null for a singular matrix. */
+/**
+ * Public `invertMatrix` of this package: math's `invertMatrix` with `out` defaulting to a new Float64Array (math's
+ * requires it). Returns null for a singular matrix.
+ */
 export function invert(m: ArrayLike<number>, out: Float64Array = new Float64Array(16)): Float64Array | null {
   return invertMatrix(m, out);
 }
 
-/** Column-major a * b (`@margoengine/math/mat4` multiplyMatrices, into a new Float64Array by default). */
+/** Public `multiplyMatrices` of this package: math's `multiplyMatrices` with `out` defaulting to a new Float64Array. */
 export function multiply(
   a: ArrayLike<number>,
   b: ArrayLike<number>,

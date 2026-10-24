@@ -3,7 +3,7 @@ import type { Camera, Engine } from '@margoengine/core';
 import { MargoError, Vector3 } from '@margoengine/math';
 import { invertMatrix } from '@margoengine/math/mat4';
 import { add, cross, dot, normalize, scale, sub } from '@margoengine/math/vec3';
-import type { Vec3 } from './bvh.js';
+import type { MutableVec3 } from '@margoengine/math';
 import { Raycaster, cameraRay, isOrthographic } from './raycaster.js';
 import {
   createScreenRectangle,
@@ -31,9 +31,9 @@ export interface RaycastProjectionOptions {
 /** Owned near-clipped world endpoints and their corresponding captured CSS projections. */
 export interface RaycastProjectedSegment {
   /** First world endpoint, moved onto the near plane when it was behind it. */
-  a: Vec3;
+  a: MutableVec3;
   /** Second world endpoint, moved onto the near plane when it was behind it. */
-  b: Vec3;
+  b: MutableVec3;
   /** Projection of `a`. */
   start: RaycastProjectedPoint;
   /** Projection of `b`. */
@@ -77,7 +77,7 @@ export class RaycastProjection {
   private runtime: ProjectionRuntime | null;
   private data: CameraState | null;
   private height: number | undefined;
-  private axes: { forward: Vec3; right: Vec3; up: Vec3 } | null = null;
+  private axes: { forward: MutableVec3; right: MutableVec3; up: MutableVec3 } | null = null;
   // Reused for every projection: Vector3.applyMatrix4 is math's perspective-divide transform.
   private readonly scratch = new Vector3();
   private readonly clip: { elements: Float64Array };
@@ -125,7 +125,7 @@ export class RaycastProjection {
     return this.data;
   }
 
-  private basisValues(): { forward: Vec3; right: Vec3; up: Vec3 } {
+  private basisValues(): { forward: MutableVec3; right: MutableVec3; up: MutableVec3 } {
     const c = this.open();
     if (!this.axes) {
       if (![...c.target, ...c.up].every(Number.isFinite))
@@ -140,7 +140,7 @@ export class RaycastProjection {
   }
 
   /** Owned captured forward/right/up basis, using the same operand order as Margo vector helpers. */
-  basis(): { forward: Vec3; right: Vec3; up: Vec3 } {
+  basis(): { forward: MutableVec3; right: MutableVec3; up: MutableVec3 } {
     const b = this.basisValues();
     return { forward: [...b.forward], right: [...b.right], up: [...b.up] };
   }
@@ -157,7 +157,7 @@ export class RaycastProjection {
     return this.depthValues(readPoint(point));
   }
 
-  private depthValues(p: Vec3): number {
+  private depthValues(p: MutableVec3): number {
     const depth = dot(sub(p, this.open().position), this.basisValues().forward);
     if (!Number.isFinite(depth))
       throw new RangeError('Projection depth overflowed; reduce coordinates or repair the camera.');
@@ -171,7 +171,7 @@ export class RaycastProjection {
     return this.projectValues(p);
   }
 
-  private projectValues(p: Vec3): RaycastProjectedPoint | null {
+  private projectValues(p: MutableVec3): RaycastProjectedPoint | null {
     const c = this.open();
     if (!Number.isFinite(c.near) || c.near < 0)
       throw new RangeError('Projection near plane must be finite and nonnegative; repair the camera and recapture.');
@@ -345,10 +345,10 @@ export class RaycastProjection {
 }
 
 /** @internal Finite point capture, also used before atomic visibility batches. */
-export function readPoint(point: ArrayLike<number>): Vec3 {
+export function readPoint(point: ArrayLike<number>): MutableVec3 {
   if (!point || (typeof point !== 'object' && typeof point !== 'function') || point.length !== 3)
     throw new TypeError('Projection points need an XYZ array-like object; supply three finite coordinates.');
-  const p: Vec3 = [point[0], point[1], point[2]];
+  const p: MutableVec3 = [point[0], point[1], point[2]];
   if (!p.every(Number.isFinite)) throw new RangeError('Projection coordinates must be finite; repair the world point.');
   return p;
 }

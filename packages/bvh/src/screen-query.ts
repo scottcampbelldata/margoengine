@@ -1,10 +1,10 @@
-import type { Vec3 } from './bvh.js';
+import type { MutableVec3 } from '@margoengine/math';
 import { readPoint, type RaycastProjectedPoint, type RaycastProjection } from './projection.js';
 
 /** Owned world point, captured CSS point/depth and distance in CSS pixels from the queried canvas coordinate. */
 export interface RaycastSegmentPoint {
   /** World point. */
-  point: Vec3;
+  point: MutableVec3;
   /** Its CSS canvas point and camera depth. */
   screen: RaycastProjectedPoint;
   /** CSS-pixel distance from `screen` to the queried canvas coordinate. */

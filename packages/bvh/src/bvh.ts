@@ -8,6 +8,7 @@ import {
   type BVHBuildOptions,
   type BVHData,
 } from './build.js';
+import type { MutableVec3 } from '@margoengine/math';
 import { invertMatrix } from '@margoengine/math/mat4';
 import {
   closestPointTriangle,
@@ -20,8 +21,6 @@ import {
   type Side,
 } from './math.js';
 
-/** Mutable [x, y, z] owned by the caller (hit points, normals, barycentric weights). */
-export type Vec3 = [number, number, number];
 /** Anything with interleaved stride-6 `vertices` (position xyz, normal xyz) and `indices`, such as the core `Geometry`. */
 export interface GeometryLike {
   readonly vertices: Float32Array;
@@ -43,7 +42,12 @@ export interface TriangleSource {
 }
 /** Vertex positions of a MeshBVH: float32 unless its source asked for `precision: 'float64'`. */
 export type BVHPositions = Float32Array | Float64Array;
-/** A ray: `origin + t * direction`. The direction need not be normalized; distances are t * |direction|. */
+/**
+ * Array-shaped ray input for MeshBVH queries: `origin + t * direction`, read as `[x, y, z]` array-likes (a
+ * Raycaster's Float64Arrays, plain arrays). The direction need not be normalized; distances are t * |direction|.
+ * This is the plain data a query reads, not a second ray type: math's `Ray` class (Vector3 fields, unit direction)
+ * converts with `{ origin: ray.origin.toArray(), direction: ray.direction.toArray() }`.
+ */
 export interface Ray {
   origin: ArrayLike<number>;
   direction: ArrayLike<number>;
@@ -61,17 +65,17 @@ export interface RaycastOptions {
 export interface BVHHit {
   /** t * |direction| from the ray origin. */
   distance: number;
-  point: Vec3;
+  point: MutableVec3;
   /** Triangle index in the source index buffer (or vertex order / 3 without indices). */
   faceIndex: number;
   /** Vertex indices of the triangle. */
-  face: Vec3;
+  face: MutableVec3;
   /** Barycentric weights of the three vertices. */
-  barycoord: Vec3;
+  barycoord: MutableVec3;
   /** Interpolated vertex normal, normalized, or the face normal when the source has no normals. Not flipped for back faces. */
-  normal: Vec3;
+  normal: MutableVec3;
   /** Geometric normal from the counter-clockwise winding, normalized. */
-  faceNormal: Vec3;
+  faceNormal: MutableVec3;
   frontFace: boolean;
 }
 /** Search range for MeshBVH.closestPointToPoint. */
@@ -83,10 +87,10 @@ export interface ClosestPointOptions {
 }
 /** Closest point on the mesh, its distance, triangle and barycentric weights. */
 export interface ClosestPointResult {
-  point: Vec3;
+  point: MutableVec3;
   distance: number;
   faceIndex: number;
-  barycoord: Vec3;
+  barycoord: MutableVec3;
 }
 /** Axis-aligned box given by `min` and `max` corners. */
 export interface Box3Like {
@@ -313,7 +317,7 @@ export class MeshBVH {
   }
 
   /** Root bounds as {min, max}. */
-  getBoundingBox(): { min: Vec3; max: Vec3 } {
+  getBoundingBox(): { min: MutableVec3; max: MutableVec3 } {
     const f = this.nodeBounds;
     return { min: [f[0], f[1], f[2]], max: [f[3], f[4], f[5]] };
   }
@@ -607,7 +611,7 @@ export class MeshBVH {
     };
   }
 
-  private faceNormal(ia: number, ib: number, ic: number): Vec3 {
+  private faceNormal(ia: number, ib: number, ic: number): MutableVec3 {
     const P = this.positions,
       s = this.stride,
       a = ia * s,
@@ -629,8 +633,8 @@ export class MeshBVH {
     wa: number,
     wb: number,
     wc: number,
-    fallback: Vec3,
-  ): Vec3 {
+    fallback: MutableVec3,
+  ): MutableVec3 {
     const N = this.normals;
     if (!N) return [fallback[0], fallback[1], fallback[2]];
     const s = this.normalStride,
@@ -1233,7 +1237,7 @@ function parallelOutside(origin: number, min: number, max: number): boolean {
   return origin < min - slack || origin > max + slack;
 }
 
-function normalize(x: number, y: number, z: number): Vec3 {
+function normalize(x: number, y: number, z: number): MutableVec3 {
   const l = Math.hypot(x, y, z);
   return l > 0 ? [x / l, y / l, z / l] : [0, 0, 0];
 }

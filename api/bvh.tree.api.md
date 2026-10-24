@@ -18,12 +18,12 @@ export interface BVHData {
 
 export interface BVHHit {
     distance: number;
-    point: Vec3;
+    point: MutableVec3;
     faceIndex: number;
-    face: Vec3;
-    barycoord: Vec3;
-    normal: Vec3;
-    faceNormal: Vec3;
+    face: MutableVec3;
+    barycoord: MutableVec3;
+    normal: MutableVec3;
+    faceNormal: MutableVec3;
     frontFace: boolean;
 }
 
@@ -42,10 +42,10 @@ export interface ClosestPointOptions {
 }
 
 export interface ClosestPointResult {
-    point: Vec3;
+    point: MutableVec3;
     distance: number;
     faceIndex: number;
-    barycoord: Vec3;
+    barycoord: MutableVec3;
 }
 
 export interface GeometryLike {
@@ -72,8 +72,8 @@ export class MeshBVH {
     get nodeCount(): number;
     get triangleCount(): number;
     getBoundingBox(): {
-        min: Vec3;
-        max: Vec3;
+        min: MutableVec3;
+        max: MutableVec3;
     };
     isLeaf(node: number): boolean;
     leafTriangles(node: number): Uint32Array;
@@ -93,6 +93,8 @@ export class MeshBVH {
         mode?: 'triangles' | 'leaves';
     }): Uint32Array;
 }
+
+export { MutableVec3 } from "@margoengine/math";
 
 export const NOT_INTERSECTED = 0;
 
@@ -142,7 +144,7 @@ export interface TriangleSource {
     precision?: 'float32' | 'float64';
 }
 
-export type Vec3 = [number, number, number];
+export { Vec3 } from "@margoengine/core";
 
 export function buildBVH(positions: ArrayLike<number>, stride: number, indices: ArrayLike<number> | null, options?: BVHBuildOptions): BVHData;
 ```
