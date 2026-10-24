@@ -160,6 +160,23 @@ nodes under the mesh node, `skeleton.inverseBindMatrices`, `bakeKeyframeClip`), 
 buffer of a skinned `createMesh` strip and matches `skin.pose()` positions and normals within 1e-5 after posing, a
 ranged `setInfluences` and a device restore, with no validation errors.
 
+## Rigid rigs: whole meshes bound to bones
+
+`compileRigidClip(bones, bindings, keys, {name, duration})` turns keys of meshes rigidly bound to bones into stepped
+bone translation and rotation tracks. A key moves its bone by the mesh's offset from its rest pose and rotates it by
+the key rotation times the inverse rest rotation; each bone follows the first bound mesh (in binding order) keyed so
+far, and holds the last pose until `duration`. Times are seconds; rotations are `[x, y, z, w]`.
+
+```ts
+const clip = compileRigidClip(
+  [{id: 'arm', translation: [0.5, 1.5, 0]}],
+  [{object: 'sword', bone: 'arm', position: [1, 1, 0], rotation: [0, 0, 0, 1]}],
+  [{object: 'sword', time: 0.5, position: [1, 2, 0], rotation: [0, 0, 0, 1]}],
+  {duration: 2},
+);
+applyKeyframeClip(clip, skeleton, t);
+```
+
 ## Property tracks: any number, vector or colour
 
 ```ts
@@ -242,23 +259,6 @@ transmission factors, unknown extensions), `extras`, `texCoord`, textures of ext
 leaves undefined (a camera without `zfar`, a light without `range`), factors gltf-pro did not load (physical factors
 without the materials decoder, transmission on a material loaded without it) and targets no scene node or primitive
 uses.
-
-## Rigid rigs: whole meshes bound to bones
-
-`compileRigidClip(bones, bindings, keys, {name, duration})` turns keys of meshes rigidly bound to bones into stepped
-bone translation and rotation tracks. A key moves its bone by the mesh's offset from its rest pose and rotates it by
-the key rotation times the inverse rest rotation; each bone follows the first bound mesh (in binding order) keyed so
-far, and holds the last pose until `duration`. Times are seconds; rotations are `[x, y, z, w]`.
-
-```ts
-const clip = compileRigidClip(
-  [{id: 'arm', translation: [0.5, 1.5, 0]}],
-  [{object: 'sword', bone: 'arm', position: [1, 1, 0], rotation: [0, 0, 0, 1]}],
-  [{object: 'sword', time: 0.5, position: [1, 2, 0], rotation: [0, 0, 0, 1]}],
-  {duration: 2},
-);
-applyKeyframeClip(clip, skeleton, t);
-```
 
 ## Groups: one clip for many models
 
