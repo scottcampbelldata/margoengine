@@ -1,7 +1,7 @@
 {
-  "commit": "6a33be2a",
+  "commit": "6ce380cf",
   "dirty": false,
-  "browser": "msedge 155.0.4283.62 headless",
+  "browser": "msedge 156.0.4314.42 headless",
   "adapter": "nvidia ampere",
   "method": "Vite production build of tests/fixtures/basic-scene (base ./, es2022), served by vite preview (its own on-the-fly gzip); transferred = Playwright requestfinished sizes (encoded body + response headers); raw, gzip and brotli of the same built files at zlib defaults",
   "files": [
@@ -11,8 +11,17 @@
       "encoding": "identity",
       "transferred": 808,
       "raw": 558,
-      "gzip": 372,
-      "brotli": 229
+      "gzip": 369,
+      "brotli": 227
+    },
+    {
+      "path": "assets/index-CwacNH2x.js",
+      "role": "Entry: core + stage + app",
+      "encoding": "gzip",
+      "transferred": 23182,
+      "raw": 57068,
+      "gzip": 22801,
+      "brotli": 20108
     },
     {
       "path": "assets/geometry-CAWt7Gfm.js",
@@ -24,15 +33,6 @@
       "brotli": 938
     },
     {
-      "path": "assets/index-CILSKmOO.js",
-      "role": "Entry: core + stage + app",
-      "encoding": "gzip",
-      "transferred": 23184,
-      "raw": 57068,
-      "gzip": 22803,
-      "brotli": 20103
-    },
-    {
       "path": "assets/extension-DuYhGmhk.js",
       "role": "Shared chunk",
       "encoding": "identity",
@@ -42,13 +42,13 @@
       "brotli": 44
     },
     {
-      "path": "assets/dist-B8lBmgIP.js",
+      "path": "assets/dist-DOp2DXty.js",
       "role": "@margoengine/gltf (app.load)",
       "encoding": "gzip",
-      "transferred": 5666,
-      "raw": 12807,
-      "gzip": 5294,
-      "brotli": 4758
+      "transferred": 5675,
+      "raw": 12827,
+      "gzip": 5303,
+      "brotli": 4773
     },
     {
       "path": "model.glb",
@@ -62,22 +62,22 @@
   ],
   "total": {
     "requests": 6,
-    "transferred": 33008,
-    "raw": 73841,
-    "gzip": 29993,
-    "brotli": 26431
+    "transferred": 33015,
+    "raw": 73861,
+    "gzip": 29997,
+    "brotli": 26449
   },
   "notFetched": [
     {
-      "path": "assets/brep-runtime-D1ZpsHpo.js",
-      "raw": 127278
+      "path": "assets/brep-runtime-BMgHlbZ9.js",
+      "raw": 127429
     },
     {
-      "path": "assets/cad-CPCGJ4JS-Ced23Ldk.js",
-      "raw": 38938
+      "path": "assets/cad-C7RC7GGg-CX173zNF.js",
+      "raw": 38931
     },
     {
-      "path": "assets/cad-DyKvpEto.js",
+      "path": "assets/cad-qwvA_Qjn.js",
       "raw": 108
     },
     {
@@ -85,24 +85,24 @@
       "raw": 17496
     },
     {
-      "path": "assets/dist-BG7T_LVU.js",
+      "path": "assets/dist-7GDmpwI7.js",
+      "raw": 87813
+    },
+    {
+      "path": "assets/dist-BkanMCkI.js",
       "raw": 44
     },
     {
-      "path": "assets/dist-Ca4T3_OL.js",
-      "raw": 87753
-    },
-    {
-      "path": "assets/dist-CiCyMGqu.js",
-      "raw": 40708
-    },
-    {
-      "path": "assets/dist-mLIETkp1.js",
+      "path": "assets/dist-Ce0zCk-4.js",
       "raw": 61049
     },
     {
-      "path": "assets/dist-sRFpkISG.js",
-      "raw": 33079
+      "path": "assets/dist-recUg52g.js",
+      "raw": 41254
+    },
+    {
+      "path": "assets/dist-rSleZwAr.js",
+      "raw": 35614
     },
     {
       "path": "assets/occt-import-js-BhHfLpto.wasm",
@@ -121,20 +121,20 @@
       "raw": 28502
     },
     {
-      "path": "assets/post-DAosVK7x.js",
+      "path": "assets/post-BE_ETdJ4.js",
+      "raw": 18721
+    },
+    {
+      "path": "assets/post-Bi5xSX8B.js",
       "raw": 52
     },
     {
-      "path": "assets/post-DUlS7stt.js",
-      "raw": 18384
+      "path": "assets/sky-BeRDyXxh.js",
+      "raw": 20727
     },
     {
-      "path": "assets/sky-BG7T_LVU.js",
+      "path": "assets/sky-BkanMCkI.js",
       "raw": 44
-    },
-    {
-      "path": "assets/sky-BR_I_aVj.js",
-      "raw": 20291
     },
     {
       "path": "assets/validate-DE7v94fO.js",
