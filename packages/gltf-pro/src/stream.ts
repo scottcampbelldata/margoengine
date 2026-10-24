@@ -1,4 +1,5 @@
 import type { GLTFPrimitive } from '../../shared/gltf.js';
+import { GLB_BIN, GLB_JSON, GLB_MAGIC } from '../../shared/glb.js';
 // Network and decode half of @margoengine/gltf-pro/progressive. Runs in dist/workers/progressive.js, or on the main
 // thread where Worker is unavailable. HTTP range requests fetch each primitive's accessor bytes in the priority order
 // the main thread sends; a server without range support streams the whole file and primitives decode as their bytes
@@ -235,7 +236,7 @@ export class GLTFStream {
     const first = new Uint8Array(length);
     parts.reduce((at, p) => (first.set(p, at), at + p.length), 0);
     const view = new DataView(first.buffer);
-    if (length < 12 || view.getUint32(0, true) !== 0x46546c67) {
+    if (length < 12 || view.getUint32(0, true) !== GLB_MAGIC) {
       // .gltf: JSON plus external or embedded buffers; the whole JSON is needed (the rest of a ranged reply follows).
       for (let r; !(r = await reader.read()).done; ) {
         parts.push(r.value);
@@ -300,7 +301,7 @@ export class GLTFStream {
     const json = () => new DataView(s.data!.buffer).getUint32(12, true),
       need = () => Math.min(total, 28 + json());
     while (!covered(s.got, 0, 20)) await this.next();
-    if (json() % 4 || 20 + json() > total || new DataView(s.data!.buffer).getUint32(16, true) !== 0x4e4f534a)
+    if (json() % 4 || 20 + json() > total || new DataView(s.data!.buffer).getUint32(16, true) !== GLB_JSON)
       throw new TypeError('Invalid GLB chunk');
     if (s.ranged) for (const [a, b] of gaps(s.got, 0, need())) this.request(0, a, b);
     while (!covered(s.got, 0, need())) await this.next();
@@ -316,7 +317,7 @@ export class GLTFStream {
       const d = glb.data!,
         v = new DataView(d.buffer),
         at = 20 + v.getUint32(12, true);
-      if (at + 8 <= d.length && covered(glb.got, at, at + 8) && v.getUint32(at + 4, true) === 0x004e4942) {
+      if (at + 8 <= d.length && covered(glb.got, at, at + 8) && v.getUint32(at + 4, true) === GLB_BIN) {
         binStart = at + 8;
         binLength = Math.min(v.getUint32(at, true), d.length - binStart);
       }

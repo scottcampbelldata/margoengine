@@ -3,6 +3,7 @@
 import { parseJSON } from '../../shared/json.js';
 import { copyExtras } from './extras.js';
 import type { Extras } from './scene.js';
+import { GLB_BIN, GLB_JSON, GLB_MAGIC, glbChunks } from '../../shared/glb.js';
 
 const isObject = <T>(value: T): value is T & Record<string, unknown> => typeof value === 'object' && value !== null;
 
@@ -52,9 +53,6 @@ export interface AppendedMesh {
   meshExtras?: Extras;
 }
 
-const MAGIC = 0x46546c67,
-  JSON_CHUNK = 0x4e4f534a,
-  BIN_CHUNK = 0x004e4942;
 const align = (n: number): number => (n + 3) & ~3;
 
 /**
@@ -67,16 +65,16 @@ export function glbFrame(text: Uint8Array, jsonLength: number, binLength: number
     out = new Uint8Array(total),
     view = new DataView(out.buffer),
     at = 20 + jsonLength;
-  view.setUint32(0, MAGIC, true);
+  view.setUint32(0, GLB_MAGIC, true);
   view.setUint32(4, 2, true);
   view.setUint32(8, total, true);
   view.setUint32(12, jsonLength, true);
-  view.setUint32(16, JSON_CHUNK, true);
+  view.setUint32(16, GLB_JSON, true);
   out.set(text, 20);
   out.fill(0x20, 20 + text.length, at);
   if (binLength) {
     view.setUint32(at, binLength, true);
-    view.setUint32(at + 4, BIN_CHUNK, true);
+    view.setUint32(at + 4, GLB_BIN, true);
   }
   return { out, bin: at + 8 };
 }
@@ -88,23 +86,8 @@ export function glbFrame(text: Uint8Array, jsonLength: number, binLength: number
  */
 export function splitGLB(bytes: Uint8Array, options: SplitGLBOptions = {}): GLBParts {
   const { copy = true, parse = parseJSON } = options;
-  if (!(bytes instanceof Uint8Array) || bytes.length < 20) throw new TypeError('GLB needs at least a 20-byte header');
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  if (view.getUint32(0, true) !== MAGIC || view.getUint32(4, true) !== 2 || view.getUint32(8, true) !== bytes.length)
-    throw new TypeError('GLB magic, version 2 or total length is wrong; pass a whole binary glTF 2.0 file');
-  const chunks: GLBChunk[] = [];
-  for (let at = 12; at < bytes.length; ) {
-    if (at + 8 > bytes.length) throw new TypeError('GLB ends inside a chunk header');
-    const length = view.getUint32(at, true),
-      type = view.getUint32(at + 4, true),
-      end = at + 8 + length;
-    if (length % 4 || end > bytes.length) throw new TypeError('GLB chunk is misaligned or runs past the file');
-    if ((chunks.length === 0) !== (type === JSON_CHUNK) || (type === BIN_CHUNK && chunks.length !== 1))
-      throw new TypeError('GLB chunks must be JSON first, then at most one BIN second');
-    chunks.push({ type, data: bytes.subarray(at + 8, end) });
-    at = end;
-  }
-  if (!chunks.length) throw new TypeError('GLB has no JSON chunk');
+  if (!(bytes instanceof Uint8Array)) throw new TypeError('splitGLB needs the GLB file as a Uint8Array');
+  const chunks: GLBChunk[] = glbChunks(bytes);
   let json: unknown;
   try {
     // Untrusted file: the default parser drops __proto__/constructor/prototype keys so they cannot reach a caller's merge.
@@ -114,7 +97,7 @@ export function splitGLB(bytes: Uint8Array, options: SplitGLBOptions = {}): GLBP
   }
   if (!isObject(json) || Array.isArray(json) || !isObject(json.asset) || json.asset.version !== '2.0')
     throw new TypeError('GLB JSON is not a glTF 2.0 document');
-  const bin = chunks[1]?.type === BIN_CHUNK ? chunks[1].data : null,
+  const bin = chunks[1]?.type === GLB_BIN ? chunks[1].data : null,
     buffers = json.buffers;
   if (buffers !== undefined && (!Array.isArray(buffers) || !buffers.every(isObject)))
     throw new TypeError('glTF buffers must be an array of objects');
@@ -143,13 +126,13 @@ export function joinGLB({ json, bin, chunks = [] }: GLBParts): Uint8Array {
     throw new TypeError('GLB bin must be a Uint8Array or null');
   const text = new TextEncoder().encode(JSON.stringify(json)),
     parts: { type: number; data: Uint8Array; length: number; fill: number }[] = [
-      { type: JSON_CHUNK, data: text, length: align(text.length), fill: 0x20 },
+      { type: GLB_JSON, data: text, length: align(text.length), fill: 0x20 },
     ];
-  if (bin) parts.push({ type: BIN_CHUNK, data: bin, length: align(bin.length), fill: 0 });
+  if (bin) parts.push({ type: GLB_BIN, data: bin, length: align(bin.length), fill: 0 });
   for (const chunk of chunks) {
     if (!isObject(chunk) || !(chunk.data instanceof Uint8Array) || !Number.isInteger(chunk.type))
       throw new TypeError('GLB chunks need a type and data');
-    if (chunk.data.length % 4 || chunk.type === JSON_CHUNK || chunk.type === BIN_CHUNK)
+    if (chunk.data.length % 4 || chunk.type === GLB_JSON || chunk.type === GLB_BIN)
       throw new TypeError('Extra GLB chunks must be 4-byte aligned and neither JSON nor BIN');
     parts.push({ type: chunk.type, data: chunk.data, length: chunk.data.length, fill: 0 });
   }
@@ -157,7 +140,7 @@ export function joinGLB({ json, bin, chunks = [] }: GLBParts): Uint8Array {
   if (total > 0xffffffff) throw new RangeError('GLB exceeds its 4 GiB length limit; split the scene');
   const out = new Uint8Array(total),
     view = new DataView(out.buffer);
-  view.setUint32(0, MAGIC, true);
+  view.setUint32(0, GLB_MAGIC, true);
   view.setUint32(4, 2, true);
   view.setUint32(8, total, true);
   let at = 12;
@@ -250,7 +233,9 @@ export function readAccessor(parts: GLBParts, index: number): AccessorValues {
       length = bufferView.byteLength,
       stride = bufferView.byteStride ?? 0;
     if (![offset, length, stride].every((n) => Number.isSafeInteger(n) && (n as number) >= 0))
-      throw new TypeError(`${label} ${what} buffer view has a bad byteOffset, byteLength or byteStride; repair the GLB`);
+      throw new TypeError(
+        `${label} ${what} buffer view has a bad byteOffset, byteLength or byteStride; repair the GLB`,
+      );
     if ((offset as number) + (length as number) > parts.bin.length)
       throw new RangeError(`${label} ${what} buffer view runs past the BIN chunk; repair the GLB`);
     return {
@@ -269,7 +254,8 @@ export function readAccessor(parts: GLBParts, index: number): AccessorValues {
     }
   };
   const start = accessor.byteOffset ?? 0;
-  if (!Number.isSafeInteger(start) || (start as number) < 0) throw new TypeError(`${label} has a bad byteOffset; repair the GLB`);
+  if (!Number.isSafeInteger(start) || (start as number) < 0)
+    throw new TypeError(`${label} has a bad byteOffset; repair the GLB`);
   if (accessor.bufferView !== undefined) {
     const { data, stride } = view(accessor.bufferView, 'data');
     copy(data, start as number, stride || element, 0, count, type);
@@ -294,7 +280,8 @@ export function readAccessor(parts: GLBParts, index: number): AccessorValues {
       throw new RangeError(`${label} sparse indices run past their buffer view; repair the GLB`);
     for (let k = 0; k < total; k++) {
       const target = readComponent(indices.data, indexStart + k * indexSize, indexType);
-      if (target >= count) throw new RangeError(`${label} sparse index ${target} is past count ${count}; repair the GLB`);
+      if (target >= count)
+        throw new RangeError(`${label} sparse index ${target} is past count ${count}; repair the GLB`);
       // One element at a time from the packed values view into slot `target`.
       copy(substitutes.data, valueStart + k * element, element, target, target + 1, type);
     }

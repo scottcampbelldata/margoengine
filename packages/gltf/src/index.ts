@@ -6,6 +6,7 @@ import { readResponse } from '../../shared/loading.js';
 import { checkCount, countLimit } from '../../shared/limits.js';
 import { parseJSON } from '../../shared/json.js';
 import { assetURL } from '../../shared/asset-url.js';
+import { GLB_BIN, glbChunks, isGLB } from '../../shared/glb.js';
 
 const limit = 64 * 1024 * 1024;
 import type { GLTFDocument as Document, GLTFNode } from '../../shared/gltf.js';
@@ -47,38 +48,10 @@ function container(input: string | object | ArrayBuffer | ArrayBufferView): { do
     return { doc: json(input) };
   }
   if (!(input instanceof ArrayBuffer) && !ArrayBuffer.isView(input)) return { doc: input as Document };
-  const data = bytes(input),
-    view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-  if (
-    data.length < 20 ||
-    data.length > limit ||
-    view.getUint32(0, true) !== 0x46546c67 ||
-    view.getUint32(4, true) !== 2 ||
-    view.getUint32(8, true) !== data.length
-  )
-    throw new TypeError('Invalid GLB header');
-  let doc: Document | undefined,
-    binary: Uint8Array | undefined,
-    offset = 12;
-  while (offset < data.length) {
-    if (offset + 8 > data.length) throw new RangeError('Truncated GLB chunk');
-    const length = view.getUint32(offset, true),
-      type = view.getUint32(offset + 4, true);
-    offset += 8;
-    if (length % 4 || offset + length > data.length) throw new RangeError('Invalid GLB chunk size');
-    const chunk = data.subarray(offset, offset + length);
-    if (offset === 20 && type !== 0x4e4f534a) throw new TypeError('GLB JSON must be first');
-    if (type === 0x4e4f534a) {
-      if (doc) throw new TypeError('Duplicate GLB JSON');
-      doc = json(text(chunk));
-    } else if (type === 0x004e4942) {
-      if (binary) throw new TypeError('Duplicate GLB binary');
-      binary = chunk;
-    }
-    offset += length;
-  }
-  if (!doc) throw new TypeError('Missing GLB JSON');
-  return { doc, binary };
+  const data = bytes(input);
+  if (data.length > limit) throw new RangeError('GLB exceeds 64 MiB');
+  const chunks = glbChunks(data);
+  return { doc: json(text(chunks[0].data)), binary: chunks[1]?.type === GLB_BIN ? chunks[1].data : undefined };
 }
 function embedded(uri: string): Uint8Array {
   const match = /^data:application\/(?:octet-stream|gltf-buffer);base64,([A-Za-z0-9+/]*={0,2})$/.exec(uri);
@@ -407,8 +380,7 @@ export async function loadGLTF(
     return data;
   }
   const data = await fetchBytes(base, true),
-    glb =
-      data.length >= 4 && new DataView(data.buffer, data.byteOffset, data.byteLength).getUint32(0, true) === 0x46546c67,
+    glb = isGLB(data),
     { doc, binary } = container(glb ? data : text(data));
   validate(doc, maxNodes);
   const buffers = [];

@@ -14,6 +14,7 @@ import type {
   GLTFExtensions,
   GLTFTextureInfo,
 } from '../../shared/gltf.js';
+import { GLB_BIN, glbChunks, isGLB } from '../../shared/glb.js';
 export type { GLTFDocument } from '../../shared/gltf.js';
 import { withMaterials } from './default-materials.js';
 /** Retained mip bytes let compressed textures upload again after device restoration. */
@@ -223,40 +224,18 @@ export function container(
     input instanceof ArrayBuffer
       ? new Uint8Array(input)
       : new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
-  if (data.length >= 4 && new DataView(data.buffer, data.byteOffset).getUint32(0, true) !== 0x46546c67) {
+  if (data.length >= 4 && !isGLB(data)) {
     // JSON bytes: the budget is checked before the text is decoded, so a huge input is not copied twice first.
     if (data.length > limit) throw overBudget('glTF JSON exceeds byte budget', limit);
     return { ...container(utf8(data), limit), sourceBytes: data.byteLength };
   }
   if (data.length > limit) throw overBudget('glTF exceeds download budget', limit);
-  if (data.length < 20) throw new RangeError('Invalid GLB size');
-  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-  if (
-    view.getUint32(0, true) !== 0x46546c67 ||
-    view.getUint32(4, true) !== 2 ||
-    view.getUint32(8, true) !== data.length
-  )
-    throw new TypeError('Invalid GLB header');
-  let doc: GLTFDocument | undefined, binary: Uint8Array | undefined;
-  for (let offset = 12; offset < data.length; ) {
-    if (offset + 8 > data.length) throw new RangeError('Truncated GLB chunk');
-    const length = view.getUint32(offset, true),
-      type = view.getUint32(offset + 4, true);
-    offset += 8;
-    if (length % 4 || offset + length > data.length) throw new RangeError('Invalid GLB chunk');
-    const chunk = data.subarray(offset, offset + length);
-    if (offset === 20 && type !== 0x4e4f534a) throw new TypeError('GLB JSON must be first');
-    if (type === 0x4e4f534a) {
-      if (doc) throw new TypeError('Duplicate GLB JSON');
-      doc = parseJSON(chunk);
-    } else if (type === 0x004e4942) {
-      if (binary) throw new TypeError('Duplicate GLB binary');
-      binary = chunk;
-    }
-    offset += length;
-  }
-  if (!doc) throw new TypeError('Missing GLB JSON');
-  return { doc, binary, sourceBytes: data.byteLength };
+  const chunks = glbChunks(data);
+  return {
+    doc: parseJSON(chunks[0].data),
+    binary: chunks[1]?.type === GLB_BIN ? chunks[1].data : undefined,
+    sourceBytes: data.byteLength,
+  };
 }
 export function embedded(uri: string, limit = assetLimit): Uint8Array {
   const match = /^data:[^;,]+;base64,([A-Za-z0-9+/]*={0,2})$/.exec(uri);
