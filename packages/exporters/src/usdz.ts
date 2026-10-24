@@ -1,5 +1,5 @@
 import { collect, drawables, num, toWorld, normalizeMaterial, type ExportSource, type SceneOptions } from './scene.js';
-import { crc32 } from './png.js';
+import { crc32 } from '../../shared/crc32.js';
 export interface USDZOptions extends SceneOptions {}
 
 const tuples = (values: ArrayLike<number>, size: number): string => {

@@ -1,4 +1,5 @@
 // PNG encoding for exportModel, loaded with import() only when a texture has no encoded bytes or must shrink.
+import { crc32 } from '../../shared/crc32.js';
 
 interface Pixels {
   data: Uint8Array | Uint8ClampedArray;
@@ -8,17 +9,6 @@ interface Pixels {
 export type PNGSource = CanvasImageSource | Pixels;
 const raw = (s: PNGSource): s is Pixels =>
   'data' in s && (s.data instanceof Uint8Array || s.data instanceof Uint8ClampedArray);
-const crcTable = /* @__PURE__ */ Int32Array.from({ length: 256 }, (_, n) => {
-  for (let k = 0; k < 8; k++) n = n & 1 ? 0xedb88320 ^ (n >>> 1) : n >>> 1;
-  return n;
-});
-
-/** @internal CRC-32 (the ISO-HDLC polynomial PNG and ZIP use) of `bytes`; shared by the PNG, ZIP and USDZ writers. */
-export function crc32(bytes: Uint8Array): number {
-  let c = -1;
-  for (let i = 0; i < bytes.length; i++) c = crcTable[(c ^ bytes[i]) & 255] ^ (c >>> 8);
-  return ~c >>> 0;
-}
 
 /**
  * RGBA8 PNG (Sub filter, zlib from CompressionStream) of a texture source, at most `max` pixels on its longer side,

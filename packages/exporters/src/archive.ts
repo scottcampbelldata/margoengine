@@ -1,7 +1,8 @@
 // Archives of captured frames: a bounded full-frame sprite atlas, a deterministic stored ZIP, and PNG-sequence and
 // atlas ZIPs with a manifest the caller can extend. Every step can report progress and stop on an AbortSignal; a
 // cancelled call throws the signal's reason and returns nothing partial. Re-exported by `@margoengine/exporters/capture`.
-import { crc32, png } from './png.js';
+import { crc32 } from '../../shared/crc32.js';
+import { png } from './png.js';
 import type { FrameSource, Pixels } from './capture.js';
 
 /** Progress and cancellation for the archive functions. */

@@ -24,4 +24,10 @@ await writeFile(scene, (await readFile(scene, 'utf8')).replace('../../shared/mes
 await copyFile(resolve(repository, 'packages/shared/json.js'), resolve(root, 'dist/json.js'));
 const glb = resolve(root, 'dist/glb.js');
 await writeFile(glb, (await readFile(glb, 'utf8')).replace('../../shared/json.js', './json.js'));
+// The writers share one CRC-32, shipped beside them.
+await copyFile(resolve(repository, 'packages/shared/crc32.js'), resolve(root, 'dist/crc32.js'));
+for (const name of ['archive', 'usdz', 'png']) {
+  const file = resolve(root, `dist/${name}.js`);
+  await writeFile(file, (await readFile(file, 'utf8')).replace('../../shared/crc32.js', './crc32.js'));
+}
 await packageDeclarations(root);

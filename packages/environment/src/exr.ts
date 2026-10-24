@@ -1,7 +1,7 @@
 // OpenEXR scanline decoder for single-part scanline files with
 // NONE, RLE, ZIPS, ZIP or PIZ compression and HALF, FLOAT or UINT channels.
 import { halfToFloat } from './half.js';
-import { inflateZlib } from './inflate.js';
+import { inflateZlib } from '../../shared/inflate.js';
 import { MAX_PIXELS, toBytes, type FloatImage } from './hdr.js';
 import { MargoError } from '@margoengine/math/errors';
 
