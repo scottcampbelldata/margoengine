@@ -9,18 +9,27 @@ import { median, ms, nodeCase, timed } from '../lib/node.mjs';
 
 const voxel = (sub = 'index') => import(`../../packages/voxel/dist/${sub}.js`);
 
-/** A 256 x 64 x 256 rolling terrain (stone under grass) in 8 x 2 x 8 chunks. */
-async function terrain() {
-  const { BlockTypes, VoxelWorld } = await voxel(),
+/**
+ * A 256 x 64 x 256 rolling terrain (stone under grass) in 8 x 2 x 8 chunks. `shaped`: every surface cell one block
+ * up gets a slab or stair on a fixed pattern (a third each of air, slabs and stairs of every facing).
+ */
+async function terrain(shaped = false) {
+  const { BlockTypes, VoxelWorld, slabState, stairState } = await voxel(),
     blocks = new BlockTypes(),
     stone = blocks.define('stone'),
     grass = blocks.define('grass'),
+    slab = blocks.define('slab', { shape: 'slab' }),
+    stair = blocks.define('stair', { shape: 'stair' }),
+    facings = ['+x', '-x', '+z', '-z'],
     world = new VoxelWorld({ blocks }),
     cells = [];
   for (let x = 0; x < 256; x++)
     for (let z = 0; z < 256; z++) {
       const h = Math.floor(24 + 10 * Math.sin(x * 0.05) * Math.cos(z * 0.04) + 6 * Math.sin((x + z) * 0.11));
       for (let y = 0; y <= h; y++) cells.push(x, y, z, y === h ? grass : stone);
+      const k = (x * 7 + z * 13) % 9;
+      if (shaped && k >= 3)
+        cells.push(x, h + 1, z, k < 6 ? slabState(slab, k === 5) : stairState(stair, facings[(x + z) & 3], k === 8));
     }
   world.setBlocks(cells);
   return world;
@@ -64,6 +73,30 @@ export default {
                 if (!input) continue;
                 const m = meshChunk(input);
                 quads += (m.opaque.length + m.cutout.length + m.translucent.length) / 3; // 3 words per quad
+              }
+            },
+            { reps: 5, warm: 1 },
+          );
+          return { meshMs, quads };
+        },
+      ),
+      nodeCase(
+        'mesh-128-shaped-chunks',
+        'Mesh the same terrain with slabs and stairs on two thirds of its surface (half-block faces, greedy quads)',
+        { meshMs: ms(), quads: { unit: '', exact: true } },
+        async () => {
+          const { meshChunk, meshInput } = await voxel('mesher'),
+            world = await terrain(true),
+            keys = [...world.dirty];
+          let quads = 0;
+          const meshMs = timed(
+            () => {
+              quads = 0;
+              for (const key of keys) {
+                const input = meshInput(world, key);
+                if (!input) continue;
+                const m = meshChunk(input);
+                quads += (m.opaque.length + m.cutout.length + m.translucent.length) / 3;
               }
             },
             { reps: 5, warm: 1 },

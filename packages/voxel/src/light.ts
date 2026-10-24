@@ -1,6 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // @margoengine/voxel/light: sky and block light by breadth-first flood fill, on the main thread with a per-call budget.
 import { MargoError } from '@margoengine/math/errors';
+import { octants } from './octants.js';
 import { paletteOf, type VoxelChunk } from './chunk.js';
 import { chunkKey, VoxelWorld } from './world.js';
 
@@ -33,7 +34,25 @@ const NONE = -32768, // heightmap value of a column with no light-blocking cell
   // rose); block light may fall (opacity rose or emission fell).
   SKY = 1,
   SKY_FALLS = 2,
-  BLOCK_FALLS = 4;
+  BLOCK_FALLS = 4,
+  // Block flags beyond opacity (0-3) and light (4-7): a slab or stair (8), a stair rather than a slab (9). state()
+  // adds the faces its boxes cover whole at bits 10-15 (bit 10 + d for face d: +x, -x, +y, -y, +z, -z).
+  PART = 256,
+  STAIR = 512,
+  UP = 1 << 12, // +y covered
+  // Faces covered whole per slab (data & 7), then stair: face d is covered when the 4 octants against it are filled.
+  COVER = Uint8Array.from({ length: 16 }, (_, i) => {
+    const mask = octants(i < 8 ? 'slab' : 'stair', i & 7);
+    let faces = 0;
+    for (let d = 0; d < 6; d++) {
+      const bit = 1 << (d >> 1),
+        side = d & 1 ? 0 : bit;
+      let all = true;
+      for (let k = 0; k < 8; k++) if ((k & bit) === side && !((mask >> k) & 1)) all = false;
+      if (all) faces |= 1 << d;
+    }
+    return faces;
+  });
 const attached = new WeakSet<VoxelWorld>();
 const budgetOf = (value: unknown): number => {
   if (typeof value !== 'number') throw new TypeError('VoxelLighting budget must be a number; pass cells per update');
@@ -61,8 +80,10 @@ const shell = (i: number): number => {
 /**
  * Sky and block light of a {@link VoxelWorld}, kept in its chunks' light bytes (sky light in the high nibble, block
  * light in the low). Sky light is {@link MAX_LIGHT} in every cell above its column's heightmap (the highest cell with
- * opacity > 0) and spreads from there; block light spreads from each block type's `light`. Each step to a neighbour
- * costs 1 plus the entered cell's `opacity`, across chunk borders. Edits and chunk loads are queued as they happen and
+ * opacity > 0, or a slab or stair) and spreads from there; block light spreads from each block type's `light`. Each step
+ * to a neighbour costs 1 plus the entered cell's `opacity`, across chunk borders. Slabs and stairs pass light through
+ * their open part: light does not cross a face their boxes cover whole (a slab's bottom, a stair's back), and one whose
+ * top is open is lit as open sky when it tops its column. Edits and chunk loads are queued as they happen and
  * {@link VoxelLighting.update} (call it once a frame) works through at most `budget` cells, so big changes spread over
  * frames. Chunks whose light changed, and loaded neighbours whose border shell holds a changed cell, go into
  * `world.dirty`. A removed chunk's cells keep their heights in the heightmap, so caves stay dark when the chunks above
@@ -71,7 +92,8 @@ const shell = (i: number): number => {
 export class VoxelLighting {
   private readonly world: VoxelWorld;
   private limit: number;
-  private flags = new Uint8Array(65536); // per block id: opacity | light << 4
+  private flags = new Uint16Array(65536); // per block id: opacity | light << 4 | PART | STAIR
+  private parts = false; // some block type is a slab or stair
   private types = 0;
   private disposed = false;
   private readonly sections = new Map<string, Section>();
@@ -119,6 +141,8 @@ export class VoxelLighting {
       if (this.types !== world.blocks.table.length) this.refresh();
       const now = this.flags[state & 0xffff],
         was = this.flags[previous & 0xffff];
+      // A slab or stair before or after (or turned) may open or close any face: everything is checked again.
+      if ((now | was) & PART && state !== previous) return void this.edits.push(x, y, z, SKY | SKY_FALLS | BLOCK_FALLS);
       if (now === was) return;
       const opacity = (now & 15) - (was & 15);
       this.edits.push(
@@ -220,11 +244,37 @@ export class VoxelLighting {
   }
   private refresh(): void {
     const table = this.world.blocks.table;
-    for (const type of table) this.flags[type.id] = type.opacity | (type.light << 4);
+    for (const type of table) {
+      const part = type.shape === 'slab' ? PART : type.shape === 'stair' ? PART | STAIR : 0;
+      this.flags[type.id] = type.opacity | (type.light << 4) | part;
+      if (part) this.parts = true;
+    }
     this.types = table.length;
   }
+  // Flags of cell i of s; for a slab or stair with its whole-covered faces at bits 10-15.
   private state(s: Section, i: number): number {
-    return this.flags[s.chunk.get(i & 31, i >> 10, (i >> 5) & 31) & 0xffff];
+    const state = s.chunk.get(i & 31, i >> 10, (i >> 5) & 31),
+      f = this.flags[state & 0xffff];
+    return f & PART ? f | (COVER[((f >> 6) & 8) | ((state >>> 16) & 7)] << 10) : f;
+  }
+  // Whether light cannot cross between cell i of s (flags `f`) and its neighbour j of t (flags `g`) across face d of i.
+  private shut(f: number, g: number, d: number): boolean {
+    return ((f >> (10 + d)) & 1) === 1 || ((g >> (10 + (d ^ 1))) & 1) === 1;
+  }
+  // The column top (heightmap cell) of a slab or stair with an open top is lit as open sky.
+  private top(s: Section, i: number, f: number): void {
+    if (!(f & PART) || f & UP) return;
+    this.put(s, i, 0xf0 | (this.light(s, i) & 15));
+    this.push(s, i);
+  }
+  // The heightmap cell y of column cell k goes under a new top: an open-topped slab or stair there loses its sky light.
+  private cover(column: Section[], k: number, y: number): void {
+    if (!this.parts || y === NONE) return;
+    for (const s of column)
+      if (y >> 5 === s.cy) {
+        const i = k | ((y & 31) << 10);
+        if (this.state(s, i) & PART) this.clear(s, i, 0);
+      }
   }
   private light(s: Section, i: number): number {
     return s.chunk.getLight(i & 31, i >> 10, (i >> 5) & 31);
@@ -262,12 +312,15 @@ export class VoxelLighting {
     }
     return s.links[d];
   }
-  // Raises cell j of t to what light byte `from` gives it; queues it when either channel rose.
-  private relax(from: number, t: Section, j: number): void {
+  // Raises cell j of t to what light byte `from` gives it, entering through j's face `enter`; queues it when either
+  // channel rose.
+  private relax(from: number, t: Section, j: number, enter: number): void {
     const to = this.light(t, j);
     // Most steps lead back toward brighter cells: rule them out before reading the block state.
     if ((from >> 4) - 1 <= to >> 4 && (from & 15) - 1 <= (to & 15)) return;
-    const opacity = this.state(t, j) & 15,
+    const f = this.state(t, j);
+    if ((f >> (10 + enter)) & 1) return; // a face its boxes cover whole
+    const opacity = f & 15,
       sky = (from >> 4) - 1 - opacity,
       block = (from & 15) - 1 - opacity;
     if (sky > to >> 4 || block > (to & 15)) {
@@ -282,9 +335,10 @@ export class VoxelLighting {
     if (s.removed) return;
     const from = this.light(s, i);
     if (from >> 4 <= 1 && (from & 15) <= 1) return;
+    const shut = this.parts ? this.state(s, i) >> 10 : 0;
     for (let d = 0; d < 6; d++) {
-      const t = this.near(s, i, d);
-      if (t) this.relax(from, t, this.j);
+      const t = (shut >> d) & 1 ? undefined : this.near(s, i, d);
+      if (t) this.relax(from, t, this.j, d ^ 1);
     }
   }
   // The two-queue removal of Ben Arnold, "Fast Flood Fill Lighting in a Blocky Voxel Game: Pt 1" (Seed of Andromeda
@@ -299,7 +353,8 @@ export class VoxelLighting {
       e = this.cutE[h],
       i = e & 32767,
       level = (e >> 15) & 15,
-      block = e >> 19;
+      block = e >> 19,
+      f = this.parts && !s.removed ? this.state(s, i) : 0;
     for (let d = 0; d < 6; d++) {
       const t = this.near(s, i, d);
       if (!t || t.removed) continue;
@@ -307,7 +362,9 @@ export class VoxelLighting {
         byte = this.light(t, j),
         v = block ? byte & 15 : byte >> 4;
       if (!v) continue;
-      const own = block ? this.state(t, j) >> 4 : 0;
+      const g = this.state(t, j);
+      if (this.parts && this.shut(f, g, d)) continue; // no light passed that way
+      const own = block ? (g >> 4) & 15 : 0;
       if (v < level && own < v) {
         this.put(t, j, block ? (byte & 0xf0) | own : byte & 15);
         this.cut(t, j, block, v);
@@ -347,9 +404,11 @@ export class VoxelLighting {
       const y0 = s.cy << 5;
       if (y0 > from) continue;
       for (let y = Math.min(from, y0 + 31); y >= y0; y--, cost++) {
-        const i = k | ((y & 31) << 10);
-        if (this.state(s, i) & 15) {
+        const i = k | ((y & 31) << 10),
+          f = this.state(s, i);
+        if (f & (15 | PART)) {
           heights[k] = y;
+          this.top(s, i, f);
           return cost;
         }
         this.put(s, i, 0xf0 | (this.light(s, i) & 15));
@@ -372,17 +431,19 @@ export class VoxelLighting {
         column = this.columns.get(`${cx},${cz}`) as Section[],
         k = i & 1023,
         h = heights[k];
-      if (f & 15 && y > h) {
+      if (f & (15 | PART) && y > h) {
+        this.cover(column, k, h);
         cost += this.shade(column, k, h + 1, y);
         heights[k] = y;
-      } else if (!(f & 15) && y === h) cost += this.open(column, heights, k, y);
+      } else if (!(f & (15 | PART)) && y === h) cost += this.open(column, heights, k, y);
       else if (y <= h && flags & SKY_FALLS) this.clear(s, i, 0);
+      if (y === heights[k]) this.top(s, i, f);
     }
     if (flags & BLOCK_FALLS) this.clear(s, i, 1);
     this.pull(s, i); // light that may now enter the cell
     const byte = this.light(s, i);
-    if (f >> 4 > (byte & 15)) {
-      this.put(s, i, (byte & 0xf0) | (f >> 4));
+    if (((f >> 4) & 15) > (byte & 15)) {
+      this.put(s, i, (byte & 0xf0) | ((f >> 4) & 15));
       this.push(s, i);
     }
     return cost;
@@ -404,15 +465,15 @@ export class VoxelLighting {
       cost = 1,
       scanned = 1024; // the column pass
     for (const state of paletteOf(chunk)) {
-      blocking ||= (flags[state & 0xffff] & 15) > 0;
-      emitting ||= flags[state & 0xffff] > 15;
+      blocking ||= (flags[state & 0xffff] & (15 | PART)) > 0;
+      emitting ||= (flags[state & 0xffff] & 0xf0) > 0;
     }
     // Heights: the chunk decides its own range; above it they only rise, which shades the loaded cells below.
     for (let k = 0; k < 1024; k++) {
       let top = NONE;
       if (blocking)
         for (let y = 31; y >= 0; y--, scanned++)
-          if (flags[chunk.get(k & 31, y, k >> 5) & 0xffff] & 15) {
+          if (flags[chunk.get(k & 31, y, k >> 5) & 0xffff] & (15 | PART)) {
             top = y0 + y;
             break;
           }
@@ -422,6 +483,7 @@ export class VoxelLighting {
         if (top !== NONE) heights[k] = top;
         else cost += this.open(column, heights, k, y0 - 1);
       } else if (top !== NONE) {
+        this.cover(column, k, h);
         cost += this.shade(column, k, h + 1, y0 - 1);
         heights[k] = top;
       }
@@ -457,6 +519,9 @@ export class VoxelLighting {
           x = k & 31,
           z = k >> 5;
         for (let y = lo; y < 32; y++, scanned++) chunk.setLight(x, y, z, 0xf0);
+        // An open-topped slab or stair topping the column here is lit as open sky too.
+        if (this.parts && lo && heights[k] === y0 + lo - 1)
+          this.top(s, k | ((lo - 1) << 10), this.state(s, k | ((lo - 1) << 10)));
         if (lo > 31) continue;
         if (lo) this.push(s, k | (lo << 10));
         for (const n of [x < 31 ? k + 1 : -1, x ? k - 1 : -1, z < 31 ? k + 32 : -1, z ? k - 32 : -1])
@@ -464,7 +529,7 @@ export class VoxelLighting {
       }
     if (emitting)
       for (let i = 0; i < 32768; i++, scanned++) {
-        const own = this.state(s, i) >> 4;
+        const own = (this.state(s, i) >> 4) & 15;
         if (own) {
           this.put(s, i, (this.light(s, i) & 0xf0) | own);
           this.push(s, i);
@@ -481,8 +546,11 @@ export class VoxelLighting {
       for (let a = 0; a < 32; a++)
         for (let b = 0; b < 32; b++) {
           const cell = (a << u) | (b << v);
-          this.relax(this.light(t, cell | there), s, cell | here);
-          this.relax(this.light(s, cell | here), t, cell | there);
+          // Light leaves a slab or stair only through a face it leaves open.
+          const out = this.parts ? (this.state(t, cell | there) >> 10) & (1 << (d ^ 1)) : 0,
+            back = this.parts ? (this.state(s, cell | here) >> 10) & (1 << d) : 0;
+          if (!out) this.relax(this.light(t, cell | there), s, cell | here, d);
+          if (!back) this.relax(this.light(s, cell | here), t, cell | there, d ^ 1);
         }
       scanned += 2048;
     }

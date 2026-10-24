@@ -38,7 +38,7 @@ export function serveVoxelGenerator(generate: VoxelGenerate): void;
 
 type BlockLayer = 'opaque' | 'cutout' | 'translucent' | 'invisible';
 
-type BlockShape = 'cube' | 'cross' | 'liquid';
+type BlockShape = 'cube' | 'cross' | 'liquid' | 'slab' | 'stair';
 
 interface BlockType {
     readonly id: number;

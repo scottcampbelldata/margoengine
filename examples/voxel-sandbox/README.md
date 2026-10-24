@@ -85,10 +85,12 @@ to load), quads, quad memory and draw calls (`voxels.stats`).
 
 ## Deterministic mode: screenshots and benchmarks
 
-`?view=overview`, `?view=ground` or `?view=night` fixes the seed's world, the camera and the clock (the sky clock does
+`?view=overview`, `?view=ground`, `?view=night` or `?view=shapes` fixes the seed's world, the camera and the clock (the sky clock does
 not run and every frame renders with delta 0, so water and clouds hold still), stores nothing and takes no input. The
 HUD and overlays are hidden; the hotbar and crosshair stay. The ground and night views build a small hut with glass
-windows, torches and a glowstone lamp post by the lake (`src/showcase.ts`) once its chunks are loaded.
+windows, torches and a glowstone lamp post by the lake (`src/showcase.ts`) once its chunks are loaded; the shapes view
+builds slabs and stairs there instead (a plank deck under a top-slab roof with stair eaves, a stair flight, a slab
+terrace and a brick column ringed by stairs of every facing), seen from above at 10:00 with sun shadows.
 
 `window.voxelSandbox` reports progress:
 
@@ -145,8 +147,9 @@ render distance 8 and 1.51 ms at 16 in this run (2.56 and 0.72 ms in an earlier 
 
 ### Visual checks
 
-`scripts/visual-regression.js` defines `voxel-overview`, `voxel-ground` (high, light and phone) and `voxel-night`
-(high) on the site build's `/voxel/?view=...`. References exist on the RTX A6000 profile
+`scripts/visual-regression.js` defines `voxel-overview`, `voxel-ground` (high, light and phone), `voxel-night` and
+`voxel-shapes` (high) on the site build's `/voxel/?view=...`; `voxel-shapes` has its reference on the Edge 156 profile
+(`nvidia-ampere-msedge-156`, 2026-10-24, four runs pixel-identical). References exist on the RTX A6000 profile
 (`nvidia-ampere-msedge-155`, recorded 2026-10-19 with shadows and torch lights; four runs each, pixel-identical). On
 hardware whose profile is not in the views' `profiles` list they are captured but skipped: record them there with
 `npm run visual:update -- --only=voxel --runs=4` and add the profile to `VOXEL` in that script.

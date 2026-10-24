@@ -1,14 +1,23 @@
 import type { ColorInput, Vec3 } from '@margoengine/math';
 import { parseColor } from '@margoengine/math/color';
 import { MargoError } from '@margoengine/math/errors';
+import { octants } from './octants.js';
 
 /**
  * Render pass of a block type: `'opaque'` (back-face culled, hides its neighbours' faces), `'cutout'` (alpha
  * tested, e.g. leaves), `'translucent'` (sorted and blended, e.g. glass and water) or `'invisible'` (never drawn, e.g. air).
  */
 export type BlockLayer = 'opaque' | 'cutout' | 'translucent' | 'invisible';
-/** Geometry of a block type: a full `'cube'`, two diagonal quads (`'cross'`, e.g. grass and flowers) or a `'liquid'`. */
-export type BlockShape = 'cube' | 'cross' | 'liquid';
+/**
+ * Geometry of a block type: a full `'cube'`, two diagonal quads (`'cross'`, e.g. grass and flowers), a `'liquid'`, a
+ * half-height `'slab'` or a `'stair'`. A slab fills the lower half of its cell, or the upper half when bit 2 of its
+ * state data is set ({@link slabState}). A stair is a lower slab plus the upper quarter on its back side: state data
+ * bits 0-1 name that side (0 +x, 1 -x, 2 +z, 3 -z) and bit 2 turns it upside down ({@link stairState}). Slabs and
+ * stairs are meshed, lit, shadowed, collided and picked as their half-block boxes ({@link shapeOctants}).
+ */
+export type BlockShape = 'cube' | 'cross' | 'liquid' | 'slab' | 'stair';
+/** Side a stair's full-height back faces: `'+x'`, `'-x'`, `'+z'` or `'-z'`. */
+export type StairFacing = '+x' | '-x' | '+z' | '-z';
 
 /** Options of {@link BlockTypes.define}. Every field is optional. */
 export interface BlockTypeOptions {
@@ -92,7 +101,8 @@ export interface BlockType {
 }
 
 const LAYERS: readonly BlockLayer[] = ['opaque', 'cutout', 'translucent', 'invisible'],
-  SHAPES: readonly BlockShape[] = ['cube', 'cross', 'liquid'];
+  SHAPES: readonly BlockShape[] = ['cube', 'cross', 'liquid', 'slab', 'stair'],
+  FACINGS: readonly StairFacing[] = ['+x', '-x', '+z', '-z'];
 
 // Argument error for `value` that should be an integer in 0..max: TypeError for a non-number, RangeError otherwise.
 export const integerError = (what: string, value: unknown, max: number, fix: string): Error =>
@@ -114,6 +124,30 @@ export function blockState(id: number, state = 0): number {
 export const blockId = (s: number): number => s & 0xffff;
 /** The data of block state `s` (its high 16 bits). */
 export const blockData = (s: number): number => s >>> 16;
+
+/**
+ * The block state of slab block `id`: its lower half, or its upper half when `top`.
+ * @throws TypeError for a non-number id. @throws RangeError when `id` is not an integer in 0..65535.
+ */
+export const slabState = (id: number, top = false): number => blockState(id, top ? 4 : 0);
+/**
+ * The block state of stair block `id` with its full-height back toward `facing`, upside down (the slab on top) when
+ * `upsideDown`.
+ * @throws TypeError for a non-number id or a facing other than `'+x'`, `'-x'`, `'+z'`, `'-z'`.
+ * @throws RangeError when `id` is not an integer in 0..65535.
+ */
+export function stairState(id: number, facing: StairFacing, upsideDown = false): number {
+  const side = FACINGS.indexOf(facing);
+  if (side < 0) throw new TypeError(`Stair facing ${String(facing)} must be '+x', '-x', '+z' or '-z'`);
+  return blockState(id, side | (upsideDown ? 4 : 0));
+}
+/**
+ * The half-block cells block state `state` of `type` fills, as an 8-bit mask: bit `x + 2y + 4z` for the octant at
+ * (x, y, z), each 0 for the cell's low half on that axis and 1 for its high half. 255 for a cube (of any layer), the
+ * filled octants of a slab or stair, 0 for a cross or a liquid. Collision, picking, light and the path tracer's shapes
+ * use these boxes.
+ */
+export const shapeOctants = (type: BlockType, state: number): number => octants(type.shape, state >>> 16);
 
 const amount = (value: unknown, name: string, fallback: number, max = Infinity): number => {
   if (value === undefined) return fallback;

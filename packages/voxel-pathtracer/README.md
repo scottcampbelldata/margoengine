@@ -51,6 +51,12 @@ Everything is in Margo's **Y-up** world. Convert MagicaVoxel's Z-up `.vox` data 
   instead of tiles also keeps volumes whole: glass or media cut into tiles get an interface wherever two tiles meet
   (measured: a 400-cell glass bar as one model renders exactly like a 200-cell bar stretched 2x; as two 200-cell tiles
   the image differs by RMS 0.85). Dense `voxels` and the same cells as `blocks` pack identically.
+- **Half-block shapes** (addition). A model's `shapes` (and each block's, with `blocks`) gives one byte per cell in
+  `voxels` order: 0 or 255 for a whole cell, else an octant mask, bit `x + 2y + 4z` for the half cell at (x, y, z) (0
+  the low half on that axis, 1 the high), as `shapeOctants` of `@margoengine/voxel` gives for slabs and stairs. A
+  shaped cell is hit, shadowed, entered and left as its filled half blocks only; `raycast` reports the box face hit and
+  its point. Bricks holding a shaped cell carry 512 more bytes for the masks. A shaped cell is not cut by a cut-out
+  texture, and its emission is found by BSDF sampling alone (not light-sampled).
 - **Model material tables** (addition). A model's own `materials` replace `scene.materials` for its voxels, so a scene
   holds any number of distinct materials (255 per table), as model banks of an editor do: two models may give palette 1
   different materials. Tables equal in content are stored once; at most 4096 per scene, 32 KiB each, within the
@@ -333,7 +339,7 @@ disposal releases them.
 | Block textures | 4096, each 1-1024 texels a side (in the scene buffer, within the binding size) |
 | Material tables | 4096 per scene (`scene.materials` and distinct model tables), 32 KiB each, within the binding size |
 | Light-sampled glass and mirror instances | 8 of each (others are path sampled) |
-| Voxel data | grids plus 512-byte mixed bricks within the device's `maxStorageBufferBindingSize` (WebGPU default 128 MiB: about 262,000 mixed bricks; uniform bricks cost one word) |
+| Voxel data | grids plus 512-byte mixed bricks (1,024 bytes with half-block shapes) within the device's `maxStorageBufferBindingSize` (WebGPU default 128 MiB: about 262,000 mixed bricks; uniform bricks cost one word) |
 | Environment map | 8192 x 4096, and width x height x 16 bytes within the binding size (4096 x 2048 at the default) |
 | Emissive faces | their tables (12 bytes each), with the scene records, block textures and other light tables in one binding (about 11 million at the default) |
 | Viewport | every image 16 bytes per pixel within the binding size (8.3 million pixels at the default, so 3840 x 2160 is traced at its native size, denoised or not); the denoiser's two history images are textures within `maxTextureDimension2D` (8192 at the default). Larger canvases are traced at a lower resolution, keeping the aspect: `stats.requestedWidth`/`requestedHeight` give the size asked for, `stats.limitedBy` the limit that reduced it, and `traceViewportSize(width, height, device.limits, options)` predicts it |

@@ -5,6 +5,7 @@ import type { Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
 import { JobPool } from '../../shared/worker-pool.js';
 import type { BlockType } from './blocks.js';
+import { octants } from './octants.js';
 import type { PackedChunk, VoxelChunk } from './chunk.js';
 import type { VoxelWorld } from './world.js';
 
@@ -37,14 +38,18 @@ export interface MeshInput {
  * Quad bits, low bits first. Word 0: local cell x 0-4, y 5-9, z 10-14; face 15-17 (0-5: +x, -x, +y, -y, +z, -z;
  * 6, 7: the diagonals of a cross block); w - 1 at 18-22 and h - 1 at 23-27 (size in cells along u and v); flip 28;
  * liquidDrop 29-31. Word 1: material 0-11; AO of corners 0-3 at 12-13, 14-15, 16-17, 18-19 (0 darkest, 3 open);
- * wave 20; 21-31 zero. Word 2: corner c's sky light at bits 8c to 8c + 3 and block light at 8c + 4 to 8c + 7.
+ * wave 20; inset 21; trim 22-25; 26-31 zero. Word 2: corner c's sky light at bits 8c to 8c + 3 and block light at
+ * 8c + 4 to 8c + 7.
  *
  * Geometry: (u, v) are (z, y) on x faces, (x, z) on y faces and (x, y) on z faces; the face lies on the cell's side
  * toward its normal (cell + 1 for +x, +y, +z). Face 6 runs from the cell's (x, z) corner to (x + 1, z + 1), face 7 from
  * (x + 1, z) to (x, z + 1), both with v = y. Corner c sits at (u, v) = (0, 0), (w, 0), (w, h), (0, h) from the cell.
  * Triangles are (0, 1, 2) and (0, 2, 3), or (0, 1, 3) and (1, 2, 3) when flip is set. A liquid's top corners (the whole
  * +y face, corners 2 and 3 of a side face) sit liquidDrop eighths of a block below the cell top; wave marks a quad of a
- * liquid's surface (its +y face and the sides of a cell without the same liquid above).
+ * liquid's surface (its +y face and the sides of a cell without the same liquid above). Slabs, stairs and the faces
+ * they partly cover use the half-block bits: inset moves the face half a block back toward its cell's centre, and trim
+ * bits 1, 2, 4, 8 move the quad's start along u, its end along u, its start along v and its end along v half a block
+ * inward, so corner 0 sits at (0.5, 0) when bit 1 is set and corner 2 at (w - 0.5, h) when bit 2 is.
  */
 export interface ChunkMesh {
   /** Quads of `'opaque'` blocks. */
@@ -84,6 +89,13 @@ export interface DecodedQuad {
   ao: [number, number, number, number];
   /** Part of a liquid surface. */
   wave: boolean;
+  /** The face lies half a block inside its cell, toward the cell's centre (a slab's top, a stair's step). */
+  inset: boolean;
+  /**
+   * Half-block trims: bit 1 starts the quad half a block later along u, bit 2 ends it half a block earlier along u,
+   * bits 4 and 8 the same along v. 0 for whole-cell quads.
+   */
+  trim: number;
   /** Sky light per corner, 0-15. */
   sky: [number, number, number, number];
   /** Block light per corner, 0-15. */
@@ -97,15 +109,17 @@ const CELLS = 32768,
   SY = 1156,
   BASE = 1191, // index of local cell (0, 0, 0)
   // Per block id: layer in bits 0-1 (opaque, cutout, translucent, invisible), shape in 2-3, opaque cube in 4, no cube
-  // faces (invisible or cross) in 5.
+  // faces (invisible or cross) in 5, slab or stair in 6 (with shape bits 12).
   INVISIBLE = 3,
   SHAPE = 12,
   CROSS = 4,
   LIQUID = 8,
   OCCLUDES = 16,
   NO_FACES = 32,
+  PART = 64,
+  TAG = 0x8000, // a bucket entry meshed at half-block resolution
   LAYERS: Record<string, number> = { opaque: 0, cutout: 1, translucent: 2, invisible: 3 },
-  SHAPES: Record<string, number> = { cube: 0, cross: CROSS, liquid: LIQUID },
+  SHAPES: Record<string, number> = { cube: 0, cross: CROSS, liquid: LIQUID, slab: SHAPE | PART, stair: SHAPE | PART },
   // Per face direction (+x, -x, +y, -y, +z, -z): index strides of the normal, u and v axes, and the word 0 shifts of
   // the slice, u and v coordinates (x at 0, y at 5, z at 10).
   NORMAL = [1, 1, SY, SY, SZ, SZ],
@@ -113,7 +127,32 @@ const CELLS = 32768,
   V = [SY, SY, SZ, SZ, SY, SY],
   AT_S = [0, 0, 5, 5, 10, 10],
   AT_U = [10, 10, 0, 0, 0, 0],
-  AT_V = [5, 5, 10, 10, 5, 5];
+  AT_V = [5, 5, 10, 10, 5, 5],
+  // Per face direction: the octant bit (x 1, y 2, z 4) of the normal, u and v axes.
+  BIT_N = [1, 1, 2, 2, 4, 4],
+  BIT_U = [4, 4, 1, 1, 1, 1],
+  BIT_V = [2, 2, 4, 4, 2, 2];
+
+// Rectangles covering each 2 x 2 mask of quarter faces (bit u + 2v), as u0 | v0 << 2 | u1 << 4 | v1 << 6 in half
+// blocks (0-2): both rows at once when they match, else a full row first and the other row's quarters; at most two.
+const RECTS: readonly (readonly number[])[] = Array.from({ length: 16 }, (_, mask) => {
+  const out: number[] = [],
+    row = (bits: number, v0: number, v1: number) => {
+      if (bits === 3) out.push((v0 << 2) | (2 << 4) | (v1 << 6));
+      else if (bits) out.push((bits >> 1) | (v0 << 2) | (((bits >> 1) + 1) << 4) | (v1 << 6));
+    },
+    low = mask & 3,
+    high = mask >> 2;
+  if (low === high) row(low, 0, 2);
+  else if (high === 3) {
+    row(3, 1, 2);
+    row(low, 0, 1);
+  } else {
+    row(low, 0, 1);
+    row(high, 1, 2);
+  }
+  return out;
+});
 
 // Visibility bits of every pair among the chunk faces set in `faces`.
 const pairs = (faces: number): number => {
@@ -152,13 +191,16 @@ interface Table {
   n: number;
   flags: Uint8Array;
   materials: Uint16Array;
+  // Per id: the octant masks of its state data & 7 when it is a slab or stair.
+  octants: Uint8Array;
 }
 // Derived per-id data, kept per table (BlockTypes.table only grows, so a longer table is rebuilt).
 const tables = new WeakMap<readonly BlockType[], Table>();
 function prepare(blocks: readonly BlockType[]): Table {
   let table = tables.get(blocks);
   if (table?.n === blocks.length) return table;
-  const flags = new Uint8Array(blocks.length);
+  const flags = new Uint8Array(blocks.length),
+    parts = new Uint8Array(blocks.length * 8);
   for (let id = 0; id < blocks.length; id++) {
     const layer = LAYERS[blocks[id]?.layer] as number | undefined,
       shape = SHAPES[blocks[id]?.shape] as number | undefined;
@@ -166,21 +208,31 @@ function prepare(blocks: readonly BlockType[]): Table {
       throw new TypeError(`MeshInput blocks[${id}] is not a block type; pass blocks.table`);
     flags[id] =
       layer | shape | (layer === 0 && shape === 0 ? OCCLUDES : 0) | (layer === 3 || shape === CROSS ? NO_FACES : 0);
+    if (shape & PART) for (let data = 0; data < 8; data++) parts[id * 8 + data] = octants(blocks[id].shape, data);
   }
-  table = { n: blocks.length, flags, materials: blockMaterials(blocks) };
+  table = { n: blocks.length, flags, materials: blockMaterials(blocks), octants: parts };
   tables.set(blocks, table);
   return table;
 }
 
 // Scratch reused by every call: the chunk and its shell as 34^3 states, light bytes, block flags, opaque-cube flags and
 // spread light; the candidate faces of each (direction, slice) bucket; the two words of each face in one 32 x 32 slice
-// and the slice's faces in scan order; flood-fill state and the growing output per layer.
+// and the slice's faces in scan order; flood-fill state and the growing output per layer. With slabs or stairs in
+// reach also: each cell's octants (cube 255), its opaque octants, whether a slab or stair is within one cell, and the
+// slice's trimmed or inset faces (cell, the two words, and the half-block bits) waiting for their own merges.
 interface Work {
   states: Uint32Array;
   light: Uint8Array;
   kind: Uint8Array;
   occ: Uint8Array;
   spread: Uint16Array;
+  shape: Uint8Array;
+  solid: Uint8Array;
+  near: Uint8Array;
+  partM: Uint16Array;
+  partK: Uint32Array;
+  partL: Uint32Array;
+  partN: number;
   bucket: Uint16Array;
   filled: Uint16Array;
   keys: Uint32Array;
@@ -242,9 +294,12 @@ function merge(w: Work, d: number, s: number, n: number): void {
       l3 = B >>> 24;
     let width = 1,
       height = 1;
-    if (o0 === o1 && o3 === o2 && l0 === l1 && l3 === l2)
+    // Half-block bits (key bits 26-30: inset, then the trims): a trimmed quad leaves a gap along its trimmed axis, so
+    // it only merges across the other one.
+    const part = (A >>> 26) & 31;
+    if (o0 === o1 && o3 === o2 && l0 === l1 && l3 === l2 && !(part & 6))
       while (u + width < 32 && keys[m + width] === A && lights[m + width] === B) width++;
-    if (o0 === o3 && o1 === o2 && l0 === l3 && l1 === l2)
+    if (o0 === o3 && o1 === o2 && l0 === l3 && l1 === l2 && !(part & 24))
       grow: for (; v + height < 32; height++)
         for (let k = m + (height << 5), end = k + width; k < end; k++) if (keys[k] !== A || lights[k] !== B) break grow;
     for (let j = 0; j < height; j++) for (let k = m + (j << 5), end = k + width; k < end; k++) keys[k] = 0;
@@ -255,7 +310,7 @@ function merge(w: Work, d: number, s: number, n: number): void {
       w,
       (A >>> 24) & 3,
       (base | (u << atU) | (v << atV) | ((width - 1) << 18) | ((height - 1) << 23) | flip | ((A >>> 21) << 29)) >>> 0,
-      A & 0x1fffff,
+      (A & 0x1fffff) | (part << 21),
       B,
     );
   }
@@ -268,9 +323,10 @@ const add = (bucket: Uint16Array, filled: Uint16Array, b: number, m: number): vo
 // One pass over the chunk's cells: each cube face that no opaque cube covers goes to bucket `direction * 32 + slice`
 // as its slice position u | v << 5, already in the order the greedy merge scans (rows of v, then u). Liquids keep every
 // face for the checks in `faces`. Cross blocks emit their two diagonal quads, unshaded (AO 3) and lit by their own
-// cell. In a uniform chunk only boundary cells can show faces.
-function candidates(w: Work, materials: Uint16Array, boundaryOnly: boolean): void {
-  const { states, light, kind, occ, bucket, filled } = w;
+// cell. In a uniform chunk only boundary cells can show faces. With slabs or stairs about (`parts`), their six face
+// directions and every cube face whose front cell has one within a cell go in tagged (TAG): meshed by `half`.
+function candidates(w: Work, materials: Uint16Array, boundaryOnly: boolean, parts: boolean): void {
+  const { states, light, kind, occ, near, bucket, filled } = w;
   filled.fill(0);
   for (let y = 0; y < 32; y++)
     for (let z = 0; z < 32; z++)
@@ -286,6 +342,16 @@ function candidates(w: Work, materials: Uint16Array, boundaryOnly: boolean): voi
           continue;
         }
         if (boundaryOnly && x && y && z && x < 31 && y < 31 && z < 31) continue;
+        if (parts && !((f & SHAPE) === LIQUID)) {
+          const tag = f & PART ? TAG : 0;
+          if (tag || !occ[p + 1]) add(bucket, filled, x, z | (y << 5) | (tag || (near[p + 1] && TAG)));
+          if (tag || !occ[p - 1]) add(bucket, filled, 32 + x, z | (y << 5) | (tag || (near[p - 1] && TAG)));
+          if (tag || !occ[p + SY]) add(bucket, filled, 64 + y, x | (z << 5) | (tag || (near[p + SY] && TAG)));
+          if (tag || !occ[p - SY]) add(bucket, filled, 96 + y, x | (z << 5) | (tag || (near[p - SY] && TAG)));
+          if (tag || !occ[p + SZ]) add(bucket, filled, 128 + z, x | (y << 5) | (tag || (near[p + SZ] && TAG)));
+          if (tag || !occ[p - SZ]) add(bucket, filled, 160 + z, x | (y << 5) | (tag || (near[p - SZ] && TAG)));
+          continue;
+        }
         const all = f & LIQUID;
         if (all || !occ[p + 1]) add(bucket, filled, x, z | (y << 5));
         if (all || !occ[p - 1]) add(bucket, filled, 32 + x, z | (y << 5));
@@ -310,8 +376,12 @@ function faces(w: Work, materials: Uint16Array): void {
       const slot = d * 32 + s;
       let n = 0;
       for (let k = slot << 10, end = k + filled[slot]; k < end; k++) {
-        const m = bucket[k],
-          p = BASE + s * sN + (m & 31) * sU + (m >> 5) * sV,
+        const m = bucket[k];
+        if (m & TAG) {
+          n = half(w, materials, d, s, m & 1023, n);
+          continue;
+        }
+        const p = BASE + s * sN + (m & 31) * sU + (m >> 5) * sV,
           f = kind[p],
           q = p + front,
           state = states[p],
@@ -366,7 +436,147 @@ function faces(w: Work, materials: Uint16Array): void {
         list[n++] = m;
       }
       if (n) merge(w, d, s, n);
+      if (w.partN) mergeParts(w, d, s);
     }
+  }
+}
+
+// Face direction d of the cell at slice position m of slice s, at half-block resolution: the cell is a slab or stair,
+// or a cube whose front cell has one within a cell. Each quarter of the face on the cell's side shows when the cell
+// fills the octant behind it and the octant in front is neither opaque nor the same block's; a slab or stair also shows
+// the quarters of its mid-cell (inset) face where it fills the octant behind and not the one in front. Visible quarters
+// become at most two rectangles per plane (RECTS). AO and smooth light follow `faces` with half blocks for cells: per
+// corner, the four half blocks of the front layer around it, opaque octants occluding. A whole face joins the slice's
+// main merge (the new count is returned); trimmed and inset ones wait in part* for `mergeParts`.
+function half(w: Work, materials: Uint16Array, d: number, s: number, m: number, n: number): number {
+  const { states, light, kind, shape, solid, spread, keys, lights, list } = w,
+    sN = NORMAL[d],
+    sU = U[d],
+    sV = V[d],
+    bN = BIT_N[d],
+    bU = BIT_U[d],
+    bV = BIT_V[d],
+    plus = !(d & 1),
+    p = BASE + s * sN + (m & 31) * sU + (m >> 5) * sV,
+    q = p + (plus ? sN : -sN),
+    f = kind[p],
+    id = states[p] & 0xffff,
+    own = shape[p],
+    // Octant bit along the normal of the cell's half toward the face direction, and of its other half.
+    out = plus ? bN : 0,
+    back = plus ? 0 : bN,
+    same = (states[q] & 0xffff) === id,
+    there = shape[q],
+    opaque = solid[q],
+    material = materials[id * 6 + d] | ((f & 3) << 24) | (1 << 31);
+  let outer = 0,
+    inset = 0;
+  for (let c = 0; c < 4; c++) {
+    const o = (c & 1 ? bU : 0) | (c & 2 ? bV : 0);
+    if ((own >> (o | out)) & 1) {
+      if (!(((opaque | (same ? there : 0)) >> (o | back)) & 1)) outer |= 1 << c;
+    } else if ((own >> (o | back)) & 1) inset |= 1 << c;
+  }
+  for (let plane = 0; plane < 2; plane++) {
+    const mask = plane ? inset : outer;
+    if (!mask) continue;
+    // Half-block index of the front layer along the normal, from the cell's low side.
+    const hn = plane ? (plus ? 1 : 0) : plus ? 2 : -1,
+      layer = p + (hn >> 1) * sN,
+      layerBit = hn & 1 ? bN : 0;
+    for (const r of RECTS[mask]) {
+      const u0 = r & 3,
+        v0 = (r >> 2) & 3,
+        u1 = (r >> 4) & 3,
+        v1 = r >> 6;
+      let key = material | ((plane | ((u0 & 1) << 1) | ((u1 & 1) << 2) | ((v0 & 1) << 3) | ((v1 & 1) << 4)) << 26),
+        lit = 0;
+      for (let c = 0; c < 4; c++) {
+        // Corner c at half-block (cu, cv); the half block on the face is (cu + du, cv + dv), du and dv 0 or -1.
+        const right = c === 1 || c === 2,
+          cu = right ? u1 : u0,
+          cv = c >= 2 ? v1 : v0,
+          du = right ? -1 : 0,
+          dv = c >= 2 ? -1 : 0,
+          // The half blocks across u, across v and diagonal from the one on the face.
+          au = cu - 1 - du,
+          av = cv - 1 - dv,
+          iu = cu + du,
+          iv = cv + dv,
+          cI = layer + (iu >> 1) * sU + (iv >> 1) * sV,
+          cA = layer + (au >> 1) * sU + (iv >> 1) * sV,
+          cB = layer + (iu >> 1) * sU + (av >> 1) * sV,
+          cG = layer + (au >> 1) * sU + (av >> 1) * sV,
+          ou = iu & 1 ? bU : 0,
+          ov = iv & 1 ? bV : 0,
+          xu = au & 1 ? bU : 0,
+          xv = av & 1 ? bV : 0,
+          a = (solid[cA] >> (layerBit | xu | ov)) & 1,
+          b = (solid[cB] >> (layerBit | ou | xv)) & 1,
+          g = a & b ? 1 : (solid[cG] >> (layerBit | xu | xv)) & 1,
+          ao = a & b ? 0 : 3 - a - b - g;
+        key |= ao << (12 + 2 * c);
+        lit |=
+          vertexLight(
+            ao + 1,
+            spread[cI] + (a ? 0 : spread[cA]) + (b ? 0 : spread[cB]) + (g ? 0 : spread[cG]),
+            light[p],
+          ) <<
+          (8 * c);
+      }
+      if (key >>> 26 === 0x20) {
+        keys[m] = key;
+        lights[m] = lit;
+        list[n++] = m;
+      } else {
+        const i = w.partN++;
+        w.partM[i] = m;
+        w.partK[i] = key;
+        w.partL[i] = lit >>> 0;
+      }
+    }
+  }
+  return n;
+}
+
+// Merges the slice's trimmed and inset faces, one half-block kind at a time (equal kinds never share a cell).
+function mergeParts(w: Work, d: number, s: number): void {
+  const { keys, lights, list, partM, partK, partL } = w,
+    count = w.partN;
+  let kinds = 0;
+  for (let i = 0; i < count; i++) kinds |= 1 << ((partK[i] >>> 26) & 31);
+  for (let kind = 1; kind < 32; kind++) {
+    if (!((kinds >>> kind) & 1)) continue;
+    let n = 0;
+    for (let i = 0; i < count; i++)
+      if (((partK[i] >>> 26) & 31) === kind) {
+        const m = partM[i];
+        keys[m] = partK[i];
+        lights[m] = partL[i];
+        list[n++] = m;
+      }
+    merge(w, d, s, n);
+  }
+  w.partN = 0;
+}
+
+// With slabs or stairs about: each cell's octants (cube 255, slab or stair its mask, else 0) and opaque octants, and
+// which cells have a slab or stair within one cell (their faces are meshed by `half`).
+function halfBlocks(w: Work, parts: Uint8Array): void {
+  const { states, kind, shape, solid, near } = w;
+  near.fill(0);
+  for (let p = 0; p < VOLUME; p++) {
+    const f = kind[p],
+      o = f & PART ? parts[(states[p] & 0xffff) * 8 + ((states[p] >>> 16) & 7)] : f & SHAPE ? 0 : 255;
+    shape[p] = o;
+    solid[p] = (f & 3) === 0 ? o : 0;
+    if (!(f & PART)) continue;
+    const x = p % SZ,
+      z = ((p / SZ) | 0) % SZ,
+      y = (p / SY) | 0;
+    for (let ny = Math.max(y - 1, 0); ny <= Math.min(y + 1, 33); ny++)
+      for (let nz = Math.max(z - 1, 0); nz <= Math.min(z + 1, 33); nz++)
+        for (let nx = Math.max(x - 1, 0); nx <= Math.min(x + 1, 33); nx++) near[nx + nz * SZ + ny * SY] = 1;
   }
 }
 
@@ -449,13 +659,20 @@ export function meshChunk(input: MeshInput): ChunkMesh {
     throw new RangeError(
       `MeshInput shell and light have ${shell.length} and ${around.length} cells, not 6,536; build them with meshInput()`,
     );
-  const { flags, materials } = prepare(blocks),
+  const { flags, materials, octants: parts } = prepare(blocks),
     w = (work ??= {
       states: new Uint32Array(VOLUME),
       light: new Uint8Array(VOLUME),
       kind: new Uint8Array(VOLUME),
       occ: new Uint8Array(VOLUME),
       spread: new Uint16Array(VOLUME),
+      shape: new Uint8Array(VOLUME),
+      solid: new Uint8Array(VOLUME),
+      near: new Uint8Array(VOLUME),
+      partM: new Uint16Array(4096),
+      partK: new Uint32Array(4096),
+      partL: new Uint32Array(4096),
+      partN: 0,
       bucket: new Uint16Array(192 * 1024),
       filled: new Uint16Array(192),
       keys: new Uint32Array(1024),
@@ -501,6 +718,7 @@ export function meshChunk(input: MeshInput): ChunkMesh {
         states[p + 33] = shell[k];
         light[p + 33] = around[k++];
       }
+  let seen = 0;
   for (let p = 0; p < VOLUME; p++) {
     const f = flags[states[p] & 0xffff];
     if (f === undefined)
@@ -510,11 +728,13 @@ export function meshChunk(input: MeshInput): ChunkMesh {
     kind[p] = f;
     occ[p] = (f >> 4) & 1;
     spread[p] = f & OCCLUDES ? 0 : ((light[p] >> 4) << 8) | (light[p] & 15);
+    seen |= f;
   }
   const first = flags[palette[0] & 0xffff];
   // A uniform chunk (other than a liquid, whose surface steps inside) has faces only on its boundary slices.
   if (!bits && (first & 3) === INVISIBLE) return empty(ALL);
-  candidates(w, materials, !bits && (first & SHAPE) !== LIQUID);
+  if (seen & PART) halfBlocks(w, parts);
+  candidates(w, materials, !bits && !(first & LIQUID), (seen & PART) !== 0);
   faces(w, materials);
   const { out, count } = w;
   return {
@@ -563,6 +783,8 @@ export function decodeQuad(words: Uint32Array, i: number): DecodedQuad {
     material: w1 & 4095,
     ao: [(w1 >>> 12) & 3, (w1 >>> 14) & 3, (w1 >>> 16) & 3, (w1 >>> 18) & 3],
     wave: ((w1 >>> 20) & 1) === 1,
+    inset: ((w1 >>> 21) & 1) === 1,
+    trim: (w1 >>> 22) & 15,
     sky: nibbles(0),
     block: nibbles(4),
   };
@@ -625,16 +847,19 @@ export function quadCenters(words: Uint32Array): Float32Array {
   const out = new Float32Array((words.length / QUAD_WORDS) * 3);
   for (let i = 0; i < out.length; i += 3) {
     const w0 = words[i],
+      part = words[i + 1] >>> 21,
       face = (w0 >>> 15) & 7,
-      u = ((w0 >>> 18) & 31) / 2, // half the size along u and v, less half a cell
-      v = ((w0 >>> 23) & 31) / 2;
+      // Half the size along u and v, less half a cell, plus a quarter per half-block trim at the start (less at the end).
+      u = ((w0 >>> 18) & 31) / 2 + ((part >> 1) & 1) / 4 - ((part >> 2) & 1) / 4,
+      v = ((w0 >>> 23) & 31) / 2 + ((part >> 3) & 1) / 4 - ((part >> 4) & 1) / 4,
+      side = part & 1 ? 0 : 0.5; // an inset face lies in the cell's middle
     // The cell centre moved half a cell toward the normal and spread over the quad (see ChunkMesh).
     let x = (w0 & 31) + 0.5,
       y = ((w0 >>> 5) & 31) + 0.5,
       z = ((w0 >>> 10) & 31) + 0.5;
-    if (face < 2) (x += face ? -0.5 : 0.5), (z += u), (y += v);
-    else if (face < 4) (y += face === 2 ? 0.5 : -0.5), (x += u), (z += v);
-    else if (face < 6) (z += face === 4 ? 0.5 : -0.5), (x += u), (y += v);
+    if (face < 2) (x += face ? -side : side), (z += u), (y += v);
+    else if (face < 4) (y += face === 2 ? side : -side), (x += u), (z += v);
+    else if (face < 6) (z += face === 4 ? side : -side), (x += u), (y += v);
     out[i] = x;
     out[i + 1] = y;
     out[i + 2] = z;

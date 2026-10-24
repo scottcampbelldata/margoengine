@@ -172,6 +172,7 @@ export interface TraceModel {
     size: TraceVec3;
     voxels?: Uint8Array;
     blocks?: readonly TraceModelBlock[];
+    shapes?: Uint8Array;
     materials?: readonly TraceMaterial[];
 }
 
@@ -179,6 +180,7 @@ export interface TraceModelBlock {
     origin: TraceVec3;
     size: TraceVec3;
     voxels: Uint8Array;
+    shapes?: Uint8Array;
 }
 
 export interface TracePhysicalSky {

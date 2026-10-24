@@ -79,7 +79,8 @@ fn voxelOpaque(m:vec4u,uv:vec2f,t:f32)->bool {return (m.x&4194304u)!=0u||texture
 `;
 // Group 0 bindings 1-3 of the quad shaders: quad pool, page -> chunk slot, slot -> chunk origin. Vertex pulling: quad =
 // vertex_index >> 2, corner = vertex_index & 3, chunk = pages[quad >> 6]. voxelPlace gives corner c of a quad, (0, 0),
-// (w, 0), (w, h) or (0, h) along the face's u and v (see ChunkMesh), with a liquid's lowered top; voxelRise lifts the
+// (w, 0), (w, h) or (0, h) along the face's u and v (see ChunkMesh), with a liquid's lowered top and the half-block
+// inset and trims of slab and stair faces (word 1 bits 21-25: voxelPart); voxelRise lifts the
 // surface of a liquid with the wave bit by the same height everywhere at time t, so merged and unit quads, tops and
 // sides and neighbouring chunks stay joined (the ripples are in the shading normal, voxelRipple). voxelTile maps
 // chunk-local point l on a face to texture coordinates in blocks (the sampler repeats), v running down the sides
@@ -89,13 +90,20 @@ const QUADS = /* wgsl */ `${MATERIALS}
 @group(0) @binding(2) var<storage,read> voxelPages:array<u32>;
 @group(0) @binding(3) var<storage,read> voxelOrigins:array<vec4f>;
 fn voxelRise(w1:u32,t:f32)->f32 {return select(0.0,0.04*sin(t*1.6),(w1&0x100000u)!=0u);}
+// voxelPart: a quad's start and end along u and v in blocks from its cell, and its plane's offset along the normal.
+struct VoxelPart {lo:vec2f,hi:vec2f,n:f32}
+fn voxelPart(w0:u32,w1:u32)->VoxelPart {
+ let b=vec4f(vec4u(w1>>22u,w1>>23u,w1>>24u,w1>>25u)&vec4u(1u))*0.5;
+ let size=vec2f(f32(((w0>>18u)&31u)+1u),f32(((w0>>23u)&31u)+1u));
+ return VoxelPart(b.xz,size-b.yw,abs(f32(((w0>>15u)&1u)==0u)-f32((w1>>21u)&1u)*0.5));
+}
 fn voxelPlace(w0:u32,w1:u32,c:u32,t:f32)->vec3f {
- let face=(w0>>15u)&7u;let su=select(0.0,f32(((w0>>18u)&31u)+1u),c==1u||c==2u);let sv=select(0.0,f32(((w0>>23u)&31u)+1u),c>=2u);
+ let face=(w0>>15u)&7u;let r=voxelPart(w0,w1);let su=select(r.lo.x,r.hi.x,c==1u||c==2u);let sv=select(r.lo.y,r.hi.y,c>=2u);
  var p=vec3f(f32(w0&31u),f32((w0>>5u)&31u),f32((w0>>10u)&31u));
  switch face {
-  case 0u,1u {p+=vec3f(f32(face==0u),sv,su);}
-  case 2u,3u {p+=vec3f(su,f32(face==2u),sv);}
-  case 4u,5u {p+=vec3f(su,sv,f32(face==4u));}
+  case 0u,1u {p+=vec3f(r.n,sv,su);}
+  case 2u,3u {p+=vec3f(su,r.n,sv);}
+  case 4u,5u {p+=vec3f(su,sv,r.n);}
   case 6u {p+=vec3f(su,sv,su);}
   default {p+=vec3f(1.0-su,sv,su);}
  }
@@ -160,7 +168,8 @@ const SHADE = /* wgsl */ `
 // quad's edges, and once the rasterizer snaps them to its subpixel grid a sliver between the two can stay uncovered;
 // voxelStretch moves each edge EDGE pixels out along the quad's own edges in clip space (so it stays in its plane): EDGE
 // over the quad's on-screen thickness there, at most a pixel and half the quad, 0 for an edge under 1/16 pixel long,
-// whose direction is too uncertain. Unit quads share all their corners with their neighbours and stay as they are.
+// whose direction is too uncertain. Unit quads share all their corners with their neighbours and stay as they are;
+// half-block quads (a slab beside a cube) do not, so they stretch too.
 // The fragment shades from voxelHit, the point where the pixel's ray meets the face's plane (never from interpolated
 // attributes), so a greedy quad shades its pixels bit for bit like the unit faces it covers; AO and light (voxelCorner)
 // are mixed bilinearly with voxelMix, which returns a exactly when a == b; texture gradients come from the neighbouring
@@ -177,7 +186,7 @@ fn voxelStretch(s:vec2f,along:vec2f,across:vec2f)->f32 {
  if((w0&0x10000000u)!=0u){c=(c+1u)&3u;}
  if(face==0u||face==2u||face==5u){c=(4u-c)&3u;}
  let origin=voxelOrigins[voxelPages[q>>6u]];var clip=f.camera*vec4f(origin.xyz+voxelPlace(w0,w1,c,t),1.0);
- if(EDGE>0.0&&((w0>>18u)&0x3ffu)!=0u){
+ if(EDGE>0.0&&(((w0>>18u)&0x3ffu)!=0u||(w1&0x3e00000u)!=0u)){
   let u=f.camera*vec4f(origin.xyz+voxelPlace(w0,w1,c^1u,t),1.0);let v=f.camera*vec4f(origin.xyz+voxelPlace(w0,w1,3u-c,t),1.0);
   if(clip.w>0.0&&u.w>0.0&&v.w>0.0){
    let half=f.viewport.xy*0.5;let s=clip.xy/clip.w*half;let su=u.xy/u.w*half;let sv=v.xy/v.w*half;
@@ -198,14 +207,15 @@ fn voxelRipple(p:vec2f,t:f32)->vec3f {
 }
 @fragment fn fragment(o:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {
  let w=o.words;let face=(w.x>>15u)&7u;let O=o.origin.xyz;let t=f.glow.w;let drop=f32(w.x>>29u)*0.125-voxelRise(w.y,t);
- let cell=vec3f(f32(w.x&31u),f32((w.x>>5u)&31u),f32((w.x>>10u)&31u));let size=vec2f(f32(((w.x>>18u)&31u)+1u),f32(((w.x>>23u)&31u)+1u));
- let axis=face>>1u;var n=vec3f(f32(axis==0u),f32(axis==1u),f32(axis==2u));var k=dot(n,O+cell)+f32((face&1u)==0u);
+ let cell=vec3f(f32(w.x&31u),f32((w.x>>5u)&31u),f32((w.x>>10u)&31u));let part=voxelPart(w.x,w.y);let size=part.hi-part.lo;
+ let axis=face>>1u;var n=vec3f(f32(axis==0u),f32(axis==1u),f32(axis==2u));var k=dot(n,O+cell)+part.n;
  if(face==2u){k-=drop;}
  if(face==6u){n=vec3f(1.0,0.0,-1.0);k=(O.x+cell.x)-(O.z+cell.z);}
  if(face==7u){n=vec3f(1.0,0.0,1.0);k=O.x+cell.x+1.0+O.z+cell.z;}
  var i:VoxelPixel;i.clip=o.clip;i.position=voxelHit(o.clip.xy,n,k);let l=i.position-O;
  var at=l.xy;var start=cell.xy;
  if(axis==0u){at=l.zy;start=cell.zy;} else if(axis==1u){at=l.xz;start=cell.xz;}
+ start+=part.lo;
  let r=clamp((at-start)/vec2f(size.x,size.y-select(0.0,drop,face<6u&&axis!=1u)),vec2f(0.0),vec2f(1.0));
  let lit=voxelMix(voxelMix(voxelCorner(w,0u),voxelCorner(w,1u),r.x),voxelMix(voxelCorner(w,3u),voxelCorner(w,2u),r.x),r.y);
  let m=o.material;let maps=o.maps;
@@ -1221,14 +1231,15 @@ export class VoxelRenderer implements EnginePlugin {
     return true;
   }
 
-  // A mesh layer's quads that stay quads under a bevel (crosses and liquids), and its cube faces to chamfer, their
+  // A mesh layer's quads that stay quads under a bevel (crosses, liquids, half-block faces), and its cube faces to chamfer, their
   // material carrying the face for the shader's tangent frame.
   #split(words: Uint32Array): [Uint32Array, CubeFace[]] {
     const kept: number[] = [],
       faces: CubeFace[] = [];
     for (let i = 0; i < words.length; i += 3) {
       const quad = decodeQuad(words, i / 3);
-      if (quad.face > 5 || this.#liquid[quad.material]) kept.push(words[i], words[i + 1], words[i + 2]);
+      if (quad.face > 5 || this.#liquid[quad.material] || quad.inset || quad.trim)
+        kept.push(words[i], words[i + 1], words[i + 2]);
       else faces.push({ ...quad, material: quad.material | (quad.face << 12) });
     }
     return [Uint32Array.from(kept), faces];

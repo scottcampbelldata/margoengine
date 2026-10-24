@@ -26,6 +26,11 @@ const BRICK = 8;
 export const BRICK_WORDS = (BRICK * BRICK * BRICK) / 4;
 /** Grid entry flag of a brick whose voxels are all one non-zero palette index (index in the low byte). */
 export const UNIFORM = 0x80000000;
+/**
+ * Grid entry flag of a mixed brick with half-block shapes: its 128 words of palette indices are followed by 128 words
+ * of octant masks (0 for a whole cell), and the entry's low 30 bits are 1 + the palette brick's number.
+ */
+export const SHAPED = 0x40000000;
 /** Instances at most: ids AOVs store `(instance + 1) * 256 + palette` exactly in a float. */
 const MAX_INSTANCES = 65535;
 /** Area lights at most. */
@@ -79,9 +84,12 @@ export interface PackedModel {
   readonly size: readonly [number, number, number];
   /** Bricks per axis. */
   readonly bricks: readonly [number, number, number];
-  /** Per brick (`bx + Bx * (bz + Bz * by)`): 0 empty, `UNIFORM | index`, or 1 + the payload brick number. */
+  /**
+   * Per brick (`bx + Bx * (bz + Bz * by)`): 0 empty, `UNIFORM | index`, or 1 + the payload brick number (with
+   * `SHAPED` when the next payload brick holds its cells' half-block masks).
+   */
   readonly grid: Uint32Array;
-  /** 128 words (512 bytes, `lx + 8 * (lz + 8 * ly)`) per mixed brick. */
+  /** 128 words (512 bytes, `lx + 8 * (lz + 8 * ly)`) per mixed brick; a shaped one's masks after it, as many. */
   readonly payload: Uint32Array;
   /** Voxel count per palette index. */
   readonly counts: Uint32Array;
@@ -347,9 +355,11 @@ function packModel(model: TraceModel, name: string, maxWords: number): PackedMod
     throw new TypeError(
       `${where} ${name}.voxels has ${voxels.length} entries; a ${sx}x${sy}x${sz} model needs ${sx * sy * sz} (index = x + sx * (z + sz * y))`,
     );
-  const grid = new Uint32Array(bx * by * bz),
+  const shapes = checkShapes(model.shapes, voxels.length, name),
+    grid = new Uint32Array(bx * by * bz),
     counts = new Uint32Array(256),
-    scratch = new Uint8Array(BRICK * BRICK * BRICK);
+    scratch = new Uint8Array(BRICK * BRICK * BRICK),
+    masks = new Uint8Array(BRICK * BRICK * BRICK);
   let payload = new Uint32Array(BRICK_WORDS * Math.min(grid.length, 64)),
     bricks = 0;
   for (let cy = 0; cy < by; cy++)
@@ -363,21 +373,29 @@ function packModel(model: TraceModel, name: string, maxWords: number): PackedMod
           nz = Math.min(BRICK, sz - z0);
         // Cells past the model's edge stay 0, so a partial brick is uniform only when it is empty.
         const partial = nx < BRICK || ny < BRICK || nz < BRICK;
-        if (partial) scratch.fill(0);
+        if (partial) {
+          scratch.fill(0);
+          masks.fill(0);
+        }
         let first = -1,
-          uniform = !partial;
+          uniform = !partial,
+          shaped = false;
         for (let ly = 0; ly < ny; ly++)
           for (let lz = 0; lz < nz; lz++) {
             const row = x0 + sx * (z0 + lz + sz * (y0 + ly)),
               at = 8 * (lz + 8 * ly);
             for (let lx = 0; lx < nx; lx++) {
-              const v = voxels[row + lx];
+              const v = voxels[row + lx],
+                mask = v && shapes ? shapes[row + lx] % 255 : 0;
               scratch[at + lx] = v;
+              masks[at + lx] = mask;
+              if (mask) shaped = true;
               counts[v]++;
               if (first < 0) first = v;
               else if (v !== first) uniform = false;
             }
           }
+        if (shaped) uniform = false;
         const index = cx + bx * (cz + bz * cy);
         if (partial && first === 0) {
           let empty = true;
@@ -388,13 +406,10 @@ function packModel(model: TraceModel, name: string, maxWords: number): PackedMod
           grid[index] = first === 0 ? 0 : (UNIFORM | first) >>> 0;
           continue;
         }
-        if ((bricks + 1) * BRICK_WORDS > payload.length) {
-          const grown = new Uint32Array(Math.min(grid.length, bricks * 2 + 1) * BRICK_WORDS);
-          grown.set(payload);
-          payload = grown;
-        }
+        payload = room(payload, bricks + (shaped ? 2 : 1), grid.length * 2);
         new Uint8Array(payload.buffer, bricks * BRICK_WORDS * 4, 512).set(scratch);
-        grid[index] = ++bricks;
+        grid[index] = shaped ? (SHAPED | ++bricks) >>> 0 : ++bricks;
+        if (shaped) new Uint8Array(payload.buffer, bricks++ * BRICK_WORDS * 4, 512).set(masks);
       }
   counts[0] = 0;
   return {
@@ -409,6 +424,24 @@ function packModel(model: TraceModel, name: string, maxWords: number): PackedMod
   };
 }
 
+/** The payload grown (doubling, at most `cap` bricks) to hold `need` bricks. */
+function room(payload: Uint32Array<ArrayBuffer>, need: number, cap: number): Uint32Array<ArrayBuffer> {
+  if (need * BRICK_WORDS <= payload.length) return payload;
+  const grown = new Uint32Array(Math.min(cap, Math.max(need, (payload.length / BRICK_WORDS) * 2 + 1)) * BRICK_WORDS);
+  grown.set(payload);
+  return grown;
+}
+
+/** Checks a model's or block's `shapes` (undefined: none) against its cell count. */
+function checkShapes(shapes: unknown, cells: number, name: string): Uint8Array | undefined {
+  if (shapes === undefined) return undefined;
+  if (!(shapes instanceof Uint8Array))
+    throw new TypeError(`${where} ${name}.shapes must be a Uint8Array of octant masks (0 for whole cells)`);
+  if (shapes.length !== cells)
+    throw new TypeError(`${where} ${name}.shapes has ${shapes.length} entries; it needs one per cell (${cells})`);
+  return shapes;
+}
+
 /**
  * Packs a model given as blocks: dense windows at offsets inside it (cells no block covers are empty; where blocks
  * overlap, the later one's cells win, its zeros included). Only bricks a block touches are visited.
@@ -418,7 +451,9 @@ function packBlocks(model: TraceModel, name: string, size: readonly [number, num
     bx = Math.ceil(sx / BRICK),
     by = Math.ceil(sy / BRICK),
     bz = Math.ceil(sz / BRICK),
-    touched = new Map<number, Uint8Array>();
+    touched = new Map<number, Uint8Array>(),
+    // Half-block masks of the bricks a shaped block touched (written with the cells, so later blocks win alike).
+    shaped = new Map<number, Uint8Array>();
   for (const [i, block] of (model.blocks as readonly TraceModelBlock[]).entries()) {
     const at = `${name}.blocks[${i}]`;
     if (!isObject(block)) throw new TypeError(`${where} ${at} must be {origin, size, voxels}`);
@@ -437,6 +472,7 @@ function packBlocks(model: TraceModel, name: string, size: readonly [number, num
       throw new TypeError(
         `${where} ${at}.voxels has ${v.length} entries; a ${n[0]}x${n[1]}x${n[2]} block needs ${n[0] * n[1] * n[2]} (index = x + sx * (z + sz * y))`,
       );
+    const shapes = checkShapes(block.shapes, v.length, at);
     for (let y = 0; y < n[1]; y++)
       for (let z = 0; z < n[2]; z++) {
         const gy = o[1] + y,
@@ -447,7 +483,12 @@ function packBlocks(model: TraceModel, name: string, size: readonly [number, num
             key = (gx >> 3) + bx * ((gz >> 3) + bz * (gy >> 3));
           let brick = touched.get(key);
           if (!brick) touched.set(key, (brick = new Uint8Array(BRICK * BRICK * BRICK)));
-          brick[(gx & 7) + 8 * ((gz & 7) + 8 * (gy & 7))] = v[row + x];
+          const cell = (gx & 7) + 8 * ((gz & 7) + 8 * (gy & 7)),
+            mask = shapes && v[row + x] ? shapes[row + x] % 255 : 0;
+          brick[cell] = v[row + x];
+          let masks = shaped.get(key);
+          if (mask && !masks) shaped.set(key, (masks = new Uint8Array(BRICK * BRICK * BRICK)));
+          if (masks) masks[cell] = mask;
         }
       }
   }
@@ -462,8 +503,9 @@ function packBlocks(model: TraceModel, name: string, size: readonly [number, num
       cz = Math.floor(key / bx) % bz,
       cy = Math.floor(key / (bx * bz)),
       partial = cx * 8 + 8 > sx || cy * 8 + 8 > sy || cz * 8 + 8 > sz;
+    const masks = shaped.get(key)?.some(Boolean) ? shaped.get(key) : undefined;
     let first = cells[0],
-      uniform = !partial;
+      uniform = !partial && !masks;
     for (let k = 0; k < cells.length; k++) {
       counts[cells[k]]++;
       if (cells[k] !== first) uniform = false;
@@ -473,13 +515,10 @@ function packBlocks(model: TraceModel, name: string, size: readonly [number, num
       continue;
     }
     if (cells.every((c) => c === 0)) continue;
-    if ((bricks + 1) * BRICK_WORDS > payload.length) {
-      const grown = new Uint32Array(Math.min(keys.length, bricks * 2 + 1) * BRICK_WORDS);
-      grown.set(payload);
-      payload = grown;
-    }
+    payload = room(payload, bricks + (masks ? 2 : 1), keys.length * 2);
     new Uint8Array(payload.buffer, bricks * BRICK_WORDS * 4, 512).set(cells);
-    grid[key] = ++bricks;
+    grid[key] = masks ? (SHAPED | ++bricks) >>> 0 : ++bricks;
+    if (masks) new Uint8Array(payload.buffer, bricks++ * BRICK_WORDS * 4, 512).set(masks);
   }
   counts[0] = 0;
   return {
@@ -502,8 +541,17 @@ function voxelAt(m: PackedModel, x: number, y: number, z: number): number {
   if (entry === 0) return 0;
   if (entry >= UNIFORM) return entry & 255;
   const b = (x & 7) + 8 * ((z & 7) + 8 * (y & 7)),
-    word = m.payload[(entry - 1) * BRICK_WORDS + (b >> 2)];
+    word = m.payload[((entry & ~SHAPED) - 1) * BRICK_WORDS + (b >> 2)];
   return (word >>> ((b & 3) * 8)) & 255;
+}
+
+/** Half-block mask of a model cell: 0 for a whole cell, an empty one or one outside the model. */
+function shapeAt(m: PackedModel, x: number, y: number, z: number): number {
+  if (x < 0 || y < 0 || z < 0 || x >= m.size[0] || y >= m.size[1] || z >= m.size[2]) return 0;
+  const entry = m.grid[(x >> 3) + m.bricks[0] * ((z >> 3) + m.bricks[2] * (y >> 3))];
+  if (entry >= UNIFORM || !(entry & SHAPED)) return 0;
+  const b = (x & 7) + 8 * ((z & 7) + 8 * (y & 7));
+  return (m.payload[(entry & ~SHAPED) * BRICK_WORDS + (b >> 2)] >>> ((b & 3) * 8)) & 255;
 }
 
 const luminance = (r: number, g: number, b: number) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
@@ -749,7 +797,7 @@ function modelEmitters(m: PackedModel, materials: Float32Array, cache: SceneCach
           for (let z = cz * 8; z < Math.min(cz * 8 + 8, sz); z++)
             for (let x = cx * 8; x < Math.min(cx * 8 + 8, sx); x++) {
               const v = voxelAt(m, x, y, z);
-              if (!glow[v]) continue;
+              if (!glow[v] || shapeAt(m, x, y, z)) continue; // shaped cells are found by BSDF sampling alone
               for (let f = 0; f < 6; f++) {
                 const s = steps[f];
                 if (!see[voxelAt(m, x + s[0], y + s[1], z + s[2])]) continue;

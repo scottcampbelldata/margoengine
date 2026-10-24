@@ -153,6 +153,14 @@ export interface TraceModel {
    */
   blocks?: readonly TraceModelBlock[];
   /**
+   * Compatible addition: half-block shapes (slabs, stairs) per cell, in the order of `voxels`: 0 or 255 for the whole
+   * cell, else an octant mask, bit `x + 2y + 4z` for the half cell at (x, y, z) (each 0 for the cell's low half on that
+   * axis, 1 for its high half), as `shapeOctants` of @margoengine/voxel gives. A shaped cell is hit, shadowed and
+   * entered as its filled half blocks only (a cut-out texture does not cut it, and its emission is not light-sampled).
+   * Read, never kept or changed; change `revision` when it changes. With `blocks`, give each block's `shapes`.
+   */
+  shapes?: Uint8Array;
+  /**
    * Compatible addition: this model's own material table (one material per palette index it uses, ids 1 to 255 and
    * unique), used instead of `scene.materials`: a scene may then hold any number of distinct materials, up to 255 per
    * table. Tables equal in content are stored once; a scene holds at most 4096 (`scene.materials` included), within
@@ -169,6 +177,8 @@ export interface TraceModelBlock {
   size: TraceVec3;
   /** Dense palette indices, `index = x + size[0] * (z + size[2] * y)`; 0 is empty. Read, never kept or changed. */
   voxels: Uint8Array;
+  /** Compatible addition: half-block shapes of the block's cells, as {@link TraceModel.shapes}, in `voxels` order. */
+  shapes?: Uint8Array;
 }
 
 /** One placement of a model. */

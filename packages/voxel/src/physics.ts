@@ -3,7 +3,8 @@
 // Only types come from @margoengine/physics: this entry adds no runtime import, so neither it nor the root pulls Rapier.
 import type { CollisionEvent, Physics, PhysicsBody, ShapeOptions } from '@margoengine/physics';
 import { MargoError } from '@margoengine/math/errors';
-import type { VoxelChunk } from './chunk.js';
+import { octants } from './octants.js';
+import { paletteOf, type VoxelChunk } from './chunk.js';
 import { chunkKey, VoxelWorld } from './world.js';
 
 /** Options of {@link VoxelPhysics}. */
@@ -92,6 +93,10 @@ interface Entry {
   scanned: boolean;
   // Faces (bit d, see DX) whose neighbour collider went away: this collider's border states may still count its voxels.
   stale: number;
+  // The triangle mesh of the chunk's solid slabs and stairs (null when it has none), always enabled, and whether an
+  // edit in or beside one of them left it stale.
+  parts: Collider | null;
+  partsDirty: boolean;
 }
 type Place = Pick<Entry, 'cx' | 'cy' | 'cz' | 'chunk'>;
 // A chunk within radius + 1 of a body: Chebyshev distance in chunks to the nearest body (d) and ball body (b).
@@ -121,6 +126,24 @@ const ONE = { x: 1, y: 1, z: 1 },
   PIECE = 2048,
   // Metres added to every body's reach: what a body can touch before the next step is never left pending.
   MARGIN = 1;
+// Rectangles [u0, v0, u1, v1] in half blocks covering each 2 x 2 mask of quarter faces (bit u + 2v), as the mesher's.
+const RECTS: readonly (readonly number[])[][] = Array.from({ length: 16 }, (_, mask) => {
+  const out: number[][] = [],
+    row = (bits: number, v0: number, v1: number) => {
+      if (bits) out.push(bits === 3 ? [0, v0, 2, v1] : [bits >> 1, v0, (bits >> 1) + 1, v1]);
+    },
+    low = mask & 3,
+    high = mask >> 2;
+  if (low === high) row(low, 0, 2);
+  else if (high === 3) {
+    row(3, 1, 2);
+    row(low, 0, 1);
+  } else {
+    row(low, 0, 1);
+    row(high, 1, 2);
+  }
+  return out;
+});
 const neighbour = (e: Entry, d: number): string => chunkKey(e.cx + DX[d], e.cy + DY[d], e.cz + DZ[d]);
 const same = (a: Map<string, number>, b: Map<string, number>): boolean => {
   if (a.size !== b.size) return false;
@@ -140,6 +163,9 @@ const checkBudget = (budget: unknown): number => {
  * loaded chunk within `radius` chunks of any non-fixed body (dynamic or kinematic, awake or asleep: a sleeping body
  * keeps its floor) gets a collider in cell coordinates, built from the chunk's surface: its solid cells (block types
  * with `solid`) with at least one non-solid face neighbour, reading neighbour chunks (an unloaded one counts as air).
+ * Solid slabs and stairs collide as their half-block boxes instead: each chunk with any gets one more triangle mesh of
+ * their open faces (`FIX_INTERNAL_EDGES`), rebuilt when a cell in or beside one changes, so bodies rest on a slab's
+ * top and climb stairs.
  * A chunk keeps it until no body is within `radius + 1` (so a body on a chunk border does not make chunks come and go
  * every step) or the chunk unloads.
  *
@@ -183,8 +209,9 @@ export class VoxelPhysics {
   private centres = new Map<string, number>(); // body chunk key -> 1 when a ball body is there
   private near = new Map<string, Near>();
   private needed: Near[] = [];
-  // Conservative cost estimates (ms) of a voxel build, a scan and a piece build: a decaying maximum of measured runs.
-  private readonly cost = [0.5, 0.3, 0.5];
+  // Conservative cost estimates (ms) of a voxel build, a scan, a piece build and a slab and stair mesh build: a decaying
+  // maximum of measured runs.
+  private readonly cost = [0.5, 0.3, 0.5, 0.3];
   // x, y, z, reach, ball per non-fixed body, gathered when there is work.
   private readonly spheres: number[] = [];
   private readonly vector = { x: 0, y: 0, z: 0 };
@@ -195,6 +222,7 @@ export class VoxelPhysics {
   private readonly vertices = new Float32Array(PIECE * 6);
   private readonly indices = new Uint32Array(PIECE * 3);
   private solid = new Uint8Array(0);
+  private part = new Uint8Array(0);
   private disposed = false;
   private readonly offStep: () => void;
   private readonly offChange: () => void;
@@ -271,6 +299,7 @@ export class VoxelPhysics {
       if (entry.mode !== MESH) {
         if (entry.collider) list.push(entry.collider);
       } else for (const piece of entry.pieces) if (piece.collider) list.push(piece.collider);
+      if (entry.parts) list.push(entry.parts);
       if (list.length) out.set(key, list);
     }
     return out;
@@ -356,6 +385,8 @@ export class VoxelPhysics {
         faces: null,
         scanned: false,
         stale: 0,
+        parts: null,
+        partsDirty: false,
       };
       this.entries.set(key, entry);
       this.work.add(entry);
@@ -404,6 +435,10 @@ export class VoxelPhysics {
           this.unit(0, entry);
           urgent = true;
         }
+        if (entry.partsDirty) {
+          this.unit(3, entry);
+          urgent = true;
+        }
         // A ball about to touch a chunk that is not a mesh yet: switch now (pieces near bodies are built below).
         if (entry.mode !== MESH && this.reaches(entry, WHOLE, true)) {
           if (entry.mode === VOXELS) this.setMode(entry, true);
@@ -423,6 +458,11 @@ export class VoxelPhysics {
     const order = Array.from(this.work).sort((a, b) => this.distance(a) - this.distance(b));
     let ran = urgent;
     for (const entry of order) {
+      if (entry.partsDirty && !entry.rebuild) {
+        if (ran && performance.now() - start + this.cost[3] > this.limit) return;
+        this.unit(3, entry);
+        ran = true;
+      }
       for (;;) {
         const i = entry.rebuild ? -1 : entry.pieces.findIndex((piece) => piece.dirty);
         if (!entry.rebuild && i < 0) break;
@@ -434,12 +474,16 @@ export class VoxelPhysics {
       this.settle(entry);
     }
   }
-  // One unit of work, timed: 0 builds the voxel collider, 1 scans the faces for the pieces, 2 builds piece i.
-  // Returns true when the piece was over the triangle cap and split instead.
+  // One unit of work, timed: 0 builds the voxel collider (and the slab and stair mesh), 1 scans the faces for the
+  // pieces, 2 builds piece i, 3 the slab and stair mesh. Returns true when the piece was over the triangle cap and split
+  // instead.
   private unit(kind: number, entry: Entry, i = 0): boolean {
     const start = performance.now();
     let split = false;
-    if (kind === 0) this.voxels(entry);
+    if (kind === 0) {
+      this.voxels(entry);
+      this.shapes(entry);
+    } else if (kind === 3) this.shapes(entry);
     else if (kind === 1) {
       this.scan(entry, (entry.faces ??= new Uint8Array(32768)));
       entry.scanned = true;
@@ -449,7 +493,7 @@ export class VoxelPhysics {
   }
   // Leaves the work set once nothing is pending; a building chunk becomes a mesh then.
   private settle(entry: Entry): void {
-    if (entry.rebuild || entry.pieces.some((piece) => piece.dirty)) return;
+    if (entry.rebuild || entry.partsDirty || entry.pieces.some((piece) => piece.dirty)) return;
     if (entry.mode === BUILDING) this.activate(entry);
     entry.faces = null;
     this.work.delete(entry);
@@ -556,14 +600,111 @@ export class VoxelPhysics {
       }
     }
     for (const piece of entry.pieces) if (piece.collider) this.retire(piece.collider);
+    if (entry.parts) this.retire(entry.parts);
     this.entries.delete(entry.key);
     this.work.delete(entry);
   }
-  // Solid flag per block id, refreshed when the world's block types grow.
+  // Solid flag per block id (whole cells: solid slabs and stairs are 0), refreshed when the world's block types grow.
   private solidIds(): Uint8Array {
     const table = this.world.blocks.table;
-    if (this.solid.length !== table.length) this.solid = Uint8Array.from(table, (type) => +type.solid);
+    if (this.solid.length !== table.length) {
+      this.part = Uint8Array.from(table, (t) =>
+        t.solid && t.shape === 'slab' ? 1 : t.solid && t.shape === 'stair' ? 2 : 0,
+      );
+      this.solid = Uint8Array.from(table, (t, id) => +(t.solid && !this.part[id]));
+    }
     return this.solid;
+  }
+  // Per block id: 1 for a solid slab, 2 for a solid stair, else 0.
+  private partIds(): Uint8Array {
+    this.solidIds();
+    return this.part;
+  }
+  // Octants of the solid slab or stair at world cell (x, y, z), 255 for a solid whole cell, 0 otherwise.
+  private octantsAt(x: number, y: number, z: number): number {
+    if ((x | 0) !== x || (z | 0) !== z) return 0;
+    const state = this.world.getBlock(x, y, z),
+      kind = this.partIds()[state & 0xffff];
+    return kind ? octants(kind === 1 ? 'slab' : 'stair', state >>> 16) : this.solid[state & 0xffff] ? 255 : 0;
+  }
+  // (Re)builds the triangle mesh of the chunk's solid slabs and stairs: per cell and face direction, the quarters of its
+  // face on the cell's side where it fills the octant behind and the neighbour's octant in front is not solid, and of
+  // its mid-cell face where it fills the octant behind and not the one in front, as at most two rectangles each.
+  private shapes(entry: Entry): void {
+    entry.partsDirty = false;
+    const parts = this.partIds(),
+      { chunk } = entry,
+      positions: number[] = [],
+      corner = [0, 0, 0],
+      x0 = entry.cx * 32,
+      y0 = entry.cy * 32,
+      z0 = entry.cz * 32;
+    let any = false;
+    for (const state of paletteOf(chunk)) if (parts[state & 0xffff]) any = true;
+    if (any)
+      for (let i = 0; i < 32768; i++) {
+        const lx = i & 31,
+          ly = i >> 10,
+          lz = (i >> 5) & 31,
+          state = chunk.get(lx, ly, lz),
+          kind = parts[state & 0xffff];
+        if (!kind) continue;
+        const own = octants(kind === 1 ? 'slab' : 'stair', state >>> 16),
+          cell = [x0 + lx, y0 + ly, z0 + lz];
+        for (let d = 0; d < 6; d++) {
+          const a = d >> 1,
+            u = (a + 1) % 3,
+            v = (a + 2) % 3,
+            bN = 1 << a,
+            bU = 1 << u,
+            bV = 1 << v,
+            positive = !(d & 1),
+            out = positive ? bN : 0,
+            back = positive ? 0 : bN,
+            there = this.octantsAt(cell[0] + DX[d], cell[1] + DY[d], cell[2] + DZ[d]);
+          let outer = 0,
+            inset = 0;
+          for (let c = 0; c < 4; c++) {
+            const o = (c & 1 ? bU : 0) | (c & 2 ? bV : 0);
+            if ((own >> (o | out)) & 1) {
+              if (!((there >> (o | back)) & 1)) outer |= 1 << c;
+            } else if ((own >> (o | back)) & 1) inset |= 1 << c;
+          }
+          for (let plane = 0; plane < 2; plane++) {
+            const mask = plane ? inset : outer;
+            for (const r of RECTS[mask]) {
+              // Corners counter-clockwise seen from outside: u then v spans +a, so a negative face goes v then u.
+              corner[a] = cell[a] + (plane ? 0.5 : positive ? 1 : 0);
+              for (let c = 0; c < 4; c++) {
+                const far = c === 1 || c === 2,
+                  side = c >= 2;
+                corner[u] = cell[u] + ((positive ? far : side) ? r[2] : r[0]) / 2;
+                corner[v] = cell[v] + ((positive ? side : far) ? r[3] : r[1]) / 2;
+                positions.push(corner[0], corner[1], corner[2]);
+              }
+            }
+          }
+        }
+      }
+    if (entry.parts) this.retire(entry.parts);
+    entry.parts = null;
+    if (!positions.length) return;
+    const quads = positions.length / 12,
+      indices = new Uint32Array(quads * 6);
+    for (let q = 0; q < quads; q++) indices.set([q * 4, q * 4 + 1, q * 4 + 2, q * 4, q * 4 + 2, q * 4 + 3], q * 6);
+    const R = this.rapier;
+    entry.parts = this.attach(
+      R.ColliderDesc.trimesh(Float32Array.from(positions), indices, R.TriMeshFlags?.FIX_INTERNAL_EDGES),
+      entry,
+      true,
+    );
+  }
+  // The slab and stair mesh of the chunk holding world cell (x, y, z) rebuilds.
+  private reshape(x: number, y: number, z: number): void {
+    const entry = this.entries.get(chunkKey(x >> 5, y >> 5, z >> 5));
+    if (!entry) return;
+    entry.partsDirty = true;
+    this.work.add(entry);
   }
   // Fills `faces` with the open faces (bit d: that neighbour is not solid) of each solid cell; returns how many have any.
   private scan(e: Place, faces: Uint8Array): number {
@@ -752,7 +893,12 @@ export class VoxelPhysics {
   private readonly edit = (x: number, y: number, z: number, state: number, previous: number): void => {
     if (this.physics.isDisposed) return this.dispose();
     const ids = this.solidIds(),
+      parts = this.part,
       solid = ids[state & 0xffff];
+    // A slab or stair here or beside: its mesh (which hides faces against solid neighbours) rebuilds.
+    if (parts[state & 0xffff] || parts[previous & 0xffff]) this.reshape(x, y, z);
+    for (let d = 0; d < 6; d++)
+      if (this.octantsAt(x + DX[d], y + DY[d], z + DZ[d]) % 255) this.reshape(x + DX[d], y + DY[d], z + DZ[d]);
     if (solid === ids[previous & 0xffff]) return;
     this.set(x, y, z, !!solid);
     this.touch(x, y, z);

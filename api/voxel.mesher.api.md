@@ -25,6 +25,8 @@ export interface DecodedQuad {
     material: number;
     ao: [number, number, number, number];
     wave: boolean;
+    inset: boolean;
+    trim: number;
     sky: [number, number, number, number];
     block: [number, number, number, number];
 }
@@ -67,7 +69,7 @@ export function sortQuads(words: Uint32Array, eye: Vec3): Uint32Array;
 
 type BlockLayer = 'opaque' | 'cutout' | 'translucent' | 'invisible';
 
-type BlockShape = 'cube' | 'cross' | 'liquid';
+type BlockShape = 'cube' | 'cross' | 'liquid' | 'slab' | 'stair';
 
 interface BlockType {
     readonly id: number;

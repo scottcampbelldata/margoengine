@@ -101,6 +101,14 @@ const demos = [
     views: ['high'],
     profiles: VOXEL,
   },
+  // Slabs and stairs (DESIGN.md "Block shapes"): sun-shadowed half blocks, an inset deck step and a top-slab roof.
+  {
+    id: 'voxel-shapes',
+    path: 'voxel/?view=shapes',
+    ready: 'window.voxelSandbox?.ready===true',
+    views: ['high'],
+    profiles: ['nvidia-ampere-msedge-156'],
+  },
   {
     id: 'character-animation',
     path: 'demos/character-animation.html',

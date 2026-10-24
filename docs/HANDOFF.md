@@ -2,6 +2,23 @@
 
 Last updated 2026-10-24. Read this first when starting a new session. Update it whenever work lands.
 
+## Landed 2026-10-24: voxel slabs and stairs
+
+`BlockShape` `'slab'` and `'stair'` are back, built end to end (Codex's vertex shift was removed earlier). States carry
+the orientation: `slabState(id, top)`, `stairState(id, facing, upsideDown)` (four facings), `shapeOctants(type,
+state)` (one octant mask that every system reads). The mesher meshes slabs, stairs and the cube faces beside them per
+quarter face (culling against neighbours of any shape, inset and trimmed quads in word 1 bits 21-25, greedy merging
+per kind), with half-block AO and light; chunks without them mesh to the same bytes as before. The quad and shadow
+shaders place inset and trimmed quads; light stops only at faces a block covers whole; `sweepBox`, `VoxelCharacter`
+and `raycastVoxels` use the boxes; `VoxelPhysics` gives each chunk with solid ones a triangle mesh of their faces; the
+path tracer takes `TraceModel.shapes`; the codecs keep the states; VOX import stays whole blocks (no shape mapping).
+Demo: the voxel sandbox's `?view=shapes`, a new visual reference (`voxel-shapes-high`, A6000 Edge 156 profile).
+Sizes (gzip): voxel root +225 B, `./mesher` +1,344, `./light` +503, `./physics` +848, `./query` +545, `./render` +340,
+mesher worker +1,342, voxel-pathtracer +1,823; core + stage unchanged at 22,253 B. Meshing the 128-chunk bench terrain
+(Node, RTX A6000 desktop): 39.2 ms before, 39.7-40.6 ms after (A/B in one process, same 106,971 quads); with slabs and
+stairs on two thirds of its surface (`mesh-128-shaped-chunks`): 80.0 ms. Open: no corner (inner/outer) stairs, no
+double slabs as one state, no waterlogging; the path tracer does not light-sample shaped emissive cells.
+
 ## Landed 2026-10-24: multi-view demos (roadmap M7 done)
 
 Three site demos built from public APIs only: [four-view CAD layout](../examples/cad-views.html) (top, front and right
@@ -84,7 +101,8 @@ Codex's `work/changes` (82cef03e, 100 commits) was reviewed, rewritten and lande
 views and scenes are in core as Scott's approved freeze exception: core + stage 22,253 B gzip (core 20,015), 2,747 B
 under the 25,000 B gate. Every package is view-aware ([multi-view-roadmap.md](multi-view-roadmap.md)); only the M7
 CAD demos are open. One clean-room AgX in `packages/shared/agx.js`. Public renames for the apps:
-[renames-2026-10-24.md](renames-2026-10-24.md). Removed until done properly: voxel slab and stair shapes.
+[renames-2026-10-24.md](renames-2026-10-24.md). Removed until done properly: voxel slab and stair shapes (back since,
+see the slabs and stairs landing above).
 Checks at landing: `npm run check:merge` (4,405 tests, proofs 20/20, visual 62/62, `check:views`) and hygiene with no
 gate worse than main for the packages touched.
 Duplicate cleanup (2026-10-24): the duplicates gate went from 92 items (1,182 duplicated lines) to 4 (15). Shared

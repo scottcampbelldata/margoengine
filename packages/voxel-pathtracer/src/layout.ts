@@ -8,6 +8,7 @@ import {
   NODE_WORDS,
   type PackedModel,
   type SceneSnapshot,
+  SHAPED,
   sceneRecordWords,
   UNIFORM,
 } from './scene.js';
@@ -45,7 +46,7 @@ export function modelWords(m: PackedModel, offset: number): Uint32Array {
     payload = offset + m.grid.length;
   for (let i = 0; i < m.grid.length; i++) {
     const e = m.grid[i];
-    out[i] = e === 0 || e >= UNIFORM ? e : payload + (e - 1) * BRICK_WORDS;
+    out[i] = e === 0 || e >= UNIFORM ? e : (payload + ((e & ~SHAPED) - 1) * BRICK_WORDS) | (e & SHAPED);
   }
   out.set(m.payload, m.grid.length);
   return out;

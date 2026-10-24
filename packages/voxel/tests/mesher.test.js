@@ -86,8 +86,16 @@ const UAXIS = [
   ];
 const word0 = (x, y, z, face, w, h, flip, drop) =>
   (x | (y << 5) | (z << 10) | (face << 15) | ((w - 1) << 18) | ((h - 1) << 23) | (flip << 28) | (drop << 29)) >>> 0;
-const word1 = (material, ao, wave) =>
-  (material | (ao[0] << 12) | (ao[1] << 14) | (ao[2] << 16) | (ao[3] << 18) | (wave << 20)) >>> 0;
+const word1 = (material, ao, wave, inset = 0, trim = 0) =>
+  (material |
+    (ao[0] << 12) |
+    (ao[1] << 14) |
+    (ao[2] << 16) |
+    (ao[3] << 18) |
+    (wave << 20) |
+    (inset << 21) |
+    (trim << 22)) >>>
+  0;
 const word2 = (sky, block) => sky.reduce((w, s, c) => w | ((s | (block[c] << 4)) << (8 * c)), 0) >>> 0;
 
 // Every quad of a layer cut back to unit faces: the merged mesh must equal one quad per face.
@@ -579,22 +587,32 @@ test('decodeQuad reads every field of the bit layout, maxima included', () => {
         material: r(4095),
         ao: [r(3), r(3), r(3), r(3)],
         wave: next() < 0.5,
+        inset: next() < 0.5,
+        trim: r(15),
         sky: [r(15), r(15), r(15), r(15)],
         block: [r(15), r(15), r(15), r(15)],
       };
     if (n === 0)
       Object.assign(q, { x: 31, y: 31, z: 31, face: 7, w: 32, h: 32, flip: true, liquidDrop: 7, material: 4095 });
-    if (n === 0) Object.assign(q, { ao: [3, 3, 3, 3], wave: true, sky: [15, 15, 15, 15], block: [15, 15, 15, 15] });
+    if (n === 0)
+      Object.assign(q, {
+        ao: [3, 3, 3, 3],
+        wave: true,
+        inset: true,
+        trim: 15,
+        sky: [15, 15, 15, 15],
+        block: [15, 15, 15, 15],
+      });
     const words = Uint32Array.of(
       0,
       0,
       0,
       word0(q.x, q.y, q.z, q.face, q.w, q.h, +q.flip, q.liquidDrop),
-      word1(q.material, q.ao, +q.wave),
+      word1(q.material, q.ao, +q.wave, +q.inset, q.trim),
       word2(q.sky, q.block),
     );
     assert.deepEqual(decodeQuad(words, 1), q);
-    if (n === 0) assert.deepEqual([...words.slice(3)], [0xffffffff, 0x1fffff, 0xffffffff]);
+    if (n === 0) assert.deepEqual([...words.slice(3)], [0xffffffff, 0x3ffffff, 0xffffffff]);
   }
   assert.equal(QUAD_WORDS, 3);
 });

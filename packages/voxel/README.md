@@ -47,10 +47,26 @@ worker.onmessage = ({ data }) => world.addChunk(0, 1, 0, VoxelChunk.unpack(data)
   key with no chunk was removed. `heightmap(cx, cz)` is the column's 32 x 32 Int16Array that `./light` fills. Edit
   loaded chunks through the world (`chunk.set` on a loaded chunk bypasses dirty tracking and events).
 - **Block types.** Options: `textures`, `layer` (`'opaque'`, `'cutout'`, `'translucent'`, `'invisible'`), `shape`
-  (`'cube'`, `'cross'`, `'liquid'`), `solid`, `liquid`, `light` and `opacity` (0-15), `color`, `roughness`,
-  `metalness`, `emissive`, `animation: {frames, fps}`, `maps: {normal, roughness, emissive}` (texture layers),
-  `transmission` and `scatter`. `blocks.table` is the resolved list, plain data for workers.
+  (`'cube'`, `'cross'`, `'liquid'`, `'slab'`, `'stair'`), `solid`, `liquid`, `light` and `opacity` (0-15), `color`,
+  `roughness`, `metalness`, `emissive`, `animation: {frames, fps}`, `maps: {normal, roughness, emissive}` (texture
+  layers), `transmission` and `scatter`. `blocks.table` is the resolved list, plain data for workers.
   Ids follow definition order, so define types in the same order wherever saved states are read back.
+- **Slabs and stairs.** Half-block shapes whose orientation is in the block state's data: `slabState(id, top)` (the
+  lower half, or the upper half when `top`) and `stairState(id, facing, upsideDown)` (a lower slab plus the upper
+  quarter on its back side, `facing` `'+x'`, `'-x'`, `'+z'` or `'-z'` naming that side; upside down puts the slab on
+  top). `shapeOctants(type, state)` gives the half cells a state fills as an 8-bit mask (bit `x + 2y + 4z`, 255 for a
+  cube). They mesh, shade, cast and receive shadows, pass light, collide and pick as those boxes (the sections below),
+  and their states go through the codecs unchanged. `opacity` defaults to 0: light is stopped by the faces they cover
+  whole, not by a cost.
+
+```ts
+import { slabState, stairState } from '@margoengine/voxel';
+
+const slab = blocks.define('stone_slab', { shape: 'slab', textures: stone });
+const stairs = blocks.define('oak_stairs', { shape: 'stair', textures: planks });
+world.setBlock(x, y, z, slabState(slab)); // lower half; slabState(slab, true) is the upper half
+world.setBlock(x + 1, y, z, stairState(stairs, '+x')); // climbs toward +x; stairState(stairs, '+x', true) hangs
+```
 - **Errors.** `TypeError` for wrong types, `RangeError` for values out of range (cells, states, ids, options),
   `MargoError` `'state'` for a duplicate block name or a chunk that is already loaded.
 
@@ -89,9 +105,11 @@ engine.onFrame((_, dt) => {
   through an exact edge or corner skips the cells it only touches; a ray in a face plane runs in the cells on the
   plane's positive side; a ray that starts inside a block hits it at distance 0 with normal `[0, 0, 0]`. `point` lies
   exactly on the face (that coordinate is an integer). By default every drawn block except liquids is hit, solid or
-  not, and a cross block (flower, torch) is hit as its whole cell; the optional `filter(state, type)` changes that.
+  not, and a cross block (flower, torch) is hit as its whole cell; the optional `filter(state, type)` changes that. A
+  slab or stair is hit where the ray meets its half-block boxes (the walk continues through its open part): `normal`
+  is that box face's, `point` lies on it (a multiple of 0.5 there, such as a slab's top at `y + 0.5`).
 - **Sweeps.** `sweepBox` moves along y, then x, then z, each axis stopped by the first solid block (`solid: true`,
-  as its whole cell) after scanning every cell layer the move crosses. Touching, or overlapping by up to 1e-6 blocks,
+  as its whole cell, or a slab's or stair's half-block boxes) after scanning every cell layer the move crosses. Touching, or overlapping by up to 1e-6 blocks,
   is not a collision, and a box can leave a block placed inside it. `position` is the box's new min corner; `onGround`
   is true when the downward move was stopped, or with motion y 0, when the box rests on a block.
 - **Player body.** `update(dt, intent)` runs fixed 1/120 s steps (the remainder carries over, at most 0.25 s per
@@ -99,8 +117,8 @@ engine.onFrame((_, dt) => {
   Walking accelerates and brakes in about 0.15 s on the ground (weakly in the air), falls at `gravity` (default 32
   blocks/s², capped at 78.4 blocks/s) and jumps at `speeds.jump` (9: 1.27 blocks high). It steps onto ledges up to
   `stepHeight` (0.6) only from the ground, when landing or in liquid, and only when the raised body fits under the
-  ceiling. Full blocks make ground ledges whole blocks, so 0.6 matters when climbing out of water and for anything
-  that leaves the feet off the grid. In a liquid block it swims: slower (`speeds.swim`, 2), buoyant (a fifth of
+  ceiling. Full blocks make ground ledges whole blocks; slabs and stairs make half-block ones, so the default 0.6
+  walks up stairs and onto slabs without jumping. In a liquid block it swims: slower (`speeds.swim`, 2), buoyant (a fifth of
   gravity), `jump` swims up, and jumping against a wall climbs out onto the bank. `flying` turns gravity off; `jump`
   and `descend` rise and sink at `speeds.fly` (11). Defaults: size `[0.6, 1.8, 0.6]`, walk 4.317, sprint 5.612.
 
@@ -183,7 +201,13 @@ const materials = blockMaterials(blocks.table); // material id per block id * 6 
 
 - **Faces.** An opaque cube hides every face against it; faces between blocks of the same id (glass and glass, water
   and water, leaves and leaves) are hidden; every other face stays, so stone behind glass keeps its face and the glass
-  face against the stone goes. Invisible blocks emit nothing. `cross` blocks emit two diagonal quads (faces 6 and 7),
+  face against the stone goes. Invisible blocks emit nothing. Slabs and stairs, and cube faces with one within a cell,
+  are meshed at half-block resolution: a quarter of a face shows when its block fills the half cell behind it and the
+  half cell in front is neither an opaque block's nor the same block's, so a cube beside a slab keeps only its upper
+  half face, a slab under a cube hides the cube's bottom only as a top slab, and two slabs side by side hide the faces
+  between them. Visible quarters become at most two rectangles per face plane, on the cell's side or (for a slab's top,
+  a stair's step and riser) half a block inside it, and merge greedily along every axis they are not trimmed on. A
+  chunk without slabs or stairs meshes to the same bytes as before. `cross` blocks emit two diagonal quads (faces 6 and 7),
   unshaded and lit by their own cell. A `liquid` cell without the same liquid above is a surface: its top and sides
   drop by its state data's low 3 bits in eighths of a block (`blockState(water, level)`) and carry the wave bit; a
   lowered top under a solid block stays, and a side above a lower surface of the same liquid stays.
@@ -191,11 +215,14 @@ const materials = blockMaterials(blocks.table); // material id per block id * 6 
   edge cells are opaque, else 3 minus the count of edge and diagonal cells; 0fps.net's rule) and smooth light, the
   rounded mean of the open cells around it. The AO picks the triangle diagonal (the brighter pair). Faces merge only when
   their words are equal and their corners equal along the merge axis, so a merged quad shades exactly like the unit
-  faces it covers; the tests check this against a one-quad-per-face oracle.
+  faces it covers; the tests check this against a one-quad-per-face oracle. On half-block faces the AO and light come
+  from the four half cells of the front layer around each corner (a stair's step darkens where it meets its riser),
+  and the tests check every face against a half-block oracle.
 - **Quad words** (low bits first). Word 0: x 0-4, y 5-9, z 10-14 (the local cell), face 15-17 (+x, -x, +y, -y, +z, -z,
   then the two cross diagonals), w - 1 at 18-22, h - 1 at 23-27, flip 28, liquidDrop 29-31. Word 1: material 0-11, AO
-  per corner at 12-19 (2 bits each), wave 20. Word 2: per corner c, sky light at bits 8c-8c+3 and block light at
-  8c+4-8c+7. The u and v axes are z, y on x faces, x, z on y faces and x, y on z faces; corners run (0, 0), (w, 0),
+  per corner at 12-19 (2 bits each), wave 20, inset 21 (the face lies half a block inside its cell), trim 22-25 (bits
+  1, 2, 4, 8: the quad starts half a block later along u, ends half a block earlier along u, the same along v). Word
+  2: per corner c, sky light at bits 8c-8c+3 and block light at 8c+4-8c+7. The u and v axes are z, y on x faces, x, z on y faces and x, y on z faces; corners run (0, 0), (w, 0),
   (w, h), (0, h). `ChunkMesh` documents the geometry in full.
 - **Materials.** `blockMaterials(table)` numbers each distinct texture layer of each block in id order (up to 4,096), so
   a renderer builds its material table (layer, tint, roughness, metalness, emissive, animation) from the same walk.
@@ -229,6 +256,10 @@ lighting.dispose();
 - **Sky light** is 15 in every cell above its column's heightmap (`world.heightmap`: the highest cell with opacity > 0,
   so glass passes it at full strength) and spreads from there; **block light** spreads from each type's `light`. Each
   step costs 1 plus the entered cell's `opacity` (stone's 15 stops it; leaves with `opacity: 1` dim it by 2 a block).
+- **Slabs and stairs** pass light through their open part: no light crosses a face their boxes cover whole (a lower
+  slab's bottom, an upper slab's top, a stair's back and the half it stands on), any other face passes it at the
+  usual cost. They end their column's open sky; one whose top is open (a lower slab, a stair) is itself lit as open
+  sky when it tops its column, so its top face shades like the ground beside it.
 - Edits and chunk loads and removals (`world.onChunk`) are queued as they happen; `update()` applies them in order,
   across chunk borders: a chunk loaded later takes light in from its loaded neighbours and gives its own out. Darkening
   uses the two-queue removal flood, so removing a torch, closing a roof or unloading a chunk clears only what that
@@ -330,6 +361,10 @@ voxels.dispose();
   body's chunk and its 26 neighbours) of any non-fixed body gets a collider; sleeping bodies count, so they keep their
   floor, and kinematic ones count, so character controllers walk on blocks. A chunk keeps it until no body is within
   `radius + 1` (a body resting on a chunk border does not make chunks come and go) or the chunk unloads.
+- **Slabs and stairs.** Solid slabs and stairs are left out of the voxel collider and collide as their half-block
+  boxes: each chunk with any gets one more triangle mesh of their open faces (`FIX_INTERNAL_EDGES`, always enabled,
+  beside the voxels or the mesh pieces), rebuilt when a cell in or beside one changes. A box rests on a slab's top at
+  `y + 0.5` and on a stair's step or back.
 - **What collides.** The chunk's surface: cells of block types with `solid` (the default) that touch a non-solid cell
   or an unloaded chunk. Buried cells are left out, so an underground chunk costs almost nothing.
 - **Seams and edits.** Each chunk has a Rapier voxel collider, coupled with its neighbours through

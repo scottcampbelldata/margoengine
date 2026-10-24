@@ -1,7 +1,7 @@
 // Two-level voxel traversal on the CPU: Amanatides and Woo's grid walk ("A Fast Voxel Traversal Algorithm for Ray
 // Tracing", 1987) over 8^3 bricks, and inside a mixed brick over its voxels. The WGSL march in shaders.ts is the same
 // walk step for step; VoxelPathTracer.raycast uses this one, and the browser check compares the two per pixel.
-import { BRICK_WORDS, type PackedModel, type SceneSnapshot, UNIFORM } from './scene.js';
+import { BRICK_WORDS, type PackedModel, type SceneSnapshot, SHAPED, UNIFORM } from './scene.js';
 
 /** Result of {@link march}: the boundary crossed and the cell entered. */
 interface MarchHit {
@@ -21,8 +21,45 @@ const TINY = 1e-12;
 const inverse = (d: number) => 1 / (Math.abs(d) < TINY ? (d < 0 ? -TINY : TINY) : d);
 
 /**
+ * Where o + t d first reaches a half block of cell c that is filled (`fill`) or empty, walking the cell's 2 x 2 x 2
+ * half blocks of `mask` (bit x + 2y + 4z) from t0, entered across axis a0 (3: the ray starts inside), to t1: [t, axis],
+ * or undefined. The same walk as the shader's octWalk.
+ */
+function octWalk(
+  mask: number,
+  o: readonly number[],
+  d: readonly number[],
+  c: readonly number[],
+  t0: number,
+  t1: number,
+  a0: number,
+  fill: boolean,
+): [number, number] | undefined {
+  // The half the ray is in just after t0, and when it crosses into the other half on each axis.
+  const ts = t0 + Math.min((t1 - t0) * 0.5, 1e-4),
+    h = [0, 0, 0],
+    next = [Infinity, Infinity, Infinity];
+  for (let a = 0; a < 3; a++) {
+    h[a] = o[a] + d[a] * ts - c[a] >= 0.5 ? 1 : 0;
+    if ((d[a] > 0 && !h[a]) || (d[a] < 0 && h[a])) next[a] = (c[a] + 0.5 - o[a]) * inverse(d[a]);
+  }
+  let t = t0,
+    axis = a0;
+  for (let i = 0; i < 4; i++) {
+    if ((((mask >> (h[0] | (h[1] << 1) | (h[2] << 2))) & 1) === 1) === fill) return [t, axis];
+    t = Math.min(next[0], next[1], next[2]);
+    if (!(t < t1)) return undefined;
+    axis = next[0] === t ? 0 : next[1] === t ? 1 : 2;
+    h[axis] ^= 1;
+    next[axis] = Infinity;
+  }
+  return undefined;
+}
+
+/**
  * Walks the model-local ray `o + t d` (d need not be unit length) through `m` for t in [tMin, tMax) and returns the
- * first boundary into a cell whose palette index differs from `target` (0 outside a volume). When `target` is not 0
+ * first boundary into a cell whose palette index differs from `target` (0 outside a volume). A shaped cell holds its
+ * index in its filled half blocks and 0 elsewhere, so its boundaries are those of its half-block boxes. When `target` is not 0
  * and the ray leaves the model first, the exit through the model's box is returned with value 0.
  */
 function march(
@@ -114,7 +151,8 @@ function march(
           clamp(Math.floor(oz + dz * t), lz, hz),
         );
     } else {
-      const base = (entry - 1) * BRICK_WORDS;
+      const base = ((entry & ~SHAPED) - 1) * BRICK_WORDS,
+        shaped = (entry & SHAPED) !== 0;
       let vx = clamp(Math.floor(ox + dx * t), lx, hx),
         vy = clamp(Math.floor(oy + dy * t), ly, hy),
         vz = clamp(Math.floor(oz + dz * t), lz, hz),
@@ -125,8 +163,23 @@ function march(
         va = axis;
       for (;;) {
         const b = vx - lx + 8 * (vz - lz + 8 * (vy - ly)),
-          v = (m.payload[base + (b >> 2)] >>> ((b & 3) * 8)) & 255;
-        if (v !== target) return record(vt, v, va, vx, vy, vz);
+          v = (m.payload[base + (b >> 2)] >>> ((b & 3) * 8)) & 255,
+          mask = shaped && v ? (m.payload[base + BRICK_WORDS + (b >> 2)] >>> ((b & 3) * 8)) & 255 : 0;
+        if (mask) {
+          const o = [ox, oy, oz],
+            d = [dx, dy, dz],
+            c = [vx, vy, vz],
+            tc = Math.min(vnx, vny, vnz);
+          if (v === target) {
+            const r = octWalk(mask, o, d, c, vt, tc, va, false);
+            if (r) return record(r[0], 0, r[1], vx, vy, vz);
+          } else {
+            const r = octWalk(mask, o, d, c, vt, tc, va, true);
+            // In a volume, entering the empty part of a shaped cell leaves the volume there.
+            if (target !== 0 && (!r || r[0] > vt)) return record(vt, 0, va, vx, vy, vz);
+            if (r) return record(r[0], v, r[1], vx, vy, vz);
+          }
+        } else if (v !== target) return record(vt, v, va, vx, vy, vz);
         if (vnx < vny && vnx < vnz) {
           va = 0;
           vt = vnx;

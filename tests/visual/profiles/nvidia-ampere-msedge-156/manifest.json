@@ -83,9 +83,9 @@
    "size": "640x360",
    "runs": 4,
    "noise": {
-    "changed": 4.77e-05,
+    "changed": 0.0000477,
     "hot": 0,
-    "mean": 4.77e-05,
+    "mean": 0.0000477,
     "max": 1
    },
    "tolerance": {
@@ -109,9 +109,9 @@
    "size": "640x360",
    "runs": 4,
    "noise": {
-    "changed": 1.3e-05,
+    "changed": 0.000013,
     "hot": 0,
-    "mean": 1.3e-05,
+    "mean": 0.000013,
     "max": 1
    },
    "tolerance": {
@@ -1409,7 +1409,7 @@
    "size": "320x240",
    "runs": 4,
    "noise": {
-    "changed": 5.21e-05,
+    "changed": 0.0000521,
     "hot": 0,
     "mean": 0.000378,
     "max": 11
@@ -1845,6 +1845,54 @@
     "renderedInputsDirty": false,
     "renderedInputChanges": []
    }
+  },
+  "voxel-shapes-high": {
+   "url": "voxel/?view=shapes&quality=high",
+   "size": "640x360",
+   "runs": 4,
+   "noise": {
+    "changed": 0,
+    "hot": 0,
+    "mean": 0,
+    "max": 0
+   },
+   "tolerance": {
+    "changed": 0.0005,
+    "hot": 0.0002
+   },
+   "environment": {
+    "browser": "msedge 156.0.4314.42",
+    "gpu": "nvidia ampere",
+    "acPowerBefore": true,
+    "acPowerAfter": true,
+    "date": "2026-10-24T20:15:36.477Z",
+    "commit": "37c45372dac487f0177dacbdefc6c9cf505dc4cb",
+    "packagesDirty": true,
+    "renderedInputsDirty": true,
+    "renderedInputChanges": [
+     "examples/voxel-sandbox/src/blocks.ts",
+     "examples/voxel-sandbox/src/main.ts",
+     "examples/voxel-sandbox/src/showcase.ts",
+     "examples/voxel-sandbox/test/blocks.test.js",
+     "packages/voxel-pathtracer/src/layout.ts",
+     "packages/voxel-pathtracer/src/scene.ts",
+     "packages/voxel-pathtracer/src/shaders.ts",
+     "packages/voxel-pathtracer/src/traverse.ts",
+     "packages/voxel-pathtracer/src/types.ts",
+     "packages/voxel/src/blocks.ts",
+     "packages/voxel/src/index.ts",
+     "packages/voxel/src/light.ts",
+     "packages/voxel/src/mesher.ts",
+     "packages/voxel/src/physics.ts",
+     "packages/voxel/src/query.ts",
+     "packages/voxel/src/render.ts",
+     "packages/voxel/tests/blocks.test.js",
+     "packages/voxel/tests/mesher.test.js",
+     "packages/voxel/tests/physics.test.js",
+     "packages/voxel-pathtracer/tests/shapes.test.js",
+     "packages/voxel/tests/shapes.test.js"
+    ]
+   }
   }
  },
  "profile": "nvidia-ampere-msedge-156",
@@ -1853,11 +1901,33 @@
   "gpu": "nvidia ampere",
   "acPowerBefore": true,
   "acPowerAfter": true,
-  "date": "2026-10-24T18:54:18.206Z",
-  "commit": "6ecfa01815566747090ccd9564dafcbcbf4de986",
-  "packagesDirty": false,
-  "renderedInputsDirty": false,
-  "renderedInputChanges": []
+  "date": "2026-10-24T20:15:36.477Z",
+  "commit": "37c45372dac487f0177dacbdefc6c9cf505dc4cb",
+  "packagesDirty": true,
+  "renderedInputsDirty": true,
+  "renderedInputChanges": [
+   "examples/voxel-sandbox/src/blocks.ts",
+   "examples/voxel-sandbox/src/main.ts",
+   "examples/voxel-sandbox/src/showcase.ts",
+   "examples/voxel-sandbox/test/blocks.test.js",
+   "packages/voxel-pathtracer/src/layout.ts",
+   "packages/voxel-pathtracer/src/scene.ts",
+   "packages/voxel-pathtracer/src/shaders.ts",
+   "packages/voxel-pathtracer/src/traverse.ts",
+   "packages/voxel-pathtracer/src/types.ts",
+   "packages/voxel/src/blocks.ts",
+   "packages/voxel/src/index.ts",
+   "packages/voxel/src/light.ts",
+   "packages/voxel/src/mesher.ts",
+   "packages/voxel/src/physics.ts",
+   "packages/voxel/src/query.ts",
+   "packages/voxel/src/render.ts",
+   "packages/voxel/tests/blocks.test.js",
+   "packages/voxel/tests/mesher.test.js",
+   "packages/voxel/tests/physics.test.js",
+   "packages/voxel-pathtracer/tests/shapes.test.js",
+   "packages/voxel/tests/shapes.test.js"
+  ]
  },
  "method": {
   "hot": 24,

@@ -113,8 +113,21 @@ on vfx's texture option). Avoided taken names: `World`, `RayHit`, `WorkerPool`.
   have no chunk); `onChange(x, y, z, state, previous)` fires once per changed cell of setBlock/setBlocks.
 - Mesher input: PackedChunk + a 34^3 shell (6,536 states + light: faces, edges, corners for AO/smooth light).
 - Quad 12 bytes (3 u32, vertex pulling): w0 = x5 y5 z5 face3 (0-5 axes, 6-7 cross diagonals) (w-1)5 (h-1)5 flip1
-  liquidDrop3; w1 = material12 ao 4x2 wave1 spare11; w2 = 4 corners x (sky4 block4). Greedy merges only faces with equal
-  corners along the merge axis, so merged meshes shade identically to the naive mesh.
+  liquidDrop3; w1 = material12 ao 4x2 wave1 inset1 trim4 spare6; w2 = 4 corners x (sky4 block4). Greedy merges only
+  faces with equal corners along the merge axis, so merged meshes shade identically to the naive mesh.
+- Block shapes (slabs and stairs): a block state's data orients them (slab bit 2 top; stair bits 0-1 the back side
+  +x, -x, +z, -z and bit 2 upside down), and every system reads one 8-bit octant mask (half cell x + 2y + 4z) per
+  state (`octants.ts`). Mesher: cells that are slabs or stairs, and cube faces with one within a cell of their front,
+  are meshed per quarter face; a quarter shows where its block fills the octant behind and the octant in front is
+  neither opaque nor the same block's; inset faces (half a block inside the cell) where the block fills the octant
+  behind but not the one in front. Visible quarters become at most two rectangles per plane (inset and trim bits of
+  w1), merged per (inset, trim) kind in their own pass; AO and smooth light sample half cells of the front layer.
+  Chunks without them take the old path and mesh to identical bytes. Light: no step crosses a face a block's octants
+  cover whole; slabs and stairs end the open-sky column and an open-topped one at the column top is lit 15. Physics:
+  solid ones leave the voxel collider for a per-chunk triangle mesh of their octant faces. Queries: ray casts walk the
+  2 x 2 x 2 octants of a hit cell; sweeps clip against each filled octant. Path tracer: `TraceModel.shapes` holds the
+  masks; shaped bricks carry them after their palette indices and the march walks the octants of a shaped cell.
+  VOX has no shapes: imports stay whole blocks.
 - Material table storage buffer, 16 B per entry, up to 4,096: texture layer, animation frames/fps, tint RGBA8,
   roughness, metalness, emissive.
 - Chunk codec: u8 version, u8 flags, varint palette length, varint states, u8 bits, u32 index words LE, optional light

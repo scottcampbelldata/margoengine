@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Physics } from '@margoengine/physics';
-import { BlockTypes, chunkKey, VoxelChunk, VoxelWorld } from '../dist/index.js';
+import { BlockTypes, chunkKey, slabState, stairState, VoxelChunk, VoxelWorld } from '../dist/index.js';
 import { VoxelPhysics } from '../dist/physics.js';
 
 const rapierDir = process.env.MARGOENGINE_RAPIER
@@ -55,7 +55,9 @@ const random = (seed) => () => {
 const blocks = new BlockTypes(),
   stone = blocks.define('stone'),
   dirt = blocks.define('dirt'),
-  flower = blocks.define('flower', { shape: 'cross', layer: 'cutout', solid: false });
+  flower = blocks.define('flower', { shape: 'cross', layer: 'cutout', solid: false }),
+  slab = blocks.define('slab', { shape: 'slab' }),
+  stair = blocks.define('stair', { shape: 'stair' });
 const setup = (options, gravity = [0, -9.81, 0]) => {
   const physics = new Physics(null, { rapier: RAPIER, gravity }),
     world = new VoxelWorld({ blocks }),
@@ -1049,5 +1051,32 @@ rtest('benchmark: collider builds and edit updates (printed)', (t) => {
   t.diagnostic(
     `an edit in a mesh chunk: ${calls.meshes - meshes} piece rebuilt at the next step, ${spent[0].toFixed(1)} ms`,
   );
+  physics.dispose();
+});
+
+rtest('slabs and stairs collide as their half-block boxes, and edits rebuild their mesh', () => {
+  const { physics, world, voxels } = setup();
+  fill(world, 0, 8, 0, 1, 0, 8, stone);
+  fill(world, 1, 4, 1, 2, 1, 4, slabState(slab));
+  world.setBlock(6, 1, 6, stairState(stair, '+x'));
+  const box = (x, z) =>
+    physics.addBody(null, { position: [x, 4, z], colliders: { shape: 'box', halfExtents: [0.2, 0.2, 0.2] } });
+  const onSlab = box(2.5, 2.5),
+    onBack = box(6.75, 6.5), // over the stair's full-height back
+    onStep = box(6.25, 6.5), // over its step
+    ball = ballBody(physics, 0.2, [2.5, 4, 1.5]);
+  steps(physics, 240);
+  const near = (body, y, what) =>
+    assert.ok(Math.abs(body.position[1] - y) < 0.02, `${what} rests at y ${y} (y ${body.position[1]})`);
+  near(onSlab, 1.7, 'a box on a slab top');
+  near(onBack, 2.2, "a box on a stair's back");
+  near(onStep, 1.7, "a box on a stair's step");
+  near(ball, 1.7, 'a ball on a slab (mesh chunk)');
+  // The slab and stair mesh is one collider of the chunk, beside its voxels or mesh pieces.
+  assert.ok(voxels.colliders.get('0,0,0').some((c) => c.shapeType() === RAPIER.ShapeType.TriMesh));
+  // Removing the slab under a resting box rebuilds the mesh and drops the box to the floor.
+  world.setBlock(2, 1, 2, 0);
+  steps(physics, 120);
+  near(onSlab, 1.2, 'the box, once its slab is gone,');
   physics.dispose();
 });

@@ -8,7 +8,7 @@ import { Engine, type EngineKernel } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { Line, Lines } from '@margoengine/lines';
 import { applyQualityTier, paceEngine, watchQuality } from '@margoengine/quality';
-import { blockId, type VoxelChunk, VoxelWorld } from '@margoengine/voxel';
+import { blockId, slabState, stairState, type VoxelChunk, VoxelWorld } from '@margoengine/voxel';
 import { VoxelLighting } from '@margoengine/voxel/light';
 import { raycastVoxels, VoxelCharacter, type VoxelHit } from '@margoengine/voxel/query';
 import { BlockTextures, VoxelRenderer } from '@margoengine/voxel/render';
@@ -18,7 +18,7 @@ import generatorUrl from './generator.worker.ts?worker&url';
 import { type SceneLighting, setupLighting } from './lighting.ts';
 import { PhotoMode } from './photo.ts';
 import { joinServer, keyBits, type Online } from './multiplayer.ts';
-import { buildShowcase, groundY, showcaseReady } from './showcase.ts';
+import { buildShapes, buildShowcase, groundY, showcaseReady } from './showcase.ts';
 import { DEFAULT_SEED } from './terrain.ts';
 import { paintBlockTextures } from './textures.ts';
 import { Hotbar, setDeterministic, setHud, setOverlay, setUnderwater, showError, toast, toggleHud } from './ui.ts';
@@ -39,13 +39,16 @@ interface View {
   hours: number;
   /** South-west corner column of the showcase hut, or none. */
   showcase?: [number, number];
+  /** What the showcase builds: the hut (default) or the slab and stair yard. */
+  build?: 'hut' | 'shapes';
 }
 // The deterministic views (seed 1): a vista over hills and a lake at 10:00; the showcase hut by the lake at eye height
-// at 10:00 and at 21:30 (torch and glowstone light).
+// at 10:00 and at 21:30 (torch and glowstone light); slabs and stairs in its place at 10:00, sun-shadowed.
 const VIEWS: Record<string, View> = {
   overview: { eye: [-60, 42, 70], yaw: 2.6, pitch: -0.2, hours: 10, showcase: [-27, 16] },
   ground: { eye: [-17.5, 0, 31.5], yaw: 0.48, pitch: -0.1, hours: 10, showcase: [-27, 16] },
   night: { eye: [-17.5, 0, 31.5], yaw: 0.48, pitch: -0.1, hours: 21.5, showcase: [-27, 16] },
+  shapes: { eye: [-17, 21, 27.5], yaw: 0.68, pitch: -0.38, hours: 10, showcase: [-27, 16], build: 'shapes' },
 };
 
 const params = new URLSearchParams(location.search),
@@ -375,8 +378,15 @@ async function boot(): Promise<void> {
       if (there.id && !there.liquid && there.name !== 'tall_grass') return;
       if (type.solid && touchesPlayer(x, y, z)) return;
       if (type.shape === 'cross' && type.name !== 'torch' && !(below.solid && below.shape === 'cube')) return;
-      if (online) online.client.edit(x, y, z, id);
-      else world.setBlock(x, y, z, id);
+      // Slabs and stairs: the upper half when placed against a ceiling or the upper half of a side; a stair's back away
+      // from the player, so it climbs the way they look.
+      const f = forward(),
+        high = hit.normal[1] < 0 || (hit.normal[1] === 0 && hit.point[1] - Math.floor(hit.point[1]) > 0.5),
+        facing = Math.abs(f[0]) > Math.abs(f[2]) ? (f[0] > 0 ? '+x' : '-x') : f[2] > 0 ? '+z' : '-z',
+        state =
+          type.shape === 'slab' ? slabState(id, high) : type.shape === 'stair' ? stairState(id, facing, high) : id;
+      if (online) online.client.edit(x, y, z, state);
+      else world.setBlock(x, y, z, state);
     } else if (button === 1) {
       const type = blocks.get(blockId(hit.state));
       hotbar.pick(type.name);
@@ -424,7 +434,7 @@ async function boot(): Promise<void> {
   function update(dt: number): void {
     if (view) {
       if (showcase === 'waiting' && view.showcase && showcaseReady(world, ...view.showcase) && !lightWork) {
-        buildShowcase(world, blocks, ...view.showcase);
+        (view.build === 'shapes' ? buildShapes : buildShowcase)(world, blocks, ...view.showcase);
         showcase = 'built';
       }
       if (flight) {

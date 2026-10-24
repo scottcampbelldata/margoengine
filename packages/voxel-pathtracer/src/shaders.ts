@@ -341,6 +341,40 @@ fn safeInv(d:vec3f)->vec3f {
  let s=select(vec3f(-1e-12),vec3f(1e-12),d>=vec3f(0.0));
  return 1.0/select(d,s,abs(d)<vec3f(1e-12));
 }
+// Half-block shapes (TraceModel.shapes): a mixed brick's entry with bit 30 holds its cells' octant masks after its
+// palette indices. shapeIn: the mask of cell k of brick entry (0: the whole cell). octWalk: where o + t d first reaches
+// a half block of cell c that is filled (fill) or empty, from t0 (entered across axis a0, 3 inside) to t1, as (t, axis),
+// t -1 when it does not (traverse.ts walks the same); octSpan: how far the ray runs through filled half blocks.
+fn shapeIn(entry:u32,k:u32)->u32 {if((entry&0x40000000u)==0u){return 0u;}return (voxels[(entry&0x3fffffffu)+128u+(k>>2u)]>>((k&3u)*8u))&255u;}
+fn octStart(o:vec3f,d:vec3f,c:vec3i,t0:f32,t1:f32,h:ptr<function,vec3u>,nx:ptr<function,vec3f>) {
+ let p=o+d*(t0+min((t1-t0)*0.5,1e-4))-vec3f(c);
+ *h=select(vec3u(0u),vec3u(1u),p>=vec3f(0.5));
+ let toward=(d>vec3f(0.0)&(*h==vec3u(0u)))|(d<vec3f(0.0)&(*h==vec3u(1u)));
+ *nx=select(vec3f(3e38),(vec3f(c)+0.5-o)*safeInv(d),toward);
+}
+fn octWalk(mask:u32,o:vec3f,d:vec3f,c:vec3i,t0:f32,t1:f32,a0:u32,fill:bool)->vec2f {
+ var h:vec3u;var nx:vec3f;octStart(o,d,c,t0,t1,&h,&nx);
+ var t=t0;var a=a0;
+ for(var i=0u;i<4u;i++){
+  if((((mask>>(h.x|(h.y<<1u)|(h.z<<2u)))&1u)!=0u)==fill){return vec2f(t,f32(a));}
+  t=min(min(nx.x,nx.y),nx.z);
+  if(!(t<t1)){break;}
+  if(nx.x==t){a=0u;h.x^=1u;nx.x=3e38;}else if(nx.y==t){a=1u;h.y^=1u;nx.y=3e38;}else{a=2u;h.z^=1u;nx.z=3e38;}
+ }
+ return vec2f(-1.0,0.0);
+}
+fn octSpan(mask:u32,o:vec3f,d:vec3f,c:vec3i,t0:f32,t1:f32)->f32 {
+ var h:vec3u;var nx:vec3f;octStart(o,d,c,t0,t1,&h,&nx);
+ var t=t0;var span=0.0;
+ for(var i=0u;i<4u;i++){
+  let tn=min(min(min(nx.x,nx.y),nx.z),t1);
+  if(((mask>>(h.x|(h.y<<1u)|(h.z<<2u)))&1u)!=0u){span+=max(tn-t,0.0);}
+  if(tn>=t1){break;}
+  if(nx.x==tn){h.x^=1u;nx.x=3e38;}else if(nx.y==tn){h.y^=1u;nx.y=3e38;}else{h.z^=1u;nx.z=3e38;}
+  t=tn;
+ }
+ return span;
+}
 fn found(h:ptr<function,Hit>,t:f32,v:u32,a:u32,stp:vec3i,d:vec3f,c:vec3i)->bool {
  var axis=a;
  if(axis==3u){let q=abs(d);axis=select(select(2u,1u,q.y>=q.z),0u,q.x>=q.y&&q.x>=q.z);}
@@ -391,9 +425,20 @@ fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit
    let uniform=entry>=0x80000000u;
    loop {
     let l=vec3u(c-lo);let k=l.x+8u*(l.z+8u*l.y);
-    let pv=select((voxels[entry+(k>>2u)]>>((k&3u)*8u))&255u,entry&255u,uniform);
+    let pv=select((voxels[(entry&0x3fffffffu)+(k>>2u)]>>((k&3u)*8u))&255u,entry&255u,uniform);
     let v=select(0u,base|pv,pv!=0u);
-    if(step){if(!skip){return found(h,vt,v,va,stp,d,c);}skip=false;}
+    let sm=select(0u,shapeIn(entry,k),pv!=0u&&!uniform&&!step);
+    if(sm!=0u){
+     // A shaped cell holds v in its filled half blocks and nothing elsewhere.
+     let tc=min(min(vn.x,vn.y),vn.z);
+     if(v==want){let r=octWalk(sm,o,d,c,vt,tc,va,false);if(r.x>=0.0){return found(h,r.x,0u,u32(r.y),stp,d,c);}}
+     else{
+      let r=octWalk(sm,o,d,c,vt,tc,va,true);
+      if(want!=0u&&(r.x<0.0||r.x>vt)){return found(h,vt,0u,va,stp,d,c);}
+      if(r.x>=0.0){return found(h,r.x,v,u32(r.y),stp,d,c);}
+     }
+    }
+    else if(step){if(!skip){return found(h,vt,v,va,stp,d,c);}skip=false;}
     else if(v!=want){
      if(!cutMat(v)){return found(h,vt,v,va,stp,d,c);}
      let r=cutThrough(v,o,d,vt,va==3u,c,vn);
@@ -471,11 +516,18 @@ fn marchShadow(model:u32,o:vec3f,d:vec3f,tMax:f32)->f32 {
    let uniform=entry>=0x80000000u;
    loop {
     let l=vec3u(c-lo);let k=l.x+8u*(l.z+8u*l.y);
-    let pv=select((voxels[entry+(k>>2u)]>>((k&3u)*8u))&255u,entry&255u,uniform);
+    let pv=select((voxels[(entry&0x3fffffffu)+(k>>2u)]>>((k&3u)*8u))&255u,entry&255u,uniform);
     let v=select(0u,base|pv,pv!=0u);
     let next=min(min(vn.x,vn.y),min(vn.z,tOut));
+    let sm=select(0u,shapeIn(entry,k),pv!=0u&&!uniform);
+    // A shaped cell blocks or dims the ray only where it runs through its filled half blocks.
+    if(sm!=0u){
+     let span=octSpan(sm,o,d,c,vt,next);
+     if(span>0.0){let x=extinction(v,false);if(x<0.0){return -1.0;}depth+=x*span;}
+     own=false;
+    }
     // A cut-out cell lets the shadow through where both its texels on the ray are cut away.
-    if(cutMat(v)){if(cutThrough(v,o,d,vt,start&&vt==0.0,c,vn)!=1u){return -1.0;}own=false;}
+    else if(cutMat(v)){if(cutThrough(v,o,d,vt,start&&vt==0.0,c,vn)!=1u){return -1.0;}own=false;}
     else if(v!=0u){
      own=own&&(vol==0u||vol==v);vol=v;
      let x=extinction(v,own);if(x<0.0){return -1.0;}depth+=x*max(next-vt,0.0);
@@ -654,7 +706,10 @@ fn faceOf(a:u32,l:vec3f,c:vec3i)->u32 {return a*2u+select(1u,0u,l[a]-f32(c[a])>0
 fn faceTexel(h:Hit,p:vec3f)->vec4f {
  if(scene[0]==0u||h.inst>=AREA){return vec4f(1.0);}
  let l=xpoint(localX(h.inst),p);
- return texelAt(h.value,faceOf(h.axis,l,h.cell),l);
+ var face=faceOf(h.axis,l,h.cell);
+ // A shaped cell's mid-cell face reads the face it turns toward.
+ if(abs(l[h.axis]-f32(h.cell[h.axis])-0.5)<1e-3){face=h.axis*2u+select(1u,0u,h.sgn>0.0);}
+ return texelAt(h.value,face,l);
 }
 fn cutMat(v:u32)->bool {return v!=0u&&(u32(mat(v*MV+3u).w)&CUTOUT)!=0u;}
 // A ray (model space o + t d) through cut-out cell c of palette v, entering at t0 (inside: it starts in the cell), next
@@ -681,7 +736,16 @@ fn voxelAt(model:u32,c:vec3i)->u32 {
  if(entry==0u){return 0u;}
  if(entry>=0x80000000u){return entry&255u;}
  let l=vec3u(c&vec3i(7));let k=l.x+8u*(l.z+8u*l.y);
- return (voxels[entry+(k>>2u)]>>((k&3u)*8u))&255u;
+ return (voxels[(entry&0x3fffffffu)+(k>>2u)]>>((k&3u)*8u))&255u;
+}
+// The half-block mask of model cell c (0: a whole cell, an empty one or a uniform brick's).
+fn shapeAt(model:u32,c:vec3i)->u32 {
+ let mb=f.scene.x+model*MODEL;
+ let nb=vec3i(i32(scene[mb+4u]),i32(scene[mb+5u]),i32(scene[mb+6u]));
+ let b=c>>vec3u(3u);
+ let entry=voxels[scene[mb+3u]+u32(b.x+nb.x*(b.z+nb.z*b.y))];
+ if(entry>=0x80000000u){return 0u;}
+ let l=vec3u(c&vec3i(7));return shapeIn(entry,l.x+8u*(l.z+8u*l.y));
 }
 
 // Camera rays: origins on the near plane and directions, computed in float64 on the CPU at the image's corners and
@@ -1269,6 +1333,7 @@ fn direct(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,medium:u32,mInst:u32,w:ptr<fun
 fn emitWeight(h:Hit,n:vec3f,d:vec3f,radiance:vec3f,lastPdf:f32)->f32 {
  if(lastPdf<=0.0){return 1.0;}
  let ib=f.scene.y+h.inst*INSTANCE;
+ if(shapeAt(scene[ib+36u],h.cell)!=0u){return 1.0;} // shaped cells are not light-sampled
  let pick=fl(ib+38u);
  let total=fl(f.scene.x+scene[ib+36u]*MODEL+10u);
  if(pick<=0.0||total<=0.0){return 1.0;}

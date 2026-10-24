@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3030113,
+  "total": 3034720,
   "history": [
     {
       "date": "2026-10-24",
@@ -68,6 +68,12 @@
       "commit": "ccb4a164",
       "reason": "geometry: triangulation and extrusion move to their own entries (geometry/triangulate, geometry/extrude) so geometry/shapes drops from about 11.0 KB to 3.6 KB gzip and is no longer heavy; loaders/font, loaders/svg, procedural and procedural/voronoi stop counting as leaks of it",
       "grew": 2
+    },
+    {
+      "date": "2026-10-24",
+      "commit": "37c45372",
+      "reason": "voxel slabs and stairs: half-block mesher faces, light through open faces, octant collision and picking",
+      "grew": 5
     }
   ],
   "items": {
@@ -318,7 +324,7 @@
     "@margoengine/video": 2199,
     "@margoengine/viewcube": 3608,
     "@margoengine/voxel": 5158,
-    "@margoengine/voxel dist/workers/mesher.js": 4408,
+    "@margoengine/voxel dist/workers/mesher.js": 5750,
     "@margoengine/voxel dist/workers/terrain.js": 5948,
     "@margoengine/voxel-edit": 7789,
     "@margoengine/voxel-edit/animation": 1895,
@@ -339,11 +345,11 @@
     "@margoengine/voxel/bevel": 2457,
     "@margoengine/voxel/codec": 8959,
     "@margoengine/voxel/generate": 4442,
-    "@margoengine/voxel/light": 7893,
+    "@margoengine/voxel/light": 8396,
     "@margoengine/voxel/lightmap": 2762,
-    "@margoengine/voxel/mesher": 6541,
-    "@margoengine/voxel/physics": 9384,
-    "@margoengine/voxel/query": 3276,
+    "@margoengine/voxel/mesher": 7885,
+    "@margoengine/voxel/physics": 10257,
+    "@margoengine/voxel/query": 3821,
     "@margoengine/voxel/render": 22428,
     "@margoengine/voxel/stream": 12985,
     "@margoengine/voxel/vox": 12969,

@@ -8,7 +8,7 @@ import { ColorInput } from "@margoengine/math";
 
 export type BlockLayer = 'opaque' | 'cutout' | 'translucent' | 'invisible';
 
-export type BlockShape = 'cube' | 'cross' | 'liquid';
+export type BlockShape = 'cube' | 'cross' | 'liquid' | 'slab' | 'stair';
 
 export interface BlockType {
     readonly id: number;
@@ -79,6 +79,8 @@ export interface PackedChunk {
     light: number | Uint8Array;
 }
 
+export type StairFacing = '+x' | '-x' | '+z' | '-z';
+
 export class VoxelChunk {
     constructor(state?: number);
     get(x: number, y: number, z: number): number;
@@ -122,4 +124,10 @@ export const blockId: (s: number) => number;
 export function blockState(id: number, state?: number): number;
 
 export const chunkKey: (cx: number, cy: number, cz: number) => string;
+
+export const shapeOctants: (type: BlockType, state: number) => number;
+
+export const slabState: (id: number, top?: boolean) => number;
+
+export function stairState(id: number, facing: StairFacing, upsideDown?: boolean): number;
 ```

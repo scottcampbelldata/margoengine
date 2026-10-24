@@ -109,7 +109,7 @@ export function writeVox(scene: VoxScene): Uint8Array;
 
 type BlockLayer = 'opaque' | 'cutout' | 'translucent' | 'invisible';
 
-type BlockShape = 'cube' | 'cross' | 'liquid';
+type BlockShape = 'cube' | 'cross' | 'liquid' | 'slab' | 'stair';
 
 interface BlockType {
     readonly id: number;

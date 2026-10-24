@@ -3,6 +3,7 @@
 // (x, y, z). Unloaded cells and cells outside the world's minY..maxY are air.
 import type { BoxLike, MutableVec3, Vec3 } from '@margoengine/math';
 import type { BlockType } from './blocks.js';
+import { octants } from './octants.js';
 import type { VoxelWorld } from './world.js';
 
 /** A hit from {@link raycastVoxels}. */
@@ -11,12 +12,16 @@ export interface VoxelHit {
   cell: MutableVec3;
   /**
    * Outward normal of the face the ray entered through: one unit axis (at an exact edge or corner, the first crossed
-   * axis in x, y, z order), or [0, 0, 0] when the ray starts inside the cell.
+   * axis in x, y, z order), or [0, 0, 0] when the ray starts inside the cell. For a slab or stair it is the face of its
+   * half-block boxes the ray meets (a slab's top, a stair's step or riser).
    */
   normal: MutableVec3;
   /** `cell + normal`: the cell in front of that face, where a placed block goes (`cell` itself for a zero normal). */
   adjacent: MutableVec3;
-  /** Where the ray enters the cell, exactly on its face (that coordinate is an integer), or the origin. */
+  /**
+   * Where the ray enters the cell, exactly on its face (that coordinate is an integer; a multiple of 0.5 on a slab or
+   * stair, where it enters the block's boxes), or the origin.
+   */
   point: MutableVec3;
   /** From the origin to `point`, in blocks. */
   distance: number;
@@ -99,6 +104,36 @@ const amount = (value: unknown, what: string, fallback: number): number => {
 
 // Picks what a player can target: drawn blocks except liquids (cross blocks such as flowers count, as their cell box).
 const picks = (_state: number, type: BlockType): boolean => type.layer !== 'invisible' && !type.liquid;
+// The half-block boxes of a slab or stair: its octant mask, or 255 (the whole cell) for any other shape.
+const boxes = (type: BlockType, state: number): number =>
+  type.shape === 'slab' || type.shape === 'stair' ? octants(type.shape, state >>> 16) : 255;
+// Where ray o + t d (t from t0 to t1, inside cell c) first enters an octant of `mask`: walks the cell's 2 x 2 x 2 half
+// blocks as the cell walk does. Writes t and the entered axis (-1: it starts inside one) to OCT; false on a miss.
+const OCT = [0, 0];
+function octantHit(mask: number, c: Vec3, o: Vec3, d: Vec3, t0: number, t1: number, axis: number): boolean {
+  const h = [0, 0, 0],
+    next = [0, 0, 0];
+  for (let a = 0; a < 3; a++) {
+    // The half the ray is in at t0: from the midpoint of its span so a point on a half boundary picks the right side.
+    const at = o[a] + d[a] * t0 - c[a],
+      mid = o[a] + d[a] * ((t0 + Math.min(t1, t0 + 1e-9)) / 2) - c[a];
+    h[a] = at > 0.5 || (at === 0.5 && (d[a] > 0 || (d[a] === 0 && mid >= 0.5))) ? 1 : 0;
+    next[a] = d[a] > 0 && !h[a] ? (c[a] + 0.5 - o[a]) / d[a] : d[a] < 0 && h[a] ? (c[a] + 0.5 - o[a]) / d[a] : Infinity;
+  }
+  let t = t0;
+  for (;;) {
+    if ((mask >> (h[0] | (h[1] << 1) | (h[2] << 2))) & 1) {
+      OCT[0] = t;
+      OCT[1] = axis;
+      return true;
+    }
+    t = Math.min(next[0], next[1], next[2]);
+    if (!(t < t1)) return false;
+    axis = next[0] === t ? 0 : next[1] === t ? 1 : 2;
+    h[axis] ^= 1;
+    next[axis] = Infinity;
+  }
+}
 // A ray's first cell on one axis: the floor, except that a ray leaving an integer coordinate downwards starts below it.
 const first = (o: number, d: number): number => {
   const c = Math.floor(o);
@@ -161,20 +196,33 @@ export function raycastVoxels(
     if (y >= minY && y <= maxY) {
       const state = world.getBlock(x, y, z),
         type = state ? table[state & 0xffff] : undefined;
-      if (type && filter(state, type)) {
+      const mask = type && filter(state, type) ? boxes(type, state) : 0;
+      let axis: number = stepped & 1 ? 0 : stepped & 2 ? 1 : stepped & 4 ? 2 : -1,
+        at = t;
+      // A slab or stair is hit where the ray meets its boxes, if it does before leaving the cell.
+      if (
+        mask !== 255 &&
+        mask &&
+        octantHit(mask, [x, y, z], [ox, oy, oz], [dx, dy, dz], t, Math.min(tx, ty, tz, end), axis)
+      ) {
+        at = OCT[0];
+        axis = OCT[1];
+      } else if (mask !== 255) axis = -2;
+      if (axis > -2) {
         const cell: MutableVec3 = [x, y, z],
           normal: MutableVec3 = [0, 0, 0],
-          point: MutableVec3 = [ox + dx * t, oy + dy * t, oz + dz * t],
-          axis: number = stepped & 1 ? 0 : stepped & 2 ? 1 : stepped & 4 ? 2 : -1,
+          point: MutableVec3 = [ox + dx * at, oy + dy * at, oz + dz * at],
           d = [dx, dy, dz];
-        if (t) for (let a = 0; a < 3; a++) if (stepped & (1 << a)) point[a] = d[a] > 0 ? cell[a] : cell[a] + 1;
+        if (at === t && t) {
+          for (let a = 0; a < 3; a++) if (stepped & (1 << a)) point[a] = d[a] > 0 ? cell[a] : cell[a] + 1;
+        } else if (at !== t && axis >= 0) point[axis] = cell[axis] + 0.5;
         if (axis >= 0) normal[axis] = -Math.sign(d[axis]);
         return {
           cell,
           normal,
           adjacent: [x + normal[0], y + normal[1], z + normal[2]],
           point,
-          distance: t * length,
+          distance: at * length,
           state,
         };
       }
@@ -202,33 +250,52 @@ export function raycastVoxels(
 }
 
 // Moves box `b` (min x, y, z, max x, y, z) along axis `a` by up to `m` blocks and returns the distance moved. It stops
-// at the first solid cell ahead that overlaps the box's cross-section by more than EPS, scanning every cell layer the
-// move sweeps (no speed tunnels). Cells the box already overlaps are ignored, so a box can leave a block placed inside
-// it. `m` 0 probes for a solid cell touching the bottom face. Sets `blocked`.
+// at the first solid box ahead that overlaps the box's cross-section by more than EPS, scanning every cell layer the
+// move sweeps (no speed tunnels): a solid cell's whole box, or each filled octant of a solid slab or stair. Boxes the
+// box already overlaps are ignored, so a box can leave a block placed inside it. `m` 0 probes for a solid box touching
+// the bottom face. Sets `blocked`.
 function clip(world: VoxelWorld, b: Float64Array, a: number, m: number): number {
   const table = world.blocks.table,
     u = a ? 0 : 1,
     v = a === 2 ? 1 : 2,
+    bit = [1, 2, 4],
     u0 = Math.floor(b[u] + EPS),
     v0 = Math.floor(b[v] + EPS),
     up = m > 0,
     face = up ? b[a + 3] : b[a],
-    from = up ? Math.ceil(face - EPS) : Math.floor(face + EPS) - 1,
+    // The cell layer holding the face too: a slab's half there may still be ahead.
+    from = up ? Math.ceil(face - EPS) - 1 : Math.floor(face + EPS),
     to = up ? Math.floor(face + m + EPS) : Math.ceil(face + m - EPS) - 1,
     cell = CELL;
   blocked = false;
-  layers: for (let n = from; up ? n <= to : n >= to; n += up ? 1 : -1) {
+  for (let n = from; up ? n <= to : n >= to; n += up ? 1 : -1) {
     cell[a] = n;
     for (let i = u0; i < b[u + 3] - EPS; i++)
       for (let j = v0; j < b[v + 3] - EPS; j++) {
         cell[u] = i;
         cell[v] = j;
-        if (table[world.getBlock(cell[0], cell[1], cell[2]) & 0xffff]?.solid) {
-          blocked = true;
-          m = up ? Math.min(m, n - face) : Math.max(m, n + 1 - face);
-          break layers;
+        const state = world.getBlock(cell[0], cell[1], cell[2]),
+          type = table[state & 0xffff];
+        if (!type?.solid) continue;
+        const mask = boxes(type, state),
+          whole = mask === 255;
+        // A whole cell is one box; a slab or stair is each filled octant (half a block on every axis).
+        for (let k = 0; k < (whole ? 1 : 8); k++) {
+          if (!whole && !((mask >> k) & 1)) continue;
+          const size = whole ? 1 : 0.5,
+            lo = n + (!whole && k & bit[a] ? 0.5 : 0),
+            hu = i + (!whole && k & bit[u] ? 0.5 : 0),
+            hv = j + (!whole && k & bit[v] ? 0.5 : 0);
+          if (hu >= b[u + 3] - EPS || hu + size <= b[u] + EPS || hv >= b[v + 3] - EPS || hv + size <= b[v] + EPS)
+            continue;
+          const stop = up ? lo - face : lo + size - face;
+          if (up ? lo >= face - EPS && stop <= m + EPS : lo + size <= face + EPS && stop >= m - EPS) {
+            blocked = true;
+            m = up ? Math.min(m, stop) : Math.max(m, stop);
+          }
         }
       }
+    if (blocked) break;
   }
   b[a] += m;
   b[a + 3] += m;
@@ -256,7 +323,8 @@ function wet(world: VoxelWorld, b: Float64Array): boolean {
 }
 
 /**
- * Moves `box` by `motion` through `world`'s solid blocks (`BlockType.solid`, each its whole cell) and reports where it
+ * Moves `box` by `motion` through `world`'s solid blocks (`BlockType.solid`: each its whole cell, a slab or stair its
+ * half-block boxes, as `shapeOctants` gives them) and reports where it
  * stops. Axis-separated: y first, then x, then z, each clipped at the first solid cell ahead after scanning every
  * cell layer the move crosses, so nothing tunnels at any speed (cost grows with the distance swept). Touching, or
  * overlapping by up to 1e-6 blocks, is not a collision; blocks the box already overlaps are ignored, so it can move

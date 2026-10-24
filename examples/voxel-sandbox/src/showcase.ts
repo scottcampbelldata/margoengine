@@ -1,7 +1,8 @@
 // A small fixed build for the deterministic views (?view=): a plank hut with glass windows, a brick and cobblestone
-// roof, torches and a glowstone lamp post, so screenshots show block light, glass and cutout plants. Built on the ground
-// it finds, with a cobblestone footing down to it. Only deterministic views place it (a saved world never gets it).
-import type { BlockTypes, VoxelWorld } from '@margoengine/voxel';
+// roof, torches and a glowstone lamp post, so screenshots show block light, glass and cutout plants; or, for
+// ?view=shapes, slabs and stairs on the same yard. Built on the ground it finds, with a cobblestone footing down to it.
+// Only deterministic views place them (a saved world never gets them).
+import { type BlockTypes, slabState, stairState, type VoxelWorld } from '@margoengine/voxel';
 
 /** Highest solid block of column (x, z) at or below `from`, or undefined while that part of the world is not loaded. */
 export function groundY(world: VoxelWorld, x: number, z: number, from = 96, to = -64): number | undefined {
@@ -22,6 +23,25 @@ export function showcaseReady(world: VoxelWorld, x: number, z: number): boolean 
   return true;
 }
 
+// The yard at column (x, z): returns its base level (one above the highest ground under it) and puts its footing
+// (cobblestone under the 7 x 7 floor, dirt with grass on top around it) and air above it.
+function yard(world: VoxelWorld, blocks: BlockTypes, x: number, z: number, put: (...cell: number[]) => void): number {
+  const cobble = blocks.id('cobblestone');
+  let base = -Infinity;
+  for (let dz = -2; dz <= 8; dz++)
+    for (let dx = -2; dx <= 8; dx++) base = Math.max(base, groundY(world, x + dx, z + dz) ?? -Infinity);
+  base += 1;
+  for (let dz = -2; dz <= 8; dz++)
+    for (let dx = -2; dx <= 8; dx++) {
+      const ground = groundY(world, x + dx, z + dz) ?? base - 1,
+        inside = dx >= 0 && dx <= 6 && dz >= 0 && dz <= 6;
+      for (let y = ground + 1; y < base; y++) put(x + dx, y, z + dz, inside ? cobble : blocks.id('dirt'));
+      if (!inside && ground + 1 <= base - 1) put(x + dx, base - 1, z + dz, blocks.id('grass'));
+      for (let y = base; y < base + 8; y++) put(x + dx, y, z + dz, 0);
+    }
+  return base;
+}
+
 /** Builds the hut with its south-west corner at column (x, z) on the highest ground under its footprint. */
 export function buildShowcase(world: VoxelWorld, blocks: BlockTypes, x: number, z: number): void {
   const id = (name: string) => blocks.id(name),
@@ -38,19 +58,8 @@ export function buildShowcase(world: VoxelWorld, blocks: BlockTypes, x: number, 
     ].map(id),
     edits: number[] = [],
     put = (px: number, py: number, pz: number, state: number) => edits.push(px, py, pz, state);
-  let base = -Infinity;
-  for (let dz = -2; dz <= 8; dz++)
-    for (let dx = -2; dx <= 8; dx++) base = Math.max(base, groundY(world, x + dx, z + dz) ?? -Infinity);
-  base += 1;
   // Footing and a cleared yard: cobblestone under the floor down to the ground, air above the yard.
-  for (let dz = -2; dz <= 8; dz++)
-    for (let dx = -2; dx <= 8; dx++) {
-      const ground = groundY(world, x + dx, z + dz) ?? base - 1,
-        inside = dx >= 0 && dx <= 6 && dz >= 0 && dz <= 6;
-      for (let y = ground + 1; y < base; y++) put(x + dx, y, z + dz, inside ? cobble : id('dirt'));
-      if (!inside && ground + 1 <= base - 1) put(x + dx, base - 1, z + dz, id('grass'));
-      for (let y = base; y < base + 8; y++) put(x + dx, y, z + dz, 0);
-    }
+  const base = yard(world, blocks, x, z, put);
   for (let dz = 0; dz <= 6; dz++)
     for (let dx = 0; dx <= 6; dx++) {
       const wall = dx === 0 || dx === 6 || dz === 0 || dz === 6,
@@ -76,5 +85,58 @@ export function buildShowcase(world: VoxelWorld, blocks: BlockTypes, x: number, 
   put(x + 7, base, z + 5, dandelion);
   put(x + 1, base, z + 8, poppy);
   put(x + 6, base, z + 8, dandelion);
+  world.setBlocks(edits);
+}
+
+/**
+ * Builds the slab and stair yard with its south-west corner at column (x, z): a plank deck on log posts under a roof
+ * of top slabs with an eave of upside-down stairs, a cobblestone flight up to it whose steps face +x, a stone slab
+ * terrace and a brick column ringed by stairs of all four facings, with a torch under the deck.
+ */
+export function buildShapes(world: VoxelWorld, blocks: BlockTypes, x: number, z: number): void {
+  const id = (name: string) => blocks.id(name),
+    [planks, log, cobble, bricks, torch, slab, plankSlab, stairs, brickStairs] = [
+      'planks',
+      'log',
+      'cobblestone',
+      'bricks',
+      'torch',
+      'stone_slab',
+      'planks_slab',
+      'cobblestone_stairs',
+      'brick_stairs',
+    ].map(id),
+    edits: number[] = [],
+    put = (px: number, py: number, pz: number, state: number) => edits.push(px, py, pz, state);
+  const base = yard(world, blocks, x, z, put);
+  // The deck (dx 0-3, dz 0-4) at base + 2 on log posts, and its roof of top slabs at base + 5 on log posts.
+  for (let dz = 0; dz <= 4; dz++)
+    for (let dx = 0; dx <= 3; dx++) {
+      const corner = (dx === 0 || dx === 3) && (dz === 0 || dz === 4);
+      put(x + dx, base + 2, z + dz, planks);
+      put(x + dx, base + 5, z + dz, slabState(plankSlab, true));
+      if (corner) for (const y of [base, base + 1, base + 3, base + 4]) put(x + dx, y, z + dz, log);
+    }
+  // An eave of upside-down stairs along the roof's +x and +z edges, their backs against it.
+  for (let dz = 0; dz <= 4; dz++) put(x + 4, base + 5, z + dz, stairState(stairs, '-x', true));
+  for (let dx = 0; dx <= 3; dx++) put(x + dx, base + 5, z + 5, stairState(stairs, '-z', true));
+  // The flight: three stairs climbing toward -x (backs to -x) onto the deck, on cobblestone.
+  for (let dz = 1; dz <= 3; dz++)
+    for (let i = 0; i < 3; i++) {
+      for (let y = base; y < base + i; y++) put(x + 6 - i, y, z + dz, cobble);
+      put(x + 6 - i, base + i, z + dz, stairState(stairs, '-x'));
+    }
+  // A stone slab terrace in front, and a slab step down from it.
+  for (let dx = 2; dx <= 6; dx++) put(x + dx, base, z + 6, slabState(slab));
+  for (let dx = 3; dx <= 5; dx++) put(x + dx, base, z + 7, slabState(slab));
+  // The brick column with a stair of each facing round its foot and a stone slab cap.
+  for (let y = base; y <= base + 2; y++) put(x, y, z + 7, bricks);
+  put(x, base + 3, z + 7, slabState(slab));
+  put(x - 1, base, z + 7, stairState(brickStairs, '+x'));
+  put(x + 1, base, z + 7, stairState(brickStairs, '-x'));
+  put(x, base, z + 6, stairState(brickStairs, '+z'));
+  put(x, base, z + 8, stairState(brickStairs, '-z'));
+  // Block light under the deck.
+  put(x + 1, base, z + 2, torch);
   world.setBlocks(edits);
 }
