@@ -198,6 +198,12 @@ try {
       shell: process.platform === 'win32',
     });
     if (build.status !== 0) fail('npm run build:packages in the engine failed');
+    // The build regenerates tracked files (docs/catalog.json); on a sound main they come out unchanged.
+    const changed = git('status', '--porcelain', '--untracked-files=no');
+    if (changed)
+      fail(
+        `building engine main ${head.slice(0, 8)} changed tracked files, so main is missing a regenerated file:\n${changed}\nland that file on engine main, then run git -C "${engine}" checkout -- . and sync again`,
+      );
     // build:packages builds every package, so every app finds its packages current.
     for (const name of readdirSync(join(engine, 'packages')))
       if (existsSync(join(engine, 'packages', name, 'dist'))) writeFileSync(stamp(name), `${head}\n`);
