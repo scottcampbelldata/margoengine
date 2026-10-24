@@ -76,6 +76,10 @@
     "./afterimage": {
       "types": "./dist/afterimage.d.ts",
       "import": "./dist/afterimage.js"
+    },
+    "./mrt": {
+      "types": "./dist/mrt.d.ts",
+      "import": "./dist/mrt.js"
     }
   },
   "files": [

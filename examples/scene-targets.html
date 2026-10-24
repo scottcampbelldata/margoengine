@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scene targets · Margo Engine</title>
+  <link rel="stylesheet" href="./multi-view.css">
+</head>
+<body>
+  <h1>Several targets, named outputs</h1>
+  <p><code>@margoengine/post/mrt</code> · One pass writes albedo, world normal, camera distance and a custom WGSL output from core meshes and a materials mesh; each output fills a quarter of the canvas.</p>
+  <div id="views" class="views">
+    <canvas id="viewport" aria-label="Four views of the same scene: colour, normals, depth and a custom output"></canvas>
+  </div>
+  <p id="status" data-webgpu-status role="status">Starting WebGPU…</p>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./scene-targets.ts'));
+  </script>
+</body>
+</html>

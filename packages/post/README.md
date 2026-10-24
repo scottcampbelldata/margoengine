@@ -451,6 +451,33 @@ trails.reset();       // drop the trail, e.g. on a camera cut
 - **Limits.** Screen-space trails: a moving camera smears the whole frame. Two full-size `rgba16float` history
   textures. GPU cost not measured yet. WebGPU only.
 
+## Multiple render targets: `SceneTargets`
+
+`@margoengine/post/mrt` draws the scene's surfaces into several named textures in one pass. Each output is a built-in
+value (`albedo`, `normal` (world), `position` (world), `distance` (from the camera), `emissive`, `material`
+(roughness, metalness, occlusion)) or your WGSL `vec4f` expression over `t: TargetSurface` (the same values, all world
+space), with its own float or normalised colour format. Core meshes always draw (a replay of core's shader with the
+lighting left out); add gltf-pro models and materials meshes with `targets.add(model)` so their own maps, skinning and
+instances write the outputs. The pass runs before the main pass by default (`order: -5`), so materials can read this
+frame's targets; a material that reads a target must not be added. Its own depth is `targets.depth`. Textures follow
+the drawing size and are replaced on resize (`onResize`). WebGPU only.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { SceneTargets } from '@margoengine/post/mrt';
+
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas);
+const targets = SceneTargets.attach(engine, {
+  outputs: {
+    albedo: 'albedo',
+    normal: 'normal',
+    mask: { wgsl: 'vec4f(t.roughness, t.metalness, 0, 1)', format: 'rg8unorm' },
+  },
+});
+targets.onResize(() => console.log(targets.texture('normal')?.width));
+```
+
 ## Projected decals: `Decals`
 
 `@margoengine/post/decals` (4,118 B min+gzip, its own entry) projects textured boxes onto whatever is already drawn,
