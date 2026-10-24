@@ -52,20 +52,31 @@ worker.onmessage = ({ data }) => world.addChunk(0, 1, 0, VoxelChunk.unpack(data)
   layers), `transmission` and `scatter`. `blocks.table` is the resolved list, plain data for workers.
   Ids follow definition order, so define types in the same order wherever saved states are read back.
 - **Slabs and stairs.** Half-block shapes whose orientation is in the block state's data: `slabState(id, top)` (the
-  lower half, or the upper half when `top`) and `stairState(id, facing, upsideDown)` (a lower slab plus the upper
-  quarter on its back side, `facing` `'+x'`, `'-x'`, `'+z'` or `'-z'` naming that side; upside down puts the slab on
-  top). `shapeOctants(type, state)` gives the half cells a state fills as an 8-bit mask (bit `x + 2y + 4z`, 255 for a
-  cube). They mesh, shade, cast and receive shadows, pass light, collide and pick as those boxes (the sections below),
-  and their states go through the codecs unchanged. `opacity` defaults to 0: light is stopped by the faces they cover
+  lower half, or the upper half when `top`), `doubleSlabState(id)` (both halves: one block of the slab's material,
+  shaped and lit like a cube) and `stairState(id, facing, upsideDown, corner?)` (a lower slab plus the upper quarter on
+  its back side, `facing` `'+x'`, `'-x'`, `'+z'` or `'-z'` naming that side; upside down puts the slab on top).
+  `connectStairs(world, x, y, z)` turns the stairs in that cell and beside it into the corners their neighbours call
+  for: outer when a stair's back meets the side of another stair of the same half (toward that stair's back), inner
+  when its front does; a `corner` given to `stairState` (`'straight'`, `'inner+z'`, `'outer-x'`, ...) is kept.
+  `waterlogState(state)` waterlogs a slab or stair: the liquid its type names (`waterlog`, a defined liquid's id or
+  name) fills the rest of the cell, meshed, lit and swum in like that liquid, while the block keeps colliding.
+  `shapeOctants(type, state)` gives the half cells a state fills as an 8-bit mask (bit `x + 2y + 4z`, 255 for a cube).
+  They mesh, shade, cast and receive shadows, pass light, collide and pick as those boxes (the sections below), and
+  their states go through the codecs unchanged. `opacity` defaults to 0: light is stopped by the faces they cover
   whole, not by a cost.
 
 ```ts
-import { slabState, stairState } from '@margoengine/voxel';
+import { connectStairs, doubleSlabState, slabState, stairState, waterlogState } from '@margoengine/voxel';
 
-const slab = blocks.define('stone_slab', { shape: 'slab', textures: stone });
-const stairs = blocks.define('oak_stairs', { shape: 'stair', textures: planks });
+const water = blocks.define('water', { shape: 'liquid', liquid: true, solid: false, layer: 'translucent' });
+const slab = blocks.define('stone_slab', { shape: 'slab', textures: stone, waterlog: water });
+const stairs = blocks.define('oak_stairs', { shape: 'stair', textures: planks, waterlog: 'water' });
 world.setBlock(x, y, z, slabState(slab)); // lower half; slabState(slab, true) is the upper half
+world.setBlock(x, y + 1, z, doubleSlabState(slab)); // both halves
 world.setBlock(x + 1, y, z, stairState(stairs, '+x')); // climbs toward +x; stairState(stairs, '+x', true) hangs
+connectStairs(world, x + 1, y, z); // corners from the neighbouring stairs
+world.setBlock(x + 2, y, z, stairState(stairs, '+x', false, 'outer+z')); // a corner by hand, kept
+world.setBlock(x, y - 1, z, waterlogState(slabState(slab))); // a slab under water
 ```
 - **Errors.** `TypeError` for wrong types, `RangeError` for values out of range (cells, states, ids, options),
   `MargoError` `'state'` for a duplicate block name or a chunk that is already loaded.
@@ -207,7 +218,9 @@ const materials = blockMaterials(blocks.table); // material id per block id * 6 
   half face, a slab under a cube hides the cube's bottom only as a top slab, and two slabs side by side hide the faces
   between them. Visible quarters become at most two rectangles per face plane, on the cell's side or (for a slab's top,
   a stair's step and riser) half a block inside it, and merge greedily along every axis they are not trimmed on. A
-  chunk without slabs or stairs meshes to the same bytes as before. `cross` blocks emit two diagonal quads (faces 6 and 7),
+  waterlogged slab or stair also holds its liquid in its open octants, meshed by the liquid rules per half block (no
+  faces against the same liquid beside it, its surface waving with the pool's, sides of lowered water beside a slab cut
+  at the water line). A chunk without slabs or stairs meshes to the same bytes as before. `cross` blocks emit two diagonal quads (faces 6 and 7),
   unshaded and lit by their own cell. A `liquid` cell without the same liquid above is a surface: its top and sides
   drop by its state data's low 3 bits in eighths of a block (`blockState(water, level)`) and carry the wave bit; a
   lowered top under a solid block stays, and a side above a lower surface of the same liquid stays.
@@ -257,8 +270,8 @@ lighting.dispose();
   so glass passes it at full strength) and spreads from there; **block light** spreads from each type's `light`. Each
   step costs 1 plus the entered cell's `opacity` (stone's 15 stops it; leaves with `opacity: 1` dim it by 2 a block).
 - **Slabs and stairs** pass light through their open part: no light crosses a face their boxes cover whole (a lower
-  slab's bottom, an upper slab's top, a stair's back and the half it stands on), any other face passes it at the
-  usual cost. They end their column's open sky; one whose top is open (a lower slab, a stair) is itself lit as open
+  slab's bottom, an upper slab's top, a stair's back and the half it stands on, every face of a double slab), any
+  other face passes it at the usual cost (a waterlogged one costs its liquid's opacity when that is more). They end their column's open sky; one whose top is open (a lower slab, a stair) is itself lit as open
   sky when it tops its column, so its top face shades like the ground beside it.
 - Edits and chunk loads and removals (`world.onChunk`) are queued as they happen; `update()` applies them in order,
   across chunk borders: a chunk loaded later takes light in from its loaded neighbours and gives its own out. Darkening

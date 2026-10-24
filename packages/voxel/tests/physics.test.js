@@ -5,7 +5,16 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Physics } from '@margoengine/physics';
-import { BlockTypes, chunkKey, slabState, stairState, VoxelChunk, VoxelWorld } from '../dist/index.js';
+import {
+  BlockTypes,
+  chunkKey,
+  doubleSlabState,
+  slabState,
+  stairState,
+  VoxelChunk,
+  VoxelWorld,
+  waterlogState,
+} from '../dist/index.js';
 import { VoxelPhysics } from '../dist/physics.js';
 
 const rapierDir = process.env.MARGOENGINE_RAPIER
@@ -56,8 +65,9 @@ const blocks = new BlockTypes(),
   stone = blocks.define('stone'),
   dirt = blocks.define('dirt'),
   flower = blocks.define('flower', { shape: 'cross', layer: 'cutout', solid: false }),
-  slab = blocks.define('slab', { shape: 'slab' }),
-  stair = blocks.define('stair', { shape: 'stair' });
+  water = blocks.define('water', { shape: 'liquid', liquid: true, solid: false, layer: 'translucent' }),
+  slab = blocks.define('slab', { shape: 'slab', waterlog: water }),
+  stair = blocks.define('stair', { shape: 'stair', waterlog: water });
 const setup = (options, gravity = [0, -9.81, 0]) => {
   const physics = new Physics(null, { rapier: RAPIER, gravity }),
     world = new VoxelWorld({ blocks }),
@@ -1078,5 +1088,27 @@ rtest('slabs and stairs collide as their half-block boxes, and edits rebuild the
   world.setBlock(2, 1, 2, 0);
   steps(physics, 120);
   near(onSlab, 1.2, 'the box, once its slab is gone,');
+  physics.dispose();
+});
+
+rtest('double slabs, waterlogged slabs and corner stairs collide as their boxes', () => {
+  const { physics, world } = setup();
+  fill(world, 0, 8, 0, 1, 0, 8, stone);
+  world.setBlock(2, 1, 2, doubleSlabState(slab));
+  world.setBlock(5, 1, 2, waterlogState(slabState(slab)));
+  world.setBlock(2, 1, 5, stairState(stair, '+x', false, 'outer+z')); // only the +x, +z quarter is high
+  const box = (x, z) =>
+    physics.addBody(null, { position: [x, 4, z], colliders: { shape: 'box', halfExtents: [0.2, 0.2, 0.2] } });
+  const onDouble = box(2.5, 2.5),
+    onWet = box(5.5, 2.5),
+    onCorner = box(2.75, 5.75),
+    besideCorner = box(2.25, 5.75);
+  steps(physics, 240);
+  const near = (body, y, what) =>
+    assert.ok(Math.abs(body.position[1] - y) < 0.02, `${what} rests at y ${y} (y ${body.position[1]})`);
+  near(onDouble, 2.2, 'a box on a double slab');
+  near(onWet, 1.7, 'a box on a waterlogged slab');
+  near(onCorner, 2.2, "a box on an outer corner's high quarter");
+  near(besideCorner, 1.7, 'a box beside it, on the step');
   physics.dispose();
 });

@@ -115,9 +115,13 @@ on vfx's texture option). Avoided taken names: `World`, `RayHit`, `WorkerPool`.
 - Quad 12 bytes (3 u32, vertex pulling): w0 = x5 y5 z5 face3 (0-5 axes, 6-7 cross diagonals) (w-1)5 (h-1)5 flip1
   liquidDrop3; w1 = material12 ao 4x2 wave1 inset1 trim4 spare6; w2 = 4 corners x (sky4 block4). Greedy merges only
   faces with equal corners along the merge axis, so merged meshes shade identically to the naive mesh.
-- Block shapes (slabs and stairs): a block state's data orients them (slab bit 2 top; stair bits 0-1 the back side
-  +x, -x, +z, -z and bit 2 upside down), and every system reads one 8-bit octant mask (half cell x + 2y + 4z) per
-  state (`octants.ts`). Mesher: cells that are slabs or stairs, and cube faces with one within a cell of their front,
+- Block shapes (slabs and stairs): a block state's data orients them (slab bit 2 top, bit 3 double; stair bits 0-1
+  the back side +x, -x, +z, -z, bit 2 upside down, bits 3-4 corner none/inner/outer, bit 5 the corner's side, bit 6 a
+  corner set by hand; bit 15 waterlogged), and every system reads one 8-bit octant mask (half cell x + 2y + 4z) per
+  state (`octants.ts`). Corners are states, not a mesh-time lookup: `connectStairs` writes them from the neighbours,
+  so light, physics, picking and the path tracer need no neighbour context. A waterlogged cell holds two things, the
+  block's octants and its type's `waterlog` liquid in the others; the mesher keeps a liquid id and octant mask per cell
+  so liquid faces follow the liquid rules per half block. Mesher: cells that are slabs or stairs, and cube faces with one within a cell of their front,
   are meshed per quarter face; a quarter shows where its block fills the octant behind and the octant in front is
   neither opaque nor the same block's; inset faces (half a block inside the cell) where the block fills the octant
   behind but not the one in front. Visible quarters become at most two rectangles per plane (inset and trim bits of
@@ -126,7 +130,9 @@ on vfx's texture option). Avoided taken names: `World`, `RayHit`, `WorkerPool`.
   cover whole; slabs and stairs end the open-sky column and an open-topped one at the column top is lit 15. Physics:
   solid ones leave the voxel collider for a per-chunk triangle mesh of their octant faces. Queries: ray casts walk the
   2 x 2 x 2 octants of a hit cell; sweeps clip against each filled octant. Path tracer: `TraceModel.shapes` holds the
-  masks; shaped bricks carry them after their palette indices and the march walks the octants of a shaped cell.
+  masks; shaped bricks carry them after their palette indices and the march walks the octants of a shaped cell
+  (cut-out ones per run through filled octants, entry then exit texel); emissive shaped cells are light-sampled as
+  quarter faces (bit 19 of an emitter face, weighted by area so the sampling density is unchanged).
   VOX has no shapes: imports stay whole blocks.
 - Material table storage buffer, 16 B per entry, up to 4,096: texture layer, animation frames/fps, tint RGBA8,
   roughness, metalness, emissive.

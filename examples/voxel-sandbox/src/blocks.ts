@@ -43,10 +43,10 @@ export const BLOCK_DEFINITIONS: readonly (readonly [name: string, options: Block
   ['dandelion', { textures: t('dandelion'), layer: 'cutout', shape: 'cross', solid: false }, 'Dandelion'],
   ['poppy', { textures: t('poppy'), layer: 'cutout', shape: 'cross', solid: false }, 'Poppy'],
   ['glowstone', { textures: t('glowstone'), light: 15, emissive: 0.5 }, 'Glowstone'],
-  ['stone_slab', { textures: t('stone'), shape: 'slab' }, 'Stone slab'],
-  ['planks_slab', { textures: t('planks'), shape: 'slab' }, 'Plank slab'],
-  ['cobblestone_stairs', { textures: t('cobblestone'), shape: 'stair' }, 'Cobblestone stairs'],
-  ['brick_stairs', { textures: t('bricks'), shape: 'stair' }, 'Brick stairs'],
+  ['stone_slab', { textures: t('stone'), shape: 'slab', waterlog: 'water' }, 'Stone slab'],
+  ['planks_slab', { textures: t('planks'), shape: 'slab', waterlog: 'water' }, 'Plank slab'],
+  ['cobblestone_stairs', { textures: t('cobblestone'), shape: 'stair', waterlog: 'water' }, 'Cobblestone stairs'],
+  ['brick_stairs', { textures: t('bricks'), shape: 'stair', waterlog: 'water' }, 'Brick stairs'],
 ];
 
 /** Blocks in the hotbar at the start, by name (keys 1-9). */

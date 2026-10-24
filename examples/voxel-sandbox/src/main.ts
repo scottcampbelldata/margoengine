@@ -8,7 +8,16 @@ import { Engine, type EngineKernel } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { Line, Lines } from '@margoengine/lines';
 import { applyQualityTier, paceEngine, watchQuality } from '@margoengine/quality';
-import { blockId, slabState, stairState, type VoxelChunk, VoxelWorld } from '@margoengine/voxel';
+import {
+  blockId,
+  connectStairs,
+  doubleSlabState,
+  slabState,
+  stairState,
+  type VoxelChunk,
+  VoxelWorld,
+  waterlogState,
+} from '@margoengine/voxel';
 import { VoxelLighting } from '@margoengine/voxel/light';
 import { raycastVoxels, VoxelCharacter, type VoxelHit } from '@margoengine/voxel/query';
 import { BlockTextures, VoxelRenderer } from '@margoengine/voxel/render';
@@ -48,7 +57,7 @@ const VIEWS: Record<string, View> = {
   overview: { eye: [-60, 42, 70], yaw: 2.6, pitch: -0.2, hours: 10, showcase: [-27, 16] },
   ground: { eye: [-17.5, 0, 31.5], yaw: 0.48, pitch: -0.1, hours: 10, showcase: [-27, 16] },
   night: { eye: [-17.5, 0, 31.5], yaw: 0.48, pitch: -0.1, hours: 21.5, showcase: [-27, 16] },
-  shapes: { eye: [-17, 21, 27.5], yaw: 0.68, pitch: -0.38, hours: 10, showcase: [-27, 16], build: 'shapes' },
+  shapes: { eye: [-17, 21.5, 28], yaw: 0.68, pitch: -0.5, hours: 10, showcase: [-27, 16], build: 'shapes' },
 };
 
 const params = new URLSearchParams(location.search),
@@ -367,14 +376,27 @@ async function boot(): Promise<void> {
     if (button === 0) {
       const [x, y, z] = hit.cell,
         above = blocks.get(blockId(world.getBlock(x, y + 1, z)));
-      if (!online) world.setBlocks(above.shape === 'cross' ? [x, y, z, 0, x, y + 1, z, 0] : [x, y, z, 0]);
-      else if (online.client.edit(x, y, z, 0) && above.shape === 'cross') online.client.edit(x, y + 1, z, 0);
+      if (!online) {
+        world.setBlocks(above.shape === 'cross' ? [x, y, z, 0, x, y + 1, z, 0] : [x, y, z, 0]);
+        connectStairs(world, x, y, z);
+      } else if (online.client.edit(x, y, z, 0) && above.shape === 'cross') online.client.edit(x, y + 1, z, 0);
     } else if (button === 2) {
       const id = blocks.id(hotbar.block),
         type = blocks.get(id),
-        [x, y, z] = hit.adjacent,
+        // A slab placed on the open half of the same slab makes a double slab in its cell.
+        onSlab =
+          type.shape === 'slab' &&
+          hit.state === slabState(id, hit.normal[1] < 0) &&
+          hit.normal[1] !== 0 &&
+          hit.point[1] - Math.floor(hit.point[1]) === 0.5,
+        [x, y, z] = onSlab ? hit.cell : hit.adjacent,
         there = blocks.get(blockId(world.getBlock(x, y, z))),
         below = blocks.get(blockId(world.getBlock(x, y - 1, z)));
+      if (onSlab) {
+        if (online) online.client.edit(x, y, z, doubleSlabState(id));
+        else world.setBlock(x, y, z, doubleSlabState(id));
+        return;
+      }
       if (there.id && !there.liquid && there.name !== 'tall_grass') return;
       if (type.solid && touchesPlayer(x, y, z)) return;
       if (type.shape === 'cross' && type.name !== 'torch' && !(below.solid && below.shape === 'cube')) return;
@@ -383,10 +405,15 @@ async function boot(): Promise<void> {
       const f = forward(),
         high = hit.normal[1] < 0 || (hit.normal[1] === 0 && hit.point[1] - Math.floor(hit.point[1]) > 0.5),
         facing = Math.abs(f[0]) > Math.abs(f[2]) ? (f[0] > 0 ? '+x' : '-x') : f[2] > 0 ? '+z' : '-z',
-        state =
-          type.shape === 'slab' ? slabState(id, high) : type.shape === 'stair' ? stairState(id, facing, high) : id;
+        shaped =
+          type.shape === 'slab' ? slabState(id, high) : type.shape === 'stair' ? stairState(id, facing, high) : id,
+        // Placed into its waterlog liquid, a slab or stair is waterlogged.
+        state = there.liquid && type.waterlog === there.id ? waterlogState(shaped) : shaped;
       if (online) online.client.edit(x, y, z, state);
-      else world.setBlock(x, y, z, state);
+      else {
+        world.setBlock(x, y, z, state);
+        connectStairs(world, x, y, z);
+      }
     } else if (button === 1) {
       const type = blocks.get(blockId(hit.state));
       hotbar.pick(type.name);

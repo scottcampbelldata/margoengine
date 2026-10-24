@@ -375,6 +375,27 @@ fn octSpan(mask:u32,o:vec3f,d:vec3f,c:vec3i,t0:f32,t1:f32)->f32 {
  }
  return span;
 }
+// The axis whose plane of cell c point l lies nearest (the face a ray crosses there).
+fn planeAxis(l:vec3f,c:vec3i)->u32 {let e=min(abs(l-vec3f(c)),abs(l-vec3f(c+1)));return select(select(2u,1u,e.y<=e.z),0u,e.x<=e.y&&e.x<=e.z);}
+// A cut-out shaped cell (palette v, mask sm) along o + t d from t0 to t1 (inside: the ray starts in it): where it stops
+// on a texel that is not cut away, as (t, axis), t -1 when it passes. Each run through filled half blocks stops at the
+// texel where it enters them, else at the one where it leaves them (an inner face), else goes on.
+fn shapeCut(v:u32,sm:u32,o:vec3f,d:vec3f,c:vec3i,t0:f32,t1:f32,inside:bool)->vec2f {
+ let cut=mat(v*MV+7u).z;let up=d>=vec3f(0.0);
+ var t=t0;var a=select(planeAxis(o+d*t0,c),3u,inside);
+ for(var i=0u;i<3u;i++){
+  let r=octWalk(sm,o,d,c,t,t1,a,true);
+  if(r.x<0.0){break;}
+  let ea=u32(r.y);
+  if(ea<3u&&texelAt(v,ea*2u+select(0u,1u,up[ea]),o+d*r.x).a>=cut){return r;}
+  let x=octWalk(sm,o,d,c,r.x,t1,ea,false);
+  let tx=select(t1,x.x,x.x>=0.0);let xa=select(planeAxis(o+d*t1,c),u32(x.y),x.x>=0.0);
+  if(texelAt(v,xa*2u+select(1u,0u,up[xa]),o+d*tx).a>=cut){return vec2f(tx,f32(xa));}
+  if(x.x<0.0){break;}
+  t=tx;a=xa;
+ }
+ return vec2f(-1.0,0.0);
+}
 fn found(h:ptr<function,Hit>,t:f32,v:u32,a:u32,stp:vec3i,d:vec3f,c:vec3i)->bool {
  var axis=a;
  if(axis==3u){let q=abs(d);axis=select(select(2u,1u,q.y>=q.z),0u,q.x>=q.y&&q.x>=q.z);}
@@ -433,7 +454,9 @@ fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit
      let tc=min(min(vn.x,vn.y),vn.z);
      if(v==want){let r=octWalk(sm,o,d,c,vt,tc,va,false);if(r.x>=0.0){return found(h,r.x,0u,u32(r.y),stp,d,c);}}
      else{
-      let r=octWalk(sm,o,d,c,vt,tc,va,true);
+      // A cut-out one stops only on texels not cut away.
+      var r=vec2f(-1.0,0.0);
+      if(cutMat(v)){r=shapeCut(v,sm,o,d,c,vt,tc,va==3u);}else{r=octWalk(sm,o,d,c,vt,tc,va,true);}
       if(want!=0u&&(r.x<0.0||r.x>vt)){return found(h,vt,0u,va,stp,d,c);}
       if(r.x>=0.0){return found(h,r.x,v,u32(r.y),stp,d,c);}
      }
@@ -522,8 +545,8 @@ fn marchShadow(model:u32,o:vec3f,d:vec3f,tMax:f32)->f32 {
     let sm=select(0u,shapeIn(entry,k),pv!=0u&&!uniform);
     // A shaped cell blocks or dims the ray only where it runs through its filled half blocks.
     if(sm!=0u){
-     let span=octSpan(sm,o,d,c,vt,next);
-     if(span>0.0){let x=extinction(v,false);if(x<0.0){return -1.0;}depth+=x*span;}
+     if(cutMat(v)){if(shapeCut(v,sm,o,d,c,vt,next,start&&vt==0.0).x>=0.0){return -1.0;}}
+     else{let span=octSpan(sm,o,d,c,vt,next);if(span>0.0){let x=extinction(v,false);if(x<0.0){return -1.0;}depth+=x*span;}}
      own=false;
     }
     // A cut-out cell lets the shadow through where both its texels on the ray are cut away.
@@ -737,15 +760,6 @@ fn voxelAt(model:u32,c:vec3i)->u32 {
  if(entry>=0x80000000u){return entry&255u;}
  let l=vec3u(c&vec3i(7));let k=l.x+8u*(l.z+8u*l.y);
  return (voxels[(entry&0x3fffffffu)+(k>>2u)]>>((k&3u)*8u))&255u;
-}
-// The half-block mask of model cell c (0: a whole cell, an empty one or a uniform brick's).
-fn shapeAt(model:u32,c:vec3i)->u32 {
- let mb=f.scene.x+model*MODEL;
- let nb=vec3i(i32(scene[mb+4u]),i32(scene[mb+5u]),i32(scene[mb+6u]));
- let b=c>>vec3u(3u);
- let entry=voxels[scene[mb+3u]+u32(b.x+nb.x*(b.z+nb.z*b.y))];
- if(entry>=0x80000000u){return 0u;}
- let l=vec3u(c&vec3i(7));return shapeIn(entry,l.x+8u*(l.z+8u*l.y));
 }
 
 // Camera rays: origins on the near plane and directions, computed in float64 on the CPU at the image's corners and
@@ -1079,14 +1093,16 @@ fn sampleEmitter()->LightPoint {
  let u2=rand();
  lo=0u;hi=count-1u;
  while(lo<hi){let mid=(lo+hi)/2u;if(ll(faces+mid*3u+2u)<u2){lo=mid+1u;}else{hi=mid;}}
- // Three words per face: x | y << 16, z | face << 16, cumulative probability.
+ // Three words per face: x | y << 16, z | face << 16 (a quarter face: bit 19, mid-cell 20, its halves 21-22),
+ // cumulative probability (weighted by area, so the density below holds for quarters too).
  let c0=scene[faces+lo*3u];let c1=scene[faces+lo*3u+1u];
  let cell=vec3i(i32(c0&0xffffu),i32(c0>>16u),i32(c1&0xffffu));
- let face=c1>>16u;let axis=face>>1u;let sg=select(-1.0,1.0,(face&1u)==0u);
- var lp=vec3f(cell)+vec3f(rand(),rand(),rand());
- lp[axis]=f32(cell[axis])+select(0.0,1.0,sg>0.0)+sg*EPS;
+ let face=(c1>>16u)&7u;let axis=face>>1u;let sg=select(-1.0,1.0,(face&1u)==0u);
+ let a1=(axis+1u)%3u;let a2=(axis+2u)%3u;let quarter=((c1>>19u)&1u)!=0u;
+ var lp=vec3f(cell)+vec3f(rand(),rand(),rand())*select(1.0,0.5,quarter);
+ if(quarter){lp[a1]+=f32((c1>>21u)&1u)*0.5;lp[a2]+=f32((c1>>22u)&1u)*0.5;}
+ lp[axis]=f32(cell[axis])+select(0.0,1.0,sg>0.0)-sg*0.5*f32((c1>>20u)&1u)+sg*EPS;
  let w=worldX(inst);let l=localX(inst);
- let a1=(axis+1u)%3u;let a2=(axis+2u)%3u;
  let area=length(cross(colOf(w,a1),colOf(w,a2)));
  let m=material(scene[mb+7u]|voxelAt(model,cell));
  r.p=xpoint(w,lp);
@@ -1333,7 +1349,6 @@ fn direct(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,medium:u32,mInst:u32,w:ptr<fun
 fn emitWeight(h:Hit,n:vec3f,d:vec3f,radiance:vec3f,lastPdf:f32)->f32 {
  if(lastPdf<=0.0){return 1.0;}
  let ib=f.scene.y+h.inst*INSTANCE;
- if(shapeAt(scene[ib+36u],h.cell)!=0u){return 1.0;} // shaped cells are not light-sampled
  let pick=fl(ib+38u);
  let total=fl(f.scene.x+scene[ib+36u]*MODEL+10u);
  if(pick<=0.0||total<=0.0){return 1.0;}

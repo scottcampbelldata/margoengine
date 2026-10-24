@@ -35,6 +35,7 @@ export interface BlockType {
     };
     readonly transmission: number;
     readonly scatter: number;
+    readonly waterlog: number;
 }
 
 export interface BlockTypeOptions {
@@ -60,6 +61,7 @@ export interface BlockTypeOptions {
     };
     transmission?: number;
     scatter?: number;
+    waterlog?: number | string;
 }
 
 export class BlockTypes {
@@ -78,6 +80,8 @@ export interface PackedChunk {
     words: Uint32Array;
     light: number | Uint8Array;
 }
+
+export type StairCorner = 'straight' | 'inner+x' | 'inner-x' | 'inner+z' | 'inner-z' | 'outer+x' | 'outer-x' | 'outer+z' | 'outer-z';
 
 export type StairFacing = '+x' | '-x' | '+z' | '-z';
 
@@ -125,9 +129,15 @@ export function blockState(id: number, state?: number): number;
 
 export const chunkKey: (cx: number, cy: number, cz: number) => string;
 
+export function connectStairs(world: VoxelWorld, x: number, y: number, z: number): void;
+
+export const doubleSlabState: (id: number) => number;
+
 export const shapeOctants: (type: BlockType, state: number) => number;
 
 export const slabState: (id: number, top?: boolean) => number;
 
-export function stairState(id: number, facing: StairFacing, upsideDown?: boolean): number;
+export function stairState(id: number, facing: StairFacing, upsideDown?: boolean, corner?: StairCorner): number;
+
+export function waterlogState(state: number, wet?: boolean): number;
 ```

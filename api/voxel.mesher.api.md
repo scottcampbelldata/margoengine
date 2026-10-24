@@ -96,6 +96,7 @@ interface BlockType {
     };
     readonly transmission: number;
     readonly scatter: number;
+    readonly waterlog: number;
 }
 
 interface BlockTypeOptions {
@@ -121,6 +122,7 @@ interface BlockTypeOptions {
     };
     transmission?: number;
     scatter?: number;
+    waterlog?: number | string;
 }
 
 class BlockTypes {

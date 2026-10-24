@@ -1,7 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // @margoengine/voxel/light: sky and block light by breadth-first flood fill, on the main thread with a per-call budget.
 import { MargoError } from '@margoengine/math/errors';
-import { octants } from './octants.js';
+import { slabOctants, stairOctants, WATERLOGGED } from './octants.js';
 import { paletteOf, type VoxelChunk } from './chunk.js';
 import { chunkKey, VoxelWorld } from './world.js';
 
@@ -40,9 +40,8 @@ const NONE = -32768, // heightmap value of a column with no light-blocking cell
   PART = 256,
   STAIR = 512,
   UP = 1 << 12, // +y covered
-  // Faces covered whole per slab (data & 7), then stair: face d is covered when the 4 octants against it are filled.
-  COVER = Uint8Array.from({ length: 16 }, (_, i) => {
-    const mask = octants(i < 8 ? 'slab' : 'stair', i & 7);
+  // Faces covered whole per octant mask: face d is covered when the 4 octants against it are filled.
+  COVER = Uint8Array.from({ length: 256 }, (_, mask) => {
     let faces = 0;
     for (let d = 0; d < 6; d++) {
       const bit = 1 << (d >> 1),
@@ -94,6 +93,7 @@ export class VoxelLighting {
   private limit: number;
   private flags = new Uint16Array(65536); // per block id: opacity | light << 4 | PART | STAIR
   private parts = false; // some block type is a slab or stair
+  private wet = new Uint8Array(65536); // per slab or stair id: its waterlog liquid's opacity
   private types = 0;
   private disposed = false;
   private readonly sections = new Map<string, Section>();
@@ -247,15 +247,20 @@ export class VoxelLighting {
     for (const type of table) {
       const part = type.shape === 'slab' ? PART : type.shape === 'stair' ? PART | STAIR : 0;
       this.flags[type.id] = type.opacity | (type.light << 4) | part;
+      this.wet[type.id] = type.waterlog ? (table[type.waterlog]?.opacity ?? 0) : 0;
       if (part) this.parts = true;
     }
     this.types = table.length;
   }
   // Flags of cell i of s; for a slab or stair with its whole-covered faces at bits 10-15.
+  // A waterlogged one costs its liquid's opacity when that is more.
   private state(s: Section, i: number): number {
     const state = s.chunk.get(i & 31, i >> 10, (i >> 5) & 31),
       f = this.flags[state & 0xffff];
-    return f & PART ? f | (COVER[((f >> 6) & 8) | ((state >>> 16) & 7)] << 10) : f;
+    if (!(f & PART)) return f;
+    const data = state >>> 16,
+      opacity = data & WATERLOGGED ? Math.max(f & 15, this.wet[state & 0xffff]) : f & 15;
+    return (f & ~15) | opacity | (COVER[f & STAIR ? stairOctants(data) : slabOctants(data)] << 10);
   }
   // Whether light cannot cross between cell i of s (flags `f`) and its neighbour j of t (flags `g`) across face d of i.
   private shut(f: number, g: number, d: number): boolean {

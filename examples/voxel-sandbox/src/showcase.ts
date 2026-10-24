@@ -2,7 +2,15 @@
 // roof, torches and a glowstone lamp post, so screenshots show block light, glass and cutout plants; or, for
 // ?view=shapes, slabs and stairs on the same yard. Built on the ground it finds, with a cobblestone footing down to it.
 // Only deterministic views place them (a saved world never gets them).
-import { type BlockTypes, slabState, stairState, type VoxelWorld } from '@margoengine/voxel';
+import {
+  type BlockTypes,
+  connectStairs,
+  doubleSlabState,
+  slabState,
+  stairState,
+  type VoxelWorld,
+  waterlogState,
+} from '@margoengine/voxel';
 
 /** Highest solid block of column (x, z) at or below `from`, or undefined while that part of the world is not loaded. */
 export function groundY(world: VoxelWorld, x: number, z: number, from = 96, to = -64): number | undefined {
@@ -91,7 +99,8 @@ export function buildShowcase(world: VoxelWorld, blocks: BlockTypes, x: number, 
 /**
  * Builds the slab and stair yard with its south-west corner at column (x, z): a plank deck on log posts under a roof
  * of top slabs with an eave of upside-down stairs, a cobblestone flight up to it whose steps face +x, a stone slab
- * terrace and a brick column ringed by stairs of all four facings, with a torch under the deck.
+ * terrace starting with a double slab, a brick column ringed by stairs that turn into inner and outer corners, a pool
+ * holding a waterlogged slab and stair, and a torch under the deck.
  */
 export function buildShapes(world: VoxelWorld, blocks: BlockTypes, x: number, z: number): void {
   const id = (name: string) => blocks.id(name),
@@ -126,8 +135,8 @@ export function buildShapes(world: VoxelWorld, blocks: BlockTypes, x: number, z:
       for (let y = base; y < base + i; y++) put(x + 6 - i, y, z + dz, cobble);
       put(x + 6 - i, base + i, z + dz, stairState(stairs, '-x'));
     }
-  // A stone slab terrace in front, and a slab step down from it.
-  for (let dx = 2; dx <= 6; dx++) put(x + dx, base, z + 6, slabState(slab));
+  // A stone slab terrace in front, a double slab at its start, and a slab step down from it.
+  for (let dx = 2; dx <= 6; dx++) put(x + dx, base, z + 6, dx === 2 ? doubleSlabState(slab) : slabState(slab));
   for (let dx = 3; dx <= 5; dx++) put(x + dx, base, z + 7, slabState(slab));
   // The brick column with a stair of each facing round its foot and a stone slab cap.
   for (let y = base; y <= base + 2; y++) put(x, y, z + 7, bricks);
@@ -136,7 +145,20 @@ export function buildShapes(world: VoxelWorld, blocks: BlockTypes, x: number, z:
   put(x + 1, base, z + 7, stairState(brickStairs, '-x'));
   put(x, base, z + 6, stairState(brickStairs, '+z'));
   put(x, base, z + 8, stairState(brickStairs, '-z'));
+  // Stairs in the ring's corner cells, which connectStairs turns into corners below.
+  for (const [dx, dz] of [
+    [-1, 6],
+    [1, 6],
+    [-1, 8],
+    [1, 8],
+  ])
+    put(x + dx, base, z + dz, stairState(brickStairs, dz < 7 ? '+z' : '-z'));
+  // A pool in the ground with a waterlogged slab and stair in it.
+  for (let dx = 4; dx <= 6; dx++) put(x + dx, base - 1, z + 8, blocks.id('water'));
+  put(x + 5, base - 1, z + 8, waterlogState(slabState(slab)));
+  put(x + 6, base - 1, z + 8, waterlogState(stairState(stairs, '-x')));
   // Block light under the deck.
   put(x + 1, base, z + 2, torch);
   world.setBlocks(edits);
+  for (let dx = -1; dx <= 1; dx++) for (let dz = 6; dz <= 8; dz++) connectStairs(world, x + dx, base, z + dz);
 }

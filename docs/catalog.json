@@ -1160,9 +1160,12 @@
       "blockId",
       "blockState",
       "chunkKey",
+      "connectStairs",
+      "doubleSlabState",
       "shapeOctants",
       "slabState",
-      "stairState"
+      "stairState",
+      "waterlogState"
     ],
     "example": "../voxel/",
     "exampleTitle": "Voxel sandbox",

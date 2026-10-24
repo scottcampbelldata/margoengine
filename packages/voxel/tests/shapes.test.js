@@ -1,9 +1,19 @@
-// Slabs and stairs end to end: their state helpers and octants, the mesher (against a half-block oracle), picking,
-// box sweeps and the character on stairs, light through their open part, and their states in the byte formats.
+// Slabs and stairs end to end: their state helpers and octants (corners, double slabs, waterlogging), the mesher
+// (against a half-block oracle with liquids), picking, box sweeps and the character on stairs, light through their open
+// part, and their states in the byte formats.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BlockTypes, VoxelWorld, shapeOctants, slabState, stairState } from '../dist/index.js';
-import { decodeQuad, meshChunk, meshInput, quadCenters } from '../dist/mesher.js';
+import {
+  BlockTypes,
+  VoxelWorld,
+  connectStairs,
+  doubleSlabState,
+  shapeOctants,
+  slabState,
+  stairState,
+  waterlogState,
+} from '../dist/index.js';
+import { blockMaterials, decodeQuad, meshChunk, meshInput, quadCenters } from '../dist/mesher.js';
 import { VoxelCharacter, raycastVoxels, sweepBox } from '../dist/query.js';
 import { VoxelLighting } from '../dist/light.js';
 import { decodeBlockChanges, decodeChunk, encodeBlockChanges, encodeChunk } from '../dist/codec.js';
@@ -17,20 +27,40 @@ const random = (seed) => () => {
 
 const blocks = new BlockTypes();
 const STONE = blocks.define('stone', { textures: 1 }),
-  SLAB = blocks.define('slab', { shape: 'slab', textures: 2 }),
-  STAIR = blocks.define('stair', { shape: 'stair', textures: 3 }),
+  WATER = blocks.define('water', {
+    layer: 'translucent',
+    shape: 'liquid',
+    liquid: true,
+    solid: false,
+    opacity: 2,
+    textures: 7,
+  }),
+  SLAB = blocks.define('slab', { shape: 'slab', textures: 2, waterlog: WATER }),
+  STAIR = blocks.define('stair', { shape: 'stair', textures: 3, waterlog: 'water' }),
   GLASS = blocks.define('glass', { layer: 'translucent', textures: 4 }),
   GLASS_SLAB = blocks.define('glass-slab', { layer: 'translucent', shape: 'slab', textures: 4 }),
   FLOWER = blocks.define('flower', { layer: 'cutout', shape: 'cross', solid: false, textures: 5 }),
   TORCH = blocks.define('torch', { layer: 'cutout', shape: 'cross', solid: false, light: 14, textures: 6 });
 const table = blocks.table,
   FACINGS = ['+x', '-x', '+z', '-z'],
-  // Every slab and stair state.
-  SHAPED = [
+  ACROSS = { '+x': ['+z', '-z'], '-x': ['+z', '-z'], '+z': ['+x', '-x'], '-z': ['+x', '-x'] },
+  // Every slab and stair shape: straight stairs, corners of both kinds toward both sides, a double slab.
+  SHAPES = [
     slabState(SLAB),
     slabState(SLAB, true),
-    ...FACINGS.flatMap((f) => [stairState(STAIR, f), stairState(STAIR, f, true)]),
-  ];
+    doubleSlabState(SLAB),
+    ...FACINGS.flatMap((f) =>
+      [false, true].flatMap((down) => [
+        stairState(STAIR, f, down),
+        ...ACROSS[f].flatMap((side) => [
+          stairState(STAIR, f, down, `inner${side}`),
+          stairState(STAIR, f, down, `outer${side}`),
+        ]),
+      ]),
+    ),
+  ],
+  // Each of them dry and waterlogged.
+  SHAPED = SHAPES.flatMap((state) => [state, waterlogState(state)]);
 
 test('slab and stair states and their octants', () => {
   assert.equal(slabState(SLAB), SLAB);
@@ -78,7 +108,14 @@ const AXES = [
   [2, 0, 1],
   [2, 0, 1],
 ];
-// The half-block unit squares a quad covers, as `face:hx,hy,hz` of the half cell behind each (the filled one).
+// The owner (block id) of each material id.
+const owners = (() => {
+  const ids = blockMaterials(table),
+    out = [];
+  for (let i = 0; i < ids.length; i++) if (ids[i] !== 0xffff) out[ids[i]] ??= Math.floor(i / 6);
+  return out;
+})();
+// The half-block unit squares a quad covers, as `owner:face:hx,hy,hz` of the half cell behind each (the filled one).
 function squares(q) {
   const [n, u, v] = AXES[q.face],
     cell = [q.x, q.y, q.z],
@@ -95,36 +132,43 @@ function squares(q) {
       h[n] = plus ? plane - 1 : plane;
       h[u] = a;
       h[v] = b;
-      out.push(`${q.face}:${h.join(',')}`);
+      out.push(`${owners[q.material]}:${q.face}:${h.join(',')}`);
     }
   return out;
 }
+// What fills half cell (hx, hy, hz): the block state whose box covers it, and the liquid there (a liquid cell's, or a
+// waterlogged slab's or stair's in its open part).
+function filler(w, hx, hy, hz) {
+  const state = w.getBlock(hx >> 1, hy >> 1, hz >> 1),
+    type = table[state & 0xffff],
+    k = (hx & 1) | ((hy & 1) << 1) | ((hz & 1) << 2);
+  if (type.shape === 'liquid') return { liquid: state & 0xffff };
+  if (type.layer === 'invisible' || type.shape === 'cross') return {};
+  if ((shapeOctants(type, state) >> k) & 1) return { block: state };
+  return { liquid: type.waterlog && state >>> 31 ? type.waterlog : 0 };
+}
 // Oracle: every face of a filled half cell of a chunk block whose neighbouring half cell is neither an opaque block's
-// nor the same block's, read from the world (so the shell counts).
+// nor the same block's, and every face of a liquid's half cell whose neighbour is neither an opaque block's nor the
+// same liquid's (sources only: no lowered surfaces), read from the world (so the shell counts).
 function exposed(w) {
-  const at = (hx, hy, hz) => {
-      const state = w.getBlock(hx >> 1, hy >> 1, hz >> 1),
-        type = table[state & 0xffff];
-      if (type.layer === 'invisible' || type.shape === 'cross' || type.shape === 'liquid') return undefined;
-      const k = (hx & 1) | ((hy & 1) << 1) | ((hz & 1) << 2);
-      return (shapeOctants(type, state) >> k) & 1 ? state : undefined;
-    },
-    out = new Set();
+  const out = new Set(),
+    opaque = (state) => state !== undefined && table[state & 0xffff].layer === 'opaque';
   for (let hy = 0; hy < 64; hy++)
     for (let hz = 0; hz < 64; hz++)
       for (let hx = 0; hx < 64; hx++) {
-        const state = at(hx, hy, hz);
-        if (state === undefined) continue;
+        const here = filler(w, hx, hy, hz);
+        if (here.block === undefined && !here.liquid) continue;
         for (let face = 0; face < 6; face++) {
           const h = [hx, hy, hz];
           h[face >> 1] += face % 2 ? -1 : 1;
-          const other = at(...h);
-          if (
-            other !== undefined &&
-            (table[other & 0xffff].layer === 'opaque' || (other & 0xffff) === (state & 0xffff))
-          )
-            continue;
-          out.add(`${face}:${hx},${hy},${hz}`);
+          const other = filler(w, ...h);
+          if (here.block !== undefined) {
+            if (
+              !(opaque(other.block) || (other.block !== undefined && (other.block & 0xffff) === (here.block & 0xffff)))
+            )
+              out.add(`${here.block & 0xffff}:${face}:${hx},${hy},${hz}`);
+          } else if (!(opaque(other.block) || other.liquid === here.liquid))
+            out.add(`${here.liquid}:${face}:${hx},${hy},${hz}`);
         }
       }
   return out;
@@ -164,7 +208,19 @@ test('mesher: one slab and one stair of every state show exactly their outer fac
 });
 
 test('mesher: random mixes of cubes, slabs, stairs and glass match the half-block oracle (culling, merging)', () => {
-  const choices = [0, 0, 0, STONE, GLASS, slabState(GLASS_SLAB), slabState(GLASS_SLAB, true), FLOWER, ...SHAPED];
+  const choices = [
+    0,
+    0,
+    0,
+    0,
+    STONE,
+    WATER,
+    GLASS,
+    slabState(GLASS_SLAB),
+    slabState(GLASS_SLAB, true),
+    FLOWER,
+    ...SHAPED,
+  ];
   for (let seed = 1; seed <= 6; seed++) {
     const next = random(seed),
       w = world(),
@@ -388,14 +444,159 @@ test('light passes through the open part of slabs and stairs, not through faces 
 
 test('formats: slab and stair states survive the chunk and block-change codecs', async () => {
   const w = world();
-  for (const [i, state] of SHAPED.entries()) w.setBlock(i, 3, 7, state);
+  for (const [i, state] of SHAPED.entries()) w.setBlock(i & 31, 3 + (i >> 5), 7, state);
   const chunk = w.getChunk(0, 0, 0),
     back = await decodeChunk(await encodeChunk(chunk));
-  for (const [i, state] of SHAPED.entries()) assert.equal(back.get(i, 3, 7), state);
+  for (const [i, state] of SHAPED.entries()) assert.equal(back.get(i & 31, 3 + (i >> 5), 7), state);
   const changes = SHAPED.flatMap((state, i) => [i, 1, 2, state]),
     decoded = decodeBlockChanges(encodeBlockChanges(changes));
   assert.deepEqual(
     [...decoded].map((v, i) => (i % 4 === 3 ? v >>> 0 : v)),
     changes,
   );
+});
+
+test('stair corners: octants of inner and outer corners, explicit corners and their errors', () => {
+  const octants = (state) => shapeOctants(table[state & 0xffff], state);
+  // Facing +x: the back's upper octants are bits 3 and 7 (x high); the lower slab 0x33.
+  assert.equal(octants(stairState(STAIR, '+x')), 0x33 | 0x88);
+  // Inner +z: the whole back and the front quarter on +z (x low, y high, z high: bit 6).
+  assert.equal(octants(stairState(STAIR, '+x', false, 'inner+z')), 0x33 | 0x88 | 0x40);
+  // Outer +z: only the back quarter on +z (bit 7); outer -z: only bit 3.
+  assert.equal(octants(stairState(STAIR, '+x', false, 'outer+z')), 0x33 | 0x80);
+  assert.equal(octants(stairState(STAIR, '+x', false, 'outer-z')), 0x33 | 0x08);
+  // Upside down: the slab on top, the corner below.
+  assert.equal(octants(stairState(STAIR, '-z', true, 'outer-x')), 0xcc | 0x01);
+  // A straight corner given by hand is a different state (kept by connectStairs) with the same octants.
+  assert.notEqual(stairState(STAIR, '+x', false, 'straight'), stairState(STAIR, '+x'));
+  assert.equal(octants(stairState(STAIR, '+x', false, 'straight')), octants(stairState(STAIR, '+x')));
+  assert.throws(() => stairState(STAIR, '+x', false, 'inner+x'), TypeError);
+  assert.throws(() => stairState(STAIR, '+z', false, 'outer+z'), TypeError);
+  assert.throws(() => stairState(STAIR, '+z', false, 'sideways'), TypeError);
+  // Double slabs fill the cell; waterlogging changes no octants.
+  assert.equal(octants(doubleSlabState(SLAB)), 255);
+  assert.equal(octants(waterlogState(stairState(STAIR, '-x'))), octants(stairState(STAIR, '-x')));
+  assert.equal(waterlogState(waterlogState(SLAB), false), SLAB);
+  assert.throws(() => waterlogState(-1), RangeError);
+  assert.throws(() => blocks.define('wet-stone', { waterlog: WATER }), TypeError);
+  assert.throws(() => blocks.define('wet-slab', { shape: 'slab', waterlog: STONE }), RangeError);
+  assert.throws(() => blocks.define('wet-slab2', { shape: 'slab', waterlog: 'lava' }), RangeError);
+});
+
+test('connectStairs: outer corners toward a stair behind, inner toward one in front; hand-set corners stay', () => {
+  const w = world(),
+    corner = (x, z) => (w.getBlock(x, 4, z) >>> 16) & 0x7f;
+  // An L: a stair facing +x with, behind it (+x), a stair facing +z. The first becomes an outer corner toward +z.
+  w.setBlock(5, 4, 5, stairState(STAIR, '+x'));
+  w.setBlock(6, 4, 5, stairState(STAIR, '+z'));
+  connectStairs(w, 6, 4, 5); // from the second stair's cell: its neighbours are reconnected too
+  assert.equal(corner(5, 5), (2 << 3) | 32);
+  assert.equal(
+    shapeOctants(table[STAIR], w.getBlock(5, 4, 5)),
+    shapeOctants(table[STAIR], stairState(STAIR, '+x', false, 'outer+z')),
+  );
+  assert.equal(corner(6, 5), 2); // the +z stair stays straight
+  // A stair whose front (-x) meets a stair facing -z becomes an inner corner toward -z.
+  w.setBlock(10, 4, 5, stairState(STAIR, '+x'));
+  w.setBlock(9, 4, 5, stairState(STAIR, '-z'));
+  connectStairs(w, 9, 4, 5);
+  assert.equal(corner(10, 5), 1 << 3);
+  // Different halves do not connect.
+  w.setBlock(9, 4, 5, stairState(STAIR, '-z', true));
+  connectStairs(w, 9, 4, 5);
+  assert.equal(corner(10, 5), 0);
+  // A corner set by hand is kept.
+  w.setBlock(5, 4, 5, stairState(STAIR, '+x', false, 'straight'));
+  connectStairs(w, 5, 4, 5);
+  assert.equal(corner(5, 5), 64);
+  // A ring of stairs round a column, backs inward, with stairs in the corner cells: those become corners, meshed and
+  // picked as their boxes.
+  const ring = world(),
+    corners = [
+      [19, 19],
+      [21, 19],
+      [19, 21],
+      [21, 21],
+    ];
+  ring.setBlock(20, 4, 20, STONE);
+  ring.setBlocks([19, 4, 20, stairState(STAIR, '+x'), 21, 4, 20, stairState(STAIR, '-x')]);
+  ring.setBlocks([20, 4, 19, stairState(STAIR, '+z'), 20, 4, 21, stairState(STAIR, '-z')]);
+  for (const [x, z] of corners) ring.setBlock(x, 4, z, stairState(STAIR, z < 20 ? '+z' : '-z'));
+  for (let x = 19; x <= 21; x++) for (let z = 19; z <= 21; z++) connectStairs(ring, x, 4, z);
+  sameFaces(ring, 'stair ring');
+  assert.ok(
+    corners.every(([x, z]) => (ring.getBlock(x, 4, z) >>> 19) & 3),
+    'the corner cells are corners',
+  );
+  const hit = raycastVoxels(ring, [19.25, 9, 19.25], [0, -1, 0], 20);
+  assert.ok(hit.point[1] === 4.5 || hit.point[1] === 5, `hit at ${hit.point}`);
+});
+
+test('double slabs act as whole blocks for meshing, picking and sweeps', () => {
+  const w = world();
+  w.setBlock(3, 2, 3, doubleSlabState(SLAB));
+  const hit = raycastVoxels(w, [3.5, 10, 3.5], [0, -1, 0], 20);
+  assert.deepEqual([hit.normal, hit.point[1]], [[0, 1, 0], 3]);
+  const r = sweepBox(w, { min: { x: 3.2, y: 6, z: 3.2 }, max: { x: 3.8, y: 7, z: 3.8 } }, [0, -10, 0]);
+  assert.equal(r.position[1], 3);
+  sameFaces(w, 'double slab');
+  assert.equal(quads(mesh(w)).length, 6);
+});
+
+test('waterlogging: the liquid fills the open part for meshing, light and swimming; the block still collides', () => {
+  // A waterlogged bottom slab in a pool: no water faces in it but the surface; its inset top shows under the water.
+  const w = world(),
+    edits = [];
+  for (let x = 2; x < 7; x++) for (let z = 2; z < 7; z++) edits.push(x, 3, z, WATER);
+  w.setBlocks(edits);
+  w.setBlock(4, 3, 4, waterlogState(slabState(SLAB)));
+  sameFaces(w, 'pool');
+  const q = quads(mesh(w)),
+    inCell = q.filter((x) => x.x === 4 && x.y === 3 && x.z === 4);
+  assert.ok(inCell.some((x) => owners[x.material] === SLAB && x.face === 2 && x.inset));
+  assert.ok(!inCell.some((x) => owners[x.material] === WATER && x.face !== 2 && x.face !== 3));
+  // The surface: the pool's water on its cell side, the slab cell's water too (one wave quad kind, merged per row).
+  const surface = q.filter((x) => owners[x.material] === WATER && x.face === 2);
+  assert.ok(surface.every((x) => x.wave && !x.inset));
+  assert.equal(
+    surface.reduce((n, x) => n + x.w * x.h, 0),
+    25,
+  );
+  // Lowered water beside a top slab shows only its side under the slab (the shader cuts it at the water line).
+  const low = world();
+  low.setBlock(4, 3, 4, (WATER | (5 << 16)) >>> 0);
+  low.setBlock(5, 3, 4, slabState(SLAB, true));
+  const side = quads(mesh(low)).find((x) => owners[x.material] === WATER && x.face === 0);
+  assert.deepEqual([side.trim, side.liquidDrop], [8, 5]);
+  // Light: a waterlogged slab costs the water's opacity (2) on top of the step.
+  const tunnel = (state) => {
+    const v = new VoxelWorld({ blocks }),
+      cells = [];
+    for (let x = 0; x < 9; x++) for (let z = 0; z < 3; z++) for (let y = 0; y < 4; y++) cells.push(x, y, z, STONE);
+    for (let x = 1; x < 8; x++) cells.push(x, 1, 1, 0);
+    v.setBlocks(cells);
+    v.setBlock(1, 1, 1, TORCH);
+    v.setBlock(4, 1, 1, state);
+    const l = VoxelLighting.attach(v, { budget: Infinity });
+    l.update();
+    const before = l.blockLight(5, 1, 1);
+    v.setBlock(4, 1, 1, waterlogState(state));
+    l.update();
+    const after = l.blockLight(5, 1, 1);
+    l.dispose();
+    return [before, after];
+  };
+  assert.deepEqual(tunnel(slabState(SLAB)), [10, 8]);
+  // A character in a waterlogged cell swims; the slab still holds it up.
+  const pool = world(),
+    floor = [];
+  for (let x = 0; x < 8; x++)
+    for (let z = 0; z < 8; z++) floor.push(x, 0, z, STONE, x, 1, z, waterlogState(slabState(SLAB)));
+  pool.setBlocks(floor);
+  const swimmer = new VoxelCharacter(pool);
+  swimmer.position = [4, 1.5, 4];
+  swimmer.update(1 / 60);
+  assert.equal(swimmer.inLiquid, true);
+  for (let i = 0; i < 60; i++) swimmer.update(1 / 60);
+  assert.ok(swimmer.position[1] >= 1.5 - 1e-9, `stands on the slab (${swimmer.position[1]})`);
 });

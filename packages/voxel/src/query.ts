@@ -312,13 +312,16 @@ function move(world: VoxelWorld, b: Float64Array, mx: number, my: number, mz: nu
   hit[2] = slide(world, b, 2, mz);
   return ground;
 }
-// Whether box `b` overlaps a liquid cell by more than EPS.
+// Whether box `b` overlaps a liquid cell (a waterlogged slab or stair included) by more than EPS.
 function wet(world: VoxelWorld, b: Float64Array): boolean {
   const table = world.blocks.table;
   for (let x = Math.floor(b[0] + EPS); x < b[3] - EPS; x++)
     for (let y = Math.floor(b[1] + EPS); y < b[4] - EPS; y++)
-      for (let z = Math.floor(b[2] + EPS); z < b[5] - EPS; z++)
-        if (table[world.getBlock(x, y, z) & 0xffff]?.liquid) return true;
+      for (let z = Math.floor(b[2] + EPS); z < b[5] - EPS; z++) {
+        const state = world.getBlock(x, y, z),
+          type = table[state & 0xffff];
+        if (type?.liquid || (type?.waterlog && state >>> 31)) return true;
+      }
   return false;
 }
 

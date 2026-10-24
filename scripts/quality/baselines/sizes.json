@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3036565,
+  "total": 3041286,
   "history": [
     {
       "date": "2026-10-24",
@@ -80,6 +80,12 @@
       "commit": "e69bfb2d",
       "reason": "Core bug fixes (Scott 2026-10-24: freeze blocks features, not fixes): engine.pick queues overlapping calls, MargoError codes and fix-naming messages for every core throw",
       "grew": 2
+    },
+    {
+      "date": "2026-10-24",
+      "commit": "51380919",
+      "reason": "voxel corner stairs (connectStairs), double slabs, waterlogging; path tracer shaped emitters and cut-outs",
+      "grew": 5
     }
   ],
   "items": {
@@ -329,8 +335,8 @@
     "@margoengine/vfx/wrap": 671,
     "@margoengine/video": 2199,
     "@margoengine/viewcube": 3608,
-    "@margoengine/voxel": 5158,
-    "@margoengine/voxel dist/workers/mesher.js": 5750,
+    "@margoengine/voxel": 6167,
+    "@margoengine/voxel dist/workers/mesher.js": 6162,
     "@margoengine/voxel dist/workers/terrain.js": 5948,
     "@margoengine/voxel-edit": 7789,
     "@margoengine/voxel-edit/animation": 1895,
@@ -346,14 +352,14 @@
     "@margoengine/voxel-net": 5532,
     "@margoengine/voxel-net/bot": 7303,
     "@margoengine/voxel-net/server": 10798,
-    "@margoengine/voxel-pathtracer": 71382,
+    "@margoengine/voxel-pathtracer": 73959,
     "@margoengine/voxel-pathtracer/studio": 1313,
     "@margoengine/voxel/bevel": 2457,
     "@margoengine/voxel/codec": 8959,
     "@margoengine/voxel/generate": 4442,
-    "@margoengine/voxel/light": 8396,
+    "@margoengine/voxel/light": 8692,
     "@margoengine/voxel/lightmap": 2762,
-    "@margoengine/voxel/mesher": 7885,
+    "@margoengine/voxel/mesher": 8312,
     "@margoengine/voxel/physics": 10257,
     "@margoengine/voxel/query": 3821,
     "@margoengine/voxel/render": 22428,

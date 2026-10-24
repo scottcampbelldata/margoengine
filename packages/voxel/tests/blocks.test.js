@@ -56,6 +56,7 @@ test('BlockTypes assigns ids in order after air and resolves every option', () =
     maps: { normal: 0, roughness: 0, emissive: 0 },
     transmission: 0,
     scatter: 0,
+    waterlog: 0,
   });
   assert.deepEqual(blocks.get(grass).textures, [2, 2, 0, 1, 2, 2]);
   assert.deepEqual(blocks.get(grass).color, [1, 0, 0]);

@@ -98,7 +98,11 @@ export interface PackedModel {
 /** Emissive faces of one model for one material set. */
 interface ModelEmitters {
   key: string;
-  /** Two words per face: `x | y << 16`, `z | face << 16` (face 0..5 = +x -x +y -y +z -z). */
+  /**
+   * Two words per face: `x | y << 16`, `z | face << 16` (face 0..5 = +x -x +y -y +z -z); a quarter face of a shaped
+   * cell (or of a whole one beside a shaped cell's open part) adds bit 19 of the second word, bit 20 when it lies mid-cell
+   * and bits 21 and 22 for its high half along the face's first and second axes (axis + 1 and axis + 2, mod 3).
+   */
   faces: Uint32Array;
   /** Palette index of each face's voxel. */
   ids: Uint8Array;
@@ -797,12 +801,38 @@ function modelEmitters(m: PackedModel, materials: Float32Array, cache: SceneCach
           for (let z = cz * 8; z < Math.min(cz * 8 + 8, sz); z++)
             for (let x = cx * 8; x < Math.min(cx * 8 + 8, sx); x++) {
               const v = voxelAt(m, x, y, z);
-              if (!glow[v] || shapeAt(m, x, y, z)) continue; // shaped cells are found by BSDF sampling alone
+              if (!glow[v]) continue;
+              const own = shapeAt(m, x, y, z) || 255;
               for (let f = 0; f < 6; f++) {
-                const s = steps[f];
-                if (!see[voxelAt(m, x + s[0], y + s[1], z + s[2])]) continue;
-                faces.push((x | (y << 16)) >>> 0, (z | (f << 16)) >>> 0);
-                ids.push(v);
+                const s = steps[f],
+                  nx = x + s[0],
+                  ny = y + s[1],
+                  nz = z + s[2];
+                // A whole face toward a see-through cell, as before shapes.
+                if (own === 255 && see[voxelAt(m, nx, ny, nz)]) {
+                  faces.push((x | (y << 16)) >>> 0, (z | (f << 16)) >>> 0);
+                  ids.push(v);
+                  continue;
+                }
+                // Else per quarter: on the cell's side toward a see-through octant (an empty part of a shaped
+                // neighbour), and mid-cell where a shaped cell fills the octant behind and not the one in front.
+                const axis = f >> 1,
+                  bit = 1 << axis,
+                  out = f & 1 ? 0 : bit,
+                  back = bit ^ out,
+                  b1 = 1 << ((axis + 1) % 3),
+                  b2 = 1 << ((axis + 2) % 3),
+                  there = see[voxelAt(m, nx, ny, nz)] ? 0 : shapeAt(m, nx, ny, nz) || 255;
+                for (let q = 0; q < 4; q++) {
+                  const o = (q & 1 ? b1 : 0) | (q & 2 ? b2 : 0),
+                    word = (z | (f << 16) | (1 << 19) | ((q & 3) << 21)) >>> 0;
+                  if ((own >> (o | out)) & 1) {
+                    if ((there >> (o | back)) & 1) continue;
+                    faces.push((x | (y << 16)) >>> 0, word);
+                  } else if ((own >> (o | back)) & 1) faces.push((x | (y << 16)) >>> 0, (word | (1 << 20)) >>> 0);
+                  else continue;
+                  ids.push(v);
+                }
               }
             }
       }
@@ -1465,7 +1495,8 @@ export function buildSnapshot(scene: VoxelTraceScene, cache: SceneCache, maxWord
     let total = 0;
     for (let k = 0; k < e.ids.length; k++) {
       const b = e.ids[k] * MATERIAL_FLOATS + 8;
-      total += luminance(table[b], table[b + 1], table[b + 2]);
+      // Weighted by area: a quarter face counts a quarter, so a point's density is the same on any face.
+      total += luminance(table[b], table[b + 1], table[b + 2]) * ((e.faces[k * 2 + 1] >>> 19) & 1 ? 0.25 : 1);
       cdf[k] = total;
     }
     for (let k = 0; k < cdf.length; k++) cdf[k] = k === cdf.length - 1 ? 1 : cdf[k] / total;

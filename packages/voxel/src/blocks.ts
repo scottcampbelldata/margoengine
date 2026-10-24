@@ -1,7 +1,8 @@
 import type { ColorInput, Vec3 } from '@margoengine/math';
 import { parseColor } from '@margoengine/math/color';
 import { MargoError } from '@margoengine/math/errors';
-import { octants } from './octants.js';
+import { octants, SLAB_DOUBLE, SLAB_TOP, STAIR_CORNER, STAIR_FIXED, WATERLOGGED } from './octants.js';
+import type { VoxelWorld } from './world.js';
 
 /**
  * Render pass of a block type: `'opaque'` (back-face culled, hides its neighbours' faces), `'cutout'` (alpha
@@ -10,14 +11,32 @@ import { octants } from './octants.js';
 export type BlockLayer = 'opaque' | 'cutout' | 'translucent' | 'invisible';
 /**
  * Geometry of a block type: a full `'cube'`, two diagonal quads (`'cross'`, e.g. grass and flowers), a `'liquid'`, a
- * half-height `'slab'` or a `'stair'`. A slab fills the lower half of its cell, or the upper half when bit 2 of its
- * state data is set ({@link slabState}). A stair is a lower slab plus the upper quarter on its back side: state data
- * bits 0-1 name that side (0 +x, 1 -x, 2 +z, 3 -z) and bit 2 turns it upside down ({@link stairState}). Slabs and
- * stairs are meshed, lit, shadowed, collided and picked as their half-block boxes ({@link shapeOctants}).
+ * half-height `'slab'` or a `'stair'`. A slab fills the lower half of its cell, the upper half when bit 2 of its
+ * state data is set, or both halves when bit 3 is ({@link slabState}, {@link doubleSlabState}). A stair is a lower
+ * slab plus the upper quarter on its back side: state data bits 0-1 name that side (0 +x, 1 -x, 2 +z, 3 -z), bit 2
+ * turns it upside down, bits 3-4 make it an inner (1) or outer (2) corner toward the side bit 5 names on the other
+ * horizontal axis (0 its -, 1 its +), and bit 6 marks a corner set by hand ({@link stairState},
+ * {@link connectStairs}). Bit 15 of either waterlogs it ({@link waterlogState}). Slabs and stairs are meshed, lit,
+ * shadowed, collided and picked as their half-block boxes ({@link shapeOctants}).
  */
 export type BlockShape = 'cube' | 'cross' | 'liquid' | 'slab' | 'stair';
 /** Side a stair's full-height back faces: `'+x'`, `'-x'`, `'+z'` or `'-z'`. */
 export type StairFacing = '+x' | '-x' | '+z' | '-z';
+/**
+ * A stair's corner: `'straight'`, or an inner or outer corner toward a side on the horizontal axis across its back
+ * (`'inner+z'` for a stair facing `'+x'` keeps its whole back and adds the front quarter on the +z side; `'outer+z'`
+ * keeps only the back quarter on the +z side).
+ */
+export type StairCorner =
+  | 'straight'
+  | 'inner+x'
+  | 'inner-x'
+  | 'inner+z'
+  | 'inner-z'
+  | 'outer+x'
+  | 'outer-x'
+  | 'outer+z'
+  | 'outer-z';
 
 /** Options of {@link BlockTypes.define}. Every field is optional. */
 export interface BlockTypeOptions {
@@ -60,6 +79,11 @@ export interface BlockTypeOptions {
   transmission?: number;
   /** Translucent blocks only: interior scatter, 0-1; 1 halves the see-through part of `transmission`. Default 0. */
   scatter?: number;
+  /**
+   * Slabs and stairs only: the liquid (a defined `'liquid'` type's id or name) that fills the rest of the cell when a
+   * state is waterlogged ({@link waterlogState}). Default none: the waterlogged bit is ignored.
+   */
+  waterlog?: number | string;
 }
 
 /** A defined block type with every option resolved; `color` is linear RGB. Plain, structured-cloneable data. */
@@ -98,6 +122,8 @@ export interface BlockType {
   readonly transmission: number;
   /** Interior scatter of a translucent block, 0-1. */
   readonly scatter: number;
+  /** Id of the liquid a waterlogged state of this slab or stair holds; 0 for none. */
+  readonly waterlog: number;
 }
 
 const LAYERS: readonly BlockLayer[] = ['opaque', 'cutout', 'translucent', 'invisible'],
@@ -129,17 +155,90 @@ export const blockData = (s: number): number => s >>> 16;
  * The block state of slab block `id`: its lower half, or its upper half when `top`.
  * @throws TypeError for a non-number id. @throws RangeError when `id` is not an integer in 0..65535.
  */
-export const slabState = (id: number, top = false): number => blockState(id, top ? 4 : 0);
+export const slabState = (id: number, top = false): number => blockState(id, top ? SLAB_TOP : 0);
+/**
+ * The block state of slab block `id` filling both halves of its cell: one block of the slab's material, shaped and
+ * lit like a cube.
+ * @throws TypeError for a non-number id. @throws RangeError when `id` is not an integer in 0..65535.
+ */
+export const doubleSlabState = (id: number): number => blockState(id, SLAB_DOUBLE);
 /**
  * The block state of stair block `id` with its full-height back toward `facing`, upside down (the slab on top) when
- * `upsideDown`.
- * @throws TypeError for a non-number id or a facing other than `'+x'`, `'-x'`, `'+z'`, `'-z'`.
+ * `upsideDown`. Without `corner` it is straight and {@link connectStairs} may turn it into a corner; with one (even
+ * `'straight'`) that corner is kept.
+ * @throws TypeError for a non-number id, a facing other than `'+x'`, `'-x'`, `'+z'`, `'-z'`, or a corner that is not a
+ * {@link StairCorner} or whose side is not across `facing` (`'inner+x'` for a stair facing `'+x'`).
  * @throws RangeError when `id` is not an integer in 0..65535.
  */
-export function stairState(id: number, facing: StairFacing, upsideDown = false): number {
+export function stairState(id: number, facing: StairFacing, upsideDown = false, corner?: StairCorner): number {
   const side = FACINGS.indexOf(facing);
   if (side < 0) throw new TypeError(`Stair facing ${String(facing)} must be '+x', '-x', '+z' or '-z'`);
-  return blockState(id, side | (upsideDown ? 4 : 0));
+  let bits = 0;
+  if (corner !== undefined) {
+    const kind = corner === 'straight' ? 0 : corner.startsWith('inner') ? 1 : corner.startsWith('outer') ? 2 : -1,
+      toward = FACINGS.indexOf(corner.slice(5) as StairFacing);
+    if (kind < 0 || (kind && (toward < 0 || toward >> 1 === side >> 1)))
+      throw new TypeError(
+        `Stair corner ${String(corner)} must be 'straight' or 'inner'/'outer' with a side across ${facing}, such as '${side < 2 ? 'inner+z' : 'inner+x'}'`,
+      );
+    bits = STAIR_FIXED | (kind << 3) | (kind && toward % 2 === 0 ? 32 : 0);
+  }
+  return blockState(id, side | (upsideDown ? 4 : 0) | bits);
+}
+/**
+ * Block state `state` waterlogged (the slab's or stair's `waterlog` liquid fills the rest of its cell), or not when
+ * `wet` is false: bit 15 of its data.
+ * @throws TypeError for a non-number. @throws RangeError when `state` is not an unsigned 32-bit integer.
+ */
+export function waterlogState(state: number, wet = true): number {
+  if (typeof state !== 'number') throw new TypeError('waterlogState expects a block state number');
+  if (state >>> 0 !== state) throw new RangeError(`Block state ${state} is not a u32; pass a state from blockState()`);
+  return (wet ? state | (WATERLOGGED << 16) : state & ~(WATERLOGGED << 16)) >>> 0;
+}
+const STEPS = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+];
+/**
+ * Turns the stairs at cell (x, y, z) of `world` and beside it on x and z into the corners their neighbours call for:
+ * a stair whose back meets the side of another stair of the same half becomes an outer corner toward that stair's
+ * back, else one whose front meets such a stair becomes an inner corner toward it, else straight. Stairs placed with
+ * an explicit corner ({@link stairState}) keep it. Call it after placing or removing a block; it edits only cells that
+ * change, through `world.setBlocks`.
+ * @throws TypeError when `world` is not a VoxelWorld. @throws RangeError when a coordinate is not a 32-bit integer.
+ */
+export function connectStairs(world: VoxelWorld, x: number, y: number, z: number): void {
+  if (typeof world?.getBlock !== 'function') throw new TypeError('connectStairs expects a VoxelWorld and a cell');
+  const table = world.blocks.table,
+    edits: number[] = [],
+    // A stair's facing (0-3) at (cx, cz) when it has `half`, else -1.
+    stair = (cx: number, cz: number, half: number) => {
+      const s = world.getBlock(cx, y, cz);
+      return table[s & 0xffff]?.shape === 'stair' && ((s >>> 16) & 4) === half ? (s >>> 16) & 3 : -1;
+    };
+  for (const [dx, dz] of [[0, 0], ...STEPS]) {
+    const cx = x + dx,
+      cz = z + dz,
+      state = world.getBlock(cx, y, cz),
+      data = state >>> 16;
+    if (table[state & 0xffff]?.shape !== 'stair' || data & STAIR_FIXED) continue;
+    const facing = data & 3,
+      [bx, bz] = STEPS[facing],
+      back = stair(cx + bx, cz + bz, data & 4),
+      front = stair(cx - bx, cz - bz, data & 4),
+      // Outer toward the back neighbour's back, else inner toward the front neighbour's back.
+      corner =
+        back >= 0 && back >> 1 !== facing >> 1
+          ? 16 | (back % 2 === 0 ? 32 : 0)
+          : front >= 0 && front >> 1 !== facing >> 1
+            ? 8 | (front % 2 === 0 ? 32 : 0)
+            : 0,
+      next = ((data & ~STAIR_CORNER) | corner) >>> 0;
+    if (next !== data) edits.push(cx, y, cz, blockState(state & 0xffff, next));
+  }
+  if (edits.length) world.setBlocks(edits);
 }
 /**
  * The half-block cells block state `state` of `type` fills, as an 8-bit mask: bit `x + 2y + 4z` for the octant at
@@ -247,8 +346,22 @@ export class BlockTypes {
       },
       transmission: amount(o.transmission, 'transmission', 0, 1),
       scatter: amount(o.scatter, 'scatter', 0, 1),
+      waterlog: this.waterlogOf(o.waterlog, shape),
     });
     this.names.set(name, id);
+    return id;
+  }
+  // The liquid id of a `waterlog` option: a defined liquid type's id or name; 0 when absent.
+  private waterlogOf(value: unknown, shape: BlockShape): number {
+    if (value === undefined) return 0;
+    if (shape !== 'slab' && shape !== 'stair')
+      throw new TypeError(`Block type waterlog applies to slabs and stairs, not a '${shape}'; drop it or change shape`);
+    if (typeof value !== 'string' && typeof value !== 'number')
+      throw new TypeError(`Block type waterlog must be a liquid's id or name, not ${typeof value}`);
+    const id = typeof value === 'string' ? (this.names.get(value) ?? -1) : value;
+    const liquid = Number.isInteger(id) ? this.types[id] : undefined;
+    if (!liquid || liquid.shape !== 'liquid')
+      throw new RangeError(`Block type waterlog ${value} is not a defined 'liquid' type; define the liquid first`);
     return id;
   }
   /**

@@ -90,7 +90,9 @@ not run and every frame renders with delta 0, so water and clouds hold still), s
 HUD and overlays are hidden; the hotbar and crosshair stay. The ground and night views build a small hut with glass
 windows, torches and a glowstone lamp post by the lake (`src/showcase.ts`) once its chunks are loaded; the shapes view
 builds slabs and stairs there instead (a plank deck under a top-slab roof with stair eaves, a stair flight, a slab
-terrace and a brick column ringed by stairs of every facing), seen from above at 10:00 with sun shadows.
+terrace with a double slab, a brick column ringed by stairs and corner stairs, a pool with a waterlogged slab and
+stair), seen from above at 10:00 with sun shadows. Placing a slab on the open half of the same slab makes a double
+slab, slabs and stairs placed in water are waterlogged, and stairs turn into corners from their neighbours.
 
 `window.voxelSandbox` reports progress:
 

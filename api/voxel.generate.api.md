@@ -65,6 +65,7 @@ interface BlockType {
     };
     readonly transmission: number;
     readonly scatter: number;
+    readonly waterlog: number;
 }
 
 interface PackedChunk {

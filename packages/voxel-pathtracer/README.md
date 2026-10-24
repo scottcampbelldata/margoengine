@@ -55,8 +55,9 @@ Everything is in Margo's **Y-up** world. Convert MagicaVoxel's Z-up `.vox` data 
   `voxels` order: 0 or 255 for a whole cell, else an octant mask, bit `x + 2y + 4z` for the half cell at (x, y, z) (0
   the low half on that axis, 1 the high), as `shapeOctants` of `@margoengine/voxel` gives for slabs and stairs. A
   shaped cell is hit, shadowed, entered and left as its filled half blocks only; `raycast` reports the box face hit and
-  its point. Bricks holding a shaped cell carry 512 more bytes for the masks. A shaped cell is not cut by a cut-out
-  texture, and its emission is found by BSDF sampling alone (not light-sampled).
+  its point. Bricks holding a shaped cell carry 512 more bytes for the masks. A cut-out shaped cell is cut per run
+  through its filled half blocks (the texel where the ray enters them, else the one where it leaves), and an emissive
+  one is light-sampled as quarter faces, mid-cell ones included.
 - **Model material tables** (addition). A model's own `materials` replace `scene.materials` for its voxels, so a scene
   holds any number of distinct materials (255 per table), as model banks of an editor do: two models may give palette 1
   different materials. Tables equal in content are stored once; at most 4096 per scene, 32 KiB each, within the

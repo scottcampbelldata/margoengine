@@ -23,6 +23,9 @@
 // - environment: the equirectangular map's orientation; determinism: equal seeds give identical images;
 // - textures: every pixel's albedo is the texel the CPU finds through the same face tiling, on a rotated block;
 // - cutout: rays and shadows pass texels cut away by alpha (a leaf wall, a leaf slab over a floor under a high sun);
+// - shapes: half-block shapes: per-pixel first hits on a random shaped model against raycast, a cut-out layer of
+//   slabs passing sunlight through its cut stripes only, and ceilings of emissive slabs (quarter and mid-cell emitter
+//   faces) lighting a floor to 2/3 as the analytic emissive planes do;
 // - transparent: alpha is the camera rays' coverage, covered pixels match the opaque render, escapes add nothing;
 // - convergence: error against a 4096-sample reference falls about as 1/sqrt(samples), both projections;
 // - denoise: error with and without the wavelet denoiser, overall and at object edges, also on two caustic scenes;
@@ -389,6 +392,39 @@ try {
       'sunlight through the cut stripes',
     );
     assert.ok(r.shadow.dark < 0.01, 'shadow under the solid stripes');
+  }
+  if (wanted('shapes')) {
+    const r = await run('shapes'),
+      t = r.traversal;
+    console.log(
+      `  shapes traversal: ${t.same}/${t.pixels} pixels agree (${t.hits} hit voxels), depth within ${t.maxRelativeDepth.toExponential(2)}`,
+      t.mismatch.length ? JSON.stringify(t.mismatch) : '',
+    );
+    console.log(
+      ' ',
+      JSON.stringify({
+        cutout: r.cutout,
+        lower: r['emissive lower slabs 2/3'],
+        upper: r['emissive upper slabs 2/3'],
+        whole: r['emissive whole slabs 2/3'],
+      }),
+    );
+    assert.ok(t.hits > t.pixels / 6, 'the view shows shaped voxels');
+    assert.ok(t.same >= t.pixels - Math.ceil(t.pixels * 0.002), 'GPU first hits equal raycast on shaped cells');
+    assert.ok(t.maxRelativeDepth < 1e-3, 'GPU and CPU hit distances agree');
+    assert.ok(
+      Math.abs(r.cutout.lit - r.cutout.expected) < 0.03 * r.cutout.expected,
+      'sunlight through the cut stripes',
+    );
+    assert.ok(r.cutout.dark < 0.01, 'shadow under the solid stripes');
+    near(r['emissive lower slabs 2/3'].mean, 2 / 3, 0.01, 'floor under a ceiling of emissive lower slabs');
+    near(r['emissive upper slabs 2/3'].mean, 2 / 3, 0.01, 'floor under a ceiling of emissive upper slabs');
+    // Light-sampled like whole cells: no more noise than under a whole-cell ceiling.
+    for (const name of ['lower', 'upper'])
+      assert.ok(
+        r[`emissive ${name} slabs 2/3`].sd <= 1.1 * r['emissive whole slabs 2/3'].sd,
+        `${name} slabs light-sampled: sd ${r[`emissive ${name} slabs 2/3`].sd} vs ${r['emissive whole slabs 2/3'].sd}`,
+      );
   }
   if (wanted('transparent')) {
     const r = await run('transparent');

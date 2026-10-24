@@ -108,6 +108,10 @@ fn voxelPlace(w0:u32,w1:u32,c:u32,t:f32)->vec3f {
   default {p+=vec3f(1.0-su,sv,su);}
  }
  if(face==2u||(face!=3u&&face<6u&&c>=2u)){p.y+=voxelRise(w1,t)-f32(w0>>29u)*0.125;}
+ // A lowered liquid side cut to half a block (beside a slab or stair) keeps its corners at or under the surface.
+ if((w0>>29u)!=0u&&(face<2u||(face>3u&&face<6u))&&(w1&0x3000000u)!=0u){
+  let y0=f32((w0>>5u)&31u);p.y=min(y0+select(r.lo.y,r.hi.y,c>=2u),y0+1.0-f32(w0>>29u)*0.125)+select(0.0,voxelRise(w1,t),c>=2u);
+ }
  return p;
 }
 ${tileShader}`;
@@ -216,7 +220,9 @@ fn voxelRipple(p:vec2f,t:f32)->vec3f {
  var at=l.xy;var start=cell.xy;
  if(axis==0u){at=l.zy;start=cell.zy;} else if(axis==1u){at=l.xz;start=cell.xz;}
  start+=part.lo;
- let r=clamp((at-start)/vec2f(size.x,size.y-select(0.0,drop,face<6u&&axis!=1u)),vec2f(0.0),vec2f(1.0));
+ var high=size.y-select(0.0,drop,face<6u&&axis!=1u);
+ if((w.x>>29u)!=0u&&face<6u&&axis!=1u&&(w.y&0x3000000u)!=0u){high=max(min(part.hi.y,1.0-drop)-part.lo.y,0.0001);}
+ let r=clamp((at-start)/vec2f(size.x,high),vec2f(0.0),vec2f(1.0));
  let lit=voxelMix(voxelMix(voxelCorner(w,0u),voxelCorner(w,1u),r.x),voxelMix(voxelCorner(w,3u),voxelCorner(w,2u),r.x),r.y);
  let m=o.material;let maps=o.maps;
  let uv=voxelTile(face,l,cell);let dx=voxelTile(face,voxelHit(o.clip.xy+vec2f(1.0,0.0),n,k)-O,cell)-uv;let dy=voxelTile(face,voxelHit(o.clip.xy+vec2f(0.0,1.0),n,k)-O,cell)-uv;
