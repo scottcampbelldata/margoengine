@@ -66,7 +66,7 @@ test('shadow rays block directional light, honoring backfaces and the shadows sw
   );
 });
 
-test('point light falloff follows window / max(d^decay, 0.01)', () => {
+test('point light falloff follows window / max(d^decay, 2^-12)', () => {
   const at = (light) =>
     red(bakeVertexColors(floor(0), null, { lights: [{ type: 'point', position: [0, 2, 0], ...light }] }))[0];
   // d = 2, distance 4: window = (1 - (2/4)^4)^2 = 0.87890625, over d^2 = 4.
@@ -76,9 +76,10 @@ test('point light falloff follows window / max(d^decay, 0.01)', () => {
   assert.ok(close(at({}), 0.25));
   assert.ok(close(at({ decay: 1 }), 0.5));
   assert.ok(close(at({ decay: 0, distance: 3 }), (1 - (2 / 3) ** 4) ** 2));
-  // Very close lights are capped by the 0.01 floor.
-  const near = red(bakeVertexColors(floor(0), null, { lights: [{ type: 'point', position: [0, 0.05, 0] }] }))[0];
-  assert.ok(close(near, 100, 1e-5));
+  // Close lights follow 1 / d^2 down to the 2^-12 floor (d = 1/64), and are capped at 4096 inside it.
+  const near = (y) => red(bakeVertexColors(floor(0), null, { lights: [{ type: 'point', position: [0, y, 0] }] }))[0];
+  assert.ok(close(near(0.05), 400, 1e-5));
+  assert.ok(close(near(0.01), 4096, 1e-5));
   // Lambert: a light off to the side at 45 degrees.
   const side = red(bakeVertexColors(floor(0), null, { lights: [{ type: 'point', position: [2, 2, 0] }] }))[0];
   assert.ok(close(side, Math.SQRT1_2 / 8));

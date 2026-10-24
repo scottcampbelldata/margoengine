@@ -148,20 +148,28 @@ export class RigScratch {
       u = to[0] / b,
       v = to[1] / b,
       w = to[2] / b,
-      r = x * u + y * v + z * w + 1,
+      r = 1 + x * u + y * v + z * w,
       q = this.delta;
+    // Same rule as math Quaternion.setFromUnitVectors: opposite vectors give a half turn about from x e, with e the
+    // world axis least aligned with from.
     if (r < 1e-8) {
-      if (Math.abs(x) > Math.abs(z)) {
-        q[0] = -y;
-        q[1] = x;
-        q[2] = 0;
-        q[3] = 0;
-      } else {
+      const mx = Math.abs(x),
+        my = Math.abs(y),
+        mz = Math.abs(z);
+      if (mx <= my && mx <= mz) {
         q[0] = 0;
-        q[1] = -z;
-        q[2] = y;
-        q[3] = 0;
+        q[1] = z;
+        q[2] = -y;
+      } else if (my <= mz) {
+        q[0] = -z;
+        q[1] = 0;
+        q[2] = x;
+      } else {
+        q[0] = y;
+        q[1] = -x;
+        q[2] = 0;
       }
+      q[3] = 0;
     } else {
       q[0] = y * w - z * v;
       q[1] = z * u - x * w;

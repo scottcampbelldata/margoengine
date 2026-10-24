@@ -215,7 +215,8 @@ test('shadows and clustered lights compose through their declared WGSL and bindi
 
 test("contract with clustered and shadows: the froxel light loop repeats clusterLighting's cell lookup and the cascade bias", async () => {
   const { Clustered } = await import('../../clustered/dist/index.js'),
-    { Shadows } = await import('../../shadows/dist/index.js');
+    { Shadows } = await import('../../shadows/dist/index.js'),
+    { legacyTerms } = await import('../../shared/light-terms.js');
   const gpu = mockGPU(),
     lights = new Clustered({ grid: [4, 3, 2] });
   lights.setup({ gpu: gpu.device, removePlugin() {} });
@@ -236,8 +237,8 @@ test("contract with clustered and shadows: the froxel light loop repeats cluster
     'let z=min(u32(max(0.0,select(log(depth/near)/log(far/near),(depth-near)/(far-near),clusterFrame.intensity.w>0.5)*f32(grid.z))),grid.z-1);',
     'let cell=xy.x+grid.x*(xy.y+grid.y*z);let count=clusterCounts[cell];',
     'let light=clusterLights[clusterIndices[cell*1024u+j]];',
-    'let falloff=pow(max(0.0,1-pow(distance/light.positionRange.w,4.0)),2.0)/max(distance*distance,0.01);',
-    'var cone=1.0;if(light.params.y>0.5){cone=clamp((dot(-l,light.directionOuter.xyz)-light.directionOuter.w)/max(light.params.x-light.directionOuter.w,0.00001),0.0,1.0);cone*=cone*(3-2*cone);}',
+    // Windowed inverse square with the 2^-12 near floor and the Hermite cone (packages/shared/light-terms.js).
+    legacyTerms,
     'return result*clusterFrame.intensity.x;',
   ]) {
     assert.ok(clustered.includes(line), `clustered no longer has: ${line}`);
