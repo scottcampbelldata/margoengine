@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Depth texture · Margo Engine</title>
+  <link rel="stylesheet" href="./multi-view.css">
+</head>
+<body>
+  <h1>A depth any material can sample</h1>
+  <p><code>@margoengine/post/depth</code> · The scene depth in a texture of its own, drawn before the main pass. The water is a <code>WgslMaterial</code> that reads it: foam where rocks meet the surface, darker where the water is deep.</p>
+  <div id="views" class="views">
+    <canvas id="viewport" aria-label="Rocks standing in shallow water with white foam where they meet the surface"></canvas>
+  </div>
+  <p id="status" data-webgpu-status role="status">Starting WebGPU…</p>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./depth-texture.ts'));
+  </script>
+</body>
+</html>

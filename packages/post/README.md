@@ -478,6 +478,32 @@ const targets = SceneTargets.attach(engine, {
 targets.onResize(() => console.log(targets.texture('normal')?.width));
 ```
 
+## Depth texture: `DepthTexture`
+
+`@margoengine/post/depth` keeps the scene's depth in textures of its own, so any pass or material can sample it without
+borrowing one from an effect: `depth.texture` (depth32float, reversed Z, bind as `texture_depth_2d`) and
+`depth.distance` (r32float world distance from the camera, 0 where empty; read with `textureLoad`). It runs before the
+main pass, so a material reads this frame's depth: soft particles, shorelines, fog volumes. Core meshes always draw
+into it; add gltf-pro models and materials meshes with `depth.add(model)`, but not one whose material reads the depth.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { Texture, WgslMaterial } from '@margoengine/materials';
+import { DepthTexture } from '@margoengine/post/depth';
+
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas);
+const depth = DepthTexture.attach(engine);
+const water = new WgslMaterial({
+  wgsl: `fn shade(i:Out,s:Surface)->Surface {var o=s;
+    let behind=textureLoad(sceneDistance,vec2i(i.clip.xy),0).r;
+    let gap=behind-distance(f.eye.xyz,i.position);
+    o.base=vec4f(mix(vec3f(1),o.base.rgb,clamp(gap/0.4,0.0,1.0)),1);return o;}`,
+  textures: { sceneDistance: new Texture({ data: new Float32Array(1), width: 1, height: 1, format: 'r32float' }) },
+});
+depth.onResize(() => (water.textures.sceneDistance = new Texture(depth.distance!)));
+```
+
 ## Projected decals: `Decals`
 
 `@margoengine/post/decals` (4,118 B min+gzip, its own entry) projects textured boxes onto whatever is already drawn,

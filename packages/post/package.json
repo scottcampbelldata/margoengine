@@ -80,6 +80,10 @@
     "./mrt": {
       "types": "./dist/mrt.d.ts",
       "import": "./dist/mrt.js"
+    },
+    "./depth": {
+      "types": "./dist/depth.d.ts",
+      "import": "./dist/depth.js"
     }
   },
   "files": [
