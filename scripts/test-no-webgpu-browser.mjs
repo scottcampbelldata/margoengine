@@ -13,6 +13,17 @@ import { createServer, preview } from 'vite';
 import { acquire } from './gpu-lock.mjs';
 import { message } from '../examples/needs-webgpu.js';
 
+/** Bytes of a built chunk plus every chunk it imports statically (`from "./x.js"`), each counted once. */
+async function codeBytes(folder, chunk, seen = new Set()) {
+  if (seen.has(chunk)) return 0;
+  seen.add(chunk);
+  const code = await readFile(join(folder, chunk), 'utf8');
+  let bytes = code.length;
+  for (const [, dep] of code.matchAll(/from\s*["']\.\/([^"']+\.js)["']/g))
+    bytes += await codeBytes(folder, join(dirname(chunk), dep), seen);
+  return bytes;
+}
+
 const root = resolve(import.meta.dirname, '..'),
   dist = join(root, 'site/dist');
 // The two ways a browser lacks WebGPU: no `navigator.gpu` at all, or one whose adapter request answers null.
@@ -61,8 +72,13 @@ try {
       imports = [...code.matchAll(/import\(`\.\/([^`]+\.js)`\)/g)];
     assert.ok(imports.length, `${path}: imports no demo code`);
     for (const [, chunk] of imports) {
-      const bytes = (await readFile(join(folder, dirname(entry), chunk))).length;
-      assert.ok(bytes > 2000, `${path}: the demo code it imports, ${chunk}, is ${bytes} B: tree-shaken away?`);
+      // The demo's chunk and the shared chunks it imports statically: a small demo built on packages keeps their code
+      // in shared chunks, while a demo tree-shaken to nothing has neither.
+      const bytes = await codeBytes(join(folder, dirname(entry)), chunk);
+      assert.ok(
+        bytes > 2000,
+        `${path}: the demo code it imports, ${chunk}, is ${bytes} B with its imports: tree-shaken away?`,
+      );
     }
   }
   site = await preview({
