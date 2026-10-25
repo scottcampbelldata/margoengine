@@ -40,6 +40,7 @@ export interface ModelExportOptions {
     generator?: string;
     embed?: boolean;
     binUri?: string;
+    pixelArt?: boolean | PixelArtSampling;
 }
 
 export function exportModel(models: PBRModel | readonly PBRModel[], options: ModelExportOptions & {
@@ -49,4 +50,11 @@ export function exportModel(models: PBRModel | readonly PBRModel[], options?: Mo
     binary?: false;
 }): Promise<GLTFJsonResult>;
 export function exportModel(models: PBRModel | readonly PBRModel[], options?: ModelExportOptions): Promise<Uint8Array | GLTFJsonResult>;
+
+// Not exported from this entry, but used by the exports above:
+
+interface PixelArtSampling {
+    mipmaps?: 'none' | 'nearest';
+    wrap?: 'repeat' | 'clamp' | 'mirror';
+}
 ```

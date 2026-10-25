@@ -15,7 +15,7 @@ import type {
 import type { PNGSource } from './png.js';
 type PBRPrimitive = ModelPrimitive & { instances?: { count: number; data: Float32Array } };
 import { Bin, ARRAY_BUFFER, ELEMENT_ARRAY_BUFFER, FLOAT, type GLTFJsonResult } from './container.js';
-import { decompose, materialSlots as slots } from './scene.js';
+import { decompose, materialSlots as slots, pixelArtOf, type PixelArtSampling, type SceneOptions } from './scene.js';
 import { writeSceneMetadata } from './scene-metadata.js';
 export type { GLTFJsonResult } from './container.js';
 
@@ -60,6 +60,8 @@ export interface ModelExportOptions {
   embed?: boolean;
   /** `.gltf` only: the separate buffer's relative file name. Default 'scene.bin'. */
   binUri?: string;
+  /** Write every sampler as pixel art, as {@link SceneOptions.pixelArt} does. Default false. */
+  pixelArt?: boolean | PixelArtSampling;
 }
 
 type Json = Record<string, unknown>;
@@ -123,6 +125,7 @@ class Writer extends Bin {
   constructor(
     private readonly embedImages: boolean,
     private readonly maxSize: number,
+    private readonly pixelArt?: PixelArtSampling,
   ) {
     super();
   }
@@ -415,7 +418,16 @@ class Writer extends Bin {
   }
 
   private sampler(def: GLTFSampler): number {
-    const s = clean({ magFilter: def.magFilter, minFilter: def.minFilter, wrapS: def.wrapS, wrapT: def.wrapT });
+    const p = this.pixelArt,
+      wrap = p?.wrap && wraps[p.wrap],
+      s = p
+        ? clean({
+            magFilter: 9728,
+            minFilter: p.mipmaps === 'nearest' ? 9984 : 9728,
+            wrapS: wrap ?? def.wrapS,
+            wrapT: wrap ?? def.wrapT,
+          })
+        : clean({ magFilter: def.magFilter, minFilter: def.minFilter, wrapS: def.wrapS, wrapT: def.wrapT });
     return this.memo(JSON.stringify(s), () => this.list('samplers', s));
   }
 
@@ -426,7 +438,9 @@ class Writer extends Bin {
     return this.memo(def, () => {
       const out: Json = {},
         ext: Json = {};
-      if (def.sampler !== undefined) out.sampler = this.sampler(doc.samplers![def.sampler]);
+      // A texture without a sampler samples linearly, so pixel art gives it one.
+      if (def.sampler !== undefined || this.pixelArt)
+        out.sampler = this.sampler(def.sampler === undefined ? {} : doc.samplers![def.sampler]);
       if (def.source !== undefined) out.source = this.docImage(model, def.source);
       for (const name of ['KHR_texture_basisu', 'EXT_texture_webp', 'EXT_texture_avif'] as const) {
         const source = def.extensions?.[name]?.source;
@@ -600,7 +614,7 @@ export async function exportModel(
   if (!(maxTextureSize >= 1)) throw new RangeError('maxTextureSize must be at least 1');
   if (!list.length || list.some((m) => !m?.asset?.doc || !Array.isArray(m.nodes) || m.disposed))
     throw new TypeError('Expected live gltf-pro models');
-  const w = new Writer(embedImages, maxTextureSize),
+  const w = new Writer(embedImages, maxTextureSize, pixelArtOf(options.pixelArt)),
     json = w.json,
     maps = new Map<PBRModel, Int32Array>(),
     roots: number[] = [];

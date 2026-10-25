@@ -313,6 +313,48 @@ export interface SceneOptions {
   geometryData?: Lookup<Geometry, GeometryData>;
   /** Richer data (textures, emission) to write in place of a core PbrMaterial. */
   materialData?: Lookup<PbrMaterial, MaterialData>;
+  /**
+   * Sample every texture as pixel art: nearest magnification and minification, with `mipmaps: 'none'` (default; glTF
+   * NEAREST) or `'nearest'` (NEAREST_MIPMAP_NEAREST), and `wrap` replacing both wrap modes when given. `true` is
+   * `{mipmaps: 'none'}`. Godot's glTF import maps these to TEXTURE_FILTER_NEAREST and NEAREST_WITH_MIPMAPS; Unreal's
+   * Interchange needs `@margoengine/exporters/unreal-pixel-art` after import.
+   */
+  pixelArt?: boolean | PixelArtSampling;
+}
+/** How {@link SceneOptions.pixelArt} samples textures. */
+export interface PixelArtSampling {
+  /** 'none' (default): no mip levels; 'nearest': mip levels picked nearest, never blended. */
+  mipmaps?: 'none' | 'nearest';
+  /** Replaces both wrap modes; omitted keeps each texture's own. */
+  wrap?: 'repeat' | 'clamp' | 'mirror';
+}
+/**
+ * `texture` with pixel-art sampling: nearest magnification and minification, `mipmaps` 'none' (default) or 'nearest',
+ * and `wrap` for both axes when given. The image bytes are shared, not copied. Throws RangeError for unknown values.
+ */
+export function pixelArtTexture(texture: TextureData, sampling: PixelArtSampling = {}): TextureData {
+  const s = pixelArtOf(sampling);
+  if (!s) return texture;
+  return {
+    ...texture,
+    magFilter: 'nearest',
+    minFilter: 'nearest',
+    mipmaps: s.mipmaps === 'nearest',
+    ...(s.wrap ? { wrapS: s.wrap, wrapT: s.wrap } : {}),
+  };
+}
+/** @internal The validated pixel-art sampling of an option, or undefined when off. */
+export function pixelArtOf(option: SceneOptions['pixelArt']): PixelArtSampling | undefined {
+  if (option === undefined || option === false) return undefined;
+  if (option === true) return { mipmaps: 'none' };
+  if (!option || typeof option !== 'object')
+    throw new TypeError('pixelArt must be true, false or {mipmaps, wrap}; pass true for no-mip nearest sampling');
+  const { mipmaps = 'none', wrap } = option;
+  if (mipmaps !== 'none' && mipmaps !== 'nearest')
+    throw new RangeError(`pixelArt mipmaps must be 'none' or 'nearest', not ${String(mipmaps)}`);
+  if (wrap !== undefined && !wraps.includes(wrap))
+    throw new RangeError(`pixelArt wrap must be 'repeat', 'clamp' or 'mirror', not ${String(wrap)}`);
+  return { mipmaps, wrap };
 }
 
 /** @internal Normalized geometry. */
@@ -634,15 +676,16 @@ export function checkTexture(texture: unknown, label: string): TextureData | und
 const filters = ['nearest', 'linear'] as const,
   wraps = ['repeat', 'clamp', 'mirror'] as const;
 
-/** @internal A texture's sampler with the defaults filled in. */
+/** @internal A texture's sampler with the defaults filled in, and pixel-art sampling applied when given. */
 export const samplerOf = (
   t: TextureData,
+  pixelArt?: PixelArtSampling,
 ): Required<Pick<TextureData, 'magFilter' | 'minFilter' | 'mipmaps' | 'wrapS' | 'wrapT'>> => ({
-  magFilter: t.magFilter ?? 'linear',
-  minFilter: t.minFilter ?? 'linear',
-  mipmaps: t.mipmaps ?? true,
-  wrapS: t.wrapS ?? 'repeat',
-  wrapT: t.wrapT ?? 'repeat',
+  magFilter: pixelArt ? 'nearest' : (t.magFilter ?? 'linear'),
+  minFilter: pixelArt ? 'nearest' : (t.minFilter ?? 'linear'),
+  mipmaps: pixelArt ? pixelArt.mipmaps === 'nearest' : (t.mipmaps ?? true),
+  wrapS: pixelArt?.wrap ?? t.wrapS ?? 'repeat',
+  wrapT: pixelArt?.wrap ?? t.wrapT ?? 'repeat',
 });
 
 /** sRGB #111111 in linear rgb, the default Phong highlight. */

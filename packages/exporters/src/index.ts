@@ -28,7 +28,9 @@ export type {
   ExportPrimitiveData,
   Extras,
   LightmapData,
+  PixelArtSampling,
 } from './scene.js';
+export { pixelArtTexture } from './scene.js';
 
 export { animateCels, animatePlacements, animateTransforms, frameTimes, sampleFrames } from './keyframes.js';
 export type { FrameClip, FramePose } from './keyframes.js';

@@ -273,6 +273,7 @@ export interface ModelExportOptions {
     generator?: string;
     embed?: boolean;
     binUri?: string;
+    pixelArt?: boolean | PixelArtSampling;
 }
 
 export interface MorphData {
@@ -313,6 +314,11 @@ export interface PaletteTexture {
     uvs: Float32Array;
 }
 
+export interface PixelArtSampling {
+    mipmaps?: 'none' | 'nearest';
+    wrap?: 'repeat' | 'clamp' | 'mirror';
+}
+
 export interface STLOptions extends SceneOptions {
     binary?: boolean;
     name?: string;
@@ -323,6 +329,7 @@ export interface SceneOptions {
     root?: Mesh;
     geometryData?: Lookup<Geometry, GeometryData>;
     materialData?: Lookup<PbrMaterial, MaterialData>;
+    pixelArt?: boolean | PixelArtSampling;
 }
 
 export interface SkinData {
@@ -399,6 +406,8 @@ export function joinGLB({ json, bin, chunks }: GLBParts): Uint8Array;
 export function paletteTexture(colors: ArrayLike<number>, options?: {
     name?: string;
 }): Promise<PaletteTexture>;
+
+export function pixelArtTexture(texture: TextureData, sampling?: PixelArtSampling): TextureData;
 
 export function readAccessor(parts: GLBParts, index: number): AccessorValues;
 

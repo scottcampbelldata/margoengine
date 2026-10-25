@@ -7,6 +7,7 @@ import {
   num,
   polygons,
   samplerOf,
+  pixelArtOf,
   textureFiles,
   type ExportSource,
   type Geo,
@@ -59,7 +60,8 @@ const same = (v: number) => v;
 export function exportDAE(source: ExportSource, options: DAEOptions = {}): DAEResult {
   const colorSpace = options.colorSpace ?? 'srgb';
   if (colorSpace !== 'srgb' && colorSpace !== 'linear') throw new TypeError("colorSpace must be 'srgb' or 'linear'");
-  const files = textureFiles(options.texturePrefix ?? ''),
+  const pixelArt = pixelArtOf(options.pixelArt),
+    files = textureFiles(options.texturePrefix ?? ''),
     roots = collect(source, options),
     encode = colorSpace === 'srgb' ? toSrgb : same;
   if (!roots.length) throw new TypeError('DAE export needs a visible node; a COLLADA visual scene cannot be empty');
@@ -88,7 +90,7 @@ export function exportDAE(source: ExportSource, options: DAEOptions = {}): DAERe
     let base = `<color>${rgba(mat.color)}</color>`;
     if (texture) {
       const img = image(texture),
-        s = samplerOf(texture),
+        s = samplerOf(texture, pixelArt),
         min = s.mipmaps
           ? s.minFilter === 'nearest'
             ? 'NEAREST_MIPMAP_NEAREST'

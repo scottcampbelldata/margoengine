@@ -192,11 +192,17 @@ interface MorphData {
     tangents?: ArrayLike<number>;
 }
 
+interface PixelArtSampling {
+    mipmaps?: 'none' | 'nearest';
+    wrap?: 'repeat' | 'clamp' | 'mirror';
+}
+
 interface SceneOptions {
     onlyVisible?: boolean;
     root?: Mesh;
     geometryData?: Lookup<Geometry, GeometryData>;
     materialData?: Lookup<PbrMaterial, MaterialData>;
+    pixelArt?: boolean | PixelArtSampling;
 }
 
 interface SkinData {

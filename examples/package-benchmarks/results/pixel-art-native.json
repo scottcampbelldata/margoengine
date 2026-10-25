@@ -1,0 +1,28 @@
+{
+  "date": "2026-10-25",
+  "purpose": "Pixel-art sampling written by @margoengine/exporters, read back by each target's own importer on this PC.",
+  "fixture": "One quad with a 4-texel palette PNG whose own sampler is linear with mips; exported with pixelArt: true (glTF NEAREST/NEAREST) and pixelArt: {mipmaps: 'nearest', wrap: 'clamp'} (NEAREST/NEAREST_MIPMAP_NEAREST).",
+  "godot": {
+    "version": "4.7.2-stable, headless --import, default glTF import settings",
+    "pixelArt true": { "texture_filter": 0, "meaning": "TEXTURE_FILTER_NEAREST", "imageFormat": 5, "imageHasMipmaps": true },
+    "pixelArt nearest mips": { "texture_filter": 2, "meaning": "TEXTURE_FILTER_NEAREST_WITH_MIPMAPS", "imageFormat": 5, "imageHasMipmaps": true },
+    "note": "The glTF sampler alone sets the material filter; Godot keeps the embedded image uncompressed RGBA8 (format 5) and still builds mips, which a NEAREST filter never samples."
+  },
+  "unreal": {
+    "version": "5.8.4, UnrealEditor-Cmd -NullRHI, Interchange glTF import",
+    "interchangeOnly": "NEAREST gives TF_NEAREST but keeps mips (TMGS_FROM_TEXTURE_GROUP) and lossy TC_DEFAULT; NEAREST_MIPMAP_NEAREST gives TF_DEFAULT (linear).",
+    "afterCreateUnrealPixelArtScript": {
+      "mipmaps none": { "lod_group": "TEXTUREGROUP_PIXELS2D", "filter": "TF_NEAREST", "mip_gen_settings": "TMGS_NO_MIPMAPS", "compression_settings": "TC_EDITOR_ICON", "lossy_compression_amount": "TLCA_NONE" },
+      "mipmaps nearest": { "lod_group": "TEXTUREGROUP_PIXELS2D", "filter": "TF_NEAREST", "mip_gen_settings": "TMGS_SIMPLE_AVERAGE", "compression_settings": "TC_EDITOR_ICON", "lossy_compression_amount": "TLCA_NONE" },
+      "persisted": "Read back in a fresh editor process after save: identical.",
+      "emptyPath": "RuntimeError: No Texture2D at or under /Game/NoSuchFolder; pass the imported texture or its folder"
+    }
+  },
+  "unity": {
+    "version": "6000.6.7f1, -batchmode -nographics, loose PNGs",
+    "Assets/Tiles (mipmaps none)": { "filterMode": "Point", "mipmapEnabled": false, "textureCompression": "Uncompressed", "npotScale": "None", "mipmapCount": 1, "format": "RGBA32" },
+    "Assets/Mips (mipmaps nearest)": { "filterMode": "Point", "mipmapEnabled": true, "textureCompression": "Uncompressed", "npotScale": "None", "mipmapCount": 2, "format": "RGBA32" },
+    "Assets/Other (outside both folders)": { "filterMode": "Bilinear", "mipmapEnabled": true, "textureCompression": "Compressed", "npotScale": "ToNearest" },
+    "note": "glTF files imported with glTFast take filters from the glTF samplers; the engine's Unity exact profile already enforces Point with no mips."
+  }
+}

@@ -11,6 +11,8 @@ import {
   normalMatrix,
   isObject,
   samplerOf,
+  pixelArtOf,
+  type PixelArtSampling,
   type AnimationData,
   type AnimationChannelData,
   type MaterialAnimationData,
@@ -119,6 +121,8 @@ class Writer {
   /** Binary data by BIN offset, copied once, into the output. Padding between parts stays zero. */
   readonly parts: { bytes: Uint8Array; offset: number }[] = [];
   length = 0;
+  /** Pixel-art sampling applied to every texture (SceneOptions.pixelArt). */
+  pixelArt?: PixelArtSampling;
   /** BIN bytes the collected scene is known to need (vertex attributes, images) before they are written. */
   private planned = 0;
 
@@ -293,7 +297,7 @@ class Writer {
       source = this.list('images', image);
       this.imageCache.set(texture.image, source);
     }
-    const s = samplerOf(texture),
+    const s = samplerOf(texture, this.pixelArt),
       nearest = s.minFilter === 'nearest',
       sampler = {
         magFilter: s.magFilter === 'nearest' ? 9728 : 9729,
@@ -671,6 +675,7 @@ function document(
     generator = options.generator ?? 'Margo Engine exporters';
   if (typeof flatten !== 'boolean') throw new TypeError('flatten must be boolean');
   if (typeof generator !== 'string') throw new TypeError('generator must be a string');
+  writer.pixelArt = pixelArtOf(options.pixelArt);
   const roots = collect(source, options, (bytes) => writer.plan(bytes));
   prepare?.(roots);
   const json = writer.json,

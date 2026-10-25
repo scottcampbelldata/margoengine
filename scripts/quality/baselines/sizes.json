@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3129920,
+  "total": 3132741,
   "history": [
     {
       "date": "2026-10-24",
@@ -104,6 +104,12 @@
       "commit": "302cf731",
       "reason": "One install: the stage facade moved from margoengine to @margoengine/stage (same code), and the kits margoengine/game, /cad, /viz and /web (re-export files)",
       "grew": 5
+    },
+    {
+      "date": "2026-10-25",
+      "commit": "6dbc8729",
+      "reason": "padTileGrid/remapTileUVs in materials/atlas (+508 B); new unity-pixel-art and unreal-pixel-art script generators",
+      "grew": 3
     }
   ],
   "items": {
@@ -185,8 +191,10 @@
     "@margoengine/exporters/roblox-runtime-restore": 6130,
     "@margoengine/exporters/skin": 2459,
     "@margoengine/exporters/unity": 41842,
+    "@margoengine/exporters/unity-pixel-art": 931,
     "@margoengine/exporters/unity-precision": 25154,
     "@margoengine/exporters/unity-precision-importer": 14647,
+    "@margoengine/exporters/unreal-pixel-art": 1126,
     "@margoengine/exporters/unreal-precision": 28243,
     "@margoengine/exporters/unreal-precision-importer": 16503,
     "@margoengine/exporters/usdz": 10841,
@@ -255,7 +263,7 @@
     "@margoengine/machinery/surface": 13814,
     "@margoengine/machinery/telemetry": 13378,
     "@margoengine/materials": 54162,
-    "@margoengine/materials/atlas": 1250,
+    "@margoengine/materials/atlas": 2014,
     "@margoengine/materials/batched": 31160,
     "@margoengine/materials/transmission": 6815,
     "@margoengine/math": 12483,

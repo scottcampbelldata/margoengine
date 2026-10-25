@@ -79,6 +79,10 @@
       "types": "./dist/unity-precision-importer.d.ts",
       "import": "./dist/unity-precision-importer.js"
     },
+    "./unity-pixel-art": {
+      "types": "./dist/unity-pixel-art.d.ts",
+      "import": "./dist/unity-pixel-art.js"
+    },
     "./unreal-precision": {
       "types": "./dist/unreal-precision.d.ts",
       "import": "./dist/unreal-precision.js"
@@ -86,6 +90,10 @@
     "./unreal-precision-importer": {
       "types": "./dist/unreal-precision-importer.d.ts",
       "import": "./dist/unreal-precision-importer.js"
+    },
+    "./unreal-pixel-art": {
+      "types": "./dist/unreal-pixel-art.d.ts",
+      "import": "./dist/unreal-pixel-art.js"
     },
     "./godot-precision-addon": {
       "types": "./dist/godot-precision-addon.d.ts",

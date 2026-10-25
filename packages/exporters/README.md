@@ -289,6 +289,38 @@ const glb = exportGLB({nodes: [
 ]});
 ```
 
+### Pixel-art sampling
+
+`pixelArt` on the glTF, GLB, COLLADA and `exportModel` options writes every sampler as pixel art: nearest
+magnification and minification with no mips (`true` or `{mipmaps: 'none'}`, glTF NEAREST/NEAREST) or with mips picked
+nearest (`{mipmaps: 'nearest'}`, NEAREST/NEAREST_MIPMAP_NEAREST); `wrap` replaces both wrap modes when given.
+`pixelArtTexture(texture, sampling)` does the same for one `TextureData`. Each target reads it its own way (measured
+on this PC, `examples/package-benchmarks/results/pixel-art-native.json`):
+
+| Target | What the export gives it | What to add |
+| --- | --- | --- |
+| Godot 4.7 | glTF import maps NEAREST to `TEXTURE_FILTER_NEAREST` and NEAREST_MIPMAP_NEAREST to `NEAREST_WITH_MIPMAPS`; embedded images stay uncompressed RGBA8 | nothing |
+| Unreal 5.8 | Interchange keeps NEAREST as `TF_NEAREST` but still builds mips with lossy compression, and reads NEAREST_MIPMAP_NEAREST as linear | `createUnrealPixelArtScript` (`unreal-pixel-art`) after import |
+| Unity 6 (glTFast) | filters come from the glTF samplers; the exact profile (`unity`) already enforces Point with no mips | `createUnityPixelArtPostprocessor` (`unity-pixel-art`) for loose PNGs |
+
+```ts
+import {exportGLB, type GeometryData, type TextureData} from 'margoengine/exporters';
+import {createUnrealPixelArtScript} from 'margoengine/exporters/unreal-pixel-art';
+import {createUnityPixelArtPostprocessor} from 'margoengine/exporters/unity-pixel-art';
+
+declare const geometry: GeometryData, pixels: TextureData;
+const tiles = exportGLB({nodes: [{geometry, material: {baseColorTexture: pixels}}]}, {pixelArt: {mipmaps: 'nearest'}});
+// Unreal: run after the Interchange import, then call apply_pixel_art("/Game/Tiles").
+const unrealPython = createUnrealPixelArtScript({mipmaps: 'nearest'});
+// Unity: save as Assets/Editor/PixelArtTextures.cs; textures imported under Assets/Tiles get the settings.
+const unityCSharp = createUnityPixelArtPostprocessor({folder: 'Assets/Tiles'});
+```
+
+The Unreal script sets the "2D Pixels (unfiltered)" texture group, `TF_NEAREST`, `TMGS_NO_MIPMAPS` (or
+`TMGS_SIMPLE_AVERAGE` for nearest mips), uncompressed `TC_EDITOR_ICON` storage and `TLCA_NONE`, reads each setting
+back and saves; the Unity postprocessor sets Point filtering, the mip policy, no compression, no mip streaming and no
+power-of-two rescale, and leaves wrap as imported.
+
 ## Rich data scenes: multi-material meshes, extras, PBR textures and lightmaps
 
 Plain data scenes carry what a voxel or game-asset pipeline writes into a standard glTF, all checked by the Khronos
