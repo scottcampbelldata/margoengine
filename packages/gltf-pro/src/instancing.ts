@@ -27,7 +27,10 @@ export class PBRInstances {
   private source?: PBRInstances;
   private gpu?: GPUBuffer;
   private device?: GPUDevice;
-  private flipped = false;
+  // 1 per mirrored row (negative determinant) and how many drawn rows are mirrored, kept per setMatrixAt; a full scan
+  // runs only after `count` changes or direct `data` writes (stale).
+  private flips?: Uint8Array;
+  private flipCount = 0;
   readonly capacity: number;
   constructor(capacity: number) {
     this.capacity = capacity;
@@ -76,14 +79,34 @@ export class PBRInstances {
       return this;
     }
     const o = this.index(i) + at;
-    for (let k = 0; k < n; k++)
-      if (!Number.isFinite(Math.fround(values[k])) || values[k] < min) throw new RangeError('Invalid instance value');
+    // One test for the row: a NaN or infinite float32 value makes the sum non-finite, and n finite float32 values cannot
+    // overflow a double. Values that are not numbers (strings) are rejected for plain arrays; typed arrays hold numbers.
+    let sum = 0;
+    for (let k = 0; k < n; k++) sum += Math.fround(values[k]);
+    if (!Number.isFinite(sum)) throw new RangeError('Invalid instance value: pass finite float32 numbers');
+    if (min > -Infinity || !ArrayBuffer.isView(values))
+      for (let k = 0; k < n; k++)
+        if (typeof values[k] !== 'number' || values[k] < min)
+          throw new RangeError('Invalid instance value: pass finite float32 numbers (tints 0 or more)');
     for (let k = 0; k < n; k++) this.data[o + k] = values[k];
-    this.low = Math.min(this.low, i);
-    this.high = Math.max(this.high, i + 1);
-    this.stale = true;
+    if (i < this.low) this.low = i;
+    if (i >= this.high) this.high = i + 1;
+    if (at === 0 && !this.stale) {
+      const flip = +(this.determinant(o) < 0),
+        flips = this.flips!;
+      if (i < this.drawn) this.flipCount += flip - flips[i];
+      flips[i] = flip;
+    }
     this.revision++;
     return this;
+  }
+  private determinant(o: number): number {
+    const d = this.data;
+    return (
+      d[o] * (d[o + 5] * d[o + 10] - d[o + 6] * d[o + 9]) -
+      d[o + 4] * (d[o + 1] * d[o + 10] - d[o + 2] * d[o + 9]) +
+      d[o + 8] * (d[o + 1] * d[o + 6] - d[o + 2] * d[o + 5])
+    );
   }
   /** Column-major 4x4 (`Matrix4.elements` from @margoengine/math, `camera.matrix` layout); the last row must be 0, 0, 0, 1. */
   setMatrixAt(i: number, m: ArrayLike<number>): this {
@@ -114,7 +137,7 @@ export class PBRInstances {
   get mirrored(): boolean {
     if (this.source) return this.source.mirrored;
     this.scan();
-    return this.flipped;
+    return this.flipCount > 0;
   }
   /** @internal The vertex buffer for `device` with pending rows uploaded (gltf-pro, shadows and staging call it before drawing). */
   upload(device: GPUDevice): GPUBuffer {
@@ -161,14 +184,13 @@ export class PBRInstances {
   }
   private scan(): void {
     if (!this.stale) return;
-    const d = this.data;
-    this.stale = this.flipped = false;
-    for (let o = 0; o < this.drawn * 24 && !this.flipped; o += 24)
-      this.flipped =
-        d[o] * (d[o + 5] * d[o + 10] - d[o + 6] * d[o + 9]) -
-          d[o + 4] * (d[o + 1] * d[o + 10] - d[o + 2] * d[o + 9]) +
-          d[o + 8] * (d[o + 1] * d[o + 6] - d[o + 2] * d[o + 5]) <
-        0;
+    const flips = (this.flips ??= new Uint8Array(this.capacity));
+    this.stale = false;
+    this.flipCount = 0;
+    for (let i = 0; i < this.capacity; i++) {
+      flips[i] = +(this.determinant(i * 24) < 0);
+      if (i < this.drawn) this.flipCount += flips[i];
+    }
   }
   /** Frees the GPU buffer; the next draw uploads everything again. */
   dispose(): void {

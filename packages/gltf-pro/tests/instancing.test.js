@@ -320,3 +320,41 @@ test('texture binding limit: over the device limit, the draw throws naming the m
   ibl.dispose();
   engine.dispose();
 });
+
+test('instance rows reject non-finite, out-of-float32 and non-number values with one check per row', () => {
+  const inst = new PBRInstances(2),
+    m = (k, v) => Object.assign([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], { [k]: v });
+  for (const bad of [NaN, Infinity, -Infinity, 3.5e38]) assert.throws(() => inst.setMatrixAt(0, m(12, bad)), /value/);
+  assert.throws(() => inst.setMatrixAt(0, m(13, '1')), /value/);
+  assert.throws(() => inst.setColorAt(0, [1, -0.5, 1]), /value/);
+  assert.deepEqual(
+    [...inst.getMatrixAt(0)],
+    [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+    'a rejected row is not written',
+  );
+  inst.setMatrixAt(1, new Float64Array(m(12, 3.4e38)));
+  inst.setMatrixAt(1, Float32Array.from(m(14, -2)));
+  assert.equal(inst.getMatrixAt(1)[14], -2);
+});
+
+test('mirrored follows each setMatrixAt, count and direct data writes without rescanning every row per frame', () => {
+  const inst = new PBRInstances(4),
+    flip = [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+    plain = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+  assert.equal(inst.mirrored, false);
+  inst.setMatrixAt(3, flip);
+  assert.equal(inst.mirrored, true);
+  inst.count = 3;
+  assert.equal(inst.mirrored, false, 'a mirrored row past count is not drawn');
+  inst.setMatrixAt(1, flip);
+  assert.equal(inst.mirrored, true);
+  inst.setMatrixAt(1, plain);
+  assert.equal(inst.mirrored, false);
+  inst.count = 4;
+  assert.equal(inst.mirrored, true, 'row 3 is drawn again');
+  inst.data.set(plain, 3 * 24);
+  inst.needsUpdate = true;
+  assert.equal(inst.mirrored, false, 'direct writes rescan');
+  inst.setColorAt(2, [1, 1, 1]);
+  assert.equal(inst.mirrored, false);
+});
