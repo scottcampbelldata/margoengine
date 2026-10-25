@@ -138,7 +138,7 @@ export type Engine = EngineKernel;
 /**
  * Engine factory. `Engine.create(canvas, options)` resolves to an engine using WebGPU, or `options.fallback` when WebGPU
  * is unavailable or `backend` is 'webgl2'. Rejects with TypeError for a missing canvas or unknown backend, and with
- * Error 'WebGPU unavailable' when no renderer can be made.
+ * Error 'WebGPU unavailable' when no renderer can be made, or one naming the missing 'fallback' for backend 'webgl2'.
  */
 export const Engine: { create(canvas: HTMLCanvasElement, options?: EngineOptions): Promise<EngineKernel> } =
   Runtime as unknown as typeof Engine;

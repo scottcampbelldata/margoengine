@@ -10,7 +10,7 @@ test('core uses the WebGL fallback only when an app passes it', async () => {
   try {
     const canvas = { width: 4, height: 4, clientWidth: 4, clientHeight: 4, getContext: () => null };
     await assert.rejects(Engine.create(canvas, { backend: 'auto' }), /WebGPU unavailable|adapter unavailable/);
-    await assert.rejects(Engine.create(canvas, { backend: 'webgl2' }), /WebGPU unavailable/);
+    await assert.rejects(Engine.create(canvas, { backend: 'webgl2' }), /webgl2 needs fallback: webglRenderer/);
     const fallback = (target) => {
       calls.push(target);
       return { backend: 'webgl2', add() {}, remove() {}, render() {}, dispose() {} };

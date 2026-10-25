@@ -462,7 +462,11 @@ export class Engine {
       renderer ??= (
         options.fallback ??
         (() => {
-          throw fault('unsupported', 'WebGPU unavailable', 'webgpu');
+          throw fault(
+            'unsupported',
+            backend === 'webgl2' ? 'webgl2 needs fallback: webglRenderer' : 'WebGPU unavailable',
+            'webgpu',
+          );
         })
       )(canvas);
       const engine = new Engine(canvas, store, renderer, options.camera, fallbackReason);
