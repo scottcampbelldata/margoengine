@@ -4,7 +4,7 @@
 
 ```ts
 import { ArcballControls, ArcballProjection, ControlEvent, MapControls, NavigationProfile, OrbitControls, PROFILES, PointerLockControls, TransformControls, TransformControlsOptions } from "@margoengine/controls";
-import { EngineKernel, EngineOptions, FrameCallback, Geometry, Mesh, Vec3 } from "@margoengine/core";
+import { Camera, EngineKernel, EngineOptions, FrameCallback, Geometry, Mesh, RenderView, Vec3 } from "@margoengine/core";
 import { DOF, DOFOptions } from "@margoengine/dof";
 import { SectionOptions, SectionPlanes } from "@margoengine/machinery";
 import { Material, MeshGeometry, TransmissionOptions } from "@margoengine/materials";
@@ -307,6 +307,7 @@ export interface MeshProps extends PointerHandlers {
     scale?: Vec3;
     castShadow?: boolean;
     receiveShadow?: boolean;
+    layers?: number;
     children?: ReactNode;
 }
 
@@ -403,6 +404,21 @@ export interface PointerLockProps extends ErrorProps {
 
 export type ProfileName = keyof typeof PROFILES;
 
+export function RenderView({ camera, viewport, pixels, scissor, clear, layers, scene, target, id, order }: RenderViewProps): null;
+
+export interface RenderViewProps {
+    camera?: Camera;
+    viewport?: readonly [number, number, number, number];
+    pixels?: boolean;
+    scissor?: readonly [number, number, number, number];
+    clear?: CoreView['clear'];
+    layers?: number;
+    scene?: string;
+    target?: CoreView['target'];
+    id?: string;
+    order?: number;
+}
+
 export function SMAA({ onReady, onError, ...options }: SMAAProps): null;
 
 export interface SMAAProps extends SMAAOptions, Callbacks<SMAAEffect> {
@@ -421,6 +437,14 @@ export interface SSGIProps extends SSGIOptions, Callbacks<SSGIEffect> {
 export function SSR({ onReady, onError, ...options }: SSRProps): null;
 
 export interface SSRProps extends SSROptions, Callbacks<SSREffect> {
+}
+
+export function Scene({ name, background, children }: SceneProps): import("react").JSX.Element | null;
+
+export interface SceneProps {
+    name: string;
+    background?: string | null;
+    children?: ReactNode;
 }
 
 export const SceneTargets: import("react").ForwardRefExoticComponent<SceneTargetsProps & import("react").RefAttributes<TargetsPlugin>>;

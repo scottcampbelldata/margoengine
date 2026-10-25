@@ -42,6 +42,7 @@ import {
   one,
   useCommit,
   useResourceEffect,
+  createViews,
   type Scene,
   type Registry,
   type Resources,
@@ -114,6 +115,7 @@ export function MargoCanvas({
   frames.mode = frameloop;
   const assetCache = useMemo(() => createAssetCache(engine as unknown as EngineKernel | null), [engine]);
   const resources = useMemo<Resources>(() => ({ models: new Set(), lighting: new Map() }), [engine]);
+  const views = useMemo(() => (engine ? createViews(engine) : null), [engine]);
   useEffect(() => {
     if (engine) activateAssetCache(assetCache);
     return () => disposeAssetCache(assetCache);
@@ -396,9 +398,22 @@ export function MargoCanvas({
             pointerHandlers,
             frames,
             assetCache,
+            world: null,
+            views: views!,
           }
         : null,
-    [engine, resources, enableShadows, shadow, requestShadows, cameraOverrides, pointerHandlers, frames, assetCache],
+    [
+      engine,
+      resources,
+      enableShadows,
+      shadow,
+      requestShadows,
+      cameraOverrides,
+      pointerHandlers,
+      frames,
+      assetCache,
+      views,
+    ],
   );
   const value = useMemo<MargoContextValue>(
     () => ({
@@ -487,6 +502,11 @@ export interface MeshProps extends PointerHandlers {
   castShadow?: boolean;
   /** Darken where shadows fall. Default true. */
   receiveShadow?: boolean;
+  /**
+   * Render-layer mask (`layerMask(...)` from `@margoengine/cameras/layers`): a `<RenderView layers>` draws only meshes
+   * sharing a bit with it. Default: the parent mesh's, else layer 1.
+   */
+  layers?: number;
   children?: ReactNode;
 }
 export const Mesh = forwardRef<MeshRef, MeshProps>(function Mesh(
@@ -496,6 +516,7 @@ export const Mesh = forwardRef<MeshRef, MeshProps>(function Mesh(
     scale = one,
     castShadow = false,
     receiveShadow = true,
+    layers,
     children,
     onClick,
     onPointerOver,
@@ -504,7 +525,7 @@ export const Mesh = forwardRef<MeshRef, MeshProps>(function Mesh(
   ref,
 ) {
   const parentScene = useScene(),
-    { engine, registry: parent, pointerHandlers } = parentScene;
+    { engine, registry: parent, pointerHandlers, world } = parentScene;
   const [node, setNode] = useState<EngineMesh | null>(null);
   const registry = useMemo<Registry>(
     () => ({
@@ -524,7 +545,8 @@ export const Mesh = forwardRef<MeshRef, MeshProps>(function Mesh(
     [engine],
   );
   useCommit(() => {
-    const mesh = engine.createMesh();
+    // In the enclosing <Scene>'s engine scene, else the default one.
+    const mesh = (world ?? engine).createMesh() as EngineMesh;
     registry.current = mesh;
     try {
       parent?.register(mesh);
@@ -542,7 +564,7 @@ export const Mesh = forwardRef<MeshRef, MeshProps>(function Mesh(
       registry.current = null;
       mesh.dispose();
     };
-  }, [engine, parent, registry]);
+  }, [engine, world, parent, registry]);
   useCommit(() => {
     const mesh = registry.current;
     if (!mesh || !(onClick || onPointerOver || onPointerOut)) return;
@@ -572,6 +594,26 @@ export const Mesh = forwardRef<MeshRef, MeshProps>(function Mesh(
     scale[1],
     scale[2],
   ]);
+  // Layers load @margoengine/cameras/layers only when a mesh uses them. Removing the prop sets layer 1, the default
+  // of a mesh with no ancestor mask (the layers registry has no "unset").
+  const layered = useRef(false);
+  useEffect(() => {
+    const mesh = registry.current;
+    if (!mesh || (layers === undefined && !layered.current)) return;
+    let active = true;
+    optionalPeer('@margoengine/cameras', () => import('@margoengine/cameras/layers'))
+      .then(({ setRenderLayers }) => {
+        if (!active || live(registry) !== mesh) return;
+        setRenderLayers(mesh as unknown as MeshHandle, layers ?? 1);
+        layered.current = layers !== undefined;
+      })
+      .catch((error) => {
+        if (active && !engine.disposed) engine.onError(error);
+      });
+    return () => {
+      active = false;
+    };
+  }, [registry, node, layers, engine]);
   // The live mesh, not the `node` state: effects that recreate the mesh without a render (StrictMode's replay, a
   // Suspense boundary revealing again) would otherwise hand the ref the disposed one until the next render, and a
   // useFrame callback writing to it throws "Mesh disposed". This runs after the creation effect above.

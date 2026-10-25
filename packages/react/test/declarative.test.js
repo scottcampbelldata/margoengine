@@ -79,6 +79,26 @@ mock.module('@margoengine/core/extension', {
           createMesh() {
             return mesh(this);
           },
+          // Core's scenes: their meshes live in the engine-wide map, each knowing its scene.
+          scenes: [],
+          createScene(name) {
+            const engine = this,
+              scene = {
+                name,
+                disposed: false,
+                createMesh() {
+                  const node = mesh(engine);
+                  node.scene = scene;
+                  return node;
+                },
+                dispose() {
+                  scene.disposed = true;
+                  for (const node of [...engine.meshes.values()]) if (node.scene === scene) node.dispose();
+                },
+              };
+            this.scenes.push(scene);
+            return scene;
+          },
           start() {
             this.started = true;
           },
@@ -337,6 +357,13 @@ mock.module('@margoengine/controls', {
     PROFILES: profiles,
   },
 });
+mock.module('@margoengine/cameras/layers', {
+  namedExports: {
+    setRenderLayers(node, mask) {
+      node.layers = mask;
+    },
+  },
+});
 mock.module('@margoengine/shadows', {
   namedExports: {
     Shadows: class {
@@ -394,6 +421,8 @@ const {
   useCamera,
   useLoader,
   useProgress,
+  Scene,
+  RenderView,
 } = await import('../dist/index.js');
 test('SSR skips all optional resources and hooks reject missing canvas providers', () => {
   const result = renderToString(
@@ -950,4 +979,62 @@ test('useLoader suspends, shares one load per URL, counts fetches in useProgress
   } finally {
     globalThis.fetch = saved;
   }
+});
+
+test('Scene creates its meshes in its own engine scene and View lists the Canvas views in order', async () => {
+  const errors = [],
+    overlay = { name: 'overlay camera' };
+  const children = (hud) => [
+    React.createElement(RenderView, { key: 'main' }),
+    React.createElement(RenderView, {
+      key: 'hud',
+      order: 1,
+      scene: 'hud',
+      camera: overlay,
+      viewport: [0.7, 0, 0.3, 0.3],
+      clear: { color: false },
+      layers: 2,
+    }),
+    hud &&
+      React.createElement(
+        Scene,
+        { key: 'scene', name: 'hud', background: null },
+        React.createElement(Mesh, { position: [1, 0, 0] }),
+      ),
+    React.createElement(Mesh, { key: 'world' }),
+  ];
+  const view = render(tree(children(true), { onError: (error) => errors.push(error) }));
+  await flush();
+  const engine = engines.at(-1),
+    [hud] = engine.scenes.filter((scene) => !scene.disposed),
+    nodes = [...engine.meshes.values()];
+  assert.equal(hud.name, 'hud');
+  assert.equal(hud.background, null);
+  assert.equal(nodes.filter((node) => node.scene === hud).length, 1, 'the Scene child is created in the hud scene');
+  assert.equal(nodes.filter((node) => !node.scene).length, 1, 'the other mesh stays in the default scene');
+  assert.equal(engine.views.length, 2);
+  assert.equal(engine.views[0].camera, engine.camera, 'a View without camera keeps the main camera');
+  assert.deepEqual(engine.views[0].viewport, [0, 0, 1, 1]);
+  assert.equal(engine.views[1].camera, overlay);
+  assert.equal(engine.views[1].scene, hud);
+  assert.deepEqual(engine.views[1].clear, { color: false });
+  assert.equal(engine.views[1].layers, 2);
+  view.rerender(tree(children(false), { onError: (error) => errors.push(error) }));
+  await flush();
+  assert.equal(hud.disposed, true, 'unmounting the Scene disposes it and its meshes');
+  assert.equal(engine.views.length, 1, 'a View naming a missing scene is left out');
+  assert.match(String(errors.at(-1)), /names no <Scene name="hud">/);
+  view.rerender(tree([], { onError: (error) => errors.push(error) }));
+  await flush();
+  assert.equal(engine.views, undefined, 'no View: the engine draws its full-canvas camera view again');
+});
+
+test('Mesh layers set the render-layer mask, and removing the prop sets layer 1', async () => {
+  const view = render(tree(React.createElement(Mesh, { layers: 6 })));
+  await flush();
+  const [node] = engines.at(-1).meshes.values();
+  assert.equal(node.layers, 6);
+  view.rerender(tree(React.createElement(Mesh, {})));
+  await flush();
+  assert.equal(node.layers, 1);
 });

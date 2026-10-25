@@ -49,6 +49,42 @@ export interface Scene {
   pointerHandlers: Map<number, PointerHandlers>;
   frames: Frames;
   assetCache: AssetCache;
+  /** The engine scene meshes are created in: a `<Scene>`'s, or null for the default scene. */
+  world: World | null;
+  /** The Canvas's `<RenderView>`s and named `<Scene>`s. */
+  views: Views;
+}
+/** Core's scene (meshes, lighting, plugins drawn together); `engine.scene` is the default one. */
+export type World = Engine['scene'];
+type View = NonNullable<Engine['views']>[number];
+/** The `<RenderView>`s of one Canvas, written to `engine.views` in `order`, then mount order. */
+export interface Views {
+  /** A null view is waiting for the <Scene> it names. */
+  entries: Map<object, { order: number; serial: number; view: View | null }>;
+  scenes: Map<string, World>;
+  serial: number;
+  /** Writes the current views to the engine (none: the engine's full-canvas camera view). */
+  update(): void;
+  /** Bumps when a named scene appears or goes, so views naming it look it up again. */
+  revision: number;
+  listeners: Set<() => void>;
+}
+export function createViews(engine: Engine): Views {
+  const views: Views = {
+    entries: new Map(),
+    scenes: new Map(),
+    serial: 0,
+    revision: 0,
+    listeners: new Set(),
+    update() {
+      if (engine.disposed) return;
+      const list = [...views.entries.values()]
+        .filter((entry) => entry.view)
+        .sort((a, b) => a.order - b.order || a.serial - b.serial);
+      engine.views = list.length ? list.map((entry) => entry.view!) : undefined;
+    },
+  };
+  return views;
 }
 export const Context = createContext<Scene | null>(null);
 export function useScene(): Scene {

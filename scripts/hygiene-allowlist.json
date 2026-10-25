@@ -287,6 +287,20 @@
         "react"
       ],
       "reason": "One thing, two forms: @margoengine/machinery's SectionPlanes plugin and @margoengine/react's <SectionPlanes> JSX component that attaches it with the same options. Decision in docs/conventions.md."
+    },
+    "Scene": {
+      "packages": [
+        "core",
+        "react"
+      ],
+      "reason": "One thing, two forms: @margoengine/core's Scene and @margoengine/react's <Scene> JSX component that creates one for its child meshes. Decision in docs/conventions.md."
+    },
+    "RenderView": {
+      "packages": [
+        "core",
+        "react"
+      ],
+      "reason": "One thing, two forms: @margoengine/core's RenderView and @margoengine/react's <RenderView> JSX component that adds one to engine.views. Decision in docs/conventions.md."
     }
   }
 }

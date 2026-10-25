@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3134840,
+  "total": 3135642,
   "history": [
     {
       "date": "2026-10-24",
@@ -127,6 +127,12 @@
       "date": "2026-10-25",
       "commit": "e542c8f5",
       "reason": "React stage 2b (item 17): BatchedMesh/BatchedItem, DepthTexture, SceneTargets and SectionPlanes components on the root (their engine packages load lazily)",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-25",
+      "commit": "e166a074",
+      "reason": "React stage 2b (item 17): <Scene>, <RenderView> and Mesh layers for multi-view (layers load lazily)",
       "grew": 1
     }
   ],
@@ -340,7 +346,7 @@
     "@margoengine/procedural/voronoi": 5026,
     "@margoengine/quality": 1879,
     "@margoengine/quality/warm": 1536,
-    "@margoengine/react": 21500,
+    "@margoengine/react": 22302,
     "@margoengine/react/kit": 10785,
     "@margoengine/react/physics": 5204,
     "@margoengine/react/post": 3770,

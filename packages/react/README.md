@@ -171,6 +171,28 @@ export function Crates({ count }: { count: number }) {
 }
 ```
 
+`<RenderView>` draws the Canvas through a camera into part of it (split screen, a four-view CAD layout, a minimap) or into a texture: `camera` (a core `Camera`; default the Canvas camera), `viewport` (fractions from the top left), `scissor`, `clear`, `layers`, `target`, `id` and `order`. With one or more views the Canvas draws only those; picking follows the view under the pointer. `<Scene name>` holds meshes drawn only by the views that name it (`<RenderView scene="hud">`), such as a HUD overlay or an item preview; `background={null}` keeps what is below. `<Mesh layers={mask}>` (a `layerMask(...)` from `@margoengine/cameras/layers`) limits which views draw a mesh. Views and scenes work on WebGPU and WebGL2.
+
+```tsx
+import { Camera } from '@margoengine/core';
+import { Canvas, RenderView, Scene, Box } from '@margoengine/react';
+
+const top = new Camera({ position: [0, 20, 0.01], target: [0, 0, 0] });
+export function SplitScreen() {
+  return (
+    <Canvas>
+      <RenderView viewport={[0, 0, 0.5, 1]} />
+      <RenderView viewport={[0.5, 0, 0.5, 1]} camera={top} />
+      <RenderView viewport={[0.75, 0.75, 0.25, 0.25]} scene="hud" order={1} clear={{ color: false }} />
+      <Box castShadow />
+      <Scene name="hud" background={null}>
+        <Box color="#e45630" />
+      </Scene>
+    </Canvas>
+  );
+}
+```
+
 `useFrame((engine, deltaSeconds) => ...)` updates meshes without React renders or re-subscribing when the callback changes. The canvas serializes initialization, disposes superseded engines, and disconnects ResizeObserver during cleanup. It handles StrictMode, HMR effect replacement, late initialization after unmount, and `capacity`/`backend` changes. Camera changes update the existing engine. Errors reach `onError` and an accessible alert.
 
 SSR emits an accessible canvas without accessing GPU APIs. The ESM output preserves `use client` and includes TypeScript declarations. Peer ranges accept the current core 0.1.x workspace and the requested core 1.x release, plus React 18/19.

@@ -77,6 +77,7 @@ interface MeshProps extends PointerHandlers {
     scale?: Vec3;
     castShadow?: boolean;
     receiveShadow?: boolean;
+    layers?: number;
     children?: ReactNode;
 }
 
