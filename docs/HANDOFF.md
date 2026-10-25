@@ -2,6 +2,21 @@
 
 Last updated 2026-10-25. Read this first when starting a new session. Update it whenever work lands.
 
+## Landed 2026-10-25: every package GPU test in check:merge (`npm run check:gpu-packages`)
+
+`scripts/gpu-package-tests.mjs` builds once, then runs every package `test:*browser*` / `test:*gpu*` script and the
+root browser suites (modern, XR, USDZ, postfx, modules, catalog) under one GPU lock hold; `check:merge` runs it. It
+finds package scripts by name and fails before running anything when a file under `packages/*/{test,tests,scripts}`
+drives a browser but no script runs it, when a root browser/GPU script is in no check, or when a test takes
+`gpu.lock` by hand. Twenty-three unrun GPU tests got package scripts (cameras, lod, machinery, materials, shader,
+sky, staging, vfx, viewcube, voxel, voxel-pathtracer, post, terrain, exporters png/capture, gltf-pro shader review).
+Failures found on main and fixed in the tests: labels and text asked core for WebGL2 without `fallback:
+webglRenderer`; creative expected 4x MSAA and DPR 2 from the light tier and the phone tier (now 1x and DPR 1);
+selection expected a rejected overlapping pick (core queues it since 59e32ef7); staging took the lock by hand and
+deadlocked inside any holder; voxel's bevel check lit metal in a world with no sky light (README: no light bytes, no
+sun) and sampled a cleared lightmap before its pipelines were rebuilt; gltf-pro's shader review asked
+`getCompilationInfo()` on an idle device, which Chromium leaves pending.
+
 ## Landed 2026-10-25: provenance sweep and IGES reader
 
 Provenance sweep: FXAA rebuilt from Lottes' FXAA whitepaper (`post/fxaa`); the transmission blur footprint now comes
@@ -3201,7 +3216,7 @@ From package descriptions, not yet audited against code:
 Apps call `applyQualityTier()` before creating an engine and `watchQuality()` once rendering. Rule from Scott:
 engine behaviour belongs in packages, never only in demo code.
 
-- Phones (user agent `Mobi|Android`): 1x MSAA, DPR up to 2, phone scene settings. Unchanged.
+- Phones (user agent `Mobi|Android`): 1x MSAA, DPR 1 (since 5ec83b52), phone scene settings.
 - Desktops start on the light tier (1x MSAA, DPR 1, capped at ~60 FPS) unless `localStorage.margoQuality` is
   `'high'`. While light, the watcher times submit-to-`onSubmittedWorkDone` for 120 submissions after a 2 s warm-up;
   90th percentile under `FAST_GPU_MS` (5 ms) stores `'high'` for the next page load, else `'low'`. No reload.

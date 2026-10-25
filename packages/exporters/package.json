@@ -27,7 +27,9 @@
     "build": "node scripts/build.js",
     "test": "npm run build && node --test tests/exporters.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:png:browser": "cd ../.. && node packages/exporters/tests/png-browser.mjs",
+    "test:capture:browser": "cd ../.. && node packages/exporters/tests/capture-browser.mjs"
   },
   "sideEffects": false,
   "exports": {

@@ -49,6 +49,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js voxel-pathtracer",
     "test": "npm run build && node --test tests/*.test.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:gpu": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs"
   }
 }

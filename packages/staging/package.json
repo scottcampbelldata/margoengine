@@ -41,6 +41,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js staging",
     "test": "npm run build && node --test test/*.test.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:gpu": "cd ../.. && node packages/staging/test/browser-check.mjs --no-record"
   }
 }

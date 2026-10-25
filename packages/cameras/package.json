@@ -49,6 +49,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js cameras",
     "test": "npm run build && node --test test/*.test.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:gpu": "cd ../.. && node packages/cameras/test/browser-check.mjs"
   }
 }

@@ -67,6 +67,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js shader",
     "test": "npm run build && node --test test/*.test.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:gpu": "cd ../.. && node packages/shader/test/browser-check.mjs && node packages/shader/test/noise-check.mjs && node packages/shader/test/readback-check.mjs"
   }
 }

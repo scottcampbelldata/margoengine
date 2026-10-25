@@ -307,7 +307,7 @@ Run `npm run build:packages`, `npm run modern:test:react`, `npm run typecheck`,
 `npm run test:modules:packages`, and `npm run measure:size` from the workspace.
 `npm run test:browser --workspace @margoengine/react` exercises the scene
 components with real WebGPU and Rapier.
-`npm run test:after-scene --workspace @margoengine/react` checks lit shape colors, transmission, animated picking and
+`npm run test:after-scene:browser --workspace @margoengine/react` checks lit shape colors, transmission, animated picking and
 crossfades on WebGPU. Unit tests cover StrictMode, Suspense,
 optional imports, source ownership, parent transforms, post limits and mocked
 XR sessions. Packaging tests exercise strict public subpath consumers and prove

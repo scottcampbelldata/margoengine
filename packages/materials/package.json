@@ -26,7 +26,8 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js materials",
     "test": "npm run build && node --test tests/*.test.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:gpu": "cd ../.. && node packages/materials/test/browser-check.mjs"
   },
   "sideEffects": false,
   "exports": {
