@@ -32,6 +32,60 @@ export class Enum {
     constructor(name: string);
 }
 
+export interface IGESConversion {
+    readonly step: string;
+    readonly global: IGESGlobal;
+    readonly unit: number;
+    readonly counts: {
+        readonly solids: number;
+        readonly shells: number;
+        readonly faces: number;
+    };
+    readonly warnings: readonly string[];
+}
+
+export interface IGESEntity {
+    readonly de: number;
+    readonly type: number;
+    readonly form: number;
+    readonly transform: number;
+    readonly color: number;
+    readonly level: number;
+    readonly blanked: boolean;
+    readonly subordinate: number;
+    readonly use: number;
+    readonly label: string;
+    readonly subscript: number;
+    readonly params: readonly IGESValue[];
+}
+
+export interface IGESFile {
+    readonly start: string;
+    readonly global: IGESGlobal;
+    readonly entities: ReadonlyMap<number, IGESEntity>;
+}
+
+export interface IGESGlobal {
+    readonly parameterDelimiter: string;
+    readonly recordDelimiter: string;
+    readonly sender: string;
+    readonly fileName: string;
+    readonly system: string;
+    readonly preprocessor: string;
+    readonly modelScale: number;
+    readonly unitsFlag: number;
+    readonly unitsName: string;
+    readonly millimetres: number;
+    readonly resolution: number;
+    readonly maxCoordinate: number;
+    readonly author: string;
+    readonly organization: string;
+    readonly version: number;
+    readonly fields: readonly IGESValue[];
+}
+
+export type IGESValue = number | string | null;
+
 export interface JTAttribute {
     readonly id: number;
     readonly type: string;
@@ -308,6 +362,10 @@ export interface XTOptions {
 
 export type XTValue = number | null | string | boolean | readonly number[] | readonly XTValue[];
 
+export function igesToSTEP(input: string | ArrayBuffer | ArrayBufferView): IGESConversion;
+
+export function isIGES(input: string | ArrayBuffer | ArrayBufferView): boolean;
+
 export namespace model {
     export class Body {
         name: Name;
@@ -574,6 +632,8 @@ export namespace model {
 
 export function orient3d(a: readonly number[], b: readonly number[], c: readonly number[], d: readonly number[]): number;
 
+export function parseIGES(input: string | ArrayBuffer | ArrayBufferView, options?: STEPOptions): STEPModel;
+
 export function parseJT(input: ArrayBuffer | ArrayBufferView, options?: JTOptions): JTModel;
 
 export function parseSAT(input: string | ArrayBuffer | ArrayBufferView, options?: STEPOptions): STEPModel;
@@ -581,6 +641,8 @@ export function parseSAT(input: string | ArrayBuffer | ArrayBufferView, options?
 export function parseSTEP(input: string | ArrayBuffer | ArrayBufferView, options?: STEPOptions): STEPModel;
 
 export function parseXT(input: string | ArrayBuffer | ArrayBufferView, options?: STEPOptions): STEPModel;
+
+export function readIGES(input: string | ArrayBuffer | ArrayBufferView): IGESFile;
 
 export function readStructure(file: STEPFile, { maxInstances }?: STEPStructureOptions): STEPStructure;
 
