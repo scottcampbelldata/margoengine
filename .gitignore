@@ -27,3 +27,6 @@ Thumbs.db
 *.swp
 # npm run bench writes every run here; --record and --baseline keep committed copies in benchmarks/records and benchmarks/baselines.
 benchmarks/runs/
+# Built by python/build-frontend.mjs (the Python package's browser bundles).
+python/margoengine/labextension/
+python/margoengine/static/
